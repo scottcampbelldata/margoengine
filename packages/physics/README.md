@@ -7829,11 +7829,13 @@ a layout-1 f64 mesh field and copies live positions, velocities and triangle ind
 local second Piola–Kirchhoff stress and plastic state. `readBudget` gives the work and energy
 ledger in joules. Omit `hardeningModulus` for ideal plasticity.
 
+Choose `threads: 1` (the default), `2` or `4` on the shell loader. The multi-participant route uses a shared world in Node or a cross-origin-isolated browser worker. `readNativeWork()` reports the previous accepted step by participant. Use `using` to release native helpers after the world finishes. Malformed rigid input gives a [coded error](https://margoengine.com/errors#ductile-crush) and preserves the last accepted damage and impulses.
+
 ```ts
 import { CrushShellSolver } from '@margoengine/physics/crush';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const shell = await CrushShellSolver.load();
+using shell = await CrushShellSolver.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, 0, 0] });
 world.add(shell, {
   positions: [[0, 0, 0], [1, 0, 0], [0, 1, 0]],
@@ -8066,7 +8068,7 @@ if (!dent.fractured || crush.read(0).sealLoss !== 1)
   throw new Error('Expected the native plate contact to open the seal and retain its dent');
 ```
 
-`CrushSolver` couples a list of known contact patches to a `RigidSolver`, including fixed barriers. Use body-local anchors for moving patches. Fix a barrier in the zero cell or give its cell and set `cellSize`. Match `bodyCapacity` to the rigid port and register both solvers in a `staggered` group. Use collision groups to filter the contact pair handled by the crush patch. The README fixtures use sensor-only colliders for bodies whose entire collision response belongs to the patch. The normal and point impulses are equal and opposite on moving pairs. A patch that stays compressed after
+`CrushSolver` couples a list of known contact patches to a `RigidSolver`, including fixed barriers. Use body-local anchors for moving patches. Fix a barrier in the zero cell or give its cell and set `cellSize`. Match `bodyCapacity` to the rigid port and register both solvers in a `staggered` group. Filter only the contact pair whose normal response belongs to the crush patch. A dedicated rig can use a sensor-only collider when the patch handles every contact. Keep other rigid contacts enabled in a mixed scene. The normal and point impulses are equal and opposite on moving pairs. A patch that stays compressed after
 impact continues to support load. It uses its `backingStiffness` and critical damping of the effective
 normal mass. This contact carries reciprocal impulses without creating a new material event. The durable
 damage fields record the prior material event and accumulated crush work. The descriptor `damageField` publishes layout-1 f64 rows in input order. Each row contains permanent stroke (m), cumulative absorbed work (J), last peak stroke (m), force (N), impulse (N s), elastic work (J), seal loss (0–1), and impact count. `read()` copies the corresponding typed record.

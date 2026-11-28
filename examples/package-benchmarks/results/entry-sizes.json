@@ -15674,8 +15674,8 @@
         "gzip": 14183
       },
       "./seakeeping": {
-        "raw": 146439,
-        "gzip": 53151
+        "raw": 146484,
+        "gzip": 53191
       },
       "./celestial": {
         "raw": 20227,
@@ -15686,8 +15686,8 @@
         "gzip": 10317
       },
       "./crush": {
-        "raw": 59905,
-        "gzip": 21351
+        "raw": 69020,
+        "gzip": 24368
       },
       "./legged": {
         "raw": 26980,
@@ -19386,14 +19386,14 @@
       "brotli": 10892
     },
     "packages/physics/dist/crush-shell-kernel.wasm": {
-      "raw": 19230,
-      "gzip": 8975,
-      "brotli": 7824
+      "raw": 24979,
+      "gzip": 11416,
+      "brotli": 9916
     },
     "packages/physics/dist/crush-shell-kernel-shared.wasm": {
-      "raw": 19230,
-      "gzip": 8975,
-      "brotli": 7824
+      "raw": 24979,
+      "gzip": 11416,
+      "brotli": 9916
     },
     "packages/physics/dist/viscoplastic-kernel.wasm": {
       "raw": 36124,
@@ -20279,6 +20279,11 @@
       "raw": 32933,
       "gzip": 12726,
       "brotli": 11044
+    },
+    "packages/physics/dist/crush-shell-kernel-threaded.wasm": {
+      "raw": 25644,
+      "gzip": 11683,
+      "brotli": 10109
     }
   },
   "splits": {

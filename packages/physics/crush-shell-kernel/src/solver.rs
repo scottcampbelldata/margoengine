@@ -7,8 +7,16 @@ use crate::contact::{
 };
 use crate::material::{Hill, Plastic, Steel};
 use crate::math::sqrt;
-use crate::membrane::{Element, Vector, combine, cross, dot, membrane, sub};
+use crate::membrane::{Element, Membrane, Vector, combine, cross, dot, membrane, sub};
 use crate::pressure::{PanelPressure, pressure_forces};
+
+#[cfg(target_arch = "wasm32")]
+mod parallel;
+#[cfg(target_arch = "wasm32")]
+use parallel::FaceJob;
+
+#[cfg(not(target_arch = "wasm32"))]
+type FaceJob = core::ffi::c_void;
 
 #[derive(Clone, Copy)]
 #[repr(C)]
@@ -135,6 +143,7 @@ struct Workspace {
     face_state: *mut FaceState,
     seam_history: *mut History,
     forces: *mut Vector,
+    face_job: *mut FaceJob,
 }
 
 impl Shell {
@@ -152,7 +161,7 @@ impl Shell {
         true
     }
 
-    unsafe fn workspace(&self) -> Workspace {
+    unsafe fn workspace(&self, face_job: *mut FaceJob) -> Workspace {
         let positions = self.scratch.cast::<Vector>();
         // Layout in f64 words: three position, three velocity and three force words
         // per vertex, followed by 8 mutable words per face.
@@ -172,6 +181,7 @@ impl Shell {
             face_state,
             seam_history,
             forces,
+            face_job,
         }
     }
 }
@@ -190,7 +200,70 @@ unsafe fn add_forces<const N: usize>(data: *mut Vector, indices: [u32; N], force
     }
 }
 
+fn face_is_valid(points: [Vector; 3]) -> bool {
+    let normal = cross(sub(points[1], points[0]), sub(points[2], points[0]));
+    let area_squared = dot(normal, normal);
+    area_squared.is_finite() && area_squared > 0.0
+}
+
+unsafe fn panel_load(shell: &Shell, i: usize, points: [Vector; 3]) -> Option<[Vector; 3]> {
+    if shell.pressure.is_null() {
+        return None;
+    }
+    let pressure = unsafe { *shell.pressure.add(i) };
+    if pressure.air == 0.0 && (pressure.water_weight == 0.0 || pressure.inside == pressure.outside)
+    {
+        return None;
+    }
+    Some(pressure_forces(pressure, points))
+}
+
+fn update_face(state: &mut FaceState, result: &Membrane) -> bool {
+    let returned = result.result.state.equivalent > state.plastic.equivalent;
+    state.plastic = result.result.state;
+    state.stress = result.result.stress;
+    returned
+}
+
 impl Workspace {
+    unsafe fn face_forces(&self, shell: &Shell, budget: &mut Ledger, hill: Option<Hill>) -> bool {
+        #[cfg(all(target_arch = "wasm32", feature = "threaded"))]
+        if !self.face_job.is_null() && unsafe { (*self.face_job).parts } > 1 {
+            return unsafe { self.parallel_faces(shell, budget) };
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        let _ = self.face_job;
+        let mut returned = 0;
+        let mut loaded = 0;
+        for i in 0..shell.face_count as usize {
+            let face = unsafe { *shell.faces.add(i) };
+            let state = unsafe { &mut *self.face_state.add(i) };
+            let points = unsafe { load(self.positions, face.vertices) };
+            if !face_is_valid(points) {
+                return false;
+            }
+            let result = membrane(face.element, points, shell.steel, state.plastic, hill);
+            returned += u32::from(update_face(state, &result));
+            budget.membrane += face.element.volume * result.result.elastic;
+            budget.hardening += face.element.volume * result.result.hardened;
+            budget.plastic += face.element.volume * result.result.state.dissipated;
+            unsafe { add_forces(self.forces, face.vertices, result.forces) };
+            if let Some(forces) = unsafe { panel_load(shell, i, points) } {
+                loaded += 1;
+                unsafe { add_forces(self.forces, face.vertices, forces) };
+            }
+        }
+        #[cfg(target_arch = "wasm32")]
+        if let Some(job) = unsafe { self.face_job.as_ref() } {
+            let receipt = unsafe { &mut *job.work };
+            receipt.force_evaluations += 1.0;
+            receipt.faces += f64::from(shell.face_count);
+            receipt.plastic_returns += f64::from(returned);
+            receipt.pressure_faces += f64::from(loaded);
+        }
+        true
+    }
+
     /// Visit the closest point on each shell feature that is also a local minimum on the live sheet.
     unsafe fn visit_manifold(
         &self,
@@ -334,31 +407,8 @@ impl Workspace {
                     .write(combine(applied, 1.0, shell.gravity, node.mass))
             };
         }
-        for i in 0..shell.face_count as usize {
-            let face = unsafe { *shell.faces.add(i) };
-            let state = unsafe { &mut *self.face_state.add(i) };
-            let points = unsafe { load(self.positions, face.vertices) };
-            let normal = cross(sub(points[1], points[0]), sub(points[2], points[0]));
-            let area_squared = dot(normal, normal);
-            if !(area_squared.is_finite() && area_squared > 0.0) {
-                return false;
-            }
-            let result = membrane(face.element, points, shell.steel, state.plastic, hill);
-            state.plastic = result.result.state;
-            state.stress = result.result.stress;
-            budget.membrane += face.element.volume * result.result.elastic;
-            budget.hardening += face.element.volume * result.result.hardened;
-            budget.plastic += face.element.volume * result.result.state.dissipated;
-            unsafe { add_forces(self.forces, face.vertices, result.forces) };
-            if !shell.pressure.is_null() {
-                let pressure = unsafe { *shell.pressure.add(i) };
-                if pressure.air != 0.0
-                    || (pressure.water_weight != 0.0 && pressure.inside != pressure.outside)
-                {
-                    let forces = pressure_forces(pressure, points);
-                    unsafe { add_forces(self.forces, face.vertices, forces) };
-                }
-            }
+        if !unsafe { self.face_forces(shell, budget, hill) } {
+            return false;
         }
         for i in 0..shell.hinge_count as usize {
             let hinge = unsafe { *shell.hinges.add(i) };
@@ -581,6 +631,7 @@ unsafe extern "C" fn crush_shell_advance(
     seconds: f64,
     count: u32,
     work_counts: *mut [f64; 6],
+    face_job: *mut FaceJob,
 ) -> u32 {
     let shell = unsafe { &*descriptor };
     let (nodes, faces) = (shell.node_count as usize, shell.face_count as usize);
@@ -592,7 +643,7 @@ unsafe extern "C" fn crush_shell_advance(
     } else {
         seconds / count as f64
     };
-    let mut work = unsafe { shell.workspace() };
+    let mut work = unsafe { shell.workspace(face_job) };
     let mut budget = unsafe { *shell.ledger };
     unsafe {
         copy_nonoverlapping(shell.positions, work.positions, nodes);

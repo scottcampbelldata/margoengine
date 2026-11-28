@@ -32,6 +32,22 @@ async function model(params = {}, gravity = zero, shared = false) {
   return { shell, world };
 }
 
+test('a crush shell refuses a second world and keeps advancing in the first', async () => {
+  const first = await model({ pinned: [0, 1] });
+  using shell = first.shell;
+  const second = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: zero, memory: worldMemory(false) });
+  const accepted = shell.readMesh();
+  assert.throws(() => second.add(shell, { positions, triangles, material }), {
+    name: 'MargoError',
+    code: 'attached',
+    message: /Load a separate shell solver.*#ductile-crush/,
+  });
+  assert.deepEqual(shell.readMesh(), accepted);
+  shell.setForce(2, [0, 0, 1]);
+  first.world.advance(1);
+  assert.ok(shell.readMesh().positions[8] > accepted.positions[8]);
+});
+
 test('free sheet follows analytic gravity motion without artificial strain or work in either arena', async () => {
   const gravity = [0, -9.81, 0];
   const velocity = [0.45, -1.5, 0.2];
@@ -175,6 +191,7 @@ test('invalid mesh rejects precisely and degenerate drift publishes no partial s
   });
   const { world, shell } = await model({ pinned: [0, 1, 2] });
   const before = shell.readMesh();
+  const workBefore = shell.readNativeWork();
   shell.setForce(2, [0, 0, 1e200]);
   assert.throws(() => world.advance(1), {
     code: 'failed',
@@ -182,6 +199,7 @@ test('invalid mesh rejects precisely and degenerate drift publishes no partial s
   });
   assert.deepEqual(shell.readMesh(), before);
   assert.deepEqual(shell.supportReaction(2), zero);
+  assert.deepEqual(shell.readNativeWork(), workBefore);
 });
 
 async function sphereModel({

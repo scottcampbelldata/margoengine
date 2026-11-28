@@ -7070,3 +7070,7 @@ The Rust random stage produces the same particle values and signed-origin world 
 ### FLUID-07 native film matrix and rolling-pane rain
 
 Native ranges apply the existing face matrix with exact published state at 1, 2 and 4 participants. The final packaged tick records 2,137 face matrix products and 2,169,055 paired gradient operations with three helpers. Before any film output is replaced, the step validates the pressure wave, cumulative volumes, mounted force and timed outlet events. A rolling pane intercepts oblique rain, drains after cutoff and releases actual drops into a lower film. Both renderers replay accepted state and complete resolved images from each camera. Steady partial-wetting drop speed remains unvalidated in the independent slope comparison. [Evidence and bounds](../limits.md#accepted-film-motion-and-independent-incline-drops-fluid-07)
+
+### BREAK-03 native shell material and civil fender proof
+
+A malformed rigid input preserves the previous accepted damage and impulse outputs. The optional native shell preserves the existing material and loaded pressure face response and face accumulation order. The 211-face fixture records 38,430 SIMD face evaluations with three helpers and matches the public scalar baseline byte for byte. Both renderers independently replay the clamped dock fender's accepted rebound and permanent set. The lower-order folding law misses mean force and work in all six independent ASTM A500 tube tests. [Bounds and evidence](../limits.md#civilian-shell-contact-and-independent-tube-compression-break-03)

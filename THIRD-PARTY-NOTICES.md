@@ -670,3 +670,7 @@ Its figures, PDF, fitted curves and software are absent from the package.
 ### FLUID-07 inclined silicone-oil drop measurements
 
 `packages/physics/scripts/fluid07-sliding-drop-measured.mjs` records two sparse numerical markers and their readout bands from Figure 7 of Nolwenn Le Grand, Adrian Daerr and Laurent Limat (2005), *Shape and motion of drops sliding down an inclined plane*. The inclination and speed conversions and the production diagnostic are original. The paper, figure, source arrays and implementations are absent. [Article](https://doi.org/10.1017/S0022112005006105)
+
+### BREAK-03 steel tube compression measurements
+
+`packages/physics/scripts/break03-steel-tube-measured.mjs` contains specimen, tensile and experimental force scalars from Tables 1, 2 and 4 and sparse numerical readings from Figures 5 and 29. J. Y. Jung measured these specimens for *On the Collision Strength of Ship’s Bow* (1997), Pusan National University. Young Il Park, Jin-Seong Cho and Jeong-Hwan Kim republished the data in *Numerical and Experimental Investigation of Quasi-Static Crushing Behaviors of Steel Tubular Structures*, Materials 15, 2107 (2022), © 2022 the authors. The numeric conversions and production comparison are new. [Publication and data](https://doi.org/10.3390/ma15062107) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)

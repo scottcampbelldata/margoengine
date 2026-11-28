@@ -235,20 +235,24 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     static load(options?: {
         readonly id?: string;
         readonly signal?: AbortSignal;
+        readonly threads?: number;
     }): Promise<CrushShellSolver>;
     static loadRigid(options?: {
         readonly id?: string;
         readonly signal?: AbortSignal;
+        readonly threads?: number;
         readonly rate?: RateLevel;
     }): Promise<CrushShellSolver>;
     static loadWithApertures(options?: {
         readonly id?: string;
         readonly signal?: AbortSignal;
+        readonly threads?: number;
         readonly rigid?: {
             readonly rate?: RateLevel;
         };
     }): Promise<CrushShellSolver>;
     static loadWithAperturePressure(options?: Parameters<typeof CrushShellSolver.loadWithApertures>[0]): Promise<CrushShellSolver>;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, params: CrushShellParams): void;
     step(_context: StepContext, dt: number): void;
@@ -264,6 +268,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     };
     supportReaction(vertex: number): CrushVector;
     readWork(): CrushShellWork;
+    readNativeWork(): ShellNativeWorkCounts;
     readSphereContact(index: number): CrushShellContact;
     readSphereFriction(index: number): CrushShellFriction;
     readSeam(index: number): CrushSheetSeamReading;
@@ -389,6 +394,19 @@ export interface GirderSample {
 export const SHELL_APERTURE_LAYOUT = 1;
 
 export const SHELL_APERTURE_WORDS = 13;
+
+export interface ShellNativeWorkCounts extends ShellNativeWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly ShellNativeWorkerWork[];
+}
+
+export interface ShellNativeWorkerWork {
+    readonly forceEvaluations: number;
+    readonly faces: number;
+    readonly pairedFaces: number;
+    readonly plasticReturns: number;
+    readonly pressureFaces: number;
+}
 
 export interface SquareCrushTube {
     readonly width: number;

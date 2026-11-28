@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21982831,
+  "total": 21985940,
   "history": [
     {
       "date": "2026-10-24",
@@ -15785,6 +15785,12 @@
       "commit": "fluid-07-native-film-matrix",
       "reason": "FLUID-07 @margoengine/physics/thin-film 15193 to 18253 B gzip, ceiling 15631 to 18801 B. The existing optional solver owns the finite acceptance and worker lifecycle with its port and matrix state. A separate solver would duplicate volume and mount ownership. Native modules and helpers load only when used. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "break-03-native-shell-faces",
+      "reason": "BREAK-03 @margoengine/physics/crush 21351 to 24368 B gzip, ceiling 21991 to 25100 B. The existing optional solver owns transactional contact and ordered face assembly. A separate solver would duplicate persistent shell and contact state. Native modules and helpers load only when used. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16656,7 +16662,7 @@
     "@margoengine/physics/bubbles": 3289,
     "@margoengine/physics/celestial": 9756,
     "@margoengine/physics/clouds": 11689,
-    "@margoengine/physics/crush": 21991,
+    "@margoengine/physics/crush": 25100,
     "@margoengine/physics/debug-view": 1965,
     "@margoengine/physics/decomposition": 11487,
     "@margoengine/physics/dfsph": 8136,

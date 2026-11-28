@@ -1,4 +1,4 @@
-import { MargoError } from '@margoengine/math/errors';
+import { crushError } from './errors.js';
 import { regionWords } from '../world/memory.js';
 import type { Cell, Region, SolverHost, StepContext } from '../world/solver.js';
 import { BODIES_FIELD, BODY_WORDS, FORCE_WORDS, IMPULSE_WORDS } from '../world/solvers/rigid.js';
@@ -58,7 +58,7 @@ function f64(host: SolverHost, region: Region): Float64Array {
 function cellOffset(from: Cell, to: Cell, cellSize: number | undefined): CrushVector {
   const delta = sub(from, to);
   if (cellSize === undefined && delta.some((value) => value !== 0))
-    throw new MargoError('state', 'Set cellSize to couple different rigid and shell origin cells.');
+    throw crushError('state', 'Set cellSize to couple different rigid and shell origin cells.');
   return scale(delta, cellSize ?? 1);
 }
 
@@ -83,19 +83,19 @@ export class ShellRigid {
     this.capacity = host.bodyRows();
     this.rigidSubsteps = new Uint32Array(config.length);
     if (cellSize !== undefined && !(cellSize > 0 && Number.isFinite(cellSize)))
-      throw new MargoError('state', 'Use a positive finite shell cell size in metres.');
+      throw crushError('state', 'Use a positive finite shell cell size in metres.');
     const seen = new Set<number>();
     this.spheres = config.map((sphere) => {
       const body = rowIndex(sphere.body, this.capacity);
-      if (seen.has(body)) throw new MargoError('state', 'Give each rigid shell sphere a different body row.');
+      if (seen.has(body)) throw crushError('state', 'Give each rigid shell sphere a different body row.');
       seen.add(body);
       const radius = sphere.radius + 0.5 * thickness;
       const stiffness = (4 / 3) * sphere.contactModulus * Math.sqrt(sphere.radius);
       if (!(radius > 0 && Number.isFinite(radius) && stiffness > 0 && Number.isFinite(stiffness)))
-        throw new MargoError('state', 'Use positive finite radii and contact moduli for rigid shell spheres.');
+        throw crushError('state', 'Use positive finite radii and contact moduli for rigid shell spheres.');
       const friction = sphere.friction ?? 0;
       if (!(friction >= 0 && Number.isFinite(friction)))
-        throw new MargoError('state', 'Choose a finite nonnegative friction coefficient for rigid shell spheres.');
+        throw crushError('state', 'Choose a finite nonnegative friction coefficient for rigid shell spheres.');
       return { body, radius, stiffness, friction };
     });
     this.work = host.allocate('shell-sphere-work', SPHERE_WORDS * this.spheres.length * 8, 'f64', 1);
@@ -116,7 +116,7 @@ export class ShellRigid {
   stage(context: StepContext, dt: number, velocity: Float64Array, inverseMass: number, contacts: number): number {
     const port = context.inputs.get(BODIES_FIELD.name);
     if (!port || port.tick !== context.tick - 1)
-      throw new MargoError(
+      throw crushError(
         'state',
         'Use matching shell and rigid rates and place the shell first in their staggered coupling.',
       );
@@ -125,10 +125,7 @@ export class ShellRigid {
       port.region.layout !== 2 ||
       port.region.byteLength !== this.capacity * BODY_WORDS * 4
     )
-      throw new MargoError(
-        'state',
-        'Use the layout-2 RigidSolver bodies port with the same body capacity as the shell.',
-      );
+      throw crushError('state', 'Use the layout-2 RigidSolver bodies port with the same body capacity as the shell.');
     const bodies = regionWords(port.region.memory ?? this.host.memory, port.region) as Float32Array;
     const work = f64(this.host, this.work);
     const frictionWork = this.frictionWork && f64(this.host, this.frictionWork);
@@ -145,20 +142,24 @@ export class ShellRigid {
     let rateSquared = 0;
     for (const [i, sphere] of this.spheres.entries()) {
       const at = sphere.body * BODY_WORDS;
-      const quaternionNorm = dot(triple(bodies, at + 3), triple(bodies, at + 3)) + bodies[at + 6]! ** 2;
+      const xyz = triple(bodies, at + 3);
+      const qw = bodies[at + 6]!;
+      const quaternionNorm = dot(xyz, xyz) + qw * qw;
       const massCenter = triple(bodies, at + 7);
       const centerOffset = sub(massCenter, triple(bodies, at));
-      if (!(quaternionNorm > 0 && Number.isFinite(quaternionNorm)) || centerOffset.some((value) => value !== 0))
-        throw new MargoError(
-          'state',
-          'Use live centered rigid-body spheres with the center of mass at the local origin.',
-        );
+      if (!(Math.abs(quaternionNorm - 1) <= 2e-6) || centerOffset.some((value) => value !== 0))
+        throw crushError('state', 'Use live centered rigid-body spheres with the center of mass at the local origin.');
       const center = add(massCenter, offset);
       const v = triple(bodies, at + 10);
       const inv = bodies[at + 16]!;
+      if (!center.every(Number.isFinite) || !v.every(Number.isFinite) || !Number.isFinite(inv) || inv < 0)
+        throw crushError(
+          'state',
+          'Use finite local positions, velocities and nonnegative inverse mass for shell spheres.',
+        );
       const steps = bodies[at + 24]!;
       if (inv > 0 && (!Number.isSafeInteger(steps) || steps < 2))
-        throw new MargoError('state', 'Use at least two rigid substeps for moving sphere contact.');
+        throw crushError('state', 'Use at least two rigid substeps for moving sphere contact.');
       this.rigidSubsteps[i] = inv > 0 ? steps : 0;
       work.set(
         [...center, ...v, inv, sphere.radius, sphere.stiffness, 0, 0, 0, 0, 0, 0, 0, sphere.radius, 0, 0, 0],
@@ -168,7 +169,7 @@ export class ShellRigid {
         const angular = triple(bodies, at + 13);
         const inertia = bodies.subarray(at + 17, at + 23);
         if (![...angular, ...inertia].every(Number.isFinite))
-          throw new MargoError('state', 'Use finite angular velocity and inertia for frictional shell contact.');
+          throw crushError('state', 'Use finite angular velocity and inertia for frictional shell contact.');
         frictionWork.set([sphere.friction, ...angular, ...inertia], i * FRICTION_WORK_WORDS);
       }
       // Hertz's maximum normal tangent over 0 <= compression <= radius.
@@ -224,7 +225,7 @@ export class ShellRigid {
 
   readFriction(index: number): CrushShellFriction {
     if (!Number.isSafeInteger(index) || index < 0 || index >= this.spheres.length)
-      throw new MargoError('state', 'Choose the index of a configured shell sphere.');
+      throw crushError('state', 'Choose the index of a configured shell sphere.');
     if (!this.frictionReadings) return { angularImpulse: [0, 0, 0], dissipatedEnergy: 0 };
     const words = f64(this.host, this.frictionReadings);
     const at = index * FRICTION_READING_WORDS;
@@ -233,7 +234,7 @@ export class ShellRigid {
 
   read(index: number): CrushShellContact {
     if (!Number.isSafeInteger(index) || index < 0 || index >= this.spheres.length)
-      throw new MargoError('state', 'Choose the index of a configured shell sphere.');
+      throw crushError('state', 'Choose the index of a configured shell sphere.');
     const words = f64(this.host, this.readings);
     const at = index * CONTACT_WORDS;
     return { impulse: triple(words, at), compression: words[at + 3]!, energy: words[at + 4]! };

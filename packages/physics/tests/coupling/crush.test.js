@@ -83,6 +83,38 @@ async function assemble(options) {
   return withBodies(options);
 }
 
+test('invalid rigid input preserves the last accepted crush damage and reaction ports', async () => {
+  const { world, physics, crush, vehicle } = await assemble({ two: false });
+  using _physics = physics;
+  vehicle.setPosition([-0.3, 0, 0]);
+  const reaction = crush.exportPorts(0)[1].region;
+  for (let frame = 1; frame <= 6; frame++) {
+    world.advance(frame);
+    if (regionWords(world.memory, reaction).some((word) => word !== 0)) break;
+  }
+  assert.ok(
+    regionWords(world.memory, reaction).some((word) => word !== 0),
+    'The accepted contact has a reaction.',
+  );
+  const frozen = () =>
+    [...crush.stateRegions(), ...crush.extraState()].map((region) =>
+      new Uint8Array(world.memory.buffer, region.byteOffset, region.byteLength).slice(),
+    );
+  const before = frozen();
+  const port = world.fields.port('bodies');
+  assert.ok(port);
+  const invalid = { ...port, region: { ...port.region, layout: 999 } };
+  assert.throws(
+    () => crush.step({ tick: port.tick + 1, cell: port.cell, seed: 0, inputs: new Map([['bodies', invalid]]) }, 1 / 60),
+    {
+      name: 'MargoError',
+      code: 'state',
+      message: /RigidSolver layout-2 bodies port.*#ductile-crush/,
+    },
+  );
+  assert.deepEqual(frozen(), before);
+});
+
 test('two actual moving bodies transfer opposite impulse and lose exactly the measured normal work', async () => {
   const { world, physics, crush, vehicle, other } = await assemble();
   try {

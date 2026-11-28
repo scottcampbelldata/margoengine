@@ -264,6 +264,17 @@
     const { broken, fractureWork, openingArea } = seamShell.readSeam(0);
     return { broken, fractureWork, openingArea, hash: seamWorld.hash() };
   };
+  window.openFender = async () => {
+    engine.dispose();
+    physics.dispose();
+    membranePhysics.dispose();
+    shellPhysics.dispose();
+    const { openFender } = await import('./crush-fender.fixture.js');
+    const { draw, close, ...timing } = await openFender();
+    window.drawFender = draw;
+    window.closeFender = close;
+    return timing;
+  };
 </script>
 </body>
 </html>

@@ -5255,3 +5255,17 @@ node scripts/run-with-timeout.mjs --max=6 -- node packages/physics/scripts/fluid
 ```
 
 The directed rain test reads physical precipitation and follows the rigid pane, accepted film, timed rim events and detached flight into a separate film. The seeded runnel and glazing controls remain. The directed scene compares every accepted snapshot byte and resolved RGBA through hold, restore, re-advance and rewind from inside and outside on each renderer. The inclined-drop diagnostic treats the two Le Grand et al. Figure 7 marker heights as outcomes and uses separately sourced silicone oil properties and static coating angles. [Experiment](https://doi.org/10.1017/S0022112005006105)
+
+### BREAK-03 accepted shell and civilian fender
+
+```sh
+node --test packages/physics/tests/coupling/crush.test.js packages/physics/tests/coupling/crush-shell.test.js packages/physics/tests/coupling/crush-contact-inertia.test.js
+npm run test:browser:crush-plate -w @margoengine/physics
+node scripts/run-with-timeout.mjs --max=1 -- node --test packages/physics/tests/coupling/crush-shell-workers.test.js packages/physics/tests/coupling/crush-contact-inertia.test.js
+node scripts/run-with-timeout.mjs --max=2 -- npm run test:gpu:crush-shell-workers -w @margoengine/physics
+node scripts/run-with-timeout.mjs --max=1 -- node packages/physics/scripts/break03-steel-tube-measured.mjs
+```
+
+The fixed-camera fixture releases a test carriage against a clamped dock fender and runs a parked control. At the same accepted state it can hide the deformed surface to isolate the contribution to the image. Each backend compares accepted snapshot bytes and full resolved RGBA through hold, restore, re-advance and rewind.
+
+The compression diagnostic takes independent geometry and tensile data from Tables 1 and 2 and holds out the experimental force values and digitized trace and compaction observations. It reports force rounding, compaction readout, input rounding and numerical displacement sensitivity separately. All six steel specimens miss the averaged force and work intervals. [Original measurement publication](https://doi.org/10.3390/ma15062107)

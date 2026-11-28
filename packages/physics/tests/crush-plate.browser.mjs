@@ -21,6 +21,80 @@ const { page, hardware, close } = await openBrowser({
 });
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
+
+async function fenderTake(device) {
+  const { cue, approach, loaded, end, mass, speed } = await page.evaluate(() => window.openFender());
+  async function draw(shotFrame, options = {}) {
+    const { image, ...state } = await page.evaluate((input) => window.drawFender(input), { shotFrame, ...options });
+    const png = Buffer.from(image, 'base64');
+    assert.ok(state.visible >= 12);
+    return { png, pixels: await decodePNG(png), state };
+  }
+  function same(actual, expected) {
+    assert.deepEqual(actual.state, expected.state);
+    assert.deepEqual(actual.pixels.data, expected.pixels.data);
+  }
+
+  const before = await draw(cue - 1);
+  assert.deepEqual(before.state.velocity, [0, 0, 0]);
+  assert.equal(before.state.inward, 0);
+  assert.equal(before.state.plastic, 0);
+  same(await draw(cue), before);
+
+  const moving = await draw(approach, { action: 'save' });
+  assert.ok(Math.abs(moving.state.velocity[2] + speed) < 1e-6);
+  assert.equal(moving.state.compression, 0);
+  assert.equal(moving.state.inward, 0);
+  const contact = await draw(loaded);
+  assert.ok(contact.state.inward > 0.01 && contact.state.compression > 0.002 && contact.state.plastic > 0);
+  assert.ok(Math.abs(contact.state.velocity[2]) < 0.1 * speed, 'contact almost stops the carriage');
+  const contactControl = await draw(loaded, { flatten: true });
+  assert.deepEqual(contactControl.state, contact.state);
+  const loadPixels = changedPixels(contact.pixels, contactControl.pixels);
+  assert.ok(loadPixels > 50, `only ${loadPixels} pixels show the loaded fender skin`);
+
+  const released = await draw(end);
+  const after = released.state;
+  assert.equal(after.compression, 0);
+  assert.ok(after.velocity[2] > 0 && after.velocity[2] < speed, 'the integrated reaction returns the carriage');
+  assert.ok(after.position[2] > before.state.position[2]);
+  assert.ok(after.inward > 0.001 && after.inward < contact.state.inward);
+  assert.ok(after.plastic >= contact.state.plastic);
+  const speedNow = Math.hypot(...after.velocity);
+  assert.ok(
+    after.plastic < (mass * (speed ** 2 - speedNow ** 2)) / 2,
+    'absorbed yield work fits the lost carriage energy',
+  );
+  // One accepted interval per tick. Allow f32 roundoff of the rigid velocity and forces over the whole sequence.
+  const momentum = mass * (after.velocity[2] + speed);
+  const roundoff = 4 * 2 ** -24 * after.tick * momentum;
+  assert.ok(Math.abs(after.impulse - momentum) <= roundoff, 'contact impulse accounts for measured recoil');
+  const unloadedControl = await draw(end, { flatten: true });
+  assert.deepEqual(unloadedControl.state, after);
+  const releasePixels = changedPixels(released.pixels, unloadedControl.pixels);
+  assert.ok(releasePixels > 10, `only ${releasePixels} pixels show the unloaded skin`);
+  const parked = await draw(end, { parked: true });
+  assert.equal(parked.state.plastic, 0);
+  assert.equal(parked.state.impulse, 0);
+  assert.equal(parked.state.inward, 0);
+  assert.deepEqual(parked.pixels.data, before.pixels.data);
+
+  same(await draw(end + 10), released);
+  same(await draw(approach, { action: 'restore' }), moving);
+  same(await draw(loaded), contact);
+  same(await draw(end), released);
+  same(await draw(cue - 1), before);
+  same(await draw(end), released);
+  assert.deepEqual(await page.evaluate(() => window.closeFender()), { errors: [], validation: null });
+  await writeFile(`test-results/break03-fender-loaded-${device}.png`, contact.png);
+  await writeFile(`test-results/break03-fender-released-${device}.png`, released.png);
+  console.log(
+    `Dock fender ${device}: ${(1000 * contact.state.inward).toFixed(2)} mm loaded (${loadPixels} pixels), ` +
+      `${(1000 * after.inward).toFixed(2)} mm unloaded (${releasePixels} pixels), ` +
+      `${after.velocity[2].toFixed(4)} m/s recoil, ${after.plastic.toFixed(3)} J dissipated, ${after.hash}.`,
+  );
+}
+
 try {
   await page.waitForFunction(() => typeof window.drawCrushPlate === 'function', null, { timeout: 20_000 });
   const canvas = page.locator('canvas');
@@ -142,6 +216,8 @@ try {
   assert.deepEqual(errors, []);
   await writeFile(`test-results/break03-sheet-seam-${device}.png`, tornSeamImage);
   console.log(`Cohesive seam: ${tornSeam.openingArea.toFixed(4)} m² opening, ${tearPixels} changed pixels.`);
+  await fenderTake(device);
+  assert.deepEqual(errors, []);
 } finally {
   await close();
 }

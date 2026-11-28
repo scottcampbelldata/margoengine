@@ -12146,3 +12146,7 @@ The optional native Wasm variants preserve each parcel's Philox key and counter 
 ### FLUID-07 implicit face matrix and rolling-pane acceptance
 
 The optional native matrix phase splits the same cell pressure and face operations over disjoint ranges. Global reductions keep their established order. The film validates candidate wave, water, load and detached-drop outputs before replacing accepted regions. A scoped late-overflow test checks all accepted bytes and exact retry. The directed rolling pane uses projected precipitation and sends detached drops into a second film. Two renderer paths replay its full resolved output and accepted snapshots from inside and outside. [Limits and evidence](../limits.md#accepted-film-motion-and-independent-incline-drops-fluid-07)
+
+### BREAK-03 ordered shell face assembly and accepted contact
+
+The optional crush entry partitions shell membrane and pressure faces across native workers. Each range writes a private result before the caller assembles face forces in canonical order. The 211-face shared fixture matches the preceding scalar Wasm and reports accepted work across four participants. The fixed-camera dock fender checks exact accepted snapshots and full renderer replay independently on WebGPU and WebGL2. Arbitrary-shape shell contact, automatic tearing and the original EF-11 shot remain open. [Evidence and commands](../whitepaper/reproduce.md#break-03-accepted-shell-and-civilian-fender)

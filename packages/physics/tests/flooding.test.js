@@ -63,7 +63,7 @@ test('Flooding rejects a bad second sea query without changing state, output or 
   assert.equal(calls, 2);
   assert.throws(() => flood.step(state, moved, still, dt, dt, RHO, Infinity), {
     code: 'unsupported',
-    message: /positive SI step, density and gravity.*#hull-flooding/,
+    message: /positive step and density, and nonnegative gravity.*#hull-flooding/,
   });
   assert.deepEqual(state, acceptedState);
   assert.deepEqual(output, acceptedOutput);
@@ -74,6 +74,19 @@ test('Flooding rejects a bad second sea query without changing state, output or 
     reference.step(refState, moved, still, dt, dt, RHO, G),
   );
   assert.deepEqual(state, refState);
+});
+
+test('Flooding preserves carried water and its mass when the prescribed gravity is zero', () => {
+  const mesh = cuboid([-1, -1, -1], [1, 1, 1]);
+  const flood = new Flooding([{ mesh, permeability: 1, water: 0.5 }], []);
+  const before = new Float64Array(flood.words);
+  flood.initialise(before);
+  const state = before.slice();
+  const result = flood.step(state, upright, still, 0, 1 / 60, RHO, 0);
+  assert.deepEqual(state, before);
+  assert.equal(result.level[0], -0.875);
+  assert.equal(result.mass[0], 0.5 * RHO);
+  assert.equal(flood.convergenceWarning, undefined);
 });
 
 test('volumeBelow: a cube cut level and on a slant, its volume and centre exact', () => {

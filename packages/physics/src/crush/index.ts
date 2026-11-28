@@ -1,4 +1,4 @@
-import { MargoError } from '@margoengine/math/errors';
+import { crushError } from './errors.js';
 import type { Bed } from '@margoengine/math/fields';
 import { hypot } from '@margoengine/math/pinned';
 import { BED_FIELD, bedFromPort, bedVertexCount, type BedShape } from '../earth/bed.js';
@@ -81,6 +81,7 @@ export {
 export { resolvePlateBuckling, type CrushPlate, type CrushPlateResponse, type CrushPlateSurface } from './plate.js';
 export { SHELL_APERTURE_LAYOUT, SHELL_APERTURE_WORDS } from './shell-aperture.js';
 export type { CrushShellAnisotropy } from './shell-anisotropy.js';
+export type { ShellNativeWorkCounts, ShellNativeWorkerWork } from './shell-kernel.js';
 export type { CrushShellContact, CrushShellFriction, CrushShellSphere } from './shell-rigid.js';
 export type { CrushSheetSeam, CrushSheetSeamReading } from './shell-seam.js';
 export {
@@ -238,6 +239,13 @@ interface State {
   readonly reactions: Region;
   readonly plateStrokes?: Region;
   readonly wetReceipt?: Region;
+  readonly draft: {
+    readonly damage: Float64Array;
+    readonly contacts: Uint8Array;
+    readonly reactions: Float64Array;
+    readonly plateStrokes?: Float64Array;
+    readonly wetReceipt?: Float64Array;
+  };
 }
 
 function angularMass(
@@ -348,7 +356,7 @@ function fixedAnchor(support: CrushSupport, cell: Cell, size: number | undefined
 function cellOffset(from: Cell, to: Cell, size: number | undefined): CrushVector {
   const difference = sub(from, to);
   if (!size && difference.some((value) => value !== 0))
-    throw new MargoError(
+    throw crushError(
       'state',
       'Set the world cell size when a crush support surface is in a different cell from the rigid bodies.',
     );
@@ -357,10 +365,10 @@ function cellOffset(from: Cell, to: Cell, size: number | undefined): CrushVector
 
 function preparedSupport(support: CrushSupport, body: number, capacity: number): CrushSupport {
   const other = support.body === undefined ? undefined : rowIndex(support.body, capacity);
-  if (other === body) throw new MargoError('state', 'Choose opposing crush contacts on distinct rigid body rows.');
+  if (other === body) throw crushError('state', 'Choose opposing crush contacts on distinct rigid body rows.');
   const cell = support.cell && vector(support.cell, 'barrier cell');
   if (cell && !cell.every(Number.isSafeInteger))
-    throw new MargoError('state', 'Use a crush barrier cell as three safe integer coordinates.');
+    throw crushError('state', 'Use a crush barrier cell as three safe integer coordinates.');
   return { body: other, point: vector(support.point, 'support anchor'), cell };
 }
 
@@ -371,7 +379,7 @@ function supportImpulse(depth: number, closing: number, inverseMass: number, sti
   // Backward Euler with end penetration d + h(v - Jw) and end inward speed v - Jw.
   const impulse = Math.max(0, (dt * (stiffness * depth + rate * closing)) / (1 + dt * rate * inverseMass)); // float division
   if (!Number.isFinite(impulse))
-    throw new MargoError('state', 'Choose representable crush support stiffness, mass and compression.');
+    throw crushError('state', 'Choose representable crush support stiffness, mass and compression.');
   return impulse;
 }
 
@@ -579,7 +587,7 @@ export class CrushSolver implements Solver<CrushParams> {
   constructor({ id = 'crush', terrain, rate = 0 }: CrushOptions = {}) {
     this.id = id;
     if (!Number.isInteger(rate) || rate < 0 || rate > 7)
-      throw new MargoError('state', 'Choose a crush rate level from 0 (60 Hz) to 7 (7,680 Hz).');
+      throw crushError('state', 'Choose a crush rate level from 0 (60 Hz) to 7 (7,680 Hz).');
     this.rate = rate;
     if (terrain) {
       bedVertexCount(terrain);
@@ -622,7 +630,9 @@ export class CrushSolver implements Solver<CrushParams> {
   }
 
   init(host: SolverHost, params: CrushParams): void {
-    const capacity = params.bodyCapacity;
+    if (this.state)
+      throw crushError('attached', 'This crush solver belongs to a world. Create a separate crush solver.');
+    const capacity = params?.bodyCapacity;
     if (
       !Number.isSafeInteger(capacity) ||
       capacity < 1 ||
@@ -633,10 +643,7 @@ export class CrushSolver implements Solver<CrushParams> {
         params.envelopePatches?.length
       )
     )
-      throw new MargoError(
-        'state',
-        'Choose the RigidSolver body capacity and provide at least one crush contact patch.',
-      );
+      throw crushError('state', 'Choose the RigidSolver body capacity and provide at least one crush contact patch.');
     const all: PatchInput[] = [
       ...(params.patches ?? []),
       ...(params.groundPatches ?? []).map((patch) => ({ ...patch, terrain: true as const })),
@@ -645,11 +652,11 @@ export class CrushSolver implements Solver<CrushParams> {
       const material = 'loading' in patch.material ? prepareEnvelope(patch.material) : crushMaterial(patch.material);
       const response = patch.response ?? 'impact';
       if (response !== 'impact' && response !== 'continuous')
-        throw new MargoError('state', 'Choose impact or continuous for the crush patch response.');
+        throw crushError('state', 'Choose impact or continuous for the crush patch response.');
       const plate = patch.plate && { ...patch.plate };
       if (plate) {
         if (response !== 'continuous')
-          throw new MargoError('state', 'Use a continuous crush patch response to sample the live plate shape.');
+          throw crushError('state', 'Use a continuous crush patch response to sample the live plate shape.');
         resolvePlateBuckling(plate, 0);
       }
       const body = rowIndex(patch.body, capacity);
@@ -667,10 +674,7 @@ export class CrushSolver implements Solver<CrushParams> {
       };
       if ('terrain' in patch) {
         if (!this.terrain)
-          throw new MargoError(
-            'state',
-            'Give CrushSolver the TerrainBed grid shape before configuring a ground patch.',
-          );
+          throw crushError('state', 'Give CrushSolver the TerrainBed grid shape before configuring a ground patch.');
         return { ...common, terrain: true };
       }
       return {
@@ -696,6 +700,7 @@ export class CrushSolver implements Solver<CrushParams> {
     }
     for (const patch of params.envelopePatches ?? [])
       patches.push(prepareStation('support' in patch ? patch : { ...patch, terrain: true }));
+    const hasPlates = patches.some((patch) => patch.plate);
     this.state = {
       host,
       patches,
@@ -705,39 +710,49 @@ export class CrushSolver implements Solver<CrushParams> {
       damage: host.allocate('crush-damage', patches.length * CRUSH_WORDS * F64, 'f64', CRUSH_LAYOUT),
       contacts: host.allocate('crush-contacts', patches.length, 'u8', CRUSH_LAYOUT),
       reactions: host.allocate('crush-reactions', capacity * IMPULSE_WORDS * F64, 'f64', IMPULSES_LAYOUT),
-      plateStrokes: patches.some((patch) => patch.plate)
+      plateStrokes: hasPlates
         ? host.allocate('crush-plate-strokes', patches.length * F64, 'f64', CRUSH_LAYOUT)
         : undefined,
       wetReceipt: this.wet
         ? host.allocate('crush-wet-impulse', capacity * WET_IMPULSE_WORDS * F64, 'f64', WET_INERTIA_LAYOUT)
         : undefined,
+      draft: {
+        damage: new Float64Array(patches.length * CRUSH_WORDS),
+        contacts: new Uint8Array(patches.length),
+        reactions: new Float64Array(capacity * IMPULSE_WORDS),
+        plateStrokes: hasPlates ? new Float64Array(patches.length) : undefined,
+        wetReceipt: this.wet ? new Float64Array(capacity * WET_IMPULSE_WORDS) : undefined,
+      },
     };
   }
 
   step(context: StepContext, dt: number): void {
     const state = this.requireState();
-    const out = regionWords(state.host.memory, state.reactions) as Float64Array;
+    if (!Number.isFinite(dt) || dt <= 0)
+      throw crushError('unsupported', 'The crush step is invalid. Advance it with a finite positive world interval.');
+    const { draft } = state;
+    const out = draft.reactions;
     out.fill(0);
     const port = context.inputs.get(BODIES_FIELD.name);
-    if (!port) return;
+    if (!port) {
+      (regionWords(state.host.memory, state.reactions) as Float64Array).set(out);
+      return;
+    }
     if (
       port.region.type !== 'f32' ||
       port.region.layout !== BODIES_LAYOUT ||
       port.region.byteLength !== state.capacity * BODY_WORDS * F32
     )
-      throw new MargoError('state', 'Set the crush body capacity to match the RigidSolver layout-2 bodies port.');
+      throw crushError('state', 'Set the crush body capacity to match the RigidSolver layout-2 bodies port.');
     if (state.staged && port.tick !== context.tick - 1)
-      throw new MargoError(
-        'state',
-        'Run staged crush before the rigid solver at the same rate in their staggered group.',
-      );
-    const bodies = regionWords(state.host.memory, port.region) as Float32Array;
+      throw crushError('state', 'Run staged crush before the rigid solver at the same rate in their staggered group.');
+    const bodies = regionWords(port.region.memory ?? state.host.memory, port.region) as Float32Array;
     let wet: WetContactStep | undefined;
-    if (this.wet && state.wetReceipt) {
+    if (this.wet && draft.wetReceipt) {
       const input = context.inputs.get(this.wet.mobility.name);
       if (!input || input.tick !== context.tick || port.tick !== context.tick - 1)
-        throw new MargoError('state', 'Place the hull before crush contact and rigid last in their same-rate group.');
-      const receipt = regionWords(state.host.memory, state.wetReceipt) as Float64Array;
+        throw crushError('state', 'Place the hull before crush contact and rigid last in their same-rate group.');
+      const receipt = draft.wetReceipt;
       receipt.fill(0);
       wet = {
         receipt,
@@ -746,7 +761,7 @@ export class CrushSolver implements Solver<CrushParams> {
     }
     const terrainPort = this.terrain && context.inputs.get(BED_FIELD.name);
     if (this.terrain && !terrainPort)
-      throw new MargoError('state', 'Add TerrainBed to the PhysicsWorld and couple it with the crush ground patches.');
+      throw crushError('state', 'Add TerrainBed to the PhysicsWorld and couple it with the crush ground patches.');
     const terrain =
       terrainPort &&
       this.terrain &&
@@ -754,8 +769,34 @@ export class CrushSolver implements Solver<CrushParams> {
     const damage = regionWords(state.host.memory, state.damage) as Float64Array;
     const contacts = regionWords(state.host.memory, state.contacts) as Uint8Array;
     const plateStrokes = state.plateStrokes && (regionWords(state.host.memory, state.plateStrokes) as Float64Array);
+    draft.damage.set(damage);
+    draft.contacts.set(contacts);
+    if (draft.plateStrokes && plateStrokes) draft.plateStrokes.set(plateStrokes);
     for (let i = 0; i < state.patches.length; i++)
-      impact(state, state.patches[i]!, i, port, bodies, out, damage, contacts, plateStrokes, dt, terrain, wet);
+      impact(
+        state,
+        state.patches[i]!,
+        i,
+        port,
+        bodies,
+        out,
+        draft.damage,
+        draft.contacts,
+        draft.plateStrokes,
+        dt,
+        terrain,
+        wet,
+      );
+    if ([out, draft.damage, draft.plateStrokes, wet?.receipt].some((words) => words && !words.every(Number.isFinite)))
+      throw crushError(
+        'failed',
+        'The crush damage or reaction overflowed. Reduce the contact scale or refine the step.',
+      );
+    (regionWords(state.host.memory, state.reactions) as Float64Array).set(out);
+    damage.set(draft.damage);
+    contacts.set(draft.contacts);
+    if (draft.plateStrokes && plateStrokes) plateStrokes.set(draft.plateStrokes);
+    if (state.wetReceipt && wet) (regionWords(state.host.memory, state.wetReceipt) as Float64Array).set(wet.receipt);
   }
 
   importPorts(_tick: number): void {}
@@ -783,7 +824,7 @@ export class CrushSolver implements Solver<CrushParams> {
   read(index: number): CrushPatchState {
     const state = this.requireState();
     if (!Number.isSafeInteger(index) || index < 0 || index >= state.patches.length)
-      throw new MargoError('state', 'Use a crush patch index in the configured patch list.');
+      throw crushError('state', 'Use a crush patch index in the configured patch list.');
     const values = regionWords(state.host.memory, state.damage) as Float64Array;
     const at = index * CRUSH_WORDS;
     return {
@@ -803,7 +844,7 @@ export class CrushSolver implements Solver<CrushParams> {
     const { host, patches, plateStrokes, damage } = this.requireState();
     const plate = Number.isSafeInteger(index) ? patches[index]?.plate : undefined;
     if (!plate || !plateStrokes)
-      throw new MargoError('state', 'Choose a configured continuous crush patch with a plate to sample its shape.');
+      throw crushError('state', 'Choose a configured continuous crush patch with a plate to sample its shape.');
     const stroke = (regionWords(host.memory, plateStrokes) as Float64Array)[index]!;
     const sealLoss = (regionWords(host.memory, damage) as Float64Array)[index * CRUSH_WORDS + CRUSH_SEAL_LOSS_WORD]!;
     return {
@@ -818,14 +859,13 @@ export class CrushSolver implements Solver<CrushParams> {
     const { host, patches, damage } = this.requireState();
     const patch = Number.isSafeInteger(index) ? patches[index] : undefined;
     if (!patch || !('indentation' in patch))
-      throw new MargoError('state', 'Choose a configured circular indentation station to sample its dent.');
+      throw crushError('state', 'Choose a configured circular indentation station to sample its dent.');
     const stroke = (regionWords(host.memory, damage) as Float64Array)[index * CRUSH_WORDS]!;
     return patch.indentation.read(stroke, rest);
   }
 
   private requireState(): State {
-    if (!this.state)
-      throw new MargoError('state', 'Add CrushSolver to a PhysicsWorld before calling its state methods.');
+    if (!this.state) throw crushError('state', 'Add CrushSolver to a PhysicsWorld before calling its state methods.');
     return this.state;
   }
 }

@@ -210,6 +210,14 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/crush-shell-kernel-threaded.wasm',
+    label: 'crush-shell-kernel-threaded.wasm',
+    kind: 'Shared crush shell lead with a membrane evaluation barrier',
+    measure: 'file',
+    when: 'CrushShellSolver.load() or its variants with 2 or 4 native participants',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/viscoplastic-kernel.wasm',
     label: 'viscoplastic-kernel.wasm',
     kind: 'Rust SIMD three-dimensional elastoviscoplastic material points',

@@ -347,6 +347,13 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'crush-shell-kernel-threaded',
+    crate: 'packages/physics/crush-shell-kernel',
+    blueprint: 'packages/physics/src/crush/crush-shell-kernel-threaded.wasm',
+    script: 'packages/physics/scripts/build-crush-shell-kernel.mjs',
+    args: ['threaded'],
+  },
+  {
     name: 'viscoplastic-kernel',
     crate: 'packages/physics/viscoplastic-kernel',
     blueprint: 'packages/physics/src/viscoplastic/viscoplastic-kernel.wasm',

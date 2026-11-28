@@ -141,6 +141,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'ductile-crush',
+    title: '@margoengine/physics/crush ductile contact and shell mechanics',
+    kind: 'family',
+    messages: [],
+    cause: 'A civil contact patch, shell, rigid port, or step produced an invalid geometry, load, or damage ledger.',
+    fix: 'Use one loaded solver per world. Supply finite local geometry, valid rigid rows and matching field layouts, time steps and origin cell sizes. Reduce the load or refine the time step when damage or reaction values overflow.',
+  },
+  {
     id: 'thin-film-flow',
     title: '@margoengine/physics/thin-film wet surfaces, drops and receivers',
     kind: 'family',

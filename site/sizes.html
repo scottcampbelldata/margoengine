@@ -110,8 +110,9 @@
 <tr><th scope="row"><code>loads-kernel-shared.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches, shared world memory</td><td class="num">7,761</td><td class="num">2,926</td><td class="num">2,524</td><td>LoadSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>thin-film-kernel-shared.wasm</code></th><td>Rust SIMD conservative thin-film flow and capillarity, shared world memory</td><td class="num">32,746</td><td class="num">12,619</td><td class="num">10,892</td><td>ThinFilmSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>thin-film-kernel-threaded.wasm</code></th><td>Thin-film shared lead with synchronous capillary matrix barriers</td><td class="num">32,933</td><td class="num">12,726</td><td class="num">11,044</td><td>ThinFilmSolver.load() with 2 or 4 native participants</td></tr>
-<tr><th scope="row"><code>crush-shell-kernel.wasm</code></th><td>Rust thin-sheet plane-stress plasticity and hinge bending</td><td class="num">19,230</td><td class="num">8,975</td><td class="num">7,824</td><td>CrushShellSolver.load() from the optional /crush entry</td></tr>
-<tr><th scope="row"><code>crush-shell-kernel-shared.wasm</code></th><td>Rust thin-sheet plane-stress plasticity and hinge bending, shared world memory</td><td class="num">19,230</td><td class="num">8,975</td><td class="num">7,824</td><td>the shell loader on a host supporting shared world memory</td></tr>
+<tr><th scope="row"><code>crush-shell-kernel.wasm</code></th><td>Rust thin-sheet plane-stress plasticity and hinge bending</td><td class="num">24,979</td><td class="num">11,416</td><td class="num">9,916</td><td>CrushShellSolver.load() from the optional /crush entry</td></tr>
+<tr><th scope="row"><code>crush-shell-kernel-shared.wasm</code></th><td>Rust thin-sheet plane-stress plasticity and hinge bending, shared world memory</td><td class="num">24,979</td><td class="num">11,416</td><td class="num">9,916</td><td>the shell loader on a host supporting shared world memory</td></tr>
+<tr><th scope="row"><code>crush-shell-kernel-threaded.wasm</code></th><td>Shared crush shell lead with a membrane evaluation barrier</td><td class="num">25,644</td><td class="num">11,683</td><td class="num">10,109</td><td>CrushShellSolver.load() or its variants with 2 or 4 native participants</td></tr>
 <tr><th scope="row"><code>viscoplastic-kernel.wasm</code></th><td>Rust SIMD three-dimensional elastoviscoplastic material points</td><td class="num">36,124</td><td class="num">13,261</td><td class="num">11,319</td><td>ViscoplasticSolver.load() from the optional /viscoplastic entry</td></tr>
 <tr><th scope="row"><code>viscoplastic-kernel-shared.wasm</code></th><td>Rust SIMD three-dimensional elastoviscoplastic material points, shared world memory</td><td class="num">36,124</td><td class="num">13,261</td><td class="num">11,257</td><td>ViscoplasticSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>underwater-kernel.wasm</code></th><td>Rust SIMD underwater ray and Gaussian-beam tracing</td><td class="num">10,911</td><td class="num">4,846</td><td class="num">4,394</td><td>UnderwaterAcousticsSolver.load() from the optional /underwater entry</td></tr>
@@ -5005,10 +5006,10 @@
 <tr><td><code>./entry</code></td><td class="num">36,117</td><td class="num">14,182</td></tr>
 <tr><td><code>./flip</code></td><td class="num">38,669</td><td class="num">13,878</td></tr>
 <tr><td><code>./sea</code></td><td class="num">36,863</td><td class="num">14,183</td></tr>
-<tr><td><code>./seakeeping</code></td><td class="num">146,439</td><td class="num">53,151</td></tr>
+<tr><td><code>./seakeeping</code></td><td class="num">146,484</td><td class="num">53,191</td></tr>
 <tr><td><code>./celestial</code></td><td class="num">20,227</td><td class="num">9,486</td></tr>
 <tr><td><code>./life</code></td><td class="num">26,328</td><td class="num">10,317</td></tr>
-<tr><td><code>./crush</code></td><td class="num">59,905</td><td class="num">21,351</td></tr>
+<tr><td><code>./crush</code></td><td class="num">69,020</td><td class="num">24,368</td></tr>
 <tr><td><code>./legged</code></td><td class="num">26,980</td><td class="num">10,111</td></tr>
 <tr><td><code>./locomotion</code></td><td class="num">16,224</td><td class="num">6,552</td></tr>
 <tr><td><code>./pedestrians</code></td><td class="num">10,894</td><td class="num">4,432</td></tr>

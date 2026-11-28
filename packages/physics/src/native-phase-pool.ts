@@ -80,6 +80,11 @@ type NativePhaseSolver =
       readonly subject: 'Thin film';
       readonly phaseExport: 'thin_film_thread_phase';
       readonly phase: 'capillary matrix';
+    }
+  | {
+      readonly subject: 'Crush shell';
+      readonly phaseExport: 'crush_shell_thread_phase';
+      readonly phase: 'membrane evaluation';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };

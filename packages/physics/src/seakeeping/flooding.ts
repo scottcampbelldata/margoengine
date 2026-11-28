@@ -143,6 +143,10 @@ function floodElevation(sea: Surface, x: number, z: number, t: number): number {
   return height;
 }
 
+function waterHead(weight: number, level: number, height: number): number {
+  return weight === 0 ? 0 : weight * Math.max(0, level - height);
+}
+
 /** What a flooding step leaves: per opening its flows, per compartment its water's weight and where it acts. */
 export interface FloodResult {
   /** Per opening: water m^3/s, air kg/s and cargo kg/s from `from` toward `to`, and 1 where it is open. */
@@ -309,8 +313,9 @@ function stripFlow(
   rho: number,
   g: number,
 ): number {
-  const pa = (z: number) => a.p + rho * g * Math.max(0, a.level - z),
-    pb = (z: number) => b.p + rho * g * Math.max(0, b.level - z);
+  const weight = rho * g,
+    pa = (z: number) => a.p + waterHead(weight, a.level, z),
+    pb = (z: number) => b.p + waterHead(weight, b.level, z);
   // One piece: the pressure difference linear on it, one side higher throughout.
   const piece = (z0: number, z1: number): number => {
     const zm = (z0 + z1) / 2,
@@ -753,11 +758,11 @@ export class Flooding {
       !Number.isFinite(t) ||
       !(dt > 0 && Number.isFinite(dt)) ||
       !(rho > 0 && Number.isFinite(rho)) ||
-      !(g > 0 && Number.isFinite(g) && Number.isFinite(rho * g))
+      !(g >= 0 && Number.isFinite(g) && Number.isFinite(rho * g))
     )
       throw floodError(
         'unsupported',
-        'The flood step or fluid is invalid. Use finite time and positive SI step, density and gravity.',
+        'The flood step or fluid is invalid. Use finite time, positive step and density, and nonnegative gravity in SI units.',
       );
     const compartmentWords = this.compartments.length * COMPARTMENT_WORDS;
     for (let word = 0; word < state.length; word++) {
@@ -917,11 +922,13 @@ export class Flooding {
         const a = sides[o.from]!,
           b = o.to === -1 ? outside[k]! : sides[o.to]!,
           span = spans[k]!;
+        const weight = rho * g;
         let head = 0;
         for (let c = 0; c < span.length; c++) {
           const z = span[c]!,
-            d = a.p + rho * g * Math.max(0, a.level - z) - (b.p + rho * g * Math.max(0, b.level - z));
-          head = Math.max(head, Math.abs(d) / (rho * g));
+            d = a.p + waterHead(weight, a.level, z) - (b.p + waterHead(weight, b.level, z));
+          // At zero weight, equal air pressures give zero head. Any pressure difference exceeds a finite head threshold.
+          head = Math.max(head, weight === 0 ? (d === 0 ? 0 : Infinity) : Math.abs(d) / weight);
         }
         if (head >= o.collapse) state[base + k] = 1;
       }
@@ -1029,7 +1036,7 @@ export class Flooding {
               span = spans[k]!;
             let low = Infinity;
             for (let c = 0; c < span.length; c++) low = Math.min(low, span[c]!);
-            if (Number.isFinite(other.p)) hi = Math.max(hi, other.p + rho * g * Math.max(0, other.level - low));
+            if (Number.isFinite(other.p)) hi = Math.max(hi, other.p + waterHead(rho * g, other.level, low));
           }
           hi *= 1 + 1e-9;
           pressed[i] = root(g2, 0, hi, g2(0), g2(hi), TOLERANCE * hi);
@@ -1075,7 +1082,7 @@ export class Flooding {
             span = spans[k]!;
           let low = Infinity;
           for (let c = 0; c < span.length; c++) low = Math.min(low, span[c]!);
-          hi = Math.max(hi, other.p + rho * g * Math.max(0, other.level - low));
+          hi = Math.max(hi, other.p + waterHead(rho * g, other.level, low));
         }
         hi *= 1 + 1e-9;
         const p = root(f, 0, hi, f(0), f(hi), TOLERANCE * hi);

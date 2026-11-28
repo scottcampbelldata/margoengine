@@ -23848,3 +23848,7 @@ The new finite-volume entry holds a resting layer on a bank, follows the live te
 ### SEA-15 submerged jet crater depth and redistribution
 
 **OPEN KB-TRACER-CRATERFLOW1.** Run `node packages/physics/scripts/sea15-jet-scour-measured.mjs`. For two independently metered jets over a granular bed, the resulting final crater deficit is 1.29 and 1.00 cm³ on the 5 mm grid against 57.49 and 116.47 cm³ from the published ultrasonic profiles. The existing bed writer estimates pickup from projected jet momentum. This setup lacks a resolved return current and evolving wall shear over the new crater. The reported gross lift ledger counts repeated entrainment. The experiment measures final morphology, and a directly measured suspended-mass benchmark remains open. [Experiment](https://doi.org/10.1002/aic.70336)
+
+### Fixed zero-acceleration carried-water contact
+
+A zero-gravity frame using a vessel's carried floodwater failed before the contact solve. SEA-10 input validation required positive gravity although the displacement-free carried-water test uses zero. `Flooding` now keeps its pressure and carried mass at a nonnegative prescribed gravity. Zero specific weight contributes zero hydrostatic head. `packages/physics/tests/flooding.test.js` checks the closed tank exactly, and `packages/physics/tests/coupling/crush-contact-inertia.test.js` checks a real hull's wet normal, transverse and sliding impulses.
