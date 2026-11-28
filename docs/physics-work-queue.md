@@ -95,6 +95,12 @@ there, add a line below with the solver ID and what is needed, and build against
   and dissipated energy through its optional impact field. SOUND-05 needs a consumer for that field and an
   entrained-bubble event contract. SOUND-04's modal contact field has a real impact producer.
 
+- **SEA-04 / SEA-01:** Define a bidirectional boundary wave-action contract with face position and normal,
+  frequency and direction bins, and accepted incident, reflected and dissipated fluxes per tick. The local
+  wake can resolve a supplied incident wave. `WaveSolver` currently publishes its spectrum and has no
+  input port for a reflected or dissipated flux to return to the same bins. The coupling needs one ledger
+  for wave action crossing the boundary so source energy and reflected energy are each counted once.
+
 - **SOFT-04** needs a same-tick handoff for GPU-resident positions and reciprocal rigid-contact impulses,
   with an ordered snapshot readback after the tick commits. The current SoftSolver contract steps CPU
   regions synchronously. Both native nonlinear modes run on that contract and use the existing rigid fields.
@@ -384,6 +390,12 @@ owner, not fixed here.
 
 ## One solver at a time, start to finish (Scott, 2026-11-26)
 
+**Four-point pass (Scott, 2026-11-27).** Bring the lowest-scoring built solvers up to four of the eight
+points first. Hold one BUILDING row at a time. Record the exact four points and their evidence when
+releasing the row as REOPENED for the full pass. Reserve LANDED and VERIFIED for the full standard.
+Resume the eight-point upgrades after every eligible built solver has reached four. Keep existing
+ownership and exclusions.
+
 Scott: "complete wave all the way start to finish until it's done and passes all eight test and wire it into anything
 that it connects to." Each builder works on ONE row at a time:
 
@@ -527,7 +539,7 @@ KB2161 (docs/known-bugs.md, "A chain laid out level under a 1000:1 end mass stre
 | SOFT-02 | Rods, ropes, cables, chains (Cosserat) | elastic rods (`@margoengine/physics/rod`: bend, twist and stretch in a multibody's direct solve, pins, cast-off) with water loads per segment (`segmentLoads` in `@margoengine/physics/loads`: buoyancy, Morison drag and inertia, vortex lift); validated against a cantilever in a current, a catenary, a taut cable's frequency and strumming lock-in (`packages/physics/tests/rod.test.js`, `loads-segments.test.js`) | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 7bcfb11e3 |
 | SEA-01 | Wave spectrum and wave-field evolution | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 62fa8c303 |
 | SEA-02 | Ocean surface synthesis and query | partial | Claude (laptop) | P10 CHECKLIST MET 2026-11-27 (taken over from Gemini on Scott's order; sample, setWind, debug view, seaSurface floating, quick start, migration note, examples/ocean.html); speed unmeasured until the speed phase. REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 52b68ca65 |
-| SEA-04 | Local dispersive free surface | stand-in | Codex | P11 CHECKLIST MET 2026-11-27 (Claude took over from Gemini on Scott's order; obstacles, trackBody, disturbRay, cpu queries and snapshot, RippleField, seaSurface floating, debug view, quick start, migration note, examples/water-ripples.html); speed unmeasured until the speed phase. BUILDING (codex/physics-sea-04-upgrade; [audit](physics-solver-audit.md)), prior landing 33ab69766 |
+| SEA-04 | Local dispersive free surface | stand-in | Codex | REOPENED for the full audit. P11 CHECKLIST MET 2026-11-27 (Claude took over from Gemini on Scott's order; obstacles, trackBody, disturbRay, cpu queries and snapshot, RippleField, seaSurface floating, debug view, quick start, migration note, examples/water-ripples.html); speed unmeasured until the speed phase. Last production checkpoint `03657797a3`; [remaining audit](physics-solver-audit.md). |
 | SEA-08 | Ship seakeeping | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 0ae7b50ae2 |
 | SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Claude | LANDED 2026-11-27 after pass 5's five items ([physics-solver-audit.md](physics-solver-audit.md)): the unsourced advance removed and every shallow-water source checked (08b6158e2); squat at Huuska's limit and the shaft at KCS's published height (1e0083389); the catalog row (156359a01); bank forces by Lataire's model fitted to Vantorre's tests and checked on two hulls not fitted (9b23b5ecc); every hand-set bound derived from measured scatter (3a29a0c55), the VPP sailing ORC's No Spinnaker configuration (ccd0b17fd), and the accepted differences in docs/limits.md |
 | SEA-10 | Damage, flooding, capsize, sinking | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 533cc7249 |

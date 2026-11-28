@@ -12,7 +12,7 @@ const json = (name) => JSON.parse(read(name));
 const write = (name, value) => writeFileSync(here(name), JSON.stringify(value, null, 2) + '\n');
 const [command, selected] = process.argv.slice(2);
 const variant = process.env.SEA04_MEASURED_VARIANT ?? '';
-assert.ok(['', 'crest'].includes(variant));
+assert.ok(['', 'crest', 'upstream'].includes(variant));
 const tag = variant ? `-${variant}` : '';
 const planFile = `sea04-measured-plan${tag}.json`;
 const plan = json(planFile);

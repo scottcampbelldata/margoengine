@@ -1048,9 +1048,17 @@ Count: 3 DONE, 4 PARTIAL, 7 NOT DONE.
 - Item 2 in part. `6a73b7c01e` and `coupling/sea04-hull-boundary.test.js` check impermeable mean hull faces,
   a prescribed oscillating hull with reciprocal pressure and signed work, heave, late registration and exact
   replay. The work residual is 1.44e−13 J. Large advancing geometry and its Kelvin reflection remain open.
+- Item 2 in part. `03657797a3` and `coupling/sea04-hull-mask.test.js` check the same indexed-mesh bake for
+  imported and procedural hulls. The mask survives reindexing and exact seam copies, bounds box and cylinder
+  volume at three resolutions, and reproduces live pressure exchange after restore. A fixed mesh still uses
+  its mean wetted geometry.
 - Item 3 measured comparison. `6a73b7c01e` and [sea04-stem](../packages/physics/scripts/sea04-stem.md) record
   two published Wigley conditions. Fine surface sources give 16.42 and 14.53 mm at the stem against
   43.84 and 39.94 mm measured. Depth bands give 9.52 and 9.28 mm. Wetted-side through-flow remains open.
+- Item 3 rejected follow-up. The [steady tow reproduction](../packages/physics/scripts/sea04-stem-tow.md)
+  verifies the signed wall flux and outgoing modes. Using the identical signed hull source in an uncut
+  tank gives bounded waves at both speeds. The cut wetted surface produces unphysical waterline peaks
+  even with conservative face flux and affine trace restriction. The diagnostic remains outside the runtime.
 - Item 4 in part. `9d36eb9d75` and `sea04-cauchy-poisson.test.js` verify the finite-depth release ring against
   a Hankel integral, with 1.20e−8 maximum normalized error and exact replay.
   `3cf936a831` and `sea04-havelock.test.js` check moving pressure amplitude at five
@@ -1077,6 +1085,14 @@ Count: 3 DONE, 4 PARTIAL, 7 NOT DONE.
   The refined DHI case gives 63.95 mm RMS on the nominal archive clock. The circular analytic
   comparison also misses by 61.18 mm. The two photographed wake angles miss by −7.35° and +2.75°.
   These comparisons remain open.
+- Items 1 and 4 follow-up. The [measurement record](../packages/physics/scripts/sea04-measured.md)
+  adds a refined Briggs M4 breakwater comparison and `sea04-rabaud-gaussian.mjs`. Briggs gives
+  0.03792 and 0.04465 RMS on successive grids, so the measured error does not converge at all transects.
+  The convolved Gaussian gives 18.99° and 11.58° against 19.85° and 9.00° in the photographs.
+  The slower case moves outside ±1° after refinement. The faster case already misses on the coarse grid.
+- Item 1 measured cylinder follow-up. DHI same-run WG1 fixes the input while WG9 stays held out.
+  Fine RMS falls to 17.98 mm with no timing or gain fit. The exact linear solution gives 18.33 mm RMS.
+  [Reproduction](../packages/physics/scripts/sea04-measured.md#dhi-f1-cylinder)
 - Item 1. `75ee9d9129` and `coupling/sea04-diffraction.test.js` check the Penney–Price tip and
   MacCamy–Fuchs cylinder with the production finite wake. Refined normalized complex RMS is 0.05144
   and 0.08465, respectively. An incident-only packet forms its own diffracted wave, and restore replays

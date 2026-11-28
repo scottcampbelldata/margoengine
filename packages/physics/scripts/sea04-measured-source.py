@@ -40,10 +40,12 @@ PERIOD = 1.22
 RATE = 60
 SCORE = (FOCUS-PERIOD, FOCUS+PERIOD)
 VARIANT = sys.argv[2] if len(sys.argv)>2 else ""
-assert VARIANT in ("","crest")
+assert VARIANT in ("", "crest", "upstream")
 SUFFIX = "-"+VARIANT if VARIANT else ""
 ORIGIN = (-2.5, -5.0)
 DOMAIN = (5.0, 8.0)
+# Chen et al. (2014), §3.1 and Fig. 5: WG1 is 0.77 m from the paddle, the cylinder centre is 7.52 m.
+UPSTREAM_GAUGE = .77 - 7.52
 
 
 def sha(path):
@@ -70,13 +72,13 @@ def fetch():
 
 
 
-def sheet(path):
+def sheet(path, gauge_name="WG9"):
     ns = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
     with ZipFile(path) as archive:
         workbook = ET.fromstring(archive.read("xl/workbook.xml"))
         rel = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
         relations = {v.get("Id"):v.get("Target") for v in rel}
-        gauge = next(v for v in workbook.iter(ns+"sheet") if v.get("name") == "WG9")
+        gauge = next(v for v in workbook.iter(ns+"sheet") if v.get("name") == gauge_name)
         key = next(value for name,value in gauge.attrib.items() if name.endswith("}id"))
         location = relations[key]
         location = location.lstrip("/") if location.startswith("/") else "xl/"+location
@@ -139,35 +141,43 @@ def circular_transfer(omega):
 
 
 def input_plan():
-    path = HERE/"dhi-incident.xlsx"
-    assert sha(path) == INCIDENT_HASH
-    t,crest,trough = sheet(path)
+    upstream = VARIANT == "upstream"
+    path = HERE / ("dhi-holdout.xlsx" if upstream else "dhi-incident.xlsx")
+    assert sha(path) == (HOLDOUT_HASH if upstream else INCIDENT_HASH)
+    t,crest,trough = sheet(path, "WG1" if upstream else "WG9")
     data = crest.copy() if VARIANT else .5*(crest-trough)
     quiet = (t>=1.)&(t<20.)
     quiet_mean = float(np.mean(data[quiet]))
     quiet_max = float(np.max(abs(data[quiet]-quiet_mean)))
     dt = .01
-    bins = 30. + np.arange(2000)*dt
-    window = np.clip(np.minimum(bins-30.,50.-bins)/4.,0.,1.)
+    start, end, taper = (24., 42., 2.) if upstream else (30., 50., 4.)
+    bins = start + np.arange(round((end-start)/dt))*dt
+    window = np.clip(np.minimum(bins-start, end-bins)/taper,0.,1.)
     data = (np.interp(bins,t,data)-quiet_mean)*np.sin(np.pi/2*window)**2
     freq = np.fft.rfftfreq(len(data),dt)
     ft = np.fft.rfft(data)
     keep = (freq>=FRANGE[0])&(freq<=FRANGE[1])
     omega = 2.*np.pi*freq[keep]
     coef = 2.*ft[keep]/len(data)*np.exp(1j*omega*(FOCUS-bins[0]))
+    if upstream:
+        # Transfer the separately measured incoming signal to the WG9 plane, without comparing to WG9.
+        coef *= np.exp(-1j*gravity_k(omega)*(-GAUGE-UPSTREAM_GAUGE))
     seconds = START + np.arange(round((SCORE[1]-START)*RATE)+2)/RATE
     phasor = np.exp(1j*omega[:,None]*(seconds-FOCUS))
     plane_trace = np.real(coef @ phasor)
     transfer = circular_transfer(omega)
     circular_trace = np.real((coef*transfer) @ phasor)
-    payload = {"source":CATALOG,"incident_source":BASE_URL+"F1.F3.-.incoming.wave_.data_.xlsx",
+    incident_file = "F1.F3.-.with_.cylinder.in_.place_.xlsx" if upstream else "F1.F3.-.incoming.wave_.data_.xlsx"
+    incident_proxy = ("same-run upstream WG1 crest, propagated by the finite-depth dispersion relation"
+                      if upstream else "single crest, independent no-cylinder WG9 workbook, fixed trigger time"
+                      if VARIANT else "half crest minus trough, independent no-cylinder WG9 workbook, fixed trigger time")
+    payload = {"source":CATALOG,"incident_source":BASE_URL+incident_file,
                "heldout_source":BASE_URL+"F1.F3.-.with_.cylinder.in_.place_.xlsx",
-               "incident_xlsx_sha256":INCIDENT_HASH,"heldout_xlsx_sha256":HOLDOUT_HASH,
+               "incident_xlsx_sha256":sha(path),"heldout_xlsx_sha256":HOLDOUT_HASH,
                "case":"F1 WG9","gravity":G,"depth":DEPTH,"cylinder_radius":RADIUS,
                "gauge":[0.,-GAUGE],"focus_s":FOCUS,"start_s":START,"rate":RATE,
-               "score_s":SCORE,"frequency_hz":FRANGE,"incident_window_s":[30.,50.],
-               "incident_linear_proxy":("single crest, independent no-cylinder WG9 workbook, fixed trigger time"
-                                        if VARIANT else "half crest minus trough, independent no-cylinder WG9 workbook, fixed trigger time"),
+               "score_s":SCORE,"frequency_hz":FRANGE,"incident_window_s":[start,end],
+               "incident_linear_proxy":incident_proxy,
                "source_band_energy_fraction":float(np.sum(abs(ft[keep])**2)/np.sum(abs(ft[1:])**2)),
                "background_max_incident_m":quiet_max,"origin_m":ORIGIN,"domain_m":DOMAIN,"sponge_m":1.,
                "sponge_rate":4.,
@@ -179,6 +189,8 @@ def input_plan():
                "modes":[[float(o),float(a.real),float(a.imag)] for o,a in zip(omega,coef)],
                "time_s":seconds.tolist(),"analytical_incident_m":plane_trace.tolist(),
                "analytical_cylinder_m":circular_trace.tolist()}
+    if upstream:
+        payload["incident_gauge_m"] = UPSTREAM_GAUGE
     target = HERE/("sea04-measured-plan"+SUFFIX+".json")
     target.write_text(json.dumps(payload,indent=2)+"\n")
     print("frozen plan",sha(target),"retained energy",payload["source_band_energy_fraction"],
