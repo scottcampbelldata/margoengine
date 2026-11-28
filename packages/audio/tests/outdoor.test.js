@@ -72,12 +72,33 @@ test('one controller a sound; bad options and paths are refused', async (t) => {
   const s = await scene();
   t.after(() => s.dispose());
   const good = () => ({ delaySeconds: 0, gainDb });
-  assert.throws(() => new OutdoorAudio(s.sound, good, { maxDelay: 0 }), { name: 'RangeError' });
-  assert.throws(() => new OutdoorAudio(s.sound, good, { smoothing: -1 }), { name: 'RangeError' });
+  assert.throws(() => new OutdoorAudio(s.sound, good, null), { name: 'MargoError', code: 'unsupported' });
+  assert.throws(() => new OutdoorAudio(s.sound, good, { maxDelay: 0 }), { name: 'MargoError', code: 'unsupported' });
+  assert.throws(() => new OutdoorAudio(s.sound, good, { smoothing: -1 }), { name: 'MargoError', code: 'unsupported' });
   assert.throws(() => new OutdoorAudio(s.sound, () => ({ delaySeconds: 31, gainDb })), /delay line/);
   assert.throws(() => new OutdoorAudio(s.sound, () => ({ delaySeconds: 0, gainDb: [0] })), /eight-band/);
   const outdoor = new OutdoorAudio(s.sound, good);
   assert.throws(() => new OutdoorAudio(s.sound, good), { code: 'attached' });
   outdoor.dispose();
   new OutdoorAudio(s.sound, good).dispose();
+});
+
+test('an invalid band or unrepresentable path gain changes none of the audio parameters', async (t) => {
+  const s = await scene();
+  t.after(() => s.dispose());
+  let path = { delaySeconds: 0.125, gainDb };
+  const outdoor = new OutdoorAudio(s.sound, () => path, { maxDelay: 2 });
+  t.after(() => outdoor.dispose());
+  const [delay, bass, treble, level] = s.sound.getFilters();
+  const current = () => [delay.delayTime.value, bass.gain.value, treble.gain.value, level.gain.value];
+  const accepted = current();
+  path = { delaySeconds: 0.25, gainDb: gainDb.map((db, i) => (i === 3 ? NaN : db)) };
+  assert.throws(() => outdoor.update(), { name: 'MargoError', code: 'unsupported' });
+  assert.deepEqual(current(), accepted);
+  path = { delaySeconds: 0.25, gainDb: gainDb.map((db, i) => (i === 4 ? 900 : db)) };
+  assert.throws(() => outdoor.update(), { name: 'MargoError', code: 'failed' });
+  assert.deepEqual(current(), accepted);
+  path = { delaySeconds: 0.25, gainDb };
+  outdoor.update();
+  assert.equal(delay.delayTime.value, 0.25);
 });

@@ -13,6 +13,13 @@ export const OUTDOOR_SOUND_LAYOUT = 1;
 export class OutdoorSound implements Solver<OutdoorSoundParams> {
     readonly id: string;
     readonly field: FieldDescriptor;
+    static load({ id, threads, signal }?: {
+        readonly id?: string;
+        readonly threads?: number;
+        readonly signal?: AbortSignal;
+    }): Promise<OutdoorSound>;
+    workCounts(): OutdoorSoundWorkCounts | undefined;
+    dispose(): void;
     constructor(id?: string);
     describe(): SolverDescription;
     init(host: SolverHost, params: OutdoorSoundParams): void;
@@ -50,6 +57,18 @@ export interface OutdoorSoundReading {
     readonly gainDb: Float64Array;
     readonly airLossDb: Float64Array;
     readonly diffractionDb: Float64Array;
+}
+
+export interface OutdoorSoundWorkCounts extends OutdoorSoundWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly OutdoorSoundWorkerWork[];
+}
+
+export interface OutdoorSoundWorkerWork {
+    readonly links: number;
+    readonly samples: number;
+    readonly bandPairs: number;
+    readonly coefficientSets: number;
 }
 
 export function aviationNWave(secondsSinceArrival: number, duration: number, peak: number, rise?: number): number;

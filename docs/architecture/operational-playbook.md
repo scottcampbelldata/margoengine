@@ -11450,6 +11450,15 @@ the field registry. A production Vite build preserves both lazy Wasm files.
 
 The Biomes entry reads current HYDRO-02 water through the registered soil storage field and publishes versioned branch geometry. The phase, stable parent graph, radii and in-season water sums survive snapshot restore. The SIMD shadow kernel allocates its own arena stack and has no static window. Geometry conversion uses the existing Procedural tube entry. Tests derive the apical and lateral allocation, branch angle, attenuation, and radius from the production law, then exercise drought, solid occlusion, plant competition and wasm/browser replay.
 
+### Native outdoor path integration (SOUND-01)
+
+One solver tick samples the actual Wind and TerrainBed in their signed cells. The optional native module
+uses private Wasm memory for the staged atmosphere and terrain paths. Workers integrate disjoint links.
+Each SIMD lane keeps deterministic per-band order. The two legs of a blocked path keep separate time and
+distance accumulators. Path records publish together after all inputs and results pass their finite-range
+checks. Spot checks cover 35 and 63 links at 1, 2 and 4 participants, exact shared and plain world replay,
+and a 50 m OfflineAudioContext and fixed-camera bell cutaway on WebGPU and WebGL2.
+
 ### Native room pressure kernel (SOUND-02)
 
 Two-lane Wasm updates the seven-point pressure stencil. The world owns both pressure buffers, the receiver

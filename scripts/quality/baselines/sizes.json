@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21858947,
+  "total": 21864059,
   "history": [
     {
       "date": "2026-10-24",
@@ -15647,6 +15647,12 @@
       "commit": "aero-03-native-flight",
       "reason": "AERO-03 @margoengine/physics/flight 7423 to 12800 B gzip, @margoengine/physics 988134 to 992317 B gzip, @margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table)) 107016 to 107307 B gzip, @margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table) 880546 to 884404 B gzip, @margoengine/physics/flight 7651 to 13184 B ceiling. Flight adds validated body-relative panel and rotor sampling, coded range errors and the shared native phase loader. The native matrix and wake code stays in on-demand Wasm files. Splitting the flight options would duplicate the existing wing geometry and wrench path. The air accumulator guard is shared with WindForce. Core and stage are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "sound-01-native-paths",
+      "reason": "SOUND-01 @margoengine/physics/outdoor-sound 3490 to 8600 B gzip, @margoengine/physics 992317 to 992336 B gzip, @margoengine/audio/outdoor 1191 to 1389 B gzip, @margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table)) 107307 to 107331 B gzip, @margoengine/physics/outdoor-sound 3746 to 8858 B ceiling. Phase workers integrate the same ordered path samples, and the optional entry validates and atomically publishes all bands. Terrain occlusion tests both legs of the specular image. The same inputs and outputs serve scalar and native integration, so an extra public split would duplicate the ray and validation paths. Core and stage are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16547,7 +16553,7 @@
     "@margoengine/physics/modal-sound": 9489,
     "@margoengine/physics/mooring": 3744,
     "@margoengine/physics/orbit": 6947,
-    "@margoengine/physics/outdoor-sound": 3746,
+    "@margoengine/physics/outdoor-sound": 8858,
     "@margoengine/physics/pack-ice": 4971,
     "@margoengine/physics/pbf": 5833,
     "@margoengine/physics/pedestrians": 4688,

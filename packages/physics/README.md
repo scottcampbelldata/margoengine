@@ -7001,22 +7001,29 @@ boundary reflections. A `signal` can cancel kernel loading.
 
 `@margoengine/physics/outdoor-sound` gives each source–listener link its travel time and eight octave gains.
 Set `air` to a Weather wind field for advection and vertical refraction, and `bed` to a TerrainBed for
-diffraction. An explicit `groundY` adds a plane reflection. The reflected pressure defaults to full strength
+diffraction. An explicit `groundY` adds a plane reflection where both legs reach the reflecting point. The reflected pressure defaults to full strength
 and `groundReflection: 0` turns it off. With still air, temperature defaults to 293.15 K, pressure to
 101,325 Pa, and relative humidity to 0.5. Call `read` after advancing the world. Callbacks for moving links
 take world seconds and return metres relative to the solver cell. For a nonstandard world cell size, pass the
 same `cellSize` to the solver. The default is 4,096 m per cell.
+The spreading reference is 1 m and integration uses 24 intervals per leg by default.
+
+`new OutdoorSound()` uses the scalar integrator. `OutdoorSound.load()` lazily loads the SIMD path and accepts an optional solver `id`,
+a cancellation `signal` and `threads` of 1 (default), 2 or 4, including the caller. Multiple participants need Node
+or a cross-origin-isolated browser worker. `workCounts()` reports work for the last successful native integration.
+Those diagnostic counters update on the next solved tick after restoring a snapshot.
 
 ```ts
 import { OutdoorSound } from 'margoengine/physics/outdoor-sound';
 import { PhysicsWorld } from 'margoengine/physics/world';
 
-const paths = new OutdoorSound();
+const paths = await OutdoorSound.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(paths, {
   links: [{ source: [0, 3, 0], listener: [3000, 3, 0] }],
 });
 world.advance(1);
 console.log(paths.read().delaySeconds.toFixed(2)); // 8.74
+paths.dispose();
 ```
 
 `read` also provides the band losses before summing spreading, air, terrain, and interference. Use

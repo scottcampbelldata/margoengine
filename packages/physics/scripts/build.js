@@ -27,7 +27,7 @@ const exposeOptionalUrls = {
     return {
       code: code
         .replace(
-          /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|cloud-projection|vegetation|wind-traction|wing-lattice|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
+          /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|cloud-projection|vegetation|wind-traction|wing-lattice|accretion|room-sound|outdoor-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
           '',
         )
         .replace(
@@ -220,6 +220,8 @@ for (const name of ['airborne-kernel.wasm', 'airborne-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/airborne', name), resolve(dist, name));
 for (const name of ['accretion-kernel.wasm', 'accretion-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/accretion', name), resolve(dist, name));
+for (const name of ['outdoor-sound-kernel.wasm', 'outdoor-sound-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/outdoor-sound', name), resolve(dist, name));
 for (const name of ['room-sound-kernel.wasm', 'room-sound-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/room-sound', name), resolve(dist, name));
 for (const name of ['modal-sound-kernel.wasm', 'modal-sound-kernel-shared.wasm'])

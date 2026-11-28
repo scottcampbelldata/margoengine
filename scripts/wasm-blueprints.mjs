@@ -635,6 +635,20 @@ export const BLUEPRINTS = [
     args: ['plain'],
   },
   {
+    name: 'outdoor-sound-kernel',
+    crate: 'packages/physics/outdoor-sound-kernel',
+    blueprint: 'packages/physics/src/outdoor-sound/outdoor-sound-kernel.wasm',
+    script: 'packages/physics/scripts/build-outdoor-sound-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'outdoor-sound-kernel-shared',
+    crate: 'packages/physics/outdoor-sound-kernel',
+    blueprint: 'packages/physics/src/outdoor-sound/outdoor-sound-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-outdoor-sound-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'wing-lattice-kernel',
     crate: 'packages/physics/wing-lattice-kernel',
     blueprint: 'packages/physics/src/flight/wing-lattice-kernel.wasm',

@@ -1,4 +1,5 @@
 import { exp, hypot, ln, pow } from '@margoengine/math/pinned';
+import { soundError } from './errors.js';
 
 /** Octave-band centres in Hz, ordered from bass to treble. */
 export const OUTDOOR_SOUND_BANDS = Object.freeze([63, 125, 250, 500, 1000, 2000, 4000, 8000] as const);
@@ -20,7 +21,8 @@ export function outdoorAirAbsorption(
     !(relativeHumidity >= 0 && relativeHumidity <= 1) ||
     !(pressure > 0 && Number.isFinite(pressure))
   )
-    throw new RangeError(
+    throw soundError(
+      'unsupported',
       'Invalid air absorption inputs; pass Hz, positive kelvins and pascals, and humidity from 0 to 1.',
     );
   const tr = temperature / STANDARD_TEMPERATURE;
@@ -33,16 +35,28 @@ export function outdoorAirAbsorption(
   const relaxation =
     (0.01275 * exp(-2239.1 / temperature) * oxygen) / (oxygen * oxygen + square) +
     (0.1068 * exp(-3352 / temperature) * nitrogen) / (nitrogen * nitrogen + square);
-  return 8.686 * square * ((1.84e-11 * pow(tr, 0.5)) / pr + pow(tr, -2.5) * relaxation);
+  const loss = 8.686 * square * ((1.84e-11 * pow(tr, 0.5)) / pr + pow(tr, -2.5) * relaxation);
+  if (!(loss >= 0 && Number.isFinite(loss)))
+    throw soundError(
+      'failed',
+      'The ISO air loss is unrepresentable. Use terrestrial temperature and pressure, or reduce frequency.',
+    );
+  return loss;
 }
 
 /** Fresnel–Kirchhoff single-edge attenuation, in dB (P.526-16, equation 31). */
 export function outdoorDiffractionLoss(fresnelNumber: number): number {
   if (!Number.isFinite(fresnelNumber))
-    throw new RangeError('Fresnel clearance must be finite; pass the signed clearance scaled by the Fresnel radius.');
+    throw soundError(
+      'unsupported',
+      'Fresnel clearance must be finite; pass the signed clearance scaled by the Fresnel radius.',
+    );
   if (fresnelNumber <= -0.78) return 0;
   const v = fresnelNumber - 0.1;
-  return Math.max(0, 6.9 + (20 * ln(hypot(v, 1) + v)) / LN_10);
+  const sum = hypot(v, 1) + v;
+  // Beyond the range of the squared norm, its relative correction to v is below floating precision.
+  const log = Number.isFinite(sum) ? ln(sum) : ln(v) + ln(2);
+  return Math.max(0, 6.9 + (20 * log) / LN_10);
 }
 
 /** A prescribed far-field aviation N-wave, sampled as signed acoustic pressure. */
@@ -53,7 +67,8 @@ export function aviationNWave(secondsSinceArrival: number, duration: number, pea
     !(peak >= 0 && Number.isFinite(peak)) ||
     !(rise >= 0 && rise < duration / 2)
   )
-    throw new RangeError(
+    throw soundError(
+      'unsupported',
       'Invalid aviation N-wave; pass finite time, positive duration, nonnegative peak and a rise below half its duration.',
     );
   if (secondsSinceArrival < 0 || secondsSinceArrival >= duration) return 0;

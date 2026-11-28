@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { PositionalAudio } from './audio.js';
 import { smoothParam } from './math.js';
-import { fault, rangeError } from '../../shared/errors.js';
+import { fault } from '../../shared/errors.js';
 
 /** Structural reading so an Audio scene can use a physics path without loading the physics package itself. */
 export interface OutdoorAudioPath {
@@ -37,19 +37,37 @@ export class OutdoorAudio {
     private readonly path: () => OutdoorAudioPath,
     options: OutdoorAudioOptions = {},
   ) {
-    if (sound.isDisposed || OutdoorAudio.owners.has(sound))
+    if (!sound || sound.isDisposed || OutdoorAudio.owners.has(sound))
       throw fault(
         'attached',
-        'Outdoor audio needs a live, uncontrolled sound; dispose its old controller or use a fresh sound.',
+        'Outdoor audio needs a live, uncontrolled sound. Dispose its old controller or use a fresh sound',
+        'outdoor-sound',
+      );
+    if (typeof path !== 'function')
+      throw fault(
+        'unsupported',
+        'Outdoor audio needs a callback that returns a solved path. Pass a function',
+        'outdoor-sound',
+      );
+    if (!options || typeof options !== 'object')
+      throw fault(
+        'unsupported',
+        'Outdoor audio settings must be an object. Supply settings or omit the argument',
+        'outdoor-sound',
       );
     this.upperDelay = options.maxDelay ?? 30;
     if (!(this.upperDelay > 0 && this.upperDelay <= 180))
-      throw rangeError('Outdoor maxDelay must be above 0 and at most 180 seconds; pass a sufficient delay.', 'state');
+      throw fault(
+        'unsupported',
+        'Outdoor maxDelay must be above 0 and at most 180 seconds. Pass a sufficient delay',
+        'outdoor-sound',
+      );
     this.smoothing = options.smoothing ?? sound.listener.smoothing;
     if (!(this.smoothing >= 0 && Number.isFinite(this.smoothing)))
-      throw rangeError(
-        'Outdoor smoothing must be finite and nonnegative; pass seconds or use the listener value.',
-        'state',
+      throw fault(
+        'unsupported',
+        'Outdoor smoothing must be finite and nonnegative. Pass seconds or use the listener value',
+        'outdoor-sound',
       );
     this.previousRolloff = sound.rolloffFactor;
     const context = sound.context;
@@ -76,27 +94,49 @@ export class OutdoorAudio {
       this.dispose();
       return;
     }
-    const { delaySeconds, gainDb } = this.path();
-    const low = gainDb[0],
-      mid = gainDb[4],
-      high = gainDb[7];
-    if (!(delaySeconds >= 0 && delaySeconds <= this.upperDelay))
-      throw rangeError('Outdoor travel time exceeds the delay line; increase maxDelay or shorten the path.', 'state');
+    const path = this.path();
+    if (!path || !(path.delaySeconds >= 0 && path.delaySeconds <= this.upperDelay))
+      throw fault(
+        'unsupported',
+        'Outdoor travel time exceeds the delay line. Increase maxDelay or pass a shorter path',
+        'outdoor-sound',
+      );
+    const { delaySeconds, gainDb } = path;
+    if (!gainDb || gainDb.length !== 8)
+      throw fault(
+        'unsupported',
+        'Outdoor audio needs finite octave gains. Pass a solved eight-band path',
+        'outdoor-sound',
+      );
+    for (let band = 0; band < 8; band++)
+      if (!Number.isFinite(gainDb[band]))
+        throw fault(
+          'unsupported',
+          'Outdoor audio needs finite octave gains. Pass a solved eight-band path',
+          'outdoor-sound',
+        );
+    const middle = gainDb[4]!;
+    const level = 10 ** (middle / 20);
+    const bass = gainDb[0]! - middle;
+    const treble = gainDb[7]! - middle;
     if (
-      low === undefined ||
-      mid === undefined ||
-      high === undefined ||
-      !Number.isFinite(low) ||
-      !Number.isFinite(mid) ||
-      !Number.isFinite(high)
+      !(
+        Number.isFinite(Math.fround(level)) &&
+        Number.isFinite(Math.fround(bass)) &&
+        Number.isFinite(Math.fround(treble))
+      )
     )
-      throw rangeError('Outdoor audio needs finite octave gains; pass a solved eight-band path.', 'state');
+      throw fault(
+        'failed',
+        'Outdoor audio gains exceed the representable filter range. Reduce the path gain or equalizer difference',
+        'outdoor-sound',
+      );
     const context = this.sound.context;
     const smoothing = this.initial ? 0 : this.smoothing;
     smoothParam(this.delay.delayTime, delaySeconds, context, smoothing);
-    smoothParam(this.level.gain, 10 ** (mid / 20), context, smoothing);
-    smoothParam(this.bass.gain, low - mid, context, smoothing);
-    smoothParam(this.treble.gain, high - mid, context, smoothing);
+    smoothParam(this.level.gain, level, context, smoothing);
+    smoothParam(this.bass.gain, bass, context, smoothing);
+    smoothParam(this.treble.gain, treble, context, smoothing);
     this.initial = false;
   }
 

@@ -209,7 +209,7 @@ and shelves driven by the 63 Hz and 8 kHz gains. The path model handles distance
 continues to pan and use its authored volume and filters. `maxDelay` defaults to 30 seconds and accepts
 values above zero through 180 seconds. Moving paths smooth with the listener's time constant unless you
 pass `smoothing`. Use one time-of-flight controller per sound. The controller removes its nodes on disposal
-and restores the sound's distance rolloff.
+and restores the sound's distance rolloff. Give the controller a finite delay and all eight finite octave gains.
 
 ```ts
 import { AudioListener, PositionalAudio } from 'margoengine/audio';

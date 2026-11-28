@@ -141,6 +141,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'outdoor-sound',
+    title: 'Outdoor sound paths and positional audio',
+    kind: 'family',
+    messages: [],
+    cause: 'A source, listener, atmosphere, terrain or audio path is invalid or exceeds the numerical range.',
+    fix: 'Supply finite local source and listener coordinates, a valid bed and wind, and positive kelvin and density. Use a shorter local path if derived distances overflow. Use all eight finite band gains and keep travel time within the audio delay capacity.',
+  },
+  {
     id: 'physics-flight',
     title: '@margoengine/physics/flight wings, rotors and lifting gas',
     kind: 'family',

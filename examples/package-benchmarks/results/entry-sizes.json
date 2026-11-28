@@ -180,8 +180,8 @@
         "gzip": 1323
       },
       "./outdoor": {
-        "raw": 2663,
-        "gzip": 1191
+        "raw": 3394,
+        "gzip": 1389
       },
       "./events": {
         "raw": 18904,
@@ -15638,8 +15638,8 @@
         "gzip": 9212
       },
       "./outdoor-sound": {
-        "raw": 8158,
-        "gzip": 3490
+        "raw": 22064,
+        "gzip": 8600
       },
       "./falling": {
         "raw": 13550,
@@ -20201,6 +20201,16 @@
       "raw": 1558039,
       "gzip": 574912,
       "brotli": 424250
+    },
+    "packages/physics/dist/outdoor-sound-kernel.wasm": {
+      "raw": 4374,
+      "gzip": 2078,
+      "brotli": 1914
+    },
+    "packages/physics/dist/outdoor-sound-kernel-shared.wasm": {
+      "raw": 4374,
+      "gzip": 2078,
+      "brotli": 1914
     }
   },
   "splits": {

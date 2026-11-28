@@ -342,6 +342,13 @@ first: each names its scope, its evidence file and how to reproduce it.
   equilibrium equation and soil demand matches Seed–Idriss. Run `node --test packages/physics/tests/coupling/seismic.test.js`
   and `node packages/physics/tests/seismic.browser.mjs` after building.
 
+- Outdoor sound native integration and ridge visibility (SOUND-01). The actual 63-link fixture evaluates
+  1,768 atmosphere samples and 7,072 paired octave updates on up to four participants, with exact signed-cell
+  snapshots and replay. In the 50 m bell cutaway, accepted path times are 145.674 and 157.553 ms.
+  The ridge arrival is 570 samples later at 48 kHz and has 12.83 dB less treble relative to bass. Full rendered
+  PCM and each backend’s camera pixels replay exactly. Independent Rasmussen berm spectra match 5 of 16
+  figure readings within their readout intervals. The largest remaining discrepancy is 6.97 dB.
+  Tests are `packages/physics/tests/coupling/outdoor-sound-workers.test.js` and `packages/audio/tests/outdoor-film.browser.mjs`.
 - Outdoor sound (SOUND-01, 2026-11-26). Terrain ridge diffraction, Weather wind, the round-trip ground image
   and the ISO 9613-1 coefficient are checked against independent reference values. Web Audio delays a 3 km
   pulse by 8.74044 s at 48 kHz relative to its otherwise identical undelayed filter chain. Reproduce with

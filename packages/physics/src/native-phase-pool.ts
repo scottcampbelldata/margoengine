@@ -24,7 +24,8 @@ type NativePhaseSolver =
   | { readonly subject: 'Aeolian'; readonly phaseExport: 'aeolian_thread_phase' }
   | { readonly subject: 'Rail wire'; readonly phaseExport: 'rail_wire_thread_phase' }
   | { readonly subject: 'Room acoustics'; readonly phaseExport: 'acoustic_wave_thread_phase' }
-  | { readonly subject: 'Wing lattice'; readonly phaseExport: 'flight_lattice_thread_phase' };
+  | { readonly subject: 'Wing lattice'; readonly phaseExport: 'flight_lattice_thread_phase' }
+  | { readonly subject: 'Outdoor sound'; readonly phaseExport: 'outdoor_sound_thread_phase' };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };
 
@@ -78,6 +79,7 @@ const phaseLabel = {
   'Rail wire': 'catenary',
   'Room acoustics': 'pressure stencil',
   'Wing lattice': 'matrix and wake',
+  'Outdoor sound': 'path quadrature',
 } as const;
 
 function failedThreads(subject: NativePhaseSolver['subject'], reason: string, cause?: unknown): MargoError {

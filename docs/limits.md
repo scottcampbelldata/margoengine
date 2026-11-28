@@ -23,13 +23,19 @@ notes one change's size or behaviour and its evidence. Every number has a row in
   screening uses configured soil resistance, with no pore-water pressure evolution. A building receiver
   is one horizontal mode. The optional solver is 5,646 bytes gzip and each lazy SIMD asset is 2,474 bytes raw.
 
-- Outdoor sound (SOUND-01, 2026-11-26). The solver traces one weakly refracted path or one dominant terrain edge
-  per link. It estimates ground interference with one locally horizontal reflecting plane. It uses the current
-  wind profile for the path, with no caustics, atmospheric ducts, turbulence scattering, or multiple-edge
-  diffraction. ISO 9613-1 reports ±10% absorption accuracy for its ordinary weather range. The solver publishes
-  eight octave gains, while the realtime playback approximates the response with two shelves and a centre gain.
-  Maximum configured realtime delay is 180 s (Web Audio DelayNode), with a 30 s default.
-  The optional physics and audio entries are 4,391 and 1,191 bytes gzip.
+- Outdoor sound (SOUND-01). The solver uses a local midpoint sound-speed gradient, one weakly refracted direct
+  trajectory or one dominant edge and one coherent horizontal-plane reflection. Both specular legs must reach
+  the reflecting point without passing through the terrain. The model omits ground impedance, multiple-edge and
+  reflected diffraction, atmospheric ducts and shadow strength, turbulence scattering and phase-resolved audio.
+  ISO 9613-1 gives ±10% absorption accuracy for its ordinary weather range. In Rasmussen’s berm experiment,
+  5 of 16 spectral readings are inside the figure-reading intervals after the reflection visibility fix. The
+  remaining residual reaches 6.97 dB. The figures supply readout ranges and no full experimental uncertainty.
+  Playback uses two shelves and a centre gain for the eight-band path. Its configured delay is above 0 through
+  180 s, default 30 s. Sound tracing stages up to two sets of configured intervals per link in private scratch.
+  The 1/2/4-participant path uses native f64 SIMD for each octave pair. Multiple participants require Node or a
+  cross-origin-isolated browser worker. Terrain and field sampling remain on the caller. A finer bed can increase
+  sampling work. The optional plain and shared Wasm assets are each 4,374 B raw and 2,078 B gzip.
+  The optional Physics and Audio entries are 8,600 B and 1,389 B gzip.
 
 - Webcam face to morph targets (`@margoengine/input/face`, 2026-11-26): no detector shipped; the app supplies one.
   Landmarks alone give 15 of the 52 ARKit shapes (blinks, wide eyes, jaw, smiles, frowns, pucker, brows); the others

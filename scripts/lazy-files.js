@@ -535,6 +535,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/outdoor-sound-kernel.wasm',
+    label: 'outdoor-sound-kernel.wasm',
+    kind: 'Rust SIMD octave loss and time-of-flight integration',
+    measure: 'file',
+    when: 'OutdoorSound.load() from the optional /outdoor-sound entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/outdoor-sound-kernel-shared.wasm',
+    label: 'outdoor-sound-kernel-shared.wasm',
+    kind: 'Rust SIMD octave paths with private shared worker scratch',
+    measure: 'file',
+    when: 'OutdoorSound.load() with more than one participant',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/room-sound-kernel.wasm',
     label: 'room-sound-kernel.wasm',
     kind: 'Rust SIMD room acoustic pressure waves',

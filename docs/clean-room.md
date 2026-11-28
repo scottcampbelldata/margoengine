@@ -1102,6 +1102,29 @@ uses the Web Audio DelayNode and tests its sample arrival against the same undel
 <https://ntrs.nasa.gov/citations/20250003228>, <https://doi.org/10.1109/79.482137>,
 and <https://www.w3.org/TR/webaudio/#DelayNode>.
 
+#### Atomic outdoor paths, terrain visibility and native quadrature
+
+ANSI/ISO atmospheric attenuation above states the eight bands as pure-tone centre values. H. E. Bass,
+L. C. Sutherland, A. J. Zuckerwar, D. T. Blackstock and D. M. Hester, *Atmospheric absorption of sound: Further
+developments* (1995), compares the relaxation mechanisms and saturation expression. The solver keeps the ISO
+coefficients. The TypeScript and Rust pinned functions evaluate the same formula. Native SIMD visits successive
+octave pairs, and each band keeps its original midpoint sum order. Diffraction legs retain independent length and
+delay sums followed by the original two-leg addition. [Bass et al.](https://doi.org/10.1121/1.412989).
+
+Karsten B. Rasmussen, *Model experiments related to outdoor propagation over an earth berm* (1994), Fig. 1
+gives the triangular berm, source location and four receiver heights. Figs. 3–6 report measurements relative to
+free field. The diagnostic reads a small set of those outcomes and runs the actual terrain and solver from the
+geometry without fitting. The still laboratory atmosphere is evaluated at the existing standard temperature,
+humidity and pressure because the paper does not specify them. The original 250 Hz error on the highest
+receiver exposed a geometric fault. The direct ray clears the crest, but the outgoing leg from the plane’s
+specular point crosses it. Both reflection legs now use the same bed visibility test. This handles a blocked
+image and leaves wedge reflections and finite ground impedance open. [Rasmussen](https://doi.org/10.1121/1.411404).
+
+Zen'iti Maekawa, *Noise reduction by screens* (1968), tests screening loss as a function of detour relative to
+wavelength. The real-terrain bell cutaway checks rendering and audible timing with the existing scalar
+knife-edge approximation. It uses accepted distances and octave gains with the Web Audio DelayNode.
+[Maekawa](https://doi.org/10.1016/0003-682X(68)90020-0), [Web Audio](https://www.w3.org/TR/webaudio/#DelayNode).
+
 ### Webcam hands and body to a skeleton in Input (2026-11-26)
 
 Michael Gleicher, Retargetting Motion to New Characters (SIGGRAPH 1998, https://doi.org/10.1145/280814.280820), and Jean-Sebastien Monzani, Paolo Baerlocher, Ronan Boulic and Daniel Thalmann, Using an Intermediate Skeleton and Inverse Kinematics for Motion Retargeting (Computer Graphics Forum 19(3), 2000, https://doi.org/10.1111/1467-8659.00393), for retargeting through an intermediate humanoid: `BodyDriver` maps the landmarks onto VRM humanoid bones (VRM 1.0 humanoid specification, https://github.com/vrm-c/vrm-specification/blob/master/specification/VRMC_vrm-1.0/humanoid.md) and rotates each bone so its rest direction (toward its child, from the skeleton or a calibration T-pose or A-pose) lies along the landmark direction: the shortest-arc quaternion for one direction, the change of orthonormal frame for a direction plus a side direction (hips, chest, hands). Joint limits clamp the turn from the rest rotation relative to the parent (a cone about the rest pose, the joint constraint of Andreas Aristidou and Joan Lasenby, FABRIK: A fast, iterative solver for the Inverse Kinematics problem, Graphical Models 73(5), 2011, https://doi.org/10.1016/j.gmod.2011.05.003). Point orders are the Pose Landmarker (Bazarevsky et al., BlazePose, 2020, https://arxiv.org/abs/2006.10204) and Hand Landmarker (Zhang et al., MediaPipe Hands, 2020, https://arxiv.org/abs/2006.10214) maps. Smoothing is the one-euro filter on each landmark direction. No detector, model or weights are shipped or fetched; no rival source was read.

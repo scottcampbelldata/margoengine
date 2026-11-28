@@ -24,6 +24,7 @@
     "access": "public"
   },
   "scripts": {
+    "test:gpu:outdoor-film": "cd ../.. && node packages/audio/tests/outdoor-film.browser.mjs && node packages/audio/tests/outdoor-film.browser.mjs --compat",
     "test:browser:outdoor-sound": "cd ../.. && node packages/audio/tests/outdoor-sound.browser.mjs",
     "build": "node ../../scripts/build-optional.js audio",
     "test": "npm run build && node --test tests/*.test.js",

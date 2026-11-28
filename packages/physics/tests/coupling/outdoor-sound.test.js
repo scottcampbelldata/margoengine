@@ -151,3 +151,63 @@ test('moving links replay through frame rates, snapshots, and both world memory 
   shared.advance(120);
   assert.equal(plain.hash(), shared.hash());
 });
+
+test('a visible direct ray does not carry a ground reflection whose leg crosses the bed', () => {
+  const source = [-5, 1, 0];
+  const listener = [5, 4, 0];
+  const links = [{ source, listener }];
+  const terrain = new TerrainBed();
+  const world = new PhysicsWorld({ rate }).add(terrain, {
+    rows: 1,
+    columns: 2,
+    width: 2,
+    depth: 4,
+    centre: [0, 0],
+    elevations: [0, 0, 2.2, 2.2, 0, 0],
+  });
+  const rigid = new OutdoorSound('reflects'),
+    noImage = new OutdoorSound('absorbs');
+  world.add(rigid, { links, bed: terrain.bed, groundY: 0 });
+  world.add(noImage, { links, bed: terrain.bed, groundY: 0, groundReflection: 0 });
+  const open = make(links, { groundY: 0 });
+  world.advance(1);
+  open.world.advance(1);
+  // At the crest direct y = 2.5 m, specular y = 1.5 m, and the surveyed ridge is 2.2 m.
+  assert.equal(rigid.read().blocked, false);
+  assert.deepEqual(rigid.read(), noImage.read());
+  assert.notDeepEqual(open.solver.read().gainDb, rigid.read().gainDb);
+});
+
+test('a rejected late link never replaces any accepted path and the same tick can recover', () => {
+  let invalid = false;
+  let excessive = false;
+  const links = [
+    { source: (t) => [t * 20, 5, 0], listener: [30, 5, 0] },
+    {
+      source: [0, 5, 0],
+      listener: () => (invalid ? null : excessive ? [Number.MAX_VALUE, 5, Number.MAX_VALUE] : [50, 5, 0]),
+    },
+  ];
+  const { world, solver } = make(links);
+  world.advance(1);
+  const accepted = [solver.read(0), solver.read(1)];
+  invalid = true;
+  assert.throws(() => world.advance(2), { name: 'MargoError', code: 'unsupported' });
+  assert.deepEqual([solver.read(0), solver.read(1)], accepted);
+  invalid = false;
+  excessive = true;
+  assert.throws(() => world.advance(2), { name: 'MargoError', code: 'failed' });
+  assert.deepEqual([solver.read(0), solver.read(1)], accepted);
+  excessive = false;
+  world.advance(2);
+  assert.ok(solver.read(0).distance < accepted[0].distance);
+  assert.deepEqual(solver.read(1), accepted[1]);
+});
+
+test('finite extreme diffraction and invalid profile inputs have a finite response or a coded fix', () => {
+  assert.ok(Number.isFinite(outdoorDiffractionLoss(Number.MAX_VALUE)));
+  assert.throws(() => outdoorAirAbsorption(Number.MAX_VALUE), { name: 'MargoError', code: 'failed' });
+  const air = { medium: 'air', cell: [0, 0, 0], sample: () => ({ density: 0, temperature: 293, velocity: [0, 0, 0] }) };
+  const { world } = make([{ source: [0, 5, 0], listener: [30, 5, 0] }], { air });
+  assert.throws(() => world.advance(1), { name: 'MargoError', code: 'unsupported' });
+});
