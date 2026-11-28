@@ -26,6 +26,8 @@ import { texture, type BindableTexture } from './texture.js';
 
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+// `@margoengine/shader/raw` capture code declares the surface its `captureEntry` returns.
+const rawMaterial = /struct MargoMaterial\s*\{/;
 const variable = (name: string) => 'margoOut' + name,
   declaration = (name: string) => `var<private> ${variable(name)}:vec4f;\n`,
   checkName = (name: string) => {
@@ -149,20 +151,29 @@ export class ScenePass implements EnginePlugin {
   private tail(code: string): string {
     let out = this.tails.get(code);
     if (out === undefined) {
-      const lit = this.names.includes('color'),
-        missing = this.names.filter((name) => name !== 'color' && !code.includes(declaration(name)));
+      // `@margoengine/shader/raw` code with a `captureEntry` (`pass.add(raw)`). Its entry writes an output by declaring
+      // `var<private> margoOut<name>:vec4f;` (and the lit colour as `margoBeauty`) in its own code, which its colour
+      // module compiles too; `color` is its base colour when it declares no `margoBeauty`.
+      const raw = rawMaterial.test(code),
+        declares = (v: string) =>
+          raw ? new RegExp(`var\\s*<\\s*private\\s*>\\s*${v}\\s*:`).test(code) : code.includes(`var<private> ${v}:vec4f;\n`),
+        beauty = this.names.includes('color') && !(raw && declares('margoBeauty')),
+        missing = this.names.filter((name) => name !== 'color' && !declares(variable(name)));
       out =
         missing.map(declaration).join('') +
-        (lit ? 'var<private> margoBeauty:vec4f;\n' : '') +
+        (beauty ? 'var<private> margoBeauty:vec4f;\n' : '') +
         // Members by number: an output may be named `loop`, which WGSL reserves.
         `struct MargoCapture {${this.names.map((_, i) => `@location(${i}) o${i}:vec4f`).join(',')}}\n` +
-        `fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {return MargoCapture(${this.names
-          .map((name) => (name === 'color' ? 'margoBeauty' : variable(name)))
-          .join(',')});}\n`;
+        (raw
+          ? `fn margoCapture(m:MargoMaterial)->MargoCapture {${beauty ? 'margoBeauty=vec4f(m.base,1);' : '_=m;'}return MargoCapture(${this.outputs()});}\n`
+          : `fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {return MargoCapture(${this.outputs()});}\n`);
       if (this.tails.size >= 64) this.tails.clear();
       this.tails.set(code, out);
     }
     return out;
+  }
+  private outputs(): string {
+    return this.names.map((name) => (name === 'color' ? 'margoBeauty' : variable(name))).join(',');
   }
   private begin(): GPURenderPassEncoder {
     if (this.pass) return this.pass;

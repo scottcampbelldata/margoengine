@@ -8,6 +8,7 @@ import {Material,createMesh} from '/packages/materials/dist/index.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
 import {GTAO,SSAO,SSGI,SSR} from '/packages/post/dist/index.js';
 import {SceneTargets} from '/packages/post/dist/mrt.js';
+import {ScenePass} from '/packages/shader/dist/pass.js';
 import {Picking} from '/packages/selection/dist/index.js';
 import {ComputePass,storage,vec4} from '/packages/shader/dist/index.js';
 import {RawMesh,RawPicking,RawShaderMaterial,RawShaders} from '/packages/shader/dist/raw.js';
@@ -95,6 +96,8 @@ const scenarios={
   ssgiOwn:s=>bounce(s,true),
   mrtOwn:s=>targetsScene(s,true),
   mrtDepth:s=>targetsScene(s,false),
+  passOwn:s=>scenePassScene(s,true),
+  passDepth:s=>scenePassScene(s,false),
   ssgiDepth:s=>bounce(s,false),
   // A raw mesh with captureEntry added to an effect whose capture takes no MargoMaterial reports it (SSAO has no capture).
   captureWrong:s=>{const material=new RawShaderMaterial({vertexShader:surfaceCode('vec3f(1)','vec3f(1)',0,1,'vec3f(0)'),fragmentEntry:'fragment',captureEntry:'capture'});return {threw:(()=>{try{material.captureCode(new RawMesh({material,attributes:quad(),index}),{declarations:()=>'',targets:[],begin(){}});return false;}catch(e){return e.code==='unsupported';}})()};},
@@ -182,6 +185,24 @@ function targetsScene(s,own){
   s.engine.camera.position=[0,1,3];s.engine.camera.target=[0,-1,0];
   const texel=async(name,[x,y])=>{const texture=targets.texture(name),rect=s.engine.canvas.getBoundingClientRect(),px=Math.floor(x*texture.width/rect.width),py=Math.floor(y*texture.height/rect.height),buffer=s.device.createBuffer({size:256,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),e=s.device.createCommandEncoder();e.copyTextureToBuffer({texture,origin:[px,py]},{buffer,bytesPerRow:256},[1,1]);s.device.queue.submit([e.finish()]);await buffer.mapAsync(GPUMapMode.READ);const v=[...new Uint8Array(buffer.getMappedRange().slice(0,4))];buffer.unmap();buffer.destroy();return v;};
   s.after=async()=>{const at=s.pixel([0,-1,0]);return {albedo:await texel('albedo',at),normal:await texel('normal',at)};};
+}
+// One texel of a bindable pass texture at a canvas point, as 0-255 values: a compute load, as its textures are sampled only.
+async function loadTexel(s,source,[x,y]){const [view]=source.bind(s.device),rect=s.engine.canvas.getBoundingClientRect(),size=[s.engine.canvas.width,s.engine.canvas.height],px=Math.floor(x*size[0]/rect.width),py=Math.floor(y*size[1]/rect.height),
+  module=s.device.createShaderModule({code:'@group(0) @binding(0) var t:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> o:vec4f;@compute @workgroup_size(1) fn main(){o=textureLoad(t,vec2u('+px+','+py+'),0);}'}),
+  pipeline=s.device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}}),out=s.device.createBuffer({size:16,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),
+  group=s.device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:view},{binding:1,resource:{buffer:out}}]}),e=s.device.createCommandEncoder(),c=e.beginComputePass();
+  c.setPipeline(pipeline);c.setBindGroup(0,group);c.dispatchWorkgroups(1);c.end();s.device.queue.submit([e.finish()]);const v=await read(s.device,out,16);out.destroy();return v.map(x=>Math.round(x*255));}
+// A raw floor of base colour (0.2, 0.6, 0.9) in a node ScenePass: with its capture entry the pass's color holds that base
+// colour, its normal output what the entry writes (the normal up) and an output it does not write stays clear; without
+// the entry the floor writes only depth there.
+function scenePassScene(s,own){
+  const code='var<private> margoOutnormal:vec4f;'+surfaceCode('vec3f(0.5)','vec3f(0.2,0.6,0.9)',0,0.5,'vec3f(0)').replace('@fragment fn capture(i:Out)->MargoCapture {','@fragment fn capture(i:Out)->MargoCapture {margoOutnormal=vec4f(i.normal*0.5+0.5,1);');
+  const floor=new RawShaderMaterial({vertexShader:code,fragmentEntry:'fragment',...(own?{captureEntry:'capture'}:{})});
+  s.raw.add(new RawMesh({material:floor,attributes:flat(-1,-3,3),index}));
+  const pass=ScenePass.attach(s.engine,{outputs:{color:'rgba8unorm',normal:'rgba8unorm',glow:'rgba8unorm'}});
+  pass.add(s.raw);
+  s.engine.camera.position=[0,1,3];s.engine.camera.target=[0,-1,0];
+  s.after=async()=>{const at=s.pixel([0,-1,0]),read=name=>loadTexel(s,pass.texture(name),at);return {color:await read('color'),normal:await read('normal'),glow:await read('glow')};};
 }
 async function pickScene(s,z=0){
   const picking=RawPicking.attach(Picking.attach(s.engine),s.raw),m=x=>solid(s,{vertexShader:paint('vec3f(1)')},{attributes:quad(0.5,z),matrix:translate(x,0,0)}),left=m(-0.6),right=m(0.6);

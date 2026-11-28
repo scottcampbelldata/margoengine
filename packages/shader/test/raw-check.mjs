@@ -219,6 +219,17 @@ try {
   assert.ok(close(tOwn.normal, [128, 255, 128, 255]), `SceneTargets normal from the raw capture: ${tOwn.normal}`);
   assert.ok(close(tDepth.albedo, [0, 0, 0, 0]), `nothing written without the entry: ${tDepth.albedo}`);
   console.log('ok scene targets');
+  // The node ScenePass: the raw floor writes its base colour and the normal its entry writes only with its capture entry.
+  const pOwn = await scene('passOwn');
+  await clear();
+  const pDepth = await scene('passDepth');
+  await clear();
+  console.log('scene pass color', pOwn.color, 'normal', pOwn.normal, 'glow', pOwn.glow, 'without', pDepth.color, pDepth.normal);
+  assert.ok(close(pOwn.color, [51, 153, 230, 255]), `ScenePass color from the raw capture: ${pOwn.color}`);
+  assert.ok(close(pOwn.normal, [128, 255, 128, 255]), `ScenePass normal the raw entry writes: ${pOwn.normal}`);
+  assert.ok(close(pOwn.glow, [0, 0, 0, 0]), `an output the entry does not write stays clear: ${pOwn.glow}`);
+  assert.ok(close(pDepth.color, [0, 0, 0, 0]) && close(pDepth.normal, [0, 0, 0, 0]), `nothing written without the entry: ${pDepth.color} ${pDepth.normal}`);
+  console.log('ok scene pass');
   assert.deepEqual((await scene('captureWrong')).threw, true, 'captureWrong');
   await clear();
   console.log('ok captureWrong');
