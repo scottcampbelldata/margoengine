@@ -44,7 +44,7 @@ fn meshWorldNormal(h:Hit,n:vec3f)->vec3f {
  return normalize(n.x*lx.r0.xyz+n.y*lx.r1.xyz+n.z*lx.r2.xyz);
 }
 fn meshDeforms(h:Hit)->bool {return h.mesh!=0u&&motion<1.0&&scene[h.mesh+27u]!=0u;}
-fn triangleNormal(h:Hit)->vec3f {if(!meshDeforms(h)){return meshWorldNormal(h,meshCorner(h.tri+12u));}return meshWorldNormal(h,h.ng);}
+fn triangleNormal(h:Hit)->vec3f {var n=h.ng;if(!meshDeforms(h)){n=meshCorner(h.tri+12u);}return meshWorldNormal(h,n);}
 fn triangleShadingNormal(h:Hit)->vec3f {
  let ng=triangleNormal(h);let a=scene[triangleBase(h)+7u];if(a==0u){return h.sgn*ng;}
  let b=h.meshHead+a;if((scene[b+15u]&1u)==0u){return h.sgn*ng;}
@@ -67,6 +67,7 @@ fn meshTexel(h:Hit)->vec4f {
  return vec4f(select(c.rgb/12.92,pow((c.rgb+0.055)/1.055,vec3f(2.4)),c.rgb>vec3f(0.04045)),c.a);
 }
 fn triangleHitNormal(h:Hit)->vec3f {return h.sgn*triangleNormal(h);}
+fn triangleWrongSide(h:Hit,wi:vec3f,transmit:bool)->bool {let g=dot(triangleHitNormal(h),wi);return select(g<=0.0,g>=0.0,transmit);}
 fn hitNormal(h:Hit)->vec3f {
  if(h.inst==TRIANGLE){return triangleHitNormal(h);}
  return h.sgn*normalize(rowOf(localX(h.inst),h.axis));
@@ -245,11 +246,11 @@ export function meshSource(input: string): string {
   );
   edit(
     'let s=dielectric(mm.alpha,n,-d,mm.ior,sm);\n     if(!s.ok){break;}',
-    'let s=dielectric(mm.alpha,n,-d,mm.ior,sm);\n     if(!s.ok){break;}\n     if(h.inst==TRIANGLE&&select(dot(triangleHitNormal(h),s.wi)<=0.0,dot(triangleHitNormal(h),s.wi)>=0.0,s.transmit)){break;}',
+    'let s=dielectric(mm.alpha,n,-d,mm.ior,sm);\n     if(!s.ok){break;}\n     if(h.inst==TRIANGLE&&triangleWrongSide(h,s.wi,s.transmit)){break;}',
   );
   edit(
     'if(!s.ok){done=true;continue;}',
-    'if(!s.ok){done=true;continue;}\n  if(h.inst==TRIANGLE&&select(dot(triangleHitNormal(h),s.wi)<=0.0,dot(triangleHitNormal(h),s.wi)>=0.0,s.transmit)){done=true;continue;}',
+    'if(!s.ok){done=true;continue;}\n  if(h.inst==TRIANGLE&&triangleWrongSide(h,s.wi,s.transmit)){done=true;continue;}',
   );
   edit('let wn=h.sgn*normalize(rowOf(localX(h.inst),h.axis));', 'let wn=hitNormal(h);');
   edit('let woff=h.sgn*EPS*colOf(worldX(h.inst),h.axis);', 'let woff=hitOffset(h,wp);');

@@ -5,6 +5,7 @@ import { meshPBR, traceSceneFromGLTF } from '../dist/mesh-pbr.js';
 import { fakeEngine, simpleScene } from './support.js';
 import { checkWGSL } from '@margoengine/webgl2-compat/wgsl';
 import { runComputeOnCPU } from '@margoengine/webgl2-compat/compute';
+import { inlinedCopies } from '../../../scripts/support/wgsl-inline.mjs';
 function scene() {
   return {
     ...simpleScene(),
@@ -409,6 +410,32 @@ test('pbrMaterial reads every texture slot through one filter call in a loop bou
     const w = packet(h),
       r = w[w[5] + 29];
     assert.equal(w[r + 3], 13, 'the record holds the slot count');
+  } finally {
+    t.dispose();
+  }
+});
+// KB5451: the staged surface program inlined meshWorldNormal twice into every triangleNormal (one per branch), the
+// triangle normal twice into each dielectric side test and meshWorld three times into the tangent frame; Direct3D's
+// compiler inlines every call, and these pure repeats of one hit's values were a quarter of the surface program's
+// cold compile (offline fxc 144 s to 107 s). Each is now computed once; the values are the same bit for bit.
+test('the mesh helpers compute each hit value once per call site (KB5451)', async () => {
+  const h = fakeEngine(),
+    codes = [],
+    make = h.device.createShaderModule.bind(h.device);
+  h.device.createShaderModule = (d) => {
+    codes.push(d.code);
+    return make(d);
+  };
+  const t = await ComposedVoxelPathTracer.create(h.engine, { scene: scene(), features: [meshPBR()], denoise: false });
+  try {
+    await t.ready;
+    h.frame();
+    const code = codes.find((s) => s.includes('fn pbrMapNormal') && s.includes('fn triangleWrongSide'));
+    assert.ok(code, 'a module holds the mesh PBR surface');
+    assert.equal(inlinedCopies(code, 'triangleNormal').copies.get('meshWorldNormal'), 1);
+    assert.equal(inlinedCopies(code, 'triangleWrongSide').copies.get('triangleHitNormal'), 1);
+    assert.equal(inlinedCopies(code, 'pbrMapNormal').copies.get('meshWorld'), 2, 'one per tangent branch');
+    assert.doesNotMatch(code, /select\(dot\(triangleHitNormal\(h\),s\.wi\)/);
   } finally {
     t.dispose();
   }

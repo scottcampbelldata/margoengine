@@ -111,8 +111,8 @@ fn pbrMaterial(h:Hit,l:vec3f,input:Mat)->Mat {
  if(any(m.emission>vec3f(0.0))){m.flags|=EMISSIVE;}
  m.seen=vec4f(0.0);return m;
 }
-fn pbrDirection(h:Hit,v:vec3f)->vec3f {
- let x=meshWorld(h);return vec3f(dot(x.r0.xyz,v),dot(x.r1.xyz,v),dot(x.r2.xyz,v));
+fn pbrDirection(x:Xform,v:vec3f)->vec3f {
+ return vec3f(dot(x.r0.xyz,v),dot(x.r1.xyz,v),dot(x.r2.xyz,v));
 }
 fn pbrMappedNormal(h:Hit,mapSlot:u32,scale:f32)->vec3f {
  let r=pbrRecord(h);
@@ -126,7 +126,7 @@ fn pbrMapNormal(h:Hit,r:u32,mapSlot:u32,scale:f32,texel:vec4f)->vec3f {
  if(dot(map,map)==0.0){return n;}
  let info=scene[2]+scene[h.mesh+28u];var t:vec3f;var hand=1.0;
  if(scene[info+2u]!=0u){
-  let tangent=pbrAttribute(h,8u);t=pbrDirection(h,tangent.xyz);hand=tangent.w;
+  let tangent=pbrAttribute(h,8u);t=pbrDirection(meshWorld(h),tangent.xyz);hand=tangent.w;
   let x=meshModel(h);hand*=select(1.0,-1.0,dot(cross(x.r0.xyz,x.r1.xyz),x.r2.xyz)<0.0);
  }else{
   let slot=scene[2]+scene[r+16u+mapSlot];let uvSet=scene[slot+3u];
@@ -136,8 +136,8 @@ fn pbrMapNormal(h:Hit,r:u32,mapSlot:u32,scale:f32,texel:vec4f)->vec3f {
   let det=u1.x*u2.y-u1.y*u2.x;
   if(det==0.0){return n;}
   let p0=meshVertex(h,0u);let e1=meshVertex(h,1u)-p0;let e2=meshVertex(h,2u)-p0;
-  t=pbrDirection(h,(e1*u2.y-e2*u1.y)/det);
-  let bitangent=pbrDirection(h,(e2*u1.x-e1*u2.x)/det);
+  let w=meshWorld(h);t=pbrDirection(w,(e1*u2.y-e2*u1.y)/det);
+  let bitangent=pbrDirection(w,(e2*u1.x-e1*u2.x)/det);
   hand=select(1.0,-1.0,dot(cross(n,t),bitangent)<0.0);
  }
  t-=n*dot(n,t);if(dot(t,t)<1e-20){return n;}t=normalize(t);

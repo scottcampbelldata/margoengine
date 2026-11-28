@@ -12505,6 +12505,20 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
 - **Still open:** the other staged programs (`hit`, `shadow`, an unlabeled one) still take minutes cold on Direct3D
   11, so the 120 s `renderImage` signal with the disk cache off is not yet met. Next: the same loop-bound treatment
   for `pbrVisible`'s alpha reads and the traversal loops in `hit` and `shadow`, proven by the same counts.
+- **Measured 2026-11-28 (lane A):** `MARGO_COMPAT=1 node packages/voxel-pathtracer/tests/mesh-pbr-lobes-browser.mjs`
+  (Edge, ANGLE Direct3D 11, a fresh profile each run, so cold) passes, but its first image arrives 314 s after
+  `ready`; later images and the ANGLE Vulkan leg take under a second. The draw-time compiles of four 7-output programs
+  hold it: 74 to 173 s each by the first-draw wait. Binding the framebuffer before `linkProgram`, or declaring the
+  outputs as one array, leaves the link at about 1 s and the first draw as long (ANGLE links against one output either
+  way), so the cost cannot be moved to the parallel link. Inlined statements of the surface program: 21,211, of which
+  the layer's storage-word loads are 15,596 (1,114 copies). Fixed in part: `triangleNormal` calls `meshWorldNormal`
+  once (it was in both branches), the dielectric side test takes the triangle normal once (`triangleWrongSide`), and
+  the tangent frame reads `meshWorld` once per branch. Surface program 21,211 to 18,425 statements, paired offline fxc
+  144.2 to 106.5 s; emitter program 79.6 to 75.2 s. Same output: 122 GPU readbacks of `test:gpu:mesh-pbr`,
+  `mesh-deform`, `mesh-attributes` and `mesh-pbr-lobes` hash the same before and after (native WebGPU, repeatable run
+  to run). Regression: `packages/voxel-pathtracer/tests/mesh-pbr.test.js` "the mesh helpers compute each hit value
+  once per call site (KB5451)". Still open: the cold first image is far above 120 s; next are the 941 storage loads
+  (meshX 19 copies of 12 loads, pbrVertex 21, rowAt 27, meshCorner 27) and the two pbrMapNormal copies.
 - **Sources:** Microsoft, "Function Declaration Syntax" (HLSL `inline` is the default; one copy of the body per call),
   https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-function-syntax ; Microsoft,
   "for Statement" (`loop` keeps flow control, `unroll` copies the body; without an attribute the compiler unrolls
