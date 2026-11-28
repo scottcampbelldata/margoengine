@@ -754,6 +754,24 @@ lands do not cancel, |f + b|^2 > 0.01 (|f|^2 + |b|^2) + 0.5 pixels (the forward-
 2010): the next frame covers or uncovers it, so it has no match to shimmer against. `detail.occluded` counts them; the
 shot tool writes `moving.back` for every moving probe.
 
+**T4 leaves out what moves on purpose** (KB-LOOK-TV-SHIMMER2, 2026-11-28). `MovingFrames.velocity` and `nextVelocity`,
+the engine's own motion of each pixel of this frame and of the next (TAA's velocity with its jitter removed, pixels over
+one frame), make `shimmerMoving` skip a pixel whose surface, or the one its camera motion f lands on, the engine moved
+otherwise, |v - f| > 0.5 pixels: a swaying branch, a flame or a wave, and the sky a branch leaves, change on purpose, so
+they are not shimmer. `detail.animated` counts them; the shot tool writes both when the shot sets
+`moving.velocity: true`.
+
+```js
+import { shimmerMoving } from '@margoengine/headless/look';
+
+const size = 8,
+  image = () => ({ width: size, height: size, data: new Uint8Array(size * size * 4).fill(128) }),
+  motion = { width: size, height: size, data: new Float32Array(size * size * 2) },
+  velocity = { width: size, height: size, data: new Float32Array(size * size * 2).fill(1) };
+const row = shimmerMoving(image(), { next: image(), motion, velocity });
+console.log(row.detail.animated); // 64: every pixel moved 1 px more than the still camera
+```
+
 **T6 reads the precise frame and pools frames** (KB-LOOK-TV-TINTRES1, 2026-11-28). `bounce` and `shadowTint` also take
 `precise`, the frame before its 8 bits (RGB float32, sRGB coded 0 to 1: the shot tool's `probes/<name>.rgb32f`), read in
 place of the 8-bit frame, and `pool`, more frames of the shot (each its `precise` or `frame` with `lit`, `shadow` and

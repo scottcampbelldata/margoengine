@@ -56,7 +56,14 @@ const over=()=>{
 };
 globalThis.timberShot={
   engine,scene,
-  aovs:()=>({device:engine.gpu,textures:{...Object.fromEntries(['geometry','depth','penumbra','subject','lit','shadow','plants'].map(n=>[n,targets.texture(n)])),...Object.fromEntries(['r','g','b'].map(c=>['albedo-'+c,surface.texture('albedo'+c.toUpperCase())])),over:over()}}),
+  // `velocity` (asked for by the shot's moving.velocity): TAA's rg16float velocity and its jitter difference, the
+  // engine's own motion of each pixel, so the moving shimmer check leaves out what sways or burns (KB-LOOK-TV-SHIMMER2).
+  aovs:({vectors=[]}={})=>{
+    const textures={...Object.fromEntries(['geometry','depth','penumbra','subject','lit','shadow','plants'].map(n=>[n,targets.texture(n)])),...Object.fromEntries(['r','g','b'].map(c=>['albedo-'+c,surface.texture('albedo'+c.toUpperCase())])),over:over()};
+    if(!vectors.includes('velocity'))return{device:engine.gpu,textures};
+    const v=scene.parts.taa?.velocity;if(!v)throw new Error('moving.velocity needs TAA velocity from the scene, and this frame has none');
+    return{device:engine.gpu,textures:{...textures,velocity:v.texture},jitter:{velocity:[v.jitter[0],v.jitter[1]]}};
+  },
   async apply(state,{time}){
     const now=clocks();
     if(first===null){first={time,...now};return;}

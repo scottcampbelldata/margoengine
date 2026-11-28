@@ -1064,3 +1064,50 @@ test('T4 shimmerMoving leaves out what the next frame covers or uncovers, by the
   assert.equal(without.detail.occluded, undefined);
   assert.throws(() => shimmerMoving(frame, { next, motion, back: { ...back, data: new Float32Array(2) } }), RangeError);
 });
+
+test('T4 shimmerMoving leaves out what moves other than the camera moves it, by the engine velocity (KB-LOOK-TV-SHIMMER2)', () => {
+  // The camera pans 2 px; a swaying patch at columns 10 to 15 moves 1 px further in the engine's velocity, so its shade
+  // differs from the camera's warp. Without the velocity it reads as shimmer; with it it is animated and left out, and
+  // the rest, where the velocity is the camera's (within half a pixel), still counts.
+  const size = 48,
+    shade = (x) => 60 + ((x * 7) % 50),
+    sway = (x) => x >= 12 && x < 18,
+    frame = image(size, size, (x) => shade(x)),
+    next = image(size, size, (x) => (sway(x) ? shade(x - 3) : shade(x - 2))),
+    motion = { width: size, height: size, data: new Float32Array(size * size * 2) },
+    velocity = { width: size, height: size, data: new Float32Array(size * size * 2) };
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 2;
+      motion.data[i] = 2;
+      velocity.data[i] = sway(x) ? 3 : 2.3;
+    }
+  const without = shimmerMoving(frame, { next, motion }),
+    withVelocity = shimmerMoving(frame, { next, motion, nextVelocity: velocity });
+  assert.ok(without.value > 5, `the patch reads as shimmer without the velocity: ${without.value}`);
+  assert.equal(withVelocity.value, 0);
+  assert.equal(withVelocity.detail.animated, 6 * size);
+  assert.equal(without.detail.animated, undefined);
+  // A real fault in still ground (a pixel that flips) still counts with the velocity.
+  const flicker = image(size, size, (x, y) => (x === 30 && y < 24 ? 250 : sway(x) ? shade(x - 3) : shade(x - 2)));
+  assert.ok(shimmerMoving(frame, { next: flicker, motion, nextVelocity: velocity }).value > 1);
+  assert.throws(
+    () => shimmerMoving(frame, { next, motion, nextVelocity: { ...velocity, data: new Float32Array(2) } }),
+    RangeError,
+  );
+  // What a swaying branch leaves: in the probe a branch (250) over columns 30 to 33 moving 3 px more than the camera,
+  // in the next frame the sky behind it where the camera puts it. The next frame's velocity there is the sky's, the
+  // camera's, so only the probe's own velocity finds it.
+  const branch = (x) => x >= 30 && x < 34,
+    leaving = image(size, size, (x) => (branch(x) ? 250 : shade(x))),
+    own = { width: size, height: size, data: new Float32Array(size * size * 2) };
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) own.data[(y * size + x) * 2] = branch(x) ? 5 : 2;
+  const still = { width: size, height: size, data: new Float32Array(size * size * 2) };
+  for (let i = 0; i < size * size; i++) still.data[i * 2] = 2;
+  const vacated = image(size, size, (x) => shade(x - 2)),
+    next2 = shimmerMoving(leaving, { next: vacated, motion, nextVelocity: still }),
+    both = shimmerMoving(leaving, { next: vacated, motion, velocity: own, nextVelocity: still });
+  assert.ok(next2.value > 5, `the branch's place reads as shimmer with the next frame's velocity alone: ${next2.value}`);
+  assert.equal(both.value, 0);
+  assert.equal(both.detail.animated, 4 * size);
+});

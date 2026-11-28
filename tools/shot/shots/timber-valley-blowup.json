@@ -94,7 +94,8 @@
     },
     "lookFamily": "animatedFeature",
     "moving": {
-      "depthScale": 2000
+      "depthScale": 2000,
+      "velocity": true
     },
     "aovs": [
       "geometry",

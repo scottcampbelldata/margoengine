@@ -112,6 +112,8 @@ export const GROUND_ALBEDO_LEVELS = 16;
 
 export const GROUND_INSET: number;
 
+export const GROUND_MIN_PIXELS = 30;
+
 export interface GroundFrame {
     frame?: LookImage;
     precise?: PreciseFrame;
@@ -123,6 +125,7 @@ export interface GroundFrame {
 
 export interface GroundSample {
     readonly strata: ReadonlyMap<number, Readonly<GroundStratum>>;
+    readonly covered?: number;
 }
 
 export interface GroundStratum {
@@ -272,6 +275,8 @@ export interface MovingFrames {
     next: LookImage;
     motion: LookMotion;
     back?: LookMotion;
+    velocity?: LookMotion;
+    nextVelocity?: LookMotion;
     shutter?: number;
 }
 
@@ -313,6 +318,8 @@ export interface ShotManifestProbe {
         next: string;
         motion: string;
         back?: string;
+        velocity?: string;
+        nextVelocity?: string;
     };
     lookBounds?: Record<string, LookBound>;
     light?: LookLight;
@@ -449,7 +456,7 @@ export function shimmer(frames: readonly LookImage[], { mask, bound, threshold }
     threshold?: number;
 }): LookResult;
 
-export function shimmerMoving(frame: LookImage, { next, motion, back }: MovingFrames, { mask, bound, threshold }?: FlickerOptions & {
+export function shimmerMoving(frame: LookImage, { next, motion, back, velocity, nextVelocity }: MovingFrames, { mask, bound, threshold }?: FlickerOptions & {
     threshold?: number;
 }): LookResult;
 

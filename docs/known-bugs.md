@@ -4142,6 +4142,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   match); plant interiors 0.28 to 0.17 and 0.55 to 0.46, sky 0.02 and 0.14 both, other 0.07 to 0.06 and 0.34 to 0.32.
   What render fixes could reach is 0.25 early, inside the 0.5 bound, and 0.92 mid: the flame wall's puffing, the smoke
   plume and the bounded sway, motion the scene draws on purpose. Accepted as deliberate motion; the bound stays 0.5.
+- **Check rebuilt 2026-11-28 (lane B, part (b) of private/handoffs/shimmer2-plan.md):** with `moving.velocity` the
+  shot tool reads TAA's velocity (rg16float, exact, the last sub-frame, jitter out, scaled by 1 / fps over the sub-frame
+  step) for each probe and the frame after it, and `shimmerMoving` leaves out a pixel the engine moved more than half a
+  pixel other than the camera (`detail.animated`). On the blowup (`--once --seconds 1.1`) sky pixels' velocity matches
+  the camera motion to a median 0.01 to 0.02 px; the animated pixels are the swaying crowns (tops move, trunks and the
+  hillside do not). shimmerMoving early 3.86 to 1.76, mid 5.30 to 3.85 percent (occluded 58,707 and 101,256 px,
+  animated 328,439 and 252,250 px). The rest lies on one-pixel lines along high-contrast silhouettes (a tree against
+  the sky, a leaf over a leaf), early and mid: sky side 0.43 and 1.44, depth edges 1.02 and 1.55, other edges 0.24 and
+  0.75, over 0.07 and 0.11. Of it, 1.26 early and 1.78 mid sits inside the range of the four pixels the warp samples
+  (what bilinear resampling of a sharp edge gives, not a change); 0.50 and 2.07 lies outside every one of them.
 
 ### Fixed 2026-11-26: tonemap's settings check on the WebGL2 layer on ANGLE Direct3D 11 differed by one pixel in group `local` about half the time (KB-TONEMAP-LOCALD3D1, tonemap)
 

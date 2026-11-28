@@ -58,10 +58,12 @@ const writeMotion = (out, file, motion) =>
  * Writes `probes/<name>.next.png` and `probes/<name>.motion.f32` (little-endian float32, x then y per pixel, the
  * frame's size) into the shot folder and returns the manifest's `moving` entry. With `next` (the next frame's eye and
  * its `depth` and `water` mask records, {file, exact}) it also writes `probes/<name>.back.f32`, each pixel of the next
- * frame's motion back to the probe, for shimmerMoving's forward-backward occlusion test.
- * @param {{ out: string, name: string, nextFile: string, next?: { eye?: number[], depth?: { file: string, exact?: string }, water?: { file: string } }, eye: number[], viewProjection: number[], nextViewProjection: number[], shot: { moving: { depthScale: number }, horizon: { y: number } | null, aovs: string[] } }} options
+ * frame's motion back to the probe, for shimmerMoving's forward-backward occlusion test. With `velocity` and
+ * `next.velocity` (TAA's, as the shot tool records it) it writes `probes/<name>.velocity.f32` and
+ * `probes/<name>.next-velocity.f32`, the engine's own motion of each pixel of the probe and of the next frame, in pixels.
+ * @param {{ out: string, name: string, nextFile: string, next?: { eye?: number[], depth?: { file: string, exact?: string }, water?: { file: string }, velocity?: { file: string, jitter: number[], scale: number } }, velocity?: { file: string, jitter: number[], scale: number }, eye: number[], viewProjection: number[], nextViewProjection: number[], shot: { moving: { depthScale: number }, horizon: { y: number } | null, aovs: string[] } }} options
  */
-export async function writeMoving({ out, name, nextFile, next, eye, viewProjection, nextViewProjection, shot }) {
+export async function writeMoving({ out, name, nextFile, next, velocity, eye, viewProjection, nextViewProjection, shot }) {
   const water = shot.aovs.includes('water'),
     { ndc, width, height } = await ndcOf({
       out,
@@ -87,5 +89,33 @@ export async function writeMoving({ out, name, nextFile, next, eye, viewProjecti
     shot,
   });
   writeMotion(out, `probes/${name}.back.f32`, reprojectionMotion(after.ndc, nextViewProjection, viewProjection, width, height));
-  return { ...entry, back: `probes/${name}.back.f32` };
+  const moved = { ...entry, back: `probes/${name}.back.f32` };
+  if (velocity?.file) {
+    writeMotion(out, `probes/${name}.velocity.f32`, velocityInPixels(out, velocity, width, height));
+    moved.velocity = `probes/${name}.velocity.f32`;
+  }
+  if (next.velocity?.file) {
+    writeMotion(out, `probes/${name}.next-velocity.f32`, velocityInPixels(out, next.velocity, width, height));
+    moved.nextVelocity = `probes/${name}.next-velocity.f32`;
+  }
+  return moved;
+}
+
+/**
+ * The engine's own motion of each pixel of a frame, from the shot tool's record of TAA's velocity ({file, jitter,
+ * scale}: uv over the last sub-frame step, x then y a pixel, the jitter difference in it): (velocity - jitter) times
+ * the frame's size and `scale`, pixels over one frame interval, as `motion` is.
+ * @param {string} out
+ * @param {{ file: string, jitter: number[], scale: number }} velocity
+ * @param {number} width
+ * @param {number} height
+ */
+export function velocityInPixels(out, { file, jitter, scale }, width, height) {
+  const uv = readFloats(join(out, file), width * height * 2),
+    data = new Float32Array(uv.length);
+  for (let i = 0; i < width * height; i++) {
+    data[i * 2] = (uv[i * 2] - jitter[0]) * width * scale;
+    data[i * 2 + 1] = (uv[i * 2 + 1] - jitter[1]) * height * scale;
+  }
+  return { width, height, data };
 }

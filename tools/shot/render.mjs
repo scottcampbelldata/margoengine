@@ -453,7 +453,13 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
           skip || pass || kept === null || !masks
             ? null
             : write && shot.moving && (probes.has(kept) || nextProbes.has(kept))
-              ? { ...masks, exact: ['depth'] }
+              ? {
+                  ...masks,
+                  exact: ['depth'],
+                  // A probe and the frame after it also give the engine's own motion, TAA's velocity
+                  // (shot.moving.velocity).
+                  ...(shot.moving.velocity ? { vectors: ['velocity'] } : {}),
+                }
               : masks,
         viewProjection: write && !skip && !pass && (probes.has(kept) || nextProbes.has(kept)),
         light: write && !skip && !pass && probes.has(kept),
@@ -473,6 +479,17 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
       if (result.aovs) {
         record.aovs = {};
         for (const [name, mask] of Object.entries(result.aovs)) {
+          if (mask.vector) {
+            // TAA's velocity over the last sub-frame step (uv), with the jitter difference to take out and the scale to
+            // one frame interval: 1 / fps over that step (1 drawn once).
+            const step = offsets.length > 1 ? offsets.at(-1) - offsets.at(-2) : 1 / shot.fps;
+            record.velocity = { jitter: mask.jitter, scale: 1 / shot.fps / step, format: mask.format };
+            if (!write) continue;
+            mkdirSync(join(out, 'aovs', name), { recursive: true });
+            record.velocity.file = `aovs/${name}/${frameName(kept).replace(/png$/, 'f32')}`;
+            writeFileSync(join(out, record.velocity.file), Buffer.from(mask.vector, 'base64'));
+            continue;
+          }
           record.aovs[name] = { sha256: mask.sha256, mean: mask.mean };
           if (!write) continue;
           mkdirSync(join(out, 'aovs', name), { recursive: true });
@@ -660,8 +677,9 @@ export async function shoot(file, { out, output, source, runs = 2, check = 'ever
         entry.moving = await writeMoving({
           out,
           name,
+          velocity: record.velocity,
           nextFile: next.file,
-          next: { eye: next.eye, depth: next.aovs?.depth, water: next.aovs?.water },
+          next: { eye: next.eye, depth: next.aovs?.depth, water: next.aovs?.water, velocity: next.velocity },
           eye: record.eye,
           viewProjection: record.viewProjection,
           nextViewProjection: next.viewProjection,

@@ -167,6 +167,32 @@ export function resampleMask({ grey, width, height, outWidth, outHeight }) {
 }
 
 /**
+ * Two floats a pixel (a velocity's x and y) from `width` x `height` to `outWidth` x `outHeight`, each output pixel the
+ * area-weighted mean of its footprint: the motion of what the pixel shows, as the frame's own filter mixes its colour.
+ */
+export function resampleVector({ vector, width, height, outWidth, outHeight }) {
+  if (width === outWidth && height === outHeight) return vector;
+  const across = areaWeights(width, outWidth),
+    down = areaWeights(height, outHeight),
+    out = new Float32Array(outWidth * outHeight * 2);
+  for (let i = 0; i < outHeight; i++)
+    for (let j = 0; j < outWidth; j++) {
+      let x = 0,
+        y = 0;
+      for (let a = 0; a < down.count[i]; a++)
+        for (let b = 0; b < across.count[j]; b++) {
+          const w = down.weights[down.offset[i] + a] * across.weights[across.offset[j] + b],
+            k = ((down.first[i] + a) * width + across.first[j] + b) * 2;
+          x += vector[k] * w;
+          y += vector[k + 1] * w;
+        }
+      out[(i * outWidth + j) * 2] = x;
+      out[(i * outWidth + j) * 2 + 1] = y;
+    }
+  return out;
+}
+
+/**
  * A nearness mask (a larger value is a nearer surface, 0 is nothing drawn) from `width` x `height` to `outWidth` x
  * `outHeight`: each output pixel takes the largest value its footprint covers, so a silhouette pixel holds the nearest
  * surface's own distance and never a mix with the background's, which is no distance at all.

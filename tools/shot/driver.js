@@ -222,7 +222,7 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
     if (found) return found;
     // `sum` makes the shutter's pipeline: the value as grey reads it (NaN and below 0 as 0, above 1 as 1) added into
     // an r16float target with the blend constant 1 / sub-frames, so the target ends as the shutter's mean.
-    const make = (sampleType, type, load, sum = false) => {
+    const make = (sampleType, type, load, sum = false, vector = false) => {
       const layout = device.createBindGroupLayout({
           entries: [{ binding: 0, visibility: 2, texture: { sampleType } }],
         }),
@@ -230,7 +230,7 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
         module = device.createShaderModule({
           code: `@group(0) @binding(0) var source:${type};
 @vertex fn vs(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{let p=vec2f(f32((i<<1u)&2u),f32(i&2u));return vec4f(p*2.0-1.0,0.0,1.0);}
-@fragment fn fs(@builtin(position) p:vec4f)->@location(0) vec4f{let v=${load};return vec4f(${value},0.0,0.0,1.0);}`,
+@fragment fn fs(@builtin(position) p:vec4f)->@location(0) vec4f{let v=${load};return ${vector ? 'vec4f(v,0.0,1.0)' : `vec4f(${value},0.0,0.0,1.0)`};}`,
         });
       const add = { operation: 'add', srcFactor: 'constant', dstFactor: 'one' },
         pipeline = device.createRenderPipeline({
@@ -239,7 +239,11 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
           fragment: {
             module,
             entryPoint: 'fs',
-            targets: [sum ? { format: 'r16float', blend: { color: add, alpha: add } } : { format: 'r32float' }],
+            targets: [
+              sum
+                ? { format: 'r16float', blend: { color: add, alpha: add } }
+                : { format: vector ? 'rg32float' : 'r32float' },
+            ],
           },
           primitive: { topology: 'triangle-list' },
         });
@@ -252,6 +256,8 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
       depth: make(...depth),
       sumColor: make(...colour, true),
       sumDepth: make(...depth, true),
+      // Two signed channels as they are (a velocity texture): nothing clamped.
+      vector: make('unfilterable-float', 'texture_2d<f32>', 'textureLoad(source,vec2i(p.xy),0).rg', false, true),
     };
     readers.set(device, found);
     return found;
@@ -372,6 +378,44 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
     buffer.destroy();
     target.destroy();
     return value ? { width, height, grey, value, format: texture.format } : { width, height, grey };
+  };
+  // A two-channel float texture (TAA's rg16float velocity) read exactly: x then y of each pixel as floats, signed and
+  // unclamped, row 0 at the top. Resolves {width, height, vector, format}.
+  const readVector = async (device, name, texture) => {
+    checkMask(name, texture);
+    const { layout, pipeline } = reader(device).vector,
+      { width, height } = texture,
+      bytesPerRow = Math.ceil((width * 8) / 256) * 256;
+    device.pushErrorScope('validation');
+    const target = device.createTexture({ size: [width, height], format: 'rg32float', usage: 0x10 | 0x01 }),
+      buffer = device.createBuffer({ size: bytesPerRow * height, usage: 0x01 | 0x08 }),
+      encoder = device.createCommandEncoder(),
+      pass = encoder.beginRenderPass({
+        colorAttachments: [
+          { view: target.createView(), loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 0 } },
+        ],
+      });
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, device.createBindGroup({ layout, entries: [{ binding: 0, resource: texture.createView() }] }));
+    pass.draw(3);
+    pass.end();
+    encoder.copyTextureToBuffer({ texture: target }, { buffer, bytesPerRow }, [width, height]);
+    device.queue.submit([encoder.finish()]);
+    const error = await device.popErrorScope();
+    if (error) {
+      target.destroy();
+      buffer.destroy();
+      throw new Error(`the ${name} vectors (${texture.format}) cannot be read: ${error.message}`);
+    }
+    await buffer.mapAsync(1);
+    const data = new Float32Array(buffer.getMappedRange()),
+      vector = new Float32Array(width * height * 2),
+      stride = bytesPerRow / 4;
+    for (let y = 0; y < height; y++) vector.set(data.subarray(y * stride, y * stride + width * 2), y * width * 2);
+    buffer.unmap();
+    buffer.destroy();
+    target.destroy();
+    return { width, height, vector, format: texture.format };
   };
   /**
    * Sky and water from the geometry mask: a pixel with no geometry (below 128) is water when its view ray through the
@@ -614,10 +658,10 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
      * the plane y = `horizon.y`. Resolves name: {sha256 of the grey bytes, mean 0 to 1, png in base64 when `png`};
      * a page mask named in `exact` also has `exact` (its floats in base64) and `format`.
      */
-    async masks({ hook, names, derived, horizon, engine, png, exact = [], sub = 0, subs = 1 }) {
+    async masks({ hook, names, derived, horizon, engine, png, exact = [], vectors = [], sub = 0, subs = 1 }) {
       const give = get(hook);
       if (typeof give !== 'function') throw new Error(`${hook} is not a function in the page`);
-      const given = await give({ names: names.filter((name) => !derived.includes(name)) });
+      const given = await give({ names: names.filter((name) => !derived.includes(name)), vectors });
       if (!given?.device || !given.textures)
         throw new Error(`${hook} must return {device, textures: {name: GPUTexture}}`);
       const read = {};
@@ -648,7 +692,24 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
         const split = splitHorizon(read.geometry, camera, horizon.y);
         for (const name of derived) read[name] = split[name];
       }
-      return pack(Object.fromEntries(names.map((name) => [name, read[name]])), png);
+      const packed = await pack(Object.fromEntries(names.map((name) => [name, read[name]])), png);
+      // Vectors (TAA's velocity): the last sub-frame's, the one the probe's view-projection is of, in uv at the frame's
+      // size, with the page's jitter difference for them (`jitter`, name: [x, y] in uv) to take out.
+      for (const name of vectors) {
+        const texture = given.textures[name];
+        if (!texture) throw new Error(`${hook} gave no ${name} texture`);
+        const read = await readVector(given.device, name, texture),
+          vector = globalThis.__margoShotPixels.resampleVector({ ...read, outWidth: out[0], outHeight: out[1] }),
+          jitter = given.jitter?.[name];
+        if (!(Array.isArray(jitter) && jitter.length === 2 && jitter.every(Number.isFinite)))
+          throw new Error(`${hook} must give jitter.${name}, [x, y] in uv, with its ${name} texture`);
+        packed[name] = {
+          vector: base64(new Uint8Array(vector.buffer, vector.byteOffset, vector.byteLength)),
+          format: read.format,
+          jitter: [...jitter],
+        };
+      }
+      return packed;
     },
     /**
      * The light the engine shaded a kept frame with, for the look checks' T6 limits (@margoengine/headless/look

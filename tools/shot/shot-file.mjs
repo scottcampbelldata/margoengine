@@ -228,6 +228,18 @@ export function validateShot(input) {
       );
     else if (!aovs.includes('depth'))
       add(at('aovs'), 'must list depth for shot.moving: the camera motion of each pixel is made from its distance');
+    if (isRecord(shot.moving) && 'velocity' in shot.moving) {
+      if (typeof shot.moving.velocity !== 'boolean')
+        add(
+          `${at('moving')}.velocity`,
+          "must be true or false: true reads the page's TAA velocity for the frame after each probe",
+        );
+      else if (shot.moving.velocity && (shot.subframes ?? 1) > 1 && !((shot.shutter ?? 0) > 0))
+        add(
+          `${at('moving')}.velocity`,
+          'needs a shutter above 0 with sub-frames: the velocity is over the last sub-frame step, scaled to a frame',
+        );
+    }
     if (!(isRecord(shot.probes) && Object.keys(shot.probes).length))
       add(at('moving'), 'needs probes: the frame after each one is written');
     else if (finite(shot.seconds) && finite(shot.fps))

@@ -37,7 +37,7 @@ evaluated state goes to the page's `apply` hook when it has one.
 | `probeLookBounds` | `{}` | A probe's own bounds, probe name: {check name: bound}; on that probe they replace `lookBounds` for the checks they name (see Bounds) |
 | `aovs` | `[]` | Masks written beside every frame (see Masks): names the page gives through `page.aovs`, and `sky` and `water`, which the tool works out |
 | `horizon` | `null` | `{y}`: the world height of the water plane that splits `sky` from `water`; needed for either |
-| `moving` | `null` | `{depthScale}`: each probe also writes the frame after it and the camera's motion to it (see Moving evidence); `depthScale` is the metres of the page's `depth` mask, which holds exp(-distance / depthScale) in an `r32float` texture; needs `depth` in `aovs`, a camera track and probes before the last frame |
+| `moving` | `null` | `{depthScale, velocity?}`: each probe also writes the frame after it and the camera's motion to it (see Moving evidence); `depthScale` is the metres of the page's `depth` mask, which holds exp(-distance / depthScale) in an `r32float` texture; needs `depth` in `aovs`, a camera track and probes before the last frame |
 | `probePool` | `null` | `{frames, step}`: the ground checks (T6 `bounce`, `shadowTint`) of each probe pool `frames` frames (2 to 400, the probe one of them) `step` kept frames apart and centred on it, for shadow interiors too small in one frame; each pooled frame also gets its precise frame (see Precise frames); frames outside a `--seconds` cut are left out |
 | `subject` | `null` | `{target: [x, y, z], size}` in world metres: the point the shot is about and how big it is across, for a film pipeline's camera checks (framing, focus, the subject at a cut); `cameraFrames` and `--cameras` hand it on |
 | `kit`, `grade`, `endCard` | `null` | Carried in the manifest for the steps that use them: scene kits (P5), the grade (P3) and the end card (P6) |
@@ -135,6 +135,15 @@ the next frame covers or uncovers by the forward-backward test of optical flow, 
 pixels (Sundaram, Brox and Keutzer, ECCV 2010, doi:10.1007/978-3-642-15549-9_32; the occlusion masks of MPI-Sintel,
 Butler et al., ECCV 2012, doi:10.1007/978-3-642-33783-3_44), and its detail counts them as `occluded`
 (KB-LOOK-TV-SHIMMER2).
+
+With `"moving": {"depthScale": 2000, "velocity": true}` each probe and the frame after it also read the page's TAA velocity
+(the page's aovs hook gets `{vectors: ['velocity']}` and gives `textures.velocity`, an `rg16float` of uv motion, and
+`jitter.velocity`, [x, y] the jitter difference in uv). The tool reads its two channels exactly at the last sub-frame,
+area-means them to the frame's size (`aovs/velocity/frame_NNNN.f32`) and writes `probes/<name>.velocity.f32` (the
+probe's) and `probes/<name>.next-velocity.f32` (the next frame's): (velocity - jitter) x the frame's size x 1 / fps over
+the last sub-frame step, pixels over one frame (manifest `moving.velocity`, `moving.nextVelocity`). `shimmerMoving` then
+leaves out a pixel whose surface, or the one it lands on, the engine moved more than half a pixel other than the camera
+did (a swaying branch and the sky it leaves), counted as `animated`. The scale assumes the motion steady across one frame; a shot with sub-frames needs a shutter above 0.
 
 The page draws the mask as `r32float` (a `SceneTargets` output `{wgsl, format: 'r32float'}`). On each probe the tool
 also keeps the floats, `aovs/depth/frame_NNNN.f32` and `probes/<name>.depth.f32` (little-endian float32, one per

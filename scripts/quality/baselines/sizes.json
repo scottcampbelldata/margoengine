@@ -15608,6 +15608,12 @@
     },
     {
       "date": "2026-11-28",
+      "commit": "shimmer2-velocity",
+      "reason": "KB-LOOK-TV-SHIMMER2 part (b): T4 shimmerMoving leaves out pixels the engine moves on purpose (MovingFrames.velocity and nextVelocity, TAA's velocity), with detail.animated and the manifest's two velocity files: headless/look 19,739 to 19,898 B gzip measured (ceiling 19739 to 19898). The skip sits inside shimmerMoving's own pixel loop; a separate entry would repeat the warp and the occlusion test.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-28",
       "commit": "dyn05-threaded-contact-wire",
       "reason": "DYN-05: rail grows from 8496 to 12230 B gzip (ceiling 8752 to 12597) for staged car and wire publication, coded invalid geometry and loads, signed origins, and optional native worker phases with exact work receipts. A separate wire entry would duplicate the coupled car, contact and registry layout. Each lazy wire variant measures 2,914 B raw and 1,062 B gzip. The Physics base and existing users of the worker pool remain within their ceilings. Core and Stage gain zero bytes.",
       "grew": 1
@@ -16220,7 +16226,7 @@
     "@margoengine/headless/formats": 5809,
     "@margoengine/headless/frames": 2152,
     "@margoengine/headless/gif": 374,
-    "@margoengine/headless/look": 19739,
+    "@margoengine/headless/look": 19898,
     "@margoengine/headless/null": 3411,
     "@margoengine/headless/stage": 3972,
     "@margoengine/headless/tiles": 2829,

@@ -1847,7 +1847,7 @@ export interface ShotManifestProbe {
    * The frame after this one (a PNG) and each pixel's motion to it (raw little-endian float32, x then y per pixel, the
    * frame's size), for `shimmerMoving` and `motionBlur`.
    */
-  moving?: { next: string; motion: string; back?: string };
+  moving?: { next: string; motion: string; back?: string; velocity?: string; nextVelocity?: string };
   /**
    * This probe's own bounds, check name: bound. They replace the shot's `lookBounds` for the checks they name, on this
    * probe only (for example a lights bound for the probes that face the lamps).
@@ -1878,7 +1878,7 @@ export interface CheckShotOptions extends CheckProbeOptions, LookReportOptions {
 }
 
 async function movingFrames(
-  entry: { next: string; motion: string; back?: string },
+  entry: { next: string; motion: string; back?: string; velocity?: string; nextVelocity?: string },
   frame: LookImage,
   read: (path: string) => Promise<Uint8Array>,
   png: (path: string) => Promise<LookImage>,
@@ -1888,16 +1888,25 @@ async function movingFrames(
   if (bytes.byteLength !== data.byteLength)
     throw rangeError(`${entry.motion} is not the frame's size in float32 pairs (x, y)`, 'headless');
   new Uint8Array(data.buffer).set(bytes);
-  let back: LookMotion | undefined;
-  if (entry.back) {
-    const bytes = await read(entry.back),
+  const pairs = async (path: string | undefined): Promise<LookMotion | undefined> => {
+    if (!path) return undefined;
+    const bytes = await read(path),
       floats = new Float32Array(frame.width * frame.height * 2);
     if (bytes.byteLength !== floats.byteLength)
-      throw rangeError(`${entry.back} is not the frame's size in float32 pairs (x, y)`, 'headless');
+      throw rangeError(`${path} is not the frame's size in float32 pairs (x, y)`, 'headless');
     new Uint8Array(floats.buffer).set(bytes);
-    back = { width: frame.width, height: frame.height, data: floats };
-  }
-  return { next: await png(entry.next), motion: { width: frame.width, height: frame.height, data }, back };
+    return { width: frame.width, height: frame.height, data: floats };
+  };
+  const back = await pairs(entry.back),
+    velocity = await pairs(entry.velocity),
+    nextVelocity = await pairs(entry.nextVelocity);
+  return {
+    next: await png(entry.next),
+    motion: { width: frame.width, height: frame.height, data },
+    ...(back ? { back } : {}),
+    ...(velocity ? { velocity } : {}),
+    ...(nextVelocity ? { nextVelocity } : {}),
+  };
 }
 
 /**
@@ -2376,6 +2385,15 @@ export interface MovingFrames {
    */
   back?: LookMotion;
   /**
+   * The engine's own motion of each pixel of this frame from the frame before, the same way as `motion` (pixels over
+   * one frame, TAA's velocity with its jitter removed): with it `shimmerMoving` leaves out a pixel whose surface moves
+   * other than the camera moves it, by more than half a pixel (a swaying branch, a flame, a wave), which changes on
+   * purpose, including what such a surface leaves behind.
+   */
+  velocity?: LookMotion;
+  /** The same for each pixel of `next`: `shimmerMoving` also leaves out a pixel that lands where such a surface moved. */
+  nextVelocity?: LookMotion;
+  /**
    * The shutter angle the frame was exposed with, in degrees (more than 0, up to 360), for `motionBlur`. Default 180,
    * the film standard: a frame drawn without sub-frames is still judged against a 180 degree smear.
    */
@@ -2404,7 +2422,7 @@ function sampleLuma(y: Float32Array, width: number, height: number, x: number, v
  */
 export function shimmerMoving(
   frame: LookImage,
-  { next, motion, back }: MovingFrames,
+  { next, motion, back, velocity, nextVelocity }: MovingFrames,
   { mask, bound, threshold = 6 }: FlickerOptions & { threshold?: number } = {},
 ): LookResult {
   const { width, height } = frame;
@@ -2417,12 +2435,22 @@ export function shimmerMoving(
     if (back.data.length !== width * height * 2)
       throw rangeError('The back motion holds two floats (x, y) per pixel', 'headless');
   }
+  for (const [name, field] of [
+    ['velocity', velocity],
+    ['next velocity', nextVelocity],
+  ] as const) {
+    if (!field) continue;
+    sameSize(frame, field, name);
+    if (field.data.length !== width * height * 2)
+      throw rangeError(`The ${name} holds two floats (x, y) per pixel`, 'headless');
+  }
   const a = luma(frame),
     b = luma(next),
     inside = maskBits(frame, mask, 'shimmerMoving');
   let count = 0,
     off = 0,
-    occluded = 0;
+    occluded = 0,
+    animated = 0;
   for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {
       const i = y * width + x;
@@ -2434,6 +2462,13 @@ export function shimmerMoving(
         occluded++;
         continue;
       }
+      if (
+        (velocity && animatedAt(motion.data[i * 2], motion.data[i * 2 + 1], velocity, x, y)) ||
+        (nextVelocity && animatedAt(motion.data[i * 2], motion.data[i * 2 + 1], nextVelocity, tx, ty))
+      ) {
+        animated++;
+        continue;
+      }
       count++;
       if (Math.abs(a[i] - sampleLuma(b, width, height, tx, ty)) > threshold) off++;
     }
@@ -2441,8 +2476,22 @@ export function shimmerMoving(
     'shimmerMoving',
     percent(off, count),
     bound,
-    back ? { pixels: count, off, occluded } : { pixels: count, off },
+    {
+      pixels: count,
+      off,
+      ...(back ? { occluded } : {}),
+      ...(velocity || nextVelocity ? { animated } : {}),
+    },
   );
+}
+
+/**
+ * A pixel the camera moves by (fx, fy) moves on purpose when the engine moved the surface at (tx, ty) of `velocity`'s
+ * frame by more than half a pixel otherwise (its own velocity, read at the nearest pixel as the back motion is).
+ */
+function animatedAt(fx: number, fy: number, velocity: LookMotion, tx: number, ty: number): boolean {
+  const j = Math.round(ty) * velocity.width + Math.round(tx);
+  return (velocity.data[j * 2] - fx) ** 2 + (velocity.data[j * 2 + 1] - fy) ** 2 > 0.25;
 }
 
 /**

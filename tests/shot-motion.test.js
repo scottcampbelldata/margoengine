@@ -7,7 +7,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { encodePNG } from '@margoengine/headless';
-import { SKY_DISTANCE, distanceFromNearness, writeMoving } from '../tools/shot/motion.mjs';
+import { SKY_DISTANCE, distanceFromNearness, velocityInPixels, writeMoving } from '../tools/shot/motion.mjs';
+import { resampleVector } from '../tools/shot/pixels.js';
 import { validateShot } from '../tools/shot/shot-file.mjs';
 
 const grey = (width, height, value) => {
@@ -177,4 +178,39 @@ test('shot.moving needs a depth scale, the depth mask, probes and a frame after 
   assert.deepEqual(paths(header({ moving: { depthScale: 200 }, aovs: ['geometry'] })), ['shot.aovs']);
   assert.deepEqual(paths(header({ moving: { depthScale: 200 }, probes: {} })), ['shot.moving']);
   assert.ok(paths(header({ moving: { depthScale: 200 }, probes: { open: 1.99 } })).includes('shot.probes.open'));
+});
+
+test('moving.velocity is true or false and needs an open shutter with sub-frames (KB-LOOK-TV-SHIMMER2)', () => {
+  const paths = (input) => validateShot(input).map((issue) => issue.path);
+  assert.deepEqual(validateShot(header({ moving: { depthScale: 200, velocity: true } })), []);
+  assert.deepEqual(validateShot(header({ moving: { depthScale: 200, velocity: true }, subframes: 8, shutter: 180 })), []);
+  assert.deepEqual(paths(header({ moving: { depthScale: 200, velocity: 1 } })), ['shot.moving.velocity']);
+  assert.deepEqual(paths(header({ moving: { depthScale: 200, velocity: true }, subframes: 8, shutter: 0 })), [
+    'shot.moving.velocity',
+  ]);
+});
+
+test('TAA velocity becomes pixels over a frame: jitter out, the frame size, the sub-frame scale (KB-LOOK-TV-SHIMMER2)', () => {
+  const out = mkdtempSync(join(tmpdir(), 'margo-velocity-')),
+    width = 4,
+    height = 2;
+  try {
+    const uv = new Float32Array(width * height * 2);
+    for (let i = 0; i < width * height; i++) uv.set([0.01 + 0.002, -0.005 + 0.001], i * 2);
+    writeFileSync(join(out, 'v.f32'), Buffer.from(uv.buffer));
+    const { data } = velocityInPixels(out, { file: 'v.f32', jitter: [0.002, 0.001], scale: 16 }, width, height);
+    assert.ok(Math.abs(data[0] - 0.01 * 4 * 16) < 1e-5, `x ${data[0]}`);
+    assert.ok(Math.abs(data[1] + 0.005 * 2 * 16) < 1e-5, `y ${data[1]}`);
+    assert.throws(() => velocityInPixels(out, { file: 'v.f32', jitter: [0, 0], scale: 1 }, 8, 2), RangeError);
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test('resampleVector takes each pixel the area mean of both channels, signs kept', () => {
+  // 4 x 2 to 2 x 1: each output pixel the mean of a 2 x 2 block.
+  const vector = Float32Array.from([1, -1, 3, -3, 5, 5, 7, 7, 1, -1, 3, -3, 5, 5, 7, 7]),
+    out = resampleVector({ vector, width: 4, height: 2, outWidth: 2, outHeight: 1 });
+  assert.deepEqual([...out], [2, -2, 6, 6]);
+  assert.equal(resampleVector({ vector, width: 4, height: 2, outWidth: 4, outHeight: 2 }), vector);
 });
