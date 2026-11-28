@@ -2634,15 +2634,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   removed without growth cover under a tenth), `packages/scenes/test/library-parts.test.js`.
 - **To use it:** the asset library's old level files are unchanged; load the full scan with `foliageTriangles`.
 
-### Open 2026-11-27: some near firs in the timber valley lean about 20 degrees (KB-SCENES-FIRLEAN1, scenes, biomes)
+### Fixed 2026-11-26: some near firs in the timber valley leaned about 20 degrees (KB-SCENES-FIRLEAN1, scatter)
 
 - **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=creek --library=<asset library>
-  "--query=fir=<fir_tree_01_a levels>"` (lane B frames of 2026-11-17): trees on the creek banks lean toward the valley
+  "--query=fir=<fir_tree_01_a levels>"` (lane B frames of 2026-11-17): trees on the creek banks leaned toward the valley
   floor, the nearest right one by about 24 degrees.
-- **Ruled out:** the scan is upright (trunk x -0.53 to 0.60 m over 17.5 m; stills of all its levels stand straight),
-  `BiomeObjects` sets no `alignToGround`, and the trunk's wind reach (about 1.1 m at full strength) gives under half
-  that angle.
-- **Cause:** not found; next step is a frame with the weather's wind at 0 to separate wind from placement.
+- **Cause:** the wind bend of those frames, KB-LOOK-TV-SHIMMER1: `windBend` moved a vertex by gust x strength x
+  h^2 / (1 + h), so a 17.5 m fir's top moved up to 16.6 m at full strength; 24 degrees needs a gust x strength of 0.47.
+  The bound that rules wind out (a 1.1 m reach) came with the fix, after the frames.
+- **Fix:** 1d1729c194 (`swayTip`: at most 1.2 m at stiffness 1). Checked 2026-11-28 on the `creek` view with the scanned
+  levels: the firs stand upright in the calm, smoke and blowup weathers (2, 6 and 20 m/s of wind), and the same build
+  served with the old `windBend` formula put back in its WGSL leans them again, as reported.
+- **Regression:** `packages/scatter/test/sway.test.js`, `packages/scatter/test/sway.browser.mjs` (a 25 m plant's top
+  moves at most 2 m; WebGPU and the WebGL2 layer).
 
 ### Open 2026-11-26: the far sea shows even parallel rows of crests, as Water's default sea is a sum of eight trains (KB-WATER-FARROWS1, water, SEA-02)
 
