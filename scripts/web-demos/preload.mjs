@@ -17,7 +17,8 @@ function chunk(base, files) {
   if (found.length === 1) return found[0];
   // A chunk of a prebuilt package keeps that package's own hash in its name (`readback-Cf9k53gF-DiYXj9wd.js`), which
   // changes when the package is rebuilt: match on the name before the hashes, when exactly one chunk has it.
-  const stem = /^(.+?)(?:-[A-Za-z0-9_]{8})+$/.exec(base)?.[1];
+  // A hash is base64url, so it may hold a dash itself (`wasm-zd5jb-Ua-BCKdNKAj.js`).
+  const stem = /^(.+?)(?:-[A-Za-z0-9_-]{8})+$/.exec(base)?.[1];
   if (!stem || found.length) return undefined;
   const stemmed = new RegExp(`^${escape(stem)}(?:-[A-Za-z0-9_-]{8}){2,}\\.js$`);
   const same = files.filter((f) => stemmed.test(f));
