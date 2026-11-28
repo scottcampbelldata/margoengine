@@ -150,7 +150,7 @@ test('heading convention matches north at zero and finite malformed inputs leave
   assert.throws(() => new BoundaryLayerWind({ turbulence: { cells: [0, 4, 4] } }), {
     name: 'MargoError',
     code: 'state',
-    message: /supported cell counts/,
+    message: /Supply three lengths with only 2, 3 and 5/,
   });
   assert.throws(() => new BoundaryLayerWind({ seaLevelTemperature: 1 }), {
     name: 'MargoError',

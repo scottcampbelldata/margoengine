@@ -86,6 +86,11 @@
   <table>
   <caption class="sr-only">Files loaded after the entry, in bytes, with the call that loads each</caption>
   <thead><tr><th scope="col">File</th><th scope="col">Kind</th><th scope="col" class="num">Raw (B)</th><th scope="col" class="num">Gzip (B)</th><th scope="col" class="num">Brotli (B)</th><th scope="col">Loads when</th></tr></thead>
+<tbody data-lazy-package="@margoengine/weather">
+<tr class="group"><th scope="rowgroup" colspan="6"><code>@margoengine/weather</code></th></tr>
+<tr><th scope="row"><code>mann-fft.wasm</code></th><td>Rust SIMD atmospheric turbulence FFT</td><td class="num">25,652</td><td class="num">10,306</td><td class="num">8,962</td><td>MannBox.create(), only from weather/turbulence; one private plan per participating thread</td></tr>
+<tr><th scope="row"><code>workers/mann-fft.js</code></th><td>Mann turbulence component FFT worker</td><td class="num">1,599</td><td class="num">832</td><td class="num">699</td><td>MannBox.create({ threads: 2 or 3 }); one worker asset shared by the independent component helpers</td></tr>
+</tbody>
 <tbody data-lazy-package="@margoengine/physics">
 <tr class="group"><th scope="rowgroup" colspan="6"><code>@margoengine/physics</code></th></tr>
 <tr><th scope="row"><code>drainage-fog-kernel.wasm</code></th><td>Rust SIMD radiation fog and cold-air drainage</td><td class="num">8,955</td><td class="num">3,273</td><td class="num">2,865</td><td>DrainageFog.load() from the optional /drainage-fog entry</td></tr>
@@ -3973,7 +3978,7 @@
 <tr><td><code>./tornado</code></td><td class="num">24,762</td><td class="num">10,132</td></tr>
 </tbody>
 <tbody data-package="@margoengine/weather">
-<tr><th scope="rowgroup" rowspan="23"><a href="./catalog/#weather">@margoengine/weather</a></th><td><code>root</code></td><td class="num">25,773</td><td class="num">9,148</td><td rowspan="23"><code>@margoengine/core</code>, <code>@margoengine/physics</code> (optional), <code>@margoengine/post</code> (optional)<br>Installs <code>@margoengine/audio</code>, <code>@margoengine/math</code></td></tr>
+<tr><th scope="rowgroup" rowspan="24"><a href="./catalog/#weather">@margoengine/weather</a></th><td><code>root</code></td><td class="num">25,773</td><td class="num">9,148</td><td rowspan="24"><code>@margoengine/core</code>, <code>@margoengine/physics</code> (optional), <code>@margoengine/post</code> (optional)<br>Installs <code>@margoengine/audio</code>, <code>@margoengine/math</code></td></tr>
 <tr><td><code>./hail</code></td><td class="num">12,695</td><td class="num">5,467</td></tr>
 <tr><td><code>./hail-physics</code></td><td class="num">2,367</td><td class="num">1,056</td></tr>
 <tr><td><code>./puddles</code></td><td class="num">8,605</td><td class="num">3,797</td></tr>
@@ -3981,8 +3986,8 @@
 <tr><td><code>./snow-drift</code></td><td class="num">14,592</td><td class="num">5,577</td></tr>
 <tr><td><code>./avalanche</code></td><td class="num">18,826</td><td class="num">7,195</td></tr>
 <tr><td><code>./eruption</code></td><td class="num">24,673</td><td class="num">10,138</td></tr>
-<tr><td><code>./turbulence</code></td><td class="num">3,283</td><td class="num">1,753</td></tr>
-<tr><td><code>./boundary-layer</code></td><td class="num">7,682</td><td class="num">3,408</td></tr>
+<tr><td><code>./turbulence</code></td><td class="num">13,442</td><td class="num">5,597</td></tr>
+<tr><td><code>./boundary-layer</code></td><td class="num">15,471</td><td class="num">6,278</td></tr>
 <tr><td><code>./precipitation</code></td><td class="num">10,030</td><td class="num">3,852</td></tr>
 <tr><td><code>./surface-energy</code></td><td class="num">7,509</td><td class="num">3,360</td></tr>
 <tr><td><code>./lava</code></td><td class="num">38,881</td><td class="num">15,291</td></tr>
@@ -3996,6 +4001,7 @@
 <tr><td><code>./lens</code></td><td class="num">9,334</td><td class="num">4,057</td></tr>
 <tr><td><code>./cover</code></td><td class="num">4,034</td><td class="num">1,684</td></tr>
 <tr><td><code>./settings</code></td><td class="num">25,293</td><td class="num">9,205</td></tr>
+<tr><td><code>dist/workers/mann-fft.js (worker)</code></td><td class="num">1,599</td><td class="num">832</td></tr>
 </tbody>
 <tbody data-package="@margoengine/toon">
 <tr><th scope="rowgroup" rowspan="6"><a href="./catalog/#toon">@margoengine/toon</a></th><td><code>root</code></td><td class="num">4,914</td><td class="num">2,206</td><td rowspan="6"><code>@margoengine/core</code>, <code>@margoengine/gltf</code> (optional)<br>Installs <code>@margoengine/creative</code>, <code>@margoengine/math</code></td></tr>

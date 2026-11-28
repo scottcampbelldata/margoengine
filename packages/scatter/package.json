@@ -132,6 +132,7 @@
     "@margoengine/math": "^1.0.0"
   },
   "scripts": {
+    "test:gpu:plant-gust": "cd ../.. && node packages/scatter/test/plant-gust.browser.mjs && node packages/scatter/test/plant-gust.browser.mjs --compat",
     "test:gpu:plant-surge": "cd ../.. && node packages/scatter/test/plant-surge.browser.mjs && node packages/scatter/test/plant-surge.browser.mjs --compat",
     "test:settings:browser": "cd ../.. && node packages/scatter/test/settings.browser.mjs && node packages/scatter/test/settings.browser.mjs --compat",
     "build": "node ../../scripts/build-optional.js scatter",

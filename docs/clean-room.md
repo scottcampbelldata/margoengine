@@ -13385,9 +13385,6 @@ framework's `Wind`. Written from:
 - M. Faccioni, D. Kiehn and P. Vrancken, "Generating high-fidelity wind fields from the wind speed correlation tensor", Wind
   Energy Science 11, 2093-2101, 2026, https://doi.org/10.5194/wes-11-2093-2026, read in full: the discrete Fourier synthesis
   C* C = (2 pi)^m / V Phi (eqs. 3-5) and the finite box's loss of the largest eddies (section 4).
-- J. Mann, "The spatial structure of neutral atmospheric surface-layer turbulence", Journal of Fluid Mechanics 273, 1994, and
-  J. Mann, "Wind field simulation", Probabilistic Engineering Mechanics 13(4), 1998: the model and its simulation, not
-  readable here (paywalled); their equations are taken from the two papers above, which restate them.
 - R. B. Stull, "An Introduction to Boundary Layer Meteorology", Kluwer, 1988 (section 9.7: the neutral log law and sigma_u
   about 2.5 u*), and G. I. Taylor, "The spectrum of turbulence", Proceedings of the Royal Society A 164, 1938 (frozen
   turbulence): textbook results, known through these references.
@@ -13398,6 +13395,36 @@ The factor G = D G0, G0 = sqrt(E / (4 pi)) / k0^2 [k0]x, the Nyquist and mean bi
 standard deviation, Pfaff's transformation of the hypergeometric function to a series that converges for every argument,
 and an atan from + - * / only are this package's own arrangement. Proof: `packages/weather/tests/turbulence.test.js` (isotropy,
 the IEC ratios 0.68 and 0.51, u'w' < 0, divergence below 1e-12, determinism) and `tests/boundary-layer.test.js`.
+
+ATMO-02 checked the original tensor and lifetime against Jakob Mann, [The spatial structure of neutral atmospheric
+surface-layer turbulence](https://orbit.dtu.dk/en/publications/the-spatial-structure-of-neutral-atmospheric-surface-lay/),
+*Journal of Fluid Mechanics* 273 (1994), eqs. 2.16–2.17, 3.3 and 3.13–3.17. In the available
+[Models in Micrometeorology](https://backend.orbit.dtu.dk/ws/portalfiles/portal/254755257/Mann1994PhD.pdf)
+(Risø-R-727(EN), 1994), Part IB §1.3 and eqs. 1.7, 1.11–1.12 describe the large-box Gaussian Fourier
+construction. It became [Wind field simulation](https://doi.org/10.1016/S0266-8920(97)00036-2) (1998).
+The continuous limit of eqs. 3.15–3.17 at zero along-wind wavenumber and nonzero across-wind
+wavenumber is `zeta1 = -beta`; the original branch dropped this shear. Evaluating the angle difference
+before dividing by the small along-wind wavenumber avoids cancellation. The FFT uses the Stockham
+work order already established for K17. The added f64x2 path keeps the arithmetic order of the
+scalar Weather FFT, while component plans run independently on the caller and optional helpers.
+
+The placed gust uses the longitudinal envelope of the discrete gust in FAA,
+[Dynamic Gust Loads](https://www.faa.gov/documentLibrary/media/Advisory_Circular/AC_25_341-1.pdf)
+(2014), §6.2.1 and 14 CFR 25.341(a)(2), with the length set to twice the gradient distance.
+The direction, amplitude vector, advection speed and optional vertical taper are author inputs.
+The envelope is the square of the sine of pi times penetration divided by length, algebraically
+equal to the one-cosine law while preserving the small onset near the leading edge.
+The vertical taper uses the same envelope on the optional height span.
+
+Rieska Mawarni Putri et al., [Turbulence in a coastal environment: the case of Vindeby](https://doi.org/10.5194/wes-7-1693-2022)
+(2022), Fig. 11 provides independent near-neutral co-coherence markers at 12, 27 and 39 m vertical separation.
+`packages/weather/scripts/atmo02-vindeby-measured.mjs` uses four fixed seeds, with the pre-existing 33.6 m length
+scale and 3.9 shear. The measured ordinate is excluded from the model inputs. The refined grid's along-wind,
+across-wind and vertical co-coherence RMSEs are 0.242, 0.293 and 0.409. At `kΔz = 0.31576` across 39 m the
+vertical prediction is 0.695, versus 0.156 measured. Each of the 12 refined vertical predictions exceeds its
+observation. The diagnostic reports model seed uncertainty and observed high-wavenumber scatter separately.
+The paper gives no per-marker confidence interval. Ground blocking and stability-dependent coherence
+remain open.
 
 ATMO-01 integrates the surface-layer momentum gradient from the roughness length. A. J. Dyer
 and B. B. Hicks, [Flux-gradient relationships in the constant flux layer](https://doi.org/10.1002/qj.49709641012)

@@ -15545,6 +15545,12 @@
       "commit": "bio01-native-plant-workers",
       "reason": "BIO-01: the Physics vegetation entry measures 9,667 to 12,687 B gzip (ceiling 9,958 to 13,068). The additional code translates signed flow origins and accepts Rust SIMD worker results atomically. A second optional entry would repeat the kernel and state bindings. The shared optional worker is visible to downstream build tools. Core and Stage gain no bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "atmo02-native-mann-fft",
+      "reason": "ATMO-02: Weather turbulence grows 1,753 to 5,597 B gzip (cap 1,965 to 5,853), and boundary-layer grows 3,408 to 6,278 (cap 3,664 to 6,534) because it uses the same MannBox implementation. The optional native planner and coded event code share the existing data model. Splitting the public API would duplicate box synthesis and exact-byte checks. Wasm and the helper are separate assets. The new worker is 832 B gzip, with a 1,088 B ceiling.",
+      "grew": 3
     }
   ],
   "items": {
@@ -17255,9 +17261,10 @@
     "@margoengine/water/underwater": 9344,
     "@margoengine/water/wake": 3362,
     "@margoengine/weather": 9423,
+    "@margoengine/weather dist/workers/mann-fft.js": 1088,
     "@margoengine/weather/audio": 1908,
     "@margoengine/weather/avalanche": 7451,
-    "@margoengine/weather/boundary-layer": 3664,
+    "@margoengine/weather/boundary-layer": 6534,
     "@margoengine/weather/cover": 1795,
     "@margoengine/weather/data": 2788,
     "@margoengine/weather/drive": 9747,
@@ -17276,7 +17283,7 @@
     "@margoengine/weather/snow-drift": 5806,
     "@margoengine/weather/surface-energy": 3616,
     "@margoengine/weather/synoptic": 1196,
-    "@margoengine/weather/turbulence": 1965,
+    "@margoengine/weather/turbulence": 5853,
     "@margoengine/webgl2-compat": 131958,
     "@margoengine/webgl2-compat base (without compute runtime and read-back)": 97864,
     "@margoengine/webgl2-compat lazy compute runtime and read-back": 33850,

@@ -18830,12 +18830,12 @@
         "gzip": 10138
       },
       "./turbulence": {
-        "raw": 3283,
-        "gzip": 1753
+        "raw": 13442,
+        "gzip": 5597
       },
       "./boundary-layer": {
-        "raw": 7682,
-        "gzip": 3408
+        "raw": 15471,
+        "gzip": 6278
       },
       "./precipitation": {
         "raw": 10030,
@@ -18888,6 +18888,10 @@
       "./settings": {
         "raw": 25293,
         "gzip": 9205
+      },
+      "dist/workers/mann-fft.js": {
+        "raw": 1599,
+        "gzip": 832
       }
     },
     "@margoengine/webgl2-compat": {
@@ -19084,6 +19088,16 @@
     }
   },
   "lazyFiles": {
+    "packages/weather/dist/mann-fft.wasm": {
+      "raw": 25652,
+      "gzip": 10306,
+      "brotli": 8962
+    },
+    "packages/weather/dist/workers/mann-fft.js": {
+      "raw": 1599,
+      "gzip": 832,
+      "brotli": 699
+    },
     "packages/physics/dist/drainage-fog-kernel.wasm": {
       "raw": 8955,
       "gzip": 3273,

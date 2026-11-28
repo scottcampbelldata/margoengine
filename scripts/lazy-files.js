@@ -14,6 +14,22 @@ const core = [/^@margoengine\/core(\/|$)/];
 /** @type {{package: string, file: string, label: string, kind: string, measure: 'file' | 'bundle', external?: RegExp[], when: string}[]} */
 export const LAZY_FILES = [
   {
+    package: '@margoengine/weather',
+    file: 'packages/weather/dist/mann-fft.wasm',
+    label: 'mann-fft.wasm',
+    kind: 'Rust SIMD atmospheric turbulence FFT',
+    measure: 'file',
+    when: 'MannBox.create(), only from weather/turbulence; one private plan per participating thread',
+  },
+  {
+    package: '@margoengine/weather',
+    file: 'packages/weather/dist/workers/mann-fft.js',
+    label: 'workers/mann-fft.js',
+    kind: 'Mann turbulence component FFT worker',
+    measure: 'file',
+    when: 'MannBox.create({ threads: 2 or 3 }); one worker asset shared by the independent component helpers',
+  },
+  {
     package: '@margoengine/physics',
     file: 'packages/physics/dist/drainage-fog-kernel.wasm',
     label: 'drainage-fog-kernel.wasm',

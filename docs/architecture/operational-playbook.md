@@ -11841,3 +11841,13 @@ computes the input differences at the world clock and gives each native worker a
 Only complete, checked modal state is copied to the field backing. Placement, shape and displacement use the same
 physical Scatter adapter in the fixed-camera sea-surge fixture. Signed origin, rejected calculation, worker replay,
 frame-zero rigid activation and both renderers have scoped tests.
+
+### ATMO-02 synthesis and gust evidence
+
+The optional Weather turbulence entry retains pinned noise and tensor evaluation. Its asynchronous FFT transforms
+each of the three complex fields twice with the Rust Stockham plan. A build can use one, two or three participants,
+each with a private plan. The 512 × 32 × 32 test counts 3,145,728 transformed complex values and 179,306,496 SIMD
+twiddle products. The published URL keeps Wasm and the worker script as separate assets. The production browser
+test loads both from an application build, starts two helpers and checks the library build's external Wasm asset.
+The solver and renderer test carries the placed gust through the signed wind cell to rooted clumps on both backends.
+The independent Vindeby vertical co-coherence remains outside the model's seed spread.

@@ -96,6 +96,48 @@ test('the special functions: pinned atan and the eddy lifetime hypergeometric', 
     for (let j = 0; j < 3; j++) row += g[3 * i + j] * k[j];
     assert.ok(Math.abs(row) < 1e-15 * Math.hypot(...g), `row ${i}`);
   }
-  assert.throws(() => new MannBox({ cells: [7, 8, 8] }), RangeError);
-  assert.throws(() => new MannBox({ sigma: 0 }), RangeError);
+  assert.throws(() => new MannBox({ cells: [7, 8, 8] }), { code: 'state', message: /Supply three lengths/ });
+  assert.throws(() => new MannBox({ sigma: 0 }), { code: 'state', message: /Set lengthScale and sigma/ });
+});
+
+test('exactly transverse Mann modes keep the continuous limit of the shear transfer', () => {
+  const k2 = 0.11;
+  const k3 = 0.2;
+  const kSquared = k2 * k2 + k3 * k3;
+  const L = 30;
+  const shear = 3.9;
+  const kL = Math.sqrt(kSquared) * L;
+  const beta = (shear * Math.pow(kL, -2 / 3)) / Math.sqrt(hypergeometric(1 / (kL * kL)));
+  const g0 = tensorFactor(0, k2, k3, kSquared, L, 0);
+  const g = tensorFactor(0, k2, k3, kSquared, L, shear);
+  assert.notEqual(g0[6], 0);
+  for (let component = 0; component < 3; component++) {
+    const expected = g0[component] - beta * g0[6 + component];
+    const rounding = 16 * Number.EPSILON * (Math.abs(g0[component]) + beta * Math.abs(g0[6 + component]));
+    assert.ok(Math.abs(g[component] - expected) <= rounding);
+    assert.equal(g[3 + component], g0[3 + component]);
+    assert.equal(g[6 + component], g0[6 + component]);
+  }
+  for (const k1 of [-1e-15, 1e-15]) {
+    const near = tensorFactor(k1, k2, k3, kSquared + k1 * k1, L, shear);
+    // k1/k2 is below 1e-14. Allow two decades for the physical change in the smooth shear terms.
+    assert.ok(Math.abs(near[0] - g[0]) <= 1e-12 * Math.abs(g[0]));
+  }
+});
+
+test('a Mann tile reduces far finite coordinates before cell scaling and rejects invalid accepted samples', () => {
+  const box = new MannBox({ cells: [8, 6, 5], size: [120, 90, 75] });
+  const x = Number.MAX_VALUE;
+  const y = -Number.MAX_VALUE;
+  assert.deepEqual(box.sample(x, y, 2), box.sample(x % 120, y % 90, 2));
+  const out = [1, 2, 3];
+  assert.throws(() => box.sample(Infinity, 0, 0, out), { code: 'state', message: /Supply finite metres/ });
+  box.w[0] = Infinity;
+  assert.throws(() => box.sample(0, 0, 0, out), { code: 'state', message: /Keep the box planes finite/ });
+  assert.deepEqual(out, [1, 2, 3]);
+  assert.throws(() => new MannBox({ cells: [2, 2, 2] }), { code: 'state', message: /Use at least three cells/ });
+  assert.throws(() => new MannBox({ cells: [8, 6, 5], size: [1e-200, 1e-200, 1e-200] }), {
+    code: 'state',
+    message: /Use representable box extents/,
+  });
 });

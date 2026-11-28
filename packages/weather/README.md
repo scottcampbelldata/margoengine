@@ -469,7 +469,34 @@ const air = wind.sample(0, 30, 0, 5); // 30 m up, 5 s into the shot
 console.log(wind.meanSpeed(30).toFixed(2), air.density.toFixed(3)); // 13.22 1.221
 ```
 
-`new MannBox({cells, size, lengthScale, shear, sigma, seed})` synthesises the box on its own (default 512 x 32 x 32 cells over 4,096 x 256 x 256 m; each cell count a product of 2, 3 and 5), `box.u`, `box.v` and `box.w` are its along-wind, across and upward fluctuations, and `box.sample(x, y, z)` reads it trilinearly, repeating past its size. A box should span several length scales (the largest eddies are under-represented in a finite box) and be long enough along the wind that its repeat is not seen: at 12 m/s the default repeats every 5.7 minutes. Making the default box takes under a second.
+`new MannBox({cells, size, lengthScale, shear, sigma, seed})` synthesises the box synchronously. Its default box
+uses 512 × 32 × 32 cells across 4,096 × 256 × 256 m. Each cell count is a product of 2, 3 and 5. The
+`u`, `v` and `w` planes are its along-wind, across-wind and upward fluctuations. `sample(x, y, z)` reads
+them trilinearly, repeating past the box edges. A box should span several length scales to resolve large
+eddies. At 12 m/s the default repeats after 5.7 minutes.
+
+Use `MannBox.create(options)` to load a Rust Wasm SIMD FFT on demand. It makes the same seeded tile and accepts
+`threads` (1 by default, or 2–3 for separate component workers) and an optional `AbortSignal`. The returned
+box exposes the executed transforms, complex values and SIMD twiddle products in `fftWork`.
+
+`travellingGust(base, options)` places a one-cosine front on any `Wind` field. Give the leading-edge
+`speed` (m/s), the full `length` (m), and the added peak velocity `amplitude` ([x, y, z], m/s).
+`origin` defaults to [0, 0, 0] in the base field's starting cell, and the leading edge crosses it at
+`start` (default 0 s). `direction` defaults to 0 radians (+x toward +z). Set `cellSize` to the physics
+world's cell side (default 4,096 m). An optional `height: [bottom, top]`, in metres above the origin,
+tapers the perturbation to zero at both vertical boundaries. The base field still supplies density and temperature.
+
+```ts
+import {BoundaryLayerWind} from '@margoengine/weather/boundary-layer';
+import {MannBox, travellingGust} from '@margoengine/weather/turbulence';
+
+const box = await MannBox.create({cells: [24, 12, 10], size: [192, 96, 80], threads: 2});
+const wind = new BoundaryLayerWind({speed: 4, turbulence: box});
+const gust = travellingGust(wind, {speed: 4, length: 8, amplitude: [6, 0, 0]});
+const base = wind.sample(0, 2, 0, 1);
+const crest = gust.sample(0, 2, 0, 1);
+console.log((crest.velocity[0] - base.velocity[0]).toFixed(1)); // 6.0 m/s at the front's crest
+```
 
 ## Rain, snow, graupel and hail (the physics framework's precipitation)
 

@@ -162,7 +162,7 @@ export class BoundaryLayerWind implements Wind {
         : ([cos(direction), sin(direction)] as const);
     try {
       this.turbulence =
-        turbulence === false
+        turbulence === false || (this.frictionVelocity === 0 && turbulence?.sigma === undefined)
           ? undefined
           : turbulence instanceof MannBox
             ? turbulence

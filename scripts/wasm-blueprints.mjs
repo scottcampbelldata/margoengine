@@ -91,6 +91,12 @@ export const BLUEPRINTS = [
     script: 'packages/physics/scripts/build-wake-fft.mjs',
   },
   {
+    name: 'mann-fft',
+    crate: 'packages/weather/mann-fft',
+    blueprint: 'packages/weather/src/mann-fft.wasm',
+    script: 'packages/weather/scripts/build-mann-fft.mjs',
+  },
+  {
     name: 'hull-panel-kernel',
     crate: 'packages/physics/hull-panel-kernel',
     blueprint: 'packages/physics/src/seakeeping/hull-panel-kernel.wasm',

@@ -6938,3 +6938,11 @@ sand. Both renderers reproduce a settled bed with zero net volume change. The in
 and count 8,198 SIMD pairs for 4,099 plants. `scatter/test/plant-surge.browser.mjs` verifies the live sea orbital
 input and accepted seagrass pose on both renderers. Tip excursions are 21.74 cm and 1.52 cm at the two depths
 with anchored roots and exact replay. Measured tree and wet-blade validation remain open.
+
+### ATMO-02 signed gusts and component FFT
+
+The same seeded Mann tile is byte-identical across the scalar build and one, two and three native FFT participants.
+The default grid's transform count is reported by `turbulence-native.test.js`. The `mann-fft.browser.mjs` test
+starts two helpers from a production consumer and verifies the emitted assets. `plant-gust.browser.mjs` reproduces
+a gust travelling across three rooted clumps, with exactly 30 simulation frames between first motion on each.
+The independent Vindeby vertical co-coherence error remains open. [Measurement and method](../clean-room.md#the-frameworks-wind-log-law-boundary-layer-and-mann-turbulence-atmo-01-atmo-02-margoengineweatherboundary-layer-and-turbulence-2026-11-25).
