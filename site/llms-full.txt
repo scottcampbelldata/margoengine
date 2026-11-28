@@ -16583,6 +16583,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   against 35,849). Regression: `packages/scatter/test/velocity.browser.mjs` (the `coverage: false` run against the
   default, WebGPU and `MARGO_COMPAT=1`).
 
+### Open 2026-11-28: a spinning bullet's strike at 300 m/s throws it sideways by a speed that follows the substeps (KB-PHYS-CCDKNOCK1, physics kernel, ccd)
+
+- **Repro:** `packages/physics/tests/next-ccd.test.js`'s dynamic plate scene, seed 9, bullet 64 alone with the plate (a 4 x 4 x
+  12 cm steel box at 300 m/s, spinning at about 30 rad/s, ccd on, no gravity): after the strike it leaves at 45.4 m/s along the
+  face with 8 substeps (the default), 10.7 m/s with 32 and 17.6 m/s with 64, spinning at 650, 230 and 440 rad/s. The answer does
+  not settle as the step shrinks. Energy is lost, not made (3 percent of the kinetic energy is left), the tangential impulse is
+  0.15 of the normal, inside the cone, and in the full scene its later hit on bullet 170 conserves momentum exactly.
+- **Cause:** not traced. At the spin the strike leaves, the bullet turns about 1.4 rad a default substep, far past the small turn
+  the contact rows are linearised for, so the strike's split between spin and sliding depends on the pose each substep catches.
+- **Next:** compare the strike with the rigid-body impact law for a corner with Coulomb friction (Stronge, "Impact Mechanics",
+  2000, ch. 5) at fine substeps, and with Rapier 3D as the oracle; the test only needs the bullet stopped, which it is.
+
 ### Open 2026-11-28: 21 web demos cannot be rebuilt from source/: the data files their code imports are missing (KB-DEMO-SOURCEDATA1, demos)
 
 - **Repro:** `node scripts/web-demos/build.mjs the-brain-scan` (or caustic-glass, character-course, cutscene-studio,
@@ -16757,6 +16769,83 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Left of KB1867b:** the two XR examples that need an AR headset or a body-tracking device stay skipped by hardware
   (`scripts/support/readme-run-skip.json`); the headless examples that needed ffmpeg run on the workstation now (22 of
   22).
+### Fixed 2026-11-28: a plate held well inside its friction slipped on a deck pitching far from it (KB-PHYS-CONECUT1, physics kernel, contact solver)
+
+- **Repro:** a plate (0.24 m square, one box collider) on a kinematic deck 140 m long that pitches 4 degrees at 9 s about
+  its own middle, the plate 60 m from it, with friction 0.138, 1.3 times what the pitch asks of it. In 36 s it slid
+  2.24 mm across the deck; 30 m out 0.24 mm, 10 m out 0.03 mm. On the storm deck of `packages/physics/tests/deck-props.test.js`
+  the held plate moved 1.84 mm (its bar is 2 mm), and 3.7 to 3.9 mm with the friction at 1.29, 1.3001 or 1.31 times the
+  demand: the test passed at 1.3 by chance, and any change to the contact solver (KB-PHYS-RESTDEPTH1's fix) could fail it.
+- **Cause:** a pair's friction took one Gauss-Seidel sweep over its points, the first point turning each substep. The
+  four corners' shares came out uneven (0.46 to 3.75 of 8.9 x 1e-4 N s at the first steps), so the busiest corner reached
+  its cone, mu times its own normal impulse, while the plate as a whole held 30 percent inside its cone. The relaxing pass
+  then cut that corner's anchor alone. Cut one corner at a time, the four anchors stopped agreeing with any rigid move of
+  the plate (x drifts of -32, -57, -246 and -4 micrometres at 3.3 s), so the corners pushed against each other at their
+  cones (one +5.1, one -4.3 x 1e-4) and the plate slipped where the deck turned fastest and asked least. Farther out the
+  load swings more with the pitch (alpha r), so the uneven share met the cone sooner.
+- **Fix:** in the relaxing pass, which decides the cuts, the friction rows sweep a pair's points until no impulse moves
+  by more than rounding, as the normal rows do (`friction_rows` in `kernel/src/solver.rs`), and a point's anchor is cut by
+  its cone only from the last sweep's answer. The shares then follow the anchors, a corner saturates only when the patch
+  does, and the held plate on the storm deck moves 0.88 to 0.97 mm at every factor from 1.29 to 1.4 (it was 1.5 to
+  3.9 mm). The pushing pass keeps its one sweep: swept to the end as well, its anchors' pull did work that no relaxing pass
+  took back, and a web of joints and contacts gained 2e-3 of the work its kinematic bodies did
+  (`kernel/tests/stability.rs` `a_web_of_joints_stays_in_the_numbers` allows 1e-6).
+- **Regression:** `packages/physics/kernel/tests/solver.rs`
+  `a_plate_held_near_its_friction_rides_a_deck_pitching_far_from_it` (the plate 60 m out at 1.3 times the demand stays
+  within 0.1 mm for 36 s; it slid 2.27 mm). The chair of five colliders still creeps on the storm deck, 2.8 cm (it was
+  2.0): that is several pairs on one body, KB-PHYS-MULTIPAIRCREEP1, still open.
+
+### Fixed 2026-11-28: a contact's resting depth jumped between two branches, so a small change of g flipped it (KB-PHYS-RESTDEPTH1, physics kernel, contact solver)
+
+- **Repro:** `packages/physics/tests/next-parameters.test.js`, "the solver settings do what they say", the case "a tenth
+  the size, the default damping ratio": a 5 cm ball on a box with `contactHertz` 60 and `allowedPenetration` 0.003, 900
+  steps. At 9.81 m/s^2 it rested at the allowed depth plus g / omega^2 (6.9e-5 m past it), the soft spring's equilibrium;
+  at 9.80665 and 9.82 it rested at the allowed depth exactly (2e-9 m short of it).
+- **Cause:** a point inside the slop is closed to the slop's depth by a rigid speculative row (Catto's soft step), one
+  past it by the soft spring. The rigid row closes the point to the slop to within the gap's float32 rounding. Closed a
+  rounding short, the point stayed in the rigid row, which then held the load at zero speed with no give; closed a
+  rounding past, it was the spring's and sank by g / omega^2. Which side it landed on followed the fifth digit of g.
+- **Fix:** a point within the gap's rounding of the slop (two units of the last place of the largest coordinate in the
+  gap's sums: the bodies' centres and the two points) counts as closed and is the soft row's (`normal_rows` in
+  `kernel/src/solver.rs`), so it sinks on to where its spring holds the load whatever g is. A point farther inside the
+  slop still closes rigidly, so a cube set down on a slope does not tilt downhill. An earlier try that made every loaded
+  point within its give of the slop the soft row's, with the load the point carried last substep in a new column, held
+  the depth too but moved the storm deck's plates and chairs past their bars; that was KB-PHYS-CONECUT1 above, fixed first.
+- **Regression:** `packages/physics/kernel/tests/solver.rs`
+  `a_resting_depth_is_continuous_in_the_load_inside_and_past_the_slop` (g from 2 to 20 m/s^2, the ball dropped from 1 cm,
+  set down inside the slop and past it: at rest within 1e-7 m of the slop plus g / omega^2), and the case above in
+  `next-parameters.test.js`, now run at 9.81, 9.80665 and 9.82 (it fails at 9.80665 without the fix).
+
+### Open 2026-11-28: HullSolver's heeled box loses roll 13 percent slower than Jung, Chang and Jo measured (KB-SEA-HEELDECAY1, physics seakeeping)
+
+- **Repro:** `node --test --test-name-pattern="let go heeled" packages/physics/tests/coupling/seakeeping.test.js`: the
+  roll decay coefficient K is 0.288 against the measured 0.333 (the test's bar is 12 percent). Red on main at bfb7d64cd8.
+- **Cause:** not traced yet. The test and the hull solver last changed in the wake-source commits of 2026-11-27
+  (dea79afb78, 2414f3724d); the decay comes from the eddy, skin-friction and form-drag damping on the swing.
+
+### Open 2026-11-28: a tissue's sliding attachment misses the analytic normal response by 1.6 times its rounding bound (KB-SOFT-SLIDEATTACH1, physics soft, SOFT-05)
+
+- **Repro:** `node --test --test-name-pattern="sliding attachment" packages/physics/tests/coupling/tissue.test.js`: the
+  particle ends at 0.5100431 against the closed form 0.5100446, 1.5e-6 off, where the bound is 16 float32 spacings of the
+  0.5 m length (9.5e-7). Red on main at bfb7d64cd8.
+- **Cause:** not traced yet. Whether the solve falls short of its closed form (a missing term) or only rounds past the
+  bound is to be found first; the bound is not to be widened.
+
+### Open 2026-11-28: a volumetric rung stops cracking under continued remeshing (KB-SOFT-CRACKRES1, physics soft volumetric)
+
+- **Repro:** `node --test --test-name-pattern="automatic cracks remain finite" packages/physics/tests/coupling/volumetric-solids.test.js`:
+  the tensile ladder at strain rate 0.005 makes 8 cracks or fewer in 18 steps, where the test asks for more than 8 ("the
+  rung keeps fracturing past its earlier resolution failure"). Red on main at bfb7d64cd8.
+- **Cause:** not traced yet.
+
+### Fixed 2026-11-28: next-hull's exact-predicate test could not load the hull source (KB-PHYS-HULLTESTLOAD1, physics tests)
+
+- **Repro:** `node --test --test-name-pattern="a hair above a face" packages/physics/tests/next-hull.test.js`: "Cannot
+  find module src/rigid-errors.js imported from src/hull.ts".
+- **Cause:** the test imports `src/hull.ts` itself to reach `beyond`. Since DYN-01 (e4b589866a) hull.ts imports
+  `./rigid-errors.js`, the built file's name, and Node strips the types but does not map `.js` to `.ts`.
+- **Fix:** the test registers the repository's source hooks first (`moduleHooks` from
+  `scripts/support/node-compat.mjs`), as `loads-capsule.test.js` does. The test is its own regression: it fails without them.
 
 ### Fixed 2026-11-28: touching a collider after its neighbour's body was removed read and wrote past the body rows (KB-PHYS-RETIREDPAIR1, physics kernel)
 
@@ -20533,7 +20622,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
 - **Repro:** the storm deck of `packages/physics/tests/deck-props.test.js` (roll 20 degrees at 12 s, pitch 4 degrees at 9 s,
   heave 2 m at 9 s, the prop 57 m aft), friction 1.3 times the deck's friction demand, 36 s at 8 substeps. A plate of one
-  box collider moves 1.5 mm. The same plate cut into two box colliders on one body moves 7.2 mm, and cut into four it
+  box collider moved 1.5 mm (0.9 mm since KB-PHYS-CONECUT1 made a pair's friction converge: the one-pair part of this
+  creep). The same plate cut into two box colliders on one body moves 7.2 mm, and cut into four it
   moves 10.5 mm. The test's chair (a seat on four legs, five colliders) creeps 2.0 cm. HEAD before this change gave
   the chair 2.4 cm, so it is not new. The same loads on a fixed floor (gravity turned to the deck's specific force at the
   prop) move the chair 2.4 mm and a single box 0.02 mm. A constant load holds it: on a floor tilted to tan 0.47 against
@@ -22531,12 +22621,6 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **Cause, found:** a one-cube-thick slab tips out of its plane. The chain contacts at one pass take the eighth-rate spring (30 Hz at 240 Hz substeps), and a patch of springs resists a turn with k = K b^2 / 12; the r rows above an interface lean on it with W h = [r (r + 1) / 2] m g r / 3, so the slab stands only while r (r + 1) < omega^2 / (4 g) = 906, r < 29.6. Thirty rows sit on the edge, which is why a 0.03 percent change of g tipped it.
 - **Fix:** an island's contacts get the stiffness its structures need not to tip, from the bodies' masses and the contacts' shape alone (`kernel/src/tilt.rs`, `tilt_gains`, a discrete Hardy inequality along each support path), and where that would need a contact stiffer than a quarter of the substep rate, the island steps at a finer level of substeps (`island_level`, up to the 7,680 Hz tick), the rest of the world as before. The 20- and 30-row piles hold at 7.5e-5 to 4.3e-4 m/s from 30 to 90 s at both 9.81 and 9.80665, and the 50-row pile at 8.4e-4 to 9.6e-4 m/s from 15 to 75 s (measured once, 4 minutes a run, too long for the suite).
 - **Regression:** `packages/physics/kernel/tests/solver.rs` `a_pile_of_twenty_rows_holds_still_for_ninety_seconds` and the two thirty-row tests beside it (fastest under 1 mm/s at 30, 60 and 90 s, and no more than a quarter over its 30 s figure later).
-
-### Open 2026-11-25: a contact's resting depth jumps between two branches, so a small change of g flips it (KB-PHYS-RESTDEPTH1, physics kernel, contact solver)
-
-- **Repro:** `packages/physics/tests/next-parameters.test.js`, "the solver settings do what they say", the case "a tenth the size, the default damping ratio": a 5 cm ball on a box with `contactHertz` 60 and `allowedPenetration` 0.003, 900 steps. At 9.81 m/s^2 it rests at the allowed depth plus g / omega^2 (6.9e-5 m past it), the soft spring's equilibrium; at 9.80665 it rests at the allowed depth exactly (2e-9 m past it).
-- **Cause:** a point inside the slop is closed by a rigid speculative row to the slop's depth, and one past it by the soft spring; the resting depth depends on which branch the point settles in, not continuously on the load. A correct contact gives a resting depth continuous in g.
-- **Owner:** the contact solver's rebuild. Blocks moving the engine to standard gravity.
 
 ### Fixed 2026-11-25: a default cloth stretched under a heavy body and sprang it off (KB-SOFT-LOOPSTRETCH1, physics soft)
 
