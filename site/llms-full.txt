@@ -16643,16 +16643,17 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   match still wins, and `HUMAN_NAMINGS` lists them.
 - **Regression:** `packages/rigging/tests/anatomy-human-bundled.test.js` (both bundled rigs fit; the five-bone spine).
 
-### Open 2026-11-28: every `procedural:rock` of a biome is the same stone (KB-BIOMES-ROCKSEED1, biomes)
+### Fixed 2026-11-28: every `procedural:rock` of a biome is the same stone (KB-BIOMES-ROCKSEED1, biomes)
 
 - **Repro:** Above the Treeline before 2026-11-28 (talus of `procedural:rock` over the upper meadow and scree): every
   stone has one silhouette, only turned and scaled, which reads as copies from 2 to 30 m.
-- **Cause:** `partsOf` in `packages/biomes/src/objects.ts` builds the `rock` key from `generateRockMesh(1, ...)`, seed
-  1 for every species and instance, and a species draws one mesh through its `ScatterTiles`, so the seeded forms of
-  `@margoengine/procedural` (block, slab, wedge, shard, pebble) never appear.
-- **Fix needed:** draw a `procedural:rock` species as several seeded forms (records split among a few `ScatterTiles`
-  by a hash of each record, density unchanged), with a test that a talus field holds at least four distinct meshes.
-  The film now draws eight scanned stones instead (`treeline-rocks/talus` in the asset library).
+- **Cause:** `partsOf` in `packages/biomes/src/objects.ts` built the `rock` key from `generateRockMesh(1, ...)`, seed
+  1 for every species and instance, and a species drew one mesh through its `ScatterTiles`, so the seeded forms of
+  `@margoengine/procedural` (block, slab, wedge, shard, pebble) never appeared.
+- **Fix:** a `procedural:rock` species draws eight seeded forms (seeds 1 to 8, each with its three LOD rings), and
+  `add` and `steps` split each tile's records among them by the record's variant nibble, so density is unchanged and
+  neighbouring stones differ. Test: `packages/biomes/tests/objects.test.js` ("a procedural:rock species draws eight
+  seeded stones and splits its records among them").
 
 ### Fixed 2026-11-28: the lens drops' glint added light over empty pixels without covering them (KB-WEATHER-LENSGLINT1, weather)
 
@@ -17296,16 +17297,38 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   occlusion strength) and the file's image is kept; anything else is written into the pixels when the model is created.
 - **Regression:** `packages/usdz/tests/texture-factors.test.js`.
 
-### Open 2026-11-28: a hard-edged peach band lies under the dune coast's cloud deck at the sea horizon (KB-WATER-HORIZONBAND1, water and sky)
+### Fixed 2026-11-28: a hard-edged peach band lay under the dune coast's cloud deck at the sea horizon (KB-WATER-HORIZONBAND1, water)
 
-- **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --out=<folder>`, `surf.png`: rows 512 to
-  516 read about (212, 205, 194), warm and brighter, between the overcast sky just above (189, 190, 187, rows 500 to
-  510) and the sea below; the band's top edge is one pixel sharp. The first-flight view, whose land reaches the
-  horizon, has none.
-- **Where to look:** the sea is a `horizon: true` Water, and its far rows reflect the sky texture (`skyTap` in
-  `packages/water/src/index.ts`, `skyTexture(source)`), which reads below-horizon rays at the horizon. The camera sees the
-  cloud deck there, the sea's reflection a sky without it: the band is the clear horizon of the sky texture showing at
-  grazing incidence. To prove before a fix: sample the sky texture at the horizon against the band's colour.
+- **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --views=surf --out=<folder>`, `surf.png`
+  rows 512 to 517 at x 910: about (219, 210, 196), warm and brighter, under the overcast deck (189, 190, 187, rows 500 to
+  510), with a one-pixel top edge and the same peach in the far glints.
+- **Cause (measured):** the sky's 64 x 32 reflection map in the surf view holds the grey deck in row 15, the last row
+  above the horizon, (0.127, 0.128, 0.124), and in row 16, the first below it, (0.209, 0.160, 0.105): below the
+  horizon the sky has no cloud (the ground hides it) and fades its clear, warm horizon toward the ground. The Water
+  holds every reflected ray at or above the horizon (`skyTap` at y 0, the callback route's `reflectionRay` at 0.02),
+  but the bilinear filter at v 0.5 (or 0.4936) still took half (or 0.29) of row 16. The far sea, which reflects the
+  horizon at grazing incidence, drew that share of the clear horizon as a band.
+- **Fix:** `aboveHorizon()` in `packages/water/src/index.ts` holds a horizon tap's v at the centre of the last row above
+  the horizon (0.5 - 0.5 / the map's rows), on both the HDR (`skyTap`) and the callback route, so a horizon tap reads
+  the rows above it alone. After: rows 512 to 517 (199, 199, 197), neutral, the glints grey.
+- **Regression:** `packages/water/test/sky-radiance.browser.mjs` (in `test:gpu:surface`): a 64 x 32 map grey above the
+  horizon and red below; the sea's far rows read red over green by up to 69 codes before the fix (callback route,
+  [160, 91, 91]) and under 12 after, on both routes.
+- **Left:** the far rows read 199 under the 189 deck, a flat lighter strip six pixels high; not traced (see
+  KB-SKY-ENVBELOW1 for the map's rows below the horizon).
+
+### Open 2026-11-28: the sky's environment map holds a cloudless horizon below the horizon under an overcast deck (KB-SKY-ENVBELOW1, sky)
+
+- **Repro:** the dune coast surf view (overcast, `clouds: 1`), `Sky.reflectionTexture` read back by a compute copy (64 x
+  32): row 15, just above the horizon, (0.127, 0.128, 0.124), the deck; row 16, just below, (0.209, 0.160, 0.105), warm
+  and brighter; rows 18 on (0.007, 0.009, 0.006).
+- **Cause:** `skyEnvironment` (`packages/sky/src/environment.ts`) takes `daySky` of the ray held at the horizon and mixes
+  it toward the ground colour by `smoothstep(-0.2, 0.02, y)`, but hands `cloudSky` the unheld ray, which for y below 0
+  hits the ground and returns the clear sky: just under the horizon the map is the clear horizon, not the deck.
+  Anything lit or reflected from that band (an object's lower hemisphere, a reflection that filters across the horizon)
+  takes a warm light an overcast day does not have.
+- **Where to fix:** give `cloudSky` the held ray and mix toward the ground after the clouds, with a sky test of an
+  overcast map's first row below the horizon against the row above.
 
 ### Open 2026-11-28: the dune coast's shore foam is drawn as long thin streaks along the shore (KB-WATER-FOAMSTREAK1, water)
 
@@ -20705,6 +20728,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   match); plant interiors 0.28 to 0.17 and 0.55 to 0.46, sky 0.02 and 0.14 both, other 0.07 to 0.06 and 0.34 to 0.32.
   What render fixes could reach is 0.25 early, inside the 0.5 bound, and 0.92 mid: the flame wall's puffing, the smoke
   plume and the bounded sway, motion the scene draws on purpose. Accepted as deliberate motion; the bound stays 0.5.
+- **Check rebuilt 2026-11-28 (lane B, part (b) of private/handoffs/shimmer2-plan.md):** with `moving.velocity` the
+  shot tool reads TAA's velocity (rg16float, exact, the last sub-frame, jitter out, scaled by 1 / fps over the sub-frame
+  step) for each probe and the frame after it, and `shimmerMoving` leaves out a pixel the engine moved more than half a
+  pixel other than the camera (`detail.animated`). On the blowup (`--once --seconds 1.1`) sky pixels' velocity matches
+  the camera motion to a median 0.01 to 0.02 px; the animated pixels are the swaying crowns (tops move, trunks and the
+  hillside do not). shimmerMoving early 3.86 to 1.76, mid 5.30 to 3.85 percent (occluded 58,707 and 101,256 px,
+  animated 328,439 and 252,250 px). The rest lies on one-pixel lines along high-contrast silhouettes (a tree against
+  the sky, a leaf over a leaf), early and mid: sky side 0.43 and 1.44, depth edges 1.02 and 1.55, other edges 0.24 and
+  0.75, over 0.07 and 0.11. Of it, 1.26 early and 1.78 mid sits inside the range of the four pixels the warp samples
+  (what bilinear resampling of a sharp edge gives, not a change); 0.50 and 2.07 lies outside every one of them.
 
 ### Fixed 2026-11-26: tonemap's settings check on the WebGL2 layer on ANGLE Direct3D 11 differed by one pixel in group `local` about half the time (KB-TONEMAP-LOCALD3D1, tonemap)
 
