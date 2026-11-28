@@ -28,7 +28,14 @@ import { pathToFileURL } from 'node:url';
 import { runMinutes } from './gpu-package-tests.mjs';
 import { runLimited } from './support/run-limited.mjs';
 import { mergeShards } from './support/wgsl-corpus.mjs';
-import { readCorpus, recordsOf, superseded, writeCorpus } from '../packages/webgl2-compat/test/corpus/store.mjs';
+import {
+  authorsOf,
+  readCorpus,
+  recordsOf,
+  superseded,
+  wgslLineIndex,
+  writeCorpus,
+} from '../packages/webgl2-compat/test/corpus/store.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   dir = join(root, 'test-results', 'wgsl-corpus'),
@@ -76,7 +83,12 @@ const { shards, modules } = mergeShards(dir),
 if (drop.length && (!process.argv.includes('--add') || failed.length))
   throw new Error(`--drop needs --add and suites that all pass${failed.length ? `: ${failed.join('; ')}` : ''}`);
 const base = process.argv.includes('--add') ? recordsOf(readCorpus()) : [],
-  summary = writeCorpus([...superseded(base, drop, [...modules.values()]), ...modules.values()]);
+  index = wgslLineIndex(root),
+  // A module also names the packages whose WGSL text it holds: RawShaderMaterial and other lazy compilers create their
+  // modules inside core's frame, where the call stack no longer names the package that wrote the shader.
+  summary = writeCorpus([...superseded(base, drop, [...modules.values()]), ...modules.values()], {
+    authors: (code) => authorsOf(code, index),
+  });
 console.log(
   `record-wgsl-corpus: ${shards} shards, ${modules.size} distinct modules seen; kept ${summary.kept} (${summary.bytes} bytes of WGSL, ${summary.packages.length} packages), dropped ${summary.fragments} that failed to compile alone (fragments) and ${summary.unknown} whose compile result never arrived`,
 );

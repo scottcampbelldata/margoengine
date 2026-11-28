@@ -7,7 +7,17 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { classify, entryPoints, flagsOf, readCorpus, recordsOf, superseded, writeCorpus } from './corpus/store.mjs';
+import {
+  authorsOf,
+  classify,
+  entryPoints,
+  flagsOf,
+  readCorpus,
+  recordsOf,
+  superseded,
+  wgslLineIndex,
+  writeCorpus,
+} from './corpus/store.mjs';
 
 const root = resolve(import.meta.dirname, '..', '..', '..');
 const { manifest, modules } = readCorpus();
@@ -54,13 +64,47 @@ test('the corpus covers every package whose source holds WGSL', () => {
       .filter(Boolean)
       .map((f) => f.split('/')[1]),
   );
-  const covered = new Set(modules.flatMap((m) => [m.package, ...m.packages]));
+  const covered = new Set(modules.flatMap((m) => [m.package, ...m.packages, ...(m.authors ?? [])]));
   const missing = [...withShaders].filter((p) => !covered.has(p) && p !== 'webgl2-compat');
   assert.deepEqual(
     missing,
     [],
     `record the corpus again (npm run record:wgsl-corpus); not covered: ${missing.join(', ')}`,
   );
+});
+
+test('a lazily compiled module is credited to the package whose WGSL it holds (KB-CORPUS-OPTICS1)', () => {
+  // RawShaderMaterial compiles optics' screens at the first draw, inside core's frame: the call stack names shader and
+  // core only. The module's text is optics' own WGSL, so the recording credits optics.
+  const index = wgslLineIndex(root),
+    source = readFileSync(join(root, 'packages/optics/src/screens.ts'), 'utf8'),
+    fragment = source.slice(source.indexOf('@fragment fn fragment('), source.indexOf('}`;', source.indexOf('@fragment fn fragment('))),
+    code = `struct ScreenVarying { @builtin(position) position: vec4f }
+${fragment}}
+`;
+  assert.deepEqual(authorsOf(code, index), ['optics']);
+  assert.deepEqual(authorsOf('@compute @workgroup_size(1) fn main() { let unrelatedLineOfCode = 1.0; }', index), []);
+  const dir = mkdtempSync(join(tmpdir(), 'wgsl-corpus-authors-'));
+  try {
+    const record = {
+      key: 'raw',
+      code,
+      errors: 0,
+      packages: ['shader', 'core'],
+      labels: ['shader:raw:optics screens:fragment'],
+      pages: ['/tests/modern-extension.html'],
+      pipelines: [],
+    };
+    writeCorpus([record], { dir, authors: (text) => authorsOf(text, index) });
+    const [module] = readCorpus(dir).modules;
+    assert.equal(module.package, 'shader', 'the creating package stays the owner');
+    assert.deepEqual(module.packages, ['shader', 'core'], 'the call stack stays as recorded');
+    assert.deepEqual(module.authors, ['optics']);
+    writeCorpus(recordsOf(readCorpus(dir)), { dir });
+    assert.deepEqual(readCorpus(dir).modules[0].authors, ['optics'], 'a rewrite keeps the authors');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('repeated sources merge owners, labels, pages and distinct pipelines without growing sources', () => {

@@ -2,13 +2,15 @@
 // reading the whole corpus opens two files however many modules it holds:
 //   manifest.json  plain text for review, one line per distinct module (sorted by key): key (first 16 hex digits of
 //                  the SHA-256 of the source), bytes, package (the one that created it), packages (every package on
-//                  the creating call stack), entry points per stage, flags (features the WebGL2 layer must map),
+//                  the creating call stack), authors (packages whose WGSL text it holds that the stack did not
+//                  name, as a lazily compiled module's author: KB-CORPUS-OPTICS1), entry points per stage, flags (features the WebGL2 layer must map),
 //                  labels and the pages that created it. `sha256` is the hash of the uncompressed data text, so a
 //                  hand edit of either file fails the corpus test.
 //   corpus.json.br Brotli of one JSON object: `sources` ({ key: WGSL source }, about 3.3 MB of text), `layouts` (the
 //                  distinct pipeline layouts: bind groups with binding types) and `pipelines` (the distinct pipelines:
 //                  stage modules by key, entry point, constants, layout by index into `layouts` or 'auto', vertex
 //                  buffers, targets, depth, multisample). Compressed it is about 200 KB.
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -76,6 +78,59 @@ function owner(module) {
 }
 
 /**
+ * Index of the WGSL source lines the packages hold: each trimmed line of 24 characters or more (outside `${}`
+ * interpolations) of a tracked `packages/<name>/src` file or `packages/shared/*.js` that declares a WGSL function,
+ * mapped to the packages holding it. {@link authorsOf} reads it.
+ */
+export function wgslLineIndex(root) {
+  let files = '';
+  try {
+    files = execFileSync(
+      'git',
+      ['grep', '-l', '-E', 'fn [A-Za-z_][A-Za-z0-9_]*[[:space:]]*\\(', '--', 'packages/*/src/**', 'packages/shared/*.js'],
+      { cwd: root, encoding: 'utf8', maxBuffer: 64 << 20 },
+    );
+  } catch (e) {
+    if (e.status !== 1) throw e; // 1: no file matched.
+  }
+  const index = new Map();
+  for (const file of files.split('\n').filter(Boolean)) {
+    const name = file.split('/')[1];
+    for (const line of sourceLines(readFileSync(join(root, file), 'utf8'))) {
+      const set = index.get(line) ?? new Set();
+      set.add(name);
+      index.set(line, set);
+    }
+  }
+  return index;
+}
+
+const sourceLines = (text) =>
+  new Set(
+    text
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length >= 24 && !l.includes('${')),
+  );
+
+/**
+ * The packages whose WGSL text a module holds: each package with at least `min` distinct lines of the module that its
+ * source holds and no other package's does. A module compiled lazily (RawShaderMaterial builds its modules at the first
+ * draw, inside core's frame) has only the drawing packages on its call stack; its author's source text survives
+ * (KB-CORPUS-OPTICS1).
+ */
+export function authorsOf(code, index, min = 3) {
+  const count = new Map();
+  for (const line of sourceLines(code)) {
+    const set = index.get(line);
+    if (set?.size !== 1) continue;
+    const [name] = set;
+    count.set(name, (count.get(name) ?? 0) + 1);
+  }
+  return [...count].filter(([, n]) => n >= min).map(([name]) => name).sort();
+}
+
+/**
  * What the corpus does with one merged record: `keep` (compiled with zero errors and declares an entry point),
  * `fragment` (failed to compile alone, or has no entry point) or `unknown` (its compile result never arrived).
  */
@@ -92,7 +147,7 @@ export function classify(record) {
  * (scripts/support/wgsl-corpus.mjs mergeShards). Keeps the records {@link classify} keeps; returns what was kept
  * and dropped.
  */
-export function writeCorpus(records, { date = new Date().toISOString().slice(0, 10), dir = here } = {}) {
+export function writeCorpus(records, { date = new Date().toISOString().slice(0, 10), dir = here, authors } = {}) {
   const byKey = new Map(),
     keys = new Map(records.map((r) => [r.key, sha(r.code).slice(0, 16)]));
   let fragments = 0,
@@ -106,11 +161,17 @@ export function writeCorpus(records, { date = new Date().toISOString().slice(0, 
     const key = sha(record.code).slice(0, 16),
       who = owner(record),
       known = byKey.get(key);
+    // Packages whose WGSL text the module holds (`authors`, e.g. authorsOf over wgslLineIndex) and the call stack did
+    // not name. Kept apart from `packages`, so the owner stays the creating package's.
+    const wrote = [...new Set([...(record.authors ?? []), ...(authors ? authors(record.code) : [])])]
+      .filter((p) => p !== who.package && !who.packages.includes(p))
+      .sort();
     if (known) {
       // The same source can be created by more than one package or acquire a
       // useful label on a later recording. Keep all provenance and pipelines.
       const union = (a, b) => [...new Set([...a, ...b])];
       known.packages = union(known.packages, who.packages);
+      if (wrote.length) known.authors = union(known.authors ?? [], wrote).sort();
       if (who.package !== '(bundled page)') {
         if (known.package === '(bundled page)') known.package = who.package;
         else if (known.package !== who.package) known.packages = union(known.packages, [who.package]);
@@ -129,6 +190,7 @@ export function writeCorpus(records, { date = new Date().toISOString().slice(0, 
       bytes: Buffer.byteLength(record.code),
       package: who.package,
       packages: who.packages,
+      ...(wrote.length ? { authors: wrote } : {}),
       entryPoints: Object.fromEntries(Object.entries(points).filter(([, list]) => list.length)),
       flags: flagsOf(record.code),
       labels: (record.labels ?? []).map((l) => l.replace(/^check-wgsl:/, 'check:wgsl ')),

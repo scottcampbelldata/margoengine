@@ -16533,7 +16533,7 @@ voxel path tracer is excluded on this hardware (hardware check).
   point. No pixel shows a rounding difference, so there is no defect to fix. Proof:
   `packages/voxel-pathtracer/tests/browser-check.mjs` (`traversal`, `projections`).
 
-### Open 2026-11-28: the WGSL corpus cannot name optics, and water's new shaders inline past the Direct3D limit (KB-CORPUS-OPTICS1)
+### Fixed 2026-11-28: the WGSL corpus could not name optics, and water's new shaders inlined past the Direct3D limit (KB-CORPUS-OPTICS1)
 
 - **Repro:** `node --test packages/webgl2-compat/test/corpus.test.js` fails "not covered: optics" on main. Recording
   optics and water alone (`node scripts/record-wgsl-corpus.mjs --no-build "--suites=check:gpu-packages -- --no-build
@@ -16548,7 +16548,32 @@ voxel path tracer is excluded on this hardware (hardware check).
 - **Cause, water:** the surface fragment's repeated `noise()` and `skyTap()` calls (KB-WATER-GL2LINK1, fixed
   2026-11-28): the base fragment went from 251,507 to 157,264 characters inlined. The optics variants are not
   re-measured until the corpus is recorded again.
-- **Left:** both fixes, then `npm run record:wgsl-corpus` in full. Found by lane A, 2026-11-28; not fixed.
+- **Fix, optics:** the recorder also credits a module to the packages whose WGSL text it holds: `wgslLineIndex` maps
+  every trimmed source line of 24 characters or more (no `${}`) of a package source file that declares a WGSL function
+  to the packages holding it, and `authorsOf` names each package with at least 3 distinct lines of the module that
+  only its source holds (`packages/webgl2-compat/test/corpus/store.mjs`, wired in `scripts/record-wgsl-corpus.mjs`).
+  They go in the manifest's own `authors` field, so `package` and `packages` stay the call stack's and no settled owner
+  moves; the coverage test counts them. A rewrite of the existing corpus gave 1,410 of 3,256 modules authors (gltf
+  modules holding shared, clustered and shadows text, for example).
+- **Fix, water:** none needed: KB-WATER-GL2LINK1 brought the base fragment to 157,264 characters, and the recorded
+  optics variants pass `corpus-inline.test.js`. Recording them found a second water bug, KB-WATER-RIPPLEDUP1 below.
+- **Evidence:** `node scripts/record-wgsl-corpus.mjs --add "--suites=check:gpu-packages -- --no-build --only=optics"`
+  passes both suites and adds 101 modules (3,357 kept); `corpus.test.js`, `corpus-inline.test.js` and the other corpus
+  readers in `packages/webgl2-compat/test` pass (35 tests).
+- **Regression:** `packages/webgl2-compat/test/corpus.test.js` "a lazily compiled module is credited to the package
+  whose WGSL it holds (KB-CORPUS-OPTICS1)" (optics' screens fragment under a shader and core stack; without the
+  `authors` option the module names no optics).
+
+### Fixed 2026-11-28: every water surface with Ripples failed to compile, "redeclaration of 'rippleAt'" (KB-WATER-RIPPLEDUP1, water)
+
+- **Repro:** `water test:gpu:optics` on main at efb3b28b72: `flow-map.browser.mjs` throws `WGSL compile errors:
+  redeclaration of 'rippleAt'`, and the suite's later checks never run.
+- **Cause:** bfb7d64cd8 (KB-WATER-GL2LINK1) split the surface's ripple layers around their noise with a new
+  `fn rippleAt(xz, turn, ...)` in `packages/water/src/index.ts`; the ripple field (`packages/water/src/ripples.ts`),
+  which `addSurfaceEffect` joins to the same surface module, already read its grid through `fn rippleAt(p:vec2i)`.
+- **Fix:** the ripple field's grid read is `rippleCell`. Same code otherwise, so the same pixels.
+- **Regression:** `packages/water/test/ripples.test.js` "the ripple field joins the surface shader with each function
+  declared once (KB-WATER-RIPPLEDUP1)" (fails on the old build with `rippleAt` twice); `water test:gpu:optics` passes.
 
 ### Fixed 2026-11-28: local CI kept CRLF copies of files whose .gitattributes rule became -text or eol=lf (local CI runner, KB-CI-EOL-STALE1)
 
