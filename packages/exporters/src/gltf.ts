@@ -53,10 +53,11 @@ export interface GLTFOptions extends SceneOptions {
   sparseMorphs?: boolean;
   /**
    * Also write the pixel width of a plugin line and the pixel diameter of a plugin point cloud as the vendor
-   * extensions `BENTLEY_materials_line_style` (`width`) and `BENTLEY_materials_point_style` (`diameter`), which
-   * CesiumJS and iTwin.js draw. Both are whole pixels (rounded, at least 1) on the material; world-unit widths,
-   * per-point multipliers and dashes have no form there and stay as they are written without this. Neither is a
-   * Khronos extension, and the Khronos validator warns where one sits beside `KHR_materials_unlit`. Default false.
+   * extensions `BENTLEY_materials_line_style` (`width`) and `BENTLEY_materials_point_style` (`diameter`). CesiumJS
+   * 1.147.0 draws the point diameter and still draws the lines 1 px wide. Both are whole pixels (rounded, at least 1)
+   * on the material; world-unit widths, per-point multipliers and dashes have no form there and stay as they are
+   * written without this. Neither is a Khronos extension, and the Khronos validator warns where one sits beside
+   * `KHR_materials_unlit`. Default false.
    */
   styleExtensions?: boolean;
 }

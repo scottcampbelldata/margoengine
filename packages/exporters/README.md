@@ -154,8 +154,9 @@ write a loaded model's points and lines with their extras and `_WIDTH`, and skip
 plugins that draw them, so a second export holds each once.
 
 `styleExtensions: true` (`exportGLB`, `exportGLTF`) also writes pixel widths and diameters as the vendor extensions
-`BENTLEY_materials_line_style` and `BENTLEY_materials_point_style`, which CesiumJS and iTwin.js draw: whole pixels,
-rounded and at least 1. World-unit widths and per-point multipliers have no form there. They are not Khronos
+`BENTLEY_materials_line_style` and `BENTLEY_materials_point_style`, drafts from Bentley for CAD viewers: whole pixels,
+rounded and at least 1. CesiumJS 1.147.0 draws the point diameter (24 px asked, 24 px drawn) but still draws these
+lines 1 px wide; iTwin.js has not been tried. World-unit widths and per-point multipliers have no form there. They are not Khronos
 extensions, and the Khronos validator warns where one sits beside `KHR_materials_unlit`, so they are off by default.
 
 The style keys are written only where a line or cloud differs from the `Line` or `PointsMaterial` defaults; a batch writes `lineCap: 'square'`, the
