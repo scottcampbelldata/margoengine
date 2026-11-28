@@ -3,7 +3,40 @@
 // events, markers, clip starts and ends, also inside nested timelines) are precomputed and sorted once, so
 // `eventsBetween` returns them in one deterministic order however the time range is split.
 import { interpolateQuaternions } from '@margoengine/math/quat';
-import * as tween from '@margoengine/tween';
+import {
+  cubicBezier,
+  linear,
+  easeInBack,
+  easeInBounce,
+  easeInCirc,
+  easeInCubic,
+  easeInElastic,
+  easeInExpo,
+  easeInOutBack,
+  easeInOutBounce,
+  easeInOutCirc,
+  easeInOutCubic,
+  easeInOutExpo,
+  easeInOutQuad,
+  easeInOutQuart,
+  easeInOutQuint,
+  easeInOutSine,
+  easeInQuad,
+  easeInQuart,
+  easeInQuint,
+  easeInSine,
+  easeOutBack,
+  easeOutBounce,
+  easeOutCirc,
+  easeOutCubic,
+  easeOutElastic,
+  easeOutExpo,
+  easeOutQuad,
+  easeOutQuart,
+  easeOutQuint,
+  easeOutSine,
+  easeSmoothstep,
+} from '@margoengine/tween';
 import {
   type AnimationClip,
   type AudioClip,
@@ -22,21 +55,54 @@ import {
 
 type Ease = (u: number) => number;
 
+// Each easing is imported by name: a namespace import read by key keeps every export of the tween package (Tween,
+// Timeline, Spring) in any app that imports one export of this one. tests/tree-shake.test.js holds the list to the
+// tween package's `ease*` easings.
+const NAMED: Readonly<Record<string, Ease>> = {
+  easeInBack,
+  easeInBounce,
+  easeInCirc,
+  easeInCubic,
+  easeInElastic,
+  easeInExpo,
+  easeInOutBack,
+  easeInOutBounce,
+  easeInOutCirc,
+  easeInOutCubic,
+  easeInOutExpo,
+  easeInOutQuad,
+  easeInOutQuart,
+  easeInOutQuint,
+  easeInOutSine,
+  easeInQuad,
+  easeInQuart,
+  easeInQuint,
+  easeInSine,
+  easeOutBack,
+  easeOutBounce,
+  easeOutCirc,
+  easeOutCubic,
+  easeOutElastic,
+  easeOutExpo,
+  easeOutQuad,
+  easeOutQuart,
+  easeOutQuint,
+  easeOutSine,
+  easeSmoothstep,
+};
+
 /** Every easing name a document may use: `linear`, `step`, `smoothstep` and the `ease*` easings of `@margoengine/tween`. */
-export const EASING_NAMES: ReadonlySet<string> = new Set([
-  ...BASIC_EASINGS,
-  ...Object.keys(tween).filter(
-    (name) => /^ease[A-Z]/.test(name) && typeof (tween as Record<string, unknown>)[name] === 'function',
-  ),
-]);
+export const EASING_NAMES: ReadonlySet<string> = /* @__PURE__ */ new Set(
+  /* @__PURE__ */ (BASIC_EASINGS as readonly string[]).concat(/* @__PURE__ */ Object.keys(NAMED)),
+);
 const STEP: Ease = (u) => (u < 1 ? 0 : 1);
 /** The easing function of a spec the document validator accepted. */
 export const easing = (spec: EaseSpec | undefined): Ease => {
-  if (spec === undefined || spec === 'linear') return tween.linear;
+  if (spec === undefined || spec === 'linear') return linear;
   if (spec === 'step') return STEP;
-  if (spec === 'smoothstep') return tween.easeSmoothstep;
-  if (typeof spec === 'string') return (tween as unknown as Record<string, Ease>)[spec];
-  return tween.cubicBezier(spec[0], spec[1], spec[2], spec[3]);
+  if (spec === 'smoothstep') return easeSmoothstep;
+  if (typeof spec === 'string') return NAMED[spec];
+  return cubicBezier(spec[0], spec[1], spec[2], spec[3]);
 };
 
 /** Where the camera is at a time. */
