@@ -1383,6 +1383,42 @@ engine.start();
 Each record places a clump; the GPU picks the near, middle and far mesh by distance and fades between them. Manage
 the held set with `setTile` and `removeTile`; the coordinate range alone does not allocate records for unheld chunks.
 
+## Shadow cascades draw only what reaches them
+
+With `@margoengine/shadows`, each cascade of the shadow map draws, per LOD ring, only the instances whose posed bounds
+reach that cascade's light box. Nothing to set: `Shadows` calls `scatter.prepareShadow` once a frame with every
+cascade's matrix, and the cull runs on the GPU before the cascades draw. The shadow map is the same as when every
+cascade draws every instance the camera keeps; an instance outside a cascade's box would only clip away there.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {sphereGeometry, toGeometry} from 'margoengine/geometry';
+import {Scatter} from 'margoengine/scatter';
+import {Shadows} from 'margoengine/shadows';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const shadows = Shadows.attach(engine, {cascades: 4});
+const bushes = Scatter.attach(engine, toGeometry(sphereGeometry(0.5, 12, 6)), {count: 20000, area: [300, 300], lod: [25, 60, 250]});
+shadows.add(bushes); // bushes past the shadow distance are drawn in no cascade; the near ones in the cascades they reach
+```
+
+- Proof: `node packages/scatter/test/shadow-cull.browser.mjs` draws three scenes (LOD rings with fades, scales and
+  wind; widened wind-bent grass blades; trunks with a raised canopy sharing their rings) and checks that the
+  four-cascade shadow map is bit for bit the one drawn without the cull, and the frames pixel for pixel. In its tree
+  scene it reads back each cascade's indirect draw counts and checks them against a CPU classification of every
+  instance against Shadows' matrices: every instance whose bounds reach a cascade is drawn there, none outside it, so
+  49 trees 300 m away (past 120 m of shadows) are drawn in no cascade. Before the cull, 4 cascades redrew every tree 4
+  times.
+- WebGPU: one compute pass writes a list per cascade and ring and the indirect arguments the cascade draws use.
+- WebGL2 compatibility layer: the same tests run as point draws on the GPU, each storing at its own slot, and a prefix
+  count compacts the lists in candidate order, so the lists hold the instances WebGPU's hold. WebGL2 has no indirect
+  draws and reading the counts back would stall the main thread, so a cascade's draw asks for every slot of its ring
+  and the vertex stage drops the slots at or past the list's count, read from a small counts buffer. The shadow map is
+  the same; the saving there is the rasterization and fragment work of the instances left out, while the vertex stage
+  still runs for every slot.
+- A caller that draws scatter shadows through `drawShadow` without calling `prepareShadow` in the frame gets every
+  camera-culled instance in every cascade. The lists are made again when the cascade count or the ring buffers change
+  (a `ScatterTiles` ring that grew or shrank), and freed by `dispose()`.
+
 ## Material capture: SSR, SceneTargets and LightBounce see the plants
 
 `scatter.setCapture(hook)` lets a capture effect of `@margoengine/post` draw the plants with their own material:
