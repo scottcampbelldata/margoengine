@@ -1,5 +1,6 @@
-import { EngineKernel } from '@margoengine/core';
-import { Shadows } from '@margoengine/shadows';
+import { dot } from '@margoengine/math/vec3';
+import { openBench } from '@margoengine/studio/bench';
+import { Tween } from '@margoengine/tween';
 import { days, solarPosition } from './solar.js';
 import { prepareCourtyard } from './dial.js';
 
@@ -16,16 +17,13 @@ const stop = new AbortController();
 const listener = {signal:stop.signal};
 const fov = 34, deckCenterY = .35;
 const radius = [4.35,1.28,3.99];
-const dot = (a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-let engine,courtyard,resize,frame,layoutDirty=true;
-let season=1,plan=false,playStart=null,lastMinute=null;
+let bench,engine,courtyard,playing,layoutDirty=true;
+let season=1,plan=false,lastMinute=null,cancelPlay=null;
+// Play the day: the tween walks the solar clock from 08:00 to 16:00 in 12 seconds, in the slider's 5-minute steps.
+const day = new Tween(), dayClock = {minute:480};
 
 function fit() {
   const width = Math.max(1,canvas.clientWidth), height = Math.max(1,canvas.clientHeight);
-  const dpr = Math.min(1.5,Math.max(1.25,devicePixelRatio));
-  const pixels = [Math.round(width*dpr),Math.round(height*dpr)];
-  if(canvas.width!==pixels[0]) canvas.width=pixels[0];
-  if(canvas.height!==pixels[1]) canvas.height=pixels[1];
   const slope=Math.tan(fov*Math.PI/360);
   if(plan) {
     const scale=Math.min(1,width/height);
@@ -74,27 +72,29 @@ function updateSun() {
 function setPlaying(value) {
   sweep.setAttribute('aria-pressed',String(value));
   sweep.textContent=value?'Pause the day':'Play the day';
-  if(!value) playStart=null;
+  if(!value) { cancelPlay?.(); cancelPlay=null; }
 }
 
-function draw(now) {
-  frame=undefined;
-  if(stop.signal.aborted) return;
-  try {
-    if(playStart!==null) {
-      if(playStart===0) playStart=now;
-      clock.value=String(480+Math.min(480,Math.floor((now-playStart)/125)*5));
-      if (clock.value==='960') setPlaying(false);
-    }
-    const solarChanged=updateSun();
-    if(layoutDirty) fit();
-    if(layoutDirty || solarChanged) engine.render({delta:0});
-    layoutDirty=false;
-  } catch(error) { fail(error); }
-  if(playStart!==null) schedule();
+// Runs before every bench frame; the bench draws once per request and keeps drawing while the day plays.
+function refresh(delta=0) {
+  if(cancelPlay) {
+    day.update(delta);
+    clock.value=String(Math.floor(dayClock.minute/5)*5);
+  }
+  updateSun();
+  if(layoutDirty) fit();
+  layoutDirty=false;
 }
-
-function schedule() { frame??=requestAnimationFrame(draw); }
+function schedule() {
+  if(cancelPlay) playing??=bench.frame(refresh);
+  else { playing?.(); playing=undefined; refresh(); bench.request(); }
+}
+function play() {
+  dayClock.minute=480;
+  cancelPlay=day.to(dayClock,'minute',960,{duration:12,onComplete:()=>{ cancelPlay=null; setPlaying(false); schedule(); }});
+  setPlaying(true);
+  schedule();
+}
 
 function connect() {
   clock.addEventListener('input',()=>{ setPlaying(false); schedule(); },listener);
@@ -107,25 +107,22 @@ function connect() {
     schedule();
   },listener);
   sweep.addEventListener('click',()=>{
-    if(playStart!==null) setPlaying(false);
-    else { playStart=0; setPlaying(true); schedule(); }
+    if(cancelPlay) { setPlaying(false); schedule(); }
+    else play();
   },listener);
   choices.forEach((button,i)=>button.addEventListener('click',()=>{
     season=i;
     choices.forEach((choice,j)=>choice.setAttribute('aria-pressed',String(i===j)));
     schedule();
   },listener));
-  document.addEventListener('visibilitychange',()=>{ if(document.hidden) setPlaying(false); },listener);
-  resize=new ResizeObserver(()=>{ layoutDirty=true; schedule(); });
-  resize.observe(canvas);
+  document.addEventListener('visibilitychange',()=>{ if(document.hidden) { setPlaying(false); schedule(); } },listener);
 }
 
 function dispose() {
-  stop.abort();
-  if(frame!==undefined) cancelAnimationFrame(frame);
-  resize?.disconnect();
   courtyard?.dispose();
-  engine?.dispose();
+  courtyard=undefined;
+  bench?.dispose();
+  stop.abort();
 }
 
 function fail(error) {
@@ -137,31 +134,18 @@ function fail(error) {
 }
 
 async function open() {
-  const options={backend:'webgpu',exactSize:true,antialias:false,signal:stop.signal,startupTimeout:5000,camera:{fov,near:.5,far:95}};
-  const force=new URLSearchParams(location.search).get('backend')==='webgl2';
-  const create=async()=>{
-    if(!force) {
-      try { return [await EngineKernel.create(canvas,options),'webgpu']; }
-      catch(error) { if(error?.code!=='unsupported' && error?.code!=='timeout') throw error; }
-    }
-    const {install}=await import('@margoengine/webgl2-compat');
-    await install({force:true});
-    return [await EngineKernel.create(canvas,options),'compatibility'];
-  };
-  const opening=create();
+  const opening=openBench(canvas,{
+    exhibit:document.body,signal:stop.signal,pixelRatio:1.5,startupTimeout:5000,camera:{fov,near:.5,far:95},
+    background:'#37362e',light:false,environment:false,backdrop:false,contact:false,onError:fail,
+    onResize:()=>{ layoutDirty=true; refresh(); },
+    shadows:{resolution:1024,bounds:{min:[-5,-.64,-5],max:[5,2.3,5]},normalBias:.019,filter:'pcf'},
+  });
   const assemble=prepareCourtyard();
-  const [device,renderer]=await opening;
-  engine=device;
-  document.body.dataset.renderer=renderer;
-  engine.scene.background='#37362e';
-  engine.onError=fail;
-  const shadows=Shadows.attach(engine,{resolution:1024,bounds:{min:[-5,-.64,-5],max:[5,2.3,5]},normalBias:.019,filter:'pcf'});
-  courtyard=assemble(engine,shadows);
-  updateSun();
-  fit();
-  engine.render({delta:0});
-  await engine.gpu.queue.onSubmittedWorkDone();
-  if(stop.signal.aborted) return;
+  bench=await opening;
+  engine=bench.engine;
+  courtyard=assemble(engine,bench.shadows);
+  refresh();
+  if(!await bench.ready()) return;
   connect();
   for(const control of [clock,overhead,sweep,...choices]) control.disabled=false;
   loading.hidden=true;

@@ -657,7 +657,7 @@
   },
   "the-light-bench": {
    "R4": 1,
-   "R5": 397
+   "R5": 355
   },
   "the-lighting-store": {
    "R3": 10,
@@ -899,8 +899,7 @@
   },
   "the-shadow-calendar": {
    "R3": 4,
-   "R4": 1,
-   "R5": 395
+   "R5": 367
   },
   "the-shadow-lab": {
    "R3": 7,

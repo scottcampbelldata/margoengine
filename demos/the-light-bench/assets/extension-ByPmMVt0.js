@@ -1,0 +1,1 @@
+import{n as e,r as t,t as n}from"./version-AxB7Hc8g.js";var r=(r,i=t,a=import.meta.url)=>(n(r,e(i,a)),r),i=e=>e;export{i as n,r as t};

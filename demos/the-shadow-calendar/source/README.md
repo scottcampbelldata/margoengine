@@ -4,7 +4,7 @@ Move the time slider to rotate the real shadow of a bronze sundial. Select a dat
 
 The original cutaway courtyard, stone pedestal and engraved instrument are made from Margo Engine geometry, all measured in metres. The sundial is horizontal at 43.5° N and its style points along the celestial pole. The hour marks are calculated independently of the solar model and the shadow itself comes from Margo Engine’s directional light and shadow map. The projected distance is measured from the gnomon foot to the projected tip on the horizontal plane of the bronze face. The shadow can extend beyond that face.
 
-Solar declination uses the NOAA fractional-year approximation with a 365-day reference year. The controls use local apparent solar time, so longitude, time zones, and daylight saving are outside the model. The model uses the solar center and geometric elevation, with no atmospheric refraction.
+The sun's place comes from `sunPath` in `@margoengine/sky/sun` (Spencer's 1971 Fourier series for the declination, with a 365-day reference year, the same series NOAA's calculator uses), and the Play the day sweep is a `Tween` from `@margoengine/tween`. The controls use local apparent solar time, so longitude, time zones, and daylight saving are outside the model. The model uses the solar center and geometric elevation, with no atmospheric refraction.
 
 ## References
 

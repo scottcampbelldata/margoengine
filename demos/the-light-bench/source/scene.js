@@ -1,5 +1,5 @@
 import { Clustered } from '@margoengine/clustered';
-import { Engine } from '@margoengine/core';
+import { openBench } from '@margoengine/studio/bench';
 import { createBench, lampAxis, lampPosition } from './bench.js';
 
 const canvas = document.querySelector('#scene');
@@ -16,19 +16,10 @@ const controls = [angle, beam, view, reset];
 const wideShot = { target: [-.07, .44, -.035], offset: [.51, .80, 1.99], framedAspect: 1.99 };
 const closeShot = { target: [.34, .43, -.205], offset: [.26, .35, 1.27], framedAspect: 1.26 };
 
-let engine, set, resizeObserver, frame;
+let bench, engine, set, frame;
 let last = 0, displayedAngle = initialAngle, displayedLift = 0, displayedView = 0;
 let isOpen = false, isClose = false;
 let apertureChanged = false;
-
-function size() {
-  const bounds = canvas.getBoundingClientRect();
-  const density = Math.min(devicePixelRatio, 1.5);
-  const width = Math.max(1, Math.round(bounds.width * density));
-  const height = Math.max(1, Math.round(bounds.height * density));
-  if (canvas.width !== width) canvas.width = width;
-  if (canvas.height !== height) canvas.height = height;
-}
 
 function camera(t) {
   const blend = (a, b) => a + (b - a) * t;
@@ -89,41 +80,18 @@ function fail(error) {
   for (const control of controls) control.disabled = true;
   console.error(error);
   lifetime.abort();
-  resizeObserver?.disconnect();
   if (frame !== undefined) cancelAnimationFrame(frame);
-  engine?.dispose();
 }
 
 async function start() {
-  const forced = new URLSearchParams(location.search).get('backend') === 'webgl2';
-  const open = () => Engine.create(canvas, {
-    backend: 'webgpu',
-    exactSize: true,
-    capacity: 160,
-    camera: { fov: 33, near: .2, far: 18 },
-    signal: lifetime.signal,
-    startupTimeout: 10000,
+  bench = await openBench(canvas, {
+    exhibit: document.body, signal: lifetime.signal, pixelRatio: 1.5, capacity: 160, startupTimeout: 10000,
+    camera: { fov: 33, near: .2, far: 18 }, background: '#1b2528', backdrop: false, contact: false, shadows: false,
+    environment: false, light: { direction: [.23, .79, .55], intensity: 1.18, color: [.78, .88, 1], ambient: .19, ambientColor: [.75, .87, 1] },
+    onError: fail, onResize: () => schedule(),
   });
-  size();
-  if (!forced) {
-    try {
-      engine = await open();
-    } catch (error) {
-      if (error?.code !== 'unsupported') throw error;
-    }
-  }
-  const compatible = !engine;
-  if (compatible) {
-    const { install } = await import('@margoengine/webgl2-compat');
-    await install({ force: true, signal: lifetime.signal });
-    engine = await open();
-  }
-  engine.onError = fail;
-  engine.scene.background = '#1b2528';
-  // Cool, broad studio fill. Only the warm optical beam casts a dynamic shadow.
-  engine.lighting.direction.set([.23, .79, .55, 1.18]);
-  engine.lighting.radiance.set([.78, .88, 1, .19]);
-  engine.lighting.ambient.set([.75, .87, 1]);
+  engine = bench.engine;
+  // Cool, broad studio fill from the bench sun. Only the warm optical beam casts a dynamic shadow.
   const light = Clustered.attach(engine, { grid: [8, 6, 12], maxLights: 3, shadows: { maxLights: 1, resolution: 1024 } });
   light.setLights([
     {
@@ -141,7 +109,6 @@ async function start() {
   ]);
   set = createBench(engine, light);
   document.body.dataset.meshCount = String(set.meshCount);
-  document.body.dataset.renderer = compatible ? 'compatibility' : 'webgpu';
   const options = { signal: lifetime.signal };
   const update = () => { syncControls(); schedule(); };
   const applyAngle = () => {
@@ -160,24 +127,14 @@ async function start() {
     update();
   }, options);
   reduced.addEventListener('change', schedule, options);
-  addEventListener('pagehide', (event) => {
-    if (event.persisted) return;
-    lifetime.abort();
-    resizeObserver?.disconnect();
-    if (frame !== undefined) cancelAnimationFrame(frame);
-    engine.dispose();
-  }, options);
+  lifetime.signal.addEventListener('abort', () => { if (frame !== undefined) cancelAnimationFrame(frame); }, { once: true });
 
   draw(performance.now());
-  await engine.gpu.queue.onSubmittedWorkDone();
-  await new Promise(requestAnimationFrame);
-  if (lifetime.signal.aborted) return;
+  if (!await bench.ready()) return;
   for (const control of controls) control.disabled = false;
   loading.hidden = true;
   document.body.dataset.state = 'ready';
   performance.mark('margo-first-usable-frame');
-  resizeObserver = new ResizeObserver(() => { size(); schedule(); });
-  resizeObserver.observe(canvas);
 }
 
 await start().catch(fail);
