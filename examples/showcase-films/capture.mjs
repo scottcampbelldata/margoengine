@@ -1,8 +1,9 @@
 import { createWriteStream } from 'node:fs';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { once } from 'node:events';
 import { dirname } from 'node:path';
 import { parseShot } from '../../tools/shot/shot-file.mjs';
+import { colourSidecar } from './video-range.mjs';
 import { openShotPage, CLOCK_START } from '../../tools/shot/render.mjs';
 
 const [spec, output, limit] = process.argv.slice(2);
@@ -51,8 +52,11 @@ try {
       }
       const encoded = [];
       let failure;
+      // The encoder's own colour space (range and matrix) goes beside the stream, so export.mjs converts from it.
+      window.captureColour = null;
       const encoder = new VideoEncoder({
-        output(chunk) {
+        output(chunk, metadata) {
+          if (metadata?.decoderConfig?.colorSpace) window.captureColour = { ...metadata.decoderConfig.colorSpace };
           const bytes = new Uint8Array(chunk.byteLength);
           chunk.copyTo(bytes);
           encoded.push(bytes);
@@ -80,6 +84,7 @@ try {
             await new Promise((resolve) => encoder.addEventListener('dequeue', resolve, { once: true }));
         }
         await encoder.flush();
+        if (!window.captureColour) throw new Error('The encoder reported no colour space.');
         const packets = encoded.splice(0);
         const all = new Uint8Array(packets.reduce((sum, bytes) => sum + bytes.length, 0));
         let offset = 0;
@@ -89,7 +94,7 @@ try {
         }
         let binary = '';
         for (let i = 0; i < all.length; i += 16384) binary += String.fromCharCode(...all.subarray(i, i + 16384));
-        return { count: packets.length, base64: btoa(binary) };
+        return { count: packets.length, base64: btoa(binary), colour: window.captureColour };
       };
       return { width: canvas.width, height: canvas.height, hardware: driver.get(target.engine).gpu.adapterInfo };
     },
@@ -101,6 +106,7 @@ try {
     const batch = await page.evaluate(({ from, to }) => window.captureFilm(from, to), { from: i, to: end });
     if (errors.length) throw new Error(errors.join('\n'));
     if (batch.count !== end - i) throw new Error('Missing encoded frames in batch ' + i);
+    if (i === 0) await writeFile(colourSidecar(output), JSON.stringify(batch.colour) + '\n');
     if (!out.write(Buffer.from(batch.base64, 'base64'))) await once(out, 'drain');
     console.log(end + '/' + frames + ' frames in ' + ((Date.now() - begin) / 1000).toFixed(2) + ' s');
   }

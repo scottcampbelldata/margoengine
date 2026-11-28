@@ -138,6 +138,8 @@ node examples/showcase-films/export.mjs $film $folder phone
 
 Both versions contain 2,160 frames at 24 fps and 90 seconds of stereo audio. The closing card is drawn inside the Margo canvas.
 
+The browser's encoder writes full-range samples. `capture.mjs` records the encoder's colour space in `<stream>.colour.json` beside the stream, and `export.mjs` converts from it to the BT.709 limited range that the master is tagged with, so the film keeps the dark levels of its stills (`tests/video-range.test.mjs`). An old capture without that file has to be captured again.
+
 For `inside-turbofan` and `inside-concert-hall`, use `python examples/showcase-films/author-technical-audio.py $film "test-results/showcase-$film.wav"` in place of `mix.mjs`. Python needs NumPy. The hall loads the repository's optional web-ifc runtime from `node_modules/web-ifc`.
 
 For `the-solar-field`, `the-scanned-workshop`, `city-to-street` and `the-observatory-dome`, use `python examples/showcase-films/author-environment-audio.py $film "test-results/showcase-$film.wav"`. These mixes follow the camera and mechanical motion.

@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { colourSidecar, toLimitedBt709 } from './video-range.mjs';
 
 const [film, output, kind = 'master'] = process.argv.slice(2);
 const profile = {
@@ -40,13 +41,16 @@ function command(tool, args, timeout = 240000) {
 const phone = kind === 'phone';
 const master = join(output, profile.name + '-90s.mp4');
 const path = join(output, profile.name + '-90s' + (phone ? '-phone' : '') + '.mp4');
+const stream = 'test-results/showcase-' + film + '.h264';
+// The capture's samples are in the encoder's range (full range from Chromium); convert them to the limited range the
+// output is tagged with, or every level below 16 decodes as black (KB-FILM-RANGE1).
 const source = phone
   ? ['-i', master, '-vf', 'scale=1280:720:flags=lanczos', '-c:a', 'copy']
   : [
       '-framerate',
       '24',
       '-i',
-      'test-results/showcase-' + film + '.h264',
+      stream,
       '-i',
       'test-results/showcase-' + film + '.wav',
       '-map',
@@ -61,6 +65,8 @@ const source = phone
       '192k',
       '-ar',
       '48000',
+      '-vf',
+      toLimitedBt709(JSON.parse(await readFile(colourSidecar(stream), 'utf8'))),
     ];
 command('ffmpeg', [
   '-nostdin',
