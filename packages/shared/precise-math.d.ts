@@ -22,6 +22,7 @@ export const PRECISE: Readonly<{
 export const PRECISE_FUNCTIONS: readonly string[];
 /**
  * WGSL source of the named precise functions (`preciseSin`, `preciseAtan2`, ...) and the helpers they need, each
- * once. Every function takes and returns f32.
+ * once. Every function takes and returns f32, except `preciseSinCos` (not in PRECISE_FUNCTIONS), which returns
+ * `vec2f(preciseSin(x), preciseCos(x))` bit for bit from one reduction.
  */
 export function preciseMathWgsl(names: Iterable<string>): string;

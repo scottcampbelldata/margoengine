@@ -588,3 +588,50 @@ test('the route runs one pass of light kind 1 per resampled proposal, in the ord
     }
   }
 });
+
+// The camera ray took the sine and cosine of its angles in six calls, each a copy of the precise argument reduction
+// once fxc had inlined them, the biggest share of the start program's compile over ANGLE Direct3D 11, whose draw-time
+// recompile helps WebKit's Windows build past its 15 s wait (KB-COMPAT-LOSTWHY1). Each angle now takes one
+// preciseSinCos, two in all.
+for (const [name, attach] of cases)
+  test(`the programs of ${name} that make camera rays reduce each projection angle once`, async () => {
+    const h = harness(),
+      tracer = await attach(h.engine);
+    try {
+      await tracer.ready;
+      let rays = 0;
+      for (const code of h.modules.filter((m) => /@fragment fn stage\(/.test(m))) {
+        if (!functions(code).has('wideRay')) continue;
+        const copies = inlinedCopies(code, 'wideRay').copies;
+        assert.equal(copies.get('pmReduceTrig'), 2, `${name}: ${copies.get('pmReduceTrig')} trig reductions in wideRay`);
+        assert.equal(copies.get('preciseSin') ?? 0, 0);
+        assert.equal(copies.get('preciseCos') ?? 0, 0);
+        rays++;
+      }
+      assert.ok(rays >= 1, `${name}: a staged program makes the camera ray`);
+    } finally {
+      tracer.dispose();
+    }
+  });
+
+// march returned found(...) at each of its ten exits; fxc inlines each, and the ten copies inside the walk's loop were
+// half the hit program's compile time over ANGLE Direct3D 11 (KB-COMPAT-LOSTWHY1). Every exit now leaves the loop with
+// its values for one found() after it.
+for (const [name, attach] of cases)
+  test(`the voxel walk of ${name} records its hit in one place`, async () => {
+    const h = harness(),
+      tracer = await attach(h.engine);
+    try {
+      await tracer.ready;
+      let walks = 0;
+      for (const code of h.modules.filter((m) => /@fragment fn stage\(/.test(m))) {
+        if (!functions(code).has('march')) continue;
+        const n = inlinedCopies(code, 'march').copies.get('found');
+        assert.equal(n, 1, `${name}: march holds ${n} copies of found()`);
+        walks++;
+      }
+      assert.ok(walks >= 1, `${name}: a staged program walks voxels`);
+    } finally {
+      tracer.dispose();
+    }
+  });

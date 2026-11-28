@@ -1903,6 +1903,14 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   stop the draw-time compile, and the page cannot tell WebKit's Windows build from Safari (both report macOS). The lever
   Margo has is the voxel programs' own Direct3D 11 compile time (`packages/voxel-pathtracer/tests/compat-d3d11-case-seconds.json`).
   Report draft: `docs/upstream-reports/KB-COMPAT-LOSTWHY1/report.md`.
+- **Margo, 2026-11-28:** that compile cut in part, with the same output bit for bit (30 images of eight cases on
+  WebGPU and on the layer over Direct3D 11): the camera ray takes its sines and cosines from two reductions instead
+  of six (`preciseSinCos`), and the voxel walk records its hit in one `found()` instead of ten. Paired offline fxc
+  compiles on a loaded machine: start 5.40 to 4.16 s and hit 7.11 to 5.84 s, but shadow 5.27 to 5.89 s and the last
+  loop program 6.45 to 6.94 s, about 6 percent off the five measured programs in all (operational playbook, section
+  5, KB-COMPAT-LOSTWHY1). Still open: why fxc takes longer on shadow and the last loop program, quiet-machine
+  seconds, and a rerun of the WebKit matrix row, so whether every wait now stays under 15 s is not shown; the
+  upstream report waits on Scott.
 
 ### Open (below Margo) 2026-11-27: on WebKit's Windows build the WebGL2 layer copies unpremultiplied ImageBitmaps wrong (KB-WEBKIT-BITMAPALPHA1, browser; webgl2-compat)
 
@@ -15295,6 +15303,19 @@ reproduced `EBUSY` and the live server/worker ports; the repaired seven-test fil
   (5.51 and 2.81 without the wide estimate), each part's variance now coming from its own samples; which term of the
   two chains loses the 1 percent is not established. Repro: `npm run test:gpu:denoise -w
   @margoengine/voxel-pathtracer`, the `denoisehistory` line. Job 2 remains open.
+- **What closing each job needs, exactly (2026-11-28, lane A):** nothing in this repository can close either job as
+  the bars are written, and no hardware is missing. Job 1's bar is zero error against an external MagicaVoxel image.
+  MagicaVoxel is closed source with its own random sequence, so a Monte Carlo render of it carries its own noise: the
+  1,024-sample references on disk (`docs/whitepaper/results/batch-99-parity-gamma-20261109.json`) are themselves
+  estimates, and two independent unbiased renderers agree pixel for pixel only in the limit of infinite samples. The
+  rival run that is missing is a reference corpus rendered in MagicaVoxel itself (outside this repository): the `_sss`
+  block at three or more densities, colours and sun angles with a view of its side faces (the model question of KB1673 above), glass over a lit floor at two or more IORs, and the atmosphere at its `_atm`
+  settings, each at the highest sample count it allows, with the file and settings saved beside the image. With that
+  corpus the transport can be compared per setting; a zero-error match still needs Scott to state whether the oracle
+  means equal expected values (a statistical bound against the reference's own noise) or equal pixels, which no
+  renderer can give against another's samples. Job 2's bar, a noise-free disocclusion, asks a finite first-frame
+  estimate to recover radiance it has not sampled; Schied et al. 2017 (section 6) report the same limit for SVGF. The
+  oracle exists (`denoisedisocclusion`); the remaining gap is 6.01 against 4.52 RMS. Closing it as written needs a bar Scott sets (a ratio to the kept pixels, for example); no change to either bar is made here.
 
 ### Batch 99 caustic guide scope
 
@@ -18218,7 +18239,7 @@ No open defect found within the documented contract. Explicit vertex topology on
 
 ### Batch 99 spectral transport evidence
 
-**Status:** open (owner: voxel-pathtracer).
+**Status:** closed 2026-11-28 (no open defect; proof: packages/voxel-pathtracer/tests/spectral-browser.mjs).
 
 The root tracer's documented unscaled-index convention and single dispersive wavelength are retained
 there; the optional /spectral entry provides physical index-ratio transport, hero packets and chromatic
@@ -18232,6 +18253,14 @@ The initial optional spectral coverage pass left its wavelength at zero, so chro
 were nonfinite and an opaque emitter returned alpha zero. The pass now chooses a uniform wavelength
 or the capture wavelength before generating each ray. The unchanged full-coverage GPU regression
 fails with alpha [0] before the repair and requires alpha [1] for packet, 450, 587.6 and 650 nm captures.
+
+Rechecked 2026-11-28 (lane A): `npm run test:gpu:spectral -w @margoengine/voxel-pathtracer` passes on native
+WebGPU and on the WebGL2 layer over ANGLE Vulkan (Edge 158, RTX A6000): the one-interface, closed-slab, single-collapse
+and finite-slab edge oracles and the alpha rows for packet, 450, 587.6 and 650 nm. What is left are the scope limits
+in [limits.md](limits.md), LIM-641 (no reconstructed reflectance or emission spectra, no physical lens stack,
+lateral colour or diffraction); three.js, Babylon.js and PlayCanvas ship no spectral renderer, so these are
+recorded limits, not a gap to a rival. Not run: another GPU vendor, and the layer over Direct3D 11. The Batch 99
+parity and disocclusion jobs stay open in their own entry.
 
 ### Batch 68 job 7 verification scope
 

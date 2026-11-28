@@ -130,6 +130,25 @@ window.runPreciseTests = async (n = 1 << 14) => {
       `${NAMES[name]} within ${results[name].maxUlp} ulp (bound ${results[name].bound}) on ${count} inputs, ${(100 * exact) / count}% bit for bit as the host reference`,
     );
   }
+  // preciseSinCos takes both from one reduction (a shader compiled by fxc pays for every reduction it inlines,
+  // KB-COMPAT-LOSTWHY1): its two halves must be preciseSin's and preciseCos's values bit for bit on the same GPU.
+  {
+    const flat = [Float32Array.from(cases.sin.sets.flatMap((set) => set[0]))],
+      count = flat[0].length,
+      helpers = preciseMathWgsl(['preciseSin', 'preciseCos', 'preciseSinCos']);
+    for (const [part, single] of [
+      ['x', 'preciseSin'],
+      ['y', 'preciseCos'],
+    ]) {
+      const pair = await run(device, kernel(helpers, `preciseSinCos(a).${part}`), flat, count),
+        one = await run(device, kernel(helpers, `${single}(a)`), flat, count);
+      let differ = 0;
+      for (let i = 0; i < count; i++)
+        if (!Object.is(pair[i], one[i]) && !(Number.isNaN(pair[i]) && Number.isNaN(one[i]))) differ++;
+      if (differ) throw new Error(`preciseSinCos(a).${part} differs from ${single}(a) on ${differ} of ${count} inputs`);
+      checks.push(`preciseSinCos(a).${part} equals ${single}(a) bit for bit on ${count} inputs`);
+    }
+  }
   device.destroy();
   return { checks, results };
 };

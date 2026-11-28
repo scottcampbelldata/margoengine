@@ -1198,6 +1198,29 @@ Sources: Microsoft, "for Statement" (HLSL reference; the compiler simulates loop
 https://learn.microsoft.com/windows/win32/direct3dhlsl/dx-graphics-hlsl-for ; John Amanatides and Andrew Woo, "A
 Fast Voxel Traversal Algorithm for Ray Tracing", Eurographics 1987, https://www.cse.yorku.ca/~amana/research/grid.pdf .
 
+### Section 5 evidence: the staged programs' draw-time compile on Direct3D 11 (KB-COMPAT-LOSTWHY1, 2026-11-28)
+
+ANGLE's Direct3D 11 back end links a program with more than one colour output against a one-output layout and
+compiles it again at its first draw, inside the next call that waits on the GPU process; on WebKit's Windows build
+a wait past 15 s loses the context. Every staged path program writes a 7-output page, so each pays that second
+compile. Measured with the HLSL ANGLE emits (`WEBGL_debug_shaders` in Edge, then `D3DCompile` ps_5_0 of
+d3dcompiler_47 offline), stubbing one function at a time: the camera ray's six precise sine and cosine reductions
+were most of the start program's compile, and `march`'s ten `found()` copies a large part of the hit program's.
+Two changes, values the same bit for bit: `preciseSinCos` (packages/shared/precise-math.js) gives both from one
+reduction and `wideRay` takes two; and `march` leaves its loop with the hit's values for one `found()`. Paired
+offline compiles (old and new interleaved, minimum of three rounds each, the workstation at 87 percent CPU): start
+5.40 to 4.16 s, hit 7.11 to 5.84 s, a viewRay program 1.53 to 1.41 s, but the last loop program 6.45 to 6.94 s and
+shadow 5.27 to 5.89 s; the five together 25.8 to 24.2 s. Statement counts are a poor guide here: the inlined HLSL of
+shadow fell from 2,771 to 1,711 statements and its compile still rose. A third change, picking the layer's scalar
+storage word with a mask instead of nested `?:`, cut statements further but made the last loop program 10.2 s, so it
+was dropped. Proof of the same output: 30 images of eight browser-check cases (traversal, projections, shapes,
+cutout, mediaboundary, glassfurnace, textures, bouncelimit) hash the same before and after on native WebGPU and on
+the layer over ANGLE Direct3D 11 (Edge, RTX A6000), and `preciseSinCos` equals the two calls on 67,072 inputs on the
+GPU (packages/compute/tests). Pinned by `packages/voxel-pathtracer/tests/compat-staged.test.js` (two reductions in
+`wideRay`, one `found()` in `march`) and `tests/precise-math.test.js`. Missing: why fxc takes longer on shadow and
+the last loop program after the `march` change, compile seconds on a quiet machine, and a rerun of the WebKit matrix
+row; no program is yet under the 1.4 s of the fastest staged program, so the 15 s WebKit wait is not shown cleared.
+
 ### Section 5 evidence: one call site per costly function in layer-compiled kernels (KB-COMPAT-FXCTIME1, 2026-11-18)
 
 fxc (ANGLE's Direct3D 11 back end) inlines every call and unrolls every loop it can count, so a kernel's compile cost

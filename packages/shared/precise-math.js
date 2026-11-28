@@ -288,6 +288,23 @@ fn pmReduceTrig(a: f32) -> PmReduced {
 }
 `,
     ],
+    // preciseSin and preciseCos of one angle from one reduction, bit for bit the two calls' values: a shader that
+    // needs both makes one call. Direct3D's shader compiler inlines every call, so each reduction it is spared
+    // shortens its compile (the voxel path tracer's camera ray, KB-COMPAT-LOSTWHY1).
+    preciseSinCos: [
+      ['pmTrig'],
+      `fn preciseSinCos(x: f32) -> vec2f {
+ let a = abs(x);
+ if (pmExponent(x) == 255u) { let n = pmNan(x); return vec2f(n, n); }
+ if (a < 0.000244140625) { return vec2f(x, 1.0); }
+ let r = pmReduceTrig(a);
+ let s = pmSinK(r.hi, r.lo); let c = pmCosK(r.hi, r.lo);
+ let vs = select(select(select(-c, -s, r.q == 2u), c, r.q == 1u), s, r.q == 0u);
+ let vc = select(select(select(s, -c, r.q == 2u), -s, r.q == 1u), c, r.q == 0u);
+ return vec2f(pmWithSign(vs, x), vc);
+}
+`,
+    ],
     preciseTan: [
       ['pmTrig', 'preciseDiv'],
       `fn preciseTan(x: f32) -> f32 {
@@ -658,7 +675,8 @@ export const PRECISE_FUNCTIONS = /* @__PURE__ */ Object.freeze([
 
 /**
  * WGSL source of the named precise functions (`preciseSin`, `preciseAtan2`, ...) and the helpers they need, each
- * once, ready to paste into a shader. Every function takes and returns f32.
+ * once, ready to paste into a shader. Every function takes and returns f32, except `preciseSinCos` (not in
+ * PRECISE_FUNCTIONS), which returns `vec2f(preciseSin(x), preciseCos(x))` bit for bit from one reduction.
  */
 export function preciseMathWgsl(names) {
   const order = [],

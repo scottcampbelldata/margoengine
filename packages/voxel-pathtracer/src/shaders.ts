@@ -254,7 +254,7 @@ const GUIDE_WEIGHT = /* wgsl */ `fn guideWeight(s:Bounce,alpha:f32,n:vec3f,wo:ve
 // - Leaving into empty space or a plain medium (`skinOut`) meets the diffuse surface from inside: the far side is a
 //   white cosine lobe (the walk has carried the colour), light is sampled there and the path leaves about the outward
 //   normal. The direction is mirrored in the surface, so the lobe sees it arrive from outside.
-export const TRACE: string = /* wgsl */ `${FRAME}${COMMON}${SPECTRUM}${preciseMathWgsl(['preciseSin', 'preciseCos', 'preciseAsin', 'preciseAtan'])}
+export const TRACE: string = /* wgsl */ `${FRAME}${COMMON}${SPECTRUM}${preciseMathWgsl(['preciseSinCos', 'preciseAsin', 'preciseAtan'])}
 const INF=3.0e38;
 const NONE=0xffffffffu;
 const GROUND=0xfffffffeu;
@@ -494,6 +494,10 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
  var skip=step&&axis==3u;
  var inCell=false;var entry=0u;var tOut=0.0;var lo=vec3i(0);var hi=vec3i(0);
  var c=vec3i(0);var vn=vec3f(0.0);var vt=0.0;var va=0u;var uniform=false;
+ // Every hit leaves the loop with its values and takes one found() after it: Direct3D's compiler inlines every
+ // call, and a found() at each of the walk's ten exits made half the compile time of the program that walks
+ // (KB-COMPAT-LOSTWHY1).
+ var fin=true;var ft=0.0;var fv=0u;var fa=0u;var fc=vec3i(0);
  loop {
   if(inCell){
    let l=vec3u(c-lo);let k=l.x+8u*(l.z+8u*l.y);
@@ -506,20 +510,20 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
     // A cut-out one stops only on texels not cut away.
     var r=vec2f(-1.0,0.0);
     if(v!=want&&cutMat(v)){r=shapeCut(v,sm,o,d,c,vt,tc,va==3u);}else{r=octWalk(sm,o,d,c,vt,tc,va,v!=want);}
-    if(v==want){if(r.x>=0.0){return found(h,r.x,0u,u32(r.y),stp,d,c);}}
+    if(v==want){if(r.x>=0.0){ft=r.x;fv=0u;fa=u32(r.y);fc=c;break;}}
     else{
-     if(want!=0u&&(r.x<0.0||r.x>vt)){return found(h,vt,0u,va,stp,d,c);}
-     if(r.x>=0.0){return found(h,r.x,v,u32(r.y),stp,d,c);}
+     if(want!=0u&&(r.x<0.0||r.x>vt)){ft=vt;fv=0u;fa=va;fc=c;break;}
+     if(r.x>=0.0){ft=r.x;fv=v;fa=u32(r.y);fc=c;break;}
     }
    }
-   else if(step){if(!skip){return found(h,vt,v,va,stp,d,c);}skip=false;}
+   else if(step){if(!skip){ft=vt;fv=v;fa=va;fc=c;break;}skip=false;}
    else if(v!=want){
-    if(!cutMat(v)){return found(h,vt,v,va,stp,d,c);}
+    if(!cutMat(v)){ft=vt;fv=v;fa=va;fc=c;break;}
     let r=cutThrough(v,o,d,vt,va==3u,c,vn);
-    if(r==0u){return found(h,vt,v,va,stp,d,c);}
+    if(r==0u){ft=vt;fv=v;fa=va;fc=c;break;}
     if(r==2u){
      let ax=select(select(2u,1u,vn.y<=vn.z),0u,vn.x<=vn.y&&vn.x<=vn.z);
-     return found(h,min(min(vn.x,vn.y),vn.z),v,ax,stp,d,c);
+     ft=min(min(vn.x,vn.y),vn.z);fv=v;fa=ax;fc=c;break;
     }
    }
    if(vn.x<vn.y&&vn.x<vn.z){va=0u;vt=vn.x;c.x+=stp.x;vn.x+=ad.x;}
@@ -534,8 +538,8 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
    let ue=select(0u,base|(entry&255u),entry!=0u);
    if(entry==0u||(entry>=0x80000000u&&!step&&!cutMat(ue))){
     let u=ue;
-    if(step){if(!skip){return found(h,t,u,axis,stp,d,clamp(forwardCell(o+d*t,d),lo,hi));}skip=false;}
-    else if(u!=want){return found(h,t,u,axis,stp,d,clamp(forwardCell(o+d*t,d),lo,hi));}
+    if(step){if(!skip){ft=t;fv=u;fa=axis;fc=clamp(forwardCell(o+d*t,d),lo,hi);break;}skip=false;}
+    else if(u!=want){ft=t;fv=u;fa=axis;fc=clamp(forwardCell(o+d*t,d),lo,hi);break;}
    } else {
     c=clamp(forwardCell(o+d*t,d),lo,hi);
     vn=(vec3f(c)+up-o)*inv;
@@ -544,15 +548,17 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
     inCell=true;continue;
    }
   }
-  if(tOut>=tExit){break;}
+  if(tOut>=tExit){fin=false;break;}
   if(bn.x<bn.y&&bn.x<bn.z){axis=0u;t=bn.x;bc.x+=stp.x;bn.x+=ad.x*8.0;}
   else if(bn.y<bn.z){axis=1u;t=bn.y;bc.y+=stp.y;bn.y+=ad.y*8.0;}
   else{axis=2u;t=bn.z;bc.z+=stp.z;bn.z+=ad.z*8.0;}
-  if(any(bc<vec3i(0))||any(bc>=nb)){break;}
+  if(any(bc<vec3i(0))||any(bc>=nb)){fin=false;break;}
  }
- if(want==0u||boxExit>=tMax){return false;}
- let ex=select(select(2u,1u,tf.y<=tf.z),0u,tf.x<=tf.y&&tf.x<=tf.z);
- return found(h,boxExit,0u,ex,stp,d,vec3i(floor(o+d*boxExit)));
+ if(!fin){
+  if(want==0u||boxExit>=tMax){return false;}
+  ft=boxExit;fv=0u;fa=select(select(2u,1u,tf.y<=tf.z),0u,tf.x<=tf.y&&tf.x<=tf.z);fc=vec3i(floor(o+d*boxExit));
+ }
+ return found(h,ft,fv,fa,stp,d,fc);
 }
 // Extinction of a see-through cell for shadow rays, -1 when the cell blocks light (only media let it through; with
 // opaque shadows none, except the sun-lit volume the shadow ray starts in, or only its start cell for a sun ray from a
@@ -904,19 +910,26 @@ fn wideRay(px:vec2f)->Ray {
   rt=normalize(mix(f.prevRight.xyz,rt,motion));up=normalize(mix(f.prevUp.xyz,up,motion));
  }
  let W=f32(f.image.x);let H=f32(f.image.y);
- if(f.projection.x==1u){
+ // Both projections take the sine and cosine of their angles from two preciseSinCos calls (the panorama's elevation
+ // and azimuth, the fisheye's angle off the axis): Direct3D's compiler inlines every call, and six reductions in
+ // the camera ray were most of the start program's 5.4 s compile (KB-COMPAT-LOSTWHY1). The values are the same bit for bit.
+ let pano=f.projection.x==1u;
+ var outer=0.0;var azimuth=0.0;var a=vec2f(0.0);
+ if(pano){
   // Fitted to the width (360 degrees across) or to the height (the same angle per pixel across as down).
-  let phi=select((px.x/W-0.5)*TAU,(px.x-0.5*W)/H*PI,f.projection.w==1u);let el=(0.5-px.y/H)*PI;
-  return Ray(eye,normalize(preciseCos(el)*(preciseSin(phi)*rt+preciseCos(phi)*fw)+preciseSin(el)*up));
+  azimuth=select((px.x/W-0.5)*TAU,(px.x-0.5*W)/H*PI,f.projection.w==1u);outer=(0.5-px.y/H)*PI;
+ } else {
+  let p=vec2f(px.x-0.5*W,0.5*H-px.y)/(0.5*H);
+  let r=length(p);
+  var th=r*0.5*f.lensFov.x;
+  if(f.projection.y==1u){let s=r*f.lensFov.y;if(s>1.0){return Ray(eye,vec3f(0.0));}th=2.0*preciseAsin(s);}
+  if(f.projection.y==2u){th=2.0*preciseAtan(r*f.lensFov.y);}
+  else if(th>0.5*f.lensFov.x+1e-6){return Ray(eye,vec3f(0.0));}
+  a=select(vec2f(0.0),p/r,r>0.0);outer=th;
  }
- let p=vec2f(px.x-0.5*W,0.5*H-px.y)/(0.5*H);
- let r=length(p);
- var th=r*0.5*f.lensFov.x;
- if(f.projection.y==1u){let s=r*f.lensFov.y;if(s>1.0){return Ray(eye,vec3f(0.0));}th=2.0*preciseAsin(s);}
- if(f.projection.y==2u){th=2.0*preciseAtan(r*f.lensFov.y);}
- else if(th>0.5*f.lensFov.x+1e-6){return Ray(eye,vec3f(0.0));}
- let a=select(vec2f(0.0),p/r,r>0.0);
- return Ray(eye,normalize(preciseCos(th)*fw+preciseSin(th)*(a.x*rt+a.y*up)));
+ let so=preciseSinCos(outer);let sa=preciseSinCos(azimuth);
+ if(pano){return Ray(eye,normalize(so.y*(sa.x*rt+sa.y*fw)+so.x*up));}
+ return Ray(eye,normalize(so.y*fw+so.x*(a.x*rt+a.y*up)));
 }
 // The ray through pixel position px without the lens: the projection's, distortion applied.
 fn viewRay(px:vec2f)->Ray {

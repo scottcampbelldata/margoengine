@@ -312,3 +312,28 @@ test('no sum in the precise maths can be factored by a term of its own, as Mesa 
     globalThis.GPUDevice = previous;
   }
 });
+
+test('preciseSinCos is preciseSin and preciseCos from one reduction, written as they are (KB-COMPAT-LOSTWHY1)', () => {
+  const pair = preciseMathWgsl(['preciseSinCos']),
+    sin = preciseMathWgsl(['preciseSin']),
+    cos = preciseMathWgsl(['preciseCos']);
+  const body = (code, name) => code.slice(code.indexOf(`fn ${name}(`), code.indexOf('\n}\n', code.indexOf(`fn ${name}(`)));
+  const p = body(pair, 'preciseSinCos'),
+    s = body(sin, 'preciseSin'),
+    c = body(cos, 'preciseCos');
+  assert.equal(p.match(/pmReduceTrig\(/g).length, 1, 'one reduction');
+  // The same early returns, kernels and quadrant selections as the two functions.
+  for (const line of ['if (pmExponent(x) == 255u)', 'if (a < 0.000244140625)', 'let r = pmReduceTrig(a);', 'let s = pmSinK(r.hi, r.lo); let c = pmCosK(r.hi, r.lo);'])
+    assert.ok(p.includes(line) && s.includes(line) && c.includes(line), line);
+  const select = (code) => code.match(/select\(select\(select\([^;]*\)/)[0];
+  assert.ok(p.includes(`let vs = ${select(s)}`), 'the sine quadrant as preciseSin selects it');
+  assert.ok(p.includes(`let vc = ${select(c)}`), 'the cosine quadrant as preciseCos selects it');
+  assert.match(s, /return pmWithSign\(v, x\);/);
+  assert.match(p, /return vec2f\(pmWithSign\(vs, x\), vc\);/);
+  assert.match(p, /return vec2f\(n, n\);/);
+  assert.match(s, /return pmNan\(x\);/);
+  assert.match(c, /return pmNan\(x\);/);
+  assert.match(p, /return vec2f\(x, 1\.0\);/);
+  // It returns a vec2f, so it is not one of the f32 functions.
+  assert.ok(!PRECISE_FUNCTIONS.includes('preciseSinCos'));
+});
