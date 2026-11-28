@@ -1,6 +1,5 @@
 import { Geometry, PbrMaterial, box } from '@margoengine/core';
-import { autoEngine } from '@margoengine/webgl2-compat/auto';
-import { Shadows } from '@margoengine/shadows';
+import { openBench } from '@margoengine/studio/bench';
 
 const ground = {
   road: 1, markings: 1, 'centre-lines': 1, kerb: 1, pavement: 1, paving: 1, lawn: 1,
@@ -50,11 +49,11 @@ function bevel(width, depth, y, levels) {
   return new Geometry(p, n, i);
 }
 
-function exhibition(engine, shadows) {
+function exhibition(engine, bench) {
   const material = (color, roughness = .66, metalness = 0) => new PbrMaterial({color, roughness, metalness, doubleSided: false});
   const plank = (geometry, paint, position = [0,0,0], caster = false) => {
     const mesh = engine.createMesh().setGeometry(geometry).setMaterial(paint).setPosition(position);
-    if (caster) shadows.add(mesh, {static: true});
+    if (caster) bench.add(mesh, {static: true});
     return mesh;
   };
   plank(box(1400, 1, 1400), material('#bfb19a', .95), [0, -12, 0]);
@@ -76,16 +75,14 @@ function exhibition(engine, shadows) {
   arrow(86.8, 68, 1.38, material('#a47c50', .52, .2));
 }
 
-export async function openCity(canvas, first, force, signal) {
-  let engine, shadows, current = [], closed = false, error;
+export async function openCity(canvas, first, signal) {
+  let bench, engine, current = [], closed = false, error;
   const close = () => {
     if (closed) return;
     closed = true;
-    engine?.dispose();
+    bench?.dispose();
   };
   signal.addEventListener('abort', close, {once: true});
-  const legacy = force || !navigator.gpu;
-  const install = async () => (await import('./compatibility.js')).installCompatibility(force, signal);
   let planView = false;
   const ortho = (out, aspect, webgpu) => {
     const camera = engine.camera;
@@ -100,16 +97,10 @@ export async function openCity(canvas, first, force, signal) {
   async function draw(overhead = planView) {
     signal.throwIfAborted();
     planView = overhead;
-    const ratio = Math.min(devicePixelRatio, 2, 1450 / Math.max(1, canvas.clientWidth));
-    const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
-    const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
-    if (canvas.width !== width) canvas.width = width;
-    if (canvas.height !== height) canvas.height = height;
     engine.camera.position = overhead ? [0,310,0] : [190,172,225];
     engine.camera.target = overhead ? [0,0,0] : [0,-2,0];
     engine.camera.up = overhead ? [0,0,-1] : [0,1,0];
-    engine.render({delta: 0});
-    await engine.gpu.queue.onSubmittedWorkDone();
+    await bench.render(0);
     signal.throwIfAborted();
     if (error) throw error;
   }
@@ -122,7 +113,7 @@ export async function openCity(canvas, first, force, signal) {
         const {name, material, positions, normals, indices} = part;
         const paint = new PbrMaterial({...material, color: paints[name] ?? material.color, doubleSided: false});
         const mesh = engine.createMesh().setGeometry(new Geometry(positions, normals, indices)).setMaterial(paint);
-        const dropShadow = ground[name] || name === 'glass' ? undefined : shadows.add(mesh, {static: true});
+        const dropShadow = ground[name] || name === 'glass' ? undefined : bench.add(mesh, {static: true});
         next.push({mesh, dropShadow});
       }
     } catch (cause) {
@@ -140,38 +131,28 @@ export async function openCity(canvas, first, force, signal) {
     await draw();
   }
 
-  if (legacy) await install();
   try {
-    engine = await autoEngine(canvas, async target => {
-      if (!target.gpu) {
-        const unsupported = new Error('The model requires WebGPU or the full Margo WebGL2 compatibility layer.');
-        unsupported.code = 'unsupported';
-        throw unsupported;
-      }
-      engine = target;
-      canvas = target.canvas;
-      error = undefined;
-      current = [];
-      engine.onError = cause => {error = cause;};
-      engine.scene.background = '#bfb19a';
-      engine.camera.project = ortho;
-      engine.lighting.direction.set([-.56,.76,.42,2.20]);
-      engine.lighting.radiance.set([1,.91,.81,.52]);
-      engine.lighting.ambient.set([.62,.68,.73]);
-      shadows = Shadows.attach(engine, {resolution: 1024, filter: 'pcf',
-        bounds: {min: [-136,-13,-136], max: [136,34,136]}, normalBias: .07,
-      });
-      exhibition(engine, shadows);
-      performance.mark('margo-device-open');
-      await replace(await first);
-    }, {
-      backend: legacy ? 'webgpu' : undefined, loadCompat: async () => ({install}),
-      signal, exactSize: true, antialias: true, startupTimeout: 11000, capacity: 512,
-      camera: {near: 2, far: 740},
+    bench = await openBench(canvas, {
+      signal, pixelRatio: 2, maxWidth: 1450, startupTimeout: 11000, capacity: 512,
+      camera: {near: 2, far: 740}, background: '#bfb19a',
+      backdrop: false, contact: false, environment: false,
+      light: {direction: [-.56,.76,.42], intensity: 2.20, color: [1,.91,.81], ambient: .52, ambientColor: [.62,.68,.73]},
+      shadows: {resolution: 1024, filter: 'pcf', bounds: {min: [-136,-13,-136], max: [136,34,136]}, normalBias: .07},
+      onError: cause => {error = cause;},
     });
+    engine = bench.engine;
+    if (!engine.gpu) {
+      const unsupported = new Error('The model requires WebGPU or the full Margo WebGL2 compatibility layer.');
+      unsupported.code = 'unsupported';
+      throw unsupported;
+    }
+    engine.camera.project = ortho;
+    exhibition(engine, bench);
+    performance.mark('margo-device-open');
+    await replace(await first);
   } catch (cause) {
     close();
     throw cause;
   }
-  return {replace, draw, close, backend: engine.gpu.adapterInfo?.vendor === 'margo-webgl2' ? 'webgl2' : 'webgpu'};
+  return {replace, draw, close, backend: bench.renderer === 'compatibility' ? 'webgl2' : 'webgpu'};
 }

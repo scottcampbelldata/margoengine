@@ -11,7 +11,6 @@ const message = element('status');
 const status = demoStatus(exhibit, message);
 const controller = new AbortController();
 const {signal} = controller;
-const force = new URLSearchParams(location.search).get('backend') === 'webgl2';
 const controls = [era, layout, generate, view];
 let seed = 13407, scene, observer, revision = 0, overhead = false, busy = false;
 let drawing, resizePending = false;
@@ -122,7 +121,7 @@ window.addEventListener('pagehide', event => {
 const first = build();
 first.catch(fail);
 import('./scene.js').then(async ({openCity}) => {
-  scene = await openCity(canvas, first, force, signal);
+  scene = await openCity(canvas, first, signal);
   const model = await first;
   signal.throwIfAborted();
   report(model);
