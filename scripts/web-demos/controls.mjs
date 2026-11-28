@@ -70,11 +70,13 @@ if (flag('all')) names = catalog.map((d) => d.slug).filter((n) => fs.existsSync(
 
 const report = fs.existsSync(reportFile) ? JSON.parse(fs.readFileSync(reportFile, 'utf8')) : { demos: {} };
 const mdOnly = flag('md-only');
-if (!names.length && !mdOnly) {
+// With nothing to do the run prints its usage and ends by its event loop (no server, no browser), exit code 2.
+const usage = !names.length && !mdOnly;
+if (usage) {
   console.error(
     'usage: node scripts/web-demos/controls.mjs <demo> [demo...] | --all [--resume] [--save-frames] [--no-confirm]',
   );
-  process.exit(2);
+  process.exitCode = 2;
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -561,25 +563,24 @@ const types = {
   '.hdr': 'image/vnd.radiance',
   '.bin': 'application/octet-stream',
 };
-const server = http
-  .createServer((req, res) => {
-    let file = path.join(demos, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-    if (!file.startsWith(demos)) {
-      res.writeHead(403);
-      res.end();
-      return;
-    }
-    if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
-    if (!fs.existsSync(file)) {
-      res.writeHead(404);
-      res.end();
-      return;
-    }
-    res.writeHead(200, { 'content-type': types[path.extname(file)] ?? 'application/octet-stream' });
-    fs.createReadStream(file).pipe(res);
-  })
-  .listen(0);
-const { port } = server.address();
+const server = http.createServer((req, res) => {
+  let file = path.join(demos, decodeURIComponent(new URL(req.url, 'http://x').pathname));
+  if (!file.startsWith(demos)) {
+    res.writeHead(403);
+    res.end();
+    return;
+  }
+  if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
+  if (!fs.existsSync(file)) {
+    res.writeHead(404);
+    res.end();
+    return;
+  }
+  res.writeHead(200, { 'content-type': types[path.extname(file)] ?? 'application/octet-stream' });
+  fs.createReadStream(file).pipe(res);
+});
+if (!usage) server.listen(0);
+const port = usage ? 0 : server.address().port;
 
 // Installed Chrome has a working WebGPU adapter; the bundled Chromium fails to spawn here. Occlusion and background
 // throttling are off so a covered window keeps drawing.
@@ -1671,7 +1672,9 @@ function writeMarkdown() {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-if (mdOnly) {
+if (usage) {
+  // Nothing to run: the usage line above is the whole output.
+} else if (mdOnly) {
   // Judge again with the current rules: a dead control that an older rule called unsure goes back to dead first.
   const REFINED = /^(a tool or|the page asks for|a sound control|a speed or playback|a drag handle|already holds)/;
   for (const d of Object.values(report.demos))
@@ -1681,52 +1684,52 @@ if (mdOnly) {
   save();
   writeMarkdown();
   server.close();
-  process.exit(0);
-}
-await openBrowser();
-let n = 0;
-for (const slug of names)
-  for (const backend of backends) {
-    n++;
-    if (flag('resume') && report.demos[backend === 'webgpu' ? slug : `${slug}@${backend}`]) continue;
-    const d = await runDemo(slug, backend);
-    if (!flag('no-confirm')) {
-      const flagged = d.controls.filter((c) => c.verdict === 'dead' || c.verdict === 'unsure');
-      for (const c of flagged.slice(0, 12)) {
-        const again = await confirm(slug, backend, c);
-        c.confirm = again;
-        if (again.verdict === 'live') c.verdict = 'live';
-        else if (again.verdict === 'dead' && c.verdict === 'unsure') c.verdict = 'dead';
-        if (again.errors?.length) c.errors = [...new Set([...(c.errors ?? []), ...again.errors])];
-        if (c.verdict === 'dead' || c.verdict === 'unsure') {
-          const third = await confirm(slug, backend, c, { running: true });
-          c.whileRunning = third;
-          if (third.verdict === 'live')
-            Object.assign(c, {
-              verdict: 'live',
-              note: `acts only while "${third.started}" runs; at rest only its label changes`,
-            });
-          if (third.errors?.length) c.errors = [...new Set([...(c.errors ?? []), ...third.errors])];
+} else {
+  await openBrowser();
+  let n = 0;
+  for (const slug of names)
+    for (const backend of backends) {
+      n++;
+      if (flag('resume') && report.demos[backend === 'webgpu' ? slug : `${slug}@${backend}`]) continue;
+      const d = await runDemo(slug, backend);
+      if (!flag('no-confirm')) {
+        const flagged = d.controls.filter((c) => c.verdict === 'dead' || c.verdict === 'unsure');
+        for (const c of flagged.slice(0, 12)) {
+          const again = await confirm(slug, backend, c);
+          c.confirm = again;
+          if (again.verdict === 'live') c.verdict = 'live';
+          else if (again.verdict === 'dead' && c.verdict === 'unsure') c.verdict = 'dead';
+          if (again.errors?.length) c.errors = [...new Set([...(c.errors ?? []), ...again.errors])];
+          if (c.verdict === 'dead' || c.verdict === 'unsure') {
+            const third = await confirm(slug, backend, c, { running: true });
+            c.whileRunning = third;
+            if (third.verdict === 'live')
+              Object.assign(c, {
+                verdict: 'live',
+                note: `acts only while "${third.started}" runs; at rest only its label changes`,
+              });
+            if (third.errors?.length) c.errors = [...new Set([...(c.errors ?? []), ...third.errors])];
+          }
+          refine(c, d);
         }
-        refine(c, d);
+        for (const c of flagged.slice(12))
+          c.confirm = { verdict: 'not confirmed', note: 'more than 12 flagged controls on the page' };
+        for (const c of d.controls) refine(c, d);
       }
-      for (const c of flagged.slice(12))
-        c.confirm = { verdict: 'not confirmed', note: 'more than 12 flagged controls on the page' };
-      for (const c of d.controls) refine(c, d);
+      report.demos[d.demo] = d;
+      save();
+      const counts = {};
+      for (const c of d.controls) counts[c.verdict] = (counts[c.verdict] ?? 0) + 1;
+      console.log(
+        `[${n}/${names.length * backends.length}] ${d.demo}: ${d.status}${d.renderer ? ` (${d.renderer})` : ''} in ${d.seconds} s ${JSON.stringify(counts)}`,
+      );
     }
-    report.demos[d.demo] = d;
-    save();
-    const counts = {};
-    for (const c of d.controls) counts[c.verdict] = (counts[c.verdict] ?? 0) + 1;
-    console.log(
-      `[${n}/${names.length * backends.length}] ${d.demo}: ${d.status}${d.renderer ? ` (${d.renderer})` : ''} in ${d.seconds} s ${JSON.stringify(counts)}`,
-    );
-  }
-await browser.close().catch(() => {});
-try {
-  killTree(browserServer.process());
-} catch {}
-server.close();
-const ranked = writeMarkdown();
-// Exit 1 when any page this run checked failed to start, logged an error or has a dead or broken control.
-process.exitCode = ranked.some(({ d }) => names.includes(d.slug ?? d.demo)) ? 1 : 0;
+  await browser.close().catch(() => {});
+  try {
+    killTree(browserServer.process());
+  } catch {}
+  server.close();
+  const ranked = writeMarkdown();
+  // Exit 1 when any page this run checked failed to start, logged an error or has a dead or broken control.
+  process.exitCode = ranked.some(({ d }) => names.includes(d.slug ?? d.demo)) ? 1 : 0;
+}

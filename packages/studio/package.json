@@ -89,7 +89,8 @@
     "test:gpu:materials": "cd ../.. && node packages/studio/test/pathtrace-materials-browser.mjs",
     "test:gpu:ambient": "cd ../.. && node packages/studio/test/accumulate-ambient-browser.mjs && node packages/studio/test/sky-occlusion-browser.mjs && node packages/studio/test/sky-occlusion-browser.mjs --compat",
     "test:gpu:caustics": "cd ../.. && node packages/studio/test/caustics-browser.mjs",
-    "test:gpu:backdrop": "cd ../.. && node packages/studio/test/backdrop-browser.mjs"
+    "test:gpu:backdrop": "cd ../.. && node packages/studio/test/backdrop-browser.mjs",
+    "test:gpu:bench": "cd ../.. && node packages/studio/test/bench-browser.mjs && node packages/studio/test/bench-browser.mjs --compat"
   },
   "peerDependenciesMeta": {
     "@margoengine/voxel-pathtracer": {
