@@ -817,6 +817,14 @@ interface GLTFTransmissionPass {
     attach(model: import('./model.js').PBRModel, engine: Engine, graph: import('@margoengine/core/extension').FrameGraph): () => void;
 }
 
+interface GLTFWarning {
+    readonly code: 'missing-texcoord';
+    readonly message: string;
+    readonly material: number;
+    readonly map: string;
+    readonly texCoord: number;
+}
+
 type GenericOptions = Extract<JointOptions, {
     type: 'generic';
 }>;
@@ -1061,6 +1069,7 @@ class PBRModel implements EnginePlugin {
     readonly lights: GLTFLight[];
     readonly lods: GLTFLOD[];
     readonly cameras: GLTFCamera[];
+    readonly warnings: GLTFWarning[];
     readonly pointsAndLines: PBRPrimitive[];
     readonly variants: readonly string[];
     selectedVariant: number | undefined;

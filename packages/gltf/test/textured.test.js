@@ -336,7 +336,10 @@ test('a malformed texture reference is a named error and rolls back', async (t) 
   const { engine } = await gpuEngine(t);
   try {
     const noSet = file({ attributes: { POSITION: 0, NORMAL: 1 } });
-    await assert.rejects(load(engine, noSet), /TEXCOORD_0/);
+    // KB-GLTFA A2: a map without its TEXCOORD set is left out with a warning, not a refusal.
+    const loaded = await load(engine, noSet);
+    assert.equal(loaded.warnings[0]?.code, 'missing-texcoord');
+    loaded.dispose();
     assert.equal(engine.meshes.size, 0);
     await assert.rejects(load(engine, file({ textures: [] })), /Missing glTF texture/);
     await assert.rejects(load(engine, file({ images: [] })), /Missing glTF image/);

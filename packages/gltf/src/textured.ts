@@ -16,6 +16,7 @@ import { generateMipmaps } from '../../shared/mipmaps.js';
 import { unitLight } from '../../shared/unit-light.js';
 import type { GLTFDocument, GLTFMaterial, GLTFSampler, GLTFTextureInfo } from '../../shared/gltf.js';
 import { entry, integer, readAccessor } from './accessor.js';
+import { addWarning, missingTexCoord, type GLTFWarning } from './warning.js';
 import type { GLTFBuilt, GLTFExtension, GLTFFile, Model } from './index.js';
 
 declare const GPUBufferUsage: { VERTEX: number; UNIFORM: number; COPY_DST: number };
@@ -586,10 +587,16 @@ export const textured: GLTFExtension = {
     for (const { geometry, source, expanded } of built.primitives) {
       const surface = source.material === undefined ? undefined : surfaces.get(source.material);
       if (!surface) continue;
+      const id = source.attributes?.[`TEXCOORD_${surface.texCoord}`],
+        // KB-GLTFA A2: a primitive without its map's TEXCOORD set draws without the map (glTF 2.0 5.24), as gltf/pbr does.
+        lacks = surface.image !== undefined && id === undefined;
+      if (lacks)
+        addWarning(
+          model.warnings as GLTFWarning[],
+          missingTexCoord(source.material!, file.doc.materials?.[source.material!]?.name, 'baseColorTexture', surface.texCoord),
+        );
       const read = () => {
-        if (surface.image === undefined) return new Float32Array((geometry.vertices.length / 6) * 2);
-        const id = source.attributes?.[`TEXCOORD_${surface.texCoord}`];
-        if (id === undefined) throw invalid(`primitive: its material needs TEXCOORD_${surface.texCoord}`);
+        if (surface.image === undefined || id === undefined) return new Float32Array((geometry.vertices.length / 6) * 2);
         return readAccessor(
           file,
           id,
@@ -614,7 +621,7 @@ export const textured: GLTFExtension = {
         geometry,
         uv,
         surface,
-        bitmap: surface.image === undefined ? undefined : images.get(surface.image),
+        bitmap: surface.image === undefined || lacks ? undefined : images.get(surface.image),
         sampler: samplerOf(surface.sampler === undefined ? undefined : file.doc.samplers?.[surface.sampler]),
         keep: 0,
         groups: new WeakMap(),

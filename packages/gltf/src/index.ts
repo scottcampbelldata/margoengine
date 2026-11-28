@@ -12,6 +12,8 @@ import { GLB_BIN, checkBinChunk, glbChunks, isGLB } from '../../shared/glb.js';
 import { captureScene, type SceneScope } from '../../shared/scene-scope.js';
 import { entry, integer, readAccessor } from './accessor.js';
 import { supportedVersion } from './version.js';
+import type { GLTFWarning } from './warning.js';
+export type { GLTFWarning } from './warning.js';
 
 const limit = 64 * 1024 * 1024;
 // A limit only this loader has: `unsupported`, so loadAuto hands the file to gltf/pbr, whose budget is 512 MiB.
@@ -174,6 +176,8 @@ export interface Model {
    * the next scene root (KB-GLTFA A7). Nodes outside the scene are not here; gltf/pbr's `nodes` is indexed by node.
    */
   nodes: readonly MeshHandle[];
+  /** Problems in the file the loader worked around, each listed once (`code` says which; KB-GLTFA A2), as gltf/pbr's. */
+  readonly warnings: readonly GLTFWarning[];
   dispose(): void;
   /** The same as `dispose()`, so `using model = parseGLTF(...)` releases it (KB-GLTFA A8). */
   [Symbol.dispose](): void;
@@ -482,6 +486,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
       root,
       meshes: renderable,
       nodes: imported,
+      warnings: [],
       dispose: release,
       // Where the runtime has no Symbol.dispose a private symbol keeps the member unused, as core does.
       [(Symbol.dispose ?? Symbol()) as typeof Symbol.dispose]: release,

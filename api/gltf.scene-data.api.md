@@ -345,10 +345,19 @@ interface GLTFTextureTransform {
   texCoord?: number;
 }
 
+interface GLTFWarning {
+    readonly code: 'missing-texcoord';
+    readonly message: string;
+    readonly material: number;
+    readonly map: string;
+    readonly texCoord: number;
+}
+
 interface Model {
     root: MeshHandle;
     meshes: readonly MeshHandle[];
     nodes: readonly MeshHandle[];
+    readonly warnings: readonly GLTFWarning[];
     dispose(): void;
     [Symbol.dispose](): void;
 }

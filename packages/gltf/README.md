@@ -174,7 +174,7 @@ engine.start();
 `model` is a light `Model` or a `PBRModel`; `loader` tells them apart, and with `'gltf/pbr'` the result also holds the
 `reason` the light loader gave.
 
-Both shapes share `root`, `nodes`, `meshes`, `dispose()` and `Symbol.dispose`, so code that uses only those needs no
+Both shapes share `root`, `nodes`, `meshes`, `warnings`, `dispose()` and `Symbol.dispose`, so code that uses only those needs no
 branch on `loader`. The light loader lists `nodes` depth first in file order (a node, then its children as the file
 lists them, then the next scene root) and holds only the loaded scene's nodes; gltf/pbr's `nodes` is indexed by glTF
 node. The two agree for a file that lists its nodes depth first, as most exporters write them; to find a node in any
@@ -226,6 +226,26 @@ and no camera or light is still refused.
 This ESM package includes TypeScript declarations and requires `@margoengine/core` 1.0.0. See the supported glTF subset and lifecycle guide before importing assets.
 
 Apache-2.0 licensed.
+
+### Warnings: what a loader worked around
+
+Both loaders list on `model.warnings` the problems in a file they work around instead of refusing it, each once. Each
+warning has a `code` and a `message` with the fix. Today the one code is `'missing-texcoord'`: a material's map reads a
+TEXCOORD set (glTF 2.0 section 5.24, `textureInfo.texCoord`) that a primitive using the material lacks. That primitive
+draws without the map, with its factors only, as other web loaders draw such files; the warning names the `material`
+index, the `map` (for example `'baseColorTexture'`) and the missing `texCoord` set. A set past TEXCOORD_3 is still
+refused, as the engine reads four.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { loadAuto } from 'margoengine/gltf/auto';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const { model } = await loadAuto(engine, '/any.glb');
+for (const warning of model.warnings) console.warn(`${warning.code}: ${warning.message}`);
+engine.start();
+// On teardown: model.dispose(); engine.dispose();
+```
 
 ### Git LFS pointer files
 

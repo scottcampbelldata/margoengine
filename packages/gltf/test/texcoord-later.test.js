@@ -148,13 +148,18 @@ test('a normal map on a later set takes its frame from that set, as authored tan
   engine.dispose();
 });
 
-test('sets are checked: a missing one and a fifth are refused by name', async () => {
-  await assert.rejects(
-    load({ pbrMetallicRoughness: { baseColorTexture: { index: 0, texCoord: 2 } } }, (doc) => {
-      delete doc.meshes[0].primitives[0].attributes.TEXCOORD_2;
-    }),
-    /Material requires available TEXCOORD_2/,
+test('sets are checked: a missing one leaves the map out with a warning, a fifth is refused by name', async () => {
+  // KB-GLTFA A2: the model loads, the map is absent on that primitive, and model.warnings names it once.
+  const missing = await load({ pbrMetallicRoughness: { baseColorTexture: { index: 0, texCoord: 2 } } }, (doc) => {
+    delete doc.meshes[0].primitives[0].attributes.TEXCOORD_2;
+  });
+  assert.equal(missing.model.primitives[0].material.maps[0], undefined);
+  assert.deepEqual(
+    missing.model.warnings.map(({ code, material, map, texCoord }) => ({ code, material, map, texCoord })),
+    [{ code: 'missing-texcoord', material: 0, map: 'baseColorTexture', texCoord: 2 }],
   );
+  missing.model.dispose();
+  missing.engine.dispose();
   await assert.rejects(
     load({ pbrMetallicRoughness: { baseColorTexture: { index: 0, texCoord: 4 } } }),
     /at most TEXCOORD_3/,

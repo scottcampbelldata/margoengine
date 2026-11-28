@@ -167,6 +167,8 @@ interface StaticBatchDeferral {
 import { occlusionShader } from './occlusion.js';
 import { sectionState, sectionShader } from '../../shared/section.js';
 export { GLTFAsset, closeImages } from './asset.js';
+export type { GLTFWarning } from './warning.js';
+import { addWarning, missingTexCoord, type GLTFWarning } from './warning.js';
 export type { GLTFDocument } from './asset.js';
 export type {
   GLTFImage,
@@ -2137,6 +2139,7 @@ function primitive(
   mesh: GLTFMesh,
   materials: PBRMaterial[],
   packs: Map<object, readonly PreparedGeometry[]>,
+  warnings?: GLTFWarning[],
 ): PBRPrimitive[] {
   // Packing depends only on the primitive definition, so nodes sharing a mesh share its arrays (and GPU buffers, keyed by array).
   // Models of one asset (cloneModel copies) share the arrays too: packing is a pure function of the definition.
@@ -2153,6 +2156,8 @@ function primitive(
     p,
     p.material === undefined ? material() : materials[integer(p.material, 'material')],
     !!list[0].topology,
+    p.material === undefined ? undefined : integer(p.material, 'material'),
+    warnings,
   );
   const targets = p.targets ?? [];
   if (!Array.isArray(targets))
@@ -2184,26 +2189,86 @@ function primitive(
     return made;
   });
 }
-// Material `m` as primitive `p` draws it: every map must name a texture and a UV set the primitive has. glTF 2.0 3.9.2:
+// The glTF property of each map slot of a PBRMaterial, for warnings: the core five, the KHR physical maps (slots 5-12)
+// and the extended ones (13-21) in the order parseMaterial and extended.ts list them.
+const mapNames = [
+  'baseColorTexture',
+  'metallicRoughnessTexture',
+  'normalTexture',
+  'occlusionTexture',
+  'emissiveTexture',
+  'clearcoatTexture',
+  'clearcoatRoughnessTexture',
+  'clearcoatNormalTexture',
+  'transmissionTexture',
+  'sheenColorTexture',
+  'sheenRoughnessTexture',
+  'specularTexture',
+  'specularColorTexture',
+  'iridescenceTexture',
+  'iridescenceThicknessTexture',
+  'anisotropyTexture',
+  'diffuseTransmissionTexture',
+  'diffuseTransmissionColorTexture',
+  'bumpTexture',
+  'multiscatterColorTexture',
+  'thicknessTexture',
+  'diffuseRoughnessTexture',
+];
+// One copy of a material per set of maps left out, so primitives (and variant switches) that lack the same TEXCOORD
+// sets share it and `fit` returns the same object each time.
+const withoutMaps = new WeakMap<PBRMaterial, Map<string, PBRMaterial>>();
+// Material `m` as primitive `p` draws it: every map must name a texture, and reads a UV set the primitive has or is left
+// out with a `missing-texcoord` warning (KB-GLTFA A2; glTF 2.0 5.24 textureInfo.texCoord). glTF 2.0 3.9.2:
 // points and lines without NORMAL are rendered without lighting (here: the base colour, as KHR_materials_unlit).
-function fit(asset: GLTFAsset, p: GLTFPrimitive, m: PBRMaterial, pointsOrLines: boolean): PBRMaterial {
+function fit(
+  asset: GLTFAsset,
+  p: GLTFPrimitive,
+  m: PBRMaterial,
+  pointsOrLines: boolean,
+  index?: number,
+  warnings?: GLTFWarning[],
+): PBRMaterial {
   if (!m)
     throw new TypeError(
       'Missing glTF material; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
     );
-  const a = p.attributes ?? {};
-  for (const map of m.maps)
-    if (map) {
-      const set = integer(map.texCoord ?? 0, 'texture coordinate');
-      if (set > 3 || a['TEXCOORD_' + set] === undefined)
-        throw margoError(
-          'failed',
-          `Material requires available TEXCOORD_${set}, and at most TEXCOORD_3; add the attribute or remove the texture`,
-        );
-      entry(asset.doc.textures, map.index, 'texture');
+  const a = p.attributes ?? {},
+    missing: number[] = [];
+  m.maps.forEach((map, slot) => {
+    if (!map) return;
+    const set = integer(map.texCoord ?? 0, 'texture coordinate');
+    entry(asset.doc.textures, map.index, 'texture');
+    if (set > 3)
+      throw margoError(
+        'failed',
+        `Material requires available TEXCOORD_${set}, and at most TEXCOORD_3; add the attribute or remove the texture`,
+      );
+    if (a['TEXCOORD_' + set] === undefined) {
+      missing.push(slot);
+      if (warnings && index !== undefined)
+        addWarning(warnings, missingTexCoord(index, m.name, mapNames[slot] ?? `map ${slot}`, set));
     }
+  });
+  // `side` is read live from the material it was parsed for, so a copy keeps its accessor.
+  const copyOf = (from: PBRMaterial, change: Partial<PBRMaterial>): PBRMaterial => {
+    const side = Object.getOwnPropertyDescriptor(from, 'side');
+    const out = { ...from, ...change };
+    return side ? Object.defineProperty(out, 'side', side) : out;
+  };
+  if (missing.length) {
+    const key = missing.join(',');
+    let copies = withoutMaps.get(m);
+    if (!copies) withoutMaps.set(m, (copies = new Map()));
+    let copy = copies.get(key);
+    if (!copy) {
+      const maps = m.maps.map((map, slot) => (missing.includes(slot) ? undefined : map));
+      copies.set(key, (copy = copyOf(m, { maps })));
+    }
+    m = copy;
+  }
   return pointsOrLines && a.NORMAL === undefined
-    ? Object.defineProperty({ ...m, ext: [1, ...m.ext!.slice(1)] }, 'side', Object.getOwnPropertyDescriptor(m, 'side')!)
+    ? copyOf(m, { ext: [1, ...m.ext!.slice(1)] })
     : m;
 }
 /** KB-GLTFA A5: a bad translation, rotation or scale names its node instead of surfacing core's transform error. */
@@ -2363,6 +2428,8 @@ export class PBRModel implements EnginePlugin {
   /** The file's `MSFT_lod` objects; `LOD.fromModel` from `@margoengine/lod` drives them. Empty without the extension. */
   readonly lods: GLTFLOD[] = [];
   readonly cameras: GLTFCamera[] = [];
+  /** Problems in the file the loader worked around, each listed once (`code` says which; KB-GLTFA A2). */
+  readonly warnings: GLTFWarning[] = [];
   /**
    * glTF POINTS, LINES, LINE_LOOP and LINE_STRIP primitives (`topology` set), drawn in the beauty pass only: no shadows,
    * SSAO, SSR or transparency hook. Kept out of `primitives`, which picking, BVH, outlines, walk collisions and exporters
@@ -2617,7 +2684,7 @@ export class PBRModel implements EnginePlugin {
             if (!prepared && (p?.mode ?? 4) < 4 && packed.has(p) && !packed.get(p)![0].topology) continue;
             const parts: PBRPrimitive[] = prepared
               ? preparedPrimitive(asset, p, prepared[defs[i].mesh][j], this.nodes[i], i, materials, checked)
-              : primitive(asset, p, this.nodes[i], i, mesh, materials, packs);
+              : primitive(asset, p, this.nodes[i], i, mesh, materials, packs, this.warnings);
             for (const made of parts) {
               for (const data of [made.vertices, made.indices])
                 if (!counted.has(data)) {
@@ -3813,7 +3880,14 @@ export class PBRModel implements EnginePlugin {
       const own = this.defaults.get(p) ?? p.material,
         hit = mappings.find((m) => Array.isArray(m?.variants) && m.variants.includes(index));
       const m = hit
-        ? fit(this.asset, p.definition, this.materials[integer(hit.material, 'material')], !!p.topology)
+        ? fit(
+            this.asset,
+            p.definition,
+            this.materials[integer(hit.material, 'material')],
+            !!p.topology,
+            integer(hit.material, 'material'),
+            this.warnings,
+          )
         : own;
       if (m !== p.material) changes.push([p, m]);
     }
@@ -3851,7 +3925,7 @@ export class PBRModel implements EnginePlugin {
       const m =
         index === undefined
           ? (this.defaults.get(p) ?? p.material)
-          : fit(this.asset, p.definition, this.materials[index], !!p.topology);
+          : fit(this.asset, p.definition, this.materials[index], !!p.topology, index, this.warnings);
       const uvs =
         !p.uvs && m.maps.some((map) => map && (map.texCoord ?? 0) > 1)
           ? p.part

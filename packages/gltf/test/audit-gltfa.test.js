@@ -192,8 +192,10 @@ test('a failed or aborted textured load closes every bitmap it decoded and leave
     refused.doc.meshes[0].primitives.push({ attributes: { POSITION: 0 }, material: 1 });
     await assert.rejects(loadTextured(engine, refused), /gltf\/pbr/);
     settled('refused');
-    // `finish` throws: the material needs TEXCOORD_0 and the primitive has none.
-    await assert.rejects(loadTextured(engine, texturedFile({ attributes: { POSITION: 0 } })), /TEXCOORD_0/);
+    // `finish` throws: TEXCOORD_0 has fewer vertices than POSITION.
+    const short = texturedFile();
+    short.doc.accessors[1].count = 2;
+    await assert.rejects(loadTextured(engine, short), /fewer vertices than POSITION/);
     settled('finish');
     // One image fails to decode while a slower one is still in flight.
     const two = texturedFile({
@@ -514,4 +516,37 @@ test('KB-GLTFA A3: a gltf/pbr file with only a camera loads with its camera and 
     code: 'failed',
     message: /^glTF contains no renderable meshes/,
   });
+});
+
+test('KB-GLTFA A2: a map whose TEXCOORD set the primitive lacks is left out with one coded warning, in both loaders', async (t) => {
+  const bitmaps = withBitmaps(t),
+    { engine } = await gpuEngine(t),
+    expected = { code: 'missing-texcoord', material: 0, map: 'baseColorTexture', texCoord: 0 };
+  const fields = (model) => model.warnings.map(({ code, material, map, texCoord }) => ({ code, material, map, texCoord }));
+  // Two primitives lack the set: still one warning.
+  const file = texturedFile({ materials: [{ name: 'Body', pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }], attributes: { POSITION: 0 } });
+  file.doc.meshes[0].primitives.push({ attributes: { POSITION: 0 }, material: 0 });
+  const light = await loadTextured(engine, file);
+  try {
+    assert.equal(light.meshes.length, 2, 'the light model loads and draws both primitives');
+    assert.deepEqual(fields(light), [expected]);
+    assert.match(light.warnings[0].message, /material 0 \("Body"\).*TEXCOORD_0.*5\.24/);
+  } finally {
+    light.dispose();
+  }
+  assert.equal(bitmaps.closed, bitmaps.opened, 'the light model closes its bitmap');
+  // gltf/pbr: the same file loads, the primitive's material has no base colour map, and the same warning is listed.
+  const { parseGLTF: parse } = await import('../dist/pbr.js');
+  const image = { width: 1, height: 1, close() {} };
+  const pbr = parse(engine, file.doc, [file.bytes], [image]);
+  try {
+    assert.equal(pbr.primitives.length, 2);
+    for (const p of pbr.primitives) assert.equal(p.material.maps[0], undefined);
+    assert.equal(pbr.primitives[0].material, pbr.primitives[1].material, 'one copy of the material per missing set');
+    assert.ok(pbr.materials[0].maps[0], 'the model material keeps its map for primitives that have the set');
+    assert.deepEqual(fields(pbr), [expected]);
+    assert.equal(pbr.warnings[0].message, light.warnings[0].message);
+  } finally {
+    pbr.dispose();
+  }
 });

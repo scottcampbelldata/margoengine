@@ -53,6 +53,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   inverted cells. Regression: `packages/physics/tests/soft-volume-cells.test.js` ("meets Hertz contact at the default
   passes").
 
+### Fixed 2026-11-27: glTF node order, bitmap ownership, camera-only files and maps without their UV set (KB-GLTFA A2, A3, A7, A9, A10, gltf)
+
+- **Repro:** the light loader gave `model.nodes` as `b, a, a1, a0` for roots `a, b` with `a`'s children `a0, a1`; a
+  gltf/pbr `parseGLTF` that failed on its container, asset or a bad pixel image left the caller's `ImageBitmap`s open;
+  a gltf/pbr file with only a camera threw "no renderable meshes"; a material whose map reads a TEXCOORD set the
+  primitive lacks stopped the whole load in both loaders.
+- **Cause:** the traversal stack popped the last child first; the sync parsers closed images only once the model
+  existed; the empty-scene check counted only drawables; `fit` (gltf/pbr) and the textured entry's `finish` threw.
+- **Fix:** nodes are visited in file order and the order is documented (with a `loadAuto` example using only the shared
+  members); every failing parse closes the images it was given; a file with cameras or lights loads with an empty scene
+  (glTF 2.0 5.25); a map without its set is left out of that primitive and listed once on `model.warnings` as a
+  `missing-texcoord` warning naming the material, the map and the set (glTF 2.0 5.24), the same in both loaders.
+  Regression: `packages/gltf/test/audit-gltfa.test.js` ("KB-GLTFA A2", "A3", "A7", "A9"). The audit's API table
+  is closed.
+
 ### Fixed 2026-11-27: glTF loader errors named no node, mixed a cycle with the depth limit, and a light model had no `using` (KB-GLTFA A1, A4, A5, A6, A8, gltf)
 
 - **Repro:** `translation: [1, 2]` on node 3 surfaced core's "Position: 3 values" with no node; a sheared node matrix threw
@@ -66,7 +81,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   the shear; a loop (a walk longer than the node count) is a `TypeError` naming a node on it, and a node past 62 levels a
   `RangeError` naming it and its depth; the URL refusal points to `parseGLTFAsync` with the file's bytes; the light model
   has `Symbol.dispose`. Regression: `packages/gltf/test/audit-gltfa.test.js` ("KB-GLTFA A1" to "A8", all fail without
-  the fix). Still open from the audit's API table: A2 and A3 (rulings), A7, A9 and A10.
+  the fix). The rest of the audit's API table closed the same day (entry above).
 
 ### Fixed 2026-11-27: scatter motion vectors drew a streamed forest from destroyed buffers (KB-SCATTER-VELTILES1, scatter)
 
