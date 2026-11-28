@@ -6,6 +6,12 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: the physics preview render check ignores MARGO_COMPAT (KB-PHYS-PREVIEWCOMPAT1, physics scripts)
+
+- **Repro:** `node --test tests/gpu-compat-honoured.test.js` fails, naming `packages/physics/scripts/test-preview.js`.
+- **Cause:** the script opens its own page without the compatibility shim (`compatShim`) and is not on the owed list,
+  so a run asked for the WebGL2 layer checks WebGPU instead. It belongs to the physics lane.
+
 ### Fixed 2026-11-28: a hung, touching Newton's cradle lost energy at every strike and clumped (KB-PHYS-HUNGCRADLE1, physics DYN-01)
 
 - **Repro:** five 26 mm steel balls (`density: 'steel'`, `restitution: 1`, friction 0.1), each hung from one fixed
