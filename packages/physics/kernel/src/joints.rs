@@ -813,6 +813,43 @@ impl World {
             self.set_u(SOLVE_LEAD, i, lead);
         }
         self.order_joints_by_island(solving);
+        self.place_newton(solving);
+    }
+
+    /// Gives each path of the solving joints its own slice of NEWTON for the locks' Newton solve (`newton_right`), sized by its
+    /// lock rows, so islands solving at once never share one; grows NEWTON when the paths need more. A copy of the world's bytes
+    /// keeps every solve. When memory cannot hold them, every path is marked NONE and the step reports the failure.
+    fn place_newton(&mut self, solving: usize) {
+        let mut total = 0u64;
+        let mut first = 0;
+        while first < solving {
+            let mut rows = lock_rows(self.uu(JOINT_FLAGS, self.uu(SOLVE_JOINTS, first) as usize)).0 as u64;
+            let mut last = first;
+            while last + 1 < solving && self.uu(SOLVE_VIA, last + 1) != NONE {
+                last += 1;
+                rows += lock_rows(self.uu(JOINT_FLAGS, self.uu(SOLVE_JOINTS, last) as usize)).0 as u64;
+            }
+            self.set_u(SOLVE_NEWTON, first, total.min(NONE as u64 - 1) as u32);
+            total += newton_words(rows);
+            first = last + 1;
+        }
+        let mut capacity = self.header().capacity;
+        let have = capacity[Rows::Newton as usize] as u64;
+        if total <= have {
+            return;
+        }
+        // Doubling, so a world whose paths lengthen a little each step does not lay its memory out again each step.
+        let want = total.max(2 * have);
+        capacity[Rows::Newton as usize] = want.min(u32::MAX as u64) as u32;
+        if want >= NONE as u64 || !self.grow(capacity) {
+            capacity[Rows::Newton as usize] = total.min(u32::MAX as u64) as u32;
+            if total >= NONE as u64 || !self.grow(capacity) {
+                self.header_mut().failed = 1;
+                for i in 0..solving {
+                    self.set_u(SOLVE_NEWTON, i, NONE);
+                }
+            }
+        }
     }
 
     /// The island a path of listed joints belongs to: that of the first awake dynamic body any of its joints holds. A path
@@ -928,6 +965,16 @@ impl World {
     fn taut(&self, row: usize) -> *mut [Sym; 2] {
         unsafe { self.f(JOINT_SCRATCH).add(row * JOINT_WORDS as usize + JOINT_TAUT as usize) as *mut [Sym; 2] }
     }
+    /// Where a joint's scratch keeps its rows and its bodies' poses at the substep's start, and the discrete gradient since.
+    #[inline(always)]
+    fn lock_start(&self, row: usize) -> *mut LockStart {
+        unsafe { self.f(JOINT_SCRATCH).add(row * JOINT_WORDS as usize + JOINT_LOCK_START as usize) as *mut LockStart }
+    }
+    /// Where a joint's scratch keeps the step the projection last moved it by (`project_to`).
+    #[inline(always)]
+    fn lock_step(&self, row: usize) -> *mut LockStep {
+        unsafe { self.f(JOINT_SCRATCH).add(row * JOINT_WORDS as usize + JOINT_STEP as usize) as *mut LockStep }
+    }
     /// Where a joint's scratch keeps what its three sliding rows carried through the substep before, along frame A's axes.
     #[inline(always)]
     fn pull(&self, row: usize) -> *mut V3 {
@@ -1021,7 +1068,7 @@ impl World {
             }
             let (j, k) = ((i + 1) % 3, (i + 2) % 3);
             let m = if det > 0.0 { (w[j][j] * w[k][k] - w[j][k] * w[k][j]) / det } else { 1.0 / w[i][i] };
-            let col = (kt[0][i] * kt[0][i] + kt[1][i] * kt[1][i] + kt[2][i] * kt[2][i]).sqrt();
+            let col = sqrt64(kt[0][i] * kt[0][i] + kt[1][i] * kt[1][i] + kt[2][i] * kt[2][i]);
             let hk = h as f64 * col;
             if hk > 4.0 * alpha * m {
                 d[i][i] += 0.5 * (hk - 4.0 * alpha * m);
@@ -1265,22 +1312,19 @@ impl World {
             (body_a.inertia, body_b.inertia) = (self.taut_inertia(a, body_a.inertia, h), self.taut_inertia(b, body_b.inertia, h));
             unsafe { *self.taut(row) = [body_a.inertia, body_b.inertia] };
             if fresh {
-                if self.lock_start.len() <= row {
-                    let blank = Row { d: v3(0.0, 0.0, 0.0), ta: v3(0.0, 0.0, 0.0), tb: v3(0.0, 0.0, 0.0) };
-                    self.lock_start.resize(row + 1, LockStart { rows: [blank; 6], poses: [(v3(0.0, 0.0, 0.0), Q::IDENTITY); 2], dg: [blank; 6] });
-                }
-                self.lock_start[row] = LockStart { rows: view.rows, poses: [(self.pose_center(a), self.pose_rotation(a)), (self.pose_center(b), self.pose_rotation(b))], dg: view.rows };
-            }
-            if !fresh && self.lock_start.len() > row {
-                // The discrete gradient read at the pose this refresh reads, as K is.
-                let start = self.lock_start[row];
+                let poses = [(self.pose_center(a), self.pose_rotation(a)), (self.pose_center(b), self.pose_rotation(b))];
+                unsafe { *self.lock_start(row) = LockStart { rows: view.rows, poses, dg: view.rows } };
+            } else {
+                // The discrete gradient read at the pose this refresh reads, as K is. The substep's first refresh wrote the
+                // start of every joint it solves.
+                let start = unsafe { *self.lock_start(row) };
                 let mut rows = view.rows;
                 for k in 0..6 {
                     let (s, c) = (start.rows[k], view.rows[k]);
                     rows[k] = Row { d: s.d.add(c.d).scale(0.5), ta: s.ta.add(c.ta).scale(0.5), tb: s.tb.add(c.tb).scale(0.5) };
                 }
                 self.gradient_rows(row, &start, &mut rows);
-                self.lock_start[row].dg = rows;
+                unsafe { (*self.lock_start(row)).dg = rows };
             }
             let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
             let doubles = self.doubles(row);
@@ -1900,12 +1944,8 @@ impl World {
     /// The rows the projection moves a joint's bodies along, the discrete gradient over the substep, and the inertia it
     /// turns them by.
     fn lock_dirs(&self, row: usize) -> ([Row; 6], Moving, Moving) {
-        let view = self.view(row);
         let (body_a, body_b) = self.ends(row);
-        if self.lock_start.len() <= row {
-            return (view.rows, body_a, body_b);
-        }
-        (self.lock_start[row].dg, body_a, body_b)
+        (unsafe { (*self.lock_start(row)).dg }, body_a, body_b)
     }
 
     /// A joint's arms, slide and axes at the given poses of its bodies, as `joint_view` reads them.
@@ -1945,21 +1985,25 @@ impl World {
             if q.w < 0.0 {
                 q = Q { x: -q.x, y: -q.y, z: -q.z, w: -q.w };
             }
-            q.to_rotation_vector()
+            (q.to_rotation_vector(), q)
         };
-        let (phi_a, phi_b) = (turn(0), turn(1));
-        // sinc and (1 - cos) / |phi|^2, by their series where |phi| is small.
-        let parts = |phi: V3| {
+        let ((phi_a, q_a), (phi_b, q_b)) = (turn(0), turn(1));
+        // sinc and (1 - cos) / |phi|^2, by their series where |phi| is small. Past it from the turn's own quaternion, with
+        // s = |q.xyz| = sin(t/2) and w = cos(t/2) over |q|: sin t = 2 s w and 1 - cos t = 2 s^2, so plus, times, divide and a
+        // root alone reach the state (the head of lib.rs), and 1 - cos t takes no cancellation.
+        let parts = |phi: V3, q: Q| {
             let t2 = phi.dot(phi);
             if t2 < 1e-4 {
                 (1.0 - t2 / 6.0 + t2 * t2 / 120.0, 0.5 - t2 / 24.0 + t2 * t2 / 720.0)
             } else {
                 let t = sqrt(t2);
-                (t.sin() / t, (1.0 - t.cos()) / t2)
+                let s2 = q.x * q.x + q.y * q.y + q.z * q.z;
+                let size = s2 + q.w * q.w;
+                (2.0 * sqrt(s2) * q.w / size / t, 2.0 * s2 / size / t2)
             }
         };
-        let grad = |phi: V3, w: V3, e: V3| {
-            let (s1, c2) = parts(phi);
+        let grad = |phi: V3, q: Q, w: V3, e: V3| {
+            let (s1, c2) = parts(phi, q);
             w.cross(e).scale(s1).add(phi.cross(w).cross(e).scale(c2))
         };
         let rigid = flags / JOINT_LOCK & 7;
@@ -1969,8 +2013,8 @@ impl World {
                 continue;
             }
             let e = axes0[k].add(axes1[k]).scale(0.5);
-            let tb = grad(phi_b, arm_b0, e);
-            let ta = grad(phi_a, arm_a0, e).sub(grad(phi_a, axes0[k], mean_slide));
+            let tb = grad(phi_b, q_b, arm_b0, e);
+            let ta = grad(phi_a, q_a, arm_a0, e).sub(grad(phi_a, q_a, axes0[k], mean_slide));
             rows[k] = Row { d: e, ta, tb };
         }
     }
@@ -2137,12 +2181,52 @@ const LOCK_CLOSED: f32 = 1e-6;
 /// What the projection's shift over h adds to the speeds: 1 for SHAKE, 2 for the midpoint rule.
 const LOCK_SPEED_SHARE: f32 = 2.0;
 /// A joint's rows and its bodies' poses at the start of a substep, and the discrete gradient
-/// of its locks read since (`gradient_rows`).
+/// of its locks read since (`gradient_rows`), kept in its JOINT_SCRATCH words from JOINT_LOCK_START.
+#[repr(C)]
 #[derive(Clone, Copy)]
 pub(crate) struct LockStart {
     rows: [Row; 6],
     poses: [(V3, Q); 2],
     dg: [Row; 6],
+}
+const _: () = assert!(core::mem::size_of::<LockStart>() <= ((JOINT_STEP - JOINT_LOCK_START) * 4) as usize);
+
+/// The step an iterate of the projection moved a joint's bodies by and gave its locks, kept in its JOINT_SCRATCH words from
+/// JOINT_STEP so the line search can take it back; at the first joint of a path, also the widest gap the path stood at and
+/// whether it stepped.
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct LockStep {
+    moves: [V3; 4],
+    given: [f32; 6],
+    before: f32,
+    stepped: u32,
+}
+const _: () = assert!(core::mem::size_of::<LockStep>() <= ((JOINT_WORDS - JOINT_STEP) * 4) as usize);
+
+/// One lock row of a path in its Newton solve: the joint and row, the row read at this pose and the one the step moves along,
+/// the joint's bodies and how they move, and the share of its gap it asks to close.
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct Entry {
+    at: u32,
+    r: u32,
+    a: u32,
+    b: u32,
+    j: Row,
+    g: Row,
+    ma: Moving,
+    mb: Moving,
+    ask: f64,
+}
+const ENTRY_WORDS: u64 = (core::mem::size_of::<Entry>() / 4) as u64;
+const _: () = assert!(core::mem::size_of::<Entry>() % 8 == 0);
+
+/// Words of NEWTON a path of `n` lock rows takes: its entries, then the doubles of its matrix and the copy kept whole, seven
+/// vectors of n doubles, and three lists of n places; even, so the next slice's doubles stay on 8 bytes.
+pub(crate) fn newton_words(n: u64) -> u64 {
+    let words = n * ENTRY_WORDS + 2 * (2 * n * n + 7 * n) + 3 * n;
+    (words + 1) & !1
 }
 
 impl World {
@@ -2214,7 +2298,7 @@ impl World {
                         if flags & LOCK_ANGULAR != 0 {
                             turn = crate::integrate::lock(turn, flags / LOCK_ANGULAR_X);
                         }
-                        if self.mid_start.len() > body {
+                        {
                             // The locked part of the loads, and on the free axes the whole change the substep made: a motor's
                             // spring or a contact moves the body by h^2 a / 2 as the loads do. A lock's impulse has no free part.
                             // A tree's implicit springs are loads too (`note_springs`): at rest they and gravity are what the
@@ -2223,13 +2307,13 @@ impl World {
                             // together hold only in part, and the rest moved the free axes by h^2 g / 2 a substep: a
                             // cantilever of 8 links stood 0.35 % low
                             // (`a_chain_of_implicit_springs_bends_as_its_beam_at_any_length_and_substeps`).
-                            if let Some(&(sv, sw)) = self.spring_change.get(body) {
-                                if sv.dot(sv) + sw.dot(sw) > 0.0 {
-                                    (push, turn) = (push.add(sv), turn.add(sw));
-                                }
+                            // Both were noted this substep: a body a lock moves is awake, so on the window's list.
+                            let (sv, sw) = (self.v(SPRING_CHANGE_X, body), self.v(SPRING_CHANGE_SPIN_X, body));
+                            if sv.dot(sv) + sw.dot(sw) > 0.0 {
+                                (push, turn) = (push.add(sv), turn.add(sw));
                             }
                             (push, turn) = self.locked_part(body, push, turn);
-                            let (v0, w0) = self.mid_start[body];
+                            let (v0, w0) = (self.v(MID_START_X, body), self.v(MID_START_SPIN_X, body));
                             let (dv, dw) = (self.v(LINEAR_X, body).sub(v0).scale(1.0 / h), self.v(ANGULAR_X, body).sub(w0).scale(1.0 / h));
                             let (lv, lw) = self.locked_part(body, dv, dw);
                             (push, turn) = (push.add(dv.sub(lv)), turn.add(dw.sub(lw)));
@@ -2241,15 +2325,13 @@ impl World {
         }
     }
 
-    /// Notes each awake body's velocity and spin before the substep's loads (`World::mid_start`).
+    /// Notes each awake body's velocity and spin before the substep's loads (MID_START).
     pub fn note_mid_start(&mut self) {
         let (list, from, to) = self.window.bodies;
         for slot in from..to {
             let at = self.uu(list, slot) as usize;
-            if self.mid_start.len() <= at {
-                self.mid_start.resize(at + 1, (v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0)));
-            }
-            self.mid_start[at] = (self.v(LINEAR_X, at), self.v(ANGULAR_X, at));
+            self.set_v(MID_START_X, at, self.v(LINEAR_X, at));
+            self.set_v(MID_START_SPIN_X, at, self.v(ANGULAR_X, at));
         }
     }
 
@@ -2263,7 +2345,10 @@ impl World {
             [l.x as f64, l.y as f64, l.z as f64, t.x as f64, t.y as f64, t.z as f64]
         };
         let dot = |a: &[f64; 6], b: &[f64; 6]| a.iter().zip(b).map(|(x, y)| x * y).sum::<f64>();
-        let mut basis: Vec<([f64; 6], [f64; 6])> = Vec::new();
+        // At most six: past six the span is the whole space, and a seventh row's part outside it is rounding, which the test
+        // below drops.
+        let mut basis = [([0.0f64; 6], [0.0f64; 6]); 6];
+        let mut count = 0;
         let mut at = self.uu(FIRST_JOINT, body);
         while at != NONE {
             let row = at as usize;
@@ -2287,8 +2372,11 @@ impl World {
                 if !(size > 0.0) {
                     continue;
                 }
+                if count == basis.len() {
+                    break;
+                }
                 for _ in 0..2 {
-                    for (bf, be) in &basis {
+                    for (bf, be) in basis.iter().take(count) {
                         let c = dot(&f, be);
                         for i in 0..6 {
                             f[i] -= c * bf[i];
@@ -2300,13 +2388,14 @@ impl World {
                 if !(left > DEPENDENT * 64.0 * size) {
                     continue;
                 }
-                let inv = 1.0 / left.sqrt();
-                basis.push((f.map(|x| x * inv), e.map(|x| x * inv)));
+                let inv = 1.0 / sqrt64(left);
+                basis[count] = (f.map(|x| x * inv), e.map(|x| x * inv));
+                count += 1;
             }
         }
         let u = [linear.x as f64, linear.y as f64, linear.z as f64, angular.x as f64, angular.y as f64, angular.z as f64];
         let mut out = [0.0f64; 6];
-        for (bf, be) in &basis {
+        for (bf, be) in basis.iter().take(count) {
             let c = dot(bf, &u);
             for i in 0..6 {
                 out[i] += c * be[i];
@@ -2321,16 +2410,15 @@ impl World {
         let (list, from, to) = self.window.bodies;
         for slot in from..to {
             let at = self.uu(list, slot) as usize;
-            if self.spring_change.len() <= at {
-                self.spring_change.resize(at + 1, (v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0)));
-            }
             let (v, w) = (self.v(LINEAR_X, at), self.v(ANGULAR_X, at));
-            self.spring_change[at] = if before {
+            let (v, w) = if before {
                 (v, w)
             } else {
-                let (v0, w0) = self.spring_change[at];
+                let (v0, w0) = (self.v(SPRING_CHANGE_X, at), self.v(SPRING_CHANGE_SPIN_X, at));
                 if v == v0 && w == w0 { (v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0)) } else { (v.sub(v0).scale(1.0 / h), w.sub(w0).scale(1.0 / h)) }
             };
+            self.set_v(SPRING_CHANGE_X, at, v);
+            self.set_v(SPRING_CHANGE_SPIN_X, at, w);
         }
     }
 
@@ -2417,14 +2505,15 @@ impl World {
             let (from, solving) = self.window.joints;
             let mut open = false;
             let mut first = from;
-            // Each path's step and the gap it stood at, for a backtracking line search on the gap.
-            let mut steps: Vec<(usize, usize, f32, Vec<(usize, [V3; 4], [f32; 6])>)> = Vec::new();
+            // Each path's step and the gap it stood at, for a backtracking line search on the gap, in its joints' LockStep.
             while first < solving {
                 let mut last = first;
                 while last + 1 < solving && self.uu(SOLVE_VIA, last + 1) != NONE {
                     last += 1;
                 }
+                let lead = self.uu(SOLVE_JOINTS, first) as usize;
                 if !(self.widest_lock(first, last, to) > LOCK_CLOSED) {
+                    unsafe { (*self.lock_step(lead)).stepped = 0 };
                     first = last + 1;
                     continue;
                 }
@@ -2437,7 +2526,6 @@ impl World {
                 self.newton_right(first, last, self.s(SOLVE_SHARE, first) / h, to, counted);
                 let by = h * self.push_share(first, last, asked, h);
                 let before = self.widest_lock(first, last, to);
-                let mut moves = Vec::new();
                 for i in first..=last {
                     let row = self.uu(SOLVE_JOINTS, i) as usize;
                     let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
@@ -2459,9 +2547,17 @@ impl World {
                     if self.lock_moves(b) {
                         self.nudge(b, mv[2], mv[3], counted);
                     }
-                    moves.push((row, mv, given));
+                    unsafe {
+                        let step = self.lock_step(row);
+                        (*step).moves = mv;
+                        (*step).given = given;
+                    }
                 }
-                steps.push((first, last, before, moves));
+                unsafe {
+                    let step = self.lock_step(lead);
+                    (*step).before = before;
+                    (*step).stepped = 1;
+                }
                 first = last + 1;
             }
             if !open {
@@ -2472,13 +2568,23 @@ impl World {
             // on the gap, Nocedal and Wright 2006, ch. 3 and 10).
             for _ in 0..8 {
                 let mut cut = false;
-                for (first, last, before, moves) in steps.iter_mut() {
-                    if !(self.widest_lock(*first, *last, to) > *before + LOCK_CLOSED) {
+                let mut first = from;
+                while first < solving {
+                    let mut last = first;
+                    while last + 1 < solving && self.uu(SOLVE_VIA, last + 1) != NONE {
+                        last += 1;
+                    }
+                    let (path, next) = ((first, last), last + 1);
+                    first = next;
+                    let lead = unsafe { *self.lock_step(self.uu(SOLVE_JOINTS, path.0) as usize) };
+                    if lead.stepped == 0 || !(self.widest_lock(path.0, path.1, to) > lead.before + LOCK_CLOSED) {
                         continue;
                     }
                     cut = true;
-                    for (row, mv, given) in moves.iter_mut() {
-                        let (a, b) = (self.uu(JOINT_A, *row) as usize, self.uu(JOINT_B, *row) as usize);
+                    for i in path.0..=path.1 {
+                        let row = self.uu(SOLVE_JOINTS, i) as usize;
+                        let LockStep { moves: mut mv, mut given, .. } = unsafe { *self.lock_step(row) };
+                        let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
                         for v in mv.iter_mut() {
                             *v = v.scale(0.5);
                         }
@@ -2491,8 +2597,13 @@ impl World {
                         for k in 0..6 {
                             given[k] *= 0.5;
                             if counted {
-                                self.set_s(JOINT_LOCK_P_0 + k, *row, self.s(JOINT_LOCK_P_0 + k, *row) - given[k]);
+                                self.set_s(JOINT_LOCK_P_0 + k, row, self.s(JOINT_LOCK_P_0 + k, row) - given[k]);
                             }
+                        }
+                        unsafe {
+                            let step = self.lock_step(row);
+                            (*step).moves = mv;
+                            (*step).given = given;
                         }
                     }
                 }
@@ -2509,28 +2620,55 @@ impl World {
     /// from J (Gonzalez 1999 solves the discrete gradient's constraint with this matrix). Householder QR with column
     /// pivoting; a column under the path's tolerance is a dependent row and takes no push.
     fn newton_right(&mut self, first: usize, last: usize, rate: f32, to: usize, along_dirs: bool) {
-        struct Entry { at: usize, r: usize, j: Row, g: Row, a: usize, b: usize, ma: Moving, mb: Moving, ask: f64 }
-        let mut list: Vec<Entry> = Vec::new();
+        // The path's slice of NEWTON, which `prepare_joints` sized for its lock rows; none when memory could not hold it, and
+        // then the path takes no push (the step reports the failure).
+        let at = self.uu(SOLVE_NEWTON, first);
+        if at == NONE {
+            for i in first..=last {
+                let row = self.uu(SOLVE_JOINTS, i) as usize;
+                let doubles = self.doubles(row);
+                for r in 0..6 {
+                    unsafe { *doubles.add(RIGHT + r) = 0.0 };
+                }
+            }
+            return;
+        }
+        let mut n = 0;
+        for i in first..=last {
+            n += lock_rows(self.uu(JOINT_FLAGS, self.uu(SOLVE_JOINTS, i) as usize)).0;
+        }
+        if n == 0 {
+            return;
+        }
+        // Carved into its parts in the order `newton_words` counts them, none overlapping another.
+        let base = unsafe { self.f(NEWTON).add(at as usize) };
+        let list = unsafe { core::slice::from_raw_parts_mut(base as *mut Entry, n) };
+        let doubles = unsafe { base.add(n * ENTRY_WORDS as usize) as *mut f64 };
+        let part = |from: usize, len: usize| unsafe { core::slice::from_raw_parts_mut(doubles.add(from), len) };
+        let (nm, whole) = (part(0, n * n), part(n * n, n * n));
+        let vectors = 2 * n * n;
+        let (rhs, asked, norms, own) = (part(vectors, n), part(vectors + n, n), part(vectors + 2 * n, n), part(vectors + 3 * n, n));
+        let (x, lambda) = (part(vectors + 5 * n, n), part(vectors + 6 * n, n));
+        let places = unsafe { doubles.add(vectors + 7 * n) as *mut u32 };
+        let place = |from: usize| unsafe { core::slice::from_raw_parts_mut(places.add(from), n) };
+        let (perm, left, order) = (place(0), place(n), place(2 * n));
+        let mut count = 0;
         for i in first..=last {
             let row = self.uu(SOLVE_JOINTS, i) as usize;
             let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
             let view = self.view(row);
             // The rows the step moves along: the locks' own for a counted step (`lock_gains`), this pose's for a move (`gains`).
             let (g, ma, mb) = if along_dirs { self.lock_dirs(row) } else { let (ma, mb) = self.ends(row); (view.rows, ma, mb) };
-            let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+            let (a, b) = (self.uu(JOINT_A, row), self.uu(JOINT_B, row));
             for r in 0..m {
                 let k = axes[r];
                 let ask = rate as f64 * (view.at[k] as f64 - self.s(to + k, row) as f64);
-                list.push(Entry { at: row, r, j: view.rows[k], g: g[k], a, b, ma, mb, ask });
+                list[count] = Entry { at: row as u32, r: r as u32, j: view.rows[k], g: g[k], a, b, ma, mb, ask };
+                count += 1;
             }
-        }
-        let n = list.len();
-        if n == 0 {
-            return;
         }
         // Each end as (body, sign, its part of the row, its Moving).
         let ends = |e: &Entry, row: &Row| [(e.a, -1.0f64, row.d, row.ta, e.ma), (e.b, 1.0f64, row.d, row.tb, e.mb)];
-        let mut nm = vec![0.0f64; n * n];
         for p in 0..n {
             for q in 0..n {
                 let mut sum = 0.0f64;
@@ -2545,14 +2683,19 @@ impl World {
                 nm[p * n + q] = sum;
             }
         }
-        let mut rhs: Vec<f64> = list.iter().map(|e| -e.ask).collect();
-        let (whole, asked) = (nm.clone(), rhs.clone());
+        for (r, e) in list.iter().enumerate() {
+            rhs[r] = -e.ask;
+        }
+        whole.copy_from_slice(nm);
+        asked.copy_from_slice(rhs);
         // Householder QR with column pivoting (Golub and Van Loan 2013, Algorithm 5.4.1).
-        let mut perm: Vec<usize> = (0..n).collect();
-        let mut norms: Vec<f64> = (0..n).map(|c| (0..n).map(|r| nm[r * n + c] * nm[r * n + c]).sum::<f64>()).collect();
+        for c in 0..n {
+            perm[c] = c as u32;
+            norms[c] = (0..n).map(|r| nm[r * n + c] * nm[r * n + c]).sum::<f64>();
+        }
         // Each column is judged against its own size, as the path's factor is (Higham 1990's stop at n u): a heavy end's
         // columns are a thousandth of a light link's and still hold.
-        let mut own = norms.clone();
+        own.copy_from_slice(norms);
         let tolerance = DEPENDENT * n as f64;
         let mut rank = 0;
         for c in 0..n {
@@ -2576,7 +2719,10 @@ impl World {
                 break;
             }
             let alpha = if nm[c * n + c] > 0.0 { -size } else { size };
-            let mut v: Vec<f64> = (c..n).map(|r| nm[r * n + c]).collect();
+            let v = part(vectors + 4 * n, n - c);
+            for r in c..n {
+                v[r - c] = nm[r * n + c];
+            }
             v[0] -= alpha;
             let vv: f64 = v.iter().map(|x| x * x).sum();
             if vv > 0.0 {
@@ -2596,25 +2742,33 @@ impl World {
             }
             rank = c + 1;
         }
-        let mut x = vec![0.0f64; n];
+        x.fill(0.0);
         if rank < n {
             // More locks than freedoms: the rows are taken in the path's own order and one whose pivot is rounding against its
             // own diagonal is dropped, row and column, as the path's factor drops the row that depends (Higham 1990's stop)
             // (`a_path_with_more_locks_than_freedoms_drops_the_row_that_depends`). A least-squares step over every row asks the
-            // body for a compromise the dependent rows' gaps move each substep, and that becomes speed.
-            let mut m = whole.clone();
-            let mut y = asked.clone();
-            let mut left: Vec<usize> = (0..n).collect();
-            let mut order: Vec<usize> = Vec::with_capacity(n);
+            // body for a compromise the dependent rows' gaps move each substep, and that becomes speed. The factor is done
+            // with, so its matrix and right side take the copies kept whole.
+            let m = nm;
+            m.copy_from_slice(whole);
+            let y = rhs;
+            y.copy_from_slice(asked);
+            let mut lefts = n;
+            for k in 0..n {
+                left[k] = k as u32;
+            }
+            let mut ordered = 0;
             let share = THRESHOLD_SHARE;
-            while !left.is_empty() {
+            while lefts > 0 {
+                let left_now = || left.iter().take(lefts);
                 // A row in the path's own order is taken while its pivot holds against its column, the threshold test of
                 // sparse LU (Duff, Erisman and Reid 2017, section 7.8); otherwise the steadiest of the rows left.
-                let column = |k: usize| left.iter().map(|&r| m[r * n + k].abs()).fold(0.0f64, f64::max);
+                let column = |k: usize| left_now().map(|&r| m[r as usize * n + k].abs()).fold(0.0f64, f64::max);
                 let clear = |k: usize| m[k * n + k].abs() > tolerance * whole[k * n + k].abs();
-                let pick = left.iter().position(|&k| clear(k) && m[k * n + k].abs() >= share * column(k)).or_else(|| {
+                let pick = left_now().position(|&k| clear(k as usize) && m[k as usize * n + k as usize].abs() >= share * column(k as usize)).or_else(|| {
                     let mut best: Option<(usize, f64)> = None;
-                    for (i, &k) in left.iter().enumerate() {
+                    for (i, &k) in left_now().enumerate() {
+                        let k = k as usize;
                         let ratio = m[k * n + k].abs() / column(k);
                         if clear(k) && best.map_or(true, |(_, r)| ratio > r) {
                             best = Some((i, ratio));
@@ -2623,9 +2777,14 @@ impl World {
                     best.map(|(i, _)| i)
                 });
                 let Some(i) = pick else { break };
-                let c = left.remove(i);
+                let c = left[i] as usize;
+                for k in i + 1..lefts {
+                    left[k - 1] = left[k];
+                }
+                lefts -= 1;
                 let pivot = m[c * n + c];
-                for &r in &left {
+                for &r in left.iter().take(lefts) {
+                    let r = r as usize;
                     let f = m[r * n + c] / pivot;
                     if f == 0.0 {
                         continue;
@@ -2635,20 +2794,22 @@ impl World {
                     }
                     y[r] -= f * y[c];
                 }
-                order.push(c);
+                order[ordered] = c as u32;
+                ordered += 1;
             }
             // The rows left are the ones that depend: they are dropped, row and column.
-            let mut z = vec![0.0f64; n];
-            for (at, &c) in order.iter().enumerate().rev() {
+            let z = x;
+            for at in (0..ordered).rev() {
+                let c = order[at] as usize;
                 let mut sum = y[c];
-                for &k in &order[at + 1..] {
-                    sum -= m[c * n + k] * z[k];
+                for &k in order.iter().take(ordered).skip(at + 1) {
+                    sum -= m[c * n + k as usize] * z[k as usize];
                 }
                 z[c] = sum / m[c * n + c];
             }
-            for (e, l) in list.iter().zip(z) {
-                let doubles = self.doubles(e.at);
-                unsafe { *doubles.add(RIGHT + e.r) = l };
+            for (e, &l) in list.iter().zip(z.iter()) {
+                let doubles = self.doubles(e.at as usize);
+                unsafe { *doubles.add(RIGHT + e.r as usize) = l };
             }
             return;
         } else {
@@ -2660,13 +2821,12 @@ impl World {
                 x[c] = sum / nm[c * n + c];
             }
         }
-        let mut lambda = vec![0.0f64; n];
         for c in 0..n {
-            lambda[perm[c]] = x[c];
+            lambda[perm[c] as usize] = x[c];
         }
-        for (e, l) in list.iter().zip(lambda) {
-            let doubles = self.doubles(e.at);
-            unsafe { *doubles.add(RIGHT + e.r) = l };
+        for (e, &l) in list.iter().zip(lambda.iter()) {
+            let doubles = self.doubles(e.at as usize);
+            unsafe { *doubles.add(RIGHT + e.r as usize) = l };
         }
     }
 

@@ -39,8 +39,11 @@ pub enum Rows {
     PathPoint,
     /// Two rows a collider, the nodes of the dynamic tree of fat boxes (src/tree.rs).
     BroadNode,
+    /// Words of the locks' Newton solves, a slice for each path of solving joints (joints.rs, `newton_right`), sized each step
+    /// by the paths' lock rows (`newton_words`).
+    Newton,
 }
-pub const ROW_CLASSES: usize = 22;
+pub const ROW_CLASSES: usize = 23;
 
 macro_rules! columns {
     ($($name:ident $kind:ident $rows:ident,)*) => {
@@ -111,6 +114,21 @@ columns! {
     LOCK_SHIFT_SPIN_Z f32 Body,
     // The substep stamp of the last substep a lock held the body.
     LOCK_MARK u32 Body,
+    // Each awake body's velocity and spin at its substep's start, before the loads: what the substep changed them by
+    // (joints.rs, `note_mid_start`, `shed_locks`).
+    MID_START_X f32 Body,
+    MID_START_Y f32 Body,
+    MID_START_Z f32 Body,
+    MID_START_SPIN_X f32 Body,
+    MID_START_SPIN_Y f32 Body,
+    MID_START_SPIN_Z f32 Body,
+    // What a tree's implicit springs changed of each awake body's velocity and spin this substep, over h (`note_springs`).
+    SPRING_CHANGE_X f32 Body,
+    SPRING_CHANGE_Y f32 Body,
+    SPRING_CHANGE_Z f32 Body,
+    SPRING_CHANGE_SPIN_X f32 Body,
+    SPRING_CHANGE_SPIN_Y f32 Body,
+    SPRING_CHANGE_SPIN_Z f32 Body,
     // Forces stay until the caller clears them and reach every substep; impulses land once, before the first.
     FORCE_X f32 Body,
     FORCE_Y f32 Body,
@@ -666,6 +684,8 @@ columns! {
     SOLVE_VIA u32 JointList,
     // The share of its error each listed joint closes in a biased pass.
     SOLVE_SHARE f32 JointList,
+    // At the first place of each path: where its slice of NEWTON starts, in words, or NONE when memory could not hold it.
+    SOLVE_NEWTON u32 JointList,
     // Where each listed joint goes when the list is put in runs by island, and a place to move the lists through.
     JOINT_ORDER u32 JointList,
     JOINT_TEMP u32 JointList,
@@ -680,6 +700,8 @@ columns! {
     ISLAND_COUPLING_CURSOR u32 BodyList,
     // Rows, measures and factors of the solving joints.
     JOINT_SCRATCH f32 JointScratch,
+    // The locks' Newton solves, a slice a path (SOLVE_NEWTON).
+    NEWTON f32 Newton,
     // A pair of a triangle mesh or a compound holds no points itself: each triangle or compound child that touches has a
     // part, a pair row of its own off the broad phase's lists, chained from the pair; the chain ends in NONE. A part names
     // its triangle, or the child row of the pair's other side for a compound against a convex shape or against the B
@@ -814,7 +836,7 @@ pub const MANIFOLD: usize = 4;
 
 /// The rows of every class for `bodies`, `colliders` and `pairs`, keeping the hull and mesh rows a world already has room
 /// for.
-pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4], joints: u32, meshes: [u32; 5], couplings: u32, paths: u32) -> [u32; ROW_CLASSES] {
+pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4], joints: u32, meshes: [u32; 5], couplings: u32, paths: u32, newton: u32) -> [u32; ROW_CLASSES] {
     let [hull, vertices, edges, faces] = hulls;
     let [mesh, mesh_vertices, triangles, nodes, words] = meshes;
     [
@@ -841,6 +863,7 @@ pub fn capacities(bodies: u32, colliders: u32, pairs: u32, hulls: [u32; 4], join
         paths,
         // The tree broad phase's nodes: a leaf for each collider and one inner node for each pair of them, with a spare.
         colliders * 2 + 2,
+        newton,
     ]
 }
 
@@ -865,8 +888,12 @@ pub const COUPLING_WORDS: u32 = (core::mem::size_of::<crate::couplings::Coupling
 /// Words of JOINT_SCRATCH a joint takes: 64 for its rows and measures, then doubles, 36 of inverse, 36 of link, 6 of right side,
 /// 6 of what the pushing pass gave, 4 more, and 18 for a multibody link's implicit springs (multibody.rs, G_AT, V_AT, W_AT),
 /// then from JOINT_TAUT 12 words, the inverse inertia its rows turn each of its two bodies by (joints.rs, `taut_inertia`),
-/// and 4 for what its sliding locks carried through the substep before.
-pub const JOINT_WORDS: u32 = JOINT_TAUT + 16;
+/// and 4 for what its sliding locks carried through the substep before; from JOINT_LOCK_START 122 words, its rows and its
+/// bodies' poses at the substep's start and the discrete gradient read since (joints.rs, `LockStart`), and from JOINT_STEP 20,
+/// the step the projection last moved it by, for the line search (joints.rs, `project_to`).
+pub const JOINT_WORDS: u32 = JOINT_STEP + 20;
+pub const JOINT_LOCK_START: u32 = JOINT_TAUT + 16;
+pub const JOINT_STEP: u32 = JOINT_LOCK_START + 124;
 pub const JOINT_TAUT: u32 = 64 + 2 * (36 + 36 + 6 + 36 + 6 + 4 + 18);
 /// Most joints one world holds.
 pub const MAX_JOINTS: u32 = 1 << 22;
@@ -1095,13 +1122,16 @@ pub const JOINT_IDLE: u32 = JOINT_OFF | JOINT_BROKEN | JOINT_DISABLED;
 
 /// The columns that hold the order a step solves in, rebuilt every step from the world's state: the pairs and joints it
 /// solves, the impacts it found, the islands it numbered, the solving joints' scratch, which is indexed by place in
-/// their list, and the rotor speeds read at each substep's start. `World::hash` leaves them out; `World::arena_hash` does not.
-pub const SCRATCH: [usize; 53] = [
+/// their list, the rotor speeds read at each substep's start, the locks' Newton solves and what each body's speeds were and
+/// what the springs changed of them in the substep. `World::hash` leaves them out; `World::arena_hash` does not.
+pub const SCRATCH: [usize; 67] = [
     ISLAND_LEVEL, ISLAND_STAMP, MB_HELD, ISLAND_SUBSTEPS,
     SOLVE_PAIRS, IMPACTS, ISLAND_BODIES, ISLAND_LEAD, ISLAND_START, ISLAND_COUNT, ISLAND_READY, ISLAND_PASSES, SOLVE_JOINTS,
     SOLVE_LEAD, SOLVE_VIA, SOLVE_SHARE, ISLAND_PAIR_START, ISLAND_PAIR_COUNT, ISLAND_PAIR_CURSOR, JOINT_ORDER, JOINT_TEMP, ISLAND_JOINT_START,
     ISLAND_JOINT_COUNT, ISLAND_JOINT_CURSOR, COUPLING_ORDER, ISLAND_COUPLING_START, ISLAND_COUPLING_COUNT, ISLAND_COUPLING_CURSOR, MB_STAMP,
     TILT_MASS, TILT_SUPPORTS, TILT_Y, TILT_G, TILT_A, TILT_BASE, TILT_TOP, TILT_TOPS, PAIR_TILT_GAIN, PAIR_TILT_UNHELD, TILT_PAIRS, TILT_TEMP,
-    JOINT_ROTOR_0, JOINT_ROTOR_1, JOINT_ROTOR_2, JOINT_ROTOR_3, JOINT_ROTOR_4, JOINT_ROTOR_5, PAIR_PATCH_NEXT, PAIR_PATCH_TAIL,
-    PATCH_LIST, PATCH_TEMP, PATCH_SIGN, CONTACT_CUT,
+    JOINT_ROTOR_0, JOINT_ROTOR_1, JOINT_ROTOR_2, JOINT_ROTOR_3, JOINT_ROTOR_4, JOINT_ROTOR_5, SOLVE_NEWTON, NEWTON,
+    MID_START_X, MID_START_Y, MID_START_Z, MID_START_SPIN_X, MID_START_SPIN_Y, MID_START_SPIN_Z,
+    SPRING_CHANGE_X, SPRING_CHANGE_Y, SPRING_CHANGE_Z, SPRING_CHANGE_SPIN_X, SPRING_CHANGE_SPIN_Y, SPRING_CHANGE_SPIN_Z,
+    PAIR_PATCH_NEXT, PAIR_PATCH_TAIL, PATCH_LIST, PATCH_TEMP, PATCH_SIGN, CONTACT_CUT,
 ];

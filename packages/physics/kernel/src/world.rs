@@ -201,12 +201,6 @@ pub struct World {
     pub path_samples: core::cell::Cell<u64>,
     /// Nearest-point searches of paths so far, the other half of that count.
     pub path_searches: core::cell::Cell<u64>,
-    /// Experiment: each joint's rows at the start of the substep.
-    pub(crate) lock_start: Vec<crate::joints::LockStart>,
-    /// Each body's velocity and spin at its substep's start, before the loads: what the substep changed them by.
-    pub(crate) mid_start: Vec<(crate::math::V3, crate::math::V3)>,
-    /// What a tree's implicit springs changed of each body's velocity and spin this substep, over h (`note_springs`).
-    pub(crate) spring_change: Vec<(crate::math::V3, crate::math::V3)>,
     /// Pairs the narrow phase worked out in full, and pairs that kept their manifold by recycling, so far (work counts; not part of the world's state).
     pub narrow_found: core::cell::Cell<u64>,
     pub narrow_recycled: core::cell::Cell<u64>,
@@ -219,7 +213,7 @@ impl World {
             return None;
         }
         let mut arena = Arena::new();
-        let capacity = capacities(bodies, colliders, colliders.max(16), [0; 4], 0, [0; 5], 0, 0);
+        let capacity = capacities(bodies, colliders, colliders.max(16), [0; 4], 0, [0; 5], 0, 0, 0);
         let (offsets, bytes) = offsets(HEADER_BYTES, &capacity)?;
         if !arena.ensure(bytes as usize) {
             return None;
@@ -238,9 +232,6 @@ impl World {
             part_id: core::cell::Cell::new(u32::MAX),
             path_samples: core::cell::Cell::new(0),
             path_searches: core::cell::Cell::new(0),
-            lock_start: Vec::new(),
-            mid_start: Vec::new(),
-            spring_change: Vec::new(),
             narrow_found: core::cell::Cell::new(0),
             narrow_recycled: core::cell::Cell::new(0),
         };
@@ -363,7 +354,7 @@ impl World {
         if bodies > MAX_BODIES || colliders > MAX_COLLIDERS {
             return false;
         }
-        self.grow(capacities(bodies.max(old[0]), colliders.max(old[1]), old[3], hull_capacity(&old), old[11], mesh_capacity(&old), old[19], old[20]))
+        self.grow(capacities(bodies.max(old[0]), colliders.max(old[1]), old[3], hull_capacity(&old), old[11], mesh_capacity(&old), old[19], old[20], old[22]))
     }
 
     /// Moves every column up to its place in the larger layout, last column first, so nothing is overwritten before it
@@ -933,9 +924,6 @@ impl World {
             part_id: core::cell::Cell::new(u32::MAX),
             path_samples: core::cell::Cell::new(0),
             path_searches: core::cell::Cell::new(0),
-            lock_start: Vec::new(),
-            mid_start: Vec::new(),
-            spring_change: Vec::new(),
             narrow_found: core::cell::Cell::new(0),
             narrow_recycled: core::cell::Cell::new(0),
         }

@@ -571,7 +571,7 @@ impl World {
         let capacity = self.header().capacity;
         let rows = capacity[3] * 2;
         let hulls = [capacity[7], capacity[8], capacity[9], capacity[10]];
-        if rows > MAX_PAIRS || !self.grow(capacities(capacity[0], capacity[1], rows, hulls, capacity[11], mesh_capacity(&capacity), capacity[19], capacity[20])) {
+        if rows > MAX_PAIRS || !self.grow(capacities(capacity[0], capacity[1], rows, hulls, capacity[11], mesh_capacity(&capacity), capacity[19], capacity[20], capacity[22])) {
             return false;
         }
         for slot in 0..self.header().capacity[4] as usize {
