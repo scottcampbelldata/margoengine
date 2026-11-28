@@ -589,7 +589,11 @@ test('T6 bounce and shadowTint compare like surfaces when given the albedo (KB-L
   // surfaces. Here one light falls on two surfaces, warm sand and grey ash: the lit mask is mostly sand, the shadow
   // mask mostly ash. Without the albedo the masks mix the surfaces and the checks measure sand against ash; with it
   // each surface is compared with itself and the pooled values are the light's own.
-  const size = 60,
+  // A 90 px frame holds 9 px blocks with one row in nine of each side the other surface: 10 of the 88 rows inside the
+  // 1 px inset (11.4 %), the share of the whole-frame fixture this replaces (7 of 62, 11.3 %). Six-pixel blocks would
+  // force one row in six (16.7 %), which mixes the masks less and is not the case this test was written for.
+  const size = 90,
+    stripe = (x) => x % 8 < 4,
     encode = (v) => {
       const c = Math.min(1, Math.max(0, v));
       return Math.round(255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055));
@@ -597,13 +601,13 @@ test('T6 bounce and shadowTint compare like surfaces when given the albedo (KB-L
     sun = [0.9, 0.8, 0.6],
     sky = [0.12, 0.13, 0.16],
     sand = [0.55, 0.45, 0.3],
-    ash = [0.08, 0.1, 0.15],
-    lit = mask(size, size, litStripe),
-    shadow = mask(size, size, (x) => !litStripe(x)),
-    // Lit: one row in six ash, the rest sand. Shadow: one row in six sand, the rest ash (every block holds both).
-    surface = (x, y) => (litStripe(x) ? (y % 6 === 3 ? ash : sand) : y % 6 === 3 ? sand : ash),
+    ash = [0.1, 0.1, 0.11],
+    lit = mask(size, size, stripe),
+    shadow = mask(size, size, (x) => !stripe(x)),
+    // Lit: one row in nine ash, the rest sand. Shadow: one row in nine sand, the rest ash (every block holds both).
+    surface = (x, y) => (stripe(x) ? (y % 9 === 4 ? ash : sand) : y % 9 === 4 ? sand : ash),
     shade = (a, inSun) => a.map((v, c) => encode(v * (sky[c] + (inSun ? sun[c] : 0)))),
-    frame = image(size, size, (x, y) => shade(surface(x, y), litStripe(x))),
+    frame = image(size, size, (x, y) => shade(surface(x, y), stripe(x))),
     grey = (c) => mask(size, size, () => false),
     plane = (c) => {
       const m = grey(c);
@@ -612,7 +616,7 @@ test('T6 bounce and shadowTint compare like surfaces when given the albedo (KB-L
     },
     albedo = albedoOf(frame, { 'albedo-r': plane(0), 'albedo-g': plane(1), 'albedo-b': plane(2) }),
     // Each surface alone, a frame of nothing but it, lit on the left and shaded on the right.
-    alone = (a) => image(size, size, (x) => shade(a, litStripe(x))),
+    alone = (a) => image(size, size, (x) => shade(a, stripe(x))),
     truth = (check) => [sand, ash].map((a) => check(alone(a), { lit, shadow }).value);
   assert.equal(GROUND_ALBEDO_LEVELS, 16);
   assert.equal(albedoOf(frame, { 'albedo-r': plane(0) }), undefined, 'all three planes or none');
@@ -638,8 +642,8 @@ test('T6 bounce and shadowTint compare like surfaces when given the albedo (KB-L
   assert.equal(tint.detail.strata, 2 * 10 * 10);
   assert.equal(tint.detail.matched, tint.detail.lit + tint.detail.shadow);
   // A surface seen only in the sun is not compared: with the shadow all ash and the lit ground all sand nothing matches.
-  const apart = (x) => (litStripe(x) ? sand : ash),
-    split = image(size, size, (x) => shade(apart(x), litStripe(x))),
+  const apart = (x) => (stripe(x) ? sand : ash),
+    split = image(size, size, (x) => shade(apart(x), stripe(x))),
     splitAlbedo = albedoOf(split, {
       'albedo-r': mask(size, size, () => false),
       'albedo-g': mask(size, size, () => false),

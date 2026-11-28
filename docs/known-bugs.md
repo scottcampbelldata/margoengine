@@ -265,6 +265,13 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   -4.7 b*. T6 now compares within blocks a tenth of the frame's shorter side (`GROUND_BLOCK`, headless/look): 94.8 /
   95.3 percent and +0.64 / +0.58 b*, the 98 percent the light predicts. Regression:
   `packages/headless/tests/look-clean.test.js` (a glow across the frame, shadows on its bright side).
+- **TINTMATCH fixture (2026-11-28):** the first block version of the KB-LOOK-TV-TINTMATCH1 fixture made its ash cooler
+  ([0.08, 0.1, 0.15]) so its mixed tint cleared `sand + 5`; that change of test data is undone and the ash is
+  [0.1, 0.1, 0.11] again. The block maths did not move the tint: every block of the fixture is alike and means are
+  linear, so pooling by block gives the whole frame's value. The layout did: with 6 px blocks the other surface took
+  one row in six (16.7 percent), against 7 of the 62 rows inside the 1 px inset (11.3 percent) in the old whole-frame
+  fixture, so the masks mixed less. The fixture is now 90 px with 9 px blocks and one row in nine (10 of 88 rows,
+  11.4 percent), the old share, and passes with its colours and assertions unchanged.
 
 ### Open 2026-11-28: the timber-valley blowup shows single bright pixels through conifer foliage, 15 and 46 ppm (KB-LOOK-TV-SPECKLE, procedural, biomes)
 
