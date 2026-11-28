@@ -13,8 +13,10 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { linkModules, MISSING_HISTORY, problems, scratchFolder } from '../scripts/fresh-clone-check.mjs';
 
 const summary = (pass, historical, fail) => `\n${pass} pass, ${historical} historical, ${fail} fail in 0.3 min\n`;
@@ -141,4 +143,14 @@ test('node_modules in the clone are its own files: real paths inside the clone, 
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
+});
+
+test('the script imports from node -e, where process.argv[1] is undefined, without running its check', () => {
+  const url = pathToFileURL(join(import.meta.dirname, '..', 'scripts', 'fresh-clone-check.mjs')).href;
+  const out = execFileSync(
+    process.execPath,
+    ['--input-type=module', '-e', `const m = await import(${JSON.stringify(url)}); console.log(typeof m.problems);`],
+    { encoding: 'utf8', timeout: 60_000 },
+  );
+  assert.equal(out.trim(), 'function');
 });

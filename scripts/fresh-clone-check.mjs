@@ -10,7 +10,7 @@
 //   node scripts/fresh-clone-check.mjs [--pinned] [--keep]   --pinned: the pinned runs too, which must end PASS or
 //   HISTORICAL (a claim whose commits the clone lacks), never FAIL; --keep: leave the folder (its path is printed)
 // Every step has a hard time limit; the folder is removed in a detached process afterwards (Windows deletes slowly).
-import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   copyFileSync,
   existsSync,
@@ -274,7 +274,8 @@ ${verify.stderr}`.slice(-8000)}`,
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href)
+// process.argv[1] is undefined under `node -e` or `node --input-type=module`, where importing this file must not throw.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
   await main().catch((error) => {
     console.error(error.message);
     process.exitCode = 1;
