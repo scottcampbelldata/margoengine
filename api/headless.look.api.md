@@ -431,9 +431,10 @@ export function maskTopEdge(mask: LookMask): Float32Array;
 
 export function missingResult(check: LookCheckName | string, missing: string, bound?: LookBound): LookResult;
 
-export function motionBlur(frame: LookImage, motion: LookMotion, { mask, bound, minimum, shutter }?: FlickerOptions & {
+export function motionBlur(frame: LookImage, motion: LookMotion, { mask, bound, minimum, shutter, velocity }?: FlickerOptions & {
     minimum?: number;
     shutter?: number;
+    velocity?: LookMotion;
 }): LookResult;
 
 export function nan(frame: FloatFrame, { bound }?: {

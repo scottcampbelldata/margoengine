@@ -8,7 +8,7 @@ import { FuelMap } from "@margoengine/biomes/fuel";
 import { Settlements } from "@margoengine/biomes/settlements";
 import { BiomeView, BiomeViewOptions } from "@margoengine/biomes/view";
 import { EngineKernel, Vec3 } from "@margoengine/core";
-import { GTAO } from "@margoengine/post";
+import { GTAO, MotionBlur } from "@margoengine/post";
 import { Shadows } from "@margoengine/shadows";
 import { PresetScene } from "@margoengine/sky/scenes";
 import { VolumetricClouds } from "@margoengine/sky/volumetric-clouds";
@@ -79,6 +79,7 @@ export interface TimberValleyScene extends Disposable {
         readonly fuel: FuelMap;
         readonly fireFront?: FireFront;
         readonly taa?: TAA;
+        readonly motionBlur?: MotionBlur;
     };
     dispose(): void;
 }

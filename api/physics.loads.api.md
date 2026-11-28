@@ -1095,6 +1095,7 @@ interface HullPanelOptions {
     readonly gravity?: number;
     readonly frequencies: ArrayLike<number>;
     readonly headings?: number;
+    readonly threads?: 1 | 2 | 4;
     readonly signal?: AbortSignal;
 }
 
@@ -1109,12 +1110,25 @@ interface HullPanelResponse {
     readonly frequencies: readonly number[];
     readonly samples: readonly HullPanelSample[];
     readonly infiniteMass: readonly number[];
+    readonly work?: HullPanelWorkCounts;
 }
 
 interface HullPanelSample {
     readonly addedMass: readonly number[];
     readonly damping: readonly number[];
     readonly diffraction: readonly number[];
+}
+
+interface HullPanelWorkCounts extends HullPanelWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly HullPanelWorkerWork[];
+}
+
+interface HullPanelWorkerWork {
+    readonly systems: number;
+    readonly frequencySolves: number;
+    readonly eliminationPairs: number;
+    readonly eliminationTail: number;
 }
 
 interface InteractionGroups {
