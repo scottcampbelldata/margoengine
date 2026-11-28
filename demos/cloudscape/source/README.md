@@ -4,7 +4,7 @@ Fly from 455 m to the middle of a 940–3,340 m cumulus layer, then rise above i
 
 The archipelago is an original 19 km height field with smoothly interpolated pigments, slope and depth cues. It uses nine island forms with coherent terrain detail. There is a continuous sea surface around the tile. All scene lights and camera distances use meters.
 
-Native WebGPU uses Margo Sky’s Preetham atmosphere, `VolumetricClouds`, `volumetricCloudShadows`, Margo Shadows, HDR Bloom, and depth-aware `LightShafts`. The native flight control opens on the working volume, then the shadow and shaft passes initialize. WebGL2 uses Margo’s direct FrameGraph preview device with an original compact GLSL volume, height field, and solar transmittance shader. It integrates live three-dimensional density, light visibility, depth ordering and in-scattering. Both devices give the same altitudes, route and controls. The cloud fine structure and scattering differ between the two render implementations.
+Native WebGPU uses Margo Sky’s Preetham atmosphere, `VolumetricClouds`, `volumetricCloudShadows`, Margo Shadows, HDR Bloom, and depth-aware `LightShafts`. The native flight control opens on the working volume, then the shadow and shaft passes initialize. Without WebGPU the same packages run on the Margo WebGL2 compatibility layer, so both give the same clouds, shafts, shadows, route and controls.
 
 ## References
 

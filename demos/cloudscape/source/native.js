@@ -6,7 +6,7 @@ import {Bloom} from '@margoengine/post/bloom';
 import {installCoast} from './coast.js';
 import {profile} from './coast-field.mjs';
 
-export async function openNative(canvas,{sun,signal,fail}){
+export async function openNative(canvas,{sun,signal,fail,compatibility=false}){
   const engine=await Engine.create(canvas,{backend:'webgpu',signal,exactSize:true,antialias:false,
     camera:{near:25,far:39000,fov:55}});
   engine.onError=fail;
@@ -22,7 +22,7 @@ export async function openNative(canvas,{sun,signal,fail}){
   const coast=installCoast(engine);
   let shadowField,shafts;
   return {
-    renderer:'webgpu',
+    renderer:compatibility?'compatibility':'webgpu',
     draw(frame){
       engine.camera.position=frame.eye;engine.camera.target=frame.look;
       clouds.options.coverage=frame.cover;

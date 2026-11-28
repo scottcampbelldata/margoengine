@@ -1,0 +1,30 @@
+{
+  "about": "Controls that change nothing to see when operated alone, by design. controls.mjs reports each under 'Could not tell' with its reason, so none is hidden and none counts as dead. A label matches when it starts with `control`; `backend` limits a row to webgpu or webgl2. Add a row only with the next action that shows the control working.",
+  "controls": [
+    {
+      "demo": "night-storm-sky",
+      "control": "Hold for inspection",
+      "reason": "it sets how the next strike ends (held lit until Return to night); press Trigger a strike to see it"
+    },
+    {
+      "demo": "shape-casts",
+      "control": "Angled block",
+      "reason": "a cast selects its first contact and moves the probe there; this cast found one contact, so clicking it again keeps the probe where it is (with more contacts, choosing another moves it)"
+    },
+    {
+      "demo": "the-camera-director",
+      "control": "Hard cuts",
+      "reason": "it sets how the camera moves at the next shot change (a cut instead of a glide); pick another shot to see it"
+    },
+    {
+      "demo": "the-glass-stack",
+      "control": "Reverse draw order",
+      "reason": "the exhibit's three methods (weighted, moment, exact) are all order-independent transparency, and this control shows it: the picture stays the same when the draw order is reversed"
+    },
+    {
+      "demo": "the-meshlet-statue",
+      "control": "Use wall for Hi-Z",
+      "reason": "the wall culls the statue's clusters only while the wall slider puts it in front of the statue; at the starting position it hides nothing, so the drawn count stays the same"
+    }
+  ]
+}

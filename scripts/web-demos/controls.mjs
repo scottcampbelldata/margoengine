@@ -65,6 +65,9 @@ const DESKTOP = { width: 1440, height: 900 },
 const WORK = 320; // working width of a compared picture, in pixels
 
 const catalog = JSON.parse(fs.readFileSync(path.join(demos, 'demos.json'), 'utf8'));
+// Controls that change nothing to see by design, each with its reason (scripts/web-demos/controls-by-design.json). They
+// are reported under "Could not tell" with that reason, never dropped, and never count as dead.
+const byDesign = JSON.parse(fs.readFileSync(path.join(here, 'controls-by-design.json'), 'utf8')).controls;
 let names = args.filter((a) => !a.startsWith('--'));
 if (flag('all')) names = catalog.map((d) => d.slug).filter((n) => fs.existsSync(path.join(demos, n, 'index.html')));
 
@@ -1086,6 +1089,11 @@ function refine(c, d) {
     if (!c.sameStops.length) delete c.sameStops;
   }
   if (c.verdict !== 'dead') return c;
+  const slug = d?.slug ?? d?.demo?.replace(/@.*$/, ''),
+    designed = byDesign.find(
+      (x) => x.demo === slug && c.label?.startsWith(x.control) && (!x.backend || x.backend === (d?.backend ?? 'webgpu')),
+    );
+  if (designed) return Object.assign(c, { verdict: 'unsure', note: `by design: ${designed.reason}` });
   const hint =
     d?.dragHint ??
     pageText(d?.slug ?? d?.demo)
@@ -1695,7 +1703,7 @@ if (usage) {
   // Nothing to run: the usage line above is the whole output.
 } else if (mdOnly) {
   // Judge again with the current rules: a dead control that an older rule called unsure goes back to dead first.
-  const REFINED = /^(a tool or|the page asks for|a sound control|a speed or playback|a drag handle|already holds)/;
+  const REFINED = /^(by design|a tool or|the page asks for|a sound control|a speed or playback|a drag handle|already holds)/;
   for (const d of Object.values(report.demos))
     for (const c of d.controls ?? [])
       if (c.verdict === 'unsure' && REFINED.test(c.note ?? '')) Object.assign(c, { verdict: 'dead', note: undefined });

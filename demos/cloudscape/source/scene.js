@@ -126,8 +126,10 @@ async function start(){
     catch(error){if(!['unsupported','no-adapter'].includes(error?.code))throw error;}
   }
   if(!view){
-    const {openDirect}=await import('./direct.js');
-    view=await openDirect(canvas,params);
+    // The same packages on the WebGL2 layer: clouds, sky, light shafts and cloud shadows.
+    await (await import('@margoengine/webgl2-compat')).install({force:true,signal});
+    const {openNative}=await import('./native.js');
+    view=await openNative(canvas,{...params,compatibility:true});
   }
   signal.throwIfAborted();
   performance.mark('cloudscape-model');
