@@ -1,7 +1,7 @@
 import { applyMatrix4, cylinderGeometry, extrudeGeometry, latheGeometry, mergeGeometries, Path, Shape } from '@margoengine/geometry';
 import { roundedBoxGeometry } from '@margoengine/geometry/extras';
 import { Material, createMesh } from '@margoengine/materials';
-import { crankRadius, rollerRadius, slotEndRadius, slotHalfHeight, slotHalfWidth } from './kinematics.js';
+import { crankRadius, rollerRadius, slotEndRadius, slotHalfHeight, slotHalfWidth } from './mechanism.js';
 
 const tau=Math.PI*2;
 const up=[0,1,0],xAxis=[1,0,0],zAxis=[0,0,1];

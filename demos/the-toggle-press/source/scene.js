@@ -1,6 +1,6 @@
 import { EngineKernel } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
-import { pressPose } from './kinematics.js';
+import { pressPose } from './mechanism.js';
 import { preparePress } from './model.js';
 
 const canvas=document.querySelector('#scene');

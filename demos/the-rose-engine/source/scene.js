@@ -1,6 +1,6 @@
 import { EngineKernel } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
-import { rosettes, spindlePose } from './kinematics.js';
+import { rosettes, spindlePose } from './mechanism.js';
 import { prepareRoseEngine } from './model.js';
 
 const canvas=document.querySelector('#scene');

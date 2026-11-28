@@ -1,7 +1,7 @@
 import { applyMatrix4, cylinderGeometry, extrudeGeometry, latheGeometry, mergeGeometries, Shape, sphereGeometry } from '@margoengine/geometry';
 import { roundedBoxGeometry } from '@margoengine/geometry/extras';
 import { Material, createMesh } from '@margoengine/materials';
-import { linkLength, pivotY, stopOffset } from './kinematics.js';
+import { linkLength, pivotY, stopOffset } from './mechanism.js';
 
 const tau=Math.PI*2;
 const up=[0,1,0],right=[1,0,0],front=[0,0,1];

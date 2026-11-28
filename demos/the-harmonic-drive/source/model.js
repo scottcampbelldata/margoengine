@@ -2,7 +2,7 @@ import { applyMatrix4, latheGeometry, mergeGeometries } from '@margoengine/geome
 import { roundedBoxGeometry } from '@margoengine/geometry/extras';
 import { Material, createMesh } from '@margoengine/materials';
 import { bend, ellipseRadius, fixedRootRadius, fixedTeeth, fixedToothDepth, flexTeeth,
-  flexToothDepth, major, minor, nominalRadius, tau, toothProfile } from './kinematics.js';
+  flexToothDepth, major, minor, nominalRadius, tau, toothProfile } from './mechanism.js';
 
 const up=[0,1,0], front=[0,0,1], right=[1,0,0];
 const center=[-.014,.351,.027];

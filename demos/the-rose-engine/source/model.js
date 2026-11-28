@@ -1,7 +1,7 @@
 import { applyMatrix4, cylinderGeometry, latheGeometry, mergeGeometries, torusGeometry } from '@margoengine/geometry';
 import { roundedBoxGeometry } from '@margoengine/geometry/extras';
 import { Material, Texture, createMesh } from '@margoengine/materials';
-import { camRadius, cutAt, modulation, rosettes, toolX } from './kinematics.js';
+import { camRadius, cutAt, modulation, rosettes, toolX } from './mechanism.js';
 
 const tau=Math.PI*2;
 const up=[0,1,0],front=[0,0,1],right=[1,0,0];

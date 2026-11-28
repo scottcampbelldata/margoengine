@@ -1,6 +1,6 @@
 import { EngineKernel } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
-import { yokePose } from './kinematics.js';
+import { yokePose } from './mechanism.js';
 import { prepareYoke } from './model.js';
 
 const canvas=document.querySelector('#scene');
