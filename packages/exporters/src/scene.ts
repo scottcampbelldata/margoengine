@@ -1789,7 +1789,8 @@ export function collect(
         fail(
           'A live Material has no image file to name; pass textures: false for its shape and colors, or use exportModel (@margoengine/exporters/model)',
         );
-      const base = loaded === 'baseColor' ? baseColorOf(source, definition.material) : undefined;
+      // A base color map the model left out of this primitive (it lacks the map's TEXCOORD set) is not written either.
+      const base = loaded === 'baseColor' && mat.maps[0] ? baseColorOf(source, definition.material) : undefined;
       const attribute = (offset: number, width: number): Float32Array => {
         const out = new Float32Array(count * width);
         for (let i = 0; i < count; i++)

@@ -235,13 +235,22 @@ async function onSet(texCoord, withSet2 = true) {
   return glb(doc);
 }
 
-test('a base colour on TEXCOORD_2 maps with TEXCOORD_2, and a texCoord the primitive lacks is refused on load', () =>
+test('a base colour on TEXCOORD_2 maps with TEXCOORD_2, and a map on a set the primitive lacks is left out', () =>
   headlessModels(async () => {
     const engine = await headless();
     parseGLTF(engine, await onSet(2));
     const { obj } = exportOBJ(engine, options),
       us = [...obj.matchAll(/^vt (\S+) /gm)].map((m) => Number(m[1])).sort();
     assert.deepEqual([...new Set(us)], [0.125, 0.375]);
-    // gltf/pbr already refuses a texCoord whose TEXCOORD_<n> the primitive lacks, so no loaded model reaches here without it.
-    await assert.rejects(async () => parseGLTF(await headless(), await onSet(1)), /requires available TEXCOORD_1/);
+    // glTF 2.0 5.24: a map reads TEXCOORD_<texCoord>. Without that set gltf/pbr loads the model, leaves the map out of
+    // the primitive with one coded warning (KB-GLTFA A2), and the export writes no texture for it.
+    const lacking = await headless(),
+      model = parseGLTF(lacking, await onSet(1));
+    assert.deepEqual(
+      model.warnings.map((w) => w.code),
+      ['missing-texcoord'],
+    );
+    assert.match(model.warnings[0].message, /TEXCOORD_1/);
+    const left = exportOBJ(lacking, options);
+    assert.doesNotMatch(left.mtl, /^map_Kd /m);
   }));
