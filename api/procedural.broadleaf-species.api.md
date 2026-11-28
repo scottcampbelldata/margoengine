@@ -40,8 +40,10 @@ export type BroadleafSpecies = 'english-oak' | 'european-beech' | 'black-alder';
 export interface BroadleafSpeciesData {
     readonly latin: string;
     readonly growth: readonly [number, number, number];
+    readonly openHeight: number;
     readonly dbh: readonly [number, number, number];
     readonly crownWidth: readonly [number, number];
+    readonly freeCrown: number;
     readonly crownBase: readonly [number, number];
     readonly limbs: readonly [number, number];
     readonly fork: number;
@@ -54,15 +56,15 @@ export interface BroadleafSpeciesData {
     readonly bark: readonly [number, number, number];
 }
 
-export function broadleafAgeAt(species: BroadleafSpecies, height: number): number;
+export function broadleafAgeAt(species: BroadleafSpecies, height: number, open?: number): number;
 
-export function broadleafCrownWidth(species: BroadleafSpecies, dbh: number): number;
+export function broadleafCrownWidth(species: BroadleafSpecies, dbh: number, open?: number): number;
 
 export function broadleafDiameter(species: BroadleafSpecies, age: number, open?: number): number;
 
 export function broadleafForm(species: BroadleafSpecies, options?: BroadleafFormOptions): BroadleafForm;
 
-export function broadleafHeightAt(species: BroadleafSpecies, age: number): number;
+export function broadleafHeightAt(species: BroadleafSpecies, age: number, open?: number): number;
 
 export function parseBroadleafKey(key: string): BroadleafKey | undefined;
 ```

@@ -20,11 +20,18 @@
 //   it; tips in deep shade are cut off with their dead branches, so the inside of the crown shows bare limbs and the
 //   leaves sit in an outer shell.
 // - Foliage: alpha-cut spray cards (a code-drawn leaf atlas: lobed oak leaves on twigs, in four variants and three
-//   light levels), tilted 20 to 40 degrees from flat (broadleaf leaves are planophile to plagiophile; Pisek et al.
+//   light levels), tilted 40 to 65 degrees from flat (broadleaf leaves are planophile to plagiophile; Pisek et al.
 //   2013) with steep cross cards between; the card count follows the leaf area index. Normals blend each card's own
 //   normal with the direction out of its own foliage mass, not the whole crown's centre.
-// - Levels: the middle level keeps trunk and limbs and every fourth card at twice the size, the same leaf area (Cook,
-//   Halstead, Planck and Ryu 2007, "Stochastic simplification of aggregate detail", ACM TOG 26(3)); the far level is
+// - Levels: the middle level keeps trunk and limbs and about one card in five, chosen by visibility: cards are counted
+//   by the pixels they win in 12 low views of the near tree, each foliage mass keeps cards in proportion to what it
+//   shows, its cards are split into cells of equal visibility and one card a cell is drawn with odds equal to its
+//   visibility (stratified pruning, Cook and Halstead 2006, and Cook, Halstead, Planck and Ryu 2007, "Stochastic
+//   simplification of aggregate detail", ACM TOG 26(3); pruning by occlusion, Neubert, Pirk, Deussen and Dachsbacher
+//   2011). A kept card takes its cell's area (Remolar et al. 2002), grown about its centre, and each mass's cards are
+//   then scaled until the mass shows as much inside the near outline as the near tree does (Gasch et al. 2018). Random
+//   every-k-th cards at one width cannot match both: they sample all cards, not the visible ones, so they come out
+//   darker. The far level is
 //   the billboard cloud of Behrendt, Colditz, Franzke, Kopf and Deussen 2005 ("Realistic real-time rendering of
 //   landscapes using billboard clouds", Computer Graphics Forum 24(3)): three cards, each with its own baked
 //   orthographic view of the near mesh (albedo, a depth-based occlusion term, alpha coverage).
@@ -46,7 +53,7 @@ export type BroadleafCondition = 'live' | 'bare';
 
 /** Options of {@link generateBroadleafMesh}. */
 export interface BroadleafMeshOptions extends BroadleafFormOptions {
-  /** 2 near (all wood, all cards), 1 middle (trunk and limbs, every fourth card at twice the size), 0 far (stem only). Default 2. */
+  /** 2 near (all wood, all cards), 1 middle (trunk and limbs, about one card in five chosen by visibility, grown to keep the near coverage), 0 far (stem only). Default 2. */
   readonly detail?: 0 | 1 | 2;
   /** Leafed or bare. Default 'live'. */
   readonly condition?: BroadleafCondition;
@@ -91,6 +98,16 @@ const BREAST = 1.37,
   TILE_ROWS = 3,
   POINTS = 2200,
   NODE_CAP = 9000,
+  // The middle level: at most MIDDLE_CARDS cards (four triangles each, both faces) and MIDDLE_TRIANGLES with its wood,
+  // judged from MIDDLE_VIEWS directions (0 to 37 degrees up) at MIDDLE_CELLS pixels to a card's side, its sizes solved
+  // in at most MIDDLE_PASSES passes.
+  MIDDLE_CARDS = 800,
+  MIDDLE_TRIANGLES = 4000,
+  MIDDLE_VIEWS = 12,
+  MIDDLE_CELLS = 5,
+  MIDDLE_PASSES = 6,
+  // How far, in mass radii, a sampled spot may lie outside every foliage mass before a fill mass goes there.
+  FILL_GAP = 1,
   TILT = Math.tan(Math.PI / 12);
 
 function random(seed: number): () => number {
@@ -284,6 +301,8 @@ interface Card {
   size: number;
   tile: number;
   m: [number, number, number];
+  /** Index of the foliage mass the card belongs to. */
+  k: number;
 }
 interface Tree {
   form: BroadleafForm;
@@ -483,12 +502,9 @@ function grow(species: BroadleafSpecies, form: BroadleafForm, seed: number): Tre
     }
   }
   // Fill masses: where the limbs' own masses leave the dome empty, a mass goes at the sampled spot farthest from the
-  // others that a limb node can still reach, until the masses fill two thirds of the envelope.
-  const volOf = (m: Mass) => (4 / 3) * Math.PI * m.rh * m.rh * m.rv;
-  let envVol = 0;
-  for (let k = 0; k < 64; k++) envVol += Math.PI * env(zb + (CL * (k + 0.5)) / 64) ** 2 * (CL / 64);
-  let filled = masses.reduce((sum, m) => sum + volOf(m), 0);
-  for (let extra = 0; extra < 16 && filled < 0.65 * envVol; extra++) {
+  // others that a limb node can still reach, until no sampled spot lies more than a mass's radius outside every mass.
+  // (A volume sum counts overlaps, so it reads full while one side of the crown is still bare.)
+  for (let extra = 0; extra < 48; extra++) {
     let best: Mass | undefined,
       bestScore = -1;
     for (let tryk = 0; tryk < 40; tryk++) {
@@ -510,9 +526,8 @@ function grow(species: BroadleafSpecies, form: BroadleafForm, seed: number): Tre
         best = { x, y, z, rh, rv: rh * 0.6 };
       }
     }
-    if (!best) break;
+    if (!best || bestScore < FILL_GAP) break;
     masses.push(best);
-    filled += volOf(best);
   }
   // Attraction points in the masses, denser toward each mass's shell.
   const volume = masses.reduce((sum, m) => sum + m.rh * m.rh * m.rv, 0),
@@ -738,7 +753,7 @@ function grow(species: BroadleafSpecies, form: BroadleafForm, seed: number): Tre
 }
 
 // Leaf cards on the lit nodes: the count is the leaf area (LAI x crown ground area) over a card's leaf area, shared
-// out in a seeded order; two cards in three are sprays tilted 20 to 40 degrees from flat, the rest steep crosses.
+// out in a seeded order; two cards in three are sprays tilted 40 to 65 degrees from flat, the rest steep crosses.
 function makeCards(tree: Tree, cover: Float64Array, species: BroadleafSpecies): { cards: Card[]; leafArea: number } {
   const s = BROADLEAF_SPECIES[species],
     rand = random(tree.seed * 31 + 7),
@@ -802,7 +817,7 @@ function makeCards(tree: Tree, cover: Float64Array, species: BroadleafSpecies): 
       f = [cy, 0.35 * (rand() - 0.5), sy];
       u = [0, 1, 0];
     } else {
-      const tilt = (20 + 20 * rand()) * (Math.PI / 180) * (rand() < 0.7 ? 1 : -1);
+      const tilt = (40 + 25 * rand()) * (Math.PI / 180) * (rand() < 0.7 ? 1 : -1);
       f = [cy * Math.cos(tilt), Math.sin(tilt), sy * Math.cos(tilt)];
       u = [-sy, 0, cy];
     }
@@ -810,7 +825,7 @@ function makeCards(tree: Tree, cover: Float64Array, species: BroadleafSpecies): 
     const jx = (rand() - 0.5) * 2.6 * cardSize,
       jy = (rand() - 0.5) * 1.4 * cardSize,
       jz = (rand() - 0.5) * 2.6 * cardSize;
-    cards.push({ b: [x + jx, y + jy, z + jz], f, u, size, tile, m: [mc.x, mc.y, mc.z] });
+    cards.push({ b: [x + jx, y + jy, z + jz], f, u, size, tile, m: [mc.x, mc.y, mc.z], k: best });
     area += size * size * cover[tile];
   }
   return { cards, leafArea: area };
@@ -967,6 +982,310 @@ function canopyOf(cards: readonly Card[], every: number, scale: number, atlasSiz
   return geometryData(p, nrm, uv, idx);
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// The middle level (KB-PROCEDURAL-OAKIMPOSTER1): visibility-driven stratified pruning with solved sizes.
+
+interface Drawn {
+  c: [number, number, number];
+  f: [number, number, number];
+  u: [number, number, number];
+  size: number;
+  tile: number;
+  m: [number, number, number];
+  k: number;
+}
+
+interface MiddleView {
+  R: number;
+  cell: number;
+  cy: number;
+  dirs: readonly [number, number, number][];
+}
+
+// Orthographic z-buffer views of cards (alpha-cut by the atlas) and wood about the tree's mid height. Counts the pixels
+// each card wins and the wood pixels each mass owns (`owner`: one mass a wood triangle). Without `spans` it also
+// returns each view's row spans of covered pixels; with them, only pixels inside the spans count.
+function visibility(
+  cards: readonly Drawn[],
+  atlas: BroadleafImage,
+  wood: GeometryData,
+  owner: Int32Array,
+  masses: number,
+  view: MiddleView,
+  spans?: Int32Array[],
+): { vis: Float64Array; woodPx: Float64Array; spans: Int32Array[] } {
+  const { R, cell, cy, dirs } = view,
+    vis = new Float64Array(cards.length),
+    woodPx = new Float64Array(masses),
+    item = new Int32Array(R * R),
+    depth = new Float32Array(R * R),
+    out: Int32Array[] = [],
+    P = wood.positions,
+    I = wood.indices,
+    aw = atlas.width,
+    ah = atlas.height,
+    ad = atlas.data,
+    half = R / 2;
+  for (let di = 0; di < dirs.length; di++) {
+    const d = dirs[di],
+      u = norm([d[2], 0, -d[0]]),
+      v0 = d[1] * u[2] - d[2] * u[1],
+      v1 = d[2] * u[0] - d[0] * u[2],
+      v2 = d[0] * u[1] - d[1] * u[0],
+      sx = (x: number, y: number, z: number) => half + (x * u[0] + y * u[1] + z * u[2]) / cell,
+      sy = (x: number, y: number, z: number) => half - (x * v0 + (y - cy) * v1 + z * v2) / cell,
+      sz = (x: number, y: number, z: number) => x * d[0] + y * d[1] + z * d[2];
+    item.fill(-1);
+    depth.fill(-Infinity);
+    for (let ci = 0; ci < cards.length; ci++) {
+      const { c, f, size, tile } = cards[ci],
+        cu = cards[ci].u,
+        col = tile % TILE_COLS,
+        row = Math.floor(tile / TILE_COLS),
+        // The card's corner (s, t) = (0, 0) and its two edges on screen.
+        x0 = c[0] - (cu[0] + f[0]) * size * 0.5,
+        y0 = c[1] - (cu[1] + f[1]) * size * 0.5,
+        z0 = c[2] - (cu[2] + f[2]) * size * 0.5,
+        ox = sx(x0, y0, z0),
+        oy = sy(x0, y0, z0),
+        oz = sz(x0, y0, z0),
+        ux = cu[0] * size,
+        uy = cu[1] * size,
+        uz = cu[2] * size,
+        fx = f[0] * size,
+        fy = f[1] * size,
+        fz = f[2] * size,
+        ex0 = sx(x0 + ux, y0 + uy, z0 + uz) - ox,
+        ex1 = sy(x0 + ux, y0 + uy, z0 + uz) - oy,
+        exz = sz(x0 + ux, y0 + uy, z0 + uz) - oz,
+        ey0 = sx(x0 + fx, y0 + fy, z0 + fz) - ox,
+        ey1 = sy(x0 + fx, y0 + fy, z0 + fz) - oy,
+        eyz = sz(x0 + fx, y0 + fy, z0 + fz) - oz,
+        det = ex0 * ey1 - ex1 * ey0;
+      if (Math.abs(det) < 1e-9) continue;
+      const xa = Math.max(0, Math.floor(Math.min(ox, ox + ex0, ox + ey0, ox + ex0 + ey0))),
+        xb = Math.min(R - 1, Math.ceil(Math.max(ox, ox + ex0, ox + ey0, ox + ex0 + ey0))),
+        ya = Math.max(0, Math.floor(Math.min(oy, oy + ex1, oy + ey1, oy + ex1 + ey1))),
+        yb = Math.min(R - 1, Math.ceil(Math.max(oy, oy + ex1, oy + ey1, oy + ex1 + ey1)));
+      for (let y = ya; y <= yb; y++)
+        for (let x = xa; x <= xb; x++) {
+          const dx = x + 0.5 - ox,
+            dy = y + 0.5 - oy,
+            s = (dx * ey1 - dy * ey0) / det,
+            t = (ex0 * dy - ex1 * dx) / det;
+          if (s < 0 || s > 1 || t < 0 || t > 1) continue;
+          const z = oz + s * exz + t * eyz,
+            i = y * R + x;
+          if (z <= depth[i]) continue;
+          const tx = Math.min(aw - 1, Math.floor(((col + s) / TILE_COLS) * aw)),
+            ty = Math.min(ah - 1, Math.floor(((row + 1 - t) / (2 * TILE_COLS)) * ah));
+          if (ad[(ty * aw + tx) * 4 + 3] < 128) continue;
+          depth[i] = z;
+          item[i] = ci;
+        }
+    }
+    for (let t = 0; t < I.length; t += 3) {
+      const a = I[t] * 3,
+        b = I[t + 1] * 3,
+        e = I[t + 2] * 3,
+        ax = sx(P[a], P[a + 1], P[a + 2]),
+        ay = sy(P[a], P[a + 1], P[a + 2]),
+        az = sz(P[a], P[a + 1], P[a + 2]),
+        bx = sx(P[b], P[b + 1], P[b + 2]),
+        by = sy(P[b], P[b + 1], P[b + 2]),
+        bz = sz(P[b], P[b + 1], P[b + 2]),
+        ex = sx(P[e], P[e + 1], P[e + 2]),
+        ey = sy(P[e], P[e + 1], P[e + 2]),
+        ez = sz(P[e], P[e + 1], P[e + 2]),
+        area = (bx - ax) * (ey - ay) - (by - ay) * (ex - ax);
+      if (!area) continue;
+      const xa = Math.max(0, Math.floor(Math.min(ax, bx, ex))),
+        xb = Math.min(R - 1, Math.ceil(Math.max(ax, bx, ex))),
+        ya = Math.max(0, Math.floor(Math.min(ay, by, ey))),
+        yb = Math.min(R - 1, Math.ceil(Math.max(ay, by, ey))),
+        mark = -2 - owner[t / 3];
+      for (let y = ya; y <= yb; y++)
+        for (let x = xa; x <= xb; x++) {
+          const px = x + 0.5,
+            py = y + 0.5,
+            w0 = ((bx - px) * (ey - py) - (by - py) * (ex - px)) / area,
+            w1 = ((ex - px) * (ay - py) - (ey - py) * (ax - px)) / area,
+            w2 = 1 - w0 - w1;
+          if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+          const z = w0 * az + w1 * bz + w2 * ez,
+            i = y * R + x;
+          if (z <= depth[i]) continue;
+          depth[i] = z;
+          item[i] = mark;
+        }
+    }
+    let sp = spans?.[di];
+    if (!sp) {
+      sp = new Int32Array(R * 2).fill(-1);
+      for (let y = 0; y < R; y++)
+        for (let x = 0; x < R; x++)
+          if (item[y * R + x] !== -1) {
+            if (sp[y * 2] < 0) sp[y * 2] = x;
+            sp[y * 2 + 1] = x;
+          }
+      out.push(sp);
+    }
+    for (let y = 0; y < R; y++) {
+      const lo = sp[y * 2],
+        hi = sp[y * 2 + 1];
+      if (lo < 0) continue;
+      for (let x = lo; x <= hi; x++) {
+        const k = item[y * R + x];
+        if (k >= 0) vis[k]++;
+        else if (k < -1) woodPx[-2 - k]++;
+      }
+    }
+  }
+  return { vis, woodPx, spans: spans ?? out };
+}
+
+// The mass each wood triangle belongs to: the card-carrying mass nearest its centroid (the makeCards metric).
+function woodOwners(wood: GeometryData, masses: readonly Mass[], carrying: readonly number[]): Int32Array {
+  const P = wood.positions,
+    I = wood.indices,
+    owner = new Int32Array(I.length / 3);
+  for (let t = 0; t < I.length; t += 3) {
+    const x = (P[I[t] * 3] + P[I[t + 1] * 3] + P[I[t + 2] * 3]) / 3,
+      y = (P[I[t] * 3 + 1] + P[I[t + 1] * 3 + 1] + P[I[t + 2] * 3 + 1]) / 3,
+      z = (P[I[t] * 3 + 2] + P[I[t + 1] * 3 + 2] + P[I[t + 2] * 3 + 2]) / 3;
+    let best = carrying[0] ?? 0,
+      bd = Infinity;
+    for (const k of carrying) {
+      const m = masses[k],
+        dd = ((m.x - x) ** 2 + ((m.y - y) * 1.6) ** 2 + (m.z - z) ** 2) / (m.rh * m.rh);
+      if (dd < bd) {
+        bd = dd;
+        best = k;
+      }
+    }
+    owner[t / 3] = best;
+  }
+  return owner;
+}
+
+// The middle level's cards. Each mass keeps cards in proportion to the pixels it shows (its cards and the wood it
+// owns) over MIDDLE_VIEWS views of the near tree; its cards are split into cells of equal visibility (a k-d split on
+// the longest axis of their centres) and each cell keeps one card, drawn with odds equal to its visibility, taking the
+// cell's area about its own centre. Each mass's cards are then scaled until the mass, with the middle wood, shows as
+// many pixels inside the near outline as the near mass does.
+function middleCards(p: Prepared, nearWood: GeometryData, middleWood: GeometryData): Card[] {
+  const tree = p.tree,
+    f = p.form,
+    extent = 1.2 * Math.max(f.height / 2, f.crownWidth / 2),
+    R = clamp(Math.ceil((2 * extent * MIDDLE_CELLS) / tree.cardSize), 64, 512),
+    dirs: [number, number, number][] = [];
+  for (let k = 0; k < MIDDLE_VIEWS; k++) {
+    const up = 0.6 * ((k + 0.5) / MIDDLE_VIEWS),
+      az = k * 2.39996323,
+      flat = Math.sqrt(1 - up * up);
+    dirs.push([flat * Math.sin(az), up, flat * Math.cos(az)]);
+  }
+  const view: MiddleView = { R, cell: (2 * extent) / R, cy: f.height / 2, dirs },
+    near: Drawn[] = p.cards.map((k) => ({
+      c: [k.b[0] + k.f[0] * k.size * 0.5, k.b[1] + k.f[1] * k.size * 0.5, k.b[2] + k.f[2] * k.size * 0.5],
+      f: k.f,
+      u: k.u,
+      size: k.size,
+      tile: k.tile,
+      m: k.m,
+      k: k.k,
+    })),
+    M = tree.masses.length,
+    groups: number[][] = Array.from({ length: M }, () => []);
+  near.forEach((k, i) => groups[k.k].push(i));
+  const carrying = groups.flatMap((g, k) => (g.length ? [k] : [])),
+    nv = visibility(near, p.atlas, nearWood, woodOwners(nearWood, tree.masses, carrying), M, view),
+    vis = nv.vis,
+    target = groups.map((ids, k) => ids.reduce((a, i) => a + vis[i], 0) + nv.woodPx[k]),
+    total = target.reduce((a, b) => a + b, 0),
+    budget = Math.min(
+      MIDDLE_CARDS,
+      Math.floor((MIDDLE_TRIANGLES - middleWood.indices.length / 3) / 4) - 4,
+      Math.ceil(near.length / 4),
+    ),
+    rand = random(tree.seed * 131 + 5),
+    kept: Drawn[] = [];
+  if (!(total > 0) || budget < 1) return [];
+  const split = (set: number[], n: number, cells: number[][]): void => {
+    if (n <= 1 || set.length <= 1) {
+      cells.push(set);
+      return;
+    }
+    const lo = [Infinity, Infinity, Infinity],
+      hi = [-Infinity, -Infinity, -Infinity];
+    for (const i of set)
+      for (let a = 0; a < 3; a++) {
+        lo[a] = Math.min(lo[a], near[i].c[a]);
+        hi[a] = Math.max(hi[a], near[i].c[a]);
+      }
+    const ax =
+      hi[0] - lo[0] > hi[1] - lo[1] ? (hi[0] - lo[0] > hi[2] - lo[2] ? 0 : 2) : hi[1] - lo[1] > hi[2] - lo[2] ? 1 : 2;
+    set.sort((a, b) => near[a].c[ax] - near[b].c[ax] || a - b);
+    const nl = Math.floor(n / 2),
+      W = set.reduce((a, i) => a + vis[i], 0);
+    let acc = 0,
+      j = 0;
+    while (j < set.length - 1 && acc + vis[set[j]] <= (W * nl) / n) acc += vis[set[j++]];
+    j = Math.max(1, j);
+    split(set.slice(0, j), nl, cells);
+    split(set.slice(j), n - nl, cells);
+  };
+  for (const k of carrying) {
+    const n = Math.round((budget * target[k]) / total),
+      cells: number[][] = [];
+    if (n < 1) continue;
+    split(groups[k].slice(), n, cells);
+    for (const cell of cells) {
+      const V = cell.reduce((a, i) => a + vis[i], 0);
+      if (!(V > 0)) continue;
+      let j = cell[0],
+        r = rand() * V;
+      for (const i of cell) {
+        r -= vis[i];
+        j = i;
+        if (r <= 0) break;
+      }
+      kept.push({ ...near[j], size: Math.sqrt(cell.reduce((a, i) => a + near[i].size ** 2, 0)) });
+    }
+  }
+  // Each mass's scale: a secant step in log space on how its visible pixels grow with the card side.
+  const owner = woodOwners(middleWood, tree.masses, carrying),
+    base = kept.map((k) => k.size),
+    scale = new Float64Array(M).fill(1),
+    prevS = new Float64Array(M),
+    prevG = new Float64Array(M);
+  for (let pass = 0; pass < MIDDLE_PASSES; pass++) {
+    const mv = visibility(kept, p.atlas, middleWood, owner, M, view, nv.spans),
+      got = Float64Array.from(mv.woodPx);
+    mv.vis.forEach((x, i) => (got[kept[i].k] += x));
+    if (Math.abs(got.reduce((a, b) => a + b, 0) / total - 1) < 0.003) break;
+    for (let k = 0; k < M; k++) {
+      if (!(got[k] > 0 && target[k] > 0)) continue;
+      let e = 1;
+      if (prevS[k] && Math.abs(Math.log(scale[k] / prevS[k])) > 1e-3)
+        e = clamp(Math.log(got[k] / prevG[k]) / (2 * Math.log(scale[k] / prevS[k])), 0.15, 1);
+      prevS[k] = scale[k];
+      prevG[k] = got[k];
+      scale[k] *= clamp((target[k] / got[k]) ** (1 / (2 * e)), 0.6, 1.5);
+    }
+    kept.forEach((k, i) => (k.size = base[i] * scale[k.k]));
+  }
+  return kept.map(({ c, f: d, u, size, tile, m, k }) => ({
+    b: [c[0] - d[0] * size * 0.5, c[1] - d[1] * size * 0.5, c[2] - d[2] * size * 0.5],
+    f: d,
+    u,
+    size,
+    tile,
+    m,
+    k,
+  }));
+}
+
 /**
  * A broadleaf at an age or height: trunk forking into limbs with pipe-model radii and twigs grown by space
  * colonisation, shaded inner branches shed, leaf cards cut from a code-drawn atlas, or the bare wood in winter.
@@ -979,13 +1298,14 @@ export function generateBroadleafMesh(species: BroadleafSpecies, options: Broadl
   const detail = options.detail ?? 2;
   if (detail !== 0 && detail !== 1 && detail !== 2) throw new RangeError('detail must be 0, 1 or 2.');
   const p = prepare(species, options),
-    w = wood(p, detail, (options.seed ?? 1) >>> 0),
+    seed = (options.seed ?? 1) >>> 0,
+    w = wood(p, detail, seed),
     canopy =
       !p.live || detail === 0
         ? geometryData([], [], [], [])
         : detail === 2
           ? canopyOf(p.cards, 1, 1, p.atlas.width)
-          : canopyOf(p.cards, 4, 2.25, p.atlas.width);
+          : canopyOf(middleCards(p, wood(p, 2, seed).trunk, w.trunk), 1, 1, p.atlas.width);
   return {
     trunk: w.trunk,
     canopy,
@@ -1220,7 +1540,7 @@ export function broadleafLevels(species: BroadleafSpecies, options: BroadleafLev
     return { form: p.form, trunk: [near.trunk, middle.trunk, far.trunk], canopy: [none, none, none] };
   }
   const nearCanopy = canopyOf(p.cards, 1, 1, p.atlas.width),
-    middleCanopy = canopyOf(p.cards, 4, 2.25, p.atlas.width),
+    middleCanopy = canopyOf(middleCards(p, near.trunk, middle.trunk), 1, 1, p.atlas.width),
     imp = generateBroadleafImposter({ trunk: near.trunk, canopy: nearCanopy, form: p.form, atlas: p.atlas }),
     none = geometryData(
       [0, 0, 0, 0, 0.001, 0, 0.001, 0, 0],

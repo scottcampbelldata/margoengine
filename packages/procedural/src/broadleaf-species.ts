@@ -7,7 +7,15 @@
 //   relationship for different species of broadleaved trees", Forest Ecology and Management 215, 285-294, and the table
 //   of open-grown trees on https://gabrielhemery.com/blog/2011/06/15/how-big-will-this-tree-grow/ (oak 2.50 m across at
 //   0.10 m dbh and 13.14 m at 0.70 m, a straight line 0.727 + 17.73 dbh; beech 2.52 m and 11.96 m, 0.947 + 15.73 dbh).
+// - Open-grown oak height and shape: Bean, "Trees and Shrubs Hardy in the British Isles", Quercus robur,
+//   http://www.beanstreesandshrubs.org/browse/quercus/quercus-robur-l/ ("in the open ground a broad, spreading head
+//   [...] wider than the tree is high"; fully grown 60 to 80 ft there, 100 ft or more close together). The open-grown
+//   asymptote is 21.3 m (70 ft); the forest one stays 28 m.
 //   The table has no alder; the alder line is ours, narrower than beech.
+// - Free-standing crowns: Coombes, Martin and Slater 2019, "Defining the allometry of stem and crown diameter of urban
+//   trees", Urban Forestry & Urban Greening 44, 126421, https://doi.org/10.1016/j.ufug.2019.126421 (400 free-standing
+//   trees in Norwich and Peterborough, oak among them: crown diameter 24 to 27 times dbh, abstract). A solitary oak's
+//   crown is that wide (25.5 dbh at open 1); Hemery's line, 18.7 dbh at a mature oak's 0.82 m, holds at open 0.
 // - Growth form: Eaton, Caudullo, Oliveira and de Rigo 2016, "Quercus robur and Quercus petraea in Europe", European
 //   Atlas of Forest Tree Species (open-grown pedunculate oak forks low into a few large decurrent limbs); Buck-Sorlin
 //   and Bell 2000, "Models of crown architecture in Quercus petraea and Q. robur", Forestry 73(5); Barthelemy and
@@ -30,12 +38,19 @@ export type BroadleafAge = 'sapling' | 'pole' | 'mature' | 'old';
 export interface BroadleafSpeciesData {
   /** Latin name. */
   readonly latin: string;
-  /** Chapman-Richards height growth: asymptote (m), rate (per year) and shape. */
+  /** Chapman-Richards height growth: asymptote (m), rate (per year) and shape, of a forest-grown tree. */
   readonly growth: readonly [number, number, number];
+  /** The height asymptote of an open-grown tree (m), reached at open 1; the forest asymptote where it is 0. */
+  readonly openHeight: number;
   /** Diameter at breast height asymptote, forest grown and open grown (m), and its time constant (years). */
   readonly dbh: readonly [number, number, number];
   /** Crown diameter = a + b dbh (metres; Hemery's open-grown table). */
   readonly crownWidth: readonly [number, number];
+  /**
+   * Crown diameter over dbh of a free-standing tree (Coombes, Martin and Slater 2019), or 0 where no free-standing data
+   * is used: the crown width runs from Hemery's line at open 0 to this ratio times dbh at open 1.
+   */
+  readonly freeCrown: number;
   /** Crown base height over total height, forest grown and open grown. */
   readonly crownBase: readonly [number, number];
   /** Limbs the trunk forks into, fewest and most (an alder's leader counts as one). */
@@ -63,14 +78,16 @@ export const BROADLEAF_SPECIES: Readonly<Record<BroadleafSpecies, BroadleafSpeci
   'english-oak': Object.freeze({
     latin: 'Quercus robur',
     growth: [28, 0.013, 1.2] as const,
+    openHeight: 21.3,
     dbh: [0.9, 1.4, 120] as const,
     crownWidth: [0.727, 17.73] as const,
+    freeCrown: 25.5,
     crownBase: [0.45, 0.16] as const,
     limbs: [4, 7] as const,
     fork: 0.3,
     leader: false,
-    limbPitch: [-12, 55] as const,
-    massSize: 0.185,
+    limbPitch: [-22, 55] as const,
+    massSize: 0.23,
     lai: 5.8,
     leaf: [0.11, 0.075, 6] as const,
     leaves: [0.05, 0.11, 0.035] as const,
@@ -79,8 +96,10 @@ export const BROADLEAF_SPECIES: Readonly<Record<BroadleafSpecies, BroadleafSpeci
   'european-beech': Object.freeze({
     latin: 'Fagus sylvatica',
     growth: [35, 0.015, 1.3] as const,
+    openHeight: 0,
     dbh: [0.8, 1.2, 110] as const,
     crownWidth: [0.947, 15.73] as const,
+    freeCrown: 0,
     crownBase: [0.5, 0.2] as const,
     limbs: [5, 8] as const,
     fork: 0.6,
@@ -95,8 +114,10 @@ export const BROADLEAF_SPECIES: Readonly<Record<BroadleafSpecies, BroadleafSpeci
   'black-alder': Object.freeze({
     latin: 'Alnus glutinosa',
     growth: [28, 0.022, 1.2] as const,
+    openHeight: 0,
     dbh: [0.45, 0.65, 60] as const,
     crownWidth: [0.8, 12] as const,
+    freeCrown: 0,
     crownBase: [0.45, 0.3] as const,
     limbs: [5, 8] as const,
     fork: 0.95,
@@ -126,7 +147,7 @@ export const BROADLEAF_AGES: Readonly<Record<BroadleafAge, number>> = Object.fre
 export interface BroadleafFormOptions {
   /** Age in years (1 to 600) or a named age. Default 'mature' (120 years). Ignored when `height` is given. */
   readonly age?: number | BroadleafAge;
-  /** Total height in metres, 1.5 up to just under the species' asymptote; overrides `age`. */
+  /** Total height in metres, 1.5 up to just under the species' asymptote at this `open`; overrides `age`. */
   readonly height?: number;
   /** 0 forest grown (high bole, slender) to 1 open grown (low limbs, stout). Default 0.8, a meadow or park tree. */
   readonly open?: number;
@@ -140,7 +161,7 @@ export interface BroadleafForm {
   readonly height: number;
   /** Diameter at breast height (1.37 m). */
   readonly dbh: number;
-  /** Crown diameter (Hemery's line for the species). */
+  /** Crown diameter (Hemery's line, toward the free-standing ratio as `open` rises). */
   readonly crownWidth: number;
   /** Height of the lowest limb. */
   readonly crownBase: number;
@@ -159,15 +180,25 @@ const speciesData = (species: BroadleafSpecies): BroadleafSpeciesData => {
   return s;
 };
 
-/** Height in metres at `age` years (Chapman-Richards). */
-export function broadleafHeightAt(species: BroadleafSpecies, age: number): number {
-  const [a, k, p] = speciesData(species).growth;
-  return BREAST + (a - BREAST) * (1 - Math.exp(-k * age)) ** p;
+// The height curve of a tree `open` (0 forest grown to 1 open grown): its asymptote, and a rate that keeps a young
+// tree's height (a k^p, the curve's start) the forest tree's, since an open-grown tree is not slower when young, only
+// lower when old. Returns [asymptote above breast height, rate, shape].
+const curve = (s: BroadleafSpeciesData, open: number): [number, number, number] => {
+  const [a, k, p] = s.growth,
+    top = s.openHeight > 0 ? a + (s.openHeight - a) * open : a;
+  return [top - BREAST, k * ((a - BREAST) / (top - BREAST)) ** (1 / p), p];
+};
+
+/** Height in metres at `age` years (Chapman-Richards), of a forest (`open` 0, the default) to open (1) grown tree. */
+export function broadleafHeightAt(species: BroadleafSpecies, age: number, open = 0): number {
+  const [a, k, p] = curve(speciesData(species), open);
+  return BREAST + a * (1 - Math.exp(-k * age)) ** p;
 }
 
 /** Age in years at which the species reaches `height` metres (the inverse of {@link broadleafHeightAt}). */
-export function broadleafAgeAt(species: BroadleafSpecies, height: number): number {
-  const [a, k, p] = speciesData(species).growth;
+export function broadleafAgeAt(species: BroadleafSpecies, height: number, open = 0): number {
+  const [top, k, p] = curve(speciesData(species), open),
+    a = BREAST + top;
   if (!(height > BREAST && height < a))
     throw new RangeError(`Height must be above 1.37 m and below ${a} m for ${species}.`);
   return -Math.log(1 - ((height - BREAST) / (a - BREAST)) ** (1 / p)) / k;
@@ -179,10 +210,15 @@ export function broadleafDiameter(species: BroadleafSpecies, age: number, open =
   return Math.max(0.01, (forest + (wide - forest) * open) * (1 - Math.exp(-age / tau)));
 }
 
-/** Crown width in metres for a stem diameter in metres (Hemery's line). */
-export function broadleafCrownWidth(species: BroadleafSpecies, dbh: number): number {
-  const [a, b] = speciesData(species).crownWidth;
-  return a + b * dbh;
+/**
+ * Crown width in metres for a stem diameter in metres: Hemery's line at `open` 0 (the default), running to the
+ * free-standing ratio of Coombes, Martin and Slater 2019 at `open` 1 for a species that has one (English oak).
+ */
+export function broadleafCrownWidth(species: BroadleafSpecies, dbh: number, open = 0): number {
+  const s = speciesData(species),
+    [a, b] = s.crownWidth,
+    line = a + b * dbh;
+  return s.freeCrown > 0 ? line + (s.freeCrown * dbh - line) * open : line;
 }
 
 /**
@@ -196,15 +232,16 @@ export function broadleafForm(species: BroadleafSpecies, options: BroadleafFormO
   let age: number, height: number;
   if (options.height !== undefined) {
     height = options.height;
-    if (!(typeof height === 'number' && height >= 1.5 && height <= s.growth[0] - 0.05))
-      throw new RangeError(`height must be 1.5 to ${s.growth[0] - 0.05} m for ${species}.`);
-    age = broadleafAgeAt(species, height);
+    const top = BREAST + curve(s, open)[0] - 0.05;
+    if (!(typeof height === 'number' && height >= 1.5 && height <= top))
+      throw new RangeError(`height must be 1.5 to ${top.toFixed(2)} m for ${species} at open ${open}.`);
+    age = broadleafAgeAt(species, height, open);
   } else {
     const named = options.age ?? 'mature';
     age = typeof named === 'string' ? (Object.hasOwn(BROADLEAF_AGES, named) ? BROADLEAF_AGES[named] : NaN) : named;
     if (!(typeof age === 'number' && age >= 1 && age <= 600))
       throw new RangeError("age must be 1 to 600 years or 'sapling', 'pole', 'mature' or 'old'.");
-    height = Math.max(1.5, broadleafHeightAt(species, age));
+    height = Math.max(1.5, broadleafHeightAt(species, age, open));
   }
   const dbh = broadleafDiameter(species, age, open),
     base = height * (s.crownBase[0] + (s.crownBase[1] - s.crownBase[0]) * open);
@@ -214,7 +251,7 @@ export function broadleafForm(species: BroadleafSpecies, options: BroadleafFormO
     open,
     height,
     dbh,
-    crownWidth: broadleafCrownWidth(species, dbh),
+    crownWidth: broadleafCrownWidth(species, dbh, open),
     crownBase: base,
     crownLength: height - base,
     crownRatio: (height - base) / height,

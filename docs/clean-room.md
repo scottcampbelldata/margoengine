@@ -12678,11 +12678,35 @@ companion code. The leaf atlas is drawn in code; no photograph or outside image 
 - N. Breda, "Ground-based measurements of leaf area index: a review of methods, instruments and current controversies",
   Journal of Experimental Botany 54(392), 2003; J. Pisek, O. Sonnentag, A. Richardson and M. Mottus, "Is the spherical
   leaf inclination angle distribution a valid assumption for temperate and boreal broadleaf tree species?", Agricultural
-  and Forest Meteorology 169, 2013. Used: a leaf area index of 4 to 6 and cards tilted 20 to 40 degrees from flat.
+  and Forest Meteorology 169, 2013. Used: a leaf area index of 4 to 6, and broadleaf leaves planophile to plagiophile;
+  the spray cards' tilt of 40 to 65 degrees from flat is ours, the range that puts the crown's sky in the photo band.
+- J. Coombes, J. Martin and D. Slater, "Defining the allometry of stem and crown diameter of urban trees", Urban
+  Forestry & Urban Greening 44, 126421, 2019, https://doi.org/10.1016/j.ufug.2019.126421. Used (abstract): free-standing
+  crowns 24 to 27 times the stem diameter; the oak's crown runs from Hemery's line at open 0 to 25.5 dbh at open 1.
+- W. J. Bean, "Trees and Shrubs Hardy in the British Isles", Quercus robur,
+  http://www.beanstreesandshrubs.org/browse/quercus/quercus-robur-l/. Used: in open ground the crown is wider than the
+  tree is high, 60 to 80 ft fully grown (100 ft or more close together); the open-grown height asymptote 21.3 m is ours
+  from it, the rate scaled so a young tree's height is the forest tree's.
+- The photo band: five open-grown Quercus robur photographs on Wikimedia Commons ("Category:Solitary Quercus robur",
+  named in `test/broadleaves.test.js`), measured only (hull gap 0.10 to 0.19, inner transparency up to 0.09); no pixel of
+  them is used by the engine.
 - R. Cook, J. Halstead, M. Planck and D. Ryu, "Stochastic simplification of aggregate detail", ACM TOG 26(3), 2007;
   M. Behrendt, C. Colditz, O. Franzke, J. Kopf and O. Deussen, "Realistic real-time rendering of landscapes using
-  billboard clouds", Computer Graphics Forum 24(3), 2005. Used: the middle level (fewer, wider cards) and the far level
-  (crossed cards, each with its own baked view).
+  billboard clouds", Computer Graphics Forum 24(3), 2005. Used: area kept as cards are pruned (Cook et al.) and the far
+  level (crossed cards, each with its own baked view). Contrast compensation was judged and not used: the middle ring's
+  error was a shift of the mean, not of the variance.
+- R. Cook and J. Halstead, "Stochastic pruning", Pixar Technical Memo 06-05, 2006,
+  https://graphics.pixar.com/library/StochasticPruning/paper.pdf; B. Neubert, S. Pirk, O. Deussen and C. Dachsbacher,
+  "Improved model- and view-dependent pruning of large botanical scenes", Computer Graphics Forum 30(6), 1708-1718, 2011,
+  https://doi.org/10.1111/j.1467-8659.2011.01897.x. Used: a stratified choice of the kept cards, pruning by what the
+  views show rather than at random (the middle level's 12 views, cells of equal visibility, one card a cell drawn with
+  odds equal to its visibility).
+- I. Remolar, M. Chover, O. Belmonte, J. Ribelles and C. Rebollo, "Geometric simplification of foliage", Eurographics
+  2002 short presentations, https://diglib.eg.org/items/879d3160-d9ee-4463-9b0b-b36fda9bba37; C. Gasch, I. Remolar,
+  M. Chover and C. Rebollo, "Viewpoint-driven simplification of plant and tree foliage", Entropy 20(4), 213, 2018,
+  https://doi.org/10.3390/e20040213 (abstracts read). Used: a kept card takes the area of the cards it replaces, and
+  the survivors' size makes up what the views lose; the per-mass size solve against the near coverage inside the near
+  outline (a secant step in log space, at most 6 passes) is ours.
 - F. Richards, "A flexible growth function for empirical use", Journal of Experimental Botany 10(2), 1959. Used: the
   Chapman-Richards height-age form; its rates, the diameter curve, albedos and leaf sizes are ours.
 

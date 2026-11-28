@@ -1605,20 +1605,31 @@ English oak, European beech and black alder at any age, leafed or bare. An oak i
 colonisation, the inner branches that sit in deep shade are shed so the limbs show, and leaf clusters (alpha-cut cards
 cut from a leaf atlas drawn in code) sit in a shell on the outside, with sky between the masses. Sizes are measured
 forestry: crown width follows Hemery's table of open-grown trees (an oak 2.5 m across at 0.1 m diameter and 13.1 m at
-0.7 m), branch radii follow the pipe model (r^2.4 at a fork is the sum of the children's) scaled so breast height has the
+0.7 m) at `open` 0 and runs to the free-standing crowns of Coombes, Martin and Slater (2019, 25.5 times the stem
+diameter for an oak) at `open` 1; an open-grown oak's height levels off at 21.3 m (Bean: in open ground the crown is
+wider than the tree is high), so the default meadow oak is 18.8 m tall and 19.8 m wide. Branch radii follow the pipe model (r^2.4 at a fork is the sum of the children's) scaled so breast height has the
 stem's diameter, and the leaf area is a leaf area index of 4 to 6 over the crown's ground area. Tested from orthographic
-views against the old lobe crown (`generateTreeMesh('broadleaf')`): sky inside the silhouette's convex hull 0.25 to 0.45
-(the old crown 0.15), sky in that hull shrunk to 0.8 0.10 to 0.25 (old 0.03), bark at least 2 percent of the crown
-(old 1.3 percent).
+views against five photographed open-grown English oaks (Wikimedia Commons): sky inside the silhouette's convex hull
+0.10 to 0.20 (the photos 0.10 to 0.19), sky in that hull shrunk to 0.8 at most 0.10 (photos up to 0.09), bark at least
+2 percent of the crown (the old lobe crown, `generateTreeMesh('broadleaf')`, 1.3 percent). Seeds 1 to 3 are in that
+band; of seeds 1 to 10, 7 are, and seeds 5, 6 and 9 show 0.206 to 0.217 of sky in the hull (holes inside the crown).
 
 - `broadleafForm(species, {age, height, open})` (also in `/broadleaf-species`, a small data entry): `{height, dbh,
   crownWidth, crownBase, crownLength, crownRatio}` in metres. `age` is years or `'sapling'` (15), `'pole'` (40),
   `'mature'` (120, the default) or `'old'` (300); `open` runs from 0 (forest grown, high bole) to 1 (open grown, low
-  limbs, stout; default 0.8, a meadow tree).
+  limbs, stout, wide and lower; default 0.8, a meadow tree). `broadleafHeightAt(species, age, open)` and
+  `broadleafAgeAt(species, height, open)` take the same `open` (default 0, the forest curve; an open-grown tree is as
+  tall as a forest one when young and levels off lower), and `broadleafCrownWidth(species, dbh, open)` likewise
+  (default 0, Hemery's line).
 - `generateBroadleafMesh(species, {age, height, open, detail, condition, seed, atlasSize})`: `{trunk, canopy, form,
   limbs, masses, leafArea, distanceTests, skeleton, atlas}`, standing on y = 0. `detail` 2 (near: all the wood to the
-  twigs that carry leaves and every card, about 15,000 triangles for a mature oak), 1 (middle: trunk and limbs and every
-  fourth card, 2.25 times as wide, about 2,900) or 0 (the stem). `condition` `'live'` or `'bare'`. The canopy's uvs point
+  twigs that carry leaves and every card, about 22,000 triangles for a mature oak), 1 (middle: trunk and limbs and about
+  one card in five, at most 800 and 4,000 triangles with the wood: 3,922 for a mature oak) or 0 (the stem). The middle
+  cards are chosen by visibility: 12 low views of the near tree count the pixels each card wins, each foliage mass keeps
+  cards in proportion to what it shows, its cards are split into cells of equal visibility and each cell keeps one card
+  drawn with odds equal to its visibility; a kept card takes its cell's area, and each mass is then scaled until it shows
+  as much inside the near outline as the near tree does. From 24 views the middle oak stays well inside the near
+  tree's own change when turned 45 degrees (seed 1: coverage 2.2 percent against 5.3, luminance 2.5 against 4.7). `condition` `'live'` or `'bare'`. The canopy's uvs point
   into `atlas` (draw it with an alpha cut-off of 0.5 and both faces); `skeleton` is the grown wood as nodes, parents,
   pipe-model radii and branch orders; `distanceTests` is the growth's work count. Growing takes a few hundred
   milliseconds for a mature tree.
@@ -1632,7 +1643,7 @@ views against the old lobe crown (`generateTreeMesh('broadleaf')`): sky inside t
 ```ts
 import {broadleafLevels, generateBroadleafMesh, parseBroadleafKey} from 'margoengine/procedural/broadleaves';
 const oak = generateBroadleafMesh('english-oak', {age: 'mature'});
-console.log(oak.form.height.toFixed(1), (oak.form.dbh * 100).toFixed(0), oak.form.crownWidth.toFixed(1), oak.limbs); // 21.4 82 15.3 5
+console.log(oak.form.height.toFixed(1), (oak.form.dbh * 100).toFixed(0), oak.form.crownWidth.toFixed(1), oak.limbs); // 18.8 82 19.8 5
 const beech = broadleafLevels('european-beech', {age: 'pole'});
 console.log(beech.canopy.length, beech.textures?.baseColor.width, beech.textures?.baseColor.height); // 3 512 1024
 console.log(parseBroadleafKey('procedural:english-oak/old')?.age); // old
@@ -1658,7 +1669,13 @@ Tree Species; Buck-Sorlin and Bell 2000, "Models of crown architecture in Quercu
 Barthelemy and Caraglio 2007, "Plant architecture", Annals of Botany 99(3); Breda 2003, "Ground-based measurements of leaf
 area index", Journal of Experimental Botany 54(392); Pisek et al. 2013, "Is the spherical leaf inclination angle
 distribution a valid assumption for temperate and boreal broadleaf tree species?", Agricultural and Forest Meteorology 169;
-Cook, Halstead, Planck and Ryu 2007, "Stochastic simplification of aggregate detail", ACM TOG 26(3); Behrendt, Colditz,
+Cook, Halstead, Planck and Ryu 2007, "Stochastic simplification of aggregate detail", ACM TOG 26(3); Cook and Halstead
+2006, "Stochastic pruning", Pixar Technical Memo 06-05; Neubert, Pirk, Deussen and Dachsbacher 2011, "Improved model-
+and view-dependent pruning of large botanical scenes", Computer Graphics Forum 30(6); Remolar, Chover, Belmonte,
+Ribelles and Rebollo 2002, "Geometric simplification of foliage", Eurographics short presentations; Gasch, Remolar,
+Chover and Rebollo 2018, "Viewpoint-driven simplification of plant and tree foliage", Entropy 20(4); Coombes, Martin
+and Slater 2019, "Defining the allometry of stem and crown diameter of urban trees", Urban Forestry & Urban Greening 44;
+Bean, Trees and Shrubs Hardy in the British Isles (Quercus robur); Behrendt, Colditz,
 Franzke, Kopf and Deussen 2005, "Realistic real-time rendering of landscapes using billboard clouds", Computer Graphics
 Forum 24(3); Richards 1959, "A flexible growth function for empirical use", J. Exp. Bot. 10(2).
 

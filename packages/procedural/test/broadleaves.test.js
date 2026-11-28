@@ -34,7 +34,7 @@ test('crown width follows the Hemery table of open-grown trees', () => {
   for (const sp of BROADLEAF_SPECIES_IDS)
     for (const age of ['sapling', 'pole', 'mature', 'old']) {
       const f = broadleafForm(sp, { age });
-      assert.ok(Math.abs(f.crownWidth - broadleafCrownWidth(sp, f.dbh)) < 1e-9);
+      assert.ok(Math.abs(f.crownWidth - broadleafCrownWidth(sp, f.dbh, f.open)) < 1e-9);
       assert.ok(f.crownBase > 1 && f.crownBase < f.height * 0.5, `${sp} ${age}: crown base ${f.crownBase}`);
     }
 });
@@ -61,19 +61,42 @@ const oldCrown = () => {
   );
 };
 
-test('an oak crown has sky inside its hull and shows its limbs; the old lobe crown shows neither', () => {
+// The photo band: five open-grown English oaks on Wikimedia Commons ("Category:Solitary Quercus robur"), each crown
+// cropped, scaled to 400 px across (this view's cells), split leaf from sky by Otsu on the blue channel and measured
+// with the same hull and 0.8-hull maths, rows below the crown base cut. Hull gap, then inner transparency:
+// "Eiche bei Graditz, a.jpg" 0.100, 0.005; "Mehlinger Heide 1 (Hans Buch).jpg" 0.119, 0.041; "Stileiche Naturdenkmal
+// Bindsachsen.jpg" 0.190, 0.081; "Quercus robur - alone tree.jpg" (upper crown) 0.181, 0.090; "20161005Quercus
+// robur2.jpg" 0.181, 0.073. So gap 0.10 to 0.19 and inner up to 0.09; the bars are 0.10 to 0.20 and at most 0.10.
+test('an oak crown has the sky inside its hull that photographed open-grown oaks have, and shows its limbs', () => {
   for (const seed of [1, 2, 3]) {
     const m = generateBroadleafMesh('english-oak', { seed }),
       c = crownMeasures(partsOf(m), extentOf(m.form), m.form.height / 2, m.form.crownBase);
     // Sky inside the silhouette's convex hull, and inside that hull shrunk to 0.8.
-    assert.ok(c.gap >= 0.25 && c.gap <= 0.45, `seed ${seed}: hull gap ${c.gap}`);
-    assert.ok(c.inner >= 0.1 && c.inner <= 0.25, `seed ${seed}: inner transparency ${c.inner}`);
+    assert.ok(c.gap >= 0.1 && c.gap <= 0.2, `seed ${seed}: hull gap ${c.gap}`);
+    assert.ok(c.inner <= 0.1, `seed ${seed}: inner transparency ${c.inner}`);
     assert.ok(c.bark >= 0.02, `seed ${seed}: bark share ${c.bark}`);
   }
+  // The old lobe crown's sky (0.151, 0.026) sits inside the photo band; it fails on its hidden limbs.
   const old = oldCrown();
-  assert.ok(old.gap < 0.25, `old hull gap ${old.gap}`);
-  assert.ok(old.inner < 0.1, `old inner transparency ${old.inner}`);
   assert.ok(old.bark < 0.02, `old bark share ${old.bark}`);
+});
+
+test('a mature open-grown oak is wider than it is tall (Bean) and as wide as free-standing crowns (Coombes et al.)', () => {
+  // Bean, Trees and Shrubs Hardy in the British Isles, Quercus robur: in open ground a crown wider than the tree is high,
+  // 60 to 80 ft (18.3 to 24.4 m) fully grown, 100 ft or more close together. Coombes, Martin and Slater 2019: crown
+  // diameter 24 to 27 times dbh in free-standing trees.
+  const open = broadleafForm('english-oak', { open: 1, age: 'old' }),
+    meadow = broadleafForm('english-oak'),
+    forest = broadleafForm('english-oak', { open: 0, age: 'old' });
+  assert.ok(open.height >= 18.3 && open.height <= 24.4, `open-grown old oak ${open.height} m`);
+  assert.ok(forest.height > 26, `forest-grown old oak ${forest.height} m`);
+  assert.ok(open.crownWidth / open.dbh >= 24 && open.crownWidth / open.dbh <= 27, `${open.crownWidth / open.dbh}`);
+  assert.ok(meadow.crownWidth > meadow.height, `meadow oak ${meadow.crownWidth} m wide, ${meadow.height} m tall`);
+  assert.ok(meadow.crownWidth > 1.3 * meadow.crownLength, `crown ${meadow.crownWidth} by ${meadow.crownLength} m`);
+  // Hemery's line stays the default of broadleafCrownWidth and the forest end of the form.
+  assert.ok(Math.abs(forest.crownWidth - broadleafCrownWidth('english-oak', forest.dbh)) < 1e-9);
+  assert.ok(Math.abs(species.broadleafHeightAt('english-oak', 300) - forest.height) < 1e-9);
+  assert.throws(() => broadleafForm('english-oak', { open: 1, height: 22 }), RangeError);
 });
 
 test('an oak forks into 4 to 7 limbs that stay single and thick to half the crown radius', () => {

@@ -1,7 +1,11 @@
 // Broadleaf levels of detail (@margoengine/procedural/broadleaves): the middle ring keeps the near tree's coverage and
 // colour from every side, as the conifer rule has it (test/conifer-lod.test.js): within the near tree's own change when
-// it is turned 45 degrees about its trunk. Aggregate geometry is simplified by dropping every fourth card and growing
-// the rest (Cook, Halstead, Planck and Ryu 2007, "Stochastic simplification of aggregate detail"). The far ring is an
+// it is turned 45 degrees about its trunk. Aggregate geometry is simplified by stratified pruning on visibility: each
+// foliage mass keeps cards in proportion to what it shows, one card a cell of equal visibility, its size solved so the
+// mass shows as much as before (Cook, Halstead, Planck and Ryu 2007, "Stochastic simplification of aggregate detail";
+// Neubert, Pirk, Deussen and Dachsbacher 2011). Every fourth card grown at one width failed it on the open-grown oak:
+// at 2.25 times the side the coverage was 9.0 percent off, at 1.9 the coverage passed and the luminance was 7.5. The
+// far ring is an
 // imposter of three baked views (Behrendt, Colditz, Franzke, Kopf and Deussen 2005; Bruneton and Neyret 2012).
 //
 // KB-PROCEDURAL-OAKIMPOSTER1 (docs/known-bugs.md): the imposter does not meet that bound; its measured error is the
@@ -63,21 +67,36 @@ function measures(seed) {
 }
 
 test('the middle ring keeps the near coverage and colour from every side, within a 45 degree turn of the near tree', () => {
-  const results = measures(1);
-  for (const key of ['coverage', 'luminance']) {
-    // The tolerance is the near tree's own change when turned 45 degrees about its trunk, its largest over the eight
-    // turns and three elevations.
-    let own = 0;
-    for (const views of results)
-      views.forEach((each, k) => (own = Math.max(own, Math.abs(views[(k + 1) % 8][0][key] / each[0][key] - 1))));
-    let worst = 0;
-    for (const views of results)
-      for (const each of views) worst = Math.max(worst, Math.abs(each[1][key] / each[0][key] - 1));
-    assert.ok(
-      worst <= own,
-      `middle ${key} differs by ${(worst * 100).toFixed(2)}%, a 45 degree turn by ${(own * 100).toFixed(2)}%`,
-    );
+  // Measured 2026-11-28 (worst of 24 views, then the near tree's own 45 degree change): seed 1 coverage 2.19 of 5.28
+  // percent, luminance 2.54 of 4.71; seed 2 2.41 of 4.48 and 1.76 of 4.81; seed 3 1.88 of 4.50 and 2.98 of 7.70.
+  for (const seed of [1, 2, 3]) {
+    const results = measures(seed);
+    for (const key of ['coverage', 'luminance']) {
+      // The tolerance is the near tree's own change when turned 45 degrees about its trunk, its largest over the eight
+      // turns and three elevations.
+      let own = 0;
+      for (const views of results)
+        views.forEach((each, k) => (own = Math.max(own, Math.abs(views[(k + 1) % 8][0][key] / each[0][key] - 1))));
+      let worst = 0;
+      for (const views of results)
+        for (const each of views) worst = Math.max(worst, Math.abs(each[1][key] / each[0][key] - 1));
+      assert.ok(
+        worst <= own,
+        `seed ${seed}: middle ${key} differs by ${(worst * 100).toFixed(2)}%, a 45 degree turn by ${(own * 100).toFixed(2)}%`,
+      );
+    }
   }
+});
+
+test('the middle ring is the same for the same seed and stays under 4,000 triangles with its wood', () => {
+  const a = broadleafLevels('english-oak', { seed: 2 }),
+    b = broadleafLevels('english-oak', { seed: 2 });
+  assert.deepEqual(a.canopy[1].positions, b.canopy[1].positions);
+  assert.deepEqual(a.canopy[1].uvs, b.canopy[1].uvs);
+  assert.ok((a.canopy[1].indices.length + a.trunk[1].indices.length) / 3 <= 4000);
+  // About one card in five of the near ring's (four triangles a card, both faces).
+  const ratio = a.canopy[0].indices.length / a.canopy[1].indices.length;
+  assert.ok(ratio > 4 && ratio < 6, `near over middle cards ${ratio}`);
 });
 
 test('the imposter keeps the near tree within its measured error from every side', () => {

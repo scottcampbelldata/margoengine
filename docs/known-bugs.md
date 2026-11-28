@@ -635,6 +635,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix needed:** a view-dependent or soft-alpha bake (fewer artefacts than three fixed views), or a horizontal cap
   card, judged on the same measure; the test holds the imposter at its measured ceiling (0.16 coverage, 0.25
   luminance) until then.
+- **Progress (middle ring, 2026-11-28):** the open-grown oak (wider crown, 7,248 near card faces) made every fourth
+  card at one width fail: at 2.25 times the side coverage was 9.0 percent off, at 1.9 coverage passed and luminance was
+  7.5 (the near tree's own 45 degree change 5.28 and 4.71). The cause: every k-th card samples all cards, while the
+  view shows mostly the bright outer ones (visible pixels by light row 37.7, 33.3 and 21.4 percent against a card
+  population of 28.6, 42.1 and 29.2), so the middle ring was 3.3 percent darker at equal cover. The middle ring is now
+  chosen by visibility (stratified pruning over 12 views, per-mass sizes solved to the near coverage;
+  `middleCards` in `broadleaves.ts`). Measured, worst of 24 views against the tree's own change: oak seeds 1 to 5
+  coverage 1.9 to 2.6 percent (own 4.5 to 6.7), luminance 1.8 to 4.9 (own 4.7 to 9.1); old and sapling oak and beech
+  seeds 1 and 2 pass. Still failing, the middle ring of the black alder: seed 1 luminance 5.73 against 5.42, seed 2
+  coverage 6.24 against 3.87 and luminance 5.65 against 5.05, seed 3 luminance 6.57 against 5.16 (its middle wood
+  takes up to 2,900 of the 4,000 triangles, leaving it 255 to 360 cards). `test/broadleaf-lod.test.js` holds oak
+  seeds 1 to 3. The imposter part stays open.
 
 ### Open 2026-11-28: a broadleaf tree (oak, beech, alder) reads as a few smooth lime blobs (KB-PROCEDURAL-OAKBLOB1, procedural, biomes)
 
@@ -662,6 +674,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   where the photos are a fresh mid green; (3) the far imposters are dark round blobs (KB-PROCEDURAL-OAKIMPOSTER1);
   (4) one mature oak takes about 0.5 s to grow (plan bound 30 ms; move the loop to `trees-kernel` or cut the work).
   The sync default (step C) is not done.
+- **Progress (oak form, 2026-11-28):** for (1), the oak's crown now runs from Hemery's line to the free-standing
+  crowns of Coombes, Martin and Slater 2019 (25.5 dbh at `open` 1), its open-grown height levels off at 21.3 m (Bean),
+  limbs pitch from -22 degrees, spray cards tilt 40 to 65 degrees and fill masses go wherever a sampled spot lies a
+  mass radius outside every mass: the meadow oak is 18.8 m tall and 19.8 m wide. The hull-gap band was measured on five
+  photographed open-grown oaks (0.10 to 0.19, inner up to 0.09; bars 0.10 to 0.20 and 0.10): seeds 1 to 3 pass, and of
+  seeds 1 to 10, 7 pass; seeds 5, 6 and 9 read 0.206 to 0.217 (holes inside the crown). (2) to (4) and step C open.
 
 ### Fixed 2026-11-28: a meadow seen from a few metres up showed the edge of the dense near grass as a band (KB-BIOMES-GRASSRING1, biomes, scatter)
 

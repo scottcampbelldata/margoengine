@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22101281,
+  "total": 22103408,
   "history": [
     {
       "date": "2026-10-24",
@@ -15971,6 +15971,12 @@
       "commit": "fe03ac8e44",
       "reason": "@margoengine/terrain 20,386 to 22,428 B and @margoengine/terrain/stream 18,303 to 20,469 B gzip: rock structure on steep faces and warped patches (fe03ac8e44, shader 181 lines), facets blending across joints and fading with the pixel footprint (4082046664), and crests following the ground diagonal with rock faces keeping their texture (ba2399ec11). The rock shader code is in the terrain fragment stage that both the terrain and its streamed form compile, so both entries carry it; making it optional would add a second pipeline variant to every terrain. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "oakimposter1-middle-ring",
+      "reason": "@margoengine/procedural/broadleaves 12,190 to 14,255 B gzip, ceiling 12,556 to 14683 B: the middle LOD ring is chosen by visibility (an orthographic z-buffer over 12 views of the near tree, stratified pruning per foliage mass and a per-mass size solve, KB-PROCEDURAL-OAKIMPOSTER1), and the open-grown oak form. broadleafLevels always builds the middle ring for scatter, so a lazy split would load the same bytes on every leafed tree. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16990,7 +16996,7 @@
     "@margoengine/procedural": 20280,
     "@margoengine/procedural/broadleaf-settings": 2019,
     "@margoengine/procedural/broadleaf-species": 1564,
-    "@margoengine/procedural/broadleaves": 12556,
+    "@margoengine/procedural/broadleaves": 14683,
     "@margoengine/procedural/building-plans": 39215,
     "@margoengine/procedural/building-rules": 28575,
     "@margoengine/procedural/building-settings": 6573,
