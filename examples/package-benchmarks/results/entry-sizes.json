@@ -15638,8 +15638,8 @@
         "gzip": 3902
       },
       "./landscape": {
-        "raw": 10144,
-        "gzip": 4282
+        "raw": 12381,
+        "gzip": 5066
       },
       "./sediment": {
         "raw": 11090,
@@ -19352,14 +19352,14 @@
       "brotli": 1000
     },
     "packages/physics/dist/landscape-kernel.wasm": {
-      "raw": 12166,
-      "gzip": 5235,
-      "brotli": 4687
+      "raw": 43592,
+      "gzip": 11788,
+      "brotli": 9872
     },
     "packages/physics/dist/landscape-kernel-shared.wasm": {
-      "raw": 12254,
-      "gzip": 5302,
-      "brotli": 4729
+      "raw": 43680,
+      "gzip": 11848,
+      "brotli": 9970
     },
     "packages/physics/dist/accretion-kernel.wasm": {
       "raw": 1657,

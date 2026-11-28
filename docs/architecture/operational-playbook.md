@@ -11132,6 +11132,11 @@ cover the analytic impulse and held-force convolution, resting contact, rolling 
 rupture, 44.1 kHz allocation at 120 Hz, frame-rate independence and replay. The Physics README uses
 an actual browser audio destination to verify the rendered signal.
 
+The landscape stages its new material, ledger and bed delta before publishing. It checks that the
+accepted delta can be represented in the receiving float32 TerrainBed. Biomes copies the accepted
+terrain into the relief that drives the fixed-camera Terrain test. The volume check includes the
+last contribution still pending on the staggered terrain step.
+
 ### Drainage fog evidence (ATMO-08)
 
 `DrainageFog` uses the PhysicsWorld arena and pinned thermodynamics. Its coupled tests verify heat and water through

@@ -16162,6 +16162,8 @@ The implementation uses separately built plain and shared SIMD Wasm against the 
 sine, cosine and exponential setup use the pinned math entry. Track phases, modal state, input ticks,
 integer sample carry and PCM history survive a snapshot.
 
+The linear stream-power implicit row can be divided by its largest magnitude without changing the solution. The scaled path retains this equivalent form when ordinary coefficient or receiver-slope arithmetic cannot be represented. Candidate elevation deltas and the loose sediment and export sums must remain finite. The Braun-Willett steady profile and Roering et al. equations 1-2 supply independent analytic controls for an uplifted channel and hillslope smoothening.
+
 ### Drainage fog and its live medium (ATMO-08)
 
 - P. C. Manins and B. L. Sawford (1979), [A Model of Katabatic Winds](https://journals.ametsoc.org/view/journals/atsc/36/4/1520-0469_1979_036_0619_amokw_2_0_co_2.xml).

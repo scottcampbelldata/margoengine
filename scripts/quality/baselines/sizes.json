@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21690757,
+  "total": 21692645,
   "history": [
     {
       "date": "2026-10-24",
@@ -15374,6 +15374,12 @@
       "date": "2026-11-28",
       "commit": "rigs-page-helpers",
       "reason": "Demo engine code moved into packages (check:demo-sources R5 on the four mechanism demos). @margoengine/machinery/rigs gains openRig, keyedRig, signedReading, a signal option, Geneva turnWheel and the Oldham orbit: 2980 to 3303 B gzip (ceiling 3236 to 3559 B). @margoengine/webgl2-compat/auto gains startEngine, the WebGPU then full WebGL2 layer start every full-renderer demo repeated, the layer still a caller-passed import(): 3984 B gzip now (ceiling 3976 to 4240 B). A split would add an entry and a request for under 300 B each."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "hydro-04-numeric-range-and-surface",
+      "reason": "HYDRO-04 physics/landscape grows from 4282 to 5066 B gzip (ceiling 4538 to 5322) for input validation, transactional material and bed state, and TerrainBed float32 checks. The optional plain/shared native assets grow from 5235/5302 to 11788/11848 B gzip for finite multi-flow routing and scaled incision, grain and diffusion arithmetic. A split would duplicate accepted arena state and the receiver graph. Core and Stage gain zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16257,7 +16263,7 @@
     "@margoengine/physics/hydro": 22723,
     "@margoengine/physics/ice": 3483,
     "@margoengine/physics/iceberg": 4595,
-    "@margoengine/physics/landscape": 4538,
+    "@margoengine/physics/landscape": 5322,
     "@margoengine/physics/lava": 9824,
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,

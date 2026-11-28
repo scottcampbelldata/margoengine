@@ -1,7 +1,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import { gravityMagnitude } from '@margoengine/math/gravity';
-import { type BedShape, BedChange, BED_CHANGE_FIELD, BED_FIELD, BED_LAYOUT } from '../earth/bed.js';
-import { canShareMemory, isShared, regionWords, STACK_BYTES } from '../world/memory.js';
+import { type BedShape, BedChange, BED_CHANGE_FIELD, BED_FIELD, BED_LAYOUT, bedVertexCount } from '../earth/bed.js';
+import { canShareMemory, DYNAMIC_BASE, isShared, MAX_MEMORY_PAGES, regionWords, STACK_BYTES } from '../world/memory.js';
 import type {
   Cell,
   FieldDescriptor,
@@ -132,7 +132,7 @@ interface NativeKernel extends WebAssembly.Exports {
     nGrains: number,
     outletMask: number,
     dt: number,
-  ): void;
+  ): number;
 }
 
 interface State {
@@ -150,7 +150,10 @@ interface State {
   readonly grains: Region;
   readonly input: Region;
   readonly columns: Region;
+  readonly candidate: Region;
+  readonly candidateDelta: Region;
   readonly budget: Region;
+  readonly candidateBudget: Region;
   readonly scratch: Region;
   readonly topology: Region;
   readonly cell: Region;
@@ -158,7 +161,7 @@ interface State {
 
 function checked(label: string, value: number, min: number, max = Infinity): number {
   if (!Number.isFinite(value) || value < min || value > max)
-    throw new RangeError(`Invalid landscape ${label}; pass a finite value between ${min} and ${max}.`);
+    throw new MargoError('state', `Invalid landscape ${label}. Pass a finite value between ${min} and ${max}.`);
   return value;
 }
 
@@ -167,8 +170,11 @@ function fill(target: Float64Array, value: Scalars, label: string, min: number):
     target.fill(checked(label, value, min));
     return;
   }
-  if (value.length !== target.length)
-    throw new RangeError(`Invalid landscape ${label} length; pass one value or ${target.length} vertex values.`);
+  if (value?.length !== target.length)
+    throw new MargoError(
+      'state',
+      `Invalid landscape ${label} length. Pass one value or ${target.length} vertex values.`,
+    );
   for (let i = 0; i < target.length; i++) target[i] = checked(label, value[i]!, min);
 }
 
@@ -178,8 +184,11 @@ function output(name: string, quantity: string, unit: string): FieldDescriptor {
 
 function inputField(field: FieldDescriptor | undefined, unit: string): FieldDescriptor | undefined {
   if (!field) return undefined;
-  if (field.unit !== unit || (field.centring !== 'vertex' && field.centring !== 'cell'))
-    throw new RangeError(`Invalid landscape field ${field.name}; supply cell or vertex scalars in ${unit}.`);
+  if (!field.name || field.unit !== unit || (field.centring !== 'vertex' && field.centring !== 'cell'))
+    throw new MargoError(
+      'state',
+      `Invalid landscape field ${field.name}. Supply a named cell or vertex field in ${unit}.`,
+    );
   return { ...field };
 }
 
@@ -193,13 +202,37 @@ async function readModule(file: URL, signal?: AbortSignal): Promise<WebAssembly.
   }
   const response = await fetch(file, { signal });
   if (!response.ok) {
-    throw new MargoError('failed', `Landscape kernel HTTP ${response.status}; serve the matching landscape Wasm file.`);
+    throw new MargoError('failed', `Landscape kernel HTTP ${response.status}. Serve the matching landscape Wasm file.`);
   }
   return WebAssembly.compile(await response.arrayBuffer());
 }
 
 function floats(host: SolverHost, region: Region): Float64Array {
   return regionWords(host.memory, region) as Float64Array;
+}
+
+function landscapeVertexCount(grid: BedShape): number {
+  try {
+    return bedVertexCount(grid);
+  } catch (cause) {
+    throw Object.assign(new MargoError('state', 'Invalid landscape bed grid. Pass a valid TerrainBed rectangle.'), {
+      cause,
+    });
+  }
+}
+
+function checkGridAxis(axis: string, centre: number, width: number, cells: number): number {
+  const left = centre - width * 0.5;
+  const right = centre + width * 0.5;
+  const spacing = width / cells;
+  const next = left + spacing;
+  const previous = right - spacing;
+  if (!(Number.isFinite(next) && Number.isFinite(previous) && next > left && previous < right))
+    throw new MargoError(
+      'state',
+      `Landscape ${axis} vertices exceed coordinate resolution. Use a nearer local origin.`,
+    );
+  return spacing;
 }
 
 function readInput(source: FieldDescriptor, port: Port, state: State, cell: Cell, out: Float64Array): void {
@@ -213,8 +246,9 @@ function readInput(source: FieldDescriptor, port: Port, state: State, cell: Cell
     region.byteLength !== expected * (region.type === 'f32' ? 4 : F64) ||
     !port.cell.every((coordinate, i) => coordinate === cell[i])
   ) {
-    throw new RangeError(
-      `Invalid landscape port ${source.name}; publish one layout-1 scalar in each matching grid location.`,
+    throw new MargoError(
+      'state',
+      `Invalid landscape port ${source.name}. Publish one layout-1 scalar in each matching grid location.`,
     );
   }
   const values = regionWords(state.host.memory, region);
@@ -225,17 +259,34 @@ function readInput(source: FieldDescriptor, port: Port, state: State, cell: Cell
   }
   // Transfer each x-fast cell over its four z-fast vertices in proportion to triangle support.
   for (let x = 0; x <= nx; x++) {
+    const firstColumn = Math.max(0, x - 1);
+    const lastColumn = Math.min(nx - 1, x);
     for (let z = 0; z <= nz; z++) {
+      const firstRow = Math.max(0, z - 1);
+      const lastRow = Math.min(nz - 1, z);
       let total = 0;
       let weights = 0;
-      for (let j = Math.max(0, z - 1); j <= Math.min(nz - 1, z); j++) {
-        for (let k = Math.max(0, x - 1); k <= Math.min(nx - 1, x); k++) {
+      for (let j = firstRow; j <= lastRow; j++) {
+        for (let k = firstColumn; k <= lastColumn; k++) {
           const weight = (z === j) === (x === k) ? 1 : 2;
           total += weight * values[j * nx + k]!;
           weights += weight;
         }
       }
-      out[x * (nz + 1) + z] = total / weights;
+      let average = total / weights;
+      if (!Number.isFinite(average)) {
+        // Every input is finite and nonnegative. Fold the weighted mean without forming the large sum.
+        average = 0;
+        let included = 0;
+        for (let j = firstRow; j <= lastRow; j++) {
+          for (let k = firstColumn; k <= lastColumn; k++) {
+            const weight = (z === j) === (x === k) ? 1 : 2;
+            included += weight;
+            average += (values[j * nx + k]! - average) * (weight / included);
+          }
+        }
+      }
+      out[x * (nz + 1) + z] = checked(source.name, average, 0);
     }
   }
 }
@@ -260,6 +311,8 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
     options: LandscapeLoadOptions,
   ) {
     this.id = options.id ?? 'landscape';
+    if (typeof this.id !== 'string' || !this.id.trim() || this.id !== this.id.trim())
+      throw new MargoError('state', 'Invalid landscape solver ID. Use a nonempty name without outer whitespace.');
     this.rain = inputField(options.rainField, 'm/s');
     this.shear = inputField(options.shearField, 'Pa');
     this.roots = inputField(options.rootCohesionField, 'Pa');
@@ -270,14 +323,27 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
 
   /** Loads the optional native implementation. Add the result alongside a TerrainBed in a PhysicsWorld. */
   static async load(options: LandscapeLoadOptions = {}): Promise<LandscapeEvolution> {
+    if (options === null || typeof options !== 'object')
+      throw new MargoError('state', 'Invalid landscape load options. Pass an options object or omit it.');
     const { signal } = options;
-    const [plain, shared] = await Promise.all([
-      readModule(new URL(/* @vite-ignore */ './landscape-kernel.wasm?no-inline', import.meta.url), signal),
-      canShareMemory()
-        ? readModule(new URL(/* @vite-ignore */ './landscape-kernel-shared.wasm?no-inline', import.meta.url), signal)
-        : undefined,
-    ]);
-    signal?.throwIfAborted();
+    let plain: WebAssembly.Module;
+    let shared: WebAssembly.Module | undefined;
+    try {
+      [plain, shared] = await Promise.all([
+        readModule(new URL(/* @vite-ignore */ './landscape-kernel.wasm?no-inline', import.meta.url), signal),
+        canShareMemory()
+          ? readModule(new URL(/* @vite-ignore */ './landscape-kernel-shared.wasm?no-inline', import.meta.url), signal)
+          : undefined,
+      ]);
+      signal?.throwIfAborted();
+    } catch (cause) {
+      signal?.throwIfAborted();
+      if (cause instanceof MargoError) throw cause;
+      throw Object.assign(
+        new MargoError('failed', 'Landscape Wasm failed to load. Use a SIMD runtime and serve the landscape kernel.'),
+        { cause },
+      );
+    }
     return new LandscapeEvolution(plain, shared, options);
   }
 
@@ -294,15 +360,26 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
   }
 
   init(host: SolverHost, params: LandscapeParams): void {
-    if (!params?.grid) throw new RangeError('Landscape needs a bed grid; pass the TerrainBed grid in metres.');
+    if (!params?.grid) throw new MargoError('state', 'Landscape needs a bed grid. Pass the TerrainBed grid in metres.');
+    const n = landscapeVertexCount(params.grid);
     const grid: BedShape = { ...params.grid, centre: [params.grid.centre[0], params.grid.centre[1]] };
-    const change = new BedChange(host, grid, 'landscape-bed-change');
-    const n = change.area.length;
+    const dx = checkGridAxis('X', grid.centre[0], grid.width, grid.columns);
+    const dz = checkGridAxis('Z', grid.centre[1], grid.depth, grid.rows);
+    checked('vertex area', (dx * dz) / 6, Number.MIN_VALUE);
     const grains = params.grains ?? [{ diameter: 0.0003, fraction: 1 }];
+    if (!Array.isArray(grains) || !grains.every((grain) => grain && typeof grain === 'object'))
+      throw new MargoError('state', 'Invalid landscape grain mixture. Pass an array of diameter and fraction records.');
     const nGrains = grains.length;
+    // Include the candidate regions and the world mirrors for the output fields.
+    const required = ((31 + 3 * nGrains) * n + 19 + 7 * nGrains) * F64 + DYNAMIC_BASE + STACK_BYTES + 16;
+    if (required >= MAX_MEMORY_PAGES * 65536)
+      throw new MargoError('state', 'Landscape grid exceeds the wasm32 arena. Use fewer vertices or grain classes.');
     const total = grains.reduce((sum, grain) => sum + checked('grain fraction', grain.fraction, 0), 0);
     if (!Number.isFinite(total) || total <= 0)
-      throw new RangeError('Invalid landscape grain mixture; give at least one class with a positive fraction.');
+      throw new MargoError(
+        'state',
+        'Invalid landscape grain mixture. Give at least one class with a positive fraction.',
+      );
     const density = checked('water density', params.waterDensity ?? 1000, Number.MIN_VALUE);
     const timeScale = checked('time scale', params.secondsPerSecond ?? 1, Number.MIN_VALUE, Number.MAX_VALUE / 60);
     const allocate = (name: string, count: number): Region =>
@@ -311,16 +388,17 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
     if (!module)
       throw new MargoError(
         'unsupported',
-        'Shared landscape Wasm is unavailable; choose plain world memory on this host.',
+        'Shared landscape Wasm is unavailable. Choose plain world memory on this host.',
       );
     const stack = host.allocate('landscape-stack', STACK_BYTES + 8, 'u8', LAYOUT);
     const kernel = new WebAssembly.Instance(module, { env: { memory: host.memory } }).exports as NativeKernel;
     const pointer = kernel.__stack_pointer;
     if (!(pointer instanceof WebAssembly.Global))
-      throw new MargoError('failed', 'Landscape Wasm has no stack pointer; rebuild both landscape assets.');
+      throw new MargoError('failed', 'Landscape Wasm has no stack pointer. Rebuild both landscape assets.');
     pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
 
     const edges = params.outlets;
+    const change = new BedChange(host, grid, 'landscape-bed-change');
     const outlets = (edges?.minX ? 1 : 0) | (edges?.maxX ? 2 : 0) | (edges?.minZ ? 4 : 0) | (edges?.maxZ ? 8 : 0);
     const state: State = {
       host,
@@ -337,7 +415,10 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
       grains: allocate('grains', 5 * nGrains),
       input: allocate('input', 4 * n),
       columns: allocate('state', (STATE_PLANES + nGrains) * n),
+      candidate: allocate('candidate-state', (STATE_PLANES + nGrains) * n),
+      candidateDelta: allocate('candidate-bed-delta', n),
       budget: allocate('budget', 3 + nGrains),
+      candidateBudget: allocate('candidate-budget', 3 + nGrains),
       scratch: allocate('scratch', (6 + nGrains) * n),
       topology: host.allocate('landscape-topology', 2 * n * Uint32Array.BYTES_PER_ELEMENT, 'u32', LAYOUT),
       cell: allocate('cell', 3),
@@ -349,7 +430,7 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
       checked('discharge exponent', params.dischargeExponent ?? 0.5, 0),
       checked('Manning roughness', params.manning ?? 0.03, 0),
       density,
-      gravityMagnitude(host.gravity),
+      checked('gravity magnitude', gravityMagnitude(host.gravity), 0),
       checked('rock shear threshold', params.bedrockThreshold ?? 0, 0),
       checked('porosity', params.porosity ?? 0.4, 0, 1 - Number.EPSILON),
       checked('hillslope diffusivity', params.hillslopeDiffusivity ?? 1e-8, 0),
@@ -367,12 +448,17 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
     const classes = floats(host, state.grains);
     const values = floats(host, state.columns);
     const budget = floats(host, state.budget);
-    for (let i = 0; i < n; i++) budget[2]! += alluvium[i]! * change.area[i]!;
+    for (let i = 0; i < n; i++)
+      budget[2] = checked('initial loose volume', budget[2]! + alluvium[i]! * change.area[i]!, 0);
     for (let k = 0; k < nGrains; k++) {
       const grain = grains[k]!;
-      const relativeDensity = checked('grain density', grain.density ?? 2650, density) / density;
+      const relativeDensity = checked(
+        'grain density ratio',
+        checked('grain density', grain.density ?? 2650, density) / density,
+        1,
+      );
       if (!(relativeDensity > 1))
-        throw new RangeError('Invalid landscape grain density; choose a grain denser than the ambient water.');
+        throw new MargoError('state', 'Invalid landscape grain density. Choose a grain denser than the ambient water.');
       const fraction = grain.fraction / total;
       classes.set(
         [
@@ -386,6 +472,7 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
       );
       for (let i = 0; i < n; i++) values[(STATE_PLANES + k) * n + i] = alluvium[i]! * change.area[i]! * fraction;
     }
+    floats(host, state.cell).set(host.cell);
     this.state = state;
   }
 
@@ -407,8 +494,12 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
       bed.region.byteLength !== n * Float32Array.BYTES_PER_ELEMENT ||
       !bed.cell.every((coordinate, i) => coordinate === context.cell[i])
     ) {
-      throw new RangeError('Invalid landscape bed port; place the matching TerrainBed and landscape grid in one cell.');
+      throw new MargoError(
+        'state',
+        'Invalid landscape bed port. Place the matching TerrainBed and landscape grid in one cell.',
+      );
     }
+    const interval = checked('geological step', dt * state.timeScale, Number.MIN_VALUE);
     const input = floats(host, state.input);
     input.set(regionWords(host.memory, bed.region));
     input.set(floats(host, state.baseRain), n);
@@ -419,14 +510,21 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
       if (descriptor && port)
         readInput(descriptor, port, state, context.cell, input.subarray((1 + index) * n, (2 + index) * n));
     }
-    state.kernel.landscape_step(
+    const accepted = floats(host, state.columns);
+    const budget = floats(host, state.budget);
+    const candidate = floats(host, state.candidate);
+    const delta = floats(host, state.candidateDelta);
+    const nextBudget = floats(host, state.candidateBudget);
+    candidate.set(accepted);
+    nextBudget.set(budget);
+    const status = state.kernel.landscape_step(
       state.input.byteOffset,
       state.constants.byteOffset,
       state.settings.byteOffset,
       state.grains.byteOffset,
-      state.columns.byteOffset,
-      state.change.state.byteOffset,
-      state.budget.byteOffset,
+      state.candidate.byteOffset,
+      state.candidateDelta.byteOffset,
+      state.candidateBudget.byteOffset,
       state.scratch.byteOffset,
       state.topology.byteOffset,
       grid.columns + 1,
@@ -435,15 +533,29 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
       grid.depth / grid.rows,
       state.nGrains,
       state.outlets,
-      dt * state.timeScale,
+      interval,
     );
+    if (status !== 0)
+      throw new MargoError(
+        'state',
+        'Landscape update exceeds the finite terrain or sediment range. Reduce rates or the geological time scale.',
+      );
+    for (let i = 0; i < n; i++) {
+      if (!Number.isFinite(Math.fround(input[i]! + delta[i]!)))
+        throw new MargoError(
+          'state',
+          'Landscape bed exceeds TerrainBed float32 range. Reduce uplift or shorten the geological step.',
+        );
+    }
+    accepted.set(candidate);
+    budget.set(nextBudget);
+    state.change.deltas.set(delta);
     floats(host, state.cell).set(context.cell);
   }
 
   exportPorts(tick: number): readonly Port[] {
     const state = this.requireState();
-    const [x, y, z] = floats(state.host, state.cell);
-    const cell: Cell = [x!, y!, z!];
+    const cell = state.host.cell;
     const length = state.n * F64;
     const ports: Port[] = [state.change.port(tick, cell)];
     for (const [i, descriptor] of [this.dischargeField, this.incisionField, this.sedimentField].entries()) {
@@ -478,7 +590,7 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
       column > grid.columns ||
       row > grid.rows
     )
-      throw new RangeError('Invalid landscape vertex; pass integer column and row inside the bed grid.');
+      throw new MargoError('state', 'Invalid landscape vertex. Pass integer column and row inside the bed grid.');
     const i = column * (grid.rows + 1) + row;
     const values = floats(host, columns);
     return {
@@ -498,7 +610,7 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
 
   private requireState(): State {
     if (!this.state)
-      throw new MargoError('failed', 'Landscape is not attached; add it to a PhysicsWorld with its terrain grid.');
+      throw new MargoError('failed', 'To attach Landscape, add it to a PhysicsWorld with its terrain grid.');
     return this.state;
   }
 }

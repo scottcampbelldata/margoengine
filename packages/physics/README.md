@@ -6657,13 +6657,18 @@ geological time. The Manning roughness is 0.03, fluid density 1,000 kg/m³, bed 
 0.0495 and zero extra travel length. Linear and thermal diffusivities default to `1e-8` and `1e-7` m²/s.
 Thermal transfer starts above a slope of tan(30°). The rock stress threshold is zero unless supplied.
 
-Outlets default to closed. An open edge keeps its elevation and exports arriving water and sediment. Provide
+Outlets default to closed. An open edge keeps its elevation and exports arriving water and fluvial sediment. Hillslope and thermal exchange stop at this edge. Provide
 the same `floor` to the landscape and `bedrock` to TerrainBed if there is a minimum elevation. Optional
 `rainField`, `shearField` and `rootCohesionField` accept layout-1 cell or vertex scalars in m/s, Pa and Pa.
 Use `SedimentTransport.shearField` or a time-averaged equivalent for hydraulic forcing. `load` also accepts
 `id` (default `landscape`) and `signal`. Discharge, gross incision and sediment flux are layout-1 f64 vertex
 fields. TerrainBed applies a published change at its next tick, so diagnostics describe the most recent
 calculated change one tick before it becomes terrain. Use the bed for the current rendered elevation.
+
+For an animated terrain pass, advance or seek the `evolveRelief` world and draw the accepted
+terrain from `snapshotRelief()`. Match the Biomes relief's sampling grid to the rendered terrain.
+A refused landscape tick retains the last accepted sediment ledger and bed contribution.
+Keep the predicted elevation within the TerrainBed float32 representation.
 
 ## Tropical cyclones and compact vortices
 

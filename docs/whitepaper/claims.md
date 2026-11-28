@@ -6093,6 +6093,10 @@ leave according to their Shields threshold and travel length. The evolved bed ch
 and its world replays bit-for-bit across 24, 30 and 60 fps in both memory modes.
 Proof in [the landscape coupling tests](../../packages/physics/tests/coupling/landscape.test.js) and
 [the relief snapshot test](../../packages/biomes/tests/landscape.test.js).
+The fixed-camera terrain test draws up to 61,000 years of accepted relief and replays the exact frames on
+WebGPU and WebGL2. The native geometry checks finite sediment and bed change before publishing.
+`packages/physics/scripts/hydro04-landscape-analytic.mjs` gives a convergent steady stream-power profile
+and closed hillslope control, and exposes the missing diffusive outflow at fixed fluvial boundaries.
 
 ### Rigid-contact modal excitation on the world clock (SOUND-04)
 

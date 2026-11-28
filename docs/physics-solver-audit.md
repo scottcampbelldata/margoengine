@@ -181,6 +181,26 @@ them; the rest is a record of what a stronger solver would need.
   [Zhuk et al. (2024), flume and scale observations](https://doi.org/10.1016/j.heliyon.2024.e24734) and
   [Woolhiser and Liggett (1967), analytic rising limb](https://doi.org/10.1029/WR003i003p00753)
 
+### HYDRO-04 four-point pass
+
+- Point 5. `landscape-extremes.test.js` checks coded grid and material corrections, finite aggregation of
+  extreme cell rainfall and candidate rejection when a finite delta would exceed TerrainBed range.
+  The accepted state and previous terrain contribution survive rejection and replay in both memory kinds.
+  `landscape-native-ranges.test.js` covers overflow-dependent route, stiff implicit incision and transport guards.
+- Point 7. `landscape-surface.browser.mjs` drives a Biomes relief through the accepted landscape clock,
+  traces the exposed sediment and uplift through the shared bed, and draws the evolved terrain through
+  WebGPU and WebGL2. The proof includes the pending staggered bed delta and checks exact visual replay.
+  The shared 61,000-year endpoint exports 113,136.59 m³. Actual terrain readback agrees within 0.061 mm.
+- Point 8. The Physics README and `docs/limits.md` document the n=1 incision law, closed depressions,
+  fluvial-only export, prescribed shear and grain assumptions, the bed's float32 path and relief quantisation.
+- Point 2 remains open. The `hydro04-landscape-analytic.mjs` controls converge to the n=1 steady
+  stream-power profile within 0.029 mm at the finer grid and to the closed hillslope within 0.133 mm.
+  The steady open parabola misses: a 0.158 m drift and no exported material versus 0.480 m³ predicted
+  by the continuum solution. Current fixed fluvial outlets omit the creep faces. The reviewed
+  experiments infer erodibility from the same morphology or omit independent material coefficients.
+  [Braun and Willett (2013)](https://doi.org/10.1016/j.geomorph.2012.10.008) and
+  [Roering, Kirchner and Dietrich (1999)](https://doi.org/10.1029/1998WR900090)
+
 ## Film set first: the underwater and boat films
 
 The solvers behind the Edmund Fitzgerald, First Wake, Below the Swell and Below the Blue Line films (problem rows EF,

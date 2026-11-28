@@ -9729,7 +9729,7 @@ The optional JavaScript entry is 4,590 B gzip. The plain and shared Wasm assets 
 
 `LandscapeEvolution` uses one rectangular TerrainBed, a linear stream-power slope exponent and a fixed downhill
 graph within each step. Closed depressions trap incoming sediment. Route floodwater, lake overtopping and rapid
-flows with the shallow-water solver. Specified open edges supply fixed elevations and accept downhill export.
+flows with the shallow-water solver. Specified open edges supply fixed elevations and accept fluvial export. Hillslope and thermal exchange stop at these edges. The analytic open-parabola comparison records the resulting missing diffusive outflow.
 
 The solver can estimate equilibrium Manning depth or consume a time-averaged shear field. Its independently
 transported size classes share one bed porosity. The model tracks changing loose material and parent fractions,
@@ -9739,12 +9739,16 @@ site predictions. The loose sediment field excludes material brought by external
 initially supplied.
 
 Bed changes are accrued in f64 and become TerrainBed elevations on the following tick. The geometry used to
-choose downhill directions comes from the shared f32 bed field. The biomes snapshot rounds the current terrain
+choose downhill directions comes from the shared f32 bed field. A native candidate that exceeds the finite volume or rate range, or would publish a height outside TerrainBed's float32 range, is rejected before its state and contribution are accepted.
+The biomes snapshot rounds the current terrain
 to millimetres and keeps the relief's authored river lines. Use fixed boundary elevations if a snapshot must join
 unchanged terrain outside the simulated rectangle.
 
 The optional Physics and Biomes landscape entries measure 4,347 B and 614 B min+gzip respectively. The
 plain and shared SIMD files are 12,166 B and 12,254 B before HTTP compression.
+
+The optional physics entry is 5,066 B gzip under a 5,322 B ceiling. Optional plain/shared Wasm is
+43,592/43,680 B raw and 11,788/11,848 B gzip. Core and Stage gain zero bytes.
 
 ### Utility passes (`@margoengine/post`: `kawase-blur`, `lut1d`, `color-average`, `depth-downsample`, 2026-11-25)
 
