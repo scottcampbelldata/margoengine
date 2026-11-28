@@ -12,6 +12,23 @@ const TABLE_TOLERANCE = 0.005;
 const SHEET_STEPS_MAX = 0.0015;
 const SHEET_SPREAD_MIN = 0.48;
 const checks = {
+  // The cloud base lit from below by lit ground and the mist under it (groundLights and mist; ground-light-check.html).
+  async 'ground-light'(page, samples) {
+    const r = await page.evaluate(() => window.check.run());
+    assert.equal(r.validation, null);
+    assert.deepEqual(r.errors, []);
+    const s = JSON.stringify(r);
+    assert.ok(r.dark.mean < 0.05 * r.overhead.mean, `no sun, no sky light, no ground light: a black deck (${s})`);
+    assert.ok(r.toward.mean > 4 * r.away.mean, `the deck is brightest toward the city (${s})`);
+    assert.ok(r.overhead.spread > 0.15, `the lit base shows its structure, gaps darker (${s})`);
+    assert.ok(r.toward.warm > 3 && r.toward.warm < 4.4, `the base takes the light's colour, red over blue 4 (${s})`);
+    assert.ok(r.mistToward.mean > 2 * r.mistAway.mean, `the low mist glows toward the city (${s})`);
+    assert.ok(r.mistToward.mean > r.clearToward.mean, `the mist adds its light over the low sky (${s})`);
+    // One law for one light: a disc wider than the sky lights the deck as the even light from below does.
+    assert.ok(Math.abs(r.wide.mean / r.uniform.mean - 1) < 0.02, `a wide disc is the even ground light (${s})`);
+    console.log(`ok ground-light ${samples}x: ${s}`);
+    return r;
+  },
   // The broken cloud sheet thins to its rims and shades within (KB-SKY-HOLES-KH1; sheet-check.html).
   async sheet(page, samples) {
     const r = await page.evaluate(() => window.check.run());

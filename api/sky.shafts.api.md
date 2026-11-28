@@ -53,6 +53,17 @@ export interface ShaftSky {
 
 // Not exported from this entry, but used by the exports above:
 
+interface CloudGroundLight {
+    color: Vec3;
+    x: number;
+    z: number;
+    radius?: number;
+}
+
+interface CloudMist {
+    visibility: number;
+}
+
 type CloudType = 'cumulus' | 'stratus' | 'storm' | 'hurricane';
 
 interface CloudWeather {
@@ -217,6 +228,8 @@ interface VolumetricCloudOptions {
     depth?: () => GPUTexture | undefined;
     flash?: VolumetricCloudFlash;
     temporal?: boolean | 'auto';
+    groundLights?: readonly CloudGroundLight[];
+    mist?: CloudMist;
 }
 
 interface VolumetricCloudSky {

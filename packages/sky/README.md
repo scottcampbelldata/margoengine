@@ -508,6 +508,51 @@ wind drift, wrapped at its repeat (`scale` / 0.17), so the cover never jumps; `v
 Radeon 680M (diagnostic, taken with other jobs on the machine). Lower `steps` on slow GPUs. Needs WebGPU (`MargoError`
 `'unsupported'` on WebGL2).
 
+### City light on a low deck: ground lights and mist
+
+At night a low deck over a town is lit from below: the streets, yards and windows send light up, the base sends part
+of it back down, and the sky glows orange where it would be black under a clear sky. `groundLights` (at most eight)
+are discs of lit ground, each sending up `color`, the radiance of the lit ground seen from above, round `x`, `z` over
+`radius` metres. The base at height H over a disc's centre receives `color` times rho^2 / (H^2 + rho^2) (the view
+factor of a disc to a parallel point over it), falling as ((H^2 + rho^2) / (H^2 + rho^2 + r^2))^2 with the distance r
+across, the law that keeps the disc's whole flux on the base. That light spreads through the cloud by the same
+two-stream as the sky light from below, so thick cloud glows, gaps and thin parts stay darker and the deck is
+brightest over the town and toward its horizon. The ground reflects what the base sends back (`groundAlbedo`), the
+series 1 / (1 - albedo x deck reflectance). A disc wider than the sky gives exactly the even light from below that
+`ambient[1]` gives (1 in 1,000,000 on the GPU, WebGPU and the WebGL2 layer alike; `features-check.mjs ground-light`).
+`mist` is the rain or haze under the deck, given by its `visibility` (Koschmieder 1924: extinction 3.912 /
+visibility): over the sky's pixels it hides the deck toward the horizon and takes the light round it, the ground's
+along the ray's ground track and the deck's above, so the low sky glows toward the town. Scene surfaces keep their own
+fog (`Fog` from `@margoengine/environment`); give it the colour of the low sky. `cloudGroundLight(options, x, z)` is
+the CPU twin of the light on the base.
+
+Sources: C. C. M. Kyba, T. Ruhtz, J. Fischer and F. Holker, "Cloud Coverage Acts as an Amplifier for Ecological Light
+Pollution in Urban Ecosystems", PLoS ONE 6(3) e17307, 2011, https://doi.org/10.1371/journal.pone.0017307 (overcast
+nights in Berlin 10.1 times brighter than clear ones, the cloud base taken as a Lambertian reflector); M. Kocifaj,
+"Light-pollution model for cloudy and cloudless night skies with ground-based light sources", Applied Optics 46(15)
+3013, 2007, https://doi.org/10.1364/AO.46.003013; M. Aube, "Physical behaviour of anthropogenic light propagation into
+the nocturnal environment", Phil. Trans. R. Soc. B 370, 20140117, 2015, https://doi.org/10.1098/rstb.2014.0117;
+A. Jechow and F. Holker, "Snowglow: The Amplification of Skyglow by Snow and Clouds Can Exceed Full Moon Illuminance in
+Suburban Areas", J. Imaging 5(8) 69, 2019, https://doi.org/10.3390/jimaging5080069; H. Koschmieder, "Theorie der
+horizontalen Sichtweite", Beitr. Phys. freien Atm. 12, 1924.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {VolumetricClouds, cloudGroundLight} from 'margoengine/sky/volumetric-clouds';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu', camera: {position: [0, 1.6, 0], target: [-0.7, 1.9, 0.7], far: 200},
+});
+// A rainy night: no sun, a low deck lit orange by a town 4.5 km south-west (north is -z).
+const clouds = VolumetricClouds.attach(engine, {
+  sunDirection: [0, -1, 0],
+  ambient: [[0.0004, 0.0005, 0.0008], [0.0025, 0.0018, 0.0012]],
+  coverage: 0.8, bottom: 750, top: 1350, density: 0.04, scale: 5000, erosion: 1.4,
+  groundLights: [{color: [0.6, 0.33, 0.18], x: -3200, z: 3200, radius: 4200}],
+  mist: {visibility: 12000},
+});
+console.log(cloudGroundLight(clouds.options, 0, 0)); // the light from below on the base over the camera
+```
+
 ### Hurricanes: the eye, the eyewall and the rain bands
 
 `Hurricane` from `@margoengine/sky/hurricane` is a whole tropical cyclone at sea: its wind, rain and cloud at every

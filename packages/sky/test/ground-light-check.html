@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky cloud ground light check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body><canvas width="320" height="240"></canvas>
+<script type="module">
+// The cloud base lit from below by lit ground (VolumetricClouds groundLights and mist) on a real GPU: a night deck at
+// 800 to 1400 m with no sun and no sky light, one city disc 3 km across to the south-west, read back from a PostStack's
+// linear HDR scene target. Driven by features-check.mjs (ground-light).
+import {Engine} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {VolumetricClouds,cloudGroundLight} from '/packages/sky/dist/volumetric-clouds.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,1.6,0],target:[0,1.6,-1],fov:50,near:0.1,far:1000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(id.x<s.x&&id.y<s.y){result[id.y*s.x+id.x]=textureLoad(image,id.xy,0);}}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function scene(){
+ const w=post.sceneTexture.width,h=post.sceneTexture.height,size=w*h*16;
+ const output=device.createBuffer({size,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:post.sceneTexture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(w/8),Math.ceil(h/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,size);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const v=new Float32Array(staging.getMappedRange().slice(0));staging.unmap();output.destroy();staging.destroy();return {w,h,v};
+}
+const lum=(v,i)=>0.2126*v[i]+0.7152*v[i+1]+0.0722*v[i+2];
+const city={color:[1,0.55,0.25],x:-4000*Math.SQRT1_2,z:4000*Math.SQRT1_2,radius:3000};
+const base={sunDirection:[0,-1,0],ambient:[[0,0,0],[0,0,0]],coverage:0.9,bottom:800,top:1400,density:0.03,wind:[0,0],evolution:0,temporal:false};
+// One view: yaw from north (-z) toward east (+x), pitch up, in degrees; the frame's mean luminance, its spread over the
+// cloud and its mean red over blue.
+async function view(options,yaw,pitch){
+ const y=yaw*Math.PI/180,p=pitch*Math.PI/180;
+ engine.camera.target=[Math.sin(y)*Math.cos(p),1.6+Math.sin(p),-Math.cos(y)*Math.cos(p)];
+ const clouds=VolumetricClouds.attach(engine,{...base,...options});
+ engine.render({delta:0});engine.render({delta:0});const {v}=await scene();clouds.dispose();
+ const l=[];let red=0,blue=0;for(let i=0;i<v.length;i+=4){l.push(lum(v,i));red+=v[i];blue+=v[i+2];}
+ const mean=l.reduce((a,b)=>a+b,0)/l.length,spread=Math.sqrt(l.reduce((a,b)=>a+(b-mean)**2,0)/l.length)/Math.max(mean,1e-12);
+ return {mean,spread,max:Math.max(...l),warm:red/Math.max(blue,1e-12)};
+}
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');
+  const lit={groundLights:[city]},twin=cloudGroundLight({...base,...lit},0,0);
+  const r={
+   dark:await view({},0,60),
+   overhead:await view(lit,0,89),
+   toward:await view(lit,225,20),
+   away:await view(lit,45,20),
+   mistToward:await view({...lit,mist:{visibility:3000}},225,3),
+   mistAway:await view({...lit,mist:{visibility:3000}},45,3),
+   clearToward:await view(lit,225,3),
+   // A disc wider than the sky is the even ground light the sky light's lower half already gives (ambient[1]).
+   uniform:await view({ambient:[[0,0,0],[0.3,0.2,0.1]],groundAlbedo:0},0,70),
+   wide:await view({groundLights:[{color:[0.3,0.2,0.1],x:0,z:0,radius:1e6}],groundAlbedo:0},0,70),
+   twin:0.2126*twin[0]+0.7152*twin[1]+0.0722*twin[2],
+  };
+  return {validation:(await device.popErrorScope())?.message??null,errors,...r};
+ }};
+window.ready=true;
+</script></body></html>

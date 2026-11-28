@@ -6,6 +6,17 @@
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
+export interface CloudGroundLight {
+    color: Vec3;
+    x: number;
+    z: number;
+    radius?: number;
+}
+
+export interface CloudMist {
+    visibility: number;
+}
+
 export interface LightningStrike {
     id: number;
     time: number;
@@ -72,6 +83,8 @@ export interface VolumetricCloudOptions {
     depth?: () => GPUTexture | undefined;
     flash?: VolumetricCloudFlash;
     temporal?: boolean | 'auto';
+    groundLights?: readonly CloudGroundLight[];
+    mist?: CloudMist;
 }
 
 export interface VolumetricCloudSky {

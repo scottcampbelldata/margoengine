@@ -214,7 +214,8 @@ test('a low haze layer in the sky dims and veils the clouds seen through it', ()
   for (const [i, c] of [0.3, 0.2, 0.1, 2].entries()) assert.equal(v[96 + i], Math.fround(c));
   for (const [i, c] of [0.4, 0.25, 0.1].entries()) assert.ok(Math.abs(v[100 + i] - c * unit) < 1e-5 * unit);
   // The picture and both deck maps take the cloud's light through the layer.
-  assert.match(code(h), /var color=cloudVeiled\(m\.light,m\.opacity,d\)\*clouds\.sunColor\.w;/);
+  assert.match(code(h), /light=cloudVeiled\(m\.light,m\.opacity,d\);opacity=m\.opacity;/);
+  assert.match(code(h), /var color=light\*clouds\.sunColor\.w;/);
   assert.match(code(h), /cloudVeiled\(light,opacity,dir\)\*k/);
   assert.match(code(h), /cloudVeiled\(scene,opacity,dir\)\*k/);
   assert.match(
@@ -227,9 +228,9 @@ test('a low haze layer in the sky dims and veils the clouds seen through it', ()
   const clear = new Float32Array(CLOUD_FLOATS),
     none = [1, 1, 1, 1, 0, 0, 0, 0, ...new Array(128).fill(0)];
   writeVeil(clear, undefined);
-  assert.deepEqual([...clear.subarray(96)], none);
+  assert.deepEqual([...clear.subarray(96, 232)], none);
   writeVeil(clear, { sun: [0, 1, 0], options: {}, zenithSun: 6.9 });
-  assert.deepEqual([...clear.subarray(96)], none);
+  assert.deepEqual([...clear.subarray(96, 232)], none);
 });
 
 // KB-SKY-FIREDAY1: the dome draws the fires' light on the smoke layer (atmosphere.fireSpots) in front of what is above it
@@ -250,7 +251,7 @@ test("the fires' light on the layer is in front of the clouds, as of the dome", 
     [f(0.2 * unit), f(0.1 * unit), f(0.05 * unit), 1440000, 300, 1500, -40, 2600],
   );
   assert.ok(
-    v.subarray(112).every((x) => x === 0),
+    v.subarray(112, 232).every((x) => x === 0),
     'the spots left over end the list',
   );
   const h = tracedGPU(),
@@ -260,7 +261,11 @@ test("the fires' light on the layer is in front of the clouds, as of the dome", 
   h.engine.use(clouds);
   frame(h, sky, clouds);
   const c = code(h);
-  assert.match(c, /fires:array<vec4f,16>,hazeFires:array<vec4f,16>\}/, 'the uniform holds the spots');
+  assert.match(
+    c,
+    /fires:array<vec4f,16>,hazeFires:array<vec4f,16>,ground:array<vec4f,16>,mist:vec4f\}/,
+    'the uniform holds the spots',
+  );
   assert.ok(c.includes('fn fireLayer(w:vec3f)->vec3f'), "the dome's fire term");
   assert.ok(c.includes('let sight=clouds.fires[1].w;'), 'read from the clouds uniform');
   clouds.dispose();
@@ -282,7 +287,7 @@ test("the haze's fire glow is in front of the clouds, as of the dome", () => {
   // 2^1 x 0.5 = 1: the fog's units are the sky's here; the path end 2 / 0.002 = 1000 m.
   assert.deepEqual([...v.subarray(168, 176)], [f(0.4), f(0.2), f(0.1), 640000, 50, 1000, -1500, 1000]);
   assert.ok(
-    v.subarray(176).every((x) => x === 0),
+    v.subarray(176, 232).every((x) => x === 0),
     'the spots left over end the list',
   );
   writeVeil(v, { sun: [0, 1, 0], options: { exposure: 2, fog: { density: 0.002, fireSpots: [spot] } }, zenithSun: 5 });
@@ -290,7 +295,7 @@ test("the haze's fire glow is in front of the clouds, as of the dome", () => {
   for (const fog of [{ density: 0, fireSpots: [spot] }, { density: 0.002 }, undefined]) {
     writeVeil(v, { sun: [0, 1, 0], options: { fog }, zenithSun: 5 });
     assert.ok(
-      v.subarray(168).every((x) => x === 0),
+      v.subarray(168, 232).every((x) => x === 0),
       `no haze glow: ${JSON.stringify(fog)}`,
     );
   }

@@ -10559,6 +10559,27 @@ base-shape samples per lit cloud sample (frame times diagnostic only: 373, 7.8 a
 against 354, 10.3 and 11.0 before, on a loaded machine). Missing: 3D transport (side leakage from finite clouds), a
 reference renderer or photograph, and one unit for the sky map and the engine sun (KB-SKY-SUNUNITS1).
 
+## Cloud base lit from below: ground lights and mist (section 5 evidence, 2026-11-28)
+
+GPU maths change in `packages/sky/src/volumetric-clouds.ts`, both backends from one WGSL source. `groundLights` (at
+most eight discs of lit ground, 64 floats after the haze spots, the `Clouds` uniform now 300 floats) add to the light
+from below each cloud sample takes into the two-stream (`cloudSkyScatter`'s lower side): a Lambertian disc of radius rho
+on a plane H above it gives rho^2 / (H^2 + rho^2) of its radiance over its centre, falling as ((H^2 + rho^2) /
+(H^2 + rho^2 + r^2))^2, which keeps the disc's flux, times the ground-to-deck series 1 / (1 - albedo x deck
+reflectance) on the CPU (Kyba et al. 2011, Kocifaj 2007, Jechow and Holker 2019). `mist` (extinction 3.912 / visibility,
+Koschmieder 1924) composites in front of the clouds over sky pixels only: flat Beer-Lambert to the base, its light the
+isotropic single scattering of the mean radiance round it, the ground's (the even lower light plus the discs along the
+ray's ground track to two extinction lengths, the closed-form line integral of the same law) and the deck's above.
+Without either option the picture is unchanged: the added terms are zero and the fragment takes the old discards.
+Evidence: `features-check.mjs ground-light` (RTX A6000, WebGPU and `MARGO_COMPAT=1` agree to 1e-4): a black deck
+without light, 10 times brighter toward the city than away, structure (spread 0.33) overhead, the light's colour, the
+mist 2.5 times brighter toward the city, and a disc wider than the sky equal to the even light from below to 1e-6;
+`ground-light.test.js` proves the CPU twin's flux to 0.5 percent and the series. `volumetric`, `cloud-bounds` and
+`overcast` still pass. Cost: one loop over the discs per lit cloud sample (none without them). Missing: the discs
+are not shadowed by terrain or buildings, the mist is single scattering with an isotropic phase and a flat path, the
+yard-scale light of a scene's own lamps on its mist near the camera is the scene fog's, and no photograph comparison
+is automated.
+
 ## Sky light in the sun's units (KB-SKY-SUNUNITS1, section 5 evidence, 2026-11-17)
 
 GPU maths change in `packages/sky/src/lighting.ts` (and the one `BlownSand` read of the sky map), both backends from one

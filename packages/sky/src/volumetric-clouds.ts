@@ -212,6 +212,48 @@ export interface VolumetricCloudOptions {
    * the scene has `@margoengine/taa` (a plugin named `taa`) and off otherwise.
    */
   temporal?: boolean | 'auto';
+  /**
+   * Lit ground under the deck that lights its base from below: a city, a town, a lit yard (at most eight). Each is a
+   * disc of ground of `radius` metres round `x`, `z` that sends up `color`, the radiance of the lit ground seen from
+   * above (linear RGB, the clouds' units). A cloud at height H above the disc's centre takes its light as a
+   * Lambertian disc lights a plane over it (cosine at both ends over the distance squared): the base over the centre
+   * receives `color` times rho^2 / (H^2 + rho^2), falling as ((H^2 + rho^2) / (H^2 + rho^2 + r^2))^2 with the distance r
+   * across, which keeps the disc's whole flux (pi rho^2 times pi `color`) on the base. The light then spreads through the
+   * cloud by the deck's two-stream, so a low overcast deck glows over the lights, brightest over the city and toward its
+   * horizon, with the thin parts and gaps darker, as clouds amplify urban skyglow (C. C. M. Kyba, T. Ruhtz, J. Fischer
+   * and F. Holker, "Cloud Coverage Acts as an Amplifier for Ecological Light Pollution in Urban Ecosystems", PLoS ONE 6,
+   * e17307, 2011: overcast nights 10 times brighter than clear ones in Berlin). The light the base sends back down is
+   * reflected up again by the ground (`groundAlbedo`), the series 1 / (1 - albedo x deck reflectance) (M. Kocifaj,
+   * "Light-pollution model for cloudy and cloudless night skies with ground-based light sources", Applied Optics 46,
+   * 3013, 2007; A. Jechow and F. Holker, "Snowglow", J. Imaging 5, 69, 2019: snow and cloud together raise it most).
+   * Read every frame; default none, at no cost.
+   */
+  groundLights?: readonly CloudGroundLight[];
+  /**
+   * Rain, mist or haze in the air between the ground and the deck, over the sky the clouds draw (scene surfaces keep
+   * their own fog): `visibility` metres, the distance at which it leaves 2 percent of what is behind it (Koschmieder
+   * 1924: extinction 3.912 / visibility). The air takes the light round it: the ground's below it (the sky light's lower
+   * half and the `groundLights` along the ray's ground track, as far as two extinction lengths, as the sky's fog takes its
+   * fire spots) and the deck's above it, so the low sky toward a lit city glows and the deck dims into it toward the
+   * horizon. Only while the camera is under the deck. Read every frame; default none.
+   */
+  mist?: CloudMist;
+}
+/** {@link VolumetricCloudOptions.groundLights}: one disc of lit ground that lights the cloud base from below. */
+export interface CloudGroundLight {
+  /** Radiance of the lit ground seen from above, linear RGB 0 to 10,000 in the clouds' units (the sky's when it has one). */
+  color: Vec3;
+  /** World x of the disc's centre, metres. */
+  x: number;
+  /** World z of the disc's centre, metres (north is -z). */
+  z: number;
+  /** Radius of the lit ground, 1 to 1,000,000 metres. Default 1000. */
+  radius?: number;
+}
+/** {@link VolumetricCloudOptions.mist}: the air between the ground and the deck. */
+export interface CloudMist {
+  /** Distance at which the air leaves 2 percent of what is behind it, 10 to 1,000,000 metres. */
+  visibility: number;
 }
 /** {@link VolumetricCloudOptions.flash}: a lightning flash that lights the clouds from inside. */
 export interface VolumetricCloudFlash {
@@ -311,7 +353,7 @@ fn perlinFbm(p:vec3f,period:i32)->f32 {
 // three quarters of the layer's slant depth, of the base shape only.
 /** WGSL of the cloud uniform and its density field, shared with `@margoengine/sky/cloud-shadows`. */
 export const cloudField = /* wgsl */ `
-struct Clouds {inverse:mat4x4f,eye:vec4f,sun:vec4f,sunColor:vec4f,layer:vec4f,shape:vec4f,wind:vec4f,flags:vec4f,moon:vec4f,moonColor:vec4f,flash:vec4f,flashColor:vec4f,look:vec4f,storm:array<vec4f,8>,veil:vec4f,glow:vec4f,fires:array<vec4f,16>,hazeFires:array<vec4f,16>}
+struct Clouds {inverse:mat4x4f,eye:vec4f,sun:vec4f,sunColor:vec4f,layer:vec4f,shape:vec4f,wind:vec4f,flags:vec4f,moon:vec4f,moonColor:vec4f,flash:vec4f,flashColor:vec4f,look:vec4f,storm:array<vec4f,8>,veil:vec4f,glow:vec4f,fires:array<vec4f,16>,hazeFires:array<vec4f,16>,ground:array<vec4f,16>,mist:vec4f}
 fn cloudRemap(x:f32,a:f32,b:f32)->f32 {return (x-a)/max(b-a,0.00001);}
 fn cloudAltitude(c:Clouds,p:vec3f)->f32 {let R=c.eye.w;return (dot(p,p)+2.0*R*p.y)/(length(vec3f(p.x,p.y+R,p.z))+R);}
 fn cloudBase(s:vec4f)->f32 {let low=s.g*0.625+s.b*0.25+s.a*0.125;return clamp((clamp(cloudRemap(s.r,low-1.0,1.0),0.0,1.0)-0.67)/0.21,0.0,1.0);}
@@ -414,6 +456,26 @@ fn cloudColumn(p:vec3f,dir:vec3f,reach:f32,n:u32)->f32 {
  var od=0.0;for(var i=0u;i<n;i++){od+=cloudDensityAt(clouds,shapeNoise,erosionNoise,noiseSampler,p+dir*(reach*(f32(i)+0.5)/f32(n)),false);}
  return od*reach/f32(n)*clouds.layer.w;
 }
+fn cloudGround(p:vec2f,h:f32)->vec3f {
+ var light=vec3f(0);let h2=h*h;
+ for(var i=0u;i<8u;i++){
+  let spot=clouds.ground[2u*i];if(spot.w<=0.0){break;}let r=p-clouds.ground[2u*i+1u].xz;let R2=h2+spot.w;let f=R2/(R2+dot(r,r));
+  light+=spot.rgb*(spot.w/R2)*f*f;
+ }
+ return light;
+}
+fn cloudGroundSpan(u:f32,a2:f32)->f32 {let a=sqrt(a2);return u/(a2+u*u)+atan(u/a)/a;}
+fn cloudGroundTrack(start:vec2f,end:vec2f,h:f32)->vec3f {
+ let path=end-start;let span=length(path);if(span<1.0){return cloudGround((start+end)*0.5,h);}
+ var light=vec3f(0);let h2=h*h;let along=path/span;
+ for(var i=0u;i<8u;i++){
+  let spot=clouds.ground[2u*i];if(spot.w<=0.0){break;}let to=clouds.ground[2u*i+1u].xz-start;let R2=h2+spot.w;
+  let s0=dot(to,along);let a2=R2+max(dot(to,to)-s0*s0,0.0);
+  let mean=R2*R2/(2.0*a2)*(cloudGroundSpan(span-s0,a2)+cloudGroundSpan(s0,a2))/span;
+  light+=spot.rgb*(spot.w/R2)*clamp(mean,0.0,1.0);
+ }
+ return light;
+}
 fn cloudAirPath(h0:f32,h1:f32,t:f32)->f32 {
  let a=exp(-h0/8000.0);let dh=max(h1,0.0)-h0;if(abs(dh)<1.0){return t*a;}return t*8000.0*(a-exp(-max(h1,0.0)/8000.0))/dh;
 }
@@ -469,7 +531,7 @@ fn cloudMarch(d:vec3f,start:f32,end:f32,n:u32,jitter:f32,glow:f32)->CloudLight {
     moon=clouds.moonColor.rgb*clouds.moon.w*0.15*(cloudScatter(od,below0/slant,nuMoon)+0.5*(cloudHG(nuMoon,glow)-cloudPhaseK(nuMoon,1.0))*exp(-0.15*od));
    }
    if(aUp<0.0){aUp=cloudColumn(p,up,max(top-altitude,0.0),columnN);}
-   let sky=cloudSkyScatter(above,below,aUp,below0,nuUp);
+   let sky=cloudSkyScatter(above,below+cloudGround(p.xz,bottom),aUp,below0,nuUp);
    var flash=vec3f(0);
    if(clouds.flash.w>0.0){
     let toward=clouds.flash.xyz-p;let r2=dot(toward,toward);var od=0.0;
@@ -497,20 +559,38 @@ ${fireSkyWgsl('clouds')}fn cloudVeiled(light:vec3f,opacity:f32,d:vec3f)->vec3f {
  let t=pow(max(clouds.veil.rgb,vec3f(1e-30)),vec3f(1.0/max(d.y/max(length(d),1e-6),0.052336)));
  return light*t*clouds.veil.w+opacity*(clouds.glow.rgb+fireSky(d,t));
 }
+fn cloudMist(d:vec3f)->vec4f {
+ let e=clouds.eye.xyz;let k=clouds.mist.x;
+ if(k<=0.0||cloudAltitude(clouds,e)>=clouds.layer.x){return vec4f(0,0,0,1);}
+ let up=normalize(vec3f(e.x,e.y+clouds.eye.w,e.z));
+ let s=select(clouds.shape.z,min(clouds.shape.z,cloudShell(d,clouds.layer.x).y),dot(d,up)>0.0);let t=exp(-k*s);
+ let above=textureLoad(skyLight,vec2i(0,0),0).rgb;
+ let below=textureLoad(skyLight,vec2i(1,0),0).rgb+clouds.look.w*above+cloudGroundTrack(e.xz,e.xz+d.xz*min(s,2.0/k),clouds.mist.w);
+ return vec4f(0.5*((1.0+clouds.mist.y)*below+clouds.mist.z*above)*(1.0-t),t);
+}
 `;
+// The clouds over the sky, with the mist under the deck (`mist`, cloudMist) in front of them over the sky's pixels: the
+// air's transmittance t to the base along the ray, flat Beer-Lambert, and its light, isotropic single scattering of the
+// mean radiance round it, the ground's below (the sky light's lower half plus the ground lights along the ray's ground
+// track to two extinction lengths, cloudGroundTrack) and the deck's above (its reflectance mist.y of that, plus its
+// transmittance mist.z of the light above it), times 1 - t. Behind it the cloud's light and the backdrop both take t.
 const shader = (depthBinding: string) => /* wgsl */ `${fullscreen}${march}${displayShader}
 ${depthBinding}
 @fragment fn fragment(i:Vertex)->@location(0) vec4f {
  let ndc=vec2f(i.uv.x*2.0-1.0,1.0-i.uv.y*2.0);let far=clouds.inverse*vec4f(ndc,0.000001,1);
  let d=normalize(far.xyz/far.w-clouds.eye.xyz)*select(-1.0,1.0,far.w>=0.0);
- let span=cloudSpan(d);var end=span.y;
- ${depthBinding ? `let z=sceneDepthAt(vec2i(i.position.xy));if(z>0.0){let w=clouds.inverse*vec4f(ndc,z,1);end=min(end,length(w.xyz/w.w-clouds.eye.xyz));}` : ''}
- if(end<=span.x){discard;}
- let m=cloudMarch(d,span.x,end,u32(clouds.shape.w),fract(cloudHash3(vec3u(vec2u(i.position.xy),7u)).x+clouds.flags.y),0.95);
- if(m.opacity<=0.0){discard;}
- var color=cloudVeiled(m.light,m.opacity,d)*clouds.sunColor.w;
- if(clouds.flags.x>0.5){color=toDisplay(color/m.opacity)*m.opacity;}
- return vec4f(color,m.opacity);
+ let span=cloudSpan(d);var end=span.y;var open=true;
+ ${depthBinding ? `let z=sceneDepthAt(vec2i(i.position.xy));if(z>0.0){open=false;let w=clouds.inverse*vec4f(ndc,z,1);end=min(end,length(w.xyz/w.w-clouds.eye.xyz));}` : ''}
+ var light=vec3f(0);var opacity=0.0;
+ if(end>span.x){
+  let m=cloudMarch(d,span.x,end,u32(clouds.shape.w),fract(cloudHash3(vec3u(vec2u(i.position.xy),7u)).x+clouds.flags.y),0.95);
+  if(m.opacity>0.0){light=cloudVeiled(m.light,m.opacity,d);opacity=m.opacity;}
+ }
+ if(open&&clouds.mist.x>0.0){let air=cloudMist(d);light=air.rgb+air.a*light;opacity=1.0-air.a*(1.0-opacity);}
+ if(opacity<=0.0){discard;}
+ var color=light*clouds.sunColor.w;
+ if(clouds.flags.x>0.5){color=toDisplay(color/opacity)*opacity;}
+ return vec4f(color,opacity);
 }
 `;
 // The deck as the sky's environment sees it (Sky.environmentLayer): each texel of the sky's 64 x 32 map, in its
@@ -664,8 +744,73 @@ export function writeVeil(v: Float32Array, sky: VolumetricCloudSky | undefined):
   // The haze's spots (the sky's fog.fireSpots), from the fog's units into the sky's, as the dome writes them.
   writeHazeFires(v, 168, sky?.options.fog, 2 ** (sky?.options.exposure ?? 0) * (sky?.pictureScale ?? 1));
 }
+// The deck's diffuse reflectance for light from below: 1 less its transmittance at the two-stream's mean slant (the
+// diffusivity factor 1.66, Elsasser 1942; cos 0.6), the deck taken as conservative scatterers.
+const deckReflectance = (layer: CloudLayer): number => 1 - cloudDeckTransmittance(layer, 0.6);
+/**
+ * The ground-to-deck series: light the base sends back down is reflected up again by the ground of `albedo`, and so on,
+ * 1 / (1 - albedo x reflectance) of the first pass (Kocifaj 2007; Jechow and Holker 2019).
+ */
+const groundGain = (options: VolumetricCloudOptions, layer: CloudLayer): number =>
+  1 / (1 - (options.groundAlbedo ?? defaults.groundAlbedo) * deckReflectance(layer));
+/**
+ * Writes the ground lights (`groundLights`, floats 232 to 295: colour times the ground-to-deck series and radius
+ * squared, then x, 0 and z) and the mist (`mist`, floats 296 to 299: extinction 3.912 / visibility per metre, the
+ * deck's reflectance and transmittance for light from below, and the height the mist takes the ground lights at, a
+ * quarter of the base). Without them all zero.
+ */
+export function writeGround(
+  v: Float32Array,
+  options: VolumetricCloudOptions,
+  layer: CloudLayer = layerOf(options),
+): void {
+  v.fill(0, 232, 300);
+  const lights = options.groundLights,
+    gain = lights?.length ? groundGain(options, layer) : 0;
+  lights?.forEach((g, i) => {
+    const o = 232 + 8 * i;
+    for (let k = 0; k < 3; k++) v[o + k] = g.color[k]! * gain;
+    v[o + 3] = (g.radius ?? 1000) ** 2;
+    v[o + 4] = g.x;
+    v[o + 6] = g.z;
+  });
+  if (options.mist) {
+    const r = deckReflectance(layer);
+    v[296] = 3.912 / options.mist.visibility;
+    v[297] = r;
+    v[298] = 1 - r;
+    v[299] = 0.25 * layer.bottom;
+  }
+}
+/**
+ * The light the `groundLights` send up into the cloud base over world `x`, `z` (linear RGB, the clouds' units, as
+ * radiance from below): each disc's Lambertian law on the base at its height, times the ground-to-deck series. The CPU
+ * twin of the march's `cloudGround`; `out`, when given, receives it.
+ * @example cloudGroundLight({ bottom: 800, groundLights: [{ color: [1, 0.6, 0.3], x: 0, z: 0, radius: 3000 }] }, 0, 0);
+ */
+export function cloudGroundLight(
+  options: VolumetricCloudOptions,
+  x: number,
+  z: number,
+  out: [number, number, number] = [0, 0, 0],
+): [number, number, number] {
+  out[0] = out[1] = out[2] = 0;
+  const lights = options.groundLights;
+  if (!lights?.length) return out;
+  const layer = layerOf(options),
+    gain = groundGain(options, layer),
+    h2 = layer.bottom ** 2;
+  for (const g of lights) {
+    const rho2 = (g.radius ?? 1000) ** 2,
+      R2 = h2 + rho2,
+      f = R2 / (R2 + (x - g.x) ** 2 + (z - g.z) ** 2),
+      k = (rho2 / R2) * f * f * gain;
+    for (let i = 0; i < 3; i++) out[i] += g.color[i]! * k;
+  }
+  return out;
+}
 /** Floats in the `Clouds` uniform ({@link cloudField}): the buffers of the clouds, their shadows and shafts hold this many. */
-export const CLOUD_FLOATS = 232;
+export const CLOUD_FLOATS = 300;
 let loadedStorm: StormField | undefined, loading: Promise<StormField> | undefined, loadError: unknown;
 /** Whether the options draw a storm: a `hurricane`, or `type: 'hurricane'`. */
 export const wantsStorm = (options: VolumetricCloudOptions): boolean =>
@@ -825,6 +970,29 @@ export class VolumetricClouds implements EnginePlugin {
           'Invalid VolumetricClouds flash; use an intensity of 0 to 1e12, a color of 0 or more and a radius of 1 to 100000',
         );
     }
+    if (o.groundLights !== undefined) {
+      const lights = o.groundLights as readonly CloudGroundLight[];
+      if (!Array.isArray(lights) || lights.length > 8)
+        throw new RangeError(
+          'Invalid VolumetricClouds groundLights; use a list of at most 8 lights {color, x, z, radius}',
+        );
+      for (const g of lights)
+        if (
+          typeof g !== 'object' ||
+          g === null ||
+          !Array.isArray(g.color) ||
+          g.color.length !== 3 ||
+          !g.color.every((c: number) => inRange(c, 0, 10000)) ||
+          !inRange(g.x, -1e7, 1e7) ||
+          !inRange(g.z, -1e7, 1e7) ||
+          !inRange(g.radius ?? 1000, 1, 1e6)
+        )
+          throw new RangeError(
+            'Invalid VolumetricClouds groundLights; each light is {color: three numbers 0 to 10000, x and z within 1e7, radius 1 to 1e6}',
+          );
+    }
+    if (o.mist !== undefined && (typeof o.mist !== 'object' || o.mist === null || !inRange(o.mist.visibility, 10, 1e6)))
+      throw new RangeError('Invalid VolumetricClouds mist; give {visibility: 10 to 1000000 metres}');
     const { coverage, bottom, top, density } = layerOf(o, this.layer);
     if (
       !inRange(coverage, 0, 1) ||
@@ -1004,8 +1172,9 @@ export class VolumetricClouds implements EnginePlugin {
     // The ground's albedo times the share of the light the deck passes to it (cloudDeckTransmittance at the sun's height).
     v[63] = (o.groundAlbedo ?? defaults.groundAlbedo) * cloudDeckTransmittance(layer, Math.max(v[21], 0.1));
     writeVeil(v, sky);
+    writeGround(v, o, layer);
     c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
-    return v[30] > 0;
+    return v[30] > 0 || v[296] > 0;
   }
   // The sky light: from the sky's reflection map on the GPU when it has one, else the `ambient` option.
   private skyLight(c: Context): void {
