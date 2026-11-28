@@ -1249,6 +1249,79 @@ test('T4 shimmerMoving leaves out the trail a near swaying leaf smears over the 
     assert.throws(() => shimmerMoving(frame, { ...moving, subframes: bad }), RangeError, String(bad));
 });
 
+test('T4 shimmerMoving still fails one-pixel shimmer on a static edge just outside a fast mover`s sub-frame trail (KB-SCATTER-FRINGEVEL1 guard)', () => {
+  // The leaf of the test above: 63 px a frame on screen, 53 px of it camera parallax, eight sub-frames at 180 degrees,
+  // so its trail reaches 29.5 px behind (columns 50 to 79), 2 px ahead (100, 101) and the next frame's trail covers
+  // 113 to 142. A static edge at column 49 (pale ground left of it) and the sky at columns 102 and 112, one pixel past
+  // each reach, flash in every row: the wider reach must not swallow them.
+  const width = 160,
+    height = 16,
+    leaf = (x) => x >= 80 && x < 100,
+    trail = (x) => x >= 50 && x < 80,
+    edge = (x) => x < 50,
+    frame = image(width, height, (x) => (leaf(x) ? 40 : trail(x) ? 40 + ((80 - x) * 190) / 31 : edge(x) ? 200 : 230)),
+    shimmer = (x) => x === 49 || x === 102 || x === 112,
+    next = image(width, height, (x) =>
+      shimmer(x) ? 0 : x >= 143 ? 40 : x >= 113 ? 40 + ((143 - x) * 190) / 31 : edge(x) ? 200 : 230,
+    ),
+    motion = { width, height, data: new Float32Array(width * height * 2) },
+    velocity = { width, height, data: new Float32Array(width * height * 2) },
+    nextVelocity = { width, height, data: new Float32Array(width * height * 2) },
+    back = { width, height, data: new Float32Array(width * height * 2) };
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 2;
+      motion.data[i] = leaf(x) ? 53 : 0;
+      velocity.data[i] = leaf(x) ? 63 : 0;
+      if (x >= 143) {
+        nextVelocity.data[i] = 63;
+        back.data[i] = -53;
+      }
+    }
+  const row = shimmerMoving(frame, { next, motion, velocity, nextVelocity, back, shutter: 180, subframes: 8 });
+  assert.equal(row.detail.blurred, (30 + 2 + 30) * height, 'the reach is the trail alone');
+  assert.equal(row.detail.off, 3 * height, 'every pixel one past a reach is still counted');
+  assert.ok(row.value > 0.5 && !row.pass, `shimmer just outside the trail fails: ${row.value}`);
+});
+
+test('T4 shimmerMoving still fails shimmer in a background a fast mover`s reach covers when the background moves with it (KB-SCATTER-FRINGEVEL1 guard)', () => {
+  // A camera pan of 63 px a frame: the sky moves 63 px, the leaf near the lens 63 px on screen too (53 px parallax
+  // plus its sway), so the leaf's smear lies on sky moving the same way and changes nothing there. Shimmer in that sky,
+  // inside the leaf's 29.5 px sub-frame trail (column 60, landing on 123), is real and must count; the same shimmer
+  // over a still sky, where the smear does change the pixel, is the trail and is left out.
+  const width = 160,
+    height = 16,
+    leaf = (x) => x >= 80 && x < 100,
+    frame = image(width, height, (x) => (leaf(x) ? 40 : 230)),
+    panned = image(width, height, (x) => (x === 123 ? 0 : 230)),
+    still = image(width, height, (x) => (x === 60 ? 0 : 230)),
+    motion = { width, height, data: new Float32Array(width * height * 2) },
+    velocity = { width, height, data: new Float32Array(width * height * 2) },
+    stillMotion = { width, height, data: new Float32Array(width * height * 2) },
+    stillVelocity = { width, height, data: new Float32Array(width * height * 2) };
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 2;
+      motion.data[i] = leaf(x) ? 53 : 63;
+      velocity.data[i] = 63;
+      stillMotion.data[i] = leaf(x) ? 53 : 0;
+      stillVelocity.data[i] = leaf(x) ? 63 : 0;
+    }
+  const row = shimmerMoving(frame, { next: panned, motion, velocity, shutter: 180, subframes: 8 });
+  assert.equal(row.detail.blurred, 0, 'a smear over a surface moving with it reaches nothing');
+  assert.equal(row.detail.off, height, 'the shimmer inside the trail is counted');
+  assert.ok(row.value > 0.5 && !row.pass, `shimmer under a mover moving with it fails: ${row.value}`);
+  const over = shimmerMoving(frame, {
+    next: still,
+    motion: stillMotion,
+    velocity: stillVelocity,
+    shutter: 180,
+    subframes: 8,
+  });
+  assert.equal(over.detail.blurred, (30 + 2) * height, `the trail behind and half a slice ahead`);
+  assert.equal(over.detail.off, 0, 'over a still sky the same column is the trail');
+});
+
 test('T8 motionBlur fails a stepped trail: eight sharp copies over a 180 degree shutter are not a smear (KB-LOOK-TV-SUBSTEP1)', () => {
   // Bars moving 96 and 64 px a frame, exposed at 180 degrees as 8 sharp copies (each sub-frame drawn without blurring over
   // its own slice of the shutter, the old timber-valley trail) or as one continuous smear.
