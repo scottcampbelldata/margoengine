@@ -100,6 +100,11 @@ type NativePhaseSolver =
       readonly subject: 'Surf force';
       readonly phaseExport: 'surf_force_thread_phase';
       readonly phase: 'wave moments and stress divergence';
+    }
+  | {
+      readonly subject: 'Surge potential';
+      readonly phaseExport: 'surge_potential_thread_phase';
+      readonly phase: 'tides and inverse barometer';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };

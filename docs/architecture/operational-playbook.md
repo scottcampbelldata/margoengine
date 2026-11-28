@@ -12201,3 +12201,7 @@ Spatial fluxes are independent across transverse lines and spectral bins. Option
 ### SEA-05 accepted radiation stress and wet sand
 
 The surf solver computes native directional moments in canonical order, then synchronizes before the divergence pass. Forcing, wave energy, roller and wet history publish together only after validation. The two-renderer cutaway reads the accepted shallow-water surface and wet-sand history. [Evidence and commands](../whitepaper/reproduce.md#sea-05-accepted-surf-and-boers-flume-gauges)
+
+### SEA-07 native head composition and accepted tide
+
+The optional surge workers evaluate the rationalized Sun and Moon tide terms and the pressure head in separate phases, with the wet pressure and tide totals reduced in canonical cell order. The surge publishes only after both phases succeed. Scalar and native tests exercise the same accepted shallow-water and geocentric state at signed origins. [Evidence and commands](../whitepaper/reproduce.md#sea-07-tide-replay-and-lake-superior)

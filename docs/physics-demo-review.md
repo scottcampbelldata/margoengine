@@ -517,3 +517,8 @@ Not in the catalog: staged construction (placement of pieces, stacking, scaffold
 - The two analytic frequencies and the planted-root and moving-crown checks in `packages/scatter/test/states.browser.mjs`
   cover the wind response in CY-14, CITY-TO-STREET-1, TREE-2 and THE-SCANNED-WORKSHOP-2.
 - TREE-3's permanent wind-shaped growth is verified in `packages/biomes/tests/coupling/forest.test.js`. The filmed stand still needs the renderer binding.
+
+### SEA-07 automated lunar and solar tide reproduction
+
+- `packages/water/test/tide-film.browser.mjs` drives the accepted shallow-water solution from the live Earth-fixed Sun and Moon under a fixed camera. The west sill floods at 7 hours and the east sill at 14 hours, while the tide-off control stays dry at both. The rendered height agrees with the accepted physics within 1 mm. WebGPU and WebGL2 each reproduce their own full RGBA frames and the complete accepted snapshots after hold, restore and rewind.
+- The scene labels its display-only vertical exaggeration. It covers a closed idealized basin. The original production shots, open-coast gauge validation and moving-storm coupling remain open.

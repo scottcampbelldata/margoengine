@@ -4958,7 +4958,9 @@ It sums them into one forcing potential per cell, the field `surfaceWaterPotenti
 
 The pressure is a function of the water's time, so with the water's `timeScale` it is written in storm time. The tide comes from the `CelestialSolver` at the world's time: give it the water's `timeScale` too.
 
-`potentialAt(x, z)` reads the potential. The rest of a storm surge is the shallow water's own:
+`potentialAt(x, z)` reads the last accepted potential. A rejected pressure sample or celestial port preserves the accepted parts and potential, with an error code that names the fix. `SurgeSolver.load(id?, options?, {threads, signal})` selects the native tide and pressure calculation. With one participant by default, it preserves scalar results. Two or four participants run in Node or an isolated browser worker. Use `using` to release the helpers after the world finishes. `readNativeWork()` gives the last accepted grid work.
+
+The shallow water also solves:
 - `wind`, a `Wind` field 10 m above the water: its stress rho_a C_D |U| U, with Garratt's C_D = (0.75 + 0.067 U) 1e-3 up to `windDragLimit` (default 2.5e-3, where the sea's roughness saturates in strong winds, Donelan et al. 2004);
 - `coriolis`, the Earth's rotation: a Coriolis parameter f in 1/s, or `{latitude, north}` for the beta plane about the grid's centre. It turns the momentum by f dt each substep, exactly, so currents swing to the right in the north and a Kelvin wave keeps its coast;
 - `roughness`, Manning's n of the bed.
@@ -4989,7 +4991,7 @@ const wind = {
   },
 };
 const water = new ShallowWaterSolver();
-const surge = new SurgeSolver();
+using surge = await SurgeSolver.load();
 const world = new PhysicsWorld()
   .add(water, {
     bed: bedSurface({columns, rows, width, depth, centre: [width / 2, depth / 2]}, elevations),

@@ -9,6 +9,11 @@ export const STANDARD_PRESSURE = 101325;
 
 export const SURGE_LAYOUT = 1;
 
+export interface SurgeNativeOptions {
+    readonly threads?: 1 | 2 | 4;
+    readonly signal?: AbortSignal;
+}
+
 export interface SurgeOptions {
     readonly tide?: boolean;
 }
@@ -23,12 +28,29 @@ export interface SurgeParams {
     readonly rate?: RateLevel;
 }
 
+export interface SurgePotentialWorkCounts extends SurgePotentialWorkerWork {
+    readonly threads: number;
+    readonly wetCells: number;
+    readonly workers: readonly SurgePotentialWorkerWork[];
+}
+
+export interface SurgePotentialWorkerWork {
+    readonly pressureCells: number;
+    readonly tideCells: number;
+    readonly pairedTides: number;
+    readonly synthesizedCells: number;
+    readonly pairedSynthesis: number;
+}
+
 export interface SurgeSite extends GeodeticSite {
     readonly north?: number;
 }
 
 export class SurgeSolver implements Solver<SurgeParams> {
     constructor(id?: string, options?: SurgeOptions);
+    static load(id?: string, options?: SurgeOptions, native?: SurgeNativeOptions): Promise<SurgeSolver>;
+    readNativeWork(): SurgePotentialWorkCounts | undefined;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, params: SurgeParams): void;
     step(context: StepContext, _dt: number): void;

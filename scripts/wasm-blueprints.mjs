@@ -396,6 +396,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'surge-potential-kernel',
+    crate: 'packages/physics/surge-potential-kernel',
+    blueprint: 'packages/physics/src/surge/surge-potential-kernel.wasm',
+    script: 'packages/physics/scripts/build-surge-potential-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'surge-potential-kernel-shared',
+    crate: 'packages/physics/surge-potential-kernel',
+    blueprint: 'packages/physics/src/surge/surge-potential-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-surge-potential-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'viscoplastic-kernel',
     crate: 'packages/physics/viscoplastic-kernel',
     blueprint: 'packages/physics/src/viscoplastic/viscoplastic-kernel.wasm',

@@ -27,6 +27,7 @@ packages/physics/tracer-random-kernel/target/
 packages/physics/rogue-pair-kernel/target/
 packages/physics/wave-transport-kernel/target/
 packages/physics/surf-force-kernel/target/
+packages/physics/surge-potential-kernel/target/
 packages/physics2d/kernel/target/
 packages/physics2d/kernel/wasm-check/target/
 packages/sciviz/kernel/target/

@@ -15750,8 +15750,8 @@
         "gzip": 74569
       },
       "./surge": {
-        "raw": 9374,
-        "gzip": 4428
+        "raw": 22245,
+        "gzip": 9078
       },
       "./ice": {
         "raw": 6791,
@@ -20338,6 +20338,16 @@
       "raw": 4696,
       "gzip": 2362,
       "brotli": 2217
+    },
+    "packages/physics/dist/surge-potential-kernel.wasm": {
+      "raw": 3899,
+      "gzip": 1808,
+      "brotli": 1635
+    },
+    "packages/physics/dist/surge-potential-kernel-shared.wasm": {
+      "raw": 3899,
+      "gzip": 1808,
+      "brotli": 1635
     }
   },
   "splits": {

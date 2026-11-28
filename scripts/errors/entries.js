@@ -141,6 +141,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'storm-surge',
+    title: '@margoengine/physics/surge surge and tidal potential',
+    kind: 'family',
+    messages: [],
+    cause: 'A shallow-water grid, pressure sample, celestial input, geodetic site or tidal boundary could not produce a finite potential.',
+    fix: 'Add the shallow water and a matching celestial source before the surge. Use finite SI pressures, gravity, density and water depth. Set the geodetic site in radians and metres, and choose a finite simulation time. Create a fresh solver after disposal.',
+  },
+  {
     id: 'nearshore-surf',
     title: '@margoengine/physics/surf nearshore waves and run-up',
     kind: 'family',

@@ -24145,3 +24145,7 @@ The step wrote its clock, outgoing spectrum and prior cells' friction before rea
 ### Fixed: SEA-05 could publish partial surf outputs and read stale wave height after restore
 
 The surf previously changed step memory before validating its shallow-water samples, and its height query read output scratch from the last advanced step. It now prepares the energy, roller, radiation-stress forcing, wet sand and shore statistics in candidates before publication. Height and angle queries use the stored directional energy, including after restoring a checkpoint. The coupled rejection and rewind tests are in `packages/physics/tests/coupling/surf.test.js`.
+
+### Fixed: SEA-07 could overwrite pressure and tidal terms before validating the forcing
+
+A nonfinite pressure in a later grid cell previously left some of the surge's saved pressure and tide terms updated, while its output potential still described the previous step. The solver now stages the wet mask, raw terms and potential, validates the full Earth-fixed celestial port and publishes both regions together. It copies the six body coordinates before sampling callbacks. The regression in `packages/physics/tests/coupling/surge.test.js` checks late pressure failure, malformed celestial layout and exact corrected replay.

@@ -7086,3 +7086,9 @@ The directional spectrum, wave clock and friction remain unchanged when a later 
 ### SEA-05 accepted surf and wet sand
 
 Native radiation moments and divergence reproduce scalar forcing in signed coupled worlds. The fixed-camera shore advances 8 m in the grouped case, retreats with seaward flow, and leaves a dark sand mark where the accepted water column has dropped below the visible cutoff. WebGPU and WebGL2 independently reproduce complete frames and accepted state. Independent Boers measurements show an unresolved setup overprediction at 27 m in all three regimes. [Evidence and bounds](../limits.md#native-surf-forcing-accepted-swash-and-measured-setup-sea-05)
+
+### SEA-07 accepted astronomical tide and staged pressure forcing
+
+The optional native tide and pressure evaluator reproduces the scalar shallow-water result exactly at 1, 2 and 4 participants, including signed origins, coupled restore and rejected inputs. Three real Chromium helpers process 153 cells in each native phase. Each phase uses 152 SIMD lanes, and the wet reductions retain their original order. The live tide raises the west sill and then the east, while both stay dry in the tide-off control. WebGPU and WebGL2 each reproduce complete accepted snapshots and their own full RGBA frames on hold, restore, re-advance and rewind.
+
+The archived 1975 surge is an independent measurement comparison. Peak level at Point Iroquois is 0.671 m in the fine run versus 0.971 m observed, an hour later. The 0.300 m miss exceeds the 0.047 m numerical spread. [Tests, observations and limits](reproduce.md#sea-07-tide-replay-and-lake-superior)

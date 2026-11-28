@@ -682,3 +682,7 @@ Its figures, PDF, fitted curves and software are absent from the package.
 ### Boers barred beach measurements (SEA-05)
 
 `packages/physics/scripts/sea05-boers-measured.mjs` records sparse physical bed coordinates and actual Boers flume wave-height and water-level markers. The observation markers and separate offshore height and period are adapted with metric rounding and datum adjustment from figure 10 and Table 3 of [Moghimi et al. 2020](https://doi.org/10.3390/jmse8050308), licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The physical bed facts come from figure 2 of [Daly et al. 2012](https://doi.org/10.1016/j.coastaleng.2011.08.001). The original figures and time series are outside the repository.
+
+### Lake Superior November 1975 forcing and observations (SEA-07)
+
+`packages/physics/scripts/sea07-superior-measured.mjs` retrieves published [NOAA CO-OPS gauge observations](https://api.tidesandcurrents.noaa.gov/api/dev/) and the [NOAA NCEI Great Lakes bathymetry](https://www.ncei.noaa.gov/products/great-lakes-bathymetry). Atmospheric forcing is adapted from [Copernicus Climate Change Service and ECMWF ERA5](https://doi.org/10.24381/cds.adbb2d47), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), accessed through [Open-Meteo](https://open-meteo.com/en/docs/historical-weather-api). The script resamples the independent forcing onto the model grid. Downloaded inputs are kept in its local cache.

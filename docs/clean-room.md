@@ -20299,3 +20299,6 @@ flat yellow discs, moss campion cushions as lily pads, and the flowers vanished 
 Margo's own: the Rodrigues turn of a head built upright onto its nodding axis; a cushion's rosettes as a product of
 sines over the surface point; far-ring sizes chosen so the area seen from above is kept (procedural test/forbs.test.js).
 
+### SEA-07 native Sun, Moon and atmospheric potential
+
+Pugh and Woodworth (2014), [Sea-Level Science](https://doi.org/10.1017/CBO9781139235778), Chapter 3, and Stewart, [Introduction to Physical Oceanography](https://geo.libretexts.org/Bookshelves/Oceanography/Introduction_to_Physical_Oceanography_%28Stewart%29/17%3A_Coastal_Processes_and_Tides/17.4%3A_Theory_of_Ocean_Tides), §17.4, give the tide-generating potential with constant and uniform-acceleration terms removed. Native cells evaluate the existing rationalized Newton expression for the Sun and Moon using the published Earth-fixed vectors. The wet pressure and tide sums use the original row order. The next phase forms the same pressure head and relative equilibrium tide. Luettich and Westerink (2004), [Formulation and numerical implementation of ADCIRC](https://adcirc.org/wp-content/uploads/sites/2255/2013/07/adcirc_theory_2004_12_08.pdf), Eq. 1.13, gives the separate atmospheric and equilibrium-potential gradients in depth-integrated momentum.

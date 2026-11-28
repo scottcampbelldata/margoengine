@@ -210,6 +210,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/surge-potential-kernel.wasm',
+    label: 'surge-potential-kernel.wasm',
+    kind: 'Rust SIMD astronomical and pressure surge potential',
+    measure: 'file',
+    when: 'SurgeSolver.load() from the optional /surge entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/surge-potential-kernel-shared.wasm',
+    label: 'surge-potential-kernel-shared.wasm',
+    kind: 'Rust SIMD surge potential with helper workers',
+    measure: 'file',
+    when: 'SurgeSolver.load() with threads: 2 or 4 from the optional /surge entry',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/loads-kernel.wasm',
     label: 'loads-kernel.wasm',
     kind: 'Rust SIMD batch for hydrodynamic wrenches',

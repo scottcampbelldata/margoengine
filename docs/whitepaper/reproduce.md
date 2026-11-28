@@ -5302,3 +5302,16 @@ node scripts/run-with-timeout.mjs --max=2 -- node packages/physics/scripts/sea05
 ```
 
 The independent flume diagnostic runs the finite-volume shallow water and the phase-averaged surf solver with the measured offshore depth, period and height. It evaluates five separate gauges in each of three regimes, using the reported concrete bed and a steady offshore envelope. The two resolutions are 0.4 and 0.2 m, 20 and 40 Hz, and 9 and 17 bins, with 60–120 s and 120–180 s averages. The local allowances combine plot readout, gauge position and observed numerical sensitivity. The reproduction lacks published gauge repeatability and finite-record confidence bounds. [Measurements](https://doi.org/10.3390/jmse8050308)
+
+### SEA-07 tide replay and Lake Superior
+
+```sh
+node scripts/run-with-timeout.mjs --max=2 -- node --test packages/physics/tests/surge.test.js packages/physics/tests/coupling/surge.test.js packages/physics/tests/coupling/surge-potential-workers.test.js
+node scripts/run-with-timeout.mjs --max=2 -- npm run test:gpu:surge-potential-workers -w @margoengine/physics
+node scripts/run-with-timeout.mjs --max=3 -- npm run test:gpu:tide-film -w @margoengine/water
+node scripts/run-with-timeout.mjs --max=5 -- node packages/physics/scripts/sea07-superior-measured.mjs
+```
+
+The fixed-camera test drives a real shallow-water basin from the accepted Earth-fixed Sun and Moon positions. The physical level and current use SI units. The cutaway enlarges vertical geometry for the camera, with the scale identified in the view. The tide-off control retains the same geometry, time and celestial sky.
+
+The Lake Superior diagnostic uses the NOAA NCEI draft bathymetry in Lake Superior low-water datum and independent hourly ERA5 winds and mean sea-level pressure. The initial level is from the 8 November 1975 UTC pre-event Grand Marais record. The scored gauges are Duluth, Ontonagon and Point Iroquois for 9–11 November. Flagged missing hours are excluded identically from the model and the observations. Gauge proxies select the nearest model wet cell connected to the lake interior. The same forcing is run at 16 km and 8 km, with coupled pressure evaluated every 120 and 60 seconds. That difference measures numerical sensitivity. The archive does not supply the historical calibration uncertainty. The checksummed inputs are downloaded and reused from a local cache. [Gauge API](https://api.tidesandcurrents.noaa.gov/api/dev/) [Bathymetry](https://www.ncei.noaa.gov/products/great-lakes-bathymetry) [ERA5](https://doi.org/10.24381/cds.adbb2d47)
