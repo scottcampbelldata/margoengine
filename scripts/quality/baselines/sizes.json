@@ -15515,6 +15515,12 @@
       "commit": "life03-native-swim-workers",
       "reason": "LIFE-03: Physics life grows from 6,884 to 10,176 B gzip (ceiling 6,901 to 10,482) for signed ports, coded bounds, body-length tail limits and optional SIMD worker phases. The same optional entry keeps the control, ordinary and reciprocal passive routes on one body state. A separate worker entry would duplicate the checked body and field bindings. Core and Stage gain no bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "0357c2ed03 audit",
+      "reason": "Audit of the 14 items other than studio/bench that the fbabe71501 (on main as 0357c2ed03) update raised: each was measured on a full build of 632d700155 and each grew from committed source changes on main that had not updated this record, so all are kept. cutscene, cutscene/editor, cutscene/nested-editor and cutscene/render: dee8388f41 (GAP-FILM-RESET resetClocks) and 96c3d44779 (FG-17 samples and shutter). physics, its lazy kernel, physics/breakable and physics/decomposition: the ATMO-01, ATMO-03 and ATMO-06 native worker phases (9d7dd26bc5, 9622992eda, a65111cd3a) and 632d700155. rigging/retarget: 9a0a5f9188, 4131095aab and 3001234894 (IK hinge and hand fixes). sky/milky-way: 848d9f409b (survey catalogues). splats/edit: 96d7978d3d (SplatBrush history, undo and reset). terrain: bb8bf442aa (complex craters) and 0382682375 (drawLocalShadow casters). animator/stepping: a new entry on main since caf466b4cc, fixed in a20b94c768. leak optics/screens to shader/raw: e2272ca739 and 5bf270d0a1 import RawMesh statically. No item came from an uncommitted demo build.",
+      "grew": 0
     }
   ],
   "items": {
