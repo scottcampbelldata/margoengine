@@ -2,6 +2,7 @@
 // From the 3MF Consortium's specifications: Volumetric and Implicit Extensions
 // (https://github.com/3MFConsortium/spec_volumetric) and Displacement Extension
 // (https://github.com/3MFConsortium/spec_displacement).
+import { isMixColor } from './mix-color.js';
 import { num, type ExportNode, type Geo } from './scene.js';
 import type { ThreeMFConstituent, ThreeMFLattice } from './threemf.js';
 
@@ -488,7 +489,7 @@ export function fieldWriter(context: FieldContext) {
       if (!composite.length) fail('volume composites need at least one material');
       const mappings = composite.map((m) => field(m, 'scalar', toGeometry, box, 'composite material')),
         bases = composite.map(({ name, color }) => {
-          if (typeof name !== 'string' || !name || !/^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(color))
+          if (typeof name !== 'string' || !name || !isMixColor(color))
             fail("composite materials need a name and a '#RRGGBB' or '#RRGGBBAA' colour");
           return `<base name="${escaped(name)}" displaycolor="${color.toUpperCase()}"/>`;
         }),

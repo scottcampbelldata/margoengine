@@ -6,6 +6,7 @@ import type { Mesh } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 import { encodeZIP } from './archive.js';
 import { sceneOfGLB } from './glb-scene.js';
+import { isMixColor } from './mix-color.js';
 import type { ExtendedMaterialData, MaterialTextureInfo } from './materials.js';
 import {
   checkTexture,
@@ -209,8 +210,7 @@ function checkSlices({ layers, bottom = 0, meshResolution = 'fullres', separateP
       const colors = color === undefined || typeof color === 'string' ? color : Array.from(color);
       if (
         colors !== undefined &&
-        ((typeof colors !== 'string' && colors.length < count) ||
-          [colors].flat().some((c) => typeof c !== 'string' || !MIX_COLOR.test(c)))
+        ((typeof colors !== 'string' && colors.length < count) || [colors].flat().some((c) => !isMixColor(c)))
       )
         fail("colours are '#RRGGBB' or '#RRGGBBAA', one or one for each point");
       return { points, count, color: colors };
@@ -490,8 +490,6 @@ const colorOf = (r: number, g: number, b: number, a: number): string => {
   return `#${hex(byte(r))}${hex(byte(g))}${hex(byte(b))}${alpha === 255 ? '' : hex(alpha)}`;
 };
 
-const MIX_COLOR = /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/;
-
 /** One mixture as the file writes it, checked. */
 function ratioRow(ratios: ThreeMFRatios, count: number): string {
   if (!Array.isArray(ratios) || ratios.length !== count)
@@ -512,8 +510,7 @@ function checkComposite({ materials, ratios }: ThreeMFComposite): ThreeMFComposi
     throw new RangeError('3MF composite materials mix two or more materials');
   const checked = (materials as readonly ThreeMFConstituent[]).map(({ name, color }) => {
     if (typeof name !== 'string' || !name) throw new TypeError('3MF composite materials each need a name');
-    if (typeof color !== 'string' || !MIX_COLOR.test(color))
-      throw new RangeError("3MF composite material colours are '#RRGGBB' or '#RRGGBBAA'");
+    if (!isMixColor(color)) throw new RangeError("3MF composite material colours are '#RRGGBB' or '#RRGGBBAA'");
     return { name, color: color.toUpperCase() };
   });
   if (typeof ratios !== 'function') ratioRow(ratios, checked.length);
@@ -564,7 +561,7 @@ function checkLattice(lattice: ThreeMFLattice) {
   if (ballMode !== 'none' && ballRadius === undefined) fail('ballMode needs a ballRadius');
   if (ballMode === 'none' && balls.length) fail("lists balls but its ballMode is 'none'");
   const colour = (color: unknown): void => {
-      if (typeof color !== 'string' || !MIX_COLOR.test(color)) fail("colours are '#RRGGBB' or '#RRGGBBAA'");
+      if (!isMixColor(color)) fail("colours are '#RRGGBB' or '#RRGGBBAA'");
     },
     ends = new Set<number>();
   for (const { v1, v2, r1, r2, cap1, cap2, color } of beams as readonly ThreeMFLatticeBeam[]) {
