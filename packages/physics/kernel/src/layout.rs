@@ -699,7 +699,8 @@ columns! {
     // The share of its error each listed joint closes in a biased pass.
     SOLVE_SHARE f32 JointList,
     // 1 for a joint of a path solved exactly (SOLVE_SHARE is joint_share), 0 for a loose one: the locks' projection steps an
-    // exact path the whole way to the gap its share leaves, and a loose one its share an iterate (joints.rs, `project_to`).
+    // exact path the whole way to the gap its share leaves, and leaves a loose one, of a loop, to the passes (joints.rs,
+    // `project_to`).
     SOLVE_EXACT u32 JointList,
     // At the first place of each path: where its slice of NEWTON starts, in words, or NONE when memory could not hold it.
     SOLVE_NEWTON u32 JointList,

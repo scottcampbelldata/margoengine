@@ -1668,12 +1668,21 @@ impl World {
     /// 457,390 rad/s, a cut to nothing kept it, and a body landed 1,100 m from its joints
     /// (`a_cut_push_still_takes_back_the_speed_along_the_locks`).
     fn solve_path(&mut self, first: usize, last: usize, rate: f32, most: f32, h: f32, pass: Pass) {
-        let _ = (rate, h);
-        // The locks' position is the projection's (`project_locks`), so every pass solves their speeds only, and remembers them:
-        // `shed_locks` takes off exactly what they carry.
+        // A path the projection closes (SOLVE_EXACT, `project_locks`): every pass solves its locks' speeds only, and remembers
+        // them, so `shed_locks` takes off exactly what they carry.
+        if self.uu(SOLVE_EXACT, first) != 0 {
+            self.path_right(first, last, rate, most, false);
+            self.apply_path(first, last, 1.0, true);
+            return;
+        }
+        // A loose path of a loop is not projected (`project_to`), so the pushing pass closes its share of the gap.
         self.path_right(first, last, rate, most, false);
-        self.apply_path(first, last, 1.0, true);
-        let _ = pass;
+        self.apply_path(first, last, 1.0, pass != Pass::Push);
+        if pass == Pass::Push {
+            let asked = self.path_right(first, last, rate, most, true);
+            let share = self.push_share(first, last, asked, h);
+            self.apply_path(first, last, share, false);
+        }
     }
 
     /// The path's impulses into RIGHT: what its locks' speeds ask, or with `bias` what their position bias asks, read from the
@@ -2200,6 +2209,10 @@ impl World {
 /// The most Gauss-Newton iterations of the projection, and the gap that ends it sooner: a lock closed to this, in metres along
 /// a sliding lock or radians about a turning one.
 const LOCK_ITERATIONS: usize = 24;
+/// Work counts for the lock projection, native only (feature `counts`): iterates that stepped a path [0], each followed by a
+/// `refresh_joints` of the window, and the paths they stepped [1]. The Wasm build has no such feature, so its code is untouched.
+#[cfg(feature = "counts")]
+pub static LOCK_STEPS: [core::sync::atomic::AtomicU64; 2] = [core::sync::atomic::AtomicU64::new(0), core::sync::atomic::AtomicU64::new(0)];
 const LOCK_CLOSED: f32 = 1e-6;
 /// What the projection's shift over h adds to the speeds: 1 for SHAKE, 2 for the midpoint rule.
 const LOCK_SPEED_SHARE: f32 = 2.0;
@@ -2274,7 +2287,8 @@ impl World {
             for k in 0..6 {
                 self.set_s(JOINT_LOCK_P_0 + k, row, 0.0);
             }
-            if m == 0 {
+            // A loose path is not projected (`project_to`): its bodies keep the move symplectic Euler gives them.
+            if m == 0 || self.uu(SOLVE_EXACT, i) == 0 {
                 continue;
             }
             let view = self.view(row);
@@ -2520,6 +2534,9 @@ impl World {
         for i in from..solving {
             let row = self.uu(SOLVE_JOINTS, i) as usize;
             let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+            if self.uu(SOLVE_EXACT, i) == 0 {
+                continue;
+            }
             let view = self.view(row);
             let most = self.s(JOINT_REACH, row);
             for r in 0..m {
@@ -2549,22 +2566,32 @@ impl World {
                     last += 1;
                 }
                 let lead = self.uu(SOLVE_JOINTS, first) as usize;
-                if !(self.widest_lock(first, last, to) > LOCK_CLOSED) {
+                // A loose path, of a loop, is not projected: its passes close its share of the gap, as before the projection
+                // (`solve_path`), and `shed_locks` takes no midpoint move from its bodies. Stepped by its share an iterate, the
+                // loops' paths fought each other's steps to a stand at a gap their rows, which depend on each other, cannot close
+                // past, and never read closed: a 30 by 30 grid ran all 24 iterates of both stages every substep, each with a
+                // refresh of every joint, 58 times slower than before the projection (KB-PHYS-LOCKGRIDSLOW1,
+                // `a_grid_s_loops_take_no_projection_iterate_and_a_chain_takes_a_few`). Capped at one iterate a stage, or
+                // stopped where an iterate closed less than LOCK_CLOSED, the grid still ran 9 and 25 times slower and opened
+                // wider than with no projection at all (0.92 mm and 0.98 mm against 0.65 mm in 20 steps), as the midpoint move
+                // taken from its bodies came back only in part. Exact and loose locks never share a body that moves: one that
+                // holds three locking joints or more is a branch and makes every path at it loose (`walk_path`).
+                if self.uu(SOLVE_EXACT, first) == 0 || !(self.widest_lock(first, last, to) > LOCK_CLOSED) {
                     unsafe { (*self.lock_step(lead)).stepped = 0 };
                     first = last + 1;
                     continue;
                 }
                 open = true;
+                #[cfg(feature = "counts")]
+                LOCK_STEPS[1].fetch_add(1, core::sync::atomic::Ordering::Relaxed);
                 // RIGHT = K^-1 (-(gap - leave) / h): the speed whose move over the substep, h M^-1 J^T p, closes each lock to
-                // what it may leave open, which already leaves the share's rest (`shed_locks`); a loose joint of a loop takes its
-                // share an iterate, as it did a pass, as the paths of a loop step together and a whole step would fight its
-                // neighbours'. Stepping an exact path by its share as well applied it twice: a share of 0.05 closed 3.5 % a
-                // substep (`an_exact_path_closes_its_share_of_a_gap_each_substep`). Near a pose where the rows turn dependent the
-                // step is a Gauss-Newton step past its first order model, so it is cut by `push_share` as the pushing pass's bias
-                // was (Buss and Kim 2005; see the head of this file).
-                let share = if self.uu(SOLVE_EXACT, first) != 0 { 1.0 } else { self.s(SOLVE_SHARE, first) };
-                let asked = self.path_right_to(first, last, share / h, to);
-                self.newton_right(first, last, share / h, to, counted);
+                // what it may leave open, which already leaves the share's rest (`shed_locks`). Stepping the path by its share as
+                // well applied it twice: a share of 0.05 closed 3.5 % a substep
+                // (`an_exact_path_closes_its_share_of_a_gap_each_substep`). Near a pose where the rows turn dependent the step is
+                // a Gauss-Newton step past its first order model, so it is cut by `push_share` as the pushing pass's bias was
+                // (Buss and Kim 2005; see the head of this file).
+                let asked = self.path_right_to(first, last, 1.0 / h, to);
+                self.newton_right(first, last, 1.0 / h, to, counted);
                 let by = h * self.push_share(first, last, asked, h);
                 let before = self.widest_lock(first, last, to);
                 for i in first..=last {
@@ -2598,6 +2625,8 @@ impl World {
             if !open {
                 return;
             }
+            #[cfg(feature = "counts")]
+            LOCK_STEPS[0].fetch_add(1, core::sync::atomic::Ordering::Relaxed);
             self.refresh_joints(h, false);
             // A path whose step widened its gap takes half the step back, up to eight times (Armijo backtracking
             // on the gap, Nocedal and Wright 2006, ch. 3 and 10).
