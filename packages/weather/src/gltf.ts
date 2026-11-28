@@ -7,6 +7,7 @@ import { Snow, snowWGSL, type SnowOptions } from './snow.js';
 import { noiseWGSL } from './scene-patch.js';
 import { PBR_PROJECTION, pbrLift, puddleSurfaceCode, snowSurfaceCode } from './surface-code.js';
 import type { PrecipitationCover } from './cover.js';
+import { serveGLTF } from './gltf-served.js';
 
 /** Imported model accepting gltf/pbr's composable lighting/shading effects. */
 export interface WeatherGLTFModel {
@@ -73,14 +74,21 @@ export class GLTFWeather implements EnginePlugin {
     if (this.disposed) throw new MargoError('disposed', 'GLTFWeather is disposed; attach a new effect');
   }
 
-  /** Adds a model once. The returned function removes its weather without disposing the model. */
+  /**
+   * Adds a model once. The returned function removes its weather without disposing the model. A
+   * `@margoengine/materials` mesh may be added too: it then takes its weather from this effect alone, and the scene's
+   * `Puddles`, `Snow` and `PrecipitationCover` leave it (give this effect a `cover` to shelter it).
+   */
   add(model: WeatherGLTFModel): () => void {
     this.alive();
     if (!this.engine) throw new MargoError('state', 'Attach GLTFWeather before adding models');
     if (this.removers.has(model)) return this.removers.get(model)!;
     const remove = model.addLighting(this);
+    // The scene's Puddles, Snow and cover leave this model to this effect (KB-WEATHER-GLTFTWICE1).
+    serveGLTF(model, 1);
     const detach = () => {
       remove();
+      serveGLTF(model, -1);
       this.removers.delete(model);
     };
     this.removers.set(model, detach);

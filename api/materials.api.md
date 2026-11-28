@@ -616,6 +616,7 @@ export interface MaterialSortModes {
 
 export interface MaterialSurfaceEffect extends LightingEffect {
     readonly order?: number;
+    skips?(model: PBRModel): boolean;
 }
 
 export interface MaterialSurfaceHook extends EnginePlugin {

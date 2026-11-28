@@ -3,6 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, FrameGraph, type Engine, type EnginePlugin } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
+import { servedByGLTF } from './gltf-served.js';
 
 /** The live map supplied by an unattached sky WeatherFX capture. */
 export interface PrecipitationMap {
@@ -39,6 +40,7 @@ export class PrecipitationCover implements EnginePlugin {
     readonly owner: Engine | undefined;
     shader(source: string, group: number): string;
     bindings(): GPUBindGroupEntry[];
+    skips(model: object): boolean;
   };
 
   constructor(
@@ -108,13 +110,15 @@ export class PrecipitationCover implements EnginePlugin {
    * The Material-mesh side of the cover (KB-WEATHER-MATERIALSWET1): the gltf/pbr lighting effect every
    * `@margoengine/materials` mesh of the scene joins after the scene's Puddles and Snow (order -0.5, as the cover's pass
    * follows theirs on core meshes), so sheltered Material surfaces stay dry as sheltered core surfaces do. Like the core
-   * pass, it changes a shader only once the map exists.
+   * pass, it changes a shader only once the map exists. It `skips` a model that a `GLTFWeather` weathers: that one
+   * shelters through the GLTFWeather's own `cover`.
    */
   get materialSurface(): {
     readonly order: number;
     readonly owner: Engine | undefined;
     shader(source: string, group: number): string;
     bindings(): GPUBindGroupEntry[];
+    skips(model: object): boolean;
   } {
     const cover = this;
     return (this.surfaceEffect ??= {
@@ -124,6 +128,8 @@ export class PrecipitationCover implements EnginePlugin {
       },
       shader: (source, group) => (this.bindings().length ? this.shader(source, group) : source),
       bindings: () => this.bindings(),
+      // A model a GLTFWeather weathers takes its cover from that GLTFWeather's `cover` (KB-WEATHER-GLTFTWICE1).
+      skips: servedByGLTF,
     });
   }
 

@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { Puddles } from '../dist/puddles.js';
 import { Snow } from '../dist/snow.js';
 import { PrecipitationCover } from '../dist/cover.js';
+import { GLTFWeather } from '../dist/gltf.js';
 
 const shader = readFileSync(new URL('../../gltf/src/shader.ts', import.meta.url), 'utf8');
 const input = shader.slice(shader.indexOf('struct Frame'), shader.indexOf('export const extendedPBRShader'));
@@ -158,4 +159,34 @@ test('the cover shelters Material surfaces after the entries, once its map exist
     [162, 163],
   );
   cover.dispose();
+});
+
+// KB-WEATHER-GLTFTWICE1: a Material mesh is a gltf/pbr model, so GLTFWeather.add takes one; it then carries the
+// puddles, snow and its own cover, and the scene's entries must skip it, or their WGSL is declared twice (a shader
+// compile error: "redeclaration of 'WeatherPuddles'") and the surface wetted twice.
+test('the scene entries skip a model a GLTFWeather weathers, while any GLTFWeather has it', () => {
+  const { engine } = fakeEngine();
+  const model = { added: 0, addLighting() { this.added++; return () => this.added--; } },
+    other = { addLighting: () => () => {} };
+  const puddles = new Puddles({ wetness: 1 }).materialSurface,
+    snow = new Snow({ cover: 1 }).materialSurface,
+    cover = new PrecipitationCover({ name: 'capture', options: { weather: {} }, setup() {}, registerPasses() {}, dispose() {} })
+      .materialSurface;
+  const skipped = () => [puddles.skips(model), snow.skips(model), cover.skips(model)];
+  assert.deepEqual(skipped(), [false, false, false]);
+  const first = new GLTFWeather({ puddles: { wetness: 1 } }),
+    second = new GLTFWeather({ snow: { cover: 1 } });
+  first.setup(engine);
+  second.setup(engine);
+  const removeFirst = first.add(model);
+  assert.deepEqual(skipped(), [true, true, true]);
+  assert.equal(puddles.skips(other), false, 'a model no GLTFWeather has still joins');
+  assert.equal(first.add(model), removeFirst, 'adding twice counts once');
+  second.add(model);
+  removeFirst();
+  assert.deepEqual(skipped(), [true, true, true], 'the second GLTFWeather still has it');
+  second.dispose();
+  assert.deepEqual(skipped(), [false, false, false], 'disposal hands the model back to the scene');
+  assert.equal(model.added, 0);
+  first.dispose();
 });

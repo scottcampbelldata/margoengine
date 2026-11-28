@@ -4096,7 +4096,8 @@ model's group 2 at slots 166 (puddles), 167 (snow), 168 and 169 (snow field); th
 queue (`packages/materials/src/scene-surfaces.ts`) reads the scene's `weather-puddles`, `weather-snow` and
 `weather-cover` plugins once a frame and joins their effects to each lit mesh through `addLighting` in order before its
 draw (`sceneSurfaces = false` opts one out); such a mesh composes its shader each frame, as under a `Sky`, and equal
-meshes still batch. Uniforms upload only when their bytes change. Evidence: `packages/weather/tests/material-wet-browser.mjs`
+meshes still batch. A mesh given to a `GLTFWeather` joins none of them (each effect `skips` it while a
+`GLTFWeather` has it, KB-WEATHER-GLTFTWICE1), so no weather WGSL is declared twice. Uniforms upload only when their bytes change. Evidence: `packages/weather/tests/material-wet-browser.mjs`
 on an RTX A6000, native WebGPU and the WebGL2 layer: a core `PbrMaterial` ground and a `Material` ground of the same
 inputs, dry, wet (water and rain rings) and snowed on, differ by a mean relative 7.6e-8 and 5.3e-8 (WebGPU) and
 6.8e-8 and 3.7e-8 (WebGL2) with no pixel off by 2 percent; disposal restores the dry picture and an opted-out mesh stays

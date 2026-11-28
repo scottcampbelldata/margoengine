@@ -5,6 +5,7 @@
 // surface. Two entries chain: the second finds the copy and adds its code after the first's.
 /// <reference lib="esnext.disposable" preserve="true" />
 import { MargoError } from '@margoengine/math/errors';
+import { servedByGLTF } from './gltf-served.js';
 import type { EngineKernel } from '@margoengine/core';
 import {
   engineRuntime,
@@ -135,6 +136,7 @@ export abstract class SurfaceHook implements EnginePlugin {
     readonly owner: Engine | undefined;
     shader(source: string, group: number): string;
     bindings(): GPUBindGroupEntry[];
+    skips(model: object): boolean;
   };
 
   /** @param label The class name, for errors. @param binding Group 0 slot. @param declarations WGSL without the noise. @param values The uniform's values. */
@@ -191,13 +193,15 @@ export abstract class SurfaceHook implements EnginePlugin {
    * The Material-mesh side of this entry (KB-WEATHER-MATERIALSWET1): a gltf/pbr lighting effect that every
    * `@margoengine/materials` mesh in this entry's scene joins by itself (its `sceneSurfaces`), so wet ground and snow
    * reach Material surfaces as they reach core meshes. The same WGSL and uniform as on core meshes, bound in gltf/pbr's
-   * group 2 at {@link MATERIAL_SLOTS}.
+   * group 2 at {@link MATERIAL_SLOTS}. It `skips` a model that a `GLTFWeather` weathers, which then carries the
+   * weather itself.
    */
   get materialSurface(): {
     readonly order: number;
     readonly owner: Engine | undefined;
     shader(source: string, group: number): string;
     bindings(): GPUBindGroupEntry[];
+    skips(model: object): boolean;
   } {
     const hook = this;
     return (this.surfaceEffect ??= {
@@ -207,6 +211,8 @@ export abstract class SurfaceHook implements EnginePlugin {
       },
       shader: (source, group) => this.materialShader(source, group),
       bindings: () => this.materialBindings(),
+      // A model a GLTFWeather weathers takes this weather from it (KB-WEATHER-GLTFTWICE1).
+      skips: servedByGLTF,
     });
   }
 

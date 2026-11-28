@@ -95,6 +95,7 @@ abstract class SurfaceHook implements EnginePlugin {
         readonly owner: Engine | undefined;
         shader(source: string, group: number): string;
         bindings(): GPUBindGroupEntry[];
+        skips(model: object): boolean;
     };
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;

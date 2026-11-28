@@ -9,6 +9,7 @@ import {Bloom} from '/packages/post/dist/bloom.js';
 import {Material,createMesh} from '/packages/materials/dist/index.js';
 import {Puddles} from '/packages/weather/dist/puddles.js';
 import {Snow} from '/packages/weather/dist/snow.js';
+import {GLTFWeather} from '/packages/weather/dist/gltf.js';
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,7,7],target:[0,0,-1],near:0.1,far:200}}),device=engine.gpu,errors=[];
 engine.stop();device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
@@ -65,7 +66,19 @@ window.run=async()=>{
  const mesh=createMesh(engine,{positions,normals,indices},new Material(inputs));mesh.sceneSurfaces=false;
  const keptDry=await shot();mesh.dispose();kept.dispose();
  const validation=(await device.popErrorScope())?.message??null;
+ // KB-WEATHER-GLTFTWICE1: a Material mesh given to a GLTFWeather under the scene's Puddles takes the weather from the
+ // GLTFWeather alone. Before the fix it joined both, and its shader declared the puddle WGSL twice and did not compile.
+ device.pushErrorScope('validation');
+ const rain={wetness:1,coverage:0.5,size:2,rain:1},ground=()=>createMesh(engine,{positions,normals,indices},new Material(inputs));
+ const scenePuddles=Puddles.attach(engine,rain);scenePuddles.advanceTime(0.3);
+ let m=ground();const sceneWet=await shot();m.dispose();
+ const gltf=GLTFWeather.attach(engine,{puddles:{...rain}});gltf.advanceTime(0.3);
+ m=ground();gltf.add(m);const bothWet=await shot();m.dispose();
+ scenePuddles.dispose();
+ m=ground();gltf.add(m);const gltfWet=await shot();m.dispose();gltf.dispose();
+ const gltfValidation=(await device.popErrorScope())?.message??null;
  return {
+  gltfValidation,both:compare(sceneWet,bothWet),gltfOnly:compare(sceneWet,gltfWet),gltfWetChange:compare(materialDry,bothWet),
   compat:globalThis.__margoCompat===true,
   dry:compare(coreDry,materialDry),wet:compare(coreWet,materialWet),snow:compare(coreSnow,materialSnow),
   coreWetChange:compare(coreDry,coreWet),materialWetChange:compare(materialDry,materialWet),

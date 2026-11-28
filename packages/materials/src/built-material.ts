@@ -3656,7 +3656,8 @@ export type MaterialMesh<M extends Material | readonly Material[] = Material> = 
    * Takes the surface hooks of its scene (`@margoengine/weather`'s `Puddles`, `Snow` and `PrecipitationCover`): wet
    * ground, standing water and snow change its colour, roughness, metalness and normal before lighting, as they change
    * core meshes, from the next frame, with no call per mesh. Only a mesh with a lit material (standard, Lambert, Phong
-   * or toon shading) joins them. Set false to keep this mesh out of the weather (a sign under a roof). Live; default true.
+   * or toon shading) joins them. Set false to keep this mesh out of the weather (a sign under a roof). A mesh given to
+   * a `GLTFWeather` (`add`) takes its weather from that alone. Live; default true.
    */
   sceneSurfaces: boolean;
 };

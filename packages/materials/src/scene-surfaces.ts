@@ -12,6 +12,12 @@ import type { LightingEffect, PBRModel } from '@margoengine/gltf/pbr-model';
  */
 export interface MaterialSurfaceEffect extends LightingEffect {
   readonly order?: number;
+  /**
+   * True for a mesh that takes this weather another way (`@margoengine/weather`'s `GLTFWeather.add` on it): the mesh
+   * then joins none of its scene's surface effects, so no surface WGSL is declared twice (KB-WEATHER-GLTFTWICE1).
+   * Default: no mesh is skipped.
+   */
+  skips?(model: PBRModel): boolean;
 }
 
 /** A scene plugin whose `materialSurface` every Material mesh of its scene joins (`@margoengine/weather`'s surface entries). */
@@ -80,11 +86,14 @@ export class SceneSurfaces {
 
   /**
    * Joins `model` to the surface effects of its scene when `wanted` (and leaves them when not), before it draws. A
-   * mesh adds them through `addLighting` in their order; a change of the scene's effects re-adds them all.
+   * mesh adds them through `addLighting` in their order; a change of the scene's effects re-adds them all. A mesh one
+   * of them `skips` joins none.
    */
   sync(model: PBRModel, wanted: boolean): void {
-    const list = wanted ? this.effects(this.runtime.sceneOf(model)) : none,
-      joined = this.joined.get(model);
+    let list = wanted ? this.effects(this.runtime.sceneOf(model)) : none;
+    // A mesh weathered another way joins none of them: its own effect carries the same surface code.
+    if (list.length && list.some((effect) => effect.skips?.(model) === true)) list = none;
+    const joined = this.joined.get(model);
     if ((joined?.list ?? none) === list) return;
     if (joined) for (const release of joined.release) release();
     if (!list.length) {

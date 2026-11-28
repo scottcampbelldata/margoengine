@@ -106,3 +106,29 @@ test('createMesh meshes take the scene surface hooks by default; sceneSurfaces i
     engine.dispose();
   }
 });
+
+// KB-WEATHER-GLTFTWICE1: a mesh weathered another way (GLTFWeather.add on it) joins none of the scene's surface
+// effects, so the same WGSL is never declared twice; it joins them again once it is handed back.
+test('a mesh one surface effect skips joins none of them, and joins again when no longer skipped', () => {
+  const { runtime, plugins, model, effect } = world();
+  const surfaces = new SceneSurfaces(runtime);
+  let served = true;
+  const puddles = { ...effect(-1), skips: (m) => served && m === model },
+    cover = effect(-0.5);
+  plugins.set('weather-puddles', { name: 'weather-puddles', materialSurface: puddles });
+  plugins.set('weather-cover', { name: 'weather-cover', materialSurface: cover });
+  const other = { ...model, lighting: [] };
+  surfaces.next();
+  surfaces.sync(model, true);
+  surfaces.sync(other, true);
+  assert.deepEqual(model.lighting, [], 'the skipped mesh takes neither the puddles nor the cover');
+  assert.deepEqual(other.lighting, [puddles, cover]);
+  served = false;
+  surfaces.next();
+  surfaces.sync(model, true);
+  assert.deepEqual(model.lighting, [puddles, cover]);
+  served = true;
+  surfaces.next();
+  surfaces.sync(model, true);
+  assert.deepEqual(model.lighting, [], 'skipped again: it leaves what it joined');
+});

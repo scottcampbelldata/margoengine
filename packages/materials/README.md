@@ -549,7 +549,8 @@ world position) after every map and feature the material read and before lightin
 scene's `weather-puddles`, `weather-snow` and `weather-cover` plugins (`materialSurfaceHooks`) in their order and leaves
 them when they go. Only a mesh with a lit material (standard, Lambert, Phong or toon shading) joins; `sceneSurfaces`
 (default `true`, live) set to `false` keeps one dry. Any plugin under those names with a `materialSurface`
-(`MaterialSurfaceHook`) joins the same way.
+(`MaterialSurfaceHook`) joins the same way. A mesh one of those effects `skips` (one given to a `GLTFWeather`, which
+then weathers it alone) joins none of them until it is no longer skipped.
 
 ```ts
 import { Engine } from 'margoengine/core';

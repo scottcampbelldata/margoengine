@@ -209,6 +209,31 @@ The surface entries bind their uniforms in gltf/pbr's group 2 at slots 166 to 16
 the pixel's centroid. A Material mesh under weather composes its shader each frame, as one under a `Sky` does; meshes
 that share material and geometry still draw as one instanced batch.
 
+A Material mesh is a gltf/pbr model, so `GLTFWeather.add` takes one as well. Such a mesh takes its weather from that
+`GLTFWeather` alone: the scene's `Puddles`, `Snow` and `PrecipitationCover` leave it while any `GLTFWeather` has it
+(their `materialSurface` `skips` it) and take it back once it is removed, so the weather is never applied, or its WGSL
+declared, twice. Give the `GLTFWeather` a `cover` to shelter it. A film that hands every model to one receiver list may
+include a `GLTFWeather` there.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { Material, createMesh } from 'margoengine/materials';
+import { Puddles } from 'margoengine/weather/puddles';
+import { GLTFWeather } from 'margoengine/weather/gltf';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const rain = { wetness: 0.9, rain: 0.6, coverage: 0.3 };
+Puddles.attach(engine, rain); // every Material and core mesh of the scene
+const imported = GLTFWeather.attach(engine, { puddles: rain });
+const kerb = createMesh(engine, {
+  positions: [-2, 0.15, -1, 2, 0.15, -1, 2, 0.15, 1, -2, 0.15, 1],
+  normals: [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0],
+  indices: [0, 3, 1, 1, 3, 2],
+}, new Material({ color: '#6b6862', roughness: 0.8 }));
+const remove = imported.add(kerb); // the kerb is wetted once, by the GLTFWeather
+remove(); // and by the scene's Puddles again
+```
+
 ## Snow with depth
 
 `Snow` from `margoengine/weather/snow` lays snow on every core mesh and every `Material` mesh: up-facing surfaces
