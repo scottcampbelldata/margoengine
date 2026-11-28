@@ -137,6 +137,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'tracer-random-kernel',
+    crate: 'packages/physics/tracer-random-kernel',
+    blueprint: 'packages/physics/src/tracer-random-kernel.wasm',
+    script: 'packages/physics/scripts/build-tracer-random-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'tracer-random-kernel-shared',
+    crate: 'packages/physics/tracer-random-kernel',
+    blueprint: 'packages/physics/src/tracer-random-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-tracer-random-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'loads-kernel',
     crate: 'packages/physics/loads-kernel',
     blueprint: 'packages/physics/src/loads/loads-kernel.wasm',

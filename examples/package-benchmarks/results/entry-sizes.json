@@ -15710,8 +15710,8 @@
         "gzip": 12793
       },
       "./tracers": {
-        "raw": 46886,
-        "gzip": 17389
+        "raw": 60307,
+        "gzip": 22152
       },
       "./hydro": {
         "raw": 62589,
@@ -19359,6 +19359,16 @@
       "raw": 4930,
       "gzip": 2471,
       "brotli": 2210
+    },
+    "packages/physics/dist/tracer-random-kernel.wasm": {
+      "raw": 6901,
+      "gzip": 2651,
+      "brotli": 2405
+    },
+    "packages/physics/dist/tracer-random-kernel-shared.wasm": {
+      "raw": 6901,
+      "gzip": 2651,
+      "brotli": 2403
     },
     "packages/physics/dist/loads-kernel.wasm": {
       "raw": 7761,

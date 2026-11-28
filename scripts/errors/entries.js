@@ -141,6 +141,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'water-tracers',
+    title: '@margoengine/physics/tracers parcel transport and sediment exchange',
+    kind: 'family',
+    messages: [],
+    cause: 'A tracer source, oil spill, fluid query, bed geometry, port, or particle step supplies invalid data.',
+    fix: 'Use finite local metres, finite water and wind velocities, nonnegative SI rates, and the same origin cell size as the PhysicsWorld. Read accepted parcels between steps. If a particle or ledger overflows, reduce the local scale or source mass and validate the supplied flow.',
+  },
+  {
     id: 'hull-flooding',
     title: '@margoengine/physics/seakeeping damage, flooding and loss of buoyancy',
     kind: 'family',

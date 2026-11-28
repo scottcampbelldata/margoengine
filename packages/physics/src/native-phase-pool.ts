@@ -70,6 +70,11 @@ type NativePhaseSolver =
       readonly subject: 'Flood volume';
       readonly phaseExport: 'flood_volume_thread_phase';
       readonly phase: 'compartment clipping';
+    }
+  | {
+      readonly subject: 'Tracer diffusion';
+      readonly phaseExport: 'tracer_random_thread_phase';
+      readonly phase: 'Brownian draws';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };

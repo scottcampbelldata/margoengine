@@ -198,6 +198,7 @@ export interface TracerParams {
     oilSpills?: readonly TracerOilSpill[];
     sea?: SeaSurface;
     water?: FlowField;
+    randomKernel?: TracerRandomKernel;
     stokesSpectrum?: WaveSpectrumSample;
     cellSize?: number;
     wind?: Wind;
@@ -216,6 +217,27 @@ export interface TracerParams {
     breaches?: number;
     breachMixes?: readonly BreachTracerMix[];
     bedJets?: TracerBedJets;
+}
+
+export interface TracerRandomKernel {
+    normals(rows: Uint32Array, tick: number, seed: number, solver: number, out: Float64Array): void;
+    workCounts(): TracerRandomWorkCounts;
+    resetWork(): void;
+    close(): void;
+    [Symbol.dispose](): void;
+}
+
+export interface TracerRandomWorkCounts extends TracerRandomWorkerWork {
+    readonly batches: number;
+    readonly threads: number;
+    readonly workers: readonly TracerRandomWorkerWork[];
+}
+
+export interface TracerRandomWorkerWork {
+    readonly rows: number;
+    readonly pairedRows: number;
+    readonly philoxRoundPairs: number;
+    readonly normalValues: number;
 }
 
 export class TracerSolver implements Solver<TracerParams> {
@@ -268,6 +290,11 @@ export interface TracerSource {
     start?: number;
     stop?: number;
 }
+
+export function loadTracerRandomKernel({ threads, signal }?: {
+    threads?: number;
+    signal?: AbortSignal;
+}): Promise<TracerRandomKernel>;
 
 export function settlingVelocity(material: TracerMaterial, density?: number, nu?: number, g?: number): number;
 

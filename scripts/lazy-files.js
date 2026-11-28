@@ -146,6 +146,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/tracer-random-kernel.wasm',
+    label: 'tracer-random-kernel.wasm',
+    kind: 'Rust SIMD parcel Brownian draws',
+    measure: 'file',
+    when: 'loadTracerRandomKernel() from the optional /tracers entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/tracer-random-kernel-shared.wasm',
+    label: 'tracer-random-kernel-shared.wasm',
+    kind: 'Rust SIMD parcel Brownian draws, with helper workers',
+    measure: 'file',
+    when: 'loadTracerRandomKernel() with threads: 2 or 4 from the optional /tracers entry',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/loads-kernel.wasm',
     label: 'loads-kernel.wasm',
     kind: 'Rust SIMD batch for hydrodynamic wrenches',

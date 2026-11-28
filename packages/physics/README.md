@@ -4404,19 +4404,25 @@ console.log(air.surfaced > 0 && air.held > 0); // true: the big bubbles are up, 
 
 ### Tracers and slicks in water (`@margoengine/physics/tracers`)
 
-`TracerSolver` is the physics framework's tracers (SEA-15): dye, discoloured water, silt and cargo plumes, and oil slicks. Each is a cloud of particles of a material, carried by the water's velocity at its depth (`water`, any `FlowField` of water; still water by default). Turbulence spreads them as a random walk, so a cloud's variance grows as 2 K t (`horizontalDiffusivity`, default 0.1 m^2/s; `verticalDiffusivity`, default 0.001). Grains settle at Ferguson and Church's speed for their size and density and come to rest on the `bed` (a terrain bed, or a depth, default 30 m below `waterLevel`). Floating material stays on the surface and drifts with the water there plus a share of the `wind` (`windage`, default 3 percent). `sources` release a material (one of `TRACER_MATERIALS`: `dye`, `silt`, `sand`, `ironOre`, `coal`, `grain`, `oil`, or your own `{density, diameter, shape, floats, windage, colour}`) at a fixed place or along a path (a breach in a moving hull), at a rate in kg/s that may change with time, between `start` and `stop`. A damaged hull's cargo comes in by itself: the solver reads the `hullBreaches` port of a `HullSolver` with compartments (in the tracers' cell) and releases what each breach carries out, as its cargo's material, at its centre (`breaches`, default 64 of them; 0 none). `particleMass` (default 1 kg) sets how fine the cloud is, and `capacity` (default 20,000) how many particles it may hold.
+`TracerSolver` is the physics framework's tracers (SEA-15): dye, discoloured water, silt and cargo plumes, and oil slicks. Each is a cloud of particles of a material, carried by the water's velocity at its depth (`water`, any `FlowField` of water; still water by default). Turbulence spreads them as a random walk, so a cloud's variance grows as 2 K t (`horizontalDiffusivity`, default 0.1 m^2/s; `verticalDiffusivity`, default 0.001). Grains settle at Ferguson and Church's speed for their size and density and come to rest on the `bed` (a terrain bed, or a depth, default 30 m below `waterLevel`). Floating material stays on the surface and drifts with the water there plus a share of the `wind` (`windage`, default 3 percent). `sources` release a material (one of `TRACER_MATERIALS`: `dye`, `silt`, `sand`, `ironOre`, `coal`, `grain`, `oil`, or your own `{density, diameter, shape, floats, windage, colour}`) at a fixed place or along a path (a breach in a moving hull), at a rate in kg/s that may change with time, between `start` and `stop`. A damaged hull's cargo comes in by itself: the solver reads the `hullBreaches` port of a `HullSolver` with compartments and releases what each breach carries out, as its cargo's material, at its centre (`breaches`, default 64 of them; 0 none). `particleMass` (default 1 kg) sets how fine the cloud is, and `capacity` (default 20,000) how many particles it may hold.
 
-The solver keeps the mass exactly: `budget` gives what was released, what is in the water, on the surface and on the bed, always adding up. `concentration(min, max, cells)` gives the concentration (kg/m^3) on a grid and the colour it gives the water, `particlesOf()` every particle, and the particles are the registry field `tracers` for the sea surface to tint its water. A ship's `wakeTint` (`@margoengine/water`) remains as an art override for a stern trail and is deprecated as the source of discoloured water: release the cargo here instead.
+The `budget` records mass released, in the water, on the surface and on the bed. Oil vapour and biodegraded mass have separate queries. These inventories close to floating-point roundoff in the mass-ledger checks. `concentration(min, max, cells)` gives the concentration (kg/m^3) on a grid and the colour it gives the water, `particlesOf()` every particle, and the particles are the registry field `tracers` for the sea surface to tint its water. A ship's `wakeTint` (`@margoengine/water`) remains as an art override for a stern trail and is deprecated as the source of discoloured water: release the cargo here instead.
+
+Read `particlesOf()`, `concentration()` and the mass ledger between accepted steps. External water and wind queries sample their own origin cells. Give the tracer the world’s cell size. Non-finite source or field samples raise a [coded error](https://margoengine.com/errors#water-tracers) without replacing the accepted parcel and ledger state.
+
+Attach an optional disposable `loadTracerRandomKernel({threads, signal})` to `randomKernel` for the parcel diffusion loop. The default is one participant. More participants use actual native workers in a runtime with shared Wasm memory. Draws still use each parcel’s slot and tick. The example keeps the kernel alive until its world finishes advancing.
 
 ```ts
-import {TracerSolver} from 'margoengine/physics/tracers';
+import {loadTracerRandomKernel, TracerSolver} from 'margoengine/physics/tracers';
 import {PhysicsWorld} from 'margoengine/physics/world';
 
 // A hull steaming at 3 m/s through a 0.4 m/s current leaks iron ore from a breach, less as its hold empties.
 const water = {medium: 'water' as const, cell: [0, 0, 0] as const, sample: (_x: number, _y: number, _z: number, _t: number, out = {velocity: [0, 0, 0] as [number, number, number], density: 1025, temperature: 285}) => ((out.velocity = [0.4, 0, 0]), out)};
+using randomKernel = await loadTracerRandomKernel();
 const tracers = new TracerSolver();
 const world = new PhysicsWorld({rate: {num: 24, den: 1}}).add(tracers, {
   water,
+  randomKernel,
   bed: 12,
   sources: [{material: 'ironOre', position: (t) => [3 * t, -5, 0], rate: (t) => 40 * Math.exp(-t / 60)}],
 });

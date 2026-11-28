@@ -34,6 +34,97 @@ const make = (rate = { num: 24, den: 1 }) =>
 test('TracerSolver: the same plume at 24, 30 and 60 frames a second', () => frameRateIndependent(make));
 test('TracerSolver: a seek equals a continuous run', () => seekEqualsContinuous(() => make()));
 
+test('SEA-15 a failed second water sample preserves accepted parcels, source balance and port bytes', () => {
+  const setup = () => {
+    const tracer = new TracerSolver();
+    let badSecondSample = false;
+    let calls = 0;
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, seed: 42 }).add(tracer, {
+      capacity: 11,
+      breaches: 0,
+      horizontalDiffusivity: 0.002,
+      sources: [{ material: 'dye', position: [1, -2, 3], rate: 180 }],
+      water: {
+        ...water,
+        sample(_x, _y, _z, _t, out) {
+          out.velocity[0] = ++calls === 2 && badSecondSample ? Infinity : 0.25;
+          out.velocity[1] = 0;
+          out.velocity[2] = 0;
+          return out;
+        },
+      },
+    });
+    return { tracer, world, arm: () => { badSecondSample = true; calls = 0; }, disarm: () => { badSecondSample = false; } };
+  };
+  const trial = setup(), control = setup();
+  trial.world.advance(1);
+  control.world.advance(1);
+  const before = [...trial.tracer.particlesOf()];
+  assert.equal(before.length, 3);
+  const budget = trial.tracer.budget;
+  const acceptedBytes = () => trial.tracer.stateRegions().map((region) =>
+    new Uint8Array(trial.world.memory.buffer, region.byteOffset, region.byteLength).slice(),
+  );
+  const bytes = acceptedBytes();
+  const ports = trial.tracer.exportPorts(1);
+  trial.arm();
+  assert.throws(() => trial.world.advance(2), {
+    code: 'failed', message: /Return three finite velocity components in m\/s.*#water-tracers/,
+  });
+  assert.deepEqual([...trial.tracer.particlesOf()], before);
+  assert.deepEqual(trial.tracer.budget, budget);
+  assert.deepEqual(acceptedBytes(), bytes);
+  assert.deepEqual(trial.tracer.exportPorts(1), ports);
+  assert.throws(() => trial.tracer.concentration([0, 0, 0], [0, 1, 1], [2, 2, 2]), {
+    code: 'unsupported', message: /Give increasing metre bounds.*#water-tracers/,
+  });
+  trial.disarm();
+  trial.world.advance(2);
+  control.world.advance(2);
+  assert.equal(trial.world.hash(), control.world.hash());
+});
+
+test('SEA-15 supplied water is sampled in its own signed origin cell and replays exactly', () => {
+  const tracerCell = [-1_040_000_000, 940_000_000, -1_130_000_000];
+  const cellSize = 64;
+  const setup = (fieldCell, expected) => {
+    const tracer = new TracerSolver();
+    const queried = [];
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, cellSize }).add(tracer, {
+      cellSize,
+      capacity: 3,
+      breaches: 0,
+      horizontalDiffusivity: 0,
+      verticalDiffusivity: 0,
+      sources: [{ material: 'dye', position: [2, -3, 4], rate: 60, stop: 1 / 60 }],
+      water: {
+        ...water,
+        cell: fieldCell,
+        sample(x, y, z, _time, out) {
+          queried.push([x, y, z]);
+          out.velocity[0] = x >= expected[0] ? 0.5 : -0.5;
+          out.velocity[1] = 0;
+          out.velocity[2] = 0;
+          return out;
+        },
+      },
+    }).setCell('tracers', tracerCell);
+    world.advance(1);
+    assert.deepEqual(queried[0], expected);
+    return { world, tracer };
+  };
+  const local = setup(tracerCell, [2, -3, 4]);
+  const shifted = setup([tracerCell[0] + 2, tracerCell[1] - 2, tracerCell[2] + 3], [-126, 125, -188]);
+  const replay = shifted.world.takeSnapshot();
+  local.world.advance(5);
+  shifted.world.advance(5);
+  assert.deepEqual([...shifted.tracer.particlesOf()], [...local.tracer.particlesOf()]);
+  const hash = shifted.world.hash();
+  shifted.world.restoreSnapshot(replay.bytes);
+  shifted.world.advance(5);
+  assert.equal(shifted.world.hash(), hash);
+});
+
 test('SEA-15 a finite waxy film thins to the Bingham yield level and conserves its oil', () => {
   const tracer = new TracerSolver();
   const volume = 0.004;

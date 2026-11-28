@@ -59,6 +59,7 @@
     "test:gpu:hull-panel-workers": "cd ../.. && node packages/physics/tests/hull-panel-workers.browser.mjs",
     "test:gpu:hull-slamming-workers": "cd ../.. && node packages/physics/tests/hull-slamming-workers.browser.mjs",
     "test:gpu:flood-volume-workers": "cd ../.. && node packages/physics/tests/flood-volume-workers.browser.mjs",
+    "test:gpu:tracer-random-workers": "cd ../.. && node packages/physics/tests/tracer-random-workers.browser.mjs",
     "test:gpu:wing-lattice-workers": "cd ../.. && node packages/physics/tests/wing-lattice-workers.browser.mjs",
     "test:gpu:aero-mobile": "cd ../.. && node packages/physics/tests/aero-mobile.browser.mjs && node packages/physics/tests/aero-mobile.browser.mjs --compat",
     "test:gpu:boundary-layer-surface": "cd ../.. && node packages/physics/tests/boundary-layer-surface.browser.mjs && node packages/physics/tests/boundary-layer-surface.browser.mjs --compat",

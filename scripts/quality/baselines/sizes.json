@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21969859,
+  "total": 21974799,
   "history": [
     {
       "date": "2026-10-24",
@@ -15767,6 +15767,12 @@
       "commit": "terrain-eye-relative",
       "reason": "KB-TERRAIN-REBASEROUND1: the floating-origin terrain draws relative to the eye (eye-relative clip position, layer texture coordinates and their derivatives, float64 ring lattice and camera column on the CPU), so a rebase in place no longer re-rounds every float32 number the lit draw reads (WebGL2 layer 79 to 5 changed pixels of 76,800, native 66 to 3): measured gzip @margoengine/terrain 19,201 to 19,792, @margoengine/terrain/stream 17,195 to 17,769. The code runs only with TerrainOptions.floatingOrigin, a synchronous construction option of the main entry; a lazy entry would make every large-world terrain wait on a second import before its first frame and split the origin path, which already lives in this entry, in two.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "sea-15-native-parcel-diffusion",
+      "reason": "SEA-15 @margoengine/physics/tracers 17389 to 22152 B gzip, ceiling 17877 to 22817 B. The tracer entry owns ordered advection and accepted parcel validation across water, bed and oil. A separate solver would duplicate parcel storage and the shared field contract. Both random-walk assets and the native helpers load only when requested. Core and stage are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16698,7 +16704,7 @@
     "@margoengine/physics/thermal": 6905,
     "@margoengine/physics/thin-film": 15631,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 17877,
+    "@margoengine/physics/tracers": 22817,
     "@margoengine/physics/tsunami": 9164,
     "@margoengine/physics/underwater": 8242,
     "@margoengine/physics/vegetation": 12889,

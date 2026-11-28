@@ -662,3 +662,7 @@ Its figures, PDF, fitted curves and software are absent from the package.
 ### SEA-10 model-basin flooding readings
 
 `packages/physics/scripts/sea10-ruponen-measured.mjs` contains fifteen sparse numeric water-level readings with local plotted ranges from Pekka Ruponen (2007), *Progressive flooding of a damaged passenger ship*, Figures 5.8–5.10. The Aalto dissertation SHA-256 is `06e86b6039149248018926c0f6716fd0f727362cd546b06abe8334c70105cc58`. The file contains independently authored simulation code and transcribed measurement facts. It redistributes no publication, plots, source code or dataset. [Ruponen dissertation](https://urn.fi/urn:nbn:fi:tkk-010597) · [Ruponen, Sundell and Larmela (2007)](https://doi.org/10.3233/SHP-2007-isp032) · [Dankowski dissertation (2013)](https://tore.tuhh.de/entities/publication/c9f6ab74-3ae3-4dae-8aa1-ff7bf96a86b2)
+
+### SEA-15 experimental jet scour profiles
+
+`packages/physics/scripts/sea15-jet-scour-measured.mjs` includes six derived volumes from ultrasonic crater profiles H12_7 and H12_8 in Figure 9. Radial geometric integration and readout-resolution sensitivity produce these values. The original data are Ahmad Mohamadiyeh, Jeffrey Peakall, Michael Fairweather, Martyn Barnes and Timothy N. Hunter (2026), *Data associated with Impinging jet erosion of granular sediments*, © 2026 University of Leeds. The source arrays and implementations are absent. [Dataset DOI](https://doi.org/10.5518/1730) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) · [Article](https://doi.org/10.1002/aic.70336)

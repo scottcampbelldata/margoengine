@@ -104,6 +104,8 @@
 <tr><th scope="row"><code>hull-slamming-thread.js</code></th><td>Private hull slamming station worker</td><td class="num">1,352</td><td class="num">727</td><td class="num">642</td><td>bakeHullSlamming() with threads: 2 or 4 from the optional /seakeeping entry</td></tr>
 <tr><th scope="row"><code>flood-volume-kernel.wasm</code></th><td>Rust SIMD compartment volume clipping</td><td class="num">4,930</td><td class="num">2,471</td><td class="num">2,210</td><td>loadFloodVolumeKernel() from the optional /seakeeping entry</td></tr>
 <tr><th scope="row"><code>flood-volume-kernel-shared.wasm</code></th><td>Rust SIMD compartment volume clipping, with helper workers</td><td class="num">4,930</td><td class="num">2,471</td><td class="num">2,210</td><td>loadFloodVolumeKernel() with threads: 2 or 4 from the optional /seakeeping entry</td></tr>
+<tr><th scope="row"><code>tracer-random-kernel.wasm</code></th><td>Rust SIMD parcel Brownian draws</td><td class="num">6,901</td><td class="num">2,651</td><td class="num">2,405</td><td>loadTracerRandomKernel() from the optional /tracers entry</td></tr>
+<tr><th scope="row"><code>tracer-random-kernel-shared.wasm</code></th><td>Rust SIMD parcel Brownian draws, with helper workers</td><td class="num">6,901</td><td class="num">2,651</td><td class="num">2,403</td><td>loadTracerRandomKernel() with threads: 2 or 4 from the optional /tracers entry</td></tr>
 <tr><th scope="row"><code>loads-kernel.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches</td><td class="num">7,761</td><td class="num">2,926</td><td class="num">2,525</td><td>LoadSolver.load() from the optional /loads entry</td></tr>
 <tr><th scope="row"><code>loads-kernel-shared.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches, shared world memory</td><td class="num">7,761</td><td class="num">2,926</td><td class="num">2,524</td><td>LoadSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>thin-film-kernel-shared.wasm</code></th><td>Rust SIMD conservative thin-film flow and capillarity, shared world memory</td><td class="num">30,756</td><td class="num">11,743</td><td class="num">10,152</td><td>ThinFilmSolver.load() with shared world memory support</td></tr>
@@ -5011,7 +5013,7 @@
 <tr><td><code>./pedestrians</code></td><td class="num">10,894</td><td class="num">4,432</td></tr>
 <tr><td><code>./schooling</code></td><td class="num">12,270</td><td class="num">4,860</td></tr>
 <tr><td><code>./vegetation</code></td><td class="num">33,836</td><td class="num">12,793</td></tr>
-<tr><td><code>./tracers</code></td><td class="num">46,886</td><td class="num">17,389</td></tr>
+<tr><td><code>./tracers</code></td><td class="num">60,307</td><td class="num">22,152</td></tr>
 <tr><td><code>./hydro</code></td><td class="num">62,589</td><td class="num">22,362</td></tr>
 <tr><td><code>./foam</code></td><td class="num">36,300</td><td class="num">13,774</td></tr>
 <tr><td><code>./surf</code></td><td class="num">18,940</td><td class="num">7,413</td></tr>

@@ -33,7 +33,8 @@ import { cos, exp, hypot, ln, pow, sin } from '@margoengine/math/pinned';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { RandomStream, solverNumber } from '@margoengine/math/random';
 import { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT, SWIM_WAKE_WORDS } from './life/wake.js';
-import { MargoError } from '@margoengine/math/errors';
+import { tracerError } from './tracer-errors.js';
+import type { TracerRandomKernel } from './tracer-random-kernel.js';
 import { BED_CHANGE_FIELD } from './earth/bed.js';
 import { TracerBedExchange } from './tracer-bed.js';
 import { type BedWashGrid, bedWashGrid, type TracerBedWash } from './tracer-bed-wash.js';
@@ -100,6 +101,12 @@ import type {
 } from './world/solver.js';
 
 export { type SubmergedJet, submergedJetWallShear } from './tracer-wall-jet.js';
+export {
+  loadTracerRandomKernel,
+  type TracerRandomKernel,
+  type TracerRandomWorkCounts,
+  type TracerRandomWorkerWork,
+} from './tracer-random-kernel.js';
 export type { TracerDiffusionKnot, TracerHorizontalDispersion } from './tracer-diffusion.js';
 export type { TracerBedWash } from './tracer-bed-wash.js';
 export type { TracerOilEvaporation } from './tracer-evaporation.js';
@@ -254,6 +261,8 @@ export interface TracerParams {
   sea?: SeaSurface;
   /** Override the water's velocity at any depth (default: sea.water when supplied). */
   water?: FlowField;
+  /** Optional caller-owned Wasm kernel for the parcel random walk. Keep it open while the world uses it. */
+  randomKernel?: TracerRandomKernel;
   /** Wave-averaged Stokes drift from a fixed directional spectrum. Use `water` for the mean current in this mode. */
   stokesSpectrum?: WaveSpectrumSample;
   /** Size of an origin cell, m. Match the PhysicsWorld setting (default 4096). */
@@ -298,10 +307,29 @@ export interface TracerParams {
 
 /** Columns of a particle: x, y, z, mass, material, state (0 free, 1 in the water, 2 on the surface, 3 on the bed). */
 const STRIDE = 6;
+const RANDOM_BATCH_SIZE = 4096;
+
+interface TracerUndoRegion {
+  readonly region: Region;
+  readonly stride: number;
+  saved: Uint8Array;
+}
 const FREE = 0;
 const WATER = 1;
 const SURFACE = 2;
 const BED = 3;
+
+function finiteTracerVector(
+  value: readonly number[] | undefined,
+): value is readonly [number, number, number] {
+  return value?.length === 3 && Number.isFinite(value[0]) && Number.isFinite(value[1]) && Number.isFinite(value[2]);
+}
+
+function tracerVelocity(value: readonly number[] | undefined, field: string): readonly [number, number, number] {
+  if (!finiteTracerVector(value))
+    throw tracerError('failed', `The ${field} gave an invalid velocity. Return three finite velocity components in m/s.`);
+  return value;
+}
 const ORIGIN: Cell = [0, 0, 0];
 const JET_PARCELS = 4;
 const JET_CORE_RINGS = 32;
@@ -396,6 +424,7 @@ export class TracerSolver implements Solver<TracerParams> {
       TracerParams,
       | 'sea'
       | 'water'
+      | 'randomKernel'
       | 'stokesSpectrum'
       | 'wind'
       | 'bed'
@@ -443,6 +472,10 @@ export class TracerSolver implements Solver<TracerParams> {
   private water: FlowField | undefined;
   private wind: Wind | undefined;
   private random!: RandomStream;
+  private randomKernel?: TracerRandomKernel;
+  private normalBatch?: { readonly rows: Uint32Array; readonly values: Float64Array };
+  private undo?: TracerUndoRegion[];
+  private stepping = false;
   private particles!: Region;
   private ledger!: Region;
   private jetBed?: JetBed;
@@ -512,40 +545,42 @@ export class TracerSolver implements Solver<TracerParams> {
       breaches = 64,
     } = params;
     if (!(Number.isInteger(breaches) && breaches >= 0 && breaches <= 65536))
-      throw new RangeError(`A tracer solver takes 0 to 65536 whole breaches (got ${breaches}); pass a whole number.`);
+      throw tracerError('unsupported', `A tracer solver takes 0 to 65536 whole breaches (got ${breaches}); pass a whole number.`);
     for (const [name, value] of [
       ['water density', waterDensity],
       ['viscosity', viscosity],
       ['particle mass', particleMass],
     ] as const)
       if (!(value > 0 && Number.isFinite(value)))
-        throw new RangeError(`A tracer solver's ${name} is a finite number above 0 (got ${value}); pass one.`);
+        throw tracerError('unsupported', `A tracer solver's ${name} is a finite number above 0 (got ${value}); pass one.`);
     for (const [name, value] of [
       ['horizontal diffusivity', horizontalDiffusivity],
       ['vertical diffusivity', verticalDiffusivity],
     ] as const)
       if (!(value >= 0 && Number.isFinite(value)))
-        throw new RangeError(`A tracer solver's ${name} is a finite number, 0 or more (got ${value}); pass one.`);
+        throw tracerError('unsupported', `A tracer solver's ${name} is a finite number, 0 or more (got ${value}); pass one.`);
     if (!(Number.isInteger(capacity) && capacity >= 1 && capacity <= 1 << 22))
-      throw new RangeError(
+      throw tracerError(
+        'unsupported',
         `A tracer solver holds 1 to 4194304 whole particles (got ${capacity}); pass a whole number.`,
       );
     if (!Number.isFinite(waterLevel))
-      throw new RangeError(`The water level is a finite height (got ${waterLevel}); pass one.`);
+      throw tracerError('unsupported', `The water level is a finite height (got ${waterLevel}); pass one.`);
     if (!(Number.isInteger(cellSize) && cellSize >= 1 && cellSize <= 1 << 20 && (cellSize & (cellSize - 1)) === 0))
-      throw new MargoError(
+      throw tracerError(
         'unsupported',
         'Tracer cells must be powers of two from 1 to 2^20 m; use the PhysicsWorld cell size.',
       );
     if (typeof bed === 'number' && !(bed > 0 && Number.isFinite(bed)))
-      throw new RangeError(
+      throw tracerError(
+        'unsupported',
         `A water depth is a finite number of metres above 0 (got ${bed}); pass one, or a terrain bed.`,
       );
     const horizontalLaw =
       params.horizontalDispersion && horizontalDispersionLaw(params.horizontalDispersion, horizontalDiffusivity);
     this.bedWash = params.bedWash && bedWashGrid(params.bedWash, waterDensity);
     if (this.writeBedChange && !this.useBedJets && !this.bedWash)
-      throw new MargoError('unsupported', 'A tracer wash exchange needs a wash field; supply bedWash options.');
+      throw tracerError('unsupported', 'A tracer wash exchange needs a wash field; supply bedWash options.');
     this.host = host;
     const [gx, gy, gz] = host.gravity;
     this.g = hypot(gx, gy, gz);
@@ -564,19 +599,27 @@ export class TracerSolver implements Solver<TracerParams> {
     this.sea = sea;
     this.water = water;
     this.wind = wind;
+    this.randomKernel = params.randomKernel;
     sources.forEach((source, n) => {
       const material: TracerMaterial =
         typeof source.material === 'string' ? TRACER_MATERIALS[source.material] : source.material;
       if (!material)
-        throw new RangeError(
+        throw tracerError(
+          'unsupported',
           `Source ${n}'s material is not one of ${Object.keys(TRACER_MATERIALS).join(', ')}; pass one or a material.`,
         );
       if (!(material.density > 0 && Number.isFinite(material.density)))
-        throw new RangeError(
+        throw tracerError(
+          'unsupported',
           `Source ${n}'s material density is a finite number of kg/m^3 above 0 (got ${material.density}); pass one.`,
         );
+      if (typeof source.position !== 'function' && !finiteTracerVector(source.position))
+        throw tracerError('unsupported', `Source ${n} has an invalid position. Supply three finite local metre coordinates.`);
+      if (!finiteTracerVector(material.colour))
+        throw tracerError('unsupported', `Source ${n} has an invalid colour. Supply three finite linear RGB components.`);
       if (typeof source.rate === 'number' && !(source.rate >= 0 && Number.isFinite(source.rate)))
-        throw new RangeError(
+        throw tracerError(
+          'unsupported',
           `Source ${n}'s rate is a finite number of kg/s, 0 or more (got ${source.rate}); pass one.`,
         );
       this.sources.push({ material: this.materialIndex(material), source });
@@ -606,26 +649,31 @@ export class TracerSolver implements Solver<TracerParams> {
         (erodibility !== undefined && !(erodibility >= 0 && Number.isFinite(erodibility))) ||
         !(availableMass >= 0)
       )
-        throw new RangeError(
+        throw tracerError(
+          'unsupported',
           'Invalid erodible tracer bed; pass sinking grains with a finite diameter, supported shear, positive Shields and nonnegative erosion and mass.',
         );
       if (!(suspensionReferenceHeight >= 0 && Number.isFinite(suspensionReferenceHeight)))
-        throw new RangeError(
+        throw tracerError(
+          'unsupported',
           'Invalid tracer bed reference height; pass a finite, nonnegative suspensionReferenceHeight in metres.',
         );
       if (typeof turbulentTransition !== 'boolean' || (turbulentTransition && shear !== 'wall-jet'))
-        throw new RangeError(
+        throw tracerError(
+          'unsupported',
           'Turbulent transition uses the radial wall jet; set turbulentTransition to a boolean and use wall-jet shear when enabled.',
         );
       if (
         typeof denseSand !== 'boolean' ||
         (denseSand && ((!customGrains && material === 'silt') || erodibility !== undefined))
       )
-        throw new RangeError(
+        throw tracerError(
+          'unsupported',
           'Dense-sand damping applies to van Rijn sand pickup; pass a boolean and omit linear erodibility and the silt preset when enabled.',
         );
       if (!(waterDensity < grains.density && this.g > 0))
-        throw new RangeError(
+        throw tracerError(
+          'unsupported',
           'The tracer bed requires sinking grains under gravity; use water less dense than the grains and nonzero gravity.',
         );
       const reducedGravity = ((grains.density - waterDensity) / waterDensity) * this.g;
@@ -636,7 +684,7 @@ export class TracerSolver implements Solver<TracerParams> {
       const pickupScale =
         erodibility ?? 0.00033 * grains.density * Math.sqrt(reducedGravity * diameter) * pow(grainSize, 0.3);
       if (!(threshold > 0 && Number.isFinite(threshold) && Number.isFinite(pickupScale)))
-        throw new MargoError(
+        throw tracerError(
           'unsupported',
           'The tracer bed shear threshold or pick-up rate is outside numeric range; use physical water density, viscosity and gravity.',
         );
@@ -662,7 +710,7 @@ export class TracerSolver implements Solver<TracerParams> {
           !layer ||
           !(layer.thickness > 0 && Number.isFinite(layer.thickness) && layer.porosity >= 0 && layer.porosity < 1)
         )
-          throw new MargoError(
+          throw tracerError(
             'unsupported',
             'Tracer bed change needs a live TerrainBed and a finite positive mobile layer with porosity in [0, 1); pass both.',
           );
@@ -707,7 +755,7 @@ export class TracerSolver implements Solver<TracerParams> {
         [primary, initial, stokesFactor, aggregation, breakup].every(Number.isFinite)
       )
     )
-      throw new MargoError(
+      throw tracerError(
         'unsupported',
         'Flocculation needs finite kinetic coefficients and sinking primary grains; supply a positive grain diameter and breakup coefficient.',
       );
@@ -746,7 +794,7 @@ export class TracerSolver implements Solver<TracerParams> {
         material = TRACER_MATERIALS.oil,
       } = spill;
       if (!(Number.isInteger(parcels) && parcels >= 2 && parcels <= first))
-        throw new MargoError(
+        throw tracerError(
           'unsupported',
           'Oil spill parcels cannot resolve a patch or exceed available slots; use at least two whole parcels within tracer capacity.',
         );
@@ -765,35 +813,35 @@ export class TracerSolver implements Solver<TracerParams> {
           Number.isFinite(spreadingCoefficient)
         )
       )
-        throw new MargoError(
+        throw tracerError(
           'unsupported',
           'Oil spreading needs finite mass, position, time and tension with oil lighter than the water; pass positive mass, nonnegative time and tension, and a floating material.',
         );
       const volume = mass / material.density;
       const reducedGravity = this.g * (1 - material.density / waterDensity);
       if (!(yieldStress >= 0 && Number.isFinite(yieldStress)))
-        throw new RangeError('Invalid oil yield stress; pass a finite, nonnegative shear yield stress in Pa.');
+        throw tracerError('unsupported', 'Invalid oil yield stress; pass a finite, nonnegative shear yield stress in Pa.');
       if (!(releaseDuration >= 0 && Number.isFinite(releaseDuration)))
-        throw new RangeError('Invalid oil release duration; pass a finite, nonnegative duration in seconds.');
+        throw tracerError('unsupported', 'Invalid oil release duration; pass a finite, nonnegative duration in seconds.');
       const weathering = spill.evaporation || spill.dispersion || spill.emulsification || spill.dissolution;
       if (releaseDuration > 0 && (yieldStress || spreadingCoefficient || weathering))
-        throw new MargoError(
+        throw tracerError(
           'unsupported',
           'A fed oil patch uses gravity spreading; pass zero tension and yield stress and omit oil weathering.',
         );
       if (yieldStress > 0 && (spreadingCoefficient || weathering))
-        throw new MargoError(
+        throw tracerError(
           'unsupported',
           'Waxy oil uses a fixed-volume gravity-spreading law; use zero spreading coefficient and omit oil weathering.',
         );
       if (spill.dissolution && (spill.evaporation || spill.dispersion))
-        throw new MargoError(
+        throw tracerError(
           'unsupported',
           'Bulk evaporation and droplet dispersion do not track dissolved constituents; omit evaporation and dispersion when using dissolution.',
         );
       const profile = fayCoefficients(volume, reducedGravity, waterDensity, viscosity, spreadingCoefficient);
       if (!profile.every(Number.isFinite) || !(fayRadius(profile, 1) > 0))
-        throw new MargoError(
+        throw tracerError(
           'unsupported',
           'Oil spill radius is outside numeric range; use physical oil mass, buoyancy, viscosity and tension.',
         );
@@ -846,21 +894,21 @@ export class TracerSolver implements Solver<TracerParams> {
   private initBreachMixes(mixes: readonly BreachTracerMix[], firstSlot: number): number {
     if (mixes.length === 0) return firstSlot;
     if (this.breachSlots === 0)
-      throw new MargoError('unsupported', 'Cargo mixtures require hull breaches; set breaches to a positive count.');
+      throw tracerError('unsupported', 'Cargo mixtures require hull breaches; set breaches to a positive count.');
     const byOpening = new Map<string, readonly CargoFraction[]>();
     let nextSlot = firstSlot;
     for (const { body, opening, fractions } of mixes) {
       if (!(Number.isSafeInteger(body) && body >= 0 && Number.isSafeInteger(opening) && opening >= 0))
-        throw new MargoError(
+        throw tracerError(
           'unsupported',
           'A cargo mixture needs nonnegative whole body and opening indices; use the hull record indices.',
         );
       const key = `${body}/${opening}`;
       if (byOpening.has(key))
-        throw new MargoError('unsupported', `Opening ${key} has more than one cargo mixture; combine them into one.`);
+        throw tracerError('unsupported', `Opening ${key} has more than one cargo mixture; combine them into one.`);
       const total = fractions.reduce((sum, entry) => sum + entry.fraction, 0);
       if (!Number.isFinite(total) || Math.abs(total - 1) > Number.EPSILON * 2 * fractions.length)
-        throw new MargoError('unsupported', `Opening ${key} has invalid cargo shares; use fractions that sum to one.`);
+        throw tracerError('unsupported', `Opening ${key} has invalid cargo shares; use fractions that sum to one.`);
       const entries = fractions.map(({ material, fraction }) => {
         const grain: TracerMaterial | undefined = typeof material === 'string' ? TRACER_MATERIALS[material] : material;
         const diameter = grain?.diameter ?? 0;
@@ -877,7 +925,7 @@ export class TracerSolver implements Solver<TracerParams> {
             fraction > 0
           )
         )
-          throw new MargoError(
+          throw tracerError(
             'unsupported',
             `Opening ${key} has an invalid cargo fraction; use positive shares and finite valid grain properties.`,
           );
@@ -936,6 +984,17 @@ export class TracerSolver implements Solver<TracerParams> {
     return regionWords(this.host.memory, this.particles) as Float64Array;
   }
 
+  /** Settled ordinary parcels keep their slots. Only the separate oil parcel range recycles rows. */
+  private ordinaryParcels(words: Float64Array): number {
+    let low = 0, high = this.emissionCapacity;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (words[middle * STRIDE + 5] === FREE) high = middle;
+      else low = middle + 1;
+    }
+    return low;
+  }
+
   private book(): Float64Array {
     return regionWords(this.host.memory, this.ledger) as Float64Array;
   }
@@ -944,14 +1003,32 @@ export class TracerSolver implements Solver<TracerParams> {
   private bedAt(x: number, z: number): number {
     const bed = this.params.bed;
     const [dx, dy, dz] = this.bedOffset;
-    return typeof bed === 'number'
+    const floor = typeof bed === 'number'
       ? this.params.waterLevel - this.seaOffset[1] - bed
-      : bed.sample(x + dx, z + dz).elevation - dy;
+      : bed.sample(x + dx, z + dz)?.elevation - dy;
+    if (!Number.isFinite(floor))
+      throw tracerError('failed', 'The tracer bed has an invalid height. Return a finite metre elevation at each sample.');
+    return floor;
   }
 
   private surfaceAt(x: number, z: number, time: number): number {
     const [dx, dy, dz] = this.seaOffset;
-    return this.params.waterLevel - dy + (this.sea?.elevation(x + dx, z + dz, time) ?? 0);
+    const surface = this.params.waterLevel - dy + (this.sea ? this.sea.elevation(x + dx, z + dz, time) : 0);
+    if (!Number.isFinite(surface))
+      throw tracerError('failed', 'The tracer sea has an invalid height. Return a finite metre elevation at each sample.');
+    return surface;
+  }
+
+  private flowVelocity(field: FlowField, x: number, y: number, z: number, time: number): readonly [number, number, number] {
+    const [fx, fy, fz] = field.cell ?? this.cell;
+    const { cellSize } = this.params;
+    const dx = x + (this.cell[0] - fx) * cellSize;
+    const dy = y + (this.cell[1] - fy) * cellSize;
+    const dz = z + (this.cell[2] - fz) * cellSize;
+    if (!Number.isFinite(dx) || !Number.isFinite(dy) || !Number.isFinite(dz))
+      throw tracerError('failed', `The ${field.medium} flow location is invalid. Use finite coordinates and matching origin cells.`);
+    const sample = field.sample(dx, dy, dz, time, this.flow);
+    return tracerVelocity(sample?.velocity, field.medium);
   }
 
   private spreadOil(time: number, dt: number, tick: number, words: Float64Array, book: Float64Array): void {
@@ -969,7 +1046,7 @@ export class TracerSolver implements Solver<TracerParams> {
         if (!this.wind) return emulsionWindFactor(0);
         const [x, z] = radii[i] === 0 ? spill.position : this.oilCentre(spill, words);
         const midpoint = time - 0.5 * Math.min(age, dt);
-        const velocity = this.wind.sample(x, this.surfaceAt(x, z, midpoint) + 10, z, midpoint, this.flow).velocity;
+        const velocity = this.flowVelocity(this.wind, x, this.surfaceAt(x, z, midpoint) + 10, z, midpoint);
         return emulsionWindFactor(hypot(velocity[0], velocity[2]));
       });
     // Check all supplied breaker conditions before moving any parcels or transferring mass.
@@ -995,7 +1072,7 @@ export class TracerSolver implements Solver<TracerParams> {
         radius = Math.min(radius, waxRadius(spill.waxStoppingRadius, viscous));
       }
       if (!(radius > 0 && Number.isFinite(radius)))
-        throw new MargoError(
+        throw tracerError(
           'unsupported',
           'The oil spill radius exceeds numeric range; use a physical release mass and time.',
         );
@@ -1195,6 +1272,74 @@ export class TracerSolver implements Solver<TracerParams> {
   }
 
   step(context: StepContext, dt: number): void {
+    this.requireAccepted();
+    if (!Number.isFinite(dt) || dt <= 0)
+      throw tracerError('unsupported', 'Tracer transport needs a finite positive interval. Use the PhysicsWorld step.');
+    const previousCell = this.cell;
+    const accepted = this.ordinaryParcels(this.words());
+    const undo = (this.undo ??= this.stateRegions().map((region) => ({
+      region,
+      stride: region === this.particles ? STRIDE * 8 : region === this.dispersionAges || region === this.flocculation?.sizes ? 8 : 0,
+      saved: new Uint8Array(0),
+    })));
+    for (const entry of undo) this.saveRegion(entry, accepted);
+    this.stepping = true;
+    try {
+      this.advance(context, dt);
+      const used = this.ordinaryParcels(this.words());
+      for (const { region, stride } of undo) {
+        if (region.type !== 'f64' && region.type !== 'f32') continue;
+        const values = regionWords(region.memory ?? this.host.memory, region);
+        const end = stride ? (used * stride) / 8 : values.length;
+        const reserved = stride ? (this.emissionCapacity * stride) / 8 : end;
+        for (let word = 0; word < values.length; word++) {
+          if (word === end) word = reserved;
+          if (word === values.length) break;
+          if (!Number.isFinite(values[word]))
+            throw tracerError('failed', 'A tracer parcel or balance overflowed. Reduce the local scale or release rate.');
+        }
+      }
+    } catch (cause) {
+      const next = this.ordinaryParcels(this.words());
+      for (const entry of undo) this.restoreRegion(entry, accepted, next);
+      this.cell = previousCell;
+      throw cause;
+    } finally {
+      this.stepping = false;
+    }
+  }
+
+  private stateBytes(region: Region): Uint8Array {
+    return new Uint8Array((region.memory ?? this.host.memory).buffer, region.byteOffset, region.byteLength);
+  }
+
+  private saveRegion(entry: TracerUndoRegion, used: number): void {
+    const bytes = this.stateBytes(entry.region);
+    const front = entry.stride ? used * entry.stride : bytes.length;
+    const back = entry.stride ? this.emissionCapacity * entry.stride : bytes.length;
+    const count = front + bytes.length - back;
+    if (entry.saved.length < count)
+      entry.saved = new Uint8Array(Math.min(bytes.length, Math.max(count, 2 * entry.saved.length)));
+    entry.saved.set(bytes.subarray(0, front));
+    entry.saved.set(bytes.subarray(back), front);
+  }
+
+  private restoreRegion(entry: TracerUndoRegion, used: number, next: number): void {
+    const bytes = this.stateBytes(entry.region);
+    const front = entry.stride ? used * entry.stride : bytes.length;
+    const back = entry.stride ? this.emissionCapacity * entry.stride : bytes.length;
+    bytes.set(entry.saved.subarray(0, front));
+    if (entry.stride) bytes.fill(0, front, Math.max(used, next) * entry.stride);
+    bytes.set(entry.saved.subarray(front, front + bytes.length - back), back);
+  }
+
+  private requireAccepted(): void {
+    if (!this.ledger) throw tracerError('state', 'Add the tracer solver to a PhysicsWorld before stepping or reading it.');
+    if (this.stepping)
+      throw tracerError('state', 'The tracer solver is stepping. Read its accepted parcels and balances between steps.');
+  }
+
+  private advance(context: StepContext, dt: number): void {
     this.cell = context.cell;
     const sea = this.sea;
     const column = this.depthDiffusivity;
@@ -1221,12 +1366,15 @@ export class TracerSolver implements Solver<TracerParams> {
       if (time <= start || time - dt >= stop) continue;
       const rate = typeof source.rate === 'function' ? source.rate(time) : source.rate;
       if (!(rate >= 0 && Number.isFinite(rate)))
-        throw new RangeError(
+        throw tracerError(
+          'unsupported',
           `Source ${s} gave a rate of ${rate} kg/s at ${time} s; its rate must be a finite number, 0 or more.`,
         );
       const overlap = (time < stop ? time : stop) - (time - dt > start ? time - dt : start);
       book[4 + s]! += rate * overlap;
       const at = typeof source.position === 'function' ? source.position(time) : source.position;
+      if (!finiteTracerVector(at))
+        throw tracerError('failed', `Source ${s} gave an invalid position. Return three finite local metre coordinates.`);
       free = this.release(4 + s, at, material, words, book, free);
     }
     // The breaches' cargo: each record's outflow over the step, at its centre, as its cargo's material.
@@ -1270,15 +1418,45 @@ export class TracerSolver implements Solver<TracerParams> {
     const ages = this.dispersionAges && (regionWords(this.host.memory, this.dispersionAges) as Float64Array);
     const flocs = this.flocculation;
     const diameters = flocs && (regionWords(this.host.memory, flocs.sizes) as Float64Array);
-    for (let i = 0; i < capacity; i++) {
-      const p = i * STRIDE,
+    const kernel = this.randomKernel;
+    const batch = kernel && (this.normalBatch ??= {
+      rows: new Uint32Array(RANDOM_BATCH_SIZE),
+      values: new Float64Array(3 * RANDOM_BATCH_SIZE),
+    });
+    const ordinary = this.ordinaryParcels(words);
+    const liveSlots = ordinary + capacity - this.emissionCapacity;
+    const slotOf = (slot: number) => slot < ordinary ? slot : slot - ordinary + this.emissionCapacity;
+    let normalNext = 0;
+    let normalCount = 0;
+    for (let cursor = 0; cursor < liveSlots; cursor++) {
+      const i = slotOf(cursor),
+        p = i * STRIDE,
         state = words[p + 5]!;
       if (state !== WATER && state !== SURFACE) continue;
       const x = words[p]!,
         y = words[p + 1]!,
         z = words[p + 2]!,
-        material = this.materials[words[p + 4]!]!,
-        [n0, n1, n2] = this.normals(context.tick, i);
+        material = this.materials[words[p + 4]!]!;
+      let n0: number, n1: number, n2: number;
+      if (batch && kernel) {
+        while (normalNext < normalCount && batch.rows[normalNext]! < i) normalNext++;
+        if (normalNext === normalCount || batch.rows[normalNext] !== i) {
+          normalNext = 0;
+          normalCount = 0;
+          for (let candidate = cursor; candidate < liveSlots && normalCount < batch.rows.length; candidate++) {
+            const slot = slotOf(candidate);
+            const status = words[slot * STRIDE + 5];
+            if (status === WATER || status === SURFACE) batch.rows[normalCount++] = slot;
+          }
+          const rows = batch.rows.subarray(0, normalCount);
+          const values = batch.values.subarray(0, 3 * normalCount);
+          kernel.normals(rows, context.tick, this.random.seed, this.random.solver, values);
+        }
+        const at = 3 * normalNext++;
+        n0 = batch.values[at]!;
+        n1 = batch.values[at + 1]!;
+        n2 = batch.values[at + 2]!;
+      } else [n0, n1, n2] = this.normals(context.tick, i);
       let sh = baseSpread;
       if (horizontalLaw && ages) {
         sh = horizontalSpread(horizontalLaw, ages[i]! * dt, dt);
@@ -1289,15 +1467,16 @@ export class TracerSolver implements Solver<TracerParams> {
         uz = 0;
       if (this.water) {
         const sampleY = sea && state === SURFACE ? this.surfaceAt(x, z, time) : y;
-        const v = this.water.sample(x, sampleY, z, time, this.flow).velocity;
+        const v = this.flowVelocity(this.water, x, sampleY, z, time);
         ux = v[0];
         uy = v[1];
         uz = v[2];
       } else if (sea && !stokes) {
-        const v =
+        const sample =
           state === SURFACE
-            ? sea.sample(x + seaX, z + seaZ, time, this.seaSample).velocity
-            : sea.water.sample(x + seaX, y + seaY - waterLevel, z + seaZ, time, this.flow).velocity;
+            ? sea.sample(x + seaX, z + seaZ, time, this.seaSample)
+            : sea.water.sample(x + seaX, y + seaY - waterLevel, z + seaZ, time, this.flow);
+        const v = tracerVelocity(sample?.velocity, 'sea');
         ux = v[0];
         uy = v[1];
         uz = v[2];
@@ -1310,7 +1489,7 @@ export class TracerSolver implements Solver<TracerParams> {
       if (state === SURFACE) {
         if (this.wind) {
           const share = material.windage ?? 0.03,
-            w = this.wind.sample(x, this.surfaceAt(x, z, time) + 10, z, time, this.flow).velocity;
+            w = this.flowVelocity(this.wind, x, this.surfaceAt(x, z, time) + 10, z, time);
           ux += share * w[0];
           uz += share * w[2];
         }
@@ -1366,7 +1545,8 @@ export class TracerSolver implements Solver<TracerParams> {
     if (!port) return free;
     const { region } = port;
     if (region.layout !== SWIM_WAKE_LAYOUT || region.type !== 'f64' || region.byteLength % (SWIM_WAKE_WORDS * 8))
-      throw new RangeError(
+      throw tracerError(
+        'unsupported',
         'The swim wake port has an incompatible layout; connect the current SwimSolver wake output.',
       );
     const wake = regionWords(region.memory ?? this.host.memory, region) as Float64Array;
@@ -1500,7 +1680,7 @@ export class TracerSolver implements Solver<TracerParams> {
         const tz = uz - normalSpeed * normalZ;
         const stress = stressFactor * (tx * tx + ty * ty + tz * tz);
         if (!Number.isFinite(stress))
-          throw new MargoError(
+          throw tracerError(
             'unsupported',
             'Bed wash shear exceeds numeric range; supply finite physical velocities and roughness.',
           );
@@ -1556,6 +1736,7 @@ export class TracerSolver implements Solver<TracerParams> {
   }
 
   exportPorts(tick: number): readonly Port[] {
+    this.requireAccepted();
     const tracer = { field: TRACER_FIELD.name, region: this.particles, tick, cell: this.cell };
     return this.bedExchange ? [tracer, this.bedExchange.port(tick)] : [tracer];
   }
@@ -1581,6 +1762,7 @@ export class TracerSolver implements Solver<TracerParams> {
 
   /** The mass, kg: released, in the water, floating on the surface and settled on the bed. */
   get budget(): { released: number; water: number; surface: number; bed: number } {
+    this.requireAccepted();
     const b = this.book();
     // A fed patch keeps all its oil at the surface. Read its current share from the parcels so the
     // ledger never accumulates rounding error from adding thousands of small per-tick increments.
@@ -1591,6 +1773,7 @@ export class TracerSolver implements Solver<TracerParams> {
 
   /** Cumulative oil vapour, kg. Included in `budget.released` and excluded from the liquid and bed terms. */
   get evaporatedMass(): number {
+    this.requireAccepted();
     if (!this.spillVapour) return 0;
     const vapour = regionWords(this.host.memory, this.spillVapour) as Float64Array;
     return vapour.reduce((total, mass) => total + mass, 0);
@@ -1598,6 +1781,7 @@ export class TracerSolver implements Solver<TracerParams> {
 
   /** Cumulative biodegraded oil, kg. Included in `budget.released` and excluded from the liquid and bed terms. */
   get biodegradedMass(): number {
+    this.requireAccepted();
     if (!this.spillSolutes) return 0;
     const solutes = regionWords(this.host.memory, this.spillSolutes) as Float64Array;
     let total = 0;
@@ -1607,6 +1791,7 @@ export class TracerSolver implements Solver<TracerParams> {
 
   /** Dissolved and biodegraded oil by spill and solute index. Dissolved mass is included in `budget.water`. */
   oilSolute(index: number, solute: number): TracerOilSoluteMass | undefined {
+    this.requireAccepted();
     const dissolution = this.oilSpills[index]?.dissolution;
     if (!this.spillSolutes || !dissolution?.solutes[solute]) return undefined;
     const solutes = regionWords(this.host.memory, this.spillSolutes) as Float64Array;
@@ -1618,6 +1803,7 @@ export class TracerSolver implements Solver<TracerParams> {
   oilFilm(
     index: number,
   ): { centre: readonly [number, number]; radius: number; meanThickness: number; centreThickness: number } | undefined {
+    this.requireAccepted();
     const spill = this.oilSpills[index];
     if (!spill || !this.spillRadii) return undefined;
     const radius = (regionWords(this.host.memory, this.spillRadii) as Float64Array)[index]!;
@@ -1638,6 +1824,7 @@ export class TracerSolver implements Solver<TracerParams> {
 
   /** Water uptake, mixture density and dynamic viscosity of a floating emulsifying release. */
   oilEmulsion(index: number): TracerOilEmulsion | undefined {
+    this.requireAccepted();
     const spill = this.oilSpills[index];
     if (!spill?.emulsification || !this.spillEmulsion) return undefined;
     const mass = this.oilSurfaceMass(spill, this.words());
@@ -1660,27 +1847,35 @@ export class TracerSolver implements Solver<TracerParams> {
 
   /** Cumulative kg lifted out of the erodible layer by water jets. Included in `budget.released`. */
   get jetErosion(): number {
+    this.requireAccepted();
     return this.jetBed ? this.book()[4 + this.sources.length]! : 0;
   }
 
-  /** Every live particle: position, mass, material index (into {@link TracerSolver.materialList}) and where it is. */
+  /** Copy each live particle's accepted position, mass, material and state. Consume between world steps. */
   *particlesOf(): Generator<{
     position: [number, number, number];
     mass: number;
     material: number;
     state: 'water' | 'surface' | 'bed';
   }> {
-    const words = this.words();
-    for (let i = 0; i < this.params.capacity; i++) {
-      const p = i * STRIDE,
-        state = words[p + 5]!;
-      if (state === FREE || words[p + 3] === 0) continue;
-      yield {
-        position: [words[p]!, words[p + 1]!, words[p + 2]!],
-        mass: words[p + 3]!,
-        material: words[p + 4]!,
-        state: state === WATER ? 'water' : state === SURFACE ? 'surface' : 'bed',
-      };
+    this.requireAccepted();
+    const ordinary = this.ordinaryParcels(this.words());
+    for (const [first, end] of [[0, ordinary], [this.emissionCapacity, this.params.capacity]] as const) {
+      for (let from = first; from < end; from += 256) {
+        // A generator can be paused by its caller. Hold only a copy, with no view into growable world memory.
+        this.requireAccepted();
+        const words = this.words().slice(from * STRIDE, Math.min(from + 256, end) * STRIDE);
+        for (let p = 0; p < words.length; p += STRIDE) {
+          const state = words[p + 5]!;
+          if (state === FREE || words[p + 3] === 0) continue;
+          yield {
+            position: [words[p]!, words[p + 1]!, words[p + 2]!],
+            mass: words[p + 3]!,
+            material: words[p + 4]!,
+            state: state === WATER ? 'water' : state === SURFACE ? 'surface' : 'bed',
+          };
+        }
+      }
     }
   }
 
@@ -1698,10 +1893,23 @@ export class TracerSolver implements Solver<TracerParams> {
     max: readonly [number, number, number],
     cells: readonly [number, number, number],
   ): { mass: Float32Array; colour: Float32Array } {
-    const [nx, ny, nz] = cells,
-      mass = new Float32Array(nx * ny * nz),
-      colour = new Float32Array(nx * ny * nz * 3),
-      volume = ((((max[0] - min[0]) / nx) * (max[1] - min[1])) / ny) * ((max[2] - min[2]) / nz);
+    this.requireAccepted();
+    if (!finiteTracerVector(min) || !finiteTracerVector(max) || !finiteTracerVector(cells) ||
+      cells.some((count) => !Number.isSafeInteger(count) || count <= 0) || max.some((bound, axis) => bound <= min[axis]!))
+      throw tracerError('unsupported', 'The concentration grid is invalid. Give increasing metre bounds and positive whole cell counts.');
+    const [nx, ny, nz] = cells;
+    const count = nx * ny * nz;
+    const volume = ((((max[0] - min[0]) / nx) * (max[1] - min[1])) / ny) * ((max[2] - min[2]) / nz);
+    if (!Number.isSafeInteger(3 * count) || !Number.isFinite(volume) || volume <= 0)
+      throw tracerError('unsupported', 'The concentration grid is outside numerical range. Reduce its dimensions or rescale its bounds.');
+    let mass: Float32Array, colour: Float32Array;
+    try {
+      mass = new Float32Array(count);
+      colour = new Float32Array(count * 3);
+    } catch (cause) {
+      if (!(cause instanceof RangeError)) throw cause;
+      throw tracerError('unsupported', 'The concentration grid does not fit. Query a smaller area or request fewer cells.');
+    }
     for (const particle of this.particlesOf()) {
       if (particle.state === 'bed') continue;
       const [x, y, z] = particle.position,
@@ -1714,7 +1922,17 @@ export class TracerSolver implements Solver<TracerParams> {
       mass[c]! += particle.mass / volume;
       for (let n = 0; n < 3; n++) colour[3 * c + n]! += (particle.mass / volume) * rgb[n]!;
     }
-    for (let c = 0; c < mass.length; c++) if (mass[c]! > 0) for (let n = 0; n < 3; n++) colour[3 * c + n]! /= mass[c]!;
+    for (let c = 0; c < mass.length; c++) {
+      if (!(mass[c]! > 0)) continue;
+      if (!Number.isFinite(mass[c]))
+        throw tracerError('failed', 'The tracer concentration overflowed. Increase cell size or reduce the source mass.');
+      for (let n = 0; n < 3; n++) {
+        const channel = 3 * c + n;
+        if (!Number.isFinite(colour[channel]))
+          throw tracerError('failed', 'A tracer colour sum overflowed. Use finite linear colours and a larger concentration cell.');
+        colour[channel]! /= mass[c]!;
+      }
+    }
     return { mass, colour };
   }
 }

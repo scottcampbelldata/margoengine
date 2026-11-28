@@ -5231,3 +5231,14 @@ node packages/physics/scripts/sea10-ruponen-measured.mjs --through=20
 The two fixed-camera backends compare early and late emergency isolation with the same triangle hull on the same water. They check accepted snapshots, compartment levels derived from accepted volumes, mesh motion, same-backend pixels and the external and internal water balance. Code-built geometry may use the same APIs as an imported hull, provided both pass the same body-local physical mesh.
 
 Ruponen's Case A Test 06 gauge markers from Figures 5.8–5.10 were held out. The script fixes the geometry, initial pose, water density and time-dependent breach from the source test arrangement and uses discharge from independent drainage work. It reports local readout ranges, step-size sensitivity and per-room water and gas residuals. This is a failed measured validation, with a reusable comparison and a passing deterministic warning check. [Ruponen dissertation](https://urn.fi/urn:nbn:fi:tkk-010597) · [Ruponen, Sundell and Larmela, ship-model experiments (2007)](https://doi.org/10.3233/SHP-2007-isp032)
+
+### SEA-15 parcel diffusion and scour
+
+```sh
+node --test packages/physics/tests/coupling/tracer-random-workers.test.js
+npm run test:gpu:tracer-random-workers -w @margoengine/physics
+npm run test:gpu:breach-ore -w @margoengine/environment
+node scripts/run-with-timeout.mjs --max=2 -- node packages/physics/scripts/sea15-jet-scour-measured.mjs
+```
+
+The measured tank diagnostic runs `TracerSolver` over a live `TerrainBed`. Independently published nozzle discharge, diameter, bed thickness and grain size drive the two cases. The held-out ultrasonic profiles enter only the comparison. Measured final net crater deficits are distinct from the model's cumulative, repeat-counting lifted mass. The model misses both profile-derived deficits under the recorded sensitivity and grid spacing checks. [Primary experiment](https://doi.org/10.1002/aic.70336) · [Open University of Leeds data](https://doi.org/10.5518/1730)
