@@ -18021,6 +18021,24 @@ voxel path tracer is excluded on this hardware (hardware check).
 
 ## Open defects
 
+### Open 2026-11-28: skeletal JSON physics constraints are kept but never simulated (KB-SPRITES-SPINEPHYS1, sprites, missing feature)
+
+- **What:** `@margoengine/sprites/spine` parses, validates and round-trips physics constraints (inertia, strength,
+  damping, mass, wind, gravity, their mix and reset timelines), but posing never runs them. A bone a physics
+  constraint drives stays exactly where its animation puts it: hair, cloth and tails do not lag, swing or settle.
+  The current runtime reference of the format includes physics constraint simulation, so this is a gap against the
+  rivals' Spine runtimes (No partial packages), not a choice.
+- **Repro:** load a skeleton with a root bone, a child bone `tail` and `"physics": [{ "name": "tail", "bone": "tail",
+  "rotate": 1, "inertia": 0.5, "strength": 100, "damping": 0.85 }]`, and an animation that moves the root 100 units
+  along x in 0.2 s and holds. `parseSpineJSON` lists one `warnings` entry, code `'spine-physics-deferred'`. Pose
+  the skeleton every 1/60 s: the tail's world rotation is the same on every frame, where a simulated constraint
+  swings it against the motion and settles it over the hold.
+- **Cause:** never built. The reader landed during the physics hold (batch 245 job 4, docs/limits.md), which kept
+  the data and deferred evaluation; the hold ended on 2026-11-24 and the evaluation was not scheduled.
+- **To build:** a per-skeleton physics step in posing (time-stepped, with the constraint's reset and the skeleton's
+  own world position and wind and gravity), clean room from the public format documentation, with a test against
+  measured swing and settle on a fixed step. Then the `'spine-physics-deferred'` warning goes.
+
 ### Closed 2026-11-28: bug 45's native half, trace compile time and CPU/GPU camera rounding (KB5185a, voxel-pathtracer)
 
 - **Was:** the bug sweep row "native Dawn compile about 17 s per pipeline and CPU/GPU camera rounding remain", left

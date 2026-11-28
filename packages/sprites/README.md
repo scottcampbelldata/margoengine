@@ -576,8 +576,9 @@ console.log(serializeSpineJSON(asset) === JSON.stringify(document)); // true: ev
   `maxValues` and `maxVertices` (1,000,000 each) and a 64-level nesting limit bound what a document may hold. A
   document that breaks them, or is invalid (an unknown parent, say), throws a `MargoError` with code `'failed'` that
   names the fault.
-- Physics constraints are read, kept and round-tripped, but posing does not simulate them yet: each one logs and lists
-  a `warnings` entry with code `'spine-physics-deferred'` when the document loads. Binary skeleton files are not read.
+- Physics constraints are read, kept and round-tripped, but posing does not simulate them yet (a missing feature,
+  KB-SPRITES-SPINEPHYS1 in docs/known-bugs.md): each one logs and lists a `warnings` entry with code
+  `'spine-physics-deferred'` when the document loads. Binary skeleton files are not read.
 - Spine is a trademark of Esoteric Software LLC; this independent reader of the public JSON format has no affiliation
   with it.
 

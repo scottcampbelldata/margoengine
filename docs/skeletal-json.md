@@ -86,7 +86,7 @@ Physics constraints are parsed and validated in either constraint layout.
 Their definitions, global flags, animation curves and reset keys survive
 serialization. Loading emits one `spine-physics-deferred` warning per
 constraint, naming it. `asset.warnings` also retains those diagnostics.
-Physics never affects pose; evaluation waits for Scott's physics phase.
+Physics never affects pose: simulating physics constraints is a missing feature (docs/known-bugs.md, KB-SPRITES-SPINEPHYS1).
 
 Reader limits default to 1,000,000 JSON values and explicit source mesh/path
 vertices, 64 JSON nesting levels, and JSON text length at most 128 times

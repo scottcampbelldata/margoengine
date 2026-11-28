@@ -86,7 +86,7 @@ export class SpineAsset {
   readonly animations: ReadonlyMap<string, SpineAnimation>;
   /** Named skins, including their bone and constraint activation sets. */
   readonly skins: ReadonlyMap<string, SpineObject>;
-  /** Physics is retained but not evaluated during Scott's physics hold. */
+  /** One per physics constraint: it is kept and round-tripped, but posing does not simulate it yet (docs/known-bugs.md, KB-SPRITES-SPINEPHYS1). */
   readonly warnings: readonly SpineWarning[];
   /** @internal Use parseSpineJSON to validate input. */
   constructor(
@@ -104,7 +104,7 @@ export class SpineAsset {
       .map(({ data: c }) => ({
         code: 'spine-physics-deferred',
         constraint: str(c.name),
-        message: `Physics constraint ${str(c.name)} is retained but evaluation waits for the physics phase.`,
+        message: `Physics constraint ${str(c.name)} is kept but not simulated: posing does not run skeletal physics constraints yet.`,
       }));
     for (const warning of this.warnings) console.warn(`${warning.code}: ${warning.message}`);
   }
