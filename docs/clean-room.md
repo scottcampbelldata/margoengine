@@ -19773,3 +19773,9 @@ Margo's own design from these public sources; no engine's or library's source wa
 - Static equilibrium of a floating body (weight equals displacement; centre of gravity on the vertical through the centre
   of buoyancy) and GM from the centre of buoyancy's shift under a small heel: K. J. Rawson and E. C. Tupper, *Basic Ship
   Theory*, 5th ed. (2001), vol. 1, ch. 4.
+
+## SEA-12 the step's bound for a floating body (2026-11-28)
+
+- E. Hairer, C. Lubich and G. Wanner, *Geometric Numerical Integration*, 2nd ed. (Springer, 2006), §I.1 and §IX.8:
+  symplectic Euler on an oscillator keeps a shadow energy within (w h / 2) of the energy, and is stable for w h < 2;
+  the held buoyancy's measured bound (0.95 stable, 1.17 growing) sets the refusal at 0.9.

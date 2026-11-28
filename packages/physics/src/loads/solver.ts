@@ -216,6 +216,8 @@ interface BodyRuntime {
   readonly capsule: CapsuleDimensions | undefined;
   /** Body-local pressure integration surface relative to the geometric centre. */
   readonly mesh: HullMesh | undefined;
+  /** The largest waterplane the shape can show in any attitude, m², for the step's stiffness bound. */
+  readonly waterplane: number;
   /** What the last step found, for {@link LoadSolver.bodyLoad} and {@link LoadSolver.debugRender}. */
   readonly last: LastLoad;
   /** A closed surface to draw an analytic shape with, body frame about its centre (made on first draw). */
@@ -676,6 +678,7 @@ export class LoadSolver implements Solver<LoadParams> {
       box,
       capsule,
       mesh,
+      waterplane: largestWaterplane(axes, box, capsule),
       last: {
         active: false,
         time: 0,
@@ -895,6 +898,14 @@ export class LoadSolver implements Solver<LoadParams> {
       const buoyancyArm = add(sub(hcentre, hcm), offset);
       torque = cross(buoyancyArm, [0, densityGravity * submerged, 0]);
     }
+    // The step must resolve the heave: a buoyancy held over a step of a body whose hydrostatic frequency sqrt(rho g A / m)
+    // times dt passes about 1 gains energy each cycle (measured: a 4 mm box at 60 steps a second, w dt 1.17, grew its swing
+    // 1.8 times in 10 s; at 0.95 it held). A is the largest waterplane the shape shows and m its dry mass, so the bound is
+    // conservative by the added mass.
+    if (submerged > 0 && (densityGravity * b.waterplane * dt * dt) / mass > 0.81)
+      throw invalidLoad(
+        `Body row ${b.spec.row} heaves too fast for the step (hydrostatic frequency times dt ${(Math.sqrt((densityGravity * b.waterplane) / mass) * dt).toFixed(2)}, above 0.9): raise the Loads level (level) or the world's rate, or make the body larger or heavier.`,
+      );
     const wet = submerged / b.volume;
     const buoyancy = densityGravity * submerged;
     const last = b.last;
@@ -1437,6 +1448,17 @@ export class LoadSolver implements Solver<LoadParams> {
   extraState(): readonly Region[] {
     return [this.forces];
   }
+}
+
+/** The largest horizontal section of the shape in any attitude, m²: an ellipsoid's or box's two largest axes, a capsule lying down. */
+function largestWaterplane(axes: Vec3, box: Vec3 | undefined, capsule: CapsuleDimensions | undefined): number {
+  if (capsule)
+    return Math.max(
+      Math.PI * capsule.radius * capsule.radius,
+      4 * capsule.radius * capsule.halfHeight + Math.PI * capsule.radius * capsule.radius,
+    );
+  const [a, b] = [...(box ?? axes)].sort((x, y) => y - x) as Vec3;
+  return box ? 4 * a * b : Math.PI * a * b;
 }
 
 function resetMemberWake(wakes: Float64Array, motion: Float64Array, index: number): void {

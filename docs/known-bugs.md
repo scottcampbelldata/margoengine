@@ -7,6 +7,19 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
 ### Open 2026-11-28: 21 web demos cannot be rebuilt from source/: the data files their code imports are missing (KB-DEMO-SOURCEDATA1, demos)
+### Open 2026-11-28: a floating body's carried water swaps energy with it as its draft changes (KB-LOADS-ADDEDRATE1, physics)
+
+- **Repro:** a 0.1 m sphere at half the water's density let go 0.04 m above its rest on still water, `LoadSolver` at 60
+  steps a second, drag 0: its energy with the water it carries (Lamb's added mass, (1/2) A v^2) swings by 13 % of
+  m g r within a swing and drifts about 10 % over 20 s; with drag (the default) the body still ends below its start.
+- **Cause:** the added mass scales with the submerged volume and the solver holds A dv/dt = F. Lagrange's equation for
+  a kinetic energy (1/2) v^T A(q) v gives A dv/dt = F - (1/2) (dA/dt) v (Lamb 1932, art. 136-137).
+- **Tried:** the rate term with each body's last submerged volumes as snapshot state, exact in energy over a step;
+  it closed the sphere's swing to 1.5 % but damped the undamped wall-sided box of KB-LOADS-HEAVEGAIN1 by 0.15 % a
+  swing (`tests/loads-floating.test.js`), so it was not landed. The term taken at the step's energy-neutral pose
+  (as the buoyancy is) is the next try.
+
+### Open 2026-11-28: a 3MF with `production: {separateParts: true}` copies every resource group whole into each part (KB-3MF-PARTCOPY1, exporters)
 
 - **Repro:** `node scripts/web-demos/build.mjs the-brain-scan` (or caustic-glass, character-course, cutscene-studio,
   depth-video, directional-lightmaps, ground-projection, hdr-window, parallel-coordinates, the-ar-card,
