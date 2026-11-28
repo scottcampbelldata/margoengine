@@ -45428,12 +45428,12 @@ nanometres unless a parameter says metres, and argument errors throw `RangeError
 
 | Entry | What it holds |
 | --- | --- |
-| `@margoengine/optics/refraction` | `snell`, `criticalAngle`, `brewsterAngle`, `fresnelAmplitudes`, `fresnelReflectance`, `sellmeierIndex` with `FUSED_SILICA` and `N_BK7`, `cauchyFromAbbe`, `cauchyIndex`, `prismDeviation`, `minimumDeviation`, `minimumDeviationIncidence`, `hexagonalHaloProfile`, `traceGradedRay` |
+| `@margoengine/optics/refraction` | `snell`, `criticalAngle`, `brewsterAngle`, `fresnelAmplitudes`, `fresnelReflectance`, `sellmeierIndex` with `FUSED_SILICA` and `N_BK7`, `cauchyFromAbbe`, `cauchyIndex`, `prismDeviation`, `minimumDeviation`, `minimumDeviationIncidence`, `hexagonalHaloProfile`, `traceGradedRay`, `layeredElevation`, `ciddorRefractivity`, `heatedAirLayer`, `refractVector`, `tracePolygon` |
 | `@margoengine/optics/polarization` | `malus`, `JonesVector`, `JonesMatrix` (polariser, retarder, `after`, `apply`), `photoelasticTransmission`, `photoelasticColors`, `photoelasticRetardation`, `diametralDiscStress` |
 | `@margoengine/optics/interference` | `thinFilmReflectance`, `multilayerReflectance`, `quarterWaveStack`, `thinFilmColor`, `michelsonFringes`, `michelsonIntensity`, `michelsonTilt`, `moireSpacing` |
 | `@margoengine/optics/diffraction` | `gratingAngle`, `gratingOrders`, `besselJ`, `airyIntensity`, `airyFirstZero`, `fresnelNumber`, `circularPointSpread` |
 | `@margoengine/optics/imaging` | `thinLens`, `pinholeImage`, `relativeIllumination`, `astigmaticFoci`, `astigmaticImage`, `designFresnelLens`, `cornerCubeReflect`, `airIndexTemperatureSlope`, `knifeEdgeTransmission` |
-| `@margoengine/optics/spectrum` | `cieXYZ`, `xyzToLinearSRGB`, `wavelengthToLinearSRGB`, `spectralColor`, `planckRelative`, `SpectralIntegrator` |
+| `@margoengine/optics/spectrum` | `cieXYZ`, `xyzToLinearSRGB`, `wavelengthToLinearSRGB`, `spectralColor`, `planckRelative`, `SpectralIntegrator` (`color`, `luminance`) |
 
 The root entry re-exports all six; import an entry to load only that topic.
 
@@ -45453,7 +45453,21 @@ console.log(inside, tir, glare.p, n, halo);
 `hexagonalHaloProfile({ indices })` bins the light through randomly oriented hexagonal ice columns by scattering
 angle, one channel per index, for a halo texture. `traceGradedRay(medium, options)` follows a ray through a medium whose
 index changes with height (mirages, looming) by fourth-order Runge-Kutta on the ray equation; `n cos(elevation)` is
-kept to integration accuracy and the turning point is reported.
+kept to integration accuracy and the turning point is reported. `heatedAirLayer` is the medium for a road or desert
+mirage (Ciddor's dry-air refractivity, a temperature excess that falls off with height); its exact inverse puts the
+turning point where n equals the ray invariant, and `layeredElevation` gives the angle a ray leaves the layer at.
+`refractVector` is Snell's law for 2D or 3D direction vectors, and `tracePolygon` follows a 2D ray in and out of a
+convex prism.
+
+```ts
+import { heatedAirLayer, layeredElevation, traceGradedRay, tracePolygon } from '@margoengine/optics/refraction';
+const deg = Math.PI / 180;
+const air = heatedAirLayer({ ambient: 26, surface: 62, depth: 0.02 }); // 36 C hotter at the asphalt
+const ray = traceGradedRay(air, { height: 0.5, elevation: -0.32 * deg, distance: 640, ceiling: 0.5 });
+console.log(ray.kind, ray.turn?.height, layeredElevation(ray.invariant, air.farIndex) / deg); // 'ceiling', ~0.013 m, 0.32
+const prism = tracePolygon([[-0.5, 0], [0.5, 0], [0, 0.866]], [-0.9, 0.1], [Math.cos(20 * deg), Math.sin(20 * deg)], 1.6);
+console.log(prism?.exitEdge, prism?.direction); // leaves through the right face, bent toward the base
+```
 
 ## Polarisation
 
@@ -45469,22 +45483,6 @@ console.log(half, throughX, michelLevy.length);
 ```
 
 ## Thin films and coatings
-
-```ts
-import { thinFilmReflectance, multilayerReflectance, quarterWaveStack, thinFilmColor, michelsonFringes, moireSpacing } from '@margoengine/optics/interference';
-const coating = { filmIndex: Math.sqrt(1.52), thickness: 550 / (4 * Math.sqrt(1.52)), substrateIndex: 1.52 };
-const antiReflection = thinFilmReflectance(coating, 550); // 0
-const mirror = multilayerReflectance({ layers: quarterWaveStack(2.35, 1.38, 6, 600), substrateIndex: 1.52 }, 600); // 0.998
-const soapBubble = thinFilmColor({ filmIndex: 1.33, thickness: 380, substrateIndex: 1 }); // linear sRGB
-const fringes = michelsonFringes(10000, 632.8); // 31.6 fringes for 10 um of mirror travel
-const bands = moireSpacing(1, 1, Math.PI / 90); // 28.65 line pitches
-console.log(antiReflection, mirror, soapBubble, fringes, bands);
-```
-
-`multilayerReflectance` uses the characteristic matrix of each layer, so it takes any number of layers, tilted light
-in s or p, and evanescent gaps past a critical angle (frustrated total internal reflection).
-
-## Diffraction
 
 [README continues: https://margoengine.com/llms/packages/optics.md]
 
