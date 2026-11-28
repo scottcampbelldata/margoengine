@@ -143,7 +143,7 @@
     "test:browser:tools:compat": "node test/tools-browser.mjs --compat",
     "test:browser:shaders": "node test/shaders-browser.mjs",
     "test:browser:remote": "node test/remote-browser.mjs",
-    "test:browser:mesh-debug": "node test/mesh-debug-browser.mjs",
-    "test:browser:mesh-debug:compat": "node test/mesh-debug-browser.mjs --compat"
+    "test:browser:mesh-debug": "cd ../.. && node packages/inspector/test/mesh-debug-browser.mjs",
+    "test:browser:mesh-debug:compat": "cd ../.. && node packages/inspector/test/mesh-debug-browser.mjs --compat"
   }
 }
