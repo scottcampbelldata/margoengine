@@ -81,13 +81,29 @@ export const surfaceStruct = (code: string): string =>
  * distance and across a rebase, and a terrain moved with its camera draws the same picture. `Frame.anchor` is
  * (shift.x - origin.x, shift.z - origin.z, shift.y, 0): local + anchor.xy is the terrain-relative XZ that cache surfaces,
  * overlays and imagery read. Applied once; the text without the option is unchanged.
+ *
+ * The lit draw also works relative to the eye (Cozzi and Ring 2011, "3D Engine Design for Virtual Globes", chapter 5,
+ * "Rendering relative to eye"; Ohlarik 2008, "Precisions, Precisions", AGI): local positions are whatever the origin's
+ * shift leaves them, so a rebase in place re-rounds every float32 number derived from them (the clip position, each
+ * texture coordinate and its screen derivatives), and the texture unit's sub-texel and level rounding, finer with 16x
+ * anisotropy, flipped 0.1 percent of pixels by one level (KB-TERRAIN-REBASEROUND1). The vertex writes `Output.eye`,
+ * the vertex less the eye, from `Frame.view` (the ring's lattice less the eye, and the eye's local Y, computed in
+ * float64 on the CPU) plus the ring-relative grid offset, and the clip position is `camera * (eye, 0)` plus
+ * `Frame.column` (the camera matrix times the local eye, float64): none of these depend on where the origin sits, so a
+ * rebase in place draws the same numbers. `eyeShader` reads the textures there.
  */
+export const terrainClip = 'o.clip=frame.camera*vec4f(position,1);';
+/** The clip line of the floating-origin vertex (`originShader`): what `surface-height` replaces with its own. */
+export const originClip =
+  'let terrainE=frame.view.xy+aligned*frame.grid.z+frame.offset.xy*inner;o.eye=vec3f(terrainE.x,position.y-frame.view.z,terrainE.y);o.clip=frame.camera*vec4f(o.eye,0)+frame.column;';
 export const originShader = (code: string): string =>
-  code.includes('anchor:vec4f}')
+  code.includes('anchor:vec4f,view:vec4f')
     ? code
     : code
-        .replace('ambient:vec4f}', 'ambient:vec4f,anchor:vec4f}')
-        .replace(/struct Layer \{([^}]*)\}/, 'struct Layer {$1,wrap:vec4f,tone:vec4f}')
+        .replace('ambient:vec4f}', 'ambient:vec4f,anchor:vec4f,view:vec4f,column:vec4f}')
+        .replace(/struct Layer \{([^}]*)\}/, 'struct Layer {$1,wrap:vec4f,tone:vec4f,eyeWrap:vec4f,eyeTone:vec4f}')
+        .replace('@location(3) material:vec4f}', '@location(3) material:vec4f,@location(12) eye:vec3f}')
+        .replace(terrainClip, originClip)
         .replace(
           'fn terrainPatchXZ(p:vec3f)->vec2f {return p.xz;}',
           'fn terrainPatchXZ(p:vec3f)->vec2f {return p.xz+frame.anchor.xy;}',
@@ -98,6 +114,31 @@ export const originShader = (code: string): string =>
           'let p=position*m;let q=position*m*0.302;',
           'let p=(position+layerRules[layer].wrap.xyz)*layerRules[layer].params.x/24.0;let q=p*0.302+layerRules[layer].tone.xyz;',
         );
+const fragmentHead = '@fragment fn fragment(i:Output)->@location(0) vec4f {';
+/** What an entry adds at its start to read the textures relative to the eye (`eyeShader`). */
+export const eyeEntry = 'terrainEyeOn=true;terrainEyeAt=i.eye;terrainEyeLocal=i.position;';
+/**
+ * The floating-origin lit shader's last step, after every entry and effect has edited the text (so the text they look
+ * for is the one they always saw): each layer sample's point and screen derivatives come from `Output.eye`, the vertex
+ * less the eye, plus the layer's `eyeWrap` (the eye less the terrain's anchor less whole macro repeats, float64 on the
+ * CPU) and `eyeTone`, in place of the local position plus `wrap` and `tone`. A sample point that is not the fragment's
+ * own (a displaced one) keeps its offset from it. The same texel either way (the two differ by whole repeats); only
+ * the rounding no longer moves with the origin. Shaders without `eyeEntry` (the virtual texture's bake) keep the local
+ * reading. Applied once.
+ */
+export const eyeShader = (code: string): string =>
+  code.includes('var<private> terrainEyeOn:bool;') || !code.includes('eye:vec3f}')
+    ? code
+    : /* wgsl */ `var<private> terrainEyeOn:bool;var<private> terrainEyeAt:vec3f;var<private> terrainEyeLocal:vec3f;
+fn terrainTexAt(p:vec3f)->vec3f {return select(p,terrainEyeAt+(p-terrainEyeLocal),terrainEyeOn);}
+fn terrainTexPoint(p:vec3f,l:u32)->vec3f {return terrainTexAt(p)+select(layerRules[l].wrap.xyz,layerRules[l].eyeWrap.xyz,terrainEyeOn);}
+fn terrainToneOf(l:u32)->vec3f {return select(layerRules[l].tone.xyz,layerRules[l].eyeTone.xyz,terrainEyeOn);}
+` +
+      code
+        .replace(fragmentHead, fragmentHead + eyeEntry)
+        .replace(/\(position\+layerRules\[layer\]\.wrap\.xyz\)/g, 'terrainTexPoint(position,layer)')
+        .replace(/layerRules\[layer\]\.tone\.xyz/g, 'terrainToneOf(layer)')
+        .replace(/(dpd[xy](Fine)?)\(position\)/g, '$1(terrainTexAt(position))');
 const surfaceFunctions = /* wgsl */ `
 var<private> terrainRelief:f32;var<private> terrainRepeat:f32;
 fn terrainMacro(p:vec2f,q:vec2f,dx:vec2f,dy:vec2f,m:f32,layer:u32,top:f32,norm:f32)->f32 {

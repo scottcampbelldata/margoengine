@@ -4,6 +4,7 @@ import { Terrain, planRings } from '../dist/index.js';
 import { planWindows, splitTerrainColor, TerrainVirtualTexture } from '../dist/rvt.js';
 import { TerrainBlend } from '../dist/blend.js';
 import { TerrainQuery } from '../dist/query.js';
+import { Camera } from '@margoengine/core';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 
 function rig(options = {}) {
@@ -203,8 +204,8 @@ test('ring uniforms and layer rules are bit-identical at 0, 1e5 and 1e7 when the
   frameOf(reference);
   const ringsOf = (r) => r.terrain.rings.map((ring) => bits32(ring.values)).join(),
     rules = bits32(reference.terrain.ruleData());
-  // 48 floats, `lighting.ambient` among them (KB-TERRAIN-SKYAMBIENT1), and the anchor after them.
-  assert.equal(reference.terrain.rings[0].values.length, 52);
+  // 48 floats, `lighting.ambient` among them (KB-TERRAIN-SKYAMBIENT1), and the anchor, view and column after them.
+  assert.equal(reference.terrain.rings[0].values.length, 60);
   for (const d of OFFSETS.slice(1)) {
     const r = originRig(d);
     frameOf(r);
@@ -218,7 +219,7 @@ test('the layer wrap and tone are whole macro repeats of the terrain-relative sh
     shift = [1234567.891, 87.5, -7654321.123];
   r.at.rebase(shift);
   const data = r.terrain.ruleData(),
-    stride = 20; // 8 rule floats, 4 for bump and macro, 8 for wrap and tone.
+    stride = 28; // 8 rule floats, 4 for bump and macro, 8 for wrap and tone, 8 for the eye's wrap and tone.
   r.terrain.options.layers.forEach((layer, i) => {
     const scale = Math.fround(layer.scale),
       relative = [shift[0] + 16, shift[1], shift[2] + 16];
@@ -255,6 +256,48 @@ test('a rebase rewrites the rules once and redraws the shadow maps once, a still
   assert.deepEqual([...r.terrain.shift], next);
   r.terrain.dispose();
   assert.equal(r.at.listeners.size, 0, 'dispose unsubscribes from the origin');
+});
+
+test('a rebase in place keeps the eye-relative ring lattice and layer wraps bit-identical (KB-TERRAIN-REBASEROUND1)', () => {
+  // The camera stays at its float64 world pose, two thirds of a metre off the metre grid, while the origin moves from
+  // the lattice onto it: every local number changes, the ones the lit draw reads relative to the eye must not.
+  const d = 4883 * 2048,
+    r = originRig(d),
+    eye = [d - 60 + 2 / 3, 45.7, d - 90.1],
+    target = [d + 10.6, 8.2, d + 20.4];
+  const draw = () => {
+    const at = r.at.origin,
+      camera = new Camera({ position: eye.map((v, a) => v - at[a]), target: target.map((v, a) => v - at[a]) });
+    camera.update(4 / 3, true);
+    r.gpu.record(() => {
+      r.view.begin(3);
+      r.view.c.camera = { ...r.view.camera, matrix: camera.matrix, position: camera.position };
+      r.prepare.execute(r.view.c);
+    });
+    return { rings: r.terrain.rings.map((ring) => Float32Array.from(ring.values)), rules: r.terrain.ruleData() };
+  };
+  const before = draw();
+  r.at.rebase(eye);
+  const after = draw(),
+    stride = 28;
+  assert.equal(before.rings[0].length, 60, 'the frame carries view and column');
+  before.rings.forEach((a, i) => {
+    const b = after.rings[i];
+    assert.notEqual(a[28], b[28], `ring ${i}: the local lattice moved`);
+    assert.notEqual(a[12], b[12], `ring ${i}: the camera matrix's translation moved`);
+    assert.deepEqual([b[52], b[53]], [a[52], a[53]], `ring ${i}: the lattice less the eye is the same float32`);
+    // The column is the camera matrix times the local eye in float64: only the float32 rounding of the camera's own
+    // translation is left of what moved (the projection's column, 0.5 in z here, the same to 2^-20 of its terms).
+    for (let k = 0; k < 4; k++)
+      assert.ok(Math.abs(b[56 + k] - a[56 + k]) <= Math.abs(a[12 + k]) * 2 ** -20 + 1e-7, `ring ${i} column ${k}`);
+  });
+  r.terrain.options.layers.forEach((_, i) => {
+    const at = (data, k) => Array.from(data.subarray(i * stride + 20, i * stride + 28))[k];
+    for (let k = 0; k < 8; k++)
+      if (k % 4 < 3) assert.equal(at(after.rules, k), at(before.rules, k), `layer ${i}: eye wrap and tone ${k}`);
+  });
+  const code = r.terrain.colorSource().code;
+  assert.ok(code.includes('o.clip=frame.camera*vec4f(o.eye,0)+frame.column;'), 'the clip position is eye-relative');
 });
 
 test('blend noise stays on the ground across a rebase: it reads world less the anchor from the cache frame', () => {
@@ -299,8 +342,11 @@ test('the origin shader edits every layer sample and keeps the anchors other ent
   ];
   for (const r of variants) {
     const code = r.terrain.colorSource().code;
-    assert.ok(code.includes('heights:vec4f,ambient:vec4f,anchor:vec4f}'));
-    assert.match(code, /struct Layer \{heightSlope:vec4f,params:vec4f(,surface:vec4f)?,wrap:vec4f,tone:vec4f\}/);
+    assert.ok(code.includes('heights:vec4f,ambient:vec4f,anchor:vec4f,view:vec4f,column:vec4f}'));
+    assert.match(
+      code,
+      /struct Layer \{heightSlope:vec4f,params:vec4f(,surface:vec4f)?,wrap:vec4f,tone:vec4f,eyeWrap:vec4f,eyeTone:vec4f\}/,
+    );
     assert.ok(!code.includes('position*scale;') && !code.includes('let p=position*m;'), 'no unwrapped sample left');
     assert.equal(code.split('wrap:vec4f').length, 2, 'the layer struct grows once');
     // The virtual texture's split and the materials' anchors still find their text.

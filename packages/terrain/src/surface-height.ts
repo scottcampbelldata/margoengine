@@ -1,4 +1,4 @@
-import { terrainOutside } from './shader.js';
+import { originClip, terrainClip, terrainOutside } from './shader.js';
 
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number };
 
@@ -44,7 +44,7 @@ export function surfaceHeight(
   // Seed uncovered texels from the height field. The drawn rings replace those samples on the visible surface.
   const module = device.createShaderModule({
     code: clip(
-      vertexCode.replace('o.clip=frame.camera*vec4f(position,1);', projection) +
+      vertexCode.replace(floating ? originClip : terrainClip, projection) +
         /* wgsl */ `
 @vertex fn seedVertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {
   return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);

@@ -79,6 +79,32 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `add` and `steps` split each tile's records among them by the record's variant nibble, so density is unchanged and
   neighbouring stones differ. Test: `packages/biomes/tests/objects.test.js` ("a procedural:rock species draws eight
   seeded stones and splits its records among them").
+
+### Fixed 2026-11-28: a terrain under a floating origin changed 0.1 percent of its pixels when the origin rebased in place (KB-TERRAIN-REBASEROUND1, terrain)
+
+- **Repro (before):** `MARGO_COMPAT=1 node packages/terrain/test/origin.browser.mjs`, stack `stream`: the streamed
+  ground at 1e7 m with the origin on the lattice, then rebased onto the camera in place (the camera keeps its world
+  pose): 79 of 76,800 pixels changed by one level of 255 (99.897 percent equal against the 99.9 percent bar), 66
+  natively (99.914), each a single channel scattered over the near ground. With the 16x anisotropic sampler of
+  KB-TERRAIN-GRAZESMEAR1 the WebGL2 layer failed the bar; with the isotropic one it read 99.932.
+- **Cause:** the lit draw worked in local coordinates, world less the origin's shift. A rebase in place changes every
+  local number, so every float32 rounding derived from them changed: the clip position (the camera matrix's
+  translation and the product with a local vertex), each layer's texture coordinate (local position plus a `wrap` of
+  a different size) and its screen derivatives (differences of interpolated local positions). The texture unit rounds
+  coordinates to sub-texel steps and the level to a fraction, and an anisotropic footprint takes several such taps, so
+  a fraction of pixels moved across an 8-bit rounding step. Measured on the RTX A6000 with each part swapped in a
+  scratch build: eye-relative texture coordinates alone left 45 pixels, an eye-relative clip position alone 64, both 5.
+- **Fix:** the floating-origin terrain draws relative to the eye (Cozzi and Ring 2011, "3D Engine Design for Virtual
+  Globes", chapter 5; Ohlarik 2008, "Precisions, Precisions"). The vertex writes `Output.eye` from `Frame.view`, the
+  ring's lattice less the eye computed in float64, plus the ring-relative grid offset, and the clip position is
+  `camera * (eye, 0)` plus `Frame.column` (the camera matrix times the local eye, float64). The lit shader's last step
+  (`eyeShader`) reads every layer sample at the eye-relative point plus the layer's `eyeWrap` and `eyeTone` (the eye
+  less the anchor, less whole macro repeats), with derivatives of that point; the virtual texture's bake keeps the
+  local reading, the same texels either way. Rebased in place the stream now changes 5 pixels on the WebGL2 layer and
+  3 natively (99.993 and 99.996 percent), the float32 rounding of the camera matrix's own translation that is left.
+- **Regression:** `packages/terrain/test/origin.test.js` ("a rebase in place keeps the eye-relative ring lattice and
+  layer wraps bit-identical") and `packages/terrain/test/origin.browser.mjs` on both backends.
+
 ### Fixed 2026-11-28: the ground between a meadow's far tussocks smeared into flat blotches at low angles (KB-TERRAIN-GRAZESMEAR1, terrain)
 
 - **Repro (before):** the FG-16 whole scene (a BiomeView temperate meadow from 0.9 to 6 m up, Bruneton sky, shadows,
@@ -556,6 +582,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Left of KB1867b:** the two XR examples that need an AR headset or a body-tracking device stay skipped by hardware
   (`scripts/support/readme-run-skip.json`); the headless examples that needed ffmpeg run on the workstation now (22 of
   22).
+
 ### Fixed 2026-11-28: a plate held well inside its friction slipped on a deck pitching far from it (KB-PHYS-CONECUT1, physics kernel, contact solver)
 
 - **Repro:** a plate (0.24 m square, one box collider) on a kinematic deck 140 m long that pitches 4 degrees at 9 s about
@@ -1061,6 +1088,7 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   The Watt governor rig of `@margoengine/machinery/rigs` uses point-mass balls (I = 1e-5 m L^2) and 32 substeps, which
   settle within 0.001 degrees.
   Physics lane.
+
 ### Open 2026-11-28: the Arms-wide walk's elbows sit past straight on every frame, so the take is held off the stage (KB-RIG-ARMS2, demo take, rigging)
 
 - **Repro:** demos/the-mocap-theatre, "Arms-wide walk" (100STYLE Aeroplane_FW.bvh, frames 5598 to 5724), the source
@@ -1772,6 +1800,7 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   the `environmentLayer` doc names the unit (`packages/sky/src/base.ts`).
 - **Regression:** `packages/sky/test/cloud-bounds-check.html` (features-check cloud-bounds) on WebGPU and
   `MARGO_COMPAT=1`.
+
 ### Fixed 2026-11-27: create3MFMesh made a material for every group, so a coloured scan crashed the page (KB-3MF-SCANGROUPS1, loaders)
 
 - **Repro:** `create3MFMesh` on the 3MF Consortium's `examples/material/kinect_scan.3mf` (3mf-samples 665e20dc4d,
@@ -2203,6 +2232,7 @@ checks the retained stations of a sheer hull and exact agreement of the native a
 - **Left then, fixed since:** liquid and underwater fog over empty pixels (KB-WATER-LIQUIDALPHA1).
 - **Regression:** the GPU test above and `packages/post/test/straight-display.test.js` "every display shader that keeps
   a sampled alpha is built through displayFor, in every package".
+
 ### Fixed 2026-11-27: the aftermath shot shimmered 0.61 percent at mid, all of it the crest conifers' parallax against the sky (KB-LOOK-TV-SHIMMER3, look check; fixed by TAA, KB-SCENES-TVTAA1)
 
 - **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-aftermath.json --once --seconds 1.1 --out <folder>`
@@ -3488,6 +3518,7 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   them is still judged at 180. The rail-line probes read 0.55 and 0.60 percent. Regression:
   `packages/headless/tests/look-clean.test.js` (an 8 sub-frame 180 degree bar passes, one sub-frame and a 90 degree
   bar judged at 180 fail, the probe's own angle applies).
+
 ### Fixed 2026-11-27: the WebGL2 layer accepted a compute pipeline past its workgroup limits at creation (KB-COMPAT-WGSIZE1, webgl2-compat)
 
 - **Repro:** on the layer's device (maxComputeInvocationsPerWorkgroup 256), `createComputePipeline` with
@@ -3578,6 +3609,7 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   `test/corpus.test.js` "re-recording keeps an owner", `test/compute.test.js` corpus tier test. khronos-gallery's
   full material on the layer: `scripts/compat-units-gpu-check.js --compat` (all 13 maps, image light, both shadow
   kinds, clustered light, bounce) passes.
+
 ### Fixed 2026-11-27: `Water` refused bad options with plain RangeError and TypeError (KB-WATER-CODED1, water)
 
 - **Repro:** `new Water({ color: [2, 0, 0] })` or `water.setSeaLevel(NaN)` threw a `RangeError` with no `code` and no
@@ -3907,6 +3939,7 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   under `node scripts/run-with-timeout.mjs --max=6 --`: the clustered sphere-light check (no failures), the biomes
   browser check, the SSAO GPU check and `sky/test/features-check.mjs sleet astro hillaire`. The failures are seen on
   the Intel Arc 140V only, so the row waits for a run on that laptop.
+
 ### Fixed 2026-11-27: flame-check `graded` failed on main on both backends (KB-FLAME-GRADEDBG1, vfx)
 
 - **Repro:** `node scripts/run-with-timeout.mjs -- node packages/vfx/test/flame-check.mjs --only graded` (and with
@@ -5038,6 +5071,7 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   the box's own result to round-off.
 - **Regression:** "water slips along a solid as along the box's own sides: a dam break runs alike on either floor" in
   `packages/physics/tests/flip.test.js`.
+
 ### Fixed 2026-11-26: a ship and a hull solver on one body counted its sway and yaw damping twice (KB-SHIP-DAMP1, physics ship and seakeeping)
 
 - **Repro (before):** a 7 m hull at 0.6 m/s, kicked to 0.08 m/s in sway, held by a `ShipSolver` and floated by a
@@ -5947,6 +5981,7 @@ test.
 - **Fix:** `OutdoorSound` solves the acoustic path and `OutdoorAudio` applies its delay and broad spectral response.
 - **Regression:** `packages/physics/tests/coupling/outdoor-sound.test.js` checks air, diffraction and reflection.
   `packages/audio/tests/outdoor-sound.browser.mjs` measures the added arrival delay in real PCM.
+
 ### Fixed 2026-11-26: a glTF wall added to LightBounce did not stop the bounce in the visibility maps (KB-BOUNCE-OCCLUDE1, clustered)
 
 - **Repro:** packages/clustered/test/bounce.test.js, the table-by-the-wall room given as gltf/pbr primitives: before, only
@@ -6213,6 +6248,7 @@ test.
   the cube's), a held edge pair now gives the manifold a test with no history gives on every pose; before, 1,499 lost an end.
 - **Regression:** `packages/physics/kernel/tests/sat.rs` `a_face_resting_on_a_parallel_edge_keeps_both_ends_after_an_edge_pair`
   (one point with the held edge pair before), and the voxel debris test above with the block solver.
+
 ### Fixed 2026-11-25: the joint webs' energy ledger read a kinematic body's speed as energy gained (KB-PHYS-LEDGER1, physics kernel tests)
 
 - **Repro:** `packages/physics/kernel/tests/stability.rs` `the_energy_ledger_reads_the_same_in_a_moving_frame`: a kinematic
@@ -6228,6 +6264,7 @@ test.
   `a_joint_does_not_turn_its_drift_into_speed` measures speed directly and still fails on the drift bug it was made for. No
   shipped code changes: the ledger is native only.
 - **Regression:** the moving-frame test above (-4,800 J before), within f32's rounding of the box's kinetic energy.
+
 ### Fixed 2026-11-25 Open-channel and flood models had no link to changing sediment beds (HYDRO-03)
 
 The shallow-water field now drives suspended load, bedload and bank exchange. The production TerrainBed
@@ -6381,6 +6418,7 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   `#define` maps each row read onto it (Khronos, "The OpenGL ES Shading Language 3.00", 2016, section 3.4,
   https://registry.khronos.org/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf). ANGLE's source was not read; its
   behaviour comes from the raw repro.
+
 ### Fixed 2026-11-25: fsm's equivalent mutants named lines that had moved (KB-MUTATION-PINS1, scripts, mutation)
 
 - **Repro:** `node --test tests/mutation.test.js` on main at caf466b4c: "every listed equivalent mutant exists" failed on
@@ -6854,6 +6892,7 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **Fix:** `publish` allocates every region it needs first and only then takes views, and the registry keeps no view at all
   (each read goes through `words()`). Regression: `packages/physics/tests/world-fields.test.js`, "a first publish that
   grows the memory copies the port whole".
+
 ### Fixed 2026-11-25: environment's dist still imported its decoders both lazily and statically (KB-ENV-LOADCHUNK2, environment)
 
 - **Repro:** `npm run build:packages`, then `node --test tests/dist-dynamic-imports.test.js`: dist/hdr.js, exr.js and ultrahdr.js were `import()`ed by load.js and imported by loaders.js and parse-image.js, and main.js carried hashed copies of load.js and every decoder (hdr-*.js both imported by exr-*.js and `import()`ed by load-*.js). An app that called `parseEnvironmentImage` and `loadEnvironmentImage` built with `INEFFECTIVE_DYNAMIC_IMPORT` for hdr.js and exr.js.
@@ -14342,6 +14381,7 @@ Repro: `node scripts/reference-rendering/environment.mjs --decompose`, then with
 - **Rechecked under load 2026-11-27, not reproduced:** the same six loaded rounds as the
   furnace entry above (12 layer runs of `--compat analytic viewport` under load): every `restored` read 0 differing
   pixels, max 0.
+
 ### SSGI multiBounce off does not return the one-bounce frame exactly under MARGO_COMPAT=1 (found 2026-11-11, open)
 
 Release exception: SSGI multiBounce off differs below the GL calls (driver).

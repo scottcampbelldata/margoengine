@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21968659,
+  "total": 21969859,
   "history": [
     {
       "date": "2026-10-24",
@@ -15761,6 +15761,12 @@
       "commit": "4097c1b796",
       "reason": "headless/look +85 B (19,898 to 19,983): 9edd16641d KB-LOOK-TV-SHIMMER2 counts a pixel off only outside its four reprojection taps; the taps are the check itself, not a split candidate",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "terrain-eye-relative",
+      "reason": "KB-TERRAIN-REBASEROUND1: the floating-origin terrain draws relative to the eye (eye-relative clip position, layer texture coordinates and their derivatives, float64 ring lattice and camera column on the CPU), so a rebase in place no longer re-rounds every float32 number the lit draw reads (WebGL2 layer 79 to 5 changed pixels of 76,800, native 66 to 3): measured gzip @margoengine/terrain 19,201 to 19,792, @margoengine/terrain/stream 17,195 to 17,769. The code runs only with TerrainOptions.floatingOrigin, a synchronous construction option of the main entry; a lazy entry would make every large-world terrain wait on a second import before its first frame and split the origin path, which already lives in this entry, in two.",
+      "grew": 2
     }
   ],
   "items": {
@@ -17202,7 +17208,7 @@
     "@margoengine/taa/sharpen": 971,
     "@margoengine/taa/upscale": 11037,
     "@margoengine/taa/upscale-velocity": 26362,
-    "@margoengine/terrain": 19778,
+    "@margoengine/terrain": 20386,
     "@margoengine/terrain/blend": 3634,
     "@margoengine/terrain/deform": 7313,
     "@margoengine/terrain/displace": 4701,
@@ -17226,7 +17232,7 @@
     "@margoengine/terrain/scour": 3012,
     "@margoengine/terrain/sculpt": 4873,
     "@margoengine/terrain/settings": 2711,
-    "@margoengine/terrain/stream": 17711,
+    "@margoengine/terrain/stream": 18303,
     "@margoengine/terrain/wet-ground": 3443,
     "@margoengine/text": 16729,
     "@margoengine/text/animate": 11627,

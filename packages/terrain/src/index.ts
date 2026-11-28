@@ -21,6 +21,8 @@ import {
   terrainShading,
   weightedFragment,
   originShader,
+  eyeShader,
+  eyeEntry,
 } from './shader.js';
 import { applyView } from '../../shared/view-rect.js';
 import { unitLight } from '../../shared/unit-light.js';
@@ -149,6 +151,15 @@ export function planRings(
     out[i * 2 + 1] = Math.floor(eye[2] / spacing) * spacing - shift[2];
   }
   return out;
+}
+/**
+ * Writes the column `matrix * (eye, 1)` (column-major `matrix`, local `eye`) in float64 at `out[56..59]`: the
+ * floating-origin vertex draws `camera * (vertex less the eye, 0)` plus it (originShader), which is the camera times
+ * the local vertex without the float32 product of a local position that a rebase changes.
+ */
+function eyeColumn(out: Float32Array, matrix: ArrayLike<number>, eye: ArrayLike<number>): void {
+  for (let k = 0; k < 4; k++)
+    out[56 + k] = matrix[12 + k] + matrix[k] * eye[0] + matrix[4 + k] * eye[1] + matrix[8 + k] * eye[2];
 }
 /** Clipmap terrain settings, fixed at construction. Invalid values throw RangeError. */
 export interface TerrainOptions {
@@ -291,6 +302,9 @@ export class Terrain implements EnginePlugin {
   private readonly shiftValues = new Float64Array(3);
   /** The shift the layer rules were last written with, and the scratch eye and ring plan of `prepare`. */
   private readonly rulesShift = new Float64Array(3);
+  /** The world eye the layer rules' `eyeWrap` was last written for (NaN: never), and the local eye of `prepare`. */
+  private readonly rulesEye = new Float64Array([NaN, NaN, NaN]);
+  private readonly eyeLocal = new Float64Array(3);
   private readonly eye = new Float64Array(3);
   private anchoredEye?: readonly [number, number, number];
   private capturedSurface?: ReturnType<typeof surfaceHeight>;
@@ -535,8 +549,8 @@ export class Terrain implements EnginePlugin {
         ],
       });
     this.ringGroup = group;
-    // With `floatingOrigin` the frame grows by `anchor` (originShader), 192 to 208 bytes.
-    const floats = this.options.floatingOrigin ? 52 : 48;
+    // With `floatingOrigin` the frame grows by `anchor`, `view` and `column` (originShader), 192 to 240 bytes.
+    const floats = this.options.floatingOrigin ? 60 : 48;
     for (let i = 0; i < (this.options.levels ?? 6); i++) {
       const uniform = this.device.createBuffer({
           size: floats * 4,
@@ -585,15 +599,15 @@ export class Terrain implements EnginePlugin {
   }
   /**
    * The layer rules: 8 floats a layer; 12 with `bump` or `macro` (surfaceStruct: bump metres per unit of luma, macro,
-   * macro scale); with `floatingOrigin` 8 more (originShader: `wrap` and `tone` per axis) and the height bounds less the
-   * shift's Y, as positions reach the shader local.
+   * macro scale); with `floatingOrigin` 16 more (originShader: `wrap` and `tone` per axis for the shift, `eyeWrap` and
+   * `eyeTone` for the eye) and the height bounds less the shift's Y, as positions reach the shader local.
    */
   private ruleData(): Float32Array {
     const tint = this.textures!.tint,
       origin = !!this.options.floatingOrigin,
       s = this.shiftValues,
       surface = this.surface() ? 12 : 8,
-      stride = surface + (origin ? 8 : 0),
+      stride = surface + (origin ? 16 : 0),
       data = new Float32Array(this.options.layers.length * stride);
     this.options.layers.forEach((layer, i) => {
       data.set(
@@ -615,14 +629,22 @@ export class Terrain implements EnginePlugin {
       // its camera together draws the same picture. k whole macro repeats (24 / scale, in the shader's float32 scale)
       // per axis: wrap is the shift so measured less them, tone their phase in the 0.302 tone repeat (k times the
       // shader's float32 0.302, exact in float64).
+      // eyeWrap and eyeTone: the same for the world eye (the eye-relative reading of originShader and eyeShader), so
+      // the eye-relative point plus eyeWrap is that same terrain-relative coordinate up to whole repeats.
       const scale = Math.fround(layer.scale),
-        relative = [s[0] - this.anchor![0], s[1], s[2] - this.anchor![1]];
-      for (let a = 0; a < 3; a++) {
-        const k = Math.floor((relative[a] * scale) / 24),
-          tone = k * Math.fround(0.302);
-        data[i * stride + surface + a] = relative[a] - (k * 24) / scale;
-        data[i * stride + surface + 4 + a] = tone - Math.floor(tone);
-      }
+        e = this.eye,
+        relative = [s[0] - this.anchor![0], s[1], s[2] - this.anchor![1]],
+        eye = [e[0] - this.anchor![0], e[1], e[2] - this.anchor![1]];
+      for (const [from, at] of [
+        [relative, surface],
+        [eye, surface + 8],
+      ] as const)
+        for (let a = 0; a < 3; a++) {
+          const k = Math.floor((from[a] * scale) / 24),
+            tone = k * Math.fround(0.302);
+          data[i * stride + at + a] = from[a] - (k * 24) / scale;
+          data[i * stride + at + 4 + a] = tone - Math.floor(tone);
+        }
     });
     return data;
   }
@@ -658,12 +680,18 @@ export class Terrain implements EnginePlugin {
     // shift could only turn -0 into 0).
     let eye: ArrayLike<number> = c.camera.position;
     if (floating) {
-      for (let a = 0; a < 3; a++) this.eye[a] = eye[a] + s[a];
+      for (let a = 0; a < 3; a++) {
+        this.eyeLocal[a] = eye[a];
+        this.eye[a] = eye[a] + s[a];
+      }
       eye = this.eye;
-      const r = this.rulesShift;
-      if (r[0] !== s[0] || r[1] !== s[1] || r[2] !== s[2]) {
+      const r = this.rulesShift,
+        w = this.rulesEye,
+        e = this.eye;
+      if (r[0] !== s[0] || r[1] !== s[1] || r[2] !== s[2] || w[0] !== e[0] || w[1] !== e[1] || w[2] !== e[2]) {
         c.device.queue.writeBuffer(this.rules!, 0, this.ruleData() as Float32Array<ArrayBuffer>);
         r.set(s);
+        w.set(e);
       }
     }
     if (this.plan.length !== this.rings.length * 2) this.plan = new Float64Array(this.rings.length * 2);
@@ -714,6 +742,14 @@ export class Terrain implements EnginePlugin {
         values[49] = s[2] - this.anchor![1];
         values[50] = s[1];
         values[51] = 0;
+        // view: the ring's lattice less the eye (both local, in float64: the world lattice less the world eye whatever
+        // the shift) and the eye's local Y; column: the camera matrix times the local eye (originShader).
+        const local = this.eyeLocal;
+        values[52] = x - local[0];
+        values[53] = z - local[2];
+        values[54] = local[1];
+        values[55] = 0;
+        eyeColumn(values, c.camera.matrix, local);
       }
       this.upload(c.device.queue, this.rings[i].uniform, values);
       previousX = x;
@@ -743,7 +779,7 @@ export class Terrain implements EnginePlugin {
     let code = this.base();
     for (const effect of this.lighting) code = effect.shader(code, 1);
     for (const effect of this.lighting) if (effect.finish) code = effect.finish(code, 1);
-    return code;
+    return this.options.floatingOrigin ? eyeShader(code) : code;
   }
   /**
    * The terrain's own shader, with its edge and hole tests and no lighting effect, with the bind group layout and the
@@ -902,7 +938,7 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
       code =
         declarations +
         lit.replace(head, 'fn margoShade(i:Output)->vec4f {') +
-        `\n@fragment fn capture(i:Output)->MargoSSR {${source ? source.shader(edge, this.sourceBinding()) : edge}${terrainShading(this.surface())}let v=normalize(frame.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:') ? 'margoPosition=i.position;' : ''}return margoSSR(n,v,base,i.material.y,i.material.x);}\n`;
+        `\n@fragment fn capture(i:Output)->MargoSSR {${this.options.floatingOrigin ? eyeEntry : ''}${source ? source.shader(edge, this.sourceBinding()) : edge}${terrainShading(this.surface())}let v=normalize(frame.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:') ? 'margoPosition=i.position;' : ''}return margoSSR(n,v,base,i.material.y,i.material.x);}\n`;
       if (this.captureCode.size >= 16) this.captureCode.clear();
       this.captureCode.set(cacheKey, code);
     }
@@ -966,6 +1002,8 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
         r.shadowValues.set(r.values);
         r.shadowValues.set(c.camera.matrix);
         r.shadowValues.set(c.camera.position, 16);
+        // The eye-relative vertex stays relative to the prepared eye; only the column follows this camera's matrix.
+        if (this.options.floatingOrigin) eyeColumn(r.shadowValues, c.camera.matrix, this.eyeLocal);
         this.upload(c.device.queue, buffer, r.shadowValues);
         group = r.captureGroups[view];
       }

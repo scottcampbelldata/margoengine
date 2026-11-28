@@ -3903,6 +3903,24 @@ covers blend (a box placed with `FloatingOrigin.place`) and stream: identical pi
 noise along the box (82 of 255 on 0.27 percent of pixels); the noise now reads local XZ plus the cache frame's
 `anchor` (world less the terrain's anchor), checked in `origin.test.js` across a rebase. Missing: other GPUs, frame cost.
 
+The lit floating-origin terrain draws relative to the eye (2026-11-28, KB-TERRAIN-REBASEROUND1; Cozzi and Ring 2011,
+"3D Engine Design for Virtual Globes", chapter 5; Ohlarik 2008, "Precisions, Precisions"). With the 16x anisotropic
+layer sampler (KB-TERRAIN-GRAZESMEAR1) a rebase in place changed 0.103 percent of the streamed ground's pixels by one
+level on the WebGL2 layer, over the 0.1 percent bar: every float32 number derived from a local position (the clip
+position, each layer's texture coordinate and its screen derivatives) rounds differently once the origin moves, and
+the texture unit's sub-texel and level steps, taken several times along an anisotropic footprint, turn that into 8-bit
+flips. Now `Frame.view` holds each ring's lattice less the eye (float64 on the CPU) and `Frame.column` the camera matrix
+times the local eye (float64); the vertex writes `Output.eye` (that lattice plus the ring-relative grid offset, and the
+local height less the eye's) and clips at `camera * (eye, 0) + column`. The lit shader's last step (`eyeShader`, after
+every entry and effect edits its text, so the text they look for is unchanged) reads each layer sample at the
+eye-relative point plus the layer's `eyeWrap` and `eyeTone` (the world eye less the anchor, less whole macro repeats,
+rewritten when the eye moves) with that point's derivatives; the virtual texture's bake keeps the local reading (the
+same texel, whole repeats apart). Shadow, occluder and local-shadow passes keep the local vertex. What is left after a
+rebase in place is the float32 rounding of the camera matrix's own translation inside `column`. Evidence: the stream
+rebased in place at 1e7 changes 5 of 76,800 pixels on the WebGL2 layer and 3 natively (79 and 66 before; scratch
+builds with one part each: eye-relative texture coordinates alone 45, clip alone 64), `origin.test.js` checks the
+lattice less the eye and the layer eye wraps are the same float32 across a rebase in place. Missing: other GPUs.
+
 Both shadow classes take `effects`: objects that declare WGSL at bindings 40 and up (four each), give a factor that
 `shadowLit` multiplies the sun by, and update once a frame after the depth passes. With none the shader text is what it was,
 which the golden GPU proofs pin. `cloudShadows` runs the sky's cloud remap and erosion along the ray to the sun, with the

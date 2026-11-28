@@ -108,9 +108,16 @@ test('the bump height is read from exact texel loads, tinted and under a floatin
     { bump: 0.5 },
     { extra: { floatingOrigin: { origin: [0, 0, 0], onRebase: () => () => {} } } },
   ).code;
+  // The lit shader reads the relief where the colour reads (relative to the eye, KB-TERRAIN-REBASEROUND1), and a
+  // shader without the eye entry (the virtual texture's bake) at the wrapped local point.
   assert.match(
     moving.slice(moving.indexOf('fn terrainReliefLuma(')),
-    /^[^}]*let p=\(position\+layerRules\[layer\]\.wrap\.xyz\)\*scale;/,
+    /^[^}]*let p=terrainTexPoint\(position,layer\)\*scale;/,
+  );
+  assert.match(moving, /let p=terrainTexPoint\(position,layer\)\*scale;\s*let x=textureSampleGrad/);
+  assert.match(
+    moving,
+    /terrainTexAt\(p\)\+select\(layerRules\[l\]\.wrap\.xyz,layerRules\[l\]\.eyeWrap\.xyz,terrainEyeOn\)/,
   );
 });
 
