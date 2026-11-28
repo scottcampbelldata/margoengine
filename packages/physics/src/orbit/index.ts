@@ -1,4 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
+import type { NativePhasePool } from '../native-phase-pool.js';
+import { isShared } from '../world/memory.js';
 import type {
   FieldDescriptor,
   FieldUse,
@@ -9,7 +11,7 @@ import type {
   SolverHost,
   StepContext,
 } from '../world/solver.js';
-import { bindOrbitKernel, loadOrbitBuilds, type OrbitBuilds, type OrbitKernel } from './kernel.js';
+import { bindOrbitKernel, loadOrbitBuilds, type OrbitBuilds, type OrbitKernel, orbitStackTop } from './kernel.js';
 
 export {
   type KeplerDiskOptions,
@@ -78,6 +80,8 @@ export interface OrbitOptions {
 export interface OrbitLoadOptions {
   /** Solver ID and field prefix. Defaults to 'orbit'. */
   readonly id?: string;
+  /** Native thread count including the caller. Defaults to one. More threads need shared world memory. */
+  readonly threads?: number;
   /** Cancels the load with the signal's reason. */
   readonly signal?: AbortSignal;
 }
@@ -87,6 +91,24 @@ export interface OrbitSample {
   readonly position: OrbitVector;
   readonly velocity: OrbitVector;
   readonly mass: number;
+}
+
+/** Work executed by one native gravity partition in the last accepted tick. */
+export interface OrbitWorkerWork {
+  /** Number of pair distances evaluated by this partition. */
+  readonly pairGeometryEvaluations: number;
+  /** Number of ordered source contributions to target acceleration. */
+  readonly sourceContributions: number;
+}
+
+/** Deterministic workload of the last accepted native tick. */
+export interface OrbitWorkCounts extends OrbitWorkerWork {
+  /** Force sweeps, including the initial sweep and one for each symplectic stage. */
+  readonly forceEvaluations: number;
+  /** Number of native partitions, including the caller. */
+  readonly threads: number;
+  /** Actual work by partition in slot order. */
+  readonly workers: readonly OrbitWorkerWork[];
 }
 
 interface OrbitState {
@@ -103,12 +125,22 @@ interface OrbitState {
   readonly position: Region;
   readonly velocity: Region;
   readonly regions: readonly Region[];
+  readonly massiveIndices: Region;
+  readonly receipts: Region;
+  readonly job?: Region;
+  readonly acceptedWork: Float64Array;
+  forceEvaluations: number;
 }
 
 const CENTRE = [0, 0, 0] as const;
 const STATE_WORDS = 6;
 const BODY_WORDS = 2;
 const F64_BYTES = Float64Array.BYTES_PER_ELEMENT;
+const U32_BYTES = Uint32Array.BYTES_PER_ELEMENT;
+const MAX_THREADS = 64;
+const WORK_WORDS = 2;
+const JOB_HEADER_WORDS = 10;
+const JOB_HEADER_BYTES = JOB_HEADER_WORDS * U32_BYTES;
 
 function words(memory: WebAssembly.Memory, region: Region): Float64Array {
   return new Float64Array(memory.buffer, region.byteOffset, region.byteLength / F64_BYTES);
@@ -116,14 +148,14 @@ function words(memory: WebAssembly.Memory, region: Region): Float64Array {
 
 function scalar(value: number, name: string, minimum = 0): number {
   if (!Number.isFinite(value) || value < minimum)
-    throw new RangeError(`Invalid orbit ${name}; pass a finite value at least ${minimum}.`);
+    throw new MargoError('state', `Invalid orbit ${name}; pass a finite value at least ${minimum}.`);
   return value;
 }
 
 function vector(value: OrbitVector): OrbitVector {
-  if (value?.length !== 3 || !value.every(Number.isFinite))
-    throw new RangeError('Invalid orbital vector; pass three finite Cartesian coordinates.');
-  return value;
+  if (value?.length !== 3 || ![value[0], value[1], value[2]].every(Number.isFinite))
+    throw new MargoError('state', 'Invalid orbital vector; pass three finite Cartesian coordinates.');
+  return [value[0], value[1], value[2]];
 }
 
 function figure(options: OrbitOptions): readonly number[] {
@@ -133,11 +165,11 @@ function figure(options: OrbitOptions): readonly number[] {
   if (!primary) return [gravity, softening, -1, 0, 0, 0, 1, 0];
   const body = primary.body;
   if (!Number.isInteger(body) || body < 0 || !((options.bodies[body]?.mass ?? 0) > 0))
-    throw new RangeError('Invalid orbital primary; choose an existing body with positive mass.');
+    throw new MargoError('state', 'Invalid orbital primary; choose an existing body with positive mass.');
   const radius = scalar(primary.radius, 'reference radius');
   const height = scalar(primary.scaleHeight ?? 8500, 'atmosphere scale height');
   if (radius === 0 || height === 0)
-    throw new RangeError('Invalid orbital primary radius or scale height; pass positive values in metres.');
+    throw new MargoError('state', 'Invalid orbital primary radius or scale height; pass positive values in metres.');
   return [
     gravity,
     softening,
@@ -153,10 +185,13 @@ function figure(options: OrbitOptions): readonly number[] {
 function controls(options: OrbitOptions): readonly number[] {
   const integrator = options.integrator ?? 'yoshida';
   if (integrator !== 'verlet' && integrator !== 'yoshida')
-    throw new RangeError('Unknown orbit integrator; choose verlet or yoshida.');
+    throw new MargoError('state', 'Unknown orbit integrator; choose verlet or yoshida.');
   const substeps = options.substeps ?? 1;
   if (!Number.isSafeInteger(substeps) || substeps <= 0 || substeps > 0x80000000 || (substeps & (substeps - 1)) !== 0)
-    throw new RangeError('Invalid orbital subdivisions; pass a positive power of two representable in wasm32.');
+    throw new MargoError(
+      'state',
+      'Invalid orbital subdivisions; pass a positive power of two representable in wasm32.',
+    );
   return [scalar(options.timeScale ?? 1, 'time scale'), substeps, Number(integrator === 'yoshida')];
 }
 
@@ -179,6 +214,8 @@ export class OrbitSolver implements Solver<OrbitOptions> {
   readonly #id: string;
   readonly #builds: OrbitBuilds;
   #data: OrbitState | undefined;
+  #pool?: NativePhasePool;
+  #disposed = false;
 
   /** Three f64 coordinates per body, in metres. */
   readonly positionField: FieldDescriptor;
@@ -197,10 +234,33 @@ export class OrbitSolver implements Solver<OrbitOptions> {
 
   /** Loads the lazy SIMD kernel. */
   static async load(options: OrbitLoadOptions = {}): Promise<OrbitSolver> {
+    if (options === null || typeof options !== 'object')
+      throw new MargoError('state', 'Invalid orbit loader options. Pass an options object or omit it.');
     const id = options.id ?? 'orbit';
     if (typeof id !== 'string' || id.trim() === '' || id.trim() !== id)
-      throw new RangeError('Invalid orbit solver ID; pass a nonempty identifier without outer whitespace.');
-    return new OrbitSolver(id, await loadOrbitBuilds(options.signal));
+      throw new MargoError('state', 'Invalid orbit solver ID; pass a nonempty identifier without outer whitespace.');
+    const { threads = 1, signal } = options;
+    if (!Number.isSafeInteger(threads) || threads < 1 || threads > MAX_THREADS)
+      throw new MargoError('state', `Choose a whole number of orbit threads from 1 to ${MAX_THREADS}.`);
+    const builds = await loadOrbitBuilds(signal);
+    const solver = new OrbitSolver(id, builds);
+    if (threads > 1) {
+      if (!builds.shared)
+        throw new MargoError('unsupported', 'Use a shared-memory runtime for orbit workers or use threads: 1.');
+      const { createNativePhasePool } = await import('../native-phase-pool.js');
+      solver.#pool = await createNativePhasePool(threads, {
+        subject: 'Orbit',
+        phaseExport: 'orbit_thread_phase',
+        signal,
+      });
+    }
+    return solver;
+  }
+
+  /** Close the native workers after removing the solver from its world. */
+  [Symbol.dispose](): void {
+    this.#disposed = true;
+    this.#pool?.close();
   }
 
   /** Declares the position, velocity and integrated clock output ports. */
@@ -214,16 +274,26 @@ export class OrbitSolver implements Solver<OrbitOptions> {
 
   /** Copies initial conditions into the shared world and allocates the working state. */
   init(host: SolverHost, options: OrbitOptions): void {
+    this.#assertActive();
+    if (this.#pool && !isShared(host.memory))
+      throw new MargoError('unsupported', 'Use worldMemory(true) for orbit threads or use threads: 1.');
     if (this.#data)
       throw new MargoError('attached', 'OrbitSolver already has a world; load a fresh solver to attach again.');
     if (!Array.isArray(options?.bodies) || options.bodies.length === 0)
-      throw new RangeError('OrbitSolver requires bodies; supply at least one initial position.');
+      throw new MargoError('state', 'OrbitSolver requires bodies; supply at least one initial position.');
     const model = figure(options);
     const stepper = controls(options);
-    const prepared = options.bodies.map((body) => ({
-      state: [...vector(body.position), ...vector(body.velocity ?? CENTRE)],
-      physical: [scalar(body.mass ?? 0, 'mass'), scalar(body.dragAreaPerMass ?? 0, 'drag area per mass')],
-    }));
+    const prepared = Array.from(options.bodies, (body) => {
+      if (body === null || typeof body !== 'object')
+        throw new MargoError(
+          'state',
+          'Invalid orbit body. Pass an object with Cartesian position and optional velocity.',
+        );
+      return {
+        state: [...vector(body.position), ...vector(body.velocity ?? CENTRE)],
+        physical: [scalar(body.mass ?? 0, 'mass'), scalar(body.dragAreaPerMass ?? 0, 'drag area per mass')],
+      };
+    });
     const count = prepared.length;
     const kernel = bindOrbitKernel(host, this.#builds);
     const allocate = (name: string, size: number) =>
@@ -237,6 +307,8 @@ export class OrbitSolver implements Solver<OrbitOptions> {
     const acceleration = allocate('acceleration', count * 3);
     const position = allocate('position', count * 3);
     const velocity = allocate('velocity', count * 3);
+    const massiveIndices = host.allocate('orbit-massive-indices', count * U32_BYTES, 'u32', 1);
+    const receipts = allocate('work-receipts', WORK_WORDS * (this.#pool?.count ?? 1));
     const columns = words(host.memory, integrated);
     const bodyWords = words(host.memory, physical);
     words(host.memory, config).set(model);
@@ -259,42 +331,158 @@ export class OrbitSolver implements Solver<OrbitOptions> {
       position,
       velocity,
       regions: [config, physical, step, time, integrated, position, velocity],
+      massiveIndices,
+      receipts,
+      acceptedWork: new Float64Array(receipts.byteLength / F64_BYTES),
+      forceEvaluations: 0,
     };
     this.#publish(data, columns);
-    this.#data = data;
+    this.#data = { ...data, job: this.#bindWorkers(host, data, this.#pool) };
+  }
+
+  #bindWorkers(host: SolverHost, state: OrbitState, pool?: NativePhasePool): Region | undefined {
+    if (!pool) return undefined;
+    const job = host.allocate('orbit-worker-job', JOB_HEADER_BYTES + F64_BYTES, 'u32', 1);
+    const control = host.allocate('orbit-worker-control', pool.controlWords * U32_BYTES, 'i32', 1);
+    const stackTops = Array.from({ length: pool.count - 1 }, (_, part) =>
+      orbitStackTop(host, `orbit-worker-stack-${part + 1}`),
+    );
+    new Uint32Array(host.memory.buffer, job.byteOffset, JOB_HEADER_WORDS).set([
+      state.scratch.byteOffset,
+      state.physical.byteOffset,
+      state.acceleration.byteOffset,
+      state.options.byteOffset,
+      state.massiveIndices.byteOffset,
+      state.count,
+      0,
+      state.receipts.byteOffset,
+    ]);
+    pool.init({
+      module: this.#builds.shared!,
+      memory: host.memory,
+      job: job.byteOffset,
+      control: control.byteOffset,
+      stackTops,
+    });
+    return job;
   }
 
   /** Advances one world interval using fixed symplectic substeps. */
   step(_context: StepContext, dt: number): void {
     const state = this.#state();
-    const { memory, kernel, count, options, physical, controls, time, integrated, scratch, acceleration } = state;
+    const {
+      memory,
+      kernel,
+      count,
+      options,
+      physical,
+      controls,
+      time,
+      integrated,
+      scratch,
+      acceleration,
+      massiveIndices,
+      receipts,
+      job,
+    } = state;
     const [scale, substeps, fourthOrder] = words(memory, controls);
     if (scale === 0) return;
     const seconds = dt * scale!;
     const clock = words(memory, time);
     const nextTime = clock[0]! + seconds;
-    if (!(seconds > 0 && Number.isFinite(nextTime)))
-      throw new RangeError('Orbital time exceeds numeric range; choose a representable positive time scale.');
+    if (!(nextTime > clock[0]! && Number.isFinite(nextTime)))
+      throw new MargoError('state', 'Orbital time exceeds numeric range; choose a representable positive time scale.');
     const current = words(memory, integrated);
     const next = words(memory, scratch);
     next.set(current);
-    const result = kernel.orbit_step(
-      scratch.byteOffset,
-      physical.byteOffset,
-      acceleration.byteOffset,
-      options.byteOffset,
-      count,
-      substeps!,
-      fourthOrder!,
-      seconds,
-    );
-    if (result !== 0)
-      throw new RangeError(
-        'Orbital step encountered a singular or unrepresentable state; reduce time scale or set softening.',
+    const pool = this.#pool;
+    let work: Float64Array;
+    if (job && pool) {
+      work = this.#stepWorkers(state, job, pool, substeps!, fourthOrder!, seconds);
+    } else {
+      const result = kernel.orbit_step(
+        scratch.byteOffset,
+        physical.byteOffset,
+        acceleration.byteOffset,
+        options.byteOffset,
+        count,
+        substeps!,
+        fourthOrder!,
+        seconds,
+        massiveIndices.byteOffset,
+        receipts.byteOffset,
       );
+      this.#requireNativeSuccess(result);
+      work = words(memory, receipts);
+    }
+    if (!next.every(Number.isFinite)) this.#requireNativeSuccess(1);
+    for (let lane = 0; lane < WORK_WORDS; lane++) {
+      let total = 0;
+      for (let at = lane; at < work.length; at += WORK_WORDS) total += work[at]!;
+      if (!Number.isSafeInteger(total) || total < 0)
+        throw new MargoError('state', 'Orbit work exceeds exact numeric range. Reduce the body count or subdivisions.');
+    }
     this.#publish(state, next);
     current.set(next);
     clock[0] = nextTime;
+    state.acceptedWork.set(work);
+    state.forceEvaluations = 1 + substeps! * (fourthOrder === 1 ? 3 : 1);
+  }
+
+  #stepWorkers(
+    state: OrbitState,
+    job: Region,
+    pool: NativePhasePool,
+    substeps: number,
+    fourthOrder: number,
+    seconds: number,
+  ): Float64Array {
+    const { memory, kernel, receipts, acceptedWork } = state;
+    const pointer = job.byteOffset;
+    new Uint32Array(memory.buffer, pointer, JOB_HEADER_WORDS).set([substeps, fourthOrder], 8);
+    new Float64Array(memory.buffer, pointer + JOB_HEADER_BYTES, 1)[0] = seconds;
+    this.#requireNativeSuccess(kernel.orbit_thread_prepare(pointer));
+    const work = new Float64Array(acceptedWork.length);
+    const gravity = () => {
+      this.#requireNativeSuccess(pool.phase(0, () => kernel.orbit_thread_phase(pointer, 0, 0, pool.count)));
+      this.#requireNativeSuccess(kernel.orbit_thread_finish_accel(pointer));
+      const stepWork = words(memory, receipts);
+      for (let at = 0; at < work.length; at++) work[at] = work[at]! + stepWork[at]!;
+    };
+    const stages = fourthOrder === 1 ? 3 : 1;
+    gravity();
+    for (let substep = 0; substep < substeps; substep++) {
+      for (let stage = 0; stage < stages; stage++) {
+        this.#requireNativeSuccess(kernel.orbit_thread_before(pointer, stage));
+        gravity();
+        this.#requireNativeSuccess(kernel.orbit_thread_after(pointer, stage));
+      }
+    }
+    return work;
+  }
+
+  #requireNativeSuccess(status: number): void {
+    if (status !== 0)
+      throw new MargoError(
+        'state',
+        'Orbital step encountered a singular or unrepresentable state; reduce time scale or set softening.',
+      );
+  }
+
+  /** Work from the last accepted tick. Counts start at zero and are independent of snapshot state. */
+  workCounts(): OrbitWorkCounts {
+    const { acceptedWork, forceEvaluations } = this.#state();
+    const threads = acceptedWork.length / WORK_WORDS;
+    let pairGeometryEvaluations = 0;
+    let sourceContributions = 0;
+    const workers = Array.from({ length: threads }, (_, part) => {
+      const pairs = acceptedWork[part * WORK_WORDS]!;
+      const sources = acceptedWork[part * WORK_WORDS + 1]!;
+      pairGeometryEvaluations += pairs;
+      sourceContributions += sources;
+      return { pairGeometryEvaluations: pairs, sourceContributions: sources };
+    });
+    return { pairGeometryEvaluations, sourceContributions, threads, forceEvaluations, workers };
   }
 
   /** Input forces are evaluated internally. This solver has no incoming accumulators. */
@@ -330,7 +518,7 @@ export class OrbitSolver implements Solver<OrbitOptions> {
   sample(body: number): OrbitSample {
     const { memory, count, integrated, physical } = this.#state();
     if (!Number.isInteger(body) || body < 0 || body >= count)
-      throw new RangeError(`Orbit body index is out of range; use an integer from 0 to ${count - 1}.`);
+      throw new MargoError('state', `Orbit body index is out of range; use an integer from 0 to ${count - 1}.`);
     const state = words(memory, integrated);
     return {
       position: triplet(state, body * STATE_WORDS),
@@ -348,7 +536,13 @@ export class OrbitSolver implements Solver<OrbitOptions> {
     }
   }
 
+  #assertActive(): void {
+    if (this.#disposed)
+      throw new MargoError('disposed', 'OrbitSolver is disposed. Load a new solver before adding it.');
+  }
+
   #state(): OrbitState {
+    this.#assertActive();
     if (!this.#data) throw new MargoError('state', 'OrbitSolver has no world; add it to a PhysicsWorld before use.');
     return this.#data;
   }

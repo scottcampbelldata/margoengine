@@ -1,3 +1,4 @@
+import { MargoError } from '@margoengine/math/errors';
 import { cos, sin } from '@margoengine/math/pinned';
 import type { OrbitVector } from './index.js';
 
@@ -29,14 +30,40 @@ export interface KeplerState {
 
 function angle(value: number): number {
   if (!Number.isFinite(value))
-    throw new RangeError('Orbital angle is outside numeric range; use a finite angle or time.');
+    throw new MargoError('state', 'Orbital angle is outside numeric range; use a finite angle or time.');
   return value % TAU;
 }
 
 function positive(value: number, name: string): number {
   if (!(Number.isFinite(value) && value > 0))
-    throw new RangeError(`Invalid ${name}; pass a finite positive value in SI units.`);
+    throw new MargoError('state', `Invalid ${name}; pass a finite positive value in SI units.`);
   return value;
+}
+
+// Evaluate E - sin(E) directly from its convergent series near the singular corner.
+function keplerResidual(eccentric: number, e: number, mean: number): number {
+  if (Math.abs(eccentric) >= 0.125) return eccentric - e * sin(eccentric) - mean;
+  const square = eccentric * eccentric;
+  const difference =
+    eccentric *
+    square *
+    (1 / 6 + square * (-1 / 120 + square * (1 / 5040 + square * (-1 / 362880 + square / 39916800))));
+  return (1 - e) * eccentric + e * difference - mean;
+}
+
+function circularSpeed(mu: number, radius: number): number {
+  const speed = Math.sqrt(mu / radius);
+  return speed > 0 && Number.isFinite(speed) ? speed : Math.sqrt(mu) / Math.sqrt(radius);
+}
+
+function phaseAdvance(speed: number, radius: number, seconds: number): number {
+  if (seconds === 0) return 0;
+  const direct = (speed / radius) * seconds;
+  if (direct !== 0 && Number.isFinite(direct)) return direct;
+  const reverse = (seconds / radius) * speed;
+  if (reverse !== 0 && Number.isFinite(reverse)) return reverse;
+  const product = (speed * seconds) / radius;
+  return Number.isFinite(product) ? product : direct;
 }
 
 function eccentricAnomaly(mean: number, eccentricity: number): number {
@@ -47,7 +74,7 @@ function eccentricAnomaly(mean: number, eccentricity: number): number {
   while (true) {
     const middle = (lower + upper) * 0.5;
     if (middle === lower || middle === upper) return middle;
-    const residual = middle - eccentricity * sin(middle) - mean;
+    const residual = keplerResidual(middle, eccentricity, mean);
     if (residual === 0) return middle;
     if (residual > 0) upper = middle;
     else lower = middle;
@@ -56,22 +83,35 @@ function eccentricAnomaly(mean: number, eccentricity: number): number {
 
 /** Evaluates a bound two-body orbit at a signed time relative to the epoch in seconds. */
 export function keplerState(elements: KeplerElements, seconds = 0): KeplerState {
+  if (elements === null || typeof elements !== 'object')
+    throw new MargoError(
+      'state',
+      'Invalid Kepler elements. Pass an object with a gravitational parameter and semimajor axis.',
+    );
+  if (!Number.isFinite(seconds))
+    throw new MargoError('state', 'Invalid Kepler epoch offset. Pass finite signed seconds.');
   const mu = positive(elements.gravitationalParameter, 'gravitational parameter');
   const a = positive(elements.semimajorAxis, 'semimajor axis');
   const e = elements.eccentricity ?? 0;
-  if (!(e >= 0 && e < 1))
-    throw new RangeError('A Kepler ellipse requires eccentricity in [0, 1); choose a bound orbit.');
+  if (!Number.isFinite(e) || e < 0 || e >= 1)
+    throw new MargoError('state', 'A Kepler ellipse requires eccentricity in [0, 1); choose a bound orbit.');
   const inclination = angle(elements.inclination ?? 0);
   const node = angle(elements.ascendingNode ?? 0);
   const periapsis = angle(elements.argumentOfPeriapsis ?? 0);
+  const speed = circularSpeed(mu, a);
   const eccentric = eccentricAnomaly(
-    angle(angle(elements.meanAnomalyAtEpoch ?? 0) + angle((Math.sqrt(mu / a) / a) * seconds)),
+    angle(angle(elements.meanAnomalyAtEpoch ?? 0) + angle(phaseAdvance(speed, a, seconds))),
     e,
   );
   const cE = cos(eccentric);
   const sE = sin(eccentric);
   const ratio = Math.sqrt((1 - e) * (1 + e));
-  const rate = Math.sqrt(mu / a) / (1 - e * cE);
+  // 1 - cos(E) = 2 sin²(E/2) avoids losing the small periapsis radius and the time derivative.
+  const halfSine = Math.abs(eccentric) < 0.125 ? sin(eccentric / 2) : undefined;
+  const oneMinusCosine = halfSine === undefined ? 1 - cE : 2 * halfSine * halfSine;
+  const xFactor = halfSine === undefined ? cE - e : 1 - e - oneMinusCosine;
+  const denominator = halfSine === undefined ? 1 - e * cE : 1 - e + e * oneMinusCosine;
+  const rate = speed / denominator;
   const ci = cos(inclination);
   const si = sin(inclination);
   const cn = cos(node);
@@ -83,10 +123,12 @@ export function keplerState(elements: KeplerElements, seconds = 0): KeplerState 
     const q = sp * x + cp * y;
     return [cn * p - sn * ci * q, sn * p + cn * ci * q, si * q];
   };
-  const position = rotate(a * (cE - e), a * ratio * sE);
-  const velocity = rotate(-rate * sE, rate * ratio * cE);
+  const position = rotate(a * xFactor, a * ratio * sE);
+  const velocity = Number.isFinite(rate)
+    ? rotate(-rate * sE, rate * ratio * cE)
+    : rotate(-speed * (sE / denominator), speed * ((ratio * cE) / denominator));
   if (!position.every(Number.isFinite) || !velocity.every(Number.isFinite))
-    throw new RangeError('Orbital state exceeds numeric range; use representable size and mass.');
+    throw new MargoError('state', 'Orbital state exceeds numeric range; use representable size and mass.');
   return { position, velocity };
 }
 
@@ -110,21 +152,30 @@ export interface KeplerDiskSample extends KeplerState {
 
 /** Advances a thin-disk tracer's radius and integrates Kepler angular speed along the drift. */
 export function keplerDiskSample(options: KeplerDiskOptions, seconds = 0): KeplerDiskSample {
+  if (options === null || typeof options !== 'object')
+    throw new MargoError(
+      'state',
+      'Invalid Kepler disk options. Pass an object with a gravitational parameter and radius.',
+    );
   const mu = positive(options.gravitationalParameter, 'disk gravitational parameter');
   const initial = positive(options.radius, 'initial disk radius');
   const radial = options.radialVelocity ?? 0;
+  if (!Number.isFinite(radial) || !Number.isFinite(seconds))
+    throw new MargoError('state', 'Invalid disk motion. Pass a finite radial velocity and signed seconds.');
   const radius = positive(initial + radial * seconds, 'advanced disk radius');
   const a = Math.sqrt(initial);
   const b = Math.sqrt(radius);
-  const change = (((2 * Math.sqrt(mu)) / a / b) * seconds) / (a + b);
+  const direct = (((2 * Math.sqrt(mu)) / a / b) * seconds) / (a + b);
+  const change =
+    initial === radius && radial === 0 && (!Number.isFinite(direct) || direct === 0)
+      ? phaseAdvance(circularSpeed(mu, radius), radius, seconds)
+      : direct;
   const azimuth = angle(angle(options.azimuth ?? 0) + angle(change));
-  const tangential = Math.sqrt(mu / radius);
+  const tangential = circularSpeed(mu, radius);
   const c = cos(azimuth);
   const s = sin(azimuth);
-  return {
-    radius,
-    azimuth,
-    position: [radius * c, radius * s, 0],
-    velocity: [radial * c - tangential * s, radial * s + tangential * c, 0],
-  };
+  const velocity: OrbitVector = [radial * c - tangential * s, radial * s + tangential * c, 0];
+  if (!velocity.every(Number.isFinite))
+    throw new MargoError('state', 'Disk velocity exceeds numeric range. Choose a larger radius or smaller mass.');
+  return { radius, azimuth, position: [radius * c, radius * s, 0], velocity };
 }

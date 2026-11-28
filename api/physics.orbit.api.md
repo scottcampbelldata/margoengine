@@ -43,6 +43,7 @@ export interface OrbitBodyOptions {
 
 export interface OrbitLoadOptions {
     readonly id?: string;
+    readonly threads?: number;
     readonly signal?: AbortSignal;
 }
 
@@ -77,9 +78,11 @@ export class OrbitSolver implements Solver<OrbitOptions> {
     readonly timeField: FieldDescriptor;
     private constructor();
     static load(options?: OrbitLoadOptions): Promise<OrbitSolver>;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, options: OrbitOptions): void;
     step(_context: StepContext, dt: number): void;
+    workCounts(): OrbitWorkCounts;
     importPorts(_tick: number): void;
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
@@ -89,6 +92,17 @@ export class OrbitSolver implements Solver<OrbitOptions> {
 }
 
 export type OrbitVector = readonly [number, number, number];
+
+export interface OrbitWorkCounts extends OrbitWorkerWork {
+    readonly forceEvaluations: number;
+    readonly threads: number;
+    readonly workers: readonly OrbitWorkerWork[];
+}
+
+export interface OrbitWorkerWork {
+    readonly pairGeometryEvaluations: number;
+    readonly sourceContributions: number;
+}
 
 export function keplerDiskSample(options: KeplerDiskOptions, seconds?: number): KeplerDiskSample;
 

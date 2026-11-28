@@ -4869,6 +4869,16 @@ fixture also drove wall-clock time while the raw shader reads the engine's shade
 `packages/shader/test/black-hole-check.mjs` uses the actual shader clock and checks moving emission,
 repeatable explicit disk time and inward advection. The live demo uses the same clock for flare timing.
 
+### Fixed 2026-11-28: finite extreme orbital forces and periapsis motion (KB-ORBIT-RANGE1)
+
+A finite inverse-square force could disappear or reject when its squared separation or intermediate
+strength left float64 range before source mass was applied. The native kernel scales extreme pairs
+while preserving force direction. Near a parabolic periapsis, subtracting nearly equal terms in
+Kepler's equation lost displacement and velocity precision. The residual and half-angle radius now
+retain those terms. Regression: `packages/physics/tests/orbit.test.js` checks both physical values
+and coded input corrections. `packages/physics/tests/coupling/orbit-threads.test.js` checks that a
+failed singular step leaves the earlier accepted orbit and worker work intact.
+
 ### Fixed 2026-11-28: thin uniform acoustic columns visited each reflection (KB-SOUND-03-FOLD)
 
 A 1/60 s tick in a uniform 2⁻²⁰ m column at 1,920 m/s needed 33,554,432 identical crossings.

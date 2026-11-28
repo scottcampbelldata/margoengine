@@ -6198,6 +6198,15 @@ buoyancy enabled. The Water bridge uses that world state to write the rendered i
 [Physical tests](../../packages/physics/tests/pack-ice.test.js) · [Coupling tests](../../packages/physics/tests/coupling/pack-ice.test.js) ·
 [Display test](../../packages/physics/tests/coupling/pack-ice-render.test.js)
 
+### Deterministic orbital force partitions (SPACE-01)
+
+The orbital solver publishes the same accepted positions, velocities and time in plain Wasm and
+with one, two and four workers. `orbit-threads.test.js` and `orbit-threads.browser.mjs` prove
+exact state, actual contribution counts and far-origin replay. `orbit-surface.browser.mjs` draws
+three accepted bodies on both rendering backends. The orbital position error of the triangular
+control is at most 6.17 m over a 9.60-billion-metre separation. The claim covers the control's
+conditions and exact replay. [SPACE-01 audit](../physics-solver-audit.md#space-01-four-point-pass)
+
 ### Deterministic underwater ray workers (SOUND-03)
 
 The optional Physics underwater entry reproduces accepted Gaussian-beam paths and pressure ports

@@ -15201,10 +15201,37 @@ theta = (s - 1) / (2 s) neither feeds nor drains the motion; the radiation force
   Gauss–Legendre to the Kerr angular velocity along that path. Doppler hue follows the existing observer
   redshift, and local emission modulates beaming brightness as the texture moves through the flow.
 
+- David Tommasini and Daniele Olivieri, [Two fast and accurate routines for solving the elliptic Kepler
+  equation for all values of the eccentricity and mean anomaly](https://doi.org/10.1051/0004-6361/202141423)
+  (2022), identify the loss of accuracy near eccentricity one and mean anomaly zero. The bracketed
+  solver evaluates `(1-e)E + e(E-sin E) - M` with the Taylor residual close to zero and uses the
+  half-angle identity for the associated radius and velocity denominator. The independent test starts
+  from an eccentric anomaly and derives the mean anomaly, position and velocity with their series.
+- Ryan S. Park, William M. Folkner, James G. Williams and Dale H. Boggs, [The JPL Planetary and
+  Lunar Ephemerides DE440 and DE441](https://ssd.jpl.nasa.gov/doc/Park.2021.AJ.DE440.pdf) (2021),
+  equation 27. Normalize extreme displacement components, then evaluate the inverse-square force
+  with its original direction. This keeps the source mass from amplifying an underflowing intermediate.
+  The ordinary SIMD force and integration retain their summation order. Workers partition acceleration
+  rows, with the serial J2 correction applied in its original order before the next kick.
+- Alain Chenciner, [Central configurations](https://www.scholarpedia.org/article/Central_configurations)
+  (2007), triangular relative equilibrium. Three unequal masses in a rotating equilateral formation
+  have common angular frequency `sqrt(G sum(m) / side³)`. This gives the orbit and barycentre reference
+  for the live field cutaway.
+
 The binary test checks fourth-order step refinement and barycentre symmetry. Other tests check a quadrupole
 orbit, exact constant-density drag, inclined Kepler states, the disk phase, and equal hashes after restore
 and across shared and plain SIMD builds. The shader tests exercise the Event Horizon observations against
 real pixel readback at a fixed camera in addition to the CPU orbit checks.
+
+The close-encounter comparison uses Victor Szebehely and C. Frederick Peters, [Complete Solution of
+a General Problem of Three Bodies](https://doi.org/10.1086/110355) (1967), Table I and its defined initial
+coordinates. The separate lunar comparison uses Nicholas Colmenares, James B. R. Battat, Daniel P.
+Gonzales, Thomas W. Murphy Jr. and Sanchit Sabhlok's [APOLLO archive](https://doi.org/10.5281/zenodo.7818557)
+(2023, CC BY 4.0). It takes the first grade A or B Apollo 15 point on each observed October 2020 UTC date.
+Park et al. Table 3 lists Apache Point observations only through 2017. The withheld return times
+are never inputs. The fixture lists hashes for the source archive and NASA NAIF centre and orientation
+kernels. Both the N-body and DE440 comparisons use the same two-leg geometric observable. This is a
+diagnostic against held-out measurement rather than a complete lunar ranging data reduction.
 
 ## Underwater acoustics (SOUND-03)
 

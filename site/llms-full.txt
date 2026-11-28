@@ -13936,21 +13936,38 @@ Reflected objects beyond the captured extent are unavailable to the planar adapt
 
 ## Orbital mechanics and disk motion (SPACE-01)
 
-The simulator uses a single inertial Cartesian frame for all bodies. Direct pair gravity costs O(n²) per
-force evaluation. Use fixed steps small relative to close-approach and orbital timescales. Optional Plummer
+The simulator uses a single inertial Cartesian frame. Registry coordinates move between origin cells
+while local orbital positions and velocities stay unchanged. Force work is proportional to the product
+of body count and the count of positive-mass sources. With all bodies massive, force cost is O(n²).
+Serial uses one separation for both sides of a massive pair. Worker partitions independently compute
+the target's acceleration in the same summation order, so they compute massive–massive separations twice.
+Massless pairs contribute no gravity. Work receipts count geometry and the ordered contributions.
+Use fixed steps small relative to close-approach and orbital timescales. Optional Plummer
 softening changes the near-field force. A positive J2 models one body's axial figure. The exponential atmosphere
 is a prescribed rotating background with dissipative drag, so its combined integrator is second order.
 It models atmospheric deceleration without heating, ablation, aerodynamic lift, surface contact or a mission
 atmosphere. The Cartesian solver uses Newtonian gravity and provides a bound-ellipse helper. Catalog orbit
-elements continue to use the SGP4 entry.
+elements continue to use the SGP4 entry. The scaled force path avoids overflow in squared distances
+and isolated force factors. A singular or unrepresentable candidate is refused before accepting the
+tick or its work counters. The helper is limited to ellipses. It uses direct residual arithmetic for
+nearly parabolic periapsides and rejects out-of-range states. Step refinement resolves some close
+encounters, but adaptive encounters, collisions and merging remain open.
 
 The lensed disk uses circular Kerr angular velocity and a prescribed radial drift. The angular integral is exact
 for zero spin and a two-point quadrature for spinning disks. The model covers slow radial drift of the emitter
 texture. Full relativistic gas dynamics, disk thickness and angular momentum transport are separate work.
 
-The orbit JS entry measures 4,017 B gzip against 4,273 B. Its optional plain and shared Rust Wasm assets
-measure 2,380 B and 2,435 B gzip. The black-hole entry grows from 25,293 B to 25,814 B within its 26,010 B
+The orbit entry is 6,691 B gzip under a 6,947 B ceiling. The optional plain and shared Rust Wasm
+assets are 14,124/14,212 B raw and 6,091/6,146 B gzip. Core and Stage gain zero bytes. The black-hole entry grows from 25,293 B to 25,814 B within its 26,010 B
 budget. Core and stage together measure 24,820 B.
+
+The independent October 2020 Apache Point normal points give geometric range residuals of
+−9.86, +71.97, +218.18 and +60.78 m with a Newtonian eleven-body run initialized once from DE440.
+Additional reductions for the atmosphere, relativity and geophysics are needed for precision
+laser ranging. A comparison using DE440 centres still differs by about 10 m because it uses the
+same geometric observable. APOLLO's millimetre instrumental scatter does not bound the omitted
+adjustments. The reproduction is `packages/physics/scripts/space01-apollo-measured.mjs`.
+[Colmenares et al. (2023), APOLLO archive](https://doi.org/10.5281/zenodo.7818557)
 
 ## Underwater acoustics (SOUND-03)
 
@@ -13968,7 +13985,7 @@ folds into the column with one beam drift and integer powers of the reflection f
 count must remain exactly representable as a float64 integer. The solver refuses an unresolved layer-crossing
 time or a tick that would leave the path or beam outside representable range. The previous accepted ray and
 ports remain available. The world holds 384 bytes per ray for state, outputs and scratch, plus the field
-registry's output copies, and 24 bytes per profile knot. The optional entry is 8,028 B gzip under an 8,284 B
+registry's output copies, and 24 bytes per profile knot. The optional entry is 8,041 B gzip under an 8,284 B
 ceiling. Each optional Wasm variant is 10,911 B raw and 4,846 B gzip. Core and Stage gain zero bytes.
 
 The loaded native path operates on the same ray and output regions as the synchronous constructor.
@@ -14434,7 +14451,7 @@ f64 words per cell and a dedicated stack per helper. A single-threaded world can
 browser window. Shared threads use Node or a cross-origin-isolated browser worker. Work counts
 describe the executed grid visits. Wall-clock throughput is unmeasured.
 
-The optional runoff entry is 6,963 B min+gzip under a 7,192 B ceiling. Lazy SIMD Wasm images are
+The optional runoff entry is 6,973 B min+gzip under a 7,192 B ceiling. Lazy SIMD Wasm images are
 23,699 B plain and 23,787 B shared raw, or 6,427 and 6,489 B gzip. Water's inland surface is
 1,716 B gzip under its 1,962 B ceiling. Core and Stage gain zero bytes.
 
@@ -15140,7 +15157,7 @@ renderer's optional destination uses a separate ArrayBuffer to protect the physi
 arena, even after shared memory grows. Counts describe work assignments. Wall-clock
 throughput is unmeasured.
 
-The optional viscoplastic entry is 8,605 B gzip with an 8,826 B ceiling. Both Wasm assets are 36,124 B raw and 13,261 B gzip. Core and Stage gain zero bytes.
+The optional viscoplastic entry is 8,616 B gzip with an 8,826 B ceiling. Both Wasm assets are 36,124 B raw and 13,261 B gzip. Core and Stage gain zero bytes.
 
 ### Skeletal tissue attachments (SOFT-05)
 
@@ -15439,7 +15456,7 @@ Receipts describe recent execution, while snapshots retain the physical state.
 
 Lava uses a regular depth-averaged heightfield patch with closed edges. It resolves laminar Bingham resistance, advected crystallisation enthalpy, diffusion, radiative and convective skin transfer and basal cooling. The optional terminal transport removes inertia for creeping flow, using Bingham discharge at each face and conservative enthalpy transport. It requires a thin, slowly varying sheet and has no imposed initial discharge. A point vent omits the real basalt experiment's chute momentum. Terrain, cooled crust and the pressure gradient drive channel confinement and arrest. The shallow-layer aspect-ratio approximation applies to patch-scale flow. Individual crust fractures, elastic lava tubes, three-dimensional overturning and a separate bubble phase need higher-dimensional models. The coastal source is the signed change in displaced volume under a fixed reference sea level. This estimate covers gravity-wave forcing from submerged occupancy. Rapid interface chemistry and water-side multiphase overturning are outside the model.
 
-The native microstep respects transport and thermal diffusion bounds. It refuses a tick above 4,096 explicit microsteps and publishes only finite, accepted volume and heat ledgers. With zero conductivity the well-mixed bulk is exposed, so radiation, convection and the water film act without a conductive skin or basal term. The default positive conductivity resolves a resistive skin. The ICE-05 contact is a 60 Hz staggered heat exchange. Match the terrain and render frames to the lava grid. Weather draws accepted skin emission and basalt coverage from the depth and crust with no guessed exposed crack area. Physics lava is 9,628 B gzip under 9,824 B. Weather lava is 15,291 B under 15,750 B. Both Wasm assets are 19,038 B raw and 8,497 B gzip. Core and Stage gain zero bytes.
+The native microstep respects transport and thermal diffusion bounds. It refuses a tick above 4,096 explicit microsteps and publishes only finite, accepted volume and heat ledgers. With zero conductivity the well-mixed bulk is exposed, so radiation, convection and the water film act without a conductive skin or basal term. The default positive conductivity resolves a resistive skin. The ICE-05 contact is a 60 Hz staggered heat exchange. Match the terrain and render frames to the lava grid. Weather draws accepted skin emission and basalt coverage from the depth and crust with no guessed exposed crack area. Physics lava is 9,637 B gzip under 9,824 B. Weather lava is 15,291 B under 15,750 B. Both Wasm assets are 19,038 B raw and 8,497 B gzip. Core and Stage gain zero bytes.
 
 The optional native worker path needs shared memory and a blocking host (Node or a
 cross-origin-isolated browser worker). On each microstep it partitions stability and local
@@ -21140,6 +21157,16 @@ fixture also drove wall-clock time while the raw shader reads the engine's shade
 `packages/physics/tests/orbit.test.js` checks the new conservative and atmospheric dynamics.
 `packages/shader/test/black-hole-check.mjs` uses the actual shader clock and checks moving emission,
 repeatable explicit disk time and inward advection. The live demo uses the same clock for flare timing.
+
+### Fixed 2026-11-28: finite extreme orbital forces and periapsis motion (KB-ORBIT-RANGE1)
+
+A finite inverse-square force could disappear or reject when its squared separation or intermediate
+strength left float64 range before source mass was applied. The native kernel scales extreme pairs
+while preserving force direction. Near a parabolic periapsis, subtracting nearly equal terms in
+Kepler's equation lost displacement and velocity precision. The residual and half-angle radius now
+retain those terms. Regression: `packages/physics/tests/orbit.test.js` checks both physical values
+and coded input corrections. `packages/physics/tests/coupling/orbit-threads.test.js` checks that a
+failed singular step leaves the earlier accepted orbit and worker work intact.
 
 ### Fixed 2026-11-28: thin uniform acoustic columns visited each reflection (KB-SOUND-03-FOLD)
 

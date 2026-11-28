@@ -6295,7 +6295,7 @@ The optional SIMD kernel implements reversible fourth-order Yoshida stepping in 
 import { OrbitSolver, keplerState } from 'margoengine/physics/orbit';
 import { PhysicsWorld } from 'margoengine/physics/world';
 
-const orbit = await OrbitSolver.load();
+using orbit = await OrbitSolver.load();
 const mass = 5.9722e24;
 const satellite = keplerState({ gravitationalParameter: 3.986004418e14, semimajorAxis: 7e6 });
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(orbit, {
@@ -6321,10 +6321,19 @@ An optional `primary` specifies the gravitating body index and its equatorial `r
 for space-track mean elements. Numerical Cartesian propagation starts from a state in the chosen frame.
 
 `positionField` and `velocityField` publish three f64 values per body and `timeField` publishes elapsed seconds.
-All three ports use layout 1 and the solver ID as the prefix (default `orbit`). `OrbitSolver.load({ signal })`
-can cancel the optional load. `keplerState` samples an ideal ellipse and `keplerDiskSample` integrates
-the phase of a tracer with a prescribed radial drift. A viewer can set `hole.diskTime = orbit.elapsedSeconds`
-to replay a disk on the simulation's clock.
+All three ports use layout 1 and the solver ID as the prefix (default `orbit`). Import `worldMemory` from
+the physics world entry and use `worldMemory(true)` with `OrbitSolver.load({ threads: 4 })` to partition
+the native gravity sweep. The default is one thread. Browser worlds with multiple threads run inside
+a Worker on a cross-origin-isolated page. The optional `signal` can cancel the load. Dispose the
+solver after removing it from the world to close the workers. `orbit.workCounts()` reports each
+partition's actual pair geometry calculations and source contributions from the last accepted tick.
+Registry cells shift without changing the local inertial coordinates.
+
+`keplerState` samples a bound ellipse and keeps the small periapsis displacement and speed stable
+near eccentricity one. `keplerDiskSample` integrates a tracer's phase with prescribed radial drift.
+A viewer can set `hole.diskTime = orbit.elapsedSeconds` to replay a disk on the simulation's clock.
+Run `npm run test:gpu:orbit-surface -w @margoengine/physics` for the fixed-camera live three-body
+plate, driven by the accepted registry positions.
 
 ## Limits
 

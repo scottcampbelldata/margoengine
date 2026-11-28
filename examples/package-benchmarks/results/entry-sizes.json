@@ -15442,8 +15442,8 @@
         "gzip": 5010
       },
       "./lightning": {
-        "raw": 24267,
-        "gzip": 8875
+        "raw": 24283,
+        "gzip": 8890
       },
       "./explosive": {
         "raw": 41750,
@@ -15598,20 +15598,20 @@
         "gzip": 15190
       },
       "./viscoplastic": {
-        "raw": 22740,
-        "gzip": 8605
+        "raw": 22756,
+        "gzip": 8616
       },
       "./tsunami": {
-        "raw": 23358,
-        "gzip": 8950
+        "raw": 23374,
+        "gzip": 8959
       },
       "./pack-ice": {
         "raw": 11423,
         "gzip": 4715
       },
       "./runoff": {
-        "raw": 18099,
-        "gzip": 6963
+        "raw": 18115,
+        "gzip": 6973
       },
       "./drainage-fog": {
         "raw": 10045,
@@ -15638,28 +15638,28 @@
         "gzip": 3902
       },
       "./landscape": {
-        "raw": 19462,
-        "gzip": 7521
+        "raw": 19478,
+        "gzip": 7533
       },
       "./sediment": {
         "raw": 11090,
         "gzip": 4402
       },
       "./underwater": {
-        "raw": 20293,
-        "gzip": 8028
+        "raw": 20309,
+        "gzip": 8041
       },
       "./orbit": {
-        "raw": 8213,
-        "gzip": 3624
+        "raw": 17069,
+        "gzip": 6691
       },
       "./granular-flow": {
         "raw": 14611,
         "gzip": 5574
       },
       "./lava": {
-        "raw": 25251,
-        "gzip": 9628
+        "raw": 25267,
+        "gzip": 9637
       },
       "./dfsph": {
         "raw": 19974,
@@ -19288,8 +19288,8 @@
     },
     "packages/physics/dist/solver-phase-thread.js": {
       "raw": 1592,
-      "gzip": 764,
-      "brotli": 668
+      "gzip": 767,
+      "brotli": 674
     },
     "packages/physics/dist/cloth-kernel.wasm": {
       "raw": 11606,
@@ -19412,14 +19412,14 @@
       "brotli": 4747
     },
     "packages/physics/dist/orbit-kernel.wasm": {
-      "raw": 4444,
-      "gzip": 2380,
-      "brotli": 2191
+      "raw": 14124,
+      "gzip": 6091,
+      "brotli": 5491
     },
     "packages/physics/dist/orbit-kernel-shared.wasm": {
-      "raw": 4532,
-      "gzip": 2435,
-      "brotli": 2248
+      "raw": 14212,
+      "gzip": 6146,
+      "brotli": 5567
     },
     "packages/physics/dist/runoff-kernel.wasm": {
       "raw": 23699,

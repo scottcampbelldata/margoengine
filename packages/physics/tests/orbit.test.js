@@ -132,3 +132,84 @@ test('EVENTHORIZON-1 and EVENTHORIZON-3: Kepler tracers orbit, shear and advect 
   tolerance(recovered.radius, 4, 8 * Number.EPSILON);
   tolerance(recovered.azimuth, 0, 8 * Number.EPSILON);
 });
+
+test('Kepler uses a cancellation-free residual close to a parabolic periapsis', () => {
+  const axis = 1e12;
+  const eccentricity = 1 - Number.EPSILON;
+  const eccentric = 2 ** -20;
+  const square = eccentric * eccentric;
+  const offset = 1 - eccentricity;
+  const expectedSine = eccentric * (1 - square / 6 + (square * square) / 120);
+  const expectedOneMinusCosine = square * (0.5 - square / 24 + (square * square) / 720);
+  const meanAnomalyAtEpoch = offset * eccentric + eccentricity * eccentric * square * (1 / 6 - square / 120);
+  const actual = keplerState({
+    semimajorAxis: axis,
+    gravitationalParameter: axis,
+    meanAnomalyAtEpoch,
+    eccentricity,
+  });
+  const ratio = Math.sqrt(offset * (1 + eccentricity));
+  const denominator = offset + eccentricity * expectedOneMinusCosine;
+  const expected = [
+    axis * (offset - expectedOneMinusCosine),
+    axis * ratio * expectedSine,
+    -expectedSine / denominator,
+    (ratio * (1 - expectedOneMinusCosine)) / denominator,
+  ];
+  const values = [...actual.position.slice(0, 2), ...actual.velocity.slice(0, 2)];
+  for (const [i, value] of values.entries())
+    assert.ok(
+      Math.abs(value - expected[i]) <= Math.abs(expected[i]) * 32 * Number.EPSILON,
+      `${value} vs ${expected[i]}`,
+    );
+});
+
+test('extreme circular states are finite when mu divided by radius would overflow or underflow', () => {
+  for (const [mu, radius, speed] of [
+    [1e300, 1e-200, 1e250],
+    [1e-300, 1e200, 1e-250],
+  ]) {
+    const ellipse = keplerState({ gravitationalParameter: mu, semimajorAxis: radius });
+    const disk = keplerDiskSample({ gravitationalParameter: mu, radius });
+    for (const sample of [ellipse, disk]) {
+      assert.equal(sample.position[0], radius);
+      assert.equal(sample.position[1], 0);
+      assert.ok(Math.abs(sample.velocity[1] - speed) <= speed * 4 * Number.EPSILON);
+    }
+  }
+});
+
+test('malformed orbit bodies and Kepler elements use coded remedies', async () => {
+  const error = (message) => ({ name: 'MargoError', code: 'state', message });
+  await assert.rejects(OrbitSolver.load(null), error(/Pass an options object/));
+  const solver = await OrbitSolver.load();
+  const world = new PhysicsWorld();
+  assert.throws(() => world.add(solver, { bodies: [undefined] }), error(/object with Cartesian position/));
+  assert.throws(() => world.add(solver, { bodies: [{ position: { length: 3 } }] }), error(/three finite Cartesian/));
+  assert.throws(() => keplerState(null), error(/object with a gravitational parameter/));
+  assert.throws(() => keplerDiskSample(null), error(/object with a gravitational parameter/));
+});
+
+test('finite inverse-square force survives extreme position and mass scales', async () => {
+  for (const [distance, mass, duration, speed] of [
+    [1e155, 1e300, 1, 1e-10],
+    [1e120, 1e290, 1e-100, 1e-50],
+    [1e-165, 1e-300, 1e-200, 1e-170],
+  ]) {
+    const { orbit, world } = await make({
+      bodies: [{ position: [0, 0, 0], mass }, { position: [0, 0, -distance] }],
+      gravitationalConstant: 1,
+      timeScale: 60 * duration,
+      integrator: 'verlet',
+    });
+    world.advance(1);
+    const primary = orbit.sample(0);
+    const probe = orbit.sample(1);
+    assert.deepEqual(primary.position, [0, 0, 0]);
+    assert.deepEqual(primary.velocity, [0, 0, 0]);
+    assert.equal(probe.position[2], -distance);
+    tolerance(probe.velocity[2], speed, 24 * Number.EPSILON * speed);
+    assert.equal(probe.velocity[0], 0);
+    assert.equal(probe.velocity[1], 0);
+  }
+});

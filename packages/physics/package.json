@@ -37,6 +37,8 @@
     "test:gpu:landscape-threads": "cd ../.. && node packages/physics/tests/landscape-threads.browser.mjs",
     "test:gpu:underwater-surface": "cd ../.. && node packages/physics/tests/underwater-surface.browser.mjs && node packages/physics/tests/underwater-surface.browser.mjs --compat",
     "test:gpu:underwater-threads": "cd ../.. && node packages/physics/tests/underwater-threads.browser.mjs",
+    "test:gpu:orbit-surface": "cd ../.. && node packages/physics/tests/orbit-surface.browser.mjs && node packages/physics/tests/orbit-surface.browser.mjs --compat",
+    "test:gpu:orbit-threads": "cd ../.. && node packages/physics/tests/orbit-threads.browser.mjs",
     "test:browser:lightning": "cd ../.. && node packages/physics/tests/lightning.browser.mjs && node packages/physics/tests/lightning.browser.mjs --compat",
     "test:browser:gpu-cloth": "cd ../.. && node packages/physics/tests/gpu-cloth-check.mjs && node packages/physics/tests/gpu-cloth-check.mjs --compat",
     "test:browser:floating": "cd ../.. && node packages/physics/tests/floating-example.browser.mjs && node packages/physics/tests/floating-example.browser.mjs --compat",

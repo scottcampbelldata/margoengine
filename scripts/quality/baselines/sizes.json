@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21707183,
+  "total": 21710250,
   "history": [
     {
       "date": "2026-10-24",
@@ -15415,6 +15415,12 @@
       "commit": "cameras-shots-1",
       "reason": "new entry @margoengine/cameras/shots at 571 B gzip (ceiling 827 B): ShotBlend, two framed views and an eased move between them with a portrait back-off, so the optics demos carry no camera maths. The root and the other entries are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "space-01-scaled-orbit-worker-phases",
+      "reason": "SPACE-01 physics/orbit grows from 3624 to 6691 B gzip (cap 3880 to 6947). The entry adds precision near the Kepler periapsis, transactional gravity phase joins and exact workload receipts. The optional plain/shared Wasm assets grow from 2380/2435 to 6091/6146 B gzip for the scaled extreme force and paired execution. Keeping both variants together preserves the same world state layout and avoids a duplicate orbit API. Core and Stage gain zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16309,7 +16315,7 @@
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 9489,
     "@margoengine/physics/mooring": 3744,
-    "@margoengine/physics/orbit": 3880,
+    "@margoengine/physics/orbit": 6947,
     "@margoengine/physics/outdoor-sound": 3746,
     "@margoengine/physics/pack-ice": 4971,
     "@margoengine/physics/pbf": 5833,

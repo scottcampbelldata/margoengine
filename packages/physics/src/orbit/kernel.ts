@@ -17,7 +17,14 @@ export interface OrbitKernel {
     substeps: number,
     fourthOrder: number,
     dt: number,
+    massiveIndices: number,
+    receipts: number,
   ): number;
+  orbit_thread_prepare(job: number): number;
+  orbit_thread_phase(job: number, phase: number, part: number, parts: number): number;
+  orbit_thread_finish_accel(job: number): number;
+  orbit_thread_before(job: number, stage: number): number;
+  orbit_thread_after(job: number, stage: number): number;
 }
 
 export async function loadOrbitBuilds(signal?: AbortSignal): Promise<OrbitBuilds> {
@@ -63,16 +70,21 @@ async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Modu
   }
 }
 
+export function orbitStackTop(host: SolverHost, name: string): number {
+  const stack = host.allocate(name, STACK_BYTES + 8, 'u8', 1);
+  return Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
+}
+
 export function bindOrbitKernel(host: SolverHost, builds: OrbitBuilds): OrbitKernel {
   const shared = typeof SharedArrayBuffer !== 'undefined' && host.memory.buffer instanceof SharedArrayBuffer;
   const wasm = shared ? builds.shared : builds.plain;
   if (!wasm)
     throw new MargoError('unsupported', 'The shared orbit kernel is unavailable; create a plain-memory world.');
-  const stack = host.allocate('orbit-kernel-stack', STACK_BYTES, 'u8', 1);
+  const stackTop = orbitStackTop(host, 'orbit-kernel-stack');
   const { exports } = new WebAssembly.Instance(wasm, { env: { memory: host.memory } });
   const pointer = exports.__stack_pointer;
   if (!(pointer instanceof WebAssembly.Global))
     throw new MargoError('failed', 'The orbit kernel has no stack pointer; rebuild the optional Wasm assets.');
-  pointer.value = stack.byteOffset + stack.byteLength;
+  pointer.value = stackTop;
   return exports as unknown as OrbitKernel;
 }

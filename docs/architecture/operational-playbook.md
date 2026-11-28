@@ -11036,6 +11036,15 @@ loads for unequal masses, rotational clearance, wall loads, queue release, input
 replay across frame rates and memory variants. The NavMesh regressions check weight in the
 existing ORCA planner and preserve covered-target and wall guidance behavior.
 
+### Native orbital evidence (SPACE-01)
+
+The optional orbit entry compacts positive-mass sources in row order. Native workers partition target
+acceleration updates, then join before the ordered J2 correction and symplectic kicks. The accepted
+state is byte-identical across plain memory and shared workers. `orbit-threads.test.js` and
+`orbit-threads.browser.mjs` cover far-cell shifts, snapshot replay, singular-state rollback and
+actual work. WebGPU and WebGL2 draw the live accepted triangular solution in
+`orbit-surface.browser.mjs`. Independently measured lunar ranging still exposes residuals.
+
 ### Underwater acoustic evidence (SOUND-03)
 
 The optional Rust/Wasm SIMD tracer updates the same Gaussian beam and Snell arc state as the TypeScript

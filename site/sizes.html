@@ -108,7 +108,7 @@
 <tr><th scope="row"><code>underwater-kernel-shared.wasm</code></th><td>Rust SIMD underwater ray and Gaussian-beam tracing, shared world memory</td><td class="num">10,911</td><td class="num">4,846</td><td class="num">4,401</td><td>UnderwaterAcousticsSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>tsunami-kernel.wasm</code></th><td>Rust SIMD natural long-wave propagation and inundation</td><td class="num">23,068</td><td class="num">9,530</td><td class="num">8,475</td><td>TsunamiSolver.load() from the optional /tsunami entry</td></tr>
 <tr><th scope="row"><code>tsunami-kernel-shared.wasm</code></th><td>Rust SIMD natural long-wave propagation and inundation, shared world memory</td><td class="num">23,068</td><td class="num">9,530</td><td class="num">8,489</td><td>TsunamiSolver.load() with shared world memory support</td></tr>
-<tr><th scope="row"><code>solver-phase-thread.js</code></th><td>Worker for shared-memory SIMD coastal flux sweeps and lightning relaxation</td><td class="num">1,592</td><td class="num">764</td><td class="num">668</td><td>TsunamiSolver.load({ threads }) or LightningSolver.load({ threads }) with more than one thread</td></tr>
+<tr><th scope="row"><code>solver-phase-thread.js</code></th><td>Worker for shared-memory SIMD coastal flux sweeps and lightning relaxation</td><td class="num">1,592</td><td class="num">767</td><td class="num">674</td><td>TsunamiSolver.load({ threads }) or LightningSolver.load({ threads }) with more than one thread</td></tr>
 <tr><th scope="row"><code>terramechanics-kernel.wasm</code></th><td>Rust SIMD soil footprint and conservative redistribution</td><td class="num">40,423</td><td class="num">16,491</td><td class="num">14,395</td><td>Terramechanics.load() from the optional /terramechanics entry</td></tr>
 <tr><th scope="row"><code>terramechanics-kernel-shared.wasm</code></th><td>Rust SIMD soil footprint and conservative redistribution, shared world memory</td><td class="num">40,423</td><td class="num">16,491</td><td class="num">14,345</td><td>Terramechanics.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>granular-flow-kernel.wasm</code></th><td>Rust SIMD depth-averaged conservative granular flow</td><td class="num">9,620</td><td class="num">4,255</td><td class="num">3,875</td><td>GranularFlowSolver.load() from the optional /granular-flow entry</td></tr>
@@ -157,8 +157,8 @@
 <tr><th scope="row"><code>falling-kernel-shared.wasm</code></th><td>Rust SIMD plate and grain dynamics, shared world memory</td><td class="num">10,109</td><td class="num">4,273</td><td class="num">3,824</td><td>FallingSolver.load() from the optional /falling entry with shared memory support</td></tr>
 <tr><th scope="row"><code>sediment-kernel.wasm</code></th><td>Rust SIMD sediment transport</td><td class="num">12,483</td><td class="num">5,224</td><td class="num">4,691</td><td>SedimentTransport.load(), only from the optional /sediment entry</td></tr>
 <tr><th scope="row"><code>sediment-kernel-shared.wasm</code></th><td>Rust SIMD sediment transport, shared world memory</td><td class="num">12,571</td><td class="num">5,279</td><td class="num">4,747</td><td>SedimentTransport.load() on a host with shared memory support</td></tr>
-<tr><th scope="row"><code>orbit-kernel.wasm</code></th><td>Rust SIMD N-body gravity and orbital drag</td><td class="num">4,444</td><td class="num">2,380</td><td class="num">2,191</td><td>OrbitSolver.load(), only from the optional /orbit entry</td></tr>
-<tr><th scope="row"><code>orbit-kernel-shared.wasm</code></th><td>Rust SIMD N-body gravity, shared world memory</td><td class="num">4,532</td><td class="num">2,435</td><td class="num">2,248</td><td>OrbitSolver.load() on a host with shared memory support</td></tr>
+<tr><th scope="row"><code>orbit-kernel.wasm</code></th><td>Rust SIMD N-body gravity and orbital drag</td><td class="num">14,124</td><td class="num">6,091</td><td class="num">5,491</td><td>OrbitSolver.load(), only from the optional /orbit entry</td></tr>
+<tr><th scope="row"><code>orbit-kernel-shared.wasm</code></th><td>Rust SIMD N-body gravity, shared world memory</td><td class="num">14,212</td><td class="num">6,146</td><td class="num">5,567</td><td>OrbitSolver.load() on a host with shared memory support</td></tr>
 <tr><th scope="row"><code>runoff-kernel.wasm</code></th><td>Rust SIMD catchment runoff</td><td class="num">23,699</td><td class="num">6,427</td><td class="num">5,537</td><td>RainfallRunoff.load(), only from the optional /runoff entry</td></tr>
 <tr><th scope="row"><code>runoff-kernel-shared.wasm</code></th><td>Rust SIMD catchment runoff, shared world memory</td><td class="num">23,787</td><td class="num">6,489</td><td class="num">5,604</td><td>RainfallRunoff.load() on a host with shared memory support</td></tr>
 <tr><th scope="row"><code>thermal-kernel.wasm</code></th><td>Rust SIMD heat conduction</td><td class="num">12,160</td><td class="num">5,120</td><td class="num">4,460</td><td>HeatConduction.load() or Thermoelasticity.load() from the optional /thermal entry</td></tr>
@@ -4914,7 +4914,7 @@
 <tr><td><code>./terramechanics</code></td><td class="num">47,678</td><td class="num">16,106</td></tr>
 <tr><td><code>./rail</code></td><td class="num">20,545</td><td class="num">8,496</td></tr>
 <tr><td><code>./seismic</code></td><td class="num">12,828</td><td class="num">5,010</td></tr>
-<tr><td><code>./lightning</code></td><td class="num">24,267</td><td class="num">8,875</td></tr>
+<tr><td><code>./lightning</code></td><td class="num">24,283</td><td class="num">8,890</td></tr>
 <tr><td><code>./explosive</code></td><td class="num">41,750</td><td class="num">15,583</td></tr>
 <tr><td><code>./granular-mpm</code></td><td class="num">14,644</td><td class="num">5,824</td></tr>
 <tr><td><code>./strands</code></td><td class="num">14,451</td><td class="num">5,915</td></tr>
@@ -4953,22 +4953,22 @@
 <tr><td><code>./glacier</code></td><td class="num">7,631</td><td class="num">3,484</td></tr>
 <tr><td><code>./iceberg</code></td><td class="num">9,936</td><td class="num">4,339</td></tr>
 <tr><td><code>./thin-film</code></td><td class="num">39,042</td><td class="num">15,190</td></tr>
-<tr><td><code>./viscoplastic</code></td><td class="num">22,740</td><td class="num">8,605</td></tr>
-<tr><td><code>./tsunami</code></td><td class="num">23,358</td><td class="num">8,950</td></tr>
+<tr><td><code>./viscoplastic</code></td><td class="num">22,756</td><td class="num">8,616</td></tr>
+<tr><td><code>./tsunami</code></td><td class="num">23,374</td><td class="num">8,959</td></tr>
 <tr><td><code>./pack-ice</code></td><td class="num">11,423</td><td class="num">4,715</td></tr>
-<tr><td><code>./runoff</code></td><td class="num">18,099</td><td class="num">6,963</td></tr>
+<tr><td><code>./runoff</code></td><td class="num">18,115</td><td class="num">6,973</td></tr>
 <tr><td><code>./drainage-fog</code></td><td class="num">10,045</td><td class="num">4,267</td></tr>
 <tr><td><code>./vortices</code></td><td class="num">13,162</td><td class="num">5,197</td></tr>
 <tr><td><code>./snowpack</code></td><td class="num">11,964</td><td class="num">4,916</td></tr>
 <tr><td><code>./airborne</code></td><td class="num">16,197</td><td class="num">7,062</td></tr>
 <tr><td><code>./aeolian</code></td><td class="num">11,986</td><td class="num">5,000</td></tr>
 <tr><td><code>./groundwater</code></td><td class="num">9,310</td><td class="num">3,902</td></tr>
-<tr><td><code>./landscape</code></td><td class="num">19,462</td><td class="num">7,521</td></tr>
+<tr><td><code>./landscape</code></td><td class="num">19,478</td><td class="num">7,533</td></tr>
 <tr><td><code>./sediment</code></td><td class="num">11,090</td><td class="num">4,402</td></tr>
-<tr><td><code>./underwater</code></td><td class="num">20,293</td><td class="num">8,028</td></tr>
-<tr><td><code>./orbit</code></td><td class="num">8,213</td><td class="num">3,624</td></tr>
+<tr><td><code>./underwater</code></td><td class="num">20,309</td><td class="num">8,041</td></tr>
+<tr><td><code>./orbit</code></td><td class="num">17,069</td><td class="num">6,691</td></tr>
 <tr><td><code>./granular-flow</code></td><td class="num">14,611</td><td class="num">5,574</td></tr>
-<tr><td><code>./lava</code></td><td class="num">25,251</td><td class="num">9,628</td></tr>
+<tr><td><code>./lava</code></td><td class="num">25,267</td><td class="num">9,637</td></tr>
 <tr><td><code>./dfsph</code></td><td class="num">19,974</td><td class="num">7,880</td></tr>
 <tr><td><code>./pbf</code></td><td class="num">13,032</td><td class="num">5,577</td></tr>
 <tr><td><code>./breakable</code></td><td class="num">58,334</td><td class="num">19,414</td></tr>
