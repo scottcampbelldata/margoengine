@@ -70,6 +70,8 @@ type CaptureResources = {
   params: GPUBuffer;
   read?: GPUBuffer;
   depthUniform?: GPUBuffer;
+  /** The exact prefilter's running sums between its chunks: one vec4f per texel of the largest rough level. */
+  prefilterSums?: GPUBuffer;
   sampler: GPUSampler;
   /** One capture target per user, so a live reflection probe's faces survive the live volume's captures between frames. */
   targets: Map<'volume' | 'reflection', CaptureTarget>;
@@ -239,7 +241,12 @@ export const PROBE_BINDING = 26;
 const CAPTURE_BINDING = 27,
   HEADER_BYTES = 64 + MAX_REFLECTION_PROBES * 64,
   MAX_VOLUME_PROBES = 4096,
-  LIVE_SAMPLES = 256;
+  LIVE_SAMPLES = 256,
+  // The exact prefilter's chunks (prefilterExact): at most 2^14 source texels per output texel, what a 128 px probe's
+  // whole loop is (65,536 failed on ANGLE Metal, 32,768 passed), and at most 2^24 texel reads in all, a quarter of that
+  // probe's first rough level as one dispatch.
+  PREFILTER_LOOP = 1 << 14,
+  PREFILTER_FETCHES = 1 << 24;
 // Capture cameras per cube face: forward and up (right = forward x up); the WGSL below uses the same table.
 const FACES: readonly (readonly [Vec3, Vec3])[] = [
   [
@@ -472,7 +479,7 @@ const bakeWgsl = (environment: boolean, sampled: boolean) =>
   dataWgsl('read_write', 0, 0) +
   (sampled ? common : '') +
   /* wgsl */ `
-struct Bake {offset:u32,size:u32,source:u32,sourceSize:u32,roughness:f32,count:u32,pad0:u32,pad1:u32}
+struct Bake {offset:u32,size:u32,source:u32,sourceSize:u32,roughness:f32,count:u32,first:u32,end:u32}
 @group(0) @binding(1) var<uniform> bake:Bake;
 @group(0) @binding(2) var faces:texture_2d_array<f32>;
 @group(0) @binding(3) var linear:sampler;
@@ -541,16 +548,20 @@ var<workgroup> texelSum:array<vec4f,64>;
 }
 `
     : `
+// Source texels first to end only, so no submit runs long (KB-SHOT-COMPATLOST1): a chunk that does not reach the last
+// texel keeps its running sum in prefilterSums for the next, and the last stores the texel. The same additions in order.
+@group(0) @binding(6) var<storage,read_write> prefilterSums:array<vec4f>;
 @compute @workgroup_size(8,8) fn prefilter(@builtin(global_invocation_id) id:vec3u) {
   let s=bake.size;if(id.x>=s||id.y>=s){return;}
   let n=normalize(octDecode((vec2f(id.xy)+0.5)/f32(s)));let a=bake.roughness*bake.roughness;let a2=a*a;let m=bake.sourceSize;
-  var sum=vec4f(0);
-  for(var j=0u;j<m*m;j++){
+  let i=id.y*s+id.x;var sum=vec4f(0);if(bake.first>0u){sum=prefilterSums[i];}
+  for(var j=bake.first;j<bake.end;j++){
     let p=octDecode((vec2f(f32(j%m),f32(j/m))+0.5)/f32(m));let r=length(p);let l=p/r;let nl=dot(n,l);if(nl<=0.0){continue;}
     let h=normalize(n+l);let nh=dot(n,h);let q=${/* @__PURE__ */ ggxDenominatorOf('n', 'h')};let w=a2/(q*q)*nl/(r*r*r);
     sum+=vec4f(probeTexel(bake.source+j)*w,w);
   }
-  store(bake.offset+id.y*s+id.x,sum.rgb/max(sum.a,1e-20));
+  if(bake.end<m*m){prefilterSums[i]=sum;return;}
+  store(bake.offset+i,sum.rgb/max(sum.a,1e-20));
 }
 `
 }`;
@@ -1260,6 +1271,7 @@ export class LightProbes extends ShaderEffect {
           );
         if (this.pending) throw new MargoError('failed', 'Light probe capture did not run (the engine did not render)');
         if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
+        if (samples === 0) this.prefilterExact(device);
         this.writeHeader(true);
       }
       await this.copyBack(device, true);
@@ -1873,7 +1885,15 @@ export class LightProbes extends ShaderEffect {
         { binding: 0, resource: { buffer: this.buffer! } },
         { binding: 1, resource: { buffer: resources.params, offset: slot * 256, size: 32 } },
       ];
-      if (entry !== 'prefilter' || samples > 0) {
+      if (entry === 'prefilter' && samples === 0) {
+        const bytes = Math.max(16, (this.resolution >> 1) ** 2 * 16);
+        let sums = resources.prefilterSums;
+        if (!sums || sums.size < bytes) {
+          sums = resources.prefilterSums = resources.device.createBuffer({ size: bytes, usage: GPUBufferUsage.STORAGE });
+          resources.owned.push(sums);
+        }
+        entries.push({ binding: 6, resource: { buffer: sums } });
+      } else {
         entries.push({ binding: 2, resource: target.array });
         // Without an environment SH reads textureLoad and the sampler is absent from its static layout.
         if (entry !== 'sh' || this.environment) entries.push({ binding: 3, resource: resources.sampler });
@@ -1972,7 +1992,8 @@ export class LightProbes extends ShaderEffect {
     }
     resources.device.queue.writeBuffer(resources.params, 0, slots, 0, count * 64);
     const pass = encoder.beginComputePass();
-    for (let slot = 0; slot < count; slot++) {
+    // The exact prefilter runs after the bake's capture, in chunks of its own (prefilterExact).
+    for (let slot = 0; slot < (!volume && samples === 0 ? 1 : count); slot++) {
       const entry = volume ? 'sh' : slot === 0 ? 'resample' : 'prefilter',
         size = slots[slot * 64 + 1],
         // Sampled prefilter: one 64-thread workgroup per texel; otherwise 8 x 8 texels per workgroup.
@@ -1983,6 +2004,57 @@ export class LightProbes extends ShaderEffect {
       pass.dispatchWorkgroups(x, x);
     }
     pass.end();
+  }
+  /**
+   * The exact GGX prefilter of every reflection probe's rough levels (bake samples 0), after a bounce's capture: each
+   * level's loop over its probe's level 0 is split into dispatches of at most PREFILTER_LOOP source texels per output
+   * texel (and PREFILTER_FETCHES reads in all), one submit each (KB-SHOT-COMPATLOST1). As one dispatch per level a
+   * 256 px probe loops over all 65,536 texels of its level 0 for every output texel; on the WebGL2 layer over ANGLE
+   * Metal (Apple M6, Chrome 156) the command buffer holding such a dispatch failed and the context was lost, while a
+   * 128 px probe's 16,384 passed. Measured with probe-capture at 256 px: chunks of 65,536 per texel failed whatever the
+   * total (2^20 to 2^24 reads), 32,768 and 16,384 passed, with or without waiting for each submit. Every texel adds the
+   * same terms in the same order, its running sum kept in float32 between chunks, so the stored texels do not change.
+   */
+  private prefilterExact(device: GPUDevice): void {
+    const resources = this.captureResources,
+      target = resources?.targets.get('reflection');
+    if (!resources || !target || !this.reflections.length) return;
+    const slots = resources.slots,
+      floats = resources.floats,
+      total = this.resolution ** 2,
+      count = levelCount(this.resolution),
+      pipeline = this.bakePipelines(device, false).prefilter;
+    for (let index = 0; index < this.reflections.length; index++) {
+      const base = this.offsets[index];
+      let offset = base + total;
+      for (let slot = 1; slot < count; slot++) {
+        const size = this.resolution >> slot,
+          step = Math.max(1, Math.min(total, PREFILTER_LOOP, Math.floor(PREFILTER_FETCHES / (size * size)))),
+          group = this.captureGroup(resources, target, pipeline, 'prefilter', slot, 0),
+          x = Math.ceil(size / 8),
+          at = slot * 64;
+        // The level's slot as filterProbe writes it (another probe's filter may have written it since).
+        slots[at] = offset;
+        slots[at + 1] = size;
+        slots[at + 2] = base;
+        slots[at + 3] = this.resolution;
+        floats[at + 4] = slot / (count - 1);
+        slots[at + 5] = 0;
+        for (let first = 0; first < total; first += step) {
+          slots[at + 6] = first;
+          slots[at + 7] = Math.min(total, first + step);
+          device.queue.writeBuffer(resources.params, slot * 256, slots, at, 8);
+          const encoder = device.createCommandEncoder(),
+            pass = encoder.beginComputePass();
+          pass.setPipeline(pipeline);
+          pass.setBindGroup(0, group);
+          pass.dispatchWorkgroups(x, x);
+          pass.end();
+          device.queue.submit([encoder.finish()]);
+        }
+        offset += size * size;
+      }
+    }
   }
   private bakePipelines(device: GPUDevice, sampled: boolean): BakePipelines {
     if (this.bakeDevice !== device) {

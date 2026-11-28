@@ -378,7 +378,13 @@ await probes.bake();
   from the probe camera, and every added model with a `draw` method, as linear radiance without fog (receivers fog
   themselves); clustered point and spot lights are looped in full (the light lists are culled for the main camera), area
   lights and shadows are as the frame has them; where nothing was drawn the environment's sky (or black) fills in. One
-  submit per face, then one compute pass per probe. `bounces: n` repeats the capture n times, each seeing the previous
+  submit per face, then one compute pass per probe. The full-source convolution of a reflection probe's rough levels
+  (the default, no `samples`) then runs in dispatches that each loop over at most 16,384 source texels per output
+  texel (and 2^24 reads in all), one submit each, their running sums kept in a small storage buffer between them, so
+  the stored texels are the same. As one dispatch per level a 256 px probe loops over all 65,536 texels of its level 0
+  for every output texel, and on the WebGL2 layer over ANGLE Metal (Apple M6) that command buffer failed and the
+  context was lost (KB-SHOT-COMPATLOST1; 32,768 passed). A 256 px probe takes 96 such submits per bake bounce, a
+  128 px probe 8, a 16 px probe 2. `bounces: n` repeats the capture n times, each seeing the previous
   bake's probe light (one more bounce each). The result is also read back to the CPU: a device restore re-uploads it, and
   `irradianceAt(position, normal)` returns the volume's irradiance there, as the shaders compute it.
 - **Live reflection filtering.** `bake({samples: 256})` uses a deterministic Hammersley GGX importance filter for the rough

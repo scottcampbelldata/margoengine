@@ -424,7 +424,7 @@ test('bounded GGX samples validate before rendering and do not leak into later d
   await pending;
   const sampledCode = log.find((e) => e[0] === 'module' && e[2].code.includes('fn prefilter('))[2].code;
   assert.match(sampledCode, /importanceGGX\(hammersley\(i,bake.count\),alpha\)/);
-  assert.doesNotMatch(sampledCode, /for\(var j=0u;j<m\*m;j\+\+\)/);
+  assert.doesNotMatch(sampledCode, /for\(var j=bake\.first;j<bake\.end;j\+\+\)/);
   const uniforms = log
     .filter((e) => e[0] === 'writeBuffer' && e[3].length === 3 * 256 * 2)
     .map((e) => Buffer.from(e[3], 'hex'));
@@ -449,9 +449,105 @@ test('bounded GGX samples validate before rendering and do not leak into later d
   log = [];
   await probes.bake();
   const exactCode = log.find((e) => e[0] === 'module' && e[2].code.includes('fn prefilter('))[2].code;
-  assert.match(exactCode, /for\(var j=0u;j<m\*m;j\+\+\)/);
+  assert.match(exactCode, /for\(var j=bake\.first;j<bake\.end;j\+\+\)/);
   assert.doesNotMatch(exactCode, /fn importanceGGX/);
   assert.notEqual(probes.texels, first);
+  probes.dispose();
+});
+
+test('the exact prefilter of a 256 px probe loops over at most 2^14 source texels per dispatch (KB-SHOT-COMPATLOST1)', async () => {
+  // As one dispatch per level each output texel looped over all 65,536 source texels: ANGLE Metal failed that command
+  // buffer and lost the context (the orrery's bake on the WebGL2 layer, Apple M6).
+  const gpu = mockGPU(),
+    engine = fakeEngine(gpu),
+    probes = new LightProbes({ reflections: [{ position: [0, 1, 0], ...room }], resolution: 256 });
+  probes.setup(engine);
+  let log = [],
+    renders = 0;
+  const frame = context(gpu, { shader: coreShader });
+  engine.render = () => {
+    renders++;
+    log.push(
+      ...gpu.record(() => {
+        frame.begin(renders);
+        frame.c.shader = coreShader;
+        passes(probes)(frame.c);
+      }),
+    );
+  };
+  const texels = [256, 128, 64, 32, 16, 8, 4].reduce((n, s) => n + s * s, 0),
+    createBuffer = gpu.device.createBuffer;
+  gpu.device.createBuffer = (d) =>
+    Object.assign(
+      createBuffer(d),
+      d.usage & GPUBufferUsage.MAP_READ
+        ? { mapAsync: async () => undefined, getMappedRange: () => new ArrayBuffer(texels * 8), unmap() {} }
+        : {},
+    );
+  // The chunks run after the capture frame, outside gpu.record: watch the queue for the whole bake.
+  const queue = gpu.device.queue,
+    calls = [],
+    { writeBuffer, submit } = queue,
+    createCommandEncoder = gpu.device.createCommandEncoder;
+  queue.writeBuffer = (buffer, offset, data, start = 0, count) => {
+    const bytes = new Uint8Array(data.buffer, data.byteOffset + start * 4, (count ?? data.length - start) * 4);
+    calls.push(['writeBuffer', null, offset, Buffer.from(bytes).toString('hex')]);
+    return writeBuffer.call(queue, buffer, offset, data, start, count);
+  };
+  queue.submit = (list) => (calls.push(['submit']), submit.call(queue, list));
+  gpu.device.createCommandEncoder = (d) => {
+    const encoder = createCommandEncoder.call(gpu.device, d),
+      begin = encoder.beginComputePass;
+    encoder.beginComputePass = (p) => {
+      const pass = begin.call(encoder, p);
+      // The recorder hands out one pass object: wrap it once.
+      if (!pass.spied) {
+        const dispatch = pass.dispatchWorkgroups;
+        pass.spied = true;
+        pass.dispatchWorkgroups = (x, y, z) => (calls.push(['pass.dispatchWorkgroups', x, y]), dispatch?.call(pass, x, y, z));
+      }
+      return pass;
+    };
+    return encoder;
+  };
+  await probes.bake();
+  log = calls;
+  // Each chunk writes its level's 256-byte slot (first and end at byte 24), then submits one dispatch.
+  const chunks = [];
+  log.forEach((e, i) => {
+    if (e[0] !== 'writeBuffer' || e[3].length !== 64 || e[2] % 256 !== 0 || e[2] === 0) return;
+    const range = Buffer.from(e[3], 'hex'),
+      rest = log.slice(i + 1),
+      submit = rest.findIndex((x) => x[0] === 'submit');
+    chunks.push({
+      slot: e[2] / 256,
+      first: range.readUInt32LE(24),
+      end: range.readUInt32LE(28),
+      source: range.readUInt32LE(8),
+      dispatches: rest.slice(0, submit).filter((x) => x[0] === 'pass.dispatchWorkgroups'),
+    });
+  });
+  const levels = [1, 2, 3, 4, 5, 6];
+  assert.deepEqual([...new Set(chunks.map((c) => c.slot))], levels, 'every rough level, in order');
+  for (const slot of levels) {
+    const size = 256 >> slot,
+      own = chunks.filter((c) => c.slot === slot);
+    assert.equal(own[0].first, 0);
+    assert.ok(own.every((c) => c.source === own[0].source), "every chunk reads the probe's level 0");
+    assert.equal(own.at(-1).end, 256 * 256, 'the last chunk reaches the last source texel and stores');
+    for (let k = 0; k < own.length; k++) {
+      if (k > 0) assert.equal(own[k].first, own[k - 1].end, 'chunks cover the source in order');
+      assert.ok(own[k].end - own[k].first <= 2 ** 14, `level ${slot} chunk ${k}: at most 2^14 source texels a texel`);
+      assert.ok((own[k].end - own[k].first) * size * size <= 2 ** 24, `level ${slot} chunk ${k} within 2^24 reads`);
+      assert.deepEqual(
+        own[k].dispatches.map((d) => [d[1], d[2]]),
+        [[Math.ceil(size / 8), Math.ceil(size / 8)]],
+        'one dispatch per submit',
+      );
+    }
+  }
+  assert.equal(chunks.filter((c) => c.slot === 1).length, 64, '128 px level: 1,024 source texels a chunk');
+  assert.equal(chunks.length, 64 + 16 + 4 + 4 + 4 + 4, 'levels from 32 px down: four chunks of 16,384');
   probes.dispose();
 });
 
@@ -640,7 +736,9 @@ test('pooled probe groups invalidate on actual environment resources and filter 
   environment.version++;
   await g.probes.bake();
   const groups = g.takeLog().filter((entry) => entry[0] === 'group');
-  assert.equal(groups.length, 4);
+  // SH and resample in the capture frame; the two exact prefilter groups bind no environment and are made by its
+  // chunks after the frame, outside this log (KB-SHOT-COMPATLOST1).
+  assert.equal(groups.length, 2);
   assert.ok(
     groups
       .filter((entry) => entry[2].entries.some((binding) => binding.binding === 4))

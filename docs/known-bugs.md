@@ -1703,6 +1703,13 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   compatibility layer did not load: ...); map it again ..."), so the next occurrence names its cause
   (`test/task-polling.test.js`, "a map aborted by its own buffer destroy names the destroy, and a device loss names the
   loss"). Open until a failing run is read with it.
+- **Read (2026-11-27, 25 more runs):** 2 lost (runs 7 and 12), 23 passed. Both say "The WebGL2 context was lost": a real
+  context loss, not a destroy or a lazy part that failed to load. With page logging on (run 12) WebKit printed
+  "WebGL: context lost." 82 s into the page, near the end of a run that takes 80 to 100 s; no `webglcontextlost` event
+  reached the device canvas's listener; the layer found it when `isContextLost()` turned true during a framebuffer
+  status check (`makeFramebuffer`). The probe context's own release is the only event seen. Still not found: why
+  WebKit's Windows build loses it. Next: time the traversal's dispatches on that build (the same per-dispatch loop class
+  as KB-SHOT-COMPATLOST1 is a candidate, not shown).
 
 ### Open (below Margo) 2026-11-27: on WebKit's Windows build the WebGL2 layer copies unpremultiplied ImageBitmaps wrong (KB-WEBKIT-BITMAPALPHA1, browser; webgl2-compat)
 
@@ -4585,7 +4592,7 @@ test.
   the surface once. With both triangulations of the faces and three lattice sizes the box fills every cube.
 - **Regression:** the two tests above (the second fails on the previous code: 60 of 64 cubes for a 4 cube box).
 
-### Open 2026-11-26: on the WebGL2 compatibility layer, test:shot's sky-coverage check loses the device on the orrery shot (KB-SHOT-COMPATLOST1, tools/shot)
+### Fixed 2026-11-27: on the WebGL2 compatibility layer, test:shot's sky-coverage check loses the device on the orrery shot (KB-SHOT-COMPATLOST1, environment; was tools/shot)
 
 - **Repro:** on an Apple M6 Mac (ANGLE on Metal), `npm run build:packages`, then `MARGO_COMPAT=1 npm run test:shot`. Two
   runs out of two failed the same way. `determinism-check.mjs` passes all its cases. `sky-coverage-check.mjs` passes its
@@ -4616,6 +4623,22 @@ test.
   Direct3D 11 load time on the layer against the shot tool's 180 s wait.
 - **Same on main:** main's tools/shot fails the same way. The film hook added for PA-03 does not change it.
 - **Windows run (RTX A6000, Chrome, 2026-11-27, main cd4508a015):** `MARGO_COMPAT=1 node tools/shot/test/sky-coverage-check.mjs` passes all three shots, orrery included, so the loss is specific to ANGLE Metal. A rerun on the M6 Mac with the new loss texts is the only way forward; no cause is claimed.
+- **Cause (M6 Mac, Chrome 156, ANGLE Metal, 2026-11-27, main f3a7cb1d62):** the orrery alone fails within 6 s; Chrome
+  logs "GL_INVALID_OPERATION ... ContextMtl.mm, checkCommandBufferError ... Metal command buffer execution failed", then
+  the context is lost, during `probes.bake({ bounces: 3 })`. The orrery passes with its reflection probes at 64 px or
+  without them, and fails with one bounce or without its volume. `packages/environment` probe-capture at 256 px on the
+  layer reads black where 16 and 128 px pass, and passes at 256 px with `samples: 256` (the sampled filter), on native
+  WebGPU on the Mac, and on the layer on Windows. The default bake's exact GGX prefilter ran each rough level as one
+  dispatch whose every output texel loops over all of level 0: 65,536 texels at 256 px, 16,384 at 128 px. Chunking
+  that loop: 65,536 per texel failed whatever the chunk's total reads (2^20 to 2^24), 32,768 and 16,384 passed, with
+  or without waiting for each submit, and a 2^26-read chunk of 16,384 passed. So the per-texel loop length decides it.
+- **Fixed (2026-11-27):** `LightProbes` runs the exact prefilter after each bounce's capture in chunks of at most 2^14
+  source texels per output texel and 2^24 reads, one submit each; a chunk that does not reach the last texel keeps its
+  float32 running sum in a storage buffer for the next (same additions, same order). A 256 px probe takes 96 submits a
+  bounce. Regression: `packages/environment/tests/probes.test.js` ("the exact prefilter of a 256 px probe loops over at
+  most 2^14 source texels per dispatch"), which fails on the old code. On the M6 Mac probe-capture at 256 px and
+  `MARGO_COMPAT=1 node tools/shot/test/sky-coverage-check.mjs` pass (all three shots, orrery included; WebGPU passes too). Not measured: the stored texels byte
+  for byte against the one-dispatch filter on a GPU where both run.
 - **Again on main feca833059 (RTX A6000, 2026-11-27, packages rebuilt):** the same command passes all three shots. The
   device loss has reproduced only on the M6 Mac (ANGLE on Metal); this row stays open until a Mac session reruns it.
   The Direct3D 11 load time above is a separate failure, seen on the Arc 140V laptop.
