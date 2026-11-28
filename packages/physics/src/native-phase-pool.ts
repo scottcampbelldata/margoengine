@@ -1,10 +1,17 @@
 import { MargoError } from '@margoengine/math/errors';
-import { canShareMemory, isShared } from '../world/memory.js';
+import { canShareMemory, isShared } from './world/memory.js';
 
 /** Offsets in the shared i32 control region. Status has one word per worker, in partition order. */
-export const TSUNAMI_THREAD_CONTROL = { generation: 0, stage: 1, ready: 2, done: 3, fault: 4, status: 5 } as const;
+export const NATIVE_PHASE_CONTROL = { generation: 0, stage: 1, ready: 2, done: 3, fault: 4, status: 5 } as const;
 
-export interface TsunamiWorkerStart {
+type NativePhaseSolver =
+  | { readonly subject: 'Tsunami'; readonly phaseExport: 'tsunami_thread_phase' }
+  | { readonly subject: 'Lightning'; readonly phaseExport: 'lightning_thread_phase' };
+
+export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };
+
+export interface NativePhaseWorkerStart {
+  readonly phaseExport: NativePhaseSolver['phaseExport'];
   readonly module: WebAssembly.Module;
   readonly memory: WebAssembly.Memory;
   readonly stackTop: number;
@@ -23,7 +30,7 @@ interface ThreadBinding {
 }
 
 interface ThreadWorker {
-  post(start: TsunamiWorkerStart): void;
+  post(start: NativePhaseWorkerStart): void;
   observe(ready: () => void, failed: (reason: unknown) => void): void;
   unref(): void;
   close(): void;
@@ -31,16 +38,19 @@ interface ThreadWorker {
 
 // Deadlines bound transport failures. Once a phase joins, its numerical result has no wall-clock input.
 const DEADLINE_MS = 10_000;
-const slots = TSUNAMI_THREAD_CONTROL;
+const slots = NATIVE_PHASE_CONTROL;
 
-function failedThreads(reason: string, cause?: unknown): MargoError {
+function failedThreads(subject: NativePhaseSolver['subject'], reason: string, cause?: unknown): MargoError {
   return Object.assign(
-    new MargoError('failed', `Tsunami workers ${reason}. Load a new solver with working worker assets or threads: 1.`),
+    new MargoError(
+      'failed',
+      `${subject} workers ${reason}. Load a new solver with working worker assets or threads: 1.`,
+    ),
     { cause },
   );
 }
 
-function assertThreadEnvironment(): void {
+function assertThreadEnvironment(subject: NativePhaseSolver['subject']): void {
   if (canShareMemory()) {
     try {
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 0);
@@ -51,12 +61,12 @@ function assertThreadEnvironment(): void {
   }
   throw new MargoError(
     'unsupported',
-    'Tsunami threads need a blocking agent and shared memory. Use Node, a cross-origin-isolated browser worker, or threads: 1.',
+    `${subject} threads need a blocking agent and shared memory. Use Node, a cross-origin-isolated browser worker, or threads: 1.`,
   );
 }
 
 async function startWorker(): Promise<ThreadWorker> {
-  const url = new URL(/* @vite-ignore */ './tsunami-thread.js', import.meta.url);
+  const url = new URL(/* @vite-ignore */ './solver-phase-thread.js', import.meta.url);
   if (typeof Worker === 'function') {
     const worker = new Worker(url, { type: 'module' });
     // Chromium can defer a nested Worker's startup message while its owner
@@ -82,9 +92,12 @@ async function startWorker(): Promise<ThreadWorker> {
   }
   const name = 'node:worker_threads';
   const { Worker: NodeWorker } = (await import(/* @vite-ignore */ /* webpackIgnore: true */ name)) as {
-    Worker: new (url: URL, options: { execArgv: string[] }) => {
+    Worker: new (
+      url: URL,
+      options: { execArgv: string[] },
+    ) => {
       on(event: 'message' | 'messageerror' | 'error' | 'exit', listener: (value: unknown) => void): void;
-      postMessage(message: TsunamiWorkerStart): void;
+      postMessage(message: NativePhaseWorkerStart): void;
       unref(): void;
       terminate(): Promise<number>;
     };
@@ -122,27 +135,40 @@ async function waitForWorkerBoot(worker: ThreadWorker, signal: AbortSignal): Pro
 }
 
 /** The pool owns only workers. Its job, control and stacks are unsnapshotted regions owned by the solver. */
-export class TsunamiThreads {
+export class NativePhasePool {
   readonly count: number;
   readonly controlWords: number;
   private binding?: ThreadBinding;
   private closed = false;
 
-  constructor(private readonly workers: readonly ThreadWorker[]) {
+  constructor(
+    private readonly workers: readonly ThreadWorker[],
+    private readonly solver: NativePhaseSolver,
+  ) {
     this.count = workers.length + 1;
     this.controlWords = slots.status + workers.length;
   }
 
   init(binding: ThreadBinding): void {
+    const { subject } = this.solver;
     if (this.closed || this.binding)
-      throw new MargoError('state', 'Tsunami worker pool is already bound or closed. Load a new tsunami solver.');
+      throw new MargoError(
+        'state',
+        `${subject} worker pool is already bound or closed. Load a new ${subject.toLowerCase()} solver.`,
+      );
     if (!isShared(binding.memory)) {
       this.close();
-      throw new MargoError('unsupported', 'Tsunami threads need shared world memory. Use worldMemory(true) or threads: 1.');
+      throw new MargoError(
+        'unsupported',
+        `${subject} threads need shared world memory. Use worldMemory(true) or threads: 1.`,
+      );
     }
     if (binding.stackTops.length !== this.workers.length) {
       this.close();
-      throw new MargoError('state', 'Give each tsunami worker its own stack top in the shared world arena.');
+      throw new MargoError(
+        'state',
+        `Give each ${subject.toLowerCase()} worker its own stack top in the shared world arena.`,
+      );
     }
     this.binding = binding;
     try {
@@ -150,6 +176,7 @@ export class TsunamiThreads {
       control.fill(0);
       for (const [i, worker] of this.workers.entries()) {
         worker.post({
+          phaseExport: this.solver.phaseExport,
           module: binding.module,
           memory: binding.memory,
           control: binding.control,
@@ -163,14 +190,19 @@ export class TsunamiThreads {
     } catch (cause) {
       this.close();
       if (cause instanceof MargoError) throw cause;
-      throw failedThreads('did not initialize', cause);
+      throw failedThreads(subject, 'did not initialize', cause);
     }
   }
 
   /** Run native parts concurrently and return a native status in canonical part order. */
   phase(stage: number, leader: () => number): number {
+    const { subject } = this.solver;
+    const phase = subject === 'Tsunami' ? 'flux' : 'relaxation';
     if (this.closed || !this.binding)
-      throw new MargoError('state', 'Tsunami workers are not available. Load a new solver with threads: 1 or working workers.');
+      throw new MargoError(
+        'state',
+        `${subject} workers are not available. Load a new solver with threads: 1 or working workers.`,
+      );
     try {
       const control = this.control();
       Atomics.store(control, slots.done, 0);
@@ -178,7 +210,7 @@ export class TsunamiThreads {
       Atomics.add(control, slots.generation, 1);
       Atomics.notify(control, slots.generation);
       const status = leader();
-      this.waitFor(control, slots.done, 'did not finish a flux phase');
+      this.waitFor(control, slots.done, `did not finish a ${phase} phase`);
       if (status !== 0) return status;
       for (let i = 0; i < this.workers.length; i++) {
         const workerStatus = Atomics.load(control, slots.status + i);
@@ -188,7 +220,7 @@ export class TsunamiThreads {
     } catch (cause) {
       this.close();
       if (cause instanceof MargoError) throw cause;
-      throw failedThreads('trapped in a flux phase', cause);
+      throw failedThreads(subject, `trapped in a ${phase} phase`, cause);
     }
   }
 
@@ -208,20 +240,28 @@ export class TsunamiThreads {
     const limit = performance.now() + DEADLINE_MS;
     for (;;) {
       const seen = Atomics.load(control, slot);
-      if (Atomics.load(control, slots.fault)) throw failedThreads('stopped during native work');
+      if (Atomics.load(control, slots.fault)) throw failedThreads(this.solver.subject, 'stopped during native work');
       if (seen === this.workers.length) return;
       const remaining = limit - performance.now();
-      if (remaining <= 0) throw failedThreads(failure);
+      if (remaining <= 0) throw failedThreads(this.solver.subject, failure);
       Atomics.wait(control, slot, seen, remaining);
     }
   }
 }
 
-export async function createTsunamiThreads(threads: number, signal?: AbortSignal): Promise<TsunamiThreads> {
+export async function createNativePhasePool(
+  threads: number,
+  options: NativePhasePoolOptions,
+): Promise<NativePhasePool> {
+  const { signal, ...solver } = options;
+  const { subject } = solver;
   signal?.throwIfAborted();
   if (!Number.isSafeInteger(threads) || threads < 2)
-    throw new MargoError('state', 'Give the tsunami worker pool a whole thread count of at least two.');
-  assertThreadEnvironment();
+    throw new MargoError(
+      'state',
+      `Give the ${subject.toLowerCase()} worker pool a whole thread count of at least two.`,
+    );
+  assertThreadEnvironment(subject);
   const deadline = AbortSignal.timeout(DEADLINE_MS);
   const boot = signal ? AbortSignal.any([deadline, signal]) : deadline;
   const workers: ThreadWorker[] = [];
@@ -233,10 +273,10 @@ export async function createTsunamiThreads(threads: number, signal?: AbortSignal
       await waitForWorkerBoot(worker, boot);
     }
     boot.throwIfAborted();
-    return new TsunamiThreads(workers);
+    return new NativePhasePool(workers, solver);
   } catch (cause) {
     for (const worker of workers) worker.close();
     signal?.throwIfAborted();
-    throw failedThreads('could not start', cause);
+    throw failedThreads(subject, 'could not start', cause);
   }
 }

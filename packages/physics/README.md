@@ -8558,6 +8558,25 @@ Advance the world before drawing. The callback reads the accepted channel region
 solver's origin cell. A third argument sets leader brightness relative to the return stroke; it
 defaults to 0.1. This is an appearance control. See the Sky README for a complete example.
 
+One CPU thread is the default. Pass an integer `threads` from 1 to 64 at load time. With more than
+one, use a shared-memory world in Node or a cross-origin-isolated browser worker. The solver splits
+native stencil rows, retaining exactly the serial channel and electric field. Remove it from its
+world before disposal to release the workers. `workCounts()` reports the most recent accepted
+electrical update, including the initial solve. It is execution telemetry, outside the snapshot.
+
+```ts
+import { LightningSolver } from '@margoengine/physics/lightning';
+import { PhysicsWorld, worldMemory } from '@margoengine/physics/world';
+
+using lightning = await LightningSolver.load({ threads: 4 });
+const world = new PhysicsWorld({ memory: worldMemory(true) }).add(lightning, {
+  size: [17, 19, 13],
+  charge: (x, y) => y > 500 ? 1e-11 : x > 480 ? -1e-11 : 0,
+});
+console.log(lightning.workCounts());
+world.remove('lightning');
+```
+
 ## Natural lava flow and coastal displacement
 
 `@margoengine/physics/lava` advances a vent-fed lava sheet on the PhysicsWorld clock. It transports mass and enthalpy, grows stationary crust, follows slopes and channels, and stops sub-yield flow. It can sample a live `TerrainBed` and publish the volume entering the sea to `TsunamiSolver`.

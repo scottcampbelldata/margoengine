@@ -78,7 +78,13 @@ them; the rest is a record of what a stronger solver would need.
 - Point 5. `lightning-extremes.test.js` checks independent leader and return speed limits, a terrain chord
   that would travel faster than light, malformed spatial and electrical inputs, and transactional
   rejection of a late return-time overflow in both Wasm memory modes. `lightning-native.test.js` checks
-  both SIMD lanes report an unrepresentable Poisson correction.
+  both SIMD lanes report an unrepresentable Poisson correction. Sky's `lightning-bolt.test.js`
+  checks coded settings, coordinates and radiance corrections.
+- Point 6. `lightning-threads.test.js` verifies identical native field, channel and replay in plain
+  and shared memory on one, two and four threads, with a 700,000-cell origin shift and signed charge.
+  Four threads execute 9,009 and 27,846 SIMD pairs over seven sweeps on distinct odd grids.
+  Chromium's `lightning.browser.mjs` launches three nested helpers and matches shared serial byte
+  for byte over 480 sweeps and 184,800 SIMD pairs.
 - Point 7. `lightning.browser.mjs` compares a placed leader, the accepted return stroke, fade and
   snapshot restore. WebGPU and WebGL2 each draw 455 bright pixels over 102 rows, with the channel
   translated from the adjoining origin cell. The accepted flash and replay hash match.

@@ -66,13 +66,13 @@ test('no branching grows the main channel alone, more branching more forks, and 
 });
 
 test('a bad channel setting is refused with its name', () => {
-  assert.throws(() => grow({ start: [0, 0, 0], end: [0, 5, 0] }), RangeError);
+  assert.throws(() => grow({ start: [0, 0, 0], end: [0, 5, 0] }), { code: 'state', message: /cloud point first/ });
   assert.throws(() => grow({ detail: 3 }), /detail/);
   assert.throws(() => grow({ branching: 0.9 }), /branching/);
   assert.throws(() => grow({ spread: 90 }), /spread/);
   assert.throws(() => grow({ maxSegments: 5000 }), /maxSegments/);
-  assert.throws(() => grow({ end: [0, NaN, 0] }), TypeError);
-  assert.throws(() => grow({ seed: NaN }), RangeError);
+  assert.throws(() => grow({ end: [0, NaN, 0] }), { code: 'state', message: /finite Float32 coordinates/ });
+  assert.throws(() => grow({ seed: NaN }), { code: 'state', message: /finite seed/ });
 });
 
 test('the lights along a channel share one light by height and sit on the channel', () => {
@@ -85,9 +85,9 @@ test('the lights along a channel share one light by height and sit on the channe
   assert.ok(pts.every((p) => p.radius > 100 && p.position[1] > 0 && p.position[1] < 1500));
   assert.equal(channelLightPoints(ch, 1, 700).length, 1);
   assert.ok(Math.abs(channelLightPoints(ch, 8, 700).reduce((s, p) => s + p.weight, 0) - 1) < 1e-9);
-  assert.throws(() => channelLightPoints(ch, 0, 700), RangeError);
-  assert.throws(() => channelLightPoints(ch, 9, 700), RangeError);
-  assert.throws(() => channelLightPoints(ch, 3, 0), RangeError);
+  assert.throws(() => channelLightPoints(ch, 0, 700), { code: 'state', message: /whole number of lights/ });
+  assert.throws(() => channelLightPoints(ch, 9, 700), { code: 'state', message: /whole number of lights/ });
+  assert.throws(() => channelLightPoints(ch, 3, 0), { code: 'state', message: /positive finite distance/ });
   assert.ok(channelLightPoints(ch, 3, 5000)[0].weight > pts[0].weight, 'a longer decay length weights the top more');
 });
 
@@ -197,8 +197,11 @@ test('bolt options are checked', () => {
   assert.throws(() => new Weather({ lightning: { light: { segments: 2.5 } } }), RangeError);
   assert.throws(() => new Weather({ lightning: { light: { segments: 9 } } }), RangeError);
   assert.throws(() => new Weather({ lightning: { light: { line: 'yes' } } }), TypeError);
-  assert.throws(() => new LightningBolt({}), TypeError);
-  assert.throws(() => new LightningBolt({ weather: new Weather(), coreRadiance: -1 }), RangeError);
+  assert.throws(() => new LightningBolt({}), { code: 'state', message: /with a Weather/ });
+  assert.throws(() => new LightningBolt({ weather: new Weather(), coreRadiance: -1 }), {
+    code: 'state',
+    message: /coreRadiance to a finite nonnegative number/,
+  });
   assert.doesNotThrow(() => new Weather({ lightning: { bolt: {}, light: { line: true, segments: 8 } } }));
 });
 

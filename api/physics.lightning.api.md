@@ -30,6 +30,12 @@ export interface LightningFlash {
     readonly time: number;
 }
 
+export interface LightningLoadOptions {
+    readonly id?: string;
+    readonly threads?: number;
+    readonly signal?: AbortSignal;
+}
+
 export interface LightningParams {
     size?: readonly [number, number, number];
     spacing?: number;
@@ -54,10 +60,8 @@ export class LightningSolver implements Solver<LightningParams> {
     readonly channelField: FieldDescriptor;
     readonly thunderField: FieldDescriptor;
     private constructor();
-    static load(options?: {
-        id?: string;
-        signal?: AbortSignal;
-    }): Promise<LightningSolver>;
+    static load(options?: LightningLoadOptions): Promise<LightningSolver>;
+    [Symbol.dispose](): void;
     describe(): {
         id: string;
         rate: 0;
@@ -74,6 +78,7 @@ export class LightningSolver implements Solver<LightningParams> {
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
     potentialAt(x: number, y: number, z: number): number;
+    workCounts(): LightningWorkCounts;
     get residual(): number;
     get status(): LightningStatus;
     get flash(): LightningFlash | undefined;
@@ -91,6 +96,14 @@ export interface LightningSoundSource {
 }
 
 export type LightningStatus = 'pending' | 'growing' | 'halted' | 'grounded';
+
+export interface LightningWorkCounts {
+    readonly threads: number;
+    readonly sweeps: number;
+    readonly simdPairs: number;
+    readonly haloCopies: number;
+    readonly threadSimdPairs: readonly number[];
+}
 
 export interface SolvedLightningChannel {
     readonly segments: Float32Array;

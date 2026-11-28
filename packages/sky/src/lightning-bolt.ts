@@ -8,7 +8,6 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
-import { finiteVector } from '@margoengine/math/validate';
 import type { Vec3 } from '@margoengine/math';
 import { applyView, viewSize } from '../../shared/view-rect.js';
 import {
@@ -91,9 +90,11 @@ const norm = (v: number[]): number[] => {
  * grid. Forks leave the main channel and each other downward, shorter at each generation, as in the particle-traced
  * channel of K. T. Reed and B. Wyvill, "Visual simulation of lightning", SIGGRAPH 1994, 359-364. The main channel
  * always reaches `end`; forks stop at the ground height of `end` or at the segment cap.
- * @throws TypeError for an end that is not three finite numbers; RangeError for a setting out of range or a start not above the end.
+ * @throws MargoError `state` for invalid points or growth settings.
  */
 export function lightningChannel(options: LightningChannelOptions): LightningChannel {
+  if (!options || typeof options !== 'object')
+    throw new MargoError('state', 'Give lightning channel options with a seed and two endpoints.');
   const {
     seed,
     start,
@@ -106,13 +107,19 @@ export function lightningChannel(options: LightningChannelOptions): LightningCha
     eta = 2,
     maxSegments = 768,
   } = options;
-  if (!Number.isFinite(seed)) throw new RangeError('Lightning channel seed must be a finite number');
-  finiteVector(start, 3, 'Lightning channel start');
-  finiteVector(end, 3, 'Lightning channel end');
+  if (!Number.isFinite(seed)) throw new MargoError('state', 'Give the lightning channel a finite seed.');
+  for (const [label, point] of [
+    ['start', start],
+    ['end', end],
+  ] as const) {
+    if (point?.length !== 3 || !finiteF32(point[0]) || !finiteF32(point[1]) || !finiteF32(point[2]))
+      throw new MargoError('state', `Give the lightning channel ${label} three finite Float32 coordinates.`);
+  }
   const range = (v: number, lo: number, hi: number, name: string, whole = false) => {
-    if (!(v >= lo && v <= hi) || (whole && !Number.isInteger(v)))
-      throw new RangeError(
-        `Lightning channel ${name} must be ${whole ? 'a whole number ' : ''}from ${lo} to ${hi}; got ${String(v)}`,
+    if (typeof v !== 'number' || !(v >= lo && v <= hi) || (whole && !Number.isInteger(v)))
+      throw new MargoError(
+        'state',
+        `Set lightning channel ${name} to ${whole ? 'a whole number ' : 'a value '}from ${lo} to ${hi}.`,
       );
   };
   range(detail, 8, 400, 'detail');
@@ -123,7 +130,7 @@ export function lightningChannel(options: LightningChannelOptions): LightningCha
   range(eta, 0, 8, 'eta');
   range(maxSegments, 8, MAX_CHANNEL_SEGMENTS, 'maxSegments', true);
   if (!(start[1] > end[1]))
-    throw new RangeError('Lightning channel start must be above its end; give the cloud end first');
+    throw new MargoError('state', 'Start the lightning channel above its end. Give the cloud point first.');
   const random = generator(seed),
     length = Math.hypot(end[0] - start[0], end[1] - start[1], end[2] - start[2]),
     step = length / detail,
@@ -236,7 +243,7 @@ export function lightningChannel(options: LightningChannelOptions): LightningCha
  * piece's middle for a line of the piece's length (`radius` half of it), with a share of the light (`weight`, all
  * summing to 1) from the light a return stroke gives off at that height, which falls off as exp(-height / `decay`)
  * (Jordan and Uman 1983, as {@link Weather.lightningLight}).
- * @throws RangeError for a count that is not a whole number from 1 to 8 or a decay of 0 or less.
+ * @throws MargoError `state` for an invalid light count or decay.
  */
 export function channelLightPoints(
   channel: LightningChannel,
@@ -244,9 +251,9 @@ export function channelLightPoints(
   decay: number,
 ): { position: Vec3; weight: number; radius: number }[] {
   if (!Number.isInteger(count) || count < 1 || count > 8)
-    throw new RangeError('Lightning channel light count must be a whole number from 1 to 8');
+    throw new MargoError('state', 'Give the lightning channel a whole number of lights from 1 to 8.');
   if (!(decay > 0) || !Number.isFinite(decay))
-    throw new RangeError('Lightning channel light decay must be above 0 metres');
+    throw new MargoError('state', 'Set lightning channel light decay to a positive finite distance in metres.');
   const s = channel.segments,
     lengths: number[] = [];
   let total = 0;
@@ -475,13 +482,13 @@ export class LightningBolt implements EnginePlugin {
       typeof options.weather !== 'object' ||
       options.weather === null
     )
-      throw new TypeError('LightningBolt needs a Weather; pass {weather}');
+      throw new MargoError('state', 'Attach LightningBolt with a Weather in the weather option.');
     for (const [k, v] of [
       ['coreRadiance', options.coreRadiance],
       ['glowRadiance', options.glowRadiance],
     ] as const)
       if (v !== undefined && !(v >= 0 && Number.isFinite(v)))
-        throw new RangeError(`LightningBolt ${k} must be a finite number of 0 or more`);
+        throw new MargoError('state', `Set LightningBolt ${k} to a finite nonnegative number.`);
     if (options.field !== undefined) {
       if (typeof options.field !== 'function' || options.channel !== undefined)
         throw new MargoError(

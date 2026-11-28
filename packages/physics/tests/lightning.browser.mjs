@@ -55,6 +55,42 @@ try {
   console.log(
     `ATMO-07 ${result.compat ? 'WebGL2' : 'WebGPU'} registered channel ${result.plain.hash}: ${result.lit.bright} bright pixels over ${result.lit.rows} rows at frame ${result.strokeFrame}.`,
   );
+
+  const threads = await page.evaluate(async () => {
+    const worker = new Worker('/packages/physics/tests/fixtures/lightning-threads-worker.mjs', { type: 'module' });
+    let timer;
+    try {
+      return await new Promise((resolve, reject) => {
+        timer = setTimeout(() => reject(new Error('The isolated LightningSolver worker did not finish.')), 30_000);
+        worker.onmessage = ({ data }) => resolve(data);
+        worker.onerror = (event) => reject(new Error(event.message));
+        worker.onmessageerror = () => reject(new Error('The LightningSolver worker returned an unreadable receipt.'));
+      });
+    } finally {
+      clearTimeout(timer);
+      worker.terminate();
+    }
+  });
+  assert.equal(threads.error, undefined, threads.error);
+  const { serial, parallel } = threads;
+  assert.equal(serial.helpers, 0);
+  assert.equal(parallel.helpers, 3);
+  assert.equal(parallel.hash, serial.hash);
+  assert.ok(threads.equalSnapshots && serial.replayed && parallel.replayed);
+  assert.ok(parallel.channelCount > 0 && parallel.channelCount === serial.channelCount);
+  assert.ok(parallel.work.sweeps > 0 && parallel.work.sweeps === serial.work.sweeps);
+  assert.equal(parallel.work.simdPairs, serial.work.simdPairs);
+  assert.equal(parallel.work.haloCopies, serial.work.haloCopies);
+  // 77 rows by five SIMD pairs, with the 20-row share assigned to the last part.
+  assert.deepEqual(
+    parallel.work.threadSimdPairs,
+    [95, 95, 95, 100].map((n) => n * parallel.work.sweeps),
+  );
+  assert.equal(parallel.work.simdPairs, 385 * parallel.work.sweeps);
+  assert.deepEqual(errors, []);
+  console.log(
+    `ATMO-07 isolated browser worker ${parallel.hash}: ${parallel.work.simdPairs} SIMD stencil pairs on four threads.`,
+  );
 } finally {
   await close();
 }

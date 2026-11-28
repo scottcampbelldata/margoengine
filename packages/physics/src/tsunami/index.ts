@@ -6,7 +6,7 @@ import { WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS } from '../sea/wake.js';
 import { regionWords, STACK_BYTES } from '../world/memory.js';
 import type { FieldDescriptor, FieldUse, Port, Region, Solver, SolverHost, StepContext } from '../world/solver.js';
 import { bindTsunamiKernel, loadTsunamiBuilds, type TsunamiBuilds, type TsunamiKernel } from './kernel.js';
-import type { TsunamiThreads } from './threads.js';
+import type { NativePhasePool } from '../native-phase-pool.js';
 
 /** Layout of the cell-centred f64 inundation records. */
 export const TSUNAMI_LAYOUT = 1;
@@ -284,7 +284,7 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
   private readonly sources: readonly FieldDescriptor[];
   private readonly terrain?: BedShape;
   private state?: State;
-  private threads?: TsunamiThreads;
+  private threads?: NativePhasePool;
   private disposed = false;
 
   private constructor(
@@ -342,8 +342,12 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
     if (threads > 1) {
       if (!builds.shared)
         throw new MargoError('unsupported', 'Use a shared-memory runtime for tsunami threads or load with threads: 1.');
-      const { createTsunamiThreads } = await import('./threads.js');
-      solver.threads = await createTsunamiThreads(threads, signal);
+      const { createNativePhasePool } = await import('../native-phase-pool.js');
+      solver.threads = await createNativePhasePool(threads, {
+        subject: 'Tsunami',
+        phaseExport: 'tsunami_thread_phase',
+        signal,
+      });
     }
     return solver;
   }

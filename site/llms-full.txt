@@ -15254,8 +15254,8 @@ It displays the moving wet/dry boundary and depth-averaged surface, without an o
 A world tick accepts only finite depth, discharge, volume and inundation records. If the explicit solver
 would need more than 4,096 CFL substeps, use a coarser grid or smaller forcing. No partial step is published.
 
-The optional tsunami entry is 8,743 B gzip with a 9,006 B ceiling. The plain and shared Wasm assets are
-each 23,068 B raw and 9,530 B gzip. The optional worker asset is 750 B gzip. Extreme finite Coriolis rates retain the midpoint rotation's bounded
+The optional tsunami entry is 8,883 B gzip with a 9,006 B ceiling. The plain and shared Wasm assets are
+each 23,068 B raw and 9,530 B gzip. Its optional worker asset is 767 B gzip and is shared with ATMO-07. Extreme finite Coriolis rates retain the midpoint rotation's bounded
 half-turn limit. Resolve the rotation in time when phase accuracy matters.
 
 An incoming wave is uniform along its configured open side and is sampled once per tick. Give its
@@ -15319,9 +15319,17 @@ for visualization and relative acoustic delays. Predicting strike locations, cur
 absolute sound pressure requires storm observations and additional plasma and atmospheric models.
 The live Sky field borrows accepted geometry and a relative radiance envelope at the requested world time.
 Points between accepted physics ticks use the last accepted geometry. Weather retains its own light schedule. Grid capacity follows available wasm32 arena space, including each
-published field's two mirrors. The optional entry measures 6,341 B gzip within a 6,597 B ceiling. Both native
-modules measure 2,491 B raw and 1,200 B gzip and load only with that entry. Sky's bolt measures 6,044 B gzip
-within a 6,300 B ceiling. Core and Stage gain zero bytes.
+published field's two mirrors. The optional entry measures 8,807 B gzip within a 9,072 B ceiling. Both native
+modules measure 3,272 B raw and 1,648 B gzip and load with that entry. Sky's bolt measures 6,103 B gzip
+within a 6,300 B ceiling. The optional worker asset is 767 B gzip and is shared with SEA-06. Core and Stage
+gain zero bytes.
+
+The default serial solve runs on every supported host. Use two or more threads in Node or a
+cross-origin-isolated browser worker with a shared-memory world. Workers partition independent
+Jacobi rows without changing the residual, order of additions or stochastic branch choices.
+The browser window runs serially. Iteration count still increases as the grid grows or the requested
+tolerance tightens. Each work receipt counts the accepted sweeps, stencil pairs and halo writes.
+Receipts describe recent execution, while snapshots retain the physical state.
 
 ### Thermo-viscoplastic lava and nearshore occupancy (EARTH-10)
 

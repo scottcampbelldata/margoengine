@@ -3,6 +3,7 @@ import { MargoError } from '@margoengine/math/errors';
 import type { Bed } from '@margoengine/math/fields';
 import { exp, hypot, ln, pow } from '@margoengine/math/pinned';
 import { RandomStream, solverNumber } from '@margoengine/math/random';
+import type { NativePhasePool } from '../native-phase-pool.js';
 import { canShareMemory, DYNAMIC_BASE, isShared, MAX_MEMORY_PAGES, regionWords, STACK_BYTES } from '../world/memory.js';
 import type { Cell, FieldDescriptor, Port, Region, Solver, SolverHost, StepContext } from '../world/solver.js';
 
@@ -16,6 +17,8 @@ const ZERO: Cell = [0, 0, 0];
 const OPEN = -1;
 const SEED = -2;
 const HALTED = -3;
+const MAX_THREADS = 64;
+const THREAD_JOB_WORDS = 8;
 
 /** A count row followed by channel rows [start xyz, order, end xyz, 0] or thunder rows [midpoint xyz, emission s, weight, length m]. */
 export const LIGHTNING_LAYOUT = 1;
@@ -23,6 +26,30 @@ export const LIGHTNING_CHANNEL_WORDS = 8;
 export const LIGHTNING_THUNDER_WORDS = 6;
 const STRIDE = LIGHTNING_CHANNEL_WORDS;
 const SOUND_WORDS = LIGHTNING_THUNDER_WORDS;
+
+/** Load the optional lightning kernel and its execution mode. */
+export interface LightningLoadOptions {
+  /** Unique solver identifier. Defaults to 'lightning'. */
+  readonly id?: string;
+  /** Total CPU threads including the caller. Defaults to one. */
+  readonly threads?: number;
+  /** Cancels loading the native implementation and workers. */
+  readonly signal?: AbortSignal;
+}
+
+/** Finite-difference work in the most recent accepted electrical update. */
+export interface LightningWorkCounts {
+  /** Total execution threads including the caller. */
+  readonly threads: number;
+  /** Completed Jacobi sweeps, including the last stopping sweep of each solve. */
+  readonly sweeps: number;
+  /** Native two-node SIMD stencil evaluations. */
+  readonly simdPairs: number;
+  /** Scalar mirror writes on the insulated X and Z boundary halos. */
+  readonly haloCopies: number;
+  /** SIMD stencil evaluations by partition, in worker order with the caller first. */
+  readonly threadSimdPairs: readonly number[];
+}
 
 /** Local forward electric fields required for seeded breakdown, in V/m. */
 export interface LightningBreakdown {
@@ -121,7 +148,10 @@ type Native = {
     nz: number,
     eps: number,
     sweeps: number,
+    receipt: number,
   ): number;
+  relax_prepare(p: number, nx: number, ny: number, nz: number): void;
+  lightning_thread_phase(job: number, stage: number, part: number, parts: number): number;
 };
 
 const SIZE_DEFAULT = [13, 19, 13] as const;
@@ -193,6 +223,12 @@ export class LightningSolver implements Solver<LightningParams> {
   private host!: SolverHost;
   private native!: Native;
   private initialized = false;
+  private disposed = false;
+  private threads?: NativePhasePool;
+  private threadWork?: { readonly job: Region; readonly residuals: Region };
+  private solveReceipt!: Region;
+  private trialSweeps = 0;
+  private acceptedSweeps = 0;
   private cell: Cell = ZERO;
   private origin: Vec3 = ZERO;
   private size: Vec3 = SIZE_DEFAULT;
@@ -245,8 +281,12 @@ export class LightningSolver implements Solver<LightningParams> {
   }
 
   /** Loads the optional native Poisson solver. */
-  static async load(options: { id?: string; signal?: AbortSignal } = {}): Promise<LightningSolver> {
-    const { signal } = options;
+  static async load(options: LightningLoadOptions = {}): Promise<LightningSolver> {
+    if (!options || typeof options !== 'object')
+      throw new MargoError('state', 'Load lightning with an options object.');
+    const { signal, threads = 1 } = options;
+    if (!Number.isInteger(threads) || threads < 1 || threads > MAX_THREADS)
+      throw new MargoError('state', `Choose a whole number of lightning threads from 1 to ${MAX_THREADS}.`);
     const [plain, shared] = await Promise.all([
       compile(new URL(/* @vite-ignore */ './lightning-kernel.wasm?no-inline', import.meta.url), signal),
       canShareMemory()
@@ -254,7 +294,27 @@ export class LightningSolver implements Solver<LightningParams> {
         : undefined,
     ]);
     signal?.throwIfAborted();
-    return new LightningSolver(plain, shared, options.id ?? 'lightning');
+    const solver = new LightningSolver(plain, shared, options.id ?? 'lightning');
+    if (threads > 1) {
+      if (!shared)
+        throw new MargoError(
+          'unsupported',
+          'Use a shared-memory runtime for lightning threads or load with threads: 1.',
+        );
+      const { createNativePhasePool } = await import('../native-phase-pool.js');
+      solver.threads = await createNativePhasePool(threads, {
+        subject: 'Lightning',
+        phaseExport: 'lightning_thread_phase',
+        signal,
+      });
+    }
+    return solver;
+  }
+
+  /** Stop optional workers. Remove the solver from its world before disposal. */
+  [Symbol.dispose](): void {
+    this.disposed = true;
+    this.threads?.close();
   }
 
   describe() {
@@ -270,6 +330,9 @@ export class LightningSolver implements Solver<LightningParams> {
   }
 
   init(host: SolverHost, params: LightningParams = {}): void {
+    if (this.disposed) throw new MargoError('state', 'This lightning solver was disposed. Load a new solver.');
+    if (this.threads && !isShared(host.memory))
+      throw new MargoError('unsupported', 'Give lightning threads a shared-memory world or load with threads: 1.');
     if (this.initialized)
       throw new MargoError('state', 'Lightning solver already belongs to a world. Load another solver.');
     if (!params || typeof params !== 'object')
@@ -290,7 +353,8 @@ export class LightningSolver implements Solver<LightningParams> {
     // Each output field has two registry mirrors beyond its owned buffer.
     const gridBytes = (4 * 8 + 1 + 4) * this.volume + 8 * nx * nz;
     const channelBytes = (4 + 3 * (STRIDE * 4 + SOUND_WORDS * 8)) * count;
-    if (gridBytes + channelBytes + STACK_BYTES + DYNAMIC_BASE + 128 >= MAX_MEMORY_PAGES * 65536)
+    const workerBytes = this.threads ? (this.threads.count - 1) * (STACK_BYTES + 32) + 48 : 0;
+    if (gridBytes + channelBytes + workerBytes + STACK_BYTES + DYNAMIC_BASE + 128 >= MAX_MEMORY_PAGES * 65536)
       throw new MargoError('state', 'Lightning grid exceeds wasm32 memory. Use smaller grid extents.');
     this.spacing = positive(params.spacing ?? 80, 'node spacing');
     const origin = params.origin ?? ZERO;
@@ -386,6 +450,9 @@ export class LightningSolver implements Solver<LightningParams> {
     this.header = reserve('flash-state', 5);
     this.segments = host.allocate('lightning-channel', count * STRIDE * 4, 'f32', LIGHTNING_LAYOUT);
     this.sound = reserve('lightning-thunder', count * SOUND_WORDS);
+    this.solveReceipt = host.allocate('lightning-sweep-receipt', 4, 'u32', LIGHTNING_LAYOUT);
+    if (this.threads) this.bindWorkers(this.threads);
+    this.trialSweeps = 0;
     this.initializeGrid(params);
     const seed = this.index(x, ny - 1, z);
     this.i32(this.parent).fill(OPEN);
@@ -496,20 +563,84 @@ export class LightningSolver implements Solver<LightningParams> {
     return regionWords(this.host.memory, region) as Uint8Array;
   }
 
+  private bindWorkers(threads: NativePhasePool): void {
+    const host = this.host;
+    const job = host.allocate('lightning-thread-job', THREAD_JOB_WORDS * 4, 'u32', LIGHTNING_LAYOUT);
+    const residuals = host.allocate('lightning-thread-residuals', threads.count * 8, 'f64', LIGHTNING_LAYOUT);
+    const control = host.allocate('lightning-thread-control', threads.controlWords * 4, 'i32', LIGHTNING_LAYOUT);
+    const stackTops = Array.from({ length: threads.count - 1 }, (_, i) => {
+      const stack = host.allocate(`lightning-worker-stack-${i + 1}`, STACK_BYTES, 'u8', LIGHTNING_LAYOUT);
+      return Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
+    });
+    threads.init({
+      module: this.shared!,
+      memory: host.memory,
+      control: control.byteOffset,
+      job: job.byteOffset,
+      stackTops,
+    });
+    this.threadWork = { job, residuals };
+  }
+
+  private solveThreaded(
+    threads: NativePhasePool,
+    job: Region,
+    residuals: Region,
+  ): { residual: number; sweeps: number } {
+    const [nx, ny, nz] = this.size;
+    const at = job.byteOffset;
+    const addresses = regionWords(this.host.memory, job) as Uint32Array;
+    addresses.set([0, 0, this.forcing.byteOffset, this.mask.byteOffset, nx, ny, nz, residuals.byteOffset]);
+    const partition = () => this.native.lightning_thread_phase(at, 0, 0, threads.count);
+    const parts = this.f64(residuals);
+    let source = this.candidate;
+    let target = this.scratch;
+    let residual = 0;
+    let sweeps = 0;
+    while (sweeps < this.sweeps) {
+      addresses[0] = source.byteOffset;
+      addresses[1] = target.byteOffset;
+      this.native.relax_prepare(source.byteOffset, nx, ny, nz);
+      const status = threads.phase(0, partition);
+      if (status !== 0) return { residual: Infinity, sweeps };
+      residual = 0;
+      for (const correction of parts) residual = Math.max(residual, correction);
+      const previous = source;
+      source = target;
+      target = previous;
+      sweeps++;
+      if (residual <= this.eps) break;
+    }
+    if (source !== this.candidate) this.f64(this.candidate).set(this.f64(source));
+    return { residual, sweeps };
+  }
+
   private solvePotential(): number {
     const [nx, ny, nz] = this.size;
     this.f64(this.scratch).fill(0);
-    const residual = this.native.relax_potential(
-      this.candidate.byteOffset,
-      this.scratch.byteOffset,
-      this.forcing.byteOffset,
-      this.mask.byteOffset,
-      nx,
-      ny,
-      nz,
-      this.eps,
-      this.sweeps,
-    );
+    const receipt = regionWords(this.host.memory, this.solveReceipt) as Uint32Array;
+    const work = this.threadWork;
+    let residual: number;
+    let completed: number;
+    if (work) {
+      const result = this.solveThreaded(this.threads!, work.job, work.residuals);
+      residual = result.residual;
+      completed = result.sweeps;
+    } else {
+      residual = this.native.relax_potential(
+        this.candidate.byteOffset,
+        this.scratch.byteOffset,
+        this.forcing.byteOffset,
+        this.mask.byteOffset,
+        nx,
+        ny,
+        nz,
+        this.eps,
+        this.sweeps,
+        this.solveReceipt.byteOffset,
+      );
+      completed = receipt[0]!;
+    }
     if (!(Number.isFinite(residual) && residual >= 0))
       throw new MargoError(
         'failed',
@@ -526,10 +657,15 @@ export class LightningSolver implements Solver<LightningParams> {
           'Lightning potential or boundary rail is invalid. Use compatible charge, voltage and grounded geometry.',
         );
     }
+    const total = this.trialSweeps + completed;
+    if (!Number.isSafeInteger(total * Math.max(Math.ceil(nx / 2) * ny * nz, 2 * ny * (nx + nz))))
+      throw new MargoError('failed', 'Lightning work exceeds numeric range. Use fewer sweeps or a smaller grid.');
+    this.trialSweeps = total;
     return residual;
   }
 
   private acceptPotential(residual: number): void {
+    this.acceptedSweeps = this.trialSweeps;
     this.f64(this.potential).set(this.f64(this.candidate));
     this.f64(this.header)[3] = residual;
   }
@@ -683,6 +819,7 @@ export class LightningSolver implements Solver<LightningParams> {
   }
 
   step(context: StepContext, dt: number): void {
+    this.requireInitialized();
     const cell = checkedCell(context.cell, 'step cell');
     const elapsed = finite((context.tick + 1) * positive(dt, 'step duration') - this.start, 'elapsed leader time');
     const header = this.f64(this.header);
@@ -700,6 +837,7 @@ export class LightningSolver implements Solver<LightningParams> {
       );
     const random = new RandomStream(context.seed, this.rngId);
     this.f64(this.candidate).set(this.f64(this.potential));
+    this.trialSweeps = 0;
     let residual = header[3]!;
     try {
       for (let n = first; n <= limit; n++) {
@@ -757,6 +895,7 @@ export class LightningSolver implements Solver<LightningParams> {
   }
 
   private requireInitialized(): void {
+    if (this.disposed) throw new MargoError('state', 'This lightning solver was disposed. Load a new solver.');
     if (!this.initialized)
       throw new MargoError('state', 'Lightning solver is not initialized. Add it to a PhysicsWorld.');
   }
@@ -767,6 +906,26 @@ export class LightningSolver implements Solver<LightningParams> {
     if (![x, y, z].every((v, k) => Number.isInteger(v) && v >= 0 && v < this.size[k]!))
       throw new MargoError('state', 'Lightning potential node is outside the grid. Use valid x, y and z indices.');
     return this.voltage * this.f64(this.potential)[this.index(x, y, z)]!;
+  }
+
+  /** Counts the last accepted electrical update. Execution receipts are kept outside snapshots. */
+  workCounts(): LightningWorkCounts {
+    this.requireInitialized();
+    const [nx, ny, nz] = this.size;
+    const threads = this.threads?.count ?? 1;
+    const sweeps = this.acceptedSweeps;
+    const rows = ny * nz;
+    const pairsPerRow = Math.ceil(nx / 2);
+    return {
+      threads,
+      sweeps,
+      simdPairs: sweeps * rows * pairsPerRow,
+      haloCopies: sweeps * 2 * ny * (nx + nz),
+      threadSimdPairs: Array.from({ length: threads }, (_, part) => {
+        const span = Math.floor(((part + 1) * rows) / threads) - Math.floor((part * rows) / threads);
+        return sweeps * span * pairsPerRow;
+      }),
+    };
   }
 
   /** Maximum normalized potential correction in the last native sweep. */

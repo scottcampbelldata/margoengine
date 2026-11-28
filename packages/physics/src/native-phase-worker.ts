@@ -1,16 +1,16 @@
-import { TSUNAMI_THREAD_CONTROL as slots, type TsunamiWorkerStart } from './threads.js';
+import { NATIVE_PHASE_CONTROL as slots, type NativePhaseWorkerStart } from './native-phase-pool.js';
 
 type NativePhase = (job: number, stage: number, part: number, parts: number) => number;
 
-function run(start: TsunamiWorkerStart): void {
+function run(start: NativePhaseWorkerStart): void {
   const view = () => new Int32Array(start.memory.buffer, start.control, slots.status + start.parts - 1);
   let phase: NativePhase;
   try {
     const { exports } = new WebAssembly.Instance(start.module, { env: { memory: start.memory } });
     const stack = exports.__stack_pointer;
-    const kernelPhase = exports.tsunami_thread_phase;
+    const kernelPhase = exports[start.phaseExport];
     if (!(stack instanceof WebAssembly.Global) || typeof kernelPhase !== 'function') {
-      throw new Error('Tsunami worker Wasm exports are missing. Rebuild both tsunami kernel variants.');
+      throw new Error(`Missing native worker export ${start.phaseExport}. Rebuild the solver's shared Wasm kernel.`);
     }
     stack.value = start.stackTop;
     phase = kernelPhase as NativePhase;
@@ -50,7 +50,7 @@ if (typeof node === 'string') {
   const name = 'node:worker_threads';
   const { parentPort } = (await import(/* @vite-ignore */ /* webpackIgnore: true */ name)) as {
     parentPort: {
-      once(event: 'message', listener: (message: TsunamiWorkerStart) => void): void;
+      once(event: 'message', listener: (message: NativePhaseWorkerStart) => void): void;
       postMessage(message: string): void;
     } | null;
   };
@@ -61,7 +61,7 @@ if (typeof node === 'string') {
     onmessage: (event: MessageEvent<MessagePort>) => void;
   };
   worker.onmessage = ({ data: port }) => {
-    port.onmessage = (event: MessageEvent<TsunamiWorkerStart>) => {
+    port.onmessage = (event: MessageEvent<NativePhaseWorkerStart>) => {
       port.close();
       run(event.data);
     };

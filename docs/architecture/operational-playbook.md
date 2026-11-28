@@ -4874,7 +4874,10 @@ channel and the same path drives Sky's renderer and lights. The acoustic fixture
 OutdoorSound travel time. Optional initiation and growth thresholds gate each eligible bond in V/m.
 The candidate field and new segments are accepted only after native correction and timing checks.
 Both renderers use the accepted layout-1 channel directly, with the same origin offset and flash
-clock. Absolute acoustic pressure and evolving cloud fields still need separate models.
+clock. The optional worker path splits whole SIMD rows after the leader publishes insulated
+halos. It joins each sweep for a scalar maximum residual, preserving serial convergence, growth
+and snapshots. Work receipts count accepted sweeps and actual stencil participation per thread.
+Absolute acoustic pressure and evolving cloud fields still need separate models.
 
 ### Vortex wind and pressure (ATMO-05)
 

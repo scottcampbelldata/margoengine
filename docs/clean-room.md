@@ -949,6 +949,14 @@ rejects the trial, since a max that ignores NaN cannot establish convergence.
 [Mansell et al.](https://doi.org/10.1029/2000JD000244) ·
 [Long Chen, Finite Difference Methods for Poisson Equation, §3](https://www.math.uci.edu/~chenlong/226/FDM.pdf).
 
+Each Jacobi sweep reads the previous field after reflecting the insulated side halos. A shared
+worker processes complete transverse rows with the same two-node SIMD stencil as serial. The
+next sweep begins after each partition publishes its maximum correction. The result retains the
+ordering of every field update, including the discarded odd-width SIMD lane. The counted work
+is one native pair per two nodes (rounded up per row) per completed sweep.
+[Randall J. LeVeque, Finite Difference Methods (2007), §4.1](https://doi.org/10.1137/1.9780898717839.ch4) ·
+[HTML Standard, agents](https://html.spec.whatwg.org/multipage/webappapis.html#agents).
+
 Vladimir A. Rakov and Martin A. Uman, *Lightning: Physics and Effects* (2003), describes the downward leader and
 upward return stroke. James D. Hill, Martin A. Uman and Douglas M. Jordan, “High-speed video observations of
 a lightning stepped leader” (2011), gives the measured order of leader speed. J. Jerauld et al., “Electric and

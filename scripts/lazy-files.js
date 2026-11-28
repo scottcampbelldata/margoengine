@@ -159,11 +159,11 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
-    file: 'packages/physics/dist/tsunami-thread.js',
-    label: 'tsunami-thread.js',
-    kind: 'Worker for Rust SIMD coastal flux sweeps',
+    file: 'packages/physics/dist/solver-phase-thread.js',
+    label: 'solver-phase-thread.js',
+    kind: 'Worker for shared-memory SIMD coastal flux sweeps and lightning relaxation',
     measure: 'file',
-    when: 'TsunamiSolver.load({ threads }) with more than one thread',
+    when: 'TsunamiSolver.load({ threads }) or LightningSolver.load({ threads }) with more than one thread',
   },
   {
     package: '@margoengine/physics',

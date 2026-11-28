@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21634927,
+  "total": 21637402,
   "history": [
     {
       "date": "2026-10-24",
@@ -15286,6 +15286,12 @@
       "date": "2026-11-27",
       "commit": "machinery-mechanisms",
       "reason": "New entry @margoengine/machinery/mechanisms (U5): fifteen closed-form mechanism poses as pure functions, no engine import; the umbrella entry is a 67 B re-export of it. @margoengine/machinery/mechanisms 3864 B gzip (ceiling 0 to 4120 B); margoengine/machinery/mechanisms 67 B gzip (ceiling 0 to 323 B)."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "atmo-07-threaded-poisson",
+      "reason": "ATMO-07 physics/lightning grows from 6341 to 8807 B gzip, ceiling 6597 to 9072 B, for optional worker execution of SIMD rows, deterministic convergence and actual sweep receipts. A separate solver entry would duplicate initialization, memory and accepted channel contracts. Each lazy native asset grows from 1200 to 1648 B. The two solvers share the 767 B worker file. SEA-06 stays under 9006 B at 8883 B and Sky lightning-bolt stays under 6300 B at 6103 B. Core and Stage are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16170,7 +16176,7 @@
     "@margoengine/physics/lava": 6147,
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
-    "@margoengine/physics/lightning": 6597,
+    "@margoengine/physics/lightning": 9072,
     "@margoengine/physics/loads": 74232,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
