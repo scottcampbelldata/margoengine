@@ -10667,6 +10667,23 @@ is 0.39 off without the shader term; the ridge-smoke shot's pre-dither float fla
 to 2.73 mid against main. Missing: the change of the phase angle to the sun between the horizon and the actual ray, and
 shadows in the air (cloud and smoke-column shadows).
 
+**Fog past the scene's end (KB-SKY-BAREBELOW1, 2026-11-28).** The fog pass discarded every pixel with no depth, so
+where a world ended before the horizon (its edge, or a camera far plane short of the far ground) the sky's own horizon
+colour showed under the far ranges as a flat band, unlike the fogged ground beside it. A bare pixel above the horizon is
+still the sky's; one below it takes the fog at infinity (opacity 1, colour times `fogBelowLight` for a hidden ground,
+no fire haze), the limit of in-scattering as optical depth grows (Bruneton and Neyret 2008). Evidence: sky
+test/fog-below-check.mjs on WebGPU and `MARGO_COMPAT=1` (RTX A6000, ANGLE D3D11): with the ground gone, 31,966 pixels
+below the horizon match the fog colour to 6.0e-4 and the 16,128 sky pixels are unchanged. Fingerprints fog and
+fogColour and traces night-fog, afterlight and preetham-clouds-fog recorded again (WGSL text only).
+
+**Rock facets filtered by footprint (terrain `rock`, 2026-11-28).** Jointed blocks 200 to 600 m off drew as low-poly
+shards: each Worley cell's tilt switched hard at its edge and kept full relief and joint shade while a block spanned 10
+to 60 pixels. The tilt and tone now blend into the second-nearest cell's by F2 - F1 (over 0.14 of a cell plus two
+pixels) and relief, tone and joint shade fall to 0.3 between footprints of 0.006 and 0.04 of a block (Toksvig 2005;
+Bruneton and Neyret 2012). Evidence: terrain test/rock-structure.browser.mjs on WebGPU and `MARGO_COMPAT=1`: 16 m blocks
+47 pixels across jump in tone between neighbouring pixels 0.003 of the time (0.027 before) at an sd of 11 (22 before),
+and a close view keeps its spread. Missing: sub-block weathering texture within a facet.
+
 **The fires' light on the smoke layer at every hour (KB-SKY-FIREDAY1, 2026-11-27).** The look's `lowLayer` added the
 fires' light on the layer (`atmosphere.fireSpots`) by the night's share alone, while the sky fog adds the same fires'
 light to the haze (`fog.fireSpots`) at every hour, so by day a fully hazed far ridge read lighter than the sky over it

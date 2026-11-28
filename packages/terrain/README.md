@@ -377,7 +377,9 @@ not change):
 - facets: jointed blocks `facets` metres across and 2.4 times as tall (default 18; 0 for none), ribs and columns as a
   steep joint set cuts them, and buttresses 4.1 times that, each tilting the
   normal by up to `relief` (0 to 1, default 0.45), with dark joints between them (Worley cells, one point anywhere in
-  each cell, the nearest two of the 27 cells around);
+  each cell, the nearest two of the 27 cells around). Each tilt blends into its neighbour's across the cell edge (by
+  F2 - F1, over 0.14 of a cell plus two pixels), and relief, tone and joint shade fall to 0.3 as a block shrinks from
+  about 170 to 25 pixels across, then to none, so blocks 200 to 600 m away do not read as low-poly shards;
 - gullies, with `TerrainTextures.structure` (one `rgba8unorm` texture over the bounds): its R, drainage 0 to 1, is
   carved `gullies` metres deep (default 6) and darkened as wet, shaded rock, and its G is loose debris such as talus
   fans. `@margoengine/biomes/hydrology` `drainageStructure` makes both from a height grid;

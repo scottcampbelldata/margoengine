@@ -20226,3 +20226,21 @@ reach is solved with the hand it ends with.
 Longuet-Higgins and Stewart (1964), [Radiation stresses in water waves](https://doi.org/10.1016/0011-7471(64)90001-4), §1 and §7, derive the progressive-wave tensor and its rotation. Roelvink et al. (2009), [Modelling storm impacts on beaches, dunes and barrier islands](https://doi.org/10.1016/j.coastaleng.2009.08.006), §3.2, give the directional and roller stresses and the force from their negative divergence. Native workers compute equal per-cell directional sums, the existing roller stresses and Stokes terms, then apply centered differences once all moments are available. The reduction retains the original bin order.
 
 Boers (1996), [Simulation of a surf zone with a barred beach](https://resolver.tudelft.nl/uuid:22dfbc0a-adf8-44cb-9659-9d0a366c88d6), measured the flume conditions. Moghimi et al. (2020), [Development of an ESMF Based Flexible Coupling Application of ADCIRC and WAVEWATCH III for High Fidelity Coastal Inundation Studies](https://doi.org/10.3390/jmse8050308), Table 3 and figure 10, report the offshore forcing and independently measured wave-height and mean-level markers. Daly et al. (2012), [Validation of an advective-deterministic approach to short wave breaking in a surf-beat model](https://doi.org/10.1016/j.coastaleng.2011.08.001), figure 2, provide physical bed coordinates. Janssen, Battjes and van Dongeren (2003), [Long waves induced by short-wave groups over a sloping bottom](https://doi.org/10.1029/2002JC001515), §2.1 and Table 1, give experiment metadata and gauge placement. No competing model's fitted coefficients were used. [Reproduction](whitepaper/reproduce.md#sea-05-accepted-surf-and-boers-flume-gauges)
+
+## Rock facets filtered by footprint, fog past the scene's end: terrain rock, sky fog (2026-11-28)
+
+Above the Treeline look round 5: jointed rock blocks 200 to 600 m away read as low-poly shards (each Voronoi cell a flat
+tilted plane with a hard switch at its edge and dark joint lines), and where the world ended before the horizon the sky's
+own horizon colour showed as a flat band under the far ranges. Sources read (papers only, no companion code):
+
+- M. Toksvig, "Mipmapping normal maps", Journal of Graphics Tools 10(3), 2005,
+  https://doi.org/10.1080/2151237X.2005.10129203 (normal detail finer than a pixel is averaged away, not sampled).
+- E. Bruneton and F. Neyret, "A survey of nonlinear prefiltering methods for efficient and accurate surface shading",
+  IEEE TVCG 18(2), 2012, https://doi.org/10.1109/TVCG.2011.81 (fading meso-scale normal variation with the footprint so
+  the mean shading holds; the relief, tone and joint shade fall with the block's size in pixels).
+- S. Worley, "A cellular texture basis function", SIGGRAPH 1996, https://doi.org/10.1145/237170.237267 (F2 - F1 as the
+  distance to a cell edge: the tilt and tone blend into the second-nearest cell across it, so the normal is continuous).
+- E. Bruneton and F. Neyret, "Precomputed atmospheric scattering", EGSR 2008, https://doi.org/10.1111/j.1467-8659.2008.01245.x
+  (aerial perspective: the in-scattered light along a ray tends to its limit as the ray's optical depth grows, so a ray
+  below the horizon that meets nothing in the scene takes the fog's colour at infinity, not the sky's horizon).
+

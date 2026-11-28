@@ -242,7 +242,12 @@ const f32 = (v: number): string => {
  *   ribs and columns), and buttresses 4.1 times that at 0.7 the strength, the nearest of the points scattered one to a
  *   cell over the 27 cells around the position
  *   (Worley 1996, "A cellular texture basis function", SIGGRAPH), each tilting the normal by up to `relief` in its own
- *   direction, with dark joints where the nearest two points are about equally near (F2 - F1).
+ *   direction, with dark joints where the nearest two points are about equally near (F2 - F1). The tilt and tone blend
+ *   into the second-nearest cell's across the edge (half each where F2 = F1, all the cell's own by F2 - F1 = 0.14 of a
+ *   cell plus two pixels), so an edge is a rounded joint, never a hard switch; relief, tone and joint shade fall to 0.3
+ *   as the pixel footprint grows from 0.006 to 0.04 of a block (about 170 to 25 pixels across it) and to none by 0.4,
+ *   the prefiltering of normal detail with its footprint (Toksvig 2005; Bruneton and Neyret 2012), so blocks 200 to
+ *   600 m away do not read as low-poly shards (Above the Treeline look round 5).
  * - Gullies: with `TerrainTextures.structure`, its R (drainage, 0 to 1) is carved `gullies` metres deep into the
  *   shading normal by its central differences, darkened as wet, shaded rock, and on gentler ground below the faces its
  *   floors and its G (debris fans) carry `debris`. `@margoengine/biomes/hydrology` `drainageStructure` makes one from
@@ -269,14 +274,17 @@ fn terrainRockNoise(p:vec2f,seed:i32)->f32 {
   return mix(mix(terrainRockHash(vec3i(c,seed)).x,terrainRockHash(vec3i(c+vec2i(1,0),seed)).x,u.x),mix(terrainRockHash(vec3i(c+vec2i(0,1),seed)).x,terrainRockHash(vec3i(c+vec2i(1,1),seed)).x,u.x),u.y);
 }
 fn terrainRockFacets(p:vec3f,normal:vec3f,size:f32,fp:f32,steep:f32,weight:f32,seed:vec3i)->vec3f {
-  let q=p*vec3f(1.0,0.42,1.0)/size;let base=vec3i(floor(q));var d1=1e9;var d2=1e9;var id=vec3i(0);
+  let q=p*vec3f(1.0,0.42,1.0)/size;let base=vec3i(floor(q));var d1=1e9;var d2=1e9;var id=vec3i(0);var id2=vec3i(0);
   for(var j=0;j<27;j++){
     let cell=base+vec3i(j%3-1,(j/3)%3-1,j/9-1);let d=distance(q,vec3f(cell)+terrainRockHash(cell+seed));
-    if(d<d1){d2=d1;d1=d;id=cell+seed;}else if(d<d2){d2=d;}
+    if(d<d1){d2=d1;id2=id;d1=d;id=cell+seed;}else if(d<d2){d2=d;id2=cell+seed;}
   }
-  let near=steep*weight*(1.0-smoothstep(0.12,0.4,fp/size));let tilt=terrainRockHash(id+vec3i(17,-31,7))*2.0-1.0;
-  let joint=smoothstep(0.0,max(0.05,2.0*fp/size),d2-d1);
-  terrainRockShade*=mix(1.0,mix(0.82,1.0,joint)*(1.0+${f32(o.tone)}*(terrainRockHash(id).y-0.5)),near);
+  let r=fp/size;let near=steep*weight*mix(1.0,0.3,smoothstep(0.006,0.04,r))*(1.0-smoothstep(0.12,0.4,r));
+  let own=0.5+0.5*smoothstep(0.0,0.14+2.0*r,d2-d1);
+  let tilt=mix(terrainRockHash(id2+vec3i(17,-31,7)),terrainRockHash(id+vec3i(17,-31,7)),own)*2.0-1.0;
+  let joint=mix(1.0,0.82+0.18*smoothstep(0.0,max(0.05,2.0*r),d2-d1),1.0-smoothstep(0.006,0.04,r));
+  let tone=mix(terrainRockHash(id2).y,terrainRockHash(id).y,own);
+  terrainRockShade*=mix(1.0,joint*(1.0+${f32(o.tone)}*(tone-0.5)),near);
   return normalize(normal+${f32(o.relief)}*near*(tilt-normal*dot(tilt,normal)));
 }
 fn terrainRock(position:vec3f,normal:vec3f)->vec3f {

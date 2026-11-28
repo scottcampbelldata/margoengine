@@ -6,7 +6,11 @@
 // 2. a slope of 10 degrees, under the rock's slope range, draws exactly what it draws without rock;
 // 3. from far enough that a pixel covers a block, the face is even again and keeps its mean (no aliasing);
 // 4. a structure texture: a drainage line carves a gully the plain face does not have, and debris on gentle ground
-//    gives its weight to the debris layer.
+//    gives its weight to the debris layer;
+// 5. look round 5: blocks 200 to 600 m away read as low-poly shards (a hard switch of the facet normal at each cell
+//    edge, full relief and dark joints while a block still spans only 10 to 60 pixels). Seen with blocks a few dozen
+//    pixels across, neighbouring pixels rarely jump in tone (edges blend across the cell boundary, relief and joint
+//    contrast fade with the pixel footprint), while a close view keeps its spread of tones.
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -93,7 +97,20 @@ await runSuite(
             if (p[i + 1] > p[i] + 40) green++;
           }
           const mean = l.reduce((a, b) => a + b, 0) / l.length;
-          return { mean, sd: Math.sqrt(l.reduce((a, b) => a + (b - mean) ** 2, 0) / l.length), green: green / l.length };
+          // The share of neighbouring pixel pairs (across and down) whose tone jumps by more than 10 of 255.
+          let jumps = 0;
+          for (let y = 0; y < size - 1; y++)
+            for (let x = 0; x < size - 1; x++) {
+              const i = y * size + x;
+              if (Math.abs(l[i] - l[i + 1]) > 10) jumps++;
+              if (Math.abs(l[i] - l[i + size]) > 10) jumps++;
+            }
+          return {
+            mean,
+            sd: Math.sqrt(l.reduce((a, b) => a + (b - mean) ** 2, 0) / l.length),
+            green: green / l.length,
+            jumps: jumps / (2 * (size - 1) ** 2),
+          };
         },
         worst = (a, b) => a.reduce((m, v, i) => Math.max(m, Math.abs(v - b[i])), 0),
         mean = (a, b) => a.reduce((m, v, i) => m + Math.abs(v - b[i]), 0) / a.length,
@@ -114,6 +131,11 @@ await runSuite(
       out.plain = stats(await picture({ degrees: 50 }));
       out.rock = stats(await picture({ degrees: 50, rock }));
       out.gentle = worst(await picture({ degrees: 10 }), await picture({ degrees: 10, rock }));
+      // Blocks of 16 m (and 66 m buttresses) at 60 m on a 128-pixel view of 40 degrees: a pixel covers 0.34 m and a
+      // block about 47 pixels, as on the film's summit face 450 m away at 1080p. The close view: 9 m blocks at 10 m.
+      out.midRock = stats(await picture({ degrees: 50, rock: { ...rock, strata: 0, facets: 16 }, distance: 60 }));
+      out.midPlain = stats(await picture({ degrees: 50, distance: 60 }));
+      out.closeRock = stats(await picture({ degrees: 50, rock: { ...rock, strata: 0 }, distance: 10 }));
       out.farPlain = stats(await picture({ degrees: 50, distance: 2500 }));
       out.farRock = stats(await picture({ degrees: 50, rock, distance: 2500 }));
       const bare = await picture({ degrees: 50, rock: { ...rock, strata: 0, facets: 0, gullies: 30 }, distance: 1500 }),
@@ -138,6 +160,13 @@ await runSuite(
     assert.ok(result.gentle <= 1, `gentle ground draws as without rock (largest difference ${result.gentle})`);
     assert.ok(result.farRock.sd < result.farPlain.sd + 3, `far rock is even again, no aliasing (sd ${result.farRock.sd})`);
     assert.ok(Math.abs(result.farRock.mean - result.farPlain.mean) < 0.05 * result.farPlain.mean, 'far rock keeps its mean');
+    assert.ok(
+      // Before the fix: 0.027 of the pairs jumped and the sd was 22; after it 0.003 and 11.
+      result.midRock.jumps < 0.01,
+      `blocks a few dozen pixels across have no hard edges (share of tone jumps ${result.midRock.jumps})`,
+    );
+    assert.ok(result.midRock.sd < result.midPlain.sd + 15, `mid-distance relief is filtered (sd ${result.midRock.sd})`);
+    assert.ok(result.closeRock.sd > 3 * Math.max(result.plain.sd, 2), `a close view keeps its facets (sd ${result.closeRock.sd})`);
     assert.ok(result.gully > 0.5, `a drainage line carves a gully (mean difference ${result.gully})`);
     assert.ok(result.debris > 0.9 && result.noDebris < 0.01, 'debris gives its weight to the debris layer');
   },
