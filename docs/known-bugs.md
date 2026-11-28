@@ -35,17 +35,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   "Leaf Optical Properties EXperiment 93", JRC EUR 16095 EN, 1995).
 - **Regression:** `packages/procedural/test/shrub-leaves.test.js`.
 
-### Open 2026-11-28: the USD importers drop texture factors, and the default one emission and occlusion (KB-USDZ-FACTORS1, usdz)
+### Fixed 2026-11-28: the USD importers dropped texture factors, and the default one emission and occlusion (KB-USDZ-FACTORS1, usdz)
 
-- **What:** a textured file written by `exportUSDZ` reads back through `@margoengine/usdz` with a white base colour
-  factor, roughness 1 and metalness 1, whatever the file's `inputs:scale` says; the default importer also leaves out
-  `emissiveColor`, its texture and `occlusion`.
+- **What:** a textured file written by `exportUSDZ` read back through `@margoengine/usdz` with a white base colour
+  factor, roughness 1 and metalness 1, whatever the file's `inputs:scale` said; the default importer also left out
+  `emissiveColor`, its texture and `occlusion`, `previewSurface()` left out `occlusion`, and both left out a normal
+  map's scale.
 - **Repro:** `exportUSDZ` of a material with `color: [0.5, 0.25, 1]`, `roughness: 0.4`, `metalness: 0.6`, `emissive:
-  [0.5, 0, 0]` and base colour, metal-rough and emissive textures, then `parseUSDZ(file).document.materials[0]`:
-  `baseColorFactor` [1, 1, 1, 1], `roughnessFactor` 1, `metallicFactor` 1, no emission.
+  [0.5, 0, 0]` and base colour, metal-rough and emissive textures, then `parseUSDZ(file).document.materials[0]`.
 - **Cause:** `material()` in `packages/usdz/src/index.ts` and `surface()` in `preview-surface.ts` set the factors to 1
-  for a textured input and never read the `UsdUVTexture`'s `inputs:scale`; the default `material()` never reads
-  `inputs:emissiveColor` or `inputs:occlusion`. The coat inputs do read their scale (`preview-physical.ts`).
+  for a textured input and never read the `UsdUVTexture`'s `inputs:scale` or `inputs:bias`; the default `material()`
+  never read `inputs:emissiveColor` or `inputs:occlusion`.
+- **Fix:** `packages/usdz/src/preview-factors.ts`, for both importers. A scale glTF's factors hold stays a factor
+  (colour, roughness, metalness, opacity, emission with `KHR_materials_emissive_strength` past 1, normal scale,
+  occlusion strength) and the file's image is kept; anything else is written into the pixels when the model is created.
+- **Regression:** `packages/usdz/tests/texture-factors.test.js`.
 
 ### Open 2026-11-28: gltf/asset, a data entry, imports core/extension (KB-GLTF-DATADEP1, gltf)
 

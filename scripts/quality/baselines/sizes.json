@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21745199,
+  "total": 21756758,
   "history": [
     {
       "date": "2026-10-24",
@@ -15491,6 +15491,12 @@
       "commit": "atmo03-cloud-projection",
       "reason": "ATMO-03: Physics clouds 5,725 to 11,455 B gzip (ceiling 5,981 to 11,799) for checked MAC projection, finite transactional field state and lazy SIMD workers. Environment density-volume 3,563 to 4,386 B (ceiling 3,819 to 4,642) for real cloud extinction with authored droplet radius. Splitting those producer and renderer paths would repeat state or volume transfers. The shared optional native pool moves Physics tsunami from 8,985 to 9,007 B (ceiling 9,006 to 9,278). Core and Stage gain no bytes.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "lane-e-usdz-factors",
+      "reason": "KB-USDZ-FACTORS1: both USD importers read texture scale and bias, emission, occlusion and normal scale, and write into pixels what glTF factors cannot hold (usdz 13,740 to 14,738 B, preview-surface 5,479 to 6,278 B, workers/usdz.js 162,958 to 163,956 B). Both importers share one module; a split entry would leave the plain import with wrong materials.",
+      "grew": 6
     }
   ],
   "items": {
@@ -17032,20 +17038,20 @@
     "@margoengine/ui/react": 34010,
     "@margoengine/ui/world": 10170,
     "@margoengine/ui/world-gl": 7816,
-    "@margoengine/usdz": 14153,
-    "@margoengine/usdz dist/workers/usdz.js": 163144,
+    "@margoengine/usdz": 15156,
+    "@margoengine/usdz dist/workers/usdz.js": 168844,
     "@margoengine/usdz/anim": 2987,
-    "@margoengine/usdz/clips": 28825,
-    "@margoengine/usdz/compose": 25021,
+    "@margoengine/usdz/clips": 30240,
+    "@margoengine/usdz/compose": 26473,
     "@margoengine/usdz/curves": 3405,
     "@margoengine/usdz/instancer": 2451,
     "@margoengine/usdz/lux": 2221,
     "@margoengine/usdz/materialx": 7561,
-    "@margoengine/usdz/preview-surface": 5515,
+    "@margoengine/usdz/preview-surface": 6509,
     "@margoengine/usdz/shapes": 1457,
     "@margoengine/usdz/skel": 4372,
     "@margoengine/usdz/subdiv": 4929,
-    "@margoengine/usdz/worker": 15236,
+    "@margoengine/usdz/worker": 16231,
     "@margoengine/vfx": 40343,
     "@margoengine/vfx/base": 14674,
     "@margoengine/vfx/blown-sand": 11393,

@@ -22,9 +22,10 @@ import type {
 } from './extension.js';
 import type { GLTFDocument, GLTFMaterial, GLTFNode } from '../../shared/gltf.js';
 import { captureScene } from '../../shared/scene-scope.js';
-import { LinearToSRGB, SRGBToLinear } from '@margoengine/math/color';
+import { LinearToSRGB } from '@margoengine/math/color';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import { physicalExtensions, type PhysicalInput } from './preview-physical.js';
+import { remapPixels, scalarTable, surfaceMaps, type ShaderMap } from './preview-factors.js';
 
 /** Parse limits and loading hooks for the USD readers. Every limit is checked while parsing; a breach throws a `LoaderError` with code `limit`. */
 export interface USDOptions {
@@ -443,23 +444,16 @@ export class USDAsset {
         signal?.throwIfAborted();
         if (source.path) {
           let bitmap = await decode(source.path);
-          const convert = source.opacity ?? source.scalar;
-          if (convert) {
+          if (source.opacity || source.scalar || source.color || source.normal) {
             try {
               const canvas = new OffscreenCanvas(bitmap.width, bitmap.height),
                 context = canvas.getContext('2d')!;
               context.drawImage(bitmap, 0, 0);
               const pixels = context.getImageData(0, 0, bitmap.width, bitmap.height);
-              for (let i = 0; i < pixels.data.length; i += 4) {
-                let value = pixels.data[i + convert.channel] / 255;
-                if (convert.srgb && convert.channel !== 3) value = SRGBToLinear(value);
-                const out = Math.round(255 * Math.max(0, Math.min(1, value * convert.scale + convert.bias)));
-                // A coat map stays opaque: a canvas premultiplies, so a low alpha would round its colours away.
-                pixels.data.set(source.opacity ? [255, out, 255, out] : [out, out, 0, 255], i);
-              }
-              context.putImageData(pixels, 0, 0);
+              remapPixels(pixels.data, source);
               bitmap.close();
-              bitmap = await createImageBitmap(canvas);
+              // From the pixels, not the canvas, which would premultiply a converted alpha a second time.
+              bitmap = await createImageBitmap(pixels);
             } catch (error) {
               bitmap.close();
               throw error;
@@ -483,12 +477,16 @@ export class USDAsset {
             if (metal) context.drawImage(metal, 0, 0);
             const m = metal ? context.getImageData(0, 0, width, height).data : undefined,
               packed = context.createImageData(width, height);
+            const green = scalarTable(source.roughnessRemap),
+              blue = scalarTable(source.metallicRemap);
             for (let i = 0; i < packed.data.length; i += 4) {
               packed.data[i] = 255;
               packed.data[i + 1] = r
-                ? r[i + source.roughness!.channel]
+                ? green[r[i + source.roughness!.channel]]
                 : Math.round((source.roughnessValue ?? 0.5) * 255);
-              packed.data[i + 2] = m ? m[i + source.metallic!.channel] : Math.round((source.metallicValue ?? 0) * 255);
+              packed.data[i + 2] = m
+                ? blue[m[i + source.metallic!.channel]]
+                : Math.round((source.metallicValue ?? 0) * 255);
               packed.data[i + 3] = 255;
             }
             context.putImageData(packed, 0, 0);
@@ -616,10 +614,7 @@ function asset(
     const name = node && input(node, 'inputs:varname');
     return typeof name === 'string' ? name : undefined;
   };
-  const texture = (
-    path: string,
-    name: string,
-  ): { path: string; channel: number; placement: Placement; uv: string } | undefined => {
+  const texture = (path: string, name: string): ShaderMap | undefined => {
     const target = connection(path, name);
     if (!target) return;
     const shader = target.split('.outputs:')[0];
@@ -644,11 +639,19 @@ function asset(
       soft('unsupported texture channel');
       return;
     }
+    const [scale, bias] = ['inputs:scale', 'inputs:bias'].map((key, at) =>
+        Array.from(numeric(input(shader, key) ?? new Array(4).fill(1 - at), 4)),
+      ),
+      space = attrs(shader, 'inputs:sourceColorSpace');
     return {
       path: root === undefined ? file : pathName(file, root),
       channel: Math.max(0, index),
-      placement: placement(shader),
+      where: placement(shader),
       uv: uvPrimvar(shader) ?? 'st',
+      scale,
+      bias,
+      srgb: space === 'sRGB',
+      raw: space === 'raw',
     };
   };
   /**
@@ -778,87 +781,65 @@ function asset(
     if (color) p.baseColorFactor = [1, 1, 1, opacity];
     const sets = uvSets(soft);
     if (shader) {
+      /** An input's authored value or the texture it reads. A primvar reader on it is previewSurface()'s to read. */
+      const reading = (name: string): PhysicalInput => {
+        const node = connection(shader!, name)?.split('.outputs:')[0];
+        // A constant, or an interface's value.
+        if (!node || attrs(node, 'info:id') === undefined) return { value: input(shader!, name) };
+        if (/^UsdPrimvarReader/.test(String(attrs(node, 'info:id')))) {
+          if (composed) soft('unsupported primvar reader on ' + name);
+          return { value: undefined };
+        }
+        return { value: undefined, map: texture(shader!, name) };
+      };
+      /** A mapped texture, bound to the coordinate set of the primvar it reads. */
+      const mapped = (source: ImageSource, map: ShaderMap) => {
+        const info: { index: number; texCoord?: number } = image(source, map.where);
+        sets.bind(info, map.uv);
+        return info;
+      };
       const diffuse = color ? undefined : texture(shader, 'inputs:diffuseColor'),
         alpha = vertexOpacity ? undefined : texture(shader, 'inputs:opacity'),
-        normal = texture(shader, 'inputs:normal'),
         rough = texture(shader, 'inputs:roughness'),
-        metal = texture(shader, 'inputs:metallic');
-      if (diffuse) {
-        p.baseColorFactor = [1, 1, 1, opacity];
-        p.baseColorTexture = image({ path: diffuse.path }, diffuse.placement);
-        sets.bind(p.baseColorTexture, diffuse.uv);
-      }
+        metal = texture(shader, 'inputs:metallic'),
+        emit = reading('inputs:emissiveColor');
       // glTF holds opacity in the base colour's alpha, so an opacity map has to be that texture's own.
+      const own = !!alpha && alpha.path === diffuse?.path && alpha.uv === diffuse.uv && alpha.channel === 3;
       if (alpha) {
-        if (alpha.path !== diffuse?.path || alpha.uv !== diffuse.uv || alpha.channel !== 3)
-          soft('unsupported opacity texture');
-        else seeThrough();
+        if (own) seeThrough();
+        else soft('unsupported opacity texture');
       }
-      if (normal) {
-        definition.normalTexture = image({ path: normal.path }, normal.placement);
-        sets.bind(definition.normalTexture, normal.uv);
-      }
-      if (rough || metal) {
+      if (rough && metal) {
         // One packed glTF texture: both maps must be sampled the same way.
-        if (rough && metal && JSON.stringify(rough.placement) !== JSON.stringify(metal.placement))
+        if (JSON.stringify(rough.where) !== JSON.stringify(metal.where))
           soft('unsupported roughness and metallic textures with different transforms or wrap modes');
-        if (rough && metal && rough.uv !== metal.uv)
+        if (rough.uv !== metal.uv)
           soft('unsupported roughness and metallic textures with different texture coordinates');
-        p.metallicRoughnessTexture = image(
-          {
-            roughness: rough && { path: rough.path, channel: rough.channel },
-            metallic: metal && { path: metal.path, channel: metal.channel },
-            roughnessValue: roughness,
-            metallicValue: metallic,
-          },
-          (rough ?? metal)!.placement,
-        );
-        sets.bind(p.metallicRoughnessTexture, (rough ?? metal)!.uv);
-        p.roughnessFactor = 1;
-        p.metallicFactor = 1;
       }
-      const coat = (name: string): PhysicalInput => {
-        const node = connection(shader!, name)?.split('.outputs:')[0];
-        if (!node) return { value: input(shader!, name) };
-        // A primvar-driven input is previewSurface()'s; only a texture or an interface value is read here.
-        if (attrs(node, 'info:id') !== 'UsdUVTexture') {
-          if (/^UsdPrimvarReader/.test(String(attrs(node, 'info:id')))) {
-            if (composed) soft('unsupported primvar reader on ' + name);
-            return { value: undefined };
-          }
-          return { value: input(shader!, name) };
-        }
-        const map = texture(shader!, name);
-        if (!map) return { value: undefined };
-        const [scale, bias] = ['inputs:scale', 'inputs:bias'].map((key, at) =>
-          Array.from(numeric(attrs(node, key) ?? new Array(4).fill(1 - at), 4)),
-        );
-        return {
-          value: undefined,
-          map: {
-            path: map.path,
-            channel: map.channel,
-            scale,
-            bias,
-            srgb: attrs(node, 'inputs:sourceColorSpace') === 'sRGB',
-            where: map.placement,
-            uv: map.uv,
-          },
-        };
-      };
-      const physical = physicalExtensions(
-        coat('inputs:clearcoat'),
-        coat('inputs:clearcoatRoughness'),
-        input(shader, 'inputs:ior'),
-        (source, map) => {
-          const info: { index: number; texCoord?: number } = image(source, map.where);
-          sets.bind(info, map.uv);
-          return info;
+      surfaceMaps(
+        definition,
+        {
+          diffuse,
+          alpha: own ? alpha : undefined,
+          normal: texture(shader, 'inputs:normal'),
+          rough,
+          metal,
+          occlusion: reading('inputs:occlusion').map,
+          emit: emit.map,
+          emissive: emit.value === undefined ? [0, 0, 0] : Array.from(numeric(emit.value, 3)),
         },
+        mapped,
+        doc,
+      );
+      const physical = physicalExtensions(
+        reading('inputs:clearcoat'),
+        reading('inputs:clearcoatRoughness'),
+        input(shader, 'inputs:ior'),
+        mapped,
         () => fail('invalid material factor'),
       );
       if (physical) {
-        definition.extensions = physical;
+        definition.extensions = { ...definition.extensions, ...physical };
         doc.extensionsUsed ??= [];
         for (const name of Object.keys(physical)) if (!doc.extensionsUsed.includes(name)) doc.extensionsUsed.push(name);
       }

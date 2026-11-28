@@ -321,6 +321,16 @@ interface USDImage {
         srgb: boolean;
     };
     linearColor?: boolean;
+    color?: {
+        scale: number[];
+        bias: number[];
+        srgb: boolean;
+    };
+    normal?: {
+        scale: number[];
+        bias: number[];
+        srgb: boolean;
+    };
     roughness?: {
         path: string;
         channel: number;
@@ -328,6 +338,16 @@ interface USDImage {
     metallic?: {
         path: string;
         channel: number;
+    };
+    roughnessRemap?: {
+        scale: number;
+        bias: number;
+        srgb: boolean;
+    };
+    metallicRemap?: {
+        scale: number;
+        bias: number;
+        srgb: boolean;
     };
     roughnessValue?: number;
     metallicValue?: number;

@@ -129,8 +129,19 @@ export interface USDImage {
   scalar?: { channel: number; scale: number; bias: number; srgb: boolean };
   /** The file's colours are linear, where a base colour texture is read as sRGB. */
   linearColor?: boolean;
+  /**
+   * A UsdUVTexture's scale and bias written into a base colour or emission map, `scale` and `bias` for each of red,
+   * green, blue and alpha. `srgb` says the file's colours are sRGB; the result is.
+   */
+  color?: { scale: number[]; bias: number[]; srgb: boolean };
+  /** The same for a normal map's red, green and blue: each vector it gives is stored as `(n + 1) / 2`. */
+  normal?: { scale: number[]; bias: number[]; srgb: boolean };
   roughness?: { path: string; channel: number };
   metallic?: { path: string; channel: number };
+  /** A node's scale and bias written into the roughness channel, where the material's factor cannot hold them. */
+  roughnessRemap?: { scale: number; bias: number; srgb: boolean };
+  /** The same for the metalness channel. */
+  metallicRemap?: { scale: number; bias: number; srgb: boolean };
   roughnessValue?: number;
   metallicValue?: number;
 }

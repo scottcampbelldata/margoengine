@@ -3,6 +3,7 @@ import type { ExtensionHooks, SurfaceRead, USDExtension, USDImagePlacement, USDS
 import { flat } from './clip.js';
 import { attachPreviewOpacity } from './preview-opacity.js';
 import { physicalExtensions, type PhysicalInput } from './preview-physical.js';
+import { surfaceMaps } from './preview-factors.js';
 import { primvarStream } from './primvar-stream.js';
 import { uvSets } from './uv-sets.js';
 import type { PreviewOpacity } from './preview-opacity.js';
@@ -73,14 +74,16 @@ function surface(read: SurfaceRead): USDSurface | undefined {
         scale: [scale[0], scale[1]],
       };
     }
+    const space = attr(node, 'inputs:sourceColorSpace');
     return {
       path: read.resolve(file as string),
       channel: Math.max(0, index),
       where,
       uv: uv(node),
-      scale: values(attr(node, 'inputs:scale'), 4, [1, 1, 1, 1]),
-      bias: values(attr(node, 'inputs:bias'), 4, [0, 0, 0, 0]),
-      srgb: attr(node, 'inputs:sourceColorSpace') === 'sRGB',
+      scale: values(input(node, 'inputs:scale'), 4, [1, 1, 1, 1]),
+      bias: values(input(node, 'inputs:bias'), 4, [0, 0, 0, 0]),
+      srgb: space === 'sRGB',
+      raw: space === 'raw',
     };
   };
   const color = reader('diffuseColor', 3),
@@ -90,7 +93,8 @@ function surface(read: SurfaceRead): USDSurface | undefined {
     normal = texture('normal'),
     rough = texture('roughness'),
     metal = texture('metallic'),
-    emit = texture('emissiveColor');
+    emit = texture('emissiveColor'),
+    shade = texture('occlusion');
   const widths: Record<string, number> = {
     diffuseColor: 3,
     opacity: 1,
@@ -133,7 +137,7 @@ function surface(read: SurfaceRead): USDSurface | undefined {
   if (threshold > 0) material.alphaCutoff = threshold;
   // TEXCOORD_2 and 3 hold the primvar readers' coordinates, so with readers the maps have the first two sets.
   const sets = uvSets(read.soft, readers.length ? 2 : 4),
-    first = [diffuse, normal, rough, metal, alpha].find((map) => map);
+    first = [diffuse, normal, rough, metal, alpha, emit, shade].find((map) => map);
   if (first) sets.names.push(first.uv ?? 'st');
   // The separate opacity map is sampled from TEXCOORD_1.
   if (alpha) sets.names.push(alpha.uv ?? 'st');
@@ -142,27 +146,22 @@ function surface(read: SurfaceRead): USDSurface | undefined {
     sets.bind(info, from.uv);
     return info;
   };
-  if (diffuse) p.baseColorTexture = mapped({ path: diffuse.path }, diffuse);
-  if (normal) material.normalTexture = mapped({ path: normal.path }, normal);
-  if (rough || metal) {
-    if (rough && metal && (JSON.stringify(rough.where) !== JSON.stringify(metal.where) || rough.uv !== metal.uv))
-      bad('metal and roughness sampling differs');
-    p.metallicRoughnessTexture = mapped(
-      {
-        roughness: rough && { path: rough.path, channel: rough.channel },
-        metallic: metal && { path: metal.path, channel: metal.channel },
-        roughnessValue: p.roughnessFactor,
-        metallicValue: p.metallicFactor,
-      },
-      (rough ?? metal)!,
-    );
-    p.roughnessFactor = p.metallicFactor = 1;
-  }
-  material.emissiveFactor = values(input(shader, 'inputs:emissiveColor'), 3, [0, 0, 0]);
-  if (emit) {
-    material.emissiveTexture = mapped({ path: emit.path }, emit);
-    material.emissiveFactor = [1, 1, 1];
-  }
+  if (rough && metal && (JSON.stringify(rough.where) !== JSON.stringify(metal.where) || rough.uv !== metal.uv))
+    bad('metal and roughness sampling differs');
+  surfaceMaps(
+    material,
+    {
+      diffuse,
+      normal,
+      rough,
+      metal,
+      occlusion: shade,
+      emit,
+      emissive: values(input(shader, 'inputs:emissiveColor'), 3, [0, 0, 0]),
+    },
+    mapped,
+    read.document,
+  );
   const driven = (name: string): boolean => readers.some((r) => r.input === name);
   const physicalInput = (name: string): PhysicalInput => {
     if (driven(name)) return { value: undefined };
@@ -177,7 +176,7 @@ function surface(read: SurfaceRead): USDSurface | undefined {
       mapped,
       () => bad('invalid shader value'),
     );
-  if (physical) material.extensions = physical;
+  if (physical) material.extensions = { ...material.extensions, ...physical };
   if (['clearcoat', 'clearcoatRoughness', 'ior', 'specularColor'].some(driven)) {
     // The shader sets a constant or primvar coat; a textured coat stays the extension's own.
     if (!coat.map)
@@ -186,6 +185,7 @@ function surface(read: SurfaceRead): USDSurface | undefined {
       clearcoatRoughnessFactor: scalar('clearcoatRoughness', 0.01),
     }) as Record<string, unknown>;
     material.extensions = {
+      ...material.extensions,
       KHR_materials_clearcoat: { ...held, ...(coat.map ? {} : { clearcoatFactor: 1 }) },
       KHR_materials_ior: physical?.KHR_materials_ior ?? { ior: 1.5 },
     };
