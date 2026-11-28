@@ -3315,3 +3315,14 @@ Spatial pitting and runoff streaks, laboratory appearance calibration, predictiv
 - Point 8 (bb86ef47c6). `packages/physics/scripts/space02-celestial-measured.mjs` compares independently surveyed grazing eclipses with no fitted parameters. The model gives 65.75 s against 18.1 s at Cape Range and 168 s against 13.7 s at Stephenville. Both Stephenville contacts miss camera brackets. [Measured limits](limits.md#space-02-measured-eclipse-contacts-near-the-edge-of-totality)
 
 High-precision apparent limbs and eclipse contact times, full Earth-orientation terms, two-way sea coupling and the original SOLARFIELD shots remain open. The row stays REOPENED at four points.
+
+### SPACE-03 Accretion disks and compact objects
+
+#### SPACE-03 four-point pass
+
+- Point 5 (58d338d44e). `packages/physics/tests/coupling/accretion.test.js` checks signed foreign f64 supply, coded layout and range errors, accepted disk snapshots and receipts after rejected trials, and exact Kerr replay after rejecting an unresolved observer step.
+- Point 6 (58d338d44e). `packages/physics/tests/coupling/accretion-workers.test.js` checks exact shared, plain and 1/2/4 native annulus runs and keeps the accepted bank and receipt during native phase overflow. `packages/physics/tests/accretion-workers.browser.mjs` measures 65 annuli, 64 paired rows and three concurrent Chromium helpers. Thomas, face and luminosity sums retain radial order.
+- Point 7 (58d338d44e). `packages/physics/tests/accretion-film.browser.mjs` drives heat, density, differential winding and a Kerr tracer from actual published fields. The viscous disk accretes 2.013% and winds 2.888 rad relative to the outer ring at the winding probe. Each renderer repeats complete accepted snapshots and raw RGBA.
+- Point 8 (58d338d44e). `packages/physics/scripts/space03-accretion-measured.mjs` uses separately measured stellar mass and distance to project traced vacuum widths, 52.080, 51.288 and 48.494 µas at spins 0, 0.5 and 0.9. The independent EHT emission diameter is 51.8 ± 2.3 µas. Comparing the two observables leaves emission validation open. [Observed limits](limits.md#space-03-observed-sagittarius-a-emission-and-exterior-geodesic-widths)
+
+A relativistic disk heat and stress closure, emission and light transfer, the original Event Horizon binding and measured transport validation remain open. The row stays REOPENED at four points.
