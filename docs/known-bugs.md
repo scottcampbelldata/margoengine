@@ -13754,6 +13754,17 @@ Release exception: Safari recordCanvas MP4 duration claim.
   about 93 minutes after the start, consistent with a page suspended while the Mac was locked. Not proven: Safari could
   not run on 2026-11-14 (screen locked), and Playwright WebKit cannot hide its page. The Safari run on Scott's list
   decides it.
+- **2026-11-27, the boxes read in Playwright WebKit 27.2 on the Apple M6 (screen locked, so Safari still not run):** the
+  MP4 is fragmented, `mvhd` and `mdhd` state 0, and the length is the sum of the `trun` sample durations (ISO/IEC
+  14496-12). The last sample lasts until `stop()`: frames at 0 and 1.33 s stopped at 3 s are 800 + 1000 units of
+  timescale 600, and with every WebKit process held by SIGSTOP for 15 s mid-recording they are 800 + 9191 (16.65 s, the
+  wall time). A file of 2 frames claiming 5,576.2 s is that shape with `stop()` handled 5,576 s after the start. A 2D
+  and a WebGPU canvas behaved alike, as did a first draw 2 s late and a main thread blocked for 2.5 s (the file was
+  shorter then, 0.5 s). With an audio track the same SIGSTOP left a file of about 1 s for 16 s of wall time.
+- **Guard (2026-11-27):** `packages/video/test/record-check.mjs` sums the MP4's header and fragment durations and fails
+  if they pass the wall time between `recordCanvas` and the finished file by over 0.1 s (Edge: 0 to 16 ms over;
+  Playwright WebKit on the M6: 44 ms over, the AAC priming). A copy of a WebKit file with 5,574.9 s added to its last
+  sample reads 5,577.9 s through the same parser.
 
 ### Fixed 2026-11-14: WebKit headless MP4 drawn contrast-reduced (found by the WebKit run of the headless browser check)
 

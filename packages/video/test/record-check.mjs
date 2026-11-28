@@ -34,6 +34,14 @@ try {
     assert.ok(r.rms > 0.1, 'recorded tone is audible');
     assert.ok(Math.abs(r.hz - 440) < 5, 'recorded audio retains tone pitch');
     assert.equal(r.callerAudio, 'live');
+    if (r.format === 'mp4') {
+      // MediaRecorder stamps real time (the last frame is held until stop()), so no box may end a timeline past the
+      // time between start and the finished file; a mistimed sample or header claims hours (docs/known-bugs.md,
+      // "Safari recordCanvas MP4 of 2 frames claims 5,576 s"). 0.1 s covers the AAC encoder's priming samples (WebKit
+      // 27.2 ends 44 ms past the wall time) and one frame.
+      const longest = Math.max(r.stated.headers, r.stated.fragments);
+      assert.ok(longest > 0.5 && longest <= r.wallSeconds + 0.1, `MP4 boxes state ${longest} s: ${JSON.stringify(r)}`);
+    }
     // What the encoder wrote, read as raw planes through WebCodecs: the limited-range code of #336699 under BT.601
     // (WebKit 27.2: 95, 159, 100) or BT.709 (Chrome 156: 97, 156, 104), whichever is nearer, within 2.5 levels.
     const standard =

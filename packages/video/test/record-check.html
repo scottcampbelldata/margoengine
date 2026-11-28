@@ -24,6 +24,30 @@ async function webmCentreYUV(bytes){
     return {format:frame.format,space};
   }finally{frame.close();}
 }
+// Where a fragmented or plain MP4's boxes end its longest timeline, in seconds (ISO/IEC 14496-12): the movie and media
+// headers' durations, and each track fragment's decode time (tfdt) plus its sample durations (trun, tfhd, trex).
+function mp4Seconds(bytes){
+  const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),containers=new Set(['moov','trak','mdia','mvex','moof','traf']);
+  const scales={},defaults={},ends={},headers=[];let track=0,sample=0,time=0;
+  const walk=(start,end)=>{for(let p=start;p+8<=end;){
+    let size=view.getUint32(p),head=8;
+    if(size===1){size=Number(view.getBigUint64(p+8));head=16;}else if(size===0)size=end-p;
+    if(size<head)break;
+    const type=String.fromCharCode(...bytes.subarray(p+4,p+8)),d=p+head;
+    if(containers.has(type))walk(d,p+size);
+    else if(type==='tkhd')track=view.getUint32(d+(bytes[d]?20:12));
+    else if(type==='mvhd'||type==='mdhd'){const long=bytes[d],scale=view.getUint32(d+(long?20:12)),length=long?Number(view.getBigUint64(d+24)):view.getUint32(d+16);if(type==='mdhd')scales[track]=scale;if(length!==0xffffffff&&length<2**63)headers.push(length/scale);}
+    else if(type==='trex')defaults[view.getUint32(d+4)]=view.getUint32(d+12);
+    else if(type==='tfhd'){const flags=view.getUint32(d)&0xffffff;track=view.getUint32(d+4);sample=flags&8?view.getUint32(d+8+(flags&1?8:0)+(flags&2?4:0)):defaults[track];time=ends[track]??0;}
+    else if(type==='tfdt')time=bytes[d]?Number(view.getBigUint64(d+4)):view.getUint32(d+4);
+    else if(type==='trun'){const flags=view.getUint32(d)&0xffffff,count=view.getUint32(d+4);let q=d+8+(flags&1?4:0)+(flags&4?4:0);
+      for(let i=0;i<count;i++){time+=flags&0x100?view.getUint32(q):sample;q+=[0x100,0x200,0x400,0x800].reduce((n,bit)=>n+(flags&bit?4:0),0);}
+      ends[track]=Math.max(ends[track]??0,time);}
+    p+=size;
+  }};
+  walk(0,bytes.length);
+  return {headers:Math.max(0,...headers),fragments:Math.max(0,...Object.entries(ends).map(([id,end])=>end/scales[id]))};
+}
 window.check=async()=>{
   const results=[];
   for(const backend of ['webgpu','webgl2']) for(const format of ['webm','mp4']) {
@@ -41,10 +65,10 @@ window.check=async()=>{
         catch(e){if(e.code!=='unsupported'||!e.message.includes('https:'))throw e;results.push({backend,format,unsupported:e.code});}
         continue;
       }
-      const recording=recordCanvas(canvas,{format,audio:dest.stream});
+      const started=performance.now(),recording=recordCanvas(canvas,{format,audio:dest.stream});
       // fixed-wait: real-time recording needs 1.2 seconds of media time to produce picture and sound, independent of GPU readiness.
       await new Promise(resolve=>setTimeout(resolve,1200));
-      const blob=await recording.stop(),buffer=await blob.arrayBuffer();
+      const blob=await recording.stop(),wallSeconds=(performance.now()-started)/1000,buffer=await blob.arrayBuffer();
       const video=document.createElement('video'),url=URL.createObjectURL(blob);video.muted=true;video.src=url;
       try{
         await new Promise((resolve,reject)=>{video.onloadeddata=resolve;video.onerror=()=>reject(Error('recorded file did not decode'));video.load();});
@@ -58,7 +82,8 @@ window.check=async()=>{
         for(let i=start;i<end;i++){energy+=samples[i]**2;if(i>start&&samples[i-1]<=0&&samples[i]>0)crossings++;}
         const rms=Math.sqrt(energy/(end-start)),hz=crossings*sound.sampleRate/(end-start);
         const encoded=format==='webm'&&!blob.type.includes('mp4')?await webmCentreYUV(new Uint8Array(buffer)):null;
-        results.push({backend,format,encoded,bytes:blob.size,type:blob.type,width:video.videoWidth,height:video.videoHeight,pixel,audioSeconds:sound.duration,rms,hz,callerAudio:dest.stream.getAudioTracks()[0].readyState});
+        const stated=format==='mp4'?mp4Seconds(new Uint8Array(buffer)):null;
+        results.push({backend,format,encoded,stated,wallSeconds,bytes:blob.size,type:blob.type,width:video.videoWidth,height:video.videoHeight,pixel,audioSeconds:sound.duration,rms,hz,callerAudio:dest.stream.getAudioTracks()[0].readyState});
       }finally{video.removeAttribute('src');video.load();URL.revokeObjectURL(url);}
       const abort=new AbortController(),cancelled=recordCanvas(canvas,{signal:abort.signal});abort.abort();
       try{await cancelled.result;throw Error('abort resolved');}catch(e){if(e.name!=='AbortError')throw e;}

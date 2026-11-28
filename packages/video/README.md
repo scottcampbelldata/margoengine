@@ -151,6 +151,10 @@ header, which no player opens, so it rejects with code `state` instead of resolv
 discard an unfinished recording. The complete compressed recording stays in memory.
 There is no duration, frame-count, codec, audio-mixing or cross-player compatibility
 guarantee: this is real-time capture, so overloaded or background pages can drop frames.
+The recording also runs on while a page's timers are held (a hidden tab, a locked screen):
+a late `stop()` can give a file far longer than you meant, with the last frame held until
+then (measured in WebKit's MP4). Listen for `visibilitychange` and call `stop()` when the
+page hides if that matters to you.
 Use exporters/capture or headless/video for deterministic offline frame sequences.
 Audio permission and user gestures remain the page's responsibility. Neither Node nor
 OffscreenCanvas has this page capture API. The GPU check records generated colour and
