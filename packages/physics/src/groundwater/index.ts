@@ -479,3 +479,14 @@ export class GroundwaterSolver implements Solver<GroundwaterParams> {
     return this.state;
   }
 }
+
+export {
+  type ConfinedFlow,
+  type ConfinedFlowInput,
+  heleShawTransmissivity,
+  solveConfinedFlow,
+  type Streamline,
+  type StreamlineOptions,
+  streamlinePoint,
+  traceStreamlines,
+} from './confined.js';

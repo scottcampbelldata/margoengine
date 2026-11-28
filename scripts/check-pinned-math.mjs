@@ -26,6 +26,8 @@ export const ALWAYS = [
   'packages/physics/src/air-hold.ts',
   'packages/physics/src/hydro/shallow.ts',
   'packages/physics/src/hydro/index.ts',
+  'packages/physics/src/hydraulics/*.ts',
+  'packages/physics/src/groundwater/confined.ts',
   'packages/physics/src/foam/breaking.ts',
   'packages/physics/src/foam/spray.ts',
   'packages/physics/src/foam/index.ts',

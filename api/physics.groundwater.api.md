@@ -5,6 +5,40 @@
 ```ts
 import { BedGrid } from "@margoengine/math/fields";
 
+export interface ConfinedFlow {
+    readonly columns: number;
+    readonly rows: number;
+    readonly cellSize: number;
+    readonly cellSizeZ: number;
+    readonly thickness: number;
+    readonly origin: readonly [number, number];
+    readonly potential: Float64Array;
+    readonly flowX: Float64Array;
+    readonly flowZ: Float64Array;
+    readonly streamFunction: Float64Array;
+    readonly inflow: number;
+    readonly outflow: number;
+    readonly maxSpeed: number;
+    readonly maxResidual: number;
+    readonly iterations: number;
+}
+
+export interface ConfinedFlowInput {
+    readonly columns: number;
+    readonly rows: number;
+    readonly cellSize: number;
+    readonly cellSizeZ?: number;
+    readonly transmissivity: Scalars;
+    readonly thickness?: number;
+    readonly active?: ArrayLike<number>;
+    readonly sides?: Readonly<Partial<Record<'minX' | 'maxX' | 'minZ' | 'maxZ', number>>>;
+    readonly fixed?: ArrayLike<number>;
+    readonly sources?: Scalars;
+    readonly origin?: readonly [number, number];
+    readonly tolerance?: number;
+    readonly maxIterations?: number;
+}
+
 export interface GroundwaterBudget {
     readonly storage: number;
     readonly recharge: number;
@@ -65,6 +99,26 @@ export class GroundwaterSolver implements Solver<GroundwaterParams> {
     get budget(): GroundwaterBudget;
 }
 
+export interface Streamline {
+    readonly x: Float64Array;
+    readonly z: Float64Array;
+    readonly time: Float64Array;
+    readonly duration: number;
+}
+
+export interface StreamlineOptions {
+    readonly seeds: ArrayLike<number>;
+    readonly minSpeed?: number;
+}
+
+export function heleShawTransmissivity(gap: number, viscosity: number): number;
+
+export function solveConfinedFlow(input: ConfinedFlowInput): ConfinedFlow;
+
+export function streamlinePoint(lane: Streamline, time: number): [number, number];
+
+export function traceStreamlines(flow: ConfinedFlow, options: StreamlineOptions): Streamline[];
+
 // Not exported from this entry, but used by the exports above:
 
 type BedShape = Omit<BedGrid, 'cell'>;
@@ -112,6 +166,8 @@ interface Region {
 }
 
 const SIDES: readonly ['minX', 'maxX', 'minZ', 'maxZ'];
+
+type Scalars = number | ArrayLike<number>;
 
 type Scalars = number | ArrayLike<number>;
 

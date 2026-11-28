@@ -6958,6 +6958,99 @@ and an abort `signal`. The linear solve defaults to a relative residual of `1e-1
 world second so a receiving stream gets the actual exported volume. The model records total storage, recharge,
 boundary inflow and outflow, spring discharge and seepage in cubic metres.
 
+### Confined Darcy and Hele-Shaw cells
+
+`solveConfinedFlow` solves steady confined flow on a cell grid: an aquifer slice, a permeameter or a Hele-Shaw cell
+(two plates a gap apart, where the gap-averaged flow is a potential flow). Give a transmissivity, the sides held at
+a fixed potential and any solid cells; it returns the potential, face flows, stream function and the mean speeds,
+and `traceStreamlines` follows dye lines with their travel times.
+
+```ts
+import { heleShawTransmissivity, solveConfinedFlow, streamlinePoint, traceStreamlines } from '@margoengine/physics/groundwater';
+
+const columns = 84, rows = 48, cellSize = 0.005;
+const active = new Uint8Array(columns * rows);
+for (let row = 0; row < rows; row++)
+  for (let column = 0; column < columns; column++)
+    active[column + row * columns] = Math.hypot((column + 0.5) * cellSize - 0.21, (row + 0.5) * cellSize - 0.12) > 0.04 ? 1 : 0;
+const cell = solveConfinedFlow({
+  columns, rows, cellSize, active,
+  transmissivity: heleShawTransmissivity(0.001, 0.08), // 1 mm gap of glycerol solution, Pa s
+  thickness: 0.001,
+  sides: { minX: 420, maxX: 0 }, // Pa
+});
+const [lane] = traceStreamlines(cell, { seeds: [0.3] });
+console.log(cell.inflow, cell.maxSpeed, streamlinePoint(lane, lane.duration / 2));
+```
+
+The potential is the hydraulic head for an aquifer (transmissivity K b, m²/s) or the pressure for a Hele-Shaw gap
+(b³ / 12μ). Transmissivity may vary per cell; faces take the harmonic mean, and a fixed side sits half a cell
+from the cell centre. `fixed` holds a potential per cell (NaN for free cells) for wells and inner boundaries, and
+`sources` adds inflow per cell. A free cell with no path to a fixed potential is refused with a `MargoError`
+`'failed'`. The conjugate-gradient solve stops at a relative residual of `1e-12` (`tolerance`).
+
+## Pipe flow, hydraulic structures and machines
+
+`@margoengine/physics/hydraulics` covers water in pipes, through openings and machines, and in open channels, as
+plain deterministic functions: Darcy-Weisbach friction (Colebrook, Haaland or Churchill), pipe runs and siphons,
+orifices and basins equalising through a sluice, Venturi meters, steady pipe networks with reservoirs, valves and
+pumps, Joukowsky water hammer and a lumped hydraulic ram, the Pelton runner, a hinged bellows, and the hydraulic
+jump with critical and normal depth. It loads no Wasm and needs no world.
+
+```ts
+import {
+  equalize, hydraulicJump, HydraulicRam, orificeConductance, peltonRunner, pipeFlow, siphon, solveNetwork, venturi,
+} from '@margoengine/physics/hydraulics';
+
+const tap = pipeFlow({ head: 12, diameter: 0.05, length: 120, roughness: 4.6e-5, minorLoss: 3 });
+const arch = siphon({ drop: 0.1, crownRise: 0.18, diameter: 0.013, length: 1.2, minorLoss: 1.65 });
+const lock = equalize({ area: 82.8, level: 0.92, otherLevel: 2.72, openingArea: 1.75, dischargeCoefficient: 0.62, time: 60 });
+const meter = venturi({ inletDiameter: 0.053, throatDiameter: 0.026, flow: 0.0005 });
+const jump = hydraulicJump({ upstreamDepth: 0.028, upstreamSpeed: 3.2, width: 0.28 });
+const wheel = peltonRunner({ netHead: 8.6, nozzleDiameter: 0.017, pitchRadius: 0.167, rpm: 360 });
+const town = solveNetwork({
+  nodes: [{ id: 'dam', kind: 'reservoir', head: 100 }, { id: 'square', elevation: 40, demand: 0.02 }],
+  links: [{ id: 'main', from: 'dam', to: 'square', length: 900, diameter: 0.2, roughness: 2.6e-4 }],
+});
+const ram = new HydraulicRam({
+  supplyHead: 1.6, driveLength: 8, driveDiameter: 0.042, driveResistance: 1.14e10, compliance: 7.5e-10,
+  waste: { conductance: orificeConductance(4.2e-4, 1), tripFlow: 7.9e-4, closeTime: 0.036, holdTime: 0.09, reopenPressure: 4900, reopenTime: 0.055 },
+  checkConductance: 5.05e-6, deliveryConductance: 3.55e-6, vessel: { volume: 0.0023, exponent: 1.24 },
+});
+const cycle = ram.settle(4, { signal: AbortSignal.timeout(10_000) });
+console.log(tap.flow, arch.crownPressure, lock.level, meter.pressureDrop, jump.downstreamDepth, wheel.efficiency,
+  town.heads.square, cycle.meanDelivery * 60000);
+```
+
+Every function takes SI units and defaults to water at 20 °C (`water(t)` gives density, viscosity, vapour pressure
+and bulk modulus from Kell 1975, Kestin et al. 1978 and Buck 1981) and to the engine's 9.81 m/s² gravity; pass
+`liquid` and `gravity` to change them. Defaults: Churchill friction, a smooth wall, an orifice discharge coefficient
+of 0.61, a Venturi coefficient of 0.995 (ISO 5167-4, machined), a Pelton nozzle coefficient of 0.98 with bucket
+retention 0.9 and a 15° exit angle, and a ram vessel exponent of 1.2. Bad arguments throw `RangeError`; a solve
+that cannot finish throws `MargoError` `'failed'`.
+
+- **Pipes.** `pipeFlow` solves head = (exit + fL/D + ΣK) v²/2g to the last bit; `pipeLoss` gives the loss at a
+  speed. `siphon` adds the crown pressure and `cavitates` once it reaches vapour pressure, with `crownLimit`, the
+  highest crown at that flow (about 10.1 m for still water). `jetAfterFall` narrows a falling jet by continuity.
+- **Openings.** `orificeFlow` is Torricelli's Q = Cd A √(2gh); `equalize` follows two basins (or one and a river)
+  through an opening in closed form; `venturi` and `venturiFlow` convert between flow and pressure drop;
+  `plugTracer` moves a dye parcel through a conduit of changing area.
+- **Networks.** `solveNetwork` runs Todini and Pilati's global gradient method over reservoirs, junctions with
+  demands, pipes, valves (area 0 shuts one) and pumps (h₀ - rQⁿ, with a check valve).
+- **Transients.** `pipeWaveSpeed` (Korteweg with the three restraint cases), `joukowsky` (ρ a Δv), and
+  `HydraulicRam`: `simulate(lift, seconds)` keeps every step, `settle(lift)` returns the repeating cycle with its
+  volumes, mean flows, d'Aubuisson and Rankine efficiencies and its water balance; `ramFrameAt` samples it.
+  Give `waveSpeed` instead of `compliance` to use the drive pipe's own elasticity; a fast closure then gives the
+  Joukowsky surge.
+- **Machines.** `peltonRunner` returns force, torque, power and efficiency at a speed, with the best and runaway
+  speeds. `hingedBellows` gives the exact volume between two hinged boards and the flow through its check valves.
+- **Open channels.** `hydraulicJump` (Belanger's conjugate depth, the head lost, Hager's roller length, Chow's jump
+  type), `criticalDepth`, `specificEnergy`, `froudeNumber` and Manning's `normalDepth` for rectangles and
+  trapezoids.
+
+These are steady and lumped models: there is no distributed pressure-wave (method of characteristics) solver yet,
+no cavitation column separation, and no `PhysicsWorld` solver wrapper; see `docs/limits.md`.
+
 ## Glacier and ice-sheet flow
 
 `@margoengine/physics/glacier` advances grounded ice over a rectangular cell-centred bed. It solves

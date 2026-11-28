@@ -16289,6 +16289,60 @@ Tests reconstruct the fixed-head solution, a two-cell material contact, a draini
 exchange with the existing runoff and shallow-water solvers. The implementation uses the papers and the repository's
 field contracts.
 
+### Confined Darcy flow and Hele-Shaw cells (HYDRO-06 groundwater entry, for HYDRO-07)
+
+- Henry Darcy, *Les fontaines publiques de la ville de Dijon*, 1856 (print), gives the linear seepage law.
+- H. S. Hele-Shaw, [The flow of water](https://doi.org/10.1038/058033a0), 1898, and G. K. Batchelor,
+  [An Introduction to Fluid Dynamics](https://doi.org/10.1017/CBO9780511800955), 1967, section 4.8: the gap-averaged
+  velocity between plates a gap b apart is -b²/(12 μ) ∇p, a potential flow, so the cell takes transmissivity
+  b³/(12 μ) on the pressure.
+- Arlen W. Harbaugh, [MODFLOW-2005](https://pubs.usgs.gov/publication/tm6A16), 2005, chapter 2: block-centred
+  finite volumes, harmonic face conductances and a specified-head side half a cell from the centre.
+- Hestenes and Stiefel 1952 (cited above) for the Jacobi-preconditioned conjugate gradients.
+
+Tests check plane Poiseuille flow in a channel, resistances in series, a quadratic potential under harmonic faces,
+conservation and a closed stream function around an obstacle, and a well, all against closed forms.
+
+### Pipe flow, hydraulic structures and machines (HYDRO-07)
+
+- Water: G. S. Kell, [Density, thermal expansivity, and compressibility of liquid water from 0° to 150 °C](https://doi.org/10.1021/je60064a005),
+  1975; J. Kestin, M. Sokolov and W. A. Wakeham, [Viscosity of liquid water in the range -8 °C to 150 °C](https://srd.nist.gov/jpcrdreprint/1.555581.pdf),
+  1978 (the cubic correlation about 1.0016 mPa s at 20 °C); A. L. Buck, [New equations for computing vapor pressure
+  and enhancement factor](https://doi.org/10.1175/1520-0450(1981)020%3C1527:NEFCVP%3E2.0.CO;2), 1981.
+- Friction: C. F. Colebrook, [Turbulent flow in pipes, with particular reference to the transition region between the
+  smooth and rough pipe laws](https://doi.org/10.1680/ijoti.1939.13150), 1939 (solved by Newton on 1/√f);
+  S. E. Haaland, [Simple and explicit formulas for the friction factor in turbulent pipe flow](https://doi.org/10.1115/1.3240948),
+  1983; S. W. Churchill, *Friction-factor equation spans all fluid-flow regimes*, Chemical Engineering 84(24), 1977
+  (print), the default because it is smooth across laminar, transitional and turbulent flow.
+- Pipes, orifices and meters: F. M. White, *Fluid Mechanics*, 7th ed., McGraw-Hill, 2011 (print), sections 3.5,
+  6.6 to 6.9 and 6.12, for the energy equation, minor losses and the sharp orifice; ISO 5167-4:2003, *Venturi tubes*
+  (standard), for the machined discharge coefficient 0.995. The two-basin equalisation integrates
+  dD/dt = -Cd a √(2gD) (1/A1 + 1/A2) in closed form (√D falls linearly).
+- Water hammer: N. Joukowsky, *Über den hydraulischen Stoss in Wasserleitungsröhren*, 1898 (trans. O. Simin, Proc.
+  AWWA 24, 1904), for ρ a Δv; E. B. Wylie and V. L. Streeter, *Fluid Transients in Systems*, Prentice Hall, 1993
+  (print), chapters 1 and 2, for the elastic wave speed with its three restraint cases and the lumped compliance
+  C = A L / (ρ a²).
+- Hydraulic ram: G. O. Lungudi, S. Cohen, S. Nasraoui, C. Dupont, S. G. Salinas-Rodriguez, M. Kennedy and D. Ferras,
+  [Numerical and experimental analyses of hydraulic rams](https://doi.org/10.1080/00221686.2024.2401899), 2024, for the
+  cycle's phases (acceleration, waste closure, delivery, recoil); the d'Aubuisson (1840) and Rankine (1872)
+  efficiencies as stated in the hydraulics texts.
+- Networks: E. Todini and S. Pilati, *A gradient algorithm for the analysis of pipe networks*, in Computer
+  Applications in Water Supply, vol. 1, Research Studies Press, 1988 (print): Newton on link flows and junction heads
+  with the flows eliminated, one symmetric positive-definite system per step.
+- Open channels: J.-B. Belanger, 1828 (print), the momentum balance across a jump; V. T. Chow, *Open-Channel
+  Hydraulics*, McGraw-Hill, 1959 (print), chapters 3, 6 and 15; W. H. Hager, R. Bremen and N. Kawagoshi,
+  [Classical hydraulic jump: length of roller](https://doi.org/10.1080/00221689009499048), 1990,
+  L_r / y1 = 160 tanh(F1 / 20) - 12.
+- Machines: S. L. Dixon and C. A. Hall, *Fluid Mechanics and Thermodynamics of Turbomachinery*, 7th ed.,
+  Butterworth-Heinemann, 2014 (print), chapter 10, and White 2011, section 11.6, for the Pelton momentum theory
+  (peak efficiency Cv²(1 + k cos β)/2 at half the jet speed). The hinged bellows volume is derived here: the ruled
+  solid between two boards hinged on one edge holds A g (1 + cos θ)/2 + M sin θ for outline area A and first moment M.
+
+No other engine's or library's code was read. Tests compare against an independent Colebrook iteration,
+Hagen-Poiseuille, a Runge-Kutta run of the basins, Bernoulli and continuity, the 10.1 m vapour limit, Joukowsky,
+the ram's own water balance and step convergence, momentum across a jump with Chow's tabled ratio, the wide-channel
+Manning depth, the momentum-theory Pelton optimum, quadrature of the bellows, and a three-reservoir bisection.
+
 ## Glacier and ice-sheet flow (ICE-02)
 
 - Ralf Greve and Heinz Blatter, [Dynamics of Ice Sheets and Glaciers](https://doi.org/10.1007/978-3-642-03415-2),

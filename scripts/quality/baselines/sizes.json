@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21637402,
+  "total": 21647672,
   "history": [
     {
       "date": "2026-10-24",
@@ -15292,6 +15292,12 @@
       "commit": "atmo-07-threaded-poisson",
       "reason": "ATMO-07 physics/lightning grows from 6341 to 8807 B gzip, ceiling 6597 to 9072 B, for optional worker execution of SIMD rows, deterministic convergence and actual sweep receipts. A separate solver entry would duplicate initialization, memory and accepted channel contracts. Each lazy native asset grows from 1200 to 1648 B. The two solvers share the 767 B worker file. SEA-06 stays under 9006 B at 8883 B and Sky lightning-bolt stays under 6300 B at 6103 B. Core and Stage are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "e102734004",
+      "reason": "HYDRO-07 entry sizes: new @margoengine/physics/hydraulics 7681 B (ceiling 7937 B), and @margoengine/physics/groundwater 3939 to 6235 B (ceiling 4158 to 6491 B) for the confined Darcy and Hele-Shaw solve (solveConfinedFlow, traceStreamlines), kept in the groundwater entry so Darcy flow has one home. Both are plain TypeScript with no Wasm or world; the confined functions are separate exports that a bundler drops when only the aquifer is imported, so a split entry would save little in real bundles.",
+      "grew": 2
     }
   ],
   "items": {
@@ -16168,7 +16174,8 @@
     "@margoengine/physics/gpu-cloth": 17278,
     "@margoengine/physics/granular-flow": 5830,
     "@margoengine/physics/granular-mpm": 6045,
-    "@margoengine/physics/groundwater": 4158,
+    "@margoengine/physics/groundwater": 6491,
+    "@margoengine/physics/hydraulics": 7937,
     "@margoengine/physics/hydro": 22723,
     "@margoengine/physics/ice": 3483,
     "@margoengine/physics/iceberg": 4595,

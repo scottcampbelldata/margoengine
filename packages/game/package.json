@@ -2539,6 +2539,10 @@
       "types": "./dist/physics/groundwater.d.ts",
       "import": "./dist/physics/groundwater.js"
     },
+    "./physics/hydraulics": {
+      "types": "./dist/physics/hydraulics.d.ts",
+      "import": "./dist/physics/hydraulics.js"
+    },
     "./physics/landscape": {
       "types": "./dist/physics/landscape.d.ts",
       "import": "./dist/physics/landscape.js"

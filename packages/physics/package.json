@@ -309,6 +309,10 @@
       "types": "./dist/groundwater/index.d.ts",
       "import": "./dist/groundwater.js"
     },
+    "./hydraulics": {
+      "types": "./dist/hydraulics/index.d.ts",
+      "import": "./dist/hydraulics.js"
+    },
     "./landscape": {
       "types": "./dist/landscape/index.d.ts",
       "import": "./dist/landscape.js"

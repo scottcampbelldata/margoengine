@@ -104,6 +104,7 @@ await build({
         airborne: resolve(root, 'src/airborne/index.ts'),
         aeolian: resolve(root, 'src/aeolian/index.ts'),
         groundwater: resolve(root, 'src/groundwater/index.ts'),
+        hydraulics: resolve(root, 'src/hydraulics/index.ts'),
         vegetation: resolve(root, 'src/vegetation.ts'),
         ice: resolve(root, 'src/ice/index.ts'),
         glacier: resolve(root, 'src/glacier/index.ts'),
