@@ -1359,7 +1359,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,492 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,496 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -16682,9 +16682,21 @@ Entry sizes are in scripts/quality/baselines/sizes.json.
 
 - `TerrainGroundContact` footprints are circles baked on the CPU into a 1024 x 1024 mask of 0.2 m texels (205 m around
   the camera, 2 MB), re-baked whole when footprints inside it change. Only stored stones and tree trunks are fed by
-  `BiomeView`; meshes placed by hand need `view.groundContact.set`. Grass drawn over the ground can hide the soil ring.
+  `BiomeView`; meshes placed by hand need `view.groundContact.set`.
+- `BiomeObjects` opens its own grass and ferns in the soil rings (`groundCover`, `scatter/clearing-map`: `thin` 1.4,
+  `shorten` 0.6, `reach` 0.25 m, five texel reads a candidate). Grass scattered by a scene itself is not thinned unless
+  it takes `thinning` too, and still hides the ring. Chosen on rendered frames, with no measurement: those three values,
+  a trunk footprint of 0.3 of its crown's reach and the crown depth 1.2.
+- The crown shade (`skyOcclusion.crown`) is a cone about the up axis, not the mesh's outline, and dims sky light only.
+  On the treeline stills it deepens crowns a little (crown luma down 3 to 9 percent); it does not separate near and far
+  stands, which needs haze (the scene's fog).
+- The relief shadows' toothed edges on the treeline summit cliff are the cast outline of a serrated crest: raising the
+  bake's march from 48 to 256 steps moved 0.3 percent of those pixels by more than 20 of 255.
+- Relief bake work: one compute pass over the height texture, each texel marching `rays + 1` rays of up to `steps`
+  samples of 4 reads (defaults 12 and 48): 2,496 texture reads a texel, 10.5 billion for a 2049 x 2049 texture, once
+  per rebake. Wall-clock time is not measured (speed is deferred).
 - The stone ring's width and strength, a trunk's 0.6 of the sphere form factor, the foot bands' heights and the
-  canopy's optical depth (0.7 x stand cover over the lower half) are chosen on rendered frames, with no measurement behind them.
+  canopy's optical depth (0.5 x stand cover over the lower half) are chosen on rendered frames, with no measurement behind them.
 - `relief` shades the terrain only (not the objects on it), from the height texture at `textureResolution`, and
   multiplies with `shadows` where both reach: the same in umbra and light, darker only in soft edges.
 
@@ -16733,6 +16745,20 @@ until it is fixed. Entries are newest first. A heading starts with the state (Op
 an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the regression test that keeps it fixed.
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
+
+### Fixed 2026-11-28: a biome species' `color` hue and value did nothing (KB-BIOMES-SPECIESCOLOR1, biomes)
+
+- **Repro:** a `SpeciesRule` with `color: { hue: 0.2, value: 0.3 }`: its objects jitter like every other species'.
+- **Cause:** the field was declared in `packages/biomes/src/define.ts` and never carried into the placed species.
+- **Fix:** `PlacedSpecies.color`, and `BiomeObjects` passes the jitter to the species' leaf and stone scatters (a hue
+  past half a turn is half a turn). Test: `packages/biomes/tests/contact.test.js`.
+
+### Fixed 2026-11-28: the alpine rock look check read cast shadows as grain (KB-BIOMES-ROCKSHADOW1, biomes test)
+
+- **Repro:** `node packages/biomes/tests/browser-check.mjs` from fefe0bad71: rock light and dark 0.108 over its 0.104.
+- **Cause:** the check divides the light out against a flat-colour frame, which holds for one light colour. With
+  BiomeView's relief lighting on by default, shadowed rock keeps only the sky's blue light and luma over red rises.
+- **Fix:** the check's material shots set `relief: false` (0.086, limits unchanged); relief has its own GPU checks.
 
 ### Fixed 2026-11-28: a subtree reference could not be a child of selector, sequence or any builder (KB-BEHAVIOR-SUBTREEBUILD1, behavior)
 
