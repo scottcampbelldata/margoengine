@@ -104,7 +104,17 @@ export function gpuHarness() {
       sceneOf(plugin) {
         return plugins.get(plugin.name) === plugin ? engine : undefined;
       },
+      // As core's Engine.use: a missing or taken name, a plugin already in use or one without setup is refused before
+      // anything changes, so the plugin holding the name stays (until 2026-11-28 the mock let the pass name clash
+      // throw instead, and its rollback deleted the plugin that held the name).
       use(plugin) {
+        if (
+          !plugin?.name ||
+          plugins.has(plugin.name) ||
+          [...plugins.values()].includes(plugin) ||
+          typeof plugin.setup !== 'function'
+        )
+          throw new TypeError('Invalid plugin');
         plugins.set(plugin.name, plugin);
         try {
           graph.withOwner(plugin.name, () => {
@@ -118,6 +128,7 @@ export function gpuHarness() {
           plugin.dispose?.();
           throw error;
         }
+        return engine;
       },
       removePlugin(name) {
         const p = plugins.get(name);
