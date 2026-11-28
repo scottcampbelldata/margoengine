@@ -162,6 +162,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** one helper (`packages/shared/occlude-ambient.js`) multiplies every ambient term. Test:
   `packages/scatter/test/contact.browser.mjs` (1.000 against 0.502 before and after).
 
+### Open 2026-11-28: four timber-valley shots fail look checks once they pool frames and carry velocity (KB-LOOK-TV-POOLFAILS1, scenes)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-<shot>.json --once --seconds 1.1` (RTX A6000,
+  WebGPU) after every shot gained `moving.velocity: true` and `probePool` {frames 15, step 2}. Aftermath, fire-line and
+  ridge-smoke pass every check. Failing (early / mid):
+  - creek: speckle 10.2 / 9.2 ppm (bound 5); penumbra 0.76 early (0.7); bounce and shadowTint lack shadowed ground even
+    pooled (17 and 14 pixels, 80 percent of the frame covered); shimmerMoving mid 0.95 percent (0.5).
+  - rail-line: speckle 76.4 / 36.8 ppm; chromaSmear early 2.62 percent (2); shimmerMoving 0.78 / 2.73; bounce 137.7 /
+    139.3 percent (29.5 to 100); shadowTint -4.7 / -4.8 b* (over 0.07); penumbra mid short of ground (1,119 of 2,055).
+  - town-street: skyClip early 0.54 percent (0.5); shimmerMoving 1.74 / 2.55.
+  - valley-aerial: speckle early 5.3 ppm; bounce 20.4 / 20.3 percent (29.5 to 100).
+- **Cause:** not traced. Speckle shares the blowup's causes (KB-LOOK-TV-SPECKLE, tree LOD by distance); shimmerMoving
+  likely shares KB-SCATTER-FRINGEVEL1. The rest are each shot's own and need tracing one by one.
+
 ### Open 2026-11-28: the timber-valley blowup shows single bright pixels through conifer foliage, 15 and 46 ppm (KB-LOOK-TV-SPECKLE, procedural, biomes)
 
 - **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-blowup.json --once --seconds 1.1` (RTX A6000,
@@ -186,6 +200,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause (to trace):** `ScatterVelocity`'s dominant pass (`coverage` 0.5) should give a pixel mostly covered by a blade
   the blade's motion. Pixels at 60 to 87 percent coverage still read the sky's here. Not depth of field: the scene draws
   none.
+- **Owner:** lane C, which built the dominant-coverage pass (e11607a717). KB-LOOK-TV-SHIMMER2 stays open until this is
+  fixed and the blowup mid probe passes `shimmerMoving` at 0.5.
 
 ### Open 2026-11-28: motionBlur calls a correctly smeared mover narrower than its smear sharp (KB-LOOK-TV-MBNARROW1, headless look)
 

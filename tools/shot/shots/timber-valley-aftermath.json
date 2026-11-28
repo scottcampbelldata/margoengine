@@ -78,9 +78,14 @@
       "early": 0.3,
       "mid": 1
     },
+    "probePool": {
+      "frames": 15,
+      "step": 2
+    },
     "lookFamily": "animatedFeature",
     "moving": {
-      "depthScale": 2000
+      "depthScale": 2000,
+      "velocity": true
     },
     "aovs": [
       "geometry",
