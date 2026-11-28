@@ -3,7 +3,7 @@ import { Clustered } from '@margoengine/clustered';
 import { Shadows } from '@margoengine/shadows';
 import { createRoad } from './model.js';
 import { mirrorCenter, traceRetroreflector } from './optics.js';
-import { lerp as mix } from '@margoengine/math/mathutils';
+import { ShotBlend } from '@margoengine/cameras/shots';
 
 const canvas=document.querySelector('#scene');
 const loading=document.querySelector('#loading');
@@ -15,9 +15,9 @@ const view=document.querySelector('#view');
 const controls=[range,view];
 const lifetime=new AbortController();
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
-const wide={aim:[0,.080,.044],offset:[1.05,1.31,1.96],fit:1.45,fov:45};
-const detail={aim:[mirrorCenter[0],mirrorCenter[1],mirrorCenter[2]-.025],offset:[.065,.214,.475],fit:1.08,fov:40};
-let engine,road,observer,frame,last=0,zoom=0;
+const wide={target:[0,.080,.044],offset:[1.05,1.31,1.96],fit:1.45,fov:45};
+const detail={target:[mirrorCenter[0],mirrorCenter[1],mirrorCenter[2]-.025],offset:[.065,.214,.475],fit:1.08,fov:40};
+let engine,shots,road,observer,frame,last=0;
 let angle=Number(range.value),ray=traceRetroreflector(angle),close=false,dirty=true,applied=false;
 
 function resize(){
@@ -43,20 +43,16 @@ function paint(now){
   frame=undefined;
   const delta=last?Math.min(.06,(now-last)/1000):1/60;
   last=now;
-  const goal=Number(close);
-  zoom=motion.matches||Math.abs(zoom-goal)<.001?goal:mix(goal,zoom,Math.exp(-delta*16));
-  const fit=Math.max(1,mix(wide.fit,detail.fit,zoom)*canvas.height/canvas.width);
-  engine.camera.target=wide.aim.map((axis,i)=>mix(axis,detail.aim[i],zoom));
-  engine.camera.position=engine.camera.target.map((axis,i)=>axis+fit*mix(wide.offset[i],detail.offset[i],zoom));
-  engine.camera.fov=mix(wide.fov,detail.fov,zoom);
+  shots.goal=Number(close);
+  const moving=shots.update(delta,canvas.width,canvas.height);
   if(dirty){road.update(angle,ray,close);dirty=false;}
   engine.render({delta});
   Object.assign(document.body.dataset,{
     angle,route:ray.hits.map(({axis})=>axis+1).join(','),
-    offset:(1000*ray.offset).toFixed(6),view:zoom===0?'road':zoom===1?'reflections':'moving',
+    offset:(1000*ray.offset).toFixed(6),view:moving?'moving':close?'reflections':'road',
   });
   if(applied){performance.mark('margo-lamp-applied');applied=false;}
-  if(zoom!==goal)schedule();
+  if(moving)schedule();
   else last=0;
 }
 
@@ -99,6 +95,7 @@ async function start(){
     engine=await open();
   }
   engine.onError=fail;
+  shots=new ShotBlend(engine.camera,wide,detail,{rate:16,still:motion});
   engine.scene.background='#263744';
   engine.lighting.direction.set([-.77,.57,-.43,1.35]);
   engine.lighting.radiance.set([.60,.78,1,.26]);

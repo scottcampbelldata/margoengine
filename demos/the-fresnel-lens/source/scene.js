@@ -2,7 +2,7 @@ import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { createLantern } from './model.js';
 import { beamMeasure, facets, focalDistance, targetRadius, traceFacet } from './optics.js';
-import { lerp as mix } from '@margoengine/math/mathutils';
+import { ShotBlend } from '@margoengine/cameras/shots';
 
 const canvas=document.querySelector('#scene');
 const loading=document.querySelector('#loading');
@@ -15,9 +15,9 @@ const view=document.querySelector('#view');
 const controls=[range,focus,view];
 const lifetime=new AbortController();
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
-const wide={aim:[-.04,.144,.047],offset:[.90,1.04,1.55],fit:1.33,fov:41};
-const detail={aim:[-.028,.221,0],offset:[.095,1.88,.315],fit:1.48,fov:40};
-let engine,lantern,observer,frame,last=0,zoom=0;
+const wide={target:[-.04,.144,.047],offset:[.90,1.04,1.55],fit:1.33,fov:41};
+const detail={target:[-.028,.221,0],offset:[.095,1.88,.315],fit:1.48,fov:40};
+let engine,shots,lantern,observer,frame,last=0;
 let distance=Number(range.value)/1000;
 let measure=beamMeasure(distance),top=false,dirty=true,applied=false;
 
@@ -45,21 +45,17 @@ function paint(now){
   frame=undefined;
   const delta=last?Math.min(.06,(now-last)/1000):1/60;
   last=now;
-  const goal=Number(top);
-  zoom=motion.matches||Math.abs(zoom-goal)<.001?goal:mix(goal,zoom,Math.exp(-delta*15));
-  const fit=Math.max(1,mix(wide.fit,detail.fit,zoom)*canvas.height/canvas.width);
-  engine.camera.target=wide.aim.map((axis,i)=>mix(axis,detail.aim[i],zoom));
-  engine.camera.position=engine.camera.target.map((axis,i)=>axis+fit*mix(wide.offset[i],detail.offset[i],zoom));
-  engine.camera.fov=mix(wide.fov,detail.fov,zoom);
+  shots.goal=Number(top);
+  const moving=shots.update(delta,canvas.width,canvas.height);
   if(dirty){lantern.update(distance);dirty=false;}
   engine.render({delta});
   Object.assign(document.body.dataset,{
     distance:Math.round(distance*1000),angle:measure.spread.toFixed(7),shape:measure.state,
     footprint:targetRadius(traceFacet(distance,facets.length-1)).toFixed(7),
-    view:zoom===0?'lantern':zoom===1?'beam':'moving',
+    view:moving?'moving':top?'beam':'lantern',
   });
   if(applied){performance.mark('margo-lamp-applied');applied=false;}
-  if(zoom!==goal)schedule();
+  if(moving)schedule();
   else last=0;
 }
 
@@ -112,6 +108,7 @@ async function start(){
     engine=await open();
   }
   engine.onError=fail;
+  shots=new ShotBlend(engine.camera,wide,detail,{still:motion});
   engine.scene.background='#5d5962';
   engine.lighting.direction.set([-.66,1.43,.78,3.74]);
   engine.lighting.radiance.set([1,.93,.81,.49]);

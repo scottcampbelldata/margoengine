@@ -342,7 +342,7 @@
   "the-birefringence-viewer": {
    "R1": 4,
    "R3": 1,
-   "R5": 341
+   "R5": 340
   },
   "the-block-tower": {
    "R2": 1,
@@ -473,7 +473,7 @@
    "R5": 362
   },
   "the-dichroic-splitter": {
-   "R5": 337
+   "R5": 334
   },
   "the-differential": {
    "R2": 1,
@@ -481,7 +481,7 @@
    "R5": 414
   },
   "the-diffraction-ruler": {
-   "R5": 322
+   "R5": 319
   },
   "the-domino-cascade": {
    "R2": 1,
@@ -554,7 +554,7 @@
   "the-fresnel-lens": {
    "R1": 3,
    "R3": 11,
-   "R5": 409
+   "R5": 406
   },
   "the-game-menu": {
    "R5": 678
@@ -708,7 +708,7 @@
    "R5": 400
   },
   "the-michelson-interferometer": {
-   "R5": 342
+   "R5": 341
   },
   "the-mirror-hall": {
    "R1": 28,
@@ -822,7 +822,7 @@
    "R5": 625
   },
   "the-retroreflector": {
-   "R5": 426
+   "R5": 423
   },
   "the-reuleaux-drive": {
    "R3": 4,

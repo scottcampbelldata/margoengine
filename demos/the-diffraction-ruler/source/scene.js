@@ -2,7 +2,7 @@ import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { createRuler } from './model.js';
 import { displayedOrders, orderAngle, radians } from './optics.js';
-import { lerp as mix } from '@margoengine/math/mathutils';
+import { ShotBlend } from '@margoengine/cameras/shots';
 
 const canvas = document.querySelector('#scene');
 const loading = document.querySelector('#loading');
@@ -15,11 +15,11 @@ const view = document.querySelector('#view');
 const controls = [wavelength,groove,view];
 const lifetime = new AbortController();
 const motion = matchMedia('(prefers-reduced-motion: reduce)');
-const wide = { target:[-.026,.098,.011],offset:[.63,1.17,1.63],fitAspect:1.14 };
-const overhead = { target:[0,.124,-.059],offset:[.004,1.77,.315],fitAspect:1.16 };
+const wide = { target:[-.026,.098,.011],offset:[.63,1.17,1.63],fit:1.14 };
+const overhead = { target:[0,.124,-.059],offset:[.004,1.77,.315],fit:1.16 };
 let nm = Number(wavelength.value), density = Number(groove.value);
-let engine,ruler,observer,frame,last=0;
-let zoom=0,detail=false,dirty=true,pending=false;
+let engine,shots,ruler,observer,frame,last=0;
+let detail=false,dirty=true,pending=false;
 
 function resize() {
   const bounds=canvas.getBoundingClientRect();
@@ -44,24 +44,20 @@ function paint(now) {
   frame=undefined;
   const delta=last?Math.min(.06,(now-last)/1000):1/60;
   last=now;
-  const target=Number(detail);
-  zoom=motion.matches||Math.abs(zoom-target)<.001?target:mix(target,zoom,Math.exp(-delta*15));
-  const fit=Math.max(1,mix(wide.fitAspect,overhead.fitAspect,zoom)*canvas.height/canvas.width);
-  const focus=wide.target.map((value,i)=>mix(value,overhead.target[i],zoom));
-  engine.camera.target=focus;
-  engine.camera.position=focus.map((value,i)=>value+fit*mix(wide.offset[i],overhead.offset[i],zoom));
+  shots.goal=Number(detail);
+  const moving=shots.update(delta,canvas.width,canvas.height);
   if(dirty) {
     ruler.update(nm,density);
     dirty=false;
   }
   engine.render({delta});
-  Object.assign(document.body.dataset,{wavelength:nm,density,view:zoom===1?'overhead':zoom===0?'bench':'moving',
+  Object.assign(document.body.dataset,{wavelength:nm,density,view:moving?'moving':detail?'overhead':'bench',
     orders:displayedOrders(nm,density).map(({order,angle})=>order+'='+angle.toFixed(7)).join(',')});
   if(pending) {
     performance.mark('margo-wavelength-applied');
     pending=false;
   }
-  if(zoom!==target)schedule();
+  if(moving)schedule();
   else last=0;
 }
 
@@ -109,6 +105,7 @@ async function start() {
     engine=await open();
   }
   engine.onError=fail;
+  shots=new ShotBlend(engine.camera,wide,overhead,{still:motion});
   engine.scene.background='#626276';
   engine.lighting.direction.set([-.64,1.42,.69,3.63]);
   engine.lighting.radiance.set([1,.92,.79,.43]);
