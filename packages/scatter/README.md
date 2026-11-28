@@ -70,6 +70,8 @@ viewport height each frame, and move only when the pixel footprint drifts more
 than 5 percent (hysteresis), set from the footprint plus that 5 percent so a
 feature never draws under `lodPixels`. The third distance stays the culling
 boundary. Without `lodSize` the shader is the distance-only one, unchanged.
+It is off unless asked for: on the Timber Valley blowup shot (biomes, `lodPixels: 1`) it raised speckle from 19.8 to
+25.1 ppm early and 47.4 to 48.4 ppm mid (2026-11-28), so a default that worsens real frames stays off.
 This is the projected-size criterion of Luebke, Reddy, Cohen, Varshney, Watson
 and Huebner, *Level of Detail for 3D Graphics* (2003), ch. 4.
 

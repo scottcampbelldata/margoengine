@@ -270,7 +270,11 @@ three rings: near mesh, middle mesh, imposter, by distance (`[0.15, 0.4, 1] * ra
 ends where the tree's sprays would project under that many viewport pixels through the camera's field of view,
 whichever is nearer, so no spray draws thinner than that before the next level takes over (KB-BIOMES-SCREENLOD1). The
 spray width is `foliageWidth` of the near and middle foliage meshes: the area-weighted tenth percentile of each
-triangle's narrowest width. Rocks and bare stems keep distance rings. Default none (distance rings).
+triangle's narrowest width. Rocks and bare stems keep distance rings. Default none (distance rings). It stays opt-in
+because real frames got worse with it on: the Timber Valley blowup shot, rings off then on at `lodPixels: 1`, measured
+speckle 19.8 to 25.1 ppm early and 47.4 to 48.4 ppm mid (2026-11-28). A full-size fir's middle spray (0.39 m) reaches
+one rendered pixel only at about 970 m on a 2160-row, 45 degree frame, past the 800 m ring, so few rings move, and the
+ones that do hand over sooner to a coarser mesh.
 
 A species mesh is the reference size its plant's reverse-J `size` scales, from about a third of it to `size.max` (2.4
 in a forest preset), so presets name a species at pole age (`procedural:douglas-fir/pole`), and the generic
