@@ -75,6 +75,23 @@ test('writeMoving writes the next frame and the camera motion of a still world b
     const sky = (height - 1) * width + 32;
     assert.ok(Math.abs(motion[sky * 2]) < Math.abs(motion[centre * 2]) / 10, `sky ${motion[sky * 2]}`);
     assert.ok(SKY_DISTANCE > 1000);
+    // With the next frame's eye and depth the motion back is written too (KB-LOOK-TV-SHIMMER2): a still world moves
+    // back by the opposite of its motion, so the forward-backward test finds nothing covered.
+    writeFileSync(join(out, 'frames', 'depth_0016.png'), await encodePNG(depth));
+    const both = await writeMoving({
+        out,
+        name: 'open',
+        nextFile: 'frames/frame_0016.png',
+        next: { eye: [0.5, 0, 0], depth: { file: 'frames/depth_0016.png' } },
+        eye: [0, 0, 0],
+        viewProjection: projection,
+        nextViewProjection: moved(projection, 0.5),
+        shot,
+      }),
+      backBytes = readFileSync(join(out, both.back)),
+      back = new Float32Array(backBytes.buffer.slice(backBytes.byteOffset, backBytes.byteOffset + backBytes.byteLength));
+    assert.equal(both.back, 'probes/open.back.f32');
+    assert.ok(Math.abs(back[centre * 2] + motion[centre * 2]) < 0.1, `back ${back[centre * 2]} against ${motion[centre * 2]}`);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }

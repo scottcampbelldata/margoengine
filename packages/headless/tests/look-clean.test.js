@@ -923,3 +923,28 @@ test('checkShot passes a probe its precise frame and pooled frames for T6 (KB-LO
     'a precise frame of the wrong size',
   );
 });
+
+test('T4 shimmerMoving leaves out what the next frame covers or uncovers, by the forward-backward test (KB-LOOK-TV-SHIMMER2)', () => {
+  // The camera pans 2 px; a near post in the next frame stands over columns 20 to 23 and moves with itself (back 0),
+  // covering background the probe saw there. Without the back motion those pixels read as shimmer; with it they are
+  // occluded and left out, and the rest of the frame, which moved as the camera says, is clean.
+  const size = 48,
+    shade = (x) => 60 + ((x * 7) % 50),
+    frame = image(size, size, (x) => shade(x)),
+    next = image(size, size, (x) => (x >= 20 && x < 24 ? 250 : shade(x - 2))),
+    motion = { width: size, height: size, data: new Float32Array(size * size * 2) },
+    back = { width: size, height: size, data: new Float32Array(size * size * 2) };
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 2;
+      motion.data[i] = 2;
+      back.data[i] = x >= 20 && x < 24 ? 0 : -2;
+    }
+  const without = shimmerMoving(frame, { next, motion }),
+    withBack = shimmerMoving(frame, { next, motion, back });
+  assert.ok(without.value > 5, `the post reads as shimmer without the back motion: ${without.value}`);
+  assert.equal(withBack.value, 0);
+  assert.equal(withBack.detail.occluded, 4 * size);
+  assert.equal(without.detail.occluded, undefined);
+  assert.throws(() => shimmerMoving(frame, { next, motion, back: { ...back, data: new Float32Array(2) } }), RangeError);
+});

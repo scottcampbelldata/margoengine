@@ -104,6 +104,26 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   occlusion strength) and the file's image is kept; anything else is written into the pixels when the model is created.
 - **Regression:** `packages/usdz/tests/texture-factors.test.js`.
 
+### Open 2026-11-28: a hard-edged peach band lies under the dune coast's cloud deck at the sea horizon (KB-WATER-HORIZONBAND1, water and sky)
+
+- **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --out=<folder>`, `surf.png`: rows 512 to
+  516 read about (212, 205, 194), warm and brighter, between the overcast sky just above (189, 190, 187, rows 500 to
+  510) and the sea below; the band's top edge is one pixel sharp. The first-flight view, whose land reaches the
+  horizon, has none.
+- **Where to look:** the sea is a `horizon: true` Water, and its far rows reflect the sky texture (`skyTap` in
+  `packages/water/src/index.ts`, `skyTexture(source)`), which reads below-horizon rays at the horizon. The camera sees the
+  cloud deck there, the sea's reflection a sky without it: the band is the clear horizon of the sky texture showing at
+  grazing incidence. To prove before a fix: sample the sky texture at the horizon against the band's colour.
+
+### Open 2026-11-28: the dune coast's shore foam is drawn as long thin streaks along the shore (KB-WATER-FOAMSTREAK1, water)
+
+- **Repro:** the same `surf.png`, x 300 to 700 and y 530 to 630: the surf and shoreline foam is thin bright lines
+  stretched along the shore with little break-up along them, smeared rather than lacy, where foam on a surf beach
+  breaks into patches and lace along each line.
+- **Where to look:** the coastal surf foam of the Water (`COAST_SURF`, `landNearby()` foam lines in
+  `packages/water/src/index.ts`); the dune coast attaches no physics wake, so the cause is in the water package, not
+  water physics, unless the trace finds otherwise.
+
 ### Open 2026-11-28: the WaterWake README example runs out its 20 s page limit (KB-WATER-WAKEREADME1, physics solver SEA-04)
 
 - **Repro:** `npm run check:readme-run -- --packages=water` on the workstation (RTX A6000, Node 26): "water/readme-a-physics-

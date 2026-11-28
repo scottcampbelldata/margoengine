@@ -129,6 +129,13 @@ with no geometry that the `water` mask marks takes the distance to the sea plane
 `tools/shot/test/moving-check.mjs` (in `npm run test:shot`) renders the Storm Light tour at 270 x 480 with a fast camera
 (12.7 px mean motion) and finds 11.4 % of pixels off by over 6 codes warped against 36.9 % unwarped.
 
+The frame after each probe keeps its depth floats too, and the tool writes `probes/<name>.back.f32`, each pixel of the
+next frame moved back to the probe the same way (manifest `moving.back`). `shimmerMoving` then leaves out the pixels
+the next frame covers or uncovers by the forward-backward test of optical flow, |f + b|^2 > 0.01 (|f|^2 + |b|^2) + 0.5
+pixels (Sundaram, Brox and Keutzer, ECCV 2010, doi:10.1007/978-3-642-15549-9_32; the occlusion masks of MPI-Sintel,
+Butler et al., ECCV 2012, doi:10.1007/978-3-642-33783-3_44), and its detail counts them as `occluded`
+(KB-LOOK-TV-SHIMMER2).
+
 The page draws the mask as `r32float` (a `SceneTargets` output `{wgsl, format: 'r32float'}`). On each probe the tool
 also keeps the floats, `aovs/depth/frame_NNNN.f32` and `probes/<name>.depth.f32` (little-endian float32, one per
 pixel), and the motion reads those. At the frame's size each pixel takes the nearest surface its footprint covers (the

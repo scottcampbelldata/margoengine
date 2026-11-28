@@ -14853,6 +14853,12 @@
       "grew": 1
     },
     {
+      "date": "2026-11-28",
+      "commit": "shimmer2-occlusion",
+      "reason": "KB-LOOK-TV-SHIMMER2 part 1: shimmerMoving leaves out pixels the next frame covers or uncovers by the forward-backward test (Sundaram, Brox and Keutzer 2010) and checkShot reads moving.back: headless/look about 18,728 to 18,924 B gzip (limit 19290 to 19492). The test shares sampleLuma, the mask and motion helpers of shimmerMoving; a second entry would repeat them.",
+      "grew": 1
+    },
+    {
       "date": "2026-11-27",
       "commit": "exr-zip",
       "reason": "EXRExporter parity: encodeEXR writes ZIPS and ZIP, environment/exr-write 2,084 to 2,648 B gzip measured: the byte split and predictor, chunked zlib through CompressionStream and the compressed offset table in the one writer; a separate entry would repeat the header and sample loops",
@@ -16057,7 +16063,7 @@
     "@margoengine/headless/formats": 5809,
     "@margoengine/headless/frames": 2152,
     "@margoengine/headless/gif": 374,
-    "@margoengine/headless/look": 19290,
+    "@margoengine/headless/look": 19492,
     "@margoengine/headless/null": 3411,
     "@margoengine/headless/stage": 3972,
     "@margoengine/headless/tiles": 2829,

@@ -748,6 +748,12 @@ const row = shadowTint(frame, { lit: half(true), shadow: half(false), albedo });
 console.log(row.value.toFixed(1), row.pass, row.detail.strata); // 34.1 true 1
 ```
 
+**T4 leaves out what the next frame covers** (KB-LOOK-TV-SHIMMER2, 2026-11-28). `MovingFrames.back`, each pixel of the
+next frame moved back to this one, makes `shimmerMoving` skip a pixel whose motion and the motion back from where it
+lands do not cancel, |f + b|^2 > 0.01 (|f|^2 + |b|^2) + 0.5 pixels (the forward-backward test, Sundaram, Brox and Keutzer
+2010): the next frame covers or uncovers it, so it has no match to shimmer against. `detail.occluded` counts them; the
+shot tool writes `moving.back` for every moving probe.
+
 **T6 reads the precise frame and pools frames** (KB-LOOK-TV-TINTRES1, 2026-11-28). `bounce` and `shadowTint` also take
 `precise`, the frame before its 8 bits (RGB float32, sRGB coded 0 to 1: the shot tool's `probes/<name>.rgb32f`), read in
 place of the 8-bit frame, and `pool`, more frames of the shot (each its `precise` or `frame` with `lit`, `shadow` and

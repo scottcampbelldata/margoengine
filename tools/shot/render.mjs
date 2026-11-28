@@ -445,11 +445,12 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
         png: write && !skip && !pass,
         expectHash: !skip && !pass && kept !== null ? expect?.[kept] : undefined,
         thumbnail: skip || pass ? undefined : sheet.get(kept),
-        // A moving probe's depth mask also comes as floats: 8 bits cannot hold the distances its motion needs.
+        // A moving probe's depth mask also comes as floats: 8 bits cannot hold the distances its motion needs; so does
+        // the next frame's, for the motion back that finds what the next frame covers or uncovers.
         masks:
           skip || pass || kept === null || !masks
             ? null
-            : write && shot.moving && probes.has(kept)
+            : write && shot.moving && (probes.has(kept) || nextProbes.has(kept))
               ? { ...masks, exact: ['depth'] }
               : masks,
         viewProjection: write && !skip && !pass && (probes.has(kept) || nextProbes.has(kept)),
@@ -658,6 +659,7 @@ export async function shoot(file, { out, output, source, runs = 2, check = 'ever
           out,
           name,
           nextFile: next.file,
+          next: { eye: next.eye, depth: next.aovs?.depth, water: next.aovs?.water },
           eye: record.eye,
           viewProjection: record.viewProjection,
           nextViewProjection: next.viewProjection,

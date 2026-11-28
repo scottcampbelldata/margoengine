@@ -1835,7 +1835,7 @@ export interface ShotManifestProbe {
    * The frame after this one (a PNG) and each pixel's motion to it (raw little-endian float32, x then y per pixel, the
    * frame's size), for `shimmerMoving` and `motionBlur`.
    */
-  moving?: { next: string; motion: string };
+  moving?: { next: string; motion: string; back?: string };
   /**
    * This probe's own bounds, check name: bound. They replace the shot's `lookBounds` for the checks they name, on this
    * probe only (for example a lights bound for the probes that face the lamps).
@@ -1866,7 +1866,7 @@ export interface CheckShotOptions extends CheckProbeOptions, LookReportOptions {
 }
 
 async function movingFrames(
-  entry: { next: string; motion: string },
+  entry: { next: string; motion: string; back?: string },
   frame: LookImage,
   read: (path: string) => Promise<Uint8Array>,
   png: (path: string) => Promise<LookImage>,
@@ -1876,7 +1876,16 @@ async function movingFrames(
   if (bytes.byteLength !== data.byteLength)
     throw rangeError(`${entry.motion} is not the frame's size in float32 pairs (x, y)`, 'headless');
   new Uint8Array(data.buffer).set(bytes);
-  return { next: await png(entry.next), motion: { width: frame.width, height: frame.height, data } };
+  let back: LookMotion | undefined;
+  if (entry.back) {
+    const bytes = await read(entry.back),
+      floats = new Float32Array(frame.width * frame.height * 2);
+    if (bytes.byteLength !== floats.byteLength)
+      throw rangeError(`${entry.back} is not the frame's size in float32 pairs (x, y)`, 'headless');
+    new Uint8Array(floats.buffer).set(bytes);
+    back = { width: frame.width, height: frame.height, data: floats };
+  }
+  return { next: await png(entry.next), motion: { width: frame.width, height: frame.height, data }, back };
 }
 
 /**
@@ -2343,6 +2352,11 @@ export interface MovingFrames {
   next: LookImage;
   motion: LookMotion;
   /**
+   * Each pixel of `next` moved back to this frame, the same way as `motion`: with it `shimmerMoving` leaves out the
+   * pixels the next frame covers or uncovers (the forward-backward test).
+   */
+  back?: LookMotion;
+  /**
    * The shutter angle the frame was exposed with, in degrees (more than 0, up to 360), for `motionBlur`. Default 180,
    * the film standard: a frame drawn without sub-frames is still judged against a 180 degree smear.
    */
@@ -2371,7 +2385,7 @@ function sampleLuma(y: Float32Array, width: number, height: number, x: number, v
  */
 export function shimmerMoving(
   frame: LookImage,
-  { next, motion }: MovingFrames,
+  { next, motion, back }: MovingFrames,
   { mask, bound, threshold = 6 }: FlickerOptions & { threshold?: number } = {},
 ): LookResult {
   const { width, height } = frame;
@@ -2379,11 +2393,17 @@ export function shimmerMoving(
   sameSize(frame, motion, 'motion');
   if (motion.data.length !== width * height * 2)
     throw rangeError('The motion holds two floats (x, y) per pixel', 'headless');
+  if (back) {
+    sameSize(frame, back, 'back motion');
+    if (back.data.length !== width * height * 2)
+      throw rangeError('The back motion holds two floats (x, y) per pixel', 'headless');
+  }
   const a = luma(frame),
     b = luma(next),
     inside = maskBits(frame, mask, 'shimmerMoving');
   let count = 0,
-    off = 0;
+    off = 0,
+    occluded = 0;
   for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {
       const i = y * width + x;
@@ -2391,10 +2411,30 @@ export function shimmerMoving(
       const tx = x + motion.data[i * 2],
         ty = y + motion.data[i * 2 + 1];
       if (!(tx >= 0 && ty >= 0 && tx <= width - 1 && ty <= height - 1)) continue;
+      if (back && occludedAt(motion.data[i * 2], motion.data[i * 2 + 1], back, tx, ty)) {
+        occluded++;
+        continue;
+      }
       count++;
       if (Math.abs(a[i] - sampleLuma(b, width, height, tx, ty)) > threshold) off++;
     }
-  return result('shimmerMoving', percent(off, count), bound, { pixels: count, off });
+  return result('shimmerMoving', percent(off, count), bound, back ? { pixels: count, off, occluded } : { pixels: count, off });
+}
+
+/**
+ * The forward-backward consistency test of optical flow: a pixel moved by (fx, fy) to (tx, ty) in the next frame is
+ * covered or uncovered there when the next frame's motion back from that point does not bring it home,
+ * |f + b|^2 > 0.01 (|f|^2 + |b|^2) + 0.5 in pixels (N. Sundaram, T. Brox and K. Keutzer, "Dense point trajectories by
+ * GPU-accelerated large displacement optical flow", ECCV 2010, https://doi.org/10.1007/978-3-642-15549-9_32; the
+ * occlusions of D. J. Butler, J. Wulff, G. B. Stanley and M. J. Black, "A naturalistic open source movie for optical
+ * flow evaluation", ECCV 2012, https://doi.org/10.1007/978-3-642-33783-3_44). The back motion is read at the nearest
+ * pixel: blending across a depth edge would make a motion no surface has.
+ */
+function occludedAt(fx: number, fy: number, back: LookMotion, tx: number, ty: number): boolean {
+  const j = Math.round(ty) * back.width + Math.round(tx),
+    bx = back.data[j * 2],
+    by = back.data[j * 2 + 1];
+  return (fx + bx) ** 2 + (fy + by) ** 2 > 0.01 * (fx * fx + fy * fy + bx * bx + by * by) + 0.5;
 }
 
 /** Inverse of a column-major 4 x 4 matrix, or undefined when it is singular. */

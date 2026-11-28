@@ -269,6 +269,7 @@ export interface LookResult {
 export interface MovingFrames {
     next: LookImage;
     motion: LookMotion;
+    back?: LookMotion;
     shutter?: number;
 }
 
@@ -309,6 +310,7 @@ export interface ShotManifestProbe {
     moving?: {
         next: string;
         motion: string;
+        back?: string;
     };
     lookBounds?: Record<string, LookBound>;
     light?: LookLight;
@@ -445,7 +447,7 @@ export function shimmer(frames: readonly LookImage[], { mask, bound, threshold }
     threshold?: number;
 }): LookResult;
 
-export function shimmerMoving(frame: LookImage, { next, motion }: MovingFrames, { mask, bound, threshold }?: FlickerOptions & {
+export function shimmerMoving(frame: LookImage, { next, motion, back }: MovingFrames, { mask, bound, threshold }?: FlickerOptions & {
     threshold?: number;
 }): LookResult;
 
