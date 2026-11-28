@@ -51,20 +51,26 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   Regression: `packages/vfx/test/flocking-check.mjs` (seekEven, seekMixed; WebGPU and the WebGL2 layer) and
   `tests/film-time.test.js`.
 
-### Open 2026-11-28: a 3MF with `production: {separateParts: true}` copies every resource group whole into each part (KB-3MF-PARTCOPY1, exporters)
+### Fixed 2026-11-28: a 3MF with `production: {separateParts: true}` copied every resource group whole into each part (KB-3MF-PARTCOPY1, exporters)
 
-- **Repro:** `export3MF(NodePerformanceTest.glb, {assembly: 'components', production: {separateParts: true}})`
+- **Repro (before):** `export3MF(NodePerformanceTest.glb, {assembly: 'components', production: {separateParts: true}})`
   (`examples/assets/khronos`, 10,001 mesh nodes): RangeError "ZIP would exceed 268435456 bytes". The same scene with
   `assembly: 'components'` alone is 10,402,277 B, and with `production: true` in one part 10,056,754 B.
 - **Cause:** a part may refer only to resources in itself (production extension 3.2), so the writer copies into each
-  part the resource groups its object names (`resourcesOf`, `packages/exporters/src/threemf.ts`, where `apart` is
-  built). It copies a group whole: this scene's one `basematerials` holds about 10,000 entries with their
-  `pbmetallicdisplayproperties`, and every one of the 10,001 parts carries both, past `encodeZIP`'s 256 MiB, which it
-  counts uncompressed. Smaller scenes pay the same way: OrientationTest is 15,644 B in 14 parts against 5,916 B as
-  components.
-- **Fix wanted:** each part gets copies of its groups pruned to the indices its object uses, with `pindex`, `p1` to
-  `p3`, `multiproperties` layers and the display properties' entries renumbered to match, and a regression test that
-  reads such a file back through `parse3MF` and `parse3MFMaterials` with the same colours and checks the part sizes.
+  part the resource groups its object names (`resourcesOf`, `packages/exporters/src/threemf.ts`). It copied a group
+  whole: this scene's one `basematerials` holds about 10,000 entries with their `pbmetallicdisplayproperties`, and
+  every part carried both, past `encodeZIP`'s 256 MiB, which it counts uncompressed.
+- **Fix:** `prunedPart` gives each part copies of its indexed groups (base materials, colour, texture coordinate,
+  composite and multiproperties groups and display properties) cut to the entries its object reaches, through
+  `multiproperties` layers, composite `matindices` and display properties index for index, and renumbers the object's
+  `pindex`, `p1` to `p3`, the layers' `pindices` and `matindices` to match; textures and other whole resources are
+  copied as before. Resources are read once for all parts, so the scene exports in 8.8 s (it scanned every resource
+  for every part, about 92 s, once the size was fixed). NodePerformanceTest in separate parts is now 22,603,139 B,
+  10,000 parts of 4,155 to 7,286 B, against 10,363,111 B as components. Regression test
+  `packages/exporters/tests/threemf-part-prune.test.js`: a scene of metallic, translucent and vertex-coloured boxes
+  reads back through `parse3MF` and `parse3MFMaterials` with the same groups, colours and positions in separate parts
+  as in components, each part's groups holding one entry; and NodePerformanceTest's parts stay under 16 KiB.
+  `parse3MF` reads at most 1,024 model parts, so Margo's own reader still refuses this 10,000-part file (limits.md).
 
 ### Fixed 2026-11-28: on the WebGL2 layer a page linked its synchronous pipelines one at a time (KB-COMPAT-SYNCLINK1, webgl2-compat)
 

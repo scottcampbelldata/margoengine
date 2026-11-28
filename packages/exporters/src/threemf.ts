@@ -612,20 +612,161 @@ function checkLattice(lattice: ThreeMFLattice) {
 const REFERENCE = / (?:pid|pids|texid|matid|displaypropertiesid|[a-z]+textureid)="([\d ]+)"/g;
 const idOf = (xml: string): string => / id="(\d+)"/.exec(xml)![1];
 
+/** A property resource, read once however many model parts copy it. */
+interface Resource {
+  xml: string;
+  id: string;
+  /** Its place in the resource list. */
+  at: number;
+  /** Its opening tag. */
+  head: string;
+  tag: string;
+  /** The ids it names. */
+  refs: string[];
+  /** Its entries, when they are named by index; read on first use. */
+  entries?: string[] | null;
+}
+
+/** The property groups whose entries are named by index, which a model part may carry pruned to the ones it uses. */
+const INDEXED =
+  /^(?:basematerials|m:(?:colorgroup|texture2dgroup|compositematerials|multiproperties|pbspeculardisplayproperties|pbmetallicdisplayproperties|translucentdisplayproperties))$/;
+const attributeOf = (tag: string, name: string): string | undefined =>
+  new RegExp(` ${name}="([^"]*)"`).exec(tag)?.[1];
+const numbers = (list: string | undefined): number[] => (list ? list.split(' ').map(Number) : []);
+const namedIds = (xml: string): string[] => [...xml.matchAll(REFERENCE)].flatMap(([, ids]) => ids.split(' '));
+
+/** Each resource by id. A group's references are all in its opening tag or its entries, as this writer makes them. */
+function indexed(resources: readonly string[]): Map<string, Resource> {
+  return new Map(
+    resources.map((xml, at) => {
+      const [head, tag] = /^<([\w:]+)[^>]*?\/?>/.exec(xml)!;
+      return [idOf(xml), { xml, id: idOf(xml), at, head, tag, refs: namedIds(xml) }];
+    }),
+  );
+}
+
+/** A resource's entries when they are named by index, or null. */
+function entriesOf(resource: Resource): string[] | null {
+  if (resource.entries !== undefined) return resource.entries;
+  const { xml, head, tag } = resource;
+  return (resource.entries =
+    head.endsWith('/>') || !INDEXED.test(tag)
+      ? null
+      : (xml.slice(head.length, -`</${tag}>`.length).match(/<[^>]*\/>/g) ?? []));
+}
+
 /** The property resources that `from` refers to, directly or through one another, in their own order. */
-function resourcesOf(resources: readonly string[], from: string): string[] {
-  const byId = new Map(resources.map((xml) => [idOf(xml), xml])),
-    wanted = new Set<string>(),
-    pending = [from];
+function resourcesOf(resources: readonly string[], from: string, byId = indexed(resources)): string[] {
+  const wanted = new Set<string>(),
+    found: Resource[] = [],
+    pending = [namedIds(from)];
   while (pending.length)
-    for (const [, ids] of pending.pop()!.matchAll(REFERENCE))
-      for (const id of ids.split(' ')) {
-        if (wanted.has(id)) continue;
-        wanted.add(id);
-        const found = byId.get(id);
-        if (found) pending.push(found);
-      }
-  return resources.filter((xml) => wanted.has(idOf(xml)));
+    for (const id of pending.pop()!) {
+      if (wanted.has(id)) continue;
+      wanted.add(id);
+      const resource = byId.get(id);
+      if (resource) found.push(resource), pending.push(resource.refs);
+    }
+  return found.sort((a, b) => a.at - b.at).map(({ xml }) => xml);
+}
+
+/**
+ * `needs`, the resources a model part of one object refers to (a part refers only to its own, production extension
+ * 3.2), each indexed group cut to the entries the object reaches, and the object's XML with its indices renumbered to
+ * match (KB-3MF-PARTCOPY1: a part of a scene with one big base material group once carried the whole group).
+ */
+function prunedPart(
+  needs: readonly string[],
+  object: string,
+  byId: ReadonlyMap<string, Resource>,
+): { own: string[]; xml: string } {
+  const groups = new Map(
+      needs.map((xml) => {
+        const resource = byId.get(idOf(xml))!;
+        return [
+          resource.id,
+          {
+            ...resource,
+            entries: entriesOf(resource),
+            used: new Set<number>(),
+            /** The groups whose entries this group's entries show, index for index (display properties). */
+            owners: [] as string[],
+          },
+        ] as const;
+      }),
+    ),
+    pending: [string, number][] = [],
+    mark = (id: string, index: number): void => {
+      const group = groups.get(id);
+      if (!group?.entries || group.used.has(index)) return;
+      group.used.add(index);
+      pending.push([id, index]);
+    },
+    markAll = (id: string): void => groups.get(id)?.entries?.forEach((_, i) => mark(id, i));
+  for (const [id, { head }] of groups) {
+    const shown = attributeOf(head, 'displaypropertiesid');
+    if (shown) groups.get(shown)?.owners.push(id);
+  }
+  for (const [tag] of object.matchAll(/<[^>]+>/g)) {
+    const pid = attributeOf(tag, 'pid');
+    if (pid === undefined) {
+      namedIds(tag).forEach(markAll);
+      continue;
+    }
+    const at = ['pindex', 'p1', 'p2', 'p3', 'p'].map((name) => attributeOf(tag, name)).filter((v) => v !== undefined);
+    if (at.length) for (const index of at) mark(pid, Number(index));
+    else markAll(pid);
+  }
+  while (pending.length) {
+    const [id, index] = pending.pop()!,
+      { head, tag, entries, owners } = groups.get(id)!,
+      shown = attributeOf(head, 'displaypropertiesid');
+    if (shown) mark(shown, index);
+    for (const owner of owners) mark(owner, index);
+    if (tag === 'm:multiproperties') {
+      const layers = numbers(attributeOf(head, 'pids')),
+        row = numbers(attributeOf(entries![index], 'pindices'));
+      layers.forEach((layer, j) => mark(String(layer), row[j] ?? 0));
+    } else if (tag === 'm:compositematerials')
+      for (const base of numbers(attributeOf(head, 'matindices'))) mark(attributeOf(head, 'matid')!, base);
+  }
+  /** Each group's old index to its new one. */
+  const renumbered = new Map(
+      [...groups].map(([id, { used }]) => [id, new Map([...used].sort((a, b) => a - b).map((old, i) => [old, i]))]),
+    ),
+    index = (id: string, old: string | number): number => renumbered.get(id)?.get(Number(old)) ?? Number(old),
+    own = [...groups].map(([id, { xml, head, tag, entries }]) => {
+      if (!entries) return xml;
+      const kept = [...renumbered.get(id)!.keys()],
+        layers = numbers(attributeOf(head, 'pids')),
+        material = attributeOf(head, 'matid'),
+        top =
+          material === undefined
+            ? head
+            : head.replace(
+                / matindices="[^"]*"/,
+                ` matindices="${numbers(attributeOf(head, 'matindices'))
+                  .map((i) => index(material, i))
+                  .join(' ')}"`,
+              );
+      if (kept.length === entries.length && top === head && !layers.length) return xml;
+      const body = kept.map((old) =>
+        layers.length
+          ? entries[old].replace(
+              / pindices="([^"]*)"/,
+              (_, row: string) => ` pindices="${numbers(row).map((i, j) => index(String(layers[j]), i)).join(' ')}"`,
+            )
+          : entries[old],
+      );
+      return `${top}${body.join('')}</${tag}>`;
+    }),
+    xml = object.replace(/<[^>]+>/g, (tag) => {
+      const pid = attributeOf(tag, 'pid');
+      return pid === undefined
+        ? tag
+        : tag.replace(/ (pindex|p1|p2|p3|p)="(\d+)"/g, (_, name: string, old: string) => ` ${name}="${index(pid, old)}"`);
+    });
+  return { own, xml };
 }
 
 /** What `objectInfo` says of a node, with its lattice and layers checked. */
@@ -2170,12 +2311,16 @@ export async function export3MF(
   });
   // Textures first: display properties of base materials never sample one, those of texture groups do.
   const resources = [...baseXml, ...textureXml, ...groups, ...mixtureXml],
+    byId = indexed(resources),
     /** Each model part of one object, with the resources it needs: a part refers only to its own. */
     apart = objects
       .filter((object) => object.part)
-      .map(({ part, xml }) => ({ part: part!, xml, needs: resourcesOf(resources, xml) })),
+      .map(({ part, xml }) => {
+        const needs = resourcesOf(resources, xml, byId);
+        return { part: part!, needs, ...prunedPart(needs, xml, byId) };
+      }),
     rooted = objects.filter((object) => !object.part).map(({ xml }) => xml),
-    rootNeeds = new Set(resourcesOf(resources, rooted.join(''))),
+    rootNeeds = new Set(resourcesOf(resources, rooted.join(''), byId)),
     elsewhere = new Set(apart.flatMap(({ needs }) => needs)),
     rootResources = resources.filter((xml) => rootNeeds.has(xml) || !elsewhere.has(xml)),
     alternatives = rooted.some((xml) => xml.includes('<pa:alternatives>') || xml.includes(' pa:modelresolution="')),
@@ -2229,9 +2374,9 @@ export async function export3MF(
       ...fieldFiles.map(({ name }) => [name, `${RELATIONSHIP}3dtexture`] as const),
       ...[...apart, ...layerParts].map(({ part }) => [part, `${RELATIONSHIP}3dmodel`] as const),
     ],
-    parts = apart.flatMap(({ part, xml, needs }) => {
-      const textured = sampled(new Set(needs)),
-        data = encoder.encode(modelOf(namespaces, '', [...needs, xml], '<build/>'));
+    parts = apart.flatMap(({ part, xml, own }) => {
+      const textured = sampled(new Set(own)),
+        data = encoder.encode(modelOf(namespaces, '', [...own, xml], '<build/>'));
       return [
         { name: part, data },
         ...(textured.length
