@@ -368,6 +368,42 @@ They reuse one lazily loaded Wasm instance and one field copy per call, with pat
 per-release `maxSteps`. They retain nothing after settling. The `/flow` Wasm binary stays separate from
 all other feature kernels. GPU transport itself uses no Wasm and reads back only when explicitly requested.
 
+### Flow ink: traces as strokes, with travelling highlights
+
+`flowInk` from the optional `@margoengine/sciviz/flow-ink` entry draws pathlines, streaklines and streamlines as fat strokes, on a `Figure` (a layer in data units) or on an
+engine's scene (world units through `matrix`). Strokes take packed x, y, z points or `tracePathline` samples
+(`stride: 4`, cut at `until` with the crossing interpolated); NaN points break a stroke. Values per point colour it
+through OKLab stops. `pulse` adds highlights that travel downstream, as in Jobard and Lefer's animated streamlines:
+strokes are sorted into speed bands by their mean value, each band one dashed draw whose offset `seek` sets, and each
+stroke starts at its own golden-ratio phase. `set` replaces the strokes and `seek` moves the highlights; neither
+rebuilds the other. Margo Lines draws it, so WebGPU and the WebGL2 compatibility layer show the same strokes.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { tracePathline } from '@margoengine/sciviz/flow';
+import { flowInk } from '@margoengine/sciviz/flow-ink';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const grid = {
+  dims: [2, 2, 1], bounds: [-2, 2, -2, 2, 0, 0],
+  frames: [{ time: 0, u: new Float32Array(4).fill(1), v: new Float32Array(4).fill(0.5) }],
+} as const;
+const path = await tracePathline(grid, [-1.5, -1, 0], { from: 0, to: 2, step: 0.1 });
+const ink = await flowInk(engine, { colors: ['#1f4e6b', '#f2d58c'], width: 3, pulse: { speed: 0.4 } });
+ink.set([{ positions: path.samples, stride: 4, until: 1.5, values: path.samples.filter((_, i) => i % 4 === 3) }]);
+ink.seek(0.75); // highlights where they are 0.75 s in; any order of times
+engine.render();
+ink.dispose();
+```
+
+Defaults: `colors` `['#1f4e6b', '#43b7b0', '#f2d58c', '#ee7f5f']`, `range` the values' extent, `color` `'#e8f4ff'`
+for strokes without values, `tint` none (`tintAmount` 0.4), `width` 2 CSS pixels (at most 64), `opacity` 1,
+`onTop` false, `depthBias` 0.002, `order` 60. `pulse: true` or an object: `length` 0.14, `gap` 0.2, `speed` 0.5
+world units per second, `speedPerValue` 0, `bands` 8 (1 to 32), `opacity` 1, `highlight` `'#fff3d0'`, `amount` 0.4.
+`flowInkDraws(strokes, options)` returns the same draws on the CPU (segment pairs and linear rgba) for tests or
+another line renderer. Bad strokes and options throw coded `RangeError`s; `dispose()` (or `using`) removes the ink's
+lines plugin.
+
 ## CPU isosurface extraction
 
 The optional `@margoengine/sciviz/fallback` entry provides `marchingCubes`, the CPU extraction part of

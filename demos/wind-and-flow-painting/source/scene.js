@@ -1,7 +1,8 @@
-import {autoEngine} from '@margoengine/webgl2-compat/auto';
+import {startEngine} from '@margoengine/webgl2-compat/auto';
 import {applyQualityTier} from '@margoengine/quality';
-import {fetchTexture,installTexture} from './preview.js';
-import {createInk} from './ink.js';
+import {Figure} from '@margoengine/sciviz';
+import {flowInk} from '@margoengine/sciviz/flow-ink';
+import {lic} from '@margoengine/sciviz/lic';
 import {demoStatus} from 'margo-demo-status';
 import {bounds,defaultSeed,dims,duration,maxSpeed,snapshot,stops} from './flow-field.js';
 
@@ -11,11 +12,9 @@ const texture=id('texture'),streak=id('streak'),path=id('path'),status=id('statu
 const report=demoStatus(document.body,status,id('error')), state=document.body.dataset;
 const lifetime=new AbortController(),{signal}=lifetime;
 const forced=new URLSearchParams(location.search).get('backend')==='webgl2';
-const pixels=fetchTexture(signal);
-pixels.catch(()=>{});
 const runner=new Worker(new URL('./flow-worker.js',import.meta.url),{type:'module'});
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
-let engine,figure,layer,ink,openingTexture,resize,raf,clockAt=0,clockBase=0,detailTimer;
+let engine,figure,layer,pathInk,streakInk,resize,raf,clockAt=0,clockBase=0;
 let running=false,observation=0,nextId=0,busy=false,started=false;
 let seed=defaultSeed.slice(),samples=[],pathPoints=[],pathHead=null;
 
@@ -68,11 +67,11 @@ function markers(){
   ctx.beginPath();ctx.arc(sx,sy,5.6*scale,0,2*Math.PI);ctx.stroke();
 }
 function render(){
-  if(layer)layer.visible=texture.checked;
-  openingTexture?.show(!layer&&texture.checked);
-  ink.show(streak.checked?samples:[],path.checked?pathPoints:[]);
+  layer.visible=texture.checked;
+  streakInk.set(streak.checked&&samples.length>1?[{positions:samples.flatMap(([x,y])=>[x,y,0])}]:[]);
+  pathInk.set(path.checked&&pathPoints.length>1?[{positions:pathPoints.flatMap(([x,y])=>[x,y,0])}]:[]);
   markers();
-  if(figure)figure.render();else engine.render();
+  figure.render();
 }
 function setRun(value){
   running=value;
@@ -161,7 +160,7 @@ async function actual(event){
   state.pathPoints=String(first.length);
   state.traceSignature=dye.slice(0,8).map(p=>p.map(n=>n.toFixed(4)).join(',')).join('|');
   render();
-  await engine.gpu.queue.onSubmittedWorkDone();
+  await figure.ready();
   if(data.id!==nextId||signal.aborted)return;
   state.revision=String(data.id);
   if(started&&dye.length>=2&&!performance.getEntriesByName('flow-dye-applied').length)performance.mark('flow-dye-applied');
@@ -200,34 +199,9 @@ function connect(){
   resize=new ResizeObserver(()=>render());
   resize.observe(canvas);
 }
-async function compat(){
-  const {install}=await import('@margoengine/webgl2-compat');
-  return {install:()=>install({force:true,signal})};
-}
-async function refine(){
-  const [{Figure},{lic}]=await Promise.all([import('@margoengine/sciviz'),import('@margoengine/sciviz/lic')]);
-  signal.throwIfAborted();
-  const display=new Figure(engine,{limits:bounds,axes:false,tooltips:false,legend:false,
-    theme:{background:'#193344',axis:'#92b1ba',grid:'#305460',text:'#e0e8da'}});
-  const field=snapshot(0);
-  const live=await lic(display,{bounds,dims,u:field.u,v:field.v},{
-    resolution:[360,216],steps:21,step:.61,seed:1445,contrast:4.45,
-    colormap:stops,range:[0,maxSpeed],signal,
-  });
-  await display.ready();
-  signal.throwIfAborted();
-  figure=display;
-  layer=live;
-  render();
-  await engine.gpu.queue.onSubmittedWorkDone();
-  if(!signal.aborted)state.textureDetail='full';
-}
-async function setup(target){
-  if(!target.gpu)throw new Error('This flow exhibit needs WebGPU or WebGL2 compatibility.');
-  engine=target;
+async function setup(){
   engine.onError=fail;
   layout();
-  engine.scene.background='#193344';
   engine.camera.position=[0,3,0];
   engine.camera.target=[0,0,0];
   engine.camera.up=[0,0,-1];
@@ -239,38 +213,45 @@ async function setup(target){
     matrix[10]=webgpu?r:-2*r;
     matrix[14]=webgpu?far*r:-(far+near)*r;
   };
-  openingTexture=installTexture(engine,await pixels);
-  ink=createInk(engine,bounds);
+  figure=new Figure(engine,{limits:bounds,axes:false,tooltips:false,legend:false,
+    theme:{background:'#193344',axis:'#92b1ba',grid:'#305460',text:'#e0e8da'}});
+  const field=snapshot(0);
+  layer=await lic(figure,{bounds,dims,u:field.u,v:field.v},{
+    resolution:[360,216],steps:21,step:.61,seed:1445,contrast:4.45,
+    colormap:stops,range:[0,maxSpeed],signal,
+  });
+  pathInk=await flowInk(figure,{color:'#a6f5e3',width:1.65,onTop:true,signal});
+  streakInk=await flowInk(figure,{color:'#f5b870',width:2.5,onTop:true,signal});
   state.layers='111';
-  state.textureDetail='opening';
+  state.textureDetail='full';
   showTime(0);
   render();
-  await engine.gpu.queue.onSubmittedWorkDone();
+  await figure.ready();
 }
 async function start(){
   applyQualityTier();
-  const known=forced||!navigator.gpu;
-  if(known)await (await compat()).install();
-  await autoEngine(canvas,setup,{signal,backend:known?'webgpu':undefined,loadCompat:compat,
-    exactSize:true,antialias:false,startupTimeout:6500});
+  ({engine}=await startEngine(canvas,{loadCompat:()=>import('@margoengine/webgl2-compat'),forceCompat:forced,
+    signal,exactSize:true,antialias:false,startupTimeout:6500}).then(started=>{
+    state.renderer=started.renderer==='compatibility'?'webgl2':'webgpu';
+    return started;
+  }));
   signal.throwIfAborted();
-  state.renderer=engine.gpu.adapterInfo?.vendor==='margo-webgl2'?'webgl2':'webgpu';
+  await setup();
+  signal.throwIfAborted();
   tools.disabled=false;
   status.hidden=true;
   setRun(false);
   connect();
   report.ready();
   performance.mark('margo-first-usable-frame');
-  detailTimer=setTimeout(()=>refine().catch(fail),1650);
 }
 function dispose(){
   lifetime.abort();
   cancelAnimationFrame(raf);
   resize?.disconnect();
-  clearTimeout(detailTimer);
   runner.terminate();
-  ink?.dispose();
-  openingTexture?.dispose();
+  pathInk?.dispose();
+  streakInk?.dispose();
   figure?.dispose();
   engine?.dispose();
 }

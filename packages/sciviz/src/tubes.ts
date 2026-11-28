@@ -4,8 +4,7 @@ import { sweepGeometry } from '@margoengine/geometry/sweep';
 import type { GeometryData } from '@margoengine/geometry';
 import type { TriangleSet } from './grids.js';
 import type { Bounds } from './layer.js';
-import { SRGBToLinear } from '@margoengine/math';
-import { linearToOklab, oklabToLinear } from './oklab.js';
+import { oklabRamp } from './oklab.js';
 import { rangeError } from '../../shared/errors.js';
 
 /** A finite polyline in data units, including the last point again for a closed line. */
@@ -393,26 +392,19 @@ export interface StreamColorOptions {
 export function streamTubeColors(mesh: { readonly values: ArrayLike<number> }, options: StreamColorOptions): Float32Array {
   const values = mesh?.values;
   if (!values || typeof values.length !== 'number') throw rangeError('Stream colours need a mesh with values', 'sciviz');
-  const stops = (options?.colors ?? []).map((c) => {
-    const rgb = typeof c === 'string' && /^#[\da-f]{6}$/i.test(c)
-      ? [1, 3, 5].map((k) => parseInt(c.slice(k, k + 2), 16) / 255)
-      : Array.isArray(c) && c.length === 3 && c.every((v) => Number.isFinite(v) && v >= 0 && v <= 1) ? c : null;
-    if (!rgb) throw rangeError('Stream colours must be #rrggbb or [r, g, b] in 0 to 1', 'sciviz');
-    return linearToOklab(SRGBToLinear(rgb[0]), SRGBToLinear(rgb[1]), SRGBToLinear(rgb[2]));
-  });
-  if (stops.length < 2) throw rangeError('Stream colours need at least two colours', 'sciviz');
+  let ramp;
+  try {
+    ramp = oklabRamp(options?.colors ?? [], 'Stream');
+  } catch (error) {
+    throw rangeError((error as Error).message, 'sciviz');
+  }
   let [lo, hi] = options.range ?? [Infinity, -Infinity];
   if (!options.range) for (let i = 0; i < values.length; i++) (lo = Math.min(lo, values[i])), (hi = Math.max(hi, values[i]));
   if (!Number.isFinite(lo) || !Number.isFinite(hi)) throw rangeError('Stream colour range must be finite', 'sciviz');
   const out = new Float32Array(values.length * 4);
   for (let i = 0; i < values.length; i++) {
-    const x = hi > lo ? Math.min(1, Math.max(0, (values[i] - lo) / (hi - lo))) : 0,
-      at = x * (stops.length - 1),
-      j = Math.min(stops.length - 2, Math.floor(at)),
-      f = at - j,
-      lab = [0, 1, 2].map((c) => stops[j][c] * (1 - f) + stops[j + 1][c] * f),
-      rgb = oklabToLinear(lab[0], lab[1], lab[2]);
-    out.set([Math.max(0, rgb[0]), Math.max(0, rgb[1]), Math.max(0, rgb[2]), 1], i * 4);
+    ramp.sample(hi > lo ? (values[i] - lo) / (hi - lo) : 0, out, i * 4);
+    out[i * 4 + 3] = 1;
   }
   return out;
 }

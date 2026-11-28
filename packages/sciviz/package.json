@@ -72,6 +72,10 @@
       "types": "./dist/flow.d.ts",
       "import": "./dist/flow.js"
     },
+    "./flow-ink": {
+      "types": "./dist/flow-ink.d.ts",
+      "import": "./dist/flow-ink.js"
+    },
     "./lic": {
       "types": "./dist/lic.d.ts",
       "import": "./dist/lic.js"

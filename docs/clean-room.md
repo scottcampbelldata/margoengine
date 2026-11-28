@@ -20537,3 +20537,25 @@ Margo's own: the per-pixel line coverage w / 2 + 0.5 - distance / (levels per pi
 with fwidth, here on the CPU; the gentle brightening of slopes facing the light. Tests: sciviz
 tests/contour2d-relief.test.js (lines on the exact levels of a plane, wider index contours, the hillshade order of
 north-west, flat and south-east slopes, outward skirts and their material group).
+
+## G04 flow ink: sciviz/flow flowInk and flowInkDraws (2026-11-28)
+
+Written from the sources below; no other library's code was read.
+
+- B. Cabral and L. C. Leedom, "Imaging vector fields using line integral convolution", SIGGRAPH 1993,
+  https://doi.org/10.1145/166117.166151 (the texture the ink is drawn over; traces and texture show one field).
+- B. Jobard and W. Lefer, "Creating evenly-spaced streamlines of arbitrary density", Visualization in Scientific
+  Computing 1997, https://doi.org/10.1007/978-3-7091-6876-9_5 (streamlines as strokes of one width and spacing).
+- B. Jobard and W. Lefer, "Unsteady flow visualization by animating evenly-spaced streamlines", Computer Graphics
+  Forum 19(3), 2000, https://doi.org/10.1111/1467-8659.00395 (highlights travelling along static streamlines, each
+  line at its own phase, so direction reads without moving the lines).
+- D. Stalling and H.-C. Hege, "Fast and resolution independent line integral convolution", SIGGRAPH 1995,
+  https://doi.org/10.1145/218380.218448 (traces kept as arc-length polylines).
+- B. Ottosson, OKLab, 2020, https://bottosson.github.io/posts/oklab/ (value ramp and highlight blend in OKLab).
+- IEC 61966-2-1:1999, sRGB (the transfer from sRGB stops to linear light).
+
+Margo's own: strokes sorted into speed bands by their mean value, one dashed draw per band, so highlights of faster
+flow travel faster without a per-fragment shader; each stroke led by one invisible spacer whose length is its
+golden-ratio phase within the dash period; trace cuts at a time with the crossing interpolated. Tests: sciviz
+tests/flow-ink.test.js (breaks at NaN, cut at until, ramp end colours, band speeds and spacer phase, highlight blend,
+validation, the engine plugin's dash offsets and disposal).

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22107133,
+  "total": 22111145,
   "history": [
     {
       "date": "2026-10-24",
@@ -15989,6 +15989,12 @@
       "commit": "hydro-06-native-aquifer-rows",
       "reason": "HYDRO-06 @margoengine/physics/groundwater 6235 to 9253 B gzip, ceiling 6491 to 9531 B. The groundwater entry retains shared signed terrain and recharge validation, staged aquifer columns and outlet budgets, and optional independent native face rows. Splitting would duplicate the unconfined solver publication path and worker lifecycle. The existing independent confined exports stay available. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "g04-flow-ink",
+      "reason": "G04 new optional @margoengine/sciviz/flow-ink: 0 to 3756 B gzip, ceiling 4012 B. Ink strokes along traces with OKLab value colours and travelling highlights for the two wind demos; its own entry so sciviz/flow (tracing and particles) stays at its measured size. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -17226,6 +17232,7 @@
     "@margoengine/sciviz/fallback": 2258,
     "@margoengine/sciviz/fits": 5453,
     "@margoengine/sciviz/flow": 9392,
+    "@margoengine/sciviz/flow-ink": 4012,
     "@margoengine/sciviz/format": 9114,
     "@margoengine/sciviz/formats": 20945,
     "@margoengine/sciviz/geo": 5071,

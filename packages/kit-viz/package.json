@@ -1887,6 +1887,10 @@
       "types": "./dist/sciviz/flow.d.ts",
       "import": "./dist/sciviz/flow.js"
     },
+    "./sciviz/flow-ink": {
+      "types": "./dist/sciviz/flow-ink.d.ts",
+      "import": "./dist/sciviz/flow-ink.js"
+    },
     "./sciviz/lic": {
       "types": "./dist/sciviz/lic.d.ts",
       "import": "./dist/sciviz/lic.js"

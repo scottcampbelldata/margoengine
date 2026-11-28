@@ -1,1 +1,0 @@
-import{n as e,t}from"./extension-B3SnASoc.js";var n=(e,n=`1.0.0`,r=import.meta.url)=>t(e,n,r);function r(e,t){for(let n=t;n>=0;n=e.parents?.[n]??-1)if(e.hidden[n])return!0;return!1}function i(t,i){let a=n(t),o=e(i),s=o.id;return a.disposed||a.meshes.get(s)!==i||r(a.store,s)?null:o.matrix??a.store.matrices.subarray(s*16,s*16+16)}export{i as t};
