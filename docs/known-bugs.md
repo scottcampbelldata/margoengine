@@ -18175,6 +18175,28 @@ Regression: packages/gltf/test/node-images.test.js, six PNG/JPEG source cases fa
   0.36 m forward on its heel, so the figure falls backward anyway. Next: why a stance foot that the bound holds stays toe-up
   after a step (the foot load `foot` against the real contact force), and step execution for a straight-legged figure; the
   levers above all trade one figure's falls for another's, so none landed.
+- **Where it stands, and what a fix needs (lane P, 2026-11-28, write-up; work stopped here on the manager's order):**
+  - Measured levers, falls of 56 at 1 m/s (seven figures, four directions, seeds 1 and 2) against 18 on Margo's solver:
+    true hip height 27; 0.998 extension 18 (and 4 / 9 / 12 at 0.5 / 1 / 1.5 m/s, seed 1, against 5 / 9 / 11); both 16;
+    swing lift capped at 1, 2 or 4 g 17, 17, 19; `stepTrigger` x0.5 or x0.25 16, 23; capture-point hull trigger 21, with
+    true hip height and 0.998 extension 26; trailing-foot rule off 18; shortest step 0.8 or 1.2 of 1/omega 17, 18. The best
+    total was `stepTrigger` x0.5 with the hull pick, true hip height and 0.998 extension, 12 of 56 at 1 m/s; it was not run
+    at 0.5 or 1.5 m/s, it moves falls between figures, and it is four changes for no one cause, so it did not land.
+  - Not the cause (each measured): Seed-san's sole fit, `minWeight`, the stance ankle's rod gains (x0, x0.25, x4), the solver
+    change (the remeasure on Margo's solver keeps the same two figures failing).
+  - Three separate faults are proven, and a fix needs all three: (1) `RagdollBalance.landing` reads the hips' height as the
+    leg's, so `room` is 0 on RiggedFigure and Seed-san (97.6 percent of the leg, past the 0.9 factor) and the step lands under
+    the hips; (2) the step waits on a fixed `stepTrigger` of 0.2 of the reach while the capture point is already outside the
+    sole, 52 frames on Seed-san's 0.2 m/s backward push; the trigger must be the capture point leaving the support hull
+    (Pratt et al. 2006, "Capture Point: A Step toward Humanoid Push Recovery", Humanoids; Koolen et al. 2012, IJRR); (3) after
+    a step a stance foot stays toe-up on its heel at 0.2 to 0.4 rad and slides, though the ankle bound holds it: the next
+    reading is the controller's `foot` load against the contact force the solver really applies on that foot, and a
+    straight-legged figure's swing (its knee snap lifts the whole body, the RiggedFigure trace above). (1) and (2) fixed alone
+    move the backward step to 4 cm back and bring the capture point home by frame 30, and the figure still falls on (3).
+  - So the fix is a controller redesign of step timing and stance-foot control in `packages/ragdoll/src/balance.ts`
+    (and the stance ankle in `powered.ts`), judged over all seven figures, four directions, both seeds and all three speeds
+    at once, not a tuning lever. It needs a planner before code. Probes: `.lane/kb2208-*.mjs` and `.lane/patch2208.py` in the
+    lane P worktree (env switches PICK, HIPH, EXT, TRIG, HULL, SHORT, CLAMP1, ANKS over the built dist).
 
 ### Fixed 2026-11-11: npm run verify hung once in its unit test step
 
