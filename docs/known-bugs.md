@@ -4566,6 +4566,22 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   `packages/physics/tests/surge.test.js` (a wind with no scale, a wind at 60, and a sky at 1, each refused by a water at
   600; a wind at 600 accepted).
 
+### Fixed 2026-11-28: a tensile seam in a cell with no volume reported its points outside the cell (KB-SOFT-SEAMFLAT1, physics/soft)
+
+- **Repro:** `tetrahedron().setTensileSeam({...})` (the volumetric-cut test's cell), then `desc.positions[11] = 0` so the cell is
+  flat after `setCells` checked it, then `soft.create(desc)`: the refusal read "A tensile seam point is outside its cell".
+- **Cause:** `bindTensileSeam` divided by the cell's determinant without checking it, so every cell coordinate was not
+  finite and `locate` blamed the points; its orientation was `Math.sign(determinant)`, 0 for such a cell (the class
+  `tests/modern-zero-determinant-normals.test.js` checks).
+- **Fix:** the seam refuses a cell whose determinant is within `MIN_TET_DETERMINANT` (the bound `setCells` uses) with a coded
+  `unsupported` error naming the cell, and the orientation is `determinant < 0 ? -1 : 1`. SOFT-04 file, changed by lane P
+  with the manager's go.
+- **Regression:** "a tensile seam rejects points outside its material cell and purely face-aligned triangles" in
+  `packages/physics/tests/coupling/volumetric-cut.test.js`.
+- **Open for the SOFT-04 owner (KB-SOFT-FLATCELLMSG1):** `SoftBodyDesc.setCells` (`packages/physics/src/soft.ts`, the flat-cell
+  check) says "Cell N must be flat: its four particles lie in one plane." when it refuses a flat cell; it should say the
+  cell must not be flat. Not changed here: soft.ts is the laptop session's file.
+
 ### Fixed 2026-11-28: a tracked vehicle facing along its up axis ignored every steer (KB-PHYS-TRACKEDUP1, physics)
 
 - **Repro:** `new TrackedVehicle(physics, chassis, { tracks: [{ position: [-1, 0, 0], length: 2 }, { position: [1, 0, 0], length: 2 }], forward: [0, 1, 0] })`

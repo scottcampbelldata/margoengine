@@ -1,6 +1,7 @@
 import { softError } from './soft-error.js';
 import { checkVec, type Vec3 } from './math.js';
 import { cross, dot, subtract, type Tet } from './soft-plane-cut.js';
+import { MIN_TET_DETERMINANT } from './soft-volume.js';
 
 type Triangle = readonly [Vec3, Vec3, Vec3];
 type Edges = [Vec3, Vec3, Vec3];
@@ -64,6 +65,12 @@ export function bindTensileSeam(
   const edges: Edges = [subtract(position(b), origin), subtract(position(c), origin), subtract(position(d), origin)];
   const cofactors = volumeMatrix(edges);
   const determinant = dot(edges[0], cofactors[0]);
+  // setCells refuses a flat cell, but the positions can change after it; a seam in a cell with no volume has no
+  // orientation (its sign would be 0) and no cell coordinates, so it is refused here with its own reason.
+  if (!(Math.abs(determinant) > MIN_TET_DETERMINANT))
+    throw softError(
+      `Tensile seam cell ${cell} has no volume: its four particles lie in one plane. Move one off that plane.`,
+    );
   const inCell = (p: Vec3): Vec3 => coordinates((axis) => dot(p, cofactors[axis]) / determinant);
   const locate = (p: Vec3): Vec3 => {
     const q = inCell(subtract(p, origin));
@@ -98,7 +105,7 @@ export function bindTensileSeam(
     direction: inCell(unitNormal),
     shear,
     openingStrain,
-    orientation: Math.sign(determinant),
+    orientation: determinant < 0 ? -1 : 1,
   };
 }
 

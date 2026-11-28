@@ -896,6 +896,25 @@ test('a tensile seam rejects points outside its material cell and purely face-al
     ),
     /positive strain or omit/,
   );
+  // A cell flattened after setCells (its positions edited in place) has no volume: the seam names that, where it used to
+  // report every point as outside its cell, and never takes the sign of a zero determinant.
+  const flattened = tetrahedron().setTensileSeam({
+    cell: 0,
+    triangle: [
+      [0.5, 0.2, 0],
+      [0.5, 0.65, 0],
+      [0.2, 0.2, 0],
+    ],
+    openingStrain: 0.01,
+  });
+  flattened.positions[11] = 0;
+  await assert.rejects(
+    specimen(flattened),
+    (error) =>
+      error.code === 'unsupported' &&
+      /cell 0 has no volume/.test(error.message) &&
+      error.message.includes('margoengine.com/errors#soft-bodies'),
+  );
 });
 
 test('an authored seam uses independent sliding and tearing limits with quadratic mode interaction', async () => {
