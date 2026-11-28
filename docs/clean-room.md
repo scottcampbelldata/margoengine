@@ -20279,3 +20279,23 @@ own horizon colour showed as a flat band under the far ranges. Sources read (pap
   (aerial perspective: the in-scattered light along a ray tends to its limit as the ray's optical depth grows, so a ray
   below the horizon that meets nothing in the scene takes the fog's colour at infinity, not the sky's horizon).
 
+## Alpine forbs read as flowers at every distance: procedural forbs (2026-11-28)
+
+Above the Treeline look round 5: bistort spikes of solid florets on a golden-angle lattice read as pine cones, arnica as
+flat yellow discs, moss campion cushions as lily pads, and the flowers vanished past the middle ring. Sources read:
+
+- T. Ijiri, S. Owada, M. Okabe and T. Igarashi, "Floral diagrams and inflorescences: interactive flower modeling using
+  botanical structural constraints", SIGGRAPH 2005, https://doi.org/10.1145/1073204.1073253 (heads as an axis with
+  florets; a spike's florets stand open and at varied angles).
+- Flora of North America, vol. 5 (Bistorta bistortoides: spike 2 to 5 cm by 1 to 2 cm, white to pink, stamens exserted;
+  Silene acaulis: dense cushions of packed rosettes 3 to 8 cm tall), vol. 8 (Gentiana parryi: flowers crowded at the
+  stem tips), vol. 21 (Arnica cordifolia: heads nodding to erect, rays spreading).
+- C. Atamian et al., "Circadian regulation of sunflower heliotropism, floral orientation, and pollinator visits",
+  Science 353(6299), 2016, https://doi.org/10.1126/science.aaf9793 (composite heads face the morning sun, not the
+  zenith).
+- R. L. Cook, J. Halstead, M. Planck and D. Ryu, "Stochastic simplification of aggregate detail", ACM TOG 26(3), 2007,
+  https://doi.org/10.1145/1276377.1276476 (a simplified far plant keeps the area and colour its detail covered).
+
+Margo's own: the Rodrigues turn of a head built upright onto its nodding axis; a cushion's rosettes as a product of
+sines over the surface point; far-ring sizes chosen so the area seen from above is kept (procedural test/forbs.test.js).
+

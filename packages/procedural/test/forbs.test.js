@@ -78,3 +78,57 @@ test('FORB_COLORS: the measured FReD spectra integrated under a 6504 K black bod
   assert.deepEqual(arnica.parts[1].color, FORB_COLORS.arnicaRay);
   assert.ok(forb('gentian').parts[1].color[2] > 1.5 * forb('gentian').parts[1].color[0]);
 });
+
+// Above the Treeline look round 5: arnica read as flat yellow discs, aster barely showed, moss campion cushions read as
+// lily pads and every flower vanished past the middle ring. Heads nod and their rays rise and droop; a cushion is a
+// lumpy mound; the far ring keeps (or grows) the coloured area seen from above.
+const area = (g) => {
+  let sum = 0;
+  for (let i = 0; i < g.indices.length; i += 3) {
+    const [a, b, c] = [0, 1, 2].map((k) => g.indices[i + k] * 3),
+      ux = g.positions[b] - g.positions[a],
+      uz = g.positions[b + 2] - g.positions[a + 2],
+      vx = g.positions[c] - g.positions[a],
+      vz = g.positions[c + 2] - g.positions[a + 2];
+    sum += Math.abs(ux * vz - uz * vx) / 2;
+  }
+  return sum;
+};
+test('forb heads nod and stand up from the stem; cushions are lumpy mounds; the far ring keeps its colour', () => {
+  for (const species of ['arnica', 'aster']) {
+    const petals = forb(species, { seed: 4 }).parts.find((p) => p.name === 'petals').rings[0];
+    let low = Infinity,
+      high = -Infinity,
+      nx = 0,
+      ny = 0,
+      nz = 0;
+    for (let i = 0; i < petals.positions.length; i += 3) {
+      low = Math.min(low, petals.positions[i + 1]);
+      high = Math.max(high, petals.positions[i + 1]);
+      nx += petals.normals[i];
+      ny += petals.normals[i + 1];
+      nz += petals.normals[i + 2];
+    }
+    const diameter = 2 * FORB_SPECIES[species].ray;
+    assert.ok(high - low > 0.3 * diameter, `${species}: the head stands ${(high - low).toFixed(4)} m tall, not flat`);
+    const tilt = (Math.acos(Math.abs(ny) / Math.hypot(nx, ny, nz)) * 180) / Math.PI;
+    assert.ok(tilt > 8, `${species}: the head nods ${tilt.toFixed(1)} degrees off the zenith`);
+  }
+  const cushion = forb('campion', { seed: 4 }).parts[0].rings[0];
+  let top = 0,
+    radius = 0;
+  const radii = [];
+  for (let i = 0; i < cushion.positions.length; i += 3) {
+    top = Math.max(top, cushion.positions[i + 1]);
+    radius = Math.max(radius, Math.hypot(cushion.positions[i], cushion.positions[i + 2]));
+    radii.push(Math.hypot(cushion.positions[i], cushion.positions[i + 1], cushion.positions[i + 2]));
+  }
+  assert.ok(top > 0.38 * radius, `campion: a mound ${top.toFixed(3)} m tall on ${radius.toFixed(3)} m, not a pad`);
+  let lumpy = 0;
+  for (let i = 1; i < radii.length; i++) lumpy = Math.max(lumpy, Math.abs(radii[i] - radii[i - 1]) / radius);
+  assert.ok(lumpy > 0.03, `campion: the cushion is lumpy (${lumpy.toFixed(3)})`);
+  for (const species of ['arnica', 'aster', 'bistort', 'gentian', 'campion']) {
+    const petals = forb(species, { seed: 4 }).parts.find((p) => p.name === 'petals').rings;
+    assert.ok(area(petals[2]) > 0.9 * area(petals[0]), `${species}: far ring keeps the area seen from above (${area(petals[2])} of ${area(petals[0])})`);
+  }
+});

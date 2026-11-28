@@ -32,5 +32,8 @@ window.check={
   return {parts:plant.parts.map(p=>p.name),counts,errors:errors.splice(0)};
  },
 };
+// Which device drew: the WebGL2 layer in a forced-compatibility run (scripts/support/compat-shim.js sets __margoCompat
+// when it installs the layer on the first requestAdapter), native WebGPU otherwise.
+window.check.device=()=>({compat:!!globalThis.__margoCompat,adapter:engine.gpu.adapterInfo?.vendor??null,layer:engine.gpu.constructor?.name??null});
 window.ready=true;
 </script></body></html>

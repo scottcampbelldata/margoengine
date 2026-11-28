@@ -220,27 +220,27 @@ function dome(b: Builder, base: V3, r: number, h: number, rings: number, sides: 
   }
 }
 
-/** A small octahedron (a floret of a spike), radius `r`. */
-function floret(b: Builder, c: V3, r: number): void {
-  const v = [
-    [r, 0, 0],
-    [-r, 0, 0],
-    [0, r, 0],
-    [0, -r, 0],
-    [0, 0, r],
-    [0, 0, -r],
-  ].map((d) => b.vertex([c[0] + d[0], c[1] + d[1], c[2] + d[2]]));
-  for (const [a, x, y] of [
-    [2, 0, 4],
-    [2, 4, 1],
-    [2, 1, 5],
-    [2, 5, 0],
-    [3, 4, 0],
-    [3, 1, 4],
-    [3, 5, 1],
-    [3, 0, 5],
-  ])
-    b.i.push(v[a], v[x], v[y]);
+/** A closed oblong spheroid (a bistort spike's core) from `base` up `length`, radius `r`, `rings` along by `sides`. */
+function spike(b: Builder, base: V3, length: number, r: number, sides: number, rings: number): void {
+  const bottom = b.vertex([base[0], base[1], base[2]]),
+    apex = b.vertex([base[0], base[1] + length, base[2]]),
+    rows: number[][] = [];
+  const n = rings + 2;
+  for (let s = 1; s < n; s++) {
+    const t = s / n,
+      radius = r * Math.sin(Math.PI * t) ** 0.8,
+      row: number[] = [];
+    for (let k = 0; k < sides; k++) {
+      const a = (k / sides) * Math.PI * 2;
+      row.push(b.vertex([base[0] + Math.cos(a) * radius, base[1] + length * t, base[2] + Math.sin(a) * radius]));
+    }
+    rows.push(row);
+  }
+  for (let k = 0; k < sides; k++) b.i.push(bottom, rows[0][k], rows[0][(k + 1) % sides]);
+  for (let s = 1; s < rows.length; s++)
+    for (let k = 0; k < sides; k++) b.quad(rows[s - 1][k], rows[s - 1][(k + 1) % sides], rows[s][(k + 1) % sides], rows[s][k]);
+  const last = rows[rows.length - 1];
+  for (let k = 0; k < sides; k++) b.i.push(apex, last[(k + 1) % sides], last[k]);
 }
 
 /**
@@ -282,13 +282,54 @@ function star(b: Builder, c: V3, n: V3, r: number): void {
   for (let k = 0; k < 10; k++) b.i.push(centre, rim[k], rim[(k + 1) % 10]);
 }
 
-/** A composite head (arnica, aster) at `top`: a disc and `rays` ray florets on the golden angle. */
-function head(petals: Builder, centres: Builder, top: V3, disc: number, rays: number, ray: number, width: number, d: number, next: () => number): void {
-  dome(centres, [top[0], top[1] - disc * 0.15, top[2]], disc, disc * 0.55, Math.max(1, Math.round(3 * d)), Math.max(5, Math.round(10 * d)));
-  for (let k = 0; k < rays; k++) {
-    const az = k * GOLDEN * 2.0 + next() * 0.1;
-    strip(petals, [top[0] + Math.cos(az) * disc * 0.8, top[1], top[2] + Math.sin(az) * disc * 0.8], az, 0.12 + next() * 0.15, ray * (0.85 + 0.3 * next()), width, 'strap', Math.max(1, Math.round(3 * d)), 0.35, 0.15);
+/**
+ * Appends `src`, built upright about the origin, to `dst` turned so +Y points along unit `n` (the shortest rotation,
+ * Rodrigues' formula) and moved to `at`: a nodding head or a bell turned on its stalk.
+ */
+function place(dst: Builder, src: Builder, at: V3, n: V3): void {
+  const c = n[1],
+    k: V3 = [n[2], 0, -n[0]],
+    s = Math.hypot(k[0], k[2]),
+    base = dst.p.length / 3;
+  if (s > 1e-6) {
+    k[0] /= s;
+    k[2] /= s;
   }
+  for (let i = 0; i < src.p.length; i += 3) {
+    const v: V3 = [src.p[i], src.p[i + 1], src.p[i + 2]];
+    let r: V3 = v;
+    if (s > 1e-6) {
+      const kv = k[0] * v[0] + k[2] * v[2],
+        x: V3 = [k[1] * v[2] - k[2] * v[1], k[2] * v[0] - k[0] * v[2], k[0] * v[1] - k[1] * v[0]];
+      r = [0, 1, 2].map((j) => v[j] * c + x[j] * s + k[j] * kv * (1 - c)) as V3;
+    }
+    dst.vertex([r[0] + at[0], r[1] + at[1], r[2] + at[2]]);
+  }
+  for (const i of src.i) dst.i.push(i + base);
+}
+
+/** A unit direction `tilt` radians off +Y toward azimuth `az`. */
+const nod = (az: number, tilt: number): V3 => [Math.sin(tilt) * Math.cos(az), Math.cos(tilt), Math.sin(tilt) * Math.sin(az)];
+
+/**
+ * A composite head (arnica, aster) at `top`, facing `n`: a domed disc and `rays` ray florets on the golden angle, each
+ * rising from the disc's rim, then spreading and drooping a little at its tip, so the head reads as a flower from the
+ * side too, not a flat disc. In the far ring (`d` under 0.5) the rays are 1.3 times as long and 1.4 times as wide,
+ * so the head keeps its coloured area when the camera sees it at a few pixels.
+ */
+function head(petals: Builder, centres: Builder, top: V3, n: V3, disc: number, rays: number, ray: number, width: number, d: number, next: () => number): void {
+  const p = new Builder(),
+    c = new Builder(),
+    far = d < 0.5,
+    length = ray * (far ? 1.3 : 1),
+    wide = width * (far ? 1.4 : 1);
+  dome(c, [0, -disc * 0.2, 0], disc, disc * 0.8, Math.max(1, Math.round(3 * d)), Math.max(5, Math.round(10 * d)));
+  for (let k = 0; k < rays; k++) {
+    const az = k * GOLDEN * 2.0 + next() * 0.15;
+    strip(p, [Math.cos(az) * disc * 0.85, 0, Math.sin(az) * disc * 0.85], az, 0.32 + next() * 0.2, length * (0.85 + 0.3 * next()), wide * (0.8 + 0.4 * next()), 'strap', Math.max(2, Math.round(4 * d)), 0.55, 0.22);
+  }
+  place(petals, p, top, n);
+  place(centres, c, top, n);
 }
 
 /** Detail of the near, middle and far rings. */
@@ -350,17 +391,47 @@ function build(species: ForbSpecies, spec: (typeof FORB_SPECIES)[ForbSpecies], s
     disc = spec.disc * scale,
     turn = next() * Math.PI * 2;
   if (species === 'campion') {
-    // A cushion: a bumpy low dome of tiny leaves, flowers sitting on it.
-    const r = leaf * (0.7 + 0.6 * next());
-    dome(foliage, [0, -0.005 * scale, 0], r, h, seg(8), seg(24), 0.08, seed);
+    // A cushion: a mound of packed rosettes, as tall as 0.45 of its radius, its surface lumpy with them (a bump each
+    // 1.5 to 2 cm), its rim rounded down into the ground, and flowers standing just clear of it. A smooth low dome read
+    // as a lily pad.
+    const r = leaf * (0.7 + 0.6 * next()),
+      tall = Math.max(h, 0.45 * r),
+      phase = [next(), next(), next(), next()].map((v) => v * Math.PI * 2),
+      k = (Math.PI * 2) / (0.018 * scale);
+    // The rosettes: a product of sines over the surface point, so the lumps lie every way alike (a function of the
+    // angles alone drew creases running out from the crown, like a lily pad's veins).
+    const lump = (a: number, polar: number) => {
+      const x = Math.cos(a) * Math.sin(polar) * r,
+        y = Math.cos(polar) * tall,
+        z = Math.sin(a) * Math.sin(polar) * r;
+      return 1 + 0.06 * Math.sin(x * k + phase[0]) * Math.sin(y * k * 1.3 + phase[1]) * Math.sin(z * k + phase[2]) + 0.03 * Math.sin((x + z) * k * 1.9 + phase[3]);
+    };
+    const rings = seg(16),
+      sides = seg(56),
+      apex = foliage.vertex([0, tall - 0.005 * scale, 0]);
+    let previous: number[] | undefined;
+    for (let s = 1; s <= rings; s++) {
+      const polar = (s / rings) * (Math.PI / 2) * 1.08,
+        row: number[] = [];
+      for (let k = 0; k < sides; k++) {
+        const a = (k / sides) * Math.PI * 2,
+          j = s < rings ? lump(a, polar) : 1;
+        row.push(foliage.vertex([Math.cos(a) * Math.sin(polar) * r * j, Math.cos(polar) * tall * j - 0.005 * scale, Math.sin(a) * Math.sin(polar) * r * j]));
+      }
+      for (let k = 0; k < sides; k++)
+        if (previous) foliage.quad(previous[k], previous[(k + 1) % sides], row[(k + 1) % sides], row[k]);
+        else foliage.i.push(apex, row[(k + 1) % sides], row[k]);
+      previous = row;
+    }
     for (let k = 0; k < Math.round(heads * Math.max(d, 0.35)); k++) {
       const a = k * GOLDEN + turn,
-        q = Math.sqrt((k + 0.5) / heads) * 0.92,
+        q = Math.sqrt((k + 0.5) / heads) * 0.95,
         polar = q * (Math.PI / 2),
-        n: V3 = [Math.cos(a) * Math.sin(polar) / r, Math.cos(polar) / h, Math.sin(a) * Math.sin(polar) / r],
-        nl = Math.hypot(...n);
-      // Just above the bumps (8 percent) so no flower sinks into the cushion.
-      star(petals, [Math.cos(a) * Math.sin(polar) * r * 1.09, Math.cos(polar) * h * 1.09, Math.sin(a) * Math.sin(polar) * r * 1.09], [n[0] / nl, n[1] / nl, n[2] / nl], ray * (d < 0.5 ? 1.6 : 1));
+        n: V3 = [Math.cos(a) * Math.sin(polar) / r, Math.cos(polar) / tall, Math.sin(a) * Math.sin(polar) / r],
+        nl = Math.hypot(...n),
+        lift = 1.11 * lump(a, polar);
+      // Just above the lumps so no flower sinks into the cushion.
+      star(petals, [Math.cos(a) * Math.sin(polar) * r * lift, Math.cos(polar) * tall * lift - 0.005 * scale, Math.sin(a) * Math.sin(polar) * r * lift], [n[0] / nl, n[1] / nl, n[2] / nl], ray * (d < 0.5 ? 1.6 : 1.15));
     }
     return [foliage.done(), petals.done(), centres.done()];
   }
@@ -400,19 +471,46 @@ function build(species: ForbSpecies, spec: (typeof FORB_SPECIES)[ForbSpecies], s
         strip(foliage, c, a + side, 0.45, size, (species === 'gentian' ? width : width * 0.5), 'lanceolate', seg(3), 0.35, 0.3);
     }
     if (species === 'arnica' || species === 'aster')
-      head(petals, centres, top, disc, species === 'arnica' ? 11 + Math.floor(next() * 4) : 28 + Math.floor(next() * 10), ray, species === 'arnica' ? ray * 0.32 : ray * 0.16, d, next);
-    else if (species === 'gentian')
-      bell(petals, [top[0], top[1] - ray * 0.3, top[2]], ray, disc * 0.45, disc, d >= 1 ? 20 : d >= 0.5 ? 10 : 5, seg(5));
-    else {
-      // Bistort: a dense spike of florets, an ellipsoid of rings.
+      // Heads nod 15 to 40 degrees toward the stem's lean (heliotropic heads face the low sun, not the zenith).
+      head(
+        petals,
+        centres,
+        top,
+        nod(az, 0.26 + 0.44 * next()),
+        disc,
+        species === 'arnica' ? 10 + Math.floor(next() * 4) : 26 + Math.floor(next() * 10),
+        ray,
+        species === 'arnica' ? ray * 0.3 : ray * 0.22,
+        d,
+        next,
+      );
+    else if (species === 'gentian') {
+      // A terminal cluster: one upright bell and one or two lateral bells on short stalks just below it, turned out
+      // 25 to 45 degrees (Gentiana parryi's crowded cymes). The far ring's bells are 1.3 times as wide.
+      const sides = d >= 1 ? 20 : d >= 0.5 ? 10 : 5,
+        mouth = disc * (d < 0.5 ? 1.3 : 1),
+        bells = 1 + Math.floor(next() * 2.2);
+      for (let k = 0; k <= bells - 1; k++) {
+        const one = new Builder(),
+          a = az + k * 2.3 + next() * 0.5,
+          below = k ? ray * (0.35 + 0.25 * next()) : 0;
+        bell(one, [0, 0, 0], ray * (k ? 0.85 : 1), mouth * 0.45, mouth, sides, seg(5));
+        place(petals, one, [top[0] + (k ? Math.cos(a) * disc * 0.6 : 0), top[1] - ray * 0.3 - below, top[2] + (k ? Math.sin(a) * disc * 0.6 : 0)], k ? nod(a, 0.45 + 0.35 * next()) : nod(az, 0.1 * next()));
+      }
+    } else {
+      // Bistort: a dense, fluffy spike, a smooth oblong core with small open florets standing out of it at random,
+      // not in rows (rows of solid florets read as a pine cone). The far ring keeps the core alone, 1.7 times as wide (the florets' area).
       const length = ray * (0.8 + 0.4 * next()),
-        count = Math.round(70 * Math.max(d, 0.15)),
-        size = 0.0028 * scale * Math.sqrt(70 / count);
+        core = disc * (d < 0.5 ? 1.7 : 1);
+      spike(petals, top, length, core, Math.max(4, Math.round(10 * d)), Math.max(1, Math.round(4 * d)));
+      const count = d < 0.5 ? 0 : Math.round(80 * d);
       for (let k = 0; k < count; k++) {
-        const y = (k + 0.5) / count,
-          a = k * GOLDEN,
-          r = disc * Math.sqrt(Math.max(0, 1 - (2 * y - 1) ** 2)) * 0.9 + 0.001 * scale;
-        floret(petals, [top[0] + Math.cos(a) * r, top[1] + y * length, top[2] + Math.sin(a) * r], size);
+        const y = 0.06 + 0.88 * next(),
+          a = next() * Math.PI * 2,
+          r = core * Math.sqrt(Math.max(0, 1 - (2 * y - 1) ** 2)) * (1.0 + 0.25 * next()),
+          out: V3 = [Math.cos(a) * 0.9, 0.3 * (2 * y - 1) + 0.15, Math.sin(a) * 0.9],
+          ol = Math.hypot(...out);
+        star(petals, [top[0] + Math.cos(a) * r, top[1] + y * length, top[2] + Math.sin(a) * r], [out[0] / ol, out[1] / ol, out[2] / ol], 0.0022 * scale * (0.8 + 0.5 * next()));
       }
     }
   }

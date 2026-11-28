@@ -1470,7 +1470,11 @@ console.log(block.floors.length); // 2
 daisies, the disc centres), each in three detail rings for a Scatter's LOD. Species: `arnica` (heartleaf arnica, a
 yellow daisy on a leafy stem), `gentian` (Parry's gentian, blue bells in a cluster), `aster` (alpine aster, violet rays
 around a yellow disc), `bistort` (American bistort, a white spike on a bare stalk) and `campion` (moss campion, a tight
-cushion dotted with pink stars). Part colours are the measured FReD flower and leaf spectra integrated under a
+cushion dotted with pink stars). Daisy heads nod 15 to 40 degrees and their rays rise from the disc then droop, a
+gentian stem ends in a cluster of one to three bells, a bistort spike is a smooth white core with open florets standing
+out of it at random, and a campion cushion is a lumpy mound about 0.45 of its radius tall. The far ring keeps the
+coloured area seen from above (rays 1.3 times as long and 1.4 times as wide, wider bells and bistort cores), so drifts
+stay coloured at a few pixels a flower. Part colours are the measured FReD flower and leaf spectra integrated under a
 6504 K black body (`FORB_COLORS`). Draw each part as its own Scatter with the same seed, placement, `reach` and
 `sway.height`, so the parts land on the same instances:
 

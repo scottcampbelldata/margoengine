@@ -6,6 +6,8 @@
 // 1. Every part of every species compiles and draws with no validation error, and the parts keep the same instances
 //    (equal ring counts), also inside clumps and around a clearing.
 // 2. The measured colours show: a field of arnica has yellow pixels, gentian blue ones and campion pink ones.
+// 3. In a forced-compatibility run (MARGO_COMPAT=1) the page really drew on the WebGL2 layer, not on native WebGPU
+//    (Above the Treeline look round 5 asked for the proof).
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -29,6 +31,10 @@ await runSuite(
   async () => {
     console.log('adapter', JSON.stringify(hardware.webgpu));
     await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
+    const device = await page.evaluate(() => window.check.device());
+    console.log('device', JSON.stringify(device), hardware.compat ? '(forced compatibility run)' : '');
+    assert.equal(device.compat, !!hardware.compat, `drew on ${hardware.compat ? 'the WebGL2 layer' : 'native WebGPU'}`);
+    if (hardware.compat) assert.equal(device.adapter, 'margo-webgl2', 'the engine device is the layer');
     await mkdir('test-results', { recursive: true });
     const results = {};
     for (const species of ['arnica', 'gentian', 'aster', 'bistort', 'campion']) {
