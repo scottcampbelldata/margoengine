@@ -98,17 +98,52 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   A fix reuses the step's spectrum for the rise (one forward transform fewer) or makes the shared FFT's radix-2 and
   radix-4 stages cheaper, bit for bit with its Rust twin; the README limit and the example's ten seconds stay.
 
-### Open 2026-11-28: the water surface program takes over 5 s to link on the WebGL2 layer (KB-WATER-GL2LINK1, water)
+### Fixed 2026-11-28: the water surface program took over 5 s to link on the WebGL2 layer (KB-WATER-GL2LINK1, water)
 
-- **Repro:** `demos/ten-thousand-trees/?backend=webgl2` (BiomeView with `water: { rivers: 'auto' }`) on Chrome, ANGLE
-  over Direct3D 11: the page is ready after 31 to 43 s, against 16 s with `water: false` (CPU near 57 percent busy). Timing
-  `getProgramParameter(LINK_STATUS)` per program shows the water surface program (37 KB vertex, 63 KB fragment GLSL)
-  at 5.5 s, the next five water and banks programs at 0.6 to 1.4 s each. WebGPU is ready in 8 s.
-  `node scripts/web-demos/controls.mjs ten-thousand-trees --backends=webgl2` reports it as not started (30 s wait).
-- **Cause:** the translated fragment shader holds 18 loops, several nested with constant bounds (8 by 10 and 3 by 6
-  wave and refraction steps, a 24-entry part array built in a loop); the Direct3D shader compiler unrolls constant
-  loops, so the program grows many times over before it links. Not yet traced to the WGSL loop that costs most.
-- **For:** the water lane (`packages/water`, GLSL emitted by `packages/webgl2-compat`).
+- **Repro (before):** `demos/ten-thousand-trees/?backend=webgl2` (BiomeView with `water: { rivers: 'auto' }`) on Chrome,
+  ANGLE over Direct3D 11: timing `getProgramParameter(LINK_STATUS)` per program showed the water surface program at
+  5.5 to 11.5 s on a loaded machine, against 0.6 to 1.6 s for every other program; `node scripts/web-demos/controls.mjs
+  ten-thousand-trees --backends=webgl2` reported the page as not started.
+- **Cause:** a shader compiler inlines every call (HLSL has no real calls) and Direct3D's compiler unrolls a loop
+  whose bound it can count, and ANGLE compiles the program's HLSL inside the link. The surface fragment held 24 inlined
+  copies of `noise()` (five ripple layers, five capillary octaves, six whitecap, four surf, two foam layers, grain, the
+  wind patch), 26 of `skyTap()` (five taps in each of `skyLobe()`'s call sites) and two `refractionBisect()` call
+  sites. Offline `fxc` (ps_5_0) on ANGLE's own HLSL: 6,000 instruction slots, 114 samples, 92 sincos; stubbing `noise()`
+  alone halved the slots and the compile time, while `[loop]` on every existing loop only took it to 5,958 (the old
+  loops were not the cost). The 18 loops the first note blamed were not it.
+- **Fix:** each repeated call sits once in a loop over an array of its arguments, every argument written out as before,
+  and the loop's bound is `waterLoops(n)` = n + `frame.sea.z`, a frame uniform lane Water always leaves 0, so no compiler
+  can count it (the rule of KB-COMPAT-FXCTIME1). The sums around the calls keep their written order. A ripple layer and
+  a capillary octave are split around their noise (`rippleAt`/`rippleSlope`, `shortOctaveAt`/`shortOctaveSlope`), each
+  half called with the layer's literal arguments: a first version read the octaves' wavenumbers from a table, so
+  `k/3.77` and `9.81/k` were divided at run time where the literal had been folded, and 84 of 307,200 bytes of a sea
+  frame came out 1/255 apart on WebGPU; a ripple loop that summed its weighted layers in the loop moved one byte on the
+  layer (multiply and add no longer fused the same way). `refractionCrossing` has one `refractionBisect` call site.
+  After: 7 `noise()`, 5 `skyTap()`, 1 `refractionBisect()` sites; offline fxc of the first, table-driven version
+  (same call sites) 3,175 slots, 42 samples, 36 sincos; the final version was not compiled offline.
+- **Numbers:** the surface program's link in the demo (`private/tools/profile.mjs`, before and after builds taking
+  turns, two rounds, workstation loaded): 6.44 and 6.76 s before, 3.19 and 2.97 s after; all eight programs 12.1 to
+  8.9 s. Standalone link of the module (shader disk cache off, minimum of two): 4.5 to 8.8 s before, 3.1 to 3.2 s
+  for the first, table-driven version. The fragment's inlined size under the corpus gate's model (`scripts/support/wgsl-inline.mjs`) went from
+  251,507 to 157,264 characters (KB-CORPUS-OPTICS1). `controls.mjs ten-thousand-trees` passes on both backends
+  (WebGL2: ok in 119 and 138 s; one run while GPU tests ran beside it reported a page script over 15 s).
+- **Same output:** three scenes (an HDR-sky sea, a plain sea, a refracting beach with surf) rendered with the old and
+  new builds on one page are byte for byte the same on WebGPU and on the WebGL2 layer over ANGLE Direct3D 11 (RTX
+  A6000); the old build against a copy of itself is also identical on both, so the check is deterministic.
+- **Still open:** Water creates its pipeline with the synchronous `createRenderPipeline`, so the link blocks the page;
+  the surface writes three colour outputs, so ANGLE's Direct3D 11 back end compiles it again at its first draw
+  (KB-COMPAT-LOSTWHY1) and LINK_STATUS shows about half the cost. Async readiness (`createRenderPipelineAsync`, on the
+  layer `KHR_parallel_shader_compile`) is not done.
+- **Regression:** `packages/water/test/surface-copies.browser.mjs` (fragment call sites and unrolled copies of
+  `noise`, `skyTap` and `refractionBisect`; fails on the old build with 24, 26 and 2 sites).
+- **Sources:** Microsoft, "for statement (HLSL)", https://learn.microsoft.com/windows/win32/direct3dhlsl/dx-graphics-hlsl-for;
+  ANGLE, UnrollFlatten_test.cpp, https://chromium.googlesource.com/angle/angle.git/+/HEAD/src/tests/compiler_tests/UnrollFlatten_test.cpp;
+  ANGLE group, "Solving slow compilation of long loops with texture sampling", https://groups.google.com/g/angleproject/c/0zfeMdGzzyQ;
+  Dawn, "HLSL: force FXC to never unroll loops" and its revert, https://dawn.googlesource.com/tint/+/11d09f2fe7c006b78f7319e876e4ced43f0c1a60;
+  ANGLE, HLSLCompiler.cpp (its X3531/X4014 retries). The link times were measured here.
+- **Also fixed here:** `packages/water/test/whitecaps.browser.mjs` counted `RangeError`s from `setWhitecaps`, which has
+  thrown the documented MargoError `'unsupported'` since a62634a9bf, and `water.test.js` read the ripple turns from
+  `rippleSlope(p,...)` calls; both now read what the code does.
 
 ### Open 2026-11-28: a reuleaux drive rig sits up to 0.1 mm off its exact centre, 0.3 mm between samples (KB-PHYS-REULEAUXWALLS1, physics solver)
 
@@ -16312,9 +16347,9 @@ voxel path tracer is excluded on this hardware (hardware check).
   `createShaderModule` (`scripts/support/wgsl-corpus.mjs`, `origin`), so the three modules are attributed to `shader`
   and `core` (label `shader:raw:optics screens:*`). Any package that draws only through `RawShaderMaterial` is
   uncovered the same way. Fix belongs in the recorder (an attribution that survives the lazy compile), with a test.
-- **Cause, water:** not traced. The corpus on disk (recorded 2026-11-27) holds water modules under the bound; the
-  modules water creates today are new sources over it, so a water shader change since then grew the fragment's inlined
-  call tree past the bound.
+- **Cause, water:** the surface fragment's repeated `noise()` and `skyTap()` calls (KB-WATER-GL2LINK1, fixed
+  2026-11-28): the base fragment went from 251,507 to 157,264 characters inlined. The optics variants are not
+  re-measured until the corpus is recorded again.
 - **Left:** both fixes, then `npm run record:wgsl-corpus` in full. Found by lane A, 2026-11-28; not fixed.
 
 ### Fixed 2026-11-28: local CI kept CRLF copies of files whose .gitattributes rule became -text or eol=lf (local CI runner, KB-CI-EOL-STALE1)

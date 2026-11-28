@@ -5255,6 +5255,20 @@ counts the inlined copies per entry point from the WGSL (static, any machine); o
 first frame of Water, Caustics and Underwater went from 22 to 26 s of compile to 13.7 s. Missing: other GPUs and
 drivers; FXC's own per-copy cost is measured, not documented by Microsoft.
 
+KB-WATER-GL2LINK1 water surface fragment (2026-11-28): the surface fragment inlined 24 copies of `noise()`, 26 of
+`skyTap()` and two `refractionBisect()` call sites, and its program took 5.5 to 11.5 s to link on the WebGL2 layer over
+ANGLE Direct3D 11 (fxc compiles inside the link). Each repeated call now sits once in a loop over an array of its
+arguments, written out as before, bounded by `waterLoops(n)` (n plus a frame uniform lane that is always 0), so fxc
+cannot unroll it; the sums around the calls keep their order. Bit-exactness needs the arguments kept literal: reading a
+wavenumber from a table moved a compile-time fold to a run-time divide (84 of 307,200 bytes 1/255 apart on WebGPU), and
+summing weighted layers inside the loop changed multiply-add fusion on the layer (1 byte). Evidence: old and new builds
+render three scenes (HDR-sky sea, plain sea, refracting beach) byte for byte the same on WebGPU and on the layer (RTX
+A6000, Chrome); the demo's surface program links in 2.97 to 3.19 s against 6.44 to 6.76 s, old and new taking turns on
+a loaded machine; the fragment's inlined size under scripts/support/wgsl-inline.mjs is 157,264 characters against
+251,507. Pinned by packages/water/test/surface-copies.browser.mjs (call sites and unrolled copies). Missing: async
+program readiness (Water's pipeline is synchronous, and the three-output program compiles again at its first draw,
+KB-COMPAT-LOSTWHY1), other GPUs and drivers, and link seconds on a quiet machine.
+
 Batch 234 water `/fft`: a separate GPU spectrum/evolution/2D-FFT/folding-foam
 pass owns all of its buffers and writes surface colour and depth at order 4.
 Core and stage are untouched. The [batch record](../water-fft.md) defines the

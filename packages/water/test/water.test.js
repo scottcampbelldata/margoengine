@@ -206,7 +206,7 @@ test('ripple normals use gradient noise on five separately turned lattices (the 
   assert.match(code, /fn rippleGradient\(cell:vec2i\)->vec2f/);
   assert.match(code, /f\*f\*f\*\(10\.0\+f\*\(6\.0\*f-15\.0\)\)/);
   assert.doesNotMatch(code, /6\.0\*f\*\(1\.0-f\)/);
-  const turns = [...code.matchAll(/rippleSlope\(p,vec2f\(([-\d.]+),([-\d.]+)\)/g)].map((m) => [+m[1], +m[2]]);
+  const turns = [...code.matchAll(/rippleAt\(p,vec2f\(([-\d.]+),([-\d.]+)\)/g)].map((m) => [+m[1], +m[2]]);
   assert.equal(turns.length, 5);
   const angles = turns.map(([c, s]) => {
     assert.ok(Math.abs(Math.hypot(c, s) - 1) < 1e-4, 'Turns rotate without scaling');

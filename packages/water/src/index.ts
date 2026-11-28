@@ -157,6 +157,9 @@ const FAR_AT = 144;
 // default 34 x 24 spectrum.
 const SEA_AT = FAR_AT + FAR_FLOATS;
 const SEA_BLEND_AT = SEA_AT + 1;
+// frame.sea.z: always 0. The surface shader adds it to loop bounds (waterLoops) so no compiler unrolls those loops
+// (KB-WATER-GL2LINK1); never write anything else here.
+const SEA_ZERO_AT = SEA_AT + 2;
 /** The most waves a {@link WaterSea} may give Water to draw. */
 export const WATER_SEA_WAVES = 896;
 export { WATER_FLOW_TICKS_PER_FRAME };
@@ -589,6 +592,9 @@ fn refractionCrossing(a:vec4f,b:vec4f)->vec4f {
  var lower=0.0;var upper=0.08;var wasBehind=false;
  for(var step=0;step<8;step++){
   let clip=a+b*upper;let p=refractionPixel(clip);
+  // One refractionBisect call site (KB-WATER-GL2LINK1): the bent ray's crossing found either at the frame's edge or
+  // where it first passes behind the scene.
+  var bisect=false;var last=false;var span=vec2f(0);var behind=false;
   if(p.x<0){
    // The bent ray leaves the frame. Find where (bisected to the edge): if it crossed the scene before, that crossing
    // is the hit; if it is still in front, the frame holds nothing past its edge, so take the last texel it crosses on
@@ -600,14 +606,19 @@ fn refractionCrossing(a:vec4f,b:vec4f)->vec4f {
    for(var j=0;j<10;j++){let t=(lo+hi)*0.5;if(refractionPixel(a+b*t).x<0){hi=t;}else{lo=t;}}
    let at=a+b*lo;let q=refractionPixel(at);
    if(q.x<0){break;}
-   if(refractionBehind(at,q)){return refractionBisect(a,b,lower,lo);}
-   if(textureLoad(depth,q,0)>0.0){return vec4f(textureLoad(opaque,q,0).rgb,lo);}
-   break;
+   if(!refractionBehind(at,q)){
+    if(textureLoad(depth,q,0)>0.0){return vec4f(textureLoad(opaque,q,0).rgb,lo);}
+    break;
+   }
+   // Bisected to the frame's edge, its crossing is the hit or nothing (the bisection below returns either way).
+   bisect=true;last=true;span=vec2f(lower,lo);
+  }else{
+   behind=refractionBehind(clip,p);
+   if(behind&&!wasBehind){bisect=true;span=vec2f(lower,upper);}
   }
-  let behind=refractionBehind(clip,p);
-  if(behind&&!wasBehind){
-   let hit=refractionBisect(a,b,lower,upper);
-   if(hit.w>=0.0){return hit;}
+  if(bisect){
+   let hit=refractionBisect(a,b,span.x,span.y);
+   if(last||hit.w>=0.0){return hit;}
   }
   if(upper>=50.0){break;}
   wasBehind=behind;lower=upper;upper=min(50.0,upper*2.8);
@@ -635,14 +646,21 @@ fn noise(p:vec2f)->vec3f {
 }
 // One ripple layer's world-space slope. Each layer turns the wind frame by its own angle (cos, sin) and scales it by
 // non-integer ratios, so no two layers share a lattice axis or spacing.
-fn rippleSlope(xz:vec2f,turn:vec2f,scale:vec2f,drift:vec2f,offset:vec2f,pixelX:vec2f,pixelY:vec2f)->vec2f {
+// A ripple layer in two halves around its noise (KB-WATER-GL2LINK1): rippleAt places the layer, rippleSlope turns its
+// noise into slope. Each half is called with the layer's own literal arguments, as the one function was, so every value
+// is the one it computed; only the noise call moves into the loop below.
+struct NoiseLayer {basis:mat2x2f,scale:vec2f,at:vec2f,detail:f32}
+fn rippleAt(xz:vec2f,turn:vec2f,scale:vec2f,drift:vec2f,offset:vec2f,pixelX:vec2f,pixelY:vec2f)->NoiseLayer {
  let w=frame.waves[0].wave.xy;let along=vec2f(w.x*turn.x-w.y*turn.y,w.x*turn.y+w.y*turn.x);let across=vec2f(-along.y,along.x);
  let basis=mat2x2f(along,across);let local=transpose(basis);
  let width=max(length((local*pixelX)*scale),length((local*pixelY)*scale));
  let detail=1.0-smoothstep(0.25,1.0,width);
- if(detail<=0.0){return vec2f(0);}
- let n=noise((local*xz)*scale+frame.settings.x*drift+offset).yz*scale;
- return (basis*n)*detail;
+ return NoiseLayer(basis,scale,(local*xz)*scale+frame.settings.x*drift+offset,detail);
+}
+fn rippleSlope(o:NoiseLayer,noise:vec2f)->vec2f {
+ if(o.detail<=0.0){return vec2f(0);}
+ let n=noise*o.scale;
+ return (o.basis*n)*o.detail;
 }
 // A short gravity wave lives in the shading normal. Its phase warp bends and breaks the visible crest.
 fn shortWaveSlope(p:vec2f,pixelX:vec2f,pixelY:vec2f,k:vec2f,height:f32,warp:vec3f)->vec2f {
@@ -665,20 +683,44 @@ fn shortSaturation(k:f32,friction:f32)->f32 {
  let c=sqrt(9.81/k+7.4e-5*k);let m=0.01*(1.0+select(1.0,3.0,friction>0.23)*log(max(friction,1e-4)/0.23));
  let r=k/370.0-1.0;return 0.5*max(m,0.0)*(0.23/c)*exp(-0.25*r*r);
 }
-fn shortOctave(xz:vec2f,turn:vec2f,k:f32,friction:f32,offset:vec2f,pixelX:vec2f,pixelY:vec2f)->vec3f {
+// A capillary octave in two halves around its noise, as a ripple layer (KB-WATER-GL2LINK1). Each half is called with
+// its octave's literal wavenumber, so a compiler folds the same constants: with k read from a table, k/3.77 and 9.81/k
+// were divided at run time instead of folded, and 84 of 307,200 bytes of a sea frame came out 1/255 apart on WebGPU.
+fn shortOctaveAt(xz:vec2f,turn:vec2f,k:f32,offset:vec2f,pixelX:vec2f,pixelY:vec2f)->NoiseLayer {
  let w=frame.waves[0].wave.xy;let along=vec2f(w.x*turn.x-w.y*turn.y,w.x*turn.y+w.y*turn.x);let across=vec2f(-along.y,along.x);
  let basis=mat2x2f(along,across);let local=transpose(basis);
  // Gradient noise peaks near 0.6 cycles a cell, so a cell is 2 pi 0.6 / k metres; crests 1.8 times their spacing long.
  let s=k/3.77;let scale=vec2f(s,0.55*s);
  let width=max(length((local*pixelX)*scale),length((local*pixelY)*scale));
  let detail=1.0-smoothstep(0.25,1.0,width);
- if(detail<=0.0){return vec3f(0);}
+ let c=sqrt(9.81/k+7.4e-5*k);
+ return NoiseLayer(basis,scale,(local*xz)*scale+frame.settings.x*vec2f(-c,0.12*c)*scale+offset,detail);
+}
+fn shortOctaveSlope(o:NoiseLayer,k:f32,friction:f32,noise:vec2f)->vec3f {
+ if(o.detail<=0.0){return vec3f(0);}
  let variance=shortSaturation(k,friction)*0.6931472;
  // The noise's slope is 0.62 RMS per axis in cells: (0.62 h s)^2 (1 + 0.55^2) is the octave's mean square slope.
- let h=sqrt(variance/1.3025)/(0.62*s);let c=sqrt(9.81/k+7.4e-5*k);
- let n=noise((local*xz)*scale+frame.settings.x*vec2f(-c,0.12*c)*scale+offset).yz*scale;
- return vec3f((basis*n)*(h*detail),variance*detail*detail);
+ let s=k/3.77;let h=sqrt(variance/1.3025)/(0.62*s);
+ let n=noise*o.scale;
+ return vec3f((o.basis*n)*(h*o.detail),variance*o.detail*o.detail);
 }
+// One compiled copy of each repeated term (KB-WATER-GL2LINK1). A shader compiler inlines every call (HLSL has no real
+// calls), and Direct3D's compiler unrolls a loop whose bound it can count, so the ripple layers, capillary octaves,
+// whitecap, surf and foam noise and the sky taps, written as separate calls, compiled as 24 copies of noise() and 26 of
+// skyTap(): the WebGL2 layer's program took 4.5 to 8.8 s to link on ANGLE over Direct3D 11 (ANGLE compiles the HLSL
+// with D3DCompile inside the link). Each repeated call now sits once in a loop over an array of its arguments, every
+// argument written out as before, and the loop's bound comes from waterLoops(), which reads the frame uniform, so no
+// compiler can count it and the loop stays one copy. The sums around the calls are the ones written out before, in the
+// same order, so every value is the same.
+// Sources: Microsoft, "for statement (HLSL)" ([unroll] and [loop]: without either the compiler chooses),
+// https://learn.microsoft.com/windows/win32/direct3dhlsl/dx-graphics-hlsl-for; ANGLE, UnrollFlatten_test.cpp (ANGLE
+// marks [loop] only on loops holding a gradient operation), https://chromium.googlesource.com/angle/angle.git/+/HEAD/src/tests/compiler_tests/UnrollFlatten_test.cpp;
+// ANGLE, "Solving slow compilation of long loops with texture sampling" (FXC unrolling dominates long compiles),
+// https://groups.google.com/g/angleproject/c/0zfeMdGzzyQ; Dawn, "HLSL: force FXC to never unroll loops" and its revert
+// (a blanket [loop] miscompiles some loops, so the bound is made opaque per loop instead),
+// https://dawn.googlesource.com/tint/+/11d09f2fe7c006b78f7319e876e4ced43f0c1a60. The link times were measured here.
+// n, as a bound no shader compiler can count: frame.sea.z is a lane of the frame uniform Water always leaves 0 (SEA_ZERO_AT).
+fn waterLoops(n:u32)->u32 {return n+u32(frame.sea.z);}
 fn fresnel(cosine:f32)->f32 {return 0.02+0.98*pow(1.0-clamp(cosine,0.0,1.0),5.0);}
 fn landNearby(xz:vec2f)->f32 {
  let size=vec2f(textureDimensions(coast));var land=0.0;
@@ -699,14 +741,18 @@ fn whitecap(xz:vec2f,footprint:f32)->f32 {
  }
  let w=frame.waves[0].wave.xy;let q=vec2f(dot(xz,w),dot(xz,vec2f(-w.y,w.x)));let t=frame.settings.x;
  let detail=1.0-smoothstep(0.3,1.5,footprint);
- let patches=noise(q*vec2f(0.32,0.7)+vec2f(-t*0.35,0)).x+noise(q*vec2f(1.3,2.9)+vec2f(-t*0.8,5.1)).x*0.5*detail;
+ let at=array<vec2f,6>(q*vec2f(0.32,0.7)+vec2f(-t*0.35,0),q*vec2f(1.3,2.9)+vec2f(-t*0.8,5.1),q*vec2f(0.75,1.3)+vec2f(-t*0.6,2.3),
+  q*vec2f(2.1,2.7)+vec2f(-t*0.9,7.7),q*vec2f(0.16,2.2)+vec2f(-t*0.45,3.7),q*vec2f(0.06,1.4)+vec2f(-t*0.5,0));
+ var layers:array<f32,6>;
+ for(var k=0u;k<waterLoops(6u);k++){layers[k]=noise(at[k]).x;}
+ let patches=layers[0]+layers[1]*0.5*detail;
  let threshold=select(mix(0.42,0.16,amount),frame.foam.x,frame.foam.x>0.0);
  let over=crest+patches*0.08-threshold;let core=smoothstep(-0.02,0.07,over);
- let bubbles=noise(q*vec2f(0.75,1.3)+vec2f(-t*0.6,2.3)).x+noise(q*vec2f(2.1,2.7)+vec2f(-t*0.9,7.7)).x*0.5;
- let streak=noise(q*vec2f(0.16,2.2)+vec2f(-t*0.45,3.7)).x;
+ let bubbles=layers[2]+layers[3]*0.5;
+ let streak=layers[4];
  let broken=smoothstep(-0.55,0.3,bubbles*0.8+streak*0.7+core*0.8-0.3);
  let caps=core*mix(0.85+0.15*core,broken*(0.55+0.45*core),detail);
- let streaks=amount*amount*smoothstep(0.25,0.55,noise(q*vec2f(0.06,1.4)+vec2f(-t*0.5,0)).x)*0.25*detail;
+ let streaks=amount*amount*smoothstep(0.25,0.55,layers[5])*0.25*detail;
  return clamp(caps+streaks,0.0,1.0);
 }
 // The sea's glint lobe for light arriving from unit direction l: GGX D with alpha = rough^2 widened by the waves' unresolved
@@ -735,8 +781,10 @@ fn skyLobe(direction:vec3f,rough:f32,horizon:f32,turn:f32)->vec3f {
  let across=normalize(cross(select(vec3f(0,1,0),vec3f(1,0,0),r.y>0.999),r));
  let up=cross(r,across);
  let width=rough*rough*1.41421356;
- return skyTap(r,horizon,turn)*0.5+(skyTap(r+across*width,horizon,turn)+skyTap(r-across*width,horizon,turn)+
-        skyTap(r+up*width,horizon,turn)+skyTap(r-up*width,horizon,turn))*0.125;
+ let at=array<vec3f,5>(r,r+across*width,r-across*width,r+up*width,r-up*width);
+ var taps:array<vec3f,5>;
+ for(var k=0u;k<waterLoops(5u);k++){taps[k]=skyTap(at[k],horizon,turn);}
+ return taps[0]*0.5+(taps[1]+taps[2]+taps[3]+taps[4])*0.125;
 }
 fn reflectionRay(r:vec3f)->vec3f {return normalize(vec3f(r.x,max(0.02,r.y),r.z));}
 fn incidentSky(direction:vec3f,rough:f32)->vec3f {
@@ -750,7 +798,10 @@ fn incidentSky(direction:vec3f,rough:f32)->vec3f {
 // The sea's body is lit by this light, so a night sky, however its ambient is set, lights it only as much as it lights
 // the sky the sea reflects (a sea that glowed above the sky it mirrors was the night-sea bug).
 fn skyAmbient()->f32 {
- let a=incidentSky(vec3f(0.866,0.5,0),0.4);let b=incidentSky(vec3f(0.5,0.866,0),0.4);
+ let at=array<vec3f,2>(vec3f(0.866,0.5,0),vec3f(0.5,0.866,0));
+ var sky:array<vec3f,2>;
+ for(var k=0u;k<waterLoops(2u);k++){sky[k]=incidentSky(at[k],0.4);}
+ let a=sky[0];let b=sky[1];
  return clamp(dot((a+b)*0.5,vec3f(0.2126,0.7152,0.0722))/0.02,0.0,1.0);
 }
 fn foamSky()->vec3f {
@@ -760,7 +811,10 @@ fn foamSky()->vec3f {
 }
 fn foamLight(deep:vec3f,n:vec3f,xz:vec2f,amount:f32,footprint:f32,fine:f32,sky:vec3f,sun:vec3f,toward:vec3f)->vec3f {
  let t=frame.settings.x;
- let a=noise(xz*1.9+vec2f(t*0.07,-t*0.05));let b=noise(xz*4.7+vec2f(-t*0.11,3.3));
+ let at=array<vec2f,2>(xz*1.9+vec2f(t*0.07,-t*0.05),xz*4.7+vec2f(-t*0.11,3.3));
+ var layers:array<vec3f,2>;
+ for(var k=0u;k<waterLoops(2u);k++){layers[k]=noise(at[k]);}
+ let a=layers[0];let b=layers[1];
  let detail=(1.0-smoothstep(0.15,0.6,footprint))*min(1.0,amount*1.5);
  let slope=(a.yz*(1.9*0.08)+b.yz*(4.7*0.03*fine))*detail;
  let lump=normalize(n-vec3f(slope.x,0.0,slope.y));
@@ -815,8 +869,11 @@ ${displayShader}
   let here=surfHere(i.xz,footprint,true);surfing=here.weight*here.surf.breaking;surfZone=here.weight*here.surf.zone;
   if(surfing>0.0){
    let q=i.world.xz;let t=frame.settings.x;
-   let patches=noise(q*0.21+vec2f(t*0.03,0.0)).x+noise(q*0.63+vec2f(3.1,-t*0.05)).x*0.5;
-   let web=1.0-abs(noise(q*0.9+vec2f(-t*0.04,7.3)).x+noise(q*2.3+vec2f(1.7,t*0.06)).x*0.45*grainDetail);
+   let at=array<vec2f,4>(q*0.21+vec2f(t*0.03,0.0),q*0.63+vec2f(3.1,-t*0.05),q*0.9+vec2f(-t*0.04,7.3),q*2.3+vec2f(1.7,t*0.06));
+   var layers:array<f32,4>;
+   for(var k=0u;k<waterLoops(4u);k++){layers[k]=noise(at[k]).x;}
+   let patches=layers[0]+layers[1]*0.5;
+   let web=1.0-abs(layers[2]+layers[3]*0.45*grainDetail);
    let roller=here.surf.foam.x*smoothstep(-0.3,0.15,patches+here.surf.foam.x*0.45-0.2)*mix(0.6,1.0,smoothstep(0.35,0.8,web));
    let trail=here.surf.foam.y*smoothstep(-0.3,0.3,patches+here.surf.foam.y*0.3)*mix(0.25,1.0,smoothstep(0.62,0.9,web))*0.9;
    surfFoam=max(roller,trail)*here.weight;
@@ -840,12 +897,19 @@ ${displayShader}
  // Agitation, chop and two micro layers turned 11, -21, 30 and -41 degrees from the wind. Weights keep the former
  // value-noise slope (RMS 0.39 per axis against gradient noise's 0.62).
  let p=i.world.xz;
- let slope=rippleSlope(p,vec2f(0.98200,0.18886),vec2f(0.22,0.16),vec2f(-0.09,0.03),vec2f(0),pixelX,pixelY)*0.186
-  +rippleSlope(p,vec2f(0.93233,-0.36162),vec2f(0.57,0.42),vec2f(-0.17,-0.06),vec2f(3.17,9.23),pixelX,pixelY)*0.062
-  +rippleSlope(p,vec2f(0.86281,0.50553),vec2f(1.8,0.65),vec2f(-0.5,0.12),vec2f(0),pixelX,pixelY)*0.0112
-  +rippleSlope(p,vec2f(0.75836,-0.65183),vec2f(3.4,1.9),vec2f(-0.7,0.2),vec2f(7.13,3.71),pixelX,pixelY)*0.0037;
+ let ripples=array<NoiseLayer,5>(rippleAt(p,vec2f(0.98200,0.18886),vec2f(0.22,0.16),vec2f(-0.09,0.03),vec2f(0),pixelX,pixelY),
+  rippleAt(p,vec2f(0.93233,-0.36162),vec2f(0.57,0.42),vec2f(-0.17,-0.06),vec2f(3.17,9.23),pixelX,pixelY),
+  rippleAt(p,vec2f(0.86281,0.50553),vec2f(1.8,0.65),vec2f(-0.5,0.12),vec2f(0),pixelX,pixelY),
+  rippleAt(p,vec2f(0.75836,-0.65183),vec2f(3.4,1.9),vec2f(-0.7,0.2),vec2f(7.13,3.71),pixelX,pixelY),
+  rippleAt(p,vec2f(0.99619,-0.08716),vec2f(0.11,0.075),vec2f(-0.3,0.05),vec2f(1.9,6.4),pixelX,pixelY));
+ var rippleNoise:array<vec2f,5>;
+ for(var k=0u;k<waterLoops(5u);k++){rippleNoise[k]=vec2f(0);if(ripples[k].detail>0.0){rippleNoise[k]=noise(ripples[k].at).yz;}}
+ let slope=rippleSlope(ripples[0],rippleNoise[0])*0.186
+  +rippleSlope(ripples[1],rippleNoise[1])*0.062
+  +rippleSlope(ripples[2],rippleNoise[2])*0.0112
+  +rippleSlope(ripples[3],rippleNoise[3])*0.0037;
  let chop=frame.grid.w;
- let windSea=rippleSlope(p,vec2f(0.99619,-0.08716),vec2f(0.11,0.075),vec2f(-0.3,0.05),vec2f(1.9,6.4),pixelX,pixelY)*0.5;
+ let windSea=rippleSlope(ripples[4],rippleNoise[4])*0.5;
  let w=frame.waves[0].wave.xy;let basis=mat2x2f(w,vec2f(-w.y,w.x));let local=transpose(basis);let q=local*p;
  // A broad, advecting wind patch varies the short-wave slope. Long-wave displacement stays in the authored trains.
  var shortWaves=vec2f(0);var gain=1.0;
@@ -862,11 +926,16 @@ ${displayShader}
  var capillary=vec2f(0);
  if(chop>0.0&&footprint<0.16){
   let u=shortWind(chop);
-  let o=shortOctave(p,vec2f(0.99255,0.12187),25.0,u,vec2f(0.37,5.1),pixelX,pixelY)
-   +shortOctave(p,vec2f(0.95630,-0.29237),48.0,u,vec2f(8.3,1.9),pixelX,pixelY)
-   +shortOctave(p,vec2f(0.89879,0.43837),92.0,u,vec2f(2.6,7.7),pixelX,pixelY)
-   +shortOctave(p,vec2f(0.78801,-0.61566),177.0,u,vec2f(6.1,3.3),pixelX,pixelY)
-   +shortOctave(p,vec2f(0.68200,0.73135),340.0,u,vec2f(4.4,9.6),pixelX,pixelY);
+  let octaves=array<NoiseLayer,5>(shortOctaveAt(p,vec2f(0.99255,0.12187),25.0,vec2f(0.37,5.1),pixelX,pixelY),
+   shortOctaveAt(p,vec2f(0.95630,-0.29237),48.0,vec2f(8.3,1.9),pixelX,pixelY),
+   shortOctaveAt(p,vec2f(0.89879,0.43837),92.0,vec2f(2.6,7.7),pixelX,pixelY),
+   shortOctaveAt(p,vec2f(0.78801,-0.61566),177.0,vec2f(6.1,3.3),pixelX,pixelY),
+   shortOctaveAt(p,vec2f(0.68200,0.73135),340.0,vec2f(4.4,9.6),pixelX,pixelY));
+  var n:array<vec2f,5>;
+  for(var k=0u;k<waterLoops(5u);k++){n[k]=vec2f(0);if(octaves[k].detail>0.0){n[k]=noise(octaves[k].at).yz;}}
+  let o=shortOctaveSlope(octaves[0],25.0,u,n[0])+shortOctaveSlope(octaves[1],48.0,u,n[1])
+   +shortOctaveSlope(octaves[2],92.0,u,n[2])+shortOctaveSlope(octaves[3],177.0,u,n[3])
+   +shortOctaveSlope(octaves[4],340.0,u,n[4]);
   capillary=o.xy;resolvedShort=o.z*gain*gain;
  }
  let agitated=(slope*(1.0+3.0*chop)+windSea*chop)*gain+shortWaves+capillary*gain;
@@ -1218,6 +1287,7 @@ export class Water implements EnginePlugin {
     // A sea's own waves replace the swell trains on the surface (their count is 0); the trains keep the wind's direction
     // for the ripples and foam patterns that read it.
     this.values.set([0, height, foamDistance, options.sea ? 0 : waves.length], 20);
+    this.values[SEA_ZERO_AT] = 0;
     this.values.set(color, 24);
     this.values[135] = 0.12;
     this.values.set([0, 0.28, 0.3], 136);

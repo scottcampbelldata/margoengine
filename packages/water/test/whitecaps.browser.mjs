@@ -148,7 +148,8 @@ try {
     t1 = texture(choppy);
   console.log(`chop: fine texture ${t0.toFixed(2)} -> ${t1.toFixed(2)}`);
   assert.ok(t1 > t0 * 1.3, `chop 1 adds too little surface detail: ${t0.toFixed(2)} -> ${t1.toFixed(2)}`);
-  // The setters take effect on the next frame and reject values outside 0-1.
+  // The setters take effect on the next frame and reject values outside 0-1 with the coded error the docs name
+  // (MargoError 'unsupported', errors#ocean, since a62634a9bf; this check still counted RangeErrors).
   const live = await page.evaluate(async () => {
     const { engine, water } = window.capsTest;
     water.setChop(0).setWhitecaps(1);
@@ -157,7 +158,7 @@ try {
       try {
         water.setWhitecaps(bad);
       } catch (error) {
-        rejected += +(error instanceof RangeError);
+        rejected += +(error?.code === 'unsupported' && error?.name === 'MargoError');
       }
     engine.render({ delta: 0 });
     await engine.gpu.queue.onSubmittedWorkDone();

@@ -15,6 +15,7 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
+import { inlinedCopies as unrolledCopies } from '../../../scripts/support/wgsl-inline.mjs';
 
 /** Top-level functions of a WGSL module: name to body text (between its braces). */
 export function wgslFunctions(code) {
@@ -126,8 +127,27 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     for (const entry of ['vertex', 'beamVertex', 'measure', 'maskVertex', 'fieldVertex', 'probeVertex'])
       assert.ok(counted.some((s) => s.entry === entry && s.copies > 0), `${entry} evaluates the surface`);
     for (const s of counted) assert.ok(s.copies <= 1, `${s.entry} compiles ${s.copies} copies of surface()`);
+    // KB-WATER-GL2LINK1: the surface fragment's repeated terms compile once each. The fragment held 24 copies of noise(),
+    // 26 skyTap() and 2 refractionBisect() call sites once inlined, and the WebGL2 layer's program took 4.5 to 8.8 s to
+    // link on ANGLE over Direct3D 11. Counted two ways: call sites once every call is inlined (a waterLoops loop is one
+    // site), and copies once every loop with a countable bound is unrolled too (scripts/support/wgsl-inline.mjs, the
+    // corpus gate's model, which also unrolls the sky integrals' and the refraction march's literal 8-step loops).
+    // Before the fix: 24, 26 and 2 sites; 24, 68 and 16 copies, 251,507 characters (over the gate's 250,000).
+    const fragments = stages.filter((s) => s.entry === 'fragment' && s.code.includes('fn skyTap('));
+    assert.ok(fragments.length > 0, 'the water surface fragment was made');
+    for (const s of fragments) {
+      const unrolled = unrolledCopies(s.code, 'fragment'),
+        terms = ['noise', 'skyTap', 'refractionBisect'],
+        sites = Object.fromEntries(terms.map((name) => [name, inlinedCopies(s.code, 'fragment', name)])),
+        copies = Object.fromEntries(terms.map((name) => [name, unrolled.copies.get(name) ?? 0]));
+      console.log(`fragment sites ${JSON.stringify(sites)}, unrolled ${JSON.stringify(copies)}, ${unrolled.size} characters`);
+      for (const [name, most] of [['noise', 7], ['skyTap', 5], ['refractionBisect', 1]])
+        assert.ok(sites[name] <= most, `the fragment inlines ${sites[name]} ${name}() call sites, over ${most}`);
+      for (const [name, most] of [['noise', 7], ['skyTap', 19], ['refractionBisect', 8]])
+        assert.ok(copies[name] <= most, `the fragment unrolls to ${copies[name]} copies of ${name}(), over ${most}`);
+    }
     assert.deepEqual(errors, []);
-    console.log('water surface copies PASS: one compiled surface() per entry point');
+    console.log('water surface copies PASS: one compiled surface() per entry point, one of each repeated fragment term');
   } finally {
     await browser.close();
   }
