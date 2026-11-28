@@ -12469,3 +12469,8 @@ The celestial arena publishes the live signed world cell along with Earth-fixed 
 ### SPACE-03 native disk transport, signed fields and exterior trajectories
 
 The implicit disk solve and radial ledger sums retain fixed order. Native f64x2 publication can partition independent density, heating and phase across four participants. A private candidate includes the advected mass, phase and budget and all derived outputs. Finite validation completes before accepted publication. Density and phase describe absolute rings. Kerr coordinates also stay absolute across signed world-origin shifts and unresolved trial steps preserve the accepted frame. The technical replay binds both published fields to the renderers. The measured EHT ring diagnostic identifies the missing emission-transfer model.
+
+
+### SOFT-03 staged strand motion and native point prediction
+
+The optional strand entry treats accepted centreline, frames and swept rigid-contact history as one transaction. Wind and bed sample in their signed frames. Rigid leases validate layout and offsets in their own memory. Optional workers evaluate independent SIMD points before the existing serial solver and reciprocal impulse fold. The weighted horse camera witness drives skin from the accepted guide field, while held-out single-hair static tests quantify deviation from measured deflection.

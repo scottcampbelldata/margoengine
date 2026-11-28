@@ -5512,3 +5512,9 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
 - Build Physics with `node packages/physics/scripts/build.js`. Run `node --test packages/physics/tests/accretion.test.js packages/physics/tests/coupling/accretion.test.js packages/physics/tests/coupling/accretion-workers.test.js`.
 - Run `npm run test:gpu:accretion-workers -w @margoengine/physics` for packaged Chromium native participants and `npm run test:gpu:accretion-film -w @margoengine/physics` for fixed-camera accepted field replay.
 - Run `node packages/physics/scripts/space03-accretion-measured.mjs` for signed light-tracer bracketing, launch radius and phase-step convergence, independent stellar angular scale, and the observed EHT emission diameter.
+
+### SOFT-03 strand contacts, native prediction and independently measured bending
+
+- Build Physics with `node packages/physics/scripts/build.js`. Run `node --test packages/physics/tests/coupling/strands.test.js packages/physics/tests/coupling/strand-workers.test.js packages/horses/test/strand-horse.test.js packages/rigging/tests/strand-springs.test.js`.
+- Run `npm run test:gpu:strand-workers -w @margoengine/physics` for actual native helpers and `npm run test:gpu:strand-film -w @margoengine/physics` for the weighted horse witness on both renderers.
+- Run `node packages/physics/scripts/soft03-strand-measured.mjs` for the four independent force-deflection specimens and graph, load, spatial and time sensitivity.

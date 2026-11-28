@@ -182,6 +182,11 @@ type NativePhaseSolver =
       readonly phase: 'density, heating and orbital phase';
     }
   | {
+      readonly subject: 'Strands';
+      readonly phaseExport: 'strand_predict_phase';
+      readonly phase: 'point prediction';
+    }
+  | {
       readonly subject: 'Seismic';
       readonly phaseExport: 'seismic_thread_phase';
       readonly phase: 'velocity and stress stencil';

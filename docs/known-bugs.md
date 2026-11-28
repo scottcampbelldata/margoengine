@@ -24731,6 +24731,10 @@ Fast rotation still requires enough substeps to resolve the capsule's arc.
 The optional horse driver applies solved frames to the horse skin, and the physical spring
 rig binds the weighted VRM reference ponytail. The named production shots still need their own bindings.
 
+The measured single-fibre bending comparison shows the default elastic strand underpredicts
+all four experimental deflections. The original dynamic hair-clump model, horse bundle calibration
+and production shots require separate evidence. [Independent bending data](limits.md#soft-03-measured-single-hair-bending)
+
 ### Energy at a strand contact with a light rigid capsule (SOFT-03)
 
 Fixed for the reciprocal capsule path. Penetration correction previously acted as a

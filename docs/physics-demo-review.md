@@ -300,6 +300,12 @@ What it shows: a bay horse walks, pauses, trots and walks again along a dirt tra
 Handled acceptably: the walk is four-beat with one hoof landing at a time; the pause (0:27-0:32) is a standing horse with a settled body; hooves do not visibly slide on the flat track in the 4 fps strips (uncertain at that frame rate); the head and neck move with the stride.
 Not in the catalog: none.
 
+The SOFT-03 technical ridge take drives the 58-joint weighted horse with a signed travelling ATMO-02
+gust and a matched still-air control. Tail, mane and forelock tips differ by 7.2, 5.7 and 12.9 cm.
+The registered guide poses match skin matrices, and both renderers replay accepted state and RGBA
+through two checkpoints. A separate 240 Hz signed guide verifies the 0.948 mm crossflow response.
+The original HORSE-1 and HORSE-2 shots remain open. [Technical replay](../packages/physics/tests/strand-film.browser.mjs)
+
 ### Horse at the Ridge, making of (horse-at-the-ridge-making-of)
 What it shows: a 12 min 43 s walkthrough of the rig and gait, with code editor screens, Blender views and side-by-side renders of the same horse footage (early rig against rebuilt rig, before and after a restart pass).
 | ID | Time | What is wrong (observed) | What real physics does | Solver | Solver state | Needed for AAA | Status |

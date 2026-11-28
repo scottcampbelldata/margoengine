@@ -25,6 +25,7 @@ export interface StrandCapsule {
 export interface StrandLoadOptions {
     readonly id?: string;
     readonly signal?: AbortSignal;
+    readonly threads?: 1 | 2 | 4;
     readonly rigidCapsules?: readonly StrandRigidCapsule[];
 }
 
@@ -72,6 +73,8 @@ export class StrandSolver implements Solver<StrandParams> {
     readonly field: FieldDescriptor;
     private constructor();
     static load(options?: StrandLoadOptions): Promise<StrandSolver>;
+    [Symbol.dispose](): void;
+    readNativeWork(): StrandWorkCounts | undefined;
     describe(): {
         id: string;
         rate: 0;
@@ -93,6 +96,18 @@ export interface StrandSpec extends StrandSection {
     readonly sections?: readonly StrandSection[];
     readonly drag?: number;
     readonly anchor?: (time: number) => StrandAnchor;
+}
+
+export interface StrandWorkCounts extends StrandWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly StrandWorkerWork[];
+}
+
+export interface StrandWorkerWork {
+    readonly points: number;
+    readonly movingPoints: number;
+    readonly spinningPoints: number;
+    readonly pairedMovingPoints: number;
 }
 
 // Not exported from this entry, but used by the exports above:

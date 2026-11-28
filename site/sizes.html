@@ -166,8 +166,8 @@
 <tr><th scope="row"><code>rail-kernel-shared.wasm</code></th><td>Rust SIMD tensioned contact-wire propagation, shared world memory</td><td class="num">2,914</td><td class="num">1,062</td><td class="num">924</td><td>RailSolver.load(world.memory) from the optional /rail entry with shared memory</td></tr>
 <tr><th scope="row"><code>granular-mpm-kernel.wasm</code></th><td>Rust SIMD sparse granular material points</td><td class="num">16,409</td><td class="num">6,501</td><td class="num">5,659</td><td>GranularMpmSolver.load() from the optional /granular-mpm entry</td></tr>
 <tr><th scope="row"><code>granular-mpm-kernel-shared.wasm</code></th><td>Rust SIMD sparse granular material points, shared world memory</td><td class="num">16,409</td><td class="num">6,502</td><td class="num">5,644</td><td>GranularMpmSolver.load() from the optional /granular-mpm entry with shared memory support</td></tr>
-<tr><th scope="row"><code>strand-kernel.wasm</code></th><td>Rust SIMD Cosserat and follow-the-leader strand dynamics</td><td class="num">44,959</td><td class="num">17,942</td><td class="num">15,143</td><td>StrandSolver.load() from the optional /strands entry</td></tr>
-<tr><th scope="row"><code>strand-kernel-shared.wasm</code></th><td>Rust SIMD Cosserat and follow-the-leader strand dynamics, shared world memory</td><td class="num">44,959</td><td class="num">17,942</td><td class="num">15,147</td><td>StrandSolver.load() from the optional /strands entry with shared memory support</td></tr>
+<tr><th scope="row"><code>strand-kernel.wasm</code></th><td>Rust SIMD Cosserat and follow-the-leader strand dynamics</td><td class="num">48,706</td><td class="num">18,771</td><td class="num">15,768</td><td>StrandSolver.load() from the optional /strands entry</td></tr>
+<tr><th scope="row"><code>strand-kernel-shared.wasm</code></th><td>Rust SIMD Cosserat and follow-the-leader strand dynamics, shared world memory</td><td class="num">48,706</td><td class="num">18,771</td><td class="num">15,719</td><td>StrandSolver.load() from the optional /strands entry with shared memory support</td></tr>
 <tr><th scope="row"><code>synoptic-kernel.wasm</code></th><td>Rust SIMD regional weather and moisture transport</td><td class="num">23,185</td><td class="num">7,734</td><td class="num">6,729</td><td>SynopticWeather.load() from the optional /synoptic entry</td></tr>
 <tr><th scope="row"><code>synoptic-kernel-shared.wasm</code></th><td>Rust SIMD regional weather and moisture transport, shared world memory</td><td class="num">23,185</td><td class="num">7,734</td><td class="num">6,729</td><td>SynopticWeather.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>seismic-kernel.wasm</code></th><td>Rust SIMD elastodynamic waves</td><td class="num">4,031</td><td class="num">1,895</td><td class="num">1,629</td><td>SeismicGround.load() from the optional /seismic entry</td></tr>
@@ -5014,7 +5014,7 @@
 <tr><td><code>./lightning</code></td><td class="num">24,693</td><td class="num">9,107</td></tr>
 <tr><td><code>./explosive</code></td><td class="num">41,746</td><td class="num">15,580</td></tr>
 <tr><td><code>./granular-mpm</code></td><td class="num">14,644</td><td class="num">5,824</td></tr>
-<tr><td><code>./strands</code></td><td class="num">14,451</td><td class="num">5,915</td></tr>
+<tr><td><code>./strands</code></td><td class="num">24,059</td><td class="num">9,181</td></tr>
 <tr><td><code>./synoptic</code></td><td class="num">15,555</td><td class="num">6,377</td></tr>
 <tr><td><code>./clouds</code></td><td class="num">31,804</td><td class="num">11,625</td></tr>
 <tr><td><code>./ageing</code></td><td class="num">19,716</td><td class="num">8,069</td></tr>

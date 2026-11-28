@@ -3,7 +3,14 @@ import test from 'node:test';
 import { StrandSolver, STRAND_LAYOUT, STRAND_WORDS } from '../../dist/strands.js';
 import { Physics } from '../../dist/index.js';
 import { TerrainBed } from '../../dist/earth.js';
-import { BODY_IMPULSES_FIELD, PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
+import {
+  BODIES_FIELD,
+  BODY_IMPULSES_FIELD,
+  PhysicsWorld,
+  regionWords,
+  RigidSolver,
+  worldMemory,
+} from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 const zero = [0, 0, 0];
@@ -332,6 +339,89 @@ test('a moving sphere receives the matched impulse from an anchored link witness
     near(fraction * reaction[at + 1] + tipMass * tip.velocity[1], 0, 1e-6);
     world.advance(2);
     assert.ok(body.linearVelocity[1] > velocity && body.angularVelocity[2] > 0);
+  } finally {
+    rigid.dispose();
+  }
+});
+
+test('signed foreign rigid publication and rejected strand trials preserve an accepted swept reaction', async () => {
+  await Physics.load();
+  const world = new PhysicsWorld({ rate, gravity: zero });
+  const rigid = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, gravity: zero });
+  try {
+    const cell = [-8, 3, -4];
+    const radius = 0.01;
+    const body = rigid.addBody(null, {
+      position: [0, 0.095, 0],
+      linearVelocity: [0, -2.8, 0],
+      colliders: { shape: 'sphere', radius: 0.06, sensor: true, mass: 2 },
+    });
+    const bodies = new RigidSolver();
+    world.add(bodies, { physics: rigid }, cell);
+    using solver = await StrandSolver.load({
+      rigidCapsules: [{ body: body.row, start: [0.03, 0, 0], end: [0.03, 0, 0], radius: 0.06 }],
+    });
+    world.add(
+      solver,
+      {
+        strands: [
+          {
+            points: [
+              [-0.2, 0, 0],
+              [0.2, 0, 0],
+            ],
+            radius,
+            density: 850,
+            young: 1,
+            drag: 0,
+          },
+        ],
+        rate: 0,
+        damping: 0,
+        friction: 0,
+        iterations: 1,
+        selfCollision: false,
+        contactGeometry: 'swept',
+      },
+      cell,
+    );
+    for (const port of solver.exportPorts(-1)) assert.deepEqual(port.cell, cell);
+    world.couple(['rigid', solver.id], 'staggered');
+    world.advance(1);
+    const reaction = solver.exportPorts(0).find((port) => port.field === BODY_IMPULSES_FIELD.name);
+    assert.ok(regionWords(world.memory, reaction.region)[body.row * 6 + 1] > 0);
+    const snapshot = world.takeSnapshot().bytes.slice();
+    const receipt = solver.readNativeWork();
+    const input = bodies.exportPorts(0).find((port) => port.field === BODIES_FIELD.name);
+    const byteOffset = 16;
+    const memory = new WebAssembly.Memory({ initial: Math.ceil((byteOffset + input.region.byteLength) / 65536) });
+    const foreign = { ...input, cell, region: { ...input.region, byteOffset, memory } };
+    new Float32Array(memory.buffer, byteOffset, input.region.byteLength / 4).set(
+      regionWords(world.memory, input.region),
+    );
+    const dt = 1 / 60;
+    const context = (port) => ({ tick: 1, level: 0, seed: 0, cell, inputs: new Map([[BODIES_FIELD.name, port]]) });
+    assert.throws(() => solver.step(context({ ...foreign, region: { ...foreign.region, layout: 1 } }), dt), {
+      code: 'version',
+      message: /layout-2 RigidSolver.*#strands/,
+    });
+    assert.throws(() => solver.step(context({ ...foreign, region: { ...foreign.region, byteOffset: 2 } }), dt), {
+      code: 'state',
+      message: /aligned rigid body rows.*#strands/,
+    });
+    assert.throws(() => solver.step(context(foreign), 0), { code: 'state', message: /positive.*substep.*#strands/ });
+    assert.deepEqual(world.takeSnapshot().bytes, snapshot);
+    assert.deepEqual(solver.readNativeWork(), receipt);
+    solver.step(context({ ...input, cell }), dt);
+    const advanced = world.takeSnapshot().bytes.slice();
+    world.restoreSnapshot(snapshot);
+    solver.step(context(foreign), dt);
+    assert.deepEqual(world.takeSnapshot().bytes, advanced);
+    world.restoreSnapshot(snapshot);
+    world.shiftOrigin([2, -1, 7]);
+    for (const port of solver.exportPorts(0)) assert.deepEqual(port.cell, [-10, 4, -11]);
+    world.restoreSnapshot(snapshot);
+    assert.deepEqual(world.takeSnapshot().bytes, snapshot);
   } finally {
     rigid.dispose();
   }

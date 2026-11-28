@@ -2,7 +2,8 @@
 #![cfg(target_arch = "wasm32")]
 
 use core::arch::wasm32::{
-    f64x2, f64x2_extract_lane, f64x2_floor, f64x2_mul, f64x2_splat, f64x2_sqrt, unreachable,
+    f64x2, f64x2_add, f64x2_div, f64x2_extract_lane, f64x2_floor, f64x2_mul, f64x2_splat,
+    f64x2_sqrt, unreachable, v128,
 };
 use margoengine_physics_kernel_common::pinned::{cos, sin};
 
@@ -900,8 +901,193 @@ fn pair<T>(items: &mut [T], a: usize, b: usize) -> (&mut T, &mut T) {
 }
 
 /// Advances every strand in deterministic authoring order. All pointers name disjoint host-owned world ranges.
+#[repr(C)]
+struct PredictionJob {
+    nodes: *mut State,
+    material: *const Material,
+    environment: *const Environment,
+    scratch: *mut Scratch,
+    config: *const Advance,
+    count: usize,
+    work: *mut PredictionWork,
+}
+
+#[repr(C)]
+#[derive(Default)]
+struct PredictionWork {
+    points: u32,
+    moving_points: u32,
+    spinning_points: u32,
+    paired_moving_points: u32,
+}
+
+// Store the old point for the ordered projection and velocity reconstruction.
+fn begin_prediction(scratch: &mut Scratch, node: State) {
+    *scratch = Scratch {
+        old: node,
+        correction: V::ZERO,
+        shear: V::ZERO,
+        bend: V::ZERO,
+        contact: V::ZERO,
+    };
+}
+
+fn predict_translation(node: &mut State, air: &Environment, gravity: V, cfg: &Advance) {
+    let relative = node
+        .velocity
+        .scale(cfg.retention)
+        .add(gravity)
+        .subtract(air.wind);
+    node.velocity = air
+        .wind
+        .add(relative.scale(1.0 / (1.0 + cfg.dt * air.drag * relative.length())));
+    node.position = node.position.add(node.velocity.scale(cfg.dt));
+}
+
+fn predict_translation_pair(
+    a: &mut State,
+    b: &mut State,
+    aa: &Environment,
+    ba: &Environment,
+    gravity: V,
+    cfg: &Advance,
+) {
+    let retention = f64x2_splat(cfg.retention);
+    let dt = f64x2_splat(cfg.dt);
+    let one = f64x2_splat(1.0);
+    let minus_one = f64x2_splat(-1.0);
+    let relative = |velocity, wind, gravity| {
+        f64x2_add(
+            f64x2_add(f64x2_mul(velocity, retention), f64x2_splat(gravity)),
+            f64x2_mul(wind, minus_one),
+        )
+    };
+    let wind_x = f64x2(aa.wind.x, ba.wind.x);
+    let wind_y = f64x2(aa.wind.y, ba.wind.y);
+    let wind_z = f64x2(aa.wind.z, ba.wind.z);
+    let x = relative(f64x2(a.velocity.x, b.velocity.x), wind_x, gravity.x);
+    let y = relative(f64x2(a.velocity.y, b.velocity.y), wind_y, gravity.y);
+    let z = relative(f64x2(a.velocity.z, b.velocity.z), wind_z, gravity.z);
+    // Each lane preserves the established (x² + y²) + z² order and drag grouping.
+    let length = f64x2_sqrt(f64x2_add(
+        f64x2_add(f64x2_mul(x, x), f64x2_mul(y, y)),
+        f64x2_mul(z, z),
+    ));
+    let drag = f64x2_div(
+        one,
+        f64x2_add(
+            one,
+            f64x2_mul(f64x2_mul(dt, f64x2(aa.drag, ba.drag)), length),
+        ),
+    );
+    let vx = f64x2_add(wind_x, f64x2_mul(x, drag));
+    let vy = f64x2_add(wind_y, f64x2_mul(y, drag));
+    let vz = f64x2_add(wind_z, f64x2_mul(z, drag));
+    let x = f64x2_add(f64x2(a.position.x, b.position.x), f64x2_mul(vx, dt));
+    let y = f64x2_add(f64x2(a.position.y, b.position.y), f64x2_mul(vy, dt));
+    let z = f64x2_add(f64x2(a.position.z, b.position.z), f64x2_mul(vz, dt));
+    a.velocity = extract_vector::<0>(vx, vy, vz);
+    b.velocity = extract_vector::<1>(vx, vy, vz);
+    a.position = extract_vector::<0>(x, y, z);
+    b.position = extract_vector::<1>(x, y, z);
+}
+
+#[inline(always)]
+fn extract_vector<const LANE: usize>(x: v128, y: v128, z: v128) -> V {
+    V {
+        x: f64x2_extract_lane::<LANE>(x),
+        y: f64x2_extract_lane::<LANE>(y),
+        z: f64x2_extract_lane::<LANE>(z),
+    }
+}
+
+// Like Kugelstadt and Schömer (2016), algorithm 1, prediction only depends on its own point.
+// The following projection still owns root constraints, contacts and the ordered reaction fold.
 #[unsafe(no_mangle)]
-unsafe extern "C" fn advance_strands(
+unsafe extern "C" fn strand_predict_phase(
+    job: *const PredictionJob,
+    stage: u32,
+    part: usize,
+    parts: usize,
+) -> u32 {
+    if stage != 0 || !matches!(parts, 1 | 2 | 4) || part >= parts {
+        return 1;
+    }
+    let job = unsafe { &*job };
+    let pairs = job.count / 2;
+    let from = 2 * (part * pairs / parts);
+    let end = if part + 1 == parts {
+        job.count
+    } else {
+        2 * ((part + 1) * pairs / parts)
+    };
+    let count = end - from;
+    // The helpers borrow only their own writable ranges. Material, environment and config are immutable throughout.
+    let nodes = unsafe { core::slice::from_raw_parts_mut(job.nodes.add(from), count) };
+    let scratch = unsafe { core::slice::from_raw_parts_mut(job.scratch.add(from), count) };
+    let material = unsafe { core::slice::from_raw_parts(job.material.add(from), count) };
+    let environment = unsafe { core::slice::from_raw_parts(job.environment.add(from), count) };
+    let cfg = unsafe { &*job.config };
+    let gravity = cfg.gravity.scale(cfg.dt);
+    let mut work = PredictionWork {
+        points: count as u32,
+        ..PredictionWork::default()
+    };
+
+    for (start, points) in nodes.chunks_mut(2).enumerate() {
+        let i = 2 * start;
+        for (lane, node) in points.iter_mut().enumerate() {
+            begin_prediction(slot_mut(scratch, i + lane), *node);
+        }
+        if let [a, b] = points
+            && slot(material, i).inverse_mass > 0.0
+            && slot(material, i + 1).inverse_mass > 0.0
+        {
+            predict_translation_pair(
+                a,
+                b,
+                slot(environment, i),
+                slot(environment, i + 1),
+                gravity,
+                cfg,
+            );
+            work.moving_points += 2;
+            work.paired_moving_points += 2;
+        } else {
+            for (lane, node) in points.iter_mut().enumerate() {
+                if slot(material, i + lane).inverse_mass > 0.0 {
+                    predict_translation(node, slot(environment, i + lane), gravity, cfg);
+                    work.moving_points += 1;
+                }
+            }
+        }
+        for (lane, node) in points.iter_mut().enumerate() {
+            if slot(material, i + lane).inverse_bend > 0.0 {
+                node.frame = node.frame.advance(node.spin.scale(cfg.retention), cfg.dt);
+                work.spinning_points += 1;
+            }
+            let State {
+                position,
+                velocity,
+                frame,
+                ..
+            } = *node;
+            let finite_vector = |v: V| v.x.is_finite() && v.y.is_finite() && v.z.is_finite();
+            if !finite_vector(position)
+                || !finite_vector(velocity)
+                || !finite_vector(frame.v)
+                || !frame.w.is_finite()
+            {
+                return 2;
+            }
+        }
+    }
+    unsafe { job.work.add(part).write(work) };
+    0
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn solve_strands(
     nodes: *mut State,
     material: *const Material,
     environment: *const Environment,
@@ -945,31 +1131,6 @@ unsafe extern "C" fn advance_strands(
         };
     }
     let dt = cfg.dt;
-    for (i, node) in nodes.iter_mut().enumerate() {
-        let rest = slot(material, i);
-        let air = slot(env, i);
-        *slot_mut(scratch, i) = Scratch {
-            old: *node,
-            correction: V::ZERO,
-            shear: V::ZERO,
-            bend: V::ZERO,
-            contact: V::ZERO,
-        };
-        if rest.inverse_mass > 0.0 {
-            let relative = node
-                .velocity
-                .scale(cfg.retention)
-                .add(cfg.gravity.scale(dt))
-                .subtract(air.wind);
-            node.velocity = air
-                .wind
-                .add(relative.scale(1.0 / (1.0 + dt * air.drag * relative.length())));
-            node.position = node.position.add(node.velocity.scale(dt));
-        }
-        if rest.inverse_bend > 0.0 {
-            node.frame = node.frame.advance(node.spin.scale(cfg.retention), dt);
-        }
-    }
     for root in roots {
         let at = root.start as usize;
         let first = slot_mut(nodes, at);

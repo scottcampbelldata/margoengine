@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'strands',
+    title: '@margoengine/physics/strands guide, wind, bed and rigid coupling',
+    kind: 'family',
+    messages: [],
+    cause: 'A guide, callback, borrowed rigid port or candidate step cannot produce a finite strand state.',
+    fix: 'Pass finite guide points, wind, bed and time in SI units. Publish aligned layout-2 rigid body rows in their owning memory. Increase the solver rate or simplify the guide if its trial becomes singular.',
+  },
+  {
     id: 'accretion',
     title: '@margoengine/physics/accretion annulus transport, supply and exterior Kerr orbits',
     kind: 'family',

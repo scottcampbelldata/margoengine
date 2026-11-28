@@ -16183,10 +16183,17 @@ side and exact replay after reversal. This is a beam-and-drag test for narrow
 leaves. Lift-driven leaf flutter and canopy wind shielding need a separate model.
 
 The 720-point tapered and swept fixture moved its selected tip 0.7516 m relative to the
-still-air control and changed 2,907 pixels with the same camera on WebGPU and WebGL2.
+still-air control. The workstation rerun changed 2,907 pixels on WebGPU and WebGL2.
+The earlier audit recorded 3,022 pixels. Area of change is renderer evidence and depends on the capture.
 Plain, shared and restored native state all hash to `9245de2188de6730` in the fixture. The optional entry
-is 6,329 B gzip with a 6,518 B ceiling. Both lazy Wasm variants are 44,959 B raw and
-17,942 B gzip. Core and Stage gain zero bytes.
+is 9,181 B gzip with a 9,457 B ceiling. Both lazy Wasm variants are 48,706 B raw and
+18,771 B gzip. Core and Stage gain zero bytes.
+
+Native inertial and drag prediction divides disjoint point pairs across one, two or four participants.
+Constraint projection, rigid reactions and neighbour sweeps retain their serial order. A candidate
+adds a 104 B centreline record per point and 80 B of step settings. The reciprocal path adds 192 B
+per dynamic capsule for the trial history and 48 B per rigid body row for candidate impulses.
+Prediction adds a 28 B job, 16 B of work per participant, helper stacks and pool control.
 
 The optional horse adapter drives eight tail joints and ten five-point mane and forelock
 guides on the existing gait clock. It represents the rest of the strands through hair cards
@@ -16203,6 +16210,17 @@ camera test measured 0.0942 m of ponytail-tip movement and 436 changed pixels on
 backends. Its restored simulation hash is `0bf6500c22b9e929`. The manual rig uses a 240 Hz
 world clock. The automatic adapter advances that clock after the Animator pose. The optional
 rigging entry measures 1,991 B gzip with a 2,247 B ceiling.
+
+#### SOFT-03 measured single-hair bending
+
+With the existing 3 GPa default and a 96-link direct rod, the predicted deflections at four measured
+force points are 21.54, 28.00, 40.76 and 15.58 µm. Akanda et al. report 23.4, 31.0, 46.5 and
+17.8 µm for those specimens and loads. Each remains low after a ±0.5 µm plot readout and ±2.5 µN
+force sensitivity. Doubling 48 links to 96 shifts predictions by at most 0.64 µm. Halving the
+time step at 48 links changes them by at most 0.002 µm. A fourfold reduction in numerical
+settling mass changes the longest specimen by less than 0.001 µm. The authors' fitted modulus
+does not enter the prediction. The plotted points describe quasistatic bending of individual
+fibres. Measured clump motion and calibration of larger horse bundles remain open. [Akanda, Tohmyoh, and Saka 2010](https://doi.org/10.1299/jmmp.4.545)
 
 ## Typed events (scene/emitter)
 
@@ -41757,6 +41775,10 @@ Tests measure the one-tick rigid reaction at 24 m/s and inter-guide momentum exc
 Fast rotation still requires enough substeps to resolve the capsule's arc.
 The optional horse driver applies solved frames to the horse skin, and the physical spring
 rig binds the weighted VRM reference ponytail. The named production shots still need their own bindings.
+
+The measured single-fibre bending comparison shows the default elastic strand underpredicts
+all four experimental deflections. The original dynamic hair-clump model, horse bundle calibration
+and production shots require separate evidence. [Independent bending data](limits.md#soft-03-measured-single-hair-bending)
 
 ### Energy at a strand contact with a light rigid capsule (SOFT-03)
 

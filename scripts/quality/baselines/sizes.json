@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22159276,
+  "total": 22162562,
   "history": [
     {
       "date": "2026-10-24",
@@ -16068,6 +16068,12 @@
       "commit": "space-03-accretion-native-annuli",
       "reason": "SPACE-03 @margoengine/physics/accretion 5110 to 8119 B gzip, ceiling 5366 to 8375 B. The accretion entry stages a complete disk trial and uses optional native workers for independent annulus publication. Splitting the workers from the entry would duplicate the accepted fields, budget and sparse disk layout. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "soft-03-strand-point-prediction",
+      "reason": "SOFT-03 @margoengine/physics/strands 5915 to 9181 B gzip, ceiling 6171 to 9457 B. The strand entry stages accepted centreline and contact state and distributes independent point prediction to native SIMD workers. A split would duplicate world-cell, guide and rigid-port handling. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16994,7 +17000,7 @@
     "@margoengine/physics/soft": 193804,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 65533,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 127671,
-    "@margoengine/physics/strands": 6171,
+    "@margoengine/physics/strands": 9457,
     "@margoengine/physics/surf": 12869,
     "@margoengine/physics/surge": 9351,
     "@margoengine/physics/synoptic": 6633,

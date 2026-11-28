@@ -9755,7 +9755,8 @@ dense guide sets when elastic frames and point self contact are unnecessary.
   origin cell length defaults to 4,096 m and must match the world's `cellSize` when customized.
 - `field` publishes `STRAND_LAYOUT` in the world registry. Each `STRAND_WORDS`-word f64 record
   stores centreline position, linear velocity, XYZW material frame and angular velocity in that
-  order. Give the same deterministic anchor, wind, and body functions to playback and snapshot replay.
+  order. Each field carries the solver's signed cell, including after a change of world origin.
+  Give the same deterministic anchor, wind, and body functions to playback and snapshot replay.
 
 For a dynamic capsule or sphere, give `StrandSolver.load({ rigidCapsules })` its rigid body
 row, local endpoints and radius. Add the `RigidSolver` first so the strand solver can size its
@@ -9780,7 +9781,7 @@ const body = rigid.addBody(null, {
   colliders: { shape: 'sphere', radius: 0.1, mass: 2 },
 });
 world.add(new RigidSolver(), { physics: rigid });
-const strand = await StrandSolver.load({
+using strand = await StrandSolver.load({
   rigidCapsules: [{ body: body.row, start: [0, 0, 0], end: [0, 0, 0], radius: 0.1 }],
 });
 world.add(strand, { strands: [{ points: [[0, 0.3, 0], [0, 0, 0]], radius: 0.01 }], rate: 0 });
@@ -9795,6 +9796,13 @@ and exchange contact and friction impulses. A registered rigid capsule receives 
 matching linear and angular impulse. Choose `'swept'` to test both body and self contacts
 along linear endpoint trajectories between substeps. Use a higher rate for fast rotation
 to sample the arc more closely. The default is `'points'`.
+
+Native point prediction uses one participant by default. Set `threads: 2` or `threads: 4` on
+`StrandSolver.load` with shared world memory in Node or an isolated browser worker. Inertial and
+drag prediction processes pairs of points with SIMD. Constraints and contacts retain their existing
+order. `readNativeWork()` reports the current accepted substep's work. Stop advancing the world before
+disposing the solver. Invalid wind, bed, rigid fields or trial values leave the preceding centreline,
+frames and impulses intact. [Strand error remedies](https://margoengine.com/errors#strands)
 
 ## Depth-averaged natural granular flow
 

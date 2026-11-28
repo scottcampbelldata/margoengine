@@ -1,8 +1,7 @@
 import type { Quat, Vec3 } from '@margoengine/math';
-import { MargoError } from '@margoengine/math/errors';
 import type { Bed, BedSample, FlowSample, Wind } from '@margoengine/math/fields';
 import { exp, hypot } from '@margoengine/math/pinned';
-import { canShareMemory, isShared, MAX_MEMORY_PAGES, regionWords, STACK_BYTES } from '../world/memory.js';
+import { isShared, MAX_MEMORY_PAGES, regionWords, STACK_BYTES } from '../world/memory.js';
 import type {
   Cell,
   FieldDescriptor,
@@ -15,6 +14,16 @@ import type {
   StepContext,
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_IMPULSES_FIELD, BODY_WORDS, bodyRowsOf, IMPULSE_WORDS } from '../world/solvers/rigid.js';
+import { strandError } from './errors.js';
+import {
+  type StrandKernelBuilds,
+  type StrandPrediction,
+  type StrandWorkCounts,
+  bindStrandPrediction,
+  loadStrandKernels,
+} from './kernel.js';
+
+export { type StrandWorkerWork, type StrandWorkCounts } from './kernel.js';
 
 const IDENTITY: Quat = [0, 0, 0, 1];
 const ZERO: Vec3 = [0, 0, 0];
@@ -93,6 +102,8 @@ export interface StrandLoadOptions {
   /** Solver registry id. Default 'strands'. */
   readonly id?: string;
   readonly signal?: AbortSignal;
+  /** Maximum native participants for point prediction. Defaults to one. */
+  readonly threads?: 1 | 2 | 4;
   /** Optional reciprocal rigid contacts. Add the RigidSolver first and use the rod tier. */
   readonly rigidCapsules?: readonly StrandRigidCapsule[];
 }
@@ -138,7 +149,7 @@ export interface StrandReading {
 
 type Native = {
   __stack_pointer: WebAssembly.Global;
-  advance_strands(
+  solve_strands(
     state: number,
     material: number,
     environment: number,
@@ -176,11 +187,12 @@ type Guide = {
 };
 
 function invalid(fix: string): never {
-  throw new MargoError('state', fix);
+  throw strandError(fix);
 }
 
 function finite(value: number, label: string, min = -Infinity): number {
-  if (!Number.isFinite(value) || value < min) invalid(`Pass a finite ${label} at or above ${min}.`);
+  if (!Number.isFinite(value) || value < min)
+    invalid(min === -Infinity ? `Pass a finite ${label}.` : `Pass a finite ${label} at or above ${min}.`);
   return value;
 }
 
@@ -206,7 +218,8 @@ function readSection(guide: StrandSection, section?: StrandSection) {
 }
 
 function vector(value: Vec3): Vec3 {
-  if (value.length !== 3 || !value.every(Number.isFinite)) invalid('Pass three finite coordinate values in metres.');
+  if (value?.length !== 3 || ![value[0], value[1], value[2]].every(Number.isFinite))
+    invalid('Pass three finite coordinate values in SI units.');
   return [value[0], value[1], value[2]];
 }
 
@@ -247,25 +260,13 @@ function align(frame: Quat, direction: Vec3): Quat {
   );
 }
 
-async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {
-  signal?.throwIfAborted();
-  if (url.protocol === 'file:') {
-    const fs = 'node:fs/promises';
-    const { readFile } = await import(/* @vite-ignore */ fs);
-    return WebAssembly.compile(await readFile(url, { signal }));
-  }
-  const response = await fetch(url, { signal });
-  if (!response.ok)
-    throw new MargoError('failed', 'Strand Wasm could not load. Provide both native variants beside strands.js.');
-  return WebAssembly.compile(await response.arrayBuffer());
-}
-
 /** SI strand guides with Cosserat bending and twist, inextensible fast following, and body and ground contact. */
 export class StrandSolver implements Solver<StrandParams> {
   readonly field: FieldDescriptor;
   private host!: SolverHost;
   private native!: Native;
-  private cell: Cell = ZERO;
+  private prediction?: StrandPrediction;
+  private disposed = false;
   private clock: RateLevel = 2;
   private count = 0;
   private bucketCount = 1;
@@ -276,19 +277,23 @@ export class StrandSolver implements Solver<StrandParams> {
   private colliders: NonNullable<StrandParams['colliders']> = [];
   private readonly guides: Guide[] = [];
   private nodes!: Region;
+  private trialNodes!: Region;
   private material!: Region;
   private environment!: Region;
   private scratch!: Region;
   private roots!: Region;
   private obstacles!: Region;
   private config!: Region;
+  private trialConfig!: Region;
   private ledger!: Region;
   private links!: Region;
   private buckets!: Region;
   private movingCapsules?: Region;
+  private trialCapsules?: Region;
   private capsuleHits?: Region;
   private rigidMasses?: Region;
   private reactions?: Region;
+  private trialReactions?: Region;
   private rigidRows = 0;
   private directBlocks?: Region;
   private previousObstacles?: Region;
@@ -296,8 +301,7 @@ export class StrandSolver implements Solver<StrandParams> {
 
   private constructor(
     readonly id: string,
-    private readonly plain: WebAssembly.Module,
-    private readonly shared: WebAssembly.Module | undefined,
+    private readonly builds: StrandKernelBuilds,
     private readonly rigidCapsules: readonly StrandRigidCapsule[],
   ) {
     this.field = {
@@ -311,20 +315,28 @@ export class StrandSolver implements Solver<StrandParams> {
 
   /** Loads the optional SIMD variants. No native asset is fetched on import. */
   static async load(options: StrandLoadOptions = {}): Promise<StrandSolver> {
-    const [plain, shared] = await Promise.all([
-      compile(new URL(/* @vite-ignore */ './strand-kernel.wasm?no-inline', import.meta.url), options.signal),
-      canShareMemory()
-        ? compile(new URL(/* @vite-ignore */ './strand-kernel-shared.wasm?no-inline', import.meta.url), options.signal)
-        : undefined,
-    ]);
-    options.signal?.throwIfAborted();
+    const id = options.id ?? 'strands';
+    if (typeof id !== 'string' || id.length === 0) invalid('Choose a nonempty strand solver id.');
     const rigidCapsules = (options.rigidCapsules ?? []).map(({ start, end, radius, body }) => ({
       start: vector(start),
       end: vector(end),
       radius: positive(radius, 'rigid capsule radius'),
       body,
     }));
-    return new StrandSolver(options.id ?? 'strands', plain, shared, rigidCapsules);
+    const builds = await loadStrandKernels(options.signal, options.threads ?? 1);
+    return new StrandSolver(id, builds, rigidCapsules);
+  }
+
+  /** Release any prediction helpers after stopping the world. */
+  [Symbol.dispose](): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.builds[Symbol.dispose]();
+  }
+
+  /** Work for the most recent accepted strand substep. */
+  readNativeWork(): StrandWorkCounts | undefined {
+    return this.prediction?.workCounts();
   }
 
   describe() {
@@ -335,6 +347,7 @@ export class StrandSolver implements Solver<StrandParams> {
   }
 
   init(host: SolverHost, params: StrandParams): void {
+    if (this.disposed) throw strandError('Load a new strand solver after disposing its helpers.', 'disposed');
     if (this.host) invalid('Load a fresh solver to attach another world.');
     if (!params?.strands?.length) invalid('Supply at least one strand with two or more points.');
     const fidelity = params.fidelity ?? 'rod';
@@ -372,13 +385,13 @@ export class StrandSolver implements Solver<StrandParams> {
     this.colliders = [...(params.colliders ?? [])];
     this.count = params.strands.reduce((n, guide) => n + guide.points.length, 0);
     const bytes =
-      this.count * 8 * (3 * STRAND_WORDS + MATERIAL_WORDS + ENVIRONMENT_WORDS + SCRATCH_WORDS + ROOT_WORDS + 4) +
+      this.count * 8 * (4 * STRAND_WORDS + MATERIAL_WORDS + ENVIRONMENT_WORDS + SCRATCH_WORDS + ROOT_WORDS + 4) +
       (this.colliders.length * CAPSULE_WORDS * (this.swept ? 2 : 1) +
         (direct ? this.count * DIRECT_BLOCK_WORDS : 0) +
         (this.rigidRows
           ? this.count * CAPSULE_HIT_WORDS +
-            this.rigidCapsules.length * (RIGID_CAPSULE_WORDS + RIGID_MASS_WORDS) +
-            this.rigidRows * IMPULSE_WORDS
+            this.rigidCapsules.length * (2 * RIGID_CAPSULE_WORDS + RIGID_MASS_WORDS) +
+            2 * this.rigidRows * IMPULSE_WORDS
           : 0)) *
         8;
     if (!Number.isSafeInteger(bytes) || bytes >= MAX_MEMORY_PAGES * 65536)
@@ -386,13 +399,15 @@ export class StrandSolver implements Solver<StrandParams> {
     while (this.bucketCount < 2 * this.count) this.bucketCount *= 2;
     const native =
       isShared(host.memory) || Object.prototype.toString.call(host.memory.buffer) === '[object SharedArrayBuffer]'
-        ? this.shared
-        : this.plain;
-    if (!native) throw new MargoError('failed', 'Shared strand Wasm is unavailable. Use a plain-memory world.');
+        ? this.builds.shared
+        : this.builds.plain;
+    if (!native)
+      throw strandError('Use shared world memory for strand helpers, or choose one participant.', 'unsupported');
     this.host = host;
     const area = (label: string, words: number) => host.allocate(label, words * 8, 'f64', STRAND_LAYOUT);
     const stack = host.allocate('strand-stack', STACK_BYTES, 'u8', STRAND_LAYOUT);
     this.nodes = area('strand-centreline-and-frames', this.count * STRAND_WORDS);
+    this.trialNodes = area('strand-trial-centreline-and-frames', this.count * STRAND_WORDS);
     this.material = area('strand-material-coefficients', this.count * MATERIAL_WORDS);
     this.environment = area('strand-wind-and-terrain', this.count * ENVIRONMENT_WORDS);
     this.scratch = area('strand-snapshot-of-substep', this.count * SCRATCH_WORDS);
@@ -401,24 +416,25 @@ export class StrandSolver implements Solver<StrandParams> {
     if (this.swept && this.colliders.length)
       this.previousObstacles = area('strand-previous-prescribed-capsules', this.colliders.length * CAPSULE_WORDS);
     this.config = area('strand-step-parameters', 10);
+    this.trialConfig = area('strand-trial-step-parameters', 10);
     this.ledger = area('strand-contact-work-and-cell', 4);
     this.links = host.allocate('strand-grid-links', this.count * 16, 'i32', STRAND_LAYOUT);
     this.buckets = host.allocate('strand-grid-buckets', this.bucketCount * 4, 'i32', STRAND_LAYOUT);
     if (direct) this.directBlocks = area('strand-direct-rod-blocks', this.count * DIRECT_BLOCK_WORDS);
     if (this.rigidRows) {
       this.movingCapsules = area('strand-dynamic-body-capsules', this.rigidCapsules.length * RIGID_CAPSULE_WORDS);
+      this.trialCapsules = area('strand-trial-body-capsules', this.rigidCapsules.length * RIGID_CAPSULE_WORDS);
       this.capsuleHits = area('strand-rigid-contact-witness', this.count * CAPSULE_HIT_WORDS);
       this.reactions = area('strand-rigid-body-impulses', this.rigidRows * IMPULSE_WORDS);
+      this.trialReactions = area('strand-trial-body-impulses', this.rigidRows * IMPULSE_WORDS);
       this.rigidMasses = area('strand-rigid-inverse-inertia', this.rigidCapsules.length * RIGID_MASS_WORDS);
       const poses = this.words(this.movingCapsules);
       for (let i = 0; i < this.rigidCapsules.length; i++) poses[i * RIGID_CAPSULE_WORDS + BODY_INDEX] = -1;
     }
-    this.native = new WebAssembly.Instance(native, { env: { memory: host.memory } }).exports as Native;
-    if (
-      typeof this.native.advance_strands !== 'function' ||
-      !(this.native.__stack_pointer instanceof WebAssembly.Global)
-    )
-      throw new MargoError('failed', 'Unexpected strand Wasm layout. Run the strand kernel build for both variants.');
+    const instance = new WebAssembly.Instance(native, { env: { memory: host.memory } });
+    this.native = instance.exports as Native;
+    if (typeof this.native.solve_strands !== 'function' || !(this.native.__stack_pointer instanceof WebAssembly.Global))
+      throw strandError('Run the strand kernel build for both variants and serve the current modules.', 'version');
     this.native.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
     let first = 0,
       maxRadius = 0;
@@ -438,7 +454,22 @@ export class StrandSolver implements Solver<StrandParams> {
       Number(self) + 2 * Number(contactGeometry !== 'points') + 4 * Number(direct) + 8 * Number(this.swept),
       2 * maxRadius,
     ]);
+    this.words(this.ledger).set(host.cell, 1);
     this.anchorAndColliders(0);
+    this.prediction = bindStrandPrediction(
+      host,
+      this.builds,
+      native,
+      instance,
+      {
+        nodes: this.trialNodes,
+        material: this.material,
+        environment: this.environment,
+        scratch: this.scratch,
+        config: this.trialConfig,
+      },
+      this.count,
+    );
   }
 
   private words(region: Region): Float64Array {
@@ -572,7 +603,7 @@ export class StrandSolver implements Solver<StrandParams> {
     }
   }
 
-  private sampleEnvironment(t: number, dt: number): void {
+  private sampleEnvironment(t: number, dt: number, cell: Cell): void {
     const env = this.words(this.environment),
       state = this.words(this.nodes),
       material = this.words(this.material);
@@ -580,8 +611,8 @@ export class StrandSolver implements Solver<StrandParams> {
       bed = this.bed;
     const air: FlowSample = { density: 1.225, velocity: [0, 0, 0], temperature: 288.15 };
     const ground: BedSample = { normal: [0, 1, 0], elevation: 0 };
-    const windOffset = wind ? scaled(difference(this.cell, wind.cell), this.cellSize) : ZERO;
-    const bedOffset = bed ? scaled(difference(this.cell, bed.cell), this.cellSize) : ZERO;
+    const windOffset = wind ? scaled(difference(cell, wind.cell), this.cellSize) : ZERO;
+    const bedOffset = bed ? scaled(difference(cell, bed.cell), this.cellSize) : ZERO;
     for (const guide of this.guides)
       for (let i = guide.first; i < guide.first + guide.count; i++) {
         const at = ENVIRONMENT_WORDS * i,
@@ -589,8 +620,9 @@ export class StrandSolver implements Solver<StrandParams> {
           v = xyz(state, STRAND_WORDS * i + 3);
         const position = sum(p, windOffset);
         const flow = wind ? wind.sample(position[0], position[1], position[2], t, air) : air;
+        const velocity = vector(flow.velocity);
         const tangent = rotate(quaternion(state, STRAND_WORDS * i + 6), Z);
-        const relative = difference(flow.velocity, v),
+        const relative = difference(velocity, v),
           along = dot(tangent, relative),
           magnitude = dot(relative, relative);
         const crossFraction = magnitude > 0 ? Math.sqrt(Math.max(0, 1 - (along * along) / magnitude)) : 0;
@@ -604,30 +636,29 @@ export class StrandSolver implements Solver<StrandParams> {
           finite(flow.density, 'air density', 0) *
           guide.drag *
           (side * crossFraction + frontal * (1 - crossFraction));
-        env.set([...vector(flow.velocity), factor * material[MATERIAL_WORDS * i]!], at);
+        env.set(
+          [...velocity, finite(factor * material[MATERIAL_WORDS * i]!, 'strand drag acceleration factor', 0)],
+          at,
+        );
         if (bed) {
           const x = p[0] + v[0] * dt,
             z = p[2] + v[2] * dt;
           const sample = bed.sample(x + bedOffset[0], z + bedOffset[2], ground);
-          env.set([...sample.normal, dot(sample.normal, [x, sample.elevation - bedOffset[1], z])], at + 4);
+          const normal = vector(sample.normal);
+          const plane = dot(normal, [x, sample.elevation - bedOffset[1], z]);
+          env.set([...normal, finite(plane, 'bed contact plane')], at + 4);
         }
       }
   }
 
-  private updateRigidCapsules(port: Port | undefined, dt: number): void {
-    if (!this.movingCapsules || !this.reactions || !this.rigidMasses) return;
-    this.words(this.reactions).fill(0);
-    const capsules = this.words(this.movingCapsules),
+  private updateRigidCapsules(port: Port | undefined, dt: number, cell: Cell): void {
+    if (!this.movingCapsules || !this.trialCapsules || !this.trialReactions || !this.rigidMasses) return;
+    this.words(this.trialReactions).fill(0);
+    const capsules = this.words(this.trialCapsules),
       masses = this.words(this.rigidMasses);
-    if (
-      port &&
-      (port.region.layout !== 2 ||
-        port.region.type !== 'f32' ||
-        port.region.byteLength !== 4 * BODY_WORDS * this.rigidRows)
-    )
-      invalid('Use the layout-2 RigidSolver bodies port with the same body rows.');
-    const bodies = port ? regionWords(this.host.memory, port.region) : undefined;
-    const offset = port ? scaled(difference(port.cell, this.cell), this.cellSize) : ZERO;
+    capsules.set(this.words(this.movingCapsules));
+    const bodies = port && this.readBodies(port);
+    const offset = port ? scaled(difference(port.cell, cell), this.cellSize) : ZERO;
     for (const [index, capsule] of this.rigidCapsules.entries()) {
       const at = index * RIGID_CAPSULE_WORDS,
         body = capsule.body * BODY_WORDS;
@@ -651,53 +682,88 @@ export class StrandSolver implements Solver<StrandParams> {
       }
       capsules.set([...start, ...end, capsule.radius, ...centre, ...linear, ...angular, capsule.body], at);
       masses.set(bodies.subarray(body + 16, body + 23), index * RIGID_MASS_WORDS);
+      if (!bodies.subarray(body, body + 23).every(Number.isFinite) || masses[index * RIGID_MASS_WORDS]! < 0)
+        invalid('Publish finite rigid pose, velocities and inverse inertia, with a nonnegative inverse mass.');
     }
+    if (!capsules.every(Number.isFinite)) invalid('Use a finite signed rigid origin and swept capsule pose.');
+  }
+
+  private readBodies(port: Port): Float32Array {
+    const region = port.region;
+    const bytes = 4 * BODY_WORDS * this.rigidRows;
+    if (port.field !== BODIES_FIELD.name || region.layout !== 2 || region.type !== 'f32' || region.byteLength !== bytes)
+      throw strandError('Use the layout-2 RigidSolver bodies port with the same body rows.', 'version');
+    const memory = region.memory ?? this.host.memory;
+    const offset = region.byteOffset;
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset % 4 !== 0 || offset > memory.buffer.byteLength - bytes)
+      invalid('Publish aligned rigid body rows within the memory that owns them.');
+    return new Float32Array(memory.buffer, offset, bytes / 4);
   }
 
   step(context: StepContext, dt: number): void {
-    this.cell = context.cell;
-    const t = (context.tick + 1) * dt;
+    if (this.disposed)
+      throw strandError('Use a live strand solver and dispose it after the world stops stepping.', 'disposed');
+    if (!this.prediction) invalid('Add the strand solver to a PhysicsWorld before stepping it.');
+    positive(dt, 'strand substep duration');
+    const t = finite((context.tick + 1) * dt, 'strand time');
     this.anchorAndColliders(t, context.tick * dt);
-    this.sampleEnvironment(t, dt);
-    this.updateRigidCapsules(context.inputs.get(BODIES_FIELD.name), dt);
-    const config = this.words(this.config);
+    this.sampleEnvironment(t, dt, context.cell);
+    this.updateRigidCapsules(context.inputs.get(BODIES_FIELD.name), dt, context.cell);
+    const config = this.words(this.trialConfig);
+    config.set(this.words(this.config));
     config[3] = dt;
     config[4] = exp(-this.damping * dt);
-    const checks = this.native.advance_strands(
-      this.nodes.byteOffset,
+    const nodes = this.words(this.trialNodes);
+    nodes.set(this.words(this.nodes));
+    this.prediction.run();
+    const checks = this.native.solve_strands(
+      this.trialNodes.byteOffset,
       this.material.byteOffset,
       this.environment.byteOffset,
       this.scratch.byteOffset,
       this.roots.byteOffset,
       this.obstacles.byteOffset,
-      this.config.byteOffset,
+      this.trialConfig.byteOffset,
       this.links.byteOffset,
       this.buckets.byteOffset,
       this.count,
       this.guides.length,
       this.colliders.length,
       this.bucketCount,
-      this.movingCapsules?.byteOffset ?? this.config.byteOffset,
+      this.trialCapsules?.byteOffset ?? this.trialConfig.byteOffset,
       this.rigidCapsules.length,
       this.capsuleHits?.byteOffset ?? this.config.byteOffset,
-      this.reactions?.byteOffset ?? this.config.byteOffset,
+      this.trialReactions?.byteOffset ?? this.trialConfig.byteOffset,
       this.rigidRows,
       this.directBlocks?.byteOffset ?? this.config.byteOffset,
       this.previousObstacles?.byteOffset ?? this.config.byteOffset,
       this.rigidMasses?.byteOffset ?? this.config.byteOffset,
     );
     if (checks < 0)
-      throw new MargoError(
-        'failed',
+      throw strandError(
         'The direct rod constraint matrix became singular. Increase the solver rate or use fewer points on this guide.',
+        'failed',
       );
     const ledger = this.words(this.ledger);
-    ledger[0]! += checks;
+    const reactions = this.trialReactions && this.words(this.trialReactions);
+    const nextChecks = ledger[0]! + checks;
+    if (
+      !Number.isFinite(nextChecks) ||
+      !nodes.every(Number.isFinite) ||
+      (reactions && !reactions.every(Number.isFinite))
+    )
+      invalid('Reduce the strand motion or shorten the substep to keep candidate state and contact impulses finite.');
+    this.words(this.nodes).set(nodes);
+    this.words(this.config).set(config);
+    if (this.reactions && reactions) this.words(this.reactions).set(reactions);
+    if (this.movingCapsules && this.trialCapsules) this.words(this.movingCapsules).set(this.words(this.trialCapsules));
+    ledger[0] = nextChecks;
     ledger.set(context.cell, 1);
+    this.prediction.accept();
   }
 
   exportPorts(tick: number): readonly Port[] {
-    const cell = xyz(this.words(this.ledger), 1);
+    const cell = this.host.cell;
     const ports = [{ field: this.field.name, region: this.nodes, tick, cell }];
     if (this.reactions) ports.push({ field: BODY_IMPULSES_FIELD.name, region: this.reactions, tick, cell });
     return ports;
