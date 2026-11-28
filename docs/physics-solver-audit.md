@@ -1874,6 +1874,15 @@ Count: 3 DONE, 4 PARTIAL, 7 NOT DONE.
   [Briggs, Thompson and Vincent, 1995](https://doi.org/10.1061/%28ASCE%290733-950X%281995%29121%3A1%2823%29)
   [DHI Test 008](https://www.ccp-wsi.ac.uk/catalogue/test_cases/test_case_008/)
 
+#### SEA-04 four-point pass
+
+- Point 5 (166bf67f94). `packages/physics/tests/coupling/sea04-accepted.test.js` checks signed surface and submerged ports, borrowed memories, arena growth and late malformed source and mode trials. Rejection preserves the complete wake snapshot, depth velocities, breaking data and accepted receipt. A control arena and the recovered retry produce identical bytes.
+- Point 6 (166bf67f94). `packages/physics/tests/coupling/sea04-workers.test.js` and `packages/physics/tests/sea04-workers.browser.mjs` compare TypeScript and native wakes, exact complete state, and 1, 2 and 4 joined participants. Gravity advances 149 and the current/capillary case 399 real complex pairs. The four-way case dispatches 99, 100, 100 and 100 modes. The existing FFT has the same order and transform receipts.
+- Point 7 (166bf67f94). `packages/water/test/quay-diffraction-film.browser.mjs` renders the same wave packet with the live finite quay and open take. It measures 4.38 cm reflection and +0.92 cm in the lee versus a −3.25 cm open trough. The two takes close the wave and absorber ledger within 5.12e−13 relative. Both renderers match accepted query heights within 4.54e−8 m and replay every state and RGBA byte.
+- Point 8 (166bf67f94). `packages/physics/scripts/sea04-measured-source.py` and [the measured reproduction](../packages/physics/scripts/sea04-measured.md) score DHI WG9 with the independent WG1 input, giving coarse and fine RMS 18.220 and 17.975 mm on the original clock. `sea-wake-modes.test.js` gives 1.30% RMS for Scott’s seven capillary wavelengths against 22.36% for gravity alone. The Craeye ring crests stay 32–56 mm too far out. No measured target fits a model parameter.
+
+The observed wave amplitudes and wake angles, free advancing hull, current gradients, delayed drop collapse and original film bindings remain open. The row stays REOPENED at four points.
+
 ### SEA-02 Ocean surface synthesis and query (`@margoengine/physics/sea`, commits 52b68ca65, 4514375c8, 713c344ef, 3dbda315d; patches added by 33ab69766 and 4ec0717e8), owner Codex: REOPENED
 
 **Checked.** Read `packages/physics/src/sea/surface.ts` (415 lines), `tests/sea-surface.test.js`, the `sea-wake.test.js` patch tests, the audit row, the catalog row, `docs/limits.md` row "Sea surface" and the demo-review rows. `git log --since=2026-11-25` on the sea source shows no change to the wave synthesis since the audit: only error wording (713c344ef) and the wake `patches` and `waterBelow` hooks. Ran under run-with-timeout: `sea-surface.test.js` + `sea-wake.test.js`: 20 tests, 20 pass, 0 fail. `packages/water/test/sea-agreement.browser.mjs` (WebGPU, Apple Metal): passed (2043 vertices, 408 waves, worst 0.0% of its bound, largest difference 0.0020 mm). Not run: the WebGL2 `--compat` variant, and `coupling/seakeeping.test.js` (it tests the hull, not this surface).
