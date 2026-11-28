@@ -325,7 +325,7 @@
   },
   "the-bellows": {
    "R3": 5,
-   "R5": 622
+   "R5": 616
   },
   "the-bim-house": {
    "R3": 4,
@@ -612,10 +612,10 @@
    "R5": 437
   },
   "the-hele-shaw-cell": {
-   "R2": 3,
+   "R2": 2,
    "R3": 9,
    "R4": 1,
-   "R5": 591
+   "R5": 469
   },
   "the-hex-map": {
    "R3": 4,
@@ -629,12 +629,12 @@
   "the-hydraulic-jump": {
    "R2": 2,
    "R3": 7,
-   "R5": 517
+   "R5": 513
   },
   "the-hydraulic-ram": {
    "R2": 3,
    "R3": 4,
-   "R5": 587
+   "R5": 521
   },
   "the-inspector": {
    "R5": 412
@@ -1013,7 +1013,7 @@
   "the-venturi-meter": {
    "R2": 1,
    "R3": 2,
-   "R5": 519
+   "R5": 504
   },
   "the-vortex-ring": {
    "R2": 1,
