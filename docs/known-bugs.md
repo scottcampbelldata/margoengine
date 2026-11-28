@@ -24360,3 +24360,7 @@ A nonfinite pressure in a later grid cell previously left some of the surge's sa
 ### Fixed: ATMO-04 rain transport used one arrival path for the whole shaft
 
 A narrow moving rain cell kept its cloud-base peak below the cloud even though large and small drops arrive from different places and times. Precipitation now transports 192 mass-weighted size nodes per active species through the layer wind and uses local temperature for the phase share. A late invalid source or wind sample fails before copying any moments to the caller. The uniform-air characteristic and invalid-source replay regressions are in `packages/weather/tests/precipitation.test.js`.
+
+### Fixed: ICE-04 pack ice read foreign flow from the world arena and exported a stale origin
+
+Registered flow and rigid rows now use the bank declared by the port. The solver stages positions and forcing values before calling a field, then reacquires the arena views for the step. A late bad flow leaves accepted floes, reaction impulses and work intact. New ports name the live host cell, including after an origin shift or restore. See `packages/physics/tests/coupling/pack-ice.test.js`.

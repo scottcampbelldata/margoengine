@@ -12248,3 +12248,7 @@ The optional surge workers evaluate the rationalized Sun and Moon tide terms and
 ### ATMO-04 size-resolved falling contacts
 
 The existing falling Rust kernel partitions its RK4 body rows in shared memory and joins before ordered collision. The caller's accepted state and work receipt are written only after all contacts succeed. The precipitation scene renders accepted drop and snow positions and uses first water crossings to drive actual capillary pulses. WebGPU and WebGL2 independently pass full-frame and snapshot replay. The Paris disdrometer and shared-lineage snow comparisons define the remaining fidelity gaps in the limits record.
+
+### ICE-04 native pack drift and ordered contact
+
+The pack-ice kernel splits only its independent planar drift rows between native participants. Each substep joins before ordered grid insertion and contact, then commits floes, metrics and vessel impulses together. Registered input banks and the live solver cell are explicit. Node and live Chromium compare replay on the shared variants. The independent model tank checks resistance change by concentration and retains the observed friction sensitivity.

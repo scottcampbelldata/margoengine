@@ -1,4 +1,3 @@
-import { MargoError } from '@margoengine/math/errors';
 import type { FlowField, FlowSample, Wind } from '@margoengine/math/fields';
 import { exp } from '@margoengine/math/pinned';
 import { regionWords } from '../world/memory.js';
@@ -13,7 +12,16 @@ import type {
   StepContext,
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_IMPULSES_FIELD, BODY_WORDS, IMPULSE_WORDS } from '../world/solvers/rigid.js';
-import { bindPackIceKernel, loadPackIceBuilds, type PackIceBuilds, type PackIceKernel } from './kernel.js';
+import { packIceError } from './errors.js';
+import {
+  bindPackIceKernel,
+  loadPackIceBuilds,
+  type PackIceBuilds,
+  type PackIceKernel,
+  type PackIceWorkCounts,
+} from './kernel.js';
+
+export type { PackIceWorkCounts, PackIceWorkerWork } from './kernel.js';
 
 /** Layout of the pack-ice fields. */
 export const PACK_ICE_LAYOUT = 1;
@@ -26,7 +34,6 @@ const FLOW_WORDS = 6;
 const VESSEL_WORDS = 15;
 const GRID_WORDS = 4;
 const RIGID_LAYOUT = 2;
-const ORIGIN: Cell = [0, 0, 0];
 
 type Pair = readonly [number, number];
 
@@ -66,6 +73,8 @@ export interface PackIceLoadOptions {
   /** Registry field supplying water velocity and density in layout-1 f64 rows. */
   readonly currentField?: FieldDescriptor;
   readonly signal?: AbortSignal;
+  /** Native participants including the caller. Use 1 (default), 2 or 4 with shared memory. */
+  readonly threads?: number;
 }
 
 /** Material properties for the upper thickness of simple rafting. */
@@ -129,25 +138,25 @@ export interface PackIceSample extends Required<PackIceFloe> {
 
 function checked(label: string, value: number, low = -Infinity, high = Infinity): number {
   if (!(Number.isFinite(value) && value >= low && value <= high))
-    throw new RangeError(`Invalid pack-ice ${label}. Use a finite value from ${low} to ${high}.`);
+    throw packIceError(`Invalid pack-ice ${label}. Use a finite value from ${low} to ${high}.`);
   return value;
 }
 
 function positive(label: string, value: number): number {
   if (!(Number.isFinite(value) && value > 0))
-    throw new RangeError(`Invalid pack-ice ${label}. Use a positive finite value.`);
+    throw packIceError(`Invalid pack-ice ${label}. Use a positive finite value.`);
   return value;
 }
 
 function integer(label: string, value: number): number {
   if (!(Number.isSafeInteger(value) && value >= 0))
-    throw new RangeError(`Invalid pack-ice ${label}. Use a nonnegative safe integer.`);
+    throw packIceError(`Invalid pack-ice ${label}. Use a nonnegative safe integer.`);
   return value;
 }
 
 function pair(label: string, value: Pair): Pair {
   if (value?.length !== 2 || !Number.isFinite(value[0]) || !Number.isFinite(value[1]))
-    throw new RangeError(`Invalid pack-ice ${label}. Use two finite values for X and Z.`);
+    throw packIceError(`Invalid pack-ice ${label}. Use two finite values for X and Z.`);
   return value;
 }
 
@@ -175,6 +184,9 @@ interface LiveVessel {
 
 interface State {
   readonly memory: WebAssembly.Memory;
+  readonly host: SolverHost;
+  readonly positions: Float64Array;
+  readonly stagedForcing: Float64Array;
   readonly kernel: PackIceKernel;
   readonly count: number;
   readonly vessels: readonly LiveVessel[];
@@ -199,6 +211,19 @@ interface State {
   readonly regions: readonly Region[];
 }
 
+function inputWords(memory: WebAssembly.Memory, port: Port) {
+  const bank = port.region.memory ?? memory;
+  try {
+    return regionWords(bank, port.region);
+  } catch (cause) {
+    throw packIceError(
+      'The pack-ice input region is outside its bank or misaligned. Publish a valid region with the memory that owns it.',
+      'state',
+      cause,
+    );
+  }
+}
+
 function flowRows(
   memory: WebAssembly.Memory,
   field: FieldDescriptor,
@@ -213,8 +238,8 @@ function flowRows(
     region.layout !== PACK_ICE_LAYOUT ||
     region.byteLength !== count * PACK_ICE_FLOW_WORDS * F64
   )
-    throw new RangeError(`Invalid pack-ice ${field.name} port. Use vx, vz and density in layout-1 f64 rows.`);
-  return regionWords(memory, region) as Float64Array;
+    throw packIceError(`Invalid pack-ice ${field.name} port. Use vx, vz and density in layout-1 f64 rows.`);
+  return inputWords(memory, port) as Float64Array;
 }
 
 function sampleFlow(
@@ -227,24 +252,42 @@ function sampleFlow(
   z: number,
   time: number,
 ): FlowSample {
-  return field.sample(
-    x + (cell[0] - field.cell[0]) * cellSize,
-    y + (cell[1] - field.cell[1]) * cellSize,
-    z + (cell[2] - field.cell[2]) * cellSize,
-    time,
-    scratch,
-  );
+  let flow: FlowSample;
+  try {
+    flow = field.sample(
+      x + (cell[0] - field.cell[0]) * cellSize,
+      y + (cell[1] - field.cell[1]) * cellSize,
+      z + (cell[2] - field.cell[2]) * cellSize,
+      time,
+      scratch,
+    );
+  } catch (cause) {
+    throw packIceError(
+      'The pack-ice flow sample failed. Supply a field covering the requested coordinates and time.',
+      'failed',
+      cause,
+    );
+  }
+  if (!flow?.velocity || flow.velocity.length !== 3)
+    throw packIceError(
+      'The pack-ice flow returned no valid velocity. Supply three velocity components and a positive density.',
+    );
+  return flow;
+}
+
+function validFlow(field: FlowField): boolean {
+  return field.cell?.length === 3 && field.cell.every(Number.isSafeInteger) && typeof field.sample === 'function';
 }
 
 function checkedVessels(vessels: readonly PackIceVessel[]): LiveVessel[] {
   const rows = new Set<number>();
   return vessels.map((vessel) => {
     const body = integer('rigid body row', vessel.bodyRow);
-    if (rows.has(body)) throw new RangeError('Repeated pack-ice body row. Use one waterline capsule per vessel.');
+    if (rows.has(body)) throw packIceError('Repeated pack-ice body row. Use one waterline capsule per vessel.');
     rows.add(body);
     const length = positive('vessel length', vessel.length);
     const beam = positive('vessel beam', vessel.beam);
-    if (beam > length) throw new RangeError('Invalid pack-ice vessel beam. Use a beam no greater than the length.');
+    if (beam > length) throw packIceError('Invalid pack-ice vessel beam. Use a beam no greater than the length.');
     return {
       body,
       length,
@@ -264,6 +307,9 @@ export class PackIceSolver implements Solver<PackIceOptions> {
   private readonly airSample: FlowSample = { velocity: [0, 0, 0], temperature: 0, density: 0 };
   private readonly waterSample: FlowSample = { velocity: [0, 0, 0], temperature: 0, density: 0 };
   private state?: State;
+  private stepping = false;
+  private disposed = false;
+  private nativeWork?: PackIceWorkCounts;
 
   private constructor(
     private readonly builds: PackIceBuilds,
@@ -279,8 +325,6 @@ export class PackIceSolver implements Solver<PackIceOptions> {
       unit: 'm, m/s, rad, rad/s, m³',
       centring: 'particle',
     });
-    if (windField && windField.name === currentField?.name)
-      throw new RangeError('Repeated pack-ice flow field. Use distinct air and water names.');
     this.uses = [
       { field: this.floeField, access: 'write' },
       ...(windField ? [{ field: windField, access: 'read' as const }] : []),
@@ -296,13 +340,19 @@ export class PackIceSolver implements Solver<PackIceOptions> {
 
   /** Load the SIMD Wasm on demand. */
   static async load(options: PackIceLoadOptions = {}): Promise<PackIceSolver> {
-    return new PackIceSolver(
-      await loadPackIceBuilds(options.signal),
-      options.id ?? 'pack-ice',
-      options.rigid ?? false,
-      options.windField,
-      options.currentField,
-    );
+    const { id = 'pack-ice', rigid = false, windField, currentField, signal, threads = 1 } = options;
+    if (!(typeof id === 'string' && id.trim().length > 0))
+      throw packIceError('Pack-ice solver ID is empty. Provide a nonempty ID.');
+    if (windField && windField.name === currentField?.name)
+      throw packIceError('Repeated pack-ice flow field. Use distinct air and water names.');
+    return new PackIceSolver(await loadPackIceBuilds(signal, threads), id, rigid, windField, currentField);
+  }
+
+  /** Release native helpers after the world finishes using this solver. */
+  [Symbol.dispose](): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.builds[Symbol.dispose]();
   }
 
   describe() {
@@ -310,27 +360,38 @@ export class PackIceSolver implements Solver<PackIceOptions> {
   }
 
   init(host: SolverHost, options: PackIceOptions): void {
+    if (this.disposed) throw packIceError('The pack-ice solver was disposed. Load a new instance.', 'disposed');
     if (this.state)
-      throw new MargoError('state', 'Pack-ice solver is already initialized. Load another solver for the new world.');
+      throw packIceError('Pack-ice solver is already initialized. Load another solver for the new world.');
+    try {
+      this.initialize(host, options);
+    } catch (cause) {
+      if (this.builds.pool) this[Symbol.dispose]();
+      throw cause;
+    }
+  }
+
+  private initialize(host: SolverHost, options: PackIceOptions): void {
+    if (!Array.isArray(options?.floes) || options.floes.length === 0)
+      throw packIceError('Pack-ice needs at least one floe. Pass an array of initial disks in floes.');
     const count = options.floes.length;
-    if (!count) throw new RangeError('Pack-ice needs at least one floe. Pass the initial disks in floes.');
-    if (options.wind && (options.wind.medium !== 'air' || this.windField))
-      throw new RangeError('Invalid pack-ice wind. Use one air Wind or one wind port.');
-    if (options.current && (options.current.medium !== 'water' || this.currentField))
-      throw new RangeError('Invalid pack-ice current. Use one water FlowField or one current port.');
+    if (options.wind && (options.wind.medium !== 'air' || this.windField || !validFlow(options.wind)))
+      throw packIceError('Invalid pack-ice wind. Use one air Wind or one wind port.');
+    if (options.current && (options.current.medium !== 'water' || this.currentField || !validFlow(options.current)))
+      throw packIceError('Invalid pack-ice current. Use one water FlowField or one current port.');
     const vessels = checkedVessels(options.vessels ?? []);
     if (this.rigid !== vessels.length > 0)
-      throw new RangeError('Pack-ice vessels require rigid coupling. Pass vessel profiles and load with rigid true.');
+      throw packIceError('Pack-ice vessels require rigid coupling. Pass vessel profiles and load with rigid true.');
     const bodyCount = vessels.reduce((last, vessel) => Math.max(last, vessel.body + 1), 0);
     const capacity = integer('rigid capacity', options.rigidCapacity ?? bodyCount);
     if (capacity < bodyCount)
-      throw new RangeError('Invalid pack-ice rigid capacity. Use a capacity that covers every requested hull row.');
+      throw packIceError('Invalid pack-ice rigid capacity. Use a capacity that covers every requested hull row.');
     const cellSize = positive('origin cell size', options.cellSize ?? 4096);
     const level = checked('sea level', options.seaLevel ?? 0);
     const iceDensity = positive('ice density', options.iceDensity ?? 917);
     const waterDensity = positive('water density', options.waterDensity ?? 1025);
     if (iceDensity >= waterDensity)
-      throw new RangeError('Pack-ice needs floating ice. Use ice density lower than the water density.');
+      throw packIceError('Pack-ice needs floating ice. Use ice density lower than the water density.');
     const airDensity = positive('air density', options.airDensity ?? 1.23);
     const gravity = positive('downward gravity', -host.gravity[1]);
     const tensileStrength = positive('tensile strength', options.tensileStrength ?? 350_000);
@@ -395,6 +456,9 @@ export class PackIceSolver implements Solver<PackIceOptions> {
     (regionWords(memory, floes) as Float64Array).set(seed);
     this.state = {
       memory,
+      host,
+      positions: new Float64Array(options.wind || options.current ? 2 * count : 0),
+      stagedForcing: new Float64Array(FLOW_WORDS * count),
       kernel,
       count,
       vessels,
@@ -421,32 +485,52 @@ export class PackIceSolver implements Solver<PackIceOptions> {
   }
 
   private live(): State {
-    if (!this.state)
-      throw new MargoError('state', 'Pack-ice solver is not initialized. Add the solver to a PhysicsWorld.');
+    if (!this.state) throw packIceError('Pack-ice solver is not initialized. Add the solver to a PhysicsWorld.');
     return this.state;
   }
 
-  private fluids(s: State, context: StepContext, dt: number, records: Float64Array): void {
-    const { memory, count, cellSize, wind, current } = s;
-    const forcing = regionWords(memory, s.forcing) as Float64Array;
-    const air = this.windField && flowRows(memory, this.windField, context, count);
-    const water = this.currentField && flowRows(memory, this.currentField, context, count);
-    const time = context.tick * dt;
-    for (let i = 0; i < count; i++) {
-      const j = i * PACK_ICE_WORDS;
-      const k = i * FLOW_WORDS;
-      const row = i * PACK_ICE_FLOW_WORDS;
-      const x = records[j]!;
-      const z = records[j + 1]!;
-      const a = wind?.sample && sampleFlow(wind, this.airSample, context.cell, cellSize, x, s.level, z, time);
-      const w = current?.sample && sampleFlow(current, this.waterSample, context.cell, cellSize, x, s.level, z, time);
-      forcing[k] = checked('air velocity X', air?.[row] ?? a?.velocity[0] ?? 0);
-      forcing[k + 1] = checked('air velocity Z', air?.[row + 1] ?? a?.velocity[2] ?? 0);
-      forcing[k + 2] = positive('sampled air density', air?.[row + 2] ?? a?.density ?? s.airDensity);
-      forcing[k + 3] = checked('current X', water?.[row] ?? w?.velocity[0] ?? 0);
-      forcing[k + 4] = checked('current Z', water?.[row + 1] ?? w?.velocity[2] ?? 0);
-      forcing[k + 5] = positive('sampled water density', water?.[row + 2] ?? w?.density ?? s.waterDensity);
+  private fluids(s: State, context: StepContext, dt: number): void {
+    const { memory, count, cellSize, wind, current, positions, stagedForcing: forcing } = s;
+    // Collect the input words before a callback may grow or replace a backing buffer.
+    {
+      const records = regionWords(memory, s.floes);
+      const air = this.windField && flowRows(memory, this.windField, context, count);
+      const water = this.currentField && flowRows(memory, this.currentField, context, count);
+      for (let i = 0; i < count; i++) {
+        const j = i * PACK_ICE_WORDS;
+        const k = i * FLOW_WORDS;
+        const row = i * PACK_ICE_FLOW_WORDS;
+        if (wind || current) {
+          positions[2 * i] = records[j]!;
+          positions[2 * i + 1] = records[j + 1]!;
+        }
+        forcing[k] = checked('air velocity X', air?.[row] ?? 0);
+        forcing[k + 1] = checked('air velocity Z', air?.[row + 1] ?? 0);
+        forcing[k + 2] = positive('sampled air density', air?.[row + 2] ?? s.airDensity);
+        forcing[k + 3] = checked('current X', water?.[row] ?? 0);
+        forcing[k + 4] = checked('current Z', water?.[row + 1] ?? 0);
+        forcing[k + 5] = positive('sampled water density', water?.[row + 2] ?? s.waterDensity);
+      }
     }
+    const time = context.tick * dt;
+    for (let i = 0; (wind || current) && i < count; i++) {
+      const x = positions[2 * i]!;
+      const z = positions[2 * i + 1]!;
+      const k = i * FLOW_WORDS;
+      if (wind) {
+        const air = sampleFlow(wind, this.airSample, context.cell, cellSize, x, s.level, z, time);
+        forcing[k] = checked('air velocity X', air.velocity[0]);
+        forcing[k + 1] = checked('air velocity Z', air.velocity[2]);
+        forcing[k + 2] = positive('sampled air density', air.density);
+      }
+      if (current) {
+        const water = sampleFlow(current, this.waterSample, context.cell, cellSize, x, s.level, z, time);
+        forcing[k + 3] = checked('current X', water.velocity[0]);
+        forcing[k + 4] = checked('current Z', water.velocity[2]);
+        forcing[k + 5] = positive('sampled water density', water.density);
+      }
+    }
+    (regionWords(memory, s.forcing) as Float64Array).set(forcing);
   }
 
   private vesselStates(s: State, context: StepContext): void {
@@ -457,15 +541,15 @@ export class PackIceSolver implements Solver<PackIceOptions> {
     if (!port) return;
     const body = port.region;
     if (body.type !== 'f32' || body.layout !== RIGID_LAYOUT || body.byteLength % (BODY_WORDS * 4) !== 0)
-      throw new RangeError('Invalid pack-ice rigid pose port. Use the layout-2 bodies port.');
-    const values = regionWords(s.memory, body);
+      throw packIceError('Invalid pack-ice rigid pose port. Use the layout-2 bodies port.');
+    const values = inputWords(s.memory, port);
     const dx = (port.cell[0] - context.cell[0]) * s.cellSize;
     const dy = (port.cell[1] - context.cell[1]) * s.cellSize;
     const dz = (port.cell[2] - context.cell[2]) * s.cellSize;
     for (const [i, vessel] of s.vessels.entries()) {
       const p = vessel.body * BODY_WORDS;
       if (p + BODY_WORDS > values.length)
-        throw new RangeError('Invalid pack-ice vessel row. Use a body row within the rigid pose capacity.');
+        throw packIceError('Invalid pack-ice vessel row. Use a body row within the rigid pose capacity.');
       const y = values[p + 1]! + dy + vessel.offset;
       const [qx, qy, qz, qw] = [values[p + 3]!, values[p + 4]!, values[p + 5]!, values[p + 6]!];
       const fx = 2 * (qx * qz + qw * qy);
@@ -502,13 +586,28 @@ export class PackIceSolver implements Solver<PackIceOptions> {
   }
 
   step(context: StepContext, dt: number): void {
+    if (this.disposed) throw packIceError('The pack-ice solver was disposed. Load a new instance.', 'disposed');
+    positive('step duration', dt);
+    if (this.stepping)
+      throw packIceError(
+        'The pack-ice flow callback re-entered this solver. Sample a separate field during the callback.',
+      );
+    this.stepping = true;
+    try {
+      this.advance(context, dt);
+    } finally {
+      this.stepping = false;
+    }
+  }
+
+  private advance(context: StepContext, dt: number): void {
     const s = this.live();
+    this.fluids(s, context, dt);
+    this.vesselStates(s, context);
     const { memory } = s;
     const floes = regionWords(memory, s.floes) as Float64Array;
     const next = regionWords(memory, s.nextFloes) as Float64Array;
     const impulses = regionWords(memory, s.nextImpulses) as Float64Array;
-    this.fluids(s, context, dt, floes);
-    this.vesselStates(s, context);
     next.set(floes);
     impulses.fill(0);
     const error = s.kernel.pack_ice_step(
@@ -526,18 +625,24 @@ export class PackIceSolver implements Solver<PackIceOptions> {
       dt,
     );
     if (error)
-      throw new RangeError(
-        'Pack-ice step exceeds numeric range. Use smaller initial velocities and finite floe scales.',
-      );
+      throw packIceError('Pack-ice step exceeds numeric range. Use smaller initial velocities and finite floe scales.');
     floes.set(next);
     (regionWords(memory, s.impulses) as Float64Array).set(impulses);
     (regionWords(memory, s.metrics) as Uint32Array).set(regionWords(memory, s.nextMetrics));
+    this.nativeWork = s.kernel.workCounts();
+  }
+
+  /** Copies native work counts from the last accepted step, including counts for every helper. */
+  readNativeWork(): PackIceWorkCounts | undefined {
+    const work = this.nativeWork;
+    return work && { ...work, workers: work.workers.map((worker) => ({ ...worker })) };
   }
 
   exportPorts(tick: number): readonly Port[] {
     const s = this.live();
-    const out: Port[] = [{ field: this.floeField.name, region: s.floes, tick, cell: ORIGIN }];
-    if (this.rigid) out.push({ field: BODY_IMPULSES_FIELD.name, region: s.impulses, tick, cell: ORIGIN });
+    const cell = s.host.cell;
+    const out: Port[] = [{ field: this.floeField.name, region: s.floes, tick, cell }];
+    if (this.rigid) out.push({ field: BODY_IMPULSES_FIELD.name, region: s.impulses, tick, cell });
     return out;
   }
 
@@ -560,7 +665,7 @@ export class PackIceSolver implements Solver<PackIceOptions> {
   sample(index: number): PackIceSample {
     const s = this.live();
     if (!(integer('floe index', index) < s.count))
-      throw new RangeError('Invalid pack-ice floe index. Use a row below count.');
+      throw packIceError('Invalid pack-ice floe index. Use a row below count.');
     const record = regionWords(s.memory, s.floes);
     const i = index * PACK_ICE_WORDS;
     const radius = record[i + 6]!;
@@ -585,7 +690,7 @@ export class PackIceSolver implements Solver<PackIceOptions> {
     const i = integer('rigid body row', bodyRow) * IMPULSE_WORDS;
     const data = regionWords(s.memory, s.impulses);
     if (!this.rigid || i + IMPULSE_WORDS > data.length)
-      throw new RangeError('Pack-ice impulse row is missing. Use a row inside the configured rigid capacity.');
+      throw packIceError('Pack-ice impulse row is missing. Use a row inside the configured rigid capacity.');
     return { linear: [data[i]!, data[i + 2]!], yaw: data[i + 4]! };
   }
 

@@ -141,6 +141,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'pack-ice',
+    title: '@margoengine/physics/pack-ice floes, flow inputs and vessel contact',
+    kind: 'family',
+    messages: [],
+    cause: 'A floe or vessel input, origin-cell value, registered flow bank or native step exceeds its supported range.',
+    fix: 'Use finite SI quantities with positive floe sizes and densities. Supply adequately sized ports from their owning memories and valid air or water field samples. Start a new instance after disposal. Use 1, 2 or 4 native participants, with a shared world in Node or an isolated browser worker for multiple participants.',
+  },
+  {
     id: 'precipitation',
     title: '@margoengine/weather/precipitation rates, winds and rain trajectories',
     kind: 'family',

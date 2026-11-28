@@ -26,6 +26,7 @@ export interface PackIceLoadOptions {
     readonly windField?: FieldDescriptor;
     readonly currentField?: FieldDescriptor;
     readonly signal?: AbortSignal;
+    readonly threads?: number;
 }
 
 export interface PackIceOptions extends Omit<RaftingMaterial, 'gravity'> {
@@ -59,6 +60,7 @@ export class PackIceSolver implements Solver<PackIceOptions> {
     readonly floeField: FieldDescriptor;
     private constructor();
     static load(options?: PackIceLoadOptions): Promise<PackIceSolver>;
+    [Symbol.dispose](): void;
     describe(): {
         id: string;
         fields: readonly FieldUse[];
@@ -67,6 +69,7 @@ export class PackIceSolver implements Solver<PackIceOptions> {
     };
     init(host: SolverHost, options: PackIceOptions): void;
     step(context: StepContext, dt: number): void;
+    readNativeWork(): PackIceWorkCounts | undefined;
     exportPorts(tick: number): readonly Port[];
     importPorts(_tick: number): void;
     stateRegions(): readonly Region[];
@@ -90,6 +93,18 @@ export interface PackIceVessel {
     readonly waterlineOffset?: number;
     readonly draft?: number;
     readonly freeboard?: number;
+}
+
+export interface PackIceWorkCounts extends PackIceWorkerWork {
+    readonly threads: number;
+    readonly substeps: number;
+    readonly cflProbes: number;
+    readonly workers: readonly PackIceWorkerWork[];
+}
+
+export interface PackIceWorkerWork {
+    readonly dragRows: number;
+    readonly pairedRows: number;
 }
 
 export interface RaftingMaterial {

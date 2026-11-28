@@ -110,6 +110,11 @@ type NativePhaseSolver =
       readonly subject: 'Falling bodies';
       readonly phaseExport: 'falling_thread_phase';
       readonly phase: 'Runge–Kutta flight';
+    }
+  | {
+      readonly subject: 'Pack ice';
+      readonly phaseExport: 'pack_ice_thread_phase';
+      readonly phase: 'planar floe drift';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };

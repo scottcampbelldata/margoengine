@@ -197,3 +197,85 @@ test('PackIceSolver: live RigidSolver receives the opposite ice impulse and bend
   assert.ok(Math.abs((linearZ[ship.row] - speed) * hullMass - iceImpulse[1]) <= 24 * 2 ** -23 * hullMass * speed);
   assert.equal(pack.exportPorts(12)[1].field, BODY_IMPULSES_FIELD.name);
 });
+
+test('PackIceSolver stages foreign wind rows and retains accepted state after late bad flow', async () => {
+  const memory = worldMemory(false);
+  const bank = new WebAssembly.Memory({ initial: 1 });
+  const region = {
+    name: 'foreign-wind',
+    type: 'f64',
+    layout: PACK_ICE_LAYOUT,
+    byteOffset: 80,
+    byteLength: 48,
+    memory: bank,
+  };
+  new Float64Array(bank.buffer, region.byteOffset, 6).set([12, 0, 1.23, -14, 0, 1.23]);
+  let grow = true;
+  let reject = false;
+  const current = {
+    medium: 'water',
+    cell: [0, 0, 0],
+    sample(x, _y, _z, _t, out) {
+      if (grow) {
+        grow = false;
+        memory.grow(1);
+      }
+      out.velocity[0] = reject && x > 0 ? NaN : 0;
+      out.velocity[2] = 0;
+      out.density = 1025;
+      return out;
+    },
+  };
+  using pack = await PackIceSolver.load({ windField: flow });
+  const world = new PhysicsWorld({ rate, memory })
+    .add(pack, { ...still, airSkinDrag: 0.0017, current, floes: [frozen(-5, 0, 0, 0), frozen(5, 0, 0, 0)] })
+    .add(new WindSource(), {});
+  const input = { field: flow.name, region, tick: 0, cell: [0, 0, 0] };
+  const context = { tick: 0, level: 0, seed: 9, cell: [0, 0, 0], inputs: new Map([[flow.name, input]]) };
+  pack.step(context, 1 / 60);
+  assert.equal(grow, false);
+  assert.ok(pack.sample(0).velocity[0] > 0);
+  assert.ok(pack.sample(1).velocity[0] < 0);
+  const accepted = world.takeSnapshot();
+  const work = pack.readNativeWork();
+  reject = true;
+  assert.throws(
+    () => pack.step(context, 1 / 60),
+    (error) =>
+      error.name === 'MargoError' && error.code === 'state' && /current X.*Use.*errors#pack-ice/.test(error.message),
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  assert.deepEqual(pack.readNativeWork(), work);
+  reject = false;
+  const malformed = {
+    ...input,
+    region: { ...region, byteOffset: bank.buffer.byteLength },
+  };
+  assert.throws(
+    () => pack.step({ ...context, inputs: new Map([[flow.name, malformed]]) }, 1 / 60),
+    (error) => error.name === 'MargoError' && /Publish a valid region.*errors#pack-ice/.test(error.message),
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  pack.step(context, 1 / 60);
+  const repaired = world.takeSnapshot().bytes;
+  assert.notDeepEqual(repaired, accepted.bytes);
+  world.restoreSnapshot(accepted.bytes);
+  pack.step(context, 1 / 60);
+  assert.deepEqual(world.takeSnapshot().bytes, repaired);
+});
+
+test('PackIceSolver publishes the accepted live cell after a signed shift and restore', async () => {
+  using pack = await PackIceSolver.load();
+  const world = new PhysicsWorld({ rate }).add(pack, { floes: [frozen(-9, 3, 0.2, -0.5)] });
+  world.setCell('pack-ice', [-2, 0, 3]);
+  world.advance(1);
+  assert.deepEqual(pack.exportPorts(1)[0].cell, [-2, 0, 3]);
+  const initial = world.takeSnapshot();
+  const pose = pack.sample(0);
+  world.shiftOrigin([-5, 2, 7]);
+  assert.deepEqual(pack.exportPorts(1)[0].cell, [3, -2, -4]);
+  assert.deepEqual(pack.sample(0), pose);
+  world.restoreSnapshot(initial.bytes);
+  assert.deepEqual(pack.exportPorts(1)[0].cell, [-2, 0, 3]);
+  assert.deepEqual(pack.sample(0), pose);
+});

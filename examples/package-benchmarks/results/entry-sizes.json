@@ -15778,8 +15778,8 @@
         "gzip": 9174
       },
       "./pack-ice": {
-        "raw": 11423,
-        "gzip": 4715
+        "raw": 19493,
+        "gzip": 7523
       },
       "./runoff": {
         "raw": 18565,
@@ -19335,14 +19335,14 @@
       "brotli": 3792
     },
     "packages/physics/dist/pack-ice-kernel.wasm": {
-      "raw": 5716,
-      "gzip": 2534,
-      "brotli": 2318
+      "raw": 6549,
+      "gzip": 3094,
+      "brotli": 2815
     },
     "packages/physics/dist/pack-ice-kernel-shared.wasm": {
-      "raw": 5716,
-      "gzip": 2534,
-      "brotli": 2332
+      "raw": 6549,
+      "gzip": 3095,
+      "brotli": 2815
     },
     "packages/physics/dist/thin-film-kernel.wasm": {
       "raw": 32746,

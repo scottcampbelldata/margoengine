@@ -692,3 +692,7 @@ Its figures, PDF, fitted curves and software are absent from the package.
 - Gires, Tchiguirinskaia and Schertzer, *Two months of disdrometer data in the Paris area* (2018), data archive [10.5281/zenodo.1240168](https://doi.org/10.5281/zenodo.1240168), CC BY 4.0. The diagnostic reads synchronized PWS100 forcing and independently observed Parsivel2 size and speed bins.
 - Kuhn and Vázquez-Martín, *Dual Ice Crystal Imager (D-ICI) data*, version 1 (2021), [10.5878/dgak-p185](https://doi.org/10.5878/dgak-p185), CC BY 4.0. The diagnostic reads the 94 explicit aggregate records and applies the published instrument allowance.
 - Locatelli and Hobbs (1974), [Fall speeds and masses of solid precipitation particles](https://doi.org/10.1029/JC079i015p02185). The diagnostic transcribes sparse observed Fig. 20 coordinates and notes their overlapping model lineage. The archive payloads are downloaded separately.
+
+### ICE-04 measured towing resistance
+
+Yanzhuo Xue, Kai Zhong, Bao-Yu Ni, Zhiyuan Li, Martin Bergström, Jonas W. Ringsberg and Luofeng Huang (2024), [Ocean Engineering 292, 116476](https://doi.org/10.1016/j.oceaneng.2023.116476), CC BY 4.0. The diagnostic transcribes four measured model-tow resistance values and their repeated-trial uncertainty in Table 3. Geometry, floe properties and measured friction come from the experimental setup. The diagnostic implements the comparison in Margo.

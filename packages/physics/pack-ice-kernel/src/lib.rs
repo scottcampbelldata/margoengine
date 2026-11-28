@@ -451,20 +451,34 @@ unsafe fn hull_contact(floe: &mut Floe, hull: &mut Vessel, s: &Settings, output:
     floe.set_position(floe.position().plus(n.scale(remainder)));
 }
 
+#[repr(C)]
 struct PackStep {
     floes: *mut Floe,
     forcing: *const Flow,
-    rings: *mut Vessel,
     count: u32,
+    rings: *mut Vessel,
     vessels: u32,
-    grid: Grid,
     settings: *const Settings,
+    cells: *mut Cell,
+    capacity: u32,
+    next: *mut u32,
     impulses: *mut f64,
     stats: *mut u32,
+    work: *mut f64,
+    dt: f64,
+    step: f64,
+    substeps: u32,
+    candidates: u32,
 }
 
+const _: [(); 72] = [(); core::mem::size_of::<PackStep>()];
+
 impl PackStep {
-    unsafe fn advance(&mut self, dt: f64) -> u32 {
+    unsafe fn prepare(&mut self) -> u32 {
+        for i in 0..self.capacity as usize {
+            (*self.cells.add(i)).generation = 0;
+        }
+        self.candidates = 0;
         let s = &*self.settings;
         let mut smallest = f64::INFINITY;
         let mut fastest: f64 = 0.0;
@@ -475,7 +489,7 @@ impl PackStep {
             smallest = smallest.min(floe.radius);
             fastest = fastest
                 .max(floe.velocity().length())
-                .max(drag(floe, flow, s, dt).length());
+                .max(drag(floe, flow, s, self.dt).length());
         }
         for j in 0..self.vessels as usize {
             let hull = &*self.rings.add(j);
@@ -488,58 +502,82 @@ impl PackStep {
             }
         }
         // The initial relative travel is at most half the smallest residual radius per substep.
-        let travel = 2.0 * dt * (fastest + fastest.max(hull_speed)) / smallest;
+        let travel = 2.0 * self.dt * (fastest + fastest.max(hull_speed)) / smallest;
         let count = f64x2_extract_lane::<0>(f64x2_ceil(f64x2_splat(travel))).max(1.0);
         if !(count <= f64::from(u32::MAX)) {
             return 1;
         }
-        let substeps = count as u32;
-        let step = dt / count;
-        let mut candidates = 0_u32;
-        for generation in 1..=substeps {
-            self.grid.generation = generation;
-            for i in 0..self.count {
-                let floe = &mut *self.floes.add(i as usize);
-                floe.set_velocity(drag(floe, &*self.forcing.add(i as usize), s, step));
-                floe.set_position(floe.position().plus(floe.velocity().scale(step)));
-                floe.heading += step * floe.spin;
-                self.grid.insert(i, floe.position());
-            }
-            for j in 0..self.vessels as usize {
-                (&mut *self.rings.add(j)).advance(step);
-            }
-            for i in 0..self.count {
-                let floe = &mut *self.floes.add(i as usize);
-                let (x, z) = self.grid.coordinates(floe.position());
-                for dz in -1..=1 {
-                    for dx in -1..=1 {
-                        let mut head = self.grid.first(x.wrapping_add(dx), z.wrapping_add(dz));
-                        while head != 0 {
-                            let j = head - 1;
-                            if j > i {
-                                collide(floe, &mut *self.floes.add(j as usize), s);
-                                candidates = candidates.saturating_add(1);
-                            }
-                            head = *self.grid.next.add(j as usize);
+        self.substeps = count as u32;
+        self.step = self.dt / count;
+        0
+    }
+
+    // Fluid drag is local to each disk (Herman 2016, §6.2). The same planar
+    // SIMD update is applied before the ordered contact solve in either mode.
+    unsafe fn drift(&self, first: u32, end: u32, part: u32) {
+        let s = &*self.settings;
+        let step = self.step;
+        for i in first as usize..end as usize {
+            let floe = &mut *self.floes.add(i);
+            floe.set_velocity(drag(floe, &*self.forcing.add(i), s, step));
+            floe.set_position(floe.position().plus(floe.velocity().scale(step)));
+            floe.heading += step * floe.spin;
+        }
+        if !self.work.is_null() {
+            *self.work.add(part as usize) += f64::from(end - first);
+        }
+    }
+
+    // Grid links, contact corrections and vessel impulses share writes. Keep
+    // their original row, neighbor and vessel order after the drift barrier.
+    unsafe fn contacts(&mut self, generation: u32) -> u32 {
+        let s = &*self.settings;
+        let grid = Grid {
+            cells: self.cells,
+            next: self.next,
+            mask: self.capacity - 1,
+            width: s.cell_width,
+            generation,
+        };
+        for i in 0..self.count {
+            grid.insert(i, (&*self.floes.add(i as usize)).position());
+        }
+        for j in 0..self.vessels as usize {
+            (&mut *self.rings.add(j)).advance(self.step);
+        }
+        for i in 0..self.count {
+            let floe = &mut *self.floes.add(i as usize);
+            let (x, z) = grid.coordinates(floe.position());
+            for dz in -1..=1 {
+                for dx in -1..=1 {
+                    let mut head = grid.first(x.wrapping_add(dx), z.wrapping_add(dz));
+                    while head != 0 {
+                        let j = head - 1;
+                        if j > i {
+                            collide(floe, &mut *self.floes.add(j as usize), s);
+                            self.candidates = self.candidates.saturating_add(1);
                         }
+                        head = *grid.next.add(j as usize);
                     }
                 }
-                for j in 0..self.vessels as usize {
-                    hull_contact(floe, &mut *self.rings.add(j), s, self.impulses);
-                }
-                if !floe.x.is_finite()
-                    || !floe.z.is_finite()
-                    || !floe.vx.is_finite()
-                    || !floe.vz.is_finite()
-                    || !floe.heading.is_finite()
-                    || !floe.spin.is_finite()
-                {
-                    return 2;
-                }
+            }
+            for j in 0..self.vessels as usize {
+                hull_contact(floe, &mut *self.rings.add(j), s, self.impulses);
+            }
+            if !floe.x.is_finite()
+                || !floe.z.is_finite()
+                || !floe.vx.is_finite()
+                || !floe.vz.is_finite()
+                || !floe.heading.is_finite()
+                || !floe.spin.is_finite()
+            {
+                return 2;
             }
         }
-        self.stats.write(substeps);
-        self.stats.add(1).write(candidates);
+        if generation == self.substeps {
+            self.stats.write(self.substeps);
+            self.stats.add(1).write(self.candidates);
+        }
         0
     }
 }
@@ -559,27 +597,72 @@ unsafe extern "C" fn pack_ice_step(
     impulses: *mut f64,
     stats: *mut u32,
     dt: f64,
+    work: *mut f64,
 ) -> u32 {
-    for i in 0..capacity as usize {
-        (*cells.add(i)).generation = 0;
-    }
-    let grid = Grid {
-        cells,
-        next,
-        mask: capacity - 1,
-        width: (*settings).cell_width,
-        generation: 0,
-    };
-    PackStep {
+    let mut job = PackStep {
         floes,
         forcing,
-        rings,
         count,
+        rings,
         vessels,
-        grid,
         settings,
+        cells,
+        capacity,
+        next,
         impulses,
         stats,
+        work,
+        dt,
+        step: 0.0,
+        substeps: 0,
+        candidates: 0,
+    };
+    if !work.is_null() {
+        work.write(0.0);
     }
-    .advance(dt)
+    let status = job.prepare();
+    if status != 0 {
+        return status;
+    }
+    for generation in 1..=job.substeps {
+        job.drift(0, count, 0);
+        let status = job.contacts(generation);
+        if status != 0 {
+            return status;
+        }
+    }
+    0
+}
+
+// The bridge owns an exclusive working copy and runs this before any worker.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn pack_ice_prepare(job: &mut PackStep) -> u32 {
+    job.prepare()
+}
+
+// Inputs are immutable apart from disjoint trial floe rows and per-part counters.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn pack_ice_thread_phase(
+    job: &PackStep,
+    stage: u32,
+    part: u32,
+    parts: u32,
+) -> u32 {
+    let Some(divisor) = core::num::NonZeroU64::new(u64::from(parts)) else {
+        return 1;
+    };
+    if stage != 0 || !matches!(parts, 1 | 2 | 4) || part >= parts {
+        return 1;
+    }
+    let count = u64::from(job.count);
+    let first = (count * u64::from(part) / divisor) as u32;
+    let end = (count * u64::from(part + 1) / divisor) as u32;
+    job.drift(first, end, part);
+    0
+}
+
+// Invoked by the caller after joining every drift part for this mini-step.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn pack_ice_contacts(job: &mut PackStep, generation: u32) -> u32 {
+    job.contacts(generation)
 }

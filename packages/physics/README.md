@@ -7535,7 +7535,7 @@ The optional Water ice entry can display those poses on a sampled sea.
 import { PackIceSolver } from '@margoengine/physics/pack-ice';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const pack = await PackIceSolver.load();
+using pack = await PackIceSolver.load({ threads: 1 });
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(pack, {
   restitution: 0,
   floes: [
@@ -7557,6 +7557,8 @@ put `pack-ice` and `rigid` in a staggered group. Add `hull` to that group when S
 Its body pose pushes the ice. The same contact sends the opposite linear and yaw impulse to the rigid
 body through `bodyImpulses`. `vesselImpulse(row)` reports the signed contact impulse of the current
 step. Use the same `rigidCapacity` as any other contributor to `bodyImpulses`.
+
+`PackIceSolver.load({ threads })` defaults to one participant. Use two or four in Node or an isolated browser worker with a shared-memory world. Each participant updates its own planar drag and translation rows. Grid insertion, contacts and vessel impulses stay ordered. `readNativeWork()` reports the last accepted step and per-participant drift counts. Dispose the solver after the world is finished with it.
 
 ## Ductile crashworthiness (`@margoengine/physics/crush`)
 

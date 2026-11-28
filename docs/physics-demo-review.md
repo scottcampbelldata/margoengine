@@ -522,3 +522,8 @@ Not in the catalog: staged construction (placement of pieces, stacking, scaffold
 
 - `packages/water/test/tide-film.browser.mjs` drives the accepted shallow-water solution from the live Earth-fixed Sun and Moon under a fixed camera. The west sill floods at 7 hours and the east sill at 14 hours, while the tide-off control stays dry at both. The rendered height agrees with the accepted physics within 1 mm. WebGPU and WebGL2 each reproduce their own full RGBA frames and the complete accepted snapshots after hold, restore and rewind.
 - The scene labels its display-only vertical exaggeration. It covers a closed idealized basin. The original production shots, open-coast gauge validation and moving-storm coupling remain open.
+
+### ICE-04 automated pack-ice vessel contact
+
+- `packages/water/test/pack-ice-film.browser.mjs` displays accepted floe poses, ridge volume and a real rigid launch in a fixed camera. Floes move aside and their reaction slows the launch. The control retains the same initial ice and vessel but withholds vessel contact. Both backends replay complete accepted state and frames independently.
+- The cutaway shows fixed-mass disk contacts and two-dimensional piling. Floe fracture, wave-mediated overturning, under-hull transport and original shot integration remain open.

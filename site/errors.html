@@ -141,6 +141,11 @@
       <p><strong>Cause.</strong> A rigid body, collider, shape, scene query or world setting got an input it cannot use (code unsupported): a position, velocity, force, direction or box that is not three finite numbers (or a zero direction), a rotation that is not a quaternion of finite numbers, a mass, density, damping, size, radius, speed or time that is negative or not finite, a shape name or body type that does not exist, a body, collider or row that was removed or belongs to another world, a body of the wrong type for the call (a next velocity on a body that is not kinematicPosition), a mesh from another engine, a solver option outside its range, or a hierarchy deeper than 64 nodes.</p>
       <p><strong>Fix.</strong> Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (<code>dynamic</code>, <code>fixed</code>, <code>kinematicPosition</code>, <code>kinematicVelocity</code>), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.</p>
     </section>
+    <section id="pack-ice">
+      <h2><a href="#pack-ice">@margoengine/physics/pack-ice floes, flow inputs and vessel contact</a></h2>
+      <p><strong>Cause.</strong> A floe or vessel input, origin-cell value, registered flow bank or native step exceeds its supported range.</p>
+      <p><strong>Fix.</strong> Use finite SI quantities with positive floe sizes and densities. Supply adequately sized ports from their owning memories and valid air or water field samples. Start a new instance after disposal. Use 1, 2 or 4 native participants, with a shared world in Node or an isolated browser worker for multiple participants.</p>
+    </section>
     <section id="precipitation">
       <h2><a href="#precipitation">@margoengine/weather/precipitation rates, winds and rain trajectories</a></h2>
       <p><strong>Cause.</strong> A precipitation setting, rain source, wind sample or falling drop exceeded its supported finite SI range.</p>

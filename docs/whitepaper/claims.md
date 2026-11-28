@@ -7098,3 +7098,9 @@ The archived 1975 surge is an independent measurement comparison. Peak level at 
 In a fixed-camera flume, the travelling gust adds 3.29 mm of downwind motion for a 1 mm drop and 1.22 mm for a 4.8 mm drop after 29.17 ms. Forty-eight actual simulated crossings deposit 1,303.69 µL to the water grid by 70.83 ms. Visible capillary rings disappear when the same contacts are withheld. The cold take draws 44 simulated compact snow aggregates. Accepted snapshots and complete RGBA replay exactly on each renderer.
 
 The optional K23 participants match the plain result byte for byte with signed origins, snapshot restore and contacts. An isolated Chromium worker starts three native helpers. A 769-drop tick records 2,307 RK4 evaluations and 64,596 f64x2 state updates. An invalid contact preserves accepted solver state and the previous receipt. [Reproduce](reproduce.md#atmo-04-size-resolved-rain-flight-and-field-measurements)
+
+### ICE-04 accepted floe motion and vessel reaction
+
+The fixed-camera pack-ice cutaway follows 71 accepted floes and a civilian survey launch. Retained ice volume stays constant while 65.02 L rafts and 74.71 L forms ridge volume. The launch loses 0.753 m/s against the control with vessel contact disabled. The ice momentum and vessel impulse are equal and opposite within their stored precision. WebGPU and WebGL2 each reproduce accepted state and their own complete frames exactly.
+
+One, two and four native participants reproduce the existing scalar integration at signed origins. Three Chromium helpers share 6,256 paired drift rows over 16 substeps for 391 floes. The experimental comparison agrees within repeat spread for the increase in tow force from 60 to 80 percent coverage at both test speeds, using the measured hull friction. Friction sensitivity and full measured fidelity remain open. [Proof and limits](reproduce.md#ice-04-native-floe-drift-and-towing-tank-comparison)

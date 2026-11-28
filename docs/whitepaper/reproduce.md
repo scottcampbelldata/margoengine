@@ -5336,3 +5336,14 @@ node scripts/run-with-timeout.mjs --max=2 -- node packages/weather/scripts/atmo0
 ```
 
 The natural-rain diagnostic takes rates and air temperatures from PWS100 and compares independent synchronized counts from two perpendicular Parsivel2 instruments. It compares binned size concentrations and coincident speed ranges with no fitted parameter. Each reference range retains the instrument's speed-bin aperture and the spread across both replicates. The snow plot is a separate comparison against the unrimed aggregate scatter of Locatelli and Hobbs (1974), with diameter and atmospheric interval sensitivity. Its mass and drag model has shared lineage with that campaign. The independent snow comparison uses the 94 explicit optical aggregates from the Kiruna D-ICI archive. It uses air input from the published meteorological record and compares photographed speeds, all held out. The instrument literature bounds diameter and speed readout, while snow habit and site-air uncertainty remain open. NASA IFloodS 2DVD downloads require Earthdata access. [Gires et al. paper](https://doi.org/10.5194/essd-10-941-2018) [CC BY 4.0 input and observation archive](https://doi.org/10.5281/zenodo.1240168) [Locatelli and Hobbs](https://doi.org/10.1029/JC079i015p02185) [Kiruna field archive, CC BY 4.0](https://doi.org/10.5878/dgak-p185) [D-ICI instrument](https://doi.org/10.5194/amt-13-1273-2020)
+
+### ICE-04 native floe drift and towing-tank comparison
+
+```sh
+node scripts/run-with-timeout.mjs --max=2 -- node --test packages/physics/tests/pack-ice.test.js packages/physics/tests/coupling/pack-ice.test.js packages/physics/tests/coupling/pack-ice-render.test.js packages/physics/tests/coupling/pack-ice-workers.test.js
+node scripts/run-with-timeout.mjs --max=2 -- npm run test:gpu:pack-ice-workers -w @margoengine/physics
+node scripts/run-with-timeout.mjs --max=3 -- npm run test:gpu:pack-ice-film -w @margoengine/water
+node scripts/run-with-timeout.mjs --max=2 -- node packages/physics/scripts/ice04-pack-resistance-measured.mjs
+```
+
+The production solver tows a live rigid capsule at fixed speed. The test uses three seeded 60 and 80 percent packs, equal-area model floes, the published geometry, and separately measured friction. The comparison subtracts the 60 percent tow resistance from the 80 percent resistance at each speed in both the model and the measurements. The model receives no measured force or fitted force parameters. Subtraction cancels the common open-water baseline. The repeat and instrument contributions are propagated separately. [Towing-tank measurements, CC BY 4.0](https://doi.org/10.1016/j.oceaneng.2023.116476)

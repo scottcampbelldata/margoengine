@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22035383,
+  "total": 22038191,
   "history": [
     {
       "date": "2026-10-24",
@@ -15845,6 +15845,12 @@
       "commit": "atmo-04-size-resolved-rain",
       "reason": "ATMO-04 @margoengine/weather/precipitation 3852 to 5702 B gzip, ceiling 3923 to 5958 B. @margoengine/physics/falling 5907 to 8015 B gzip, ceiling 6163 to 8271 B. Precipitation owns terminal speed, source sampling and public moments. A separate entry would duplicate the field model. K23 uses the same integration for every falling body and publishes states and collisions in order after joining optional workers. Core and stage receive zero bytes.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "ice-04-native-floe-drift",
+      "reason": "ICE-04 @margoengine/physics/pack-ice 4715 to 7523 B gzip, ceiling 4971 to 7779 B. Pack ice owns the grid, floe states and ordered vessel impulses. Splitting would duplicate native stepping and accepted state. Helpers partition independent drift while pair and vessel contacts stay ordered. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16750,7 +16756,7 @@
     "@margoengine/physics/mooring": 3744,
     "@margoengine/physics/orbit": 6881,
     "@margoengine/physics/outdoor-sound": 8569,
-    "@margoengine/physics/pack-ice": 4971,
+    "@margoengine/physics/pack-ice": 7779,
     "@margoengine/physics/pbf": 5833,
     "@margoengine/physics/pedestrians": 4688,
     "@margoengine/physics/rail": 12367,
