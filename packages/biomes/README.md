@@ -335,7 +335,8 @@ On by default in `BiomeView`:
   (`@margoengine/scatter/clearing-map`).
 - A species' `color: { hue, value }` sets the jitter of its leaf and stone parts.
 - `relief` (default true, or `TerrainReliefLighting` settings): ridges cast on the ground behind them and gullies keep
-  less sky at every distance (`view.relief`), rebaked when the engine's sun turns or the world's heights change.
+  less sky at every distance on the world's own terrain, not the horizon ring (`view.relief`), rebaked when the
+  engine's sun turns or the world's heights change.
 
 ```ts
 import { Engine } from '@margoengine/core';

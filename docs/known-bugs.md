@@ -54,12 +54,29 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** `PlacedSpecies.color`, and `BiomeObjects` passes the jitter to the species' leaf and stone scatters (a hue
   past half a turn is half a turn). Test: `packages/biomes/tests/contact.test.js`.
 
-### Fixed 2026-11-28: the alpine rock look check read cast shadows as grain (KB-BIOMES-ROCKSHADOW1, biomes test)
+### Open 2026-11-28: the horizon ring takes no relief shading (KB-BIOMES-HORIZONRELIEF1, biomes)
 
-- **Repro:** `node packages/biomes/tests/browser-check.mjs` from fefe0bad71: rock light and dark 0.108 over its 0.104.
-- **Cause:** the check divides the light out against a flat-colour frame, which holds for one light colour. With
-  BiomeView's relief lighting on by default, shadowed rock keeps only the sky's blue light and luma over red rises.
-- **Fix:** the check's material shots set `relief: false` (0.086, limits unchanged); relief has its own GPU checks.
+- **Repro:** the alpine shot of `packages/biomes/tests/browser-check.html` with `relief` on and off: the horizon
+  ring's rock pixels read the same both ways (mean and spread of luma over the flat mask's red 0.357 and 0.067), while
+  the world's rock changes (0.345 to 0.283).
+- **Cause:** `BiomeView.attach` gives `TerrainReliefLighting` the world's terrain only; the horizon ring is a second
+  terrain made once the ground weights are in.
+
+### Fixed 2026-11-28: the alpine rock look check went over its grain ceiling with relief lighting on (KB-BIOMES-ROCKSHADOW1, biomes)
+
+- **Repro:** `node packages/biomes/tests/browser-check.mjs` on the parent of db1a71d802: rock light and dark 0.108
+  over its 0.104 (0.086 with `relief: false`).
+- **Cause:** the check pools the world's rock and the horizon ring's. The ring's cone peaks in the valley's materials
+  (KB-BIOMES-HORIZONCONE1, KB-BIOMES-HORIZONALTITUDE1) raised the pooled spread, and relief lighting's share on the
+  world's rock (0.073 to 0.091) carried it past the ceiling. That share is the sky-view factor: it dims only the sky's
+  blue term, so the look's luma over the flat mask's red moves with the mix of sun and sky. Relief changes no albedo
+  and no normal, and this shot holds no cast shadow (the sun is overhead).
+- **Correction:** an earlier version of this entry blamed cast shadows and set `relief: false` in the check. Both were
+  wrong, and the check draws relief again.
+- **Fix:** db1a71d802 (the horizon ring's mountains and materials). With relief on the check measures 0.097, ceiling
+  unchanged.
+- **Regression:** `packages/biomes/tests/browser-check.mjs` (relief on: 0.108 on the parent, 0.095 at db1a71d802).
+
 ### Fixed 2026-11-28: a snapshot taken before a step that grew the rigid world would not restore, or replayed to another hash (KB-PHYS-LAYOUTHASH1, physics)
 
 - **Repro:** `node --test --test-name-pattern="first step restores" packages/physics/tests/world-rigid-solver.test.js`: a chain of
@@ -77,7 +94,6 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `World::hash` nor a snapshot carries it. Every world's hash changes once with this (the replay goldens are rebuilt).
 - **Regression:** the test above, `modal-sound.test.js`, and `a_world_grown_before_its_first_step_hashes_and_steps_as_one_its_step_grew`
   in `packages/physics/kernel/tests/canonical.rs` (growing a world changed its hash before the fix).
-
 
 ### Fixed 2026-11-28: a subtree reference could not be a child of selector, sequence or any builder (KB-BEHAVIOR-SUBTREEBUILD1, behavior)
 
@@ -216,13 +232,13 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   blotches are the scan's own half-desaturated moss over a strong normal map on meshes cut to 3,000 triangles. The fix
   belongs to the film's asset owner: average covered texels only and soften the albedo toward its local mean.
 
-### Open 2026-11-28: a biome species' `lod` and `color.hue`/`color.value` change nothing (KB-BIOMES-DEADFIELDS1, biomes)
+### Open 2026-11-28: a biome species' `lod` changes nothing (KB-BIOMES-DEADFIELDS1, biomes)
 
-- **Repro:** give a `SpeciesRule` `lod: [10, 20, 30]` or `color: { value: 1 }` and draw it with `BiomeView`: the
-  objects change level and tint exactly as without them.
-- **Cause:** `BiomeObjects` takes its rings from `radius` (`[r * 0.15, r * 0.4, r]`) and its tint from the mesh part's
-  kind; nothing reads `rule.lod`, and `rule.color` is read for `seasonal` only. (`sink` and `alignToGround` were the
-  same until KB-BIOMES-SINK1.)
+- **Repro:** give a `SpeciesRule` `lod: [10, 20, 30]` and draw it with `BiomeView`: the objects change level exactly as
+  without it.
+- **Cause:** `BiomeObjects` takes its rings from `radius` (`[r * 0.15, r * 0.4, r]`); nothing reads `rule.lod`.
+  (`sink` and `alignToGround` were the same until KB-BIOMES-SINK1, `color.hue` and `color.value` until
+  KB-BIOMES-SPECIESCOLOR1.)
 
 ### Fixed 2026-11-28: a biome species' `sink` and `alignToGround` did nothing, so stones stood on the surface (KB-BIOMES-SINK1, biomes)
 

@@ -51,10 +51,8 @@ async function shotEngine(position,target){
  const frame=async()=>{e.render({delta:1/60});await e.gpu.queue.onSubmittedWorkDone();};
  return {canvas,e,sky,errs,
   async pixels(world,options={},inspect){
-   // Without the relief lighting (its own check is terrain's relief-lighting and ground-check.mjs): these shots measure
-   // the materials by dividing the light out against a flat-colour frame, which holds for one light colour. In a cast
-   // shadow only the sky's blue light is left, so luma over red rose there and read as grain (0.108 against 0.104).
-   const view=await BiomeView.attach(e,world,{objects:false,sky,relief:false,...options});
+   // The default look, relief lighting included: the material measures below hold with it (KB-BIOMES-ROCKSHADOW1).
+   const view=await BiomeView.attach(e,world,{objects:false,sky,...options});
    await view.ready;await view.whenIdle();await waitForPipelines(frame);await view.whenIdle();await waitForPipelines(frame);
    e.render({delta:1/60});
    const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);

@@ -9629,7 +9629,12 @@ for a 1,024×1,024 map. The heightmap is borrowed. One 48-byte uniform buffer is
 bake finishes. Each bake takes up to 32 sky azimuths plus the directional sun and 256 samples per ray, bounded
 by the configured radius and the heightmap edge. The lit draw adds one bilinear lookup. The bake captures a
 single sun direction and a static heightmap. Changing either needs `rebake()`. A heightfield cannot represent
-overhangs, and distant features between samples may be missed.
+overhangs, and distant features between samples may be missed. No light is bounced from one slope to another (the
+terrain-reflected term of Dozier and Frew 1990, "Rapid calculation of terrain parameters for radiation modeling from
+digital elevation data", IEEE TGRS 28(5), https://doi.org/10.1109/36.58986), so a gully loses sky light and gains
+nothing from the walls around it. `BiomeView`'s `relief` shades the world's terrain, not its horizon ring
+(KB-BIOMES-HORIZONRELIEF1).
+
 ## Open-ocean horizon depth (2026-11-23)
 
 Water with `horizon: true` keeps the scene far plane for its displaced grid. Its flat extension reaches 10,000 km
