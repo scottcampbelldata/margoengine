@@ -1,6 +1,7 @@
 import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { createPolariscope } from './model.js';
+import { lerp as mix } from '@margoengine/math/mathutils';
 
 const canvas = document.querySelector('#scene');
 const loading = document.querySelector('#loading');
@@ -15,7 +16,6 @@ const lifetime = new AbortController();
 const motion = matchMedia('(prefers-reduced-motion: reduce)');
 const wide = { target: [0,.239,.039], offset: [.49,.505,1.145], fitAspect: 1.10 };
 const close = { target: [.012,.315,.112], offset: [.19,.227,.75], fitAspect: .92 };
-const mix = (a,b,t) => a + (b-a)*t;
 let force = Number(load.value), degrees = Number(angle.value);
 let engine, polariscope, observer, frame, last = 0;
 let detail = false, zoom = 0, parallel = false, dirty = true, pending = false;

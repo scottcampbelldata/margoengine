@@ -2,6 +2,7 @@ import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { createRuler } from './model.js';
 import { displayedOrders, orderAngle, radians } from './optics.js';
+import { lerp as mix } from '@margoengine/math/mathutils';
 
 const canvas = document.querySelector('#scene');
 const loading = document.querySelector('#loading');
@@ -16,7 +17,6 @@ const lifetime = new AbortController();
 const motion = matchMedia('(prefers-reduced-motion: reduce)');
 const wide = { target:[-.026,.098,.011],offset:[.63,1.17,1.63],fitAspect:1.14 };
 const overhead = { target:[0,.124,-.059],offset:[.004,1.77,.315],fitAspect:1.16 };
-const mix = (a,b,t) => a+(b-a)*t;
 let nm = Number(wavelength.value), density = Number(groove.value);
 let engine,ruler,observer,frame,last=0;
 let zoom=0,detail=false,dirty=true,pending=false;

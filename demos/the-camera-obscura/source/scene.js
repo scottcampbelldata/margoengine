@@ -3,6 +3,7 @@ import { Clustered } from '@margoengine/clustered';
 import { Shadows } from '@margoengine/shadows';
 import { createCamera } from './model.js';
 import { relativeExposure } from './optics.js';
+import { lerp as mix } from '@margoengine/math/mathutils';
 
 const canvas = document.querySelector('#scene');
 const loading = document.querySelector('#loading');
@@ -16,7 +17,6 @@ const lifetime = new AbortController();
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const overall = { target: [-.002, .165, .078], offset: [1.135, .78, 1.33], fitAspect: 1.23 };
 const plateView = { target: [.300, .247, .014], offset: [.83, .38, .45], fitAspect: .93 };
-const mix = (a, b, t) => a + (b - a) * t;
 let millimeters = Number(range.value);
 let engine, camera, observer, frame, last = 0;
 let zoom = 0, detail = false, showRays = false, opticalDirty = true, pending = false;

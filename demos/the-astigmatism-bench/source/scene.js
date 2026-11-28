@@ -2,6 +2,7 @@ import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { beamHeight, centerZ, createBench, lensX } from './model.js';
 import { focusPlanes, spotRadii } from './optics.js';
+import { lerp as mix } from '@margoengine/math/mathutils';
 
 const canvas=document.querySelector('#scene');
 const loading=document.querySelector('#loading');
@@ -17,7 +18,6 @@ const lifetime=new AbortController();
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
 const wide={focus:[-.069,.090,.024],offset:[-.49,.96,1.37],fit:1.53};
 const detail={offset:[-.30,.035,.052],fit:1.08};
-const mix=(a,b,t)=>a+(b-a)*t;
 const mm=(value)=> (value*1000).toFixed(1);
 let distance=Number(distanceInput.value)/1000;
 let separation=Number(separationInput.value)/1000;
