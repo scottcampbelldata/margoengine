@@ -356,6 +356,25 @@ const save = await loadGame(storage, 'slot-1');
 console.log(save?.meta?.title); // older: the edited copy fails its tag
 ```
 
+A non-extractable `CryptoKey` keeps the secret out of reach of page script, and `check` reports on both copies without
+changing anything. A wrong key reads every copy as bad, the same as an edit; a key that is too short throws a `TypeError`
+at once. A raw key is copied when the storage is made, so changing your array later does not change it.
+
+```ts
+import { loadGame, memoryStorage, saveGame } from 'margoengine/save';
+import { signedStorage } from 'margoengine/save/signed';
+
+const hmac = await crypto.subtle.generateKey({ name: 'HMAC', hash: 'SHA-256', length: 256 }, false, ['sign', 'verify']);
+const disk = memoryStorage();
+const keyed = signedStorage(disk, hmac);
+await saveGame(keyed, 'slot-1', { format: 'margo-save', version: 1, entities: [] });
+console.log(await keyed.check('slot-1')); // { ok: true, good: 1, bad: 0, generation: 1 }
+
+const wrongKey = signedStorage(disk, crypto.getRandomValues(new Uint8Array(32)));
+console.log(await wrongKey.check('slot-1')); // { ok: false, good: 0, bad: 2, generation: 0 }
+await loadGame(wrongKey, 'slot-1').catch((error) => console.log(error.code)); // failed
+```
+
 Signing proves a save was written with your key; it does not encrypt it, and it cannot tell a copy from an older one
 written under the same key and slot (a player can put back an old signed file). Anyone with the key in the page can sign.
 
@@ -382,6 +401,28 @@ await storage.delete('slot-1');
 ```
 
 Wrap it in `safeStorage` or `signedStorage` for two copies and tamper checks.
+
+The adapter stores any bytes, not only save documents, and an empty save is a real save: each file is the bytes after a
+5-byte header, so a committed empty write reads back as an empty `Uint8Array`, while a file left empty by a first write
+that never closed (a tab closed mid-write) reads as `null` and is not in `keys()`. Keys may be any well-formed Unicode up
+to 175 UTF-8 bytes; each is stored under a base64url file name, so `keys()` returns them as written, sorted.
+
+```ts
+import { opfsStorage } from 'margoengine/save/opfs';
+
+const files = opfsStorage({ namespace: 'readme-binary' });
+await files.write('thumbnail', new Uint8Array([137, 80, 78, 71]));
+await files.write('empty', new Uint8Array(0));
+console.log(await files.read('thumbnail'), (await files.read('empty'))?.length, await files.read('missing'));
+// Uint8Array(4) [137, 80, 78, 71] 0 null
+
+const late = new AbortController();
+late.abort(new Error('player quit'));
+await files.write('thumbnail', new Uint8Array([0]), { signal: late.signal }).catch((error) => console.log(error.message));
+// player quit: aborted before the close, so the old file stays
+console.log((await files.read('thumbnail'))?.length, await files.keys()); // 4 ['empty', 'thumbnail']
+for (const key of await files.keys()) await files.delete(key);
+```
 
 
 ## Cloud saves
