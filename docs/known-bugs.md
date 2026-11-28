@@ -15556,7 +15556,10 @@ reproduced `EBUSY` and the live server/worker ports; the repaired seven-test fil
   estimates, and two independent unbiased renderers agree pixel for pixel only in the limit of infinite samples. The
   rival run that is missing is a reference corpus rendered in MagicaVoxel itself (outside this repository): the `_sss`
   block at three or more densities, colours and sun angles with a view of its side faces (the model question of KB1673 above), glass over a lit floor at two or more IORs, and the atmosphere at its `_atm`
-  settings, each at the highest sample count it allows, with the file and settings saved beside the image. With that
+  settings, each at the highest sample count it allows, with the file and settings saved beside the image. The official
+  0.99.7.2 win64 build named in `results/batch-99-parity-gamma-20261109.json` is on the workstation, and
+  `packages/voxel-pathtracer/tests/magicavoxel/parity-fixtures.cjs` writes the scenes; the renders are made by hand
+  in its Render view (docs/whitepaper/reproduce.md, "Batch 99 parity gamma regression"), not by any script here. With that
   corpus the transport can be compared per setting; a zero-error match still needs Scott to state whether the oracle
   means equal expected values (a statistical bound against the reference's own noise) or equal pixels, which no
   renderer can give against another's samples. Job 2's bar, a noise-free disocclusion, asks a finite first-frame
