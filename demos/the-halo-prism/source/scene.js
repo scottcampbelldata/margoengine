@@ -2,6 +2,7 @@ import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { createObservatory, prismCenter, skyCenter } from './model.js';
 import { indices, minAt, minimumDeviation, tracePrism } from './optics.js';
+import { lerp as mix } from '@margoengine/math/mathutils';
 
 const canvas=document.querySelector('#scene');
 const loading=document.querySelector('#loading');
@@ -21,7 +22,6 @@ const wide={aim:[-.033,.173,.024],offset:[-.42,.746,1.81],fit:1.31,fov:43};
 const halo={aim:skyCenter,offset:[-.022,.160,.714],fit:1.07,fov:42};
 const prism={aim:[prismCenter[0]-.045,.250,prismCenter[2]-.052],offset:[.282,.640,.599],fit:1.13,fov:41};
 const poses={bench:wide,halo,prism};
-const mix=(a,b,t)=>a+(b-a)*t;
 let engine,instrument,observer,frame,last=0;
 let incidence=Number(range.value),ray=tracePrism(incidence),cameraView='bench',dirty=true,applied=false;
 let pose=wide;

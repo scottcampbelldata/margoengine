@@ -1,6 +1,7 @@
 import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { createBench } from './model.js';
+import { lerp as mix } from '@margoengine/math/mathutils';
 
 const canvas = document.querySelector('#film');
 const loading = document.querySelector('#loading');
@@ -15,7 +16,6 @@ const lifetime = new AbortController();
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const overview = { target: [-.003, .187, .069], offset: [.47, .69, 1.02], fitAspect: 1.10 };
 const closeUp = { target: [.016, .323, .017], offset: [.346, .44, .713], fitAspect: 1.11 };
-const mix = (a, b, t) => a + (b - a) * t;
 let thickness = Number(film.value), degrees = Number(tilt.value);
 let engine, bench, observer, frame, last = 0;
 let detail = false, zoom = 0, opticalDirty = true, pending = false;

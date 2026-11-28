@@ -2,6 +2,7 @@ import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { createLantern } from './model.js';
 import { beamMeasure, facets, focalDistance, targetRadius, traceFacet } from './optics.js';
+import { lerp as mix } from '@margoengine/math/mathutils';
 
 const canvas=document.querySelector('#scene');
 const loading=document.querySelector('#loading');
@@ -16,7 +17,6 @@ const lifetime=new AbortController();
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
 const wide={aim:[-.04,.144,.047],offset:[.90,1.04,1.55],fit:1.33,fov:41};
 const detail={aim:[-.028,.221,0],offset:[.095,1.88,.315],fit:1.48,fov:40};
-const mix=(a,b,t)=>a+(b-a)*t;
 let engine,lantern,observer,frame,last=0,zoom=0;
 let distance=Number(range.value)/1000;
 let measure=beamMeasure(distance),top=false,dirty=true,applied=false;

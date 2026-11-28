@@ -2,6 +2,7 @@ import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { createInterferometer, detectorFocus } from './model.js';
 import { fringeCount, mirrorPeriodNm, opticalPathNm, travelNm } from './optics.js';
+import { lerp as mix } from '@margoengine/math/mathutils';
 
 const canvas=document.querySelector('#scene');
 const loading=document.querySelector('#loading');
@@ -17,7 +18,6 @@ const lifetime=new AbortController();
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
 const wide={aim:[.021,.059,.020],offset:[-.85,.97,1.12],fit:1.25,fov:42};
 const detail={aim:[detectorFocus[0],detectorFocus[1]+.016,detectorFocus[2]],offset:[-.437,.182,.095],fit:1.06,fov:38};
-const mix=(a,b,t)=>a+(b-a)*t;
 let engine,instrument,observer,frame,last=0,zoom=0;
 let distance=Number(input.value),close=false,dirty=true,applied=false;
 const nanometers=(nm)=>nm.toFixed(1)+' nm';

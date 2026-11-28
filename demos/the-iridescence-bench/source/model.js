@@ -5,12 +5,12 @@ import { CatmullRomCurve3 } from '@margoengine/geometry/shapes';
 import { toGeometry } from '@margoengine/geometry/utils';
 import { axisAngleToQuaternion } from '@margoengine/math/quat';
 import { radians, reflectedColor } from './optics.js';
+import { lerp as mix } from '@margoengine/math/mathutils';
 
 const center = [0, .315, -.022];
 const axis = (theta) => axisAngleToQuaternion([0, 0, 1], theta);
 const horizontal = { rotation: axisAngleToQuaternion([1, 0, 0], Math.PI / 2) };
 const side = { rotation: axisAngleToQuaternion([0, 0, 1], Math.PI / 2) };
-const mix = (a, b, t) => a + (b - a) * t;
 
 function surface(u, v, height = 0) {
   const taper = .83 + .17 * Math.cos(Math.PI * v / 2);
