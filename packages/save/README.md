@@ -205,6 +205,103 @@ to the scene. `components(mesh)` adds your own data, and `onEntity(mesh, entity,
 
 Geometry is written into the save, so a large static mesh is better as a glTF model, which saves as a URL.
 
+### Animation, lights and shadows (`@margoengine/save/scene-state`)
+
+`captureScene` saves meshes, models, the view and plugins. `captureSceneState(bindings)` adds what plays on top of
+them: animation players, light lists and shadow settings, each under a stable id you choose. It writes plain JSON and
+no GPU objects; `restoreSceneState(state, bindings)` puts the values back onto objects you have already loaded and
+bound under the same ids.
+
+| Binding | What fits | Saved |
+| --- | --- | --- |
+| `animations` | anything with `captureState()` and `restoreState(state)`: `Animation`, `AnimationMixer` (`@margoengine/animation`), `AnimatorGraph` (`@margoengine/animator`) | the player's own state: clip times, blend parameters, weights, masks, fades and triggers |
+| `lights` | anything with `list` and `setLights(list)`: `Clustered`, `DirectionalLights`, `AreaLights` and the other `@margoengine/clustered` light sets | every light in `list`, with its per-light shadow settings |
+| `shadows` | a mutable settings object, such as `Shadows.options` (`@margoengine/shadows`) | its own properties |
+
+```ts
+import { captureSceneState, restoreSceneState } from 'margoengine/save/scene-state';
+
+// Stand-ins with the same shape as an Animation, a Clustered light set and Shadows.options.
+let walk = { clip: 'walk', time: 1.25, weight: 1 };
+const hero = { captureState: () => ({ ...walk }), restoreState: (s: typeof walk) => void (walk = { ...s }) };
+let list = [{ type: 'point', position: [0, 2, 0], intensity: 40, castShadow: true }];
+const lamps = { get list() { return list; }, setLights: (l: typeof list) => void (list = l.map((x) => ({ ...x }))) };
+const sun: Record<string, number> = { mapSize: 2048, cascades: 3, bias: 0.0005 };
+const bindings = { animations: { hero }, lights: { lamps }, shadows: { sun } };
+
+const state = captureSceneState(bindings);
+const text = JSON.stringify(state); // { version: 1, animations: { hero: ... }, lights: { lamps: [...] }, shadows: { sun: ... } }
+
+walk.time = 9;
+list = [];
+sun.mapSize = 512;
+sun.extra = 1;
+restoreSceneState(JSON.parse(text), bindings);
+console.log(walk.time, list.length, sun.mapSize, 'extra' in sun); // 1.25 1 2048 false
+
+// All or nothing: a binding that throws undoes the ones applied before it.
+let failOnce = true;
+const flaky = { list: [], setLights: () => { if (failOnce) { failOnce = false; throw new Error('lost'); } } };
+walk.time = 3;
+try {
+  restoreSceneState(state, { ...bindings, lights: { lamps: flaky } });
+} catch (e) {
+  console.log((e as Error).message, walk.time); // 'lost' 3: the animation was put back
+}
+try {
+  restoreSceneState(state, { lights: { lamps }, shadows: { sun } });
+} catch (e) {
+  console.log((e as Error).message); // "Missing animations binding 'hero'; load and bind that object before restoring"
+}
+```
+
+- Every id in the state needs its binding (an own property of `bindings.animations`, `lights` or `shadows`), or the
+  restore throws a `MargoError` with code `'state'` before anything changes. Bindings the state does not name are left
+  alone, so a newer scene can bind more than an older save holds.
+- Values must be JSON: finite numbers, strings, booleans, `null`, arrays, typed arrays (saved as arrays) and plain
+  objects. A function, `Map`, class instance, `NaN`, infinity or a cycle throws on capture, so a callback or GPU
+  resource never lands in a save; bind its portable settings instead. Keys such as `__proto__` and `constructor`
+  round-trip as ordinary keys and never change an object's prototype.
+- A shadow restore replaces the settings object's own properties: keys the save does not hold are removed, and the
+  object keeps its identity and prototype. A light restore calls `setLights` with the saved list.
+- Restore applies every animation, then every light set, then every shadow setting, each in the order of the state. If one throws, those
+  already applied are put back to what they held before the call, last first, and the error is rethrown; if putting
+  one back throws too, you get an `AggregateError` with every failure. A state whose `version` is not 1 throws.
+
+### Materials (`@margoengine/save/materials`)
+
+`captureMaterials(materials, options)` saves named materials as a `MaterialLibrary`: each material's kind, every factor,
+its maps with their samplers and per-slot UV sets, render state and shader parameters. A texture or other object used
+by several materials is saved once and shared again on restore. `restoreMaterials(library, options)` builds new
+materials and textures; put them on the loaded scene's meshes.
+
+```ts
+import { PbrMaterial, Texture } from 'margoengine/materials';
+import { captureMaterials, restoreMaterials } from 'margoengine/save/materials';
+
+const pixels = new Texture({ width: 2, height: 2, data: new Uint8Array(16).fill(200) });
+const red = new PbrMaterial({ color: [1, 0, 0, 1], roughness: 0.4, map: pixels });
+const blue = new PbrMaterial({ color: [0, 0, 1, 1], map: pixels });
+
+const library = await captureMaterials({ red, blue });
+const text = JSON.stringify(library); // plain JSON: { version: 1, materials: { red, blue }, objects: [...] }
+
+const restored = await restoreMaterials(JSON.parse(text));
+console.log(restored.red instanceof PbrMaterial, restored.red.roughness); // true 0.4
+console.log(restored.red.map === restored.blue.map); // true: still one texture
+```
+
+- Texture pixels are embedded by default. `textureURL(texture)` returns a URL (or a list of six for a cube) to save
+  in their place; restore downloads it with `fetch` (default the global one) within `limits`, the download and decode
+  caps, which only the restore's caller sets, never the file.
+- A value of a type no codec knows, such as a callback or your own resource, throws a `MargoError` with code `'state'`.
+  `externalKey(value)` names it instead, and on restore `resolveExternal(key, { signal })` hands back your object.
+- `codecs` adds your own `MaterialValueCodec`s (`type`, `test`, `capture`, `restore`). Shader materials
+  (`@margoengine/shader`) load their codecs only when the library holds one, so a save without them never downloads
+  the shader package; `loadCodecs` replaces that loader.
+- `signal` stops a capture or restore. A restore that fails or is aborted disposes every material and texture it had
+  made.
+
 ## Change recorder (`@margoengine/save/delta`)
 
 `diffSave(base, edited)` is what a user changed in a loaded scene, as a small JSON delta; `applyDelta(base, delta)` puts it back on the base. Changed entities are JSON Merge Patches (RFC 7386, as prefab overrides already are), added entities are whole, removed ones are ids, and `meta` is patched too. Keep the delta instead of the whole document: it stays valid while the shipped base changes elsewhere, and it is a few lines of JSON.
