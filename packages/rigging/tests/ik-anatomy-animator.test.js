@@ -276,3 +276,62 @@ test('addCCDChain and solveContactIK take the body ranges by default: hinges sto
   assert.ok(solve(undefined).elbow.flexion >= -1e-6, `fitted: ${solve(undefined).elbow.flexion}`);
   assert.ok(solve(null).elbow.flexion < -5, `free: ${solve(null).elbow.flexion}`);
 });
+
+test("the Animator's own footIK on a fitted Animator: the knee bends forward whatever the pole says (KB-ANIM-FOOTIK-ANATOMY1)", async (t) => {
+  for (const fit of [true, false]) {
+    const p = await person(t, { fit }),
+      [hip, knee, ankle] = p.limb('Left', 'leg'),
+      floor = p.at('LeftFoot')[1];
+    // A pole behind the body, and a 15 cm step under the left foot.
+    p.animator.addFootIK({
+      hip,
+      knee,
+      ankle,
+      pole: [0.1, 0.5, -4],
+      raycast: (origin) => ({ position: [origin[0], floor + 0.15, origin[2]] }),
+    });
+    p.step();
+    const { l_knee, l_hip } = jointAngles(p.body, p.pose()),
+      foot = p.at('LeftFoot');
+    assert.ok(Math.abs(foot[1] - (floor + 0.15)) < 1e-3, `the foot stands on the step: ${foot[1]}`);
+    if (fit) {
+      assert.ok(l_knee.flexion > 25, `knee ${l_knee.flexion}`);
+      assert.ok(p.at('LeftLeg')[2] > 0.05, 'the knee is in front of the hip');
+      assert.deepEqual(outside(p.body, p.pose()), []);
+      // The pole behind the knee is left out: the knee points forward, not turned out to the hip's stop.
+      assert.ok(Math.abs(l_hip.rotation) < 15, `hip rotation ${l_hip.rotation}`);
+    } else assert.ok(l_knee.flexion < -25, `a free leg follows the pole backwards: ${l_knee.flexion}`);
+  }
+});
+
+test('a pole behind the knee is left out: the leg takes its comfortable swivel, not the hip stop (KB-ANIM-POLEBEHIND1)', async (t) => {
+  const place = async (pole) => {
+    const p = await person(t),
+      [hip, knee, ankle] = p.limb('Left', 'leg'),
+      floor = p.at('LeftFoot')[1],
+      handle = addFootPlacement(p.animator, {
+        pelvis: p.bone('Hips'),
+        legs: [{ hip, knee, ankle, pole }],
+        ground: p.model.root,
+        raycast: (origin) => ({ position: [origin[0], floor + 0.15, origin[2]], normal: [0, 1, 0] }),
+      });
+    p.step();
+    const angles = jointAngles(p.body, p.pose()),
+      knees = { knee: p.at('LeftLeg'), hip: p.at('LeftUpLeg'), outside: outside(p.body, p.pose()) };
+    handle.dispose();
+    return { ...angles, ...knees };
+  };
+  for (const pole of [
+    [0, 0.5, -4],
+    [0.3, 0.5, -4],
+    [-0.3, 0.5, -4],
+  ]) {
+    const { l_knee, l_hip, outside: out } = await place(pole);
+    assert.ok(l_knee.flexion > 25, `knee ${l_knee.flexion}`);
+    assert.ok(Math.abs(l_hip.rotation) < 15, `pole ${pole}: hip rotation ${l_hip.rotation}`);
+    assert.deepEqual(out, []);
+  }
+  // A pole at the knee's side still turns it toward that side, as far as the hip lets it.
+  const side = await place([4, 0.5, 0.5]);
+  assert.ok(side.knee[0] > side.hip[0] + 0.03, `the knee turns out toward a pole at its side: ${side.knee[0]}`);
+});

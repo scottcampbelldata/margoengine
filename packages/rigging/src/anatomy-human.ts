@@ -860,11 +860,15 @@ export function humanTable(group: HumanGroup = {}): SpeciesTable {
       long: DOWN,
       distal: ['r_metacarpophalangeal_3', 'r_metacarpophalangeal_2', 'r_metacarpophalangeal_4'],
       across: {
+        // The index and middle knuckles first: the second and third metacarpals are the hand's fixed central unit,
+        // while the fourth and fifth sit lower toward the palm in the transverse metacarpal arch (Kapandji vol. 1),
+        // so a line to the little finger's knuckle is tilted by the arch and rolls every finger's flexion axis
+        // about 18 degrees (KB-RIG-HANDARCH1).
         pairs: [
-          ['r_metacarpophalangeal_5', 'r_metacarpophalangeal_2'],
-          ['r_metacarpophalangeal_4', 'r_metacarpophalangeal_2'],
-          ['r_metacarpophalangeal_5', 'r_metacarpophalangeal_3'],
           ['r_metacarpophalangeal_3', 'r_metacarpophalangeal_2'],
+          ['r_metacarpophalangeal_4', 'r_metacarpophalangeal_2'],
+          ['r_metacarpophalangeal_5', 'r_metacarpophalangeal_2'],
+          ['r_metacarpophalangeal_5', 'r_metacarpophalangeal_3'],
         ],
         neutral: FRONT,
       },

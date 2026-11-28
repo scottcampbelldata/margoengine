@@ -2051,6 +2051,10 @@
       "types": "./dist/humans.d.ts",
       "import": "./dist/humans.js"
     },
+    "./humans/body": {
+      "types": "./dist/humans/body.d.ts",
+      "import": "./dist/humans/body.js"
+    },
     "./humans/crowd": {
       "types": "./dist/humans/crowd.d.ts",
       "import": "./dist/humans/crowd.js"

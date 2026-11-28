@@ -779,9 +779,11 @@ export function solveLimbIK(limb: LimbIK): LimbIKResult {
         side[0] * p[0] + side[1] * p[1] + side[2] * p[2],
       );
   }
-  if (!pole && ball?.limited) {
-    // A straight limb and no pole: the swivel that leaves the shoulder or hip nearest its neutral, each angle as a
-    // share of its clinical range (a swivel outside the stops costs far more).
+  /**
+   * The swivel that leaves the shoulder or hip nearest its neutral, each angle as a share of its clinical range (a
+   * swivel outside the stops costs far more): an arm's elbow down, a leg's knee forward.
+   */
+  const comfortable = (ball: AnatomyJoint): number => {
     const comfort = ball.normal,
       TEN = Math.PI / 18,
       cost = (at: number): number => {
@@ -810,8 +812,10 @@ export function solveLimbIK(limb: LimbIK): LimbIKResult {
       if (cost(m1) <= cost(m2)) until = m2;
       else from = m1;
     }
-    phi = (from + until) / 2;
-  }
+    return (from + until) / 2;
+  };
+  // A straight limb and no pole: the comfortable swivel.
+  if (!pole && ball?.limited) phi = comfortable(ball);
   let stopped = false;
   if (outside(phi) > 1e-6) {
     // The nearest swivel the shoulder or hip allows, searched outward from the wanted one in 5 degree steps.
@@ -834,7 +838,16 @@ export function solveLimbIK(limb: LimbIK): LimbIKResult {
           best = at;
         }
       }
-    if (!Number.isNaN(found)) {
+    // A pole more than a right angle from every swivel the shoulder or hip allows is on the side the elbow or knee
+    // cannot face (a pole behind a knee): its nearest allowed swivel is the joint's stop, a knee turned out as far as
+    // the hip turns. The pole is then left out and the limb takes its comfortable swivel (KB-ANIM-POLEBEHIND1).
+    if (pole && ball?.limited && !Number.isNaN(found) && Math.abs(found - phi) > Math.PI / 2) {
+      phi = comfortable(ball);
+      if (outside(phi) <= 1e-6) found = Number.NaN;
+    }
+    if (Number.isNaN(found) && outside(phi) <= 1e-6) {
+      // The comfortable swivel fits: nothing to search.
+    } else if (!Number.isNaN(found)) {
       // Back toward the wanted swivel as far as the range lets it.
       for (let i = 0; i < 24; i++) {
         const middle = (found + edge) / 2;

@@ -19907,6 +19907,22 @@ Margo's own design from these public sources; no engine's or library's source wa
   symplectic Euler on an oscillator keeps a shadow energy within (w h / 2) of the energy, and is stable for w h < 2;
   the held buoyancy's measured bound (0.95 stable, 1.17 growing) sets the refusal at 0.9.
 
+## People with anatomy by default: humans, humans/body (2026-11-28)
+
+Scope: the `anatomy` option of `addPerson`, `person.body` and `person.check` in `@margoengine/humans`, the
+`@margoengine/humans/body` entry (`addBody`, `bodyGLTF`), the hand arch and forearm twist bones of
+`@margoengine/rigging/anatomy` and the pole rule of `@margoengine/animator/ik`. Written from the sources below and the
+glTF 2.0 specification (Khronos, https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html: nodes, skins with inverse
+bind matrices, animation channels). No other engine's or tool's code was read.
+
+I. A. Kapandji, "The Physiology of the Joints", vol. 1, The Upper Limb (the fixed central column of the hand, index and
+middle metacarpals, against the mobile ring and little metacarpals of the arch; the oblique flexion of the ring and
+little fingers toward the scaphoid; pronation shared by the forearm). V. T. Inman, J. B. Saunders and L. C. Abbott,
+"Observations on the function of the shoulder joint", J Bone Joint Surg 26(1):1-30, 1944 (the collarbone lifting with
+the raised arm, named in KB-RIG-CLAVICLE1). Matrix to rotation: K. Shoemake, "Animating rotation with quaternion
+curves", SIGGRAPH 1985, https://doi.org/10.1145/325165.325242 , with the largest-component choice of S. W. Shepperd,
+"Quaternion from rotation matrix", J Guidance and Control 1(3):223-224, 1978.
+
 ## IK that obeys anatomy: animator/ik, rigging/ik, animator/fbik (2026-11-28)
 
 Scope: `@margoengine/animator/ik` (the fitted body as the solvers read it, the swivel-angle limb solver, the joint and

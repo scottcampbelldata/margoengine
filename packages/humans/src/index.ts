@@ -18,6 +18,10 @@ import { eyeLidMargin } from './eye-lid.js';
 export { eyeLidMargin, type EyeBall, type EyeLidMargin } from './eye-lid.js';
 import { hair, hairCards, type HairCardOptions, type HairOptions } from '@margoengine/materials/hair';
 import type { Hands, HandsOptions } from '@margoengine/rigging/hands';
+import type { AnatomicalRig, ClampIssue, Tier } from '@margoengine/rigging/anatomy';
+import type { FitHumanOptions } from '@margoengine/rigging/anatomy/human';
+import { MargoError } from '@margoengine/math/errors';
+import { setAnatomy } from '@margoengine/animator';
 import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 
 /** Anything a person can join for shadows or ambient occlusion: `Shadows`, a `GTAO` pass, a scene's `parts`. */
@@ -58,6 +62,25 @@ export interface PersonMaterialNames {
   cards?: readonly string[];
 }
 
+/**
+ * How {@link addPerson} fits the body's anatomy (`fitHuman` from `@margoengine/rigging/anatomy/human`): the options of
+ * `fitHuman` (`sex`, `age`, `preset`, `map`, `forward`, `roll`, `limits`), and how playback holds the ranges.
+ */
+export interface PersonAnatomyOptions extends FitHumanOptions {
+  /**
+   * The range playback holds every frame: `'structural'` (the stops no body passes: an elbow never folds back past 5
+   * degrees) or `'normal'` (the clinical range). Default `'structural'`.
+   */
+  tier?: Tier;
+  /**
+   * Reads how the upper arms and thighs are rolled from the model's clips (`hingeRolls`), so an elbow or knee whose
+   * rig is rolled still bends about its own axis. Default true; it only runs for a model with clips.
+   */
+  calibrate?: boolean;
+  /** Called on a frame whose pose needed bringing back into range, with what was brought back. Default none. */
+  onClamp?: (issues: readonly ClampIssue[]) => void;
+}
+
 /** Options of {@link addPerson}. Every one is optional; the defaults give a finished person. */
 export interface PersonOptions {
   /** Skin options for `skin()` from `@margoengine/materials/skin`, or false for none. Default `{}`. */
@@ -96,6 +119,16 @@ export interface PersonOptions {
    * (`grip(0.035)`, `fist()`, `point()` ...). A rig whose bone names no preset knows gets none; pass `hands: {bones}`.
    */
   hands?: HandsOptions | false;
+  /**
+   * The body's anatomy (`@margoengine/rigging/anatomy`), or false for none. Default `{}`: a model whose bones a human
+   * naming knows (Character Creator, Mixamo, VRM humanoid, H-Anim and the other namings of
+   * `@margoengine/rigging/anatomy/human`) is fitted with the human table, its arm and leg rolls read from its clips;
+   * the Animator's IK solvers and foot IK then bend each joint the anatomical way (`setAnatomy`), and every frame's
+   * pose is held inside the joints' stops (`addAnatomyLimits`), so no clip or solver folds an elbow or knee backwards.
+   * A model whose bones no naming knows gets no body; name its joints with `anatomy: {map}`. `anatomy: {limits:
+   * false}` fits the body and holds nothing.
+   */
+  anatomy?: PersonAnatomyOptions | false;
   /** An ambient occlusion pass to join, such as a scene's `parts.occlusion`. Default none. */
   occlusion?: PersonReceiver | false;
   /**
@@ -127,6 +160,19 @@ export interface Person {
    * playback and is set by `time`. Undefined with `hands: false` or a model with no clips.
    */
   readonly hands: Hands | undefined;
+  /**
+   * The body's anatomy, fitted to the model's nodes bone for bone (`fitHuman`): its joints, ranges and rest pose. Read
+   * clinical angles with `jointAngles(person.body, pose)`. Undefined with `anatomy: false`, or for a model whose bones
+   * no human naming knows.
+   */
+  readonly body: AnatomicalRig | undefined;
+  /**
+   * The motions of the pose on screen now that are outside the body's range at `tier` (default `'normal'`, the clinical
+   * range; `'structural'` lists what passes a stop, which the held pose never does). Empty for a person with no body.
+   * @example
+   * for (const issue of person.check()) console.log(issue.joint, issue.motion, issue.value, issue.limit);
+   */
+  check(tier?: Tier): ClampIssue[];
   /**
    * Cross-fades to `clip` over `fade` seconds (default the person's `fade`), starting it at `at` seconds into the clip
    * (default 0). Returns the person.
@@ -445,6 +491,12 @@ export async function addPerson(engine: Engine, model: PBRModel, options: Person
     if (cardNames.includes(name)) features[name] = [...(features[name] ?? []), hairCards(options.cards || {})];
   // Defaults that live in other packages load first, so a failed load leaves the model as it was. Each is one line.
   const handsModule = options.hands === false ? undefined : await import('@margoengine/rigging/hands');
+  if (options.anatomy !== undefined && options.anatomy !== false && (typeof options.anatomy !== 'object' || !options.anatomy))
+    throw new TypeError('addPerson anatomy must be an options object or false');
+  const anatomyModules: AnatomyModules | undefined =
+    options.anatomy === false
+      ? undefined
+      : await Promise.all([import('@margoengine/rigging/anatomy'), import('@margoengine/rigging/anatomy/human')]);
 
   // Everything is built and checked before anything is attached, so bad options leave the model as it was.
   const animation = new Animation(model, options.skinning === 'linear' ? {} : { skinning: dualQuaternionSkinning }),
@@ -453,12 +505,9 @@ export async function addPerson(engine: Engine, model: PBRModel, options: Person
     throw new RangeError(
       `addPerson clip "${options.clip}" is not in the model; it has ${clips.join(', ') || 'no clips'}`,
     );
-  const animator = clips.length
-    ? new Animator(animation, {
-        initial: options.clip ?? clips[0],
-        states: Object.fromEntries(clips.map((c) => [c, c])),
-      })
-    : undefined;
+  const states = Object.fromEntries(clips.map((c) => [c, c])),
+    body = anatomyModules && personBody(model, animation, states, anatomyModules, options.anatomy || {}),
+    animator = clips.length ? new Animator(animation, { initial: options.clip ?? clips[0], states }) : undefined;
 
   const cleanups: Array<() => void> = [];
   for (const fitted of Object.values(eyes)) if (fitted.irisMap) cleanups.push(() => fitted.irisMap!.dispose());
@@ -488,6 +537,14 @@ export async function addPerson(engine: Engine, model: PBRModel, options: Person
     if (handsModule) {
       const own = (hands = handsModule.addHands(animator, options.hands || {}));
       cleanups.push(() => own.dispose());
+    }
+    if (body) {
+      // The solvers bend each joint the anatomical way, and after them every frame's pose is held inside the stops.
+      // Solvers added later obey the body themselves (setAnatomy).
+      const { tier, onClamp } = options.anatomy || {};
+      setAnatomy(animator, body);
+      cleanups.push(() => setAnatomy(animator, null));
+      cleanups.push(anatomyModules![0].addAnatomyLimits(animator, body, { tier, onClamp }));
     }
   }
   if (shadows) {
@@ -523,6 +580,23 @@ export async function addPerson(engine: Engine, model: PBRModel, options: Person
     animator,
     clips,
     hands,
+    body,
+    check(tier = 'normal') {
+      if (!body) return [];
+      if (tier !== 'normal' && tier !== 'structural')
+        throw new RangeError("Person check tier must be 'normal' or 'structural'");
+      const t = model.root.engine.store.transforms,
+        pose = body.rest.slice(),
+        issues: ClampIssue[] = [];
+      model.nodes.forEach((node, i) =>
+        pose.set(
+          [t.x[node.id], t.y[node.id], t.z[node.id], t.qx[node.id], t.qy[node.id], t.qz[node.id], t.qw[node.id]],
+          i * 10,
+        ),
+      );
+      anatomyModules![0].clampPose(body, pose, { tier, issues, force: true });
+      return issues;
+    },
     play(clip, { fade: length = fade, at = 0 } = {}) {
       if (!animator) throw new RangeError('This person has no clips to play; load a model with animations to play one');
       if (!clips.includes(clip)) throw new RangeError(`Unknown clip "${clip}"; use one of ${clips.join(', ')}`);
@@ -555,4 +629,101 @@ export async function addPerson(engine: Engine, model: PBRModel, options: Person
     [Symbol.dispose]: dispose,
   };
   return person;
+}
+
+type AnatomyModules = [
+  typeof import('@margoengine/rigging/anatomy'),
+  typeof import('@margoengine/rigging/anatomy/human'),
+];
+
+/** The model's nodes as a rig: names, parents and their local transforms now (the rest pose, before any clip plays). */
+function modelRig(model: PBRModel) {
+  const store = model.root.engine.store,
+    t = store.transforms,
+    ids = new Map(model.nodes.map((node, i) => [node.id, i])),
+    rest = new Float64Array(model.nodes.length * 10);
+  model.nodes.forEach((node, i) => {
+    const id = node.id;
+    rest.set([t.x[id], t.y[id], t.z[id], t.qx[id], t.qy[id], t.qz[id], t.qw[id], t.sx[id], t.sy[id], t.sz[id]], i * 10);
+  });
+  return {
+    names: model.nodes.map((node, i) => node.name || `node${i}`),
+    parents: model.nodes.map((node) => ids.get(store.parents[node.id]) ?? -1),
+    rest,
+  };
+}
+
+// Poses read from the clips to find how the limbs are rolled: about 30 a second, at most this many in all.
+const ROLL_POSES = 2400;
+// The largest shoulder or hip roll the clips may teach, in degrees. A rig's own roll is small (a Character Creator
+// person's clips show under 5 degrees); a larger one is a clip that bends an elbow or knee backwards or sideways, and
+// reading it as the rig's roll would turn the hinge round to fit the wrong pose instead of holding it
+// (KB-HUM-ROLLTRUST1).
+const ROLL_TRUST = 30;
+
+/**
+ * Fits the human table to `model`'s nodes; undefined when no human naming knows its bones and no `map` or `preset` is
+ * given. With clips and `calibrate`, the body is fitted again with the roll its clips show (`hingeRolls`) at the
+ * shoulders and hips only: an upper arm or thigh has no knuckles to read its roll from, while a hand's roll is read
+ * from its knuckles in the fit itself.
+ */
+function personBody(
+  model: PBRModel,
+  animation: Animation,
+  states: Record<string, string>,
+  [anatomy, humans]: AnatomyModules,
+  options: PersonAnatomyOptions,
+): AnatomicalRig | undefined {
+  const { tier, calibrate = true, onClamp, ...fit } = options;
+  if (tier !== undefined && tier !== 'normal' && tier !== 'structural')
+    throw new RangeError("addPerson anatomy.tier must be 'normal' or 'structural'");
+  if (onClamp !== undefined && typeof onClamp !== 'function')
+    throw new TypeError('addPerson anatomy.onClamp must be a function');
+  const rig = modelRig(model);
+  if (!fit.map && !fit.preset && !humans.human.naming?.(rig.names)) return undefined;
+  const fitted = (roll?: Record<string, number>): AnatomicalRig => {
+    try {
+      return humans.fitHuman(rig, roll ? { ...fit, roll: { ...roll, ...fit.roll } } : fit);
+    } catch (error) {
+      throw new MargoError(
+        'unsupported',
+        `addPerson could not fit the human anatomy to this model (${(error as Error).message}); name its joints with anatomy.map, or pass anatomy: false`,
+      );
+    }
+  };
+  const body = fitted(),
+    clips = animation.clips.filter((clip) => clip.duration > 0);
+  if (!calibrate || !clips.length) return body;
+  // A throwaway Animator samples each clip's local pose; the person's own Animator is made after it.
+  const sampler = new Animator(animation, { initial: clips[0].name, states }),
+    pose = body.rest.slice(),
+    total = clips.reduce((sum, clip) => sum + Math.ceil(clip.duration * 30) + 1, 0),
+    stride = Math.max(1, total / ROLL_POSES);
+  function* poses(): Generator<Float64Array> {
+    for (const clip of clips) {
+      sampler.transition(clip.name, 0);
+      const count = Math.max(2, Math.round((clip.duration * 30) / stride) + 1);
+      for (let k = 0; k < count; k++) {
+        sampler.time = (clip.duration * k) / (count - 1);
+        const sample = sampler.onPreUpdate(0, true)!;
+        for (let i = 0; i < sample.rotation.length; i++) {
+          pose.set(sample.position[i], i * 10);
+          pose.set(sample.rotation[i], i * 10 + 3);
+        }
+        yield pose;
+      }
+    }
+  }
+  let rolls: Record<string, number>;
+  try {
+    rolls = anatomy.hingeRolls(body, poses());
+  } finally {
+    sampler.dispose();
+  }
+  const kept = Object.fromEntries(
+    Object.entries(rolls).filter(
+      ([id, roll]) => body.joints[body.index.get(id) ?? -1]?.kind === 'ball' && Math.abs(roll) <= ROLL_TRUST,
+    ),
+  );
+  return Object.keys(kept).length ? fitted(kept) : body;
 }

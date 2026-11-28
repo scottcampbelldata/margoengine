@@ -308,15 +308,95 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   the same.
 - **Regression:** `packages/rigging/tests/ik-anatomy.test.js`, "a pose brought inside its ranges once is inside".
 
-### Open 2026-11-28: the Animator's built-in `footIK` option bends a leg by its pole alone, also on a fitted body (KB-ANIM-FOOTIK-ANATOMY1, animator)
+### Fixed 2026-11-28: the Animator's built-in `footIK` option bent a leg by its pole alone, also on a fitted body (KB-ANIM-FOOTIK-ANATOMY1, animator)
 
-- **Repro:** an Animator made with the `footIK` option on a body named by `setAnatomy`, with a pole behind the leg:
-  the knee follows the pole backwards. `addFootPlacement` on the same body bends it the anatomical way.
-- **Cause:** `Animator.foot` in `packages/animator/src/index.ts` calls `solveTwoBoneIK` directly; it is the one
-  limb solve that does not go through `placeLimb`. Moving it there puts the limb solver in the Animator's root entry,
-  so it needs the size of that entry looked at first.
-- **Until then:** use `addFootPlacement`, or `addAnatomyLimits`, which holds the pose inside the body's stops after
-  every solver.
+- **Repro (before):** an Animator made with the `footIK` option on a body named by `setAnatomy`, with a pole behind the
+  leg: the knee followed the pole backwards. `addFootPlacement` on the same body bent it the anatomical way.
+- **Cause:** `Animator.foot` in `packages/animator/src/index.ts` called `solveTwoBoneIK` directly, the one limb solve
+  that did not go through `placeLimb`.
+- **Fix:** on an Animator with a fitted body the foot goes through `poseTools().placeLimb`, so the leg obeys the body.
+- **Regression:** `packages/rigging/tests/ik-anatomy-animator.test.js`.
+
+### Fixed 2026-11-28: a pole behind the limb could still turn a fitted arm or leg over (KB-ANIM-POLEBEHIND1, animator)
+
+- **Repro (before):** `addIKChain` on a fitted Animator, arm chain, pole above and behind the shoulder: the shoulder
+  turned the arm over toward the pole, to the edge of its twist range.
+- **Cause:** `packages/animator/src/ik.ts` took the swivel the pole asks for and only then held it in range, so a pole on
+  the far side of the limb pulled the swivel to the edge of the shoulder's or hip's range.
+- **Fix:** a pole whose swivel is more than 90 degrees from the comfortable one (the one that leaves the shoulder or
+  hip nearest neutral) is left out, and the limb takes the comfortable swivel.
+- **Regression:** `packages/rigging/tests/ik-anatomy-animator.test.js`.
+
+### Fixed 2026-11-28: a cupped hand at rest read as a twisted wrist (KB-RIG-HANDARCH1, rigging)
+
+- **Repro (before):** `fitHuman` on a Character Creator rig, whose relaxed hand is cupped: the wrist's rest read
+  pronation, and clips were held off a real wrist turn.
+- **Cause:** the radiocarpal frame took its roll from the first knuckle pair of `across`, which included the ring and
+  little metacarpals; those move with the arch of the hand (Kapandji, *The Physiology of the Joints*, vol. 1).
+- **Fix:** `packages/rigging/src/anatomy-human.ts` lists the index-middle pair first, the fixed part of the hand.
+- **Regression:** `packages/rigging/tests/anatomy-hand-forearm.test.js`.
+
+### Fixed 2026-11-28: a forearm twist bone made the hand's pronation spill into the forearm bone (KB-RIG-TWISTBONE1, rigging)
+
+- **Repro (before):** a Character Creator arm (`CC_Base_L_ForearmTwist01` and `02` under the forearm) with the hand
+  pronated past the wrist's range: `clampPose` moved the excess into the forearm bone, twisting the skin a second time.
+- **Cause:** the wrist's twist range was its own alone, so its excess spilled up the chain; a rig with twist bones turns
+  the hand itself for pronation and lets the twist bones spread it along the skin.
+- **Fix:** `fitAnatomy` (`packages/rigging/src/anatomy.ts`) finds a bone under the forearm, through bones that are no
+  joint, lying along it; the wrist's twist range then takes the forearm's pronation as well and nothing spills.
+- **Regression:** `packages/rigging/tests/anatomy-hand-forearm.test.js`.
+
+### Fixed 2026-11-28: a reversed-elbow clip taught addPerson a 105 degree shoulder roll (KB-HUM-ROLLTRUST1, humans)
+
+- **Repro (before):** `addPerson` on a humanoid whose clip bends the left elbow 70 degrees the wrong way: calibration
+  read a 105 degree upper arm roll from it and flipped the elbow hinge, so the held clip kept the reversed bend.
+- **Cause:** `hingeRolls` takes the axis a clip bends a hinge about as the truth; a clip that bends it backwards gives
+  the mirrored axis.
+- **Fix:** `packages/humans/src/index.ts` calibrates shoulders and hips only and trusts a roll only up to 30 degrees
+  (`ROLL_TRUST`); real rigs measure under 5 (the Character Creator old man of the Fauld cast).
+- **Regression:** `packages/humans/test/anatomy-defaults.test.js`.
+
+### Open 2026-11-28: a Character Creator ring finger rests 12.8 degrees past its supination stop (KB-RIG-RINGROLL1, rigging)
+
+- **Repro:** `addPerson` on the Fauld cast's Character Creator old man (`civ_old_man.glb`), then
+  `jointAngles(person.body, person.body.rest)`: `l_metacarpophalangeal_4` and `r_` read flexion 2.6, abduction 9.7,
+  rotation -12.8 degrees, past the -10 supination stop. `packages/humans/test/pose-frames.browser.mjs --model=<file>`
+  prints it for the seated pose with limits off.
+- **Cause:** `fitAnatomy` rolls each segment by the bend axis of a hinge below it that is bent in the rest pose
+  (`packages/rigging/src/anatomy.ts`, "A hinge below that is bent"). The ring finger's interphalangeal axes are oblique,
+  so curled fingers converge toward the scaphoid (Kapandji, vol. 1); the fit reads that obliquity as a roll of the
+  proximal phalanx.
+- **Fix needed:** the human table gives the interphalangeal axes of the ring and little fingers their measured
+  obliquity, so the rest bend reads as flexion about an oblique axis and the phalanx keeps no roll. It needs a measured
+  source for the angle first.
+
+### Open 2026-11-28: Character Creator thumbs are held up to 22 degrees off the walk clip (KB-RIG-THUMB1, rigging)
+
+- **Repro:** the same old man, walk clip at 0.3 s with `anatomy: {limits: false}`: `r_carpometacarpal_1` reads
+  pronation 54.4 and `l_` 47.6 against a 40 degree stop, and the rest pose already reads abduction 39.1 and rotation
+  28.6. On the fitted body the thumbs are held at the stop, up to 22 degrees from the clip.
+- **Cause:** the relaxed Character Creator thumb rests opposed, in front of the palm, and its rest angles are counted
+  against ranges measured from a thumb lying beside the index. The CMC1 joint needs a zero for an opposed rest thumb.
+- **Until then:** `anatomy: {map}` can leave the thumbs out, or `roll` can turn them by hand.
+
+### Open 2026-11-28: a Character Creator collarbone is held up to 11 degrees off the walk clip (KB-RIG-CLAVICLE1, rigging)
+
+- **Repro:** the same old man, walk clip at 0.3 s with `anatomy: {limits: false}`: `l_sternoclavicular` depression
+  -25.9 degrees and `r_` -15.3, against stops of 15 and 13.3. On the fitted body the left collarbone is held at -15,
+  11 degrees above the clip. Both read 0 in the rest pose.
+- **Cause:** the sternoclavicular zero is the rest pose (`neutral: 'rest'` in `packages/rigging/src/anatomy-human.ts`).
+  A Character Creator body rests in an A pose, arms raised about 45 degrees, and a raised arm lifts the collarbone with
+  it, about 4 degrees for every 10 of arm elevation (Inman, Saunders and Abbott 1944). Lowering the arms to walk drops
+  the collarbone that far below the rest before any real depression, so the clip reads past the stop.
+- **Fix needed:** the collarbone's zero corrected by the rest pose's arm elevation, or read from the thorax as a body
+  direction. It moves the shoulder's reference frame too, so the shoulder's calibration and the IK tests are rerun.
+
+### Open 2026-11-28: the UAL mannequins have no naming `fitHuman` knows, so they get no body (KB-HUM-UALNAMES1, rigging)
+
+- **Repro:** `addPerson` on Quaternius's UAL1 mannequin (`UAL1_Standard_RM.glb`, Unreal names `upperarm_l`,
+  `lowerarm_l`, ...): `person.body` is undefined and no clip is held.
+- **Cause:** `fitHuman`'s namings (`packages/rigging/src/anatomy-human.ts`) have no Unreal mannequin preset.
+- **Until then:** `anatomy: {map}` names the joints by hand.
 
 ### Fixed 2026-11-28: on the WebGL2 layer a page linked its synchronous pipelines one at a time (KB-COMPAT-SYNCLINK1, webgl2-compat)
 

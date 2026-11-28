@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Person pose frames</title><style>body{margin:0;background:#000}canvas{display:block}</style></head>
+<body><canvas></canvas>
+<script type="module">
+  // Pose frames of a skinned person through addPerson (or addBody): walking (two phases of its walk clip), reaching
+  // (two addIKChain arms, one across the chest and one overhead, with a pole behind the body that folds a free elbow
+  // inside out) and sitting (poseFromAngles: hips and knees at 90 degrees). Each pose is drawn from the front, the
+  // three-quarter and the side, on the fitted body (the default) and with `anatomy: {limits: false}`, into one sheet.
+  // window.renderFrames({model}) returns the sheet as base64 PNG and the hinge angles of each pose.
+  import { Engine } from '/packages/core/dist/index.js';
+  import { loadGLTF } from '/packages/gltf/dist/pbr.js';
+  import { addPerson } from '/packages/humans/dist/index.js';
+  import { addBody } from '/packages/humans/dist/body.js';
+  import { addIKChain } from '/packages/rigging/dist/ik.js';
+  import { clampPose, jointAngles, poseFromAngles } from '/packages/rigging/dist/anatomy.js';
+  import { isCompatDevice } from '/packages/webgl2-compat/dist/device.js';
+  import { riggedTestBody } from '/packages/humans/test/rigged-body.js';
+
+  const CELL_W = 360, CELL_H = 540;
+  const VIEWS = [['front', 0], ['three-quarter', 45], ['side', 90]];
+  const canvas = document.querySelector('canvas');
+  canvas.width = CELL_W; canvas.height = CELL_H;
+  canvas.style.width = `${CELL_W}px`; canvas.style.height = `${CELL_H}px`;
+
+  /** A small walk for the code-built body: arms and legs swinging, elbows and knees bent forward. */
+  function testWalk(bones) {
+    const q = (axis, deg) => { const h = deg * Math.PI / 360, s = Math.sin(h); return [axis[0] * s, axis[1] * s, axis[2] * s, Math.cos(h)]; };
+    const swing = (bone, a, b, axis = [1, 0, 0]) => ({ bone, path: 'rotation', times: [0, 0.5, 1], values: [...q(axis, a), ...q(axis, b), ...q(axis, a)] });
+    // A pose: arms hang 45 degrees out. Elbows flex about the arm crossed with forward, knees about x; arms and legs
+    // swing about x, opposite each other.
+    const r = Math.SQRT1_2;
+    return [{ name: 'walk', channels: [
+      swing('leftUpperLeg', -25, 20), swing('rightUpperLeg', 20, -25),
+      swing('leftLowerLeg', 10, 40), swing('rightLowerLeg', 40, 10),
+      swing('leftUpperArm', 20, -20), swing('rightUpperArm', -20, 20),
+      swing('leftLowerArm', 20, 35, [-r, -r, 0]), swing('rightLowerArm', 35, 20, [-r, r, 0]),
+    ].filter((ch) => bones.some((b) => b.name === ch.bone)) }];
+  }
+
+  async function makePerson(model, anatomy) {
+    const engine = await Engine.create(canvas, { camera: { position: [0, 1, 4], target: [0, 1, 0], fov: 30, near: 0.05, far: 200 } });
+    engine.stop();
+    const errors = [];
+    engine.gpu?.addEventListener?.('uncapturederror', (e) => errors.push(e.error.message));
+    engine.scene.background = '#2a2e35';
+    engine.lighting.direction.set([0.4, 0.7, 0.6, 3]);
+    engine.lighting.radiance.set([1, 0.96, 0.9, 0.55]);
+    const options = { anatomy, hair: false, cards: false };
+    let person;
+    if (model) person = await addPerson(engine, await loadGLTF(engine, model), options);
+    else {
+      const b = riggedTestBody('A');
+      person = await addBody(engine, {
+        bones: b.bones,
+        meshes: [{ positions: b.positions, normals: b.normals, indices: b.indices, joints: b.joints, weights: b.weights }],
+        clips: testWalk(b.bones),
+      }, options);
+    }
+    return { engine, errors, person };
+  }
+
+  async function shoot(engine, sheet, x, y, label) {
+    engine.render({ delta: 0 });
+    if (isCompatDevice(engine.gpu)) await engine.gpu.queue.onSubmittedWorkDone();
+    sheet.drawImage(canvas, x, y);
+    sheet.fillStyle = '#e8e8e8';
+    sheet.font = '15px sans-serif';
+    sheet.fillText(label, x + 8, y + 20);
+  }
+
+  window.renderFrames = async ({ model = null } = {}) => {
+    const variants = [['fitted body', {}], ['limits: false', { limits: false }]],
+      poses = ['walk A', 'walk B', 'reach', 'sit'],
+      out = new OffscreenCanvas(CELL_W * VIEWS.length * variants.length, CELL_H * poses.length),
+      sheet = out.getContext('2d'),
+      report = [], errors = [];
+    sheet.fillStyle = '#000'; sheet.fillRect(0, 0, out.width, out.height);
+    for (const [v, [variant, anatomy]] of variants.entries()) {
+      const { engine, errors: gpuErrors, person } = await makePerson(model, anatomy),
+        body = person.body,
+        store = engine.store,
+        tr = store.transforms,
+        nodes = person.model.nodes,
+        joint = (id) => body.joints.find((j) => j.id === id),
+        at = (bone) => { store.tick(false); return Array.from(nodes[bone].matrix.subarray(12, 15)); },
+        pose = () => {
+          const p = body.rest.slice();
+          nodes.forEach((node, i) => p.set([tr.x[node.id], tr.y[node.id], tr.z[node.id], tr.qx[node.id], tr.qy[node.id], tr.qz[node.id], tr.qw[node.id]], i * 10));
+          return p;
+        },
+        hinges = () => {
+          const a = jointAngles(body, pose()), r = (id) => +(a[id]?.flexion ?? NaN).toFixed(1);
+          return { l_elbow: r('l_elbow'), r_elbow: r('r_elbow'), l_knee: r('l_knee'), r_knee: r('r_knee') };
+        };
+      const walk = person.clips.find((c) => /walk/i.test(c)) ?? person.clips[0],
+        idle = person.clips.find((c) => /idle|rest/i.test(c)) ?? person.clips[0];
+      person.playing = false;
+      const { forward, left } = body.frame,
+        h = body.stature,
+        fov = 30;
+      engine.camera.fov = fov;
+      // Frame the pose: from its lowest bone to a head's height above its highest, along the body's forward and left.
+      const view = (deg) => {
+        let low = Infinity, high = -Infinity, mid = [0, 0, 0];
+        nodes.forEach((_, i) => {
+          const p = at(i);
+          low = Math.min(low, p[1]); high = Math.max(high, p[1]);
+          mid = mid.map((v, k) => v + p[k] / nodes.length);
+        });
+        const span = high - low + h * 0.12,
+          centre = [mid[0], low + span / 2 - h * 0.03, mid[2]],
+          d = (span * 1.1) / (2 * Math.tan(fov * Math.PI / 360)),
+          a = deg * Math.PI / 180, dir = [0, 1, 2].map((i) => forward[i] * Math.cos(a) + left[i] * Math.sin(a));
+        engine.camera.position = [0, 1, 2].map((i) => centre[i] + dir[i] * d);
+        engine.camera.target = centre;
+      };
+      const cells = async (row, name) => {
+        for (const [c, [viewName, deg]] of VIEWS.entries()) {
+          view(deg);
+          await shoot(engine, sheet, (v * VIEWS.length + c) * CELL_W, row * CELL_H, `${name}, ${viewName}, ${variant}`);
+        }
+        // A joint held at its stop reads a hair past it in the Animator's 32-bit floats: only what passes by 0.01 counts.
+        const stops = person.check('structural').filter((i) => Math.abs(i.value - i.limit) > 0.01);
+        report.push({ variant, pose: name, hinges: hinges(), outside: person.check().length, structural: stops.length, stops: stops.slice(0, 6).map((i) => `${i.joint} ${i.motion} ${i.value.toFixed(1)} (${i.limit.toFixed(1)})`) });
+      };
+      // Walking: two phases of the walk clip.
+      for (const [row, phase] of [[0, 0.3], [1, 0.8]]) {
+        person.play(walk, { fade: 0, at: phase });
+        person.animator.onPreUpdate(0);
+        await cells(row, `walk ${row ? 'B' : 'A'} (${walk} ${phase} s)`);
+      }
+      // Reaching: the right hand across the chest, the left overhead, both poles behind the body.
+      person.play(idle, { fade: 0, at: 0.5 });
+      person.animator.onPreUpdate(0);
+      const k = h / 1.75, removers = [];
+      for (const [side, offset] of [['r', [0.3, -0.05, 0.3]], ['l', [0.05, 0.5, 0.1]]]) {
+        const bones = [`${side}_shoulder`, `${side}_elbow`, `${side}_radiocarpal`].map((id) => joint(id)?.bone);
+        if (bones.some((b) => b === undefined)) continue;
+        const shoulder = at(bones[0]),
+          place = (o) => [0, 1, 2].map((i) => shoulder[i] + (left[i] * o[0] + body.frame.up[i] * o[1] + forward[i] * o[2]) * k);
+        removers.push(addIKChain(person.animator, { joints: bones, target: place(offset), pole: place([0, 0.3, -3]) }));
+      }
+      for (let i = 0; i < 4; i++) person.animator.onPreUpdate(0);
+      await cells(2, 'reach (IK, pole behind)');
+      for (const remove of removers) remove();
+      // Sitting: hips and knees at 90 degrees, elbows at 60, from the rest pose, held inside the body as the Animator
+      // holds a clip (clampPose), written after the Animator each frame.
+      const sit = poseFromAngles(body, {
+        l_hip: { flexion: 90 }, r_hip: { flexion: 90 }, l_knee: { flexion: 90 }, r_knee: { flexion: 90 },
+        l_elbow: { flexion: 60 }, r_elbow: { flexion: 60 },
+      });
+      if (body.limits) clampPose(body, sit);
+      engine.use({
+        name: 'pose-frames-sit',
+        setup() {},
+        onPreUpdate() {
+          nodes.forEach((node, i) => {
+            const o = i * 10;
+            tr.x[node.id] = sit[o]; tr.y[node.id] = sit[o + 1]; tr.z[node.id] = sit[o + 2];
+            tr.qx[node.id] = sit[o + 3]; tr.qy[node.id] = sit[o + 4]; tr.qz[node.id] = sit[o + 5]; tr.qw[node.id] = sit[o + 6];
+          });
+        },
+      });
+      await cells(3, 'sit (poseFromAngles)');
+      errors.push(...gpuErrors);
+      person.dispose();
+      person.model.dispose();
+      engine.dispose();
+    }
+    const blob = await out.convertToBlob({ type: 'image/png' }),
+      bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return { png: btoa(binary), report, errors };
+  };
+  window.ready = true;
+</script>
+</body>
+</html>

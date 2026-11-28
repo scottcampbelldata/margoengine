@@ -323,6 +323,8 @@ feet.dispose();
 
 The placement object is read every frame, so poles, weight and the raycast may change. A leg whose ray misses keeps its animated pose. Each frame starts from the animated pose, so nothing accumulates. Bones and their ancestors need positive scales; rotations commit through `writeRotation` when it is set.
 
+The Animator's own `footIK` option and `addFootPlacement` both obey a fitted body: on an Animator given one (`setAnatomy`, or every person made by `@margoengine/humans`), the leg is solved by the limb solver, so the knee bends forward between straight and its stop whatever the pole says. A pole the hip cannot follow (more than 90 degrees of swivel from the comfortable one, a pole behind the knee) is left out rather than turning the leg inside out.
+
 ## Inertialization (`margoengine/animator/inertialize`)
 
 `addInertialization(animator, {duration})` replaces crossfades. A state change plays the new pose at once, and the difference between where the old motion was heading and the new pose fades out by itself, keeping the old motion's speed. Only the new state is sampled and there is no snapshot of the old pose to mix. Transitions, triggers and `animator.transition()` work as before.

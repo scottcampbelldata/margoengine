@@ -1239,6 +1239,45 @@ export function fitAnatomy(rig: RigPose | readonly RigJoint[], options: FitOptio
       restWorld[bone * 4 + 3],
     ],
     local = fitted.map((joint) => qmul(qconj(restQ(joint.bone)), joint.frame));
+  // A twist bone on the segment above a joint whose twist spills (a forearm twist bone, as Character Creator and
+  // Unreal rigs have): a bone under that segment's bone, through bones that are no joint of the table, lying along
+  // the segment between its two ends. Such a rig turns the hand itself for pronation and spreads the turn along the
+  // forearm's skin with
+  // the twist bones, while the forearm bone stays still; spilled into the forearm bone, the turn would twist the
+  // skin a second time. So that joint's twist range takes the segment's own (the forearm's pronation) as well, and
+  // nothing spills (KB-RIG-TWISTBONE1).
+  const mapped = new Set(fitted.map((joint) => joint.bone)),
+    carried = new Set<number>();
+  fitted.forEach((joint, k) => {
+    if (!joint.axes || joint.ref < 0 || !joint.spec.dofs?.[2].spill) return;
+    const upper = fitted[joint.ref].bone,
+      a = P(upper),
+      d = sub(P(joint.bone), a),
+      length2 = dot(d, d);
+    if (!(length2 > 0)) return;
+    for (let b = 0; b < n; b++) {
+      if (mapped.has(b)) continue;
+      // Under the segment's bone through bones that are no joint (a twist bone may hang off another at the elbow).
+      let up = parents[b];
+      while (up >= 0 && up !== upper && !mapped.has(up)) up = parents[up];
+      if (up !== upper) continue;
+      const r = sub(P(b), a),
+        along = dot(r, d) / length2,
+        off = sub(r, scaled(d, along));
+      if (along > 0.1 && along < 0.95 && dot(off, off) < 0.15 * 0.15 * length2) {
+        carried.add(k);
+        return;
+      }
+    }
+  });
+  const twistOf = (range: number[], above: number[]): number[] => [
+    range[0],
+    range[1],
+    range[2],
+    range[3],
+    Math.max(-180, range[4] + above[4]),
+    Math.min(180, range[5] + above[5]),
+  ];
   const joints: AnatomicalJoint[] = fitted.map((joint, k) => {
     const { spec, bone, ref } = joint,
       region = spec.region ? regionOf.get(spec.region)! : null,
@@ -1272,8 +1311,12 @@ export function fitAnatomy(rig: RigPose | readonly RigJoint[], options: FitOptio
       referenceFrame,
       neutral,
       rest: { flexion: 0, abduction: 0, rotation: 0 },
-      normal: total(joint.covers, 'normal'),
-      structural: total(region?.shared ? region.joints : joint.covers, 'structural'),
+      normal: carried.has(k)
+        ? twistOf(total(joint.covers, 'normal'), total(fitted[ref].covers, 'normal'))
+        : total(joint.covers, 'normal'),
+      structural: carried.has(k)
+        ? twistOf(total(joint.covers, 'structural'), total(fitted[ref].covers, 'structural'))
+        : total(region?.shared ? region.joints : joint.covers, 'structural'),
     };
   });
   const index = new Map<string, number>();
@@ -1314,7 +1357,11 @@ export function fitAnatomy(rig: RigPose | readonly RigJoint[], options: FitOptio
   WORK.set(body, {
     order: sorted.map(([joint]) => joint),
     spills: joints.flatMap((joint, k) =>
-      joint.limited && joint.spec.dofs![2].spill && fitted[k].ref >= 0 && joints[fitted[k].ref].limited
+      joint.limited &&
+      joint.spec.dofs![2].spill &&
+      !carried.has(k) &&
+      fitted[k].ref >= 0 &&
+      joints[fitted[k].ref].limited
         ? [[joint, joints[fitted[k].ref]] as const]
         : [],
     ),

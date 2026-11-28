@@ -190,6 +190,7 @@ garment over 5 mm into the body. What it does not do yet: push cloth aside at ru
 | Animator (`@margoengine/animator`), one state per clip, named as the clip | starts on the first clip | `clip: 'name'` |
 | Cross-fade length for `play` | 0.3 s | `fade` |
 | Hands (`@margoengine/rigging/hands`): the relaxed pose on every clip whose finger tracks stay under 15 degrees mean | on, for Mixamo, VRM, MPFB, Godot and humanoid bone names | `hands: HandsOptions` or `false` |
+| Anatomy (`@margoengine/rigging/anatomy`): the human body fitted bone for bone, every clip and every IK solve held inside its joint ranges | on, for a rig whose bones a naming `fitHuman` knows uses (the humanoid names, Character Creator and the others it lists) | `anatomy: {limits: false}` keeps the body for reading and IK but holds nothing; `anatomy: false` fits none |
 | Skinning | dual quaternion (Kavan et al. 2008) | `skinning: 'linear'` |
 | Shadows | the `Shadows` attached to the model's scene, if any | `shadows: Shadows` or `false`, or `scene` (a `@margoengine/scenes` handle) |
 | Ambient occlusion | none | `occlusion: scene.parts.occlusion`, or `scene` |
@@ -229,6 +230,70 @@ console.log(eyeLidMargin({center: [0, 0, 0], axis: [0, 0, 1], radius: 1}, {posit
 
 Everything is checked before anything is attached: a bad option or an unknown clip rejects and leaves the model as it
 was.
+
+## Anatomy by default
+
+Every person obeys a human body with no configuration. `addPerson` fits the rig with the human table
+(`fitHuman`), reads how its upper arms and thighs are rolled from its clips, and from then on each frame of each clip is
+held inside the body's ranges, elbows and knees bend only the anatomical way, and the Animator's IK (`addIKChain`, foot
+placement, the `footIK` option) solves on the same body. `person.body` is the fitted body; `person.check(tier)` lists
+what the pose on screen breaks (`'normal'`, the clinical range, by default; `'structural'`, the stops no body passes,
+which a held pose never reaches).
+
+| `anatomy` option | Default | What it does |
+| --- | --- | --- |
+| `limits` | `true` | `false` keeps the body for `check`, `jointAngles` and IK but holds no clip |
+| `tier` | `'structural'` | the range clips are held to: `'normal'` holds them to the clinical range |
+| `calibrate` | `true` | reads the arm and leg rolls from the clips (`hingeRolls`); rolls over 30 degrees are not trusted |
+| `onClamp` | none | called with the motions each held frame was brought back from |
+| `map`, `roll` and the other `fitHuman` options | none | name joints a rig's naming misses, or turn a segment by hand |
+
+A rig whose bones no naming knows gets no body (`person.body` is undefined); name its joints with `anatomy: {map}`.
+The frames in `test/pose-frames.browser.mjs` draw a walk, an IK reach and a seated pose from the front, the
+three-quarter and the side with the body and without it.
+
+## A person built in code (`./body`)
+
+`addBody(engine, {bones, meshes, clips})` makes a person from a skeleton and skinned meshes made in code or read from
+another format, with no glTF file: each bone's name, parent and bind matrix, and each mesh's positions, normals,
+indices, four joints and four weights a vertex. It writes them into an in-memory glTF (`bodyGLTF` returns that document),
+loads it and hands it to `addPerson`, so the body gets every default above, its anatomy included. With no clips it gets
+one, `rest`, holding the bind pose. `person.model` is the model it built, and disposing the person disposes it.
+
+```ts
+import {Engine} from 'margoengine';
+import {addBody} from 'margoengine/humans/body';
+// Joint positions in metres, y up, facing +z, parents before children, in the humanoid names.
+const joints: [string, string | null, number[]][] = [
+  ['hips', null, [0, 0.95, 0]], ['spine', 'hips', [0, 1.06, 0]], ['chest', 'spine', [0, 1.25, 0]],
+  ['neck', 'chest', [0, 1.46, 0]], ['head', 'neck', [0, 1.56, 0]],
+];
+for (const [side, s] of [['left', 1], ['right', -1]] as const)
+  joints.push(
+    [`${side}Shoulder`, 'chest', [s * 0.04, 1.42, 0]], [`${side}UpperArm`, `${side}Shoulder`, [s * 0.19, 1.41, 0]],
+    [`${side}LowerArm`, `${side}UpperArm`, [s * 0.4, 1.2, 0]], [`${side}Hand`, `${side}LowerArm`, [s * 0.58, 1.02, 0]],
+    [`${side}UpperLeg`, 'hips', [s * 0.09, 0.9, 0]], [`${side}LowerLeg`, `${side}UpperLeg`, [s * 0.09, 0.48, 0.01]],
+    [`${side}Foot`, `${side}LowerLeg`, [s * 0.09, 0.08, -0.01]], [`${side}Toes`, `${side}Foot`, [s * 0.09, 0.02, 0.14]],
+  );
+const bones = joints.map(([name, parent, p]) => ({
+  name,
+  parent: joints.findIndex((j) => j[0] === parent),
+  bind: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, p[0], p[1], p[2], 1],
+}));
+// A small triangle on each joint, skinned to it.
+const positions: number[] = [], normals: number[] = [], indices: number[] = [], skin: number[] = [], weights: number[] = [];
+joints.forEach(([, , [x, y, z]], i) => {
+  positions.push(x - 0.03, y, z, x + 0.03, y, z, x, y - 0.06, z);
+  normals.push(0, 0, 1, 0, 0, 1, 0, 0, 1);
+  indices.push(i * 3, i * 3 + 1, i * 3 + 2);
+  for (let k = 0; k < 3; k++) skin.push(i, 0, 0, 0), weights.push(1, 0, 0, 0);
+});
+const engine = await Engine.create(document.querySelector('canvas')!);
+const person = await addBody(engine, {bones, meshes: [{positions, normals, indices, joints: skin, weights}]});
+console.log(person.body?.preset, person.clips); // 'humanoid' ['rest']: the human body, on by default
+console.log(person.check().length); // 0: the bind pose is inside every range
+person.dispose(); // and the model with it
+```
 
 ## Playing and seeking
 

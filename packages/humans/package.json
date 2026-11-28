@@ -37,6 +37,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./body": {
+      "types": "./dist/body.d.ts",
+      "import": "./dist/body.js"
+    },
     "./crowd": {
       "types": "./dist/crowd.d.ts",
       "import": "./dist/crowd.js"

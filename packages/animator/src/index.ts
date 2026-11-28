@@ -7,7 +7,8 @@ import { multiplyQuaternions as quaternionMultiply } from '@margoengine/math/qua
 import { MargoError } from '@margoengine/math/errors';
 import { fault } from '../../shared/errors.js';
 import { blend1D, blend2D, quaternionBlend, treeWeights } from './blend.js';
-import { solveTwoBoneIK, rotationBetween } from './ik.js';
+import { anatomyOf, solveTwoBoneIK, rotationBetween } from './ik.js';
+import { poseTools } from './pose-tools.js';
 export { blend1D, blend2D } from './blend.js';
 export { anatomyOf, setAnatomy, solveTwoBoneIK } from './ik.js';
 export type { Anatomy, AnatomyGate, AnatomyJoint, AnatomyRegion } from './ik.js';
@@ -135,7 +136,11 @@ export interface FootIK {
   knee: number;
   /** glTF node index of the ankle; a child of `knee`. */
   ankle: number;
-  /** World-space point the knee bends toward. */
+  /**
+   * World-space point the knee bends toward. On an Animator with a fitted body (`setAnatomy`, with limits on) the
+   * knee bends the anatomical way inside its range whatever the pole says, and the pole only picks the leg's swivel
+   * inside the hip's range; a pole on the side the knee cannot face (behind it) is left out.
+   */
   pole: Vec3;
   /** Casts a ray from a world-space `origin` along `direction` (down); returns the hit or `null`. */
   raycast: (origin: Vec3, direction: Vec3) => GroundHit | null;
@@ -273,6 +278,7 @@ export class Animator implements EnginePlugin {
   private layers = new Set<AdditiveLayer>();
   private readonly scratch = new Map<number, Float32Array>();
   private feet = new Set<FootIK>();
+  private footTools?: ReturnType<typeof poseTools>;
   private readonly solvers: Array<(step: number) => void> = [];
   private readonly poseSteps: Array<(position: number[][], rotation: number[][]) => void> = [];
   private readonly lateSteps: Array<(pose: Pose, step: number) => void> = [];
@@ -1171,16 +1177,22 @@ export class Animator implements EnginePlugin {
     if (!hit) return;
     finiteVector(hit.position, 3, 'Ground hit');
     if (hit.normal) finiteVector(hit.normal, 3, 'Ground normal');
-    const target: [number, number, number] = [hit.position[0], hit.position[1] + (foot.offset ?? 0), hit.position[2]],
-      root = position(hip),
-      solved = solveTwoBoneIK(root, position(knee), start, target, foot.pole);
-    this.rotateWorld(hip, rotationBetween(subtract(position(knee), root), subtract(solved.knee, root)));
-    this.engine!.store.tick(false);
-    this.rotateWorld(
-      knee,
-      rotationBetween(subtract(position(ankle), position(knee)), subtract(solved.ankle, position(knee))),
-    );
-    this.engine!.store.tick(false);
+    const target: [number, number, number] = [hit.position[0], hit.position[1] + (foot.offset ?? 0), hit.position[2]];
+    if (anatomyOf(this)?.limits)
+      // A fitted body (setAnatomy): the knee bends about its own axis the anatomical way, inside its range, and the
+      // pole only picks the leg's swivel inside the hip's range, as addFootPlacement does (KB-ANIM-FOOTIK-ANATOMY1).
+      (this.footTools ??= poseTools(this, 'Foot IK')).placeLimb(hip, knee, ankle, target, foot.pole);
+    else {
+      const root = position(hip),
+        solved = solveTwoBoneIK(root, position(knee), start, target, foot.pole);
+      this.rotateWorld(hip, rotationBetween(subtract(position(knee), root), subtract(solved.knee, root)));
+      this.engine!.store.tick(false);
+      this.rotateWorld(
+        knee,
+        rotationBetween(subtract(position(ankle), position(knee)), subtract(solved.ankle, position(knee))),
+      );
+      this.engine!.store.tick(false);
+    }
     if (hit.normal) {
       const m = ankle.matrix;
       this.rotateWorld(ankle, rotationBetween([m[4], m[5], m[6]], hit.normal));

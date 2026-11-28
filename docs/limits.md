@@ -11734,6 +11734,27 @@ With `TerrainLayer.bump`, where a pixel covers less than 1/128 of a repeat (3 cm
 detail finer than that, and each showing layer costs 16 texel loads per triplanar axis there (one axis on most ground).
 Core and stage are unchanged.
 
+### People obey anatomy by default (`@margoengine/humans`, `./body`, 2026-11-28)
+
+`addPerson` fits the human table to any rig a naming of `fitHuman` knows and holds every clip at the `structural` tier;
+`addBody` builds a person from bones and skinned meshes made in code the same way. Limits and accepted differences:
+
+- Calibration reads the roll of the shoulders and hips only from the clips (`hingeRolls`), and trusts a roll only up to
+  30 degrees: a clip that bends an elbow the wrong way would otherwise teach a roll that flips the hinge. Elbow, knee
+  and finger rolls come from the fit alone.
+- A rig with no naming `fitHuman` knows (the UAL mannequins' Unreal names among them) gets no body unless
+  `anatomy: {map}` names its joints (KB-HUM-UALNAMES1).
+- Measured on the Fauld cast's Character Creator old man, three clips: hands and forearms no longer change; the ring
+  fingers rest 12.8 degrees past their supination stop (KB-RIG-RINGROLL1), the thumbs are held up to 22 degrees off
+  the walk (KB-RIG-THUMB1), the left collarbone up to 11 (KB-RIG-CLAVICLE1), the calf 4.7 and the toes 2.
+- `person.check('structural')` reads the Animator's 32-bit pose, so a joint held at its stop can read a hair past it;
+  the pose frames count only what passes by 0.01 degrees.
+- `addBody` writes each bone's rest as translation, rotation and scale; a bind matrix with shear loses the shear. A
+  person built with no clips gets one, `rest`, of two keys a second apart.
+- Proof: `packages/humans/test/anatomy-defaults.test.js`, `body.test.js` and the pose frames
+  `packages/humans/test/pose-frames.browser.mjs` (walk, IK reach and seat, front, three-quarter and side, with and
+  without limits, on WebGPU and `MARGO_COMPAT=1`).
+
 ### Anatomy core and the human table (`@margoengine/rigging/anatomy`, 2026-11-28)
 
 The optional rigging/anatomy entry fits a species table to a rig and rigging/anatomy/human holds the human table.
