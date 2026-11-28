@@ -1589,6 +1589,70 @@ species*, PNW-GTR-87; Kozak 1988, "A variable-exponent taper equation", Can. J. 
 flexible growth function for empirical use", J. Exp. Bot. 10(2); Hallé, Oldeman and Tomlinson 1978, *Tropical Trees and
 Forests*; Décoret, Durand, Sillion and Dorsey 2003, "Billboard clouds for extreme model simplification", ACM TOG 22(3).
 
+## Temperate broadleaves (`@margoengine/procedural/broadleaves`)
+
+English oak, European beech and black alder at any age, leafed or bare. An oak is not a lobed blob: the trunk forks into
+4 to 7 limbs that kink as they reach across the dome of the crown, twigs grow out of them toward foliage masses by space
+colonisation, the inner branches that sit in deep shade are shed so the limbs show, and leaf clusters (alpha-cut cards
+cut from a leaf atlas drawn in code) sit in a shell on the outside, with sky between the masses. Sizes are measured
+forestry: crown width follows Hemery's table of open-grown trees (an oak 2.5 m across at 0.1 m diameter and 13.1 m at
+0.7 m), branch radii follow the pipe model (r^2.4 at a fork is the sum of the children's) scaled so breast height has the
+stem's diameter, and the leaf area is a leaf area index of 4 to 6 over the crown's ground area. Tested from orthographic
+views against the old lobe crown (`generateTreeMesh('broadleaf')`): sky inside the silhouette's convex hull 0.25 to 0.45
+(the old crown 0.15), sky in that hull shrunk to 0.8 0.10 to 0.25 (old 0.03), bark at least 2 percent of the crown
+(old 1.3 percent).
+
+- `broadleafForm(species, {age, height, open})` (also in `/broadleaf-species`, a small data entry): `{height, dbh,
+  crownWidth, crownBase, crownLength, crownRatio}` in metres. `age` is years or `'sapling'` (15), `'pole'` (40),
+  `'mature'` (120, the default) or `'old'` (300); `open` runs from 0 (forest grown, high bole) to 1 (open grown, low
+  limbs, stout; default 0.8, a meadow tree).
+- `generateBroadleafMesh(species, {age, height, open, detail, condition, seed, atlasSize})`: `{trunk, canopy, form,
+  limbs, masses, leafArea, distanceTests, skeleton, atlas}`, standing on y = 0. `detail` 2 (near: all the wood to the
+  twigs that carry leaves and every card, about 15,000 triangles for a mature oak), 1 (middle: trunk and limbs and every
+  fourth card, 2.25 times as wide, about 2,900) or 0 (the stem). `condition` `'live'` or `'bare'`. The canopy's uvs point
+  into `atlas` (draw it with an alpha cut-off of 0.5 and both faces); `skeleton` is the grown wood as nodes, parents,
+  pipe-model radii and branch orders; `distanceTests` is the growth's work count. Growing takes a few hundred
+  milliseconds for a mature tree.
+- `generateBroadleafImposter(mesh, {cards})`: three crossed cards (72 triangles) and an image holding the leaf atlas and,
+  below it, each card's own baked view of the near mesh (albedo, a depth occlusion term, alpha coverage).
+- `broadleafLevels(species, options)`: the three scatter rings, near, middle and imposter, with the shared `textures`
+  (draw the canopy white: its colour is in the image). Bare trees draw their wood at three coarseness levels.
+- `parseBroadleafKey(key)`: what a biome mesh key names: `procedural:<species>`, `procedural:<species>/<age>`,
+  `procedural:<species>/bare` and `procedural:broadleaf` (a mature English oak).
+
+```ts
+import {broadleafLevels, generateBroadleafMesh, parseBroadleafKey} from 'margoengine/procedural/broadleaves';
+const oak = generateBroadleafMesh('english-oak', {age: 'mature'});
+console.log(oak.form.height.toFixed(1), (oak.form.dbh * 100).toFixed(0), oak.form.crownWidth.toFixed(1), oak.limbs); // 21.4 82 15.3 5
+const beech = broadleafLevels('european-beech', {age: 'pole'});
+console.log(beech.canopy.length, beech.textures?.baseColor.width, beech.textures?.baseColor.height); // 3 512 1024
+console.log(parseBroadleafKey('procedural:english-oak/old')?.age); // old
+```
+
+`BROADLEAF_SETTINGS` (`@margoengine/procedural/broadleaf-settings`) are the slider rows on the shared shape (species,
+age, open, condition, seed, imposter size; all rebuild); `broadleafOptionsFromSettings(values)` gives the species and
+the options.
+
+```ts
+import {broadleafOptionsFromSettings} from 'margoengine/procedural/broadleaf-settings';
+const {species, options} = broadleafOptionsFromSettings({species: 'black-alder', age: 60, condition: 'bare'});
+console.log(species, options.age, options.condition); // black-alder 60 bare
+```
+
+Sources: Hemery, Savill and Pryor 2005, "Applications of the crown diameter-stem diameter relationship for different
+species of broadleaved trees", Forest Ecology and Management 215, and Hemery's table of open-grown trees
+(gabrielhemery.com, 2011); Runions, Lane and Prusinkiewicz 2007, "Modeling trees with a space colonization algorithm",
+Eurographics Workshop on Natural Phenomena; Palubicki et al. 2009, "Self-organizing tree models for image synthesis", ACM
+TOG 28(3); Shinozaki, Yoda, Hozumi and Kira 1964, "A quantitative analysis of plant form: the pipe model theory",
+Japanese Journal of Ecology 14; Eaton et al. 2016, "Quercus robur and Quercus petraea in Europe", European Atlas of Forest
+Tree Species; Buck-Sorlin and Bell 2000, "Models of crown architecture in Quercus petraea and Q. robur", Forestry 73(5);
+Barthelemy and Caraglio 2007, "Plant architecture", Annals of Botany 99(3); Breda 2003, "Ground-based measurements of leaf
+area index", Journal of Experimental Botany 54(392); Pisek et al. 2013, "Is the spherical leaf inclination angle
+distribution a valid assumption for temperate and boreal broadleaf tree species?", Agricultural and Forest Meteorology 169;
+Cook, Halstead, Planck and Ryu 2007, "Stochastic simplification of aggregate detail", ACM TOG 26(3); Behrendt, Colditz,
+Franzke, Kopf and Deussen 2005, "Realistic real-time rendering of landscapes using billboard clouds", Computer Graphics
+Forum 24(3); Richards 1959, "A flexible growth function for empirical use", J. Exp. Bot. 10(2).
+
 ## The 1903 Wright Flyer and its four flights (`@margoengine/procedural/flyer`)
 
 `generateWrightFlyer(options?)` builds the 1903 Wright Flyer from its published dimensions: double-covered cambered

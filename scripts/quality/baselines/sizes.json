@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22010439,
+  "total": 22026578,
   "history": [
     {
       "date": "2026-10-24",
@@ -15827,6 +15827,12 @@
       "commit": "sea-05-native-radiation-stress",
       "reason": "SEA-05 @margoengine/physics/surf 7413 to 12495 B gzip, ceiling 7669 to 12870 B. The optional surf entry owns accepted shore marks, directional moments and the force port. A separate solver would duplicate boundary and roller state. Native modules and helpers load only when used. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "3f1910a64c",
+      "reason": "KB-PROCEDURAL-OAKBLOB1 step A: new procedural entries /broadleaves 12,190 B gzip (ceiling 12,556; it bundles tree-mesh, 4,428 B, for the wood: a separate import would load the same bytes), /broadleaf-species 1,308 (ceiling 1,564) and /broadleaf-settings 1,763 (ceiling 2,019), the oak, beech and alder with limbs, leaf cards and three levels, as the conifer entries are. Core and stage receive zero bytes.",
+      "grew": 3
     }
   ],
   "items": {
@@ -16844,6 +16850,9 @@
     "@margoengine/post/trail": 3766,
     "@margoengine/post/upscale": 5366,
     "@margoengine/procedural": 20280,
+    "@margoengine/procedural/broadleaf-settings": 2019,
+    "@margoengine/procedural/broadleaf-species": 1564,
+    "@margoengine/procedural/broadleaves": 12556,
     "@margoengine/procedural/building-plans": 39215,
     "@margoengine/procedural/building-rules": 28575,
     "@margoengine/procedural/building-settings": 6573,

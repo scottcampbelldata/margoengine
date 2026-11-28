@@ -12647,6 +12647,41 @@ Written from the papers, tables and archive records below; no other engine's or 
   2 inch brim and a crown rounding over from 0.6 of its height (`GarmentSpec.dome`) are read from it and from the
   Library of Congress photographs of the Wrights in town.
 
+## Temperate broadleaves: procedural/broadleaf-species, procedural/broadleaves, procedural/broadleaf-settings (2026-11-28)
+
+Written from the papers and tables below, read as text; no other engine's or project's code was read, and no paper's
+companion code. The leaf atlas is drawn in code; no photograph or outside image is used.
+
+- G. Hemery, P. Savill and S. Pryor, "Applications of the crown diameter-stem diameter relationship for different species
+  of broadleaved trees", Forest Ecology and Management 215, 285-294, 2005, https://doi.org/10.1016/j.foreco.2005.05.016,
+  and Hemery's table of open-grown trees, https://gabrielhemery.com/blog/2011/06/15/how-big-will-this-tree-grow/ (oak 2.50
+  m at 0.10 m dbh to 13.14 m at 0.70 m; beech 2.52 m to 11.96 m). Used: the crown width lines 0.727 + 17.73 dbh (oak) and
+  0.947 + 15.73 dbh (beech). The table has no alder; its line is ours.
+- A. Runions, B. Lane and P. Prusinkiewicz, "Modeling trees with a space colonization algorithm", Eurographics Workshop on
+  Natural Phenomena, 2007, https://algorithmicbotany.org/papers/colonization.egwnp2007.html. Used: attraction points, the
+  influence and kill distances, the upward tropism term, one new node a step toward the mean direction of the points.
+- W. Palubicki, K. Horel, S. Longay, A. Runions, B. Lane, R. Mech and P. Prusinkiewicz, "Self-organizing tree models for
+  image synthesis", ACM TOG 28(3), 2009, https://algorithmicbotany.org/papers/selforg.sig2009.html. Used: the shadow
+  propagation field (each tip shades a pyramid of voxels beneath it, weight b^-q over 5 layers); only the shading and the
+  shedding are taken, not the resource allocation.
+- K. Shinozaki, K. Yoda, K. Hozumi and T. Kira, "A quantitative analysis of plant form: the pipe model theory",
+  Japanese Journal of Ecology 14, 1964. Used: r^n at a fork is the sum of the children's r^n, n 2.4.
+- C. Eaton, G. Caudullo, S. Oliveira and D. de Rigo, "Quercus robur and Quercus petraea in Europe", European Atlas of
+  Forest Tree Species, 2016; G. Buck-Sorlin and A. Bell, "Models of crown architecture in Quercus petraea and Q. robur",
+  Forestry 73(5), 2000; D. Barthelemy and Y. Caraglio, "Plant architecture: a dynamic, multilevel and comprehensive
+  approach to plant form, structure and ontogeny", Annals of Botany 99(3), 2007. Used: the decurrent crown (a few large
+  limbs, low and near horizontal on an open-grown oak), limbs that restart from side buds every 0.5 to 1.5 m.
+- N. Breda, "Ground-based measurements of leaf area index: a review of methods, instruments and current controversies",
+  Journal of Experimental Botany 54(392), 2003; J. Pisek, O. Sonnentag, A. Richardson and M. Mottus, "Is the spherical
+  leaf inclination angle distribution a valid assumption for temperate and boreal broadleaf tree species?", Agricultural
+  and Forest Meteorology 169, 2013. Used: a leaf area index of 4 to 6 and cards tilted 20 to 40 degrees from flat.
+- R. Cook, J. Halstead, M. Planck and D. Ryu, "Stochastic simplification of aggregate detail", ACM TOG 26(3), 2007;
+  M. Behrendt, C. Colditz, O. Franzke, J. Kopf and O. Deussen, "Realistic real-time rendering of landscapes using
+  billboard clouds", Computer Graphics Forum 24(3), 2005. Used: the middle level (fewer, wider cards) and the far level
+  (crossed cards, each with its own baked view).
+- F. Richards, "A flexible growth function for empirical use", Journal of Experimental Botany 10(2), 1959. Used: the
+  Chapman-Richards height-age form; its rates, the diameter curve, albedos and leaf sizes are ours.
+
 ## Blast thermal: weather/eruption BlastCloud (2026-11-24)
 
 Written from the papers' text and equations only; no other engine's or tool's code was read. Sources: B. R. Morton,

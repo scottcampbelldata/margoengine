@@ -4727,6 +4727,18 @@
         "raw": 54,
         "gzip": 74
       },
+      "./procedural/broadleaf-species": {
+        "raw": 55,
+        "gzip": 75
+      },
+      "./procedural/broadleaves": {
+        "raw": 49,
+        "gzip": 69
+      },
+      "./procedural/broadleaf-settings": {
+        "raw": 56,
+        "gzip": 76
+      },
       "./quality": {
         "raw": 34,
         "gzip": 54
@@ -16266,6 +16278,18 @@
       "./conifer-settings": {
         "raw": 4717,
         "gzip": 2191
+      },
+      "./broadleaf-species": {
+        "raw": 2800,
+        "gzip": 1308
+      },
+      "./broadleaves": {
+        "raw": 28981,
+        "gzip": 12190
+      },
+      "./broadleaf-settings": {
+        "raw": 3542,
+        "gzip": 1763
       }
     },
     "@margoengine/quality": {

@@ -2955,6 +2955,18 @@
       "types": "./dist/procedural/conifer-settings.d.ts",
       "import": "./dist/procedural/conifer-settings.js"
     },
+    "./procedural/broadleaf-species": {
+      "types": "./dist/procedural/broadleaf-species.d.ts",
+      "import": "./dist/procedural/broadleaf-species.js"
+    },
+    "./procedural/broadleaves": {
+      "types": "./dist/procedural/broadleaves.d.ts",
+      "import": "./dist/procedural/broadleaves.js"
+    },
+    "./procedural/broadleaf-settings": {
+      "types": "./dist/procedural/broadleaf-settings.d.ts",
+      "import": "./dist/procedural/broadleaf-settings.js"
+    },
     "./quality": {
       "types": "./dist/quality.d.ts",
       "import": "./dist/quality.js"

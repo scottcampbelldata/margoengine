@@ -149,6 +149,18 @@
     "./conifer-settings": {
       "types": "./dist/conifer-settings.d.ts",
       "import": "./dist/conifer-settings.js"
+    },
+    "./broadleaf-species": {
+      "types": "./dist/broadleaf-species.d.ts",
+      "import": "./dist/broadleaf-species.js"
+    },
+    "./broadleaves": {
+      "types": "./dist/broadleaves.d.ts",
+      "import": "./dist/broadleaves.js"
+    },
+    "./broadleaf-settings": {
+      "types": "./dist/broadleaf-settings.d.ts",
+      "import": "./dist/broadleaf-settings.js"
     }
   },
   "files": [

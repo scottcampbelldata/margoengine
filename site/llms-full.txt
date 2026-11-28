@@ -1359,7 +1359,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,480 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,486 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -16929,6 +16929,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   backends, and the meadow frames show the ground's grain between the tussocks.
 - **Regression:** `packages/terrain/test/anisotropy.browser.mjs` (real GPU; `MARGO_COMPAT=1` for the WebGL2 layer).
 
+### Open 2026-11-28: the oak imposter and middle ring change the tree by more than turning it 45 degrees does (KB-PROCEDURAL-OAKIMPOSTER1, procedural)
+
+- **Repro:** `packages/procedural/test/broadleaf-lod.test.js` measures `broadleafLevels('english-oak')` from 8 azimuths
+  and elevations 0, 10 and 30 degrees (coverage inside the near outline and mean luminance, the rule of
+  `conifer-lod.test.js`). The near tree turned 45 degrees changes by 9.3 percent (coverage) and 9.9 (luminance). The
+  middle ring (seed 1) differs by 5.4 and 8.7 percent and passes; seed 2 differs by 8.0 and 9.3 against its own 4.5 and
+  5.7. The three-card imposter differs by -14 to +9 percent (coverage) and -22 to +9 (luminance).
+- **Cause:** the near cards overlap about 11 deep, so coverage saturates near 0.8 and the middle ring's fewer, wider
+  cards match it only on average, with the noise of a different random placement (hence the 2.25 times width). Three
+  vertical cards each hold one baked view: seen between two cards the oblique cards add coverage the near tree does not
+  have, and seen from 30 degrees above they lose the dome of the crown.
+- **Fix needed:** a view-dependent or soft-alpha bake (fewer artefacts than three fixed views), or a horizontal cap
+  card, judged on the same measure; the test holds the imposter at its measured ceiling (0.16 coverage, 0.25
+  luminance) until then.
+
 ### Open 2026-11-28: a broadleaf tree (oak, beech, alder) reads as a few smooth lime blobs (KB-PROCEDURAL-OAKBLOB1, procedural, biomes)
 
 - **Repro:** the FG-16 meadow frames (`BiomeView` temperate preset, its oaks 50 to 300 m away): each crown is two or
@@ -16943,6 +16958,9 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix needed:** a broadleaf crown built as limbs carrying leaf clusters with gaps (space colonisation, which
   `@margoengine/procedural/trees` already grows, then clustered leaf cards), near, middle and imposter levels as the
   conifers have, judged on whole-scene frames. A planner-sized job across procedural and biomes.
+- **Progress (step A, 2026-11-28):** `@margoengine/procedural/broadleaves`, `/broadleaf-species` and
+  `/broadleaf-settings` build the oak, beech and alder with limbs, shed inner branches, alpha-cut leaf cards and three
+  levels (`test/broadleaves.test.js`); biomes does not draw them yet (step B), nor the sync default (step C).
 
 ### Fixed 2026-11-28: a meadow seen from a few metres up showed the edge of the dense near grass as a band (KB-BIOMES-GRASSRING1, biomes, scatter)
 
