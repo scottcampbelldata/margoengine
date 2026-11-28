@@ -301,7 +301,7 @@
   "the-analog-integrator": {
    "R3": 4,
    "R4": 2,
-   "R5": 407
+   "R5": 406
   },
   "the-ar-card": {
    "R3": 11,
@@ -380,7 +380,7 @@
    "R5": 795
   },
   "the-camera-obscura": {
-   "R5": 365
+   "R5": 363
   },
   "the-canal-lock": {
    "R2": 1,
@@ -595,7 +595,7 @@
   "the-harmonic-drive": {
    "R3": 3,
    "R4": 3,
-   "R5": 436
+   "R5": 431
   },
   "the-heat-haze": {
    "R3": 4,
@@ -635,7 +635,7 @@
    "R5": 412
   },
   "the-iridescence-bench": {
-   "R5": 310
+   "R5": 307
   },
   "the-jewelry-counter": {
    "R1": 3,

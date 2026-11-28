@@ -1,7 +1,7 @@
 import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { createBench } from './model.js';
-import { lerp as mix } from '@margoengine/math/mathutils';
+import { ShotBlend } from '@margoengine/cameras/shots';
 
 const canvas = document.querySelector('#film');
 const loading = document.querySelector('#loading');
@@ -14,11 +14,11 @@ const presets = Array.from(document.querySelectorAll('[data-thickness]'));
 const controls = [film, tilt, view, ...presets];
 const lifetime = new AbortController();
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-const overview = { target: [-.003, .187, .069], offset: [.47, .69, 1.02], fitAspect: 1.10 };
-const closeUp = { target: [.016, .323, .017], offset: [.346, .44, .713], fitAspect: 1.11 };
+const overview = { target: [-.003, .187, .069], offset: [.47, .69, 1.02], fit: 1.10 };
+const closeUp = { target: [.016, .323, .017], offset: [.346, .44, .713], fit: 1.11 };
 let thickness = Number(film.value), degrees = Number(tilt.value);
-let engine, bench, observer, frame, last = 0;
-let detail = false, zoom = 0, opticalDirty = true, pending = false;
+let engine, shots, bench, observer, frame, last = 0;
+let detail = false, opticalDirty = true, pending = false;
 
 function resize() {
   const bounds = canvas.getBoundingClientRect();
@@ -46,23 +46,19 @@ function paint(now) {
   frame = undefined;
   const delta = last ? Math.min(.06, (now - last) / 1000) : 1 / 60;
   last = now;
-  const target = Number(detail);
-  zoom = reducedMotion.matches || Math.abs(zoom - target) < .001 ? target : mix(target, zoom, Math.exp(-delta * 16));
-  const fit = Math.max(1, mix(overview.fitAspect, closeUp.fitAspect, zoom) * canvas.height / canvas.width);
-  const focus = overview.target.map((value, index) => mix(value, closeUp.target[index], zoom));
-  engine.camera.target = focus;
-  engine.camera.position = focus.map((value, index) => value + fit * mix(overview.offset[index], closeUp.offset[index], zoom));
+  shots.goal = Number(detail);
+  const moving = shots.update(delta, canvas.width, canvas.height);
   if (opticalDirty) {
     bench.update(thickness, degrees);
     opticalDirty = false;
   }
   engine.render({ delta });
-  Object.assign(document.body.dataset, { thickness, tilt: degrees, view: zoom === 1 ? 'detail' : zoom === 0 ? 'overview' : 'moving' });
+  Object.assign(document.body.dataset, { thickness, tilt: degrees, view: moving ? 'moving' : detail ? 'detail' : 'overview' });
   if (pending) {
     performance.mark('margo-film-applied');
     pending = false;
   }
-  if (zoom !== target) schedule();
+  if (moving) schedule();
   else last = 0;
 }
 
@@ -114,6 +110,7 @@ async function start() {
     engine = await open();
   }
   engine.onError = fail;
+  shots = new ShotBlend(engine.camera, overview, closeUp, { rate: 16, still: reducedMotion });
   engine.scene.background = '#516067';
   engine.lighting.direction.set([0, 1, 0, 3.82]);
   engine.lighting.radiance.set([1, .99, .97, .49]);

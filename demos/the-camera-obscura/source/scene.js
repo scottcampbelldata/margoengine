@@ -3,7 +3,7 @@ import { Clustered } from '@margoengine/clustered';
 import { Shadows } from '@margoengine/shadows';
 import { createCamera } from './model.js';
 import { relativeExposure } from './optics.js';
-import { lerp as mix } from '@margoengine/math/mathutils';
+import { ShotBlend } from '@margoengine/cameras/shots';
 
 const canvas = document.querySelector('#scene');
 const loading = document.querySelector('#loading');
@@ -15,11 +15,11 @@ const view = document.querySelector('#view');
 const controls = [range, rays, view];
 const lifetime = new AbortController();
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-const overall = { target: [-.002, .165, .078], offset: [1.135, .78, 1.33], fitAspect: 1.23 };
-const plateView = { target: [.300, .247, .014], offset: [.83, .38, .45], fitAspect: .93 };
+const overall = { target: [-.002, .165, .078], offset: [1.135, .78, 1.33], fit: 1.23 };
+const plateView = { target: [.300, .247, .014], offset: [.83, .38, .45], fit: .93 };
 let millimeters = Number(range.value);
-let engine, camera, observer, frame, last = 0;
-let zoom = 0, detail = false, showRays = false, opticalDirty = true, pending = false;
+let engine, shots, camera, observer, frame, last = 0;
+let detail = false, showRays = false, opticalDirty = true, pending = false;
 
 function resize() {
   const bounds = canvas.getBoundingClientRect();
@@ -46,24 +46,22 @@ function paint(now) {
   const delta = last ? Math.min(.06, (now - last) / 1000) : 1 / 60;
   last = now;
   const distance = millimeters / 1000;
-  const target = Number(detail);
-  zoom = reducedMotion.matches || Math.abs(zoom - target) < .001 ? target : mix(target, zoom, Math.exp(-delta * 16));
-  const fit = Math.max(1, mix(overall.fitAspect, plateView.fitAspect, zoom) * canvas.height / canvas.width);
-  const focus = overall.target.map((value, i) => mix(value, i === 0 ? distance : plateView.target[i], zoom));
-  engine.camera.target = focus;
-  engine.camera.position = focus.map((value, i) => value + fit * mix(overall.offset[i], plateView.offset[i], zoom));
+  // The plate view follows the sliding screen.
+  plateView.target[0] = distance;
+  shots.goal = Number(detail);
+  const moving = shots.update(delta, canvas.width, canvas.height);
   if (opticalDirty) {
     camera.update(distance, showRays);
     opticalDirty = false;
   }
   engine.render({ delta });
   Object.assign(document.body.dataset, { distance: millimeters, exposure: relativeExposure(distance).toFixed(6),
-    rays: String(showRays), view: zoom === 1 ? 'plate' : zoom === 0 ? 'overview' : 'moving' });
+    rays: String(showRays), view: moving ? 'moving' : detail ? 'plate' : 'overview' });
   if (pending) {
     performance.mark('margo-distance-applied');
     pending = false;
   }
-  if (zoom !== target) schedule();
+  if (moving) schedule();
   else last = 0;
 }
 
@@ -105,6 +103,7 @@ async function start() {
     engine = await open();
   }
   engine.onError = fail;
+  shots = new ShotBlend(engine.camera, overall, plateView, { rate: 16, still: reducedMotion });
   engine.scene.background = '#575363';
   engine.lighting.direction.set([.98, 1.63, .48, 3.65]);
   engine.lighting.radiance.set([1, .92, .77, .43]);
