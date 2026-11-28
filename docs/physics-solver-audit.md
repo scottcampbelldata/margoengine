@@ -52,21 +52,21 @@ them; the rest is a record of what a stronger solver would need.
 
 ### BIO-01 four-point pass
 
-- Point 5. `bio01-acceptance.test.js` covers distinct flow-origin translation, signed publication, and a finite input
+- Point 5 (a638e82e14). `bio01-acceptance.test.js` covers distinct flow-origin translation, signed publication, and a finite input
   pair whose derived acceleration overflows. The invalid sample leaves the accepted pose intact. The native tests
   cover rejecting a nonfinite modal discriminant. `coupling/vegetation.test.js` drives the first rigid contact and
   trunk release from a frame-zero snapshot and checks exact replay.
-- Point 6. `vegetation-threads.test.js` and `vegetation-threads.browser.mjs` compare plain/shared serial
+- Point 6 (a638e82e14). `vegetation-threads.test.js` and `vegetation-threads.browser.mjs` compare plain/shared serial
   and four-partition acceptance, including signed origins, already failed plants and exact replay. The large case
   integrates 4,099 plants and counts 8,198 SIMD pairs. Isolated Chromium starts three actual helpers. The raw native
   comparison covers 56,160 rows and keeps accepted state when a later partition rejects an overflowing discriminant.
   The same browser test starts three helpers from a Vite production build and verifies the shipped Wasm bytes.
-- Point 7. `scatter/test/plant-surge.browser.mjs` binds actual SEA-02 water velocities into `PlantSway` and
+- Point 7 (a638e82e14). `scatter/test/plant-surge.browser.mjs` binds actual SEA-02 water velocities into `PlantSway` and
   renders its accepted output through the existing GrassScatter and PlantMotion route. Shallow and deep stem tips
   travel 21.74 cm and 1.52 cm. The shallow visible crest travels 13.88 pixels while its root stays planted.
   WebGPU and WebGL2 reproduce accepted state and held/replayed frame bytes. This is a fixed-camera BS-1/BB-2
   technical cutaway. The original shots, anemone contact and large bending remain open.
-- Point 8. The Physics and Scatter READMEs and `docs/limits.md` document the two-mode geometry, signed origin,
+- Point 8 (a638e82e14). The Physics and Scatter READMEs and `docs/limits.md` document the two-mode geometry, signed origin,
   ordered native acceptance, attached rigid adapter, the measured comparisons and the limits of the cutaway.
 - Point 2 remains open. `bio01-sway-measured.mjs` compares held-out tree ringdowns. The nominal stripped and
   intact estimates are 11.93 and 7.10 rad/s versus 11.4 ± 0.5 and 3.78 ± 0.09 rad/s observed. The paired intact
