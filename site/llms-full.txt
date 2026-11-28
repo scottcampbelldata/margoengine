@@ -16698,6 +16698,32 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: a world built again named its GLTFWeather effects otherwise, so a seek did not match a run (KB-WEATHER-GLTFSEEK1, weather)
+
+- **Repro:** `node --test packages/weather/tests/seek.test.js`: "a weather replayed 1 steps equals a continuous run"
+  failed with `name: 'weather-gltf-2'` against `'weather-gltf'`.
+- **Cause:** the KB-WEATHER-GLTFTWO1 fix named each effect by a counter over every `GLTFWeather` the program had made
+  (`packages/weather/src/gltf.ts`), so the second world of a seek, or a film's second shot, got new names, and a
+  lookup by name found nothing.
+- **Fix:** option `name` (default `'weather-gltf'`); `GLTFWeather.attach` without one takes the first free of
+  `weather-gltf`, `weather-gltf-2`, ... in the engine's scene, so the names follow the scene.
+- **Regression:** `packages/weather/tests/gltf.test.js` ("GLTFWeather names follow the scene"); `seek.test.js`.
+
+### Fixed 2026-11-28: a second VolumetricClouds layer on one engine threw "Invalid plugin" (KB-SKY-CLOUDTWO1, sky, weather)
+
+- **Repro:** `VolumetricClouds.attach(engine, {bottom: 650, top: 1300})` and then a second
+  `VolumetricClouds.attach(engine, {bottom: 250, top: 450})` (low scud under a rain deck): the engine threw
+  `Invalid plugin`.
+- **Cause:** the plugin's `name` and its frame-graph pass were both the fixed text `'sky:volumetric-clouds'`
+  (`packages/sky/src/volumetric-clouds.ts`), and core refuses a second plugin of one name (the class of
+  KB-WEATHER-GLTFTWO1). `Weather`'s flash link and `WeatherDrive` looked a layer up by that exact name, so they could
+  reach one layer only.
+- **Fix:** option `name` (default `'sky:volumetric-clouds'`), fixed text so a world built again names its layers the
+  same; the pass takes the plugin's name. `Weather` and `WeatherDrive` reach every layer named
+  `'sky:volumetric-clouds'` or `'sky:volumetric-clouds:<name>'` (`isCloudLayerName`).
+- **Regression:** `packages/sky/test/cloud-layers.test.js`; `packages/weather/tests/air.test.js` ("the drive finds
+  every cloud layer by the name prefix").
+
 ### Fixed 2026-11-28: an explicit fitAnatomy map threw when the table's naming had read the same bone (KB-RIG-MAPWINS1, rigging)
 
 - **Repro:** the animator README example "Solvers on a fitted body": `fitAnatomy` on the UAL1 mannequin with
@@ -17569,6 +17595,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   may or may not model the rhythm. Next: take the correction from the rig itself (the rest collarbone's direction in
   the thorax against Ludewig's resting values), capped by the rhythm, and compose it as one swing so the twist reads 0
   (two turns in a row read -0.8 anterior rotation at 90 degrees).
+
+- **Learned 2026-11-28 (part 3):** the fit now takes a collarbone's zero from the rig's own rest direction against
+  Ludewig's arm-at-side direction, capped by the rhythm for the rest arm's lift, as one swing
+  (`packages/rigging/tests/clavicle-rhythm.test.js`). On the old man it changes nothing: with his arm 60 degrees out,
+  his rest collarbone bone reads 2.3 degrees up and 17.8 back in the thorax frame, below the 5.9 and 19.2 of an arm at
+  the side, where the rhythm puts a real collarbone at 13 up and 28 back. A Character Creator clavicle bone aims at
+  the shoulder joint's centre, which sits below the collarbone's own axis, so the bone reads about 11 degrees lower
+  than the bone it stands for. Next: the angle between the sternoclavicular-to-glenohumeral line and the clavicle's
+  axis from a measured source (or read from the rig's clips where an arm hangs at the side), then the same cap.
 
 - **Repro:** the same old man, walk clip at 0.3 s with `anatomy: {limits: false}`: `l_sternoclavicular` depression
   -25.9 degrees and `r_` -15.3, against stops of 15 and 13.3. On the fitted body the left collarbone is held at -15,
