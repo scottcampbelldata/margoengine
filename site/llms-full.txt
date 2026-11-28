@@ -1347,7 +1347,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,466 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,468 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -6200,6 +6200,7 @@ FXAA a depthless line's one-pixel rim is partly covered, colour and alpha alike,
 | --- | --- | --- | --- | --- |
 | Mechanism poses (`@margoengine/machinery/mechanisms`, 2026-11-27) (LIM-679) | Enforced by method: each function is the rigid, frictionless, backlash-free closed form of its mechanism. The Geneva drive is external with tangential pin entry; the harmonic drive ratio assumes a two-lobe wave generator and `flexsplinePoint` is a drawing aid, not an elastic flexspline; the Watt governor is Maxwell's conical-pendulum equilibrium (massless arms, no sleeve load, no hunting dynamics); the Archimedes screw bucket is a 1,600-slice integral (within 1e-7 m^3 of 6,400 slices on the demo screw). Entry 3,864 B gzip. | Closed forms are the exact solution a joint model tracks and a readout shows. | The physics-joint models in `tests/machinery-mechanisms-physics.test.js` (a hinge motor, sliders, a pin in a slot, a gear joint) follow the poses to 2e-4 m and 2e-3 rad at 60 Hz. | For loads, friction, backlash or governor dynamics, build the mechanism from `@margoengine/physics` joints and step it. |
 | Mechanism rigs on physics (`@margoengine/machinery/rigs`, 2026-11-27) (LIM-680) | Enforced by method: fourteen rigs (Scotch yoke, Geneva, Oldham, epicyclic, harmonic drive, ball-and-disk integrator, Archimedes screw, stroboscope, toggle press, gimbal, differential, Watt governor, rose engine, Reuleaux drive) on `@margoengine/physics` joints, with no gravity, friction or load but the governor's gravity and hinge drag; the input is a position-driven body stepped at most 2 degrees per 60 Hz step. Measured gaps against the closed forms: 1.4 µm (yoke), 0.004 degrees (Geneva), 2 µm (Oldham), 0.0003 degrees (epicyclic), 0.00002 degrees (harmonic), 0.0002 degrees (integrator), 2.3 µm over 4.7 turns (screw; the gear and rack rows read their error from the poses since 2026-11-28, so a rack driven 100 turns holds the exact travel to 3.7 µm from z 0 and 9.8 µm from z 50 m, `packages/physics/kernel/tests/coupling_exact.rs`), 0.0004 degrees (stroboscope), 4.4 µm (toggle press), 0.0001 degrees (gimbal), 0.005 degrees over 14 turns (differential), and the governor's arms settled within 0.001 degrees of Maxwell's balance about 4 s after a speed change (at 32 substeps; at 8 they settle 0.04 to 0.1 degrees off, KB-PHYS-SPINBIAS1), 41 µm (rose engine: a follower held 0.2 m off its centre in the groove of a rosette, the path row's steady lag a h^2 / 2c) and 0.72 mm of a 456 mm width at 2 degrees a step, 0.10 mm at 3 (Reuleaux drive: a hull triangle between four fixed walls; measured again 2026-11-28, cause open, KB-PHYS-REULEAUXWALLS1), tested to 2e-5 m and 5e-4 rad (`packages/machinery/test/rigs.test.js`). A demo that loads a rig carries the physics solver: the four mechanism demo zips grew from about 0.32 MB to 1.25 MB. | The solver holding the exact pose is the claim; loads are not modelled yet. | `packages/machinery/test/rigs.test.js` | The Sarrus rig is still to build: the solver holds its overconstrained loop only to 3.4 mm, and the fix (a wrong sum in the push's turn bound; 1.4e-5 m with it) is built and waits on the run-away it uncovers in islands that step at a finer level (KB-PHYS-SARRUSLOOP1, KB-PHYS-LEVELSPIN1, both open). A follower in a three-lobed groove sits a h^2 / (2 c) from the exact pose over 50 turns, 17 µm at the default share c of 0.2 and 3.5 µm at 1 (KB-PHYS-PATHMOVINGBASE1 fixed). |
+| CAD bench (`@margoengine/machinery/bench`, 2026-11-28) (LIM-682) | By method: finishes are core `PbrMaterial` metals (colour, roughness, metalness only), so machining marks, anisotropic lathe highlights and the oxide interference of anodising are not drawn; anodised is a measured aluminium F0 times a dye tint, a common art approximation, not a thin-film model. Edges are `@margoengine/lines` segments from a CPU dihedral test, built once per `show` (no GPU culling or level of detail, unlike `machinery/edges` `FeatureEdges`, which is WebGPU only). The deck's black granite is the measured basalt albedo standing in for diabase. Entry 2,361 B gzip (plus lines and the presets it imports). | Core's material is what both backends draw, shadow and light with the IBL; lines draw on the WebGL2 layer. | `packages/machinery/test/bench.test.js`, `packages/machinery/test/bench-check.mjs` (WebGPU and the WebGL2 layer) | For a mesh with hundreds of thousands of edges, or anisotropy and clearcoat, use `FeatureEdges` and materials' `PbrMaterial` on WebGPU. |
 | Hand-built meshes and parts (`@margoengine/geometry/builder`, `/parts`, 2026-11-28) | Enforced by method: vertex colours are linear RGBA, four floats per vertex; the builder's weld distance is 1e-7 and its crease angle defaults to 30 degrees; a ring-sector contact shadow needs a falloff exponent above 0; a pipe, helix or ribbon along a curve keeps its frame by rotation-minimizing frames with the double-reflection step, so it does not twist but a closed curve's end frame can differ from its start by the curve's holonomy; no boolean cuts. Sources: Wang, Juttler, Zheng and Liu, "Computation of rotation minimizing frames" (ACM Transactions on Graphics, 2008); Thurmer and Wuthrich, "Computing vertex normals from polygonal facets" (Journal of Graphics Tools, 1998); Piegl and Tiller, "The NURBS Book" (Springer, 1997). | Plain mesh building is arithmetic over arrays, so no limit beyond the 1,000,000 vertices of a geometry. | A closed pipe shows a small twist seam where its first and last frames meet. | Rotate the pipe's start frame by the holonomy, or sweep with `@margoengine/geometry` sweeps. |
 | NURBS surfaces (`@margoengine/geometry/nurbs`) | Enforced by method: no trimming curves, knot insertion or degree elevation; `NurbsCurve.tessellate` halves a span at most 12 times. | Trimming needs a boundary representation, which this engine does not carry; revolves, control nets and whole patches do not. | A trimmed patch meshes untrimmed. | Cut the mesh with `@margoengine/mesh-edit`. |
 | Mesh surface sampler (`@margoengine/geometry/sample`) | Enforced by method: points are independent random draws, so they can clump; there is no minimum spacing. Vertex weights are linear across each triangle. | Independent draws cost one search each and need no neighbour lookups. | Two points can land close together. | `@margoengine/scatter` for spaced placement on terrain. |
@@ -16774,7 +16775,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** the surface's halves are `rippleLayerAt` and `rippleLayerSlope` (`packages/water/src/index.ts`); the same
   calls with the same arguments, so the pixels do not change.
 - **Regression:** `packages/water/test/water.test.js`, "a Water with Ripples attached declares each WGSL function once"
-  (fails on the parent with `['rippleAt']`).
+  (fails on the parent with `['rippleAt']`). Lane A renamed the other side too (f40f18e83a, KB-WATER-RIPPLEDUP1): the
+  field's grid read is `rippleCell`; that commit's duplicate test was removed and this one kept.
 
 ### Fixed 2026-11-28: the water surface program took over 5 s to link on the WebGL2 layer (KB-WATER-GL2LINK1, water)
 
@@ -33179,24 +33181,14 @@ voxel path tracer is excluded on this hardware (hardware check).
   moves; the coverage test counts them. A rewrite of the existing corpus gave 1,410 of 3,256 modules authors (gltf
   modules holding shared, clustered and shadows text, for example).
 - **Fix, water:** none needed: KB-WATER-GL2LINK1 brought the base fragment to 157,264 characters, and the recorded
-  optics variants pass `corpus-inline.test.js`. Recording them found a second water bug, KB-WATER-RIPPLEDUP1 below.
+  optics variants pass `corpus-inline.test.js`. Recording them found the `rippleAt` clash fixed above ("a Water with
+  interactive Ripples failed to compile").
 - **Evidence:** `node scripts/record-wgsl-corpus.mjs --add "--suites=check:gpu-packages -- --no-build --only=optics"`
   passes both suites and adds 101 modules (3,357 kept); `corpus.test.js`, `corpus-inline.test.js` and the other corpus
   readers in `packages/webgl2-compat/test` pass (35 tests).
 - **Regression:** `packages/webgl2-compat/test/corpus.test.js` "a lazily compiled module is credited to the package
   whose WGSL it holds (KB-CORPUS-OPTICS1)" (optics' screens fragment under a shader and core stack; without the
   `authors` option the module names no optics).
-
-### Fixed 2026-11-28: every water surface with Ripples failed to compile, "redeclaration of 'rippleAt'" (KB-WATER-RIPPLEDUP1, water)
-
-- **Repro:** `water test:gpu:optics` on main at efb3b28b72: `flow-map.browser.mjs` throws `WGSL compile errors:
-  redeclaration of 'rippleAt'`, and the suite's later checks never run.
-- **Cause:** bfb7d64cd8 (KB-WATER-GL2LINK1) split the surface's ripple layers around their noise with a new
-  `fn rippleAt(xz, turn, ...)` in `packages/water/src/index.ts`; the ripple field (`packages/water/src/ripples.ts`),
-  which `addSurfaceEffect` joins to the same surface module, already read its grid through `fn rippleAt(p:vec2i)`.
-- **Fix:** the ripple field's grid read is `rippleCell`. Same code otherwise, so the same pixels.
-- **Regression:** `packages/water/test/ripples.test.js` "the ripple field joins the surface shader with each function
-  declared once (KB-WATER-RIPPLEDUP1)" (fails on the old build with `rippleAt` twice); `water test:gpu:optics` passes.
 
 ### Fixed 2026-11-28: local CI kept CRLF copies of files whose .gitattributes rule became -text or eol=lf (local CI runner, KB-CI-EOL-STALE1)
 
@@ -46309,6 +46301,7 @@ Import individual systems from these subpaths to keep unrelated code out of dire
 | `/spatial` | `AssemblyBVH` picking |
 | `/clearance` | `measureClearance` |
 | `/materials` | `industrialMaterials`, `industrialMaterial` |
+| `/bench` | `CadBench`, `cadFinish`, `CAD_FINISHES`: measured metal finishes, feature edges and a surface-plate deck |
 | `/overlays` | `EngineeringAnnotations`, `worldAnchor`, `projectAnnotation` |
 | `/exploded` | `ExplodedView` |
 
@@ -46351,10 +46344,6 @@ import { SectionPlanes, boxSection } from 'margoengine/machinery/section';
 import { vertexAnchor, measureDistance } from 'margoengine/machinery/metrology';
 import { EngineeringAnnotations } from 'margoengine/machinery/overlays';
 import { AssemblyBVH } from 'margoengine/machinery/spatial';
-
-const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
-const belt = engine.createMesh().setGeometry(box()).setScale([4, 0.1, 1]);
-const crate = engine.createMesh().setGeometry(box()).setScale([0.4, 0.4, 0.4]).setPosition([-1, 0.25, 0]);
 ```
 
 [README continues: https://margoengine.com/llms/packages/machinery.md]
