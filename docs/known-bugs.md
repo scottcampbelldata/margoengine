@@ -13894,7 +13894,7 @@ Repro: `node scripts/reference-rendering/environment.mjs --decompose`, then with
   stays open on the three failures of 2026-11-10 and 2026-11-11.
 - **Third sighting of the class and rerun (2026-11-11 and 2026-11-28, KB-L4-furn):** the same `analytic` run on the
   layer read "diffuse 0.5 env map" 0.4605 (sd 0.0077) against 0.5 once, every other case right. On 2026-11-28
-  (a877a7b508 era main, RTX A6000) 6 of 6 `--compat analytic` runs read 0.4998 (sd 0.0056), some beside another GPU
+  (main 45c9810960, RTX A6000) 6 of 6 `--compat analytic` runs read 0.4998 (sd 0.0056), some beside another GPU
   suite. Not reproduced.
 
 ### Path tracer viewport: the converged image after a device restore differed once on the WebGL2 layer under GPU load (KB-C34h, 2026-11-11, open, not reproduced)
