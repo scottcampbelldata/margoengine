@@ -135,7 +135,10 @@ export class PlantSwayPhase {
       typeof exports.vegetation_apply !== 'function' ||
       typeof exports.vegetation_thread_phase !== 'function'
     )
-      throw new MargoError('failed', 'Vegetation Wasm has missing modal exports. You must rebuild the vegetation assets.');
+      throw new MargoError(
+        'failed',
+        'Vegetation Wasm has missing modal exports. You must rebuild the vegetation assets.',
+      );
     pointer.value = leaderStack;
     new Uint32Array(host.memory.buffer, job.byteOffset, JOB_HEADER_WORDS)[8] = receipts.byteOffset;
     const pool = this.pool;

@@ -230,7 +230,10 @@ async function readModule(file: URL, signal?: AbortSignal): Promise<WebAssembly.
   }
   const response = await fetch(file, { signal });
   if (!response.ok) {
-    throw new MargoError('failed', `Landscape kernel HTTP ${response.status}. You must serve the matching landscape Wasm file.`);
+    throw new MargoError(
+      'failed',
+      `Landscape kernel HTTP ${response.status}. You must serve the matching landscape Wasm file.`,
+    );
   }
   return WebAssembly.compile(await response.arrayBuffer());
 }

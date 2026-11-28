@@ -182,7 +182,8 @@ export class VortexForcing implements Solver<VortexParams> {
     this.probes = (params.probes ?? [[0, 10, 0]]).map((v) => vector(v, 'probe'));
     if (this.options.rigid) {
       const rigid = params.rigid;
-      if (!rigid) throw new RangeError('Vortex rigid coupling lacks body rows. You must supply rigid capacity and bodies.');
+      if (!rigid)
+        throw new RangeError('Vortex rigid coupling lacks body rows. You must supply rigid capacity and bodies.');
       const capacity = extent(rigid.capacity, 'body capacity'),
         used = new Set<number>();
       this.targets = rigid.bodies.map((row) => {
@@ -324,7 +325,9 @@ export class VortexForcing implements Solver<VortexParams> {
       region.layout !== SURFACE_WATER_LAYOUT ||
       region.byteLength !== grid.width * grid.depth * 3 * 4
     )
-      throw new RangeError('Vortex water grid differs from its surface field. You must match the ShallowWaterSolver geometry.');
+      throw new RangeError(
+        'Vortex water grid differs from its surface field. You must match the ShallowWaterSolver geometry.',
+      );
     const water = regionWords(region.memory ?? this.host.memory, region) as Float32Array;
     const [ox, oy, oz] = this.offset(cell);
     const { dx, dz, density } = grid;

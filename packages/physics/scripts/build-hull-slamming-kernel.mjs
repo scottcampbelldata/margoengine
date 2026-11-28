@@ -6,7 +6,16 @@ import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
 
 const crate = fileURLToPath(new URL('../hull-slamming-kernel/', import.meta.url));
 const result = await runWithTimeout(
-  ['cargo', 'build', '--locked', '--release', '--target', 'wasm32-unknown-unknown', '--manifest-path', join(crate, 'Cargo.toml')],
+  [
+    'cargo',
+    'build',
+    '--locked',
+    '--release',
+    '--target',
+    'wasm32-unknown-unknown',
+    '--manifest-path',
+    join(crate, 'Cargo.toml'),
+  ],
   { env: blueprintRustEnv(crate, '-C target-feature=+simd128'), timeoutMs: 120_000 },
 );
 if (result.code !== 0) throw new Error('Build the hull slamming kernel with the pinned Rust toolchain.');

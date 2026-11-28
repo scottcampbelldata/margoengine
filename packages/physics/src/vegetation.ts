@@ -305,7 +305,10 @@ export class PlantSway implements Solver<PlantSwayOptions> {
   step(context: StepContext, dt: number): void {
     const data = this.#state();
     if (!Number.isFinite(dt) || dt <= 0)
-      throw new MargoError('state', 'PlantSway step duration is invalid. You must advance with a finite positive world step.');
+      throw new MargoError(
+        'state',
+        'PlantSway step duration is invalid. You must advance with a finite positive world step.',
+      );
     const source = this.#impulse;
     this.#impulse = undefined;
     if (data.flow) this.#sample(data, data.flow, context, dt);
@@ -431,7 +434,10 @@ export class PlantSway implements Solver<PlantSwayOptions> {
     const middle = start + 0.5 * dt;
     const end = start + dt;
     if (![start, middle, end].every(Number.isFinite))
-      throw new MargoError('state', 'Plant flow sample time exceeds finite seconds. You must advance at the world clock rate.');
+      throw new MargoError(
+        'state',
+        'Plant flow sample time exceeds finite seconds. You must advance at the world clock rate.',
+      );
     const buffer = data.sampleScratch;
     buffer.fill(0);
     for (let i = 0; i < data.count; i++) {

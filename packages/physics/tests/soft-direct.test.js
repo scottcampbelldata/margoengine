@@ -30,7 +30,9 @@ const sphere = (r, w, h) => {
 const world = async (stiffness = 20) => {
   const physics = new Physics(null, { gravity: [0, 0, 0], fixedTimestep: 1 / 60 });
   const soft = await SoftBodies.attach(physics);
-  const ball = soft.create(SoftBodyDesc.volume(sphere(0.3, 12, 8), { density: 100, damping: 0, stiffness }).setAirDrag(false));
+  const ball = soft.create(
+    SoftBodyDesc.volume(sphere(0.3, 12, 8), { density: 100, damping: 0, stiffness }).setAirDrag(false),
+  );
   return { physics, soft, ball };
 };
 
@@ -41,7 +43,6 @@ const momentum = (body) => {
   for (let i = 0; i < v.length; i += 3) for (let a = 0; a < 3; a++) p[a] += v[i + a] * m;
   return p;
 };
-
 
 test('an impulse cue lands on the step its time falls on, not before, and carries J', async () => {
   const { physics, soft, ball } = await world();
@@ -81,7 +82,10 @@ test('a poke cue pushes only the particles within its radius and a blast pushes 
   other.physics.step();
   const p = momentum(other.ball);
   assert.ok(Math.hypot(...p) < 1e-3, `a centred blast moves no momentum (${p})`);
-  assert.ok(other.ball.surfaceVolume() > 4.0 / 3.0 * Math.PI * 0.3 ** 3 * 0.9, 'it swells outward, held by its volume');
+  assert.ok(
+    other.ball.surfaceVolume() > (4.0 / 3.0) * Math.PI * 0.3 ** 3 * 0.9,
+    'it swells outward, held by its volume',
+  );
 });
 
 test('the target pull adds to no force and no torque about the centre of mass', () => {
@@ -156,7 +160,10 @@ test('cues and targets it cannot use are refused with coded errors', async () =>
   const { physics, ball } = await world();
   physics.step();
   const refused = (fn, pattern) =>
-    assert.throws(fn, (e) => e.code === 'unsupported' && pattern.test(e.message) && /errors#soft-volumes/.test(e.message));
+    assert.throws(
+      fn,
+      (e) => e.code === 'unsupported' && pattern.test(e.message) && /errors#soft-volumes/.test(e.message),
+    );
   refused(() => ball.cue({ at: 0, impulse: [0, 1, 0] }), /or later/);
   refused(() => ball.cue({ at: Number.NaN, impulse: [0, 1, 0] }), /seconds/);
   refused(() => ball.cue({ at: 1 }), /one action/);

@@ -288,7 +288,8 @@ export class EntrySolver implements Solver<EntryParams> {
    * @throws A coded error for an invalid body, sea, mesh, rate, capacity, material or event count.
    */
   init(host: SolverHost, params: EntryParams): void {
-    if (this.disposed) throw entryError('disposed', 'This entry solver was disposed. Create and add a new EntrySolver.');
+    if (this.disposed)
+      throw entryError('disposed', 'This entry solver was disposed. Create and add a new EntrySolver.');
     const { bodies, sea, level = 0 } = params ?? ({} as EntryParams);
     if (!Array.isArray(bodies) || bodies.length === 0)
       throw entryError(
@@ -298,10 +299,16 @@ export class EntrySolver implements Solver<EntryParams> {
     if (!sea || typeof sea.elevation !== 'function')
       throw entryError('unsupported', 'An EntrySolver needs the water, a sea with elevation(x, z, t); pass {sea}.');
     if (!isRateLevel(level))
-      throw entryError('unsupported', 'The entry rate level is invalid. Use an integer from 0 to 7 matching the rigid solver.');
+      throw entryError(
+        'unsupported',
+        'The entry rate level is invalid. Use an integer from 0 to 7 matching the rigid solver.',
+      );
     const originCellSize = params.originCellSize ?? 4096;
     if (!(originCellSize > 0 && Number.isFinite(originCellSize)))
-      throw entryError('unsupported', 'The entry origin cell size is invalid. Use the world’s positive cellSize in metres.');
+      throw entryError(
+        'unsupported',
+        'The entry origin cell size is invalid. Use the world’s positive cellSize in metres.',
+      );
     if (sea.density !== undefined && !(sea.density > 0 && Number.isFinite(sea.density)))
       throw entryError('unsupported', 'The sea density is invalid. Supply finite positive kilograms per cubic metre.');
     if (sea.pressure !== undefined && typeof sea.pressure !== 'function')
@@ -309,7 +316,10 @@ export class EntrySolver implements Solver<EntryParams> {
     const seen = new Set<number>();
     for (const body of bodies) {
       if (!body || !(Number.isSafeInteger(body.row) && body.row >= 0) || seen.has(body.row))
-        throw entryError('unsupported', `Body row ${body?.row} is invalid or repeated. Supply one entry per rigid body row.`);
+        throw entryError(
+          'unsupported',
+          `Body row ${body?.row} is invalid or repeated. Supply one entry per rigid body row.`,
+        );
       seen.add(body.row);
       const { vertices, indices } = body.mesh ?? {};
       if (!vertices || !indices || vertices.length % 3 !== 0 || indices.length % 3 !== 0 || indices.length === 0)
@@ -332,10 +342,16 @@ export class EntrySolver implements Solver<EntryParams> {
     }
     const capacity = host.bodyRows();
     if (params.capacity !== undefined && params.capacity !== capacity)
-      throw entryError('unsupported', `Entry capacity differs from the world's ${capacity} rows. Omit capacity or match the world.`);
+      throw entryError(
+        'unsupported',
+        `Entry capacity differs from the world's ${capacity} rows. Omit capacity or match the world.`,
+      );
     for (const row of seen)
       if (row >= capacity)
-        throw entryError('unsupported', `Entry body row ${row} exceeds the world's ${capacity} rows. Use a rigid body in this world.`);
+        throw entryError(
+          'unsupported',
+          `Entry body row ${row} exceeds the world's ${capacity} rows. Use a rigid body in this world.`,
+        );
     const gamma = params.surfaceTension ?? WATER_SURFACE_TENSION,
       mu = params.viscosity ?? WATER_VISCOSITY,
       events = params.events ?? 64;
@@ -348,7 +364,10 @@ export class EntrySolver implements Solver<EntryParams> {
     if (!(Number.isInteger(events) && events >= 1 && events <= 4096))
       throw entryError('unsupported', `An EntrySolver keeps 1 to 4096 events (got ${events}); pass a whole number.`);
     if (params.foam !== undefined && typeof params.foam?.addFoam !== 'function')
-      throw entryError('unsupported', 'Foam goes through addFoam(min, max, whiteness, persistence); pass a FoamSolver or none.');
+      throw entryError(
+        'unsupported',
+        'Foam goes through addFoam(min, max, whiteness, persistence); pass a FoamSolver or none.',
+      );
     const [gx, gy, gz] = host.gravity;
     this.g = hypot(gx, gy, gz);
     if (!(this.g > 0 && Number.isFinite(this.g)))
@@ -407,8 +426,9 @@ export class EntrySolver implements Solver<EntryParams> {
         !finite3(value.normal) ||
         !finite3(value.velocity) ||
         value.normal[1] <= 0 ||
-        Math.abs(value.normal[0] * value.normal[0] + value.normal[1] * value.normal[1] + value.normal[2] * value.normal[2] - 1) >
-          1e-5 ||
+        Math.abs(
+          value.normal[0] * value.normal[0] + value.normal[1] * value.normal[1] + value.normal[2] * value.normal[2] - 1,
+        ) > 1e-5 ||
         !(value.density > 0 && Number.isFinite(value.density))
       )
         throw entryError(
@@ -432,7 +452,10 @@ export class EntrySolver implements Solver<EntryParams> {
     s.velocity[0] = s.velocity[1] = s.velocity[2] = 0;
     s.density = sea.density ?? SEA_WATER;
     if (!(s.density > 0 && Number.isFinite(s.density)))
-      throw entryError('failed', 'The sea returned an invalid density. Supply finite positive kilograms per cubic metre.');
+      throw entryError(
+        'failed',
+        'The sea returned an invalid density. Supply finite positive kilograms per cubic metre.',
+      );
     return s;
   }
 
@@ -440,7 +463,8 @@ export class EntrySolver implements Solver<EntryParams> {
     void dt;
     const host = this.host,
       candidate = this.candidate;
-    if (this.disposed) throw entryError('disposed', 'This entry solver was disposed. Create and add a new EntrySolver.');
+    if (this.disposed)
+      throw entryError('disposed', 'This entry solver was disposed. Create and add a new EntrySolver.');
     if (!host || !this.sea || !candidate)
       throw entryError('state', 'EntrySolver is not in a world yet; add it with world.add(solver, {bodies, sea}).');
     const cell = (this.sea as Partial<SeaSurface>).cell;
@@ -532,7 +556,10 @@ export class EntrySolver implements Solver<EntryParams> {
       count = vertices.length / 3,
       world = new Float64Array(vertices.length);
     if (!centre.every(Number.isFinite) || !q.every(Number.isFinite) || !origin.every(Number.isFinite))
-      throw entryError('failed', 'An active rigid pose is invalid. Supply finite local positions, velocities and rotation.');
+      throw entryError(
+        'failed',
+        'An active rigid pose is invalid. Supply finite local positions, velocities and rotation.',
+      );
     for (let i = 0; i < count; i++) {
       const p = rotate(q, [vertices[3 * i]!, vertices[3 * i + 1]!, vertices[3 * i + 2]!]);
       world[3 * i] = p[0] + origin[0];
@@ -540,7 +567,10 @@ export class EntrySolver implements Solver<EntryParams> {
       world[3 * i + 2] = p[2] + origin[2];
     }
     if (!world.every(Number.isFinite))
-      throw entryError('failed', 'A transformed entry vertex overflowed. Use finite body-local coordinates and a local cell.');
+      throw entryError(
+        'failed',
+        'A transformed entry vertex overflowed. Use finite body-local coordinates and a local cell.',
+      );
     // The local surface under the body: its height, normal and the water's velocity.
     const surf = this.sample(centre[0], centre[2], t),
       rho = surf.density,
@@ -551,7 +581,10 @@ export class EntrySolver implements Solver<EntryParams> {
       vr: V3 = [v[0] - surf.velocity[0], v[1] - surf.velocity[1], v[2] - surf.velocity[2]],
       speed = hypot(vr[0], vr[1], vr[2]);
     if (!Number.isFinite(level) || !Number.isFinite(speed))
-      throw entryError('failed', 'The entry plane or relative speed overflowed. Use local metres and finite SI velocities.');
+      throw entryError(
+        'failed',
+        'The entry plane or relative speed overflowed. Use local metres and finite SI velocities.',
+      );
     let lowest = Infinity,
       highest = -Infinity,
       lowestAt = 0;
@@ -698,7 +731,10 @@ export class EntrySolver implements Solver<EntryParams> {
     const w = body.row * FORCE_WORDS,
       held = mass < Infinity ? carried(mass, A, force, this.host!.gravity) : force;
     if (![...held, ...torque].every((value) => Number.isFinite(Math.fround(value))))
-      throw entryError('failed', 'The entry force exceeds the rigid columns. Reduce the body scale, density or relative speed.');
+      throw entryError(
+        'failed',
+        'The entry force exceeds the rigid columns. Reduce the body scale, density or relative speed.',
+      );
     out[w]! += held[0];
     out[w + 1]! += held[1];
     out[w + 2]! += held[2];
@@ -797,7 +833,22 @@ export class EntrySolver implements Solver<EntryParams> {
     if (state[s + SUBMERGED_ONCE] === 1) {
       if (state[s + EMERGED] === 0) {
         const up = Math.max(0, -vn);
-        this.event(log, body.row, 'exit', t, at, vr, speed, sine, R0, 0, 0, up, dropHeight(up, COLUMN_DROP_FALL, this.g), false);
+        this.event(
+          log,
+          body.row,
+          'exit',
+          t,
+          at,
+          vr,
+          speed,
+          sine,
+          R0,
+          0,
+          0,
+          up,
+          dropHeight(up, COLUMN_DROP_FALL, this.g),
+          false,
+        );
         this.addFoam(candidate, at, 1.5 * R0, 0.8);
       }
     } else {
@@ -1222,7 +1273,10 @@ function solve3(m: Float64Array, r: Vec3): V3 {
     C = d! * h! - e! * g!,
     det = a! * A + b! * B + c! * C;
   if (!(det !== 0 && Number.isFinite(det)))
-    throw entryError('failed', 'The effective entry mass is singular or out of range. Use finite body mass and mesh scale.');
+    throw entryError(
+      'failed',
+      'The effective entry mass is singular or out of range. Use finite body mass and mesh scale.',
+    );
   return [
     (A * r[0] + (c! * h! - b! * i!) * r[1] + (b! * f! - c! * e!) * r[2]) / det,
     (B * r[0] + (a! * i! - c! * g!) * r[1] + (c! * d! - a! * f!) * r[2]) / det,
@@ -1269,7 +1323,10 @@ function shapeOf(mesh: HullMesh): EntrySolver['shapes'][number] {
     breadth = 0.5 * (others[0]! + others[1]!),
     { k1, k2 } = spheroid(length / Math.max(breadth, 1e-9));
   if (![length, breadth, k1, k2].every(Number.isFinite))
-    throw entryError('unsupported', 'Entry mesh mass coefficients are unrepresentable. Use finite, nondegenerate body dimensions.');
+    throw entryError(
+      'unsupported',
+      'Entry mesh mass coefficients are unrepresentable. Use finite, nondegenerate body dimensions.',
+    );
   return { volume, length, breadth, axis, k1, k2, wetted };
 }
 

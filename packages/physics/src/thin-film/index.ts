@@ -823,7 +823,9 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
           ? [impacts[i + 8]!, impacts[i + 9]!, impacts[i + 10]!]
           : minus(position(frame, u, v), frame.center);
         if (!lever.every(Number.isFinite))
-          throw new RangeError('Invalid swept impact lever arm. You must publish a finite offset from the body centre.');
+          throw new RangeError(
+            'Invalid swept impact lever arm. You must publish a finite offset from the body centre.',
+          );
         force = plus(force, reaction);
         torque = plus(torque, cross(lever, reaction));
       }

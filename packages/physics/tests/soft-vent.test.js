@@ -21,13 +21,41 @@ const air = (area, dischargeCoefficient = 0.61) => ({
 
 function icosphere(r, levels) {
   const t = (1 + Math.sqrt(5)) / 2;
-  let positions = [
-    [-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t], [t, 0, -1], [t, 0, 1],
-    [-t, 0, -1], [-t, 0, 1],
+  const positions = [
+    [-1, t, 0],
+    [1, t, 0],
+    [-1, -t, 0],
+    [1, -t, 0],
+    [0, -1, t],
+    [0, 1, t],
+    [0, -1, -t],
+    [0, 1, -t],
+    [t, 0, -1],
+    [t, 0, 1],
+    [-t, 0, -1],
+    [-t, 0, 1],
   ].map((p) => p.map((v) => v / Math.hypot(...p)));
   let faces = [
-    [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
-    [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1],
+    [0, 11, 5],
+    [0, 5, 1],
+    [0, 1, 7],
+    [0, 7, 10],
+    [0, 10, 11],
+    [1, 5, 9],
+    [5, 11, 4],
+    [11, 10, 2],
+    [10, 7, 6],
+    [7, 1, 8],
+    [3, 9, 4],
+    [3, 4, 2],
+    [3, 2, 6],
+    [3, 6, 8],
+    [3, 8, 9],
+    [4, 9, 5],
+    [2, 4, 11],
+    [6, 2, 10],
+    [8, 6, 7],
+    [9, 8, 1],
   ];
   for (let level = 0; level < levels; level++) {
     const middle = new Map(),
@@ -71,7 +99,10 @@ test('orifice flow: the choked flow, its continuity at the critical ratio, and t
       bernoulli = 0.61 * 1e-4 * Math.sqrt((2 * inside * dp) / rt),
       flow = ventFlow(vent, inside, AMBIENT);
     // The next term is of relative size (3 / (2 gamma) - 1 / 2) dp / p, under 0.6 dp / p.
-    assert.ok(Math.abs(flow - bernoulli) <= 0.6 * (dp / inside) * bernoulli, `${flow} against ${bernoulli} at ${dp} Pa`);
+    assert.ok(
+      Math.abs(flow - bernoulli) <= 0.6 * (dp / inside) * bernoulli,
+      `${flow} against ${bernoulli} at ${dp} Pa`,
+    );
   }
   assert.equal(ventFlow(vent, AMBIENT, AMBIENT), 0, 'no flow without a drop');
   assert.equal(ventFlow(vent, 0.9 * AMBIENT, AMBIENT), 0, 'a vent lets nothing in');
@@ -168,7 +199,10 @@ test('vents and bursts it cannot use are refused with coded errors', async () =>
   const held = soft.create(SoftBodyDesc.volume(icosphere(0.1, 1)));
   const gas = soft.create(SoftBodyDesc.volume(icosphere(0.1, 1), { pressure: 120_000 }).setTranslation([1, 0, 0]));
   const refused = (fn, pattern) =>
-    assert.throws(fn, (e) => e.code === 'unsupported' && pattern.test(e.message) && /errors#soft-volumes/.test(e.message));
+    assert.throws(
+      fn,
+      (e) => e.code === 'unsupported' && pattern.test(e.message) && /errors#soft-volumes/.test(e.message),
+    );
   refused(() => held.openVent({ particle: 0, area: 1e-4 }), /gas shell/);
   refused(() => gas.openVent({ particle: -1, area: 1e-4 }), /particle/);
   refused(() => gas.openVent({ particle: 0, area: 0 }), /area/);

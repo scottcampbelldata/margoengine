@@ -768,7 +768,10 @@ export class FoamSolver implements Solver<FoamParams> {
       detected! < written! ||
       !(spacing! > 0 && Number.isFinite(spacing))
     )
-      throw foamError('state', 'You must connect a breaking crest producer with valid row counts and finite cell spacing.');
+      throw foamError(
+        'state',
+        'You must connect a breaking crest producer with valid row counts and finite cell spacing.',
+      );
     const fraction = Math.min(1, (spacing! / this.h) * (spacing! / this.h));
     const newTick = clock[2] !== port.tick;
     for (let row = 0; row < written!; row++) {

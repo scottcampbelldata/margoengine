@@ -207,7 +207,7 @@ export function wettedLoads(
           before = planeDistance(c, about, cavityNormal);
         for (const vertex of triangle) {
           const after = planeDistance(vertex, about, cavityNormal);
-          if ((before < 0) !== (after < 0)) {
+          if (before < 0 !== after < 0) {
             const f = before / (before - after);
             polygon.push([
               previous[0] + f * (vertex[0] - previous[0]),
@@ -256,7 +256,5 @@ export function wettedLoads(
 }
 
 function planeDistance(point: Vec3, origin: Vec3, normal: Vec3): number {
-  return (
-    (point[0] - origin[0]) * normal[0] + (point[1] - origin[1]) * normal[1] + (point[2] - origin[2]) * normal[2]
-  );
+  return (point[0] - origin[0]) * normal[0] + (point[1] - origin[1]) * normal[1] + (point[2] - origin[2]) * normal[2];
 }

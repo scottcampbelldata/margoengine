@@ -55,7 +55,10 @@ export function createLayeredTissue(soft: SoftBodies, desc: SoftBodyDesc, layers
   const materials = Array.from(layers.cells, (layer: TissueLayer) => {
     const material = layer === 'muscle' || layer === 'fat' || layer === 'skin' ? layers.materials[layer] : undefined;
     if (!material)
-      throw new MargoError('state', 'A tissue cell lacks a layer material. You must supply its muscle, fat or skin material.');
+      throw new MargoError(
+        'state',
+        'A tissue cell lacks a layer material. You must supply its muscle, fat or skin material.',
+      );
     return material;
   });
   return soft.create(desc.setCellMaterials(materials));

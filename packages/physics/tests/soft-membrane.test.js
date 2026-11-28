@@ -16,7 +16,7 @@ const AMBIENT = 101325;
 /** An icosphere of radius r: an icosahedron split `levels` times, each new vertex pushed onto the sphere. Outward wound. */
 function icosphere(r, levels) {
   const t = (1 + Math.sqrt(5)) / 2;
-  let positions = [
+  const positions = [
     [-1, t, 0],
     [1, t, 0],
     [-1, -t, 0],
@@ -31,8 +31,26 @@ function icosphere(r, levels) {
     [-t, 0, 1],
   ].map((p) => p.map((v) => v / Math.hypot(...p)));
   let faces = [
-    [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
-    [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1],
+    [0, 11, 5],
+    [0, 5, 1],
+    [0, 1, 7],
+    [0, 7, 10],
+    [0, 10, 11],
+    [1, 5, 9],
+    [5, 11, 4],
+    [11, 10, 2],
+    [10, 7, 6],
+    [7, 1, 8],
+    [3, 9, 4],
+    [3, 4, 2],
+    [3, 2, 6],
+    [3, 6, 8],
+    [3, 8, 9],
+    [4, 9, 5],
+    [2, 4, 11],
+    [6, 2, 10],
+    [8, 6, 7],
+    [9, 8, 1],
   ];
   for (let level = 0; level < levels; level++) {
     const middle = new Map(),
@@ -72,7 +90,9 @@ const meshVolume = ({ positions: p, indices }) => {
   let volume = 0;
   for (let k = 0; k < indices.length; k += 3) {
     const [a, b, c] = [indices[k], indices[k + 1], indices[k + 2]].map((i) => [p[3 * i], p[3 * i + 1], p[3 * i + 2]]);
-    volume += (a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6;
+    volume +=
+      (a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0])) /
+      6;
   }
   return volume;
 };
@@ -142,7 +162,11 @@ test('held out: a thinner, stiffer, smaller sheet near its peak on a coarser mes
 
 test('a membrane ball dropped on the ground bounces, stays finite and rests on it', async () => {
   const physics = new Physics(null, { fixedTimestep: 1 / 120 });
-  physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [5, 0.5, 5] } });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [5, 0.5, 5] },
+  });
   const soft = await SoftBodies.attach(physics);
   const ball = soft.create(
     SoftBodyDesc.volume(icosphere(0.1, 2), {
@@ -166,11 +190,17 @@ test('a membrane ball dropped on the ground bounces, stays finite and rests on i
 test('a membrane ball replays bit for bit after a snapshot and restore', async () => {
   const make = async () => {
     const physics = new Physics(null, { fixedTimestep: 1 / 60 });
-    physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [5, 0.5, 5] } });
+    physics.addBody(null, {
+      type: 'fixed',
+      position: [0, -0.5, 0],
+      colliders: { shape: 'box', halfExtents: [5, 0.5, 5] },
+    });
     const soft = await SoftBodies.attach(physics);
     soft.create(
-      SoftBodyDesc.volume(icosphere(0.1, 1), { pressure: 130_000, membrane: { shearModulus: 300e3, thickness: 0.5e-3 } })
-        .setTranslation([0, 0.3, 0]),
+      SoftBodyDesc.volume(icosphere(0.1, 1), {
+        pressure: 130_000,
+        membrane: { shearModulus: 300e3, thickness: 0.5e-3 },
+      }).setTranslation([0, 0.3, 0]),
     );
     return new PhysicsWorld({ rate: { num: 60, den: 1 } })
       .add(new RigidSolver(), { physics })
@@ -196,7 +226,8 @@ test('a membrane it cannot use is refused with a coded error', () => {
   const refused = (options, pattern) =>
     assert.throws(
       () => SoftBodyDesc.volume(mesh, options),
-      (error) => error.code === 'unsupported' && pattern.test(error.message) && /errors#soft-volumes/.test(error.message),
+      (error) =>
+        error.code === 'unsupported' && pattern.test(error.message) && /errors#soft-volumes/.test(error.message),
     );
   refused({ membrane: sheet }, /gas fill/);
   refused({ membrane: sheet, pressure: 120_000, tier: 'cells' }, /gas fill/);

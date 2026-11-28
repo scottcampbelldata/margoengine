@@ -330,8 +330,7 @@ export class Multibody {
     this.removed = true;
   }
   private check(): void {
-    if (this.removed)
-      throw jointFault('state', 'Multibody was removed; build a new one with physics.addMultibody.');
+    if (this.removed) throw jointFault('state', 'Multibody was removed; build a new one with physics.addMultibody.');
   }
 }
 
@@ -355,10 +354,7 @@ export function buildMultibody(
   for (const link of links) {
     const parent = link.parent ?? [...inTree].pop()!;
     if (!inTree.has(parent))
-      throw jointFault(
-        'state',
-        'A link hangs from a body already in the tree; list parents before their children.',
-      );
+      throw jointFault('state', 'A link hangs from a body already in the tree; list parents before their children.');
     if (inTree.has(link.body)) throw jointFault('state', 'A body is in a multibody once; the tree has no loops.');
     if (columns.mbRole[link.body.row] !== 0)
       throw jointFault('state', 'A body can be in one multibody only; remove the first with multibody.remove().');

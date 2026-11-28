@@ -47,10 +47,9 @@ test('an acceleration-based spring swings light and heavy bodies alike, a force 
   const world = new Physics(null),
     a = world.addBody(null, { type: 'fixed' }),
     b = world.addBody(null, { position: [0, -1, 0], colliders: { shape: 'sphere', radius: 0.1 } });
-  assert.throws(
-    () => world.addJoint(a, b, { type: 'spring', restLength: 1, stiffness: 1, model: 'nonsense' }),
-    { code: 'unsupported' },
-  );
+  assert.throws(() => world.addJoint(a, b, { type: 'spring', restLength: 1, stiffness: 1, model: 'nonsense' }), {
+    code: 'unsupported',
+  });
   world.dispose();
 });
 

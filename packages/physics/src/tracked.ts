@@ -9,11 +9,11 @@
 // entry); a belt that is stopped keeps adding to it, so a vehicle held by its belts on a slope creeps only until the shear holds it. A track
 // is held harder against sliding sideways than along its belt (the lateral and longitudinal coefficients of Wong's skid steering), so a
 // vehicle turns by driving its tracks at different speeds and the ground resists the turn as it does a real tank's.
-import type { PhysicsBody } from "./body.js";
-import type { PhysicsCollider } from "./collider.js";
-import type { Vec3 } from "./math.js";
-import type { Physics, PhysicsAttachment } from "./physics.js";
-import { invalidVehicle } from "./vehicle.js";
+import type { PhysicsBody } from './body.js';
+import type { PhysicsCollider } from './collider.js';
+import type { Vec3 } from './math.js';
+import type { Physics, PhysicsAttachment } from './physics.js';
+import { invalidVehicle } from './vehicle.js';
 
 const checkVec = (value: unknown, label: string): void => {
   const v = value as ArrayLike<number> | undefined;
@@ -72,8 +72,7 @@ export interface TrackedVehicleOptions {
 
 type V = [number, number, number];
 type Q = [number, number, number, number];
-const dot = (a: readonly number[], b: readonly number[]): number =>
-  a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
+const dot = (a: readonly number[], b: readonly number[]): number => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
 const cross = (a: readonly number[], b: readonly number[]): V => [
   a[1]! * b[2]! - a[2]! * b[1]!,
   a[2]! * b[0]! - a[0]! * b[2]!,
@@ -84,14 +83,9 @@ const rotate = (q: readonly number[], v: readonly number[]): V => {
     tx = 2 * (y * v[2]! - z * v[1]!),
     ty = 2 * (z * v[0]! - x * v[2]!),
     tz = 2 * (x * v[1]! - y * v[0]!);
-  return [
-    v[0]! + w * tx + (y * tz - z * ty),
-    v[1]! + w * ty + (z * tx - x * tz),
-    v[2]! + w * tz + (x * ty - y * tx),
-  ];
+  return [v[0]! + w * tx + (y * tz - z * ty), v[1]! + w * ty + (z * tx - x * tz), v[2]! + w * tz + (x * ty - y * tx)];
 };
-const clamp = (v: number, low: number, high: number): number =>
-  Math.min(high, Math.max(low, v));
+const clamp = (v: number, low: number, high: number): number => Math.min(high, Math.max(low, v));
 
 /**
  * The share of its friction the ground gives at a shear displacement (Wong's `tau / tau_max = 1 - exp(-j / K)`): 0 at no displacement,
@@ -100,7 +94,7 @@ const clamp = (v: number, low: number, high: number): number =>
  */
 export function shearShare(displacement: number, modulus: number): number {
   if (!(modulus > 0 && Number.isFinite(modulus)))
-    throw invalidVehicle("The shear modulus must be a finite number above 0.");
+    throw invalidVehicle('The shear modulus must be a finite number above 0.');
   return 1 - Math.exp(-Math.abs(displacement) / modulus);
 }
 
@@ -148,57 +142,39 @@ export class TrackedVehicle implements PhysicsAttachment {
     private readonly options: TrackedVehicleOptions,
   ) {
     if (!physics?.owns?.(chassis))
-      throw invalidVehicle(
-        "Chassis must belong to this physics world; add it with physics.addBody first.",
-        "state",
-      );
-    if (chassis.type !== "dynamic")
-      throw invalidVehicle("A tracked vehicle chassis must be a dynamic body.");
-    if (!chassis.colliders.length)
-      throw invalidVehicle(
-        "A tracked vehicle chassis needs a collider to have mass.",
-      );
+      throw invalidVehicle('Chassis must belong to this physics world; add it with physics.addBody first.', 'state');
+    if (chassis.type !== 'dynamic') throw invalidVehicle('A tracked vehicle chassis must be a dynamic body.');
+    if (!chassis.colliders.length) throw invalidVehicle('A tracked vehicle chassis needs a collider to have mass.');
     if (!Array.isArray(options?.tracks) || !options.tracks.length)
-      throw invalidVehicle(
-        "A tracked vehicle needs at least one track: {tracks: [{position: [-1, 0, 0], length: 3}]}",
-      );
+      throw invalidVehicle('A tracked vehicle needs at least one track: {tracks: [{position: [-1, 0, 0], length: 3}]}');
     this.maxSpeed = options.maxSpeed ?? 8;
     this.accel = options.trackAcceleration ?? 10;
     this.muX = options.longitudinalFriction ?? 0.9;
     this.muY = options.lateralFriction ?? 0.45;
     this.shear = options.shearDisplacement ?? 0.025;
     for (const [value, name] of [
-      [this.maxSpeed, "maxSpeed"],
-      [this.accel, "trackAcceleration"],
-      [this.muX, "longitudinalFriction"],
-      [this.muY, "lateralFriction"],
-      [this.shear, "shearDisplacement"],
+      [this.maxSpeed, 'maxSpeed'],
+      [this.accel, 'trackAcceleration'],
+      [this.muX, 'longitudinalFriction'],
+      [this.muY, 'lateralFriction'],
+      [this.shear, 'shearDisplacement'],
     ] as const)
       if (!(value > 0 && Number.isFinite(value)))
-        throw invalidVehicle(
-          `Tracked vehicle ${name} must be a finite number above 0.`,
-        );
+        throw invalidVehicle(`Tracked vehicle ${name} must be a finite number above 0.`);
     const f = options.forward ?? [0, 0, 1];
-    checkVec(f, "Tracked vehicle forward");
+    checkVec(f, 'Tracked vehicle forward');
     const size = Math.hypot(f[0], f[1], f[2]);
-    if (!size) throw invalidVehicle("Tracked vehicle forward must be nonzero.");
+    if (!size) throw invalidVehicle('Tracked vehicle forward must be nonzero.');
     this.facing = [f[0] / size, f[1] / size, f[2] / size];
     for (const track of options.tracks) {
-      checkVec(track?.position, "Track position");
+      checkVec(track?.position, 'Track position');
       if (!(track.length > 0 && Number.isFinite(track.length)))
-        throw invalidVehicle(
-          "A track length must be a finite number above 0 metres.",
-        );
+        throw invalidVehicle('A track length must be a finite number above 0 metres.');
       const count = track.roadWheels ?? 5;
       if (!Number.isInteger(count) || count < 2 || count > 64)
-        throw invalidVehicle(
-          "A track has 2 to 64 road wheels; pass a roadWheels count between 2 and 64.",
-        );
+        throw invalidVehicle('A track has 2 to 64 road wheels; pass a roadWheels count between 2 and 64.');
       const rest = track.suspensionRestLength ?? 0.3;
-      if (!(rest > 0))
-        throw invalidVehicle(
-          "A track suspensionRestLength must be above 0 metres.",
-        );
+      if (!(rest > 0)) throw invalidVehicle('A track suspensionRestLength must be above 0 metres.');
       this.tracks.push({
         mount: [track.position[0], track.position[1], track.position[2]],
         length: track.length,
@@ -208,8 +184,7 @@ export class TrackedVehicle implements PhysicsAttachment {
         compression: track.suspensionCompression ?? 4,
         relaxation: track.suspensionRelaxation ?? 5,
         maxForce: track.maxSuspensionForce ?? 20000,
-        side:
-          Math.sign(dot(track.position, cross([0, 1, 0], this.facing))) || 0,
+        side: Math.sign(dot(track.position, cross([0, 1, 0], this.facing))) || 0,
         target: 0,
         speed: 0,
         lengths: new Array<number>(count).fill(rest),
@@ -244,13 +219,9 @@ export class TrackedVehicle implements PhysicsAttachment {
     const throttle = clamp(input.throttle ?? 0, -1, 1),
       steer = clamp(input.steer ?? 0, -1, 1);
     if (!Number.isFinite(throttle) || !Number.isFinite(steer))
-      throw invalidVehicle(
-        "Tracked vehicle throttle and steer must be finite numbers.",
-      );
+      throw invalidVehicle('Tracked vehicle throttle and steer must be finite numbers.');
     // The track on the side the vehicle turns toward is the slower; `side` is the track's sign along forward cross up.
-    for (const track of this.tracks)
-      track.target =
-        this.maxSpeed * clamp(throttle - steer * track.side, -1, 1);
+    for (const track of this.tracks) track.target = this.maxSpeed * clamp(throttle - steer * track.side, -1, 1);
     return this;
   }
   /** The belt speed of track `index` now, m/s, and what it was asked for. */
@@ -261,9 +232,7 @@ export class TrackedVehicle implements PhysicsAttachment {
     load: number;
   } {
     if (!Number.isInteger(index) || index < 0 || index >= this.tracks.length)
-      throw invalidVehicle(
-        `Track index must be an integer from 0 to ${this.tracks.length - 1}`,
-      );
+      throw invalidVehicle(`Track index must be an integer from 0 to ${this.tracks.length - 1}`);
     const t = this.tracks[index]!;
     return {
       speed: t.speed,
@@ -281,9 +250,7 @@ export class TrackedVehicle implements PhysicsAttachment {
   /** Save belt acceleration state for a clocked simulation's snapshot. */
   writeMotionState(out: Float64Array): void {
     if (out.length !== this.motionStateWords)
-      throw invalidVehicle(
-        "Provide motionStateWords for a tracked attachment snapshot.",
-      );
+      throw invalidVehicle('Provide motionStateWords for a tracked attachment snapshot.');
     let offset = 0;
     for (const track of this.tracks) {
       out[offset++] = track.speed;
@@ -300,13 +267,8 @@ export class TrackedVehicle implements PhysicsAttachment {
 
   /** Restore the state of an attachment with the same tracks. */
   readMotionState(source: Float64Array): void {
-    if (
-      source.length !== this.motionStateWords ||
-      !source.every(Number.isFinite)
-    )
-      throw invalidVehicle(
-        "Use finite motion state produced by an attachment with the same tracks.",
-      );
+    if (source.length !== this.motionStateWords || !source.every(Number.isFinite))
+      throw invalidVehicle('Use finite motion state produced by an attachment with the same tracks.');
     let offset = 0;
     for (const track of this.tracks) {
       track.speed = source[offset++]!;
@@ -335,27 +297,20 @@ export class TrackedVehicle implements PhysicsAttachment {
       angular = chassis.angularVelocity,
       mass = chassis.mass,
       centre = chassis.centerOfMass,
-      centreWorld = rotate(rotation, centre).map(
-        (c, i) => c + position[i]!,
-      ) as V,
+      centreWorld = rotate(rotation, centre).map((c, i) => c + position[i]!) as V,
       forwardWorld = rotate(rotation, this.facing),
       up = rotate(rotation, [0, 1, 0]),
       wheelTotal = this.tracks.reduce((sum, t) => sum + t.count, 0),
       predicate =
         this.options.predicate &&
-        ((_body: PhysicsBody, collider: PhysicsCollider): boolean =>
-          this.options.predicate!(collider));
+        ((_body: PhysicsBody, collider: PhysicsCollider): boolean => this.options.predicate!(collider));
     const pointVelocity = (r: V): V => {
       const w = cross(angular, r);
       return [velocity[0] + w[0], velocity[1] + w[1], velocity[2] + w[2]];
     };
     for (const track of this.tracks) {
       // The belt speeds up or down by its acceleration at the most.
-      track.speed += clamp(
-        track.target - track.speed,
-        -this.accel * dt,
-        this.accel * dt,
-      );
+      track.speed += clamp(track.target - track.speed, -this.accel * dt, this.accel * dt);
       for (let k = 0; k < track.count; k++) {
         const along = (k / (track.count - 1) - 0.5) * track.length,
           local: V = [
@@ -381,29 +336,18 @@ export class TrackedVehicle implements PhysicsAttachment {
         }
         const length = Math.min(track.rest, Math.max(0, hit.distance)),
           normal = hit.normal,
-          r: V = [
-            hit.point[0] - centreWorld[0],
-            hit.point[1] - centreWorld[1],
-            hit.point[2] - centreWorld[2],
-          ],
+          r: V = [hit.point[0] - centreWorld[0], hit.point[1] - centreWorld[1], hit.point[2] - centreWorld[2]],
           pv = pointVelocity(r),
           cosine = dot(normal, up);
         track.lengths[k] = length;
         // The spring along the normal, with the damping on the closing speed, scaled so the ride height is that of a four-wheeler whatever the road wheels.
         const relative = cosine > 0.1 ? dot(normal, pv) / cosine : 0;
-        let force =
-          (track.stiffness * (track.rest - length)) /
-          (cosine > 0.1 ? cosine : 10);
-        force -=
-          (relative < 0 ? track.compression : track.relaxation) * relative;
+        let force = (track.stiffness * (track.rest - length)) / (cosine > 0.1 ? cosine : 10);
+        force -= (relative < 0 ? track.compression : track.relaxation) * relative;
         force = clamp((force * 4 * mass) / wheelTotal, 0, track.maxForce);
         track.loads[k] = force;
         chassis.applyImpulse(
-          [
-            normal[0] * force * dt,
-            normal[1] * force * dt,
-            normal[2] * force * dt,
-          ],
+          [normal[0] * force * dt, normal[1] * force * dt, normal[2] * force * dt],
           hit.point,
           false,
         );
@@ -425,18 +369,13 @@ export class TrackedVehicle implements PhysicsAttachment {
           keep = Math.exp(-renewal * dt),
           gain = renewal > 0 ? (1 - keep) / renewal : dt;
         track.alongShear[k] = track.alongShear[k]! * keep + slideAlong * gain;
-        track.acrossShear[k] =
-          track.acrossShear[k]! * keep + slideAcross * gain;
-        const displacement = Math.hypot(
-          track.alongShear[k]!,
-          track.acrossShear[k]!,
-        );
+        track.acrossShear[k] = track.acrossShear[k]! * keep + slideAcross * gain;
+        const displacement = Math.hypot(track.alongShear[k]!, track.acrossShear[k]!);
         if (displacement === 0) continue;
         // Wong's shear: the share of the friction the displacement has mobilised, along the displacement's direction, the friction larger along the belt.
         const share = shearShare(displacement, this.shear),
           fx = this.muX * force * share * (track.alongShear[k]! / displacement),
-          fy =
-            this.muY * force * share * (track.acrossShear[k]! / displacement);
+          fy = this.muY * force * share * (track.acrossShear[k]! / displacement);
         chassis.applyImpulse(
           [
             forward[0] * fx * dt + side[0] * fy * dt,

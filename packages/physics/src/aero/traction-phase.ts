@@ -63,7 +63,10 @@ async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Modu
     } else {
       const response = await fetch(url, { signal });
       if (!response.ok)
-        throw new MargoError('failed', `Wind traction asset returned HTTP ${response.status}. You must serve its Wasm file.`);
+        throw new MargoError(
+          'failed',
+          `Wind traction asset returned HTTP ${response.status}. You must serve its Wasm file.`,
+        );
       bytes = await response.arrayBuffer();
     }
     const module = await WebAssembly.compile(bytes);
@@ -129,7 +132,10 @@ export class WindTractionPhase {
     const pointer = exports.__stack_pointer;
     const phase = exports.wind_traction_thread_phase;
     if (!(pointer instanceof WebAssembly.Global) || typeof phase !== 'function')
-      throw new MargoError('failed', 'You must rebuild the wind traction Wasm asset with its matching phase and stack ABI.');
+      throw new MargoError(
+        'failed',
+        'You must rebuild the wind traction Wasm asset with its matching phase and stack ABI.',
+      );
     pointer.value = leaderStack;
     this.phase = phase as WindTractionPhase['phase'];
     if (pool) {
@@ -241,7 +247,10 @@ export class WindTractionPhase {
         throw new MargoError('failed', 'Rebuild wind traction assets so each worker returns its expected panel work.');
     }
     if (probes !== count)
-      throw new MargoError('failed', 'You must rebuild wind traction assets so workers execute every requested wrench probe.');
+      throw new MargoError(
+        'failed',
+        'You must rebuild wind traction assets so workers execute every requested wrench probe.',
+      );
     const results = new Float64Array(buffer, this.output.byteOffset, MOTION_WORDS * count).slice();
     if (!results.every(Number.isFinite))
       throw new MargoError(

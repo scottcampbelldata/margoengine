@@ -8,11 +8,14 @@ function hemisphere(rings, around) {
   const vertices = [0, -1, 0];
   const indices = [];
   for (let j = 1; j <= rings; j++) {
-    const theta = j * Math.PI / (2 * rings);
+    const theta = (j * Math.PI) / (2 * rings);
     for (let i = 0; i < around; i++) {
-      const azimuth = 2 * Math.PI * i / around;
-      vertices.push(Math.sin(theta) * Math.cos(azimuth), j === rings ? 0 : -Math.cos(theta),
-        Math.sin(theta) * Math.sin(azimuth));
+      const azimuth = (2 * Math.PI * i) / around;
+      vertices.push(
+        Math.sin(theta) * Math.cos(azimuth),
+        j === rings ? 0 : -Math.cos(theta),
+        Math.sin(theta) * Math.sin(azimuth),
+      );
     }
   }
   const top = vertices.length / 3;
@@ -37,15 +40,22 @@ test('the optional 3D Wasm agrees with Hulme radiation and Haskind excitation of
   const table = await bakeHullPanels(mesh, { frequencies: [omega, Math.sqrt(GRAVITY)], headings: 4 });
   assert.equal(table.panelCount, 480);
   const sample = table.samples[0];
-  const volume = 2 * Math.PI / 3;
+  const volume = (2 * Math.PI) / 3;
   const surge = sample.addedMass[0] / (SEA_WATER * volume);
   const heave = sample.damping[7] / (omega * SEA_WATER * volume);
   assert.ok(Math.abs(surge - 0.6439) < 0.02 * 0.6439);
   assert.ok(Math.abs(heave - 0.3391) < 0.02 * 0.3391);
-  const wave = (part) => wettedLoads(mesh, { position: [0, 0, 0], rotation: [0, 0, 0, 1] }, {
-    elevation: () => 0,
-    pressure: (x, y) => SEA_WATER * GRAVITY * Math.exp(k * y) * part(k * x),
-  }, 0, [0, 0, 0]).force[1];
+  const wave = (part) =>
+    wettedLoads(
+      mesh,
+      { position: [0, 0, 0], rotation: [0, 0, 0, 1] },
+      {
+        elevation: () => 0,
+        pressure: (x, y) => SEA_WATER * GRAVITY * Math.exp(k * y) * part(k * x),
+      },
+      0,
+      [0, 0, 0],
+    ).force[1];
   const exactWaterPower = Math.sqrt(2 * SEA_WATER * GRAVITY * omega * sample.damping[7]) / k;
   const force = Math.hypot(wave(Math.cos) + sample.diffraction[2], wave(Math.sin) + sample.diffraction[3]);
   assert.ok(Math.abs(force / exactWaterPower - 1) < 0.025, JSON.stringify({ force, exactWaterPower }));
@@ -56,7 +66,7 @@ test('3D panel radiation removes wave work from a forced hull and restores exact
   await Physics.load();
   const mesh = hemisphere(5, 24);
   // The 720-frame measurement spans five whole cycles, so reactive work cancels.
-  const frequency = 2 * Math.PI * 5 / 12;
+  const frequency = (2 * Math.PI * 5) / 12;
   const frequencies = [0.15, 0.6, 1.2, 1.7, frequency, 2.9, 3.4, 3.8, 4.2];
   const panels = await bakeHullPanels(mesh, { frequencies, headings: 0 });
   const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(false) });
@@ -68,20 +78,29 @@ test('3D panel radiation removes wave work from a forced hull and restores exact
     colliders: { shape: 'sphere', radius: 1, mass },
   });
   const hull = new HullSolver();
-  world.add(new RigidSolver(), { physics }).add(hull, {
-    hulls: [{ row: body.row, mesh, panels }], sea: { elevation: () => 0, density: SEA_WATER },
-    addedMass: false, slamming: false, drag: false, greenWater: false, diffraction: false, rollDamping: false,
-  }).couple(['hull', 'rigid'], 'staggered');
+  world
+    .add(new RigidSolver(), { physics })
+    .add(hull, {
+      hulls: [{ row: body.row, mesh, panels }],
+      sea: { elevation: () => 0, density: SEA_WATER },
+      addedMass: false,
+      slamming: false,
+      drag: false,
+      greenWater: false,
+      diffraction: false,
+      rollDamping: false,
+    })
+    .couple(['hull', 'rigid'], 'staggered');
   const run = (from, to) => {
     let work = 0;
     let square = 0;
     for (let frame = from; frame <= to; frame++) {
-      const speed = 0.02 * Math.cos(frequency * (frame - 1) / 60);
+      const speed = 0.02 * Math.cos((frequency * (frame - 1)) / 60);
       body.setLinearVelocity([speed, 0, 0]);
       world.advance(frame);
       const load = regionWords(world.arena.memory, hull.exportPorts(frame - 1)[0].region)[FORCE_WORDS * body.row];
-      work += load * speed / 60;
-      square += speed * speed / 60;
+      work += (load * speed) / 60;
+      square += (speed * speed) / 60;
     }
     return { work, damping: -work / square };
   };
@@ -93,7 +112,10 @@ test('3D panel radiation removes wave work from a forced hull and restores exact
   assert.deepEqual(run(1441, 2160), outcome);
   assert.equal(world.hash(), hash);
   const reference = panels.samples[4].damping[0];
-  assert.ok(outcome.work < 0 && Math.abs(outcome.damping / reference - 1) < 0.05, JSON.stringify({ outcome, reference }));
+  assert.ok(
+    outcome.work < 0 && Math.abs(outcome.damping / reference - 1) < 0.05,
+    JSON.stringify({ outcome, reference }),
+  );
   context.diagnostic(JSON.stringify({ outcome, reference, hash }));
 });
 

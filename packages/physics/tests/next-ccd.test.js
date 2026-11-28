@@ -169,7 +169,11 @@ test('ccd stops bullets on a moving kinematic wall and on a free dynamic plate',
       was = bodies.map((body) => [...body.position]);
       speeds = bodies.map((body) => body.linearVelocity[0] - wall.linearVelocity[0]);
     }
-    assert.equal(struck.size, bodies.length, `${type} wall: only ${struck.size} of ${bodies.length} bullets struck its face`);
+    assert.equal(
+      struck.size,
+      bodies.length,
+      `${type} wall: only ${struck.size} of ${bodies.length} bullets struck its face`,
+    );
     physics.dispose();
   }
 });

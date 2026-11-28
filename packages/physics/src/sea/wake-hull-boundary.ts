@@ -95,7 +95,10 @@ export class WakeHullBoundary {
       const [rx, ry, rz] = [x - centre[0], y - centre[1], z - centre[2]];
       const basis: Wrench = [ax, ay, az, ry * az - rz * ay, rz * ax - rx * az, rx * ay - ry * ax];
       if (!basis.every(Number.isFinite))
-        throw new MargoError('state', 'You must measure the hull faces and moment arms at a finite scale near the wake.');
+        throw new MargoError(
+          'state',
+          'You must measure the hull faces and moment arms at a finite scale near the wake.',
+        );
       faces.push({ cell, basis });
       this.directed[axis].set(face, area > 0 ? basis : [-ax, -ay, -az, -basis[3], -basis[4], -basis[5]]);
     };

@@ -60,9 +60,7 @@ export class DragJoint implements PhysicsAttachment {
     if (!(damping >= 0 && Number.isFinite(damping)))
       throw jointInput('Drag damping ratio is 0 or more; pass options.damping of 0 or above.');
     if (!(maxForce > 0))
-      throw jointInput(
-        'Drag maxForce is a positive number of newtons; pass options.maxForce above 0 or leave it out.',
-      );
+      throw jointInput('Drag maxForce is a positive number of newtons; pass options.maxForce above 0 or leave it out.');
     if (body.type !== 'dynamic')
       throw jointInput('A drag joint pulls a dynamic body; pass a body made with type dynamic.');
     this.omega = 2 * Math.PI * frequency;

@@ -67,13 +67,17 @@ export class SeismicInertialLoad implements Solver<SeismicInertialParams> {
     const bodies = context.inputs.get(BODIES_FIELD.name)?.region;
     if (!motion || !bodies) return;
     if (motion.type !== 'f64' || motion.layout !== SEISMIC_LAYOUT || motion.byteLength % (SEISMIC_SURFACE_WORDS * 8))
-      throw new RangeError('Invalid seismic motion field. You must connect the groundField from a SeismicGround instance.');
+      throw new RangeError(
+        'Invalid seismic motion field. You must connect the groundField from a SeismicGround instance.',
+      );
     if (
       bodies.type !== 'f32' ||
       bodies.layout !== 2 ||
       bodies.byteLength / (BODY_WORDS * 4) !== out.length / FORCE_WORDS
     )
-      throw new RangeError('Invalid rigid field for seismic loads. You must match the rigid solver body capacity and layout.');
+      throw new RangeError(
+        'Invalid rigid field for seismic loads. You must match the rigid solver body capacity and layout.',
+      );
     const ground = regionWords(motion.memory ?? this.host.memory, motion) as Float64Array;
     const bodyWords = regionWords(bodies.memory ?? this.host.memory, bodies) as Float32Array;
     for (const { body, column } of this.supports) {

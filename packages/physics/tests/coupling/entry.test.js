@@ -77,7 +77,10 @@ function entryFixture(physics, options) {
     .couple(['entry', 'rigid'], 'staggered');
   const stage = (tick) => {
     const port = { ...rigid.exportPorts(tick)[0], cell: world.cellOf('rigid') };
-    entry.step({ tick, level: 2, seed: 1, inputs: new Map([[BODIES_FIELD.name, port]]), cell: world.cellOf('entry') }, 1 / 240);
+    entry.step(
+      { tick, level: 2, seed: 1, inputs: new Map([[BODIES_FIELD.name, port]]), cell: world.cellOf('entry') },
+      1 / 240,
+    );
   };
   const observe = () => ({
     events: entry.splashes(),
@@ -102,7 +105,10 @@ test('a non-finite pressure query on the second body leaves every entry publicat
     },
   };
   const { entry, world, stage, observe } = entryFixture(physics, {
-    positions: [[-0.5, 0.03125, 0], [0.5, 0.03125, 0]],
+    positions: [
+      [-0.5, 0.03125, 0],
+      [0.5, 0.03125, 0],
+    ],
     speed: 10,
     sea,
     foam: { addFoam: (...box) => foam.push(box) },
@@ -136,7 +142,9 @@ test('a signed rebase and distinct rigid cell preserve entry loads and splash re
     using physics = new Physics(null, { fixedTimestep: 1 / 240 });
     let seaCell = base;
     const sea = {
-      get cell() { return seaCell; },
+      get cell() {
+        return seaCell;
+      },
       elevation: (x) => x / 32,
     };
     const { world, observe } = entryFixture(physics, {
@@ -284,8 +292,9 @@ test('an open launch cavity changes the live hull force once and returns to wate
   const reference = launch(false, false);
   const coupled = launch(true, false);
   assert.deepEqual(launch(true, true), coupled);
-  const opening = coupled.trace.findIndex(({ cavity, load }, frame) =>
-    cavity && Math.abs(load[1] - reference.trace[frame].load[1]) > 0.01);
+  const opening = coupled.trace.findIndex(
+    ({ cavity, load }, frame) => cavity && Math.abs(load[1] - reference.trace[frame].load[1]) > 0.01,
+  );
   assert.ok(opening >= 0, 'the published cavity changes the hull water load');
   assert.deepEqual(coupled.trace.slice(0, opening), reference.trace.slice(0, opening));
   const forceChange = coupled.trace[opening].load[1] - reference.trace[opening].load[1];

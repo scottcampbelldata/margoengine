@@ -21,8 +21,7 @@ const G = 9.81;
 function wave(ratio, H, { solver, ...options } = {}) {
   const physics = new Physics(null, options);
   if (solver) physics.setSolver(solver);
-  const
-    T = 0.15 * H,
+  const T = 0.15 * H,
     gap = ratio * H,
     count = 40;
   physics.addBody(null, {

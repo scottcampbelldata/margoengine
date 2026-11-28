@@ -112,7 +112,9 @@ test('a frame is a quaternion', () => {
     [0, 0, 1],
     [0, 0, NaN, 1],
   ])
-    assert.throws(() => physics.addJoint(a, b, { type: 'revolute', frameA: frame, frameB: IDENTITY }), { code: 'unsupported' });
+    assert.throws(() => physics.addJoint(a, b, { type: 'revolute', frameA: frame, frameB: IDENTITY }), {
+      code: 'unsupported',
+    });
   physics.dispose();
 });
 

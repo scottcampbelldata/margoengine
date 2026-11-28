@@ -230,17 +230,20 @@ export interface LateralSection {
  * and the conjugate potentials in -sin(2m theta). Their Dirichlet energy gives
  * rho*pi times the sum of m times each pair of stream coefficients.
  */
-export function lateralAddedMassInfinite(form: LewisForm, density: number, pivot: number):
-  { a22: number; a24: number; a44: number } {
+export function lateralAddedMassInfinite(
+  form: LewisForm,
+  density: number,
+  pivot: number,
+): { a22: number; a24: number; a44: number } {
   const { scale, a1, a3 } = form;
   const scaleSquared = scale * scale;
-  const factor = 4 * scale / Math.PI;
+  const factor = (4 * scale) / Math.PI;
   let a22 = 0;
   let a24 = 0;
   let a44 = 0;
   for (let m = 1; m <= 128; m++) {
     const order = 4 * m * m;
-    const sway = (m % 2 ? -factor : factor) * ((1 - a1) / (1 - order) - 3 * a3 / (9 - order));
+    const sway = (m % 2 ? -factor : factor) * ((1 - a1) / (1 - order) - (3 * a3) / (9 - order));
     const shape = m === 1 ? scaleSquared * a1 * (1 + a3) : m === 2 ? -scaleSquared * a3 : 0;
     const roll = pivot * sway + shape;
     a22 += m * sway * sway;

@@ -172,7 +172,10 @@ test('a slow machine decomposes as a fast one: no wall-clock bound by default, a
     Date.now = now;
   }
   const stop = new Error('stopped');
-  assert.throws(() => convexDecomposition(tube(), { signal: AbortSignal.abort(stop) }), (error) => error === stop);
+  assert.throws(
+    () => convexDecomposition(tube(), { signal: AbortSignal.abort(stop) }),
+    (error) => error === stop,
+  );
   assert.throws(
     () => convexDecomposition(tube(), { signal: AbortSignal.abort(new DOMException('late', 'TimeoutError')) }),
     (error) => error instanceof MargoError && error.code === 'timeout',

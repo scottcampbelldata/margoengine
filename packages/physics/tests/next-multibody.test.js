@@ -233,7 +233,9 @@ test('removing a multibody or a body of one frees the others, and bad trees thro
     /already in the tree|belong/,
   );
   assert.throws(() => physics.addMultibody(pivot, []), { code: 'unsupported' });
-  assert.throws(() => physics.addMultibody(pivot, [{ body: loose, joint: { type: 'rope', length: 1 } }]), { code: 'unsupported' });
+  assert.throws(() => physics.addMultibody(pivot, [{ body: loose, joint: { type: 'rope', length: 1 } }]), {
+    code: 'unsupported',
+  });
   physics.dispose();
 });
 

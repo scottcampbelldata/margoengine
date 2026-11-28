@@ -315,7 +315,10 @@ test('bad bodies and settings are refused, each naming its fix', () => {
     sea = { elevation: () => 0 };
   const unsupported = (message) => ({ code: 'unsupported', message });
   assert.throws(() => world.add(new EntrySolver('a'), { bodies: [], sea }), unsupported(/pass them.+#sea-entry/));
-  assert.throws(() => world.add(new EntrySolver('b'), { bodies: [{ row: 0, mesh }] }), unsupported(/pass \{sea\}.+#sea-entry/));
+  assert.throws(
+    () => world.add(new EntrySolver('b'), { bodies: [{ row: 0, mesh }] }),
+    unsupported(/pass \{sea\}.+#sea-entry/),
+  );
   assert.throws(
     () => world.add(new EntrySolver('c'), { bodies: [{ row: -1, mesh }], sea }),
     unsupported(/Supply one entry per rigid body row.+#sea-entry/),
@@ -334,12 +337,21 @@ test('bad bodies and settings are refused, each naming its fix', () => {
     unsupported(/pass a FoamSolver or none.+#sea-entry/),
   );
   const valid = { bodies: [{ row: 0, mesh }], sea };
-  assert.throws(() => world.add(new EntrySolver('g'), { ...valid, capacity: 3 }), unsupported(/Omit capacity.+#sea-entry/));
-  assert.throws(() => world.add(new EntrySolver('h'), { ...valid, level: 1.5 }), unsupported(/Use an integer.+#sea-entry/));
+  assert.throws(
+    () => world.add(new EntrySolver('g'), { ...valid, capacity: 3 }),
+    unsupported(/Omit capacity.+#sea-entry/),
+  );
+  assert.throws(
+    () => world.add(new EntrySolver('h'), { ...valid, level: 1.5 }),
+    unsupported(/Use an integer.+#sea-entry/),
+  );
   assert.throws(
     () => world.add(new EntrySolver('i'), { ...valid, bodies: [valid.bodies[0], valid.bodies[0]] }),
     unsupported(/invalid or repeated.+#sea-entry/),
   );
   mesh.vertices[0] = Infinity;
-  assert.throws(() => world.add(new EntrySolver('j'), valid), unsupported(/Supply finite body-local metres.+#sea-entry/));
+  assert.throws(
+    () => world.add(new EntrySolver('j'), valid),
+    unsupported(/Supply finite body-local metres.+#sea-entry/),
+  );
 });

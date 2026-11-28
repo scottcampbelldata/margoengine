@@ -248,9 +248,15 @@ for (const name of ['pack-ice-kernel.wasm', 'pack-ice-kernel-shared.wasm'])
 await copyFile(resolve(root, 'src/seakeeping/hull-panel-kernel.wasm'), resolve(dist, 'hull-panel-kernel.wasm'));
 await copyFile(resolve(root, 'src/seakeeping/hull-slamming-kernel.wasm'), resolve(dist, 'hull-slamming-kernel.wasm'));
 await copyFile(resolve(root, 'src/seakeeping/flood-volume-kernel.wasm'), resolve(dist, 'flood-volume-kernel.wasm'));
-await copyFile(resolve(root, 'src/seakeeping/flood-volume-kernel-shared.wasm'), resolve(dist, 'flood-volume-kernel-shared.wasm'));
+await copyFile(
+  resolve(root, 'src/seakeeping/flood-volume-kernel-shared.wasm'),
+  resolve(dist, 'flood-volume-kernel-shared.wasm'),
+);
 await copyFile(resolve(root, 'src/tracer-random-kernel.wasm'), resolve(dist, 'tracer-random-kernel.wasm'));
-await copyFile(resolve(root, 'src/tracer-random-kernel-shared.wasm'), resolve(dist, 'tracer-random-kernel-shared.wasm'));
+await copyFile(
+  resolve(root, 'src/tracer-random-kernel-shared.wasm'),
+  resolve(dist, 'tracer-random-kernel-shared.wasm'),
+);
 await copyFile(resolve(root, 'src/sea/wake-fft.wasm'), resolve(dist, 'wake-fft.wasm'));
 for (const name of ['loads-kernel.wasm', 'loads-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/loads', name), resolve(dist, name));

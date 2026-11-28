@@ -211,8 +211,7 @@ function frameLines(out: DebugLineWriter, joint: PhysicsJoint, a: V, b: V, qa: Q
         n = Math.max(1, Math.ceil(span / STEP)),
         ref = axes[(i + 1) % 3]!,
         perp = axes[(i + 2) % 3]!,
-        point = (theta: number): V =>
-          at(at(a, ref, radius * Math.cos(theta)), perp, radius * Math.sin(theta));
+        point = (theta: number): V => at(at(a, ref, radius * Math.cos(theta)), perp, radius * Math.sin(theta));
       for (let j = 0; j < n; j++) out.segment(point(lo + (span * j) / n), point(lo + (span * (j + 1)) / n), limit);
       out.segment(a, point(lo), limit);
       out.segment(a, point(lo + span), limit);

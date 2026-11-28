@@ -151,7 +151,8 @@ async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Modu
     return WebAssembly.compile(await readFile(url, { signal }));
   }
   const response = await fetch(url, { signal });
-  if (!response.ok) throw new MargoError('failed', 'Seismic kernel is unavailable. You must serve both optional Wasm assets.');
+  if (!response.ok)
+    throw new MargoError('failed', 'Seismic kernel is unavailable. You must serve both optional Wasm assets.');
   return WebAssembly.compile(await response.arrayBuffer());
 }
 

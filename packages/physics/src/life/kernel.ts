@@ -176,7 +176,10 @@ export function instantiateSwimKernel(
     for (let i = 0; i < recorded.length; i += RECEIPT_WORDS) {
       const bodies = recorded[i]!;
       if (recorded[i + 1] !== (withPassive ? bodies : 0))
-        throw new MargoError('failed', 'Swimmer batch returned invalid passive work. You must rebuild the swimming assets.');
+        throw new MargoError(
+          'failed',
+          'Swimmer batch returned invalid passive work. You must rebuild the swimming assets.',
+        );
       complete += bodies;
     }
     if (complete !== count)

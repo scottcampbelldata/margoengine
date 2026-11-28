@@ -17,7 +17,12 @@ export function entryCavityField(id: string): FieldDescriptor {
 }
 
 export function isEntryCavityField(field: FieldDescriptor): boolean {
-  return field.kind === 'bodySet' && field.centring === 'particle' && field.quantity === 'entryCavityPlane' && field.unit === '1';
+  return (
+    field.kind === 'bodySet' &&
+    field.centring === 'particle' &&
+    field.quantity === 'entryCavityPlane' &&
+    field.unit === '1'
+  );
 }
 
 export function entryCavityRows(memory: WebAssembly.Memory, port: Port, capacity: number): Float64Array {
@@ -27,6 +32,9 @@ export function entryCavityRows(memory: WebAssembly.Memory, port: Port, capacity
     region.layout !== ENTRY_CAVITY_LAYOUT ||
     region.byteLength !== capacity * ENTRY_CAVITY_WORDS * Float64Array.BYTES_PER_ELEMENT
   )
-    throw new MargoError('state', 'You must connect the layout-1 EntrySolver cavity field with the same rigid capacity as HullSolver.');
+    throw new MargoError(
+      'state',
+      'You must connect the layout-1 EntrySolver cavity field with the same rigid capacity as HullSolver.',
+    );
   return regionWords(region.memory ?? memory, region) as Float64Array;
 }

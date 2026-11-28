@@ -696,12 +696,9 @@ export function estimateMeshMassProperties(
       cxx += w * (2 * (ax * ax + bx * bx + cx * cx) + 2 * (ax * bx + bx * cx + cx * ax));
       cyy += w * (2 * (ay * ay + by * by + cy * cy) + 2 * (ay * by + by * cy + cy * ay));
       czz += w * (2 * (az * az + bz * bz + cz * cz) + 2 * (az * bz + bz * cz + cz * az));
-      cxy +=
-        w * (2 * (ax * ay + bx * by + cx * cy) + ax * by + bx * ay + bx * cy + cx * by + cx * ay + ax * cy);
-      cxz +=
-        w * (2 * (ax * az + bx * bz + cx * cz) + ax * bz + bx * az + bx * cz + cx * bz + cx * az + ax * cz);
-      cyz +=
-        w * (2 * (ay * az + by * bz + cy * cz) + ay * bz + by * az + by * cz + cy * bz + cy * az + ay * cz);
+      cxy += w * (2 * (ax * ay + bx * by + cx * cy) + ax * by + bx * ay + bx * cy + cx * by + cx * ay + ax * cy);
+      cxz += w * (2 * (ax * az + bx * bz + cx * cz) + ax * bz + bx * az + bx * cz + cx * bz + cx * az + ax * cz);
+      cyz += w * (2 * (ay * az + by * bz + cy * cz) + ay * bz + by * az + by * cz + cy * bz + cy * az + ay * cz);
     }
     const sign = vol < 0 ? -1 : 1;
     const absVol = vol * sign;

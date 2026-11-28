@@ -19,7 +19,11 @@ const ulp = (x) => {
   return f[0] - Math.abs(x);
 };
 const coded = (fn, pattern = /errors#gpu-cloth/) =>
-  assert.throws(fn, (e) => e.name === 'MargoError' && pattern.test(e.message), 'a coded MargoError linking errors#gpu-cloth');
+  assert.throws(
+    fn,
+    (e) => e.name === 'MargoError' && pattern.test(e.message),
+    'a coded MargoError linking errors#gpu-cloth',
+  );
 
 test('a particle hung on two compliant edges settles where the springs hold its weight (XPBD statics)', () => {
   // Two edges of compliance alpha from pins at (+-a, 0): 2 (l - L) / alpha * y / l = m g, solved by bisection.
@@ -27,9 +31,17 @@ test('a particle hung on two compliant edges settles where the springs hold its 
     h = 0.4,
     m = 0.1,
     alpha = 0.01;
-  const desc = SoftBodyDesc.trimesh([-a, 0, 0, a, 0, 0, 0, -h, 0], [0, 1, 2]).setPinnedParticles([0, 1]).setParticleMass(m);
+  const desc = SoftBodyDesc.trimesh([-a, 0, 0, a, 0, 0, 0, -h, 0], [0, 1, 2])
+    .setPinnedParticles([0, 1])
+    .setParticleMass(m);
   // Tethers off: they would cap the stretch from the pins at 1 percent.
-  const cloth = new GPUCloth(desc, { airDensity: 0, stretchCompliance: alpha, bendCompliance: 0, damping: 4, tethers: false });
+  const cloth = new GPUCloth(desc, {
+    airDensity: 0,
+    stretchCompliance: alpha,
+    bendCompliance: 0,
+    damping: 4,
+    tethers: false,
+  });
   cloth.step(600);
   const L = Math.hypot(a, h);
   let lo = h,
@@ -69,7 +81,13 @@ test('cloth on a slope holds below its friction angle and slides at g (sin - mu 
     normal = [-Math.sin(theta), Math.cos(theta), 0];
   const run = (friction) => {
     const origin = normal.map((n) => n * thickness);
-    const desc = SoftBodyDesc.cloth(origin, along.map((x) => x * 0.05), [0, 0, 0.05], 2, 2);
+    const desc = SoftBodyDesc.cloth(
+      origin,
+      along.map((x) => x * 0.05),
+      [0, 0, 0.05],
+      2,
+      2,
+    );
     const cloth = new GPUCloth(desc, { airDensity: 0, thickness, friction });
     cloth.addCollider({ shape: 'plane', normal });
     const before = cloth.positions();
@@ -106,12 +124,21 @@ test('a particle tied to a moving, turning body follows its point exactly, and a
   }
   const p = cloth.positions(),
     at = body.position;
-  for (let k = 0; k < 3; k++) assert.ok(Math.abs(p[k] - at[k]) < 1e-6, `tied particle ${[...p.slice(0, 3)]} on body ${at}`);
+  for (let k = 0; k < 3; k++)
+    assert.ok(Math.abs(p[k] - at[k]) < 1e-6, `tied particle ${[...p.slice(0, 3)]} on body ${at}`);
   cloth.pin(15, [0.5, 2, 0.5]);
   cloth.step();
-  assert.deepEqual([...p.slice(45, 48)].map((x) => +x.toFixed(4)), [0.3, 2, 0.3], 'the pin was where it was set');
+  assert.deepEqual(
+    [...p.slice(45, 48)].map((x) => +x.toFixed(4)),
+    [0.3, 2, 0.3],
+    'the pin was where it was set',
+  );
   const moved = cloth.positions().slice(45, 48);
-  assert.deepEqual([...moved].map((x) => +x.toFixed(5)), [0.5, 2, 0.5], 'it moved to its new point over the step');
+  assert.deepEqual(
+    [...moved].map((x) => +x.toFixed(5)),
+    [0.5, 2, 0.5],
+    'it moved to its new point over the step',
+  );
   cloth.unpin(15);
   assert.deepEqual(cloth.pinned, [0]);
   physics.dispose();
@@ -168,8 +195,15 @@ test('cloth comes to rest on a sphere, a capsule, a box and a signed distance fi
 
 test('a collider on a body rides it, and a removed collider is no longer met', () => {
   const physics = new Physics(null);
-  const body = physics.addBody(null, { type: 'kinematicPosition', position: [0, 0, 0], colliders: { shape: 'sphere', radius: 0.3 } });
-  const cloth = new GPUCloth(SoftBodyDesc.cloth([-0.02, 0.4, -0.02], [0.02, 0, 0], [0, 0, 0.02], 3, 3), { physics, thickness: 0.005 });
+  const body = physics.addBody(null, {
+    type: 'kinematicPosition',
+    position: [0, 0, 0],
+    colliders: { shape: 'sphere', radius: 0.3 },
+  });
+  const cloth = new GPUCloth(SoftBodyDesc.cloth([-0.02, 0.4, -0.02], [0.02, 0, 0], [0, 0, 0.02], 3, 3), {
+    physics,
+    thickness: 0.005,
+  });
   const ball = cloth.addCollider({ shape: 'sphere', radius: 0.3, body });
   cloth.step(60);
   for (let k = 1; k <= 30; k++) {
@@ -189,9 +223,12 @@ test('a collider on a body rides it, and a removed collider is no longer met', (
 test('a flag pinned to its pole streams downwind and its threads hold their length', () => {
   const nu = 21,
     nv = 11;
-  const flag = new GPUCloth(SoftBodyDesc.cloth([0, 2, 0], [0.1, 0, 0], [0, -0.1, 0], nu, nv).setPinnedParticles(
-    Array.from({ length: nv }, (_, j) => j),
-  ), { wind: [6, 0, 0], turbulence: 0.3 });
+  const flag = new GPUCloth(
+    SoftBodyDesc.cloth([0, 2, 0], [0.1, 0, 0], [0, -0.1, 0], nu, nv).setPinnedParticles(
+      Array.from({ length: nv }, (_, j) => j),
+    ),
+    { wind: [6, 0, 0], turbulence: 0.3 },
+  );
   // The worst stretch of any thread over 3 s of gusts: measured 5.53 percent at the default 30 substeps (docs/limits.md),
   // as cotton of 0.12 kg/m^2 takes 180 m/s^2 of drag in a 6 m/s wind and one solve a substep has to follow it.
   let worst = 0;
@@ -202,7 +239,8 @@ test('a flag pinned to its pole streams downwind and its threads hold their leng
       for (let j = 0; j < nv; j++) {
         const a = (i * nv + j) * 3;
         for (const b of [i + 1 < nu ? ((i + 1) * nv + j) * 3 : -1, j + 1 < nv ? (i * nv + j + 1) * 3 : -1])
-          if (b >= 0) worst = Math.max(worst, Math.hypot(p[a] - p[b], p[a + 1] - p[b + 1], p[a + 2] - p[b + 2]) / 0.1 - 1);
+          if (b >= 0)
+            worst = Math.max(worst, Math.hypot(p[a] - p[b], p[a + 1] - p[b + 1], p[a + 2] - p[b + 2]) / 0.1 - 1);
       }
   }
   assert.ok(worst < 0.0554, `worst thread stretch ${worst}`);
@@ -216,7 +254,10 @@ test('a flag pinned to its pole streams downwind and its threads hold their leng
   flag.options.wind = (t) => (times.push(t), [0, 0, 0]);
   flag.step();
   flag.step();
-  assert.deepEqual(times.map((t) => +t.toFixed(6)), [3, 3.016667]);
+  assert.deepEqual(
+    times.map((t) => +t.toFixed(6)),
+    [3, 3.016667],
+  );
 });
 
 test('the same steps give the same state, and a restored snapshot repeats them to the bit', async () => {
@@ -260,7 +301,11 @@ test('debug lines: an edge a segment coloured by strain, pin crosses, collider o
   });
   const segments = (lines) => lines.vertices.length / 6;
   assert.equal(segments(cloth.debugRender({ pins: false, colliders: false, wind: false })), 6);
-  assert.equal(segments(cloth.debugRender({ edges: false, colliders: false, wind: false })), 3, 'a cross of three lines');
+  assert.equal(
+    segments(cloth.debugRender({ edges: false, colliders: false, wind: false })),
+    3,
+    'a cross of three lines',
+  );
   assert.equal(segments(cloth.debugRender({ edges: false, pins: false })), 2, 'the wind arrow and its head');
   cloth.addCollider({ shape: 'sphere', radius: 0.1, position: [0, 0, 0] });
   assert.equal(segments(cloth.debugRender({ edges: false, pins: false, wind: false })), 72, 'three rings of 24');
@@ -272,12 +317,15 @@ test('debug lines: an edge a segment coloured by strain, pin crosses, collider o
 test('tethers keep every particle within 1 + slack of its rest distance along the cloth from its pin (Kim et al. 2012)', () => {
   // A soft strip 2 m long hung from its top corners: its edges alone let it stretch far; the tethers cap it.
   const make = (tethers) => {
-    const cloth = new GPUCloth(SoftBodyDesc.cloth([0, 2, 0], [0.1, 0, 0], [0, -0.1, 0], 2, 21).setPinnedParticles([0, 21]), {
-      stretchCompliance: 0.05,
-      shearCompliance: 0.05,
-      airDensity: 0,
-      tethers,
-    });
+    const cloth = new GPUCloth(
+      SoftBodyDesc.cloth([0, 2, 0], [0.1, 0, 0], [0, -0.1, 0], 2, 21).setPinnedParticles([0, 21]),
+      {
+        stretchCompliance: 0.05,
+        shearCompliance: 0.05,
+        airDensity: 0,
+        tethers,
+      },
+    );
     cloth.step(120);
     const p = cloth.positions();
     return Math.hypot(p[20 * 3] - 0, p[20 * 3 + 1] - 2, p[20 * 3 + 2]); // the bottom of the pinned side, 2 m down the cloth
@@ -304,7 +352,12 @@ test('bad input is a coded MargoError naming the fix', () => {
   coded(() => cloth.step(0));
   coded(() => cloth.addCollider({ shape: 'cone' }));
   coded(() => cloth.addCollider({ shape: 'sphere', radius: -1 }));
-  coded(() => cloth.addCollider({ shape: 'sdf', sdf: { data: new Float32Array(7), size: [2, 2, 2], min: [0, 0, 0], max: [1, 1, 1] } }));
+  coded(() =>
+    cloth.addCollider({
+      shape: 'sdf',
+      sdf: { data: new Float32Array(7), size: [2, 2, 2], min: [0, 0, 0], max: [1, 1, 1] },
+    }),
+  );
   for (let i = 0; i < MAX_GPU_CLOTH_COLLIDERS; i++) cloth.addCollider({ shape: 'plane' });
   coded(() => cloth.addCollider({ shape: 'plane' }));
   coded(() => cloth.setup({ backend: 'webgl2' }), /WebGPU/);
@@ -320,7 +373,12 @@ test('the CPU route counts its work exactly: substeps, particle updates, edge so
   });
   assert.equal(cloth.colliders.length, 1, 'the colliders option adds them');
   cloth.step();
-  assert.deepEqual(cloth.stats.work, { substeps: 30, particles: 9 * 30, edges: (12 + 8 + 6) * 30, colliderTests: 9 * 30 });
+  assert.deepEqual(cloth.stats.work, {
+    substeps: 30,
+    particles: 9 * 30,
+    edges: (12 + 8 + 6) * 30,
+    colliderTests: 9 * 30,
+  });
   // A pinned particle is neither integrated nor tested, and an edge between two pins is not solved.
   cloth.pin(0).pin(1);
   cloth.step();
@@ -333,7 +391,7 @@ test('the CPU route counts its work exactly: substeps, particle updates, edge so
   coded(() => new GPUCloth(SoftBodyDesc.cloth([0, 1, 0], [0.1, 0, 0], [0, 0, 0.1], 3, 3), { colliders: {} }));
 });
 
-test('the shared wind: a FlowField is sampled at the cloth\'s centre each frame, its density the air\'s (ATMO-01 to SOFT-01)', async () => {
+test("the shared wind: a FlowField is sampled at the cloth's centre each frame, its density the air's (ATMO-01 to SOFT-01)", async () => {
   // A uniform field moves the cloth exactly as the same velocity does.
   const field = (velocity, density, seen) => ({
     medium: 'air',
@@ -358,7 +416,10 @@ test('the shared wind: a FlowField is sampled at the cloth\'s centre each frame,
   // Sampled once a frame, at the cloth's mean point as it last was, at the cloth's time.
   assert.equal(seen.filter(([, , , t]) => t > 0).length >= 29, true);
   const [x, y, z, t] = seen.at(-1);
-  assert.ok(Number.isFinite(x + y + z) && Math.abs(y - 1.8) < 0.5 && Math.abs(t - 29 / 60) < 1e-9, `sampled at ${x}, ${y}, ${z}, ${t}`);
+  assert.ok(
+    Number.isFinite(x + y + z) && Math.abs(y - 1.8) < 0.5 && Math.abs(t - 29 / 60) < 1e-9,
+    `sampled at ${x}, ${y}, ${z}, ${t}`,
+  );
   // The field's density sets the drag: a falling sheet's terminal speed in air of 0.6 kg/m^3.
   const sheet = new GPUCloth(SoftBodyDesc.cloth([0, 10, 0], [0.1, 0, 0], [0, 0, 0.1], 5, 5), {
     turbulence: 0,

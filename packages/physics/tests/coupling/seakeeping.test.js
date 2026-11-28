@@ -570,8 +570,8 @@ test('a fixed heading gives ordinary-strip sway, roll and yaw cross loads at adv
   const section = lateralSection(lewisForm(beam, draft, beam * draft), rate, SEA_WATER, 0, GRAVITY);
   const swayMass = section.sway.addedMass * length;
   const swayDamping = section.sway.damping * length;
-  const rollMass = (section.rollOfSway.addedMass + section.swayOfRoll.addedMass) * length / 2;
-  const rollDamping = (section.rollOfSway.damping + section.swayOfRoll.damping) * length / 2;
+  const rollMass = ((section.rollOfSway.addedMass + section.swayOfRoll.addedMass) * length) / 2;
+  const rollDamping = ((section.rollOfSway.damping + section.swayOfRoll.damping) * length) / 2;
 
   function play(forward, driven) {
     const world = new PhysicsWorld({ rate: { num: steps, den: 1 }, bodyRows: 1, memory: worldMemory(false) });
@@ -581,7 +581,10 @@ test('a fixed heading gives ordinary-strip sway, roll and yaw cross loads at adv
     const rig = {
       describe: () => ({
         id: 'rig',
-        fields: [{ field: BODIES_FIELD, access: 'write' }, { field: BODY_FORCES_FIELD, access: 'write' }],
+        fields: [
+          { field: BODIES_FIELD, access: 'write' },
+          { field: BODY_FORCES_FIELD, access: 'write' },
+        ],
         rate: 0,
         stableRate: () => 0,
       }),
@@ -592,7 +595,7 @@ test('a fixed heading gives ordinary-strip sway, roll and yaw cross loads at adv
         words()[23] = words()[24] = 1;
       },
       step({ tick }) {
-        const angle = rate * tick / steps;
+        const angle = (rate * tick) / steps;
         const yaw = driven === 'yaw' ? amplitude * Math.sin(angle) : 0;
         const roll = driven === 'roll' ? amplitude * Math.sin(angle) : 0;
         const body = words();
@@ -610,11 +613,18 @@ test('a fixed heading gives ordinary-strip sway, roll and yaw cross loads at adv
       extraState: () => [],
     };
     const hull = new HullSolver();
-    world.add(rig, {}).add(hull, {
-      hulls: [{ row: 0, mesh, course: { speed: forward, lateralHeading: 0 } }],
-      sea: { elevation: () => 0, density: SEA_WATER },
-      drag: false, slamming: false, greenWater: false, rollDamping: false, diffraction: false,
-    }).couple(['rig', 'hull'], 'staggered');
+    world
+      .add(rig, {})
+      .add(hull, {
+        hulls: [{ row: 0, mesh, course: { speed: forward, lateralHeading: 0 } }],
+        sea: { elevation: () => 0, density: SEA_WATER },
+        drag: false,
+        slamming: false,
+        greenWater: false,
+        rollDamping: false,
+        diffraction: false,
+      })
+      .couple(['rig', 'hull'], 'staggered');
     const reported = hull.stateRegions().find((region) => region.name === 'radiated');
     const real = [0, 0, 0];
     const quadrature = [0, 0, 0];
@@ -624,10 +634,10 @@ test('a fixed heading gives ordinary-strip sway, roll and yaw cross loads at adv
       world.advance(frame);
       if (frame > begin) {
         const words = new Float64Array(world.memory.buffer, reported.byteOffset, 7);
-        const phase = rate * (frame - 1) / steps;
+        const phase = (rate * (frame - 1)) / steps;
         for (let k = 0; k < 3; k++) {
-          real[k] += words[k + 3] * Math.cos(phase) * 2 / (end - begin);
-          quadrature[k] += words[k + 3] * Math.sin(phase) * 2 / (end - begin);
+          real[k] += (words[k + 3] * Math.cos(phase) * 2) / (end - begin);
+          quadrature[k] += (words[k + 3] * Math.sin(phase) * 2) / (end - begin);
         }
       }
     }
@@ -652,7 +662,7 @@ test('a fixed heading gives ordinary-strip sway, roll and yaw cross loads at adv
     [-speed * rollMass * rate, -speed * rollDamping],
     [speed * swayMass * rate, speed * swayDamping],
     [speed * rollMass * rate, speed * rollDamping],
-    [-(speed ** 2) * swayDamping / rate, speed ** 2 * swayMass],
+    [(-(speed ** 2) * swayDamping) / rate, speed ** 2 * swayMass],
   ].map((pair) => pair.map((value) => value * amplitude));
   const errors = received.map((pair, i) => {
     const target = expected[i];
@@ -1727,7 +1737,7 @@ test("HullSolver: a box let go heeled rolls down as Jung, Chang and Jo's measure
   // depth is 4.2, with k the gravity-wave number.
   const [l, d, b, t] = [0.9, 0.1, 0.3, 0.05],
     density = 1000,
-    gm = b * b / (12 * t) - t / 2,
+    gm = (b * b) / (12 * t) - t / 2,
     mass = density * l * b * t,
     angle = (15 * Math.PI) / 180,
     decay = (hinged, options) => {
@@ -2755,7 +2765,9 @@ test('a boat built in code and its imported GLB hull have identical buoyancy, ri
     const points = finite ? finiteQuayPointSource('hull.advancingPoints') : undefined;
     const hull = new HullSolver(
       'hull',
-      points ? { minimumRadius: 0.25, pointAdvance: points } : { minimumRadius: 0.25, submergedAdvance: [0, 0.25, 0.55] },
+      points
+        ? { minimumRadius: 0.25, pointAdvance: points }
+        : { minimumRadius: 0.25, submergedAdvance: [0, 0.25, 0.55] },
     );
     const cells = [48, 32],
       cellSize = 0.25;
@@ -2772,16 +2784,18 @@ test('a boat built in code and its imported GLB hull have identical buoyancy, ri
           radius: 0.15,
         }
       : undefined;
-    const sea = finite ? wake.seaSurface() : new SpectralSea({
-      waves: {
-        frequencies: Float64Array.of(0.5),
-        directions: Float64Array.of(0),
-        energy: Float64Array.of(0),
-        depth,
-        density,
-      },
-      patches: [wake],
-    });
+    const sea = finite
+      ? wake.seaSurface()
+      : new SpectralSea({
+          waves: {
+            frequencies: Float64Array.of(0.5),
+            directions: Float64Array.of(0),
+            energy: Float64Array.of(0),
+            depth,
+            density,
+          },
+          patches: [wake],
+        });
     world
       .add(new RigidSolver(), { physics })
       .add(hull, {

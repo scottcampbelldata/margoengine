@@ -9,7 +9,12 @@ import { MargoError } from '@margoengine/math/errors';
 /** What the main thread sends: the module and memory to start on, then runs of boxes, of active pairs and of islands. */
 type Message =
   | { readonly module: WebAssembly.Module; readonly memory: WebAssembly.Memory; readonly stack: number }
-  | { readonly work: 'boxes' | 'pairs' | 'islands'; readonly first: number; readonly last: number; readonly dt: number };
+  | {
+      readonly work: 'boxes' | 'pairs' | 'islands';
+      readonly first: number;
+      readonly last: number;
+      readonly dt: number;
+    };
 
 /** The answer to each message: done, or the error that stopped it. */
 type Reply = { readonly ok: true } | { readonly ok: false; readonly message: string };

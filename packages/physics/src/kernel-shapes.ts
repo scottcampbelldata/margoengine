@@ -84,8 +84,7 @@ function segmentFrame(a: Vec3, b: Vec3, label: string): { middle: Vec3; rotation
   const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
     squared = d[0] * d[0] + d[1] * d[1] + d[2] * d[2],
     length = root(squared);
-  if (!(squared > 0))
-    throw meshInput(`A ${label.toLowerCase()} needs two different points; a and b are the same.`);
+  if (!(squared > 0)) throw meshInput(`A ${label.toLowerCase()} needs two different points; a and b are the same.`);
   const y = d[1] / length;
   // The shortest turn from +Y to the direction: the axis Y x d with the angle's half in w, and a half turn about X for -Y.
   let q: [number, number, number, number];
@@ -231,8 +230,7 @@ function compoundParts(parts: readonly CompoundPart[], hulls: HullRows): KernelC
     if (part.shape === 'capsule') return { shape: 'capsule', size: [part.radius, part.halfHeight], ...placed };
     if (part.shape === 'cylinder' || part.shape === 'cone')
       return { shape: part.shape, size: revolvedSize(part), ...placed };
-    if (!part.points)
-      throw meshInput('A compound convexHull part needs points; parts are never fitted to the mesh.');
+    if (!part.points) throw meshInput('A compound convexHull part needs points; parts are never fitted to the mesh.');
     const { vertices, faces } = buildHull(Float32Array.from(part.points));
     return {
       shape: 'hull',
@@ -393,9 +391,7 @@ export function kernelCollider(
       indexSource = options.indices ?? source?.indices;
     if (!indexSource) throw meshInput('A trimesh needs indices; pass indices or a geometry that has them.');
     if (!indexSource.length || indexSource.length % 3 || vertices.length % 3)
-      throw meshInput(
-        'A trimesh needs whole triangles; pass three indices per triangle and three numbers per vertex.',
-      );
+      throw meshInput('A trimesh needs whole triangles; pass three indices per triangle and three numbers per vertex.');
     for (let i = 0; i < vertices.length; i++)
       if (!Number.isFinite(vertices[i])) throw meshInput('Trimesh vertices must be finite Float32 values.');
     for (let i = 0; i < indexSource.length; i++)
@@ -428,7 +424,8 @@ export function kernelCollider(
           enclosed +=
             (meshVertices[a]! *
               (meshVertices[b + 1]! * meshVertices[c + 2]! - meshVertices[b + 2]! * meshVertices[c + 1]!) +
-              meshVertices[a + 1]! * (meshVertices[b + 2]! * meshVertices[c]! - meshVertices[b]! * meshVertices[c + 2]!) +
+              meshVertices[a + 1]! *
+                (meshVertices[b + 2]! * meshVertices[c]! - meshVertices[b]! * meshVertices[c + 2]!) +
               meshVertices[a + 2]! *
                 (meshVertices[b]! * meshVertices[c + 1]! - meshVertices[b + 1]! * meshVertices[c]!)) /
             6;
@@ -492,8 +489,7 @@ export function kernelCollider(
     checkVec(normal, 'Half space normal');
     const squared = normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2],
       length = root(squared);
-    if (!(squared > 0))
-      throw meshInput('A half space needs a nonzero normal; pass the direction out of the solid.');
+    if (!(squared > 0)) throw meshInput('A half space needs a nonzero normal; pass the direction out of the solid.');
     size = [normal[0] / length, normal[1] / length, normal[2] / length];
   } else if (options.shape === 'triangle') {
     checkVec(options.a, 'Triangle a');
@@ -539,9 +535,7 @@ export function kernelCollider(
   } else if (options.shape === 'voxels') {
     const { cells, size: cell = [1, 1, 1] } = options;
     if (!(cells instanceof Int32Array) || cells.length % 3)
-      throw meshInput(
-        'A voxels collider needs cells as an Int32Array of x, y, z cell coordinates, three per cell.',
-      );
+      throw meshInput('A voxels collider needs cells as an Int32Array of x, y, z cell coordinates, three per cell.');
     checkVec(cell, 'Voxel size');
     for (const value of cell)
       if (!(value > 0))
@@ -681,8 +675,7 @@ export function queryShape(options: ShapeOptions, hulls: HullRows): KernelQueryS
     checkVec(normal, 'Half space normal');
     const squared = normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2],
       length = root(squared);
-    if (!(squared > 0))
-      throw meshInput('A half space needs a nonzero normal; pass the direction out of the solid.');
+    if (!(squared > 0)) throw meshInput('A half space needs a nonzero normal; pass the direction out of the solid.');
     return { shape: 'halfspace', size: [normal[0] / length, normal[1] / length, normal[2] / length] };
   }
   if (options.shape === 'segment') {

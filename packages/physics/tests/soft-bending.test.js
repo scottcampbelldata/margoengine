@@ -140,7 +140,8 @@ test('on the vertex-block solver the strip settles on the same elastica at the d
       const p = body.particlePositions(),
         v = body.particleVelocities();
       let e = 0;
-      for (let i = 0; i < p.length / 3; i++) e += 0.5 * (v[3 * i] ** 2 + v[3 * i + 1] ** 2 + v[3 * i + 2] ** 2) + G * p[3 * i + 1];
+      for (let i = 0; i < p.length / 3; i++)
+        e += 0.5 * (v[3 * i] ** 2 + v[3 * i + 1] ** 2 + v[3 * i + 2] ** 2) + G * p[3 * i + 1];
       return e;
     },
     start = energy();

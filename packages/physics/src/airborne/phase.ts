@@ -142,7 +142,10 @@ export class AirbornePhase {
       typeof exports.airborne_apply !== 'function' ||
       typeof exports.airborne_thread_phase !== 'function'
     )
-      throw new MargoError('failed', 'Airborne integration exports are missing. You must rebuild the airborne Wasm assets.');
+      throw new MargoError(
+        'failed',
+        'Airborne integration exports are missing. You must rebuild the airborne Wasm assets.',
+      );
     stack.value = top;
     new Uint32Array(host.memory.buffer, job.byteOffset, 4)[3] = receipts.byteOffset;
     const pool = this.pool;

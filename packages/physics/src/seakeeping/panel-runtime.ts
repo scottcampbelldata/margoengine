@@ -63,10 +63,13 @@ export function panelDiffraction(
     const above = omega > last;
     const low = above ? final : band(frequencies, omega);
     const below = omega < frequencies[0]!;
-    const weight = above ? 1 - (omega - last) / tail : below ? omega / frequencies[0]!
-      : (omega - frequencies[low]!) / (frequencies[low + 1]! - frequencies[low]!);
+    const weight = above
+      ? 1 - (omega - last) / tail
+      : below
+        ? omega / frequencies[0]!
+        : (omega - frequencies[low]!) / (frequencies[low + 1]! - frequencies[low]!);
     const direction = atan2(kx * across[0] + kz * across[2], kx * forward[0] + kz * forward[2]);
-    const wrapped = (direction < 0 ? direction + TWO_PI : direction) * headings / TWO_PI;
+    const wrapped = ((direction < 0 ? direction + TWO_PI : direction) * headings) / TWO_PI;
     const h = Math.floor(wrapped);
     const s = 2 * AXES * (h % headings);
     const t = 2 * AXES * ((h + 1) % headings);
@@ -78,7 +81,8 @@ export function panelDiffraction(
     const im = -amplitude * sin(phaseAtOrigin);
     for (let j = 0; j < 2 * AXES; j++) {
       const p = previous[s + j]! + ratio * (previous[t + j]! - previous[s + j]!);
-      const value = below || !next ? p * weight : p + weight * (next[s + j]! + ratio * (next[t + j]! - next[s + j]!) - p);
+      const value =
+        below || !next ? p * weight : p + weight * (next[s + j]! + ratio * (next[t + j]! - next[s + j]!) - p);
       force[j >>> 1]! += value * (j % 2 === 0 ? re : im);
     }
   }

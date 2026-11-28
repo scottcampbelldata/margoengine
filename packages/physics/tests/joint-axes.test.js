@@ -45,7 +45,10 @@ test('a ball joint motor on one turn reaches its speed when its cap covers the l
       post = physics.addBody(null, { type: 'fixed', colliders: [] }),
       // A solid sphere of 2 kg and 0.5 m: I = 2/5 m r^2 = 0.2 kg m^2, so 2 rad/s in 1 s takes 0.4 N m.
       ball = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.5, mass: 2 } });
-    physics.addJoint(post, ball, { type: 'spherical', motors: { angZ: { targetVelocity: 2, damping: 1e4, model: 'force', maxForce } } });
+    physics.addJoint(post, ball, {
+      type: 'spherical',
+      motors: { angZ: { targetVelocity: 2, damping: 1e4, model: 'force', maxForce } },
+    });
     for (let i = 0; i < 60; i++) physics.step();
     const w = ball.angularVelocity;
     physics.dispose();
@@ -63,7 +66,13 @@ test('a spring stops at its least and greatest length, and between them it is a 
     hook = physics.addBody(null, { type: 'fixed', colliders: [] }),
     // 10 kg on 100 N/m would hang 1 + 0.981 m down at rest; the stop at 1.5 m holds it there.
     weight = physics.addBody(null, { position: [0, -1, 0], colliders: { shape: 'sphere', radius: 0.1, mass: 10 } }),
-    spring = physics.addJoint(hook, weight, { type: 'spring', restLength: 1, stiffness: 100, damping: 20, maxLength: 1.5 });
+    spring = physics.addJoint(hook, weight, {
+      type: 'spring',
+      restLength: 1,
+      stiffness: 100,
+      damping: 20,
+      maxLength: 1.5,
+    });
   spring.axisLimits('linX').forEach((v, k) => near(v, [0, 1.5][k], 1e-7, 'spring stops read back'));
   for (let i = 0; i < 240; i++) physics.step();
   near(-weight.position[1], 1.5, 5e-3, 'held at its greatest length');
@@ -76,7 +85,10 @@ test('a spring stops at its least and greatest length, and between them it is a 
   physics.addJoint(up, strut, { type: 'spring', restLength: 0, stiffness: 1000, minLength: 0.4 });
   for (let i = 0; i < 120; i++) physics.step();
   near(distance(strut.position, up.position), 0.4, 5e-3, 'held at its least length against a spring that pulls it in');
-  assert.throws(() => spring.setAxisMotor('linX', { targetVelocity: 1 }), { code: 'unsupported', message: /spring itself/ });
+  assert.throws(() => spring.setAxisMotor('linX', { targetVelocity: 1 }), {
+    code: 'unsupported',
+    message: /spring itself/,
+  });
   assert.throws(() => spring.setAxisLimits('linY', 0, 1), { code: 'unsupported', message: /linX/ });
   assert.throws(() => spring.setAxisLimits('linX', -1, 1), { code: 'unsupported', message: /from 0 up/ });
   assert.throws(
@@ -95,10 +107,14 @@ test('a rope takes a least length too, and a hinge and a slider take their axis 
   b.setLinearVelocity([0, 3, 0]);
   for (let i = 0; i < 60; i++) physics.step();
   near(distance(a.position, b.position), 0.8, 5e-3, 'a rope with a least length is a strut there');
-  const hinge = physics.addJoint(a, physics.addBody(null, { colliders: { shape: 'box', halfExtents: [0.1, 0.1, 0.1] } }), {
-    type: 'revolute',
-    axis: [0, 0, 1],
-  });
+  const hinge = physics.addJoint(
+    a,
+    physics.addBody(null, { colliders: { shape: 'box', halfExtents: [0.1, 0.1, 0.1] } }),
+    {
+      type: 'revolute',
+      axis: [0, 0, 1],
+    },
+  );
   hinge.setAxisLimits('angX', -1, 1);
   assert.deepEqual(hinge.limits, [-1, 1], 'angX is the hinge axis setLimits sets');
   assert.throws(() => hinge.setAxisLimits('angY', 0, 1), { code: 'unsupported', message: /locks angY/ });
@@ -113,11 +129,20 @@ test('the joint debug view draws frame axes at the anchors and each limit where 
     door = physics.addBody(null, { position: [0.5, 2, 0], colliders: { shape: 'box', halfExtents: [0.5, 1, 0.05] } });
   physics.addJoint(post, door, { type: 'revolute', axis: [0, 1, 0], anchorB: [-0.5, 0, 0], limits: [0, 1.5] });
   const plain = physics.debugRender({ colliders: false, contacts: false }),
-    framed = physics.debugRender({ colliders: false, contacts: false, jointFrames: true, style: { jointFrameLength: 1 } });
+    framed = physics.debugRender({
+      colliders: false,
+      contacts: false,
+      jointFrames: true,
+      style: { jointFrameLength: 1 },
+    });
   const segments = (lines) => {
     const out = [];
     for (let i = 0; i < lines.vertices.length; i += 6) {
-      out.push({ a: [...lines.vertices.subarray(i, i + 3)], b: [...lines.vertices.subarray(i + 3, i + 6)], color: [...lines.colors.subarray((i / 3) * 4, (i / 3) * 4 + 4)] });
+      out.push({
+        a: [...lines.vertices.subarray(i, i + 3)],
+        b: [...lines.vertices.subarray(i + 3, i + 6)],
+        color: [...lines.colors.subarray((i / 3) * 4, (i / 3) * 4 + 4)],
+      });
     }
     return out;
   };
@@ -147,9 +172,24 @@ test('the same joints give the same state hash, and a snapshot and restore step 
     const physics = new Physics(null),
       top = physics.addBody(null, { type: 'fixed', position: [0, 3, 0], colliders: [] }),
       ball = physics.addBody(null, { position: [0.4, 2, 0.1], colliders: { shape: 'sphere', radius: 0.2, mass: 2 } }),
-      bob = physics.addBody(null, { position: [1, 2.5, 0], colliders: { shape: 'box', halfExtents: [0.1, 0.1, 0.1], mass: 1 } });
-    physics.addJoint(top, ball, { type: 'spherical', anchorB: [0, 1, 0], limits: { angX: [-0.4, 0.4], angZ: [-0.2, 0.6] }, motors: { angY: { targetVelocity: 1, maxForce: 2 } } });
-    physics.addJoint(top, bob, { type: 'spring', restLength: 0.5, stiffness: 300, damping: 4, minLength: 0.3, maxLength: 0.9 });
+      bob = physics.addBody(null, {
+        position: [1, 2.5, 0],
+        colliders: { shape: 'box', halfExtents: [0.1, 0.1, 0.1], mass: 1 },
+      });
+    physics.addJoint(top, ball, {
+      type: 'spherical',
+      anchorB: [0, 1, 0],
+      limits: { angX: [-0.4, 0.4], angZ: [-0.2, 0.6] },
+      motors: { angY: { targetVelocity: 1, maxForce: 2 } },
+    });
+    physics.addJoint(top, bob, {
+      type: 'spring',
+      restLength: 0.5,
+      stiffness: 300,
+      damping: 4,
+      minLength: 0.3,
+      maxLength: 0.9,
+    });
     ball.setAngularVelocity([1, 0.5, -2]);
     return physics;
   };

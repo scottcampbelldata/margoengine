@@ -282,7 +282,10 @@ export class RailSolver implements Solver<RailSolverParams> {
     const state = this.running();
     const { host, cars, wire, candidateCars, candidateWire } = state;
     if (!(dt > 0 && dt <= 1 / rateOf(state.rate)))
-      throw new MargoError('state', 'Railway interval is outside the stable range. It must be above 0 and within the rail rate, so step it on the PhysicsWorld clock.');
+      throw new MargoError(
+        'state',
+        'Railway interval is outside the stable range. It must be above 0 and within the rail rate, so step it on the PhysicsWorld clock.',
+      );
     const source = this.weather && context.inputs.get(this.weather.name);
     if (source && (source.region.type !== 'f64' || source.region.layout !== 1))
       throw new MargoError('state', 'Use a layout-1 f64 relative wetness port for rail adhesion.');

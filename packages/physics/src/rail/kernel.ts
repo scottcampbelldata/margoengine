@@ -54,7 +54,8 @@ export async function loadWireKernel(memory: WebAssembly.Memory, signal?: AbortS
       return module;
     }
     const response = await fetch(url, { signal });
-    if (!response.ok) throw new MargoError('failed', 'You must serve the optional railway solver Wasm from its package URL.');
+    if (!response.ok)
+      throw new MargoError('failed', 'You must serve the optional railway solver Wasm from its package URL.');
     const module =
       response.headers.get('content-type')?.split(';')[0] === 'application/wasm'
         ? await WebAssembly.compileStreaming(response)
@@ -96,7 +97,10 @@ export function bindWireKernel(host: SolverHost, module: WebAssembly.Module, poo
     typeof apply !== 'function' ||
     typeof phase !== 'function'
   )
-    throw new MargoError('failed', 'You must rebuild the railway solver Wasm with its matching stack, wire and phase exports.');
+    throw new MargoError(
+      'failed',
+      'You must rebuild the railway solver Wasm with its matching stack, wire and phase exports.',
+    );
   pointer.value = leaderStack;
   if (pool) {
     const control = host.allocate('rail-wire-control', pool.controlWords * U32, 'i32', 1);
@@ -141,7 +145,10 @@ export function bindWireKernel(host: SolverHost, module: WebAssembly.Module, poo
         return { velocityRows: kicks, positionRows: drifts, simdNodePairs: kicks + drifts };
       });
       if (positionRows !== nodes - 2 || velocityRows !== positionRows - Math.floor(positionRows / intervals))
-        throw new MargoError('failed', 'Native workers missed catenary nodes. You must rebuild the matching railway assets.');
+        throw new MargoError(
+          'failed',
+          'Native workers missed catenary nodes. You must rebuild the matching railway assets.',
+        );
       return { threads, velocityRows, positionRows, simdNodePairs: velocityRows + positionRows, workers };
     },
   };

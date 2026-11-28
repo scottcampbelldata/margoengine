@@ -1188,9 +1188,7 @@ function coupling(options: Extract<JointOptions, { type: 'generic' }>): Coupling
   const slides = axes.filter((dof) => dof.startsWith('lin')),
     turns = axes.filter((dof) => dof.startsWith('ang'));
   if (slides.length && turns.length)
-    throw jointInput(
-      'Coupled axes are of one kind: sliding axes together, or angY and angZ together; pass one group.',
-    );
+    throw jointInput('Coupled axes are of one kind: sliding axes together, or angY and angZ together; pass one group.');
   if (axes.length < 2)
     throw jointInput('Coupled axes need two or three axes to share a limit; pass linY and linZ, for example.');
   if (turns.length && !(turns.length === 2 && turns[0] === 'angY' && turns[1] === 'angZ'))
@@ -1203,17 +1201,13 @@ function coupling(options: Extract<JointOptions, { type: 'generic' }>): Coupling
       throw jointInput(
         `Coupled axes share one limit; put it on the first of them, limits.${first}, not limits.${dof}.`,
       );
-    if (motors[dof])
-      throw jointInput(`Coupled axes have no motor of their own; drive ${dof} with a joint of its own.`);
+    if (motors[dof]) throw jointInput(`Coupled axes have no motor of their own; drive ${dof} with a joint of its own.`);
   }
   const range = limits[first];
-  if (!range)
-    throw jointInput(`Coupled axes need their limit on the first of them, limits.${first}; pass [min, max].`);
+  if (!range) throw jointInput(`Coupled axes need their limit on the first of them, limits.${first}; pass [min, max].`);
   checkLimits(range[0], range[1]);
   if (slides.length && range[0] < 0)
-    throw jointInput(
-      'A coupled sliding limit measures a distance, so its min is 0 or more; pass [min, max] from 0.',
-    );
+    throw jointInput('A coupled sliding limit measures a distance, so its min is 0 or more; pass [min, max] from 0.');
   if (turns.length && range[0] !== 0)
     throw jointInput('A coupled swing limit has a min of 0 and a max in radians; pass [0, max].');
   if (turns.length && !(range[1] > 0))

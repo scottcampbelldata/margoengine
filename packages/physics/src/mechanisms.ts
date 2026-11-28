@@ -274,9 +274,7 @@ export class PathJoint extends Mechanism {
     points.forEach((point, i) => checkVec(point, `Path point ${i}`));
     checkVec(anchor, 'Anchor');
     if (motor && !(Number.isFinite(motor.speed) && motor.maxForce >= 0 && Number.isFinite(motor.maxForce)))
-      throw jointInput(
-        'A path motor has a finite speed and a maxForce of 0 or more; pass options.motor with both.',
-      );
+      throw jointInput('A path motor has a finite speed and a maxForce of 0 or more; pass options.motor with both.');
     super(physics, PATH, base, follower, options);
     const k = physics.kernel;
     k.setCoupling(this.slot, 3, anchor);

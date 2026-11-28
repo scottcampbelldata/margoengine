@@ -306,7 +306,10 @@ function workerResult(s: State): DrainageFogWorkCounts {
       worker.resolvedRows !== worker.settledRows ||
       worker.simdPairs * 2 > worker.resolvedRows
     )
-      throw new MargoError('failed', 'Drainage fog worker returned an invalid work count. You must rebuild the native assets.');
+      throw new MargoError(
+        'failed',
+        'Drainage fog worker returned an invalid work count. You must rebuild the native assets.',
+      );
     workers.push(worker);
     resolvedRows += worker.resolvedRows;
     sourceRows += worker.sourceRows;
@@ -491,7 +494,10 @@ export class DrainageFog implements Solver<DrainageFogParams> {
       typeof kernel.fog_step !== 'function' ||
       typeof kernel.fog_thread_phase !== 'function'
     )
-      throw new MargoError('failed', 'Drainage fog has an invalid Wasm layout. You must rebuild the slot-free native variants.');
+      throw new MargoError(
+        'failed',
+        'Drainage fog has an invalid Wasm layout. You must rebuild the slot-free native variants.',
+      );
     kernel.__stack_pointer.value = stack;
     const allocate = (label: string, size: number): Region => host.allocate(`fog-${label}`, 8 * size, 'f64', LAYOUT);
     const s: State = {

@@ -187,7 +187,9 @@ test('a path of a thousand points closes on itself and a car rides it round', ()
       const angle = -Math.PI / 2 + (k / 1000) * 2 * Math.PI;
       return [5 * Math.cos(angle), 5 * Math.sin(angle), 0];
     });
-  assert.throws(() => new PathJoint(loop, base, car, { points: points.slice(0, 2), closed: true }), { code: 'unsupported' });
+  assert.throws(() => new PathJoint(loop, base, car, { points: points.slice(0, 2), closed: true }), {
+    code: 'unsupported',
+  });
   new PathJoint(loop, base, car, { points, closed: true, motor: { speed: 3, maxForce: 1000 } });
   let off = 0,
     last = 0,

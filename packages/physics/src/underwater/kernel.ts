@@ -78,7 +78,10 @@ export function bindAcousticKernel(host: SolverHost, module: WebAssembly.Module)
     const { exports } = new WebAssembly.Instance(module, { env: { memory: host.memory } });
     const pointer = exports.__stack_pointer;
     if (!(pointer instanceof WebAssembly.Global))
-      throw new MargoError('failed', 'The underwater kernel has no stack pointer. You must rebuild the acoustic Wasm assets.');
+      throw new MargoError(
+        'failed',
+        'The underwater kernel has no stack pointer. You must rebuild the acoustic Wasm assets.',
+      );
     pointer.value = top;
     return exports as unknown as AcousticKernel;
   } catch (cause) {

@@ -87,8 +87,7 @@ function measureSections(
         vertices[3 * i + 1]!,
         vertices[3 * i + 2]!,
       ]);
-      let negativeToPositive: [number, number] | undefined,
-        positiveToNegative: [number, number] | undefined;
+      let negativeToPositive: [number, number] | undefined, positiveToNegative: [number, number] | undefined;
       for (let e = 0; e < 3; e++) {
         const a = p[e]!,
           b = p[(e + 1) % 3]!,

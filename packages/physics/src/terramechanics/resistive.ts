@@ -136,7 +136,10 @@ export class ResistiveSoil implements Solver<ResistiveSoilParams> {
     let sampleCount = 0;
     this.bodies = params.bodies.map(({ row, strips }) => {
       if (!Number.isSafeInteger(row) || row < 0 || seen.has(row) || !strips.length)
-        throw new MargoError('state', 'Invalid resistive soil body binding. You must supply unique body rows with strips.');
+        throw new MargoError(
+          'state',
+          'Invalid resistive soil body binding. You must supply unique body rows with strips.',
+        );
       seen.add(row);
       const resolved = strips.map(stripOf);
       for (const strip of resolved) sampleCount += strip.count;

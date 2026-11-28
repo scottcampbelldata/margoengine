@@ -141,7 +141,10 @@ export class CloudProjection {
       typeof exports.cloud_projection_apply !== 'function' ||
       typeof exports.cloud_projection_thread_phase !== 'function'
     )
-      throw new MargoError('failed', 'Cloud projection Wasm exports are missing. You must rebuild the cloud projection assets.');
+      throw new MargoError(
+        'failed',
+        'Cloud projection Wasm exports are missing. You must rebuild the cloud projection assets.',
+      );
     stack.value = top;
     new Uint32Array(host.memory.buffer, job.byteOffset, JOB_WORDS).set([0, 0, 0, receipts.byteOffset, nx, ny, nz, 0]);
     const pool = this.pool;
@@ -191,7 +194,10 @@ export class CloudProjection {
       const rows = counts[i]!;
       const paired = counts[i + 1]!;
       if (paired > rows || paired % 2 !== 0)
-        throw new MargoError('failed', 'Cloud projection reported invalid SIMD work. You must rebuild the cloud assets.');
+        throw new MargoError(
+          'failed',
+          'Cloud projection reported invalid SIMD work. You must rebuild the cloud assets.',
+        );
       visited += rows;
     }
     if (visited !== cells)

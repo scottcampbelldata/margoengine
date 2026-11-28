@@ -2,7 +2,7 @@ export {
   ContactModification,
   ContactPointModification,
   Physics,
-} from "./physics.js";
+} from './physics.js';
 export type {
   PhysicsOptions,
   PhysicsSnapshot,
@@ -24,12 +24,12 @@ export type {
   ModelLike,
   ModelPrimitiveLike,
   ModelBodyOptions,
-} from "./physics.js";
-export { PhysicsBody } from "./body.js";
-export { PhysicsCollider } from "./collider.js";
-export type { ColliderShape } from "./collider.js";
-export type { BodyOptions, BodyType } from "./body.js";
-export { PhysicsJoint } from "./joints.js";
+} from './physics.js';
+export { PhysicsBody } from './body.js';
+export { PhysicsCollider } from './collider.js';
+export type { ColliderShape } from './collider.js';
+export type { BodyOptions, BodyType } from './body.js';
+export { PhysicsJoint } from './joints.js';
 export type {
   NextJointOptions,
   ConeJointOptions,
@@ -38,10 +38,10 @@ export type {
   JointType,
   MotorOptions,
   RotationMotorOptions,
-} from "./joints.js";
-export { CharacterController } from "./character.js";
-export { DynamicCharacter } from "./dynamic-character.js";
-export type { DynamicCharacterOptions } from "./dynamic-character.js";
+} from './joints.js';
+export { CharacterController } from './character.js';
+export { DynamicCharacter } from './dynamic-character.js';
+export type { DynamicCharacterOptions } from './dynamic-character.js';
 export type {
   CharacterControllerOptions,
   CharacterDebugOptions,
@@ -50,15 +50,15 @@ export type {
   CharacterContact,
   CharacterMoveFilter,
   CharacterMoveResult,
-} from "./character.js";
+} from './character.js';
 export {
   collisionGroups,
   geometryPositions,
   HeightfieldCell,
   interactionGroups,
-} from "./shapes.js";
-export type { InteractionGroups, MaterialName } from "./shapes.js";
-export { densities, densityOf } from "./shapes.js";
+} from './shapes.js';
+export type { InteractionGroups, MaterialName } from './shapes.js';
+export { densities, densityOf } from './shapes.js';
 export type {
   CollisionPairKind,
   ShapeOptions,
@@ -67,20 +67,20 @@ export type {
   CombineRule,
   ColliderGeometry,
   CompoundPart,
-} from "./shapes.js";
-export { Vehicle } from "./vehicle.js";
-export { pacejkaTyre, brushTyre } from "./tyres.js";
-export { Drivetrain } from "./drivetrain.js";
-export { TrackedVehicle, shearShare } from "./tracked.js";
-export { Motorcycle } from "./motorcycle.js";
-export type { MotorcycleOptions, MotorcycleInput } from "./motorcycle.js";
-export type { TrackOptions, TrackedVehicleOptions } from "./tracked.js";
+} from './shapes.js';
+export { Vehicle } from './vehicle.js';
+export { pacejkaTyre, brushTyre } from './tyres.js';
+export { Drivetrain } from './drivetrain.js';
+export { TrackedVehicle, shearShare } from './tracked.js';
+export { Motorcycle } from './motorcycle.js';
+export type { MotorcycleOptions, MotorcycleInput } from './motorcycle.js';
+export type { TrackOptions, TrackedVehicleOptions } from './tracked.js';
 export type {
   DrivetrainOptions,
   AxleOptions,
   DifferentialOptions,
   DrivenWheel,
-} from "./drivetrain.js";
+} from './drivetrain.js';
 export type {
   TyreModel,
   TyreSample,
@@ -88,7 +88,7 @@ export type {
   MagicCurve,
   PacejkaOptions,
   BrushOptions,
-} from "./tyres.js";
+} from './tyres.js';
 export type {
   VehicleOptions,
   CarOptions,
@@ -101,7 +101,7 @@ export type {
   WheelGroundMaterial,
   WheelGroundState,
   WheelGroundTraction,
-} from "./vehicle.js";
+} from './vehicle.js';
 export {
   explosion,
   GravityField,
@@ -109,7 +109,7 @@ export {
   Vortex,
   WindField,
   WindForce,
-} from "./fields.js";
+} from './fields.js';
 export type {
   ExplosionOptions,
   FieldOptions,
@@ -118,18 +118,22 @@ export type {
   VortexOptions,
   WindForceFrame,
   WindOptions,
-} from "./fields.js";
-export type { WindTractionPhaseOptions, WindTractionWorkCounts, WindTractionWorkerWork } from "./aero/traction-phase.js";
-export { InstancedBodies } from "./instances.js";
-export type { InstancedBodiesOptions, InstancedTarget } from "./instances.js";
-export { DragJoint } from "./drag.js";
-export type { DragOptions } from "./drag.js";
-export { addUniversalJoint, addWheelJoint } from "./joint-presets.js";
+} from './fields.js';
+export type {
+  WindTractionPhaseOptions,
+  WindTractionWorkCounts,
+  WindTractionWorkerWork,
+} from './aero/traction-phase.js';
+export { InstancedBodies } from './instances.js';
+export type { InstancedBodiesOptions, InstancedTarget } from './instances.js';
+export { DragJoint } from './drag.js';
+export type { DragOptions } from './drag.js';
+export { addUniversalJoint, addWheelJoint } from './joint-presets.js';
 export type {
   UniversalJointOptions,
   WheelJoint,
   WheelJointOptions,
-} from "./joint-presets.js";
+} from './joint-presets.js';
 export {
   coupleDofs,
   DistanceJoint,
@@ -137,29 +141,29 @@ export {
   PathJoint,
   PulleyJoint,
   RackAndPinionJoint,
-} from "./mechanisms.js";
+} from './mechanisms.js';
 export type {
   DistanceOptions,
   GearOptions,
   MechanismOptions,
   PulleyOptions,
   RackAndPinionOptions,
-} from "./mechanisms.js";
-export { Rope } from "./rope.js";
-export type { RopeOptions } from "./rope.js";
-export { eulerToQuat } from "./math.js";
-export type { Vec3, Quat } from "./math.js";
-export { KernelWorld, loadKernel, trianglesAcross } from "./kernel.js";
-export { buildHull as convexHull } from "./hull.js";
-export { Multibody } from "./multibody.js";
-export type { MultibodyLink, MultibodyLinkOptions } from "./multibody.js";
-export type { IkOptions, IkResult, IkTarget } from "./kinematics.js";
+} from './mechanisms.js';
+export { Rope } from './rope.js';
+export type { RopeOptions } from './rope.js';
+export { eulerToQuat } from './math.js';
+export type { Vec3, Quat } from './math.js';
+export { KernelWorld, loadKernel, trianglesAcross } from './kernel.js';
+export { buildHull as convexHull } from './hull.js';
+export { Multibody } from './multibody.js';
+export type { MultibodyLink, MultibodyLinkOptions } from './multibody.js';
+export type { IkOptions, IkResult, IkTarget } from './kinematics.js';
 export {
   PdController,
   PidController,
   PidControllerBase,
   pdErrors,
-} from "./pid.js";
+} from './pid.js';
 export type {
   PdErrors,
   PdOptions,
@@ -170,14 +174,14 @@ export type {
   PidOptions,
   PidPose,
   PidVelocity,
-} from "./pid.js";
+} from './pid.js';
 export type {
   DebugColor,
   DebugLines,
   DebugRenderOptions,
   DebugStyle,
-} from "./debug.js";
-export { cleanTrimesh } from "./mesh-clean.js";
+} from './debug.js';
+export { cleanTrimesh } from './mesh-clean.js';
 export {
   convertMesh,
   estimateMeshMassProperties,
@@ -185,16 +189,16 @@ export {
   meshHalfEdges,
   voxelizedMesh,
   voxelsFromPoints,
-} from "./mesh-tools.js";
+} from './mesh-tools.js';
 export type {
   HalfEdgeTopology,
   MeshConversion,
   MeshMassFallbackOptions,
   MeshMassProperties,
   VoxelFill,
-} from "./mesh-tools.js";
-export type { MeshCleanOptions } from "./mesh-clean.js";
-export type { HullFaces } from "./hull.js";
+} from './mesh-tools.js';
+export type { MeshCleanOptions } from './mesh-clean.js';
+export type { HullFaces } from './hull.js';
 export type {
   KernelBodyKind,
   KernelColliderOptions,
@@ -215,4 +219,4 @@ export type {
   KernelShape,
   KernelSolverOptions,
   KernelTrimeshOptions,
-} from "./kernel.js";
+} from './kernel.js';

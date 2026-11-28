@@ -109,7 +109,9 @@ export function solveNetwork(network: PipeNetwork, options: NetworkSolveOptions 
     if (node.kind === 'reservoir') fixed.push(i);
     else if (node.kind === undefined || node.kind === 'junction') unknown.push(i);
     else
-      throw new RangeError(`Network node '${node.id}' has unknown kind '${String((node as { kind: unknown }).kind)}'; use 'reservoir' or 'junction'.`);
+      throw new RangeError(
+        `Network node '${node.id}' has unknown kind '${String((node as { kind: unknown }).kind)}'; use 'reservoir' or 'junction'.`,
+      );
   });
   if (fixed.length === 0) throw new RangeError('A pipe network needs at least one reservoir to fix its heads.');
   const n = network.nodes.length,
@@ -149,7 +151,9 @@ export function solveNetwork(network: PipeNetwork, options: NetworkSolveOptions 
       positive('diameter', link.diameter);
       flow[l] = 1e-3 * circleArea(link.diameter);
     } else
-      throw new RangeError(`Network link '${link.id}' has unknown kind '${String((link as { kind: unknown }).kind)}'; use 'pipe', 'valve' or 'pump'.`);
+      throw new RangeError(
+        `Network link '${link.id}' has unknown kind '${String((link as { kind: unknown }).kind)}'; use 'pipe', 'valve' or 'pump'.`,
+      );
   });
 
   // Head loss along link l at flow q and its derivative dh/dq (Newton's linearisation, kept positive).
@@ -285,7 +289,11 @@ function cholesky(a: Float64Array, b: Float64Array, n: number): Float64Array {
   for (let j = 0; j < n; j++) {
     let d = a[j * n + j]!;
     for (let k = 0; k < j; k++) d -= l[j * n + k]! * l[j * n + k]!;
-    if (!(d > 0)) throw new MargoError('failed', 'A pipe network junction is not connected to any reservoir; every junction must connect to one through links.');
+    if (!(d > 0))
+      throw new MargoError(
+        'failed',
+        'A pipe network junction is not connected to any reservoir; every junction must connect to one through links.',
+      );
     const root = Math.sqrt(d);
     l[j * n + j] = root;
     for (let i = j + 1; i < n; i++) {
