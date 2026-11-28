@@ -1063,8 +1063,12 @@ and `MotionBlur` smears them along the gust at film shutters.
 
 - Every stage that writes depth takes a vector, drawn as the colour pass draws it (TAA tests depth for equality):
   opaque rings, the opaque core of a `GrassScatter`'s near ring, and the coverage-depth stage of its covered tips and
-  middle and far rings, which keeps the same hashed pixels the colour pass gave depth. A pixel a covered blade only
-  blends into (no depth there) keeps the surface behind it and that surface's motion.
+  middle and far rings, which keeps the same hashed pixels the colour pass gave depth.
+- A pixel a covered blade only blends into (no depth of it there) takes the blade's motion where the blade covers at
+  least `coverage` of it (default 0.5): each covered stage is drawn once more in front of the depth there, writing no
+  depth, nearer rings last, so a pixel whose colour is mostly blade moves with the blade. Below that share it keeps the
+  motion of the surface behind. `new ScatterVelocity(grass, { coverage: false })` turns the stage off (one draw fewer
+  for each covered ring).
 - Plant states (`@margoengine/scatter/states`) and interaction bends are posed as they are now in both frames: their
   own change between frames is not in the vector.
 - WebGPU and the full WebGL2 layer. Nothing is drawn before the scatter's first frame or after `dispose()`.

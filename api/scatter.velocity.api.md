@@ -8,7 +8,8 @@ import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core
 
 export class ScatterVelocity {
     readonly scatter: Scatter;
-    constructor(scatter: Scatter);
+    readonly coverage: number | false;
+    constructor(scatter: Scatter, { coverage }?: ScatterVelocityOptions);
     get disposed(): boolean;
     drawVelocity(pass: GPURenderPassEncoder, frame: ScatterVelocityFrame): void;
     releaseVelocity(key: object): void;
@@ -28,6 +29,10 @@ export interface ScatterVelocityFrame {
     readonly targets: readonly GPUColorTargetState[];
     readonly depthStencil: GPUDepthStencilState;
     readonly samples: number;
+}
+
+export interface ScatterVelocityOptions {
+    coverage?: number | false;
 }
 
 // Not exported from this entry, but used by the exports above:

@@ -9,6 +9,9 @@
 //     largest move the wind bend can make in one frame, and mostly along the wind's screen direction.
 //  3. Wind strength 0: no vectors though the pass draws (no false motion).
 //  4. Both the diffuse and the PBR stage, no GPU validation error; a 700,000-clump field draws its motion too.
+//  5. Pixels a covered blade only blends into (no depth of it there) take its motion where it covers at least half the
+//     pixel: more of the meadow moves than with `coverage: false`, which gives only the blades' hashed depth pixels
+//     their vectors and left the rest with the ground's (KB-SCATTER-BLENDVEL1).
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
@@ -88,7 +91,7 @@ try {
       return { moving, largest, aligned: moving ? aligned / moving : 0 };
     };
     const material = new PbrMaterial({ color: [0.2, 0.45, 0.1], roughness: 0.9 });
-    const run = async ({ lit = false, pass = true, strength = 0.8, count = 4000 }) => {
+    const run = async ({ lit = false, pass = true, strength = 0.8, count = 4000, coverage }) => {
       const grass = GrassScatter.attach(engine, {
         count,
         area: [12, 12],
@@ -98,7 +101,7 @@ try {
         wind: [1, 0, strength, 12],
         ...(lit ? { material } : {}),
       });
-      const velocity = pass ? new ScatterVelocity(grass) : undefined,
+      const velocity = pass ? new ScatterVelocity(grass, coverage === undefined ? {} : { coverage }) : undefined,
         remove = velocity ? taa.add(velocity) : undefined;
       for (let i = 0; i < 12; i++) engine.render({ delta: 1 / 30 });
       await device.queue.onSubmittedWorkDone();
@@ -115,6 +118,7 @@ try {
       diffuse: await run({}),
       pbr: await run({ lit: true }),
       calm: await run({ strength: 0 }),
+      hashedOnly: await run({ coverage: false }),
       big: await run({ count: 700_000 }),
     };
     await device.queue.onSubmittedWorkDone();
@@ -137,6 +141,12 @@ try {
     assert.ok(r.aligned > 0.6, `${k}: motion is mostly along the wind (${r.aligned})`);
   }
   assert.equal(result.calm.moving, 0, 'no wind, no motion');
+  // Blended pixels now move with their blades: 1,709 more of this 256 x 256 view than the hashed depth pixels alone on
+  // WebGPU (37,608 against 35,899), every other frame input the same.
+  assert.ok(
+    result.diffuse.moving - result.hashedOnly.moving > 1000,
+    `blended blades carry their motion (${result.diffuse.moving} against ${result.hashedOnly.moving} pixels)`,
+  );
   console.log('scatter velocity check passed');
 } finally {
   await closeAll({ browser });

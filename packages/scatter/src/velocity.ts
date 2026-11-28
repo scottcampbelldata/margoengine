@@ -11,7 +11,11 @@
 // it draws each stage that writes depth exactly as the colour pass does: opaque rings, a split ring's opaque core, and
 // the coverage-depth stage of covered rings and split tips, which keeps a fragment only where the strip's coverage
 // passes the pose's hashed threshold (`coverCode` with depth, Wyman and McGuire, "Hashed Alpha Testing", I3D 2017), so
-// the same pixels take the grass's depth and its vector.
+// the same pixels take the grass's depth and its vector. A pixel a covered blade only blends into keeps no depth of
+// it, so it would keep the motion of the ground behind: after those stages each covered stage is drawn once more in
+// front of the depth there, without writing depth, keeping only fragments the blade covers by at least `coverage`
+// (default one half), so a pixel whose colour is mostly a blade takes the blade's motion (the dominant layer's
+// velocity that a single-velocity motion blur reconstructs from, McGuire et al. 2012 above), nearer rings last.
 import type { Scatter, ScatterVelocityParts } from './index.js';
 import { poseShader } from './pose.js';
 import { windShader } from './wind.js';
@@ -35,12 +39,13 @@ export interface ScatterVelocityFrame {
   readonly samples: number;
 }
 
-// Frame values: current and previous view-projection (0-31), size (32: width, height, history, 0), the eye now and
+// Frame values: current and previous view-projection (0-31), size (32: width, height, history, dominant coverage), the eye now and
 // before with each frame's pixel footprint in w (36, 40), the wind now and before (44, 48), the ground fit (52) and the
 // blades (56), the sway now and before (60, 64: plant top, reach, calm clock, clock rate): the colour pass's frame
 // values 68-80 and 84-87 for each frame.
-// `cover` draws a ring's coverage-depth stage: the pose's coverage in `scatterCover`, kept above its threshold w.
-const code = (split: boolean, cover: boolean) =>
+// `cover` draws a ring's coverage-depth stage: the pose's coverage in `scatterCover`, kept above its threshold w; with
+// `dominant`, a covered stage's fragments the blade covers by at least that share (`frame.size.w`).
+const code = (split: boolean, cover: boolean, dominant = false) =>
   (split ? splitDeclaration : '') +
   (cover ? coverDeclaration + coverageShader : '') +
   windShader +
@@ -61,7 +66,7 @@ struct Output {@builtin(position) @invariant clip:vec4f,@location(0) current:vec
 }
 struct Motion {@location(0) velocity:vec4f,@location(1) depth:f32}
 @fragment fn fragment(i:Output)->Motion {
- ${cover ? 'if(scatterCoverage(i.cover)<=i.cover.w){discard;}' : ''}var o:Motion;o.velocity=vec4f(0,0,0,1);o.depth=-1.0;
+ ${dominant ? 'if(scatterCoverage(i.cover)<frame.size.w){discard;}' : cover ? 'if(scatterCoverage(i.cover)<=i.cover.w){discard;}' : ''}var o:Motion;o.velocity=vec4f(0,0,0,1);o.depth=-1.0;
  if(i.previous.w>0.0){let e=i.previous.z/i.previous.w;o.velocity=vec4f((i.current.xy/i.current.w-i.previous.xy/i.previous.w)*vec2f(0.5,-0.5),select(0.0,log2(e),e>0.0),1);o.depth=e;}
  return o;
 }
@@ -104,15 +109,33 @@ const same = (a: readonly GPUBuffer[], b: readonly GPUBuffer[]) =>
  * MotionBlur.attach(engine, { velocity: () => taa.velocity });
  * ```
  */
+/** Options of `ScatterVelocity`. */
+export interface ScatterVelocityOptions {
+  /**
+   * The share of a pixel, 0 to 1, a covered blade must cover for the pixel to take its motion where the blade writes
+   * no depth (it blends over what is behind). Default 0.5: a pixel whose colour is mostly blade moves with the blade.
+   * `false` gives only the pixels the blades write depth to their motion, as before 2026-11-28.
+   */
+  coverage?: number | false;
+}
+
 export class ScatterVelocity {
   private readonly views = new Map<object, View>();
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly values = new Float32Array(68);
   private device?: GPUDevice;
   #disposed = false;
-  constructor(readonly scatter: Scatter) {
+  /** The share a blade covers for a blended pixel to take its motion, or false (see `ScatterVelocityOptions`). */
+  readonly coverage: number | false;
+  constructor(
+    readonly scatter: Scatter,
+    { coverage = 0.5 }: ScatterVelocityOptions = {},
+  ) {
     if (!scatter || typeof scatter.velocityParts !== 'function')
       throw new TypeError('ScatterVelocity needs a Scatter; pass the scatter whose motion TAA should see');
+    if (coverage !== false && !(typeof coverage === 'number' && coverage > 0 && coverage <= 1))
+      throw new RangeError(`ScatterVelocity coverage must be in (0, 1] or false, got ${String(coverage)}`);
+    this.coverage = coverage;
   }
   /** True after `dispose()`, or once the scatter is disposed. */
   get disposed(): boolean {
@@ -136,6 +159,7 @@ export class ScatterVelocity {
     const v = this.values,
       p = parts.values;
     v.set(frame.camera.subarray(0, 36));
+    v[35] = this.coverage || 0;
     v.set(p.subarray(16, 19), 36);
     v[39] = p[80];
     v.set(p.subarray(68, 72), 44);
@@ -167,6 +191,13 @@ export class ScatterVelocity {
               : [];
       for (const [split, cover] of uses) this.drawRing(pass, device, parts, frame, view, ring, split, cover);
     }
+    // Then each covered stage where it only blends, far rings first so a nearer blade's motion is the one kept.
+    if (this.coverage !== false)
+      for (let ring = 2; ring >= 0; ring--) {
+        const stage = parts.stages[ring];
+        if (stage === 'cover' || stage === 'split')
+          this.drawRing(pass, device, parts, frame, view, ring, stage === 'split', true, true);
+      }
   }
   private drawRing(
     pass: GPURenderPassEncoder,
@@ -177,8 +208,9 @@ export class ScatterVelocity {
     ring: number,
     split: boolean,
     cover: boolean,
+    dominant = false,
   ): void {
-    const pipeline = this.pipeline(device, parts, frame, split, cover);
+    const pipeline = this.pipeline(device, parts, frame, split, cover, dominant);
     const bound = boundBuffers(parts);
     let held = view.groups.get(pipeline);
     if (!held || !same(held.bound, bound)) {
@@ -230,11 +262,12 @@ export class ScatterVelocity {
     frame: ScatterVelocityFrame,
     split: boolean,
     cover: boolean,
+    dominant: boolean,
   ): GPURenderPipeline {
-    const key = `${split}:${cover}:${frame.samples}:${frame.depthStencil.format}:${frame.targets.map((t) => t.format).join()}:${parts.stride}:${!!parts.route}`;
+    const key = `${split}:${cover}:${dominant}:${frame.samples}:${frame.depthStencil.format}:${frame.targets.map((t) => t.format).join()}:${parts.stride}:${!!parts.route}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      let text = parts.pose(code(split, cover), parts.route ? 3 : 2);
+      let text = parts.pose(code(split, cover, dominant), parts.route ? 3 : 2);
       if (parts.route) text = parts.route.vertex(text);
       const module = device.createShaderModule({ code: text });
       pipeline = device.createRenderPipeline({
@@ -254,7 +287,10 @@ export class ScatterVelocity {
         },
         fragment: { module, entryPoint: 'fragment', targets: [...frame.targets] },
         multisample: { count: frame.samples },
-        depthStencil: frame.depthStencil,
+        // Core's depth is reversed (cleared to 0, nearer is greater): in front of the depth there, writing none.
+        depthStencil: dominant
+          ? { format: frame.depthStencil.format, depthWriteEnabled: false, depthCompare: 'greater' }
+          : frame.depthStencil,
       });
       this.pipelines.set(key, pipeline);
     }

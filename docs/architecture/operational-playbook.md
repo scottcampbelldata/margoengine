@@ -693,8 +693,14 @@ first so `scatterCover` is this frame's. Evidence: `packages/scatter/test/veloci
 pass, 39,020 moving pixels (38,929 on the WebGL2 layer) along the wind with it, diffuse and PBR alike, the largest move
 0.89 px a frame at 30 fps; none at wind strength 0; 700,000 clumps draw their motion (47,497 pixels) with no GPU error.
 Drawing the near core alone, before the coverage-depth stages, gave 72 pixels once covered parts wrote depth.
-Missing: a pixel a covered blade only blends into keeps the motion behind it; state and interaction changes between
-frames are not in the vector.
+Since 2026-11-28 (KB-SCATTER-BLENDVEL1) each covered stage is drawn once more after them, depth-tested in front
+(core's reversed depth, `greater`) and writing none, keeping fragments whose coverage is at least `coverage` (default
+0.5) and drawing far rings first: a pixel whose colour is mostly a blended blade takes its motion, the dominant layer a
+single-velocity reconstruction filter needs (McGuire et al. 2012). Same proof at 256 x 256: 37,608 moving pixels
+against 35,899 with `coverage: false` (37,584 against 35,849 on the WebGL2 layer); a 1280 x 720 shot of 700,000 clumps
+with TAA and MotionBlur on a trucking camera renders with no GPU error. Missing: a pixel under the coverage share keeps
+the motion behind it; state and interaction changes between frames are not in the vector; the 700,000-clump field has
+not been judged against film references in a whole scene.
 
 ### Section 5 evidence: suspended sediment in the flood (water/flood FG-13, 2026-11-24)
 

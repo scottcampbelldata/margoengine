@@ -19,6 +19,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   again; the totals are counted from the rows, in `mergeScopedApiSurface` and as a last step of `rebase:main`.
 - **Regression:** `tests/rebase-main.test.js`, both "(KB-REBASE-SURFACE1)" tests.
 
+### Fixed 2026-11-28: a pixel a blended grass blade covered kept the ground's motion in TAA and MotionBlur (KB-SCATTER-BLENDVEL1, scatter)
+
+- **Repro (before):** `node packages/scatter/test/velocity.browser.mjs`, a still camera over a `GrassScatter` in wind
+  with `ScatterVelocity`: 35,899 of the 256 x 256 pixels moved. The covered rings blend each blade over the ground by
+  its coverage, so pixels whose colour was mostly blade still carried the ground's vector (zero for a still camera),
+  which is what MotionBlur and TAA then followed there.
+- **Cause:** the velocity pass tests depth for equality, so it reached only the pixels a blade wrote depth to: an
+  opaque core, or the hashed coverage-depth stage, which keeps a fragment with probability equal to its coverage. A
+  blended fragment that lost the hash wrote no depth and so no vector (`packages/scatter/src/velocity.ts`).
+- **Fix:** after the depth-equal stages each covered stage is drawn again, depth-tested in front of the depth there
+  (`greater`, core's reversed depth) and writing none, keeping fragments the blade covers by at least
+  `ScatterVelocityOptions.coverage` (default 0.5), far rings first. 37,608 pixels move now (37,584 on the WebGL2 layer
+  against 35,849). Regression: `packages/scatter/test/velocity.browser.mjs` (the `coverage: false` run against the
+  default, WebGPU and `MARGO_COMPAT=1`).
+
 ### Open 2026-11-28: 21 web demos cannot be rebuilt from source/: the data files their code imports are missing (KB-DEMO-SOURCEDATA1, demos)
 ### Open 2026-11-28: a floating body's carried water swaps energy with it as its draft changes (KB-LOADS-ADDEDRATE1, physics)
 
