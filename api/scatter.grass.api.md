@@ -27,6 +27,10 @@ export interface GrassShape {
     lean?: number;
     round?: number;
     segments?: readonly [number, number, number];
+    tussock?: number;
+    dry?: number;
+    dryColor?: readonly [number, number, number];
+    tone?: number;
 }
 
 export function grassPoseCode(code: string, shape?: GrassShape): string;
@@ -46,6 +50,10 @@ const DEFAULTS: {
     lean: number;
     round: number;
     segments: readonly [5, 3, 1];
+    tussock: number;
+    dry: number;
+    dryColor: readonly [0.3476, 0.2394, 0.0983];
+    tone: number;
 };
 
 type GroundBounds = readonly [minX: number, minZ: number, maxX: number, maxZ: number];
@@ -274,5 +282,6 @@ type ScatterWind = readonly [number, number, number] | readonly [number, number,
 
 type Shape = typeof DEFAULTS & {
     segments: readonly [number, number, number];
+    dryColor: readonly [number, number, number];
 };
 ```

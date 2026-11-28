@@ -56,6 +56,10 @@ test('grassShape: defaults and refusals that say how to fix it', () => {
     lean: 0.35,
     round: 0.3,
     segments: [5, 3, 1],
+    tussock: 0.6,
+    dry: 0.2,
+    dryColor: [0.3476, 0.2394, 0.0983],
+    tone: 0.25,
   });
   for (const bad of [
     { height: 0 },
@@ -276,4 +280,61 @@ test('coverCode depth: the coverage-depth stage keeps a fragment above its thres
     l,
     /let c=scatterOpaque\(varyings,front\);if\(c\.a\*scatterCoverage\(varyings\.cover\)<=varyings\.cover\.w\)\{discard;\}return c;\}/,
   );
+});
+
+// Film look 2026-11-28 ("Above the Treeline"): the meadow read as lone strokes, every blade the same flat colour and
+// leaning its own random way. A bunchgrass tussock fans from its crown, holds cured blades and varies leaf to leaf.
+const litStage =
+  'struct ScatterPose {world:vec3f,normal:vec3f,ground:vec4f,shade:f32}\n' +
+  'fn scatterPose(p:vec3f,n:vec3f,position:vec4f,rotation:vec4f,ground:vec4f,blade:vec4f,eye:vec3f,wind:vec4f,pixel:f32,sway:vec4f)->ScatterPose {}\n' +
+  '@vertex fn vertex()->Output {let pose=scatterPose();var o:Output;o.color=material[0].rgb*pose.shade;return o;}\n';
+
+test('grassPoseCode: a tussock fans its blades out from the crown, the outer ones leaning furthest', () => {
+  const code = grassPoseCode(litStage, { tussock: 0.8, radius: 0.2, lean: 0.5 });
+  // Roots gather toward the centre (u, not sqrt(u)) and the heading turns outward from the root's own angle.
+  assert.match(code, /let d=0\.2\*mix\(sqrt\(u\),u,0\.8\);/);
+  assert.match(code, /let heading=a\+\(grassHash\(seed\^0xb5297a4du\)-0\.5\)\*6\.2831853\*\(1\.0-0\.85\*0\.8\);/);
+  assert.match(code, /let fan=sqrt\(d\/max\(0\.2,1e-6\)\);/);
+  assert.match(code, /\(0\.3\+0\.7\*fan\)/);
+  // At 0 the blade is built exactly as before.
+  const flat = grassPoseCode(litStage, { tussock: 0 });
+  assert.match(flat, /let d=0\.15\*sqrt\(grassHash\(seed\^0x68e31da4u\)\);/);
+  assert.match(flat, /let heading=grassHash\(seed\^0xb5297a4du\)\*6\.2831853;/);
+  assert.doesNotMatch(flat, /fan/);
+});
+
+test('grassPoseCode: cured blades take the dry colour at their own brightness, and blades vary in tone', () => {
+  const code = grassPoseCode(litStage, { dry: 0.3, tone: 0.4, dryColor: [0.5, 0.25, 0.125] });
+  assert.match(
+    code,
+    /grassTone=vec2f\(1\.0\+\(grassHash\(seed\^0x5bd1e995u\)\*2\.0-1\.0\)\*0\.4,select\(0\.0,1\.0,grassHash\(seed\^0x27d4eb2fu\)<0\.3\)\);/,
+  );
+  assert.match(code, /pose\.shade\*=grassTone\.x;return pose;/);
+  // The lit stage mixes toward the dry colour, scaled by the drawn colour's luminance over the material's.
+  assert.match(
+    code,
+    /o\.color=material\[0\]\.rgb\*pose\.shade;o\.color=mix\(o\.color,vec3f\(0\.5,0\.25,0\.125\)\*\(dot\(o\.color,vec3f\(0\.2126,0\.7152,0\.0722\)\)\/max\(dot\(material\[0\]\.rgb,/,
+  );
+  assert.match(code, /,grassTone\.y\);return o;/);
+  // A stage with no colour (shadow, depth) is left as it was apart from the pose.
+  const depth = grassPoseCode(litStage.replace(/var o:Output;.*return o;/, ''));
+  assert.doesNotMatch(depth, /grassTone\.y/);
+});
+
+test('grassShape: tussock, dry, tone and dryColor are checked', () => {
+  for (const bad of [
+    { tussock: -0.1 },
+    { tussock: 1.5 },
+    { dry: 2 },
+    { tone: -1 },
+    { dryColor: [1, 1] },
+    { dryColor: [0, 0, 2] },
+  ])
+    assert.throws(
+      () => grassShape(bad),
+      (e) => e instanceof RangeError && /tussock, dry and tone 0-1, dryColor/.test(e.message),
+      JSON.stringify(bad),
+    );
+  const grass = new GrassScatter({ grass: { dryColor: [0.4, 0.3, 0.1] } });
+  assert.ok(Object.isFrozen(grass.grass.dryColor));
 });

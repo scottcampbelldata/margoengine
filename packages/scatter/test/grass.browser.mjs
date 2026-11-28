@@ -58,6 +58,25 @@ await runSuite(
       assert.ok(c.many > 3 * c.one, `16 blades a clump (${c.many}) cover over 3 times 1 blade (${c.one})`);
       assert.ok(c.tall > 1.3 * c.one, `blades twice as tall (${c.tall}) cover more than ${c.one}`);
       results[lit ? 'pbr' : 'diffuse'] = c;
+      if (lit) {
+        // 4. Cured blades (film look, 2026-11-28): with every blade dry the lit meadow turns from green to straw, red
+        //    over green rising toward the measured cured-grass albedo; the shader compiles with a tussock too.
+        const green = await make({ dry: 0, tussock: 0.9 }, true),
+          straw = await make({ dry: 1, tussock: 0.9 }, true),
+          hue = (image) => {
+            let r = 0,
+              g = 0;
+            for (let p = 0; p < image.data.length; p += 4)
+              if ([0, 1, 2].some((k) => image.data[p + k] !== empty.data[p + k])) {
+                r += image.data[p];
+                g += image.data[p + 1];
+              }
+            return r / g;
+          };
+        results.dry = { green: hue(green.image), straw: hue(straw.image) };
+        assert.ok(covered(green.image, empty) > 5000, 'a tussock meadow draws');
+        assert.ok(results.dry.straw > results.dry.green + 0.15, `dry blades redden: ${JSON.stringify(results.dry)}`);
+      }
     }
     assert.deepEqual(pageErrors, []);
     console.log('ok scatter grass', JSON.stringify(results));

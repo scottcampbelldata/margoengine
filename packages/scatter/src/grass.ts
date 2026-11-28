@@ -27,6 +27,24 @@ export interface GrassShape {
   round?: number;
   /** Segments along a blade in rings 0, 1 and 2, integers 1 to 16 and not increasing (default [5, 3, 1]). */
   segments?: readonly [number, number, number];
+  /**
+   * How much a clump grows as a bunchgrass tussock, 0 to 1 (default 0.6): its blades root toward the crown at the
+   * clump's centre and fan outward, the inner ones upright and the outer ones arching out to the full `lean`. At 0 the
+   * roots fill the disc evenly and every blade leans its own random way, as before 2026-11-28.
+   */
+  tussock?: number;
+  /**
+   * Share of the blades that are cured (dead, straw coloured), 0 to 1 (default 0.2): standing dead leaves stay in a
+   * living bunchgrass through the season. Each is picked by a hash of the blade, so it stays put as the camera moves.
+   */
+  dry?: number;
+  /**
+   * Linear RGB albedo of a cured blade (default [0.3476, 0.2394, 0.0983], wild oat litter measured by the ECOSTRESS
+   * Spectral Library 1.0, samples VH354 and VH355). It keeps the brightness of the blade's root shade and variation.
+   */
+  dryColor?: readonly [number, number, number];
+  /** Brightness spread from blade to blade within a clump, 0 to 1 (default 0.25): leaves differ in age and angle. */
+  tone?: number;
 }
 /** Options of `new GrassScatter(options)`: a Scatter's, with `blades` shading on by default, plus the blade shape. */
 export interface GrassScatterOptions extends ScatterOptions {
@@ -42,8 +60,15 @@ const DEFAULTS = {
   lean: 0.35,
   round: 0.3,
   segments: [5, 3, 1] as const,
+  tussock: 0.6,
+  dry: 0.2,
+  dryColor: [0.3476, 0.2394, 0.0983] as const,
+  tone: 0.25,
 };
-type Shape = typeof DEFAULTS & { segments: readonly [number, number, number] };
+type Shape = typeof DEFAULTS & {
+  segments: readonly [number, number, number];
+  dryColor: readonly [number, number, number];
+};
 
 /** Checks a shape and fills in its defaults. */
 export function grassShape(shape: GrassShape = {}): Shape {
@@ -53,13 +78,19 @@ export function grassShape(shape: GrassShape = {}): Shape {
       'scatter',
     );
   const s = { ...DEFAULTS, ...shape } as Shape;
-  const { height, heightVariance, width, blades, radius, lean, round, segments } = s;
+  const { height, heightVariance, width, blades, radius, lean, round, segments, tussock, dry, dryColor, tone } = s;
   const within = (v: number, lo: number, hi: number) => Number.isFinite(v) && v >= lo && v <= hi;
   if (
     !(within(height, 1e-4, 1e4) && within(width, 1e-5, 1e3) && within(radius, 0, 1e4)) ||
     !within(heightVariance, 0, 0.95) ||
     !within(lean, 0, 0.95) ||
     !within(round, 0, 1) ||
+    !within(tussock, 0, 1) ||
+    !within(dry, 0, 1) ||
+    !within(tone, 0, 1) ||
+    !Array.isArray(dryColor) ||
+    dryColor.length !== 3 ||
+    !dryColor.every((v) => within(v, 0, 1)) ||
     !Number.isInteger(blades) ||
     !within(blades, 1, 64) ||
     !Array.isArray(segments) ||
@@ -67,7 +98,7 @@ export function grassShape(shape: GrassShape = {}): Shape {
     !segments.every((v, i) => Number.isInteger(v) && within(v, 1, 16) && (!i || v <= segments[i - 1]))
   )
     throw rangeError(
-      'GrassScatter grass needs height 0.0001-10000, width 0.00001-1000, radius 0-10000, heightVariance, lean 0-0.95, round 0-1, blades an integer 1-64 and three non-increasing integer segments 1-16',
+      'GrassScatter grass needs height 0.0001-10000, width 0.00001-1000, radius 0-10000, heightVariance, lean 0-0.95, round, tussock, dry and tone 0-1, dryColor three linear RGB numbers 0-1, blades an integer 1-64 and three non-increasing integer segments 1-16',
       'scatter',
     );
   return s;
@@ -147,12 +178,20 @@ export function grassPoseCode(code: string, shape: GrassShape = {}): string {
     code.replace(head, 'fn scatterPoseBase(p:vec3f,n:vec3f,position:vec4f,') +
     `
 struct GrassVertex {p:vec3f,n:vec3f}
+var<private> grassTone:vec2f=vec2f(1.0,0.0);
 fn grassHash(value:u32)->f32 {var x=value;x=(x^(x>>16u))*0x7feb352du;x=(x^(x>>15u))*0x846ca68bu;x=x^(x>>16u);return f32(x)/4294967296.0;}
 fn grassVertex(p:vec3f,position:vec4f,wide:f32,pix:f32,view:vec3f)->GrassVertex {
  let side=p.x/${f(r)};let along=p.y/${f(s.height)};let k=u32(round((p.z/${f(r)}+1.0)*0.5*${f(s.blades - 1)}));
  let seed=(bitcast<u32>(position.x)*0x9e3779b9u)^(bitcast<u32>(position.z)*0x85ebca6bu)^((k+1u)*0xc2b2ae35u);
- let a=grassHash(seed)*6.2831853;let d=${f(s.radius)}*sqrt(grassHash(seed^0x68e31da4u));
- let heading=grassHash(seed^0xb5297a4du)*6.2831853;let dir=vec3f(cos(heading),0.0,sin(heading));let right=vec3f(-dir.z,0.0,dir.x);
+ let a=grassHash(seed)*6.2831853;${
+   s.tussock > 0
+     ? // A tussock: roots gather toward the crown, blades fan out from it and the outer ones arch furthest.
+       `let u=grassHash(seed^0x68e31da4u);let d=${f(s.radius)}*mix(sqrt(u),u,${f(s.tussock)});
+ let heading=a+(grassHash(seed^0xb5297a4du)-0.5)*6.2831853*(1.0-0.85*${f(s.tussock)});let fan=sqrt(d/max(${f(s.radius)},1e-6));`
+     : `let d=${f(s.radius)}*sqrt(grassHash(seed^0x68e31da4u));
+ let heading=grassHash(seed^0xb5297a4du)*6.2831853;`
+ }let dir=vec3f(cos(heading),0.0,sin(heading));let right=vec3f(-dir.z,0.0,dir.x);
+ grassTone=vec2f(1.0+(grassHash(seed^0x5bd1e995u)*2.0-1.0)*${f(s.tone)},select(0.0,1.0,grassHash(seed^0x27d4eb2fu)<${f(s.dry)}));
  let foot=1.5*pix;let w=${f(s.width)};let face=sqrt(max(1.0-dot(view,right)*dot(view,right),0.0));let seen=max(face,0.25);let wp=w*face;
 ${
   cover || split
@@ -166,7 +205,11 @@ ${
  if(grow<=0.0){return GrassVertex(vec3f(0.0),vec3f(0.0,1.0,0.0));}
 `
 } let height=grow*${f(s.height)}*(1.0-${f(s.heightVariance)}*grassHash(seed^0x1b56c4e9u));
- let lean=${f(s.lean)}*(0.25+0.75*grassHash(seed^0x7f4a7c15u));
+ let lean=${f(s.lean)}*${
+   s.tussock > 0
+     ? `mix(0.25+0.75*grassHash(seed^0x7f4a7c15u),(0.3+0.7*fan)*(0.75+0.25*grassHash(seed^0x7f4a7c15u)),${f(s.tussock)})`
+     : '(0.25+0.75*grassHash(seed^0x7f4a7c15u))'
+ };
  // Root (0,0,0), control point straight above at the blade's height, tip leaning along dir at the same length.
  let ctrl=vec3f(0.0,height,0.0);let tip=vec3f(0.0,height*sqrt(1.0-lean*lean),0.0)+dir*(height*lean);
  let spine=2.0*t*(1.0-t)*ctrl+t*t*tip;let tangent=2.0*(1.0-t)*ctrl+2.0*t*(tip-ctrl);
@@ -203,9 +246,15 @@ fn scatterPose(p:vec3f,n:vec3f,position:vec4f,rotation:vec4f,ground:vec4f,blade:
  let d=distance(position.xyz,eye);let wide=1.0+d*blade.y;let c=cos(rotation.x);let s=sin(rotation.x);
  let look=(position.xyz-eye)/max(d,1e-6);let view=vec3f(c*look.x-s*look.z,look.y,s*look.x+c*look.z);
  let g=grassVertex(p,position,wide,d*pixel/(wide*position.w),view);
- return scatterPoseBase(g.p,g.n,position,rotation,ground,blade,eye,wind,pixel,sway);
+ var pose=scatterPoseBase(g.p,g.n,position,rotation,ground,blade,eye,wind,pixel,sway);pose.shade*=grassTone.x;return pose;
 }
 `
+  ).replace(
+    // A lit stage: a cured blade takes the dry colour at the brightness its green would have had (root shade, tone and
+    // variation kept), by the ratio of the drawn colour's luminance to the material's.
+    /(o\.color=[^;]+;)/,
+    (line) =>
+      `${line}o.color=mix(o.color,vec3f(${s.dryColor.map(f).join(',')})*(dot(o.color,vec3f(0.2126,0.7152,0.0722))/max(dot(material[0].rgb,vec3f(0.2126,0.7152,0.0722)),1e-4)),grassTone.y);`,
   );
 }
 
@@ -221,8 +270,14 @@ export class GrassScatter extends Scatter {
       throw typeError('GrassScatter takes an options object; omit it for the defaults', 'scatter');
     const { grass, ...rest } = options;
     const shape = grassShape(grass);
-    super(grassRings(shape), { color: [0.18, 0.42, 0.08], blades: {}, ...rest });
-    this.grass = Object.freeze({ ...shape, segments: Object.freeze([...shape.segments]) as Shape['segments'] });
+    // Default albedo: green grass leaves, wild oat and ripgut brome (ECOSTRESS Spectral Library 1.0 samples VH352 and
+    // VH350), each spectrum integrated to linear RGB under a 6504 K black body and averaged.
+    super(grassRings(shape), { color: [0.1617, 0.2024, 0.0917], blades: {}, ...rest });
+    this.grass = Object.freeze({
+      ...shape,
+      segments: Object.freeze([...shape.segments]) as Shape['segments'],
+      dryColor: Object.freeze([...shape.dryColor]) as Shape['dryColor'],
+    });
   }
   /**
    * Makes a grass scatter and adds it to `engine`: `GrassScatter.attach(engine, options)`. The parameter also admits

@@ -936,6 +936,21 @@ every `Scatter` option, with `blades` shading on by default.
   middle and far rings twice (the extra draw is the depth pass), and a covered fragment blends.
 - Normals turn across the width (`round`) so flat blades shade round; wind, ground alignment and blade shading are the
   plain `Scatter`'s.
+- Bunchgrass by default. `tussock` (0 to 1, default 0.6) gathers a clump's roots toward its crown and fans the blades
+  outward from it, the inner ones upright and the outer ones arching to the full `lean`, the fountain form of the
+  tussock grasses of mountain meadows (Thurber and Idaho fescue); 0 keeps the even disc and random leans. `dry` (0 to 1,
+  default 0.2) is the share of cured, straw coloured blades a living tussock keeps, each picked by a hash of the blade;
+  they take `dryColor` (default linear [0.3476, 0.2394, 0.0983], wild oat litter, ECOSTRESS Spectral Library 1.0
+  samples VH354 and VH355; Meerdink, Hook, Roberts and Abbott, Remote Sensing of Environment 230, 2019,
+  https://doi.org/10.1016/j.rse.2019.05.015) at the brightness the green blade would have had. `tone` (0 to 1, default
+  0.25) spreads brightness blade by blade. The default green, used without a `material`, is green grass leaves
+  measured the same way (samples VH350 and VH352, ripgut brome and wild oat): linear [0.1617, 0.2024, 0.0917].
+
+  ```js
+  import { GrassScatter } from '@margoengine/scatter/grass';
+  const meadow = new GrassScatter({ count: 20000, area: [40, 40], grass: { tussock: 0.8, dry: 0.3, blades: 14 } });
+  meadow.dispose();
+  ```
 - The shape is compiled into the shaders: make a new `GrassScatter` to change it.
 - Real-GPU proof: `npm run test:browser:grass --workspace @margoengine/scatter`, and the shadows the blades cast, still,
   wind-bent and in each ring, in `Shadows` and `VirtualShadows`: `npm run test:browser:grass-shadow --workspace @margoengine/scatter`
