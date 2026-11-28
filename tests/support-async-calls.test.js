@@ -50,7 +50,7 @@ export function unawaitedCalls(file, source, names) {
   for (const name of names) {
     const CALL = new RegExp(`(?<![\\w$.])${name.replace(/\$/g, '\\$')}\\s*\\(`, 'g');
     for (const match of source.matchAll(CALL)) {
-      if (inComment(source, match.index)) continue;
+      if (inComment(source, match.index) || inString(source, match.index)) continue;
       const before = source.slice(Math.max(0, match.index - 400), match.index);
       if (DEFINITION.test(before) || SETTLED_BEFORE.test(before)) continue;
       if (SETTLED_AFTER.test(source.slice(closing(source, match.index + match[0].length)))) continue;
@@ -59,6 +59,16 @@ export function unawaitedCalls(file, source, names) {
     }
   }
   return found;
+}
+
+/**
+ * Whether `at` is inside a quoted string on its line, where a helper's name followed by `(` is a label or a message,
+ * not a call: tests/process-kill.test.js labels its cases 'endTree(child)', and tests/check-downloads.test.js says
+ * "with pinnedFiles (scripts/support/pinned-files.mjs)" in an assert message.
+ */
+function inString(source, at) {
+  const line = source.slice(source.lastIndexOf('\n', at - 1) + 1, at);
+  return /['"`]/.test(line.replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g, ''));
 }
 
 /**
@@ -210,6 +220,18 @@ test('a helper named in a comment is not a call, and a dropped call beside a URL
     'scripts/x.mjs:5 probe',
     'scripts/x.mjs:7 probe',
   ]);
+});
+
+// Regression: a case label 'endTree(child)' in tests/process-kill.test.js and an assert message naming
+// "pinnedFiles (scripts/...)" in tests/check-downloads.test.js failed this gate as dropped promises.
+test('a helper named inside a string is not a call, and a dropped call after a string still is', () => {
+  const source = [
+    "import { endTree } from './support/shutdown.mjs';",
+    "const cases = [['endTree(child)', async (c) => await endTree(c)]];",
+    "assert.ok(x, 'a check ends with endTree (scripts/support/shutdown.mjs)');",
+    "const label = 'x'; endTree(child);",
+  ].join('\n');
+  assert.deepEqual(unawaitedCalls('tests/x.test.js', source, ['endTree']), ['tests/x.test.js:4 endTree']);
 });
 
 test('the checker accepts a promise kept in a variable and awaited later in its function, and nothing looser', () => {
