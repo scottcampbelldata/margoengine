@@ -9,6 +9,7 @@ import {
   type SurfaceEnergyWorkerStart,
   WORK_WORDS,
 } from './surface-energy-native-core.js';
+import { compileWasmAsset } from '../../shared/wasm-asset.js';
 
 /** Work completed by one native participant in the latest accepted batch. */
 export interface SurfaceEnergyWorkerWork {
@@ -48,21 +49,13 @@ async function loadModule(shared: boolean, signal?: AbortSignal): Promise<WebAss
   const url = shared
     ? new URL(/* @vite-ignore */ './surface-energy-kernel-shared.wasm?no-inline', import.meta.url)
     : new URL(/* @vite-ignore */ './surface-energy-kernel.wasm?no-inline', import.meta.url);
-  try {
-    if (url.protocol === 'file:') {
-      url.search = '';
-      const fs = 'node:fs/promises';
-      const { readFile } = await import(/* @vite-ignore */ /* webpackIgnore: true */ fs);
-      return await WebAssembly.compile(await readFile(url, { signal }));
-    }
-    const response = await fetch(url, { signal });
-    if (!response.ok) throw failure(`Surface energy kernel HTTP ${response.status}. Serve its bundled Wasm asset.`);
-    return await WebAssembly.compile(await response.arrayBuffer());
-  } catch (cause) {
-    signal?.throwIfAborted();
-    if (cause instanceof MargoError) throw cause;
-    throw failure('Run surface energy with Wasm SIMD support and its bundled kernel asset.', cause);
-  }
+  return compileWasmAsset(
+    url,
+    signal,
+    failure,
+    (status) => `Surface energy kernel HTTP ${status}. Serve its bundled Wasm asset.`,
+    'Run surface energy with Wasm SIMD support and its bundled kernel asset.',
+  );
 }
 
 async function endpoint(): Promise<WorkerEndpoint> {

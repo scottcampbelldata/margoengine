@@ -1,4 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
+import { compileWasmAsset } from '../../../shared/wasm-asset.js';
 import { createNativePhasePool, type NativePhasePool } from '../native-phase-pool.js';
 import { MAX_MEMORY_PAGES } from '../world/memory.js';
 import { entryError } from './errors.js';
@@ -54,21 +55,13 @@ async function loadModule(shared: boolean, signal?: AbortSignal): Promise<WebAss
   const url = shared
     ? new URL(/* @vite-ignore */ './entry-profile-kernel-shared.wasm?no-inline', import.meta.url)
     : new URL(/* @vite-ignore */ './entry-profile-kernel.wasm?no-inline', import.meta.url);
-  try {
-    if (url.protocol === 'file:') {
-      url.search = '';
-      const fs = 'node:fs/promises';
-      const { readFile } = await import(/* @vite-ignore */ /* webpackIgnore: true */ fs);
-      return await WebAssembly.compile(await readFile(url, { signal }));
-    }
-    const response = await fetch(url, { signal });
-    if (!response.ok) throw failure(`Entry profile kernel HTTP ${response.status}. Serve its shipped Wasm asset.`);
-    return await WebAssembly.compile(await response.arrayBuffer());
-  } catch (cause) {
-    signal?.throwIfAborted();
-    if (cause instanceof MargoError) throw cause;
-    throw failure('Run entry profiles with Wasm SIMD support and their matching kernel asset.', cause);
-  }
+  return compileWasmAsset(
+    url,
+    signal,
+    failure,
+    (status) => `Entry profile kernel HTTP ${status}. Serve its shipped Wasm asset.`,
+    'Run entry profiles with Wasm SIMD support and their matching kernel asset.',
+  );
 }
 
 function instantiate(module: WebAssembly.Module, threads: number) {
