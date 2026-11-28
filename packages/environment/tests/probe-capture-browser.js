@@ -169,5 +169,84 @@ window.runTests = async () => {
   const report = { adapter: hardware({ info: device.adapterInfo }), checks };
   probes.dispose();
   engine.dispose();
+  checks.push(await chunkedPrefilter());
   return report;
 };
+
+// The exact prefilter's chunks (KB-SHOT-COMPATLOST1) store the same texels as one dispatch per rough level. A 128 px
+// probe's 64 px level runs in 4 chunks of 4,096 source texels; rewriting each chunk's range as it is uploaded turns the
+// bake back into the old filter: the first chunk loops over every source texel and stores, the later ones only copy
+// their running sums. Two chunked bakes around the one-dispatch bake show the capture itself repeats.
+async function chunkedPrefilter() {
+  const RES = 128,
+    engine = await Engine.create(document.querySelector('#scene'), {
+      backend: 'webgpu',
+      camera: { position: [3, 4, 9], target: [0, 0, 0] },
+    }),
+    device = engineRuntime(engine).gpu,
+    queue = device.queue,
+    writeBuffer = queue.writeBuffer,
+    sky = Sky.attach(engine),
+    probes = LightProbes.attach(engine, {
+      reflections: [{ position: [0, 2, 0], min: [-10, -1, -10], max: [10, 10, 10] }],
+      resolution: RES,
+    });
+  device.pushErrorScope('validation');
+  probes.addCapture(sky);
+  let chunks = 0,
+    oneDispatch = false;
+  queue.writeBuffer = function (buffer, offset, data, start, count) {
+    // A chunk's 8-word slot of the bake params (first and end at words 6 and 7), written after the capture frame.
+    if (count === 8 && offset > 0 && offset % 256 === 0 && data instanceof Uint32Array) {
+      const words = data.slice(start, start + 8);
+      if (words[3] === RES) {
+        chunks++;
+        if (oneDispatch) {
+          if (words[6] === 0) words[7] = RES * RES;
+          else (words[6] = 1), (words[7] = 0);
+        }
+        return writeBuffer.call(this, buffer, offset, words);
+      }
+    }
+    return writeBuffer.call(this, buffer, offset, data, start, count);
+  };
+  const bake = async (one) => {
+    oneDispatch = one;
+    chunks = 0;
+    await probes.bake();
+    return { texels: probes.texels.slice(), chunks };
+  };
+  try {
+    const a = await bake(false),
+      b = await bake(true),
+      c = await bake(false),
+      base = probes.reflectionOffset(0),
+      end = base + [128, 64, 32, 16, 8, 4].reduce((n, s) => n + s * s, 0),
+      differ = (x, y) => {
+        let n = 0;
+        for (let i = base * 2; i < end * 2; i++) if (x[i] !== y[i]) n++;
+        return n;
+      };
+    // 64 px: 4 chunks; 32 px down to 4 px: 1 each.
+    assert(a.chunks === 4 + 4, `the chunked bake runs 8 chunks: ${a.chunks}`);
+    assert(b.chunks === 8, `the one-dispatch bake rewrote 8 chunk ranges: ${b.chunks}`);
+    assert(differ(a.texels, c.texels) === 0, 'two chunked bakes store the same texels');
+    let lit = 0;
+    for (let i = (base + RES * RES) * 2; i < end * 2; i++) if (a.texels[i] & 0x7fff7fff) lit++;
+    assert(lit > 0, 'the rough levels hold the captured sky');
+    const words = differ(a.texels, b.texels);
+    assert(words === 0, `chunked and one-dispatch prefilters store the same texels: ${words} words differ`);
+    const validation = await device.popErrorScope();
+    assert(!validation, validation?.message);
+    return {
+      name: 'chunked prefilter equals one dispatch',
+      words: (end - base) * 2,
+      lit,
+      differ: words,
+    };
+  } finally {
+    queue.writeBuffer = writeBuffer;
+    probes.dispose();
+    engine.dispose();
+  }
+}

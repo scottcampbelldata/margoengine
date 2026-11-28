@@ -4657,8 +4657,10 @@ test.
   float32 running sum in a storage buffer for the next (same additions, same order). A 256 px probe takes 96 submits a
   bounce. Regression: `packages/environment/tests/probes.test.js` ("the exact prefilter of a 256 px probe loops over at
   most 2^14 source texels per dispatch"), which fails on the old code. On the M6 Mac probe-capture at 256 px and
-  `MARGO_COMPAT=1 node tools/shot/test/sky-coverage-check.mjs` pass (all three shots, orrery included; WebGPU passes too). Not measured: the stored texels byte
-  for byte against the one-dispatch filter on a GPU where both run.
+  `MARGO_COMPAT=1 node tools/shot/test/sky-coverage-check.mjs` pass (all three shots, orrery included; WebGPU passes too). Measured byte for byte (2026-11-27,
+  NVIDIA Ampere, Chrome 158, WebGPU and the WebGL2 layer): a 128 px probe's stored texels from the chunked filter (its
+  64 px level in 4 chunks) and from the one-dispatch filter match in all 43,680 words, checked by
+  `packages/environment/tests/probe-capture-browser.js` ("chunked prefilter equals one dispatch").
 - **Again on main feca833059 (RTX A6000, 2026-11-27, packages rebuilt):** the same command passes all three shots. The
   device loss has reproduced only on the M6 Mac (ANGLE on Metal); this row stays open until a Mac session reruns it.
   The Direct3D 11 load time above is a separate failure, seen on the Arc 140V laptop.
