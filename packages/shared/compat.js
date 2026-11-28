@@ -25,6 +25,15 @@ export function compatTier(device) {
 }
 
 /**
+ * Sets a GPU simulation's `stats.backend` for `device` (`'webgl2-compat'` on the WebGL2 layer, else `'webgpu'`) and
+ * returns whether it is the WebGL2 layer.
+ */
+export function reportBackend(stats, device) {
+  stats.backend = compatTier(device) === 'webgl2' ? 'webgl2-compat' : 'webgpu';
+  return stats.backend === 'webgl2-compat';
+}
+
+/**
  * Whether `device` is a browser's own WebGPU device at the compatibility feature level (`featureLevel: 'compatibility'`):
  * one that lacks `core-features-and-limits`. The WebGL2 layer's devices lack it too, and take their own routes.
  */

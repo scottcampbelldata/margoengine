@@ -1,5 +1,5 @@
 import type { MutableVec3, Vec3 } from '@margoengine/math';
-import { normalize, scale } from '@margoengine/math/vec3';
+import { newell, normalize, scale } from '@margoengine/math/vec3';
 import type { PaintGeometry } from './paint-types.js';
 import type { CompiledPolygonMesh, PolygonEdge, PolygonMesh } from './types.js';
 
@@ -310,15 +310,7 @@ export const meshPolygonNormal = (points: readonly Vec3[]): MutableVec3 => norma
 
 /** Unit Newell normal (the edit commands' and painter's established operand order); [0, 0, 0] when degenerate. */
 export function newellNormal(points: readonly Vec3[]): MutableVec3 {
-  const n: MutableVec3 = [0, 0, 0];
-  for (let i = 0; i < points.length; i++) {
-    const a = points[i],
-      b = points[(i + 1) % points.length];
-    n[0] += (a[1] - b[1]) * (a[2] + b[2]);
-    n[1] += (a[2] - b[2]) * (a[0] + b[0]);
-    n[2] += (a[0] - b[0]) * (a[1] + b[1]);
-  }
-  return normalize(n);
+  return normalize(newell(points));
 }
 
 /** Centroid of the points (sum, then one scale); [0, 0, 0] for none. */

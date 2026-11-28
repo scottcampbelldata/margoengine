@@ -5,6 +5,11 @@ export function requireCompatTier(device: unknown, feature: string, minimum?: 'f
 /** `'webgl2'` for a device of the WebGL2 compatibility layer, `'native'` for a browser's own WebGPU device. */
 export function compatTier(device: GPUDevice | undefined): 'native' | 'webgl2';
 /**
+ * Sets a GPU simulation's `stats.backend` for `device` (`'webgl2-compat'` on the WebGL2 layer, else `'webgpu'`) and
+ * returns whether it is the WebGL2 layer.
+ */
+export function reportBackend(stats: { backend: string }, device: GPUDevice | undefined): boolean;
+/**
  * On the WebGL2 layer, starts loading a package's compatibility route (`load`, a dynamic import) and resolves what it
  * resolves; on native WebGPU returns undefined and loads nothing.
  */

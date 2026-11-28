@@ -12,7 +12,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
-import { compatTier } from '../../shared/compat.js';
+import { reportBackend } from '../../shared/compat.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { applyView } from '../../shared/view-rect.js';
 import {
@@ -99,7 +99,13 @@ const packMesh = (geometry: GPUFlockOptions['geometry'], preset: FlockPreset) =>
 
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
-declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; COPY_SRC: number; MAP_READ: number };
+declare const GPUBufferUsage: {
+  UNIFORM: number;
+  STORAGE: number;
+  COPY_DST: number;
+  COPY_SRC: number;
+  MAP_READ: number;
+};
 declare const GPUMapMode: { READ: number };
 
 /** Longest frame delta a frame advances the flock by, in seconds: a longer stall advances this much. */
@@ -167,7 +173,10 @@ export class GPUFlock implements EnginePlugin {
   private debugModule?: GPUShaderModule;
   private velocityModule?: GPUShaderModule;
   private renderPipelines = new Map<string, [GPURenderPipeline, GPUBindGroup, GPUBindGroup]>();
-  private debugPipelines = new Map<string, [GPURenderPipeline, GPUBindGroup, GPURenderPipeline, GPUBindGroup, GPUBindGroup]>();
+  private debugPipelines = new Map<
+    string,
+    [GPURenderPipeline, GPUBindGroup, GPURenderPipeline, GPUBindGroup, GPUBindGroup]
+  >();
 
   private readonly simData = new ArrayBuffer(FLOCK_SIM_FLOATS * 4);
   private readonly simU32 = new Uint32Array(this.simData);
@@ -175,7 +184,11 @@ export class GPUFlock implements EnginePlugin {
   private readonly renderData = new Float32Array(36);
   private readonly debugUniformData = new Float32Array(40);
 
-  private readonly colorAttachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
+  private readonly colorAttachment: GPURenderPassColorAttachment = {
+    view: undefined!,
+    loadOp: 'load',
+    storeOp: 'store',
+  };
   private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {
     view: undefined!,
     depthLoadOp: 'load',
@@ -185,7 +198,10 @@ export class GPUFlock implements EnginePlugin {
     colorAttachments: [this.colorAttachment],
     depthStencilAttachment: this.depthAttachment,
   };
-  private readonly debugDepthAttachment: GPURenderPassDepthStencilAttachment = { view: undefined!, depthReadOnly: true };
+  private readonly debugDepthAttachment: GPURenderPassDepthStencilAttachment = {
+    view: undefined!,
+    depthReadOnly: true,
+  };
   private readonly debugPassDesc: GPURenderPassDescriptor = {
     colorAttachments: [this.colorAttachment],
     depthStencilAttachment: this.debugDepthAttachment,
@@ -228,7 +244,9 @@ export class GPUFlock implements EnginePlugin {
   setDebug(debug: FlockDebugOptions): void {
     this.assertAlive('setDebug');
     if (!debug || typeof debug !== 'object')
-      throw flockError('GPUFlock.setDebug takes an object; pass { enabled, velocities?, grid?, perception?, vectors? }.');
+      throw flockError(
+        'GPUFlock.setDebug takes an object; pass { enabled, velocities?, grid?, perception?, vectors? }.',
+      );
     const merged = { ...this.options.debug, ...debug };
     this.stats.debugEnabled = resolveFlockParams({ ...this.options, debug: merged }, this.count).debug.enabled;
     this.options.debug = merged;
@@ -293,7 +311,8 @@ export class GPUFlock implements EnginePlugin {
     this.assertAlive('step');
     const n = flockSubsteps(dt);
     const device = this.device;
-    if (!device) throw new MargoError('state', 'GPUFlock.step needs the flock attached; call GPUFlock.attach(engine) first.');
+    if (!device)
+      throw new MargoError('state', 'GPUFlock.step needs the flock attached; call GPUFlock.attach(engine) first.');
     if (!n) return;
     const params = resolveFlockParams(this.options, this.count);
     this.ensureResources(device, params);
@@ -314,7 +333,8 @@ export class GPUFlock implements EnginePlugin {
   async snapshot(): Promise<FlockSnapshot> {
     this.assertAlive('snapshot');
     const device = this.device;
-    if (!device) throw new MargoError('state', 'GPUFlock.snapshot needs the flock attached; call GPUFlock.attach(engine) first.');
+    if (!device)
+      throw new MargoError('state', 'GPUFlock.snapshot needs the flock attached; call GPUFlock.attach(engine) first.');
     const params = resolveFlockParams(this.options, this.count);
     this.ensureResources(device, params);
     const steps = this.stats.steps;
@@ -367,8 +387,7 @@ export class GPUFlock implements EnginePlugin {
       );
     this.engine = engine;
     this.device = device;
-    this.compat = compatTier(device) === 'webgl2';
-    this.stats.backend = this.compat ? 'webgl2-compat' : 'webgpu';
+    this.compat = reportBackend(this.stats, device);
   }
 
   /** Registers the step, the instanced draw and the debug overlay on the frame graph. */
@@ -401,17 +420,32 @@ export class GPUFlock implements EnginePlugin {
       const stateUsage = STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
       this.states = [this.buffer(device, stateBytes, stateUsage)];
       this.debugBuf = this.buffer(device, 128, STORAGE | GPUBufferUsage.COPY_DST);
-      this.renderUniform = this.buffer(device, this.renderData.byteLength, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
-      this.debugUniform = this.buffer(device, this.debugUniformData.byteLength, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+      this.renderUniform = this.buffer(
+        device,
+        this.renderData.byteLength,
+        GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      );
+      this.debugUniform = this.buffer(
+        device,
+        this.debugUniformData.byteLength,
+        GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      );
       if (!this.compat) {
         this.states.push(this.buffer(device, stateBytes, stateUsage));
-        const sim = (this.simUniform = this.buffer(device, this.simData.byteLength, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST));
+        const sim = (this.simUniform = this.buffer(
+          device,
+          this.simData.byteLength,
+          GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        ));
         const grid = this.buffer(device, (2 * g + 512) * 4, STORAGE);
         const keys = this.buffer(device, 4 * n * 4, STORAGE);
         const sorted = this.buffer(device, stateBytes, STORAGE);
         const [a, b] = this.states;
         const pipe = (code: string): GPUComputePipeline =>
-          device.createComputePipeline({ layout: 'auto', compute: { module: device.createShaderModule({ code }), entryPoint: 'main' } });
+          device.createComputePipeline({
+            layout: 'auto',
+            compute: { module: device.createShaderModule({ code }), entryPoint: 'main' },
+          });
         const pass = (pipeline: GPUComputePipeline, buffers: GPUBuffer[]): Pass => [
           pipeline,
           device.createBindGroup({
@@ -495,7 +529,13 @@ export class GPUFlock implements EnginePlugin {
   }
 
   /** Encodes `n` equal steps of `dt / n` seconds, ping-ponging the state buffers. */
-  private encodeSteps(encoder: GPUCommandEncoder, device: GPUDevice, p: ResolvedFlockParams, dt: number, n: number): void {
+  private encodeSteps(
+    encoder: GPUCommandEncoder,
+    device: GPUDevice,
+    p: ResolvedFlockParams,
+    dt: number,
+    n: number,
+  ): void {
     const rt = this.compute!;
     this.writeSimUniforms(device, p, dt / n);
     const boidGroups = Math.ceil(this.count / 256);

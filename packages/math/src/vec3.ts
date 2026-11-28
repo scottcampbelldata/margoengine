@@ -31,3 +31,18 @@ export const normalize = (a: In): MutableVec3 => {
   const l = length(a);
   return l ? [a[0] / l, a[1] / l, a[2] / l] : [0, 0, 0];
 };
+/**
+ * Newell's normal of a closed polygon (Newell 1972; Sutherland, Sproull and Schumacker 1974), unnormalized: its length
+ * is twice the polygon's area and it points along the right-hand winding. Robust for non-planar and concave polygons.
+ */
+export const newell = (points: ArrayLike<In>): MutableVec3 => {
+  const n: MutableVec3 = [0, 0, 0];
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i],
+      b = points[(i + 1) % points.length];
+    n[0] += (a[1] - b[1]) * (a[2] + b[2]);
+    n[1] += (a[2] - b[2]) * (a[0] + b[0]);
+    n[2] += (a[0] - b[0]) * (a[1] + b[1]);
+  }
+  return n;
+};

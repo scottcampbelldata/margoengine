@@ -213,6 +213,48 @@ test('vec3: plain-array helpers return new arrays', () => {
   assert.deepEqual(a, [1, 2, 3], 'inputs are not modified');
 });
 
+test('vec3.newell: twice the area along the right-hand winding, for concave and non-planar polygons too', () => {
+  // A 2 x 1 rectangle in the xy plane, counter-clockwise seen from +z: area 2, so the vector is [0, 0, 4].
+  assert.deepEqual(
+    vec3.newell([
+      [0, 0, 0],
+      [2, 0, 0],
+      [2, 1, 0],
+      [0, 1, 0],
+    ]),
+    [0, 0, 4],
+  );
+  // Clockwise flips it.
+  assert.deepEqual(
+    vec3.newell([
+      [0, 1, 0],
+      [2, 1, 0],
+      [2, 0, 0],
+      [0, 0, 0],
+    ]),
+    [0, 0, -4],
+  );
+  // A concave L of area 3 in the yz plane points along +x.
+  const L = [
+    [0, 0, 0],
+    [0, 2, 0],
+    [0, 2, 1],
+    [0, 1, 1],
+    [0, 1, 2],
+    [0, 0, 2],
+  ];
+  assert.deepEqual(vec3.newell(L), [6, 0, 0]);
+  // A degenerate polygon (collinear points) has none.
+  assert.deepEqual(
+    vec3.newell([
+      [0, 0, 0],
+      [1, 1, 1],
+      [2, 2, 2],
+    ]),
+    [0, 0, 0],
+  );
+});
+
 test('errors: MargoError carries a code and matches across bundled copies', () => {
   const error = new MargoError('disposed', 'Thing is disposed; create a new Thing.');
   assert.equal(error.code, 'disposed');

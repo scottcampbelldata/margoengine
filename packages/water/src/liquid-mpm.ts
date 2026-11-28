@@ -12,7 +12,7 @@ import {
   type FrameGraph,
   type PassContext,
 } from '@margoengine/core/extension';
-import { compatTier } from '../../shared/compat.js';
+import { reportBackend } from '../../shared/compat.js';
 import { fault } from '../../shared/errors.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { applyView } from '../../shared/view-rect.js';
@@ -762,8 +762,7 @@ export class GPULiquid implements EnginePlugin {
       );
     this.engine = engine;
     this.device = device;
-    this.compat = compatTier(device) === 'webgl2';
-    this.stats.backend = this.compat ? 'webgl2-compat' : 'webgpu';
+    this.compat = reportBackend(this.stats, device);
   }
 
   /** Registers the step, the debug particles and the debug lines on the frame graph. */

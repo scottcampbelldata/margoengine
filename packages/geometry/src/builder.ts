@@ -6,6 +6,7 @@
 // where neighbouring faces differ by more than the given angle (`creasedNormals`).
 import type { Geometry } from '@margoengine/core';
 import { SRGBToLinear } from '@margoengine/math';
+import { newell } from '@margoengine/math/vec3';
 import { type GeometryData, toGeometry } from './data.js';
 import type { MutableVec3 } from './math.js';
 import { triangulate } from './triangulate.js';
@@ -176,18 +177,6 @@ const unit3 = (a: P3, fallback: P3 = [0, 1, 0]): MutableVec3 => {
   const l = Math.hypot(a[0], a[1], a[2]);
   return l > 0 ? [a[0] / l, a[1] / l, a[2] / l] : [fallback[0], fallback[1], fallback[2]];
 };
-/** Newell's normal of a polygon (unnormalized; its length is twice the area). */
-function newell(points: readonly P3[]): MutableVec3 {
-  const n: MutableVec3 = [0, 0, 0];
-  for (let i = 0; i < points.length; i++) {
-    const a = points[i],
-      b = points[(i + 1) % points.length];
-    n[0] += (a[1] - b[1]) * (a[2] + b[2]);
-    n[1] += (a[2] - b[2]) * (a[0] + b[0]);
-    n[2] += (a[0] - b[0]) * (a[1] + b[1]);
-  }
-  return n;
-}
 
 function check(points: readonly P3[], label: string): void {
   for (const p of points)

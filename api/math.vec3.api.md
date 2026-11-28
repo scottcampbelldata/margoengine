@@ -13,6 +13,8 @@ export const length: (a: In) => number;
 
 export const lerp: (a: In, b: In, t: number) => MutableVec3;
 
+export const newell: (points: ArrayLike<In>) => MutableVec3;
+
 export const normalize: (a: In) => MutableVec3;
 
 export const scale: (a: In, s: number) => MutableVec3;
