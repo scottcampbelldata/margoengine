@@ -3271,3 +3271,14 @@ Mushy melting, temperature-dependent materials, melt convection, a scalable impl
 - Point 8 (b23fdc911c). `packages/physics/scripts/sound04-modes-measured.mjs` evaluates independent thin-plate predictions using nominal geometry and material and reads the frequencies from the production PCM. The 24 independent measurements differ by up to 14.19 Hz and 6.31%, with five falling inside the published rounding and readout interval. The solver still requires supplied modes. [Measured limits](limits.md#sound-04-simply-supported-aluminum-plates)
 
 Geometry-derived modes, contact-point mode shapes, acoustic radiation and the other mapped source couplings remain open. The row stays REOPENED at four points.
+
+### BIO-02 Plant growth and morphogenesis
+
+#### BIO-02 four-point pass
+
+- Point 5 (ba3941ca5d). `packages/biomes/tests/coupling/growth.test.js` checks signed HYDRO-02 and branch replay, independently owned offset soil banks, and byte-exact retention on an invalid last root or an unrepresentable late candidate shoot. The season counter and native work receipt advance only on acceptance.
+- Point 6 (ba3941ca5d). `packages/biomes/tests/coupling/growth-workers.test.js` verifies 1, 2 and 4 native participants on odd grids, clipped edges, singleton depth, and byte-exact branch and snapshot replay. `packages/biomes/tests/growth-workers.browser.mjs` starts three simultaneous helpers and records 143 sources, 1,404 clipped rows, 6,577 additions and 5,346 paired SIMD additions in one accepted season.
+- Point 7 (ba3941ca5d). `packages/biomes/tests/growth-film.browser.mjs` drives growth and Procedural tube geometry from live HYDRO-02. An 8 mm surface application produces 59 internodes and a 1.035 m crown after eight modeled seasons versus 24 and 0.403 m in the matched control. The water budget closes, and accepted state and RGBA replay exactly on each renderer.
+- Point 8 (ba3941ca5d). `packages/biomes/scripts/bio02-growth-measured.mjs` compares 16 independent field red maple means. At two years the solver gives 38.4 and 80.0 cm against 9.3 and 33.7 cm for 8% and 57% light. The generic parameters overestimate all means by up to 57.3 cm. Halving the voxel side preserves the result and reduced water still overpredicts. [Measured limits](limits.md#bio-02-red-maple-growth-under-field-shade)
+
+Species-specific physiology, sustained multi-internode extension, crown shedding, a spatial colonisation tier and existing branch bending remain open. The row stays REOPENED at four points.

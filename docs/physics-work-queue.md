@@ -511,7 +511,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | SOUND-03 | Underwater acoustics | physics/underwater | Codex | REOPENED (4/8 at 85765e0ef8, points 5–8, [evidence](physics-solver-audit.md#sound-03-four-point-pass)), prior landing 9f850999d0 |
 | SOUND-04 | Contact and modal sound | none | Codex | REOPENED (4/8 at b23fdc911c, points 5–8, [evidence](physics-solver-audit.md#sound-04-four-point-pass)), prior landing e0b1f274ab |
 | SOUND-05 | Physics-driven fluid, fire, wind and machine sound | none | Open | OPEN |
-| BIO-02 | Plant growth and morphogenesis | biomes/growth with HYDRO-02 soil and live Procedural branch graphs | Codex | BUILDING (codex/physics-bio-02-four-point; four-point pass; [audit](physics-solver-audit.md)), landed d5e70fde20 |
+| BIO-02 | Plant growth and morphogenesis | biomes/growth with HYDRO-02 soil and live Procedural branch graphs | Codex | REOPENED (4/8 at ba3941ca5d, points 5–8, [evidence](physics-solver-audit.md#bio-02-four-point-pass)), prior landing d5e70fde20 |
 | BIO-03 | Forest ecosystem dynamics | sound | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 609d76e5ce |
 | BIO-04 | Material ageing | material exposure, decay and PBR appearance | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 9632f2731c |
 | SPACE-01 | N-body and orbital dynamics | physics/orbit | Codex | REOPENED (4/8 at 06bda264b7, points 5–8, [evidence](physics-solver-audit.md#space-01-four-point-pass)), prior landing 56f09d5d54 |
