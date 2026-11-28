@@ -370,11 +370,16 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
   // package's test:gpu chain, in its order. Read from the package script, not pinned here: a pinned copy went stale
   // each time a package added a check (voxel smooth-lod, post stack-dynamic, taa still/settle/converge, 2026-11-16).
   assert.equal(splitSteps({ label: 'x y', command: 'npm run a || node b.mjs', dir: 'x' }).length, 1);
+  // One node check, with only `--name` or `--name=value` flags (the compat and mode runs of a check).
+  const NODE_CHECK = /^node \S+\.mjs(?: --[a-z-]+(?:=[a-z-]+)?)*$/;
+  assert.ok(NODE_CHECK.test('node a.mjs --compat') && NODE_CHECK.test('node a.mjs --mode=half-float'));
+  for (const other of ['npm run a', 'node a.mjs extra', 'node a.mjs --compat | tee log', 'node a.mjs; node b.mjs'])
+    assert.ok(!NODE_CHECK.test(other), other);
   for (const dir of ['voxel', 'voxel-edit', 'post', 'taa', 'dof', 'toon']) {
     const script = JSON.parse(readFileSync(join(root, `packages/${dir}/package.json`), 'utf8')).scripts['test:gpu'],
       parts = script.replace(/^cd \.\.\/\.\. && /, '').split(' && '),
       chain = splitSteps(byId(`${dir}/test:gpu`));
-    assert.ok(parts.length > 1 && parts.every((p) => /^node \S+\.mjs$/.test(p)), `${dir}: a chain of node checks`);
+    assert.ok(parts.length > 1 && parts.every((p) => NODE_CHECK.test(p)), `${dir}: a chain of node checks`);
     assert.deepEqual(
       chain.map((s) => s.command),
       parts.map((p) => `cd ../.. && ${p}`),
