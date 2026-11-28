@@ -36,7 +36,9 @@
     "test:gpu:discrete": "cd ../.. && node packages/animation/tests/discrete-browser.mjs",
     "test:gpu:uploads": "cd ../.. && node packages/animation/tests/upload-copies-browser.mjs",
     "test:gpu:points": "cd ../.. && node packages/animation/tests/deformed-points-browser.mjs",
-    "test:gpu:instanced-morph": "cd ../.. && node packages/animation/tests/instanced-morph-browser.mjs"
+    "test:gpu:instanced-morph": "cd ../.. && node packages/animation/tests/instanced-morph-browser.mjs",
+    "test:gpu:vat-ssao": "cd ../.. && node packages/animation/test/vat-ssao-browser.mjs",
+    "test:gpu:vat-clustered": "cd ../.. && node packages/animation/test/vat-clustered-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
