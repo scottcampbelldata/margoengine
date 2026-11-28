@@ -23,6 +23,7 @@
 // - A range that depends on the pose (a knee twists only when it is bent): Akhter and Black, "Pose-conditioned joint
 //   angle limits for 3D human pose reconstruction", CVPR 2015 (the idea only; no learned data).
 import type { Animator } from '@margoengine/animator';
+import { rotateByQuaternion } from '@margoengine/math/quat';
 import type { CCDJointLimit } from '@margoengine/animator/ccd';
 import type { PoseJointLimit } from './joint-limits.js';
 import { checkRig, parentOrder, worldFrames, type RigJoint, type RigPose } from './rig.js';
@@ -467,16 +468,7 @@ const qmul = (a: Quat, b: Quat): Q4 => [
   a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
 ];
 const qconj = (q: Quat): Q4 => [-q[0], -q[1], -q[2], q[3]];
-const qrot = (q: Quat, v: Vec3): V3 => {
-  const tx = 2 * (q[1] * v[2] - q[2] * v[1]),
-    ty = 2 * (q[2] * v[0] - q[0] * v[2]),
-    tz = 2 * (q[0] * v[1] - q[1] * v[0]);
-  return [
-    v[0] + q[3] * tx + (q[1] * tz - q[2] * ty),
-    v[1] + q[3] * ty + (q[2] * tx - q[0] * tz),
-    v[2] + q[3] * tz + (q[0] * ty - q[1] * tx),
-  ];
-};
+const qrot = (q: Quat, v: Vec3): V3 => rotateByQuaternion(v, q);
 const qaxis = (axis: Vec3, angle: number): Q4 => {
   const s = Math.sin(angle / 2);
   return [axis[0] * s, axis[1] * s, axis[2] * s, Math.cos(angle / 2)];

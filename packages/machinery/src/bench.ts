@@ -17,6 +17,7 @@
 //   line removal", SCCG 2008: depth-biased, coverage-antialiased lines over their own faces.
 // - Metal F0 values: @margoengine/materials/presets (measured complex indices; each row cites its source).
 import { box, PbrMaterial, type EngineKernel, type Geometry, type Mesh } from '@margoengine/core';
+import { hexColor } from '@margoengine/math/color';
 import { Line, LineMaterial, Lines } from '@margoengine/lines';
 import { EdgesHelper } from '@margoengine/lines/edges';
 import { castIron, metal, surface, type MaterialPreset, type MetalName } from '@margoengine/materials/presets';
@@ -138,15 +139,13 @@ export interface CadPart {
   remove(dispose?: boolean): void;
 }
 
-const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 const linear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 /** Linear rgb of `#rgb`, `#rrggbb` or a linear triple. */
 function rgb(value: string | Vec3, what: string): [number, number, number] {
   if (typeof value === 'string') {
-    const m = hex.exec(value);
-    if (!m) throw new TypeError(`Invalid ${what}; pass #rgb, #rrggbb or linear [r, g, b]`);
-    const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join('') : m[1];
-    return [0, 2, 4].map((i) => linear(parseInt(h.slice(i, i + 2), 16) / 255)) as [number, number, number];
+    const srgb = value.length === 9 ? undefined : hexColor(value);
+    if (!srgb) throw new TypeError(`Invalid ${what}; pass #rgb, #rrggbb or linear [r, g, b]`);
+    return [linear(srgb[0]), linear(srgb[1]), linear(srgb[2])];
   }
   if (!Array.isArray(value) || value.length !== 3 || !value.every((v) => v >= 0 && v <= 1))
     throw new TypeError(`Invalid ${what}; pass #rgb, #rrggbb or linear [r, g, b] in 0..1`);
@@ -212,7 +211,8 @@ export class CadBench {
     if (!options || typeof options !== 'object') throw new TypeError('Invalid CadBench options; pass an object');
     this.engine = engine;
     this.casters = options.casters;
-    this.edgeDefaults = options.edges === false ? null : edgeOptions(options.edges === true ? {} : options.edges ?? {});
+    this.edgeDefaults =
+      options.edges === false ? null : edgeOptions(options.edges === true ? {} : (options.edges ?? {}));
     if (options.deck !== false) {
       const deck = options.deck === true ? {} : (options.deck ?? {});
       this.deck = this.makeDeck(deck);
@@ -222,7 +222,13 @@ export class CadBench {
     this.lines = options.lines ?? Lines.attach(engine, { name: 'cad-bench:lines' });
   }
 
-  private makeDeck({ size = [0.42, 0.3], thickness = 0.04, top = thickness, center = [0, 0], material }: CadDeckOptions): Mesh {
+  private makeDeck({
+    size = [0.42, 0.3],
+    thickness = 0.04,
+    top = thickness,
+    center = [0, 0],
+    material,
+  }: CadDeckOptions): Mesh {
     if (!(size[0] > 0 && size[1] > 0 && thickness > 0) || ![top, center[0], center[1]].every(Number.isFinite))
       throw new RangeError('Invalid deck; pass a positive size and thickness and a finite top and center');
     const granite = surface('basalt', { roughness: 0.5 }),

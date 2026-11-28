@@ -1,5 +1,6 @@
 // A collider of the own solver. Reads only, so it may use `Math`: nothing here can change a step.
 import { MargoError } from '@margoengine/math/errors';
+import { rotateByQuaternion } from '@margoengine/math/quat';
 import {
   COLLIDER_MODIFY,
   COLLIDER_NO_CONTACT_FILTER,
@@ -74,16 +75,7 @@ function multiplyQuat(a: Quat, b: Quat): [number, number, number, number] {
 }
 
 /** A vector turned by a unit quaternion. */
-function rotateByQuat(q: Quat, v: Vec3): [number, number, number] {
-  const tx = 2 * (q[1] * v[2] - q[2] * v[1]),
-    ty = 2 * (q[2] * v[0] - q[0] * v[2]),
-    tz = 2 * (q[0] * v[1] - q[1] * v[0]);
-  return [
-    v[0] + q[3] * tx + (q[1] * tz - q[2] * ty),
-    v[1] + q[3] * ty + (q[2] * tx - q[0] * tz),
-    v[2] + q[3] * tz + (q[0] * ty - q[1] * tx),
-  ];
-}
+const rotateByQuat = (q: Quat, v: Vec3): [number, number, number] => rotateByQuaternion(v, q);
 
 /** A collider on a {@link PhysicsBody}: what `body.colliders` hands you. */
 export class PhysicsCollider {

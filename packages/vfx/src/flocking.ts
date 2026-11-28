@@ -15,6 +15,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { reportBackend } from '../../shared/compat.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { applyView } from '../../shared/view-rect.js';
+import { loadAttachments } from '../../shared/load-attachments.js';
 import {
   FLOCK_ADD_OFFSETS_WGSL,
   FLOCK_CLEAR_WGSL,
@@ -184,16 +185,9 @@ export class GPUFlock implements EnginePlugin {
   private readonly renderData = new Float32Array(36);
   private readonly debugUniformData = new Float32Array(40);
 
-  private readonly colorAttachment: GPURenderPassColorAttachment = {
-    view: undefined!,
-    loadOp: 'load',
-    storeOp: 'store',
-  };
-  private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {
-    view: undefined!,
-    depthLoadOp: 'load',
-    depthStoreOp: 'store',
-  };
+  private readonly attachments = loadAttachments();
+  private readonly colorAttachment: GPURenderPassColorAttachment = this.attachments.color;
+  private readonly depthAttachment: GPURenderPassDepthStencilAttachment = this.attachments.depth;
   private readonly renderPassDesc: GPURenderPassDescriptor = {
     colorAttachments: [this.colorAttachment],
     depthStencilAttachment: this.depthAttachment,

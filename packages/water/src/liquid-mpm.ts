@@ -16,6 +16,7 @@ import { reportBackend } from '../../shared/compat.js';
 import { fault } from '../../shared/errors.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { applyView } from '../../shared/view-rect.js';
+import { loadAttachments } from '../../shared/load-attachments.js';
 import { ParticleLiquid, type ParticleLiquidOptions } from './liquid.js';
 import {
   LIQUID_CLEAR_WGSL,
@@ -310,16 +311,9 @@ export class GPULiquid implements EnginePlugin {
   private readonly simU32 = new Uint32Array(this.simData);
   private readonly simF32 = new Float32Array(this.simData);
   private readonly debugData = new Float32Array(LIQUID_DEBUG_FLOATS);
-  private readonly colorAttachment: GPURenderPassColorAttachment = {
-    view: undefined!,
-    loadOp: 'load',
-    storeOp: 'store',
-  };
-  private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {
-    view: undefined!,
-    depthLoadOp: 'load',
-    depthStoreOp: 'store',
-  };
+  private readonly attachments = loadAttachments();
+  private readonly colorAttachment: GPURenderPassColorAttachment = this.attachments.color;
+  private readonly depthAttachment: GPURenderPassDepthStencilAttachment = this.attachments.depth;
   private readonly passDesc: GPURenderPassDescriptor = {
     colorAttachments: [this.colorAttachment],
     depthStencilAttachment: this.depthAttachment,
