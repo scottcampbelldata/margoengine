@@ -16441,6 +16441,25 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   (`scripts/support/readme-run-skip.json`); the headless examples that needed ffmpeg run on the workstation now (22 of
   22).
 
+### Fixed 2026-11-28: touching a collider after its neighbour's body was removed read and wrote past the body rows (KB-PHYS-RETIREDPAIR1, physics kernel)
+
+- **Repro:** three boxes in a pile, stepped until they touch. Remove the bottom body, then, before the next step, do any
+  of these to the middle box: `touch_collider` (what a change of collision groups calls), `wake_touching_pairs`,
+  `set_collider_state` (sensor and back) or `set_body_enabled` (off and on). The native build stops with
+  STATUS_ACCESS_VIOLATION. Found while the replay scene ran on with a world that had stopped: 220 iterations of removals
+  and edits with no step between them, then a change of groups on a collider whose neighbour was gone.
+- **Cause:** `retire_collider` sets the removed collider's `COLLIDER_BODY` to NONE at once and leaves its pairs for the
+  next step's broad phase to drop. Until that step the other collider's pair list still holds the pair, and
+  `pair_bodies` gives NONE for the removed side. `wake_pair` woke row NONE, `end_touches_as` zeroed its `SLEEP_TIME` and
+  `set_body_enabled` read `is_awake(NONE)`: row 4,294,967,295 of the body columns. Natively that is 16 GiB past the column;
+  in Wasm the address wraps, so it read and wrote the word before the column. Nothing numeric is involved: no NaN or
+  large speed is needed.
+- **Fix:** a pair with a retired collider names no body on that side, and the walks pass it by (`pair_retired` and
+  `wake_pair` in `kernel/src/events.rs`): the live body still wakes, the pair keeps its contacts for the step that drops
+  it, and it joins no list. Regression: `packages/physics/kernel/tests/retired_pair.rs` (both tests end in an access
+  violation without the fix; with it the pile falls onto the floor, the middle box at y 0.5 and the top one at 1.5 within
+  0.02 m).
+
 ### Fixed 2026-11-28: a Water added to SceneTargets drew nothing, and its SSR capture drew with TAA's jittered camera (KB-WATER-CAPTURECAM1; water)
 
 - **Repro (before):** `SceneTargets.add(water, {ground: false})` (`@margoengine/post/mrt`): the targets hold no water
@@ -16514,27 +16533,67 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   A fix reuses the step's spectrum for the rise (one forward transform fewer) or makes the shared FFT's radix-2 and
   radix-4 stages cheaper, bit for bit with its Rust twin; the README limit and the example's ten seconds stay.
 
-### Open 2026-11-28: the water surface program takes over 5 s to link on the WebGL2 layer (KB-WATER-GL2LINK1, water)
+### Fixed 2026-11-28: the water surface program took over 5 s to link on the WebGL2 layer (KB-WATER-GL2LINK1, water)
 
-- **Repro:** `demos/ten-thousand-trees/?backend=webgl2` (BiomeView with `water: { rivers: 'auto' }`) on Chrome, ANGLE
-  over Direct3D 11: the page is ready after 31 to 43 s, against 16 s with `water: false` (CPU near 57 percent busy). Timing
-  `getProgramParameter(LINK_STATUS)` per program shows the water surface program (37 KB vertex, 63 KB fragment GLSL)
-  at 5.5 s, the next five water and banks programs at 0.6 to 1.4 s each. WebGPU is ready in 8 s.
-  `node scripts/web-demos/controls.mjs ten-thousand-trees --backends=webgl2` reports it as not started (30 s wait).
-- **Cause:** the translated fragment shader holds 18 loops, several nested with constant bounds (8 by 10 and 3 by 6
-  wave and refraction steps, a 24-entry part array built in a loop); the Direct3D shader compiler unrolls constant
-  loops, so the program grows many times over before it links. Not yet traced to the WGSL loop that costs most.
-- **For:** the water lane (`packages/water`, GLSL emitted by `packages/webgl2-compat`).
+- **Repro (before):** `demos/ten-thousand-trees/?backend=webgl2` (BiomeView with `water: { rivers: 'auto' }`) on Chrome,
+  ANGLE over Direct3D 11: timing `getProgramParameter(LINK_STATUS)` per program showed the water surface program at
+  5.5 to 11.5 s on a loaded machine, against 0.6 to 1.6 s for every other program; `node scripts/web-demos/controls.mjs
+  ten-thousand-trees --backends=webgl2` reported the page as not started.
+- **Cause:** a shader compiler inlines every call (HLSL has no real calls) and Direct3D's compiler unrolls a loop
+  whose bound it can count, and ANGLE compiles the program's HLSL inside the link. The surface fragment held 24 inlined
+  copies of `noise()` (five ripple layers, five capillary octaves, six whitecap, four surf, two foam layers, grain, the
+  wind patch), 26 of `skyTap()` (five taps in each of `skyLobe()`'s call sites) and two `refractionBisect()` call
+  sites. Offline `fxc` (ps_5_0) on ANGLE's own HLSL: 6,000 instruction slots, 114 samples, 92 sincos; stubbing `noise()`
+  alone halved the slots and the compile time, while `[loop]` on every existing loop only took it to 5,958 (the old
+  loops were not the cost). The 18 loops the first note blamed were not it.
+- **Fix:** each repeated call sits once in a loop over an array of its arguments, every argument written out as before,
+  and the loop's bound is `waterLoops(n)` = n + `frame.sea.z`, a frame uniform lane Water always leaves 0, so no compiler
+  can count it (the rule of KB-COMPAT-FXCTIME1). The sums around the calls keep their written order. A ripple layer and
+  a capillary octave are split around their noise (`rippleAt`/`rippleSlope`, `shortOctaveAt`/`shortOctaveSlope`), each
+  half called with the layer's literal arguments: a first version read the octaves' wavenumbers from a table, so
+  `k/3.77` and `9.81/k` were divided at run time where the literal had been folded, and 84 of 307,200 bytes of a sea
+  frame came out 1/255 apart on WebGPU; a ripple loop that summed its weighted layers in the loop moved one byte on the
+  layer (multiply and add no longer fused the same way). `refractionCrossing` has one `refractionBisect` call site.
+  After: 7 `noise()`, 5 `skyTap()`, 1 `refractionBisect()` sites; offline fxc of the first, table-driven version
+  (same call sites) 3,175 slots, 42 samples, 36 sincos; the final version was not compiled offline.
+- **Numbers:** the surface program's link in the demo (`private/tools/profile.mjs`, before and after builds taking
+  turns, two rounds, workstation loaded): 6.44 and 6.76 s before, 3.19 and 2.97 s after; all eight programs 12.1 to
+  8.9 s. Standalone link of the module (shader disk cache off, minimum of two): 4.5 to 8.8 s before, 3.1 to 3.2 s
+  for the first, table-driven version. The fragment's inlined size under the corpus gate's model (`scripts/support/wgsl-inline.mjs`) went from
+  251,507 to 157,264 characters (KB-CORPUS-OPTICS1). `controls.mjs ten-thousand-trees` passes on both backends
+  (WebGL2: ok in 119 and 138 s; one run while GPU tests ran beside it reported a page script over 15 s).
+- **Same output:** three scenes (an HDR-sky sea, a plain sea, a refracting beach with surf) rendered with the old and
+  new builds on one page are byte for byte the same on WebGPU and on the WebGL2 layer over ANGLE Direct3D 11 (RTX
+  A6000); the old build against a copy of itself is also identical on both, so the check is deterministic.
+- **Still open:** Water creates its pipeline with the synchronous `createRenderPipeline`, so the link blocks the page;
+  the surface writes three colour outputs, so ANGLE's Direct3D 11 back end compiles it again at its first draw
+  (KB-COMPAT-LOSTWHY1) and LINK_STATUS shows about half the cost. Async readiness (`createRenderPipelineAsync`, on the
+  layer `KHR_parallel_shader_compile`) is not done.
+- **Regression:** `packages/water/test/surface-copies.browser.mjs` (fragment call sites and unrolled copies of
+  `noise`, `skyTap` and `refractionBisect`; fails on the old build with 24, 26 and 2 sites).
+- **Sources:** Microsoft, "for statement (HLSL)", https://learn.microsoft.com/windows/win32/direct3dhlsl/dx-graphics-hlsl-for;
+  ANGLE, UnrollFlatten_test.cpp, https://chromium.googlesource.com/angle/angle.git/+/HEAD/src/tests/compiler_tests/UnrollFlatten_test.cpp;
+  ANGLE group, "Solving slow compilation of long loops with texture sampling", https://groups.google.com/g/angleproject/c/0zfeMdGzzyQ;
+  Dawn, "HLSL: force FXC to never unroll loops" and its revert, https://dawn.googlesource.com/tint/+/11d09f2fe7c006b78f7319e876e4ced43f0c1a60;
+  ANGLE, HLSLCompiler.cpp (its X3531/X4014 retries). The link times were measured here.
+- **Also fixed here:** `packages/water/test/whitecaps.browser.mjs` counted `RangeError`s from `setWhitecaps`, which has
+  thrown the documented MargoError `'unsupported'` since a62634a9bf, and `water.test.js` read the ripple turns from
+  `rippleSlope(p,...)` calls; both now read what the code does.
 
-### Open 2026-11-28: a reuleaux drive rig sits 0.6 to 0.7 mm off its exact centre (KB-PHYS-REULEAUXWALLS1, physics solver)
+### Open 2026-11-28: a reuleaux drive rig sits up to 0.1 mm off its exact centre, 0.3 mm between samples (KB-PHYS-REULEAUXWALLS1, physics solver)
 
 - **Repro:** `reuleauxRig` of `@margoengine/machinery/rigs` (landed in 267729b7bd): a convex-hull Reuleaux triangle of 64
   points per arc between four fixed walls at zero clearance, its turn locked to the input, sits 0.6 to 0.7 mm off the
   exact centre over a 456 mm travel. More substeps, more iterations, the high-fidelity tier and zero friction gave at best
   0.52 mm; a 24-point hull measured 0.16 mm.
-- **Cause:** not found yet. The leads are the four walls at zero clearance, a contact set that holds more rows than the
-  triangle has freedoms, and how a hull's face count moves where its contact points sit (a finer hull reads worse).
-  Physics lane.
+- **Measured again 2026-11-28 on `main` (the 0.6 to 0.7 mm above is stale):** over two turns in 2 degree 60 Hz steps the
+  64-point hull's worst gap is 9.8e-5 m read every 3 degrees and 3.0e-4 m at any step; the 24-point hull reads 1.5e-4 m
+  and 1.8e-4 m. Driven to 45 degrees and left for 300 steps it settles to 7.8e-6 m, so the offset is made while the
+  triangle moves and is not a resting state.
+- **Cause:** not found yet. Ruled out: the allowed penetration (0 to 2e-4 m reads the same) and the hull build (all 192
+  and 72 outline points are kept, no faces merged). It is not KB-PHYS-SARRUSLOOP1's cut: the rig has one joint and no
+  path. The lead: the box-against-hull contact may take the normal of a hull facet (0.94 degrees a facet at 64 points)
+  where the wall's own normal is exact, so four contacts push a little sideways as the facets pass. Physics lane.
 
 ### Open 2026-11-28: a Sarrus linkage's loop error grows as it moves and stays when it stops (KB-PHYS-SARRUSLOOP1, physics solver)
 
@@ -16543,16 +16602,37 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `sarrusPose` reads 2.2e-5 m at 49 degrees, 3.4e-4 at 56, 2.1e-3 after 73 and back to 30, 3.4e-3 back at 48, and holds
   each figure unchanged for 300 steps at rest. The error is four of the five hinges pulled apart along their links by the
   same amount (2.6 mm each at the end), with every turning row within 2e-7 rad.
-- **Cause (found 2026-11-28, not fixed):** the loop runs from the fixed base to the kinematic crank, so it is one path
-  of five joints, 25 lock rows on 24 freedoms, solved exactly (share 1). Higham's stop drops one row, always the same one:
-  axis 4 of the base hinge, the last joint of the path, as pivoting only chooses among a joint's own columns. What is left
-  is still close to singular in the loop's direction, so the pushing pass asks for turns far past what it closes: the
-  push asked up to 4.2 (the sum of the largest rows) and `push_share` (Buss and Kim 2005's clamp, TURN) cut it to as
-  little as 7e-7 of itself. Cutting the whole push also cuts the part of it that would close the links, so the stretch made by
-  each move (second order in the step, as the rows turn) is never taken back. The fix is the one Buss and Kim name for
-  this: damp each singular direction apart (selectively damped least squares, or damped least squares on the path's
-  factors, Wampler 1986, Nakamura and Hanafusa 1986), so a near dependent direction asks little and the rest closes whole.
-  Physics lane.
+- **Cause (corrected 2026-11-28, fix built, not landed):** not the near singular push the first note named. `push_share`
+  (`kernel/src/joints.rs`) adds what the joint before gave a shared body (`carried`) to what this joint gives it. Where a
+  joint's body A goes on along the path and its body B came before, it wrote this joint's gain on A into `carried` and
+  then read that as the joint before's gain on B. The Sarrus path runs J0 J1 J4 J3 J2 and J4 and J3 are that way round,
+  so the deck and a knee each read 2,800 rad/s (two hinge gains that cancel, added to each other) and the push was cut to
+  1e-4 to 1e-6 of itself every substep. The pivot at 4.5e-5 of its row is real and harmless: it scales with I / (m L^2).
+- **Measured with the fix (five lines, reading `carried` before it is replaced), on a held-back build:** the gap at rest
+  1.2e-7 to 1.6e-7 m (was 3.4e-3 and growing), the worst while driven 2 degrees a step 1.44e-5 m (was 2.4e-3). A kernel
+  test of the loop is written (`sarrus_loop.rs`, worst 2.2e-5 m at 49 degrees without the fix).
+- **Why it is not landed:** the wrong sum was also hiding a second defect, which the replay scene shows
+  (`kernel/tests/replay.rs`: 48 to 96 random bodies, 24 random joints with anchors up to metres apart, bodies moved by
+  hand, 10,000 steps). Fastest spin, and body-steps past 1,000 rad/s, over the whole run:
+
+  | Build | Block solver, levels on | Sweeps, levels on | Block solver, levels off | Sweeps, levels off |
+  | --- | --- | --- | --- | --- |
+  | `main` | 273 rad/s, 0 | 4,431 rad/s, 593 | 284 rad/s, 0 | 586 rad/s, 0 |
+  | fix alone | 5,965 rad/s, 1,239 | 4.4e8 rad/s at step 1948, then NaN and the world stops | 289 rad/s, 0 | 858 rad/s, 0 |
+  | fix and a damped push | 2,401 rad/s, 609 | 1,703 rad/s, 725 | 777 rad/s, 0 | 261 rad/s, 0 |
+
+  "Levels" are the islands' own substep levels (`adaptive_substeps`). With them off no build passes 1,000 rad/s; with
+  them on `main` already does in the sweeps run. The median gap of the scene's sliding locks, levels on, block solver:
+  5.3e-2 m on `main`, 3.5e-3 m with the fix, 2.7e-2 m with the fix and the damped push; mean kinetic energy 1.4e4, 3.3e4
+  and 4.0e4 J. So the fix holds the joints closer and the scene carries more energy: not yet a state that can be called
+  more correct. The path that starts the run-away is a chain from a fixed body through three bodies (a ball joint with its
+  anchors 4.5 m apart, a ball joint 1.7 m apart, a weld 0.5 m apart): errors no push can close, asked for again every
+  substep. The lead, not proven: the turn bound (TURN, 0.2 rad) is per substep, an island that spins is given up to 128
+  substeps a step, so what the relaxing pass leaves of a cut push grows with the level it raises. The damped push
+  (Levenberg 1944, Marquardt 1963, Wampler 1986, Nakamura and Hanafusa 1986: (K + mu^2 D) x = b on the path's factors,
+  taken only where the exact push breaks the bound) is built and stops the NaN, and does not remove the spin.
+  Next: bound what a cut push leaves in the speeds across substep levels, then land the fix with the replay figures.
+  The access violation that followed the NaN was a separate bug, fixed (KB-PHYS-RETIREDPAIR1). Physics lane.
 
 ### Open 2026-11-28: a ball on a spinning hinge settles off its balance in proportion to its inertia (KB-PHYS-SPINBIAS1, physics solver)
 
@@ -16701,7 +16781,9 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
 - **Repro:** the same class as KB-PHYS-COUPLINGDRIFT1, on `coupleDofs` (kind COORDS): its error is `error + speed * h`
   each substep in `track_couplings`, so over long runs its two joint coordinates part from the ratio by the f32 rounding
-  of the poses. Not measured yet.
+  of the poses. Measured 2026-11-28 on `main`: an arm three hinges deep with `coupleDofs(..., { ratio: 2 })` on its second
+  and third, spun by two torque impulses with no gravity, reads |q2 + 2 q3| of 4.3e-7 rad at 1.5 s, 4.5e-4 at 10 s,
+  7.5e-3 at 60 s and 0.11 rad at 600 s; the worst over the ten minutes is 0.88 rad.
 - **Cause:** the row's two coordinates are a hinge angle or a slide of each child in its parent's frame, which the row
   does not read from the poses. The fix is to read them as the joint's own measure does (`joint_measure`). Physics lane.
 
@@ -28940,6 +29022,20 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
 - **Still open:** the other staged programs (`hit`, `shadow`, an unlabeled one) still take minutes cold on Direct3D
   11, so the 120 s `renderImage` signal with the disk cache off is not yet met. Next: the same loop-bound treatment
   for `pbrVisible`'s alpha reads and the traversal loops in `hit` and `shadow`, proven by the same counts.
+- **Measured 2026-11-28 (lane A):** `MARGO_COMPAT=1 node packages/voxel-pathtracer/tests/mesh-pbr-lobes-browser.mjs`
+  (Edge, ANGLE Direct3D 11, a fresh profile each run, so cold) passes, but its first image arrives 314 s after
+  `ready`; later images and the ANGLE Vulkan leg take under a second. The draw-time compiles of four 7-output programs
+  hold it: 74 to 173 s each by the first-draw wait. Binding the framebuffer before `linkProgram`, or declaring the
+  outputs as one array, leaves the link at about 1 s and the first draw as long (ANGLE links against one output either
+  way), so the cost cannot be moved to the parallel link. Inlined statements of the surface program: 21,211, of which
+  the layer's storage-word loads are 15,596 (1,114 copies). Fixed in part: `triangleNormal` calls `meshWorldNormal`
+  once (it was in both branches), the dielectric side test takes the triangle normal once (`triangleWrongSide`), and
+  the tangent frame reads `meshWorld` once per branch. Surface program 21,211 to 18,425 statements, paired offline fxc
+  144.2 to 106.5 s; emitter program 79.6 to 75.2 s. Same output: 122 GPU readbacks of `test:gpu:mesh-pbr`,
+  `mesh-deform`, `mesh-attributes` and `mesh-pbr-lobes` hash the same before and after (native WebGPU, repeatable run
+  to run). Regression: `packages/voxel-pathtracer/tests/mesh-pbr.test.js` "the mesh helpers compute each hit value
+  once per call site (KB5451)". Still open: the cold first image is far above 120 s; next are the 941 storage loads
+  (meshX 19 copies of 12 loads, pbrVertex 21, rowAt 27, meshCorner 27) and the two pbrMapNormal copies.
 - **Sources:** Microsoft, "Function Declaration Syntax" (HLSL `inline` is the default; one copy of the body per call),
   https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-function-syntax ; Microsoft,
   "for Statement" (`loop` keeps flow control, `unroll` copies the body; without an attribute the compiler unrolls
@@ -31930,7 +32026,10 @@ reproduced `EBUSY` and the live server/worker ports; the repaired seven-test fil
   estimates, and two independent unbiased renderers agree pixel for pixel only in the limit of infinite samples. The
   rival run that is missing is a reference corpus rendered in MagicaVoxel itself (outside this repository): the `_sss`
   block at three or more densities, colours and sun angles with a view of its side faces (the model question of KB1673 above), glass over a lit floor at two or more IORs, and the atmosphere at its `_atm`
-  settings, each at the highest sample count it allows, with the file and settings saved beside the image. With that
+  settings, each at the highest sample count it allows, with the file and settings saved beside the image. The official
+  0.99.7.2 win64 build named in `results/batch-99-parity-gamma-20261109.json` is on the workstation, and
+  `packages/voxel-pathtracer/tests/magicavoxel/parity-fixtures.cjs` writes the scenes; the renders are made by hand
+  in its Render view (docs/whitepaper/reproduce.md, "Batch 99 parity gamma regression"), not by any script here. With that
   corpus the transport can be compared per setting; a zero-error match still needs Scott to state whether the oracle
   means equal expected values (a statistical bound against the reference's own noise) or equal pixels, which no
   renderer can give against another's samples. Job 2's bar, a noise-free disocclusion, asks a finite first-frame
@@ -32683,9 +32782,9 @@ voxel path tracer is excluded on this hardware (hardware check).
   `createShaderModule` (`scripts/support/wgsl-corpus.mjs`, `origin`), so the three modules are attributed to `shader`
   and `core` (label `shader:raw:optics screens:*`). Any package that draws only through `RawShaderMaterial` is
   uncovered the same way. Fix belongs in the recorder (an attribution that survives the lazy compile), with a test.
-- **Cause, water:** not traced. The corpus on disk (recorded 2026-11-27) holds water modules under the bound; the
-  modules water creates today are new sources over it, so a water shader change since then grew the fragment's inlined
-  call tree past the bound.
+- **Cause, water:** the surface fragment's repeated `noise()` and `skyTap()` calls (KB-WATER-GL2LINK1, fixed
+  2026-11-28): the base fragment went from 251,507 to 157,264 characters inlined. The optics variants are not
+  re-measured until the corpus is recorded again.
 - **Left:** both fixes, then `npm run record:wgsl-corpus` in full. Found by lane A, 2026-11-28; not fixed.
 
 ### Fixed 2026-11-28: local CI kept CRLF copies of files whose .gitattributes rule became -text or eol=lf (local CI runner, KB-CI-EOL-STALE1)
