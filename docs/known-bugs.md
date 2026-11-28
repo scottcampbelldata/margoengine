@@ -18,6 +18,28 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   (`inner`, `innerFade`). 98.6 percent covered; the whole-scene frames read as a meadow.
 - **Regression:** `packages/biomes/tests/meadow-grass-check.mjs` (real GPU).
 
+### Open 2026-11-28: Puddles and Snow leave `@margoengine/materials` surfaces dry (KB-WEATHER-MATERIALSWET1, weather, materials)
+
+- **Repro:** Last Tram (`examples/showcase-films/last-tram.js`) with `Puddles.attach(engine, {wetness: 0.98, rain:
+  0.72, coverage: 0.39})`: the core `PbrMaterial` ground darkens, holds puddles and rain rings, while the asphalt
+  strips, platform and ballast drawn with `Material` from `@margoengine/materials` keep their dry colour and roughness,
+  so the film has to set a wet-looking roughness on them by hand.
+- **Cause:** `SurfaceHook` (`packages/weather/src/scene-patch.ts`) patches only core's mesh shader, at the top of its
+  `fragment` function; the materials package builds its own WGSL (`built-material.ts`), which has no surface hook for
+  the weather entries to patch, so `weather_puddle_surface` and the snow cover never run there.
+- **Fix needed:** a surface hook in the materials package's built shader (colour, roughness, metalness and normal
+  before lighting, with the world position) that `SurfaceHook` patches as it does core's, on WebGPU and the WebGL2
+  layer, with a GPU test that a wet `Material` matches a wet `PbrMaterial` of the same inputs.
+
+### Fixed 2026-11-28: no showcase film soundtrack could be built (KB-FILM-MIXIMPORT1, examples)
+
+- **Repro:** `node examples/showcase-films/mix.mjs last-tram` failed with ERR_MODULE_NOT_FOUND.
+- **Cause:** `mix.mjs` imported `createMix` and `peakDb` from `examples/demo-audio/mix.mjs`, a module that never
+  reached `main`.
+- **Fix:** the mix bus lives beside the film scripts in `examples/showcase-films/audio-mix.mjs`. Regression:
+  `examples/showcase-films/tests/audio-mix.test.mjs` checks that every relative import of the film scripts resolves
+  and that the bus places, pans and limits a cue.
+
 ### Fixed 2026-11-28: liquid and underwater fog over the empty part of a transparent canvas were see-through (KB-WATER-LIQUIDALPHA1, water)
 
 - **Repro:** `packages/post/test/alpha-rim-browser.mjs` on a `TransparentCanvas`: through the middle of a dense 0.8 m

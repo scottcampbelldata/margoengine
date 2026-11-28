@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
-import { createMix, peakDb } from '../demo-audio/mix.mjs';
+import { createMix, peakDb } from './audio-mix.mjs';
 
 const film = process.argv[2];
 const output = process.argv[3];
