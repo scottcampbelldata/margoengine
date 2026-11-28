@@ -31,3 +31,4 @@ export {
   type TiledPlaneOptions,
   type TiledBoxOptions,
 } from './tiled.js';
+export { trussGeometry, type TrussOptions, type TrussPattern } from './truss.js';

@@ -72,7 +72,7 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `computeVertexNormals`, `toNonIndexed`, `applyMatrix4`, `center`, `computeBoundingBox`, `computeBoundingSphere`: pure functions returning new data |
 | `edgesGeometry`, `wireframe` (line index pairs) |
 | `loopSubdivide` |
-| `roundedBoxGeometry`, `convexGeometry`, `parametricGeometry`, `decalGeometry` from `@margoengine/geometry/extras` |
+| `roundedBoxGeometry`, `convexGeometry`, `parametricGeometry`, `decalGeometry`, `trussGeometry` from `@margoengine/geometry/extras` |
 | `NurbsCurve`, `NurbsSurface`, `nurbsSurfaceGeometry`, `nurbsCircle`, `nurbsRevolve` from `@margoengine/geometry/nurbs` |
 | `MeshSurfaceSampler` from `@margoengine/geometry/sample` |
 | `CurveFlow`, `flowGeometry` from `@margoengine/geometry/flow` |
@@ -114,10 +114,35 @@ const wallGeometry = roundedBoxGeometry(4, 3, 0.2, 1, 0), wallMatrix = [1, 0, 0,
 const sticker = decalGeometry(wallGeometry, wallMatrix, [0, 1, 0.1], [0, 0, 0, 1], [0.5, 0.5, 0.2]);
 ```
 
+A lattice girder, the welded box-section truss of a crane mast or jib, a radio mast or a stage truss, is one call and
+one mesh:
+
+```ts
+import {Engine, PbrMaterial} from 'margoengine/core';
+import {trussGeometry} from 'margoengine/geometry/extras';
+import {toGeometry} from 'margoengine/geometry/utils';
+const engine = await Engine.create(document.querySelector('canvas')!);
+// A 2 m mast of 8 Warren panels, then a jib that tapers to 40 percent, laid along +X.
+const mast = trussGeometry({length: 2, width: 0.24, bays: 8, chordRadius: 0.012});
+const jib = trussGeometry({length: 1.6, width: 0.16, depth: 0.2, bays: 10, taper: 0.4, pattern: 'pratt'});
+const red = new PbrMaterial({color: '#b5432b', roughness: 0.45});
+engine.createMesh().setGeometry(toGeometry(mast)).setMaterial(red);
+engine.createMesh().setGeometry(toGeometry(jib)).setMaterial(red).setPosition([0, 2, 0]).setQuaternion([0, 0, -Math.SQRT1_2, Math.SQRT1_2]);
+engine.start();
+```
+
 - `roundedBoxGeometry(width, height, depth, segments = 2, radius = 0.1)`: every edge and corner is rounded; the radius
   is clamped to half the smallest side, and half of every side gives a sphere. Each rounded edge is split between the
   two faces that meet there and both compute their shared vertices from the same numbers, so there are no cracks. An
   odd `segments` gets one extra facet so a vertex sits on the 45-degree seam.
+- `trussGeometry(options)`: a box-section lattice girder along +Y from 0 to `length` (1), `width` (0.2) along X and
+  `depth` (`width`) along Z between chord centres, `bays` panels (length over the larger side, rounded). Four corner
+  chords of `chordRadius` (6 percent of the smaller side), battens at every panel point (`battens`, true) and diagonals
+  of `lacingRadius` (60 percent of the chord) on each face, in a `pattern` named as structural texts name them:
+  `'warren'` zigzag, `'pratt'` all one way or `'x'` crossed (Hibbeler, *Structural Analysis*, chapter 3, trusses).
+  `taper` (1) scales the section at the top end for jibs; `radialSegments` (8) sides per member. Every member is a capped
+  `cylinderGeometry` merged into one `GeometryData`; members meet at the panel points without joint geometry. Chords that
+  would overlap, a non-positive size or a bad count throw `RangeError`.
 - `convexGeometry(points)`: quickhull (Barber, Dobkin and Huhdanpaa 1996) with a tolerance scaled to the coordinates.
   Duplicates and points inside or on a face or edge are dropped; coplanar triangles merge into one flat face with one
   normal. UVs project each face onto the bounding-box side it faces. Fewer than four points, or points that do not

@@ -75,6 +75,21 @@ export interface TiledPlaneOptions {
     backUVs?: readonly [number, number, number, number];
 }
 
+export interface TrussOptions {
+    length?: number;
+    width?: number;
+    depth?: number;
+    bays?: number;
+    chordRadius?: number;
+    lacingRadius?: number;
+    pattern?: TrussPattern;
+    battens?: boolean;
+    taper?: number;
+    radialSegments?: number;
+}
+
+export type TrussPattern = 'warren' | 'pratt' | 'x';
+
 export function convexGeometry(points: ArrayLike<number> | readonly ArrayLike<number>[]): GeometryData;
 
 export function decalGeometry(target: GeometryData, matrix: ArrayLike<number>, position: ArrayLike<number>, orientation: ArrayLike<number>, size: ArrayLike<number>, options?: DecalGeometryOptions): GeometryData;
@@ -104,6 +119,8 @@ export function roundedBoxGeometry(width?: number, height?: number, depth?: numb
 export function tiledBoxGeometry(options?: TiledBoxOptions): GeometryData;
 
 export function tiledPlaneGeometry(options?: TiledPlaneOptions): GeometryData;
+
+export function trussGeometry(options?: TrussOptions): GeometryData;
 
 // Not exported from this entry, but used by the exports above:
 
