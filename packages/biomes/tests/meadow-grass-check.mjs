@@ -1,5 +1,6 @@
 // Real-GPU proof of KB-BIOMES-SPARSEGRASS1 (run from the repository root after building packages):
 //   node packages/biomes/tests/meadow-grass-check.mjs
+//   MARGO_COMPAT=1 node packages/biomes/tests/meadow-grass-check.mjs   (the WebGL2 compatibility layer)
 // A BiomeView meadow seen from eye height must read as a sward, not tufts on bare ground. Before the fix its grass was
 // a three-blade clump mesh at the 400,000 candidate cap over the 240 m detail square, about 7 clumps a square metre:
 // from 0.9 m up, grass covered 11.3 percent of the ground below the horizon and the soil showed between the tufts (RTX
@@ -56,13 +57,18 @@ await runSuite(
         window.meadow = { engine, grass, errors };
         engine.render({ delta: 1 / 60 });
         await engine.gpu.queue.onSubmittedWorkDone();
-        return grass.map((s) => ({ count: s.options.count, area: s.options.area, inner: s.options.inner ?? 0 }));
+        return {
+          layer: globalThis.__margoCompat === true,
+          grass: grass.map((s) => ({ count: s.options.count, area: s.options.area, inner: s.options.inner ?? 0 })),
+        };
       },
       [W, H],
     );
+    // A forced-compatibility run must really draw on the WebGL2 layer.
+    assert.equal(info.layer, context.hardware?.compat === true, 'the page draws on the device the run asked for');
     // Two GrassScatter layers for the one grass detail: the dense near square and the field across detailRadius.
-    assert.equal(info.length, 2, `grass layers: ${JSON.stringify(info)}`);
-    const [field, near] = info;
+    assert.equal(info.grass.length, 2, `grass layers: ${JSON.stringify(info.grass)}`);
+    const [field, near] = info.grass;
     assert.equal(near.area[0], 40, 'the near layer covers 20 m around the camera');
     assert.ok(near.count / near.area[0] ** 2 >= 100, `near clumps a square metre: ${near.count / near.area[0] ** 2}`);
     assert.equal(field.inner, 16, 'the field starts where the near layer shrinks out');
@@ -103,7 +109,7 @@ await runSuite(
     assert.deepEqual(pageErrors, []);
     assert.ok(covered >= 0.95, `grass covers ${(covered * 100).toFixed(1)} percent of the ground below the horizon`);
     console.log(
-      `ok meadow grass: ${(covered * 100).toFixed(1)} percent of the ground covered; near layer`,
+      `ok meadow grass${info.layer ? ' (WebGL2 layer)' : ''}: ${(covered * 100).toFixed(1)} percent of the ground covered; near layer`,
       near.count / near.area[0] ** 2,
       'clumps a square metre',
     );
