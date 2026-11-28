@@ -14,6 +14,7 @@ import { checkVec, type Quat, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
 import { planPlaneCut, type SlicePlan, TETRA_EDGES } from './soft-plane-cut.js';
 import { makeCutPieces } from './soft-plane-pieces.js';
+import { type SoftVent, type SoftVentOptions, ventStep, ventThrust } from './soft-vent.js';
 import {
   bindSkin,
   boundaryTriangles,
@@ -1197,6 +1198,20 @@ export interface SoftMembrane {
   readonly shearModulus: number;
   /** The sheet's rest thickness in metres. */
   readonly thickness: number;
+  /**
+   * The stretch at which the sheet bursts (default none, it never does): once a triangle's greater principal stretch reaches
+   * it, the sheet tears there, its gas goes, and {@link SoftBodies.onBurst} reports it. Above 1.
+   */
+  readonly burstStretch?: number;
+}
+
+/** Reported once a step bursts a membrane ({@link SoftMembrane.burstStretch}). */
+export interface SoftBurstEvent {
+  body: SoftBody;
+  /** The triangles that tore, as `body.triangles()` numbers them (three particle indices each). */
+  triangles: number[];
+  /** The fill's absolute pressure in Pa the moment before it burst. */
+  pressure: number;
 }
 
 /** What `debugRender` draws of soft bodies (see {@link SoftBodies.debugRender} and {@link SoftBody.debugRender}). */
@@ -1269,6 +1284,7 @@ export class SoftBodyDesc {
   /** @internal */ volumeFactor: number | null = null;
   /** @internal */ gas: SoftGasPressure | null = null;
   /** @internal The membrane's shear modulus times its thickness, N/m (SoftVolumeOptions.membrane); 0 for none. */ membrane = 0;
+  /** @internal The membrane's burst stretch, or null. */ burstStretch: number | null = null;
   /** @internal */ groups: number | undefined = undefined;
   /** @internal */ selfContacts = false;
   /** @internal */ selfFriction = 0;
@@ -1804,6 +1820,8 @@ export class SoftBodyDesc {
         throw volumeError('membrane is {shearModulus, thickness}, in Pa and metres.');
       positive(membrane.shearModulus, 'membrane.shearModulus (Pa)');
       positive(membrane.thickness, 'membrane.thickness (metres)');
+      if (membrane.burstStretch !== undefined && !(membrane.burstStretch > 1 && Number.isFinite(membrane.burstStretch)))
+        throw volumeError(`membrane.burstStretch must be a finite stretch above 1 (got ${membrane.burstStretch}).`);
     }
     const desc = SoftBodyDesc.trimesh(welded.positions, welded.triangles)
       .setShapeMatching(false)
@@ -1818,6 +1836,7 @@ export class SoftBodyDesc {
       desc.edgeKinds = [];
       desc.edgeShear = [];
       desc.membrane = Math.fround(membrane.shearModulus * membrane.thickness);
+      desc.burstStretch = membrane.burstStretch ?? null;
       if (!(desc.membrane > 0 && Number.isFinite(desc.membrane)))
         throw volumeError('membrane.shearModulus times membrane.thickness must be a finite positive float32 (N/m).');
     }
@@ -2765,6 +2784,8 @@ export class SoftBody {
   /** @internal Whether its surface holds a volume, and the volume at rest. */ volumeOn = false;
   /** @internal A membrane's mu H (N/m, 0 for none) and per triangle its rest shape's inverse (4) and rest area. */ membrane = 0;
   /** @internal */ membraneRest: Float32Array = new Float32Array(0);
+  /** @internal */ burstStretch: number | null = null;
+  /** @internal Its open vents (openVent). */ vents: SoftVent[] = [];
   /** @internal The water a closed body displaced at its last step in `SoftBodies.water`, m^3. */ displaced = 0;
   /** @internal */ surfaceRest = 0;
   /** @internal */ canSleepFlag = true;
@@ -3067,6 +3088,72 @@ export class SoftBody {
   gasState(): SoftGasState | null {
     this.check();
     return this.owner.gasState(this);
+  }
+
+  /**
+   * Opens a hole in a gas shell at a particle: every step the gas leaves through it as an ideal gas through an orifice
+   * (choked above a pressure ratio of 1.89 for air), taken down by `dischargeCoefficient`, and the jet pushes the shell back
+   * at the particle against its outward normal, so a loose balloon flies. The shell's gas stays at one temperature. Vents of
+   * one body share its gas's `gasConstant`, `temperature` and `heatCapacityRatio`. Returns the vent's number.
+   * @throws MargoError (`unsupported`) for a body that holds no gas or an option out of range.
+   */
+  openVent(options: SoftVentOptions): number {
+    this.check();
+    if (this.owner.gasState(this) === null)
+      throw volumeError(
+        'A vent lets gas out of a gas shell; give the body a pressure (SoftVolumeOptions.pressure) first.',
+      );
+    const {
+      particle,
+      area,
+      dischargeCoefficient = 0.61,
+      gasConstant = 287.05,
+      temperature = 293.15,
+      heatCapacityRatio = 1.4,
+    } = options ?? ({} as SoftVentOptions);
+    if (!Number.isInteger(particle) || particle < 0 || particle >= this.particles)
+      throw volumeError(`A vent's particle must be one of the body's (0 to ${this.particles - 1}); got ${particle}.`);
+    const above = (value: number, least: number, name: string): void => {
+      if (!(value > least) || !Number.isFinite(value))
+        throw volumeError(`${name} must be a finite number above ${least} (got ${value}).`);
+    };
+    above(area, 0, 'A vent area (m²)');
+    above(dischargeCoefficient, 0, 'dischargeCoefficient');
+    if (dischargeCoefficient > 1) throw volumeError(`dischargeCoefficient is at most 1 (got ${dischargeCoefficient}).`);
+    above(gasConstant, 0, 'gasConstant (J/(kg K))');
+    above(temperature, 0, 'temperature (K)');
+    above(heatCapacityRatio, 1, 'heatCapacityRatio');
+    const vent: SoftVent = { particle, area, dischargeCoefficient, gasConstant, temperature, heatCapacityRatio },
+      first = this.vents[0];
+    if (
+      first &&
+      (first.gasConstant !== gasConstant ||
+        first.temperature !== temperature ||
+        first.heatCapacityRatio !== heatCapacityRatio)
+    )
+      throw volumeError(
+        'The vents of one body let out one gas: give each the same gasConstant, temperature and heatCapacityRatio.',
+      );
+    this.vents.push(vent);
+    return this.vents.length - 1;
+  }
+
+  /** Closes every vent of the body. */
+  closeVents(): this {
+    this.check();
+    this.vents = [];
+    return this;
+  }
+
+  /** The body's open vents, as {@link SoftBody.openVent} resolved them. */
+  openVents(): readonly SoftVent[] {
+    return this.vents.map((vent) => ({ ...vent }));
+  }
+
+  /** Whether its membrane has burst ({@link SoftMembrane.burstStretch}). */
+  isBurst(): boolean {
+    for (let k = 4; k < this.membraneRest.length; k += 5) if (this.membraneRest[k] === 0) return true;
+    return false;
   }
   /** @internal The spring of a woven sheet's thread, or null for an edge that is none of them. */
   threadSoftness(edge: number): SoftSoftness | null {
@@ -3575,6 +3662,7 @@ type Columns = Record<string, Float32Array>;
 export class SoftBodies implements PhysicsAttachment {
   private readonly bodies: SoftBody[] = [];
   private readonly listeners = new Set<(event: SoftTearEvent) => void>();
+  private readonly burstListeners = new Set<(event: SoftBurstEvent) => void>();
   private view: Columns | null = null;
   private viewBuffer: ArrayBuffer | null = null;
   private capacity = [0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -3754,6 +3842,11 @@ export class SoftBodies implements PhysicsAttachment {
   onTear(listener: (event: SoftTearEvent) => void): () => void {
     this.listeners.add(listener);
     return () => void this.listeners.delete(listener);
+  }
+  /** Calls `listener` after a step that burst a membrane ({@link SoftMembrane.burstStretch}); returns a function that stops it. */
+  onBurst(listener: (event: SoftBurstEvent) => void): () => void {
+    this.burstListeners.add(listener);
+    return () => void this.burstListeners.delete(listener);
   }
   /** A number that changes whenever any particle moves: equal across two runs that did the same. */
   hash(): number {
@@ -4104,6 +4197,7 @@ export class SoftBodies implements PhysicsAttachment {
     if (desc.membrane > 0) {
       body.membrane = desc.membrane;
       body.membraneRest = membraneRest(desc.positions, desc.triangles);
+      body.burstStretch = desc.burstStretch;
     }
     body.selfThickness = Math.min(radius, half);
     body.dominance = desc.dominance;
@@ -5328,6 +5422,7 @@ export class SoftBodies implements PhysicsAttachment {
       this.waterAccel.fill(0);
     }
     this.applyForces(this.columns(), dt);
+    this.vent(dt);
     const h = dt / this.substeps,
       g = this.physics.gravity,
       rows = new Map<number, number>(),
@@ -5445,6 +5540,7 @@ export class SoftBodies implements PhysicsAttachment {
       this.report(c);
     }
     if (this.tensileFractures.size > 0) this.openTensileFractures();
+    this.burstMembranes();
     this.tearFaces();
     const live = this.columns();
     for (const body of this.bodies) if (body.surface) this.moveSurface(body, live);
@@ -6104,6 +6200,63 @@ export class SoftBodies implements PhysicsAttachment {
     c.iiyz[row] = inverse[5]!;
     c.iizz[row] = inverse[6]!;
     c.jx[row] = c.jy[row] = c.jz[row] = c.kx[row] = c.ky[row] = c.kz[row] = 0;
+  }
+
+  /**
+   * The gas that leaves through each body's vents this step (src/soft-vent.ts), at the volume the shell has now, and the
+   * push of its jets: each vent's mean thrust over the step against the surface's outward normal at its particle, on the
+   * whole shell, shared by mass, as the gas's pressure on the wall round the hole carries it, so the shell gains the jet's
+   * impulse whatever its passes leave unconverged.
+   */
+  private vent(dt: number): void {
+    for (const body of this.bodies) {
+      if (!body.vents.length) continue;
+      const state = this.gasState(body);
+      if (!state) continue;
+      const c = this.columns(),
+        row = body.handle,
+        before = c.vb_target[row]!,
+        { product, mass } = ventStep(body.vents, before, state.volume, state.ambientPressure, dt);
+      c.vb_target[row] = Math.fround(product);
+      const normals = vertexNormals(body, c),
+        mean = (before + c.vb_target[row]!) / 2 / state.volume,
+        force = [0, 0, 0];
+      body.vents.forEach((vent, k) => {
+        const push = ventThrust(vent, mean, state.ambientPressure, mass[k]! / dt),
+          n = normals[vent.particle]!;
+        for (let a = 0; a < 3; a++) force[a] = force[a]! - push * n[a]!;
+      });
+      const total = body.mass();
+      for (let i = body.firstParticle; i < body.firstParticle + body.particles; i++) {
+        if (c.w[i] === 0) continue;
+        c.ax[i] = c.ax[i]! + force[0]! / total;
+        c.ay[i] = c.ay[i]! + force[1]! / total;
+        c.az[i] = c.az[i]! + force[2]! / total;
+      }
+    }
+  }
+
+  /** Bursts each membrane stretched past its burst stretch: its gas goes and the triangles past it tear. */
+  private burstMembranes(): void {
+    for (const body of this.bodies) {
+      if (body.membrane === 0 || body.burstStretch === null || this.columns().vb_on[body.handle] !== GAS_VOLUME_MODE)
+        continue;
+      const c = this.columns(),
+        rest = body.membraneRest,
+        list = body.triangleList,
+        torn: number[] = [];
+      for (let t = 0; t < list.length / 3; t++)
+        if (rest[t * 5 + 4]! > 0 && principalStretch(c, body.firstParticle, list, rest, t) >= body.burstStretch)
+          torn.push(t);
+      if (!torn.length) continue;
+      const pressure = this.gasState(body)!.pressure;
+      for (const t of torn) rest[t * 5 + 4] = 0;
+      this.setVolume(body, null);
+      body.vents = [];
+      this.syncVolume();
+      const event: SoftBurstEvent = { body, triangles: torn, pressure };
+      for (const listener of [...this.burstListeners]) listener(event);
+    }
   }
 
   private applyForces(c: Columns, dt: number): void {
@@ -7137,6 +7290,54 @@ function spinImpulse(body: PhysicsBody, spin: Vec3): Vec3 {
 const COLLIDER_COLUMN =
   /^(c_kind|cx|cy|cz|q[xyzw]|s[xyz]|friction|lv[xyz]|av[xyz]|m[xyz]|j[xyz]|k[xyz]|wm|gs|dom|bmesh|m0[xyz]|l0[xyz]|a0[xyz]|ro[xyz]|ii(xx|xy|xz|yy|yz|zz))$/;
 
+/** Each particle's outward unit normal: the area-weighted sum of its triangles' normals. */
+function vertexNormals(body: SoftBody, c: Columns): [number, number, number][] {
+  const out: [number, number, number][] = Array.from({ length: body.particles }, () => [0, 0, 0]),
+    list = body.triangleList,
+    at = (i: number): Vec3 => {
+      const row = body.firstParticle + i;
+      return [c.x[row]!, c.y[row]!, c.z[row]!];
+    };
+  for (let t = 0; t < list.length; t += 3) {
+    const [a, b, d] = [at(list[t]!), at(list[t + 1]!), at(list[t + 2]!)],
+      u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+      v = [d[0] - a[0], d[1] - a[1], d[2] - a[2]],
+      n = [u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!];
+    for (let k = 0; k < 3; k++) {
+      const o = out[list[t + k]!]!;
+      o[0] += n[0]!;
+      o[1] += n[1]!;
+      o[2] += n[2]!;
+    }
+  }
+  for (const n of out) {
+    const length = Math.hypot(n[0], n[1], n[2]) || 1;
+    n[0] /= length;
+    n[1] /= length;
+    n[2] /= length;
+  }
+  return out;
+}
+
+/** A membrane triangle's greater principal stretch: the root of the larger eigenvalue of C = F^T F (soft-kernel membrane.rs). */
+function principalStretch(c: Columns, first: number, list: Uint32Array, rest: Float32Array, t: number): number {
+  const at = (k: number): Vec3 => {
+      const row = first + list[t * 3 + k]!;
+      return [c.x[row]!, c.y[row]!, c.z[row]!];
+    },
+    [a, b, d] = [at(0), at(1), at(2)],
+    e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+    e2 = [d[0] - a[0], d[1] - a[1], d[2] - a[2]],
+    [m0, m1, m2, m3] = [rest[t * 5]!, rest[t * 5 + 1]!, rest[t * 5 + 2]!, rest[t * 5 + 3]!],
+    f0 = [0, 1, 2].map((k) => m0 * e1[k]! + m2 * e2[k]!),
+    f1 = [0, 1, 2].map((k) => m1 * e1[k]! + m3 * e2[k]!),
+    c00 = f0[0]! * f0[0]! + f0[1]! * f0[1]! + f0[2]! * f0[2]!,
+    c11 = f1[0]! * f1[0]! + f1[1]! * f1[1]! + f1[2]! * f1[2]!,
+    c01 = f0[0]! * f1[0]! + f0[1]! * f1[1]! + f0[2]! * f1[2]!,
+    mean = (c00 + c11) / 2;
+  return Math.sqrt(mean + Math.sqrt(((c00 - c11) / 2) ** 2 + c01 * c01));
+}
+
 function rowsOf(
   name: string,
   particles: number,
@@ -7192,6 +7393,7 @@ function barycentric(a: [Vec3, Vec3, Vec3, Vec3], p: Vec3): number[] {
 export { SailForce, type SailOptions } from './sail.js';
 // Skinned cloth: the skinned mesh a cloth is held to, from a skeleton's joint matrices.
 export { type SkinBinding, type SkinnedVertices, skinVertices } from './soft-skinning.js';
+export { type SoftVent, type SoftVentOptions, ventFlow, ventStep, ventThrust } from './soft-vent.js';
 
 /**
  * How the faces of a cloth meet the air ({@link SoftBodyDesc.setAerodynamics}). Each face is a thin plate: attached flow

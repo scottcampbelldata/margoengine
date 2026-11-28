@@ -1377,6 +1377,7 @@ class SoftBodyDesc {
     volumeFactor: number | null;
     gas: SoftGasPressure | null;
     membrane: number;
+    burstStretch: number | null;
     groups: number | undefined;
     selfContacts: boolean;
     selfFriction: number;
@@ -1522,6 +1523,7 @@ interface SoftGasPressure {
 interface SoftMembrane {
     readonly shearModulus: number;
     readonly thickness: number;
+    readonly burstStretch?: number;
 }
 
 interface SoftOrthotropicFractureEnergy {

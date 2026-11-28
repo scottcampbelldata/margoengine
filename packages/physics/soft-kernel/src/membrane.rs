@@ -115,6 +115,9 @@ impl World {
             let p = [0, 1, 2].map(|c| if c == k { moved } else { self.membrane_position(self.vtri[3 * t + c] as usize) });
             let m = [self.mt_a[t] as f64, self.mt_b[t] as f64, self.mt_c[t] as f64, self.mt_d[t] as f64];
             let scale = self.vb_mu[self.pbody[i] as usize] as f64 * self.mt_area[t] as f64;
+            if !(scale > 0.0) {
+                continue;
+            }
             match corner_terms(sub(p[1], p[0]), sub(p[2], p[0]), m, [0.0, 0.0]) {
                 Some((e, _, _, _)) => energy += scale * e,
                 None => return f64::INFINITY,
@@ -176,6 +179,10 @@ impl World {
                     let an = cross(e1, e2);
                     for a in 0..3 {
                         gv[a] += an[a] / 6.0;
+                    }
+                    // A torn triangle (a burst, rest area 0) holds nothing.
+                    if !(self.mt_area[t] > 0.0) {
+                        continue;
                     }
                     let Some((_, g, q, j)) = corner_terms(e1, e2, m, coefficients) else {
                         flat = true;

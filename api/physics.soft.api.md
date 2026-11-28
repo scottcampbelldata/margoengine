@@ -274,6 +274,7 @@ export class SoftBodies implements PhysicsAttachment {
     get alpha(): number;
     list(): readonly SoftBody[];
     onTear(listener: (event: SoftTearEvent) => void): () => void;
+    onBurst(listener: (event: SoftBurstEvent) => void): () => void;
     hash(): number;
     columns(): Columns;
     cellColumns(): Columns;
@@ -424,6 +425,8 @@ export class SoftBody {
     volumeOn: boolean;
     membrane: number;
     membraneRest: Float32Array;
+    burstStretch: number | null;
+    vents: SoftVent[];
     displaced: number;
     surfaceRest: number;
     canSleepFlag: boolean;
@@ -469,6 +472,10 @@ export class SoftBody {
     setVolumeFactor(factor: number | null): this;
     setGasPressure(options: SoftGasPressure): this;
     gasState(): SoftGasState | null;
+    openVent(options: SoftVentOptions): number;
+    closeVents(): this;
+    openVents(): readonly SoftVent[];
+    isBurst(): boolean;
     threadSoftness(edge: number): SoftSoftness | null;
     get canSleep(): boolean;
     set canSleep(value: boolean);
@@ -546,6 +553,7 @@ export class SoftBodyDesc {
     volumeFactor: number | null;
     gas: SoftGasPressure | null;
     membrane: number;
+    burstStretch: number | null;
     groups: number | undefined;
     selfContacts: boolean;
     selfFriction: number;
@@ -677,6 +685,12 @@ export class SoftBodyMaterial {
     clone(): SoftBodyMaterial;
 }
 
+export interface SoftBurstEvent {
+    body: SoftBody;
+    triangles: number[];
+    pressure: number;
+}
+
 export interface SoftContact {
     readonly soft: SoftBody;
     readonly particle: number;
@@ -724,6 +738,7 @@ export interface SoftGasState {
 export interface SoftMembrane {
     readonly shearModulus: number;
     readonly thickness: number;
+    readonly burstStretch?: number;
 }
 
 export class SoftMeshBinding {
@@ -805,6 +820,24 @@ export interface SoftTensileSeam {
     readonly tearingStrain?: number;
 }
 
+export interface SoftVent {
+    readonly particle: number;
+    readonly area: number;
+    readonly dischargeCoefficient: number;
+    readonly gasConstant: number;
+    readonly temperature: number;
+    readonly heatCapacityRatio: number;
+}
+
+export interface SoftVentOptions {
+    readonly particle: number;
+    readonly area: number;
+    readonly dischargeCoefficient?: number;
+    readonly gasConstant?: number;
+    readonly temperature?: number;
+    readonly heatCapacityRatio?: number;
+}
+
 export type SoftVolumeMesh = {
     readonly vertices: ArrayLike<number>;
     readonly indices: ArrayLike<number>;
@@ -843,6 +876,15 @@ export function skinVertices(binding: SkinBinding, matrices: ArrayLike<number>, 
     positions: Float32Array;
     normals?: Float32Array | null;
 }): SkinnedVertices;
+
+export function ventFlow(vent: SoftVent, inside: number, outside: number): number;
+
+export function ventStep(vents: readonly SoftVent[], product: number, volume: number, outside: number, dt: number, pieces?: number): {
+    product: number;
+    mass: number[];
+};
+
+export function ventThrust(vent: SoftVent, inside: number, outside: number, flow: number): number;
 
 // Not exported from this entry, but used by the exports above:
 

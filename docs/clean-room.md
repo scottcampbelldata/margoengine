@@ -51,6 +51,21 @@ curvature is dropped, which is negative because J is the norm of a function affi
 until the potential falls. The tests hold a sphere to the closed form at three fills, its stiffness dp / dlambda and a
 held-out sheet near the peak (`packages/physics/tests/soft-membrane.test.js`). No code was read.
 
+### Venting and bursting soft shells (P8, SOFT-06, 2026-11-28)
+
+`SoftBody.openVent` (`packages/physics/src/soft-vent.ts`) lets a shell's gas out by the isentropic orifice flow of an ideal
+gas, subsonic below the critical pressure ratio (2 / (gamma + 1))^(gamma / (gamma - 1)) and choked above it, and the jet's
+thrust mdot u + (p_t - p_a) A_e: Ascher H. Shapiro, *The Dynamics and Thermodynamics of Compressible Fluid Flow*, vol. 1
+(Ronald Press, 1953), ch. 4, and John D. Anderson, *Modern Compressible Flow* (3rd ed., McGraw-Hill, 2003), ch. 5. The
+default discharge coefficient, 0.61, is the contraction of a free jet from a sharp-edged hole in a thin wall: G. Kirchhoff,
+"Zur Theorie freier Flüssigkeitsstrahlen", Journal für die reine und angewandte Mathematik 70 (1869), whose free-streamline
+contraction is pi / (pi + 2) = 0.611, against the 0.596 the Reader-Harris/Gallagher equation of ISO 5167-2:2003
+(*Measurement of fluid flow by means of pressure differential devices, Part 2: Orifice plates*) gives as its diameter
+ratio and inverse Reynolds number go to 0. The gas inside stays isothermal (the shell's own model, Matyka and Ollila 2003
+below), so a blowdown is the isothermal tank's: choked, p(t) = p_0 exp(-Cd A sqrt(gamma R T) (2 / (gamma + 1))^((gamma +
+1) / (2 (gamma - 1))) t / V), which the tests hold it to. A membrane bursts once a triangle's greater principal stretch,
+the root of the larger eigenvalue of C = F^T F, reaches its burst stretch. No code was read.
+
 ### Soft volumes from a mesh (P8, SOFT-04 and SOFT-06, 2026-11-27)
 
 `SoftBodyDesc.volume` (`packages/physics/src/soft.ts`, `weldMesh` in `soft-volume.ts`) welds a mesh's split vertices

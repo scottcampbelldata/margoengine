@@ -1997,6 +1997,30 @@ console.log(ball.centerOfMass(), ball.surfaceVolume());
   for (let i = 0; i < 120; i++) physics.step();
   console.log(balloon.gasState());
   ```
+- **Venting and bursting.** `body.openVent({particle, area})` opens a hole in a gas shell: the gas leaves as an ideal gas
+  through an orifice (choked above a pressure ratio of 1.89 for air, `dischargeCoefficient` default 0.61, a sharp-edged hole
+  in a thin wall), the fill's pressure falls as it goes, and the jet pushes the shell the other way, so a loose balloon flies
+  round the room; `gasConstant` (287.05 J/(kg K)), `temperature` (293.15 K) and `heatCapacityRatio` (1.4) name the gas.
+  `closeVents()` shuts them. A membrane given `burstStretch` bursts once a triangle stretches that far: the sheet tears there,
+  its gas goes and `soft.onBurst(listener)` reports it. `ventFlow`, `ventThrust` and `ventStep` are the flow laws on their
+  own.
+
+  <!-- example:node -->
+  ```js
+  import { Physics } from '@margoengine/physics';
+  import { SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+  import { sphereGeometry } from '@margoengine/geometry/primitives';
+
+  await Physics.load();
+  const physics = new Physics(null, { gravity: [0, 0, 0] });
+  const soft = await SoftBodies.attach(physics);
+  const sheet = { shearModulus: 300e3, thickness: 0.5e-3, burstStretch: 1.6 };
+  const balloon = soft.create(SoftBodyDesc.volume(sphereGeometry(0.1, 24, 16), { pressure: 150_000, membrane: sheet }));
+  soft.onBurst(({ pressure }) => console.log('burst at', pressure, 'Pa'));
+  balloon.openVent({ particle: 0, area: 2e-5 });
+  for (let i = 0; i < 120; i++) physics.step();
+  console.log(balloon.gasState()?.pressure, balloon.centerOfMass());
+  ```
 - **Anchoring.** Every `SoftBodyDesc` setting applies to the description it returns: `setPinnedParticles([i])` pins a
   particle, `setParticleKinematicTarget(i, position)` on the body drags one, `attachParticle(i, rigidBody)` ties
   one to a rigid body; `setMass`, `setVolumeFactor` (inflate or deflate), `setGravityScale`, `setAirDrag` (default on:
@@ -2019,7 +2043,7 @@ console.log(ball.centerOfMass(), ball.surfaceVolume());
   absolute pressure in Pa against the air outside, not a unitless coefficient.
 - **Limits.** The soft kernel keeps positions in float32: damped springs lose up to about 1e-3 of the body's momentum
   over a few seconds near the origin, and more far from it (KB-SOFT-F32MOMENTUM1, `docs/known-bugs.md`). A gas shell is
-  isothermal and sealed: no venting, bursting or orifice flow yet (`docs/limits.md`).
+  isothermal: a vent's flow is isentropic through the hole but the gas left inside keeps its temperature (`docs/limits.md`).
 
 ## How it works
 

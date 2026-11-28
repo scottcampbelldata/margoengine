@@ -2341,6 +2341,7 @@ class SoftBodies implements PhysicsAttachment {
     get alpha(): number;
     list(): readonly SoftBody[];
     onTear(listener: (event: SoftTearEvent) => void): () => void;
+    onBurst(listener: (event: SoftBurstEvent) => void): () => void;
     hash(): number;
     columns(): Columns;
     cellColumns(): Columns;
@@ -2491,6 +2492,8 @@ class SoftBody {
     volumeOn: boolean;
     membrane: number;
     membraneRest: Float32Array;
+    burstStretch: number | null;
+    vents: SoftVent[];
     displaced: number;
     surfaceRest: number;
     canSleepFlag: boolean;
@@ -2536,6 +2539,10 @@ class SoftBody {
     setVolumeFactor(factor: number | null): this;
     setGasPressure(options: SoftGasPressure): this;
     gasState(): SoftGasState | null;
+    openVent(options: SoftVentOptions): number;
+    closeVents(): this;
+    openVents(): readonly SoftVent[];
+    isBurst(): boolean;
     threadSoftness(edge: number): SoftSoftness | null;
     get canSleep(): boolean;
     set canSleep(value: boolean);
@@ -2613,6 +2620,7 @@ class SoftBodyDesc {
     volumeFactor: number | null;
     gas: SoftGasPressure | null;
     membrane: number;
+    burstStretch: number | null;
     groups: number | undefined;
     selfContacts: boolean;
     selfFriction: number;
@@ -2744,6 +2752,12 @@ class SoftBodyMaterial {
     clone(): SoftBodyMaterial;
 }
 
+interface SoftBurstEvent {
+    body: SoftBody;
+    triangles: number[];
+    pressure: number;
+}
+
 interface SoftContact {
     readonly soft: SoftBody;
     readonly particle: number;
@@ -2791,6 +2805,7 @@ interface SoftGasState {
 interface SoftMembrane {
     readonly shearModulus: number;
     readonly thickness: number;
+    readonly burstStretch?: number;
 }
 
 class SoftMeshBinding {
@@ -2865,6 +2880,24 @@ interface SoftTensileSeam {
     readonly openingStrain: number;
     readonly slidingStrain?: number;
     readonly tearingStrain?: number;
+}
+
+interface SoftVent {
+    readonly particle: number;
+    readonly area: number;
+    readonly dischargeCoefficient: number;
+    readonly gasConstant: number;
+    readonly temperature: number;
+    readonly heatCapacityRatio: number;
+}
+
+interface SoftVentOptions {
+    readonly particle: number;
+    readonly area: number;
+    readonly dischargeCoefficient?: number;
+    readonly gasConstant?: number;
+    readonly temperature?: number;
+    readonly heatCapacityRatio?: number;
 }
 
 type SoftVolumeMesh = {
