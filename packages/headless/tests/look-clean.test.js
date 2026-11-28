@@ -8,6 +8,7 @@ import { encodePNG } from '../dist/index.js';
 import { decodePNG } from '../dist/compare.js';
 import {
   GROUND_ALBEDO_LEVELS,
+  GROUND_BLOCK,
   GROUND_MIN_PIXELS,
   GROUND_INSET,
   albedoOf,
@@ -56,6 +57,9 @@ const mask = (width, height, inside) => {
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) data[y * width + x] = inside(x, y) ? 255 : 0;
   return { width, height, data };
 };
+// T6 compares lit and shadowed ground within blocks a tenth of the frame's shorter side (GROUND_BLOCK): its ground
+// fixtures are 60 pixels wide, 6 pixel blocks, with lit and shadowed stripes 3 pixels wide so each block holds both.
+const litStripe = (x) => x % 6 < 3;
 const mix = (a, b, t) =>
   typeof a === 'number' ? Math.round(a + (b - a) * t) : a.map((v, i) => Math.round(v + (b[i] - v) * t));
 /** A frame split by the diagonal line x = y + 8: hard (a pixel is one side or the other) or resolved (4 x 4 coverage). */
@@ -538,13 +542,54 @@ test('T6 counts only ground its masks cover whole, over the pixel and the shutte
   );
 });
 
+test('T6 compares shadowed ground with the lit ground beside it, not across the frame (KB-LOOK-TV-POOLFAILS1)', () => {
+  // The timber-valley rail-line read bounce 137.7 percent and shadowTint -4.7 b*: its few shadowed pixels lay at the
+  // frame's edge beside the fire, whose glow in the haze brightens that side, and were compared with lit road across
+  // the whole frame. One surface here under a weak sun and a sky, plus a warm glow that falls from the left edge to
+  // nothing by a third of the way across; small shadows only near the left edge. The light's own ratio is
+  // (sky + glow) / (sky + glow + sun) at each place, under 100 percent everywhere.
+  const width = 320,
+    height = 180,
+    encode = (v) => {
+      const c = Math.min(1, Math.max(0, v));
+      return Math.round(255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055));
+    },
+    sun = [0.02, 0.004, 0.0003],
+    sky = [0.05, 0.04, 0.03],
+    glow = (x) => Math.max(0, 1 - x / 100) * 0.08,
+    ground = [0.3, 0.25, 0.2],
+    inShadow = (x, y) => x >= 8 && x < 30 && ((y >= 20 && y < 40) || (y >= 100 && y < 120)),
+    frame = image(width, height, (x, y) =>
+      ground.map((a, c) => encode(a * (sky[c] + (c === 0 ? glow(x) : glow(x) * 0.5) + (inShadow(x, y) ? 0 : sun[c])))),
+    ),
+    lit = mask(width, height, (x, y) => !inShadow(x, y)),
+    shadow = mask(width, height, inShadow),
+    luminance = (c) => 0.2126729 * c[0] + 0.7151522 * c[1] + 0.072175 * c[2],
+    // The ratio the light gives at the shadows' middle (x 19) and at their far edge, where the glow is weakest.
+    at = (x) => {
+      const diffuse = sky.map((v, c) => v + (c === 0 ? glow(x) : glow(x) * 0.5));
+      return (100 * luminance(diffuse)) / luminance(diffuse.map((v, c) => v + sun[c]));
+    };
+  assert.equal(GROUND_BLOCK, 1 / 10);
+  const b = bounce(frame, { lit, shadow }),
+    t = shadowTint(frame, { lit, shadow });
+  assert.ok(b.value < 100, `bounce ${b.value} must stay under 100 percent, as the light gives`);
+  assert.ok(Math.abs(b.value - at(19)) < 3, `bounce ${b.value} against the light's ${at(19)}`);
+  // The sun is warm, so ground it leaves is cooler: a positive tint, not the glow's gradient.
+  assert.ok(t.value > 0, `shadowTint ${t.value}`);
+  // A shadow with no lit ground in its block is not compared: shadows alone in their blocks leave nothing to read.
+  const lone = bounce(frame, { lit: mask(width, height, (x) => x >= 160), shadow });
+  assert.equal(lone.pass, false);
+  assert.match(lone.missing, /lit and shadowed ground/);
+});
+
 test('T6 bounce and shadowTint compare like surfaces when given the albedo (KB-LOOK-TV-TINTMATCH1)', () => {
   // The timber-valley blowup read mid bounce 103 percent and shadowTint 0.036 b* (bound 0.0448): shadowed ground
   // brighter than lit ground, which one surface under one light cannot be. Its lit and shadow masks held different
   // surfaces. Here one light falls on two surfaces, warm sand and grey ash: the lit mask is mostly sand, the shadow
   // mask mostly ash. Without the albedo the masks mix the surfaces and the checks measure sand against ash; with it
   // each surface is compared with itself and the pooled values are the light's own.
-  const size = 64,
+  const size = 60,
     encode = (v) => {
       const c = Math.min(1, Math.max(0, v));
       return Math.round(255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055));
@@ -552,13 +597,13 @@ test('T6 bounce and shadowTint compare like surfaces when given the albedo (KB-L
     sun = [0.9, 0.8, 0.6],
     sky = [0.12, 0.13, 0.16],
     sand = [0.55, 0.45, 0.3],
-    ash = [0.1, 0.1, 0.11],
-    lit = mask(size, size, (x) => x < 32),
-    shadow = mask(size, size, (x) => x >= 32),
-    // Lit: rows 0 to 7 ash, the rest sand. Shadow: rows 0 to 55 ash, the rest sand.
-    surface = (x, y) => (x < 32 ? (y < 8 ? ash : sand) : y < 56 ? ash : sand),
+    ash = [0.08, 0.1, 0.15],
+    lit = mask(size, size, litStripe),
+    shadow = mask(size, size, (x) => !litStripe(x)),
+    // Lit: one row in six ash, the rest sand. Shadow: one row in six sand, the rest ash (every block holds both).
+    surface = (x, y) => (litStripe(x) ? (y % 6 === 3 ? ash : sand) : y % 6 === 3 ? sand : ash),
     shade = (a, inSun) => a.map((v, c) => encode(v * (sky[c] + (inSun ? sun[c] : 0)))),
-    frame = image(size, size, (x, y) => shade(surface(x, y), x < 32)),
+    frame = image(size, size, (x, y) => shade(surface(x, y), litStripe(x))),
     grey = (c) => mask(size, size, () => false),
     plane = (c) => {
       const m = grey(c);
@@ -567,7 +612,7 @@ test('T6 bounce and shadowTint compare like surfaces when given the albedo (KB-L
     },
     albedo = albedoOf(frame, { 'albedo-r': plane(0), 'albedo-g': plane(1), 'albedo-b': plane(2) }),
     // Each surface alone, a frame of nothing but it, lit on the left and shaded on the right.
-    alone = (a) => image(size, size, (x) => shade(a, x < 32)),
+    alone = (a) => image(size, size, (x) => shade(a, litStripe(x))),
     truth = (check) => [sand, ash].map((a) => check(alone(a), { lit, shadow }).value);
   assert.equal(GROUND_ALBEDO_LEVELS, 16);
   assert.equal(albedoOf(frame, { 'albedo-r': plane(0) }), undefined, 'all three planes or none');
@@ -589,11 +634,12 @@ test('T6 bounce and shadowTint compare like surfaces when given the albedo (KB-L
     matched.value >= Math.min(sandBounce, ashBounce) - 1e-9 && matched.value <= Math.max(sandBounce, ashBounce) + 1e-9,
     `bounce ${matched.value}`,
   );
-  assert.equal(tint.detail.strata, 2);
+  // Two surfaces in each of the 10 x 10 blocks.
+  assert.equal(tint.detail.strata, 2 * 10 * 10);
   assert.equal(tint.detail.matched, tint.detail.lit + tint.detail.shadow);
   // A surface seen only in the sun is not compared: with the shadow all ash and the lit ground all sand nothing matches.
-  const apart = (x) => (x < 32 ? sand : ash),
-    split = image(size, size, (x) => shade(apart(x), x < 32)),
+  const apart = (x) => (litStripe(x) ? sand : ash),
+    split = image(size, size, (x) => shade(apart(x), litStripe(x))),
     splitAlbedo = albedoOf(split, {
       'albedo-r': mask(size, size, () => false),
       'albedo-g': mask(size, size, () => false),
@@ -618,7 +664,7 @@ test('T6 leaves out ground an effect is drawn over, given the over mask (KB-LOOK
   // the scene, sat on ground the sun's masks still counted as lit or shadowed, and moved and flickered along the shot.
   // One surface under one light here, a bright orange flame over part of the shadowed ground: without `over` the
   // shadow reads far warmer and brighter than the light gives it; with the flame's coverage the value is the light's.
-  const size = 64,
+  const size = 60,
     encode = (v) => {
       const c = Math.min(1, Math.max(0, v));
       return Math.round(255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055));
@@ -627,19 +673,19 @@ test('T6 leaves out ground an effect is drawn over, given the over mask (KB-LOOK
     sky = [0.12, 0.13, 0.16],
     flame = [1.0, 0.45, 0.08],
     soil = [0.3, 0.25, 0.2],
-    lit = mask(size, size, (x) => x < 32),
-    shadow = mask(size, size, (x) => x >= 32),
+    lit = mask(size, size, litStripe),
+    shadow = mask(size, size, (x) => !litStripe(x)),
     // The flame's coverage: a soft-edged patch over the shadowed ground, rows 8 to 40, columns 36 to 60.
-    cover = (x, y) => (x >= 36 && x < 60 && y >= 8 && y < 40 ? (x < 40 || x >= 56 ? 0.2 : 0.9) : 0),
+    cover = (x, y) => (!litStripe(x) && x >= 36 && x < 60 && y >= 8 && y < 40 ? (x < 40 || x >= 56 ? 0.2 : 0.9) : 0),
     over = mask(size, size, () => false),
     pixel = (x, y) =>
       soil.map((a, c) => {
-        const ground = a * (sky[c] + (x < 32 ? sun[c] : 0)),
+        const ground = a * (sky[c] + (litStripe(x) ? sun[c] : 0)),
           k = cover(x, y);
         return encode(ground * (1 - k) + flame[c] * k);
       }),
     frame = image(size, size, pixel),
-    clean = image(size, size, (x) => soil.map((a, c) => encode(a * (sky[c] + (x < 32 ? sun[c] : 0)))));
+    clean = image(size, size, (x) => soil.map((a, c) => encode(a * (sky[c] + (litStripe(x) ? sun[c] : 0)))));
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) over.data[y * size + x] = Math.round(255 * cover(x, y));
   const truth = shadowTint(clean, { lit, shadow }).value,
     trueBounce = bounce(clean, { lit, shadow }).value,
@@ -663,7 +709,7 @@ test('T6 leaves out ground an effect is drawn over, given the over mask (KB-LOOK
   const warm = [0.25, 0.12, 0.02],
     faulty = image(size, size, (x, y) =>
       soil.map((a, c) => {
-        const ground = a * (sky[c] + (x < 32 ? sun[c] : warm[c] * 4)),
+        const ground = a * (sky[c] + (litStripe(x) ? sun[c] : warm[c] * 4)),
           k = cover(x, y);
         return encode(ground * (1 - k) + flame[c] * k);
       }),
@@ -672,7 +718,7 @@ test('T6 leaves out ground an effect is drawn over, given the over mask (KB-LOOK
   assert.equal(fault.pass, false, `the warm shadow fails with over: ${fault.value}`);
   assert.ok(fault.value < 0 && !fault.missing);
   // Too little ground left: a mask over nearly all the shadowed ground leaves fewer than GROUND_MIN_PIXELS there.
-  const most = mask(size, size, (x, y) => x >= 32 && !(x === 40 && y < 20)),
+  const most = mask(size, size, (x, y) => !litStripe(x) && !(x === 40 && y < 20)),
     gone = shadowTint(frame, { lit, shadow, over: most });
   assert.equal(gone.pass, false);
   assert.match(gone.missing, new RegExp(`^${GROUND_MIN_PIXELS} lit and shadowed ground pixels nothing is drawn over`));
@@ -711,14 +757,14 @@ test('T6 limits follow the light: a clear sun keeps 10 to 35 percent and 3 b*, a
   );
 
   // Ground frames: lit ground at 200, shadows on the left at the luminance share asked for, cooler by `cool` in blue.
-  const size = 128,
-    lit = mask(size, size, (x) => x >= 64),
-    shadow = mask(size, size, (x) => x < 64),
+  const size = 120,
+    lit = mask(size, size, litStripe),
+    shadow = mask(size, size, (x) => !litStripe(x)),
     ground = (share, cool = 0) => {
       const code = (v) => Math.round(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055)),
         linear = 0.578;
       return image(size, size, (x) => {
-        if (x >= 64) return [200, 200, 200];
+        if (litStripe(x)) return [200, 200, 200];
         const v = code(linear * share);
         return [Math.max(0, v - cool), v, Math.min(255, v + cool)];
       });
@@ -928,9 +974,9 @@ test('T6 reads the precise frame, pools frames and gives its standard error (KB-
   // The blowup's shadow interior is a few hundred pixels and one 8-bit blue code is 0.4 b* at its dark ground, both
   // coarser than the 0.0448 b* floor. Here the lit and shadowed ground share their 8-bit codes but not their floats:
   // only the precise frame shows the shadow cooler. Pooled frames add their pixels, and the standard error follows.
-  const size = 32,
-    lit = mask(size, size, (x) => x < 16),
-    shadow = mask(size, size, (x) => x >= 16),
+  const size = 60,
+    lit = mask(size, size, litStripe),
+    shadow = mask(size, size, (x) => !litStripe(x)),
     frame = image(size, size, () => [60, 40, 20]),
     // Shadow blue 0.3 of a code higher (cooler), lit 0.3 lower; one pixel in four 0.2 higher again, for a spread.
     precise = (lift = 0) => {
@@ -940,7 +986,7 @@ test('T6 reads the precise frame, pools frames and gives its standard error (KB-
           const i = (y * size + x) * 3;
           data[i] = 60 / 255;
           data[i + 1] = 40 / 255;
-          data[i + 2] = (20 + (x < 16 ? -0.3 : 0.3) + ((x + y) % 4 ? 0 : 0.2) + lift) / 255;
+          data[i + 2] = (20 + (litStripe(x) ? -0.3 : 0.3) + ((x + y) % 4 ? 0 : 0.2) + lift) / 255;
         }
       return { width: size, height: size, data };
     };
@@ -967,7 +1013,7 @@ test('T6 reads the precise frame, pools frames and gives its standard error (KB-
   // Frames that disagree: the batch-means error is the larger and is used.
   const apart = (lift) => {
       const p = precise();
-      for (let i = 2; i < p.data.length; i += 3) if ((i / 3) % size >= 16) p.data[i] += lift / 255;
+      for (let i = 2; i < p.data.length; i += 3) if (!litStripe((i - 2) / 3 % size)) p.data[i] += lift / 255;
       return p;
     },
     spread = shadowTint(frame, {
@@ -992,7 +1038,7 @@ test('T6 reads the precise frame, pools frames and gives its standard error (KB-
 });
 
 test('checkShot passes a probe its precise frame and pooled frames for T6 (KB-LOOK-TV-TINTRES1)', async () => {
-  const size = 32,
+  const size = 60,
     frame = image(size, size, () => [60, 40, 20]),
     grey = (inside) => {
       const m = mask(size, size, inside),
@@ -1005,14 +1051,14 @@ test('checkShot passes a probe its precise frame and pooled frames for T6 (KB-LO
       for (let i = 0; i < size * size; i++) {
         data[i * 3] = 60 / 255;
         data[i * 3 + 1] = 40 / 255;
-        data[i * 3 + 2] = (20 + (i % size < 16 ? -0.4 : 0.4)) / 255;
+        data[i * 3 + 2] = (20 + (litStripe(i % size) ? -0.4 : 0.4)) / 255;
       }
       return new Uint8Array(data.buffer);
     },
     files = {
       'probes/a.png': await encodePNG(frame),
-      'probes/a.lit.png': await encodePNG(grey((x) => x < 16)),
-      'probes/a.shadow.png': await encodePNG(grey((x) => x >= 16)),
+      'probes/a.lit.png': await encodePNG(grey(litStripe)),
+      'probes/a.shadow.png': await encodePNG(grey((x) => !litStripe(x))),
       'probes/a.rgb32f': floats(),
       'frames/1.rgb32f': floats(),
       'frames/1.geometry.png': new Uint8Array(1),

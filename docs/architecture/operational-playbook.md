@@ -10537,6 +10537,16 @@ shaded against 0.99999 lit, the frame darker inside the shaded mask, 1 everywher
 tools/shot/test/look-masks-check.mjs (every mask check runs on a real shot). Missing: local lights' shadows in the
 visibility, core meshes as the subject.
 
+**T6 compares within blocks of the frame (KB-LOOK-TV-POOLFAILS1, 2026-11-28).** `bounce` and `shadowTint` compare lit
+and shadowed ground only within blocks a tenth of the frame's shorter side (`GROUND_BLOCK`, 108 pixels at 1080p), each
+block one more stratum beside the albedo's, so light that changes across the frame does not read as the shadow's (a
+shadow read across its own edge: Finlayson, Hordley, Lu and Drew 2006; slow illumination: Land and McCann 1971); bounds
+unchanged. Evidence: the rail-line's sun is 1.6 percent of its ground's light and its 74 shadowed pixels a frame sit
+beside the fire wall, whose glow lights the haze; T6 read 137.7 / 139.3 percent and -4.7 / -4.8 b* across the frame and
+94.8 / 95.3 percent and +0.64 / +0.58 b* within blocks (98 predicted). Aftermath, fire-line and town-street still pass
+(88 to 96 percent becomes 95 to 96); valley-aerial goes from 20.4 to 101.0 percent, still failing, its own cause open.
+Regression: headless tests/look-clean.test.js (a glow across the frame; 145 percent without blocks).
+
 **T6 compares like surfaces (KB-LOOK-TV-TINTMATCH1, 2026-11-28).** With an albedo (`albedo-r`, `albedo-g`, `albedo-b`
 masks, `albedoOf`) `bounce` and `shadowTint` compare lit and shadowed ground within strata of like albedo (16 levels per
 sRGB channel), pooled with Cochran-Mantel-Haenszel weights; bounds unchanged. Evidence: headless tests/look-clean.test.js

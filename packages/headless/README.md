@@ -695,7 +695,7 @@ console.log(lookReport([{ name: 'hearth', frame, results: rows }]).markdown.spli
 | `flip(test, reference, { pixelsPerDegree?, map? })` | FLIP (Andersson et al. 2020): the difference a viewer sees flipping between two frames, 0 to 1 per pixel, as `{ mean, p50, p95, p99, max }` and the per-pixel `map` with `map: true`. 67 pixels per degree is a 4K monitor at 0.7 m; a phone at 30 cm showing 1080 pixels across 6.5 cm is about 87. `difference(frame, other, 'reference' or 'backends')` is its check row. |
 | `hdrFlip(test, reference, { pixelsPerDegree?, map?, toneMapper?, startExposure?, stopExposure?, exposureMap? })` | HDR-FLIP (Andersson, Nilsson, Shirley and Akenine-Moller 2021) on two linear float frames (RGBA, Float32 or half floats): the largest FLIP error over a range of exposures, pooled as `flip`'s, with `startExposure`, `stopExposure`, `exposures` and, with `exposureMap: true`, the exposure that gave each pixel its error. See "HDR-FLIP" below. |
 | `horizonLine(viewProjection, width, height)`, `maskTopEdge(mask)` | The row per column of the horizon of horizontal planes (column-major view-projection, WebGPU clip space) and of a mask's top edge. NaN where there is none. |
-| `stairs`, `colourEdges`, `chromaSmear`, `penumbra`, `penumbraPlants`, `shimmerMoving`, `motionBlur`, `silhouette`, `silhouetteShape`, `bounce`, `shadowTint`, `albedoOf(frame, masks)`, `GROUND_ALBEDO_LEVELS`, `nightLuma`, `nightPeak`, `reprojectionMotion(depth, viewProjection, nextViewProjection, width, height)`, `depthFromDistance(distance, eye, viewProjection, width, height, { water, plane, far })` (NDC depth from each pixel's distance to the eye, for `reprojectionMotion`; pixels with no distance meet the sea plane where `water` is 128 or more, or are `far` away), `detailKeptFloor(family)` (T7: 0.5, and 0.6 for `animatedFeature`, as `LOOK_FAMILY_DETAIL_KEPT`) | The clean-frame checks (below), each alone with its `bound`; `reprojectionMotion` gives the motion of every pixel of a still world seen by a moving camera. |
+| `stairs`, `colourEdges`, `chromaSmear`, `penumbra`, `penumbraPlants`, `shimmerMoving`, `motionBlur`, `silhouette`, `silhouetteShape`, `bounce`, `shadowTint`, `albedoOf(frame, masks)`, `GROUND_ALBEDO_LEVELS`, `GROUND_BLOCK`, `nightLuma`, `nightPeak`, `reprojectionMotion(depth, viewProjection, nextViewProjection, width, height)`, `depthFromDistance(distance, eye, viewProjection, width, height, { water, plane, far })` (NDC depth from each pixel's distance to the eye, for `reprojectionMotion`; pixels with no distance meet the sea plane where `water` is 128 or more, or are `far` away), `detailKeptFloor(family)` (T7: 0.5, and 0.6 for `animatedFeature`, as `LOOK_FAMILY_DETAIL_KEPT`) | The clean-frame checks (below), each alone with its `bound`; `reprojectionMotion` gives the motion of every pixel of a still world seen by a moving camera. |
 | `LOOK_FAMILY_BOUNDS`, `LOOK_FAMILY_NAMES`, `familyBounds(name)` | The look families and their bounds. |
 | `luma(frame)`, `lookBound(bound)`, `LOOK_CHECKS` | BT.709 luma on 0 to 255, a bound as `[low, high]`, and each check's default bound, unit and meaning. |
 
@@ -722,6 +722,23 @@ const { diffuse, bounce, shadowTint } = lightBounds({
   ambient: [0.33, 0.29, 0.27],
 });
 console.log(diffuse.toFixed(2), bounce.map(Math.round), shadowTint[0].toFixed(2)); // 0.95 [ 28, 99 ] 0.24
+```
+
+**T6 compares within blocks** (KB-LOOK-TV-POOLFAILS1, 2026-11-28). The lit and shadowed ground are compared only
+inside the same block of the frame, `GROUND_BLOCK` (a tenth of its shorter side, 108 pixels at 1080p), as a shadow is
+read across its own edge (Finlayson, Hordley, Lu and Drew, IEEE TPAMI 28(1), 2006), so light that changes across the
+frame, such as a fire's glow in the haze, does not read as the shadow's. `detail.strata` counts block and albedo strata
+both sides hold.
+
+```js
+import { bounce, GROUND_BLOCK } from '@margoengine/headless/look';
+
+const size = 60,
+  frame = { width: size, height: size, data: new Uint8Array(size * size * 4) },
+  mask = (inside) => ({ width: size, height: size, data: Uint8Array.from({ length: size * size }, (_, i) => (inside(i % size) ? 255 : 0)) });
+for (let i = 0; i < size * size; i++) frame.data.set(i % size % 6 < 3 ? [200, 200, 200, 255] : [120, 120, 120, 255], i * 4);
+const row = bounce(frame, { lit: mask((x) => x % 6 < 3), shadow: mask((x) => x % 6 >= 3) });
+console.log(GROUND_BLOCK, Math.round(row.value)); // 0.1 33
 ```
 
 **T6 compares like surfaces** (KB-LOOK-TV-TINTMATCH1, 2026-11-28). `bounce` and `shadowTint` take an optional `albedo`,

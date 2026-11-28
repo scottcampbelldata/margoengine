@@ -2320,7 +2320,9 @@ function inset(width: number, height: number, inside: Uint8Array, r: number): Ui
 // 417-451, 1954, https://doi.org/10.2307/3001616; N. Mantel and W. Haenszel, "Statistical aspects of the analysis of
 // data from retrospective studies of disease", JNCI 22(4), 719-748, 1959, https://doi.org/10.1093/jnci/22.4.719), so
 // a surface that is only lit or only shaded does not count (KB-LOOK-TV-TINTMATCH1). Without an albedo the ground is
-// one stratum, as before.
+// one stratum, as before. Every stratum is also one block of the frame (GROUND_BLOCK): lit and shadowed ground are
+// compared beside each other, so light that changes across the frame (a fire's glow in the haze, a hillside's own
+// slope) does not read as the shadow's (KB-LOOK-TV-POOLFAILS1).
 
 /**
  * The albedo of a probe's masks: `albedo-r`, `albedo-g` and `albedo-b` (grey masks of one sRGB coded channel each, as
@@ -2356,6 +2358,19 @@ const GROUND_AOVS = ['lit', 'shadow', 'albedo-r', 'albedo-g', 'albedo-b', 'over'
 
 /** Levels per sRGB channel of the albedo strata {@link bounce} and {@link shadowTint} compare within: 16 (16 codes). */
 export const GROUND_ALBEDO_LEVELS = 16;
+
+/**
+ * The side of the frame's blocks T6 compares lit and shadowed ground within, as a share of the frame's shorter side:
+ * 1/10, 108 pixels at 1080p. A shadow's ratio is read across its own edge, where the light other than the sun's beam is
+ * the same on both sides (G. D. Finlayson, S. D. Hordley, C. Lu and M. S. Drew, "On the removal of shadows from
+ * images", IEEE TPAMI 28(1), 59-68, 2006, https://doi.org/10.1109/TPAMI.2006.18; illumination varies slowly across an
+ * image, E. H. Land and J. J. McCann, "Lightness and Retinex theory", JOSA 61(1), 1-11, 1971,
+ * https://doi.org/10.1364/JOSA.61.000001). Across a whole frame it is not: in the timber-valley rail-line shot the sun
+ * is 1.6 percent of the ground's light and the haze the fire lights from below brightens one side of the frame, so 74
+ * shadowed pixels a frame beside the fire read 137 percent of the lit road across the frame and 95 percent beside
+ * themselves (KB-LOOK-TV-POOLFAILS1).
+ */
+export const GROUND_BLOCK = 1 / 10;
 
 /** The ground pixels of one albedo stratum, lit side first: counts and sums of Y and b* and of their squares. */
 export interface GroundStratum {
@@ -2435,15 +2450,20 @@ function groundStrata({ frame, precise, lit, shadow, albedo, over }: GroundFrame
       throw rangeError('The albedo holds four bytes per pixel (RGBA, sRGB coded)', 'headless');
   }
   const strata = new Map<number, GroundStratum>(),
-    q = 256 / GROUND_ALBEDO_LEVELS;
+    q = 256 / GROUND_ALBEDO_LEVELS,
+    block = Math.max(1, Math.round(Math.min(size.width, size.height) * GROUND_BLOCK));
   for (let i = 0, j = 0; i < masks[0].length; i++, j += 4) {
     if (!masks[0][i] && !masks[1][i]) continue;
     const side = masks[0][i] ? 0 : 1;
-    const key = albedo
-      ? (Math.floor(albedo.data[j] / q) * GROUND_ALBEDO_LEVELS + Math.floor(albedo.data[j + 1] / q)) *
-          GROUND_ALBEDO_LEVELS +
-        Math.floor(albedo.data[j + 2] / q)
-      : 0;
+    const surface = albedo
+        ? (Math.floor(albedo.data[j] / q) * GROUND_ALBEDO_LEVELS + Math.floor(albedo.data[j + 1] / q)) *
+            GROUND_ALBEDO_LEVELS +
+          Math.floor(albedo.data[j + 2] / q)
+        : 0,
+      x = i % size.width,
+      y = (i - x) / size.width,
+      // Like surface in the same block of the frame (GROUND_BLOCK); albedo keys are under 16^3.
+      key = surface + GROUND_ALBEDO_LEVELS ** 3 * (Math.floor(y / block) * Math.ceil(size.width / block) + Math.floor(x / block));
     let at = strata.get(key);
     if (!at) strata.set(key, (at = { n: [0, 0], Y: [0, 0], b: [0, 0], Y2: [0, 0], b2: [0, 0] }));
     // Codes 0 to 255, fractional from the precise frame.

@@ -9123,6 +9123,13 @@ interior pixels (5 percent relative standard error), and report the check as mis
 a frame whose plants are all in the penumbra, or that holds plants of very different detail in and out of it, cannot
 be judged by it.
 
+## T6 within blocks (headless/look `GROUND_BLOCK`, KB-LOOK-TV-POOLFAILS1, 2026-11-28)
+
+`bounce` and `shadowTint` compare lit and shadowed ground only inside the same block of the frame, a tenth of its
+shorter side (108 pixels at 1080p); a shadow with no lit ground in its block is left out, and a frame with none on both
+sides in any block reports `missing`. A frame under 30 pixels on its shorter side has blocks of 3 pixels or fewer, too
+small to hold both sides' interiors, so T6 reads nothing there. Light that changes within a block still counts.
+
 ## T6 like surfaces (headless/look, KB-LOOK-TV-TINTMATCH1, 2026-11-28)
 
 With an albedo, `bounce` and `shadowTint` compare only ground of like albedo, 16 levels per sRGB channel (16 codes); a

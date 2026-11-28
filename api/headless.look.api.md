@@ -110,6 +110,8 @@ export interface FoamEdgesOptions {
 
 export const GROUND_ALBEDO_LEVELS = 16;
 
+export const GROUND_BLOCK: number;
+
 export const GROUND_INSET: number;
 
 export const GROUND_MIN_PIXELS = 30;

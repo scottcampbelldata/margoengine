@@ -255,6 +255,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   - valley-aerial: speckle early 5.3 ppm; bounce 20.4 / 20.3 percent (29.5 to 100).
 - **Cause:** not traced. Speckle shares the blowup's causes (KB-LOOK-TV-SPECKLE, tree LOD by distance); shimmerMoving
   may share the blowup's rest (KB-LOOK-TV-SHIMMER2, after KB-SCATTER-FRINGEVEL1's fix). The rest are each shot's own and need tracing one by one.
+- **Rail-line bounce and shadowTint (fixed, 2026-11-28):** not the sun. The 16:00 sun is right, 29.5 degrees up in
+  the west-south-west behind the camera (`sunPath`, measured in the page); the low bright disk ahead-right is fire
+  column 10's glow (`glowAt` -1044, 995, 219: 14 degrees right, 10.8 up, where the disk sits). Trees do cast shadows
+  (a top-down probe's shadow AOV is full of them), parallel to the road, so the road stays lit; under the blowup's
+  smoke the sun is 1.6 percent of the ground's light (diffuse 0.984), so they barely show. The 74 interior shadowed
+  pixels a frame lie at the frame's left edge beside the fire wall, where the haze the fire lights from below
+  (KB-WEATHER-FIREHAZE1) is brighter, and T6 compared them with lit road across the whole frame: 137.7 percent and
+  -4.7 b*. T6 now compares within blocks a tenth of the frame's shorter side (`GROUND_BLOCK`, headless/look): 94.8 /
+  95.3 percent and +0.64 / +0.58 b*, the 98 percent the light predicts. Regression:
+  `packages/headless/tests/look-clean.test.js` (a glow across the frame, shadows on its bright side).
 
 ### Open 2026-11-28: the timber-valley blowup shows single bright pixels through conifer foliage, 15 and 46 ppm (KB-LOOK-TV-SPECKLE, procedural, biomes)
 
