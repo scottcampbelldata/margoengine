@@ -388,7 +388,10 @@ async function sizeRecords() {
   // above it.
   // 2026-11-27, core feature multi-draw under the same ruling: a redirected batch draws `draws` indirect argument sets,
   // in one multiDrawIndexedIndirect call with `multi`: core 22,479 -> 22,525 B (+46 B). Strict ceiling one byte above.
-  const CORE_ONLY_CEILING = 22_526;
+  // 2026-11-28, core bug fix KB-BIOMES-BLACKSKY1 (4614c1eb18): a background that is not a colour string is refused
+  // instead of read as unset: core 22,525 -> 22,526 B (+1 B; core + stage stayed 25,149 B). Strict ceiling one byte
+  // above it.
+  const CORE_ONLY_CEILING = 22_527;
   assert.ok(sizes.core.gzip < CORE_ONLY_CEILING, `Core exceeds ${CORE_ONLY_CEILING} B gzip: ${sizes.core.gzip}`);
   assert.ok(sizes.core.gzip + sizes.gltf.gzip < 30 * 1024, 'Core + glTF exceed 30 KiB gzip');
   const { modules, ...baseSize } = await measureCoreStage();
