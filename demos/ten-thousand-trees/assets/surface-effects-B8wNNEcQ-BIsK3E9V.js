@@ -1,0 +1,1 @@
+var e=new WeakMap;function t(t,n){let r=e.get(t)??[];return r.push(n),e.set(t,r),()=>{let i=r.indexOf(n);i>=0&&r.splice(i,1),r.length||e.delete(t)}}export{t as n,e as t};

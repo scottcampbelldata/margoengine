@@ -13,8 +13,9 @@ Everything on screen comes from Margo Engine packages; the page only wires them 
   1,000 m above the floor. Its three northern Rockies biomes (moist forest, dry forest and south-facing openings) place
   western white pine, western red cedar, grand fir, Douglas-fir and western larch, shrubs, rocks and grass.
   `coniferAge(biomes, 'mature')` draws the conifers at a hundred years, old timber, in place of the presets' pole stands.
-  `BiomeView` streams the tiles round the camera onto a clipmap terrain with the biomes' ground materials (the needle
-  litter darkened to a duff brown here), and carries the relief past the world's edge. The trees are
+  `BiomeView` streams the tiles round the camera onto a clipmap terrain with the biomes' ground materials (needle litter and
+  cured grass coloured from measured ECOSTRESS spectra), the creek's still water with its banks, and carries the
+  relief past the world's edge. The trees are
   `@margoengine/procedural/conifers` meshes in three rings, octahedral imposters far off, through `@margoengine/scatter`.
 - **Sky, air and sun**: `@margoengine/sky` (Preetham sky lighting the scene, a late afternoon sun 26 degrees up in the
   west-southwest) and `@margoengine/sky/aerial` (aerial perspective, so far ridges turn blue).
@@ -32,8 +33,10 @@ Append `?backend=webgl2` to force the WebGL2 compatibility layer.
 
 ## Weak spots
 
-- The creek runs dry: still water on an 8 m creek breaks into patches on the view's 8 m water grid (KB-BIOMES-RIVERSTEP1
-  in docs/known-bugs.md), so the page leaves the water off until that is fixed.
+- On `?backend=webgl2` the page takes about twice as long to start as without the creek: the water surface program
+  links slowly on the WebGL2 layer (KB-WATER-GL2LINK1 in docs/known-bugs.md).
+- The dry needle litter was measured loose in a lab, so the open forest floor reads lighter and more even than litter
+  in place, which holds shade and humus between the needles.
 - The valley floor is open ground: the presets keep woody plants 50 m from the creek, where a view can stand river water.
 - Far ridges past the streamed radius carry the regional cover only and read smoother than the near slopes.
 
@@ -50,5 +53,8 @@ Append `?backend=webgl2` to force the WebGL2 compatibility layer.
   (aerial perspective). [Paper](https://doi.org/10.1111/cgf.14050).
 - Renaldas Zioma, *GPU-Generated Procedural Wind Animations for Trees*, GPU Gems 3, 2007.
   [Chapter](https://developer.nvidia.com/gpugems/gpugems3/part-i-geometry/chapter-6-gpu-generated-procedural-wind-animations-trees).
+- S. K. Meerdink, S. J. Hook, D. A. Roberts and E. A. Abbott, *The ECOSTRESS spectral library version 1.0*, Remote
+  Sensing of Environment 230, 2019 (white fir dry needles VH325 to VH327, wild oat litter VH354 and VH355; the ground
+  colours). [Paper](https://doi.org/10.1016/j.rse.2019.05.015), [library](https://speclib.jpl.nasa.gov).
 - National Park Service, *Subalpine Ecosystem*, Rocky Mountain National Park.
   [Timberline and subalpine forest](https://www.nps.gov/romo/learn/nature/subalpine_ecosystem.htm).

@@ -110,7 +110,7 @@ async function start() {
   const biomes = coniferAge(rockiesValleyWorld.biomes, 'mature');
   world = await BiomeWorld.create({ climate, height: { relief }, biomes, signal: lifetime.signal });
   const shadows = Shadows.attach(engine, { resolution: 2048, cascades: 4, distance: 1600, filter: 'soft' });
-  view = await BiomeView.attach(engine, world, { sky, shadows, water: false, horizon: true, materials: { needles: { color: [0.3, 0.27, 0.17] }, 'dry-grass': { color: [0.6, 0.56, 0.34] } }, budget: 1, signal: lifetime.signal });
+  view = await BiomeView.attach(engine, world, { sky, shadows, water: { rivers: 'auto' }, horizon: true, budget: 1, signal: lifetime.signal });
   const stack = PostStack.attach(engine, [new Bloom({ strength: 0.05, threshold: 1.2 }), new Tonemap({ curve: 'agx', exposure: 0.4, contrast: 1.08, vignette: 0.25 })]);
   AerialPerspective.attach(engine, { sky, depth: () => stack.depthTexture });
 
