@@ -183,10 +183,11 @@ test('the shipped guide has every matrix row and maps the common names', async (
     assert.equal(best.section?.title, section, `${query} links the guide section`);
     assert.ok(best.section.margo.length > 10, `${query} carries Margo code`);
   }
-  // Statuses follow the parity matrix the guide is built from, as recounted on main: StereoCamera is COVERED by cameras StereoRig, and the
-  // vector SVGRenderer is a decided NOT PLANNED.
+  // Statuses follow the parity matrix the guide is built from, as recounted on main: StereoCamera is COVERED by cameras StereoRig,
+  // SVGRenderer by sciviz exportSceneSVG (640a0e6303), and a deferred shading pipeline is a decided NOT PLANNED.
   assert.equal(lookupPorting(main, 'StereoCamera')[0].row.status, 'COVERED');
-  assert.equal(lookupPorting(main, 'SVGRenderer')[0].row.status, 'NOT PLANNED');
+  assert.equal(lookupPorting(main, 'SVGRenderer')[0].row.status, 'COVERED');
+  assert.equal(lookupPorting(main, 'Deferred shading pipeline')[0].row.status, 'NOT PLANNED');
 });
 
 test('port_to_margo answers with the row, the code and structured matches, and rejects bad arguments', async () => {
