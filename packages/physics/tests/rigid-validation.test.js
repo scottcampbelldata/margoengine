@@ -187,6 +187,32 @@ for (const fidelity of ["standard", "high"]) {
     }
   });
 
+  test(`${fidelity}: a ball struck sideways into a touching line slides under Coulomb friction through the strike`, () => {
+    // Equal solid balls, e = 1, mu = 0.1, the first at 1 m/s along the line and 1 m/s across it into two that touch. The strike
+    // is resolved pair by pair (collide_pairwise): its normal impulse is (1 + e) v m / 2 = m, and friction may take up to mu m
+    // across it, where stopping the slip would take m / 7 (each ball gives 1 / m + R^2 / I = 3.5 / m along the slip). So the ball
+    // slides: it leaves with 1 - mu = 0.9 m/s across the line and R omega = mu m R^2 / I = 0.25 m/s, and stops along it.
+    // Regression: the pairwise pass rubbed nothing, so the ball kept its whole 1 m/s across. The bound is f32 rounding.
+    const physics = new Physics(null, { fidelity });
+    physics.gravity = [0, 0, 0];
+    const r = 0.1,
+      balls = [];
+    for (let i = 0; i < 3; i++)
+      balls.push(
+        physics.addBody(null, {
+          position: [i * 2 * r - (i === 0 ? 0.001 : 0), 0, 0],
+          colliders: { shape: "sphere", radius: r, restitution: 1, friction: 0.1 },
+        }),
+      );
+    balls[0].setLinearVelocity([1, 1, 0]);
+    for (let i = 0; i < 6; i++) physics.step();
+    const [vx, vy] = balls[0].linearVelocity,
+      spin = Math.abs(balls[0].angularVelocity[2]) * r;
+    assert.ok(Math.abs(vx) < 1e-3, `along the line ${vx}`);
+    assert.ok(Math.abs(vy - 0.9) < 1e-3, `across the line ${vy}`);
+    assert.ok(Math.abs(spin - 0.25) < 1e-3, `R omega ${spin}`);
+  });
+
   test(`${fidelity}: a tower of ten boxes stands for ten seconds and falls asleep where it was built, bouncy or not`, () => {
     // The pairwise strike pass acts only on points approaching faster than two substeps of gravity, so a bouncy pile rests
     // as a dead one does.

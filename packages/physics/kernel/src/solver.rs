@@ -517,7 +517,8 @@ impl World {
     /// this substep; a point still apart joins only when one of its bodies touches a third (within the slop) through
     /// another bouncy pair or was moved by a strike of the pass, as a lone strike is met exactly by the speculative row and
     /// the bounce after it. Each impulse is -(1 + e) times the approach times the point's normal mass, which takes energy
-    /// out for e up to 1, so no sweep can add energy.
+    /// out for e up to 1, so no sweep can add energy; friction then takes the slip toward rest within mu times that impulse,
+    /// which takes energy out too.
     pub fn collide_pairwise(&mut self, h: f32, turn: usize) {
         let (start, end) = self.window.pairs;
         if !(start..end).any(|i| self.s(PAIR_RESTITUTION, self.uu(SOLVE_PAIRS, i) as usize) > 0.0) {
@@ -569,6 +570,24 @@ impl World {
                     let applied = normal.scale(impulse);
                     body_a.push(applied.scale(-1.0), arm_a);
                     body_b.push(applied, arm_b);
+                    // Coulomb friction through the strike, as in the paper's collision step: the slip brought to rest along its
+                    // own line, in the cone of mu times this impulse (a struck ball otherwise kept its whole sideways speed).
+                    let relative = body_b.at(arm_b).sub(body_a.at(arm_a)).sub(self.v(PAIR_SURFACE_X, row));
+                    let slip = relative.sub(normal.scale(relative.dot(normal)));
+                    let length = sqrt(slip.dot(slip));
+                    let give = if length > 0.0 {
+                        let line = slip.scale(1.0 / length);
+                        body_a.give(line, arm_a) + body_b.give(line, arm_b)
+                    } else {
+                        0.0
+                    };
+                    if give > 0.0 {
+                        let most = self.s(PAIR_FRICTION, row) * impulse;
+                        let stop = length / give;
+                        let rub = slip.scale(-(if stop < most { stop } else { most }) / length);
+                        body_a.push(rub.scale(-1.0), arm_a);
+                        body_b.push(rub, arm_b);
+                    }
                     self.settle(a, &body_a);
                     self.settle(b, &body_b);
                     self.set_s(PAIR_FORCE, row, self.s(PAIR_FORCE, row) + impulse);
@@ -1173,26 +1192,40 @@ impl World {
         2.0 * sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]) * h
     }
 
-    /// Sends the points struck in this substep off at their restitution, after relaxing took the push back out.
-    pub fn solve_impacts(&mut self) {
+    /// Sends the points struck in this substep off at their restitution, after relaxing took the push back out, and then
+    /// solves the struck pair's friction again in the cone of the whole impulse. Coulomb friction acts through the restitution
+    /// phase of an impact as through the compression (Brody 1984; Cross 2002, eqs. 11 to 13): a ball sliding through a bounce
+    /// loses mu (1 + e) times its approach speed along the surface, not mu times it, and one that grips leaves rolling.
+    /// Solved from the relaxed normal alone, a tennis ball bounced at 20 degrees on wood kept 0.92 of its speed along the
+    /// surface where Cross measured 0.84, and at 45 degrees it slid where it rolls (`tests/rigid-materials.test.js`).
+    pub fn solve_impacts(&mut self, turn: usize) {
         let first = self.window.pairs.0 * MANIFOLD;
-        for i in first..first + self.window.impacts {
-            let at = self.uu(IMPACTS, i) as usize;
-            let row = at / MANIFOLD;
+        let last = first + self.window.impacts;
+        let mut i = first;
+        // A pair's struck points are listed together (`normal_rows`): each run takes its normals, then one friction sweep.
+        while i < last {
+            let row = self.uu(IMPACTS, i) as usize / MANIFOLD;
             let (a, b) = self.pair_bodies(row as u32);
             let (mut body_a, mut body_b) = self.pair_moving(row, a, b);
             let normal = self.v(PAIR_NORMAL_X, row);
-            let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
-            let speed = body_b.at(arm_b).sub(body_a.at(arm_a)).dot(normal);
-            let wanted = -self.s(PAIR_RESTITUTION, row) * self.s(CONTACT_APPROACH, at);
-            let pressed = self.s(CONTACT_NORMAL_IMPULSE, at);
-            let total = pressed + self.s(CONTACT_NORMAL_MASS, at) * (wanted - speed);
-            let total = if total > 0.0 { total } else { 0.0 };
-            let applied = normal.scale(total - pressed);
-            self.set_s(CONTACT_NORMAL_IMPULSE, at, total);
-            self.set_s(PAIR_FORCE, row, self.s(PAIR_FORCE, row) + total - pressed);
-            body_a.push(applied.scale(-1.0), arm_a);
-            body_b.push(applied, arm_b);
+            while i < last && self.uu(IMPACTS, i) as usize / MANIFOLD == row {
+                let at = self.uu(IMPACTS, i) as usize;
+                let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
+                let speed = body_b.at(arm_b).sub(body_a.at(arm_a)).dot(normal);
+                let wanted = -self.s(PAIR_RESTITUTION, row) * self.s(CONTACT_APPROACH, at);
+                let pressed = self.s(CONTACT_NORMAL_IMPULSE, at);
+                let total = pressed + self.s(CONTACT_NORMAL_MASS, at) * (wanted - speed);
+                let total = if total > 0.0 { total } else { 0.0 };
+                let applied = normal.scale(total - pressed);
+                self.set_s(CONTACT_NORMAL_IMPULSE, at, total);
+                self.set_s(PAIR_FORCE, row, self.s(PAIR_FORCE, row) + total - pressed);
+                body_a.push(applied.scale(-1.0), arm_a);
+                body_b.push(applied, arm_b);
+                i += 1;
+            }
+            // Unbiased, so the soft step's scales are not read.
+            let plain = Soft { bias_rate: 0.0, mass_scale: 1.0, impulse_scale: 0.0 };
+            self.friction_rows(row, plain, false, turn, &mut body_a, &mut body_b);
             self.settle(a, &body_a);
             self.settle(b, &body_b);
         }

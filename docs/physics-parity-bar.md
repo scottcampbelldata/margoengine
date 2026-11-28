@@ -108,12 +108,19 @@ Status 2026-11-27 (Claude, laptop). Met: every checklist row above but Rapier pa
 - Point 6: four-wide solver batches, parallel broad and narrow phases (islands already solve on threads, 684c99009) and
   B-02 64-bit builds are not built: each is kernel work across the Rust crate, its three Wasm builds and the thread
   scheduler, to be proven by deterministic work counts with identical output.
-- Point 2: restitution and friction are inputs, checked by exact solutions, not against measured material pairs.
 
 Closed since (2026-11-27, Claude, laptop):
 - Point 1: `fidelity: 'standard' | 'high'` (28b7c2b4f), each tier validated: both pass the exact-solution suite, a light box
   under 1000 times its mass sinks within 10 percent of each tier's spring depth (18 mm and 1.3 mm), and the domino wave
   agrees between tiers.
+- Point 2: measured material pairs (2026-11-27): a tennis ball on polished timber, Rebound Ace and emery (Cross 2002, AJP 70,
+  482), restitution and sliding friction each from its own experiment and nothing fitted, bounced at 20 and 45 degrees: the
+  six bounces' speed kept along the surface, time-average friction and 45-degree rebound angles match within the paper's stated
+  errors, and every bounce is the rigid ball's exact solution, sliding or gripping, at both tiers (`tests/rigid-materials.test.js`).
+  It found that friction was held to the cone of the compression alone, so a bounce lost mu v_n along the surface where Coulomb
+  gives mu (1 + e) v_n and balls slid through bounces that grip; friction now acts through the restitution, and through a strike
+  resolved pair by pair (PK60). What a rigid ball cannot do (spin after gripping up to 41 percent low, a superball's reversing
+  bounce, restitution falling with speed) is in `docs/limits.md`, "Oblique bounce of a deformable ball".
 - Point 2: the measured domino wave of Larham (2008), one friction fitted and four spacings held out within 0.1 sqrt(gH)
   (`tests/rigid-measured.test.js`, 28b7c2b4f).
 - Point 3: the textbook Newton's cradle (2026-11-27): strikes into touching balls are resolved one pair at a time
@@ -149,6 +156,10 @@ and cylinder fitted to the bounds, with no hull, mesh or decomposition tag and n
 default density is 1 kg/m³ as in Rapier, not a real material's. Closed since: PA-87 and named material densities
 (f45c74238): Blender `margo:collider` hull, mesh and decomposition with `margo:density`, and `densities` in the API, the
 default staying 1 kg/m³ and documented as Rapier's.
+Point 2 (2026-11-27): a measured inertia carried through contact. A tennis ball given its shell's inertia (`setMassProperties`,
+I = 2 m R1^2 / 3) leaves a gripping bounce at vx1 / (1 + I / m R^2) = 0.645 vx1 on timber, Rebound Ace and emery, within twice
+the scatter of Cross's five measured bounces (2002), and a solid ball rolls down a slope at 5/7 g sin t
+(`tests/rigid-materials.test.js`, `tests/rigid-validation.test.js`).
 
 ### P3. DYN-03 Joints and motors
 

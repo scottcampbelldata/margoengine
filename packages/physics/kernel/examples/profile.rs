@@ -107,7 +107,7 @@ fn step(w: &mut World, dt: f32, clock: &mut Clock) {
             w.solve_contacts(h, stiffness, false, substep as usize, least, pass == relaxes);
             clock.lap(12);
         }
-        w.solve_impacts();
+        w.solve_impacts(substep as usize);
         clock.lap(13);
     }
     w.gather_events();

@@ -1504,6 +1504,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Kept honest by:** `packages/physics/tests/vehicle-car.test.js` asserts the balance the dampers hold,
   `k (rest - length) - c v = g / 4`, to 1e-5 m, and the length within 5% of the static sag.
 
+### Fixed 2026-11-27: a bounce took friction from its compression only, so balls slid through bounces that grip (KB-PHYS-BOUNCEFRICTION1, physics)
+
+- **Repro:** a 57 g tennis ball (shell inertia, `setMassProperties`) meeting a fixed floor of friction 0.23 and restitution 0.77 at
+  3.72 m/s, 20 degrees above the surface, with no spin: it kept 0.916 of its speed along the surface, where Coulomb's law gives
+  0.852 and Cross (2002) measured 0.84; at 45 degrees it slid off at 0.770 where it grips and leaves rolling at 0.645 (measured
+  0.60 to 0.68 on three surfaces). A ball struck sideways into a touching line kept all of its sideways speed.
+- **Cause:** `kernel/src/solver.rs` solved friction in the relaxing pass within mu times the normal impulse that stopped the
+  approach, and then `solve_impacts` added the restitution impulse along the normal alone; `collide_pairwise` rubbed nothing.
+  The tangential impulse was held to mu m v_n where it is mu (1 + e) m v_n.
+- **Fix:** after a struck point is sent off, its pair's friction is solved again, unbiased, in the cone of the whole impulse;
+  a strike resolved pair by pair brings the slip toward rest within mu times its own impulse (PK60 in `docs/clean-room.md`).
+  Regression: `packages/physics/tests/rigid-materials.test.js` "an oblique bounce is the rigid ball's exact solution" and
+  `packages/physics/tests/rigid-validation.test.js` "a ball struck sideways into a touching line slides under Coulomb friction
+  through the strike".
+
 ### Fixed 2026-11-27: a domino wave ran slower in a row of small dominoes than in the same row scaled up (KB-PHYS-DOMINOSCALE1, physics)
 
 - **Repro:** `packages/physics/tests/rigid-measured.test.js`: the 0.2 m row at the defaults against the 48 mm row with its

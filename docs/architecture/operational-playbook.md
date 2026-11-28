@@ -1,3 +1,11 @@
+### Section 5 evidence: friction through a bounce in the rigid kernel, against measured material pairs (2026-11-27)
+
+The rigid kernel's strike (`physics/kernel/src/solver.rs`, `solve_impacts` and `collide_pairwise`) now solves friction in the cone
+of the whole impulse, restitution included (KB-PHYS-BOUNCEFRICTION1). Evidence: `packages/physics/tests/rigid-materials.test.js`
+holds seven oblique tennis-ball bounces to the rigid ball's exact solution at both solver tiers and six to Cross's measurements
+(American Journal of Physics 70, 482, 2002) on three named surfaces, nothing fitted. Missing: tangential compliance (spin after a
+gripping bounce runs up to 41 percent under the measured), recorded in `docs/limits.md`.
+
 ### Section 5 evidence: precipitation streaks at 4x take centroid-sampled varyings (2026-11-27)
 
 `packages/sky/test/features-check.mjs sleet` requires no pixel below 0 in the rain, snow and sleet frames of Bloom's

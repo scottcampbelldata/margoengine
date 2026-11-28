@@ -376,7 +376,7 @@ impl World {
                 self.solve_joints(h, stiffness, Pass::Relax, least, u32::MAX);
                 self.solve_contacts(h, stiffness, false, substep as usize, least, pass == relaxes);
             }
-            self.solve_impacts();
+            self.solve_impacts(substep as usize);
             self.project_multibodies();
             self.clamp_speeds();
             tick(self, 9, inner);
