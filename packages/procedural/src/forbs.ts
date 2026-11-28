@@ -8,8 +8,7 @@
 // M. Okabe and T. Igarashi, "Floral diagrams and inflorescences: interactive flower modeling using botanical structural
 // constraints", SIGGRAPH 2005). Heights, leaf and head sizes are from the species' floras (see FORB_SPECIES). Metres,
 // local origin at the root, +Y up.
-import { geometryData, type GeometryData } from '@margoengine/geometry';
-import { computeVertexNormals } from '@margoengine/geometry/utils';
+import { computeVertexNormals, geometryData, type GeometryData } from '@margoengine/geometry/utils';
 
 /** The forbs drawn: heartleaf arnica, Parry's gentian, alpine aster, American bistort and moss campion. */
 export type ForbSpecies = 'arnica' | 'gentian' | 'aster' | 'bistort' | 'campion';
