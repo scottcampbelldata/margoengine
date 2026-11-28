@@ -246,6 +246,197 @@ Six more entries are separate imports, so a screen that does not use them does n
 - `@margoengine/ui/i18n` has `Localization`: message tables per locale with `{name}` substitutions and plural forms, a fallback chain, text direction taken from the locale's script (or set with `directions`), and `missing: 'error'` to throw on a missing key instead of showing the key. `bind` ties a translation to a widget, so a locale change reflows the layout on the next frame.
 - `@margoengine/ui/editor` has `LayoutDocument` (a markup layout with undo and redo, validated before each edit commits, saved as a project string) and `LayoutEditor`, a browser editor over it (options `ui`, `canvas`, `actions` and `signal`). Action handlers named in the markup come only from the options you pass, never from the saved project.
 
+### Text fields (`@margoengine/ui/input`)
+
+`TextInput` and `TextArea` are painted by the canvas, but the editing is the browser's: `attachTextInputs(ui, canvas)`
+keeps one invisible `<input>` or `<textarea>` over each field, so selection with the keyboard, the clipboard (cut, copy
+and paste, with the system shortcuts and context menu), undo, spellcheck, autofill, mobile keyboards and IME
+composition all behave as in any web form. The canvas reads the value and selection back after every native `input`,
+`select` and `keyup`, and while an IME composes (`field.composing` is `true`), it draws the composition and never resets
+the native value or selection, which would end it.
+
+```ts
+import { Button, Panel, Ui, UiRenderer } from '@margoengine/ui';
+import { Engine } from '@margoengine/core';
+import { TextArea, TextInput, attachTextInputs } from '@margoengine/ui/input';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const ui = new Ui();
+const name = new TextInput({ label: 'Name', placeholder: 'Your name', maxLength: 24, required: true });
+const password = new TextInput({ label: 'Password', type: 'password', autocomplete: 'current-password' });
+const notes = new TextArea({ label: 'Notes', value: 'First line\r\nSecond line' });
+ui.add(new Panel({ anchor: 'center', gap: 12, children: [name, password, notes, new Button({ text: 'Sign in' })] }));
+UiRenderer.attach(engine, ui); // first the renderer, then the native fields
+const detach = attachTextInputs(ui, canvas);
+
+name.on('change', () => console.log('typed', name.value));
+name.on('submit', () => ui.focus(password)); // Enter in a single-line field, never while composing
+name.value = 'Ada'; // set from code: no change event
+name.setSelectionRange(3);
+name.insertText(' Lovelace'); // as a virtual keyboard types: replaces the selection, keeps maxLength, emits change
+console.log(name.value, name.selectionStart, notes.value.split('\n').length); // 'Ada Lovelace' 12 2
+engine.start();
+// Later: detach() (or `using`) removes the native fields and their listeners.
+detach();
+```
+
+| Option | Default |
+| --- | --- |
+| `value` | `''`; a `TextInput` drops line breaks, a `TextArea` turns `\r\n` and `\r` into `\n` |
+| `placeholder` | `''`, shown while the field is empty; also the accessible name when there is no `label` |
+| `type` | `'text'`; `'password'` draws one bullet per grapheme over a native password input (`TextInput` only) |
+| `readOnly` | `false`; read-only text can still be selected and copied |
+| `maxLength` | `-1` (no limit), in UTF-16 units as in HTML; `insertText` stops at a whole grapheme within it |
+| `autocomplete` | `'off'`, passed to the native control (`'username'`, `'current-password'`, ...) |
+| `spellcheck` | `true`, `false` for passwords |
+| `required`, `invalid` | `false`, mirrored as `aria-required` and `aria-invalid` |
+| `onChange`, `onSubmit` | `change` after every user edit, IME updates included; `submit` on Enter in a `TextInput` |
+
+Selection follows HTML: `selectionStart`, `selectionEnd` and `selectionDirection` in UTF-16 units, and
+`setSelectionRange(start, end, direction)` and `select()` as on an `<input>` (bounds given backwards collapse at the end).
+On the canvas a press places the caret, a drag selects, a double press selects a word (by `Intl.Segmenter`) and a triple
+press selects everything. A gamepad's accept button, or `activate()`, moves the native focus into the field to start
+editing; Escape hands focus back to the canvas. `insertText(text)` is for virtual keyboards and app code: it goes through
+the same edit path as native typing but not through the browser's undo history.
+
+Accessibility: each native control carries the field's `label` (or its placeholder) as `aria-label`, its `description`,
+`aria-required` and `aria-invalid`, and stays in the accessibility tree where the canvas cannot be. The controls have
+`tabindex="-1"`: Tab and Shift+Tab move through the `Ui`'s own focus order, and at either end leave the `Ui` for the
+next focusable element of the page. A hidden or disabled field (or one under a disabled panel, or behind a modal) has its
+native control hidden or disabled too.
+
+Lifetime: `attachTextInputs` returns a `Detach`; call it, `using` it, or abort `options.signal` to remove every native
+control and listener. `options.container` sets where the controls are placed (default the canvas's parent). A field taken
+out of the `Ui` loses its control at the next change of the `Ui`. Attach once per `Ui`, after its `UiRenderer`.
+
+### Images and nine-slice borders (`@margoengine/ui/image`)
+
+An `ImageTexture` is a snapshot: it copies straight-alpha sRGB RGBA bytes when it is made and never changes after, so
+the source can be closed, reused or redrawn at once. Make one from bytes, from anything `drawImage` takes
+(`ImageTexture.from(image | video | canvas | bitmap)`, at its natural size; a video gives its current frame), or from a
+URL (`await ImageTexture.load(url, { signal })`, which fetches, decodes and closes its own bitmap; an aborted signal
+rejects with the signal's reason, and a failed fetch or decode rejects with a `MargoError`).
+
+```ts
+import { Panel, Ui } from '@margoengine/ui';
+import { Image, ImageTexture } from '@margoengine/ui/image';
+
+// A 4 by 2 atlas: a red cell on the left, a blue cell on the right.
+const pixels = new Uint8Array(4 * 2 * 4);
+for (let i = 0; i < 8; i++) pixels.set(i % 4 < 2 ? [220, 40, 40, 255] : [40, 80, 220, 255], i * 4);
+const atlas = new ImageTexture(4, 2, pixels);
+pixels.fill(0); // the texture kept its own copy
+
+const red = new Image({ texture: atlas, source: { x: 0, y: 0, width: 2, height: 2 }, width: 48, height: 48 });
+const blue = new Image({ texture: atlas, source: { x: 2, y: 0, width: 2, height: 2 }, fit: 'cover', tint: [1, 1, 1, 0.5] });
+const frame = new Image({ texture: atlas, slice: 1, borderScale: 8, width: 200, height: 80 }); // corners stay 8 units
+const ui = new Ui({ width: 320, height: 200 });
+ui.add(new Panel({ anchor: 'center', gap: 8, children: [red, blue, frame] }));
+console.log(atlas.width, atlas.height, red.measure(), blue.measure()); // 4 2 { width: 2, height: 2 } { width: 2, height: 2 }
+
+const drawn = new OffscreenCanvas(3, 5);
+drawn.getContext('2d')!.fillRect(0, 0, 3, 5);
+const url = URL.createObjectURL(await drawn.convertToBlob()); // or any same-origin or CORS image URL
+const icon = await ImageTexture.load(url, { signal: AbortSignal.timeout(5000) });
+URL.revokeObjectURL(url);
+red.texture = icon; // swap at any time; the old texture is left for the garbage collector
+red.source = undefined; // the whole new texture
+console.log(icon.width, icon.height); // 3 5
+```
+
+| `new Image({...})` option | Default |
+| --- | --- |
+| `texture` | required, an `ImageTexture` |
+| `source` | the whole texture; an integer pixel rectangle inside it, for one cell of an atlas |
+| `fit` | `'contain'` (letterboxed); `'cover'` fills the box and crops the source's middle; `'fill'` stretches |
+| `slice` | none; top, right, bottom and left border pixels of the source (`Edges`, as `padding`), for nine-slice frames |
+| `borderScale` | `1` UI unit per border pixel; borders shrink when the box is too small for them |
+| `tint` | `[1, 1, 1, 1]`, straight-alpha sRGB 0 to 1, multiplied into every pixel |
+
+Without `width` and `height` an `Image` measures as its source rectangle in UI units. With `slice`, `fit` does not apply:
+the corners keep their size, the edges stretch one way and the middle both ways. Every option is also a property; a bad
+value, set from the constructor or later, throws (`TypeError` for a missing texture or unknown fit, `RangeError` for a
+source outside the texture, borders wider than it, or a negative `borderScale`) and leaves the widget as it was.
+
+Ownership and GPU residency: an `ImageTexture` holds CPU bytes only, and many `Image`s may share one. The `UiRenderer`
+places what is drawn in its colour atlas (the one emoji use, `colorAtlasSize` 512 by default) as 60 by 60 pixel tiles,
+each with a clamped one-pixel border so filtering never reads a neighbouring cell, and frees the tiles of an image no
+longer drawn at the next upload. There is nothing to dispose on an image: drop the widget and the texture, and
+`renderer.dispose()` frees the atlases. A large image takes many tiles; keep big pictures in an atlas cell no larger
+than they are shown.
+
+### Select, radio buttons, tabs and a colour picker (`@margoengine/ui/forms`)
+
+`Select`, `RadioGroup` and `Tabs` take `options`, a list of `{ label, value, disabled }` whose values are unique strings
+(a `TypeError` otherwise), plus `value` (default: the first enabled option) and `onChange`, which receives
+`{ value, index }`. Setting `value` from code checks it names an option (a `RangeError` otherwise) and emits nothing;
+choices made by the user emit `change`. Disabled options cannot be chosen and arrows skip them.
+
+```ts
+import { Label, Panel, Ui } from '@margoengine/ui';
+import { Checkbox, ColorPicker, RadioGroup, Select, Tabs } from '@margoengine/ui/forms';
+
+const quality = new Select({
+  label: 'Quality',
+  options: [
+    { label: 'Low', value: 'low' },
+    { label: 'High', value: 'high' },
+    { label: 'Ultra', value: 'ultra', disabled: true },
+  ],
+  value: 'high',
+  onChange: (e) => console.log('quality', e.value, e.index),
+});
+quality.select('ultra', true); // ignored: disabled
+quality.command('down'); // as the down arrow or d-pad: the next enabled option, wrapping
+console.log(quality.value, quality.expanded); // 'low' false (logged 'quality low 0' first)
+
+const hand = new RadioGroup({ label: 'Hand', orientation: 'horizontal', options: [{ label: 'Left', value: 'l' }, { label: 'Right', value: 'r' }] });
+const tabs = new Tabs({
+  label: 'Settings',
+  options: [
+    { label: 'Video', value: 'video', panel: new Panel({ children: [quality] }) },
+    { label: 'Controls', value: 'controls', panel: new Panel({ children: [hand, new Checkbox({ text: 'Invert Y' })] }) },
+  ],
+});
+tabs.value = 'controls';
+console.log(hand.value, tabs.panels.map((p) => p.visible)); // 'l' [false, true]
+
+const tint = new ColorPicker({ value: '#FF8000' });
+console.log(tint.value, tint.hue.toFixed(3), tint.saturation); // '#ff8000ff' '0.084' 1
+tint.value = '#000000';
+console.log(tint.value, tint.hue.toFixed(3), tint.saturation); // '#000000ff' '0.084' 1: black keeps its hue and saturation
+tint.setHSV(0, 0, 1); // from your own control; emits change
+console.log(tint.value, tint.hexInput.value); // '#ffffffff' '#ffffffff'
+
+const ui = new Ui({ width: 640, height: 480 });
+ui.add(new Panel({ anchor: 'center', gap: 12, children: [new Label({ text: 'Options' }), tabs, tint] }));
+tabs.dispose(); // disposes every tab's content, the Select (and an open popup) with it
+```
+
+- `Select` is a button showing the chosen label; activating it (press, Enter, gamepad accept) opens a modal dialog with a
+  `List` of the options, focus on the current one. Picking an option, Escape or a press outside closes it. `expanded`
+  and `popupId` say whether it is open; the `Select` owns the popup and `dispose()` closes it, so a `Select` removed
+  while open leaves no dialog behind. Up, down, left and right step through the enabled options without opening it.
+- `Checkbox` is a `Toggle` drawn as a checkbox, with all of `Toggle`'s options and accessibility.
+- `RadioGroup` has one tab stop, on the chosen option (or the first enabled one); arrows move the choice and focus
+  together and wrap. `orientation` is `'vertical'` by default; `buttons` are its controls in option order.
+- `Tabs` is a `RadioGroup` whose options each carry the `panel` widget to show (default orientation `'horizontal'`).
+  `Tabs` owns those widgets: each goes in its own panel, only the chosen one is visible, and `tabs.dispose()` disposes all
+  of them. Choosing a tab with the arrows shows it at once (automatic activation).
+- `ColorPicker` has a saturation and value square, `Hue`, `Saturation`, `Value`, `Red`, `Green`, `Blue` and `Alpha` sliders
+  (0 to 1 in steps of 1/255) and `hexInput`, a `TextInput` that applies a complete `#rrggbb` or `#rrggbbaa` as you type.
+  `value` reads back normalised as lowercase `#rrggbbaa` (default `#ffffff`, so `#ffffffff`); it accepts `#rgb`,
+  `#rrggbb` or `#rrggbbaa`. `hue` and `saturation` (0 to 1) are kept on their own: a grey keeps its hue and black keeps
+  its saturation, so dragging the value back up returns the colour you had. `setHSV(h, s, v)` throws a `RangeError`
+  outside 0 to 1 and does nothing while the picker is disabled.
+
+The screen-reader mirror (`UiRenderer`'s, see Accessibility) knows buttons and sliders. `attachFormsMirror(ui, canvas)`
+adds what forms need: `role="combobox"` with `aria-expanded` and `aria-controls` on a `Select`, `radiogroup` and `radio`
+with `aria-checked` and `aria-orientation`, and `tablist`, `tab` and `tabpanel` with `aria-selected`, `aria-controls` and
+`aria-labelledby`. It also moves the real DOM focus into a `Select`'s popup and back. Call it once after the
+`UiRenderer`; it returns a `Detach` (call it, `using` it, or pass `{ signal }`).
+
 ## Theming
 
 `themes.dark` is the default (`themeForPreferences()` picks high contrast, light or dark from the user's settings).
@@ -586,6 +777,106 @@ panel under a ray, `screenRay(camera, x, y, width, height)` the ray under a canv
 pointing ray. Give a panel's `Ui` to `WorldPanels` only, never also to `UiRenderer`: the renderer would resize it to the
 canvas. Keyboard and gamepad focus work as on the screen through the panel's own `ui` (`ui.bindInput`, `ui.navigate`).
 
+### Curved panels and panel layouts (`@margoengine/ui/curved`)
+
+`CurvedPanel` is a `WorldPanel` bent onto a cylinder or a sphere, for a menu that wraps around the player. It takes every
+`WorldPanel` option; `width` and `height` are arc lengths in metres along the surface, and the panel's origin is the
+middle of the patch, where the surface touches the panel's local `z = 0` plane, with the centre of curvature at
+`[0, 0, -radius]` (the UI faces +Z, so the curve bows away from a viewer in front of it).
+
+| `new CurvedPanel(ui, {...})` option | Default |
+| --- | --- |
+| `shape` | `'cylinder'`: curved left to right only; `'sphere'` curves top to bottom too |
+| `radius` | `2` metres; must be positive and finite |
+| `segments` | `64` quads per curved axis, an integer from 4 to 512; only the drawing is tessellated |
+| every `WorldPanel` option | as above (`width`, `height`, `position`, `rotation`, `pixelRatio`, `doubleSided`) |
+
+The constructor throws a `RangeError` for an unknown shape, a radius that is not positive, segments outside 4 to 512, a
+width of one full circumference or more, or (for a sphere) a height of half a circumference or more.
+
+A ray hits the exact cylinder or sphere, not the drawn triangles, so a press lands on the same UI pixel whatever
+`segments` is. `panel.pointAt(u, v)` is the local position of a UI point given as 0 to 1 across and down (`[0, 0, 0]` at
+the middle, `pointAt(0, 0)` the top left corner); the shader draws with the same mapping. `intersect` reports `back: true`
+for a hit from behind, mirrored so the UI reads, and skips it unless the panel is `doubleSided`.
+
+`layoutPanels(panels, options)` sets the pose of each panel, row by row, on a plane, cylinder or sphere; it works for
+flat `WorldPanel`s and `CurvedPanel`s alike and keeps their sizes. Each panel faces out from the centre of curvature,
+or toward it with `inward: true`, tangent to the surface. The last row, when shorter, is centred.
+
+| `layoutPanels(panels, {...})` option | Default |
+| --- | --- |
+| `shape` | `'plane'`; `'cylinder'` or `'sphere'` put the panels round an arc |
+| `columns` | `ceil(sqrt(panels.length))` |
+| `spacing` | `[1.2, 0.8]` metres between panel centres across and down, measured along the arc |
+| `radius` | `2` metres |
+| `position` | `[0, 0, 0]`: the middle of the arrangement, where it touches its tangent plane |
+| `inward` | `false`: panels face away from the centre of curvature |
+
+It throws a `RangeError` for an unknown shape, columns that are not a positive integer, a spacing or radius that is not
+positive, a position that is not finite, or an arrangement that would wrap onto itself (a row as long as the
+circumference, or for a sphere, a column as tall as half of it).
+
+```ts
+import { Button, Label, Panel, Ui } from '@margoengine/ui';
+import { CurvedPanel, layoutPanels } from '@margoengine/ui/curved';
+
+const screen = (title: string) => {
+  const ui = new Ui({ width: 400, height: 240 });
+  ui.add(
+    new Panel({
+      background: 'surface',
+      anchor: 'stretch',
+      padding: 16,
+      children: [new Label({ text: title, size: 'title' }), new Button({ text: 'Open' })],
+    }),
+  );
+  return ui;
+};
+const wall = new CurvedPanel(screen('Inventory'), { width: 2, radius: 1.5, position: [0, 1.5, -1.5] });
+console.log(wall.surface, wall.pointAt(0.5, 0.5)); // [1.5, 1, 64, 1] [0, 0, 0]
+const hit = wall.intersect({ origin: [0, 1.5, 0], direction: [0, 0, -1] });
+console.log(hit?.inside, hit?.x, hit?.y); // true 200 120: the middle of the 400 by 240 UI
+
+const menus = ['Map', 'Quests', 'Crafting', 'Settings'].map((title) => new CurvedPanel(screen(title), { width: 1, radius: 2 }));
+layoutPanels(menus, { shape: 'cylinder', columns: 4, spacing: [1.1, 0.8], radius: 2, position: [0, 1.5, -2], inward: true });
+console.log(menus.map((panel) => panel.matrix[13].toFixed(2))); // ['1.50', '1.50', '1.50', '1.50']
+```
+
+Add the panels to a `WorldPanels` (or the `@margoengine/ui/world-gl` one below) as any other panel.
+
+### World panels on every backend (`@margoengine/ui/world-gl`)
+
+`@margoengine/ui/world` draws with WebGPU only: native WebGPU and the full WebGL2 compatibility layer, which both
+report `backend: 'webgpu'`. `@margoengine/ui/world-gl` exports everything `@margoengine/ui/world` does, with a
+`WorldPanels` that also draws on the small `@margoengine/webgl2-compat/preview` renderer. Swap the import and nothing
+else changes:
+
+```ts
+import { Engine } from '@margoengine/core';
+import { webglRenderer } from '@margoengine/webgl2-compat/preview';
+import { Button, Panel, Ui } from '@margoengine/ui';
+import { WorldPanel, WorldPanels } from '@margoengine/ui/world-gl';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { fallback: webglRenderer });
+const menu = new Ui({ width: 320, height: 200 });
+menu.add(new Panel({ background: 'surface', anchor: 'stretch', padding: 16, children: [new Button({ text: 'Start' })] }));
+const panels = WorldPanels.attach(engine); // the WebGPU renderer on 'webgpu', its own WebGL2 program on 'webgl2'
+panels.add(new WorldPanel(menu, { width: 1, position: [0, 1.5, -1.5] }));
+console.log(engine.backend, panels.list.length); // 'webgpu' 1, or 'webgl2' 1 where WebGPU is missing
+engine.start();
+```
+
+On `backend: 'webgpu'` it is the WebGPU `WorldPanels`, unchanged. On the preview it keeps the same options (`order`,
+`input`, `signal`), the same `WorldPanel` and `CurvedPanel` options, the same canvas pointer routing and the same
+`pointer` and `controller` rays. What differs on the preview:
+
+- Each panel draws into a WebGL2 texture with a full mip chain, then onto the scene with depth test, no depth write and
+  premultiplied alpha, after the frame; the WebGL2 state it changes is put back afterwards.
+- A panel larger than the context's `MAX_TEXTURE_SIZE` (its UI size times `pixelRatio`) throws a `RangeError` at its
+  first draw; lower its size or `pixelRatio`.
+- When the engine restores a lost context, the panel textures and the program are made again.
+- `dispose()` (or `using`) deletes every panel's texture, framebuffer and painter, the program, and the canvas listeners.
+
 ## Markup and style sheets
 
 ```ts
@@ -683,7 +974,7 @@ after that load. An unchanged UI uploads nothing; it is drawn again each frame b
 
 ## Limits
 
-- World panels require native WebGPU or the full compatibility layer and refuse the small preview during setup. Screen UI has a real preview route.
+- `@margoengine/ui/world` panels require native WebGPU or the full compatibility layer and refuse the small preview during setup; `@margoengine/ui/world-gl` draws them on the preview too. Screen UI has a real preview route.
 - A world panel is drawn with depth test and no depth write, so it does not hide transparent effects drawn after it; one texture and one pair of glyph atlases per panel. A `CurvedPanel` (`@margoengine/ui/curved`) is a tessellated cylinder or sphere patch; its rays hit the analytic surface.
 - Shaping is the browser's, one word at a time: a run never crosses a space, so no join or ligature forms across
   words. Only labels and wrapped text follow the text direction: toggles, slider values, list details and rows of
