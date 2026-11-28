@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { KernelWorld, Physics, convexHull, loadKernel } from '../dist/index.js';
+import { moduleHooks } from '../../../scripts/support/node-compat.mjs';
 
 await Physics.load();
 
@@ -278,6 +279,8 @@ test('a hull without points is the hull of the given geometry, scaled with the m
 // replaced, 5e-15 times the product of the three L1 lengths, called a point 2e-15 above a face spanned by 4 by 4 in
 // plane not above it, though its volume of 3.2e-14 is exact (every other product is zero); the paper bounds it by 2.5e-29.
 test('a point a hair above a face counts as above it, and rounding noise never does', async () => {
+  // The source's own imports name their built '.js' files (since DYN-01 hull.ts imports './rigid-errors.js'): the hooks map them.
+  await moduleHooks([{ source: new URL('../src/', import.meta.url).href }]);
   const { beyond } = await import('../src/hull.ts');
   assert.equal(beyond(4, 0, 0, 0, 4, 0, 3, 3, 2e-15), true, 'an exact volume of 3.2e-14 is above the bound');
   assert.equal(beyond(0, 4, 0, 4, 0, 0, 3, 3, 2e-15), false, 'the same corners the other way round are below');

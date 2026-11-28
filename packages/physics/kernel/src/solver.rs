@@ -826,8 +826,8 @@ impl World {
     /// speed back out. `least`: a pair joins only when its island asks for at least this many extra passes (see `step`).
     /// `last`: the last relaxing pass, after which what the points hold is what they gave in this substep.
     ///
-    /// Gauss-Seidel over the pairs. Within a pair, friction takes one sweep over the points, the first point turning each
-    /// substep; the normal rows sweep until no impulse moves by more than rounding. From one sweep the first point held a
+    /// Gauss-Seidel over the pairs. Within a pair the normal rows, and in the relaxing pass the friction rows, sweep over the
+    /// points, the first point turning each substep, until no impulse moves by more than rounding. From one sweep the first point held a
     /// whole strike: a cube dropped flat on its face spun and slid off sideways, and two meeting head on left turning
     /// (`a_cube_dropped_flat_lands_flat`). The soft pass solves friction first, from the normal so far; the relaxing pass
     /// solves the normal first, so friction's cone is what the normal holds once the push is out. From the soft pass's
@@ -946,7 +946,14 @@ impl World {
         zero
     }
 
-    /// A pair's friction, one sweep over the points, each in a circular cone of mu times its normal impulse so far.
+    /// A pair's friction, swept over the points until it settles, each in a circular cone of mu times its normal impulse so
+    /// far. From one sweep the points' shares were uneven: the busiest reached its cone while the patch held well inside its
+    /// own, its anchor alone was cut, and anchors cut one at a time no longer agreed with any rigid move, so the points pushed
+    /// against each other at their cones and a plate 60 m from a pitching deck's axis slid 2 mm at 1.3 times its friction
+    /// demand (KB-PHYS-CONECUT1). The relaxing pass, which decides the cuts, sweeps until it settles, and an anchor is cut from
+    /// its last sweep's answer, the one the point holds. The pushing pass keeps one sweep: swept to the end, its anchors' pull
+    /// did work no relaxing pass took back, and a web of joints and contacts gained 2e-3 of the work its kinematic bodies did
+    /// (`a_web_of_joints_stays_in_the_numbers`, which allows 1e-6).
     fn friction_rows(&mut self, row: usize, step: Soft, biased: bool, turn: usize, body_a: &mut Moving, body_b: &mut Moving) {
         if self.header().friction_model == 1 && self.uu(PAIR_CONTACTS, row) > 1 {
             return self.simplified_friction(row, step, biased, body_a, body_b);
@@ -957,38 +964,59 @@ impl World {
         let friction = self.s(PAIR_FRICTION, row);
         let surface = self.v(PAIR_SURFACE_X, row);
         let count = self.uu(PAIR_CONTACTS, row) as usize;
-        for k in 0..count {
-            let at = row * MANIFOLD + (k + turn) % count;
-            let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
-            let pressed = self.s(CONTACT_NORMAL_IMPULSE, at);
-            let held = self.v(CONTACT_TANGENT_X, at);
-            let drift = self.v(CONTACT_DRIFT_X, at);
-            // A surface that moves (a conveyor) is a relative velocity that sliding is brought to, not to zero.
-            let relative = body_b.at(arm_b).sub(body_a.at(arm_a)).sub(surface);
-            let slide = relative.sub(normal.scale(relative.dot(normal)));
-            let (mass_scale, impulse_scale, target) = if biased {
-                (step.mass_scale, step.impulse_scale, slide.add(drift.scale(step.bias_rate)))
-            } else {
-                (1.0, 0.0, slide)
-            };
-            let along = -self.s(CONTACT_TANGENT_MASS, at) * mass_scale * target.dot(tangent) - impulse_scale * held.dot(tangent);
-            let across = -self.s(CONTACT_OTHER_MASS, at) * mass_scale * target.dot(other) - impulse_scale * held.dot(other);
-            let mut next = held.add(tangent.scale(along)).add(other.scale(across));
-            let most = friction * pressed;
-            let squared = next.dot(next);
-            if squared > most * most {
-                let cut = most / sqrt(squared);
-                next = next.scale(cut);
-                // Only the last word counts: within a substep the first point of a manifold sees the whole load. The anchor
-                // comes along, to where the cone holds it: a sliding block pulls it along, and one that stops holds from there.
-                if !biased {
-                    self.set_v(CONTACT_DRIFT_X, at, drift.scale(cut));
+        let mut cuts = [1.0f32; MANIFOLD];
+        let mut sweeps = 0;
+        loop {
+            let (mut moved, mut largest) = (0.0f32, 0.0f32);
+            for k in 0..count {
+                let at = row * MANIFOLD + (k + turn) % count;
+                let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
+                let pressed = self.s(CONTACT_NORMAL_IMPULSE, at);
+                let held = self.v(CONTACT_TANGENT_X, at);
+                let drift = self.v(CONTACT_DRIFT_X, at);
+                // A surface that moves (a conveyor) is a relative velocity that sliding is brought to, not to zero.
+                let relative = body_b.at(arm_b).sub(body_a.at(arm_a)).sub(surface);
+                let slide = relative.sub(normal.scale(relative.dot(normal)));
+                let (mass_scale, impulse_scale, target) = if biased {
+                    (step.mass_scale, step.impulse_scale, slide.add(drift.scale(step.bias_rate)))
+                } else {
+                    (1.0, 0.0, slide)
+                };
+                let along = -self.s(CONTACT_TANGENT_MASS, at) * mass_scale * target.dot(tangent) - impulse_scale * held.dot(tangent);
+                let across = -self.s(CONTACT_OTHER_MASS, at) * mass_scale * target.dot(other) - impulse_scale * held.dot(other);
+                let mut next = held.add(tangent.scale(along)).add(other.scale(across));
+                let most = friction * pressed;
+                let squared = next.dot(next);
+                cuts[(k + turn) % count] = 1.0;
+                if squared > most * most {
+                    let cut = most / sqrt(squared);
+                    next = next.scale(cut);
+                    cuts[(k + turn) % count] = cut;
+                }
+                let applied = next.sub(held);
+                body_a.push(applied.scale(-1.0), arm_a);
+                body_b.push(applied, arm_b);
+                self.set_v(CONTACT_TANGENT_X, at, next);
+                let size = sqrt(applied.dot(applied));
+                moved = if size > moved { size } else { moved };
+                let total = sqrt(next.dot(next));
+                largest = if total > largest { total } else { largest };
+            }
+            sweeps += 1;
+            // One sweep when pushing (see above); the relaxing pass sweeps until the shares settle.
+            if biased || count == 1 || moved <= f32::EPSILON * largest || sweeps == SWEEPS {
+                break;
+            }
+        }
+        // Only the last word counts: within a substep the first point of a manifold sees the whole load. The anchor comes
+        // along, to where the cone holds it: a sliding block pulls it along, and one that stops holds from there.
+        if !biased {
+            for (k, cut) in cuts.iter().enumerate().take(count) {
+                if *cut < 1.0 {
+                    let at = row * MANIFOLD + k;
+                    self.set_v(CONTACT_DRIFT_X, at, self.v(CONTACT_DRIFT_X, at).scale(*cut));
                 }
             }
-            let applied = next.sub(held);
-            body_a.push(applied.scale(-1.0), arm_a);
-            body_b.push(applied, arm_b);
-            self.set_v(CONTACT_TANGENT_X, at, next);
         }
     }
 
@@ -1124,12 +1152,21 @@ impl World {
             // A bouncy pair's approach is its pre-solve speed (`note_approach`), not one an earlier pair's push gave in this pass.
             approach[k] = if bounce > 0.0 { self.s(CONTACT_APPROACH, at) } else { speed[k] };
             open[k] = gap;
+            // What the gap's float32 sums round by: two units of the last place of the largest coordinate in them, the
+            // bodies' centres and the points the gap is measured between.
+            let large = |p: V3| p.x.abs().max(p.y.abs()).max(p.z.abs());
+            let reach = large(center_a).max(large(center_b)).max(large(on_a)).max(large(on_b));
+            let rounding = 2.0 * f32::EPSILON * reach;
             (bias[k], scale[k], leak[k]) = if gap > 0.0 {
                 (gap / h, 1.0, 0.0)
-            } else if biased && gap + slop > 0.0 {
+            } else if biased && gap + slop > rounding {
                 // Inside the slop the point closes to the slop's depth as a speculative row, rigidly (Catto's Solver2D
                 // soft step). A soft row here, with nothing to push, let a point sink at a speed that followed its load,
-                // so a cube on a slope tilted downhill for its first second.
+                // so a cube on a slope tilted downhill for its first second. A point the row has closed is at the slop to
+                // within the gap's rounding, and from there it is the soft row's, which sinks it on to where its spring
+                // holds the load. Closed to a rounding short of the slop it stayed in this row, held there with no give,
+                // while one a rounding past it sank by the give, g / omega^2: the resting depth jumped by that with g
+                // changed in its fifth digit (KB-PHYS-RESTDEPTH1).
                 ((gap + slop) / h, 1.0, 0.0)
             } else if biased {
                 let depth = gap + slop;

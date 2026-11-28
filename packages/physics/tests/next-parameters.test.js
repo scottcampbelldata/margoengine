@@ -319,24 +319,30 @@ test('the solver settings do what they say: stiffness, allowed depth, push-out s
   );
   // The same scene at a tenth of the size, with the default damping ratio of 10: float32 spacing is ten times finer, and the depth
   // agrees ten times closer (0.05 micrometre against 0.36), which is what rounding, and not a fault of the solver, does.
-  const small = new Physics(null);
-  small.setSolver({ contactHertz: 60, allowedPenetration: 0.003 });
-  small.addBody(null, {
-    type: 'fixed',
-    position: [0, -0.05, 0],
-    colliders: { shape: 'box', halfExtents: [2, 0.05, 2] },
-  });
-  const ball = small.addBody(null, {
-    position: [0, 0.06, 0],
-    canSleep: false,
-    colliders: { shape: 'sphere', radius: 0.05, density: 1000 },
-  });
-  steps(small, 900);
-  assert.ok(
-    Math.abs(0.05 - ball.position[1] - 0.003 - give(60)) < 1e-7,
-    `a tenth the size, the default damping ratio: ${0.05 - ball.position[1] - 0.003} against ${give(60)}`,
-  );
-  small.dispose();
+  // Any g gives that depth, standard gravity as well: the rigid row inside the slop once left a ball closed a rounding short of
+  // it with no give, so at 9.80665 it rested 6.9e-5 m higher than at 9.81 (KB-PHYS-RESTDEPTH1).
+  for (const g of [9.81, 9.80665, 9.82]) {
+    const small = new Physics(null, { gravity: [0, -g, 0] });
+    small.setSolver({ contactHertz: 60, allowedPenetration: 0.003 });
+    small.addBody(null, {
+      type: 'fixed',
+      position: [0, -0.05, 0],
+      colliders: { shape: 'box', halfExtents: [2, 0.05, 2] },
+    });
+    const ball = small.addBody(null, {
+      position: [0, 0.06, 0],
+      canSleep: false,
+      colliders: { shape: 'sphere', radius: 0.05, density: 1000 },
+    });
+    steps(small, 900);
+    const sunk = 0.05 - ball.position[1] - 0.003,
+      spring = (give(60) * g) / 9.81;
+    assert.ok(
+      Math.abs(sunk - spring) < 1e-7,
+      `a tenth the size, the default damping ratio, g ${g}: ${sunk} against ${spring}`,
+    );
+    small.dispose();
+  }
   assert.ok(cold < 0.005, `a cold start still settles it (${cold})`);
 
   // How fast a depth is pushed out: two boxes started 0.5 m into each other leave no faster than the cap.

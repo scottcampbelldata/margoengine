@@ -781,3 +781,89 @@ fn a_smooth_path_spins_each_substep_by_the_turn_its_poses_make_when_its_axis_swi
         assert!(size(made.sub(b.sub(a))) > 10.0 * size(made.sub(spun)), "substep {s}: b - a would have done as well");
     }
 }
+
+#[test]
+fn a_resting_depth_is_continuous_in_the_load_inside_and_past_the_slop() {
+    // A 5 cm ball on a box, 60 Hz contacts, 3 mm of slop: whatever g, it rests at the slop plus the soft spring's give,
+    // g / omega^2 (Catto 2011), wherever it settles. The rigid row inside the slop closed to the slop alone, so a ball that
+    // settled a rounding short of it stayed there with no give: at 9.80665 and 9.82 it rested 6.9e-5 m higher than at 9.81,
+    // a jump the load's fifth digit made (KB-PHYS-RESTDEPTH1). The bound is the small scene's of next-parameters.test.js,
+    // 1e-7 m: the soft step's float32 rounding at this size (KB-PHYS-SOFTGIVE1), seven hundred times under the jump.
+    let rest = |g: f32, from: f32| {
+        let mut w = world(2);
+        let fixed = w.add_body(FIXED).unwrap();
+        w.add_collider(fixed, SHAPE_BOX, [2.0, 0.05, 2.0], [0.0; 3], IDENTITY, 0.0).unwrap();
+        w.set_v(POSITION_X, fixed as usize, v3(0.0, -0.05, 0.0));
+        let body = w.add_body(DYNAMIC).unwrap();
+        w.add_collider(body, SHAPE_BALL, [0.05, 0.0, 0.0], [0.0; 3], IDENTITY, 1000.0).unwrap();
+        w.set_v(POSITION_X, body as usize, v3(0.0, from, 0.0));
+        no_sleep(&mut w, body);
+        let header = w.header_mut();
+        (header.gravity, header.contact_hertz, header.contact_slop) = ([0.0, -g, 0.0], 60.0, 0.003);
+        for _ in 0..900 {
+            w.step(DT);
+        }
+        0.05 - w.v(POSITION_X, body as usize).y - 0.003
+    };
+    let omega = 2.0 * std::f32::consts::PI * 60.0;
+    for g in [2.0f32, 9.8, 9.80665, 9.81, 9.82, 9.9, 20.0] {
+        // Dropped from 1 cm, set down inside the slop, and set down past it.
+        for from in [0.06f32, 0.0475, 0.04698] {
+            let (past, give) = (rest(g, from), g / (omega * omega));
+            assert!((past - give).abs() < 1e-7, "g {g} from {from}: rests {past:e} past the slop, the give is {give:e}");
+        }
+    }
+}
+
+#[test]
+fn a_plate_held_near_its_friction_rides_a_deck_pitching_far_from_it() {
+    // The smooth-path pitching deck of `a_plate_rides_a_deck_on_a_smooth_path_for_minutes_at_any_substeps`, the plate 60 m
+    // from the axis, with friction 0.138: 1.3 times the most the pitch asks of it (its tilt, the turn's w^2 r and the swing
+    // of its load, about 0.106). Its friction took one sweep over the four corners, whose shares came out uneven, so the
+    // busiest corner met its own cone while the plate held 30 percent inside its own, and its anchor alone was cut; anchors
+    // cut one corner at a time pushed against each other, and the plate slid 2.2 mm in 36 s (KB-PHYS-CONECUT1). With the
+    // sweeps run until they settle it keeps to its contacts' softness, as at friction 0.5.
+    let mut w = world(4);
+    let deck = w.add_body(KINEMATIC_POSITION).unwrap();
+    let floor = w.add_collider(deck, SHAPE_BOX, [70.0, 0.5, 8.0], [0.0; 3], IDENTITY, 0.0).unwrap();
+    w.set_v(POSITION_X, deck as usize, v3(60.0, -0.5, 0.0));
+    w.set_u(FLAGS, deck as usize, w.flags(deck as usize) | SMOOTH_PATH);
+    let plate = w.add_body(DYNAMIC).unwrap();
+    let top = w.add_collider(plate, SHAPE_BOX, [0.12, 0.01, 0.12], [0.0; 3], IDENTITY, 600.0).unwrap();
+    w.set_v(POSITION_X, plate as usize, v3(0.0, 0.01, 0.0));
+    no_sleep(&mut w, plate);
+    for c in [floor, top] {
+        w.set_s(COLLIDER_FRICTION, c as usize, 0.138);
+    }
+    let (amplitude, omega) = (4.0f64.to_radians(), 2.0 * std::f64::consts::PI / 9.0);
+    let angle = |t: f64| amplitude * (omega * t + 1.0).sin();
+    let spin = |t: f64| (amplitude * omega * (omega * t + 1.0).cos()) as f32;
+    let pose = |t: f64| Q { x: 0.0, y: 0.0, z: (angle(t) / 2.0).sin() as f32, w: (angle(t) / 2.0).cos() as f32 };
+    w.set_q(ROTATION_X, deck as usize, pose(0.0));
+    w.set_v(START_ANGULAR_X, deck as usize, v3(0.0, 0.0, spin(0.0)));
+    w.set_v(ANGULAR_X, deck as usize, v3(0.0, 0.0, spin(0.0)));
+    // The plate starts on the deck at its place and speed: turned with it about the axis, moving at w across the 60 m arm.
+    let (c, s) = (angle(0.0).cos() as f32, angle(0.0).sin() as f32);
+    let arm = v3(-60.0 * c - 0.51 * s, -60.0 * s + 0.51 * c, 0.0);
+    w.set_v(POSITION_X, plate as usize, v3(60.0, -0.5, 0.0).add(arm));
+    w.set_q(ROTATION_X, plate as usize, pose(0.0));
+    w.set_v(ANGULAR_X, plate as usize, v3(0.0, 0.0, spin(0.0)));
+    w.set_v(LINEAR_X, plate as usize, v3(-spin(0.0) * arm.y, spin(0.0) * arm.x, 0.0));
+    let local = |w: &World| {
+        let q = w.q(ROTATION_X, deck as usize);
+        q.conjugate().rotate(w.v(POSITION_X, plate as usize).sub(w.v(POSITION_X, deck as usize)))
+    };
+    let start = local(&w);
+    let mut worst = 0.0f32;
+    for i in 1..=(36 * 60) {
+        let t = i as f64 / 60.0;
+        w.set_q(TARGET_ROTATION_X, deck as usize, pose(t));
+        w.set_v(TARGET_X, deck as usize, v3(60.0, -0.5, 0.0));
+        w.set_v(TARGET_ANGULAR_X, deck as usize, v3(0.0, 0.0, spin(t)));
+        w.step(DT);
+        let d = local(&w).sub(start);
+        worst = worst.max((d.x * d.x + d.z * d.z).sqrt());
+    }
+    assert!(worst < 1e-4, "the plate slid {worst} m on the deck at 1.3 times its friction demand");
+    println!("the plate stayed within {worst:e} m of its place at 1.3 times its friction demand");
+}
