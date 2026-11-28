@@ -308,7 +308,7 @@ const stop = new AbortController();
 const yoke = await openRig(scotchYokeRig, 0.142, { angle: 0, signal: stop.signal });
 console.log(signedReading(yoke.drive(1).slide * 1000, ' mm')); // '+76.7 mm'
 
-const train = keyedRig((held, angle) => epicyclicRig({ sun: 21, planet: 18, ring: 57 }, { held, angle }), { signal: stop.signal });
+const train = keyedRig((held: 'sun' | 'ring' | 'carrier', angle: number) => epicyclicRig({ sun: 21, planet: 18, ring: 57 }, { held, angle }), { signal: stop.signal });
 train.drive(1, 'carrier'); // built at 1 radian with the carrier held
 console.log(train.drive(1.2, 'ring').carrier); // rebuilt with the ring held, then driven
 stop.abort(); // disposes the yoke and the train

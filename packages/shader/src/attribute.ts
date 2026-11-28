@@ -12,7 +12,6 @@ import type {
 } from '@margoengine/materials';
 import { StorageBuffer } from './compute.js';
 import { Node, type Host, type Program, type Resource } from './node.js';
-
 const identifier = /^[A-Za-z_][A-Za-z0-9_]*$/,
   type = /^(?:([fiu])32|vec([234])([fiu]))$/;
 const components = (t: string): number => +(type.exec(t)![2] ?? 1);
@@ -66,7 +65,9 @@ export class AttributeReads implements Resource {
       words = new Uint32Array(count * this.stride),
       views = { f: new Float32Array(words.buffer), i: new Int32Array(words.buffer), u: words };
     for (const { name, type: t, offset } of this.list) {
-      const given: VertexAttribute | undefined = geometry.attributes?.[name],
+      // A bare array (the loaders' extra per-vertex scalars, `attributes: {intensity: Float32Array}`) is one f32 a vertex.
+      const raw = geometry.attributes?.[name],
+        given = (raw && !('type' in raw) ? { data: raw, type: 'f32' } : raw) as VertexAttribute | undefined,
         size = components(t),
         kind = scalar(t);
       if (!given)

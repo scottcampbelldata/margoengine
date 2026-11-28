@@ -556,7 +556,7 @@ interface MeshGeometry {
         count: number;
         materialIndex: number;
     }[];
-    attributes?: Readonly<Record<string, VertexAttribute>>;
+    attributes?: Readonly<Record<string, VertexAttribute | ArrayLike<number>>>;
 }
 
 type ParallaxMode = 'offset' | 'occlusion' | 'relief';

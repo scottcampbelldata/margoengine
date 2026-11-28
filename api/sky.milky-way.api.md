@@ -57,7 +57,7 @@ export function galacticCoordinates(direction: readonly [number, number, number]
 
 export function galacticDirection<T extends number[] | Float32Array = number[]>(ra: number, dec: number, out?: T, offset?: number): T;
 
-export function galacticOfDirection(direction: readonly [number, number, number]): {
+export function galacticOfDirection(direction: ArrayLike<number>): {
     l: number;
     b: number;
 };

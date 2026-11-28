@@ -105,8 +105,11 @@ export function galacticDirection<T extends number[] | Float32Array = number[]>(
  * @throws TypeError for a zero or non-finite direction.
  * @example galacticOfDirection([0, 0, -1]); // { l: 0, b: 0 }
  */
-export function galacticOfDirection(direction: readonly [number, number, number]): { l: number; b: number } {
-  const [x, y, z] = direction ?? [],
+export function galacticOfDirection(direction: ArrayLike<number>): { l: number; b: number } {
+  // Any three numbers, galacticDirection's own number[] or Float32Array output included (KB1867b).
+  const x = direction?.[0] as number,
+    y = direction?.[1] as number,
+    z = direction?.[2] as number,
     n = Math.hypot(x, y, z);
   if (!(n > 0 && Number.isFinite(n))) throw new TypeError('Pass the direction as three finite numbers, not all 0.');
   const l = Math.atan2(-x, -z) / rad;

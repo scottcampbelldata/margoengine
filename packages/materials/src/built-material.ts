@@ -2688,9 +2688,10 @@ export interface MeshGeometry {
   groups?: readonly { start: number; count: number; materialIndex: number }[];
   /**
    * Your own per-vertex values by name, read by a node material's `attribute(name, type)` (`@margoengine/shader`).
-   * `setGeometry` uploads them again, a ranged one only its vertices.
+   * `setGeometry` uploads them again, a ranged one only its vertices. A bare array is one `f32` per vertex, as the
+   * loaders give their extra scalars (PCD `intensity`, VTK point scalars, COLLADA channels).
    */
-  attributes?: Readonly<Record<string, VertexAttribute>>;
+  attributes?: Readonly<Record<string, VertexAttribute | ArrayLike<number>>>;
 }
 /** The WGSL type of a per-vertex attribute: one to four 32-bit floats, signed or unsigned integers. */
 export type VertexAttributeType =

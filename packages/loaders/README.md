@@ -1041,11 +1041,11 @@ const { functions, objects } = await parse3MFVolumetric(file);
 console.log(functions.length, objects[0].levelSet?.channel, objects[0].levelSet?.cellSize);
 // A finer surface.
 const fine = await parse3MFVolumetric(file, { levelSetResolution: 128 });
-console.log(fine.indices.length / 3);
+console.log((fine.indices?.length ?? 0) / 3);
 ```
 
 ```ts
-import { export3MF } from 'margoengine/exporters/threemf';
+import { export3MF, type ThreeMFImplicitFunction } from 'margoengine/exporters/threemf';
 import { parse3MFVolumetric } from 'margoengine/loaders/threemf-volumetric';
 
 const geometry = {
@@ -1053,7 +1053,7 @@ const geometry = {
   indices: [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2],
 };
 // Two materials that trade places along x.
-const mix = {
+const mix: ThreeMFImplicitFunction = {
   nodes: [
     { id: 'axes', op: 'decomposevector', in: { A: 'inputs.pos' } },
     { id: 'one', op: 'constant', value: 1 },
@@ -1096,7 +1096,7 @@ const { displacementGroups, meshes } = await parse3MFDisplacement(file);
 console.log(displacementGroups[0].height, meshes[0].triangleGroups.length);
 // A coarser surface for a preview.
 const preview = await parse3MFDisplacement(file, { samplesPerTexel: 0.5, maxSegments: 32 });
-console.log(preview.indices.length / 3);
+console.log((preview.indices?.length ?? 0) / 3);
 ```
 
 ## 3MF boolean shapes
@@ -1117,7 +1117,7 @@ const { shapes } = await parse3MFBoolean(file);
 console.log(shapes[0].operation, shapes[0].operands.length);
 // The shapes alone, without evaluating them.
 const structure = await parse3MFBoolean(file, { evaluate: false });
-console.log(structure.indices.length);
+console.log(structure.indices?.length);
 ```
 
 ## 3MF packages that mix extensions
@@ -1139,10 +1139,10 @@ const file = await export3MF(
   },
 );
 const { indices, lattices } = await parse3MFEvaluated(file);
-console.log(indices.length / 3, lattices[0].lattice.beams.length);
+console.log((indices?.length ?? 0) / 3, lattices[0].lattice.beams.length);
 // Rounder beams.
 const round = await parse3MFEvaluated(file, { beamSegments: 48 });
-console.log(round.indices.length / 3);
+console.log((round.indices?.length ?? 0) / 3);
 ```
 
 ## 3MF beam lattices as triangles

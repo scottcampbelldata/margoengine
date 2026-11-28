@@ -633,13 +633,13 @@ back the eye away along the offset by `max(1, fit * height / width)`, so a bench
 upright phone. `still: matchMedia('(prefers-reduced-motion: reduce)')` jumps straight to the goal. `fov` is set only when
 both shots give one; shot targets are read on every update, so a shot can follow a moving part. CPU only, no plugin.
 
-```js
+```ts
 import { Camera } from '@margoengine/core';
-import { ShotBlend } from '@margoengine/cameras/shots';
+import { ShotBlend, type Shot } from '@margoengine/cameras/shots';
 
 const camera = new Camera({ fov: 42 });
-const bench = { target: [0, 0.06, 0], offset: [-0.85, 0.97, 1.12], fit: 1.25, fov: 42 };
-const detector = { target: [0.43, 0.28, 0], offset: [-0.44, 0.18, 0.1], fit: 1.06, fov: 38 };
+const bench: Shot = { target: [0, 0.06, 0], offset: [-0.85, 0.97, 1.12], fit: 1.25, fov: 42 };
+const detector: Shot = { target: [0.43, 0.28, 0], offset: [-0.44, 0.18, 0.1], fit: 1.06, fov: 38 };
 const shots = new ShotBlend(camera, bench, detector, { rate: 16 });
 shots.goal = 1; // the "Inspect" button
 let frames = 0;

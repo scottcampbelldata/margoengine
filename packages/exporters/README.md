@@ -1656,7 +1656,7 @@ console.log(`${file.length} bytes`);
 The [3MF Volumetric and Implicit Extensions](https://github.com/3MFConsortium/spec_volumetric) describe what fills a part. A function is a stack of PNG slices (`{ image: { sheets } }`, with `filter`, `tile`, `offset` and `scale`) or a graph of native nodes (`{ inputs, nodes, outputs }`, the extension's node names). `objectInfo`'s `volume` samples functions into a node's `color`, `composite` mixture and vendor `properties`; `levelSet` makes the node's shape the region where a function's scalar output is zero, inside the node's mesh. A field's `channel`, `transform` (a 4 x 4 matrix from geometry to function coordinates), `minFeatureSize` and `fallback` are optional: an image function spans the geometry's bounding box and a graph reads geometry coordinates. Both need an object of the node's own (`assembly: false` or `'components'`, or one node). A level set, or a function that names a mesh, makes the file require the extension; volume data alone does not. The writer checks node names, input types and that a node reads only earlier ones. It writes the resources, not meshes of them. `parse3MFVolumetric` (`@margoengine/loaders/threemf-volumetric`) reads it all back and meshes the level sets.
 
 ```ts
-import { export3MF } from 'margoengine/exporters/threemf';
+import { export3MF, type ThreeMFImplicitFunction } from 'margoengine/exporters/threemf';
 
 // A tetrahedron 40 mm on a side, which bounds the region the function is evaluated in.
 const geometry = {
@@ -1664,7 +1664,7 @@ const geometry = {
   indices: [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2],
 };
 // A sphere of 15 mm radius: length(pos) - radius.
-const sphere = {
+const sphere: ThreeMFImplicitFunction = {
   nodes: [
     { id: 'radius', op: 'constant', value: 0.015 },
     { id: 'distance', op: 'length', in: { A: 'inputs.pos' } },

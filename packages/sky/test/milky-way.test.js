@@ -158,6 +158,11 @@ test('galacticDirection puts the galactic centre at -z, the north galactic pole 
   near(out[4], 1, 1e-6, 'written at the offset');
   assert.throws(() => galacticDirection(NaN, 0), TypeError);
   assert.throws(() => galacticOfDirection([0, 0, 0]), TypeError);
+  // KB1867b: galacticDirection's Float32Array output goes straight back in (the README's example failed its type check).
+  const single = galacticOfDirection(galacticDirection(266.41683, -29.00781, new Float32Array(3))),
+    double = galacticOfDirection(galacticDirection(266.41683, -29.00781));
+  assert.ok(Math.abs(((single.l - double.l + 540) % 360) - 180) < 1e-4 && Math.abs(single.b - double.b) < 1e-4);
+  assert.throws(() => galacticOfDirection(new Float32Array(2)), TypeError);
 });
 
 test('nearInfraredColor reddens along the dwarf sequence and behind dust past M5', () => {

@@ -446,8 +446,10 @@ mesh.setGeometry({...geometry, attributes: {heat: {data: heat, type: 'f32'}}}, {
 `createMesh`, `createInstancedMesh`, `setGeometry` and a material swap throw when the geometry lacks an attribute the
 material reads, gives it another type or the wrong number of values, or holds a value that does not fit (`NaN`, a
 fraction for an integer type). The values are copied when the call is made: edit your array, then call `setGeometry`,
-with a range to upload those vertices alone. Meshes that come from elsewhere (a loaded glTF, `BatchedMesh`) have no
-`geometry.attributes`, so a material that reads one cannot draw them. The values of a mesh's attributes are interleaved
+with a range to upload those vertices alone. A bare array in `attributes` is one `f32` per vertex, the form
+`margoengine/loaders` gives its extra scalars (PCD `intensity`, VTK point scalars, COLLADA channels), so a loaded
+geometry draws with `attribute('intensity', 'f32')` as it is. Meshes that come from elsewhere (a loaded glTF,
+`BatchedMesh`) have no `geometry.attributes`, so a material that reads one cannot draw them. The values of a mesh's attributes are interleaved
 into one read-only storage buffer read by vertex index (one of the vertex stage's storage buffers), so the 80-byte
 vertex and its pipelines are unchanged. `node packages/shader/test/attribute-check.mjs` (and `--compat`) compares meshes
 drawn from attributes with the same meshes built on the CPU, pixel for pixel. Sources: D. Rákos, "Programmable Vertex

@@ -89,6 +89,23 @@ test('a mesh gets its own interleaved buffer, written whole and then by range, a
   assert.equal(grown.destroyed, true);
 });
 
+// Regression (2026-11-28, KB1867b): the loaders give extra per-vertex scalars as bare arrays (`attributes: {intensity:
+// Float32Array}`, LoadedGeometry), while MeshGeometry took only {data, type}: the loaders README's COLLADA example failed
+// its type check, and a node material reading such a channel threw. A bare array is one f32 per vertex.
+test('a bare per-vertex array, as the loaders give it, is read as one f32 a vertex', () => {
+  const m = new NodeMaterial({ emissiveNode: vec3(attribute('intensity', 'f32'), 0, 0) }),
+    gpu = device(),
+    data = m.meshData(geometry({ intensity: new Float32Array([0.5, 1, 1.5, 2]) }));
+  const buffer = storageOf(m, gpu, data);
+  assert.deepEqual(gpu.writes.find((w) => w.buffer === buffer).words, floats(0.5, 1, 1.5, 2));
+  data.dispose();
+  const wide = new NodeMaterial({ emissiveNode: vec3(attribute('intensity', 'vec2f').x, 0, 0) });
+  assert.throws(
+    () => wide.meshData(geometry({ intensity: [1, 2, 3, 4] })),
+    /attribute 'intensity' is f32, and its material reads it as vec2f/,
+  );
+});
+
 test('meshes share the material and its depth pipeline key, each with its own depth record and buffer', () => {
   const m = new NodeMaterial({ positionNode: positionLocal.add(vec3(0, attribute('heat', 'f32'), 0)) }),
     gpu = device(),

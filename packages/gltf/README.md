@@ -660,12 +660,12 @@ model to it replaces that model's default pass. It copies the scene into a
 mip chain on frames where a hooked surface draws and refracts, blurs by roughness and attenuates through the volume
 behind each transmissive primitive of the models it is given:
 
-```js
+```ts
 import { Engine } from '@margoengine/core';
 import { loadGLTF } from '@margoengine/gltf/pbr';
 import { Transmission } from '@margoengine/gltf/transmission';
 
-const engine = await Engine.create(document.querySelector('canvas'));
+const engine = await Engine.create(document.querySelector('canvas')!);
 const glass = Transmission.attach(engine);
 glass.add(await loadGLTF(engine, '/glass.glb'));
 ```
@@ -679,11 +679,11 @@ would. A view with no capture (an environment probe face, a `createRenderer` pas
 
 The default pass, and the opt-out for one load:
 
-```js
+```ts
 import { Engine } from '@margoengine/core';
 import { loadGLTF } from '@margoengine/gltf/pbr';
 
-const engine = await Engine.create(document.querySelector('canvas'));
+const engine = await Engine.create(document.querySelector('canvas')!);
 await loadGLTF(engine, '/glass.glb'); // refracts and blurs: the default screen-space pass
 await loadGLTF(engine, '/glass.glb', { decoders: { transmission: false } }); // the tinted blend
 ```
@@ -693,12 +693,12 @@ so a glass surface hides the glass behind it (a solid sphere's back faces and th
 water, fog and OIT later see the glass depth. BLEND glass stays blended and writes none. The scene copy holds the
 opaque scene only, so glass seen through glass shows what is behind both. Default `false`, `order` default 3:
 
-```js
+```ts
 import { Engine } from '@margoengine/core';
 import { loadGLTF } from '@margoengine/gltf/pbr';
 import { Transmission } from '@margoengine/gltf/transmission';
 
-const engine = await Engine.create(document.querySelector('canvas'));
+const engine = await Engine.create(document.querySelector('canvas')!);
 const solid = Transmission.attach(engine, { depthWrite: true });
 solid.add(await loadGLTF(engine, '/glass.glb'));
 ```

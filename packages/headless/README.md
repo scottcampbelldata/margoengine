@@ -799,13 +799,13 @@ and the stop its median, so every test frame of one reference is judged over the
 infinite values reject with a RangeError (run `nan` first), and so does a reference whose largest or median luminance
 is 0 unless both exposures are given. It costs one FLIP per exposure.
 
-```js
+```ts
 import { hdrFlip } from '@margoengine/headless/look';
 
 // A lamp (luminance 40) over a dim wall; the test frame's wall is 20 percent too dark.
 const width = 32,
   height = 32;
-const frame = (wall) => {
+const frame = (wall: number) => {
   const data = new Float32Array(width * height * 4);
   for (let i = 0; i < width * height; i++) {
     const lamp = i % width > 20 && Math.floor(i / width) < 8;

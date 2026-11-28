@@ -6,6 +6,28 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: 17 README examples failed their type check, two of them on real API defects (KB1867b; shader, materials, sky, READMEs)
+
+- **Repro:** `npm run build:packages`, then `node scripts/check-readme-types.mjs`: 17 new errors in the cameras,
+  exporters, gltf, headless, loaders, machinery and sky READMEs (0 on the known list).
+- **Cause, API:** (1) the loaders give extra per-vertex scalars as bare arrays (`LoadedGeometry.attributes`, PCD
+  `intensity`, VTK scalars, COLLADA channels), while `MeshGeometry.attributes` took only `{data, type}` (93e29395ee): the
+  COLLADA example's `createMesh(engine, binding.geometry, ...)` failed its type check, and a node material reading such a
+  channel with `attribute(name, 'f32')` threw "is undefined". (2) `galacticOfDirection` took only a `[x, y, z]` tuple,
+  so `galacticDirection`'s own `number[]` or `Float32Array` output could not go back in.
+- **Cause, examples:** 15 examples left a nullable canvas, an untyped parameter, a literal 3MF function graph or an
+  optional `indices` unhandled, or were fenced `js` with TypeScript in them.
+- **Fix:** a bare array in `attributes` is one `f32` per vertex (`packages/shader/src/attribute.ts`, the materials type;
+  shader whole-package ceiling 20,880 B to 20,910 B for 27 B); `galacticOfDirection` takes any three numbers; the
+  examples type their values (`Shot`, `ThreeMFImplicitFunction`) and handle what they read. The README type check
+  reports 0 errors over 2,319 examples.
+- **Regression:** `packages/shader/test/attribute.test.js` ("a bare per-vertex array, as the loaders give it"; fails
+  before the fix with "attribute 'intensity' is undefined"), `packages/sky/test/milky-way.test.js` (a `Float32Array`
+  direction), and `node scripts/check-readme-types.mjs`, which `npm run quality` runs.
+- **Left of KB1867b:** the two XR examples that need an AR headset or a body-tracking device stay skipped by hardware
+  (`scripts/support/readme-run-skip.json`); the headless examples that needed ffmpeg run on the workstation now (22 of
+  22).
+
 ### Fixed 2026-11-28: touching a collider after its neighbour's body was removed read and wrote past the body rows (KB-PHYS-RETIREDPAIR1, physics kernel)
 
 - **Repro:** three boxes in a pile, stepped until they touch. Remove the bottom body, then, before the next step, do any

@@ -608,5 +608,9 @@ test('importing a colour node and NodeMaterial leaves post, compute and textures
   // renewed when a texture or buffer its depth passes bind is rebuilt (KB-SHADOW-STALEMOVE1: a resized texture under a
   // shadow stopped the engine on a destroyed texture). NodeMaterial makes the record, so every graph with a moved or
   // cut shadow needs the check; a split entry would leave NodeMaterial with the crash.
-  assert.ok(minimal.gzip < 9480 && all.gzip < 20880, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
+  // Then 20,910 B (2026-11-28, whole 20,878 B to 20,905 B, minimal unchanged at 9,477 B): attribute() takes a bare
+  // per-vertex array as one f32 a vertex, the form the loaders give their extra scalars (KB1867b: loader geometry could
+  // not feed a node material's attribute). attribute() is shaken out of the minimal bundle; converting in the loaders
+  // instead would change LoadedGeometry.attributes for every reader of PCD intensity or VTK scalars.
+  assert.ok(minimal.gzip < 9480 && all.gzip < 20910, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
 });

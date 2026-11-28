@@ -630,7 +630,7 @@ export interface MeshGeometry {
         count: number;
         materialIndex: number;
     }[];
-    attributes?: Readonly<Record<string, VertexAttribute>>;
+    attributes?: Readonly<Record<string, VertexAttribute | ArrayLike<number>>>;
 }
 
 export interface MetalRoughNode {
