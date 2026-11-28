@@ -102,7 +102,7 @@ export function camera(t) {
   return { position: hermite('position', t), target: hermite('target', t), fov: mix(37, 44, ramp(t, 10, 68)) };
 }
 
-export const ridgeCamera = { ...flight(0), near: 0.11, far: 6100 };
+export const ridgeCamera = { ...flight(0), near: 0.11, far: 30000 };
 export const ridgeLook = {
   direction: [...sun, 3.18],
   radiance: [1, 0.86, 0.67, 0.36],
