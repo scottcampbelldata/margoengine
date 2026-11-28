@@ -133,6 +133,23 @@ for (const name of names) {
         await handle.click();
         await settle(page);
         changed = !same(before, await state(page));
+        // The selected option of a pressed-button group changes nothing when clicked: pick a sibling, then test it.
+        const sibling = changed
+          ? null
+          : await handle.evaluateHandle((e) =>
+              e.getAttribute('aria-pressed') === 'true'
+                ? [...e.parentElement.querySelectorAll(':scope > [aria-pressed]')].find((s) => s !== e && !s.disabled) ?? null
+                : null,
+            );
+        const other = sibling?.asElement();
+        if (other) {
+          await other.click();
+          await settle(page);
+          const picked = await state(page);
+          await handle.click();
+          await settle(page);
+          changed = !same(picked, await state(page));
+        }
         // A button that starts motion keeps changing the frame: click it again so the next control starts from rest.
         const moving = !same(await state(page), (await settle(page, 300), await state(page)));
         if (moving) {
@@ -146,9 +163,11 @@ for (const name of names) {
     const dead = results.filter((r) => !r.changed).map((r) => r.control);
     const skipped = controls.filter((c) => !tested.has(c.index)).map((c) => `${c.tag} ${c.id}`);
     report[key] = { started, renderer, errors, controls: results.length, dead, skipped };
-    if (!started || errors.length || dead.length) failed = true;
+    // ?backend=webgl2 must reach the WebGL2 layer: a page that says it drew on WebGPU there ignored the query.
+    const wrongPath = backend === 'webgl2' && renderer === 'webgpu';
+    if (!started || errors.length || dead.length || wrongPath) failed = true;
     console.log(
-      `${key}: ${started ? 'started' : 'FAILED TO START'} renderer=${renderer} controls=${results.length} dead=${dead.length}` +
+      `${key}: ${started ? 'started' : 'FAILED TO START'} renderer=${renderer}${wrongPath ? ' (WRONG PATH: the query was ignored)' : ''} controls=${results.length} dead=${dead.length}` +
         `${dead.length ? ` [${dead.join(', ')}]` : ''} errors=${errors.length}${errors.length ? ` [${errors[0].slice(0, 160)}]` : ''}`,
     );
     await page.close();

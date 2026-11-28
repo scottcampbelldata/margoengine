@@ -248,7 +248,7 @@ export function prepareYoke() {
       mesh.root.setParent(owners[group]);
       shadows.add(mesh,{static:group==='world',castShadow:finish!=='floor'&&finish!=='marker'});
     }
-    return ({angle,x})=>{
+    return ({angle,slide:x})=>{
       crank.setRotation([0,0,angle]);
       slide.setPosition([crankX+x,shaftY,0]);
     };

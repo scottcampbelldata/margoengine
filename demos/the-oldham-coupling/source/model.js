@@ -229,9 +229,9 @@ export function prepareCoupling() {
     }
     return (pose,offset,exploded)=>{
       const spread=exploded?gap:0;
-      input.setPosition([-spread,axle,0]).setRotation([pose.inputAngle,0,0]);
-      output.setPosition([spread,axle+offset,0]).setRotation([pose.outputAngle,0,0]);
-      disk.setPosition([0,axle+pose.center[0],pose.center[1]]).setRotation([pose.diskAngle,0,0]);
+      input.setPosition([-spread,axle,0]).setRotation([pose.input,0,0]);
+      output.setPosition([spread,axle+offset,0]).setRotation([pose.output,0,0]);
+      disk.setPosition([0,axle+pose.center[0],pose.center[1]]).setRotation([pose.disc,0,0]);
       slide.setPosition([0,axle+offset,0]);
       orbit.setPosition([.008,axle+pose.orbitCenter[0],0])
         .setScale([.067,Math.max(.0005,pose.orbitRadius),Math.max(.0005,pose.orbitRadius)]);

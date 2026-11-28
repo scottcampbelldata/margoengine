@@ -523,7 +523,7 @@
   "the-epicyclic-drive": {
    "R3": 4,
    "R4": 2,
-   "R5": 476
+   "R5": 462
   },
   "the-exploded-assembly": {
    "R3": 3,
@@ -567,7 +567,7 @@
   },
   "the-geneva-drive": {
    "R4": 1,
-   "R5": 382
+   "R5": 374
   },
   "the-gimbal": {
    "R4": 2,
@@ -752,7 +752,7 @@
   "the-oldham-coupling": {
    "R3": 1,
    "R4": 2,
-   "R5": 409
+   "R5": 398
   },
   "the-orrery": {
    "R3": 11,
@@ -876,7 +876,7 @@
   },
   "the-scotch-yoke": {
    "R4": 2,
-   "R5": 395
+   "R5": 380
   },
   "the-sculpting-clay": {
    "R1": 17,

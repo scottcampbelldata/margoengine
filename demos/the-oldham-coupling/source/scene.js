@@ -1,5 +1,6 @@
-import { EngineKernel } from '@margoengine/core';
+import { startEngine } from '@margoengine/webgl2-compat/auto';
 import { Shadows } from '@margoengine/shadows';
+import { describeCheck } from '@margoengine/machinery/rigs';
 import { openCoupling } from './mechanism.js';
 import { prepareCoupling } from './model.js';
 
@@ -53,13 +54,13 @@ function update() {
   const changed=separation!==lastOffset||angle!==lastTurn;
   if(!fitDirty&&!poseDirty&&!changed) return;
   if(fitDirty) fit();
-  const pose=changed||poseDirty?mechanism.pose(angle,separation/1000):null;
+  const pose=changed||poseDirty?mechanism.drive(angle*Math.PI/180,separation/1000,false):null;
   if(pose) model(pose,separation/1000,exploded);
   engine.render({delta:0});
   if(pose) {
     offsetValue.textContent=separation+' mm';
     inputTurn.textContent=angle+'°';
-    outputTurn.textContent=Math.round(pose.outputAngle*180/Math.PI)+'°';
+    outputTurn.textContent=Math.round(pose.output*180/Math.PI)+'°';
     orbit.textContent=(pose.orbitRadius*1000).toFixed(1)+' mm';
     offset.setAttribute('aria-valuetext',offsetValue.textContent);
     turn.setAttribute('aria-valuetext',angle+' degrees');
@@ -67,8 +68,7 @@ function update() {
     document.body.dataset.angle=String(angle);
     document.body.dataset.center=pose.center.map((value)=>value.toFixed(7)).join(',');
     document.body.dataset.view=exploded?'exploded':'assembly';
-    gap.textContent=pose.check;
-    document.body.dataset.check=pose.check;
+    document.body.dataset.check=gap.textContent=describeCheck(mechanism.check);
   }
   if(fitDirty) document.body.dataset.side=otherSide?'reverse':'default';
   lastOffset=separation;
@@ -133,7 +133,6 @@ function dispose() {
   observer?.disconnect();
   if(frame!==undefined) cancelAnimationFrame(frame);
   engine?.dispose();
-  mechanism?.dispose();
 }
 
 function fail(error) {
@@ -146,24 +145,12 @@ function fail(error) {
 }
 
 async function open() {
-  const options={
-    backend:'webgpu',exactSize:true,antialias:true,signal:stop.signal,
-    startupTimeout:5000,camera:{fov,near:.11,far:72},
-  };
-  const force=new URLSearchParams(location.search).get('backend')==='webgl2';
-  async function create() {
-    if(!force) {
-      try { return [await EngineKernel.create(canvas,options),'webgpu']; }
-      catch(error) { if(error?.code!=='unsupported'&&error?.code!=='timeout') throw error; }
-    }
-    const {install}=await import('@margoengine/webgl2-compat');
-    await install({force:true});
-    return [await EngineKernel.create(canvas,options),'compatibility'];
-  }
-  const opening=create();
+  const opening=startEngine(canvas,{exactSize:true,antialias:true,signal:stop.signal,startupTimeout:5000,
+    camera:{fov,near:.11,far:72},forceCompat:location.search.includes('backend=webgl2'),
+    loadCompat:()=>import('@margoengine/webgl2-compat')});
   const assemble=prepareCoupling();
-  const solving=openCoupling();
-  const [device,renderer]=await opening;
+  const solving=openCoupling(stop.signal);
+  const {engine:device,renderer}=await opening;
   mechanism=await solving;
   engine=device;
   engine.onError=fail;

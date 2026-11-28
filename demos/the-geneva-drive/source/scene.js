@@ -1,6 +1,7 @@
-import { EngineKernel } from '@margoengine/core';
+import { startEngine } from '@margoengine/webgl2-compat/auto';
 import { Shadows } from '@margoengine/shadows';
-import { openDrive } from './mechanism.js';
+import { describeCheck, signedReading } from '@margoengine/machinery/rigs';
+import { crankAngle, openDrive } from './mechanism.js';
 import { prepareDrive } from './model.js';
 
 const canvas=document.querySelector('#scene');
@@ -54,15 +55,14 @@ function update() {
   const value=Number(angle.value);
   if(!fitDirty&&value===previous) return;
   if(fitDirty) fit();
-  const pose=mechanism.pose(value);
+  const pose=mechanism.drive(crankAngle(value));
   move(pose);
   engine.render({delta:0});
   if(value!==previous) {
-    const degrees=-pose.wheel*180/Math.PI;
+    const degrees=-pose.turnWheel*180/Math.PI;
     const state=pose.indexing?'index':'dwell';
     crank.textContent=value+'°';
-    const shown=Math.round(degrees*10)/10;
-    wheel.textContent=(shown>0?'−':'')+shown.toFixed(1)+'°';
+    wheel.textContent=signedReading(-degrees,'°');
     marker.style.left=value/3.6+'%';
     if(document.body.dataset.phase!==state) {
       phase.textContent=pose.indexing?'Indexing':'Dwell';
@@ -73,8 +73,7 @@ function update() {
     document.body.dataset.phase=state;
     document.body.dataset.angle=String(value);
     document.body.dataset.output=degrees.toFixed(6);
-    gap.textContent=pose.check;
-    document.body.dataset.check=pose.check;
+    document.body.dataset.check=gap.textContent=describeCheck(mechanism.check);
   }
   previous=value;
   fitDirty=false;
@@ -116,7 +115,6 @@ function dispose() {
   observer?.disconnect();
   if(frame!==undefined) cancelAnimationFrame(frame);
   engine?.dispose();
-  mechanism?.dispose();
 }
 
 function fail(error) {
@@ -129,24 +127,12 @@ function fail(error) {
 }
 
 async function open() {
-  const options={
-    backend:'webgpu',exactSize:true,antialias:true,signal:stop.signal,
-    startupTimeout:5000,camera:{fov,near:.09,far:50},
-  };
-  const force=new URLSearchParams(location.search).get('backend')==='webgl2';
-  async function create() {
-    if(!force) {
-      try { return [await EngineKernel.create(canvas,options),'webgpu']; }
-      catch(error) { if(error?.code!=='unsupported'&&error?.code!=='timeout') throw error; }
-    }
-    const {install}=await import('@margoengine/webgl2-compat');
-    await install({force:true});
-    return [await EngineKernel.create(canvas,options),'compatibility'];
-  }
-  const opening=create();
+  const opening=startEngine(canvas,{exactSize:true,antialias:true,signal:stop.signal,startupTimeout:5000,
+    camera:{fov,near:.09,far:50},forceCompat:location.search.includes('backend=webgl2'),
+    loadCompat:()=>import('@margoengine/webgl2-compat')});
   const assemble=prepareDrive();
-  const solving=openDrive(Number(angle.value));
-  const [device,renderer]=await opening;
+  const solving=openDrive(Number(angle.value),stop.signal);
+  const {engine:device,renderer}=await opening;
   mechanism=await solving;
   engine=device;
   engine.onError=fail;

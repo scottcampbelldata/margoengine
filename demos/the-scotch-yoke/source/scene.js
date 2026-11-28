@@ -1,5 +1,6 @@
-import { EngineKernel } from '@margoengine/core';
+import { startEngine } from '@margoengine/webgl2-compat/auto';
 import { Shadows } from '@margoengine/shadows';
+import { describeCheck, signedReading } from '@margoengine/machinery/rigs';
 import { openYoke } from './mechanism.js';
 import { prepareYoke } from './model.js';
 
@@ -46,22 +47,15 @@ function fit() {
   engine.camera.position=target.map((value,i)=>value+eye[i]*distance);
 }
 
-function formattedLength(value) {
-  const mm=Math.round(value*10000)/10;
-  if(mm===0) return '0.0 mm';
-  return (mm<0?'−':'+')+Math.abs(mm).toFixed(1)+' mm';
-}
-
 function show(value,pose) {
   degrees.textContent=value+'°';
   angle.setAttribute('aria-valuetext',value+' degrees');
-  piston.textContent=formattedLength(pose.x);
-  roller.textContent=formattedLength(pose.y);
+  piston.textContent=signedReading(pose.slide*1000,' mm');
+  roller.textContent=signedReading(pose.slot*1000,' mm');
   document.body.dataset.angle=String(value);
-  document.body.dataset.offset=(pose.x*1000).toFixed(6);
-  document.body.dataset.height=(pose.y*1000).toFixed(6);
-  gap.textContent=pose.check;
-  document.body.dataset.check=pose.check;
+  document.body.dataset.offset=(pose.slide*1000).toFixed(6);
+  document.body.dataset.height=(pose.slot*1000).toFixed(6);
+  document.body.dataset.check=gap.textContent=describeCheck(mechanism.check);
 }
 
 function setRun(value) {
@@ -74,7 +68,7 @@ function update() {
   const value=Number(angle.value);
   if(!viewDirty&&value===prior) return;
   if(viewDirty) fit();
-  const pose=mechanism.pose(value);
+  const pose=mechanism.drive(value*Math.PI/180);
   if(value!==prior) model(pose);
   engine.render({delta:0});
   if(value!==prior) show(value,pose);
@@ -121,7 +115,6 @@ function dispose() {
   observer?.disconnect();
   if(frame!==undefined) cancelAnimationFrame(frame);
   engine?.dispose();
-  mechanism?.dispose();
 }
 
 function fail(error) {
@@ -134,24 +127,12 @@ function fail(error) {
 }
 
 async function open() {
-  const options={
-    backend:'webgpu',exactSize:true,antialias:true,signal:stop.signal,
-    startupTimeout:5000,camera:{fov,near:.12,far:66},
-  };
-  const force=new URLSearchParams(location.search).get('backend')==='webgl2';
-  async function create() {
-    if(!force) {
-      try { return [await EngineKernel.create(canvas,options),'webgpu']; }
-      catch(error) { if(error?.code!=='unsupported'&&error?.code!=='timeout') throw error; }
-    }
-    const {install}=await import('@margoengine/webgl2-compat');
-    await install({force:true});
-    return [await EngineKernel.create(canvas,options),'compatibility'];
-  }
-  const opening=create();
+  const opening=startEngine(canvas,{exactSize:true,antialias:true,signal:stop.signal,startupTimeout:5000,
+    camera:{fov,near:.12,far:66},forceCompat:location.search.includes('backend=webgl2'),
+    loadCompat:()=>import('@margoengine/webgl2-compat')});
   const assemble=prepareYoke();
-  const solving=openYoke(Number(angle.value));
-  const [device,renderer]=await opening;
+  const solving=openYoke(Number(angle.value),stop.signal);
+  const {engine:device,renderer}=await opening;
   mechanism=await solving;
   engine=device;
   engine.onError=fail;

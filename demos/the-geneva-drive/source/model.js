@@ -193,7 +193,7 @@ export function prepareDrive() {
       mesh.root.setParent(parents[owner]);
       shadows.add(mesh,{static:owner==='fixed',castShadow:name!=='backdrop'});
     }
-    return ({driver:driveAngle,wheel:wheelAngle})=>{
+    return ({driver:driveAngle,turnWheel:wheelAngle})=>{
       driver.setRotation([0,driveAngle,0]);
       wheel.setRotation([0,wheelAngle,0]);
     };
