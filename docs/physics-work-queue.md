@@ -477,7 +477,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | AERO-05 | Falling and tumbling light bodies | falling plates, winged seeds and swept hail | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c82d68bf98 |
 | SEA-03 | Nonlinear waves, rogue waves | physics/rogue and live launch cutaway | Codex | REOPENED (4/8 at 0f282397e6, points 5–8, [evidence](physics-solver-audit.md#sea-03-four-point-pass)), prior landing 47be5f699 |
 | SEA-06 | Tsunami and impulse waves | none | Codex | REOPENED (4/8 at a437d9db30, points 5–8, [evidence](physics-solver-audit.md#sea-06-four-point-pass)), prior landing 1905b1c216 |
-| SEA-07 | Tides, storm surge and currents | physics/surge (`SurgeSolver` over HYDRO-01's shallow water: inverse barometer, equilibrium tide, wind, Coriolis, open-sea tides, time scale) | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e5462e9cc |
+| SEA-07 | Tides, storm surge and currents | physics/surge (`SurgeSolver` over HYDRO-01's shallow water: inverse barometer, equilibrium tide, wind, Coriolis, open-sea tides, time scale) | Codex | BUILDING (codex/physics-sea-07-four-point; four-point pass; [audit](physics-solver-audit.md)), landed e5462e9cc |
 | FLUID-05 | Compressible flow, shock and blast | none | Open | OPEN |
 | FLUID-06 | Viscoplastic fluids at small scale | partial | Codex | REOPENED (4/8 at e3bd12821b, points 5–8, [evidence](physics-solver-audit.md#fluid-06-four-point-pass)), prior landing a540dd915c |
 | FLUID-07 | Thin films and droplets on surfaces | physics/thin-film and live pane cutaway | Codex | REOPENED (4/8 at 119f92f328, points 5–8, [evidence](physics-solver-audit.md#fluid-07-four-point-pass)), prior checkpoint 3cb9cb3ebc |
