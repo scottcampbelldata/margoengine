@@ -35,6 +35,15 @@ export interface BiomeObjectsOptions {
   readonly nearRadius?: number;
   /** Detail (grass, ferns) is drawn within this distance. Default 120 m. */
   readonly detailRadius?: number;
+  /**
+   * Screen-space tree LOD (KB-BIOMES-SCREENLOD1): a tree with detail levels hands its near and middle foliage to the
+   * next ring once its sprays (the finest tenth of the foliage's area, see {@link foliageWidth}) would project under
+   * this many viewport pixels through the camera's field of view, or at its ring distance, whichever comes first, so no
+   * spray draws thinner than this before the imposter takes over (scatter `lodSize`). Default none: rings by distance
+   * alone. On the timber-valley blowup (2160 rendered rows, 45 degrees) 1 px moved few rings and raised speckle in the
+   * smoke band from 19.8 to 25.1 ppm early (47.4 to 48.4 mid), so it is not on by default.
+   */
+  readonly lodPixels?: number;
   /** Metres per detail density texel. Default 2. */
   readonly detailResolution?: number;
   /**
@@ -258,6 +267,55 @@ const CANOPY_DEPTH = 0.5,
   // Ground materials under which stones grow moss at their foot; stones of a desert or a bare field only darken.
   DAMP_GROUND: readonly string[] = ['grass', 'meadow', 'moss', 'needles', 'leaf-litter', 'tundra', 'mud'];
 
+/**
+ * The width of a mesh's finest foliage: the area-weighted tenth percentile, over its triangles, of each triangle's
+ * narrowest width (twice its area over its longest edge), in mesh units. A leaf spray or needle band is a strip of
+ * triangles, so this is about the strip's width at its thin end; nine tenths of the area is at least this wide.
+ * Screen-space LOD switches when this projects under a pixel (Luebke, Reddy, Cohen, Varshney, Watson and Huebner 2003,
+ * Level of Detail for 3D Graphics, ch. 4: the projected size of a level's geometric error picks the level).
+ */
+export function foliageWidth(geometry: { readonly vertices: ArrayLike<number>; readonly indices: ArrayLike<number> }): number {
+  const v = geometry.vertices,
+    ix = geometry.indices,
+    rows: [number, number][] = [];
+  let total = 0;
+  for (let t = 0; t + 2 < ix.length; t += 3) {
+    const a = ix[t] * 6,
+      b = ix[t + 1] * 6,
+      c = ix[t + 2] * 6,
+      ux = v[b] - v[a],
+      uy = v[b + 1] - v[a + 1],
+      uz = v[b + 2] - v[a + 2],
+      wx = v[c] - v[a],
+      wy = v[c + 1] - v[a + 1],
+      wz = v[c + 2] - v[a + 2],
+      area = 0.5 * Math.hypot(uy * wz - uz * wy, uz * wx - ux * wz, ux * wy - uy * wx),
+      longest = Math.max(
+        Math.hypot(ux, uy, uz),
+        Math.hypot(wx, wy, wz),
+        Math.hypot(v[c] - v[b], v[c + 1] - v[b + 1], v[c + 2] - v[b + 2]),
+      );
+    if (area > 0 && longest > 0) {
+      rows.push([(2 * area) / longest, area]); // float division: view only
+      total += area;
+    }
+  }
+  rows.sort((x, y) => x[0] - y[0]);
+  let sum = 0;
+  for (const [width, area] of rows) if ((sum += area) >= 0.1 * total) return width;
+  return 0;
+}
+
+/** Scatter `lodSize` of a form whose foliage has detail levels: its near and middle foliage widths, or none. */
+function screenLod(form: readonly Part[]): [number, number] | undefined {
+  const foliage = form.find((part) => part.kind === 'foliage' && Array.isArray(part.geometry));
+  if (!foliage) return undefined;
+  const [near, middle] = foliage.geometry as readonly [Geometry, Geometry, Geometry],
+    a = foliageWidth(near),
+    b = foliageWidth(middle);
+  return a > 0 && b > 0 ? [Math.min(a, b), b] : undefined;
+}
+
 /** The foot and sky options of one part of a species whose mesh stands `height` metres at scale 1. */
 function standingLooks(
   kind: Kind,
@@ -361,7 +419,8 @@ type Optional =
   | 'states'
   | 'contact'
   | 'ground'
-  | 'groundCover';
+  | 'groundCover'
+  | 'lodPixels';
 /** What one form of a species presses into the ground: its radius at scale 1, and 0 a trunk or 1 a stone. */
 type Foot = { readonly radius: number; readonly kind: 0 | 1 };
 /** A mesh part: one geometry, or one per LOD ring (near, middle, far) for meshes with detail levels. */
@@ -697,7 +756,7 @@ export class BiomeObjects implements Disposable {
         'BiomeObjects needs a heightmap function and the bounds [minX, minZ, maxX, maxZ] it covers',
         'biomes',
       );
-    for (const key of ['radius', 'nearRadius', 'detailRadius', 'detailResolution', 'detailBudget'] as const)
+    for (const key of ['radius', 'nearRadius', 'detailRadius', 'detailResolution', 'detailBudget', 'lodPixels'] as const)
       if (options[key] !== undefined && !(options[key]! > 0))
         throw rangeError(`BiomeObjects ${key} must be above 0`, 'biomes');
     if (!(b[2] > b[0] && b[3] > b[1]))
@@ -844,7 +903,8 @@ export class BiomeObjects implements Disposable {
           heads: ScatterTiles[] = [],
           feet: (Foot | undefined)[] = [];
         for (const form of formsOf(key, this.#modules.procedural, this.#make, this.#options.meshes, this.#modules)) {
-          const list: ScatterTiles[] = [],
+          const screen = this.#options.lodPixels ? screenLod(form) : undefined,
+            list: ScatterTiles[] = [],
             // The form's height at scale 1, over all its parts, so a trunk and its crown shade as one tree.
             height = Math.max(0, ...form.map((part) => meshTop(part.geometry))),
             crown = crownOf(form),
@@ -862,6 +922,8 @@ export class BiomeObjects implements Disposable {
                 slotSize,
                 lod: [r * 0.15, r * 0.4, r],
                 lodFade: 0,
+                // Foliage with detail levels switches ring by its sprays' projected width as well (KB-BIOMES-SCREENLOD1).
+                ...(screen && this.#options.lodPixels ? { lodSize: screen, lodPixels: this.#options.lodPixels } : {}),
                 // Lit by the engine's sun and sky and shadowed by an attached Shadows, like the terrain under it.
                 material: this.#material(part.color, seasonal && part.kind === 'foliage', part.mean),
                 // Each object its own tint; leaves shade as clusters (a few vertex operations, shadows unchanged).

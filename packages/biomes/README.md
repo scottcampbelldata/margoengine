@@ -263,6 +263,25 @@ console.log(biomes[0].plants?.[0].mesh, climate.latitude, relief.base); // proce
 The ages and their sizes follow the Forest Vegetation Simulator's Inland Empire variant (Wykoff height-diameter and
 Crookston crown width equations), as `@margoengine/procedural/conifers` documents.
 
+## Distant trees hand over by their sprays' size on screen: `lodPixels`
+
+`BiomeObjects` draws each tree with detail levels (the conifer and broadleaf species keys, the generic trees, shrubs) in
+three rings: near mesh, middle mesh, imposter, by distance (`[0.15, 0.4, 1] * radius`). With `lodPixels`, a ring also
+ends where the tree's sprays would project under that many viewport pixels through the camera's field of view,
+whichever is nearer, so no spray draws thinner than that before the next level takes over (KB-BIOMES-SCREENLOD1). The
+spray width is `foliageWidth` of the near and middle foliage meshes: the area-weighted tenth percentile of each
+triangle's narrowest width. Rocks and bare stems keep distance rings. Default none (distance rings).
+
+```js
+import { foliageWidth } from '@margoengine/biomes/objects';
+import { coniferLevels } from '@margoengine/procedural/conifers';
+import { Geometry } from '@margoengine/core';
+
+const [near, middle] = coniferLevels('douglas-fir').canopy.map((d) => new Geometry(d.positions, d.normals, d.indices));
+console.log(foliageWidth(near).toFixed(2), foliageWidth(middle).toFixed(2)); // 0.27 0.39 (metres)
+// BiomeObjects.attach(engine, placement, { heightmap, bounds, lodPixels: 2 }) keeps sprays at 2 px or more.
+```
+
 ## Meadow grass and stones
 
 A detail drawing `procedural:grass` (every preset's grass) takes measured leaf green, linear (0.1617, 0.2024,

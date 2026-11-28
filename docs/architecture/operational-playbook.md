@@ -677,6 +677,16 @@ motionBlur judges a mover narrower than its smear by its ramp plus the plateau i
 takes only the edge's own ramp round its crossing (KB-LOOK-TV-MBNARROW1, 2026-11-28; evidence: look-clean.test.js, a
 smeared 12 px bar at 64 px passes, sharp, half smeared and 8-copy versions fail).
 
+### Section 5 evidence: screen-space LOD rings in scatter (scatter, biomes, KB-BIOMES-SCREENLOD1, 2026-11-28)
+
+Scatter's cull can end each of its first two rings where a mesh's finest feature (`lodSize`) projects under
+`lodPixels` viewport pixels, from the camera's pixel footprint each frame with 5 percent hysteresis, as well as at the
+ring's distance; without `lodSize` the WGSL is byte for byte the distance-only text. Evidence:
+`packages/scatter/test/lod.browser.mjs` on WebGPU and the WebGL2 compatibility layer (switch distances at two
+resolutions, two fields of view and two scales, within 2 percent; hysteresis). Biomes passes each tree's spray width
+when `lodPixels` is set; it is off by default because the timber-valley blowup's speckle rose with it (KB-LOOK-TV-SPECKLE).
+Missing: a default decided on frames from more than one shot.
+
 ### Section 5 evidence: TAA on the timber-valley film shots (scenes, biomes, KB-SCENES-TVTAA1, 2026-11-27)
 
 `@margoengine/scenes/timber-valley` at `film` quality attaches `@margoengine/taa` with its defaults on the post stack's

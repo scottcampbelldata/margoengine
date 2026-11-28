@@ -45,8 +45,8 @@ export interface ScatterTilesOptions
 }
 
 /** The distribute shader that reads records: scatter's world-rectangle variant with a record prelude. */
-export function tilesCullShader(): string {
-  const code = scatterCullShader({ bounds: [0, 0, 1, 1] })
+export function tilesCullShader(screen = false): string {
+  const code = scatterCullShader({ bounds: [0, 0, 1, 1], ...(screen ? { lodSize: [1, 1] as const } : {}) })
     .replace(
       '@group(0) @binding(6) var<storage,read> exclusions:array<vec4f>;',
       '@group(0) @binding(6) var<storage,read> exclusions:array<vec4f>;\n@group(0) @binding(7) var<storage,read> records:array<vec2u>;\n@group(0) @binding(8) var<storage,read> pages:array<vec4u>;',
@@ -335,7 +335,7 @@ export class ScatterTiles extends Scatter {
   }
 
   protected override cullCode(): string {
-    return tilesCullShader();
+    return tilesCullShader(!!this.options.lodSize);
   }
 
   protected override ringCapacity(): number {

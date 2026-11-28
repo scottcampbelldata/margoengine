@@ -62,6 +62,19 @@ try {
         target.destroy();
         return data;
       };
+      const geometriesOf = () => [2, 1, 0].map((detail) => toGeometry(icosahedronGeometry(1, detail, true)));
+      const readFrom = async (owner, buffer) => {
+        const device = owner.gpu,
+          target = device.createBuffer({ size: buffer.size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+          encoder = device.createCommandEncoder();
+        encoder.copyBufferToBuffer(buffer, 0, target, 0, buffer.size);
+        device.queue.submit([encoder.finish()]);
+        await target.mapAsync(GPUMapMode.READ);
+        const data = target.getMappedRange().slice(0);
+        target.unmap();
+        target.destroy();
+        return data;
+      };
       const frame = async () => {
         engine.render({ delta: 0, culling: false });
         await engine.gpu.queue.onSubmittedWorkDone();
@@ -185,6 +198,89 @@ try {
         effect.dispose();
       }
       summaries.push({ pathSteps });
+      // KB-BIOMES-SCREENLOD1: with lodSize, a ring hands over where its finest feature projects under lodPixels, so the
+      // switch distance follows the viewport height, the field of view and the object's scale, and no drawn feature of
+      // a ring projects under a pixel. The rings move only past 5 percent of footprint drift (hysteresis).
+      const screenSteps = [];
+      for (const [height, fov, scale] of [
+        [256, 45, 1],
+        [512, 45, 1],
+        [512, 30, 1],
+        [256, 45, 2],
+      ]) {
+        const view = document.createElement('canvas');
+        document.body.append(view);
+        const sized = await EngineKernel.create(view, {
+            backend: 'webgpu',
+            exactSize: [256, height],
+            camera: { position: [0, 0, 3], target: [0, 0, 0], fov, far: 1000 },
+          }),
+          create = sized.gpu.createBuffer.bind(sized.gpu);
+        // Test-only readback usage, as instrument() gives the first engine.
+        sized.gpu.createBuffer = (descriptor) =>
+          create({
+            ...descriptor,
+            usage:
+              descriptor.usage |
+              (descriptor.usage & (GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT) ? GPUBufferUsage.COPY_SRC : 0),
+          });
+        const screenFrame = async () => {
+            sized.render({ delta: 0, culling: false });
+            await sized.gpu.queue.onSubmittedWorkDone();
+          },
+          sizes = [0.05, 0.2],
+          effect = Scatter.attach(sized, geometriesOf(), {
+            count: 1,
+            area: [0.001, 0.001],
+            scale: [scale, scale],
+            lod: [400, 600, 900],
+            lodFade: 0,
+            lodSize: sizes,
+          });
+        await screenFrame();
+        const footprint = effect.values[80],
+          expected = (2 * Math.tan((fov * Math.PI) / 360)) / height;
+        check(Math.abs(footprint / expected - 1) < 1e-3, `Footprint ${footprint} for ${height} px at ${fov} degrees`);
+        const ends = sizes.map((s) => (scale * s) / (footprint * 1.05)),
+          ringAt = async (distance) => {
+            sized.camera.position = [0, 0, distance];
+            sized.camera.target = [0, 0, 0];
+            await screenFrame();
+            const command = new Uint32Array(await readFrom(sized, effect.commands));
+            return [command[1], command[6], command[11]].findIndex((n) => n === 1);
+          };
+        for (const [k, end] of ends.entries()) {
+          const inside = await ringAt(end * 0.98),
+            past = await ringAt(end * 1.02);
+          check(inside === k && past === k + 1, `Ring ${k} at ${height} px, ${fov} degrees, scale ${scale}: ${inside}, ${past} around ${end}`);
+          // The feature as drawn just inside the ring end is a pixel or more.
+          check((scale * sizes[k]) / (footprint * end * 0.98) >= 1, 'A drawn feature projected under a pixel');
+        }
+        screenSteps.push({ height, fov, scale, ends });
+        // Hysteresis: a 3 percent zoom keeps the rings, a 10 percent zoom moves them.
+        const held = [effect.values[81], effect.values[82]];
+        sized.camera.fov = fov * 1.03;
+        await screenFrame();
+        check(effect.values[81] === held[0] && effect.values[82] === held[1], 'Rings moved within the hysteresis');
+        sized.camera.fov = fov * 1.1;
+        await screenFrame();
+        check(effect.values[81] < held[0] * 0.95, 'Rings kept past the hysteresis');
+        effect.dispose();
+        sized.dispose();
+        view.remove();
+      }
+      check(
+        Math.abs(screenSteps[1].ends[0] / screenSteps[0].ends[0] - 2) < 1e-3 &&
+          Math.abs(screenSteps[3].ends[1] / screenSteps[0].ends[1] - 2) < 1e-3 &&
+          screenSteps[2].ends[0] > screenSteps[1].ends[0],
+        'Screen ring ends do not scale with resolution, scale and field of view',
+      );
+      // Without lodSize the rings stay at their distances.
+      const plain = Scatter.attach(engine, geometriesOf(), { count: 1, area: [0.001, 0.001], scale: [1, 1], lod: [5, 10, 20] });
+      await frame();
+      check(plain.values[81] === Math.fround(1e30) && plain.values[82] === Math.fround(1e30), 'Rings bound without lodSize');
+      plain.dispose();
+      summaries.push({ screenSteps });
       engine.camera.position = [0, 0, 3];
       engine.camera.target = [0, 0, 0];
       const shared = toGeometry(icosahedronGeometry(1, 1, true)),

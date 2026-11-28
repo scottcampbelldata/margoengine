@@ -34,6 +34,11 @@ import { contactStages, contactValues } from './contact.js';
 export type { ScatterBase, ScatterCrown, ScatterSkyOcclusion } from './contact.js';
 import { fadeCode, pixelFootprint, poseShader } from './pose.js';
 import { outsideLod } from './lod.js';
+
+/** A screen ring end that never binds (lodSize unset): far past any lod distance, finite times any scale up to 100. */
+const SCREEN_OFF = 1e30,
+  /** Relative footprint drift the screen rings ignore (hysteresis against a zoom or resize jittering about a value). */
+  SCREEN_HOLD = 0.05;
 import { sameBindings, snapshotBindings } from './bindings.js';
 export type { ScatterSway, ScatterWind } from './wind.js';
 export type { ScatterCapture } from './capture.js';
@@ -291,8 +296,31 @@ function validateWorld(o: ScatterOptions): void {
 export function scatterCullShader(o: ScatterOptions): string {
   const code = optionShader(o),
     extra = (o.paths?.length ? PATHS : '') + clearingCode(o) + clumpCode(o),
-    placed = extra ? code.replace(PLANES, extra + PLANES) : code;
+    out = extra ? code.replace(PLANES, extra + PLANES) : code,
+    placed = o.lodSize ? screenRingCode(out) : out;
   return o.thinning ? o.thinning.cullCode(placed, o.follow ? 'key' : 'i') : placed;
+}
+
+/**
+ * The cull text with screen-space rings (`lodSize`): each of the first two rings ends at its `lod` distance or where
+ * its finest feature, times the instance's scale, falls under `lodPixels` (`frame.pixel.yz`, set each frame from the
+ * camera's pixel footprint). Off (no `lodSize`), the text is left as it was.
+ * @throws MargoError `'unsupported'` when the text is not the one these edits were written for.
+ */
+export function screenRingCode(cull: string): string {
+  const loop = ' for(var ring=0u;ring<2u;ring++){\n',
+    pick = 'emit(select(select(2u,1u,d<frame.lod.y),0u,d<frame.lod.x),instance);';
+  if (cull.split(loop).length !== 2 || cull.split(pick).length !== 2 || cull.split('frame.lod[ring]').length !== 3)
+    throw new MargoError('unsupported', 'screenRingCode needs the distribute shader it was written for');
+  return cull
+    .replace(
+      loop,
+      ' // Each ring ends at its distance or where its finest feature falls under lodPixels (frame.pixel.yz).\n' +
+        ' let at=min(frame.lod.xy,scale*frame.pixel.yz);\n' +
+        loop,
+    )
+    .replaceAll('frame.lod[ring]', 'at[ring]')
+    .replace(pick, 'emit(select(select(2u,1u,d<at.y),0u,d<at.x),instance);');
 }
 
 const wgslNumber = (v: number) => (Number.isInteger(v) ? `${v}.0` : `${v}`);
@@ -559,6 +587,10 @@ export class Scatter implements EnginePlugin {
   /** The cull reach before `blades.widen` widens it, and the last LOD distance the blades widen toward. */
   private bladeReach = 0;
   private lodEnd = 1;
+  private readonly lodSize: readonly [number, number] | undefined;
+  private readonly lodPixels: number;
+  /** The pixel footprint the screen rings were last set from (0 before the first frame). */
+  private lodFootprint = 0;
   /** `variation` hue and value; both 0 (and no `clusters`) keep the original lit vertex stage. */
   private tint: readonly [number, number];
   constructor(geometry: Geometry | readonly [Geometry, Geometry, Geometry], input: ScatterOptions = {}) {
@@ -638,6 +670,17 @@ export class Scatter implements EnginePlugin {
     }
     if (!Number.isFinite(lodFade) || lodFade < 0 || lodFade > 100000)
       throw new RangeError('Invalid scatter LOD fade; set lodFade to a finite number from 0 to 100000.');
+    if (
+      (options.lodSize !== undefined &&
+        (options.lodSize.length !== 2 ||
+          !options.lodSize.every((v) => Number.isFinite(v) && v > 0 && v <= 1000) ||
+          options.lodSize[0] > options.lodSize[1])) ||
+      (options.lodPixels !== undefined &&
+        !(Number.isFinite(options.lodPixels) && options.lodPixels > 0 && options.lodPixels <= 64))
+    )
+      throw new RangeError('Scatter lodSize needs two sizes 0..1000, near <= middle, and lodPixels 0..64');
+    this.lodSize = options.lodSize;
+    this.lodPixels = options.lodPixels ?? 1;
     if (
       ![alignToGround, sink].every(Number.isFinite) ||
       alignToGround < 0 ||
@@ -1151,6 +1194,7 @@ export class Scatter implements EnginePlugin {
         this.values.set(c.camera.planes, 44);
         this.values[43] = +linearHdr(c.format);
         this.values[80] = pixelFootprint(c.camera.matrix, c.view?.viewport[3] ?? c.height);
+        this.screenRings(this.values[80]);
         c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
         this.cull(c, terrain);
       },
@@ -1248,6 +1292,25 @@ export class Scatter implements EnginePlugin {
   private thinned?: GPUBindGroupEntry[];
 
   /** Threads of the distribute pass. */
+  /**
+   * Sets the screen-space ring ends (`lodSize`) from the camera's pixel footprint (metres a pixel spans at 1 m). They
+   * move only when the footprint drifts more than 5 percent from the one in use, and are set from the held footprint
+   * plus that 5 percent, so a feature never projects under `lodPixels` while a zoom or resize jitters about a value.
+   */
+  private screenRings(footprint: number): void {
+    const size = this.lodSize;
+    if (!size || !(footprint > 0)) {
+      this.values[81] = SCREEN_OFF;
+      this.values[82] = SCREEN_OFF;
+      return;
+    }
+    if (!(this.lodFootprint > 0) || Math.abs(footprint / this.lodFootprint - 1) > SCREEN_HOLD)
+      this.lodFootprint = footprint;
+    const reach = 1 / (this.lodFootprint * (1 + SCREEN_HOLD) * this.lodPixels); // float division: view only
+    this.values[81] = size[0] * reach;
+    this.values[82] = size[1] * reach;
+  }
+
   protected dispatched(): number {
     return this.count;
   }

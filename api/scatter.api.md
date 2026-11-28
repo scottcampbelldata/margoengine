@@ -223,6 +223,8 @@ export interface ScatterOptions {
     scale?: readonly [number, number];
     lod?: readonly [number, number, number];
     lodFade?: number;
+    lodSize?: readonly [number, number];
+    lodPixels?: number;
     seed?: number;
     color?: readonly [number, number, number];
     material?: PbrMaterial;
@@ -342,6 +344,8 @@ export function radialPlacements(centers: readonly (readonly [number, number])[]
 export function randomPlacements(total: number, bounds: GroundBounds, scale: readonly [number, number], seed?: number): GroundPlacement[];
 
 export function scatterCullShader(o: ScatterOptions): string;
+
+export function screenRingCode(cull: string): string;
 
 export function spacePlacements(candidates: readonly GroundPlacement[], radius: number, gap?: number): GroundPlacement[];
 

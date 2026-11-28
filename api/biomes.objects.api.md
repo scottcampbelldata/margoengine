@@ -52,6 +52,7 @@ export interface BiomeObjectsOptions {
     readonly radius?: number;
     readonly nearRadius?: number;
     readonly detailRadius?: number;
+    readonly lodPixels?: number;
     readonly detailResolution?: number;
     readonly detailBudget?: number;
     readonly far?: {
@@ -78,6 +79,11 @@ export const DETAIL_BUDGET = 134217728;
 export function checkBiomeMeshes(meshes: unknown): asserts meshes is Readonly<Record<string, readonly BiomeMeshPart[]>>;
 
 export function detailFits(bounds: readonly [number, number, number, number], resolution: number, species: number, limit: number, budget?: number): boolean;
+
+export function foliageWidth(geometry: {
+    readonly vertices: ArrayLike<number>;
+    readonly indices: ArrayLike<number>;
+}): number;
 
 // Not exported from this entry, but used by the exports above:
 

@@ -56,6 +56,35 @@ default 0) scales instances down to zero over that last stretch instead of
 cutting them at it, so the far edge of a grass field recedes without popping;
 it needs no fade mask or `discard`, so it also suits the phone tier.
 
+### Screen-space rings: `lodSize` and `lodPixels`
+
+Distance rings ignore the camera: through a long lens or on a 4K frame a mesh's
+finest feature (a leaf spray, a needle band) can still be many pixels wide at the
+ring's end, and through a wide lens or a small viewport it can fall under a
+pixel and alias long before the next mesh takes over. `lodSize` gives the width
+of the near and middle mesh's finest feature at scale 1, in world units; each of
+the first two rings then ends at its `lod` distance or where that feature, times
+the instance's scale, would project under `lodPixels` viewport pixels (default
+1), whichever comes first. The ends follow the camera's field of view and
+viewport height each frame, and move only when the pixel footprint drifts more
+than 5 percent (hysteresis), set from the footprint plus that 5 percent so a
+feature never draws under `lodPixels`. The third distance stays the culling
+boundary. Without `lodSize` the shader is the distance-only one, unchanged.
+This is the projected-size criterion of Luebke, Reddy, Cohen, Varshney, Watson
+and Huebner, *Level of Detail for 3D Graphics* (2003), ch. 4.
+
+```ts
+import {Scatter} from 'margoengine/scatter';
+import {sphereGeometry, toGeometry} from 'margoengine/geometry';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const rings = [16, 8, 4].map((n) => toGeometry(sphereGeometry(0.5, n, n / 2)));
+// Near spheres hand over once a 0.1 m facet is under 2 px, middle ones once a 0.2 m facet is.
+const trees = Scatter.attach(engine, rings, {
+  count: 10000, area: [400, 400], lod: [60, 150, 400], lodFade: 0, lodSize: [0.1, 0.2], lodPixels: 2,
+});
+```
+
 `inner` (world units, default 0: off) leaves a hole round the camera, so another
 layer can take over nearby, such as stored objects in front of far stand-ins.
 `innerFade` (world units, default 0: a sharp circle) is a band past `inner` where

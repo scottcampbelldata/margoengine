@@ -57,10 +57,11 @@ export function candidateShader(cull: string): string {
       'instance.rotation.w=1.0;emit(ring,instance);\n   instance.rotation.w=2.0;emit(ring+1u,instance);return;',
       'instance.rotation.w=f32(ring)+1.0;placed=instance;return 3u<<ring;',
     ],
-    [
-      'emit(select(select(2u,1u,d<frame.lod.y),0u,d<frame.lod.x),instance);',
-      'placed=instance;return 1u<<select(select(2u,1u,d<frame.lod.y),0u,d<frame.lod.x);',
-    ],
+    // Screen-space rings (`screenRingCode`) pick by `at`, the rest by the lod distances.
+    ((v) => [
+      `emit(select(select(2u,1u,d<${v}.y),0u,d<${v}.x),instance);`,
+      `placed=instance;return 1u<<select(select(2u,1u,d<${v}.y),0u,d<${v}.x);`,
+    ])(cull.includes('emit(select(select(2u,1u,d<at.y),0u,d<at.x),instance);') ? 'at' : 'frame.lod'),
   ])
     code = once(code, from, to);
   return `${code.replaceAll('return;', 'return 0u;')}

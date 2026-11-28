@@ -205,6 +205,8 @@ interface ScatterOptions {
     scale?: readonly [number, number];
     lod?: readonly [number, number, number];
     lodFade?: number;
+    lodSize?: readonly [number, number];
+    lodPixels?: number;
     seed?: number;
     color?: readonly [number, number, number];
     material?: PbrMaterial;

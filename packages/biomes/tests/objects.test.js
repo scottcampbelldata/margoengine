@@ -511,6 +511,55 @@ test('conifer species keys draw their species meshes, imposters in the far ring,
   objects.dispose();
 });
 
+// KB-BIOMES-SCREENLOD1: tree rings were picked by distance alone ([0.15 r, 0.4 r, r]), so a distant tree's middle
+// sprays could fall under a pixel before the imposter took over. With lodPixels a tree whose foliage has detail levels
+// hands each ring over by its sprays' projected width as well (scatter lodSize, its GPU test in
+// packages/scatter/test/lod.browser.mjs); rocks, bare stems and snags keep distance rings.
+test('with lodPixels, trees with foliage rings switch ring by their sprays projected width (lodSize); without, by distance', async () => {
+  const { foliageWidth } = await import('../dist/objects.js'),
+    { Geometry } = await import('@margoengine/core'),
+    conifers = await import('@margoengine/procedural/conifers');
+  // A strip 0.2 wide and 4 long, in 8 square-ish quads: nine tenths of its area is at least 0.2 / sqrt(1.25) wide.
+  const p = [],
+    n = [],
+    ix = [];
+  for (let i = 0; i <= 8; i++) for (const x of [0, 0.2]) p.push(x, 0, i * 0.5), n.push(0, 1, 0);
+  for (let i = 0; i < 8; i++) ix.push(2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 1, 2 * i + 3, 2 * i + 2);
+  const strip = foliageWidth(new Geometry(new Float32Array(p), new Float32Array(n), new Uint32Array(ix)));
+  assert.ok(Math.abs(strip - (0.2 * 0.5) / Math.hypot(0.2, 0.5)) < 1e-6, `strip ${strip}`);
+  const make = async (options = {}) => {
+    const engine = { camera: { position: [0, 0, 0] }, use() {} },
+      species = [
+        { key: 'fir', mesh: 'procedural:douglas-fir', layer: 1 },
+        { key: 'dead', mesh: 'procedural:grand-fir/burnt', layer: 1 },
+        { key: 'rock', mesh: 'procedural:rock', layer: 2 },
+      ];
+    return BiomeObjects.attach(
+      engine,
+      { tile() {}, species, details: [], tileSize: 256 },
+      { heightmap: () => undefined, bounds: [0, 0, 512, 512], ...options },
+    );
+  };
+  const plain = await make();
+  assert.ok(plain.casters.every((c) => c.options.lodSize === undefined), 'distance rings without lodPixels');
+  plain.dispose();
+  const objects = await make({ lodPixels: 1 }),
+    [firBark, firNeedles, deadBark, rock] = objects.casters,
+    fir = conifers.coniferLevels('douglas-fir'),
+    widths = fir.canopy.slice(0, 2).map((d) => foliageWidth(new Geometry(d.positions, d.normals, d.indices)));
+  assert.deepEqual(firBark.options.lodSize, widths, 'the head of the shared rings carries the sprays widths');
+  assert.deepEqual(firNeedles.options.lodSize, widths);
+  assert.ok(widths[0] > 0.1 && widths[0] < widths[1] && widths[1] < 1, widths.join());
+  assert.equal(firBark.options.lodPixels, 1);
+  assert.equal(deadBark.options.lodSize, undefined, 'a bare stem keeps distance rings');
+  assert.equal(rock.options.lodSize, undefined, 'a rock keeps distance rings');
+  objects.dispose();
+  const two = await make({ lodPixels: 2 });
+  assert.equal(two.casters[0].options.lodPixels, 2);
+  two.dispose();
+  await assert.rejects(make({ lodPixels: 0 }), /lodPixels/);
+});
+
 // Fauld handoff 5, root cause 1: hedges thinned to bare hedge trees past 300 m, because every species off the canopy
 // layer (hedge shrubs among them) was drawn within a fixed 300 m. A countryside seen from a hill or a drone draws its
 // hedge shrubs out to `nearRadius`; the default stays 300 m.

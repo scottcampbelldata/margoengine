@@ -42,7 +42,7 @@ export interface ScatterTilesOptions extends Omit<ScatterOptions, 'count' | 'are
     readonly share?: ScatterTiles;
 }
 
-export function tilesCullShader(): string;
+export function tilesCullShader(screen?: boolean): string;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -210,6 +210,8 @@ interface ScatterOptions {
     scale?: readonly [number, number];
     lod?: readonly [number, number, number];
     lodFade?: number;
+    lodSize?: readonly [number, number];
+    lodPixels?: number;
     seed?: number;
     color?: readonly [number, number, number];
     material?: PbrMaterial;

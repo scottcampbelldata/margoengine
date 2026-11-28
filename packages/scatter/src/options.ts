@@ -126,6 +126,15 @@ export interface ScatterOptions {
    * Geometry for all rings does the same. The phone quality tier sets 0 when the app leaves it unset.
    */
   lodFade?: number;
+  /**
+   * Screen-space LOD (Luebke et al. 2003, ch. 4 screen-space error): the finest feature of the near and middle mesh at
+   * scale 1, in world units (a leaf spray's width). With it, an object moves to the next ring once that feature, times
+   * the object's scale, would project under `lodPixels` pixels through the camera's field of view and viewport height,
+   * or at the `lod` distance, whichever comes first. Default none: rings by `lod` distance alone.
+   */
+  lodSize?: readonly [number, number];
+  /** Pixels (of the viewport) a `lodSize` feature keeps before its ring hands over. Default 1. */
+  lodPixels?: number;
   /** Placement seed, an integer 0..2^32-1. Default 1. */
   seed?: number;
   /** Diffuse colour (linear RGB 0..1) when no `material` is given. Default [0.12, 0.35, 0.08]. */
