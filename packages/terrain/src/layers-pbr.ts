@@ -169,7 +169,7 @@ export class TerrainMaterials implements EnginePlugin, TerrainLighting {
     const head = '@fragment fn fragment(i:Output)->@location(0) vec4f {',
       plain = 'let n=normalize(i.normal);let base=terrainColor(i.position,n);',
       // TerrainOptions.rock without relief: the rock normal and tone stand where the plain normal does.
-      plainRock = 'let n=terrainRock(i.position,normalize(i.normal));let base=terrainColor(i.position,n)*terrainRockShade;',
+      plainRock = 'let n=terrainRock(i.position,normalize(i.normal));let base=terrainColor(i.position,normalize(i.normal))*terrainRockShade;',
       bumped = 'let n=terrainBump(i.position,terrainN);',
       rules = 'let weight=smoothstep(',
       painted = 'let weight=packed[layer/4u][layer%4u];if(weight<=0.0){continue;}',
@@ -199,7 +199,7 @@ export class TerrainMaterials implements EnginePlugin, TerrainLighting {
         )
         .replace(
           plainRock,
-          `let terrainN0=terrainRock(i.position,normalize(i.normal));let base=terrainColor(i.position,terrainN0)*terrainRockShade;let n=terrainPbrNormal(terrainN0);${resolve}`,
+          `let terrainN0=terrainRock(i.position,normalize(i.normal));let base=terrainColor(i.position,normalize(i.normal))*terrainRockShade;let n=terrainPbrNormal(terrainN0);${resolve}`,
         )
         .replace(bumped, `let n=terrainPbrNormal(terrainBump(i.position,terrainN));${resolve}`)
         .replace(rules, 'let weight=terrainPbrHeight(position,projection,dx,dy,layer)*smoothstep(')

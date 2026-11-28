@@ -1,0 +1,49 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Terrain crest teeth check</title><style>body{margin:0}canvas{display:block;width:1280px;height:720px}</style></head><body><canvas width="1280" height="720"></canvas>
+<script type="module">
+// Real-GPU check for the clipmap's cell diagonals (teeth.browser.mjs reads the results). A knife-edge ridge 20 m high
+// runs along the grid's x = z diagonal over flat ground, seen side-on from below its crest so the crest stands against
+// the sky. Each call attaches the terrain (optionally with its diagonal choice patched to the old fixed split), renders
+// once every pipeline is ready and returns the crest's silhouette: for each column of the middle half, the first row from the top that is
+// not sky, and their total variation.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine} from '/packages/core/dist/index.js';
+import {Terrain} from '/packages/terrain/dist/index.js';
+const W=1280,H=720,canvas=document.querySelector('canvas'),errors=[],n=257,half=128;
+const heights=new Float32Array(n*n);
+for(let j=0;j<n;j++)for(let i=0;i<n;i++)heights[j*n+i]=20*Math.max(0,1-Math.abs(i-j)/3);
+const d=60/Math.SQRT2;
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[d,9,-d],target:[0,19,0],fov:40,near:0.3,far:5000}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.lighting.direction.set([0.3,1,0.2,3]);engine.lighting.radiance.set([1,1,1,0.3]);engine.scene.background='#80a8e0';
+const grey=new Uint8Array(64*64*4*4).fill(128);
+window.check={
+  async show(fixed){
+    device.pushErrorScope('validation');
+    const terrain=Terrain.attach(engine,{origin:[-half,-half],size:[n-1,n-1],heightScale:1,cellSize:1,resolution:64,levels:4,
+      layers:[0,1,2,3].map(()=>({height:[-1e6,1e6],slope:[0,1],scale:0.25})),
+      textures(gpu){
+        const heightmap=gpu.createTexture({size:[n,n],format:'r32float',usage:6}),layers=gpu.createTexture({size:[64,64,4],format:'rgba8unorm-srgb',usage:6});
+        gpu.queue.writeTexture({texture:heightmap},heights,{bytesPerRow:n*4,rowsPerImage:n},[n,n]);
+        gpu.queue.writeTexture({texture:layers},grey,{bytesPerRow:64*4,rowsPerImage:64},[64,64,4]);
+        return {heightmap,layers};
+      }});
+    let patched=0;
+    if(fixed)terrain.addLighting({bindings:()=>[],shader:(src)=>src.replace('let along=abs(r-ad)<abs(r-bc);',()=>{patched++;return 'let along=false;';})});
+    await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+    // Read in the task that renders: a WebGPU canvas keeps its frame only until that task ends.
+    engine.render({delta:0});const c=new OffscreenCanvas(W,H).getContext('2d');c.drawImage(canvas,0,0);const p=c.getImageData(0,0,W,H).data;
+    terrain.dispose();
+    const png=await new Promise(r=>{const cv=document.createElement('canvas');cv.width=W;cv.height=H;const x=cv.getContext('2d');x.putImageData(new ImageData(new Uint8ClampedArray(p),W,H),0,0);r(cv.toDataURL());});window.lastPng=png;
+    const e=await device.popErrorScope();if(e)errors.push(e.message);
+    const sky=(x,y)=>{const k=(y*W+x)*4;return Math.abs(p[k]-0x80)<3&&Math.abs(p[k+1]-0xa8)<3&&Math.abs(p[k+2]-0xe0)<3;};
+    // The crest's row in each column of the middle half of the frame, and its total variation: the sum of the row
+    // changes from column to column. A crest without teeth rises and falls once or twice; teeth add twice their height
+    // for every tooth.
+    const rows=[];
+    for(let x=W/4;x<(W*3)/4;x++){let y=0;while(y<H&&sky(x,y))y++;rows.push(y);}
+    let variation=0;for(let k=1;k<rows.length;k++)variation+=Math.abs(rows[k]-rows[k-1]);
+    return {columns:rows.filter(y=>y>0&&y<H).length,variation,top:Math.min(...rows),patched:fixed?patched>0:undefined,errors:errors.splice(0)};
+  },
+};
+window.ready=true;
+</script></body></html>

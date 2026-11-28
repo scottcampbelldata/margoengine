@@ -744,6 +744,15 @@ through `EXT_texture_filter_anisotropic`); grey noise seen 3.4 degrees down from
 4.35 past 25 m where it had 2.36 (`packages/terrain/test/anisotropy.browser.mjs`, the same on the layer). The wide shot from 6 m also shows the 20 m edge of the
 dense grass layer as a band (KB-BIOMES-GRASSRING1, open).
 
+Above the Treeline look round 10 (2026-11-28): crests that ran along the clipmap's fixed cell diagonal drew as rows of
+triangular teeth (KB-TERRAIN-CRESTTEETH1). Each cell is now a fan around a centre vertex the vertex shader puts on the
+diagonal nearer the Catmull-Rom height at the centre (twice the triangles and about twice the vertices of the old
+grid; the centre is internal to its cell, so no crack). A knife-edge ridge seen side-on has a silhouette variation of
+88 px over the middle half of a 1280 x 720 frame against 3,103 px with the fixed split patched back
+(`packages/terrain/test/teeth.browser.mjs`, the same on WebGPU and the WebGL2 layer). With `rock`, the triplanar
+projections now read the surface normal instead of the structure's (KB-TERRAIN-ROCKSMEAR1,
+`packages/terrain/test/rock-projection.test.js`; rock-structure.browser.mjs passes on WebGPU and the WebGL2 layer).
+
 ### Section 5 evidence: suspended sediment in the flood (water/flood FG-13, 2026-11-24)
 
 GPU maths change in `packages/water/src/flood-shaders.ts` (`floodRecord`), both backends from one WGSL source, only when

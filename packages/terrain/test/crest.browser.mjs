@@ -8,8 +8,8 @@
 // edge, where the interpolated normal, the triplanar blend and the layer weights are extrapolated), and the division
 // made them slopes of 1.5 to over 8 that tipped the normal away from the noon sun. The shader caps the slope at
 // min(1, 4 det). Here, on the same crests and camera: with bump 1 the frame keeps within 4 dark specks of bump off,
-// drawn by rules and by painted weights (0 and 0 on an RTX A6000); the formula without the cap draws over 10 more in
-// both (21 and 14), so the scene still has the slivers.
+// drawn by rules and by painted weights (0 and 0 on an RTX A6000); the formula without the cap draws over 20 more over
+// the two (85 and 8 since the clipmap follows the crests; 21 and 14 before), so the scene still has the slivers.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -47,14 +47,17 @@ await runSuite(
     for (const [name, r] of Object.entries(result))
       assert.ok(r.ground > 1440 * 900 * 0.1, `${name}: the crests fill the frame (${r.ground} ground pixels)`);
     assert.ok(result.uncapped.patched && result.weightedUncapped.patched, 'the uncapped formula replaced terrainBump');
-    for (const [off, bump, uncapped] of [
-      ['off', 'bump', 'uncapped'],
-      ['weightedOff', 'weightedBump', 'weightedUncapped'],
+    // The scene has edge-on slivers: the uncapped formula draws over 20 more specks than bump off over both paths. Until
+    // the clipmap chose each cell's diagonal by the ground (KB-TERRAIN-CRESTTEETH1) that was 21 and 14 against 0 and 0;
+    // with it, 85 and 8 (the cells now follow the crests, so the painted-weights path sees fewer slivers).
+    assert.ok(
+      counts.uncapped + counts.weightedUncapped > counts.off + counts.weightedOff + 20,
+      `the scene has edge-on slivers (${counts.uncapped} and ${counts.weightedUncapped} specks uncapped, ${counts.off} and ${counts.weightedOff} without bump)`,
+    );
+    for (const [off, bump] of [
+      ['off', 'bump'],
+      ['weightedOff', 'weightedBump'],
     ]) {
-      assert.ok(
-        counts[uncapped] > counts[off] + 10,
-        `${uncapped}: the scene has edge-on slivers (${counts[uncapped]} specks uncapped, ${counts[off]} without bump)`,
-      );
       assert.ok(
         counts[bump] <= counts[off] + 4,
         `${bump}: bump 1 draws no dark specks along the crests (${counts[bump]} against ${counts[off]} without bump, at most 4 more)`,

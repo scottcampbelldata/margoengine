@@ -1,6 +1,14 @@
 import { neutralShader } from '../../shared/display.js';
 import { ggxD, smithGCorrelated } from '../../shared/light-terms.js';
 // Vertex morph between grid levels: Strugar 2009, "Continuous Distance-Dependent Level of Detail" (CDLOD), JGT.
+// Each cell is a fan around a centre vertex (`clipmapGrid`) that sits on the midpoint of one of the cell's diagonals, so
+// the cell is drawn split along that diagonal: the one whose mean height is nearer the Catmull-Rom height at the cell's
+// centre (Catmull and Rom 1974, "A class of local interpolating splines"; the cubic convolution weights of Keys 1981,
+// "Cubic convolution interpolation for digital image processing", IEEE TASSP 29(6), a = -0.5). Choosing each quad's
+// diagonal by the data is data-dependent triangulation (Dyn, Levin and Rippa 1990, "Data dependent triangulations for
+// piecewise linear interpolation", IMA J. Numer. Anal. 10(1)); a fixed diagonal draws a crest that runs along the other
+// one as a row of triangular teeth (KB-TERRAIN-CRESTTEETH1, Above the Treeline look round 10). The centre is shared by
+// its own cell's triangles only, so no choice opens a crack; it follows the cell's corners through the morph.
 export const terrainVertex = /* wgsl */ `
 struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,grid:vec4f,offset:vec4f,map:vec4f,heights:vec4f,ambient:vec4f}
 struct Layer {heightSlope:vec4f,params:vec4f}
@@ -15,11 +23,29 @@ fn height(position:vec2f)->f32 {
   let a=mix(textureLoad(heightMap,lo,0).r,textureLoad(heightMap,vec2i(hi.x,lo.y),0).r,t.x);let b=mix(textureLoad(heightMap,vec2i(lo.x,hi.y),0).r,textureLoad(heightMap,hi,0).r,t.x);
   return mix(a,b,t.y)*frame.heights.x+frame.heights.y;
 }
+fn terrainCatmull(t:f32)->vec4f {let t2=t*t;let t3=t2*t;return vec4f(-0.5*t3+t2-0.5*t,1.5*t3-2.5*t2+1.0,-1.5*t3+2.0*t2+0.5*t,0.5*t3-0.5*t2);}
+fn terrainCubic(position:vec2f)->f32 {
+  let dimensions=vec2i(textureDimensions(heightMap));let uv=clamp((position-frame.map.xy)/frame.map.zw,vec2f(0),vec2f(1));let pixel=uv*vec2f(dimensions-vec2i(1));let lo=vec2i(floor(pixel));
+  let wx=terrainCatmull(fract(pixel.x));let wy=terrainCatmull(fract(pixel.y));var h=0.0;
+  for(var j=0;j<4;j++){for(var k=0;k<4;k++){h+=wx[k]*wy[j]*textureLoad(heightMap,clamp(lo+vec2i(k-1,j-1),vec2i(0),dimensions-vec2i(1)),0).r;}}
+  return h*frame.heights.x+frame.heights.y;
+}
+fn terrainMorph(g:vec2f)->vec3f {
+  let edge=max(abs(g.x),abs(g.y));let morph=clamp((edge-frame.grid.w*0.5+2)/2,0.0,1.0);
+  return vec3f(mix(g,round(g*0.5)*2,morph),clamp((frame.grid.w*0.5-edge)/(frame.grid.w*0.25),0.0,1.0));
+}
+fn terrainMorphXZ(m:vec3f)->vec2f {return frame.grid.xy+m.xy*frame.grid.z+frame.offset.xy*m.z;}
 struct Output {@builtin(position) @invariant clip:vec4f,@location(0) position:vec3f,@location(1) normal:vec3f,@location(2) color:vec3f,@location(3) material:vec4f}
 @vertex fn vertex(@location(0) grid:vec2f)->Output {
-  let edge=max(abs(grid.x),abs(grid.y));let morph=clamp((edge-frame.grid.w*0.5+2)/2,0.0,1.0);
-  let aligned=mix(grid,round(grid*0.5)*2,morph);let inner=clamp((frame.grid.w*0.5-edge)/(frame.grid.w*0.25),0.0,1.0);
-  let xz=frame.grid.xy+aligned*frame.grid.z+frame.offset.xy*inner;let position=vec3f(xz.x,height(xz),xz.y);
+  var m=terrainMorph(grid);var lift=0.0;let centre=fract(grid.x)!=0.0;
+  if(centre){
+    let a=terrainMorph(grid-vec2f(0.5));let b=terrainMorph(grid+vec2f(0.5,-0.5));let c=terrainMorph(grid+vec2f(-0.5,0.5));let d=terrainMorph(grid+vec2f(0.5));
+    let ad=(height(terrainMorphXZ(a))+height(terrainMorphXZ(d)))*0.5;let bc=(height(terrainMorphXZ(b))+height(terrainMorphXZ(c)))*0.5;
+    let r=terrainCubic(terrainMorphXZ((a+b+c+d)*0.25));let along=abs(r-ad)<abs(r-bc);
+    m=select((b+c)*0.5,(a+d)*0.5,along);lift=select(bc,ad,along);
+  }
+  let aligned=m.xy;let inner=m.z;
+  let xz=frame.grid.xy+aligned*frame.grid.z+frame.offset.xy*inner;let position=vec3f(xz.x,select(height(xz),lift,centre),xz.y);
   let step=frame.map.zw/max(vec2f(textureDimensions(heightMap))-1,vec2f(1));
   var normal=normalize(vec3f((height(xz-vec2f(step.x,0))-height(xz+vec2f(step.x,0)))/(2*step.x),1,(height(xz-vec2f(0,step.y))-height(xz+vec2f(0,step.y)))/(2*step.y)));
   if(frame.offset.w>0.5){let dimensions=vec2i(textureDimensions(normalMap));let uv=clamp((xz-frame.map.xy)/frame.map.zw,vec2f(0),vec2f(1));let sampled=textureLoad(normalMap,min(vec2i(uv*vec2f(dimensions)),dimensions-vec2i(1)),0).xyz*2-1;if(dot(sampled,sampled)>0.00001){normal=normalize(sampled);}}
@@ -198,13 +224,17 @@ fn terrainBump(position:vec3f,normal:vec3f)->vec3f {
 }`;
 /**
  * The fragment's shading normal `n` and layer colour `base` (the SSR capture entry starts the same way). With `rock`
- * (`TerrainOptions.rock`) the normal first takes the rock structure and the colour its tone.
+ * (`TerrainOptions.rock`) the normal first takes the rock structure and the colour its tone. The layer colour (its
+ * triplanar projections and slope rules) still reads the surface's own normal: the structure only shades. Picking the
+ * projections by the structure's normal laid a bench's near-level normal or a facet's tilt on a steep face, so the
+ * texture was projected along the face and drawn as streaks a few metres long down every rock wall
+ * (KB-TERRAIN-ROCKSMEAR1, Above the Treeline look round 10).
  */
 export const terrainShading = (surface: boolean, rock = false): string =>
   rock
     ? surface
-      ? 'let terrainN=terrainRock(i.position,normalize(i.normal));let base=terrainColor(i.position,terrainN)*terrainRockShade;let n=terrainBump(i.position,terrainN);'
-      : 'let n=terrainRock(i.position,normalize(i.normal));let base=terrainColor(i.position,n)*terrainRockShade;'
+      ? 'let terrainN=terrainRock(i.position,normalize(i.normal));let base=terrainColor(i.position,normalize(i.normal))*terrainRockShade;let n=terrainBump(i.position,terrainN);'
+      : 'let n=terrainRock(i.position,normalize(i.normal));let base=terrainColor(i.position,normalize(i.normal))*terrainRockShade;'
     : surface
       ? 'let terrainN=normalize(i.normal);let base=terrainColor(i.position,terrainN);let n=terrainBump(i.position,terrainN);'
       : 'let n=normalize(i.normal);let base=terrainColor(i.position,n);';

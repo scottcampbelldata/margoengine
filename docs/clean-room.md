@@ -20392,3 +20392,29 @@ test/fog-height-falloff.test.js and test/fog-below-check.mjs).
 ### ICE-03 independent native iceberg rows and accepted water sources
 
 Justin Burton et al. (2012), [Laboratory investigations of iceberg capsize dynamics, energy dissipation and tsunamigenesis](https://doi.org/10.1029/2011JF002055), §5, give a hydrostatic cuboid comparison and discuss dissipation and added mass. Till Wagner, Alon Stern, Rebecca Dell and Ian Eisenman (2017), [On the representation of capsizing in iceberg models](https://doi.org/10.1016/j.ocemod.2017.07.003), §2, give the static aspect-ratio criterion with its density-ratio dependence. This change retains the current clipped-waterline dynamics. Helpers integrate disjoint rows and use the existing f64x2 area and wrench math. The caller checks staged outputs and publishes the ordered calving, wake and freshwater records together.
+
+## Crest teeth and smeared rock faces on the clipmap terrain (2026-11-28, Above the Treeline round 10)
+
+Problem: every clipmap cell was two triangles split along the same diagonal, so a crest running along the other
+diagonal was drawn as a row of triangular teeth (the near ridge of the alpine shot; KB-TERRAIN-CRESTTEETH1). With
+`TerrainOptions.rock`, the layer colour's triplanar projections were picked by the rock structure's shading normal, so
+a bench's near-level normal or a facet's tilt projected the texture along steep faces as streaks
+(KB-TERRAIN-ROCKSMEAR1).
+
+Sources read (papers only, no code):
+- N. Dyn, D. Levin and S. Rippa, "Data dependent triangulations for piecewise linear interpolation", IMA Journal of
+  Numerical Analysis 10(1), 1990, https://doi.org/10.1093/imanum/10.1.137 (choose each quad's diagonal by the data, not
+  a fixed rule).
+- E. Catmull and R. Rom, "A class of local interpolating splines", Computer Aided Geometric Design, Academic Press,
+  1974; R. Keys, "Cubic convolution interpolation for digital image processing", IEEE TASSP 29(6), 1981,
+  https://doi.org/10.1109/TASSP.1981.1163711 (the a = -0.5 cubic: a reference height at the cell centre that sees the
+  4 x 4 neighbourhood, so it leans toward the crest along a ridge and toward the floor along a valley).
+- M. Strugar, "Continuous Distance-Dependent Level of Detail for Rendering Heightmaps", Journal of Graphics, GPU, and
+  Game Tools 14(4), 2009, https://doi.org/10.1080/2151237X.2009.10129287 (the vertex morph the centre follows).
+- R. Geiss, "Generating Complex Procedural Terrains Using the GPU", GPU Gems 3, ch. 1, 2007 (triplanar projection
+  weighted by the surface normal).
+
+Margo's own: a centre vertex per cell, shared only by its own fan, so its choice cannot open a crack; it sits on the
+midpoint of the diagonal whose mean height is nearer the cubic height at the centre, following the morphed corners;
+the projections read the interpolated surface normal while the structure normal only shades (terrain
+test/grid.test.js, test/teeth.browser.mjs, test/rock-projection.test.js).
