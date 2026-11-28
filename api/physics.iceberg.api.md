@@ -26,6 +26,7 @@ export interface IcebergLoadOptions {
     readonly id?: string;
     readonly calving?: FieldDescriptor;
     readonly signal?: AbortSignal;
+    readonly threads?: number;
 }
 
 export interface IcebergOptions {
@@ -71,9 +72,11 @@ export class IcebergSolver implements Solver<IcebergOptions> {
     readonly releaseField: FieldDescriptor;
     private constructor();
     static load(options?: IcebergLoadOptions): Promise<IcebergSolver>;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, options?: IcebergOptions): void;
     step(context: StepContext, dt: number): void;
+    readNativeWork(): IcebergWorkCounts | undefined;
     importPorts(_tick: number): void;
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
@@ -84,6 +87,19 @@ export class IcebergSolver implements Solver<IcebergOptions> {
 }
 
 export type IcebergVector = readonly [number, number, number];
+
+export interface IcebergWorkCounts extends IcebergWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly IcebergWorkerWork[];
+}
+
+export interface IcebergWorkerWork {
+    readonly rows: number;
+    readonly activeRows: number;
+    readonly substeps: number;
+    readonly wrenchEvaluations: number;
+    readonly pairedPanelDots: number;
+}
 
 export function icebergCriticalAspect(iceDensity?: number, waterDensity?: number): number;
 

@@ -700,3 +700,8 @@ Yanzhuo Xue, Kai Zhong, Bao-Yu Ni, Zhiyuan Li, Martin Bergström, Jonas W. Rings
 ### ICE-01 Col de Porte snowpack observations
 
 Samuel Morin, Yves Lejeune, Bernard Lesaffre, Jean-Michel Panel, Daniel Poncet, Pierre David and Marcel Sudul (2012), [Col de Porte meteorology and snow measurements](https://doi.org/10.1594/PANGAEA.774249), CC BY 3.0. The diagnostic separately downloads the hourly forcing, hourly snow depth and daily snow water equivalent. It reads initialization values once and uses later observations only for comparison. [Dataset paper](https://doi.org/10.5194/essd-4-13-2012)
+
+### ICE-03 measured capsize
+
+- Burton et al. (2012), [Laboratory investigations of iceberg capsize dynamics](https://doi.org/10.1029/2011JF002055). The diagnostic uses sparse factual readings from Figure 5. The [archived measurements](https://doi.org/10.7265/N56H4FCJ) carry CC BY-NC 4.0 and are referenced separately.
+- Heller et al. (2019), [Large-scale experiments into the tsunamigenic potential of different iceberg calving mechanisms](https://doi.org/10.1038/s41598-018-36634-3), CC BY 4.0. The motion file is supplied externally from the authors' [SPHERIC Test 15](https://www.spheric-sph.org/tests/test-15). The engine bundles neither archive.

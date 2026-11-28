@@ -228,6 +228,16 @@ struct Panel {
     pressure_first: V,
 }
 
+#[repr(C)]
+#[derive(Default)]
+struct Work {
+    rows: f64,
+    active_rows: f64,
+    substeps: f64,
+    wrench_evaluations: f64,
+    paired_panel_dots: f64,
+}
+
 fn clipped(face: [V; 4], waterline: f64, wet: bool) -> ([V; 5], usize) {
     let mut poly = [ZERO; 5];
     let mut n = 0;
@@ -258,8 +268,9 @@ fn clipped(face: [V; 4], waterline: f64, wet: bool) -> ([V; 5], usize) {
 }
 
 /// Integrate area, first moment, depth and depth first moment over a clipped planar face.
-fn panel(face: [V; 4], waterline: f64, wet: bool) -> Panel {
+fn panel(face: [V; 4], waterline: f64, wet: bool, paired_dots: &mut usize) -> Panel {
     let (polygon, count) = clipped(face, waterline, wet);
+    *paired_dots += count.saturating_sub(2);
     let mut result = Panel {
         area: 0.0,
         first: ZERO,
@@ -303,7 +314,8 @@ fn drag(panel: &Panel, normal: V, speed: V, spin: V, fluid: &Fluid, wrench: &mut
     wrench.torque = wrench.torque + centre.cross(force);
 }
 
-fn loads(body: Body, env: &Environment) -> Wrench {
+fn loads(body: Body, env: &Environment, work: &mut Work) -> Wrench {
+    let mut paired_dots = 0;
     let mut output = Wrench {
         force: ZERO,
         torque: ZERO,
@@ -339,7 +351,7 @@ fn loads(body: Body, env: &Environment) -> Wrench {
                 centre + tangent_a + tangent_b,
                 centre - tangent_a + tangent_b,
             ];
-            let wet = panel(face, waterline, true);
+            let wet = panel(face, waterline, true, &mut paired_dots);
             put(
                 &mut output.wet_fractions,
                 2 * axis + sign,
@@ -352,7 +364,7 @@ fn loads(body: Body, env: &Environment) -> Wrench {
             drag(&wet, normal, body.speed, spin, &env.water, &mut output);
             if env.air.drag > 0.0 {
                 drag(
-                    &panel(face, waterline, false),
+                    &panel(face, waterline, false, &mut paired_dots),
                     normal,
                     body.speed,
                     spin,
@@ -362,6 +374,8 @@ fn loads(body: Body, env: &Environment) -> Wrench {
             }
         }
     }
+    work.wrench_evaluations += 1.0;
+    work.paired_panel_dots += paired_dots as f64;
     output
 }
 
@@ -462,7 +476,7 @@ fn stable_interval(body: Body, env: &Environment) -> f64 {
     0.125 / (hydro + angular + drag_rate(&env.water) + drag_rate(&env.air))
 }
 
-fn advance_row(row: &mut [f64; ROW_WORDS], env: &Environment, dt: f64) -> bool {
+fn advance_row(row: &mut [f64; ROW_WORDS], env: &Environment, dt: f64, work: &mut Work) -> bool {
     let mut body = Body::read(row);
     let initial = body.size.volume();
     let previous_wet = row[16];
@@ -472,6 +486,7 @@ fn advance_row(row: &mut [f64; ROW_WORDS], env: &Environment, dt: f64) -> bool {
         row[18] = 0.0;
         return true;
     }
+    work.active_rows += 1.0;
     let mut time = 0.0;
     while time < dt && body.size.volume() > 0.0 {
         let mut local = dt - time;
@@ -485,11 +500,11 @@ fn advance_row(row: &mut [f64; ROW_WORDS], env: &Environment, dt: f64) -> bool {
         if time + local == time {
             return false;
         }
-        let start = loads(body, env);
+        let start = loads(body, env, work);
         let (a, spin) = acceleration(body, env, &start);
         body.kick(a, spin, 0.5 * local);
         body.drift(local);
-        let end = loads(body, env);
+        let end = loads(body, env, work);
         let (a, spin) = acceleration(body, env, &end);
         body.kick(a, spin, 0.5 * local);
         let wet = core::array::from_fn(|i| {
@@ -497,11 +512,12 @@ fn advance_row(row: &mut [f64; ROW_WORDS], env: &Environment, dt: f64) -> bool {
         });
         melt(&mut body, env, &wet, local);
         time += local;
+        work.substeps += 1.0;
     }
     body.write(row);
     let volume = body.size.volume();
     let wet = if volume > 0.0 {
-        (loads(body, env).buoyancy / (env.gravity * env.water.density))
+        (loads(body, env, work).buoyancy / (env.gravity * env.water.density))
             .max(0.0)
             .min(volume)
     } else {
@@ -515,21 +531,81 @@ fn advance_row(row: &mut [f64; ROW_WORDS], env: &Environment, dt: f64) -> bool {
     row.iter().all(|value| value.is_finite())
 }
 
+#[repr(C)]
+struct Job {
+    state: *mut f64,
+    count: usize,
+    settings: *const f64,
+    work: *mut Work,
+    dt: f64,
+}
+
+const _: [(); 24] = [(); size_of::<Job>()];
+
+impl Job {
+    fn valid(&self) -> bool {
+        self.count <= isize::MAX as usize / size_of::<[f64; ROW_WORDS]>()
+            && self.dt.is_finite()
+            && self.dt >= 0.0
+    }
+
+    unsafe fn advance_rows(&self, start: usize, end: usize, part: usize) -> u32 {
+        let rows = end - start;
+        let mut work = Work {
+            rows: rows as f64,
+            ..Work::default()
+        };
+        if rows != 0 {
+            // Each participant exclusively owns its candidate body rows. The environment is immutable.
+            let data = unsafe {
+                slice::from_raw_parts_mut(self.state.cast::<[f64; ROW_WORDS]>().add(start), rows)
+            };
+            let settings = unsafe { &*self.settings.cast::<[f64; SETTINGS_WORDS]>() };
+            let env = Environment::read(settings);
+            for row in data {
+                if !advance_row(row, &env, self.dt, &mut work) {
+                    return 1;
+                }
+            }
+        }
+        if !self.work.is_null() {
+            unsafe { self.work.add(part).write(work) };
+        }
+        0
+    }
+}
+
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn iceberg_step(
+unsafe extern "C" fn iceberg_step(
     state: *mut f64,
     count: usize,
     settings: *const f64,
     dt: f64,
+    work: *mut Work,
 ) -> u32 {
-    // The host work region and constant environment have distinct allocations.
-    let data = unsafe { slice::from_raw_parts_mut(state.cast::<[f64; ROW_WORDS]>(), count) };
-    let settings = unsafe { &*settings.cast::<[f64; SETTINGS_WORDS]>() };
-    let env = Environment::read(settings);
-    for row in data {
-        if !advance_row(row, &env, dt) {
-            return 1;
-        }
+    let job = Job {
+        state,
+        count,
+        settings,
+        work,
+        dt,
+    };
+    if !job.valid() {
+        return 1;
     }
-    0
+    unsafe { job.advance_rows(0, count, 0) }
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn iceberg_thread_phase(job: &Job, stage: u32, part: u32, parts: u32) -> u32 {
+    let Some(parts) = core::num::NonZeroU64::new(u64::from(parts)) else {
+        return 1;
+    };
+    if stage != 0 || u64::from(part) >= parts.get() || !job.valid() {
+        return 1;
+    }
+    let count = job.count as u64;
+    let start = (count * u64::from(part) / parts.get()) as usize;
+    let end = (count * u64::from(part + 1) / parts.get()) as usize;
+    unsafe { job.advance_rows(start, end, part as usize) }
 }

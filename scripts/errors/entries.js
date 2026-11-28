@@ -141,6 +141,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'iceberg',
+    title: '@margoengine/physics/iceberg rigid bodies, marine release and wake sources',
+    kind: 'family',
+    messages: [],
+    cause: 'An iceberg body, calving bank, melt rate or optional native step exceeds its supported range.',
+    fix: 'Pass finite SI dimensions and rates and a layout-1 solid-volume field from its owning memory. Reduce forcing or use a usable step duration if the candidate overflows. Load a new solver after disposal. Use one native participant or use two or four with a shared-memory world.',
+  },
+  {
     id: 'snowpack',
     title: '@margoengine/physics/snowpack heat, layers and weather fields',
     kind: 'family',

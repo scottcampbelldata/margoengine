@@ -24425,3 +24425,7 @@ Registered flow and rigid rows now use the bank declared by the port. The solver
 ### Fixed: ICE-01 could overwrite accepted snow and runoff during an invalid native step
 
 Snowpack copies registered forcing from the owning memory, then samples wind without retaining that bank's views. Native snow, cover, heat and meltwater update candidate regions. A nonfinite candidate leaves the previous publications and render revision intact. After an origin shift, new ports use the live host cell. See `packages/physics/tests/coupling/snowpack.test.js`.
+
+### Fixed: ICE-03 could publish a partial wake when a derived melt flux exceeded its range
+
+Native body rows, pending calving, freshwater and signed wakes stage before acceptance. A malformed foreign calving bank or a late derivative overflow leaves the previous ports, work and bodies intact. The published origin follows the live solver cell immediately after shift or restore. See `packages/physics/tests/coupling/iceberg.test.js`.

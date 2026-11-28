@@ -7467,7 +7467,7 @@ import { IcebergSolver } from '@margoengine/physics/iceberg';
 import { WakeSolver } from '@margoengine/physics/sea';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const ice = await IcebergSolver.load();
+using ice = await IcebergSolver.load({ threads: 1 });
 const wake = new WakeSolver('iceberg-wake', ice.wakeSourceField);
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
   .add(wake, { cells: [48, 48], cellSize: 0.5, sponge: 6 })
@@ -7490,6 +7490,8 @@ and current geometry for rendering. `meltwaterField` carries freshwater in m³/s
 The wake field contains paired layout-1 f64 SeaSource rows [x, z, radius, pressure, volume]. Bind it
 in the second argument of `WakeSolver`, with both solvers at 60 Hz in the same world cell. It works
 alongside `WakeParams.sources`. Read the result in `SpectralSea` or render it with `WaterWake`.
+
+One native participant is the default. Set `threads` to 2 or 4 in Node or an isolated browser worker with a shared-memory world. Participants update disjoint body rows. The solver admits calving and publishes signed wake, meltwater and release records in order on the caller. `readNativeWork()` copies the counts from the last accepted step. Dispose the solver once the world finishes using it.
 
 ## Grounded biped and quadruped gait
 

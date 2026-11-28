@@ -10216,7 +10216,7 @@ A WakeSolver receives two area-scaled patches per changing body and gives the li
 Wind and water currents are each uniform and use the still-water plane. The model excludes large
 wave feedback on the body, fragment collisions, grounding and sea-ice resistance. Calving sites
 have explicitly allocated body rows, with queued volumes retained across snapshots when full.
-The optional iceberg entry measures 5,162 B gzip with a 5,418 B ceiling. The plain and shared
+At its original landing, the optional iceberg entry measured 5,162 B gzip with a 5,418 B ceiling. The plain and shared
 assets each measure 9,128 B raw and 4,318 B gzip. Physics/sea measures 7,745 B gzip
 with the field reader, with an 8,001 B ceiling. Core plus stage remains 24,820 B gzip.
 
@@ -11951,3 +11951,11 @@ The solver stages cross-memory forcing, column state, cover and runoff before pu
 At Col de Porte, independent six-day dry-window depth RMSE is 0.011 and 0.018 m for the cold and warm cases. At the end of the cold case, the model reports 0.290 m against 0.301 m measured. The warm case reports 0.428 against 0.400 m. Its trailing daily mean SWE is 232.89 against 189 kg/m², and its instantaneous lower bound still misses by 31.70 kg/m² against the published 25 kg/m² RMS spatial variability scale. Halving the step changes SWE by at most 0.00084 kg/m². Moving the forcing time by an hour changes it by up to 0.98 kg/m². The model retains too much water in the warm run. Layer creation, microstructure, sublimation, changing albedo, basal-flux uncertainty and full warm-season accuracy remain open. [Reproduction](whitepaper/reproduce.md#ice-01-native-snow-columns-and-col-de-porte)
 
 The four-participant browser case checks 221 columns and 714 conduction interfaces. 694 interfaces use paired f64x2 lanes, with 38,556 bisection iterations in total. The optional entry grows from 4,916 to 8,220 B gzip, with an 8,476 B ceiling. Each binary uses 11,383 B raw and 4,552 B gzip. The plain and shared assets use 4,107 and 4,109 B Brotli. Core and stage receive zero bytes.
+
+### ICE-03 accepted calving and independent capsize measurements
+
+Workers advance independent bodies including vacant release rows. Admission and ordered publication of signed source and freshwater rows remain on the caller. The 259-row Chromium run has 234 active bodies, 887 substeps, 2,008 wrench evaluations and 40,160 paired face dot products. Its four participants complete 240, 253, 244 and 150 substeps. The two grid populations replay exactly and match the previous scalar kernel. When small releases enter vacant slots immediately, the shortest cuboids can dominate adaptive work in one partition. A configured reusable slot retains the remaining event volume in the queue. A physically guided parcel aggregation model remains open.
+
+Measured Burton Figure 5 intervals for 10° to 45°, 45° to 80°, and 10° to 90° are 0.620, 0.278 and 0.998 s. The model takes 0.431, 0.167 and 0.636 s. Each interval misses its conservative readout and release bound. The model reaches 114.28° against 96.07° observed. Halving the integration interval changes the 10° to 90° duration by 0.00010 s. In the separate Heller comparison the measured marker peaks at 0.214 m/s versus 0.403 m/s in the free-body model. The guide assembly restrains surge and contributes rod inertia, so that comparison leaves the effect of those differences unresolved. Added inertia, water feedback and radiation damping, heat-driven melt, irregular shapes, grounding, ship contact and quantitative capsize accuracy remain open.
+
+The optional entry grows from 4,339 to 6,937 B gzip with a 7,193 B ceiling. Both Wasm assets use 9,776 B raw and 4,693 B gzip, with plain and shared Brotli sizes 4,114 and 4,107 B. Core and stage receive zero bytes. [Tests and measured record](whitepaper/reproduce.md#ice-03-native-iceberg-rows-and-capsize-measurements)

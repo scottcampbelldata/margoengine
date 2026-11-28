@@ -92,8 +92,8 @@
 <tr><th scope="row"><code>wind-traction-kernel-shared.wasm</code></th><td>Shared Rust SIMD wind traction and torque</td><td class="num">2,507</td><td class="num">1,165</td><td class="num">1,034</td><td>WindForce.create() with multiple threads; independent native wrench probes</td></tr>
 <tr><th scope="row"><code>drainage-fog-kernel.wasm</code></th><td>Rust SIMD radiation fog and cold-air drainage</td><td class="num">13,174</td><td class="num">5,419</td><td class="num">4,801</td><td>DrainageFog.load() from the optional /drainage-fog entry</td></tr>
 <tr><th scope="row"><code>drainage-fog-kernel-shared.wasm</code></th><td>Rust SIMD radiation fog and cold-air drainage, shared world memory</td><td class="num">13,174</td><td class="num">5,419</td><td class="num">4,822</td><td>DrainageFog.load() with shared world memory support</td></tr>
-<tr><th scope="row"><code>iceberg-kernel.wasm</code></th><td>Rust SIMD iceberg hydrostatics and rigid-body dynamics</td><td class="num">9,128</td><td class="num">4,318</td><td class="num">3,792</td><td>IcebergSolver.load() from the optional /iceberg entry</td></tr>
-<tr><th scope="row"><code>iceberg-kernel-shared.wasm</code></th><td>Rust SIMD iceberg hydrostatics and rigid-body dynamics, shared world memory</td><td class="num">9,128</td><td class="num">4,318</td><td class="num">3,792</td><td>IcebergSolver.load() with shared world memory support</td></tr>
+<tr><th scope="row"><code>iceberg-kernel.wasm</code></th><td>Rust SIMD iceberg hydrostatics and rigid-body dynamics</td><td class="num">9,776</td><td class="num">4,693</td><td class="num">4,114</td><td>IcebergSolver.load() from the optional /iceberg entry</td></tr>
+<tr><th scope="row"><code>iceberg-kernel-shared.wasm</code></th><td>Rust SIMD iceberg hydrostatics and rigid-body dynamics, shared world memory</td><td class="num">9,776</td><td class="num">4,693</td><td class="num">4,107</td><td>IcebergSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>pack-ice-kernel.wasm</code></th><td>Rust SIMD pack-ice contacts and floe fracture</td><td class="num">6,549</td><td class="num">3,094</td><td class="num">2,815</td><td>PackIceSolver.load() from the optional /pack-ice entry</td></tr>
 <tr><th scope="row"><code>pack-ice-kernel-shared.wasm</code></th><td>Rust SIMD pack-ice contacts and floe fracture, shared world memory</td><td class="num">6,549</td><td class="num">3,095</td><td class="num">2,815</td><td>PackIceSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>thin-film-kernel.wasm</code></th><td>Rust SIMD conservative thin-film flow and capillarity</td><td class="num">32,746</td><td class="num">12,619</td><td class="num">10,878</td><td>ThinFilmSolver.load() from the optional /thin-film entry</td></tr>
@@ -5039,7 +5039,7 @@
 <tr><td><code>./surge</code></td><td class="num">22,245</td><td class="num">9,078</td></tr>
 <tr><td><code>./ice</code></td><td class="num">6,791</td><td class="num">3,227</td></tr>
 <tr><td><code>./glacier</code></td><td class="num">7,631</td><td class="num">3,484</td></tr>
-<tr><td><code>./iceberg</code></td><td class="num">9,936</td><td class="num">4,339</td></tr>
+<tr><td><code>./iceberg</code></td><td class="num">17,273</td><td class="num">6,937</td></tr>
 <tr><td><code>./thin-film</code></td><td class="num">48,527</td><td class="num">18,253</td></tr>
 <tr><td><code>./viscoplastic</code></td><td class="num">23,166</td><td class="num">8,840</td></tr>
 <tr><td><code>./tsunami</code></td><td class="num">23,784</td><td class="num">9,174</td></tr>

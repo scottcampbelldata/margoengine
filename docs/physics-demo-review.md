@@ -532,3 +532,8 @@ Not in the catalog: staged construction (placement of pieces, stacking, scaffold
 
 - `packages/weather/tests/snowmelt-film.browser.mjs` links accepted atmospheric heat to snowmelt and routes registered discharge into real shallow water. Weather Snow and Water each read accepted fields. WebGPU and WebGL2 independently reproduce all accepted snapshot bytes and full frames. The matched cold take remains snow-covered and dry.
 - The authored basin sends each outlet's volume once, under the illustrated routing. Snow time advances at four simulated hours per screen second. The receiving water remains on its ordinary clock. The original film shots and avalanche release remain open.
+
+### ICE-03 automated capsize and wake
+
+- `packages/water/test/iceberg-film.browser.mjs` renders accepted cuboid pose and its registered WakeSolver response in the same fixed camera. The control repeats the accepted iceberg motion with the wake disconnected. A far gauge rises by 11.99 cm only with the live connection. Both renderers individually replay complete accepted snapshots and full frames.
+- The scene uses an unscaled idealized basin and one-way linear wave response. Original site shots and measured wave amplitude remain open.

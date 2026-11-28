@@ -5358,3 +5358,14 @@ node scripts/run-with-timeout.mjs --max=2 -- node packages/physics/scripts/ice01
 ```
 
 The cold and warm six-day simulations use Col de Porte's measured air and downwelling radiation. Their only snow-state inputs are the start-depth reading and prior-day water equivalent and albedo. Later depth and water equivalent are held out. The diagnostic selects dry periods because the provider uses snow properties to partition precipitation into rain and snow. It fixes the initial albedo, uses a neutral sensible heat flux and tracks meltwater without a vapor mass exchange. It compares 150 and 300 second steps and a one-hour forcing-label shift. [Observations and methods](https://doi.org/10.5194/essd-4-13-2012) [Spatial uncertainty](https://doi.org/10.5194/essd-11-71-2019) [Surface flux context](https://doi.org/10.5194/gmd-5-773-2012)
+
+### ICE-03 native iceberg rows and capsize measurements
+
+```sh
+node scripts/run-with-timeout.mjs --max=2 -- node --test packages/physics/tests/iceberg.test.js packages/physics/tests/coupling/iceberg.test.js packages/physics/tests/coupling/iceberg-workers.test.js
+node scripts/run-with-timeout.mjs --max=2 -- npm run test:gpu:iceberg-workers -w @margoengine/physics
+node scripts/run-with-timeout.mjs --max=3 -- npm run test:gpu:iceberg-film -w @margoengine/water
+node scripts/run-with-timeout.mjs --max=2 -- node packages/physics/scripts/ice03-capsize-measured.mjs
+```
+
+Burton et al. provide the original lab geometry and an orientation trace. The transfer uses observed early-state information once, then compares later angular crossings and peak using the existing drag parameters. Froude similarity evaluates the same physical parameters at a finer effective interval with no fit. The published plot's marker readout and release variation determine the comparison bounds. For the additional guided case, download the named capsizing marker file through SPHERIC Test 15 and pass its path to the same diagnostic. The measured velocity is the reconstructed marker speed. The lab guide and free engine trajectory differ in admissible surge and inertia. [Burton lab results](https://doi.org/10.1029/2011JF002055) [Heller experimental data](https://www.spheric-sph.org/tests/test-15) [Heller paper](https://doi.org/10.1038/s41598-018-36634-3)

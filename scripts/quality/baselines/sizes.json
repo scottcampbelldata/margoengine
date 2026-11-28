@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22059801,
+  "total": 22062399,
   "history": [
     {
       "date": "2026-10-24",
@@ -15869,6 +15869,12 @@
       "commit": "437b388a0d",
       "reason": "rigging group 6, coupled motion, measured with the change on 437b388a0d after npm run build:packages: new optional entry @margoengine/rigging/coupling 4,632 B gzip (couplePose, addCoupling, twistBones: the shoulder girdle rhythm, limb twist, finger curl, spine share and knee screw-home); @margoengine/rigging/anatomy/human 24,565 B (ceiling 23,517) as the human table gains the coupling numbers with their source rows (Ludewig 2009, Kim 2015) and the frame fit gains the body vertical (KB-RIG-FRAMEUP1). The table is the one source the fit, the limits and the coupling read; moving the coupling rows to an entry of their own would load a second copy of the row and citation helpers for under 1 kB.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "ice-03-native-iceberg-poses",
+      "reason": "ICE-03 @margoengine/physics/iceberg 4339 to 6937 B gzip, ceiling 4595 to 7193 B. The entry owns accepted iceberg rows, calving volume, meltwater and signed wake sources. Splitting would duplicate their staging and lifetime. Optional helpers integrate only disjoint body rows before ordered source publication. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16761,7 +16767,7 @@
     "@margoengine/physics/hydraulics": 7937,
     "@margoengine/physics/hydro": 22723,
     "@margoengine/physics/ice": 3483,
-    "@margoengine/physics/iceberg": 4595,
+    "@margoengine/physics/iceberg": 7193,
     "@margoengine/physics/landscape": 7724,
     "@margoengine/physics/lava": 9865,
     "@margoengine/physics/legged": 10415,

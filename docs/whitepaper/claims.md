@@ -7110,3 +7110,9 @@ One, two and four native participants reproduce the existing scalar integration 
 The fixed-camera basin takes live atmospheric heat and uses its accepted snowpack discharge to fill a live shallow-water pond. With the heat link present, modeled snow area retreats from 300 to 128 m² and the pond receives 10.965 m³. Its gauge reaches 23.46 cm. The matched heat-link-off take stays dry and keeps its snow cover. Each renderer reproduces its own complete frames and accepted state through hold, restore, re-advance and rewind. The drawn water gauge agrees with the accepted height within 20 µm.
 
 The one-, two- and four-participant native paths reproduce signed column and runoff changes exactly. A 221-column Chromium run uses three real helpers and records 694 paired conduction interfaces of 714 total. Col de Porte comparisons preserve the warm model's 43.89 kg/m² high bias in six-day water equivalent. [Tests and measured record](reproduce.md#ice-01-native-snow-columns-and-col-de-porte)
+
+### ICE-03 accepted capsize and signed wake
+
+The fixed-camera basin follows a native 42.525 m³ cuboid from its 0.1 rad seed heel through 105.2° of roll in five seconds. Its live signed wake produces an 11.99 cm rise 9.22 m from the then-current body centre at 9.5 s. The disconnected-wake control repeats the same motion with flat water. Independent clipping reproduces the submerged volume, the signed patches cancel, and the drawn gauge agrees within 2 µm. Both backends repeat their full frames and accepted snapshots exactly.
+
+The independent lab comparison shows early rotation and excess overshoot. The model takes 0.636 s from 10° to 90°, against 0.998 s measured. Parallel execution changes neither the published rows nor the existing scalar model. [Proof and independent comparison](reproduce.md#ice-03-native-iceberg-rows-and-capsize-measurements)

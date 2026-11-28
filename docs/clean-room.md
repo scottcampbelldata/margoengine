@@ -20375,3 +20375,7 @@ Margo's own: the massif and ridge mix, the softened ridge fold sqrt(n^2 + e^2), 
 height distribution, the ring texel of up to 32 m and a 64th of the world; the haze's spectral factor (1 - e^(-x k)) / (1 - e^(-x))
 with k = 1 + (rayleigh - rayleigh green) / density on one opacity (biomes tests/horizon.test.js, sky
 test/fog-height-falloff.test.js and test/fog-below-check.mjs).
+
+### ICE-03 independent native iceberg rows and accepted water sources
+
+Justin Burton et al. (2012), [Laboratory investigations of iceberg capsize dynamics, energy dissipation and tsunamigenesis](https://doi.org/10.1029/2011JF002055), §5, give a hydrostatic cuboid comparison and discuss dissipation and added mass. Till Wagner, Alon Stern, Rebecca Dell and Ian Eisenman (2017), [On the representation of capsizing in iceberg models](https://doi.org/10.1016/j.ocemod.2017.07.003), §2, give the static aspect-ratio criterion with its density-ratio dependence. This change retains the current clipped-waterline dynamics. Helpers integrate disjoint rows and use the existing f64x2 area and wrench math. The caller checks staged outputs and publishes the ordered calving, wake and freshwater records together.

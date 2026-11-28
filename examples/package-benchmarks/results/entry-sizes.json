@@ -15762,8 +15762,8 @@
         "gzip": 3484
       },
       "./iceberg": {
-        "raw": 9936,
-        "gzip": 4339
+        "raw": 17273,
+        "gzip": 6937
       },
       "./thin-film": {
         "raw": 48527,
@@ -19325,14 +19325,14 @@
       "brotli": 4822
     },
     "packages/physics/dist/iceberg-kernel.wasm": {
-      "raw": 9128,
-      "gzip": 4318,
-      "brotli": 3792
+      "raw": 9776,
+      "gzip": 4693,
+      "brotli": 4114
     },
     "packages/physics/dist/iceberg-kernel-shared.wasm": {
-      "raw": 9128,
-      "gzip": 4318,
-      "brotli": 3792
+      "raw": 9776,
+      "gzip": 4693,
+      "brotli": 4107
     },
     "packages/physics/dist/pack-ice-kernel.wasm": {
       "raw": 6549,

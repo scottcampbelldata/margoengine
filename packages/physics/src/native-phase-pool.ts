@@ -120,6 +120,11 @@ type NativePhaseSolver =
       readonly subject: 'Snowpack';
       readonly phaseExport: 'snowpack_thread_phase';
       readonly phase: 'column enthalpy';
+    }
+  | {
+      readonly subject: 'Iceberg';
+      readonly phaseExport: 'iceberg_thread_phase';
+      readonly phase: 'body hydrodynamics';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };

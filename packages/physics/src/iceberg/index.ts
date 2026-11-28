@@ -1,4 +1,3 @@
-import { MargoError } from '@margoengine/math/errors';
 import { pow } from '@margoengine/math/pinned';
 import { WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS } from '../sea/wake.js';
 import type {
@@ -10,7 +9,16 @@ import type {
   SolverHost,
   StepContext,
 } from '../world/solver.js';
-import { bindIcebergKernel, type IcebergBuilds, type IcebergKernel, loadIcebergBuilds } from './kernel.js';
+import {
+  bindIcebergKernel,
+  type IcebergBuilds,
+  type IcebergKernel,
+  type IcebergWorkCounts,
+  loadIcebergBuilds,
+} from './kernel.js';
+
+export type { IcebergWorkerWork, IcebergWorkCounts } from './kernel.js';
+import { icebergError } from './errors.js';
 
 /** Binary layout of the cell-volume and iceberg ports. */
 export const ICEBERG_FIELD_LAYOUT = 1;
@@ -84,6 +92,8 @@ export interface IcebergLoadOptions {
   readonly calving?: FieldDescriptor;
   /** Cancels loading with the signal's reason. */
   readonly signal?: AbortSignal;
+  /** Native participants including the caller. Use 1 (default), 2 or 4 with shared memory. */
+  readonly threads?: number;
 }
 
 /** Physical pose, shape, and the latest signed wave-source volume. */
@@ -134,6 +144,8 @@ const SOURCE_PAIR = 2 * WAKE_SOURCE_WORDS;
 
 interface Regions {
   readonly memory: WebAssembly.Memory;
+  readonly host: SolverHost;
+  readonly staged: { readonly wave: Float64Array; readonly sources: Float64Array; readonly fresh: Float64Array };
   readonly kernel: IcebergKernel;
   readonly count: number;
   readonly sites: number;
@@ -153,19 +165,19 @@ interface Regions {
 
 function scalar(label: string, value: number, minimum = -Infinity): number {
   if (!Number.isFinite(value) || value < minimum)
-    throw new RangeError(`Invalid iceberg ${label}. Use a finite value at least ${minimum}.`);
+    throw icebergError(`Invalid iceberg ${label}. Use a finite value at least ${minimum}.`);
   return value;
 }
 
 function positive(label: string, value: number): number {
   if (!(Number.isFinite(value) && value > 0))
-    throw new RangeError(`Invalid iceberg ${label}. Use a positive finite value.`);
+    throw icebergError(`Invalid iceberg ${label}. Use a positive finite value.`);
   return value;
 }
 
 function vec(label: string, value: IcebergVector): IcebergVector {
   if (value?.length !== 3 || !value.every(Number.isFinite))
-    throw new RangeError(`Invalid iceberg ${label}. Use three finite coordinates.`);
+    throw icebergError(`Invalid iceberg ${label}. Use three finite coordinates.`);
   return value;
 }
 
@@ -180,7 +192,7 @@ function dimensions(value: IcebergVector): IcebergVector {
 
 function rotor(source: IcebergRotation): IcebergRotation {
   if (source?.length !== 4 || !source.every(Number.isFinite))
-    throw new RangeError('Invalid iceberg orientation. Use four finite quaternion components.');
+    throw icebergError('Invalid iceberg orientation. Use four finite quaternion components.');
   const [x, y, z, w] = source;
   const length = positive('orientation norm', Math.sqrt(x * x + y * y + z * z + w * w));
   return [x / length, y / length, z / length, w / length];
@@ -190,7 +202,7 @@ function rotor(source: IcebergRotation): IcebergRotation {
 export function icebergCriticalAspect(iceDensity = 917, waterDensity = 1025): number {
   const densityRatio = positive('ice density', iceDensity) / positive('water density', waterDensity);
   if (!(densityRatio < 1))
-    throw new RangeError('The ice must be less dense than its water. Increase waterDensity or lower iceDensity.');
+    throw icebergError('The ice must be less dense than its water. Increase waterDensity or lower iceDensity.');
   return Math.sqrt(6 * densityRatio * (1 - densityRatio));
 }
 
@@ -258,20 +270,20 @@ function siteRecords(sites: readonly IcebergReleaseSite[], initial: number): { c
   for (const site of sites) {
     const slots = site.slots ?? 1;
     if (!Number.isSafeInteger(slots) || slots < 1 || !Number.isSafeInteger(count + slots))
-      throw new RangeError('Invalid calving slot count. Use a positive integer representable by the arena.');
+      throw icebergError('Invalid calving slot count. Use a positive integer representable by the arena.');
     const cell = site.sourceCell;
     if (!Number.isSafeInteger(cell) || cell < 0 || cells.has(cell))
-      throw new RangeError('Invalid iceberg release site. Use a unique nonnegative source cell index.');
+      throw icebergError('Invalid iceberg release site. Use a unique nonnegative source cell index.');
     cells.add(cell);
     const { position } = site;
     if (position?.length !== 2 || !position.every(Number.isFinite))
-      throw new RangeError('Invalid iceberg release position. Use finite x and z coordinates in metres.');
+      throw icebergError('Invalid iceberg release position. Use finite x and z coordinates in metres.');
     records.push(cell, ...position, ...dimensions(site.shape ?? DEFAULT_SHAPE), count, slots);
     count += slots;
   }
   // Two body buffers and two scalar output arrays must fit wasm32, in addition to other world allocations.
   if (count * (2 * BODY + 2 + SOURCE_PAIR) * F64 >= 0x1_0000_0000)
-    throw new RangeError('Iceberg body capacity exceeds wasm32 memory. Reduce the initial bodies or release slots.');
+    throw icebergError('Iceberg body capacity exceeds wasm32 memory. Reduce the initial bodies or release slots.');
   return { count, records };
 }
 
@@ -290,32 +302,66 @@ function wakePair(sources: Float64Array, slot: number, body: Float64Array, befor
   const delta = body[at + WAVE]!;
   if (delta === 0) return;
   const area = projectedArea(volume(body, at) > 0 ? body : before, at);
-  const radius = Math.sqrt(area / Math.PI);
+  const radius = positive('projected wake radius', Math.sqrt(area / Math.PI));
   const x = body[at]!;
   const z = body[at + 2]!;
   const word = slot * SOURCE_PAIR;
   sources.set([x, z, radius, 0, -delta, x, z, radius * Math.SQRT2, 0, delta], word);
 }
 
-function advance(state: Regions, config: Float64Array, target: Float64Array, dt: number): void {
+function advance(state: Regions, dt: number): void {
   const result = state.kernel.iceberg_step(state.work.byteOffset, state.count, state.config.byteOffset, dt);
   if (result !== 0)
-    throw new RangeError(
+    throw icebergError(
       'Iceberg state left numeric range. Use practical dimensions and reduce forcing or melt rates.',
+      'failed',
     );
-  const wave = words(state.memory, state.wave);
-  const fresh = words(state.memory, state.freshWater);
-  const before = words(state.memory, state.bodies);
-  const sources = words(state.memory, state.wakeSources);
+  const {
+    memory,
+    staged: { wave, sources, fresh },
+  } = state;
+  const target = words(memory, state.work);
+  if (!target.every(Number.isFinite))
+    throw icebergError('Iceberg state contains nonfinite rows. Reduce forcing, body sizes or step duration.', 'failed');
+  const before = words(memory, state.bodies);
   sources.fill(0);
-  const densityRatio = config[1]! / 1000;
+  const densityRatio = words(memory, state.config)[1]! / 1000;
   for (let i = 0; i < state.count; i++) {
     const at = i * BODY;
     wave[i] = target[at + WAVE]!;
     wakePair(sources, i, target, before, at);
-    fresh[i] = dt > 0 ? (target[at + MELTED]! * densityRatio) / dt : 0;
+    const flux = dt > 0 ? (target[at + MELTED]! * densityRatio) / dt : 0;
+    if (!(flux >= 0 && Number.isFinite(flux)))
+      throw icebergError(
+        'Iceberg meltwater flux exceeded its finite range. Reduce melt rates or use a larger step duration.',
+        'failed',
+      );
+    fresh[i] = flux;
   }
+  words(memory, state.wave).set(wave);
+  words(memory, state.wakeSources).set(sources);
+  words(memory, state.freshWater).set(fresh);
   before.set(target);
+}
+
+function calvingWords(port: Port, fallback: WebAssembly.Memory): Float64Array {
+  const { region } = port;
+  if (region.type !== 'f64' || region.layout !== ICEBERG_FIELD_LAYOUT)
+    throw icebergError('Invalid calving field layout. Use layout-1 f64 solid volumes in cubic metres.');
+  const memory = region.memory ?? fallback;
+  if (
+    !(
+      Number.isSafeInteger(region.byteOffset) &&
+      region.byteOffset >= 0 &&
+      region.byteOffset % F64 === 0 &&
+      Number.isSafeInteger(region.byteLength) &&
+      region.byteLength >= 0 &&
+      region.byteLength % F64 === 0 &&
+      region.byteOffset + region.byteLength <= memory.buffer.byteLength
+    )
+  )
+    throw icebergError('Invalid calving region. Publish an aligned f64 region from its owning memory.');
+  return words(memory, region);
 }
 
 function spawn(state: Regions, target: Float64Array, config: Float64Array, incoming: Float64Array | undefined): void {
@@ -360,6 +406,8 @@ export class IcebergSolver implements Solver<IcebergOptions> {
   readonly #builds: IcebergBuilds;
   readonly #calving: FieldDescriptor | undefined;
   #data?: Regions;
+  #disposed = false;
+  #nativeWork?: IcebergWorkCounts;
 
   /** f64 rows: position 3, rotation 4, velocity 3, spin 3, size 3, displacement, wave volume, melt, cumulative melt. */
   readonly bodyField: FieldDescriptor;
@@ -387,10 +435,17 @@ export class IcebergSolver implements Solver<IcebergOptions> {
   static async load(options: IcebergLoadOptions = {}): Promise<IcebergSolver> {
     const id = options.id ?? 'iceberg';
     if (typeof id !== 'string' || id.length === 0 || id.trim() !== id)
-      throw new RangeError('Invalid iceberg solver ID. Use a nonempty identifier without outer whitespace.');
+      throw icebergError('Invalid iceberg solver ID. Use a nonempty identifier without outer whitespace.');
     if (options.calving && options.calving.unit !== 'm^3')
-      throw new RangeError('Invalid iceberg source unit. Use a marine calving field in cubic metres.');
-    return new IcebergSolver(id, await loadIcebergBuilds(options.signal), options.calving);
+      throw icebergError('Invalid iceberg source unit. Use a marine calving field in cubic metres.');
+    return new IcebergSolver(id, await loadIcebergBuilds(options.signal, options.threads), options.calving);
+  }
+
+  /** Release optional helper threads after the world stops using this solver. */
+  [Symbol.dispose](): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    this.#builds[Symbol.dispose]();
   }
 
   /** Declares its registry fields at the base 60 Hz dyadic interval. */
@@ -413,14 +468,24 @@ export class IcebergSolver implements Solver<IcebergOptions> {
 
   /** Initializes world-owned bodies, the environment, and fixed calving-site storage. */
   init(host: SolverHost, options: IcebergOptions = {}): void {
+    if (this.#disposed) throw icebergError('The iceberg solver was disposed. Load a new instance.', 'disposed');
     if (this.#data)
-      throw new MargoError('attached', 'IcebergSolver already has a world. Load a fresh solver to attach again.');
+      throw icebergError('IcebergSolver already has a world. Load a fresh solver to attach again.', 'attached');
+    try {
+      this.#initialize(host, options);
+    } catch (cause) {
+      if (this.#builds.pool) this[Symbol.dispose]();
+      throw cause;
+    }
+  }
+
+  #initialize(host: SolverHost, options: IcebergOptions): void {
     const bodies = options.bodies ?? [];
     const sites = options.releaseSites ?? [];
     if (sites.length && !this.#calving)
-      throw new RangeError('Iceberg releases need a source. Bind a calving field when loading the solver.');
+      throw icebergError('Iceberg releases need a source. Bind a calving field when loading the solver.');
     const { count, records } = siteRecords(sites, bodies.length);
-    if (count === 0) throw new RangeError('IcebergSolver needs bodies. Use an initial body or a marine release site.');
+    if (count === 0) throw icebergError('IcebergSolver needs bodies. Use an initial body or a marine release site.');
     const model = settings(host, options);
     const initial = new Float64Array(count * BODY);
     for (const [i, body] of bodies.entries()) seedBody(initial, i * BODY, body, model);
@@ -441,6 +506,12 @@ export class IcebergSolver implements Solver<IcebergOptions> {
     const { memory } = host;
     const data = {
       memory,
+      host,
+      staged: {
+        wave: new Float64Array(count),
+        sources: new Float64Array(count * SOURCE_PAIR),
+        fresh: new Float64Array(count),
+      },
       kernel,
       count,
       sites: sites.length,
@@ -462,18 +533,18 @@ export class IcebergSolver implements Solver<IcebergOptions> {
     words(memory, placements).set(records);
     const prepared = words(memory, work);
     prepared.set(initial);
-    advance(data, env, prepared, 0);
+    advance(data, 0);
     this.#data = data;
   }
 
   /** Steps the physical iceberg poses, consuming any calving volume at this coupling tick. */
   step(context: StepContext, dt: number): void {
+    if (this.#disposed) throw icebergError('The iceberg solver was disposed. Load a new instance.', 'disposed');
+    positive('step duration', dt);
     const state = this.#state();
     const { memory, config, bodies, work, queue, nextQueue, released, nextReleased, sites } = state;
     const input = this.#calving && context.inputs.get(this.#calving.name);
-    if (input && (input.region.type !== 'f64' || input.region.layout !== ICEBERG_FIELD_LAYOUT))
-      throw new RangeError('Invalid calving field layout. Use layout-1 f64 solid volumes in cubic metres.');
-    const incoming = input ? words(input.region.memory ?? memory, input.region) : undefined;
+    const incoming = input && calvingWords(input, memory);
     const env = words(memory, config);
     const target = words(memory, work);
     target.set(words(memory, bodies));
@@ -482,11 +553,18 @@ export class IcebergSolver implements Solver<IcebergOptions> {
       words(memory, nextReleased).fill(0);
       spawn(state, target, env, incoming);
     }
-    advance(state, env, target, dt);
+    advance(state, dt);
     if (sites > 0) {
       words(memory, queue).set(words(memory, nextQueue));
       words(memory, released).set(words(memory, nextReleased));
     }
+    this.#nativeWork = state.kernel.workCounts();
+  }
+
+  /** Copies native counts from the last accepted physical step. */
+  readNativeWork(): IcebergWorkCounts | undefined {
+    const work = this.#nativeWork;
+    return work && { ...work, workers: work.workers.map((worker) => ({ ...worker })) };
   }
 
   /** The glacier field is sampled at the current step. There are no incoming accumulators. */
@@ -494,13 +572,14 @@ export class IcebergSolver implements Solver<IcebergOptions> {
 
   /** Publishes the current body rows and the co-located wave, melt and release data. */
   exportPorts(tick: number): readonly Port[] {
-    const { bodies, wave, wakeSources, freshWater, released } = this.#state();
+    const { bodies, wave, wakeSources, freshWater, released, host } = this.#state();
+    const cell = host.cell;
     return [
-      { field: this.bodyField.name, region: bodies, tick, cell: ZERO },
-      { field: this.waveField.name, region: wave, tick, cell: ZERO },
-      { field: this.wakeSourceField.name, region: wakeSources, tick, cell: ZERO },
-      { field: this.meltwaterField.name, region: freshWater, tick, cell: ZERO },
-      { field: this.releaseField.name, region: released, tick, cell: ZERO },
+      { field: this.bodyField.name, region: bodies, tick, cell },
+      { field: this.waveField.name, region: wave, tick, cell },
+      { field: this.wakeSourceField.name, region: wakeSources, tick, cell },
+      { field: this.meltwaterField.name, region: freshWater, tick, cell },
+      { field: this.releaseField.name, region: released, tick, cell },
     ];
   }
 
@@ -523,7 +602,7 @@ export class IcebergSolver implements Solver<IcebergOptions> {
   sample(row: number): IcebergSample {
     const { memory, bodies, count } = this.#state();
     if (!Number.isInteger(row) || row < 0 || row >= count)
-      throw new RangeError(`Iceberg body row is out of range. Use an integer from 0 to ${count - 1}.`);
+      throw icebergError(`Iceberg body row is out of range. Use an integer from 0 to ${count - 1}.`);
     const data = words(memory, bodies);
     const at = row * BODY;
     return {
@@ -561,7 +640,7 @@ export class IcebergSolver implements Solver<IcebergOptions> {
 
   #state(): Regions {
     if (!this.#data)
-      throw new MargoError('failed', 'IcebergSolver has no state. Add it to a PhysicsWorld with bodies first.');
+      throw icebergError('IcebergSolver has no state. Add it to a PhysicsWorld with bodies first.', 'state');
     return this.#data;
   }
 }

@@ -12280,3 +12280,7 @@ The pack-ice kernel splits only its independent planar drift rows between native
 ### ICE-01 accepted snowpack heat, cover and water
 
 Snowpack reads forcing from its owning memory and copies it before callbacks, uses ordered surface transport, and joins independent native column solves before accepting a step. Published cover and runoff change together after the candidate finite check. The fixed-camera scene exercises live atmospheric heat and shallow-water coupling on both renderers. The independent station comparison retains the warm water-equivalent bias in the limits record.
+
+### ICE-03 accepted body rows and water sources
+
+Iceberg Wasm distributes independent body rows and preserves adaptive substeps. The caller stages signed waves, freshwater and calving receipts, validates each candidate, then copies accepted outputs and the live origin together. Browser tests check replay of the underwater body, signed patches and rendered gauges. The laboratory record keeps the timing and roll overshoot residuals explicit.

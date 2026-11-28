@@ -146,3 +146,84 @@ test('IcebergSolver: no-slot shared and plain builds give identical coupled hash
   shared.advance(90);
   assert.equal(shared.hash(), plain.hash());
 });
+
+test('IcebergSolver preserves all accepted ports when a later derived melt flux overflows', async () => {
+  using berg = await IcebergSolver.load();
+  const world = new PhysicsWorld({ rate, memory: worldMemory(false) }).add(berg, {
+    sideMelt: Number.MAX_VALUE,
+    bodies: [{ size: [0.001, 0.001, 0.001] }, { size: [2, 4, 4], position: [5, -1.5, 0] }],
+  });
+  const context = { tick: 0, level: 0, seed: 9, cell: [0, 0, 0], inputs: new Map() };
+  const accepted = world.takeSnapshot();
+  assert.throws(
+    () => berg.step(context, 1e-308),
+    (error) =>
+      error.name === 'MargoError' &&
+      error.code === 'failed' &&
+      /meltwater flux.*Reduce melt rates.*errors#iceberg/.test(error.message),
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  assert.equal(berg.readNativeWork(), undefined);
+  berg.step(context, 1 / 60);
+  assert.ok(berg.sample(0).melted > 0 && berg.sample(1).melted > 0);
+  const corrected = world.takeSnapshot();
+  world.restoreSnapshot(accepted.bytes);
+  berg.step(context, 1 / 60);
+  assert.deepEqual(world.takeSnapshot().bytes, corrected.bytes);
+});
+
+test('IcebergSolver validates foreign calving banks atomically and publishes the signed cell after restore', async () => {
+  const glacier = await GlacierSolver.load();
+  const calving = glacier.calvingField;
+  using berg = await IcebergSolver.load({ calving });
+  const world = new PhysicsWorld({ rate, memory: worldMemory(false) }).add(berg, {
+    releaseSites: [
+      { sourceCell: 0, position: [-4, 1] },
+      { sourceCell: 1, position: [4, 1] },
+    ],
+  });
+  world.setCell('iceberg', [-2, 1, 3]);
+  const accepted = world.takeSnapshot();
+  const bank = new WebAssembly.Memory({ initial: 1 });
+  const region = { name: 'foreign calving', type: 'f64', layout: 1, byteOffset: 128, byteLength: 16, memory: bank };
+  const volumes = new Float64Array(bank.buffer, region.byteOffset, 2);
+  volumes.set([3, NaN]);
+  const makeContext = (source) => ({
+    tick: 0,
+    level: 0,
+    seed: 9,
+    cell: [-2, 1, 3],
+    inputs: new Map([[calving.name, { field: calving.name, region: source, tick: 0, cell: [4, -3, 6] }]]),
+  });
+  assert.throws(
+    () => berg.step(makeContext(region), 1 / 60),
+    (error) => error.code === 'state' && /incoming calving volume.*Use.*errors#iceberg/.test(error.message),
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  volumes[1] = 2;
+  assert.throws(
+    () => berg.step(makeContext({ ...region, byteOffset: bank.buffer.byteLength }), 1 / 60),
+    /Publish an aligned f64 region.*errors#iceberg/,
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  berg.step(makeContext(region), 1 / 60);
+  assert.equal(berg.budget.calved, 5);
+  assert.deepEqual(
+    berg.exportPorts(0).map((port) => port.cell),
+    Array(5).fill([-2, 1, 3]),
+  );
+  const corrected = world.takeSnapshot();
+  world.shiftOrigin([5, -4, 2]);
+  assert.deepEqual(
+    berg.exportPorts(0).map((port) => port.cell),
+    Array(5).fill([-7, 5, 1]),
+  );
+  world.restoreSnapshot(corrected.bytes);
+  assert.deepEqual(
+    berg.exportPorts(0).map((port) => port.cell),
+    Array(5).fill([-2, 1, 3]),
+  );
+  world.restoreSnapshot(accepted.bytes);
+  berg.step(makeContext(region), 1 / 60);
+  assert.deepEqual(world.takeSnapshot().bytes, corrected.bytes);
+});
