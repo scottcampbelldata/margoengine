@@ -312,6 +312,7 @@ export class RockSurface implements EnginePlugin {
    * gradient, its tangential part (the surface gradient) taken off the normal; the beds from world height.
    * graniteGrain puts one crystal in each cell of a lattice whose edges a low noise bends, so grains are irregular and
    * interlock; the cell's hash picks its mineral, and the result is its brightness over granite's mean.
+   * Granite's crystals are millimetres whatever the rock's relief scale: cells of GRANITE_GRAIN metres.
    */
   private code(binding: number): string {
     return `
@@ -363,7 +364,6 @@ fn rockShade(p:vec3f,n0:vec3f,id:f32,footprint:f32)->RockShade {
  // Rock types share weathering, but have different grains at the scale of a broken face.
  // Fade grain contrast and relief together when the footprint can no longer resolve it.
  var fabric=0.0;
- // Granite's crystals are millimetres whatever the rock's relief scale: ${GRANITE_GRAIN} m cells.
  let gf=select(21.0/g0.y,${(1 / GRANITE_GRAIN).toFixed(1)},m2.w==1.0);
  let keepGrain=clamp(2.0-4.0*footprint*gf,0.0,1.0);
  if(keepGrain>0.0){

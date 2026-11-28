@@ -32,13 +32,14 @@ export interface AnamorphicOptions {
   enabled?: boolean;
 }
 
+// brightShader reads four source rows per texel (quarter height) and keeps the brightest of them, so a one-pixel
+// point is never lost.
 const brightShader = `${fullscreen}
 struct U {threshold:f32,intensity:f32,step:f32,pad:f32,tint:vec4f}
 @group(0) @binding(0) var<uniform> u:U;
 @group(0) @binding(1) var scene:texture_2d<f32>;
 @group(0) @binding(2) var bilinear:sampler;
 @fragment fn fragment(@builtin(position) at:vec4f)->@location(0) vec4f {
- // Four source rows per texel (quarter height): the brightest of them, so a one-pixel point is never lost.
  let size=vec2f(textureDimensions(scene));var c=vec3f(0);
  for(var y=0;y<4;y++){c=max(c,textureSampleLevel(scene,bilinear,vec2f(at.x*2.0,floor(at.y)*4.0+f32(y)+0.5)/size,0.0).rgb);}
  let peak=max(c.r,max(c.g,c.b));let knee=0.5*u.threshold;

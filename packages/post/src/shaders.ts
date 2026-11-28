@@ -136,6 +136,7 @@ export const ssaoShader =
 // is still off the centre's plane and rejected (depth-keyed bilateral reconstruction, McGuire, Mara and Luebke,
 // "Scalable Ambient Obscurance", HPG 2012). A surface is any depth but 0: orthographic depth is negative
 // behind the eye, so the prediction there needs both depths non-zero, not above 0 (KB-SSAO-ORTHOBLUR1).
+// Perspective keys on 1/depth, affine across a plane; orthographic (settings.w 1) on depth itself.
 export const blurShader = `
 @group(0) @binding(0) var input:texture_2d<f32>;
 @group(0) @binding(1) var gbuffer:texture_2d<f32>;
@@ -148,7 +149,6 @@ export const blurShader = `
   let axis=vec2i(settings.xy);let limit=vec2i(size)-1;
   let ahead=textureLoad(viewDepth,clamp(p+axis,vec2i(0),limit),0).r;let behind=textureLoad(viewDepth,clamp(p-axis,vec2i(0),limit),0).r;
   let forward=abs(ahead-centre)<abs(centre-behind);let near=select(behind,ahead,forward);
-  // Perspective: 1/depth is affine across a plane; orthographic (settings.w 1): depth itself.
   let ortho=settings.w>0.5;let key=select(1.0/max(centre,1e-30),centre,ortho);
   let slope=select(0.0,select(-1.0,1.0,forward)*(select(1.0/max(near,1e-30),near,ortho)-key),select(centre>0.0&&near>0.0,centre!=0.0&&near!=0.0,ortho));
   var sum=0.0;var total=0.0;

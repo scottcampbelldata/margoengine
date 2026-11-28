@@ -3,25 +3,31 @@
 // buffers. No atomics: every thread writes only its own particle or, in an edge pass, the two particles of its edge, which
 // no other edge of the colour touches, so a run gives the same bits every time on one GPU and driver.
 
-/** The substep record, the first 96 bytes of a 256-byte slot (packClothFrame writes it). */
+/**
+ * The substep record, the first 96 bytes of a 256-byte slot (packClothFrame writes it). dt is the substep length, s;
+ * alpha0 the share of the frame done when the substep starts (pins and colliders move by it) and alpha1 the share done
+ * when it ends; time the cloth time at its end, s (the wind's gusts); damp the velocity factor of a substep,
+ * exp(-damping dt); dragK 1/2 rho Cd; thickness the distance kept from colliders, m; count the particles; compliance
+ * stretch, shear and bend, m/N; tetherStretch 1 + the tethers' slack.
+ */
 const SIM = /* wgsl */ `
 struct Sim {
-  dt: f32,            // substep length, s
-  alpha0: f32,        // share of the frame done when the substep starts (pins and colliders move by it)
-  alpha1: f32,        // share done when it ends
-  time: f32,          // cloth time at its end, s (the wind's gusts)
+  dt: f32,
+  alpha0: f32,
+  alpha1: f32,
+  time: f32,
   gravity: vec3f,
-  damp: f32,          // velocity factor of a substep, exp(-damping dt)
+  damp: f32,
   wind: vec3f,
   turbulence: f32,
-  dragK: f32,         // 1/2 rho Cd
-  thickness: f32,     // distance kept from colliders, m
+  dragK: f32,
+  thickness: f32,
   friction: f32,
-  count: u32,         // particles
-  compliance: vec3f,  // stretch, shear, bend, m/N
+  count: u32,
+  compliance: vec3f,
   pinCount: u32,
   colliderCount: u32,
-  tetherStretch: f32, // 1 + the tethers' slack
+  tetherStretch: f32,
   pad1: u32,
   pad2: u32,
 }
@@ -32,15 +38,18 @@ struct Sim {
  * Integrate: each free particle's velocity takes the last substep's corrections, damping, the wind's drag through its faces
  * and gravity, and the particle moves by it. The velocity is state of its own, so float32 positions far from the origin
  * do not round small accelerations away (as (x - previous) / dt would).
+ *
+ * state holds [0, count) particles (xyz, w = inverse mass, 0 when pinned), [count, 2 count) velocities and
+ * [2 count, 3 count) where the substep's integrate put each particle (its prediction), before the constraints and
+ * colliders moved it. normals holds xyz the particle's unit normal from the last surface pass, w its third of its
+ * triangles' rest area. windAt is the base wind varied by smooth gusts along and across it (windAt in
+ * gpu-cloth-sim.ts). A pinned particle is skipped: the pin pass places it. The drag is a flat plate's on the air
+ * through the face, 1/2 rho Cd A |u_n| u_n, capped so it cannot reverse u_n in a substep.
  */
 export const CLOTH_INTEGRATE_WGSL = /* wgsl */ `${SIM}
-// [0, count) particles (xyz, w = inverse mass, 0 when pinned); [count, 2 count) velocities; [2 count, 3 count) where the
-// substep's integrate put each particle (its prediction), before the constraints and colliders moved it.
 @group(1) @binding(0) var<storage, read_write> state: array<vec4f>;
-// xyz the particle's unit normal from the last surface pass, w its third of its triangles' rest area.
 @group(1) @binding(1) var<storage, read> normals: array<vec4f>;
 
-// The base wind varied by smooth gusts along and across it (windAt in gpu-cloth-sim.ts).
 fn windAt(p: vec3f, t: f32) -> vec3f {
   let gust = sin(0.9 * p.x + 1.7 * t) * cos(1.1 * p.z + 1.3 * t) + 0.5 * sin(2.3 * p.y - 2.9 * t + 1.1 * p.x);
   let speed = length(sim.wind);
@@ -57,12 +66,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let i = gid.x;
   if (i >= sim.count) { return; }
   let p = state[i];
-  if (p.w == 0.0) { return; } // pinned: the pin pass places it
+  if (p.w == 0.0) { return; }
   let n2 = 2u * sim.count;
   var v = (state[sim.count + i].xyz + (p.xyz - state[n2 + i].xyz) / sim.dt) * sim.damp;
   let nrm = normals[i];
   if (sim.dragK > 0.0 && nrm.w > 0.0) {
-    // A flat plate's drag on the air through the face, 1/2 rho Cd A |u_n| u_n, capped so it cannot reverse u_n in a substep.
     let un = dot(windAt(p.xyz, sim.time) - v, nrm.xyz);
     let k = min(sim.dragK * nrm.w * p.w * abs(un) * sim.dt, 1.0);
     v = v + nrm.xyz * (un * k);
@@ -75,10 +83,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 }
 `;
 
-/** Pins: each held particle moves from where its pin was to where it is, by the substep's share of the frame. */
+/**
+ * Pins: each held particle moves from where its pin was to where it is, by the substep's share of the frame. pins holds
+ * two vec4 a pin: (from xyz, particle index bits), (to xyz, 0).
+ */
 export const CLOTH_PIN_WGSL = /* wgsl */ `${SIM}
 @group(1) @binding(0) var<storage, read_write> state: array<vec4f>;
-// Two a pin: (from xyz, particle index bits), (to xyz, 0).
 @group(1) @binding(1) var<storage, read> pins: array<vec4f>;
 
 @compute @workgroup_size(64)
@@ -95,10 +105,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 }
 `;
 
-/** Edges of one colour: an XPBD distance constraint each (Macklin, Mueller and Chentanez 2016), one solve a substep. */
+/**
+ * Edges of one colour: an XPBD distance constraint each (Macklin, Mueller and Chentanez 2016), one solve a substep.
+ * edges holds this colour's edges only (the binding's slice): (i, j, rest length bits, kind); i = 0xffffffff pads the
+ * slice. The multiplier starts at zero each substep (small steps, Macklin et al. 2019):
+ * dl = -C / (w_i + w_j + alpha / dt^2).
+ */
 export const CLOTH_EDGES_WGSL = /* wgsl */ `${SIM}
 @group(1) @binding(0) var<storage, read_write> state: array<vec4f>;
-// This colour's edges only (the binding's slice): (i, j, rest length bits, kind); i = 0xffffffff pads the slice.
 @group(1) @binding(1) var<storage, read> edges: array<vec4u>;
 
 @compute @workgroup_size(64)
@@ -114,7 +128,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let d = pi.xyz - pj.xyz;
   let len = length(d);
   if (len < 1e-9) { return; }
-  // The multiplier starts at zero each substep (small steps, Macklin et al. 2019): dl = -C / (w_i + w_j + alpha / dt^2).
   let c = len - bitcast<f32>(ed.z);
   let dl = -c / (ws + sim.compliance[ed.w] / (sim.dt * sim.dt));
   let n = d / len;
@@ -123,10 +136,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 }
 `;
 
-/** Tethers: each free particle kept within its rest distance along the cloth (times 1 + slack) of its nearest pin. */
+/**
+ * Tethers: each free particle kept within its rest distance along the cloth (times 1 + slack) of its nearest pin, a long
+ * range attachment (Kim, Chentanez and Mueller 2012): one-sided, the pin does not move. tethers holds two words a
+ * particle: its nearest pin's index (0xffffffff for none, or for a pin itself) and the rest distance's bits.
+ */
 export const CLOTH_TETHER_WGSL = /* wgsl */ `${SIM}
 @group(1) @binding(0) var<storage, read_write> state: array<vec4f>;
-// Two a particle: its nearest pin's index (0xffffffff for none, or for a pin itself) and the rest distance's bits.
 @group(1) @binding(1) var<storage, read> tethers: array<vec2u>;
 
 @compute @workgroup_size(64)
@@ -136,7 +152,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let t = tethers[i];
   let p = state[i];
   if (t.x == 0xffffffffu || p.w == 0.0) { return; }
-  // A long range attachment (Kim, Chentanez and Mueller 2012): one-sided, the pin does not move.
   let a = state[t.x].xyz;
   let d = p.xyz - a;
   let l = length(d);
@@ -146,20 +161,26 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 }
 `;
 
-/** Colliders: each free particle pushed out of each collider in order, then its slide held back by Coulomb friction. */
+/**
+ * Colliders: each free particle pushed out of each collider in order, then its slide held back by Coulomb friction.
+ * shapes holds eight vec4 a collider: (type, sdf offset, radius, half height), (from position, friction), (from
+ * rotation), (to position, 0), (to rotation), (box half extents | sdf min), (sdf spacing), (sdf samples per axis); sdf
+ * holds every sdf collider's samples, x fastest, end to end. qmix is the normalised blend of two rotations, along the
+ * shorter way. field is the field's value and gradient at a point of the collider's space (trilinear, the gradient
+ * exact in the cell); w < -1e30 outside the grid. start is where the particle began the substep: its prediction less
+ * the velocity that carried it there. A sphere, or a capsule along its local y, is the distance to the segment less
+ * the radius; inside a box the particle leaves along the axis of least depth. Friction takes back up to mu times the
+ * depth of the slide over the substep relative to the surface.
+ */
 export const CLOTH_COLLIDE_WGSL = /* wgsl */ `${SIM}
 @group(1) @binding(0) var<storage, read_write> state: array<vec4f>;
-// Eight vec4 a collider: (type, sdf offset, radius, half height), (from position, friction), (from rotation),
-// (to position, 0), (to rotation), (box half extents | sdf min), (sdf spacing), (sdf samples per axis).
 @group(1) @binding(1) var<storage, read> shapes: array<vec4f>;
-// Every sdf collider's samples, x fastest, end to end.
 @group(1) @binding(2) var<storage, read> sdf: array<f32>;
 
 fn rot(q: vec4f, v: vec3f) -> vec3f {
   let t = 2.0 * cross(q.xyz, v);
   return v + q.w * t + cross(q.xyz, t);
 }
-// Normalised blend of two rotations, along the shorter way.
 fn qmix(a: vec4f, b: vec4f, t: f32) -> vec4f {
   var bb = b;
   if (dot(a, b) < 0.0) { bb = -b; }
@@ -168,8 +189,6 @@ fn qmix(a: vec4f, b: vec4f, t: f32) -> vec4f {
 fn voxel(off: u32, i: u32, j: u32, k: u32, sx: u32, sxy: u32) -> f32 {
   return sdf[off + i + j * sx + k * sxy];
 }
-// The field's value and gradient at a point of the collider's space (trilinear, the gradient exact in the cell); w < -1e30
-// outside the grid.
 fn field(o: u32, local: vec3f) -> vec4f {
   let size = bitcast<vec3u>(shapes[o + 7u].xyz);
   let spacing = shapes[o + 6u].xyz;
@@ -207,7 +226,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (i >= sim.count) { return; }
   var p = state[i];
   if (p.w == 0.0) { return; }
-  // Where the particle began the substep: its prediction less the velocity that carried it there.
   let start = state[2u * sim.count + i].xyz - state[sim.count + i].xyz * sim.dt;
   for (var c = 0u; c < sim.colliderCount; c++) {
     let o = c * 8u;
@@ -221,7 +239,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     var dist = 1e30;
     var n = vec3f(0.0, 1.0, 0.0);
     if (kind <= 1u) {
-      // A sphere, or a capsule along its local y: the distance to the segment less the radius.
       var h = 0.0;
       if (kind == 1u) { h = head.w; }
       let v = local - vec3f(0.0, clamp(local.y, -h, h), 0.0);
@@ -236,7 +253,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         n = sign(local) * max(g, vec3f(0.0)) / out;
         dist = out - sim.thickness;
       } else {
-        // Inside: out along the axis of least depth.
         var a = 2u;
         if (g.x >= g.y && g.x >= g.z) { a = 0u; } else if (g.y >= g.z) { a = 1u; }
         n = vec3f(0.0);
@@ -258,7 +274,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let w0 = x0 + rot(q0, lc);
       let nw = rot(q1, n);
       let pw = x1 + rot(q1, lc);
-      // The slide over the substep relative to the surface: friction takes back up to mu times the depth of it.
       let r = w0 - start;
       let t = r - nw * dot(r, nw);
       let lt = length(t);
@@ -271,11 +286,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 }
 `;
 
-/** Normals: each particle's unit normal from its triangles now, for the drag of the substep (w, its area, is kept). */
+/**
+ * Normals: each particle's unit normal from its triangles now, for the drag of the substep (w, its area, is kept).
+ * adjacency holds count + 1 offsets, then the triangles at each particle. Each cross product is twice the area along
+ * the normal, so the sum weights each face by its area.
+ */
 export const CLOTH_NORMALS_WGSL = /* wgsl */ `${SIM}
 @group(1) @binding(0) var<storage, read> state: array<vec4f>;
 @group(1) @binding(1) var<storage, read_write> normals: array<vec4f>;
-// count + 1 offsets, then the triangles at each particle.
 @group(1) @binding(2) var<storage, read> adjacency: array<u32>;
 @group(1) @binding(3) var<storage, read> triangles: array<u32>;
 
@@ -287,7 +305,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   for (var k = adjacency[v]; k < adjacency[v + 1u]; k++) {
     let t = adjacency[sim.count + 1u + k] * 3u;
     let a = state[triangles[t]].xyz;
-    // Twice the area along the normal: the sum weights each face by its area.
     nsum += cross(state[triangles[t + 1u]].xyz - a, state[triangles[t + 2u]].xyz - a);
   }
   let l = length(nsum);
@@ -295,11 +312,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 }
 `;
 
-/** Surface: each particle's normal and tangent from its triangles, and its 20-float draw vertex (gltf PBR layout). */
+/**
+ * Surface: each particle's normal and tangent from its triangles, and its 20-float draw vertex (gltf PBR layout).
+ * adjacency holds count + 1 offsets, then the triangles at each particle; the cross product is twice the area along
+ * the normal, so the sum weights each face by its area.
+ */
 export const CLOTH_SURFACE_WGSL = /* wgsl */ `${SIM}
 @group(1) @binding(0) var<storage, read> state: array<vec4f>;
 @group(1) @binding(1) var<storage, read_write> normals: array<vec4f>;
-// count + 1 offsets, then the triangles at each particle.
 @group(1) @binding(2) var<storage, read> adjacency: array<u32>;
 @group(1) @binding(3) var<storage, read> triangles: array<u32>;
 @group(1) @binding(4) var<storage, read> uvs: array<vec2f>;
@@ -319,7 +339,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let i2 = triangles[t + 2u];
     let e1 = state[i1].xyz - state[i0].xyz;
     let e2 = state[i2].xyz - state[i0].xyz;
-    // The cross product is twice the area along the normal: the sum weights each face by its area.
     nsum += cross(e1, e2);
     let d1 = uvs[i1] - uvs[i0];
     let d2 = uvs[i2] - uvs[i0];

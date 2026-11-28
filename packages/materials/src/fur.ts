@@ -55,6 +55,8 @@ const vector = (value: readonly number[], label: string): void => {
   )
     throw new TypeError(`Fur ${label} needs three finite components; pass [x, y, z] in mesh axes`);
 };
+// In margoFurCoverage, shape.w is the root radius (furRootRadius); the centre moves only as far as keeps that disc
+// inside its cell.
 const declarations = (group: number) => `struct MargoFur {shape:vec4f,gravity:vec4f,wind:vec4f,clock:vec4f}
 @group(${group}) @binding(180) var<uniform> margoFur:MargoFur;
 fn margoFurHash(cell:vec2f)->f32 {
@@ -75,7 +77,6 @@ fn margoFurMove(n:vec3f,uv:vec2f)->vec3f {
 fn margoFurCoverage(uv:vec2f)->f32 {
   let layer=margoFur.shape.x;if(layer<=0.0){return 1.0;}
   if(margoFur.shape.z<=0.0){return 0.0;}let cell=uv*margoFur.shape.z;let base=floor(cell);let random=margoFurHash(base);
-  // shape.w is the root radius (furRootRadius); the centre moves only as far as keeps that disc inside its cell.
   let center=0.5+(vec2f(margoFurHash(base+vec2f(97,13)),margoFurHash(base+vec2f(7,157)))-0.5)*max(1.0-2.0*margoFur.shape.w,0.0);
   let height=0.35+0.65*random;
   let radius=margoFur.shape.w*max(1.0-layer/height,0.0);

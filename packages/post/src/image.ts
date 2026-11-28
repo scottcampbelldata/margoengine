@@ -85,6 +85,7 @@ function checkedOptions(value: ImagePostOptions): ImagePostOptions {
 // the producer's exposure/vignette before bloom; the viewport producer has already done that to its HDR target.
 // Vignette: the natural-vignetting cos^4 law, 1/(1 + t^2)^2; its 0.2238 field scale is fitted to observed MagicaVoxel
 // output (docs/magicavoxel-parity.md). sRGB encode: IEC 61966-2-1.
+// Coverage is preserved: a glow on the transparent surround raises alpha so its light survives compositing.
 const shader =
   neutralShader +
   agxShader +
@@ -102,7 +103,6 @@ fn srgb(c:vec3f)->vec3f{return select(c*12.92,1.055*pow(c,vec3f(1.0/2.4))-0.055,
   var gain=exp2(options[0].x);let t=options[0].z*length((p.xy-options[1].xy*0.5)/(0.2238*options[1].y));
   gain/=(1.0+t*t)*(1.0+t*t);return vec4f(min(c*gain,vec3f(65504)),s.a);
  }
- // Coverage is preserved; a glow on the transparent surround raises alpha so its light survives compositing.
  let a=max(s.a,clamp(max(c.r,max(c.g,c.b)),0.0,1.0));
  if(options[1].z>0.0){c/=max(a,0.000001);}
  if(mode==0u){c=pbrNeutral(c);}else if(mode==2u){c=acesNarkowicz(c);}else if(mode==4u){c=agx(c);}

@@ -84,6 +84,10 @@ export interface MaterialDecalsOptions {
 export const MAX_MATERIAL_DECALS = 64;
 const FLOATS = 24;
 
+// In the shader: shade is core's lit shader, the sun's direct light (Lambert plus GGX) and the ambient term, in
+// linear light. t and b are the decal's right and up axes laid on the surface, the tangent frame its normal map is
+// drawn in. sun is the share of the unshadowed sun the pixel got, read back from the lit image; 1 where the sun
+// gives it nothing to read.
 const shader = (encode: boolean) => `${fullscreen}${encode ? displayShader : ''}
 struct Decal {center:vec4f,right:vec4f,up:vec4f,forward:vec4f,rect:vec4f,color:vec4f}
 struct U {inverse:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,ambient:vec4f,count:vec4f,decals:array<Decal,${MAX_MATERIAL_DECALS}>}
@@ -100,7 +104,6 @@ fn out(c:vec3f,a:f32)->vec4f {return vec4f(${encode ? 'toDisplay(c)' : 'c'},a);}
 fn read(t:texture_2d<f32>,p:vec2i,size:vec2f)->vec4f {
  let s=vec2f(textureDimensions(t));return textureLoad(t,vec2i((vec2f(p)+0.5)*s/size),0);
 }
-// Core's lit shader: the sun's direct light (Lambert plus GGX) and the ambient term, in linear light.
 fn shade(c:vec3f,r:f32,m:f32,n:vec3f,v:vec3f)->Light {
  let l=u.light.xyz;let h=(v+l)/max(length(v+l),0.0001);
  let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.0001,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
@@ -126,7 +129,6 @@ fn shade(c:vec3f,r:f32,m:f32,n:vec3f,v:vec3f)->Light {
   let uv=mix(d.rect.xy,d.rect.zw,vec2f(local.x*0.5+0.5,0.5-local.y*0.5));
   let texel=textureSampleLevel(atlas,atlasSampler,uv,0.0);let a=texel.a*d.right.w*fade;
   if(a<=0.0){continue;}
-  // The decal's right and up axes laid on the surface: the tangent frame its normal map is drawn in.
   let t=normalize(d.right.xyz-n*dot(n,d.right.xyz)+vec3f(1e-12));var b=cross(n,t);b=select(-b,b,dot(b,d.up.xyz)>=0.0);
   var tn=texel.xyz*2.0-1.0;tn=vec3f(tn.xy*d.up.w,max(tn.z,0.001));
   n=normalize(mix(n,normalize(t*tn.x+b*tn.y+n*tn.z),a));
@@ -136,7 +138,6 @@ fn shade(c:vec3f,r:f32,m:f32,n:vec3f,v:vec3f)->Light {
  }
  if(!hit){return out(lit.rgb,lit.a);}
  let v=normalize(u.eye.xyz-pos);let before=shade(c0,m0.x,m0.y,n0,v);let after=shade(c,r,m,n,v);
- // The share of the unshadowed sun the pixel got, read back from the lit image; 1 where the sun gives it nothing to read.
  let dd=dot(before.direct,before.direct);
  let sun=select(1.0,clamp(dot(lit.rgb-before.ambient,before.direct)/dd,0.0,1.0),dd>1e-10);
  return out(max(lit.rgb+sun*(after.direct-before.direct)+after.ambient-before.ambient,vec3f(0)),lit.a);

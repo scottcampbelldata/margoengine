@@ -45,11 +45,11 @@ export interface StylizeOptions {
   /** Default true. */
   enabled?: boolean;
 }
+// pcg is the existing Margo PCG hash, documented against Jarzynski and Olano (JCGT 2020).
 const shader = `${fullscreen}
 struct U{scan:vec4f,wave:vec4f,light:vec4f,bits:vec4u}
 @group(0) @binding(0) var scene:texture_2d<f32>;
 @group(0) @binding(1) var<uniform> u:U;
-// Existing Margo PCG hash, documented against Jarzynski and Olano (JCGT 2020).
 fn pcg(v:u32)->u32{let s=v*747796405u+2891336453u;let w=((s>>((s>>28u)+4u))^s)*277803737u;return (w>>22u)^w;}
 fn random(v:u32)->f32{return f32(pcg(v)>>8u)/16777216.0-0.5;}
 fn tap(p:vec2i)->vec4f{return textureLoad(scene,clamp(p,vec2i(0),vec2i(textureDimensions(scene))-1),0);}

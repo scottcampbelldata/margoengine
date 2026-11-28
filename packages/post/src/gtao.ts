@@ -57,6 +57,9 @@ export interface GTAOOptions {
 // The horizons are searched over the occluder depth (binding 7), the scene's depth; the pixel's own point and normal
 // come from the centre depth (binding 1), which under covered blades is the surface beneath them (KB-SCATTER-AOFRINGE1,
 // see shaders.ts). The two are the same texture in every other frame.
+// In the shader, v points toward the eye: from the point for perspective, the constant view axis for orthographic
+// (clip w constant). Screen y runs down and view y up; the slice direction and v span the slice for both
+// projections.
 const gtaoShader =
   frame +
   `
@@ -107,7 +110,6 @@ fn sky(p:vec2i,position:vec3f,n:vec3f,v:vec3f,cell:vec4f,slices:u32,size:vec2u)-
   let p=vec2i(id.xy);let data=textureLoad(gbuffer,p,0);_=textureLoad(noise,vec2i(0),0);_=textureLoad(occluders,vec2i(0),0);
   if(textureLoad(viewDepth,p,0).r==0||f.params.w<0.5){textureStore(output,p,vec4f(1));return;}
   let position=viewPosition(p,textureLoad(depth,p,0));let n=normalize(data.xyz);
-  // Toward the eye: from the point for perspective, the constant view axis for orthographic (clip w constant).
   let v=select(vec3f(0,0,1),normalize(-position),f.projection[2][3]<-0.5);
   let a=f.projection*vec4f(position,1);let b=f.projection*vec4f(position+vec3f(f.params.x,0,0),1);
   let reach=abs(b.x/b.w-a.x/a.w)*0.5*f.size.x;
@@ -116,7 +118,6 @@ fn sky(p:vec2i,position:vec3f,n:vec3f,v:vec3f,cell:vec4f,slices:u32,size:vec2u)-
   let steps=u32(f.params.y);var visibility=0.0;
   for(var k=0u;k<slices;k++){
     let phi=(f32(k)+cell.x)*PI/f32(slices);let d=vec2f(cos(phi),sin(phi));
-    // Screen y runs down, view y up; this direction and v span the slice for both projections.
     let direction=vec3f(d.x,-d.y,0.0);let side=normalize(direction-dot(direction,v)*v);let axis=cross(side,v);
     let projected=n-axis*dot(n,axis);let weight=length(projected);
     let g=select(-1.0,1.0,dot(projected,side)>=0.0)*acos(clamp(dot(projected,v)/max(weight,1e-6),-1.0,1.0));

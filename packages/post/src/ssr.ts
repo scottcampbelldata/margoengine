@@ -133,6 +133,7 @@ const lit = (code: string) => code.includes('let margoAmbient=') && code.include
 // to the hit projected at the hit's depth (shared/reflection-cone.js), so contacts stay sharp and the blur grows with
 // distance whichever way the ray runs (until 2026-11-25 the footprint came from the ray's on-screen length, which
 // left rays running away from the camera nearly sharp). Deterministic, so frames are stable without TAA.
+// Hits fade for rays toward the camera, back faces, roughness, screen edges and distance.
 const compositeShader =
   vertex +
   `
@@ -156,7 +157,6 @@ let n=normalize(textureLoad(normals,q,0).xyz*2.0-1.0);let r=reflect(-v,n);let to
 if(toward<0.5){
 ${march}if(hit){
 let h=o+dir*t;let hq=vec2i(h.xy);let hp=world(vec2f(hq)+0.5,textureLoad(depth,hq,0));let hn=textureLoad(normals,hq,0).xyz*2.0-1.0;
-// Fades: rays toward the camera, back faces, roughness, screen edges, distance.
 let f=(1.0-smoothstep(0.0,0.5,toward))*(1.0-smoothstep(0.0,0.3,dot(hn,r)))*(1.0-smoothstep(u.a.z*0.5,u.a.z,rough))
 *clamp(min(min(h.x,u.a.x-h.x),min(h.y,u.a.y-h.y))/(0.08*min(u.a.x,u.a.y)),0.0,1.0)*(1.0-smoothstep(0.8*u.b.x,u.b.x,distance(p,hp)));
 let hc=u.matrix*vec4f(hp,1.0);let lod=margoConeLevel(rough,distance(p,hp),length(vec3f(u.matrix[0].y,u.matrix[1].y,u.matrix[2].y))*0.5*u.a.y/max(abs(hc.w),1e-20),f32(textureNumLevels(blurred)));var reflected=textureLoad(scene,hq,0).rgb;

@@ -134,6 +134,8 @@ export interface EyeFeature extends MaterialFeature {
 // smooth coat (`coat`, `film`) on the rough lobe.
 const tearF0 = ((1.337 - 1) / (1.337 + 1)) ** 2;
 const lidAmbient = (q: string) => `(0.2015+0.7985*(1.0-1.0/(1.0+0.44*${q}+1.15*${q}*${q})))`;
+// In the shader: margoEyeFibres draws spokes of two scales, darker toward the pupil and the rim, and a lighter ring
+// a third of the way out. Where the ray misses the iris it meets the white of the eye, in the iris's shadow.
 const code = (
   group: number,
   mapped: boolean,
@@ -161,7 +163,6 @@ fn margoEyeSpokes(angle:f32,count:f32)->f32 {
   let a=(angle/6.2831853+0.5)*count; let low=floor(a); let t=a-low;
   return mix(margoEyeHash(low),margoEyeHash(low+1.0-select(0.0,count,low+1.0>=count)),t*t*(3.0-2.0*t));
 }
-// Fibres: spokes of two scales, darker toward the pupil and the rim, and a lighter ring a third of the way out.
 fn margoEyeFibres(q:vec2f,t:f32)->vec3f {
   let angle=atan2(q.y,q.x); let fine=margoEyeSpokes(angle,96.0); let broad=margoEyeSpokes(angle,24.0);
   let ring=exp(-pow((t-0.32)/0.14,2.0));
@@ -179,7 +180,6 @@ fn margoEyeSurface(i:Out,n:vec3f,under:Surface)->Surface {
   let picture=${mapped ? `textureSampleGrad(margoEyeMap,margoEyeSampler,q/max(reach,0.00001)*mix(${mapPupil},1.0,t)*${mapRadius}+0.5,dx*${mapRadius},dy*${mapRadius}).rgb` : 'margoEyeFibres(q,t)'};
   let soft=max(length(dx)+length(dy),0.004);
   let colour=margoEyeRows.iris.rgb*picture*smoothstep(k.z-soft,k.z+soft,reach)*mix(1.0,0.25,smoothstep(0.8,1.0,reach));
-  // Where the ray misses the iris it meets the white of the eye, in the iris's shadow.
   let inside=mix(colour,under.base.rgb*0.25,smoothstep(1.0,1.08,reach));
   let cornea=select(0.0,1.0-smoothstep(0.94,1.06,rim),height>0.0);
   var s=under; s.base=vec4f(mix(under.base.rgb,inside,cornea),under.base.a); s.n=normalize(mix(under.n,cn,cornea));

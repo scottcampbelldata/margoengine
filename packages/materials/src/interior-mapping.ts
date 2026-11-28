@@ -221,6 +221,12 @@ export function traceRoom(point: Vec3, normal: Vec3, direction: Vec3, rooms: Roo
 }
 
 const levelFields = Array.from({ length: 9 }, (_, k) => `floors${k}`);
+// In the shader: each room gets its own tint, its walls more than its floor and ceiling; corners darken with the
+// distance to the two other surfaces meeting there; a door or a picture may stand on the back wall. imBox is how
+// much of a pixel of side foot a box of half size half covers, at offset p from its middle. Derivatives are taken
+// before any branch. A piece of furniture stands across the room, on a plane of its own, and curtains and blinds
+// hang just inside the glass, their folds fading out where a pixel is wider than one. Daylight falls off into the
+// room; a lamp under the ceiling lights what faces it.
 /** The shader: the plain rooms, or rooms pictured by a cube or a 2D atlas. */
 function shader(map?: 'cube' | '2d'): string {
   const pick = levelFields.map((f, k) => `if (q == ${k}) { return uniforms.${f}[r]; }`).join('\n  ');
@@ -247,16 +253,13 @@ function shader(map?: 'cube' | '2d'): string {
         : `var own = uniforms.wall;
     if (face == 1) { own = uniforms.ground; }
     if (face == 2) { own = uniforms.ceiling; }
-    // A room's own tint, its walls more than its floor and ceiling.
     let shades = imHash(id + vec3u(0u, 0u, 4000037u));
     let tint = 0.45 + 1.1 * mix(vec3f(shades.x), shades, 0.35);
     let tone = mix(vec3f(1.0), tint, uniforms.variation * select(0.35, 1.0, face == 0 || face == 3));
-    // Corners darken: the distance to the two other surfaces meeting there.
     let edge = min(hit, size - hit);
     let near = select(select(edge.xy, edge.xz, face == 1 || face == 2), edge.yz, face == 3);
     let corner = mix(0.62, 1.0, smoothstep(0.0, 0.7, near.x)) * mix(0.62, 1.0, smoothstep(0.0, 0.7, near.y));
     colour = own * tone * corner;
-    // A door or a picture on the back wall.
     if (face == 0 && h2.z < uniforms.furniture) {
       let at = vec2f(hit.x - size.x * (0.2 + 0.6 * h3.x), hit.y);
       if (h3.y < 0.45) {
@@ -282,13 +285,11 @@ fn imLevel(k: i32) -> f32 {
   ${pick}
   return 0.0;
 }
-// How much of a pixel of side foot a box of half size half covers, at offset p from its middle.
 fn imBox(p: vec2f, half: vec2f, foot: f32) -> f32 {
   let d = clamp((half - abs(p)) / max(foot, 1e-4) + 0.5, vec2f(0.0), vec2f(1.0));
   return d.x * d.y;
 }
 fn shade(i: Out, s: Surface) -> Surface {
-  // Derivatives are taken before any branch.
   let foot = length(fwidth(i.position));
   var o = s;
   let yaw = uniforms.turn;
@@ -341,7 +342,6 @@ fn shade(i: Out, s: Surface) -> Surface {
   if (face == 1) { normal = vec3f(0.0, 1.0, 0.0); }
   if (face == 2) { normal = vec3f(0.0, -1.0, 0.0); }
   if (face == 3) { normal = vec3f(select(1.0, -1.0, ray.x > 0.0), 0.0, 0.0); }
-  // A piece of furniture across the room, on a plane of its own.
   if (h2.z < uniforms.furniture) {
     let z = size.z * (0.45 + 0.4 * h3.z);
     let tz = z / steep.z;
@@ -357,7 +357,6 @@ fn shade(i: Out, s: Surface) -> Surface {
       }
     }
   }
-  // Curtains and blinds just inside the glass.
   let tc = min(0.12, 0.5 * size.z) / steep.z;
   if (tc < t) {
     let q = start + steep * tc;
@@ -365,7 +364,6 @@ fn shade(i: Out, s: Surface) -> Surface {
       if (h1.x * 0.999 + 0.0005 < uniforms.curtains) {
         let open = w * (0.12 + 0.3 * h3.x);
         let cover = clamp((open - min(q.x, w - q.x)) / max(foot, 1e-4) + 0.5, 0.0, 1.0);
-        // Folds fade out where a pixel is wider than one.
         let fold = 0.8 + 0.2 * sin(q.x * 45.0) * clamp(1.0 - foot * 14.0, 0.0, 1.0);
         let dye = imHash(id + vec3u(9u, 0u, 0u));
         let cloth = (0.15 + 0.65 * mix(vec3f(dye.x), dye, 0.3)) * fold;
@@ -380,7 +378,6 @@ fn shade(i: Out, s: Surface) -> Surface {
       }
     }
   }
-  // Daylight falls off into the room; a lamp under the ceiling lights what faces it.
   var light = vec3f(uniforms.daylight * mix(1.0, 0.4, clamp(at.z / size.z, 0.0, 1.0)));
   light *= mix(1.0, 0.55 + 0.9 * h3.y, uniforms.variation);
   if (h1.y < uniforms.lit) {

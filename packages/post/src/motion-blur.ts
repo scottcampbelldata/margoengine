@@ -72,6 +72,9 @@ textureStore(neighbours,p,vec4f(best,0,0));
 }`;
 // OUTPUT: 0 linear (HDR stage), 1 Margo's display transform (last stage), 2 sRGB encoding only (after TAA, unorm canvas),
 // 3 as is (after TAA, float canvas).
+// In the shader: front is 1 when a is in front of b (or within 1% of b's distance) and 0 when clearly behind; reach
+// is 1 within a blur radius r, fading out over 10% of it. Interleaved gradient noise (Jimenez 2014) staggers the
+// samples per pixel; it does not change between frames.
 const reconstructShader = (output: number) =>
   vertex +
   `
@@ -91,15 +94,12 @@ fn away(p:vec2i)->f32 {
 let d=textureLoad(depth,p,0);if(d<=0.0){return 1e30;}let q=(vec2f(p)+0.5)/m.size.xy;
 let w=m.inverse*vec4f(q.x*2.0-1.0,1.0-q.y*2.0,d,1.0);return distance(w.xyz/w.w,m.eye.xyz);
 }
-// 1 when a is in front of b (or within 1% of b's distance), 0 when clearly behind.
 fn front(a:f32,b:f32)->f32 {return clamp(1.0-(a-b)/(0.01*min(a,b)+1e-4),0.0,1.0);}
-// 1 within a blur radius r, fading out over 10% of it.
 fn reach(d:f32,r:f32)->f32 {return clamp((1.05*r-d)/(0.1*r+1e-4),0.0,1.0);}
 @fragment fn fragment(@builtin(position) frag:vec4f)->@location(0) vec4f {
 let p=vec2i(frag.xy);let c=textureLoad(scene,p,0);let k=i32(m.size.z);
 let vn=textureLoad(neighbours,p/k,0).xy;if(m.size.w<0.5||length(vn)<0.5){return encode(c);}
 let vx=length(radius(p));let zx=away(p);let n=i32(m.size.w);let limit=vec2i(m.size.xy)-1;
-// Interleaved gradient noise (Jimenez 2014) staggers the samples per pixel; it does not change between frames.
 let j=fract(52.9829189*fract(dot(vec2f(p),vec2f(0.06711056,0.00583715))))-0.5;var sum=vec3f(0);
 for(var i=0;i<n;i++){
 let t=(f32(i)+0.5+j)/f32(n)*2.0-1.0;let q=clamp(vec2i(floor(vec2f(p)+0.5+vn*t)),vec2i(0),limit);

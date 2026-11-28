@@ -112,6 +112,8 @@ struct U {inverse:mat4x4f,matrix:mat4x4f,a:vec4f,b:vec4f,g:vec4f}
 // One bounce of diffuse light: cosine-weighted rays around the normal, each marched over the Hi-Z like SSR's mirror ray.
 // A hit returns the lit scene there (a blurred mip of it for far hits, so a few rays see an area, not a point). The
 // result is the hit light summed over all rays (rgb) and the share of rays that hit (a), both over the ray count.
+// The rays use an orthonormal basis around n (Duff, Burgess, Christensen et al. 2017) and start two pixel footprints
+// off the surface. Hits fade on back faces (hit normal along the ray) and near maxDistance.
 const traceShader =
   vertex +
   uniforms +
@@ -132,7 +134,6 @@ return vec4f(-1.0);
 let q=vec2i(frag.xy);let d=textureLoad(depth,q,0);
 if(u.b.w<0.5||d<=0.0||textureLoad(albedo,q,0).a<0.5){return vec4f(0);}
 let px=vec2f(q)+0.5;let p=world(px,d);let n=normalize(textureLoad(normals,q,0).xyz*2.0-1.0);
-// Orthonormal basis around n (Duff, Burgess, Christensen et al. 2017); rays start two pixel footprints off the surface.
 let sg=select(-1.0,1.0,n.z>=0.0);let a=-1.0/(sg+n.z);let b=n.x*n.y*a;
 let t1=vec3f(1.0+sg*n.x*n.x*a,sg*b,-sg*n.x);let t2=vec3f(b,sg+n.y*n.y*a,-n.y);
 let start=p+n*2.0*distance(world(px+vec2f(1,0),d),p);
@@ -141,7 +142,6 @@ for(var j=0u;j<count;j++){
 let k=rays[cell+16u*j].xyz;let r=normalize(t1*k.x+t2*k.y+n*k.z);let h=trace(start,r);
 if(h.w<0.0){continue;}
 let hq=vec2i(h.xy);let hn=textureLoad(normals,hq,0).xyz*2.0-1.0;let hp=world(vec2f(hq)+0.5,textureLoad(depth,hq,0));
-// Fades: hits on back faces (hit normal along the ray) and near maxDistance.
 let w=(1.0-smoothstep(0.0,0.3,dot(hn,r)))*(1.0-smoothstep(0.8*u.b.x,u.b.x,distance(p,hp)));
 let lod=log2(max(h.w*u.g.w,1.0));var light=textureLoad(input,hq,0).rgb;
 if(lod>1.0){light=textureSampleLevel(blurred,bilinear,h.xy/u.a.xy,min(lod-1.0,f32(textureNumLevels(blurred)-1))).rgb;}

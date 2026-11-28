@@ -111,11 +111,17 @@ if(level==0){return textureLoad(depth,cell,0);}
 return textureLoad(hiz,min(cell,vec2i(textureDimensions(hiz,level-1))-1),level-1).r;
 }
 `;
+// In the march: the ray is clipped to the near plane (reversed-Z: z<=w) and the far plane (z>=0), then to the
+// screen. Bit k of `failed` marks that the level-k cell around the ray already sent it down: while depth does not
+// grow along the ray it stays at or behind that cell's closest depth until it leaves the cell, so testing the cell
+// again would only descend once more. In front of everything in a cell, the ray drops to the cell's closest depth if
+// it gets there inside the cell, else moves on. A ray reaches only surfaces facing it: one that faces away is the
+// ray's own surface or a back seen at grazing angles. Cells the step leaves lose their mark: the highest level whose
+// cell changed is the top bit where the pixels differ.
 /** The Hi-Z march of a ray from world point `p` along unit `r` (up to `u.b.x`), as a statement list: it clips the ray,
  * opens `if(len>1.5){` and leaves `o`, `dir`, `len`, `t` and `hit` in scope there (the hit is at `o+dir*t`). The caller
  * closes that block. */
 export const march = `let start=u.matrix*vec4f(p,1.0);var end=u.matrix*vec4f(p+r*u.b.x,1.0);
-// Clip to the near plane (reversed-Z: z<=w) and the far plane (z>=0), then to the screen.
 if(end.z>end.w){end=mix(start,end,0.999*(start.w-start.z)/((start.w-start.z)-(end.w-end.z)));}
 if(end.z<0.0){end=mix(start,end,start.z/(start.z-end.z));}
 let o=screen(start);var dir=screen(end)-o;
@@ -124,8 +130,6 @@ let fit=select(vec2f(1),room/dir.xy,abs(dir.xy)>vec2f(1e-6));dir*=clamp(min(fit.
 let len=length(dir.xy);
 if(len>1.5){
 var t=1.5/len;var level=0;var hit=false;let top=i32(u.b.z);let nudge=0.01/max(abs(dir.x),abs(dir.y));
-// Bit k: the level-k cell around the ray already sent it down. While depth does not grow along the ray it stays at or
-// behind that cell's closest depth until it leaves the cell, so testing the cell again would only descend once more.
 var failed=0u;let away=dir.z<=0.0;
 for(var i=0;i<i32(u.b.y);i++){
 if(t>1.0){break;}
@@ -134,18 +138,15 @@ let edge=(cell+select(vec2f(0),vec2f(1),dir.xy>vec2f(0)))*size;
 let across=select(vec2f(1e30),(edge-o.xy)/dir.xy,abs(dir.xy)>vec2f(1e-6));let exit=min(across.x,across.y)+nudge;
 var next=-1.0;var up=true;
 if(h.z>z){
-// In front of everything in this cell: drop to its closest depth if the ray gets there inside the cell, else move on.
 let plane=select(2.0,(z-o.z)/dir.z,dir.z<0.0);
 if(plane>=exit){next=exit;}
 else if(level>0){t=max(t,plane);if(away){failed|=1u<<u32(level);}level--;}
-// A ray reaches only surfaces facing it: one that faces away is the ray's own surface or a back seen at grazing angles.
 else if(z>0.0&&facing(vec2i(cell),r)){t=max(t,plane);hit=true;break;}
 else{next=exit;}
 }else if(level>0){if(away){failed|=1u<<u32(level);}level--;}
 else if(z>0.0&&facing(vec2i(cell),r)&&distance(world(h.xy,z),world(h.xy,h.z))<u.a.w){hit=true;break;}
 else{next=exit;up=false;}
 if(next>=0.0){
-// Cells the step leaves lose their mark: the highest level whose cell changed is the top bit where the pixels differ.
 let a=vec2u(max(floor(h.xy),vec2f(0)));let b=vec2u(max(floor((o+dir*next).xy),vec2f(0)));let x=(a.x^b.x)|(a.y^b.y);
 if(x!=0u){failed&=~((2u<<firstLeadingBit(x))-1u);}
 t=next;if(up&&(failed&(1u<<u32(level+1)))==0u){level=min(level+1,top);}

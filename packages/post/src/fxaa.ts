@@ -30,6 +30,12 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 //   coarser far away where the shift is small anyway. Steps are whole pixels so each fetch stays on the boundary.
 // - Sub-pixel: tent low-pass (direct neighbours weight 2, diagonals 1, over 12); strength 0.75 so an isolated dot is
 //   softened but never fully replaced by its surroundings.
+// In the shader: the orientation is the total luma change across rows against across columns (centre row and column
+// count twice). The side is the neighbour across the edge with the larger step; `across` points at it, one pixel
+// long. The end search starts from the pixel boundary, where each bilinear fetch averages both sides of the edge.
+// The edge shift is largest beside an end, zero mid-span, and only where the end turns toward this pixel's own side.
+// The sub-pixel shift is how far the centre stands out from a low-pass of its neighbourhood, relative to the
+// contrast.
 const shader =
   fullscreen +
   `
@@ -52,12 +58,10 @@ fn along(uv:vec2f)->f32 {return luma(textureSampleLevel(image,bilinear,uv,0));}
  let gate=max(FLOOR,hi*RELATIVE);
  if(contrast<gate){return centre;}
  let nw=texel(q+vec2i(-1,-1));let ne=texel(q+vec2i(1,-1));let sw=texel(q+vec2i(-1,1));let se=texel(q+vec2i(1,1));
- // Orientation: total luma change across rows against across columns (centre row/column counts twice).
  let rows=2*(abs(n-m)+abs(s-m))+abs(nw-w)+abs(sw-w)+abs(ne-e)+abs(se-e);
  let columns=2*(abs(w-m)+abs(e-m))+abs(nw-n)+abs(ne-n)+abs(sw-s)+abs(se-s);
  let horizontal=rows>=columns;
  let size=1/vec2f(textureDimensions(image));
- // Side: the neighbour across the edge with the larger step; 'across' points at it, one pixel long.
  let before=select(w,n,horizontal);let after=select(e,s,horizontal);
  let toBefore=abs(before-m)>=abs(after-m);
  let gradient=max(abs(before-m),abs(after-m));
@@ -65,7 +69,6 @@ fn along(uv:vec2f)->f32 {return luma(textureSampleLevel(image,bilinear,uv,0));}
  var across=select(vec2f(size.x,0),vec2f(0,size.y),horizontal);
  if(toBefore){across=-across;}
  let tangent=select(vec2f(0,size.y),vec2f(size.x,0),horizontal);
- // End search from the pixel boundary, where each bilinear fetch averages both sides of the edge.
  let start=v.position.xy*size+0.5*across;
  let limit=END*gradient;
  var back=0.0;var forth=0.0;var backDelta=0.0;var forthDelta=0.0;var backDone=false;var forthDone=false;
@@ -75,14 +78,12 @@ fn along(uv:vec2f)->f32 {return luma(textureSampleLevel(image,bilinear,uv,0));}
   if(!forthDone){forth+=stride;forthDelta=along(start+tangent*forth)-mid;forthDone=abs(forthDelta)>=limit;}
   if(backDone&&forthDone){break;}
  }
- // Edge shift: largest beside an end, zero mid-span, and only where the end turns toward this pixel's own side.
  let nearBack=back<forth;
  let nearest=min(back,forth);
  let endDelta=select(forthDelta,backDelta,nearBack);
  let endFound=select(forthDone,backDone,nearBack);
  var shift=0.0;
  if(endFound&&((m-mid)<0)!=(endDelta<0)){shift=0.5-nearest/(back+forth);}
- // Sub-pixel shift: how far the centre stands out from a low-pass of its neighbourhood, relative to the contrast.
  let low=(2*(n+s+w+e)+nw+ne+sw+se)/12;
  let blend=smoothstep(0.0,1.0,clamp(abs(low-m)/contrast,0.0,1.0));
  shift=max(shift,SUBPIXEL*blend*blend)*smoothstep(gate,2*gate,contrast);

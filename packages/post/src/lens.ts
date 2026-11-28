@@ -59,6 +59,8 @@ const spreadShader = `${fullscreen}${uniforms}
  }
  return vec4f(sum/total,1);
 }`;
+// smudges is the built-in dirt: a faint haze plus soft round smudges, one per cell of a 5-high grid, placed and
+// sized by a hash.
 const compositeShader = (display: boolean) => `${fullscreen}${display ? displayShader : ''}${uniforms}
 @group(0) @binding(1) var scene:texture_2d<f32>;
 @group(0) @binding(2) var glow:texture_2d<f32>;
@@ -68,7 +70,6 @@ fn hash(v:vec2u)->vec2f{
  var w=v*1664525u+1013904223u;w.x+=w.y*1664525u;w.y+=w.x*1664525u;w=w^(w>>vec2u(16u));
  w.x+=w.y*1664525u;w.y+=w.x*1664525u;w=w^(w>>vec2u(16u));return vec2f(w)/4294967295.0;
 }
-// The built-in dirt: a faint haze plus soft round smudges, one per cell of a 5-high grid, placed and sized by a hash.
 fn smudges(uv:vec2f)->vec3f{
  let p=uv*vec2f(u.aspect,1.0)*5.0;let cell=floor(p);var d=0.08;
  for(var j=0;j<9;j++){

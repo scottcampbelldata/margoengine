@@ -33,14 +33,14 @@ const BURST = [3, 10] as const;
 const TEARS = 4; // most horizontal tear bands per glitched frame (the shader's tears array length)
 const UNIFORM_BYTES = 48 + TEARS * 16;
 
+// pcg is the PCG hash (Jarzynski and Olano, "Hash Functions for GPU Rendering", JCGT 9(3), 2020). texel wraps
+// horizontally, clamps vertically and is unfiltered.
 const shader = `${fullscreen}
 struct Glitch {flags:vec4u,split:vec4f,blocks:vec4f,tears:array<vec4f,4>}
 @group(0) @binding(0) var<uniform> g:Glitch;
 @group(0) @binding(1) var frame:texture_2d<f32>;
-// PCG hash (Jarzynski and Olano, "Hash Functions for GPU Rendering", JCGT 9(3), 2020).
 fn pcg(v:u32)->u32 {let s=v*747796405u+2891336453u;let w=((s>>((s>>28u)+4u))^s)*277803737u;return (w>>22u)^w;}
 fn unit(v:u32)->f32 {return f32(pcg(v)>>8u)*(1.0/16777216.0);}
-// Wraps horizontally, clamps vertically, unfiltered.
 fn texel(p:vec2f,size:vec2i)->vec4f {
  let x=((i32(floor(p.x))%size.x)+size.x)%size.x;
  return textureLoad(frame,vec2i(x,clamp(i32(floor(p.y)),0,size.y-1)),0);

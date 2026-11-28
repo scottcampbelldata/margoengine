@@ -128,6 +128,9 @@ fn contrast(a:vec4f,b:vec4f)->f32 {let d=abs(a-b);return max(select(abs(dot(a.rg
 // z, w alike for the edge on its left.
 // Edge walk: bilinear double fetch after Jimenez et al., "Practical Morphological Antialiasing" (GPU Pro 2, 2011);
 // its stop thresholds 0.83 and 0.015 follow from Margo's 21/7/3/1 (in 32nds) edge encoding.
+// walk returns the pixels of the edge from start in steps of dir, two per fetch, with y = 1 when the walk reached
+// its step limit. corner: where the crossing edge runs on past its pixel, the end is a corner of the shape, not a
+// step, so it is kept sharper.
 const weightShader =
   fullscreen +
   uniforms +
@@ -139,7 +142,6 @@ const weightShader =
 fn edge(q:vec2i)->vec2f {if(any(q<vec2i(0))||any(q>=vec2i(textureDimensions(edges)))){return vec2f(0);}return textureLoad(edges,q,0).rg;}
 fn crosses(q:vec2i,h:bool)->bool {let e=edge(q);return select(e.y,e.x,h)>0.5;}
 fn crossing(e:vec2i,across:vec2i,h:bool)->i32 {return select(0,1,crosses(e,h))+select(0,2,crosses(e-across,h));}
-// Pixels of the edge from start in steps of dir, two per fetch; y = 1 when the walk reached its step limit.
 fn walk(start:vec2i,dir:vec2i,across:vec2i,h:bool,back:bool)->vec2i {
  let size=vec2f(textureDimensions(edges));let offset=0.5+0.25*vec2f(dir)-0.125*vec2f(across);var a=start;var n=0;
  for(var j=0;j<i32(s.steps);j++){
@@ -149,7 +151,6 @@ fn walk(start:vec2i,dir:vec2i,across:vec2i,h:bool,back:bool)->vec2i {
  }
  return vec2i(n,1);
 }
-// Where the crossing edge runs on past its pixel, the end is a corner of the shape, not a step: keep it sharper.
 fn corner(e:vec2i,across:vec2i,h:bool,code:i32)->f32 {
  let on=(code==1&&crosses(e+across,h))||(code==2&&crosses(e-2*across,h));return select(1.0,s.rounding,on);
 }
