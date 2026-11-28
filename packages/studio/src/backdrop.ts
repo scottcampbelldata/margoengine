@@ -5,7 +5,11 @@ import type { EnvironmentLighting, EnvironmentLoadOptions } from '@margoengine/e
 import { rangeError, typeError } from '../../shared/errors.js';
 
 /** The four photographic staging rigs, for a subject facing a camera on +Z. */
-export type StagingPreset = 'portrait' | 'rembrandt' | 'upfront' | 'soft';
+/**
+ * Named softbox rigs. 'tent' is a product light tent for metal and other mirror-like parts: six panels ring the
+ * horizon, so every vertical face reflects a lit panel instead of the dark room, under a large overhead box.
+ */
+export type StagingPreset = 'portrait' | 'rembrandt' | 'upfront' | 'soft' | 'tent';
 /** Quarter-circle cyclorama dimensions, in world units. */
 export interface BackdropShape {
   /** Horizontal width, 0.001..1e4. Default 8. */
@@ -127,12 +131,43 @@ const rigs: Record<StagingPreset, readonly StudioLight[]> = {
     { direction: [1, 0.6, 0.6], width: 1.5, height: 1.3, intensity: 3 },
     { direction: [0, 1, -0.5], width: 1.4, height: 1.1, intensity: 2 },
   ],
+  // A light tent (the diffuse enclosure of product and jewellery photography): six panels 60 degrees apart, each 1.2
+  // rad wide, ring the horizon with soft overlapping edges, so a flat metal face at any heading mirrors a panel. The
+  // front-left panel is brightest and the back ones dimmest, so faces still read as a gradient of form, not one tone.
+  tent: [
+    { direction: [0, 1, 0], width: 1.6, height: 1.6, intensity: 3 },
+    ...[3, 2.2, 1.6, 1.3, 1.6, 2.2].map((intensity, i) => {
+      const a = Math.PI / 4 + (i * Math.PI) / 3;
+      return { direction: [-Math.sin(a), 0.22, Math.cos(a)] as [number, number, number], width: 1.2, height: 0.9, intensity, softness: 0.3 };
+    }),
+  ],
 };
+
+// The room each rig's softboxes hang in (environment/studio floor, walls and ceiling radiance). A tent is white
+// fabric all round, floor included, so a vertical face seen from above mirrors lit cloth instead of a dark floor;
+// the other rigs keep studio's grey room.
+type Rgb = [number, number, number];
+/** The room radiance a staging rig sets in environment/studio (linear RGB); undefined keeps studio's grey room. */
+export interface StagingRoom {
+  floor: Rgb;
+  walls: Rgb;
+  ceiling: Rgb;
+}
+const rooms: Partial<Record<StagingPreset, StagingRoom>> = {
+  tent: { floor: [0.6, 0.6, 0.6], walls: [0.8, 0.8, 0.8], ceiling: [1, 1, 1] },
+};
+
+/** A fresh copy of the named rig's room (floor, walls, ceiling), or undefined for studio's default grey room. */
+export function stagingRoom(preset: StagingPreset): StagingRoom | undefined {
+  stagingLights(preset);
+  const room = rooms[preset];
+  return room && (structuredClone(room) as StagingRoom);
+}
 
 /** Fresh softbox descriptors for the named rig, ready for environment/studio. Default rembrandt. */
 export function stagingLights(preset: StagingPreset = 'rembrandt'): StudioLight[] {
   if (!Object.hasOwn(rigs, preset))
-    throw rangeError('Unknown staging preset; choose portrait, rembrandt, upfront or soft', 'arguments');
+    throw rangeError('Unknown staging preset; choose portrait, rembrandt, upfront, soft or tent', 'arguments');
   return structuredClone(rigs[preset]) as StudioLight[];
 }
 /** Environment preparation settings, with an optional procedural image width. */
@@ -154,5 +189,5 @@ export async function stagingLighting(
     import('@margoengine/environment'),
   ]);
   options.signal?.throwIfAborted();
-  return EnvironmentLighting.load(engine, studio({ width, lights }), settings);
+  return EnvironmentLighting.load(engine, studio({ width, lights, ...stagingRoom(preset) }), settings);
 }

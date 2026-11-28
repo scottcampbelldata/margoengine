@@ -48,6 +48,15 @@ function fakeEngine() {
   };
 }
 
+test('metal swaps the finish metal and keeps its roughness and tint', () => {
+  const copper = cadFinish('machined', { metal: 'copper' });
+  for (let i = 0; i < 3; i++) assert.equal(copper.color[i], METALS.copper.color[i]);
+  assert.equal(copper.roughness, CAD_FINISHES.machined.roughness);
+  const steel = cadFinish('anodised', { metal: 'steel' });
+  for (let i = 0; i < 3; i++) assert.equal(steel.color[i], METALS.steel.color[i] * CAD_FINISHES.anodised.tint[i]);
+  assert.deepEqual(cadFinish('machined', { metal: 'castIron' }).color, cadFinish('cast').color);
+  assert.throws(() => cadFinish('machined', { metal: 'unobtainium' }), RangeError);
+});
 test('every finish is a measured metal F0 times its tint, metalness 1', () => {
   for (const [name, spec] of Object.entries(CAD_FINISHES)) {
     const preset = cadFinish(name),
@@ -118,4 +127,20 @@ test('bad options throw before anything is made', () => {
   assert.equal(cad.deck, null);
   assert.equal(cad.show(box()).edges, null);
   assert.throws(() => cad.show(fakeEngine().createMesh()), TypeError);
+});
+
+test('mark draws a three-axis cross at a point through the bench lines and removes it once', () => {
+  const cad = CadBench.attach(fakeEngine(), { deck: false, edges: false }),
+    mark = cad.mark([0.01, 0.02, -0.03], { size: 0.005 });
+  assert.equal(mark.line.count, 6);
+  assert.equal(mark.line.segmentCount, 3);
+  const stride = mark.line.points.length / mark.line.count;
+  assert.deepEqual(
+    Array.from({ length: 18 }, (_, i) => +mark.line.points[Math.floor(i / 3) * stride + (i % 3)].toFixed(6)),
+    [0.005, 0.02, -0.03, 0.015, 0.02, -0.03, 0.01, 0.015, -0.03, 0.01, 0.025, -0.03, 0.01, 0.02, -0.035, 0.01, 0.02, -0.025],
+  );
+  mark.remove();
+  mark.remove();
+  assert.throws(() => cad.mark([0, Number.NaN, 0]), RangeError);
+  assert.throws(() => cad.mark([0, 0, 0], { size: 0 }), RangeError);
 });

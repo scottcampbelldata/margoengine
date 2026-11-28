@@ -31,11 +31,23 @@ export interface StagingLightingOptions extends EnvironmentLoadOptions {
     width?: number;
 }
 
-export type StagingPreset = 'portrait' | 'rembrandt' | 'upfront' | 'soft';
+export type StagingPreset = 'portrait' | 'rembrandt' | 'upfront' | 'soft' | 'tent';
+
+export interface StagingRoom {
+    floor: Rgb;
+    walls: Rgb;
+    ceiling: Rgb;
+}
 
 export function backdropGeometry(options?: BackdropShape): Geometry;
 
 export function stagingLighting(engine: EngineKernel, preset?: StagingPreset, options?: StagingLightingOptions): Promise<EnvironmentLighting>;
 
 export function stagingLights(preset?: StagingPreset): StudioLight[];
+
+export function stagingRoom(preset: StagingPreset): StagingRoom | undefined;
+
+// Not exported from this entry, but used by the exports above:
+
+type Rgb = [number, number, number];
 ```

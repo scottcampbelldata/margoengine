@@ -77,9 +77,9 @@ async function open() {
     signal,
     exhibit: document.body,
     camera: { position: [0.62, 0.36, 0.66], target: [0, 0.05, 0], fov: 36, near: 0.01, far: 40 },
-    background: '#4f4c48',
-    environment: { preset: 'soft', intensity: 0.5 },
-    backdrop: { material: { color: '#4a4743' } },
+    environment: { preset: 'tent', intensity: 0.5 },
+    // A cove sized to the bench: its back wall 1.5 m behind the part, so oblique views end on the wall, not past its side.
+    backdrop: { width: 24, depth: 3, height: 3, radius: 0.8, material: { color: '#4a4743' } },
     contact: { size: 0.6, height: 0.14, opacity: 0.6, blur: 0.02, position: [0, plate + 0.0005, 0] },
     ao: true,
     orbit: { minDistance: 0.12, maxDistance: 1.6 },

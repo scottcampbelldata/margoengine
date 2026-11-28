@@ -17,7 +17,7 @@
 //   line removal", SCCG 2008: depth-biased, coverage-antialiased lines over their own faces.
 // - Metal F0 values: @margoengine/materials/presets (measured complex indices; each row cites its source).
 import { box, PbrMaterial, type EngineKernel, type Geometry, type Mesh } from '@margoengine/core';
-import { LineMaterial, Lines, type Line } from '@margoengine/lines';
+import { Line, LineMaterial, Lines } from '@margoengine/lines';
 import { EdgesHelper } from '@margoengine/lines/edges';
 import { castIron, metal, surface, type MaterialPreset, type MetalName } from '@margoengine/materials/presets';
 
@@ -97,6 +97,8 @@ export interface CadBenchOptions {
 export interface CadShowOptions {
   /** Default 'machined'. */
   finish?: CadFinish;
+  /** Measured metal replacing the finish's (machined steel, cut copper); 'castIron' for scaled iron. Default the finish's. */
+  metal?: MetalName | 'castIron';
   /** Linear [r, g, b] or `#rrggbb` replacing the finish's tint on the metal F0 (an anodising dye, say). */
   tint?: string | Vec3;
   /** Replaces the finish's roughness, 0..1. */
@@ -105,6 +107,22 @@ export interface CadShowOptions {
   edges?: CadEdgeOptions | boolean;
   /** Cast shadows through the bench's `casters`. Default true. */
   shadow?: boolean;
+}
+
+/** {@link CadBench.mark} options. */
+export interface CadMarkOptions {
+  /** Arm length of the cross in metres, each way from the point. Default 0.008. */
+  size?: number;
+  /** Colour, `#rgb`/`#rrggbb` or linear [r, g, b]. Default '#d2302a', a witness-mark red. */
+  color?: string | Vec3;
+  /** Width in CSS pixels. Default 2. */
+  width?: number;
+}
+/** A point marked on the bench. */
+export interface CadMark {
+  readonly line: Line;
+  /** Takes the mark off. Safe to repeat. */
+  remove(): void;
 }
 
 /** A part on the bench. */
@@ -136,18 +154,20 @@ function rgb(value: string | Vec3, what: string): [number, number, number] {
 }
 
 /**
- * The PbrMaterial options of a finish: the metal's measured F0 times the tint, metalness 1.
- * @throws RangeError for an unknown finish or a roughness outside 0..1; TypeError for a malformed tint.
+ * The PbrMaterial options of a finish: the metal's measured F0 times the tint, metalness 1. `metal` swaps the finish's
+ * metal and keeps its roughness and tint: `cadFinish('machined', { metal: 'copper' })`.
+ * @throws RangeError for an unknown finish or metal or a roughness outside 0..1; TypeError for a malformed tint.
  */
 export function cadFinish(
   finish: CadFinish,
-  { tint, roughness }: Pick<CadShowOptions, 'tint' | 'roughness'> = {},
+  { tint, roughness, metal: name }: Pick<CadShowOptions, 'tint' | 'roughness' | 'metal'> = {},
 ): MaterialPreset {
   const spec = Object.prototype.hasOwnProperty.call(CAD_FINISHES, finish) ? CAD_FINISHES[finish] : undefined;
   if (!spec) throw new RangeError(`Unknown finish '${String(finish)}'; pass machined, cast, anodised or cut`);
   const r = roughness ?? spec.roughness;
   if (!(r >= 0 && r <= 1)) throw new RangeError(`roughness must be 0 to 1, got ${r}`);
-  const base = spec.metal === 'castIron' ? castIron : metal(spec.metal),
+  const which = name ?? spec.metal,
+    base = which === 'castIron' ? castIron : metal(which),
     t = tint === undefined ? spec.tint : rgb(tint, 'tint');
   return Object.freeze({
     color: Object.freeze([base.color[0] * t[0], base.color[1] * t[1], base.color[2] * t[2]] as const),
@@ -217,7 +237,7 @@ export class CadBench {
   }
 
   /** A finish's material, shared by every part with the same finish, tint and roughness. */
-  material(finish: CadFinish, options: Pick<CadShowOptions, 'tint' | 'roughness'> = {}): PbrMaterial {
+  material(finish: CadFinish, options: Pick<CadShowOptions, 'tint' | 'roughness' | 'metal'> = {}): PbrMaterial {
     const preset = cadFinish(finish, options),
       key = `${preset.color.join(',')}|${preset.roughness}`;
     let value = this.materials.get(key);
@@ -292,6 +312,40 @@ export class CadBench {
       };
     parts.add(part);
     return part;
+  }
+
+  /**
+   * Marks a point (a centre of mass, a datum, a probe hit) with a three-axis cross drawn through the bench's Lines.
+   * @throws RangeError for a non-finite point or a size or width that is not positive.
+   * @example const mark = cad.mark([0, 0.02, 0]); // later: mark.remove()
+   */
+  mark(point: Vec3, { size = 0.008, color = '#d2302a', width = 2 }: CadMarkOptions = {}): CadMark {
+    if (this.disposed) throw new TypeError('This CadBench is disposed');
+    if (!Array.isArray(point) || point.length !== 3 || !point.every(Number.isFinite))
+      throw new RangeError('mark needs a finite [x, y, z] point');
+    if (!(size > 0 && Number.isFinite(size))) throw new RangeError('Mark size must be positive');
+    if (!(width > 0 && width <= 64)) throw new RangeError('Mark width must be above 0 and at most 64 pixels');
+    const [x, y, z] = point,
+      line = new Line({
+        mode: 'segments',
+        positions: [x - size, y, z, x + size, y, z, x, y - size, z, x, y + size, z, x, y, z - size, x, y, z + size],
+        material: new LineMaterial({
+          color: typeof color === 'string' ? color : rgb(color, 'mark colour'),
+          width,
+          depthBias: EDGE_DEFAULTS.depthBias,
+        }),
+      });
+    this.lines.add(line);
+    const lines = this.lines;
+    let removed = false;
+    return {
+      line,
+      remove() {
+        if (removed) return;
+        removed = true;
+        lines.remove(line);
+      },
+    };
   }
 
   /** The parts on the bench, in the order shown. */

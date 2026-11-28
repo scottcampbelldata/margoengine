@@ -280,7 +280,7 @@ interface Settings {
     tint: readonly number[];
 }
 
-type StagingPreset = 'portrait' | 'rembrandt' | 'upfront' | 'soft';
+type StagingPreset = 'portrait' | 'rembrandt' | 'upfront' | 'soft' | 'tent';
 
 type Vec3 = readonly [number, number, number];
 ```

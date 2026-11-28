@@ -412,6 +412,20 @@ const spin = bench.frame((delta) => product.setRotation([0, (turn += delta * 0.5
 | `orbit` | false | `true` or `{target, minDistance, maxDistance, damping}` |
 | `exhibit`, `signal`, `onResize`, `onError` | canvas, none | where the signals go, cancellation, callbacks |
 
+Staging rigs (`@margoengine/studio/backdrop` `stagingLights`, `stagingRoom`, `stagingLighting`): `'portrait'`,
+`'rembrandt'`, `'upfront'` and `'soft'` hang three softboxes in studio's grey room. `'tent'` is a product light tent
+for metal and other mirror-like parts: six panels 60 degrees apart ring the horizon under a large overhead box, in a
+white room (floor 0.6, walls 0.8, ceiling 1), so a flat metal face at any heading, seen from any height, mirrors lit
+cloth instead of a dark wall or floor. Under `'soft'` the same face reads near black.
+
+```ts
+import {stagingLights, stagingRoom} from 'margoengine/studio/backdrop';
+const lights = stagingLights('tent'); // 7 softboxes: overhead and the six-panel ring
+const room = stagingRoom('tent'); // {floor, walls, ceiling}; undefined for the other rigs
+console.log(lights.length, room?.floor);
+// With a bench: openBench(canvas, {environment: {preset: 'tent', intensity: 0.5}})
+```
+
 `bench.frame(callback)` runs `callback(delta, time)` before every frame until its remover runs; `bench.request()`
 draws one frame on the next animation frame (requests merge); `bench.render()` draws now and resolves when the GPU
 finished; `bench.add(mesh, {shadow, contact, static, fit})` registers a caster with both shadows and makes it part of the

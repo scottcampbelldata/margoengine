@@ -175,7 +175,13 @@ Edge defaults: `angle` 30, `width` 1.25 CSS px, `color` '#0c1013', `opacity` 0.8
 `size` [0.42, 0.3] m, `thickness` 0.04, `top` the thickness (the plate rests on studio/bench's floor at y 0; parts rest
 on `cad.deckTop`), `center` [0, 0]. `casters` takes anything with `add(mesh)`, such as
 studio/bench's `openBench` result, so shown parts cast its shadows. The bench stages nothing else: open the engine,
-lights, shadows and backdrop with `openBench`.
+lights, shadows and backdrop with `openBench`; its `'tent'` environment preset (studio/backdrop) lights flat metal
+faces from every heading.
+
+`show(mesh, { metal })` swaps the finish's metal for any measured one in `@margoengine/materials/presets` (or
+`'castIron'`) and keeps the finish's roughness and tint: a machined copper or steel part. `cad.mark(point, { size,
+color, width })` draws a three-axis cross at a point through the bench's lines (defaults 0.008 m, '#d2302a', 2 px), for
+a centre of mass, a datum or a probe hit; `mark.remove()` takes it off.
 
 ```ts
 import { box } from 'margoengine/core';
@@ -185,11 +191,15 @@ import { CadBench } from 'margoengine/machinery/bench';
 const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
 const bench = await openBench(canvas, {
   camera: { position: [0.3, 0.2, 0.38], target: [0, 0.03, 0], fov: 35, near: 0.01, far: 20 },
+  environment: { preset: 'tent', intensity: 0.5 },
   contact: false,
 });
 const cad = CadBench.attach(bench.engine, { deck: { size: [0.42, 0.3] }, casters: bench });
 cad.show(box(0.12, 0.06, 0.08), { finish: 'anodised' }).mesh.setPosition([0, cad.deckTop + 0.03, 0]);
+cad.show(box(0.04, 0.02, 0.04), { finish: 'machined', metal: 'copper' }).mesh.setPosition([0.1, cad.deckTop + 0.01, 0]);
+const centre = cad.mark([0, cad.deckTop + 0.061, 0]); // on the anodised block's top face
 await bench.ready();
+centre.remove();
 ```
 
 The demo solids travel as GLB: a build script meshes the B-rep body, writes it with `exportGLB` and

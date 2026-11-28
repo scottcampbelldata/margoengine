@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Backdrop, backdropGeometry, stagingLights, stagingLighting } from '../dist/backdrop.js';
+import { Backdrop, backdropGeometry, stagingLights, stagingLighting, stagingRoom } from '../dist/backdrop.js';
 test('cyclorama has a tangent circular bend, unit analytic normals and front-facing triangles', () => {
   const g = backdropGeometry(),
     v = g.vertices;
@@ -59,6 +59,40 @@ test('each named rig owns fresh lights and has distinct key/fill/softness; cance
   assert(stagingLights('soft')[0].width > stagingLights('portrait')[0].width);
   assert.throws(() => stagingLights('__proto__'), RangeError);
   await assert.rejects(stagingLighting({}, 'portrait', { signal: AbortSignal.abort() }), { name: 'AbortError' });
+});
+test('the tent rig rings the horizon: a vertical mirror at any heading reflects a lit panel, not the room', async () => {
+  // Regression: under 'soft' a flat metal face turned away from its three boxes mirrored the walls (0.3) and read
+  // near black on the CAD bench. The tent's panels light every heading to well above the walls.
+  const { studio } = await import('@margoengine/environment/studio');
+  const lights = stagingLights('tent'),
+    width = 256,
+    height = width / 2,
+    image = studio({ width, lights, ...stagingRoom('tent') });
+  assert.equal(lights.length, 7);
+  assert.equal(stagingRoom('soft'), undefined);
+  stagingRoom('tent').floor[0] = 9;
+  assert.equal(stagingRoom('tent').floor[0], 0.6);
+  const at = (azimuth, elevation) => {
+    // Equirect: column by azimuth, row 0 at the top (elevation PI / 2).
+    const x = Math.min(width - 1, Math.floor((((azimuth / (2 * Math.PI)) % 1) + 1) % 1 * width)),
+      y = Math.min(height - 1, Math.floor((0.5 - elevation / Math.PI) * height));
+    return image.data[(y * width + x) * 4];
+  };
+  let low = Infinity,
+    high = 0;
+  for (let deg = 0; deg < 360; deg += 5)
+    for (const elevation of [-0.5, -0.2, 0.05, 0.2, 0.4]) {
+      const v = at((deg * Math.PI) / 180, elevation);
+      low = Math.min(low, v);
+      high = Math.max(high, v);
+    }
+  // Below the horizon a vertical face seen from above mirrors the tent's white floor (0.6), not a dark one.
+  assert(low >= 0.6, `darkest heading ${low}`);
+  assert(high > 2 * low, `the panels keep a gradient (${low} to ${high})`);
+  const soft = studio({ width, lights: stagingLights('soft') });
+  let softLow = Infinity;
+  for (let x = 0; x < width; x += 4) softLow = Math.min(softLow, soft.data[(Math.floor(0.45 * height) * width + x) * 4]);
+  assert(softLow < 0.5, `soft leaves headings on the bare walls (${softLow})`);
 });
 test('backdrop is an ordinary owned mesh and using cleanup is idempotent', () => {
   const mesh = {

@@ -16,8 +16,9 @@ export class CadBench {
     readonly lines: Lines;
     static attach(engine: EngineKernel, options?: CadBenchOptions): CadBench;
     private constructor();
-    material(finish: CadFinish, options?: Pick<CadShowOptions, 'tint' | 'roughness'>): PbrMaterial;
+    material(finish: CadFinish, options?: Pick<CadShowOptions, 'tint' | 'roughness' | 'metal'>): PbrMaterial;
     show(source: Mesh | Geometry, options?: CadShowOptions): CadPart;
+    mark(point: Vec3, { size, color, width }?: CadMarkOptions): CadMark;
     get shown(): readonly CadPart[];
     dispose(): void;
     [Symbol.dispose](): void;
@@ -62,6 +63,17 @@ export interface CadFinishSpec {
     readonly tint: Vec3;
 }
 
+export interface CadMark {
+    readonly line: Line;
+    remove(): void;
+}
+
+export interface CadMarkOptions {
+    size?: number;
+    color?: string | Vec3;
+    width?: number;
+}
+
 export interface CadPart {
     readonly mesh: Mesh;
     readonly finish: CadFinish;
@@ -73,13 +85,14 @@ export interface CadPart {
 
 export interface CadShowOptions {
     finish?: CadFinish;
+    metal?: MetalName | 'castIron';
     tint?: string | Vec3;
     roughness?: number;
     edges?: CadEdgeOptions | boolean;
     shadow?: boolean;
 }
 
-export function cadFinish(finish: CadFinish, { tint, roughness }?: Pick<CadShowOptions, 'tint' | 'roughness'>): MaterialPreset;
+export function cadFinish(finish: CadFinish, { tint, roughness, metal: name }?: Pick<CadShowOptions, 'tint' | 'roughness' | 'metal'>): MaterialPreset;
 
 // Not exported from this entry, but used by the exports above:
 
