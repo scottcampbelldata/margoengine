@@ -1404,6 +1404,15 @@ failing test on `main` (KB-SOFT-SPLITDENSITY1).
   9. Fix the stale number in `docs/limits.md` (2,907 changed pixels; the run measures 3,022).
   10. Close the named film rows LH-5, OPENING-NIGHT-9 and HORSE-1, still OPEN in the demo review.
 
+#### SOFT-03 four-point pass
+
+- Point 5 (2d3a281145). `packages/physics/tests/coupling/strands.test.js` checks the owned-memory and signed-cell contract through a live rigid coupling with nonzero swept impulse. A malformed layout, unaligned port or invalid duration retains exact accepted bytes and the native receipt. Valid borrowed rows replay exactly in both memories.
+- Point 6 (2d3a281145). `packages/physics/tests/coupling/strand-workers.test.js` and `packages/physics/tests/strand-workers.browser.mjs` check independent SIMD point prediction with 1, 2 and 4 participants in plain and shared worlds. One case has 1,025 guides and 3,075 points, and another has 1,193 guides and 5,965 points. The larger case visits 3,578 paired moving points. Centreline, frames and reciprocal rigid reactions repeat exactly across thread counts and restore.
+- Point 7 (2d3a281145). `packages/physics/tests/strand-film.browser.mjs` drives the weighted bay horse with a registered signed ATMO-02 gust. All 58 guide rows agree with skin joint transforms. Tail, mane and forelock tips move 7.2, 5.7 and 12.9 cm against the still-air take. A separate signed crossflow probe gives its analytic 0.948 mm. Both renderers replay complete accepted state and RGBA. The original 720-point renderer check recorded 2,907 changed pixels on both backends in the workstation rerun.
+- Point 8 (2d3a281145). `packages/physics/scripts/soft03-strand-measured.mjs` scores independent Akanda et al. single-fibre bending without fitting to the four measured values. The default modulus underpredicts all four by 1.86–5.74 µm. The model gives quasistatic results and film-clump motion remains open. [Measured bounds](limits.md#soft-03-measured-single-hair-bending)
+
+Superhelices, calibrated moving clumps and horse bundles, guide interpolation, production shot wiring and additional reciprocal media remain open. The row stays REOPENED at four points.
+
 ### SOFT-04 volumetric solids (landed a0de32ed1b): REOPENED
 
 - **Checked:** a0de32ed1b, 07a8b6b82 and the history behind them from b3a3d3a6e to 84a2a1985. CPU (four `volumetric-*.test.js` files, `soft-cells.test.js`, `world-soft-solver.test.js`): 96 pass, **1 fail** on `main`: `soft-cells.test.js` "a cloth torn in two becomes two cloths" throws "A trimesh with a mass or a density must be a closed surface" (KB-SOFT-SPLITDENSITY1). `test:browser:volumetric-solids` passes on WebGPU (0 WGSL errors); the script has no compatibility-layer run.
