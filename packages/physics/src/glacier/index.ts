@@ -1,4 +1,3 @@
-import { MargoError } from '@margoengine/math/errors';
 import type {
   FieldDescriptor,
   Port,
@@ -9,7 +8,16 @@ import type {
   StepContext,
 } from '../world/solver.js';
 import { DYNAMIC_BASE, MAX_MEMORY_PAGES, STACK_BYTES } from '../world/memory.js';
-import { bindGlacierKernel, type GlacierBuilds, type GlacierKernel, loadGlacierBuilds } from './kernel.js';
+import { glacierError } from './errors.js';
+import {
+  bindGlacierKernel,
+  type GlacierBuilds,
+  type GlacierKernel,
+  type GlacierWorkCounts,
+  loadGlacierBuilds,
+} from './kernel.js';
+
+export type { GlacierWorkCounts, GlacierWorkerWork } from './kernel.js';
 
 /** Glacier registry ports use x-fast layout-1 f64 cells. */
 export const GLACIER_FIELD_LAYOUT = 1;
@@ -55,6 +63,8 @@ export interface GlacierOptions {
 export interface GlacierLoadOptions {
   /** Solver ID and field prefix. Defaults to 'glacier'. */
   readonly id?: string;
+  /** Native participants, including the calling thread. Use 1 (default), 2 or 4. */
+  readonly threads?: 1 | 2 | 4;
   /** Cancels loading with the signal's reason. */
   readonly signal?: AbortSignal;
 }
@@ -98,7 +108,6 @@ const GRAPH_COLUMNS = 3;
 const BUDGET_WORDS = 4;
 const F64 = Float64Array.BYTES_PER_ELEMENT;
 const U32 = Uint32Array.BYTES_PER_ELEMENT;
-const CENTRE = [0, 0, 0] as const;
 
 interface Geometry {
   readonly nx: number;
@@ -109,6 +118,7 @@ interface Geometry {
 }
 
 interface GlacierState {
+  readonly host: SolverHost;
   readonly memory: WebAssembly.Memory;
   readonly kernel: GlacierKernel;
   readonly grid: Geometry;
@@ -132,15 +142,13 @@ function words(memory: WebAssembly.Memory, region: Region): Float64Array {
 
 function finite(name: string, value: number, minimum = -Infinity): number {
   if (!Number.isFinite(value) || value < minimum)
-    throw new RangeError(
-      `Invalid glacier ${name}; use a finite value${minimum === -Infinity ? '' : ` >= ${minimum}`}.`,
-    );
+    throw glacierError(`Invalid glacier ${name}; use a finite value${minimum === -Infinity ? '' : ` >= ${minimum}`}.`);
   return value;
 }
 
 function positive(name: string, value: number): number {
   if (!(Number.isFinite(value) && value > 0))
-    throw new RangeError(`Invalid glacier ${name}; use a finite positive value in the documented unit.`);
+    throw glacierError(`Invalid glacier ${name}; use a finite positive value in the documented unit.`);
   return value;
 }
 
@@ -148,23 +156,23 @@ function geometry(options: GlacierOptions): Geometry {
   const { nx, nz } = options;
   const cells = nx * nz;
   if (!Number.isSafeInteger(nx) || nx <= 0 || !Number.isSafeInteger(nz) || nz <= 0 || !Number.isSafeInteger(cells))
-    throw new RangeError('Invalid glacier grid; pass positive integer dimensions with a representable product.');
+    throw glacierError('Invalid glacier grid; pass positive integer dimensions with a representable product.');
   const dx = positive('dx', options.dx);
   const dz = positive('dz', options.dz ?? dx);
   positive('cell area', dx * dz);
   positive('squared cell diagonal', dx * dx + dz * dz);
   if (dx * dx === 0 || dz * dz === 0)
-    throw new RangeError('Glacier cells are smaller than representable; use practical metre-scale grid spacing.');
+    throw glacierError('Glacier cells are smaller than representable; use practical metre-scale grid spacing.');
   const arenaBytes = (INPUT_COLUMNS + 2 * STATE_COLUMNS + WORK_COLUMNS) * F64 + GRAPH_COLUMNS * U32;
   if (cells * arenaBytes + DYNAMIC_BASE + STACK_BYTES + 2 * BUDGET_WORDS * F64 + 10 * F64 > MAX_MEMORY_PAGES * 65536)
-    throw new RangeError('Glacier grid exceeds wasm32 memory; use fewer cells or a wider grid spacing.');
+    throw glacierError('Glacier grid exceeds wasm32 memory; use fewer cells or a wider grid spacing.');
   return { nx, nz, dx, dz, cells };
 }
 
 function column(name: string, input: number | ArrayLike<number> | undefined, count: number, min: number): Float64Array {
   if (input === undefined || typeof input === 'number')
     return new Float64Array(count).fill(finite(name, input ?? 0, min));
-  if (input?.length !== count) throw new RangeError(`Invalid glacier ${name}; supply one value per grid cell.`);
+  if (input?.length !== count) throw glacierError(`Invalid glacier ${name}; supply one value per grid cell.`);
   return Float64Array.from(input, (value) => finite(name, value, min));
 }
 
@@ -175,10 +183,9 @@ function portion(region: Region, name: string, offset: number, length: number): 
 function evolve(state: GlacierState, dt: number): void {
   const { memory, kernel, grid, config, values, next, parameters, work, graph } = state;
   const [, , dx, dz, gravity, softness, ice, water, sea, timeScale] = words(memory, config);
+  finite('world tick length', dt, 0);
   const simulated = finite('simulated tick length', dt * timeScale!, 0);
-  const scratch = words(memory, next);
-  const destination = words(memory, values);
-  scratch.set(destination);
+  words(memory, next).set(words(memory, values));
   const result = kernel.glacier_step(
     next.byteOffset,
     parameters.byteOffset,
@@ -197,10 +204,13 @@ function evolve(state: GlacierState, dt: number): void {
     dt,
   );
   if (result === 1)
-    throw new MargoError('failed', 'Glacier flow did not converge; reduce timeScale or increase grid spacing.');
+    throw glacierError('Glacier flow did not converge; reduce timeScale or increase grid spacing.', 'failed');
   if (result !== 0)
-    throw new RangeError('Glacier state exceeded numeric range; reduce forcing, topographic span, or timeScale.');
-  destination.set(scratch);
+    throw glacierError(
+      'Glacier state exceeded numeric range; reduce forcing, topographic span, or timeScale.',
+      'failed',
+    );
+  words(memory, values).set(words(memory, next));
 }
 
 /** Conservative shallow-ice flow, first-order calving and icefall, and meltwater drainage. */
@@ -208,6 +218,8 @@ export class GlacierSolver implements Solver<GlacierOptions> {
   readonly #id: string;
   readonly #builds: GlacierBuilds;
   #data: GlacierState | undefined;
+  #nativeWork: GlacierWorkCounts | undefined;
+  #disposed = false;
 
   /** One f64 thickness per cell in metres. */
   readonly thicknessField: FieldDescriptor;
@@ -246,10 +258,18 @@ export class GlacierSolver implements Solver<GlacierOptions> {
 
   /** Loads the plain and, where supported, shared-memory SIMD kernels. */
   static async load(options: GlacierLoadOptions = {}): Promise<GlacierSolver> {
+    if (!options) throw glacierError('Invalid glacier load options; pass an options object or omit it.');
     const id = options.id ?? 'glacier';
     if (typeof id !== 'string' || id.trim() === '' || id.trim() !== id)
-      throw new RangeError('Invalid glacier solver ID; pass a nonempty identifier without outer whitespace.');
-    return new GlacierSolver(id, await loadGlacierBuilds(options.signal));
+      throw glacierError('Invalid glacier solver ID; pass a nonempty identifier without outer whitespace.');
+    return new GlacierSolver(id, await loadGlacierBuilds(options.signal, options.threads));
+  }
+
+  /** Releases any optional helper threads after the world stops using this solver. */
+  [Symbol.dispose](): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    this.#builds[Symbol.dispose]();
   }
 
   /** Declares six field writes at the world base rate of 60 Hz. */
@@ -264,9 +284,20 @@ export class GlacierSolver implements Solver<GlacierOptions> {
 
   /** Initializes and copies the caller's grid into world-owned memory. */
   init(host: SolverHost, options: GlacierOptions): void {
+    if (this.#disposed) throw glacierError('The glacier solver was disposed; load a new instance.', 'disposed');
     if (this.#data)
-      throw new MargoError('attached', 'GlacierSolver already has a world; load a fresh solver to attach again.');
-    if (!options?.bed) throw new RangeError('GlacierSolver needs bed elevations; pass a cell-centred bed grid.');
+      throw glacierError('GlacierSolver already has a world; load a fresh solver to attach again.', 'attached');
+    try {
+      this.#initialize(host, options);
+    } catch (cause) {
+      if (this.#builds.pool) this[Symbol.dispose]();
+      throw cause;
+    }
+  }
+
+  #initialize(host: SolverHost, options: GlacierOptions): void {
+    if (options?.bed == null || typeof options.bed === 'number')
+      throw glacierError('GlacierSolver needs bed elevations; pass a cell-centred bed grid.');
     const grid = geometry(options);
     const n = grid.cells;
     const material = {
@@ -278,7 +309,7 @@ export class GlacierSolver implements Solver<GlacierOptions> {
       timeScale: finite('timeScale', options.timeScale ?? 1, 0),
     };
     if (!(material.water > material.ice))
-      throw new RangeError(
+      throw glacierError(
         'Glacier ice cannot float in the given fluid; use a water density greater than the ice density.',
       );
     const stress = positive('ice weight density', material.gravity * material.ice);
@@ -292,15 +323,15 @@ export class GlacierSolver implements Solver<GlacierOptions> {
     for (let i = 0; i < n; i++) {
       const mode = boundary[i];
       if (mode !== 0 && mode !== 1 && mode !== 2)
-        throw new RangeError(
+        throw glacierError(
           'Invalid glacier boundary class; use 0 for ground, 1 for open water, or 2 for a dry cliff receiver.',
         );
       if (mode !== 0 && (thickness[i] !== 0 || snow[i] !== 0))
-        throw new RangeError(
+        throw glacierError(
           'Glacier receivers cannot carry grounded ice; set their thickness and accumulation to zero.',
         );
       if (mode === 1 && bed[i]! >= material.sea)
-        throw new RangeError('Glacier open-water cells need a submerged bed; lower the bed or change the cell class.');
+        throw glacierError('Glacier open-water cells need a submerged bed; lower the bed or change the cell class.');
     }
     const kernel = bindGlacierKernel(host, this.#builds);
     const allocate = (name: string, count: number) =>
@@ -320,6 +351,7 @@ export class GlacierSolver implements Solver<GlacierOptions> {
     for (const [i, input] of [bed, snow, melt, water, boundary].entries()) packed.set(input, i * n);
     words(memory, values).set(thickness);
     const state = {
+      host,
       memory,
       kernel,
       grid,
@@ -338,7 +370,15 @@ export class GlacierSolver implements Solver<GlacierOptions> {
 
   /** Advances one dyadic tick and publishes its drain and fracture releases. */
   step(_context: StepContext, dt: number): void {
-    evolve(this.#state(), dt);
+    const state = this.#state();
+    evolve(state, dt);
+    this.#nativeWork = state.kernel.workCounts();
+  }
+
+  /** Copies work counts for the last accepted native step. */
+  readNativeWork(): GlacierWorkCounts | undefined {
+    const work = this.#nativeWork;
+    return work && { ...work, workers: work.workers.map((worker) => ({ ...worker })) };
   }
 
   /** The supplied boundary and climate are local inputs. */
@@ -346,7 +386,9 @@ export class GlacierSolver implements Solver<GlacierOptions> {
 
   /** Publishes the layout-1 cell arrays at the given tick. */
   exportPorts(tick: number): readonly Port[] {
-    return this.#state().outputs.map((region) => ({ field: region.name, region, tick, cell: CENTRE }));
+    const { host, outputs } = this.#state();
+    const cell = host.cell;
+    return outputs.map((region) => ({ field: region.name, region, tick, cell }));
   }
 
   /** Region handles for repeatable snapshot and restore. */
@@ -364,7 +406,7 @@ export class GlacierSolver implements Solver<GlacierOptions> {
     const { memory, grid, parameters, values } = this.#state();
     const { nx, nz, cells: n } = grid;
     if (!Number.isInteger(x) || x < 0 || x >= nx || !Number.isInteger(z) || z < 0 || z >= nz)
-      throw new RangeError('Glacier sample is outside the grid; use integer column and row indices inside the extent.');
+      throw glacierError('Glacier sample is outside the grid; use integer column and row indices inside the extent.');
     const i = z * nx + x;
     const data = words(memory, values);
     const thickness = data[i]!;
@@ -387,9 +429,14 @@ export class GlacierSolver implements Solver<GlacierOptions> {
     const area = options[2]! * options[3]!;
     let thickness = 0;
     for (let i = 0; i < grid.cells; i++) thickness += data[i]!;
+    let ice = thickness * area;
+    if (!Number.isFinite(thickness)) {
+      ice = 0;
+      for (let i = 0; i < grid.cells; i++) ice += data[i]! * area;
+    }
     const start = STATE_COLUMNS * grid.cells;
     return {
-      ice: thickness * area,
+      ice,
       accumulation: data[start]!,
       melted: data[start + 1]!,
       calved: data[start + 2]!,
@@ -398,8 +445,9 @@ export class GlacierSolver implements Solver<GlacierOptions> {
   }
 
   #state(): GlacierState {
+    if (this.#disposed) throw glacierError('The glacier solver was disposed; load a new instance.', 'disposed');
     if (!this.#data)
-      throw new MargoError('failed', 'GlacierSolver has no grid; add it to a PhysicsWorld with bed elevations first.');
+      throw glacierError('GlacierSolver has no grid; add it to a PhysicsWorld with bed elevations first.');
     return this.#data;
   }
 }

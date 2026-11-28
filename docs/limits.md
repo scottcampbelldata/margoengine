@@ -10157,12 +10157,26 @@ residual norm target of √(f64 machine epsilon). The initial residual is evalua
 in surface elevation. Limit accelerated time steps for accuracy on steep or rapidly evolving terrain.
 D8 drains each source to an outlet or local depression during the same tick. It represents no
 routing delay, subglacial storage or lake spill. Discharge is in m³ per world second even if the ice
-runs on accelerated physical time.
+runs on accelerated physical time. A failed tick leaves its published banks and cumulative budget at their
+last accepted values.
 
-The optional entry is 3,519 B min+gzip with a 3,775 B ceiling. Plain and shared Wasm are 15,437 B
-and 15,525 B raw, or 6,189 B and 6,250 B gzip. A solver reserves 260 B of arena and scratch per cell,
-144 B of fixed config and budget, and a 64 KiB instance stack. Core and stage together stay at
-24,820 B gzip.
+An independent borehole comparison at Athabasca gives 75.99 m/yr depth-mean downslope flow against
+49.6 m/yr measured. The model's geometry sensitivity is 60.47–94.67 m/yr. At Insunnguata Sermia the
+nominal modeled no-slip surface deformation is 19.46 m/yr against the borehole estimate of 4.6
+[0.4, 10.8] m/yr. The published GPS surface speed is 114.8 m/yr with 110.2 m/yr attributed to
+basal sliding. The model's geometry sensitivity is 9.42–34.93 m/yr for deformation. The two checks
+use independent thickness and surface-slope observations and the default ice softness. They show where a
+grounded, isothermal no-slip strip loses accuracy under strong lateral stress, depth-varying ice
+temperature or basal sliding. [Raymond (1971)](https://doi.org/10.3189/S0022143000012995).
+[Maier et al. (2019)](https://doi.org/10.1126/sciadv.aaw5406).
+
+The optional entry is 5,930 B min+gzip with a 6,186 B ceiling. Plain and shared Wasm are 17,775 B
+and 17,863 B raw, or 7,305 B and 7,371 B gzip. A solver reserves 260 B of arena and scratch per cell,
+144 B of fixed config and budget, 104 B of native job data, 40 B of work receipt and a 64 KiB aligned
+stack for each participant. With helpers, the control words add 4 B per helper and 20 B of fixed
+storage. Worker jobs are partitioned by cell. The caller assembles and solves the grid, applies
+ordered face transfers, then routes meltwater and accepts the complete result. Core and stage
+receive zero bytes.
 
 ### Ground animal locomotion (LIFE-02)
 

@@ -537,3 +537,13 @@ Not in the catalog: staged construction (placement of pieces, stacking, scaffold
 
 - `packages/water/test/iceberg-film.browser.mjs` renders accepted cuboid pose and its registered WakeSolver response in the same fixed camera. The control repeats the accepted iceberg motion with the wake disconnected. A far gauge rises by 11.99 cm only with the live connection. Both renderers individually replay complete accepted snapshots and full frames.
 - The scene uses an unscaled idealized basin and one-way linear wave response. Original site shots and measured wave amplitude remain open.
+
+### ICE-02 automated tidewater calving and wake
+
+- `packages/water/test/glacier-calving-film.browser.mjs` reads accepted glacier thickness and registered marine release,
+  then runs ICE-03 and WakeSolver in the same fixed-camera scene. The grounded 3 × 3 m front releases 36.450 m³ of ice.
+  Water agrees with accepted gauge elevations within 20 µm. The gauge 5.5 m from release rises 16.44 cm at 3 s.
+- Closing the marine boundary retains the front and keeps the water flat. Muting the displayed wake while preserving
+  accepted ice isolates the water pixels. WebGPU and WebGL2 each reproduce complete accepted snapshots and RGBA buffers
+  through hold, restore, re-advance and rewind. The scene represents idealized whole-cell calving and a linear outgoing wake.
+  Measured terminus evolution and the original production shots remain open.

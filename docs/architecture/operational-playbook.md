@@ -12317,3 +12317,7 @@ ground in view, and `contact: false`, `relief: false` and `groundCover: false` e
 `packages/scatter/test/clearing-map.browser.mjs` and `contact.browser.mjs` hold the heights, drop rule, reach and crown
 shade to their formulas. Missing evidence: no timing of the five map reads or of the relief bake (speed is deferred; the
 bake's work count is in docs/limits.md). A default changed here changes every BiomeView film, whose stills need review.
+
+### ICE-02 native face conductance and fracture
+
+The glacier kernel joins disjoint paired face-conductance rows before the ordered implicit solve. It joins the separate per-column fracture phase before cumulative ice release and drainage. Native snapshots agree across one, two and four participants and the previous executable assets. All six accepted ports carry the current signed origin. A failed numeric trial preserves published values and work receipts. Local field comparisons record the missing lateral stress, basal sliding and temperature effects.

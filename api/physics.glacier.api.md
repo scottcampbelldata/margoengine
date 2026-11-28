@@ -17,6 +17,7 @@ export interface GlacierBudget {
 
 export interface GlacierLoadOptions {
     readonly id?: string;
+    readonly threads?: 1 | 2 | 4;
     readonly signal?: AbortSignal;
 }
 
@@ -57,15 +58,30 @@ export class GlacierSolver implements Solver<GlacierOptions> {
     readonly velocityField: FieldDescriptor;
     private constructor();
     static load(options?: GlacierLoadOptions): Promise<GlacierSolver>;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, options: GlacierOptions): void;
     step(_context: StepContext, dt: number): void;
+    readNativeWork(): GlacierWorkCounts | undefined;
     importPorts(_tick: number): void;
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
     sample(x: number, z: number): GlacierSample;
     get budget(): GlacierBudget;
+}
+
+export interface GlacierWorkCounts extends GlacierWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly GlacierWorkerWork[];
+}
+
+export interface GlacierWorkerWork {
+    readonly weightsRows: number;
+    readonly faceWeights: number;
+    readonly pairedFaceWeights: number;
+    readonly fractureRows: number;
+    readonly crevasseRoots: number;
 }
 
 // Not exported from this entry, but used by the exports above:

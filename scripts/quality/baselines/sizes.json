@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22075367,
+  "total": 22077813,
   "history": [
     {
       "date": "2026-10-24",
@@ -15887,6 +15887,12 @@
       "commit": "7b394c5aec",
       "grew": 4,
       "reason": "@margoengine/scatter measures 32053 B gzip (ceiling 31670 -> 33015); @margoengine/scatter/clearing-map measures 1455 B gzip (ceiling none -> 1711); @margoengine/biomes/objects measures 7561 B gzip (ceiling 7340 -> 7817); @margoengine/terrain/ground-contact-settings measures 1182 B gzip (ceiling none -> 1438). Grass opens around trunk and stone feet (a distribute-pass thinning hook in scatter and the lazy clearing-map entry), a crown shades itself (skyOcclusion.crown), live clearing and ground contact slider rows. The hook must sit in scatter's own cull; the rest is already behind separate or lazy entries."
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "ice-02-native-glacier-flow",
+      "reason": "ICE-02 @margoengine/physics/glacier 3484 to 5930 B gzip, ceiling 3740 to 6186 B. The optional entry owns accepted glacier flow, fracture and outlet discharge and the native helper lifecycle. Separate entries would duplicate this staged candidate. Workers compute disjoint face and fracture rows before ordered flux and release reduction. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16771,7 +16777,7 @@
     "@margoengine/physics/flight": 12898,
     "@margoengine/physics/flip": 14295,
     "@margoengine/physics/foam": 14188,
-    "@margoengine/physics/glacier": 3740,
+    "@margoengine/physics/glacier": 6186,
     "@margoengine/physics/gpu-cloth": 15626,
     "@margoengine/physics/granular-flow": 5830,
     "@margoengine/physics/granular-mpm": 6045,

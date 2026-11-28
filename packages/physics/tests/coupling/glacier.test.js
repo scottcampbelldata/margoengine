@@ -115,3 +115,66 @@ test('GlacierSolver: plain and shared kernels give the same hashes after drainag
   shared.advance(90);
   assert.equal(shared.hash(), plain.hash());
 });
+
+test('GlacierSolver rolls back an overflowing candidate and replays restored signed ports after a rebase', async () => {
+  using ice = await GlacierSolver.load();
+  const world = new PhysicsWorld({ rate, memory: worldMemory(false) }).add(ice, {
+    nx: 1,
+    nz: 1,
+    dx: 2,
+    bed: [12],
+    thickness: [100],
+    accumulation: 1,
+    melt: 0.2,
+  });
+  world.setCell('glacier', [-5, 2, 3]);
+  const initial = world.takeSnapshot();
+  const portCells = () => ice.exportPorts(0).map((port) => port.cell);
+  assert.deepEqual(portCells(), Array(6).fill([-5, 2, 3]));
+  const context = { tick: 0, level: 0, seed: 9, cell: [-5, 2, 3], inputs: new Map() };
+  assert.throws(
+    () => ice.step(context, 8e307),
+    (error) =>
+      error.name === 'MargoError' &&
+      error.code === 'failed' &&
+      /numeric range; reduce forcing.*errors#glacier/.test(error.message),
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, initial.bytes);
+  assert.equal(ice.readNativeWork(), undefined);
+  world.advance(4);
+  assert.ok(ice.sample(0, 0).meltwater > 0);
+  assert.ok(ice.budget.accumulation > 0);
+  const accepted = world.takeSnapshot();
+  world.shiftOrigin([7, -2, 1]);
+  assert.deepEqual(portCells(), Array(6).fill([-12, 4, 2]));
+  world.restoreSnapshot(initial.bytes);
+  assert.deepEqual(portCells(), Array(6).fill([-5, 2, 3]));
+  world.advance(4);
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+});
+
+test('GlacierSolver rejects an unrepresentable total ice volume and a negative paused tick with a coded fix', async () => {
+  using oversized = await GlacierSolver.load();
+  const world = new PhysicsWorld({ rate });
+  assert.throws(
+    () => world.add(oversized, { nx: 2, nz: 1, dx: 1e153, bed: [0, 0], thickness: [100, 100] }),
+    (error) => error.code === 'failed' && /numeric range; reduce forcing.*errors#glacier/.test(error.message),
+  );
+  using paused = await GlacierSolver.load();
+  const frozen = new PhysicsWorld({ rate }).add(paused, {
+    nx: 2,
+    nz: 1,
+    dx: 0.5,
+    bed: [0, 0],
+    thickness: [9e307, 9e307],
+    timeScale: 0,
+  });
+  assert.equal(paused.budget.ice, 4.5e307);
+  const state = frozen.takeSnapshot();
+  assert.throws(
+    () => paused.step({ tick: 0, level: 0, seed: 0, cell: [0, 0, 0], inputs: new Map() }, -1),
+    (error) =>
+      error.code === 'state' && /world tick length; use a finite value >= 0.*errors#glacier/.test(error.message),
+  );
+  assert.deepEqual(frozen.takeSnapshot().bytes, state.bytes);
+});

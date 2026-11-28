@@ -16815,6 +16815,18 @@ Manning depth, the momentum-theory Pelton optimum, quadrature of the bellows, an
   failure threshold, while trajectories or damage below a released column belong to separate solvers.
 - John F. O’Callaghan and David M. Mark, [The extraction of drainage networks from digital elevation data](https://doi.org/10.1016/S0734-189X(84)80011-0), 1984. Connect each active surface cell to its steepest of
   eight descending neighbours using metric distances. A topological sweep transmits each liquid volume once.
+- Charles F. Raymond, [Flow in a Transverse Section of Athabasca Glacier, Alberta, Canada](https://doi.org/10.3189/S0022143000012995),
+  1971. Figure 3a and Table I give independently observed geometry. The measured centre-line depth mean from
+  Figure 10a and page 73 is held out. The observed margin shear and varying basal motion motivate resolving
+  transverse stress and sliding separately from the isothermal no-slip layer.
+- Nathan Maier, Neil Humphrey, Joel Harper and Toby Meierbachtol, [Sliding dominates slow-flowing margin regions,
+  Greenland Ice Sheet](https://doi.org/10.1126/sciadv.aaw5406), 2019. The input strip uses only the drill
+  thickness and surveyed surface slope from Methods. The winter GPS speed and borehole-derived deformation
+  from Results are held out. The script uses the no-slip Glen n=3 surface-to-depth-mean ratio of 5/4.
+- Ed Bueler and Jed Brown, [Shallow shelf approximation as a sliding law in a thermomechanically coupled
+  ice sheet model](https://doi.org/10.1029/2008JF001179), 2009, demonstrate coupling membrane stresses to
+  a sliding law. The optional glacier retains its no-slip shallow-ice model at this checkpoint.
+  No external solver code or measurement files are redistributed.
 
 The tests derive the exact two-column backward-Euler update, the linear-slope Glen velocity, the Nye
 depth and its hydrostatic increment, and the closed mass balance. The HYDRO-01 fixture measures the actual

@@ -141,6 +141,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'glacier',
+    title: '@margoengine/physics/glacier grounded ice, fracture and drainage',
+    kind: 'family',
+    messages: [],
+    cause: 'A glacier grid, material, tick length or native step exceeds its representable range.',
+    fix: 'Provide one finite SI bed elevation per positive-size cell, nonnegative ice and climate data, and water denser than ice. Use positive metre spacing, a finite nonnegative tick and the suggested change to forcing or spacing if a step fails. Use one native participant or use two or four with shared memory.',
+  },
+  {
     id: 'iceberg',
     title: '@margoengine/physics/iceberg rigid bodies, marine release and wake sources',
     kind: 'family',

@@ -169,20 +169,74 @@ fn solve(
     false
 }
 
-/// Derives the 2-D face diffusivities with H averaged across a face and transverse slopes averaged from both cells.
-fn diffuse(
-    grid: &Grid,
-    h: &mut [f64],
-    bed: &[f64],
-    boundary: &[f64],
-    scratch: &mut [f64],
-    coefficient: f64,
-    dt: f64,
-) -> bool {
+/// Greve's shallow-ice diffusivity with n=3, averaged at the same faces as in the scalar step.
+struct Face {
+    drop: f64,
+    tangent: f64,
+    thickness: f64,
+    size: f64,
+}
+
+impl Face {
+    fn get(
+        i: usize,
+        j: usize,
+        size: f64,
+        terrain: &FlowTerrain<'_>,
+        tangent: &[f64],
+    ) -> Option<Self> {
+        if terrain.boundary[i] != GROUND || terrain.boundary[j] != GROUND {
+            return None;
+        }
+        let drop = terrain.surface[i] - terrain.surface[j];
+        let h = terrain.h;
+        if (drop >= 0.0 && h[i] == 0.0) || (drop <= 0.0 && h[j] == 0.0) {
+            return None;
+        }
+        Some(Self {
+            drop,
+            tangent: 0.5 * (tangent[i] + tangent[j]),
+            thickness: 0.5 * (h[i] + h[j]),
+            size,
+        })
+    }
+
+    fn weight(&self, scale: f64) -> f64 {
+        let normal = self.drop / self.size;
+        let h2 = self.thickness * self.thickness;
+        scale * (h2 * h2 * self.thickness) * (normal * normal + self.tangent * self.tangent)
+            / (self.size * self.size)
+    }
+}
+
+fn paired_weights(x: &Face, z: &Face, scale: f64) -> (f64, f64) {
+    let size = f64x2(x.size, z.size);
+    let normal = f64x2_div(f64x2(x.drop, z.drop), size);
+    let tangent = f64x2(x.tangent, z.tangent);
+    let h = f64x2(x.thickness, z.thickness);
+    let h2 = f64x2_mul(h, h);
+    let h5 = f64x2_mul(f64x2_mul(h2, h2), h);
+    let gradient2 = f64x2_add(f64x2_mul(normal, normal), f64x2_mul(tangent, tangent));
+    let weights = f64x2_div(
+        f64x2_mul(f64x2_mul(f64x2_splat(scale), h5), gradient2),
+        f64x2_mul(size, size),
+    );
+    (
+        f64x2_extract_lane::<0>(weights),
+        f64x2_extract_lane::<1>(weights),
+    )
+}
+
+struct FlowTerrain<'a> {
+    h: &'a [f64],
+    surface: &'a [f64],
+    boundary: &'a [f64],
+}
+
+fn diffuse(grid: &Grid, h: &mut [f64], scratch: &mut [f64]) -> bool {
     let n = h.len();
     let (surface, scratch) = scratch.split_at_mut(n);
-    let (gx, scratch) = scratch.split_at_mut(n);
-    let (gz, scratch) = scratch.split_at_mut(n);
+    let (_, scratch) = scratch.split_at_mut(2 * n); // frozen transverse gradients
     let (wx, scratch) = scratch.split_at_mut(n);
     let (wz, scratch) = scratch.split_at_mut(n);
     let (increment, scratch) = scratch.split_at_mut(n);
@@ -191,35 +245,6 @@ fn diffuse(
     let (product, scratch) = scratch.split_at_mut(n);
     let (diagonal, scratch) = scratch.split_at_mut(n);
     let (outgoing, incoming) = scratch.split_at_mut(n);
-    for i in 0..n {
-        surface[i] = bed[i] + h[i];
-    }
-    for i in 0..n {
-        gx[i] = grid.cross(i, surface, boundary, 1, 0);
-        gz[i] = grid.cross(i, surface, boundary, 0, 1);
-    }
-    wx.fill(0.0);
-    wz.fill(0.0);
-    grid.faces(|i, j, x| {
-        if boundary[i] != GROUND || boundary[j] != GROUND {
-            return;
-        }
-        let drop = surface[i] - surface[j];
-        if (drop >= 0.0 && h[i] == 0.0) || (drop <= 0.0 && h[j] == 0.0) {
-            return;
-        }
-        let (size, tangent, result) = if x {
-            (grid.dx, &*gz, &mut *wx)
-        } else {
-            (grid.dz, &*gx, &mut *wz)
-        };
-        let normal = drop / size;
-        let other = 0.5 * (tangent[i] + tangent[j]);
-        let thickness = 0.5 * (h[i] + h[j]);
-        let h2 = thickness * thickness;
-        result[i] = dt * coefficient * (h2 * h2 * thickness) * (normal * normal + other * other)
-            / (size * size);
-    });
     let weights = Weights { x: wx, z: wz };
     if !solve(
         grid, &weights, surface, increment, residual, direction, product, diagonal,
@@ -310,20 +335,24 @@ fn fracture(
     cracks: &mut [f64],
     calving: &mut [f64],
     falls: &mut [f64],
-) {
+    start: usize,
+) -> f64 {
     let area = grid.dx * grid.dz;
     let ratio = material.water / material.ice;
-    for i in 0..h.len() {
+    let mut roots = 0.0;
+    for row in 0..h.len() {
+        let i = start + row;
         let u = ux[i];
         let v = uz[i];
         let speed2 = u * u + v * v;
-        let depth = if h[i] > 0.0 && speed2 > 0.0 {
+        let depth = if h[row] > 0.0 && speed2 > 0.0 {
             let dux = grid.cross(i, ux, boundary, 1, 0);
             let duz = grid.cross(i, ux, boundary, 0, 1);
             let dvx = grid.cross(i, uz, boundary, 1, 0);
             let dvz = grid.cross(i, uz, boundary, 0, 1);
             let strain = ((u * u) * dux + (u * v) * (duz + dvx) + (v * v) * dvz) / speed2;
             if strain > 0.0 {
+                roots += 1.0;
                 // The n=3 free-surface velocity is 5/4 of the depth-averaged velocity.
                 let surface_strain = 1.25 * strain;
                 2.0 / (material.ice * material.gravity)
@@ -335,8 +364,8 @@ fn fracture(
         } else {
             0.0
         };
-        cracks[i] = depth.min(h[i]);
-        if dt == 0.0 || h[i] == 0.0 {
+        cracks[row] = depth.min(h[row]);
+        if dt == 0.0 || h[row] == 0.0 {
             continue;
         }
         let mut marine = false;
@@ -347,14 +376,15 @@ fn fracture(
                 drop |= boundary[j] == DROP && bed[j] < bed[i];
             }
         }
-        if marine && (h[i] <= ratio * (sea - bed[i]) || depth >= bed[i] + h[i] - sea) {
-            calving[i] = h[i] * area;
-            h[i] = 0.0;
-        } else if drop && depth >= h[i] {
-            falls[i] = h[i] * area;
-            h[i] = 0.0;
+        if marine && (h[row] <= ratio * (sea - bed[i]) || depth >= bed[i] + h[row] - sea) {
+            calving[row] = h[row] * area;
+            h[row] = 0.0;
+        } else if drop && depth >= h[row] {
+            falls[row] = h[row] * area;
+            h[row] = 0.0;
         }
     }
+    roots
 }
 
 /// Steepest-descending D8 links, then an upstream-first sweep. Every cell ends at a unique outlet.
@@ -418,8 +448,263 @@ fn route(grid: &Grid, height: &[f64], discharge: &mut [f64], graph: &mut [u32]) 
     }
 }
 
+#[repr(C)]
+#[derive(Default)]
+struct Work {
+    weights_rows: f64,
+    face_weights: f64,
+    paired_face_weights: f64,
+    fracture_rows: f64,
+    crevasse_roots: f64,
+}
+
+#[repr(C)]
+struct Job {
+    state: *mut f64,
+    data: *const f64,
+    work: *mut f64,
+    drainage: *mut u32,
+    nx: usize,
+    nz: usize,
+    receipt: *mut Work,
+    _padding: u32,
+    dx: f64,
+    dz: f64,
+    gravity: f64,
+    softness: f64,
+    ice_density: f64,
+    water_density: f64,
+    sea_level: f64,
+    seconds: f64,
+    dt: f64,
+}
+
+const _: [(); 104] = [(); size_of::<Job>()];
+
+impl Job {
+    fn count(&self) -> Option<usize> {
+        let count = self.nx.checked_mul(self.nz)?;
+        (count > 0 && count <= isize::MAX as usize / (12 * size_of::<f64>())).then_some(count)
+    }
+
+    fn grid(&self) -> Grid {
+        Grid {
+            nx: self.nx,
+            nz: self.nz,
+            dx: self.dx,
+            dz: self.dz,
+        }
+    }
+
+    fn material(&self) -> Material {
+        Material {
+            gravity: self.gravity,
+            softness: self.softness,
+            ice: self.ice_density,
+            water: self.water_density,
+        }
+    }
+
+    unsafe fn prepare(&self, n: usize) {
+        let (state, budget) =
+            unsafe { slice::from_raw_parts_mut(self.state, 7 * n + 4) }.split_at_mut(7 * n);
+        let (h, rest) = state.split_at_mut(n);
+        let (discharge, rest) = rest[n..].split_at_mut(n);
+        rest[..2 * n].fill(0.0);
+        let data = unsafe { slice::from_raw_parts(self.data, 5 * n) };
+        let (bed, data) = data.split_at(n);
+        let (snow, data) = data.split_at(n);
+        let (melt, data) = data.split_at(n);
+        let boundary = &data[n..];
+        let area = self.dx * self.dz;
+        for i in 0..n {
+            let added = snow[i] * self.seconds;
+            let available = h[i] + added;
+            let melted = (melt[i] * self.seconds).min(available);
+            h[i] = available - melted;
+            budget[0] += added * area;
+            budget[1] += melted * area;
+            discharge[i] = if self.dt > 0.0 {
+                (self.ice_density / self.water_density) * (melted * area) / self.dt
+            } else {
+                0.0
+            };
+        }
+        if self.seconds > 0.0 {
+            let grid = self.grid();
+            let (surface, rest) =
+                unsafe { slice::from_raw_parts_mut(self.work, 3 * n) }.split_at_mut(n);
+            let (gx, gz) = rest.split_at_mut(n);
+            for i in 0..n {
+                surface[i] = bed[i] + h[i];
+            }
+            for i in 0..n {
+                gx[i] = grid.cross(i, surface, boundary, 1, 0);
+                gz[i] = grid.cross(i, surface, boundary, 0, 1);
+            }
+        }
+    }
+
+    unsafe fn weights(&self, n: usize, start: usize, end: usize, part: usize) -> u32 {
+        let mut count = Work::default();
+        if self.seconds > 0.0 {
+            let grid = self.grid();
+            let boundary = unsafe { slice::from_raw_parts(self.data.add(4 * n), n) };
+            let h = unsafe { slice::from_raw_parts(self.state, n) };
+            let (surface, rest) = unsafe { slice::from_raw_parts(self.work, 3 * n) }.split_at(n);
+            let (gx, gz) = rest.split_at(n);
+            let terrain = FlowTerrain {
+                h,
+                surface,
+                boundary,
+            };
+            let stride = end - start;
+            // Every participant gets only its own face rows in both output planes.
+            let wx = unsafe { slice::from_raw_parts_mut(self.work.add(3 * n + start), stride) };
+            let wz = unsafe { slice::from_raw_parts_mut(self.work.add(4 * n + start), stride) };
+            let stress = self.ice_density * self.gravity;
+            let coefficient = (2.0 / 5.0) * self.softness * stress * stress * stress;
+            let scale = self.seconds * coefficient;
+            count.weights_rows = stride as f64;
+            for row in 0..stride {
+                let i = start + row;
+                let x = grid
+                    .neighbor(i, 1, 0)
+                    .and_then(|j| Face::get(i, j, grid.dx, &terrain, gz));
+                let z = grid
+                    .neighbor(i, 0, 1)
+                    .and_then(|j| Face::get(i, j, grid.dz, &terrain, gx));
+                let (w_x, w_z) = match (x, z) {
+                    (Some(x), Some(z)) => {
+                        count.face_weights += 2.0;
+                        count.paired_face_weights += 2.0;
+                        paired_weights(&x, &z, scale)
+                    }
+                    (Some(x), None) => {
+                        count.face_weights += 1.0;
+                        (x.weight(scale), 0.0)
+                    }
+                    (None, Some(z)) => {
+                        count.face_weights += 1.0;
+                        (0.0, z.weight(scale))
+                    }
+                    (None, None) => (0.0, 0.0),
+                };
+                if !w_x.is_finite() || !w_z.is_finite() {
+                    return 1;
+                }
+                wx[row] = w_x;
+                wz[row] = w_z;
+            }
+        }
+        if !self.receipt.is_null() {
+            unsafe { self.receipt.add(part).write(count) };
+        }
+        0
+    }
+
+    unsafe fn solve(&self, n: usize) -> u32 {
+        let grid = self.grid();
+        let material = self.material();
+        let (h, rest) = unsafe { slice::from_raw_parts_mut(self.state, 7 * n) }.split_at_mut(n);
+        let (ux, uz) = rest[4 * n..].split_at_mut(n);
+        let data = unsafe { slice::from_raw_parts(self.data, 5 * n) };
+        let bed = &data[..n];
+        let boundary = &data[4 * n..];
+        let work = unsafe { slice::from_raw_parts_mut(self.work, 12 * n) };
+        if self.seconds > 0.0 && !diffuse(&grid, h, work) {
+            return 1;
+        }
+        velocity(&grid, h, bed, boundary, &material, &mut work[..n], ux, uz);
+        0
+    }
+
+    unsafe fn fracture(&self, n: usize, start: usize, end: usize, part: usize) {
+        let len = end - start;
+        // Fracture reads neighbour velocities and bed only. No worker reads another mutable ice row.
+        let h = unsafe { slice::from_raw_parts_mut(self.state.add(start), len) };
+        let cracks = unsafe { slice::from_raw_parts_mut(self.state.add(n + start), len) };
+        let calving = unsafe { slice::from_raw_parts_mut(self.state.add(3 * n + start), len) };
+        let falls = unsafe { slice::from_raw_parts_mut(self.state.add(4 * n + start), len) };
+        let ux = unsafe { slice::from_raw_parts(self.state.add(5 * n), n) };
+        let uz = unsafe { slice::from_raw_parts(self.state.add(6 * n), n) };
+        let data = unsafe { slice::from_raw_parts(self.data, 5 * n) };
+        let roots = fracture(
+            &self.grid(),
+            h,
+            &data[..n],
+            &data[4 * n..],
+            &data[3 * n..4 * n],
+            &self.material(),
+            self.sea_level,
+            self.seconds,
+            ux,
+            uz,
+            cracks,
+            calving,
+            falls,
+            start,
+        );
+        if !self.receipt.is_null() {
+            let receipt = unsafe { &mut *self.receipt.add(part) };
+            receipt.fracture_rows = len as f64;
+            receipt.crevasse_roots = roots;
+        }
+    }
+
+    unsafe fn finish(&self, n: usize) -> u32 {
+        let grid = self.grid();
+        let (state, budget) =
+            unsafe { slice::from_raw_parts_mut(self.state, 7 * n + 4) }.split_at_mut(7 * n);
+        let (h, state) = state.split_at_mut(n);
+        let (cracks, state) = state.split_at_mut(n);
+        let (discharge, state) = state.split_at_mut(n);
+        let (calving, state) = state.split_at_mut(n);
+        let (falls, state) = state.split_at_mut(n);
+        let (ux, uz) = state.split_at_mut(n);
+        let bed = unsafe { slice::from_raw_parts(self.data, n) };
+        let boundary = unsafe { slice::from_raw_parts(self.data.add(4 * n), n) };
+        let surface = unsafe { slice::from_raw_parts_mut(self.work, n) };
+        let graph = unsafe { slice::from_raw_parts_mut(self.drainage, 3 * n) };
+        if self.seconds > 0.0 {
+            for i in 0..n {
+                budget[2] += calving[i];
+                budget[3] += falls[i];
+                if h[i] == 0.0 {
+                    ux[i] = 0.0;
+                    uz[i] = 0.0;
+                }
+                surface[i] = if boundary[i] == WATER {
+                    self.sea_level
+                } else {
+                    bed[i] + h[i]
+                };
+            }
+            if discharge.iter().any(|value| *value > 0.0) {
+                route(&grid, surface, discharge, graph);
+            }
+        }
+        let area = self.dx * self.dz;
+        let thickness = h.iter().sum::<f64>();
+        let volume = if thickness.is_finite() {
+            thickness * area
+        } else {
+            h.iter().map(|value| value * area).sum()
+        };
+        if volume.is_finite()
+            && state_finite(
+                h, cracks, discharge, calving, falls, ux, uz, budget, surface,
+            )
+        {
+            0
+        } else {
+            2
+        }
+    }
+}
+
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn glacier_step(
+unsafe extern "C" fn glacier_step(
     state: *mut f64,
     data: *const f64,
     work: *mut f64,
@@ -435,84 +720,81 @@ pub unsafe extern "C" fn glacier_step(
     sea_level: f64,
     seconds: f64,
     dt: f64,
+    receipt: *mut Work,
 ) -> u32 {
-    let n = nx * nz;
-    let grid = Grid { nx, nz, dx, dz };
-    let material = Material {
+    let job = Job {
+        state,
+        data,
+        work,
+        drainage,
+        nx,
+        nz,
+        receipt,
+        _padding: 0,
+        dx,
+        dz,
         gravity,
         softness,
-        ice: ice_density,
-        water: water_density,
+        ice_density,
+        water_density,
+        sea_level,
+        seconds,
+        dt,
     };
-    // The host owns and validates these distinct allocations before calling into the module.
-    let (state, budget) =
-        unsafe { slice::from_raw_parts_mut(state, 7 * n + 4) }.split_at_mut(7 * n);
-    let data = unsafe { slice::from_raw_parts(data, 5 * n) };
-    let work = unsafe { slice::from_raw_parts_mut(work, 12 * n) };
-    let graph = unsafe { slice::from_raw_parts_mut(drainage, 3 * n) };
-    let (h, state) = state.split_at_mut(n);
-    let (cracks, state) = state.split_at_mut(n);
-    let (discharge, state) = state.split_at_mut(n);
-    let (calving, state) = state.split_at_mut(n);
-    let (falls, state) = state.split_at_mut(n);
-    let (ux, uz) = state.split_at_mut(n);
-    let (bed, data) = data.split_at(n);
-    let (snow, data) = data.split_at(n);
-    let (melt, data) = data.split_at(n);
-    let (water, boundary) = data.split_at(n);
+    let Some(n) = job.count() else { return 2 };
+    unsafe {
+        job.prepare(n);
+        let status = job.weights(n, 0, n, 0);
+        if status != 0 {
+            return status;
+        }
+        let status = job.solve(n);
+        if status != 0 {
+            return status;
+        }
+        job.fracture(n, 0, n, 0);
+        job.finish(n)
+    }
+}
 
-    let area = dx * dz;
-    let stress = ice_density * gravity;
-    let coefficient = (2.0 / 5.0) * softness * stress * stress * stress;
-    calving.fill(0.0);
-    falls.fill(0.0);
-    for i in 0..n {
-        let added = snow[i] * seconds;
-        let available = h[i] + added;
-        let melted = (melt[i] * seconds).min(available);
-        h[i] = available - melted;
-        budget[0] += added * area;
-        budget[1] += melted * area;
-        discharge[i] = if dt > 0.0 {
-            (ice_density / water_density) * (melted * area) / dt
-        } else {
-            0.0
-        };
+#[unsafe(no_mangle)]
+unsafe extern "C" fn glacier_prepare(job: &Job) -> u32 {
+    let Some(n) = job.count() else { return 2 };
+    unsafe { job.prepare(n) };
+    0
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn glacier_solve(job: &Job) -> u32 {
+    let Some(n) = job.count() else { return 2 };
+    unsafe { job.solve(n) }
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn glacier_thread_phase(job: &Job, stage: u32, part: u32, parts: u32) -> u32 {
+    let Some(n) = job.count() else { return 2 };
+    let Some(parts) = core::num::NonZeroU64::new(u64::from(parts)) else {
+        return 2;
+    };
+    if u64::from(part) >= parts.get() {
+        return 2;
     }
-    if seconds > 0.0 && !diffuse(&grid, h, bed, boundary, work, coefficient, seconds) {
-        return 1;
-    }
-    let surface = &mut work[..n];
-    velocity(&grid, h, bed, boundary, &material, surface, ux, uz);
-    fracture(
-        &grid, h, bed, boundary, water, &material, sea_level, seconds, ux, uz, cracks, calving,
-        falls,
-    );
-    if seconds > 0.0 {
-        for i in 0..n {
-            budget[2] += calving[i];
-            budget[3] += falls[i];
-            if h[i] == 0.0 {
-                ux[i] = 0.0;
-                uz[i] = 0.0;
-            }
-            surface[i] = if boundary[i] == WATER {
-                sea_level
-            } else {
-                bed[i] + h[i]
-            };
+    let start = (n as u64 * u64::from(part) / parts.get()) as usize;
+    let end = (n as u64 * u64::from(part + 1) / parts.get()) as usize;
+    match stage {
+        0 => unsafe { job.weights(n, start, end, part as usize) },
+        1 => {
+            unsafe { job.fracture(n, start, end, part as usize) };
+            0
         }
-        if discharge.iter().any(|value| *value > 0.0) {
-            route(&grid, surface, discharge, graph);
-        }
+        _ => 2,
     }
-    if state_finite(
-        h, cracks, discharge, calving, falls, ux, uz, budget, surface,
-    ) {
-        0
-    } else {
-        2
-    }
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn glacier_finish(job: &Job) -> u32 {
+    let Some(n) = job.count() else { return 2 };
+    unsafe { job.finish(n) }
 }
 
 fn state_finite(

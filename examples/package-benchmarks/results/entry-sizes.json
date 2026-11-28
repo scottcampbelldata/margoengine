@@ -15758,8 +15758,8 @@
         "gzip": 3227
       },
       "./glacier": {
-        "raw": 7631,
-        "gzip": 3484
+        "raw": 14703,
+        "gzip": 5930
       },
       "./iceberg": {
         "raw": 17273,
@@ -19495,14 +19495,14 @@
       "brotli": 4109
     },
     "packages/physics/dist/glacier-kernel.wasm": {
-      "raw": 15437,
-      "gzip": 6189,
-      "brotli": 5527
+      "raw": 17775,
+      "gzip": 7305,
+      "brotli": 6509
     },
     "packages/physics/dist/glacier-kernel-shared.wasm": {
-      "raw": 15525,
-      "gzip": 6250,
-      "brotli": 5583
+      "raw": 17863,
+      "gzip": 7371,
+      "brotli": 6574
     },
     "packages/physics/dist/airborne-kernel.wasm": {
       "raw": 1444,

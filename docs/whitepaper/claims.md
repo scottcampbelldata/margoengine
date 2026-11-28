@@ -7116,3 +7116,13 @@ The one-, two- and four-participant native paths reproduce signed column and run
 The fixed-camera basin follows a native 42.525 m³ cuboid from its 0.1 rad seed heel through 105.2° of roll in five seconds. Its live signed wake produces an 11.99 cm rise 9.22 m from the then-current body centre at 9.5 s. The disconnected-wake control repeats the same motion with flat water. Independent clipping reproduces the submerged volume, the signed patches cancel, and the drawn gauge agrees within 2 µm. Both backends repeat their full frames and accepted snapshots exactly.
 
 The independent lab comparison shows early rotation and excess overshoot. The model takes 0.636 s from 10° to 90°, against 0.998 s measured. Parallel execution changes neither the published rows nor the existing scalar model. [Proof and independent comparison](reproduce.md#ice-03-native-iceberg-rows-and-capsize-measurements)
+
+### ICE-02 accepted glacier columns and local field comparisons
+
+The accepted thickness, fracture, discharge and velocity banks survive a rejected numeric step and
+retain their signed origin through a shift and restore. Native workers reproduce the accepted banks
+bit for bit using 1, 2 or 4 participants. The coupled cutaway releases 36.450 m³ of ice and its
+computed wake raises a gauge by 16.44 cm at three seconds. Both backends independently replay the
+full accepted state and pixels. The unchanged no-slip flow model
+overpredicts measured depth-mean Athabasca flow and underpredicts Greenland total GPS motion.
+Local geometry spreads and deformation-only comparisons appear in [limits](../limits.md#grounded-glacier-and-ice-sheet-flow-ice-02).

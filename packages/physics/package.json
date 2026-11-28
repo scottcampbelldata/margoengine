@@ -69,6 +69,7 @@
     "test:gpu:pack-ice-workers": "cd ../.. && node packages/physics/tests/pack-ice-workers.browser.mjs",
     "test:gpu:snowpack-workers": "cd ../.. && node packages/physics/tests/snowpack-workers.browser.mjs",
     "test:gpu:iceberg-workers": "cd ../.. && node packages/physics/tests/iceberg-workers.browser.mjs",
+    "test:gpu:glacier-workers": "cd ../.. && node packages/physics/tests/glacier-workers.browser.mjs",
     "test:gpu:wing-lattice-workers": "cd ../.. && node packages/physics/tests/wing-lattice-workers.browser.mjs",
     "test:gpu:aero-mobile": "cd ../.. && node packages/physics/tests/aero-mobile.browser.mjs && node packages/physics/tests/aero-mobile.browser.mjs --compat",
     "test:gpu:boundary-layer-surface": "cd ../.. && node packages/physics/tests/boundary-layer-surface.browser.mjs && node packages/physics/tests/boundary-layer-surface.browser.mjs --compat",

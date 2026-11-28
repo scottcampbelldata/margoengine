@@ -125,6 +125,11 @@ type NativePhaseSolver =
       readonly subject: 'Iceberg';
       readonly phaseExport: 'iceberg_thread_phase';
       readonly phase: 'body hydrodynamics';
+    }
+  | {
+      readonly subject: 'Glacier';
+      readonly phaseExport: 'glacier_thread_phase';
+      readonly phase: 'flow weights and crevasses';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };

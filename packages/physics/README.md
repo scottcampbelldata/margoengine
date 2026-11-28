@@ -7323,7 +7323,7 @@ volumes, and sends meltwater down a D8 surface drainage graph. Simulation runs o
 import { GlacierSolver } from '@margoengine/physics/glacier';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const glacier = await GlacierSolver.load();
+using glacier = await GlacierSolver.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(glacier, {
   nx: 3, nz: 2, dx: 100,
   bed: [80, 45, 0, 75, 40, -5],
@@ -7339,9 +7339,13 @@ Grid arrays are x-fast. Each cell is grounded (boundary 0), open water (1), or a
 transport. Unspecified thickness, accumulation, melt and crevasse water default to zero. The
 default Glen exponent is 3 and the temperate rate factor is 2.4e-24 Pa⁻³ s⁻¹. Ice and water
 densities default to 917 and 1000 kg/m³. Sea level defaults to 0 m, dz to dx, and timeScale to 1.
-`GlacierSolver.load({ id, signal })` accepts an optional field prefix (default glacier) and cancellation.
+`GlacierSolver.load({ id, signal, threads })` accepts a field prefix (default glacier), cancellation, and
+1, 2 or 4 native participants including the caller (default 1). Use a shared-memory world with helpers.
+In browsers, advance that world inside an isolated Worker so helpers can join its synchronous native phases.
+Dispose the solver when the world stops using it. `readNativeWork()` copies row and SIMD operation counts
+from the last accepted tick. Before the first accepted tick it returns undefined.
 
-All six published fields use layout-1 f64 cells. `thicknessField` and `crevasseField` are metres,
+All six published fields use layout-1 f64 cells in the solver's current origin cell. `thicknessField` and `crevasseField` are metres,
 `velocityField` stores x and z component planes in m/s of simulated time, and `meltwaterField`
 publishes m³ of liquid per world second at each outlet. Pass that descriptor and the appropriate
 outlet indices to `ShallowWaterSolver`. `calvingField` and `icefallField` publish the ice volume

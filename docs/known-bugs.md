@@ -24455,3 +24455,14 @@ Snowpack copies registered forcing from the owning memory, then samples wind wit
 ### Fixed: ICE-03 could publish a partial wake when a derived melt flux exceeded its range
 
 Native body rows, pending calving, freshwater and signed wakes stage before acceptance. A malformed foreign calving bank or a late derivative overflow leaves the previous ports, work and bodies intact. The published origin follows the live solver cell immediately after shift or restore. See `packages/physics/tests/coupling/iceberg.test.js`.
+
+### KB-GLACIER-ACCEPTED1 — A glacier could report unrepresentable volume or the wrong origin cell (FIXED)
+
+- **Repro:** Add a two-cell 100 m column grid with 1e153 m spacing and read the ice budget, or set
+  a negative origin cell on an ordinary glacier and read its six exported ports directly.
+- **Cause:** The native candidate checked each ice column separately, leaving the combined volume
+  unchecked. The solver also published a constant origin rather than the host's saved cell.
+- **Fix:** The native step validates the total ice volume before publication and the six ports
+  read the live host cell through a shift or restore. The coupling test preserves the exact
+  accepted state through a rejected tick and replays the next valid ticks.
+- **Regression:** [glacier coupling](../packages/physics/tests/coupling/glacier.test.js).

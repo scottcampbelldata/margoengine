@@ -5369,3 +5369,16 @@ node scripts/run-with-timeout.mjs --max=2 -- node packages/physics/scripts/ice03
 ```
 
 Burton et al. provide the original lab geometry and an orientation trace. The transfer uses observed early-state information once, then compares later angular crossings and peak using the existing drag parameters. Froude similarity evaluates the same physical parameters at a finer effective interval with no fit. The published plot's marker readout and release variation determine the comparison bounds. For the additional guided case, download the named capsizing marker file through SPHERIC Test 15 and pass its path to the same diagnostic. The measured velocity is the reconstructed marker speed. The lab guide and free engine trajectory differ in admissible surge and inertia. [Burton lab results](https://doi.org/10.1029/2011JF002055) [Heller experimental data](https://www.spheric-sph.org/tests/test-15) [Heller paper](https://doi.org/10.1038/s41598-018-36634-3)
+
+### ICE-02 native glacier columns and measured flow
+
+- Build Physics with `node packages/physics/scripts/build.js`.
+- Run `node --test packages/physics/tests/glacier.test.js packages/physics/tests/coupling/glacier.test.js`
+  for the lagged transport, conservative release, originated ports and rejected trial state.
+- Run `node packages/physics/scripts/ice02-glacier-velocity-measured.mjs` for the Athabasca and
+  Insunnguata Sermia geometry inputs, independent kinematic measurements and model errors.
+- Run `node --test packages/physics/tests/coupling/glacier-workers.test.js` and
+  `npm run test:gpu:glacier-workers -w @margoengine/physics` for native rows, exact hashes across
+  worker counts and actual browser-worker startup.
+- Run `npm run test:gpu:glacier-calving-film -w @margoengine/water` for the coupled fixed-camera replay
+  on WebGPU and WebGL2.
