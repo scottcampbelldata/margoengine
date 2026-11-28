@@ -26,6 +26,22 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   comparison run captures with that flag (`captureArgs`, `scripts/support/visual-compat-pages.js`; regression
   `tests/visual-compat-pages.test.js`). Thresholds and the exact-frame rule are unchanged.
 
+### Open 2026-11-27: a hung, touching Newton's cradle loses energy at every strike and clumps after about ten seconds (KB-PHYS-HUNGCRADLE1, physics DYN-01)
+
+- **Repro:** five 26 mm steel balls (`density: 'steel'`, `restitution: 1`, friction 0.1), each hung from one fixed
+  body by a `revolute` joint about z on a 247 mm arm, touching in a line; the first lifted 34 degrees and let go;
+  `new Physics(null)` stepped at 60 Hz with no air drag (the web demo `demos/newtons-cradle`). One ball in, one out is
+  clean at first, but the total energy (kinetic plus potential) reads 99.0 percent after the first strike, 96.6 at
+  2 s, 88.2 at 7 s, then at about 12 to 15 s all five swing together and it reads 58 to 18 percent at 30 s. The same
+  at `fidelity: 'high'` (59.7 percent at 30 s) and with a 0.1 mm gap between balls.
+- **Cause:** not found yet, but not the joint: one ball hung the same way alone holds its energy within 0.9 percent
+  over 60 s (100.15, 100.44, 99.11, 100.41, 99.43 percent at 1, 5, 15, 30 and 60 s). So the loss is in the strike or
+  the contact solve between hung balls: about 0.85 percent a strike with restitution 1, and the strike pass may share
+  a strike once joint drift leaves a small load between neighbours (a point carrying load into a substep is treated
+  as resting, `docs/limits.md`, "Touching Newton's cradle"), which would explain the clumping.
+- **Wanted:** a hung cradle at restitution 1 keeps one in, one out for at least 60 s with energy within 1 percent,
+  as a regression test beside "Newton's cradle" in `packages/physics/tests/rigid-validation.test.js`.
+
 ### Open: GPULiquid's accurate profile moves momentum at a free surface (KB-LIQUID-SURFMOM1, water)
 
 - **Repro:** `GPULiquid` CPU twin, `profile: 'accurate'`, no gravity, free-slip walls (`walls: 'slip'`), a layer 4
