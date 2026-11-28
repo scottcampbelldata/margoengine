@@ -2928,6 +2928,10 @@ more than 4,096 explicit CFL substeps returns an error before changing the world
 fixtures exercise both memory modes, the Coriolis half-turn limit, overflow rejection and exact replay
 through repeated wetting and drying. Water's coastal renderer reads the accepted cells, with the same
 dry-to-wet transition tested on WebGPU and WebGL2.
+The optional single-period bed model damps the depth-integrated discharge. A separate column
+eigenmode solution checks the thin, intermediate and deep cases and exact replay. With the
+laboratory inputs fixed, the laminar term improves T20 run-up and leaves other camera bands open.
+
 
 Rigid axis locks project the angular impulse and held torque before applying the rotated inverse inertia and
 then project the resulting velocity. This uses the same available degrees of freedom as the contact solve.

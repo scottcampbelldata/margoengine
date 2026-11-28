@@ -17132,6 +17132,16 @@ The collider uses the same visible road and bank geometry. A dynamic deck contri
   all four sides. Drähne's laboratory gauge and camera records provide separate forcing and holdouts.
   [Kristina, Bokhove and van Groesen, 2014, §3.2](https://doi.org/10.5194/npg-21-987-2014) ·
   [Drähne et al., 2016, §§2.2–2.4 and supplementary data](https://doi.org/10.3390/jmse4010001)
+- Philip L.-F. Liu and Alejandro Orfila, “Viscous effects on transient long-wave propagation”
+  (2004), treat the deep-column laminar bottom layer as a shear history. SEA-06 uses an optional
+  single-frequency dissipative closure, derived from `iωu = G + νu''` with zero bed velocity and zero surface shear.
+  For `q = h sqrt(iω/ν)` the depth-average admittance is `(1 − tanh(q)/q)/(iω)`. The real part of
+  its inverse is the damping rate. It reduces to `3ν/h²` in a shallow viscous column and
+  `sqrt(νω/2)/h` in the deep-column limit. Only this real rate attenuates both horizontal
+  discharges, with an exponential update. The phase lag, turbulence and surface tension are separate.
+  The regression independently sums the column's no-slip/free-shear eigenmodes.
+  [Liu and Orfila, 2004](https://doi.org/10.1017/S0022112004001806) ·
+  [Tanaka, Tinh and Sana, 2022](https://doi.org/10.3390/jmse10101433)
 - Kinjiro Kajiura, “The Leading Wave of a Tsunami” (1963). The rapid bottom-to-surface
   transfer at depth h is `sech(kh)`. The implementation uses its long-wave Padé approximation
   `1/(1 + (kh)²/2)`. The equivalent wet-cell Helmholtz system is symmetric and solved by

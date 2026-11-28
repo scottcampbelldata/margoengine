@@ -141,6 +141,28 @@ The comparison does not identify the respective contributions of
 friction, surface tension, wet-front discretization or forcing
 uncertainty. [Drähne et al. (2016), §§2.3 and 3.4.1](https://doi.org/10.3390/jmse4010001)
 
-Both diagnostic invocations currently return a failed camera comparison
-after printing the individual runs. The four laboratory cases here
-leave measured validation open.
+### Smooth-bed laminar comparison
+
+The optional closure uses the nominal freshwater kinematic viscosity
+of 1 × 10⁻⁶ m²/s cited in §2.3 and the two reference paddle periods of 20 and
+30 seconds. The camera and held-out gauges were used only for scoring, with
+the same cell and readout bounds as above. The commands are
+
+```sh
+node scripts/run-with-timeout.mjs --max=3 -- node packages/physics/scripts/sea06-draehne-runup.mjs T30_H2 laminar
+node scripts/run-with-timeout.mjs --max=3 -- node packages/physics/scripts/sea06-draehne-runup.mjs T20_H2 laminar
+```
+
+| Case | Grid spacing | Run-up heights in mm, in run order | Paired camera bands met |
+| --- | --- | --- | --- |
+| T30_H2 | 0.04 m | 38.50 / 38.50 / 39.50 / 40.50 / 38.50 / 40.50 | 1 of 6 |
+| T30_H2 | 0.02 m | 38.75 / 38.75 / 39.75 / 40.75 / 38.75 / 40.75 | 1 of 6 |
+| T20_H2 | 0.04 m | 41.50 / 41.50 / 41.50 / 41.50 / 41.50 / 39.50 | 4 of 6 |
+| T20_H2 | 0.02 m | 42.25 / 41.75 / 42.25 / 41.75 / 42.25 / 40.25 | 4 of 6 |
+
+The 20 mm grid's gauge RMS ranges are 1.05–2.45 mm for T20_H2 and
+1.21–2.37 mm for T30_H2. The signed volume closes to 1.72 × 10⁻¹³ m²
+per unit width. The laminar model improves the T20 camera comparison,
+while it underpredicts several T30 repeats. Both diagnostic invocations
+return a failed camera comparison after printing the individual runs.
+The four laboratory cases here leave measured validation open.

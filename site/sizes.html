@@ -104,8 +104,8 @@
 <tr><th scope="row"><code>crush-shell-kernel-shared.wasm</code></th><td>Rust thin-sheet plane-stress plasticity and hinge bending, shared world memory</td><td class="num">19,230</td><td class="num">8,975</td><td class="num">7,824</td><td>the shell loader on a host supporting shared world memory</td></tr>
 <tr><th scope="row"><code>viscoplastic-kernel.wasm</code></th><td>Rust SIMD three-dimensional elastoviscoplastic material points</td><td class="num">16,986</td><td class="num">6,744</td><td class="num">6,051</td><td>ViscoplasticSolver.load() from the optional /viscoplastic entry</td></tr>
 <tr><th scope="row"><code>viscoplastic-kernel-shared.wasm</code></th><td>Rust SIMD three-dimensional elastoviscoplastic material points, shared world memory</td><td class="num">16,986</td><td class="num">6,744</td><td class="num">6,052</td><td>ViscoplasticSolver.load() with shared world memory support</td></tr>
-<tr><th scope="row"><code>tsunami-kernel.wasm</code></th><td>Rust SIMD natural long-wave propagation and inundation</td><td class="num">16,569</td><td class="num">7,303</td><td class="num">6,551</td><td>TsunamiSolver.load() from the optional /tsunami entry</td></tr>
-<tr><th scope="row"><code>tsunami-kernel-shared.wasm</code></th><td>Rust SIMD natural long-wave propagation and inundation, shared world memory</td><td class="num">16,569</td><td class="num">7,303</td><td class="num">6,551</td><td>TsunamiSolver.load() with shared world memory support</td></tr>
+<tr><th scope="row"><code>tsunami-kernel.wasm</code></th><td>Rust SIMD natural long-wave propagation and inundation</td><td class="num">19,409</td><td class="num">8,220</td><td class="num">7,392</td><td>TsunamiSolver.load() from the optional /tsunami entry</td></tr>
+<tr><th scope="row"><code>tsunami-kernel-shared.wasm</code></th><td>Rust SIMD natural long-wave propagation and inundation, shared world memory</td><td class="num">19,409</td><td class="num">8,220</td><td class="num">7,392</td><td>TsunamiSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>terramechanics-kernel.wasm</code></th><td>Rust SIMD soil footprint and conservative redistribution</td><td class="num">40,423</td><td class="num">16,491</td><td class="num">14,395</td><td>Terramechanics.load() from the optional /terramechanics entry</td></tr>
 <tr><th scope="row"><code>terramechanics-kernel-shared.wasm</code></th><td>Rust SIMD soil footprint and conservative redistribution, shared world memory</td><td class="num">40,423</td><td class="num">16,491</td><td class="num">14,345</td><td>Terramechanics.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>granular-flow-kernel.wasm</code></th><td>Rust SIMD depth-averaged conservative granular flow</td><td class="num">9,620</td><td class="num">4,255</td><td class="num">3,875</td><td>GranularFlowSolver.load() from the optional /granular-flow entry</td></tr>
@@ -4951,7 +4951,7 @@
 <tr><td><code>./iceberg</code></td><td class="num">9,936</td><td class="num">4,339</td></tr>
 <tr><td><code>./thin-film</code></td><td class="num">39,042</td><td class="num">15,190</td></tr>
 <tr><td><code>./viscoplastic</code></td><td class="num">11,645</td><td class="num">4,898</td></tr>
-<tr><td><code>./tsunami</code></td><td class="num">16,121</td><td class="num">6,455</td></tr>
+<tr><td><code>./tsunami</code></td><td class="num">16,649</td><td class="num">6,641</td></tr>
 <tr><td><code>./pack-ice</code></td><td class="num">11,423</td><td class="num">4,715</td></tr>
 <tr><td><code>./runoff</code></td><td class="num">9,524</td><td class="num">3,869</td></tr>
 <tr><td><code>./drainage-fog</code></td><td class="num">10,045</td><td class="num">4,267</td></tr>

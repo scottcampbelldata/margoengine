@@ -4,7 +4,7 @@
 use core::arch::wasm32::{
     f64x2, f64x2_extract_lane, f64x2_floor, f64x2_mul, f64x2_splat, f64x2_sqrt, unreachable,
 };
-use margoengine_physics_kernel_common::pinned::pow;
+use margoengine_physics_kernel_common::pinned::{cos, exp, pow, sin};
 
 // This is an explicit solver. Refuse a requested tick that needs more work
 // than this budget rather than stepping over the CFL bound or dropping time.
@@ -272,12 +272,80 @@ fn ghost(inside: Rep, outward: f64, open: bool, model: &Model, wave: Option<Boun
     }
 }
 
+struct LaminarBed {
+    viscosity_root: f64,
+    frequency: f64,
+    stokes_root: f64,
+}
+
+impl LaminarBed {
+    // Real bed impedance of a no-slip, stress-free harmonic Stokes column.
+    // If z=(1+i)h/delta and w=tanh(z)/z, the impedance is i*frequency*w/(1-w).
+    fn decay(&self, depth: f64, dt: f64) -> f64 {
+        let diffusion = self.viscosity_root / depth;
+        let stokes_depth = self.stokes_root / diffusion;
+        let exponent = if stokes_depth <= 1.0 {
+            // Evaluate Re[cosh(z) / ((z cosh(z) - sinh(z))/z^3)] without
+            // subtracting near-equal terms. Re(i*frequency) is zero.
+            let chi = 2.0 * stokes_depth * stokes_depth;
+            let mut c = (1.0, 0.0);
+            let mut d = (1.0 / 3.0, 0.0);
+            let mut c_term = c;
+            let mut d_term = d;
+            for n in 0..11 {
+                let k = f64::from(2 * n);
+                let c_ratio = chi / ((k + 1.0) * (k + 2.0));
+                let d_ratio = chi / ((k + 2.0) * (k + 5.0));
+                c_term = (-c_term.1 * c_ratio, c_term.0 * c_ratio);
+                d_term = (-d_term.1 * d_ratio, d_term.0 * d_ratio);
+                c.0 += c_term.0;
+                c.1 += c_term.1;
+                d.0 += d_term.0;
+                d.1 += d_term.1;
+            }
+            let ratio = (c.0 * d.0 + c.1 * d.1) / (d.0 * d.0 + d.1 * d.1);
+            let scaled = diffusion * sqrt(dt);
+            (scaled * scaled) * ratio
+        } else {
+            let half_reciprocal = 0.5 / stokes_depth;
+            let (real, negative_imaginary) = if stokes_depth < 20.0 {
+                // Scale sinh and cosh by e^(-2a), where a=h/delta, so both
+                // components of tanh stay finite at any depth.
+                let angle = 2.0 * stokes_depth;
+                let e = exp(-angle);
+                let e2 = e * e;
+                let denominator = 1.0 + e2 + 2.0 * e * cos(angle);
+                let tanh_real = (1.0 - e2) / denominator;
+                let tanh_imaginary = (2.0 * e * sin(angle)) / denominator;
+                (
+                    (tanh_real + tanh_imaginary) * half_reciprocal,
+                    (tanh_real - tanh_imaginary) * half_reciprocal,
+                )
+            } else {
+                // For a>=20, |tanh(z)-1| < 9e-18. Retain the finite-depth
+                // normalization to the depth-mean velocity.
+                (half_reciprocal, half_reciprocal)
+            };
+            let remainder = 1.0 - real;
+            let integral = if stokes_depth.is_finite() {
+                (self.frequency * dt) * negative_imaginary
+            } else {
+                // Evaluate omega/(2a) without the overflowing intermediate a.
+                ((self.viscosity_root * self.stokes_root) / depth) * dt
+            };
+            integral / (remainder * remainder + negative_imaginary * negative_imaginary)
+        };
+        exp(-exponent)
+    }
+}
+
 struct Basin<'a> {
     grid: Grid,
     model: &'a Model,
     bed: *const f64,
     pressure: *const f64,
     incoming: Option<&'a [BoundaryWave; 4]>,
+    laminar: Option<LaminarBed>,
 }
 
 impl Basin<'_> {
@@ -452,6 +520,11 @@ impl Basin<'_> {
         if m.roughness > 0.0 {
             let drag = m.gravity * m.roughness * m.roughness * norm(q.x, q.z) / pow(q.h, 7.0 / 3.0);
             let factor = 1.0 / (1.0 + dt * drag);
+            q.x *= factor;
+            q.z *= factor;
+        }
+        if let Some(laminar) = &self.laminar {
+            let factor = laminar.decay(q.h, dt);
             q.x *= factor;
             q.z *= factor;
         }
@@ -678,6 +751,8 @@ unsafe extern "C" fn tsunami_step(
     dt: f64,
     time: f64,
     incoming: *const [BoundaryWave; 4],
+    kinematic_viscosity: f64,
+    angular_frequency: f64,
 ) -> u32 {
     let grid = Grid {
         width: nx as usize,
@@ -685,12 +760,29 @@ unsafe extern "C" fn tsunami_step(
         size: nx as usize * nz as usize,
     };
     let model = &*parameters;
+    let laminar = if kinematic_viscosity == 0.0 {
+        None
+    } else if kinematic_viscosity > 0.0
+        && kinematic_viscosity.is_finite()
+        && angular_frequency > 0.0
+        && angular_frequency.is_finite()
+        && model.roughness == 0.0
+    {
+        Some(LaminarBed {
+            viscosity_root: sqrt(kinematic_viscosity),
+            frequency: angular_frequency,
+            stokes_root: sqrt(angular_frequency) * core::f64::consts::FRAC_1_SQRT_2,
+        })
+    } else {
+        return StepFailure::Numeric as u32;
+    };
     let basin = Basin {
         grid,
         model,
         bed,
         pressure,
         incoming: incoming.as_ref(),
+        laminar,
     };
     if !(dt.is_finite() && dt > 0.0 && time.is_finite() && time >= 0.0) {
         return StepFailure::Numeric as u32;

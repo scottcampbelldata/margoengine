@@ -39,6 +39,11 @@ export interface TsunamiBudget {
     readonly substeps: number;
 }
 
+export interface TsunamiLaminarBed {
+    readonly kinematicViscosity: number;
+    readonly period: number;
+}
+
 export interface TsunamiLoadOptions {
     readonly id?: string;
     readonly bottomField?: FieldDescriptor;
@@ -58,6 +63,7 @@ export interface TsunamiOptions {
     readonly dischargeZ?: Series;
     readonly waterDensity?: number;
     readonly manning?: number;
+    readonly laminarBed?: TsunamiLaminarBed;
     readonly dryDepth?: number;
     readonly open?: readonly [boolean, boolean, boolean, boolean];
     readonly incoming?: readonly [TsunamiBoundaryWave?, TsunamiBoundaryWave?, TsunamiBoundaryWave?, TsunamiBoundaryWave?];

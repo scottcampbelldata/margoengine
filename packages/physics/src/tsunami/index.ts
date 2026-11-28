@@ -39,6 +39,14 @@ export interface TsunamiBoundarySample {
 /** Deterministic wave input sampled at the midpoint of each world tick, in seconds. */
 export type TsunamiBoundaryWave = (time: number) => TsunamiBoundarySample;
 
+/** Smooth-bed laminar attenuation at a single reference wave period. */
+export interface TsunamiLaminarBed {
+  /** Kinematic viscosity of the water in m²/s. */
+  readonly kinematicViscosity: number;
+  /** Reference wave period in seconds, specified from the incident wave or its forcing. */
+  readonly period: number;
+}
+
 /** A regular XZ patch including offshore water and dry land. Coordinates are metres from the world cell. */
 export interface TsunamiOptions {
   /** X and Z grid dimensions, fastest axis X. */
@@ -61,6 +69,8 @@ export interface TsunamiOptions {
   readonly waterDensity?: number;
   /** Manning roughness in s/m^(1/3). Defaults to zero. */
   readonly manning?: number;
+  /** Optional smooth-bed attenuation. Supply this in place of positive Manning roughness. */
+  readonly laminarBed?: TsunamiLaminarBed;
   /** Threshold in metres for applying discharge in near-dry cells. Defaults to 1e-7. */
   readonly dryDepth?: number;
   /** Open characteristic boundaries at X low, X high, Z low and Z high. Defaults to all closed. */
@@ -177,6 +187,8 @@ interface State {
   readonly spacing: number;
   readonly cellSize: number;
   readonly filterDepth: number;
+  readonly kinematicViscosity: number;
+  readonly angularFrequency: number;
   readonly sea: number;
   readonly dry: number;
   readonly state: Region;
@@ -343,12 +355,25 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
         waves.some((wave, i) => wave !== undefined && (!open[i] || typeof wave !== 'function')))
     )
       throw new MargoError('state', 'Give incoming waves as callbacks on open sides in low/high X and Z order.');
+    const manning = checked('Manning roughness', options.manning ?? 0, 0);
+    const laminarBed = options.laminarBed;
+    let kinematicViscosity = 0;
+    let angularFrequency = 0;
+    if (laminarBed !== undefined) {
+      if (!laminarBed || typeof laminarBed !== 'object')
+        throw new MargoError('state', 'Give the tsunami laminar bed a kinematicViscosity and a period.');
+      if (manning > 0)
+        throw new MargoError('state', 'Choose either tsunami laminar-bed attenuation or positive Manning roughness.');
+      kinematicViscosity = positive('laminar-bed kinematic viscosity', laminarBed.kinematicViscosity);
+      const period = positive('laminar-bed wave period', laminarBed.period);
+      angularFrequency = positive('laminar-bed angular frequency from the wave period', (2 * Math.PI) / period);
+    }
     const parameters = [
       spacing,
       positive('downward gravity', -host.gravity[1]),
       positive('water density', options.waterDensity ?? 1025),
       sea,
-      checked('Manning roughness', options.manning ?? 0, 0),
+      manning,
       dry,
       mask,
       ...origin,
@@ -391,6 +416,8 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
       spacing,
       cellSize,
       filterDepth,
+      kinematicViscosity,
+      angularFrequency,
       sea,
       dry,
       state,
@@ -586,6 +613,8 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
       dt,
       (context.tick + 1) * dt,
       s.incoming?.region.byteOffset ?? 0,
+      s.kinematicViscosity,
+      s.angularFrequency,
     );
     if (status === 2)
       throw new MargoError(

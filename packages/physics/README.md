@@ -8160,6 +8160,7 @@ surface altitude and outward-normal speed. A negative speed enters the grid. Omi
 exterior water. The budget's signed `boundaryExportVolume` subtracts incoming water and adds outgoing water.
 
 ```ts
+import { sin } from '@margoengine/math/pinned';
 import { PhysicsWorld } from '@margoengine/physics/world';
 import { TsunamiSolver } from '@margoengine/physics/tsunami';
 
@@ -8170,14 +8171,21 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(pulse, {
   bathymetry: -2,
   open: [true, false, false, false],
   incoming: [(time) => {
-    const phase = Math.max(0, 1 - Math.abs(time - 1));
-    const surface = 0.025 * phase * phase;
+    const phase = sin(Math.PI * time / 20);
+    const surface = 0.025 * phase;
     return { surface, outwardVelocity: 2 * (Math.sqrt(9.80665 * 2) - Math.sqrt(9.80665 * (2 + surface))) };
   }],
+  laminarBed: { kinematicViscosity: 1e-6, period: 40 },
 });
 world.advance(60);
 console.log(pulse.budget.boundaryExportVolume);
 ```
+
+On a smooth bed with laminar flow, give `laminarBed` the water's kinematic viscosity in m²/s and the
+incident wave period in seconds. It applies the dissipative part of the depth-dependent oscillatory
+bed stress. Omit it for the default frictionless bed, or use positive `manning` for the existing roughness
+model. Positive Manning and laminar attenuation are mutually exclusive. To restore or replay a world,
+use the same registered solver configuration, including its period and viscosity.
 
 Pass a live `TerrainBed` geometry or an aligned layout-1 `bottomField` to supply natural seabed
 motion. An optional `bottomFilterDepth` redistributes the rapid bottom response over nearby wet

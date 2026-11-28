@@ -5,6 +5,10 @@ import { TsunamiSolver } from '../dist/tsunami.js';
 import { PhysicsWorld } from '../dist/world.js';
 
 const wave = process.argv[2] ?? 'T30_H2';
+const bed = process.argv[3] ?? 'inviscid';
+assert.ok(bed === 'inviscid' || bed === 'laminar', 'Choose inviscid or laminar.');
+// Drähne et al. §2.3 uses the nominal freshwater viscosity at 20 °C for its Reynolds scaling.
+const laminarBed = bed === 'laminar' ? { kinematicViscosity: 1e-6, period: wave === 'T20_H2' ? 20 : 30 } : undefined;
 assert.ok(wave === 'T20_H2' || wave === 'T30_H2', 'Choose T20_H2 or T30_H2.');
 const fixture = new URL(`../tests/fixtures/sea06-draehne-${wave.toLowerCase().replace('_', '')}.json`, import.meta.url);
 const { secondsPerSample, scoreIntervalSeconds, runs } = JSON.parse(readFileSync(fixture, 'utf8'));
@@ -82,6 +86,7 @@ async function measure(run, spacing) {
     origin,
     bathymetry,
     dryDepth,
+    laminarBed,
     open: [false, true, false, false],
     incoming: [undefined, (time) => boundary(run, time), undefined, undefined],
   });
@@ -139,7 +144,7 @@ const report = [];
 for (const spacing of gridSpacings) {
   for (let i = 0; i < runs.length; i++) {
     const results = await measure(runs[i], spacing);
-    const entry = { wave, spacing, run: i + 1, ...results };
+    const entry = { wave, bed, spacing, run: i + 1, ...results };
     report.push(entry);
     process.stdout.write(`${JSON.stringify(entry)}\n`);
   }

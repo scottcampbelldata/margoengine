@@ -22,6 +22,8 @@ export interface TsunamiKernel {
     dt: number,
     time: number,
     incoming: number,
+    kinematicViscosity: number,
+    angularFrequency: number,
   ): number;
   tsunami_sources(
     water: number,

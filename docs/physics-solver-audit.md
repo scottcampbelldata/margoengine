@@ -63,6 +63,9 @@ them; the rest is a record of what a stronger solver would need.
 - Point 2 remains open. On the 20 mm grid, the Drähne T30 case meets two of six paired camera bounds and T20 meets
   none. Both preserve the inlet and gauge records separately. The NOAA canonical beach misses persist across
   three grids, with the larger crest arriving too early and a weaker case missing the observed rundown.
+  The smooth-bed closure's `tsunami-laminar.test.js` verifies the linear column against independent
+  eigenmode sums over shallow, transitional and deep regimes. At 20 mm the closure meets four of six
+  T20 camera bounds and one of six T30 bounds, so the coastal validation point remains open.
 
 ## Film set first: the underwater and boat films
 
