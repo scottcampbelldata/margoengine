@@ -299,11 +299,13 @@ export const screensVertexShader = `${varying}
   return ScreenVarying(camera.viewProjection*p,v.uv,v.kind,v.a,v.b,v.c,v.d,v.e,p.xyz,mesh.normal*v.direction);
 }`;
 
-/** The fragment stage: one branch per part kind, each reading its look from the flat values a to e. */
+/**
+ * The fragment stage: one branch per part kind, each reading its look from the flat values a to e. Its derivatives
+ * come first, in uniform control flow (before any branch or discard); only the reticle reads them.
+ */
 export const screensFragmentShader = `${varying}
 @fragment fn fragment(i:ScreenVarying)->@location(0) vec4f {
   let uv=i.uv;
-  // Derivatives first, in uniform control flow (before any branch or discard); only the reticle reads them.
   let sample=uv*i.e.yz;
   let radius=length(sample/max(abs(i.a.xy),vec2f(1e-6)));
   let radiusStep=fwidth(radius);

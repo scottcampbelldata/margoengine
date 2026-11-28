@@ -53,6 +53,10 @@ const BINDING = 124;
 //   spread over the volume path, path * tan(delta-t), is scaled by the same row instead. The lobe diameter in
 //   texels is that NDC radius times the capture height; mip L averages 2^L texels, so level = log2(diameter).
 // margoTransmission reads KHR_materials_ior 0 (the specular-glossiness mode) as an infinite index, 1e30.
+// margoTransmissionLevel takes the blur level from the transmitted lobe width (derivation above declarations) at one IOR:
+// dispersed rays each have their own. With KHR_materials_dispersion the IOR spreads by (IOR-1)*0.025*dispersion, and red
+// and blue each read on their own ray. The volume is Beer-Lambert: margoVolume.yzw is the transmittance per world unit.
+// The dielectric's Fresnel is glTF 2.0 Appendix B's, which mixes the metal part in beside it, not over it.
 const declarations = (group: number): string => /* wgsl */ `
 @group(${group}) @binding(${BINDING}) var margoScene:texture_2d<f32>;
 @group(${group}) @binding(${BINDING + 1}) var margoSceneSampler:sampler;
@@ -62,7 +66,6 @@ fn margoTransmissionBehind(i:Out,n:vec3f,v:vec3f,ior:f32,path:f32,level:f32)->ve
   let uv=clamp(c.xy/max(c.w,0.000001)*vec2f(0.5,-0.5)+0.5,vec2f(0),vec2f(1));
   return textureSampleLevel(margoScene,margoSceneSampler,uv,level).rgb;
 }
-// Blur level from the transmitted lobe width (derivation above declarations) at one IOR: dispersed rays each have their own.
 fn margoTransmissionLevel(roughness:f32,ior:f32,path:f32)->f32 {
   let size=vec2f(textureDimensions(margoScene,0));
   let alpha=roughness*roughness;
@@ -89,18 +92,15 @@ fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f {
   let path=max(margoVolume.x*s.th*margoVolumeThickness(i)*margoVolumeChord(i,s.n,v,ior),0.0);
   var behind=margoTransmissionBehind(i,s.n,v,ior,path,margoTransmissionLevel(s.roughness,ior,path));
   if(f.ext.w>0.0&&path>0.0){
-    // KHR_materials_dispersion: IOR spread (IOR-1)*0.025*dispersion; red and blue each read on their own ray.
     let spread=(ior-1.0)*0.025*f.ext.w;
     let red=max(1.0,ior-spread); let blue=ior+spread;
     behind=vec3f(margoTransmissionBehind(i,s.n,v,red,path,margoTransmissionLevel(s.roughness,red,path)).r,behind.g,margoTransmissionBehind(i,s.n,v,blue,path,margoTransmissionLevel(s.roughness,blue,path)).b);
   }
-  // Beer-Lambert through the volume: margoVolume.yzw is the transmittance per world unit.
   var transmittance=vec3f(1.0);
   if(path>0.0){
     let t=margoVolume.yzw;
     transmittance=select(select(pow(max(t,vec3f(0.000001)),vec3f(path)),vec3f(0.0),t<=vec3f(0.0)),vec3f(1.0),t>=vec3f(1.0));
   }
-  // The dielectric's Fresnel: glTF 2.0 Appendix B mixes the metal part in beside this one, not over it.
   let keep=1.0-margoFresnelPeak(margoDielectricFresnel(s.f0,s.sw,clamp(dot(s.n,v),0.0,1.0)));
   return (1.0-s.metal)*s.tr*keep*s.base.rgb*transmittance*behind;
 }
@@ -108,6 +108,11 @@ fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f {
 // Copy of the scene: level0 copies the resolved scene texel for texel; every next level is the area filter of the one
 // above (shared/mipmaps.js: each source texel weighted by its overlap with the destination footprint, so an odd last
 // row or column keeps its share; a plain 2x2 box from texel 2p dropped it).
+// level0Display: a display-encoded source holds toDisplay(light), the PBR Neutral curve then the sRGB transfer
+// (shared/display.js). Level 0 undoes both, so every mip averages scene light (an encoded average is a darker blur) and
+// margoTransmission adds the same light it would on an HDR target; the glass shader's own display transform then
+// applies the curve once, so clear IOR 1 glass shows exactly what is behind it (a plain decode applied the curve
+// twice: 230 drew 225).
 const copy = /* wgsl */ `
 @group(0) @binding(0) var source:texture_2d<f32>;
 @vertex fn vertex(@builtin(vertex_index) k:u32)->@builtin(position) vec4f {
@@ -117,10 +122,6 @@ const copy = /* wgsl */ `
 @fragment fn level0(@builtin(position) p:vec4f)->@location(0) vec4f {
   return textureLoad(source,vec2i(p.xy),0);
 }
-// A display-encoded source holds toDisplay(light): the PBR Neutral curve, then the sRGB transfer (shared/display.js).
-// Level 0 undoes both, so every mip averages scene light (an encoded average is a darker blur) and margoTransmission
-// adds the same light it would on an HDR target; the glass shader's own display transform then applies the curve once,
-// so clear IOR 1 glass shows exactly what is behind it (a plain decode applied the curve twice: 230 drew 225).
 @fragment fn level0Display(@builtin(position) p:vec4f)->@location(0) vec4f {
   let c=textureLoad(source,vec2i(p.xy),0);
   let x=clamp(c.rgb,vec3f(0.0),vec3f(1.0));

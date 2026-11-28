@@ -548,8 +548,6 @@ var<workgroup> texelSum:array<vec4f,64>;
 }
 `
     : `
-// Source texels first to end only, so no submit runs long (KB-SHOT-COMPATLOST1): a chunk that does not reach the last
-// texel keeps its running sum in prefilterSums for the next, and the last stores the texel. The same additions in order.
 @group(0) @binding(6) var<storage,read_write> prefilterSums:array<vec4f>;
 @compute @workgroup_size(8,8) fn prefilter(@builtin(global_invocation_id) id:vec3u) {
   let s=bake.size;if(id.x>=s||id.y>=s){return;}

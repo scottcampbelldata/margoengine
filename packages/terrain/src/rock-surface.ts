@@ -310,6 +310,8 @@ export class RockSurface implements EnginePlugin {
    * The WGSL added to core's shader. `rockShade` returns the rock's colour (rgb) and roughness (a) and tilts the normal:
    * triplanar weights |n|^4; per octave the three projections' value noise and its analytic slopes, summed as a world
    * gradient, its tangential part (the surface gradient) taken off the normal; the beds from world height.
+   * graniteGrain puts one crystal in each cell of a lattice whose edges a low noise bends, so grains are irregular and
+   * interlock; the cell's hash picks its mineral, and the result is its brightness over granite's mean.
    */
   private code(binding: number): string {
     return `
@@ -324,8 +326,6 @@ fn rockPlanar(p:vec3f,w:vec3f,f:f32,o:f32)->RockPlanar {
  var r:RockPlanar;r.value=w.x*a.x+w.y*b.x+w.z*c.x;
  r.gradient=f*(w.x*vec3f(0,a.y,a.z)+w.y*vec3f(b.y,0,b.z)+w.z*vec3f(c.y,c.z,0));return r;
 }
-// One crystal per cell of a lattice whose edges a low noise bends, so grains are irregular and interlock; the cell's
-// hash picks its mineral, and the result is its brightness over granite's mean.
 fn graniteGrain(q:vec2f,o:f32)->f32 {
  let s=q*0.6+o*31.0;let bend=vec2f(terrainNoise(s).x,terrainNoise(s+17.3).x)-0.5;
  let c=bitcast<vec2u>(vec2i(floor(q+0.9*bend)));
