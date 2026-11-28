@@ -234,6 +234,22 @@ const remove = imported.add(kerb); // the kerb is wetted once, by the GLTFWeathe
 remove(); // and by the scene's Puddles again
 ```
 
+A scene may hold several `GLTFWeather` effects, each with its own settings and models (each takes its own plugin name,
+`weather-gltf`, `weather-gltf-2`, ...). Water stands only on surfaces that can hold it: give props, roofs and vehicles,
+whose small tops and edges shed it, an effect with `coverage: 0`, so they darken and gloss in the rain while the ground
+pools (`tests/material-wet-browser.mjs`, KB-WEATHER-GLTFTWO1, WebGPU and the WebGL2 layer).
+
+```ts
+import { Engine } from 'margoengine/core';
+import { GLTFWeather } from 'margoengine/weather/gltf';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const rain = { wetness: 0.95, rain: 0.7, coverage: 0.25 };
+const ground = GLTFWeather.attach(engine, { puddles: rain }); // add the yard and the track here
+const props = GLTFWeather.attach(engine, { puddles: { ...rain, coverage: 0 } }); // and the crates and drums here
+console.log(ground.name, props.name); // weather-gltf weather-gltf-2
+```
+
 ## Snow with depth
 
 `Snow` from `margoengine/weather/snow` lays snow on every core mesh and every `Material` mesh: up-facing surfaces

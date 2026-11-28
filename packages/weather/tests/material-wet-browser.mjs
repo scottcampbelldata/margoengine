@@ -3,6 +3,7 @@
 //   node packages/weather/tests/material-wet-browser.mjs [--compat]
 // Before the fix a Material mesh stayed dry under the weather, so its wet and snowy pictures were the dry one.
 // KB-WEATHER-GLTFTWICE1: a Material mesh given to a GLTFWeather as well takes the weather once, from the GLTFWeather.
+// KB-WEATHER-GLTFTWO1: two GLTFWeathers, one pooling and one shedding water, share a scene.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 
@@ -37,6 +38,12 @@ try {
   for (const leg of ['both', 'gltfOnly'])
     assert.ok(r[leg].pixels > 20_000 && r[leg].off === 0 && r[leg].mean < 1e-5, `${leg}: ${receipt}`);
   assert.ok(r.gltfWetChange.off > 0.5 * r.gltfWetChange.pixels, `gltfWetChange: ${receipt}`);
+  // KB-WEATHER-GLTFTWO1: two GLTFWeathers share a scene under their own names; the pooling one draws as alone, the one
+  // with coverage 0 leaves its ground wet but without standing water.
+  assert.equal(new Set(r.names).size, 2, receipt);
+  assert.ok(r.pooledBeside.pixels > 20_000 && r.pooledBeside.off === 0, `pooledBeside: ${receipt}`);
+  assert.ok(r.shedVsPooled.off > 0.05 * r.shedVsPooled.pixels, `shedVsPooled: ${receipt}`);
+  assert.ok(r.shedVsDry.off > 0.5 * r.shedVsDry.pixels, `shedVsDry: ${receipt}`);
   console.log(
     `KB-WEATHER-MATERIALSWET1 ${r.compat ? 'WebGL2 layer' : 'WebGPU'}: wet Material matches core over ${r.wet.pixels} px (mean ${r.wet.mean.toExponential(1)}), snow over ${r.snow.pixels} px (mean ${r.snow.mean.toExponential(1)}); with a GLTFWeather too, mean ${r.both.mean.toExponential(1)}.`,
   );

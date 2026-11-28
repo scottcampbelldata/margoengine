@@ -39,12 +39,20 @@ class SnowValues extends Snow {
 
 /**
  * Weather on imported PBR models, after their texture sampling and before lighting.
- * Uses the same WGSL and options as Puddles and Snow. Authored alpha, emission,
+ * Uses the same WGSL and options as Puddles and Snow. A scene may hold several, each with its own settings and models:
+ * give props whose tops cannot hold standing water an effect with `puddles.coverage: 0`, so they only darken and
+ * gloss while the ground pools. Authored alpha, emission,
  * texture coordinates and material extensions remain intact. WebGPU only.
  * @throws MargoError for unsupported backends, mismatched shaders or disposed use.
  */
+let instances = 0;
+
 export class GLTFWeather implements EnginePlugin {
-  readonly name = 'weather-gltf';
+  /**
+   * Plugin name, unique to each effect (`weather-gltf`, then `weather-gltf-2`, ...), so one scene can hold several:
+   * ground that pools water beside props whose small tops shed it (KB-WEATHER-GLTFTWO1).
+   */
+  readonly name: string = instances++ ? `weather-gltf-${instances}` : 'weather-gltf';
   private engine?: Engine;
   private uniform?: GPUBuffer;
   private readonly values = new Float32Array(20);

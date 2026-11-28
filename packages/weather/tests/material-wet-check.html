@@ -75,9 +75,17 @@ window.run=async()=>{
  const gltf=GLTFWeather.attach(engine,{puddles:{...rain}});gltf.advanceTime(0.3);
  m=ground();gltf.add(m);const bothWet=await shot();m.dispose();
  scenePuddles.dispose();
- m=ground();gltf.add(m);const gltfWet=await shot();m.dispose();gltf.dispose();
+ m=ground();gltf.add(m);const gltfWet=await shot();m.dispose();
+ // KB-WEATHER-GLTFTWO1: a second GLTFWeather in the same scene, whose models shed standing water (coverage 0), attaches
+ // beside the first. Before the fix both took the plugin name weather-gltf and the second threw. Each weathers its own
+ // models: the pooling ground draws as before, the shedding one is wet without water.
+ const shed=GLTFWeather.attach(engine,{puddles:{...rain,coverage:0}});shed.advanceTime(0.3);
+ m=ground();gltf.add(m);const pooledBeside=await shot();m.dispose();
+ m=ground();shed.add(m);const shedWet=await shot();m.dispose();
+ const names=[gltf.name,shed.name];shed.dispose();gltf.dispose();
  const gltfValidation=(await device.popErrorScope())?.message??null;
  return {
+  names,pooledBeside:compare(gltfWet,pooledBeside),shedVsPooled:compare(gltfWet,shedWet),shedVsDry:compare(materialDry,shedWet),
   gltfValidation,both:compare(sceneWet,bothWet),gltfOnly:compare(sceneWet,gltfWet),gltfWetChange:compare(materialDry,bothWet),
   compat:globalThis.__margoCompat===true,
   dry:compare(coreDry,materialDry),wet:compare(coreWet,materialWet),snow:compare(coreSnow,materialSnow),

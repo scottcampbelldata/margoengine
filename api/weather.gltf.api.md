@@ -8,7 +8,7 @@ import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
 export class GLTFWeather implements EnginePlugin {
     readonly options: GLTFWeatherOptions;
-    readonly name = "weather-gltf";
+    readonly name: string;
     constructor(options?: GLTFWeatherOptions);
     static attach(engine: EngineKernel, options?: GLTFWeatherOptions): GLTFWeather;
     get owner(): Engine | undefined;
