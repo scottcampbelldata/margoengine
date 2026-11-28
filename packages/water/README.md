@@ -714,6 +714,11 @@ Other capture effects take the water too: `SceneTargets.add(water, {ground: fals
 colour with the foam it shows, its roughness, not metal) instead of SSR's reflection fields, and its depth. One water
 can be in several effects at once; each keeps its own capture pipeline.
 
+A capture draws from the frame's unjittered camera with frame values of its own, so under TAA its targets line up
+with the resolved frame. A capture that runs before this frame's surface draw (`SceneTargets`, ahead of the main pass)
+draws the surface last drawn, at this frame's time and camera; on the very first frame there is none yet, so the water
+is missing from that frame's targets (KB-WATER-CAPTURECAM1).
+
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

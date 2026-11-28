@@ -29,6 +29,7 @@ import { linearHdr } from '../../shared/hdr-format.js';
 import { seaState, whitecapCoverage } from './sea-state.js';
 import { publishSurfaceDepth } from '../../shared/surface-depth.js';
 import { publishReactiveMask } from '../../shared/reactive-mask.js';
+import { unjitteredCamera } from '../../shared/temporal-camera.js';
 import {
   skyCoordinates,
   skyTexture,
@@ -1133,6 +1134,9 @@ export class Water implements EnginePlugin {
   private source?: () => GPUTexture | undefined;
   private shared?: ReturnType<typeof acquireDepth>;
   private uniform?: GPUBuffer;
+  // The capture's own frame values: the surface's, from the capture's unjittered camera (KB-WATER-CAPTURECAM1).
+  private captureUniform?: GPUBuffer;
+  private captureValues?: Float32Array;
   private vertices?: GPUBuffer;
   private indices?: GPUBuffer;
   private count = 0;
@@ -2414,8 +2418,10 @@ export class Water implements EnginePlugin {
     this.disposers.add(callback);
     return () => this.disposers.delete(callback);
   }
-  /** `mode` 'capture': draws this frame's surface into the capture hook's pass (`setCapture`); `color` and `depth` are
-   * unused (the hook's pass has its own). Does nothing before the water's first draw, without a hook or after disposal. */
+  /** `mode` 'capture': draws the surface into the capture hook's pass (`setCapture`) from the context's unjittered
+   * camera; `color` and `depth` are unused (the hook's pass has its own). A capture before this frame's surface draw
+   * (SceneTargets, ahead of the main pass) draws the surface last drawn, at this frame's time. Does nothing before the
+   * water's first draw, without a hook or after disposal. */
   draw(
     c: Extract<PassContext, { backend: 'webgpu' }>,
     mode: 'capture',
@@ -2423,7 +2429,9 @@ export class Water implements EnginePlugin {
     depth?: GPUTextureView,
   ): void {
     const hook = this.capture;
-    const view = this.view;
+    // SceneTargets draws ahead of the main pass, so no view is drawn yet this frame: the last one drawn stands in
+    // (KB-WATER-CAPTURECAM1; it drew nothing there before).
+    const view = this.view ?? this.drawnView;
     if (mode !== 'capture' || !hook || this.disposed || !view?.groups.length || !this.shaderCode) return;
     void color;
     void depth;
@@ -2476,6 +2484,30 @@ export class Water implements EnginePlugin {
       this.captures.set(key, (capture = { pipeline }));
     }
     const pipeline = capture.pipeline;
+    // The surface's frame values from the capture's own camera: the colour draw's carry TAA's jittered matrix, and a
+    // capture ahead of this frame's draw would read the last frame's camera (KB-WATER-CAPTURECAM1).
+    const camera = unjitteredCamera(c.camera),
+      values = (this.captureValues ??= new Float32Array(this.values.length));
+    values.set(this.values);
+    values.set(camera.matrix);
+    values.set(camera.position, 16);
+    if (this.horizon) {
+      const [x, z] = this.cell;
+      values[128] = Math.round(camera.position[0] / x) * x;
+      values[129] = Math.round(camera.position[2] / z) * z;
+    }
+    values[20] = this.seconds;
+    values[28] = camera.near;
+    values[29] = camera.far;
+    if (this.captureUniform?.size !== this.uniform!.size) {
+      this.captureUniform?.destroy();
+      this.captureUniform = c.device.createBuffer({
+        size: this.uniform!.size,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      for (const state of this.views.values()) state.captureGroups.clear();
+    }
+    c.device.queue.writeBuffer(this.captureUniform, 0, values as Float32Array<ArrayBuffer>, 0, SEA_AT + 4 + 4 * values[SEA_AT]!);
     // The capture fragment ends before the fog mix, so its layout has no fog binding (resource 8).
     let groups = view.captureGroups.get(pipeline);
     if (!groups)
@@ -2485,7 +2517,9 @@ export class Water implements EnginePlugin {
           c.device.createBindGroup({
             layout: pipeline.getBindGroupLayout(0),
             entries: [
-              ...resources.slice(0, 8).map((resource, binding) => ({ binding, resource })),
+              ...resources
+                .slice(0, 8)
+                .map((resource, binding) => ({ binding, resource: binding === 0 ? { buffer: this.captureUniform! } : resource })),
               ...this.effectBindings,
             ],
           }),
@@ -2532,6 +2566,8 @@ export class Water implements EnginePlugin {
     this.reflected = undefined;
     this.skySampler = undefined;
     this.uniform?.destroy();
+    this.captureUniform?.destroy();
+    this.captureUniform = undefined;
     this.vertices?.destroy();
     this.indices?.destroy();
     this.fogBuffer?.destroy();

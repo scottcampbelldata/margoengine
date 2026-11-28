@@ -4,7 +4,8 @@
 // camera: before the fix the targets were drawn with TAA's jittered camera, a fifth of a pixel off the resolved frame
 // (the timber-valley shot's look masks). One scene per capture path, each alone in the targets: core meshes (core's lit
 // shader with TAA's clip patch), a terrain (its prepared ring uniforms carry the jittered matrix), a lit Scatter and
-// ScatterInstances (their capture stages took TAA's clip patch) and a gltf/pbr model. Each is read without TAA, then
+// ScatterInstances (their capture stages took TAA's clip patch), a gltf/pbr model and a Water (its capture bound the
+// uniform of its colour draw, TAA's jittered camera). Each is read without TAA, then
 // after frames with TAA at several jitter phases: coverage, height and camera distance must not move (offset 0).
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
@@ -17,14 +18,15 @@ await postBrowser(
   () => launchBrowser({ headless: true }),
   async (page) => {
     const results = [];
-    for (const kind of ['core', 'terrain', 'scatter', 'instances', 'gltf']) {
+    for (const kind of ['core', 'terrain', 'scatter', 'instances', 'gltf', 'water']) {
       await page.evaluate(async (kind) => {
         const { Engine, PbrMaterial, box } = await import('/packages/core/dist/index.js'),
           { SceneTargets } = await import('/packages/post/dist/mrt.js'),
           { TAA } = await import('/packages/taa/dist/index.js'),
           { Terrain } = await import('/packages/terrain/dist/index.js'),
           { Scatter, ScatterInstances } = await import('/packages/scatter/dist/index.js'),
-          { loadGLTF } = await import('/packages/gltf/dist/pbr.js');
+          { loadGLTF } = await import('/packages/gltf/dist/pbr.js'),
+          { Water } = await import('/packages/water/dist/index.js');
         const canvas = document.querySelector('canvas'),
           engine = await Engine.create(canvas, {
             backend: 'webgpu',
@@ -96,7 +98,16 @@ await postBrowser(
             },
           ]);
           engine.use(model);
-        } else {
+        } else if (kind === 'water') {
+          // A flat 4 m square of water (one train of zero height, so time moves nothing): its edges against the empty
+          // background move with any camera offset.
+          model = Water.attach(engine, {
+            size: [4, 4],
+            segments: 16,
+            height: 0.5,
+            waves: [{ direction: [1, 0], amplitude: 0, wavelength: 10 }],
+          });
+        } else if (kind === 'gltf') {
           model = await loadGLTF(engine, '/packages/exporters/tests/fixtures/Box.glb');
           model.root.setPosition([0.1, 0.5, 0]);
           model.root.setScale([1.7, 1.3, 1.9]);

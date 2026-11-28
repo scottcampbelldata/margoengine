@@ -6,6 +6,22 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: a Water added to SceneTargets drew nothing, and its SSR capture drew with TAA's jittered camera (KB-WATER-CAPTURECAM1; water)
+
+- **Repro (before):** `SceneTargets.add(water, {ground: false})` (`@margoengine/post/mrt`): the targets hold no water
+  pixel once frames move time on (`delta` above 0), with or without TAA (0 px in
+  `packages/post/test/scene-targets-taa-browser.mjs`'s water case).
+- **Cause:** the capture drew only the view its colour pass had drawn this frame, and bound that pass's uniform.
+  `SceneTargets` runs at order -4.5, before the water's colour pass (order 4), so it found no view and drew nothing
+  (`packages/post/test/scene-targets-water-browser.mjs` draws with `delta: 0`, which skips the clear, so it passed);
+  a capture after the pass (SSR) drew from the colour pass's camera, TAA's jittered one.
+- **Fix:** the capture writes frame values of its own from the context's unjittered camera
+  (`packages/shared/temporal-camera.js`) at this frame's time, and before this frame's draw it uses the view drawn last
+  (`packages/water/src/index.ts`).
+- **Regression test:** `node packages/post/test/scene-targets-taa-browser.mjs` (and `--compat`, in post `test:gpu`):
+  the water covers 5,855 px of the targets, and TAA's jitter moves none of them.
+- **Weak spot left:** on the very first frame no surface has been drawn, so that frame's targets hold no water.
+
 ### Fixed 2026-11-28: shrubs drew as flat bright green blobs on the slopes (KB-SHRUB-BLOBS1; procedural, biomes)
 
 - **What:** in timber-valley stills every shrub on the slopes was a smooth mint to lime dome with a hard outline.
