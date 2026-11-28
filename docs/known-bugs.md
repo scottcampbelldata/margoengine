@@ -74,6 +74,34 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   loops, so the program grows many times over before it links. Not yet traced to the WGSL loop that costs most.
 - **For:** the water lane (`packages/water`, GLSL emitted by `packages/webgl2-compat`).
 
+### Open 2026-11-28: a reuleaux drive rig sits 0.6 to 0.7 mm off its exact centre (KB-PHYS-REULEAUXWALLS1, physics solver)
+
+- **Repro:** `reuleauxRig` of `@margoengine/machinery/rigs` (landed in 267729b7bd): a convex-hull Reuleaux triangle of 64
+  points per arc between four fixed walls at zero clearance, its turn locked to the input, sits 0.6 to 0.7 mm off the
+  exact centre over a 456 mm travel. More substeps, more iterations, the high-fidelity tier and zero friction gave at best
+  0.52 mm; a 24-point hull measured 0.16 mm.
+- **Cause:** not found yet. The leads are the four walls at zero clearance, a contact set that holds more rows than the
+  triangle has freedoms, and how a hull's face count moves where its contact points sit (a finer hull reads worse).
+  Physics lane.
+
+### Open 2026-11-28: a Sarrus linkage's loop error grows as it moves and stays when it stops (KB-PHYS-SARRUSLOOP1, physics solver)
+
+- **Repro:** the parked rig `sarrus-rig.ts` (links 0.8 m, four 1 kg point links of radius 0.02 m, five hinges from a
+  fixed base and a position-driven crank, no gravity, 2 degree 60 Hz steps from 48 degrees). The deck's gap from
+  `sarrusPose` reads 2.2e-5 m at 49 degrees, 3.4e-4 at 56, 2.1e-3 after 73 and back to 30, 3.4e-3 back at 48, and holds
+  each figure unchanged for 300 steps at rest. The error is four of the five hinges pulled apart along their links by the
+  same amount (2.6 mm each at the end), with every turning row within 2e-7 rad.
+- **Cause (found 2026-11-28, not fixed):** the loop runs from the fixed base to the kinematic crank, so it is one path
+  of five joints, 25 lock rows on 24 freedoms, solved exactly (share 1). Higham's stop drops one row, always the same one:
+  axis 4 of the base hinge, the last joint of the path, as pivoting only chooses among a joint's own columns. What is left
+  is still close to singular in the loop's direction, so the pushing pass asks for turns far past what it closes: the
+  push asked up to 4.2 (the sum of the largest rows) and `push_share` (Buss and Kim 2005's clamp, TURN) cut it to as
+  little as 7e-7 of itself. Cutting the whole push also cuts the part of it that would close the links, so the stretch made by
+  each move (second order in the step, as the rows turn) is never taken back. The fix is the one Buss and Kim name for
+  this: damp each singular direction apart (selectively damped least squares, or damped least squares on the path's
+  factors, Wampler 1986, Nakamura and Hanafusa 1986), so a near dependent direction asks little and the rest closes whole.
+  Physics lane.
+
 ### Open 2026-11-28: a ball on a spinning hinge settles off its balance in proportion to its inertia (KB-PHYS-SPINBIAS1, physics solver)
 
 - **Repro:** a position-driven spindle turned about z at 68 rpm (`setNextRotation` each 60 Hz step), gravity -9.80665 z, a
@@ -83,10 +111,31 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   same with a dynamic spindle or a `Multibody` tree. A drag on the ball's speed (`linearDamping`) in place of the hinge drag
   moves it too, in proportion (0.17 degrees at 3/s, 0.32 at 6/s). Finer steps shrink it slowly (1/60 s: 0.113 degrees at
   I = 3.6e-4, 1/480 s: 0.064).
-- **Cause:** not found yet. An isotropic ball's spin cannot move the balance (its angular momentum `I w z` is constant), so
-  the shift is the solver's. It looks first order in the substep, as an impulse along a direction fixed at a substep's
-  start while the arm turns `w h` within it would push steadily outward. The Watt governor rig of
-  `@margoengine/machinery/rigs` uses point-mass balls (I = 1e-5 m L^2) and 32 substeps, which settle within 0.001 degrees.
+- **Cause (found 2026-11-28, not fixed):** the substep takes its forces before the poses move and the joints' centripetal
+  turn after. Gravity is a full kick of h in `integrate_velocities`; the passes then solve rows read at the substep's
+  start pose, where the spin carries no swing; the poses move along those rows' tangent, which flings the ball out by
+  R (w h)^2 / 2, half a substep of the centrifugal pull; and the relaxing pass, on rows from the new pose, gives the whole
+  centrifugal swing speed at the end. At the balance the two pulls cancel over the substep, but the speed reads +p h / 2
+  of swing inward in the passes and -p h / 2 outward at the substep's end, p = g sin(a) / L the swing pull: measured
+  7.66e-3 m/s against p h L / 2 = 7.66e-3 m/s at 8 substeps, halving with each doubling of the substeps. A hinge drag
+  solved in the passes reads the inward half and pushes the arm out; a `linearDamping` reads the body's speed after the
+  kick and pushes it out too (0.32 degrees at 6/s, the same at I = 1e-6 and 1e-2). The inertia enters through how much of
+  that speed one motor row takes: on the free body alone its effective mass is I, not the swing's I + m L^2, so a light
+  ball's drag acts on almost none of it. Repro test (not landed, as it fails): a 68 rpm `KINEMATIC_POSITION` spindle,
+  a 1 kg ball 0.292 m out on a hinge started on the balance with w x r and w z, axis-3 force motor of damping 2, 600
+  steps; 0.806 degrees at I = 1e-2 and 8 substeps, 0.464 at 16, 0.252 at 32, 0.132 at 64.
+- **Tried:** (1) both of RATTLE's halves (Andersen 1983; Hairer, Lubich and Wanner 2006, section VII.1.4): gravity and
+  forces half before the passes and half after the poses move, and the passes' rows read at the substep's midpoint (each
+  body turned on by its spin for h / 2). Every reading then sits on the balance, within 7e-4 degrees for every inertia,
+  drag and substep count, and second order (1.7e-4 at 16). It cannot land as it stands: the midpoint rows project the
+  speed twice a substep on two different poses, which takes kinetic energy out (the double pendulum of tests/joints.rs
+  lost 4.7 J against its 0.098 J bar, the bob at 90 degrees ran 1.3 percent short), and the split kick moves every
+  contact figure of tests/solver.rs and tests/block_solver.rs (bounce heights, the slope hold, pyramid settling), 17 kernel
+  tests in all and every replay hash. Either half alone does not move the balance. (2) Solving the motors after the
+  locks' push in the pushing pass: worse (12 degrees). A fix has to give the centripetal turn to the speed before the poses
+  move without projecting on two poses, a rows-turn-with-the-bodies step, which is integrator work for the physics lane.
+  The Watt governor rig of `@margoengine/machinery/rigs` uses point-mass balls (I = 1e-5 m L^2) and 32 substeps, which
+  settle within 0.001 degrees.
   Physics lane.
 ### Checked 2026-11-28, no engine defect: the Arms-wide walk's side view shows the capture's own low, locked arms (KB-RIG-ARMS2, rigging, animation, demo take)
 
