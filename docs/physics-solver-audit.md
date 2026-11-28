@@ -3260,3 +3260,14 @@ Distributed heat storage, brine and surface snow evolution, local water-flow fee
 - Point 8 (127472895c). `packages/physics/scripts/fire06-gallium-measured.mjs` compares independent measured fronts and tests grid and boundary sensitivity. At 17 min the solver predicts a flat 30.67 mm front and the measured span is 23.7–70.3 mm. Only one of nine samples overlaps the estimated figure and sensitivity range. [Measured limits](limits.md#fire-06-gallium-melting-across-a-heated-vertical-plate)
 
 Mushy melting, temperature-dependent materials, melt convection, a scalable implicit solve and installation in the original kiln and turbofan shots remain open. The row stays REOPENED at four points.
+
+### SOUND-04 Contact and modal sound
+
+#### SOUND-04 four-point pass
+
+- Point 5 (b23fdc911c). `packages/physics/tests/coupling/modal-sound.test.js` checks a real joint rupture through a signed-origin shift and exact rewind. It reads separately owned contact memory and rejects a late malformed load, an unaligned region and a wrong origin before any accepted sound state changes. `packages/physics/tests/coupling/modal-sound-workers.test.js` checks rejection of individually nonfinite PCM, oscillator and roughness trials with retained prior work.
+- Point 6 (b23fdc911c). `packages/physics/tests/coupling/modal-sound-workers.test.js` verifies exact accepted history and audio for 1, 2 and 4 participants on 7 and 11 tracks. `packages/physics/tests/modal-sound-workers.browser.mjs` verifies three simultaneous actual Chromium helpers, 7 tracks, 2,569 PCM samples and 6,606 paired complex recurrence updates among the 367-sample block.
+- Point 7 (b23fdc911c). `packages/physics/tests/modal-sound-film.browser.mjs` generates the steel bar's 431.86 Hz ring from an accepted 0.6867 N·s hit, with a gravity-released control striker caught above the bar. All 28,800 samples follow the analytic response to within 1.49 × 10⁻⁸. Both renderers independently repeat complete state, PCM and RGBA through held frames, pre-contact and mid-ring restore, re-advance and rewind.
+- Point 8 (b23fdc911c). `packages/physics/scripts/sound04-modes-measured.mjs` evaluates independent thin-plate predictions using nominal geometry and material and reads the frequencies from the production PCM. The 24 independent measurements differ by up to 14.19 Hz and 6.31%, with five falling inside the published rounding and readout interval. The solver still requires supplied modes. [Measured limits](limits.md#sound-04-simply-supported-aluminum-plates)
+
+Geometry-derived modes, contact-point mode shapes, acoustic radiation and the other mapped source couplings remain open. The row stays REOPENED at four points.
