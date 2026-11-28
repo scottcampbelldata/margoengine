@@ -4291,6 +4291,10 @@
         "raw": 43,
         "gzip": 63
       },
+      "./physics/boundary-layer": {
+        "raw": 49,
+        "gzip": 69
+      },
       "./physics/aeolian": {
         "raw": 42,
         "gzip": 62
@@ -15442,8 +15446,8 @@
         "gzip": 5010
       },
       "./lightning": {
-        "raw": 24304,
-        "gzip": 8900
+        "raw": 24337,
+        "gzip": 8917
       },
       "./explosive": {
         "raw": 41750,
@@ -15598,20 +15602,20 @@
         "gzip": 15190
       },
       "./viscoplastic": {
-        "raw": 22777,
-        "gzip": 8628
+        "raw": 22810,
+        "gzip": 8643
       },
       "./tsunami": {
-        "raw": 23395,
-        "gzip": 8969
+        "raw": 23428,
+        "gzip": 8985
       },
       "./pack-ice": {
         "raw": 11423,
         "gzip": 4715
       },
       "./runoff": {
-        "raw": 18136,
-        "gzip": 6982
+        "raw": 18169,
+        "gzip": 7003
       },
       "./drainage-fog": {
         "raw": 10045,
@@ -15629,6 +15633,10 @@
         "raw": 16197,
         "gzip": 7062
       },
+      "./boundary-layer": {
+        "raw": 14014,
+        "gzip": 5513
+      },
       "./aeolian": {
         "raw": 11986,
         "gzip": 5000
@@ -15638,28 +15646,28 @@
         "gzip": 3902
       },
       "./landscape": {
-        "raw": 19499,
-        "gzip": 7542
+        "raw": 19532,
+        "gzip": 7562
       },
       "./sediment": {
-        "raw": 21174,
-        "gzip": 7845
+        "raw": 21207,
+        "gzip": 7863
       },
       "./underwater": {
-        "raw": 20330,
-        "gzip": 8051
+        "raw": 20363,
+        "gzip": 8067
       },
       "./orbit": {
-        "raw": 17090,
-        "gzip": 6703
+        "raw": 17123,
+        "gzip": 6720
       },
       "./granular-flow": {
         "raw": 14611,
         "gzip": 5574
       },
       "./lava": {
-        "raw": 25288,
-        "gzip": 9647
+        "raw": 25321,
+        "gzip": 9666
       },
       "./dfsph": {
         "raw": 19974,
@@ -18826,8 +18834,8 @@
         "gzip": 1753
       },
       "./boundary-layer": {
-        "raw": 4951,
-        "gzip": 2410
+        "raw": 7682,
+        "gzip": 3408
       },
       "./precipitation": {
         "raw": 10030,
@@ -19410,6 +19418,16 @@
       "raw": 19596,
       "gzip": 7667,
       "brotli": 6712
+    },
+    "packages/physics/dist/boundary-layer-kernel.wasm": {
+      "raw": 11852,
+      "gzip": 4483,
+      "brotli": 3982
+    },
+    "packages/physics/dist/boundary-layer-kernel-shared.wasm": {
+      "raw": 11852,
+      "gzip": 4483,
+      "brotli": 3982
     },
     "packages/physics/dist/orbit-kernel.wasm": {
       "raw": 14124,

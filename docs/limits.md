@@ -1793,7 +1793,7 @@ only: no timings.
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
 | Physics kernel download (`@margoengine/physics`, `Physics.load()`, 2026-11-24) | By size: the kernel is a deflated Wasm blueprint inside the entry's JavaScript, inflated and compiled by the first `Physics.load()`, once per app; no Wasm file, bundler plugin or peer install. Before 2026-11-24 the solver was Rapier, a 3,082,103 byte Wasm (1,176,707 gzip) with a 270,338 byte lazy chunk. | One file less for every app, and a solver that is Margo's own. | `Physics.load()` rejects with a `MargoError` (`failed`) when the blueprint cannot be compiled (a Content Security Policy without `'wasm-unsafe-eval'` among them); the next call tries again. | Allow `'wasm-unsafe-eval'` as `docs/csp.md` says. |
-| Boundary-layer wind and Mann turbulence (`@margoengine/weather/boundary-layer`, `/turbulence`, 2026-11-25, ATMO-01, ATMO-02) | By method: neutral stability only (no Monin-Obukhov stability functions), flat terrain (no speed-up over hills or shelter behind them), one roughness length; the turbulence keeps its standard deviation at every height above the roughness and is advected at the reference speed; the box repeats past its size (default 4,096 m along the wind: every 5.7 minutes at 12 m/s) and, being finite, under-represents eddies larger than about a third of it (Faccioni et al. 2026). Enforced: box cells with prime factors 2, 3 and 5; size, length scale and sigma finite and above 0; a reference height above the roughness. | Mann's tensor is the IEC 61400-1 model for wind loads, and a synthesised box is the same bits on every engine. | No stable or convective boundary layer, no terrain effects yet. | A larger box (`cells`, `size`) for long shots; a box per region for very large scenes. |
+| Boundary-layer wind and Mann turbulence (ATMO-01, ATMO-02) | Dyer–Paulson stability is a surface-layer closure for fixed roughness above flat ground. Positive L is stable, negative L is unstable and positive infinity is neutral. The finite Mann box advects with the sampled mean layer, tapers within one vertical cell at the boundaries and tiles horizontally. Shear and taper are algebraic, without projection. | Pinned scalar Weather and native Physics agree on the same grid and continuous queries. Multiple native threads require shared world memory and a Worker outside the browser Window. | Terrain speed-up and shelter, stability-dependent spectral intensity, top-of-boundary-layer entrainment and two-way feedback remain open. | Use the original Mann model entry for periodic turbulence synthesis, and matching finite cells for a registered wind grid. |
 | Precipitation (`@margoengine/weather/precipitation`, 2026-11-25, ATMO-04) | By method: raindrop fall speeds from the Loftus and Wordsworth drag balance run up to 7 percent under Gunn and Kinzer's measurements (6.6 percent at 1 mm, 3.5 percent at 2 to 4 mm, 0.3 percent at 5.8 mm); snow aggregates take the Brown and Francis mass law with maximum dimension (its authors used a mean dimension, which makes flakes heavier and up to about a third faster than measured below 2 mm); graupel's speeds follow Heymsfield and Wright's fit within 2 percent from 2 to 5 mm but fall to half of their power law at 0.5 mm; no evaporation below cloud base, no aggregation or breakup on the way down, hail and graupel do not melt, one fall speed (the strongest rain's median drop) carries the whole shaft sideways, a raindrop takes the air's temperature, and the snow share uses air temperature alone (no humidity). A sample costs about a millisecond. Enforced: rates 0 or more, sizes, heights, temperatures and gravity finite and above 0, graupel and hail fractions in [0, 1] with a sum of at most 1, hail density at most solid ice's 917 kg/m^3. | Fall speeds from each particle's physics follow the air with height, and one rate sets the sizes, counts and energy of what lands. | No below-cloud evaporation, no melting of hail, no humidity in the snow line. | Rain cells from the cloud solver (ATMO-03) when it lands; sample a grid and interpolate for many particles. |
 | Land-surface energy (@margoengine/weather/surface-energy, 2026-11-25, ATMO-09) | One homogeneous patch per solver. One liquid store, snow water equivalent and a prescribed deep-ground temperature. Bulk heat and vapour resistances represent ground or canopy exchange. Meltwater becomes eligible to evaporate on the next tick. | Implicit storage, radiation, sensible and latent exchange, conduction, snow fusion, runoff and dead-fuel timelags. Optional entry 3360 B gzip, ceiling 3616 B. | Soil hydraulics, ice vapour and multilayer snow are outside this patch model. | Couple its evaporation and runoff to a watershed and supply local air, soil and radiative measurements or field projections. |
 | Clouds: moist convection (`@margoengine/physics/clouds`, 2026-11-25, ATMO-03) | By method: incompressible (Boussinesq) flow, so deep clouds overshoot less than in an anelastic model; warm rain only (Kessler: no ice, no Bergeron growth, no hail; snow at the ground is decided by the precipitation field from the air there); flat ground; walls around the box for the flow it makes, while the mean wind carries air through it and fresh environment air comes in at the upwind side; semi-Lagrangian advection, which smooths small cloud features and does not keep water exactly; a cell of 100 to 200 m resolves cumulus but not their small turrets. Cost: the default 48 by 24 by 48 box takes about 0.3 s of computer time per step in this TypeScript build (CPU only); `timeScale` and `interval` trade film time for weather time. Enforced: 2 to 512 cells an axis; sizes, temperatures, times finite and above 0; humidities and patchiness in [0, 1] (a bubble's up to 1.2); fluxes and vorticity 0 or more. | Harris et al.'s cloud model with Kessler's rain gives cumulus that rise, rain and drift from first principles at film resolution. | No ice phase, no terrain lift (orographic cloud), no anelastic density weighting, CPU only. | Orographic lift over a terrain bed, a cold phase (Thunderscapes), and a Rust kernel for larger boxes. |
@@ -9209,7 +9209,7 @@ The lensed disk uses circular Kerr angular velocity and a prescribed radial drif
 for zero spin and a two-point quadrature for spinning disks. The model covers slow radial drift of the emitter
 texture. Full relativistic gas dynamics, disk thickness and angular momentum transport are separate work.
 
-The orbit entry is 6,703 B gzip under a 6,947 B ceiling. The optional plain and shared Rust Wasm
+The orbit entry is 6,720 B gzip under a 6,947 B ceiling. The optional plain and shared Rust Wasm
 assets are 14,124/14,212 B raw and 6,091/6,146 B gzip. Core and Stage gain zero bytes. The black-hole entry grows from 25,293 B to 25,814 B within its 26,010 B
 budget. Core and stage together measure 24,820 B.
 
@@ -9237,7 +9237,7 @@ folds into the column with one beam drift and integer powers of the reflection f
 count must remain exactly representable as a float64 integer. The solver refuses an unresolved layer-crossing
 time or a tick that would leave the path or beam outside representable range. The previous accepted ray and
 ports remain available. The world holds 384 bytes per ray for state, outputs and scratch, plus the field
-registry's output copies, and 24 bytes per profile knot. The optional entry is 8,051 B gzip under an 8,284 B
+registry's output copies, and 24 bytes per profile knot. The optional entry is 8,067 B gzip under an 8,284 B
 ceiling. Each optional Wasm variant is 10,911 B raw and 4,846 B gzip. Core and Stage gain zero bytes.
 
 The loaded native path operates on the same ray and output regions as the synchronous constructor.
@@ -9703,7 +9703,7 @@ f64 words per cell and a dedicated stack per helper. A single-threaded world can
 browser window. Shared threads use Node or a cross-origin-isolated browser worker. Work counts
 describe the executed grid visits. Wall-clock throughput is unmeasured.
 
-The optional runoff entry is 6,982 B min+gzip under a 7,192 B ceiling. Lazy SIMD Wasm images are
+The optional runoff entry is 7,003 B min+gzip under a 7,192 B ceiling. Lazy SIMD Wasm images are
 23,699 B plain and 23,787 B shared raw, or 6,427 and 6,489 B gzip. Water's inland surface is
 1,716 B gzip under its 1,962 B ceiling. Core and Stage gain zero bytes.
 
@@ -9744,6 +9744,33 @@ The optional falling entry measures 6,259 B min+gzip. Each lazy Wasm build is 10
 4,273 B gzip. The Hail overlay measures 5,443 B and its optional world adapter 1,056 B min+gzip.
 Core and stage remain at 24,820 B min+gzip combined.
 
+### Surface-layer wind and native registry grid (ATMO-01)
+
+The resolved surface layer uses an authored roughness and an independent stability length. Reported
+altitude and temperature follow dry standard air. The mean profile is for the atmospheric surface
+layer. Above the finite gust box, only that mean and the standard atmosphere are supplied.
+The taper prevents vertical periodic repetition and enforces zero disturbance at the roughness
+height. Its post-processed velocities are not a projected divergence-free field. Greater horizontal
+extent needs a correspondingly longer box or separately authored regions.
+
+The optional Physics grid stores five f64 values per sample in X/Y/Z index order, one accepted state
+and one candidate. A frozen Mann field stores three f64 planes. Continuous Wind queries use a private
+one-row native pass at arbitrary finite signed time. They do not step the registry grid. The browser
+thread path joins on the world Worker under cross-origin isolation. State and probe rows use local
+coordinates and exact origin cell metadata. Boundaries, positions, parameter values and non-finite
+results are checked before the field is accepted.
+
+At 49 MOSAiC times the higher sensors provide 98 held-out wind readings. With an external roughness
+and only the lower wind and stability as inputs, top-sensor RMS is 0.382 m/s for stable, 0.500 m/s for
+unstable and 0.615 m/s for near neutral profiles. With independent lower-level friction velocity
+the values are 0.262, 0.382 and 0.405 m/s. Per-record uncertainty in the supplied flux and stability
+remains unavailable. The use of a flat surface layer leaves terrain effects and flow feedback open.
+[Measured MOSAiC archive](https://doi.org/10.18739/A2PV6B83F)
+
+The optional Physics entry is 5,513 B gzip within a 5,769 B ceiling. The Weather entry is 3,408 B gzip
+within a 3,664 B ceiling. Each Wasm variant is 11,852 B raw and 4,483 B gzip. Neither entry adds bytes
+to Physics World, Core or Stage.
+
 ### Sediment transport and bed change (HYDRO-03, 2026-11-25)
 
 `@margoengine/physics/sediment` works on one co-located rectangular TerrainBed and shallow-water grid. It uses a
@@ -9771,7 +9798,7 @@ per-capacity measurement uncertainty. The comparison does not simulate the exper
 subsequent aggradation. [Eslami and Radice (2025)](https://doi.org/10.5194/esurf-13-437-2025) ·
 [Measured capacities](https://doi.org/10.5281/zenodo.14883164)
 
-The optional sediment entry is 7,845 B gzip under a 8,101 B ceiling.
+The optional sediment entry is 7,863 B gzip under an 8,101 B ceiling.
 The plain and shared SIMD Wasm are 19,505/19,596 B raw and 7,606/7,667 B gzip.
 Water's optional shallow-surface mirror is 3,003 B gzip under a 3,259 B ceiling.
 Core and Stage gain zero bytes.
@@ -9816,7 +9843,7 @@ sums keep their cell order. The graph's downstream order and its incision, trans
 exchange retain their serial ordering. Worker scratch needs one job, a receipt and a stack
 per helper. The receipts describe work and stay outside snapshots. Throughput is unmeasured.
 
-The optional physics entry is 7,508 B gzip under a 7,764 B ceiling. The Biomes adapter is 739 B gzip under 870 B. Optional plain/shared Wasm is
+The optional physics entry is 7,562 B gzip under a 7,764 B ceiling. The Biomes adapter is 739 B gzip under 870 B. Optional plain/shared Wasm is
 42,179/42,267 B raw and 11,467/11,530 B gzip. Core and Stage gain zero bytes.
 
 ### Utility passes (`@margoengine/post`: `kawase-blur`, `lut1d`, `color-average`, `depth-downsample`, 2026-11-25)
@@ -10429,7 +10456,7 @@ renderer's optional destination uses a separate ArrayBuffer to protect the physi
 arena, even after shared memory grows. Counts describe work assignments. Wall-clock
 throughput is unmeasured.
 
-The optional viscoplastic entry is 8,628 B gzip with an 8,826 B ceiling. Both Wasm assets are 36,124 B raw and 13,261 B gzip. Core and Stage gain zero bytes.
+The optional viscoplastic entry is 8,643 B gzip with an 8,826 B ceiling. Both Wasm assets are 36,124 B raw and 13,261 B gzip. Core and Stage gain zero bytes.
 
 ### Skeletal tissue attachments (SOFT-05)
 
@@ -10647,7 +10674,7 @@ It displays the moving wet/dry boundary and depth-averaged surface, without an o
 A world tick accepts only finite depth, discharge, volume and inundation records. If the explicit solver
 would need more than 4,096 CFL substeps, use a coarser grid or smaller forcing. No partial step is published.
 
-The optional tsunami entry is 8,883 B gzip with a 9,006 B ceiling. The plain and shared Wasm assets are
+The optional tsunami entry is 8,985 B gzip with a 9,006 B ceiling. The plain and shared Wasm assets are
 each 23,068 B raw and 9,530 B gzip. Its optional worker asset is 767 B gzip and is shared with ATMO-07. Extreme finite Coriolis rates retain the midpoint rotation's bounded
 half-turn limit. Resolve the rotation in time when phase accuracy matters.
 
@@ -10712,7 +10739,7 @@ for visualization and relative acoustic delays. Predicting strike locations, cur
 absolute sound pressure requires storm observations and additional plasma and atmospheric models.
 The live Sky field borrows accepted geometry and a relative radiance envelope at the requested world time.
 Points between accepted physics ticks use the last accepted geometry. Weather retains its own light schedule. Grid capacity follows available wasm32 arena space, including each
-published field's two mirrors. The optional entry measures 8,807 B gzip within a 9,072 B ceiling. Both native
+published field's two mirrors. The optional entry measures 8,917 B gzip within a 9,072 B ceiling. Both native
 modules measure 3,272 B raw and 1,648 B gzip and load with that entry. Sky's bolt measures 6,103 B gzip
 within a 6,300 B ceiling. The optional worker asset is 767 B gzip and is shared with SEA-06. Core and Stage
 gain zero bytes.
@@ -10728,7 +10755,7 @@ Receipts describe recent execution, while snapshots retain the physical state.
 
 Lava uses a regular depth-averaged heightfield patch with closed edges. It resolves laminar Bingham resistance, advected crystallisation enthalpy, diffusion, radiative and convective skin transfer and basal cooling. The optional terminal transport removes inertia for creeping flow, using Bingham discharge at each face and conservative enthalpy transport. It requires a thin, slowly varying sheet and has no imposed initial discharge. A point vent omits the real basalt experiment's chute momentum. Terrain, cooled crust and the pressure gradient drive channel confinement and arrest. The shallow-layer aspect-ratio approximation applies to patch-scale flow. Individual crust fractures, elastic lava tubes, three-dimensional overturning and a separate bubble phase need higher-dimensional models. The coastal source is the signed change in displaced volume under a fixed reference sea level. This estimate covers gravity-wave forcing from submerged occupancy. Rapid interface chemistry and water-side multiphase overturning are outside the model.
 
-The native microstep respects transport and thermal diffusion bounds. It refuses a tick above 4,096 explicit microsteps and publishes only finite, accepted volume and heat ledgers. With zero conductivity the well-mixed bulk is exposed, so radiation, convection and the water film act without a conductive skin or basal term. The default positive conductivity resolves a resistive skin. The ICE-05 contact is a 60 Hz staggered heat exchange. Match the terrain and render frames to the lava grid. Weather draws accepted skin emission and basalt coverage from the depth and crust with no guessed exposed crack area. Physics lava is 9,647 B gzip under 9,824 B. Weather lava is 15,291 B under 15,750 B. Both Wasm assets are 19,038 B raw and 8,497 B gzip. Core and Stage gain zero bytes.
+The native microstep respects transport and thermal diffusion bounds. It refuses a tick above 4,096 explicit microsteps and publishes only finite, accepted volume and heat ledgers. With zero conductivity the well-mixed bulk is exposed, so radiation, convection and the water film act without a conductive skin or basal term. The default positive conductivity resolves a resistive skin. The ICE-05 contact is a 60 Hz staggered heat exchange. Match the terrain and render frames to the lava grid. Weather draws accepted skin emission and basalt coverage from the depth and crust with no guessed exposed crack area. Physics lava is 9,666 B gzip under 9,824 B. Weather lava is 15,291 B under 15,750 B. Both Wasm assets are 19,038 B raw and 8,497 B gzip. Core and Stage gain zero bytes.
 
 The optional native worker path needs shared memory and a blocking host (Node or a
 cross-origin-isolated browser worker). On each microstep it partitions stability and local

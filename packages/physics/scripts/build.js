@@ -21,7 +21,7 @@ const exposeOptionalWasmUrl = {
       return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|(?:school|swim|airborne|falling|pedestrian|landscape|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -98,6 +98,7 @@ await build({
         runoff: resolve(root, 'src/runoff/index.ts'),
         sediment: resolve(root, 'src/sediment/index.ts'),
         landscape: resolve(root, 'src/landscape/index.ts'),
+        'boundary-layer': resolve(root, 'src/boundary-layer/index.ts'),
         'drainage-fog': resolve(root, 'src/drainage-fog/index.ts'),
         vortices: resolve(root, 'src/vortices/index.ts'),
         snowpack: resolve(root, 'src/snowpack/index.ts'),
@@ -169,6 +170,8 @@ await copyFile(resolve(root, 'src/runoff/runoff-kernel.wasm'), resolve(dist, 'ru
 await copyFile(resolve(root, 'src/runoff/runoff-kernel-shared.wasm'), resolve(dist, 'runoff-kernel-shared.wasm'));
 await copyFile(resolve(root, 'src/sediment/sediment-kernel.wasm'), resolve(dist, 'sediment-kernel.wasm'));
 await copyFile(resolve(root, 'src/sediment/sediment-kernel-shared.wasm'), resolve(dist, 'sediment-kernel-shared.wasm'));
+for (const name of ['boundary-layer-kernel.wasm', 'boundary-layer-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/boundary-layer', name), resolve(dist, name));
 await copyFile(resolve(root, 'src/orbit/orbit-kernel.wasm'), resolve(dist, 'orbit-kernel.wasm'));
 await copyFile(resolve(root, 'src/orbit/orbit-kernel-shared.wasm'), resolve(dist, 'orbit-kernel-shared.wasm'));
 await copyFile(resolve(root, 'src/landscape/landscape-kernel.wasm'), resolve(dist, 'landscape-kernel.wasm'));

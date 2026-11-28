@@ -208,6 +208,34 @@ renderer of your own. Attach it after `Physics`: both are late plugins, so it up
 `dispose()` removes its line (and the `Lines` plugin when it made one); `using` works. Bad input is a `MargoError` linked to
 [its help entry](https://margoengine.com/errors#physics-debug-view).
 
+## Boundary-layer wind (`@margoengine/physics/boundary-layer`)
+
+`BoundaryLayerSolver` publishes accepted velocity, density and temperature on a regular local grid and
+implements the continuous Wind query for rain, rigid air loads and other physics consumers.
+
+```ts
+import { BoundaryLayerSolver } from '@margoengine/physics/boundary-layer';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { BoundaryLayerWind } from '@margoengine/weather/boundary-layer';
+
+const profile = new BoundaryLayerWind({ speed: 12, roughness: 0.03, obukhovLength: 90, turbulence: false });
+using wind = await BoundaryLayerSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(wind, {
+  profile: profile.profile,
+  grid: { cells: [3, 3, 1], origin: [0, 0, 0], spacing: [5, 10, 5] },
+});
+world.advance(60);
+console.log(wind.sample(0, 20, 0, wind.elapsedSeconds).velocity[0] > 12); // true
+```
+
+`grid.origin` is the first sampled position in the declared cell. `grid.spacing` is in metres. The
+`sampleField` publishes layout-1 f64 rows of velocity X, Y, Z, density and temperature, with X varying
+fastest, then Y and Z. The solver accepts `load({ id, threads, signal })` with default ID
+`'boundary-layer'` and one thread. Use `worldMemory(true)` with multiple threads. In a browser,
+run that world in a Worker on a cross-origin-isolated page. `workCounts()` reports the last accepted
+tick's sample, SIMD and turbulence counts. Querying `sample` at any finite signed time does not
+advance the grid.
+
 ## Sediment transport and bed change
 
 `@margoengine/physics/sediment` reads shallow-water depth and discharge and routes suspended and bedload sediment.

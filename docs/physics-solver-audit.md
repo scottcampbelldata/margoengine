@@ -50,6 +50,32 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### ATMO-01 four-point pass
+
+- Point 5. Weather's `boundary-layer.test.js` compares stable and unstable profiles to independent
+  closed and quadrature references, checks coded options, applies local Taylor speed, and verifies
+  the finite-height box or ground does not repeat an earlier vertical gust. Physics' `coupling/boundary-layer.test.js`
+  verifies height-dependent rigid panel loads and exact replay through AirSolver.
+- Point 6. `boundary-layer-threads.test.js` and `boundary-layer-threads.browser.mjs` compare
+  accepted Weather and Rust/Wasm states through far-origin shifts and exact seek with plain
+  and shared memory. Chromium starts three actual helpers. The largest Node grid samples 71,703 rows
+  with 71,702 SIMD-paired rows and 55,769 Mann interpolations.
+- Point 7. `boundary-layer-surface.browser.mjs` reproduces RITS-5 with a fixed camera using
+  continuous accepted native wind and the production Weather precipitation field. The shaft
+  drifts 30 m in six seconds and its lower section moves 105.93 m downwind of the cloud base.
+  Both renderers draw the actual slant and reproduce exact replay. The precipitation fixture
+  has a separate published droplet terminal-speed comparison.
+- Point 8. Physics and Weather READMEs and `docs/limits.md` describe the stability law and
+  supported heights, tapered synthetic gusts, registry grid, scope of the rain reproduction
+  and remaining terrain and coupling work.
+- Point 2 remains open. `atmo01-mosaic-measured.mjs` compares 98 higher-level MOSAiC wind
+  observations at 49 times. Low-level speed and turbulence stability data and external SHEBA
+  roughness initialise the model. The corrected top-sensor RMS is 0.382 m/s stable, 0.500 m/s
+  unstable and 0.615 m/s near neutral. Independently measured friction velocity lowers those
+  to 0.262, 0.382 and 0.405 m/s. The two top levels remain held out. The archive has no full
+  per-record uncertainty on the measured friction velocity and stability.
+  [MOSAiC archive](https://doi.org/10.18739/A2PV6B83F) · [SHEBA](https://doi.org/10.1029/2000JC000705)
+
 ### HYDRO-03 four-point pass
 
 - Point 5. `0991351637`. `coupling/sediment.test.js` verifies that remote pools cannot alter a bank's exchange, channel-normal

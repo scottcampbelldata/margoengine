@@ -11054,6 +11054,15 @@ loads for unequal masses, rotational clearance, wall loads, queue release, input
 replay across frame rates and memory variants. The NavMesh regressions check weight in the
 existing ORCA planner and preserve covered-target and wall guidance behavior.
 
+### Boundary-layer wind on the world clock (ATMO-01)
+
+The optional Physics boundary-layer entry uses the same pinned surface-layer profile as the scalar
+Weather source. Workers sample disjoint grid rows and publish only after all rows complete. Arbitrary
+time Wind queries run the same Wasm with a separate one-row scratch descriptor. Native tests cover
+bit-exact far-cell replay and actual SIMD and turbulence work. AirSolver samples the wind at real
+collider panels. The fixed-camera rain-shaft reproduction draws the coupled precipitation on WebGPU
+and WebGL2. Held-out MOSAiC wind profiles and their misses are recorded in the Weather diagnostic.
+
 ### Live sediment and channel-bank evidence (HYDRO-03)
 
 Sediment updates one accepted TerrainBed with shared vertex mass accounting. Its native SIMD workers prepare

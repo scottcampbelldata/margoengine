@@ -5,6 +5,18 @@
 ```ts
 import { FlowSample, Wind } from "@margoengine/math/fields";
 
+export interface BoundaryLayerProfile {
+    readonly roughness: number;
+    readonly obukhovLength: number;
+    readonly meanScale: number;
+    readonly psiAtRoughness: number;
+    readonly ground: number;
+    readonly altitude: number;
+    readonly seaLevelTemperature: number;
+    readonly along: readonly [number, number];
+    readonly turbulence?: MannBox;
+}
+
 export class BoundaryLayerWind implements Wind {
     readonly medium: 'air';
     readonly cell: readonly [0, 0, 0];
@@ -14,6 +26,7 @@ export class BoundaryLayerWind implements Wind {
     readonly roughness: number;
     readonly frictionVelocity: number;
     readonly turbulence: MannBox | undefined;
+    readonly profile: BoundaryLayerProfile;
     constructor(options?: BoundaryLayerWindOptions);
     meanSpeed(h: number): number;
     sample(x: number, y: number, z: number, t: number, out?: FlowSample): FlowSample;
@@ -23,6 +36,8 @@ export interface BoundaryLayerWindOptions {
     speed?: number;
     referenceHeight?: number;
     direction?: number;
+    directionConvention?: 'cartesian' | 'heading';
+    obukhovLength?: number;
     roughness?: number;
     ground?: number;
     altitude?: number;

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21730684,
+  "total": 21737521,
   "history": [
     {
       "date": "2026-10-24",
@@ -15473,6 +15473,12 @@
       "date": "2026-11-28",
       "commit": "rigs-rose-reuleaux",
       "reason": "Two more mechanism rigs on the solver so their demos show physics against exact: roseEngineRig (a follower on a slide held 0.2 m off its centre to the rosette groove by a path joint on the turning cam) and reuleauxRig (a convex-hull triangle with its turn locked to the input between four fixed walls, the contacts placing its centre). @margoengine/machinery/rigs 7472 to 8636 B gzip (ceiling 7728 to 8895 B). A split per rig would add an entry and a request each, and each demo loads one solver anyway."
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "atmo01-boundary-layer",
+      "reason": "ATMO-01: the optional Physics boundary-layer entry grows from 0 to 5,513 B measured gzip (5,769 B ceiling) for registry sampling, origin cells and native phase workers. Weather boundary-layer measures 3,408 B (ceiling 2,596 to 3,664 B) for the stability integral and finite vertically tapered gusts. One resolved profile serves scalar and native callers. Splitting the Weather profile would add a fetch for a required part of the wind contract. Core and Stage gain no bytes.",
+      "grew": 2
     }
   ],
   "items": {
@@ -16332,6 +16338,7 @@
     "@margoengine/physics/aeolian": 5256,
     "@margoengine/physics/ageing": 4384,
     "@margoengine/physics/airborne": 7318,
+    "@margoengine/physics/boundary-layer": 5769,
     "@margoengine/physics/breakable": 19351,
     "@margoengine/physics/bubbles": 3289,
     "@margoengine/physics/celestial": 9756,
@@ -17183,7 +17190,7 @@
     "@margoengine/weather": 9423,
     "@margoengine/weather/audio": 1908,
     "@margoengine/weather/avalanche": 7451,
-    "@margoengine/weather/boundary-layer": 2596,
+    "@margoengine/weather/boundary-layer": 3664,
     "@margoengine/weather/cover": 1795,
     "@margoengine/weather/data": 2788,
     "@margoengine/weather/drive": 9747,

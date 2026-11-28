@@ -445,7 +445,21 @@ Mastin's rate for that height), with the looks `weather`, `plinian`, `weakPlume`
 
 ## Boundary-layer wind and turbulence (the physics framework's wind)
 
-`BoundaryLayerWind` (`@margoengine/weather/boundary-layer`) is the wind every solver of the physics framework reads: one `Wind` of `@margoengine/math/fields`, sampled at any point and time on the world clock with `sample(x, y, z, t, out?)`, which gives the air's velocity (m/s), density and temperature. The mean wind follows the log law of a neutral surface layer, U(h) = (u* / 0.4) ln(h / z0) at height h above `ground`, from `speed` at `referenceHeight` (default 10 m/s at 10 m) over the roughness length `roughness` (default 0.0002 m, open sea; 0.03 grass, 0.5 to 1 forest or town), blowing toward `direction` (radians from +x toward +z); under z0 the air is still. Gusts come from a `MannBox` (`@margoengine/weather/turbulence`): Mann's spectral model of sheared surface-layer turbulence (the IEC 61400-1 wind-turbine model: length scale 33.6 m, shear 3.9), so gusts are stretched along the wind, the across and vertical components are about 0.7 and 0.5 of the along-wind one, upward gusts carry slower air (u'w' < 0), and the flow has no divergence; the box's along-wind standard deviation is 2.5 u* unless `turbulence` gives one, and it is carried along at the reference speed, so a gust that heels a sail reaches the trees downwind of it the right time later. Density and temperature are the standard atmosphere's (`@margoengine/math/atmosphere`) at `altitude` plus the height. Everything is computed with the pinned maths and the pinned FFT, so a wind is the same on every engine; `turbulence: false` gives the mean wind alone.
+`BoundaryLayerWind` (`@margoengine/weather/boundary-layer`) gives the velocity in m/s, density in kg/m³ and
+temperature in kelvin at a world-local position and time through `sample(x, y, z, t, out?)`.
+Set `speed` at `referenceHeight` above `ground` (defaults 10 m/s at 10 m, ground 0 m), and `roughness` in metres
+(default 0.0002 for open sea). The air is still at and below the roughness height. Set `obukhovLength` in metres
+to a positive value for stable air or a negative value for unstable air. Positive infinity gives the neutral
+log law and is the default. `direction` is radians toward the wind's destination. The default
+`directionConvention: 'cartesian'` starts at +X toward +Z. Use `'heading'` for +Z toward +X.
+The scalar source uses cell [0, 0, 0]. The standard atmosphere uses `altitude` above sea level (default 0 m) plus local
+height, with `seaLevelTemperature` (default 288.15 K).
+
+Mann's spectral box supplies gusts, with default along-wind standard deviation 2.5 times the friction
+velocity. It travels at the mean speed of the sampled height. A one-cell taper at the roughness height and
+the top makes the velocity continuous there and prevents vertical repetition. The horizontal axes still
+tile. Set `turbulence: false` for just the mean. Pass `wind.profile` to the optional Physics
+`BoundaryLayerSolver` to publish a native grid on the same world clock.
 
 ```ts
 import {BoundaryLayerWind} from '@margoengine/weather/boundary-layer';

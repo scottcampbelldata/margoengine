@@ -567,6 +567,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/boundary-layer-kernel.wasm',
+    label: 'boundary-layer-kernel.wasm',
+    kind: 'Rust SIMD boundary-layer sampling',
+    measure: 'file',
+    when: 'BoundaryLayerSolver.load(), only from the optional /boundary-layer entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/boundary-layer-kernel-shared.wasm',
+    label: 'boundary-layer-kernel-shared.wasm',
+    kind: 'Rust SIMD boundary-layer sampling, shared world memory',
+    measure: 'file',
+    when: 'BoundaryLayerSolver.load() on a host with shared memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/orbit-kernel.wasm',
     label: 'orbit-kernel.wasm',
     kind: 'Rust SIMD N-body gravity and orbital drag',

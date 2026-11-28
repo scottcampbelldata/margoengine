@@ -13399,6 +13399,31 @@ standard deviation, Pfaff's transformation of the hypergeometric function to a s
 and an atan from + - * / only are this package's own arrangement. Proof: `packages/weather/tests/turbulence.test.js` (isotropy,
 the IEC ratios 0.68 and 0.51, u'w' < 0, divergence below 1e-12, determinism) and `tests/boundary-layer.test.js`.
 
+ATMO-01 integrates the surface-layer momentum gradient from the roughness length. A. J. Dyer
+and B. B. Hicks, [Flux-gradient relationships in the constant flux layer](https://doi.org/10.1002/qj.49709641012)
+(1970), give the unstable factor `(1-16 z/L)^(-1/4)`. A. J. Dyer,
+[A review of flux-profile relationships](https://doi.org/10.1007/BF00240838) (1974), gives
+the stable factor `1+5 z/L`. Charles A. Paulson, [The mathematical representation of wind speed and
+temperature profiles in the unstable atmospheric surface layer](https://www2.mmm.ucar.edu/wrf/users/physics/phys_refs/SURFACE_LAYER/MM5_part1.pdf)
+(1970), derives the logarithm and arctangent antiderivative. The Weather and native entries
+use the same pinned arithmetic. The independent Weather control directly integrates the gradient
+in log-height coordinates and retains its composite Simpson error bound.
+
+The finite-height Mann box uses Taylor advection at the local layer mean speed. Hunt and
+Graham, [Free-stream turbulence near plane boundaries](https://doi.org/10.1017/S0022112078000130)
+(1978), show the decrease in normal fluctuations near a plane boundary. The authored taper
+enforces zero disturbance at roughness and box top and uses the last represented vertical
+plane through the top taper. It is a finite box boundary rule. The original spectral box
+remains available on its own. Shearing and tapering the sample are not a solenoidal projection.
+
+Christopher J. Cox et al., [Met City meteorological and surface flux measurements, MOSAiC](https://doi.org/10.18739/A2PV6B83F)
+(2023, CC0), provide the sensor heights, wind and flux data. The separate prior roughness
+comes from P. Ola G. Persson et al., [Measurements near the Atmospheric Surface Flux Group tower at SHEBA](https://doi.org/10.1029/2000JC000705)
+(2002). Only the low sonic measurement, local stability and externally reported roughness enter
+the speed-anchored wind calculation. A second comparison uses separately recorded low-sonic
+eddy-covariance friction velocity for the gradient, with both upper wind readings withheld in
+each comparison. Recorded misses remain in `atmo01-mosaic-measured.mjs`.
+
 ### The framework's precipitation: rain, snow, graupel and hail (ATMO-04, `@margoengine/weather/precipitation`, 2026-11-25)
 
 `packages/weather/src/precipitation.ts` (`PrecipitationField`, the fall-speed functions) is the framework's `Precipitation`

@@ -482,6 +482,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'boundary-layer-kernel',
+    crate: 'packages/physics/boundary-layer-kernel',
+    blueprint: 'packages/physics/src/boundary-layer/boundary-layer-kernel.wasm',
+    script: 'packages/physics/scripts/build-boundary-layer-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'boundary-layer-kernel-shared',
+    crate: 'packages/physics/boundary-layer-kernel',
+    blueprint: 'packages/physics/src/boundary-layer/boundary-layer-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-boundary-layer-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'runoff-kernel',
     crate: 'packages/physics/runoff-kernel',
     blueprint: 'packages/physics/src/runoff/runoff-kernel.wasm',

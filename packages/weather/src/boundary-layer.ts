@@ -1,23 +1,9 @@
-// The wind of the physics framework (ATMO-01 and ATMO-02 of docs/physics-solvers.md): a neutral atmospheric boundary layer
-// with the log-law mean profile and Mann turbulence carried along by the mean wind, as one `Wind` of
-// `@margoengine/math/fields` that every solver samples at its own place and time on the world clock (docs/physics-framework.md,
-// section 4). Density and temperature come from the standard atmosphere (`@margoengine/math/atmosphere`).
-//
-// Mean wind: U(h) = (u* / kappa) ln(h / z0) at height h above the ground over roughness z0, with the friction velocity u*
-// from the speed given at a reference height and kappa = 0.40 (the logarithmic law of the wall in the neutral surface layer;
-// R. B. Stull, "An Introduction to Boundary Layer Meteorology", Kluwer, 1988, section 9.7; H. Tennekes and J. L. Lumley, "A
-// First Course in Turbulence", MIT Press, 1972, section 5.2). Below z0 the air is still.
-// Turbulence: a {@link MannBox} whose along-wind standard deviation is 2.5 u* (neutral surface layer, Stull 1988, section
-// 9.7; J. C. Kaimal and J. J. Finnigan, "Atmospheric Boundary Layer Flows", Oxford, 1994, chapter 1) unless given, advected
-// at the reference speed (Taylor's frozen-turbulence hypothesis, G. I. Taylor, "The spectrum of turbulence", Proceedings of
-// the Royal Society A 164, 1938), so a gust that reaches a sail reaches the tree downwind of it the right time later.
-//
-// Accepted differences: neutral stability only (no Monin-Obukhov stability functions yet), flat terrain (no speed-up over
-// hills or shelter behind them), one roughness; the turbulence keeps its standard deviation at every height above z0.
-
+// Dyer (1974) and Paulson (1970): the integrated Monin-Obukhov surface-layer profile.
+// Mann fluctuations use Taylor's hypothesis at the mean speed of their own layer.
 import { airDensity, SEA_LEVEL_TEMPERATURE, standardAtmosphere } from '@margoengine/math/atmosphere';
+import { MargoError } from '@margoengine/math/errors';
 import type { FlowSample, Wind } from '@margoengine/math/fields';
-import { cos, ln, sin } from '@margoengine/math/pinned';
+import { atan, cos, ln, sin } from '@margoengine/math/pinned';
 import { MannBox, type MannBoxOptions } from './turbulence.js';
 
 /** The von Karman constant of the log law. */
@@ -31,6 +17,10 @@ export interface BoundaryLayerWindOptions {
   referenceHeight?: number;
   /** Where the wind blows toward, radians in the ground plane from +x toward +z (default 0: along +x). */
   direction?: number;
+  /** Azimuth zero axis. 'cartesian' starts at +x (default). 'heading' starts at +z toward +x. */
+  directionConvention?: 'cartesian' | 'heading';
+  /** Monin-Obukhov length in metres. Positive is stable, negative unstable, and +Infinity is neutral (default). */
+  obukhovLength?: number;
   /** Roughness length z0, m (default 0.0002, open sea; 0.03 short grass, 0.5 to 1 forest and town). */
   roughness?: number;
   /** The ground's height, y metres, that heights are measured from (default 0). */
@@ -46,7 +36,46 @@ export interface BoundaryLayerWindOptions {
   turbulence?: MannBox | MannBoxOptions | false;
 }
 
-/** A neutral atmospheric boundary layer: log-law mean wind plus Mann turbulence, sampled anywhere on the world clock. */
+/** A resolved boundary-layer profile for sampling on a native world grid. */
+export interface BoundaryLayerProfile {
+  /** Aerodynamic roughness length in metres. */
+  readonly roughness: number;
+  /** Signed Monin-Obukhov length in metres. Positive infinity represents neutral air. */
+  readonly obukhovLength: number;
+  /** Friction velocity divided by the von Karman constant in m/s. */
+  readonly meanScale: number;
+  /** Unstable momentum correction evaluated at the roughness height. */
+  readonly psiAtRoughness: number;
+  /** Ground height in the field's origin cell, in metres. */
+  readonly ground: number;
+  /** Ground altitude above sea level, in metres. */
+  readonly altitude: number;
+  /** Sea-level temperature in kelvin. */
+  readonly seaLevelTemperature: number;
+  /** Unit wind direction [x, z] on the world axes. */
+  readonly along: readonly [number, number];
+  /** Optional precomputed Mann fluctuations in the wind frame. */
+  readonly turbulence?: MannBox;
+}
+
+function instability(zeta: number): number {
+  const q = Math.sqrt(Math.sqrt(1 - 16 * zeta));
+  return 2 * ln((1 + q) / 2) + ln((1 + q * q) / 2) - 2 * atan(q) + Math.PI / 2;
+}
+
+function potential(h: number, roughness: number, length: number, psiAtRoughness: number): number {
+  const ratio = h / roughness;
+  const log = Number.isFinite(ratio) ? ln(ratio) : ln(h) - ln(roughness);
+  if (length === Infinity) return log;
+  if (length > 0) return log + 5 * ((h - roughness) / length);
+  return log - instability(h / length) + psiAtRoughness;
+}
+
+function ramp(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+/** Samples the surface-layer mean, optional finite-height Mann gusts and standard-atmosphere state on the world clock. */
 export class BoundaryLayerWind implements Wind {
   readonly medium = 'air' as const;
   readonly cell = [0, 0, 0] as const;
@@ -57,18 +86,20 @@ export class BoundaryLayerWind implements Wind {
   /** The friction velocity u*, m/s. */
   readonly frictionVelocity: number;
   readonly turbulence: MannBox | undefined;
-  private readonly ground: number;
-  private readonly altitude: number;
-  private readonly seaLevel: number;
-  private readonly along: readonly [number, number];
+  /** Resolved profile parameters in world coordinates for a native grid sampler. */
+  readonly profile: BoundaryLayerProfile;
   private readonly fluctuation: [number, number, number] = [0, 0, 0];
 
-  /** @throws RangeError for a speed, height or roughness that is not finite and positive, or a reference height at or below the roughness. */
+  /** Sets up a height profile. Invalid settings throw a coded error with a correction. */
   constructor(options: BoundaryLayerWindOptions = {}) {
+    if (options === null || typeof options !== 'object')
+      throw new MargoError('state', 'Invalid wind options. Pass a boundary-layer options object or omit it.');
     const {
       speed = 10,
       referenceHeight = 10,
       direction = 0,
+      directionConvention = 'cartesian',
+      obukhovLength = Infinity,
       roughness = 0.0002,
       ground = 0,
       altitude = 0,
@@ -76,66 +107,168 @@ export class BoundaryLayerWind implements Wind {
       turbulence = {},
     } = options;
     if (!(speed >= 0 && Number.isFinite(speed)))
-      throw new RangeError(`A wind speed is 0 or more m/s (got ${speed}); pass a finite speed.`);
+      throw new MargoError('state', `A wind speed is 0 or more m/s (got ${speed}); pass a finite speed.`);
     if (!(roughness > 0 && Number.isFinite(roughness)))
-      throw new RangeError(
+      throw new MargoError(
+        'state',
         `A roughness length is a finite number of metres above 0 (got ${roughness}); pass a roughness such as 0.03 for open grass.`,
       );
     if (!(referenceHeight > roughness && Number.isFinite(referenceHeight)))
-      throw new RangeError(
-        `The reference height (${referenceHeight} m) must be above the roughness length (${roughness} m).`,
+      throw new MargoError(
+        'state',
+        `The reference height (${referenceHeight} m) is too low. Set it above the roughness length (${roughness} m).`,
       );
     for (const [name, v] of [
       ['direction', direction],
       ['ground', ground],
       ['altitude', altitude],
+      ['sea-level temperature', seaLevelTemperature],
     ] as const)
       if (!Number.isFinite(v))
-        throw new RangeError(`A wind's ${name} is a finite number (got ${v}); pass a finite value.`);
+        throw new MargoError('state', `A wind's ${name} is a finite number (got ${v}); pass a finite value.`);
+    if (!(seaLevelTemperature > 0.0065 * 11000))
+      throw new MargoError(
+        'state',
+        'Sea-level temperature is too low for a positive tropopause temperature. Use kelvin above 71.5.',
+      );
+    if (directionConvention !== 'cartesian' && directionConvention !== 'heading')
+      throw new MargoError('state', 'Unknown wind direction convention. Choose cartesian or heading.');
+    if (!(obukhovLength === Infinity || (Number.isFinite(obukhovLength) && obukhovLength !== 0)))
+      throw new MargoError(
+        'state',
+        'Invalid Monin-Obukhov length. Use signed nonzero metres or positive Infinity for neutral air.',
+      );
     this.speed = speed;
     this.referenceHeight = referenceHeight;
     this.direction = direction;
     this.roughness = roughness;
-    this.ground = ground;
-    this.altitude = altitude;
-    this.seaLevel = seaLevelTemperature;
-    this.frictionVelocity = (VON_KARMAN * speed) / ln(referenceHeight / roughness);
-    this.along = [cos(direction), sin(direction)];
-    this.turbulence =
-      turbulence === false
-        ? undefined
-        : turbulence instanceof MannBox
-          ? turbulence
-          : new MannBox({ sigma: 2.5 * this.frictionVelocity, ...turbulence });
+    const psiAtRoughness = obukhovLength < 0 ? instability(roughness / obukhovLength) : 0;
+    const heightFactor = potential(referenceHeight, roughness, obukhovLength, psiAtRoughness);
+    if (!(heightFactor > 0 && Number.isFinite(heightFactor)))
+      throw new MargoError(
+        'state',
+        'Wind profile exceeds numeric range. Use a representable reference height or stability.',
+      );
+    this.frictionVelocity = (VON_KARMAN * speed) / heightFactor;
+    const meanScale = this.frictionVelocity / VON_KARMAN;
+    if (!Number.isFinite(meanScale))
+      throw new MargoError(
+        'state',
+        'Wind friction velocity exceeds numeric range. Reduce the speed or raise the reference height.',
+      );
+    const along =
+      directionConvention === 'heading'
+        ? ([sin(direction), cos(direction)] as const)
+        : ([cos(direction), sin(direction)] as const);
+    try {
+      this.turbulence =
+        turbulence === false
+          ? undefined
+          : turbulence instanceof MannBox
+            ? turbulence
+            : new MannBox({ sigma: 2.5 * this.frictionVelocity, ...turbulence });
+    } catch (cause) {
+      if (!(cause instanceof TypeError || cause instanceof RangeError)) throw cause;
+      throw Object.assign(
+        new MargoError(
+          'state',
+          'Invalid Mann turbulence settings. Choose positive box dimensions and supported cell counts.',
+        ),
+        { cause },
+      );
+    }
+    this.profile = Object.freeze({
+      roughness,
+      obukhovLength,
+      meanScale,
+      psiAtRoughness,
+      ground,
+      altitude,
+      seaLevelTemperature,
+      along: Object.freeze(along),
+      turbulence: this.turbulence,
+    });
   }
 
-  /** The mean wind speed at `h` metres above the ground: (u* / kappa) ln(h / z0), and 0 at or below z0. */
+  /** Mean wind speed at h metres above the ground. It is zero at or below the roughness height. */
   meanSpeed(h: number): number {
-    return h > this.roughness ? (this.frictionVelocity / VON_KARMAN) * ln(h / this.roughness) : 0;
+    if (!Number.isFinite(h))
+      throw new MargoError('state', 'Invalid wind height. Use a finite height above the ground.');
+    const { roughness, obukhovLength, meanScale, psiAtRoughness } = this.profile;
+    if (h <= roughness || meanScale === 0) return 0;
+    const speed = meanScale * potential(h, roughness, obukhovLength, psiAtRoughness);
+    if (!(speed >= 0 && Number.isFinite(speed)))
+      throw new MargoError(
+        'state',
+        'Wind profile exceeds numeric range at this height. Reduce the height or change the stability length.',
+      );
+    return speed;
   }
 
   /** The air at (x, y, z) at time `t` seconds: velocity, density and temperature (the {@link Wind} contract). */
   sample(x: number, y: number, z: number, t: number, out?: FlowSample): FlowSample {
-    const sample = out ?? { velocity: [0, 0, 0], density: 0, temperature: 0 },
-      h = y - this.ground,
-      [ax, az] = this.along,
-      mean = this.meanSpeed(h);
-    let fu = 0,
-      fv = 0,
-      fw = 0;
-    if (this.turbulence && h > this.roughness) {
-      // Into the wind's frame, then back along the wind by the distance the frozen field has travelled.
-      const s = x * ax + z * az - this.speed * t,
-        c = -x * az + z * ax;
-      [fu, fv, fw] = this.turbulence.sample(s, c, h, this.fluctuation);
+    if (![x, y, z, t].every(Number.isFinite))
+      throw new MargoError('state', 'Invalid wind sample coordinates or time. Use finite local metres and seconds.');
+    const {
+      ground,
+      altitude,
+      seaLevelTemperature,
+      along: [ax, az],
+      turbulence,
+    } = this.profile;
+    const h = y - ground;
+    const mean = this.meanSpeed(h);
+    let fu = 0;
+    let fv = 0;
+    let fw = 0;
+    if (turbulence && h > this.roughness && h < turbulence.size[2]) {
+      const s = x * ax + z * az - mean * t;
+      const c = -x * az + z * ax;
+      if (!Number.isFinite(s) || !Number.isFinite(c))
+        throw new MargoError(
+          'state',
+          'Wind advection is outside numeric range. Use a local origin and a shorter time.',
+        );
+      const top = turbulence.size[2];
+      const step = top / turbulence.cells[2];
+      const weight = ramp((h - this.roughness) / step) * ramp((top - h) / step);
+      [fu, fv, fw] = turbulence.sample(s, c, Math.min(h, top - step), this.fluctuation);
+      fu *= weight;
+      fv *= weight;
+      fw *= weight;
     }
     const u = mean + fu;
-    sample.velocity[0] = u * ax - fv * az;
+    const vx = u * ax - fv * az;
+    const vz = u * az + fv * ax;
+    const elevation = altitude + h;
+    if (!Number.isFinite(elevation))
+      throw new MargoError(
+        'state',
+        'Wind altitude exceeds numeric range. Use a representable altitude and local height.',
+      );
+    const [temperature, pressure] = standardAtmosphere(elevation, seaLevelTemperature);
+    const density = airDensity(temperature, pressure);
+    if (
+      !(
+        Number.isFinite(vx) &&
+        Number.isFinite(fw) &&
+        Number.isFinite(vz) &&
+        temperature > 0 &&
+        Number.isFinite(temperature) &&
+        density >= 0 &&
+        Number.isFinite(density)
+      )
+    )
+      throw new MargoError(
+        'state',
+        'Wind sample exceeds numeric range. Use a smaller local extent, speed or altitude.',
+      );
+    const sample = out ?? { velocity: [0, 0, 0], density: 0, temperature: 0 };
+    sample.velocity[0] = vx;
     sample.velocity[1] = fw;
-    sample.velocity[2] = u * az + fv * ax;
-    const [temperature, pressure] = standardAtmosphere(this.altitude + h, this.seaLevel);
+    sample.velocity[2] = vz;
     sample.temperature = temperature;
-    sample.density = airDensity(temperature, pressure);
+    sample.density = density;
     return sample;
   }
 }

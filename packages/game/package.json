@@ -2595,6 +2595,10 @@
       "types": "./dist/physics/gpu-cloth.d.ts",
       "import": "./dist/physics/gpu-cloth.js"
     },
+    "./physics/boundary-layer": {
+      "types": "./dist/physics/boundary-layer.d.ts",
+      "import": "./dist/physics/boundary-layer.js"
+    },
     "./pixel": {
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"

@@ -6199,6 +6199,14 @@ buoyancy enabled. The Water bridge uses that world state to write the rendered i
 [Physical tests](../../packages/physics/tests/pack-ice.test.js) · [Coupling tests](../../packages/physics/tests/coupling/pack-ice.test.js) ·
 [Display test](../../packages/physics/tests/coupling/pack-ice-render.test.js)
 
+### Surface-layer wind and precipitation (ATMO-01)
+
+Scalar Weather and the native solver match bit for bit on the scoped neutral, stable and unstable
+controls. `boundary-layer-threads.test.js` and `boundary-layer-threads.browser.mjs` verify actual
+parallel work and exact origin-shift replay. `boundary-layer-surface.browser.mjs` draws the 105.93 m
+rain-shaft slant and 30 m drift in its authored offshore world on both renderers. The coupled rigid
+air load fixture verifies local panel sampling. [ATMO-01 audit](../physics-solver-audit.md#atmo-01-four-point-pass)
+
 ### Conservative local bank and sediment work (HYDRO-03)
 
 The HYDRO-03 flume accounts for both water and solid mass as the bed scours and deposits. The fixed-camera
