@@ -1,6 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { BedSample } from '@margoengine/math/fields';
-import { ln } from '@margoengine/math/pinned';
+import { hypot, ln } from '@margoengine/math/pinned';
 import { BED_FIELD, BED_LAYOUT, type BedShape, bedSurface, bedVertexCount } from '../earth/bed.js';
 import {
   ICE_FIELD_LAYOUT,
@@ -611,7 +611,7 @@ export class LavaSolver implements Solver<LavaOptions> {
         if (terminal)
           throw new MargoError('state', 'Omit initial discharge for terminal flow or use inertial transport.');
         const meltDepth = positive('initial mobile depth', h * Math.min(1, (hot - solidus) / (liquidus - solidus)));
-        scalar('initial mobile velocity', Math.hypot(qx[i]!, qz[i]!) / meltDepth, 0);
+        scalar('initial mobile velocity', hypot(qx[i]!, qz[i]!) / meltDepth, 0);
       }
       columns.set(
         [
