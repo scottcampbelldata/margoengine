@@ -82,12 +82,14 @@ test('a registry impulse drives the audibly delayed receiver and restores the ex
     },
     importPorts() {},
     exportPorts(tick) {
-      return [{ field: field.name, region, tick, cell: [0, 0, 0] }];
+      return [{ field: field.name, region, tick, cell: host.cell }];
     },
     stateRegions: () => [region],
     extraState: () => [],
   };
   const world = new PhysicsWorld({ rate }).add(emitter, {}).add(room, layout);
+  const cell = [-11, 4, -2];
+  world.shiftOrigin([11, -4, 2]);
   world.advance(2);
   assert.equal(room.readTrace().values[0], 0);
   const saved = world.takeSnapshot();
@@ -98,7 +100,18 @@ test('a registry impulse drives the audibly delayed receiver and restores the ex
   world.advance(12);
   assert.equal(world.hash(), hash);
   const port = world.fields.port(room.traceField.name);
+  assert.deepEqual(port.cell, cell);
+  assert.deepEqual(world.fields.port(room.pressureField.name).cell, cell);
   assert.deepEqual(regionWords(world.memory, port.region), room.readTrace().values);
+  const accepted = world.takeSnapshot();
+  const displacement = { ...world.fields.port(field.name), cell: [0, 0, 0] };
+  const wrongCell = { tick: 12, level: 0, seed: 0, cell, inputs: new Map([[field.name, displacement]]) };
+  assert.throws(() => room.step(wrongCell), {
+    name: 'MargoError',
+    code: 'state',
+    message: /per sample in the room cell/,
+  });
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
 });
 
 test('the same room wave field at 24, 30 and 60 fps and after a seek', async () => {

@@ -563,6 +563,16 @@ code from other projects are absent from the fixture.
 [Article](https://doi.org/10.3390/lubricants13070287)
 [Licence](https://creativecommons.org/licenses/by/4.0/)
 
+## BRAS RS1 room acoustics
+
+`packages/physics/scripts/sound02-bras-measured.mjs` transcribes the source and microphone
+coordinates from the rigid-floor RS1 survey by Lukas Aspöck, Fabian Brinkmann, David Ackermann,
+Stefan Weinzierl and Michael Vorländer, version 3 (2020), under CC BY-SA 4.0. The coordinates are
+converted to metres and reordered to Y up. Run the diagnostic with the original recording directory.
+The repository contains no source figures or audio from the dataset.
+[Data](https://doi.org/10.14279/depositonce-6726.3)
+[Licence](https://creativecommons.org/licenses/by-sa/4.0/)
+
 ## Dam-break measurements (water, GPULiquid checks, 2026-11-28)
 
 packages/water/test/gpu-liquid-dambreak.test.js holds measured values copied unchanged, used with attribution:

@@ -10513,8 +10513,24 @@ The native scheme has cubic voxels and one real reflection coefficient per air c
 Normal-incidence wall admittance is exact in the model. Grazing and mixed-frequency impedance need finer
 geometry or a richer material boundary. For an axis wave resolved with ten cells per wavelength, the
 sinusoidal stencil bounds numerical phase speed from below by 1 − π²/600 of the configured speed.
-Use a finer grid for higher frequencies. The data-free plain and shared variants each measure 753 B raw.
-The optional entry measures 5,758 B gzip. Core plus stage stays at 24,820 B gzip.
+Use a finer grid for higher frequencies. The grid has reflecting edges and one pressure coefficient per
+mask cell. The default 0.85 is a generic pressure coefficient. Supply measured wall coefficients for a
+specific room. A measured frequency-dependent boundary, air absorption by frequency, absorbing open edges
+and a live terrain geometry consumer remain open. The path model uses finite specular polygons and
+leaves geometric edge diffraction and a coupled late reverberation response for later.
+
+The valid wave volume and substep count must fit Wasm memory with accepted and candidate arrays.
+Inputs or derived samples outside the numeric range report a coded action before publication.
+Choose shared world memory and a blocking agent for two or four native participants. Each
+sample needs a synchronization point before publishing its source and receiver, so the default
+one participant suits small rooms. Work includes padded guard and solid pairs actually visited by SIMD.
+The optional room-sound entry measures 9,125 B min+gzip. Each lazy Wasm variant is 2,717 B raw and 1,393 B gzip.
+
+The BRAS RS1 comparison in `packages/physics/scripts/sound02-bras-measured.mjs` holds out ten rigid-floor
+excess delays. All fall within the engineering allowance of roughly 0.16–0.18 ms, and the predictions
+are consistently 0.042–0.133 ms early. The estimate combines the experiment's position cross-check,
+44.1 kHz sample resolution and a ±1 m/s air-speed sensitivity. Amplitude, decay and other measured
+scenes remain open.
 
 ### Three-dimensional viscoplastic material (FLUID-06)
 

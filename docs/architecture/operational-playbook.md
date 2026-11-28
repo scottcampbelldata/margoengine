@@ -11446,6 +11446,12 @@ Both modules have no static data. Instantiation over sentinel-filled shared or p
 leave all existing bytes intact. Scoped tests check rigid standing modes, wall dissipation, exact arrival
 around a doorway, sample-timed excitation and browser packaging of both lazy kernels.
 
+The native job partitions padded stencil pairs on optional shared memory. A joined boundary before
+each source and receiver update preserves alternating-buffer order. Coded numeric failures preserve
+both accepted pressure arrays, the sample clock and trace. Focused Node and bundled browser tests
+compare exact replay with one, two and four participants and a signed origin. The concert-hall
+cutaway uses the same paths for visual cues and its convolved audio on both renderers.
+
 ### Viscoplastic material points (FLUID-06)
 
 The isolated SIMD module has no static writes on instantiation. The world hashes the live

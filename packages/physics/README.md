@@ -8362,6 +8362,8 @@ sampling, ordered emissions and mass accounting run on the caller. Dispose the s
 Use `@margoengine/physics/room-sound` for low-frequency pressure over an indoor air grid. Solid cells shape the room
 and the air-cell reflection values set its wall impedance. Blocks from `readTrace()` contain ordered pressure samples
 and their sample rate. Concatenate consecutive blocks to measure a room response with `roomEnergyDecay()`.
+The grid spacing and speed of sound determine the dyadic substeps inside each world tick. With no
+excitation field the first pressure increment defaults to 1 Pa. With that field it defaults to 0 Pa.
 
 ```ts
 import { RoomSoundSolver } from '@margoengine/physics/room-sound';
@@ -8405,8 +8407,16 @@ console.log(arrivals[0]?.points);
 
 The wave grid and early-path surface list use separate scene descriptions. Both can be built from one game level.
 Set `excitation: true` if a world producer writes pressure increments, then publish a single impulse per world
-step or one increment for each internal sample in a layout-1 f64 port. `pressureLayout` gives the native region's
-voxel strides. Browser or Node callers can cancel the optional asset load with an AbortSignal.
+step or one increment for each internal sample in a layout-1 f64 port in the room's cell. `pressureLayout`
+gives the native region's voxel strides. The solver publishes the receiver and pressure in its current signed
+cell. An invalid input or unrepresentable pressure update leaves the previous trace and both pressure buffers
+available. Browser or Node callers can cancel the optional asset load with an AbortSignal.
+
+`RoomSoundSolver.load({ threads: 2 })` and `load({ threads: 4 })` use shared world memory and actual helper
+workers in Node or a cross-origin-isolated browser worker. The count includes the caller. The default one
+participant runs in both memory modes and in a browser window. `workCounts()` reports the last accepted
+step computed by this instance, with samples and actual f64x2 stencil pairs per participant. Call
+`dispose()` after the world's final step to release its helpers.
 
 ## Three-dimensional viscoplastic flow
 

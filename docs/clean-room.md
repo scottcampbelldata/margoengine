@@ -17377,6 +17377,24 @@ Each solver gets a contiguous topology region whose size follows the productive 
 The native pressure update uses SIMD over adjacent cells, immutable boundary coefficients and two pressure regions.
 The continuous reflection model, fractional sample projection and audio-node setup are independently testable.
 
+Hamilton and Bilbao (2017), §II.C–D and equations 10–18, describe overwriting the older pressure value at each
+voxel because neighbours are read from the current pressure array. Each native participant therefore writes
+disjoint cell pairs. The caller joins the partitions, applies the source, reads the receiver and alternates the
+arrays before the next sample. The guard and solid lanes keep their existing masks. Bilbao's finite-volume
+derivation expresses locally reacting passive wall admittance as a face flux. [Face-flux derivation](https://doi.org/10.1109/TASL.2013.2256897)
+
+- J. Borish, *Extension of the image model to arbitrary polyhedra* (1984). The concert-hall cutaway
+  independently unfolds two finite wall reflections and compares bounce locations, incident direction and
+  direct and twice-reflected impulse timing with the production path and Web Audio convolver.
+  [Paper](https://doi.org/10.1121/1.390983)
+- F. Brinkmann, L. Aspöck, D. Ackermann, R. Opdam, M. Vorländer and S. Weinzierl, *A benchmark for room acoustical
+  simulation. Concept and database* (2021). RS1 rigid-floor geometry and recorded conditions set the
+  ten source/receiver cases. The measured outputs are excess reflection delays extracted from the
+  original WAVs by locating two arrivals independently of the predicted path. The difference removes
+  recorder latency. The comparison never adjusts a model input to match an observed delay.
+  [Paper](https://doi.org/10.1016/j.apacoust.2020.107867)
+  [BRAS version 3](https://doi.org/10.14279/depositonce-6726.3)
+
 ## Finite-strain viscoplastic flow (FLUID-06)
 
 - Daniel Ram, Theodore Gast, Chenfanfu Jiang, Craig Schroeder, Alexey Stomakhin, Joseph

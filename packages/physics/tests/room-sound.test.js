@@ -80,6 +80,28 @@ test('the causal fractional impulse keeps signed pressure and its first time mom
   assert.equal(23 * pcm[23] + 24 * pcm[24], -0.25 * 23.25);
 });
 
+test('representable long rays keep their gain and invalid geometry or PCM accumulation has coded fixes', () => {
+  const [ray] = roomArrivals({
+    source: [0, 0, 0],
+    listener: [3e160, 4e160, 0],
+    speedOfSound: 5e160,
+    seconds: 2,
+  });
+  near(ray.delay, 1);
+  near(ray.distance / 1e160, 5);
+  near(ray.gains[1] * 1e160, 0.2);
+  near(ray.direction[0], -0.6);
+  near(ray.direction[1], -0.8);
+  near(roomDecayTime(1e306, 1e306, 0.5), roomDecayTime(1, 1, 0.5));
+
+  const coded = (message) => ({ name: 'MargoError', code: 'state', message });
+  assert.throws(() => roomArrivals({ source: [0, 0], listener }), coded(/three finite metre coordinates/));
+  assert.throws(() => roomArrivals({ source, listener, surfaces: [null] }), coded(/ordered vertices/));
+  const rendered = { delay: 0, gains: [2e38, 2e38, 2e38] };
+  assert.throws(() => renderRoomImpulse(44100, [rendered, rendered]), coded(/reduce the arriving pressure gains/i));
+  assert.throws(() => roomEnergyDecay([0, NaN]), coded(/finite pressure samples/));
+});
+
 test('Eyring decay and Schroeder integrated response have exact energy references', () => {
   const rt60 = roomDecayTime(192, 208, 0.25);
   const collisionsPerSecond = (343 * 208) / (4 * 192);
@@ -122,6 +144,30 @@ test('a rigid closed axis follows the discrete Neumann standing mode in both mem
       for (const x of [0, 4, 7, 15]) near(room.pressureAt([x, 0, 0]), pressure[x] * envelope, 500);
       assert.equal(trace.values[0], room.pressureAt([4, 0, 0]));
     }
+  }
+});
+
+test('overflow after a native pressure update preserves both pressure regions, trace and clock', async () => {
+  for (const threads of [1, 4]) {
+    using room = await RoomSoundSolver.load({ threads });
+    const world = new PhysicsWorld({ rate, memory: worldMemory(threads > 1) }).add(room, {
+      grid: { dimensions: [1, 1, 1], spacing: 2, reflection: 1 },
+      source: [0, 0, 0],
+      receiver: [0, 0, 0],
+      speedOfSound: 60,
+      initialPressure: [Number.MAX_VALUE],
+      impulse: Number.MAX_VALUE,
+    });
+    const before = world.takeSnapshot();
+    assert.throws(() => room.step({ tick: 0, level: 0, seed: 0, cell: [0, 0, 0], inputs: new Map() }), {
+      name: 'MargoError',
+      code: 'state',
+      message: /pressure.*reduce/is,
+    });
+    assert.deepEqual(world.takeSnapshot().bytes, before.bytes);
+    assert.equal(room.pressureAt([0, 0, 0]), Number.MAX_VALUE);
+    assert.deepEqual(room.readTrace().values, new Float64Array(0));
+    assert.equal(room.workCounts(), undefined);
   }
 });
 

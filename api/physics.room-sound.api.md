@@ -41,6 +41,7 @@ export type RoomReflectionBands = readonly [number, number, number];
 export interface RoomSoundOptions {
     readonly id?: string;
     readonly excitation?: boolean;
+    readonly threads?: number;
     readonly signal?: AbortSignal;
 }
 
@@ -78,12 +79,25 @@ export class RoomSoundSolver implements Solver<RoomSoundParams> {
     importPorts(): void;
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
+    workCounts(): RoomWaveWorkCounts | undefined;
+    dispose(): void;
+    [Symbol.dispose](): void;
 }
 
 export interface RoomSoundTrace {
     readonly sampleRate: number;
     readonly firstSample: number;
     readonly values: Float64Array;
+}
+
+export interface RoomWaveWorkCounts extends RoomWaveWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly RoomWaveWorkerWork[];
+}
+
+export interface RoomWaveWorkerWork {
+    readonly samples: number;
+    readonly pairs: number;
 }
 
 export function acousticBox(min: RoomSoundPoint, max: RoomSoundPoint, reflection?: number | RoomReflectionBands): readonly AcousticReflector[];

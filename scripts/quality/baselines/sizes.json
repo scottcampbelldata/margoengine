@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21840225,
+  "total": 21846992,
   "history": [
     {
       "date": "2026-10-24",
@@ -15617,6 +15617,12 @@
       "commit": "sea12-film",
       "reason": "@margoengine/physics/loads 72,082 to 74,364 B gzip (both measured on this tree), ceiling 74,232 to 76,595 B: SEA-12 film direction, waveHit (NewWave and constrained NewWave crests placed at a time and place, drawn by Water), ballast (mass and centre of mass for a target draft, heel and trim) and the LoadSolver's placed impulses. Both tools work on the LoadSolver's own sea and buoyancy; a separate entry would make a directed floating scene import two entries. Core and Stage are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "sound02-native-room-pressure",
+      "reason": "SOUND-02: room-sound 5350 to 9125 B gzip (ceiling 5606 to 9399), lava 9794 to 9846 B gzip (ceiling 9824 to 10142), lightning 9037 to 9092 B gzip (ceiling 9072 to 9365). Room sound gains coded input and derived-output handling, accepted-state staging and optional native barrier and work receipt support. A separate room entry would duplicate geometry and world-port bindings. The lava and lightning figures include the extra room pressure label in the existing shared worker pool. Another copy of the worker transport would cost more bytes. Each lazy acoustic variant measures 2,717 B raw and 1,393 B gzip. Core and Stage gain zero bytes.",
+      "grew": 3
     }
   ],
   "items": {
@@ -16507,10 +16513,10 @@
     "@margoengine/physics/ice": 3483,
     "@margoengine/physics/iceberg": 4595,
     "@margoengine/physics/landscape": 7764,
-    "@margoengine/physics/lava": 9824,
+    "@margoengine/physics/lava": 10142,
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 10482,
-    "@margoengine/physics/lightning": 9072,
+    "@margoengine/physics/lightning": 9365,
     "@margoengine/physics/loads": 76595,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
@@ -16525,7 +16531,7 @@
     "@margoengine/physics/robots": 5083,
     "@margoengine/physics/rod": 4755,
     "@margoengine/physics/rogue": 7642,
-    "@margoengine/physics/room-sound": 5606,
+    "@margoengine/physics/room-sound": 9399,
     "@margoengine/physics/runoff": 7192,
     "@margoengine/physics/schooling": 5102,
     "@margoengine/physics/sea": 14609,

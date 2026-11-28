@@ -22803,9 +22803,10 @@ positions. Embers, ash, high-speed debris and snow are outside the environmental
 
 The room solver accepts an explicit air-mask lattice, and the early path trace accepts finite convex faces.
 To connect dynamic EARTH-02 tunnel or canyon geometry, the solver needs a canonical material and occupancy
-field. The opening fixture proves shadow diffraction with explicit geometry. The concert-hall fixture verifies
-early arrival cutaway points and the README plays the actual convolved response. The filmed scene still needs
-to read those paths and room material inputs. See [Framework requests](physics-work-queue.md#framework-requests).
+field. The opening fixture proves shadow diffraction with explicit geometry. `concert-hall.browser.mjs`
+ties computed bounce points and audible arrivals to a fixed in-engine cutaway on both renderers.
+The original showcase source still needs to read solved paths and room material inputs.
+See [Framework requests](physics-work-queue.md#framework-requests).
 
 ### Viscoplastic deposits and established mud scenes (PA-60)
 

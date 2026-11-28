@@ -15518,8 +15518,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 1527342,
-        "gzip": 988351
+        "raw": 1527378,
+        "gzip": 988134
       },
       "./decomposition": {
         "raw": 26988,
@@ -15578,8 +15578,8 @@
         "gzip": 5010
       },
       "./lightning": {
-        "raw": 24624,
-        "gzip": 9064
+        "raw": 24660,
+        "gzip": 9092
       },
       "./explosive": {
         "raw": 41746,
@@ -15610,8 +15610,8 @@
         "gzip": 5110
       },
       "./room-sound": {
-        "raw": 12852,
-        "gzip": 5350
+        "raw": 23644,
+        "gzip": 9125
       },
       "./modal-sound": {
         "raw": 23950,
@@ -15798,8 +15798,8 @@
         "gzip": 5574
       },
       "./lava": {
-        "raw": 25608,
-        "gzip": 9823
+        "raw": 25644,
+        "gzip": 9846
       },
       "./dfsph": {
         "raw": 19974,
@@ -19351,9 +19351,9 @@
       "brotli": 8489
     },
     "packages/physics/dist/solver-phase-thread.js": {
-      "raw": 1587,
-      "gzip": 767,
-      "brotli": 672
+      "raw": 1604,
+      "gzip": 777,
+      "brotli": 674
     },
     "packages/physics/dist/terramechanics-kernel.wasm": {
       "raw": 40423,
@@ -19556,14 +19556,14 @@
       "brotli": 851
     },
     "packages/physics/dist/room-sound-kernel.wasm": {
-      "raw": 753,
-      "gzip": 474,
-      "brotli": 424
+      "raw": 2717,
+      "gzip": 1393,
+      "brotli": 1242
     },
     "packages/physics/dist/room-sound-kernel-shared.wasm": {
-      "raw": 753,
-      "gzip": 474,
-      "brotli": 423
+      "raw": 2717,
+      "gzip": 1393,
+      "brotli": 1242
     },
     "packages/physics/dist/modal-sound-kernel.wasm": {
       "raw": 1567,
@@ -20242,13 +20242,13 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 333031,
-        "gzip": 106997
+        "raw": 333067,
+        "gzip": 107016
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",
         "raw": 1194310,
-        "gzip": 880542,
+        "gzip": 880546,
         "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },

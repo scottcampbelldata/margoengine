@@ -19,3 +19,4 @@ export {
   type RoomSoundTrace,
 } from './wave.js';
 export { roomEnergyDecay } from './analysis.js';
+export type { RoomWaveWorkCounts, RoomWaveWorkerWork } from './wave-kernel.js';

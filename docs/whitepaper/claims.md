@@ -6293,6 +6293,13 @@ eigenfrequency and checks analytical reverberation and energy-decay references.
 `packages/physics/tests/coupling/room-sound.test.js` routes receiver pressure around an opening after the exact
 shortest number of lattice links, checks absorption and verifies registry excitation and snapshot replay.
 
+`room-wave-workers.test.js` compares signed-cell snapshots, traces and pressure bytes across one,
+two and four native participants. The concert-hall cutaway in `concert-hall.browser.mjs` uses the
+actual path geometry and convolved impulse. Its direct arrival is 22.875 ms and its twice-reflected
+arrival 40.725 ms. Both renderers reproduce their held and replayed frames and PCM exactly.
+The BRAS RS1 diagnostic finds all ten measured excess reflection delays inside its engineering
+allowance. It leaves amplitude, room decay and other measured scenes open.
+
 ### Three-dimensional Bingham and Herschel–Bulkley material (FLUID-06)
 
 Finite-strain APIC preserves translation and mass in the free-fall case. Computed Bingham
