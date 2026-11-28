@@ -486,7 +486,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   the whole walk in place with `addRootMotion(animator, {apply: false})`.
 - **Regression:** `tests/modern-animator-travel-joint.test.js`.
 
-### Open 2026-11-28: a stooped body's up leans with its trunk, so ground heights read along a slope (KB-RIG-FRAMEUP1, rigging)
+### Fixed 2026-11-28: a stooped body's up leans with its trunk, so ground heights read along a slope (KB-RIG-FRAMEUP1, rigging)
 
 - **Repro:** `addPerson` on the Fauld cast's Character Creator old man: `person.body.frame.up` is
   [0, 0.992, 0.127], 7.3 degrees forward of the model's vertical. `checkPose(body, pose, {ground})` on the walk drawn in
@@ -499,6 +499,13 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix needed:** a vertical for the ground checks that does not lean with the trunk: the normal of the rest feet's
   sole plane (heels and toes of a standing rest), or the rig space's up when the species gives one. `body.frame` feeds
   the anatomical zeros too, so the change reruns the anatomy, IK and pose sheet tests.
+- **Fix:** `body.frame` gains `vertical`, the world's up: the rig's axis nearest the trunk's up (within 30 degrees)
+  when the rest feet stand level on it (each weight-bearing joint at its mirror's height, below the hips), otherwise
+  the trunk's up; `fitAnatomy({vertical})` passes one. The stature and every height and ground test of
+  `rigging/validate` are measured along it; the anatomical angles still read against the trunk's frame, so the
+  zeros are unchanged.
+- **Regression:** `packages/rigging/tests/frame-vertical.test.js` (a body leaned 7.3 degrees forward: vertical, stature,
+  a toe 0.016 m up reads clear in place and after 6.7 m of travel, and one 0.034 m down reads 0.034 m).
 
 ### Fixed 2026-11-28: the human anatomy table did not read Unreal mannequin or KayKit bone names (KB-RIG-UENAMING1, rigging)
 

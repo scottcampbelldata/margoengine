@@ -104,7 +104,10 @@ export interface PoseCheckOptions {
   readonly tier?: Tier | 'both';
   /** Degrees by which an angle may pass its limit before it counts, for noise. Default 0.5. */
   readonly tolerance?: number;
-  /** Height of the ground along the body's up, in the rig's space, or null for no ground tests. Default null. */
+  /**
+   * Height of the ground along the body's vertical (`body.frame.vertical`, the world's up), in the rig's space, or null
+   * for no ground tests. Default null.
+   */
   readonly ground?: number | null;
   /** Skin points in the rig's space (x, y, z, ...), tested against the ground as well as the joints. */
   readonly points?: ArrayLike<number>;
@@ -243,7 +246,7 @@ function fitOf(body: AnatomicalRig): Fit {
     seen.add(bone);
     feet.push({ id, bone });
   }
-  fit = { order, specs, bones, volumes, pairs, feet, up: [...body.frame.up] as V3, stature };
+  fit = { order, specs, bones, volumes, pairs, feet, up: [...body.frame.vertical] as V3, stature };
   FITS.set(body, fit);
   return fit;
 }

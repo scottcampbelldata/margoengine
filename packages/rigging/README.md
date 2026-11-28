@@ -998,7 +998,7 @@ What the entry gives:
 
 | Function | What it does |
 | --- | --- |
-| `fitAnatomy(rig, { species, preset?, map?, limits?, forward?, roll? })` | The `AnatomicalRig`: body frame, stature, rest pose (`T`, `A`, `arms-down`), and per joint its bone, kind, anatomical axes in the bone's own frame, neutral rotation, rest angles and ranges. |
+| `fitAnatomy(rig, { species, preset?, map?, limits?, forward?, roll?, vertical? })` | The `AnatomicalRig`: body frame, stature, rest pose (`T`, `A`, `arms-down`), and per joint its bone, kind, anatomical axes in the bone's own frame, neutral rotation, rest angles and ranges. |
 | `jointAngles(body, pose)`, `readJointAngles(body, pose, out)` | Clinical angles in degrees per joint: the two parts of the swing (flexion and abduction for most joints) and the twist. The second form fills a flat array and allocates nothing. |
 | `poseFromAngles(body, angles, base?)` | The pose that has those angles: the inverse. |
 | `regionAngles(body, pose)` | The head against the chest and the chest against the pelvis, whatever number of spine bones the rig has. |
@@ -1008,7 +1008,10 @@ What the entry gives:
 | `poseLimits`, `ikLimits`, `ragdollJoints`, `kinematicsLimits` | The limits in the forms `PoseJointLimits`, IK chains, ragdoll profiles and `JointLimitSet` take. |
 | `defineSpecies(table)`, `bound(allowance, ...rows)`, `mirrorJoint(spec, rename)` | Build and check a species table. |
 
-How angles are measured. The body frame is x to the body's left, y up, z forward. Each joint has a long axis (its
+How angles are measured. The body frame is x to the body's left, y up, z forward, read from the trunk: a body that
+stands stooped in its rest pose leans `body.frame.up` forward with its trunk. Heights, the stature and the pose
+checker's ground tests are measured along `body.frame.vertical` instead, the world's up: the rig's axis nearest the
+trunk's up when the rest feet stand level on it, or `vertical` as passed. Each joint has a long axis (its
 segment at neutral) and three motions: two swings across it and the twist about it. The swing is read as one rotation
 vector whose two parts are the clinical angles, so flexion and abduction are exact for a single-plane motion and stay
 well defined up to 180 degrees; the twist is what is left about the segment. Neutral for a human is the standing pose

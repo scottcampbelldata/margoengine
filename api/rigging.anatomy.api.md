@@ -45,6 +45,7 @@ export interface AnatomicalRig {
         readonly left: Vec3;
         readonly up: Vec3;
         readonly forward: Vec3;
+        readonly vertical: Vec3;
     };
     readonly mirrored: boolean;
     readonly stature: number;
@@ -104,6 +105,7 @@ export interface FitOptions {
     readonly preset?: string;
     readonly map?: Readonly<Record<string, string | number | null>>;
     readonly limits?: boolean;
+    readonly vertical?: Vec3;
     readonly forward?: Vec3;
     readonly roll?: Readonly<Record<string, number>>;
 }

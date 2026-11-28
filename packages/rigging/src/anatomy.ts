@@ -227,7 +227,7 @@ export interface ProportionNorm {
 
 /**
  * How a proportion is read on a fitted rig at neutral: the distance between two joint centres (`length`), or how far the
- * second lies above the first along the body's up (`up`), plus `offset` shares of stature (a joint's own height above the
+ * second lies above the first along the body's vertical (`up`), plus `offset` shares of stature (a joint's own height above the
  * ground). A joint centre is not the skin landmark a survey measured, so `band` is wider than the spread between people.
  */
 export interface ProportionMeasure {
@@ -415,8 +415,18 @@ export interface AnatomicalRig {
   readonly rest: Float64Array;
   /** The same pose with every fitted joint at anatomical zero. */
   readonly neutral: Float64Array;
-  /** The body frame in the rig's rest space. */
-  readonly frame: { readonly origin: Vec3; readonly left: Vec3; readonly up: Vec3; readonly forward: Vec3 };
+  /**
+   * The body frame in the rig's rest space: `left`, `up` and `forward` are the trunk's (a stoop leans `up` forward with
+   * it), which every anatomical angle is read against; `vertical` is the world's up, which heights and the ground are
+   * measured along (see {@link FitOptions.vertical}).
+   */
+  readonly frame: {
+    readonly origin: Vec3;
+    readonly left: Vec3;
+    readonly up: Vec3;
+    readonly forward: Vec3;
+    readonly vertical: Vec3;
+  };
   /** True when the left and right names disagree with the way the feet point; the feet win. */
   readonly mirrored: boolean;
   /** Standing height in the rig's units, 0 when no measure was mapped. */
@@ -445,6 +455,12 @@ export interface FitOptions {
   readonly map?: Readonly<Record<string, string | number | null>>;
   /** False turns the limits off by name: {@link clampPose} and {@link addAnatomyLimits} then leave poses alone. Default true. */
   readonly limits?: boolean;
+  /**
+   * The world's up in the rig's rest space, which the stature, heights and ground tests are measured along. Default:
+   * the rig's axis nearest the trunk's up (within 30 degrees) when the rest feet stand level on it, each weight-bearing
+   * joint at the height of its mirror and below the hips; otherwise the trunk's up, or the species' fixed up.
+   */
+  readonly vertical?: Vec3;
   /** The way the body faces in the rig's rest space, when the rig has no feet to read it from. */
   readonly forward?: Vec3;
   /**
@@ -512,7 +528,11 @@ const DEG = 180 / Math.PI,
   /** A hinge bent at least this much in the rest pose is flexed: nothing else bends a joint that far. */
   BEND_SURE = 20 * RAD,
   /** Between the two, the bend is trusted only when its axis is within this of where anatomy puts it. */
-  TWIST_TRUST = 60 * RAD;
+  TWIST_TRUST = 60 * RAD,
+  /** A rig axis within this of the trunk's up is the vertical, when the rest feet stand level on it. */
+  STOOP_MAX = 30 * RAD,
+  /** How far apart, as a share of the hip width, the heights of a weight-bearing joint and its mirror may be on level feet. */
+  LEVEL = 0.25;
 
 const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross = (a: Vec3, b: Vec3): V3 => [
@@ -1114,12 +1134,45 @@ export function fitAnatomy(rig: RigPose | readonly RigJoint[], options: FitOptio
     left = scaled(left, -1);
     forward = scaled(forward, -1);
   }
+  // The world's up. The trunk's up leans with a stoop (an old man's rest pose leans it 7 degrees forward), so heights
+  // and the ground are measured along the rig's own axis where the rest feet stand level on it (KB-RIG-FRAMEUP1).
+  let vertical: V3 = up;
+  if (options.vertical) {
+    const given = unit(options.vertical);
+    if (!given || !options.vertical.every(Number.isFinite))
+      throw new RangeError('options.vertical must be a finite direction, such as [0, 1, 0]');
+    vertical = given;
+  } else if (!species.frame.up) {
+    let axis = 0;
+    for (let c = 1; c < 3; c++) if (Math.abs(up[c]) > Math.abs(up[axis])) axis = c;
+    const candidate: V3 = [0, 0, 0];
+    candidate[axis] = Math.sign(up[axis]);
+    let pairs = 0,
+      level = dot(candidate, up) >= Math.cos(STOOP_MAX);
+    const done = new Set<string>();
+    for (const id of species.feet ?? []) {
+      const other = specs.get(id)?.mirror;
+      if (!other || done.has(id)) continue;
+      done.add(id).add(other);
+      const a = at(id),
+        b = at(other);
+      if (!a || !b) continue;
+      pairs++;
+      if (
+        Math.abs(dot(sub(a, b), candidate)) > LEVEL * width ||
+        dot(sub(origin, a), candidate) < width ||
+        dot(sub(origin, b), candidate) < width
+      )
+        level = false;
+    }
+    if (pairs && level) vertical = candidate;
+  }
   let stature = 0;
   for (const span of species.stature) {
     const a = at(span.from),
       b = at(span.to);
-    if (a && b && Math.abs(dot(sub(b, a), up)) > tiny) {
-      stature = Math.abs(dot(sub(b, a), up)) / span.share;
+    if (a && b && Math.abs(dot(sub(b, a), vertical)) > tiny) {
+      stature = Math.abs(dot(sub(b, a), vertical)) / span.share;
       break;
     }
   }
@@ -1378,7 +1431,7 @@ export function fitAnatomy(rig: RigPose | readonly RigJoint[], options: FitOptio
     parents,
     rest,
     neutral: rest.slice(),
-    frame: { origin, left, up, forward },
+    frame: { origin, left, up, forward, vertical },
     mirrored,
     stature,
     restPose: '',
