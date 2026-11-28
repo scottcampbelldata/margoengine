@@ -17212,6 +17212,10 @@ reproduced `EBUSY` and the live server/worker ports; the repaired seven-test fil
   renderer can give against another's samples. Job 2's bar, a noise-free disocclusion, asks a finite first-frame
   estimate to recover radiance it has not sampled; Schied et al. 2017 (section 6) report the same limit for SVGF. The
   oracle exists (`denoisedisocclusion`); the remaining gap is 6.01 against 4.52 RMS. Closing it as written needs a bar Scott sets (a ratio to the kept pixels, for example); no change to either bar is made here.
+- **Rechecked 2026-11-28 (lane C, main at c67afe9fd2, RTX A6000, WebGPU):** not stale. `denoisedisocclusion` reads
+  6.01 uncovered, 4.34 two frames on, 4.52 kept and 0.726 of the shadow-edge contrast, the same as recorded after the
+  KB5451, KB4037 and KB-L5a-10 changes to the tracer. Both jobs still wait on what the entry above names: Scott's
+  choice of each bar, and for job 1 the MagicaVoxel reference corpus rendered by hand.
 
 ### Batch 99 caustic guide scope
 
