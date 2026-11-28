@@ -979,6 +979,8 @@ export class BiomeView implements Disposable {
   #river?: { dispose(): void; readonly options: { fill(x: number, z: number): number | undefined } };
   #paint?: typeof import('@margoengine/biomes/rivers').paintRiverbed;
   #rivers?: { dispose(): void };
+  /** Where the terrain's rings are centred (`clipmap.anchor`, else the starting camera), for the water's banks. */
+  #anchor: NonNullable<TerrainOptions['clipmapAnchor']> = 'camera';
   #refreshRiverSources?: () => void;
   #disposed = false;
   #horizon?: Terrain;
@@ -1093,6 +1095,7 @@ export class BiomeView implements Disposable {
     );
     const view = this;
     const anchor = options.clipmap?.anchor ?? ([engine.camera.position[0], engine.camera.position[2]] as const);
+    this.#anchor = anchor;
     const extent =
       anchor === 'camera' || options.clipmap?.levels !== undefined
         ? this.#radius
@@ -1450,6 +1453,23 @@ export class BiomeView implements Disposable {
               horizon: !inland,
             }),
           );
+        // Far off, the terrain's coarse rings bridge a creek narrower than a ring cell and hide its water; the banks let
+        // the water pass the rings' error and end it where the view's own heights rise through it (KB-BIOMES-RIVERSTEP1).
+        if (river && inland && view.#water && !view.#disposed) {
+          const { WaterBanks } = await import('@margoengine/water/banks');
+          if (!view.#disposed && view.#water)
+            held.run(() =>
+              WaterBanks.attach(engine, {
+                surface: view.#water!,
+                heightmap: () => view.#textures?.height,
+                origin: [x0, z0],
+                size: [x1 - x0, z1 - z0],
+                cell: options.clipmap?.cellSize ?? 1,
+                resolution: options.clipmap?.resolution ?? 64,
+                centre: view.#anchor,
+              }),
+            );
+        }
         if (flow && river?.lines.length && view.#water && !view.#disposed) {
           const [{ Rivers }, { riverSources, climateDischarge }, drainage] = await Promise.all([
               import('@margoengine/water/rivers'),

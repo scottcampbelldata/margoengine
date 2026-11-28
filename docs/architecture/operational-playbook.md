@@ -10887,6 +10887,18 @@ The terrain GPU regression in `packages/terrain/test/clipmap-anchor.browser.mjs`
 two-millimetre camera move. The legacy moving window changed 1,315 colour pixels beyond 16 code values and 786
 silhouette pixels. Anchored terrain changed zero by either measure on WebGPU and the WebGL2 compatibility layer.
 
+### Water over coarse terrain rings
+
+A clipmap ring takes the heights at its vertices only, so far off it bridges a channel narrower than its cells and the
+depth test hides the water in it (KB-BIOMES-RIVERSTEP1). `@margoengine/water/banks` moves each water vertex toward the
+eye along its own view ray until it stands as high as the rings' error there (slope times twice the ring spacing less a
+texel, capped), which keeps the pixel and only lowers the depth, and drops fragments over the terrain heightmap at or
+above the surface, so the waterline comes from the heightmap. Evidence: `packages/water/test/banks.browser.mjs` on
+WebGPU and the WebGL2 compatibility layer (a 6 m channel's centre column: 153 of 400 rows before, 400 of 400 after, no
+water past its walls). Missing: ground occluders within the allowed error in front of the water (a bank lip seen at a
+grazing angle from a coarse ring) no longer hide it; the error is capped at 2 m and zero where the rings sample every
+texel.
+
 ### Distant forest contact
 
 The Terrain prepare pass can rasterize its drawn triangles from above before Scatter reads their height. The image

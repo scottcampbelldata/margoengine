@@ -100,9 +100,10 @@ for). Along each line it finds the bed (the lowest ground within 6 m across it) 
 ground each side within 24 m): a carved channel fills to three quarters of its depth, at most 1.5 m, so the banks stand
 over the water; open ground takes 1.5 m. The surface never rises downstream and is averaged along the line, one smooth
 falling slope (KB-BIOMES-RIVERSTEP1). The terrain hides it where the ground stands higher, so the banks draw its edge.
-The ground under the water takes the material `riverbed` (in `MATERIALS`, full at 0.3 m deep, `paintRiverbed`): the
-terrain's far rings point-sample a narrow channel away and cover its water, and the painted ground keeps the stream one
-line from the air. A world from `samples` has no lines of its own: pass yours, `rivers: [line]`, each an Int32Array of
+The terrain's far rings point-sample a narrow channel away and would cover its water, so the view attaches
+`WaterBanks` (`@margoengine/water/banks`, loaded only with river or lake water): the water passes the rings' error and
+ends where the view's own heights rise through it, one line of water at any distance (KB-BIOMES-RIVERSTEP1). The ground
+under the water takes the material `riverbed` (in `MATERIALS`, full at 0.3 m deep, `paintRiverbed`). A world from `samples` has no lines of its own: pass yours, `rivers: [line]`, each an Int32Array of
 `[x, z, ...]` millimetres. It stands still in v1.0.0 (docs/limits.md); the coupled grid has at most 512 cells a side.
 
 The world's hydrology can fill the water in too. `water: { lakes: 'auto' }` puts a still lake in every pit whose fill

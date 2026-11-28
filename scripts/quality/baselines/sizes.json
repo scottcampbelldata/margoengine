@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21720390,
+  "total": 21723115,
   "history": [
     {
       "date": "2026-10-24",
@@ -15438,6 +15438,12 @@
       "commit": "hydro-03-local-banks-and-worker-proposals",
       "reason": "HYDRO-03 physics/sediment grows from 4402 to 7845 B gzip (cap 4657 to 8101). The same optional entry validates candidate inventory and float32 outputs, joins workers and keeps the existing bed and water ports. The native plain and shared images are 7606/7667 B gzip and partition cell and face proposals before ordered sediment transfer. Water/shallow-surface grows from 1716 to 3003 B gzip (cap 1962 to 3259) for reuse of the sediment tint shader and accepted concentration upload. Keeping this with the Water surface mirror shares its renderer and device lifecycle. Core and Stage gain zero bytes.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "kb-biomes-riverstep1",
+      "reason": "KB-BIOMES-RIVERSTEP1: new optional entry water/banks (2,725 B budget: WaterBanks, still water passes a clipmap terrain's coarse-ring error and ends where the terrain heights rise through it); biomes/view loads it with import() only for river and lake water and stays within its budget",
+      "grew": 1
     }
   ],
   "items": {
@@ -17122,6 +17128,7 @@
     "@margoengine/voxel/vox": 13460,
     "@margoengine/voxel/wind": 3422,
     "@margoengine/water": 40014,
+    "@margoengine/water/banks": 2725,
     "@margoengine/water/bodies": 4379,
     "@margoengine/water/breaking": 3538,
     "@margoengine/water/caustics": 6651,

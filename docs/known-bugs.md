@@ -1246,14 +1246,26 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   bound 1.3).
 - **Still open:** the far half, below.
 
-### Open 2026-11-27: seen from far off, a narrow creek breaks into separate patches of water (KB-BIOMES-RIVERSTEP1, far half; terrain, water, biomes)
+### Fixed 2026-11-28: seen from far off, a narrow creek broke into separate patches of water (KB-BIOMES-RIVERSTEP1, far half; water, biomes)
 
-- **Repro:** the `aerial-west` view of timber-valley: past a few hundred metres the creek is a row of separate blue
-  patches, then only the riverbed paint.
-- **Cause:** a clipmap ring's cells grow with distance (16 and 32 m from about 500 m) past the channel's 14 m width. The
-  ring takes the ground at its vertices only, so the water, 0.3 m under the banks, shows where a vertex falls in the
-  channel and is covered elsewhere. A fix has to either keep the channel's low ground in the coarse rings or let the
-  water pass the coarse ground's error in the depth test; both are design work.
+- **Repro:** the `aerial-west` view of timber-valley, or ten-thousand-trees with `water: { rivers: 'auto' }`: past a few
+  hundred metres the creek was a row of separate blue patches, then only the riverbed paint. With the view's default
+  fixed clipmap anchor the patches reached the camera once the flight left its start.
+- **Cause:** a clipmap ring's cells grow with distance from its centre (16 and 32 m from about 500 m) past the channel's
+  14 m width. The ring takes the ground at its vertices only, so the water, 0.3 m under the banks, showed where a vertex
+  fell in the channel and was covered by triangles bridging the banks elsewhere.
+- **Fix:** new optional entry `@margoengine/water/banks` (`WaterBanks`), attached by `BiomeView` to its river and lake
+  water (`packages/biomes/src/view.ts`): each water vertex moves toward the eye along its view ray until it stands as
+  high as the rings' geometric error there (slope 0.25 times twice the ring spacing less a texel, at most 2 m), which
+  keeps its pixel and only brings its depth nearer, and fragments over the view's own 2 m heights at or above the surface
+  are dropped, so the waterline follows the heightmap, not the rings. Near the camera, where the rings sample every
+  texel, nothing changes. Sources: Losasso and Hoppe 2004 (geometry clipmaps), Strugar 2009 (CDLOD morph), Ulrich 2002
+  (per-level geometric error), Lengyel 2000 (projected depth offset); see `packages/water/src/banks.ts`.
+- **Regression test:** `node packages/water/test/banks.browser.mjs` and `--compat` (a 6 m channel under rings of 2 m
+  cells from 300 m up: the channel's centre column showed water in 153 of 400 rows before, 400 of 400 with the banks,
+  and no water pixel past its walls; WebGPU and the WebGL2 compatibility layer).
+- **Note for the terrain and biomes owners:** the terrain rings and BiomeView's default anchor are unchanged; the fix
+  lives in the water, which reads the terrain's heightmap and ring layout.
 
 ### Fixed 2026-11-27: past a landlocked world's edge the view showed a flat blue plane (KB-BIOMES-WORLDEDGE1; biomes)
 

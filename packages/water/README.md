@@ -304,6 +304,59 @@ Water.attach(engine, {
 });
 ```
 
+### A creek under a clipmap terrain: `WaterBanks` (`@margoengine/water/banks`)
+
+A clipmap terrain (`@margoengine/terrain`) samples its heights only at its ring vertices, whose spacing doubles ring by
+ring. Far off, a channel narrower than a ring cell is bridged by triangles between its banks, which stand above the
+water, so the water shows only where a vertex happens to fall in the channel. `WaterBanks` gives the water the terrain's
+own heightmap and ring layout: each surface vertex moves toward the eye along its view ray until it stands as high as
+the rings' error there (the same pixel, a nearer depth), and fragments over ground at or above the surface are dropped,
+so the waterline follows the heights, not the rings. Near the camera, where the rings sample every texel, the water is
+drawn as before. The error allowed is `slope` (default 0.25) times twice the ring spacing, less one texel, at most
+`limit` metres (default 2). `BiomeView` attaches one to its river and lake water. The Water must be bounded
+(`horizon` false).
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Terrain } from '@margoengine/terrain';
+import { Water } from '@margoengine/water';
+import { WaterBanks } from '@margoengine/water/banks';
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+// 1 m heights over 512 m: a 6 m channel along z, its banks 2 m up, still water 1 m deep.
+const side = 513;
+const ground = new Float32Array(side * side);
+for (let j = 0; j < side; j++) for (let i = 0; i < side; i++) ground[j * side + i] = Math.abs(i - 263) < 3 ? 0 : 2;
+const heightmap = engine.gpu!.createTexture({
+  size: [side, side],
+  format: 'r32float',
+  usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+});
+engine.gpu!.queue.writeTexture({ texture: heightmap }, ground, { bytesPerRow: side * 4 }, [side, side]);
+Terrain.attach(engine, {
+  origin: [-256, -256],
+  size: [512, 512],
+  heightScale: 1,
+  clipmapAnchor: 'camera',
+  layers: Array.from({ length: 4 }, () => ({ height: [-10, 10] as const, slope: [0, 1] as const, scale: 0.25 })),
+  textures(device) {
+    const layers = device.createTexture({
+      size: [1, 1, 4],
+      format: 'rgba8unorm-srgb',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    device.queue.writeTexture({ texture: layers }, new Uint8Array(16).fill(120), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 4]);
+    return { heightmap, layers };
+  },
+});
+const water = Water.attach(engine, {
+  size: [512, 512],
+  terrain: { heightmap: () => heightmap, origin: [-256, -256], size: [512, 512] },
+  fill: (x) => (Math.abs(x - 7) < 12 ? 1 : undefined),
+  still: true,
+});
+WaterBanks.attach(engine, { surface: water, heightmap: () => heightmap, origin: [-256, -256], size: [512, 512] });
+```
+
 Rendering blends offshore swells into the shallow simulation according to ocean
 connectivity and seabed depth, including blend derivatives in the surface normals.
 Deep ocean keeps the same wave field on both sides of the map boundary. The outer
