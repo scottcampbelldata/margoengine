@@ -29,3 +29,20 @@ test('a landscape snapshot samples the physical bed and leaves the input relief 
   assert.equal(after.height(x, origin[1] - 1), relief.height(x, origin[1] - 1));
   assert.equal(after.rivers, relief.rivers);
 });
+
+test('threaded relief opts into shared world memory and preserves the accepted terrain', async (t) => {
+  const relief = createRelief({ seed: 13, origin: [-544, 732], size: [500, 600], relief: 3 });
+  const options = { step: 70, rainfall: 0.01, uplift: 0.002, erodibility: 0.03, outlets: { maxX: true } };
+  const serial = await evolveRelief(relief, options);
+  const shared = await evolveRelief(relief, { ...options, forcing: { threads: 4 } });
+  t.after(() => shared.landscape[Symbol.dispose]());
+  assert.ok(shared.world.memory.buffer instanceof SharedArrayBuffer);
+  serial.world.advance(60);
+  shared.world.advance(60);
+  assert.equal(shared.world.hash(), serial.world.hash());
+  assert.equal(shared.landscape.workCounts().threads, 4);
+  const { origin, size } = relief.settings;
+  const x = origin[0] + size[0] / 2;
+  const z = origin[1] + size[1] / 2;
+  assert.equal(shared.snapshotRelief().height(x, z), serial.snapshotRelief().height(x, z));
+});

@@ -324,8 +324,8 @@
         "gzip": 3014
       },
       "./landscape": {
-        "raw": 1058,
-        "gzip": 669
+        "raw": 1161,
+        "gzip": 739
       },
       "./valley": {
         "raw": 10225,
@@ -15442,8 +15442,8 @@
         "gzip": 5010
       },
       "./lightning": {
-        "raw": 24224,
-        "gzip": 8850
+        "raw": 24244,
+        "gzip": 8860
       },
       "./explosive": {
         "raw": 41750,
@@ -15598,20 +15598,20 @@
         "gzip": 15190
       },
       "./viscoplastic": {
-        "raw": 22697,
-        "gzip": 8580
+        "raw": 22717,
+        "gzip": 8590
       },
       "./tsunami": {
-        "raw": 23315,
-        "gzip": 8925
+        "raw": 23335,
+        "gzip": 8936
       },
       "./pack-ice": {
         "raw": 11423,
         "gzip": 4715
       },
       "./runoff": {
-        "raw": 18056,
-        "gzip": 6936
+        "raw": 18076,
+        "gzip": 6948
       },
       "./drainage-fog": {
         "raw": 10045,
@@ -15638,8 +15638,8 @@
         "gzip": 3902
       },
       "./landscape": {
-        "raw": 12381,
-        "gzip": 5066
+        "raw": 19439,
+        "gzip": 7508
       },
       "./sediment": {
         "raw": 11090,
@@ -15658,8 +15658,8 @@
         "gzip": 5574
       },
       "./lava": {
-        "raw": 25208,
-        "gzip": 9605
+        "raw": 25228,
+        "gzip": 9616
       },
       "./dfsph": {
         "raw": 19974,
@@ -19288,8 +19288,8 @@
     },
     "packages/physics/dist/solver-phase-thread.js": {
       "raw": 1592,
-      "gzip": 764,
-      "brotli": 670
+      "gzip": 767,
+      "brotli": 674
     },
     "packages/physics/dist/cloth-kernel.wasm": {
       "raw": 11606,
@@ -19352,14 +19352,14 @@
       "brotli": 1000
     },
     "packages/physics/dist/landscape-kernel.wasm": {
-      "raw": 43592,
-      "gzip": 11788,
-      "brotli": 9872
+      "raw": 42179,
+      "gzip": 11467,
+      "brotli": 9697
     },
     "packages/physics/dist/landscape-kernel-shared.wasm": {
-      "raw": 43680,
-      "gzip": 11848,
-      "brotli": 9970
+      "raw": 42267,
+      "gzip": 11530,
+      "brotli": 9828
     },
     "packages/physics/dist/accretion-kernel.wasm": {
       "raw": 1657,

@@ -46,7 +46,7 @@ export async function evolveRelief(relief: Relief, options: ReliefLandscapeOptio
     depth: depth / MM_PER_METRE,
     centre: [(ox + width * 0.5) / MM_PER_METRE, (oz + depth * 0.5) / MM_PER_METRE] as const,
   };
-  const [{ PhysicsWorld }, { TerrainBed, bedSurface }, { LandscapeEvolution }] = await Promise.all([
+  const [{ PhysicsWorld, worldMemory }, { TerrainBed, bedSurface }, { LandscapeEvolution }] = await Promise.all([
     import('@margoengine/physics/world'),
     import('@margoengine/physics/earth'),
     import('@margoengine/physics/landscape'),
@@ -54,13 +54,21 @@ export async function evolveRelief(relief: Relief, options: ReliefLandscapeOptio
   const landscape = await LandscapeEvolution.load(forcing);
   const terrain = new TerrainBed();
   const floor = params.floor;
-  const world = new PhysicsWorld({ rate: frameRate ?? { num: 60, den: 1 } })
-    .add(terrain, {
-      ...grid,
-      elevations: (x, z) => relief.height(Math.round(x * MM_PER_METRE), Math.round(z * MM_PER_METRE)) / MM_PER_METRE,
-      bedrock: typeof floor === 'number' ? () => floor : floor,
-    })
-    .add(landscape, { ...params, grid });
+  const rate = frameRate ?? { num: 60, den: 1 };
+  let world: PhysicsWorld;
+  try {
+    const memory = (forcing?.threads ?? 1) > 1 ? worldMemory(true) : undefined;
+    world = new PhysicsWorld({ rate, memory })
+      .add(terrain, {
+        ...grid,
+        elevations: (x, z) => relief.height(Math.round(x * MM_PER_METRE), Math.round(z * MM_PER_METRE)) / MM_PER_METRE,
+        bedrock: typeof floor === 'number' ? () => floor : floor,
+      })
+      .add(landscape, { ...params, grid });
+  } catch (cause) {
+    landscape[Symbol.dispose]();
+    throw cause;
+  }
   return {
     world,
     terrain,

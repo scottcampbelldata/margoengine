@@ -11138,6 +11138,8 @@ The landscape stages its new material, ledger and bed delta before publishing. I
 accepted delta can be represented in the receiving float32 TerrainBed. Biomes copies the accepted
 terrain into the relief that drives the fixed-camera Terrain test. The volume check includes the
 last contribution still pending on the staggered terrain step.
+Shared workers prepare disjoint vertices and downhill links before the deterministic drainage graph.
+The existing Biomes helper opts into shared memory when its caller asks for multiple landscape threads.
 
 ### Drainage fog evidence (ATMO-08)
 

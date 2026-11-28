@@ -34,15 +34,21 @@ test('landscape rejects malformed grids and material inputs with coded correctio
   assert.throws(() => landscape.read(-1, 0), error(/integer column and row/));
 });
 
-test('landscape refuses a finite native change that would overflow TerrainBed before publishing it', async () => {
-  for (const shared of [false, true]) {
+test('landscape refuses a finite native change that would overflow TerrainBed before publishing it', async (t) => {
+  for (const [shared, threads] of [
+    [false, 1],
+    [true, 1],
+    [true, 4],
+  ]) {
     const bed = new TerrainBed();
-    const landscape = await LandscapeEvolution.load();
+    const landscape = await LandscapeEvolution.load({ threads });
+    t.after(() => landscape[Symbol.dispose]());
     const world = new PhysicsWorld({ rate, memory: worldMemory(shared) })
       .add(bed, { ...grid, elevations: [1e38, 1e38, 1e38, 1e38] })
       .add(landscape, { ...inactive, grid, uplift: 9e39 });
     world.advance(1);
     const before = stateBytes(world, landscape);
+    const work = landscape.workCounts();
     const acceptedTick = world.tick;
     const saved = world.takeSnapshot();
     assert.ok(landscape.budget.uplift > 1.4e38);
@@ -50,6 +56,7 @@ test('landscape refuses a finite native change that would overflow TerrainBed be
       assert.throws(() => world.advance(2), error(/TerrainBed float32 range.*Reduce uplift/));
       assert.equal(world.tick, acceptedTick);
       assert.deepEqual(stateBytes(world, landscape), before);
+      assert.deepEqual(landscape.workCounts(), work);
       assert.ok(bed.elevations().every((value) => value > 0 && Number.isFinite(value)));
       world.restoreSnapshot(saved.bytes);
     }

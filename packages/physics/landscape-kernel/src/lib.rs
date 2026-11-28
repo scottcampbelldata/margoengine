@@ -138,9 +138,10 @@ impl Grid {
         height: &[f64],
         i: usize,
         distances: &[f64; 8],
-    ) -> Option<(f64, f64, f64)> {
+    ) -> Option<(f64, f64, f64, u32)> {
         let (mut normalisation, mut slope, mut length) = (0.0, 0.0, 0.0);
         let mut regular = true;
+        let mut receivers = 0;
         if !self.routes(height, i, distances, 1.0, |j, distance, _, weight| {
             let moment = weight * (height[i] - height[j]);
             let span = weight * distance;
@@ -150,12 +151,13 @@ impl Grid {
             normalisation += weight;
             slope += grade;
             length += span;
+            receivers += 1;
         }) {
             return None;
         }
         if regular && normalisation.is_finite() && slope.is_finite() && length.is_finite() {
             if normalisation == 0.0 {
-                return Some((0.0, 0.0, 0.0));
+                return Some((0.0, 0.0, 0.0, 0));
             }
             let mean_slope = slope / normalisation;
             let mean_length = length / normalisation;
@@ -164,7 +166,7 @@ impl Grid {
                 && mean_length > 0.0
                 && mean_length.is_finite()
             {
-                return Some((normalisation, mean_slope, mean_length));
+                return Some((normalisation, mean_slope, mean_length, receivers));
             }
         }
         let peak = self.route_peak(height, i, distances);
@@ -189,7 +191,7 @@ impl Grid {
             && mean_length.is_finite()
         {
             // The negative sign marks scaled weights for the later sweeps.
-            Some((-normalisation, mean_slope, mean_length))
+            Some((-normalisation, mean_slope, mean_length, receivers))
         } else {
             None
         }
@@ -378,16 +380,7 @@ fn passing_sediment(
 // when the last receiver has been placed. The resulting order serves both triangular sweeps.
 fn receiver_order(grid: Grid, height: &[f64], count: &mut [u32], order: &mut [u32]) -> bool {
     let mut tail = 0;
-    for i in 0..height.len() {
-        let receiver_count = if grid.outlet(i) {
-            0
-        } else {
-            (0..NEIGHBOURS.len())
-                .filter_map(|k| grid.adjacent(i, k))
-                .filter(|&j| height[j] < height[i])
-                .count() as u32
-        };
-        count[i] = receiver_count;
+    for (i, &receiver_count) in count.iter().enumerate() {
         if receiver_count == 0 {
             order[tail] = i as u32;
             tail += 1;
@@ -624,6 +617,392 @@ fn diffuse(
     true
 }
 
+// Worker phases borrow only their vertex range in each output plane. The host
+// completes all ranges before running the ordered graph and diffusion.
+#[repr(C)]
+struct LandscapeJob {
+    input_ptr: *const f64,
+    constants_ptr: *const f64,
+    settings: *const f64,
+    grain_ptr: *const f64,
+    state_ptr: *mut f64,
+    delta_ptr: *mut f64,
+    budget_ptr: *mut f64,
+    scratch_ptr: *mut f64,
+    topology_ptr: *mut u32,
+    nx: usize,
+    nz: usize,
+    classes: usize,
+    outlets: u32,
+    receipts: *mut u32,
+    dx: f64,
+    dz: f64,
+    dt: f64,
+}
+
+const _: () = assert!(core::mem::size_of::<LandscapeJob>() == 80);
+
+impl LandscapeJob {
+    fn grid(&self) -> Option<(usize, Grid, [f64; 8])> {
+        let Self {
+            nx,
+            nz,
+            dx,
+            dz,
+            outlets,
+            classes,
+            dt,
+            ..
+        } = *self;
+        let n = nx.checked_mul(nz)?;
+        let words = n.checked_mul(classes.checked_add(6)?)?;
+        if !(n > 0
+            && words <= isize::MAX as usize / core::mem::size_of::<f64>()
+            && dx > 0.0
+            && dx.is_finite()
+            && dz > 0.0
+            && dz.is_finite()
+            && dt > 0.0
+            && dt.is_finite())
+        {
+            return None;
+        }
+        let grid = Grid {
+            nx,
+            nz,
+            dx,
+            dz,
+            outlets,
+        };
+        let distances = grid.distances();
+        distances[4].is_finite().then_some((n, grid, distances))
+    }
+
+    unsafe fn validate(&self) -> bool {
+        let Some((n, _, distances)) = self.grid() else {
+            return false;
+        };
+        let Self {
+            settings,
+            grain_ptr,
+            input_ptr,
+            constants_ptr,
+            state_ptr,
+            budget_ptr,
+            classes,
+            ..
+        } = *self;
+        let settings = unsafe { &*settings.cast::<Settings>() };
+        let grains = unsafe { slice::from_raw_parts(grain_ptr.cast::<Grain>(), classes) };
+        if !distances[4].is_finite()
+            || ![
+                settings.incision,
+                settings.discharge_exp,
+                settings.roughness,
+                settings.water_density,
+                settings.gravity,
+                settings.rock_threshold,
+                settings.porosity,
+                settings.diffusivity,
+                settings.thermal,
+                settings.talus,
+            ]
+            .iter()
+            .all(|&value| value >= 0.0 && value.is_finite())
+            || !(settings.roughness > 0.0
+                && settings.water_density > 0.0
+                && settings.porosity < 1.0)
+            || grains.iter().any(|grain| {
+                !(grain.diameter > 0.0
+                    && grain.diameter.is_finite()
+                    && grain.relative_density > 1.0
+                    && grain.relative_density.is_finite()
+                    && [
+                        grain.critical_shields,
+                        grain.parent_fraction,
+                        grain.travel_length,
+                    ]
+                    .iter()
+                    .all(|&value| value >= 0.0 && value.is_finite()))
+            })
+        {
+            return false;
+        }
+
+        let input = unsafe { slice::from_raw_parts(input_ptr, 4 * n) };
+        let constants = unsafe { slice::from_raw_parts(constants_ptr, 3 * n) };
+        let budget = unsafe { slice::from_raw_parts(budget_ptr, 3 + classes) };
+        let mobile = unsafe { slice::from_raw_parts(state_ptr.add(3 * n), n * classes) };
+        let (height, later) = input.split_at(n);
+        let (effective_rain, stress) = later.split_at(n);
+        let (forced_shear, root) = stress.split_at(n);
+        let (area, later) = constants.split_at(n);
+        let (uplift, floor) = later.split_at(n);
+        if !height
+            .iter()
+            .chain(uplift)
+            .chain(forced_shear)
+            .chain(budget.iter())
+            .all(|value| value.is_finite())
+            || !area.iter().all(|&value| value > 0.0 && value.is_finite())
+            || !floor
+                .iter()
+                .all(|&value| value == f64::NEG_INFINITY || value.is_finite())
+            || !effective_rain
+                .iter()
+                .chain(root)
+                .chain(mobile.iter())
+                .all(|&value| value >= 0.0 && value.is_finite())
+        {
+            return false;
+        }
+
+        true
+    }
+
+    #[inline(never)]
+    unsafe fn prepare(
+        &self,
+        n: usize,
+        grid: Grid,
+        distances: &[f64; 8],
+        range: core::ops::Range<usize>,
+    ) -> Option<u32> {
+        let Self {
+            input_ptr,
+            constants_ptr,
+            state_ptr,
+            delta_ptr,
+            scratch_ptr,
+            topology_ptr,
+            dt,
+            ..
+        } = *self;
+        unsafe {
+            let height = slice::from_raw_parts(input_ptr, n);
+            let area = slice::from_raw_parts(constants_ptr, n);
+            let uplift = slice::from_raw_parts(constants_ptr.add(n), n);
+            let floor = slice::from_raw_parts(constants_ptr.add(2 * n), n);
+            let rain = slice::from_raw_parts(input_ptr.add(n + range.start), range.len());
+            let delta = slice::from_raw_parts_mut(delta_ptr.add(range.start), range.len());
+            let discharge = slice::from_raw_parts_mut(state_ptr.add(range.start), range.len());
+            initialise(
+                &uplift[range.clone()],
+                rain,
+                &area[range.clone()],
+                delta,
+                discharge,
+                dt,
+            );
+            let mut links = 0;
+            for (i, (change, &flow)) in range.zip(delta.iter_mut().zip(discharge.iter())) {
+                if !(*change).is_finite() || !flow.is_finite() {
+                    return None;
+                }
+                *change = if grid.outlet(i) {
+                    0.0
+                } else {
+                    change.max((floor[i] - height[i]).min(0.0))
+                };
+                let base = height[i] + *change;
+                if !base.is_finite() {
+                    return None;
+                }
+                let (weights, grade, length, receivers) = grid.route_stats(height, i, distances)?;
+                scratch_ptr.add(i).write(base);
+                scratch_ptr.add(2 * n + i).write(weights);
+                scratch_ptr.add(3 * n + i).write(grade);
+                scratch_ptr.add(5 * n + i).write(length);
+                topology_ptr.add(i).write(receivers);
+                links += receivers;
+            }
+            Some(links)
+        }
+    }
+
+    #[inline(never)]
+    unsafe fn finish(&self) -> u32 {
+        let Some((n, grid, distances)) = self.grid() else {
+            return 1;
+        };
+        let Self {
+            input_ptr,
+            constants_ptr,
+            settings,
+            grain_ptr,
+            state_ptr,
+            delta_ptr,
+            budget_ptr,
+            scratch_ptr,
+            topology_ptr,
+            classes,
+            dt,
+            ..
+        } = *self;
+        let settings = unsafe { &*settings.cast::<Settings>() };
+        let grains = unsafe { slice::from_raw_parts(grain_ptr.cast::<Grain>(), classes) };
+        let input = unsafe { slice::from_raw_parts(input_ptr, n * 4) };
+        let constants = unsafe { slice::from_raw_parts(constants_ptr, n * 3) };
+        let (height, forcing) = input.split_at(n);
+        let (forced_shear, root) = forcing[n..].split_at(n);
+        let area = &constants[..n];
+        let floor = &constants[2 * n..];
+        let (state, mobile) =
+            unsafe { slice::from_raw_parts_mut(state_ptr, n * (3 + classes)) }.split_at_mut(3 * n);
+        let (discharge, diagnostics) = state.split_at_mut(n);
+        let (incision, sediment_rate) = diagnostics.split_at_mut(n);
+        let delta = unsafe { slice::from_raw_parts_mut(delta_ptr, n) };
+        let budget = unsafe { slice::from_raw_parts_mut(budget_ptr, 3 + classes) };
+        let scratch = unsafe { slice::from_raw_parts_mut(scratch_ptr, n * (6 + classes)) };
+        let (base, scratch) = scratch.split_at_mut(n);
+        let (potential, scratch) = scratch.split_at_mut(n);
+        let (normalisation, scratch) = scratch.split_at_mut(n);
+        let (slope, scratch) = scratch.split_at_mut(n);
+        let (shear, scratch) = scratch.split_at_mut(n);
+        let (length, load) = scratch.split_at_mut(n);
+        let (counts, order) =
+            unsafe { slice::from_raw_parts_mut(topology_ptr, 2 * n) }.split_at_mut(n);
+
+        for i in 0..n {
+            if !grid.outlet(i) {
+                budget[1] += delta[i] * area[i];
+                if !budget[1].is_finite() {
+                    return 1;
+                }
+            }
+        }
+        if !receiver_order(grid, height, counts, order) {
+            return 1;
+        }
+        for &index in order.iter().rev() {
+            let i = index as usize;
+            let incoming = discharge[i];
+            if !incoming.is_finite() {
+                return 1;
+            }
+            if normalisation[i] != 0.0 {
+                let scale = grid.weight_scale(height, i, &distances, normalisation[i]);
+                grid.routes(height, i, &distances, scale, |j, _, _, weight| {
+                    discharge[j] += routed_share(incoming, weight, normalisation[i].abs());
+                });
+                shear[i] = if forced_shear[i] >= 0.0 {
+                    forced_shear[i]
+                } else {
+                    hydraulic_shear(incoming, area[i], length[i], slope[i], settings)
+                };
+                if !shear[i].is_finite() {
+                    return 1;
+                }
+            } else {
+                shear[i] = 0.0;
+            }
+        }
+
+        // Backward Euler for the weighted linear-slope stream-power law. The downstream solved
+        // elevations are already available. Write the drop directly to preserve sub-ULP erosion.
+        for &index in order.iter() {
+            let i = index as usize;
+            let mut drop = 0.0;
+            if normalisation[i] != 0.0 && shear[i] > settings.rock_threshold + root[i] {
+                let Some(solved) = implicit_drop(
+                    grid,
+                    height,
+                    &distances,
+                    i,
+                    normalisation[i],
+                    base[i],
+                    potential,
+                    discharge[i],
+                    settings,
+                    dt,
+                ) else {
+                    return 1;
+                };
+                drop = solved.max(0.0).min((base[i] - floor[i]).max(0.0));
+            }
+            potential[i] = base[i] - drop;
+            incision[i] = drop / dt;
+            if !(potential[i].is_finite() && incision[i].is_finite()) {
+                return 1;
+            }
+        }
+
+        load.fill(0.0);
+        sediment_rate.fill(0.0);
+        for &index in order.iter().rev() {
+            let i = index as usize;
+            let removal = incision[i] * dt * area[i];
+            let mobile_total = (0..classes).map(|k| mobile[k * n + i]).sum::<f64>();
+            if !(removal.is_finite() && mobile_total.is_finite()) {
+                return 1;
+            }
+            // Maintain the change separately so an update smaller than the height ULP reaches the bed.
+            delta[i] -= removal / area[i];
+            for (k, grain) in grains.iter().enumerate() {
+                let p = k * n + i;
+                let incoming = load[p] + erode_class(mobile, p, mobile_total, removal, grain);
+                if !incoming.is_finite() {
+                    return 1;
+                }
+                if grid.outlet(i) {
+                    budget[3 + k] += incoming;
+                    sediment_rate[i] += incoming / dt;
+                    if !budget[3 + k].is_finite() {
+                        return 1;
+                    }
+                    continue;
+                }
+                let mut passing = 0.0;
+                if normalisation[i] != 0.0 && incoming > 0.0 {
+                    let Some(accepted) = passing_sediment(
+                        incoming,
+                        (shear[i] - root[i]).max(0.0),
+                        area[i],
+                        length[i],
+                        grain,
+                        settings,
+                        dt,
+                    ) else {
+                        return 1;
+                    };
+                    passing = accepted;
+                    let scale = grid.weight_scale(height, i, &distances, normalisation[i]);
+                    grid.routes(height, i, &distances, scale, |j, _, _, weight| {
+                        load[k * n + j] += routed_share(passing, weight, normalisation[i].abs());
+                    });
+                }
+                let deposited = incoming - passing;
+                mobile[p] += deposited;
+                delta[i] += deposited / area[i];
+                sediment_rate[i] += passing / dt;
+            }
+            base[i] = height[i] + delta[i];
+            if !(base[i].is_finite() && sediment_rate[i].is_finite()) {
+                return 1;
+            }
+        }
+
+        if !diffuse(
+            grid, base, delta, floor, area, root, mobile, grains, settings, dt,
+        ) {
+            return 1;
+        }
+        budget[0] += dt;
+        budget[2] = mobile.iter().sum();
+        if !delta
+            .iter()
+            .chain(budget.iter())
+            .all(|value| value.is_finite())
+            || !mobile
+                .iter()
+                .all(|&value| value >= 0.0 && value.is_finite())
+        {
+            return 1;
+        }
+        0
+    }
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn landscape_step(
     input_ptr: *const f64,
@@ -642,256 +1021,88 @@ pub unsafe extern "C" fn landscape_step(
     classes: usize,
     outlets: u32,
     dt: f64,
+    receipts: *mut u32,
 ) -> u32 {
-    let Some(n) = nx.checked_mul(nz) else {
-        return 1;
-    };
-    let Some(words) = classes
-        .checked_add(6)
-        .and_then(|planes| n.checked_mul(planes))
-    else {
-        return 1;
-    };
-    if !(n > 0
-        && words <= isize::MAX as usize / core::mem::size_of::<f64>()
-        && dx > 0.0
-        && dx.is_finite()
-        && dz > 0.0
-        && dz.is_finite()
-        && dt > 0.0
-        && dt.is_finite())
-    {
-        return 1;
-    }
-    let grid = Grid {
+    let job = LandscapeJob {
+        input_ptr,
+        constants_ptr,
+        settings,
+        grain_ptr,
+        state_ptr,
+        delta_ptr,
+        budget_ptr,
+        scratch_ptr,
+        topology_ptr,
         nx,
         nz,
+        classes,
+        outlets,
+        receipts,
         dx,
         dz,
-        outlets,
+        dt,
     };
-    let distances = grid.distances();
-    let settings = unsafe { &*settings.cast::<Settings>() };
-    let grains = unsafe { slice::from_raw_parts(grain_ptr.cast::<Grain>(), classes) };
-    if !distances[4].is_finite()
-        || ![
-            settings.incision,
-            settings.discharge_exp,
-            settings.roughness,
-            settings.water_density,
-            settings.gravity,
-            settings.rock_threshold,
-            settings.porosity,
-            settings.diffusivity,
-            settings.thermal,
-            settings.talus,
-        ]
-        .iter()
-        .all(|&value| value >= 0.0 && value.is_finite())
-        || !(settings.roughness > 0.0 && settings.water_density > 0.0 && settings.porosity < 1.0)
-        || grains.iter().any(|grain| {
-            !(grain.diameter > 0.0
-                && grain.diameter.is_finite()
-                && grain.relative_density > 1.0
-                && grain.relative_density.is_finite()
-                && [
-                    grain.critical_shields,
-                    grain.parent_fraction,
-                    grain.travel_length,
-                ]
-                .iter()
-                .all(|&value| value >= 0.0 && value.is_finite()))
-        })
-    {
-        return 1;
-    }
-    let input = unsafe { slice::from_raw_parts(input_ptr, n * 4) };
-    let constants = unsafe { slice::from_raw_parts(constants_ptr, n * 3) };
-    let (height, inputs) = input.split_at(n);
-    let (effective_rain, inputs) = inputs.split_at(n);
-    let (forced_shear, root) = inputs.split_at(n);
-    let (area, constants) = constants.split_at(n);
-    let (uplift, floor) = constants.split_at(n);
-    let (state, mobile) =
-        unsafe { slice::from_raw_parts_mut(state_ptr, n * (3 + classes)) }.split_at_mut(3 * n);
-    let (discharge, diagnostics) = state.split_at_mut(n);
-    let (incision, sediment_rate) = diagnostics.split_at_mut(n);
-    let delta = unsafe { slice::from_raw_parts_mut(delta_ptr, n) };
-    let budget = unsafe { slice::from_raw_parts_mut(budget_ptr, 3 + classes) };
-    let scratch = unsafe { slice::from_raw_parts_mut(scratch_ptr, n * (6 + classes)) };
-    let (base, scratch) = scratch.split_at_mut(n);
-    let (potential, scratch) = scratch.split_at_mut(n);
-    let (normalisation, scratch) = scratch.split_at_mut(n);
-    let (slope, scratch) = scratch.split_at_mut(n);
-    let (shear, scratch) = scratch.split_at_mut(n);
-    let (length, load) = scratch.split_at_mut(n);
-    let (counts, order) = unsafe { slice::from_raw_parts_mut(topology_ptr, 2 * n) }.split_at_mut(n);
-
-    if !height
-        .iter()
-        .chain(uplift)
-        .chain(forced_shear)
-        .chain(budget.iter())
-        .all(|value| value.is_finite())
-        || !area.iter().all(|&value| value > 0.0 && value.is_finite())
-        || !floor
-            .iter()
-            .all(|&value| value == f64::NEG_INFINITY || value.is_finite())
-        || !effective_rain
-            .iter()
-            .chain(root)
-            .chain(mobile.iter())
-            .all(|&value| value >= 0.0 && value.is_finite())
-    {
-        return 1;
-    }
-    initialise(uplift, effective_rain, area, delta, discharge, dt);
-    for i in 0..n {
-        if !(delta[i].is_finite() && discharge[i].is_finite()) {
+    unsafe {
+        if !job.validate() {
             return 1;
         }
-        if grid.outlet(i) {
-            delta[i] = 0.0;
-        } else {
-            delta[i] = delta[i].max((floor[i] - height[i]).min(0.0));
-            budget[1] += delta[i] * area[i];
-        }
-        base[i] = height[i] + delta[i];
-        if !(base[i].is_finite() && budget[1].is_finite()) {
-            return 1;
-        }
-        let Some((weights, grade, distance)) = grid.route_stats(height, i, &distances) else {
+        let Some((n, grid, distances)) = job.grid() else {
             return 1;
         };
-        (normalisation[i], slope[i], length[i]) = (weights, grade, distance);
+        let Some(links) = job.prepare(n, grid, &distances, 0..n) else {
+            return 1;
+        };
+        let status = job.finish();
+        if status == 0 && !receipts.is_null() {
+            receipts.write(n as u32);
+            receipts.add(1).write(links);
+        }
+        status
     }
-    if !receiver_order(grid, height, counts, order) {
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn landscape_thread_begin(job: *const LandscapeJob) -> u32 {
+    unsafe {
+        let Some(job) = job.as_ref() else { return 1 };
+        if job.validate() { 0 } else { 1 }
+    }
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn landscape_thread_phase(
+    job: *const LandscapeJob,
+    stage: u32,
+    part: u32,
+    parts: u32,
+) -> u32 {
+    if stage != 0 || part >= parts {
         return 1;
     }
-    for &index in order.iter().rev() {
-        let i = index as usize;
-        let incoming = discharge[i];
-        if !incoming.is_finite() {
+    unsafe {
+        let Some(job) = job.as_ref() else { return 1 };
+        let Some((n, grid, distances)) = job.grid() else {
             return 1;
+        };
+        let parts = u64::from(parts);
+        let start = (u64::from(part) * n as u64 / parts) as usize;
+        let end = ((u64::from(part) + 1) * n as u64 / parts) as usize;
+        let Some(links) = job.prepare(n, grid, &distances, start..end) else {
+            return 1;
+        };
+        if !job.receipts.is_null() {
+            let receipt = job.receipts.add(2 * part as usize);
+            receipt.write((end - start) as u32);
+            receipt.add(1).write(links);
         }
-        if normalisation[i] != 0.0 {
-            let scale = grid.weight_scale(height, i, &distances, normalisation[i]);
-            grid.routes(height, i, &distances, scale, |j, _, _, weight| {
-                discharge[j] += routed_share(incoming, weight, normalisation[i].abs());
-            });
-            shear[i] = if forced_shear[i] >= 0.0 {
-                forced_shear[i]
-            } else {
-                hydraulic_shear(incoming, area[i], length[i], slope[i], settings)
-            };
-            if !shear[i].is_finite() {
-                return 1;
-            }
-        } else {
-            shear[i] = 0.0;
-        }
+        0
     }
+}
 
-    // Backward Euler for the weighted linear-slope stream-power law. The downstream solved
-    // elevations are already available. Write the drop directly to preserve sub-ULP erosion.
-    for &index in order.iter() {
-        let i = index as usize;
-        let mut drop = 0.0;
-        if normalisation[i] != 0.0 && shear[i] > settings.rock_threshold + root[i] {
-            let Some(solved) = implicit_drop(
-                grid,
-                height,
-                &distances,
-                i,
-                normalisation[i],
-                base[i],
-                potential,
-                discharge[i],
-                settings,
-                dt,
-            ) else {
-                return 1;
-            };
-            drop = solved.max(0.0).min((base[i] - floor[i]).max(0.0));
-        }
-        potential[i] = base[i] - drop;
-        incision[i] = drop / dt;
-        if !(potential[i].is_finite() && incision[i].is_finite()) {
-            return 1;
-        }
+#[unsafe(no_mangle)]
+unsafe extern "C" fn landscape_thread_finish(job: *const LandscapeJob) -> u32 {
+    unsafe {
+        let Some(job) = job.as_ref() else { return 1 };
+        job.finish()
     }
-
-    load.fill(0.0);
-    sediment_rate.fill(0.0);
-    for &index in order.iter().rev() {
-        let i = index as usize;
-        let removal = incision[i] * dt * area[i];
-        let mobile_total = (0..classes).map(|k| mobile[k * n + i]).sum::<f64>();
-        if !(removal.is_finite() && mobile_total.is_finite()) {
-            return 1;
-        }
-        // Maintain the change separately so an update smaller than the height ULP reaches the bed.
-        delta[i] -= removal / area[i];
-        for (k, grain) in grains.iter().enumerate() {
-            let p = k * n + i;
-            let incoming = load[p] + erode_class(mobile, p, mobile_total, removal, grain);
-            if !incoming.is_finite() {
-                return 1;
-            }
-            if grid.outlet(i) {
-                budget[3 + k] += incoming;
-                sediment_rate[i] += incoming / dt;
-                if !budget[3 + k].is_finite() {
-                    return 1;
-                }
-                continue;
-            }
-            let mut passing = 0.0;
-            if normalisation[i] != 0.0 && incoming > 0.0 {
-                let Some(accepted) = passing_sediment(
-                    incoming,
-                    (shear[i] - root[i]).max(0.0),
-                    area[i],
-                    length[i],
-                    grain,
-                    settings,
-                    dt,
-                ) else {
-                    return 1;
-                };
-                passing = accepted;
-                let scale = grid.weight_scale(height, i, &distances, normalisation[i]);
-                grid.routes(height, i, &distances, scale, |j, _, _, weight| {
-                    load[k * n + j] += routed_share(passing, weight, normalisation[i].abs());
-                });
-            }
-            let deposited = incoming - passing;
-            mobile[p] += deposited;
-            delta[i] += deposited / area[i];
-            sediment_rate[i] += passing / dt;
-        }
-        base[i] = height[i] + delta[i];
-        if !(base[i].is_finite() && sediment_rate[i].is_finite()) {
-            return 1;
-        }
-    }
-
-    if !diffuse(
-        grid, base, delta, floor, area, root, mobile, grains, settings, dt,
-    ) {
-        return 1;
-    }
-    budget[0] += dt;
-    budget[2] = mobile.iter().sum();
-    if !delta
-        .iter()
-        .chain(budget.iter())
-        .all(|value| value.is_finite())
-        || !mobile
-            .iter()
-            .all(|&value| value >= 0.0 && value.is_finite())
-    {
-        return 1;
-    }
-    0
 }

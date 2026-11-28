@@ -169,6 +169,9 @@ console.log(evolved.height(256_000, 256_000), mountain.landscape.budget.exported
 `step` defaults to 128 m and `frameRate` to 60/1. All other physical defaults come from
 [`LandscapeEvolution`](../physics/README.md#landscape-evolution). The optional `forcing` options supply
 registry fields and an abort signal. Take a fresh snapshot when preparing a new geological time slice.
+Set `forcing: { threads: 4 }` to opt into native workers and shared world memory in Node or a
+cross-origin-isolated browser worker. The default uses one thread. When the relief world is no
+longer needed, remove the solver and call `mountain.landscape[Symbol.dispose]()`.
 Snapshots use the existing bed triangles and preserve the relief's authored river lines and settings.
 
 ## Anchored terrain and horizon

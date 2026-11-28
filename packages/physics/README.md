@@ -6667,6 +6667,11 @@ calculated change one tick before it becomes terrain. Use the bed for the curren
 
 For an animated terrain pass, advance or seek the `evolveRelief` world and draw the accepted
 terrain from `snapshotRelief()`. Match the Biomes relief's sampling grid to the rendered terrain.
+For an optional shared native step, load with `threads: 4` and use a PhysicsWorld created with
+`worldMemory(true)` from `@margoengine/physics/world`. The default is one thread. Run additional
+workers in Node or a cross-origin-isolated browser worker. `workCounts()` reports native preparation
+and downstream visits for the last successful runtime tick. Remove the solver before disposing it.
+
 A refused landscape tick retains the last accepted sediment ledger and bed contribution.
 Keep the predicted elevation within the TerrainBed float32 representation.
 

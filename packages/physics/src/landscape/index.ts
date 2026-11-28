@@ -1,6 +1,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import { gravityMagnitude } from '@margoengine/math/gravity';
 import { type BedShape, BedChange, BED_CHANGE_FIELD, BED_FIELD, BED_LAYOUT, bedVertexCount } from '../earth/bed.js';
+import type { NativePhasePool } from '../native-phase-pool.js';
 import { canShareMemory, DYNAMIC_BASE, isShared, MAX_MEMORY_PAGES, regionWords, STACK_BYTES } from '../world/memory.js';
 import type {
   Cell,
@@ -20,6 +21,11 @@ const DISCHARGE = 0;
 const INCISION = 1;
 const SEDIMENT = 2;
 const STATE_PLANES = 3;
+const MAX_THREADS = 64;
+const U32 = Uint32Array.BYTES_PER_ELEMENT;
+const THREAD_HEADER_WORDS = 14;
+const THREAD_HEADER_BYTES = THREAD_HEADER_WORDS * U32;
+const THREAD_JOB_BYTES = THREAD_HEADER_BYTES + 3 * F64;
 
 type Scalars = number | ArrayLike<number>;
 type Sides = 'minX' | 'maxX' | 'minZ' | 'maxZ';
@@ -48,6 +54,8 @@ export interface LandscapeLoadOptions {
   readonly shearField?: FieldDescriptor;
   /** Layout-1 root stabilisation pressure in Pa. Accepts cell or vertex samples. */
   readonly rootCohesionField?: FieldDescriptor;
+  /** Native threads including the caller. Defaults to one. Additional threads need shared world memory. */
+  readonly threads?: number;
   /** Cancels loading with the signal's reason. */
   readonly signal?: AbortSignal;
 }
@@ -114,6 +122,19 @@ export interface LandscapeBudget {
   readonly exported: readonly number[];
 }
 
+/** Native preparation performed by a single partition in the last successful runtime tick. */
+export interface LandscapeWorkerWork {
+  readonly preparedVertices: number;
+  readonly downhillLinks: number;
+}
+
+/** Local native preparation and distinct vertices in the ordered drainage graph. */
+export interface LandscapeWorkCounts extends LandscapeWorkerWork {
+  readonly threads: number;
+  readonly routedVertices: number;
+  readonly workers: readonly LandscapeWorkerWork[];
+}
+
 interface NativeKernel extends WebAssembly.Exports {
   landscape_step(
     input: number,
@@ -132,7 +153,11 @@ interface NativeKernel extends WebAssembly.Exports {
     nGrains: number,
     outletMask: number,
     dt: number,
+    receipt: number,
   ): number;
+  landscape_thread_begin(job: number): number;
+  landscape_thread_phase(job: number, stage: number, part: number, parts: number): number;
+  landscape_thread_finish(job: number): number;
 }
 
 interface State {
@@ -157,6 +182,9 @@ interface State {
   readonly scratch: Region;
   readonly topology: Region;
   readonly cell: Region;
+  readonly receipt: Region;
+  readonly work: Uint32Array;
+  readonly threadJob?: Region;
 }
 
 function checked(label: string, value: number, min: number, max = Infinity): number {
@@ -304,6 +332,8 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
   private readonly shear?: FieldDescriptor;
   private readonly roots?: FieldDescriptor;
   private state?: State;
+  private threads?: NativePhasePool;
+  private disposed = false;
 
   private constructor(
     private readonly plain: WebAssembly.Module,
@@ -326,6 +356,9 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
     if (options === null || typeof options !== 'object')
       throw new MargoError('state', 'Invalid landscape load options. Pass an options object or omit it.');
     const { signal } = options;
+    const threads = options.threads === undefined ? 1 : options.threads;
+    if (!Number.isSafeInteger(threads) || threads < 1 || threads > MAX_THREADS)
+      throw new MargoError('state', `Choose a whole number of landscape threads from 1 to ${MAX_THREADS}.`);
     let plain: WebAssembly.Module;
     let shared: WebAssembly.Module | undefined;
     try {
@@ -344,7 +377,24 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
         { cause },
       );
     }
-    return new LandscapeEvolution(plain, shared, options);
+    const solver = new LandscapeEvolution(plain, shared, options);
+    if (threads > 1) {
+      if (!shared)
+        throw new MargoError('unsupported', 'Use a shared-memory runtime for landscape threads or use threads: 1.');
+      const { createNativePhasePool } = await import('../native-phase-pool.js');
+      solver.threads = await createNativePhasePool(threads, {
+        subject: 'Landscape',
+        phaseExport: 'landscape_thread_phase',
+        signal,
+      });
+    }
+    return solver;
+  }
+
+  /** Close optional workers after removing the solver from its world. */
+  [Symbol.dispose](): void {
+    this.disposed = true;
+    this.threads?.close();
   }
 
   describe(): SolverDescription {
@@ -360,6 +410,14 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
   }
 
   init(host: SolverHost, params: LandscapeParams): void {
+    this.assertActive();
+    const threads = this.threads;
+    if (threads) {
+      if (this.state)
+        throw new MargoError('state', 'The landscape workers are already bound. Load a new solver for another world.');
+      if (!isShared(host.memory))
+        throw new MargoError('unsupported', 'Use worldMemory(true) for landscape threads or load with threads: 1.');
+    }
     if (!params?.grid) throw new MargoError('state', 'Landscape needs a bed grid. Pass the TerrainBed grid in metres.');
     const n = landscapeVertexCount(params.grid);
     const grid: BedShape = { ...params.grid, centre: [params.grid.centre[0], params.grid.centre[1]] };
@@ -371,7 +429,17 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
       throw new MargoError('state', 'Invalid landscape grain mixture. Pass an array of diameter and fraction records.');
     const nGrains = grains.length;
     // Include the candidate regions and the world mirrors for the output fields.
-    const required = ((31 + 3 * nGrains) * n + 19 + 7 * nGrains) * F64 + DYNAMIC_BASE + STACK_BYTES + 16;
+    const receiptWords = 2 * (threads?.count ?? 1);
+    const workerBytes = threads
+      ? THREAD_JOB_BYTES + U32 * threads.controlWords + (threads.count - 1) * (STACK_BYTES + 16)
+      : 0;
+    const required =
+      ((31 + 3 * nGrains) * n + 19 + 7 * nGrains) * F64 +
+      DYNAMIC_BASE +
+      STACK_BYTES +
+      16 +
+      U32 * receiptWords +
+      workerBytes;
     if (required >= MAX_MEMORY_PAGES * 65536)
       throw new MargoError('state', 'Landscape grid exceeds the wasm32 arena. Use fewer vertices or grain classes.');
     const total = grains.reduce((sum, grain) => sum + checked('grain fraction', grain.fraction, 0), 0);
@@ -422,6 +490,9 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
       scratch: allocate('scratch', (6 + nGrains) * n),
       topology: host.allocate('landscape-topology', 2 * n * Uint32Array.BYTES_PER_ELEMENT, 'u32', LAYOUT),
       cell: allocate('cell', 3),
+      receipt: host.allocate('landscape-work-receipt', U32 * receiptWords, 'u32', LAYOUT),
+      work: new Uint32Array(receiptWords),
+      threadJob: threads && host.allocate('landscape-thread-job', THREAD_JOB_BYTES, 'u32', LAYOUT),
     };
     const alluvium = new Float64Array(n);
     fill(alluvium, params.alluvialDepth ?? 0.1, 'loose soil depth', 0);
@@ -473,7 +544,44 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
       for (let i = 0; i < n; i++) values[(STATE_PLANES + k) * n + i] = alluvium[i]! * change.area[i]! * fraction;
     }
     floats(host, state.cell).set(host.cell);
+    if (threads && state.threadJob) this.bindWorkers(state, threads, state.threadJob);
     this.state = state;
+  }
+
+  private bindWorkers(s: State, threads: NativePhasePool, job: Region): void {
+    const { host, grid } = s;
+    const control = host.allocate('landscape-thread-control', U32 * threads.controlWords, 'i32', LAYOUT);
+    const stackTops = Array.from({ length: threads.count - 1 }, (_, part) => {
+      const stack = host.allocate(`landscape-worker-stack-${part + 1}`, STACK_BYTES + 8, 'u8', LAYOUT);
+      return Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
+    });
+    new Uint32Array(host.memory.buffer, job.byteOffset, THREAD_HEADER_WORDS).set([
+      s.input.byteOffset,
+      s.constants.byteOffset,
+      s.settings.byteOffset,
+      s.grains.byteOffset,
+      s.candidate.byteOffset,
+      s.candidateDelta.byteOffset,
+      s.candidateBudget.byteOffset,
+      s.scratch.byteOffset,
+      s.topology.byteOffset,
+      grid.columns + 1,
+      grid.rows + 1,
+      s.nGrains,
+      s.outlets,
+      s.receipt.byteOffset,
+    ]);
+    new Float64Array(host.memory.buffer, job.byteOffset + THREAD_HEADER_BYTES, 2).set([
+      grid.width / grid.columns,
+      grid.depth / grid.rows,
+    ]);
+    threads.init({
+      module: this.shared!,
+      memory: host.memory,
+      job: job.byteOffset,
+      control: control.byteOffset,
+      stackTops,
+    });
   }
 
   importPorts(): void {
@@ -486,6 +594,7 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
     const bed = context.inputs.get(BED_FIELD.name);
     if (!bed) {
       state.change.clear();
+      state.work.fill(0);
       return;
     }
     if (
@@ -517,24 +626,27 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
     const nextBudget = floats(host, state.candidateBudget);
     candidate.set(accepted);
     nextBudget.set(budget);
-    const status = state.kernel.landscape_step(
-      state.input.byteOffset,
-      state.constants.byteOffset,
-      state.settings.byteOffset,
-      state.grains.byteOffset,
-      state.candidate.byteOffset,
-      state.candidateDelta.byteOffset,
-      state.candidateBudget.byteOffset,
-      state.scratch.byteOffset,
-      state.topology.byteOffset,
-      grid.columns + 1,
-      grid.rows + 1,
-      grid.width / grid.columns,
-      grid.depth / grid.rows,
-      state.nGrains,
-      state.outlets,
-      interval,
-    );
+    const status = state.threadJob
+      ? this.stepThreaded(state, state.threadJob, interval)
+      : state.kernel.landscape_step(
+          state.input.byteOffset,
+          state.constants.byteOffset,
+          state.settings.byteOffset,
+          state.grains.byteOffset,
+          state.candidate.byteOffset,
+          state.candidateDelta.byteOffset,
+          state.candidateBudget.byteOffset,
+          state.scratch.byteOffset,
+          state.topology.byteOffset,
+          grid.columns + 1,
+          grid.rows + 1,
+          grid.width / grid.columns,
+          grid.depth / grid.rows,
+          state.nGrains,
+          state.outlets,
+          interval,
+          state.receipt.byteOffset,
+        );
     if (status !== 0)
       throw new MargoError(
         'state',
@@ -551,6 +663,19 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
     budget.set(nextBudget);
     state.change.deltas.set(delta);
     floats(host, state.cell).set(context.cell);
+    state.work.set(new Uint32Array(host.memory.buffer, state.receipt.byteOffset, state.work.length));
+  }
+
+  private stepThreaded(s: State, job: Region, interval: number): number {
+    const { kernel, host } = s;
+    const threads = this.threads!;
+    const ptr = job.byteOffset;
+    new Float64Array(host.memory.buffer, ptr + THREAD_HEADER_BYTES, 3)[2] = interval;
+    return (
+      kernel.landscape_thread_begin(ptr) ||
+      threads.phase(0, () => kernel.landscape_thread_phase(ptr, 0, 0, threads.count)) ||
+      kernel.landscape_thread_finish(ptr)
+    );
   }
 
   exportPorts(tick: number): readonly Port[] {
@@ -608,9 +733,33 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
     return { elapsed: values[0]!, uplift: values[1]!, alluvium: values[2]!, exported: Array.from(values.subarray(3)) };
   }
 
+  /** Count the last successful runtime tick. Replay rebuilds the native receipt outside the snapshot. */
+  workCounts(): LandscapeWorkCounts {
+    const { work } = this.requireState();
+    const threads = this.threads?.count ?? 1;
+    const workers = Array.from({ length: threads }, (_, part) => ({
+      preparedVertices: work[2 * part]!,
+      downhillLinks: work[2 * part + 1]!,
+    }));
+    const preparedVertices = workers.reduce((total, worker) => total + worker.preparedVertices, 0);
+    return {
+      threads,
+      preparedVertices,
+      downhillLinks: workers.reduce((total, worker) => total + worker.downhillLinks, 0),
+      routedVertices: preparedVertices,
+      workers,
+    };
+  }
+
   private requireState(): State {
+    this.assertActive();
     if (!this.state)
       throw new MargoError('failed', 'To attach Landscape, add it to a PhysicsWorld with its terrain grid.');
     return this.state;
+  }
+
+  private assertActive(): void {
+    if (this.disposed)
+      throw new MargoError('state', 'LandscapeEvolution was disposed. Load a new solver before adding or stepping it.');
   }
 }

@@ -16162,7 +16162,7 @@ The implementation uses separately built plain and shared SIMD Wasm against the 
 sine, cosine and exponential setup use the pinned math entry. Track phases, modal state, input ticks,
 integer sample carry and PCM history survive a snapshot.
 
-The linear stream-power implicit row can be divided by its largest magnitude without changing the solution. The scaled path retains this equivalent form when ordinary coefficient or receiver-slope arithmetic cannot be represented. Candidate elevation deltas and the loose sediment and export sums must remain finite. The Braun-Willett steady profile and Roering et al. equations 1-2 supply independent analytic controls for an uplifted channel and hillslope smoothening.
+The linear stream-power implicit row can be divided by its largest magnitude without changing the solution. The scaled path retains this equivalent form when ordinary coefficient or receiver-slope arithmetic cannot be represented. Candidate elevation deltas and the loose sediment and export sums must remain finite. The Braun-Willett steady profile and Roering et al. equations 1-2 supply independent analytic controls for an uplifted channel and hillslope smoothening. The independent local vertex pass can use the shared workers before the sorted receiver graph. Budget addition and sediment accumulation use canonical order to keep the serial rounding path.
 
 ### Drainage fog and its live medium (ATMO-08)
 

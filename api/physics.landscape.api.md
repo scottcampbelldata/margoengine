@@ -18,6 +18,7 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
     readonly sedimentField: FieldDescriptor;
     private constructor();
     static load(options?: LandscapeLoadOptions): Promise<LandscapeEvolution>;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, params: LandscapeParams): void;
     importPorts(): void;
@@ -27,6 +28,7 @@ export class LandscapeEvolution implements Solver<LandscapeParams> {
     extraState(): readonly Region[];
     read(column: number, row: number): LandscapeSample;
     get budget(): LandscapeBudget;
+    workCounts(): LandscapeWorkCounts;
 }
 
 export interface LandscapeGrain {
@@ -42,6 +44,7 @@ export interface LandscapeLoadOptions {
     readonly rainField?: FieldDescriptor;
     readonly shearField?: FieldDescriptor;
     readonly rootCohesionField?: FieldDescriptor;
+    readonly threads?: number;
     readonly signal?: AbortSignal;
 }
 
@@ -70,6 +73,17 @@ export interface LandscapeSample {
     readonly incision: number;
     readonly sedimentFlux: number;
     readonly alluvium: readonly number[];
+}
+
+export interface LandscapeWorkCounts extends LandscapeWorkerWork {
+    readonly threads: number;
+    readonly routedVertices: number;
+    readonly workers: readonly LandscapeWorkerWork[];
+}
+
+export interface LandscapeWorkerWork {
+    readonly preparedVertices: number;
+    readonly downhillLinks: number;
 }
 
 // Not exported from this entry, but used by the exports above:
