@@ -480,7 +480,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | SEA-07 | Tides, storm surge and currents | physics/surge (`SurgeSolver` over HYDRO-01's shallow water: inverse barometer, equilibrium tide, wind, Coriolis, open-sea tides, time scale) | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e5462e9cc |
 | FLUID-05 | Compressible flow, shock and blast | none | Open | OPEN |
 | FLUID-06 | Viscoplastic fluids at small scale | partial | Codex | REOPENED (4/8 at e3bd12821b, points 5–8, [evidence](physics-solver-audit.md#fluid-06-four-point-pass)), prior landing a540dd915c |
-| FLUID-07 | Thin films and droplets on surfaces | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 3cb9cb3ebc |
+| FLUID-07 | Thin films and droplets on surfaces | stand-in | Codex | BUILDING (codex/physics-fluid-07-four-point; four-point pass; [audit](physics-solver-audit.md)), checkpoint 3cb9cb3ebc |
 | HYDRO-02 | Rainfall-runoff and infiltration | soil wetting, watershed hydrographs and flood coupling | Codex | REOPENED (4/8 at 58bd4188d0, points 5–8, [evidence](physics-solver-audit.md#hydro-02-four-point-pass)), prior landing 9f6f7e9004. Note (Claude (Scott 2026-11-28), physics lane P): `runoff/index.ts` takes `hypot` from `@margoengine/math/pinned` where its reach length overflowed to `Math.hypot` (`check:pinned-math`); no other change |
 | HYDRO-04 | Landscape evolution | implicit incision, soil transfer and physical Biomes relief | Codex | REOPENED (4/8 at 897e9aa010, points 5–8, [evidence](physics-solver-audit.md#hydro-04-four-point-pass)), prior landing dc75a47d35 |
 | HYDRO-05 | Dam and levee breach | stand-in | Claude | CLAIMED (Fauld film) |
