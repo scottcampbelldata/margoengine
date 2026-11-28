@@ -15538,8 +15538,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 1533440,
-        "gzip": 992316
+        "raw": 1535210,
+        "gzip": 993705
       },
       "./decomposition": {
         "raw": 26988,
@@ -15639,7 +15639,7 @@
       },
       "./outdoor-sound": {
         "raw": 22064,
-        "gzip": 8600
+        "gzip": 8601
       },
       "./falling": {
         "raw": 13550,
@@ -20309,13 +20309,13 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 333857,
-        "gzip": 107307
+        "raw": 333891,
+        "gzip": 107334
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",
-        "raw": 1199582,
-        "gzip": 884404,
+        "raw": 1201318,
+        "gzip": 885755,
         "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },
