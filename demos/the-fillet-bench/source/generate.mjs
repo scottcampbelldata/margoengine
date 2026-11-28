@@ -1,5 +1,4 @@
-import { gzipSync } from 'node:zlib';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 
@@ -28,7 +27,27 @@ for (const [operation,blend] of [['round',fillet],['bevel',chamfer]]) {
       position:Array.from(mesh.positions,q), normal:Array.from(mesh.normals,q),index:Array.from(mesh.indices)});
   }
 }
-const contents = gzipSync(JSON.stringify(states),{level:9});
-await writeFile(new URL('./assets/blends.bin',import.meta.url),contents);
-console.log(JSON.stringify({states:states.length,bytes:contents.byteLength,
-  triangles:states.map(s=>s.index.length/3), max:states.at(-1).volume}));
+const glbNodes = [], facts = [];
+for (const [i, state] of states.entries()) {
+  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  for (let k = 0; k < state.position.length; k++) {
+    const a = k % 3;
+    min[a] = Math.min(min[a], state.position[k]);
+    max[a] = Math.max(max[a], state.position[k]);
+  }
+  // Each solid rests on the plate: its node moves it so its lowest point is at y 0.
+  const lift = -min[1];
+  glbNodes.push({ name: 'step-' + i, translation: [0, lift, 0],
+    geometry: { positions: state.position, normals: state.normal, indices: state.index } });
+  const { position, normal, index, edgePoints, ...rest } = state;
+  const r = (v) => +v.toFixed(6);
+  facts.push({ ...rest, box: { min: [r(min[0]), 0, r(min[2])], max: [r(max[0]), r(max[1] + lift), r(max[2])] } });
+}
+// glTF 2.0 binary with EXT_meshopt_compression and KHR_mesh_quantization (16-bit normals keep smooth metal smooth).
+const { exportGLB } = await import(pathToFileURL(resolve(process.env.MARGO_ENGINE_CHECKOUT, 'packages/exporters/dist/gltf.js')));
+const { compressMeshopt } = await import(pathToFileURL(resolve(process.env.MARGO_ENGINE_CHECKOUT, 'packages/exporters/dist/meshopt.js')));
+const { glb: packed } = await compressMeshopt(exportGLB({ nodes: glbNodes }, { generator: 'Margo Engine the-fillet-bench' }), { normalBits: 16 });
+await mkdir(new URL('./assets/', import.meta.url), { recursive: true });
+await writeFile(new URL('./assets/blends.glb', import.meta.url), packed);
+await writeFile(new URL('./facts.json', import.meta.url), JSON.stringify(facts, null, 1) + String.fromCharCode(10));
+console.log(JSON.stringify({ bytes: packed.byteLength, facts: facts.map((f) => ({ volume: f.volume, faces: f.faces })) }));
