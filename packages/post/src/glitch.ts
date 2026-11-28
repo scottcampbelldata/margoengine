@@ -10,6 +10,7 @@ import { fullscreen, render, group } from '../../shared/gpu.js';
 import { margoError } from '../../shared/errors.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { PostStack } from './stack.js';
+import { OutputKey } from '../../shared/output-key.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 type GlitchPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 
@@ -87,7 +88,7 @@ export class Glitch implements EnginePlugin {
   private disposed = false;
   private uniform?: GPUBuffer;
   private pipeline?: GPURenderPipeline;
-  private key = '';
+  private key = new OutputKey();
   private group?: GPUBindGroup;
   private input?: GPUTextureView;
   private glitched = false;
@@ -263,9 +264,7 @@ export class Glitch implements EnginePlugin {
     this.glitched = strength > 0;
     this.words[1] = +this.glitched;
     device.queue.writeBuffer(this.uniform!, 0, this.bytes);
-    const key = output.format + ':' + (output.multisample?.count ?? 1);
-    if (this.key !== key) {
-      this.key = key;
+    if (this.key.changed(output, false)) {
       this.pipeline = render(device, shader, output.format, { multisample: output.multisample });
       this.input = undefined;
     }
@@ -289,6 +288,6 @@ export class Glitch implements EnginePlugin {
   private release(): void {
     this.uniform?.destroy();
     this.uniform = this.pipeline = this.group = this.input = undefined;
-    this.key = '';
+    this.key.reset();
   }
 }

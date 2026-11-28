@@ -20,6 +20,7 @@ import {
   linearShader,
   premultipliedCanvas,
 } from '../../shared/display.js';
+import { OutputKey } from '../../shared/output-key.js';
 import { margoError } from '../../shared/errors.js';
 import { render } from '../../shared/gpu.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
@@ -290,7 +291,7 @@ export class Bloom implements EnginePlugin {
   private readonly presentation: GPURenderPassDescriptor = { colorAttachments: [this.attachment] };
   private disposed = false;
   private host?: StackHost;
-  private key = '';
+  private key = new OutputKey();
   /** The canvas was premultiplied when the solo composite was built. */
   private straight = false;
   private imageDevice?: GPUDevice;
@@ -600,16 +601,14 @@ export class Bloom implements EnginePlugin {
     this.validate();
     const device = c.device,
       width = Math.max(1, Math.ceil(c.width / 2)),
-      height = Math.max(1, Math.ceil(c.height / 2)),
-      key = output.format + output.multisample.count + output.hdr + premultipliedCanvas(this.engine);
+      height = Math.max(1, Math.ceil(c.height / 2));
     if (this.lists[0][0]?.width !== width || this.lists[0][0].height !== height) {
       for (const texture of this.textures) texture.destroy();
       this.textures = [];
       this.source = undefined;
       this.allocate(device, width, height);
     }
-    if (this.key !== key) {
-      this.key = key;
+    if (this.key.changed(output, premultipliedCanvas(this.engine))) {
       this.source = undefined;
       this.present = render(device, output.hdr ? linear : display(this.engine), output.format, {
         multisample: output.multisample,
@@ -674,7 +673,8 @@ export class Bloom implements EnginePlugin {
     this.lists = [[], []];
     this.scene = this.depth = this.original = this.originalDepth = undefined;
     this.originalFormat = undefined;
-    this.sourceShader = this.linearShader = this.key = '';
+    this.sourceShader = this.linearShader = '';
+    this.key.reset();
     this.source = undefined;
     this.scenePipelines.clear();
     this.sceneOptions.pipeline = undefined;

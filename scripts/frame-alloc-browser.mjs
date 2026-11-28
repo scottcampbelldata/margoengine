@@ -44,7 +44,8 @@ export const FLOORS = {
   basic: { median: 340 },
   instanced: { median: 292 },
   shadowed: { median: 860 },
-  post: { median: 1528 },
+  // 1,388 B since KB-GPUMAIN1 (2026-11-28): stacked stages stopped joining a key string each frame (largest of three).
+  post: { median: 1388 },
   dynamic: { median: 396 },
 };
 

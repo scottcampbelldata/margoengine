@@ -24,6 +24,7 @@ import { captureModel, drawCapture } from '../../shared/capture.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { MaterialClear, partialMaterialView } from './material-clear.js';
 import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
+import { OutputKey } from '../../shared/output-key.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
   RENDER_ATTACHMENT: number;
@@ -314,7 +315,7 @@ export class SSR implements EnginePlugin {
   private compositeGroups?: { get(copy?: GPUBufferBinding): GPUBindGroup };
   private slice?: GPUBufferBinding;
   private input?: GPUTextureView;
-  private key = '';
+  private key = new OutputKey();
   private clearPass?: GPURenderPassDescriptor;
   private materialClear?: MaterialClear;
   private extra: GPURenderPassColorAttachment[] = [];
@@ -550,18 +551,9 @@ export class SSR implements EnginePlugin {
     const models = this.models.size > 0,
       rough = this.stochastic,
       traced = this.traced?.active(c.device) ? this.traced : undefined,
-      key =
-        output.format +
-        output.multisample.count +
-        output.hdr +
-        models +
-        rough +
-        premultipliedCanvas(this.engine) +
-        !!traced,
       code = output.hdr ? linearComposite : compositeShader,
       shader = models ? guarded(code) : code;
-    if (this.key !== key) {
-      this.key = key;
+    if (this.key.changed(output, premultipliedCanvas(this.engine), +models | (+rough << 1) | (+!!traced << 2))) {
       const plain = rough ? roughComposite(shader, models) : shader,
         full = traced ? traced.mirror(plain, models) : plain;
       this.composite = render(c.device, output.hdr ? full : displayFor(this.engine, full), output.format, {
@@ -667,7 +659,7 @@ export class SSR implements EnginePlugin {
       // Rough reflections switched (or SSR re-enabled with them): new targets, a new composite and an empty history.
       this.stochastic = rough;
       this.width = 0;
-      this.key = '';
+      this.key.reset();
     }
     if (this.width === c.width && this.height === c.height && this.target === target && this.owned === own) return;
     this.release();
@@ -756,7 +748,7 @@ export class SSR implements EnginePlugin {
     this.stochastic = false;
     this.replay = this.composite = undefined;
     this.replayKey = this.base = undefined;
-    this.key = '';
+    this.key.reset();
     this.setup(engine);
   }
   dispose(): void {

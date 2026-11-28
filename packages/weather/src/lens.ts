@@ -245,7 +245,7 @@ export class LensDrops implements EnginePlugin {
   private disposed = false;
   private clock = 0;
   private readonly values = new Float32Array(8);
-  private readonly pipelines = new Map<string, GPURenderPipeline>();
+  private readonly pipelines = new Map<GPUTextureFormat, Map<number, GPURenderPipeline>>();
 
   constructor(readonly options: LensDropsOptions = {}) {
     validate(options);
@@ -299,11 +299,13 @@ export class LensDrops implements EnginePlugin {
     validate(o);
     lensSettings(o, o.time ?? this.clock, this.values);
     c.device.queue.writeBuffer(this.uniform!, 0, this.values);
-    const key = output.format + ':' + (output.multisample?.count ?? 1) + ':' + output.hdr;
-    let pipeline = this.pipelines.get(key);
+    let byCount = this.pipelines.get(output.format);
+    if (!byCount) this.pipelines.set(output.format, (byCount = new Map()));
+    const variant = (output.multisample?.count ?? 1) * 2 + +output.hdr;
+    let pipeline = byCount.get(variant);
     if (!pipeline) {
       pipeline = render(c.device, shader(output.hdr), output.format, { multisample: output.multisample });
-      this.pipelines.set(key, pipeline);
+      byCount.set(variant, pipeline);
     }
     const bindings = group(c.device, pipeline, [{ buffer: this.uniform! }, input, this.sampler!]);
     const pass = c.encoder.beginRenderPass({

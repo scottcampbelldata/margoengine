@@ -6,6 +6,7 @@ import { margoError } from '../../shared/errors.js';
 import { type BorrowSlot, type Borrowable, borrow, lend } from '../../shared/borrowed.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
+import { OutputKey } from '../../shared/output-key.js';
 import { PostStack } from './stack.js';
 import { vertex } from './hiz.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
@@ -158,7 +159,7 @@ export class LensFlare implements EnginePlugin {
   private composite?: GPURenderPipeline;
   private compositeGroup?: GPUBindGroup;
   private input?: GPUTextureView;
-  private key = '';
+  private key = new OutputKey();
   private elementBuffer?: GPUBuffer;
   private sampler?: GPUSampler;
   private images: GPUTexture[] = [];
@@ -317,9 +318,7 @@ export class LensFlare implements EnginePlugin {
       pass.dispatchWorkgroups(1);
       pass.end();
     }
-    const key = output.format + output.multisample.count + output.hdr + layout + premultipliedCanvas(this.engine);
-    if (this.key !== key) {
-      this.key = key;
+    if (this.key.changed(output, premultipliedCanvas(this.engine), layout)) {
       this.composite = render(c.device, displayFor(this.engine, flareShader(output.hdr, layout)), output.format, {
         multisample: output.multisample,
       });
@@ -360,7 +359,7 @@ export class LensFlare implements EnginePlugin {
     this.occlusion = this.composite = undefined;
     this.occlusionGroup = this.compositeGroup = undefined;
     this.depthTexture = this.input = undefined;
-    this.key = '';
+    this.key.reset();
     this.attachment.view = undefined!;
   }
   onDeviceRestored(engine: Engine): void {

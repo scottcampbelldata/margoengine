@@ -102,7 +102,7 @@ export class AnisotropicPainterly implements EnginePlugin {
   #tensor?: GPURenderPipeline;
   #blur?: GPURenderPipeline;
   #layout?: GPUBindGroupLayout;
-  #filters = new Map<string, GPURenderPipeline>();
+  #filters = new Map<GPUTextureFormat, Map<number, GPURenderPipeline>>();
   #bytes = new ArrayBuffer(32);
   #rect = new Int32Array(this.#bytes, 0, 4);
   #parameters = new Float32Array(this.#bytes, 16, 4);
@@ -188,14 +188,15 @@ export class AnisotropicPainterly implements EnginePlugin {
         ],
       });
     }
-    const key = output.format + ':' + (output.multisample?.count ?? 1);
-    let pipeline = this.#filters.get(key);
+    let byCount = this.#filters.get(output.format);
+    if (!byCount) this.#filters.set(output.format, (byCount = new Map()));
+    let pipeline = byCount.get(output.multisample?.count ?? 1);
     if (!pipeline) {
       pipeline = render(d, filterShader, output.format, {
         layout: d.createPipelineLayout({ bindGroupLayouts: [this.#layout!] }),
         multisample: output.multisample,
       });
-      this.#filters.set(key, pipeline);
+      byCount.set(output.multisample?.count ?? 1, pipeline);
     }
     return pipeline;
   }

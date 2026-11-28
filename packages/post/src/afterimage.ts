@@ -11,6 +11,7 @@ import { displayFor, displayShader, premultipliedCanvas } from '../../shared/dis
 import { margoError } from '../../shared/errors.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { PostStack } from './stack.js';
+import { OutputKey } from '../../shared/output-key.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 type AfterimagePassContext = Extract<PassContext, { backend: 'webgpu' }>;
@@ -75,7 +76,7 @@ export class Afterimage implements EnginePlugin {
   private folds: (GPUBindGroup | undefined)[] = [];
   private input?: GPUTextureView;
   private presentPipeline?: GPURenderPipeline;
-  private presentKey = '';
+  private presentKey = new OutputKey();
   private presents: (GPUBindGroup | undefined)[] = [];
   private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'clear', storeOp: 'store' };
   private readonly descriptor: GPURenderPassDescriptor = { colorAttachments: [this.attachment] };
@@ -212,9 +213,7 @@ export class Afterimage implements EnginePlugin {
     this.pass(c, this.foldPipeline, fold, this.views[next]);
     this.last = next;
     if (output.hdr) return this.views[next];
-    const key = output.format + ':' + (output.multisample?.count ?? 1) + premultipliedCanvas(this.engine);
-    if (this.presentKey !== key) {
-      this.presentKey = key;
+    if (this.presentKey.changed(output, premultipliedCanvas(this.engine))) {
       this.presentPipeline = render(device, displayFor(this.engine, presentShader), output.format, {
         multisample: output.multisample,
       });
@@ -251,7 +250,7 @@ export class Afterimage implements EnginePlugin {
     this.releaseHistory();
     this.uniform?.destroy();
     this.uniform = this.foldPipeline = this.presentPipeline = this.input = undefined;
-    this.presentKey = '';
+    this.presentKey.reset();
     this.written = false;
   }
 }

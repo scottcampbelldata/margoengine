@@ -6,6 +6,7 @@ import type { StackStage, StageOutput } from '../../shared/stack.js';
 import { fullscreen, render, group } from '../../shared/gpu.js';
 import { fault, rangeError } from '../../shared/errors.js';
 import { applyView, viewLoadOp, viewRect, ViewStates } from '../../shared/view-rect.js';
+import { OutputKey } from '../../shared/output-key.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -100,7 +101,7 @@ export class Painterly implements EnginePlugin {
   private stacked = false;
   private disposed = false;
   private pipeline?: GPURenderPipeline;
-  private key = '';
+  private key = new OutputKey();
   private readonly bytes = new ArrayBuffer(48);
   private readonly rect = new Int32Array(this.bytes, 0, 4);
   private readonly flags = new Uint32Array(this.bytes, 16, 4);
@@ -204,11 +205,8 @@ export class Painterly implements EnginePlugin {
     this.alive();
     this.validate();
     if (!this.engine) throw fault('state', 'Attach Painterly to a live PostStack before drawing');
-    const key = output.format + ':' + (output.multisample?.count ?? 1);
-    if (key !== this.key) {
+    if (this.key.changed(output, false))
       this.pipeline = render(c.device, shader, output.format, { multisample: output.multisample });
-      this.key = key;
-    }
     const state = this.views.get(c);
     this.rect.set(viewRect(c) ?? [0, 0, c.width, c.height]);
     this.flags[0] = this.options.radius ?? 3;
@@ -237,6 +235,6 @@ export class Painterly implements EnginePlugin {
   private release(): void {
     this.views.clear();
     this.pipeline = undefined;
-    this.key = '';
+    this.key.reset();
   }
 }

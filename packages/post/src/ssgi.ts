@@ -8,6 +8,7 @@ import { preset } from '../../shared/preset.js';
 import { margoError } from '../../shared/errors.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
+import { OutputKey } from '../../shared/output-key.js';
 import { PostStack } from './stack.js';
 import {
   vertex,
@@ -288,7 +289,7 @@ export class SSGI implements EnginePlugin {
   private blurViewGroups?: { get(copy?: GPUBufferBinding): GPUBindGroup[] };
   private slice?: GPUBufferBinding;
   private input?: GPUTextureView;
-  private key = '';
+  private key = new OutputKey();
   private clearPass?: GPURenderPassDescriptor;
   private materialClear?: MaterialClear;
   private extra: GPURenderPassColorAttachment[] = [];
@@ -335,7 +336,7 @@ export class SSGI implements EnginePlugin {
   private litComposite?: GPURenderPipeline;
   private feedback?: GPURenderPipeline;
   private present?: GPURenderPipeline;
-  private presentKey = '';
+  private presentKey = new OutputKey();
   private feedbackUniform?: GPUBuffer;
   private feedbackGroups: { get(copy?: GPUBufferBinding): GPUBindGroup[] }[] = [];
   private presentGroups: GPUBindGroup[] = [];
@@ -551,9 +552,7 @@ export class SSGI implements EnginePlugin {
     const traced = this.traced?.active(c.device) ? this.traced : undefined;
     this.retrace(c.device, traced);
     if (this.multi) return this.stageMulti(c, input, output, traced);
-    const key = output.format + output.multisample.count + output.hdr + premultipliedCanvas(this.engine);
-    if (this.key !== key) {
-      this.key = key;
+    if (this.key.changed(output, premultipliedCanvas(this.engine))) {
       this.composite = render(
         c.device,
         output.hdr ? linearComposite : displayFor(this.engine, compositeShader),
@@ -657,9 +656,7 @@ export class SSGI implements EnginePlugin {
     this.fullscreen(c, this.litPasses[next], this.litComposite!, composite, false);
     this.newest = next;
     if (output.hdr) return this.lit[next];
-    const key = output.format + output.multisample.count + premultipliedCanvas(this.engine);
-    if (this.presentKey !== key) {
-      this.presentKey = key;
+    if (this.presentKey.changed(output, premultipliedCanvas(this.engine))) {
       this.present = render(device, displayFor(this.engine, presentShader), output.format, {
         multisample: output.multisample,
       });
@@ -767,13 +764,13 @@ export class SSGI implements EnginePlugin {
     for (const b of this.axes) retire(this.device!, b);
     this.uniform = this.rays = this.feedbackUniform = undefined;
     this.litComposite = this.feedback = this.present = undefined;
-    this.presentKey = '';
+    this.presentKey.reset();
     this.multi = false;
     this.tracing = false;
     this.axes = [];
     this.replay = this.composite = undefined;
     this.replayKey = this.base = undefined;
-    this.key = '';
+    this.key.reset();
   }
   onDeviceRestored(engine: Engine): void {
     this.release();

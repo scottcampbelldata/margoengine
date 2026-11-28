@@ -10,6 +10,7 @@ import {
 } from '@margoengine/core/extension';
 import { render, group, compute } from '../../shared/gpu.js';
 import { orthographic } from '../../shared/projection.js';
+import { OutputKey } from '../../shared/output-key.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import {
   cocShader,
@@ -156,7 +157,7 @@ export class DOF implements EnginePlugin {
   private tileView?: GPUTextureView;
   private coarseView?: GPUTextureView;
   private outputView?: GPUTextureView;
-  private key = '';
+  private key = new OutputKey();
 
   constructor(readonly options: DOFOptions = {}) {
     this.validate();
@@ -633,8 +634,7 @@ export class DOF implements EnginePlugin {
   /** Stacked: blur `input` by the shared depth into outputTexture, handed on as linear light or presented as the display output. */
   private stage(c: Context, input: GPUTextureView, output: StageOutput): GPUTextureView | void {
     const device = c.device,
-      depth = this.host!.depthTexture!,
-      key = output.format + output.multisample.count;
+      depth = this.host!.depthTexture!;
     if (this.coc?.width !== c.width || this.coc.height !== c.height) {
       this.releaseTextures();
       this.targets(device, c.width, c.height);
@@ -671,8 +671,7 @@ export class DOF implements EnginePlugin {
     this.circles(c);
     this.blur(c);
     if (output.hdr) return this.outputView;
-    if (this.key !== key) {
-      this.key = key;
+    if (this.key.changed(output, premultipliedCanvas(this.engine))) {
       const code = displayFor(this.engine, presentShader);
       this.presentPipeline = render(device, code, output.format, { multisample: output.multisample });
       this.groups[2] = group(device, this.presentPipeline, [this.outputView!]);
@@ -776,7 +775,7 @@ export class DOF implements EnginePlugin {
     this.groups = [];
     this.presentPipeline = undefined;
     this.input = this.sceneDepth = this.cocView = this.outputView = this.tileView = this.coarseView = undefined;
-    this.key = '';
+    this.key.reset();
   }
   private release(): void {
     this.releaseTextures();

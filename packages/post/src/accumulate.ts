@@ -12,6 +12,7 @@ import { displayFor, displayShader, premultipliedCanvas } from '../../shared/dis
 import { margoError } from '../../shared/errors.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { PostStack } from './stack.js';
+import { OutputKey } from '../../shared/output-key.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number };
 type AccumulatePassContext = Extract<PassContext, { backend: 'webgpu' }>;
@@ -83,7 +84,7 @@ export class Accumulate implements EnginePlugin {
   private folds: (GPUBindGroup | undefined)[] = [];
   private input?: GPUTextureView;
   private presentPipeline?: GPURenderPipeline;
-  private presentKey = '';
+  private presentKey = new OutputKey();
   private present?: GPUBindGroup;
   private readonly sumAttachment: GPURenderPassColorAttachment = {
     view: undefined!,
@@ -276,9 +277,7 @@ export class Accumulate implements EnginePlugin {
     this.pass(c, this.foldPipeline, fold, this.foldDescriptor, [this.sumAttachment, this.meanAttachment]);
     this.last = next;
     if (output.hdr) return this.meanView;
-    const key = output.format + ':' + (output.multisample?.count ?? 1) + premultipliedCanvas(this.engine);
-    if (this.presentKey !== key) {
-      this.presentKey = key;
+    if (this.presentKey.changed(output, premultipliedCanvas(this.engine))) {
       this.presentPipeline = render(device, displayFor(this.engine, presentShader), output.format, {
         multisample: output.multisample,
       });
@@ -322,7 +321,7 @@ export class Accumulate implements EnginePlugin {
     this.releaseTargets();
     this.uniform?.destroy();
     this.uniform = this.foldPipeline = this.presentPipeline = this.input = undefined;
-    this.presentKey = '';
+    this.presentKey.reset();
     this.written = false;
   }
 }

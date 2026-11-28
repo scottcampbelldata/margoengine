@@ -29,6 +29,7 @@ import {
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 import { displayFor, linearShader, premultipliedCanvas } from '../../shared/display.js';
+import { OutputKey } from '../../shared/output-key.js';
 const linearComposite = compositeShader.replace('return vec4f(toDisplay(c),s.a);', 'return vec4f(c,s.a);');
 // The display transform must be gone, or an HDR stage would hand the next effect display-encoded colour.
 if (linearComposite.includes('vec4f(toDisplay(c)'))
@@ -135,7 +136,7 @@ export class SSAO implements EnginePlugin {
   private depthOnly?: GPUTextureView;
   private depthFormat?: GPUTextureFormat;
   private input?: GPUTextureView;
-  private key = '';
+  private key = new OutputKey();
   // Shader patches are cached per source string; pass descriptors are rebuilt with their targets in resize().
   private captureSource?: string;
   private captureShader = '';
@@ -478,9 +479,7 @@ export class SSAO implements EnginePlugin {
   }
   /** Stacked: darken the ambient term of `input`; Khronos PBR Neutral encoded only as the display output. */
   private stage(c: PostPassContext, input: GPUTextureView, output: StageOutput): void {
-    const key = output.format + output.multisample.count + output.hdr + premultipliedCanvas(this.engine);
-    if (this.key !== key) {
-      this.key = key;
+    if (this.key.changed(output, premultipliedCanvas(this.engine))) {
       this.composite = render(
         c.device,
         output.hdr ? linearComposite : displayFor(this.engine, compositeShader),
@@ -927,7 +926,7 @@ export class SSAO implements EnginePlugin {
     if (!this.host) this.captureTarget?.dispose();
     this.captureTarget = undefined;
     this.ao = this.input = undefined;
-    this.key = '';
+    this.key.reset();
     for (const t of this.textures) retire(this.device!, t);
     for (const b of this.directions) retire(this.device!, b);
     retire(this.device!, this.uniform);

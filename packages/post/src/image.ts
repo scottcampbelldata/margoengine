@@ -116,7 +116,8 @@ class ImageDisplay implements EnginePlugin {
   readonly name = 'post:image:display';
   private device?: GPUDevice;
   private uniform?: GPUBuffer;
-  private pipelines = new Map<string, GPURenderPipeline>();
+  /** Present pipelines by output format, then sample count (no key string a frame, KB-GPUMAIN1). */
+  private pipelines = new Map<GPUTextureFormat, Map<number | undefined, GPURenderPipeline>>();
   private values = new Float32Array(8);
   private source?: GPUTextureView;
   private pipeline?: GPURenderPipeline;
@@ -137,11 +138,12 @@ class ImageDisplay implements EnginePlugin {
   }
   encode(c: ImageContext, input: GPUTextureView, output: StageOutput, preprocess: boolean, straight: boolean): void {
     this.initialize(c.device);
-    const key = output.format + output.multisample.count;
-    let pipeline = this.pipelines.get(key);
+    let byCount = this.pipelines.get(output.format);
+    if (!byCount) this.pipelines.set(output.format, (byCount = new Map()));
+    let pipeline = byCount.get(output.multisample.count);
     if (!pipeline) {
       pipeline = render(c.device, shader, output.format, { multisample: output.multisample });
-      this.pipelines.set(key, pipeline);
+      byCount.set(output.multisample.count, pipeline);
     }
     this.values.set([
       this.options.exposure ?? 0,
