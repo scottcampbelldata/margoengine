@@ -2800,7 +2800,7 @@ the form-drag half of to-do 4, plus a moving-wall friction model. Take it, finis
 5. Add FIRE-04 and EARTH-02 coupling tests and fish-contact and trampling tests.
 6. Throw MargoError with fix text, and fix the time-zero snapshot bug in the field registry.
 
-### FLUID-07 Thin films and droplets (`physics/thin-film`, commits 75f931cd2 through 3cb9cb3eb, 25 commits tagged FLUID-07), owner Codex: not VERIFIED, status left BUILDING
+### FLUID-07 Thin films and droplets (`physics/thin-film`, commits 75f931cd2 through 3cb9cb3eb, 25 commits tagged FLUID-07), owner Codex: REOPENED
 
 **Checked.** Read `packages/physics/src/thin-film/{index,drips,drop-flight,drop-receiver,surface}.ts`, `thin-film-kernel/src/lib.rs` (by commit stat), `tests/thin-film.test.js`, `tests/coupling/thin-film.test.js`, the catalog row, the audit rows, `docs/limits.md` and the FLUID-07 and PA-23 parts of `docs/known-bugs.md`. Under run-with-timeout: `node --test` on the two test files gave 43 tests, 43 pass on packages built from current main, including "a pendant drop matches held-out thinning on tilted glass" (`thin-film.test.js:891`: peak amplitude against the measured 1.01 mm within 0.05 mm, a held-out measurement); a first run on an older build failed it. `thin-film.browser.mjs` ran on WebGPU and with `--compat` (WebGL2) and completed: 4041 and 4069 wet pixels, 72 drop pixels, runnels seen from inside, 0 shader errors. It prints no pass counts.
 
@@ -2838,6 +2838,15 @@ the form-drag half of to-do 4, plus a moving-wall friction model. Take it, finis
 3. Move all `RangeError` throws to MargoError with a code and a fix.
 4. Record work counts and thread or SIMD evidence, and add a fast tier.
 5. Add a rival comparison row.
+
+#### FLUID-07 four-point pass
+
+- Point 5 and audit item 3 (119f92f328). `packages/physics/tests/coupling/thin-film.test.js` rejects a late overflowing pressure wave after candidate volume computation. All accepted bytes and the last accepted native receipt remain unchanged. A corrected retry equals a fresh run. `packages/physics/tests/thin-film.test.js` and the coupled drop checks exercise coded validation with fixes.
+- Point 6 and audit item 4 native scaling (119f92f328). `packages/physics/tests/coupling/thin-film-workers.test.js` compares plain and shared 1, 2 and 4 for exact patterned/contact and suspended films, signed fields and replay. `packages/physics/tests/thin-film-workers.browser.mjs` uses three real Chromium helpers and the caller, with 2,137 face matrix products and 2,169,055 gradient SIMD pairs on the final accepted step. Packaged workers dispose after cancellation and normal use. A separate fast tier remains open.
+- Point 7 (119f92f328). `packages/physics/tests/thin-film.browser.mjs` checks seeded runnels and glazing, then dry-start directed spray on a live rolling 6 mm pane and real detached drops into a lower film. The accepted receipt is 18.47 mL of rain, 9.86 to 4.11 mL resident and 1.16 mL in the receiver. Both renderers verify exact snapshots and full resolved frames across hold, restore, re-advance and rewind, with outside and inside cameras. The original EF-4 and full tram film integrations remain open.
+- Point 8 and audit item 2 measured comparison (119f92f328). `packages/physics/scripts/fluid07-sliding-drop-measured.mjs` independently holds out two Le Grand et al. terminal speeds. The low run remains pre-terminal. The high 80 µm precursor run gives 13.92 and 13.73 mm/s over two intervals against the 10.24–11.22 mm/s band, even carrying the full grid sensitivity. At 40 µm the high run never reaches either scoring interval. [Evidence and limits](limits.md#accepted-film-motion-and-independent-incline-drops-fluid-07)
+
+Independent terminal accuracy, steep contact lines, free pinch-off, impact splash and rebound, the wider rival comparison and original production binding remain open. The row remains REOPENED at four points.
 
 ### ATMO-06 Airborne particle transport (`physics/airborne`, commits 965fab2df, 615b8daae), owner Codex: REOPENED
 
