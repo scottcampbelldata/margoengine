@@ -1,0 +1,1 @@
+import{o as e,s as t}from"./scene-BEokXwn8.js";var n=(t,n=`1.0.0`,r=import.meta.url)=>e(t,n,r);function r(e,t){for(let n=t;n>=0;n=e.parents?.[n]??-1)if(e.hidden[n])return!0;return!1}function i(e,i){let a=n(e),o=t(i),s=o.id;return a.disposed||a.meshes.get(s)!==i||r(a.store,s)?null:o.matrix??a.store.matrices.subarray(s*16,s*16+16)}export{i as t};

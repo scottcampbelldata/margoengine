@@ -134,27 +134,25 @@ for (const name of names) {
         reportCompressedSize: false,
       },
     });
+    // The new page and preload script are made before the demo folder is touched, so a build that cannot carry a
+    // preload leaves the shipped page and its chunks as they were.
+    const built = fs.readdirSync(path.join(out, "assets"));
+    let page = fs.readFileSync(path.join(out, "index.html"), "utf8"),
+      head = carriedPreloads(shipped, page, built);
+    const next =
+      preloadScript &&
+      rewritePreload(preloadScript, built, (f) =>
+        fs.readFileSync(path.join(out, "assets", f), "utf8"),
+      );
+    if (next) head += `<script src="./assets/${next.name}"></script>`;
+    page = page.replace("<head>", `<head>${head}`);
     const assets = path.join(dir, "assets");
     fs.mkdirSync(assets, { recursive: true });
     for (const f of fs.readdirSync(assets))
       if (hashed.test(f)) fs.rmSync(path.join(assets, f));
-    for (const f of fs.readdirSync(path.join(out, "assets")))
+    for (const f of built)
       fs.copyFileSync(path.join(out, "assets", f), path.join(assets, f));
-    let page = fs.readFileSync(path.join(out, "index.html"), "utf8"),
-      head = carriedPreloads(
-        shipped,
-        page,
-        fs.readdirSync(path.join(out, "assets")),
-      );
-    if (preloadScript) {
-      const next = rewritePreload(
-        preloadScript,
-        fs.readdirSync(path.join(out, "assets")),
-      );
-      fs.writeFileSync(path.join(assets, next.name), next.text);
-      head += `<script src="./assets/${next.name}"></script>`;
-    }
-    page = page.replace("<head>", `<head>${head}`);
+    if (next) fs.writeFileSync(path.join(assets, next.name), next.text);
     fs.writeFileSync(path.join(dir, "index.html"), page);
     if (zip) {
       const target = path.join(demos, "downloads", `${name}.zip`);

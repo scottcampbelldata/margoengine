@@ -5,8 +5,9 @@
 // A rebuild renames the chunks they point at, so build.mjs rewrites both from the new build with these helpers.
 import { createHash } from "node:crypto";
 
+// Older pages name the same script inline-<8 hex>.js.
 export const preloadTag =
-  /<script src="\.\/assets\/(webgl2-preload-[A-Za-z0-9_-]{8}\.js)"><\/script>/;
+  /<script src="\.\/assets\/((?:webgl2-preload|inline)-[A-Za-z0-9_-]{8}\.js)"><\/script>/;
 
 const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -14,7 +15,14 @@ const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 function chunk(base, files) {
   const pattern = new RegExp(`^${escape(base)}-[A-Za-z0-9_-]{8}\\.js$`);
   const found = files.filter((f) => pattern.test(f));
-  return found.length === 1 ? found[0] : undefined;
+  if (found.length === 1) return found[0];
+  // A chunk of a prebuilt package keeps that package's own hash in its name (`readback-Cf9k53gF-DiYXj9wd.js`), which
+  // changes when the package is rebuilt: match on the name before the hashes, when exactly one chunk has it.
+  const stem = /^(.+?)(?:-[A-Za-z0-9_]{8})+$/.exec(base)?.[1];
+  if (!stem || found.length) return undefined;
+  const stemmed = new RegExp(`^${escape(stem)}(?:-[A-Za-z0-9_-]{8}){2,}\\.js$`);
+  const same = files.filter((f) => stemmed.test(f));
+  return same.length === 1 ? same[0] : undefined;
 }
 
 /** The chunk names a preload script points at with their build hash taken off: `./assets/errors-DkwPZuAq.js` is `errors`. */
@@ -26,18 +34,33 @@ export function preloadBases(script) {
   );
 }
 
+/** The chunks a built chunk's `text` imports statically (`import"./x.js"`, `from"./x.js"`); `import("./x.js")` is not. */
+export function staticImports(text) {
+  return [...text.matchAll(/(?:\bfrom|\bimport)\s*["']\.\/([^"']+\.js)["']/g)].map(
+    (m) => m[1],
+  );
+}
+
 /**
  * The preload script for a new build: the same chunks by name, at their new hashes (`files`, the built assets/
- * names), and its file name from a hash of its text. Throws when a chunk is missing from the build, so a page never
- * preloads a file that is not there.
+ * names), and its file name from a hash of its text. Without `read` a chunk missing from the build throws, so a page
+ * never preloads a file that is not there. With `read` (built file name to its text) the list is the static import
+ * closure of the chunks still built under their names: a shared chunk that Rollup names after another of its modules
+ * on a rebuild (`version` folded into `errors`) is reached through the chunks that import it. It still throws when
+ * none of the names is built.
  */
-export function rewritePreload(script, files) {
-  const hrefs = preloadBases(script).map((base) => {
-    const found = chunk(base, files);
-    if (!found)
-      throw new Error(`webgl2-preload: no single built chunk named ${base}`);
-    return `./assets/${found}`;
-  });
+export function rewritePreload(script, files, read) {
+  const bases = preloadBases(script),
+    found = bases.map((base) => chunk(base, files)),
+    missing = bases.filter((_, i) => !found[i]);
+  if (missing.length && (!read || missing.length === bases.length))
+    throw new Error(`webgl2-preload: no single built chunk named ${missing[0]}`);
+  const list = found.filter(Boolean);
+  if (read)
+    for (let i = 0; i < list.length; i++)
+      for (const next of staticImports(read(list[i])))
+        if (files.includes(next) && !list.includes(next)) list.push(next);
+  const hrefs = list.map((file) => `./assets/${file}`);
   const text =
     `if(!navigator.gpu||new URLSearchParams(location.search).get("backend")==="webgl2"){for(const href of ${JSON.stringify(hrefs)})` +
     `{const link=document.createElement("link");link.rel="modulepreload";link.crossOrigin="anonymous";link.href=href;document.head.append(link);}}`;
@@ -46,12 +69,16 @@ export function rewritePreload(script, files) {
 }
 
 /**
- * The `<link rel="modulepreload">` tags of the shipped page (`before`) that the new build's page (`after`) lacks, for
- * the same chunks at their new names (`files`). Throws when a preloaded chunk is gone from the build.
+ * The `<link rel="modulepreload">` tags the shipped page (`before`) carries ahead of its entry `<script type="module">`
+ * that the new build's page (`after`) lacks, for the same chunks at their new names (`files`). Throws when such a
+ * chunk is gone from the build. Tags after the entry script are Vite's own preloads of the entry's static imports:
+ * Vite writes them again for the new build, under whatever names its chunks now have, so they are not carried.
  */
 export function carriedPreloads(before, after, files) {
-  const links = [];
-  for (const [, href] of before.matchAll(
+  const links = [],
+    entry = before.search(/<script type="module"/),
+    added = entry < 0 ? before : before.slice(0, entry);
+  for (const [, href] of added.matchAll(
     /<link rel="modulepreload" crossorigin href="\.\/assets\/([^"]+)">/g,
   )) {
     const base = /^(.+)-[A-Za-z0-9_-]{8}\.js$/.exec(href)?.[1];
