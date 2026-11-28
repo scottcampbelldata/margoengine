@@ -35,6 +35,81 @@ function changed(a, b) {
   return count;
 }
 
+async function directedRain(interior, output, backend) {
+  const take = new URL(page.url());
+  take.searchParams.set('storm', '');
+  if (interior) take.searchParams.set('interior', '');
+  else take.searchParams.delete('interior');
+  await page.goto(take.href);
+  await page.waitForFunction(() => typeof window.wetWindow?.rainFrame === 'function', null, { timeout: 20_000 });
+  const { onset, cutoff, release, hold } = await page.evaluate(() => window.wetWindow.timeline);
+  async function frame(tick, action, options = {}) {
+    const { state, image } = await page.evaluate(
+      async (input) => {
+        const state = await window.wetWindow.rainFrame(input);
+        return { state, image: await window.wetWindow.captureFrame() };
+      },
+      { frame: tick, action, ...options },
+    );
+    // Use the actual GPU render target for full-frame comparisons, before the browser compositor.
+    const png = Buffer.from(image, 'base64');
+    const { budget: pane, basin, flight, landed } = state;
+    assert(Math.abs(pane.rain - state.expectedRain) <= 2e-7 * state.expectedRain, 'rain matches the projected area');
+    assert(Math.abs(state.paneVolume - pane.stored) <= 1e-16);
+    assert(Math.abs(state.basinVolume - basin.stored) <= 1e-16);
+    assert(Math.abs(pane.rain - pane.stored - pane.dripped) <= 1e-16);
+    assert(Math.abs(landed - basin.impacts) <= 1e-16);
+    assert(Math.abs(flight.received - flight.airborne - flight.outflow) <= 1e-16);
+    assert.equal(flight.outflow, landed, 'the collector intercepts every departed resolved drop');
+    assert.deepEqual([...errors, ...state.errors], []);
+    return { state, png, pixels: await decodePNG(png) };
+  }
+  function same(a, b) {
+    assert.deepEqual(a.state, b.state);
+    assert.deepEqual(a.pixels.data, b.pixels.data, 'the same camera reproduces the full RGBA frame');
+  }
+
+  const dry = await frame(onset);
+  assert.equal(dry.state.budget.rain, 0);
+  assert.equal(dry.state.paneVolume, 0);
+  assert.equal(dry.state.landed, 0);
+  const first = await frame(onset + 1);
+  assert(first.state.budget.rain > 0 && first.state.paneVolume > 0);
+  const middle = Math.floor((onset + cutoff) / 2) + 1;
+  const wet = await frame(middle, 'save');
+  const noFilm = await frame(middle, undefined, { wet: false });
+  assert.deepEqual(noFilm.state, wet.state);
+  const rainPixels = changed(wet.pixels, noFilm.pixels);
+  assert(rainPixels > 100, `the caught spray changes ${rainPixels} pixels`);
+  const shutoff = await frame(cutoff);
+  const dryAir = await frame(cutoff + 1);
+  const drained = await frame(release);
+  assert(shutoff.state.rotation[0] > wet.state.rotation[0]);
+  assert.equal(dryAir.state.budget.rain, shutoff.state.budget.rain);
+  assert.equal(drained.state.budget.rain, shutoff.state.budget.rain);
+  assert(drained.state.paneVolume < 0.5 * shutoff.state.paneVolume, 'the water keeps draining once the spray stops');
+  assert(drained.state.landed > shutoff.state.landed && shutoff.state.landed > 0);
+  const noCatchment = await frame(release, undefined, { catchment: false });
+  assert.deepEqual(noCatchment.state, drained.state);
+  const catchPixels = changed(drained.pixels, noCatchment.pixels);
+  assert(catchPixels > 0, 'the accepted basin water changes the visible collector');
+
+  same(await frame(hold), drained);
+  same(await frame(middle, 'restore'), wet);
+  same(await frame(release), drained);
+  same(await frame(onset), dry);
+  same(await frame(release), drained);
+  const side = interior ? 'inside' : 'outside';
+  await writeFile(`${output}/${backend}-${side}-spray.png`, wet.png);
+  await writeFile(`${output}/${backend}-${side}-runoff.png`, drained.png);
+  console.log(
+    `${backend} ${side} spray: ${rainPixels} wet pixels, ${catchPixels} collector pixels, ` +
+      `${(drained.state.budget.rain * 1e6).toFixed(4)} mL intercepted, ` +
+      `${(drained.state.landed * 1e6).toFixed(4)} mL caught, ${drained.state.hash}.`,
+  );
+  await page.evaluate(() => window.wetWindow.dispose());
+}
+
 try {
   await page.waitForFunction(() => typeof window.wetWindow?.draw === 'function', null, { timeout: 20_000 });
   const tick = await page.evaluate(() => window.wetWindow.advance());
@@ -95,6 +170,9 @@ try {
   console.log(
     `${backend} moving window at tick ${tick}: ${filmPixels} wet pixels, ${dropPixels} drop pixels, ${interiorPixels} pixels seen from inside, ${glazingPixels} runnel pixels changed by glass, ${flight.state.hash}.`,
   );
+  await page.evaluate(() => window.wetWindow.dispose());
+  await directedRain(false, output, backend);
+  await directedRain(true, output, backend);
 } finally {
   try {
     await page.evaluate(() => window.wetWindow?.dispose());

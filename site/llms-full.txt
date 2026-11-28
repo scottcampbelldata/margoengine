@@ -16628,6 +16628,14 @@ accepted differences:
 - The separate taconite cutaway starts with a live cargo hold and a sealed control. The live hull released 131.09 kg through its breach field. At 4.2 s the scene draws 25.85 kg of suspended fines and 104.50 kg of settled pellets from their accepted locations. The fines move 2.43 m downstream. Each renderer replays its complete accepted state and pixels exactly. The existing swimming cutaway represents a ray's local bed response. The original BB-7 and EF-11 shots and direct measurements of lifting by a ray remain open.
 - The held-out final crater deficits at H/D 10 and 20 are 57.49 cm³ and 116.47 cm³. At 5 mm grid spacing the model gives 1.29 cm³ and 1.00 cm³. At 10 mm it gives 2.68 cm³ and a numerically zero deficit. Both misses exceed the radius integration, vertical resolution and observed grid sensitivity allowances. The cumulative released sediment can count repeated lifting and the source measures static post-settling geometry. Absolute mass suspended by a ray, evolving jet recirculation, the short-gap closure and multiple accepting sediment writers are open. [Reproduce the comparison](whitepaper/reproduce.md#sea-15-parcel-diffusion-and-scour)
 
+
+### Accepted film motion and independent incline drops (FLUID-07)
+
+- The optional native participants split the implicit film face matrix over disjoint ranges. The capillary, gravity, wetting and contact terms keep their existing model. The global reductions, convergence decisions, pressure-only correction and coupling sequence remain ordered on the caller. The packaged 35 by 29 case reports 2,137 matrix products, 2,169,055 pressure rows, 4,338,110 gradient faces, 991,568 pressure SIMD pairs and 2,169,055 gradient SIMD pairs in its final accepted step. `workCounts()` stays outside the physical snapshot. Plain and shared assets are each 32,746 B raw and 12,619 B gzip. The threaded lead is 32,933 B raw and 12,726 B gzip. Core and stage receive zero bytes.
+- Loaded films report standard `MargoError` codes, with `unsupported` for invalid configured inputs and `failed` for numerical rejection. A failed step preserves accepted depth, drainage, cumulative volume, drop events, loads and wave ports. Pre-publication checks include the pressure output and the volume ledger. Independent exact replay covers a corrected retry.
+- The directed technical scene uses oblique rain on a rolling 6 mm pane. The simulation records 18.47 mL intercepted, 9.86 mL resident at cutoff, 4.11 mL resident after drainage and 1.16 mL caught in a second film by actual detached drops. Both renderers replay accepted snapshot bytes and complete resolved RGBA from inside and outside. The original EF-4 production shots remain open.
+- Two independent fluoropolymer-coated incline observations hold out measured 47V10 terminal speed from the simulation. The low inclination has a measured terminal band of 2.21–2.83 mm/s. At 0.50 s and 0.333 mm spacing, the cap moves 0.959 mm with an 80 µm precursor and 0.256 mm with 40 µm. These are pre-terminal results. The high inclination has a band of 10.24–11.22 mm/s. At 0.333 mm spacing and 80 µm precursor the model's 2–4 and 4–6 mm interval speeds are 13.92 and 13.73 mm/s. The grid difference at fixed precursor leaves both intervals above the published band. At the same grid spacing a 40 µm precursor gives 2.09 mm of travel in 0.50 s and reaches neither terminal scoring interval. Shallow lubrication remains a small-slope approximation. Macroscopic steep contact slopes, a resolved contact-line slip layer, free pinch-off, splash and wet-surface rebound remain open. [Method and tests](whitepaper/reproduce.md#fluid-07-implicit-film-and-directed-rain)
+
 Entry sizes are in scripts/quality/baselines/sizes.json.
 
 Grass leaf colour, clumps and clearings (2026-11-28, plants round 1). GrassShape gains hue (0 to 0.5, default 0.02), yellow (0 to 1, default 0.15), yellowColor (linear RGB 0 to 1, default ANGERS 2003 yellowing leaves [0.1432, 0.1794, 0.0382]), tipBrown (0 to 1, default 0.25) and transmittance (three numbers 0 to 4, default [1.0909, 1.1726, 0]); the colour terms apply in the lit (PBR) stage only, and transmittance only tints `blades.translucency` above 0. Scatter gains clumps ({ size above 0 up to 100000, cover 0 to 1, edge 0.001 to 1, default 0.2 }), clearings (up to 100,000 circles, each one exclusions-buffer row after the rectangles and path segments) and reach (0 to 100000 mesh units). Clumps and clearings are compiled into the distribute shader, so they are fixed for the scatter's life; `cover` is a threshold of the patch noise, not an exact share (0.5 kept 553 of 936 instances in grass.browser.mjs). Sizes: scatter 29,682 to 30,432 B gzip, scatter/grass 3,047 to 3,432 B (scripts/quality/baselines/sizes.json).
@@ -16641,6 +16649,41 @@ until it is fixed. Entries are newest first. A heading starts with the state (Op
 an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the regression test that keeps it fixed.
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
+
+### Fixed 2026-11-28: a shot drawn in sub-frames showed what moves fast as stepped copies, not a smear (KB-LOOK-TV-SUBSTEP1, shot tool, scenes)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-blowup.json --once --seconds 1.1` (RTX A6000,
+  WebGPU, 8 sub-frames over a 180 degree shutter): the near swaying crown at the right of the mid probe (x 1600 to 1920,
+  y 100 to 420) draws as eight hard copies a few pixels apart, a staircase trail on each leaf against the sky.
+- **Cause:** the shot tool's sub-frames are sharp pictures one slice of the shutter apart (1 / 480 s here); a surface
+  moving more than a pixel a slice leaves gaps between its copies. Nothing filled the slice between them.
+- **Fix:** each sub-frame blurs over its own slice. The shot tool gives the page each sub-frame's share of the motion
+  since the frame drawn before (`shutterShare` in `tools/shot/shot-file.mjs`: the slice over the time since, at most 1)
+  through a new `shot.page.shutter` hook; `@margoengine/scenes/timber-valley` at film quality adds
+  `@margoengine/post/motion-blur` after TAA's resolve on TAA's velocity (`parts.motionBlur`, 180 degrees, McGuire,
+  Hennessy, Bukowski and Osman 2012, "A Reconstruction Filter for Plausible Motion Blur", I3D), and the timber-valley
+  shot page sets its shutter from the hook. The same crop now shows one smooth smear.
+- **Regression:** `tests/shot-file.test.js` (shutterShare tiles the open shutter: 1 within a kept frame, 1/9 for its
+  first sub-frame after the gap, the shutter for a frame drawn alone, 0 with no frame before; `page.shutter` must name a
+  function), `tests/shot-film-hook.test.js` (the hook gets each sub-frame's share before its frame is drawn) and
+  `packages/scenes/test/timber-valley-still.mjs` (film adds the motion blur at 0.5, a preview none).
+- **Measured, blowup `--once --seconds 1.1`:** shimmerMoving early 0.50 to 0.48, mid 2.07 to 2.02 (the smear over the sky,
+  the rest of KB-LOOK-TV-SHIMMER2, needs a ruling on the check); motionBlur mid 0.61 to 0.32.
+
+### Fixed 2026-11-28: the blowup's early motionBlur read 11.7 percent (bound 5) on near leaves that sway against the camera (KB-LOOK-TV-MBVEL1, headless look)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-blowup.json --once --seconds 1.1` (RTX A6000,
+  WebGPU, 1920 x 1080, supersample 2, 8 sub-frames, 180 degrees): `look.md` early motionBlur 11.8 percent, 391 sharp of
+  3,324 edges, before and after KB-LOOK-TV-SHIMMER2 part (b).
+- **Cause:** the check, not the frames. `motionBlur` took each pixel's travel from the camera's motion alone (depth
+  reprojection). The sharp edges sit on the near swaying crown at the right of the frame (x 1280 to 1660), travel 9.9 px
+  by the camera but 7.2 px by the engine's own velocity: the leaves sway against the camera's sweep, so they move less
+  than the camera moves the place they cover, and are smeared by what they really move.
+- **Fix:** `motionBlur(frame, motion, { velocity })` judges each pixel by its surface's own travel when the probe has the
+  engine velocity (`MovingFrames.velocity`, `shot.moving.velocity`); `checkProbe` passes it. Blowup early 11.8 to 0.00
+  percent (1,003 edges over 8 px), mid 0.61 to 0.88 (10,220 edges), bound 5 unchanged.
+- **Regression:** `packages/headless/tests/look-clean.test.js` (a bar moving 2 px under a 12 px camera sweep, drawn sharp,
+  fails by the camera's motion and passes by its velocity; the same bar really moving 12 px still fails).
 
 ### Open 2026-11-28: warmUp makes ten-thousand-trees take 33 s instead of 18 s to start on the WebGL2 layer (KB-QUALITY-WARMSERIAL1, quality, webgl2-compat)
 
@@ -17481,7 +17524,7 @@ checks the retained stations of a sheer hull and exact agreement of the native a
 - **Left:** the far rows read 199 under the 189 deck, a flat lighter strip six pixels high; not traced (see
   KB-SKY-ENVBELOW1 for the map's rows below the horizon).
 
-### Open 2026-11-28: the sky's environment map holds a cloudless horizon below the horizon under an overcast deck (KB-SKY-ENVBELOW1, sky)
+### Fixed 2026-11-28: the sky's environment map held a cloudless horizon below the horizon under an overcast deck (KB-SKY-ENVBELOW1, sky)
 
 - **Repro:** the dune coast surf view (overcast, `clouds: 1`), `Sky.reflectionTexture` read back by a compute copy (64 x
   32): row 15, just above the horizon, (0.127, 0.128, 0.124), the deck; row 16, just below, (0.209, 0.160, 0.105), warm
@@ -17491,8 +17534,13 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   hits the ground and returns the clear sky: just under the horizon the map is the clear horizon, not the deck.
   Anything lit or reflected from that band (an object's lower hemisphere, a reflection that filters across the horizon)
   takes a warm light an overcast day does not have.
-- **Where to fix:** give `cloudSky` the held ray and mix toward the ground after the clouds, with a sky test of an
-  overcast map's first row below the horizon against the row above.
+- **Fix:** `skyEnvironment` hands `cloudSky` the ray held at the horizon and mixes toward the ground colour after the
+  clouds. Overcast map (`Sky.attach(engine, {hours: 11, clouds: {coverage: 1, depth: 30}})`, 64 x 32): row 16 went from
+  (0.543, 0.553, 0.567), the clear horizon, to (0.245, 0.259, 0.289), the deck under row 15's (0.346, 0.365, 0.408) and
+  fading toward the ground; the clear map is unchanged. At night the rows below the horizon now fade to the ground as by
+  day, where the night gradient ran under the horizon before.
+- **Regression:** `packages/sky/test/environment-below-check.mjs` (in `test:gpu`; passed on WebGPU and the WebGL2 layer,
+  RTX A6000), which failed before with row 16 1.5 times the deck's luminance.
 
 ### Open 2026-11-28: the dune coast's shore foam is drawn as long thin streaks along the shore (KB-WATER-FOAMSTREAK1, water)
 

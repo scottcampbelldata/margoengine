@@ -15754,8 +15754,8 @@
         "gzip": 4339
       },
       "./thin-film": {
-        "raw": 39045,
-        "gzip": 15193
+        "raw": 48527,
+        "gzip": 18253
       },
       "./viscoplastic": {
         "raw": 23166,
@@ -19321,9 +19321,9 @@
       "brotli": 2332
     },
     "packages/physics/dist/thin-film-kernel.wasm": {
-      "raw": 30756,
-      "gzip": 11743,
-      "brotli": 10158
+      "raw": 32746,
+      "gzip": 12619,
+      "brotli": 10878
     },
     "packages/physics/dist/wake-fft.wasm": {
       "raw": 26728,
@@ -19381,9 +19381,9 @@
       "brotli": 2524
     },
     "packages/physics/dist/thin-film-kernel-shared.wasm": {
-      "raw": 30756,
-      "gzip": 11743,
-      "brotli": 10152
+      "raw": 32746,
+      "gzip": 12619,
+      "brotli": 10892
     },
     "packages/physics/dist/crush-shell-kernel.wasm": {
       "raw": 19230,
@@ -20274,6 +20274,11 @@
       "raw": 3365,
       "gzip": 1697,
       "brotli": 1564
+    },
+    "packages/physics/dist/thin-film-kernel-threaded.wasm": {
+      "raw": 32933,
+      "gzip": 12726,
+      "brotli": 11044
     }
   },
   "splits": {

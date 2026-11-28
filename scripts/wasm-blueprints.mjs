@@ -326,6 +326,13 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'thin-film-kernel-threaded',
+    crate: 'packages/physics/thin-film-kernel',
+    blueprint: 'packages/physics/src/thin-film/thin-film-kernel-threaded.wasm',
+    script: 'packages/physics/scripts/build-thin-film-kernel.mjs',
+    args: ['threaded'],
+  },
+  {
     name: 'crush-shell-kernel',
     crate: 'packages/physics/crush-shell-kernel',
     blueprint: 'packages/physics/src/crush/crush-shell-kernel.wasm',

@@ -1,3 +1,4 @@
+import { filmError } from './errors.js';
 import { hypot } from '@margoengine/math/pinned';
 import { conjugateQuaternion, normalizeQuaternion, rotateByQuaternion } from '@margoengine/math/quat';
 import { add, cross, dot, scale, sub } from '@margoengine/math/vec3';
@@ -67,7 +68,7 @@ function unit(value: V3): V3 {
 
 export function prepareReceiver(opts: ThinFilmDropReceiver): PreparedReceiver {
   if (!opts || typeof opts !== 'object')
-    throw new TypeError('Invalid drop receiver. Pass an object with its origin and UV dimensions.');
+    throw filmError('unsupported', 'Invalid drop receiver. Pass an object with its origin and UV dimensions.');
   const rawU = opts.u ?? [1, 0, 0];
   const rawV = opts.v ?? [0, 0, -1];
   const cell = opts.cell ?? [0, 0, 0];
@@ -82,20 +83,28 @@ export function prepareReceiver(opts: ThinFilmDropReceiver): PreparedReceiver {
     opts.size.length !== 2 ||
     !opts.size.every((d) => Number.isFinite(d) && d > 0)
   )
-    throw new RangeError(
+    throw filmError(
+      'unsupported',
       'Invalid drop receiver. Use a finite plane, positive UV dimensions and one integer origin cell.',
     );
   const u = unit(rawU);
   const v = unit(sub(rawV, scale(u, dot(rawV, u))));
   const n = cross(u, v);
-  if (!(dot(n, n) > 0)) throw new RangeError('Drop receiver tangents have no area. Use two nonparallel directions.');
+  if (!(dot(n, n) > 0))
+    throw filmError('unsupported', 'Drop receiver tangents have no area. Use two nonparallel directions.');
   const bodyRow = opts.bodyRow;
   if (bodyRow !== undefined && (!Number.isSafeInteger(bodyRow) || bodyRow < 0 || opts.cell !== undefined))
-    throw new RangeError('Invalid mounted drop receiver. Use a live body row and omit the plane origin cell.');
+    throw filmError(
+      'unsupported',
+      'Invalid mounted drop receiver. Use a live body row and omit the plane origin cell.',
+    );
   if (opts.followRotation && bodyRow === undefined)
-    throw new RangeError('Rotating drop receiver has no mount. You must supply the receiving film body row.');
+    throw filmError('unsupported', 'Rotating drop receiver has no mount. You must supply the receiving film body row.');
   if (opts.captureEdges && !opts.followRotation)
-    throw new RangeError('Wet edge capture needs a swept contact frame. Enable followRotation on the receiver.');
+    throw filmError(
+      'unsupported',
+      'Wet edge capture needs a swept contact frame. Enable followRotation on the receiver.',
+    );
   return {
     origin: [...opts.origin],
     size: [opts.size[0]!, opts.size[1]!],
@@ -113,13 +122,16 @@ export function receiverPose(memory: WebAssembly.Memory, port: Port | undefined,
   const row = receiver.bodyRow!;
   const region = port?.region;
   if (!port || region?.layout !== 2 || region.type !== 'f32' || region.byteLength < (row + 1) * BODY_WORDS * 4)
-    throw new RangeError('Missing mounted-drop pose. Add the layout-2 RigidSolver with a valid body row first.');
+    throw filmError(
+      'unsupported',
+      'Missing mounted-drop pose. Add the layout-2 RigidSolver with a valid body row first.',
+    );
   const at = row * BODY_WORDS;
   const values = regionWords(memory, region);
   const pose = Array.from(values.subarray(at, at + 7));
   const centre = receiver.followsRotation ? Array.from(values.subarray(at + 7, at + 10)) : [];
   if (!pose.every(Number.isFinite) || pose.slice(3).every((x) => x === 0) || !centre.every(Number.isFinite))
-    throw new RangeError('Mounted drop receiver has no live body pose. Use a live body row.');
+    throw filmError('unsupported', 'Mounted drop receiver has no live body pose. Use a live body row.');
   return [...pose, ...port.cell, port.tick, ...centre];
 }
 
@@ -135,7 +147,10 @@ export function sweepReceiver(
   cellSize: number,
 ): ReceiverSweep {
   if (after[10]! <= before[10]!)
-    throw new RangeError('Mounted-drop pose did not advance. Step the rigid solver before its staggered flight.');
+    throw filmError(
+      'unsupported',
+      'Mounted-drop pose did not advance. Step the rigid solver before its staggered flight.',
+    );
   const q = rotation(before);
   const endRotation = rotation(after);
   const cell: V3 = [after[7]!, after[8]!, after[9]!];
@@ -159,7 +174,10 @@ export function sweepReceiver(
     q[0] * endRotation[0] + q[1] * endRotation[1] + q[2] * endRotation[2] + q[3] * endRotation[3] < 0 ? -1 : 1;
   const rotationQuantum = 8 / 16_777_216; // Rigid poses are stored as f32 components.
   if (q.some((x, k) => Math.abs(x - sign * endRotation[k]!) > rotationQuantum))
-    throw new RangeError('Mounted drop receiver rotated during translation. Enable followRotation for its swept pose.');
+    throw filmError(
+      'unsupported',
+      'Mounted drop receiver rotated during translation. Enable followRotation for its swept pose.',
+    );
   return {
     plane: {
       ...plane,

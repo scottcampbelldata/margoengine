@@ -108,6 +108,7 @@ export interface ThinFilmLoadOptions {
     readonly impacts?: FieldDescriptor;
     readonly waveSources?: boolean;
     readonly drops?: boolean;
+    readonly threads?: number;
     readonly signal?: AbortSignal;
 }
 
@@ -150,6 +151,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     readonly dropsField: FieldDescriptor;
     private constructor();
     static load({ signal, ...options }?: ThinFilmLoadOptions): Promise<ThinFilmSolver>;
+    [Symbol.dispose](): void;
     describe(): {
         id: string;
         fields: readonly FieldUse[];
@@ -167,6 +169,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     surfaceGeometry(): ThinFilmSurfaceGeometry;
     get heldDripVolume(): number;
     get budget(): ThinFilmBudget;
+    workCounts(): ThinFilmWorkCounts;
 }
 
 export interface ThinFilmSurfaceGeometry {
@@ -174,6 +177,20 @@ export interface ThinFilmSurfaceGeometry {
     readonly normals: Float32Array;
     readonly uvs: Float32Array;
     readonly indices: Uint32Array;
+}
+
+export interface ThinFilmWorkCounts extends ThinFilmWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly ThinFilmWorkerWork[];
+}
+
+export interface ThinFilmWorkerWork {
+    readonly matrixProducts: number;
+    readonly transposeRows: number;
+    readonly pressureRows: number;
+    readonly gradientFaces: number;
+    readonly pressurePairs: number;
+    readonly gradientPairs: number;
 }
 
 // Not exported from this entry, but used by the exports above:

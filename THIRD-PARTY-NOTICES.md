@@ -666,3 +666,7 @@ Its figures, PDF, fitted curves and software are absent from the package.
 ### SEA-15 experimental jet scour profiles
 
 `packages/physics/scripts/sea15-jet-scour-measured.mjs` includes six derived volumes from ultrasonic crater profiles H12_7 and H12_8 in Figure 9. Radial geometric integration and readout-resolution sensitivity produce these values. The original data are Ahmad Mohamadiyeh, Jeffrey Peakall, Michael Fairweather, Martyn Barnes and Timothy N. Hunter (2026), *Data associated with Impinging jet erosion of granular sediments*, © 2026 University of Leeds. The source arrays and implementations are absent. [Dataset DOI](https://doi.org/10.5518/1730) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) · [Article](https://doi.org/10.1002/aic.70336)
+
+### FLUID-07 inclined silicone-oil drop measurements
+
+`packages/physics/scripts/fluid07-sliding-drop-measured.mjs` records two sparse numerical markers and their readout bands from Figure 7 of Nolwenn Le Grand, Adrian Daerr and Laurent Limat (2005), *Shape and motion of drops sliding down an inclined plane*. The inclination and speed conversions and the production diagnostic are original. The paper, figure, source arrays and implementations are absent. [Article](https://doi.org/10.1017/S0022112005006105)

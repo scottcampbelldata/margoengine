@@ -891,6 +891,44 @@ class Impacts {
   }
 }
 
+test('ThinFilmSolver: an overflowing pressure wave leaves every accepted film region unchanged', async () => {
+  const setup = async (speed) => {
+    const source = new Impacts();
+    source.step = ({ tick }) => {
+      const out = regionWords(source.memory, source.region);
+      out.fill(0);
+      if (tick === 2) out.set([hit.u, hit.v, hit.radius, 1e-6, speed()]);
+    };
+    const film = await ThinFilmSolver.load({ impacts: input, waveSources: true });
+    const world = new PhysicsWorld({ rate, memory: worldMemory(false) })
+      .add(film, { cells: [8, 8], spacing: 0.04, depth: 0.0004 })
+      .add(source, {});
+    world.advance(2);
+    return { world, film };
+  };
+  let speed = Number.MAX_VALUE;
+  const trial = await setup(() => speed);
+  const control = await setup(() => hit.speed);
+  const accepted = () =>
+    trial.film
+      .stateRegions()
+      .map((region) => new Uint8Array(trial.world.memory.buffer, region.byteOffset, region.byteLength).slice());
+  const before = accepted();
+  const workBefore = trial.film.workCounts();
+  assert.throws(() => trial.world.advance(3), {
+    code: 'failed',
+    name: 'MargoError',
+    message: /impact waves overflowed.*Reduce the wet area, rain rate or impact scale.*#thin-film-flow/,
+  });
+  assert.deepEqual(accepted(), before);
+  assert.deepEqual(trial.film.workCounts(), workBefore);
+  speed = hit.speed;
+  trial.world.advance(3);
+  control.world.advance(3);
+  assert.equal(trial.film.budget.impacts, 1e-6);
+  assert.equal(trial.world.hash(), control.world.hash());
+});
+
 test('ThinFilmSolver: an absorbed off-centre impact delivers one rigid impulse and torque', async () => {
   await Physics.load();
   const dt = 1 / rate.num;
@@ -948,7 +986,7 @@ test('ThinFilmSolver: one impact pulse has one momentum receiver', async () => {
   await assert.rejects(
     () => ThinFilmSolver.load({ rigid: true, impactRecoil: true, impacts: input, waveSources: true }),
     {
-      code: 'PHYSICS_INPUT_RANGE',
+      code: 'unsupported',
       message: /omit waveSources/,
     },
   );

@@ -1,4 +1,4 @@
-import { MargoError } from '@margoengine/math/errors';
+import { filmError } from './errors.js';
 import type { FlowSample, Precipitation, PrecipitationSample, Wind } from '@margoengine/math/fields';
 import { hypot, sin } from '@margoengine/math/pinned';
 import { WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS } from '../sea/wake.js';
@@ -22,10 +22,17 @@ import {
   type ThinFilmDripOutlet,
 } from './drips.js';
 import { FILM_IMPACT_WORDS, FILM_SWEPT_IMPACT_LAYOUT, FILM_SWEPT_IMPACT_WORDS } from './drop-receiver.js';
-import { bindThinFilmKernel, loadThinFilmBuilds, type ThinFilmBuilds, type ThinFilmKernel } from './kernel.js';
+import {
+  bindThinFilmKernel,
+  loadThinFilmBuilds,
+  type ThinFilmBuilds,
+  type ThinFilmKernel,
+  type ThinFilmWorkCounts,
+} from './kernel.js';
 import { makeFilmSurface, type ThinFilmSurfaceGeometry } from './surface.js';
 
 export { FILM_DROP_WORDS, type ThinFilmDripOutlet } from './drips.js';
+export type { ThinFilmWorkCounts, ThinFilmWorkerWork } from './kernel.js';
 export {
   FILM_FLIGHT_WORDS,
   ThinFilmDropFlight,
@@ -74,6 +81,8 @@ export interface ThinFilmLoadOptions {
   readonly waveSources?: boolean;
   /** Publish geometrically placed detached droplets from circular drains. Defaults to false. */
   readonly drops?: boolean;
+  /** Native matrix participants, including the caller. Choose 1 (default), 2 or 4. */
+  readonly threads?: number;
   readonly signal?: AbortSignal;
 }
 
@@ -205,6 +214,8 @@ interface FilmState {
     readonly entries: readonly PreparedOutlet[];
     readonly held: Region;
     readonly events: Region;
+    readonly nextHeld: Float64Array;
+    readonly nextEvents: Float64Array;
   };
   readonly regions: readonly Region[];
 }
@@ -226,13 +237,13 @@ interface ImpactRecoil {
 
 function number(label: string, value: number, min = -Infinity): number {
   if (!(Number.isFinite(value) && value >= min))
-    throw new RangeError(`Invalid thin-film ${label}. Use a finite value at least ${min}.`);
+    throw filmError('unsupported', `Invalid thin-film ${label}. Use a finite value at least ${min}.`);
   return value;
 }
 
 function positive(label: string, value: number): number {
   if (!(Number.isFinite(value) && value > 0))
-    throw new RangeError(`Invalid thin-film ${label}. Use a positive finite value.`);
+    throw filmError('unsupported', `Invalid thin-film ${label}. Use a positive finite value.`);
   return value;
 }
 
@@ -245,44 +256,39 @@ function wettingConstants(
 ): { readonly uniform: Vec2; readonly cells?: Float64Array; readonly contact?: Vec2 } | undefined {
   if (wetting === undefined) {
     if (angleMap !== undefined || hysteresis !== undefined)
-      throw Object.assign(
-        new RangeError('Thin-film wetting modifiers need a precursor. Set wetting with the map or hysteresis.'),
-        { code: 'PHYSICS_INPUT_RANGE' },
+      throw filmError(
+        'unsupported',
+        'Thin-film wetting modifiers need a precursor. Set wetting with the map or hysteresis.',
       );
     return undefined;
   }
   if (!wetting || typeof wetting !== 'object')
-    throw Object.assign(
-      new TypeError('Invalid thin-film wetting options. Pass an object with contactAngle and precursorDepth.'),
-      { code: 'PHYSICS_INPUT_TYPE' },
+    throw filmError(
+      'unsupported',
+      'Invalid thin-film wetting options. Pass an object with contactAngle and precursorDepth.',
     );
   const { contactAngle, precursorDepth } = wetting;
   if (!(Number.isFinite(precursorDepth) && precursorDepth > 0))
-    throw Object.assign(new RangeError('Invalid thin-film wetting depth. Use a positive resolved precursor depth.'), {
-      code: 'PHYSICS_INPUT_RANGE',
-    });
+    throw filmError('unsupported', 'Invalid thin-film wetting depth. Use a positive resolved precursor depth.');
   const stiffness = (angle: number) => {
     if (!(Number.isFinite(angle) && angle >= 0 && angle < Math.PI / 2))
-      throw Object.assign(
-        new RangeError('Invalid thin-film wetting angle. Use a finite contact angle from zero to less than π/2.'),
-        { code: 'PHYSICS_INPUT_RANGE' },
+      throw filmError(
+        'unsupported',
+        'Invalid thin-film wetting angle. Use a finite contact angle from zero to less than π/2.',
       );
     const slope = (2 * sin(angle * 0.5)) / precursorDepth;
     const value = tension * slope * slope;
     if (!Number.isFinite(value))
-      throw Object.assign(
-        new RangeError('Thin-film wetting stiffness overflowed. Increase the resolved precursor depth.'),
-        { code: 'PHYSICS_INPUT_RANGE' },
-      );
+      throw filmError('unsupported', 'Thin-film wetting stiffness overflowed. Increase the resolved precursor depth.');
     return value;
   };
   const fallback = stiffness(contactAngle);
   let contact: Vec2 | undefined;
   if (hysteresis !== undefined) {
     if (hysteresis?.length !== 2 || !(hysteresis[0] <= contactAngle && contactAngle <= hysteresis[1]))
-      throw Object.assign(
-        new RangeError('Invalid thin-film hysteresis. Use receding and advancing angles that bracket equilibrium.'),
-        { code: 'PHYSICS_INPUT_RANGE' },
+      throw filmError(
+        'unsupported',
+        'Invalid thin-film hysteresis. Use receding and advancing angles that bracket equilibrium.',
       );
     const receding = stiffness(hysteresis[0]);
     const advancing = stiffness(hysteresis[1]);
@@ -290,18 +296,15 @@ function wettingConstants(
   }
   if (angleMap === undefined) return { uniform: [precursorDepth, fallback], contact };
   if (angleMap?.length !== count)
-    throw Object.assign(
-      new RangeError('Invalid thin-film wetting map. Pass one angle in radians per row-major film cell.'),
-      { code: 'PHYSICS_INPUT_RANGE' },
-    );
+    throw filmError('unsupported', 'Invalid thin-film wetting map. Pass one angle in radians per row-major film cell.');
   const cells = new Float64Array(count);
   for (let i = 0; i < count; i++) {
     const angle = angleMap[i];
     cells[i] = angle === undefined ? fallback : stiffness(angle);
     if (hysteresis && angle !== undefined && (angle < hysteresis[0] || angle > hysteresis[1]))
-      throw Object.assign(
-        new RangeError('A thin-film wetting angle lies outside its hysteresis interval. Bracket every backing angle.'),
-        { code: 'PHYSICS_INPUT_RANGE' },
+      throw filmError(
+        'unsupported',
+        'A thin-film wetting angle lies outside its hysteresis interval. Bracket every backing angle.',
       );
   }
   return { uniform: [precursorDepth, 0], cells, contact };
@@ -309,13 +312,13 @@ function wettingConstants(
 
 function size(label: string, value: number, min = 1): number {
   if (!(Number.isSafeInteger(value) && value >= min))
-    throw new RangeError(`Invalid thin-film ${label}. Use a whole number at least ${min}.`);
+    throw filmError('unsupported', `Invalid thin-film ${label}. Use a whole number at least ${min}.`);
   return value;
 }
 
-function vector(label: string, value: Vec3): Vec3 {
-  if (value?.length !== 3 || !value.every(Number.isFinite))
-    throw new RangeError(`Invalid thin-film ${label}. Use three finite coordinates.`);
+function vector(label: string, value: Vec3 | undefined): Vec3 {
+  if (value?.length !== 3 || !Number.isFinite(value[0]) || !Number.isFinite(value[1]) || !Number.isFinite(value[2]))
+    throw filmError('unsupported', `Invalid thin-film ${label}. Use three finite coordinates.`);
   return [value[0], value[1], value[2]];
 }
 
@@ -382,15 +385,22 @@ function gridInput(
   if (!port) return undefined;
   const r = port.region;
   if (r.layout !== layout || (r.type !== 'f64' && (!allowScalar || r.type !== 'f32')))
-    throw new RangeError(`Invalid thin-film ${descriptor.name} layout. Use a layout-${layout} numeric field.`);
-  const values = regionWords(s.memory, r);
+    throw filmError(
+      'unsupported',
+      `Invalid thin-film ${descriptor.name} layout. Use a layout-${layout} numeric field.`,
+    );
+  const values = regionWords(r.memory ?? s.memory, r);
   if (allowScalar ? values.length !== 1 && values.length !== s.count : values.length % stride !== 0)
-    throw new RangeError(`Invalid thin-film ${descriptor.name} rows. Use the documented layout and patch dimensions.`);
+    throw filmError(
+      'unsupported',
+      `Invalid thin-film ${descriptor.name} rows. Use the documented layout and patch dimensions.`,
+    );
   return values;
 }
 
 /** Conservative thin liquid films on a substrate, including a panel mounted on a moving rigid body. */
 export class ThinFilmSolver implements Solver<ThinFilmOptions> {
+  private stepping = false;
   /** Layout-1 UV, substrate, depth and drip rate. */
   readonly filmField: FieldDescriptor;
   /** Layout-1 cell discharge to drains in m³/s. */
@@ -411,6 +421,8 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     velocity: [0, 0, 0],
   };
   private state?: FilmState;
+  private work?: ThinFilmWorkCounts;
+  private disposed = false;
 
   private constructor(
     private readonly builds: ThinFilmBuilds,
@@ -434,13 +446,11 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       centring: 'particle',
     });
     if (options.rainField && options.rainField.name === options.impacts?.name)
-      throw new RangeError('Repeated thin-film inputs. Use different names for rain and impacts.');
+      throw filmError('unsupported', 'Repeated thin-film inputs. Use different names for rain and impacts.');
     if (options.impactRecoil && (!options.rigid || !options.impacts || options.waveSources))
-      throw Object.assign(
-        new RangeError(
-          'Thin-film impact recoil needs one mounted impulse receiver. Load with rigid and impacts, and omit waveSources.',
-        ),
-        { code: 'PHYSICS_INPUT_RANGE' },
+      throw filmError(
+        'unsupported',
+        'Thin-film impact recoil needs one mounted impulse receiver. Load with rigid and impacts, and omit waveSources.',
       );
     this.loadsMount = Boolean(options.hydrostaticLoad || options.impactRecoil);
     this.fields = [
@@ -457,7 +467,26 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
 
   /** Load only this optional entry's SIMD module. */
   static async load({ signal, ...options }: ThinFilmLoadOptions = {}): Promise<ThinFilmSolver> {
-    return new ThinFilmSolver(await loadThinFilmBuilds(signal), options);
+    const builds = await loadThinFilmBuilds(signal, options.threads ?? 1);
+    try {
+      return new ThinFilmSolver(builds, options);
+    } catch (cause) {
+      builds[Symbol.dispose]();
+      throw cause;
+    }
+  }
+
+  /** Release the optional native workers after a world has finished using this solver. */
+  [Symbol.dispose](): void {
+    if (this.disposed) return;
+    if (this.stepping)
+      throw filmError('state', 'Thin-film transport is running. Release its native workers between world steps.');
+    this.disposed = true;
+    try {
+      this.state?.kernel[Symbol.dispose]();
+    } finally {
+      this.builds[Symbol.dispose]();
+    }
   }
 
   describe() {
@@ -465,12 +494,26 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
   }
 
   init(host: SolverHost, opts: ThinFilmOptions): void {
-    if (this.state) throw new MargoError('state', 'ThinFilmSolver already belongs to a world. Load another solver.');
+    if (this.disposed) throw filmError('disposed', 'This thin-film solver is closed. Load a new solver.');
+    if (this.state) throw filmError('state', 'ThinFilmSolver already belongs to a world. Load another solver.');
+    try {
+      this.initFilm(host, opts);
+    } catch (cause) {
+      if ((this.options.threads ?? 1) > 1) this[Symbol.dispose]();
+      throw cause;
+    }
+  }
+
+  private initFilm(host: SolverHost, opts: ThinFilmOptions): void {
+    if (opts?.cells?.length !== 2)
+      throw filmError('unsupported', 'ThinFilmSolver needs a rectangular patch. Supply both cell counts.');
     const nx = size('column count', opts.cells[0]);
     const ny = size('row count', opts.cells[1]);
     const count = size('total cells', nx * ny);
     const spacing = positive('cell spacing', opts.spacing);
     const area = positive('cell area', spacing * spacing);
+    positive('patch width', nx * spacing);
+    positive('patch height', ny * spacing);
     const cellSize = positive('origin cell size', opts.originCellSize ?? 4096);
     const origin = vector('surface origin', opts.origin ?? ORIGIN);
     const u = unit('u tangent', opts.u ?? [1, 0, 0]);
@@ -478,34 +521,38 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     const v = unit('orthogonal v tangent', minus(rawV, scale(u, dot(u, rawV))));
     const bodyRow = opts.bodyRow === undefined ? undefined : size('body row', opts.bodyRow, 0);
     if (this.loadsMount && bodyRow === undefined)
-      throw new MargoError('state', 'Thin-film body loads need a mount. Load with rigid: true and pass a body row.');
+      throw filmError('state', 'Thin-film body loads need a mount. Load with rigid: true and pass a body row.');
     if (
       (this.options.rigid !== undefined && this.options.rigid !== (bodyRow !== undefined)) ||
       (bodyRow !== undefined && !this.options.rigid)
     )
-      throw new RangeError('Thin-film mounting needs a rigid body row. Load with rigid true and pass bodyRow.');
+      throw filmError(
+        'unsupported',
+        'Thin-film mounting needs a rigid body row. Load with rigid true and pass bodyRow.',
+      );
     if (opts.precipitation && (opts.rainRate !== undefined || this.options.rainField))
-      throw new RangeError('Repeated thin-film rain sources. Use precipitation, a scalar rate or a registry field.');
+      throw filmError(
+        'unsupported',
+        'Repeated thin-film rain sources. Use precipitation, a scalar rate or a registry field.',
+      );
     if (opts.rainRate !== undefined && this.options.rainField)
-      throw new RangeError('Repeated thin-film rain sources. Use a scalar rate or the registry field.');
+      throw filmError('unsupported', 'Repeated thin-film rain sources. Use a scalar rate or the registry field.');
     const rain = number('rain rate', opts.rainRate ?? 0, 0);
     const density = positive('density', opts.density ?? 998);
     const airFriction = number('air friction', opts.airFriction ?? 0.003, 0);
     const shear: Vec2 = [number('u shear', opts.shear?.[0] ?? 0), number('v shear', opts.shear?.[1] ?? 0)];
     const drains = [...(opts.drains ?? [false, false, false, false])];
     if (drains.length !== 4 || drains.some((edge) => typeof edge !== 'boolean'))
-      throw new RangeError('Invalid thin-film drains. Pass four booleans in u-low, u-high, v-low, v-high order.');
+      throw filmError(
+        'unsupported',
+        'Invalid thin-film drains. Pass four booleans in u-low, u-high, v-low, v-high order.',
+      );
     const surfaceTension = number('surface tension', opts.surfaceTension ?? 0.0728, 0);
     const suspended = opts.suspended ?? false;
     if (suspended && surfaceTension === 0)
-      throw Object.assign(
-        new RangeError('Suspended thin films need capillary pressure. Use positive surface tension.'),
-        { code: 'PHYSICS_INPUT_RANGE' },
-      );
+      throw filmError('unsupported', 'Suspended thin films need capillary pressure. Use positive surface tension.');
     if (Boolean(this.options.drops) !== Boolean(opts.outlets?.length))
-      throw Object.assign(new RangeError('Thin-film outlets need drops: true at load and at least one open rim.'), {
-        code: 'PHYSICS_INPUT_RANGE',
-      });
+      throw filmError('unsupported', 'Thin-film outlets need drops: true at load and at least one open rim.');
     const entries = opts.outlets?.length
       ? prepareOutlets(opts.outlets, {
           nx,
@@ -518,9 +565,9 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
         })
       : undefined;
     if (opts.contactAngleHysteresis !== undefined && opts.pinning)
-      throw Object.assign(
-        new RangeError('Two thin-film retention laws were selected. Remove pinning when using contact angles.'),
-        { code: 'PHYSICS_INPUT_RANGE' },
+      throw filmError(
+        'unsupported',
+        'Two thin-film retention laws were selected. Remove pinning when using contact angles.',
       );
     const wettingValues = wettingConstants(
       opts.wetting,
@@ -543,7 +590,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       (typeof initialDepth !== 'number' && initialDepth !== undefined && initialDepth.length !== count) ||
       (opts.substrate && opts.substrate.length !== count)
     )
-      throw new RangeError('Invalid thin-film grid values. Use one element per grid cell.');
+      throw filmError('unsupported', 'Invalid thin-film grid values. Use one element per grid cell.');
     const allocate = (name: string, length: number, layout = THIN_FILM_LAYOUT) =>
       host.allocate(name, size('allocation bytes', F64 * length), 'f64', layout);
     const constants = allocate('properties', constantsValues.length);
@@ -574,6 +621,8 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       entries,
       held: allocate('drip-outlet-water', 3 + entries.length),
       events: allocate('detached-drops', FILM_DROP_WORDS * entries.length),
+      nextHeld: new Float64Array(3 + entries.length),
+      nextEvents: new Float64Array(FILM_DROP_WORDS * entries.length),
     };
     const kernel = bindThinFilmKernel(host, this.builds);
     const s: FilmState = {
@@ -648,13 +697,17 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       bases[i] = number('substrate height', opts.substrate?.[i] ?? 0);
       initial += h * area;
     }
+    if (!Number.isFinite(initial))
+      throw filmError('unsupported', 'The initial film volume overflowed. Reduce the patch area or initial depth.');
     words(s, budget).set([initial, 0, 0, 0, 0, initial, 0]);
     this.writeRecords(s);
+    this.work = s.kernel.workCounts();
     this.state = s;
   }
 
   private live(): FilmState {
-    if (!this.state) throw new MargoError('state', 'ThinFilmSolver is not initialized. Add it to a PhysicsWorld.');
+    if (this.disposed) throw filmError('disposed', 'This thin-film solver is closed. Load a new solver.');
+    if (!this.state) throw filmError('state', 'ThinFilmSolver is not initialized. Add it to a PhysicsWorld.');
     return this.state;
   }
 
@@ -668,10 +721,14 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       const region = rigid.region;
       const at = s.bodyRow! * BODY_WORDS;
       if (region.type !== 'f32' || region.layout !== REGISTRY_BODY_LAYOUT || region.byteLength < (at + BODY_WORDS) * 4)
-        throw new RangeError('Invalid thin-film body port. Use the layout-2 rigid body and a valid row.');
-      const a = regionWords(s.memory, region);
+        throw filmError('unsupported', 'Invalid thin-film body port. Use the layout-2 rigid body and a valid row.');
+      const a = regionWords(region.memory ?? s.memory, region);
       const q: Orientation = [a[at + 3]!, a[at + 4]!, a[at + 5]!, a[at + 6]!];
-      if (q.every((x) => x === 0)) throw new RangeError('Thin-film body row has no rigid body. Pass a live body row.');
+      if (q.every((x) => x === 0))
+        throw filmError('unsupported', 'Thin-film body row has no rigid body. Pass a live body row.');
+      const squared = q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3];
+      if (!Number.isFinite(squared) || Math.abs(squared - 1) > 2e-6)
+        throw filmError('unsupported', 'Thin-film body rotation is invalid. Publish a valid unit body quaternion.');
       origin = plus(shift([a[at]!, a[at + 1]!, a[at + 2]!], rigid.cell, context.cell, s.cellSize), rotate(q, origin));
       center = shift([a[at + 7]!, a[at + 8]!, a[at + 9]!], rigid.cell, context.cell, s.cellSize);
       u = rotate(q, u);
@@ -679,6 +736,11 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       velocity = [a[at + 10]!, a[at + 11]!, a[at + 12]!];
       angular = [a[at + 13]!, a[at + 14]!, a[at + 15]!];
     }
+    if (![origin, center, u, v, velocity, angular].every((value) => value.every(Number.isFinite)))
+      throw filmError(
+        'failed',
+        'The thin-film mount exceeds numerical range. Use finite local coordinates and speeds.',
+      );
     return { origin, u, v, n: cross(u, v), center, velocity, angular };
   }
 
@@ -694,6 +756,8 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     if (s.wind) {
       const p = shift(middle, context.cell, s.wind.cell, s.cellSize);
       const sample = s.wind.sample(...p, context.tick * dt, this.windSample);
+      if (!sample)
+        throw filmError('failed', 'The thin-film wind sample is missing. Return velocity, density and temperature.');
       const air = minus(vector('wind velocity', sample.velocity), velocity);
       const slipU = dot(air, frame.u);
       const slipV = dot(air, frame.v);
@@ -720,6 +784,11 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     const location = position(frame, u, v);
     const query = shift(location, context.cell, weather.cell, s.cellSize);
     const sample = weather.sample(...query, context.tick * dt, this.rainSample);
+    if (!sample?.rain)
+      throw filmError(
+        'failed',
+        'The thin-film rain sample is missing. Return velocity and the liquid precipitation record.',
+      );
     const velocity = plus(frame.velocity, cross(frame.angular, minus(location, frame.center)));
     const relative = minus(vector('rain velocity', sample.velocity), velocity);
     const inward = Math.max(0, -dot(relative, frame.n));
@@ -797,7 +866,10 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     );
     if (!impacts) return { added: 0, tick: last };
     if (published.cell.some((value, i) => value !== context.cell[i]))
-      throw new RangeError('Thin-film impacts have a different cell. Use the film patch cell for its local UV rows.');
+      throw filmError(
+        'unsupported',
+        'Thin-film impacts have a different cell. Use the film patch cell for its local UV rows.',
+      );
     const density = words(s, s.constants)[1]!;
     const h = words(s, s.depth);
     let added = 0;
@@ -812,9 +884,9 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       const inward = number('impact speed', impacts[i + 4]!, 0);
       const normal: Vec3 = swept ? [impacts[i + 5]!, impacts[i + 6]!, impacts[i + 7]!] : frame.n;
       if (swept && !(Math.abs(dot(normal, normal) - 1) <= 64 * Number.EPSILON))
-        throw new RangeError('Invalid swept impact normal. You must publish a unit normal in world axes.');
+        throw filmError('unsupported', 'Invalid swept impact normal. You must publish a unit normal in world axes.');
       if (u > s.spacing * s.nx || v > s.spacing * s.ny)
-        throw new RangeError('Thin-film impact is outside the patch. Use coordinates inside the UV extent.');
+        throw filmError('unsupported', 'Thin-film impact is outside the patch. Use coordinates inside the UV extent.');
       const j = this.spread(s, rates, u, v, r, volume / (s.area * dt));
       added += volume;
       if (this.options.impactRecoil && inward > 0) {
@@ -823,7 +895,8 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
           ? [impacts[i + 8]!, impacts[i + 9]!, impacts[i + 10]!]
           : minus(position(frame, u, v), frame.center);
         if (!lever.every(Number.isFinite))
-          throw new RangeError(
+          throw filmError(
+            'unsupported',
             'Invalid swept impact lever arm. You must publish a finite offset from the body centre.',
           );
         force = plus(force, reaction);
@@ -850,6 +923,19 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
 
   step(context: StepContext, dt: number): void {
     const s = this.live();
+    if (this.stepping)
+      throw filmError('state', 'Thin-film transport is already stepping. Keep weather queries free of world steps.');
+    if (!Number.isFinite(dt) || dt <= 0)
+      throw filmError('unsupported', 'The film step is invalid. Advance it with a finite positive world interval.');
+    this.stepping = true;
+    try {
+      this.advanceFilm(s, context, dt);
+    } finally {
+      this.stepping = false;
+    }
+  }
+
+  private advanceFilm(s: FilmState, context: StepContext, dt: number): void {
     const f = this.frame(s, context);
     const velocity = this.forcing(s, f, context, dt);
     const rates = this.fillRain(s, f, context, dt);
@@ -875,44 +961,66 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       Number(s.suspended),
     );
     if (status === 2)
-      throw new RangeError(
+      throw filmError(
+        'failed',
         'Thin-film pressure solve did not converge. Use scales compatible with the film approximation.',
       );
     if (status !== 0)
-      throw new RangeError(
+      throw filmError(
+        'failed',
         'Thin-film step exceeds numeric range. Use finite material values and compatible surface scales.',
       );
-    this.releaseDrops(s, f, context.cell, dt);
+    this.prepareDrops(s, f, context.cell, dt);
+    const budget = words(s, s.budget),
+      delta = words(s, s.nextBudget);
+    const totals = [
+      budget[1]! + Math.max(0, delta[0]! - impact.added),
+      budget[2]! + impact.added,
+      budget[3]! + delta[1]!,
+      budget[4]! + delta[2]!,
+      delta[3]!,
+      delta[4]!,
+    ];
+    const drips = words(s, s.nextDrips);
+    const waves = s.nextWaves && words(s, s.nextWaves);
+    if (
+      !totals.every(Number.isFinite) ||
+      !next.every(Number.isFinite) ||
+      !drips.every(Number.isFinite) ||
+      (waves && !waves.every(Number.isFinite))
+    )
+      throw filmError(
+        'failed',
+        'The film volumes or impact waves overflowed. Reduce the wet area, rain rate or impact scale.',
+      );
+    const load = this.filmLoad(s, next, f, impact.recoil);
+    const work = s.kernel.workCounts();
     h.set(next);
-    words(s, s.drips).set(words(s, s.nextDrips));
-    if (s.waves && s.nextWaves) words(s, s.waves).set(words(s, s.nextWaves));
-    const budget = words(s, s.budget);
-    const delta = words(s, s.nextBudget);
-    budget[1]! += Math.max(0, delta[0]! - impact.added);
-    budget[2]! += impact.added;
-    budget[3]! += delta[1]!;
-    budget[4]! += delta[2]!;
-    budget[5] = delta[3]!;
-    budget[6] = delta[4]!;
+    words(s, s.drips).set(drips);
+    if (s.waves && waves) words(s, s.waves).set(waves);
+    if (s.outlets) {
+      words(s, s.outlets.held).set(s.outlets.nextHeld);
+      words(s, s.outlets.events).set(s.outlets.nextEvents);
+    }
+    budget.set(totals, 1);
     words(s, s.motion).set([1, ...velocity, impact.tick]);
-    this.writeRecords(s, f, impact.recoil);
+    if (s.forces && load) words(s, s.forces).set(load, s.bodyRow! * FORCE_WORDS);
+    this.writeRecords(s);
+    this.work = work;
   }
 
-  private releaseDrops(s: FilmState, frame: Frame, cell: Cell, dt: number): void {
+  private prepareDrops(s: FilmState, frame: Frame, cell: Cell, dt: number): void {
     const outlets = s.outlets;
     if (!outlets) return;
-    const held = words(s, outlets.held);
-    const events = words(s, outlets.events);
+    const { nextHeld: held, nextEvents: events } = outlets;
+    held.set(words(s, outlets.held));
     const runoff = words(s, s.nextDrips);
     for (let i = 0; i < outlets.entries.length; i++) {
       const outlet = outlets.entries[i]!;
       const supplied = runoff[outlet.cell]! * dt;
       const count = completeDrips(held[i + 3]! + supplied, outlet.volume);
       if (!Number.isSafeInteger(count))
-        throw new MargoError(
-          'failed',
-          'Too many thin-film drops in one step. Use a larger circular rim or lower flow.',
-        );
+        throw filmError('failed', 'Too many thin-film drops in one step. Use a larger circular rim or lower flow.');
     }
     held.set(cell, 0);
     events.fill(0);
@@ -931,37 +1039,31 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       const first = Math.min(dt, Math.max(0, (outlet.volume - before) / rate));
       events.set([...at, ...velocity, outlet.volume, first, outlet.volume / rate, count], i * FILM_DROP_WORDS);
     }
+    if (!held.every(Number.isFinite) || !events.every(Number.isFinite))
+      throw filmError('failed', 'A film outlet exceeded numerical range. Reduce the water scale or mount speed.');
   }
 
-  private writeRecords(s: FilmState, frame?: Frame, recoil?: ImpactRecoil): void {
-    const out = words(s, s.cellRecords);
-    const h = words(s, s.depth);
-    const base = words(s, s.bottom);
-    const drains = words(s, s.drips);
-    const load = frame && s.forces;
-    const support = load && this.options.hydrostaticLoad;
+  private filmLoad(
+    s: FilmState,
+    depth: Float64Array,
+    frame: Frame,
+    recoil?: ImpactRecoil,
+  ): readonly number[] | undefined {
+    if (!s.forces) return undefined;
     let thickness = 0;
     let momentU = 0;
     let momentV = 0;
-    for (let y = 0; y < s.ny; y++) {
-      for (let x = 0; x < s.nx; x++) {
-        const i = x + y * s.nx;
-        const at = i * THIN_FILM_WORDS;
-        out[at] = (x + 0.5) * s.spacing;
-        out[at + 1] = (y + 0.5) * s.spacing;
-        out[at + 2] = base[i]!;
-        out[at + 3] = h[i]!;
-        out[at + 4] = drains[i]!;
-        if (support) {
-          thickness += h[i]!;
-          momentU += h[i]! * out[at]!;
-          momentV += h[i]! * out[at + 1]!;
-        }
-      }
-    }
     let force = ORIGIN;
     let torque = ORIGIN;
-    if (support && frame) {
+    if (this.options.hydrostaticLoad) {
+      for (let y = 0; y < s.ny; y++) {
+        for (let x = 0; x < s.nx; x++) {
+          const h = depth[x + y * s.nx]!;
+          thickness += h;
+          momentU += h * ((x + 0.5) * s.spacing);
+          momentV += h * ((y + 0.5) * s.spacing);
+        }
+      }
       const g = dot(s.gravity, frame.n);
       const normal = s.suspended ? g : Math.min(0, g);
       const traction = scale(frame.n, normal * words(s, s.constants)[1]! * s.area);
@@ -972,12 +1074,31 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       force = scale(traction, thickness);
       torque = cross(moment, traction);
     }
-    if (load) {
-      if (recoil) {
-        force = plus(force, recoil.force);
-        torque = plus(torque, recoil.torque);
+    if (recoil) {
+      force = plus(force, recoil.force);
+      torque = plus(torque, recoil.torque);
+    }
+    const load = [...force, ...torque];
+    if (!load.every(Number.isFinite))
+      throw filmError('failed', 'The film force or moment overflowed. Use body-local coordinates and smaller loads.');
+    return load;
+  }
+
+  private writeRecords(s: FilmState): void {
+    const out = words(s, s.cellRecords);
+    const h = words(s, s.depth);
+    const base = words(s, s.bottom);
+    const drains = words(s, s.drips);
+    for (let y = 0; y < s.ny; y++) {
+      for (let x = 0; x < s.nx; x++) {
+        const i = x + y * s.nx;
+        const at = i * THIN_FILM_WORDS;
+        out[at] = (x + 0.5) * s.spacing;
+        out[at + 1] = (y + 0.5) * s.spacing;
+        out[at + 2] = base[i]!;
+        out[at + 3] = h[i]!;
+        out[at + 4] = drains[i]!;
       }
-      words(s, load).set([...force, ...torque], s.bodyRow! * FORCE_WORDS);
     }
   }
 
@@ -1015,7 +1136,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
   sample(x: number, y: number): ThinFilmCell {
     const s = this.live();
     if (size('column', x, 0) >= s.nx || size('row', y, 0) >= s.ny)
-      throw new RangeError('Thin-film cell is outside the patch. Use a valid column and row.');
+      throw filmError('unsupported', 'Thin-film cell is outside the patch. Use a valid column and row.');
     const w = words(s, s.cellRecords);
     const i = (x + y * s.nx) * THIN_FILM_WORDS;
     return { u: w[i]!, v: w[i + 1]!, substrate: w[i + 2]!, depth: w[i + 3]!, dripRate: w[i + 4]! };
@@ -1024,7 +1145,8 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
   /** Copy the film thickness in row-major order for a render adapter or field analysis. */
   depths(out = new Float64Array(this.live().count)): Float64Array {
     const s = this.live();
-    if (out.length !== s.count) throw new RangeError('Invalid thin-film destination size. Use one word per film cell.');
+    if (out.length !== s.count)
+      throw filmError('unsupported', 'Invalid thin-film destination size. Use one word per film cell.');
     out.set(words(s, s.depth));
     return out;
   }
@@ -1058,5 +1180,12 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       stored: w[5]!,
       substeps: w[6]!,
     };
+  }
+
+  /** The matrix work of the last accepted step. This receipt is independent of physical state and snapshots. */
+  workCounts(): ThinFilmWorkCounts {
+    this.live();
+    const work = this.work!;
+    return { ...work, workers: work.workers.map((worker) => ({ ...worker })) };
   }
 }

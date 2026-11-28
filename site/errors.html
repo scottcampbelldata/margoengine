@@ -141,6 +141,11 @@
       <p><strong>Cause.</strong> A rigid body, collider, shape, scene query or world setting got an input it cannot use (code unsupported): a position, velocity, force, direction or box that is not three finite numbers (or a zero direction), a rotation that is not a quaternion of finite numbers, a mass, density, damping, size, radius, speed or time that is negative or not finite, a shape name or body type that does not exist, a body, collider or row that was removed or belongs to another world, a body of the wrong type for the call (a next velocity on a body that is not kinematicPosition), a mesh from another engine, a solver option outside its range, or a hierarchy deeper than 64 nodes.</p>
       <p><strong>Fix.</strong> Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (<code>dynamic</code>, <code>fixed</code>, <code>kinematicPosition</code>, <code>kinematicVelocity</code>), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.</p>
     </section>
+    <section id="thin-film-flow">
+      <h2><a href="#thin-film-flow">@margoengine/physics/thin-film wet surfaces, drops and receivers</a></h2>
+      <p><strong>Cause.</strong> A wetting law, film grid, wind or rain sample, moving mount, drop outlet, field layout, or implicit film solve supplied unusable data.</p>
+      <p><strong>Fix.</strong> Use finite SI material values and compatible local film scales. Match the film receiver, world clock and origin cell. Use a resolved precursor depth and contact angles within the stated wetting range. Read the accepted surface between steps.</p>
+    </section>
     <section id="water-tracers">
       <h2><a href="#water-tracers">@margoengine/physics/tracers parcel transport and sediment exchange</a></h2>
       <p><strong>Cause.</strong> A tracer source, oil spill, fluid query, bed geometry, port, or particle step supplies invalid data.</p>

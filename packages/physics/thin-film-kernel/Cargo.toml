@@ -8,6 +8,9 @@ publish = false
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+threaded = []
+
 [profile.release]
 opt-level = 3
 lto = "fat"

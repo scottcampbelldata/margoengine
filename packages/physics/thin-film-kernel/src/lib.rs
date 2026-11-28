@@ -1,6 +1,10 @@
 #![no_std]
 #![allow(unsafe_op_in_unsafe_fn)]
 
+mod matrix;
+
+use matrix::MatrixJob;
+
 use core::arch::wasm32::{
     f64x2_add, f64x2_ceil, f64x2_extract_lane, f64x2_mul, f64x2_splat, f64x2_sqrt, unreachable,
     v128, v128_load,
@@ -203,6 +207,7 @@ struct Film {
     height: *mut f64,
     base: *const f64,
     curvature: *mut f64,
+    matrix_job: *mut MatrixJob,
 }
 
 impl Film {
@@ -320,6 +325,31 @@ impl Film {
         contact_norm: *const f64,
     ) {
         let w = &self.work;
+        #[cfg(feature = "threaded")]
+        if let Some(job) = self.matrix_job.as_mut().filter(|job| job.parts > 1) {
+            *job = MatrixJob {
+                input: x,
+                result,
+                transpose: w.transpose,
+                pressure: w.cellwork,
+                weight: w.weight,
+                wetting: self.wetting_map,
+                curvature: self.curvature,
+                contact: contact_norm,
+                work: job.work,
+                n: self.grid.n,
+                cols: self.grid.cols,
+                parts: job.parts,
+                inv_dx: self.grid.inv_dx,
+                k,
+                sigma: (*self.model).surface_tension,
+                dt,
+            };
+            matrix::thin_film_join(0);
+            matrix::thin_film_join(1);
+            matrix::thin_film_join(2);
+            return;
+        }
         self.grid.gradient_transpose(x, w.weight, w.transpose);
         self.hydraulic_pressure(w.transpose, k, w.cellwork);
         if !self.wetting_map.is_null() {
@@ -344,6 +374,14 @@ impl Film {
                 };
                 *result.add(f) = *x.add(f) + factor * g * *w.weight.add(f);
             }
+        }
+        if let Some(job) = self.matrix_job.as_ref() {
+            let work = &mut *job.work;
+            let rows = self.grid.n as f64;
+            work.products += 1.0;
+            work.transpose_rows += rows;
+            work.pressure_rows += rows;
+            work.gradient_faces += 2.0 * rows;
         }
     }
 
@@ -1326,6 +1364,7 @@ unsafe extern "C" fn thin_film_step(
     wetting_map: *const f64,
     contact: *const ContactAngles,
     suspended: u32,
+    matrix_job: *mut MatrixJob,
 ) -> u32 {
     let (cols, rows) = (cols as usize, rows as usize);
     let n = cols * rows;
@@ -1352,6 +1391,7 @@ unsafe extern "C" fn thin_film_step(
         height,
         base,
         curvature,
+        matrix_job,
     }
     .step(rain, out, budget, dt)
 }

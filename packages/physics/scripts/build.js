@@ -29,7 +29,7 @@ const exposeOptionalUrls = {
     return {
       code: code
         .replace(
-          /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|cloud-projection|vegetation|wind-traction|wing-lattice|foam-transport|entry-profile|accretion|room-sound|outdoor-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|hull-slamming|flood-volume|tracer-random|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
+          /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|thin-film-kernel-threaded|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|cloud-projection|vegetation|wind-traction|wing-lattice|foam-transport|entry-profile|accretion|room-sound|outdoor-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|hull-slamming|flood-volume|tracer-random|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
           '',
         )
         .replace(
@@ -262,7 +262,7 @@ await copyFile(resolve(root, 'src/sea/wake-fft.wasm'), resolve(dist, 'wake-fft.w
 for (const name of ['loads-kernel.wasm', 'loads-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/loads', name), resolve(dist, name));
 
-for (const name of ['thin-film-kernel.wasm', 'thin-film-kernel-shared.wasm'])
+for (const name of ['thin-film-kernel.wasm', 'thin-film-kernel-shared.wasm', 'thin-film-kernel-threaded.wasm'])
   await copyFile(resolve(root, 'src/thin-film', name), resolve(dist, name));
 for (const name of ['crush-shell-kernel.wasm', 'crush-shell-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/crush', name), resolve(dist, name));

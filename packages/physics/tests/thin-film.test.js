@@ -777,18 +777,18 @@ test('ThinFilmSolver: a gated incline retains Huppert’s measured cube-root fro
 test('ThinFilmSolver: malformed wetting parameters report the range and its fix', async () => {
   const options = { cells: [4, 1], spacing: 0.001 };
   await assert.rejects(() => patch({ ...options, wetting: null }), {
-    name: 'TypeError',
-    code: 'PHYSICS_INPUT_TYPE',
+    name: 'MargoError',
+    code: 'unsupported',
     message: /Pass an object with contactAngle and precursorDepth/,
   });
   await assert.rejects(() => patch({ ...options, wetting: { contactAngle: Math.PI / 2, precursorDepth: 0.0002 } }), {
-    name: 'RangeError',
-    code: 'PHYSICS_INPUT_RANGE',
+    name: 'MargoError',
+    code: 'unsupported',
     message: /Use a finite contact angle/,
   });
   await assert.rejects(
     () => patch({ ...options, wetting: { contactAngle: 0.35, precursorDepth: 0.0002 }, wettingAngleMap: [0.5] }),
-    { name: 'RangeError', code: 'PHYSICS_INPUT_RANGE', message: /one angle in radians per row-major film cell/ },
+    { name: 'MargoError', code: 'unsupported', message: /one angle in radians per row-major film cell/ },
   );
   await assert.rejects(
     () =>
@@ -798,8 +798,8 @@ test('ThinFilmSolver: malformed wetting parameters report the range and its fix'
         contactAngleHysteresis: [0.4, 0.5],
       }),
     {
-      name: 'RangeError',
-      code: 'PHYSICS_INPUT_RANGE',
+      name: 'MargoError',
+      code: 'unsupported',
       message: /receding and advancing angles that bracket equilibrium/,
     },
   );
@@ -941,8 +941,8 @@ test('ThinFilmSolver: a pendant drop matches held-out thinning on tilted glass',
 
 test('ThinFilmSolver: a suspended film rejects removal of its restoring surface tension', async () => {
   await assert.rejects(() => patch({ cells: [4, 1], spacing: 0.001, suspended: true, surfaceTension: 0 }), {
-    name: 'RangeError',
-    code: 'PHYSICS_INPUT_RANGE',
+    name: 'MargoError',
+    code: 'unsupported',
     message: /Use positive surface tension/,
   });
 });

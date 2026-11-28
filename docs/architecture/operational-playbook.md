@@ -12142,3 +12142,7 @@ The optional Rust variant uses f64x2 pairs without changing the triangle or fan 
 ### SEA-15 native parcel diffusion and accepted plume state
 
 The optional native Wasm variants preserve each parcel's Philox key and counter and pinned Box–Muller output. A batch covers independent active rows and runs paired counter rounds with up to three native helpers. Ordered water, wind and bed samples remain on the caller. The accepted step journal retains occupied parcel rows and their ledgers. A late malformed field sample restores the tracer's accepted bytes. Node and packaged Chromium check exact state and signed-origin replay, and the cutaway checks the live release, deposit and renderer pixels. Measured static crater deficits remain outside the model's diagnostic intervals. [Bounds and evidence](../limits.md#accepted-parcels-and-independent-jet-scour-sea-15)
+
+### FLUID-07 implicit face matrix and rolling-pane acceptance
+
+The optional native matrix phase splits the same cell pressure and face operations over disjoint ranges. Global reductions keep their established order. The film validates candidate wave, water, load and detached-drop outputs before replacing accepted regions. A scoped late-overflow test checks all accepted bytes and exact retry. The directed rolling pane uses projected precipitation and sends detached drops into a second film. Two renderer paths replay its full resolved output and accepted snapshots from inside and outside. [Limits and evidence](../limits.md#accepted-film-motion-and-independent-incline-drops-fluid-07)

@@ -7066,3 +7066,7 @@ A dry compartment supplies no water head, including where the middle of a floor 
 ### SEA-15 native random walk and accepted ore plume
 
 The Rust random stage produces the same particle values and signed-origin world state as pinned TypeScript through 1, 2 and 4 participants. Packaged Chromium starts and closes three native workers and records 107,450 paired Philox rounds. A live cargo hold drives the accepted taconite deposit and fine plume, with a sealed hold as control and exact frame replay on each renderer. Both independent submerged-jet crater volume checks miss. [Evidence and limits](../limits.md#accepted-parcels-and-independent-jet-scour-sea-15)
+
+### FLUID-07 native film matrix and rolling-pane rain
+
+Native ranges apply the existing face matrix with exact published state at 1, 2 and 4 participants. The final packaged tick records 2,137 face matrix products and 2,169,055 paired gradient operations with three helpers. Before any film output is replaced, the step validates the pressure wave, cumulative volumes, mounted force and timed outlet events. A rolling pane intercepts oblique rain, drains after cutoff and releases actual drops into a lower film. Both renderers replay accepted state and complete resolved images from each camera. Steady partial-wetting drop speed remains unvalidated in the independent slope comparison. [Evidence and bounds](../limits.md#accepted-film-motion-and-independent-incline-drops-fluid-07)

@@ -8185,11 +8185,19 @@ rainfall, impacts, gravity, pressure, viscous shear, capillarity, drying and liq
 The first two axes define the patch in metres. Set its origin and tangents in a rigid body's local frame
 and pass a body row to move it with a window or deck.
 
+`ThinFilmSolver.load({threads, signal})` defaults to one native participant. Choose `threads: 2` or `4`
+with a shared-memory world to split the existing implicit film matrix across the caller and helpers.
+Run multiple participants in Node or a cross-origin-isolated browser worker. `workCounts()` copies the matrix work of
+the last accepted step. Keep the solver alive while the world uses it, and release it with `using`.
+
+Out-of-range settings and rejected steps give a [coded error](https://margoengine.com/errors#thin-film-flow)
+with a fix. A numerical failure preserves accepted depths, drainage, loads, wave outputs and timed drops.
+
 ```ts
 import { PhysicsWorld } from '@margoengine/physics/world';
 import { ThinFilmSolver } from '@margoengine/physics/thin-film';
 
-const film = await ThinFilmSolver.load();
+using film = await ThinFilmSolver.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(film, {
   cells: [4, 6],
   spacing: 0.04,
@@ -8204,6 +8212,7 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(film, {
 world.advance(60);
 const surface = film.surfaceGeometry();
 console.log(film.budget.dripped, film.sample(0, 5).depth, surface.indices.length);
+console.log(film.workCounts().threads); // 1 with the default load options
 ```
 
 Set `wetting` for a partially wetting surface. Enter the equilibrium contact angle in radians and

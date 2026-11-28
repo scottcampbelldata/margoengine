@@ -141,6 +141,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'thin-film-flow',
+    title: '@margoengine/physics/thin-film wet surfaces, drops and receivers',
+    kind: 'family',
+    messages: [],
+    cause: 'A wetting law, film grid, wind or rain sample, moving mount, drop outlet, field layout, or implicit film solve supplied unusable data.',
+    fix: 'Use finite SI material values and compatible local film scales. Match the film receiver, world clock and origin cell. Use a resolved precursor depth and contact angles within the stated wetting range. Read the accepted surface between steps.',
+  },
+  {
     id: 'water-tracers',
     title: '@margoengine/physics/tracers parcel transport and sediment exchange',
     kind: 'family',

@@ -5242,3 +5242,16 @@ node scripts/run-with-timeout.mjs --max=2 -- node packages/physics/scripts/sea15
 ```
 
 The measured tank diagnostic runs `TracerSolver` over a live `TerrainBed`. Independently published nozzle discharge, diameter, bed thickness and grain size drive the two cases. The held-out ultrasonic profiles enter only the comparison. Measured final net crater deficits are distinct from the model's cumulative, repeat-counting lifted mass. The model misses both profile-derived deficits under the recorded sensitivity and grid spacing checks. [Primary experiment](https://doi.org/10.1002/aic.70336) · [Open University of Leeds data](https://doi.org/10.5518/1730)
+
+### FLUID-07 implicit film and directed rain
+
+```sh
+node --test packages/physics/tests/thin-film.test.js packages/physics/tests/coupling/thin-film.test.js
+node --test packages/physics/tests/coupling/thin-film-workers.test.js
+npm run test:gpu:thin-film-workers -w @margoengine/physics
+npm run test:browser:thin-film -w @margoengine/physics
+node scripts/run-with-timeout.mjs --max=4 -- node packages/physics/scripts/fluid07-sliding-drop-measured.mjs low 0.5
+node scripts/run-with-timeout.mjs --max=6 -- node packages/physics/scripts/fluid07-sliding-drop-measured.mjs high 0.5
+```
+
+The directed rain test reads physical precipitation and follows the rigid pane, accepted film, timed rim events and detached flight into a separate film. The seeded runnel and glazing controls remain. The directed scene compares every accepted snapshot byte and resolved RGBA through hold, restore, re-advance and rewind from inside and outside on each renderer. The inclined-drop diagnostic treats the two Le Grand et al. Figure 7 marker heights as outcomes and uses separately sourced silicone oil properties and static coating angles. [Experiment](https://doi.org/10.1017/S0022112005006105)

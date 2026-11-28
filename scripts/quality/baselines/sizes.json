@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21979661,
+  "total": 21982831,
   "history": [
     {
       "date": "2026-10-24",
@@ -15779,6 +15779,12 @@
       "commit": "pending",
       "reason": "physics/crater (new entry, EARTH-06) 4,862 B gzip: craterSize and the CraterSolver digging the terrain bed. A new optional entry; core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "fluid-07-native-film-matrix",
+      "reason": "FLUID-07 @margoengine/physics/thin-film 15193 to 18253 B gzip, ceiling 15631 to 18801 B. The existing optional solver owns the finite acceptance and worker lifecycle with its port and matrix state. A separate solver would duplicate volume and mount ownership. Native modules and helpers load only when used. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16708,7 +16714,7 @@
     "@margoengine/physics/synoptic": 6633,
     "@margoengine/physics/terramechanics": 16590,
     "@margoengine/physics/thermal": 6905,
-    "@margoengine/physics/thin-film": 15631,
+    "@margoengine/physics/thin-film": 18801,
     "@margoengine/physics/tissue": 3218,
     "@margoengine/physics/tracers": 22817,
     "@margoengine/physics/tsunami": 9164,

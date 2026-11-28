@@ -1,3 +1,4 @@
+import { filmError } from './errors.js';
 import { pow } from '@margoengine/math/pinned';
 
 /** A wetted circular rim fed by one cell at an open edge. */
@@ -30,8 +31,8 @@ export interface PreparedOutlet {
   readonly volume: number;
 }
 
-function invalidOutlet(message: string): RangeError {
-  return Object.assign(new RangeError(message), { code: 'PHYSICS_INPUT_RANGE' });
+function invalidOutlet(message: string) {
+  return filmError('unsupported', message);
 }
 
 function dropVolume(diameter: number, surface: DripSurface): number {
@@ -47,17 +48,13 @@ function dropVolume(diameter: number, surface: DripSurface): number {
 
 export function prepareOutlets(outlets: readonly ThinFilmDripOutlet[], surface: DripSurface): PreparedOutlet[] {
   if (!Array.isArray(outlets))
-    throw Object.assign(new TypeError('Invalid thin-film outlets. Pass an array of circular rims.'), {
-      code: 'PHYSICS_INPUT_TYPE',
-    });
+    throw filmError('unsupported', 'Invalid thin-film outlets. Pass an array of circular rims.');
   const { nx, ny, spacing, drains } = surface;
   const edges = ['u0', 'u1', 'v0', 'v1'];
   const used = new Set<number>();
   return outlets.map((outlet) => {
     if (!outlet || typeof outlet !== 'object')
-      throw Object.assign(new TypeError('Invalid film outlet. Pass its edge, index and radius.'), {
-        code: 'PHYSICS_INPUT_TYPE',
-      });
+      throw filmError('unsupported', 'Invalid film outlet. Pass its edge, index and radius.');
     const { edge, index, radius } = outlet;
     const edgeIndex = edges.indexOf(edge);
     const acrossU = edgeIndex < 2;

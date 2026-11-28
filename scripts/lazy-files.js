@@ -186,6 +186,14 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/thin-film-kernel-threaded.wasm',
+    label: 'thin-film-kernel-threaded.wasm',
+    kind: 'Thin-film shared lead with synchronous capillary matrix barriers',
+    measure: 'file',
+    when: 'ThinFilmSolver.load() with 2 or 4 native participants',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/crush-shell-kernel.wasm',
     label: 'crush-shell-kernel.wasm',
     kind: 'Rust thin-sheet plane-stress plasticity and hinge bending',

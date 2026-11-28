@@ -75,6 +75,11 @@ type NativePhaseSolver =
       readonly subject: 'Tracer diffusion';
       readonly phaseExport: 'tracer_random_thread_phase';
       readonly phase: 'Brownian draws';
+    }
+  | {
+      readonly subject: 'Thin film';
+      readonly phaseExport: 'thin_film_thread_phase';
+      readonly phase: 'capillary matrix';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };

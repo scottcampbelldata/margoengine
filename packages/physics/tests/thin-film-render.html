@@ -12,13 +12,32 @@
   import { PostStack } from '/packages/post/dist/index.js';
   import { Tonemap } from '/packages/tonemap/dist/index.js';
   import { Physics } from '../dist/index.js';
-  import { ThinFilmSolver, ThinFilmDropFlight } from '../dist/thin-film.js';
-  import { PhysicsWorld, RigidSolver, worldMemory } from '../dist/world.js';
+  import { THIN_FILM_LAYOUT, THIN_FILM_WORDS, ThinFilmSolver, ThinFilmDropFlight } from '../dist/thin-film.js';
+  import { PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../dist/world.js';
 
   const spacing = 0.009;
   const columns = 32, rows = 36;
   const width = columns * spacing, height = rows * spacing, glassThickness = 0.006;
   const corner = [-width / 2, height / 2, -glassThickness / 2];
+  const take = new URLSearchParams(location.search);
+  const interior = take.has('interior'), storm = take.has('storm');
+  const rate = 60;
+  const onset = 12, cutoff = 80, release = 160, hold = 165;
+  const sprayDepthRate = 0.0004; // Deck spray equivalent horizontal catch in metres per second.
+  const sprayWidth = 12 * spacing;
+  const spray = {
+    cell: [0, 0, 0],
+    sample(x, _y, _z, seconds, out) {
+      const tick = Math.round(seconds * rate);
+      const present = tick >= onset && tick < cutoff && Math.abs(x) < sprayWidth / 2;
+      out.rain.rate = out.rate = present ? sprayDepthRate * 3_600_000 : 0;
+      out.rain.fallSpeed = 7;
+      out.velocity[0] = 0;
+      out.velocity[1] = -7;
+      out.velocity[2] = 7;
+      return out;
+    },
+  };
   const depth = Float64Array.from({ length: columns * rows }, (_, i) => {
     const x = i % columns, y = Math.floor(i / columns);
     const centre = 16 + 0.8 * Math.sin(y * 0.17);
@@ -26,12 +45,12 @@
     const feed = Math.max(0, 1 - Math.hypot(x - 8, (y - 13) * 0.29) / 2.5);
     return 0.0011 * runnel + 0.0007 * feed;
   });
-  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(true) });
+  const world = new PhysicsWorld({ rate: { num: rate, den: 1 }, memory: worldMemory(true) });
   await Physics.load({ threads: true });
   const physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60 });
   const pane = physics.addBody(null, {
     position: [0, 0.23, 0],
-    angularVelocity: [0.35, 0, 0],
+    angularVelocity: [storm ? 0.24 : 0.35, 0, 0],
     gravityScale: 0,
     colliders: { shape: 'box', halfExtents: [width / 2, height / 2, glassThickness / 2], mass: 2 },
   });
@@ -43,20 +62,41 @@
     spacing,
     origin: corner,
     v: [0, -1, 0],
-    depth,
+    depth: storm ? 0 : depth,
+    precipitation: storm ? spray : undefined,
     drains: [false, false, false, true],
     outlets: [{ edge: 'v1', index: 16, radius: 0.0016 }],
   });
   world.add(new RigidSolver(), { physics });
-  world.add(flight, { flightTime: 0.28 });
+  const basinCells = [14, 24], basinSpacing = 0.014;
+  const basinSize = basinCells.map(count => count * basinSpacing);
+  const basinOrigin = [-basinSize[0] / 2, -0.052, 0.052];
+  const receiver = storm ? { size: basinSize, origin: basinOrigin } : undefined;
+  world.add(flight, { flightTime: 0.28, receiver });
+  const basin = storm ? await ThinFilmSolver.load({ id: 'catch-basin', impacts: flight.impactField }) : null;
+  if (basin) world.add(basin, { cells: basinCells, spacing: basinSpacing, origin: basinOrigin });
   const start = world.takeSnapshot();
-  const interior = new URLSearchParams(location.search).has('interior');
+
   const sign = interior ? -1 : 1;
   const engine = await Engine.create(document.querySelector('canvas'), {
-    backend: 'webgpu', exactSize: interior,
+    backend: 'webgpu', exactSize: interior || storm,
     camera: { position: [0.065 * sign, 0.16, -0.73 * sign], target: [0, 0.16, 0], near: 0.05, far: 4 },
   });
   engine.stop();
+  const canvas = document.querySelector('canvas');
+  const capture = storm && engine.gpu.createTexture({
+    size: [canvas.width, canvas.height],
+    format: 'rgba8unorm',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+  });
+  const readback = storm && engine.gpu.createBuffer({
+    size: canvas.width * canvas.height * 4,
+    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+  });
+  const shotViews = storm ? [
+    { camera: engine.camera, viewport: [0, 0, 1, 1], id: 'window' },
+    { camera: engine.camera, viewport: [0, 0, 1, 1], id: 'capture', target: { color: capture } },
+  ] : undefined;
   engine.lighting.direction.set(interior ? [0.088, -0.092, 0.992, 2.4] : [0.25, 0.55, -1, 2.4]);
   engine.lighting.radiance.set([1, 0.97, 0.92, 0.28]);
   const errors = [];
@@ -83,6 +123,13 @@
   box([1.8, 1.25, 0.06], [0, 0.21, 0.39 * sign], backing);
   box([1.3, 0.04, 0.42], [0, -0.09, 0.14 * sign], metal);
   for (let i = -3; i <= 3; i++) box([0.015, 0.48, 0.045], [i * 0.093, 0.21, 0.33 * sign], rib);
+  if (basin) {
+    const [x, y, z] = basinOrigin;
+    const [w, l] = basinSize;
+    box([w, 0.012, l], [0, y - 0.006, z - l / 2], rib);
+    for (const side of [x - 0.004, x + w + 0.004]) box([0.008, 0.018, l], [side, y + 0.003, z - l / 2], metal);
+    for (const end of [z + 0.004, z - l - 0.004]) box([w + 0.016, 0.018, 0.008], [0, y + 0.003, end], metal);
+  }
   const glazing = box([width, height, glassThickness], [0, 0, 0], glass);
   const releaseGlass = (foregroundGlass ?? transmission).add(glazing);
   const frames = [
@@ -105,8 +152,10 @@
     transmission: 1, thicknessMap: thickness, ior: 1.333, roughness: 0.045,
     side: interior ? 'back' : 'front',
   });
+  const catchWater = basin ? new Material({ transmission: 1, ior: 1.333, thickness: 0.0005, roughness: 0.045 }) : null;
   const droplets = [];
   let waterMesh;
+  let catchMesh;
   function waterGeometry() {
     film.depths(floatDepths);
     water.thickness = floatDepths.reduce((deepest, value) => Math.max(deepest, value), 0);
@@ -123,13 +172,77 @@
   function clearWater() {
     waterMesh?.dispose();
     waterMesh = undefined;
+    catchMesh?.dispose();
+    catchMesh = undefined;
     while (droplets.length) {
       const [mesh, material] = droplets.pop();
       mesh.dispose();
       material.dispose();
     }
   }
-  async function draw({ wet = true, drops = true, glaze = true } = {}) {
+  function fieldVolume(solver, cells, spacing) {
+    const port = world.fields.port(solver.filmField.name);
+    if (!port || port.region.layout !== THIN_FILM_LAYOUT || port.region.type !== 'f64')
+      throw new Error('Use the accepted f64 film cell field.');
+    const accepted = regionWords(world.memory, port.region);
+    const depths = solver.depths();
+    let total = 0;
+    for (let i = 0; i < cells; i++) {
+      const depth = accepted[i * THIN_FILM_WORDS + 3];
+      if (depth !== depths[i]) throw new Error('The optical film must read the same accepted depths as its port.');
+      total += depth;
+    }
+    return total * spacing * spacing;
+  }
+
+  let tick = 0;
+  let expectedRain = 0;
+  let saved;
+  let disposed = false;
+  const recorded = new Map();
+  const beginning = { snapshot: start, tick, expectedRain };
+  function restore({ snapshot, tick: at, expectedRain: caught }) {
+    world.restoreSnapshot(snapshot.bytes);
+    tick = at;
+    expectedRain = caught;
+  }
+
+  function advanceRain(target) {
+    while (tick < target) {
+      world.advance(++tick);
+      // The shot cue is the step's start time. The rigid solver supplies the updated pane pose to the film.
+      if (tick > onset && tick <= cutoff) {
+        // Blocken and Carmeliet (2004), doi:10.1016/j.jweia.2004.06.003; catch is normal liquid flux.
+        // Rotation about X preserves wetted strip area; symmetric lever arms cancel the rotation's net normal flux.
+        const [x, , , w] = pane.rotation;
+        const norm = x * x + w * w;
+        const tilt = (2 * x * w + w * w - x * x) / norm; // projected [0,-7,7] velocity divided by its fall speed
+        expectedRain += (sprayDepthRate * sprayWidth * height * tilt) / rate;
+      }
+    }
+  }
+
+  async function renderView() {
+    await engine.render({ delta: 0, views: shotViews });
+    await engine.gpu.queue.onSubmittedWorkDone();
+  }
+
+  async function captureFrame() {
+    const { width, height } = canvas;
+    const command = engine.gpu.createCommandEncoder();
+    command.copyTextureToBuffer({ texture: capture }, { buffer: readback, bytesPerRow: width * 4 }, [width, height]);
+    engine.gpu.queue.submit([command.finish()]);
+    await readback.mapAsync(GPUMapMode.READ);
+    const pixels = new Uint8ClampedArray(readback.getMappedRange()).slice();
+    readback.unmap();
+    const encoded = document.createElement('canvas');
+    encoded.width = width;
+    encoded.height = height;
+    encoded.getContext('2d').putImageData(new ImageData(pixels, width, height), 0, 0);
+    return encoded.toDataURL('image/png').split(',')[1];
+  }
+
+  async function draw({ wet = true, drops = true, glaze = true, catchment = true } = {}) {
     clearWater();
     const position = pane.position, rotation = pane.rotation;
     glazing.root.visible = glaze;
@@ -137,6 +250,8 @@
     for (const { mesh, offset } of frames) {
       mesh.root.setPosition(rotateByQuaternion(offset, rotation).map((x, i) => x + position[i])).setQuaternion(rotation);
     }
+    // Initialize both transmission views from the same dry pane at each cut, before any water is drawn.
+    if (storm) await renderView();
     if (wet) {
       const geometry = waterGeometry();
       if (geometry.indices.length) {
@@ -154,12 +269,36 @@
         droplets.push([mesh, material]);
       }
     }
-    await engine.render({ delta: 0 });
-    await engine.gpu.queue.onSubmittedWorkDone();
+    if (basin && catchment) {
+      const geometry = basin.surfaceGeometry();
+      if (geometry.indices.length) {
+        catchMesh = createMesh(engine, geometry, catchWater);
+        transmission.add(catchMesh);
+      }
+    }
+    await renderView();
     return { hash: world.hash(), position, rotation, budget: film.budget, drops: flight.readDrops(), errors };
   }
   window.wetWindow = {
     draw,
+    captureFrame,
+    timeline: { onset, cutoff, release, hold },
+    async rainFrame({ frame, action, ...options }) {
+      // Freeze the final authored simulation tick during the edit's hold frames.
+      const target = Math.min(frame, release);
+      if (action === 'restore') restore(saved);
+      else if (target < tick) restore(beginning);
+      advanceRain(target);
+      const snapshot = world.takeSnapshot();
+      const earlier = recorded.get(tick);
+      if (earlier && (earlier.length !== snapshot.bytes.length || earlier.some((n, i) => n !== snapshot.bytes[i])))
+        throw new Error('Rewound, held and replayed pane and catchment snapshots must match exactly.');
+      recorded.set(tick, snapshot.bytes);
+      if (action === 'save') saved = { snapshot, tick, expectedRain };
+      return { ...await draw(options), tick, expectedRain, paneVolume: fieldVolume(film, columns * rows, spacing),
+        basinVolume: fieldVolume(basin, basinCells[0] * basinCells[1], basinSpacing), basin: basin.budget,
+        flight: flight.budget, landed: flight.depositedVolume };
+    },
     seek(tick) { world.restoreSnapshot(start.bytes); world.advance(tick); },
     advance() {
       for (let tick = 1; tick <= 75; tick++) {
@@ -169,10 +308,15 @@
       return 0;
     },
     dispose() {
+      if (disposed) return;
+      disposed = true;
       clearWater();
       releaseGlass();
       for (const mesh of statics) mesh.dispose();
       for (const material of [water, glass, metal, rib, backing]) material.dispose();
+      catchWater?.dispose();
+      capture && capture.destroy();
+      readback && readback.destroy();
       thickness.dispose();
       foregroundGlass?.dispose();
       transmission.dispose();

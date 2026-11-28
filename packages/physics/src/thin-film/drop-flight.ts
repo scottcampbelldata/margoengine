@@ -1,4 +1,4 @@
-import { MargoError } from '@margoengine/math/errors';
+import { filmError } from './errors.js';
 import type { FlowSample, Wind } from '@margoengine/math/fields';
 import { hypot, pow } from '@margoengine/math/pinned';
 import { MIN_DIAMETER, STANDARD_DENSITY, STANDARD_TEMPERATURE } from '../airborne/environment.js';
@@ -112,8 +112,8 @@ function range(name: string, value: number, min: number, max: number): number {
   return value;
 }
 
-function invalid(message: string): RangeError {
-  return Object.assign(new RangeError(message), { code: 'PHYSICS_INPUT_RANGE' });
+function invalid(message: string) {
+  return filmError('unsupported', message);
 }
 
 function words(s: FlightState, region: Region): Float64Array {
@@ -170,7 +170,7 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
   }
 
   init(host: SolverHost, opts: ThinFilmDropFlightOptions = {}): void {
-    if (this.state) throw new MargoError('state', 'Drop flight already belongs to a world. Make a new flight solver.');
+    if (this.state) throw filmError('state', 'Drop flight already belongs to a world. Make a new flight solver.');
     const capacity = opts.capacity ?? 256;
     if (!Number.isSafeInteger(capacity) || capacity < 1)
       throw invalid('Invalid drop flight capacity. Use a positive whole number of flying drops.');
@@ -229,7 +229,7 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
   }
 
   private live(): FlightState {
-    if (!this.state) throw new MargoError('state', 'Drop flight has no world. Add the solver before reading it.');
+    if (!this.state) throw filmError('state', 'Drop flight has no world. Add the solver before reading it.');
     return this.state;
   }
 
@@ -245,14 +245,17 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
   ): readonly number[] | undefined {
     if (interval === 0 && !s.receiver) return;
     const wind = s.wind;
-    const air =
-      wind?.sample(
-        target[at]! + 0.5 * interval * target[at + 3]! + (cell[0] - wind.cell[0]) * s.cellSize,
-        target[at + 1]! + 0.5 * interval * target[at + 4]! + (cell[1] - wind.cell[1]) * s.cellSize,
-        target[at + 2]! + 0.5 * interval * target[at + 5]! + (cell[2] - wind.cell[2]) * s.cellSize,
-        now + interval * 0.5,
-        s.windSample,
-      ) ?? s.air;
+    const air = wind
+      ? wind.sample(
+          target[at]! + 0.5 * interval * target[at + 3]! + (cell[0] - wind.cell[0]) * s.cellSize,
+          target[at + 1]! + 0.5 * interval * target[at + 4]! + (cell[1] - wind.cell[1]) * s.cellSize,
+          target[at + 2]! + 0.5 * interval * target[at + 5]! + (cell[2] - wind.cell[2]) * s.cellSize,
+          now + interval * 0.5,
+          s.windSample,
+        )
+      : s.air;
+    if (!air || air.velocity?.length !== 3 || !air.velocity.every(Number.isFinite))
+      throw invalid('Wind returned invalid drop flight velocity. Supply three finite components.');
     const drag =
       air.density === s.air.density && air.temperature === s.air.temperature
         ? s.drag
@@ -263,8 +266,6 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
             range('sampled air temperature', air.temperature, 200, 340),
             s.tension,
           );
-    if (!air.velocity.every(Number.isFinite))
-      throw invalid('Wind returned invalid drop flight velocity. Supply three finite components.');
     const rate = midpointDropDrag(target, at, interval, target[at + 7]!, s.gravity, air.velocity, drag);
     if (s.receiver) {
       const impact = sweep?.turn
@@ -302,11 +303,13 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     target[at + 8]! += interval;
     for (let i = 0; i < 6; i++)
       if (!Number.isFinite(target[at + i]))
-        throw new MargoError('failed', 'Drop flight exceeded numeric range. Use finite coordinates and wind speeds.');
+        throw filmError('failed', 'Drop flight exceeded numeric range. Use finite coordinates and wind speeds.');
   }
 
   step(context: StepContext, dt: number): void {
     const s = this.live();
+    if (!Number.isFinite(dt) || dt <= 0)
+      throw invalid('Invalid drop flight interval. Use a finite positive world step.');
     const meta = words(s, s.meta);
     const previous = words(s, s.drops);
     const next = words(s, s.candidate);
@@ -328,6 +331,8 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     let outflow = meta[4]!;
     let airborne = 0;
     const record = (impact: readonly number[]) => {
+      if (!impact.every(Number.isFinite))
+        throw filmError('failed', 'A detached drop impact overflowed. Use finite receiver geometry and slower drops.');
       pending!.set(impact, hits++ * stride);
       totalCaptured += impact[3]!;
     };
@@ -358,7 +363,7 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
       const { region, cell } = port;
       if (region.layout !== LAYOUT || region.type !== 'f64' || region.byteLength % (FILM_DROP_WORDS * BYTES) !== 0)
         throw invalid('Invalid drop flight field layout. Use the layout-1 thin-film drop records.');
-      const rows = words(s, region);
+      const rows = regionWords(region.memory ?? s.memory, region) as Float64Array;
       let emitted = 0;
       for (let i = 0; i < rows.length; i += FILM_DROP_WORDS) {
         const count = rows[i + 9]!;
@@ -384,7 +389,7 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
         const expired = receiver ? 0 : Math.max(0, Math.min(count, Math.floor((dt - s.lifetime - first) / period) + 1));
         emitted += count - expired;
         if (emitted > s.capacity || count - expired > s.capacity - live || !Number.isSafeInteger(id + count))
-          throw new MargoError(
+          throw filmError(
             'failed',
             'Too many flying drops. Increase flight capacity or reduce the flow or flight time.',
           );
@@ -418,6 +423,8 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
       }
       last = port.tick;
     }
+    if (![received, outflow, airborne, totalCaptured].every(Number.isFinite))
+      throw filmError('failed', 'The drop flight volume balance overflowed. Reduce the released volume and flow.');
     previous.set(next.subarray(0, live * FILM_FLIGHT_WORDS));
     previous.fill(0, live * FILM_FLIGHT_WORDS, meta[0]! * FILM_FLIGHT_WORDS);
     if (pending && capture) {

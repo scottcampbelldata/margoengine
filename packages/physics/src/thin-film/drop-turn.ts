@@ -1,3 +1,4 @@
+import { filmError } from './errors.js';
 import { hypot } from '@margoengine/math/pinned';
 import { conjugateQuaternion, multiplyQuaternions, rotateByQuaternion } from '@margoengine/math/quat';
 import { add, cross, dot, scale, sub } from '@margoengine/math/vec3';
@@ -168,7 +169,10 @@ export function turningImpact(
     roundoffScale = rectangleDistance * rectangleDistance;
   }
   if (!Number.isFinite(curvatureBound + roundoffScale))
-    throw new RangeError('The turning film sweep exceeds numeric range. Use finite scales and relative speeds.');
+    throw filmError(
+      'unsupported',
+      'The turning film sweep exceeds numeric range. Use finite scales and relative speeds.',
+    );
   function read(time: number): Clearance {
     const phase = (elapsed + time) / turn.step;
     const { start, difference } = turn;
