@@ -2568,6 +2568,25 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `packages/netcode/tests/browser/media.mjs` (the untouched listener, strict autoplay policy) and
   `packages/netcode/tests/media.test.js` "KB-NETCODE-VOICEGESTURE1".
 
+### Fixed 2026-11-28: a measured cloth on the vertex-block solver gained energy and hung past its elastica (KB-SOFT-VBDBEND1, physics soft)
+
+- **Repro (before):** the 10-cell cantilever of `packages/physics/tests/soft-bending.test.js` (flannel's warp, KES-FB2 B
+  0.288 gf cm^2/cm, 282 g/m^2, 46.2 mm out, the cotton shirting's measured threads) on `setSolver('vertex-block')`: at the
+  default 8 pieces and 2 passes the tip flailed through 13 to 143 degrees and the strip's energy climbed without damping;
+  at 20 passes it hung at 64.7 degrees where the elastica and the exact solve hold 46.0. With rigid threads it settled.
+- **Cause:** the passes start from the inertial first guess, which stretches a stiff measured thread; a few Gauss-Seidel
+  sweeps lower the step's potential from there but can end above its value at the particles' previous place, and then the
+  piece puts energy into the sheet (the energy estimate of implicit Euler needs the result no higher than the previous
+  place). The bending's Hessian was already in each block (k R_i^2 I, exact). Past that, one sweep carries a strip's bending a
+  cell at a time, so 2 sweeps a piece left the measured cantilever creeping for tens of seconds.
+- **Fix:** each block step is halved until it lowers the block's potential (backtracking), the passes start from the point
+  of the segment from the previous place to the guess with the least potential, so a piece ends no higher than where it
+  began, and the blocks take at least 8 sweeps a piece, alternating direction (`BLOCK_SWEEPS`, soft-kernel/src/cloth_block.rs).
+  The cantilever now hangs within 0.3 degrees of the elastica at the defaults, and the undamped strip never rises above
+  its starting energy.
+- **Regression:** `packages/physics/tests/soft-bending.test.js` "on the vertex-block solver the strip settles on the same
+  elastica at the default passes, and never gains energy".
+
 ### Fixed 2026-11-27: a cloth pressing on the body it is lashed to lost linear momentum (KB-SOFT-LASHCONTACT1, physics soft)
 
 - **Repro (before):** no gravity; a 4 by 7 sail of `FABRICS.sailcloth` (1 m by 6 m, from [0, 1, 0]) with a `SailForce` in a

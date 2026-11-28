@@ -107,6 +107,49 @@ test('a cantilevered strip of measured bending settles on the exact heavy elasti
   }
 });
 
+test('on the vertex-block solver the strip settles on the same elastica at the default passes, and never gains energy', async () => {
+  // KB-SOFT-VBDBEND1: started from the inertial guess, a few passes ended above where the particles were, so the flannel strip
+  // (its measured threads stiff, its bending coupling every particle along it) flailed through 13 to 143 degrees at the default
+  // 2 passes and hung at 64.7 degrees at 20. The block steps now each lower the step's potential and the passes start no higher
+  // than the previous place, and the blocks take at least 8 sweeps a piece.
+  const rigidity = fabricBendingRigidity(0.288),
+    length = 0.0462,
+    segments = 10,
+    bound = (1 / (segments + 0.5)) ** 2;
+  for (const density of [0.02, 0.282]) {
+    const exact = elastica(length, rigidity, density * G),
+      angle = await cantilever(length, rigidity, density, { segments, solver: 'vertex-block' });
+    assert.ok(Math.abs(angle - exact) <= bound * exact, `${density} kg/m^2: ${angle} degrees against ${exact}`);
+  }
+  // Undamped, released level: the strip's kinetic and potential energy never climbs above what it started with.
+  const physics = new Physics(null);
+  physics.gravity = [0, -G, 0];
+  const soft = await SoftBodies.attach(physics),
+    d = length / (segments + 0.5),
+    material = SoftBodyMaterial.fabric(FABRICS.cottonShirting),
+    b = rigidity / fabricBendingRigidity(1);
+  material.bending = { warp: b, weft: b };
+  material.arealDensity = 0.282;
+  const body = soft.create(
+      SoftBodyDesc.cloth([-d / 2, 0, 0], [d, 0, 0], [0, 0, d], segments + 2, 3)
+        .setMaterial(material)
+        .setSolver('vertex-block')
+        .setPinnedParticles([0, 1, 2, 3, 4, 5]),
+    ),
+    energy = () => {
+      const p = body.particlePositions(),
+        v = body.particleVelocities();
+      let e = 0;
+      for (let i = 0; i < p.length / 3; i++) e += 0.5 * (v[3 * i] ** 2 + v[3 * i + 1] ** 2 + v[3 * i + 2] ** 2) + G * p[3 * i + 1];
+      return e;
+    },
+    start = energy();
+  for (let i = 0; i < 200; i++) {
+    physics.step();
+    assert.ok(energy() <= start, `step ${i}: ${energy()} above the start's ${start}`);
+  }
+});
+
 /**
  * Luible's six fabrics measured on both instruments (Luible 2008, Annex C for KES-F, section 4.2.2 for FAST): areal density
  * (g/m^2, FAST table 9), KES-FB2 B along the warp and the weft (gf cm^2/cm) and FAST's bending rigidity along each

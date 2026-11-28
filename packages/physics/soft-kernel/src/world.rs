@@ -295,6 +295,9 @@ pub struct World {
     /// Each particle's first block edge slot, and the next slot (cloth_block.rs); scratch, built for each piece.
     pub cb_head: Col<u32>,
     pub cb_next: Col<u32>,
+    /// Scratch of the first guess's safeguard (cloth_block.rs): each body's potential at the guess and where it was, and the guess.
+    pub cb_phi: Col<f64>,
+    pub cb_save: Col<[f32; 3]>,
     /// A block-solved particle's velocity at the start of the last piece, before gravity (cloth_block.rs): its acceleration
     /// decides how much of gravity the next piece's first guess takes.
     /// Each particle's acceleration from the forces put on it for the step (`addForce`, `addParticleForce`), in m/s^2: taken
@@ -522,12 +525,17 @@ impl World {
         self.fem_begin();
         self.volume_begin();
         self.rigid_begin(h);
-        for _ in 0..iterations {
+        for pass in 0..iterations {
             for e in 0..self.edges {
                 self.solve_edge(e, h);
             }
             if cloth_block {
-                self.solve_cloth_blocks(h);
+                // Each pass sweeps the blocks enough times that a piece sweeps them at least BLOCK_SWEEPS times
+                // (cloth_block.rs), alternating the direction of the sweeps.
+                let sweeps = crate::cloth_block::BLOCK_SWEEPS.div_ceil(iterations);
+                for sweep in 0..sweeps {
+                    self.solve_cloth_blocks(h, (pass * sweeps + sweep) % 2 == 1);
+                }
             }
             if membrane {
                 self.solve_membranes(h);

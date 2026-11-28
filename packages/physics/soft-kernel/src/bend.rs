@@ -240,6 +240,30 @@ impl World {
         diagonal
     }
 
+    /// The energy of particle `i`'s block elements with the particle at `x` and the others where they are, J.
+    pub(crate) fn bend_block_energy(&self, i: usize, x: [f64; 3]) -> f64 {
+        if i >= self.bd_head.len() {
+            return 0.0;
+        }
+        let mut e = 0.0;
+        let mut slot = self.bd_head[i];
+        while slot != NO_SLOT {
+            let s = slot as usize / BEND_PARTS;
+            let own = slot as usize % BEND_PARTS;
+            slot = self.bd_next[slot as usize];
+            for c in 0..3 {
+                let (p, r) = self.bend_row(s, c);
+                let mut v = self.bend_value(p, r);
+                let ri = r[own];
+                v[0] += ri * (x[0] - self.x[i] as f64);
+                v[1] += ri * (x[1] - self.y[i] as f64);
+                v[2] += ri * (x[2] - self.z[i] as f64);
+                e += 0.5 * (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) / self.bd_alpha[3 * s + c] as f64;
+            }
+        }
+        e
+    }
+
     /// The bending energy of every element now, J.
     pub fn bend_energy(&self) -> f64 {
         let mut e = 0.0;

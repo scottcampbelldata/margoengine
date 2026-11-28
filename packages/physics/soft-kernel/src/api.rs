@@ -28,7 +28,7 @@ static mut WORLD: World = World {
     tt_p: Col::new(), tt_a: Col::new(), tt_len: Col::new(), tethers: 0,
     sk_p: Col::new(), sk_x: Col::new(), sk_y: Col::new(), sk_z: Col::new(), sk_vx: Col::new(), sk_vy: Col::new(), sk_vz: Col::new(),
     sk_nx: Col::new(), sk_ny: Col::new(), sk_nz: Col::new(), sk_max: Col::new(), sk_back: Col::new(), skins: 0,
-    cb_head: Col::new(), cb_next: Col::new(), cbx: Col::new(), cby: Col::new(), cbz: Col::new(),
+    cb_head: Col::new(), cb_next: Col::new(), cb_phi: Col::new(), cb_save: Col::new(), cbx: Col::new(), cby: Col::new(), cbz: Col::new(),
     ax: Col::new(), ay: Col::new(), az: Col::new(), pressed: Col::new(), vbx: Col::new(), vby: Col::new(), vbz: Col::new(),
     bd_p: Col::new(), bd_r: Col::new(), bd_alpha: Col::new(), bd_l: Col::new(), bd_flag: Col::new(), bd_len: Col::new(), bends: 0,
     bd_head: Col::new(), bd_next: Col::new(),
