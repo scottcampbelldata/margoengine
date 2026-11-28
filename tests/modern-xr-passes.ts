@@ -166,7 +166,7 @@ const green = (r: number, g: number, b: number) => g > 120 && g > r * 2 && g > b
   red = (r: number, g: number, b: number) => r > 120 && r > g * 2 && r > b * 2;
 
 /** A scene with a core box, a line, a point cloud, flat terrain and bloom. */
-function scene(engine: Awaited<ReturnType<typeof Engine.create>>): void {
+function scene(engine: Awaited<ReturnType<typeof Engine.create>>): Bloom {
   engine
     .createMesh()
     .setGeometry(box(0.6, 0.6, 0.6))
@@ -204,7 +204,7 @@ function scene(engine: Awaited<ReturnType<typeof Engine.create>>): void {
       return { heightmap, layers, weights: [weight, weight] };
     },
   });
-  Bloom.attach(engine, { threshold: 0.2, strength: 1.5 });
+  return Bloom.attach(engine, { threshold: 0.2, strength: 1.5 });
 }
 /** The camera an eye sees through, built from its pose and projection as the XR route builds it. */
 function camera(view: XRView, near: number, far: number): Camera {
@@ -273,7 +273,7 @@ async function run() {
   // 1. Through the engine: every pass in both eyes, equal to the same camera without XR.
   const engine = await createXREngine(canvas, { capacity: 16 });
   engine.onError = (error) => errors.push(String(error));
-  scene(engine);
+  const bloom = scene(engine);
   const xr = await XR.create(engine);
   if (xr.route !== 'engine') throw new Error(`createXREngine gave the ${xr.route} route`);
   await frames(xr, 'immersive-vr');
@@ -334,26 +334,50 @@ async function run() {
   }
   // The eyes differ: the box is 0.2 apart between them.
   if (eyePixels[0].every((v, i) => v === eyePixels[1][i])) throw new Error('Both eyes drew the same image');
-  // 2. AR: where nothing wrote depth the real world shows through, kept only by the scene's own light (here the
-  // bloom's glow): alpha is the brightest channel there. The box and the ground are opaque.
+  // 2. AR: where nothing wrote depth the real world shows through. Since KB-XR-ARNODEPTH1 the eye's alpha there is the
+  // coverage of what drew without depth (the line, the points), and the blit raises it to the brightest channel; Bloom
+  // raises it to its glow's brightest channel before its dither, which lowers the colour by up to one 8-bit step and
+  // never the alpha. So with A0 the alpha of the same frame without Bloom (the coverage, raised to the content's
+  // brightest channel) and m the brightest channel with Bloom: max(A0, m) <= alpha <= max(A0, m + 1), the colour stays
+  // premultiplied, empty sky keeps the glow only, and the depthless line is opaque. The box and the ground are opaque.
   await frames(xr, 'immersive-ar');
   const ar = await read(gpu, color, 0),
     sky = await far(gpu, 0);
+  await xr.end();
+  bloom.dispose();
+  await frames(xr, 'immersive-ar');
+  const bare = await read(gpu, color, 0);
   let open = 0,
     glow = 0,
-    wrong = 0;
+    wrong = 0,
+    lineOpaque = 0,
+    lineTotal = 0;
   for (let p = 0; p < SIZE * SIZE; p++) {
     if (!sky[p]) continue;
     open++;
-    const [r, g, b, a] = ar.slice(p * 4, p * 4 + 4);
-    if (a !== Math.max(r, g, b)) wrong++;
+    const [r, g, b, a] = ar.slice(p * 4, p * 4 + 4),
+      m = Math.max(r, g, b),
+      a0 = bare[p * 4 + 3];
+    if (a < Math.max(a0, m) || a > Math.max(a0, m + 1)) wrong++;
     if (a < 128) glow++;
+    if (green(bare[p * 4], bare[p * 4 + 1], bare[p * 4 + 2]) && a0 === 255) {
+      lineTotal++;
+      if (a === 255) lineOpaque++;
+    }
   }
   const solid = count(ar, (r, g, b, a) => red(r, g, b) && a === 255),
     floor = count(ar.slice(SIZE * Math.floor((SIZE * 3) / 4) * 4), (_r, _g, _b, a) => a === 255);
   await xr.end();
-  result.ar = { open, glow, wrong, solid, floor };
-  if (open < (SIZE * SIZE) / 8 || glow < 50 || wrong || solid < 20 || floor < (SIZE * SIZE) / 4)
+  result.ar = { open, glow, wrong, lineOpaque, lineTotal, solid, floor };
+  if (
+    open < (SIZE * SIZE) / 8 ||
+    glow < 50 ||
+    wrong ||
+    lineTotal < 20 ||
+    lineOpaque !== lineTotal ||
+    solid < 20 ||
+    floor < (SIZE * SIZE) / 4
+  )
     throw new Error(`AR alpha: ${JSON.stringify(result.ar)}`);
   xr.dispose();
   if (gpu.destroyed) throw new Error('Disposing XR destroyed the engine device');
