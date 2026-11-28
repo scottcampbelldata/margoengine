@@ -155,6 +155,13 @@ class Scatter implements EnginePlugin {
     [Symbol.dispose]: () => void;
 }
 
+interface ScatterBase {
+    height: number;
+    shade?: number;
+    tint?: readonly [number, number, number];
+    amount?: number;
+}
+
 interface ScatterBlades {
     rootShade?: number;
     widen?: number;
@@ -210,6 +217,8 @@ interface ScatterOptions {
     sway?: ScatterSway;
     alignToGround?: number;
     sink?: number;
+    base?: ScatterBase;
+    skyOcclusion?: ScatterSkyOcclusion;
     edgeShrink?: number;
     inner?: number;
     innerFade?: number;
@@ -226,6 +235,11 @@ interface ScatterOptions {
 type ScatterPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
+
+interface ScatterSkyOcclusion {
+    depth: number;
+    height: number;
+}
 
 interface ScatterStateSource {
     poseCode(code: string, group: number, binding: number): string;

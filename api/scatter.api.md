@@ -119,6 +119,13 @@ export class Scatter implements EnginePlugin {
     [Symbol.dispose]: () => void;
 }
 
+export interface ScatterBase {
+    height: number;
+    shade?: number;
+    tint?: readonly [number, number, number];
+    amount?: number;
+}
+
 export interface ScatterBatch {
     name: string;
     vertices: Float32Array;
@@ -223,6 +230,8 @@ export interface ScatterOptions {
     sway?: ScatterSway;
     alignToGround?: number;
     sink?: number;
+    base?: ScatterBase;
+    skyOcclusion?: ScatterSkyOcclusion;
     edgeShrink?: number;
     inner?: number;
     innerFade?: number;
@@ -234,6 +243,11 @@ export interface ScatterOptions {
     variation?: ScatterVariation;
     clusters?: number;
     states?: ScatterStateSource;
+}
+
+export interface ScatterSkyOcclusion {
+    depth: number;
+    height: number;
 }
 
 export interface ScatterStateSource {

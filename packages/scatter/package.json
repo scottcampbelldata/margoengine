@@ -148,7 +148,7 @@
     "test:browser:inner": "cd ../.. && node packages/scatter/test/inner.browser.mjs && node packages/scatter/test/inner.browser.mjs --compat",
     "test:browser:shadow": "cd ../.. && node packages/scatter/test/shadow.browser.mjs",
     "test:browser:shadow-cull": "cd ../.. && node packages/scatter/test/shadow-cull.browser.mjs",
-    "test:browser:variation": "cd ../.. && node packages/scatter/test/variation.browser.mjs",
+    "test:browser:variation": "cd ../.. && node packages/scatter/test/variation.browser.mjs && node packages/scatter/test/contact.browser.mjs",
     "test:browser:interact": "cd ../.. && node packages/scatter/test/interact.browser.mjs",
     "test:browser:states": "cd ../.. && node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/states.browser.mjs && node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/states.browser.mjs --compat && node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/states-flood.browser.mjs && node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/states-flood.browser.mjs --compat",
     "test:browser:wind-speed": "cd ../.. && node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/wind-speed.browser.mjs && node scripts/run-with-timeout.mjs --max=10 -- node packages/scatter/test/wind-speed.browser.mjs --compat",

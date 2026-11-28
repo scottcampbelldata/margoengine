@@ -1,0 +1,36 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Scatter contact check</title><style>body{margin:0}canvas{display:block;width:256px;height:256px}</style></head><body><canvas width="256" height="256"></canvas>
+<script type="module">
+// Real-GPU proof of `base`, `skyOcclusion` and textured occlusion under a Sky (contact.browser.mjs reads the canvas):
+// one upright card 2 m wide and 4 m tall facing the camera, as a `ScatterTiles` record or a one-instance `Scatter`,
+// with the light given.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine,Geometry,PbrMaterial} from '/packages/core/dist/index.js';
+import {Scatter} from '/packages/scatter/dist/index.js';
+import {ScatterTiles} from '/packages/scatter/dist/tiles.js';
+import {Sky} from '/packages/sky/dist/index.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{camera:{position:[0,2,6.5],target:[0,2,0],near:0.5,far:200}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const card=new Geometry([-1,0,0, 1,0,0, 1,4,0, -1,4,0],[0,0,1, 0,0,1, 0,0,1, 0,0,1],[0,1,2, 0,2,3]);
+const uvs=[0,1, 1,1, 1,0, 0,0];
+const white={width:1,height:1,data:new Uint8Array([255,255,255,255])};
+const record=new Uint8Array(new Uint32Array([32768|(32768<<16),128<<8]).buffer);
+let scatter,sky;
+window.check={
+  async show({kind='tiles',light='ambient',look={},occlusion}){
+    scatter?.dispose();sky?.dispose();sky=undefined;
+    device.pushErrorScope('validation');
+    engine.lighting.direction.set([0,0.35,1,light==='sun'?2:0]);
+    engine.lighting.radiance.set([1,1,1,light==='ambient'?0.9:0]);
+    if(light==='sky')sky=Sky.attach(engine,{sunDirection:[0,0.7,0.7],lighting:{intensity:0,ambient:{day:[0.6,0.6,0.6],night:[0.6,0.6,0.6]}}});
+    const textures=occlusion===undefined?undefined:{uvs,baseColor:white,occlusionRoughnessMetal:{width:1,height:1,data:new Uint8Array([occlusion,255,0,255])}};
+    const options={material:new PbrMaterial({color:[0.8,0.8,0.8],roughness:1}),lodFade:0,...(textures?{textures}:{}),...look};
+    if(kind==='scatter'){scatter=Scatter.attach(engine,card,{count:1,area:[0.001,0.001],scale:[1,1],...options});await scatter.ready;}
+    else{scatter=ScatterTiles.attach(engine,card,{bounds:[-20,-20,20,20],...options});scatter.setTile('0,0',[-20,-20],40,record);}
+    for(let i=0;i<(light==='sky'?4:1);i++)await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+    const e=await device.popErrorScope();if(e)errors.push(e.message);
+    return errors.splice(0);
+  },
+};
+window.ready=true;
+</script></body></html>

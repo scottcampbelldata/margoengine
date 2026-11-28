@@ -31,6 +31,8 @@ import {
 } from './maps.js';
 export type { ScatterImage, ScatterTextures } from './maps.js';
 import { translucencyShader } from './translucency.js';
+import { contactStages, contactValues, type ScatterBase, type ScatterSkyOcclusion } from './contact.js';
+export type { ScatterBase, ScatterSkyOcclusion } from './contact.js';
 import { fadeCode, pixelFootprint, poseShader } from './pose.js';
 import { outsideLod } from './lod.js';
 import { sameBindings, snapshotBindings } from './bindings.js';
@@ -252,6 +254,18 @@ export interface ScatterOptions {
    * buried on the downhill side of steeper ground. The heightmap gives the slope.
    */
   sink?: number;
+  /**
+   * The foot of each lit instance, where it meets the ground: the lowest `height` metres (at scale 1) above the ground
+   * lose up to `shade` of the sky's light and turn toward `tint` (moss on stones, soil on trunks), with a ragged upper
+   * edge. The ground line follows `sink` and the slope. Default none: the shader as it was. Fixed at construction.
+   */
+  base?: ScatterBase;
+  /**
+   * Sky light lit instances lose lower down, as under a closed canopy: exp(-depth * (1 - h / height)) of it is kept at
+   * height h above the ground (Beer-Lambert light in a canopy, Monsi and Saeki 1953). The sun's beam is untouched;
+   * shadows give that. Default none: the shader as it was. Fixed at construction.
+   */
+  skyOcclusion?: ScatterSkyOcclusion;
   /**
    * World units before the last LOD distance over which instances scale down to zero (default 0: cut at that
    * distance). Shrinking instead of cutting keeps the edge of a grass field from popping, without a fragment
@@ -698,7 +712,10 @@ export class Scatter implements EnginePlugin {
   readonly count: number;
   /** The meshes' highest vertex in mesh units: the plant top `sway.height` defaults to. */
   protected meshTop = 0;
-  private readonly materialValues = new Float32Array(28);
+  /** The lit material uniform's values: 7 vectors, 9 with `base` or `skyOcclusion`. */
+  private materialValues = new Float32Array(28);
+  /** `base` and `skyOcclusion` as material[7] and [8]; undefined keeps the lit shader as it was. */
+  private readonly contact?: Float32Array;
   private seconds = 0;
   private windClock = 0;
   /** The wind values (68-71) of the frame before the last drawn one, and whether a frame has been drawn since a reset. */
@@ -956,6 +973,8 @@ export class Scatter implements EnginePlugin {
     this.values[72] = alignToGround;
     this.values[73] = sink;
     this.values[74] = Math.min(edgeShrink, lod[2]);
+    this.contact = contactValues(options.base, options.skyOcclusion);
+    if (this.contact) this.materialValues = new Float32Array(36);
     const { blades } = options;
     if (blades !== undefined) {
       if (typeof blades !== 'object' || blades === null)
@@ -1044,7 +1063,7 @@ export class Scatter implements EnginePlugin {
     d.queue.writeBuffer(this.exclusionBuffer, 0, this.exclusionValues as Float32Array<ArrayBuffer>);
     if (this.options.material) {
       this.pbrUniform = d.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-      this.materialUniform = d.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.materialUniform = d.createBuffer({ size: this.materialValues.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       this.materialValues.set(this.options.material.data);
     }
     // Readable (COPY_SRC) so a test or tool can read how many instances each ring drew.
@@ -1669,6 +1688,8 @@ export class Scatter implements EnginePlugin {
         code = captured;
       }
       if (lit && this.uvs) code = texturedFragment(code, this.cut, coreNormal);
+      if (lit && this.contact)
+        code = contactStages(code, freeLocation(/struct Output \{[^}]+\}/.exec(code)?.[0] ?? ''));
       if (cover) {
         const covered = coverCode(
           code,
@@ -1692,6 +1713,7 @@ export class Scatter implements EnginePlugin {
     this.materialValues[20] = this.translucency; // read by the translucent shader only
     this.materialValues[21] = this.values[80]; // the pixel footprint, material[5].y
     this.materialValues.set(this.values.subarray(84, 88), 24); // the sway, material[6]
+    if (this.contact) this.materialValues.set(this.contact, 28); // base and skyOcclusion, material[7] and [8]
     device.queue.writeBuffer(this.materialUniform!, 0, this.materialValues as Float32Array<ArrayBuffer>);
   }
   /** Core's frame uniform (camera, eye, unit light, radiance, ambient) for `camera` into `values`. */
@@ -2172,6 +2194,7 @@ export class Scatter implements EnginePlugin {
   private stageKey(): string {
     return (
       (this.looks() ? ':look' + (this.values[75] > 0 ? 'c' : '') : '') +
+      (this.contact ? ':contact' : '') +
       (this.translucency > 0 && this.values[78] > 0 ? ':transl' : '')
     );
   }

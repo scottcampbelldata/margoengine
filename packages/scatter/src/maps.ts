@@ -21,6 +21,7 @@
 // - C. Wyman and M. McGuire, "Hashed Alpha Testing", I3D 2017 / JCGT 6(2): why plain mips of alpha lose coverage
 //   (the problem the scaling above answers). https://jcgt.org/published/0006/02/02/
 import { rangeError, typeError } from '../../shared/errors.js';
+import { occludeAmbient } from '../../shared/occlude-ambient.js';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 
@@ -288,8 +289,8 @@ export function texturedFragment(code: string, cut: number, normalLine: string):
     .slice(open)
     .replaceAll('i.color', 'surfColor')
     .replaceAll('i.material.x', 'surfRough')
-    .replaceAll('i.material.y', 'surfMetal')
-    .replaceAll('frame.ambient.rgb', '(frame.ambient.rgb*surfOrm.r)');
+    .replaceAll('i.material.y', 'surfMetal');
+  rest = occludeAmbient(rest, 'surfOrm.r');
   if (rest.includes(normalLine))
     rest = rest.replace(
       normalLine,

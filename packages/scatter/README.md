@@ -215,6 +215,38 @@ const trees = Scatter.attach(engine, canopy, {
 engine.start();
 ```
 
+### Feet and canopy shade: `base` and `skyOcclusion`
+
+Two more options of a lit scatter make objects sit in the ground, both off by default (the shader as before) and fixed
+at construction; metres are at instance scale 1.
+
+- `base: { height, shade, tint, amount }`: the lowest `height` metres above the ground lose up to `shade` (default
+  0.5) of the sky's light and turn toward the linear RGB `tint` by up to `amount` (default 0.7 with a tint), such as
+  moss on stones or soil on trunks. The band's upper edge is ragged (value noise).
+- `skyOcclusion: { depth, height }`: `exp(-depth * (1 - h / height))` of the sky's light is kept `h` metres above the
+  ground, as under a canopy (Beer-Lambert light in a canopy: Monsi and Saeki 1953; English translation 2005, Annals of
+  Botany 95:549, https://doi.org/10.1093/aob/mci052). The sun's beam is untouched.
+
+The ground line follows `sink` and the ground's slope, so a sunk stone's band starts where it leaves the soil. Both
+reach every ambient term: core's flat one, a hemisphere light's and a Sky's.
+
+```ts
+import { Engine, PbrMaterial, box } from '@margoengine/core';
+import { Scatter } from '@margoengine/scatter';
+const engine = await Engine.create(document.querySelector('canvas')!);
+Scatter.attach(engine, box(1, 3, 1), {
+  count: 200,
+  area: [60, 60],
+  material: new PbrMaterial({ color: '#7a7268', roughness: 0.9 }),
+  sink: 0.4,
+  base: { height: 0.25, shade: 0.5, tint: [0.07, 0.1, 0.03] }, // moss and contact shade at the foot
+  skyOcclusion: { depth: 0.9, height: 1.5 },
+});
+engine.start();
+```
+
+Checked on WebGPU and the WebGL2 layer by `test/contact.browser.mjs`.
+
 Thin triangles whose shading changes across them (blade root shade, vertex
 colour, occlusion, the blade ground weight, the `clusters` colour) interpolate those values at a
 covered sample (`centroid`): with multisampling, a pixel a blade only partly
