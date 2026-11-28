@@ -25,10 +25,8 @@ export async function show({bench,physics,canvas,notice,status,signal,fail,onRes
   let trace={discrete:opening,continuous:opening},busy=false,first=true;
   let timer,requestId=0,runCount=0;
 
-  function fit(){
-    const aspect=canvas.width/canvas.height,zoom=Math.max(1,1.564/aspect);
-    engine.camera.fov=2*Math.atan(Math.tan(16*Math.PI/180)*zoom)*180/Math.PI;
-  }
+  // The bench frames the rig along the opening view direction at any aspect; the box leaves out the 140 m floor.
+  const fit=()=>bench.fit({fill:.9,bounds:{min:[-3.6,-.45,-1.85],max:[3.6,.85,1.85]}});
   function stopReplay(){
     clearTimeout(timer);
     const playing=replay.getAttribute('aria-pressed')==='true';
@@ -68,7 +66,7 @@ export async function show({bench,physics,canvas,notice,status,signal,fail,onRes
     }
   }
 
-  fit();
+  await fit();
   await draw();
   signal.throwIfAborted();
   record(0);
@@ -120,6 +118,6 @@ export async function show({bench,physics,canvas,notice,status,signal,fail,onRes
     stopReplay();
     present(Number(steps.value),event.isTrusted).catch(fail);
   },{signal});
-  onResize(()=>{if(!signal.aborted){fit();bench.request();}});
+  onResize(()=>{if(!signal.aborted)fit().then(()=>bench.request(),fail);});
   signal.addEventListener('abort',()=>clearTimeout(timer),{once:true});
 }
