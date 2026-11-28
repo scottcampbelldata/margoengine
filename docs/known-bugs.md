@@ -866,6 +866,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   stop; the raw clip (`anatomy: {limits: false}`) reads past it (idle: MCP4 supination -10.5 to -11.6, talk -12.5; CMC1
   pronation up to 53.7). So the checker is reading true; the cause stays the zero this row names.
 
+- **Searched 2026-11-28:** no measured angle for the obliquity of the ring or little finger interphalangeal flexion
+  axes was found. Hollister et al. 1995 (the thumb's interphalangeal and metacarpophalangeal axes, Clin Orthop Relat
+  Res) measure the thumb's interphalangeal axis parallel to its flexion crease and not square to the phalanx, which
+  gives ulnar deviation and pronation with flexion, but for the thumb only; the finger convergence on the scaphoid
+  tubercle (Kapandji, vol. 1) is described, not measured. An MRI hand model (Stillfried et al. 2014, DLR,
+  https://elib.dlr.de/85039/) fits per-finger joint axes and is the next source to read for the angle.
 - **Repro:** `addPerson` on the Fauld cast's Character Creator old man (`civ_old_man.glb`), then
   `jointAngles(person.body, person.body.rest)`: `l_metacarpophalangeal_4` and `r_` read flexion 2.6, abduction 9.7,
   rotation -12.8 degrees, past the -10 supination stop. `packages/humans/test/pose-frames.browser.mjs --model=<file>`
@@ -884,6 +890,13 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   stop; the raw clip (`anatomy: {limits: false}`) reads past it (idle: MCP4 supination -10.5 to -11.6, talk -12.5; CMC1
   pronation up to 53.7). So the checker is reading true; the cause stays the zero this row names.
 
+- **Searched 2026-11-28:** Cooney et al. 1981 (the kinesiology of the thumb trapeziometacarpal joint, J Bone Joint
+  Surg Am 63:1371) place the trapezium's axes at median 48 degrees of flexion, 38 of abduction and 80 of pronation from
+  the third metacarpal's and measure 53 degrees of flexion and extension, 42 of abduction and adduction and 17 of
+  rotation; Hollister et al. 1992 (the axes of rotation of the thumb carpometacarpal joint, J Orthop Res 10:454) find
+  two fixed axes, flexion in the trapezium and abduction in the metacarpal, neither square to the bones nor to each
+  other (about 124 degrees apart in vivo, Chang and Pollard). Neither gives the joint's angles at a relaxed, opposed
+  rest against a thumb beside the index, which this row needs, so the zero stays as fitted.
 - **Repro:** the same old man, walk clip at 0.3 s with `anatomy: {limits: false}`: `r_carpometacarpal_1` reads
   pronation 54.4 and `l_` 47.6 against a 40 degree stop, and the rest pose already reads abduction 39.1 and rotation
   28.6. On the fitted body the thumbs are held at the stop, up to 22 degrees from the clip.
