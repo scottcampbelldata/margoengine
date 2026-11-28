@@ -32,6 +32,14 @@ test('a call counts unless its line gives the reason; comments and strings are n
   assert.equal(unjustifiedExit('const url = "http://x"; process.exit(1);'), true);
 });
 
+test('a line without the text of a call is answered without being rewritten', () => {
+  // The rewrite that takes strings out is quadratic on a minified line, so it must only see lines that could hold a call.
+  const line = Object.assign(new String(`const a = 1; ${'x"'.repeat(8)}`), {
+    replace: () => assert.fail('the line was rewritten'),
+  });
+  assert.equal(unjustifiedExit(line), false);
+});
+
 test('the owed list fails on a new file and on a listed file that no longer calls process.exit', () => {
   const texts = {
     'a.mjs': 'process.exit(1);\n',

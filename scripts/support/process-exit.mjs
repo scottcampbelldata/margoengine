@@ -10,13 +10,18 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+const CALL = /\bprocess\.exit\s*\(/;
+
 /**
  * True when a line calls `process.exit(` with no `// process.exit: <reason>` on it. Comment text (a `//` tail, a line of
- * a block comment) and string literals (code a test hands to a child process) are not calls.
+ * a block comment) and string literals (code a test hands to a child process) are not calls. A line without the call's
+ * own text is answered first: taking strings out of it cannot make one, and that rewrite takes quadratic time on a
+ * minified line with unmatched quotes (the tracked demo bundles have lines of 3 MB; the check never finished).
  */
 export const unjustifiedExit = (line) =>
+  CALL.test(line) &&
   !/^\s*(\*|\/\*)/.test(line) &&
-  /\bprocess\.exit\s*\(/.test(line.replace(/(['"`])(?:\\.|(?!\1).)*\1/g, '""').replace(/\/\/.*$/, '')) &&
+  CALL.test(line.replace(/(['"`])(?:\\.|(?!\1).)*\1/g, '""').replace(/\/\/.*$/, '')) &&
   !/\/\/ process\.exit: \S/.test(line);
 
 /** The files (repository paths, sorted) whose text calls process.exit without a reason. */
