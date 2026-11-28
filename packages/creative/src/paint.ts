@@ -205,8 +205,10 @@ export class Painterly implements EnginePlugin {
     this.alive();
     this.validate();
     if (!this.engine) throw fault('state', 'Attach Painterly to a live PostStack before drawing');
-    if (this.key.changed(output, false))
+    if (this.key.changed(output, false)) {
       this.pipeline = render(c.device, shader, output.format, { multisample: output.multisample });
+      this.key.done();
+    }
     const state = this.views.get(c);
     this.rect.set(viewRect(c) ?? [0, 0, c.width, c.height]);
     this.flags[0] = this.options.radius ?? 3;

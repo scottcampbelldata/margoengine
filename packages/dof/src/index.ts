@@ -675,6 +675,7 @@ export class DOF implements EnginePlugin {
       const code = displayFor(this.engine, presentShader);
       this.presentPipeline = render(device, code, output.format, { multisample: output.multisample });
       this.groups[2] = group(device, this.presentPipeline, [this.outputView!]);
+      this.key.done();
     }
     this.attachment.view = output.view;
     this.attachment.loadOp = viewLoadOp(c, 'clear');

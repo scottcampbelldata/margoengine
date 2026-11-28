@@ -323,6 +323,7 @@ export class LensFlare implements EnginePlugin {
         multisample: output.multisample,
       });
       this.input = undefined;
+      this.key.done();
     }
     if (this.input !== input || images.some((image, i) => image !== this.images[i])) {
       this.input = input;

@@ -239,3 +239,33 @@ test('warmUp rejects with the abort reason and renders nothing once aborted', as
   await assert.rejects(warmUp(during, { signal: mid.signal }), /stopped mid-way/);
   assert.equal(Object.hasOwn(during.gpu, 'createRenderPipeline'), false, 'patches removed after an abort');
 });
+
+test('a feature that makes its layouts again on every call still gets its warmed pipelines (no endless retry)', async () => {
+  // Like terrain's surface height: a new bind group and pipeline layout on every call, then two pipelines with them.
+  // Keyed by identity, each retry missed again and warmUp ran to maxRounds with every pipeline made synchronously.
+  const slot = {};
+  const feature = (d) => {
+    if (slot.pair) return;
+    const group = d.createBindGroupLayout({ entries: [{ binding: 0, visibility: 1, buffer: {} }] }),
+      layout = d.createPipelineLayout({ bindGroupLayouts: [group] }),
+      module = d.createShaderModule({ code: 'height' });
+    const seed = d.createRenderPipeline({ layout, vertex: { module, entryPoint: 'seedVertex' } });
+    const draw = d.createRenderPipeline({ layout, vertex: { module, entryPoint: 'vertex' } });
+    slot.pair = [seed, draw];
+  };
+  const e = engine([feature]);
+  // GPU objects, not plain records, so warmUp cannot read them by value.
+  class Layout {
+    constructor(descriptor) {
+      this.descriptor = descriptor;
+    }
+  }
+  e.gpu.createBindGroupLayout = (descriptor) => new Layout(descriptor);
+  e.gpu.createPipelineLayout = (descriptor) => new Layout(descriptor);
+  const report = await warmUp(e, { maxRounds: 40 });
+  assert.deepEqual(report, { pipelines: 2, fallbacks: 0, rounds: 4, rebooted: false });
+  assert.deepEqual(
+    slot.pair.map((p) => p.made),
+    ['async', 'async'],
+  );
+});

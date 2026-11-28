@@ -562,6 +562,7 @@ export class SSR implements EnginePlugin {
       this.input = undefined;
       // The rough trace is patched the same way, so it is rebuilt with the composite.
       this.roughTrace = undefined;
+      this.key.done();
     }
     if (this.input !== input) {
       this.input = input;

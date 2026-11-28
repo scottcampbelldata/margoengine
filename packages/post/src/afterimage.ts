@@ -218,6 +218,7 @@ export class Afterimage implements EnginePlugin {
         multisample: output.multisample,
       });
       this.presents = [];
+      this.presentKey.done();
     }
     const present = (this.presents[next] ??= group(device, this.presentPipeline!, [this.views[next]]));
     this.pass(c, this.presentPipeline!, present, output.view);

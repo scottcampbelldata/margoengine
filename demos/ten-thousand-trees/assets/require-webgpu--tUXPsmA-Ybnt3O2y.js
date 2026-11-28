@@ -1,0 +1,1 @@
+import{T as e}from"./index-Bmk27x3-.js";function t(t,n){if(t.backend===`webgl2`||!t.gpu)throw new e(`unsupported`,`${n} needs WebGPU; see https://margoengine.com/errors#webgpu`)}export{t};

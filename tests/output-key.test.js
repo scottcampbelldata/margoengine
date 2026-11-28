@@ -9,25 +9,61 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { OutputKey } from '../packages/shared/output-key.js';
 
-test('OutputKey reports a change only when a field differs, and again after reset', () => {
+test('OutputKey reports a change only when a field differs from the last build, and again after reset', () => {
   const key = new OutputKey(),
     output = { format: 'rgba8unorm', multisample: { count: 4 }, hdr: false };
-  assert.equal(key.changed(output, false), true, 'the first call builds');
-  for (let i = 0; i < 3; i++) assert.equal(key.changed(output, false), false, 'the same output keeps the pipeline');
-  assert.equal(key.changed({ ...output, format: 'bgra8unorm' }, false), true, 'format');
-  assert.equal(key.changed({ ...output, format: 'bgra8unorm', multisample: { count: 1 } }, false), true, 'samples');
-  assert.equal(key.changed({ format: 'bgra8unorm', multisample: { count: 1 }, hdr: true }, false), true, 'hdr');
-  assert.equal(
-    key.changed({ format: 'bgra8unorm', multisample: { count: 1 }, hdr: true }, true),
-    true,
-    'premultiplied',
-  );
-  assert.equal(key.changed({ format: 'bgra8unorm', multisample: { count: 1 }, hdr: true }, true, 5), true, 'extra');
-  assert.equal(key.changed({ format: 'bgra8unorm', multisample: { count: 1 }, hdr: true }, true, 5), false);
-  assert.equal(key.changed({ format: 'bgra8unorm', multisample: {} }, false), true, 'an unset sample count is a value');
-  assert.equal(key.changed({ format: 'bgra8unorm', multisample: {} }, false), false);
+  // `changed`, then `done` once the stage has built, as every stage calls them.
+  const build = (o, straight, extra) => {
+    const changed = key.changed(o, straight, extra);
+    if (changed) key.done();
+    return changed;
+  };
+  assert.equal(build(output, false), true, 'the first call builds');
+  for (let i = 0; i < 3; i++) assert.equal(build(output, false), false, 'the same output keeps the pipeline');
+  assert.equal(build({ ...output, format: 'bgra8unorm' }, false), true, 'format');
+  assert.equal(build({ ...output, format: 'bgra8unorm', multisample: { count: 1 } }, false), true, 'samples');
+  assert.equal(build({ format: 'bgra8unorm', multisample: { count: 1 }, hdr: true }, false), true, 'hdr');
+  assert.equal(build({ format: 'bgra8unorm', multisample: { count: 1 }, hdr: true }, true), true, 'premultiplied');
+  assert.equal(build({ format: 'bgra8unorm', multisample: { count: 1 }, hdr: true }, true, 5), true, 'extra');
+  assert.equal(build({ format: 'bgra8unorm', multisample: { count: 1 }, hdr: true }, true, 5), false);
+  assert.equal(build({ format: 'bgra8unorm', multisample: {} }, false), true, 'an unset sample count is a value');
+  assert.equal(build({ format: 'bgra8unorm', multisample: {} }, false), false);
   key.reset();
-  assert.equal(key.changed({ format: 'bgra8unorm', multisample: {} }, false), true, 'reset forces a rebuild');
+  assert.equal(build({ format: 'bgra8unorm', multisample: {} }, false), true, 'reset forces a rebuild');
+});
+
+// KB-WATER-WARMUP1: a key that remembered the new fields in `changed` left a stage whose pipeline creation threw (a
+// warm-up frame stopped there, @margoengine/quality/warm) with no pipeline on every later frame.
+test('a build that throws is tried again on the next frame', () => {
+  const key = new OutputKey(),
+    output = { format: 'rgba8unorm', multisample: { count: 1 }, hdr: false };
+  assert.equal(key.changed(output, false), true);
+  // The stage threw before done(): the change stands.
+  assert.equal(key.changed(output, false), true, 'the next frame builds again');
+  key.done();
+  assert.equal(key.changed(output, false), false);
+});
+
+test('every stage that asks an OutputKey whether it changed marks the build done', async () => {
+  const missing = [];
+  for (const pkg of await readdir('packages', { withFileTypes: true })) {
+    if (!pkg.isDirectory()) continue;
+    const src = join('packages', pkg.name, 'src');
+    let files;
+    try {
+      files = await readdir(src, { recursive: true });
+    } catch {
+      continue;
+    }
+    for (const file of files) {
+      if (!/\.(ts|tsx|js|mjs)$/.test(file)) continue;
+      const text = await readFile(join(src, file), 'utf8');
+      if (!text.includes('OutputKey')) continue;
+      for (const [, name] of text.matchAll(/this\.(\w+)\.changed\(output/g))
+        if (!text.includes(`this.${name}.done()`)) missing.push(`${join(src, file)} ${name}`);
+    }
+  }
+  assert.deepEqual(missing, [], 'call done() once the stage has built from the changed key');
 });
 
 test('no stage joins its output format into a key string each frame', async () => {

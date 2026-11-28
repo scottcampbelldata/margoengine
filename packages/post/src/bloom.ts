@@ -613,6 +613,7 @@ export class Bloom implements EnginePlugin {
       this.present = render(device, output.hdr ? linear : display(this.engine), output.format, {
         multisample: output.multisample,
       });
+      this.key.done();
     }
     if (this.source !== input) this.link(device, input);
     this.apply(c, output.view, output.format);

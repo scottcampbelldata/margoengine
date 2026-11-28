@@ -16,6 +16,7 @@ import { Tonemap } from '@margoengine/tonemap';
 import { Spline } from '@margoengine/splines';
 import { PathControls } from '@margoengine/controls/presentation';
 import { demoStatus } from 'margo-demo-status';
+import { warmUp } from '@margoengine/quality/warm';
 
 const $ = (selector) => document.querySelector(selector);
 const canvas = $('#scene'), loading = $('#loading'), errorNotice = $('#error'), controls = $('#controls');
@@ -129,6 +130,10 @@ async function start() {
     }
     showFlight();
   });
+  // Compile every pipeline with the async API before the first visible frame. On the WebGL2 layer the first frame
+  // otherwise linked the water surface and the post stack and compiled them again for their targets in one task of
+  // 9 s, and a loaded machine took it past 15 s (KB-WATER-WARMUP1).
+  await warmUp(engine, { signal: lifetime.signal });
   engine.start();
   await engine.gpu.queue.onSubmittedWorkDone();
   if (lifetime.signal.aborted) return;

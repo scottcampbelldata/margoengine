@@ -1145,6 +1145,7 @@ export class Water implements EnginePlugin {
   private surfaceDepth?: GPUTexture;
   private surfaceView?: GPUTextureView;
   private copyPipeline?: GPURenderPipeline;
+  private copyKey = '';
   private copyGroup?: GPUBindGroup;
   private copyBuilt = -1;
   private depthView?: GPUTextureView;
@@ -2085,7 +2086,6 @@ export class Water implements EnginePlugin {
       this.surfaceDepth?.format !== depth.format ||
       this.surfaceDepth?.sampleCount !== samples
     ) {
-      const changed = this.surfaceDepth?.format !== depth.format || this.surfaceDepth?.sampleCount !== samples;
       this.surfaceDepth?.destroy();
       this.surfaceDepth = c.device.createTexture({
         size: [c.width, c.height],
@@ -2096,17 +2096,22 @@ export class Water implements EnginePlugin {
       this.surfaceView = this.surfaceDepth.createView();
       this.copiedDepth.view = this.surfaceView;
       this.built++;
-      if (changed) {
-        const module = c.device.createShaderModule({ code: depthCopy });
-        this.copyPipeline = c.device.createRenderPipeline({
-          layout: 'auto',
-          vertex: { module, entryPoint: 'vertex' },
-          fragment: { module, entryPoint: 'fragment', targets: [] },
-          depthStencil: { format: depth.format, depthWriteEnabled: true, depthCompare: 'always' },
-          multisample: { count: samples },
-        });
-        this.format = '';
-      }
+    }
+    // Keyed apart from the surface depth texture, and set only once the pipeline exists: a create that throws (a warm-up
+    // frame stopped at it, @margoengine/quality/warm) is made again on the next frame instead of leaving no pipeline.
+    const copyKey = `${depth.format}:${samples}`;
+    if (this.copyKey !== copyKey) {
+      const module = c.device.createShaderModule({ code: depthCopy });
+      this.copyPipeline = c.device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vertex' },
+        fragment: { module, entryPoint: 'fragment', targets: [] },
+        depthStencil: { format: depth.format, depthWriteEnabled: true, depthCompare: 'always' },
+        multisample: { count: samples },
+      });
+      this.copyKey = copyKey;
+      this.built++;
+      this.format = '';
     }
     if (
       (samples === 4 &&
@@ -2629,6 +2634,7 @@ export class Water implements EnginePlugin {
     this.surfaceDepth = undefined;
     this.surfaceView = undefined;
     this.copyPipeline = undefined;
+    this.copyKey = '';
     this.copyGroup = this.depthView = undefined;
     this.captured?.destroy();
     this.captured = undefined;

@@ -489,6 +489,7 @@ export class SSAO implements EnginePlugin {
         },
       );
       this.groups.length = 4;
+      this.key.done();
     }
     if (this.input !== input || !this.groups[4]) {
       this.input = input;

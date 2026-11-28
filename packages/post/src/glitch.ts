@@ -267,6 +267,7 @@ export class Glitch implements EnginePlugin {
     if (this.key.changed(output, false)) {
       this.pipeline = render(device, shader, output.format, { multisample: output.multisample });
       this.input = undefined;
+      this.key.done();
     }
     if (this.input !== input) {
       this.input = input;

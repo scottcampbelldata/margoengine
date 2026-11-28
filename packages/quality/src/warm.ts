@@ -24,7 +24,7 @@ export interface WarmUpOptions {
 }
 
 type Kind = 'createRenderPipeline' | 'createComputePipeline';
-type Method = Kind | 'createShaderModule' | 'createCommandEncoder';
+type Method = Kind | 'createShaderModule' | 'createCommandEncoder' | 'createBindGroupLayout' | 'createPipelineLayout';
 type Call = (this: GPUDevice, descriptor?: object) => object;
 type Pass = GPURenderPassEncoder | GPUComputePassEncoder;
 const methods: Method[] = [
@@ -32,6 +32,8 @@ const methods: Method[] = [
   'createComputePipeline',
   'createShaderModule',
   'createCommandEncoder',
+  'createBindGroupLayout',
+  'createPipelineLayout',
 ];
 /** Thrown inside a warm frame to stop it at a pipeline that is still compiling; never escapes warmUp. */
 class Compiling extends Error {}
@@ -75,6 +77,9 @@ export async function warmUp(
   // Shader modules are often recreated on every call, so descriptors are keyed by their code; other GPU objects by identity.
   const sources = new Map<string, number>(),
     code = new WeakMap<object, number>(),
+    // Layouts by what they hold: two layouts made from the same descriptor are group-equivalent (WebGPU), so a feature
+    // that makes its layout again on every call (terrain's surface height) still matches its warmed pipeline.
+    layouts = new WeakMap<object, string>(),
     ids = new WeakMap<object, number>(),
     ready = new Map<string, object>();
   // This round's command encoders, each with its open pass (if any), in creation order.
@@ -96,6 +101,8 @@ export async function warmUp(
         return value;
       const source = code.get(value);
       if (source !== undefined) return 'module' + source;
+      const layout = layouts.get(value);
+      if (layout !== undefined) return 'layout' + layout;
       if (loose) return 'object';
       if (!ids.has(value)) ids.set(value, next++);
       return 'object:' + ids.get(value);
@@ -132,6 +139,16 @@ export async function warmUp(
       if (!sources.has(descriptor.code)) sources.set(descriptor.code, sources.size);
       code.set(module, sources.get(descriptor.code)!);
       return module;
+    }),
+    override(device, 'createBindGroupLayout', function (this: GPUDevice, descriptor: GPUBindGroupLayoutDescriptor) {
+      const layout = original.createBindGroupLayout.call(this, descriptor);
+      layouts.set(layout, key('createRenderPipeline', { entries: descriptor.entries }, false));
+      return layout;
+    }),
+    override(device, 'createPipelineLayout', function (this: GPUDevice, descriptor: GPUPipelineLayoutDescriptor) {
+      const layout = original.createPipelineLayout.call(this, descriptor);
+      layouts.set(layout, key('createRenderPipeline', { groups: descriptor.bindGroupLayouts }, false));
+      return layout;
     }),
     override(device, 'createCommandEncoder', function (this: GPUDevice, descriptor?: GPUCommandEncoderDescriptor) {
       const encoder = original.createCommandEncoder.call(this, descriptor) as GPUCommandEncoder;

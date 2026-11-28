@@ -120,6 +120,31 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `GPUFlock` does (KB-FILM-FLOCK1), fed the replayed world poses, with a seek check on WebGPU and the WebGL2 layer.
   Until then `scripts/film-time-reviewed.json` names this entry for the hit.
 
+### Fixed 2026-11-28: ten-thousand-trees hung on the WebGL2 layer; warmUp could not warm terrain, Water or Bloom (KB-WATER-WARMUP1, quality, water, post)
+
+- **Repro (before):** `node scripts/web-demos/controls.mjs ten-thousand-trees --backends=webgl2`: "hung: a page script
+  took over 15000 ms". `scripts/web-demos/startup-profile.mjs ten-thousand-trees`: one 9.3 s task at the first frame,
+  3.1 s of it in a `checkFramebufferStatus` behind the water surface program's compile for its three targets (ANGLE
+  Direct3D 11 compiles it again at its first draw) and 2 s in its `LINK_STATUS`.
+- **Cause:** the demo made every pipeline synchronously in its first frame. `warmUp` (`@margoengine/quality/warm`) makes
+  them with the async API, and the layer's async path draws each program once and waits on a fence without blocking,
+  but warmUp failed on this scene three ways: (1) terrain's surface height makes a new pipeline layout on every call,
+  warmUp keyed layouts by identity, so every retry missed again (256 rounds, 128 synchronous fallbacks); (2) Water
+  stored its surface depth texture and then made its depth copy pipeline only when that texture changed, so a frame
+  stopped at the copy pipeline left none, and `bindDepth` threw; (3) `OutputKey` (Bloom and ten other post stages)
+  remembered the new output in `changed`, before the stage built its pipeline, so a stopped frame left Bloom with none.
+  (2) and (3) made warmUp restore the device and finish synchronously.
+- **Fix:** warmUp keys bind group and pipeline layouts by their descriptors (layouts made from the same descriptor are
+  group-equivalent in WebGPU); Water keys its depth copy pipeline by depth format and samples and sets the key only
+  once the pipeline exists; `OutputKey.changed` only compares and `done()` keeps the fields after the build, called by
+  every stage. The demo calls `warmUp` before `engine.start()`.
+- **Numbers (loaded workstation, one run each):** WebGL2 layer longest task 9.3 s before, 0.7 s after; ready 21 s
+  before, 32 s after (the warm-up compiles one pipeline per round, 45 rounds, 22 s; the page answers throughout).
+  WebGPU ready 13 s with a 4 s warm-up. `controls.mjs ten-thousand-trees`: ok on both backends.
+- **Regression:** `packages/quality/test/warm.test.js` ("makes its layouts again on every call"),
+  `packages/water/test/warm-up.browser.mjs` (WebGPU and `MARGO_COMPAT=1`; rebooted before), `tests/output-key.test.js`
+  (a build that throws is tried again; every stage calls `done()`).
+
 ### Fixed 2026-11-28: a film seek could not move a GPU flock, so it restarted at every cut (KB-FILM-FLOCK1, vfx)
 
 - **Repro:** `GPUFlock.attach(engine, options)` in a film rendered scene by scene: `seek` from

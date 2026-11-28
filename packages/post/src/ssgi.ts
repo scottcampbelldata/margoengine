@@ -562,6 +562,7 @@ export class SSGI implements EnginePlugin {
         },
       );
       this.input = undefined;
+      this.key.done();
     }
     this.tracer ??= render(c.device, traced ? traced.trace(traceShader) : traceShader, 'rgba16float');
     if (this.input !== input) {
@@ -661,6 +662,7 @@ export class SSGI implements EnginePlugin {
         multisample: output.multisample,
       });
       this.presentGroups = [];
+      this.presentKey.done();
     }
     const present = (this.presentGroups[next] ??= bind(device, this.present!, [this.lit[next]]));
     this.compositeAttachment.view = output.view;

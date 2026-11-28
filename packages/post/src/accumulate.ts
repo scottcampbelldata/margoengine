@@ -282,6 +282,7 @@ export class Accumulate implements EnginePlugin {
         multisample: output.multisample,
       });
       this.present = undefined;
+      this.presentKey.done();
     }
     this.present ??= group(device, this.presentPipeline!, [this.meanView!]);
     this.presentAttachment.view = output.view;
