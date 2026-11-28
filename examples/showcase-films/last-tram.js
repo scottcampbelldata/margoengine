@@ -113,7 +113,8 @@ export async function buildDepot(engine, shop, cluster) {
       [0.0004, 0.0005, 0.0008],
       [0.0025, 0.0018, 0.0012],
     ],
-    coverage: 0.6,
+    // A raining deck is nimbostratus, a layer that covers the sky (WMO International Cloud Atlas), with a few thin parts.
+    coverage: 0.85,
     bottom: 650,
     top: 1300,
     density: 0.1,
@@ -130,7 +131,8 @@ export async function buildDepot(engine, shop, cluster) {
       { color: sodium.map((c) => c * 0.34), x: 600, z: -5200, radius: 1500 },
       { color: [0.55, 0.5, 0.45].map((c) => c * 0.16), x: 6200, z: -1200, radius: 1800 },
       { color: city.map((c) => c * 0.07), x: -4200, z: 4600, radius: 3000 },
-      { color: sodium.map((c) => c * 0.5), x: 0, z: 0, radius: 140 },
+      // The yard: a few pole lamps (about 10 lux, EN 12464-2 for rail yards) light it less than the city's centre.
+      { color: sodium.map((c) => c * 0.14), x: 0, z: 0, radius: 140 },
     ],
     mist: { visibility: 30000 },
   });
@@ -149,6 +151,10 @@ export async function buildDepot(engine, shop, cluster) {
       { x: 700, z: -1500, radius: 180, rate: 60, velocity: storm },
       { x: -1200, z: -2600, radius: 250, rate: 45, velocity: storm },
     ],
+    // Steps grow with distance from the camera; 48 keep the far cores' curtains clean, and full streaks break them
+    // into fibres.
+    steps: 48,
+    streaks: 1,
   };
   // Scud: torn low cloud racing under the deck on the faster low wind, lit from below by the same city and lamps.
   const scud = VolumetricClouds.attach(engine, {
@@ -159,6 +165,9 @@ export async function buildDepot(engine, shop, cluster) {
     ],
     type: 'scud',
     above: clouds,
+    // Six light steps (three down the column to the base) so the torn edges take the city's light from below without
+    // the speckle of one sample.
+    lightSteps: 6,
     coverage: 0.3,
     wind: [9, 3.5],
     groundAlbedo: 0.12,
