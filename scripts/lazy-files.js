@@ -143,6 +143,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/underwater-kernel.wasm',
+    label: 'underwater-kernel.wasm',
+    kind: 'Rust SIMD underwater ray and Gaussian-beam tracing',
+    measure: 'file',
+    when: 'UnderwaterAcousticsSolver.load() from the optional /underwater entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/underwater-kernel-shared.wasm',
+    label: 'underwater-kernel-shared.wasm',
+    kind: 'Rust SIMD underwater ray and Gaussian-beam tracing, shared world memory',
+    measure: 'file',
+    when: 'UnderwaterAcousticsSolver.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/tsunami-kernel.wasm',
     label: 'tsunami-kernel.wasm',
     kind: 'Rust SIMD natural long-wave propagation and inundation',

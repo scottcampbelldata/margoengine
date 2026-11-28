@@ -55,6 +55,12 @@ them; the rest is a record of what a stronger solver would need.
 - Point 5. `underwater.test.js` verifies coded errors for malformed launches and beams, 33,554,432
   reflections in one folded tick, overflow-resistant beam phase and width, and unchanged accepted
   state when the new reflection count would exceed the largest exact integer.
+- Point 6. `underwater-threads.test.js` and `underwater-threads.browser.mjs` compare the accepted
+  JavaScript and Rust/Wasm SIMD ray, delay and pressure state across plain memory and 1, 2 and 4 native
+  threads with exact snapshots, origin-cell shifts and worker receipts. Chromium uses three real helpers.
+  At the endpoint of its stratified case, 11 rays execute 18 drift integrals and 7 crossings. Each axis in
+  the uniform 33,554,432-crossing Node control completes one drift. Failed aggregate receipts preserve
+  the previous accepted rows and counts.
 - Point 7. `underwater-surface.browser.mjs` renders an authored 200 ms pulse in a fixed cutaway.
   Three actual boundary reflections, 39 accepted ray segments and live pressure and delay produce
   4,894 changed pixels on each renderer. The analytic folded paths and beam envelope agree, and

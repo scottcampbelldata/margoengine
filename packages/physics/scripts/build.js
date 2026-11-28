@@ -21,7 +21,7 @@ const exposeOptionalWasmUrl = {
       return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|(?:school|swim|airborne|falling|pedestrian|landscape|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|(?:school|swim|airborne|falling|pedestrian|landscape|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -226,6 +226,9 @@ for (const name of ['crush-shell-kernel.wasm', 'crush-shell-kernel-shared.wasm']
 
 for (const name of ['viscoplastic-kernel.wasm', 'viscoplastic-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/viscoplastic', name), resolve(dist, name));
+
+for (const name of ['underwater-kernel.wasm', 'underwater-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/underwater', name), resolve(dist, name));
 
 for (const name of ['tsunami-kernel.wasm', 'tsunami-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/tsunami', name), resolve(dist, name));

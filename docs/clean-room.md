@@ -15237,6 +15237,11 @@ apply the pressure factors over each boundary's count by integer exponentiation.
 constant `P`, so the total drift is the sum of the identical subinterval integrals (Porter and Bucker,
 1987). For an extreme beam size, factoring out positive scales from `Q` preserves the argument of
 its normalized cross and dot products. Ordinary arithmetic keeps its original order.
+The native implementation ports this same model using Margo's pinned math. SIMD advances range
+and depth together, handles the complex beam drift and checks pairs of candidate rays. Workers
+own consecutive ray ranges and never share a mutable ray row. The published state is independent
+of the number of partitions. Work counters come from resolved events and executed drifts, with
+their integer range verified before publication.
 
 The field timing comparison uses independent geometry and measured water speed from Table I and the
 excess arrival times from Table II of Mandar Chitre, [A high-frequency warm shallow water acoustic communications

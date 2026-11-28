@@ -33,9 +33,25 @@ export interface AcousticRaySample {
     readonly reflections: number;
 }
 
+export interface AcousticWorkCounts extends AcousticWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly AcousticWorkerWork[];
+}
+
+export interface AcousticWorkerWork {
+    readonly rays: number;
+    readonly driftIntegrals: number;
+    readonly boundaryCrossings: number;
+}
+
 export interface SoundSpeedKnot {
     readonly depth: number;
     readonly speed: number;
+}
+
+export interface UnderwaterAcousticsLoadOptions extends UnderwaterAcousticsSolverOptions {
+    readonly threads?: number;
+    readonly signal?: AbortSignal;
 }
 
 export interface UnderwaterAcousticsOptions {
@@ -51,9 +67,12 @@ export class UnderwaterAcousticsSolver implements Solver<UnderwaterAcousticsOpti
     readonly signalField: FieldDescriptor;
     readonly delayField: FieldDescriptor;
     constructor(options?: UnderwaterAcousticsSolverOptions);
+    static load(options?: UnderwaterAcousticsLoadOptions): Promise<UnderwaterAcousticsSolver>;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, options?: UnderwaterAcousticsOptions): void;
     step(_context: StepContext, dt: number): void;
+    workCounts(): AcousticWorkCounts;
     importPorts(_tick: number): void;
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];

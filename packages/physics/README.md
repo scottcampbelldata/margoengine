@@ -6236,7 +6236,7 @@ Gaussian beam whose width, phase and curvature change as the ray bends or reflec
 import { UnderwaterAcousticsSolver, acousticBeamPressure } from 'margoengine/physics/underwater';
 import { PhysicsWorld } from 'margoengine/physics/world';
 
-const acoustics = new UnderwaterAcousticsSolver();
+using acoustics = await UnderwaterAcousticsSolver.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(acoustics, {
   profile: [
     { depth: 0, speed: 1510 },
@@ -6270,6 +6270,16 @@ For another solver, read the layout-1 f64 ports below. The source ID prefixes ea
 | `pathField` | `.path` | Range, depth, total path length and beam width in metres |
 | `signalField` | `.signal` | Real and imaginary on-axis pressure in Pa |
 | `delayField` | `.delay` | Travel time in seconds |
+
+The example loads the optional native tracer. Use `new UnderwaterAcousticsSolver()` for the synchronous
+TypeScript path. Both use the same world fields and snapshot
+layout. `load({ id, threads, signal })` accepts the same ID as the constructor, a native thread count
+(the default is one), and an optional abort signal. Two or more threads use `worldMemory(true)` from
+the physics world entry. Run a threaded browser world in a Worker on a cross-origin-isolated page.
+After removing a loaded solver from the world, call `acoustics[Symbol.dispose]()` to close its workers.
+`acoustics.workCounts()` reports rays, executed drifts and real boundary crossings for the last
+successful tick, including each worker's share. A folded uniform ray counts once for drift and as
+many times as it reached a boundary.
 
 The fixed-camera Margo cutaway draws the accepted rays and signed beam-axis pressure. Run
 `npm run test:gpu:underwater-surface -w @margoengine/physics` from the repository. Set

@@ -15442,8 +15442,8 @@
         "gzip": 5010
       },
       "./lightning": {
-        "raw": 24244,
-        "gzip": 8860
+        "raw": 24267,
+        "gzip": 8875
       },
       "./explosive": {
         "raw": 41750,
@@ -15598,20 +15598,20 @@
         "gzip": 15190
       },
       "./viscoplastic": {
-        "raw": 22717,
-        "gzip": 8590
+        "raw": 22740,
+        "gzip": 8605
       },
       "./tsunami": {
-        "raw": 23335,
-        "gzip": 8936
+        "raw": 23358,
+        "gzip": 8950
       },
       "./pack-ice": {
         "raw": 11423,
         "gzip": 4715
       },
       "./runoff": {
-        "raw": 18076,
-        "gzip": 6948
+        "raw": 18099,
+        "gzip": 6963
       },
       "./drainage-fog": {
         "raw": 10045,
@@ -15638,16 +15638,16 @@
         "gzip": 3902
       },
       "./landscape": {
-        "raw": 19439,
-        "gzip": 7508
+        "raw": 19462,
+        "gzip": 7521
       },
       "./sediment": {
         "raw": 11090,
         "gzip": 4402
       },
       "./underwater": {
-        "raw": 10875,
-        "gzip": 4622
+        "raw": 20293,
+        "gzip": 8028
       },
       "./orbit": {
         "raw": 8213,
@@ -15658,8 +15658,8 @@
         "gzip": 5574
       },
       "./lava": {
-        "raw": 25228,
-        "gzip": 9616
+        "raw": 25251,
+        "gzip": 9628
       },
       "./dfsph": {
         "raw": 19974,
@@ -19288,8 +19288,8 @@
     },
     "packages/physics/dist/solver-phase-thread.js": {
       "raw": 1592,
-      "gzip": 767,
-      "brotli": 674
+      "gzip": 764,
+      "brotli": 668
     },
     "packages/physics/dist/cloth-kernel.wasm": {
       "raw": 11606,
@@ -19930,6 +19930,16 @@
       "raw": 1558039,
       "gzip": 574912,
       "brotli": 424250
+    },
+    "packages/physics/dist/underwater-kernel.wasm": {
+      "raw": 10911,
+      "gzip": 4846,
+      "brotli": 4394
+    },
+    "packages/physics/dist/underwater-kernel-shared.wasm": {
+      "raw": 10911,
+      "gzip": 4846,
+      "brotli": 4401
     }
   },
   "splits": {

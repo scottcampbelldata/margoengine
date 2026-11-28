@@ -9,6 +9,7 @@ type NativePhaseSolver =
   | { readonly subject: 'Lightning'; readonly phaseExport: 'lightning_thread_phase' }
   | { readonly subject: 'Lava'; readonly phaseExport: 'lava_thread_phase' }
   | { readonly subject: 'Viscoplastic'; readonly phaseExport: 'viscoplastic_thread_phase' }
+  | { readonly subject: 'Underwater'; readonly phaseExport: 'underwater_thread_phase' }
   | { readonly subject: 'Runoff'; readonly phaseExport: 'runoff_thread_phase' }
   | { readonly subject: 'Landscape'; readonly phaseExport: 'landscape_thread_phase' };
 
@@ -48,6 +49,7 @@ const phaseLabel = {
   Lightning: 'relaxation',
   Lava: 'native',
   Viscoplastic: 'transfer',
+  Underwater: 'ray trace',
   Runoff: 'soil',
   Landscape: 'terrain',
 } as const;

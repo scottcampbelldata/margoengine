@@ -285,14 +285,14 @@ function foldUniformRay(
   dt: number,
   surfaceReflection: number,
   bottomReflection: number,
-): boolean {
+): number {
   const vertical = ray[row + Word.Vertical]!;
   const depth = ray[row + Word.Depth]!;
   const travelled = Math.abs(speed * vertical * dt);
   const firstIsBottom = vertical > 0;
   const firstDistance = firstIsBottom ? bottom - depth : depth;
   const pastFirst = travelled - firstDistance;
-  if (!(pastFirst >= 16 * bottom)) return false;
+  if (!(pastFirst >= 16 * bottom)) return 0;
   const further = Math.floor(pastFirst / bottom);
   const reflections = further + 1;
   const total = ray[row + Word.Reflections]! + reflections;
@@ -313,7 +313,7 @@ function foldUniformRay(
     reflectionPower(surfaceReflection, pairs + (firstIsBottom ? 0 : unpaired)) *
     reflectionPower(bottomReflection, pairs + (firstIsBottom ? unpaired : 0));
   ray[row + Word.Reflections] = total;
-  return true;
+  return reflections;
 }
 
 export function advanceRay(
@@ -323,16 +323,21 @@ export function advanceRay(
   dt: number,
   surfaceReflection: number,
   bottomReflection: number,
+  receipt: Float64Array,
 ): void {
   const slowness = ray[row + Word.Slowness]!;
   let remaining = dt;
-  let previousZeroTime = false;
-  if (
-    profile.length === 2 * PROFILE_WORDS &&
-    profile[2] === 0 &&
-    foldUniformRay(ray, row, profile[1]!, profile[3]!, dt, surfaceReflection, bottomReflection)
-  )
+  let folds = 0;
+  let drifts = 0;
+  let crossings = 0;
+  if (profile.length === 2 * PROFILE_WORDS && profile[2] === 0)
+    folds = foldUniformRay(ray, row, profile[1]!, profile[3]!, dt, surfaceReflection, bottomReflection);
+  if (folds > 0) {
     remaining = 0;
+    drifts = 1;
+    crossings = folds;
+  }
+  let previousZeroTime = false;
   while (remaining > 0) {
     const layer = ray[row + Word.Layer]!;
     const index = layer * PROFILE_WORDS;
@@ -350,10 +355,13 @@ export function advanceRay(
     const exit = Math.min(upper, lower);
     if (exit > remaining) {
       advanceInside(ray, row, speed, slope, remaining);
+      drifts++;
       ray[row + Word.Depth] = Math.min(bottom, Math.max(top, ray[row + Word.Depth]!));
       break;
     }
     advanceInside(ray, row, speed, slope, exit);
+    if (exit > 0) drifts++;
+    crossings++;
     const edgeDirection = upper < lower ? -1 : 1;
     const edge = edgeDirection === -1 ? index : index + PROFILE_WORDS;
     const edgeSpeed = profile[edge + 1]!;
@@ -384,6 +392,9 @@ export function advanceRay(
     remaining = nextTime;
   }
   ray[row + Word.Time] = ray[row + Word.Time]! + dt;
+  receipt[0] = receipt[0]! + 1;
+  receipt[1] = receipt[1]! + drifts;
+  receipt[2] = receipt[2]! + crossings;
 }
 
 export function sampleRay(

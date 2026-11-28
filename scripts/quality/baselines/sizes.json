@@ -15403,6 +15403,12 @@
       "commit": "sound-03-reflection-fold-and-beam-range",
       "reason": "SOUND-03 physics/underwater 3965 to 4622 B gzip, ceiling 4221 to 4878, for coded input and accepted-state checks, exact uniform reflection counts, and scaled beam drift. Keeping the fold with the trace shares its physical state and avoids duplicating integrator and validation code. Core and Stage gain zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "sound-03-threaded-ray-trace",
+      "reason": "SOUND-03 physics/underwater grows from 4622 to 8028 B gzip (cap 4878 to 8284) for optional Wasm asset loading, shared-memory workers and exact accepted work receipts. Keeping both trace choices in one entry preserves the synchronous API and shares its snapshots and field publication. Each optional native image is 4846 B gzip. Core and Stage gain zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16327,7 +16333,7 @@
     "@margoengine/physics/tissue": 3218,
     "@margoengine/physics/tracers": 17877,
     "@margoengine/physics/tsunami": 9006,
-    "@margoengine/physics/underwater": 4878,
+    "@margoengine/physics/underwater": 8284,
     "@margoengine/physics/vegetation": 9958,
     "@margoengine/physics/viscoplastic": 8826,
     "@margoengine/physics/vortices": 5453,

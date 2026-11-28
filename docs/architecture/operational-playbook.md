@@ -11036,6 +11036,16 @@ loads for unequal masses, rotational clearance, wall loads, queue release, input
 replay across frame rates and memory variants. The NavMesh regressions check weight in the
 existing ORCA planner and preserve covered-target and wall guidance behavior.
 
+### Underwater acoustic evidence (SOUND-03)
+
+The optional Rust/Wasm SIMD tracer updates the same Gaussian beam and Snell arc state as the TypeScript
+constructor. Each native worker writes its own candidate rows and exact counters. The host accepts the
+step only after every partition and the published ports pass. `underwater-threads.test.js` and
+`underwater-threads.browser.mjs` prove exact state across worker counts and far-cell shifts. The
+fixed-camera `underwater-surface.browser.mjs` proves ray segments and pressure and delay labels on
+both renderers. The measured arrival comparison remains open across the tank and ocean regimes.
+Limits and source references are in the Physics README and the SOUND-03 audit.
+
 ### Geological landscape evidence (HYDRO-04)
 
 The optional landscape kernel uses the world clock and occupies native module slot 12 in plain and shared memory.

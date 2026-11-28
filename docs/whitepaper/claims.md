@@ -6198,6 +6198,15 @@ buoyancy enabled. The Water bridge uses that world state to write the rendered i
 [Physical tests](../../packages/physics/tests/pack-ice.test.js) · [Coupling tests](../../packages/physics/tests/coupling/pack-ice.test.js) ·
 [Display test](../../packages/physics/tests/coupling/pack-ice-render.test.js)
 
+### Deterministic underwater ray workers (SOUND-03)
+
+The optional Physics underwater entry reproduces accepted Gaussian-beam paths and pressure ports
+exactly in JavaScript and native Rust/Wasm at one, two and four threads. The Node and Chromium
+`underwater-threads` checks include the origin shift, an exact rewind and real per-worker receipts.
+The fixed cutaway `underwater-surface.browser.mjs` draws 39 accepted segments on WebGPU and WebGL2.
+The evidence covers these paths and draw calls. Receiver pressure and independent transmission loss
+remain open. [SOUND-03 audit](../physics-solver-audit.md#sound-03-four-point-pass)
+
 ### Civil barrier crush
 
 The reduced station model conserves rigid linear momentum and transfers the predicted normal work into permanent deformation. `packages/physics/tests/coupling/crush.test.js` compares the observed work to the kinetic-energy loss on two unequal masses and checks the angular response at an offset contact. The floating hull fixture verifies recoil and seal loss while actual seakeeping loads remain active. The bounded claim covers calibrated normal events on configured contact stations.

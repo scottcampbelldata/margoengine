@@ -300,6 +300,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'underwater-kernel',
+    crate: 'packages/physics/underwater-kernel',
+    blueprint: 'packages/physics/src/underwater/underwater-kernel.wasm',
+    script: 'packages/physics/scripts/build-underwater-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'underwater-kernel-shared',
+    crate: 'packages/physics/underwater-kernel',
+    blueprint: 'packages/physics/src/underwater/underwater-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-underwater-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'tsunami-kernel',
     crate: 'packages/physics/tsunami-kernel',
     blueprint: 'packages/physics/src/tsunami/tsunami-kernel.wasm',
