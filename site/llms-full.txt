@@ -32259,14 +32259,25 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
 
 ### Linux (Intel UHD, Mesa): three GPU suites not finished
 
-**Status:** open, deferred (Scott: ignore for now): Linux Intel UHD Mesa suites not finished (hardware check).
+**Status:** open, deferred (Scott: ignore for now): the 2026-11-28 run left 12 steps over the heat budget, and the
+voxel path tracer is excluded on this hardware (hardware check).
 
-- **What:** on the Ubuntu test server (Intel N100 with Intel UHD, Chromium on Mesa's Vulkan driver, Node 24, main
-  b92998d6, 2026-10-28) 42 of the 43 package GPU suites were started, one at a time, and 38 passed. The voxel, voxel
-  path tracer and root browser suites were stopped by the heat watchdog at 82 C before they finished, so they have no
-  Linux result yet. The text failure of the same run is the colour emoji entry below.
-- **Needed to close:** those three suites run to the end on Linux, on a machine that stays cool under a long GPU
-  run, and the results recorded here.
+- **What (2026-10-28, main b92998d6):** on the Ubuntu test server (Intel N100 with Intel UHD, Chromium on Mesa's Vulkan
+  driver, Node 24) 42 of the 43 package GPU suites were started, one at a time, and 38 passed. The voxel, voxel path
+  tracer and root browser suites were stopped by the heat watchdog at 82 C. The text failure of that run is the colour
+  emoji entry below.
+- **Run 2026-11-28 (main 4957cd161d, Mesa 26.0.8, profile `thermal-limited`):** `node scripts/gpu-package-tests.mjs
+  --no-build --select=...` over the three voxel GPU scripts and the 28 root suites, 47 steps, 2,111 s. Voxel: 16 pass,
+  1 fails, 2 not finished. Root: 7 pass, 11 fail, 10 not finished. Eight of the failing checks also fail on the
+  workstation (KB-GPUMAIN1 under "Open defects").
+- **Linux or that machine only:** `test:docs:browser` quickstart (`no click reached /Picked the ball/`; it passes on
+  the workstation; cause not traced). `modern:test:extensions` lacked its pinned download `test-results/robot.glb`, and
+  `test:physics2d-kernel-browsers` needs `cargo`, which the machine does not have.
+- **Not finished, heat (three stops each):** `voxel test:gpu:slow-compile` (both steps) and the root
+  `test:integration:browser`, `test:pages:browser`, `test:composition:browser`, `test:modules:browser`,
+  `test:python:browser`, `test:gallery:browser`, `test:orrery`, `test:cabin-hearth`, `test:storm-light`, `test:shot`.
+- **Needed to close:** those 12 steps (split further, or a cooler Linux machine), the voxel path tracer on a Linux
+  machine whose profile allows it, and the Linux-only failure traced.
 
 ### Fixed: steering could turn without a mass, drag or curvature constraint (PA-83, LIFE-04)
 
@@ -32299,6 +32310,24 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   docs/limits.md, "Web template bundle".
 
 ## Open defects
+
+### Open 2026-11-28: nine browser GPU checks fail on main (KB-GPUMAIN1)
+
+Found by running the voxel and root GPU suites on the Ubuntu server, then each failing check on the workstation (Windows
+11, RTX A6000), both at 4957cd161d. The first eight fail on both machines. Causes are not traced; a named commit is a
+suspect from its date and subject and was not tested.
+
+| Check (command) | Failure | Suspect |
+| --- | --- | --- |
+| `node packages/voxel/tests/render-lighting-browser-check.mjs` | `4x lit greedy vs naive view 0`: 360 pixels differ on the workstation (382 on Linux), 92 two by two blocks where 0 are allowed; sampled values differ by about 1 percent | none |
+| `node scripts/modern-browser-tests.js` (also `--pipeline-delay=300` on Linux) | `Moon not visible over the base engine: 0` | none |
+| `node scripts/modern-xr-tests.js` | `AR alpha`: `wrong` 1,337 pixels (1,328 on Linux). `tests/modern-xr-passes.ts` still requires alpha to equal the brightest channel where nothing wrote depth | cee7c8b46a (KB-XR-ARNODEPTH1) gives depthless content its coverage as alpha |
+| `node scripts/lifecycle-browser-tests.mjs`, scenario D, stage loop | the first frame after a 30 s background tab runs physics steps (1 on the workstation, 2 on Linux), 0 required | physics lane; the late physics step (KB-PHYS-FRAMEORDER1) |
+| `node scripts/modern-domain-tests.js` | `mid-encoding device loss`: `recreated` false (9 recovery frames of 21) | none |
+| `node scripts/modern-game-tests.js` | `History did not follow motion-vector reprojection: 0.2496337890625 vs 0.170196533203125` (same values on both) | f2f994fb19 (KB-POST-MRTJITTER1) changed the TAA camera |
+| `node scripts/modern-sky-fog-tests.js` | `bruneton/12` render with 4 samples and legacy fog rejected: buffer binding of 32 B below the pipeline's minimum 320 B | none |
+| `node scripts/frame-alloc-browser.mjs`, `post` | 1,588 B a steady frame, floor 1,528 B | none |
+| `node scripts/docs-browser-test.mjs`, quickstart (Linux only) | no click reaches `Picked the ball` | none |
 
 ### Open 2026-11-27: five Fauld shot cameras still cannot see their subject (shot generator, KB-SHOT-FAULDSIGHT1)
 
