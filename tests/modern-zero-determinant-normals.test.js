@@ -9,10 +9,24 @@ import test from 'node:test';
 
 const packages = new URL('../packages/', import.meta.url);
 
-// sign() of a scalar triple product dot(a,cross(b,c)): the determinant of a 3x3 matrix, in WGSL, GLSL or JS.
-const tripleSign = /\bsign\(\s*dot\([^;]*?\bcross\(/;
-// sign() of a variable named det or determinant.
-const detSign = /\bsign\(\s*(?:det|determinant)\s*\)/;
+// The ways a determinant reaches sign(), in WGSL, GLSL or JS. Each is matched over a whole file, so an argument that
+// starts on the next line (a call Prettier wraps as `Math.sign(` then the expression) is caught too: a line-by-line
+// scan missed the selection pick pass's node handedness that way.
+const patterns = [
+  // sign() of a scalar triple product dot(a,cross(b,c)): the determinant of a 3x3 matrix.
+  /\bsign\(\s*dot\([^;]*?\bcross\(/g,
+  // sign() of a value or call named det or determinant (det, detM, det3(m), m.determinant(), determinant(m)).
+  /\bsign\(\s*(?:[\w$]+(?:\[[^\]]*\])?\.)*[dD]et(?:erminant)?(?:[A-Z0-9_][\w$]*)?(?![\w$])/g,
+  // sign() of a cofactor expansion written out: a * (b * c - d * e) ...
+  /\bsign\(\s*[^;()]*?\*\s*\(\s*[^;()]*?\*[^;()]*?-[^;()]*?\*[^;()]*?\)/g,
+];
+
+/** The 1-based line of every sign() of a determinant in `text`. */
+const signedDeterminants = (text) => {
+  const lines = new Set();
+  for (const re of patterns) for (const m of text.matchAll(re)) lines.add(text.slice(0, m.index).split('\n').length);
+  return [...lines].sort((a, b) => a - b);
+};
 
 // Sites where det is never 0 or is not a model matrix's determinant, with the reason.
 const allowed = new Map([
@@ -48,12 +62,10 @@ test('no normal path multiplies by sign() of a model determinant (a zero scale g
   const found = [];
   let scanned = 0;
   for (const file of sources()) {
-    const lines = readFileSync(new URL(file, packages), 'utf8').split(/\r?\n/);
+    const text = readFileSync(new URL(file, packages), 'utf8');
     scanned++;
-    lines.forEach((line, i) => {
-      if (allowed.has(file)) return;
-      if (tripleSign.test(line) || detSign.test(line)) found.push(`packages/${file}:${i + 1}`);
-    });
+    if (allowed.has(file)) continue;
+    for (const line of signedDeterminants(text)) found.push(`packages/${file}:${line}`);
   }
   assert.ok(scanned > 500, `scanned ${scanned} source files`);
   assert.deepEqual(found, [], 'use select(-1.0,1.0,det>=0.0) or det < 0 ? -1 : 1, and guard a zero normal');
@@ -62,6 +74,29 @@ test('no normal path multiplies by sign() of a model determinant (a zero scale g
 test('every allowed site still holds a sign of a determinant, so the list cannot go stale', () => {
   for (const file of allowed.keys()) {
     const text = readFileSync(new URL(file, packages), 'utf8');
-    assert.ok(tripleSign.test(text) || detSign.test(text), `${file} no longer needs its entry`);
+    assert.ok(signedDeterminants(text).length > 0, `${file} no longer needs its entry`);
   }
+});
+
+test('the matcher finds a sign() whose determinant starts on the next line, and leaves the safe forms alone', () => {
+  // The selection pick pass's node handedness before 0aed03c203, which the line-by-line scan missed.
+  const wrapped = [
+    '      values[34] = p.texCoord ?? 0;',
+    '      values[35] = Math.sign(',
+    '        m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]),',
+    '      );',
+  ].join('\n');
+  assert.deepEqual(signedDeterminants(wrapped), [2]);
+  assert.deepEqual(signedDeterminants('a;\nn *= sign(\n  dot(m0.xyz,\n  cross(m1.xyz, m2.xyz)));'), [2]);
+  assert.deepEqual(signedDeterminants('let s = sign(determinant(m));'), [1]);
+  assert.deepEqual(signedDeterminants('const s = Math.sign(\r\n  detM,\r\n);'), [1]);
+  assert.deepEqual(signedDeterminants('const s = Math.sign(this.matrix.determinant());'), [1]);
+  for (const safe of [
+    'o.face=select(-1.0,1.0,dot(cross(a,b),c)>=0.0);',
+    'const s = det < 0 ? -1 : 1;',
+    'float s = d < 0. ? -1. : 1.;',
+    'const s = Math.sign(detail);',
+    'const s = Math.sign(x - y);',
+  ])
+    assert.deepEqual(signedDeterminants(safe), [], safe);
 });
