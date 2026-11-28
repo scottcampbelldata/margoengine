@@ -1,21 +1,21 @@
 {
  "proof": "post-ssr-models",
- "ref": "a53e3a9835",
- "revision": "a53e3a9835c0078aac9426aac72a3d11eb09b286",
- "capturedAt": "a53e3a9835c0078aac9426aac72a3d11eb09b286",
+ "ref": "48e76a057a",
+ "revision": "48e76a057a90c86ad11a606fb595b0661daeb736",
+ "capturedAt": "f3a7cb1d6289a05a8f9993d6e4184350cc0e9be8",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {
-  "a53e3a9835 descends from f5b3575bc0": true
+  "48e76a057a descends from f5b3575bc0": true
  },
  "outputs": {
-  "SSR 1x core": "7a219295cbe702bf4a47198feb69130beb2d02dc389081ed222fcd1095e6fd9e",
-  "SSR 1x IBL": "6361e45830d8e6387ac94c211e3dc556463e38c4ec5798978c2b82f0940212e8",
-  "SSR 4x core": "70c25ac16b2398820a64c410ad14a0a17c94b5e779f44c69d5dbcfa726136374",
-  "SSR 4x IBL": "91a53ab98b5ccd0eff2f46e48d67181683bfb7949ee32d2b7c6dbe6972848dc9",
-  "SSAO, SSR, Bloom, FXAA 1x core": "b3e4e460737b6ff6f0898b4008f5a6f6ad5f1bb8be9ff128df65a856c8eac719",
-  "SSAO, SSR, Bloom, FXAA 1x IBL": "d555e98db8314a94e7e30e29a1a5240abcc3cfa18a16824ada0a683958abc57e",
-  "SSAO, SSR, Bloom, FXAA 4x core": "7ce83527e51111bcf52fdcc57cde77205132c860f12c61862893db5664f2cda0",
-  "SSAO, SSR, Bloom, FXAA 4x IBL": "fc2f6e20ae3b4e546c8e9304336ff59a0d82974e55373b032e9e3a2fb05a909f",
+  "SSR 1x core": "c2298a2f86060714e199f5bb18794aae233bee8028b6272cd1d2bb8a2f107b83",
+  "SSR 1x IBL": "318bdbae532b360b29edff9d9a8e42abe85a5ef4e3a546f541231a10c2c9984e",
+  "SSR 4x core": "df5f7d0d4d4e0c8ce55854ea42f46fcb28da96680cb0bee04eb4bdd459981b33",
+  "SSR 4x IBL": "5a165db900eb664b7dfb93183a60a98ac16fa93d887e847d7e91d2f0ce96145e",
+  "SSAO, SSR, Bloom, FXAA 1x core": "e62572f0809a79b4af4a69eaa914eaefc8f989206546845dd817587d535dca27",
+  "SSAO, SSR, Bloom, FXAA 1x IBL": "cc54b66eb51fd6b6b521e69c15baaa294cf982e43f627117f2f8a346a43b3451",
+  "SSAO, SSR, Bloom, FXAA 4x core": "edb4357541d7371a89459eaf11aa5bddbfc6932e530537b2ae0b76c834ca5883",
+  "SSAO, SSR, Bloom, FXAA 4x IBL": "a0151b526dd53cbf88610543f764e79f8a2d06b7c130e9ba625ffdd2c55e1c55",
   "SSAO, Bloom, FXAA 1x core": "fd7542b7d7898753a272b2fc3eaeddbb3361e423842174235fc954be80ada914",
   "SSAO, Bloom, FXAA 1x IBL": "8032c3b341b772f7bde3cd695582788eef25dd828e07ed2e5e8b8c3cea0ae9b5",
   "SSAO, Bloom, FXAA 4x core": "a577c27795a895ed1be55ec55bdc3c8980799ef9be082f9d6ad391e59631a093",
