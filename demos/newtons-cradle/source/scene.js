@@ -2,7 +2,7 @@ import { Engine } from '@margoengine/core';
 import { EnvironmentLighting } from '@margoengine/environment';
 import { Shadows } from '@margoengine/shadows';
 import { makeCradle } from './instrument.js';
-import { advance, energy, initialise, length } from './motion.js';
+import { advance, disposeMotion, energy, initialise, length, loadMotion } from './motion.js';
 
 const canvas=document.querySelector('#scene');
 const loading=document.querySelector('#loading');
@@ -16,7 +16,7 @@ const controls=[release,slow,...count];
 
 let engine,cradle,frame,observer,last;
 let selected=1,slowed=false,running=false,firstMotion=false;
-let system=initialise(selected);
+let system;
 
 function room() {
   const width=64,height=32,data=new Float32Array(width*height*4);
@@ -92,6 +92,7 @@ function dispose() {
   observer?.disconnect();
   if(frame!==undefined)cancelAnimationFrame(frame);
   engine?.dispose();
+  disposeMotion(system);
 }
 function fail(error) {
   if(lifetime.signal.aborted)return;
@@ -103,6 +104,7 @@ function fail(error) {
   dispose();
 }
 function reset() {
+  disposeMotion(system);
   system=initialise(selected);
   last=undefined;
 }
@@ -134,6 +136,8 @@ async function start() {
     bounds:{min:[-.38,-.067,-.19],max:[.38,.45,.25]},
   });
   await EnvironmentLighting.load(engine,room(),{size:32,specularSize:32,intensity:1.00,signal:lifetime.signal});
+  await loadMotion(lifetime.signal);
+  system=initialise(selected);
   cradle=makeCradle(engine,shadows);
   size();
   draw(performance.now());
