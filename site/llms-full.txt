@@ -1359,7 +1359,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,472 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,474 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -16546,6 +16546,36 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: the animator README's fitted-body example loaded no model and failed its asset test (KB-ANIM-IKREADME1, animator)
+
+- **Repro:** `node --test packages/animator/test/readme-assets.test.js` on main after c17577b174: "standalone example
+  loads its required model" for "Solvers on a fitted body".
+- **Cause:** the example fitted a hand-typed eight-joint rig; every animator README example runs against authored model
+  data, and the test holds that.
+- **Fix:** the example fits the body to the bundled Quaternius mannequin and aims its look; it runs (animator and
+  weather README examples, 57 of 57).
+- **Regression:** that test.
+
+### Open 2026-11-28: the human anatomy table does not read Unreal mannequin or KayKit bone names (KB-RIG-UENAMING1, rigging)
+
+- **Repro:** `fitAnatomy` with `species: human` on `examples/assets/quaternius/UAL1_Standard_RM.glb` (pelvis,
+  upperarm_l, thigh_l) or on a KayKit character throws "This rig needs a left and a right joint to read its facing".
+- **Cause:** `nameHuman` (packages/rigging/src/anatomy-human.ts) knows the HAnim, segment-named, joint-named and
+  retarget preset namings only.
+- **Fix needed:** the two namings in the table's aliases (or as retarget presets), with a fit test on both bundled
+  models. Until then pass `map`, as the animator README does.
+
+### Open 2026-11-28: every `procedural:rock` of a biome is the same stone (KB-BIOMES-ROCKSEED1, biomes)
+
+- **Repro:** Above the Treeline before 2026-11-28 (talus of `procedural:rock` over the upper meadow and scree): every
+  stone has one silhouette, only turned and scaled, which reads as copies from 2 to 30 m.
+- **Cause:** `partsOf` in `packages/biomes/src/objects.ts` builds the `rock` key from `generateRockMesh(1, ...)`, seed
+  1 for every species and instance, and a species draws one mesh through its `ScatterTiles`, so the seeded forms of
+  `@margoengine/procedural` (block, slab, wedge, shard, pebble) never appear.
+- **Fix needed:** draw a `procedural:rock` species as several seeded forms (records split among a few `ScatterTiles`
+  by a hash of each record, density unchanged), with a test that a talus field holds at least four distinct meshes.
+  The film now draws eight scanned stones instead (`treeline-rocks/talus` in the asset library).
+
 ### Fixed 2026-11-28: the lens drops' glint added light over empty pixels without covering them (KB-WEATHER-LENSGLINT1, weather)
 
 - **Repro:** `packages/post/test/alpha-rim-browser.mjs`, "lens drops over nothing": `LensDrops` alone on a
@@ -16930,8 +16960,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Repro:** `node --test --test-name-pattern="sliding attachment" packages/physics/tests/coupling/tissue.test.js`: the
   particle ends at 0.5100431 against the closed form 0.5100446, 1.5e-6 off, where the bound is 16 float32 spacings of the
   0.5 m length (9.5e-7). Red on main at bfb7d64cd8.
-- **Cause:** not traced yet. Whether the solve falls short of its closed form (a missing term) or only rounds past the
-  bound is to be found first; the bound is not to be widened.
+- **Cause (traced 2026-11-28, lane P):** a missing term in the closed form's world, not rounding: the soft world's face air
+  drag acts on the tissue. `SoftBodies` steps `airDrag` for any body with triangles (`packages/physics/src/soft.ts`, the
+  `body.airDrag && body.airLoads === 0 && body.triangleList.length > 0` line), and `setSurface()` gives a body of cells its
+  boundary faces, which its doc names as what a surface collider is made of; `setAirDrag` documents the air for "a body of
+  triangles (a cloth, a trimesh)". So every box, solid and volumetric body takes a flat plate's drag on each surface face.
+  Measured with the test's scene: the particle's step falls short by 1.49e-4, 7.8e-5 and 3.1e-5 of its displacement at
+  bone offsets of 1/32, 1/64 and 1/128 m (the shortfall follows the speed, as quadratic drag does), by the same 1.49e-4 with
+  the elastic modulus set to 0.001 Pa, and by under 7e-6 (float32 rounding) with `setAirDrag(false)`, for 2 to 64 passes.
+- **Fix:** skip the face air for a body with cells (`body.cellRange.count === 0` beside the triangle check, as adaptive
+  tearing and the cloth-only flags already test), so the code keeps its documented contract and the tissue test passes
+  unchanged. `soft.ts` belongs to SOFT-01, SOFT-04 and SOFT-06 (claimed in docs/physics-work-queue.md and edited within
+  the hour), so it is left to that owner; a closed shell's faces (`SoftBodyDesc.volume` without cells) each take a whole
+  plate's drag too, front and back, which that owner should weigh at the same time.
 
 ### Open 2026-11-28: a volumetric rung stops cracking under continued remeshing (KB-SOFT-CRACKRES1, physics soft volumetric)
 
