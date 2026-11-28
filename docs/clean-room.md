@@ -19130,3 +19130,12 @@ is SEA-08's (`bakeHullPanels`, its sources listed under SEA-08) and was consumed
   21-28, https://doi.org/10.1080/10867651.1997.10487468 : the ray cast that re-panels a detailed hull as its star.
 - The inscribed polyhedron of a sphere, capsule, cylinder or cone is scaled to the shape's own volume so it floats at
   the shape's draft (an inscribed polygon of n sides holds (n / 2 pi) sin(2 pi / n) of the circle's area).
+### GPU cloth CPU route on threads (`@margoengine/physics/gpu-cloth` `threads`, SOFT-01, 2026-11-27)
+
+`packages/physics/cloth-kernel/src/lib.rs` (`cloth_step_part`), `src/cloth/kernel.ts`, `src/cloth/thread.ts`. Each pass of
+a substep is split by a static schedule, thread t of T taking items [n t / T, n (t + 1) / T) of the particles, the pins and
+each edge colour, with a counting barrier between passes (a shared arrived count and generation word, the last arrival
+raising the generation): the bulk-synchronous model (L. G. Valiant, "A bridging model for parallel computation", CACM 33(8),
+1990). No item of a pass writes what another item of it reads (a colour's edges share no particle: the graph colouring the
+GPU route already uses), so the result does not depend on the thread count. The worker pattern is the explosive kernel's
+(`src/explosive/thread.ts`).

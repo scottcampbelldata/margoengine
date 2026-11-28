@@ -35,7 +35,9 @@ export class GPUCloth implements EnginePlugin {
     readonly vertices: Float32Array;
     revision: number;
     constructor(desc: SoftBodyDesc, options?: GPUClothCreateOptions);
-    static load(signal?: AbortSignal): Promise<void>;
+    static load(signal?: AbortSignal, { threads }?: {
+        threads?: number;
+    }): Promise<void>;
     static attach(engine: EngineKernel, desc: SoftBodyDesc, options?: GPUClothCreateOptions): GPUCloth;
     pin(index: number, point?: Vec3): this;
     attach(index: number, body: PhysicsBody, point?: Vec3): this;
@@ -73,6 +75,7 @@ export interface GPUClothCreateOptions extends GPUClothOptions {
     } | null;
     uvs?: ArrayLike<number>;
     colliders?: readonly GPUClothColliderDesc[];
+    threads?: number;
 }
 
 export interface GPUClothDebugOptions {
@@ -147,6 +150,7 @@ export interface GPUClothStats {
         edges: number;
         colliderTests: number;
     };
+    threadWork?: number[];
 }
 
 export const GPU_CLOTH_FRAME_SUBSTEPS = 256;

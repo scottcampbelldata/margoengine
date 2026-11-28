@@ -37,6 +37,7 @@ const H_SDF: usize = 17; // f32 samples of every sdf collider
 const H_TETHERS: usize = 18; // u32 [2 per particle]: anchor, rest distance bits; 0 when the pass does not run
 const H_WORK: usize = 19; // u32 [4]: work counts of the call (substeps, particle updates, edge solves, collider tests)
 const H_TRIANGLE_COUNT: usize = 20;
+const H_BARRIER: usize = 21; // u32 [2]: the threads' barrier (arrived, generation); unused by one thread
 
 const NO_EDGE: u32 = 0xffff_ffff;
 const SLOT: usize = 64;
@@ -321,8 +322,8 @@ fn collide(
 }
 
 /// Each particle's unit normal, the area-weighted sum of its triangles' (xyz of `normals`; w, its area, is kept).
-fn write_normals(state: F, mut normals: F, adjacency: U, triangles: U, count: usize) {
-    for v in 0..count {
+fn write_normals(state: F, mut normals: F, adjacency: U, triangles: U, count: usize, lo: usize, hi: usize) {
+    for v in lo..hi {
         let (mut nx, mut ny, mut nz) = (0.0, 0.0, 0.0);
         for k in adjacency[v] as usize..adjacency[v + 1] as usize {
             let t = adjacency[count + 1 + k] as usize * 3;
@@ -362,8 +363,10 @@ fn write_surface(
     triangles: U,
     uvs: F,
     count: usize,
+    lo: usize,
+    hi: usize,
 ) {
-    for v in 0..count {
+    for v in lo..hi {
         let (mut nx, mut ny, mut nz) = (0.0f64, 0.0f64, 0.0f64);
         let (mut sx, mut sy, mut sz) = (0.0f64, 0.0f64, 0.0f64);
         let (mut bx, mut by, mut bz) = (0.0f64, 0.0f64, 0.0f64);
@@ -465,14 +468,64 @@ pub unsafe extern "C" fn cloth_surface(header: *const u32) {
         h.u32s(H_TRIANGLES, triangles_len),
         h.f32s(H_UVS, 2 * n),
         n,
+        0,
+        n,
     );
+}
+
+/// The first and one past the last of `count` items that thread `thread` of `threads` takes: a static schedule, the same
+/// share every pass, so a pass's work by thread is fixed by the counts alone.
+fn share(count: usize, thread: usize, threads: usize) -> (usize, usize) {
+    (count * thread / threads, count * (thread + 1) / threads)
+}
+
+/// The threads' meeting point between passes (a counting barrier on two shared words: the threads arrived and the
+/// generation). The last to arrive clears the count and raises the generation; the others spin on it. Passes are short and
+/// evenly shared, so a wait is short; between frames the threads wait in their host (thread.ts) on the frame's go word.
+/// One thread never waits. In the shared build the atomics are the memory's own (atomic loads and adds of the threads
+/// proposal); the single-threaded build never reaches them.
+struct Barrier {
+    words: *mut u32,
+    threads: u32,
+}
+
+impl Barrier {
+    fn meet(&self) {
+        if self.threads <= 1 {
+            return;
+        }
+        use core::sync::atomic::{AtomicU32, Ordering};
+        let arrived = unsafe { &*(self.words as *const AtomicU32) };
+        let generation = unsafe { &*(self.words.add(1) as *const AtomicU32) };
+        let seen = generation.load(Ordering::Acquire);
+        if arrived.fetch_add(1, Ordering::AcqRel) + 1 == self.threads {
+            arrived.store(0, Ordering::Release);
+            generation.fetch_add(1, Ordering::AcqRel);
+            return;
+        }
+        while generation.load(Ordering::Acquire) == seen {
+            core::hint::spin_loop();
+        }
+    }
 }
 
 /// The frame's substeps: for each, the normals (for the drag), integrate, pins, the edges colour by colour, tethers and
 /// colliders, in the GPU's order, and the surface pass after each step.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn cloth_step(header: *const u32) {
+    unsafe { cloth_step_part(header, 0, 1) };
+}
+
+/// Thread `thread` of `threads` of a frame (`cloth_step` is thread 0 of 1): every pass is split by a static schedule (each
+/// thread a fixed share of the particles, of the pins and of each edge colour) and the threads meet after each. No two items
+/// of a pass touch the same particle (a colour's edges share none), and an item's operations do not depend on which thread
+/// runs it, so any number of threads gives the same bits. Each thread counts its own work in its four words of the work
+/// array.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn cloth_step_part(header: *const u32, thread: u32, threads: u32) {
     let h = Header(header);
+    let (thread, threads) = (thread as usize, threads.max(1) as usize);
+    let barrier = Barrier { words: h.word(H_BARRIER) as *mut u32, threads: threads as u32 };
     let n = h.word(H_COUNT);
     let adj_len = h.u32s(H_ADJACENCY, n + 1)[n] as usize + n + 1;
     let adjacency = h.u32s(H_ADJACENCY, adj_len);
@@ -513,10 +566,12 @@ pub unsafe extern "C" fn cloth_step(header: *const u32) {
     }
     let sdf = h.f32s(H_SDF, sdf_len);
     let tethers = if h.word(H_TETHERS) != 0 { Some(h.u32s(H_TETHERS, 2 * n)) } else { None };
-    let mut work = h.u32s(H_WORK, 4);
+    let mut work = Buf((h.word(H_WORK) as *mut u32).wrapping_add(4 * thread));
     for k in 0..4 {
         work[k] = 0;
     }
+    let (lo, hi) = share(n, thread, threads);
+    let (pin_lo, pin_hi) = share(pin_count, thread, threads);
 
     for s in 0..slot_count {
         let o = s * SLOT;
@@ -530,13 +585,16 @@ pub unsafe extern "C" fn cloth_step(header: *const u32) {
         let turbulence = slots[o + 11] as f64;
         let drag_k = slots[o + 12] as f64;
         let thickness = slots[o + 13] as f64;
-        work[0] += 1;
+        if thread == 0 {
+            work[0] += 1;
+        }
         // Normals of the shape now, for the drag.
         if drag_k > 0.0 {
-            write_normals(state, normals, adjacency, triangles, n);
+            write_normals(state, normals, adjacency, triangles, n, lo, hi);
+            barrier.meet();
         }
         // Integrate: the velocity takes the last substep's corrections, damping, the wind's drag and gravity.
-        for i in 0..n {
+        for i in lo..hi {
             let p = i * 4;
             let w = state[p + 3] as f64;
             if w == 0.0 {
@@ -576,8 +634,9 @@ pub unsafe extern "C" fn cloth_step(header: *const u32) {
             state[q + 2] = state[p + 2];
             state[q + 3] = 0.0;
         }
+        barrier.meet();
         // Pins: held particles move from where the pin was to where it is, by the substep's share of the frame.
-        for k in 0..pin_count {
+        for k in pin_lo..pin_hi {
             let b = k * 8;
             let i = pins_u[b + 3] as usize;
             let p = i * 4;
@@ -600,10 +659,11 @@ pub unsafe extern "C" fn cloth_step(header: *const u32) {
             slots[o + 17] as f64 / (dt * dt),
             slots[o + 18] as f64 / (dt * dt),
         ];
+        barrier.meet();
         for c in 0..color_count {
             let start = colors[2 * c] as usize;
-            let count = colors[2 * c + 1] as usize;
-            for e in start..start + count {
+            let (first, last) = share(colors[2 * c + 1] as usize, thread, threads);
+            for e in start + first..start + last {
                 let i = edges[e * 4];
                 if i == NO_EDGE {
                     continue;
@@ -636,11 +696,12 @@ pub unsafe extern "C" fn cloth_step(header: *const u32) {
                 state[pj + 1] = (state[pj + 1] as f64 - ny * wj * dl) as f32;
                 state[pj + 2] = (state[pj + 2] as f64 - nz * wj * dl) as f32;
             }
+            barrier.meet();
         }
         // Tethers: a free particle past its rest distance along the cloth (times 1 + slack) from its pin is pulled back.
         if let Some(t) = &tethers {
             let stretch = slots[o + 21] as f64;
-            for i in 0..n {
+            for i in lo..hi {
                 let anchor = t[i * 2];
                 let p = i * 4;
                 if anchor == NO_EDGE || state[p + 3] == 0.0 {
@@ -671,7 +732,7 @@ pub unsafe extern "C" fn cloth_step(header: *const u32) {
                 let mut at = pose;
                 at[c] = collider_pose(colliders, c, a0, a1);
             }
-            for i in 0..n {
+            for i in lo..hi {
                 let p = i * 4;
                 if state[p + 3] == 0.0 {
                     continue;
@@ -686,8 +747,10 @@ pub unsafe extern "C" fn cloth_step(header: *const u32) {
                 }
             }
         }
+        barrier.meet();
         if (s + 1) % substeps == 0 {
-            write_surface(state, normals, vertices, adjacency, triangles, uvs, n);
+            write_surface(state, normals, vertices, adjacency, triangles, uvs, n, lo, hi);
+            barrier.meet();
         }
     }
 }

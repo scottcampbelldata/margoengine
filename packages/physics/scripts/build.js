@@ -46,6 +46,7 @@ await build({
         index: resolve(root, 'src/index.ts'),
         'kernel-thread': resolve(root, 'src/kernel-thread.ts'),
         'explosive-thread': resolve(root, 'src/explosive/thread.ts'),
+        'cloth-thread': resolve(root, 'src/cloth/thread.ts'),
         decomposition: resolve(root, 'src/decomposition.ts'),
         soft: resolve(root, 'src/soft.ts'),
         tissue: resolve(root, 'src/tissue.ts'),
@@ -131,7 +132,8 @@ await build({
 });
 for (const name of ['school-kernel.wasm', 'school-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/schooling', name), resolve(dist, name));
-await copyFile(resolve(root, 'src/cloth/cloth-kernel.wasm'), resolve(dist, 'cloth-kernel.wasm'));
+for (const name of ['cloth-kernel.wasm', 'cloth-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/cloth', name), resolve(dist, name));
 for (const name of ['rail-kernel.wasm', 'rail-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/rail', name), resolve(dist, name));
 for (const name of ['pbf-kernel.wasm', 'pbf-kernel-shared.wasm'])

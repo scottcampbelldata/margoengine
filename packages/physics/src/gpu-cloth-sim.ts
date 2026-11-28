@@ -170,6 +170,11 @@ export interface GPUClothStats {
    * solves and particle-collider tests. The WebGPU route does the same work on the GPU and does not count it.
    */
   work: { substeps: number; particles: number; edges: number; colliderTests: number };
+  /**
+   * With threads, each thread's share of the CPU route's work so far (particle updates, edge solves and collider tests; the
+   * main thread first), summing to `work`'s: the static schedule fixes it by the counts alone.
+   */
+  threadWork?: number[];
 }
 
 /** Resolved settings of one frame. */
@@ -260,7 +265,8 @@ export function resolveClothParams(
     if (density === undefined) density = num(at.density, 0, 'wind.sample(...).density', 0, 2000);
   } else wind = vec(source ?? [0, 0, 0], 'wind');
   const substeps = num(options.substeps, 30, 'substeps', 1, MAX_GPU_CLOTH_SUBSTEPS);
-  if (!Number.isInteger(substeps)) throw clothError(`GPUCloth substeps is ${substeps}; pass a whole number from 1 to 64.`);
+  if (!Number.isInteger(substeps))
+    throw clothError(`GPUCloth substeps is ${substeps}; pass a whole number from 1 to 64.`);
   return {
     gravity: [g[0] * s, g[1] * s, g[2] * s],
     wind,
@@ -302,19 +308,26 @@ export function buildClothTopology(
     resolvedMasses?: () => number[];
   };
   if (!d || !Array.isArray(d.positions) || typeof d.resolvedMasses !== 'function')
-    throw clothError('GPUCloth needs a SoftBodyDesc from @margoengine/physics/soft (cloth, clothAnisotropic or trimesh).');
+    throw clothError(
+      'GPUCloth needs a SoftBodyDesc from @margoengine/physics/soft (cloth, clothAnisotropic or trimesh).',
+    );
   const count = d.positions.length / 3;
   if (count < 3 || count > MAX_GPU_CLOTH_PARTICLES)
     throw clothError(`GPUCloth holds 3 to ${MAX_GPU_CLOTH_PARTICLES} particles, not ${count}.`);
   const tris = d.triangles ?? [];
   if (tris.length === 0)
-    throw clothError('GPUCloth draws triangles: build the description with SoftBodyDesc.cloth, clothAnisotropic or trimesh.');
+    throw clothError(
+      'GPUCloth draws triangles: build the description with SoftBodyDesc.cloth, clothAnisotropic or trimesh.',
+    );
   if (d.grid?.wrap)
-    throw clothError('GPUCloth does not take a clothTube (its seam); build it as a trimesh, or step it on the CPU with SoftBodies.');
+    throw clothError(
+      'GPUCloth does not take a clothTube (its seam); build it as a trimesh, or step it on the CPU with SoftBodies.',
+    );
   const rest = Float32Array.from(d.positions);
   const masses = Float32Array.from(d.resolvedMasses());
   for (let i = 0; i < count; i++)
-    if (!(masses[i]! > 0)) throw clothError(`GPUCloth particle ${i} has mass ${masses[i]}; give every particle a positive mass.`);
+    if (!(masses[i]! > 0))
+      throw clothError(`GPUCloth particle ${i} has mass ${masses[i]}; give every particle a positive mass.`);
 
   // Each particle's share of area (a third of each triangle it is in) and the triangles at each particle.
   const area = new Float32Array(count);
@@ -343,7 +356,8 @@ export function buildClothTopology(
   // Texture coordinates: given, the grid's, or the rest shape laid flat on its two longest extents.
   let uv: Float32Array;
   if (uvs) {
-    if (uvs.length !== count * 2) throw clothError(`GPUCloth uvs need two numbers a particle: ${count * 2}, not ${uvs.length}.`);
+    if (uvs.length !== count * 2)
+      throw clothError(`GPUCloth uvs need two numbers a particle: ${count * 2}, not ${uvs.length}.`);
     uv = Float32Array.from(uvs);
     if (!uv.every(Number.isFinite)) throw clothError('GPUCloth uvs must be finite numbers.');
   } else if (d.grid) {
@@ -482,7 +496,11 @@ export function buildClothTethers(topology: ClothTopology, pinned: Iterable<numb
     if (pairs[e + 2] === EDGE_BEND) continue;
     const i = pairs[e]!,
       j = pairs[e + 1]!,
-      l = Math.hypot(rest[i * 3]! - rest[j * 3]!, rest[i * 3 + 1]! - rest[j * 3 + 1]!, rest[i * 3 + 2]! - rest[j * 3 + 2]!);
+      l = Math.hypot(
+        rest[i * 3]! - rest[j * 3]!,
+        rest[i * 3 + 1]! - rest[j * 3 + 1]!,
+        rest[i * 3 + 2]! - rest[j * 3 + 2]!,
+      );
     next[fill[i]!] = j;
     length[fill[i]!++] = l;
     next[fill[j]!] = i;
@@ -573,7 +591,8 @@ export class ClothCollider {
 
   /** @internal Use {@link GPUCloth.addCollider}. */
   constructor(desc: GPUClothColliderDesc) {
-    if (!desc || typeof desc !== 'object') throw clothError('A GPUCloth collider is an object such as {shape: "sphere", radius}.');
+    if (!desc || typeof desc !== 'object')
+      throw clothError('A GPUCloth collider is an object such as {shape: "sphere", radius}.');
     switch (desc.shape) {
       case 'sphere':
         num(desc.radius, NaN, 'sphere radius', 0);
@@ -596,13 +615,18 @@ export class ClothCollider {
       case 'sdf': {
         const f = desc.sdf;
         if (!f || !(f.data instanceof Float32Array) || !f.size || f.size.length !== 3)
-          throw clothError('A GPUCloth sdf collider needs {data: Float32Array, size, min, max} (a MeshSDF passes as it is).');
+          throw clothError(
+            'A GPUCloth sdf collider needs {data: Float32Array, size, min, max} (a MeshSDF passes as it is).',
+          );
         const [x, y, z] = f.size;
         if (![x, y, z].every((n) => Number.isInteger(n) && n >= 2) || f.data.length !== x * y * z)
-          throw clothError(`GPUCloth sdf size ${f.size.join(' x ')} must be whole numbers of 2 or more matching data (${f.data.length}).`);
+          throw clothError(
+            `GPUCloth sdf size ${f.size.join(' x ')} must be whole numbers of 2 or more matching data (${f.data.length}).`,
+          );
         const min = vec(f.min, 'sdf min'),
           max = vec(f.max, 'sdf max');
-        if (![0, 1, 2].every((k) => max[k]! > min[k]!)) throw clothError('GPUCloth sdf max must be above min on every axis.');
+        if (![0, 1, 2].every((k) => max[k]! > min[k]!))
+          throw clothError('GPUCloth sdf max must be above min on every axis.');
         if (!f.data.every(Number.isFinite)) throw clothError('GPUCloth sdf data must be finite distances.');
         this.desc = { shape: 'sdf', sdf: { data: f.data, size: [x, y, z], min, max } };
         break;
@@ -646,7 +670,8 @@ export class ClothCollider {
   /** @internal The world pose now: position then rotation, seven numbers. */
   pose(): number[] {
     if (!this.body) return [...this.pos, ...this.rot];
-    if (!this.body.valid) throw clothError('A GPUCloth collider rides on a removed body; remove the collider first.', 'state');
+    if (!this.body.valid)
+      throw clothError('A GPUCloth collider rides on a removed body; remove the collider first.', 'state');
     const p = this.body.position,
       q = this.body.rotation as unknown as Quat,
       o = rotate(q, this.pos),
@@ -672,11 +697,7 @@ export function rotate(q: ArrayLike<number>, v: ArrayLike<number>): Vec3 {
   const tx = 2 * (y * v[2]! - z * v[1]!),
     ty = 2 * (z * v[0]! - x * v[2]!),
     tz = 2 * (x * v[1]! - y * v[0]!);
-  return [
-    v[0]! + w * tx + (y * tz - z * ty),
-    v[1]! + w * ty + (z * tx - x * tz),
-    v[2]! + w * tz + (x * ty - y * tx),
-  ];
+  return [v[0]! + w * tx + (y * tz - z * ty), v[1]! + w * ty + (z * tx - x * tz), v[2]! + w * tz + (x * ty - y * tx)];
 }
 function mulQuat(a: Quat, b: Quat): Quat {
   return [
@@ -763,7 +784,9 @@ export function packClothFrame(
       now = col.pose(),
       from = col.from ?? now,
       d = col.desc;
-    dataU[o] = { sphere: SHAPE_SPHERE, capsule: SHAPE_CAPSULE, box: SHAPE_BOX, plane: SHAPE_PLANE, sdf: SHAPE_SDF }[d.shape];
+    dataU[o] = { sphere: SHAPE_SPHERE, capsule: SHAPE_CAPSULE, box: SHAPE_BOX, plane: SHAPE_PLANE, sdf: SHAPE_SDF }[
+      d.shape
+    ];
     if (d.shape === 'sphere') data[o + 2] = d.radius;
     if (d.shape === 'capsule') {
       data[o + 2] = d.radius;
@@ -800,7 +823,8 @@ export function packClothFrame(
 /** Where a pin is now: its point in the world, or its point on its body. */
 export function pinPoint(pin: ClothPin): Vec3 {
   if (!pin.body) return pin.point;
-  if (!pin.body.valid) throw clothError(`GPUCloth particle ${pin.index} is attached to a removed body; unpin it first.`, 'state');
+  if (!pin.body.valid)
+    throw clothError(`GPUCloth particle ${pin.index} is attached to a removed body; unpin it first.`, 'state');
   const p = pin.body.position,
     o = rotate(pin.body.rotation, pin.point);
   return [p[0] + o[0], p[1] + o[1], p[2] + o[2]];
@@ -854,13 +878,23 @@ export function clothDebugLines(
         line(a, b, GREY);
         continue;
       }
-      const L = Math.hypot(rest[i * 3]! - rest[j * 3]!, rest[i * 3 + 1]! - rest[j * 3 + 1]!, rest[i * 3 + 2]! - rest[j * 3 + 2]!);
+      const L = Math.hypot(
+        rest[i * 3]! - rest[j * 3]!,
+        rest[i * 3 + 1]! - rest[j * 3 + 1]!,
+        rest[i * 3 + 2]! - rest[j * 3 + 2]!,
+      );
       const strain = L > 0 ? Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) / L - 1 : 0;
       const t = Math.min(Math.max(strain / range, 0), 1);
-      line(a, b, [GREEN[0]! + (RED[0]! - GREEN[0]!) * t, GREEN[1]! + (RED[1]! - GREEN[1]!) * t, GREEN[2]! + (RED[2]! - GREEN[2]!) * t, 1]);
+      line(a, b, [
+        GREEN[0]! + (RED[0]! - GREEN[0]!) * t,
+        GREEN[1]! + (RED[1]! - GREEN[1]!) * t,
+        GREEN[2]! + (RED[2]! - GREEN[2]!) * t,
+        1,
+      ]);
     }
   else if (options.bendEdges)
-    for (let e = 0; e < pairs.length; e += 3) if (pairs[e + 2] === EDGE_BEND) line(at(pairs[e]!), at(pairs[e + 1]!), GREY);
+    for (let e = 0; e < pairs.length; e += 3)
+      if (pairs[e + 2] === EDGE_BEND) line(at(pairs[e]!), at(pairs[e + 1]!), GREY);
   if (options.pins ?? true)
     for (const pin of pins) {
       const p = at(pin.index),
@@ -872,12 +906,21 @@ export function clothDebugLines(
   if (options.normals)
     for (let i = 0; i < topology.count; i++) {
       const p = at(i);
-      line(p, [p[0] + normals[i * 4]! * normalLength, p[1] + normals[i * 4 + 1]! * normalLength, p[2] + normals[i * 4 + 2]! * normalLength], BLUE);
+      line(
+        p,
+        [
+          p[0] + normals[i * 4]! * normalLength,
+          p[1] + normals[i * 4 + 1]! * normalLength,
+          p[2] + normals[i * 4 + 2]! * normalLength,
+        ],
+        BLUE,
+      );
     }
   if (options.colliders ?? true) for (const c of colliders) outline(c, line);
   if ((options.wind ?? true) && Math.hypot(wind[0], wind[1], wind[2]) > 0) {
     const m = [0, 0, 0];
-    for (let i = 0; i < topology.count; i++) for (let k = 0; k < 3; k++) m[k] = m[k]! + state[i * 4 + k]! / topology.count;
+    for (let i = 0; i < topology.count; i++)
+      for (let k = 0; k < 3; k++) m[k] = m[k]! + state[i * 4 + k]! / topology.count;
     const tip = [m[0]! + wind[0] * 0.1, m[1]! + wind[1] * 0.1, m[2]! + wind[2] * 0.1];
     line(m, tip, WHITE);
     const back = [m[0]! + wind[0] * 0.08, m[1]! + wind[1] * 0.08 + 0.02, m[2]! + wind[2] * 0.08];
@@ -887,7 +930,10 @@ export function clothDebugLines(
 }
 
 /** A collider's outline: three circles of a sphere, a capsule's rings and lines, a box's edges, a plane's square, an sdf's box. */
-function outline(c: ClothCollider, line: (a: ArrayLike<number>, b: ArrayLike<number>, c: ArrayLike<number>) => void): void {
+function outline(
+  c: ClothCollider,
+  line: (a: ArrayLike<number>, b: ArrayLike<number>, c: ArrayLike<number>) => void,
+): void {
   const pose = c.pose(),
     x = pose.slice(0, 3),
     q = pose.slice(3, 7),
@@ -922,7 +968,11 @@ function outline(c: ClothCollider, line: (a: ArrayLike<number>, b: ArrayLike<num
       [0, -d.radius],
     ] as const)
       seg([a, -d.halfHeight, b], [a, d.halfHeight, b]);
-  } else if (d.shape === 'box') box(d.halfExtents.map((h) => -h), d.halfExtents);
+  } else if (d.shape === 'box')
+    box(
+      d.halfExtents.map((h) => -h),
+      d.halfExtents,
+    );
   else if (d.shape === 'plane') {
     const s = 2;
     seg([-s, 0, -s], [s, 0, -s]);

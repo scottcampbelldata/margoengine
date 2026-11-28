@@ -19237,9 +19237,14 @@
       "brotli": 1048
     },
     "packages/physics/dist/cloth-kernel.wasm": {
-      "raw": 10941,
-      "gzip": 5056,
-      "brotli": 4493
+      "raw": 11606,
+      "gzip": 5308,
+      "brotli": 4703
+    },
+    "packages/physics/dist/cloth-kernel-shared.wasm": {
+      "raw": 11567,
+      "gzip": 5309,
+      "brotli": 4720
     },
     "packages/physics/dist/rail-kernel.wasm": {
       "raw": 571,

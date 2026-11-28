@@ -242,7 +242,7 @@ the scatter of Cross's five measured bounces (2002), and a solid ball rolls down
   coefficient (no published set with weight, KES-FB2 B and drape coefficient together was found on 2026-11-27); (4) the GPU cloth's
   ties to dynamic bodies are one way: two-way ties were built and measured (momentum to 2e-5 at 8 substeps) but a box
   hung on a stiff strip rings and grows, because the body's turn answers a frame late; it needs the body's inertia in the
-  cloth's own solve; (6) one thread on the CPU route; and speed against the rival's demo (quiet speed phase).
+  cloth's own solve; (6) the CPU route's threads landed (`threads`, a static schedule, the same bits at 1 to 8 threads, each thread's work counted); and speed against the rival's demo (quiet speed phase).
 
 ### P7. SOFT-02 Ropes and chains
 

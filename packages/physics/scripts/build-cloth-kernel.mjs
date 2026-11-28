@@ -20,9 +20,10 @@ const linker = { name: 'cloth', slot: -1 };
 const output = new URL('../src/cloth/', import.meta.url);
 mkdirSync(output, { recursive: true });
 
-// One build: the cloth keeps a memory of its own (no world memory is shared with it), so there is no shared variant.
-if (process.argv[2] && process.argv[2] !== 'plain') throw new Error('The cloth kernel has the plain build only.');
-for (const shared of [false]) {
+// Two builds: the plain one for a cloth on one thread, and the shared-memory one (atomics) for a cloth whose passes are
+// shared by worker threads (`GPUCloth` `threads`, cloth/thread.ts). Each cloth keeps a memory of its own either way.
+const variants = { plain: [false], shared: [true] }[process.argv[2]] ?? [false, true];
+for (const shared of variants) {
   const flags = rustFlags(linker, shared).replace('-C target-feature=', '-C target-feature=+simd128,');
   const manifest = join(crate, 'Cargo.toml');
   const result = await runWithTimeout(
@@ -42,5 +43,5 @@ for (const shared of [false]) {
   new WebAssembly.Instance(new WebAssembly.Module(bytes), { env: { memory } });
   if (!sentinel.every((value) => value === 0xd7))
     throw new Error('Cloth initialization overwrote the world; put all working data in solver-owned regions.');
-  copyFileSync(file, new URL('cloth-kernel.wasm', output));
+  copyFileSync(file, new URL(shared ? 'cloth-kernel-shared.wasm' : 'cloth-kernel.wasm', output));
 }
