@@ -357,6 +357,64 @@ WebGPU and WebGL2 compatibility pass the existing studio value oracle and the st
 test (`ground-browser.mjs --studio`, optionally `--compat`), including actual device replacement,
 caster removal and disposal. Native WebGL2 remains unsupported. Geometry is a generated stand-in.
 
+## A whole bench in one call
+
+`openBench` from `@margoengine/studio/bench` opens the stage a demo or product page needs, from the packages
+that already do each part: the engine through webgl2-compat/auto `startEngine` (WebGPU, or the WebGL2 layer when
+WebGPU is missing, slow to answer, or the page URL has `?backend=webgl2`), a cyclorama (`Backdrop`), a warm sun key
+with cascaded PCSS shadows (`@margoengine/shadows`), a softbox fill and rim from `environment/studio`
+(`stagingLighting`), ground contact shadows (`ContactShadows`), an optional display transform
+(`@margoengine/tonemap`), optional GTAO (`@margoengine/post/gtao`) and optional pointer orbit
+(`@margoengine/controls/orbit`). It sizes the backbuffer from the canvas box (device pixel ratio capped by
+`pixelRatio`, default 2, and `maxWidth`, default 2560) and follows resizes, marks the exhibit (`exhibit`, default the
+canvas) with `data-renderer`, `data-ready` once the first frame is on screen, `data-error` on the first failure and
+`data-reduced-motion`, turns orbit damping off for reduced motion, and disposes everything on `pagehide`, on
+`signal` or on `dispose()`. Every optional package is imported only when its option is on.
+
+```ts
+import {PbrMaterial, box} from 'margoengine/core';
+import {openBench} from 'margoengine/studio/bench';
+const bench = await openBench(document.querySelector('canvas')!, {
+  camera: {position: [2.6, 1.8, 3.4], target: [0, 0.45, 0], fov: 35},
+  orbit: {target: [0, 0.45, 0]},
+});
+const product = bench.engine.createMesh().setGeometry(box())
+  .setMaterial(new PbrMaterial({color: '#c84f2c', roughness: 0.45})).setPosition([0, 0.5, 0]);
+bench.add(product); // casts into the shadow map and the contact shadow
+await bench.ready(); // first frame drawn, data-ready set
+let turn = 0;
+const spin = bench.frame((delta) => product.setRotation([0, (turn += delta * 0.5), 0]));
+// Later: spin() stops the loop; bench.dispose() releases the engine and every part.
+```
+
+| Option | Default | |
+| --- | --- | --- |
+| `camera`, `capacity`, `antialias`, `startupTimeout`, `engine` | 35 degree view of the origin from [3.2, 2.1, 4.4]; engine default; true; 8000 ms; none | passed to `Engine.create` (always `exactSize`) |
+| `background` | `'#77736d'` | clear colour, the cyclorama's lit tone |
+| `pixelRatio`, `maxWidth` | 2, 2560 | backbuffer cap |
+| `backend` | `'webgl2'` with `?backend=webgl2`, else `'auto'` | `'webgl2'` forces the compatibility layer |
+| `loadCompat`, `compat` | `import('@margoengine/webgl2-compat')`, none | the layer and its `install` options (`{minimumTier: 'half-float'}`) |
+| `light` | direction [-0.55, 1, 0.7], colour [1, 0.95, 0.88], intensity 2.6, ambient 0.25 | core's sun; `false` leaves core's lighting as it is |
+| `environment` | `'soft'` at intensity 0.55, width 256 | softbox fill and rim (replaces core's flat ambient); a preset name, options or `false` |
+| `shadows` | `{lightSize: 0.02}` | `ShadowOptions`, or `false` |
+| `contact` | 6 x 6 plane at y 0, height 0.6, opacity 0.55, blur 0.06 | `ContactShadowOptions`, or `false` |
+| `backdrop` | 40 x 24 x 14, radius 4, `#a9a49c` matte | `BackdropOptions`, or `false` |
+| `tonemap` | none (core's Khronos PBR Neutral at 0 EV) | `TonemapOptions` attaches `Tonemap` |
+| `ao` | false | `true` or `GTAOOptions` |
+| `orbit` | false | `true` or `{target, minDistance, maxDistance, damping}` |
+| `exhibit`, `signal`, `onResize`, `onError` | canvas, none | where the signals go, cancellation, callbacks |
+
+`bench.frame(callback)` runs `callback(delta, time)` before every frame until its remover runs; `bench.request()`
+draws one frame on the next animation frame (requests merge); `bench.render()` draws now and resolves when the GPU
+finished; `bench.add(mesh, {shadow, contact, static})` registers a caster with both shadows; `bench.fail(reason)`
+marks the error and stops frames. A page that keeps its own room passes `backdrop: false`, and one that keeps its own
+lights passes `light: false, environment: false`. Checked on WebGPU and on the WebGL2 layer by
+`packages/studio/test/bench-browser.mjs` (`--compat`): the bench opens and marks itself ready, the box darkens the
+floor beside it, frame callbacks run and stop, a resize reaches the backbuffer, and disposal releases the engine.
+References: Fernando 2005, "Percentage-Closer Soft Shadows"; Karis 2013, "Real Shading in Unreal Engine 4"; Debevec
+1998, "Rendering Synthetic Objects into Real Scenes"; Jimenez, Wu, Pesce and Jarabo 2016, "Practical Real-Time
+Strategies for Accurate Indirect Occlusion"; Khronos 2024, "PBR Neutral Tone Mapping".
+
 ## Framing and turntable
 
 The existing optional stage viewer frames a glTF product, sets near/far to its bounds, adds a plain

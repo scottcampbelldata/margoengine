@@ -3727,6 +3727,10 @@
       "types": "./dist/studio/backdrop.d.ts",
       "import": "./dist/studio/backdrop.js"
     },
+    "./studio/bench": {
+      "types": "./dist/studio/bench.d.ts",
+      "import": "./dist/studio/bench.js"
+    },
     "./terrain": {
       "types": "./dist/terrain.d.ts",
       "import": "./dist/terrain.js"

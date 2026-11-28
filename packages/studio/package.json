@@ -53,6 +53,10 @@
     "./backdrop": {
       "types": "./dist/backdrop.d.ts",
       "import": "./dist/backdrop.js"
+    },
+    "./bench": {
+      "types": "./dist/bench.d.ts",
+      "import": "./dist/bench.js"
     }
   },
   "files": [
@@ -67,7 +71,12 @@
     "@margoengine/core": "^1.0.0",
     "@margoengine/voxel-pathtracer": "^1.0.0",
     "@margoengine/bvh": "^1.0.0",
-    "@margoengine/environment": "^1.0.0"
+    "@margoengine/environment": "^1.0.0",
+    "@margoengine/webgl2-compat": "^1.0.0",
+    "@margoengine/shadows": "^1.0.0",
+    "@margoengine/controls": "^1.0.0",
+    "@margoengine/tonemap": "^1.0.0",
+    "@margoengine/post": "^1.0.0"
   },
   "devDependencies": {
     "@margoengine/math": "^1.0.0"
@@ -90,6 +99,21 @@
       "optional": true
     },
     "@margoengine/environment": {
+      "optional": true
+    },
+    "@margoengine/webgl2-compat": {
+      "optional": true
+    },
+    "@margoengine/shadows": {
+      "optional": true
+    },
+    "@margoengine/controls": {
+      "optional": true
+    },
+    "@margoengine/tonemap": {
+      "optional": true
+    },
+    "@margoengine/post": {
       "optional": true
     }
   }

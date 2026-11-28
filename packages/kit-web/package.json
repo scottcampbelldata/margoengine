@@ -2055,6 +2055,10 @@
       "types": "./dist/studio/backdrop.d.ts",
       "import": "./dist/studio/backdrop.js"
     },
+    "./studio/bench": {
+      "types": "./dist/studio/bench.d.ts",
+      "import": "./dist/studio/bench.js"
+    },
     "./text": {
       "types": "./dist/text.d.ts",
       "import": "./dist/text.js"
