@@ -81,6 +81,33 @@ const farTrees = Scatter.attach(engine, standIn, {
 });
 ```
 
+`edgeThin` (world units, default 0: off) is a band before the last LOD distance
+where instances drop out one by one, each at its own hashed distance, so the count
+falls linearly to none at the last distance while every survivor keeps its size and
+place (the thinning of Cook, Halstead, Planck and Ryu, "Stochastic Simplification
+of Aggregate Detail", SIGGRAPH 2007). A dense near layer laid over a sparser field
+with it set hands over as a smooth fall in density, with no line where it ends;
+`@margoengine/biomes` draws its near meadow grass this way. Instances nearer than
+the band are the very same ones as without it, and it must be at most the last
+distance.
+
+```ts
+import { GrassScatter } from '@margoengine/scatter/grass';
+import {Engine} from '@margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+
+// A sparse field to 120 m and a dense layer to 40 m that thins out over its outer 32 m.
+const field = GrassScatter.attach(engine, { count: 500_000, area: [240, 240], follow: true, lod: [36, 72, 120] });
+const near = GrassScatter.attach(engine, {
+  count: 500_000,
+  area: [80, 80],
+  follow: true,
+  lod: [12, 24, 40],
+  edgeThin: 32,
+  seed: 2,
+});
+```
+
 With `lodFade: 0`, or one Geometry for every ring, no instance can fade, so the
 shaders are compiled without the fade's `discard`; lit scatter also compiles out
 core's back-face `discard` (single-sided materials cull back faces in the

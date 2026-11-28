@@ -100,6 +100,31 @@ const record = (x, z, species, scale = 128, yaw = 0, age = 0) => [
   age << 4,
 ];
 
+test('edgeThin: only its own shader part and frame field, off at 0, validated (KB-BIOMES-GRASSRING1)', () => {
+  const base = scatterCullShader({}),
+    plain = scatterCullShader({ edgeThin: 40 }),
+    follow = scatterCullShader({ edgeThin: 40, follow: true });
+  assert.equal(sha(scatterCullShader({ edgeThin: 0 })), ORIGINAL);
+  assert.equal(
+    plain
+      .replace('||d>frame.lod.z-frame.thin.x*hash((i*7u+7u)^0x2545f491u)', '')
+      .replace(',offset:vec4f,bounds:vec4f,thin:vec4f', ''),
+    base,
+  );
+  assert.match(follow, /d>frame\.lod\.z-frame\.thin\.x\*hash\(\(key\*7u\+7u\)\^0x2545f491u\)/);
+  const h = optionalGPU(),
+    effect = new Scatter(box(), { count: 16, edgeThin: 30 });
+  h.engine.use(effect);
+  h.frame();
+  assert.ok(
+    h.resources.some((r) => r.size === 400),
+    'a 100-float frame, the band width after the bounds',
+  );
+  effect.dispose();
+  for (const bad of [{ edgeThin: -1 }, { edgeThin: 121 }, { edgeThin: Number.NaN }])
+    assert.throws(() => new Scatter(box(), bad), /Scatter edgeThin must be/, JSON.stringify(bad));
+});
+
 test('ScatterTiles packs held records, filters a palette index, frees tiles and restores the device', () => {
   const h = optionalGPU(),
     tiles = new ScatterTiles(box(), { bounds: [0, 0, 512, 512], slots: 2, slotSize: 4, drawn: 64, species: 1 });

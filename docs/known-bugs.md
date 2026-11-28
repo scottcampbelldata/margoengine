@@ -169,18 +169,23 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `@margoengine/procedural/trees` already grows, then clustered leaf cards), near, middle and imposter levels as the
   conifers have, judged on whole-scene frames. A planner-sized job across procedural and biomes.
 
-### Open 2026-11-28: a meadow seen from a few metres up shows the edge of the dense near grass as a band (KB-BIOMES-GRASSRING1, biomes, scatter)
+### Fixed 2026-11-28: a meadow seen from a few metres up showed the edge of the dense near grass as a band (KB-BIOMES-GRASSRING1, biomes, scatter)
 
-- **Repro:** the FG-16 wide shot (camera 6 m up): the ground within 20 m is a dense sward and beyond it the grass
-  thins at once, a visible line across the frame about 17 degrees below the horizon. From 0.9 m it sits 3 degrees down
-  and hardly shows.
-- **Cause:** KB-BIOMES-SPARSEGRASS1's near layer holds 3 clumps a square metre per unit of density (120 for the
-  temperate preset) and the field across `detailRadius` about 15 (its million candidates); the near layer only shrinks
-  its clumps over its last 4 m (`edgeShrink`) while the field fades in over the same 4 m (`inner`, `innerFade`), so the
-  density falls about eight times within 4 m (`packages/biomes/src/objects.ts`, `NEAR_GRASS`).
-- **Fix needed:** thin the near layer with distance and widen the clumps that stay so the covered share of the ground
-  holds (the aggregate-detail rule of Cook, Halstead, Planck and Ryu 2007), meeting the field's density at its edge,
-  in `@margoengine/scatter` as an option with a test, then used by biomes.
+- **Repro (before):** the FG-16 wide shot (camera 6 m up): the ground within 20 m was a dense sward and beyond it the
+  grass thinned at once, a line across the frame. `packages/biomes/tests/meadow-grass-check.mjs`, 6 m up looking 20
+  degrees down: the share of ground the grass covers fell from 97.6 to 31.9 percent between 14 and 18 m (RTX A6000).
+- **Cause:** the near layer held 3 clumps a square metre per unit of density (120 for the temperate preset) and the
+  field about 10; the near layer shrank over its last 4 m (`edgeShrink`) as the field faded in (`inner`, `innerFade`),
+  so the density fell about twelve times within 4 m (`packages/biomes/src/objects.ts`, `NEAR_GRASS`).
+- **Fix:** scatter gains `edgeThin`: instances drop out one by one, each at its own hashed distance, over a band before
+  the last LOD, so the count falls linearly to none while survivors keep their size and place (the thinning of Cook,
+  Halstead, Planck and Ryu, "Stochastic Simplification of Aggregate Detail", SIGGRAPH 2007). Biomes' near layer now
+  reaches 40 m and thins over its outer 32 m, and the field runs under it to the camera at 0.45 candidates a square
+  metre per unit of density (1,000,000 at most, was 0.25). The same check now covers 92 to 100 percent from 10 to 60
+  m with no fall over 4 points between 2 m bins, on WebGPU and the WebGL2 layer; the wide frame shows no band. Cost:
+  the field places up to 74 percent more clumps.
+- **Regression:** `packages/biomes/tests/meadow-grass-check.mjs` (real GPU; `MARGO_COMPAT=1` for the WebGL2 layer),
+  `packages/scatter/test/inner.browser.mjs` (`edges` cases, `--compat` too) and `packages/scatter/test/tiles.test.js`.
 
 ### Fixed 2026-11-28: the lens drops' glint added light over empty pixels without covering them (KB-WEATHER-LENSGLINT1, weather)
 

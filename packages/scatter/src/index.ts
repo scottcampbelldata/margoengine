@@ -270,6 +270,15 @@ export interface ScatterOptions {
    */
   innerFade?: number;
   /**
+   * World units before the last LOD distance over which instances drop out one by one instead of all at that distance
+   * (default 0: off). Each instance takes its own drop distance from a hash, so the count falls linearly to none at the
+   * last distance while every survivor keeps its size, place and random numbers (the thinning of stochastic
+   * simplification, Cook, Halstead, Planck and Ryu 2007). A dense near layer laid over a sparser far one with this set
+   * hands over to it as a smooth fall in density, with no line where the near layer ends. Measured in 3D, like the LOD
+   * distances; at most the last one.
+   */
+  edgeThin?: number;
+  /**
    * Shades instances as grass blades: upright geometry whose local origin is the root and whose tallest vertex is the
    * tip (default off). Albedo darkens toward the root; the shading normal blends from the ground normal at the root to
    * the blade's own normal at the tip, and fully to the ground normal by the last LOD distance, so a field shades like
@@ -504,7 +513,7 @@ function shadowDepth(d: GPUDevice, code: string, uvs = false): GPURenderPipeline
   });
 }
 /** Whether the frame carries the world-rectangle fields (follow offsets and bounds). */
-const extended = (o: ScatterOptions) => !!(o.bounds || o.follow || o.densityMap || o.inner);
+const extended = (o: ScatterOptions) => !!(o.bounds || o.follow || o.densityMap || o.inner || o.edgeThin);
 
 function validateWorld(o: ScatterOptions): void {
   const b = o.bounds;
@@ -608,7 +617,7 @@ const PLANES = ' for(var j=0u;j<6u;j++){if(dot(frame.planes[j].xyz,p)+frame.plan
 
 function optionShader(o: ScatterOptions): string {
   if (!extended(o)) return cull;
-  let code = cull.replace('sway:vec4f}', 'sway:vec4f,offset:vec4f,bounds:vec4f}');
+  let code = cull.replace('sway:vec4f}', `sway:vec4f,offset:vec4f,bounds:vec4f${o.edgeThin ? ',thin:vec4f' : ''}}`);
   if (o.follow)
     // Random numbers from the world cell (grid cell plus the camera's cell offset), not the instance index.
     code = code
@@ -637,11 +646,19 @@ function optionShader(o: ScatterOptions): string {
         ' for(var j=0u;j<u32(frame.eye.w);j++){',
         ` let dm=(p.xz-frame.bounds.xy)/(frame.bounds.zw-frame.bounds.xy);if(any(dm<vec2f(0.0))||any(dm>=vec2f(1.0))){return;}\n if(hash(${o.follow ? 'key' : 'i'}*7u+6u)>=textureLoad(densityMap,vec2i(dm*vec2f(textureDimensions(densityMap))),0).r){return;}\n for(var j=0u;j<u32(frame.eye.w);j++){`,
       );
+  const key = o.follow ? 'key' : 'i';
   if (o.inner)
     // Slot 7 of the instance's hashes is its own (slots 1 to 6 are placement); offset.z is inner, offset.w the band.
     code = code.replace(
       `if(${outsideLod('d', 'frame.lod.z')}){return;}`,
-      `if(${outsideLod('d', 'frame.lod.z')}||d<frame.offset.z+frame.offset.w*hash(${o.follow ? 'key' : 'i'}*7u+7u)){return;}`,
+      `if(${outsideLod('d', 'frame.lod.z')}||d<frame.offset.z+frame.offset.w*hash(${key}*7u+7u)){return;}`,
+    );
+  if (o.edgeThin)
+    // edgeThin: each instance drops out at its own distance in the band before the last LOD, from a hash of slot 7
+    // mixed apart from inner's, so the two bands thin independently; thin.x is the band's width.
+    code = code.replace(
+      `if(${outsideLod('d', 'frame.lod.z')}`,
+      `if(${outsideLod('d', 'frame.lod.z')}||d>frame.lod.z-frame.thin.x*hash((${key}*7u+7u)^0x2545f491u)`,
     );
   return code;
 }
@@ -788,7 +805,7 @@ export class Scatter implements EnginePlugin {
     this.options = preset('scatter', input);
     const options = this.options;
     // The world-rectangle options extend the frame by two vec4s (follow offsets, bounds) after the sway (84).
-    this.values = new Float32Array(extended(options) ? 96 : 88);
+    this.values = new Float32Array(options.edgeThin ? 100 : extended(options) ? 96 : 88);
     this.meta = new Uint32Array(this.values.buffer);
     this.geometries = geometry instanceof Geometry ? [geometry, geometry, geometry] : [...geometry];
     const {
@@ -809,6 +826,7 @@ export class Scatter implements EnginePlugin {
       edgeShrink = 0,
       inner = 0,
       innerFade = 0,
+      edgeThin = 0,
     } = options;
     if (
       this.geometries.length !== 3 ||
@@ -874,10 +892,13 @@ export class Scatter implements EnginePlugin {
       throw new RangeError('Scatter edgeShrink must be a distance from 0 to 100000');
     if (!Number.isFinite(inner) || inner < 0 || inner >= lod[2] || !Number.isFinite(innerFade) || innerFade < 0)
       throw new RangeError('Scatter inner must be a distance from 0 up to below the last lod, innerFade 0 or more');
+    if (!Number.isFinite(edgeThin) || edgeThin < 0 || edgeThin > lod[2])
+      throw new RangeError('Scatter edgeThin must be a distance from 0 up to the last lod');
     if (options.wind) validateWind(options.wind);
     validateWorld(options);
     if (options.bounds) this.values.set(options.bounds, 92);
     if (inner) this.values.set([inner, innerFade], 90);
+    if (edgeThin) this.values[96] = edgeThin;
     validateSway(options.sway);
     for (const g of this.geometries)
       for (let i = 1; i < g.vertices.length; i += 6) this.meshTop = Math.max(this.meshTop, g.vertices[i]);

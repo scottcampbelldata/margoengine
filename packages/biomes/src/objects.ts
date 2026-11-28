@@ -449,8 +449,11 @@ type Detail = {
   data: Uint8Array;
 };
 
-/** Metres around the camera of blade grass's dense near layer, and its clumps a square metre per unit of density. */
-const NEAR_GRASS = { radius: 20, perDensity: 3 } as const;
+/**
+ * Blade grass's dense near layer: metres around the camera, clumps a square metre per unit of density, and the share of
+ * its radius over which it thins out to the field (`edgeThin`).
+ */
+const NEAR_GRASS = { radius: 40, perDensity: 3, thin: 0.8, field: 0.45 } as const;
 
 /**
  * The stored objects and detail of a biome placement, drawn through scatter around the camera. WebGPU only.
@@ -719,17 +722,17 @@ export class BiomeObjects implements Disposable {
       // Meadow grass is GrassScatter's GPU-built tussocks (KB-BIOMES-SPARSEGRASS1): eight blades a clump with cured
       // leaves and a brightness spread. The three-blade clump mesh at the old 400,000 cap left about 20 blades a square
       // metre, a field of tufts on bare ground. A dense layer of NEAR_GRASS.perDensity clumps a square metre per unit of
-      // density covers the ground within NEAR_GRASS.radius, where the eye sees single clumps; the field beyond fades in
-      // over its outer fifth (`inner`, `innerFade`) as the near layer shrinks out (`edgeShrink`), so neither ends in a
-      // line. The field keeps scatter's million candidates across `detailRadius`, where the blades merge into the sward.
+      // density lies over the field, which keeps scatter's million candidates across `detailRadius`. The near layer is
+      // whole within a fifth of NEAR_GRASS.radius and thins out one clump at a time across the rest (`edgeThin`, the
+      // thinning of Cook, Halstead, Planck and Ryu 2007), so the sum falls smoothly to the field's own density by its
+      // edge (KB-BIOMES-GRASSRING1). Before, the near layer ended at 20 m, shrinking over its last 4 m as the field faded
+      // in under it: the density fell about twelve times within 4 m, a band across the frame from a few metres up.
       const material = blades ? this.#material(GREEN_GRASS, seasonal) : this.#material(parts[0].color, seasonal),
         nearR = Math.min(NEAR_GRASS.radius, detailRadius / 2);
       entry.scatter = blades
         ? this.#modules.grass!.GrassScatter.attach(this.#engine, {
             ...shared,
-            count: Math.min(1_000_000, Math.max(1000, Math.round(d.density * area * area * 0.25))),
-            inner: nearR * 0.8,
-            innerFade: nearR * 0.2,
+            count: Math.min(1_000_000, Math.max(1000, Math.round(d.density * area * area * NEAR_GRASS.field))),
             material,
             ...this.#states(d.mesh, 'foliage'),
           })
@@ -746,7 +749,8 @@ export class BiomeObjects implements Disposable {
           area: [2 * nearR, 2 * nearR],
           count: Math.min(1_000_000, Math.max(1000, Math.round(d.density * NEAR_GRASS.perDensity * 4 * nearR * nearR))),
           lod: [nearR * 0.3, nearR * 0.6, nearR],
-          edgeShrink: nearR * 0.2,
+          edgeShrink: 0,
+          edgeThin: nearR * NEAR_GRASS.thin,
           seed: 2,
           material,
           ...this.#states(d.mesh, 'foliage'),

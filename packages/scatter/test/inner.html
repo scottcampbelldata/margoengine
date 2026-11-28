@@ -39,11 +39,24 @@ function compare(base,got,inner,fade){
  const far=l=>l.filter(p=>p.d>=inner+fade).map(p=>p.key).sort(),a=far(base),b=far(got),share=(lo,hi)=>got.filter(p=>p.d>=lo&&p.d<hi).length/Math.max(1,base.filter(p=>p.d>=lo&&p.d<hi).length);
  return {baseInside:base.filter(p=>p.d<inner).length,inside:got.filter(p=>p.d<inner).length,beyond:b.length,baseBeyond:a.length,sameBeyond:a.join(';')===b.join(';'),nearShare:share(inner,inner+fade/2),farShare:share(inner+fade/2,inner+fade)};
 }
+// Instances nearer than the band start are exactly the base's; none lie past the last LOD; the share kept falls linearly
+// across the band, so its inner half keeps three quarters and its outer half a quarter.
+function thinned(base,got,start,end){
+ const nearer=l=>l.filter(p=>p.d<start).map(p=>p.key).sort(),a=nearer(base),b=nearer(got),mid=(start+end)/2,
+  share=(lo,hi)=>got.filter(p=>p.d>=lo&&p.d<hi).length/Math.max(1,base.filter(p=>p.d>=lo&&p.d<hi).length),
+  inBand=new Set(base.filter(p=>p.d>=start).map(p=>p.key));
+ return {nearer:b.length,baseNearer:a.length,sameNearer:a.join(';')===b.join(';'),past:got.filter(p=>p.d>end).length,
+  bandBase:base.filter(p=>p.d>=start&&p.d<end).length,innerShare:share(start,mid),outerShare:share(mid,end),
+  subset:got.filter(p=>p.d>=start).every(p=>inBand.has(p.key))};
+}
 window.check={
  async run(){
   const base=await run({}),moving=await run({follow:true}),
    sharp=await run({inner:100}),band=await run({inner:100,innerFade:80}),follow=await run({inner:100,innerFade:80,follow:true});
-  return {cases:{sharp:compare(base,sharp,100,0),band:compare(base,band,100,80),follow:compare(moving,follow,100,80)},errors:errors.splice(0)};
+  // edgeThin (KB-BIOMES-GRASSRING1): the band before the last LOD thins outward; nearer instances are untouched.
+  const edge=await run({edgeThin:160}),edgeFollow=await run({edgeThin:160,follow:true}),both=await run({inner:100,innerFade:80,edgeThin:160});
+  return {cases:{sharp:compare(base,sharp,100,0),band:compare(base,band,100,80),follow:compare(moving,follow,100,80)},
+   edges:{edge:thinned(base,edge,240,400),follow:thinned(moving,edgeFollow,240,400),both:{...thinned(band,both,240,400),inner:compare(base,both,100,80)}},errors:errors.splice(0)};
  }
 };
 window.ready=true;

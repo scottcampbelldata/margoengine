@@ -33,7 +33,25 @@ await runSuite(
       assert.ok(Math.abs(c.nearShare - 0.25) < 0.08, `${name}: inner half of the band ${c.nearShare}`);
       assert.ok(Math.abs(c.farShare - 0.75) < 0.08, `${name}: outer half of the band ${c.farShare}`);
     }
-    console.log('ok scatter inner', JSON.stringify(r.cases));
+    // edgeThin (KB-BIOMES-GRASSRING1): before the fix the option was unknown and the edge stayed a hard cut, so the outer
+    // half of the band kept every instance.
+    for (const [name, c] of Object.entries(r.edges)) {
+      assert.ok(c.baseNearer > 2000 && c.bandBase > 2000, `${name}: enough instances (${c.baseNearer}, ${c.bandBase})`);
+      assert.equal(c.nearer, c.baseNearer, `${name}: count nearer than the band`);
+      assert.equal(c.sameNearer, true, `${name}: the same instances nearer than the band`);
+      assert.equal(c.past, 0, `${name}: instances past the last LOD`);
+      assert.equal(c.subset, true, `${name}: band instances are the base's, unmoved and unscaled`);
+      assert.ok(Math.abs(c.innerShare - 0.75) < 0.06, `${name}: inner half of the band ${c.innerShare}`);
+      assert.ok(Math.abs(c.outerShare - 0.25) < 0.06, `${name}: outer half of the band ${c.outerShare}`);
+    }
+    // With inner set too, the hole and its band are unchanged: two bands, two independent hashes.
+    const both = r.edges.both.inner;
+    assert.equal(both.inside, 0, 'both: instances nearer than inner');
+    assert.ok(
+      Math.abs(both.nearShare - 0.25) < 0.08 && Math.abs(both.farShare - 0.75) < 0.08,
+      `both: inner band ${JSON.stringify(both)}`,
+    );
+    console.log('ok scatter inner', JSON.stringify(r.cases), JSON.stringify(r.edges));
   },
   () => context.close(),
 );

@@ -226,6 +226,7 @@ export interface ScatterOptions {
     edgeShrink?: number;
     inner?: number;
     innerFade?: number;
+    edgeThin?: number;
     blades?: ScatterBlades;
     bounds?: readonly [number, number, number, number];
     densityMap?: () => GPUTexture | undefined;
