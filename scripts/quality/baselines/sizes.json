@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21741804,
+  "total": 21769860,
   "history": [
     {
       "date": "2026-10-24",
@@ -15533,6 +15533,12 @@
       "commit": "76d178d998",
       "reason": "Add the optional clothes authoring entry for cuff topology and posed layer clearance, 2528 bytes gzip, with no core or stage additions.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "d64468c4a8",
+      "reason": "geometry builder and parts entries; utils keeps colours",
+      "grew": 3
     }
   ],
   "items": {
@@ -15972,6 +15978,7 @@
     "@margoengine/fsm/trace": 1863,
     "@margoengine/game": 946,
     "@margoengine/geometry": 24691,
+    "@margoengine/geometry/builder": 11731,
     "@margoengine/geometry/delaunay": 3404,
     "@margoengine/geometry/extras": 19376,
     "@margoengine/geometry/extrude": 8933,
@@ -15982,6 +15989,7 @@
     "@margoengine/geometry/nurbs": 5262,
     "@margoengine/geometry/nurbs-edit": 11996,
     "@margoengine/geometry/optimize": 2409,
+    "@margoengine/geometry/parts": 15934,
     "@margoengine/geometry/polygon": 6812,
     "@margoengine/geometry/primitives": 4058,
     "@margoengine/geometry/sample": 1959,
@@ -15990,7 +15998,7 @@
     "@margoengine/geometry/teapot": 2595,
     "@margoengine/geometry/tessellate": 1491,
     "@margoengine/geometry/triangulate": 6805,
-    "@margoengine/geometry/utils": 8665,
+    "@margoengine/geometry/utils": 9056,
     "@margoengine/gltf": 7544,
     "@margoengine/gltf dist/workers/gltf.js": 41508,
     "@margoengine/gltf dist/workers/progressive.js": 19435,
