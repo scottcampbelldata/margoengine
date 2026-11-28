@@ -218,10 +218,20 @@ impl World {
             && b_low.z <= a_high.z
     }
 
-    /// Finds the world's pairs for this step: removed colliders go, moved boxes walk, new colliders join.
+    /// Finds the world's pairs for this step: removed colliders go, moved boxes walk, new colliders join. The same as
+    /// `broad_begin`, `broad_refresh` over every awake body and `broad_finish`, which is how threads share it: the awake
+    /// bodies' boxes are fitted on views of the world in fixed runs of the awake list, each collider's on its own row.
     pub fn broad_update(&mut self, dt: f32) {
+        let listed = self.broad_begin(dt);
+        self.broad_refresh(0, self.header().awake, dt);
+        self.broad_finish(dt, listed);
+    }
+
+    /// The broad phase up to the awake bodies' boxes: the colliders added, moved or removed since the last step, in the
+    /// order they were. Returns how many joined (`LIST_NEW`) and moved (`LIST_MOVED`) so far.
+    pub fn broad_begin(&mut self, dt: f32) -> (u32, u32) {
         if self.header().broad_kind == 1 {
-            return self.tree_update(dt);
+            return self.tree_begin(dt);
         }
         let mut fresh = 0usize;
         let mut moved = 0usize;
@@ -261,17 +271,56 @@ impl World {
             self.header_mut().free_collider = gone;
             gone = next;
         }
+        (fresh as u32, moved as u32)
+    }
+
+    /// Fits the boxes of the awake bodies in slots `first` to `last - 1` of the awake list, on this world or a thread's view of
+    /// it, marking each collider whose box moved (`MOVED`) for `broad_finish` to list; returns how many it fitted. A box is
+    /// its collider's own row (a compound's children are its own), so the runs share nothing they write.
+    pub fn broad_refresh(&mut self, first: u32, last: u32, dt: f32) -> u32 {
+        let mut fitted = 0;
+        for slot in first as usize..last as usize {
+            let mut c = self.uu(FIRST_COLLIDER, self.uu(AWAKE, slot) as usize);
+            while c != NONE {
+                let at = c as usize;
+                let state = self.uu(COLLIDER_STATE, at);
+                if state & IN_BROAD != 0 {
+                    fitted += 1;
+                    if self.refresh(at, dt) {
+                        self.set_u(COLLIDER_STATE, at, state | MOVED);
+                    }
+                }
+                c = self.uu(COLLIDER_NEXT, at);
+            }
+        }
+        fitted
+    }
+
+    /// Lists the colliders `broad_refresh` marked, in the order of the awake list, after those `broad_begin` listed.
+    pub(crate) fn list_moved(&mut self, mut moved: usize) -> usize {
         for slot in 0..self.header().awake as usize {
             let mut c = self.uu(FIRST_COLLIDER, self.uu(AWAKE, slot) as usize);
             while c != NONE {
                 let at = c as usize;
-                if self.uu(COLLIDER_STATE, at) & IN_BROAD != 0 && self.refresh(at, dt) {
+                let state = self.uu(COLLIDER_STATE, at);
+                if state & MOVED != 0 {
+                    self.set_u(COLLIDER_STATE, at, state & !MOVED);
                     self.set_u(LIST_MOVED, moved, c);
                     moved += 1;
                 }
                 c = self.uu(COLLIDER_NEXT, at);
             }
         }
+        moved
+    }
+
+    /// The broad phase after the awake bodies' boxes: the moved boxes walk and the new colliders join.
+    pub fn broad_finish(&mut self, dt: f32, listed: (u32, u32)) {
+        if self.header().broad_kind == 1 {
+            return self.tree_finish(dt, listed);
+        }
+        let fresh = listed.0 as usize;
+        let moved = self.list_moved(listed.1 as usize);
         for i in 0..moved {
             let id = self.uu(LIST_MOVED, i) << 1;
             for axis in 0..3 {

@@ -174,25 +174,43 @@ pub extern "C" fn world_step(dt: f32) -> u32 {
     world().header().failed
 }
 
-// A step shared by threads (KernelWorld.stepAsync): the main thread calls `world_step_broad`, each thread's instance finds a
-// run of the active pairs with `world_narrow_pairs`, the main thread plans the islands with `world_step_plan`, each thread
-// solves a run of islands with `world_solve_islands`, all on views of the world of their own, and the main thread ends the
-// step with `world_step_end`. A threadable pair and an island share no row another writes, so the bits are those of
-// `world_step` on any number of threads.
+// A step shared by threads (KernelWorld.stepAsync): the main thread calls `world_step_start`; each thread's instance fits the
+// boxes of a run of the awake bodies (`world_broad_refresh`); the main thread finishes the broad phase (`world_step_broad`);
+// each thread finds a run of the active pairs (`world_narrow_pairs`); the main thread plans the islands (`world_step_plan`);
+// each thread solves a run of islands (`world_solve_islands`), all on views of the world of their own; and the main thread
+// ends the step (`world_step_end`). A box, a threadable pair and an island share no row another run writes, so the bits are
+// those of `world_step` on any number of threads.
 static mut STEP_BEGUN: Option<crate::integrate::StepTimes> = None;
 
-/// Begins a step up to its narrow phase's pairs (`World::step_broad`): the active pairs whose runs the threads find with
-/// `world_narrow_pairs`, or u32::MAX when the world was lost and does not step. `world_step_plan` then goes on to the islands.
+/// Begins a step up to the awake bodies' boxes (`World::step_start`): the awake bodies whose runs the threads fit with
+/// `world_broad_refresh`, or u32::MAX when the world was lost and does not step. `world_step_broad` then goes on.
 #[unsafe(no_mangle)]
-pub extern "C" fn world_step_broad(dt: f32) -> u32 {
+pub extern "C" fn world_step_start(dt: f32) -> u32 {
     let w = world();
-    match w.step_broad(dt) {
+    match w.step_start(dt) {
         Some(times) => {
             unsafe { *core::ptr::addr_of_mut!(STEP_BEGUN) = Some(times) };
-            w.header().active_pairs
+            w.header().awake
         }
         None => u32::MAX,
     }
+}
+/// Fits the boxes of the awake bodies in slots `first` to `last - 1` of the step begun, on this instance's own view of the
+/// world; returns how many colliders it fitted.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_broad_refresh(first: u32, last: u32, dt: f32) -> u32 {
+    world().thread_view().broad_refresh(first, last, dt)
+}
+/// After every run of `world_broad_refresh`: the rest of the broad phase (`World::step_broad`); returns the active pairs whose
+/// runs the threads find with `world_narrow_pairs`.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_step_broad(dt: f32) -> u32 {
+    let w = world();
+    if let Some(times) = unsafe { (*core::ptr::addr_of_mut!(STEP_BEGUN)).take() } {
+        let times = w.step_broad(dt, times);
+        unsafe { *core::ptr::addr_of_mut!(STEP_BEGUN) = Some(times) };
+    }
+    w.header().active_pairs
 }
 /// Finds the threadable pairs among active pairs `first` to `last - 1` of the step begun, on this instance's own view of the
 /// world; returns how many it found.
@@ -219,7 +237,7 @@ pub extern "C" fn world_solve_islands(first: u32, last: u32, dt: f32) {
         view.solve_island(group as usize, dt);
     }
 }
-/// Ends the step `world_step_broad` began; what `world_step` returns.
+/// Ends the step `world_step_start` began; what `world_step` returns.
 #[unsafe(no_mangle)]
 pub extern "C" fn world_step_end(dt: f32) -> u32 {
     if let Some(times) = unsafe { (*core::ptr::addr_of_mut!(STEP_BEGUN)).take() } {

@@ -280,7 +280,7 @@ impl World {
 
     /// `World::broad_update` with the tree: removed colliders go, moved boxes leave and come back and meet what they now touch, new
     /// colliders join as a batch.
-    pub fn tree_update(&mut self, dt: f32) {
+    pub fn tree_begin(&mut self, dt: f32) -> (u32, u32) {
         let mut fresh = 0usize;
         let mut moved = 0usize;
         let mut gone = NONE;
@@ -315,17 +315,13 @@ impl World {
             self.header_mut().free_collider = gone;
             gone = next;
         }
-        for slot in 0..self.header().awake as usize {
-            let mut c = self.uu(FIRST_COLLIDER, self.uu(AWAKE, slot) as usize);
-            while c != NONE {
-                let at = c as usize;
-                if self.uu(COLLIDER_STATE, at) & IN_BROAD != 0 && self.refresh(at, dt) {
-                    self.set_u(LIST_MOVED, moved, c);
-                    moved += 1;
-                }
-                c = self.uu(COLLIDER_NEXT, at);
-            }
-        }
+        (fresh as u32, moved as u32)
+    }
+
+    /// `World::broad_finish` with the tree.
+    pub fn tree_finish(&mut self, dt: f32, listed: (u32, u32)) {
+        let fresh = listed.0 as usize;
+        let moved = self.list_moved(listed.1 as usize);
         // Every moved leaf comes out first and goes back at its new box, so each then meets the final boxes.
         for i in 0..moved {
             self.tree_remove(self.uu(LIST_MOVED, i) as usize);

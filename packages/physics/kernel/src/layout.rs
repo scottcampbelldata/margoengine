@@ -1007,6 +1007,8 @@ pub const IN_BROAD: u32 = 1;
 pub const PENDING: u32 = 2;
 /// Gone from its body; the next step drops its ends and pairs and frees the row.
 pub const REMOVED: u32 = 4;
+/// Within a broad phase only: `broad_refresh` fitted this collider's box again, and `broad_finish` lists it as moved.
+pub const MOVED: u32 = 8;
 /// Joining the lists in this step.
 pub const JOINING: u32 = 8;
 

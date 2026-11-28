@@ -31,6 +31,8 @@ interface KernelExports extends WebAssembly.Exports {
   world_iterations(): number;
   world_steps(): number;
   world_step(dt: number): number;
+  world_step_start(dt: number): number;
+  world_broad_refresh(first: number, last: number, dt: number): number;
   world_step_broad(dt: number): number;
   world_narrow_pairs(first: number, last: number, dt: number): number;
   world_step_plan(dt: number): number;
@@ -3317,10 +3319,32 @@ export class KernelWorld {
   }
 
   /**
-   * {@link KernelWorld.step} with the narrow phase's pairs and then the step's islands split over the threads (`useThreads`)
-   * in fixed runs, of active pairs and of island numbers, the main thread taking the first of each: a pair found on a thread
-   * writes only its own row (mesh, compound and filtered pairs stay on the main thread) and islands share no body a solve
-   * changes, so the bits are those of `step` on any number of threads. With no worker thread it is `step`.
+   * Splits `count` items over the main thread and the workers in fixed runs, the count over the runs rounded up, the main
+   * thread taking the first: each worker's run is sent before the main thread does its own with `own`.
+   */
+  private async runs(
+    count: number,
+    work: 'boxes' | 'pairs' | 'islands',
+    dt: number,
+    own: (first: number, last: number) => void,
+  ): Promise<void> {
+    const runs = this.threads.length + 1,
+      share = (count - (count % runs)) / runs + (count % runs === 0 ? 0 : 1),
+      upTo = (first: number) => (first + share < count ? first + share : count),
+      waits = this.threads.map((thread, i) => {
+        const first = (i + 1) * share;
+        return first < count ? thread.send({ work, first, last: upTo(first), dt }) : Promise.resolve();
+      });
+    own(0, upTo(0));
+    await Promise.all(waits);
+  }
+
+  /**
+   * {@link KernelWorld.step} with the awake bodies' boxes, the narrow phase's pairs and then the step's islands split over the
+   * threads (`useThreads`) in fixed runs, of the awake list, of active pairs and of island numbers, the main thread taking the
+   * first of each: a box is its collider's own, a pair found on a thread writes only its own row (mesh, compound and filtered
+   * pairs stay on the main thread) and islands share no body a solve changes, so the bits are those of `step` on any number of
+   * threads. With no worker thread it is `step`.
    * @throws as {@link KernelWorld.step} does; MargoError (`failed`) when a thread stopped.
    */
   async stepAsync(dt: number): Promise<this> {
@@ -3328,33 +3352,16 @@ export class KernelWorld {
     this.beforeStep(dt);
     let failed: number;
     try {
-      const pairs = this.api.world_step_broad(dt);
-      if (pairs !== 0xffffffff) {
-        const runs = this.threads.length + 1,
-          // Pairs a run, as islands below: the count over the runs, rounded up.
-          share = (pairs - (pairs % runs)) / runs + (pairs % runs === 0 ? 0 : 1),
-          upTo = (first: number) => (first + share < pairs ? first + share : pairs),
-          found = this.threads.map((thread, i) => {
-            const first = (i + 1) * share;
-            return first < pairs ? thread.send({ narrow: true, first, last: upTo(first), dt }) : Promise.resolve();
-          });
-        this.api.world_narrow_pairs(0, upTo(0), dt);
-        await Promise.all(found);
+      const awake = this.api.world_step_start(dt);
+      let islands = awake;
+      if (awake !== 0xffffffff) {
+        await this.runs(awake, 'boxes', dt, (first, last) => this.api.world_broad_refresh(first, last, dt));
+        const pairs = this.api.world_step_broad(dt);
+        await this.runs(pairs, 'pairs', dt, (first, last) => this.api.world_narrow_pairs(first, last, dt));
+        islands = this.api.world_step_plan(dt);
       }
-      const islands = pairs === 0xffffffff ? pairs : this.api.world_step_plan(dt);
-      if (islands !== 0xffffffff) {
-        const runs = this.threads.length + 1,
-          // Islands a run: the count over the runs, rounded up, in whole numbers.
-          run = (islands - (islands % runs)) / runs + (islands % runs === 0 ? 0 : 1),
-          end = (first: number) => (first + run < islands ? first + run : islands),
-          // Each worker's run, sent before the main thread solves its own.
-          waits = this.threads.map((thread, i) => {
-            const first = (i + 1) * run;
-            return first < islands ? thread.send({ first, last: end(first), dt }) : Promise.resolve();
-          });
-        this.api.world_solve_islands(0, end(0), dt);
-        await Promise.all(waits);
-      }
+      if (islands !== 0xffffffff)
+        await this.runs(islands, 'islands', dt, (first, last) => this.api.world_solve_islands(first, last, dt));
       failed = this.api.world_step_end(dt);
     } finally {
       this.stepping = false;

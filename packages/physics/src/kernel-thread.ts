@@ -1,15 +1,15 @@
 // A worker thread of a KernelWorld (`KernelWorld.useThreads`): its own instance of the threaded kernel over the world's
 // shared memory, on a stack region of its own, solving the runs of islands the main thread hands it. The world itself is the
-// main thread's: this instance only reads its handle from the kernel's statics and, on a view of its own, finds runs of the
-// narrow phase's pairs (`world_narrow_pairs`) and solves runs of islands (`world_solve_islands`), so it never grows the world,
-// filters a pair or modifies a contact.
+// main thread's: this instance only reads its handle from the kernel's statics and, on a view of its own, fits the boxes of
+// runs of the awake bodies (`world_broad_refresh`), finds runs of the narrow phase's pairs (`world_narrow_pairs`) and solves
+// runs of islands (`world_solve_islands`), so it never grows the world, filters a pair or modifies a contact.
 
 import { MargoError } from '@margoengine/math/errors';
 
-/** What the main thread sends: the module and memory to start on, then runs of active pairs (`narrow`) and of islands. */
+/** What the main thread sends: the module and memory to start on, then runs of boxes, of active pairs and of islands. */
 type Message =
   | { readonly module: WebAssembly.Module; readonly memory: WebAssembly.Memory; readonly stack: number }
-  | { readonly narrow?: true; readonly first: number; readonly last: number; readonly dt: number };
+  | { readonly work: 'boxes' | 'pairs' | 'islands'; readonly first: number; readonly last: number; readonly dt: number };
 
 /** The answer to each message: done, or the error that stopped it. */
 type Reply = { readonly ok: true } | { readonly ok: false; readonly message: string };
@@ -17,12 +17,13 @@ type Reply = { readonly ok: true } | { readonly ok: false; readonly message: str
 const mainOnly = (what: string) => (): never => {
   throw new MargoError(
     'state',
-    `A kernel thread only solves islands; ${what} is the main thread's work: step the world with stepAsync from the main thread.`,
+    `A kernel thread only fits boxes, finds pairs and solves islands; ${what} is the main thread's work: step the world with stepAsync from the main thread.`,
   );
 };
 
 let solve: ((first: number, last: number, dt: number) => void) | null = null,
-  narrow: ((first: number, last: number, dt: number) => number) | null = null;
+  narrow: ((first: number, last: number, dt: number) => number) | null = null,
+  boxes: ((first: number, last: number, dt: number) => number) | null = null;
 
 function handle(message: Message): Reply {
   try {
@@ -39,13 +40,15 @@ function handle(message: Message): Reply {
       (exports.__stack_pointer as WebAssembly.Global).value = message.stack;
       solve = exports.world_solve_islands as (first: number, last: number, dt: number) => void;
       narrow = exports.world_narrow_pairs as (first: number, last: number, dt: number) => number;
+      boxes = exports.world_broad_refresh as (first: number, last: number, dt: number) => number;
     } else {
-      if (!solve || !narrow)
+      if (!solve || !narrow || !boxes)
         throw new MargoError(
           'state',
           'A kernel thread was asked to solve before it was started; send the module first.',
         );
-      if (message.narrow) narrow(message.first, message.last, message.dt);
+      if (message.work === 'boxes') boxes(message.first, message.last, message.dt);
+      else if (message.work === 'pairs') narrow(message.first, message.last, message.dt);
       else solve(message.first, message.last, message.dt);
     }
     return { ok: true };

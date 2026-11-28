@@ -37,6 +37,8 @@ pub const PHASES: [&str; 15] = [
 pub struct StepTimes {
     begun: f64,
     stamp: f64,
+    /// What `broad_begin` listed, new and moved, for `broad_finish`.
+    listed: (u32, u32),
 }
 
 /// Adds the time since `since` to a slot of the timings and starts the next stretch there: the finer timers of the solver and
@@ -175,48 +177,53 @@ impl World {
     }
 
     /// The step up to its islands' solves: the broad and narrow phases, the islands, the rows, and each island's level of
-    /// substeps and multibody stamps (`plan_islands`). None when the world was lost and does not step. The same as `step_broad`,
-    /// `narrow_pairs` over every active pair and `step_plan`, which is how threads share the narrow phase: each finds a fixed
-    /// run of the active pairs on a view of its own (`thread_view`), and a pair it may take writes only its own row.
+    /// substeps and multibody stamps (`plan_islands`). None when the world was lost and does not step. The same as `step_start`,
+    /// `broad_refresh` over the awake list, `step_broad`, `narrow_pairs` over every active pair and `step_plan`, which is how
+    /// threads share the broad and narrow phases: each fits the boxes of a fixed run of the awake bodies, then finds a fixed
+    /// run of the active pairs, on a view of its own (`thread_view`), each writing only its own rows.
     pub fn step_begin(&mut self, dt: f32) -> Option<StepTimes> {
-        let times = self.step_broad(dt)?;
+        let times = self.step_start(dt)?;
+        self.broad_refresh(0, self.header().awake, dt);
+        let times = self.step_broad(dt, times);
         self.narrow_pairs(0, self.header().active_pairs, dt);
         Some(self.step_plan(dt, times))
     }
 
-    /// The step up to its narrow phase's pairs: the lists put in order, the broad phase, and the narrow phase's header. None when
-    /// the world was lost and does not step. The active pairs are then `header().active_pairs`.
-    pub fn step_broad(&mut self, dt: f32) -> Option<StepTimes> {
+    /// The step up to the awake bodies' boxes: the lists put in order and the colliders added, moved or removed since the last
+    /// step (`broad_begin`). None when the world was lost and does not step. The awake bodies are then `header().awake`.
+    pub fn step_start(&mut self, dt: f32) -> Option<StepTimes> {
         if self.header().lost != NONE {
             return None;
         }
         self.header_mut().step_dt = dt;
         let begun = now();
-        let mut stamp = begun;
-        // Closes a phase: the time since the last stamp, in milliseconds, goes in its slot.
-        let mut lap = |world: &mut World, phase: usize| {
-            let at = now();
-            world.timing[phase] = (at - stamp) as f32;
-            stamp = at;
-        };
         for sub in 8..self.timing.len() {
             self.timing[sub] = 0.0;
         }
         self.canonical_lists();
         self.spin_rotors();
         self.begin_step(dt);
-        lap(self, 1);
-        self.broad_update(dt);
-        lap(self, 2);
+        let stamp = now();
+        self.timing[1] = (stamp - begun) as f32;
+        let listed = self.broad_begin(dt);
+        Some(StepTimes { begun, stamp, listed })
+    }
+
+    /// The step after the awake bodies' boxes (`broad_refresh`) up to the narrow phase's pairs: the rest of the broad phase and
+    /// the narrow phase's header. The active pairs are then `header().active_pairs`.
+    pub fn step_broad(&mut self, dt: f32, times: StepTimes) -> StepTimes {
+        self.broad_finish(dt, times.listed);
+        let stamp = now();
+        self.timing[2] = (stamp - times.stamp) as f32;
         self.narrow_begin(dt);
-        Some(StepTimes { begun, stamp })
+        StepTimes { stamp, ..times }
     }
 
     /// The step after the narrow phase's threadable pairs (`narrow_pairs`) up to its islands' solves: the other pairs, the
     /// islands, the rows and the islands' plan.
     pub fn step_plan(&mut self, dt: f32, times: StepTimes) -> StepTimes {
         let substeps = self.header().substeps;
-        let StepTimes { begun, mut stamp } = times;
+        let StepTimes { begun, mut stamp, listed } = times;
         let mut lap = |world: &mut World, phase: usize| {
             let at = now();
             world.timing[phase] = (at - stamp) as f32;
@@ -234,7 +241,7 @@ impl World {
         if self.island_major {
             self.plan_islands(dt, substeps);
         }
-        StepTimes { begun, stamp }
+        StepTimes { begun, stamp, listed }
     }
 
     /// Each island's level of substeps (`island_level`, from its own state alone) and the first multibody stamp of its walks,

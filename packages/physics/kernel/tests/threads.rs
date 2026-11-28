@@ -38,29 +38,36 @@ fn step_on(w: &mut World, threads: usize) {
     w.step_end(DT, times);
 }
 
-/// One step with the narrow phase's pairs split over `threads` threads in fixed runs of the active pairs, then the islands as
-/// `step_on` splits them. Returns how many pairs the threads found, each run's count added in run order, and how many active
-/// pairs were left to the world.
-fn step_narrow_on(w: &mut World, threads: usize) -> (u32, u32) {
-    let Some(times) = w.step_broad(DT) else { return (0, 0) };
-    let pairs = w.header().active_pairs as usize;
-    let kept = (0..pairs).filter(|&i| !w.threadable(w.uu(ACTIVE_PAIRS, i) as usize)).count() as u32;
-    let run = pairs.div_ceil(threads).max(1);
+/// Runs `work(view, first, last)` over `count` items split into `threads` fixed runs, one a thread, each on a view of the world
+/// of its own; returns each run's count in run order.
+fn split(w: &World, threads: usize, count: usize, work: fn(&mut World, u32, u32) -> u32) -> Vec<u32> {
+    let run = count.div_ceil(threads).max(1);
     let shared = Shared(w as *const World);
-    let found: Vec<u32> = std::thread::scope(|scope| {
+    std::thread::scope(|scope| {
         let runs: Vec<_> = (0..threads)
             .map(|t| {
                 let shared = &shared;
                 scope.spawn(move || {
-                    // SAFETY: the world does nothing else while the pairs are found, and a threadable pair writes only its own row.
+                    // SAFETY: the world does nothing else while the runs go, and each run writes only its own rows.
                     let mut view = unsafe { &*shared.0 }.thread_view();
-                    let (first, last) = ((t * run).min(pairs), ((t + 1) * run).min(pairs));
-                    view.narrow_pairs(first as u32, last as u32, DT)
+                    work(&mut view, (t * run).min(count) as u32, ((t + 1) * run).min(count) as u32)
                 })
             })
             .collect();
         runs.into_iter().map(|run| run.join().unwrap()).collect()
-    });
+    })
+}
+
+/// One step with the awake bodies' boxes, then the narrow phase's pairs, then the islands split over `threads` threads in
+/// fixed runs. Returns the colliders fitted on threads, the pairs found on threads and the active pairs left to the world,
+/// each run's count added in run order.
+fn step_narrow_on(w: &mut World, threads: usize) -> (u32, u32, u32) {
+    let Some(times) = w.step_start(DT) else { return (0, 0, 0) };
+    let fitted: u32 = split(w, threads, w.header().awake as usize, |view, first, last| view.broad_refresh(first, last, DT)).iter().sum();
+    let times = w.step_broad(DT, times);
+    let pairs = w.header().active_pairs as usize;
+    let kept = (0..pairs).filter(|&i| !w.threadable(w.uu(ACTIVE_PAIRS, i) as usize)).count() as u32;
+    let found: u32 = split(w, threads, pairs, |view, first, last| view.narrow_pairs(first, last, DT)).iter().sum();
     let times = w.step_plan(DT, times);
     let islands = w.header().islands as usize;
     if w.island_major && islands > 0 {
@@ -80,7 +87,7 @@ fn step_narrow_on(w: &mut World, threads: usize) -> (u32, u32) {
         });
     }
     w.step_end(DT, times);
-    (found.iter().sum(), kept)
+    (fitted, found, kept)
 }
 
 fn floor(w: &mut World) {
@@ -188,33 +195,40 @@ fn mixed_scene(w: &mut World) {
 }
 
 #[test]
-fn narrow_phase_pairs_on_one_two_four_and_eight_threads_give_the_bits_of_one_and_the_same_work() {
-    // The work count is the proof the split is the same work: every threadable pair is found once, on some thread, and the
-    // pairs left to the world (the compound's) are the same in every run. Before each pair took a manifold of its own, 8
-    // threads differed at step 2: a pair with no points kept the normal of the pair found before it in its run.
-    let mut serial = World::new(256, 256).unwrap();
-    mixed_scene(&mut serial);
-    let mut worlds: Vec<(usize, World)> = [1usize, 2, 4, 8]
-        .into_iter()
-        .map(|threads| {
-            let mut w = World::new(256, 256).unwrap();
-            mixed_scene(&mut w);
-            (threads, w)
-        })
-        .collect();
-    let (mut most, mut kept) = (0u32, 0u32);
-    for step in 0..300 {
-        serial.step(DT);
-        let mut counts = vec![];
-        for (threads, w) in worlds.iter_mut() {
-            counts.push(step_narrow_on(w, *threads));
-            assert_eq!(w.hash(), serial.hash(), "{threads} threads: the state differs after step {step}");
+fn broad_and_narrow_phases_on_one_two_four_and_eight_threads_give_the_bits_of_one_and_the_same_work() {
+    // The work counts are the proof the split is the same work: every awake collider's box is fitted once and every
+    // threadable pair found once, on some thread, and the pairs left to the world (the compound's) are the same in every
+    // run. Before each pair took a manifold of its own, 8 threads differed at step 2: a pair with no points kept the normal
+    // of the pair found before it in its run. Both broad phases: the sweep along three axes (0) and the dynamic tree (1).
+    for kind in [0u32, 1] {
+        let mut serial = World::new(256, 256).unwrap();
+        serial.header_mut().broad_kind = kind;
+        mixed_scene(&mut serial);
+        let mut worlds: Vec<(usize, World)> = [1usize, 2, 4, 8]
+            .into_iter()
+            .map(|threads| {
+                let mut w = World::new(256, 256).unwrap();
+                w.header_mut().broad_kind = kind;
+                mixed_scene(&mut w);
+                (threads, w)
+            })
+            .collect();
+        let (mut most, mut kept, mut boxes) = (0u32, 0u32, 0u32);
+        for step in 0..300 {
+            serial.step(DT);
+            let mut counts = vec![];
+            for (threads, w) in worlds.iter_mut() {
+                counts.push(step_narrow_on(w, *threads));
+                assert_eq!(w.hash(), serial.hash(), "broad kind {kind}, {threads} threads: the state differs after step {step}");
+            }
+            assert!(counts.iter().all(|&c| c == counts[0]), "boxes fitted and pairs found on threads, and pairs left to the world, at step {step}: {counts:?}");
+            boxes = boxes.max(counts[0].0);
+            most = most.max(counts[0].1);
+            kept = kept.max(counts[0].2);
         }
-        assert!(counts.iter().all(|&c| c == counts[0]), "pairs found on threads, and left to the world, at step {step}: {counts:?}");
-        most = most.max(counts[0].0);
-        kept = kept.max(counts[0].1);
+        assert!(boxes >= 32, "at most {boxes} boxes fitted in a step");
+        assert!(most >= 32, "at most {most} threadable pairs in a step");
+        assert!(kept >= 1, "no pair was left to the world");
+        println!("broad kind {kind}: up to {boxes} boxes and {most} pairs a step on threads, up to {kept} pairs on the world");
     }
-    assert!(most >= 32, "at most {most} threadable pairs in a step");
-    assert!(kept >= 1, "no pair was left to the world");
-    println!("up to {most} pairs a step on threads, up to {kept} on the world");
 }
