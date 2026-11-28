@@ -89,7 +89,7 @@ test('a failing reader of a changed document fails the gate, naming the test', (
     ]);
     assert.throws(
       () => assertDocumentReadersPass(dir, ['docs/limits.md'], { timeout: 60000 }),
-      /tests\/doc\.test\.js[\s\S]*doc row/,
+      /tests\/doc\.test\.js[\s\S]*not ok \d+ - doc row/,
     );
     assert.deepEqual(assertDocumentReadersPass(dir, ['docs/unread.md']), [], 'a document nothing reads runs nothing');
     assert.deepEqual(

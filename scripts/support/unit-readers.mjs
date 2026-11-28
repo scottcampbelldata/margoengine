@@ -103,7 +103,14 @@ export function assertDocumentReadersPass(root, files = changedAgainstMain(root)
   if (!readers.length) return readers;
   const run = spawnSync(
     process.execPath,
-    ['--experimental-test-module-mocks', '--test', `--test-timeout=${timeout}`, ...readers.map((r) => r.test)],
+    [
+      '--experimental-test-module-mocks',
+      '--test',
+      // TAP names each failure on a `not ok` line, which the message below lists; the default reporter does not.
+      '--test-reporter=tap',
+      `--test-timeout=${timeout}`,
+      ...readers.map((r) => r.test),
+    ],
     {
       cwd: root,
       encoding: 'utf8',
