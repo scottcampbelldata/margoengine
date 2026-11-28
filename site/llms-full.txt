@@ -16939,6 +16939,13 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   again; the meadow check keeps running as `test:gpu:meadow-grass`.
 - **Regression:** `packages/biomes/tests/no-raw-division.test.js` and `packages/biomes/tests/gpu-chain-bound.test.js`.
 
+### Open 2026-11-28: a hull of two closed boxes face to face is refused as an open seam (KB-SEA-SLAMSEAM1, physics seakeeping)
+
+- **What:** `HullSolver` throws "The slam hull has an open or inconsistently wound seam" for the uneven hull of the coupling test, a wide box aft and a narrow one forward, each closed and wound outward, meeting at x = 0.
+- **Repro:** `packages/physics/tests/coupling/seakeeping.test.js`, "on a hull uneven fore and aft, heave drives pitch with the sign the strips give it" (fails on main since debcbf19fd, hull slamming; the KB2161 branch does not touch seakeeping).
+- **Cause:** the slam validation (`packages/physics/src/seakeeping/slamming-validation.ts`) welds vertices by position and wants every edge on exactly two triangles. The test's boxes are 4 by 4 grids a face, so the aft box's x = 0 face and the fore box's x = 0 face share vertices at z = 0 and +-0.75; those edges sit on four triangles, two of each box, wound in balance. The hull is closed (two closed shells touching), but the check counts it open.
+- **Fix to make:** accept an edge whose triangles pair up with balanced winding (count even, orientation zero), or validate each shell apart, with the test above as the regression; never reshape the test's hull to pass.
+
 ### Open 2026-11-28: every app that imports physics emits the wind-traction kernel's two Wasm files (KB-PHYS-TRACTIONWASM1, physics aero)
 
 - **Repro:** `node --test packages/game/tests/physics-entry.test.js`, "neither the game kit root nor its physics entry
