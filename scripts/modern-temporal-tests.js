@@ -138,7 +138,15 @@ try {
       const moved = await readTexture(taa.gpuState.velocity, 4),
         velocity = pixel(moved, 64, 64, 2);
       assert(velocity[0] > 0.05, 'Moving mesh velocity missed its previous model transform: ' + velocity);
-      const uv = [(64.5 / 128 - velocity[0]) * 128 - 0.5, (64.5 / 128 - velocity[1]) * 128 - 0.5],
+      // The vector holds the jitter difference too; the resolve fetches history by the motion alone (TAAVelocity.jitter,
+      // KB-TAA-CLAMP1). Without it the expected point was off by that difference, under the bound only while the jitter
+      // phases this frame pair landed on moved x by a quarter pixel (0.625 px gave 0.2496 against 0.2532, KB-GPUMAIN1).
+      const jitter = taa.velocity.jitter;
+      assert(jitter[0] !== 0 || jitter[1] !== 0, 'TAA reported no jitter difference on a frame with history');
+      const uv = [
+          (64.5 / 128 - velocity[0] + jitter[0]) * 128 - 0.5,
+          (64.5 / 128 - velocity[1] + jitter[1]) * 128 - 0.5,
+        ],
         base = uv.map(Math.floor),
         fraction = uv.map((v, i) => v - base[i]);
       let expected = 0;
