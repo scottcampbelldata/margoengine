@@ -18998,3 +18998,25 @@ examples were only run and their pages read, for the migration note).
   a load -k x taken at x + theta v dt has determinant 1 + (omega dt)^2 (1 - theta - (s + 1) / (2 s)). E. Hairer, C.
   Lubich and G. Wanner, *Geometric Numerical Integration*, 2nd ed. (Springer, 2006), §I.1 and §VI.3 (symplectic Euler
   and its preserved area), for why the determinant 1 leaves the amplitude unchanged.
+
+## Exact boolean output without cut points, and Float32 output (2026-11-27, KB-3MF-DOTS1)
+
+Read as published descriptions only (search results and summaries of the papers); no source code or companion
+repository was opened, CGAL's included.
+
+- W. J. Schroeder, J. A. Zarge, W. E. Lorensen, "Decimation of triangle meshes", SIGGRAPH 1992,
+  https://doi.org/10.1145/142920.134010: remove a vertex and retriangulate the loop around it.
+- G. H. Meisters, "Polygons have ears", American Mathematical Monthly 82, 1975, https://doi.org/10.2307/2319703.
+- B. Levy, "Exact predicates, exact constructions and combinatorics for mesh CSG", 2024,
+  https://arxiv.org/abs/2405.12949: clean the exact result, then round it, as rounding can create intersections.
+- V. Milenkovic, E. Sacks, "Geometric rounding and feature separation in meshes", Computer-Aided Design 108, 2019,
+  https://doi.org/10.1016/j.cad.2018.10.003: short edges and skinny triangles are removed with local mesh edits.
+- M. Botsch, L. Kobbelt, "A robust procedure to eliminate degenerate faces from triangle meshes", VMV 2001,
+  https://www.graphics.rwth-aachen.de/publication/188/: collapse needles, split the neighbor of a cap.
+- O. Devillers, S. Lazard, W. Lenhart, "3D snap rounding", SoCG 2018, https://doi.org/10.4230/LIPIcs.SoCG.2018.30:
+  rounding without any new self-intersection; not implemented, its worst case being far above the input size.
+
+Design: vertex removal runs on the exact homogeneous points, with float filters and BigInt determinants, only where
+one or two input triangles' parts meet at the point, so the point set of the surface does not change. Float32 output
+reuses the Botsch and Kobbelt pass with a length that counts as nothing (2^-20 of the largest coordinate nearby). It
+does not guarantee a result free of self-intersections after rounding.

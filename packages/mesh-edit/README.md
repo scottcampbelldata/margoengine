@@ -272,10 +272,15 @@ const other = createPrimitiveMesh('cube', 'other');
 other.vertices = other.vertices.map(([x, y, z]): [number, number, number] => [x + 1e-13, y + 1e-13, z]);
 const result = booleanMeshesExact(box, other, 'union');
 console.log(result.mesh.faces.length, result.collapsedFaces, result.nonManifoldEdges);
+// For a mesh stored in Float32 (a render mesh, a 3MF or STL file): no needle or cap survives the rounding.
+const stored = booleanMeshesExact(box, other, 'union', { precision: 'float32' });
+console.log(stored.mesh.vertices.every((point) => point.every((x) => Math.fround(x) === x)));
 ```
 
-- `booleanMeshesExact(a, b, operation, {createId, signal})` takes the same `operation` values and returns the same `mesh`, `sources`, `faceMap`, `nonManifoldEdges` and `diagnostics` as `booleanMeshes`, plus `collapsedFaces`. There is no `tolerance`.
+- `booleanMeshesExact(a, b, operation, {createId, signal, precision})` takes the same `operation` values and returns the same `mesh`, `sources`, `faceMap`, `nonManifoldEdges` and `diagnostics` as `booleanMeshes`, plus `collapsedFaces`. There is no `tolerance`.
 - Every float64 coordinate is an exact integer in one shared power-of-two scale. Polygons are stored as planes, so a cut adds a plane and never a rounded point (Sugihara and Iri, 1989; Bernstein and Fussell, 2009). Side tests run in float64 with an error bound and use BigInt only when the bound cannot decide. T-junctions are closed exactly, line by line.
+- Before rounding, the points the trees cut that are no corner of the solid are taken out by exact tests: a point inside one input triangle's part of the surface, or on a straight edge between two such parts (Schroeder, Zarge and Lorensen, 1992). A face away from the cut comes back with the corners it went in with.
+- `precision` (default `'float64'`) names the numbers the result will be stored in. With `'float32'`, corners round to Float32, corners within 2^-20 of their largest coordinate join, and a triangle thinner than that is taken out by splitting its neighbor (Botsch and Kobbelt, 2001), so each removal moves the surface by at most that much and the mesh stays closed. `batchBooleanMeshes` takes the same option.
 - Only at the end are corners rounded to float64. A face of the exact result too thin to be a valid face (about 4e-9 of its length, or a few float64 steps) is folded away, keeping every edge matched by its reverse; `collapsedFaces` counts these. The returned mesh is always closed and passes the mesh-edit checks, so it can feed the next boolean.
 - Inputs must be closed and outward facing. Separate shells of one input that overlap are joined first, and `sources` and `faceMap` still name the input's faces. A single surface that crosses itself throws `MargoError` code `failed` when the crossing breaks the result. Faces that are not quite planar count as the triangles an exact ear clip gives them.
 - Speed: only what lies in the box where the two bounds overlap goes through the exact trees, so a small cut in a large mesh costs the faces near it. Measured on two spheres of 10,224 triangles each, one operation: 7 to 11 s when they overlap by half, 2 to 3 s with a cutter a fifth the size, under 1 s when they only overlap at the edge. Work in the box grows with its faces squared. Use `booleanMeshes` for large clean inputs and pass `signal` to stop a long run.

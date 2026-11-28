@@ -411,3 +411,56 @@ test('one package of every kind evaluates in one call', async () => {
   assert.equal(read.meshes[0].objectId, '23');
   assert.ok(read.colors);
 });
+
+/** A cube of side 10 whose top is moved by a 32 x 32 height map of two sine waves each way, cut by a box. */
+function cutDisplaced() {
+  const cube = box([0, 0, 0], [10, 10, 10]),
+    top = { 2: [0, 1, 2], 3: [0, 2, 3] },
+    triangles = cube.triangles
+      .map(([a, b, c], t) => {
+        const used = top[t] ? ` did="22" d1="${top[t][0]}" d2="${top[t][1]}" d3="${top[t][2]}"` : '';
+        return `<d:triangle v1="${a}" v2="${b}" v3="${c}"${used}/>`;
+      })
+      .join(''),
+    coords = [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ].map(([u, v]) => `<d:disp2dcoord u="${u}" v="${v}" n="0"/>`),
+    wave = (x) => Math.sin((x / 32) * 4 * Math.PI),
+    map = grey(
+      Array.from({ length: 32 }, (_, y) =>
+        Array.from({ length: 32 }, (_, x) => Math.round(127.5 + 127.5 * wave(x) * wave(y))),
+      ),
+    );
+  return pack(
+    `<d:displacement2d id="20" path="/3D/Textures/map.png"/><d:normvectorgroup id="21"><d:normvector x="0" y="0" z="1"/></d:normvectorgroup><d:disp2dgroup id="22" dispid="20" nid="21" height="2.5">${coords.join('')}</d:disp2dgroup>` +
+      object(
+        23,
+        `<d:displacementmesh><d:vertices>${vertexXML(cube.vertices, 'd:')}</d:vertices><d:triangles>${triangles}</d:triangles></d:displacementmesh>`,
+      ) +
+      solid(7, [4.3, -1, 4], [20, 5.2, 20]) +
+      cut(10, 23, 7),
+    [10],
+    { '3D/Textures/map.png': map },
+  );
+}
+
+test('regression KB-3MF-DOTS1: a boolean of a finely displaced surface holds no sliver', async () => {
+  const mesh = await parse3MFEvaluated(cutDisplaced(), file),
+    { positions, indices } = mesh;
+  closed(mesh);
+  let least = Infinity;
+  for (let t = 0; t < indices.length; t += 3) {
+    const [a, b, c] = [0, 1, 2].map((k) => [0, 1, 2].map((i) => positions[indices[t + k] * 3 + i])),
+      u = b.map((x, i) => x - a[i]),
+      v = c.map((x, i) => x - a[i]),
+      area = Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]),
+      longest = Math.max(Math.hypot(...u), Math.hypot(...v), Math.hypot(...c.map((x, i) => x - b[i])));
+    least = Math.min(least, area / longest);
+  }
+  // Float32 steps near 10 are about 1e-6; before the fix 1,333 of 12,146 triangles were thinner than 1e-4.
+  assert.ok(least > 1e-4, `thinnest triangle ${least}`);
+  assert.ok(indices.length / 3 < 5000, `${indices.length / 3} triangles`);
+});

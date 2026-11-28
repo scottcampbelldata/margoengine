@@ -18,6 +18,7 @@ import { type Flattened, withoutFlatTriangles } from './flat-triangles.js';
 import { indexOfLeast } from './least.js';
 import { assertPolygonMesh, dominantAxis, faceGeometryError, newellNormal } from './polygon.js';
 import { convexLoopPieces } from './polygon-split.js';
+import { withoutCutPoints } from './boolean-simplify.js';
 import type { PolygonMesh } from './types.js';
 import type { MeshBatchBooleanResult, MeshBatchFaceSource } from './boolean-batch.js';
 import { faceIdFactory } from './result.js';
@@ -30,11 +31,25 @@ export interface ExactBooleanOptions {
   createId?: () => string;
   /** Checked as the work goes; aborting throws the signal's reason. */
   signal?: AbortSignal;
+  /**
+   * The numbers the result will be stored in (default `'float64'`). Pass `'float32'` for a mesh written to Float32, such
+   * as a render mesh or a 3MF or STL file: corners round to float32, and corners closer than {@link FLOAT32_GRAIN} of
+   * their size join, as do faces thinner than that, so the stored mesh stays closed with no needle or cap.
+   */
+  precision?: 'float64' | 'float32';
+}
+
+/** In float32 output, the length that counts as nothing, as a share of the largest coordinate nearby: 8 to 16 steps. */
+const FLOAT32_GRAIN = 2 ** -20;
+
+function assertPrecision({ precision }: ExactBooleanOptions): void {
+  if (precision !== undefined && precision !== 'float32' && precision !== 'float64')
+    throw new TypeError("Boolean precision must be 'float64' or 'float32'; choose one.");
 }
 
 /** Result of {@link booleanMeshesExact}. */
 export interface ExactBooleanResult extends MeshBooleanResult {
-  /** Faces of the exact result too thin to exist as a valid float64 face, folded away after rounding. */
+  /** Faces of the exact result too thin to exist in the chosen precision, folded away after rounding. */
   collapsedFaces: number;
 }
 
@@ -821,6 +836,33 @@ function repairLoops(
   }
 }
 
+/**
+ * For float32 output: the loops as triangles, fattest ears first, then without any triangle thinner than
+ * {@link FLOAT32_GRAIN}, as {@link withoutFlatTriangles} takes out flat ones.
+ */
+function forFloat32(
+  loops: readonly BooleanLoop[],
+  vertices: MutableVec3[],
+  tick: () => void,
+): { loops: BooleanLoop[]; collapsed: number } {
+  const triangles: BooleanLoop[] = [];
+  for (const loop of loops) {
+    tick();
+    for (const ear of loop.vertices.length > 3 ? fattestEars(loop.vertices.map((v) => vertices[v])) : [[0, 1, 2]])
+      triangles.push({ ...loop, vertices: ear.map((c) => loop.vertices[c]), uv: ear.map((c) => loop.uv[c]) });
+  }
+  const faces = triangles.map(({ vertices: corners, uv }, i) => ({ id: String(i), vertices: corners, uv })),
+    { mesh, origin, removed = 0 } = withoutFlatTriangles({ vertices, faces }, FLOAT32_GRAIN);
+  return {
+    loops: mesh.faces.map(({ id, vertices: corners, uv }) => ({
+      ...triangles[Number(origin?.get(id) ?? id)],
+      vertices: corners,
+      uv,
+    })),
+    collapsed: removed,
+  };
+}
+
 /** Remove pairs of faces with the same corners in opposite order: a fin of no thickness left by folding. */
 function cancelFins(loops: BooleanLoop[]): BooleanLoop[] {
   const keyOf = (vs: readonly number[]): string => {
@@ -938,6 +980,7 @@ export function booleanMeshesExact(
     throw new TypeError('Exact boolean createId must be a function; supply a generator or omit it.');
   if (options.signal !== undefined && !(options.signal instanceof AbortSignal))
     throw new TypeError('Exact boolean signal must be an AbortSignal; pass controller.signal or omit it.');
+  assertPrecision(options);
   options.signal?.throwIfAborted();
   const left = joinShells(flatA.mesh, options),
     right = joinShells(flatB.mesh, options),
@@ -1039,7 +1082,10 @@ function joinShells(
   for (let i = 0; i < shells.length; i++)
     for (let j = i + 1; j < shells.length; j++) {
       if (!boundsMeet(shells[i], shells[j])) continue;
-      const { mesh: joined, sources } = exactBoolean(shells[i], shells[j], 'union', options),
+      const { mesh: joined, sources } = exactBoolean(shells[i], shells[j], 'union', {
+          ...options,
+          precision: 'float64',
+        }),
         next = new Map<string, string>();
       for (const [id, { face }] of Object.entries(sources)) next.set(id, origin?.get(face) ?? face);
       origin = new Map([...(origin ?? []), ...next]);
@@ -1127,13 +1173,16 @@ function materializeExact(
       source: poly.source,
     }));
   closeJunctions(exactLoops, exact, tick);
-  // Round: exact points that round to one float64 point become one vertex.
+  const surface = withoutCutPoints(exactLoops, exact, tick);
+  // Round: exact points that round to one point become one vertex.
+  const single = options.precision === 'float32',
+    round = single ? Math.fround : (x: number): number => x;
   const vertices: MutableVec3[] = [],
     rounded = new Map<string, number>(),
     vertexOf = exact.map((P) => {
-      const x = ratio(P[0], P[3], exponent) + 0,
-        y = ratio(P[1], P[3], exponent) + 0,
-        z = ratio(P[2], P[3], exponent) + 0,
+      const x = round(ratio(P[0], P[3], exponent)) + 0,
+        y = round(ratio(P[1], P[3], exponent)) + 0,
+        z = round(ratio(P[2], P[3], exponent)) + 0,
         key = `${x},${y},${z}`;
       let v = rounded.get(key);
       if (v === undefined) {
@@ -1144,7 +1193,7 @@ function materializeExact(
       return v;
     }),
     start: BooleanLoop[] = [];
-  for (const { ids: corners, source } of exactLoops)
+  for (const { ids: corners, source } of surface)
     simplifyLoop(
       {
         vertices: corners.map((id) => vertexOf[id]),
@@ -1155,7 +1204,9 @@ function materializeExact(
       (v) => v,
       start,
     );
-  const { loops: repaired, collapsed } = repairLoops(start, vertices, tick),
+  const thinned = single ? forFloat32(start, vertices, tick) : { loops: start, collapsed: 0 },
+    { loops: repaired, collapsed: folded } = repairLoops(thinned.loops, vertices, tick),
+    collapsed = thinned.collapsed + folded,
     loops = cancelFins(repaired),
     nonManifold = closedNonManifoldEdges(loops),
     groups = new Map<string, BooleanLoop[]>();
@@ -1167,7 +1218,8 @@ function materializeExact(
   }
   const merged = [...groups.values()].flatMap((group) => mergeGroup(group, vertices, tick)),
     result = finishBoolean(a, b, merged, vertices, nonManifold, options.createId);
-  if (collapsed) result.diagnostics.push(`${collapsed} faces too thin for float64 were folded away.`);
+  if (collapsed)
+    result.diagnostics.push(`${collapsed} faces too thin for ${options.precision ?? 'float64'} were folded away.`);
   return { ...result, collapsedFaces: collapsed };
 }
 
@@ -1186,6 +1238,7 @@ export function batchExactKernel(
     throw new TypeError('Batch signal must be an AbortSignal; pass controller.signal.');
   if (options.createId !== undefined && typeof options.createId !== 'function')
     throw new TypeError('Batch createId must be a function; supply a unique ID generator.');
+  assertPrecision(options);
   options.signal?.throwIfAborted();
   let total = 0;
   const solids: Flattened[] = [];
@@ -1302,7 +1355,7 @@ export function batchExactKernel(
   const finished = materializeExact(
       all,
       { vertices: [], faces: [] },
-      { createId: () => `piece-${serial++}` },
+      { createId: () => `piece-${serial++}`, precision: options.precision },
       exponent,
       result.polys,
       tick,

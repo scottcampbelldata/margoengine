@@ -34,6 +34,7 @@ export function batchBooleanMeshes(meshes: readonly PolygonMesh[], operation?: M
 interface ExactBooleanOptions {
     createId?: () => string;
     signal?: AbortSignal;
+    precision?: 'float64' | 'float32';
 }
 
 type MeshBooleanOperation = 'union' | 'difference' | 'intersection';

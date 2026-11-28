@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { batchBooleanMeshes } from '@margoengine/mesh-edit/boolean-batch';
 import { booleanMeshesExact } from '@margoengine/mesh-edit/boolean-exact';
 import { booleanMeshes } from '@margoengine/mesh-edit/modeling';
 import { compilePolygonMesh, createPrimitiveMesh, polygonMeshEdges } from '@margoengine/mesh-edit';
@@ -372,4 +373,101 @@ test('regression: an input with a shell of over 125,000 vertices is joined witho
   assert.ok(vertices.length > 125000);
   const result = booleanMeshesExact(a, small(9, 'far'), 'union', { createId: ids() });
   assert.equal(result.mesh.faces.length, a.faces.length + 6);
+});
+
+/** A closed 10 x 10 slab with a bumpy top of `n` x `n` cells, its corners rounded to Float32 as a render mesh's are. */
+function bumpy(n) {
+  const vertices = [],
+    faces = [],
+    top = (i, j) => i * (n + 1) + j,
+    add = (...corners) => faces.push({ id: `s${faces.length}`, vertices: corners, uv: corners.map(() => [0, 0]) });
+  for (let i = 0; i <= n; i++)
+    for (let j = 0; j <= n; j++) {
+      const wave = Math.sin((i / n) * 4 * Math.PI) * Math.sin((j / n) * 4 * Math.PI);
+      vertices.push([(10 * i) / n, (10 * j) / n, 10 + 1.25 * (1 + wave)].map(Math.fround));
+    }
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < n; j++) {
+      add(top(i, j), top(i + 1, j), top(i + 1, j + 1));
+      add(top(i, j), top(i + 1, j + 1), top(i, j + 1));
+    }
+  // The sides go down to one bottom point under the middle: a closed solid with no other face.
+  const rim = [];
+  for (let i = 0; i < n; i++) rim.push(top(i, 0));
+  for (let j = 0; j < n; j++) rim.push(top(n, j));
+  for (let i = n; i > 0; i--) rim.push(top(i, n));
+  for (let j = n; j > 0; j--) rim.push(top(0, j));
+  const bottom = vertices.push([5, 5, 0]) - 1;
+  rim.forEach((v, i) => add(rim[(i + 1) % rim.length], v, bottom));
+  return { vertices, faces };
+}
+
+/** The shortest edge of any face, and the least width of any face about the line through its two farthest corners. */
+function thinnest({ vertices, faces }) {
+  let edge = Infinity,
+    width = Infinity;
+  for (const face of faces) {
+    const points = face.vertices.map((v) => vertices[v]),
+      farthest = (from) =>
+        points.reduce((best, p) =>
+          Math.hypot(...p.map((x, k) => x - from[k])) > Math.hypot(...best.map((x, k) => x - from[k])) ? p : best,
+        ),
+      a = farthest(points[0]),
+      d = farthest(a).map((x, k) => x - a[k]),
+      long = Math.hypot(...d);
+    let height = 0;
+    points.forEach((p, i) => {
+      edge = Math.min(edge, Math.hypot(...points[(i + 1) % points.length].map((x, k) => x - p[k])));
+      const r = p.map((x, k) => x - a[k]),
+        t = (r[0] * d[0] + r[1] * d[1] + r[2] * d[2]) / long ** 2;
+      height = Math.max(height, Math.hypot(...r.map((x, k) => x - t * d[k])));
+    });
+    width = Math.min(width, height);
+  }
+  return { edge, width };
+}
+
+test('regression KB-3MF-DOTS1: the points the trees cut are gone, and faces away from the cut stay whole', () => {
+  const slab = bumpy(24),
+    cutter = moved(createPrimitiveMesh('cube', 'c'), 'c', (p) =>
+      p.map((x, k) => [12.15, 3.1, 10][k] + x * [15.7, 4.2, 12][k]),
+    ),
+    { mesh, sources } = booleanMeshesExact(slab, cutter, 'difference', { createId: ids() });
+  assertClosed(mesh);
+  const { edge, width } = thinnest(mesh);
+  assert.ok(edge > 1e-3 && width > 1e-3, `shortest edge ${edge}, least width ${width}`);
+  const key = (points) => points.map(String).sort().join(' '),
+    kept = new Set(mesh.faces.map((face) => key(face.vertices.map((v) => mesh.vertices[v])))),
+    clear = slab.faces.filter((face) => face.vertices.every((v) => slab.vertices[v][1] > 5.6));
+  assert.ok(clear.length > 400);
+  for (const face of clear) assert.ok(kept.has(key(face.vertices.map((v) => slab.vertices[v]))), face.id);
+  for (const face of mesh.faces) assert.ok(sources[face.id]);
+});
+
+test('regression KB-3MF-DOTS1: float32 output joins near-coincident corners and stays closed', () => {
+  const slab = bumpy(24),
+    // The cutter passes 2e-6 beside a row and a column of the slab's corners.
+    cutter = moved(createPrimitiveMesh('cube', 'c'), 'c', (p) =>
+      p.map((x, k) => [(5 + 2e-6 + 20) / 2, (5.000002 - 1) / 2, 14][k] + x * [20 - 5 - 2e-6, 6.000002, 20.000004][k]),
+    ),
+    double = booleanMeshesExact(slab, cutter, 'difference', { createId: ids() });
+  assert.ok(thinnest(double.mesh).edge < 1e-5, 'float64 keeps the exact solid, thin strips included');
+  for (const result of [
+    booleanMeshesExact(slab, cutter, 'difference', { createId: ids(), precision: 'float32' }),
+    batchBooleanMeshes([slab, cutter], 'difference', { createId: ids(), precision: 'float32' }),
+  ]) {
+    assertClosed(result.mesh);
+    assert.ok(result.mesh.vertices.every((p) => p.every((x) => Math.fround(x) === x)));
+    // 2^-20 of a coordinate near 10.
+    const { edge, width } = thinnest(result.mesh);
+    assert.ok(edge > 4e-6 && width > 4e-6, `shortest edge ${edge}, least width ${width}`);
+    assert.ok(Math.abs(volume(result.mesh) - volume(double.mesh)) < 1e-3);
+    assert.ok(result.collapsedFaces > 0);
+    assert.match(result.diagnostics.join(' '), /float32/);
+  }
+  for (const boolean of [
+    () => booleanMeshesExact(slab, cutter, 'union', { precision: 'half' }),
+    () => batchBooleanMeshes([slab, cutter], 'union', { precision: 'half' }),
+  ])
+    assert.throws(boolean, TypeError);
 });

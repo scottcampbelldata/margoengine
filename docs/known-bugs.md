@@ -189,21 +189,23 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fixed:** the interpolated colour is clipped to 0..1. Regression:
   `packages/loaders/tests/threemf-evaluate.test.js`.
 
-### Open 2026-11-27: isolated darker pixels on the flat sides of a cut displacement mesh (KB-3MF-DOTS1, loaders)
+### Fixed 2026-11-27: isolated darker pixels on the flat sides of a cut displacement mesh (KB-3MF-DOTS1, mesh-edit, loaders)
 
 - **Repro:** `parse3MFEvaluated` on a cube of side 10 with a 32 x 32 sine height map on its top (height 2.5) minus
   a box from (4.3, -1, 4) to (20, 5.2, 20), drawn with one flat-shaded material at 640 x 640 with the engine on
-  WebGPU: three or four single pixels on the flat sides are about 18 % darker than their neighbours. A plain box and
-  a plain box cut the same way show none. The mesh is closed (every edge walked both ways), drawing both sides does
-  not change them, and the result holds two triangles with no area.
-- **Cause (established for most dots, 2026-11-27):** thin triangles in the boolean's result. The displaced cube alone
-  (4,486 triangles) has none thinner than 1e-4 units; after the difference the 12,146 triangles hold 1,333 such
-  slivers and 2 with no area, with vertices about 3e-6 apart at coordinates near 10, where Float32 steps are about
-  1e-6. A sliver's flat normal is then rounding noise, and where it covers one or two of a pixel's four samples that
-  pixel takes the wrong shade. Colouring the slivers red turned 6 of 11 dark pixels found in the picture red; the
-  other 5 did not change and are not explained. Removing only the 2 triangles with no area changes no pixel.
-- **Fix, not written:** the boolean's output (`@margoengine/mesh-edit`) needs its near-coincident vertices joined and
-  the slivers removed after rounding, keeping the solid closed.
+  WebGPU: single pixels on the flat sides about 18 % darker than their neighbours. 1,333 of the 12,146 triangles
+  were thinner than 1e-4 units and 2 had no area.
+- **Cause:** the exact boolean kept every point its BSP trees cut into the input faces, among them points a few
+  Float32 steps from a real corner and points along straight edges. Rounded, they made needles and caps whose normals
+  are rounding noise, and the 3MF reader fanned faces with corners in a line into more of them.
+- **Fixed:** before rounding, the exact boolean takes out the points that are no corner of the solid, by exact tests,
+  so the surface is the same (`packages/mesh-edit/src/boolean-simplify.ts`). The new `precision: 'float32'` option
+  rounds to Float32 and removes triangles thinner than 2^-20 of their coordinates, keeping the solid closed; the 3MF
+  reader uses it, and fans a face from its centre when a fan from a corner would give such a triangle. The repro now
+  has 3,534 triangles, none thinner than 1e-4. In the render, pixels 7 % or more below their eight neighbours' median
+  went from 10 to 3; those 3 are also in the picture of the displaced cube before any boolean (creases of the faceted
+  top). Regression: `packages/mesh-edit/tests/boolean-exact.test.js`,
+  `packages/loaders/tests/threemf-evaluate.test.js`.
 
 ### Fixed 2026-11-27: in an AR session a post effect made solid meshes see-through (KB-XR-AREFFECTS1, shared, materials)
 

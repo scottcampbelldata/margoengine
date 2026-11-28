@@ -8,6 +8,7 @@ import { MutableVec2, MutableVec3 } from "@margoengine/math";
 export interface ExactBooleanOptions {
     createId?: () => string;
     signal?: AbortSignal;
+    precision?: 'float64' | 'float32';
 }
 
 export interface ExactBooleanResult extends MeshBooleanResult {

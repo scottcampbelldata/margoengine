@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21479745,
+  "total": 21484902,
   "history": [
     {
       "date": "2026-10-24",
@@ -15145,6 +15145,12 @@
       "commit": "building-winders-ramps",
       "reason": "Winder stairs and ramps in rules buildings (limits row 19), with wing doors and well coverings fixed (KB-PROC-WINGDOOR1, KB-PROC-WELLMATS1): measured gzip building-rules 20,846 to 22,131, building-plans 30,418 to 32,076, building-settings 5,814 to 5,898, city 34,240 to 35,536. The generators are synchronous and choose a stair or ramp while building, so a split entry would leave plans without one until a second import.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-e-3mf-corpus",
+      "reason": "lane E 2026-11-27 (KB-3MF-DOTS1): the exact boolean removes cut points before rounding (boolean-simplify.ts) and takes precision float32 (Botsch and Kobbelt pass with a grain, shared with the zero-area removal of the other booleans). About 2 KB gzip on the exact entries, worth it: without it a cut of a finely faceted surface holds up to a third slivers; a split entry would cost a second kernel.",
+      "grew": 3
     }
   ],
   "items": {
@@ -15910,10 +15916,10 @@
     "@margoengine/mcp/resources": 2313,
     "@margoengine/mesh-edit": 30203,
     "@margoengine/mesh-edit/bake": 5070,
-    "@margoengine/mesh-edit/boolean-batch": 11755,
-    "@margoengine/mesh-edit/boolean-exact": 11596,
+    "@margoengine/mesh-edit/boolean-batch": 13462,
+    "@margoengine/mesh-edit/boolean-exact": 13296,
     "@margoengine/mesh-edit/geometry": 15785,
-    "@margoengine/mesh-edit/hull": 13345,
+    "@margoengine/mesh-edit/hull": 15095,
     "@margoengine/mesh-edit/modeling": 37194,
     "@margoengine/mesh-edit/modifiers": 8564,
     "@margoengine/mesh-edit/remesh": 9967,

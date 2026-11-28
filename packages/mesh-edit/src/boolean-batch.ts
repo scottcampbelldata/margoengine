@@ -2,7 +2,7 @@ import type { ExactBooleanOptions, MeshBooleanOperation } from './exact-kernel.j
 import { batchExactKernel } from './exact-kernel.js';
 import type { PolygonMesh } from './types.js';
 
-/** Options for batch booleans. There is no geometric tolerance or intermediate rounding. */
+/** Options for batch booleans. There is no geometric tolerance or intermediate rounding; `precision` rounds the result only. */
 export interface MeshBatchBooleanOptions extends ExactBooleanOptions {}
 
 /** Original solid index and face ID, even when several solids reuse the same face IDs. */

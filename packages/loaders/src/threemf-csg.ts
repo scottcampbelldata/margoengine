@@ -118,11 +118,19 @@ function movedFill({ scope, field }: VolumeFill, m: ArrayLike<number>): VolumeFi
 
 const sub = (a: Point, b: Point): Point => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot = (a: Point, b: Point): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const distance = (a: Point, b: Point): number => Math.hypot(...sub(a, b));
 const doubleArea = (a: Point, b: Point, c: Point): number => {
   const u = sub(b, a),
     v = sub(c, a);
   return Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]);
 };
+
+/** Whether a triangle's least height is within a few Float32 steps at its corners, as `FLOAT32_GRAIN` of mesh-edit. */
+function thin(a: Point, b: Point, c: Point): boolean {
+  const longest = Math.max(distance(a, b), distance(b, c), distance(c, a)),
+    size = [a, b, c].flat().reduce((most, x) => Math.max(most, Math.abs(x)), 0);
+  return !(doubleArea(a, b, c) > longest * size * 2 ** -20);
+}
 
 /** The colour of a flat or linearly shaded source face at a point of its plane. */
 function shade({ vertices, faces, colours }: Solid, at: number): ((p: Point) => Color) | undefined {
@@ -175,7 +183,7 @@ export async function booleanMesh(
   let next = 0,
     result;
   try {
-    result = batchBooleanMeshes(solids, operation, { createId: () => `f${next++}` });
+    result = batchBooleanMeshes(solids, operation, { createId: () => `f${next++}`, precision: 'float32' });
   } catch (error) {
     throw new LoaderError(F, error instanceof RangeError ? 'limit' : 'syntax', `${label}: ${(error as Error).message}`);
   }
@@ -227,10 +235,11 @@ export async function booleanMesh(
       model.propertyIds.push(key);
       model.properties.set(key, colors);
     }
-    // A fan from the first corner; a face with corners in a line fans from its centre, so no triangle is flat.
+    // A fan from the first corner; a face with corners about in a line fans from its centre, so no triangle is flat or
+    // too thin for Float32 to give it a normal.
     let ring = corners,
       shades = own;
-    const flat = corners.some((p, i) => i > 1 && !(doubleArea(corners[0], corners[i - 1], p) > 0));
+    const flat = corners.some((p, i) => i > 1 && thin(corners[0], corners[i - 1], p));
     if (flat) {
       const centre = [0, 1, 2].map((k) => corners.reduce((sum, p) => sum + p[k], 0) / corners.length) as Point,
         shade = paint?.(centre);

@@ -12,6 +12,8 @@ export interface Flattened {
   mesh: PolygonMesh;
   /** New face ID to input face ID; a face not listed keeps its ID. Absent when nothing changed. */
   origin?: Map<string, string>;
+  /** Triangles taken out. Absent when nothing changed. */
+  removed?: number;
 }
 
 interface Face {
@@ -27,12 +29,34 @@ const MAX_PASSES = 64;
  * `mesh` with no triangle of zero area (as {@link faceGeometryError} judges it). Vertex positions are kept; corners in
  * one point become one vertex. A closed mesh stays closed. A triangle that cannot be removed (an open or non-manifold
  * edge) stays, so the caller's solid check still refuses it. The input is returned as it is when it has none.
+ *
+ * With `grain`, a triangle also counts as flat when its shortest side or its least height is within that share of its
+ * largest coordinate, as for a mesh stored in float32; the surface then moves by that much at most at each removal.
  */
-export function withoutFlatTriangles(mesh: PolygonMesh): Flattened {
+export function withoutFlatTriangles(mesh: PolygonMesh, grain = 0): Flattened {
   assertPolygonMesh(mesh, false);
   const points = mesh.vertices,
+    length = (a: number, b: number): number =>
+      Math.hypot(points[a][0] - points[b][0], points[a][1] - points[b][1], points[a][2] - points[b][2]),
+    /** The length that counts as nothing at these corners. */
+    nothing = (corners: readonly number[]): number => {
+      let size = 0;
+      for (const v of corners) for (const x of points[v]) size = Math.max(size, Math.abs(x));
+      return grain * size;
+    },
+    thin = (corners: readonly number[]): boolean => {
+      const [a, b, c] = corners,
+        u = [0, 1, 2].map((k) => points[b][k] - points[a][k]),
+        v = [0, 1, 2].map((k) => points[c][k] - points[a][k]),
+        area = Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]),
+        ab = length(a, b),
+        bc = length(b, c),
+        ca = length(c, a),
+        least = nothing(corners);
+      return Math.min(ab, bc, ca) <= least || area <= least * Math.max(ab, bc, ca);
+    },
     flat = (f: { vertices: readonly number[] }): boolean =>
-      f.vertices.length === 3 && faceGeometryError(points, f.vertices) !== null;
+      f.vertices.length === 3 && (faceGeometryError(points, f.vertices) !== null || (grain > 0 && thin(f.vertices)));
   if (!mesh.faces.some(flat)) return { mesh };
   const faces: Face[] = [],
     /** The face on each directed edge. */
@@ -80,9 +104,6 @@ export function withoutFlatTriangles(mesh: PolygonMesh): Flattened {
     origin.set(id, origin.get(from) ?? from);
     return id;
   };
-  const length = (a: number, b: number): number =>
-    Math.hypot(points[a][0] - points[b][0], points[a][1] - points[b][1], points[a][2] - points[b][2]);
-
   /** Makes vertex `gone` into `kept`; a face left with a corner twice in a row loses it, and under three corners dies. */
   const collapse = (kept: number, gone: number): void => {
     for (const face of [...(around.get(gone) ?? [])]) {
@@ -157,10 +178,10 @@ export function withoutFlatTriangles(mesh: PolygonMesh): Flattened {
       .sort((a, b) => b.size - a.size);
     for (const { f } of todo) {
       if (!f.alive || !flat(f)) continue;
-      const error = faceGeometryError(points, f.vertices)!;
+      const error = faceGeometryError(points, f.vertices);
       const sides = sidesOf(f),
         [a, b, c] = sides;
-      if (error.includes('degenerate geometry')) {
+      if (error?.includes('degenerate geometry') || (grain > 0 && Math.min(a, b, c) <= nothing(f.vertices))) {
         const at = sides.indexOf(Math.min(a, b, c));
         collapse(f.vertices[at], f.vertices[(at + 1) % 3]);
         changed = true;
@@ -168,5 +189,5 @@ export function withoutFlatTriangles(mesh: PolygonMesh): Flattened {
     }
   }
   const out: PolygonFace[] = faces.filter((f) => f.alive).map(({ id, vertices, uv }) => ({ id, vertices, uv }));
-  return { mesh: { vertices: points, faces: out }, origin };
+  return { mesh: { vertices: points, faces: out }, origin, removed: mesh.faces.filter(flat).length };
 }
