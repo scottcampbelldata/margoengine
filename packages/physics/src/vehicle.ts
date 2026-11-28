@@ -947,6 +947,18 @@ export class Vehicle implements PhysicsAttachment {
       const other = wheel.ground.body.velocityAtPoint(wheel.point);
       return [v[0] - other[0], v[1] - other[1], v[2] - other[2]];
     };
+    // A damper reads how fast its length changed over the last step. The kernel splits a step into n substeps and adds gravity in
+    // each (v += g h, x += v h), so a body ends the step g dt (n - 1) / (2 n) further along gravity than its mean speed over it: a
+    // chassis held still read -7/16 g dt at 8 substeps, and its dampers carried weight its springs should (KB-PHYS-VEHICLEREST1).
+    const substeps = Math.max(1, this.physics.substeps),
+      lag = (dt * (substeps - 1)) / (2 * substeps),
+      gravity = this.physics.gravity,
+      fall = (body: PhysicsBody | undefined): number => (body?.type === 'dynamic' ? body.gravityScale * lag : 0);
+    const meanVelocity = (wheel: WheelSetup, arm: V): V => {
+      const v = relativeVelocity(wheel, arm),
+        shift = fall(chassis) - (this.groundReaction ? fall(wheel.ground?.body) : 0);
+      return [v[0] - gravity[0] * shift, v[1] - gravity[1] * shift, v[2] - gravity[2] * shift];
+    };
     const contactInverse = (wheel: WheelSetup, arm: V, at: V, axis: V): number =>
       inverseMass(arm, axis) + (this.groundReaction && wheel.ground ? groundInverse(wheel.ground.body, at, axis) : 0);
     const own = this.physics;
@@ -1048,7 +1060,7 @@ export class Vehicle implements PhysicsAttachment {
       const normal = hit.normal,
         r: V = [hit.point[0] - centreWorld[0], hit.point[1] - centreWorld[1], hit.point[2] - centreWorld[2]],
         cosine = -dot(normal, down),
-        pv = relativeVelocity(wheel, r);
+        pv = meanVelocity(wheel, r);
       let inverse = 10,
         relative = 0;
       if (cosine > 0.1) {

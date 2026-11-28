@@ -10775,8 +10775,8 @@ Core plus stage remains 24,820 B gzip.
 `Vehicle.car` lays out exactly four wheels on a chassis whose up axis is its own +y; a six-wheeled truck or a chassis
 modelled on another up axis takes `new Vehicle` with its own wheels. Its size comes from the chassis's box colliders
 (spheres, capsules, cylinders and cones count by their bounding spheres); a chassis of hulls or meshes needs
-`halfExtents`. The springs rest where the dampers' reading of a still chassis puts them, 4.6% short of the designed
-sag at the defaults (KB-PHYS-VEHICLEREST1), so the body rides a few millimetres higher than `0.8 r`. The tyre models
+`halfExtents`. The springs rest at the designed sag, so the body rides at `0.8 r` (the dampers read the step's mean speed,
+KB-PHYS-VEHICLEREST1, fixed 2026-11-28). The tyre models
 and grip keep the `Vehicle` defaults: the full MF 6.x tyre is beyond parity (docs/physics-parity-bar.md, P5).
 `debugRender()` allocates its two arrays on every call, reads the last step (the chassis pose and each wheel's cast),
 and colours a tyre-model wheel as sliding at a combined slip of 0.1, about where the default Magic Formula peaks,

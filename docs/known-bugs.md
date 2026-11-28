@@ -3402,20 +3402,28 @@ checks the retained stations of a sheer hull and exact agreement of the native a
 - **Regression:** `packages/physics/tests/sail.test.js` "a sail lashed to its hull and pressing on it keeps the momentum
   its contacts trade with the hull (KB-SOFT-LASHCONTACT1)" (1.3 percent before, against a bound of 0.1 percent).
 
-### Open 2026-11-27: a resting vehicle's dampers read the end-of-step velocity of a substepped body (KB-PHYS-VEHICLEREST1, physics)
+### Fixed 2026-11-28: a resting vehicle's dampers read the end-of-step velocity of a substepped body (KB-PHYS-VEHICLEREST1, physics)
 
 - **Repro:** `Vehicle.car(physics, chassis)` on a floor (the quick start of `packages/physics/README.md`), 300 steps:
-  the chassis does not move, yet `chassis.linearVelocity[1]` reads -0.0715 m/s every step, and each spring rests at
+  the chassis does not move, yet `chassis.linearVelocity[1]` reads -0.0715 m/s every step, and each spring rested at
   0.1826 m where `rest - sag` is 0.1785 m (compressed 4.6% less than its static sag). A body held still by any per-step impulse
   (`applyImpulse` from `beforestep`) shows the same -0.0715 m/s.
-- **Cause:** the kernel takes 8 substeps a step and spreads gravity over them, while an impulse from `beforestep` acts
-  once at the start; a body whose position does not change ends the step at `-g dt (n - 1) / (2 n)` = -7/16 of
-  `g dt`. `Vehicle`'s damper (`vehicle.ts`, the suspension loop) reads that velocity as a compression speed and
-  carries part of the weight with it. The fix is a per-substep suspension force (or a damper on the step's mean
-  velocity) in `Vehicle`, which changes every vehicle's ride against the Rapier oracle tests in
-  `tests/next-vehicle.test.js`, so it waits for its own change.
-- **Kept honest by:** `packages/physics/tests/vehicle-car.test.js` asserts the balance the dampers hold,
-  `k (rest - length) - c v = g / 4`, to 1e-5 m, and the length within 5% of the static sag.
+- **Cause:** the kernel takes n substeps a step and adds gravity in each (v += g h, x += v h, h = dt / n), while an impulse from
+  `beforestep` acts once at the start. A body ends the step `g dt (n - 1) / (2 n)` further along gravity than its mean speed
+  over the step, -7/16 of `g dt` at 8 substeps for one held still. `Vehicle`'s damper (`vehicle.ts`, the suspension loop)
+  read that end-of-step velocity as a compression speed and carried part of the weight with it. Rapier, one step with gravity
+  added once, reads 0 there.
+- **Fix:** the damper reads the step's mean speed: the contact point's velocity less `g dt (n - 1) / (2 n)` times each dynamic
+  body's gravity scale (the chassis's, less the ground body's under `groundReaction`), from `physics.substeps` and
+  `physics.gravity`. A still car's dampers read 0 and each spring rests at the static sag to 1e-5 m. Drive, grip and anti-roll
+  keep the velocity they read. Two steps after full throttle a front wheel now carries 2,803 N where it carried 2,850 N, as
+  an unloading wheel takes the extension damper (0.5 of critical) where the phantom compression kept the compression one
+  (0.3).
+- **Regression:** `packages/physics/tests/vehicle-car.test.js` "a car rests on four springs that carry a quarter of its weight
+  each" (each spring at `rest - sag` to 1e-5 m; read 0.18259 before), and "the debug lines show each suspension ray" reads each
+  tyre's push line against its own load (push times load is the 1,200 N drive to 0.5 N; it compared with the static quarter
+  load to 0.02 before). The Rapier oracle files `next-vehicle.test.js` and `next-vehicle-wheels.test.js` and the other vehicle
+  files pass (48 of 48), and `packages/road` driving (14 of 14).
 
 ### Fixed 2026-11-27: a bounce took friction from its compression only, so balls slid through bounces that grip (KB-PHYS-BOUNCEFRICTION1, physics)
 

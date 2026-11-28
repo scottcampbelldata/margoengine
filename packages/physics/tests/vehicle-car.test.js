@@ -28,26 +28,21 @@ const run = (physics, steps) => {
 test('a car rests on four springs that carry a quarter of its weight each, at the sag their closed form gives', () => {
   const { physics, chassis, car } = scene();
   run(physics, 300);
-  // r = 0.35 min(0.9, 2) = 0.315, rest = 0.85 r, sag = rest / 3, k = g / (4 sag) and the compression damper 0.3 sqrt(4 k) / 2,
-  // per kilogram. Each spring holds a quarter of the weight with its damper, which reads the chassis's end-of-step velocity
-  // (docs/known-bugs.md, KB-PHYS-VEHICLEREST1): k (rest - length) - c v = g / 4.
+  // r = 0.35 min(0.9, 2) = 0.315, rest = 0.85 r, sag = rest / 3, k = g / (4 sag) per kilogram. A car at rest has dampers that read
+  // nothing, so each spring alone holds a quarter of the weight at the static sag. The dampers once read the chassis's end-of-step
+  // velocity, -7/16 g dt at 8 substeps for a body held still, and rested every spring 4.1 mm long (KB-PHYS-VEHICLEREST1).
   const radius = 0.35 * 0.9,
     rest = 0.85 * radius,
     sag = rest / 3,
-    k = 9.81 / (4 * sag),
-    c = (0.3 * Math.sqrt(4 * k)) / 2,
-    v = chassis.linearVelocity[1],
     weight = (1200 * 9.81) / 4;
   assert.equal(car.wheelCount, 4);
   for (let i = 0; i < 4; i++) {
-    const wheel = car.wheel(i),
-      length = rest - (9.81 / 4 + c * v) / k;
+    const wheel = car.wheel(i);
     assert.ok(wheel.inContact, `wheel ${i} touches the floor`);
     assert.ok(
-      Math.abs(wheel.suspensionLength - length) < 1e-5,
-      `wheel ${i} length ${wheel.suspensionLength}, not ${length}`,
+      Math.abs(wheel.suspensionLength - (rest - sag)) < 1e-5,
+      `wheel ${i} length ${wheel.suspensionLength}, not the static sag ${rest - sag}`,
     );
-    assert.ok(Math.abs(wheel.suspensionLength - (rest - sag)) < 0.05 * sag, 'within 5% of the static sag');
     assert.ok(Math.abs(wheel.suspensionForce - weight) / weight < 1e-3, `wheel ${i} load ${wheel.suspensionForce}`);
   }
   // Each hub hangs the spring's length below its mount, 0.2 r + rest - sag above the body's bottom, so the body's centre stands
@@ -122,9 +117,15 @@ test('the debug lines show each suspension ray, contact, tyre push and wheel', (
       hub = lines.vertices.subarray(at + 3, at + 6);
     assert.ok(Math.abs(Math.hypot(hub[0] - top[0], hub[1] - top[1], hub[2] - top[2]) - wheel.suspensionLength) < 1e-5);
     assert.ok(Math.hypot(top[0] - wheel.hardPoint[0], top[1] - wheel.hardPoint[1], top[2] - wheel.hardPoint[2]) < 1e-5);
-    // The push line points forward (+Z), a quarter of the 0.4 g drive per unit of load: 4 m/s^2 / 9.81 m/s^2 of the load.
+    // The push line points forward (+Z), one metre for a push of the wheel's whole load: a quarter of the drive, 4 m/s^2 on a
+    // quarter of 1,200 kg, 1,200 N, over the load the wheel carries now. Two steps after the throttle the front wheels carry
+    // less than a quarter of the weight and the rear more, so the line is read against each wheel's own load.
     const push = lines.vertices.subarray(at + 18, at + 24);
-    assert.ok(Math.abs(push[5] - push[2] - 4 / 9.81) < 0.02, `push ${push[5] - push[2]}`);
+    assert.ok(Math.abs(push[0] - push[3]) < 1e-6 && Math.abs(push[1] - push[4]) < 1e-6, `wheel ${i} push points along Z`);
+    assert.ok(
+      Math.abs((push[5] - push[2]) * wheel.suspensionForce - 1200) < 0.5,
+      `wheel ${i} push ${push[5] - push[2]} on a load of ${wheel.suspensionForce} N`,
+    );
   }
   const only = car.debugRender({ wheels: false, slip: false, contacts: false });
   assert.equal(only.vertices.length / 6, 4 * 2, 'each part switches off');

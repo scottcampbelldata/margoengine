@@ -223,7 +223,7 @@ the scatter of Cross's five measured bounces (2002), and a solid ball rolls down
   quick start and the three.js migration note in the physics README, the example page
   `examples/test-pages/vehicle.html` (WebGPU and the WebGL2 compatibility layer), the debug view
   `vehicle.debugRender()`, and coded errors linking margoengine.com/errors#vehicles. Open: speed against the rival's
-  demo (quiet speed phase), KB-PHYS-VEHICLEREST1 and KB-PHYS-TRACKEDERR1.
+  demo (quiet speed phase) and KB-PHYS-TRACKEDERR1 (KB-PHYS-VEHICLEREST1 fixed 2026-11-28).
 
 ### P6. SOFT-01 Cloth
 
