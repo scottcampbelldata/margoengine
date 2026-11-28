@@ -3282,3 +3282,14 @@ Geometry-derived modes, contact-point mode shapes, acoustic radiation and the ot
 - Point 8 (ba3941ca5d). `packages/biomes/scripts/bio02-growth-measured.mjs` compares 16 independent field red maple means. At two years the solver gives 38.4 and 80.0 cm against 9.3 and 33.7 cm for 8% and 57% light. The generic parameters overestimate all means by up to 57.3 cm. Halving the voxel side preserves the result and reduced water still overpredicts. [Measured limits](limits.md#bio-02-red-maple-growth-under-field-shade)
 
 Species-specific physiology, sustained multi-internode extension, crown shedding, a spatial colonisation tier and existing branch bending remain open. The row stays REOPENED at four points.
+
+### BIO-03 Forest ecosystem dynamics
+
+#### BIO-03 four-point pass
+
+- Point 5 (1476595e04). `packages/biomes/tests/coupling/forest.test.js` checks borrowed f64 exposure and live signed publication, rejecting a late patch or a failed recruitment callback before replacing accepted exposure, trees or native work. `packages/biomes/tests/coupling/forest-workers.test.js` restores the physical 65,536 Q16 cover for a 1 mm crown beneath two 40 m crowns, where the previous i32 sum turned negative.
+- Point 6 (1476595e04). `packages/biomes/tests/coupling/forest-workers.test.js` exercises exact 1/2/4 signed stand histories and rewind. `packages/biomes/tests/forest-workers.browser.mjs` starts three simultaneous Chromium helpers on 62 rows, with 55 live queries, 2,005 candidates and 106 SIMD-paired overlaps out of 113. Existing BIO-02 helper replay is also checked.
+- Point 7 (1476595e04). `packages/biomes/tests/forest-film.browser.mjs` renders pair-matched exposed and sheltered crowns from real annual state. A calm year leaves leeward crown axes at 12.48–12.73 degrees while the sheltered control stays upright. WebGPU and WebGL2 each repeat entire accepted snapshots and RGBA through hold, two restores, re-advance and rewind.
+- Point 8 (1476595e04). `packages/biomes/scripts/bio03-forest-measured.mjs` compares 12 independent Douglas-fir survival values. The generic stand reproduces the final spacing rank, misses three of four year-40 reported intervals and overpredicts by up to 17.81 percentage points. A 5 to 10 cm initial-crown change moves the two-metre year-32 result by more than 24 percentage points. [Measured limits](limits.md#bio-03-douglas-fir-survival-in-the-wind-river-spacing-trial)
+
+Layered light, surveyed allometry, species-specific growth and mortality calibration, and the original TREE-3 shot remain open. The row stays REOPENED at four points.
