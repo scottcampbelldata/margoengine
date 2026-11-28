@@ -105,7 +105,7 @@ fn torMarch(origin:vec3f,dir:vec3f,start:f32,end:f32,jitter:f32)->TorLight {
 }
 fn torRay(uv:vec2f)->vec3f {
  let a=tor.inverse*vec4f(uv.x*2.0-1.0,1.0-uv.y*2.0,0.000001,1);let b=tor.inverse*vec4f(uv.x*2.0-1.0,1.0-uv.y*2.0,1.0,1);
- return normalize(a.xyz/a.w-b.xyz/b.w);
+ return normalize(a.xyz/a.w-b.xyz/b.w)*select(-1.0,1.0,(b.w-a.w)*a.w*b.w>0.0);
 }
 // The span of the ray inside the storm's cylinder (vertical axis through the centre, radius tor.shape.w) between
 // the ground and the base's top, or an empty one.

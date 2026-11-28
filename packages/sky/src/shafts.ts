@@ -83,7 +83,7 @@ struct Shafts {inverse:mat4x4f,eye:vec4f,sun:vec4f,color:vec4f,screen:vec4f,para
 fn shaftNoise(p:vec2f)->f32 {return fract(52.9829189*fract(dot(p,vec2f(0.06711056,0.00583715))));}
 fn shaftRay(uv:vec2f)->vec3f {
  let a=shafts.inverse*vec4f(uv.x*2.0-1.0,1.0-uv.y*2.0,0.000001,1);let b=shafts.inverse*vec4f(uv.x*2.0-1.0,1.0-uv.y*2.0,1.0,1);
- return normalize(a.xyz/a.w-b.xyz/b.w);
+ return normalize(a.xyz/a.w-b.xyz/b.w)*select(-1.0,1.0,(b.w-a.w)*a.w*b.w>0.0);
 }
 `;
 // The mask, at half the target's size: the share of each texel's 2 x 2 pixels where the scene is open sky, times the

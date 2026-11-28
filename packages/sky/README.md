@@ -136,6 +136,13 @@ for optional water reflection. Reading the getter enables its GPU refresh on
 subsequent frames; it uses the existing atmospheric tables. The texture changes
 on device restoration and must not be destroyed by its consumer.
 
+Planar mirrors see the whole sky. A `Reflector` or `PBRReflector` from `@margoengine/environment` captures with an
+oblique near plane on the mirror (Lengyel, "Oblique View Frustum Depth Projection and Clipping", JGT 2005), which
+tilts the far plane, so a view ray unprojected at depth 0 can land behind the eye. Every sky ray (the sky, Hillaire's
+sky and aerial view, the Moon, aurora, Milky Way, cloud, shaft and tornado rays) takes the sign of its point's clip w,
+so a frozen lake mirrors the Moon and the curtains above it; `test/oblique-gpu.mjs` holds each layer to the same
+picture with and without the oblique plane (KB-SKY-OBLIQUE1).
+
 `sky.lights` exposes two retained sun/moon records updated before rendering. Each
 holds `direction` (XYZ plus intensity) and RGB `radiance`. Pass these to
 `Water.attach(engine, {lights: sky.lights})` for separate reflection paths during

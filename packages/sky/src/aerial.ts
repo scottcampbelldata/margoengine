@@ -84,7 +84,7 @@ ${atmosphereLookups}
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){
  if(any(id.xy>=vec2u(${SLICES}))){return;}let a=atmosphere;
  let uv=(vec2f(id.xy)+0.5)/${SLICES}.0;let ndc=vec2f(uv.x*2.0-1.0,1.0-uv.y*2.0);
- let pf=a.inverse*vec4f(ndc,0.000001,1);let pn=a.inverse*vec4f(ndc,1.0,1);let d=normalize(pf.xyz/pf.w-pn.xyz/pn.w);
+ let pf=a.inverse*vec4f(ndc,0.000001,1);let pn=a.inverse*vec4f(ndc,1.0,1);let d=normalize(pf.xyz/pf.w-pn.xyz/pn.w)*select(-1.0,1.0,(pn.w-pf.w)*pf.w*pn.w>0.0);
  let o=vec3f(0,a.view.y,0);let ground=sphereHit(o,d,a.radii.x);let stop=select(1e9,ground,ground>=0.0);
  var light=vec3f(0);var throughput=vec3f(1);var travelled=0.0;
  for(var k=0u;k<${SLICES}u;k++){

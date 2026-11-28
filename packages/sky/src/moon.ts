@@ -100,7 +100,7 @@ const shader = `struct U {inverse:mat4x4f,eye:vec4f,direction:vec4f,east:vec4f,n
 @group(0) @binding(2) var filtering:sampler;
 ${backdropVertex}
 @fragment fn fragment(i:O)->@location(0) vec4f {
- let p=u.inverse*vec4f(i.ndc,0.000001,1.0);let ray=normalize(p.xyz/p.w-u.eye.xyz);
+ let p=u.inverse*vec4f(i.ndc,0.000001,1.0);let ray=normalize(p.xyz/p.w-u.eye.xyz)*select(-1.0,1.0,p.w>=0.0);
  let t=dot(ray,u.direction.xyz);let r=u.direction.w;let q=r*r-(1.0-t*t);
  if(t<=0.0||q<=0.0){discard;}
  let n=normalize((t-sqrt(q))*ray-u.direction.xyz);

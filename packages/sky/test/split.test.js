@@ -36,6 +36,8 @@ const pick = (names) => Object.fromEntries(names.map((name) => [name, entries[na
 // gained the fire spots' haze and its uniform sixteen zero vec4s; the same commands in every trace.
 // afterlight and meadow recorded again with KB-SKY-SANDGREY1 (2026-11-27): a sky that lights the scene draws in the
 // engine light's units (the exposure float and the light buffer's scale); uploads only, the same commands and WGSL.
+// Recorded again with KB-SKY-OBLIQUE1 (2026-11-27): every sky view ray turns round when its unprojected point lies
+// behind the eye (a planar reflection's oblique near plane); WGSL text only, the same commands and uploads.
 test('the full Sky records exactly the GPU work, WGSL and uploads of the recorded traces', () => {
   for (const name of Object.keys(configs)) {
     const h = trace(Sky, name);

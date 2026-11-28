@@ -26,6 +26,11 @@ export const backdropVertex = `struct O {@builtin(position) position:vec4f,@loca
 /**
  * WGSL of a layer's view ray and its pixel's solid angle, for a uniform `u` with `inverse` (the camera's inverse view
  * projection), `eye` and `extra` (zw: one pixel in NDC). `ray(n)` is the unit direction through NDC `n`.
+ * The point unprojected at depth 0 lies behind the eye when its clip w is negative, as under the oblique near plane
+ * of a planar reflection's capture camera (Lengyel, "Oblique View Frustum Depth Projection and Clipping", JGT 2005),
+ * whose tilted far plane can cross the eye's back half-space; `ray` then turns the direction round, so a mirror shows
+ * the sky above it rather than the night below the horizon. Every other sky ray takes the same sign: a point's clip w
+ * is 1 / w of its unprojected homogeneous point, and the forward end of a two-point ray is the one with the larger w.
  * `pixelSolidAngle(n)` is the solid angle of the pixel around `n`, from the Jacobian of the direction field: for the
  * unnormalised ray q(n) and its partial derivatives qx and qy, the unit sphere's area element is
  * |q . (qx x qy)| / |q|^3. The derivatives come from the matrix's columns, so nothing subtracts two nearly equal rays:
@@ -33,7 +38,7 @@ export const backdropVertex = `struct O {@builtin(position) position:vec4f,@loca
  * higher resolution, enough to turn a one-ULP rounding difference between two shader compilers into a different
  * half-float result (docs/known-bugs.md, "Milky Way and aurora on the WebGL2 layer").
  */
-export const backdropRay = `fn ray(n:vec2f)->vec3f {let p=u.inverse*vec4f(n,0.000001,1.0);return normalize(p.xyz/p.w-u.eye.xyz);}
+export const backdropRay = `fn ray(n:vec2f)->vec3f {let p=u.inverse*vec4f(n,0.000001,1.0);return normalize(p.xyz/p.w-u.eye.xyz)*select(-1.0,1.0,p.w>=0.0);}
 fn pixelSolidAngle(n:vec2f)->f32 {
  let p=u.inverse*vec4f(n,0.000001,1.0);let s=p.xyz/p.w;let q=s-u.eye.xyz;let l=length(q);
  let qx=(u.inverse[0].xyz-s*u.inverse[0].w)/p.w;let qy=(u.inverse[1].xyz-s*u.inverse[1].w)/p.w;

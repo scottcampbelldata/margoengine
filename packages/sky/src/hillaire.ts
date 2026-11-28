@@ -337,7 +337,7 @@ fn skyViewUV(a:Atmosphere,d:vec3f)->vec2f {
 }
 @fragment fn fragment(i:Vertex)->@location(0) vec4f {
  let a=atmosphere;let ndc=vec2f(i.uv.x*2.0-1.0,1.0-i.uv.y*2.0);
- let pf=a.inverse*vec4f(ndc,0.000001,1);let pn=a.inverse*vec4f(ndc,1.0,1);let d=normalize(pf.xyz/pf.w-pn.xyz/pn.w);
+ let pf=a.inverse*vec4f(ndc,0.000001,1);let pn=a.inverse*vec4f(ndc,1.0,1);let d=normalize(pf.xyz/pf.w-pn.xyz/pn.w)*select(-1.0,1.0,(pn.w-pf.w)*pf.w*pn.w>0.0);
  let o=vec3f(0,a.view.y,0);var light=vec3f(0);var through=vec3f(1);
  if(a.view.y<a.radii.y){light=textureSampleLevel(skyView,lutSampler,skyViewUV(a,d),0.0).rgb;through=transmittanceToTop(a,a.view.y,d.y);}
  else{let s=skyAlong(a,o,d,32u);light=s[0];through=s[1];}

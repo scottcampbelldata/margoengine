@@ -1,31 +1,31 @@
 {
  "night-fog": {
-  "digest": "6390c0278a7c9835",
+  "digest": "05d4d9faf94596e3",
   "created": 62,
   "commands": 58
  },
  "stage-sky": {
-  "digest": "236b556d244bd94b",
+  "digest": "c01340a6c675b36c",
   "created": 54,
   "commands": 34
  },
  "afterlight": {
-  "digest": "ca3457beadf96ef9",
+  "digest": "c6e6bd3838190307",
   "created": 88,
   "commands": 381
  },
  "meadow": {
-  "digest": "d4d9a3164ef558de",
+  "digest": "5a3ae9ff6e9cdfd5",
   "created": 74,
   "commands": 235
  },
  "preetham": {
-  "digest": "e3428732e8afab58",
+  "digest": "2f16ad3a1a73dc4a",
   "created": 60,
   "commands": 70
  },
  "preetham-clouds-fog": {
-  "digest": "5e1ee137075eb6c2",
+  "digest": "c2a93330ce32311c",
   "created": 62,
   "commands": 58
  }

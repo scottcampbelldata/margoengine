@@ -37,6 +37,9 @@
 // Recorded again with KB-SKY-HAZEBELOW1 (2026-11-27): the fog WGSL gained fogBelowLight (the haze's light below the
 // eye, fog.lightDecay) and its uniform one vec4, so fog and fogColour changed; at the default [0, 0, 0] the factor is
 // exactly 1 and nothing draws differently.
+// Recorded again with KB-SKY-OBLIQUE1 (2026-11-27): the sky's view rays take the sign of their point's clip w, so a
+// planar reflection's oblique capture camera sees the sky above the mirror; under any ordinary camera the factor is
+// exactly 1 and nothing draws differently, so only the WGSL text moved.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';

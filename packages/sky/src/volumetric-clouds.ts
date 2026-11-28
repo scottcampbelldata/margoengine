@@ -502,7 +502,7 @@ const shader = (depthBinding: string) => /* wgsl */ `${fullscreen}${march}${disp
 ${depthBinding}
 @fragment fn fragment(i:Vertex)->@location(0) vec4f {
  let ndc=vec2f(i.uv.x*2.0-1.0,1.0-i.uv.y*2.0);let far=clouds.inverse*vec4f(ndc,0.000001,1);
- let d=normalize(far.xyz/far.w-clouds.eye.xyz);
+ let d=normalize(far.xyz/far.w-clouds.eye.xyz)*select(-1.0,1.0,far.w>=0.0);
  let span=cloudSpan(d);var end=span.y;
  ${depthBinding ? `let z=sceneDepthAt(vec2i(i.position.xy));if(z>0.0){let w=clouds.inverse*vec4f(ndc,z,1);end=min(end,length(w.xyz/w.w-clouds.eye.xyz));}` : ''}
  if(end<=span.x){discard;}

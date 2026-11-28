@@ -626,7 +626,7 @@ ${displayShader}
 // level per channel every few rows and the three staircases beat into visible bands.
 ${ditherShader}
 @fragment fn fragment(i:Vertex)->@location(0) vec4f {
- let p=frame.inverse*vec4f(i.uv.x*2.0-1.0,1.0-i.uv.y*2.0,0.000001,1);let w=normalize(p.xyz/p.w-frame.eye.xyz);let s=frame.sun.xyz;
+ let p=frame.inverse*vec4f(i.uv.x*2.0-1.0,1.0-i.uv.y*2.0,0.000001,1);let w=normalize(p.xyz/p.w-frame.eye.xyz)*select(-1.0,1.0,p.w>=0.0);let s=frame.sun.xyz;
  let footprint=max(length(dpdx(w)),length(dpdy(w)));let sky=skyRadiance(w,footprint);var color=sky;
  let sun=celestialProfile(w,s,SUN_RADIUS,footprint);
  color+=(sun.x*60.0+sun.y*0.8)*trans(transmission,R+clamp(frame.eye.w,0.001,99.9),s.y)*(1.0-frame.sun.w);
