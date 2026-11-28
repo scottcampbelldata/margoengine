@@ -24,7 +24,7 @@ if (args.includes('--all')) {
 }
 if (!names.length) {
   console.error('usage: node scripts/web-demos/build.mjs <demo> [demo...] | --all [--no-zip]');
-  process.exit(2);
+  process.exitCode = 2;
 }
 
 /** The source module the built page started from: the one no other source module imports. */
@@ -104,5 +104,5 @@ for (const name of names) {
 }
 if (failures.length) {
   console.error(`${failures.length} failed: ${failures.join(' ')}`);
-  process.exit(1);
+  process.exitCode = 1;
 }

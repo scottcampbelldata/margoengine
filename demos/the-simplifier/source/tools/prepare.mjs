@@ -12,6 +12,7 @@ assert.equal(execFileSync('git',['-C',checkout,'rev-parse','HEAD'],{encoding:'ut
 execFileSync('git',['-C',checkout,'merge-base','--is-ancestor','HEAD','origin/main']);
 const {build,preview}=await import(pathToFileURL(resolve(checkout,'node_modules/vite/dist/node/index.js')));
 const {chromium}=await import(pathToFileURL(resolve(checkout,'node_modules/playwright/index.mjs')));
+const {closeAll}=await import(pathToFileURL(resolve(checkout,'scripts/support/shutdown.mjs')));
 const root=resolve('src/the-simplifier/tools'), outDir=resolve('qa-output/simplifier/bake-dist');
 const packages={name:'verified-engine',enforce:'pre',async resolveId(id) {
   if(!id.startsWith('@margoengine/'))return;
@@ -63,7 +64,5 @@ try {
   await writeFile(resolve(root,'../assets/statue.bin'),bytes);
   console.log({carved,counts,bytes:bytes.length,lowest:Math.min(...levels[0].positions.filter((_,i)=>i%3===1))});
 }finally{
-  await browser.close();
-  server.httpServer.closeAllConnections();
-  await new Promise(done=>server.httpServer.close(done));
+  await closeAll({browser,servers:[server]});
 }
