@@ -554,7 +554,7 @@ async function open1(
       ...opened,
       fetchNode: async (node, nodeSignal) => {
         const bytes = await readWhole(fetcher, `${path(node)}.${compressed ? 'laz' : 'las'}`, nodeSignal),
-          reader = parse ?? (await import('./las.js')).parseLAS,
+          reader = parse ?? (await import('./potree-las.js')).parseLAS,
           las = await reader(bytes, { origin, laz, signal: nodeSignal }),
           attributes: Record<string, PotreeAttribute> = {};
         sized(node, las.positions.length / 3);

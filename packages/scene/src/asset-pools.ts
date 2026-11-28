@@ -67,11 +67,7 @@ export interface AssetInstanceOverrides {
 }
 
 /** The scene entries a template needs, loaded on first use so the registry itself imports no engine code. */
-interface SceneTools {
-  cloneSubtree: typeof import('./clone.js').cloneSubtree;
-  traverse: typeof import('./index.js').traverse;
-  userData: typeof import('./index.js').userData;
-}
+type SceneTools = typeof import('./pool-tools.js');
 
 interface Template<T> {
   build(context: AssetTemplateContext<T>): Mesh | Promise<Mesh>;
@@ -235,7 +231,7 @@ export class AssetPool<T = unknown> extends AssetRegistry<T> {
 
   private async loadTools(): Promise<SceneTools> {
     if (!this.tools) {
-      const [{ cloneSubtree }, { traverse, userData }] = await Promise.all([import('./clone.js'), import('./index.js')]);
+      const { cloneSubtree, traverse, userData } = await import('./pool-tools.js');
       this.tools = { cloneSubtree, traverse, userData };
     }
     return this.tools;
