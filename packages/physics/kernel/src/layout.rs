@@ -114,6 +114,20 @@ columns! {
     LOCK_SHIFT_SPIN_Z f32 Body,
     // The substep stamp of the last substep a lock held the body.
     LOCK_MARK u32 Body,
+    // A lock projection iterate's move of the body, summed over the joints of its path before the body moves once: three sliding
+    // and three turning parts as f64, each in two words, low then high (joints.rs, `move_path`).
+    LOCK_SUM_0 u32 Body,
+    LOCK_SUM_1 u32 Body,
+    LOCK_SUM_2 u32 Body,
+    LOCK_SUM_3 u32 Body,
+    LOCK_SUM_4 u32 Body,
+    LOCK_SUM_5 u32 Body,
+    LOCK_SUM_6 u32 Body,
+    LOCK_SUM_7 u32 Body,
+    LOCK_SUM_8 u32 Body,
+    LOCK_SUM_9 u32 Body,
+    LOCK_SUM_10 u32 Body,
+    LOCK_SUM_11 u32 Body,
     // Each awake body's velocity and spin at its substep's start, before the loads: what the substep changed them by
     // (joints.rs, `note_mid_start`, `shed_locks`).
     MID_START_X f32 Body,
@@ -1127,7 +1141,7 @@ pub const JOINT_IDLE: u32 = JOINT_OFF | JOINT_BROKEN | JOINT_DISABLED;
 /// solves, the impacts it found, the islands it numbered, the solving joints' scratch, which is indexed by place in
 /// their list, the rotor speeds read at each substep's start, the locks' Newton solves and what each body's speeds were and
 /// what the springs changed of them in the substep. `World::hash` leaves them out; `World::arena_hash` does not.
-pub const SCRATCH: [usize; 68] = [
+pub const SCRATCH: [usize; 80] = [
     ISLAND_LEVEL, ISLAND_STAMP, MB_HELD, ISLAND_SUBSTEPS,
     SOLVE_PAIRS, IMPACTS, ISLAND_BODIES, ISLAND_LEAD, ISLAND_START, ISLAND_COUNT, ISLAND_READY, ISLAND_PASSES, SOLVE_JOINTS,
     SOLVE_LEAD, SOLVE_VIA, SOLVE_SHARE, ISLAND_PAIR_START, ISLAND_PAIR_COUNT, ISLAND_PAIR_CURSOR, JOINT_ORDER, JOINT_TEMP, ISLAND_JOINT_START,
@@ -1136,5 +1150,7 @@ pub const SCRATCH: [usize; 68] = [
     JOINT_ROTOR_0, JOINT_ROTOR_1, JOINT_ROTOR_2, JOINT_ROTOR_3, JOINT_ROTOR_4, JOINT_ROTOR_5, SOLVE_NEWTON, NEWTON, SOLVE_EXACT,
     MID_START_X, MID_START_Y, MID_START_Z, MID_START_SPIN_X, MID_START_SPIN_Y, MID_START_SPIN_Z,
     SPRING_CHANGE_X, SPRING_CHANGE_Y, SPRING_CHANGE_Z, SPRING_CHANGE_SPIN_X, SPRING_CHANGE_SPIN_Y, SPRING_CHANGE_SPIN_Z,
+    LOCK_SUM_0, LOCK_SUM_1, LOCK_SUM_2, LOCK_SUM_3, LOCK_SUM_4, LOCK_SUM_5, LOCK_SUM_6, LOCK_SUM_7, LOCK_SUM_8, LOCK_SUM_9,
+    LOCK_SUM_10, LOCK_SUM_11,
     PAIR_PATCH_NEXT, PAIR_PATCH_TAIL, PATCH_LIST, PATCH_TEMP, PATCH_SIGN, CONTACT_CUT,
 ];

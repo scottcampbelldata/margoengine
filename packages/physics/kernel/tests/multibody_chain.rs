@@ -265,3 +265,37 @@ fn a_long_path_s_banded_step_is_the_whole_matrix_s() {
     }
 }
 
+
+#[test]
+fn a_long_hinge_chain_holds_its_joints() {
+    // A chain of 100 or 200 hinged bobs swinging from a pivot, as one tree and as plain joints. Each lock projection iterate moved
+    // a link once a joint it carries, by finite turns about two joints' axes that do not add; on a long chain the joints' own
+    // moves are far larger than the links' net move, and the rest grew each iterate: 100 links spun at 291 rad/s by the sixth
+    // step. Each link now moves once an iterate, by the sum of its joints' moves (joints.rs, `move_path`).
+    for (n, tree, steps) in [(100usize, true, 60usize), (100, false, 60), (200, true, 120)] {
+        let mut w = World::new(512, 512).unwrap();
+        let rows = hinge_chain(&mut w, n, 0.02);
+        if !tree {
+            let pivot = rows[0] - 1;
+            for &b in rows.iter().chain([pivot].iter()) {
+                w.set_u(MB_ROLE, b as usize, 0);
+            }
+        }
+        let (mut worst, mut fastest) = (0.0f32, 0.0f32);
+        for _ in 0..steps {
+            w.step(1.0 / 60.0);
+            let mut before = v3(0.0, 0.0, 0.0);
+            for &b in &rows {
+                let at = w.v(POSITION_X, b as usize);
+                let d = at.sub(before);
+                worst = worst.max((d.dot(d).sqrt() - 0.1).abs());
+                before = at;
+                let o = w.v(ANGULAR_X, b as usize);
+                fastest = fastest.max(o.dot(o).sqrt());
+            }
+        }
+        println!("{n} links, {}: joints open by {worst:.2e} m at most, fastest spin {fastest:.2} rad/s", if tree { "tree" } else { "plain" });
+        assert!(worst < 1e-4, "{n} links, tree {tree}: a joint opened by {worst} m");
+        assert!(fastest < 10.0, "{n} links, tree {tree}: a link spun at {fastest} rad/s");
+    }
+}

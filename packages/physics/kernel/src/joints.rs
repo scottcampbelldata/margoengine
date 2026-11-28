@@ -2566,20 +2566,14 @@ impl World {
                         }
                     }
                     let [(la, aa, _), (lb, ab, _)] = if counted { self.lock_gains(row) } else { self.gains(row) };
-                    let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
                     let mv = [la.scale(by), aa.scale(by), lb.scale(by), ab.scale(by)];
-                    if self.lock_moves(a) {
-                        self.nudge(a, mv[0], mv[1], counted);
-                    }
-                    if self.lock_moves(b) {
-                        self.nudge(b, mv[2], mv[3], counted);
-                    }
                     unsafe {
                         let step = self.lock_step(row);
                         (*step).moves = mv;
                         (*step).given = given;
                     }
                 }
+                self.move_path(first, last, 1.0, counted);
                 unsafe {
                     let step = self.lock_step(lead);
                     (*step).before = before;
@@ -2611,15 +2605,8 @@ impl World {
                     for i in path.0..=path.1 {
                         let row = self.uu(SOLVE_JOINTS, i) as usize;
                         let LockStep { moves: mut mv, mut given, .. } = unsafe { *self.lock_step(row) };
-                        let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
                         for v in mv.iter_mut() {
                             *v = v.scale(0.5);
-                        }
-                        if self.lock_moves(a) {
-                            self.nudge(a, mv[0].scale(-1.0), mv[1].scale(-1.0), counted);
-                        }
-                        if self.lock_moves(b) {
-                            self.nudge(b, mv[2].scale(-1.0), mv[3].scale(-1.0), counted);
                         }
                         for k in 0..6 {
                             given[k] *= 0.5;
@@ -2633,6 +2620,8 @@ impl World {
                             (*step).given = given;
                         }
                     }
+                    // The halved moves, taken back: each body by the half of its own sum.
+                    self.move_path(path.0, path.1, -1.0, counted);
                 }
                 if !cut {
                     break;
@@ -2640,6 +2629,59 @@ impl World {
                 self.refresh_joints(h, false);
             }
         }
+    }
+
+    /// Moves each body of the path from `first` to `last` once, by `sign` times the sum of its joints' moves (LockStep `moves`):
+    /// summed first in doubles, then applied as one turn and one shift, the bodies in the path's order. Each joint's move turned
+    /// its bodies by itself, so a link between two joints was turned twice, by finite turns about two axes, which do not add: on
+    /// a long path under load the joints' own moves are far larger than the bodies' net move (tension and moments add up down
+    /// the chain to a self-balanced shear and moment that moves nothing), and their rest grew from one iterate to the next until
+    /// the chain flew apart; a chain of 100 hinged links turned 11 rad an iterate and spun at 291 rad/s by its sixth step
+    /// (`a_long_hinge_chain_holds_its_joints`). The sum is the Gauss-Newton step as its linear model gives it (Nocedal and Wright
+    /// 2006, ch. 10), and one rotation about one axis is undone by its opposite, so the line search's cut takes back what it gave.
+    fn move_path(&mut self, first: usize, last: usize, sign: f64, counted: bool) {
+        let ends = |w: &World, row: usize| [w.uu(JOINT_A, row) as usize, w.uu(JOINT_B, row) as usize];
+        for i in first..=last {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            for body in ends(self, row) {
+                for k in 0..12 {
+                    self.set_u(LOCK_SUM_0 + k, body, 0);
+                }
+            }
+        }
+        for i in first..=last {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            let mv = unsafe { (*self.lock_step(row)).moves };
+            for (side, body) in ends(self, row).into_iter().enumerate() {
+                if !self.lock_moves(body) {
+                    continue;
+                }
+                let (linear, angular) = (mv[2 * side], mv[2 * side + 1]);
+                for (k, part) in [linear.x, linear.y, linear.z, angular.x, angular.y, angular.z].into_iter().enumerate() {
+                    let bits = (self.lock_sum(body, k) + sign * part as f64).to_bits();
+                    self.set_u(LOCK_SUM_0 + 2 * k, body, bits as u32);
+                    self.set_u(LOCK_SUM_0 + 2 * k + 1, body, (bits >> 32) as u32);
+                }
+            }
+        }
+        for i in first..=last {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            for body in ends(self, row) {
+                let parts: [f32; 6] = core::array::from_fn(|k| self.lock_sum(body, k) as f32);
+                if parts.iter().all(|&p| p == 0.0) {
+                    continue;
+                }
+                for k in 0..12 {
+                    self.set_u(LOCK_SUM_0 + k, body, 0);
+                }
+                self.nudge(body, v3(parts[0], parts[1], parts[2]), v3(parts[3], parts[4], parts[5]), counted);
+            }
+        }
+    }
+
+    /// Part `k` of a body's summed move (`move_path`).
+    fn lock_sum(&self, body: usize, k: usize) -> f64 {
+        f64::from_bits(self.uu(LOCK_SUM_0 + 2 * k, body) as u64 | (self.uu(LOCK_SUM_0 + 2 * k + 1, body) as u64) << 32)
     }
 
     /// RIGHT solved on the Newton matrix N = J W G^T of the path, J the rows read at this pose and G
