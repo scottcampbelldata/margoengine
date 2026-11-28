@@ -36,11 +36,19 @@ const BYTES = 8;
 /** Position xyz, velocity xyz, volume, diameter, age and stable ID, all f64. Zero volume denotes an empty row. */
 export const FILM_FLIGHT_WORDS = 10;
 
+/**
+ * Optional connections of the thin-film drop flight solver: `rigid` reads registered rigid poses for a mounted
+ * film receiver (default false).
+ */
 export interface ThinFilmDropFlightConnections {
   /** Read registered rigid poses for a mounted film receiver. Defaults to false. */
   readonly rigid?: boolean;
 }
 
+/**
+ * Options for the thin-film drop flight solver: tracked drop capacity (default 256), flight time in s (default
+ * 10), origin cell width, water density, surface tension, air density and air temperature, with SI defaults.
+ */
 export interface ThinFilmDropFlightOptions {
   /** Simultaneously tracked drops. Defaults to 256. */
   readonly capacity?: number;
@@ -62,6 +70,7 @@ export interface ThinFilmDropFlightOptions {
   readonly receiver?: ThinFilmDropReceiver;
 }
 
+/** One drop in flight: position, velocity, volume, diameter, age and stable ID. */
 export interface ThinFilmFlyingDrop {
   readonly position: readonly [number, number, number];
   readonly velocity: readonly [number, number, number];

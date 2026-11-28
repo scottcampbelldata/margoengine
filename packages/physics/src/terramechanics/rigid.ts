@@ -13,6 +13,10 @@ import { SOIL_LAYOUT, SOIL_PATCH_WORDS, SOIL_WHEEL_REACTION_WORDS } from './inde
 type Point = readonly [number, number, number];
 type Pair = readonly [number, number];
 
+/**
+ * Binds a wheeled vehicle to the soil: projected footprint length and width per wheel in metres, optional
+ * effective shear radii, an optional ground collider and the forward vector (default +Z).
+ */
 export interface WheelSoilBinding {
   readonly vehicle: Vehicle;
   /** Projected footprint length and width per wheel, m. */
@@ -25,6 +29,10 @@ export interface WheelSoilBinding {
   readonly forward?: Point;
 }
 
+/**
+ * Binds a tracked vehicle to the soil: for each track the length, width and mid-belt position in the chassis
+ * frame in metres, and an optional forward vector.
+ */
 export interface TrackSoilBinding {
   readonly vehicle: TrackedVehicle;
   /** Width, length and mid-belt position in the chassis frame, m, for each configured track. */
@@ -32,6 +40,10 @@ export interface TrackSoilBinding {
   readonly forward?: Point;
 }
 
+/**
+ * Rigid-solver parameters plus the wheel and track soil bindings and the height-field collider to update when a
+ * terrain is supplied.
+ */
 export interface SoilContactRigidParams extends RigidSolverParams {
   readonly wheels?: readonly WheelSoilBinding[];
   readonly tracks?: readonly TrackSoilBinding[];
@@ -39,6 +51,10 @@ export interface SoilContactRigidParams extends RigidSolverParams {
   readonly ground?: BedCollider;
 }
 
+/**
+ * Options for the soil-contact rigid solver: its ID and the optional wheel spin, camber, reaction and side-force
+ * fields, plus the terrain bed to read before sampling loads.
+ */
 export interface SoilContactRigidOptions {
   readonly id?: string;
   /** Publish live wheel spin in the same order as the soil patch records. Use soilWheelPhaseField. */

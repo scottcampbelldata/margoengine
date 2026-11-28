@@ -8,6 +8,7 @@ const U32 = Uint32Array.BYTES_PER_ELEMENT;
 const F64 = Float64Array.BYTES_PER_ELEMENT;
 const JOB_BYTES = HEADER_WORDS * U32 + F64;
 
+/** What one participant did in a room-acoustics wave step: samples run and SIMD row pairs evaluated. */
 export interface RoomWaveWorkerWork {
   /** Number of acoustic samples in which this participant ran its assigned slab range. */
   readonly samples: number;
@@ -15,6 +16,9 @@ export interface RoomWaveWorkerWork {
   readonly pairs: number;
 }
 
+/**
+ * Work counts for one room-acoustics wave step: the thread count plus each participant's `RoomWaveWorkerWork`.
+ */
 export interface RoomWaveWorkCounts extends RoomWaveWorkerWork {
   readonly threads: number;
   readonly workers: readonly RoomWaveWorkerWork[];

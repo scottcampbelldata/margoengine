@@ -39,6 +39,10 @@ export interface TautMooringLine {
   readonly axialRigidity: number;
 }
 
+/**
+ * What a taut mooring set is made from: the lines in solve order and the rate level of the RigidSolver (default
+ * 60 Hz).
+ */
 export interface TautMooringParams {
   /** Lines in their solve order. Lines sharing bodies account for impulses staged by earlier lines. */
   readonly lines: readonly TautMooringLine[];

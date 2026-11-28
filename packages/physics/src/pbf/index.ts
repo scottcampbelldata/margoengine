@@ -66,6 +66,10 @@ export interface PbfStatistics {
   readonly maximumSpeed: number;
 }
 
+/**
+ * Options for the position-based fluid solver: its ID (default 'pbf'), rigid-body exchange (default false) and
+ * the rate level (default 0, 60 Hz).
+ */
 export interface PbfOptions {
   /** World solver ID. Default `pbf`. */
   readonly id?: string;

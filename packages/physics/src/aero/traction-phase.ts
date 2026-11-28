@@ -25,17 +25,28 @@ interface Panels {
   readonly frictionCoefficient: number;
 }
 
+/**
+ * What one participant did in a wind-traction step: probes evaluated, panels visited and panel pairs run through
+ * the SIMD path.
+ */
 export interface WindTractionWorkerWork {
   readonly probes: number;
   readonly panels: number;
   readonly simdPanelPairs: number;
 }
 
+/**
+ * Work counts for one wind-traction step: the thread count plus each participant's `WindTractionWorkerWork`.
+ */
 export interface WindTractionWorkCounts extends WindTractionWorkerWork {
   readonly threads: number;
   readonly workers: readonly WindTractionWorkerWork[];
 }
 
+/**
+ * Options for the wind-traction phase: the number of participating threads including the caller, and an
+ * `AbortSignal` that cancels the work.
+ */
 export interface WindTractionPhaseOptions {
   readonly threads?: number;
   readonly signal?: AbortSignal;

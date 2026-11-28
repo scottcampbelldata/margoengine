@@ -10,6 +10,10 @@ import {
 } from './blockage-contract.js';
 import type { ShallowWaterSolver } from './index.js';
 
+/**
+ * Options for coupling a rigid cylinder to shallow water: the water solver ID (default 'water'), the rigid
+ * solver ID (default 'rigid'), the shared rate (default 60 Hz) and an `AbortSignal`.
+ */
 export interface RigidCylinderOptions {
   /** Water solver ID. Defaults to 'water'. */
   readonly id?: string;
@@ -20,6 +24,10 @@ export interface RigidCylinderOptions {
   readonly signal?: AbortSignal;
 }
 
+/**
+ * The solvers that couple a shallow-water solver to a rigid cylinder: the water solver, the predictor, the
+ * reaction and the exact order of the staggered group.
+ */
 export interface RigidCylinderCoupling {
   readonly water: ShallowWaterSolver;
   readonly predictor: Solver;

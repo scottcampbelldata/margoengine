@@ -34,6 +34,7 @@ export interface ThinFilmDropReceiver {
 export const FILM_IMPACT_WORDS = 5;
 /** Layout 2 adds the world normal and the contact lever arm from the body centre, both XYZ in world axes. */
 export const FILM_SWEPT_IMPACT_WORDS = 11;
+/** Layout version 2 of the film impact records, which add the world normal and the contact lever arm. */
 export const FILM_SWEPT_IMPACT_LAYOUT = 2;
 export type Impact = readonly [u: number, v: number, radius: number, volume: number, inwardSpeed: number];
 

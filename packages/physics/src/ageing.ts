@@ -44,6 +44,7 @@ export const AGEING_EXPOSURE_WORDS = 10;
 /** Layout-1 state row: remaining m, loss m, coating m, inner coating m, rot activation, fouled fraction, exposure seconds. */
 export const AGEING_STATE_WORDS = 7;
 
+/** The substrate of an ageing patch: a metal, `'wood'` or `'limestone'`. */
 export type AgeingMaterial = AgeingMetal | 'wood' | 'limestone';
 
 /** Climate and surface loading for one patch, held over each world step. */
@@ -72,6 +73,10 @@ export interface FoulingRates {
   readonly dryRemoval?: number;
 }
 
+/**
+ * One patch of material to age: the substrate, thickness in metres, prior loss in metres, starting rot activity
+ * and fouling cover (0..1), exposure multiplier and optional fixed climate.
+ */
 export interface AgeingPatch {
   /** Substrate. Wood uses the untreated pine sapwood fit. */
   readonly material: AgeingMaterial;
@@ -95,6 +100,10 @@ export interface AgeingPatch {
   readonly coatingRetention?: number;
 }
 
+/**
+ * What the material ageing solver is made from: the patches in field row order, a default exposure and the
+ * environmental seconds per world second (default 1).
+ */
 export interface MaterialAgeingParams {
   /** Material patches in field row order. */
   readonly patches: readonly AgeingPatch[];
@@ -104,6 +113,10 @@ export interface MaterialAgeingParams {
   readonly timeScale?: number;
 }
 
+/**
+ * Options for the material ageing solver: its ID and port prefix (default 'ageing') and whether to read the
+ * exposure field from another solver (default false).
+ */
 export interface MaterialAgeingOptions {
   /** World solver ID and port prefix. Default 'ageing'. */
   readonly id?: string;
@@ -111,6 +124,10 @@ export interface MaterialAgeingOptions {
   readonly readExposure?: boolean;
 }
 
+/**
+ * The state of one ageing patch: remaining, consumed, coating and inner coating thickness in metres, rot
+ * activity, fouled fraction and exposure time in seconds.
+ */
 export interface AgeingState {
   readonly remainingThickness: number;
   readonly consumedThickness: number;

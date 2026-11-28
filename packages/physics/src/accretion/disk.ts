@@ -53,6 +53,10 @@ export interface AccretionDiskOptions {
   readonly signal?: AbortSignal;
 }
 
+/**
+ * One ring of an accretion disk: radius in metres, surface density in kg/m², angular velocity in rad/s, one-face
+ * heating in W/m², effective temperature in K, orbital phase in radians and inward mass flow in kg/s.
+ */
 export interface AccretionRing {
   /** Cell-centre radius, in metres. */
   readonly radius: number;
@@ -70,6 +74,10 @@ export interface AccretionRing {
   readonly inwardFlow: number;
 }
 
+/**
+ * Mass and energy accounting of an accretion disk: initial, supplied, accreted, escaped and remaining mass, and
+ * the luminosity over both faces in W.
+ */
 export interface AccretionDiskBudget {
   readonly initialMass: number;
   readonly suppliedMass: number;

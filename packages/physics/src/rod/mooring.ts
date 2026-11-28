@@ -42,6 +42,11 @@ export interface MooringSeabed {
   readonly lateralFriction?: number;
 }
 
+/**
+ * A mooring line: end points, unstretched length in m, mass per metre in kg/m and axial stiffness EA in N, with
+ * optional segments (default 40), drag, added mass, damping, breaking load, water, seabed, clumps, fixed ends,
+ * gravity and start velocity.
+ */
 export interface MooringLineOptions {
   /** Where the line starts (the anchor) and ends (the fairlead), m. */
   readonly start: Vec3;

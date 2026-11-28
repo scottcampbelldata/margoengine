@@ -15,6 +15,10 @@ export interface FloodBlockageCell {
   readonly dischargeZ: number;
 }
 
+/**
+ * A rigid body in a flood: centre, linear and angular velocity, inverse mass, optional per-axis inverse mass and
+ * the inverse inertia in port order xx, xy, xz, yy, yz, zz.
+ */
 export interface FloodBlockageBody {
   readonly centre: Vec3;
   readonly velocity: Vec3;
@@ -26,6 +30,10 @@ export interface FloodBlockageBody {
   readonly inverseInertia: Symmetric3;
 }
 
+/**
+ * Inputs for a flood blockage exchange: the water cells, the body, cell area, water density, interval, drag
+ * coefficient, wetted area in m² and the elevation in m of the exchange.
+ */
 export interface FloodBlockageInput {
   readonly cells: readonly FloodBlockageCell[];
   readonly body: FloodBlockageBody;
@@ -39,6 +47,10 @@ export interface FloodBlockageInput {
   readonly elevation: number;
 }
 
+/**
+ * Result of a flood blockage exchange: the world impulse on the body, the impulse on each cell and the kinetic
+ * energy dissipated in joules.
+ */
 export interface FloodBlockageExchange {
   /** World linear and angular impulse about the body centre, N·s and N·m·s. */
   readonly bodyImpulse: readonly [number, number, number, number, number, number];

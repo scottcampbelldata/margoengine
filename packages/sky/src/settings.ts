@@ -855,7 +855,16 @@ export const SKY_SETTINGS: readonly SkySetting[] = [
   n('fog.density', 'fog', 0.01, 0, 1, 0.0005, '1/m', 'Fog density, while the sky has fog (it needs a depth texture).'),
   n('fog.start', 'fog', 40, 0, 10000, 1, 'm', 'Distance from the camera where fog starts.'),
   n('fog.height', 'fog', 0, 0, 1, 0.001, '', 'Extra fog below y = 0, as a fraction: height fog.'),
-  n('fog.scaleHeight', 'fog', 0, 0, 10000, 10, 'm', 'Height over which the haze thins by e above fog.base, integrated along each ray (0: the same at every height).'),
+  n(
+    'fog.scaleHeight',
+    'fog',
+    0,
+    0,
+    10000,
+    10,
+    'm',
+    'Height over which the haze thins by e above fog.base, integrated along each ray (0: the same at every height).',
+  ),
   n('fog.base', 'fog', 0, -1000, 10000, 1, 'm', 'World height where the haze has fog.density (with fog.scaleHeight).'),
   c(
     'fog.lightDecay',
@@ -920,7 +929,16 @@ export const SKY_SETTINGS: readonly SkySetting[] = [
     '',
     "0 rings the whole horizon, 1 gathers the glow on the sun's side.",
   ),
-  n('exposure', 'exposure', 0, -16, 16, 0.1, 'stops', 'Brightness of the sky: its backdrop, haze and the light its map gives surfaces.'),
+  n(
+    'exposure',
+    'exposure',
+    0,
+    -16,
+    16,
+    0.1,
+    'stops',
+    'Brightness of the sky: its backdrop, haze and the light its map gives surfaces.',
+  ),
   n('tonemap.exposure', 'exposure', 0, -16, 16, 0.1, 'stops', 'Brightness of the whole frame (Tonemap).'),
   n(
     'tonemap.temperature',
@@ -942,6 +960,7 @@ export const SKY_SETTINGS: readonly SkySetting[] = [
 /** The rows that can change every frame (everything but `model`), for keying over a shot. */
 // The fog option's keys the table writes: one per fog row.
 const FOG_KEYS = SKY_SETTINGS.filter((s) => s.name.startsWith('fog.')).map((s) => s.name.slice(4));
+/** The sky settings that can change every frame, that is every row except `model`. */
 export const SKY_LIVE_SETTINGS: readonly SkySetting[] = liveSettings(SKY_SETTINGS) as SkySetting[];
 const BY_NAME = settingIndex(SKY_SETTINGS) as Map<string, SkySetting>;
 /** Every setting at its default, as a fresh object to edit (a slider panel's state). */

@@ -19,6 +19,10 @@ import { railNumber } from './contact.js';
 import type { RailWireWorkCounts, WireKernel } from './kernel.js';
 import type { RailRoute } from './track.js';
 
+/**
+ * One pantograph on a rail car: the car index and optional roof offset, rest height, mass, uplift, stiffness,
+ * damping, contact stiffness, head half width, shoe friction, energized flag and arc visual settings.
+ */
 export interface PantographSpec {
   readonly car: number;
   readonly roofOffset?: number;
@@ -35,6 +39,10 @@ export interface PantographSpec {
   readonly visualArcTime?: number;
 }
 
+/**
+ * The catenary over a route: the track, optional span length, nodes per span, support height, stagger, tension,
+ * density and damping, and the pantographs that run on it.
+ */
 export interface RailWireSpec {
   readonly track: RailRoute;
   readonly spanLength?: number;
@@ -47,12 +55,17 @@ export interface RailWireSpec {
   readonly pantographs: readonly PantographSpec[];
 }
 
+/** The overhead wire at one point: its height, lateral offset and vertical speed. */
 export interface RailWireReading {
   readonly height: number;
   readonly lateralOffset: number;
   readonly verticalSpeed: number;
 }
 
+/**
+ * A pantograph's state after a step: position along the wire, head height, contact force, gap, whether it
+ * touches the wire and whether it arcs.
+ */
 export interface PantographReading {
   readonly arclength: number;
   readonly headHeight: number;

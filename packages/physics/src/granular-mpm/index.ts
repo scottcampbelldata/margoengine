@@ -27,6 +27,7 @@ const POINT_BYTES = 28 * 8;
 const ZERO: Vec3 = [0, 0, 0];
 const EYE = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
+/** Layout version of the granular MPM sample records. */
 export const GRANULAR_MPM_LAYOUT = 1;
 /** f64 values per material point. Position, velocity, two column-major tensors, mass, rest volume, log plastic volume, material index. */
 export const GRANULAR_MPM_WORDS = POINT_BYTES / 8;
@@ -45,6 +46,10 @@ export interface GranularInertialRheology {
   readonly referenceInertialNumber: number;
 }
 
+/**
+ * A granular material for the MPM solver: sand or snow with optional density in kg/m³, Young modulus in Pa,
+ * Poisson ratio, friction angle in radians, cohesion in Pa and inertial rheology. Defaults depend on the kind.
+ */
 export interface GranularMaterial {
   /** Frictional granular continuum or cohesive compressible snow. Default 'sand'. */
   readonly kind?: 'sand' | 'snow';
@@ -68,6 +73,10 @@ export interface GranularMaterial {
   readonly hardening?: number;
 }
 
+/**
+ * One material point: rest position in metres, undeformed volume in m³, initial velocity in m/s (default zero)
+ * and the material table index (default 0).
+ */
 export interface GranularPoint {
   /** Rest position in the world cell, metres. */
   readonly position: Vec3;
@@ -79,6 +88,11 @@ export interface GranularPoint {
   readonly material?: number;
 }
 
+/**
+ * What the granular MPM solver is made from: the points, the material table (default one sand), grid spacing in
+ * metres (default 0.08), rate level, speed margin in m/s (default 3), the APIC or PIC transfer (default 'apic')
+ * and optional terrain bed surfaces.
+ */
 export interface GranularMpmParams {
   readonly points: readonly GranularPoint[];
   /** Defaults to one sand material. */
@@ -107,6 +121,10 @@ export interface GranularMpmParams {
   readonly cellSize?: number;
 }
 
+/**
+ * Options for loading the granular MPM solver: its ID (default 'granular-mpm'), whether to publish bed changes
+ * (default false), whether to receive swimming wake impulses (default false) and an `AbortSignal`.
+ */
 export interface GranularMpmLoadOptions {
   /** Solver registry ID. Default 'granular-mpm'. */
   readonly id?: string;
@@ -117,6 +135,10 @@ export interface GranularMpmLoadOptions {
   readonly signal?: AbortSignal;
 }
 
+/**
+ * One material point read back from the granular MPM solver: position in metres, velocity in m/s, mass,
+ * reference volume, log plastic volume and material index.
+ */
 export interface GranularMpmSample {
   readonly position: Vec3;
   readonly velocity: Vec3;

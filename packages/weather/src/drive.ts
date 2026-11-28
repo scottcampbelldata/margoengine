@@ -69,6 +69,7 @@ export interface SkyLightTarget {
   readonly direction: ArrayLike<number>;
   readonly radiance: ArrayLike<number>;
 }
+/** The sky a weather drive writes to: its `options` for clouds, fog, air and light. */
 export interface SkyTarget {
   readonly options: {
     clouds?: { coverage?: number; speed?: number; height?: number };

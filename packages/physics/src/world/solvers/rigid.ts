@@ -101,6 +101,10 @@ export interface RigidSolverParams {
   readonly capacity?: number;
 }
 
+/**
+ * Options for a RigidSolver. `publishMobility` (default true) publishes the effective mobility field; turn it
+ * off to restore a checkpoint captured before that field existed.
+ */
 export interface RigidSolverOptions {
   /** Publish effective mobility (default true). Disable to restore a checkpoint captured before the field was added. */
   readonly publishMobility?: boolean;
@@ -140,6 +144,10 @@ export function bodyRowsOf(host: SolverHost, who: string, rows: readonly number[
   return n;
 }
 
+/**
+ * Returns the framework rate level (0 to 7) of a fixed timestep given in seconds. Throws a RangeError when the
+ * step is not 1/60, 1/120, ... 1/7680 s.
+ */
 export function rateLevelOf(step: number): RateLevel {
   for (let level = 0; level < RATE_LEVELS; level++)
     if (rateOf(level as RateLevel) * step === 1) return level as RateLevel;

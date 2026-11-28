@@ -35,6 +35,10 @@ export interface FloodWadingBody {
   readonly dragCoefficient: number;
 }
 
+/**
+ * What a flood wading load is made from: the drag grid parameters, one wading body (or null) per legged body row
+ * and the rate level (default 60 Hz).
+ */
 export interface FloodWadingParams extends FloodDragGridParams {
   /** One entry in LeggedLocomotion's body order. Null leaves that row's load zero. */
   readonly bodies: readonly (FloodWadingBody | null)[];

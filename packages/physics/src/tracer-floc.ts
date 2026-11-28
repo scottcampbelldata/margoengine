@@ -10,6 +10,10 @@ export interface TracerFlocConditions {
   shearRate: number;
 }
 
+/**
+ * The conditions a tracer floc sits in: fixed `TracerFlocConditions`, or a function of position and time that
+ * returns them.
+ */
 export type TracerFlocEnvironment =
   | TracerFlocConditions
   | ((x: number, y: number, z: number, time: number) => TracerFlocConditions);

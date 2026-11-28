@@ -4,6 +4,10 @@ import type { Cell, PhysicsWorld } from '@margoengine/physics/world';
 import { blockId } from './blocks.js';
 import { takeMatchingCells, type VoxelWorld } from './world.js';
 
+/**
+ * One voxel that becomes granular material: its position in voxel coordinates, the expected block ID and the
+ * material table index (default 0).
+ */
 export interface VoxelGranularCell {
   /** Position of a loaded, solid cube in voxel coordinates. */
   readonly position: Cell;
@@ -13,6 +17,10 @@ export interface VoxelGranularCell {
   readonly material?: number;
 }
 
+/**
+ * Options for turning voxels into granular points: the cells, voxel side in metres (default 1), samples per axis
+ * (default 2), voxel origin, physics cell and solver parameters.
+ */
 export interface VoxelGranularOptions {
   readonly cells: readonly VoxelGranularCell[];
   /** Side length of a voxel, metres. Defaults to 1. */

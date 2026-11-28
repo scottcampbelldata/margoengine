@@ -89,6 +89,11 @@ export interface DfsphStatistics {
   readonly maximumSpeed: number;
 }
 
+/**
+ * Options for the DFSPH fluid solver: its ID (default 'dfsph'), rigid-body exchange (default false), the rate
+ * level (default 0, 60 Hz), an optional modal sound contact field, impact records (default false) and the parcel
+ * capacity per step (default 0).
+ */
 export interface DfsphOptions {
   /** World solver ID. Default `dfsph`. */
   readonly id?: string;

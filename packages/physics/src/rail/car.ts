@@ -46,6 +46,10 @@ export interface RailWheelset {
   readonly rightLoad: number;
 }
 
+/**
+ * The state of one rail car: distance and speed along the route, pose, body heave, sway, roll and pitch, bogie
+ * motion, forces, the lost-support axle bits, whether it derailed and its wheelsets.
+ */
 export interface RailCarState {
   readonly distance: number;
   readonly speed: number;

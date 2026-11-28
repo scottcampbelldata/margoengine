@@ -13,7 +13,9 @@
 
 /** Cell kinds. */
 export const AIR = 0;
+/** Cell kind of a grid cell that holds liquid. */
 export const LIQUID = 1;
+/** Cell kind of a grid cell that is a solid boundary. */
 export const SOLID = 2;
 
 /** The smallest share of a cell the surface may sit from a liquid cell's centre in the ghost-fluid rule. */

@@ -30,6 +30,10 @@ export interface ShallowWaterSurfaceSource {
   sample(x: number, z: number, out: ShallowWaterSurfaceSample): ShallowWaterSurfaceSample;
 }
 
+/**
+ * Options for a surface driven by a shallow-water solver: the flowing Water surface, the solver source and an
+ * optional suspended sediment concentration in kg/m³ (default clear water).
+ */
 export interface ShallowWaterSurfaceOptions {
   /** Flowing Water with a terrain heightmap in the source grid's dimensions and coordinate frame. */
   readonly surface: Water;

@@ -1,6 +1,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { FieldDescriptor } from '../world/solver.js';
 
+/** Descriptor of the field that carries detected breaking wave crests (a surface sample set in SI units). */
 export const WAKE_BREAKING_FIELD: FieldDescriptor = Object.freeze({
   name: 'wakeBreaking',
   kind: 'surfaceSampleSet',
@@ -11,6 +12,7 @@ export const WAKE_BREAKING_FIELD: FieldDescriptor = Object.freeze({
 
 /** f64 header [written rows, total detected rows, cell width in metres], followed by compact rows. */
 export const WAKE_BREAKING_LAYOUT = 1;
+/** f64 words in the header of the breaking-wave field: written rows, total detected rows and cell width. */
 export const WAKE_BREAKING_HEADER_WORDS = 3;
 /** [x, z, height, directionX, directionZ, crestSpeed, particleSpeed, ratio], metres and seconds. */
 export const WAKE_BREAKING_WORDS = 8;

@@ -21,6 +21,10 @@ const EQUATOR = Math.PI / 2;
 
 type Six = readonly [number, number, number, number, number, number];
 
+/**
+ * Constants of motion of a Kerr geodesic: energy, axial angular momentum in geometrized units and Carter's
+ * constant Q (default 0).
+ */
 export interface KerrConstants {
   /** Energy per unit rest mass for timelike tracers, or an arbitrary affine normalization for light. */
   readonly energy: number;
@@ -30,6 +34,10 @@ export interface KerrConstants {
   readonly carterConstant?: number;
 }
 
+/**
+ * A circular Kerr orbit: the constants of motion plus the angular velocity in radians per gravitational time
+ * GM/c³.
+ */
 export interface KerrCircularOrbit extends KerrConstants {
   /** Angular velocity in radians per gravitational time GM/c³. */
   readonly angularVelocity: number;
@@ -55,6 +63,10 @@ export interface KerrGeodesicParams extends KerrConstants {
   readonly tracer?: 'massive' | 'light';
 }
 
+/**
+ * Options for the Kerr geodesic solver: its ID (default 'kerrGeodesic'), the world rate (default 0, 60 Hz) and
+ * the largest phase step per RK4 substep (default 1/32).
+ */
 export interface KerrGeodesicOptions {
   /** Unique solver id, default 'kerrGeodesic'. */
   readonly id?: string;
@@ -64,6 +76,10 @@ export interface KerrGeodesicOptions {
   readonly maxPhaseStep?: number;
 }
 
+/**
+ * One geodesic position: radius in metres, offset above the outer horizon in metres, polar angle, azimuth and
+ * proper time in seconds.
+ */
 export interface KerrGeodesicSample {
   /** Radius in metres. */
   readonly radius: number;

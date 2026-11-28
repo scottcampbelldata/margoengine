@@ -5,6 +5,10 @@ import { requireWakeHullMesh } from '../seakeeping/wake-mesh.js';
 import type { HullMesh } from '../seakeeping/wetted.js';
 import { closedSurface, corners, weldMesh } from '../soft-volume.js';
 
+/**
+ * The grid a hull mask is drawn on: cell counts, cell size, depths and wet flags of a quay potential grid, plus
+ * the lower corner in metres (default [0, 0]).
+ */
 export interface WakeHullMaskGrid extends Pick<QuayPotentialGrid, 'cells' | 'cellSize' | 'depths' | 'wet'> {
   /** Lower horizontal grid corner in the wake's world cell, in metres. Defaults to [0, 0]. */
   readonly origin?: readonly [number, number];

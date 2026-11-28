@@ -35,6 +35,10 @@ export interface FloodPaddleBlade {
   readonly dragCoefficient: number;
 }
 
+/**
+ * What a flood paddle load is made from: the drag grid parameters, the paddle blades and the rate level (default
+ * 60 Hz).
+ */
 export interface FloodPaddleParams extends FloodDragGridParams {
   readonly blades: readonly FloodPaddleBlade[];
   /** Match the shallow-water and rigid solvers' framework rate, default 60 Hz (level zero). */

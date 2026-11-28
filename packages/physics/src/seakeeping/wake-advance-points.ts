@@ -11,6 +11,10 @@ interface Bin {
   readonly sign: number;
   readonly moments: Moments;
 }
+/**
+ * Options for building advance points: depth edges in metres below the reference plane, the horizontal bin size
+ * for each depth interval and an optional upper bound on the node count.
+ */
 export interface WakeAdvancePointOptions {
   /** Increasing depth edges in metres below the reference plane, starting at zero and covering the draft. */
   readonly depths: readonly number[];
@@ -20,6 +24,10 @@ export interface WakeAdvancePointOptions {
   readonly maxRows?: number;
 }
 
+/**
+ * Advance points of a hull: the reference waterline in hull-local metres and X, Z, depth and signed longitudinal
+ * area quadruples.
+ */
 export interface WakeAdvancePoints {
   /** Reference hull-local Y in metres. */
   readonly waterline: number;

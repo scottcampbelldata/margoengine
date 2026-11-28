@@ -6,8 +6,16 @@ import type { GeometryData } from './data.js';
 import { cylinderGeometry } from './primitives.js';
 import { applyMatrix4, mergeGeometries } from './utils.js';
 
+/**
+ * How each face of a truss is braced: `'warren'` zigzag, `'pratt'` all diagonals one way, or `'x'` crossed.
+ */
 export type TrussPattern = 'warren' | 'pratt' | 'x';
 
+/**
+ * Dimensions and bracing of a lattice truss from `trussGeometry`: length along +Y, section width and depth,
+ * bays, member radii, diagonal pattern, battens, taper and sides per member. Every field is optional and has a
+ * default.
+ */
 export interface TrussOptions {
   /** Length along +Y, from y = 0 to y = length (default 1). */
   length?: number;

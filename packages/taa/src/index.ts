@@ -277,6 +277,10 @@ struct V{@builtin(position) p:vec4f,@location(0) uv:vec2f}
 @vertex fn vs(@builtin(vertex_index) i:u32)->V{let u=vec2f(f32((i<<1u)&2u),f32(i&2u));return V(vec4f(u.x*2-1,1-u.y*2,0,1),u);}
 @fragment fn fs(v:V)->@location(0) vec4f{let s=vec2f(textureDimensions(mask));return vec4f(clamp(textureLoad(mask,vec2i(min(v.uv*s,s-1)),0).r,0,1),0,0,1);}`;
 
+/**
+ * Temporal anti-aliasing plugin: resolves each frame against the previous frames and presents the result.
+ * Configure it with `TAAOptions`.
+ */
 export class TAA implements EnginePlugin {
   readonly name = 'taa';
   private engine?: Engine;

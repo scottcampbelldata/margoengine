@@ -8,6 +8,9 @@ const HEADER_WORDS = 6;
 const RECEIPT_WORDS = 2;
 const U32 = Uint32Array.BYTES_PER_ELEMENT;
 
+/**
+ * What one participant did in a catenary step: velocity rows, position rows and SIMD node pairs integrated.
+ */
 export interface RailWireWorkerWork {
   readonly velocityRows: number;
   readonly positionRows: number;
@@ -15,6 +18,7 @@ export interface RailWireWorkerWork {
   readonly simdNodePairs: number;
 }
 
+/** Work counts for one catenary step: the thread count plus each participant's `RailWireWorkerWork`. */
 export interface RailWireWorkCounts extends RailWireWorkerWork {
   readonly threads: number;
   readonly workers: readonly RailWireWorkerWork[];

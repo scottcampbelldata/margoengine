@@ -15,6 +15,10 @@ export interface CrushShellSphere {
   readonly friction?: number;
 }
 
+/**
+ * Result of a crush shell touching a rigid body over the last interval: the impulse on the body in N·s, the
+ * endpoint normal compression in metres and the recoverable interface energy in joules.
+ */
 export interface CrushShellContact {
   /** Integrated impulse applied to the rigid body during the last interval, N·s. */
   readonly impulse: CrushVector;
@@ -24,6 +28,10 @@ export interface CrushShellContact {
   readonly energy: number;
 }
 
+/**
+ * Friction result of a crush shell on a sphere: the angular impulse about the sphere centre in N·m·s and the
+ * kinetic energy dissipated in joules.
+ */
 export interface CrushShellFriction {
   /** Integrated angular impulse about the sphere centre in N·m·s. */
   readonly angularImpulse: CrushVector;

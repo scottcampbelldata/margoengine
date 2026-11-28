@@ -52,6 +52,11 @@ type Vec3 = readonly [number, number, number];
 type Vec2 = readonly [number, number];
 type Orientation = readonly [number, number, number, number];
 
+/**
+ * Options for loading the thin-film solver: its ID (default 'thin-film'), whether to mount it on a rigid body
+ * (default false), hydrostatic load and impact recoil on that body (default false), and the optional rain,
+ * impact and wake source fields.
+ */
 export interface ThinFilmLoadOptions {
   /** Solver ID and output field prefix. Defaults to 'thin-film'. */
   readonly id?: string;
@@ -72,6 +77,10 @@ export interface ThinFilmLoadOptions {
   readonly signal?: AbortSignal;
 }
 
+/**
+ * What a thin film is made from: grid size in cells, square cell size in metres, lower UV corner, tangents u and
+ * v, the rigid body row carrying it and the origin-cell size (default 4096 m).
+ */
 export interface ThinFilmOptions {
   /** Grid width and height in cells. */
   readonly cells: Vec2;

@@ -30,6 +30,10 @@ import { rigidMobilityWords } from './rigid-mobility.js';
 type Vec3 = readonly [number, number, number];
 type Projection = 'box' | 'ellipsoid';
 
+/**
+ * A rigid body's flood drag patch: its row, optional centre in body-local metres, half height or half extents in
+ * metres, frontal area in m², projection (default 'ellipsoid') and drag coefficient.
+ */
 export interface FloodBodyDragBody {
   /** A dynamic rigid body row. */
   readonly row: number;
@@ -45,6 +49,10 @@ export interface FloodBodyDragBody {
   readonly dragCoefficient: number;
 }
 
+/**
+ * What the flood body drag load is made from: the drag grid parameters, one patch per body in rigid row order
+ * and the rate level (default 0).
+ */
 export interface FloodBodyDragParams extends FloodDragGridParams {
   /** One patch per body; patches apply in rigid row order. */
   readonly bodies: readonly FloodBodyDragBody[];

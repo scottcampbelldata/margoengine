@@ -174,6 +174,10 @@ export interface SoilTreadMesh {
   readonly rows?: number;
 }
 
+/**
+ * Options for the terramechanics solver: its ID, the optional external patch, wheel spin, camber, reaction and
+ * side-force fields, legged contact (default false), the contact tier (default 'mean') and an `AbortSignal`.
+ */
 export interface TerramechanicsOptions {
   readonly id?: string;
   /** Read an external SOIL_LAYOUT F64 patch field, e.g. one returned by `soilPatchField`. */
@@ -193,6 +197,11 @@ export interface TerramechanicsOptions {
   readonly signal?: AbortSignal;
 }
 
+/**
+ * What the terramechanics solver is made from: the terrain bed, soil material, optional hardpan, fixed, external
+ * and foot contact patches, response profiles, excavation floor and the origin-cell length in metres (default
+ * 4096).
+ */
 export interface TerramechanicsParams {
   readonly terrain: BedShape;
   readonly material?: SoilMaterial;
@@ -220,6 +229,10 @@ export interface TerramechanicsParams {
   readonly cellSize?: number;
 }
 
+/**
+ * Soil volume accounting of the terramechanics solver: removed, compacted, suspended, deposited and exported
+ * volume.
+ */
 export interface SoilBudget {
   readonly removed: number;
   readonly compacted: number;
@@ -229,6 +242,10 @@ export interface SoilBudget {
   readonly exported: number;
 }
 
+/**
+ * Describes the F64 field that carries soil contact patches in the SOIL_LAYOUT. `name` defaults to
+ * 'soilContactPatch'.
+ */
 export function soilPatchField(name = 'soilContactPatch'): FieldDescriptor {
   return { name, kind: 'surfaceSampleSet', quantity: 'soilContactPatch', unit: 'record', centring: 'particle' };
 }

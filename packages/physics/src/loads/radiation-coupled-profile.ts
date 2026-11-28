@@ -16,6 +16,11 @@ export interface LoadCoupledRadiationResonance {
   readonly strength: number;
 }
 
+/**
+ * Options for building a coupled radiation profile: mass in kg, optional centre of mass, water density (default
+ * 1025 or the panel response's), panel inputs or a baked response, and the number of resonant poles kept
+ * (default 12).
+ */
 export interface LoadCoupledRadiationProfileOptions {
   /** Mass afloat, kg. This must give a partly submerged upright hull. */
   readonly mass: number;
@@ -39,6 +44,10 @@ export interface LoadCoupledRadiationFit {
   readonly sourceNegativeDamping: number;
 }
 
+/**
+ * A hull's coupled radiation response: centre of mass, water density in kg/m³, waterline, draft, immersion, the
+ * 6x6 infinite-frequency added inertia and the resonances.
+ */
 export interface LoadCoupledRadiationProfile {
   /** Rigid centre of mass in hull coordinates, metres. */
   readonly centre: Vec3;

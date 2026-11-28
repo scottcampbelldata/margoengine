@@ -61,6 +61,10 @@ export interface WrappedRopeSolverWrap {
   readonly turn: 1 | -1;
 }
 
+/**
+ * What a wrapped-rope solver is made from: the ordered rope nodes, for each span the cylinder it wraps (or
+ * null), solver passes a step (default 8) and the rate level (default 0, 60 Hz).
+ */
 export interface WrappedRopeSolverParams {
   /** The rope's nodes in order along it, two or more. */
   readonly nodes: readonly WrappedRopeSolverNode[];

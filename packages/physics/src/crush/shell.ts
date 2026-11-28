@@ -74,6 +74,10 @@ export interface CrushShellParams {
   readonly pressurePatches?: readonly { readonly seam: number; readonly faces: readonly number[] }[];
 }
 
+/**
+ * State of one shell face: in-plane second Piola-Kirchhoff stress in Pa, equivalent plastic strain and the
+ * irreversible yield work per rest cubic metre in J/m³.
+ */
 export interface CrushShellFace {
   /** In-plane second Piola–Kirchhoff stress, Pa. Uses the material's rolling axes when set. */
   readonly stress: CrushVector;

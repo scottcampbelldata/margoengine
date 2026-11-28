@@ -56,6 +56,7 @@ export type { PantographSpec, PantographReading, RailWireReading, RailWireSpec }
 
 /** Number of f64 words in each layout-1 car record. */
 export const RAIL_CAR_WORDS = CAR_WORDS;
+/** Layout version of the rail car records the rail solver publishes. */
 export const RAIL_CAR_LAYOUT = 1;
 
 /** A sprung wagon connection with separate tension and buffer compression. */
@@ -69,6 +70,10 @@ export interface RailCoupler {
   readonly damping?: number;
 }
 
+/**
+ * Options for the rail solver: its ID, an optional layout-1 f64 wetness field with values in [0, 1] and the
+ * number of native catenary participants including the caller (default 1).
+ */
 export interface RailSolverOptions {
   readonly id?: string;
   /** Optional layout-1 f64 field containing relative wetness in [0, 1]. */
@@ -77,12 +82,16 @@ export interface RailSolverOptions {
   readonly threads?: number;
 }
 
+/** What the rail solver is made from: the cars, their couplers and an optional overhead wire. */
 export interface RailSolverParams {
   readonly cars: readonly RailCarSpec[];
   readonly couplers?: readonly RailCoupler[];
   readonly wire?: RailWireSpec;
 }
 
+/**
+ * Controls for a rail car: normalized traction torque from -1 to 1 and normalized brake torque from 0 to 1.
+ */
 export interface RailControls {
   /** Normalized traction torque from -1 to 1. */
   readonly drive?: number;

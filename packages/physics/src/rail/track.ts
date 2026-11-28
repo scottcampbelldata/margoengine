@@ -2,6 +2,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { cos, hypot, sin } from '@margoengine/math/pinned';
 import { railNumber } from './contact.js';
 
+/** A point or direction on a rail alignment: [x, y, z]. */
 export type RailPoint = readonly [number, number, number];
 
 /** One station in an authored track centreline. Metres, radians, and optional per-rail roughness in metres. */
@@ -12,6 +13,10 @@ export interface RailStation {
   readonly rightHeight?: number;
 }
 
+/**
+ * A named stretch of rail made from stations, with the names of the routes that leave it at a turnout (the first
+ * is the normal alignment).
+ */
 export interface RailSection {
   readonly name: string;
   readonly stations: readonly RailStation[];
@@ -19,6 +24,10 @@ export interface RailSection {
   readonly next?: readonly string[];
 }
 
+/**
+ * One sample of a rail route: centre line point, tangent, right and up directions, cant, curvature, left and
+ * right rail heights and whether the track is supported there.
+ */
 export interface RailSample {
   readonly centre: RailPoint;
   readonly tangent: RailPoint;

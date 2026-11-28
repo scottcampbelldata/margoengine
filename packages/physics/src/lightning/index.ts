@@ -22,7 +22,9 @@ const THREAD_JOB_WORDS = 8;
 
 /** A count row followed by channel rows [start xyz, order, end xyz, 0] or thunder rows [midpoint xyz, emission s, weight, length m]. */
 export const LIGHTNING_LAYOUT = 1;
+/** f64 words in one lightning channel row: [start x, y, z, order, end x, y, z, 0]. */
 export const LIGHTNING_CHANNEL_WORDS = 8;
+/** f64 words in one thunder row: [midpoint x, y, z, emission s, weight, length m]. */
 export const LIGHTNING_THUNDER_WORDS = 6;
 const STRIDE = LIGHTNING_CHANNEL_WORDS;
 const SOUND_WORDS = LIGHTNING_THUNDER_WORDS;

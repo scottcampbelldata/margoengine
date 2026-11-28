@@ -24,14 +24,23 @@ export interface TissueBoneBinding {
   };
 }
 
+/**
+ * What a tissue solver is made from: the soft-body parameters plus the bone bindings, and the floating-origin
+ * cell length in metres (default 4096).
+ */
 export interface TissueSolverParams extends SoftSolverParams {
   readonly bindings: readonly TissueBoneBinding[];
   /** Length of a PhysicsWorld origin cell, in metres. Defaults to 4096. */
   readonly cellSize?: number;
 }
 
+/** Anatomical label of one tetrahedron: `'muscle'`, `'fat'` or `'skin'`. */
 export type TissueLayer = 'muscle' | 'fat' | 'skin';
 
+/**
+ * Layer labels for a tissue description: one `TissueLayer` per tetrahedron and the passive material of each
+ * label present.
+ */
 export interface TissueLayers {
   /** One anatomical label for each tetrahedron in the description. */
   readonly cells: readonly TissueLayer[];

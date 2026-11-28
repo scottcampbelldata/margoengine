@@ -17,6 +17,7 @@ export interface RoadVehicleOptions extends VehicleOptions {
   readonly wind?: Wind;
 }
 
+/** A road vehicle ready to step: its physics body, its vehicle and the optional wind force. */
 export interface RoadVehicleAssembly {
   readonly body: PhysicsBody;
   readonly vehicle: Vehicle;

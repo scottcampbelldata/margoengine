@@ -41,7 +41,9 @@ export const PARCEL_WORDS = 7;
 
 /** Sea water's kinematic viscosity, m^2/s, the gas's diffusivity, m^2/s, Henry's constant for air, kg/(m^3 Pa). */
 export const SEA_VISCOSITY_KINEMATIC = 1.05e-6;
+/** Diffusivity of air in sea water, 2e-9 m²/s. */
 export const AIR_DIFFUSIVITY = 2e-9;
+/** Henry's constant for air in sea water, 2.38e-7 kg/(m³ Pa). */
 export const AIR_HENRY = 2.38e-7;
 /** Air's molar mass, kg/mol, the gas constant, J/(mol K), the atmosphere's pressure, Pa, sea water's surface tension, N/m. */
 const AIR_MOLAR = 0.02896,

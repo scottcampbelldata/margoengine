@@ -81,6 +81,10 @@ export interface RoadDriverParams {
   readonly cellSize?: number;
 }
 
+/**
+ * Options for the road driver: its registry prefix (default 'road-driver') and an optional relative wetness
+ * field.
+ */
 export interface RoadDriverOptions {
   /** Registry prefix. Default 'road-driver'. */
   readonly id?: string;

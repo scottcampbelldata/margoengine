@@ -18,6 +18,10 @@ export interface RailAdhesion {
   readonly slipFactor: number;
 }
 
+/**
+ * Inputs for rail creep forces: wheel slip relative to the rail in m/s, the reference rolling speed in m/s, the
+ * normal reaction in N, the Kalker creep stiffness in N per unit creepage and the adhesion limits.
+ */
 export interface RailCreep {
   /** Wheel-surface speed relative to the rail, in the longitudinal and lateral directions, m/s. */
   readonly slip: readonly [number, number];

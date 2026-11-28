@@ -457,6 +457,10 @@ export interface CloudDensitySource {
   cloudWater(): Float32Array;
 }
 
+/**
+ * Options for a cloud density volume: the uniform air density in kg/m³ (default 1.2) and the effective droplet
+ * radius in metres (default 10 µm).
+ */
 export interface CloudDensityVolumeOptions {
   /** Uniform air density, kg/m³ (default 1.2). */
   airDensity?: number;
@@ -592,6 +596,10 @@ export interface SeaSpraySource {
   readParticles(): readonly SeaSprayParcel[];
 }
 
+/**
+ * Options for a sea-spray density volume: voxel spacing in metres (default 0.1) and the floating-origin cell
+ * width in metres (default 4096).
+ */
 export interface SeaSprayDensityVolumeOptions {
   /** Voxel spacing in metres, default 0.1. Each parcel is spread with a standard deviation of two voxels. */
   voxelSize?: number;

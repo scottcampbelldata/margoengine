@@ -26,6 +26,7 @@ const PI = 3.141592653589793;
 const LN2 = 0.6931471805599453;
 /** Where the tip vortices go unstable, in diameters downstream (Kumar and Mahesh 2017), and where they are gone. */
 export const TIP_VORTEX_STABLE = 0.8;
+/** Distance downstream, in rotor diameters, at which tip vortices are gone (1.5). */
 export const TIP_VORTEX_GONE = 1.5;
 /** Water's vapour pressure at 15 degrees C, Pa. */
 export const VAPOUR_PRESSURE = 1705;

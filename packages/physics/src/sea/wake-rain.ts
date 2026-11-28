@@ -8,6 +8,10 @@ const PI = 3.141592653589793;
 const rainDensity = 1000;
 const millimetresPerHourToMetresPerSecond = 1 / 3_600_000;
 
+/**
+ * The wake grid rain falls on: cell counts in X and Z, cell length in metres and the lower corner in metres from
+ * the origin cell.
+ */
 export interface WakeRainGrid {
   /** Wake dimensions, X then Z. */
   readonly cells: readonly [number, number];
@@ -38,6 +42,10 @@ export interface WakeRainImpact {
   readonly z: number;
 }
 
+/**
+ * Options for rain wake sources: the precipitation, the ordered impacts, the grid, the wake step in seconds, the
+ * origin cell and the metres per cell (default 4096).
+ */
 export interface WakeRainSourcesOptions {
   readonly precipitation: Precipitation;
   /** The contact times and positions, in their canonical order within each tick. */

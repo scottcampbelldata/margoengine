@@ -23,6 +23,9 @@ export interface ShallowMovingFootprint extends ShallowBlockageBody {
   readonly footprint: ReadonlyArray<readonly [number, number]>;
 }
 
+/**
+ * The two fields of a shallow-water blockage: the motion the water reads and the reaction impulse it hands back.
+ */
 export interface ShallowBlockageFields {
   /** Layout 1 f64: ticket, end x, end z, centre-of-mass elevation. Layout 2 appends rigid vx, vz and inverse mass. */
   readonly motion: FieldDescriptor;
@@ -30,8 +33,18 @@ export interface ShallowBlockageFields {
   readonly reaction: FieldDescriptor;
 }
 
+/** Layout version 1 of the shallow-water blockage fields. */
 export const SHALLOW_BLOCKAGE_LAYOUT = 1;
+/** f64 words in a layout-1 blockage motion record: ticket, end x, end z, centre-of-mass elevation. */
 export const SHALLOW_BLOCKAGE_MOTION_WORDS = 4;
+/**
+ * f64 words in a layout-1 blockage reaction record: accepted ticket, rigid row, world linear impulse and world
+ * angular impulse.
+ */
 export const SHALLOW_BLOCKAGE_REACTION_WORDS = 8;
+/**
+ * Layout version 2 of the shallow-water blockage fields, which add the rigid body's velocity and inverse mass.
+ */
 export const SHALLOW_RIGID_BLOCKAGE_LAYOUT = 2;
+/** f64 words in a layout-2 blockage motion record: the layout-1 words plus rigid vx, vz and inverse mass. */
 export const SHALLOW_RIGID_BLOCKAGE_MOTION_WORDS = 7;

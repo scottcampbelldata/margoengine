@@ -7,6 +7,10 @@ import { Curve } from './curve.js';
 import type { MutableVec3 } from './math.js';
 import { tubeGeometry } from './primitives.js';
 
+/**
+ * Size and tessellation of one chain link from `chainLinkGeometry`: outside length along Y and width along X in
+ * metres, wire radius, rings along the centre line and sides around the wire.
+ */
 export interface ChainLinkOptions {
   /** Outside length of the link along Y, wire included (default 0.06). */
   length?: number;

@@ -66,6 +66,10 @@ export interface ViscoplasticMaterial {
   readonly solventViscosity?: number;
 }
 
+/**
+ * Options for loading the viscoplastic solver: its ID (default 'viscoplastic'), an optional terrain bed, an
+ * inlet field, the number of native threads including the caller (default 1) and an `AbortSignal`.
+ */
 export interface ViscoplasticLoadOptions {
   /** Solver ID and field prefix. Defaults to 'viscoplastic'. */
   readonly id?: string;
@@ -78,6 +82,11 @@ export interface ViscoplasticLoadOptions {
   readonly signal?: AbortSignal;
 }
 
+/**
+ * What a viscoplastic solver is made from, on top of its material: grid size in cells, spacing in metres,
+ * origin, origin-cell size (default 4096), initial points, point capacity and the closed walls (default a closed
+ * box).
+ */
 export interface ViscoplasticOptions extends ViscoplasticMaterial {
   /** Eulerian grid size in cells. */
   readonly cells: Vector;

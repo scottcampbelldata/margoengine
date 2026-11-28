@@ -36,6 +36,10 @@ export interface ResistiveSoilStrip {
   readonly samples?: number;
 }
 
+/**
+ * What the resistive soil solver is made from: the bed, the dry-soil coefficients from a plate test, the strips
+ * each rigid-kernel body row drives and the origin-cell length in metres (default 4096).
+ */
 export interface ResistiveSoilParams {
   readonly terrain: BedShape;
   /** Prepared dry soil response. Use coefficients from a separate plate test. */
@@ -46,6 +50,7 @@ export interface ResistiveSoilParams {
   readonly cellSize?: number;
 }
 
+/** Options for the resistive soil solver: its solver ID (default 'resistive-soil') and an `AbortSignal`. */
 export interface ResistiveSoilOptions {
   /** Solver ID. Default 'resistive-soil'. */
   readonly id?: string;

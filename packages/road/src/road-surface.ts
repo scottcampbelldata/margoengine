@@ -29,6 +29,10 @@ export interface RoadColliderOptions extends RoadSurfaceOptions {
   readonly position?: WheelGroundContact['point'];
 }
 
+/**
+ * Returns the grip coefficient for a road given its dry and wet traction and a relative wetness from 0 to 1
+ * (default 0). Throws when the coefficients or the wetness are out of range.
+ */
 export function roadGrip(traction: RoadTraction, wetness = 0): number {
   const { dry, wet } = traction;
   if (!(Number.isFinite(dry) && Number.isFinite(wet) && wet >= 0 && dry >= wet))

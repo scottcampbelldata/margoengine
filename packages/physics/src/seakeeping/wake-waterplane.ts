@@ -23,6 +23,10 @@ interface Strip {
   readonly across: number;
 }
 
+/**
+ * Options for building a water plane: the largest panel span in metres and an optional upper bound on the node
+ * count.
+ */
 export interface WakeWaterplaneOptions {
   /** Maximum quadrature panel span in metres along body X or across body Z. */
   readonly maxPanelSize: number;
@@ -30,6 +34,10 @@ export interface WakeWaterplaneOptions {
   readonly maxRows?: number;
 }
 
+/**
+ * A hull's water plane as quadrature nodes: the reference waterline in hull-local metres and X, Z, area-weight
+ * triples.
+ */
 export interface WakeWaterplane {
   /** Reference hull-local Y in metres. */
   readonly waterline: number;

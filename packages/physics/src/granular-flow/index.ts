@@ -17,6 +17,11 @@ export const GRANULAR_FLOW_LAYOUT = 1;
 /** Each row contains vertical depth, X and Z discharge, and bed elevation, in SI units. */
 export const GRANULAR_FLOW_WORDS = 4;
 
+/**
+ * Options for loading the granular flow solver: its field namespace (default 'granularFlow'), live terrain,
+ * deposition to terrain and marine displacement (all default false), an optional seismic ground field and an
+ * `AbortSignal`.
+ */
 export interface GranularFlowLoadOptions {
   /** Field namespace. Default 'granularFlow'. */
   readonly id?: string;
@@ -53,6 +58,10 @@ export interface GranularRoughness {
   readonly slowExponent?: number;
 }
 
+/**
+ * How flowing granular material consolidates: the consolidated density in kg/m³ (default the moving density) and
+ * the along-bed speed in m/s below which it consolidates (default 0).
+ */
 export interface GranularDeposition {
   /** Consolidated density in kilograms per cubic metre. Default the moving density. */
   readonly density?: number;
@@ -60,6 +69,10 @@ export interface GranularDeposition {
   readonly stopSpeed?: number;
 }
 
+/**
+ * Accounting of material placed in the terrain bed: the mass in kg, the horizontal momentum absorbed in kg·m/s
+ * and the horizontal kinetic energy dissipated in joules.
+ */
 export interface GranularDepositBudget {
   /** Total mass placed in TerrainBed, kilograms. */
   readonly mass: number;
@@ -69,6 +82,10 @@ export interface GranularDepositBudget {
   readonly horizontalKineticEnergy: number;
 }
 
+/**
+ * What a granular flow is made from: the grid, fixed bed elevations, initial depth and velocity in m and m/s,
+ * basal friction (default 0.35 without roughness), optional roughness and pore support, and deposition.
+ */
 export interface GranularFlowOptions {
   /** Rectangular grid. When coupled, use the shape and world cell of TerrainBed. */
   readonly grid: BedShape;
@@ -94,6 +111,10 @@ export interface GranularFlowOptions {
   readonly seaLevel?: number;
 }
 
+/**
+ * Volume accounting of granular material below the sea surface: current submerged occupancy and the signed
+ * volume change since the first terrain sample, in m³.
+ */
 export interface GranularMarineBudget {
   /** Current submerged occupancy of loose and consolidated material, cubic metres. */
   readonly occupiedVolume: number;
@@ -101,6 +122,7 @@ export interface GranularMarineBudget {
   readonly displacedVolume: number;
 }
 
+/** One cell of the granular flow: depth, X and Z discharge, bed elevation and surface elevation. */
 export interface GranularFlowSample {
   readonly depth: number;
   readonly discharge: readonly [number, number];

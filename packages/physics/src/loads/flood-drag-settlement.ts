@@ -40,6 +40,10 @@ export interface ProjectedFloodDragOptions {
   readonly signal?: AbortSignal;
 }
 
+/**
+ * The solvers of a projected flood drag coupling: the water solver, the request and relay solvers, the exact
+ * group order and the request and receipt fields.
+ */
 export interface ProjectedFloodDragCoupling {
   readonly water: ShallowWaterSolver;
   readonly request: Solver<Record<string, never>>;

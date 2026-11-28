@@ -14,12 +14,16 @@ export interface AirbornePhaseLoadOptions {
   readonly signal?: AbortSignal;
 }
 
+/** What one participant did in an airborne particle step: parcels, SIMD axis pairs and evaporation updates. */
 export interface AirborneWorkerWork {
   readonly parcels: number;
   readonly simdAxisPairs: number;
   readonly evaporationUpdates: number;
 }
 
+/**
+ * Work counts for one airborne particle step: the thread count plus each participant's `AirborneWorkerWork`.
+ */
 export interface AirborneWorkCounts extends AirborneWorkerWork {
   readonly threads: number;
   readonly workers: readonly AirborneWorkerWork[];

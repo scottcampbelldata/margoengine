@@ -21,6 +21,10 @@ import {
 import { invalidLoad } from './errors.js';
 import { FloodDragGrid, type FloodDragGridParams } from './flood-drag-grid.js';
 
+/**
+ * What the swim drag load is made from: the drag grid parameters and the rate level shared with the swimmer and
+ * the water (default 60 Hz).
+ */
 export interface SwimDragToWaterParams extends FloodDragGridParams {
   /** Same dyadic rate as the swimmer and the shallow water. Defaults to level zero (60 Hz). */
   readonly rate?: RateLevel;

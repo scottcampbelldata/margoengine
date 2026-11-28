@@ -14,6 +14,10 @@ export interface PlantSwayPhaseOptions {
   readonly signal?: AbortSignal;
 }
 
+/**
+ * What one participant did in a plant sway step: plants visited and integrated, midpoint substeps and SIMD mode
+ * pairs run.
+ */
 export interface PlantSwayWorkerWork {
   readonly plants: number;
   readonly integratedPlants: number;
@@ -21,6 +25,7 @@ export interface PlantSwayWorkerWork {
   readonly simdModePairs: number;
 }
 
+/** Work counts for one plant sway step: the thread count plus each participant's `PlantSwayWorkerWork`. */
 export interface PlantSwayWorkCounts extends PlantSwayWorkerWork {
   readonly threads: number;
   readonly workers: readonly PlantSwayWorkerWork[];

@@ -9,12 +9,17 @@ export interface SwimKernelBuilds {
   readonly pool?: NativePhasePool;
 }
 
+/**
+ * What one participant did in a swimming step: bodies visited, SIMD axis pairs run and passive reactions
+ * applied.
+ */
 export interface SwimWorkerWork {
   readonly bodies: number;
   readonly simdAxisPairs: number;
   readonly passiveReactions: number;
 }
 
+/** Work counts for one swimming step: the thread count plus each participant's `SwimWorkerWork`. */
 export interface SwimWorkCounts extends SwimWorkerWork {
   readonly threads: number;
   readonly workers: readonly SwimWorkerWork[];

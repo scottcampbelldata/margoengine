@@ -5,6 +5,11 @@ import { invalidLoad } from './errors.js';
 import type { LoadRadiationResonance } from './radiation.js';
 import { equivalentEllipsoid } from './shapes.js';
 
+/**
+ * Options for building a hull radiation profile: mass in kg, optional centre of mass, water density (default
+ * 1025), strip count (default 24), frequency count (default 56), modes per axis (default 12) and optional panel
+ * inputs.
+ */
 export interface LoadRadiationProfileOptions {
   /** Mass of the hull and its load, kg. The upright hull must clear the waterline and displace this mass. */
   readonly mass: number;
@@ -40,6 +45,10 @@ export interface LoadRadiationFrequencyResponse {
   readonly clippedNegativeDamping: readonly number[];
 }
 
+/**
+ * A hull's radiation response: the method ('strip' or 'panel'), waterline, draft, immersion, infinite-frequency
+ * added mass and inertia, resonances and the frequency response.
+ */
 export interface LoadRadiationProfile {
   readonly method: 'strip' | 'panel';
   /** Still-water level in hull coordinates, m. */

@@ -17,6 +17,10 @@ interface WorkerWork {
   readonly pairedCells: number;
 }
 
+/**
+ * Work counts for one cloud pressure projection: the thread count, applications, and the cells and paired cells
+ * each participant visited.
+ */
 export interface CloudProjectionWorkCounts extends WorkerWork {
   readonly threads: number;
   readonly applications: number;
