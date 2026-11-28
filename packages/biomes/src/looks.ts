@@ -63,7 +63,10 @@ export const MATERIALS: Readonly<Record<string, MaterialLook>> = Object.freeze({
   rock: { color: [0.54, 0.51, 0.47], detail: 0.45, bump: 1, macro: 0.5 },
   scree: { color: [0.64, 0.61, 0.57], detail: 0.4, bump: 0.8, macro: 0.6 },
   gravel: { color: [0.6, 0.57, 0.52], detail: 0.4, bump: 0.6, macro: 0.5 },
-  snow: { color: [0.95, 0.96, 0.99], detail: 0.1, bump: 0.35, macro: 0.15 },
+  // snow: relief of 8 to 9 mm root mean square at the 4 m repeat, inside the 0.5 to 9.2 mm a laser profiler read on
+  // snow surfaces (Lacroix et al. 2008, Journal of Glaciology 54(187), 753-762,
+  // https://doi.org/10.3189/002214308786570863). Until 2026-11-28 the bump was 0.35, about 35 mm.
+  snow: { color: [0.95, 0.96, 0.99], detail: 0.1, bump: 0.09, macro: 0.15 },
   tundra: { color: [0.54, 0.5, 0.34], detail: 0.35, bump: 0.3, macro: 0.2 },
   heather: { color: [0.52, 0.36, 0.4], detail: 0.35, bump: 0.3, macro: 0.2 },
   canopy: { color: [0.12, 0.2, 0.08], detail: 0.3, bump: 0.2, macro: 0.4 },

@@ -258,6 +258,12 @@ generated fine detail at 0.6 and its relief at 0.8 of each material's, and the l
 1). `biomeMaterials(look)` returns the whole `MATERIALS` table with the family applied, for `BiomeView.attach(engine, world, {materials})`;
 pass your own table as the second argument, or your own multipliers as the first.
 
+The snow material's relief (`bump` 0.09) stands 8 to 9 mm root mean square at its 4 m repeat, inside the 0.5 to 9.2 mm
+measured on snow surfaces with a laser profiler at wavelengths of 4 to 50 cm (P. Lacroix, B. Legrésy, K. Langley,
+S. E. Hamran, J. Kohler, S. Roques, F. Rémy and M. Dechambre, "In situ measurements of snow surface roughness using a
+laser profiler", Journal of Glaciology 54(187), 753-762, 2008, https://doi.org/10.3189/002214308786570863). A larger
+`bump` in your own table draws rougher snow.
+
 ```js
 import { biomeMaterials } from '@margoengine/biomes/view';
 

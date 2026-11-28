@@ -620,7 +620,7 @@ test('the sea defaults are an ocean swell the water draws without folding', () =
 
 test('ground looks: rock and snow have relief and macro tone, textures have a fine grain octave', () => {
   assert.deepEqual([MATERIALS.rock.bump, MATERIALS.rock.macro, MATERIALS.rock.detail], [1, 0.5, 0.45]);
-  assert.deepEqual([MATERIALS.snow.bump, MATERIALS.snow.macro], [0.35, 0.15]);
+  assert.deepEqual([MATERIALS.snow.bump, MATERIALS.snow.macro], [0.09, 0.15]);
   for (const [key, look] of Object.entries(MATERIALS))
     assert.ok(look.bump > 0 && look.bump <= 1 && look.macro > 0 && look.macro <= 1, `${key} relief and macro`);
   // The alpine preset's snow outweighs the rock it lies on.
@@ -643,6 +643,24 @@ test('ground looks: rock and snow have relief and macro tone, textures have a fi
       .slice(0, 16),
     '8a4fe8c41bfe93ed',
   );
+});
+
+// KB-SNOW-RELIEF1: Lacroix et al. 2008 (Journal of Glaciology 54(187), 753-762,
+// https://doi.org/10.3189/002214308786570863) read root mean square snow heights of 0.5 to 9.2 mm with a laser
+// profiler (surface wavelengths 4 to 50 cm). The snow bump of 0.35 stood 33 to 35 mm.
+test('snow relief stands within the measured root mean square height of snow surfaces', () => {
+  const linear = (v) => ((v /= 255) > 0.04045 ? ((v + 0.055) / 1.055) ** 2.4 : v / 12.92),
+    // The finest height the terrain draws: the 128-texel mip of the layer (TerrainLayer.bump), as linear luma.
+    level = materialPixels('snow', MATERIALS.snow)[1],
+    luma = [];
+  assert.equal(level.length, 128 * 128 * 4);
+  for (let k = 0; k < level.length; k += 4)
+    luma.push(0.2126 * linear(level[k]) + 0.7152 * linear(level[k + 1]) + 0.0722 * linear(level[k + 2]));
+  const mean = luma.reduce((sum, v) => sum + v, 0) / luma.length,
+    spread = Math.sqrt(luma.reduce((sum, v) => sum + (v - mean) ** 2, 0) / luma.length),
+    // Height per unit of luma is bump halves of one repeat (4 m by default).
+    millimetres = spread * MATERIALS.snow.bump * ((MATERIALS.snow.repeat ?? 4) / 2) * 1000;
+  assert.ok(millimetres >= 0.5 && millimetres <= 9.2, `snow relief ${millimetres.toFixed(1)} mm`);
 });
 
 test('regression: clipmapLevels reaches the whole world, so the terrain no longer ends at 1 km (main drew 6 rings)', () => {
