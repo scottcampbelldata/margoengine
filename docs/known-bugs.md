@@ -13867,6 +13867,11 @@ Repro: `node scripts/reference-rendering/environment.mjs --decompose`, then with
 - **Rechecked under load 2026-11-27, not reproduced:** six rounds on origin/main 8d31e3f9d5 (RTX A6000), each three GPU pages at once: two WebGL2-layer pages (ANGLE Vulkan) running `node packages/voxel-pathtracer/tests/browser-check.mjs --compat analytic viewport` beside one WebGPU page tracing the heavy `native4k largemodels` viewport cases as load; logs kept under the lane folder. All 12 layer runs read "clear glass" 1.0000
   (sd 0, 1,861 px) and "emissive media sigma 0.125" 10.1120 (sd 0.1841); no `out-of-memory` or validation line. The row
   stays open on the three failures of 2026-11-10 and 2026-11-11.
+- **Third sighting of the class and rerun (2026-11-11 and 2026-11-28, KB-L4-furn):** the same `analytic` run on the
+  layer read "diffuse 0.5 env map" 0.4605 (sd 0.0077) against 0.5 once, every other case right. On 2026-11-28
+  (a877a7b508 era main, RTX A6000) 6 of 6 `--compat analytic` runs read 0.4998 (sd 0.0056), some beside another GPU
+  suite. Not reproduced.
+
 ### Path tracer viewport: the converged image after a device restore differed once on the WebGL2 layer under GPU load (KB-C34h, 2026-11-11, open, not reproduced)
 
 - **Repro (not reproduced since):** `node packages/voxel-pathtracer/tests/browser-check.mjs --compat viewport`, inside
