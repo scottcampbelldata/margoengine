@@ -12,6 +12,9 @@ import {
   puddleSurface,
   puddleWGSL,
   validatePuddles,
+  puddleFilm,
+  dampRoughness,
+  puddleWaterRoughness,
 } from '../dist/puddles.js';
 import { wetColor, wetRoughness } from '../dist/index.js';
 
@@ -68,7 +71,8 @@ test('surface: wet darkens and smooths like wetColor and wetRoughness, water smo
   assert.deepEqual(dry, { color: [0.4, 0.3, 0.2], roughness: 0.8, metal: 0.5, water: 0 });
   const wall = puddleSurface(base, 0, 0, 0, 0.7);
   assert.deepEqual(wall.color, wetColor(base.color, 0.7));
-  assert.equal(wall.roughness, wetRoughness(0.8, 0.7));
+  assert.equal(wall.roughness, dampRoughness(0.8, 0.7, 0.5), 'A wall holds a half film');
+  assert.equal(dampRoughness(0.8, 0.7, 1), wetRoughness(0.8, 0.7), 'A whole film smooths as wetRoughness');
   assert.equal(wall.water, 0);
   let x = 0;
   while (puddleMask(x, 0, 1, 1) < 1) x += 0.05;
@@ -79,6 +83,47 @@ test('surface: wet darkens and smooths like wetColor and wetRoughness, water smo
   assert.ok(Math.abs(pool.color[0] - 0.4 * 0.75 * 0.7) < 1e-12);
   const plain = puddleSurface(base, 0, 0, 0, 0.7, { wetSurfaces: false });
   assert.deepEqual(plain.color, [0.4, 0.3, 0.2], 'without wetSurfaces only water changes a surface');
+});
+
+test('wet ground is no mirror: damp crests stay rough, low spots gloss, and rain roughens the puddles (Last Tram)', () => {
+  // Regression: every damp surface smoothed by 65 percent and every puddle sat at roughness 0.03 whatever the rain, so a
+  // wet night floor reflected the tram like a perfect mirror (Last Tram stills, 2026-11-28).
+  const base = { color: [0.2, 0.2, 0.2], roughness: 0.46 };
+  const o = { coverage: 0.39, size: 2.6, rain: 0.72, rippleStrength: 0.22 };
+  let crest = 1,
+    low = 0,
+    dampLow = 1,
+    dampHigh = 0,
+    films = 0,
+    n = 0;
+  for (let x = 0; x < 30; x += 0.37)
+    for (let z = 0; z < 30; z += 0.41) {
+      const s = puddleSurface(base, x, z, 1, 0.98, o);
+      const f = puddleFilm(x, z, 1, 0.98, o);
+      assert.ok(f >= 0 && f <= 1);
+      films += f;
+      n++;
+      crest = Math.min(crest, f);
+      low = Math.max(low, f);
+      if (s.water === 0) {
+        dampLow = Math.min(dampLow, s.roughness);
+        dampHigh = Math.max(dampHigh, s.roughness);
+      }
+    }
+  assert.ok(crest < 0.05 && low > 0.95, 'Drained crests and full films both occur');
+  assert.ok(films / n > 0.15 && films / n < 0.85, `The film covers part of the ground (${films / n})`);
+  assert.ok(dampHigh - dampLow > 0.15, `Damp roughness varies across the ground (${dampLow} to ${dampHigh})`);
+  assert.ok(dampHigh > 0.33, 'Drained damp concrete stays rough');
+  assert.ok(Math.abs(puddleWaterRoughness(0) - 0.03) < 1e-12, 'Calm water is glassy');
+  assert.ok(Math.abs(puddleWaterRoughness(1) - 0.2) < 0.005, 'Full rain with the default rings: 0.2');
+  assert.ok(puddleWaterRoughness(0.72, 0.22) > 0.12, 'Rain-struck puddles are no mirror');
+  let x = 0;
+  while (puddleMask(x, 0, 1, 1, o) < 1) x += 0.05;
+  assert.ok(Math.abs(puddleSurface(base, x, 0, 1, 1, o).roughness - puddleWaterRoughness(0.72, 0.22)) < 1e-12);
+  assert.equal(puddleFilm(3, 4, 0, 0.9), 0.5, 'Walls hold a half film');
+  // The shader computes the same film and water roughness.
+  assert.ok(puddleWGSL.includes('fn weather_puddle_film(xz:vec2f, normalY:f32, u:WeatherPuddles)->f32 {'));
+  assert.ok(puddleWGSL.includes('let calm=sqrt(0.0009+0.112*clamp(u.a.y,0.0,1.0)*clamp(u.b.w,0.0,1.0));'));
 });
 
 test('options are checked by name and range', () => {

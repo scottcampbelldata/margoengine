@@ -46,6 +46,10 @@ export class Puddles extends SurfaceHook {
     protected write(): void;
 }
 
+export function dampRoughness(roughness: number, wetness: number, film: number): number;
+
+export function puddleFilm(x: number, z: number, normalY: number, wetness: number, o?: PuddleOptions): number;
+
 export function puddleLevel(share: number): number;
 
 export function puddleMask(x: number, z: number, normalY: number, wetness: number, o?: PuddleOptions): number;
@@ -64,6 +68,8 @@ export function puddleSurface(base: {
 };
 
 export const puddleWGSL: string;
+
+export function puddleWaterRoughness(rain: number, rippleStrength?: number): number;
 
 export function validatePuddles(o: PuddleOptions): void;
 

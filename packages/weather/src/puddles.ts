@@ -5,7 +5,7 @@
 // JavaScript twin (`puddleMask`, `puddleSurface`) that the real-GPU test holds the WGSL to.
 import type { EngineKernel } from '@margoengine/core';
 import { SurfaceHook, noiseWGSL, patchFragment, valueNoise2 } from './scene-patch.js';
-import { wetColor, wetRoughness } from './surface.js';
+import { wetColor } from './surface.js';
 
 /** Bind group 0 slot of the puddle uniform in core's mesh shader. */
 export const PUDDLE_BINDING = 160;
@@ -43,7 +43,7 @@ export interface PuddleOptions {
   rippleSize?: number;
   /** How far the rings tilt the water's normal, 0 to 1. Default 0.35. */
   rippleStrength?: number;
-  /** Darken and smooth surfaces with the wetness (`wetColor`, `wetRoughness`) as well as drawing the water. Default true. */
+  /** Darken and smooth surfaces with the wetness (`wetColor`, `dampRoughness` over the `puddleFilm`) as well as drawing the water. Default true. */
   wetSurfaces?: boolean;
 }
 
@@ -117,6 +117,43 @@ export function puddleMask(x: number, z: number, normalY: number, wetness: numbe
   return flat * smoothstep(0, SHORE, puddleLevel(fill) - puddleRelief(x, z, o.size ?? 3));
 }
 
+/** Width, in relief units above the water level, over which the ground still holds a film of water. */
+const FILM = 0.15;
+
+/**
+ * How much of a water film a damp surface holds at world `(x, z)`, 0 to 1: rain drains off the crests of the relief and
+ * stands as a film in its low spots before they fill into puddles, so flat ground near the water line is glossier than
+ * the crests (Lagarde 2013, "Water drop 3b: physically based wet surfaces"; Jensen, Legakis and Dorsey 1999, "Rendering
+ * of wet materials", EGWR, doi:10.1007/978-3-7091-6809-7_25). The film lies on the relief's lower half times the
+ * wetness, whatever the puddles' coverage, so adding standing water changes only the water. Off the flat (walls) it is
+ * a uniform 0.5.
+ */
+export function puddleFilm(x: number, z: number, normalY: number, wetness: number, o: PuddleOptions = {}): number {
+  const level = puddleLevel(0.5 * clamp01(wetness)),
+    low = 1 - smoothstep(level, level + FILM, puddleRelief(x, z, o.size ?? 3));
+  return 0.5 + (low - 0.5) * smoothstep(0.96, 0.99, normalY);
+}
+
+/**
+ * Roughness of a damp surface holding a water `film` (0 to 1, {@link puddleFilm}) at `wetness`: the water fills its
+ * micro-relief, smoothing it by up to 65 percent where the film is whole and by 23 percent where it has drained, so damp
+ * asphalt keeps rough, patchy highlights instead of turning into a mirror. A film of 1 is `wetRoughness` of `@margoengine/weather`.
+ */
+export function dampRoughness(roughness: number, wetness: number, film: number): number {
+  return clamp01(roughness) * (1 - 0.65 * clamp01(wetness) * (0.35 + 0.65 * clamp01(film)));
+}
+
+/**
+ * Roughness of standing water under `rain` (0 to 1) whose rings tilt the normal by `rippleStrength`: the slopes of rings
+ * too small to resolve add their variance to the calm water's 0.03 (Toksvig 2005, "Mipmapping normal maps", JGT 10(3),
+ * doi:10.1080/2151237X.2005.10129203; Olano and Baker 2010, "LEAN mapping", I3D, doi:10.1145/1730804.1730834), so a
+ * puddle in steady rain reflects the lights as soft smears (0.2 at full rain and the default strength) rather than a
+ * mirror, and turns glassy again when the rain stops.
+ */
+export function puddleWaterRoughness(rain: number, rippleStrength = 0.35): number {
+  return Math.sqrt(0.0009 + 0.112 * clamp01(rain) * clamp01(rippleStrength));
+}
+
 /** Colour, roughness and metalness of a surface under puddles and wetness (rings aside), as the shader gives them. */
 export function puddleSurface(
   base: { color: readonly [number, number, number]; roughness: number; metal?: number },
@@ -130,11 +167,12 @@ export function puddleSurface(
     w = clamp01(wetness),
     water = puddleMask(x, z, normalY, w, o),
     c = wet ? wetColor(base.color, w) : [base.color[0], base.color[1], base.color[2]],
-    r = wet ? wetRoughness(base.roughness, w) : base.roughness,
-    dim = 1 - 0.3 * water;
+    r = wet ? dampRoughness(base.roughness, w, puddleFilm(x, z, normalY, w, o)) : base.roughness,
+    dim = 1 - 0.3 * water,
+    calm = puddleWaterRoughness(o.rain ?? 0, o.rippleStrength ?? 0.35);
   return {
     color: [c[0] * dim, c[1] * dim, c[2] * dim],
-    roughness: r + (0.03 - r) * water,
+    roughness: r + (calm - r) * water,
     metal: (base.metal ?? 0) * (1 - water),
     water,
   };
@@ -157,6 +195,12 @@ fn weather_puddle_mask(xz:vec2f, normalY:f32, u:WeatherPuddles)->f32 {
   if(fill<=0.0||flat<=0.0){return 0.0;}
   return flat*smoothstep(0.0,${SHORE},weather_puddle_level(fill)-weather_puddle_relief(xz,u.a.w));
 }
+// The water film a damp surface holds (puddleFilm): whole in the relief's low spots, drained on its crests.
+fn weather_puddle_film(xz:vec2f, normalY:f32, u:WeatherPuddles)->f32 {
+  let level=weather_puddle_level(0.5*clamp(u.a.x,0.0,1.0));
+  let low=1.0-smoothstep(level,level+${FILM},weather_puddle_relief(xz,u.a.w));
+  return 0.5+(low-0.5)*smoothstep(0.96,0.99,normalY);
+}
 // Rings: each cell of two offset grids holds one drop at a time, at a random place and phase, if a random number is
 // below the rain. The ring is the slope of a travelling Gaussian bump, so its tilt is zero at the centre and outside.
 fn weather_puddle_ripple(xz:vec2f, u:WeatherPuddles)->vec2f {
@@ -177,10 +221,11 @@ fn weather_puddle_surface(p:vec3f, n:vec3f, color:vec3f, roughness:f32, metal:f3
   let w=clamp(u.a.x,0.0,1.0);
   let water=weather_puddle_mask(p.xz,n.y,u);
   let k=select(1.0,1.0-0.25*w,wet);
-  let r=select(roughness,clamp(roughness,0.0,1.0)*(1.0-0.65*w),wet);
+  let r=select(roughness,clamp(roughness,0.0,1.0)*(1.0-0.65*w*(0.35+0.65*weather_puddle_film(p.xz,n.y,u))),wet);
+  let calm=sqrt(0.0009+0.112*clamp(u.a.y,0.0,1.0)*clamp(u.b.w,0.0,1.0));
   var normal=n;
   if(water>0.0){let t=weather_puddle_ripple(p.xz,u)*water;normal=normalize(mix(n,vec3f(0,1,0),water)+vec3f(t.x,0.0,t.y));}
-  return mat3x4f(vec4f(color*k*(1.0-0.3*water),mix(r,0.03,water)),vec4f(metal*(1.0-water),water,0,0),vec4f(normal,0));
+  return mat3x4f(vec4f(color*k*(1.0-0.3*water),mix(r,calm,water)),vec4f(metal*(1.0-water),water,0,0),vec4f(normal,0));
 }
 `;
 

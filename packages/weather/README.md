@@ -147,14 +147,29 @@ puddles.options.size = 5; // wider puddles
 ```
 
 It hooks core's mesh shader before lighting, so the sky's light, environment lighting and fog see the wet surface.
-Wetness darkens and smooths every surface as `wetColor` and `wetRoughness` do (set `wetSurfaces: false` to draw only
-the water, for example when you already call `applyWetness`). Water stands where a procedural relief of puddles about
+Wetness darkens every surface as `wetColor` does and smooths it by the water film it holds (set `wetSurfaces: false`
+to draw only the water, for example when you already call `applyWetness`). Rain drains off the crests of the ground and
+stands as a film in its low spots, so `puddleFilm(x, z, normalY, wetness)` is 1 in the relief's lower half times the
+wetness and 0 on the drained crests (0.5 on walls), and `dampRoughness(roughness, wetness, film)` smooths by up to 65
+percent under a whole film and 23 percent where it drained: damp asphalt keeps patchy, rough highlights instead of
+turning into a mirror (Lagarde 2013, "Water drop 3b: physically based wet surfaces"; Jensen, Legakis and Dorsey 1999,
+"Rendering of wet materials", doi:10.1007/978-3-7091-6809-7_25). Water stands where a procedural relief of puddles about
 `size` metres wide (default 3) lies below a water level, on surfaces within about 15 degrees of flat: from wetness
 `start` (0.4) the share of flat ground under water grows to `coverage` (0.3, at most 0.8) at wetness 1. Under water a
-surface is darker by 30 percent, has roughness 0.03 and no metalness, and its normal turns up and is tilted by rings:
-one drop at a time in each `rippleSize` cell (0.35 m) of two offset grids, in a share of the cells equal to the rain,
-by up to `rippleStrength` (0.35). `puddleMask`, `puddleSurface`, `puddleRelief` and `puddleLevel` are the same maths in
-JavaScript; `puddleWGSL` is the shader for your own materials. A bad option throws `RangeError` or `TypeError`; a
+surface is darker by 30 percent, has no metalness, and its normal turns up and is tilted by rings: one drop at a time
+in each `rippleSize` cell (0.35 m) of two offset grids, in a share of the cells equal to the rain, by up to
+`rippleStrength` (0.35). Its roughness is calm water's 0.03 plus the slope variance of rings too small to resolve,
+`puddleWaterRoughness(rain, rippleStrength)` = sqrt(0.03^2 + 0.112 rain strength) (Toksvig 2005, "Mipmapping normal
+maps", doi:10.1080/2151237X.2005.10129203; Olano and Baker 2010, "LEAN mapping", doi:10.1145/1730804.1730834): 0.2 in full
+rain, so lamps smear in a rain-struck puddle and sharpen again when the rain stops. `puddleMask`, `puddleSurface`,
+`puddleFilm`, `puddleRelief` and `puddleLevel` are the same maths in JavaScript; `puddleWGSL` is the shader for your own
+materials.
+
+```ts
+import { dampRoughness, puddleFilm, puddleWaterRoughness } from 'margoengine/weather/puddles';
+const film = puddleFilm(2, 5, 1, 0.9); // 0 on a drained crest to 1 in a low spot
+console.log(dampRoughness(0.5, 0.9, film), puddleWaterRoughness(0.8)); // patchy damp gloss; rain-roughened water
+``` A bad option throws `RangeError` or `TypeError`; a
 replaced core shader throws `MargoError` `'unsupported'`.
 
 ## Snow with depth
