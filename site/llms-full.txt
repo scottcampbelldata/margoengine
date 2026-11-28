@@ -29345,6 +29345,16 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
   to run). Regression: `packages/voxel-pathtracer/tests/mesh-pbr.test.js` "the mesh helpers compute each hit value
   once per call site (KB5451)". Still open: the cold first image is far above 120 s; next are the 941 storage loads
   (meshX 19 copies of 12 loads, pbrVertex 21, rowAt 27, meshCorner 27) and the two pbrMapNormal copies.
+- **Measured 2026-11-28, second round (lane A, paired offline fxc, `ps_5_0`, per-pair minimum of 2 rounds, loaded
+  machine):** a branch-free storage-word select (`v & mask` of `equal(ivec4(o & 3), ivec4(0,1,2,3))`, OR of the four
+  lanes) in place of the layer's nested `c < 2 ? ...` select made the surface program slower, 141.2 to 228.5 s, and
+  the emitter program 90.3 to 119.1 s, though it removes three branches from each of the 907 inlined `_ld0f` copies:
+  dropped. Filling only the first n of the surface program's 7 outputs: 1 output 40.2 s, 2 39.4 s, 4 108.4 s, 6
+  141.0 s, so outputs 3 and 4 hold most of the compile. ANGLE's Direct3D 11 back end links against the first output
+  only and compiles again at the first draw for the bound 7-target layout, on the GPU thread, so the four 7-output
+  programs compile one after another; statement cuts inside them gave 5 to 30 percent each and two of them were
+  slower. Reaching 120 s from 314 s needs a structural change to what each staged program writes (fewer outputs per
+  program, or the heavy material terms behind outputs 3 and 4 moved out of the 7-output programs), not more cuts.
 - **Sources:** Microsoft, "Function Declaration Syntax" (HLSL `inline` is the default; one copy of the body per call),
   https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-function-syntax ; Microsoft,
   "for Statement" (`loop` keeps flow control, `unroll` copies the body; without an attribute the compiler unrolls
