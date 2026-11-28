@@ -437,6 +437,211 @@ with `aria-checked` and `aria-orientation`, and `tablist`, `tab` and `tabpanel` 
 `aria-labelledby`. It also moves the real DOM focus into a `Select`'s popup and back. Call it once after the
 `UiRenderer`; it returns a `Detach` (call it, `using` it, or pass `{ signal }`).
 
+### On-screen keyboard (`@margoengine/ui/keyboard`)
+
+`VirtualKeyboard` is a `Panel` of ordinary `Button`s, so the mouse, touch, gamepad spatial navigation and world-panel
+or XR rays work on it with no extra code. Once it is in a `Ui`, it types into whichever `TextInput` of that `Ui` has
+focus; focus moving onto a key does not disconnect it. `connect(field)` sets the field by hand (or `null` to
+disconnect), which is how a keyboard on its own world panel types into a field on another `Ui`.
+
+```ts
+import { Panel, Ui } from '@margoengine/ui';
+import { TextInput } from '@margoengine/ui/input';
+import { VirtualKeyboard } from '@margoengine/ui/keyboard';
+
+const ui = new Ui({ width: 800, height: 600 });
+const name = new TextInput({ label: 'Name', onSubmit: (e) => console.log('submit', e.value) });
+const keyboard = new VirtualKeyboard({ anchor: 'bottom' });
+ui.add(new Panel({ anchor: 'center', children: [name] }));
+ui.add(keyboard);
+ui.focus(name);
+console.log(keyboard.target === name); // true
+
+keyboard.press('Shift'); // one shifted key, then back to lower case
+for (const key of 'ada') keyboard.press(key);
+console.log(name.value); // 'Ada'
+keyboard.press('CapsLock'); // letters only: digits and punctuation stay unshifted
+keyboard.press('m');
+keyboard.press('1');
+keyboard.press('CapsLock');
+console.log(name.value); // 'AdaM1'
+keyboard.press('Backspace'); // deletes one grapheme (an emoji or accented letter as a whole)
+keyboard.press('ArrowLeft');
+keyboard.press('Delete');
+console.log(name.value, name.selectionStart); // 'Ada' 3
+keyboard.press('Enter'); // a single-line field submits: logs 'submit Ada'; a TextArea gets a new line
+
+// A PIN pad: your own rows, each key a string or { key, label, shifted, width }.
+const pin = new VirtualKeyboard({
+  rows: [
+    ['1', '2', '3'],
+    ['4', '5', '6'],
+    ['7', '8', '9'],
+    [{ key: 'Backspace', label: 'Del' }, '0', { key: 'Enter', label: 'OK' }],
+  ],
+  keyWidth: 64,
+});
+const code = new TextInput({ maxLength: 4 });
+pin.connect(code);
+for (const key of '12345') pin.press(key);
+console.log(code.value); // '1234': maxLength holds
+code.readOnly = true;
+console.log(pin.press('6'), new VirtualKeyboard().press('a')); // false false: a read-only field, no field
+```
+
+- `rows` default to QWERTY with a number row (shifted to `!@#$%^&*()`), Backspace, Enter, Shift, `,` `.` `?`,
+  CapsLock, a wide Space, ArrowLeft, ArrowRight and Delete. Named keys are the W3C key names `Shift`, `CapsLock`,
+  `Backspace`, `Delete`, `Enter`, `Space`, `ArrowLeft`, `ArrowRight`, `Home` and `End`; any other key inserts its text.
+- `shifted` is the text a key types with Shift (default: its locale upper case). Shift lasts one key; CapsLock stays on
+  and shifts letters only. Shift and CapsLock show as `primary` buttons while on, and letter captions follow them.
+- `width` is relative (default 1) and `keyWidth` is the pixel width of a width-1 key (default 44, the WCAG 2.5.5
+  target size); keys are 44 pixels tall. Empty rows, a non-positive `keyWidth` or `width`, or an empty key throw.
+- `press(key)` is what each button runs, so app code and tests can type too. It returns `false` and types nothing
+  when the keyboard is disabled, no field is connected, the field is disabled or read-only, or an IME composition is in
+  progress in its DOM control. Every handled key emits `'keypress'` with `{ value: key }`.
+- Edits go through `TextInput.insertText` and `setSelectionRange`, so they replace the selection, respect `maxLength`
+  and emit `'change'` as typing does. The panel's role is `group`, labelled `'On-screen keyboard'` unless you pass
+  `label`.
+
+### Languages (`@margoengine/ui/i18n`)
+
+`Localization` holds one message table per locale. `t(key, parameters)` looks the key up in the current locale, then
+its parents (`en-GB`, then `en`), then the `fallback` locale and its parents. Messages substitute `{name}` from
+`parameters`; a plural message is an object of `Intl.PluralRules` forms (`zero`, `one`, `two`, `few`, `many`, `other`)
+and exact counts (`=0`), chosen by the `count` parameter with the plural rules of the locale the message came from.
+
+```ts
+import { Button, Label, Panel, Ui } from '@margoengine/ui';
+import { Localization } from '@margoengine/ui/i18n';
+
+const l10n = new Localization(
+  {
+    en: {
+      'menu.play': 'Play',
+      'menu.quit': 'Quit',
+      greeting: 'Hello, {name}',
+      coins: { '=0': 'No coins', one: '{count} coin', other: '{count} coins' },
+    },
+    'en-GB': { 'menu.quit': 'Exit' },
+    ar: { 'menu.play': 'العب', coins: { one: 'عملة واحدة', two: 'عملتان', few: '{count} عملات', other: '{count} عملة' } },
+  },
+  { locale: 'en-GB' },
+);
+console.log(l10n.locale, l10n.fallback, l10n.direction); // 'en-GB' 'en' 'ltr'
+console.log(l10n.t('menu.play'), l10n.t('menu.quit'), l10n.t('greeting', { name: 'Ada' })); // 'Play' 'Exit' 'Hello, Ada'
+console.log(l10n.t('coins', { count: 0 }), l10n.t('coins', { count: 1 }), l10n.t('coins', { count: 5 })); // 'No coins' '1 coin' '5 coins'
+console.log(l10n.t('menu.options'), l10n.t('greeting')); // 'menu.options' 'Hello, {name}': a missing key or parameter shows
+
+const ui = new Ui({ width: 640, height: 360 });
+const play = new Button({});
+const wallet = new Label({});
+let coins = 3;
+ui.add(new Panel({ anchor: 'center', children: [play, wallet] }));
+const unbind = l10n.bind(ui, [
+  { target: play, key: 'menu.play' },
+  { target: play, key: 'menu.play', property: 'label' }, // the screen-reader name too
+  { target: wallet, key: 'coins', parameters: () => ({ count: coins }) },
+]);
+console.log(play.text, wallet.text, ui.direction); // 'Play' '3 coins' 'ltr'
+
+l10n.locale = 'ar-EG'; // uses the ar table; the layout reflows right to left on the next frame
+console.log(l10n.direction, ui.direction, play.text, wallet.text); // 'rtl' 'rtl' 'العب' '3 عملات'
+coins = 11;
+l10n.refresh(); // the parameters changed: apply the bindings again
+console.log(wallet.text); // '11 عملة'
+unbind(); // or `using`, or pass { signal }
+l10n.dispose(); // releases every binding; the widgets keep their text
+```
+
+- `locale` and `fallback` default to the first table's locale (`en` with no tables). Locales are BCP 47 tags,
+  canonicalised (`en-gb` becomes `en-GB`); an invalid tag throws a `RangeError`.
+- `direction` is `directions[locale]` (or a parent's) when you pass `directions`, otherwise the browser's
+  `Intl.Locale` text info, otherwise the locale's likely script: `he` and `ar` are `'rtl'`, `ar-Latn` is `'ltr'`.
+  `bind` sets `ui.direction` from it each time it applies.
+- `missing: 'error'` makes a missing key, or a `{name}` with no parameter, throw a `RangeError` naming it. The default
+  `'key'` shows the key (or leaves the token), so a missing string is visible rather than blank. A plural message
+  without a finite `count` always throws.
+- `setTable(locale, table)` replaces one locale's table whole (it is copied, so later edits to your object do nothing)
+  and reapplies the bindings. A plural message without `other`, or with a form not listed above, throws a `TypeError`.
+- `bind` assigns through each widget's own `text`, `label` or `placeholder` setter, so layout and the accessibility
+  mirror update as for any change. `onChange(listener)` runs on every locale or table change and on `refresh()`; it and
+  `bind` return a disposable unsubscribe.
+
+### Layout editor (`@margoengine/ui/editor`)
+
+`LayoutDocument` holds a markup layout and its style sheet (see Markup and style sheets) with undo and redo. Every edit
+builds the layout before it commits, so an edit that would fail to build throws and leaves the document and its
+history as they were. It needs no DOM or GPU, so tools and tests can edit layouts in Node.
+
+```ts
+import { LayoutDocument } from '@margoengine/ui/editor';
+
+const doc = new LayoutDocument(
+  { markup: '<panel id="menu"><button id="play" on-click="play">Play</button></panel>', styles: '.big { padding: 16; }' },
+  { actions: { play: () => console.log('play') }, historyLimit: 50 },
+);
+doc.onChange(() => console.log(doc.canUndo, doc.canRedo)); // after each commit, undo and redo
+doc.setText('play', 'Start');
+doc.setAttribute('menu', 'class', 'big'); // undefined removes the attribute
+const added = doc.insert('button', 'menu'); // a new <button> at the end of #menu
+console.log(added, doc.tree[0].children.map((c) => c.attributes.id)); // 'element-1' ['play', 'element-1']
+doc.move(added, 'menu', 0); // reorder or reparent; an undefined parent moves it to the top level
+console.log(doc.tree[0].children.map((c) => c.attributes.id)); // ['element-1', 'play']
+
+try {
+  doc.apply({ markup: '<panel><button on-click="quit">Quit</button></panel>' });
+} catch (e) {
+  console.log((e as Error).name); // 'TypeError': quit names no function in actions; nothing changed
+}
+doc.undo(); // back to before the move
+doc.redo();
+
+const project = doc.save(); // '{ "version": 1, "markup": ..., "styles": ... }': no functions, no runtime state
+const screen = doc.build(); // fresh widgets you own: add screen.widgets to a Ui, dispose them when done
+console.log(screen.widgets.length, screen.get('play')?.text); // 1 'Start'
+
+const other = new LayoutDocument({ markup: '<panel></panel>', styles: '' }, { actions: { play() {} } });
+other.load(project); // one undoable edit; a project of another version throws and changes nothing
+console.log(other.source.markup === doc.source.markup, other.canUndo); // true true
+```
+
+`LayoutEditor` is the browser workspace over a `LayoutDocument`: a widget palette, the element tree (drag to reorder),
+the properties of the selected element, the markup and style sheet as text, undo and redo, and Save and Open. Its
+preview is your own `Ui` drawn by your own `UiRenderer`: the editor moves your canvas into its preview while it lives
+and puts it back where it was (with the accessibility mirror) on `dispose()`. A press on the preview selects the
+element under it, labels and layout boxes included.
+
+```ts
+import { Ui } from '@margoengine/ui';
+import { LayoutEditor } from '@margoengine/ui/editor';
+
+const canvas = document.createElement('canvas');
+document.body.append(canvas);
+const ui = new Ui({ width: 640, height: 360 }); // draw it with your UiRenderer as usual
+const controller = new AbortController();
+const editor = new LayoutEditor(document.body, {
+  ui,
+  canvas,
+  markup: '<panel id="hud"><label id="score">Score 0</label></panel>',
+  styles: '',
+  actions: {}, // the only handlers the markup may name; never read from a project file
+  signal: controller.signal, // aborting it disposes the editor
+});
+editor.document.setText('score', 'Score 10');
+await editor.open(new Blob([editor.document.save()])); // a saved project from disk, as one undoable edit
+console.log(editor.element.isConnected, editor.document.canUndo); // true true
+editor.dispose(); // removes the workspace and its listeners; your Ui, canvas and renderer stay
+console.log(editor.element.isConnected, canvas.parentElement === document.body); // false true
+```
+
+- `historyLimit` (default 100, a positive integer) is how many edits undo keeps; the oldest drop first. `dispose()`
+  drops the history and listeners and keeps the current source.
+- `insert(tag, parentId)` gives the new element the first free `element-<n>` id; labels, buttons and toggles get their
+  tag as text. `setAttribute`, `setText`, `remove` and `move` throw a `RangeError` for an id that does not exist, and
+  `move` refuses to put an element inside itself.
+- `open(file, { signal })` reads a `Blob` or `File`; aborting the call's signal or the editor's stops it before the
+  document changes. The workspace lives in a shadow root, so its styles do not leak into the page.
+
 ## Theming
 
 `themes.dark` is the default (`themeForPreferences()` picks high contrast, light or dark from the user's settings).
