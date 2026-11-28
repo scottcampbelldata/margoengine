@@ -1,5 +1,5 @@
 // Argument checks shared by the optics entries (docs/conventions.md: argument errors are TypeError or RangeError).
-const HELP = 'see https://margoengine.com/docs/optics';
+const HELP = 'see https://margoengine.com/errors#optics-argument';
 
 /** Throws a RangeError unless `value` is a finite number. */
 export function checkFinite(fn: string, name: string, value: number): void {

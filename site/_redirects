@@ -1,2 +1,4 @@
 # Cloudflare Pages redirects: old public URLs.
 /demos/damaged-helmet.html /demos/flight-helmet.html 301
+# The help link @margoengine/optics first shipped with, still inside the built optics demo bundles.
+/docs/optics /errors#optics-argument 301

@@ -397,6 +397,15 @@ export const entries = [
     fix: 'Pass a CurveFlow built by @margoengine/geometry/flow with at most 8,191 segments, a valid axis, finite numbers, a non-zero scale, a fit range with high above low and, for instances, at most 2,048 curves with indices below their count.',
   },
   {
+    id: 'optics-argument',
+    title: '@margoengine/optics: function arguments',
+    kind: 'family',
+    messages: [],
+    cause:
+      'An optics function was given a number it cannot use: one that is not finite, or zero or negative where only a positive value has a physical meaning (a wavelength, a length, a refractive index). The message names the function, the argument and the value it got.',
+    fix: 'Pass finite numbers in the units the README gives for that function, above 0 where the message asks for it.',
+  },
+  {
     id: 'mesh-debug-view',
     title: '@margoengine/inspector/mesh-debug: options, device and mesh size',
     kind: 'family',
