@@ -6,19 +6,13 @@ A live gallery of all 236 exhibits is at [demos.margoengine.com](https://demos.m
 
 ## Run a demo on your machine
 
-From this `demos` folder:
+From the repository root:
 
 ```sh
-npx --yes serve
+npm run dev:demos
 ```
 
-Then open a demo, for example http://localhost:3000/the-orrery/. You can also serve one folder directly:
-
-```sh
-npx --yes serve the-orrery
-```
-
-Any static file server works. The pages do not need a build step.
+Then open a demo, for example http://localhost:5173/the-orrery/. The pages do not need a build step, so any static file server pointed at this folder (or at one demo's folder) works too, such as `npx serve` from inside it.
 
 ## Rebuild a demo from its source
 

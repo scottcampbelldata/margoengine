@@ -138,6 +138,7 @@
     "dev:examples": "node scripts/dev-examples.mjs",
     "dev:sandbox": "vite examples/gameplay-sandbox",
     "dev:voxel": "vite examples/voxel-sandbox",
+    "dev:demos": "vite demos",
     "bench": "node bench/cli.mjs",
     "bench:size": "node bench/cli.mjs size",
     "bench:startup": "node bench/cli.mjs startup",
