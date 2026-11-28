@@ -26,6 +26,8 @@ A single rising camera move starts in bunchgrass and pulls back to show the fore
 
 The firs use the CC0 [Fir Tree 01](https://polyhaven.com/a/fir_tree_01) stem meshes and photographs by Rico Cilliers and Rob Tuytel. The Procedural package arranges the photographed needle sprays with a shared branch layout and one set of 1K surface maps for the distance levels. The Sky package reads the post stack's current scene depth, which includes the terrain and masked foliage.
 
+The four large boulders and the talus are photographed rocks: the CC0 [Rock Moss Set 01](https://polyhaven.com/a/rock_moss_set_01), [Rock Moss Set 02](https://polyhaven.com/a/rock_moss_set_02) and [Boulder 01](https://polyhaven.com/a/boulder_01) scans, decimated in Blender into `treeline-rocks/hero/*.glb` (loaded with `loadGLTF` of `@margoengine/gltf/pbr`) and eight talus stones of three levels each (`treeline-rocks/talus/`, drawn by the biome view through `libraryParts`), their colour maps graded to the measured albedo of granite. `treeline-rocks/build_treeline_rocks.py` in the asset library rebuilds them. The cobbles around the boulders are `buildBoulder` meshes shaded by `RockSurface` granite. The meadow is three `GrassScatter` layers: a short undercoat that closes the sward, green bunchgrass tussocks and cured straw.
+
 The film uses an 8,192 m square elevation grid centered at 40.314° N, 105.672° W. `assets/continental-divide-dem.u16` stores a 1,025 by 1,025 north-to-south grid with little-endian 16-bit samples. The value in metres is 2,000 plus 0.1 times the sample. The grid was resampled from the public-domain [USGS 3DEP elevation tile n41w106](https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/13/TIFF/current/n41w106/USGS_13_n41w106.tif). The [National Park Service's subalpine ecosystem guide](https://www.nps.gov/romo/learn/nature/subalpine_ecosystem.htm) informed the change in vegetation.
 
 ## The Kiln Shift
@@ -113,7 +115,7 @@ the repository's Vite dev server (`vite.config.mjs`, `assetLibrary`) serves the 
 to a player URL to load them from somewhere else, for example `?assets=https://cdn.example.com/showcase-films/`. The Node
 authoring scripts (`author-*.mjs`) read and write the same folder, or `MARGO_SHOWCASE_ASSETS` when it is set (`library.mjs`).
 
-The root holds `continental-divide-dem.u16`, `environment-films/`, `north-yard/`, `subalpine-fir/` and `technical-films/`.
+The root holds `continental-divide-dem.u16`, `environment-films/`, `north-yard/`, `subalpine-fir/`, `technical-films/` and `treeline-rocks/`.
 The inputs each film's section below says to prepare go under the same root, keeping their folder names:
 `four-demos-inputs/chicago`, `four-demos-inputs/solar-v2`, `four-demos-inputs/studio` and `showcase-12-15-inputs`. Where a
 section names `test-results/four-demos-inputs` or `test-results/showcase-12-15-inputs`, put those folders under the asset

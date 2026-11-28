@@ -3,6 +3,8 @@ import { BiomeView } from '@margoengine/biomes/view';
 import { alpineTreelineGraph } from '@margoengine/biomes/treeline';
 import { PbrMaterial } from '@margoengine/core';
 import { DOF } from '@margoengine/dof';
+import { loadGLTF } from '@margoengine/gltf/pbr';
+import { libraryParts } from '@margoengine/scenes/library';
 import { GrassScatter } from '@margoengine/scatter/grass';
 import { Sky } from '@margoengine/sky';
 import { VolumetricClouds } from '@margoengine/sky/volumetric-clouds';
@@ -23,6 +25,28 @@ const youngFirKey = 'library:young-fir';
 const timberlineFirKey = 'library:timberline-fir';
 
 const start = [-500, 3374.12, -500];
+const TALUS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+
+/** The talus scans at about 0.42 of their photographed size (the biome's size draw scales them again), three levels each. */
+async function talusMeshes(signal) {
+  const entries = await Promise.all(
+    TALUS.map(async (name) => {
+      const parts = await libraryParts(
+        ['near', 'middle', 'far'].map((level) => libraryAsset(`treeline-rocks/talus/talus-${name}_${level}.gltf`)),
+        { kind: 'stone', signal },
+      );
+      const shrink = (g) => ({ ...g, positions: g.positions.map((v) => v * 0.42) });
+      return [
+        'library:talus-' + name,
+        parts.map((part) => ({
+          ...part,
+          geometry: Array.isArray(part.geometry) ? part.geometry.map(shrink) : shrink(part.geometry),
+        })),
+      ];
+    }),
+  );
+  return Object.fromEntries(entries);
+}
 function flight(t) {
   // One continuous retreat and climb. Early height gain is small enough to keep the grass in frame.
   const p = ramp(t, 0, 90);
@@ -66,17 +90,19 @@ function boundaryBiomes() {
     canopyKind: 'conifer',
   };
   const scrub = plant('wind-stunted-fir', timberlineFirKey, 135, 1.6, 0.91, [line - 110, line + 135]);
-  const stone = {
-    id: 'talus',
-    mesh: 'procedural:rock',
-    density: 145,
-    radius: 0.3,
-    size: { kind: 'reverse-j', q: 1.7, max: 1.32 },
-    alignToGround: 0.65,
-    sink: 0.26,
-    lod: [27, 69, 320],
-    color: { hue: 0.02, value: 0.18 },
-  };
+  // Talus from eight photographed granite blocks (treeline-rocks/talus in the asset library), so no two stones match.
+  const stones = (density) =>
+    TALUS.map((name) => ({
+      id: 'talus-' + name,
+      mesh: 'library:talus-' + name,
+      density: density / TALUS.length,
+      radius: 0.3,
+      size: { kind: 'reverse-j', q: 1.7, max: 1.32 },
+      alignToGround: 0.65,
+      sink: 0.22,
+      lod: [27, 69, 320],
+      color: { hue: 0.02, value: 0.12 },
+    }));
   return [
     defineBiome({
       id: 'subalpine-fir',
@@ -91,7 +117,7 @@ function boundaryBiomes() {
         { ...fir, stands: { scale: 62, cover: 0.86 } },
         { ...youngFir, stands: { scale: 85, cover: 0.76 } },
       ],
-      rocks: [{ ...stone, density: 51 }],
+      rocks: stones(51),
       wind: { strength: 0.28, detail: 0.54 },
     }),
     defineBiome({
@@ -104,7 +130,7 @@ function boundaryBiomes() {
         { material: 'rock', slope: [27, null], weight: 2.1 },
       ],
       plants: [{ ...scrub, stands: { scale: 52, cover: 0.57 } }],
-      rocks: [{ ...stone, density: 84 }],
+      rocks: stones(84),
       wind: { strength: 0.59, detail: 0.62 },
       details: [{ id: 'meadow-bunchgrass', mesh: 'procedural:grass', density: 18, light: [0.44, 1], blades: true }],
     }),
@@ -117,7 +143,7 @@ function boundaryBiomes() {
         { material: 'gravel', slope: [9, 37], weight: 0.42 },
         { material: 'grass', slope: [null, 21], height: [null, line + 38], weight: 1.2 },
       ],
-      rocks: [stone],
+      rocks: stones(145),
     }),
   ];
 }
@@ -182,7 +208,10 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
     sky,
     shadows,
     water: false,
-    meshes: await ridgeTrees(firKey, youngFirKey, timberlineFirKey),
+    meshes: {
+      ...(await ridgeTrees(firKey, youngFirKey, timberlineFirKey)),
+      ...(await talusMeshes(AbortSignal.timeout(20000))),
+    },
     materials: {
       rock: { color: [0.38, 0.36, 0.33], detail: 0.68, bump: 0.53, macro: 0.61 },
       gravel: { color: [0.47, 0.414, 0.344], detail: 0.68, bump: 0.55, macro: 0.42 },
@@ -214,11 +243,14 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
     origin: [center[0] - 19, center[2] - 22],
     resolution: 128,
   });
+  // A closed subalpine sward (Festuca and Deschampsia bunchgrass, 60 to 90 percent cover): a short dense undercoat that
+  // hides the soil, green tussocks through it, and cured straw from last season standing in the tussocks.
   const grasses = [
-    { color: '#737847', count: 7900, height: 0.59, width: 0.019, radius: 0.104, seed: 279 },
-    { color: '#ac9060', count: 3400, height: 0.72, width: 0.013, radius: 0.142, seed: 721 },
+    { color: '#5f6a3a', count: 90000, height: 0.2, width: 0.011, radius: 0.09, seed: 113, blades: 12, dry: 0.15 },
+    { color: '#737847', count: 12500, height: 0.56, width: 0.016, radius: 0.11, seed: 279, blades: 14, dry: 0.2 },
+    { color: '#ac9060', count: 4200, height: 0.7, width: 0.012, radius: 0.13, seed: 721, blades: 10, dry: 0.55 },
   ];
-  for (const { color, count, height, width, radius, seed } of grasses) {
+  for (const { color, count, height, width, radius, seed, blades, dry } of grasses) {
     GrassScatter.attach(engine, {
       center,
       area,
@@ -235,21 +267,40 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
       material: new PbrMaterial({ color, roughness: 0.84, doubleSided: true }),
       blades: { rootShade: 0.56, translucency: 0.56, widen: 0.65 },
       variation: { hue: 0.036, value: 0.29 },
-      grass: { height, width, radius, blades: 8, lean: 0.49, heightVariance: 0.53, segments: [6, 3, 1] },
+      grass: { height, width, radius, blades, dry, lean: 0.49, heightVariance: 0.53, segments: [6, 3, 1] },
     });
   }
 
-  // Fallen granite blocks: closed fracture-cell meshes shaded per pixel as weathered granite with lichen on top.
-  const stoneSurface = RockSurface.attach(engine, { moss: 0.45, mossColor: [0.27, 0.26, 0.19], cracks: 0.45, scale: 0.9 });
+  // Fallen granite: the four large blocks are photographed boulders (treeline-rocks/hero in the asset library, about
+  // 11,000 to 27,000 triangles each with their 2k maps); the cobbles around them are closed fracture-cell meshes shaded
+  // per pixel as granite with lichen on top.
   const random = rng(9112);
-  const rocks = [
-    [-507, -495, 1.42],
-    [-505.2, -499, 0.54],
-    [-515, -486, 1.18],
-    [-501.7, -496.7, 0.71],
+  const heroes = [
+    ['granite-a', -507, -495, 0.82, 0.4],
+    ['granite-e', -505.2, -499, 0.5, 2.1],
+    ['granite-b', -515, -486, 0.7, 4.0],
+    ['granite-c', -501.7, -496.7, 0.42, 5.3],
   ];
-  for (let i = 0; i < 85; i++) rocks.push([-526 + random() * 41, -517 + random() * 43, 0.091 + random() ** 3 * 0.65]);
-  for (const [i, [x, z, r]] of rocks.entries()) {
+  const signal = AbortSignal.timeout(30000);
+  const boulders = await Promise.all(
+    heroes.map(async ([name, x, z, scale, turn]) => {
+      const model = await loadGLTF(engine, libraryAsset(`treeline-rocks/hero/${name}.glb`), { signal });
+      model.root
+        .setPosition([x, world.heightAt(x, z) - 0.22 * scale, z])
+        .setRotation([0, turn, 0])
+        .setScale([scale, scale, scale]);
+      return model;
+    }),
+  );
+  const stoneSurface = RockSurface.attach(engine, {
+    moss: 0.45,
+    mossColor: [0.27, 0.26, 0.19],
+    cracks: 0.45,
+    scale: 0.9,
+  });
+  const cobbles = [];
+  for (let i = 0; i < 85; i++) cobbles.push([-526 + random() * 41, -517 + random() * 43, 0.06 + random() ** 3 * 0.28]);
+  for (const [i, [x, z, r]] of cobbles.entries()) {
     const block = buildBoulder(
       { kind: 'boulder', position: [x, world.heightAt(x, z), z], radius: r, cliff: 0 },
       { seed: 9112 + i, cell: Math.max(0.02, r / 18), embed: 0.35 },
@@ -287,6 +338,7 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
     dispose() {
       world.dispose();
       stoneSurface.dispose();
+      for (const model of boulders) model.dispose?.();
     },
   };
 }
