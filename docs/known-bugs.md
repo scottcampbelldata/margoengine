@@ -198,15 +198,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   swing (`tests/loads-floating.test.js`), so it was not landed. The term taken at the step's energy-neutral pose
   (as the buoyancy is) is the next try.
 
-### Open 2026-11-28: the limits row of the USD texture factors has no escape hatch cell (KB-LIMITS-USDZCELL1, usdz, docs)
+### Fixed 2026-11-28: two limits rows were short of cells, the USD texture factors and water on a transparent canvas (KB-LIMITS-USDZCELL1, usdz, water, docs)
 
-- **Repro:** `node --test tests/claims-file.test.js`: "line 1290: 4 cells, header has 5" for the docs/limits.md row
-  "USD preview surface texture factors (`@margoengine/usdz`, 2026-11-28)".
-- **Cause:** 86ed5fd5a4 (KB-USDZ-FACTORS1) added the row with Limit, Starts at, Why and What you see, and no Escape
-  hatch. Neither the commit message, its README lines nor its known-bugs entry name one, so the cell cannot be filled
-  from that commit's own text, and the test forbids padding it.
-- **Fix wanted (the usdz importer author):** the row's fifth cell, stating what a page does when the clamped 8-bit pixels
-  or the unread constant `occlusion` matter (or "none" with the reason), then `tests/claims-file.test.js` passes.
+- **Repro:** `node --test tests/claims-file.test.js`, "every table row in docs/limits.md has as many cells as its
+  header": the rows 86ed5fd5a4 (4 of 5 cells) and d81ca32f11 (2 of 5) added.
+- **Cause:** each was written without all five columns.
+- **Fix:** both carry every cell, the escape hatches read from the importer's conversion rules
+  (`packages/usdz/src/preview-factors.ts`) and the water composite. The same test file still fails on rows of other
+  tables (`docs/clean-room.md` PK63 and PK65, and rows of `docs/limits.md` split from their table by a paragraph).
+- **Regression:** that test.
 
 ### Open 2026-11-28: a film seek cannot move GPU cloth, so it restarts at every cut (KB-FILM-CLOTH1, physics gpu-cloth)
 
