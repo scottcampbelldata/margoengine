@@ -3238,3 +3238,14 @@ Slender footprint pressure, cumulative same-peak compaction, remaining belt and 
 - Point 8 (27eeda9cac). `packages/physics/scripts/earth08-mashiki-measured.mjs` uses the original NIED P/S logging profile and an independent density estimate. The production transit is 0.33187–0.33609 s, versus a measured weak-motion reference of 0.377 s. The separately calculated continuum ratio peaks at 4.025 Hz versus the observed 3.4 Hz feature. [Measured limits](limits.md#earth-08-elastic-site-response-at-mashiki)
 
 Three-dimensional and nonlinear site response, evolving pore pressure, richer rupture geometry and a wider range of measured events remain open. The row stays REOPENED at four points.
+
+### ICE-05 Ice thermodynamics
+
+#### ICE-05 four-point pass
+
+- Point 5 (539f1f526a). `packages/physics/tests/ice.test.js` checks that equal warm face flux ablates equal depths on thin and thick sheets, independently of the old backward growth law. `packages/physics/tests/coupling/ice.test.js` checks signed replay, separate field ownership, late invalid frost forcing and preservation of the entire accepted state.
+- Point 6 (539f1f526a). `packages/physics/tests/coupling/ice-thermal-workers.test.js` compares 257 and 341 mixed sites between scalar and native one, two and four participants, including the odd tail, exact signed replay and phase budgets. `packages/physics/tests/ice-thermal-workers.browser.mjs` observes real Chromium helpers and 256 live SIMD-paired sites out of 257.
+- Point 7 (539f1f526a). `packages/physics/tests/ice-thermodynamics-film.browser.mjs` melts six 17 mm ice sheets from live natural lava. It returns 1.2485 MJ of absorbed heat, 3.741224 kg of liquid in the shallow basin and 0.1358 g of steam. The insulated control stays frozen and dry. Each renderer independently repeats complete accepted state and full RGBA.
+- Point 8 (539f1f526a). `packages/physics/scripts/ice05-channel-freezing-measured.mjs` uses measured plate temperatures and compares held-out optical thicknesses. At 120 minutes the slab predicts 27.57 and 27.48 mm at both stations. The observed ranges are 13.47–20.69 and 9.68–19.08 mm, respectively. It misses all 16 samples. The separately forced bulk-water sensitivity misses 15 of 16. [Measured limits](limits.md#ice-05-freshwater-flow-over-a-cold-plate)
+
+Distributed heat storage, brine and surface snow evolution, local water-flow feedback and inferred wind-dependent icicle transfer remain open. The row stays REOPENED at four points.
