@@ -5,7 +5,7 @@ import { instancing } from '@margoengine/gltf/pbr-instancing';
 import { Material } from '@margoengine/materials';
 import { SSR } from '@margoengine/post/ssr';
 import { VolumetricClouds } from '@margoengine/sky/volumetric-clouds';
-import { Weather } from '@margoengine/sky/weather';
+import { Weather, rainIntensity } from '@margoengine/sky/weather';
 import { WeatherMachine, skyWeather, windAt } from '@margoengine/weather';
 import { GLTFWeather } from '@margoengine/weather/gltf';
 import { Puddles } from '@margoengine/weather/puddles';
@@ -91,19 +91,6 @@ export async function buildDepot(engine, shop, cluster) {
   const steel = look('#646e71', 0.34, 0.74, brushed);
   const emit = (color, intensity) =>
     new Material({ color, roughness: 0.43, emissive: color, emissiveIntensity: intensity });
-  const wet = new WeatherMachine('rain', { seed: 41 });
-  wet.update(140);
-  const weather = Weather.attach(engine, {
-    ...skyWeather(wet.state, windAt(wet.wind, 0, 3, 0, 0)),
-    radius: 24,
-    height: 8,
-    particles: 26000,
-    fadeSeconds: 0,
-    opacity: 0.31,
-    brightness: 0.63,
-    color: [0.53, 0.68, 0.91],
-    wind: [1.4, 0.32],
-  });
   // Wet ground: core and Material meshes through Puddles, the Blender models through GLTFWeather with the same water.
   // Small, rain-roughened puddles in the low spots, so lamps smear in them rather than mirror.
   const water = { wetness: 0.96, rain: 0.72, coverage: 0.22, size: 1.7, rippleStrength: 0.3 };
@@ -146,6 +133,54 @@ export async function buildDepot(engine, shop, cluster) {
       { color: sodium.map((c) => c * 0.5), x: 0, z: 0, radius: 140 },
     ],
     mist: { visibility: 30000 },
+  });
+  // Rain shafts hanging from the deck (VolumetricClouds rain): three compact heavy cores beyond the yard, one east for
+  // the approach shots and two north for the terminal, hang as curtains under the deck and drift with the storm. The
+  // yard sits in light rain on the edge of a cell to its south (about 2 mm/h easing to 0.8). Rates in mm/h at the base. A curtain
+  // shows only through light rain: rain of R mm/h dims light by 3.647e-4 R^0.63 per metre, so 17 mm/h in the yard
+  // (sky-round-1) and even 2 to 7 mm/h with six cores' long tails (sky-round-2, 3) hid the deck and every curtain
+  // behind one even glow, as real heavy rain does; with these cells a ray between the cores keeps about half its light
+  // to the base at 8 to 14 degrees up and one through a core under a tenth.
+  const storm = [6, 2.2];
+  clouds.options.rain = {
+    cells: [
+      { x: 0, z: 800, radius: 250, rate: 40, velocity: storm },
+      { x: 1500, z: -150, radius: 180, rate: 60, velocity: storm },
+      { x: 700, z: -1500, radius: 180, rate: 60, velocity: storm },
+      { x: -1200, z: -2600, radius: 250, rate: 45, velocity: storm },
+    ],
+  };
+  // Scud: torn low cloud racing under the deck on the faster low wind, lit from below by the same city and lamps.
+  const scud = VolumetricClouds.attach(engine, {
+    sunDirection: [0, -1, 0],
+    ambient: [
+      [0.0004, 0.0005, 0.0008],
+      [0.0025, 0.0018, 0.0012],
+    ],
+    type: 'scud',
+    above: clouds,
+    coverage: 0.3,
+    wind: [9, 3.5],
+    groundAlbedo: 0.12,
+    temporal: false,
+    groundLights: clouds.options.groundLights,
+  });
+  const wet = new WeatherMachine('rain', { seed: 41 });
+  wet.update(140);
+  // The rain round the camera is the rain the shafts draw there (rainFrom): its rate sets the drops and how many.
+  Weather.attach(engine, {
+    ...skyWeather(wet.state, windAt(wet.wind, 0, 3, 0, 0)),
+    intensity: undefined,
+    rainRate: undefined,
+    rainFrom: clouds,
+    radius: 24,
+    height: 8,
+    particles: 26000,
+    fadeSeconds: 0,
+    opacity: 0.31,
+    brightness: 0.63,
+    color: [0.53, 0.68, 0.91],
+    wind: [1.4, 0.32],
   });
   const ssr = new SSR({ maxRoughness: 0.5, thickness: 0.14, maxDistance: 42, steps: 44 });
   // Far ground under the Blender yard, below its plain ground (-0.125), so nothing beyond it is a void.
@@ -410,10 +445,10 @@ export async function buildDepot(engine, shop, cluster) {
       h.direction = [forward[0], -0.071, forward[2]];
     }
     cluster.setLights(lamps);
-    weather.options.intensity = 0.73 - 0.17 * ramp(time, 68, 86);
-    puddles.options.rain = weather.options.intensity;
-    modelWeather.options.puddles.rain = weather.options.intensity;
-    propWeather.options.puddles.rain = weather.options.intensity;
+    const rainNow = rainIntensity(clouds.rainRateAt(chase(cf, 0, 0, 0)));
+    puddles.options.rain = rainNow;
+    modelWeather.options.puddles.rain = rainNow;
+    propWeather.options.puddles.rain = rainNow;
 
     if (time >= 19 && time < 27)
       return follow(
@@ -512,6 +547,7 @@ export async function buildDepot(engine, shop, cluster) {
       wet.dispose();
       grit.dispose();
       brushed.dispose();
+      scud.dispose();
       clouds.dispose();
       depot.dispose();
       for (const model of [...approach, ...lineside, ...yard, ...tram]) model.dispose();
