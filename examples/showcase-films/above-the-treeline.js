@@ -215,7 +215,9 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
     timeScale: 0,
     turbidity: 2.8,
     exposure: -0.64,
-    fog: { density: 0.00019, start: 145, falloff: 'exp', color: [0.31, 0.45, 0.61] },
+    // Clean Front Range air: about 100 km visual range (extinction 3.912 / 100 km), in the sky's own colour, so far
+    // ranges fade blue toward the horizon behind them (the sky fog's Rayleigh share) instead of to a fixed tint.
+    fog: { density: 0.00004, start: 145, falloff: 'exp' },
   });
   const cloudDeck = VolumetricClouds.attach(engine, {
     sky,
@@ -454,8 +456,8 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
   const flowers = [
     ['bistort', 160000, 31, { size: 11, cover: 0.55 }],
     ['arnica', 110000, 32, { size: 7, cover: 0.45 }],
-    ['aster', 90000, 33, { size: 6, cover: 0.42 }],
-    ['gentian', 60000, 34, { size: 9, cover: 0.4 }],
+    ['aster', 150000, 33, { size: 8, cover: 0.5 }],
+    ['gentian', 110000, 34, { size: 10, cover: 0.48 }],
     ['campion', 40000, 35, { size: 5, cover: 0.38 }],
   ];
   for (const [species, count, seed, clumps] of flowers) {
