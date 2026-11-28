@@ -957,6 +957,11 @@ export function fitAnatomy(rig: RigPose | readonly RigJoint[], options: FitOptio
     throw new RangeError(
       `No bones of this rig match the "${options.preset}" naming of the ${species.id} table; use a rig whose bones follow it or pass options.map`,
     );
+  // A bone the map places is the map's: the naming's guess for that bone gives way (KB-RIG-MAPWINS1).
+  const placed = new Set<number>();
+  for (const ref of Object.values(options.map ?? {}))
+    if (ref !== null) placed.add(typeof ref === 'number' ? ref : names.indexOf(ref));
+  for (const [id, bone] of [...bones]) if (placed.has(bone) && !(options.map && id in options.map)) bones.delete(id);
   for (const [id, ref] of Object.entries(options.map ?? {})) {
     if (!specs.has(id))
       throw new RangeError(`options.map: "${id}" is not a joint of the ${species.id} table; use one of its joint ids`);

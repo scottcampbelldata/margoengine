@@ -70,6 +70,17 @@ test('the bundled Quaternius mannequin is read by its Unreal mannequin names and
   assert.ok(body.stature > 1.5 && body.stature < 2.1, `stature ${body.stature}`);
 });
 
+// KB-RIG-MAPWINS1: a map that places a bone the naming also read (spine_01 as vl3, where the naming reads vl5) threw
+// "mapped to both"; the bone is the map's.
+test('an explicit map wins over the naming for the bones it places', () => {
+  const rig = skinRig('quaternius/UAL1_Standard_RM.glb');
+  const body = fitAnatomy(rig, { species: human, map: { vl3: 'spine_01', vt12: 'spine_02' } }),
+    name = (id) => rig[body.joints[body.index.get(id)].bone].name;
+  assert.equal(name('vl3'), 'spine_01');
+  assert.equal(name('vt12'), 'spine_02');
+  assert.equal(body.joints.filter((j) => rig[j.bone].name === 'spine_01').length, 1);
+});
+
 test('every bundled KayKit character is read by its bone names and fits', () => {
   for (const who of ['Barbarian', 'Knight', 'Mage', 'Ranger', 'Rogue', 'Rogue_Hooded']) {
     const rig = skinRig(`kaykit/adventurers/characters/${who}.glb`);
