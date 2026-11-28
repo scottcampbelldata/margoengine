@@ -12419,7 +12419,12 @@ Repro: `node scripts/reference-rendering/environment.mjs --decompose`, then with
   measured peak fits 90% of 4 GiB (docs/limits.md). Regression: packages/exporters/tests/draco-encoder-memory.test.js
   (the ceiling against the measured peak, the 280,126,152 B scan passing the check, the packet freed by the encoder).
 
-### gltf/pbr extensions browser check: the page went away once on the WebGL2 layer (found 2026-11-11, open)
+### Closed 2026-11-27, not reproduced: gltf/pbr extensions browser check: the page went away once on the WebGL2 layer (KB0043, found 2026-11-11)
+
+- **Closed 2026-11-27 (lane D, 5b8acb99d6, RTX A6000):** five `MARGO_COMPAT=1` runs of
+  `packages/gltf/scripts/test-extensions-browser.js` beside 24 busy processes on 32 threads: 23 of 23 checks in each,
+  no `page-loss` line (46 clean runs and more since the one report). The watch stays, so a repeat names its cause and
+  reopens this.
 
 - **Repro:** `MARGO_COMPAT=1 node packages/gltf/scripts/test-extensions-browser.js` on the workstation while 30 package
   test suites ran beside it: "lights: the real EnvironmentTest" failed with `page.evaluate: Execution context was
@@ -14122,6 +14127,9 @@ finishes its own attachment, translator and DOF repairs without chasing them.
   packages/gltf/scripts/test-extensions-browser.js ('a repeat capture of the plain model').
   2026-11-27 (lane A, RTX A6000, 24 busy CPU loops on 32 threads): not reproduced in 3 native and 3 `MARGO_COMPAT=1`
   runs on d6b04f0ce1; both KTX2 streaming pins passed every time.
+  **KB1042b and KB4278a closed 2026-11-27, not reproduced (lane D, 5b8acb99d6, same machine and load):** 5 of 5
+  `MARGO_COMPAT=1` runs passed all 23 checks, the streamed-against-plain and repeat-capture pins included. The pins
+  stay, so a repeat fails on its own line and reopens this.
 - `gltf/test:gpu:materials`: the all-authored-map shader combined with shadows,
   clustered local shadows and IBL exceeds the adapter's 16 fragment texture image
   units after translation. The fixture counts WGSL sampled textures but does not
@@ -18172,7 +18180,8 @@ reproducibility and the actual cause remain unresolved. Receipts:
 test-results/batch-273-ktx2-repro.log, batch-273-ktx2-probe.log and
 batch-273-ktx2-repeat-probe.log. No runtime or assertion was changed.
 Update 2026-11-12 (KB1042b, KB4278a): not reproduced on 701d54269a, 3 of 3 compat runs and native, with a
-repeat-capture pin added to the case (see the entry under the batch 273 compatibility failures).
+repeat-capture pin added to the case (see the entry under the batch 273 compatibility failures). Closed 2026-11-27,
+not reproduced (5 loaded runs, the same entry).
 
 Full-tier culling failure follow-up on b30aaa010: with MARGO_COMPAT=1,
 packages/culling/test/gpu/dynamic-check.mjs still fails at shadowed step 2
