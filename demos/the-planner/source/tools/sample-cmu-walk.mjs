@@ -1,22 +1,11 @@
-import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
-import {pathToFileURL} from 'node:url';
-import * as nodeModule from 'node:module';
+import {resolveMargoPackages} from '../../../../scripts/web-demos/pack-tool-support.mjs';
 
 const [checkout,folder,destination]=process.argv.slice(2);
 if(!destination)throw new Error('Pass the Margo checkout, source Acclaim folder, and output module.');
-const {registerHooks}=nodeModule;
-if(typeof registerHooks!=='function')throw new Error('This tool needs Node 22.15 or newer (module.registerHooks).');
-registerHooks({resolve(specifier,context,next){
-  if(!specifier.startsWith('@margoengine/'))return next(specifier,context);
-  const [,name,...pieces]=specifier.split('/');
-  const packageDir=resolve(checkout,'packages',name), manifest=JSON.parse(readFileSync(resolve(packageDir,'package.json'),'utf8'));
-  const entry=manifest.exports[pieces.length?'./'+pieces.join('/'):'.'];
-  assert.ok(entry,specifier);
-  return {url:pathToFileURL(resolve(packageDir,typeof entry==='string'?entry:entry.import)).href,shortCircuit:true};
-}});
+resolveMargoPackages(checkout);
 
 const {parseASF,parseAMC}=await import('@margoengine/loaders/mocap');
 const {Skeleton,createKeyframeClip,applyKeyframeClip}=await import('@margoengine/animation');

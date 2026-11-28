@@ -2,24 +2,15 @@ import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {readFileSync,writeFileSync} from 'node:fs';
-import * as nodeModule from 'node:module';
 import {resolve} from 'node:path';
-import {fileURLToPath,pathToFileURL} from 'node:url';
+import {fileURLToPath} from 'node:url';
+import {pinnedPython,resolveMargoPackages} from '../../../../scripts/web-demos/pack-tool-support.mjs';
 import {gzipSync} from 'node:zlib';
 
 const [checkout,model,folder,destination]=process.argv.slice(2);
 if(!destination)throw new Error('Pass the Margo checkout, Rita GLB, CMU data folder and packed output.');
-assert.equal(execFileSync('git',['-C',checkout,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),'0efd9cff8230507a32deb49907ecd499d46925f5');
-const {findPython}=await import(pathToFileURL(resolve(checkout,'scripts/support/find-python.mjs')).href),python=findPython();
-if(!python)throw new Error('Python 3 with Pillow is needed to read the albedo.');
-const {registerHooks}=nodeModule;
-if(typeof registerHooks!=='function')throw new Error('This tool needs Node 22.15 or newer (module.registerHooks).');
-registerHooks({resolve(specifier,context,next){
-  if(!specifier.startsWith('@margoengine/'))return next(specifier,context);
-  const [,pkg,...sub]=specifier.split('/'),local=resolve(checkout,'packages',pkg);
-  const entry=JSON.parse(readFileSync(resolve(local,'package.json'))).exports[sub.length?'./'+sub.join('/'):'.'];
-  return {url:pathToFileURL(resolve(local,entry.import??entry)).href,shortCircuit:true};
-}});
+const python=await pinnedPython(checkout,'0efd9cff8230507a32deb49907ecd499d46925f5','Python 3 with Pillow is needed to read the albedo.');
+resolveMargoPackages(checkout);
 const {GLTFAsset}=await import('@margoengine/gltf/asset');
 const {parseASF,parseAMC}=await import('@margoengine/loaders/mocap');
 const {createKeyframeClip,Skeleton,sampleKeyframes}=await import('@margoengine/animation');
