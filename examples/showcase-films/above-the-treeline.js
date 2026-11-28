@@ -318,6 +318,11 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
   ];
   const cobbles = [];
   for (let i = 0; i < 85; i++) cobbles.push([-526 + random() * 41, -517 + random() * 43, 0.06 + random() ** 3 * 0.28]);
+  // Soil, litter and contact shade on the ground round each stone's foot (TerrainGroundContact, the view's own).
+  view.groundContact?.set('hero-stones', [
+    ...heroes.flatMap(([, x, z, scale]) => [x, z, 0.8 * scale, 1]),
+    ...cobbles.flatMap(([x, z, r]) => [x, z, r, 1]),
+  ]);
   // Grass thins toward each stone: none under it, full cover a little way out, where rain shed off the rock and its
   // shade let the sward close again (Scatter clearings).
   const clearings = [
@@ -393,27 +398,29 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
       variation: { hue: 0.02, value: 0.25 },
       grass: { ...grass, dry: 1, tipBrown: 0, yellow: 0, heightVariance: 0.5, segments: [5, 3, 1] },
     });
-  // Gravel and small stones through the turf, laid along the slope and half buried.
-  const pebble = buildBoulder(
-    { kind: 'boulder', position: [0, 0, 0], radius: 0.12, cliff: 0 },
-    { seed: 4242, cell: 0.02, embed: 0.3 },
-  ).geometry;
-  Scatter.attach(engine, pebble, {
-    center,
-    area,
-    count: 2400,
-    seed: 905,
-    heightmap: () => fine.texture,
-    lod: [9, 20, 45],
-    lodFade: 2,
-    scale: [0.15, 0.7],
-    alignToGround: 0.85,
-    sink: 0.012,
-    maxSlope: 35,
-    clumps: { size: 2.3, cover: 0.42 },
-    material: new PbrMaterial({ color: SURFACES.granite.color.map((v) => v * 0.5), roughness: 0.86 }),
-    variation: { hue: 0.03, value: 0.3 },
-  });
+  // Gravel and small stones through the turf, laid along the slope and half buried: three broken shapes, each a few
+  // fracture cells across so they read as angular granite, not river-rounded ovals.
+  for (const [k, seed] of [4242, 5171, 6093].entries())
+    Scatter.attach(
+      engine,
+      buildBoulder({ kind: 'boulder', position: [0, 0, 0], radius: 0.12, cliff: 0 }, { seed, cell: 0.05, embed: 0.3 }).geometry,
+      {
+        center,
+        area,
+        count: 800,
+        seed: 905 + k,
+        heightmap: () => fine.texture,
+        lod: [9, 20, 45],
+        lodFade: 2,
+        scale: [0.15, 0.7],
+        alignToGround: 0.85,
+        sink: 0.012,
+        maxSlope: 35,
+        clumps: { size: 2.3, cover: 0.42 },
+        material: new PbrMaterial({ color: SURFACES.granite.color.map((v) => v * 0.5), roughness: 0.86 }),
+        variation: { hue: 0.03, value: 0.3 },
+      },
+    );
   // Moss and dark crumbs of soil gathered at each boulder's base, thinning outward (inside clearings), so the stones
   // sit in the ground.
   const moss = forb('campion', { heads: 0, seed: 7, scale: 0.42 }).parts[0];
@@ -452,7 +459,8 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
     ['campion', 40000, 35, { size: 5, cover: 0.38 }],
   ];
   for (const [species, count, seed, clumps] of flowers) {
-    const plant = forb(species, { seed });
+    // Moss campion in full bloom: twice the species' flowers, so a cushion reads pink.
+    const plant = forb(species, { seed, ...(species === 'campion' ? { heads: 220 } : {}) });
     for (const part of plant.parts)
       Scatter.attach(
         engine,
@@ -469,9 +477,11 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
           minHeight: altitude + 8,
           maxHeight: line + 110,
           maxSlope: 30,
-          lod: [10, 32, 120],
+          // The far ring keeps each flower's coloured area to 230 m (procedural forbs), thinning out over the last
+          // 80 m one plant at a time, so drifts stay coloured in the middle shots.
+          lod: [12, 40, 230],
           lodFade: 2,
-          edgeShrink: 12,
+          edgeThin: 80,
           scale: [1.1, 1.7],
           sink: 0.01,
           reach: plant.reach,
@@ -523,8 +533,10 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
     [0.2, 4.65, 'Why do the trees stop here?'],
     [15.1, 20.7, 'Wind runs across the meadow.'],
     [33.3, 39.2, 'The forest thins on the exposed slope.'],
+    // Over the tree line at 44 to 51 s the stunted firs stand in pockets up the slope (the edge still); from the
+    // summit at 79 s they are too far below to see, so its line comes here.
+    [44.2, 50.9, 'In sheltered pockets, stunted firs grow higher.'],
     [55.5, 61.5, 'Low trees give way to grass and loose rock.'],
-    [73.0, 80.8, 'In sheltered pockets, stunted firs grow higher.'],
   ];
   return {
     apply(time) {
