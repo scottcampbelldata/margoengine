@@ -317,7 +317,7 @@ default staying 1 kg/m³ and documented as Rapier's.
   weight; GPU and twin agree to 3.2e-7 m a frame). The CPU solvers `physics/pbf`, `physics/dfsph`
   and `physics/flip` stay the route for liquids coupled inside a physics `World`. Not DONE; open against the wider rival set (three.js and its ecosystem,
   Babylon, PlayCanvas, LiquidFun and the WebGPU MPM and SPH liquid libraries): speed against the rivals' demos,
-  measured in the speed phase. Since 2026-11-27 both profiles are checked against Martin and Moyce's (1952) dam-break
+  measured in the speed phase (the like-for-like scene is recorded in docs/limits.md, "GPU particle liquid"). Since 2026-11-27 both profiles are checked against Martin and Moyce's (1952) dam-break
   tables (each station inside the spread of their runs, table 2 and held-out tables 1 and 3) and the accurate profile
   against Lobovsky et al.'s (2014) front speed at 300 mm and, held out, 600 mm (`gpu-liquid-dambreak.test.js`). Open on
   point 2: the far-wall impact pressures (a sensor is a tenth of a cell) and the late run-out, where the free-slip walls

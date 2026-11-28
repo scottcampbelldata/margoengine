@@ -8518,6 +8518,17 @@ each) on a grid of at most 4,194,304 nodes (32 B each, and 16 B more with surfac
 - On the WebGL2 compatibility layer the CPU twin steps it on the main thread: 4,096 particles took about 120 ms a frame
   on a loaded laptop (180 frames in 22 s), so keep a few thousand there.
 - Speed against three.js's `webgpu_compute_particles_fluid` is not measured yet (speed phase, `scripts/speed-phase.json`).
+  The like-for-like scene, recorded now so nothing in the design is tuned to it afterwards: the rival example run as
+  published, in its own folder outside this repository (docs/benchmarking.md, "Comparing engines"), at each particle
+  count it offers, against `examples/gpu-liquid.html` at the same count with the fast profile, a grid of the same cells
+  per particle and the same substeps a frame as the rival takes, the pointer still and the surface drawn; 120 frames to
+  warm up, then GPU time a frame from timestamp queries and wall time over 600 frames on a quiet machine, both
+  published. The accurate profile is measured in the same scene and published as an accepted difference (it adds the
+  pressure solve, 7 + 5 * iterations dispatches a substep, that a weakly compressible rival does not do). Nothing in the
+  fast profile's design is known to cost more than the rival's method: one substep is the same scatter, grid update and
+  gather of MLS-MPM (Hu et al. 2018) in five dispatches with no readback, its sums integer atomics (WGSL has no float
+  atomics on storage, so a GPU scatter takes integer or compare-exchange atomics either way), and `stats.dispatches`
+  counts them.
 
 ## Sciviz volume filtering precision (2026-11-11)
 
