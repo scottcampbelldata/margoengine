@@ -13179,7 +13179,7 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
 - **Next:** report it to Mozilla with the shader above; an app that hits it renames the function.
 - **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB0003/report.md` with the repro page `dx.html`; still reproduces in Firefox 157 on 2026-11-11 (Edge 157 compiles all five cases) and on 2026-11-27 (`fn dx` fails, the other four compile).
 
-### Partly fixed 2026-11-11: mesh PBR inlined twelve texture filters into the Direct3D 11 surface program (KB5451)
+### Partly fixed 2026-11-11 and 2026-11-28: mesh PBR inlined twelve texture filters into the Direct3D 11 surface program, and the surface program held its material (KB5451)
 
 - **Repro:** a mesh-PBR tracer on the WebGL2 layer over ANGLE Direct3D 11 with Chromium's
   `--disable-gpu-shader-disk-cache`, timing each GL link and first draw: the staged `surface` program took 177 s to link and 356 s more at its first
@@ -13222,6 +13222,35 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
   programs compile one after another; statement cuts inside them gave 5 to 30 percent each and two of them were
   slower. Reaching 120 s from 314 s needs a structural change to what each staged program writes (fewer outputs per
   program, or the heavy material terms behind outputs 3 and 4 moved out of the 7-output programs), not more cuts.
+- **Fixed in part 2026-11-28, third round (lane A):** mesh PBR's shading normal (`triangleShading`) and material
+  (`pbrMaterial`) were 10,800 of the surface program's 17,900 inlined statements; with both stubbed the program
+  compiled in 12.5 s against 123.9 s (paired offline fxc). Each now runs in a staged program of its own, `shading`
+  and `material`, between `vertex` and `surface` (`packages/voxel-pathtracer/src/compat-staged.ts`, SURFACE_CALLS):
+  both read the path state only, so each is computed under a guard that holds wherever its call runs (the conjunction
+  of the branches around it), kept in three new state fields, and the call site reads them. `pbrMaterial` changes
+  nothing private but `pbrLayer`, which its program saves and restores and the call site sets from the kept copy. Only
+  tracers whose shader calls `pbrMaterial` get the two programs; WebGPU's shader is not touched. The purity check
+  read `h.mesh!=0u&&motion<1.0` as taking the address of `motion` (`&motion`); `assigns` now skips `&&`. The same
+  misreading (`&&h.inst`, `&&done`) had marked programs as writers of `h`, `done` and `medium`, so every tracer's
+  state pages are now laid out with fewer pages rewritten per program; the resampled, guiding, media, spectral, mesh
+  and compose (`--backend=compat`) GPU checks give the same 1,332 readback hashes before and after (821 on the
+  layer). Paired
+  offline fxc (2 rounds, per-pair minimum): the old surface program 94.2 s, the new surface 14.1 s, shading 3.7 s,
+  material 9.6 s. Cold first image of `MARGO_COMPAT=1 node packages/voxel-pathtracer/tests/mesh-pbr-lobes-browser.mjs`
+  (Edge, ANGLE Direct3D 11 leg, fresh profile, busy workstation, old and new builds run back to back): 272 s before,
+  200 and 193 s after. Same output: the four mesh GPU tests (`mesh-pbr`, `mesh-deform`, `mesh-attributes`,
+  `mesh-pbr-lobes`) give the same set of readback hashes before and after on native WebGPU and on the layer (244 in
+  all, the layer's `getBufferSubData` reads hashed too); only the order the layer's reads finish in differs. Entry
+  sizes stay under their ceilings (the staged route is in the lazy compat chunk). Regression:
+  `packages/voxel-pathtracer/tests/compat-staged.test.js` "mesh PBR evaluates its shading normal and material in
+  programs of their own before surface (KB5451)". Still open: 120 s. The cold first-draw waits left are `sample`
+  (mesh emitter radiance, 83 s), `hit` (45 s) and `shadow` (28 s); `sample`'s `pbrEmitterRadiance` (11,200 inlined
+  statements) is the next candidate for the same treatment.
+- **Sources (the split):** S. Laine, T. Karras, T. Aila, "Megakernels Considered Harmful: Wavefront Path Tracing on
+  GPUs", HPG 2013, https://research.nvidia.com/publication/2013-07_megakernels-considered-harmful-wavefront-path-tracing-gpus
+  (a path's work cut into small kernels that pass the path state through memory, which keeps each kernel small for
+  the compiler and the register file); D. van Antwerpen, "Improving SIMD Efficiency for Parallel Monte Carlo Light
+  Transport on the GPU", HPG 2011, https://doi.org/10.1145/2018323.2018330 (stream compaction between path stages).
 - **Sources:** Microsoft, "Function Declaration Syntax" (HLSL `inline` is the default; one copy of the body per call),
   https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-function-syntax ; Microsoft,
   "for Statement" (`loop` keeps flow control, `unroll` copies the body; without an attribute the compiler unrolls

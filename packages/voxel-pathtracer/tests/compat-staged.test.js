@@ -409,6 +409,40 @@ for (const [name, attach] of [...cases, meshPBRCase])
     }
   });
 
+// KB5451: mesh PBR's shading normal and material were 10,800 of the surface program's 17,900 inlined statements, and
+// Direct3D's compiler took 124 s for it at its first draw (12 s without them). Each now runs in a program of its own
+// before surface, which reads both from the state; tracers without mesh PBR keep the nine programs.
+test('mesh PBR evaluates its shading normal and material in programs of their own before surface (KB5451)', async () => {
+  const h = harness(),
+    tracer = await meshPBRCase[1](h.engine);
+  try {
+    await tracer.ready;
+    const code = (stage) => h.pipelines.find((x) => x.label === `voxel-pathtracer ${stage}`)?.fragment.module.code,
+      calls = (stage, fn) => inlinedCopies(code(stage), 'stage').copies.get(fn) ?? 0;
+    assert.equal(calls('shading', 'triangleShading'), 1);
+    assert.equal(calls('material', 'pbrMaterial'), 1);
+    assert.equal(calls('surface', 'triangleShading'), 0, 'surface reads the shading normal from the state');
+    assert.equal(calls('surface', 'pbrMaterial'), 0, 'surface reads the material from the state');
+    // The material program puts pbrLayer back: only surface's read of z_pl changes it.
+    assert.match(
+      code('material'),
+      /let z_keep=pbrLayer;z_pm=pbrMaterial\(h,lp,material\(h\.value\)\);z_pl=pbrLayer;pbrLayer=z_keep;/,
+    );
+    for (const stage of ['shading', 'material']) assert.doesNotThrow(() => checkWGSL(code(stage)), stage);
+  } finally {
+    tracer.dispose();
+  }
+  const plain = harness(),
+    mesh = await MeshPathTracer.create(plain.engine, { scene: meshScene() });
+  try {
+    await mesh.ready;
+    const labels = plain.pipelines.map((p) => p.label);
+    assert.ok(!labels.includes('voxel-pathtracer shading') && !labels.includes('voxel-pathtracer material'));
+  } finally {
+    mesh.dispose();
+  }
+});
+
 // meshClosest walked a lone mesh's triangles from one meshBlas call site and each instance's from another, so every
 // program with a triangle traversal held two copies of the triangle walk (6 triangle edge tests, 12 edge products in
 // the hit and shadow programs, and gather with every feature). A lone mesh is now one pass of the instance loop with

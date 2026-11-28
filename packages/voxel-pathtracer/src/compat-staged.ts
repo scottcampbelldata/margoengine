@@ -20,15 +20,29 @@ const stale = (what: string) =>
   );
 
 /** The programs of one sample, in the order they run. */
-export type Stage = 'start' | 'hit' | 'vertex' | 'surface' | 'sample' | 'shadow' | 'gather' | 'post' | 'finish';
+export type Stage =
+  | 'start'
+  | 'hit'
+  | 'vertex'
+  | 'shading'
+  | 'material'
+  | 'surface'
+  | 'sample'
+  | 'shadow'
+  | 'gather'
+  | 'post'
+  | 'finish';
 
 export interface StagedTrace {
-  /** Each program's WGSL (a fill-triangle vertex entry `fill` and a fragment entry `stage`). */
-  readonly modules: Readonly<Record<Stage, string>>;
+  /**
+   * Each program's WGSL (a fill-triangle vertex entry `fill` and a fragment entry `stage`). `shading` and `material`
+   * only for a shader with mesh PBR materials (see SURFACE_CALLS); every other stage always.
+   */
+  readonly modules: Readonly<Partial<Record<Stage, string>>>;
   /** Pages of path state (LAYERS layers of 4 words each). */
   readonly pages: number;
   /** The pages each program writes (`finish` writes the five sums instead). */
-  readonly writes: Readonly<Record<Stage, readonly number[]>>;
+  readonly writes: Readonly<Partial<Record<Stage, readonly number[]>>>;
   /** Words of path state. */
   readonly words: number;
   /** Light kinds a sample runs `sample`, `shadow` and `gather` for (kinds past the shader's bound do nothing). */
@@ -105,6 +119,28 @@ const PAGE_WORDS = LAYERS * 4;
 const REPEAT = /\bconst KIND_REPEAT=vec2u\((\d+)u,(\d+)u\);/;
 // Where the vertex program ends and the surface program begins (the hoisted `var n=vec3f(0.0);`).
 const VERTEX_CUT = 'n=vec3f(0.0);';
+// The surface's two mesh PBR calls, each evaluated in a program of its own before `surface` (KB5451). Inlined they were
+// 10,800 of the surface program's 17,900 statements, and Direct3D's compiler took 124 s for it at its first draw; the
+// rest alone takes 12 s. Both read the path state only (`pbrMaterial` changes nothing private but `pbrLayer`, which its
+// program keeps and hands on), so a program earlier in the iteration computes the same values under a guard that
+// holds wherever the call runs, keeps them in the state, and the call site reads them: the same values, in the same
+// order, with no random number drawn. Each guard is the conjunction of the branches around its call in `radiance`.
+const SURFACE_CALLS = {
+  shading: {
+    call: 'if(h.inst==TRIANGLE){n=triangleShading(h);}',
+    kept: 'if(h.inst==TRIANGLE){n=z_tn;}',
+    run: 'if(!z_skip&&!scatter&&h.inst==TRIANGLE){z_tn=triangleShading(h);}',
+  },
+  material: {
+    call: 'if(!inner&&!skinOut){m=pbrMaterial(h,lp,m);}',
+    kept: 'if(!inner&&!skinOut){m=z_pm;pbrLayer=z_pl;}',
+    // `m` is material(h.value) where the call runs, and lp is p moved into the instance's local frame.
+    run:
+      'if(!z_skip&&!scatter&&h.value!=0u&&h.inst!=NONE&&h.inst!=AREA&&h.inst!=GROUND){var lp=p;' +
+      'if(h.inst!=TRIANGLE){lp=xpoint(localX(h.inst),p);}let z_keep=pbrLayer;' +
+      'z_pm=pbrMaterial(h,lp,material(h.value));z_pl=pbrLayer;pbrLayer=z_keep;}',
+  },
+} as const;
 const SHADOW_IF = 'if(any(e.f>vec3f(0.0))&&(air||!far)){';
 const SHADOW = 'var v=shadow(o,wi,dist);';
 const SUN_OFF = 'sunCell=false;';
@@ -316,8 +352,11 @@ function hoist(text: string, known: Map<string, string>, T: Types): { text: stri
   return { text: out + text.slice(last), decls };
 }
 // Whether `text` may assign `name` (conservatively: any assignment, increment, member store or pointer to it).
+// `&&name` is a logical and, not the address of `name` (KB5451: `h.mesh!=0u&&motion<1.0` read as changing motion).
 const assigns = (text: string, name: string) =>
-  new RegExp(`(?<![\\w.])${name}(?:\\.\\w+|\\[[^\\]]*\\])*\\s*(?:[-+*/%&|^]?=(?!=)|\\+\\+|--)|&${name}\\b`).test(text);
+  new RegExp(`(?<![\\w.])${name}(?:\\.\\w+|\\[[^\\]]*\\])*\\s*(?:[-+*/%&|^]?=(?!=)|\\+\\+|--)|(?<!&)&${name}\\b`).test(
+    text,
+  );
 
 // `text` split at the top-level (outside parentheses) occurrences of `op` (`||` or `&&`), each part without the
 // parentheses that wrap all of it.
@@ -657,9 +696,32 @@ export function stagedTrace(source: string): StagedTrace {
     ),
     vertexCut = vertexStatements.findIndex((t) => t.trim() === VERTEX_CUT);
   if (vertexCut < 1) throw stale(VERTEX_CUT);
-  const vertexA = vertexStatements.slice(0, vertexCut).join(''),
-    vertexB = vertexStatements.slice(vertexCut).join('');
-  const code_ = {
+  const vertexA = vertexStatements.slice(0, vertexCut).join('');
+  let vertexB = vertexStatements.slice(vertexCut).join('');
+  // Mesh PBR's two heavy surface calls, each in a program of its own (SURFACE_CALLS).
+  const split: Partial<Record<'shading' | 'material', string>> = {};
+  if (vertexB.includes('pbrMaterial(')) {
+    const layer = privates.find((d) => d.name === 'pbrLayer');
+    if (!layer) throw stale('pbrLayer');
+    for (const [stage, { call, kept, run }] of Object.entries(SURFACE_CALLS) as [
+      'shading' | 'material',
+      (typeof SURFACE_CALLS)['shading' | 'material'],
+    ][]) {
+      if (vertexB.split(call).length !== 2) throw stale(call);
+      // Nothing private may change but pbrLayer, which the material program puts back.
+      const changed = [...touched(run)].filter((n) => n !== 'pbrLayer');
+      if (changed.length) throw stale(`${stage}: a call that changes ${changed.join(', ')}`);
+      vertexB = vertexB.replace(call, kept);
+      split[stage] = run;
+    }
+    path.push(
+      { name: 'z_tn', type: 'vec3f' },
+      { name: 'z_pm', type: T.fns.get('pbrMaterial') ?? 'Mat' },
+      { name: 'z_pl', type: layer.type },
+    );
+  }
+  const code_: Record<string, string> = {
+    ...split,
     start: once(pro.text),
     hit: `if(z_it>=limit){z_fin=true;}else{z_it++;${once(hit.text.replaceAll('break;', '{z_fin=true;break;}'))}}`,
     vertex: `z_post=false;z_direct=false;z_skip=false;${unloop(vertexA)}`,
@@ -673,7 +735,7 @@ export function stagedTrace(source: string): StagedTrace {
 
   // Pages: control words (every program writes them), then the fields grouped by the programs that write them, those
   // of the programs that run most often (five times an iteration) first, so each program rewrites few pages.
-  const STAGES = ['shadow', 'sample', 'gather', 'hit', 'post', 'vertex', 'surface'] as const,
+  const STAGES = ['shadow', 'sample', 'gather', 'hit', 'post', 'vertex', 'shading', 'material', 'surface'] as const,
     fields = [...control, ...path, ...scratch],
     // The name a field has in a program's text.
     local = (d: Decl, s: string) =>
@@ -693,7 +755,7 @@ export function stagedTrace(source: string): StagedTrace {
         ? ['all']
         : STAGES.filter((s) => {
             const n = local(d, s);
-            return n !== undefined && assigns(code_[s], n);
+            return n !== undefined && code_[s] !== undefined && assigns(code_[s], n);
           }),
     signature = new Map(fields.map((d) => [d, writers(d).join()])),
     rank = (d: Decl) => STAGES.reduce((r, s, i) => r | (writers(d).includes(s) ? 1 << (STAGES.length - i) : 0), 0),
@@ -836,10 +898,11 @@ ${unpackPath}${nonFields.map((d) => ` var ${d.name}:${d.type};\n`).join('')} ${S
  return Sums(c,a,nn,cs,ds);
 }
 `;
-  const modules: Record<Stage, string> = {
+  const modules: Partial<Record<Stage, string>> = {
     start,
     hit: pathStage(code_.hit),
     vertex: pathStage(code_.vertex),
+    ...Object.fromEntries(Object.entries(split).map(([stage, run]) => [stage, pathStage(run)])),
     surface: pathStage(code_.surface),
     post: pathStage(code_.post),
     sample: lightStage(code_.sample, ''),

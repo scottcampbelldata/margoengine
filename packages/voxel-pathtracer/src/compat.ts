@@ -700,7 +700,7 @@ export class TraceRoute {
         const run = (stage: Stage, q = 0) => {
           const read = this.#pageGroup(pages, mask()),
             loop = stage !== 'start';
-          for (const page of staged.writes[stage]) {
+          for (const page of staged.writes[stage]!) {
             const pass = record().beginRenderPass({
               label: `voxel-pathtracer ${stage}`,
               colorAttachments: pages.layers[page][1 - current[page]].map((view) => ({
@@ -720,12 +720,15 @@ export class TraceRoute {
             pass.end();
           }
           // A program reads the state before it, whichever pages it writes: flip them once all are written.
-          for (const page of staged.writes[stage]) current[page] = 1 - current[page];
+          for (const page of staged.writes[stage]!) current[page] = 1 - current[page];
         };
         const iterations = (count: number) => {
           for (let k = 0; k < count; k++) {
             run('hit');
             run('vertex');
+            // Mesh PBR's surface calls, each in its own program (compat-staged.ts, SURFACE_CALLS).
+            if (staged.modules.shading) run('shading');
+            if (staged.modules.material) run('material');
             run('surface');
             for (const q of steps) {
               run('sample', q);
