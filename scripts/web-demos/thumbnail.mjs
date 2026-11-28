@@ -6,6 +6,7 @@
 // canvas, with any control laid over it hidden) to the gallery's 900 x 579 card with cover fit, and writes
 // demos/thumbs/<demo>.jpg.
 // Options: --settle=<ms> (default 2500), --timeout=<ms> per page (default 60000), --url-suffix=<query> (e.g. ?view=x).
+// Boxes laid over the scene (controls, captions, labels) are hidden for the shot; other canvases stay.
 // A page that fails to become ready or shows an error keeps its old thumbnail and the run exits 1.
 import fs from 'node:fs';
 import http from 'node:http';
@@ -105,15 +106,16 @@ async function capture() {
               best = { canvas: c, x: r.x, y: r.y + scrollY, width: r.width, height: r.height };
           }
           if (!best) return null;
-          // Controls laid over the scene (a view button, a toolbar) are page chrome, not the picture: hide each one, or the
-          // highest box holding it that does not hold the canvas, where it overlaps the canvas.
+          // Anything laid over the scene (a view button, a toolbar, a caption, a coordinates label) is page chrome, not the
+          // picture: hide each box beside the canvas's own ancestors that overlaps it. Other canvases (a 2D label or trail
+          // layer drawn by the scene) and boxes holding one are part of the picture and stay.
           const { canvas, ...rect } = best, area = canvas.getBoundingClientRect();
           const overlaps = (r) => r.right > area.left && r.left < area.right && r.bottom > area.top && r.top < area.bottom;
-          for (const control of document.querySelectorAll('button, input, select, textarea, a, label, [role=button], [role=switch], [role=tab], [role=toolbar]')) {
-            if (control.contains(canvas)) continue;
-            let el = control;
-            while (el.parentElement && !el.parentElement.contains(canvas)) el = el.parentElement;
-            if (overlaps(el.getBoundingClientRect())) el.style.visibility = 'hidden';
+          for (let holder = canvas.parentElement; holder; holder = holder.parentElement) {
+            for (const el of holder.children) {
+              if (el.contains(canvas) || el.matches('canvas') || el.querySelector('canvas')) continue;
+              if (overlaps(el.getBoundingClientRect())) el.style.visibility = 'hidden';
+            }
           }
           return rect;
         });
