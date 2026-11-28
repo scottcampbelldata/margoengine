@@ -1165,7 +1165,13 @@ export function humanTable(group: HumanGroup = {}): SpeciesTable {
     rows: [...measured(near), ...(far === near ? [] : measured(far)), ...measured('stature')],
   });
   const limbVolumes = (s: 'l' | 'r'): VolumeSpec[] => [
-    volume(`${s}_upperArm`, `${s}_shoulder`, [`${s}_elbow`], 'biceps circumference, flexed', 'forearm circumference, flexed'),
+    volume(
+      `${s}_upperArm`,
+      `${s}_shoulder`,
+      [`${s}_elbow`],
+      'biceps circumference, flexed',
+      'forearm circumference, flexed',
+    ),
     volume(`${s}_forearm`, `${s}_elbow`, [`${s}_radiocarpal`], 'forearm circumference, flexed', 'wrist circumference'),
     volume(`${s}_thigh`, `${s}_hip`, [`${s}_knee`], 'thigh circumference', 'lower thigh circumference'),
     volume(`${s}_shank`, `${s}_knee`, [`${s}_talocrural`], 'calf circumference', 'ankle circumference'),

@@ -24,10 +24,16 @@ let url = null,
   name = 'addbody';
 if (modelFile) {
   name = basename(modelFile, '.glb') + (bare ? '-bare' : '');
-  writeFileSync('test-results/humans/pose-sheet-model.glb', prepare(new Uint8Array(readFileSync(modelFile)), { bare, strip }));
+  writeFileSync(
+    'test-results/humans/pose-sheet-model.glb',
+    prepare(new Uint8Array(readFileSync(modelFile)), { bare, strip }),
+  );
   url = '/test-results/humans/pose-sheet-model.glb';
 }
-const { page, close, hardware } = await openBrowser({ startPath: '/packages/humans/test/pose-sheet.html', port: 'free' });
+const { page, close, hardware } = await openBrowser({
+  startPath: '/packages/humans/test/pose-sheet.html',
+  port: 'free',
+});
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));

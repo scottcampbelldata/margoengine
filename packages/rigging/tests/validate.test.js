@@ -63,7 +63,10 @@ test('an elbow folded back is an error past the stop and a warning past straight
   const locked = find(checkPose(body, poseFromAngles(body, { l_elbow: { flexion: -3 } })), 'hinge-reversed', 'l_elbow');
   assert.equal(locked.severity, 'warning');
   assert.ok(Math.abs(locked.value + 3) < 1e-6);
-  assert.equal(checkPose(body, poseFromAngles(body, { l_elbow: { flexion: -3 } }), { tier: 'structural' }).issues.length, 0);
+  assert.equal(
+    checkPose(body, poseFromAngles(body, { l_elbow: { flexion: -3 } }), { tier: 'structural' }).issues.length,
+    0,
+  );
   assert.equal(checkPose(body, poseFromAngles(body, { l_elbow: { flexion: 90 } })).issues.length, 0);
 });
 

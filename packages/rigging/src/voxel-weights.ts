@@ -6,7 +6,7 @@
 // and an arm beside a hip does not bind to it unless the grid says they touch. Each vertex reads its bones' distances
 // from the grid and turns them into weights with the paper's falloff.
 import { boneSegments, checkRig, resolveJoints, segmentDistance2, type RigJoint } from './rig.js';
-import { weld, type WeightMesh, type Welded } from './mesh.js';
+import { weld, type WeightMesh } from './mesh.js';
 import { WeightMap } from './weight-map.js';
 import {
   fill,
@@ -16,7 +16,6 @@ import {
   markTriangles,
   NEIGHBOURS,
   OUTSIDE,
-  SHELL,
   SOLID,
   votes,
   type Grid,

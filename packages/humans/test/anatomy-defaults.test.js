@@ -51,10 +51,7 @@ test('addPerson fits the body and holds a reversed elbow by default', async (t) 
   assert.ok(turn(on, 'leftLowerArm') < 10, `held ${turn(on, 'leftLowerArm')}`);
   assert.ok(Math.abs(turn(on, 'rightLowerArm') - 40) < 0.5, `kept ${turn(on, 'rightLowerArm')}`);
   assert.deepEqual(on.p.check('structural'), []);
-  assert.ok(
-    off.p.check === undefined || off.p.check().length === 0,
-    'with no body there is nothing to check against',
-  );
+  assert.ok(off.p.check === undefined || off.p.check().length === 0, 'with no body there is nothing to check against');
 });
 
 test('anatomy options: limits off keeps the body for IK; the reports go to onClamp', async (t) => {
@@ -71,7 +68,10 @@ test('anatomy options: limits off keeps the body for IK; the reports go to onCla
     held = await person(t, { anatomy: { onClamp: (found) => issues.push(...found) } });
   held.p.time = 0.999;
   held.p.animator.onPreUpdate(0);
-  assert.ok(issues.some((issue) => issue.joint === 'l_elbow'), JSON.stringify(issues));
+  assert.ok(
+    issues.some((issue) => issue.joint === 'l_elbow'),
+    JSON.stringify(issues),
+  );
 });
 
 test('addPerson checks its anatomy options and names a rig it cannot read', async (t) => {

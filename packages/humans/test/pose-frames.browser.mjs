@@ -20,7 +20,10 @@ let url = null,
   name = 'addbody';
 if (modelFile) {
   name = basename(modelFile, '.glb') + (bare ? '-bare' : '');
-  writeFileSync('test-results/humans/pose-frames-model.glb', prepare(new Uint8Array(readFileSync(modelFile)), { bare, strip }));
+  writeFileSync(
+    'test-results/humans/pose-frames-model.glb',
+    prepare(new Uint8Array(readFileSync(modelFile)), { bare, strip }),
+  );
   url = '/test-results/humans/pose-frames-model.glb';
 }
 const { page, close, hardware } = await openBrowser({

@@ -22,7 +22,15 @@
 //   standard deviations; a capture pop (a joint flipping in one frame) is also caught as a lone spike between slower
 //   neighbours at any frame rate.
 import { margoError } from '../../shared/errors.js';
-import { clampPose, readJointAngles, type AnatomicalRig, type ClampIssue, type JointSpec, type Tier, type Vec3 } from './anatomy.js';
+import {
+  clampPose,
+  readJointAngles,
+  type AnatomicalRig,
+  type ClampIssue,
+  type JointSpec,
+  type Tier,
+  type Vec3,
+} from './anatomy.js';
 import { parentOrder, worldFrames } from './rig.js';
 
 /** What an issue is. */
@@ -199,7 +207,9 @@ function fitOf(body: AnatomicalRig): Fit {
   let fit = FITS.get(body);
   if (fit) return fit;
   if (!body || !body.species || !Array.isArray(body.joints) || !(body.rest instanceof Float64Array))
-    throw new TypeError(`The pose checker needs an AnatomicalRig made by fitAnatomy(rig, { species }); see ${POSE_HELP}`);
+    throw new TypeError(
+      `The pose checker needs an AnatomicalRig made by fitAnatomy(rig, { species }); see ${POSE_HELP}`,
+    );
   const species = body.species,
     order = parentOrder(body.parents as number[], 'Pose checker'),
     specs = new Map<string, JointSpec>(),
@@ -270,7 +280,11 @@ const fixed = (n: number, digits = 1) => n.toFixed(digits);
 /** Angles past each tier, from what `clampPose` would change on a copy of the pose. */
 function angleIssues(body: AnatomicalRig, fit: Fit, pose: ArrayLike<number>, options: PoseCheckOptions): PoseIssue[] {
   const tiers: Tier[] =
-      options.tier === 'normal' ? ['normal'] : options.tier === 'structural' ? ['structural'] : ['structural', 'normal'],
+      options.tier === 'normal'
+        ? ['normal']
+        : options.tier === 'structural'
+          ? ['structural']
+          : ['structural', 'normal'],
     tolerance = options.tolerance ?? 0.5,
     out: PoseIssue[] = [],
     past = new Set<string>();
@@ -496,7 +510,8 @@ function placeIssues(
     const float = (options.float ?? 0.06) * H;
     for (const id of options.supports ?? []) {
       const k = body.index.get(id);
-      if (k === undefined) throw new RangeError(`checkPose: support "${id}" is not a joint of this body; see ${POSE_HELP}`);
+      if (k === undefined)
+        throw new RangeError(`checkPose: support "${id}" is not a joint of this body; see ${POSE_HELP}`);
       const bone = body.joints[k].bone,
         h = dot(at(position, bone), up) - ground;
       if (h > float)
@@ -653,7 +668,9 @@ export function checkClip(
     between = (i: number, j: number, k: number) => {
       const p = rotations[i],
         q = rotations[j],
-        d = Math.abs(p[k * 4] * q[k * 4] + p[k * 4 + 1] * q[k * 4 + 1] + p[k * 4 + 2] * q[k * 4 + 2] + p[k * 4 + 3] * q[k * 4 + 3]);
+        d = Math.abs(
+          p[k * 4] * q[k * 4] + p[k * 4 + 1] * q[k * 4 + 1] + p[k * 4 + 2] * q[k * 4 + 2] + p[k * 4 + 3] * q[k * 4 + 3],
+        );
       return ((2 * Math.acos(Math.min(1, d)) * 180) / Math.PI) * fps;
     };
   for (let i = 1; i < n; i++)
@@ -852,9 +869,10 @@ export function formatPoseReport(report: PoseReport | ClipReport): string {
           `${row.severity.padEnd(7)} ${row.code.padEnd(18)} ${row.joint}${row.motion ? ` ${row.motion}` : ''}: ${row.frames} frames, ${fixed(row.first, 2)} to ${fixed(row.last, 2)} s; worst at ${fixed(row.worst.time!, 2)} s: ${row.worst.message}`,
       ),
     ].join('\n');
-  return [head, ...report.issues.map((found) => `${found.severity.padEnd(7)} ${found.code.padEnd(18)} ${found.message}`)].join(
-    '\n',
-  );
+  return [
+    head,
+    ...report.issues.map((found) => `${found.severity.padEnd(7)} ${found.code.padEnd(18)} ${found.message}`),
+  ].join('\n');
 }
 
 const fail = (what: string, result: PoseReport | ClipReport) =>

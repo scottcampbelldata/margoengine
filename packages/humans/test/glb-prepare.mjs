@@ -52,4 +52,3 @@ export function prepare(bytes, { bare = false, strip = STRIP } = {}) {
   out.set(bin, 28 + json.length);
   return out;
 }
-

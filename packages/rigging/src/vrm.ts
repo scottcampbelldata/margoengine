@@ -14,7 +14,7 @@ import {
   splitTRS,
 } from '@margoengine/math/quat';
 import type { Animator } from '@margoengine/animator';
-import { GLB_BIN, GLB_JSON, GLB_MAGIC, glbChunks, isGLB } from '../../shared/glb.js';
+import { GLB_JSON, GLB_MAGIC, glbChunks, isGLB } from '../../shared/glb.js';
 import { parseJSON } from '../../shared/json.js';
 import type { HumanoidBone } from './retarget.js';
 import { SpringBones, springAccess, type SpringBonesOptions, type SpringChain } from './springs.js';

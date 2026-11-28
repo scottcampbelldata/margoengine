@@ -7,8 +7,6 @@ context.page.on('pageerror', (e) => errors.push(e.message));
 try {
   const result = await context.page.evaluate(async (vrm1) => {
     const { EngineKernel } = await import('/packages/core/dist/index.js');
-    const { CameraProjection } = await import('/packages/cameras/dist/index.js');
-    const { parsePreparedPBR } = await import('/packages/gltf/dist/pbr.js');
     const { SceneTarget } = await import('/packages/shared/msaa.js');
     const { waitForPipelines } = await import('/scripts/support/gpu-ready.js');
     const { MToon } = await import('/packages/rigging/dist/mtoon.js');

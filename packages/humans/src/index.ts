@@ -491,7 +491,11 @@ export async function addPerson(engine: Engine, model: PBRModel, options: Person
     if (cardNames.includes(name)) features[name] = [...(features[name] ?? []), hairCards(options.cards || {})];
   // Defaults that live in other packages load first, so a failed load leaves the model as it was. Each is one line.
   const handsModule = options.hands === false ? undefined : await import('@margoengine/rigging/hands');
-  if (options.anatomy !== undefined && options.anatomy !== false && (typeof options.anatomy !== 'object' || !options.anatomy))
+  if (
+    options.anatomy !== undefined &&
+    options.anatomy !== false &&
+    (typeof options.anatomy !== 'object' || !options.anatomy)
+  )
     throw new TypeError('addPerson anatomy must be an options object or false');
   const anatomyModules: AnatomyModules | undefined =
     options.anatomy === false

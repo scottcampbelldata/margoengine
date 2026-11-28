@@ -22,7 +22,10 @@ function skinRig(file) {
     for (let n = i; n !== undefined; n = parent.get(n)) {
       const { translation = [0, 0, 0], rotation = [0, 0, 0, 1], scale = [1, 1, 1], matrix } = nodes[n];
       assert.equal(matrix, undefined, `${file}: node ${n} holds a matrix`);
-      point = turn(rotation, point.map((value, k) => value * scale[k])).map((value, k) => value + translation[k]);
+      point = turn(
+        rotation,
+        point.map((value, k) => value * scale[k]),
+      ).map((value, k) => value + translation[k]);
     }
     return point;
   };
