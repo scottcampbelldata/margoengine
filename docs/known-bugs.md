@@ -33,19 +33,35 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `@margoengine/machinery/rigs` uses point-mass balls (I = 1e-5 m L^2) and 32 substeps, which settle within 0.001 degrees.
   Physics lane.
 
-### Open 2026-11-28: a path joint on a turning base lags and then diverges (KB-PHYS-PATHMOVINGBASE1, physics mechanisms)
+### Fixed 2026-11-28: a path joint on a turning base lags and then diverges (KB-PHYS-PATHMOVINGBASE1, physics mechanisms)
 
 - **Repro:** a position-driven body turned about z 2 degrees a 60 Hz step (`setNextRotation`), a dynamic body on a
   `prismatic` slide along z, and a `PathJoint` from the turning body holding a point 0.1 m out on the follower to a helix
   of pitch 0.348 m (Catmull-Rom through 128 points a turn, in the turning body's frame). After a quarter turn the follower
   is 0.15 mm off the helix, 3.7 mm after a turn; with the helix 1 m out it is 1.1 m off after a quarter turn and the world
-  stops ("went past 1e15"). The same follower on a fixed curve holds.
-- **Cause:** not found yet. The path rows (`kernel/src/couplings.rs`, PATH) read the point on the curve and its frame at the
-  poses before the substep and correct a share of the error only in the biased pass; on a base that turns, the curve
-  point's own motion along the normals seems to be missed or lagged. It blocks a cam follower (the rose engine and the
-  Reuleaux drive in `@margoengine/machinery/rigs`), which wait for it. Physics lane.
+  stops ("went past 1e15"). The same follower on a fixed curve holds (nothing moves it there).
+- **Cause:** not the turning base. The path rows already read the curve point's own velocity (the material point of the
+  turning body under it), and a follower held at its centre tracks the 1 m helix to 5e-7 m. What failed is the point being
+  off the follower's centre while the slide holds the follower's turn: each push on the point mostly turned the follower
+  (a give of 1/m + r^2/I, 101 times 1/m for r 1 m and I 0.01), the slide's locks took that turn back in the next pass, and
+  a hundredth of each push was left to move the follower; the path's remembered impulse then grew with the error until the
+  path ran away. Measured before the fix: r 0.1 m with I 1e-3 lagged 3.6 mm, with I 1e-4 it ran away, as did r 1 m with
+  I 0.01; I 10 at 1 m held. A joint's own limit had met the same thing and is solved on the Schur complement of its locks.
+- **Fix:** every coupling row (gear, rack, pulley, distance, path) is solved on the Schur complement of the locks of the
+  joints the step solves on its moving bodies (`Locks` in `kernel/src/couplings.rs`, at most 12 lock rows; fewer only make
+  the row push short): it gives k - x^T K^-1 x and reads the speed the locks will leave it, and the couplings are solved
+  before the joints in each pass so the joints' exact path solve takes back the rest of the push (`run_substeps`). Block
+  elimination as in Featherstone 2008 (articulated-body inertia) and Baraff 1996. A row the locks hold entirely is left to
+  them. The follower now holds the 1 m helix to 5.7e-7 m over 10 turns, and a follower held 0.2 m off its centre in a
+  three-lobed cam groove on a turning cam sits a h^2 / (2 c) from the exact x = rho(-alpha) over 50 turns, the lag a
+  velocity row closing a share c of its error a substep leaves under the follower's own acceleration a: 1.72e-5 m at the
+  default share of 0.2 (closed form 1.713e-5) and 3.49e-6 m at a share of 1 (3.427e-6), the same at the fiftieth turn as
+  at the first. Regression: `packages/physics/kernel/tests/coupling_exact.rs`
+  (`a_follower_on_a_turning_cam_tracks_the_exact_cam_follower_kinematics_for_fifty_turns`,
+  `a_screw_on_a_turning_shaft_carries_its_follower_a_pitch_a_turn_with_the_point_a_metre_out`). Cam rigs (the rose engine,
+  the Reuleaux drive) in `@margoengine/machinery/rigs` can be built on it.
 
-### Open 2026-11-28: gear and rack rows drift from the poses by float rounding (KB-PHYS-COUPLINGDRIFT1, physics mechanisms)
+### Fixed 2026-11-28: gear and rack rows drift from the poses by float rounding (KB-PHYS-COUPLINGDRIFT1, physics mechanisms)
 
 - **Repro:** `archimedesScrewRig(0.348)` of `@margoengine/machinery/rigs` with its water body at z 0.5 m instead of near the
   origin: the water is 0.1 mm behind `pitch * angle / 2 pi` after 4.7 turns and 0.35 mm after ten, growing with the travel,
@@ -53,8 +69,26 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   after 4.7 turns and 49 µm after 100; a harmonic drive's gear row is 6e-6 rad behind after 100 turns.
 - **Cause:** a gear's and a rack's error is the integral of the row's own speed (`track_couplings`), not read from the
   poses; the positions are stored in f32 and each substep's small move is rounded, with a bias, so the poses part from the
-  integrated speed and nothing pulls them back. Box2D's gear joint reads its error from the joints' coordinates. The rig
-  keeps its water near the origin, where the float spacing is finest, until the row reads the poses. Physics lane.
+  integrated speed and nothing pulls them back. Box2D's gear joint reads its error from the joints' coordinates.
+- **Fix:** the error is read from the poses after every substep (`read_error` in `kernel/src/couplings.rs`): each body's
+  turn about its axis since the row began, the twist of start^-1 now (2 atan2(v . u, w), in doubles with a series good to
+  1e-14), counted past one turn from the angle read the substep before, and a rack's travel along its axis from its
+  starting centre; the row then closes a share of it a substep (Baumgarte 1972), as before. The start is read at the row's
+  first substep and again when its axes or ratio are set. Measured on a rack driven 100 turns (34.8 m of travel) from
+  z 0, 0.5, 5 and 50 m: 3.7e-6, 3.7e-6, 3.7e-6 and 9.8e-6 m from the exact travel, one to two f32 spacings at the far end,
+  where summing the speed left it 2.7 cm out from the origin; a 3:1 gear at x 1, 50 and 500 m holds 4.1e-7 rad over
+  100 turns, where it was 2.5e-5 rad. Regression: `packages/physics/kernel/tests/coupling_exact.rs`
+  (`a_rack_keeps_the_exact_ratio_for_a_hundred_turns_wherever_it_stands`,
+  `a_gear_keeps_the_exact_ratio_for_a_hundred_turns_wherever_it_stands`). A coordinates coupling (`coupleDofs`) still sums
+  its speed; it is listed below.
+
+### Open 2026-11-28: a coordinates coupling's error is the sum of its speed (KB-PHYS-COORDSDRIFT1, physics mechanisms)
+
+- **Repro:** the same class as KB-PHYS-COUPLINGDRIFT1, on `coupleDofs` (kind COORDS): its error is `error + speed * h`
+  each substep in `track_couplings`, so over long runs its two joint coordinates part from the ratio by the f32 rounding
+  of the poses. Not measured yet.
+- **Cause:** the row's two coordinates are a hinge angle or a slide of each child in its parent's frame, which the row
+  does not read from the poses. The fix is to read them as the joint's own measure does (`joint_measure`). Physics lane.
 
 ### Open 2026-11-27: the physics preview render check ignores MARGO_COMPAT (KB-PHYS-PREVIEWCOMPAT1, physics scripts)
 

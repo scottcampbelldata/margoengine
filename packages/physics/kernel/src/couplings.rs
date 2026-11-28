@@ -2,8 +2,13 @@
 // Each is one row of the solve, a speed Cdot = sum of (a direction times a body's linear or angular speed) that must stay zero,
 // solved in every substep next to the joint pass with the sequential impulses the joints and contacts use: the impulse a row
 // has given is carried from one substep to the next (the warm start), a biased pass shares out the error the row has built up, and
-// a soft row takes the form of Catto, "Soft Constraints", GDC 2011 (a frequency and a damping ratio). The error of a gear and a rack
-// follows from the row's own speed, one substep at a time; a pulley reads the length of its rope from the poses. Baraff, "Linear-Time
+// a soft row takes the form of Catto, "Soft Constraints", GDC 2011 (a frequency and a damping ratio). Every row's error is read from
+// the poses, so float rounding of the poses cannot build up against it: a gear's from each body's turn about its axis since the row
+// began, counted past one turn (the twist of swing-twist, Dobrowolski 2015), a rack's from that and the rack's travel along its axis,
+// a pulley's from the length of its rope. The error then closes a share a substep, Baumgarte 1972's position term in the velocity
+// row, as the joints' position-level rows do; Box2D's gear joint reads its error from its joints' coordinates the same way (Catto,
+// "Modeling and Solving Constraints", GDC 2009). An error made by summing the row's speed drifted: a rack 0.5 m from the origin
+// fell 0.35 mm behind in ten turns, a sign that changed with the step (KB-PHYS-COUPLINGDRIFT1). Baraff, "Linear-Time
 // Dynamics using Lagrange Multipliers", SIGGRAPH 1996, is the form of a row between two bodies' coordinates. The table is a fixed one
 // in the header, so a snapshot carries it.
 use crate::layout::*;
@@ -119,6 +124,26 @@ impl Coupling {
         self.cap = slides & 3;
     }
 
+    // A gear and a rack keep where they began in words their kinds have no other use for, as COORDS does above: the turn A began
+    // at (`anchor_a`, `ground_a[0]` its w), a gear's B the same (`anchor_b`, `ground_a[1]`) and a rack's starting centre
+    // (`anchor_b`), the angle each body read last (`ground_b`), the whole turns since (`closed` for A, `last_span` for B, as
+    // i32), and `indexed` set once they are read. These views are the only place that reuse is spelt out.
+    /// Whether a gear's or a rack's start has been read.
+    #[inline]
+    fn begun(&self) -> bool {
+        self.indexed != 0
+    }
+    /// The turn A began at.
+    #[inline]
+    fn start_a(&self) -> Q {
+        Q { x: self.anchor_a[0], y: self.anchor_a[1], z: self.anchor_a[2], w: self.ground_a[0] }
+    }
+    /// The turn a gear's B began at.
+    #[inline]
+    fn start_b(&self) -> Q {
+        Q { x: self.anchor_b[0], y: self.anchor_b[1], z: self.anchor_b[2], w: self.ground_a[1] }
+    }
+
     pub const NONE: Coupling = Coupling {
         kind: 0,
         a: NONE,
@@ -167,7 +192,200 @@ struct Row {
     db: V3,
 }
 
+/// Most lock rows a coupling's Schur complement takes: two joints' worth of five or six. More is a subset, which still bounds the
+/// row's give from above (a constraint left out only frees the bodies), so the row then pushes short and never over.
+const LEAN_ROWS: usize = 12;
+
+/// One end of a row: it reads `lin . v + ang . w` of `body`.
+#[derive(Clone, Copy)]
+struct End {
+    body: usize,
+    lin: V3,
+    ang: V3,
+}
+
+/// The two ends of a row that pushes `-p` on A along `d` at arm `ra` and `p` on B at arm `rb`: d . (vB + wB x rB - vA - wA x rA).
+fn arm_ends(a: usize, b: usize, d: V3, ra: V3, rb: V3) -> [End; 2] {
+    [End { body: a, lin: d.scale(-1.0), ang: ra.cross(d).scale(-1.0) }, End { body: b, lin: d, ang: rb.cross(d) }]
+}
+
+/// a . (m b) in doubles, for m a diagonal.
+#[inline]
+fn scaled(a: V3, b: V3, m: V3) -> f64 {
+    a.x as f64 * b.x as f64 * m.x as f64 + a.y as f64 * b.y as f64 * m.y as f64 + a.z as f64 * b.z as f64 * m.z as f64
+}
+
+/// What a unit impulse along one end gives the speed the other end reads, on the same body; 0 on two bodies.
+#[inline]
+fn between(w: &World, x: &End, y: &End) -> f64 {
+    if x.body != y.body {
+        return 0.0;
+    }
+    let m = w.moving(x.body);
+    scaled(x.lin, y.lin, m.mass) + m.inertia.between(x.ang, y.ang)
+}
+
+/// The locks of the joints on a coupling's moving bodies, and the inverse of their J M^-1 J^T. A coupling is solved before the
+/// joints in each pass, and the joints' path solve then takes back whatever the coupling's push did along their locks. So the row
+/// is solved on its Schur complement, as a joint's own limit is on its locks (joints.rs, `limit_row`): it gives what the locks let
+/// it give, k - x^T K^-1 x, with x its cross terms on the locks, and it reads the speed the locks will leave it,
+/// Cdot - x^T K^-1 (the locks' speeds). One sweep then holds a row whose push the locks would otherwise mostly take back: a
+/// follower on a slide held to a path by a point 1 m off its centre, inertia 0.01, saw a hundredth of each push stay, and the
+/// path ran away (KB-PHYS-PATHMOVINGBASE1). This is block elimination of the coupled system, the use of the Schur complement
+/// that Featherstone 2008 (chapter 7, articulated-body inertia) and Baraff 1996 make, on one row against its bodies' joints.
+struct Locks {
+    m: usize,
+    ends: [[End; 2]; LEAN_ROWS],
+    inverse: [[f64; LEAN_ROWS]; LEAN_ROWS],
+}
+
+impl Locks {
+    /// The give and the speed of a row with the locks answering: (speed, give), or the row's own when no lock touches it. A row
+    /// the locks hold entirely gives 0 and is left to them.
+    fn through(&self, w: &World, row: &[End; 2], speed: f32, give: f32) -> (f32, f32) {
+        if self.m == 0 {
+            return (speed, give);
+        }
+        let mut x = [0.0f64; LEAN_ROWS];
+        let mut any = false;
+        for i in 0..self.m {
+            for e in row {
+                for f in &self.ends[i] {
+                    x[i] += between(w, e, f);
+                }
+            }
+            any |= x[i] != 0.0;
+        }
+        if !any {
+            return (speed, give);
+        }
+        let mut own = 0.0f64;
+        for e in row {
+            for f in row {
+                own += between(w, e, f);
+            }
+        }
+        let (mut ease, mut along) = (own, speed as f64);
+        for i in 0..self.m {
+            let mut lean = 0.0;
+            for j in 0..self.m {
+                lean += self.inverse[i][j] * x[j];
+            }
+            if lean == 0.0 {
+                continue;
+            }
+            ease -= lean * x[i];
+            let mut lock = 0.0f64;
+            for f in &self.ends[i] {
+                let m = w.moving(f.body);
+                lock += f.lin.dot(m.linear) as f64 + f.ang.dot(m.angular) as f64;
+            }
+            along -= lean * lock;
+        }
+        // Higham's stop, as the joints' factors use it: what is left under n u of the row's own give is rounding.
+        if !(ease > own * f32::EPSILON as f64 * (self.m + 1) as f64) {
+            return (speed, 0.0);
+        }
+        (along as f32, ease as f32)
+    }
+}
+
 impl World {
+    /// The locks of the joints the step solves on the moving bodies among `bodies`, up to LEAN_ROWS rows.
+    fn locks_on(&self, bodies: [u32; 2]) -> Locks {
+        let none = End { body: 0, lin: v3(0.0, 0.0, 0.0), ang: v3(0.0, 0.0, 0.0) };
+        let mut locks = Locks { m: 0, ends: [[none; 2]; LEAN_ROWS], inverse: [[0.0; LEAN_ROWS]; LEAN_ROWS] };
+        let mut seen = [NONE; 2 * LEAN_ROWS];
+        let mut joints = 0;
+        let mut rows = [(v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0)); 6];
+        for body in bodies {
+            let body = body as usize;
+            if self.flags(body) & KIND != DYNAMIC || !self.is_awake(body) {
+                continue;
+            }
+            let mut at = self.uu(FIRST_JOINT, body);
+            while at != NONE && joints < seen.len() {
+                let joint = at as usize;
+                at = self.uu(if self.uu(JOINT_A, joint) as usize == body { JOINT_NEXT_A } else { JOINT_NEXT_B }, joint);
+                if seen[..joints].contains(&(joint as u32)) {
+                    continue;
+                }
+                seen[joints] = joint as u32;
+                joints += 1;
+                let Some((a, b, count)) = self.solved_locks(joint, &mut rows) else { continue };
+                for &(d, ta, tb) in &rows[..count] {
+                    if locks.m == LEAN_ROWS {
+                        break;
+                    }
+                    locks.ends[locks.m] = [End { body: a, lin: d.scale(-1.0), ang: ta.scale(-1.0) }, End { body: b, lin: d, ang: tb }];
+                    locks.m += 1;
+                }
+            }
+        }
+        let m = locks.m;
+        if m == 0 {
+            return locks;
+        }
+        // K = J M^-1 J^T of the locks, inverted by Gauss-Jordan with complete pivoting on the scaled diagonal (Higham 1990), a
+        // dependent row (a body held by more locks than it has freedoms) dropped as the joints' own `invert` drops it.
+        let mut k = [[0.0f64; LEAN_ROWS]; LEAN_ROWS];
+        let mut size = [0.0f64; LEAN_ROWS];
+        for i in 0..m {
+            for j in 0..m {
+                let mut sum = 0.0;
+                for e in &locks.ends[i] {
+                    for f in &locks.ends[j] {
+                        sum += between(self, e, f);
+                    }
+                }
+                k[i][j] = sum;
+            }
+            size[i] = k[i][i];
+        }
+        let inverse = &mut locks.inverse;
+        for p in 0..m {
+            inverse[p][p] = 1.0;
+        }
+        let mut taken = [false; LEAN_ROWS];
+        let tolerance = f32::EPSILON as f64 * m as f64;
+        for _ in 0..m {
+            let (mut p, mut most) = (m, tolerance);
+            for r in 0..m {
+                if !taken[r] && k[r][r] > most * size[r] {
+                    p = r;
+                    most = k[r][r] / size[r];
+                }
+            }
+            if p == m {
+                break;
+            }
+            taken[p] = true;
+            let scale = 1.0 / k[p][p];
+            for c in 0..m {
+                k[p][c] *= scale;
+                inverse[p][c] *= scale;
+            }
+            for r in 0..m {
+                let factor = k[r][p];
+                if r != p && factor != 0.0 {
+                    for c in 0..m {
+                        k[r][c] -= factor * k[p][c];
+                        inverse[r][c] -= factor * inverse[p][c];
+                    }
+                }
+            }
+        }
+        for p in 0..m {
+            if !taken[p] {
+                for c in 0..m {
+                    inverse[p][c] = 0.0;
+                    inverse[c][p] = 0.0;
+                }
+            }
+        }
+        locks
+    }
+
     /// The coupling in a slot.
     #[inline]
     fn coupling(&self, slot: usize) -> Coupling {
@@ -249,9 +467,74 @@ impl World {
             }
             _ => {}
         }
+        // A gear or a rack given new axes or a ratio holds from where its bodies stand now.
+        if (c.kind == GEAR || c.kind == RACK_AND_PINION) && field <= 7 {
+            c.indexed = 0;
+            c.error = 0.0;
+        }
         c.impulse = 0.0;
         c.impulse_n1 = 0.0;
         c.impulse_n2 = 0.0;
+        self.put_coupling(slot, c);
+    }
+
+    /// Reads where a gear's or a rack's bodies stand, the start its error is measured from.
+    fn begin_reading(&mut self, slot: usize) {
+        let mut c = self.coupling(slot);
+        let (a, b) = (c.a as usize, c.b as usize);
+        let qa = self.pose_rotation(a);
+        c.anchor_a = [qa.x, qa.y, qa.z];
+        c.ground_a = [qa.w, 0.0, 0.0];
+        if c.kind == GEAR {
+            let qb = self.pose_rotation(b);
+            c.anchor_b = [qb.x, qb.y, qb.z];
+            c.ground_a[1] = qb.w;
+        } else {
+            let centre = self.pose_center(b);
+            c.anchor_b = [centre.x, centre.y, centre.z];
+        }
+        c.ground_b = [0.0; 3];
+        c.closed = 0;
+        c.last_span = 0;
+        c.error = 0.0;
+        c.indexed = 1;
+        self.put_coupling(slot, c);
+    }
+
+    /// A gear's or a rack's error from the poses: A's turn about its axis since the start plus `ratio` times B's (a gear), or
+    /// `ratio` times A's turn plus B's travel along its axis (a rack), each axis at the length it was given, as the row's speed
+    /// reads them. The whole turns are counted from the angle read the substep before, so a substep must turn less than half a
+    /// turn. Sums are in doubles: a hundred turns is 628 rad, where an f32 is 6e-5 rad coarse.
+    fn read_error(&mut self, slot: usize) {
+        let mut c = self.coupling(slot);
+        let (a, b) = (c.a as usize, c.b as usize);
+        let turned = |start: Q, now: Q, axis: [f32; 3], last: &mut f32, turns: &mut u32| -> f64 {
+            let raw = twist(start, now, axis);
+            let step = raw - *last as f64;
+            let mut whole = *turns as i32;
+            if step > core::f64::consts::PI {
+                whole -= 1;
+            } else if step < -core::f64::consts::PI {
+                whole += 1;
+            }
+            *last = raw as f32;
+            *turns = whole as u32;
+            let length = sqrt64(axis[0] as f64 * axis[0] as f64 + axis[1] as f64 * axis[1] as f64 + axis[2] as f64 * axis[2] as f64);
+            (raw + whole as f64 * core::f64::consts::TAU) * length
+        };
+        let (mut last_a, mut last_b) = (c.ground_b[0], c.ground_b[1]);
+        let (mut turns_a, mut turns_b) = (c.closed, c.last_span);
+        let angle_a = turned(c.start_a(), self.pose_rotation(a), c.axis_a, &mut last_a, &mut turns_a);
+        let error = if c.kind == GEAR {
+            angle_a + c.ratio as f64 * turned(c.start_b(), self.pose_rotation(b), c.axis_b, &mut last_b, &mut turns_b)
+        } else {
+            let along = self.pose_rotation(b).rotate(vec(c.axis_b));
+            let moved = self.pose_center(b).sub(vec(c.anchor_b));
+            c.ratio as f64 * angle_a + moved.x as f64 * along.x as f64 + moved.y as f64 * along.y as f64 + moved.z as f64 * along.z as f64
+        };
+        c.ground_b = [last_a, last_b, 0.0];
+        (c.closed, c.last_span) = (turns_a, turns_b);
+        c.error = error as f32;
         self.put_coupling(slot, c);
     }
 
@@ -390,6 +673,20 @@ impl World {
         }
     }
 
+    /// The ends of a coupling's row, as `Locks` reads them.
+    fn coupling_ends(c: &Coupling, row: &Row) -> [End; 2] {
+        let (a, b, zero) = (c.a as usize, c.b as usize, v3(0.0, 0.0, 0.0));
+        match c.kind {
+            GEAR => [End { body: a, lin: zero, ang: row.ta }, End { body: b, lin: zero, ang: row.tb }],
+            RACK_AND_PINION => [End { body: a, lin: zero, ang: row.ta }, End { body: b, lin: row.db, ang: zero }],
+            DISTANCE => arm_ends(a, b, row.la, row.ra, row.rb),
+            _ => [
+                End { body: a, lin: row.la, ang: row.ra.cross(row.la) },
+                End { body: b, lin: row.lb.scale(c.ratio), ang: row.rb.cross(row.lb).scale(c.ratio) },
+            ],
+        }
+    }
+
     /// Gives a body the push of an impulse `p` along a row.
     fn coupling_push(c: &Coupling, row: &Row, a: &mut Moving, b: &mut Moving, p: f32) {
         match c.kind {
@@ -481,6 +778,9 @@ impl World {
                 self.warm_curve(k);
                 continue;
             }
+            if (c.kind == GEAR || c.kind == RACK_AND_PINION) && !c.begun() && self.coupling_live(&c) {
+                self.begin_reading(k);
+            }
             if c.kind == COORDS {
                 if self.coupling_live(&c) && c.impulse != 0.0 {
                     let side = self.coords_sides(&c);
@@ -499,12 +799,15 @@ impl World {
         }
     }
 
-    /// One pass over the couplings; `bias` is the pass that also closes the error.
-    pub fn solve_couplings(&mut self, h: f32, bias: bool) {
+    /// One pass over the couplings; `bias` is the pass that also closes the error. With `coords` false it solves every row but the
+    /// coordinates rows, which go before the joints (their rows are on what the joints' locks let them move, `Locks`); with it
+    /// true only the coordinates rows, which go after the joints: their row is on a joint's own coordinate and its give is the
+    /// four bodies' free response, so the joints must have answered first.
+    pub fn solve_couplings(&mut self, h: f32, bias: bool, coords: bool) {
         for place in self.window.couplings.0..self.window.couplings.1 {
             let k = self.uu(COUPLING_ORDER, place) as usize;
             let c = self.coupling(k);
-            if !self.coupling_live(&c) {
+            if !self.coupling_live(&c) || (c.kind == COORDS) != coords {
                 continue;
             }
             if c.kind == PATH {
@@ -518,6 +821,7 @@ impl World {
             let (row, rope) = self.coupling_row(&c);
             let (mut a, mut b) = (self.moving(c.a as usize), self.moving(c.b as usize));
             let (speed, inverse) = Self::coupling_speed(&c, &row, &a, &b);
+            let (speed, inverse) = self.locks_on([c.a, c.b]).through(self, &Self::coupling_ends(&c, &row), speed, inverse);
             if !(inverse > 0.0) {
                 continue;
             }
@@ -559,7 +863,7 @@ impl World {
         }
     }
 
-    /// After a substep's poses: the error a gear and a rack have built up follows from the speed they ended with.
+    /// After a substep's poses: a gear's and a rack's error read from them, and a coordinates row's from the speed it ended with.
     pub fn track_couplings(&mut self, h: f32) {
         for place in self.window.couplings.0..self.window.couplings.1 {
             let k = self.uu(COUPLING_ORDER, place) as usize;
@@ -575,14 +879,54 @@ impl World {
                 self.put_coupling(k, kept);
                 continue;
             }
-            let (row, _) = self.coupling_row(&c);
-            let (a, b) = (self.moving(c.a as usize), self.moving(c.b as usize));
-            let (speed, _) = Self::coupling_speed(&c, &row, &a, &b);
-            let mut kept = self.coupling(k);
-            kept.error = c.error + speed * h;
-            self.put_coupling(k, kept);
+            if c.begun() {
+                self.read_error(k);
+            }
         }
     }
+}
+
+/// The arc tangent of `z` in [0, 1], in doubles: two halvings, tan(x / 2) = tan x / (1 + sqrt(1 + tan^2 x)), bring it under
+/// tan(pi / 16), where nine terms of the series leave under 1e-14.
+fn arc_tangent64(z: f64) -> f64 {
+    let t = z / (1.0 + sqrt64(1.0 + z * z));
+    let t = t / (1.0 + sqrt64(1.0 + t * t));
+    let s = t * t;
+    let mut sum = 0.0;
+    for k in (0..9).rev() {
+        let term = 1.0 / (2 * k + 1) as f64;
+        sum = (if k % 2 == 0 { term } else { -term }) + s * sum;
+    }
+    4.0 * t * sum
+}
+
+/// The angle of (x, y) for x >= 0, from -pi / 2 to pi / 2, in doubles.
+fn half_atan2(y: f64, x: f64) -> f64 {
+    let size_y = if y < 0.0 { -y } else { y };
+    if size_y == 0.0 && x == 0.0 {
+        return 0.0;
+    }
+    let angle = if size_y <= x { arc_tangent64(size_y / x) } else { core::f64::consts::FRAC_PI_2 - arc_tangent64(x / size_y) };
+    if y < 0.0 { -angle } else { angle }
+}
+
+/// The turn from `start` to `now` about `axis` (in the body's frame), from -pi to pi: the twist of start^-1 now, 2 atan2(v . u, w)
+/// with the quaternion's sign taken so w >= 0. The product is in doubles, so the angle is as fine as the two f32 quaternions.
+fn twist(start: Q, now: Q, axis: [f32; 3]) -> f64 {
+    let (ax, ay, az, aw) = (-start.x as f64, -start.y as f64, -start.z as f64, start.w as f64);
+    let (bx, by, bz, bw) = (now.x as f64, now.y as f64, now.z as f64, now.w as f64);
+    let x = aw * bx + ax * bw + ay * bz - az * by;
+    let y = aw * by - ax * bz + ay * bw + az * bx;
+    let z = aw * bz + ax * by - ay * bx + az * bw;
+    let w = aw * bw - ax * bx - ay * by - az * bz;
+    let (ux, uy, uz) = (axis[0] as f64, axis[1] as f64, axis[2] as f64);
+    let length = sqrt64(ux * ux + uy * uy + uz * uz);
+    if !(length > 0.0) {
+        return 0.0;
+    }
+    let along = (x * ux + y * uy + z * uz) / length;
+    let (along, w) = if w < 0.0 { (-along, -w) } else { (along, w) };
+    2.0 * half_atan2(along, w)
 }
 
 /// One side of a coordinates coupling at the poses the bodies have now.
@@ -1013,9 +1357,10 @@ impl World {
         let mut c = self.coupling(k);
         let Some(s) = self.path_state(&c) else { return };
         c.last_span = s.span;
-        let (mut a, mut b) = (self.moving(c.a as usize), self.moving(c.b as usize));
+        let locks = self.locks_on([c.a, c.b]);
         let speed_of = |a: &Moving, b: &Moving, d: V3| d.dot(b.at(s.rb).sub(a.at(s.ra)));
         for row in 0..3 {
+            let (mut a, mut b) = (self.moving(c.a as usize), self.moving(c.b as usize));
             let (d, held) = match row {
                 0 => (s.n1, c.impulse_n1),
                 1 => (s.n2, c.impulse_n2),
@@ -1024,11 +1369,10 @@ impl World {
             if row == 2 && !(c.motor_force > 0.0) {
                 continue;
             }
-            let inverse = a.give(d, s.ra) + b.give(d, s.rb);
+            let (speed, inverse) = locks.through(self, &arm_ends(c.a as usize, c.b as usize, d, s.ra, s.rb), speed_of(&a, &b, d), a.give(d, s.ra) + b.give(d, s.rb));
             if !(inverse > 0.0) {
                 continue;
             }
-            let speed = speed_of(&a, &b, d);
             let (beta, gamma) = if row < 2 && c.hertz > 0.0 {
                 let mass = 1.0 / inverse;
                 let omega = 2.0 * core::f32::consts::PI * c.hertz;
@@ -1049,14 +1393,14 @@ impl World {
             }
             a.push(d.scale(-change), s.ra);
             b.push(d.scale(change), s.rb);
+            self.settle(c.a as usize, &a);
+            self.settle(c.b as usize, &b);
             match row {
                 0 => c.impulse_n1 += change,
                 1 => c.impulse_n2 += change,
                 _ => c.impulse += change,
             }
         }
-        self.settle(c.a as usize, &a);
-        self.settle(c.b as usize, &b);
         self.put_coupling(k, c);
         let _ = s.on;
     }

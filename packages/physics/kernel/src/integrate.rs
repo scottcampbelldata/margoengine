@@ -347,8 +347,12 @@ impl World {
             };
             for pass in 1..=all {
                 let least = most.saturating_add(1).saturating_sub(pass);
+                // The couplings go first: each is solved on what the joints' locks let it move (couplings.rs, `Locks`), and the
+                // joints' path solve that follows takes back the rest of its push. A coordinates row reads the joints' own
+                // coordinates and goes after them, as before.
+                self.solve_couplings(h, pass == all, false);
                 self.solve_joints(h, stiffness, if pass == all { Pass::Push } else { Pass::Settle }, least, u32::MAX);
-                self.solve_couplings(h, pass == all);
+                self.solve_couplings(h, pass == all, true);
                 // With no relaxing pass the last pushing one is the last word, and friction is always solved in it.
                 self.solve_contacts(h, stiffness, true, substep as usize, least, relaxes == 0 && pass == all);
             }

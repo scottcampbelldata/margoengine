@@ -885,6 +885,27 @@ impl World {
     fn view(&self, row: usize) -> View {
         unsafe { *(self.f(JOINT_SCRATCH).add(row * JOINT_WORDS as usize) as *const View) }
     }
+
+    /// The rows of the locks a joint's path solve holds this step, as its view read them at the substep's poses: each is
+    /// (d, ta, tb), with Cdot = d . (vB - vA) + tb . wB - ta . wA. Returns the joint's two bodies and how many rows it wrote, or
+    /// None for a joint the step does not solve (gone, idle, or not listed). A coupling reads them for the Schur complement of
+    /// its row (couplings.rs, `Locks`).
+    pub(crate) fn solved_locks(&self, joint: usize, out: &mut [(V3, V3, V3); 6]) -> Option<(usize, usize, usize)> {
+        let flags = self.uu(JOINT_FLAGS, joint);
+        if flags & (JOINT_ALIVE | JOINT_IDLE) != JOINT_ALIVE || self.uu(JOINT_SEEN, joint) != self.header().steps + 1 {
+            return None;
+        }
+        let (m, axes) = lock_rows(flags);
+        if m == 0 {
+            return None;
+        }
+        let view = self.view(joint);
+        for r in 0..m {
+            let row = &view.rows[axes[r]];
+            out[r] = (row.d, row.ta, row.tb);
+        }
+        Some((self.uu(JOINT_A, joint) as usize, self.uu(JOINT_B, joint) as usize, m))
+    }
     /// The doubles of a joint's scratch.
     #[inline(always)]
     pub(crate) fn doubles(&self, row: usize) -> *mut f64 {
