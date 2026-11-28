@@ -1428,8 +1428,8 @@ eye one sample at a time, which the WebGL2 layer answers with the resolved depth
 samplers), so under an effect an AR edge pixel's coverage there is 0 or 1, where WebGPU keeps quarters; the colour's
 brightest channel still gives a partly covered pixel partial alpha where coverage is 0. With no effect the two match.
 Content drawn after the main pass that writes no depth (a line with depthWrite false, a glow) takes its own alpha as
-coverage on both (KB-XR-ARNODEPTH1, fixed). Transparent meshes inside the main pass that write no depth still take their
-brightest channel: xr's AR alpha pass runs after the main pass, so it cannot tell their pixels from empty ones. Under
+coverage on both (KB-XR-ARNODEPTH1, fixed), and so do transparent glTF and materials meshes that write no depth: gltf/pbr
+draws them at frame-graph order 1, after xr's AR alpha pass, and core's main pass holds no blended draw. Under
 FXAA a depthless line's one-pixel rim is partly covered, colour and alpha alike, as the filter blends it.
 
 ## Geometry

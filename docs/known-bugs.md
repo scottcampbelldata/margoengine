@@ -241,7 +241,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   depthCompare 'equal', alpha-only mask), as TransparentCanvas does, so later draws leave their coverage in alpha; the blit
   takes the largest of depth share, that alpha and the brightest channel; AR eyes mark the engine premultiplied for the
   session (`markPremultiplied`, shared/straight-display.js). Regression: the same check's depthless round (40 checks
-  failed without the fix). Main-pass transparents without depth still take the brightest channel (docs/limits.md).
+  failed without the fix). Transparent meshes need nothing more: core's main pass (order 0) draws only core meshes,
+  which have no blending, and gltf/pbr draws every model, glTF and materials blended primitives included, at order 1,
+  after the alpha pass. The same check's veil round (added 2026-11-27) holds a depthless glTF BLEND pane and a
+  materials pane at alpha 0.6 to their own 153 of 255 under no effect, Tonemap and TAA, WebGPU and the layer, 1x and 4x.
 - **Sources:** T. Porter and T. Duff, "Compositing Digital Images", SIGGRAPH 1984,
   https://graphics.pixar.com/library/Compositing/paper.pdf ; A. R. Smith, "Image Compositing Fundamentals", Microsoft
   Technical Memo 4, 1995, http://alvyray.com/Memos/CG/Microsoft/4_comp.pdf ; WebXR Device API (W3C), XREnvironmentBlendMode

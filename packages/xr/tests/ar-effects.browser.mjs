@@ -6,6 +6,9 @@
 // KB-XR-ARNODEPTH1: the same line with its default depthWrite false writes no depth, so its alpha is its own coverage
 // (xr's AR alpha pass): every pixel two inside it stays opaque under every effect, as with depth. Before, it took its
 // brightest channel (green 241 of 255 under Tonemap) and TAA made empty space opaque.
+// Transparent panes that write no depth, a glTF BLEND primitive and a materials Material, take their own alpha (0.6)
+// as coverage too: gltf/pbr draws every model at frame-graph order 1, after the alpha pass (1e-6), and core's main
+// pass (0) draws only core meshes, which have no blending. This round keeps it so (docs/limits.md).
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -40,6 +43,54 @@ html = replace(
   html,
   'const xr = await XR.create(engine);',
   `const effect = query.get('effect');
+  // Two dark panes in empty space that write no depth: a glTF BLEND primitive and a transparent materials Material.
+  if (query.get('veil') === '1') {
+    const { parseGLTF } = await import('/packages/gltf/dist/pbr.js');
+    const { Material, createMesh } = await import('/packages/materials/dist/index.js');
+    const quad = (x0, x1) => ({
+      positions: [x0, 2.4, 0.5, x1, 2.4, 0.5, x1, 3.1, 0.5, x0, 3.1, 0.5],
+      normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+      indices: [0, 1, 2, 0, 2, 3],
+    });
+    const left = quad(-1.4, -0.1),
+      data = new Uint8Array(48 + 48 + 12);
+    data.set(new Uint8Array(new Float32Array(left.positions).buffer), 0);
+    data.set(new Uint8Array(new Float32Array(left.normals).buffer), 48);
+    data.set(new Uint8Array(new Uint16Array(left.indices).buffer), 96);
+    parseGLTF(
+      engine,
+      {
+        asset: { version: '2.0' },
+        buffers: [{ byteLength: data.byteLength }],
+        bufferViews: [
+          { buffer: 0, byteOffset: 0, byteLength: 48 },
+          { buffer: 0, byteOffset: 48, byteLength: 48 },
+          { buffer: 0, byteOffset: 96, byteLength: 12 },
+        ],
+        accessors: [
+          { bufferView: 0, componentType: 5126, count: 4, type: 'VEC3', min: [-1.4, 2.4, 0.5], max: [-0.1, 3.1, 0.5] },
+          { bufferView: 1, componentType: 5126, count: 4, type: 'VEC3' },
+          { bufferView: 2, componentType: 5123, count: 6, type: 'SCALAR' },
+        ],
+        materials: [
+          {
+            alphaMode: 'BLEND',
+            pbrMetallicRoughness: { baseColorFactor: [0.05, 0.05, 0.2, 0.6], metallicFactor: 0, roughnessFactor: 0.8 },
+          },
+        ],
+        meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0 }] }],
+        nodes: [{ mesh: 0 }],
+        scenes: [{ nodes: [0] }],
+        scene: 0,
+      },
+      [data],
+    );
+    createMesh(
+      engine,
+      quad(0.1, 1.4),
+      new Material({ shading: 'basic', color: [0.05, 0.05, 0.2], opacity: 0.6, transparent: true, depthWrite: false }),
+    );
+  }
   const from = async (path) => import('/packages/' + path + '.js');
   const attach = {
     none: async () => {},
@@ -68,14 +119,15 @@ html = replace(html, "requestSession('immersive-vr')", "requestSession('immersiv
 // `depth` is the shared scene-depth capture of water, html and contact lights; `stencil` the StencilBuffer.
 const effects = ['tonemap', 'dof', 'fxaa', 'smaa', 'bloom', 'ssao', 'taa', 'stack', 'depth', 'stencil'];
 
-/** The pixels whose whole `radius` neighbourhood has alpha `value`. */
+/** The pixels whose whole `radius` neighbourhood has alpha `value` (or passes `value` when it is a function). */
 function inside(eye, value, radius) {
+  const pass = typeof value === 'function' ? value : (a) => a === value;
   const out = [];
   for (let y = radius; y < SIZE - radius; y++)
     for (let x = radius; x < SIZE - radius; x++) {
       let all = true;
       for (let j = -radius; all && j <= radius; j++)
-        for (let i = -radius; all && i <= radius; i++) all = eye[((y + j) * SIZE + x + i) * 4 + 3] === value;
+        for (let i = -radius; all && i <= radius; i++) all = pass(eye[((y + j) * SIZE + x + i) * 4 + 3]);
       if (all) out.push((y * SIZE + x) * 4 + 3);
     }
   return out;
@@ -95,10 +147,10 @@ try {
   await browser.page.route('**/packages/webgl2-compat/test/xr.html*', (route) =>
     route.fulfill({ status: 200, contentType: 'text/html', body: html }),
   );
-  const eyes = async (backend, samples, effect, lineDepth = 1) => {
-    const key = `${backend}/${samples}x/${effect}/line depth ${lineDepth}`;
+  const eyes = async (backend, samples, effect, lineDepth = 1, veil = 0) => {
+    const key = `${backend}/${samples}x/${effect}/line depth ${lineDepth}/veil ${veil}`;
     await browser.page.goto(
-      `${origin}/packages/webgl2-compat/test/xr.html?mode=${backend}&route=engine&samples=${samples}&effect=${effect}&lineDepth=${lineDepth}`,
+      `${origin}/packages/webgl2-compat/test/xr.html?mode=${backend}&route=engine&samples=${samples}&effect=${effect}&lineDepth=${lineDepth}&veil=${veil}`,
     );
     await browser.page.waitForFunction(() => window.ready, null, { timeout: 60000 });
     const result = await browser.page.evaluate(() => ({
@@ -139,6 +191,29 @@ try {
           };
           checks.push(check);
           if (check.solid < 3000 || check.empty < 20000 || check.seeThrough || check.opaqueEmpty) failures.push(check);
+        }
+      }
+      // The panes' pixels, empty space without them, take the panes' own alpha (0.6, 153 of 255) as coverage under no
+      // effect, Tonemap and TAA, not their brightest channel (about 31).
+      for (const effect of ['none', 'tonemap', 'taa']) {
+        const drawn = await eyes(backend, samples, effect, 1, 1);
+        for (let eye = 0; eye < 2; eye++) {
+          // Pane pixels two inside its edge (at 4x an edge pixel is partly covered), where the eye without it is empty.
+          const empty = new Set(inside(base[eye], 0, 3)),
+            veiled = inside(drawn[eye], (a) => a !== 0, 2).filter((i) => empty.has(i)),
+            wrong = veiled.filter((i) => Math.abs(drawn[eye][i] - 153) > 3);
+          const check = {
+            backend,
+            samples,
+            effect,
+            veil: 1,
+            eye,
+            veiled: veiled.length,
+            wrong: wrong.length,
+            sample: wrong.slice(0, 4).map((i) => drawn[eye][i]),
+          };
+          checks.push(check);
+          if (check.veiled < 2000 || check.wrong) failures.push(check);
         }
       }
     }

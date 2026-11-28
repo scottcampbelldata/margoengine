@@ -3354,7 +3354,10 @@ eyes also mark the engine premultiplied (`markPremultiplied` in shared/straight-
 for the session, so TAA keeps coverage in its history and display transforms take straight colour. Evidence for the
 depthless case: `packages/xr/tests/ar-effects.browser.mjs`, a line with depthWrite false stays opaque two pixels inside
 under every effect on WebGPU and the layer at 1x and 4x; without the fix 40 checks failed (Tonemap, DOF, Bloom, SSAO, the
-stack). Depthless draws inside the main pass (transparent meshes that write no depth) still take the brightest channel.
+stack). Transparent meshes need nothing more: core's main pass (order 0) draws only core meshes, which have no blending,
+and gltf/pbr draws every model at order 1, after the alpha pass; the check's veil round holds a depthless glTF BLEND pane
+and a materials pane at alpha 0.6 to their own coverage (153 of 255) under no effect, Tonemap and TAA, on both backends
+at 1x and 4x. A package that ever draws blended content inside the main pass would need its own alpha handling there.
 Evidence: `tests/modern-xr-passes.ts` in `modern:test:xr:browser`, both eyes byte-equal to a desktop render of the same
 camera with a line, a point cloud, terrain and bloom, on the RTX A6000 with a stand-in session. On the WebGL2 layer
 (`installXR()`), `packages/webgl2-compat/test/xr-browser.mjs` (in the layer's `test:gpu`) runs the same route with a line
