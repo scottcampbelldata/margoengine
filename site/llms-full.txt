@@ -16954,10 +16954,13 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   early probe). `generateConiferMesh` now starts each whorled spray at the stem's axis with its inner rows covering the
   angle to the next spray. Regression: `packages/procedural/test/conifer-hub.test.js` (a ring round the stem at every
   whorl is 100 percent open before, 0 after). Early 44 to 31 speckles (21.3 to 15.0 ppm); mid 96 to 95.
-- **Cause 2 (open):** most of what is left, and nearly all of mid, sits in the smoke band at y 945 and below: distant
-  firs whose sprays are a pixel wide or less draw their tiers as dotted lines against the fire glow, and gaps between
-  the outer sprays of mid-distance crowns. Next: check which conifer level those trees draw at (`coniferLevels` rings in
-  the timber-valley biome) and whether a sub-pixel spray should already be the middle or imposter level.
+- **Cause 2 (open):** most of what is left, and nearly all of mid, sits in the smoke band at y 945 and below. Not
+  sub-pixel sprays drawn at the wrong ring: with the screen-space rings of KB-BIOMES-SCREENLOD1 (`lodPixels: 1`) a
+  full-size fir's middle sprays stay over a rendered pixel past the 800 m ring (0.39 m at 2160 rows and 45 degrees is a
+  pixel at about 970 m), and an A/B on current main (rings off, then on) read early 19.8 to 25.1 ppm and mid 47.4 to
+  48.4. The speckles are the distant canopy's gaps against the fire glow, seen behind and between near leaves
+  (blowup early, x 1600 to 1760, y 1040 to 1077). Next: the far canopy's coverage against a bright background (the
+  imposter's cut-out at distance, and the middle mesh's gaps), not its ring.
 
 ### Open 2026-11-28: shimmerMoving reads a defocused swaying leaf's soft edge as shimmer (KB-LOOK-TV-SHIMMER2, rest, headless look, scatter)
 
@@ -17521,6 +17524,27 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `ScatterVelocityOptions.coverage` (default 0.5), far rings first. 37,608 pixels move now (37,584 on the WebGL2 layer
   against 35,849). Regression: `packages/scatter/test/velocity.browser.mjs` (the `coverage: false` run against the
   default, WebGPU and `MARGO_COMPAT=1`).
+
+### Fixed 2026-11-28: tree LOD rings were chosen by distance alone, whatever the lens or resolution (KB-BIOMES-SCREENLOD1, scatter, biomes)
+
+- **Repro:** `BiomeObjects` set every tree's rings at `[0.15 r, 0.4 r, r]` metres; scatter's cull picked a ring by
+  the instance's distance only, so a spray's size on screen at the hand-over followed the camera's field of view and
+  viewport height: through a wide lens or on a small viewport a middle spray could fall under a pixel before the
+  imposter took over.
+- **Fix:** scatter `lodSize` (the near and middle mesh's finest feature at scale 1) and `lodPixels` (default 1): each
+  of the first two rings ends at its distance or where that feature, times the instance's scale, projects under
+  `lodPixels` viewport pixels (from the camera's pixel footprint each frame), whichever is first. The ends move only
+  past 5 percent of footprint drift and are set from the footprint plus that 5 percent (hysteresis, and never under a
+  pixel). The cull text is unchanged without `lodSize` (`screenRingCode`), and the WebGL2 candidate kernel and
+  ScatterTiles take it. Biomes measures each tree's spray width (`foliageWidth`, area-weighted tenth percentile of the
+  triangles' narrowest widths) and passes it when `BiomeObjects` is given `lodPixels`. Not on by default: on the
+  timber-valley blowup it raised speckle (KB-LOOK-TV-SPECKLE above), so the manager decides the default. Source:
+  Luebke, Reddy, Cohen, Varshney, Watson and Huebner, Level of Detail for 3D Graphics (2003), ch. 4.
+- **Regression:** `packages/scatter/test/lod.browser.mjs` (WebGPU and `--compat`): at 256 and 512 rows, 45 and 30
+  degrees and scale 1 and 2, each ring hands over within 2 percent of where its feature projects to a pixel, the ends
+  scale with resolution and scale, a drawn feature is never under a pixel, a 3 percent zoom keeps the rings and a 10
+  percent one moves them; `packages/scatter/test/screen-lod.test.js`; `packages/biomes/tests/objects.test.js`,
+  "with lodPixels".
 
 ### Fixed 2026-11-28: motionBlur called a correctly smeared mover narrower than its smear sharp, and passed a half-length one (KB-LOOK-TV-MBNARROW1, headless look)
 
@@ -45275,6 +45299,8 @@ The third distance remains the culling boundary. `edgeShrink` (world units,
 default 0) scales instances down to zero over that last stretch instead of
 cutting them at it, so the far edge of a grass field recedes without popping;
 it needs no fade mask or `discard`, so it also suits the phone tier.
+
+### Screen-space rings: `lodSize` and `lodPixels`
 
 [README continues: https://margoengine.com/llms/packages/scatter.md]
 
