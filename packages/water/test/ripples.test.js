@@ -130,26 +130,3 @@ test('ripples obstacles, trackBody, disturbRay, and setDebug validate inputs and
   assert.throws(() => ripples.setDebug(true), { code: 'disposed' });
   surface.dispose();
 });
-
-test('the ripple field joins the surface shader with each function declared once (KB-WATER-RIPPLEDUP1)', async () => {
-  // The surface's ripple layers gained `rippleAt` (KB-WATER-GL2LINK1) while the ripple field read its grid through a
-  // `rippleAt` of its own: every surface with Ripples failed to compile, "redeclaration of 'rippleAt'".
-  const { optionalGPU } = await import('../../../tests/support/optional-gpu.js');
-  const h = optionalGPU(),
-    water = new Water({ segments: 4 });
-  h.engine.use(water);
-  h.engine.use(new Ripples({ surface: water }));
-  h.frame();
-  const codes = h.pipelines
-    .flatMap((p) => [p.vertex?.module?.code, p.fragment?.module?.code])
-    .filter((code) => code?.includes('rippleSample'));
-  assert.ok(codes.length > 0, 'a surface stage reads the ripple field');
-  for (const code of codes) {
-    const names = [...code.matchAll(/\bfn\s+([A-Za-z_]\w*)/g)].map((m) => m[1]);
-    assert.deepEqual(
-      names.filter((n, i) => names.indexOf(n) !== i),
-      [],
-      'no function is declared twice',
-    );
-  }
-});

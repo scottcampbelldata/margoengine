@@ -263,7 +263,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** the surface's halves are `rippleLayerAt` and `rippleLayerSlope` (`packages/water/src/index.ts`); the same
   calls with the same arguments, so the pixels do not change.
 - **Regression:** `packages/water/test/water.test.js`, "a Water with Ripples attached declares each WGSL function once"
-  (fails on the parent with `['rippleAt']`).
+  (fails on the parent with `['rippleAt']`). Lane A renamed the other side too (f40f18e83a, KB-WATER-RIPPLEDUP1): the
+  field's grid read is `rippleCell`; that commit's duplicate test was removed and this one kept.
 
 ### Fixed 2026-11-28: the water surface program took over 5 s to link on the WebGL2 layer (KB-WATER-GL2LINK1, water)
 
@@ -16668,24 +16669,14 @@ voxel path tracer is excluded on this hardware (hardware check).
   moves; the coverage test counts them. A rewrite of the existing corpus gave 1,410 of 3,256 modules authors (gltf
   modules holding shared, clustered and shadows text, for example).
 - **Fix, water:** none needed: KB-WATER-GL2LINK1 brought the base fragment to 157,264 characters, and the recorded
-  optics variants pass `corpus-inline.test.js`. Recording them found a second water bug, KB-WATER-RIPPLEDUP1 below.
+  optics variants pass `corpus-inline.test.js`. Recording them found the `rippleAt` clash fixed above ("a Water with
+  interactive Ripples failed to compile").
 - **Evidence:** `node scripts/record-wgsl-corpus.mjs --add "--suites=check:gpu-packages -- --no-build --only=optics"`
   passes both suites and adds 101 modules (3,357 kept); `corpus.test.js`, `corpus-inline.test.js` and the other corpus
   readers in `packages/webgl2-compat/test` pass (35 tests).
 - **Regression:** `packages/webgl2-compat/test/corpus.test.js` "a lazily compiled module is credited to the package
   whose WGSL it holds (KB-CORPUS-OPTICS1)" (optics' screens fragment under a shader and core stack; without the
   `authors` option the module names no optics).
-
-### Fixed 2026-11-28: every water surface with Ripples failed to compile, "redeclaration of 'rippleAt'" (KB-WATER-RIPPLEDUP1, water)
-
-- **Repro:** `water test:gpu:optics` on main at efb3b28b72: `flow-map.browser.mjs` throws `WGSL compile errors:
-  redeclaration of 'rippleAt'`, and the suite's later checks never run.
-- **Cause:** bfb7d64cd8 (KB-WATER-GL2LINK1) split the surface's ripple layers around their noise with a new
-  `fn rippleAt(xz, turn, ...)` in `packages/water/src/index.ts`; the ripple field (`packages/water/src/ripples.ts`),
-  which `addSurfaceEffect` joins to the same surface module, already read its grid through `fn rippleAt(p:vec2i)`.
-- **Fix:** the ripple field's grid read is `rippleCell`. Same code otherwise, so the same pixels.
-- **Regression:** `packages/water/test/ripples.test.js` "the ripple field joins the surface shader with each function
-  declared once (KB-WATER-RIPPLEDUP1)" (fails on the old build with `rippleAt` twice); `water test:gpu:optics` passes.
 
 ### Fixed 2026-11-28: local CI kept CRLF copies of files whose .gitattributes rule became -text or eol=lf (local CI runner, KB-CI-EOL-STALE1)
 
