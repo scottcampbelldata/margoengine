@@ -695,6 +695,67 @@ https://doi.org/10.1145/199404.199422 (a portal as a screen region through which
 the reference limit, the shared-material refusal, restoring on remove, a second-scene window against that scene drawn
 alone, resize, device restore and disposal; add `-- --compat` for the WebGL2 compatibility layer.
 
+## Rooms behind windows: optional /interior-mapping
+
+`interiorMapping(options)` makes a window material with a room behind the glass, traced in the fragment shader, so a
+facade shows depth and parallax with no geometry behind its windows (van Dongen's interior mapping). Rooms are the
+cells of a grid along each upright facade: `width` apart (or `[along x, along z]`), on the storeys of `floors` (or every
+`height`), `depth` deep, counted from `origin` and turned with the building's `yaw`. `facadeRooms(building)` reads that
+grid from a `generateBuilding` result, one room to a bay and storey: give the material to its `glass` part and build it
+with `interior: 'none'`. The surface is dark glossy glass, so the sun and environment reflect in it.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `origin`, `yaw` | `[0, 0, 0]`, 0 | Where rooms are counted from, and the building's turn |
+| `width`, `height`, `floors`, `depth` | 3, 2.8, none, 4 | The room grid, metres; `floors` holds 2 to 33 levels |
+| `wallColor`, `floorColor`, `ceilingColor` | warm white, brown, white | Linear colours of plain rooms |
+| `variation`, `seed` | 0.5, 0 | How far rooms differ, and which get which look |
+| `daylight`, `lit`, `lamp`, `lampColor` | 0.35, 0.15, 1.4, `[1, 0.78, 0.52]` | Light in the rooms, the share with a lamp on; live |
+| `furniture`, `curtains`, `blinds` | 0.7, 0.35, 0.2 | Shares of rooms furnished and windows dressed; live |
+| `tint` | `[0.9, 0.95, 0.93]` | The glass's tint on what comes through |
+| `map`, `tiles`, `backWall` | none, `[1, 1]`, 0.5 | Pictured rooms, below |
+
+`map` replaces the plain rooms with pictures. A cube texture (`CubeTexture`) is one room seen from the middle of its
+box, the window toward +Z. A 2D texture is an atlas of `tiles` rooms, each drawn in one-point perspective with the back
+wall filling the middle `backWall` share of its tile. Either way each cell takes a room, sometimes mirrored.
+`traceRoom(point, normal, direction, grid)` is the shader's trace on the CPU, for picking a room.
+`@margoengine/materials/settings` has the live rows (`interior.*`, `interiorOptionsFromSettings`, `applyInteriorSettings`).
+
+```ts
+import {Engine} from '@margoengine/core';
+import {Material, createMesh} from '@margoengine/materials';
+import {facadeRooms, interiorMapping, traceRoom} from '@margoengine/materials/interior-mapping';
+import {generateBuilding} from '@margoengine/procedural/building-rules';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+canvas.width = 640; canvas.height = 360;
+const engine = await Engine.create(canvas, {camera: {position: [16, 7, 30], target: [0, 5, 8]}});
+const building = generateBuilding({style: 'western-1910-brick', interior: 'none'});
+const windows = interiorMapping({...facadeRooms(building), lit: 0.3});
+for (const [name, geometry] of Object.entries(building.parts)) {
+  const look = building.palette[name as keyof typeof building.palette];
+  createMesh(engine, geometry, name === 'glass' ? windows : new Material({color: [...look.color, 1], roughness: look.roughness}));
+}
+windows.uniforms.daylight = 0.05; // evening: the lamps carry the rooms
+engine.render();
+const room = traceRoom([0, 5, 12.2], [0, 0, 1], [0, -0.3, -1], facadeRooms(building));
+console.log(room?.face, room?.cell);
+```
+
+Limits: walls must stand upright (level surfaces are left as they are), rooms are boxes on one grid a facade (a bay
+window or a dormer looks into its wall's rooms), one furniture plane a room, and a room's light neither casts shadows
+nor lights the street.
+
+Sources: J. van Dongen, "Interior Mapping: A New Technique for Rendering Realistic Buildings", Computer Graphics
+International 2008, https://joostdevblog.blogspot.com/2018/09/interior-mapping-real-rooms-without.html; T. Kay and
+J. Kajiya, "Ray Tracing Complex Scenes", SIGGRAPH 1986, https://doi.org/10.1145/15886.15916; S. Lagarde and
+A. Zanuttini, "Local Image-based Lighting with Parallax-corrected Cubemaps", SIGGRAPH 2012 Talks,
+https://doi.org/10.1145/2343045.2343094; M. Jarzynski and M. Olano, "Hash Functions for GPU Rendering", JCGT 9(3),
+2020, https://jcgt.org/published/0009/03/02/; C. Schlick, "An Inexpensive BRDF Model for Physically-based Rendering",
+Computer Graphics Forum 13(3), 1994, https://doi.org/10.1111/1467-8659.1330233.
+
+`npm run test:gpu:interior-mapping --workspace @margoengine/materials` checks, on WebGPU and the WebGL2 compatibility
+layer, that each sampled pixel shows the face the CPU trace gives for plain, cube and atlas rooms from two views.
+
 ## Polygon offset and stencil
 
 `polygonOffset`, `polygonOffsetFactor`, `polygonOffsetUnits` and `polygonOffsetClamp` are live.
@@ -1289,7 +1350,8 @@ timed. `eye()` on a mesh far from a sphere refracts by its own normals, so the i
 
 `MATERIAL_SETTINGS` lists skin's and the eye's controls in the shared row shape: `skin.melanin`, `skin.melaninBlend`,
 `skin.hemoglobin`, `skin.oxygenation` (null keeps the published profile), `skin.thickness`, and `eye.pupil`,
-`eye.irisColor`, `eye.wetness` (live), `eye.corneaRadius`, `eye.depth`, `eye.irisRadius`. `skinFromSettings` and
+`eye.irisColor`, `eye.wetness` (live), `eye.corneaRadius`, `eye.depth`, `eye.irisRadius`, and the live
+[interior mapping](#rooms-behind-windows-optional-interior-mapping) rows `interior.*`. `skinFromSettings` and
 `eyeFromSettings` build features from them, and `applyEyeSettings` writes the live eye rows on a feature, so the next frame
 draws them.
 

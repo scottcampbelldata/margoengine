@@ -1463,6 +1463,10 @@
       "types": "./dist/materials/settings.d.ts",
       "import": "./dist/materials/settings.js"
     },
+    "./materials/interior-mapping": {
+      "types": "./dist/materials/interior-mapping.d.ts",
+      "import": "./dist/materials/interior-mapping.js"
+    },
     "./materials/portal": {
       "types": "./dist/materials/portal.d.ts",
       "import": "./dist/materials/portal.js"

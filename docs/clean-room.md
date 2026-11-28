@@ -19165,3 +19165,25 @@ Design: pairs come from a sweep along one axis and are decided with a float64 fi
 pair, local edits that keep the mesh closed: join corners within a reach, put a corner into a nearby edge or face,
 split two nearby edges at one point; then the thin-triangle pass, then test again. The reach doubles from 2^-23 to 2^-16
 of the coordinates and the state with the fewest pairs is returned. It is not proven to reach zero.
+
+
+## Interior mapping: materials/interior-mapping (2026-11-27)
+
+Written from the papers below, read as text or cited for their published method; no other engine's or project's code was
+read.
+
+- J. van Dongen, "Interior Mapping: A New Technique for Rendering Realistic Buildings", Computer Graphics International
+  2008, with the author's account at https://joostdevblog.blogspot.com/2018/09/interior-mapping-real-rooms-without.html.
+  Used: rooms as the cells between regularly spaced planes, the view ray cut by the nearest, a plane inside the room for
+  furnishings, pictured rooms.
+- T. Kay and J. Kajiya, "Ray Tracing Complex Scenes", SIGGRAPH 1986, https://doi.org/10.1145/15886.15916. Used: the
+  exit from a box as the least of the three slab exits.
+- S. Lagarde and A. Zanuttini, "Local Image-based Lighting with Parallax-corrected Cubemaps", SIGGRAPH 2012 Talks,
+  https://doi.org/10.1145/2343045.2343094. Used: a cube picture looked up toward the hit on its box.
+- M. Jarzynski and M. Olano, "Hash Functions for GPU Rendering", JCGT 9(3), 2020,
+  https://jcgt.org/published/0009/03/02/. Used: pcg3d, written from its published description.
+- C. Schlick, "An Inexpensive BRDF Model for Physically-based Rendering", Computer Graphics Forum 13(3), 1994,
+  https://doi.org/10.1111/1467-8659.1330233. Used: the Fresnel share the glass reflects.
+
+The atlas projection (scale k / (k + z) with k = b / (1 - b) for a back wall share b) is one-point perspective, derived
+here.

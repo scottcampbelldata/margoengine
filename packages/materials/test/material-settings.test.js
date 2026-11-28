@@ -5,10 +5,13 @@ import {
   MATERIAL_LIVE_SETTINGS,
   MATERIAL_SETTINGS,
   applyEyeSettings,
+  applyInteriorSettings,
+  interiorOptionsFromSettings,
   eyeFromSettings,
   materialSettingDefaults,
   skinFromSettings,
 } from '../dist/settings.js';
+import { interiorMapping } from '../dist/interior-mapping.js';
 
 test('skin and eye slider rows share the row shape and build their features', () => {
   const names = MATERIAL_SETTINGS.map((r) => r.name);
@@ -21,7 +24,19 @@ test('skin and eye slider rows share the row shape and build their features', ()
   }
   assert.deepEqual(
     MATERIAL_LIVE_SETTINGS.map((r) => r.name),
-    ['eye.pupil', 'eye.irisColor', 'eye.wetness'],
+    [
+      'eye.pupil',
+      'eye.irisColor',
+      'eye.wetness',
+      'interior.daylight',
+      'interior.lit',
+      'interior.lamp',
+      'interior.lampColor',
+      'interior.variation',
+      'interior.furniture',
+      'interior.curtains',
+      'interior.blinds',
+    ],
   );
   const defaults = materialSettingDefaults();
   assert.equal(defaults['skin.melanin'], null);
@@ -41,4 +56,21 @@ test('skin and eye slider rows share the row shape and build their features', ()
   assert.throws(() => applyEyeSettings(live, { 'eye.depth': 0.2 }), RangeError);
   assert.throws(() => skinFromSettings({ 'skin.melanin': 0.9 }), RangeError);
   assert.throws(() => skinFromSettings({ 'skin.nose': 1 }), TypeError);
+});
+
+test('interior rows build the material and write it live, their defaults its own', () => {
+  const made = interiorMapping(interiorOptionsFromSettings({ 'interior.lit': 0.6 }, { depth: 2 }));
+  assert.ok(Math.abs(made.uniforms.lit - 0.6) < 1e-6);
+  assert.equal(made.uniforms.depth, 2);
+  const plain = interiorMapping();
+  for (const row of MATERIAL_SETTINGS.filter((r) => r.group === 'interior')) {
+    const key = row.name.slice('interior.'.length),
+      built = [plain.uniforms[key]].flat().flatMap((v) => (typeof v === 'number' ? [v] : [...v]));
+    [row.default].flat().forEach((v, k) => assert.ok(Math.abs(built[k] - v) < 1e-6, row.name));
+  }
+  applyInteriorSettings(made, { 'interior.daylight': 0.9, 'interior.lampColor': [0.5, 0.5, 1] });
+  assert.ok(Math.abs(made.uniforms.daylight - 0.9) < 1e-6);
+  assert.deepEqual([...made.uniforms.lampColor], [0.5, 0.5, 1]);
+  assert.ok(Math.abs(made.uniforms.lit - 0.15) < 1e-6, 'a row left out takes its default');
+  assert.throws(() => applyInteriorSettings(made, { 'interior.lit': 2 }), RangeError);
 });

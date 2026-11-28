@@ -1144,7 +1144,8 @@ doors) and furnishing blocks of the period (chabudai, zabuton and tansu; table, 
 shop counter and shelves; office desks; stacked crates), each placed only where it blocks no window, doorway or door.
 `cells` (the default at `far`) builds one five-faced room cell behind each window instead, the cell that interior
 mapping traces (van Dongen 2008) made as geometry, ten triangles a window; `none` keeps the inner wall faces and
-floors only. The result lists `rooms` (use, floor rectangle, level, clear height, area), `furniture` (kind and box),
+floors only. With `none`, `@margoengine/materials/interior-mapping` can draw a room behind each window of the
+`glass` part in the shader instead (`facadeRooms(building)`). The result lists `rooms` (use, floor rectangle, level, clear height, area), `furniture` (kind and box),
 `doorways` and `stairs`, all in local metres.
 
 Between the storeys of furnished rooms stands a stair: a dog-leg of two flights and a half landing, stacked from floor

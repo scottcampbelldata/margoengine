@@ -18,7 +18,7 @@ export interface MaterialSetting extends SettingRow {
 
 export type MaterialSettingColor = readonly [number, number, number];
 
-export type MaterialSettingGroup = 'skin' | 'eye';
+export type MaterialSettingGroup = 'skin' | 'eye' | 'interior';
 
 export type MaterialSettingValue = number | MaterialSettingColor | null;
 
@@ -26,7 +26,11 @@ export type MaterialSettingValues = Readonly<Record<string, MaterialSettingValue
 
 export function applyEyeSettings(feature: EyeFeature, values?: MaterialSettingValues): void;
 
+export function applyInteriorSettings(material: WgslMaterial, values?: MaterialSettingValues): void;
+
 export function eyeFromSettings(values?: MaterialSettingValues, base?: EyeOptions): EyeFeature;
+
+export function interiorOptionsFromSettings(values?: MaterialSettingValues, base?: InteriorMappingOptions): InteriorMappingOptions;
 
 export function materialSettingDefaults(): Record<string, MaterialSettingValue>;
 
@@ -144,6 +148,25 @@ interface GeometryRange {
 }
 
 type ImageSource = ImageBitmap | HTMLImageElement | HTMLCanvasElement | OffscreenCanvas | HTMLVideoElement | VideoFrame;
+
+interface InteriorMappingOptions extends RoomGrid, Omit<MaterialOptions, 'shading'> {
+    wallColor?: Vec3;
+    floorColor?: Vec3;
+    ceilingColor?: Vec3;
+    variation?: number;
+    daylight?: number;
+    lit?: number;
+    lampColor?: Vec3;
+    lamp?: number;
+    furniture?: number;
+    curtains?: number;
+    blinds?: number;
+    tint?: Vec3;
+    seed?: number;
+    map?: Texture;
+    tiles?: readonly [number, number];
+    backWall?: number;
+}
 
 type LiveColor = number[] & {
     set(value: ColorInput): number[];
@@ -587,6 +610,15 @@ type RawImage = {
     height: number;
 };
 
+interface RoomGrid {
+    origin?: Vec3;
+    yaw?: number;
+    width?: number | readonly [number, number];
+    height?: number;
+    floors?: readonly number[];
+    depth?: number;
+}
+
 type SettingColor = readonly [number, number, number];
 
 interface SettingRow {
@@ -709,12 +741,30 @@ interface TranscodedTexture {
 
 type TransmissionBlend = 'auto' | 'two-draw' | 'dual-source';
 
+type Vec3 = readonly [number, number, number];
+
 interface VertexAttribute {
     data: ArrayLike<number>;
     type: VertexAttributeType;
 }
 
 type VertexAttributeType = 'f32' | 'vec2f' | 'vec3f' | 'vec4f' | 'i32' | 'vec2i' | 'vec3i' | 'vec4i' | 'u32' | 'vec2u' | 'vec3u' | 'vec4u';
+
+class WgslMaterial extends Material {
+    readonly wgsl: string;
+    readonly uniforms: Record<string, number | Float32Array>;
+    readonly textures: Record<string, Texture>;
+    constructor(options: WgslMaterialOptions);
+    clone(): this;
+    shader(source: string, group: number): string;
+    bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[];
+}
+
+interface WgslMaterialOptions extends MaterialOptions {
+    wgsl: string;
+    uniforms?: Readonly<Record<string, number | readonly number[]>>;
+    textures?: Readonly<Record<string, Texture>>;
+}
 
 type Wrap = 'repeat' | 'clamp' | 'mirror';
 

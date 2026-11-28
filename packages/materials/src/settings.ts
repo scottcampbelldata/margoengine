@@ -3,7 +3,8 @@
 // and Jensen 2006) and the depth light passes through; they are `live: false`, as a new profile is fitted and its table
 // built, so `skinFromSettings` makes a new feature. The eye's pupil, iris colour and tear film are read into its uniform
 // each frame, so `applyEyeSettings` writes them on a live feature; its shape rows are fixed at construction
-// (`eyeFromSettings`). Not rows: `unitsPerMeter` (the model's units, not a look) and the iris map (a texture).
+// (`eyeFromSettings`). Interior mapping's looks are all uniforms, so every interior row is live
+// (`interiorOptionsFromSettings`, `applyInteriorSettings`). Not rows: room colours' textures and the room grid, `unitsPerMeter` (the model's units, not a look) and the iris map (a texture).
 import {
   checkSettings,
   colorSetting,
@@ -15,6 +16,8 @@ import {
 } from '../../shared/settings.js';
 import { eye, type EyeFeature, type EyeOptions } from './eye.js';
 import { skin, type SkinOptions } from './skin.js';
+import type { InteriorMappingOptions } from './interior-mapping.js';
+import type { WgslMaterial } from './wgsl-material.js';
 import type { MaterialFeature } from './built-material.js';
 
 /** A colour value: three numbers, linear RGB. */
@@ -24,7 +27,7 @@ export type MaterialSettingValue = number | MaterialSettingColor | null;
 /** Values by setting name; a name left out takes its default. */
 export type MaterialSettingValues = Readonly<Record<string, MaterialSettingValue>>;
 /** The panel a setting sits in. */
-export type MaterialSettingGroup = 'skin' | 'eye';
+export type MaterialSettingGroup = 'skin' | 'eye' | 'interior';
 /** One control: the shared row shape with the material groups. */
 export interface MaterialSetting extends SettingRow {
   readonly group: MaterialSettingGroup;
@@ -114,6 +117,14 @@ export const MATERIAL_SETTINGS: readonly MaterialSetting[] = [
     'Iris radius. Fixed at construction.',
     false,
   ) as MaterialSetting,
+  number('interior.daylight', 'interior', 0.35, 0, 4, 0.01, '', 'Radiance of rooms from daylight.') as MaterialSetting,
+  number('interior.lit', 'interior', 0.15, 0, 1, 0.01, 'share', 'Rooms with a lamp on.') as MaterialSetting,
+  number('interior.lamp', 'interior', 1.4, 0, 10, 0.05, '', 'Radiance of a lamp.') as MaterialSetting,
+  color('interior.lampColor', 'interior', [1, 0.78, 0.52], 0, 1, 'Linear colour of the lamps.') as MaterialSetting,
+  number('interior.variation', 'interior', 0.5, 0, 1, 0.01, '', 'How far rooms differ.') as MaterialSetting,
+  number('interior.furniture', 'interior', 0.7, 0, 1, 0.01, 'share', 'Furnished rooms.') as MaterialSetting,
+  number('interior.curtains', 'interior', 0.35, 0, 1, 0.01, 'share', 'Windows with curtains.') as MaterialSetting,
+  number('interior.blinds', 'interior', 0.2, 0, 1, 0.01, 'share', 'Windows with a blind.') as MaterialSetting,
 ];
 /** The rows that may change every frame without a rebuild. */
 export const MATERIAL_LIVE_SETTINGS: readonly MaterialSetting[] = liveSettings(MATERIAL_SETTINGS) as MaterialSetting[];
@@ -139,6 +150,20 @@ export function skinFromSettings(values: MaterialSettingValues = {}, base: SkinO
 /** An `eye()` feature from the eye rows (the iris map, axis and centre come from `base`). */
 export function eyeFromSettings(values: MaterialSettingValues = {}, base: EyeOptions = {}): EyeFeature {
   return eye({ ...base, ...(pick(values, 'eye') as EyeOptions) });
+}
+/**
+ * `interiorMapping()` options from the interior rows (the room grid, colours and map come from `base`):
+ * `interiorMapping(interiorOptionsFromSettings(values, grid))`.
+ */
+export function interiorOptionsFromSettings(
+  values: MaterialSettingValues = {},
+  base: InteriorMappingOptions = {},
+): InteriorMappingOptions {
+  return { ...base, ...(pick(values, 'interior') as InteriorMappingOptions) };
+}
+/** Writes the interior rows on an `interiorMapping()` material; a row left out takes its default. */
+export function applyInteriorSettings(material: WgslMaterial, values: MaterialSettingValues = {}): void {
+  Object.assign(material.uniforms, pick(values, 'interior'));
 }
 /** Writes the live eye rows (pupil, iris colour, wetness) on an eye feature; the next frame draws them. */
 export function applyEyeSettings(feature: EyeFeature, values: MaterialSettingValues = {}): void {

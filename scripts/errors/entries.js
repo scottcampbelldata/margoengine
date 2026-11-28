@@ -180,6 +180,23 @@ export const entries = [
     fix: 'Pass a `Skeleton` from `@margoengine/animation` (or an object with names, parents, getPose and setPose), map its bone names with `bones` (for example `humanoidBones(skeleton.names, detectSkeleton(skeleton.names).preset)` from `@margoengine/rigging/retarget`), calibrate on a frame where the person stands in the rest pose in view, and create a new BodyDriver after dispose.',
   },
   {
+    id: 'materials-interior-mapping',
+    title: '@margoengine/materials/interior-mapping: rooms behind windows',
+    kind: 'family',
+    messages: [
+      'interiorMapping <name> must be from <min> to <max>; pass a number in that range; see https://margoengine.com/errors#materials-interior-mapping',
+      'interiorMapping <name> must be three finite numbers of 0 or more; pass [x, y, z]; see https://margoengine.com/errors#materials-interior-mapping',
+      'interiorMapping width must be a number or two; pass metres; see https://margoengine.com/errors#materials-interior-mapping',
+      'interiorMapping floors must be 2 to 33 levels, each 0.1 m or more over the last; pass them rising; see https://margoengine.com/errors#materials-interior-mapping',
+      'interiorMapping map must be a 2d or cube Texture; pass one of those; see https://margoengine.com/errors#materials-interior-mapping',
+      'interiorMapping tiles must be two integers from 1 to 64; pass rooms across and down; see https://margoengine.com/errors#materials-interior-mapping',
+      'interiorMapping seed must be an integer from 0 to 1000000; pass one; see https://margoengine.com/errors#materials-interior-mapping',
+    ],
+    cause:
+      'interiorMapping, facadeRooms or traceRoom was given a room width, height or depth under 0.1 m, floor levels that do not rise by 0.1 m or number outside 2 to 33, a colour or point that is not three finite numbers, a share (variation, lit, furniture, curtains, blinds) outside 0 to 1, a backWall outside 0.01 to 0.99, tiles that are not whole numbers from 1 to 64, a seed that is not a whole number, or a map that is neither a 2d nor a cube Texture.',
+    fix: 'Pass metres for the room grid (or spread `facadeRooms(building)` of a rules building), linear colours as three numbers, shares from 0 to 1, and as `map` a 2d atlas of room pictures with its `tiles` or a cube Texture of one room.',
+  },
+  {
     id: 'materials-portal',
     title: '@margoengine/materials/portal: stencil portals and windows into other scenes',
     kind: 'family',

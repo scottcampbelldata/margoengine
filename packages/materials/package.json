@@ -27,7 +27,7 @@
     "build": "node ../../scripts/build-optional.js materials",
     "test": "npm run build && node --test tests/*.test.js test/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/materials/test/browser-check.mjs && node packages/materials/test/hair-cards-browser.mjs && node packages/materials/test/borrowed-restore-browser.mjs && node packages/materials/test/dual-source-browser.mjs && node packages/materials/test/curve-flow-browser.mjs && node packages/materials/test/batched-sort-browser.mjs",
+    "test:gpu": "cd ../.. && node packages/materials/test/browser-check.mjs && node packages/materials/test/hair-cards-browser.mjs && node packages/materials/test/borrowed-restore-browser.mjs && node packages/materials/test/dual-source-browser.mjs && node packages/materials/test/curve-flow-browser.mjs && node packages/materials/test/batched-sort-browser.mjs && node packages/materials/test/interior-mapping-browser.mjs",
     "test:gpu:cutout-casters": "cd ../.. && node packages/shadows/test/cutout-casters-browser.mjs",
     "test:gpu:cutout-passes": "cd ../.. && node packages/materials/test/cutout-passes-browser.mjs",
     "test:gpu:vertex-inputs": "cd ../.. && node packages/materials/test/vertex-inputs-browser.mjs",
@@ -47,6 +47,7 @@
     "test:gpu:fur": "cd ../.. && node packages/materials/test/fur-browser.mjs",
     "test:gpu:plugins": "cd ../.. && node packages/materials/test/plugins-browser.mjs",
     "test:gpu:native-glass": "cd ../.. && node packages/materials/test/native-glass-browser.mjs && node packages/materials/test/native-glass-browser.mjs --compat",
+    "test:gpu:interior-mapping": "cd ../.. && node packages/materials/test/interior-mapping-browser.mjs",
     "test:gpu:portal": "cd ../.. && node packages/materials/test/portal-browser.mjs",
     "test:gpu:batched-lod": "cd ../.. && node packages/materials/test/batched-lod-browser.mjs && node packages/materials/test/batched-lod-browser.mjs --compat",
     "test:gpu:instance-attributes": "cd ../.. && node packages/materials/test/instance-attributes-browser.mjs",
@@ -157,6 +158,10 @@
     "./settings": {
       "types": "./dist/settings.d.ts",
       "import": "./dist/settings.js"
+    },
+    "./interior-mapping": {
+      "types": "./dist/interior-mapping.d.ts",
+      "import": "./dist/interior-mapping.js"
     },
     "./portal": {
       "types": "./dist/portal.d.ts",

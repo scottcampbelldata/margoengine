@@ -1,0 +1,50 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Interior mapping</title></head><body style="margin:0">
+<canvas width="320" height="240" style="width:320px;height:240px;display:block"></canvas>
+<script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {CubeTexture,Texture,createMesh} from '/packages/materials/dist/index.js';
+import {interiorMapping,facadeRooms} from '/packages/materials/dist/interior-mapping.js';
+import {planeGeometry} from '/packages/geometry/dist/index.js';
+
+import {generateBuilding} from '/packages/procedural/dist/building-rules.js';
+const canvas=document.querySelector('canvas');
+const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:true,camera:{position:[0,0,5],target:[0,0,0]}});
+engine.stop();engine.scene.background='#000000';
+const device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const frame=async()=>{device.pushErrorScope('validation');engine.render({delta:0});engine.render({delta:0});await device.queue.onSubmittedWorkDone();return {validation:(await device.popErrorScope())?.message??null,errors:errors.splice(0)};};
+const RED=[255,0,0,255],GREEN=[0,255,0,255],BLUE=[0,0,255,255],YELLOW=[255,255,0,255];
+const solid=(c,n=64)=>({data:new Uint8Array(Array.from({length:n*n},()=>c).flat()),width:n,height:n});
+// One room of a cube: sides red, floor green, ceiling blue, back wall (-Z) yellow, the window (+Z) white.
+const cube=()=>new CubeTexture([RED,RED,BLUE,GREEN,[255,255,255,255],YELLOW].map(c=>solid(c)),{colorSpace:'srgb'});
+// The same room drawn in one-point perspective: the back wall the middle half, each other face a trapezoid.
+const atlas=()=>{const n=256,data=new Uint8Array(n*n*4);for(let y=0;y<n;y++)for(let x=0;x<n;x++){const u=(x+0.5)/n-0.5,v=(y+0.5)/n-0.5;const c=Math.max(Math.abs(u),Math.abs(v))<0.25?YELLOW:Math.abs(u)>Math.abs(v)?RED:v<0?BLUE:GREEN;data.set(c,(y*n+x)*4);}return new Texture({data,width:n,height:n},{colorSpace:'srgb'});};
+const plain={wallColor:[1,0,0],floorColor:[0,1,0],ceilingColor:[0,0,1],variation:0,furniture:0};
+const clear={daylight:1,lit:0,curtains:0,blinds:0,tint:[1,1,1],color:[0,0,0]};
+let mesh;
+const dark=()=>{for(const [k,v] of Object.entries(engine.lighting))if(v instanceof Float32Array&&k!=='direction')v.fill(0);};
+window.check={
+ async show(kind,rooms,camera){
+  mesh?.destroy();dark();
+  engine.camera.position=camera;engine.camera.target=[0,0,0];
+  const look=kind==='cube'?{map:cube()}:kind==='atlas'?{map:atlas()}:plain;
+  mesh=createMesh(engine,planeGeometry(6,4.5),interiorMapping({...rooms,...clear,...look}));
+  return {...await frame(),fov:engine.camera.fov};
+ },
+ async extra(values){Object.assign(mesh.material.uniforms,values);return frame();},
+ async building(){
+  mesh?.destroy();mesh=undefined;
+  for(const [k,v] of Object.entries(engine.lighting))if(v instanceof Float32Array&&k!=='direction')v.fill(0);
+  const b=generateBuilding({style:'western-1910-brick',interior:'none'});
+  const parts=[];
+  for(const [name,g] of Object.entries(b.parts)){
+   const m=b.palette[name];
+   parts.push(createMesh(engine,g,name==='glass'?interiorMapping({...facadeRooms(b),daylight:0.55,lit:0.35}):new (await import('/packages/materials/dist/index.js')).Material({shading:'basic',color:m.color.map(c=>c*0.7)})));
+  }
+  engine.scene.background='#9fb4c8';
+  engine.camera.position=[16,7,30];engine.camera.target=[0,5,8];
+  const r=await frame();
+  window.parts=parts;return r;
+ },
+ async look(position,target){engine.camera.position=position;engine.camera.target=target;return frame();},
+};window.ready=true;
+</script></body></html>
