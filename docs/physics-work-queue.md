@@ -533,7 +533,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | FLUID-02 | Position based fluids (fast mode) | none | Claude (laptop), on Scott's order, 2026-11-27 | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 14a5956173; P13 GPU path (`GPULiquid`, `@margoengine/water/liquid`) landed 2026-11-27 |
 | FLUID-04 | Eulerian smoke and gas | stand-in | Open | OPEN |
 | HYDRO-03 | Sediment transport and channel morphodynamics | physics/sediment and water/shallow-surface | Codex | REOPENED (4/8 at 0991351637, points 5–8, [evidence](physics-solver-audit.md#hydro-03-four-point-pass)), prior landing db1950c88f |
-| ATMO-10 | Synoptic weather and moisture transport | stand-in | Codex | BUILDING (codex/physics-atmo-10-four-point; four-point pass; [audit](physics-solver-audit.md)), landed d19267aa1e |
+| ATMO-10 | Synoptic weather and moisture transport | stand-in | Codex | REOPENED (4/8 at 34145ff6d6, points 5–8, [evidence](physics-solver-audit.md#atmo-10-four-point-pass)), prior landing d19267aa1e |
 | EARTH-01 | MPM continuum | stand-in | Open | OPEN |
 | EARTH-02 | Depth-averaged granular flow | partial | Open | OPEN |
 | EARTH-04 | Discrete-element rubble and boulders | partial | Open | OPEN |

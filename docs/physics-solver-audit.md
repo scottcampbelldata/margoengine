@@ -1461,6 +1461,15 @@ Superhelices, calibrated moving clumps and horse bundles, guide interpolation, p
   9. Threads where the work splits.
   10. Correct `docs/whitepaper/claims.md`, which calls the high-wind drag plateau "measured" while the test only replays the formula.
 
+#### ATMO-10 four-point pass
+
+- Point 5 (34145ff6d6). `packages/physics/tests/coupling/synoptic.test.js` checks signed terrain and shallow-water fields, alignment and owning memory through a layered world. Invalid input late in a trial leaves the complete accepted snapshot, water force, layer state and native receipt unchanged. `packages/weather/tests/synoptic-drive.test.js` checks coded adapter errors with fixes.
+- Point 6 (34145ff6d6). `packages/physics/tests/coupling/synoptic-workers.test.js` and `packages/physics/tests/synoptic-workers.browser.mjs` exercise optional f64 SIMD diagnostic cells and joined workers at 1, 2 and 4 participants. The layered 256-cell case dispatches 256 paired calculations in four 64-cell ranges. Fast, high and layered cases retain exact atmospheric and water outputs.
+- Point 7 (34145ff6d6). `packages/physics/tests/synoptic-film.browser.mjs` runs the same fixed regional ridge with and without atmospheric uplift on each renderer. The rain band moves 54.0 km and peak precipitation reaches 4.848 mm/h. Terrain feedback yields 28.794 million m³ liquid rain against 0.983 million m³ in the control. The isolated runoff layer changes 13,431 pixels on each backend. The atmosphere and HYDRO-02 close accepted liquid rain and runoff volume each tick. Full snapshots, fields and raw RGBA match through replay on WebGPU and WebGL2.
+- Point 8 (34145ff6d6). `packages/physics/scripts/atmo10-synoptic-measured.mjs` compares independent OLYMPEX rain gauges withheld from initialization and model settings. The 4 km model produces 13.56 and 23.84 mm against 32.60 and 35.56 mm. Terrain altitude, mesh refinement and lapse sensitivity are reported. Upstream IVT derived from the sounding supplies input evidence. [Measured limits](limits.md#atmo-10-observed-olympex-warm-sector-rainfall)
+
+Downstream measured IVT, high-wind drag, combined-layer moisture, two-way sea feedback, energy and enstrophy through decay, and original production bindings remain open. The row stays REOPENED at four points.
+
 ### EARTH-05 terramechanics (landed 5032e1a3b4): REOPENED
 
 - **Checked:** 5032e1a3b4, 40413c537, dc1ebb90e, 237815862 and the feature and fix commits on `packages/physics/src/terramechanics` from 237a751aa to 78f45688c. CPU (`terramechanics.test.js`, `coupling/terramechanics.test.js`): 38 pass, 0 fail. `test:browser:terramechanics` passes on WebGPU (3,904 changed pixels, plain and shared builds identical); it checks kernel parity, not a reference, and has no compatibility-layer run.
