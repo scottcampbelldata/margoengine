@@ -374,10 +374,7 @@ canvas) with `data-renderer`, `data-ready` once the first frame is on screen, `d
 ```ts
 import {PbrMaterial, box} from 'margoengine/core';
 import {openBench} from 'margoengine/studio/bench';
-const bench = await openBench(document.querySelector('canvas')!, {
-  camera: {position: [2.6, 1.8, 3.4], target: [0, 0.45, 0], fov: 35},
-  orbit: {target: [0, 0.45, 0]},
-});
+const bench = await openBench(document.querySelector('canvas')!, {orbit: true}); // no camera: ready() frames the subject
 const product = bench.engine.createMesh().setGeometry(box())
   .setMaterial(new PbrMaterial({color: '#c84f2c', roughness: 0.45})).setPosition([0, 0.5, 0]);
 bench.add(product); // casts into the shadow map and the contact shadow
@@ -394,26 +391,33 @@ const spin = bench.frame((delta) => product.setRotation([0, (turn += delta * 0.5
 | `pixelRatio`, `maxWidth` | 2, 2560 | backbuffer cap |
 | `backend` | `'webgl2'` with `?backend=webgl2`, else `'auto'` | `'webgl2'` forces the compatibility layer |
 | `loadCompat`, `compat` | `import('@margoengine/webgl2-compat')`, none | the layer and its `install` options (`{minimumTier: 'half-float'}`) |
-| `light` | direction [-0.55, 1, 0.7], colour [1, 0.95, 0.88], intensity 2.6, ambient 0.25 | core's sun; `false` leaves core's lighting as it is |
-| `environment` | `'soft'` at intensity 0.55, width 256 | softbox fill and rim (replaces core's flat ambient); a preset name, options or `false` |
-| `shadows` | `{lightSize: 0.02}` | `ShadowOptions`, or `false` |
+| `light` | direction [-0.55, 1, 0.7], colour [1, 0.95, 0.88], intensity 3, ambient 0.25 | core's sun; `false` leaves core's lighting as it is |
+| `environment` | `'soft'` at intensity 0.25, width 256 | softbox fill and rim (replaces core's flat ambient); a preset name, options or `false` |
+| `shadows` | `{lightSize: 0.0047}`, the sun's angular radius | `ShadowOptions`, or `false` |
 | `contact` | 6 x 6 plane at y 0, height 0.6, opacity 0.55, blur 0.06 | `ContactShadowOptions`, or `false` |
-| `backdrop` | 40 x 24 x 14, radius 4, `#a9a49c` matte | `BackdropOptions`, or `false` |
+| `backdrop` | 80 x 24 x 14, radius 4, `#a9a49c` matte (no view across the floor sees past its sides) | `BackdropOptions`, or `false` |
 | `tonemap` | none (core's Khronos PBR Neutral at 0 EV) | `TonemapOptions` attaches `Tonemap` |
 | `ao` | false | `true` or `GTAOOptions` |
+| `fit` | true without `camera`, false with it | frame the subject on `ready()`; `true` or `{fill, bounds}` (fill default 0.8) |
 | `orbit` | false | `true` or `{target, minDistance, maxDistance, damping}` |
 | `exhibit`, `signal`, `onResize`, `onError` | canvas, none | where the signals go, cancellation, callbacks |
 
 `bench.frame(callback)` runs `callback(delta, time)` before every frame until its remover runs; `bench.request()`
 draws one frame on the next animation frame (requests merge); `bench.render()` draws now and resolves when the GPU
-finished; `bench.add(mesh, {shadow, contact, static})` registers a caster with both shadows; `bench.fail(reason)`
+finished; `bench.add(mesh, {shadow, contact, static})` registers a caster with both shadows and makes it part of the
+subject; `bench.fit({fill, bounds})` moves the camera (and the orbit target) along its view direction until every corner
+of the subject's world box sits inside `fill` of each half of the view, a box fit tighter than a bounding sphere, and
+raises `camera.far` when needed (`frameView(camera, box, fill, aspect)` is the same sum on plain numbers); `bench.fail(reason)`
 marks the error and stops frames. A page that keeps its own room passes `backdrop: false`, and one that keeps its own
 lights passes `light: false, environment: false`. Checked on WebGPU and on the WebGL2 layer by
 `packages/studio/test/bench-browser.mjs` (`--compat`): the bench opens and marks itself ready, the box darkens the
-floor beside it, frame callbacks run and stop, a resize reaches the backbuffer, and disposal releases the engine.
+floor beside it with its shadow core under 0.78 of the lit floor (the key reads over the fill), a 5 cm gnomon keeps a
+dark shadow, no pixel shows the clear colour past the cyclorama edge, a bench opened without a camera frames its box
+over 0.6 of the view's height, frame callbacks run and stop, a resize reaches the backbuffer, and disposal releases the engine.
 References: Fernando 2005, "Percentage-Closer Soft Shadows"; Karis 2013, "Real Shading in Unreal Engine 4"; Debevec
 1998, "Rendering Synthetic Objects into Real Scenes"; Jimenez, Wu, Pesce and Jarabo 2016, "Practical Real-Time
-Strategies for Accurate Indirect Occlusion"; Khronos 2024, "PBR Neutral Tone Mapping".
+Strategies for Accurate Indirect Occlusion"; Khronos 2024, "PBR Neutral Tone Mapping"; NASA Goddard, "Sun Fact Sheet"
+(the Sun's mean angular diameter, 0.533 degrees, so a tangent of 0.0047 for its radius).
 
 ## Framing and turntable
 

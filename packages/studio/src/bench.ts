@@ -18,7 +18,7 @@ export interface BenchLight {
   direction?: Vec3;
   /** Linear colour. Default [1, 0.95, 0.88] (warm studio key). */
   color?: Vec3;
-  /** Strength. Default 2.6. */
+  /** Strength. Default 3, a key about 2.4 times the softbox fill on a level floor, so shadows read. */
   intensity?: number;
   /** Ambient strength (core's flat ambient, used only when `environment` is false). Default 0.25. */
   ambient?: number;
@@ -30,7 +30,7 @@ export interface BenchLight {
 export interface BenchEnvironment {
   /** Softbox rig, as studio/backdrop `stagingLights`. Default 'soft'. */
   preset?: StagingPreset;
-  /** Radiance multiplier. Default 0.55, a fill under the sun key. */
+  /** Radiance multiplier. Default 0.25, a fill under the sun key that keeps shadows readable. */
   intensity?: number;
   /** Equirect width, a power of two 16..4096. Default 256. */
   width?: number;
@@ -69,24 +69,39 @@ export interface BenchOptions {
   exhibit?: HTMLElement;
   /** The sun key; false leaves core's lighting alone. Default {@link BenchLight} defaults. */
   light?: BenchLight | false;
-  /** Fill and rim from a softbox environment; false keeps core's flat ambient. Default 'soft' at 0.55. */
+  /** Fill and rim from a softbox environment; false keeps core's flat ambient. Default 'soft' at 0.25. */
   environment?: BenchEnvironment | StagingPreset | false;
-  /** Cascaded PCSS shadows from the sun; false for none. Default `{ lightSize: 0.02 }`. */
+  /** Cascaded PCSS shadows from the sun; false for none. Default `{ lightSize: 0.0047 }`, the sun's angular radius, so thin casters keep a crisp shadow. */
   shadows?: ShadowOptions | false;
   /** Soft ground contact shadows; false for none. Default a 6 x 6 plane at y 0, height 0.6, opacity 0.55. */
   contact?: ContactShadowOptions | false;
-  /** A cyclorama; false for none. Default 40 wide, 24 deep, 14 high, radius 4, warm grey matte. */
+  /** A cyclorama; false for none. Default 80 wide, 24 deep, 14 high, radius 4, warm grey matte: wide enough that a view
+   * across the floor at up to 70 degrees off the wall never sees past its side edge. */
   backdrop?: BackdropOptions | false;
   /** A display transform after the frame (exposure, curve, contrast). Default none: core's Khronos PBR Neutral at 0 EV. */
   tonemap?: TonemapOptions | false;
   /** Ground truth ambient occlusion (Jimenez et al. 2016). Default false. */
   ao?: GTAOOptions | boolean;
+  /**
+   * Frames the subject (every mesh passed to {@link Bench.add}) on {@link Bench.ready}: the camera keeps its view
+   * direction and moves so the subject's world box fills `fill` of the narrower half of the view. Default true when
+   * `camera` is not passed, false when it is (that camera is kept as given).
+   */
+  fit?: boolean | BenchFitOptions;
   /** Pointer orbit (controls/orbit); false for none. Default false. */
   orbit?: { target?: Vec3; minDistance?: number; maxDistance?: number; damping?: boolean } | boolean;
   /** Called after the backbuffer changed size, before the next frame. */
   onResize?: (bench: Bench) => void;
   /** Called once with the first failure (engine error, frame error, start-up error). */
   onError?: (reason: unknown) => void;
+}
+
+/** How {@link Bench.fit} frames the subject. */
+export interface BenchFitOptions {
+  /** World box to frame. Default the world box of every mesh passed to {@link Bench.add}. */
+  bounds?: { min: Vec3; max: Vec3 };
+  /** Share of the view's narrower half-extent the box reaches, 0.1..1. Default 0.8. */
+  fill?: number;
 }
 
 /** Per-mesh choice for {@link Bench.add}. */
@@ -127,7 +142,13 @@ export interface Bench {
   request(): void;
   /** Draws now and resolves once the GPU finished it. */
   render(delta?: number): Promise<void>;
-  /** Draws the first frame, waits for it, marks `data-ready` and `data-renderer`; false when already failed. */
+  /**
+   * Moves the camera (and the orbit target) so the subject fills the view, keeping the view direction; raises
+   * `camera.far` when the subject reaches past it. Resolves false when there is nothing to frame or the camera has a
+   * custom projection. Throws RangeError for an invalid `fill` or box.
+   */
+  fit(options?: BenchFitOptions): Promise<boolean>;
+  /** Draws the first frame (framing the subject first when `fit` is on), waits for it, marks `data-ready` and `data-renderer`; false when already failed. */
   ready(): Promise<boolean>;
   /** Marks `data-error`, calls `onError` once, stops frames. */
   fail(reason: unknown): void;
@@ -142,6 +163,81 @@ const normalize = (v: Vec3) => {
     throw rangeError('Invalid light direction; pass a finite nonzero vector', 'arguments');
   return [v[0] / l, v[1] / l, v[2] / l];
 };
+/** A perspective view as {@link frameView} reads it: vertical `fov` in degrees, eye, look-at point and screen up. */
+export interface FrameViewCamera {
+  fov: number;
+  position: Vec3;
+  target: Vec3;
+  up?: Vec3;
+}
+
+/**
+ * Where a perspective camera goes to frame a world box: the target moves to the box centre and the eye backs along the
+ * current view direction until every corner of the box lies inside `fill` of each half of the view (vertical `fov`,
+ * horizontal from `aspect`). Tighter than a bounding-sphere fit, so a flat or long subject fills the frame. `far` is
+ * the distance to the farthest corner.
+ * @throws RangeError for a degenerate view, a non-finite box, `fill` outside 0.1..1 or `aspect` not positive.
+ */
+export function frameView(
+  camera: FrameViewCamera,
+  box: { min: Vec3; max: Vec3 },
+  fill = 0.8,
+  aspect = 1,
+): { position: [number, number, number]; target: [number, number, number]; far: number } {
+  const up = camera.up ?? [0, 1, 0],
+    back = [0, 1, 2].map((a) => camera.position[a] - camera.target[a]),
+    length = Math.hypot(back[0], back[1], back[2]),
+    tanV = Math.tan((camera.fov * Math.PI) / 360) * fill,
+    tanH = tanV * aspect;
+  if (!(length > 0) || !(tanV > 0) || !Number.isFinite(tanH) || !(aspect > 0) || !(fill >= 0.1 && fill <= 1))
+    throw rangeError('Invalid framing; pass a camera with a view direction, fov 0..180, aspect > 0, fill 0.1..1', 'arguments');
+  const w = back.map((v) => v / length),
+    cross = (a: readonly number[], b: readonly number[]) => [
+      a[1] * b[2] - a[2] * b[1],
+      a[2] * b[0] - a[0] * b[2],
+      a[0] * b[1] - a[1] * b[0],
+    ],
+    r0 = cross(up, w),
+    rl = Math.hypot(r0[0], r0[1], r0[2]);
+  if (!(rl > 1e-9)) throw rangeError('Invalid framing; the view is parallel to camera.up', 'arguments');
+  const r = r0.map((v) => v / rl),
+    u = cross(w, r),
+    dot = (a: readonly number[], b: readonly number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+    centre = [0, 1, 2].map((a) => (box.min[a] + box.max[a]) / 2) as [number, number, number];
+  let distance = 0,
+    reach = 0;
+  for (let i = 0; i < 8; i++) {
+    const q = [0, 1, 2].map((a) => ((i >> a) & 1 ? box.max[a] : box.min[a]) - centre[a]),
+      z = dot(q, w);
+    distance = Math.max(distance, z + Math.abs(dot(q, r)) / tanH, z + Math.abs(dot(q, u)) / tanV);
+    reach = Math.max(reach, Math.hypot(q[0], q[1], q[2]));
+  }
+  if (!Number.isFinite(distance)) throw rangeError('Invalid framing; the box must be finite', 'arguments');
+  distance = Math.max(distance, reach * 1e-3, 1e-3);
+  return {
+    target: centre,
+    position: centre.map((v, a) => v + w[a] * distance) as [number, number, number],
+    far: distance + reach,
+  };
+}
+
+const frameBox = (
+  engine: EngineKernel,
+  box: { min: Vec3; max: Vec3 },
+  fill: number,
+  aspect: number,
+  orbit: OrbitControls | undefined,
+) => {
+  const camera = engine.camera;
+  if (camera.project) return false;
+  const view = frameView(camera, box, fill, aspect);
+  camera.target = view.target;
+  camera.position = view.position;
+  if (view.far * 1.05 > camera.far) camera.far = view.far * 1.05;
+  if (orbit) orbit.target = view.target;
+  return true;
+};
+
 const forcedCompat = () => {
   try {
     return new URLSearchParams(globalThis.location?.search ?? '').get('backend') === 'webgl2';
@@ -271,13 +367,13 @@ export async function openBench(canvas: HTMLCanvasElement, options: BenchOptions
       const [x, y, z] = normalize(light.direction ?? [-0.55, 1, 0.7]),
         color = light.color ?? [1, 0.95, 0.88],
         ambient = light.ambientColor ?? [0.9, 0.95, 1.05];
-      engine.lighting.direction.set([x, y, z, light.intensity ?? 2.6]);
+      engine.lighting.direction.set([x, y, z, light.intensity ?? 3]);
       engine.lighting.radiance.set([color[0], color[1], color[2], light.ambient ?? 0.25]);
       engine.lighting.ambient.set([ambient[0], ambient[1], ambient[2]]);
     }
     if (options.backdrop !== false)
       backdrop = Backdrop.attach(engine, {
-        width: 40,
+        width: 80,
         depth: 24,
         height: 14,
         radius: 4,
@@ -291,7 +387,7 @@ export async function openBench(canvas: HTMLCanvasElement, options: BenchOptions
       loads.push(
         import('@margoengine/shadows').then(({ Shadows }) => {
           signal.throwIfAborted();
-          shadows = Shadows.attach(engine, { lightSize: 0.02, ...(options.shadows || {}) });
+          shadows = Shadows.attach(engine, { lightSize: 0.0047, ...(options.shadows || {}) });
           if (backdrop) shadows.add(backdrop.mesh, { static: true });
         }),
       );
@@ -302,7 +398,7 @@ export async function openBench(canvas: HTMLCanvasElement, options: BenchOptions
         stagingLighting(engine, settings.preset ?? 'soft', { width: settings.width ?? 256, signal: outer }).then(
           (value) => {
             lighting = value;
-            lighting.environment.intensity = settings.intensity ?? 0.55;
+            lighting.environment.intensity = settings.intensity ?? 0.25;
           },
         ),
       );
@@ -351,6 +447,33 @@ export async function openBench(canvas: HTMLCanvasElement, options: BenchOptions
     engine.dispose();
     throw reason;
   }
+  const subjects = new Set<MeshHandle>(),
+    autoFit = options.fit ?? options.camera === undefined;
+  let fitted = false;
+  const fit = async (settings: BenchFitOptions = {}) => {
+    const fill = settings.fill ?? 0.8;
+    if (!(fill >= 0.1 && fill <= 1)) throw rangeError('Invalid fit; fill must be 0.1..1', 'arguments');
+    let box = settings.bounds;
+    if (!box) {
+      if (!subjects.size) return false;
+      const { worldBounds } = await import('@margoengine/scene/helpers');
+      const min: [number, number, number] = [Infinity, Infinity, Infinity],
+        max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+      for (const mesh of subjects) {
+        const part = worldBounds(mesh);
+        if (part)
+          for (let a = 0; a < 3; a++) {
+            min[a] = Math.min(min[a], part.min[a]);
+            max[a] = Math.max(max[a], part.max[a]);
+          }
+      }
+      if (!Number.isFinite(min[0])) return false;
+      box = { min, max };
+    }
+    if (![...box.min, ...box.max].every(Number.isFinite) || box.min.some((v, i) => v > box.max[i]))
+      throw rangeError('Invalid fit; bounds need finite min <= max', 'arguments');
+    return frameBox(engine, box, fill, canvas.width / Math.max(1, canvas.height), orbit);
+  };
   let disposed = false;
   const dispose = () => {
     if (disposed) return;
@@ -403,6 +526,10 @@ export async function openBench(canvas: HTMLCanvasElement, options: BenchOptions
     },
     add(mesh, { shadow = true, contact: casts = true, static: still = false } = {}) {
       const removers: (() => void)[] = [];
+      if ('id' in (mesh as object)) {
+        subjects.add(mesh as MeshHandle);
+        removers.push(() => subjects.delete(mesh as MeshHandle));
+      }
       if (shadow && shadows && 'id' in (mesh as object))
         removers.push(shadows.add(mesh as MeshHandle, { static: still }));
       if (casts && contact) removers.push(contact.add(mesh));
@@ -429,7 +556,12 @@ export async function openBench(canvas: HTMLCanvasElement, options: BenchOptions
         throw reason;
       }
     },
+    fit,
     async ready() {
+      if (autoFit && !fitted && !failed && !signal.aborted) {
+        fitted = true;
+        await fit(typeof autoFit === 'object' ? autoFit : {});
+      }
       await bench.render(0);
       await new Promise((resolve) => requestAnimationFrame(resolve));
       if (failed || signal.aborted) return false;

@@ -30,6 +30,7 @@ export interface Bench {
     frame(callback: (delta: number, time: number) => void): () => void;
     request(): void;
     render(delta?: number): Promise<void>;
+    fit(options?: BenchFitOptions): Promise<boolean>;
     ready(): Promise<boolean>;
     fail(reason: unknown): void;
     dispose(): void;
@@ -46,6 +47,14 @@ export interface BenchEnvironment {
     preset?: StagingPreset;
     intensity?: number;
     width?: number;
+}
+
+export interface BenchFitOptions {
+    bounds?: {
+        min: Vec3;
+        max: Vec3;
+    };
+    fill?: number;
 }
 
 export interface BenchLight {
@@ -77,6 +86,7 @@ export interface BenchOptions {
     backdrop?: BackdropOptions | false;
     tonemap?: TonemapOptions | false;
     ao?: GTAOOptions | boolean;
+    fit?: boolean | BenchFitOptions;
     orbit?: {
         target?: Vec3;
         minDistance?: number;
@@ -86,6 +96,22 @@ export interface BenchOptions {
     onResize?: (bench: Bench) => void;
     onError?: (reason: unknown) => void;
 }
+
+export interface FrameViewCamera {
+    fov: number;
+    position: Vec3;
+    target: Vec3;
+    up?: Vec3;
+}
+
+export function frameView(camera: FrameViewCamera, box: {
+    min: Vec3;
+    max: Vec3;
+}, fill?: number, aspect?: number): {
+    position: [number, number, number];
+    target: [number, number, number];
+    far: number;
+};
 
 export function openBench(canvas: HTMLCanvasElement, options?: BenchOptions): Promise<Bench>;
 

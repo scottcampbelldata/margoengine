@@ -76,7 +76,8 @@
     "@margoengine/shadows": "^1.0.0",
     "@margoengine/controls": "^1.0.0",
     "@margoengine/tonemap": "^1.0.0",
-    "@margoengine/post": "^1.0.0"
+    "@margoengine/post": "^1.0.0",
+    "@margoengine/scene": "^1.0.0"
   },
   "devDependencies": {
     "@margoengine/math": "^1.0.0"
@@ -115,6 +116,9 @@
       "optional": true
     },
     "@margoengine/post": {
+      "optional": true
+    },
+    "@margoengine/scene": {
       "optional": true
     }
   }

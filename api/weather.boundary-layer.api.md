@@ -59,8 +59,15 @@ class MannBox {
     readonly u: Float64Array;
     readonly v: Float64Array;
     readonly w: Float64Array;
+    readonly fftWork?: MannFftWork;
     constructor(options?: MannBoxOptions);
+    static create(options?: MannBoxCreateOptions): Promise<MannBox>;
     sample(x: number, y: number, z: number, out?: [number, number, number]): [number, number, number];
+}
+
+interface MannBoxCreateOptions extends MannBoxOptions {
+    readonly threads?: number;
+    readonly signal?: AbortSignal;
 }
 
 interface MannBoxOptions {
@@ -70,5 +77,17 @@ interface MannBoxOptions {
     shear?: number;
     sigma?: number;
     seed?: number;
+}
+
+interface MannFftParticipantWork {
+    readonly transforms: number;
+    readonly complexValues: number;
+    readonly simdTwiddleProducts: number;
+}
+
+interface MannFftWork extends MannFftParticipantWork {
+    readonly threads: number;
+    readonly workers: number;
+    readonly participants: readonly MannFftParticipantWork[];
 }
 ```

@@ -1,11 +1,11 @@
 <!doctype html><meta charset="utf-8"><title>Studio bench</title>
-<style>body{margin:0}#view{width:240px;height:160px;display:block}</style>
-<canvas id="view"></canvas><script type="module">
+<style>body{margin:0}#view,#fit{width:240px;height:160px;display:block}</style>
+<canvas id="view"></canvas><canvas id="fit"></canvas><script type="module">
 import {box,PbrMaterial} from '@margoengine/core';
 import {openBench} from '/packages/studio/dist/bench.js';
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 const canvas=document.querySelector('#view'),errors=[];
-let bench,mesh,remove;
+let bench,mesh,pole,remove,removePole;
 window.check={
  async open(compat){
   bench=await openBench(canvas,{backend:compat?'webgl2':'auto',pixelRatio:1,onError:e=>errors.push(String(e?.message??e)),
@@ -13,12 +13,15 @@ window.check={
   bench.engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
   mesh=bench.engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color:'#c84f2c',roughness:.45})).setPosition([0,.5,0]);
   remove=bench.add(mesh);
+  // A thin gnomon: its shadow must stay crisp and dark, not dissolve into a wide penumbra.
+  pole=bench.engine.createMesh().setGeometry(box(.05,1.2,.05)).setMaterial(new PbrMaterial({color:'#8a8a8a',roughness:.5})).setPosition([1.6,.6,.6]);
+  removePole=bench.add(pole);
   await waitForPipelines(()=>bench.render(0));
   const ready=await bench.ready();
   return {ready,renderer:bench.renderer,data:{...canvas.dataset},size:[canvas.width,canvas.height],
     parts:{shadows:!!bench.shadows,contact:!!bench.contact,backdrop:!!bench.backdrop,lighting:!!bench.lighting}};
  },
- async show(visible){mesh.visible=visible;await bench.render(0);await new Promise(r=>requestAnimationFrame(r));return [canvas.width,canvas.height];},
+ async show(visible){mesh.visible=visible;pole.visible=visible;await bench.render(0);await new Promise(r=>requestAnimationFrame(r));return [canvas.width,canvas.height];},
  async frames(){
   let calls=0,last=-1;const stop=bench.frame((delta,time)=>{calls++;last=time;});
   await new Promise(r=>{const t=()=>calls>=5?r():requestAnimationFrame(t);t();});
@@ -30,6 +33,15 @@ window.check={
   await new Promise(r=>{const t=()=>canvas.width===300?r():requestAnimationFrame(t);t();});
   seen=canvas.width;await bench.render(0);return seen;
  },
- async dispose(){remove();bench.dispose();bench.dispose();let disposed=false;try{bench.engine.render({delta:0});}catch(e){disposed=/dispos/i.test(e.message);}return {disposed:disposed||bench.engine.disposed,aborted:bench.signal.aborted,errors};},
+ async fit(compat){
+  const target=document.querySelector('#fit');
+  const framed=await openBench(target,{backend:compat?'webgl2':'auto',pixelRatio:1,onError:e=>errors.push(String(e?.message??e))});
+  framed.add(framed.engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color:'#c84f2c',roughness:.45})).setPosition([0,.5,0]));
+  await waitForPipelines(()=>framed.render(0));
+  await framed.ready();
+  const camera=framed.engine.camera,view={target:[...camera.target],position:[...camera.position]};
+  return {view,dispose:()=>framed.dispose()};
+ },
+ async dispose(){remove();removePole();bench.dispose();bench.dispose();let disposed=false;try{bench.engine.render({delta:0});}catch(e){disposed=/dispos/i.test(e.message);}return {disposed:disposed||bench.engine.disposed,aborted:bench.signal.aborted,errors};},
 };window.ready=true;
 </script>
