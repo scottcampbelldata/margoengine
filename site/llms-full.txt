@@ -497,7 +497,7 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 | [`@margoengine/animator`](packages/animator/README.md) | Blend trees, additive layers, animation states, foot IK, CCD IK chains, root motion, and look-at and aim constraints. |
 | [`@margoengine/kinematics-constraints`](packages/kinematics-constraints/README.md) | Standalone analytical capsule, sphere and convex hull constraints for IK target and arm clearance. |
 | [`@margoengine/robot-planning`](packages/robot-planning/README.md) | Robot arms on kinematics-constraints: a joint tree with collision shapes, swept motion checks, a joint-limit IK solver, sampling planners, URDF loading and a WebGPU clearance batch. |
-| [`@margoengine/rigging`](packages/rigging/README.md) | Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets, spring bones, VRM 1.0 avatars, geodesic voxel weights, corrective shapes, weight transfer, face tracking, automatic rigs from a bare mesh. |
+| [`@margoengine/rigging`](packages/rigging/README.md) | Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets, spring bones, VRM 1.0 avatars, geodesic voxel weights, corrective shapes, weight transfer, face tracking, automatic rigs from a bare mesh, an anatomical body model with sourced human joint limits. |
 | [`@margoengine/humans`](packages/humans/README.md) | People in one call: addPerson dresses a loaded character with skin, eyes and strand hair by material name, an Animator with clip cross-fades, dual quaternion skinning, shadows and natural hand poses; a period cast kit of measured bodies and code-built garments with measured cloth optics, fitted and skinned to any loaded rig in one call. |
 | [`@margoengine/horses`](packages/horses/README.md) | Horses built in code from published equine measurements: draft, cavalry and riding builds, coats and markings, a mane and tail in strand hair, a 37-joint rig, walk, trot, canter and gallop from equine biomechanics, a rider seat, and crowds of hundreds in one draw. |
 | [`@margoengine/armies`](packages/armies/README.md) | Armies of hundreds: soldiers and riders drawn at every distance (instanced skinning near, a vertex animation of a simplified mesh far, culled and budgeted), following navmesh formations, keeping step, riding horses on the saddle the horse crowd draws; any person source plugs in. |
@@ -1347,7 +1347,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,462 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,466 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -16451,6 +16451,45 @@ KB-SHRUB-TUNDRA1 measured gzip/ceiling change (2026-11-28): procedural/tree to 6
 With `TerrainLayer.bump`, where a pixel covers less than 1/128 of a repeat (3 cm at `scale` 0.25) the relief holds no
 detail finer than that, and each showing layer costs 16 texel loads per triplanar axis there (one axis on most ground).
 Core and stage are unchanged.
+
+### Anatomy core and the human table (`@margoengine/rigging/anatomy`, 2026-11-28)
+
+The optional rigging/anatomy entry fits a species table to a rig and rigging/anatomy/human holds the human table.
+Defaults: limits on; `clampPose` and `addAnatomyLimits` hold the `structural` tier; the human table is adults of 20
+to 44 years, the larger mean of the two sexes; naming is the convention that matches the most bones. Limits and
+accepted differences:
+
+- Angles are a swing vector and a twist. A swing of exactly 180 degrees has no defined twist, which then reads 0. Swing
+  ranges are capped at 180 degrees and `poseFromAngles` caps a swing it is given at 180.
+- The stop of a motion is its largest source value rounded up to 5 degrees plus an allowance (15 for ball, saddle and
+  condyloid joints and spine regions, 10 for a hinge's flexion, 0 for the straight side of a hinge, 5 or 10 for a
+  direction a joint's kind does not allow). The allowances are engine policy, not measurements.
+- An elbow and a knee stop 5 degrees past straight (CDC adult means 4.7 and 1.6, rounded up). The table for men of 45
+  to 69 years has no hyperextension at all (mean -0.7).
+- 90 of the table's 324 distinct source numbers are from recall and marked `recalled`; none is checked in print. The
+  recalled ones are spine levels (61), toe joints, the collarbone's split, knee rotation, wrist twist, the thumb's
+  base, the palm's small joints and the weight-bearing ankle (45 degrees, which sets the ankle's stop).
+- AAOS and AMA values are read from pages that reproduce them, named in each row; where pages disagree the
+  best-labelled AAOS table is used (hip extension 20, abduction 40, adduction 20; knee flexion 135).
+- A rig bone that stands for several joints of a region carries their summed range. In a spine region every bone's
+  stop is the whole region's, and the region's far end is held to the region's range by easing every bone by one
+  share (at most 8 passes).
+- A joint whose zero is a direction in the body is left unlimited when the joint at the far end of its segment is not
+  mapped. A hip with no knee, a shoulder with no elbow and a thumb base with no thumb joint are such joints.
+- A rest bend under 5 degrees is read as straight; from 5 to 20 degrees it sets the hinge side only within 60 degrees
+  of the anatomical side. A straight limb with no knuckle bones is taken as unrolled unless `roll` says otherwise;
+  `hingeRolls` reads the roll from motion once a hinge has swung 30 degrees.
+- The weight-bearing, forefoot and toe-row motions of a foot are lumped: inversion and eversion sit on the subtalar
+  joint, a single toe bone is fitted as the great toe joint, and the small joints of the midfoot and palm have 5
+  degrees of give and no measured range.
+- `poseLimits`, `ikLimits`, `ragdollJoints` and `kinematicsLimits` express a reach that differs by direction as one
+  cone (about the middle of the reach for the first two, about the rest direction for a ragdoll, about neutral for
+  kinematics). Hinges are exact.
+- The face joints of the standard (eyelids, eyeballs, eyebrows, jaw) are not in the table.
+- The body must stand upright in its rest pose for the human frame (up is read from the hips to the head); a species
+  table may give a fixed up direction instead.
+
+Entry sizes are in scripts/quality/baselines/sizes.json.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
