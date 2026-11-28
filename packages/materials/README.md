@@ -1861,20 +1861,160 @@ fire, from its base to `height` above it, 1.5 plume widths wide; its `rect` read
 pattern's fire end at the bottom. Use it where a mesh's UVs do not suit a mask. Decals of `post/material-decals`
 re-light with the sun and ambient only, so under firelight use `soot()` or these multiply decals.
 
-| Preset | Colour (linear) | Roughness | Metalness | Source |
+| Preset | Colour (linear) | Roughness | Metalness | Provenance |
 | --- | --- | --- | --- | --- |
-| copper | 0.955, 0.638, 0.538 | 0.3 | 1 | F0, Hoffman 2013 |
+| copper | `metal('copper')`: 0.922, 0.625, 0.521 | 0.3 | 1 | Measured, Johnson and Christy 1972 |
 | tarnishedCopper | copper x 0.6 | 0.55 | 1 | Art default: an oxide film and smoke |
-| iron | 0.562, 0.565, 0.578 | 0.6 | 1 | F0, Hoffman 2013 |
+| iron | `metal('iron')`: 0.529, 0.514, 0.494 | 0.6 | 1 | Measured, Johnson and Christy 1974 |
 | castIron | iron x 0.35 | 0.75 | 1 | Art default: blackened stove iron |
 | soot | 0.03, 0.028, 0.026 | 0.95 | 0 | Art default: near-black, matte |
 | hearthstone | 0.042, 0.036, 0.03 | 0.85 | 0 | Art default: smoke-dark stone |
 | weatheredWood | 0.258, 0.205, 0.147 | 0.82 | 0 | Art default: grey, bleached wood (luminance 0.21; at 0.13 a moonlit log wall read black) |
-| brick | 0.3, 0.1, 0.05 | 0.85 | 0 | Art default: fired clay |
+| brick | `surface('brick')`: 0.210, 0.090, 0.057 | 0.85 | 0 | Measured, ECOSTRESS red clay bricks |
 
-Presets are frozen objects; spread one into `new PbrMaterial({...preset, map})` and override what you need. Hoffman,
-"Background: Physics and Math of Shading", SIGGRAPH 2013 course,
-https://blog.selfshadow.com/publications/s2013-shading-course/hoffman/s2013_pbs_physics_math_notes.pdf.
+Presets are frozen objects; spread one into `new PbrMaterial({...preset, map})` and override what you need. Until
+2026-11-28 copper and iron were the F0 figures of Hoffman's SIGGRAPH 2013 course notes and brick an art default; they
+are now the library rows below.
+
+### Measured materials library (`@margoengine/materials/presets`)
+
+Eighty-one materials with their sources: metals as F0 from measured complex indices, clear dielectrics as measured
+refractive indices and dispersion, everyday surfaces as albedo from measured reflectance spectra. Every row says
+whether it is `measured` (converted here from a primary measurement), `derived` (computed from measured data through
+a stated assumption, a fit, or a compiled database) or `art` (chosen by eye). Today: 58 measured, 22 derived, 1 art.
+
+```ts
+import { DIELECTRICS, METALS, dielectric, materialInfo, materials, metal, surface } from '@margoengine/materials/presets';
+
+const gold = metal('gold', { roughness: 0.15 }); // PbrMaterial options: color is the linear F0, metalness 1
+const wall = surface('limestone'); // measured albedo, metalness 0, ior of calcite
+const pane = dielectric('windowGlass'); // white, metalness 0, ior 1.5234 (Rubin 1985)
+const sea = materials.water; // every row at its default roughness, by name
+console.log(gold.color, wall.color, pane.ior, sea.ior);
+console.log(METALS.copper.n, METALS.copper.k); // complex index at 650, 550 and 450 nm
+console.log(20 / (DIELECTRICS.diamond.abbe ?? Infinity)); // the transmission `dispersion` option for diamond
+console.log(materialInfo('gold').provenance, materialInfo('gold').citation);
+```
+
+Spread any of them into `new PbrMaterial({...metal('brass'), map})` or `new Material({...})`. For glass and water add
+transmission, for example `new Material({...dielectric('diamond'), transmission: {factor: 1, dispersion: 20 / 55.3}})`. `materialInfo(name)` returns the
+row, its kind (`metal`, `dielectric` or `surface`), its provenance and its citation; `SOURCES` holds every citation.
+Unknown names and roughness outside 0 to 1 throw `RangeError`.
+
+How the values are made. Metals: F0 at normal incidence, ((n - 1)^2 + k^2) / ((n + 1)^2 + k^2), from each paper's
+tabulated n and k (linear between table points), integrated to linear sRGB by `@margoengine/optics` SpectralIntegrator
+(CIE 1931 fit of Wyman, Sloan and Shirley, JCGT 2(2), 2013, under a 6504 K black body, 380 to 780 nm in 5 nm steps).
+Gold's red integrates to 1.025, outside sRGB, and is clamped to 1. Dielectrics: `ior` is n at the helium d line
+(587.56 nm) from the paper's dispersion formula, and `abbe` is (nd - 1) / (nF - nC). Surfaces: the mean albedo of the
+named ECOSTRESS samples through the same integrator. Roughness defaults and ranges are art: no source here measures
+roughness. The source data sit in `test/fixtures` (one file per database, each with its source and licence in its
+header), and `test/measured-library.test.js` recomputes every value from them: F0 and albedo within 0.002, n and k
+within 0.1 percent, IOR within 1e-4, Abbe within 0.1. The GPU check
+`npm run test:gpu:measured-library --workspace packages/materials` renders every row on a sphere under the studio
+environment on WebGPU and on the WebGL2 layer and writes labelled sheets to `test-results/measured-library`.
+
+Data sets and licences (see THIRD-PARTY-NOTICES.md): metal and dielectric constants are each paper's tables as
+transcribed in the refractiveindex.info database (Polyanskiy, Scientific Data 11, 94, 2024; CC0 1.0); surface spectra
+are the ECOSTRESS Spectral Library 1.0 (Meerdink et al. 2019; NASA JPL, free with citation); paper, tyre, porcelain,
+egg shell, bone, the six skin types and the PET, polypropylene and PVC indices are rows of physicallybased.info
+(Palmqvist; CC0 1.0), marked `derived` because that database compiles secondary sources. For skin under any light use
+`@margoengine/materials/skin`, which is spectral and measured.
+
+| Metal | F0 (linear) | n at 650, 550, 450 nm | k | Roughness | Provenance | Source |
+| --- | --- | --- | --- | --- | --- | --- |
+| gold | 1.000, 0.733, 0.366 | 0.156, 0.424, 1.383 | 3.602, 2.472, 1.915 | 0.2 | measured | Johnson and Christy 1972 |
+| silver | 0.989, 0.984, 0.978 | 0.052, 0.060, 0.040 | 4.409, 3.597, 2.648 | 0.15 | measured | Johnson and Christy 1972 |
+| copper | 0.922, 0.625, 0.521 | 0.238, 1.007, 1.240 | 3.626, 2.582, 2.393 | 0.3 | measured | Johnson and Christy 1972 |
+| iron | 0.529, 0.514, 0.494 | 2.911, 2.950, 2.584 | 3.089, 2.932, 2.767 | 0.6 | measured | Johnson and Christy 1974 |
+| nickel | 0.694, 0.642, 0.562 | 1.990, 1.921, 1.729 | 4.209, 3.616, 2.944 | 0.25 | measured | Johnson and Christy 1974 |
+| chromium | 0.550, 0.556, 0.554 | 3.107, 3.181, 2.323 | 3.331, 3.329, 3.135 | 0.1 | measured | Johnson and Christy 1974 |
+| titanium | 0.617, 0.580, 0.542 | 2.741, 2.542, 2.267 | 3.814, 3.435, 3.038 | 0.35 | measured | Johnson and Christy 1974 |
+| palladium | 0.731, 0.698, 0.651 | 1.789, 1.641, 1.408 | 4.375, 3.845, 3.254 | 0.25 | measured | Johnson and Christy 1974 |
+| cobalt | 0.682, 0.656, 0.615 | 2.237, 2.052, 1.736 | 4.236, 3.824, 3.274 | 0.3 | measured | Johnson and Christy 1974 |
+| aluminium | 0.908, 0.916, 0.922 | 1.558, 1.015, 0.633 | 7.712, 6.627, 5.454 | 0.3 | measured | Rakic 1995 |
+| platinum | 0.953, 0.936, 0.831 | 0.475, 0.465, 0.633 | 6.333, 5.107, 3.748 | 0.2 | measured | Werner et al. 2009 |
+| tungsten | 0.947, 0.816, 0.753 | 0.921, 1.344, 2.232 | 6.860, 5.229, 5.146 | 0.35 | measured | Werner et al. 2009 |
+| zinc | 0.744, 0.768, 0.768 | 12.800, 13.800, 11.940 | 2.204, 4.252, 6.182 | 0.4 | measured | Querry 1987 |
+| lead | 0.657, 0.660, 0.694 | 2.575, 2.544, 2.104 | 4.161, 4.182, 4.189 | 0.5 | measured | Mathewson and Myers 1971 |
+| mercury | 0.781, 0.779, 0.778 | 2.073, 1.552, 1.061 | 5.338, 4.651, 3.863 | 0.02 | measured | Inagaki et al. 1981 |
+| brass | 0.901, 0.783, 0.419 | 0.444, 0.527, 1.094 | 3.695, 2.765, 1.829 | 0.3 | measured | Querry 1985 |
+| magnesium | 0.892, 0.881, 0.894 | 1.014, 0.806, 0.501 | 5.795, 4.933, 4.090 | 0.35 | measured | Palm et al. 2018 |
+| steel | 0.574, 0.567, 0.562 | 2.427, 2.189, 1.736 | 3.361, 3.171, 2.906 | 0.4 | derived | Querry 1985 |
+| stainlessSteel | 0.668, 0.639, 0.598 | 2.440, 2.044, 1.678 | 4.182, 3.673, 3.117 | 0.3 | derived | Karlsson and Ribbing 1982 |
+| bronze | 0.953, 0.717, 0.462 | 0.320, 0.519, 0.980 | 3.396, 2.415, 1.945 | 0.35 | art | Querry 1985 |
+
+| Dielectric | IOR (587.6 nm) | Abbe | Provenance | Source |
+| --- | --- | --- | --- | --- |
+| fusedSilica | 1.4585 | 67.8 | measured | Malitson 1965 |
+| sapphire | 1.7682 | 72.3 | measured | Malitson 1962 |
+| diamond | 2.4175 | 55.3 | measured | Peter 1923 |
+| quartz | 1.5443 | 69.7 | measured | Ghosh 1999 |
+| calcite | 1.6585 | 49.9 | measured | Ghosh 1999 |
+| water | 1.3334 | 55.8 | measured | Daimon and Masumura 2007 |
+| ice | 1.31 | 47.8 | measured | Warren and Brandt 2008 |
+| windowGlass | 1.5234 | 64 | measured | Rubin 1985 |
+| acrylic | 1.4906 | 53.2 | derived | Sultanova et al. 2009 |
+| polycarbonate | 1.5848 | 27.9 | derived | Sultanova et al. 2009 |
+| polystyrene | 1.5916 | 29.5 | derived | Sultanova et al. 2009 |
+| ethanol | 1.3608 | 54.7 | measured | Sani and Oro 2016 |
+| cubicZirconia | 2.1477 | 33.4 | measured | Synowicki and Tiwald 2004 |
+| pet | 1.575 | - | derived | physicallybased.info |
+| polypropylene | 1.492 | - | derived | physicallybased.info |
+| pvc | 1.542 | - | derived | physicallybased.info |
+
+| Surface | Albedo (linear) | Roughness (range) | IOR | Provenance | Samples |
+| --- | --- | --- | --- | --- | --- |
+| concrete | 0.337, 0.288, 0.233 | 0.85 (0.7 to 0.95) | 1.5 | measured | Meerdink et al. 2019: 4 |
+| asphalt | 0.083, 0.073, 0.060 | 0.9 (0.75 to 0.98) | 1.5 | measured | Meerdink et al. 2019: 2 |
+| brick | 0.210, 0.090, 0.057 | 0.85 (0.7 to 0.95) | 1.5 | measured | Meerdink et al. 2019: 3 |
+| limestone | 0.389, 0.337, 0.263 | 0.8 (0.6 to 0.95) | 1.5724 | measured | Meerdink et al. 2019: 4 |
+| granite | 0.271, 0.224, 0.187 | 0.7 (0.3 to 0.9) | 1.5443 | measured | Meerdink et al. 2019: 3 |
+| sandstone | 0.360, 0.274, 0.215 | 0.9 (0.75 to 0.98) | 1.5443 | measured | Meerdink et al. 2019: 3 |
+| marble | 0.664, 0.630, 0.551 | 0.5 (0.1 to 0.8) | 1.5724 | measured | Meerdink et al. 2019: 3 |
+| slate | 0.172, 0.129, 0.124 | 0.7 (0.4 to 0.9) | 1.5 | measured | Meerdink et al. 2019: 2 |
+| basalt | 0.126, 0.120, 0.103 | 0.85 (0.6 to 0.95) | 1.5 | measured | Meerdink et al. 2019: 3 |
+| gypsum | 0.954, 0.947, 0.930 | 0.9 (0.8 to 1) | 1.5 | measured | Meerdink et al. 2019: 1 |
+| roofTile | 0.146, 0.110, 0.085 | 0.8 (0.6 to 0.9) | 1.5 | measured | Meerdink et al. 2019: 1 |
+| pineWood | 0.712, 0.467, 0.212 | 0.75 (0.5 to 0.9) | 1.5 | measured | Meerdink et al. 2019: 2 |
+| bark | 0.272, 0.238, 0.195 | 0.95 (0.85 to 1) | 1.5 | measured | Meerdink et al. 2019: 4 |
+| drySoil | 0.386, 0.255, 0.109 | 0.95 (0.85 to 1) | 1.5 | measured | Meerdink et al. 2019: 3 |
+| darkSoil | 0.102, 0.063, 0.020 | 0.95 (0.85 to 1) | 1.5 | measured | Meerdink et al. 2019: 3 |
+| sand | 0.205, 0.135, 0.047 | 0.9 (0.8 to 1) | 1.5443 | measured | Meerdink et al. 2019: 1 |
+| redSand | 0.271, 0.169, 0.111 | 0.9 (0.8 to 1) | 1.5443 | measured | Meerdink et al. 2019: 2 |
+| snow | 0.983, 0.991, 0.992 | 0.6 (0.3 to 0.8) | 1.31 | derived | Meerdink et al. 2019: 1 |
+| oldSnow | 0.961, 0.978, 0.981 | 0.5 (0.2 to 0.8) | 1.31 | derived | Meerdink et al. 2019: 2 |
+| frost | 0.990, 0.994, 0.995 | 0.7 (0.5 to 0.9) | 1.31 | derived | Meerdink et al. 2019: 1 |
+| grass | 0.132, 0.166, 0.073 | 0.6 (0.4 to 0.8) | 1.5 | measured | Meerdink et al. 2019: 3 |
+| leaves | 0.093, 0.118, 0.074 | 0.5 (0.3 to 0.7) | 1.5 | measured | Meerdink et al. 2019: 5 |
+| dryGrass | 0.357, 0.253, 0.135 | 0.7 (0.5 to 0.9) | 1.5 | measured | Meerdink et al. 2019: 3 |
+| leafLitter | 0.274, 0.197, 0.119 | 0.85 (0.6 to 0.95) | 1.5 | measured | Meerdink et al. 2019: 3 |
+| conifer | 0.152, 0.134, 0.068 | 0.6 (0.4 to 0.8) | 1.5 | measured | Meerdink et al. 2019: 3 |
+| rubber | 0.063, 0.062, 0.060 | 0.8 (0.5 to 0.9) | 1.5 | measured | Meerdink et al. 2019: 1 |
+| blackPaint | 0.036, 0.038, 0.035 | 0.5 (0.1 to 0.9) | 1.5 | measured | Meerdink et al. 2019: 2 |
+| olivePaint | 0.101, 0.196, 0.103 | 0.5 (0.1 to 0.9) | 1.5 | measured | Meerdink et al. 2019: 2 |
+| whiteCoating | 0.628, 0.583, 0.485 | 0.6 (0.3 to 0.9) | 1.5 | measured | Meerdink et al. 2019: 2 |
+| cinders | 0.044, 0.041, 0.037 | 0.95 (0.85 to 1) | 1.5 | measured | Meerdink et al. 2019: 1 |
+| graphite | 0.040, 0.041, 0.044 | 0.6 (0.4 to 0.9) | 1.5 | measured | Meerdink et al. 2019: 1 |
+| rust | 0.233, 0.077, 0.024 | 0.9 (0.7 to 1) | 1.5 | measured | Meerdink et al. 2019: 3 |
+| patina | 0.327, 0.682, 0.551 | 0.8 (0.6 to 0.95) | 1.5 | measured | Meerdink et al. 2019: 1 |
+| roofShingle | 0.208, 0.172, 0.154 | 0.9 (0.8 to 1) | 1.5 | measured | Meerdink et al. 2019: 5 |
+| paper | 0.794, 0.834, 0.884 | 0.8 (0.6 to 0.9) | 1.5 | derived | physicallybased.info: 1 |
+| tire | 0.023, 0.023, 0.023 | 0.7 (0.5 to 0.9) | 1.5 | derived | physicallybased.info: 1 |
+| porcelain | 0.745, 0.745, 0.723 | 0.1 (0.02 to 0.4) | 1.5 | derived | physicallybased.info: 1 |
+| eggShell | 0.610, 0.624, 0.631 | 0.9 (0.7 to 1) | 1.5 | derived | physicallybased.info: 1 |
+| bone | 0.793, 0.793, 0.664 | 0.9 (0.6 to 1) | 1.5 | derived | physicallybased.info: 1 |
+| skinI | 0.847, 0.638, 0.552 | 0.5 (0.35 to 0.7) | 1.4 | derived | physicallybased.info: 1 |
+| skinII | 0.799, 0.485, 0.347 | 0.5 (0.35 to 0.7) | 1.4 | derived | physicallybased.info: 1 |
+| skinIII | 0.623, 0.433, 0.343 | 0.5 (0.35 to 0.7) | 1.4 | derived | physicallybased.info: 1 |
+| skinIV | 0.436, 0.227, 0.131 | 0.5 (0.35 to 0.7) | 1.4 | derived | physicallybased.info: 1 |
+| skinV | 0.283, 0.148, 0.079 | 0.5 (0.35 to 0.7) | 1.4 | derived | physicallybased.info: 1 |
+| skinVI | 0.090, 0.050, 0.020 | 0.5 (0.35 to 0.7) | 1.4 | derived | physicallybased.info: 1 |
+
+Not in the library yet, for want of a measured source in these data sets: bronze (the `bronze` row is Cu90Zn10 brass,
+marked art), carbon steel (`steel` is iron, marked derived), weathered grey wood, oak wood, wet soil, cotton and
+other fabric, leather, white or coloured plastics as opaque surfaces, white or red paint, and lime mortar. Snow and
+frost spectra in the library are modelled from grain size, so they are marked derived. Glass of a maker's catalogue
+(N-BK7, flint) is left out: only datasheets give it.
 
 ### Your own mip levels
 

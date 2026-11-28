@@ -349,6 +349,28 @@ from 380 to 780 nm, taken unchanged from Scott Prahl's "Tabulated Molar Extincti
 N. Kollias), retrieved 2026-11-18. Measured physical data, used with attribution; the page states no licence terms. No
 program code is included.
 
+## Measured material data sets (materials library, 2026-11-28)
+
+Scott, 2026-11-28: measured data sets may be copied with credit, each in its own data file under its own licence. The
+materials library (packages/materials/src/measured.ts) ships only values derived from these files; the files sit in
+packages/materials/test/fixtures, each with its source and licence in its `_header`. No program code is included.
+
+- `optical-constants.json`: metal n and k tables and dielectric dispersion formulas from the refractiveindex.info
+  database (M. N. Polyanskiy, "Refractiveindex.info database of optical constants", Scientific Data 11, 94, 2024,
+  https://doi.org/10.1038/s41597-023-02898-2, https://github.com/polyanskiy/refractiveindex.info-database), CC0 1.0.
+  Each entry names the paper the database transcribes (Johnson and Christy 1972 and 1974, Rakic 1995, Werner et al.
+  2009, Querry 1985 and 1987, Mathewson and Myers 1971, Inagaki et al. 1981, Palm et al. 2018, Karlsson and Ribbing
+  1982, Malitson 1962 and 1965, Peter 1923, Ghosh 1999, Daimon and Masumura 2007, Warren and Brandt 2008, Rubin 1985,
+  Sultanova et al. 2009, Sani and Dell'Oro 2016, Synowicki and Tiwald 2004). Retrieved 2026-11-28.
+- `surface-spectra.json`: visible reflectance spectra resampled to 10 nm from the ECOSTRESS Spectral Library 1.0
+  (S. K. Meerdink, S. J. Hook, D. A. Roberts and E. A. Abbott, Remote Sensing of Environment 230, 111196, 2019,
+  https://speclib.jpl.nasa.gov) and its ASTER part (A. M. Baldridge et al., Remote Sensing of Environment 113, 711,
+  2009), NASA JPL data, free to use with these citations. Retrieved 2026-11-28.
+- `physicallybased.json`: rows of the physically based materials database (A. Palmqvist, https://physicallybased.info,
+  https://github.com/AntonPalmqvist/physically-based-api), CC0 1.0. Retrieved 2026-11-28.
+
+None of the three is share-alike. The CIE illuminant data sets (CC BY-SA 4.0) are not used here.
+
 ## Standard Utah Teapot control data
 
 The numeric control net in packages/geometry/src/teapot-data.ts and the unchanged data fixture packages/geometry/tests/fixtures/teapotCGA.bpt represent the historic Utah Teapot developed at the University of Utah: Martin Newell (1975), Jim Blinn's proportions (1976), and Frank Crow's round bottom (1987). Model data only, under the standard-model exception in AGENTS.md; the Margo tessellator is clean-room code.

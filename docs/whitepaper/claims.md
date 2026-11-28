@@ -1389,6 +1389,16 @@ Some newer results (the voxel sandbox and multiplayer, the create-margo starters
 Ryzen 9 9950X and an NVIDIA RTX A6000, and say so. On Apple silicon, only the results that name an Apple silicon Mac. No speed has been measured on Android, in Firefox
 or in Safari. [docs/limits.md](../limits.md) lists what is untested.
 
+## Measured materials library (2026-11-28)
+
+Claim: `@margoengine/materials/presets` holds 81 named materials (20 metals, 16 dielectrics, 45 everyday surfaces), each
+with its provenance (58 measured, 22 derived, 1 art) and a cited source, and every value is reproduced from the source
+data shipped in the repository. Proof: packages/materials/test/measured-library.test.js recomputes every F0 and albedo
+(within 0.002, through `@margoengine/optics` SpectralIntegrator), n and k (0.1 percent), IOR (1e-4) and Abbe number
+(0.1) from packages/materials/test/fixtures; packages/materials/test/measured-library-browser.mjs renders each row on
+WebGPU and the WebGL2 layer. Scope: colour at normal incidence under a 6504 K black body; roughness is art throughout; no
+claim of a match to a photograph. Sources: docs/clean-room.md, "Measured materials library".
+
 ## Headline numbers
 
 | Claim | Where | Evidence | Command | Status |

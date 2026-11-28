@@ -1,0 +1,240 @@
+{
+ "_header": {
+  "what": "Rows of the physically based materials database used where no primary data set in this folder covers a material.",
+  "source": "A. Palmqvist, physicallybased.info, https://physicallybased.info, API https://api.physicallybased.info/materials, https://github.com/AntonPalmqvist/physically-based-api.",
+  "licence": "CC0 1.0. Retrieved 2026-11-28."
+ },
+ "rows": {
+  "paper": {
+   "name": "Office Paper",
+   "color": [
+    0.794,
+    0.834,
+    0.884
+   ],
+   "roughness": 0.8,
+   "ior": 1.5,
+   "sources": [
+    "https://github.com/AntonPalmqvist/physically-based-api/tree/main/data/materials/office-paper",
+    "https://en.wikipedia.org/wiki/Paper#Types,_thickness_and_weight",
+    "https://en.wikipedia.org/wiki/Optical_brightener"
+   ]
+  },
+  "tire": {
+   "name": "Tire",
+   "color": [
+    0.023,
+    0.023,
+    0.023
+   ],
+   "roughness": 0.7,
+   "ior": 1.5,
+   "sources": [
+    "https://github.com/AntonPalmqvist/physically-based-api/tree/main/data/materials/tire/",
+    "https://en.wikipedia.org/wiki/Tire"
+   ]
+  },
+  "porcelain": {
+   "name": "Porcelain",
+   "color": [
+    0.745,
+    0.745,
+    0.723
+   ],
+   "roughness": 0,
+   "ior": 1.5,
+   "sources": [
+    "https://github.com/AntonPalmqvist/physically-based-api/tree/main/data/materials/porcelain/",
+    "https://en.wikipedia.org/w/index.php?title=Vitreous_china&oldid=1291896907",
+    "https://en.wikipedia.org/w/index.php?title=Porcelain&oldid=1320984472",
+    "https://en.wikipedia.org/w/index.php?title=Ceramic&oldid=1326921651",
+    "https://www.engineeringtoolbox.com/ceramics-properties-d_1227.html"
+   ]
+  },
+  "eggShell": {
+   "name": "Egg Shell",
+   "color": [
+    0.61,
+    0.624,
+    0.631
+   ],
+   "roughness": 0.9,
+   "ior": 1.5,
+   "sources": [
+    "https://github.com/AntonPalmqvist/physically-based-api/tree/main/data/materials/egg-shell-white/",
+    "https://en.wikipedia.org/wiki/Egg_as_food#Shell"
+   ]
+  },
+  "bone": {
+   "name": "Bone",
+   "color": [
+    0.793,
+    0.793,
+    0.664
+   ],
+   "roughness": 0.9,
+   "ior": 1.5,
+   "sources": [
+    "https://hypertextbook.com/facts/2002/AnnaYarusskaya.shtml",
+    "https://www.tandfonline.com/doi/pdf/10.3109/02841867809127938",
+    "https://en.wikipedia.org/wiki/Bone"
+   ]
+  },
+  "skinI": {
+   "name": "Skin I",
+   "color": [
+    0.847,
+    0.638,
+    0.552
+   ],
+   "roughness": 0.5,
+   "ior": 1.4,
+   "sources": [
+    "https://www.spiedigitallibrary.org/journals/journal-of-biomedical-optics/volume-17/issue-9/090901/Optical-properties-of-human-skin/10.1117/1.JBO.17.9.090901.full?SSO=1",
+    "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3699319/",
+    "https://graphics.ucsd.edu/~henrik/papers/skin_bssrdf/skin_bssrdf.pdf",
+    "https://www.iryoku.com/downloads/Next-Generation-Character-Rendering-v6.pptx",
+    "https://graphics.stanford.edu/papers/bssrdf/bssrdf.pdf",
+    "https://renderman.pixar.com/resources/RenderMan_20/subsurface.html"
+   ]
+  },
+  "skinII": {
+   "name": "Skin II",
+   "color": [
+    0.799,
+    0.485,
+    0.347
+   ],
+   "roughness": 0.5,
+   "ior": 1.4,
+   "sources": [
+    "https://www.spiedigitallibrary.org/journals/journal-of-biomedical-optics/volume-17/issue-9/090901/Optical-properties-of-human-skin/10.1117/1.JBO.17.9.090901.full?SSO=1",
+    "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3699319/",
+    "https://graphics.ucsd.edu/~henrik/papers/skin_bssrdf/skin_bssrdf.pdf",
+    "https://www.iryoku.com/downloads/Next-Generation-Character-Rendering-v6.pptx",
+    "https://graphics.stanford.edu/papers/bssrdf/bssrdf.pdf",
+    "https://renderman.pixar.com/resources/RenderMan_20/subsurface.html"
+   ]
+  },
+  "skinIII": {
+   "name": "Skin III",
+   "color": [
+    0.623,
+    0.433,
+    0.343
+   ],
+   "roughness": 0.5,
+   "ior": 1.4,
+   "sources": [
+    "https://www.spiedigitallibrary.org/journals/journal-of-biomedical-optics/volume-17/issue-9/090901/Optical-properties-of-human-skin/10.1117/1.JBO.17.9.090901.full?SSO=1",
+    "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3699319/",
+    "https://graphics.ucsd.edu/~henrik/papers/skin_bssrdf/skin_bssrdf.pdf",
+    "https://www.iryoku.com/downloads/Next-Generation-Character-Rendering-v6.pptx",
+    "https://graphics.stanford.edu/papers/bssrdf/bssrdf.pdf",
+    "https://renderman.pixar.com/resources/RenderMan_20/subsurface.html",
+    "https://spectraldb.com/measurements/00490/",
+    "https://spectraldb.com/measurements/00403/"
+   ]
+  },
+  "skinIV": {
+   "name": "Skin IV",
+   "color": [
+    0.436,
+    0.227,
+    0.131
+   ],
+   "roughness": 0.5,
+   "ior": 1.4,
+   "sources": [
+    "https://www.spiedigitallibrary.org/journals/journal-of-biomedical-optics/volume-17/issue-9/090901/Optical-properties-of-human-skin/10.1117/1.JBO.17.9.090901.full?SSO=1",
+    "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3699319/",
+    "https://graphics.ucsd.edu/~henrik/papers/skin_bssrdf/skin_bssrdf.pdf",
+    "https://www.iryoku.com/downloads/Next-Generation-Character-Rendering-v6.pptx",
+    "https://graphics.stanford.edu/papers/bssrdf/bssrdf.pdf",
+    "https://renderman.pixar.com/resources/RenderMan_20/subsurface.html",
+    "https://spectraldb.com/measurements/00408/"
+   ]
+  },
+  "skinV": {
+   "name": "Skin V",
+   "color": [
+    0.283,
+    0.148,
+    0.079
+   ],
+   "roughness": 0.5,
+   "ior": 1.4,
+   "sources": [
+    "https://www.spiedigitallibrary.org/journals/journal-of-biomedical-optics/volume-17/issue-9/090901/Optical-properties-of-human-skin/10.1117/1.JBO.17.9.090901.full?SSO=1",
+    "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3699319/",
+    "https://graphics.ucsd.edu/~henrik/papers/skin_bssrdf/skin_bssrdf.pdf",
+    "https://www.iryoku.com/downloads/Next-Generation-Character-Rendering-v6.pptx",
+    "https://graphics.stanford.edu/papers/bssrdf/bssrdf.pdf",
+    "https://renderman.pixar.com/resources/RenderMan_20/subsurface.html",
+    "https://spectraldb.com/measurements/00396/"
+   ]
+  },
+  "skinVI": {
+   "name": "Skin VI",
+   "color": [
+    0.09,
+    0.05,
+    0.02
+   ],
+   "roughness": 0.5,
+   "ior": 1.4,
+   "sources": [
+    "https://www.spiedigitallibrary.org/journals/journal-of-biomedical-optics/volume-17/issue-9/090901/Optical-properties-of-human-skin/10.1117/1.JBO.17.9.090901.full?SSO=1",
+    "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3699319/",
+    "https://graphics.ucsd.edu/~henrik/papers/skin_bssrdf/skin_bssrdf.pdf",
+    "https://www.iryoku.com/downloads/Next-Generation-Character-Rendering-v6.pptx",
+    "https://graphics.stanford.edu/papers/bssrdf/bssrdf.pdf",
+    "https://renderman.pixar.com/resources/RenderMan_20/subsurface.html",
+    "https://spectraldb.com/measurements/00414/"
+   ]
+  },
+  "pet": {
+   "name": "Plastic (PET)",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "roughness": 0,
+   "ior": 1.575,
+   "sources": [
+    "https://en.wikipedia.org/wiki/Polyethylene_terephthalate",
+    "https://polymerdatabase.com/polymer%20physics/Ref%20Index%20Table2%20.html"
+   ]
+  },
+  "polypropylene": {
+   "name": "Plastic (PP)",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "roughness": 0,
+   "ior": 1.492,
+   "sources": [
+    "https://en.wikipedia.org/wiki/Polypropylene",
+    "https://refractiveindex.info/?shelf=3d&book=plastics&page=pc",
+    "https://www.osapublishing.org/ao/viewmedia.cfm?uri=ao-42-3-592"
+   ]
+  },
+  "pvc": {
+   "name": "Plastic (PVC)",
+   "color": [
+    1,
+    1,
+    1
+   ],
+   "roughness": 0,
+   "ior": 1.542,
+   "sources": [
+    "https://en.wikipedia.org/wiki/Polyvinyl_chloride",
+    "https://polymerdatabase.com/polymer%20physics/Ref%20Index%20Table2%20.html"
+   ]
+  }
+ }
+}

@@ -1356,6 +1356,28 @@ https://doi.org/10.1103/PhysRevE.82.046111: only the people ahead count) and Fru
 (1971: levels of service) for `packages/navmesh/src/crowd.ts` and its test. The five-point Gauss-Legendre rule is the
 textbook one. No companion code or external implementation was read.
 
+### Measured materials library (materials/presets, 2026-11-28)
+
+`packages/materials/src/measured.ts` and `src/presets.ts` (`metal`, `dielectric`, `surface`, `materials`,
+`materialInfo`) hold values converted here from measured data; the data files are in `packages/materials/test/fixtures`
+(THIRD-PARTY-NOTICES.md, "Measured material data sets"), copied with credit on Scott's ruling of 2026-11-28. No code was
+read or copied from any database or renderer. Sources of the values:
+P. B. Johnson and R. W. Christy, "Optical constants of the noble metals", Phys. Rev. B 6, 4370, 1972,
+https://doi.org/10.1103/PhysRevB.6.4370; "Optical constants of transition metals", Phys. Rev. B 9, 5056, 1974,
+https://doi.org/10.1103/PhysRevB.9.5056; A. D. Rakic, Appl. Opt. 34, 4755, 1995, https://doi.org/10.1364/AO.34.004755;
+W. S. M. Werner, K. Glantschnig and C. Ambrosch-Draxl, J. Phys. Chem. Ref. Data 38, 1013, 2009,
+https://doi.org/10.1063/1.3243762; M. R. Querry, US Army CRDC-CR-85034 (1985) and CRDEC-CR-88009 (1987); A. G. Mathewson
+and H. P. Myers, Phys. Scr. 4, 291, 1971; T. Inagaki, E. T. Arakawa and M. W. Williams, Phys. Rev. B 23, 5246, 1981;
+K. J. Palm et al., ACS Photonics 5, 4677, 2018; B. Karlsson and C. G. Ribbing, J. Appl. Phys. 53, 6340, 1982;
+I. H. Malitson, J. Opt. Soc. Am. 55, 1205, 1965 and 52, 1377, 1962; F. Peter, Z. Phys. 15, 358, 1923; G. Ghosh, Opt.
+Commun. 163, 95, 1999; M. Daimon and A. Masumura, Appl. Opt. 46, 3811, 2007; S. G. Warren and R. E. Brandt, J. Geophys.
+Res. 113, D14220, 2008; M. Rubin, Solar Energy Materials 12, 275, 1985; N. Sultanova, S. Kasarova and I. Nikolov, Acta
+Phys. Pol. A 116, 585, 2009; E. Sani and A. Dell'Oro, Optical Materials 60, 137, 2016; R. A. Synowicki and T. E. Tiwald,
+Thin Solid Films 455, 248, 2004; S. K. Meerdink et al., Remote Sensing of Environment 230, 111196, 2019; and the CIE 1931
+fit of C. Wyman, P.-P. Sloan and P. Shirley, JCGT 2(2), 2013, inside `@margoengine/optics`. Fresnel at normal incidence
+for a conductor and the Abbe number are textbook (Born and Wolf, Principles of Optics). Hoffman's SIGGRAPH 2013 course
+figures, which the copper and iron presets used before, were compared and replaced.
+
 ### Light through thin skin (materials, 2026-11-15)
 
 Read Jimenez, Whelan, Sundstedt and Gutierrez, "Real-Time Realistic Skin Translucency" (IEEE Computer Graphics and

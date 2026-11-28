@@ -1,0 +1,132 @@
+// GENERATED from test/fixtures (optical-constants.json, surface-spectra.json, physicallybased.json) through
+// test/support-library.mjs; test/measured-library.test.js recomputes every value from those files.
+// Colours are linear sRGB. Metals: F0 at normal incidence from the tabulated n + ik, clamped to 1 where the spectrum
+// lies outside sRGB (gold red integrates to 1.025). Surfaces: the mean albedo of the named samples. Every spectrum goes
+// through @margoengine/optics SpectralIntegrator (6504 K black body, 380 to 780 nm, 5 nm steps). n and k are at 650,
+// 550 and 450 nm. Dielectric `ior` is n at 587.56 nm and `abbe` is (nd - 1) / (nF - nC). Roughness values and
+// ranges are art defaults: no source here measures roughness.
+
+import type { MeasuredDielectric, MeasuredMetal, MeasuredSurface } from './measured-types.js';
+
+/** Citations of the library by index: authors, title, journal, year and link. */
+export const SOURCES: readonly string[] = [
+  'P. B. Johnson, R. W. Christy, "Optical constants of the noble metals", Phys. Rev. B 6, 4370-4379 (1972), https://doi.org/10.1103/PhysRevB.6.4370',
+  'P. B. Johnson, R. W. Christy, "Optical constants of transition metals: Ti, V, Cr, Mn, Fe, Co, Ni, and Pd", Phys. Rev. B 9, 5056-5070 (1974), https://doi.org/10.1103/PhysRevB.9.5056',
+  'A. D. Rakic, "Algorithm for the determination of intrinsic optical constants of metal films: application to aluminum", Appl. Opt. 34, 4755-4767 (1995), https://doi.org/10.1364/AO.34.004755',
+  'W. S. M. Werner, K. Glantschnig, C. Ambrosch-Draxl, "Optical constants and inelastic electron-scattering data for 17 elemental metals", J. Phys. Chem. Ref. Data 38, 1013-1092 (2009), https://doi.org/10.1063/1.3243762',
+  'M. R. Querry, "Optical constants of minerals and other materials from the millimeter to the ultraviolet", US Army CRDEC Contractor Report CRDEC-CR-88009 (1987)',
+  'A. G. Mathewson, H. P. Myers, "Absolute values of the optical constants of some pure metals", Phys. Scr. 4, 291-292 (1971), https://doi.org/10.1088/0031-8949/4/6/009',
+  'T. Inagaki, E. T. Arakawa, M. W. Williams, "Optical properties of liquid mercury", Phys. Rev. B 23, 5246-5262 (1981), https://doi.org/10.1103/PhysRevB.23.5246',
+  'M. R. Querry, "Optical constants", US Army CRDC Contractor Report CRDC-CR-85034 (1985)',
+  'K. J. Palm, J. B. Murray, T. C. Narayan, J. N. Munday, "Dynamic optical properties of metal hydrides", ACS Photonics 5, 4677-4686 (2018), https://doi.org/10.1021/acsphotonics.8b01243',
+  'B. Karlsson, C. G. Ribbing, "Optical constants and spectral selectivity of stainless steel and its oxides", J. Appl. Phys. 53, 6340-6346 (1982), https://doi.org/10.1063/1.331503',
+  'I. H. Malitson, "Interspecimen comparison of the refractive index of fused silica", J. Opt. Soc. Am. 55, 1205-1208 (1965), https://doi.org/10.1364/JOSA.55.001205',
+  'I. H. Malitson, "Refraction and dispersion of synthetic sapphire", J. Opt. Soc. Am. 52, 1377-1379 (1962), https://doi.org/10.1364/JOSA.52.001377',
+  'F. Peter, "Ueber Brechungsindizes und Absorptionskonstanten des Diamanten zwischen 644 und 226 mu", Z. Phys. 15, 358-368 (1923), https://doi.org/10.1007/BF01330487',
+  'G. Ghosh, "Dispersion-equation coefficients for the refractive index and birefringence of calcite and quartz crystals", Opt. Commun. 163, 95-102 (1999), https://doi.org/10.1016/S0030-4018(99)00091-7',
+  'M. Daimon, A. Masumura, "Measurement of the refractive index of distilled water from the near-infrared region to the ultraviolet region", Appl. Opt. 46, 3811-3820 (2007), https://doi.org/10.1364/AO.46.003811',
+  'S. G. Warren, R. E. Brandt, "Optical constants of ice from the ultraviolet to the microwave: A revised compilation", J. Geophys. Res. 113, D14220 (2008), https://doi.org/10.1029/2007JD009744',
+  'M. Rubin, "Optical properties of soda lime silica glasses", Solar Energy Materials 12, 275-288 (1985), https://doi.org/10.1016/0165-1633(85)90052-8',
+  'N. Sultanova, S. Kasarova, I. Nikolov, "Dispersion properties of optical polymers", Acta Physica Polonica A 116, 585-587 (2009), https://doi.org/10.12693/APhysPolA.116.585',
+  'E. Sani, A. Dell Oro, "Spectral optical constants of ethanol and isopropanol from ultraviolet to far infrared", Optical Materials 60, 137-141 (2016), https://doi.org/10.1016/j.optmat.2016.06.041',
+  'R. A. Synowicki, T. E. Tiwald, "Optical properties of bulk c-ZrO2, c-MgO and a-As2S3 determined by variable angle spectroscopic ellipsometry", Thin Solid Films 455-456, 248-255 (2004), https://doi.org/10.1016/j.tsf.2004.02.028',
+  'A. Palmqvist, physicallybased.info database (CC0 1.0), https://physicallybased.info',
+  'S. K. Meerdink, S. J. Hook, D. A. Roberts and E. A. Abbott, "The ECOSTRESS spectral library version 1.0", Remote Sensing of Environment 230, 111196 (2019), https://doi.org/10.1016/j.rse.2019.05.015',
+];
+
+/** A metal of the library. */
+export type MetalName = 'gold' | 'silver' | 'copper' | 'iron' | 'nickel' | 'chromium' | 'titanium' | 'palladium' | 'cobalt' | 'aluminium' | 'platinum' | 'tungsten' | 'zinc' | 'lead' | 'mercury' | 'brass' | 'magnesium' | 'steel' | 'stainlessSteel' | 'bronze';
+/** A clear dielectric of the library. */
+export type DielectricName = 'fusedSilica' | 'sapphire' | 'diamond' | 'quartz' | 'calcite' | 'water' | 'ice' | 'windowGlass' | 'acrylic' | 'polycarbonate' | 'polystyrene' | 'ethanol' | 'cubicZirconia' | 'pet' | 'polypropylene' | 'pvc';
+/** An everyday surface of the library. */
+export type SurfaceName = 'concrete' | 'asphalt' | 'brick' | 'limestone' | 'granite' | 'sandstone' | 'marble' | 'slate' | 'basalt' | 'gypsum' | 'roofTile' | 'pineWood' | 'bark' | 'drySoil' | 'darkSoil' | 'sand' | 'redSand' | 'snow' | 'oldSnow' | 'frost' | 'grass' | 'leaves' | 'dryGrass' | 'leafLitter' | 'conifer' | 'rubber' | 'blackPaint' | 'olivePaint' | 'whiteCoating' | 'cinders' | 'graphite' | 'rust' | 'patina' | 'roofShingle' | 'paper' | 'tire' | 'porcelain' | 'eggShell' | 'bone' | 'skinI' | 'skinII' | 'skinIII' | 'skinIV' | 'skinV' | 'skinVI';
+
+export const METAL_DATA: Readonly<Record<MetalName, MeasuredMetal>> = {
+  gold: { provenance: 'measured', color: [1, 0.7325, 0.3658], roughness: 0.2, n: [0.1556, 0.4241, 1.383], k: [3.602, 2.472, 1.915], source: 0 },
+  silver: { provenance: 'measured', color: [0.9891, 0.9841, 0.9776], roughness: 0.15, n: [0.05222, 0.05958, 0.04], k: [4.409, 3.597, 2.648], source: 0 },
+  copper: { provenance: 'measured', color: [0.9216, 0.6251, 0.5207], roughness: 0.3, n: [0.2378, 1.007, 1.24], k: [3.626, 2.582, 2.393], source: 0 },
+  iron: { provenance: 'measured', color: [0.5289, 0.5136, 0.4938], roughness: 0.6, n: [2.911, 2.95, 2.584], k: [3.089, 2.932, 2.767], source: 1 },
+  nickel: { provenance: 'measured', color: [0.6942, 0.6417, 0.5618], roughness: 0.25, n: [1.99, 1.921, 1.729], k: [4.209, 3.616, 2.944], source: 1 },
+  chromium: { provenance: 'measured', color: [0.5496, 0.5561, 0.5537], roughness: 0.1, n: [3.107, 3.181, 2.323], k: [3.331, 3.329, 3.135], source: 1 },
+  titanium: { provenance: 'measured', color: [0.617, 0.5799, 0.5424], roughness: 0.35, n: [2.741, 2.542, 2.267], k: [3.814, 3.435, 3.038], source: 1 },
+  palladium: { provenance: 'measured', color: [0.7309, 0.6976, 0.6515], roughness: 0.25, n: [1.789, 1.641, 1.408], k: [4.375, 3.845, 3.254], source: 1 },
+  cobalt: { provenance: 'measured', color: [0.6816, 0.6558, 0.6153], roughness: 0.3, n: [2.237, 2.052, 1.736], k: [4.236, 3.824, 3.274], source: 1 },
+  aluminium: { provenance: 'measured', color: [0.9078, 0.9157, 0.9224], roughness: 0.3, n: [1.558, 1.015, 0.6332], k: [7.712, 6.627, 5.454], source: 2 },
+  platinum: { provenance: 'measured', color: [0.9529, 0.936, 0.8308], roughness: 0.2, n: [0.4748, 0.4652, 0.6327], k: [6.333, 5.107, 3.748], source: 3 },
+  tungsten: { provenance: 'measured', color: [0.9472, 0.8159, 0.7535], roughness: 0.35, n: [0.9207, 1.344, 2.232], k: [6.86, 5.229, 5.146], source: 3 },
+  zinc: { provenance: 'measured', color: [0.7436, 0.7685, 0.7677], roughness: 0.4, n: [12.8, 13.8, 11.94], k: [2.204, 4.252, 6.182], source: 4 },
+  lead: { provenance: 'measured', color: [0.6574, 0.6604, 0.6938], roughness: 0.5, n: [2.575, 2.544, 2.104], k: [4.161, 4.182, 4.189], source: 5 },
+  mercury: { provenance: 'measured', color: [0.7814, 0.7795, 0.7784], roughness: 0.02, n: [2.073, 1.552, 1.061], k: [5.338, 4.651, 3.863], source: 6 },
+  brass: { provenance: 'measured', color: [0.9012, 0.7827, 0.4189], roughness: 0.3, n: [0.444, 0.527, 1.094], k: [3.695, 2.765, 1.829], source: 7 },
+  magnesium: { provenance: 'measured', color: [0.8923, 0.8815, 0.8944], roughness: 0.35, n: [1.014, 0.806, 0.5008], k: [5.795, 4.933, 4.09], source: 8 },
+  steel: { provenance: 'derived', color: [0.5741, 0.5672, 0.5623], roughness: 0.4, n: [2.427, 2.189, 1.736], k: [3.361, 3.171, 2.906], source: 7, note: 'carbon steel: the iron of Querry 1985 stands in (steel is over 98 percent iron); no carbon steel table has a primary source' },
+  stainlessSteel: { provenance: 'derived', color: [0.6679, 0.6395, 0.5976], roughness: 0.3, n: [2.44, 2.044, 1.678], k: [4.182, 3.673, 3.117], source: 9, note: "austenitic stainless steel; the table was read from the paper's figure, not a printed table" },
+  bronze: { provenance: 'art', color: [0.9526, 0.7169, 0.4616], roughness: 0.35, n: [0.32, 0.519, 0.98], k: [3.396, 2.415, 1.945], source: 7, note: 'stand-in: Cu90Zn10 (gilding metal) until a measured copper-tin table is found' },
+};
+
+export const DIELECTRIC_DATA: Readonly<Record<DielectricName, MeasuredDielectric>> = {
+  fusedSilica: { provenance: 'measured', ior: 1.4585, abbe: 67.8, roughness: 0, source: 10 },
+  sapphire: { provenance: 'measured', ior: 1.7682, abbe: 72.3, roughness: 0, source: 11 },
+  diamond: { provenance: 'measured', ior: 2.4175, abbe: 55.3, roughness: 0, source: 12 },
+  quartz: { provenance: 'measured', ior: 1.5443, abbe: 69.7, roughness: 0, source: 13 },
+  calcite: { provenance: 'measured', ior: 1.6585, abbe: 49.9, roughness: 0, source: 13 },
+  water: { provenance: 'measured', ior: 1.3334, abbe: 55.8, roughness: 0, source: 14 },
+  ice: { provenance: 'measured', ior: 1.31, abbe: 47.8, roughness: 0.05, source: 15 },
+  windowGlass: { provenance: 'measured', ior: 1.5234, abbe: 64, roughness: 0, source: 16 },
+  acrylic: { provenance: 'derived', ior: 1.4906, abbe: 53.2, roughness: 0, source: 17, note: "a one-term Sellmeier fit to the paper's measured indices, 437 to 1052 nm" },
+  polycarbonate: { provenance: 'derived', ior: 1.5848, abbe: 27.9, roughness: 0, source: 17, note: "a one-term Sellmeier fit to the paper's measured indices, 437 to 1052 nm" },
+  polystyrene: { provenance: 'derived', ior: 1.5916, abbe: 29.5, roughness: 0, source: 17, note: "a one-term Sellmeier fit to the paper's measured indices, 437 to 1052 nm" },
+  ethanol: { provenance: 'measured', ior: 1.3608, abbe: 54.7, roughness: 0, source: 18 },
+  cubicZirconia: { provenance: 'measured', ior: 2.1477, abbe: 33.4, roughness: 0, source: 19 },
+  pet: { provenance: 'derived', ior: 1.575, roughness: 0.3, source: 20 },
+  polypropylene: { provenance: 'derived', ior: 1.492, roughness: 0.3, source: 20 },
+  pvc: { provenance: 'derived', ior: 1.542, roughness: 0.3, source: 20 },
+};
+
+export const SURFACE_DATA: Readonly<Record<SurfaceName, MeasuredSurface>> = {
+  concrete: { provenance: 'measured', color: [0.3365, 0.2881, 0.2326], roughness: 0.85, roughnessRange: [0.7, 0.95], ior: 1.5, source: 21, samples: ['manmade.concrete.constructionconcrete.solid.all.0598uuucnc.jhu.becknic | Construction  Concrete | 0598UUUCNC', 'manmade.concrete.pavingconcrete.solid.all.0092uuu_cnc.jhu.becknic | Construction  Concrete | 0092UUU_CNC', 'manmade.concrete.pavingconcrete.solid.all.0424uuucnc.jhu.becknic | Construction  Concrete | 0424UUUCNC', 'manmade.generalconstructionmaterial.cementcinderblock.solid.all.0432uuucnc.jhu.becknic | Construction Concrete | 0432UUUCNC'] },
+  asphalt: { provenance: 'measured', color: [0.08343, 0.07331, 0.06013], roughness: 0.9, roughnessRange: [0.75, 0.98], ior: 1.5, source: 21, samples: ['manmade.road.pavingasphalt.solid.all.0095uuuasp.jhu.becknic | Construction Asphalt | 0095UUUASP', 'manmade.road.pavingasphalt.solid.all.0674uuuasp.jhu.becknic | Construction Asphalt | 0674UUUASP'] },
+  brick: { provenance: 'measured', color: [0.2099, 0.09021, 0.05661], roughness: 0.85, roughnessRange: [0.7, 0.95], ior: 1.5, source: 21, samples: ['manmade.generalconstructionmaterial.brick.solid.all.0097uuubrk.jhu.becknic | Red smooth-faced Brick | 0097UUUBRK', 'manmade.generalconstructionmaterial.brick.solid.all.0413uuubrk.jhu.becknic | Bare Red Brick | 0413UUUBRK', 'manmade.generalconstructionmaterial.brick.solid.all.0412uuubrk.jhu.becknic | Weathered Red Brick | 0412UUUBRK'] },
+  limestone: { provenance: 'measured', color: [0.3889, 0.3368, 0.2625], roughness: 0.8, roughnessRange: [0.6, 0.95], ior: 1.5724, source: 21, samples: ['rock.sedimentary.limestone.solid.vswir.ward66.jpl.perkin | Ecrinal Limestone | Ward66', 'rock.sedimentary.limestone.solid.vswir.ward72.jpl.perkin | Oolitic Limestone | Ward72', 'rock.sedimentary.limestone.solid.vswir.ward73.jpl.perkin | Travertine (Calcareous Tufa) | Ward73', 'rock.sedimentary.limestone.solid.vswir.ward67.jpl.perkin | Chalk | Ward67'] },
+  granite: { provenance: 'measured', color: [0.2709, 0.224, 0.1869], roughness: 0.7, roughnessRange: [0.3, 0.9], ior: 1.5443, source: 21, samples: ['rock.igneous.felsic.solid.all.granite_h2.jhu.becknic | Granite | Granite_H2', 'rock.igneous.felsic.solid.all.granite_h3.jhu.becknic | Granite | Granite_H3', 'rock.igneous.felsic.solid.all.granite_h5.jhu.becknic | Granite | Granite_H5'] },
+  sandstone: { provenance: 'measured', color: [0.3599, 0.2737, 0.2151], roughness: 0.9, roughnessRange: [0.75, 0.98], ior: 1.5443, source: 21, samples: ['rock.sedimentary.sandstone.solid.vswir.ward58.jpl.perkin | Gray Sandstone | Ward58', 'rock.sedimentary.sandstone.solid.vswir.ward59.jpl.perkin | Red Sandstone | Ward59', 'rock.sedimentary.sandstone.solid.vswir.ward62.jpl.perkin | Arkose | Ward62'] },
+  marble: { provenance: 'measured', color: [0.664, 0.63, 0.5513], roughness: 0.5, roughnessRange: [0.1, 0.8], ior: 1.5724, source: 21, samples: ['manmade.generalconstructionmaterial.marble.solid.all.0722uuumbl.jhu.becknic | White Marble | 0722UUUMBL', 'rock.metamorphic.marble.solid.vswir.ward95.jpl.perkin | White Marble | Ward95', 'rock.metamorphic.marble.solid.vswir.ward96.jpl.perkin | Pink Marble | Ward96'] },
+  slate: { provenance: 'measured', color: [0.1724, 0.1294, 0.1236], roughness: 0.7, roughnessRange: [0.4, 0.9], ior: 1.5, source: 21, samples: ['rock.metamorphic.slate.solid.vswir.ward92.jpl.perkin | Gray Slate | Ward92', 'rock.metamorphic.slate.solid.vswir.ward91.jpl.perkin | Red Slate | Ward91'] },
+  basalt: { provenance: 'measured', color: [0.1261, 0.1198, 0.1034], roughness: 0.85, roughnessRange: [0.6, 0.95], ior: 1.5, source: 21, samples: ['rock.igneous.mafic.solid.all.basalt_h10.jhu.becknic | Basalt | Basalt_H10', 'rock.igneous.mafic.solid.all.basalt_h5.jhu.becknic | Basalt | Basalt_H5', 'rock.igneous.mafic.solid.all.basalt_h2.jhu.becknic | Basalt | Basalt_H2'] },
+  gypsum: { provenance: 'measured', color: [0.9544, 0.9465, 0.9301], roughness: 0.9, roughnessRange: [0.8, 1], ior: 1.5, source: 21, samples: ['mineral.sulfate.none.fine.vswir.so-2b.jpl.beckman | Gypsum CaSO_4.2H_2O | SO-2B'] },
+  roofTile: { provenance: 'measured', color: [0.1456, 0.1102, 0.08475], roughness: 0.8, roughnessRange: [0.6, 0.9], ior: 1.5, source: 21, samples: ['manmade.roofingmaterial.tile.solid.all.0484uuupot.jhu.becknic | Terra cotta Tiles | 0484UUUPOT'] },
+  pineWood: { provenance: 'measured', color: [0.7116, 0.4674, 0.2119], roughness: 0.75, roughnessRange: [0.5, 0.9], ior: 1.5, source: 21, samples: ['manmade.generalconstructionmaterial.wood.solid.all.0404uuuwod.jhu.becknic | Pine Wood | 0404UUUWOD', 'manmade.generalconstructionmaterial.wood.solid.all.0410uuuwod.jhu.becknic | Pine Wood | 0410UUUWOD'] },
+  bark: { provenance: 'measured', color: [0.2721, 0.238, 0.1951], roughness: 0.95, roughnessRange: [0.85, 1], ior: 1.5, source: 21, samples: ['nonphotosyntheticvegetation.bark.betula.papyrifera.vswir.bepa-1-85.ucsb.asd | Betula papyrifera | BEPA-1-85', 'nonphotosyntheticvegetation.bark.pinus.ponderosa.vswir.vh313.ucsb.asd | Pinus ponderosa Bark | VH313', 'nonphotosyntheticvegetation.bark.quercus.rubra.vswir.quru-1-79.ucsb.asd | Quercus rubra | QURU-1-79', 'nonphotosyntheticvegetation.bark.abies.concolor.vswir.vh311.ucsb.asd | Abies concolor bark | VH311'] },
+  drySoil: { provenance: 'measured', color: [0.3858, 0.2545, 0.109], roughness: 0.95, roughnessRange: [0.85, 1], ior: 1.5, source: 21, samples: ['soil.aridisol.salorthid.none.all.89p1763.jhu.becknic | Light yellowish brown clay | 89P1763', 'soil.aridisol.camborthid.none.all.89p1772.jhu.becknic | Light yellowish brown loamy sand | 89P1772', 'soil.aridisol.calciorthid.none.all.84p3721.jhu.becknic | Light yellowish brown loam | 84P3721'] },
+  darkSoil: { provenance: 'measured', color: [0.1021, 0.06289, 0.0204], roughness: 0.95, roughnessRange: [0.85, 1], ior: 1.5, source: 21, samples: ['soil.mollisol.cryoboroll.none.all.85p4663.jhu.becknic | Black loam | 85P4663', 'soil.inceptisol.haplumbrept.none.all.86p4561.jhu.becknic | Dark brown fine sandy loam | 86P4561', 'soil.mollisol.agialboll.none.all.85p5339.jhu.becknic | Dark grayish brown silty loam | 85P5339'] },
+  sand: { provenance: 'measured', color: [0.205, 0.1345, 0.04736], roughness: 0.9, roughnessRange: [0.8, 1], ior: 1.5443, source: 21, samples: ['soil.entisol.quartzipsamment.none.all.87p706.jhu.becknic | Brown to dark brown sand | 87P706'] },
+  redSand: { provenance: 'measured', color: [0.2707, 0.1694, 0.111], roughness: 0.9, roughnessRange: [0.8, 1], ior: 1.5443, source: 21, samples: ['soil.alfisol.paleustalf.none.all.87p1087.jhu.becknic | Reddish brown fine sandy loam | 87P1087', 'soil.alfisol.paleustalf.none.all.87p473.jhu.becknic | Dark reddish brown fine sandy loam | 87P473'] },
+  snow: { provenance: 'derived', color: [0.983, 0.9905, 0.9919], roughness: 0.6, roughnessRange: [0.3, 0.8], ior: 1.31, source: 21, samples: ['water.snow.finegranular.fine.all.fine_snw_.jhu.becknic | Fine Snow | FINE_SNW_'], note: "the library's 300 to 2080 nm snow and frost spectra are modelled from grain size, not measured" },
+  oldSnow: { provenance: 'derived', color: [0.961, 0.9779, 0.9813], roughness: 0.5, roughnessRange: [0.2, 0.8], ior: 1.31, source: 21, samples: ['water.snow.coarsegranular.coarse.all.coarse_snw_.jhu.becknic | Coarse Granular Snow | COARSE_SNW_', 'water.snow.mediumgranular.medium.all.medgran_snw_.jhu.becknic | Medium Granular Snow | MEDGRAN_SNW_'], note: "the library's 300 to 2080 nm snow and frost spectra are modelled from grain size, not measured" },
+  frost: { provenance: 'derived', color: [0.9896, 0.9939, 0.9945], roughness: 0.7, roughnessRange: [0.5, 0.9], ior: 1.31, source: 21, samples: ['water.frost.none.fine.all.frost_snw_.jhu.becknic | Frost | FROST_SNW_'], note: "the library's 300 to 2080 nm snow and frost spectra are modelled from grain size, not measured" },
+  grass: { provenance: 'measured', color: [0.1323, 0.1655, 0.07299], roughness: 0.6, roughnessRange: [0.4, 0.8], ior: 1.5, source: 21, samples: ['vegetation.grass.unknown.unknown.all.grass.jhu.becknic | Grass | grass', 'vegetation.grass.avena.fatua.vswir.vh352.ucsb.asd | Avena fatua | VH352', 'vegetation.grass.bromus.diandrus.vswir.vh350.ucsb.asd | Bromus diandrus | VH350'] },
+  leaves: { provenance: 'measured', color: [0.09345, 0.118, 0.07408], roughness: 0.5, roughnessRange: [0.3, 0.7], ior: 1.5, source: 21, samples: ['vegetation.tree.acer.rubrum.vswir.acru-1-13.ucsb.asd | Acer rubrum | ACRU-1-13', 'vegetation.tree.quercus.rubra.vswir.quru-1-1.ucsb.asd | Quercus rubra | QURU-1-1', 'vegetation.tree.magnolia.grandiflora.vswir.jpl116.jpl.asd | Magnolia grandiflora | JPL116', 'vegetation.tree.fagus.grandifolia.vswir.fagr-1-39.ucsb.asd | Fagus grandifolia | FAGR-1-39', 'vegetation.tree.unknown.unknown.all.deciduous.jhu.becknic | Decidous | decidous'] },
+  dryGrass: { provenance: 'measured', color: [0.3567, 0.2525, 0.135], roughness: 0.7, roughnessRange: [0.5, 0.9], ior: 1.5, source: 21, samples: ['nonphotosyntheticvegetation.leaves.unknown.unknown.all.drygrass.jhu.becknic | Dry grass | drygrass', 'nonphotosyntheticvegetation.leaves.none.none.vswir.vh357.ucsb.asd | Misc Grass Litter | VH357', 'nonphotosyntheticvegetation.leaves.avena.fatua.vswir.vh354.ucsb.asd | Avena fatua litter | VH354'] },
+  leafLitter: { provenance: 'measured', color: [0.2735, 0.1974, 0.1193], roughness: 0.85, roughnessRange: [0.6, 0.95], ior: 1.5, source: 21, samples: ['nonphotosyntheticvegetation.leaves.quercus.species.vswir.vh318.ucsb.asd | Quercus sp. litter | VH318', 'nonphotosyntheticvegetation.leaves.none.none.vswir.ll-1-87y.ucsb.asd | Misc Leaf Litter | LL-1-87y', 'nonphotosyntheticvegetation.leaves.none.none.vswir.ll-2-89z.ucsb.asd | Misc Leaf Litter | LL-2-89z'] },
+  conifer: { provenance: 'measured', color: [0.1522, 0.1342, 0.06763], roughness: 0.6, roughnessRange: [0.4, 0.8], ior: 1.5, source: 21, samples: ['vegetation.tree.unknown.unknown.all.conifer.jhu.becknic | Conifer | conifer', 'vegetation.tree.pinus.strobus.vswir.pist-1-25.ucsb.asd | Pinus strobus | PIST-1-25', 'nonphotosyntheticvegetation.needles.pinus.ponderosa.vswir.vh323.ucsb.asd | Pinus ponderosa dry needles | VH323'] },
+  rubber: { provenance: 'measured', color: [0.06325, 0.06229, 0.05954], roughness: 0.8, roughnessRange: [0.5, 0.9], ior: 1.5, source: 21, samples: ['manmade.roofingmaterial.rubber.solid.all.0833uuurbr.jhu.becknic | Black unspecified rubber | 0833UUURBR'] },
+  blackPaint: { provenance: 'measured', color: [0.03632, 0.03764, 0.03502], roughness: 0.5, roughnessRange: [0.1, 0.9], ior: 1.5, source: 21, samples: ['manmade.generalconstructionmaterial.paint.solid.all.0402uuupnt.jhu.becknic | Black gloss paint | 0402UUUPNT', 'manmade.generalconstructionmaterial.paint.solid.all.0405uuupnt.jhu.becknic | Black gloss paint | 0405UUUPNT'] },
+  olivePaint: { provenance: 'measured', color: [0.1009, 0.1957, 0.1028], roughness: 0.5, roughnessRange: [0.1, 0.9], ior: 1.5, source: 21, samples: ['manmade.generalconstructionmaterial.paint.solid.all.0385uuupnt.jhu.becknic | Olive green gloss paint | 0385UUUPNT', 'manmade.generalconstructionmaterial.paint.solid.all.0407uuupnt.jhu.becknic | Olive green paint | 0407UUUPNT'] },
+  whiteCoating: { provenance: 'measured', color: [0.6278, 0.5832, 0.4855], roughness: 0.6, roughnessRange: [0.3, 0.9], ior: 1.5, source: 21, samples: ['manmade.roofingmaterial.rubber.solid.all.0795uuurbr.jhu.becknic | White rubberized coating | 0795UUURBR', 'manmade.roofingmaterial.rubber.solid.all.0834uuurbr.jhu.becknic | White fiberglass unspecified rubber | 0834UUURBR'] },
+  cinders: { provenance: 'measured', color: [0.04382, 0.04085, 0.03675], roughness: 0.95, roughnessRange: [0.85, 1], ior: 1.5, source: 21, samples: ['manmade.generalconstructionmaterial.cinder.solid.all.0101uuucin.jhu.becknic | Cinders, ashen | 0101UUUCIN'] },
+  graphite: { provenance: 'measured', color: [0.03952, 0.04059, 0.04406], roughness: 0.6, roughnessRange: [0.4, 0.9], ior: 1.5, source: 21, samples: ['mineral.element.none.fine.vswir.e-1a.jpl.beckman | Graphite C | E-1A'] },
+  rust: { provenance: 'measured', color: [0.2329, 0.07718, 0.02415], roughness: 0.9, roughnessRange: [0.7, 1], ior: 1.5, source: 21, samples: ['mineral.oxide.none.fine.vswir.o-1a.jpl.beckman | Hematite alpha Fe_2O_3 | O-1A', 'mineral.oxide.none.fine.vswir.o-1b.jpl.beckman | Hematite alpha Fe_2O_3 | O-1B', 'mineral.hydroxide.none.fine.vswir.oh-2a.jpl.beckman | Goethite alpha Fe^3+O(OH) | OH-2A'] },
+  patina: { provenance: 'measured', color: [0.3273, 0.6819, 0.5514], roughness: 0.8, roughnessRange: [0.6, 0.95], ior: 1.5, source: 21, samples: ['mineral.carbonate.none.fine.vswir.c-7a.jpl.beckman | Malachite Cu_2(CO_3)(OH)_2 | C-7A'] },
+  roofShingle: { provenance: 'measured', color: [0.2083, 0.1717, 0.1539], roughness: 0.9, roughnessRange: [0.8, 1], ior: 1.5, source: 21, samples: ['manmade.roofingmaterial.roofingshingle.solid.all.0490uuuasp.jhu.becknic | Asphalt Shingle | 0490UUUASP', 'manmade.roofingmaterial.shingle.solid.all.0597uuuasp.jhu.becknic | Asphalt roofing shingle | 0597UUUASP', 'manmade.roofingmaterial.shingle.solid.all.0672uuuasp.jhu.becknic | Reddish Asphalt roofing shingle | 0672UUUASP', 'manmade.roofingmaterial.shingle.solid.all.0683uuuasp.jhu.becknic | Reddish asphalt Shingle | 0683UUUASP', 'manmade.roofingmaterial.shingle.solid.all.0680uuusto.jhu.becknic | Slate stone Shingle | 0680UUUSTO'] },
+  paper: { provenance: 'derived', color: [0.794, 0.834, 0.884], roughness: 0.8, roughnessRange: [0.6, 0.9], ior: 1.5, source: 20, samples: ['Office Paper'] },
+  tire: { provenance: 'derived', color: [0.023, 0.023, 0.023], roughness: 0.7, roughnessRange: [0.5, 0.9], ior: 1.5, source: 20, samples: ['Tire'] },
+  porcelain: { provenance: 'derived', color: [0.745, 0.745, 0.723], roughness: 0.1, roughnessRange: [0.02, 0.4], ior: 1.5, source: 20, samples: ['Porcelain'] },
+  eggShell: { provenance: 'derived', color: [0.61, 0.624, 0.631], roughness: 0.9, roughnessRange: [0.7, 1], ior: 1.5, source: 20, samples: ['Egg Shell'] },
+  bone: { provenance: 'derived', color: [0.793, 0.793, 0.664], roughness: 0.9, roughnessRange: [0.6, 1], ior: 1.5, source: 20, samples: ['Bone'] },
+  skinI: { provenance: 'derived', color: [0.847, 0.638, 0.552], roughness: 0.5, roughnessRange: [0.35, 0.7], ior: 1.4, source: 20, samples: ['Skin I'] },
+  skinII: { provenance: 'derived', color: [0.799, 0.485, 0.347], roughness: 0.5, roughnessRange: [0.35, 0.7], ior: 1.4, source: 20, samples: ['Skin II'] },
+  skinIII: { provenance: 'derived', color: [0.623, 0.433, 0.343], roughness: 0.5, roughnessRange: [0.35, 0.7], ior: 1.4, source: 20, samples: ['Skin III'] },
+  skinIV: { provenance: 'derived', color: [0.436, 0.227, 0.131], roughness: 0.5, roughnessRange: [0.35, 0.7], ior: 1.4, source: 20, samples: ['Skin IV'] },
+  skinV: { provenance: 'derived', color: [0.283, 0.148, 0.079], roughness: 0.5, roughnessRange: [0.35, 0.7], ior: 1.4, source: 20, samples: ['Skin V'] },
+  skinVI: { provenance: 'derived', color: [0.09, 0.05, 0.02], roughness: 0.5, roughnessRange: [0.35, 0.7], ior: 1.4, source: 20, samples: ['Skin VI'] },
+};

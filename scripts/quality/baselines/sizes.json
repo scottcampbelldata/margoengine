@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21772970,
+  "total": 21798144,
   "history": [
     {
       "date": "2026-10-24",
@@ -15575,6 +15575,12 @@
       "commit": "atmo08-threaded-fog-columns",
       "reason": "ATMO-08: the optional drainage-fog entry grows from 4,267 to 7,972 B gzip (ceiling from 4,523 to 8,228). The bytes cover coded numeric rejection, private accepted-output staging and deterministic native-worker barriers. A separate entry would duplicate native ownership, world-clock steps and registry bindings. Each optional native variant measures 13,174 B raw and 5,419 B gzip. Existing entries importing the same worker pool stay within their ceilings. Core and Stage gain no bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "materials-measured-library",
+      "reason": "Measured materials library in @margoengine/materials/presets: metal(), dielectric(), surface(), materials, materialInfo() and the METALS, DIELECTRICS, SURFACES and SOURCES tables, 81 rows (20 metals with F0, n and k; 16 dielectrics with IOR and Abbe number; 45 surfaces with albedo, roughness range, IOR and samples) and 22 citations; 278 to 7,532 B gzip, ceiling 532 to 7,788. The bytes are the data and its citations, which are what a preset is; a split per kind would make materials.gold and materialInfo() load three entries, and copper, iron and brick now read the library rows. The materials root and core + stage are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16284,7 +16290,7 @@
     "@margoengine/materials/plugins": 5179,
     "@margoengine/materials/portal": 30759,
     "@margoengine/materials/prefilter": 1933,
-    "@margoengine/materials/presets": 532,
+    "@margoengine/materials/presets": 7788,
     "@margoengine/materials/retroreflection": 1855,
     "@margoengine/materials/serialization": 47515,
     "@margoengine/materials/settings": 20831,

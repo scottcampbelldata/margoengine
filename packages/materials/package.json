@@ -51,7 +51,8 @@
     "test:gpu:portal": "cd ../.. && node packages/materials/test/portal-browser.mjs",
     "test:gpu:batched-lod": "cd ../.. && node packages/materials/test/batched-lod-browser.mjs && node packages/materials/test/batched-lod-browser.mjs --compat",
     "test:gpu:instance-attributes": "cd ../.. && node packages/materials/test/instance-attributes-browser.mjs",
-    "test:gpu:curve-flow": "cd ../.. && node packages/materials/test/curve-flow-browser.mjs"
+    "test:gpu:curve-flow": "cd ../.. && node packages/materials/test/curve-flow-browser.mjs",
+    "test:gpu:measured-library": "cd ../.. && node packages/materials/test/measured-library-browser.mjs && node packages/materials/test/measured-library-browser.mjs --compat"
   },
   "sideEffects": false,
   "exports": {
