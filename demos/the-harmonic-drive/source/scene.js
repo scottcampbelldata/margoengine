@@ -1,6 +1,7 @@
-import { EngineKernel } from '@margoengine/core';
+import { startEngine } from '@margoengine/webgl2-compat/auto';
 import { Shadows } from '@margoengine/shadows';
-import { pose, reduction } from './mechanism.js';
+import { describeCheck, signedReading } from '@margoengine/machinery/rigs';
+import { openDrive, tau } from './mechanism.js';
 import { prepareHarmonicDrive } from './model.js';
 
 const canvas=document.querySelector('#scene');
@@ -11,12 +12,13 @@ const view=document.querySelector('#view');
 const step=document.querySelector('#step');
 const run=document.querySelector('#run');
 const loading=document.querySelector('#loading');
+const gap=document.querySelector('#check');
 const controls=[turns,view,step,run];
 const stop=new AbortController();
 const listen={signal:stop.signal};
 const fov=33;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-let engine,model,observer,frame,playing;
+let engine,model,mechanism,observer,frame,playing;
 let viewDirty=true,frontView=false,previous=-1;
 
 function fit() {
@@ -53,12 +55,14 @@ function commitFrame() {
   const updated=value!==previous;
   if(!viewDirty&&!updated) return;
   if(viewDirty) fit();
-  if(updated) model(pose(value));
+  const pose=updated?mechanism.drive(value*tau,false):null;
+  if(updated) model(pose);
   engine.render({delta:0});
   if(updated) {
     const unit=value===1?' turn':' turns';
     input.textContent=value.toFixed(2)+unit;
-    output.textContent=value===0?'0.00°':'−'+Math.abs(value*360*reduction).toFixed(2)+'°';
+    output.textContent=signedReading(pose.output*180/Math.PI,'°',2);
+    document.body.dataset.check=gap.textContent=describeCheck(mechanism.check);
     turns.setAttribute('aria-valuetext',input.textContent+' of 30');
     step.disabled=value>=30||document.body.dataset.state!=='ready';
     document.body.dataset.turns=value.toFixed(2);
@@ -133,21 +137,13 @@ function fail(error) {
 }
 
 async function open() {
-  const options={backend:'webgpu',exactSize:true,antialias:true,signal:stop.signal,
-    startupTimeout:5000,camera:{fov,near:.13,far:44}};
-  const forced=new URLSearchParams(location.search).get('backend')==='webgl2';
-  async function create() {
-    if(!forced) {
-      try { return [await EngineKernel.create(canvas,options),'webgpu']; }
-      catch(error) { if(error?.code!=='unsupported'&&error?.code!=='timeout') throw error; }
-    }
-    const {install}=await import('@margoengine/webgl2-compat');
-    await install({force:true});
-    return [await EngineKernel.create(canvas,options),'compatibility'];
-  }
-  const opening=create();
+  const opening=startEngine(canvas,{exactSize:true,antialias:true,signal:stop.signal,
+    startupTimeout:5000,camera:{fov,near:.13,far:44},forceCompat:location.search.includes('backend=webgl2'),
+    loadCompat:()=>import('@margoengine/webgl2-compat')});
   const assemble=prepareHarmonicDrive();
-  const [device,renderer]=await opening;
+  const solving=openDrive(Number(turns.value),stop.signal);
+  const {engine:device,renderer}=await opening;
+  mechanism=await solving;
   engine=device;
   engine.onError=fail;
   engine.scene.background='#45515b';

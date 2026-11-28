@@ -1,6 +1,7 @@
-import { EngineKernel } from '@margoengine/core';
+import { startEngine } from '@margoengine/webgl2-compat/auto';
 import { Shadows } from '@margoengine/shadows';
-import { createIntegrator, diskTurnsPerSecond, transmission } from './mechanism.js';
+import { describeCheck } from '@margoengine/machinery/rigs';
+import { diskTurnsPerSecond, openIntegrator, transmission } from './mechanism.js';
 import { prepareIntegrator } from './model.js';
 
 const canvas = document.querySelector('#scene');
@@ -12,6 +13,7 @@ const direction = document.querySelector('#direction');
 const motor = document.querySelector('#motor');
 const zero = document.querySelector('#zero');
 const loading = document.querySelector('#loading');
+const gap = document.querySelector('#check');
 const controls = [slider,motor,zero];
 const stop = new AbortController();
 const listen = {signal:stop.signal};
@@ -64,6 +66,8 @@ function render() {
   }
   const formatted = signed(integrator.state.outputTurns,2);
   if(total.textContent!==formatted) total.textContent=formatted;
+  const checked = describeCheck(integrator.check);
+  if(gap.textContent!==checked) document.body.dataset.check=gap.textContent=checked;
 }
 
 function tick(now) {
@@ -134,21 +138,13 @@ function fail(error) {
 }
 
 async function open() {
-  const options = {backend:'webgpu',exactSize:true,antialias:true,signal:stop.signal,
-    startupTimeout:5000,camera:{fov,near:.12,far:36}};
-  const force = new URLSearchParams(location.search).get('backend')==='webgl2';
-  async function create() {
-    if(!force) {
-      try { return [await EngineKernel.create(canvas,options),'webgpu']; }
-      catch(error) { if(error?.code!=='unsupported'&&error?.code!=='timeout') throw error; }
-    }
-    const {install} = await import('@margoengine/webgl2-compat');
-    await install({force:true});
-    return [await EngineKernel.create(canvas,options),'compatibility'];
-  }
-  const opening = create();
+  const opening = startEngine(canvas,{exactSize:true,antialias:true,signal:stop.signal,
+    startupTimeout:5000,camera:{fov,near:.12,far:36},forceCompat:location.search.includes('backend=webgl2'),
+    loadCompat:()=>import('@margoengine/webgl2-compat')});
   const assemble = prepareIntegrator();
-  const [device,renderer] = await opening;
+  const solving = openIntegrator(performance.now(),Number(slider.value)/1000,false,stop.signal);
+  const {engine:device,renderer} = await opening;
+  integrator = await solving;
   engine = device;
   engine.onError = fail;
   engine.scene.background = '#2c3e43';
@@ -158,7 +154,6 @@ async function open() {
   const shadows = Shadows.attach(engine,{resolution:1024,bounds:{min:[-.71,-.013,-.44],max:[.72,.52,.49]},
     normalBias:.0019,filter:'soft',lightSize:.029});
   model = assemble(engine,shadows);
-  integrator = createIntegrator(performance.now(),Number(slider.value)/1000,false);
   render();
   await engine.gpu.queue.onSubmittedWorkDone();
   if(stop.signal.aborted) return;

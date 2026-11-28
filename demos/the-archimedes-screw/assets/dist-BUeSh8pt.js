@@ -1,0 +1,1 @@
+export{c as COMPAT_EXTENSIONS,o as COMPAT_LIMITS,i as REQUIRED_EXTENSIONS,a as install,t as probeWebGL2,s as uninstall,n as waitFor,r as webgl2Capabilities}from"./dist-C7ov9wI6.js";

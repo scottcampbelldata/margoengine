@@ -23,8 +23,8 @@ header{display:flex;justify-content:space-between;align-items:end;gap:21px;paddi
 h1{font:400 clamp(56px,7.3vw,116px)/.88 var(--serif);letter-spacing:-.075em;margin:0}
 header p{max-width:332px;margin:0 0 1px;color:var(--muted);font-size:clamp(13px,1.2vw,17px);line-height:1.49}
 .exhibit{display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,23%);border:1px solid var(--rule)}
-figure{margin:0;position:relative;min-width:0;height:clamp(422px,39.8vw,632px);overflow:hidden;background:#344f5a}
-canvas{width:100%;height:100%;display:block}
+figure{margin:0;position:relative;min-width:0;min-height:clamp(422px,39.8vw,632px);overflow:hidden;background:#344f5a}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #loading{position:absolute;z-index:2;inset:0;display:grid;place-items:center;margin:0;padding:16px;background:#3d5561e8;color:#eef0e4;text-align:center}
 #loading[hidden]{display:none}
 .scene-label{position:absolute;top:0;left:0;display:flex;align-items:center;gap:7px;background:#1e3743e7;color:#e3eeeb;border:1px solid #81a3a27d;padding:6px 9px;font-size:11px;white-space:nowrap;pointer-events:none}
@@ -48,6 +48,8 @@ dl{margin:21px 0 16px}
 dt{color:var(--muted);font-size:12px;line-height:1.24}
 dd{margin:1px 0 0;white-space:nowrap}
 dd output{font:400 clamp(29px,3.23vw,53px)/1.12 var(--serif);letter-spacing:-.06em;font-variant-numeric:lining-nums tabular-nums}
+.check{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0 0}
+.check dd output{font-size:clamp(17px,1.5vw,23px);letter-spacing:-.02em}
 .major dd output{font-size:clamp(38px,4.2vw,69px)}
 dd small{color:var(--muted);margin-left:6px;font-size:11px}
 button{min-height:44px;padding:7px 13px;align-self:flex-start;color:#e8eee6;background:#315963;border:1px solid #315963;border-radius:1px;font:650 12px/1.2 system-ui,sans-serif;cursor:pointer}

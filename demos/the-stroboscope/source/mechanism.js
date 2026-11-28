@@ -1,5 +1,7 @@
-// This demo's mechanism: its dimensions, and its pose from @margoengine/machinery/mechanisms.
-import { stroboscopicPose, stroboscopicRate } from '@margoengine/machinery/mechanisms';
+// This demo's mechanism: the apparent speed from @margoengine/machinery/mechanisms, and the rotor and its strobe samples from a
+// stepped @margoengine/physics world (@margoengine/machinery/rigs), checked every step against the rotor's exact turn.
+import { stroboscopicRate } from '@margoengine/machinery/mechanisms';
+import { openRig, stroboscopeRig } from '@margoengine/machinery/rigs';
 
 export const repeatedSectors = 6;
 export const defaultSpeed = 120;
@@ -7,7 +9,5 @@ export const defaultSampling = 14;
 
 export const apparentSpeed = (rpm, sampleRate) => stroboscopicRate(rpm, sampleRate, repeatedSectors);
 
-export function rotorPose(elapsed, rpm, sampleRate) {
-  const {reference, sampled, flash} = stroboscopicPose(elapsed, rpm, sampleRate);
-  return {reference, sampled, sample: flash};
-}
+/** Builds the rotor on the solver at `rpm` under a strobe at `flashRate`; `signal` disposes it. */
+export const openRotor = (rpm, flashRate, signal) => openRig(stroboscopeRig, {rpm, flashRate, signal});

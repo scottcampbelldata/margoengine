@@ -1,5 +1,7 @@
-// This demo's mechanism: its dimensions, and its pose from @margoengine/machinery/mechanisms.
+// This demo's mechanism: its dimensions, its tooth shapes from @margoengine/machinery/mechanisms, and its motion from a stepped
+// @margoengine/physics world (@margoengine/machinery/rigs), checked every step against the closed form.
 import { flexsplinePoint, harmonicDriveRatio, waveGeneratorRadius } from '@margoengine/machinery/mechanisms';
+import { harmonicDriveRig, openRig } from '@margoengine/machinery/rigs';
 
 export const tau = Math.PI * 2;
 export const flexTeeth = 60;
@@ -15,9 +17,8 @@ export const fixedToothDepth = .0096;
 /** Tooth height at eight points across a tooth pitch: the drawn tooth shape. */
 const toothHeightSamples = [1,1,.47,0,0,0,.47,1];
 
-export function pose(turns) {
-  return {input: turns * tau, output: turns * reduction * tau};
-}
+/** Builds the drive on the solver at `turns` of the wave generator; `signal` disposes it. */
+export const openDrive = (turns, signal) => openRig(harmonicDriveRig, spec, {angle: turns * tau, signal});
 
 export const ellipseRadius = (offset, a=major, b=minor) => waveGeneratorRadius(offset, a, b);
 

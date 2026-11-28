@@ -1,5 +1,7 @@
-// This demo's mechanism: its dimensions, and its pose from @margoengine/machinery/mechanisms.
+// This demo's mechanism: its dimensions and water from @margoengine/machinery/mechanisms, and the water's climb from a stepped
+// @margoengine/physics world (@margoengine/machinery/rigs), checked every step against the closed form.
 import { archimedesScrew, archimedesScrewPose } from '@margoengine/machinery/mechanisms';
+import { archimedesScrewRig, openRig } from '@margoengine/machinery/rigs';
 
 export const tau = 2*Math.PI;
 export const degrees = 26;
@@ -23,4 +25,7 @@ export const read = (speed) => {
   const rpm=Math.max(0,Math.min(55,speed));
   return {rpm,litersPerMinute:litersPerTurn*rpm,travel:screw.flow(rpm).axialSpeed};
 };
+/** An angle as the blades' phase within a turn, for drawing them. */
 export const phaseInTurn = (angle) => archimedesScrewPose(angle,pitch).phase;
+/** Builds the screw on the solver at shaft angle `angle`; `signal` disposes it. */
+export const openScrew = (angle,signal) => openRig(archimedesScrewRig,pitch,{angle,signal});

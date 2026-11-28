@@ -1,20 +1,23 @@
-import { Engine } from '@margoengine/core';
+import { startEngine } from '@margoengine/webgl2-compat/auto';
 import { worldToScreen } from '@margoengine/math';
 import { Shadows } from '@margoengine/shadows';
+import { describeCheck } from '@margoengine/machinery/rigs';
 import { buildScrew } from './machine.js';
-import { litersPerTurn,phaseInTurn,phaseRate,pitch,read,tau } from './mechanism.js';
+import { litersPerTurn,openScrew,phaseRate,pitch,read,tau } from './mechanism.js';
 
 const canvas=document.getElementById('scene');
 const loading=document.getElementById('loading');
 const speed=document.getElementById('drive');
 const button=document.getElementById('pause');
 const labels=['intake','outlet'].map(id=>document.getElementById(id));
-const [rpm,flow,volume,travel]=['speed','flow','volume','pitch'].map(id=>document.getElementById(id));
+const [rpm,flow,volume,travel,check]=['speed','flow','volume','pitch','check'].map(id=>document.getElementById(id));
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
 const stop=new AbortController();
 const projected={x:0,y:0,z:0};
-let engine,exhibit,observer,frame,previous;
-let phase=tau*.17;
+let engine,exhibit,screw,observer,frame,previous;
+/** The shaft's angle, counting on past a turn, and the blades' phase within the turn the solver gives for it. */
+let shaft=tau*.17,phase=shaft;
+const turn=(by)=>{ shaft+=by; phase=screw.drive(shaft,false).phase; };
 let drive=Number(speed.value);
 let paused=false;
 let sent=false;
@@ -67,6 +70,7 @@ function draw(){
   if(framing)aim();
   exhibit.update(phase,motion.matches||paused?0:drive);
   engine.render({delta:0});
+  document.body.dataset.check=check.value=describeCheck(screw.check);
   if(framing){placeLabels();framing=false;}
   if(sent&&!performance.getEntriesByName('margo-first-input-applied').length){
     performance.mark('margo-first-input-applied');
@@ -81,7 +85,7 @@ function animate(now){
   frame=undefined;
   if(stop.signal.aborted)return;
   const moving=!paused&&drive>0&&!motion.matches&&!document.hidden;
-  if(moving&&previous!==undefined)phase=phaseInTurn(phase+phaseRate(drive)*Math.min(.09,(now-previous)/1000));
+  if(moving&&previous!==undefined)turn(phaseRate(drive)*Math.min(.09,(now-previous)/1000));
   previous=moving?now:undefined;
   try{draw();}
   catch(error){fail(error);return;}
@@ -96,11 +100,11 @@ function wire(){
   speed.addEventListener('input',()=>{
     drive=Number(speed.value);
     paused=false;
-    if(motion.matches)phase=phaseInTurn(phase+tau/18);
+    if(motion.matches)turn(tau/18);
     sent=true;readouts();schedule();
   },options);
   button.addEventListener('click',()=>{
-    if(motion.matches)phase=phaseInTurn(phase+tau/8);
+    if(motion.matches)turn(tau/8);
     else if(drive===0){drive=22;speed.value='22';paused=false;}
     else paused=!paused;
     previous=undefined;sent=true;readouts();schedule();
@@ -125,18 +129,14 @@ function fail(error){
 
 async function start(){
   size();
-  const force=new URLSearchParams(location.search).get('backend')==='webgl2';
-  const open=()=>Engine.create(canvas,{backend:'webgpu',exactSize:true,antialias:true,
-    camera:{near:.063,far:16,fov:38},signal:stop.signal});
-  if(!force){
-    try{engine=await open();}
-    catch(error){if(error?.code!=='unsupported')throw error;}
-  }
-  const fallback=!engine;
-  if(fallback){
-    const {install}=await import('@margoengine/webgl2-compat');
-    await install({force:true,signal:stop.signal});engine=await open();
-  }
+  const opening=startEngine(canvas,{exactSize:true,antialias:true,
+    camera:{near:.063,far:16,fov:38},signal:stop.signal,forceCompat:location.search.includes('backend=webgl2'),
+    loadCompat:()=>import('@margoengine/webgl2-compat')});
+  const solving=openScrew(shaft,stop.signal);
+  const {engine:device,renderer}=await opening;
+  engine=device;
+  screw=await solving;
+  phase=screw.pose().phase;
   engine.onError=fail;
   engine.scene.background='#3d5965';
   engine.lighting.direction.set([-.40,.78,.48,2.58]);
@@ -155,7 +155,7 @@ async function start(){
   observer.observe(canvas);
   speed.disabled=button.disabled=false;
   loading.hidden=true;
-  document.body.dataset.renderer=fallback?'compatibility':'webgpu';
+  document.body.dataset.renderer=renderer;
   document.body.dataset.state='ready';
   performance.mark('margo-first-usable-frame');
   schedule();
