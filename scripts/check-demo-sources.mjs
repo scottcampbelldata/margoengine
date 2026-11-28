@@ -104,7 +104,8 @@ const MESH_NAME = String.raw`(?:pos(?:ition)?s?|norm(?:al)?s?|uvs?|ind(?:ex|ices
 const GPU_READINESS = /\bengine\.gpu\b(?=\s*\)|\s*\??\.(?:queue\.onSubmittedWorkDone|adapterInfo)\b)/g;
 //  - `new Geometry(a.positions, a.normals, a.indices)` and a destructured `({ positions, normals, indices }) => new Geometry(...)`
 //    wrap what a package's primitive returned; building those arrays by hand is caught by the push and typed-array patterns.
-const GEOMETRY_WRAP = /\bnew\s+Geometry\s*\(\s*(\w+)\.positions\s*,\s*\1\.normals\s*,\s*\1\.indices\b|\(\s*\{\s*positions\s*,\s*normals\s*,\s*indices\s*\}\s*\)\s*=>\s*new\s+Geometry\b/;
+const GEOMETRY_WRAP =
+  /\bnew\s+Geometry\s*\(\s*(\w+)\.positions\s*,\s*\1\.normals\s*,\s*\1\.indices\b|\(\s*\{\s*positions\s*,\s*normals\s*,\s*indices\s*\}\s*\)\s*=>\s*new\s+Geometry\b/;
 //  - `x = ... Math.exp(-k * dt)` is frame-rate independent smoothing of a camera or UI value, not a solver.
 const EXP_SMOOTHING = /Math\.exp\s*\([^()]*\)/g;
 
@@ -114,16 +115,22 @@ const LINE_RULES = {
     (l) => /@(?:vertex|fragment|compute)\b/.test(l),
     (l) => /\bfn\s+[A-Za-z_]\w*\s*\(/.test(l),
     (l) => /\bgl_(?:FragColor|Position|FragCoord)\b|#version\s+\d+|\bprecision\s+(?:high|medium|low)p\b/.test(l),
-    (l) => /\bvar<\s*(?:uniform|storage|private|workgroup)/.test(l) || /\btexture_(?:2d|3d|storage_2d|cube)\s*</.test(l),
+    (l) =>
+      /\bvar<\s*(?:uniform|storage|private|workgroup)/.test(l) || /\btexture_(?:2d|3d|storage_2d|cube)\s*</.test(l),
     (l) => /\bcreate(?:Shader|ComputePipeline|RenderPipeline|BindGroup)\w*\s*\(/.test(l),
     (l) => /@margoengine\/shader\/(?:raw|glsl)/.test(l),
-    (l) => /\bengine\.gpu\b/.test(l.replace(GPU_READINESS, '')) || /\.gpu\.device\b|\bqueue\.write(?:Buffer|Texture)\s*\(/.test(l),
+    (l) =>
+      /\bengine\.gpu\b/.test(l.replace(GPU_READINESS, '')) ||
+      /\.gpu\.device\b|\bqueue\.write(?:Buffer|Texture)\s*\(/.test(l),
   ],
   R2: [
     (l) => DT_MUL.test(l.replace(EXP_SMOOTHING, (m) => (new RegExp(DT).test(m) ? '' : m))) && ASSIGN.test(l),
     // Solver-named functions are checked with their bodies in scanText (a wrapper that calls a package's step is fine).
     (l) => /\b9\.80665\b/.test(l) || /[*/]\s*9\.81\b|\b9\.81\s*[*/]/.test(l),
-    (l) => /(?:[*/]|\*\*)\s*(?:viscosity|youngs?(?:Modulus)?|elasticModulus|shearModulus|hertz\w*|poisson\w*)\b|\b(?:viscosity|youngs?(?:Modulus)?|elasticModulus|shearModulus|hertz\w*|poisson\w*)\s*(?:[*/]|\*\*)/.test(l),
+    (l) =>
+      /(?:[*/]|\*\*)\s*(?:viscosity|youngs?(?:Modulus)?|elasticModulus|shearModulus|hertz\w*|poisson\w*)\b|\b(?:viscosity|youngs?(?:Modulus)?|elasticModulus|shearModulus|hertz\w*|poisson\w*)\s*(?:[*/]|\*\*)/.test(
+        l,
+      ),
   ],
   R3: [
     (l) => /\bnew\s+Geometry\s*\(/.test(l) && !GEOMETRY_WRAP.test(l),
@@ -142,7 +149,7 @@ const LINE_RULES = {
  */
 function bareImportHits(plain, withStrings, lines) {
   const hits = [];
-  const re = /(?:[\s}]from\s*|\bimport\s*\(\s*|^\s*import\s+)(['"`])( *)\1/gdm;
+  const re = /(?:[\s}]from\s*|\bimport\s*\(\s*|^\s*import\s+)(['"`])( *)\1/dgm;
   for (const m of plain.matchAll(re)) {
     const [from, to] = [m.indices[1][1], m.indices[1][1] + m[2].length];
     const spec = withStrings.slice(from, to);
@@ -158,7 +165,8 @@ function functionBody(plain, lineStarts, line) {
   const start = lineStarts[line - 1];
   const eol = plain.indexOf('\n', start);
   const open = plain.indexOf('{', start);
-  if (open < 0 || (eol >= 0 && open > eol && !/\)\s*(?:=>)?\s*$/.test(plain.slice(start, eol)))) return plain.slice(start, eol < 0 ? undefined : eol);
+  if (open < 0 || (eol >= 0 && open > eol && !/\)\s*(?:=>)?\s*$/.test(plain.slice(start, eol))))
+    return plain.slice(start, eol < 0 ? undefined : eol);
   let depth = 0;
   for (let k = open; k < plain.length; k++) {
     if (plain[k] === '{') depth++;
@@ -255,20 +263,41 @@ export function compare(scan, allowlist) {
   const allowed = allowlist.demos ?? {};
   const problems = [];
   for (const [demo, entry] of Object.entries(allowed)) {
-    if (!scan[demo]) problems.push({ demo, kind: 'stale', message: `allowlist lists "${demo}", which has no source/ folder; delete the entry` });
+    if (!scan[demo])
+      problems.push({
+        demo,
+        kind: 'stale',
+        message: `allowlist lists "${demo}", which has no source/ folder; delete the entry`,
+      });
     else
       for (const rule of Object.keys(entry))
-        if (!RULES.includes(rule)) problems.push({ demo, rule, kind: 'stale', message: `allowlist rule "${rule}" does not exist; delete it` });
+        if (!RULES.includes(rule))
+          problems.push({ demo, rule, kind: 'stale', message: `allowlist rule "${rule}" does not exist; delete it` });
   }
   for (const [demo, { counts, hits }] of Object.entries(scan)) {
     for (const rule of RULES) {
       const listed = allowed[demo]?.[rule];
       const limit = listed ?? (rule === 'R5' ? R5_FLOOR : 0);
       const count = counts[rule];
-      if (count > limit) problems.push({ demo, rule, kind: 'rose', count, limit, hits: hits.filter((h) => h.rule === rule), listed: demo in allowed });
+      if (count > limit)
+        problems.push({
+          demo,
+          rule,
+          kind: 'rose',
+          count,
+          limit,
+          hits: hits.filter((h) => h.rule === rule),
+          listed: demo in allowed,
+        });
       else if (listed !== undefined && (rule === 'R5' ? count <= R5_FLOOR : listed === 0))
-        problems.push({ demo, rule, kind: 'stale', message: `allowlist entry ${demo}.${rule}=${listed} is stale (count ${count}); delete it` });
-      else if (listed !== undefined && count < listed) problems.push({ demo, rule, kind: 'fell', count, limit: listed });
+        problems.push({
+          demo,
+          rule,
+          kind: 'stale',
+          message: `allowlist entry ${demo}.${rule}=${listed} is stale (count ${count}); delete it`,
+        });
+      else if (listed !== undefined && count < listed)
+        problems.push({ demo, rule, kind: 'fell', count, limit: listed });
     }
   }
   return problems;
@@ -292,7 +321,9 @@ export function format(problems) {
   for (const p of problems) {
     if (p.kind === 'stale') lines.push(`STALE ${p.message}`);
     else if (p.kind === 'fell')
-      lines.push(`LOWER demos/${p.demo} ${p.rule}: ${p.count} now, allowlist says ${p.limit}. Run: node scripts/check-demo-sources.mjs --lower`);
+      lines.push(
+        `LOWER demos/${p.demo} ${p.rule}: ${p.count} now, allowlist says ${p.limit}. Run: node scripts/check-demo-sources.mjs --lower`,
+      );
     else {
       lines.push(
         `FAIL demos/${p.demo} ${p.rule} (${WHAT[p.rule]}): ${p.count}, allowed ${p.limit}${p.listed || p.rule !== 'R5' ? '' : ''}.`,
@@ -334,7 +365,9 @@ function main(argv) {
   }
   const totals = Object.fromEntries(RULES.map((r) => [r, 0]));
   for (const { counts } of Object.values(scan)) for (const r of RULES) totals[r] += counts[r];
-  const clean = Object.values(scan).filter(({ counts }) => ['R1', 'R2', 'R3', 'R4', 'IMP'].every((r) => counts[r] === 0)).length;
+  const clean = Object.values(scan).filter(({ counts }) =>
+    ['R1', 'R2', 'R3', 'R4', 'IMP'].every((r) => counts[r] === 0),
+  ).length;
   console.log(
     `check:demo-sources ok: ${Object.keys(scan).length} demos, ${clean} at zero; ${RULES.map((r) => `${r} ${totals[r]}`).join(', ')}.`,
   );

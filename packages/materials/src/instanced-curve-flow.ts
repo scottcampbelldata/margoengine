@@ -37,8 +37,7 @@ export interface InstancedCurveFlowOptions {
 export type InstancedCurveFlowAttributes = { curve: 'f32'; offset: 'f32'; progress: 'f32' };
 
 /** What `instancedCurveFlow()` returns: a material plugin with live uniforms, per-instance places and swappable curves. */
-export interface InstancedCurveFlowPlugin
-  extends MaterialPlugin<{ offset: number; progress: number; scale: number }> {
+export interface InstancedCurveFlowPlugin extends MaterialPlugin<{ offset: number; progress: number; scale: number }> {
   /** The curve, offset and progress of every instance, for bulk and in-place edits (`array()` with `update()`). */
   readonly instanceAttributes: InstanceAttributes<InstancedCurveFlowAttributes>;
   /** Curves held, fixed at creation. */
@@ -92,7 +91,9 @@ export function instancedCurveFlow(
     low = finite(`${caller} fit low`, fit[0]);
     span = finite(`${caller} fit high`, fit[1]) - low;
     if (!(span > 0))
-      throw new RangeError(`${caller} fit [${low}, ${fit[1]}] has no extent; pass [low, high] with high > low${curveFlowHelp}`);
+      throw new RangeError(
+        `${caller} fit [${low}, ${fit[1]}] has no extent; pass [low, high] with high > low${curveFlowHelp}`,
+      );
   }
 
   const count = flows.length,
@@ -111,10 +112,7 @@ export function instancedCurveFlow(
     data[(c * 4 + 2) * width * 4 + 3] = wrap || flow.closed ? 1 : 0;
   };
   const make = (data: Float32Array, width: number) =>
-    new Texture(
-      { data, width, height: count * 4, format: 'rgba32float' },
-      { mipmaps: false, colorSpace: 'linear' },
-    );
+    new Texture({ data, width, height: count * 4, format: 'rgba32float' }, { mipmaps: false, colorSpace: 'linear' });
   let width = Math.max(...tables.map((t) => t.count)),
     data = new Float32Array(width * count * 16);
   tables.forEach((t, c) => write(data, width, c, flows[c], t.table));

@@ -460,7 +460,11 @@ export async function applyGLTFPhysics(model: PBRModel, options: GLTFPhysicsOpti
   const engine = model['engine'],
     home = engine?.sceneOf?.(model),
     scope = home ? sceneScope(engine, home) : captureScene(engine);
-  const { Physics: World, collisionGroups, densityOf } = await import('@margoengine/physics').catch((error) => {
+  const {
+    Physics: World,
+    collisionGroups,
+    densityOf,
+  } = await import('@margoengine/physics').catch((error) => {
     throw margoError(
       'unsupported',
       `glTF physics needs @margoengine/physics (${error instanceof Error ? error.message : error}): install it to use @margoengine/gltf/physics`,

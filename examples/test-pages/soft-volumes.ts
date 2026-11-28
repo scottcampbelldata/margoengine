@@ -40,7 +40,11 @@ async function start() {
 
   // The ground and two rigid crates: one fixed block to land on, one loose crate a ball can shove.
   stage.box({ size: [12, 1, 12], position: [0, -0.5, 0], color: '#6f7468', roughness: 0.9 });
-  physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [6, 0.5, 6] } });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [6, 0.5, 6] },
+  });
   const block = stage.box({ size: [1, 0.6, 1], position: [-1.4, 0.3, 0], color: '#b49a74', roughness: 0.8 });
   physics.addBody(block, { type: 'fixed', colliders: { shape: 'box', halfExtents: [0.5, 0.3, 0.5] } });
   const crateMesh = stage.box({ size: [0.6, 0.6, 0.6], position: [1.6, 0.3, 0], color: '#8a6d4b', roughness: 0.7 });
@@ -49,13 +53,20 @@ async function start() {
   // The soft bodies, each straight from a geometry primitive, its seams welded.
   const ball = sphereGeometry(0.35, 20, 14);
   const make = (): { body: SoftBody; color: [number, number, number, number] }[] => [
-    { body: soft.create(SoftBodyDesc.volume(ball, { density: 400 }).setTranslation([-1.4, 1.8, 0])), color: [0.85, 0.2, 0.15, 1] },
+    {
+      body: soft.create(SoftBodyDesc.volume(ball, { density: 400 }).setTranslation([-1.4, 1.8, 0])),
+      color: [0.85, 0.2, 0.15, 1],
+    },
     {
       body: soft.create(SoftBodyDesc.volume(ball, { density: 60, pressure: 115_000 }).setTranslation([0, 2.2, 0.2])),
       color: [0.2, 0.4, 0.9, 1],
     },
     {
-      body: soft.create(SoftBodyDesc.volume(boxGeometry(0.6, 0.6, 0.6, 4, 4, 4), { density: 300, stiffness: 12 }).setTranslation([0.9, 2.8, 0])),
+      body: soft.create(
+        SoftBodyDesc.volume(boxGeometry(0.6, 0.6, 0.6, 4, 4, 4), { density: 300, stiffness: 12 }).setTranslation([
+          0.9, 2.8, 0,
+        ]),
+      ),
       color: [0.25, 0.7, 0.35, 1],
     },
   ];
@@ -103,7 +114,10 @@ async function start() {
 
   engine.onFrame(() => {
     readout.value = bodies
-      .map((body, i) => `${['red ball', 'gas ball', 'cube'][i]} ${((body.surfaceVolume() / rest[i]!) * 100).toFixed(1)}% volume`)
+      .map(
+        (body, i) =>
+          `${['red ball', 'gas ball', 'cube'][i]} ${((body.surfaceVolume() / rest[i]!) * 100).toFixed(1)}% volume`,
+      )
       .join(' · ')
       .concat(gas().gasState() ? ` · gas ${(gas().gasState()!.pressure / 1000).toFixed(1)} kPa` : '');
   });
@@ -150,7 +164,7 @@ async function start() {
   // Drop: they fall, bounce on the ground and the block, and settle holding their volume.
   const drop = async () => {
     build();
-    let low = bodies.map(() => Infinity),
+    const low = bodies.map(() => Infinity),
       bounce = bodies.map(() => 0);
     const off = physics.on('afterstep', () =>
       bodies.forEach((body, i) => {
@@ -175,12 +189,25 @@ async function start() {
           Math.abs((state.pressure * state.volume) / (115_000 * rest[i]!) - 1) < 1e-3,
           `the gas ball lost gas: pV ${(state.pressure * state.volume).toFixed(1)} against ${(115_000 * rest[i]!).toFixed(1)}`,
         );
-        ok &&= expect(state.pressure >= state.ambientPressure, `the gas ball is under the air's pressure (${state.pressure} Pa)`);
-      } else ok &&= expect(Math.abs(held[i]! - 1) < 0.02, `the ${names[i]} is at ${(held[i]! * 100).toFixed(1)}% of its volume`);
+        ok &&= expect(
+          state.pressure >= state.ambientPressure,
+          `the gas ball is under the air's pressure (${state.pressure} Pa)`,
+        );
+      } else
+        ok &&= expect(
+          Math.abs(held[i]! - 1) < 0.02,
+          `the ${names[i]} is at ${(held[i]! * 100).toFixed(1)}% of its volume`,
+        );
       ok &&= expect(!body.particlePositions().some(Number.isNaN), `the ${names[i]} went NaN`);
-      ok &&= expect(Math.min(...[...body.particlePositions()].filter((_, k) => k % 3 === 1)) > -0.01, `the ${names[i]} sank into the ground`);
+      ok &&= expect(
+        Math.min(...[...body.particlePositions()].filter((_, k) => k % 3 === 1)) > -0.01,
+        `the ${names[i]} sank into the ground`,
+      );
     });
-    if (ok) say(`Dropped: they bounced (${bounce.map((b) => b.toFixed(2)).join(', ')} m) and rest at ${held.map((h) => (h * 100).toFixed(1)).join(', ')}% of their volume.`);
+    if (ok)
+      say(
+        `Dropped: they bounced (${bounce.map((b) => b.toFixed(2)).join(', ')} m) and rest at ${held.map((h) => (h * 100).toFixed(1)).join(', ')}% of their volume.`,
+      );
   };
   button('btnDrop').addEventListener('click', drop);
 
@@ -203,7 +230,12 @@ async function start() {
       });
     });
     const gained = (at[1]! - at[2]!) * 60 - (at[0]! - at[1]!) * 60;
-    if (expect(gained > 1.9 && gained < 2.01, `a push of J / M = 2 m/s changed the ball's speed by ${gained.toFixed(3)} m/s`))
+    if (
+      expect(
+        gained > 1.9 && gained < 2.01,
+        `a push of J / M = 2 m/s changed the ball's speed by ${gained.toFixed(3)} m/s`,
+      )
+    )
       say(`Pushed the red ball: its speed changed by ${gained.toFixed(2)} m/s for J / M = 2 m/s.`);
   });
 
@@ -217,10 +249,15 @@ async function start() {
     await steps(90);
     const back = height(body);
     if (
-      expect(pressed < standing - 0.02, `forty times its weight squashed the cube only from ${standing.toFixed(3)} to ${pressed.toFixed(3)} m`) &&
+      expect(
+        pressed < standing - 0.02,
+        `forty times its weight squashed the cube only from ${standing.toFixed(3)} to ${pressed.toFixed(3)} m`,
+      ) &&
       expect(back > pressed + 0.01, `the cube did not spring back (${pressed.toFixed(3)} to ${back.toFixed(3)} m)`)
     )
-      say(`Pressed the cube from ${standing.toFixed(2)} to ${pressed.toFixed(2)} m tall; it sprang back to ${back.toFixed(2)} m.`);
+      say(
+        `Pressed the cube from ${standing.toFixed(2)} to ${pressed.toFixed(2)} m tall; it sprang back to ${back.toFixed(2)} m.`,
+      );
   });
 
   button('btnPump').addEventListener('click', async () => {
@@ -229,8 +266,12 @@ async function start() {
     body.setGasPressure({ pressure: 141_855, volume: before });
     await steps(90);
     const after = body.surfaceVolume();
-    if (expect(after > before * 1.01, `pumping did not swell the ball (${before.toFixed(4)} to ${after.toFixed(4)} m^3)`))
-      say(`Pumped: the gas ball swelled ${(((after - before) / before) * 100).toFixed(1)}% at ${(body.gasState()!.pressure / 1000).toFixed(1)} kPa.`);
+    if (
+      expect(after > before * 1.01, `pumping did not swell the ball (${before.toFixed(4)} to ${after.toFixed(4)} m^3)`)
+    )
+      say(
+        `Pumped: the gas ball swelled ${(((after - before) / before) * 100).toFixed(1)}% at ${(body.gasState()!.pressure / 1000).toFixed(1)} kPa.`,
+      );
   });
 
   button('btnDebug').addEventListener('click', () => {

@@ -122,7 +122,10 @@ function stackReflectance(stack: Multilayer, nm: number, angle: number, p: boole
       pi = er * sini + ei * sinr;
     const a10r = -pi,
       a10i = pr;
-    const mul = (ar: number, ai: number, br: number, bi: number): [number, number] => [ar * br - ai * bi, ar * bi + ai * br];
+    const mul = (ar: number, ai: number, br: number, bi: number): [number, number] => [
+      ar * br - ai * bi,
+      ar * bi + ai * br,
+    ];
     const [n00r, n00i] = add(mul(m00r, m00i, cosr, cosi), mul(m01r, m01i, a10r, a10i));
     const [n01r, n01i] = add(mul(m00r, m00i, a01r, a01i), mul(m01r, m01i, cosr, cosi));
     const [n10r, n10i] = add(mul(m10r, m10i, cosr, cosi), mul(m11r, m11i, a10r, a10i));
@@ -176,7 +179,8 @@ export function multilayerReflectance(
 /** Quarter-wave stack (H L)^pairs H at `designNm`, the usual dielectric mirror or dichroic. */
 export function quarterWaveStack(high: number, low: number, pairs: number, designNm: number): Layer[] {
   const out: Layer[] = [];
-  for (let i = 0; i < pairs; i++) out.push({ index: high, thickness: designNm / (4 * high) }, { index: low, thickness: designNm / (4 * low) });
+  for (let i = 0; i < pairs; i++)
+    out.push({ index: high, thickness: designNm / (4 * high) }, { index: low, thickness: designNm / (4 * low) });
   out.push({ index: high, thickness: designNm / (4 * high) });
   return out;
 }

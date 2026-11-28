@@ -12,7 +12,15 @@ const make = (wind = [6, -3]) => {
     size: [640, 640],
     cell: 8,
     fuel: (x, z) =>
-      Math.hypot(x - 120, z + 80) < 90 ? null : Math.abs(x - 200) < 20 && Math.abs(z - 220) < 20 ? 'STRUCTURE' : x < -40 ? 'FM10' : z > 100 ? 'FM2' : 'FM8',
+      Math.hypot(x - 120, z + 80) < 90
+        ? null
+        : Math.abs(x - 200) < 20 && Math.abs(z - 220) < 20
+          ? 'STRUCTURE'
+          : x < -40
+            ? 'FM10'
+            : z > 100
+              ? 'FM2'
+              : 'FM8',
     ground: (x, z) => 0.18 * x + 25 * Math.sin(z / 70),
     canopy: (x) => (x < -40 ? { baseHeight: 2, bulkDensity: 0.2, height: 18 } : null),
     structures: [{ at: [200, 220], radius: 12 }],
@@ -50,9 +58,11 @@ const same = (a, b, what) => {
   assert.equal(a.spots, b.spots, `${what}: spot fires`);
   const ra = a.read(),
     rb = b.read();
-  for (let i = 0; i < ra.length; i++) assert.ok(Object.is(ra[i], rb[i]), `${what}: cell value ${i}: ${ra[i]} against ${rb[i]}`);
+  for (let i = 0; i < ra.length; i++)
+    assert.ok(Object.is(ra[i], rb[i]), `${what}: cell value ${i}: ${ra[i]} against ${rb[i]}`);
   for (let z = -316; z < 320; z += 8)
-    for (let x = -316; x < 320; x += 8) assert.equal(a.crownFraction(x, z), b.crownFraction(x, z), `${what}: crown at ${x}, ${z}`);
+    for (let x = -316; x < 320; x += 8)
+      assert.equal(a.crownFraction(x, z), b.crownFraction(x, z), `${what}: crown at ${x}, ${z}`);
 };
 
 test('settle burns a fire out cell for cell as the steps do, without stepping the cells past their flames', async () => {

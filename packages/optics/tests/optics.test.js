@@ -202,7 +202,8 @@ test('refractVector obeys Snell in 2D and 3D; tracePolygon through an equilatera
 test('Malus cos^2 and Jones calculus', () => {
   for (const a of [0, 15, 45, 60, 90]) close(malus(a * deg), Math.cos(a * deg) ** 2, 1e-15, `Malus ${a}`);
   const v = JonesVector.linear(0);
-  for (const a of [0, 30, 45, 90]) close(JonesMatrix.polarizer(a * deg).apply(v).intensity, Math.cos(a * deg) ** 2, 1e-15, `Jones ${a}`);
+  for (const a of [0, 30, 45, 90])
+    close(JonesMatrix.polarizer(a * deg).apply(v).intensity, Math.cos(a * deg) ** 2, 1e-15, `Jones ${a}`);
   // Quarter-wave plate at 45 deg makes circular light: equal halves through x and y polarisers.
   const circ = JonesMatrix.retarder(45 * deg, Math.PI / 2).apply(v);
   close(JonesMatrix.polarizer(0).apply(circ).intensity, 0.5, 1e-15, 'x half');
@@ -213,7 +214,9 @@ test('Malus cos^2 and Jones calculus', () => {
   // Retarder at theta between crossed polarisers: sin^2(2 theta) sin^2(phase / 2).
   const t = 20 * deg,
     phase = 1.3;
-  const crossed = JonesMatrix.polarizer(Math.PI / 2).after(JonesMatrix.retarder(t, phase)).apply(v).intensity;
+  const crossed = JonesMatrix.polarizer(Math.PI / 2)
+    .after(JonesMatrix.retarder(t, phase))
+    .apply(v).intensity;
   close(crossed, Math.sin(2 * t) ** 2 * Math.sin(phase / 2) ** 2, 1e-15, 'photoelastic law');
   close(photoelasticTransmission(550, 550 * (phase / (2 * Math.PI)), Math.sin(2 * t) ** 2), crossed, 1e-15, 'same law');
 });
@@ -246,7 +249,12 @@ test('Transfer matrix agrees with the two-interface closed form and the quarter-
     for (const pol of ['s', 'p'])
       for (const nm of [420, 550, 690]) {
         const film = { filmIndex: 2.32, thickness: 310, substrateIndex: 1.52 };
-        const tm = multilayerReflectance({ layers: [{ index: 2.32, thickness: 310 }], substrateIndex: 1.52 }, nm, a * deg, pol);
+        const tm = multilayerReflectance(
+          { layers: [{ index: 2.32, thickness: 310 }], substrateIndex: 1.52 },
+          nm,
+          a * deg,
+          pol,
+        );
         close(tm, thinFilmReflectance(film, nm, a * deg, pol), 1e-13, `${pol} ${a} ${nm}`);
       }
   // (HL)^N H at normal incidence: R = ((1 - Y) / (1 + Y))^2 with Y = (nH/nL)^(2N) nH^2 / ns (Macleod 2010, 5.2).
@@ -254,12 +262,17 @@ test('Transfer matrix agrees with the two-interface closed form and the quarter-
     nL = 1.38,
     ns = 1.52,
     N = 4;
-  const Y = (nH / nL) ** (2 * N) * (nH * nH) / ns;
+  const Y = ((nH / nL) ** (2 * N) * (nH * nH)) / ns;
   const R = multilayerReflectance({ layers: quarterWaveStack(nH, nL, N, 600), substrateIndex: ns }, 600);
   close(R, ((1 - Y) / (1 + Y)) ** 2, 1e-12, 'quarter-wave mirror');
   // Frustrated total internal reflection: past the critical angle a thick air gap reflects almost all, a thin one less.
   const gap = (t) =>
-    multilayerReflectance({ ambientIndex: 1.5, layers: [{ index: 1, thickness: t }], substrateIndex: 1.5 }, 550, 60 * deg, 's');
+    multilayerReflectance(
+      { ambientIndex: 1.5, layers: [{ index: 1, thickness: t }], substrateIndex: 1.5 },
+      550,
+      60 * deg,
+      's',
+    );
   assert.ok(gap(2000) > 0.999 && gap(50) < 0.9 && gap(0) < 1e-20, `${gap(2000)} ${gap(50)} ${gap(0)}`);
 });
 
@@ -281,18 +294,25 @@ test('Michelson: 2d / lambda fringes; one fringe per half wavelength of travel',
 
 test('Moire spacing: two equal gratings at small angle p / (2 sin(theta / 2))', () => {
   const p = 0.0105;
-  for (const a of [1, 5, 20]) close(moireSpacing(p, p, a * deg), p / (2 * Math.sin((a * deg) / 2)), 1e-12, `moire ${a}`);
+  for (const a of [1, 5, 20])
+    close(moireSpacing(p, p, a * deg), p / (2 * Math.sin((a * deg) / 2)), 1e-12, `moire ${a}`);
   assert.equal(moireSpacing(p, p, 0), Infinity);
   close(moireSpacing(1, 1.1, 0), 11, 1e-12, 'vernier beat');
 });
 
 test('Grating equation: orders, symmetry and the evanescent cut', () => {
   const orders = gratingOrders(500, 600);
-  assert.deepEqual(orders.map((o) => o.order), [-3, -2, -1, 0, 1, 2, 3]);
+  assert.deepEqual(
+    orders.map((o) => o.order),
+    [-3, -2, -1, 0, 1, 2, 3],
+  );
   close(orders[4].angle, Math.asin(0.3), 1e-15, 'first order');
   close(orders[2].angle, -orders[4].angle, 1e-15, 'symmetric');
   assert.equal(gratingAngle(4, 500, 600), null);
-  assert.deepEqual(gratingOrders(500, 600, 0, 40 * deg).map((o) => o.order), [-2, -1, 0, 1, 2]);
+  assert.deepEqual(
+    gratingOrders(500, 600, 0, 40 * deg).map((o) => o.order),
+    [-2, -1, 0, 1, 2],
+  );
 });
 
 test('Bessel and Airy: first zero 1.22 lambda / D; J0(2.4048) = 0', () => {
@@ -339,14 +359,25 @@ test('Astigmatism: least confusion at the harmonic mean, and its spot is round',
 });
 
 test('Fresnel lens: a source at the focus leaves parallel; nearer diverges, farther converges', () => {
-  const lens = designFresnelLens({ index: 1.49, focalDistance: 0.45, centerRadius: 0.024, ringWidth: 0.0176, rings: 10, baseDepth: 0.0046 });
+  const lens = designFresnelLens({
+    index: 1.49,
+    focalDistance: 0.45,
+    centerRadius: 0.024,
+    ringWidth: 0.0176,
+    rings: 10,
+    baseDepth: 0.0046,
+  });
   for (let i = 0; i < 10; i++) assert.ok(Math.abs(lens.trace(0.45, i).exterior) < 1e-6, `facet ${i} parallel`);
   assert.ok(lens.trace(0.35, 9).exterior > 0.01);
   assert.ok(lens.trace(0.6, 9).exterior < -0.01);
 });
 
 test('Corner cube: every ray that meets all three mirrors returns antiparallel', () => {
-  for (const d of [[-0.5, -0.55, -0.67], [-0.62, -0.55, -0.56], [-0.577, -0.577, -0.577]]) {
+  for (const d of [
+    [-0.5, -0.55, -0.67],
+    [-0.62, -0.55, -0.56],
+    [-0.577, -0.577, -0.577],
+  ]) {
     const n = Math.hypot(...d),
       dir = d.map((v) => v / n);
     const t = cornerCubeReflect([0.3, 0.3, 0.3], dir, 0.9);
@@ -391,5 +422,6 @@ test('argument errors are RangeErrors; the root entry re-exports every entry', (
   assert.throws(() => snell(0, 1, 0), RangeError);
   assert.throws(() => sellmeierIndex(-1, FUSED_SILICA), RangeError);
   assert.throws(() => gratingAngle(1, NaN, 600), RangeError);
-  for (const name of ['snell', 'malus', 'thinFilmReflectance', 'gratingOrders', 'thinLens', 'cieXYZ']) assert.equal(typeof root[name], 'function');
+  for (const name of ['snell', 'malus', 'thinFilmReflectance', 'gratingOrders', 'thinLens', 'cieXYZ'])
+    assert.equal(typeof root[name], 'function');
 });

@@ -115,7 +115,10 @@ test('MilkyWay horizon false shows the band by day and below the horizon, as fro
   h.engine.use(band);
   h.context.bindings = [];
   h.engine.frameGraph.execute(h.context);
-  assert.deepEqual(h.commands().filter((c) => c.startsWith('draw 6 ')), ['draw 6 1']);
+  assert.deepEqual(
+    h.commands().filter((c) => c.startsWith('draw 6 ')),
+    ['draw 6 1'],
+  );
   assert.equal(band.values[36], 1);
   assert.throws(() => new MilkyWay({ ...observer, horizon: 1 }), /horizon/);
   band.dispose();

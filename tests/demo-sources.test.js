@@ -4,7 +4,18 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { RULES, R5_FLOOR, allowlistPath, compare, demosDir, entryFor, format, mask, scanDemos, scanText } from '../scripts/check-demo-sources.mjs';
+import {
+  RULES,
+  R5_FLOOR,
+  allowlistPath,
+  compare,
+  demosDir,
+  entryFor,
+  format,
+  mask,
+  scanDemos,
+  scanText,
+} from '../scripts/check-demo-sources.mjs';
 
 const rules = (text) => scanText(text).hits.map((h) => h.rule);
 const has = (text, rule) => assert.ok(rules(text).includes(rule), `${rule} expected in: ${text}`);
@@ -72,11 +83,14 @@ test('R4 finds local helpers but not a package import of the same name', () => {
 });
 
 test('IMP allows @margoengine/*, margo-demo-status, relative paths and node: only', () => {
-  hasNot("import { Stage } from '@margoengine/stage';\nimport './style.css';\nimport s from '../shared.js';\nimport { report } from 'margo-demo-status';", 'IMP');
+  hasNot(
+    "import { Stage } from '@margoengine/stage';\nimport './style.css';\nimport s from '../shared.js';\nimport { report } from 'margo-demo-status';",
+    'IMP',
+  );
   hasNot("import { readFile } from 'node:fs/promises';", 'IMP');
   has("import { IfcAPI } from 'web-ifc';", 'IMP');
   has("const lib = await import('lodash');", 'IMP');
-  hasNot("const text = 'taken from \"somewhere\" else';", 'IMP');
+  hasNot('const text = \'taken from "somewhere" else\';', 'IMP');
 });
 
 test('mask keeps line numbers and blanks comments and strings', () => {
@@ -92,11 +106,16 @@ test('R5 counts code lines only', () => {
 });
 
 const counts = (over = {}) => ({ R1: 0, R2: 0, R3: 0, R4: 0, R5: 100, IMP: 0, ...over });
-const scan = (c) => ({ demo: { counts: counts(c), hits: [{ rule: 'R4', file: 'demos/demo/source/a.js', line: 3, text: 'const cross = 1' }] } });
+const scan = (c) => ({
+  demo: { counts: counts(c), hits: [{ rule: 'R4', file: 'demos/demo/source/a.js', line: 3, text: 'const cross = 1' }] },
+});
 
 test('ratchet: a count above the allowlist fails and names file:line and the fix', () => {
   const problems = compare(scan({ R4: 2 }), { demos: { demo: { R4: 1 } } });
-  assert.deepEqual(problems.map((p) => [p.kind, p.rule]), [['rose', 'R4']]);
+  assert.deepEqual(
+    problems.map((p) => [p.kind, p.rule]),
+    [['rose', 'R4']],
+  );
   const message = format(problems);
   assert.match(message, /demos\/demo R4/);
   assert.match(message, /demos\/demo\/source\/a\.js:3/);
@@ -104,21 +123,45 @@ test('ratchet: a count above the allowlist fails and names file:line and the fix
 });
 
 test('ratchet: a demo missing from the allowlist fails on any hit, and R5 passes up to the floor', () => {
-  assert.deepEqual(compare(scan({ R1: 1 }), { demos: {} }).map((p) => p.kind), ['rose']);
+  assert.deepEqual(
+    compare(scan({ R1: 1 }), { demos: {} }).map((p) => p.kind),
+    ['rose'],
+  );
   assert.deepEqual(compare(scan({ R5: R5_FLOOR }), { demos: {} }), []);
-  assert.deepEqual(compare(scan({ R5: R5_FLOOR + 1 }), { demos: {} }).map((p) => p.rule), ['R5']);
+  assert.deepEqual(
+    compare(scan({ R5: R5_FLOOR + 1 }), { demos: {} }).map((p) => p.rule),
+    ['R5'],
+  );
 });
 
 test('ratchet: a count that fell but was not lowered fails', () => {
-  assert.deepEqual(compare(scan({ R4: 1 }), { demos: { demo: { R4: 3 } } }).map((p) => p.kind), ['fell']);
-  assert.deepEqual(compare(scan({ R5: R5_FLOOR + 40 }), { demos: { demo: { R5: R5_FLOOR + 90 } } }).map((p) => p.kind), ['fell']);
+  assert.deepEqual(
+    compare(scan({ R4: 1 }), { demos: { demo: { R4: 3 } } }).map((p) => p.kind),
+    ['fell'],
+  );
+  assert.deepEqual(
+    compare(scan({ R5: R5_FLOOR + 40 }), { demos: { demo: { R5: R5_FLOOR + 90 } } }).map((p) => p.kind),
+    ['fell'],
+  );
 });
 
 test('ratchet: stale entries fail (zero count, unknown demo, unknown rule, R5 at or under the floor)', () => {
-  assert.deepEqual(compare(scan({}), { demos: { demo: { R4: 0 } } }).map((p) => p.kind), ['stale']);
-  assert.deepEqual(compare(scan({}), { demos: { gone: { R4: 1 } } }).map((p) => p.kind), ['stale']);
-  assert.deepEqual(compare(scan({}), { demos: { demo: { R9: 1 } } }).map((p) => p.kind), ['stale']);
-  assert.deepEqual(compare(scan({ R5: 120 }), { demos: { demo: { R5: R5_FLOOR + 10 } } }).map((p) => p.kind), ['stale']);
+  assert.deepEqual(
+    compare(scan({}), { demos: { demo: { R4: 0 } } }).map((p) => p.kind),
+    ['stale'],
+  );
+  assert.deepEqual(
+    compare(scan({}), { demos: { gone: { R4: 1 } } }).map((p) => p.kind),
+    ['stale'],
+  );
+  assert.deepEqual(
+    compare(scan({}), { demos: { demo: { R9: 1 } } }).map((p) => p.kind),
+    ['stale'],
+  );
+  assert.deepEqual(
+    compare(scan({ R5: 120 }), { demos: { demo: { R5: R5_FLOOR + 10 } } }).map((p) => p.kind),
+    ['stale'],
+  );
 });
 
 test('ratchet: equal counts pass', () => {

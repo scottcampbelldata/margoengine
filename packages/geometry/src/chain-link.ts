@@ -54,7 +54,8 @@ export function chainLinkGeometry(options: ChainLinkOptions = {}): GeometryData 
     if (!Number.isFinite(value) || value <= 0)
       throw new RangeError(`chainLinkGeometry: ${name} must be a positive finite number, got ${value}`);
   if (width > length) throw new RangeError('chainLinkGeometry: width must not exceed length');
-  if (4 * wire >= width) throw new RangeError('chainLinkGeometry: make wire smaller than a quarter of width so the link has an opening');
+  if (4 * wire >= width)
+    throw new RangeError('chainLinkGeometry: make wire smaller than a quarter of width so the link has an opening');
   const radius = width / 2 - wire;
   const half = Math.max(0, length / 2 - wire - radius);
   return tubeGeometry(new Stadium(half, radius), options.segments ?? 48, wire, options.radialSegments ?? 10, true);

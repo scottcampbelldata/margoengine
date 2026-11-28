@@ -139,11 +139,7 @@ export class SpectralIntegrator {
     const count = Math.round((max - min) / step) + 1;
     const lamp = options.illuminant ?? 6504;
     const power =
-      lamp === 'equal'
-        ? () => 1
-        : typeof lamp === 'number'
-          ? (nm: number) => planckRelative(nm, lamp)
-          : lamp;
+      lamp === 'equal' ? () => 1 : typeof lamp === 'number' ? (nm: number) => planckRelative(nm, lamp) : lamp;
     this.wavelengths = new Float64Array(count);
     this.weights = new Float64Array(count * 3);
     this.luminanceWeights = new Float64Array(count);

@@ -195,9 +195,15 @@ export function margoComponents(asset: MargoAsset): MargoComponentsDocument {
       if (typeof node.mesh !== 'number') bad('margo:collider', 'on a mesh object (the collider is sized by the mesh)');
       const fromMesh = meshShapes.has(shape);
       if (fromMesh && props['margo:size'] !== undefined)
-        bad('margo:size', 'on a box, sphere, capsule or cylinder collider (a hull, mesh or decomposition is the mesh itself)');
+        bad(
+          'margo:size',
+          'on a box, sphere, capsule or cylinder collider (a hull, mesh or decomposition is the mesh itself)',
+        );
       if (shape === 'mesh' && body === 'dynamic')
-        bad('margo:collider', 'hull or decomposition on a dynamic body (a mesh collider is for static and kinematic bodies)');
+        bad(
+          'margo:collider',
+          'hull or decomposition on a dynamic body (a mesh collider is for static and kinematic bodies)',
+        );
       const [min, max] = meshBounds(asset.geometry[node.mesh as number]),
         extent = [0, 1, 2].map((a) => max[a] - min[a]) as Vec3,
         center = [0, 1, 2].map((a) => (max[a] + min[a]) / 2) as Vec3,
@@ -225,7 +231,9 @@ export function margoComponents(asset: MargoAsset): MargoComponentsDocument {
           }) - 1;
       // A hull, mesh or decomposition is the object's own mesh, in its own frame (KHR_physics_rigid_bodies geometry.mesh).
       const part: Json = {
-        geometry: fromMesh ? { mesh: node.mesh, ...(shape === 'hull' ? { convexHull: true } : {}) } : { shape: shapeIndex },
+        geometry: fromMesh
+          ? { mesh: node.mesh, ...(shape === 'hull' ? { convexHull: true } : {}) }
+          : { shape: shapeIndex },
       };
       if (material !== undefined && !trigger) part.physicsMaterial = material;
       // Margo's own settings ride in the collider's extras: a density (kg/m³ or a material name) and a decomposition.
@@ -238,7 +246,10 @@ export function margoComponents(asset: MargoAsset): MargoComponentsDocument {
       }
       if (density !== undefined || shape === 'decomposition')
         part.extras = {
-          margo: { ...(density !== undefined ? { density } : {}), ...(shape === 'decomposition' ? { decomposition: true } : {}) },
+          margo: {
+            ...(density !== undefined ? { density } : {}),
+            ...(shape === 'decomposition' ? { decomposition: true } : {}),
+          },
         };
       // Off centre by more than float noise in the exported vertices.
       const offset = !fromMesh && center.some((v) => Math.abs(v) > 1e-5 * Math.max(...extent));

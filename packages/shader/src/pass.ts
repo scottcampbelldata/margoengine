@@ -156,7 +156,9 @@ export class ScenePass implements EnginePlugin {
       // module compiles too; `color` is its base colour when it declares no `margoBeauty`.
       const raw = rawMaterial.test(code),
         declares = (v: string) =>
-          raw ? new RegExp(`var\\s*<\\s*private\\s*>\\s*${v}\\s*:`).test(code) : code.includes(`var<private> ${v}:vec4f;\n`),
+          raw
+            ? new RegExp(`var\\s*<\\s*private\\s*>\\s*${v}\\s*:`).test(code)
+            : code.includes(`var<private> ${v}:vec4f;\n`),
         beauty = this.names.includes('color') && !(raw && declares('margoBeauty')),
         missing = this.names.filter((name) => name !== 'color' && !declares(variable(name)));
       out =

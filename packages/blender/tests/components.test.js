@@ -113,11 +113,19 @@ test('a tag that cannot be read names the object and the property', () => {
     { 'margo:collider': 'cone' },
     "'margo:collider' must be one of box, sphere, capsule, cylinder, hull, mesh, decomposition",
   );
-  rejects('Crate', { 'margo:body': 'dynamic', 'margo:collider': 'mesh' }, "'margo:collider' must be hull or decomposition");
+  rejects(
+    'Crate',
+    { 'margo:body': 'dynamic', 'margo:collider': 'mesh' },
+    "'margo:collider' must be hull or decomposition",
+  );
   rejects('Crate', { 'margo:collider': 'hull', 'margo:size': [1, 1, 1] }, "'margo:size' must be on a box, sphere");
   rejects('Crate', { 'margo:body': 'dynamic', 'margo:density': -2 }, "'margo:density' must be kilograms a cubic metre");
   rejects('Crate', { 'margo:body': 'static', 'margo:density': 'oak' }, "'margo:density' must be on a dynamic body");
-  rejects('Crate', { 'margo:body': 'dynamic', 'margo:density': 5, 'margo:mass': 2 }, "'margo:density' must be or margo:mass");
+  rejects(
+    'Crate',
+    { 'margo:body': 'dynamic', 'margo:density': 5, 'margo:mass': 2 },
+    "'margo:density' must be or margo:mass",
+  );
   rejects('Crate', { 'margo:body': 'static', 'margo:mass': 3 }, "'margo:mass' must be on a dynamic body");
   rejects('Crate', { 'margo:friction': 0.3 }, "'margo:friction' must be on an object with margo:collider");
   rejects('Crate', { 'margo:collider': 'box', 'margo:size': [1, 0, 1] }, "'margo:size' must be 3 positive numbers");
@@ -148,7 +156,9 @@ test('hull, mesh and decomposition colliders take the mesh itself, and margo:den
       index = byName(document, 'Crate'),
       crate = document.nodes[index],
       // As parseMargo's model has them: the crate's primitives in its node's frame, from the prepared geometry.
-      primitives = asset.geometry[crate.mesh].flat().map(({ vertices, indices }) => ({ nodeIndex: index, vertices, indices })),
+      primitives = asset.geometry[crate.mesh]
+        .flat()
+        .map(({ vertices, indices }) => ({ nodeIndex: index, vertices, indices })),
       gltf = await applyGLTFPhysics({ asset: new GLTFAsset(document, []), nodes: [], primitives }, { physics });
     return {
       gltf,
@@ -164,7 +174,10 @@ test('hull, mesh and decomposition colliders take the mesh itself, and margo:den
   assert.equal(typeof hull.collider.geometry.mesh, 'number');
   assert.deepEqual(hull.collider.extras, { margo: { density: 'steel' } });
   assert.equal(hull.body.colliders[0].shape, 'convexHull');
-  assert.ok(Math.abs(hull.body.mass - 7850 * volume) < 1e-3 * 7850 * volume, `steel hull ${hull.body.mass} of ${volume}`);
+  assert.ok(
+    Math.abs(hull.body.mass - 7850 * volume) < 1e-3 * 7850 * volume,
+    `steel hull ${hull.body.mass} of ${volume}`,
+  );
   // The cube's inertia from its hull is the box's, times the density, about the same centre.
   const a = box.body.principalInertia.map((v) => v * 7850).sort((x, y) => x - y),
     b = hull.body.principalInertia.slice().sort((x, y) => x - y);

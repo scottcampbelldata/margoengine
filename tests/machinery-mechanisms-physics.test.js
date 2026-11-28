@@ -27,7 +27,11 @@ function world() {
   return { physics, ground };
 }
 const disc = (physics, position, rotation = [0, 0, 0, 1]) =>
-  physics.addBody(null, { position, rotation, colliders: { shape: 'cylinder', radius: 0.05, halfHeight: 0.01, mass: 1 } });
+  physics.addBody(null, {
+    position,
+    rotation,
+    colliders: { shape: 'cylinder', radius: 0.05, halfHeight: 0.01, mass: 1 },
+  });
 const crank = (physics, ground, speed, rotation) => {
   const body = disc(physics, [0, 0, 0], rotation);
   physics.addJoint(ground, body, { type: 'revolute', axis: [0, 0, 1], motor: { targetVelocity: speed, damping: 1e4 } });
@@ -84,7 +88,10 @@ test('Geneva: the pin in a slot turns the wheel along genevaPose through a strok
     const expected = genevaPose(t, { slots, centerDistance: c }).wheel - start;
     worst = Math.max(worst, Math.abs(unwrap(zAngle(wheel.rotation), expected) - expected));
   }
-  assert.ok(unwrap(zAngle(wheel.rotation), -1.5) < -1.45, `the wheel indexed nearly a quarter turn (${zAngle(wheel.rotation)})`);
+  assert.ok(
+    unwrap(zAngle(wheel.rotation), -1.5) < -1.45,
+    `the wheel indexed nearly a quarter turn (${zAngle(wheel.rotation)})`,
+  );
   near(worst, 0, 2e-3, 'wheel angle against genevaPose');
 });
 
@@ -95,8 +102,16 @@ test('Oldham: a disc on two crossed sliders carries the input angle to the offse
   const output = disc(physics, [d, 0, 0.1]);
   physics.addJoint(ground, output, { type: 'revolute', axis: [0, 0, 1], anchorA: [d, 0, 0.1] });
   const middle = disc(physics, [d, 0, 0.05]);
-  physics.addJoint(input, middle, { type: 'generic', anchorA: [d, 0, 0.05], locked: ['linY', 'linZ', 'angX', 'angY', 'angZ'] });
-  physics.addJoint(output, middle, { type: 'generic', anchorA: [0, 0, -0.05], locked: ['linX', 'linZ', 'angX', 'angY', 'angZ'] });
+  physics.addJoint(input, middle, {
+    type: 'generic',
+    anchorA: [d, 0, 0.05],
+    locked: ['linY', 'linZ', 'angX', 'angY', 'angZ'],
+  });
+  physics.addJoint(output, middle, {
+    type: 'generic',
+    anchorA: [0, 0, -0.05],
+    locked: ['linX', 'linZ', 'angX', 'angY', 'angZ'],
+  });
   let worstAngle = 0,
     worstCentre = 0;
   for (let i = 0; i < 240; i++) {
@@ -104,7 +119,10 @@ test('Oldham: a disc on two crossed sliders carries the input angle to the offse
     const t = zAngle(input.rotation),
       pose = oldhamPose(t, d);
     worstAngle = Math.max(worstAngle, Math.abs(unwrap(zAngle(output.rotation), t) - pose.output));
-    worstCentre = Math.max(worstCentre, Math.hypot(middle.position[0] - pose.center[0], middle.position[1] - pose.center[1]));
+    worstCentre = Math.max(
+      worstCentre,
+      Math.hypot(middle.position[0] - pose.center[0], middle.position[1] - pose.center[1]),
+    );
   }
   near(worstAngle, 0, 2e-3, 'output angle equals input');
   near(worstCentre, 0, 5e-4, 'disc centre on d cos(t) (cos t, sin t)');

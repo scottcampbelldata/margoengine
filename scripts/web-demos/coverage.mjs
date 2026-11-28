@@ -29,7 +29,8 @@ export function packageEntries(packagesDir = join(root, 'packages')) {
     }
     if (!manifest.name?.startsWith('@margoengine/')) continue;
     const exp = manifest.exports;
-    const keys = exp && typeof exp === 'object' && !Array.isArray(exp) ? Object.keys(exp).filter((k) => k.startsWith('.')) : ['.'];
+    const keys =
+      exp && typeof exp === 'object' && !Array.isArray(exp) ? Object.keys(exp).filter((k) => k.startsWith('.')) : ['.'];
     result[manifest.name] = keys
       .filter((k) => k !== './package.json' && !k.includes('*'))
       .map((k) => (k === '.' ? manifest.name : `${manifest.name}/${k.slice(2)}`))

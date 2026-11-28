@@ -34,7 +34,8 @@ export interface TrussOptions {
 type Point = readonly [number, number, number];
 
 function positive(name: string, value: number) {
-  if (!Number.isFinite(value) || value <= 0) throw new RangeError(`trussGeometry: ${name} must be a positive finite number, got ${value}`);
+  if (!Number.isFinite(value) || value <= 0)
+    throw new RangeError(`trussGeometry: ${name} must be a positive finite number, got ${value}`);
 }
 
 /** A capped cylinder of `radius` from `a` to `b`. */
@@ -74,7 +75,8 @@ export function trussGeometry(options: TrussOptions = {}): GeometryData {
   positive('width', width);
   positive('depth', depth);
   const bays = options.bays ?? Math.max(1, Math.round(length / Math.max(width, depth)));
-  if (!Number.isInteger(bays) || bays < 1) throw new RangeError(`trussGeometry: bays must be a whole number of at least 1, got ${bays}`);
+  if (!Number.isInteger(bays) || bays < 1)
+    throw new RangeError(`trussGeometry: bays must be a whole number of at least 1, got ${bays}`);
   const chord = options.chordRadius ?? 0.06 * Math.min(width, depth);
   const lacing = options.lacingRadius ?? 0.6 * chord;
   const taper = options.taper ?? 1;
@@ -82,11 +84,15 @@ export function trussGeometry(options: TrussOptions = {}): GeometryData {
   positive('chordRadius', chord);
   positive('lacingRadius', lacing);
   positive('taper', taper);
-  if (!Number.isInteger(sides) || sides < 3) throw new RangeError(`trussGeometry: radialSegments must be a whole number of at least 3, got ${sides}`);
+  if (!Number.isInteger(sides) || sides < 3)
+    throw new RangeError(`trussGeometry: radialSegments must be a whole number of at least 3, got ${sides}`);
   if (2 * chord >= Math.min(width, depth) * Math.min(1, taper))
-    throw new RangeError('trussGeometry: the chords overlap; make chordRadius smaller than half the narrowest section side');
+    throw new RangeError(
+      'trussGeometry: the chords overlap; make chordRadius smaller than half the narrowest section side',
+    );
   const pattern = options.pattern ?? 'warren';
-  if (pattern !== 'warren' && pattern !== 'pratt' && pattern !== 'x') throw new RangeError(`trussGeometry: unknown pattern ${String(pattern)}`);
+  if (pattern !== 'warren' && pattern !== 'pratt' && pattern !== 'x')
+    throw new RangeError(`trussGeometry: unknown pattern ${String(pattern)}`);
 
   // Corner k at panel point i: the section scales linearly from the foot to `taper` at the top.
   const corner = (k: number, i: number): Point => {
@@ -100,11 +106,21 @@ export function trussGeometry(options: TrussOptions = {}): GeometryData {
   for (let k = 0; k < 4; k++) parts.push(member(corner(k, 0), corner(k, bays), chord, sides));
   for (let k = 0; k < 4; k++) {
     const n = (k + 1) % 4;
-    if (options.battens ?? true) for (let i = 0; i <= bays; i++) parts.push(member(corner(k, i), corner(n, i), lacing, sides));
+    if (options.battens ?? true)
+      for (let i = 0; i <= bays; i++) parts.push(member(corner(k, i), corner(n, i), lacing, sides));
     for (let i = 0; i < bays; i++) {
       const rising = pattern === 'pratt' || i % 2 === 0;
-      parts.push(rising ? member(corner(k, i), corner(n, i + 1), lacing, sides) : member(corner(n, i), corner(k, i + 1), lacing, sides));
-      if (pattern === 'x') parts.push(rising ? member(corner(n, i), corner(k, i + 1), lacing, sides) : member(corner(k, i), corner(n, i + 1), lacing, sides));
+      parts.push(
+        rising
+          ? member(corner(k, i), corner(n, i + 1), lacing, sides)
+          : member(corner(n, i), corner(k, i + 1), lacing, sides),
+      );
+      if (pattern === 'x')
+        parts.push(
+          rising
+            ? member(corner(n, i), corner(k, i + 1), lacing, sides)
+            : member(corner(k, i), corner(n, i + 1), lacing, sides),
+        );
     }
   }
   return mergeGeometries(parts);

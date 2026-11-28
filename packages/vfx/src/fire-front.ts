@@ -1400,7 +1400,8 @@ export class FireFront implements EnginePlugin {
     let p = 0,
       q = 0;
     while (p < list.length || q < back.length)
-      if (q >= back.length || (p < list.length && this.seqOf[list[p]!]! < this.seqOf[back[q]!]!)) merged.push(list[p++]!);
+      if (q >= back.length || (p < list.length && this.seqOf[list[p]!]! < this.seqOf[back[q]!]!))
+        merged.push(list[p++]!);
       else merged.push(back[q++]!);
     this.burning = merged;
     this.lazy.clear();

@@ -44,7 +44,8 @@ const ground = (x: number, z: number): number =>
   1.6 * Math.sin(x * 0.18) * Math.cos(z * 0.15) + 0.7 * Math.sin(x * 0.41 + z * 0.33) - 0.04 * (x * x + z * z) * 0.1;
 const heights = new Float32Array((ROWS + 1) * (COLUMNS + 1));
 for (let c = 0; c <= COLUMNS; c++)
-  for (let r = 0; r <= ROWS; r++) heights[r + (ROWS + 1) * c] = ground(-SIZE / 2 + (c * SIZE) / COLUMNS, -SIZE / 2 + (r * SIZE) / ROWS);
+  for (let r = 0; r <= ROWS; r++)
+    heights[r + (ROWS + 1) * c] = ground(-SIZE / 2 + (c * SIZE) / COLUMNS, -SIZE / 2 + (r * SIZE) / ROWS);
 
 /** The drawn terrain: the same grid and the same diagonal split as the collider, so what you see is what bodies touch. */
 function terrainGeometry(): Geometry {
@@ -76,7 +77,7 @@ function terrainGeometry(): Geometry {
 /** A seeded generator (a 32-bit linear congruential one), so every load drops the same pile. */
 function seeded(seed: number): () => number {
   let s = seed >>> 0;
-  return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296);
+  return () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296;
 }
 
 try {
@@ -110,7 +111,14 @@ try {
     .setMaterial(new StagePbr({ color: '#4f6b4a', roughness: 0.95 }));
   physics.addBody(terrain, {
     type: 'fixed',
-    colliders: { shape: 'heightfield', rows: ROWS, columns: COLUMNS, heights, scale: [SIZE, 1, SIZE], fixInternalEdges: true },
+    colliders: {
+      shape: 'heightfield',
+      rows: ROWS,
+      columns: COLUMNS,
+      heights,
+      scale: [SIZE, 1, SIZE],
+      fixInternalEdges: true,
+    },
   });
 
   // Two instanced meshes, 400 instances each, and one body per instance.
@@ -130,8 +138,8 @@ try {
     }
     return mesh;
   };
-  const crateMesh = pile(boxGeometry(0.6, 0.6, 0.6), (i) => [0.55 + 0.3 * ((i * 37) % 7) / 7, 0.32, 0.12]);
-  const ballMesh = pile(sphereGeometry(0.32, 20, 12), (i) => [0.12, 0.35 + 0.4 * ((i * 53) % 9) / 9, 0.6]);
+  const crateMesh = pile(boxGeometry(0.6, 0.6, 0.6), (i) => [0.55 + (0.3 * ((i * 37) % 7)) / 7, 0.32, 0.12]);
+  const ballMesh = pile(sphereGeometry(0.32, 20, 12), (i) => [0.12, 0.35 + (0.4 * ((i * 53) % 9)) / 9, 0.6]);
   const crates = new InstancedBodies(physics, crateMesh, {
     colliders: { shape: 'box', halfExtents: [0.3, 0.3, 0.3], density: 600, friction: 0.6 },
   });
@@ -146,8 +154,18 @@ try {
     r = 0.45,
     hh = 0.45;
   const shapes: { name: string; mesh: Geometry; collider: ColliderOptions; exact: number }[] = [
-    { name: 'Box 0.9 m', mesh: box(0.9, 0.9, 0.9), collider: { shape: 'box', halfExtents: [0.45, 0.45, 0.45] }, exact: RHO * 0.9 ** 3 },
-    { name: 'Sphere r 0.45', mesh: sphere(r, 24), collider: { shape: 'sphere', radius: r }, exact: RHO * (4 / 3) * Math.PI * r ** 3 },
+    {
+      name: 'Box 0.9 m',
+      mesh: box(0.9, 0.9, 0.9),
+      collider: { shape: 'box', halfExtents: [0.45, 0.45, 0.45] },
+      exact: RHO * 0.9 ** 3,
+    },
+    {
+      name: 'Sphere r 0.45',
+      mesh: sphere(r, 24),
+      collider: { shape: 'sphere', radius: r },
+      exact: RHO * (4 / 3) * Math.PI * r ** 3,
+    },
     {
       name: 'Capsule',
       mesh: toGeometry(capsuleGeometry(r, 2 * hh, 6, 16)),
@@ -177,7 +195,11 @@ try {
   const shapeBodies: PhysicsBody[] = shapes.map((s, i) => {
     const x = -7.5 + i * 3,
       z = 11,
-      mesh = engine.createMesh().setGeometry(s.mesh).setMaterial(shapeMaterial).setPosition([x, ground(x, z) + 1.5, z]);
+      mesh = engine
+        .createMesh()
+        .setGeometry(s.mesh)
+        .setMaterial(shapeMaterial)
+        .setPosition([x, ground(x, z) + 1.5, z]);
     return physics.addBody(mesh, { colliders: { ...s.collider, density: RHO } });
   });
   massesEl.replaceChildren(
@@ -216,7 +238,11 @@ try {
     (event) => {
       raycaster.setFromEngine(engine, event.offsetX, event.offsetY);
       const origin: [number, number, number] = [raycaster.origin[0]!, raycaster.origin[1]!, raycaster.origin[2]!],
-        direction: [number, number, number] = [raycaster.direction[0]!, raycaster.direction[1]!, raycaster.direction[2]!],
+        direction: [number, number, number] = [
+          raycaster.direction[0]!,
+          raycaster.direction[1]!,
+          raycaster.direction[2]!,
+        ],
         hit = physics.raycast(origin, direction, { maxDistance: 200 });
       if (!hit || hit.body.type !== 'dynamic') {
         pickEl.textContent = hit ? 'the terrain' : 'nothing';
@@ -225,10 +251,7 @@ try {
       const crate = crates.bodies.indexOf(hit.body),
         ball = balls.bodies.indexOf(hit.body),
         name = crate >= 0 ? `crate ${crate}` : ball >= 0 ? `ball ${ball}` : 'a shape';
-      hit.body.applyImpulseAtPoint(
-        direction.map((d) => d * 6 * hit.body.mass) as [number, number, number],
-        hit.point,
-      );
+      hit.body.applyImpulseAtPoint(direction.map((d) => d * 6 * hit.body.mass) as [number, number, number], hit.point);
       pickEl.textContent = `${name}, ${hit.body.mass.toFixed(1)} kg, at ${hit.distance.toFixed(1)} m`;
     },
     { signal: life.signal },
@@ -305,5 +328,9 @@ function octahedron(a: number): Geometry {
     positions.push(...p, ...q, ...s);
     for (let v = 0; v < 3; v++) normals.push(n[0]! / l, n[1]! / l, n[2]! / l);
   }
-  return new Geometry(positions, normals, Array.from({ length: 24 }, (_, i) => i));
+  return new Geometry(
+    positions,
+    normals,
+    Array.from({ length: 24 }, (_, i) => i),
+  );
 }

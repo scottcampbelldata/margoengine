@@ -334,11 +334,11 @@ export function solvePoseIK(pose: IKPose, chain: IKChain): FABRIKResult {
     result = solveFABRIK(points, chain.target, chain);
   if (bends) keepBendSides(points, bends);
   const rotations = chainRotations(
-      before,
-      points,
-      frames.map((f) => f.rotation),
-      chain.weight ?? 1,
-    );
+    before,
+    points,
+    frames.map((f) => f.rotation),
+    chain.weight ?? 1,
+  );
   // Local rotation of each turned joint: inverse(parent's new world rotation) x its new world rotation.
   for (let i = 0; i < joints.length - 1; i++) {
     const parent = i === 0 ? base : rotations[i - 1],

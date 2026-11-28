@@ -103,7 +103,13 @@ test('invalid input is refused with the fix and the help link', () => {
 
 test('instancedCurveFlow packs every curve into one texture with its length, segments and wrap', () => {
   const a = new CurveFlow(track, { segments: 8 }),
-    b = new CurveFlow(new CatmullRomCurve3([[0, 0, 0], [0, 6, 0]]), { segments: 20, closed: true }),
+    b = new CurveFlow(
+      new CatmullRomCurve3([
+        [0, 0, 0],
+        [0, 6, 0],
+      ]),
+      { segments: 20, closed: true },
+    ),
     plugin = instancedCurveFlow([a, b], 10),
     frames = plugin.textures.frames,
     data = frames.source.data;
@@ -145,7 +151,13 @@ test('instancedCurveFlow rows hold each curve and place, and setFlow replaces on
     // The second curve's four rows of 17 texels.
     other = Array.from(first.source.data.subarray(4 * 17 * 4, 8 * 17 * 4));
   // As many frames or fewer: the same texture, the other curve untouched.
-  const short = new CurveFlow(new CatmullRomCurve3([[0, 0, 0], [0, 3, 0]]), { segments: 4 });
+  const short = new CurveFlow(
+    new CatmullRomCurve3([
+      [0, 0, 0],
+      [0, 3, 0],
+    ]),
+    { segments: 4 },
+  );
   plugin.setFlow(0, short);
   assert.equal(plugin.textures.frames, first);
   assert.equal(first.source.data[17 * 4 + 3], 4);
@@ -158,7 +170,10 @@ test('instancedCurveFlow rows hold each curve and place, and setFlow replaces on
   assert.equal(wide.width, 41);
   for (let row = 0; row < 4; row++) {
     const at = (4 + row) * 41 * 4;
-    assert.deepEqual(Array.from(wide.source.data.subarray(at, at + 17 * 4)), other.slice(row * 17 * 4, (row + 1) * 17 * 4));
+    assert.deepEqual(
+      Array.from(wide.source.data.subarray(at, at + 17 * 4)),
+      other.slice(row * 17 * 4, (row + 1) * 17 * 4),
+    );
   }
   assert.match(plugin.code.vertex, /clamp\(i32\(floor\(curveflow_curve\+0\.5\)\),0,1\)/);
   plugin.dispose();

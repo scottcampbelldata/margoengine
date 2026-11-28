@@ -255,7 +255,11 @@ export function cornerCubeReflect(
       }
     }
     if (exitTime < time) {
-      return { hits, exit: [p[0] + d[0] * exitTime, p[1] + d[1] * exitTime, p[2] + d[2] * exitTime], direction: [...d] };
+      return {
+        hits,
+        exit: [p[0] + d[0] * exitTime, p[1] + d[1] * exitTime, p[2] + d[2] * exitTime],
+        direction: [...d],
+      };
     }
     if (!Number.isFinite(time)) return null;
     p = [p[0] + d[0] * time, p[1] + d[1] * time, p[2] + d[2] * time];

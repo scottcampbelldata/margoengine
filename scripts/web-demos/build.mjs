@@ -34,10 +34,12 @@ function entryOf(dir) {
   const imported = new Set();
   for (const f of files) {
     const text = fs.readFileSync(path.join(source, f), 'utf8');
-    for (const m of text.matchAll(/(?:from|import)\s*\(?\s*['"]\.\/([^'"]+)['"]/g)) imported.add(m[1].replace(/\?.*$/, ''));
+    for (const m of text.matchAll(/(?:from|import)\s*\(?\s*['"]\.\/([^'"]+)['"]/g))
+      imported.add(m[1].replace(/\?.*$/, ''));
   }
   const roots = files.filter((f) => !imported.has(f) && !imported.has(f.replace(/\.(?:m?js|ts)$/, '')));
-  for (const preferred of ['scene.js', 'main.js', 'app.js', 'start.js', 'index.js']) if (roots.includes(preferred)) return preferred;
+  for (const preferred of ['scene.js', 'main.js', 'app.js', 'start.js', 'index.js'])
+    if (roots.includes(preferred)) return preferred;
   if (roots.length === 1) return roots[0];
   throw new Error(`${path.basename(dir)}: cannot tell the entry module among ${roots.join(', ') || 'none'}`);
 }
@@ -48,7 +50,9 @@ function sourceHtml(dir, entry) {
   html = html.replace(/\s*<script type="module"[^>]*src="\.\/assets\/[^"]+"[^>]*><\/script>/g, '');
   html = html.replace(/\s*<link rel="modulepreload"[^>]*href="\.\/assets\/[^"]+"[^>]*>/g, '');
   html = html.replace(/\s*<link rel="stylesheet"[^>]*href="\.\/assets\/[^"]+"[^>]*>/g, '');
-  const css = fs.existsSync(path.join(dir, 'source', 'style.css')) ? `\n  <link rel="stylesheet" href="../source/style.css">` : '';
+  const css = fs.existsSync(path.join(dir, 'source', 'style.css'))
+    ? `\n  <link rel="stylesheet" href="../source/style.css">`
+    : '';
   return html.replace('</head>', `  <script type="module" src="../source/${entry}"></script>${css}\n</head>`);
 }
 
@@ -76,19 +80,30 @@ for (const name of names) {
         ],
       },
       worker: { format: 'es' },
-      build: { outDir: out, emptyOutDir: true, target: 'es2022', assetsDir: 'assets', chunkSizeWarningLimit: 100000, reportCompressedSize: false },
+      build: {
+        outDir: out,
+        emptyOutDir: true,
+        target: 'es2022',
+        assetsDir: 'assets',
+        chunkSizeWarningLimit: 100000,
+        reportCompressedSize: false,
+      },
     });
     const assets = path.join(dir, 'assets');
     fs.mkdirSync(assets, { recursive: true });
     for (const f of fs.readdirSync(assets)) if (hashed.test(f)) fs.rmSync(path.join(assets, f));
-    for (const f of fs.readdirSync(path.join(out, 'assets'))) fs.copyFileSync(path.join(out, 'assets', f), path.join(assets, f));
+    for (const f of fs.readdirSync(path.join(out, 'assets')))
+      fs.copyFileSync(path.join(out, 'assets', f), path.join(assets, f));
     fs.copyFileSync(path.join(out, 'index.html'), path.join(dir, 'index.html'));
     if (zip) {
       const target = path.join(demos, 'downloads', `${name}.zip`);
       fs.rmSync(target, { force: true });
       // The zip holds the folder's contents (index.html, assets/, source/ ...), as the gallery's downloads always have.
       // bsdtar writes zip with -a. Windows ships it as System32/tar.exe; elsewhere it is bsdtar.
-      const tar = process.platform === 'win32' ? path.join(process.env.SystemRoot ?? 'C:/Windows', 'System32', 'tar.exe') : 'bsdtar';
+      const tar =
+        process.platform === 'win32'
+          ? path.join(process.env.SystemRoot ?? 'C:/Windows', 'System32', 'tar.exe')
+          : 'bsdtar';
       const entries = fs.readdirSync(dir).filter((f) => f !== '.build' && f !== '.build-out');
       const r = spawnSync(tar, ['-a', '-c', '-f', target, ...entries], { cwd: dir, stdio: 'inherit' });
       if (r.status !== 0) throw new Error(`zip failed for ${name}`);

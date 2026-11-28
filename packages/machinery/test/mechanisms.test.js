@@ -110,7 +110,13 @@ test('Rose engine: the cut repeats every lobe pitch and follows the rosette', ()
 });
 
 test('Archimedes screw: buckets match the slice integral, water rises a pitch a turn', () => {
-  const screw = archimedesScrew({ pitch: 0.348, outerRadius: 0.175, innerRadius: 0.061, incline: (26 * Math.PI) / 180, length: 1.43 });
+  const screw = archimedesScrew({
+    pitch: 0.348,
+    outerRadius: 0.175,
+    innerRadius: 0.061,
+    incline: (26 * Math.PI) / 180,
+    length: 1.43,
+  });
   const fine = archimedesScrew({ ...screw.spec }, 6400).volumePerTurn;
   near(screw.volumePerTurn, fine, 1e-7, 'converged');
   assert.ok(screw.volumePerTurn > 0 && screw.volumePerTurn < Math.PI * 0.175 ** 2 * 0.348);
@@ -138,7 +144,12 @@ test('Gimbal: the angles point the rotor where asked and lock at 90 degrees', ()
   near(free.deviation, 0, 1e-7, 'free rings hold the axis');
   // Locked, the rotor turns with the mount: its axis is +z turned 0.7 rad about the mount axis.
   const k = [0.83, 0.38, -0.4].map((v) => v / Math.hypot(0.83, 0.38, -0.4));
-  near(Math.cos(held.deviation), Math.cos(0.7) + k[2] * k[2] * (1 - Math.cos(0.7)), 1e-12, 'locked rotor follows the mount');
+  near(
+    Math.cos(held.deviation),
+    Math.cos(0.7) + k[2] * k[2] * (1 - Math.cos(0.7)),
+    1e-12,
+    'locked rotor follows the mount',
+  );
 });
 
 test('Willis: every held member gives the exact train ratio, and the planets assemble', () => {

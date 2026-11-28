@@ -133,7 +133,9 @@ await runSuite(
     );
     const gone = at(empty, 32, 32);
     assert.ok(!(gone[0] > gone[1] + 40 && gone[0] > gone[2] + 40), `a disposed cloth is no longer drawn: ${gone}`);
-    console.log('drawSoftBody: the cloth follows its particles, draws its colour and its grid texture, and disposes; a welded volume draws its source mesh and UVs');
+    console.log(
+      'drawSoftBody: the cloth follows its particles, draws its colour and its grid texture, and disposes; a welded volume draws its source mesh and UVs',
+    );
   },
   () => browser.close(),
 );

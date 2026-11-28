@@ -316,14 +316,24 @@ test('the subsolar point: the Sun overhead there, the equation of time at noon, 
 test('AstroSky horizon false draws the whole sphere at full night, as from space', () => {
   const catalog = parseBrightStarCatalog(catalogText, { maxMagnitude: 5 }),
     day = new Date('2026-06-21T12:00:00Z'),
-    astro = new AstroSky({ latitude: degrees(90), longitude: degrees(-90), date: day, timeScale: 0, catalog, horizon: false }),
+    astro = new AstroSky({
+      latitude: degrees(90),
+      longitude: degrees(-90),
+      date: day,
+      timeScale: 0,
+      catalog,
+      horizon: false,
+    }),
     h = tracedGPU();
   h.engine.use(astro);
   astro.onPreUpdate(0);
   h.context.bindings = [];
   h.engine.frameGraph.execute(h.context);
   // By day at the pole the stars still show, and the uniform tells the shader to keep the ones below the horizon.
-  assert.deepEqual(h.commands().filter((c) => c.startsWith('draw 6 ')), [`draw 6 ${catalog.count + 7}`]);
+  assert.deepEqual(
+    h.commands().filter((c) => c.startsWith('draw 6 ')),
+    [`draw 6 ${catalog.count + 7}`],
+  );
   assert.equal(astro.values[41], 1);
   assert.throws(() => new AstroSky({ latitude: degrees(0), longitude: degrees(0), horizon: 'no' }), /horizon/);
   astro.dispose();

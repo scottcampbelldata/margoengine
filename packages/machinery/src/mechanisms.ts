@@ -20,7 +20,8 @@ type V2 = [number, number];
 type V3 = [number, number, number];
 
 const positive = (value: number, label: string): number => {
-  if (!(value > 0 && Number.isFinite(value))) throw new RangeError(`${label} must be a positive finite number; got ${value}.`);
+  if (!(value > 0 && Number.isFinite(value)))
+    throw new RangeError(`${label} must be a positive finite number; got ${value}.`);
   return value;
 };
 const finite = (value: number, label: string): number => {
@@ -28,7 +29,8 @@ const finite = (value: number, label: string): number => {
   return value;
 };
 const teethCount = (value: number, label: string): number => {
-  if (!(Number.isInteger(value) && value > 0)) throw new RangeError(`${label} must be a whole number of teeth; got ${value}.`);
+  if (!(Number.isInteger(value) && value > 0))
+    throw new RangeError(`${label} must be a whole number of teeth; got ${value}.`);
   return value;
 };
 const clamp1 = (v: number): number => Math.min(1, Math.max(-1, v));
@@ -62,7 +64,8 @@ export interface GenevaPose {
 
 /** Crank radius of an external Geneva drive whose pin enters the slots tangentially: `c sin(pi / n)` (Bickford 1972). */
 export function genevaCrankRadius(slots = 4, centerDistance = 1): number {
-  if (!(Number.isInteger(slots) && slots >= 3)) throw new RangeError(`A Geneva wheel has 3 slots or more; got ${slots}.`);
+  if (!(Number.isInteger(slots) && slots >= 3))
+    throw new RangeError(`A Geneva wheel has 3 slots or more; got ${slots}.`);
   return positive(centerDistance, 'Centre distance') * Math.sin(Math.PI / slots);
 }
 
@@ -122,7 +125,13 @@ export function scotchYokePose(crank: number, radius = 1): ScotchYokePose {
   positive(radius, 'Crank radius');
   const c = Math.cos(crank),
     s = Math.sin(crank);
-  return { pin: [radius * c, radius * s], slide: radius * c, slot: radius * s, velocity: -radius * s, acceleration: -radius * c };
+  return {
+    pin: [radius * c, radius * s],
+    slide: radius * c,
+    slot: radius * s,
+    velocity: -radius * s,
+    acceleration: -radius * c,
+  };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -233,7 +242,8 @@ export interface TogglePressPose {
  */
 export function togglePressPose(knee: number, link = 1): TogglePressPose {
   positive(link, 'Link length');
-  if (!(Math.abs(knee) <= link)) throw new RangeError(`The knee offset must be within the link length ${link}; got ${knee}.`);
+  if (!(Math.abs(knee) <= link))
+    throw new RangeError(`The knee offset must be within the link length ${link}; got ${knee}.`);
   const drop = Math.sqrt(link * link - knee * knee);
   return {
     drop,
@@ -304,7 +314,14 @@ export function reuleauxPose(angle: number, width = 1): ReuleauxPose {
   const vertices = reuleauxVertices(width),
     c = Math.cos(angle),
     s = Math.sin(angle);
-  const extremes = ([[1, 0], [0, 1], [-1, 0], [0, -1]] as V2[]).map(([x, y]) => {
+  const extremes = (
+    [
+      [1, 0],
+      [0, 1],
+      [-1, 0],
+      [0, -1],
+    ] as V2[]
+  ).map(([x, y]) => {
     const [px, py] = reuleauxSupport(vertices, width, [x * c + y * s, -x * s + y * c]);
     return [px * c - py * s, px * s + py * c] as V2;
   });
@@ -417,7 +434,8 @@ export function archimedesScrew(spec: ArchimedesScrewSpec, slices = 1600): Archi
     incline = positive(spec.incline, 'Incline'),
     length = positive(spec.length ?? pitch, 'Length'),
     freeboard = spec.freeboard ?? 0;
-  if (!(freeboard >= 0 && Number.isFinite(freeboard))) throw new RangeError(`Freeboard must be 0 or more; got ${freeboard}.`);
+  if (!(freeboard >= 0 && Number.isFinite(freeboard)))
+    throw new RangeError(`Freeboard must be 0 or more; got ${freeboard}.`);
   if (!(inner < outer)) throw new RangeError('The shaft radius must be less than the outer radius.');
   if (!(incline < Math.PI / 2)) throw new RangeError('The incline must be less than 90 degrees.');
   const vertical = Math.sin(incline),
@@ -558,7 +576,8 @@ export function epicyclicSpeeds(
   const zs = teethCount(teeth.sun, 'Sun teeth'),
     zp = teethCount(teeth.planet, 'Planet teeth'),
     zr = teethCount(teeth.ring, 'Ring teeth');
-  if (zr !== zs + 2 * zp) throw new RangeError(`The ring needs sun + 2 planet teeth (${zs + 2 * zp}) to mesh; got ${zr}.`);
+  if (zr !== zs + 2 * zp)
+    throw new RangeError(`The ring needs sun + 2 planet teeth (${zs + 2 * zp}) to mesh; got ${zr}.`);
   const given = (['sun', 'ring', 'carrier'] as const).filter((key) => known[key] !== undefined);
   if (given.length !== 2) throw new RangeError('Give exactly two of sun, ring and carrier.');
   for (const key of given) finite(known[key] as number, key);
@@ -661,7 +680,13 @@ export function flexsplinePoint(
   material: number,
   input: number,
   output: number,
-  spec: HarmonicDriveSpec & { major: number; minor: number; engageStart?: number; engageWidth?: number; strength?: number },
+  spec: HarmonicDriveSpec & {
+    major: number;
+    minor: number;
+    engageStart?: number;
+    engageWidth?: number;
+    strength?: number;
+  },
 ): { angle: number; offset: number } {
   const zf = teethCount(spec.flexTeeth, 'Flexspline teeth'),
     zc = teethCount(spec.circularTeeth, 'Circular spline teeth');
@@ -673,7 +698,10 @@ export function flexsplinePoint(
     blend = Math.min(1, Math.max(0, (Math.abs(local) - start) / width)),
     taper = 1 - blend * blend * (3 - 2 * blend);
   const pitched = angle - (spec.strength ?? 1) * taper * local * (1 - zf / zc);
-  return { angle: pitched, offset: waveGeneratorRadius(pitched - input, spec.major, spec.minor) - (spec.major + spec.minor) / 2 };
+  return {
+    angle: pitched,
+    offset: waveGeneratorRadius(pitched - input, spec.major, spec.minor) - (spec.major + spec.minor) / 2,
+  };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -762,7 +790,8 @@ export interface WattGovernorEquilibrium {
  * `w^2 L cos(a) = g` and the height of the cone is `g / w^2`, whatever the balls' mass. Below `sqrt(g / L)` the arms hang straight.
  */
 export function wattGovernorEquilibrium(omega: number, spec: WattGovernorSpec): WattGovernorEquilibrium {
-  if (!(omega >= 0 && Number.isFinite(omega))) throw new RangeError(`Spin speed must be 0 or more rad/s; got ${omega}.`);
+  if (!(omega >= 0 && Number.isFinite(omega)))
+    throw new RangeError(`Spin speed must be 0 or more rad/s; got ${omega}.`);
   const L = positive(spec.arm, 'Arm length'),
     g = positive(spec.gravity ?? 9.80665, 'Gravity'),
     height = omega > 0 ? Math.min(L, g / (omega * omega)) : L,

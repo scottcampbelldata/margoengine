@@ -417,8 +417,8 @@ export const CASES = {
             side.missing && !side.errors?.length && !side.gl
               ? lacking(side.missing)
               : side.thrown && !side.errors?.length && !side.gl
-              ? classifyError(thrownOf(side.thrown))
-              : { status: 'bug', message: wrong.join('; ') },
+                ? classifyError(thrownOf(side.thrown))
+                : { status: 'bug', message: wrong.join('; ') },
           );
         } else if (mode === 'native') t.row(name, mode, { status: 'pass' });
       }
