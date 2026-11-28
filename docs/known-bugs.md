@@ -61,6 +61,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   against 35,849). Regression: `packages/scatter/test/velocity.browser.mjs` (the `coverage: false` run against the
   default, WebGPU and `MARGO_COMPAT=1`).
 
+### Open 2026-11-28: a spinning bullet's strike at 300 m/s throws it sideways by a speed that follows the substeps (KB-PHYS-CCDKNOCK1, physics kernel, ccd)
+
+- **Repro:** `packages/physics/tests/next-ccd.test.js`'s dynamic plate scene, seed 9, bullet 64 alone with the plate (a 4 x 4 x
+  12 cm steel box at 300 m/s, spinning at about 30 rad/s, ccd on, no gravity): after the strike it leaves at 45.4 m/s along the
+  face with 8 substeps (the default), 10.7 m/s with 32 and 17.6 m/s with 64, spinning at 650, 230 and 440 rad/s. The answer does
+  not settle as the step shrinks. Energy is lost, not made (3 percent of the kinetic energy is left), the tangential impulse is
+  0.15 of the normal, inside the cone, and in the full scene its later hit on bullet 170 conserves momentum exactly.
+- **Cause:** not traced. At the spin the strike leaves, the bullet turns about 1.4 rad a default substep, far past the small turn
+  the contact rows are linearised for, so the strike's split between spin and sliding depends on the pose each substep catches.
+- **Next:** compare the strike with the rigid-body impact law for a corner with Coulomb friction (Stronge, "Impact Mechanics",
+  2000, ch. 5) at fine substeps, and with Rapier 3D as the oracle; the test only needs the bullet stopped, which it is.
+
 ### Open 2026-11-28: 21 web demos cannot be rebuilt from source/: the data files their code imports are missing (KB-DEMO-SOURCEDATA1, demos)
 
 - **Repro:** `node scripts/web-demos/build.mjs the-brain-scan` (or caustic-glass, character-course, cutscene-studio,

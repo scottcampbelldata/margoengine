@@ -128,13 +128,48 @@ test('ccd stops bullets on a moving kinematic wall and on a free dynamic plate',
           ccd: true,
         }),
       );
+    // A bullet fails when it crosses the wall's middle plane inside its face (6 m, plus the bullet's own reach). One that a
+    // rebound sends round the wall's edge crosses the plane outside the face: no tunnel (at seed 9 one is knocked to 39 m/s
+    // sideways and passes the dynamic plate's edge at 8.9 m).
+    const reach = 6 + Math.hypot(0.02, 0.02, 0.06);
+    let plane = wall.position[0],
+      was = bodies.map((body) => [...body.position]);
+    // Every bullet starts aimed at the face, so every one must strike it: be stopped (to under half its speed along the wall's
+    // normal) in a step whose path, at the speed it came in with, reached the face, inside it. A bullet that strikes and
+    // rebounds within the step is already back from the face when the step ends. Without this a test that missed the wall
+    // would pass empty.
+    const struck = new Set();
+    let speeds = bodies.map((body) => body.linearVelocity[0] - wall.linearVelocity[0]);
     for (let step = 0; step < 20; step++) {
       physics.step();
-      const plane = wall.position[0];
-      bodies.forEach((body, i) =>
-        assert.ok(body.position[0] < plane, `${type} wall: bullet ${i} at step ${step} is past the wall's middle`),
-      );
+      const now = wall.position[0];
+      bodies.forEach((body, i) => {
+        const p = body.position,
+          before = was[i][0] - plane,
+          after = p[0] - now;
+        const v = body.linearVelocity[0] - wall.linearVelocity[0];
+        if (
+          v < 150 &&
+          speeds[i] >= 150 &&
+          before + speeds[i] * physics.fixedTimestep > -0.01 - Math.hypot(0.02, 0.02, 0.06) &&
+          Math.abs(p[1] - wall.position[1]) < 6 &&
+          Math.abs(p[2] - wall.position[2]) < 6
+        )
+          struck.add(i);
+        if (after < 0) return;
+        const t = before < 0 ? -before / (after - before) : 0,
+          y = was[i][1] + (p[1] - was[i][1]) * t - wall.position[1],
+          z = was[i][2] + (p[2] - was[i][2]) * t - wall.position[2];
+        assert.ok(
+          Math.abs(y) > reach || Math.abs(z) > reach,
+          `${type} wall: bullet ${i} at step ${step} went through the wall's face at y ${y.toFixed(2)}, z ${z.toFixed(2)}`,
+        );
+      });
+      plane = now;
+      was = bodies.map((body) => [...body.position]);
+      speeds = bodies.map((body) => body.linearVelocity[0] - wall.linearVelocity[0]);
     }
+    assert.equal(struck.size, bodies.length, `${type} wall: only ${struck.size} of ${bodies.length} bullets struck its face`);
     physics.dispose();
   }
 });
