@@ -55,21 +55,21 @@ them; the rest is a record of what a stronger solver would need.
 - Point 5. `63770ed64b` and `tsunami-extremes.test.js` verify finite Coriolis and travel-time calculations,
   rejected over-budget CFL ticks and overflowing volumes, no energy increase over 12 seconds of wetting and drying,
   mass conservation to 2.22e−15 m³, and exact replay. `tsunami.test.js` checks malformed grids and coded corrections.
-- Point 6. `tsunami-threads.test.js` checks identical accepted bytes on plain Wasm and shared Wasm
+- Point 6. `a437d9db30` and `tsunami-threads.test.js` check identical accepted bytes on plain Wasm and shared Wasm
   with one, two and four threads. A live source crosses an origin-cell boundary during repeated
   wetting and drying, and a snapshot restores the same bytes and flux counts. A single CFL substep
   evaluates 50,504 faces on 129 × 97 cells and 199,304 on 257 × 193 cells, partitioned across four
   workers by whole rows and columns. `tsunami-threads.browser.mjs` checks exact replay and snapshot
   equality with three actual helpers in a Chromium worker.
 - Point 7. `63770ed64b` and Water's `tsunami-surface.browser.mjs` verify the accepted dry-to-wet surface on both
-  renderers. The incoming characteristic can be authored or supplied from an independent gauge. `tsunami.test.js`
+  renderers. `d828209f91` adds a characteristic that can be authored or supplied from an independent gauge. `tsunami.test.js`
   checks its propagation from all four sides, signed volume closure and exact seek.
 - Point 8. `63770ed64b` corrects the fault-source documentation and records the renderer and numeric limits.
   [Laboratory evidence](../packages/physics/scripts/sea06-measured.md) preserves the measured model gaps and reproduction.
 - Point 2 remains open. On the 20 mm grid, the Drähne T30 case meets two of six paired camera bounds and T20 meets
   none. Both preserve the inlet and gauge records separately. The NOAA canonical beach misses persist across
   three grids, with the larger crest arriving too early and a weaker case missing the observed rundown.
-  The smooth-bed closure's `tsunami-laminar.test.js` verifies the linear column against independent
+  `881bca11b8` and `tsunami-laminar.test.js` verify the linear column against independent
   eigenmode sums over shallow, transitional and deep regimes. At 20 mm the closure meets four of six
   T20 camera bounds and one of six T30 bounds, so the coastal validation point remains open.
 
