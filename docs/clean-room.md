@@ -11531,6 +11531,22 @@ plume alone.
 - G. I. Taylor, "The spectrum of turbulence", Proc. R. Soc. A 164, 476-490, 1938, https://doi.org/10.1098/rspa.1938.0032;
   J. G. Quintiere, Fire Safety Journal 15(1), 3-29, 1989. Used: the eddies are a frozen field carried up at the flame's
   buoyant rise speed 0.5 sqrt(g L).
+- N. Hagen, L. Reyes Bentancor et al., "Raytracing and quantifying the inferior mirage", arXiv:2611.09131, 2026,
+  https://doi.org/10.48550/arXiv.2611.09131; P. Paola et al., Revista Mexicana de Fisica 68, 2022 (the exponential
+  profile over pavement). Used (the hot ground, 2026-11-28): n(y) = n_air - (n_air - n_hot) exp(-y / beta) with beta
+  about 2 cm, and the mirage's lower edge acos(n_hot / n_air) (their equations 6 and 13: 0.17 degree for 5 K). From
+  Snell's invariant n cos(theta) in that layer, the small-angle range integral has the closed form
+  x = ((y1 - y2) - 2 H ln((sqrt A + theta2) / (sqrt A + theta1))) / sqrt A, derived here and checked against an exact
+  10 micrometre integration of the invariant (packages/post/test/heat-haze.test.js). Compared: a screen-space scroll of
+  the road texture (no size, no mirror), the plume march through a voxel grid of the layer (the grid cannot hold a 2 cm
+  layer over 400 m, and a bent-ray shift never turns a ray back up) and the closed-form ray walked against the depth.
+  The last is built.
+- J. C. Wyngaard, Y. Izumi and S. A. Collins, "Behavior of the refractive-index-structure parameter near the ground",
+  J. Opt. Soc. Am. 61(12), 1646-1650, 1971, https://doi.org/10.1364/JOSA.61.001646; L. A. Ramdas and S. L. Malurkar,
+  "Surface convection and variation of temperature near a hot surface", Nature 129, 201-202, 1932,
+  https://doi.org/10.1038/129201a0. Used: the air over a hot surface is convective and its temperature fluctuates most
+  near the ground; the excess is taken as its mean times 1 + a frozen unit-rms noise carried by the wind (Taylor 1938),
+  averaged along each ray's stretch in the layer.
 
 ## Flame volumes: vfx/flame (2026-11-17)
 

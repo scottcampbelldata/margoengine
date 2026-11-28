@@ -13,7 +13,7 @@ const frameGap=1000/30;
 function read(state){
   const amount=state.contrast;
   el('amount').textContent=(amount?'+':'')+amount+' °C';
-  slider.setAttribute('aria-valuetext',amount+' degrees Celsius warmer near the road');
+  slider.setAttribute('aria-valuetext',amount+' degrees Celsius warmer at the asphalt');
   motion.textContent=state.playing?'Pause shimmer':'Play shimmer';
   Object.assign(panel.dataset,{contrast:amount,time:state.time.toFixed(4),playing:state.playing});
 }

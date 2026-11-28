@@ -32,6 +32,25 @@
 //   turbulence), so the fluctuation field is a fixed noise that rises with the plume, at the buoyant rise speed
 //   0.5 sqrt(g L) of the flame's own tongues (J. G. Quintiere, "Scaling applications in fire research", Fire Safety
 //   Journal 15(1), 3-29, 1989).
+// - N. Hagen et al., "Raytracing and quantifying the inferior mirage", arXiv:2611.09131, 2026,
+//   https://doi.org/10.48550/arXiv.2611.09131: the air over sunlit pavement follows T(y) = T_air + (T_hot - T_air)
+//   exp(-y / beta), so n(y) = n_air - (n_air - n_hot) exp(-y / beta), with beta about 2 cm fitted to their measurements
+//   (0.3 to 0.8 cm in P. Paola et al., Revista Mexicana de Fisica 68, 2022); a ray turns back up when its depression is
+//   under acos(n_hot / n_air), the mirage's lower edge (0.17 degree for 5 K, their measured 0.34 degree for a hot road).
+// - J. C. Wyngaard, Y. Izumi and S. A. Collins, "Behavior of the refractive-index-structure parameter near the ground",
+//   Journal of the Optical Society of America 61(12), 1646-1650, 1971, https://doi.org/10.1364/JOSA.61.001646, and
+//   L. A. Ramdas and S. L. Malurkar, "Surface convection and variation of temperature near a hot surface", Nature 129,
+//   201-202, 1932, https://doi.org/10.1038/129201a0: the air over a hot surface is convective, its temperature fluctuates
+//   most near the ground, so the layer's excess is taken as its mean times 1 + a frozen unit-rms noise carried by the
+//   wind (Taylor 1938) that changes as it goes; near the lower edge a small change of the excess moves the turning point
+//   far, which is the flicker of a road mirage.
+// The hot ground is a horizontal stratified layer, so each ray keeps n cos(theta) (Snell's invariant). For small angles
+// theta^2 = A - b exp(-y / H), A = s^2 + b exp(-h / H), b = 2 (n_air - n_hot) / n_air, s the ray's depression slope at
+// the eye height h; with w = exp(-y / H) the range integral dx = dy / theta has the closed form
+// x(y1 -> y2) = ((y1 - y2) - 2 H ln((sqrt A + theta2) / (sqrt A + theta1))) / sqrt A. A ray with A > b lands; one with
+// A <= b turns at y = -H ln(A / b) and climbs back the mirror path. The curved path is walked against the scene depth (a
+// screen-space march) and the pixel reads the scene where the path first goes behind a surface, or the sky the path
+// leaves toward.
 // Each pixel marches its view ray through the box of every plume, sums the bend of the mean field and of the eddies
 // (an eddy of size l crossed by a step longer than l adds a random kick, so the eddies' part is weighted by
 // sqrt(min(1, l / ds)) and their sum grows as the square root of the path, as a random walk does), weighs each bend by
@@ -109,6 +128,31 @@ export interface HeatPlume {
   /** The plume's clock, seconds: its eddies rise with it, so a seeked flame shimmers as a played one. Default the effect's own clock. */
   readonly time?: number;
 }
+/**
+ * A sun-heated ground (a road, sand, a runway): a horizontal layer of hot air whose excess over the ambient air falls as
+ * exp(-y / depth) with height y over the surface (Hagen et al. 2026). It bends grazing rays up, which draws the inferior
+ * mirage (the sky and far objects seen mirrored in the "wet" road) below the horizon, and its convective eddies make it
+ * shimmer.
+ */
+export interface HeatGround {
+  /** The surface's height, world y metres. Default 0. */
+  readonly height?: number;
+  /** The air's temperature at the surface over `ambient`, kelvin, 0 to 60 (sunlit asphalt runs 5 to 30 K over the air). */
+  readonly excess: number;
+  /** The e-folding height of the excess, metres, 0.001 to 2. Default 0.02 (Hagen et al. 2026). */
+  readonly depth?: number;
+  /** Root-mean-square fluctuation of the excess at a point over its mean, 0 to 1 (a ray averages the eddies it crosses). Default 0.2. */
+  readonly fluctuation?: number;
+  /** The wind carrying the eddies, `[x, z]` metres per second. Default `[1.5, 0.4]`. */
+  readonly wind?: readonly [number, number];
+  /** The eddies' size over the ground, metres, 0.05 to 20. Default 0.6. */
+  readonly eddy?: number;
+  /** Air pressure, pascals. Default 101325. */
+  readonly pressure?: number;
+  /** The eddies' clock, seconds. Default the effect's own clock. */
+  readonly time?: number;
+}
+
 /** A plume, or anything that carries one as `plume` (a `Flame`). */
 export type HeatSource = HeatPlume | { readonly plume: HeatPlume };
 
@@ -118,6 +162,8 @@ export interface HeatHazeOptions {
   sources?: readonly HeatSource[] | (() => Iterable<HeatSource>);
   /** Simulated air temperature. A callback is read once per frame. Defaults to no grid. */
   temperatureVolume?: HeatHazeVolume | (() => HeatHazeVolume | undefined);
+  /** A hot ground layer (the road mirage), or a callback read once per frame. Default none. */
+  ground?: HeatGround | (() => HeatGround | undefined);
   /** The bend as a multiple of the physical, 0 to 100. Default 1: the refraction of real hot air, about a pixel at a telephoto's field of view and less at a wide one. */
   strength?: number;
   /** Root-mean-square temperature fluctuation over the mean rise, 0 to 1 (George et al. 1977). Default 0.4. */
@@ -131,14 +177,92 @@ export interface HeatHazeOptions {
 }
 
 const PLUME_FLOATS = 16;
-const HEAD = 40;
+// The hot ground (shader notes): gx is the closed-form range between two heights; gdeep the range to the deepest point
+// (landing or turning), its height, sqrt A and the angle at the layer top (16 e-folding heights, where the layer's change
+// of n is under 1e-7 of the surface's); the eddies' change of the excess is the mean of four reads spread along the
+// ray's stretch below 3 e-folding heights (the ray averages the eddies it crosses, and neighbouring rows, whose stretches
+// overlap, agree); groundView walks 12 points down, 12 back up and 10 doubling steps out against the depth (a surface
+// under 5 cm plus 0.15 of the eye height over the ground is the ground itself, met by the landing: at grazing angles one
+// pixel and the depth buffer's precision span metres along the ray, a height error of about a tenth of the eye height),
+// refines a crossing by bisection, and returns the scene coordinate to read (z 1) or z 0 for the pixel's own.
+const groundWgsl = `
+fn gx(sA:f32,H:f32,y1:f32,t1:f32,y2:f32,t2:f32)->f32 {return ((y1-y2)-2.0*H*log((sA+t2)/(sA+t1)))/sA;}
+fn gdeep(s:f32,hc:f32,H:f32,b:f32,top:f32)->vec4f {
+ let A=s*s+b*exp(-hc/H);let sA=sqrt(A);
+ let low=select(-H*log(A/b),0.0,A>b);
+ let tLow=sqrt(max(A-b,0.0));let tTop=sqrt(max(A-b*exp(-top/H),0.0));
+ return vec4f((hc-top)/s+gx(sA,H,top,tTop,low,tLow),low,sA,tTop);
+}
+fn guv(p:vec3f)->vec4f {let q=u.view*vec4f(p,1.0);return vec4f(q.xy/q.w*vec2f(0.5,-0.5)+vec2f(0.5),q.z/q.w,q.w);}
+fn gbehind(p:vec3f,o:vec3f,span:f32,size:vec2f)->vec3f {
+ let q=guv(p);
+ if(q.w<=0.0||any(q.xy<vec2f(0.0))||any(q.xy>vec2f(1.0))){return vec3f(q.xy,-1.0);}
+ let dq=textureLoad(depth,vec2i(min(q.xy*size,size-vec2f(1.0))),0);
+ if(dq<=0.0||q.z>dq){return vec3f(q.xy,0.0);}
+ let w=world(q.xy*vec2f(2.0,-2.0)+vec2f(-1.0,1.0),dq);
+ if(w.y-u.ground.x<0.05+0.15*(o.y-u.ground.x)){return vec3f(q.xy,0.0);}
+ return vec3f(q.xy,select(0.0,1.0,distance(p,o)-distance(w,o)<=span));
+}
+fn groundView(o:vec3f,dir:vec3f,tb:f32,px:vec2f,size:vec2f)->vec3f {
+ let H=u.ground.y;let hc=o.y-u.ground.x;let c=length(dir.xz);
+ if(u.ground.z<=0.0||hc<=0.0||dir.y>=0.0||c<1e-6){return vec3f(0.0);}
+ let s=-dir.y/c;let top=min(hc,16.0*H);let xTop=(hc-top)/s;
+ if(tb<1e29&&tb*c<xTop){return vec3f(0.0);}
+ let h=dir.xz/c;var b=u.ground.z;
+ let d0=gdeep(s,hc,H,b,top);let t=u.air.w;
+ let near=xTop+select(0.0,gx(d0.z,H,top,d0.w,min(3.0*H,top),sqrt(max(d0.z*d0.z-b*exp(-min(3.0*H,top)/H),0.0))),3.0*H>d0.y);
+ let span=select(d0.x-near,2.0*(d0.x-near),d0.z*d0.z<=b);var f=0.0;
+ for(var k=0;k<4;k++){let at=o.xz+h*(near+span*(f32(k)+0.5)/4.0);f+=eddies(vec3f(at.x-u.air.x*t,0.5*t,at.y-u.air.y*t)/u.air.z);}
+ b*=max(0.0,1.0+0.25*u.ground.w*f);
+ if(b<=0.0){return vec3f(0.0);}
+ let A=s*s+b*exp(-hc/H);let land=A>b;let d=gdeep(s,hc,H,b,top);let sA=d.z;
+ let start=o+dir*(xTop/c)+vec3f(0.0,top-hc+s*xTop,0.0);
+ if(land){
+  let q=guv(o+dir*(d.x/c)+vec3f(0.0,s*d.x-hc,0.0));
+  if(q.w>0.0&&all(abs(q.xy-px)*size<vec2f(0.02))){return vec3f(0.0);}
+ }
+ var prev=start;var out=vec3f(0.0);var found=false;
+ let total=select(34,12,land);
+ for(var i=1;i<=total;i++){
+  var x:f32;var y:f32;
+  if(i<=24){
+   let f=select(f32(i-12)/12.0,1.0-f32(i)/12.0,i<=12);
+   y=d.y+(top-d.y)*f*f;
+   let xd=xTop+gx(sA,H,top,d.w,y,sqrt(max(A-b*exp(-y/H),0.0)));
+   x=select(2.0*d.x-xd,xd,i<=12);
+  } else {
+   let e=2.0*d.x-xTop;let dd=max(e,1.0)*(exp2(f32(i-24))-1.0)*0.25;
+   x=e+dd;y=top+sA*dd;
+  }
+  let p=o+dir*(x/c)+vec3f(0.0,y-hc+s*x,0.0);
+  let r=gbehind(p,o,max(distance(p,prev),1.0),size);
+  if(r.z<0.0){break;}
+  if(r.z>0.0){
+   var lo=prev;var hi=p;var best=r.xy;
+   for(var k=0;k<5;k++){
+    let m=0.5*(lo+hi);let rm=gbehind(m,o,max(distance(hi,lo),0.5),size);
+    if(rm.z>0.0){hi=m;best=rm.xy;}else{lo=m;}
+   }
+   out=vec3f(best,1.0);found=true;break;
+  }
+  prev=p;
+ }
+ if(!found){
+  if(land){let q=guv(prev);if(q.w<=0.0){return vec3f(0.0);}out=vec3f(clamp(q.xy,vec2f(0.0),vec2f(1.0)),1.0);}
+  else{let e=vec3f(h.x,sA,h.y);let q=u.view*vec4f(e,0.0);if(q.w<=0.0){return vec3f(0.0);}
+   out=vec3f(clamp(q.xy/q.w*vec2f(0.5,-0.5)+vec2f(0.5),vec2f(0.0),vec2f(1.0)),1.0);}
+ }
+ if(all(abs(out.xy-px)*size<vec2f(0.02))){return vec3f(0.0);}
+ return out;
+}`;
+const HEAD = 48;
 // Shader notes (kept here so the shipped shader carries no comment text):
 // fn excess and fn plume: The plume at local q (footprint axes, the lean taken out): x the mean change of n, y the eddies' change. McCaffrey's centreline rise at height h, and Heskestad's Gaussian half-width there.
 // the march: At least two steps across the plume's narrowest half-width along the ray (it widens upward), up to 4 x steps.
 // the draw: The shift is the difference of two projections, so no bend moves no pixel by any rounding.
-const shader = (encode: boolean, volume: boolean) => `${fullscreen}${encode ? displayShader : ''}
+const shader = (encode: boolean, volume: boolean, ground: boolean) => `${fullscreen}${encode ? displayShader : ''}
 struct P {a:vec4f,b:vec4f,c:vec4f,d:vec4f}
-struct U {view:mat4x4f,inverse:mat4x4f,look:vec4f,misc:vec4f,plumes:array<P,${HEAT_HAZE_MAX_PLUMES}>}
+struct U {view:mat4x4f,inverse:mat4x4f,look:vec4f,misc:vec4f,ground:vec4f,air:vec4f,plumes:array<P,${HEAT_HAZE_MAX_PLUMES}>}
 @group(0) @binding(0) var<uniform> u:U;
 @group(0) @binding(1) var scene:texture_2d<f32>;
 @group(0) @binding(2) var depth:texture_depth_2d;
@@ -172,6 +296,7 @@ fn toWorldGradient(k:P,g:vec3f)->vec3f {
  return vec3f(k.b.x*v.x+k.b.y*v.z,v.y,-k.b.y*v.x+k.b.x*v.z);
 }
 fn world(ndc:vec2f,d:f32)->vec3f {let p=u.inverse*vec4f(ndc,d,1.0);return p.xyz/p.w;}
+${ground ? groundWgsl : ''}
 @fragment fn fragment(@builtin(position) at:vec4f)->@location(0) vec4f {
  let size=vec2f(textureDimensions(scene));let p=vec2i(at.xy);let now=textureLoad(scene,p,0);
  let ndc=at.xy/size*vec2f(2.0,-2.0)+vec2f(-1.0,1.0);
@@ -205,13 +330,14 @@ fn world(ndc:vec2f,d:f32)->vec3f {let p=u.inverse*vec4f(ndc,d,1.0);return p.xyz/
    bend+=(g-dir*dot(dir,g))*ds*w;
   }
  }
- var rgb=now.rgb;
+ var rgb=now.rgb;var uv0=at.xy/size;
+ ${ground ? 'let gm=groundView(o,dir,tb,uv0,size);if(gm.z>0.0){uv0=gm.xy;rgb=textureSampleLevel(scene,bilinear,uv0,0.0).rgb;}' : ''}
  if(first<1e29){
     let s=min(tb,1e6);let base=u.view*vec4f(o+dir*s,1.0);
   let clip=u.view*vec4f(o+dir*s+bend*u.look.x*s,1.0);
   let shift=(clip.xy/clip.w-base.xy/base.w)*vec2f(0.5,-0.5);
   if(clip.w>0.0&&base.w>0.0&&any(shift!=vec2f(0.0))){
-   let uv=at.xy/size+shift;
+   let uv=uv0+shift;
    let q=clamp(vec2i(uv*size),vec2i(0),vec2i(size)-1);let dq=textureLoad(depth,q,0);
    let behind=dq<=0.0||dot(world(uv*vec2f(2.0,-2.0)+vec2f(-1.0,1.0),dq)-o,dir)>=first;
    if(behind&&all(uv>=vec2f(0.0))&&all(uv<=vec2f(1.0))){rgb=textureSampleLevel(scene,bilinear,uv,0.0).rgb;}
@@ -219,6 +345,81 @@ fn world(ndc:vec2f,d:f32)->vec3f {let p=u.inverse*vec4f(ndc,d,1.0);return p.xyz/
  }
  return vec4f(${encode ? 'toDisplay(rgb)' : 'rgb'},now.a);
 }`;
+
+/**
+ * The depression below the horizon, radians, of the inferior mirage's lower edge over a hot ground: rays from an eye at
+ * `eye` metres over the surface that leave it less steeply than this turn back up (Snell's invariant in the layer of
+ * {@link HeatGround}). For an eye far above the layer it is acos(n_hot / n_air), Hagen et al. 2026 equation 13: about
+ * 0.17 degree for 5 K and 0.4 degree for 28 K. `strength` scales the change of n as `HeatHaze` does. 0 for no excess.
+ * @throws RangeError for an excess outside 0 to 60 K or a non-positive eye height, depth, temperature or pressure.
+ */
+export function inferiorMirageAngle(
+  excess: number,
+  options: { ambient?: number; pressure?: number; eye?: number; depth?: number; strength?: number } = {},
+): number {
+  const { ambient = 293.15, pressure = PRESSURE, eye = Infinity, depth = 0.02, strength = 1 } = options;
+  if (!(excess >= 0 && excess <= 60) || !(eye > 0) || !(depth > 0) || !(strength >= 0))
+    throw new RangeError('inferiorMirageAngle needs an excess of 0 to 60 K and an eye height and depth above 0');
+  const b = groundBend(excess, ambient, pressure, strength);
+  return Math.atan(Math.sqrt(b * (1 - Math.exp(-eye / depth))));
+}
+/**
+ * The path of a ray over a hot ground as the shader walks it (the closed form of the stratified layer): from an eye
+ * `eye` metres over the surface leaving at depression slope `slope` (drop over run), whether it `lands`, the horizontal
+ * `range` metres to where it lands or turns, and the `low`est height it reaches. For tests and tools.
+ * @throws RangeError for a slope or eye height that is not above 0, or an invalid ground.
+ */
+export function mirageRay(
+  ground: HeatGround,
+  eye: number,
+  slope: number,
+  options: { ambient?: number; strength?: number } = {},
+): { lands: boolean; range: number; low: number } {
+  if (!(eye > 0) || !(slope > 0)) throw new RangeError('mirageRay needs an eye height and slope above 0');
+  const v = new Float32Array(8);
+  writeGround(ground, options.ambient ?? 293.15, options.strength ?? 1, 0, v, 0);
+  const H = ground.depth ?? 0.02,
+    b = groundBend(ground.excess, options.ambient ?? 293.15, ground.pressure ?? PRESSURE, options.strength ?? 1),
+    top = Math.min(eye, 16 * H),
+    A = slope * slope + b * Math.exp(-eye / H),
+    sA = Math.sqrt(A),
+    lands = A > b,
+    low = lands ? 0 : -H * Math.log(A / b),
+    tLow = Math.sqrt(Math.max(A - b, 0)),
+    tTop = Math.sqrt(Math.max(A - b * Math.exp(-top / H), 0));
+  return { lands, range: (eye - top) / slope + (top - low - 2 * H * Math.log((sA + tLow) / (sA + tTop))) / sA, low };
+}
+/** b = 2 (n_air - n_hot) / n_air, the square of the mirage's lower edge for an eye far above the layer. */
+function groundBend(excess: number, ambient: number, pressure: number, strength: number): number {
+  const air = airRefractivity(ambient, pressure),
+    hot = airRefractivity(ambient + excess, pressure);
+  return (2 * strength * (air - hot)) / (1 + air);
+}
+/** The ground's two shader vec4s: (height, depth, b, fluctuation) and (wind x, wind z, eddy size, clock); b 0 for none. */
+function writeGround(g: HeatGround | undefined, ambient: number, strength: number, clock: number, out: Float32Array, at: number): void {
+  out.fill(0, at, at + 8);
+  if (g === undefined) return;
+  if (!g || typeof g !== 'object') throw new TypeError('HeatHaze ground must be a HeatGround object or undefined');
+  const height = g.height ?? 0,
+    depth = g.depth ?? 0.02,
+    fluctuation = g.fluctuation ?? 0.2,
+    [wx, wz] = g.wind ?? [1.5, 0.4],
+    eddy = g.eddy ?? 0.6,
+    pressure = g.pressure ?? PRESSURE,
+    time = g.time ?? clock;
+  if (
+    !(g.excess >= 0 && g.excess <= 60) ||
+    !(depth >= 0.001 && depth <= 2) ||
+    !(fluctuation >= 0 && fluctuation <= 1) ||
+    !(eddy >= 0.05 && eddy <= 20) ||
+    !(pressure > 0 && Number.isFinite(pressure)) ||
+    ![height, wx, wz, time].every(Number.isFinite)
+  )
+    throw new RangeError(
+      'Invalid HeatHaze ground; excess 0 to 60 K, depth 0.001 to 2 m, fluctuation 0 to 1, eddy 0.05 to 20 m, finite height, wind and time',
+    );
+  out.set([height, depth, groundBend(g.excess, ambient, pressure, strength), fluctuation, wx, wz, eddy, time], at);
+}
 
 const plumeOf = (s: HeatSource): HeatPlume => ('plume' in s && s.plume ? s.plume : (s as HeatPlume));
 
@@ -296,6 +497,8 @@ export class HeatHaze implements EnginePlugin {
       (!o.temperatureVolume || typeof o.temperatureVolume !== 'object')
     )
       throw new TypeError('HeatHaze temperatureVolume must be a grid or a callback; pass a cell-centred grid');
+    if (o.ground !== undefined && typeof o.ground !== 'function')
+      writeGround(o.ground, o.ambient ?? 293.15, 1, 0, new Float32Array(8), 0);
     if (o.enabled !== undefined && typeof o.enabled !== 'boolean')
       throw new TypeError('HeatHaze enabled must be a boolean; pass true or false');
     if (!within(o.strength, 0, 100) || !within(o.turbulence, 0, 1) || !within(o.ambient, 200, 340))
@@ -406,12 +609,14 @@ export class HeatHaze implements EnginePlugin {
       throw new MargoError('state', 'Invalid HeatHaze camera; give the camera a finite, invertible projection');
     v.set([o.strength ?? 1, o.turbulence ?? 0.4, airRefractivity(ambient), ambient], 32);
     v.set([plumes.length, o.steps ?? 24, 0, 0], 36);
+    const ground = (o.enabled ?? true) ? (typeof o.ground === 'function' ? o.ground() : o.ground) : undefined;
+    writeGround(ground, ambient, o.strength ?? 1, this.clock, v, 40);
     plumes.forEach((p, i) => writePlume(p, ambient, this.clock, v, HEAD + i * PLUME_FLOATS));
     const copy = writeUniform(device, this.uniform!, v.subarray(0, HEAD + plumes.length * PLUME_FLOATS), view);
-    const key = `${output.format}:${output.multisample?.count ?? 1}:${+output.hdr}:${premultipliedCanvas(this.engine)}:${!!volume}`;
+    const key = `${output.format}:${output.multisample?.count ?? 1}:${+output.hdr}:${premultipliedCanvas(this.engine)}:${!!volume}:${!!ground}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      pipeline = render(device, displayFor(this.engine, shader(!output.hdr, !!volume)), output.format, {
+      pipeline = render(device, displayFor(this.engine, shader(!output.hdr, !!volume, !!ground)), output.format, {
         multisample: output.multisample,
       });
       this.pipelines.set(key, pipeline);

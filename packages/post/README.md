@@ -1107,6 +1107,42 @@ cost depends on the grid resolution and its projected area. The maximum dimensio
 This models the optics of an air temperature field at uniform pressure. The supplying solver sets the heat transport and
 air motion.
 
+### The road mirage: a hot ground
+
+Set `ground` to a sunlit surface (a road, sand, a runway) and the haze draws the inferior mirage: the far ground shows the
+sky and far objects mirrored, as if wet, and the edge flickers. The air's excess over the ambient falls as
+exp(-y / depth) over the surface (Hagen et al. 2026 fitted a 2 cm depth over pavement), so every ray keeps n cos(theta)
+through the layer and is traced in closed form: a ray that leaves the eye flatter than the mirage edge acos(n_hot / n_air)
+turns back up and climbs out on the mirror path, a steeper one lands a little farther than a straight one would. The curved
+path is walked against the scene depth, so a truck or a post it meets shows mirrored under itself. The edge is about 0.17
+degree for 5 K (Hagen et al. measured a hot road at 0.34 degree), so the band is a few pixels at a 60 degree field of view
+and tens of pixels on a long lens, which is how road mirages are photographed.
+
+Fields of `ground` (an object, or a callback read once per frame): `excess` (K over `ambient`, 0 to 60; sunlit asphalt runs 5
+to 30 K), `height` (the surface's world y, 0), `depth` (the e-folding height, 0.02 m, 0.001 to 2), `fluctuation` (the rms of
+the excess at a point, 0.2; the convective eddies of Wyngaard et al. 1971, carried by `wind` `[x, z]` m/s, default
+`[1.5, 0.4]`, of size `eddy` 0.6 m; a ray averages the eddies along its path), `pressure` (101325 Pa) and `time` (the
+effect's clock). `strength` scales the change of n as it does for plumes; 0 or an excess of 0 draws the frame unchanged.
+`inferiorMirageAngle(excess, {ambient, pressure, eye, depth})` gives the band's lower edge in radians and `mirageRay` one
+ray's path, both on the CPU.
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {HeatHaze} from 'margoengine/post/heat-haze';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu',
+  camera: {position: [0, 1.2, 0], target: [0, 1.2, -100], fov: 5, near: 0.1, far: 4000},
+});
+engine.scene.background = '#9fc4f0';
+engine.createMesh().setGeometry(box(40, 0.1, 3000)).setPosition([0, -0.05, -1500])
+  .setMaterial(new PbrMaterial({color: '#333333', roughness: 1}));
+const ground = {excess: 18, time: 0};
+HeatHaze.attach(engine, {ambient: 305, ground});
+```
+
+The ground is a horizontal plane, unbounded: a surface less than 5 cm plus 0.15 of the eye height above it counts as the
+ground itself (at grazing angles the depth buffer cannot tell them apart), and only what is on screen can be seen mirrored.
+
 ## Subsurface scattering: `SSS`
 
 `@margoengine/post/sss` (6,945 B min+gzip, its own entry; it carries the stack) softens skin, wax and marble: light that enters such a surface leaves it a little way off, so

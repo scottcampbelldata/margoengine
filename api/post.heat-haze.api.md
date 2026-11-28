@@ -12,6 +12,17 @@ export const HEAT_HAZE_MAX_PLUMES = 32;
 
 export const HEAT_HAZE_NOISE_RMS = 0.1402;
 
+export interface HeatGround {
+    readonly height?: number;
+    readonly excess: number;
+    readonly depth?: number;
+    readonly fluctuation?: number;
+    readonly wind?: readonly [number, number];
+    readonly eddy?: number;
+    readonly pressure?: number;
+    readonly time?: number;
+}
+
 export class HeatHaze implements EnginePlugin {
     readonly options: HeatHazeOptions;
     readonly name = "heat-haze";
@@ -30,6 +41,7 @@ export class HeatHaze implements EnginePlugin {
 export interface HeatHazeOptions {
     sources?: readonly HeatSource[] | (() => Iterable<HeatSource>);
     temperatureVolume?: HeatHazeVolume | (() => HeatHazeVolume | undefined);
+    ground?: HeatGround | (() => HeatGround | undefined);
     strength?: number;
     turbulence?: number;
     ambient?: number;
@@ -61,6 +73,23 @@ export type HeatSource = HeatPlume | {
 export function airRefractivity(kelvin: number, pressure?: number): number;
 
 export function heatHazeNoise(x: number, y: number, z: number): number;
+
+export function inferiorMirageAngle(excess: number, options?: {
+    ambient?: number;
+    pressure?: number;
+    eye?: number;
+    depth?: number;
+    strength?: number;
+}): number;
+
+export function mirageRay(ground: HeatGround, eye: number, slope: number, options?: {
+    ambient?: number;
+    strength?: number;
+}): {
+    lands: boolean;
+    range: number;
+    low: number;
+};
 
 export function plumeBend(plume: HeatPlume, origin: Vec3, dir: Vec3, options?: {
     ambient?: number;

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21727515,
+  "total": 21729517,
   "history": [
     {
       "date": "2026-10-24",
@@ -15462,6 +15462,12 @@
       "commit": "usdz-moved-uvs",
       "reason": "KB-USDZ-QLTRANSFORM1: where a material's maps differ in UV set or transform, the USDZ writers write moved coordinates as primvars, which AR Quick Look follows. With the clearcoat maps of 3e4788880e, @margoengine/exporters/usdz-anim measures 29914 B gzip (ceiling 29678 to 30812); /usdz 24352 B stays under its 24696. The bytes are in the material writer both exports share. Core and Stage gain zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "heat-haze-ground-1",
+      "reason": "post/heat-haze moves from 13265 to 14822 B gzip and its ceiling from 13265 to 15267 B: the hot ground layer (the road mirage), a closed-form ray through a stratified hot layer walked against the scene depth, with its CPU twins inferiorMirageAngle and mirageRay. A separate entry would duplicate the post-stack, depth and uniform handling of the same pass for about 1.5 kB.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16440,7 +16446,7 @@
     "@margoengine/post/glitch": 7455,
     "@margoengine/post/gtao": 15748,
     "@margoengine/post/halftone": 7290,
-    "@margoengine/post/heat-haze": 13265,
+    "@margoengine/post/heat-haze": 15267,
     "@margoengine/post/image": 14395,
     "@margoengine/post/kawase-blur": 8760,
     "@margoengine/post/lens": 8456,

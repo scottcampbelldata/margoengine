@@ -4,12 +4,13 @@ import { Sky } from '@margoengine/sky/base';
 import { preetham } from '@margoengine/sky/preetham';
 import { look } from '@margoengine/sky/look';
 import { buildRoad } from './road.js';
-import { airLayer, ambient } from './thermal.js';
 
 const sun=[.46,.68,.567];
+// Desert noon: 34 C air at 98.6 kPa over a sunlit road whose surface air runs the slider's kelvin hotter.
+const ambient=307.15;
 export async function openRoad(canvas,initial,signal,force,earlyCompatibility){
   let engine,haze,pending,closed=false;
-  const air=airLayer();
+  const layer={excess:0,height:.04,depth:.025,fluctuation:.25,wind:[.6,1.8],eddy:.5,pressure:98600,time:0};
   const close=()=>{
     if(closed)return;
     closed=true;
@@ -24,9 +25,9 @@ export async function openRoad(canvas,initial,signal,force,earlyCompatibility){
     const width=Math.max(4,Math.round(canvas.clientWidth*ratio)),height=Math.max(4,Math.round(canvas.clientHeight*ratio));
     if(canvas.width!==width)canvas.width=width;
     if(canvas.height!==height)canvas.height=height;
-    engine.camera.fov=Math.max(20,25.3/(width/height)**.48);
-    air.set(contrast,time);
-    haze.options.strength=contrast===0?0:1.65;
+    engine.camera.fov=Math.max(4.2,6.2/(width/height)**.48);
+    layer.excess=contrast;
+    layer.time=time;
     engine.render({delta:0});
   }
 
@@ -60,7 +61,7 @@ export async function openRoad(canvas,initial,signal,force,earlyCompatibility){
         ],glowWidth:7,glowColor:[1,.75,.44],glowStrength:.041,glowSunward:.36},
       },{preetham,look});
       buildRoad(engine);
-      haze=HeatHaze.attach(engine,{ambient,temperatureVolume:air.volume,steps:20,strength:1.65});
+      haze=HeatHaze.attach(engine,{ambient,ground:layer});
       performance.mark('margo-scene-built');
       draw(initial);
       performance.mark('margo-first-submit');
@@ -68,7 +69,7 @@ export async function openRoad(canvas,initial,signal,force,earlyCompatibility){
       if(pending)throw pending;
     },{
       backend:compat?'webgpu':undefined,loadCompat:async()=>({install}),signal,exactSize:true,antialias:false,
-      capacity:840,startupTimeout:12000,camera:{position:[.70,1.19,17],target:[.24,2.85,-136],near:.19,far:1520},
+      capacity:840,startupTimeout:12000,camera:{position:[.70,1.19,17],target:[6.4,1.0,-330],near:.19,far:1520},
     });
   }catch(error){close();throw error;}
   return {

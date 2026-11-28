@@ -10,8 +10,8 @@ import { HeatHaze } from '../dist/heat-haze.js';
 import { harness, written } from './support.js';
 
 const FPS = 60,
-  // The uniform HeatHaze writes for one plume: 40 head floats and 16 for the plume.
-  HEAD = 40,
+  // The uniform HeatHaze writes for one plume: 48 head floats (two for the hot ground) and 16 for the plume.
+  HEAD = 48,
   BYTES = (HEAD + 16) * 4;
 function world() {
   const h = harness(),

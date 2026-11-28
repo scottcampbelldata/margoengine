@@ -10,6 +10,8 @@ import {
   HeatHaze,
   airRefractivity,
   heatHazeNoise,
+  inferiorMirageAngle,
+  mirageRay,
   plumeBend,
   plumeExcess,
 } from '../dist/heat-haze.js';
@@ -219,4 +221,58 @@ test('temperature volume textures release on resize and are rebuilt after device
   } finally {
     haze.dispose();
   }
+});
+
+test('hot ground: the mirage edge is acos(n_hot / n_air) (Hagen et al. 2026: 0.17 degree for 5 K) and grows as the root of the excess', () => {
+  const deg = (r) => (r * 180) / Math.PI,
+    T0 = 303.15,
+    na = 1 + airRefractivity(T0),
+    nh = 1 + airRefractivity(T0 + 5);
+  near(inferiorMirageAngle(5, { ambient: T0 }), Math.acos(nh / na), 1e-4, 'far eye against Hagen equation 13');
+  near(deg(inferiorMirageAngle(5, { ambient: T0, eye: 0.1 })), 0.167, 0.01, 'Hagen et al. 10 cm lens, 5 K');
+  near(inferiorMirageAngle(20, { ambient: T0 }) / inferiorMirageAngle(5, { ambient: T0 }), 2, 0.03, 'four times the excess');
+  assert.equal(inferiorMirageAngle(0), 0);
+  near(inferiorMirageAngle(5, { strength: 2 }) / inferiorMirageAngle(5), Math.SQRT2, 1e-5, 'strength scales the change of n (under the arctangent)');
+  assert.throws(() => inferiorMirageAngle(61), RangeError);
+});
+
+test('hot ground: the closed-form ray lands or turns as an exact Snell integration of the layer does', () => {
+  const T0 = 303.15,
+    ground = { excess: 5, depth: 0.02 },
+    eye = 1.1,
+    na = 1 + airRefractivity(T0),
+    nh = 1 + airRefractivity(T0 + 5),
+    n = (y) => na - (na - nh) * Math.exp(-y / 0.02);
+  // The exact ray keeps n cos(theta); walk it down in 10 micrometre steps.
+  const exact = (slope) => {
+    const K = n(eye) * Math.cos(Math.atan(slope));
+    let y = eye,
+      x = 0;
+    while (y > 0) {
+      const c = K / n(y - 5e-6);
+      if (c >= 1) return { lands: false, range: x };
+      x += 1e-5 / (Math.sqrt(1 - c * c) / c);
+      y -= 1e-5;
+    }
+    return { lands: true, range: x };
+  };
+  const edge = inferiorMirageAngle(5, { ambient: T0, eye });
+  for (const f of [0.5, 0.9, 1.01, 1.1, 2, 5]) {
+    const slope = Math.tan(f * edge),
+      got = mirageRay(ground, eye, slope, { ambient: T0 }),
+      want = exact(slope);
+    assert.equal(got.lands, want.lands, `${f} x the edge lands as the exact ray does`);
+    near(got.range, want.range, 0.003, `range at ${f} x the edge`);
+  }
+  // No excess is the straight ray.
+  near(mirageRay({ excess: 0 }, 1.5, 0.01).range, 150, 1e-6, 'no excess, straight');
+  assert.throws(() => mirageRay({ excess: 5, depth: 0 }, 1, 0.01), RangeError);
+});
+
+test('hot ground options are checked when set and every frame', () => {
+  assert.throws(() => new HeatHaze({ ground: { excess: 70 } }), RangeError);
+  assert.throws(() => new HeatHaze({ ground: { excess: 5, depth: 3 } }), RangeError);
+  assert.throws(() => new HeatHaze({ ground: { excess: 5, wind: [Infinity, 0] } }), RangeError);
+  assert.doesNotThrow(() => new HeatHaze({ ground: { excess: 18, depth: 0.03, height: 0.03 } }));
+  assert.doesNotThrow(() => new HeatHaze({ ground: () => undefined }));
 });

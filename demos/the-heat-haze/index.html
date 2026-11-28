@@ -1,13 +1,13 @@
 <!doctype html>
 <html lang="en">
-<head><link rel="modulepreload" crossorigin href="./assets/scene-DKH3Mlg8.js"><script src="./assets/inline-88c54b06.js"></script>
+<head><link rel="modulepreload" crossorigin href="./assets/scene-nBDsm5Zm.js"><script src="./assets/webgl2-preload-cdf413db.js"></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#d9cebb">
-  <meta name="description" content="See live heat shimmer above an original stretch of desert highway.">
+  <meta name="description" content="Watch a road mirage form over sunlit desert asphalt, traced through the hot air above it.">
   <link rel="icon" href="data:,">
   <title>The Heat Haze · Margo Engine</title>
-  <script type="module" crossorigin src="./assets/index-fwR9odcu.js"></script>
+  <script type="module" crossorigin src="./assets/index-5YrL72pK.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/index-DcmoR9TC.css">
 </head>
 <body>
@@ -15,16 +15,16 @@
     <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>Atmospheric optics</span></nav>
     <header>
       <h1>The Heat Haze</h1>
-      <p>Warm air bends the view just above the asphalt.</p>
+      <p>Hot air on the asphalt turns grazing rays back up, so the far road shows the sky.</p>
     </header>
     <figure id="haze">
       <div class="stage">
-        <canvas id="view" role="img" aria-label="A low-angle view along a desert road, where distant posts and markings shimmer above the asphalt"></canvas>
+        <canvas id="view" role="img" aria-label="A long-lens view down a desert road, where the far asphalt mirrors the sky and the roadside posts"></canvas>
         <p id="status" role="status">Opening the road…</p>
       </div>
       <figcaption class="controls">
         <div class="heat">
-          <div class="reading"><label for="contrast">Near-road air difference</label><output id="amount" for="contrast">+18 °C</output></div>
+          <div class="reading"><label for="contrast">Air at the asphalt, over the air</label><output id="amount" for="contrast">+18 °C</output></div>
           <input id="contrast" type="range" min="0" max="28" step="1" value="18" disabled>
           <div class="ends" aria-hidden="true"><span>Even air</span><span>Hotter by 28 °C</span></div>
         </div>
@@ -32,10 +32,10 @@
       </figcaption>
     </figure>
     <section class="notes">
-      <p>Watch the distant lane markings and roadside posts. The heat layer bends rays from objects behind it.</p>
+      <p>Watch the far road. As the asphalt air warms, a pool of mirrored sky and posts opens where the road meets the hills, and it grows with the heat. This is a long-lens view, the way road mirages are photographed.</p>
       <details>
         <summary>About the effect</summary>
-        <p>A changing temperature field stands in for warm air above the road. Margo bends light through that field. The air temperature difference is an illustrative input to the rendering.</p>
+        <p>The heat sits in a layer a few centimetres deep on the asphalt, as Hagen and colleagues measured in 2026. Margo traces every ray through it. A ray that leaves the eye flatter than the mirage edge (0.37° at +28 °C, 0.19° at +7 °C) turns back up and shows the sky. Convection eddies drifting in the wind make the edge flicker.</p>
       </details>
     </section>
   </main>
