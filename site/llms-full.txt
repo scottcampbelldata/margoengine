@@ -14393,7 +14393,12 @@ for a 1,024×1,024 map. The heightmap is borrowed. One 48-byte uniform buffer is
 bake finishes. Each bake takes up to 32 sky azimuths plus the directional sun and 256 samples per ray, bounded
 by the configured radius and the heightmap edge. The lit draw adds one bilinear lookup. The bake captures a
 single sun direction and a static heightmap. Changing either needs `rebake()`. A heightfield cannot represent
-overhangs, and distant features between samples may be missed.
+overhangs, and distant features between samples may be missed. No light is bounced from one slope to another (the
+terrain-reflected term of Dozier and Frew 1990, "Rapid calculation of terrain parameters for radiation modeling from
+digital elevation data", IEEE TGRS 28(5), https://doi.org/10.1109/36.58986), so a gully loses sky light and gains
+nothing from the walls around it. `BiomeView`'s `relief` shades the world's terrain, not its horizon ring
+(KB-BIOMES-HORIZONRELIEF1).
+
 ## Open-ocean horizon depth (2026-11-23)
 
 Water with `horizon: true` keeps the scene far plane for its displaced grid. Its flat extension reaches 10,000 km
@@ -16944,12 +16949,29 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** `PlacedSpecies.color`, and `BiomeObjects` passes the jitter to the species' leaf and stone scatters (a hue
   past half a turn is half a turn). Test: `packages/biomes/tests/contact.test.js`.
 
-### Fixed 2026-11-28: the alpine rock look check read cast shadows as grain (KB-BIOMES-ROCKSHADOW1, biomes test)
+### Open 2026-11-28: the horizon ring takes no relief shading (KB-BIOMES-HORIZONRELIEF1, biomes)
 
-- **Repro:** `node packages/biomes/tests/browser-check.mjs` from fefe0bad71: rock light and dark 0.108 over its 0.104.
-- **Cause:** the check divides the light out against a flat-colour frame, which holds for one light colour. With
-  BiomeView's relief lighting on by default, shadowed rock keeps only the sky's blue light and luma over red rises.
-- **Fix:** the check's material shots set `relief: false` (0.086, limits unchanged); relief has its own GPU checks.
+- **Repro:** the alpine shot of `packages/biomes/tests/browser-check.html` with `relief` on and off: the horizon
+  ring's rock pixels read the same both ways (mean and spread of luma over the flat mask's red 0.357 and 0.067), while
+  the world's rock changes (0.345 to 0.283).
+- **Cause:** `BiomeView.attach` gives `TerrainReliefLighting` the world's terrain only; the horizon ring is a second
+  terrain made once the ground weights are in.
+
+### Fixed 2026-11-28: the alpine rock look check went over its grain ceiling with relief lighting on (KB-BIOMES-ROCKSHADOW1, biomes)
+
+- **Repro:** `node packages/biomes/tests/browser-check.mjs` on the parent of db1a71d802: rock light and dark 0.108
+  over its 0.104 (0.086 with `relief: false`).
+- **Cause:** the check pools the world's rock and the horizon ring's. The ring's cone peaks in the valley's materials
+  (KB-BIOMES-HORIZONCONE1, KB-BIOMES-HORIZONALTITUDE1) raised the pooled spread, and relief lighting's share on the
+  world's rock (0.073 to 0.091) carried it past the ceiling. That share is the sky-view factor: it dims only the sky's
+  blue term, so the look's luma over the flat mask's red moves with the mix of sun and sky. Relief changes no albedo
+  and no normal, and this shot holds no cast shadow (the sun is overhead).
+- **Correction:** an earlier version of this entry blamed cast shadows and set `relief: false` in the check. Both were
+  wrong, and the check draws relief again.
+- **Fix:** db1a71d802 (the horizon ring's mountains and materials). With relief on the check measures 0.097, ceiling
+  unchanged.
+- **Regression:** `packages/biomes/tests/browser-check.mjs` (relief on: 0.108 on the parent, 0.095 at db1a71d802).
+
 ### Fixed 2026-11-28: a snapshot taken before a step that grew the rigid world would not restore, or replayed to another hash (KB-PHYS-LAYOUTHASH1, physics)
 
 - **Repro:** `node --test --test-name-pattern="first step restores" packages/physics/tests/world-rigid-solver.test.js`: a chain of
@@ -16967,7 +16989,6 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `World::hash` nor a snapshot carries it. Every world's hash changes once with this (the replay goldens are rebuilt).
 - **Regression:** the test above, `modal-sound.test.js`, and `a_world_grown_before_its_first_step_hashes_and_steps_as_one_its_step_grew`
   in `packages/physics/kernel/tests/canonical.rs` (growing a world changed its hash before the fix).
-
 
 ### Fixed 2026-11-28: a subtree reference could not be a child of selector, sequence or any builder (KB-BEHAVIOR-SUBTREEBUILD1, behavior)
 
@@ -17106,13 +17127,13 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   blotches are the scan's own half-desaturated moss over a strong normal map on meshes cut to 3,000 triangles. The fix
   belongs to the film's asset owner: average covered texels only and soften the albedo toward its local mean.
 
-### Open 2026-11-28: a biome species' `lod` and `color.hue`/`color.value` change nothing (KB-BIOMES-DEADFIELDS1, biomes)
+### Open 2026-11-28: a biome species' `lod` changes nothing (KB-BIOMES-DEADFIELDS1, biomes)
 
-- **Repro:** give a `SpeciesRule` `lod: [10, 20, 30]` or `color: { value: 1 }` and draw it with `BiomeView`: the
-  objects change level and tint exactly as without them.
-- **Cause:** `BiomeObjects` takes its rings from `radius` (`[r * 0.15, r * 0.4, r]`) and its tint from the mesh part's
-  kind; nothing reads `rule.lod`, and `rule.color` is read for `seasonal` only. (`sink` and `alignToGround` were the
-  same until KB-BIOMES-SINK1.)
+- **Repro:** give a `SpeciesRule` `lod: [10, 20, 30]` and draw it with `BiomeView`: the objects change level exactly as
+  without it.
+- **Cause:** `BiomeObjects` takes its rings from `radius` (`[r * 0.15, r * 0.4, r]`); nothing reads `rule.lod`.
+  (`sink` and `alignToGround` were the same until KB-BIOMES-SINK1, `color.hue` and `color.value` until
+  KB-BIOMES-SPECIESCOLOR1.)
 
 ### Fixed 2026-11-28: a biome species' `sink` and `alignToGround` did nothing, so stones stood on the surface (KB-BIOMES-SINK1, biomes)
 
@@ -17180,6 +17201,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   48.4. The speckles are the distant canopy's gaps against the fire glow, seen behind and between near leaves
   (blowup early, x 1600 to 1760, y 1040 to 1077). Next: the far canopy's coverage against a bright background (the
   imposter's cut-out at distance, and the middle mesh's gaps), not its ring.
+- **Rail-line, traced (2026-11-28, open):** the rail-line early probe's 167 speckles (150 bright) are nearly all single
+  pixels of the smoke sky inside dark crowns 25 to 275 m off, on the full-detail mesh (the film's tree rings are 300,
+  800 and 2,000 m): per pixel of the depth AOV, 4 ppm under 25 m, 150 ppm at 25 to 50 m, 311 at 50 to 90, 949 at 90 to
+  120, 2,148 at 180 to 240. Each pixel is about 32 samples (2 x 2 supersample, 8 jittered sub-frames), so the values
+  are the box-filtered coverage, not sampling noise. A reconstruction filter does not remove them: a Gaussian of
+  sigma 0.5 output pixel on the probe takes early 81 to 11 ppm and mid 38 to 4.8, so the shot tool's area filter
+  (`tools/shot/pixels.js`) is not the cause. Marked on the frame they sit on the trunk lines, and an orthographic
+  side view of each species' detail-2 mesh (`generateConiferMesh`, 9 yaws, pixels of 6, 12 and 20 cm) puts every
+  crown speckle in the inner tenth of the crown's width: grand fir 5,652 ppm of crown at 12 cm, Douglas-fir 2,824 at
+  20 cm, red cedar 4,905 at 12 cm, all at the stem. Cause 1's fix closed the whorl round the stem seen from above;
+  seen from the side the stem column between whorls holds only the spray bases and the stem, since sprays are flat
+  bands at the whorl's height and only sprays pointing at the camera project onto the stem. Fix to decide: Douglas-fir
+  bears internodal branches between whorls (D. A. Maguire, M. Moeur and W. S. Bennett, "Models for describing basal
+  diameter and vertical distribution of primary branches in young Douglas-fir", Forest Ecology and Management 63(1),
+  23-55, 1994), which the generator does not build; grand fir has few internodal shoots and flat, layered branches
+  (H. Ishii, E. D. Ford and D. G. Sprugel, comparative crown study of P. menziesii, A. amabilis and A. grandis,
+  Eurasian Journal of Forest Research, 2003), so some light between its tiers is real. Counts per growth unit are
+  still needed from the full texts before the generator gains internodal branches.
 
 ### Open 2026-11-28: shimmerMoving reads a defocused swaying leaf's soft edge as shimmer (KB-LOOK-TV-SHIMMER2, rest, headless look, scatter)
 
@@ -17578,6 +17617,14 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   coverage 6.24 against 3.87 and luminance 5.65 against 5.05, seed 3 luminance 6.57 against 5.16 (its middle wood
   takes up to 2,900 of the 4,000 triangles, leaving it 255 to 360 cards). `test/broadleaf-lod.test.js` holds oak
   seeds 1 to 3. The imposter part stays open.
+- **Progress (black alder middle ring, fixed 2026-11-28):** two limits, not the method. The middle ring kept at most a
+  quarter of the near cards, and the alder has only about 1,540 (the oak 3,624, where 800 binds), so 363 to 385 cards;
+  seed 2's first-order wood took 2,918 triangles, leaving 266. Now the middle ring keeps at most half the near cards and
+  its wood at most 1,500 triangles (`MIDDLE_WOOD`; the thinnest first-order limb ends go first, found by bisection on
+  their radii, a parent kept before its child). Worst of 24 views against the tree's own change: alder seeds 1 to 5
+  coverage 2.4 to 2.9 percent (own 3.3 to 7.3), luminance 1.5 to 4.0 (own 3.4 to 6.1); old and sapling alder, beech
+  seeds 1 to 3, old and sapling beech, oak seeds 1 to 5, old and sapling oak all pass. The mature oak's middle ring is
+  unchanged. `test/broadleaf-lod.test.js` now holds alder seeds 1 to 3 and the wood budget.
 
 ### Open 2026-11-28: a broadleaf tree (oak, beech, alder) reads as a few smooth lime blobs (KB-PROCEDURAL-OAKBLOB1, procedural, biomes)
 
