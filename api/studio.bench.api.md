@@ -10,7 +10,6 @@ import { EnvironmentLighting } from "@margoengine/environment";
 import { GTAO, GTAOOptions } from "@margoengine/post";
 import { ShadowOptions, Shadows } from "@margoengine/shadows";
 import { Tonemap, TonemapOptions } from "@margoengine/tonemap";
-import { StartEngineOptions } from "@margoengine/webgl2-compat/auto";
 
 export interface Bench {
     readonly engine: EngineKernel;
@@ -74,8 +73,9 @@ export interface BenchOptions {
     maxWidth?: number;
     antialias?: boolean;
     startupTimeout?: number;
-    engine?: Omit<StartEngineOptions, 'loadCompat' | 'forceCompat' | 'signal' | 'camera' | 'capacity' | 'exactSize' | 'antialias' | 'startupTimeout'>;
-    loadCompat?: StartEngineOptions['loadCompat'];
+    engine?: Omit<EngineOptions, 'backend' | 'fallback' | 'signal' | 'camera' | 'capacity' | 'exactSize' | 'antialias' | 'startupTimeout'>;
+    start?: BenchStart;
+    loadCompat?: BenchStartOptions['loadCompat'];
     compat?: Record<string, unknown>;
     backend?: 'auto' | 'webgl2';
     signal?: AbortSignal;
@@ -96,6 +96,18 @@ export interface BenchOptions {
     } | boolean;
     onResize?: (bench: Bench) => void;
     onError?: (reason: unknown) => void;
+}
+
+export type BenchStart = (canvas: HTMLCanvasElement, options: BenchStartOptions) => Promise<{
+    engine: EngineKernel;
+    renderer: 'webgpu' | 'compatibility';
+}>;
+
+export interface BenchStartOptions extends Omit<EngineOptions, 'backend' | 'fallback'> {
+    loadCompat: () => Promise<{
+        install(options?: object): Promise<unknown>;
+    }>;
+    forceCompat: boolean;
 }
 
 export interface FrameViewCamera {

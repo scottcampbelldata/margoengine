@@ -3,12 +3,14 @@
 <canvas id="view"></canvas><canvas id="fit"></canvas><script type="module">
 import {box,PbrMaterial} from '@margoengine/core';
 import {openBench} from '/packages/studio/dist/bench.js';
+import {startEngine} from '/packages/webgl2-compat/dist/auto.js';
+const start=startEngine,loadCompat=()=>import('/packages/webgl2-compat/dist/index.js');
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 const canvas=document.querySelector('#view'),errors=[];
 let bench,mesh,pole,remove,removePole;
 window.check={
  async open(compat){
-  bench=await openBench(canvas,{backend:compat?'webgl2':'auto',pixelRatio:1,onError:e=>errors.push(String(e?.message??e)),
+  bench=await openBench(canvas,{start,loadCompat,backend:compat?'webgl2':'auto',pixelRatio:1,onError:e=>errors.push(String(e?.message??e)),
     camera:{position:[2.6,1.8,3.4],target:[0,.45,0],fov:35,near:.05,far:60}});
   bench.engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
   mesh=bench.engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color:'#c84f2c',roughness:.45})).setPosition([0,.5,0]);
@@ -35,7 +37,7 @@ window.check={
  },
  async fit(compat){
   const target=document.querySelector('#fit');
-  const framed=await openBench(target,{backend:compat?'webgl2':'auto',pixelRatio:1,onError:e=>errors.push(String(e?.message??e))});
+  const framed=await openBench(target,{start,loadCompat,backend:compat?'webgl2':'auto',pixelRatio:1,onError:e=>errors.push(String(e?.message??e))});
   framed.add(framed.engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color:'#c84f2c',roughness:.45})).setPosition([0,.5,0]));
   // A 140 m floor that stays out of the fit: the 1 m box must still be framed, not the floor.
   framed.add(framed.engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color:'#808080',roughness:.8})).setPosition([0,-.06,0]).setScale([140,.12,140]),{fit:false});

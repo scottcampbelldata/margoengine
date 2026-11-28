@@ -32,8 +32,37 @@ test('an aborted signal marks data-error and opens no engine', async () => {
 
 test('the bench loads every optional package lazily, so a page pays only for what it turns on', async () => {
   const source = await readFile(new URL('../dist/bench.js', import.meta.url), 'utf8');
-  for (const name of ['webgl2-compat', 'shadows', 'tonemap', 'post', 'controls', 'scene'])
+  for (const name of ['shadows', 'tonemap', 'post', 'controls', 'scene'])
     assert.doesNotMatch(source, new RegExp(`^import[^;]*@margoengine/${name}`, 'm'), name);
+});
+
+// The bench once imported the WebGL2 layer itself (a lazy import(), still an edge the layer's isolation test refuses:
+// the layer costs a WebGPU page nothing). The page hands it in: start (startEngine) and loadCompat.
+test('the bench never reaches the WebGL2 layer: the page hands in start and loadCompat', async () => {
+  const source = await readFile(new URL('../dist/bench.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /(?:import|from)\s*\(?\s*['"][^'"]*webgl2-compat/);
+  await assert.rejects(openBench(canvas(), { backend: 'webgl2' }), /needs start for the WebGL2 layer/);
+  const seen = [],
+    reason = new Error('stop after start');
+  await assert.rejects(
+    openBench(canvas(), {
+      backend: 'webgl2',
+      compat: { minimumTier: 'half-float' },
+      loadCompat: async () => ({ install: async (o) => seen.push(o) }),
+      start: async (_, options) => {
+        assert.equal(options.forceCompat, true);
+        assert.equal(options.exactSize, true);
+        await (await options.loadCompat()).install({ force: true });
+        throw reason;
+      },
+    }),
+    (e) => e === reason,
+  );
+  assert.deepEqual(seen, [{ force: true, minimumTier: 'half-float' }]);
+  await assert.rejects(
+    openBench(canvas(), { start: async (_, o) => o.loadCompat() }),
+    /needs loadCompat for the WebGL2 layer/,
+  );
 });
 
 // Projects a world point through the framed view: [x, y] in -1..1 of each half of the view.
@@ -46,7 +75,10 @@ const project = (view, fov, aspect, p) => {
     q = p.map((v, a) => v - view.position[a]),
     depth = -(q[0] * f[0] + q[1] * f[1] + q[2] * f[2]),
     t = Math.tan((fov * Math.PI) / 360);
-  return [(q[0] * r[0] + q[1] * r[1] + q[2] * r[2]) / (depth * t * aspect), (q[0] * u[0] + q[1] * u[1] + q[2] * u[2]) / (depth * t)];
+  return [
+    (q[0] * r[0] + q[1] * r[1] + q[2] * r[2]) / (depth * t * aspect),
+    (q[0] * u[0] + q[1] * u[1] + q[2] * u[2]) / (depth * t),
+  ];
 };
 
 test('frameView fills the view with a small subject, keeping the view direction (empty canvas regression)', () => {
@@ -78,8 +110,14 @@ test('frameView frames a wide flat subject by its width on a tall view and rejec
   const [x] = project(view, 40, 0.6, [50, 0, 50]);
   assert.ok(Math.abs(x) <= 0.9 + 1e-9);
   assert.throws(() => frameView(camera, { min: [0, 0, 0], max: [1, 1, 1] }, 0.05), RangeError);
-  assert.throws(() => frameView({ fov: 40, position: [0, 0, 0], target: [0, 0, 0] }, { min: [0, 0, 0], max: [1, 1, 1] }), RangeError);
-  assert.throws(() => frameView({ fov: 40, position: [0, 5, 0], target: [0, 0, 0] }, { min: [0, 0, 0], max: [1, 1, 1] }), RangeError);
+  assert.throws(
+    () => frameView({ fov: 40, position: [0, 0, 0], target: [0, 0, 0] }, { min: [0, 0, 0], max: [1, 1, 1] }),
+    RangeError,
+  );
+  assert.throws(
+    () => frameView({ fov: 40, position: [0, 5, 0], target: [0, 0, 0] }, { min: [0, 0, 0], max: [1, 1, 1] }),
+    RangeError,
+  );
   assert.throws(() => frameView(camera, { min: [0, 0, 0], max: [Infinity, 1, 1] }), RangeError);
 });
 

@@ -132,7 +132,7 @@ export async function openCity(canvas, first, signal) {
   }
 
   try {
-    bench = await openBench(canvas, {
+    bench = await openBench(canvas, { start: (on, o) => import('@margoengine/webgl2-compat/auto').then((m) => m.startEngine(on, o)), loadCompat: () => import('@margoengine/webgl2-compat'),
       signal, pixelRatio: 2, maxWidth: 1450, startupTimeout: 11000, capacity: 512,
       camera: {near: 2, far: 740}, background: '#bfb19a',
       // The kit's softbox fill (default strength) under a lower afternoon sun, so roof pitches facing away fall

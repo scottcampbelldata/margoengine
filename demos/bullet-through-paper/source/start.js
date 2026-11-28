@@ -21,7 +21,7 @@ prepared.then(model=>model.ready).catch(fail);
 const stage=import('./scene.js');
 // The bench opens WebGPU, or the WebGL2 layer when WebGPU is missing, slow or ?backend=webgl2 asks for it, sizes the
 // backbuffer and casts the sun's shadows; the station brings its own floor, so the cyclorama and fills stay off.
-const bench=openBench(canvas,{
+const bench=openBench(canvas,{start:(on,o)=>import('@margoengine/webgl2-compat/auto').then(m=>m.startEngine(on,o)),loadCompat:()=>import('@margoengine/webgl2-compat'),
   signal,onError:fail,capacity:170,pixelRatio:1.75,startupTimeout:2500,background:'#25333b',
   camera:{position:[-1.87,6.02,7.72],target:[0,.16,0],near:.22,far:50,fov:35},
   light:{direction:[-2.6,7.6,4.1],color:[1,.93,.81],intensity:3.2,ambient:.46,ambientColor:[.78,.91,1]},

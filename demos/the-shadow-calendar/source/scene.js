@@ -135,7 +135,7 @@ function fail(error) {
 }
 
 async function open() {
-  const opening=openBench(canvas,{
+  const opening=openBench(canvas,{ start: (on, o) => import('@margoengine/webgl2-compat/auto').then((m) => m.startEngine(on, o)), loadCompat: () => import('@margoengine/webgl2-compat'),
     exhibit:document.body,signal:stop.signal,pixelRatio:1.5,startupTimeout:5000,camera:{fov,near:.5,far:95},
     background:'#37362e',light:false,environment:false,backdrop:false,contact:false,onError:fail,
     onResize:()=>{ layoutDirty=true; refresh(); },

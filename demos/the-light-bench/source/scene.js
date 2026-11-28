@@ -85,7 +85,7 @@ function fail(error) {
 }
 
 async function start() {
-  bench = await openBench(canvas, {
+  bench = await openBench(canvas, { start: (on, o) => import('@margoengine/webgl2-compat/auto').then((m) => m.startEngine(on, o)), loadCompat: () => import('@margoengine/webgl2-compat'),
     exhibit: document.body, signal: lifetime.signal, pixelRatio: 1.5, capacity: 160, startupTimeout: 10000,
     camera: { fov: 33, near: .2, far: 18 }, background: '#1b2528', backdrop: false, contact: false, shadows: false,
     environment: { intensity: .3 }, light: { direction: [.23, .79, .55], intensity: 1.18, color: [.78, .88, 1], ambient: .19, ambientColor: [.75, .87, 1] },

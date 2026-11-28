@@ -360,8 +360,10 @@ caster removal and disposal. Native WebGL2 remains unsupported. Geometry is a ge
 ## A whole bench in one call
 
 `openBench` from `@margoengine/studio/bench` opens the stage a demo or product page needs, from the packages
-that already do each part: the engine through webgl2-compat/auto `startEngine` (WebGPU, or the WebGL2 layer when
-WebGPU is missing, slow to answer, or the page URL has `?backend=webgl2`), a cyclorama (`Backdrop`), a warm sun key
+that already do each part: the engine through the `start` the page hands in (webgl2-compat/auto `startEngine` with
+`loadCompat` gives WebGPU, or the WebGL2 layer when WebGPU is missing, slow to answer, or the page URL has
+`?backend=webgl2`; the bench never imports the layer itself, so a WebGPU-only page pays nothing for it; without `start`
+it opens core's WebGPU engine), a cyclorama (`Backdrop`), a warm sun key
 with cascaded PCSS shadows (`@margoengine/shadows`), a softbox fill and rim from `environment/studio`
 (`stagingLighting`), ground contact shadows (`ContactShadows`), an optional display transform
 (`@margoengine/tonemap`), optional GTAO (`@margoengine/post/gtao`) and optional pointer orbit
@@ -374,7 +376,12 @@ canvas) with `data-renderer`, `data-ready` once the first frame is on screen, `d
 ```ts
 import {PbrMaterial, box} from 'margoengine/core';
 import {openBench} from 'margoengine/studio/bench';
-const bench = await openBench(document.querySelector('canvas')!, {orbit: true}); // no camera: ready() frames the subject
+import {startEngine} from 'margoengine/webgl2-compat/auto';
+const bench = await openBench(document.querySelector('canvas')!, {
+  orbit: true, // no camera: ready() frames the subject
+  start: startEngine, // WebGPU, or the WebGL2 layer below where WebGPU is missing
+  loadCompat: () => import('margoengine/webgl2-compat'),
+});
 const product = bench.engine.createMesh().setGeometry(box())
   .setMaterial(new PbrMaterial({color: '#c84f2c', roughness: 0.45})).setPosition([0, 0.5, 0]);
 bench.add(product); // casts into the shadow map and the contact shadow
@@ -392,7 +399,8 @@ const spin = bench.frame((delta) => product.setRotation([0, (turn += delta * 0.5
 | `background` | `'#77736d'` | clear colour, the cyclorama's lit tone |
 | `pixelRatio`, `maxWidth` | 2, 2560 | backbuffer cap |
 | `backend` | `'webgl2'` with `?backend=webgl2`, else `'auto'` | `'webgl2'` forces the compatibility layer |
-| `loadCompat`, `compat` | `import('@margoengine/webgl2-compat')`, none | the layer and its `install` options (`{minimumTier: 'half-float'}`) |
+| `start` | core's `Engine.create` on WebGPU | opens the engine; `startEngine` from `@margoengine/webgl2-compat/auto` adds the WebGL2 fallback |
+| `loadCompat`, `compat` | none, none | the layer for `start` (`() => import('@margoengine/webgl2-compat')`) and its `install` options (`{minimumTier: 'half-float'}`) |
 | `light` | direction [-0.55, 1, 0.7], colour [1, 0.95, 0.88], intensity 3, ambient 0.25 | core's sun; `false` leaves core's lighting as it is |
 | `environment` | `'soft'` at intensity 0.25, width 256 | softbox fill and rim (replaces core's flat ambient); a preset name, options or `false` |
 | `shadows` | `{lightSize: 0.0047}`, the sun's angular radius | `ShadowOptions`, or `false` |

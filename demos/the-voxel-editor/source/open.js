@@ -26,7 +26,7 @@ function fail(error){
 async function start(){
   // The bench opens WebGPU or the WebGL2 layer (?backend=webgl2 forces it), sizes the backbuffer, carries the harbor's
   // light and its single PCF cascade, and disposes on pagehide.
-  const bench=await openBench(requested,{
+  const bench=await openBench(requested,{start:(on,o)=>import('@margoengine/webgl2-compat/auto').then(m=>m.startEngine(on,o)),loadCompat:()=>import('@margoengine/webgl2-compat'),
     signal,pixelRatio:2,capacity:32,antialias:false,
     camera:{fov:41,near:.8,far:197,position:[55,40.6,59.1],target:[15.6,9.8,15.6]},
     background:'#516c70',backdrop:false,contact:false,environment:false,

@@ -17,7 +17,7 @@ function fail(reason){
 }
 // The bench sizes the backbuffer the same way (device pixels up to 1.8, at most 1330 wide), so the first camera fits it.
 const {width,height}=canvas.getBoundingClientRect(),ratio=Math.min(devicePixelRatio||1,1.8,1330/Math.max(1,width));
-const opening=openBench(canvas,{
+const opening=openBench(canvas,{start:(on,o)=>import('@margoengine/webgl2-compat/auto').then(m=>m.startEngine(on,o)),loadCompat:()=>import('@margoengine/webgl2-compat'),
   exhibit:viewport,signal,pixelRatio:1.8,maxWidth:1330,startupTimeout:8500,compat:{minimumTier:'half-float'},
   camera:cameraFor(Math.round(width*ratio)||1,Math.round(height*ratio)||1),
   // The sun's shadow covers the plinth and the tallest plant it can grow.

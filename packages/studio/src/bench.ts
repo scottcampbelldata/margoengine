@@ -1,6 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type { EngineKernel, EngineOptions, Mesh as MeshHandle } from '@margoengine/core';
-import type { StartEngineOptions } from '@margoengine/webgl2-compat/auto';
+import { Engine, type EngineKernel, type EngineOptions, type Mesh as MeshHandle } from '@margoengine/core';
 import type { Shadows, ShadowOptions } from '@margoengine/shadows';
 import type { EnvironmentLighting } from '@margoengine/environment';
 import type { OrbitControls } from '@margoengine/controls/orbit';
@@ -36,6 +35,18 @@ export interface BenchEnvironment {
   width?: number;
 }
 
+/** What {@link BenchOptions.start} is handed: `Engine.create` options, the layer's loader and whether to force it. */
+export interface BenchStartOptions extends Omit<EngineOptions, 'backend' | 'fallback'> {
+  /** Loads the WebGL2 compatibility layer, from {@link BenchOptions.loadCompat}; rejects when none was given. */
+  loadCompat: () => Promise<{ install(options?: object): Promise<unknown> }>;
+  /** True when the page asks for the compatibility layer (`backend: 'webgl2'` or `?backend=webgl2`). */
+  forceCompat: boolean;
+}
+/** Opens the bench's engine: `startEngine` from `@margoengine/webgl2-compat/auto` has this shape. */
+export type BenchStart = (
+  canvas: HTMLCanvasElement,
+  options: BenchStartOptions,
+) => Promise<{ engine: EngineKernel; renderer: 'webgpu' | 'compatibility' }>;
 /** Options of {@link openBench}. Every option has a default; `openBench(canvas)` gives a lit, shadowed studio. */
 export interface BenchOptions {
   /** Engine camera. Default a 35 degree view from [3.2, 2.1, 4.4] at [0, 0.6, 0]. */
@@ -54,11 +65,17 @@ export interface BenchOptions {
   startupTimeout?: number;
   /** Other `Engine.create` options, passed through. */
   engine?: Omit<
-    StartEngineOptions,
-    'loadCompat' | 'forceCompat' | 'signal' | 'camera' | 'capacity' | 'exactSize' | 'antialias' | 'startupTimeout'
+    EngineOptions,
+    'backend' | 'fallback' | 'signal' | 'camera' | 'capacity' | 'exactSize' | 'antialias' | 'startupTimeout'
   >;
-  /** Loads the WebGL2 compatibility layer. Default `() => import('@margoengine/webgl2-compat')`. */
-  loadCompat?: StartEngineOptions['loadCompat'];
+  /**
+   * Opens the engine. Pass `startEngine` from `@margoengine/webgl2-compat/auto` with `loadCompat` for the WebGL2
+   * fallback: the bench never imports the layer itself, so a WebGPU page pays nothing for it. Default core's
+   * `Engine.create` on WebGPU, which rejects without WebGPU.
+   */
+  start?: BenchStart;
+  /** Loads the WebGL2 compatibility layer for `start`, such as `() => import('@margoengine/webgl2-compat')`. Default none. */
+  loadCompat?: BenchStartOptions['loadCompat'];
   /** Options for the layer's `install`, such as `{ minimumTier: 'half-float' }`. Default none. */
   compat?: Record<string, unknown>;
   /** `'webgl2'` forces the compatibility layer. Default: `'webgl2'` when the page URL has `?backend=webgl2`, else 'auto'. */
@@ -195,7 +212,10 @@ export function frameView(
     tanV = Math.tan((camera.fov * Math.PI) / 360) * fill,
     tanH = tanV * aspect;
   if (!(length > 0) || !(tanV > 0) || !Number.isFinite(tanH) || !(aspect > 0) || !(fill >= 0.1 && fill <= 1))
-    throw rangeError('Invalid framing; pass a camera with a view direction, fov 0..180, aspect > 0, fill 0.1..1', 'arguments');
+    throw rangeError(
+      'Invalid framing; pass a camera with a view direction, fov 0..180, aspect > 0, fill 0.1..1',
+      'arguments',
+    );
   const w = back.map((v) => v / length),
     cross = (a: readonly number[], b: readonly number[]) => [
       a[1] * b[2] - a[2] * b[1],
@@ -321,14 +341,21 @@ export async function openBench(canvas: HTMLCanvasElement, options: BenchOptions
   };
   size();
   const outer = options.signal;
-  const loadCompat =
-    options.loadCompat ??
-    (() => import('@margoengine/webgl2-compat') as unknown as Promise<{ install(o?: object): Promise<unknown> }>);
-  const compat = options.compat;
+  const loadCompat = options.loadCompat,
+    compat = options.compat,
+    start: BenchStart =
+      options.start ??
+      (async (on, { loadCompat: _, forceCompat, ...rest }) => {
+        if (forceCompat)
+          throw new TypeError(
+            'openBench needs start for the WebGL2 layer: pass startEngine of @margoengine/webgl2-compat/auto and loadCompat',
+          );
+        return { engine: await Engine.create(on, { ...rest, backend: 'webgpu' }), renderer: 'webgpu' };
+      });
   let started;
   try {
     outer?.throwIfAborted();
-    started = await (await import('@margoengine/webgl2-compat/auto')).startEngine(canvas, {
+    started = await start(canvas, {
       ...options.engine,
       camera: options.camera ?? { position: [3.2, 2.1, 4.4], target: [0, 0.6, 0], fov: 35, near: 0.05, far: 200 },
       ...(options.capacity === undefined ? {} : { capacity: options.capacity }),
@@ -337,12 +364,19 @@ export async function openBench(canvas: HTMLCanvasElement, options: BenchOptions
       startupTimeout: options.startupTimeout ?? 8000,
       signal: outer,
       forceCompat: options.backend === 'webgl2' || (options.backend !== 'auto' && forcedCompat()),
-      loadCompat: compat
-        ? async () => {
-            const layer = await loadCompat();
-            return { install: (o?: object) => layer.install({ ...o, ...compat }) };
-          }
-        : loadCompat,
+      loadCompat: !loadCompat
+        ? () =>
+            Promise.reject(
+              new TypeError(
+                'openBench needs loadCompat for the WebGL2 layer: a function importing @margoengine/webgl2-compat',
+              ),
+            )
+        : compat
+          ? async () => {
+              const layer = await loadCompat();
+              return { install: (o?: object) => layer.install({ ...o, ...compat }) };
+            }
+          : loadCompat,
     });
   } catch (reason) {
     mark(reason);
