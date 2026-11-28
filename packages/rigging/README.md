@@ -576,9 +576,47 @@ console.log(readVRM(out).humanoid.humanBones.head?.node === names.indexOf('mixam
 | `springs` | `true` | Run the file's spring bones. |
 | `mouth`, `blink`, `lookAt` | none | Custom expression names that an expression's `overrideMouth`, `overrideBlink` or `overrideLookAt` also holds back, beside the presets the specification names. |
 
-Expressions drive morph targets, `color` and `emissionColor` of materials, and texture moves. The other colour binds exist only in MToon and land in `unsupported`, because Margo draws MToon materials by their plain glTF fallback: no toon shading or outlines. `VRMC_node_constraint` data stays in the file through `writeVRM` and does not run.
+Expressions drive morph targets, `color` and `emissionColor` of materials, and texture moves. The other colour binds exist only in MToon and land in `unsupported`, because without `MToon` (below) Margo draws MToon materials by their plain glTF fallback: no toon shading or outlines. `VRMC_node_constraint` data stays in the file through `writeVRM` and does not run.
 
 With `MToon` from `@margoengine/rigging/mtoon` attached, MToon UV animation is computed in float64 and sent as small phases, so a scrolling or turning texture keeps its 1/60 s steps after days of running; [details and limits](../../docs/rigging-mtoon.md).
+
+## Toon shading (`margoengine/rigging/mtoon`)
+
+`MToon.attach(model, { expressions })` draws a loaded model's `VRMC_materials_mtoon` materials (and the VRM 0.x
+records kept by `loadVRM0`) with MToon's lit and shade colours, rim, matcap, outlines and UV animation, on native
+WebGPU and on the WebGL2 compatibility layer. Pass the `expressions` of `addVRM` so expression binds to `shadeColor`,
+`rimColor`, `matcapColor` and `outlineColor` take effect; these are the binds `addVRM` lists in `unsupported` when no
+MToon is attached. The defaults and ranges of every control are in [docs/rigging-mtoon.md](../../docs/rigging-mtoon.md).
+
+```ts
+import { Engine } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf/pbr';
+import { Animation } from 'margoengine/animation';
+import { addVRM, readVRM } from 'margoengine/rigging/vrm';
+import { MToon } from 'margoengine/rigging/mtoon';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const url = 'Seed-san.vrm';
+const model = await loadGLTF(engine, url);
+const vrm = addVRM(new Animation(model), readVRM(new Uint8Array(await (await fetch(url)).arrayBuffer())));
+using toon = MToon.attach(model, { expressions: vrm.expressions });
+console.log(toon.materials.size > 0); // true: one definition per MToon material, keyed by glTF material index
+engine.render({ delta: 1 / 60 });
+// Leaving scope (or toon.dispose()) puts every original material record back on the model.
+```
+
+- A model may mix MToon with ordinary glTF PBR and unlit materials, as VRM allows. Those primitives keep drawing with
+  their own material in their own opaque, MASK or BLEND queue while the MToon body and outline layers run, and each
+  primitive is drawn once.
+- Within a model, opaque, MASK, depth-writing blend and plain blend groups draw in authored order, and primitives in
+  the same transparent queue keep the engine's distance sort. `renderQueueOffsetNumber` (-9 to 9) orders blended
+  MToon queues and is ignored on OPAQUE and MASK, as the specification says; VRM 0.x explicit queues (0 to 5000, -1
+  for the mode's default) are kept as authored. Queues order primitives inside one model, never across models.
+- The material records are swapped only while each queue draws and restored synchronously after it, so code that
+  reads `primitive.material` between frames sees the model's own records. `dispose()`, `Symbol.dispose` or disposing
+  the model restores them exactly; `toon.disposed` reports it.
+- The model stays yours; attach on the engine that loaded it. Importing the entry registers nothing.
+- `toon.advanceTime(delta)` moves the UV animation clock (`toon.time`, in seconds), which the frame update also runs.
 
 ## VRM first person (`margoengine/rigging/vrm-first-person`)
 
