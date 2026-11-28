@@ -114,11 +114,22 @@ for an inspector panel or a log. Give any node a `label` to name it in the trace
 
 `subtree(name)` stands for a tree registered under that name in a registry you pass in; there is no global registry.
 `SubtreeTree` expands the references once and then runs as a `BehaviorTree`, and every place a subtree appears keeps
-its own state (a `cooldown` used twice through one subtree counts twice).
+its own state (a `cooldown` used twice through one subtree counts twice). The entry's own `sequence`, `selector`,
+`parallel`, `cooldown` and the other composite and decorator builders are the root entry's, typed so a child may be a
+`subtree(name)` reference; the nodes they build are the same plain JSON.
 
 ```ts
-import { action, condition, cooldown, selector, sequence } from 'margoengine/behavior';
-import { SubtreeTree, resolveTree, subtree, validateTree, type SubtreeRegistry } from 'margoengine/behavior/subtrees';
+import { action, condition } from 'margoengine/behavior';
+import {
+  SubtreeTree,
+  cooldown,
+  resolveTree,
+  selector,
+  sequence,
+  subtree,
+  validateTree,
+  type SubtreeRegistry,
+} from 'margoengine/behavior/subtrees';
 
 const subtrees: SubtreeRegistry = {
   attack: sequence(condition('inRange'), cooldown(1, action('swing'))),

@@ -76,3 +76,28 @@ test('diamond reuse is not a cycle and labels survive', () => {
   const doc = resolveTree(JSON.stringify(root), { a: wait(0) });
   assert.equal(doc.root.children[1].label, 'second');
 });
+
+test('the subtrees entry builds composites and decorators that take subtree references (KB-BEHAVIOR-SUBTREEBUILD1)', async () => {
+  const refs = await import('../dist/subtrees.js');
+  const base = await import('../dist/index.js');
+  for (const name of [
+    'sequence',
+    'reactiveSequence',
+    'selector',
+    'reactiveSelector',
+    'randomSelector',
+    'parallel',
+    'utility',
+    'inverter',
+    'repeater',
+    'cooldown',
+    'guard',
+    'timeout',
+  ])
+    assert.equal(refs[name], base[name], `${name} is the root entry's builder`);
+  const registry = { attack: refs.sequence(base.condition('inRange'), refs.cooldown(1, base.action('swing'))) };
+  const root = refs.selector(subtree('attack'), base.action('patrol'));
+  assert.deepEqual(root, { type: 'selector', children: [{ type: 'subtree', name: 'attack' }, { type: 'action', name: 'patrol' }] });
+  assert.deepEqual(validateTree(root, registry, { conditions: ['inRange'], actions: ['swing', 'patrol'] }), []);
+  assert.equal(resolveTree(root, registry).root.children[0].type, 'sequence');
+});

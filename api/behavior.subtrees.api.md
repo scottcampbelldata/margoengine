@@ -25,9 +25,47 @@ export class SubtreeTree<C = undefined> extends BehaviorTree<C> {
     });
 }
 
+export type WithSubtrees<T> = WithReferences<T>;
+
+export const cooldown: (seconds: number, child: SubtreeSpec) => WithSubtrees<CooldownNode>;
+
+export const guard: (condition: string, child: SubtreeSpec) => WithSubtrees<GuardNode>;
+
+export const inverter: (child: SubtreeSpec) => WithSubtrees<InverterNode>;
+
+export const parallel: (children: SubtreeSpec[], policy?: {
+    success?: ParallelPolicy;
+    failure?: ParallelPolicy;
+}) => WithSubtrees<ParallelNode>;
+
+export const randomSelector: (children: SubtreeSpec[], weights?: number[]) => WithSubtrees<RandomSelectorNode>;
+
+export const reactiveSelector: (...children: SubtreeSpec[]) => WithSubtrees<SelectorNode>;
+
+export const reactiveSequence: (...children: SubtreeSpec[]) => WithSubtrees<SequenceNode>;
+
+export const repeater: (child: SubtreeSpec, options?: {
+    count?: number;
+    until?: 'success' | 'failure';
+}) => WithSubtrees<RepeaterNode>;
+
 export function resolveTree(input: SubtreeSpec | SubtreeDocument | string, registry?: SubtreeRegistry, handlers?: HandlerNames): TreeDocument;
 
+export const selector: (...children: SubtreeSpec[]) => WithSubtrees<SelectorNode>;
+
+export const sequence: (...children: SubtreeSpec[]) => WithSubtrees<SequenceNode>;
+
 export const subtree: (name: string) => SubtreeNode;
+
+export const timeout: (seconds: number, child: SubtreeSpec) => WithSubtrees<TimeoutNode>;
+
+export const utility: (options: {
+    score: string;
+    child: SubtreeSpec;
+}[], settings?: {
+    inertia?: number;
+    threshold?: number;
+}) => WithSubtrees<UtilityNode>;
 
 export function validateTree(input: unknown, registry?: SubtreeRegistry, handlers?: HandlerNames): TreeIssue[];
 

@@ -1,6 +1,29 @@
 // Clean-room reference expansion. No registry or runtime changes on the root entry.
 import { BehaviorTree, type BehaviorTreeOptions } from './tree.js';
 import {
+  cooldown as baseCooldown,
+  guard as baseGuard,
+  inverter as baseInverter,
+  parallel as baseParallel,
+  randomSelector as baseRandomSelector,
+  reactiveSelector as baseReactiveSelector,
+  reactiveSequence as baseReactiveSequence,
+  repeater as baseRepeater,
+  selector as baseSelector,
+  sequence as baseSequence,
+  timeout as baseTimeout,
+  utility as baseUtility,
+  type CooldownNode,
+  type GuardNode,
+  type InverterNode,
+  type ParallelNode,
+  type ParallelPolicy,
+  type RandomSelectorNode,
+  type RepeaterNode,
+  type SelectorNode,
+  type SequenceNode,
+  type TimeoutNode,
+  type UtilityNode,
   MAX_TREE_DEPTH,
   MAX_TREE_NODES,
   type HandlerNames,
@@ -35,6 +58,47 @@ export interface SubtreeDocument {
 export type SubtreeRegistry = Readonly<Record<string, SubtreeSpec | SubtreeDocument>>;
 /** Build a reusable reference to a registered root. */
 export const subtree = (name: string): SubtreeNode => ({ type: 'subtree', name });
+
+// Reference-aware builders: the root entry's builders, typed so a child may be a `subtree(name)` reference. They build
+// the same plain JSON nodes; `resolveTree` and `SubtreeTree` expand the references.
+/** A node whose children may be named references. */
+export type WithSubtrees<T> = WithReferences<T>;
+/** Sequence builder whose children may be {@link subtree} references. */
+export const sequence = baseSequence as (...children: SubtreeSpec[]) => WithSubtrees<SequenceNode>;
+/** Reactive sequence builder whose children may be {@link subtree} references. */
+export const reactiveSequence = baseReactiveSequence as (...children: SubtreeSpec[]) => WithSubtrees<SequenceNode>;
+/** Selector builder whose children may be {@link subtree} references. */
+export const selector = baseSelector as (...children: SubtreeSpec[]) => WithSubtrees<SelectorNode>;
+/** Reactive selector builder whose children may be {@link subtree} references. */
+export const reactiveSelector = baseReactiveSelector as (...children: SubtreeSpec[]) => WithSubtrees<SelectorNode>;
+/** Weighted random selector builder whose children may be {@link subtree} references. */
+export const randomSelector = baseRandomSelector as (
+  children: SubtreeSpec[],
+  weights?: number[],
+) => WithSubtrees<RandomSelectorNode>;
+/** Parallel builder whose children may be {@link subtree} references. */
+export const parallel = baseParallel as (
+  children: SubtreeSpec[],
+  policy?: { success?: ParallelPolicy; failure?: ParallelPolicy },
+) => WithSubtrees<ParallelNode>;
+/** Utility selector builder whose option children may be {@link subtree} references. */
+export const utility = baseUtility as (
+  options: { score: string; child: SubtreeSpec }[],
+  settings?: { inertia?: number; threshold?: number },
+) => WithSubtrees<UtilityNode>;
+/** Inverter builder whose child may be a {@link subtree} reference. */
+export const inverter = baseInverter as (child: SubtreeSpec) => WithSubtrees<InverterNode>;
+/** Repeater builder whose child may be a {@link subtree} reference. */
+export const repeater = baseRepeater as (
+  child: SubtreeSpec,
+  options?: { count?: number; until?: 'success' | 'failure' },
+) => WithSubtrees<RepeaterNode>;
+/** Cooldown builder whose child may be a {@link subtree} reference. */
+export const cooldown = baseCooldown as (seconds: number, child: SubtreeSpec) => WithSubtrees<CooldownNode>;
+/** Guard builder whose child may be a {@link subtree} reference. */
+export const guard = baseGuard as (condition: string, child: SubtreeSpec) => WithSubtrees<GuardNode>;
+/** Timeout builder whose child may be a {@link subtree} reference. */
+export const timeout = baseTimeout as (seconds: number, child: SubtreeSpec) => WithSubtrees<TimeoutNode>;
 
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
