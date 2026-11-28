@@ -183,11 +183,11 @@ them; the rest is a record of what a stronger solver would need.
 
 ### HYDRO-04 four-point pass
 
-- Point 5. `4b7a50b18c`. `landscape-extremes.test.js` checks coded grid and material corrections, finite aggregation of
+- Point 5. `4b7a50b18c` and `897e9aa010`. `landscape-extremes.test.js` checks coded grid and material corrections, finite aggregation of
   extreme cell rainfall and candidate rejection when a finite delta would exceed TerrainBed range.
   The accepted state and previous terrain contribution survive rejection and replay in both memory kinds.
   `landscape-native-ranges.test.js` covers overflow-dependent route, stiff implicit incision and transport guards.
-- Point 6. `landscape-threads.test.js` and `landscape-threads.browser.mjs` check physical and snapshot parity
+- Point 6. `897e9aa010`. `landscape-threads.test.js` and `landscape-threads.browser.mjs` check physical and snapshot parity
   through an origin shift and multiple grain classes. All native workers count their prepared vertices and
   actual downhill links. The test counts 36,992 and 147,712 links on grids with 12,513 and 49,601 vertices.
   The ordered routing, budgets and diffusion stay serial. Biomes' `landscape.test.js`
@@ -196,7 +196,7 @@ them; the rest is a record of what a stronger solver would need.
   traces the exposed sediment and uplift through the shared bed, and draws the evolved terrain through
   WebGPU and WebGL2. The proof includes the pending staggered bed delta and checks exact visual replay.
   The shared 61,000-year endpoint exports 113,136.59 m³. Actual terrain readback agrees within 0.061 mm.
-- Point 8. `4b7a50b18c`. The Physics README and `docs/limits.md` document the n=1 incision law, closed depressions,
+- Point 8. `4b7a50b18c` and `897e9aa010`. The Physics README and `docs/limits.md` document the n=1 incision law, closed depressions,
   fluvial-only export, prescribed shear and grain assumptions, the bed's float32 path and relief quantisation.
 - Point 2 remains open. The `hydro04-landscape-analytic.mjs` controls converge to the n=1 steady
   stream-power profile within 0.029 mm at the finer grid and to the closed hillslope within 0.133 mm.
