@@ -6,9 +6,9 @@ import { BED_FIELD, BED_LAYOUT, type BedShape, bedVertexCount } from '../earth/b
 import type { TrackedVehicle } from '../tracked.js';
 import type { Vehicle } from '../vehicle.js';
 import { regionWords } from '../world/memory.js';
-import type { Cell, FieldDescriptor, Port, Region, SolverHost, StepContext } from '../world/solver.js';
+import type { FieldDescriptor, Port, Region, SolverHost, StepContext } from '../world/solver.js';
 import { RigidSolver, type RigidSolverParams } from '../world/solvers/rigid.js';
-import { SOIL_LAYOUT, SOIL_PATCH_WORDS, SOIL_WHEEL_REACTION_WORDS } from './index.js';
+import { SOIL_LAYOUT, SOIL_PATCH_WORDS, SOIL_WHEEL_POSE_WORDS, SOIL_WHEEL_REACTION_WORDS } from './index.js';
 
 type Point = readonly [number, number, number];
 type Pair = readonly [number, number];
@@ -52,13 +52,14 @@ export interface SoilContactRigidParams extends RigidSolverParams {
 }
 
 /**
- * Options for the soil-contact rigid solver: its ID and the optional wheel spin, camber, reaction and side-force
- * fields, plus the terrain bed to read before sampling loads.
+ * Options for the soil-contact rigid solver: its ID, optional wheel pose, spin, camber and force fields, and its terrain.
  */
 export interface SoilContactRigidOptions {
   readonly id?: string;
   /** Publish live wheel spin in the same order as the soil patch records. Use soilWheelPhaseField. */
   readonly wheelPhase?: FieldDescriptor;
+  /** Publish restored hub poses and loads using soilWheelPoseField. Rows are ordered like the soil patches. */
+  readonly wheelPose?: FieldDescriptor;
   /** Publish the actual steered right axis's vertical component per wheel. Use soilWheelCamberField. */
   readonly wheelCamber?: FieldDescriptor;
   /** Apply solved drawbar and axle reactions to wheels on the registered terrain collider. */
@@ -194,21 +195,23 @@ function trackLoads(out: Float64Array, at: number, binding: TrackSoilBinding): n
 /** A real rigid solver that also publishes wheel and belt contact pressures as footprint rows. */
 export class SoilContactRigidSolver extends RigidSolver {
   private memory!: WebAssembly.Memory;
+  private soilHost!: SolverHost;
   private patches!: Region;
   private motion!: Region;
   private wheels: readonly WheelSoilBinding[] = [];
   private tracks: readonly TrackSoilBinding[] = [];
   private vehicles: readonly (Vehicle | TrackedVehicle)[] = [];
-  private cell: Cell = [0, 0, 0];
   private lastTick = -1;
   private readonly terrain?: BedShape;
   private readonly phase?: FieldDescriptor;
+  private readonly pose?: FieldDescriptor;
   private readonly camber?: FieldDescriptor;
   private readonly reaction?: FieldDescriptor;
   private readonly sideForce?: FieldDescriptor;
   private ground?: PhysicsCollider;
   private heights?: Region;
   private phases?: Region;
+  private poses?: Region;
   private cambers?: Region;
 
   constructor(
@@ -218,6 +221,7 @@ export class SoilContactRigidSolver extends RigidSolver {
     super(options.id ?? 'rigid');
     this.terrain = options.terrain && { ...options.terrain, centre: [...options.terrain.centre] };
     this.phase = options.wheelPhase && { ...options.wheelPhase };
+    this.pose = options.wheelPose && { ...options.wheelPose };
     this.camber = options.wheelCamber && { ...options.wheelCamber };
     this.reaction = options.wheelReaction && { ...options.wheelReaction };
     this.sideForce = options.wheelSideForce && { ...options.wheelSideForce };
@@ -233,6 +237,7 @@ export class SoilContactRigidSolver extends RigidSolver {
         ...base.fields,
         { field: this.soilField, access: 'write' as const },
         ...(this.phase ? [{ field: this.phase, access: 'write' as const }] : []),
+        ...(this.pose ? [{ field: this.pose, access: 'write' as const }] : []),
         ...(this.camber ? [{ field: this.camber, access: 'write' as const }] : []),
         ...(this.reaction ? [{ field: this.reaction, access: 'read' as const }] : []),
         ...(this.sideForce ? [{ field: this.sideForce, access: 'read' as const }] : []),
@@ -279,6 +284,7 @@ export class SoilContactRigidSolver extends RigidSolver {
       );
     super.init(host, params);
     this.memory = host.memory;
+    this.soilHost = host;
     this.patches = host.allocate('rigid-soil-patches', rows * SOIL_PATCH_WORDS * 8, 'f64', SOIL_LAYOUT);
     if (this.phase) this.phases = host.allocate('rigid-soil-wheel-phase', rows * 8, 'f64', SOIL_LAYOUT);
     if (this.camber) this.cambers = host.allocate('rigid-soil-wheel-camber', rows * 8, 'f64', SOIL_LAYOUT);
@@ -288,7 +294,11 @@ export class SoilContactRigidSolver extends RigidSolver {
       'f64',
       SOIL_LAYOUT,
     );
+    this.poses = this.pose
+      ? host.allocate('rigid-soil-wheel-poses', rows * SOIL_WHEEL_POSE_WORDS * 8, 'f64', SOIL_LAYOUT)
+      : undefined;
     this.syncMotion(-1);
+    this.publishWheelPoses();
     this.ground = params.ground?.collider;
     if (Boolean(this.terrain) !== Boolean(this.ground))
       throw new MargoError(
@@ -311,6 +321,27 @@ export class SoilContactRigidSolver extends RigidSolver {
         );
       this.heights = host.allocate('rigid-soil-heights', 4 * bedVertexCount(grid), 'f32', BED_LAYOUT);
       (regionWords(this.memory, this.heights) as Float32Array).set(params.ground.collider.heightfieldHeights());
+    }
+  }
+
+  private publishWheelPoses(): void {
+    if (!this.poses) return;
+    const poses = regionWords(this.memory, this.poses) as Float64Array;
+    poses.fill(0);
+    let at = 0;
+    for (const { vehicle, patches } of this.wheels) {
+      for (let i = 0; i < patches.length; i++) {
+        if (vehicle.valid) {
+          const wheel = vehicle.wheel(i);
+          const { position, quaternion } = vehicle.wheelLocalPose(i);
+          poses.set(position, at);
+          poses.set(quaternion, at + 3);
+          poses[at + 7] = wheel.spin;
+          poses[at + 8] = wheel.rotation;
+          poses[at + 9] = wheel.load;
+        }
+        at += SOIL_WHEEL_POSE_WORDS;
+      }
     }
   }
 
@@ -400,7 +431,6 @@ export class SoilContactRigidSolver extends RigidSolver {
     }
     this.applyReactions(context);
     super.step(context, dt);
-    this.cell = context.cell;
     const out = regionWords(this.memory, this.patches) as Float64Array;
     out.fill(0);
     const phases = this.phases ? (regionWords(this.memory, this.phases) as Float64Array) : undefined;
@@ -414,18 +444,19 @@ export class SoilContactRigidSolver extends RigidSolver {
         : at + binding.patches.length * SOIL_PATCH_WORDS;
     for (const binding of this.tracks)
       at = binding.vehicle.valid ? trackLoads(out, at, binding) : at + binding.patches.length * SOIL_PATCH_WORDS;
+    this.publishWheelPoses();
     this.syncMotion(context.tick);
     this.lastTick = context.tick;
   }
 
   override exportPorts(tick: number): readonly Port[] {
+    const cell = this.soilHost.cell;
     return [
       ...super.exportPorts(tick),
-      { field: this.soilField.name, region: this.patches, tick, cell: this.cell },
-      ...(this.phase && this.phases ? [{ field: this.phase.name, region: this.phases, tick, cell: this.cell }] : []),
-      ...(this.camber && this.cambers
-        ? [{ field: this.camber.name, region: this.cambers, tick, cell: this.cell }]
-        : []),
+      { field: this.soilField.name, region: this.patches, tick, cell },
+      ...(this.phase && this.phases ? [{ field: this.phase.name, region: this.phases, tick, cell }] : []),
+      ...(this.pose && this.poses ? [{ field: this.pose.name, region: this.poses, tick, cell }] : []),
+      ...(this.camber && this.cambers ? [{ field: this.camber.name, region: this.cambers, tick, cell }] : []),
     ];
   }
 
@@ -437,6 +468,7 @@ export class SoilContactRigidSolver extends RigidSolver {
       ...(this.heights ? [this.heights] : []),
       ...(this.phases ? [this.phases] : []),
       ...(this.cambers ? [this.cambers] : []),
+      ...(this.poses ? [this.poses] : []),
     ];
   }
 }

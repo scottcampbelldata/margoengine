@@ -5426,3 +5426,13 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
 - Run `node packages/physics/scripts/atmo05-storm-measured.mjs` for the NOAA B-deck initialized Isabel
   diagnostic and the independent Montgomery et al. and Powell et al. observations. The diagnostic
   exposes the current model discrepancies. [Measured limits](../limits.md#atmo-05-accepted-storm-forcing-and-observations).
+
+### EARTH-05 accepted soil, measured plate response and physical wheel replay
+
+- Build Physics with `node packages/physics/scripts/build.js` and run
+  `node --test packages/physics/tests/coupling/terramechanics.test.js packages/physics/tests/coupling/soil-unloading.test.js packages/physics/tests/coupling/resistive-soil.test.js packages/physics/tests/coupling/resistive-soil-workers.test.js`.
+- Run `node packages/physics/scripts/earth05-plates-measured.mjs` for the independent rectangular
+  plate and repeated-loading comparisons. The diagnostic reports its observation bands and
+  deliberately retains the discrepancies.
+- Run `npm run test:gpu:terramechanics-film -w @margoengine/physics` for the real TerrainBed, driven
+  wheel and airborne grain cue with separate state and pixel checks on WebGPU and WebGL2.

@@ -7160,3 +7160,13 @@ profiles and one, two and four participants. The coastal fixture isolates pressu
 the accepted surface and every captured pixel independently on WebGPU and WebGL2. Independent Isabel
 dropsonde profiles and high-wind marine drag intervals expose limitations of the prescribed storm and
 stress models. [Observed values and limits](../limits.md#atmo-05-accepted-storm-forcing-and-observations).
+
+### EARTH-05 accepted soil banks and measured plate limits
+
+The soil solver publishes accepted relief, dust, wheel outputs and history after the native contact
+trial succeeds. Signed-origin and separate-memory fixtures compare complete accepted snapshots.
+Granular strip force sampling uses real native helpers in joined disjoint pairs before the same
+ordered wrench sum. A fixed-camera soil-bin test draws the accepted wheel pose, deformation and lofted
+grains and repeats complete state and RGBA across immediate restore on WebGPU and WebGL2. Independent
+Apfelbeck slender plates and repeated Rashidi–Gholami loads expose the shape and loading-history limits.
+[Observed values and limits](../limits.md#independent-plate-shape-and-repeated-pressure).

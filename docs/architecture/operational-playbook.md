@@ -12402,3 +12402,7 @@ Native participants build disjoint conductance, storage and spring activity rows
 ### ATMO-05 accepted vortex forcing and coastal transfer
 
 The vortex solver stages field probes, rigid loads and water forcing together. It reads each adopted field in its owning memory and publishes its current signed cell. Optional native helpers evaluate disjoint wet-cell pressure and wind rows with paired face sampling. The native browser test observes three helpers. The Water fixture drives the live shallow-water surface and compares complete state and pixels independently on both backends. Isabel dropsondes and marine drag observations record the limitations of the prescribed height profile and short-fetch drag cap.
+
+### EARTH-05 accepted terrain trials, wheel poses and strip work
+
+Soil contact stages accepted deposition, column history, wheel reactions and optical dust in the optional entry. The footprint solver copies foreign terrain only when native code needs the grid in its own memory. The rigid attachment can publish an accepted local wheel pose for immediate renderer restore. The granular strip workers evaluate independent midpoint pairs and join before the ordered force and moment sum. Actual Chromium helpers, exact state and GPU pixel replay, and the slender-plate and cyclic-load misses cover the current operating limits.

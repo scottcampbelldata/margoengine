@@ -590,3 +590,15 @@ Not in the catalog: staged construction (placement of pieces, stacking, scaffold
   exaggeration, and one display second represents one physical hour. The prescribed field and one-way
   water transfer have [measured limits](limits.md#atmo-05-accepted-storm-forcing-and-observations).
   The CY-14 film take and its run-up, foam and coastal vegetation review remain open.
+
+### EARTH-05 automated single-wheel soil bin
+
+- `packages/physics/tests/terramechanics-film.browser.mjs` applies a driven and a braked cue to
+  the same authored single-wheel dynamometer. Both takes render its live hub and tread, the native
+  TerrainBed surface and mineral dust received by ATMO-06. The driven rut is 126.60 mm with 3.681 g
+  of airborne mineral mass. The braked rut is 31.59 mm with 0.829 g. The scene isolates both the
+  ground deformation and the dust using an optical control.
+- Each renderer independently matches every accepted byte and RGBA value through hold, immediate
+  snapshot restore, re-advance and rewind. The laboratory setup draws on NASA Glenn's soil-bin
+  concept and uses selected test inputs. The original horse, courier and making-of takes remain
+  open. [NASA Glenn SLOPE Laboratory](https://www.nasa.gov/glenn/virtual-tours/slope360/).

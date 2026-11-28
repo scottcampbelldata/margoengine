@@ -19,6 +19,7 @@ export class ResistiveSoil implements Solver<ResistiveSoilParams> {
     readonly id: string;
     private constructor();
     static load(options?: ResistiveSoilOptions): Promise<ResistiveSoil>;
+    [Symbol.dispose](): void;
     describe(): {
         id: string;
         rate: 0;
@@ -33,6 +34,7 @@ export class ResistiveSoil implements Solver<ResistiveSoilParams> {
     };
     init(host: SolverHost, params: ResistiveSoilParams): void;
     step(context: StepContext): void;
+    readNativeWork(): ResistiveSoilWorkCounts | undefined;
     read(row: number): {
         readonly force: Point;
         readonly torque: Point;
@@ -57,6 +59,7 @@ export type ResistiveSoilCoefficients = readonly [
 
 export interface ResistiveSoilOptions {
     readonly id?: string;
+    readonly threads?: 1 | 2 | 4;
     readonly signal?: AbortSignal;
 }
 
@@ -77,11 +80,24 @@ export interface ResistiveSoilStrip {
     readonly samples?: number;
 }
 
+export interface ResistiveSoilWorkCounts extends ResistiveSoilWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly ResistiveSoilWorkerWork[];
+}
+
+export interface ResistiveSoilWorkerWork {
+    readonly samples: number;
+    readonly pairedSamples: number;
+    readonly simdPairs: number;
+}
+
 export const SOIL_LAYOUT = 1;
 
 export const SOIL_PATCH_WORDS = 10;
 
 export const SOIL_RESPONSE_WORDS = 4;
+
+export const SOIL_WHEEL_POSE_WORDS = 10;
 
 export const SOIL_WHEEL_REACTION_WORDS = 3;
 
@@ -104,6 +120,7 @@ export interface SoilContactProfile {
 export interface SoilContactRigidOptions {
     readonly id?: string;
     readonly wheelPhase?: FieldDescriptor;
+    readonly wheelPose?: FieldDescriptor;
     readonly wheelCamber?: FieldDescriptor;
     readonly wheelReaction?: FieldDescriptor;
     readonly wheelSideForce?: FieldDescriptor;
@@ -293,6 +310,8 @@ export function soilPatchField(name?: string): FieldDescriptor;
 export function soilWheelCamberField(name?: string): FieldDescriptor;
 
 export function soilWheelPhaseField(name?: string): FieldDescriptor;
+
+export function soilWheelPoseField(name?: string): FieldDescriptor;
 
 export function soilWheelReactionField(name?: string): FieldDescriptor;
 

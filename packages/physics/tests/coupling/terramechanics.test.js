@@ -6,9 +6,12 @@ import { BedCollider, bedVertexAreas, TerrainBed } from '@margoengine/physics/ea
 import { LeggedLocomotion } from '@margoengine/physics/legged';
 import {
   SoilContactRigidSolver,
+  SOIL_LAYOUT,
+  SOIL_WHEEL_POSE_WORDS,
   soilPatchField,
   soilWheelCamberField,
   soilWheelPhaseField,
+  soilWheelPoseField,
   soilWheelReactionField,
   soilWheelSideForceField,
   Terramechanics,
@@ -80,6 +83,131 @@ test('PA-45: Bekker p–z and Janosi–Hanamoto shear agree with the independent
     soil.budget.removed,
     total,
     'a static load reaches a permanent settlement instead of eroding every tick',
+  );
+});
+
+test('Terrain soil rejects a late invalid wheel row without changing any accepted bank', async () => {
+  for (const shared of [false, true]) {
+    const cell = [-7, -2, 3];
+    const loadCell = [-6, -2, 3];
+    const input = soilPatchField('external-soil');
+    const soil = await Terramechanics.load({ tier: 'resolved', input });
+    const world = new PhysicsWorld({ rate, memory: worldMemory(shared) }).add(
+      soil,
+      {
+        terrain: shape,
+        material: { unloading: { stiffness: 600_000 }, dustFraction: 0.01 },
+        patches: [patch],
+        inputRows: 2,
+        cellSize: 2,
+        floor: -0.08,
+      },
+      cell,
+    );
+    const terrainMemory = new WebAssembly.Memory({ initial: 1 });
+    const terrainRegion = {
+      name: 'foreign TerrainBed',
+      memory: terrainMemory,
+      type: 'f32',
+      layout: 1,
+      byteOffset: 128,
+      byteLength: 25 * 25 * 4,
+    };
+    const elevations = new Float32Array(terrainMemory.buffer, 128, 25 * 25);
+    elevations.fill(-0.0625);
+    const loadMemory = new WebAssembly.Memory({ initial: 1 });
+    const loadRegion = {
+      name: 'foreign soil load',
+      memory: loadMemory,
+      type: 'f64',
+      layout: 1,
+      byteOffset: 128,
+      byteLength: 160,
+    };
+    const loads = new Float64Array(loadMemory.buffer, 128, 20);
+    loads.set([-2.5, 0, 0, 1, 0.3, 0.2, 1_200, 0.01, 0, 0, -1.5, 0, 0, 1, 0.3, 0.2, 800, 0, 0, 0]);
+    const context = (tick, region = loadRegion) => ({
+      tick,
+      level: 0,
+      seed: 11,
+      cell,
+      inputs: new Map([
+        ['bed', { field: 'bed', region: terrainRegion, tick, cell }],
+        [input.name, { field: input.name, region, tick, cell: loadCell }],
+      ]),
+    });
+    const dt = 1 / 60;
+    const initial = world.takeSnapshot();
+    soil.step(context(0), dt);
+    assert.deepEqual(
+      soil.exportPorts(0).map((port) => port.cell),
+      Array(4).fill(cell),
+    );
+    assert.deepEqual([soil.read(1).normalForce, soil.read(2).normalForce], [1200, 800]);
+    const contribution = soil.exportPorts(0).find((port) => port.field === 'bedChange');
+    const deltas = regionWords(world.memory, contribution.region);
+    const excavatedCentre = deltas[12 * 25 + 12];
+    assert.ok(excavatedCentre < 0);
+    // The lower rounding boundary of −2⁻⁴ metres is halfway to the next f32 value, 2⁻²⁸ m lower.
+    close(excavatedCentre, -0.08 - elevations[0] + 2 ** -28, 8 * eps);
+    assert.ok(deltas[7 * 25 + 12] < 0 && deltas[17 * 25 + 12] < 0);
+    const accepted = world.takeSnapshot();
+
+    loads[6] = 1_500;
+    loads[19] = 8;
+    assert.throws(
+      () => soil.step(context(1), dt),
+      (error) => error.code === 'state' && /invalid geometry.*errors#soil/.test(error.message),
+    );
+    assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+    assert.throws(
+      () => soil.step(context(1, { ...loadRegion, byteOffset: 129 }), dt),
+      (error) => error.code === 'state' && /unaligned.*errors#soil/.test(error.message),
+    );
+    assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+    elevations[624] = NaN;
+    assert.throws(() => soil.step(context(1), dt), /terrain elevation is not finite.*errors#soil/);
+    assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+
+    world.shiftOrigin([3, -2, 1]);
+    assert.deepEqual(
+      soil.exportPorts(0).map((port) => port.cell),
+      Array(4).fill([-10, 0, 2]),
+    );
+    world.restoreSnapshot(initial.bytes);
+    elevations[624] = elevations[0];
+    loads[6] = 1_200;
+    loads[19] = 0;
+    soil.step(context(0), dt);
+    assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  }
+});
+
+test('Soil floor samplers can grow plain memory and bad grid input names its fix', async () => {
+  const soil = await Terramechanics.load({ tier: 'resolved' });
+  const terrain = { columns: 8, rows: 8, width: 0.8, depth: 0.8, centre: [0, 0] };
+  const memory = worldMemory(false);
+  const floor = -0.008;
+  const bed = new TerrainBed();
+  const world = new PhysicsWorld({ rate, memory }).add(bed, { ...terrain, elevations: () => 0, bedrock: () => floor });
+  let sampled = 0;
+  world.add(soil, {
+    terrain,
+    patches: [patch],
+    floorGrid: () => {
+      if (++sampled === 2) memory.grow(1);
+      return floor;
+    },
+  });
+  world.couple([soil.id, 'bed'], 'staggered');
+  world.advance(1);
+  assert.equal(sampled, 81);
+  assert.equal(bed.elevations()[40], floor);
+  assert.equal(bed.refusedVolume(), 0);
+  const invalid = await Terramechanics.load();
+  assert.throws(
+    () => new PhysicsWorld().add(invalid, { terrain: { ...terrain, columns: 0 } }),
+    (error) => error.code === 'state' && /positive finite dimensions.*errors#soil/.test(error.message),
   );
 });
 
@@ -1361,7 +1489,8 @@ async function withWheelReaction(initialSpin, initialSpeed, check, sideSpeed = 0
   const wheelSideForce = sideSpeed ? soilWheelSideForceField() : undefined;
   const wheelPhase = digging ? soilWheelPhaseField() : undefined;
   const soil = await Terramechanics.load({ tier: 'resolved', input, wheelReaction, wheelSideForce, wheelPhase });
-  const rigid = new SoilContactRigidSolver(input, { terrain, wheelReaction, wheelSideForce, wheelPhase });
+  const wheelPose = soilWheelPoseField();
+  const rigid = new SoilContactRigidSolver(input, { terrain, wheelReaction, wheelSideForce, wheelPhase, wheelPose });
   const world = new PhysicsWorld({ rate, memory: worldMemory(true) });
   const bed = new TerrainBed();
   world.add(bed, { ...terrain, elevations: () => 0 });
@@ -1424,6 +1553,8 @@ async function withWheelReaction(initialSpin, initialSpeed, check, sideSpeed = 0
     inertia,
     wheelReaction,
     wheelSideForce,
+    wheelPose,
+    rigid,
     seed,
     soil,
     bed,
@@ -1448,6 +1579,33 @@ test('a live held chassis transfers real wheel rotation to a deeper soil rut', a
     0,
     true,
   );
+});
+
+test('the accepted wheel hub pose restores immediately with signed registration', async () => {
+  await withWheelReaction(10, 0.2, ({ world, vehicle, wheelPose, rigid }) => {
+    const read = () => {
+      const { region } = world.fields.port(wheelPose.name);
+      assert.equal(region.layout, SOIL_LAYOUT);
+      assert.equal(region.byteLength, SOIL_WHEEL_POSE_WORDS * 8);
+      return Array.from(regionWords(world.memory, region));
+    };
+    world.advance(2);
+    const mark = world.takeSnapshot();
+    const { position, quaternion } = vehicle.wheelLocalPose(0);
+    const motion = vehicle.wheel(0);
+    const accepted = read();
+    assert.deepEqual(accepted, [...position, ...quaternion, motion.spin, motion.rotation, motion.load]);
+    world.advance(7);
+    const later = read();
+    assert.notDeepEqual(later, accepted);
+    world.restoreSnapshot(mark.bytes);
+    assert.deepEqual(read(), accepted);
+    world.advance(7);
+    assert.deepEqual(read(), later);
+    world.shiftOrigin([2, -3, -1]);
+    assert.deepEqual(rigid.exportPorts(7).find((port) => port.field === wheelPose.name).cell, [-2, 3, 1]);
+    assert.deepEqual(read(), later);
+  });
 });
 
 test('a powered wheel consumes the native drawbar force and axle moment without adding kinetic energy', async () => {

@@ -24408,6 +24408,20 @@ snow. `AeolianTransport` sends resolved bed change to `TerrainBed`, and `BlownSa
 Reproduce with `packages/physics/tests/coupling/aeolian.test.js` and `packages/vfx/test/blown-sand-check.mjs`.
 The [TREE-5 review](physics-demo-review.md) tracks integration into the filmed scene and the atmosphere-side fields.
 
+## Fixed: a later footprint could partially publish a failed soil step (EARTH-05)
+
+The soil kernel wrote load, relief, dust, pressure, unloading state and work into the accepted
+banks while processing individual contacts. A later invalid wheel row left the earlier work
+partially published. The solver now validates the versioned inputs in their owning memory and
+commits its trial only after all rows and the native deposition are finite. The coupled foreign
+memory regression checks the complete snapshot through the rejection, origin shift and replay.
+`packages/physics/tests/coupling/terramechanics.test.js`
+
+An optional registered wheel pose field now lets the renderer consume restored hub transforms and
+loads immediately. Wheel attachment getters describe the last step run by the attachment, which can
+be ahead of the restored time until the next step. The paired browser proof draws the registered pose
+at the restored time. `packages/physics/tests/terramechanics-film.browser.mjs`
+
 ## Fixed: soil drainage had no groundwater storage or spring receiver (HYDRO-06)
 
 Previously HYDRO-02 could export soil drainage, but no aquifer stored that water or passed it back to the surface

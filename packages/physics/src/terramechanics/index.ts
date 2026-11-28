@@ -1,4 +1,3 @@
-import { MargoError } from '@margoengine/math/errors';
 import type { Bed } from '@margoengine/math/fields';
 import { exp, hypot, ln, pow } from '@margoengine/math/pinned';
 import {
@@ -14,6 +13,7 @@ import {
 import { LEGGED_CONTACT_FIELD } from '../legged/index.js';
 import { regionWords } from '../world/memory.js';
 import type { Cell, FieldDescriptor, Port, Region, Solver, SolverHost, StepContext } from '../world/solver.js';
+import { soilError } from './errors.js';
 import { bindSoil, type Builds, loadSoil, type NativeSoil } from './kernel.js';
 
 export {
@@ -22,6 +22,8 @@ export {
   type ResistiveSoilOptions,
   type ResistiveSoilParams,
   type ResistiveSoilStrip,
+  type ResistiveSoilWorkCounts,
+  type ResistiveSoilWorkerWork,
 } from './resistive.js';
 export {
   SoilContactRigidSolver,
@@ -39,8 +41,9 @@ export const SOIL_PATCH_WORDS = 10;
 export const SOIL_RESPONSE_WORDS = 4;
 /** Per rolling wheel: normal load N, drawbar N and signed resisting axle torque N·m. */
 export const SOIL_WHEEL_REACTION_WORDS = 3;
+/** Per wheel: chassis-local hub XYZ, local quaternion XYZW, spin rad/s, rotation rad and load N. */
+export const SOIL_WHEEL_POSE_WORDS = 10;
 const LEGGED_WORDS = 13;
-const CENTRE = [0, 0, 0] as const;
 
 /** Wong's unloading slope k₀ + Aᵤ zₘₐₓ for cyclic soil bearing. Measure both terms on prepared soil. */
 export interface SoilUnloading {
@@ -255,6 +258,11 @@ export function soilWheelPhaseField(name = 'soilWheelPhase'): FieldDescriptor {
   return { name, kind: 'surfaceSampleSet', quantity: 'wheelSpin', unit: 'rad', centring: 'particle' };
 }
 
+/** Accepted chassis-local hub pose and wheel motion per external contact row in SOIL_LAYOUT. */
+export function soilWheelPoseField(name = 'soilWheelPose'): FieldDescriptor {
+  return { name, kind: 'surfaceSampleSet', quantity: 'wheelPose', unit: 'record', centring: 'particle' };
+}
+
 /** Vertical component of the unit wheel right axis, one value in [-1, 1] per external row. */
 export function soilWheelCamberField(name = 'soilWheelCamber'): FieldDescriptor {
   return { name, kind: 'surfaceSampleSet', quantity: 'wheelCamberSine', unit: '1', centring: 'particle' };
@@ -272,7 +280,7 @@ export function soilWheelSideForceField(name = 'soilWheelSideForce'): FieldDescr
 
 function finite(value: number, label: string, lower = -Infinity, upper = Infinity): number {
   if (!Number.isFinite(value) || value < lower || value > upper)
-    throw new MargoError('state', `Invalid soil ${label}. Provide a finite value in [${lower}, ${upper}].`);
+    throw soilError(`Invalid soil ${label}. Provide a finite value in [${lower}, ${upper}].`);
   return value;
 }
 
@@ -344,21 +352,14 @@ function rollingWheel(wheel: SoilRollingWheel): RollingParameters {
   const lugHeight = finite(wheel.lugHeight ?? 0, 'wheel lug height', 0);
   const lugCount = wheel.lugCount ?? 0;
   if (!Number.isSafeInteger(lugCount) || lugCount < 0)
-    throw new MargoError(
-      'state',
-      'A wheel lug count must be a nonnegative integer. Provide the number of evenly spaced lugs.',
-    );
+    throw soilError('A wheel lug count must be a nonnegative integer. Provide the number of evenly spaced lugs.');
   const lugWidth = lugCount > 0 ? positive(wheel.lugWidth ?? 0, 'wheel lug width') : 0;
   if (lugCount > 0 && (lugHeight === 0 || lugCount * lugWidth >= 2 * Math.PI * radius))
-    throw new MargoError(
-      'state',
+    throw soilError(
       'The discrete wheel lugs cannot fit around the rim. Use positive height and width below their spacing.',
     );
   if (wheel.treadMesh && lugCount > 0)
-    throw new MargoError(
-      'state',
-      'Two sets of wheel treads are configured. Choose indexed triangles or evenly spaced lugs.',
-    );
+    throw soilError('Two sets of wheel treads are configured. Choose indexed triangles or evenly spaced lugs.');
   const peakFraction = finite(
     wheel.peakFraction ?? 0.4,
     'wheel pressure peak fraction',
@@ -367,11 +368,11 @@ function rollingWheel(wheel: SoilRollingWheel): RollingParameters {
   );
   const bermProfile = wheel.bermProfile ?? 'ring';
   if (bermProfile !== 'ring' && bermProfile !== 'cross-track')
-    throw new MargoError('state', 'The wheel berm profile is invalid. Choose ring or cross-track.');
+    throw soilError('The wheel berm profile is invalid. Choose ring or cross-track.');
   const grouserFill = finite(wheel.grouserFill ?? 0, 'grouser fill fraction', 0, 1);
   const grouserDig = wheel.grouserDig ?? false;
   if (typeof grouserDig !== 'boolean' || (grouserDig && !(lugHeight > 0 && grouserFill > 0)))
-    throw new MargoError('state', 'Invalid grouser digging options. Use a boolean and positive lug height and fill.');
+    throw soilError('Invalid grouser digging options. Use a boolean and positive lug height and fill.');
   return {
     radius,
     lugHeight,
@@ -403,6 +404,29 @@ function packed(p: SoilPatch): Patch {
     p.displacement?.[1] ?? 0,
     (p.elliptical ? 1 : 0) + (p.rounded ? 2 : 0),
   ];
+}
+
+interface SoilBank {
+  readonly accepted: Region;
+  readonly trial: Region;
+  readonly retain: boolean;
+}
+
+interface SoilTrial {
+  readonly change: Region;
+  readonly peaks: Region;
+  readonly dust: Region;
+  readonly budget: Region;
+  readonly response: Region;
+  readonly reactions?: Region;
+  readonly sides?: Region;
+  readonly pressure?: Region;
+  readonly work?: Region;
+  readonly faces?: Region;
+  readonly trackRelief?: Region;
+  readonly diggingPhase?: Region;
+  readonly cycleHistory?: Region;
+  readonly cycleActive?: Region;
 }
 
 /** Simulates persistent pressure–sinkage and mobilized soil shear on a live triangulated bed. */
@@ -446,7 +470,9 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   private rolling: (RollingParameters | null)[] = [];
   private meshes: (MeshSlot | null)[] = [];
   private inputRows = 0;
-  private cell: Cell = CENTRE;
+  private trial!: SoilTrial;
+  private banks!: readonly SoilBank[];
+  private inputBed!: Region;
   private cellSize = 4096;
   private floor = -Infinity;
   private floorGrid?: Region;
@@ -458,22 +484,18 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   ) {
     this.id = options.id ?? 'terramechanics';
     const tier = options.tier ?? 'mean';
-    if (tier !== 'mean' && tier !== 'resolved')
-      throw new MargoError('state', 'Unknown soil contact tier. Choose mean or resolved.');
+    if (tier !== 'mean' && tier !== 'resolved') throw soilError('Unknown soil contact tier. Choose mean or resolved.');
     this.input = options.input && { ...options.input };
     this.phase = options.wheelPhase && { ...options.wheelPhase };
     this.camber = options.wheelCamber && { ...options.wheelCamber };
     this.reaction = options.wheelReaction && { ...options.wheelReaction };
     this.sideForce = options.wheelSideForce && { ...options.wheelSideForce };
     if (this.phase && !this.input)
-      throw new MargoError('state', 'Wheel phase needs external wheel loads. Provide the matching soil patch field.');
+      throw soilError('Wheel phase needs external wheel loads. Provide the matching soil patch field.');
     if (this.camber && !this.input)
-      throw new MargoError('state', 'Wheel camber needs external wheel loads. Provide the matching soil patch field.');
+      throw soilError('Wheel camber needs external wheel loads. Provide the matching soil patch field.');
     if ((this.reaction || this.sideForce) && (tier !== 'resolved' || !this.input))
-      throw new MargoError(
-        'state',
-        'Wheel reactions need resolved external loads. Use the resolved tier and a soil patch field.',
-      );
+      throw soilError('Wheel reactions need resolved external loads. Use the resolved tier and a soil patch field.');
     this.legged = options.legged ?? false;
     this.dustField = {
       name: `${this.id}:dust`,
@@ -526,7 +548,16 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
 
   init(host: SolverHost, parameters: TerramechanicsParams): void {
     this.host = host;
-    const count = bedVertexCount(parameters.terrain);
+    let count: number;
+    try {
+      count = bedVertexCount(parameters.terrain);
+    } catch (cause) {
+      throw soilError(
+        'The soil grid is invalid. Supply positive finite dimensions, whole cell counts and a finite XZ centre.',
+        'state',
+        cause,
+      );
+    }
     this.terrain = { ...parameters.terrain, centre: [...parameters.terrain.centre] };
     this.material = materialOf(parameters.material);
     const hardpan = parameters.hardpan;
@@ -548,37 +579,30 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
         0,
       );
     if (!Number.isSafeInteger(this.inputRows) || this.inputRows < 0 || Boolean(this.input) !== this.inputRows > 0)
-      throw new MargoError(
-        'state',
+      throw soilError(
         'The contact row count conflicts with the input field. Provide a positive row count for a configured input.',
       );
     if (this.legged !== this.feet.length > 0 || this.feet.some(({ row }) => !Number.isSafeInteger(row) || row < 0))
-      throw new MargoError(
-        'state',
+      throw soilError(
         'The legged contact options disagree. Enable legged input and provide zero-based contact rows together.',
       );
     const responses = this.fixed.length + this.inputRows + this.feet.length;
     const profiles = parameters.profiles ?? [];
     const rolling = parameters.rollingWheels ?? [];
     if (rolling.length && (!this.pressureField || rolling.length !== this.inputRows))
-      throw new MargoError(
-        'state',
-        'Rolling wheels need resolved external loads. Supply one entry per external load row.',
-      );
+      throw soilError('Rolling wheels need resolved external loads. Supply one entry per external load row.');
     if (rolling.some((wheel, row) => wheel && profiles[this.fixed.length + row]))
-      throw new MargoError(
-        'state',
+      throw soilError(
         'A rolling load has two footprint geometries. Choose a cylindrical wheel or a sampled profile for that row.',
       );
     this.rolling = rolling.map((wheel) => wheel && rollingWheel(wheel));
     if (!this.phase && rolling.some((wheel) => wheel && (wheel.lugCount || wheel.treadMesh)))
-      throw new MargoError('state', 'Moving wheel treads need a phase port. Provide a soil wheel phase reader.');
+      throw soilError('Moving wheel treads need a phase port. Provide a soil wheel phase reader.');
     const digging = this.rolling.some((wheel) => wheel?.grouserDig);
     if (digging && !this.phase)
-      throw new MargoError('state', 'Grouser digging needs actual spin travel. Provide a soil wheel phase reader.');
+      throw soilError('Grouser digging needs actual spin travel. Provide a soil wheel phase reader.');
     if (profiles.length && (!this.pressureField || profiles.length !== responses))
-      throw new MargoError(
-        'state',
+      throw soilError(
         'Soil profiles conflict with the solver layout. Use the resolved tier and supply one entry per response row.',
       );
     this.change = new BedChange(host, this.terrain, 'soil-bed-change');
@@ -589,7 +613,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       const stiffness = finite(unloading.stiffness, 'initial unloading stiffness', 0);
       const hardening = finite(unloading.hardening ?? 0, 'unloading hardening', 0);
       if (stiffness === 0 && hardening === 0)
-        throw new MargoError('state', 'The soil unloading slope is zero. Give a positive stiffness or hardening.');
+        throw soilError('The soil unloading slope is zero. Give a positive stiffness or hardening.');
       this.cycle = {
         history: allocate('soil-cycle-history', 2 + count * 3),
         active: host.allocate('soil-cycle-active', (count + 1) * 4, 'u32', SOIL_LAYOUT),
@@ -597,7 +621,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       this.words(this.cycle.history).set([stiffness, hardening]);
     }
     if (parameters.hardpanDepths !== undefined && !hardpan)
-      throw new MargoError('state', 'Local hardpan depths have no material. Provide the hardpan fit with them.');
+      throw soilError('Local hardpan depths have no material. Provide the hardpan fit with them.');
     this.floorGrid =
       parameters.floorGrid === undefined
         ? undefined
@@ -636,20 +660,14 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       const { columns, rows, area, perimeter, depth } = profile;
       const words = columns * rows;
       if (![columns, rows, words].every(Number.isSafeInteger) || columns < 2 || rows < 2 || depth.length !== words)
-        throw new MargoError(
-          'state',
-          'Invalid soil profile grid. Provide at least two vertices per axis with matching depth data.',
-        );
+        throw soilError('Invalid soil profile grid. Provide at least two vertices per axis with matching depth data.');
       positive(area, 'profile area');
       positive(perimeter, 'profile perimeter');
       const region = allocate(`soil-profile-${row}`, words);
       const field = this.words(region);
       for (let i = 0; i < words; i++) field[i] = finite(depth[i]!, 'profile depth', 0, 1);
       if (!field.some((value) => value > 0))
-        throw new MargoError(
-          'state',
-          'A soil profile has no contact. Provide a positive depth for part of the footprint.',
-        );
+        throw soilError('A soil profile has no contact. Provide a positive depth for part of the footprint.');
       return { columns, rows, area, perimeter, region };
     });
     this.meshes = rolling.map((wheel, row) => {
@@ -664,8 +682,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
         positions.length % 3 ||
         indices.length % 3
       )
-        throw new MargoError(
-          'state',
+        throw soilError(
           'Invalid wheel mesh dimensions. Provide indexed triangles and at least two profile vertices per axis.',
         );
       const geometry = allocate(`soil-tread-geometry-${row}`, indices.length * 3);
@@ -674,20 +691,62 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       for (let i = 0; i < indices.length; i++) {
         const vertex = indices[i]!;
         if (!Number.isSafeInteger(vertex) || vertex < 0 || vertex >= positions.length / 3)
-          throw new MargoError(
-            'state',
-            'The tread triangle points outside the vertex array. Use zero-based vertex indices.',
-          );
+          throw soilError('The tread triangle points outside the vertex array. Use zero-based vertex indices.');
         for (let axis = 0; axis < 3; axis++) data[3 * i + axis] = finite(positions[3 * vertex + axis]!, 'tread vertex');
       }
       return { geometry, profile, columns, rows };
     });
     this.kernel = bindSoil(host, this.builds);
     this.words(this.areas).set(this.change.area);
+    // Preserve the accepted addresses used by the registry and snapshots. Native work stays in trial regions.
+    const banks: SoilBank[] = [];
+    const candidate = (accepted: Region, retain = false): Region => {
+      const trial = host.allocate(`${accepted.name}-trial`, accepted.byteLength, accepted.type, accepted.layout);
+      banks.push({ accepted, trial, retain });
+      return trial;
+    };
+    const ifPresent = (region: Region | undefined, retain = false) => region && candidate(region, retain);
+    this.trial = {
+      change: candidate(this.change.state),
+      peaks: candidate(this.peaks, true),
+      dust: candidate(this.dust),
+      budget: candidate(this.budgetRegion, true),
+      response: candidate(this.response),
+      reactions: ifPresent(this.reactions),
+      sides: ifPresent(this.sides),
+      pressure: ifPresent(this.pressure),
+      work: ifPresent(this.workRegion),
+      faces: ifPresent(this.faces, Boolean(this.reposePending)),
+      trackRelief: ifPresent(this.trackRelief, true),
+      diggingPhase: ifPresent(this.diggingPhase, true),
+      cycleHistory: ifPresent(this.cycle?.history, true),
+      cycleActive: ifPresent(this.cycle?.active, true),
+    };
+    this.banks = banks;
+    this.inputBed = host.allocate('soil-foreign-bed', count * 4, 'f32', BED_LAYOUT);
   }
 
   private words(region: Region): Float64Array {
     return regionWords(this.host.memory, region) as Float64Array;
+  }
+
+  private inputWords(region: Region, bytes: number): Float32Array | Float64Array {
+    const memory = region.memory ?? this.host.memory;
+    const { byteOffset, byteLength } = region;
+    if (
+      !Number.isSafeInteger(byteOffset) ||
+      !Number.isSafeInteger(byteLength) ||
+      byteOffset < 0 ||
+      byteLength < 0 ||
+      byteOffset % bytes ||
+      byteLength % bytes ||
+      byteOffset + byteLength > memory.buffer.byteLength
+    ) {
+      throw soilError(
+        'The soil input region is unaligned or outside its owning memory. Publish a matching allocated field bank.',
+      );
+    }
+    return regionWords(memory, region) as Float32Array | Float64Array;
   }
 
   private samples(
@@ -697,9 +756,9 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     minimum: number,
   ): Region {
     if (typeof source !== 'function' && source.length !== count)
-      throw new MargoError('state', `The soil ${label} grid has the wrong size. Provide one value per bed vertex.`);
+      throw soilError(`The soil ${label} grid has the wrong size. Provide one value per bed vertex.`);
     const region = this.host.allocate(`soil-${label.replaceAll(' ', '-')}`, count * 8, 'f64', SOIL_LAYOUT);
-    const field = this.words(region);
+    const field = new Float64Array(count);
     const { columns, rows, width, depth, centre } = this.terrain;
     for (let c = 0; c <= columns; c++)
       for (let r = 0; r <= rows; r++) {
@@ -710,6 +769,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
             : source[i]!;
         field[i] = finite(value, label, minimum);
       }
+    this.words(region).set(field);
     return region;
   }
 
@@ -732,8 +792,13 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       : (a + b - 1) * f[i + rows + 2]! + (1 - b) * cross + (1 - a) * along;
   }
 
-  private shift(port: Port): readonly [number, number] {
-    return [(port.cell[0] - this.cell[0]) * this.cellSize, (port.cell[2] - this.cell[2]) * this.cellSize];
+  private shift(port: Port, cell: Cell): readonly [number, number] {
+    if (port.cell.length !== 3 || !port.cell.every((value) => Number.isInteger(value) && value === (value | 0)))
+      throw soilError('The soil input origin is invalid. Supply three signed 32-bit cell coordinates.');
+    return [
+      finite((port.cell[0] - cell[0]) * this.cellSize, 'input X offset'),
+      finite((port.cell[2] - cell[2]) * this.cellSize, 'input Z offset'),
+    ];
   }
 
   private stamp(
@@ -746,6 +811,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     spinTravel = 0,
     bedSurface?: Bed,
   ): void {
+    const trial = this.trial;
     const [x, z, forwardX, forwardZ, length, width, load, shearX, shearZ, flags] = patch;
     if (finite(load, 'normal load', 0) === 0) return;
     if (
@@ -754,12 +820,11 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       flags < 0 ||
       flags > 3
     )
-      throw new MargoError(
-        'state',
+      throw soilError(
         'A soil contact row has invalid geometry. Use finite coordinates and shape bits for rectangle, ellipse and rounded section.',
       );
     const direction = hypot(forwardX, forwardZ);
-    if (!direction) throw new MargoError('state', 'Soil contact forward is zero. Provide a nonzero XZ vector.');
+    if (!direction) throw soilError('Soil contact forward is zero. Provide a nonzero XZ vector.');
     positive(length, 'contact length');
     positive(width, 'contact width');
     const material = this.material;
@@ -770,8 +835,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     let crossGrade = 0;
     if (bedSurface && rolling && !mesh) {
       const cosine = Math.sqrt((1 - camberSine) * (1 + camberSine));
-      if (!cosine)
-        throw new MargoError('state', 'The cylindrical wheel has no projected width. Use a camber below 90 degrees.');
+      if (!cosine) throw soilError('The cylindrical wheel has no projected width. Use a camber below 90 degrees.');
       const span = (width / 2) * cosine;
       const rightX = forward[1] * span;
       const rightZ = -forward[0] * span;
@@ -797,8 +861,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     const ellipse = Boolean(flags & 1);
     const profile = this.profiles[row];
     if (profile && profile.area > length * width)
-      throw new MargoError(
-        'state',
+      throw soilError(
         'The profile area exceeds the contact bounds. Use its projected area in square metres inside the footprint.',
       );
     const area = positive(profile?.area ?? width * length * (ellipse ? Math.PI / 4 : 1), 'contact area');
@@ -888,13 +951,13 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       mesh?.profile.byteOffset ?? 0,
       mesh?.columns ?? 0,
       mesh?.rows ?? 0,
-      rolling && this.reactions
-        ? this.reactions.byteOffset + (row - this.fixed.length) * SOIL_WHEEL_REACTION_WORDS * 8
+      rolling && trial.reactions
+        ? trial.reactions.byteOffset + (row - this.fixed.length) * SOIL_WHEEL_REACTION_WORDS * 8
         : 0,
       skid,
       rolling?.skidExponent ?? 0,
-      rolling && this.sides ? this.sides.byteOffset + (row - this.fixed.length) * 8 : 0,
-      rolling && (this.sides || rolling.bermProfile === 'cross-track')
+      rolling && trial.sides ? trial.sides.byteOffset + (row - this.fixed.length) * 8 : 0,
+      rolling && (trial.sides || rolling.bermProfile === 'cross-track')
         ? finite((shearX * forward[1] - shearZ * forward[0]) / length, 'lateral wheel slip')
         : 0,
       this.sideWeight,
@@ -909,30 +972,29 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     const peak = this.kernel.stamp(
       this.nativePatch.byteOffset,
       this.areas.byteOffset,
-      this.peaks.byteOffset,
-      this.change.state.byteOffset,
-      this.dust.byteOffset,
+      trial.peaks.byteOffset,
+      trial.change.byteOffset,
+      trial.dust.byteOffset,
       this.rim.byteOffset,
-      this.pressure?.byteOffset ?? 0,
+      trial.pressure?.byteOffset ?? 0,
       bed.byteOffset,
       this.floor,
       this.floorGrid?.byteOffset ?? 0,
-      this.budgetRegion.byteOffset,
-      this.workRegion?.byteOffset ?? 0,
-      this.faces?.byteOffset ?? 0,
+      trial.budget.byteOffset,
+      trial.work?.byteOffset ?? 0,
+      trial.faces?.byteOffset ?? 0,
       columns + 1,
       rows + 1,
       dx / columns,
       dz / rows,
       centre[0] - dx / 2,
       centre[1] - dz / 2,
-      this.trackRelief?.byteOffset ?? 0,
-      this.cycle?.history.byteOffset ?? 0,
-      this.cycle?.active.byteOffset ?? 0,
+      trial.trackRelief?.byteOffset ?? 0,
+      trial.cycleHistory?.byteOffset ?? 0,
+      trial.cycleActive?.byteOffset ?? 0,
     );
     if (rolling && !Number.isFinite(peak))
-      throw new MargoError(
-        'state',
+      throw soilError(
         'The rolling footprint cannot carry the prescribed load above its axle. Reduce the normal load or supply a measured firmer bearing fit.',
       );
     const settlement = finite(peak, 'resolved soil settlement', 0);
@@ -940,19 +1002,21 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       ? load / positive(this.words(this.nativePatch)[36]!, 'rolling contact area')
       : pressure;
     const shear = finite((material.cohesion + measuredPressure * material.friction) * share, 'shear stress', 0);
-    this.words(this.response).set([measuredPressure, settlement, shear, load], row * SOIL_RESPONSE_WORDS);
+    this.words(trial.response).set([measuredPressure, settlement, shear, load], row * SOIL_RESPONSE_WORDS);
   }
 
-  private footsteps(port: Port, start: number, bed: Region, dt: number): void {
-    const data = this.words(port.region);
-    if (port.region.type !== 'f64' || port.region.layout !== SOIL_LAYOUT || data.length % LEGGED_WORDS)
-      throw new MargoError('state', 'Unsupported foot contact field. Use the layout-1 LIFE-01 contact output.');
-    const [x, z] = this.shift(port);
+  private footsteps(port: Port, start: number, bed: Region, dt: number, cell: Cell): void {
+    if (port.region.type !== 'f64' || port.region.layout !== SOIL_LAYOUT || port.region.byteLength % (8 * LEGGED_WORDS))
+      throw soilError('Unsupported foot contact field. Use the layout-1 LIFE-01 contact output.');
+    const data = this.inputWords(port.region, 8) as Float64Array;
+    const [x, z] = this.shift(port, cell);
     for (const [i, foot] of this.feet.entries()) {
       const at = foot.row * LEGGED_WORDS;
-      if (at >= data.length)
-        throw new MargoError('state', 'Foot contact row does not exist. Use the current LIFE-01 foot index.');
-      if (data[at + 9] !== 1 || data[at + 7]! <= 0) continue;
+      if (at >= data.length) throw soilError('Foot contact row does not exist. Use the current LIFE-01 foot index.');
+      const active = data[at + 9];
+      if (active !== 0 && active !== 1)
+        throw soilError('A foot contact flag is invalid. Publish 0 or 1 in layout-1 LIFE-01 records.');
+      if (!active || finite(data[at + 7]!, 'foot normal load', 0) === 0) continue;
       const fx = -data[at + 6]!;
       const fz = -data[at + 8]!;
       const load = data[at + 7]!;
@@ -992,69 +1056,65 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     const pose = context.inputs.get(field.name);
     if (
       !pose ||
+      pose.field !== field.name ||
       pose.region.type !== 'f64' ||
       pose.region.layout !== SOIL_LAYOUT ||
       pose.region.byteLength !== this.inputRows * 8 ||
-      (pose.region.memory ?? this.host.memory) !== this.host.memory ||
+      pose.cell.length !== 3 ||
       pose.cell.some((coordinate, axis) => coordinate !== cell[axis])
     )
-      throw new MargoError(
-        'state',
+      throw soilError(
         `Wheel ${label} does not match the load rows. Provide one layout-1 value per contact in the same cell.`,
       );
-    return this.words(pose.region);
+    return this.inputWords(pose.region, 8) as Float64Array;
   }
 
   step(context: StepContext, dt: number): void {
-    this.cell = context.cell;
-    this.change.clear();
-    this.words(this.dust).fill(0);
-    this.words(this.response).fill(0);
-    if (this.reactions) this.words(this.reactions).fill(0);
-    if (this.sides) this.words(this.sides).fill(0);
-    if (this.pressure && this.workRegion && this.faces) {
-      this.words(this.pressure).fill(0);
-      this.words(this.workRegion).fill(0);
-      const faceWords = regionWords(this.host.memory, this.faces);
-      if (!this.reposePending) faceWords[faceWords.length - 1] = 0;
-    }
+    positive(dt, 'step duration');
     const bed = context.inputs.get(BED_FIELD.name);
     if (
       !bed ||
+      bed.field !== BED_FIELD.name ||
       bed.region.type !== 'f32' ||
       bed.region.layout !== BED_LAYOUT ||
       bed.region.byteLength !== this.change.area.length * 4 ||
-      (bed.region.memory ?? this.host.memory) !== this.host.memory ||
+      bed.cell.length !== 3 ||
       bed.cell.some((value, i) => value !== context.cell[i])
     )
-      throw new MargoError(
-        'state',
-        'Soil and terrain geometry disagree. Add the live TerrainBed writer on the same grid and cell.',
-      );
-    if (this.cycle)
-      this.kernel.unload_soil(
-        this.cycle.history.byteOffset,
-        this.cycle.active.byteOffset,
-        this.change.state.byteOffset,
-      );
-    for (const [i, patch] of this.fixed.entries()) this.stamp(patch, i, bed.region, dt);
+      throw soilError('Soil and terrain geometry disagree. Add the live TerrainBed writer on the same grid and cell.');
+    let bedRegion = bed.region;
+    const bedWords = this.inputWords(bedRegion, 4) as Float32Array;
+    if (bedWords.some((value) => !Number.isFinite(value)))
+      throw soilError('A terrain elevation is not finite. Publish finite metres in the TerrainBed bank.');
+    if ((bedRegion.memory ?? this.host.memory) !== this.host.memory) {
+      (regionWords(this.host.memory, this.inputBed) as Float32Array).set(bedWords);
+      bedRegion = this.inputBed;
+    }
+    for (const { accepted, trial, retain } of this.banks) {
+      const words = regionWords(this.host.memory, trial);
+      if (retain) words.set(regionWords(this.host.memory, accepted));
+      else words.fill(0);
+    }
+    const trial = this.trial;
+    if (trial.cycleHistory && trial.cycleActive)
+      this.kernel.unload_soil(trial.cycleHistory.byteOffset, trial.cycleActive.byteOffset, trial.change.byteOffset);
+    for (const [i, patch] of this.fixed.entries()) this.stamp(patch, i, bedRegion, dt);
     const port = this.input && context.inputs.get(this.input.name);
     if (port) {
-      const data = this.words(port.region);
       if (
         port.region.type !== 'f64' ||
         port.region.layout !== SOIL_LAYOUT ||
-        data.length !== this.inputRows * SOIL_PATCH_WORDS
+        port.region.byteLength !== this.inputRows * SOIL_PATCH_WORDS * 8
       )
-        throw new MargoError(
-          'state',
+        throw soilError(
           'The soil contact port differs from the configured capacity. Provide one layout-1 f64 record per row.',
         );
-      const [x, z] = this.shift(port);
+      const data = this.inputWords(port.region, 8) as Float64Array;
+      const [x, z] = this.shift(port, context.cell);
       const phases = this.readWheelPose(context, this.phase, 'phase', port.cell);
       const cambers = this.readWheelPose(context, this.camber, 'camber', port.cell);
-      const bedSurface = cambers && bedFromPort(this.host.memory, bed, this.terrain);
-      const digging = this.diggingPhase && this.words(this.diggingPhase);
+      const bedSurface = cambers && bedFromPort(this.host.memory, { ...bed, region: bedRegion }, this.terrain);
+      const digging = trial.diggingPhase && this.words(trial.diggingPhase);
       for (let i = 0; i < this.inputRows; i++) {
         const at = i * SOIL_PATCH_WORDS;
         let spinTravel = 0;
@@ -1080,7 +1140,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
             data[at + 9]!,
           ],
           this.fixed.length + i,
-          bed.region,
+          bedRegion,
           dt,
           phases?.[i],
           cambers?.[i],
@@ -1088,48 +1148,51 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
           bedSurface,
         );
       }
-    } else if (this.diggingPhase) {
-      this.words(this.diggingPhase).fill(0);
+    } else if (trial.diggingPhase) {
+      this.words(trial.diggingPhase).fill(0);
     }
     const feet = this.legged && context.inputs.get(LEGGED_CONTACT_FIELD.name);
-    if (feet) this.footsteps(feet, this.fixed.length + this.inputRows, bed.region, dt);
-    if (this.pressure && this.workRegion && this.faces && (this.reposePending || this.words(this.workRegion)[0]! > 0)) {
+    if (feet) this.footsteps(feet, this.fixed.length + this.inputRows, bedRegion, dt, context.cell);
+    if (trial.pressure && trial.work && trial.faces && (this.reposePending || this.words(trial.work)[0]! > 0)) {
       const { columns, rows, width, depth } = this.terrain;
       const slope = this.material.reposeSlope;
       const moved = this.kernel.repose(
         this.areas.byteOffset,
-        this.change.state.byteOffset,
-        this.pressure.byteOffset,
-        bed.region.byteOffset,
-        this.faces.byteOffset,
-        this.workRegion.byteOffset,
+        trial.change.byteOffset,
+        trial.pressure.byteOffset,
+        bedRegion.byteOffset,
+        trial.faces.byteOffset,
+        trial.work.byteOffset,
         columns + 1,
         rows + 1,
         (slope * width) / columns,
         (slope * depth) / rows,
-        this.trackRelief?.byteOffset ?? 0,
+        trial.trackRelief?.byteOffset ?? 0,
         this.reposePending?.byteOffset ?? 0,
         this.rim.byteOffset,
         this.floor,
         this.floorGrid?.byteOffset ?? 0,
       );
-      this.words(this.workRegion)[2] = moved;
+      this.words(trial.work)[2] = moved;
     }
+    for (const { trial } of this.banks) {
+      if (trial.type === 'f64' && this.words(trial).some((value) => !Number.isFinite(value)))
+        throw soilError('The soil trial is not finite. Reduce the load or use finite, supported soil coefficients.');
+    }
+    for (const { accepted, trial } of this.banks)
+      regionWords(this.host.memory, accepted).set(regionWords(this.host.memory, trial));
   }
 
   exportPorts(tick: number): readonly Port[] {
+    const cell = this.host.cell;
     return [
-      this.change.port(tick, this.cell),
-      { field: this.dustField.name, region: this.dust, tick, cell: this.cell },
-      { field: this.responseField.name, region: this.response, tick, cell: this.cell },
-      ...(this.reaction && this.reactions
-        ? [{ field: this.reaction.name, region: this.reactions, tick, cell: this.cell }]
-        : []),
-      ...(this.sideForce && this.sides
-        ? [{ field: this.sideForce.name, region: this.sides, tick, cell: this.cell }]
-        : []),
+      this.change.port(tick, cell),
+      { field: this.dustField.name, region: this.dust, tick, cell },
+      { field: this.responseField.name, region: this.response, tick, cell },
+      ...(this.reaction && this.reactions ? [{ field: this.reaction.name, region: this.reactions, tick, cell }] : []),
+      ...(this.sideForce && this.sides ? [{ field: this.sideForce.name, region: this.sides, tick, cell }] : []),
       ...(this.pressureField && this.pressure
-        ? [{ field: this.pressureField.name, region: this.pressure, tick, cell: this.cell }]
+        ? [{ field: this.pressureField.name, region: this.pressure, tick, cell }]
         : []),
     ];
   }
@@ -1179,7 +1242,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   read(row: number) {
     const data = this.words(this.response);
     if (!Number.isSafeInteger(row) || row < 0 || row * SOIL_RESPONSE_WORDS >= data.length)
-      throw new MargoError('state', 'The soil response row is out of bounds. Choose a configured patch or foot.');
+      throw soilError('The soil response row is out of bounds. Choose a configured patch or foot.');
     const at = row * SOIL_RESPONSE_WORDS;
     return { pressure: data[at]!, sinkage: data[at + 1]!, shearStress: data[at + 2]!, normalForce: data[at + 3]! };
   }

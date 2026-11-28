@@ -145,6 +145,11 @@ type NativePhaseSolver =
       readonly subject: 'Vortex water stress';
       readonly phaseExport: 'vortex_water_thread_phase';
       readonly phase: 'water pressure and stress';
+    }
+  | {
+      readonly subject: 'Resistive soil';
+      readonly phaseExport: 'resistive_soil_thread_phase';
+      readonly phase: 'granular strip forces';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };

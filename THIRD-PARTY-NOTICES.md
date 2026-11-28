@@ -715,3 +715,11 @@ Brock Davis, Hope Gruszewski, Craig Powers, Michael Collver, David G. Schmale II
 Biomimetics 6(2), 23 (2021), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 The script converts to SI and derives representative planform area from mean wing loading. Original figures, video,
 models and raw records are not included.
+
+### EARTH-05 soil measurements
+
+`packages/physics/scripts/earth05-plates-measured.mjs` uses sparse derived measurements from
+[Apfelbeck et al. (2011), Fig. 8](https://doi.org/10.1016/j.jterra.2011.04.001) and
+[Rashidi and Gholami (2011), Fig. 7](https://www.arpnjournals.com/jabs/research_papers/rp_2011/jabs_0311_255.pdf).
+The cited papers retain their copyrights. The script contains factual readouts and a separate
+circular material calibration. It includes no original plots or experimental files.

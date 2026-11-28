@@ -20646,3 +20646,24 @@ the bones reuse the dual quaternion slots, each rebuilt on the centre for its li
 tests/cor.test.js (a half-weighed panel keeps its area to 1e-3 where linear shrinks it, and reaches less far than dual
 quaternions; a 160 degree twist keeps its radius; one bone is exact; split parts agree) and
 scripts/animation-cor-tests.js (GPU against the CPU pose on WebGPU and the WebGL2 layer).
+
+### EARTH-05 independent plate shapes and pressure cycles
+
+Maximilian Apfelbeck, Sebastian Kuß, Bernhard Rebele and Bernd Schäfer, *A systematic approach
+to reliably characterize soils based on Bevameter testing* (2011), report separate circular and
+equal-area rectangular experiments. The executable comparison uses the Soil01 circular calibration
+from Table 5 at 4.8 mm/s. Its independent references are rectangular Fig. 8 centre values and
+whiskers at 22 and 48 kPa. The diagnostic records figure-reading allowance, monotone interpolation
+and the 128-to-256 grid difference. [Apfelbeck et al.](https://doi.org/10.1016/j.jterra.2011.04.001)
+
+Majid Rashidi and Mohammad Gholami, *Non-linear modeling of soil sinkage by multiple loadings
+using the finite element method* (2011), report ten serial loads on a rectangular plate. The
+diagnostic uses the reported geometry and load schedule. Three sparse Fig. 7 laboratory markers
+give the measured normalized response and are excluded from the model input. The study does
+not report replicate variance. No figures, lab series or implementation code were copied.
+[Rashidi and Gholami](https://www.arpnjournals.com/jabs/research_papers/rp_2011/jabs_0311_255.pdf)
+
+Native resistive-force workers partition complete midpoint pairs from Li, Zhang and Goldman (2013),
+Eqs. 1–2 and S8–S9. Each pair produces independent forces and the corresponding moment arms.
+The caller joins the pairs and adds their wrench terms in body, strip and sample order to retain
+the scalar result. [Li, Zhang and Goldman](https://doi.org/10.1126/science.1229163).

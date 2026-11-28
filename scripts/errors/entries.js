@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'soil',
+    title: '@margoengine/physics/terramechanics soil contact and terrain fields',
+    kind: 'family',
+    messages: [],
+    cause: 'A soil property, contact record, related terrain or an accepted deformation exceeds the supported range.',
+    fix: 'Use the versioned contact layout and finite SI values in aligned field banks. Supply matching terrain, contact and wheel-pose profiles. Reduce the load or use measured pressure–sinkage coefficients if the current soil cannot support it.',
+  },
+  {
     id: 'vortex',
     title: '@margoengine/physics/vortices natural storm forcing and wet-grid sampling',
     kind: 'family',

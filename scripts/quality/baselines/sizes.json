@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22124678,
+  "total": 22128382,
   "history": [
     {
       "date": "2026-10-24",
@@ -16007,6 +16007,12 @@
       "commit": "skin-center-of-rotation",
       "reason": "KB-SKIN-BULGE1 skinning about optimized centres of rotation: new entry @margoengine/animation/cor 6062 B gzip; @margoengine/animation root 26123 to 26741 B (ceiling 26616 to 27544) and /interactivity 25436 to 26072 B (25889 to 26855) for the SkinningMode vertexData hook (each mesh's primitives read once per asset, four numbers a vertex packed after the weights, the CPU pose and shader stride); @margoengine/humans/body 7863 to 7906 B (7899 to 8162) for the new default. A lazy split would make the first influence upload async; core and stage receive zero bytes.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "earth-05-native-strip-workers",
+      "reason": "EARTH-05 @margoengine/physics/terramechanics 16106 to 19702 B gzip, ceiling 16590 to 20294 B. The optional soil entry keeps accepted banks stable across rejected loads. Native helpers evaluate independent strip sample pairs. Splitting would duplicate the existing soil Wasm ABI, optional loading and the signed field contract. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16936,7 +16942,7 @@
     "@margoengine/physics/surf": 12869,
     "@margoengine/physics/surge": 9351,
     "@margoengine/physics/synoptic": 6633,
-    "@margoengine/physics/terramechanics": 16590,
+    "@margoengine/physics/terramechanics": 20294,
     "@margoengine/physics/thermal": 6905,
     "@margoengine/physics/thin-film": 18799,
     "@margoengine/physics/tissue": 3218,

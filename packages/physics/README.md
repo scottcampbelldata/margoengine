@@ -9353,6 +9353,9 @@ cohesion, 0.6 internal friction, 25 mm shear length, 20% compaction, 0.05% fines
 Each empirical coefficient may be signed. The combined pressure coefficient for the chosen footprint must be positive.
 Set `floor` for uniform bedrock. Use `floorGrid` with one value per bed vertex or the same coordinate sampler
 as `TerrainBed.bedrock` for spatial data. The grid takes precedence and both solvers share their cell.
+Soil loads and wheel pose records can live in another `WebAssembly.Memory` when their registered
+regions name that memory. Terrain shares the bed's signed origin. Invalid input or a nonfinite
+contact trial leaves the last accepted relief, pressure, loads, dust, budget and unloading history intact.
 
 `Terramechanics.load({ tier: 'resolved' })` distributes bearing stress within each patch and normalizes the
 integrated pressure to the measured load. It uses the effective width `2 × area / perimeter`. Set
@@ -9450,16 +9453,23 @@ uses the existing compaction, airborne fines and berm ledger.
 [Executable spinning-wheel example](tests/coupling/terramechanics.test.js).
 
 ```ts
-import { SoilContactRigidSolver, soilPatchField, soilWheelPhaseField, soilWheelReactionField, Terramechanics } from '@margoengine/physics/terramechanics';
+import { SoilContactRigidSolver, soilPatchField, soilWheelPhaseField, soilWheelPoseField, soilWheelReactionField, Terramechanics } from '@margoengine/physics/terramechanics';
 
 const terrain = { columns: 64, rows: 64, width: 4, depth: 4, centre: [0, 0] as const };
 const input = soilPatchField();
 const wheelPhase = soilWheelPhaseField();
+const wheelPose = soilWheelPoseField();
 const wheelReaction = soilWheelReactionField();
 const soil = await Terramechanics.load({ tier: 'resolved', input, wheelPhase, wheelReaction });
-const rigid = new SoilContactRigidSolver(input, { terrain, wheelPhase, wheelReaction });
+const rigid = new SoilContactRigidSolver(input, { terrain, wheelPhase, wheelReaction, wheelPose });
 console.log(rigid.describe().id, soil.describe().id);
 ```
+
+The optional `wheelPose` field restores immediately with the world snapshot. Read the layout-1 f64
+rows from the registry. Each wheel row gives the chassis-local hub position XYZ in metres, local
+quaternion XYZW, signed spin in rad/s, angle in radians and normal load in N. Compose the hub pose
+with the accepted chassis transform. Rows follow the soil patch ordering. Belt slots contain zeros.
+[Executable accepted-pose example](tests/terramechanics-film.fixture.js).
 
 Use `ResistiveSoil` when forces should follow the shape, depth and velocity of a moving leg
 through dry grains. It reads the active bed, integrates the published anisotropic stress law
@@ -9475,7 +9485,7 @@ import { ResistiveSoil } from '@margoengine/physics/terramechanics';
 import { PhysicsWorld, RigidSolver } from '@margoengine/physics/world';
 
 await Physics.load();
-const soil = await ResistiveSoil.load();
+using soil = await ResistiveSoil.load({ threads: 1 });
 const terrain = { columns: 8, rows: 8, width: 0.24, depth: 0.22, centre: [0, 0] as const };
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
 using physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, gravity: [0, 0, 0] });
@@ -9500,6 +9510,12 @@ The example uses the measured loosely packed poppy-seed coefficients from Li, Zh
 and Goldman (2013), Table S2. The load acts on the next rigid step. The separately
 measured rotating-leg experiment checks both lift and thrust.
 [Rotating-leg validation](tests/coupling/resistive-soil.test.js).
+
+`threads` defaults to one native participant. Choose two or four with a shared-memory world
+in Node or a cross-origin-isolated browser. Helpers evaluate disjoint pairs of submerged
+samples. The parent sums the forces and moments in the same strip order on all participant
+counts. `soil.readNativeWork()` reports the joined sample counts after an accepted step.
+Dispose the solver when the world stops to release its helpers.
 
 Set `material.unloading` to give the soil a recoverable part of its settlement.
 `unloading.stiffness` is the measured initial unloading slope in Pa/m, and

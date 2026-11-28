@@ -11080,6 +11080,11 @@ vertex controls its elastic slope. A larger stress can add permanent settlement.
 The release step visits only previously compressed vertices. Overlapping footprints in the same
 step retain their greatest elastic displacement. The dry granular model treats identical repeated
 loads below the previous peak as elastic. Progressive fatigue and same-pressure ratcheting remain open.
+Accepted topography changes, contact outputs and history are kept separate from the native trial.
+The ordinary mean trial adds 24 bytes per vertex for deformation, dust and peak settlement, plus
+4 bytes of staging capacity for an independently allocated terrain input. The resolved trial adds
+8 bytes per vertex for pressure and approximately 0.26 bytes per vertex for ordered face flags.
+Unloading and the cross-track bank add their own history to the trial when enabled.
 Optional hardpan adds one subsurface pressure
 transition sampled at the footprint centre. Resolve changes in layer depth at the scale of the footprint.
 Shear and displaced material use the topsoil fit. Shared layer exchange, overhangs and accumulated
@@ -11108,6 +11113,9 @@ parallel to the projected transverse axis, fully dry points and exactly edge-on 
 produce no load. This tier uses 64 scratch bytes per configured sample and an extra sample
 when padding an odd count. It returns forces and moments through the rigid body's force
 field. It currently reads the bed without modifying soil distribution or emitting dust.
+One, two or four native participants can evaluate disjoint pairs. The parent joins all work before
+reducing in body and strip order. Two and four require shared memory. Footprint sediment deposition
+and repose remain ordered because overlapping contacts can change the same vertices.
 The optional cross-track berm mode places the loose soil in separate triangular banks. Its
 physical width uses the configured repose slope; slope zero uses the default ring. Unresolved
 or off-grid banks report their volume as exported. With an effective `grouserFill` fraction in
@@ -11132,8 +11140,24 @@ crest-to-trough relief at one straight locked-wheel condition. Supply the same e
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 16,514 B gzip with a 16,801 B ceiling. Both Wasm assets are 40,423 B raw and 16,491 B gzip each.
-The Physics root is 866,971 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,846 B gzip.
+#### Independent plate shape and repeated pressure
+
+At 48 kPa Apfelbeck et al. (2011) observed 26.06, 36.90 and 39.49 mm of sinkage for equal-area
+1:3, 1:5 and 1:7 rectangles pressed into quartz sand. The resolved solver uses the separate
+circular-plate material fit at the same penetration speed. It gives 26.42, 27.89 and 29.38 mm.
+The latter two miss the measured ranges [32.7, 41.1] and [35.5, 43.3] mm even after the
+figure-reading uncertainty is included. The 128-to-256 resolution shift is at most 0.056 mm in
+these three cases. The mean solver also underestimates the slender plate sinkage.
+
+Rashidi and Gholami's 40 × 60 mm plate bearing test at 200 kPa accumulated 57, 83 and 98 mm
+of sinkage at cycles 1, 3 and 10. Relative to the first peak, the plotted ratios at cycles 3 and
+10 are 1.456 and 1.719. For repeated equal pressure, both solver tiers give 1.0 at both cycles with
+either unfitted unloading stiffness. This check compares the normalized shape of the response.
+Absolute soil calibration and independent test repeat variance were unavailable for this comparison.
+[Reproducible comparison](../packages/physics/scripts/earth05-plates-measured.mjs).
+
+The optional entry is 19,702 B gzip with a 20,294 B ceiling. Each lazy Wasm asset is 42,097 B raw,
+17,337 B gzip and 15,090 B Brotli. The accepted pose and native workers add zero Core or Stage bytes.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
 
