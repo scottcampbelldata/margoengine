@@ -3293,3 +3293,14 @@ Species-specific physiology, sustained multi-internode extension, crown shedding
 - Point 8 (1476595e04). `packages/biomes/scripts/bio03-forest-measured.mjs` compares 12 independent Douglas-fir survival values. The generic stand reproduces the final spacing rank, misses three of four year-40 reported intervals and overpredicts by up to 17.81 percentage points. A 5 to 10 cm initial-crown change moves the two-metre year-32 result by more than 24 percentage points. [Measured limits](limits.md#bio-03-douglas-fir-survival-in-the-wind-river-spacing-trial)
 
 Layered light, surveyed allometry, species-specific growth and mortality calibration, and the original TREE-3 shot remain open. The row stays REOPENED at four points.
+
+### BIO-04 Material ageing
+
+#### BIO-04 four-point pass
+
+- Point 5 (a9332e0abb). `packages/physics/tests/coupling/ageing.test.js` checks registered signed replay, foreign-memory exposure, invalid late rows, alignment and overflow with exact accepted history and surface. `packages/physics/tests/coupling/ageing-workers.test.js` rejects elapsed overflow on the remote odd tail without changing the accepted state or work receipt.
+- Point 6 (a9332e0abb). `packages/physics/tests/coupling/ageing-workers.test.js` checks exact scalar and native 1/2/4 results across 129 and 173 mixed patches with snapshots and replay. `packages/physics/tests/ageing-workers.browser.mjs` exercises three concurrent Chromium helpers and records 128 SIMD-paired patches out of 129.
+- Point 7 (a9332e0abb). `packages/physics/tests/ageing-film.browser.mjs` drives eight exposure bands from accepted HYDRO-01. A 118.08 mm gauge peak consumes 29.11 µm of steel at the base and leaves 42.51 µm retained oxide after drainage. The dry control stays unchanged and both renderers repeat complete accepted state and RGBA.
+- Point 8 (a9332e0abb). `packages/physics/scripts/bio04-ageing-measured.mjs` compares independent Rapa Nui copper and Milan carbon-steel coupon losses. At years one and three, predicted copper losses are 1.26 and 2.83 µm against 2.10 and 3.75 µm measured. Milan predicts 5.28 µm against 6.92 µm at ten months, with first-year weather as a proxy. [Measured limits](limits.md#bio-04-measured-copper-and-carbon-steel-coupon-losses)
+
+Spatial pitting and runoff streaks, laboratory appearance calibration, predictive site immersion current and biological supply remain open. The row stays REOPENED at four points.
