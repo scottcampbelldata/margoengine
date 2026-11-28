@@ -1,6 +1,11 @@
 // Screen-space tracing shared by SSR and SSGI: the fullscreen vertex stage, the Hi-Z reduction and the Hi-Z ray march.
 // Hi-Z tracing after Y. Uludag, "Hi-Z Screen-Space Cone-Traced Reflections" (GPU Pro 5, 2014) and McGuire & Mara,
 // "Efficient GPU Screen-Space Ray Tracing" (JCGT 3(4), 2014); the start offset and nudge constants are Margo's.
+// A cell that sent the ray down is not tested again while the ray stays in it and its depth does not grow: the ray stays
+// at or behind that cell's closest depth, so the test could only descend again (the "crossed cell boundary" rule of
+// Uludag's traversal, kept per level; N. Hofmann, P. Bogendoerfer, M. Stamminger, K. Selgrad, "Hierarchical Multi-Layer
+// Screen-Space Ray Tracing", HPG 2017, https://doi.org/10.1145/3105762.3105781, on the cost of long rays near surfaces).
+// Hits count only on surfaces facing the ray (KB-POST-SSRSTREET1).
 // SSR's composite is assembled from these pieces, so its shader text is what it was before they moved here.
 import { group as bind } from '../../shared/gpu.js';
 import { compatibilityLevel } from '../../shared/compat.js';
@@ -97,9 +102,10 @@ export const downsampleShader =
 @fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f {return textureSampleLevel(source,bilinear,p.xy*2.0/vec2f(textureDimensions(source)),0.0);}
 `;
 /** WGSL helpers of the march; need `u` (U: inverse, matrix, a = (width, height, -, thickness), b = (maxDistance, steps,
- * Hi-Z levels, -)), `depth` (texture_depth_2d) and `hiz` (the reduced levels). */
+ * Hi-Z levels, -)), `depth` (texture_depth_2d), `hiz` (the reduced levels) and `normals` (world normal * 0.5 + 0.5). */
 export const traceFunctions = `fn world(q:vec2f,d:f32)->vec3f {let w=u.inverse*vec4f(q.x/u.a.x*2.0-1.0,1.0-q.y/u.a.y*2.0,d,1.0);return w.xyz/w.w;}
 fn screen(p:vec4f)->vec3f {let n=p.xyz/p.w;return vec3f((n.x*0.5+0.5)*u.a.x,(0.5-n.y*0.5)*u.a.y,n.z);}
+fn facing(cell:vec2i,r:vec3f)->bool {return dot(textureLoad(normals,cell,0).xyz*2.0-1.0,r)<0.0;}
 fn closest(cell:vec2i,level:i32)->f32 {
 if(level==0){return textureLoad(depth,cell,0);}
 return textureLoad(hiz,min(cell,vec2i(textureDimensions(hiz,level-1))-1),level-1).r;
@@ -118,17 +124,31 @@ let fit=select(vec2f(1),room/dir.xy,abs(dir.xy)>vec2f(1e-6));dir*=clamp(min(fit.
 let len=length(dir.xy);
 if(len>1.5){
 var t=1.5/len;var level=0;var hit=false;let top=i32(u.b.z);let nudge=0.01/max(abs(dir.x),abs(dir.y));
+// Bit k: the level-k cell around the ray already sent it down. While depth does not grow along the ray it stays at or
+// behind that cell's closest depth until it leaves the cell, so testing the cell again would only descend once more.
+var failed=0u;let away=dir.z<=0.0;
 for(var i=0;i<i32(u.b.y);i++){
 if(t>1.0){break;}
 let h=o+dir*t;let size=exp2(f32(level));let cell=floor(h.xy/size);let z=closest(vec2i(cell),level);
 let edge=(cell+select(vec2f(0),vec2f(1),dir.xy>vec2f(0)))*size;
 let across=select(vec2f(1e30),(edge-o.xy)/dir.xy,abs(dir.xy)>vec2f(1e-6));let exit=min(across.x,across.y)+nudge;
+var next=-1.0;var up=true;
 if(h.z>z){
 // In front of everything in this cell: drop to its closest depth if the ray gets there inside the cell, else move on.
 let plane=select(2.0,(z-o.z)/dir.z,dir.z<0.0);
-if(plane<exit){t=max(t,plane);if(level==0){hit=z>0.0;break;}level--;}else{t=exit;level=min(level+1,top);}
-}else if(level>0){level--;}
-else if(z>0.0&&distance(world(h.xy,z),world(h.xy,h.z))<u.a.w){hit=true;break;}
-else{t=exit;}
+if(plane>=exit){next=exit;}
+else if(level>0){t=max(t,plane);if(away){failed|=1u<<u32(level);}level--;}
+// A ray reaches only surfaces facing it: one that faces away is the ray's own surface or a back seen at grazing angles.
+else if(z>0.0&&facing(vec2i(cell),r)){t=max(t,plane);hit=true;break;}
+else{next=exit;}
+}else if(level>0){if(away){failed|=1u<<u32(level);}level--;}
+else if(z>0.0&&facing(vec2i(cell),r)&&distance(world(h.xy,z),world(h.xy,h.z))<u.a.w){hit=true;break;}
+else{next=exit;up=false;}
+if(next>=0.0){
+// Cells the step leaves lose their mark: the highest level whose cell changed is the top bit where the pixels differ.
+let a=vec2u(max(floor(h.xy),vec2f(0)));let b=vec2u(max(floor((o+dir*next).xy),vec2f(0)));let x=(a.x^b.x)|(a.y^b.y);
+if(x!=0u){failed&=~((2u<<firstLeadingBit(x))-1u);}
+t=next;if(up&&(failed&(1u<<u32(level+1)))==0u){level=min(level+1,top);}
+}
 }
 `;

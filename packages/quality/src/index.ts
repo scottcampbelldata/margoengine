@@ -30,7 +30,7 @@ export interface QualityPreset {
   scatter?: { lodFade?: number };
   /** `SSAO` (@margoengine/post/ssao): on/off (default on) and kernel samples, 1-32 (default 32). */
   ssao?: { enabled?: boolean; samples?: number };
-  /** `SSR` (@margoengine/post/ssr): on/off (default on) and Hi-Z march steps (default 64). */
+  /** `SSR` (@margoengine/post/ssr): on/off (default on) and Hi-Z march steps (default 128). */
   ssr?: { enabled?: boolean; steps?: number };
   /** `VolumetricFog` (@margoengine/environment/volumetric): on/off (default on) and froxel grid (default [160, 90, 64]). */
   volumetric?: { enabled?: boolean; grid?: readonly [number, number, number] };

@@ -289,7 +289,7 @@ test('featureKnobs starts from what the app set and turns down what it can', () 
   by.ssao.apply(0);
   assert.deepEqual([ssao.enabled, ssao.options.samples], [true, 16]);
   by.ssr.apply(1);
-  assert.equal(ssr.options.steps, 32, 'the package default is the start');
+  assert.equal(ssr.options.steps, 64, 'the package default is the start');
   by['shadow filter'].apply(1);
   assert.equal(shadows.options.filter, 'hard');
   by['shadow distance'].apply(2);

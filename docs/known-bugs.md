@@ -28,6 +28,32 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   shader without the `taaCamera` swap, and terrain and scatter captures with an unjittered frame uniform of their own.
   With registered masks the TAA frame reads 0.198 b* and passes. The bar stays.
 
+### Fixed 2026-11-27: SSR drew stair-stepped streaks and smeared stripe copies on a street (KB-POST-SSRSTREET1, post)
+
+- **Repro:** The Night City demo (`demos/the-night-city`, `new SSR({steps: 56, maxRoughness: 0.59, thickness: 1.35,
+  maxDistance: 187})`), Avenue view at 20:30, 1045x631 canvas: the asphalt beside the kerbs showed vertical streaks and
+  blocky copies of the crossing stripes and kerb edges; with SSR off the road was clean.
+- **Cause:** shading each pixel by how its ray ended showed rays from the outer lanes running out of their iteration
+  budget while still in front of the depth (counted as misses) beside neighbours that finished a few iterations
+  sooner and reflected the kerbs, lamp posts and building fronts; 256 steps gave a clean mirror. The march spent the
+  budget re-testing Hi-Z cells: after descending from a cell whose closest depth the ray had reached, each step inside
+  it went up one level, tested the same cell again and came down again, although a ray whose depth falls stays behind
+  that cell until it leaves it. Rays passing just above a surface also took it as a hit from behind (the pixel's depth
+  is one value, so a ray a hair above a steep surface crosses it inside the pixel) and stopped there, copying the road
+  above them. Neither the thickness (0.1 gave the same frame) nor the cone level was the cause.
+- **Fix:** the march (`packages/post/src/hiz.ts`, shared by SSR, its rough trace and SSGI) keeps one bit per Hi-Z
+  level for the cell that sent the ray down, clears the bits of cells a step leaves, and does not go back up into a
+  marked cell, so the output is the same with fewer iterations; a hit counts only on a surface facing the ray. The SSR
+  default `steps` is 128 (was 64), as are `ssr.steps` in `@margoengine/post/settings` and the adaptive-quality knob's
+  start. The demo passes its own 56: with the fix the upper road is clean but speckled misses stay near the bottom of the frame; with 96
+  or more (or the default) it is clean. Sources: Y. Uludag, "Hi-Z Screen-Space Cone-Traced Reflections", GPU Pro 5,
+  2014; M. McGuire and M. Mara, "Efficient GPU Screen-Space Ray Tracing", JCGT 3(4), 2014,
+  https://jcgt.org/published/0003/04/04/; N. Hofmann, P. Bogendoerfer, M. Stamminger and K. Selgrad, "Hierarchical
+  Multi-Layer Screen-Space Ray Tracing", HPG 2017, https://doi.org/10.1145/3105762.3105781.
+- **Regression:** `packages/post/test/ssr-street-browser.mjs` (a glossy street between kerbs, posts and walls at
+  320x240): at 28 steps the frame was 3.1 luminance steps from the 256-step frame with 3.1 of pixel-to-pixel jumps
+  before the fix, 1.2 and 1.4 after; the test asks for under 2 and fails without the fix.
+
 ### Fixed 2026-11-27: a figure under reduced motion kept a picture without its axes and ignored input (KB-VC-SCIVIZ-VOL, -SURF, -WIND, -HEAD, sciviz)
 
 - **Repro:** `node scripts/visual-compat.mjs --only=sciviz-volume,sciviz-surface,sciviz-wind,sciviz-head` several times on

@@ -263,7 +263,7 @@ import {SSR} from 'margoengine/post/ssr';
 import {Bloom} from 'margoengine/post/bloom';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const ibl = await EnvironmentLighting.load(stage.engine, '/studio.hdr');
-const ssr = new SSR({maxRoughness: 0.6, thickness: 0.5, maxDistance: 100, steps: 64});
+const ssr = new SSR({maxRoughness: 0.6, thickness: 0.5, maxDistance: 100, steps: 128});
 const stack = PostStack.attach(stage.engine, [new SSAO(), ssr, new Bloom({strength: 0.6})]);
 const helmet = await loadGLTF(stage.engine, '/FlightHelmet.glb'); // from 'margoengine/gltf/pbr'
 ibl.add(helmet);                     // EnvironmentLighting, so SSR replaces its specular (below)
@@ -300,7 +300,13 @@ ssr.enabled = false; // pass-through, no recompiles
 - **Ray march.** One mirror ray per pixel, clipped to the near/far planes and the screen, marched in screen space over
   a hierarchical depth pyramid (Hi-Z: the closest depth per 2^n cell, up to 64 px cells) with `steps` iterations and a
   `thickness` (scene units) a ray may pass behind a surface. Pixel x/y and NDC depth are linear along the projected
-  ray for perspective and orthographic (`@margoengine/cameras`) projections alike.
+  ray for perspective and orthographic (`@margoengine/cameras`) projections alike. A cell that already sent the ray
+  down is not tested again while the ray is inside it (its depth only falls along the ray, so it stays behind that
+  cell), and a hit counts only on a surface facing the ray. A ray still marching when `steps` (default 128) run out is
+  a miss: too few for the view shows as streaks where neighbouring pixels finish on either side of the budget. Rays
+  reflected low over a street (road, kerbs, lamp posts) are the costly case: a 1045x631 street view needed about 96
+  (`test/ssr-street-browser.mjs`; until 2026-11-27 the march re-tested those cells and needed about 128, and the old
+  default 64 left the streaks, KB-POST-SSRSTREET1).
 - **Roughness.** Surfaces rougher than `maxRoughness` are skipped; reflections fade out from half of it. The hit colour
   comes from a half-resolution mip chain of the scene, at the level whose texel spans the reflection cone's footprint
   at the hit: the cone of the surface's roughness (GGX alpha = roughness² as a Phong exponent, the cone holding 3/4 of
@@ -343,7 +349,7 @@ ssr.options.stochastic = false;                                         // back 
 - **Alpha and bindings.** Keeps the scene alpha (TransparentCanvas). SSR runs in its own passes (the composite samples 7 textures),
   so it adds nothing to the mesh shader's 16-texture budget.
 - **Cost** (Intel Arc 140V, Edge 155, quiet machine, a 0.1-roughness floor filling most of the view: the worst case,
-  every floor pixel traces). GPU time of SSR's own passes, replay + Hi-Z / blur + trace + composite:
+  every floor pixel traces; measured before 2026-11-27 with the old default of 64 steps and the old march). GPU time of SSR's own passes, replay + Hi-Z / blur + trace + composite:
   1280x720 4x 2.3 ms (0.7 / 1.6), 1x 2.2 ms (0.5 / 1.7); 1920x1080 4x 5.8 ms (1.6 / 4.2), 1x 5.9 ms (1.1 / 4.9).
   `steps: 16` cuts the trace by about a third. `enabled = false` still costs one full-screen copy (0.2-1.0 ms);
   remove SSR from the stack to drop it entirely. `examples/package-benchmarks/ssr-gpu.mjs` (results/ssr-gpu.json).

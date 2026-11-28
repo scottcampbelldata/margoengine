@@ -323,7 +323,7 @@ export function featureKnobs({
     .filter((effect) => effect.enabled)
     .map((effect) => optionKnob(effect.name, effect, 'enabled', [true, false], 1));
   if (ssao?.enabled) knobs.push(halved('ssao', ssao, 'samples', ssao.options.samples ?? 32, 1));
-  if (ssr?.enabled) knobs.push(halved('ssr', ssr, 'steps', ssr.options.steps ?? 64, 1));
+  if (ssr?.enabled) knobs.push(halved('ssr', ssr, 'steps', ssr.options.steps ?? 128, 1));
   if (shadows) {
     const { options } = shadows,
       // A filter effect (`varianceFilter`) binds its own resources at construction: it is no step on this ladder.

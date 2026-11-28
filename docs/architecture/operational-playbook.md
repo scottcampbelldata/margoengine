@@ -190,6 +190,16 @@ share once, by colour space (shader.ts `shareOwner`), so the KHR_materials layou
 need 5 extension units, not 8. Evidence: CPU checks of the WGSL and bind entries (physical-map-renderer.test.js,
 materials-ext.test.js) and the `shared` variant of compat-units-gpu-check.js on native WebGPU and the WebGL2 layer.
 
+### Section 5 evidence: the screen-space march on streets (2026-11-27, KB-POST-SSRSTREET1)
+
+The Hi-Z march shared by SSR, its rough trace and SSGI (packages/post/src/hiz.ts) no longer re-tests a cell that sent
+the ray down while the ray is inside it and its depth falls (one bit per level, cleared for the cells a step leaves),
+which gives the same hits with fewer iterations, and it counts hits only on surfaces facing the ray. SSR's default
+`steps` went from 64 to 128. Evidence: real frames of The Night City's avenue (streaks gone at 96 steps or more; the
+demo's own 56 still leaves speckled misses near the frame's bottom) and `packages/post/test/ssr-street-browser.mjs`
+on WebGPU and the WebGL2 layer (28 steps: 3.1 luminance steps from the 256-step frame before, 1.2 after). Missing:
+GPU time not measured (build phase); a ray that runs out of steps is still a hard miss, with no fade by budget.
+
 ### Section 5 evidence: rough reflections with contact hardening (2026-11-25)
 
 Planar reflectors (environment's Reflector, Refractor and PBRReflector with `contactHardening`), water's planar

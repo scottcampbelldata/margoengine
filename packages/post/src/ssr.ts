@@ -41,7 +41,7 @@ export interface SSROptions {
   thickness?: number;
   /** Longest reflection ray in scene units; hits fade out over the last 20%. Default 100. */
   maxDistance?: number;
-  /** Hierarchical-depth march iterations per pixel (1-256). Default 64. */
+  /** Hierarchical-depth march iterations per pixel (1-256); a ray still marching when they run out is a miss. Default 128. */
   steps?: number;
   /** False skips the reflection passes. Default true; also `ssr.enabled`. */
   enabled?: boolean;
@@ -406,7 +406,7 @@ export class SSR implements EnginePlugin {
       r = o.maxRoughness ?? 0.6,
       t = o.thickness ?? 0.5,
       d = o.maxDistance ?? 100,
-      s = o.steps ?? 64;
+      s = o.steps ?? 128;
     if (
       !(r > 0 && r <= 1) ||
       !(t > 0 && Number.isFinite(t)) ||
@@ -466,7 +466,7 @@ export class SSR implements EnginePlugin {
     v[34] = o.maxRoughness ?? 0.6;
     v[35] = o.thickness ?? 0.5;
     v[36] = o.maxDistance ?? 100;
-    v[37] = o.steps ?? 64;
+    v[37] = o.steps ?? 128;
     v[38] = this.hizLevels!.groups.length;
     v[39] = +this.enabled;
     this.slice = writeUniform(c.device, this.uniform!, v as Float32Array<ArrayBuffer>, c.view ?? c);

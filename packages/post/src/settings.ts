@@ -397,7 +397,7 @@ export const POST_SETTINGS: readonly PostSetting[] = [
     'm',
     'Longest reflection ray in scene units; hits fade out over the last 20%.',
   ),
-  n('ssr.steps', 'ssr', 64, 1, 256, 1, '', 'Hierarchical-depth march iterations per pixel, a whole number.'),
+  n('ssr.steps', 'ssr', 128, 1, 256, 1, '', 'Hierarchical-depth march iterations per pixel, a whole number.'),
   pick(
     'ssr.stochastic',
     'ssr',
