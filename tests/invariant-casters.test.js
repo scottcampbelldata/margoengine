@@ -102,6 +102,9 @@ const DEPTH_EQUAL = {
   },
   // RawShaders' MargoVelocity against the raw vertex entry.
   'packages/shader/src/raw.ts': { 'packages/shader/src/raw.ts': ['MargoVelocity'] },
+  // XR's AR alpha pass replays no mesh: a full-screen triangle at the constant depth 0 matches only the pixels still at
+  // reversed depth's clear value 0, which no vertex expression can round differently.
+  'packages/xr/src/eyes.ts': {},
 };
 
 test('every depth-equal replay vertex and the colour vertex it replays are @invariant (WGSL 12.10)', () => {
