@@ -146,8 +146,9 @@ try {
 | `maxVertices` | all parsers | 8,000,000 |
 | `maxTriangles` | all parsers | 16,000,000 |
 | `units` | `parse3MF` | `'meters'`; `'file'` keeps the model unit |
-| `maxEntries`, `maxEntryBytes`, `maxRatio` | `parse3MF` | 10,000 entries, 512 MiB per part, a deflated part over 1 MiB may expand at most 200x (zip bombs reach 1,032x); a build expands to at most 100,000 object instances |
+| `maxEntries`, `maxEntryBytes`, `maxRatio` | `parse3MF` | 65,535 entries (10,000 for the other ZIP formats), 512 MiB per part, a deflated part over 1 MiB may expand at most 200x (zip bombs reach 1,032x); a build expands to at most 100,000 object instances |
 | `maxDepth` | `parse3MF` | 32 nested components |
+| `maxModelParts` | `parse3MF` | 65,535 model parts (production extension), the root included: every part a ZIP without ZIP64 can hold, so a 10,000-part export reads back; `maxBytes`, `maxTriangles` and `maxEntryBytes` still bound the work |
 | `modelResolution` | `parse3MF` | `'fullres'`; the first production alternative of this resolution (`'fullres'`, `'lowres'`, `'obfuscated'`) stands in for its object, which is read when there is none |
 | `signal` | `parse3MF`, `load` | none |
 | `keepInvalid` | `parsePCD` | `false` (NaN holes of organized clouds dropped) |

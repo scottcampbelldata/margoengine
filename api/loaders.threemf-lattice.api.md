@@ -204,6 +204,7 @@ interface ThreeMFMetallic {
 interface ThreeMFOptions extends ParseLimits, XMLExternalOptions, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
     units?: 'meters' | 'file';
     maxDepth?: number;
+    maxModelParts?: number;
     modelResolution?: 'fullres' | 'lowres' | 'obfuscated';
     signal?: AbortSignal;
 }

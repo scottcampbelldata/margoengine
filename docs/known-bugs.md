@@ -20,6 +20,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   liquid 0.020 (its reflection), under water every pixel covered, the same on WebGPU and the WebGL2 layer (RTX A6000).
 - **Regression:** the same GPU test, the "liquid over nothing" and "under water" cases.
 
+### Fixed 2026-11-28: parse3MF refused a package of more than 1,024 model parts, so Margo could not read its own 10,000-part export (KB-3MF-PARTLIMIT1, loaders)
+
+- **Repro (before):** `export3MF(NodePerformanceTest.glb, {assembly: 'components', production: {separateParts: true}})`
+  writes 10,000 parts; `parse3MF` on it threw `loaders/3mf: archive has 10003 entries, more than the limit of 10000`,
+  and with `maxEntries` raised, `too many model parts` at the 1,025th part. No option lifted the second.
+- **Cause:** a hard-coded `models.size >= 1024` in `read3MF` (`packages/loaders/src/threemf.ts`), and the shared ZIP
+  default of 10,000 entries, though each production part is its own entry.
+- **Fix:** `ThreeMFOptions.maxModelParts`, default 65,535 (every part a ZIP without ZIP64 can hold; the root counts),
+  and 3MF's `maxEntries` default follows it (in `parse3MFKeystore` too). `maxBytes`, `maxTriangles` and
+  `maxEntryBytes` still bound the work. The other ZIP formats keep 10,000 entries.
+- **Regression:** `packages/loaders/tests/threemf-part-limit.test.js` (fails before the fix) and the NodePerformanceTest
+  read-back in `packages/exporters/tests/threemf-part-prune.test.js`.
+
 ### Fixed 2026-11-28: rebase:main left docs/api-surface.md with a wrong Unexported figure and a short total (KB-REBASE-SURFACE1, scripts)
 
 - **Repro:** `npm run api:check` on main 66546e10a1: `webgl2-compat` read 313 unexported (the reports hold 307) and the
@@ -49,6 +62,17 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   default, WebGPU and `MARGO_COMPAT=1`).
 
 ### Open 2026-11-28: 21 web demos cannot be rebuilt from source/: the data files their code imports are missing (KB-DEMO-SOURCEDATA1, demos)
+
+- **Repro:** `node scripts/web-demos/build.mjs the-brain-scan` (or caustic-glass, character-course, cutscene-studio,
+  depth-video, directional-lightmaps, ground-projection, hdr-window, parallel-coordinates, the-ar-card,
+  the-climate-globe, the-contour-map, the-cut-house, the-laser-scan, the-lighting-store, the-simplifier, the-sky-clock,
+  the-sky-survey, the-weather-radar, wind-and-flow-painting, wind-over-america): Vite fails to resolve a relative
+  `?url` or JSON import such as `./assets/mri.bin`.
+- **Cause:** 3eb5f2dd23 added the demos with their built `assets/` but without the source copies of their data files.
+  height-streaming is fixed (its tiles restored from the shipped assets, byte for byte, guarded by
+  `tests/demo-source-data.test.js`); the rest need the same restore where the built page ships the file under a
+  content hash, and the original data where Vite inlined it.
+
 ### Open 2026-11-28: a floating body's carried water swaps energy with it as its draft changes (KB-LOADS-ADDEDRATE1, physics)
 
 - **Repro:** a 0.1 m sphere at half the water's density let go 0.04 m above its rest on still water, `LoadSolver` at 60
@@ -60,18 +84,6 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   it closed the sphere's swing to 1.5 % but damped the undamped wall-sided box of KB-LOADS-HEAVEGAIN1 by 0.15 % a
   swing (`tests/loads-floating.test.js`), so it was not landed. The term taken at the step's energy-neutral pose
   (as the buoyancy is) is the next try.
-
-### Open 2026-11-28: a 3MF with `production: {separateParts: true}` copies every resource group whole into each part (KB-3MF-PARTCOPY1, exporters)
-
-- **Repro:** `node scripts/web-demos/build.mjs the-brain-scan` (or caustic-glass, character-course, cutscene-studio,
-  depth-video, directional-lightmaps, ground-projection, hdr-window, parallel-coordinates, the-ar-card,
-  the-climate-globe, the-contour-map, the-cut-house, the-laser-scan, the-lighting-store, the-simplifier, the-sky-clock,
-  the-sky-survey, the-weather-radar, wind-and-flow-painting, wind-over-america): Vite fails to resolve a relative
-  `?url` or JSON import such as `./assets/mri.bin`.
-- **Cause:** 3eb5f2dd23 added the demos with their built `assets/` but without the source copies of their data files.
-  height-streaming is fixed (its tiles restored from the shipped assets, byte for byte, guarded by
-  `tests/demo-source-data.test.js`); the rest need the same restore where the built page ships the file under a
-  content hash, and the original data where Vite inlined it.
 
 ### Open 2026-11-28: the limits row of the USD texture factors has no escape hatch cell (KB-LIMITS-USDZCELL1, usdz, docs)
 

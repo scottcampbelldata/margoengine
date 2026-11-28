@@ -9,7 +9,7 @@ import { decodeXML, readXML } from './xml.js';
 const F = '3MF';
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 
-/** Options of {@link parse3MFKeystore}: the zip limits and an AbortSignal. */
+/** Options of {@link parse3MFKeystore}: the zip limits (`maxEntries` defaults to 65,535 as in parse3MF) and an AbortSignal. */
 export interface ThreeMFKeystoreOptions extends Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
   signal?: AbortSignal;
 }
@@ -72,7 +72,9 @@ export async function parse3MFKeystore(
 ): Promise<ThreeMFKeystore | undefined> {
   const bytes = toBytes(input, F),
     byPath = new Map<string, ZipEntry>();
-  for (const entry of readZipDirectory(bytes, options)) byPath.set(normalize(entry.name), entry);
+  // Default entry limit as parse3MF: a package may hold up to 65,535 model parts, each its own entry.
+  for (const entry of readZipDirectory(bytes, { ...options, maxEntries: options.maxEntries ?? 65_535 }))
+    byPath.set(normalize(entry.name), entry);
   const read = async (path: string): Promise<Uint8Array> => {
     throwIfAborted(options.signal, F);
     const entry = byPath.get(normalize(path));

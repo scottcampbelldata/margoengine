@@ -31,6 +31,12 @@ export interface ThreeMFOptions
   /** Component nesting limit. Default 32. */
   maxDepth?: number;
   /**
+   * Most model parts (production extension) one package may hold, the root included. Default 65,535: every part a
+   * ZIP without ZIP64 can carry, as each part is its own entry and `maxBytes`, `maxTriangles` and `maxEntryBytes`
+   * still bound the work. For 3MF `maxEntries` also defaults to 65,535.
+   */
+  maxModelParts?: number;
+  /**
    * Which of a production extension object's alternative representations to read: the first alternative of this
    * resolution stands in for the object, which is kept when there is none. Default `'fullres'`.
    */
@@ -508,16 +514,20 @@ export async function read3MF(
 ): Promise<ThreeMFResult> {
   const bytes = toBytes(input, F),
     limit = limits(options, F),
-    maxDepth = options.maxDepth ?? 32;
+    maxDepth = options.maxDepth ?? 32,
+    maxModelParts = options.maxModelParts ?? 65_535;
   if (!Number.isSafeInteger(maxDepth) || maxDepth < 0)
     throw new LoaderError(F, 'range', 'maxDepth must be a non-negative integer');
+  if (!Number.isSafeInteger(maxModelParts) || maxModelParts < 1)
+    throw new LoaderError(F, 'range', 'maxModelParts must be a positive integer');
   if (options.units !== undefined && options.units !== 'meters' && options.units !== 'file')
     throw new LoaderError(F, 'range', `units must be "meters" or "file"`);
   if (!['fullres', 'lowres', 'obfuscated', undefined].includes(options.modelResolution))
     throw new LoaderError(F, 'range', 'modelResolution must be "fullres", "lowres" or "obfuscated"');
   if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b)
     throw new LoaderError(F, 'header', 'not a ZIP package (missing PK signature)');
-  const entries = readZipDirectory(bytes, options);
+  // A part is an entry, so the entry limit follows the part limit unless the caller sets it.
+  const entries = readZipDirectory(bytes, { ...options, maxEntries: options.maxEntries ?? 65_535 });
   const byPath = new Map<string, ZipEntry>();
   for (const entry of entries) byPath.set(normalizePath(entry.name), entry);
   const read = async (path: string): Promise<Uint8Array> => {
@@ -554,7 +564,8 @@ export async function read3MF(
     const key = normalizePath(path);
     let model = models.get(key);
     if (!model) {
-      if (models.size >= 1024) throw new LoaderError(F, 'limit', 'too many model parts');
+      if (models.size >= maxModelParts)
+        throw new LoaderError(F, 'limit', `package names more than ${maxModelParts} model parts (maxModelParts)`);
       model = parseModel(decodeXML(await read(path)), limit, extension, options.external);
       models.set(key, model);
       partPaths.set(model, '/' + byPath.get(key)!.name.replace(/^\/+/, ''));

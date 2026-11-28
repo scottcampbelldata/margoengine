@@ -97,4 +97,9 @@ test('NodePerformanceTest in separate parts stays near its components size (KB-3
       assert.equal(body.match(/<base /g).length, 1, entry.name);
     for (const [, index] of text.matchAll(/ pindex="(\d+)"/g)) assert.equal(index, '0', entry.name);
   }
+  // KB-3MF-PARTLIMIT1: Margo reads its own 10,000-part file back with the default limits (it refused past 1,024 parts).
+  const back = await parse3MF(apart),
+    flat = await parse3MF(together);
+  assert.equal(new Set(back.groups.map((g) => g.modelPath)).size, 10000);
+  assert.equal(back.indices.length, flat.indices.length);
 });
