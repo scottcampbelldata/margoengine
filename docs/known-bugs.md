@@ -32,6 +32,28 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   start while the arm turns `w h` within it would push steadily outward. The Watt governor rig of
   `@margoengine/machinery/rigs` uses point-mass balls (I = 1e-5 m L^2) and 32 substeps, which settle within 0.001 degrees.
   Physics lane.
+### Fixed 2026-11-28: retargeted mocap hands kept the character's fanned bind fingers, a few degrees off the capture (KB-RIG-FLATHAND1, rigging, animation)
+
+- **Repro:** demos/the-mocap-theatre, "Arms-wide walk" (100STYLE Aeroplane BVH, Xsens), Elias at 1.05 s in Front and
+  Side view: stiff arms with the fingers spread and curled like a claw and the hand off the source wrist; Scott saw arms
+  that were not bending right. The CMU walk showed the same fanned fingers.
+- **Checked and ruled out:** a clean-room BVH forward-kinematics reader (channels in declared order, R1 R2 R3, offsets in
+  parent space) matches `parseBVH` + `Skeleton` to 9e-16 m over all 64 frames and 23 joints, and a reversed rotation
+  order fails it by 1.4 m. After the retarget, Elias's upper arm and forearm follow the source to 0.0 degrees in both
+  takes, his torso frame and the arms inside it match the source's, the palms stay down, and the 100STYLE channel order
+  gives the cleanest knee hinge of all six orders. The source's own elbows sit about 10 degrees up and back and its
+  wrists about 14 degrees up: that is in the capture.
+- **Cause:** `alignRestPose` in `packages/rigging/src/retarget.ts` aimed a bone only when the source had its child, so a
+  source hand ending in a BVH End Site left Elias's hand 5.3 degrees off and every finger in his bind pose (fanned 18
+  to 33 degrees off the hand). `Retarget.apply` also wrote only mapped bones, so an unmapped bone whose aligned rest
+  changed would still have kept the target's own pose.
+- **Fix:** a fingerless source hand is one rigid segment: the target hand and long fingers are laid along it (in line
+  with the source forearm when the source has no finger base), `prepareRetarget` lists the turned unmapped bones in
+  `hold`, `Retarget` writes and keys them (`RetargetOptions.hold`), and CMU's single `lfingers` drives all four long
+  fingers. Hand direction now 0.0 degrees from the source; fingers 0.0 degrees from the hand.
+- **Regression:** `packages/rigging/tests/retarget.test.js` ("a fingerless T-pose source ..." and "one source finger
+  segment ..."), `packages/animation/tests/retarget.test.js` ("held bones are written ..."), and
+  `packages/loaders/tests/mocap-fk.test.js` (the independent BVH reader).
 
 ### Fixed 2026-11-28: a path joint on a turning base lags and then diverges (KB-PHYS-PATHMOVINGBASE1, physics mechanisms)
 

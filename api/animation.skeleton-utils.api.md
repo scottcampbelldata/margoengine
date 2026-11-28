@@ -14,6 +14,7 @@ export class Retarget {
     readonly hip: number;
     readonly sourceHip: number;
     readonly hipScale: number;
+    readonly held: Uint8Array;
     constructor(source: RetargetRig, target: RetargetRig, options?: RetargetOptions);
     pose(source: Float64Array, out?: Float64Array): Float64Array;
     apply(source: Skeleton | PBRModel, target: Skeleton | PBRModel): void;
@@ -30,6 +31,7 @@ export interface RetargetOptions {
     names?: Readonly<Record<string, string>>;
     hip?: string;
     hipScale?: number;
+    hold?: readonly string[];
 }
 
 export interface RetargetPlayer {

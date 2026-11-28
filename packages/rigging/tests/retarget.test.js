@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { HUMANOID_BONES, detectSkeleton, humanoidBones, prepareRetarget } from '../dist/retarget.js';
 import { createKeyframeClip, sampleKeyframes } from '../../animation/dist/index.js';
 import { Retarget } from '../../animation/dist/skeleton-utils.js';
-import { rotateByQuaternion } from '@margoengine/math/quat';
+import { axisAngleToQuaternion, multiplyQuaternions, rotateByQuaternion } from '@margoengine/math/quat';
 
 /**
  * A humanoid rig under one naming, standing in a T-pose (arms along x) or an A-pose (arms 40 degrees down), y up,
@@ -364,4 +364,123 @@ test("Character Creator's CC3+ skeleton is detected and takes Mixamo clips", () 
   assert.equal(prepared.names.CC_Base_L_UpperarmTwist01, '');
   const out = new Retarget(source, prepared.target, prepared).clip(clip(mixamo), { fps: 10 });
   assert.ok(out.tracks.some((track) => track.target === 'CC_Base_L_Upperarm'));
+});
+
+/** World positions of a rig's local pose (10 numbers per bone), parents before children in these test rigs. */
+function worldPositions(rig, local) {
+  const rot = [],
+    at = [];
+  rig.parents.forEach((p, b) => {
+    const q = Array.from(local.subarray(b * 10 + 3, b * 10 + 7)),
+      t = Array.from(local.subarray(b * 10, b * 10 + 3));
+    rot[b] = p < 0 ? q : multiplyQuaternions(rot[p], q);
+    at[b] = p < 0 ? t : rotateByQuaternion(t, rot[p]).map((v, c) => v + at[p][c]);
+  });
+  return at;
+}
+const direction = (at, a, b) => {
+  const d = at[b].map((v, c) => v - at[a][c]),
+    l = Math.hypot(...d);
+  return d.map((v) => v / l);
+};
+const degreesBetween = (a, b) => (Math.acos(Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])) * 180) / Math.PI;
+const turnAbout = (axis, degrees) => axisAngleToQuaternion(axis, (degrees * Math.PI) / 180);
+
+/** A left arm: hips, chest, collarbone, upper arm, forearm, hand, and the finger chains given; rest rotations per bone. */
+function arm(fingers, rotations = {}) {
+  const layout = [
+    ['hips', null, [0, 1, 0]],
+    ['upperChest', 'hips', [0, 0.4, 0]],
+    ['leftShoulder', 'upperChest', [0.03, 0.15, 0]],
+    ['leftUpperArm', 'leftShoulder', [0.16, 0, 0]],
+    ['leftLowerArm', 'leftUpperArm', [0.31, 0, 0]],
+    ['leftHand', 'leftLowerArm', [0.26, 0, 0]],
+    ...fingers.flatMap(([finger, z]) =>
+      ['Proximal', 'Intermediate', 'Distal'].map((part, i) => [
+        `left${finger}${part}`,
+        i ? `left${finger}${['Proximal', 'Intermediate'][i - 1]}` : 'leftHand',
+        i ? [0.03, 0, 0] : [0.09, 0, z],
+      ]),
+    ),
+  ];
+  const names = layout.map(([n]) => n);
+  return {
+    names,
+    parents: layout.map(([, p]) => (p ? names.indexOf(p) : -1)),
+    rest: Float64Array.from(layout.flatMap(([n, , at]) => [...at, ...(rotations[n] ?? [0, 0, 0, 1]), 1, 1, 1])),
+  };
+}
+const FINGERS = [
+  ['Index', 0.025],
+  ['Middle', 0],
+  ['Little', -0.025],
+];
+
+test('a fingerless T-pose source (a BVH End Site hand) lays the target hand and fingers along its rigid hand', () => {
+  // Xsens-style source: the hand is one segment with no finger bones. Target: an A-pose with the elbow bent forward,
+  // the hand cocked 12 degrees and the fingers fanned and curled, as an authored character's bind pose often is.
+  const source = arm([]),
+    target = arm(FINGERS, {
+      leftUpperArm: turnAbout([0, 0, 1], -45),
+      leftLowerArm: turnAbout([0, 1, 0], 40),
+      leftHand: turnAbout([0, 0, 1], 12),
+      leftIndexProximal: multiplyQuaternions(turnAbout([0, 1, 0], 15), turnAbout([0, 0, 1], -20)),
+      leftLittleProximal: multiplyQuaternions(turnAbout([0, 1, 0], -18), turnAbout([0, 0, 1], -30)),
+      leftMiddleIntermediate: turnAbout([0, 0, 1], -25),
+    }),
+    prepared = prepareRetarget(source, target, { from: 'humanoid', to: 'humanoid' });
+  assert.deepEqual(
+    [...prepared.hold].sort(),
+    FINGERS.flatMap(([f]) => [`left${f}Proximal`, `left${f}Intermediate`]).sort(),
+  );
+  const retarget = new Retarget(source, prepared.target, prepared);
+  for (const wrist of [14, -9]) {
+    // The capture: arm 30 degrees below level and forward, elbow bent 25 degrees, wrist cocked 14 degrees.
+    const pose = source.rest.slice(),
+      set = (bone, q) => pose.set(q, source.names.indexOf(bone) * 10 + 3);
+    set('leftUpperArm', multiplyQuaternions(turnAbout([0, 1, 0], -15), turnAbout([0, 0, 1], -30)));
+    set('leftLowerArm', turnAbout([0, 1, 0], -25));
+    set('leftHand', turnAbout([0, 0, 1], wrist));
+    const s = worldPositions(source, pose),
+      local = retarget.pose(pose),
+      t = worldPositions(prepared.target, local),
+      sourceIndex = (b) => source.names.indexOf(b),
+      targetIndex = (b) => target.names.indexOf(b);
+    // Source hand direction: the wrist's frame carries the forearm-continuing rest segment (+x).
+    const hand = rotateByQuaternion([1, 0, 0], [0, 1, 2, 3, 4, 5].reduce((q, b) => multiplyQuaternions(q, pose.subarray(b * 10 + 3, b * 10 + 7)), [0, 0, 0, 1]));
+    for (const [a, b] of [
+      ['leftUpperArm', 'leftLowerArm'],
+      ['leftLowerArm', 'leftHand'],
+    ])
+      assert.ok(
+        degreesBetween(direction(s, sourceIndex(a), sourceIndex(b)), direction(t, targetIndex(a), targetIndex(b))) <
+          1e-6,
+        `${a} follows the source`,
+      );
+    const targetHand = direction(t, targetIndex('leftHand'), targetIndex('leftMiddleProximal'));
+    assert.ok(degreesBetween(hand, targetHand) < 1e-6, `hand follows the source hand (${degreesBetween(hand, targetHand)} deg)`);
+    for (const [finger] of FINGERS)
+      for (const [a, b] of [
+        ['Proximal', 'Intermediate'],
+        ['Intermediate', 'Distal'],
+      ]) {
+        const d = direction(t, targetIndex(`left${finger}${a}`), targetIndex(`left${finger}${b}`));
+        assert.ok(degreesBetween(d, hand) < 1e-6, `${finger} ${a} lies along the hand (${degreesBetween(d, hand)} deg)`);
+      }
+  }
+});
+
+test('one source finger segment (CMU lfingers) drives every long finger of the target', () => {
+  const source = arm([['Middle', 0]]),
+    target = arm(FINGERS, { leftIndexProximal: turnAbout([0, 1, 0], 15) }),
+    prepared = prepareRetarget(source, target, { from: 'humanoid', to: 'humanoid' });
+  for (const [finger] of FINGERS) assert.equal(prepared.names[`left${finger}Proximal`], 'leftMiddleProximal');
+  assert.ok(!prepared.unmapped.includes('leftIndexProximal'));
+  const pose = source.rest.slice();
+  pose.set(turnAbout([0, 0, 1], -35), source.names.indexOf('leftMiddleProximal') * 10 + 3);
+  const t = worldPositions(prepared.target, new Retarget(source, prepared.target, prepared).pose(pose)),
+    at = (b) => target.names.indexOf(b),
+    middle = direction(t, at('leftMiddleProximal'), at('leftMiddleIntermediate'));
+  for (const finger of ['Index', 'Little'])
+    assert.ok(degreesBetween(direction(t, at(`left${finger}Proximal`), at(`left${finger}Intermediate`)), middle) < 1e-6);
 });

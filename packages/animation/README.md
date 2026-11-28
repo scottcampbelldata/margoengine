@@ -966,6 +966,9 @@ options)` maps target bones to source bones by name (`names` overrides, `''` lea
 map only through `names`). Each mapped target bone turns in model space by the rotation its source bone has turned
 from rest, which absorbs different bone axes and rest orientations; bones keep their own lengths and scales, unmapped
 bones keep their rest local pose, and the `hip` bone's position follows the source hip's movement times `hipScale`.
+`hold: ['LeftHandIndex1', ...]` names unmapped bones that `apply` writes at the target rig's rest rotation and `clip`
+keys, for a rig whose rest is not the pose the target holds now; `@margoengine/rigging`'s `prepareRetarget` returns
+the list for the finger bones it lays along a fingerless source hand.
 `pose(sourceLocal, out?)` does this on raw arrays (10 numbers per bone: translation, quaternion, scale) without
 allocating, `apply(source, target)` reads and writes Skeletons or models, and `clip(source, {fps, name})` samples a
 source `KeyframeClip`, or a glTF clip through the source model's `Animation` (restoring its clip, time and playing

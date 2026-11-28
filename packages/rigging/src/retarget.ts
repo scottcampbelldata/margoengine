@@ -344,8 +344,10 @@ export interface PrepareRetargetOptions {
   /**
    * Turn the target's reference pose so each mapped limb bone (arms, hands, fingers, legs, feet) points the way its source
    * bone does at rest (default true): a T-pose source then drives an A-pose target into the same T-pose. The trunk, neck
-   * and collarbones keep the target's own rest, since their directions are body layout, not pose. False keeps the
-   * target's whole rest pose.
+   * and collarbones keep the target's own rest, since their directions are body layout, not pose. A source hand with no
+   * finger bones below it (a BVH End Site, an ASF or Xsens hand segment) is one rigid segment, so the target's hand and
+   * long fingers are laid straight along it, in line with the source forearm when the source has no finger base at all;
+   * thumbs keep the target's rest. False keeps the target's whole rest pose.
    */
   alignRest?: boolean;
 }
@@ -364,6 +366,11 @@ export interface PreparedRetarget {
   readonly to: SkeletonPreset;
   /** Humanoid bones the target has but the source does not (they stay at rest). */
   readonly unmapped: readonly HumanoidBone[];
+  /**
+   * Unmapped target bone names whose rest the alignment turned (fingers laid along a fingerless source hand). Retarget
+   * reads this as its `hold` option and keeps them at the aligned rest, so they do not stay in the target's own pose.
+   */
+  readonly hold: readonly string[];
 }
 
 /**
@@ -397,15 +404,20 @@ export function prepareRetarget(
   // Every target bone is listed: mapped ones to their source bone, the rest to '' (left at rest).
   for (const name of target.names) names[name] = '';
   for (const [bone, index] of targetBones) {
-    const s = sourceBones.get(bone);
+    // A source with one finger segment (CMU's lfingers, mapped to the middle finger) drives every long finger.
+    const one = /^(left|right)(Index|Ring|Little)Proximal$/.exec(bone)?.[1];
+    const s = sourceBones.get(bone) ?? (one ? sourceBones.get(`${one}MiddleProximal` as HumanoidBone) : undefined);
     if (s === undefined) unmapped.push(bone);
     else names[target.names[index]] = source.names[s];
   }
   if (!Object.values(names).some(Boolean))
     throw new RangeError(`Retarget maps no bones from ${from} to ${to}; check the presets`);
   const hip = targetBones.has('hips') && sourceBones.has('hips') ? target.names[targetBones.get('hips')!] : undefined;
-  const aligned = options.alignRest === false ? target : alignRestPose(source, target, sourceBones, targetBones);
-  return { target: aligned, names, ...(hip ? { hip } : {}), from, to, unmapped };
+  const turned = new Set<number>(),
+    aligned =
+      options.alignRest === false ? target : alignRestPose(source, target, sourceBones, targetBones, turned),
+    hold = [...turned].filter((b) => !names[target.names[b]]).map((b) => target.names[b]);
+  return { target: aligned, names, ...(hip ? { hip } : {}), from, to, unmapped, hold };
 }
 
 function checkRetargetRig(rig: RetargetRigData, label: string): void {
@@ -477,6 +489,33 @@ function alignPalm(
   return multiplyQuaternions(axisAngleToQuaternion(axis, roll), swing);
 }
 
+const FLAT_HAND = /^(left|right)(Hand|(Index|Middle|Ring|Little)(Proximal|Intermediate))$/;
+
+/**
+ * Where a target hand or finger bone points at rest when its source has no finger below it: along the source hand,
+ * which is then one rigid segment. The source hand's direction is wrist to middle finger base when the source has that
+ * bone, otherwise the forearm's continuation (a hand that ends in a BVH End Site or an ASF hand segment rests in line
+ * with its forearm in the T-pose these files rest in). Null when the bone is not a hand or long finger, the source has
+ * no hand on that side, or the target bone has no child to aim.
+ */
+function flatHand(
+  bone: HumanoidBone,
+  sourceBones: Map<HumanoidBone, number>,
+  targetBones: Map<HumanoidBone, number>,
+  positions: readonly number[][],
+): { child: number; want: number[] } | null {
+  const side = FLAT_HAND.exec(bone)?.[1],
+    child = AIM[bone]?.[0];
+  if (!side || !child || !targetBones.has(child)) return null;
+  const hand = sourceBones.get(`${side}Hand` as HumanoidBone),
+    base = sourceBones.get(`${side}MiddleProximal` as HumanoidBone),
+    forearm = sourceBones.get(`${side}LowerArm` as HumanoidBone);
+  if (hand === undefined) return null;
+  const [from, to] = base !== undefined ? [hand, base] : forearm !== undefined ? [forearm, hand] : [];
+  if (from === undefined || to === undefined) return null;
+  return { child: targetBones.get(child)!, want: [0, 1, 2].map((c) => positions[to][c] - positions[from][c]) };
+}
+
 /**
  * The target rig with its rest rotations turned, parents first, so every mapped bone points at its mapped child the
  * way the source's bone does at rest, with the palms also facing the same way when the finger bases are mapped.
@@ -486,6 +525,7 @@ function alignRestPose(
   target: RetargetRigData,
   sourceBones: Map<HumanoidBone, number>,
   targetBones: Map<HumanoidBone, number>,
+  turned: Set<number>,
 ): RetargetRigData {
   const rest = new Float64Array(target.rest),
     sourceWorld = worldPose(source, source.rest),
@@ -493,14 +533,23 @@ function alignRestPose(
   for (const bone of order) {
     if (LAYOUT.has(bone)) continue;
     const aim = (AIM[bone] ?? []).find((child) => targetBones.has(child) && sourceBones.has(child));
-    if (!aim || !sourceBones.has(bone)) continue;
-    const t = targetBones.get(bone)!,
-      tc = targetBones.get(aim)!,
-      s = sourceBones.get(bone)!,
-      sc = sourceBones.get(aim)!;
-    const world = worldPose(target, rest),
-      have = [0, 1, 2].map((c) => world.position[tc][c] - world.position[t][c]),
+    let tc: number, want: number[];
+    if (aim && sourceBones.has(bone)) {
+      const s = sourceBones.get(bone)!,
+        sc = sourceBones.get(aim)!;
+      tc = targetBones.get(aim)!;
       want = [0, 1, 2].map((c) => sourceWorld.position[sc][c] - sourceWorld.position[s][c]);
+    } else {
+      // A source hand that ends without fingers is one rigid segment (Biovision BVH ends it with an End Site; Acclaim
+      // ASF and Xsens hands are single segments): its target hand and the finger bones the source lacks lie along it.
+      const flat = flatHand(bone, sourceBones, targetBones, sourceWorld.position);
+      if (!flat) continue;
+      tc = flat.child;
+      want = flat.want;
+    }
+    const t = targetBones.get(bone)!;
+    const world = worldPose(target, rest),
+      have = [0, 1, 2].map((c) => world.position[tc][c] - world.position[t][c]);
     if (Math.hypot(...have) < 1e-9 || Math.hypot(...want) < 1e-9) continue;
     // Turn the bone in its parent's frame, before the parent's stretch: the child's offset there is the bone's local
     // rotation times a vector the rotation does not change, so turning it from `have` to `want` (both taken back
@@ -522,6 +571,7 @@ function alignRestPose(
     }
     const l = t * 10 + 3;
     rest.set(normalizeQuaternion(multiplyQuaternions(turn, [rest[l], rest[l + 1], rest[l + 2], rest[l + 3]])), l);
+    turned.add(t);
   }
   return { names: target.names, parents: target.parents, rest };
 }

@@ -209,3 +209,24 @@ test('bad rigs and options throw with the fix in the message', () => {
   assert.throws(() => retargetRig({}), TypeError);
   assert.throws(() => new Retarget(s, t, { names }).clip(createKeyframeClip({ tracks: [] }), { fps: 0 }), /fps 0/);
 });
+
+test('held bones are written at the rig rest by apply and keyed by clip; unknown held names throw', () => {
+  const s = source(),
+    t = new Skeleton([
+      { name: 'mixamorig:Hips', parent: -1, translation: [0, 1, 0] },
+      { name: 'mixamorig:Spine', parent: 0, translation: [0, 0.5, 0] },
+      { name: 'mixamorig:Arm', parent: 1, translation: [0.2, 0.3, 0] },
+      { name: 'Finger', parent: 2, translation: [0.5, 0, 0] },
+    ]),
+    rig = retargetRig(t),
+    bent = axisAngle(Z, -40);
+  // An aligned rig rests the finger bent, while the skeleton itself still holds it straight.
+  rig.rest.set(bent, 3 * 10 + 3);
+  const retarget = new Retarget(retargetRig(s), rig, { hold: ['Finger', 'mixamorig:Arm'] });
+  assert.deepEqual(Array.from(retarget.held), [0, 0, 0, 1], 'a mapped bone is not held');
+  retarget.apply(s, t);
+  near(t.getPose(3).rotation, bent, 1e-12, 'apply writes the held rest');
+  const clip = retarget.clip(createKeyframeClip({ name: 'still', tracks: [] }));
+  assert.ok(clip.tracks.some((track) => track.target === 'Finger' && track.path === 'rotation'), 'clip keys it');
+  assert.throws(() => new Retarget(retargetRig(s), rig, { hold: ['Tail'] }), RangeError);
+});

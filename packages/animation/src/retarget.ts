@@ -31,6 +31,12 @@ export interface RetargetOptions {
    * the source hip's, or 1 when either is not above 0.
    */
   hipScale?: number;
+  /**
+   * Unmapped target bones held at the target rig's rest rotation: {@link Retarget.apply} writes it and
+   * {@link Retarget.clip} keys it, for a rig whose rest differs from the pose the target holds now (an aligned rig
+   * from `@margoengine/rigging`'s prepareRetarget lists the bones it re-aimed). Default: none; mapped bones are ignored.
+   */
+  hold?: readonly string[];
 }
 /** A glTF PBR model's player, such as an `Animation`, whose clip {@link Retarget.clip} can sample. */
 export interface RetargetPlayer {
@@ -242,6 +248,8 @@ export class Retarget {
   readonly sourceHip: number;
   /** Scale applied to the hip's movement. */
   readonly hipScale: number;
+  /** 1 per unmapped target bone held at its rig rest rotation (see {@link RetargetOptions.hold}), else 0. */
+  readonly held: Uint8Array;
   private readonly sourceOrder: number[];
   private readonly targetOrder: number[];
   // Rest world transforms, and scratch for the current pose; all reused, so `pose` allocates nothing.
@@ -274,6 +282,14 @@ export class Retarget {
     this.map = Int32Array.from(target.names, (name) => (mapped(name) ? source.names.indexOf(mapped(name)) : -1));
     if (!this.map.some((s) => s >= 0))
       throw new RangeError('Retarget maps no bones; pass a names map or use rigs with matching bone names');
+    const hold = options.hold ?? [];
+    if (!Array.isArray(hold)) throw new TypeError('Retarget hold must be an array of target bone names');
+    this.held = new Uint8Array(target.names.length);
+    for (const name of hold) {
+      const b = typeof name === 'string' ? target.names.indexOf(name) : -1;
+      if (b < 0) throw new RangeError(`Retarget holds ${String(name)}, which the target does not have; fix the hold list`);
+      if (this.map[b] < 0) this.held[b] = 1;
+    }
     this.sourceNow = space(source);
     this.targetNow = space(target);
     const sourceRest = (this.sourceRest = space(source)),
@@ -379,8 +395,8 @@ export class Retarget {
 
   /**
    * Poses `target` the way `source` is posed now: each must be the Skeleton or model its rig was made from. Writes
-   * only the mapped bones' rotations and the hip's position; other target bones keep what they have (the retarget
-   * assumes them at rest).
+   * the mapped bones' rotations, the held bones' rest rotations ({@link RetargetOptions.hold}) and the hip's position;
+   * other target bones keep what they have (the retarget assumes them at rest).
    */
   apply(source: Skeleton | PBRModel, target: Skeleton | PBRModel): void {
     read(source, this.source.names.length, 'source', this.input);
@@ -391,7 +407,7 @@ export class Retarget {
           `Retarget target has ${target.count} bones but its rig has ${this.target.names.length}; pass a target with the rig's bone count`,
         );
       for (let b = 0; b < this.map.length; b++)
-        if (this.map[b] >= 0 || b === this.hip) target.setPose(b, this.poses[b]);
+        if (this.map[b] >= 0 || this.held[b] || b === this.hip) target.setPose(b, this.poses[b]);
       return;
     }
     if (!(target instanceof PBRModel)) throw new TypeError('Retarget target must be a Skeleton or a glTF PBR model');
@@ -402,7 +418,7 @@ export class Retarget {
     const q = this.quaternion,
       v = this.vector;
     for (let b = 0; b < this.map.length; b++) {
-      if (this.map[b] >= 0) {
+      if (this.map[b] >= 0 || this.held[b]) {
         for (let c = 0; c < 4; c++) q[c] = out[b * 10 + 3 + c];
         target.nodes[b].setQuaternion(q);
       }
@@ -415,7 +431,7 @@ export class Retarget {
 
   /**
    * A code-authored clip for the target rig from a source clip, sampled at `fps` (default 30) from 0 to the clip's
-   * duration: a rotation track per mapped target bone and a translation track for the hip, linear keys. The source
+   * duration: a rotation track per mapped or held target bone and a translation track for the hip, linear keys. The source
    * is a `KeyframeClip` whose tracks name source bones (sampled over the source rig's rest pose; weights tracks are
    * not carried over), or a glTF clip played by the source model's `Animation` (`{animation, clip}`; its clip, time and
    * playing state are restored afterwards). Play the result with `applyKeyframeClip` or an `AnimationGroup`.
@@ -472,7 +488,7 @@ export class Retarget {
       };
     }
     const frames = Math.max(1, Math.ceil(duration * fps)),
-      mapped = Array.from(this.map.keys()).filter((b) => this.map[b] >= 0),
+      mapped = Array.from(this.map.keys()).filter((b) => this.map[b] >= 0 || this.held[b]),
       rotations = mapped.map(() => [] as { time: number; value: number[] }[]),
       hip: { time: number; value: number[] }[] = [],
       out = this.output;

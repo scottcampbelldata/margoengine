@@ -825,6 +825,17 @@ applyKeyframeClip(walk, Animation.attach(godotHero), 0.5);
 
 Rest alignment matches palm roll when both rigs map the wrist and the bases of the middle, index and little fingers. The wrist-to-middle direction sets the aim, and the direction across the knuckles sets the roll about that aim. With missing or collinear landmarks, the wrist uses the aim alone. This uses the humanoid landmarks from [VRM 1.0](https://github.com/vrm-c/vrm-specification/blob/master/specification/VRMC_vrm-1.0/humanoid.md) and draws on the use of anatomical frames in [*Semantics2Hands*, Ye et al. (2023)](https://arxiv.org/abs/2308.05920). Rest alignment prepares the skeleton for motion transfer. Maintaining hand or foot contact with a surface during a clip requires a separate constraint, as described in [*Retargeting Motion to New Characters*, Gleicher (1998)](https://graphics.cs.wisc.edu/Papers/1998/Gle98/).
 
+A source hand with no finger bones below it, such as a BVH wrist that ends in an End Site (Xsens, the 100STYLE captures) or an ASF hand segment, is one rigid segment. Rest alignment then lays the target's hand and its index, middle, ring and little finger bones straight along that segment, in line with the source forearm when the source has no finger base, and lists the unmapped ones it turned in `prepared.hold`. `Retarget` reads `hold` and keeps those bones at the aligned rest, so they stop holding the target's own bind pose, which for most authored characters is a fanned, curled hand. Thumbs keep the target's rest. A source with one finger segment (CMU's `lfingers`, mapped to the middle finger) drives all four long fingers. This is the intermediate-skeleton idea of [Monzani, Baerlocher, Boulic and Thalmann (2000), *Using an Intermediate Skeleton and Inverse Kinematics for Motion Retargeting*](https://doi.org/10.1111/1467-8659.00393): a target bone the source does not have takes its rest from the source segment that holds it.
+
+```js
+import { prepareRetarget } from 'margoengine/rigging/retarget';
+
+const fingerless = { names: ['hips', 'leftLowerArm', 'leftHand'], parents: [-1, 0, 1], rest: Float64Array.from([0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0.3, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0.26, 0, 0, 0, 0, 0, 1, 1, 1, 1]) };
+const fingered = { names: ['hips', 'leftLowerArm', 'leftHand', 'leftIndexProximal', 'leftIndexIntermediate'], parents: [-1, 0, 1, 2, 3], rest: Float64Array.from([0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0.3, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0.26, 0, 0, 0, 0, 0.6, 0.8, 1, 1, 1, 0.09, 0, 0.02, 0, 0, 0, 1, 1, 1, 1, 0.03, 0, 0, 0, 0, 0, 1, 1, 1, 1]) };
+const { hold } = prepareRetarget(fingerless, fingered, { from: 'humanoid', to: 'humanoid' });
+console.log(hold); // ['leftIndexProximal']: the index finger now rests straight along the hand
+```
+
 Target bones with no source bone (a Godot `Root`, Roblox's `HumanoidRootPart`, fingers a source lacks) map to `''` and stay at rest; the humanoid bones among them are listed in `unmapped`. Roblox R15 has no neck, shoulders, toes or fingers, so clips from it leave those at rest; its `UpperTorso` maps to `spine`, which VRM 1.0 requires (chest is optional). Both rigs' model spaces must face the same way (glTF: +z forward, the figure's left at +x). `humanoidBones(names, preset)` gives the humanoid bone -> index map for your own tools, and `HUMANOID_BONES` lists every humanoid bone, parents first. An unrecognised naming throws a `RangeError` that asks for `from` or `to`.
 
 ## Hands (`margoengine/rigging/hands`)

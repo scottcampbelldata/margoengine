@@ -20,6 +20,7 @@ export interface PreparedRetarget {
     readonly from: SkeletonPreset;
     readonly to: SkeletonPreset;
     readonly unmapped: readonly HumanoidBone[];
+    readonly hold: readonly string[];
 }
 
 export interface RetargetRigData {
