@@ -1,244 +1,215 @@
-import { box, Geometry, PbrMaterial } from '@margoengine/core';
-import { margoError } from '@margoengine/core/extension';
+import { box, PbrMaterial } from '@margoengine/core';
+import { loadGLTF } from '@margoengine/gltf';
+import { meshopt } from '@margoengine/gltf/meshopt';
+import { quantized } from '@margoengine/gltf/quantized';
+import { CadBench } from '@margoengine/machinery/bench';
 import { ExplodedView } from '@margoengine/machinery/exploded';
-import { Picking } from '@margoengine/selection';
-import { Tween, easeInOutCubic } from '@margoengine/tween';
 import { applyQualityTier } from '@margoengine/quality';
-import { autoEngine } from '@margoengine/webgl2-compat/auto';
+import { Picking, Selection } from '@margoengine/selection';
+import { openBench } from '@margoengine/studio/bench';
+import { Tween, easeInOutCubic } from '@margoengine/tween';
+import { startEngine } from '@margoengine/webgl2-compat/auto';
 import { demoStatus } from 'margo-demo-status';
-import { fullSpread, parts, profiles, styles } from './iris.mjs';
-import { decodeIris } from './mesh-data.mjs';
+import { fullSpread, parts } from './iris.mjs';
 
-let canvas=document.querySelector('#view');
-const overlay=document.querySelector('#status'), detail=document.querySelector('#detail');
-const slider=document.querySelector('#spread'), distance=document.querySelector('#distance');
-const explode=document.querySelector('#explode'), assemble=document.querySelector('#assemble');
-const picker=document.querySelector('#part'), name=document.querySelector('#name');
-const controls=[slider,explode,assemble,picker];
-let status=demoStatus(canvas,overlay,detail);
-const controller=new AbortController(),{signal}=controller;
-const force=new URLSearchParams(location.search).get('backend')==='webgl2';
-const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const motion={spread:Number(slider.value)/100},timeline=new Tween();
-const highlight=new PbrMaterial({color:'#dec085',roughness:.48,metalness:0});
-let engine, stage, observer, frame, busy=false, dirty=true, last, rendered=-1, active, selected;
-let request, pickingBusy=false, pickVersion=0, beganInput=false;
-const choices=[],pickOwners=new Map();
+const id = (name) => document.getElementById(name);
+const canvas = id('view'), overlay = id('status'), detail = id('detail');
+const slider = id('spread'), distance = id('distance'), explode = id('explode'), assemble = id('assemble');
+const picker = id('part'), name = id('name');
+const controls = [slider, explode, assemble, picker];
+const status = demoStatus(document.body, overlay, detail);
+const controller = new AbortController();
+const { signal } = controller;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const motion = { spread: Number(slider.value) / 100 };
+const timeline = new Tween();
+// The iris rests on the surface plate: the mount, the lowest part, stays on it while the rest lift away, so every
+// offset is measured from the mount's.
+const plate = 0.04, floor = Math.min(...parts.map((part) => part.offset[1]));
+const highlight = new PbrMaterial({ color: '#dec085', roughness: 0.48, metalness: 0 });
+// Finishes by the part's material: anodised aluminium dyed teal for the frame, a bronze cam ring, steel carrier and
+// washer, stainless leaves and brass pins.
+const finishes = {
+  frame: { finish: 'anodised' },
+  outer: { finish: 'anodised', tint: [0.18, 0.4, 0.44] },
+  bronze: { finish: 'machined', metal: 'bronze', roughness: 0.3 },
+  steel: { finish: 'machined', metal: 'steel', roughness: 0.34 },
+  blade: { finish: 'cut', metal: 'stainlessSteel', roughness: 0.26 },
+  pin: { finish: 'machined', metal: 'brass', roughness: 0.3 },
+};
+let bench, stage, cad, outline, active, selected, stopFrame, request, pickingBusy = false, pickVersion = 0, beganInput = false;
+const choices = [], pickOwners = new Map();
 
 applyQualityTier();
 
-function fail(error){
-  if(signal.aborted||status.failed)return;
+function fail(error) {
+  if (signal.aborted || status.failed) return;
   status.error(error);
-  overlay.hidden=false;
-  overlay.querySelector('strong').textContent=error?.code==='unsupported'?'This exhibit needs WebGPU graphics.':'The iris could not be opened.';
-  document.querySelector('#help').hidden=false;
-  for(const control of controls)control.disabled=true;
+  overlay.hidden = false;
+  overlay.querySelector('strong').textContent =
+    error?.code === 'unsupported' ? 'This exhibit needs WebGPU graphics.' : 'The iris could not be opened.';
+  id('help').hidden = false;
+  for (const control of controls) control.disabled = true;
+  controller.abort();
 }
 
-function size(){
-  const ratio=Math.max(1,Math.min(devicePixelRatio,1.5));
-  const width=Math.max(1,Math.round(canvas.clientWidth*ratio)),height=Math.max(1,Math.round(canvas.clientHeight*ratio));
-  if(canvas.width!==width)canvas.width=width;
-  if(canvas.height!==height)canvas.height=height;
-
+function select(index) {
+  if (selected && selected === choices[index]) return;
+  if (selected) selected.part.mesh.setMaterial(selected.part.material);
+  selected = choices[index];
+  selected?.part.mesh.setMaterial(highlight);
+  outline.set(selected ? [selected.part.mesh] : []);
+  name.textContent = selected?.label ?? 'Move over a part';
+  canvas.dataset.part = selected?.label ?? '';
+  picker.value = selected ? String(index) : '';
+  bench.request();
 }
 
-function select(index){
-  if(selected && selected===choices[index])return;
-  if(selected)selected.node.setMaterial(selected.material);
-  selected=choices[index];
-  if(selected)selected.node.setMaterial(highlight);
-  name.textContent=selected?.label??'Move over a part';
-  canvas.dataset.part=selected?.label??'';
-  picker.value=selected?String(index):'';
-  redraw();
+async function readPick() {
+  if (pickingBusy || !request || signal.aborted || status.failed) return;
+  pickingBusy = true;
+  const at = request;
+  request = undefined;
+  try {
+    const node = await bench.engine.pick(at.x, at.y);
+    if (!signal.aborted && at.version === pickVersion) select(pickOwners.get(node?.id) ?? -1);
+  } catch (error) {
+    fail(error);
+  } finally {
+    pickingBusy = false;
+    if (request) void readPick();
+  }
 }
 
-async function readPick(){
-  if(busy||pickingBusy||!request||signal.aborted||status.failed)return;
-  pickingBusy=true;
-  const at=request;
-  request=undefined;
-  try{
-    const node=await engine.pick(at.x,at.y);
-    if(!signal.aborted&&at.version===pickVersion)select(pickOwners.get(node?.id)??-1);
-  }catch(error){fail(error);}
-  finally{pickingBusy=false;if(request)void readPick();}
-}
-
-function requestPick(event){
-  const rect=canvas.getBoundingClientRect();
-  request={x:event.clientX-rect.left,y:event.clientY-rect.top,version:++pickVersion};
+function requestPick(event) {
+  const rect = canvas.getBoundingClientRect();
+  request = { x: event.clientX - rect.left, y: event.clientY - rect.top, version: ++pickVersion };
   void readPick();
 }
 
-function update(){
-  const spread=motion.spread;
-  stage.amount=spread;
-  engine.camera.fov=2*Math.atan(Math.max(.241+.069*spread,.31*canvas.height/canvas.width))*180/Math.PI;
-  engine.camera.position=[.155+.109*spread,.316-.079*spread,.194+.085*spread];
-  engine.camera.target=[0,-.005+.057*spread,0];
-  slider.value=String(spread*100);
-  distance.textContent=(fullSpread*spread*1000).toFixed(1)+' mm';
-  slider.setAttribute('aria-valuetext',distance.textContent+' additional axial spread');
-  canvas.dataset.spread=spread.toFixed(4);
-  canvas.dataset.distance=(fullSpread*spread*1000).toFixed(3);
+// The assembled stack spans 0.046 above the mount's base; each part rises by its offset times the spread.
+function stackBounds(spread) {
+  let high = -Infinity;
+  for (const part of parts) high = Math.max(high, part.origin[1] + 0.0094 + (part.offset[1] - floor) * spread);
+  return { min: [-0.065, plate, -0.065], max: [0.065, plate + 0.02 + high, 0.065] };
 }
 
-function redraw(){
-  dirty=true;
-  if(frame===undefined&&!busy&&!status.failed)frame=requestAnimationFrame(draw);
+// The camera follows the stack: the box round every part at this spread, framed along the same view direction.
+function update() {
+  const spread = motion.spread;
+  stage.amount = spread;
+  bench.fit({ bounds: stackBounds(spread), fill: 0.84 });
+  slider.value = String(spread * 100);
+  distance.textContent = (fullSpread * spread * 1000).toFixed(1) + ' mm';
+  slider.setAttribute('aria-valuetext', distance.textContent + ' additional axial spread');
+  canvas.dataset.spread = spread.toFixed(4);
+  canvas.dataset.distance = (fullSpread * spread * 1000).toFixed(3);
+  bench.request();
 }
 
-async function draw(now){
-  frame=undefined;
-  if(signal.aborted||status.failed||!dirty)return;
-  dirty=false;
-  busy=true;
-  try{
-    if(active){
-      timeline.update(Math.min(.065,Math.max(0,last===undefined?1/60:(now-last)/1000)));
-      last=now;
-    }
-    update();
-    const submitted=motion.spread;
-    const change=beganInput&&submitted!==rendered;
-    engine.render({delta:0});
-    await engine.gpu.queue.onSubmittedWorkDone();
-    rendered=submitted;
-    if(signal.aborted)return;
-    if(change&&!performance.getEntriesByName('iris-first-spread-frame').length)
-      performance.mark('iris-first-spread-frame');
-  }catch(error){fail(error);}
-  finally{
-    busy=false;
-    if(request)void readPick();
-    if((active||dirty)&&!signal.aborted&&!status.failed)redraw();
-  }
+function mark() {
+  if (beganInput && !performance.getEntriesByName('iris-first-spread-frame').length)
+    performance.mark('iris-first-spread-frame');
 }
 
-function goTo(spread){
-  beganInput=true;
+function stopMotion() {
   active?.();
-  active=undefined;
-  if(reduced){
-    motion.spread=spread;
-  }else{
-    last=undefined;
-    active=timeline.to(motion,'spread',spread,{duration:.83,easing:easeInOutCubic,onComplete:()=>{active=undefined;}});
-  }
-  redraw();
+  active = undefined;
+  stopFrame?.();
+  stopFrame = undefined;
 }
 
-function connect(){
-  slider.addEventListener('input',()=>{
-    beganInput=true;
-    active?.();
-    active=undefined;
-    motion.spread=Number(slider.value)/100;
-    redraw();
-  },{signal});
-  explode.addEventListener('click',()=>goTo(1),{signal});
-  assemble.addEventListener('click',()=>goTo(0),{signal});
-  picker.addEventListener('change',()=>select(picker.value===''?-1:Number(picker.value)),{signal});
-  canvas.addEventListener('pointermove',event=>{if(event.pointerType==='mouse')requestPick(event);},{signal});
-  canvas.addEventListener('pointerup',requestPick,{signal});
-  canvas.addEventListener('pointerleave',event=>{
-    if(event.pointerType!=='mouse')return;
-    request=undefined;
+function goTo(target) {
+  beganInput = true;
+  stopMotion();
+  if (reduced) {
+    motion.spread = target;
+    update();
+    mark();
+    return;
+  }
+  active = timeline.to(motion, 'spread', target, { duration: 0.83, easing: easeInOutCubic, onComplete: stopMotion });
+  stopFrame = bench.frame((delta) => {
+    timeline.update(Math.min(0.065, delta));
+    update();
+    mark();
+  });
+}
+
+function connect() {
+  slider.addEventListener('input', () => {
+    beganInput = true;
+    stopMotion();
+    motion.spread = Number(slider.value) / 100;
+    update();
+    mark();
+  }, { signal });
+  explode.addEventListener('click', () => goTo(1), { signal });
+  assemble.addEventListener('click', () => goTo(0), { signal });
+  picker.addEventListener('change', () => select(picker.value === '' ? -1 : Number(picker.value)), { signal });
+  canvas.addEventListener('pointermove', (event) => { if (event.pointerType === 'mouse') requestPick(event); }, { signal });
+  canvas.addEventListener('pointerup', requestPick, { signal });
+  canvas.addEventListener('pointerleave', (event) => {
+    if (event.pointerType !== 'mouse') return;
+    request = undefined;
     pickVersion++;
     select(-1);
-  },{signal});
-  observer=new ResizeObserver(()=>{size();redraw();});
-  observer.observe(canvas);
+  }, { signal });
 }
 
-async function loadGeometry(){
-  const response=await fetch(new URL('./iris.mesh',import.meta.url),{signal});
-  if(!response.ok)throw new Error('The aperture geometry could not be loaded.');
-  const buffer=await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
-  return decodeIris(buffer,profiles.length+2);
-}
-
-async function open(){
-  const packed=loadGeometry().then(value=>({value}),error=>({error}));
-  const known=force||!navigator.gpu;
-  const early=known?import('@margoengine/webgl2-compat').then(module=>({module}),error=>({error})):undefined;
-  const loadCompat=async()=>{
-    const setup=await early;
-    if(setup?.error)throw setup.error;
-    const compat=setup?.module??await import('@margoengine/webgl2-compat');
-    return {install:()=>compat.install({force,signal})};
-  };
-  if(known)await (await loadCompat()).install();
-  engine=await autoEngine(canvas,async target=>{
-    if(!target.gpu)throw margoError('unsupported','The iris part pick uses the Margo WebGPU frame graph','selection');
-    engine=target;
-    canvas=target.canvas;
-    status=demoStatus(canvas,overlay,detail);
-    size();
-    target.scene.background='#354c56';
-    target.lighting.direction.set([.64,.69,.47,2.65]);
-    target.lighting.radiance.set([1,.93,.81,.55]);
-    target.lighting.ambient.set([.63,.79,.82]);
-    const pedestal=new PbrMaterial({color:'#263b46',roughness:.74});
-    const lip=new PbrMaterial({color:'#364c55',roughness:.62});
-    target.createMesh().setGeometry(box(.223,.011,.189)).setMaterial(pedestal).setPosition([0,-.065,0]);
-    target.createMesh().setGeometry(box(.228,.003,.194)).setMaterial(lip).setPosition([0,-.058,0]);
-    const asset=await packed;
-    if(asset.error)throw asset.error;
-    const geometric=asset.value.map(({positions,normals,indices})=>new Geometry(positions,normals,indices));
-    const ids=[...profiles.map(({id})=>id),'leaf','drive-pin'];
-    const materials=Object.fromEntries(Object.entries(styles).map(([key,spec])=>[key,new PbrMaterial(spec)]));
-    for(const [index,part] of parts.entries()){
-      const material=materials[part.style];
-      const node=target.createMesh().setGeometry(geometric[ids.indexOf(part.id)]).setMaterial(material)
-        .setPosition(part.origin).setRotation([0,-(part.angle??0),0]);
-      choices.push({...part,node,material});
-      pickOwners.set(node.id,index);
-      if(part.id==='bezel'){
-        const fine=box(.00044,.00008,.00215), master=box(.00072,.00008,.00325);
-        const enamel=new PbrMaterial({color:'#b5ad8f',roughness:.58});
-        for(let tick=0;tick<30;tick++){
-          const angle=tick*Math.PI/15;
-          const engraving=target.createMesh().setGeometry(tick%5===0?master:fine).setMaterial(enamel)
-            .setParent(node).setPosition([.0534*Math.sin(angle),.004245,.0534*Math.cos(angle)])
-            .setRotation([0,angle,0]);
-          pickOwners.set(engraving.id,index);
-        }
-      }
-      const option=document.createElement('option');
-      option.textContent=part.label;
-      option.value=String(index);
-      picker.append(option);
-    }
-    stage=ExplodedView.attach(target,choices.map(({node,offset})=>({node,offset})));
-    Picking.attach(target,{capture:false});
-    update();
-    target.render({delta:0});
-    await target.gpu.queue.onSubmittedWorkDone();
-    rendered=motion.spread;
-  },{
-    loadCompat,backend:known?'webgpu':undefined,signal,exactSize:true,antialias:false,capacity:120,
-    startupTimeout:8500,camera:{near:.02,far:2.4,fov:43},
+async function open() {
+  bench = await openBench(canvas, {
+    start: startEngine,
+    loadCompat: () => import('@margoengine/webgl2-compat'),
+    signal,
+    exhibit: document.body,
+    camera: { position: [0.19, 0.26, 0.3], target: [0, plate + 0.05, 0], fov: 38, near: 0.01, far: 40 },
+    environment: { preset: 'tent', intensity: 1 },
+    backdrop: { width: 24, depth: 3, height: 3, radius: 0.8, material: { color: '#4a5558' } },
+    contact: { size: 0.5, height: 0.12, opacity: 0.6, blur: 0.02, position: [0, plate + 0.0005, 0] },
+    ao: true,
+    orbit: { target: [0, plate + 0.05, 0], minDistance: 0.12, maxDistance: 1.2 },
+    onError: fail,
   });
-  signal.throwIfAborted();
-  engine.onError=fail;
-  canvas.dataset.renderer=engine.gpu.adapterInfo?.vendor==='margo-webgl2'?'webgl2':'webgpu';
-  canvas.dataset.parts=String(choices.length);
-  for(const control of controls)control.disabled=false;
+  if (!bench.engine.gpu) throw Object.assign(new Error('The iris part pick uses the Margo WebGPU frame graph'), { code: 'unsupported' });
+  cad = CadBench.attach(bench.engine, { deck: { size: [0.3, 0.24], thickness: plate }, casters: bench });
+  const model = await loadGLTF(bench.engine, new URL('./assets/iris.glb', import.meta.url), { extensions: [meshopt, quantized], signal });
+  // The root sits so the mount's base (0.020 below its origin) rests on the plate.
+  model.root.setPosition([0, plate + 0.02, 0]);
+  if (model.meshes.length !== parts.length || model.nodes.length !== parts.length) throw new Error('The aperture geometry has the wrong number of parts.');
+  const enamel = new PbrMaterial({ color: '#b5ad8f', roughness: 0.58 });
+  const fine = box(0.00044, 0.00008, 0.00215), master = box(0.00072, 0.00008, 0.00325);
+  for (const [index, spec] of parts.entries()) {
+    const part = cad.show(model.meshes[index], finishes[spec.style]);
+    choices.push({ ...spec, part, node: model.nodes[index], offset: [spec.offset[0], spec.offset[1] - floor, spec.offset[2]] });
+    pickOwners.set(part.mesh.id, index);
+    if (spec.id === 'bezel')
+      for (let tick = 0; tick < 30; tick++) {
+        const angle = (tick * Math.PI) / 15;
+        const engraving = bench.engine.createMesh().setGeometry(tick % 5 === 0 ? master : fine).setMaterial(enamel)
+          .setParent(model.nodes[index]).setPosition([0.0534 * Math.sin(angle), 0.004245, 0.0534 * Math.cos(angle)])
+          .setRotation([0, angle, 0]);
+        pickOwners.set(engraving.id, index);
+      }
+    const option = document.createElement('option');
+    option.textContent = spec.label;
+    option.value = String(index);
+    picker.append(option);
+  }
+  stage = ExplodedView.attach(bench.engine, choices.map(({ node, offset }) => ({ node, offset })));
+  Picking.attach(bench.engine, { capture: false });
+  // The picked part is outlined even where the others hide it: dashed lines through the rings.
+  outline = Selection.attach(bench.engine, { width: 2, color: [1, 0.62, 0.18], xray: { dash: 5, opacity: 0.9 } });
+  update();
+  await bench.fit({ bounds: stackBounds(motion.spread), fill: 0.84 });
+  bench.orbit.saveState();
+  canvas.dataset.parts = String(choices.length);
+  if (!(await bench.ready()) || !status.ready()) return;
+  for (const control of controls) control.disabled = false;
   connect();
-  overlay.hidden=true;
-  status.ready();
+  overlay.hidden = true;
   performance.mark('margo-first-usable-frame');
 }
-window.addEventListener('pagehide',event=>{
-  if(event.persisted)return;
-  controller.abort();
-  observer?.disconnect();
-  active?.();
-  if(frame!==undefined)cancelAnimationFrame(frame);
-  engine?.dispose();
-});
+
+window.addEventListener('pagehide', stopMotion, { signal });
 open().catch(fail);

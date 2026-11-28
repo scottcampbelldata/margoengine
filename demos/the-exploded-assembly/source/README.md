@@ -6,11 +6,11 @@ The assembly contains six axial rings, eight curved leaves and eight pins. A fix
 
 ## Source and build
 
-Original CAD solid geometry and finish assignments are in `generate.mjs` and `iris.mjs`. The public Margo B-rep API revolves the beveled rings and uses eight exact cylindrical cuts on the cam race. The blade uses an extruded arc-bounded profile. All eight unique shapes passed the solid validity check and tessellated without failed faces. Their 5,840 unique triangles ship as a 61,477-byte compressed mesh with instanced positions from the same source on phone and desktop.
+Original CAD solid geometry and finish assignments are in `generate.mjs` and `iris.mjs`. The Margo B-rep API revolves the beveled rings and uses eight exact cylindrical cuts on the cam race. The blade uses an extruded arc-bounded profile. All eight unique shapes passed the solid validity check and tessellated without failed faces. The 22 parts (six rings, eight leaves, eight pins), each a named node at its assembled place, ship as one meshopt GLB (`assets/iris.glb`, about 75 kB).
 
-Set `MARGO_ENGINE_CHECKOUT` to the built public Margo Engine checkout at `0efd9cff8230507a32deb49907ecd499d46925f5` and run `node src/the-exploded-assembly/generate.mjs` from the gallery root to regenerate the mesh. The gallery build bundles Margo core, `machinery` for exploded placement, `tween` for the two animation buttons, and `selection` for rendered pointer picking. It serves native WebGPU first, plus the public Margo WebGL2 compatibility implementation. The controls honor reduced-motion preferences.
+The page opens `studio/bench` and `machinery/bench`: the iris stands on the gabbro surface plate in the light tent, each part takes a measured finish (anodised aluminium for the frame, bronze for the cam ring, steel, stainless leaves, brass pins) with feature edges, and the camera follows the stack as it opens. `machinery/exploded` moves the parts, `tween` times the two buttons, and `selection` picks a part under the pointer on both WebGPU and the WebGL2 layer. The controls honor reduced-motion preferences.
 
-The local gallery browser regression inspected both real renderer paths and the automatic fallback. A fresh 390 px browser context with 150 ms latency, 1.6 Mbps throughput and 4× CPU slowdown reached the first changed frame after a trusted slider touch at 1.116 s native, 1.929 s forced WebGL2, and 1.890 s automatic WebGL2. The unthrottled desktop WebGPU case reached it at 0.206 s. Every case compared all 22 world placements at full spread and after return within 1 µm and identified the visible front bezel through genuine pointer picking. These times are local emulation results. Evidence is under the ignored `qa-output/the-exploded-assembly` folder.
+Set `MARGO_ENGINE_CHECKOUT` to a built Margo Engine checkout and run `node demos/the-exploded-assembly/source/generate.mjs` from the repository root to regenerate the GLB.
 
 ## References
 

@@ -1,15 +1,10 @@
-import { writeFile } from 'node:fs/promises';
-import { execFileSync } from 'node:child_process';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { gzipSync } from 'node:zlib';
-import { profiles } from './iris.mjs';
-import { encodeIris } from './mesh-data.mjs';
+import { parts, profiles } from './iris.mjs';
 
-const pin='0efd9cff8230507a32deb49907ecd499d46925f5';
 const checkout=process.env.MARGO_ENGINE_CHECKOUT;
-if(!checkout || execFileSync('git',['-C',checkout,'rev-parse','HEAD'],{encoding:'utf8'}).trim()!==pin)
-  throw new Error('MARGO_ENGINE_CHECKOUT must point to the built, verified public pin.');
+if(!checkout)throw new Error('Set MARGO_ENGINE_CHECKOUT to the built Margo checkout.');
 const {model}=await import(pathToFileURL(resolve(checkout,'packages/brep/dist/index.js')));
 const {revolve,extrude,cylinder,frameOf,checkBody,meshBodies,massProperties,boolean}=model;
 const direction=[0,1,0];
@@ -53,8 +48,20 @@ for(const body of bodies){
 }
 const {meshes}=meshBodies(bodies,{deflection:.00011,angle:.19,interiorDeflection:.00025,interiorAngle:.27});
 if(meshes.some(mesh=>mesh.failures.length))throw new Error(JSON.stringify(meshes.flatMap(mesh=>mesh.failures)));
-const asset=gzipSync(encodeIris(meshes),{level:9});
+// One GLB node per part at its assembled place (position, yaw), named by the part's label so the page can find it.
+const geometry=Object.fromEntries([...profiles.map(({id})=>id),'leaf','drive-pin'].map((id,i)=>{
+  const {positions,normals,indices}=meshes[i];
+  return [id,{positions:Array.from(positions),normals:Array.from(normals),indices:Array.from(indices)}];
+}));
+const nodes=parts.map(part=>{
+  const half=-(part.angle??0)/2;
+  return {name:part.label,translation:part.origin,rotation:[0,Math.sin(half),0,Math.cos(half)],geometry:geometry[part.id]};
+});
+const {exportGLB}=await import(pathToFileURL(resolve(checkout,'packages/exporters/dist/gltf.js')));
+const {compressMeshopt}=await import(pathToFileURL(resolve(checkout,'packages/exporters/dist/meshopt.js')));
+const {glb:packed}=await compressMeshopt(exportGLB({nodes},{generator:'Margo Engine the-exploded-assembly'}),{normalBits:16});
 const report=bodies.map((body,i)=>({id:body.name,faces:body.faces.length,volume:massProperties(body).volume,
   triangles:meshes[i].indices.length/3}));
-await writeFile(new URL('./iris.mesh',import.meta.url),asset);
-console.log(JSON.stringify({parts:report,bytes:asset.length}));
+await mkdir(new URL('./assets/',import.meta.url),{recursive:true});
+await writeFile(new URL('./assets/iris.glb',import.meta.url),packed);
+console.log(JSON.stringify({parts:report,bytes:packed.byteLength}));
