@@ -3,10 +3,12 @@ import {createHash} from 'node:crypto';
 import {readFileSync,writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {registerHooks} from 'node:module';
+import * as nodeModule from 'node:module';
 
 const [checkout,folder,destination]=process.argv.slice(2);
 if(!destination)throw new Error('Pass the Margo checkout, source Acclaim folder, and output module.');
+const {registerHooks}=nodeModule;
+if(typeof registerHooks!=='function')throw new Error('This tool needs Node 22.15 or newer (module.registerHooks).');
 registerHooks({resolve(specifier,context,next){
   if(!specifier.startsWith('@margoengine/'))return next(specifier,context);
   const [,name,...pieces]=specifier.split('/');

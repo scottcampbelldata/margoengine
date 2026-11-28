@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {readFileSync,writeFileSync} from 'node:fs';
-import {registerHooks} from 'node:module';
+import * as nodeModule from 'node:module';
 import {resolve} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {gzipSync} from 'node:zlib';
@@ -10,6 +10,8 @@ import {gzipSync} from 'node:zlib';
 const [checkout,model,folder,destination]=process.argv.slice(2);
 if(!destination)throw new Error('Pass the Margo checkout, Rita GLB, CMU data folder and packed output.');
 assert.equal(execFileSync('git',['-C',checkout,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),'0efd9cff8230507a32deb49907ecd499d46925f5');
+const {registerHooks}=nodeModule;
+if(typeof registerHooks!=='function')throw new Error('This tool needs Node 22.15 or newer (module.registerHooks).');
 registerHooks({resolve(specifier,context,next){
   if(!specifier.startsWith('@margoengine/'))return next(specifier,context);
   const [,pkg,...sub]=specifier.split('/'),local=resolve(checkout,'packages',pkg);
