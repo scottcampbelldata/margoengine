@@ -50,6 +50,33 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### ATMO-09 four-point pass
+
+- Point 5 (c885f8db50). `packages/physics/tests/coupling/surface-energy.test.js` checks end-of-step
+  precipitation and X-fast sampling across signed world and precipitation cells. Malformed rain
+  and strided forcing overflow leave every accepted patch unchanged. A late native partition rejection
+  also preserves accepted state and work in `packages/weather/tests/surface-energy-workers.test.js`.
+- Point 6 (c885f8db50). `packages/weather/tests/surface-energy-workers.test.js` checks exact
+  TypeScript and native state across one, two and four participants, including signed shift and replay.
+  Its 2,623 rows execute 1,311 SIMD patch pairs and 60,231 paired residual evaluations.
+  `packages/weather/tests/surface-energy-workers.browser.mjs` runs plain and shared packaged Wasm
+  with three real browser helpers and obtains identical accepted bytes across all five paths.
+- Point 7 (c885f8db50). `packages/weather/tests/surface-energy-surface.browser.mjs` uses moving
+  precipitation, a TerrainBed and accepted wet color and roughness. The rain footprint advances 278.3
+  pixels, both banks darken, and the east bank saturates, sheds runoff and dries to 0.312 wetness.
+  The dry control stays unchanged. Both renderers repeat their own accepted state and pixels exactly.
+  Installation in the original RITS-10 watershed shot stays open.
+- Point 8 (c885f8db50). `docs/limits.md` records independent patch budgets, fixed soil temperature
+  and snow properties, omitted layered heat and lateral drainage, and worker requirements.
+  `packages/physics/tests/coupling/surface-energy.test.js` covers analytic heat, water and energy
+  conservation, phase, saturation and fuel drying. Existing fog, snowpack, rail and road coupling
+  tests exercise direct consumers.
+- Point 2 stays open. `packages/weather/scripts/atmo09-col-de-porte-measured.mjs` holds out three
+  post-initialization snow skin temperatures in each of two Col de Porte episodes. Daytime RMSE is
+  1.008 K. Cold-night RMSE is 4.866 K, with the final mean 6.843 K warm. Alternate hourly timing and
+  emissivity leave the warm drift. The comparisons cover one site and skin temperature. Measured
+  turbulent flux, melt and further sites stay open. [Morin et al. (2012)](https://doi.org/10.5194/essd-4-13-2012).
+
 ### SOUND-02 four-point pass
 
 - Point 5 (`1956fb9218`). `packages/physics/tests/room-sound.test.js` checks finite geometric range
