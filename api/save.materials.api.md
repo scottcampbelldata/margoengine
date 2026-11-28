@@ -5,11 +5,20 @@
 ```ts
 export { MaterialCaptureOptions } from "@margoengine/materials";
 
+export { MaterialClass } from "@margoengine/materials";
+
+export { MaterialKinds } from "@margoengine/materials";
+
 export { MaterialLibrary } from "@margoengine/materials";
 
 export { MaterialRestoreOptions } from "@margoengine/materials";
 
+export { RestoredMaterials } from "@margoengine/materials";
+
+export { TypedMaterialRestoreOptions } from "@margoengine/materials";
+
 export function captureMaterials(materials: Readonly<Record<string, object>>, options?: MaterialCaptureOptions): Promise<MaterialLibrary>;
 
+export function restoreMaterials<K extends MaterialKinds>(library: MaterialLibrary, options: TypedMaterialRestoreOptions<K>): Promise<RestoredMaterials<K>>;
 export function restoreMaterials(library: MaterialLibrary, options?: MaterialRestoreOptions): Promise<Record<string, object>>;
 ```

@@ -56,6 +56,20 @@ export interface MaterialRestoreOptions {
   /** Download and decode caps for URL textures. They come from here only: a material file's own options never set them. */
   limits?: TextureLimits;
 }
+/** A class whose instances a restore may hand back, such as `PbrMaterial` or `NodeMaterial`. */
+export type MaterialClass<T extends object = object> = abstract new (...args: never[]) => T;
+/** The class each named material must be, such as `{ red: PbrMaterial }`. */
+export type MaterialKinds = Readonly<Record<string, MaterialClass>>;
+/** Restored materials typed by `expect`: each named entry is an instance of its class; other names are `object`. */
+export type RestoredMaterials<K extends MaterialKinds> = { [N in keyof K]: InstanceType<K[N]> } & Record<
+  string,
+  object
+>;
+/** Restore options that check and type each named material. */
+export interface TypedMaterialRestoreOptions<K extends MaterialKinds> extends MaterialRestoreOptions {
+  /** The class each named material must be. A name that is missing or of another class throws `MargoError` `'state'`, and the restore disposes what it made. */
+  expect: K;
+}
 /** A file's texture options without the download and decode caps, which only the caller of the restore may set. */
 const fileTextureOptions = (value: unknown): object => {
   const { maxBytes: _bytes, maxPixels: _pixels, ...rest } = (value ?? {}) as Record<string, unknown>;
@@ -302,9 +316,17 @@ export async function captureMaterialLibrary(
   return { version: 1, materials: roots, objects };
 }
 /** Restore a detached library. Abort and failure dispose constructed material/texture resources. */
+export function restoreMaterialLibrary<K extends MaterialKinds>(
+  library: MaterialLibrary,
+  options: TypedMaterialRestoreOptions<K>,
+): Promise<RestoredMaterials<K>>;
+export function restoreMaterialLibrary(
+  library: MaterialLibrary,
+  options?: MaterialRestoreOptions,
+): Promise<Record<string, object>>;
 export async function restoreMaterialLibrary(
   library: MaterialLibrary,
-  options: MaterialRestoreOptions = {},
+  options: MaterialRestoreOptions & { expect?: MaterialKinds } = {},
 ): Promise<Record<string, object>> {
   if (
     library?.version !== 1 ||
@@ -430,6 +452,11 @@ export async function restoreMaterialLibrary(
     const result: Record<string, object> = {};
     for (const [name, value] of Object.entries(library.materials))
       Object.defineProperty(result, name, { value: await decode(value), enumerable: true });
+    for (const [name, Class] of Object.entries(options.expect ?? {}))
+      if (!(Object.hasOwn(result, name) && result[name] instanceof Class))
+        fail(
+          `Material "${name}" is ${Object.hasOwn(result, name) ? 'not ' + (constructors.get(Class as never) ?? 'the class expect names') : 'missing'}`,
+        );
     options.signal?.throwIfAborted();
     return result;
   } catch (error) {

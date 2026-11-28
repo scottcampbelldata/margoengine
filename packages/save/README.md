@@ -286,11 +286,15 @@ const blue = new PbrMaterial({ color: [0, 0, 1, 1], map: pixels });
 const library = await captureMaterials({ red, blue });
 const text = JSON.stringify(library); // plain JSON: { version: 1, materials: { red, blue }, objects: [...] }
 
-const restored = await restoreMaterials(JSON.parse(text)); // Record<string, object>: one per name
-const [red2, blue2] = [restored.red, restored.blue] as PbrMaterial[];
+const restored = await restoreMaterials(JSON.parse(text), { expect: { red: PbrMaterial, blue: PbrMaterial } });
+const { red: red2, blue: blue2 } = restored; // both typed PbrMaterial, no cast
 console.log(red2 instanceof PbrMaterial, red2.roughness); // true 0.4
 console.log(red2.map === blue2.map); // true: still one texture
 ```
+
+- `expect` names the class each material must be. The result is typed by it, and the restore checks it: a name that is
+  missing or of another class throws a `MargoError` with code `'state'` and disposes everything the restore made.
+  Without `expect` the result is `Record<string, object>`, one entry per saved name.
 
 - Texture pixels are embedded by default. `textureURL(texture)` returns a URL (or a list of six for a cube) to save
   in their place; restore downloads it with `fetch` (default the global one) within `limits`, the download and decode

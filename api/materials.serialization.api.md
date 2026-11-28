@@ -15,6 +15,10 @@ export interface MaterialCaptureOptions {
     signal?: AbortSignal;
 }
 
+export type MaterialClass<T extends object = object> = abstract new (...args: never[]) => T;
+
+export type MaterialKinds = Readonly<Record<string, MaterialClass>>;
+
 export interface MaterialLibrary {
     version: 1;
     materials: Record<string, MaterialValue>;
@@ -48,12 +52,21 @@ export interface MaterialValueCodec {
     restore(data: never): object | Promise<object>;
 }
 
+export type RestoredMaterials<K extends MaterialKinds> = {
+    [N in keyof K]: InstanceType<K[N]>;
+} & Record<string, object>;
+
+export interface TypedMaterialRestoreOptions<K extends MaterialKinds> extends MaterialRestoreOptions {
+    expect: K;
+}
+
 export function captureMaterialLibrary(materials: Readonly<Record<string, object>>, options?: MaterialCaptureOptions): Promise<MaterialLibrary>;
 
 export function materialParameters(material: Material): Record<string, unknown>;
 
 export const materialValueCodecs: readonly MaterialValueCodec[];
 
+export function restoreMaterialLibrary<K extends MaterialKinds>(library: MaterialLibrary, options: TypedMaterialRestoreOptions<K>): Promise<RestoredMaterials<K>>;
 export function restoreMaterialLibrary(library: MaterialLibrary, options?: MaterialRestoreOptions): Promise<Record<string, object>>;
 
 export function restoreMaterialParameters(material: Material, parameters: Record<string, unknown>): void;
