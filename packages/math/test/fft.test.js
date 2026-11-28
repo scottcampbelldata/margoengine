@@ -49,3 +49,79 @@ test('a forward transform then an inverse gives the input back; lengths with oth
   assert.throws(() => new Fft(7), RangeError);
   assert.throws(() => new RealFft2(5, 4), RangeError);
 });
+
+// Regression (2026-11-28, KB-WATER-WAKEREADME1): the water README's WakeSolver example ran 600 steps of five 256 x 128
+// real transforms and missed its 20 s page limit (31 ms a step, 18.6 s). forward() transformed all nx columns and kept
+// nx / 2 + 1; the radix-2 stage ran the generic p-loop. Both are cheaper now with the same bits.
+test('a real forward transform runs the rows and only the columns its half spectrum keeps', () => {
+  const plan = new RealFft2(16, 8),
+    original = Fft.prototype.transform;
+  let calls = 0;
+  Fft.prototype.transform = function (...args) {
+    calls++;
+    return original.apply(this, args);
+  };
+  try {
+    plan.forward(Float64Array.from({ length: 128 }, (_, i) => Math.cos(i)));
+    assert.equal(calls, 8 + 9, '8 rows and 9 of the 16 columns');
+    calls = 0;
+    plan.inverse(new Float64Array(2 * 9 * 8));
+    assert.equal(calls, 8 + 16, 'the inverse needs every column');
+  } finally {
+    Fft.prototype.transform = original;
+  }
+});
+
+test('the written-out radix-2 stage gives the generic stage bits, -0 inputs included', async () => {
+  const { cos, sin } = await import('../dist/pinned.js');
+  // The stage loop as it was before the radix-2 case, for lengths of 2s, 3s and 5s.
+  const generic = (n, data, inverse) => {
+    const factors = [];
+    for (const p of [2, 3, 5]) for (let r = n; r % p === 0; r /= p) factors.push(p);
+    const w = new Float64Array(2 * n);
+    for (let j = 0; j < n; j++) {
+      w[2 * j] = cos((6.283185307179586 * j) / n);
+      w[2 * j + 1] = -sin((6.283185307179586 * j) / n);
+    }
+    let x = data.slice(),
+      y = new Float64Array(2 * n),
+      s = 1,
+      length = n;
+    const sign = inverse ? -1 : 1;
+    for (const p of factors) {
+      const m = length / p,
+        stepC = n / length,
+        stepP = n / p;
+      for (let q = 0; q < s; q++)
+        for (let j1 = 0; j1 < m; j1++)
+          for (let k2 = 0; k2 < p; k2++) {
+            let re = 0,
+              im = 0;
+            for (let j2 = 0; j2 < p; j2++) {
+              const at = 2 * (q + s * (j1 + m * j2)),
+                t = 2 * (((j2 * k2) % p) * stepP);
+              re += x[at] * w[t] - x[at + 1] * (sign * w[t + 1]);
+              im += x[at] * (sign * w[t + 1]) + x[at + 1] * w[t];
+            }
+            const t = 2 * ((j1 * k2 * stepC) % n),
+              to = 2 * (q + s * (k2 + p * j1));
+            y[to] = re * w[t] - im * (sign * w[t + 1]);
+            y[to + 1] = re * (sign * w[t + 1]) + im * w[t];
+          }
+      [x, y] = [y, x];
+      s *= p;
+      length = m;
+    }
+    return x.map((v) => v * (inverse ? 1 / n : 1));
+  };
+  let seed = 7;
+  const next = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648 - 0.5) * 8;
+  for (const n of [2, 4, 8, 16, 48, 256, 240, 1024])
+    for (const inverse of [false, true])
+      for (const fill of ['random', 'signed zeros']) {
+        const data = Float64Array.from({ length: 2 * n }, (_, i) => (fill === 'random' ? next() : i % 3 ? -0 : 0)),
+          got = data.slice();
+        new Fft(n).transform(got, inverse);
+        assert.deepEqual(Array.from(got, toHex), Array.from(generic(n, data, inverse), toHex), `${n} ${inverse} ${fill}`);
+      }
+});

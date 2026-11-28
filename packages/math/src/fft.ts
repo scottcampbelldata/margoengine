@@ -64,6 +64,43 @@ export class Fft {
         // Table steps of w_{n_c} and of w_p.
         stepC = n / length,
         stepP = n / p;
+      if (p === 2) {
+        // The radix-2 stage of the loop below written out, with the same operations in the same order (re starts at
+        // 0 and adds each term, so a -0 sum stays +0 as there), only without its index and modulo arithmetic: the
+        // Rust bits stay. w_2^0 is entry 0 of the table and w_2^1 entry n / 2; the stage's twiddle for k2 = 0 is
+        // entry 0 and for k2 = 1 entry j1 stepC (j1 stepC < n, so the modulo is that).
+        const w0r = w[0]!,
+          w0i = sign * w[1]!,
+          w1r = w[2 * stepP]!,
+          w1i = sign * w[2 * stepP + 1]!,
+          half = s * m;
+        for (let j1 = 0; j1 < m; j1++) {
+          const t = 2 * j1 * stepC,
+            tr = w[t]!,
+            ti = sign * w[t + 1]!;
+          for (let q = 0; q < s; q++) {
+            const a = 2 * (q + s * j1),
+              b = a + 2 * half,
+              ar = x[a]!,
+              ai = x[a + 1]!,
+              br = x[b]!,
+              bi = x[b + 1]!;
+            let re = 0 + (ar * w0r - ai * w0i),
+              im = 0 + (ar * w0i + ai * w0r);
+            re += br * w0r - bi * w0i;
+            im += br * w0i + bi * w0r;
+            const to = 2 * (q + s * 2 * j1);
+            y[to] = re * w0r - im * w0i;
+            y[to + 1] = re * w0i + im * w0r;
+            re = 0 + (ar * w0r - ai * w0i);
+            im = 0 + (ar * w0i + ai * w0r);
+            re += br * w1r - bi * w1i;
+            im += br * w1i + bi * w1r;
+            y[to + 2 * s] = re * tr - im * ti;
+            y[to + 2 * s + 1] = re * ti + im * tr;
+          }
+        }
+      } else
       for (let q = 0; q < s; q++)
         for (let j1 = 0; j1 < m; j1++)
           for (let k2 = 0; k2 < p; k2++) {
@@ -140,7 +177,8 @@ export class Fft3 {
 export class RealFft2 {
   readonly nx: number;
   readonly ny: number;
-  private readonly grid: Fft3;
+  private readonly rows: Fft;
+  private readonly columns: Fft;
   private readonly full: Float64Array;
 
   /** @throws RangeError for an odd nx, or a length whose prime factors are not 2, 3 and 5. */
@@ -149,7 +187,8 @@ export class RealFft2 {
       throw new RangeError(`A real 2D transform takes an even nx (got ${nx}); pad the field to an even width.`);
     this.nx = nx;
     this.ny = ny;
-    this.grid = new Fft3(nx, ny);
+    this.rows = new Fft(nx);
+    this.columns = new Fft(ny);
     this.full = new Float64Array(2 * nx * ny);
   }
 
@@ -165,7 +204,10 @@ export class RealFft2 {
       full[2 * i] = field[i]!;
       full[2 * i + 1] = 0;
     }
-    this.grid.transform(full);
+    // Fft3's rows then columns, but only the half + 1 columns the half spectrum keeps: each column is its own
+    // transform, so the kept ones give the same bits, and the others were thrown away (KB-WATER-WAKEREADME1).
+    for (let j = 0; j < ny; j++) this.rows.transform(full, false, 2 * nx * j, 1);
+    if (ny > 1) for (let i = 0; i < half; i++) this.columns.transform(full, false, 2 * i, nx);
     for (let j = 0; j < ny; j++)
       for (let i = 0; i < half; i++) {
         out[2 * (i + half * j)] = full[2 * (i + nx * j)]!;
@@ -192,7 +234,8 @@ export class RealFft2 {
         full[2 * (i + nx * j)] = spectrum[from]!;
         full[2 * (i + nx * j) + 1] = mirrored ? -spectrum[from + 1]! : spectrum[from + 1]!;
       }
-    this.grid.transform(full, true);
+    for (let j = 0; j < ny; j++) this.rows.transform(full, true, 2 * nx * j, 1);
+    if (ny > 1) for (let i = 0; i < nx; i++) this.columns.transform(full, true, 2 * i, nx);
     for (let i = 0; i < nx * ny; i++) out[i] = full[2 * i]!;
     return out;
   }
