@@ -6,6 +6,17 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-28: every `procedural:rock` of a biome is the same stone (KB-BIOMES-ROCKSEED1, biomes)
+
+- **Repro:** Above the Treeline before 2026-11-28 (talus of `procedural:rock` over the upper meadow and scree): every
+  stone has one silhouette, only turned and scaled, which reads as copies from 2 to 30 m.
+- **Cause:** `partsOf` in `packages/biomes/src/objects.ts` builds the `rock` key from `generateRockMesh(1, ...)`, seed
+  1 for every species and instance, and a species draws one mesh through its `ScatterTiles`, so the seeded forms of
+  `@margoengine/procedural` (block, slab, wedge, shard, pebble) never appear.
+- **Fix needed:** draw a `procedural:rock` species as several seeded forms (records split among a few `ScatterTiles`
+  by a hash of each record, density unchanged), with a test that a talus field holds at least four distinct meshes.
+  The film now draws eight scanned stones instead (`treeline-rocks/talus` in the asset library).
+
 ### Fixed 2026-11-28: the lens drops' glint added light over empty pixels without covering them (KB-WEATHER-LENSGLINT1, weather)
 
 - **Repro:** `packages/post/test/alpha-rim-browser.mjs`, "lens drops over nothing": `LensDrops` alone on a
