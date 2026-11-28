@@ -6,7 +6,16 @@ import assert from 'node:assert/strict';
 import { MargoError } from '@margoengine/math/errors';
 import { AstroSky, skyMatrix } from '@margoengine/sky/astro';
 import { degrees } from '@margoengine/sky/sun';
-import { MilkyWay, galacticCoordinates, milkyWayBrightness } from '../dist/milky-way.js';
+import {
+  MilkyWay,
+  galacticCoordinates,
+  galacticDirection,
+  galacticOfDirection,
+  milkyWayBrightness,
+  nearInfraredColor,
+  parsePointSources,
+  pointSourceLook,
+} from '../dist/milky-way.js';
 import { tracedGPU } from '../../../tests/support/gpu-trace.js';
 
 const near = (actual, expected, bound, what) =>
@@ -122,4 +131,95 @@ test('MilkyWay horizon false shows the band by day and below the horizon, as fro
   assert.equal(band.values[36], 1);
   assert.throws(() => new MilkyWay({ ...observer, horizon: 1 }), /horizon/);
   band.dispose();
+});
+
+test('galacticDirection puts the galactic centre at -z, the north galactic pole up and l 90 to the left', () => {
+  const pole = galacticDirection(192.85948, 27.12825),
+    centre = galacticOfDirection(galacticDirection(266.41683, -29.00781)),
+    l90 = galacticDirection(318.0044, 48.3299);
+  near(pole[1], 1, 1e-6, 'pole y');
+  near(l90[0], -1, 1e-4, 'l 90 is -x');
+  // Sagittarius A* lies at l 359.944, b -0.046 (Reid and Brunthaler, ApJ 616, 2004).
+  near(((centre.l + 180) % 360) - 180, -0.056, 0.01, 'Sgr A* l');
+  near(centre.b, -0.046, 0.01, 'Sgr A* b');
+  for (const [ra, dec] of [[10, 20], [200, -60], [359, 89]]) {
+    const back = galacticOfDirection(galacticDirection(ra, dec));
+    const d = galacticDirection(ra, dec),
+      sky = galacticOfDirection([d[0] * 3, d[1] * 3, d[2] * 3]);
+    near(back.l, sky.l, 1e-9, 'scale free l');
+    assert.ok(back.l >= 0 && back.l < 360 && Math.abs(back.b) <= 90);
+  }
+  const out = new Float32Array(6);
+  assert.equal(galacticDirection(192.85948, 27.12825, out, 3), out);
+  near(out[4], 1, 1e-6, 'written at the offset');
+  assert.throws(() => galacticDirection(NaN, 0), TypeError);
+  assert.throws(() => galacticOfDirection([0, 0, 0]), TypeError);
+});
+
+test('nearInfraredColor reddens along the dwarf sequence and behind dust past M5', () => {
+  const ratio = (jk) => nearInfraredColor(jk)[0] / nearInfraredColor(jk)[2];
+  let last = 0;
+  for (const jk of [-0.3, -0.1, 0, 0.16, 0.31, 0.5, 0.72, 0.9, 1.1, 1.2]) {
+    const r = ratio(jk);
+    assert.ok(r > last, `J-Ks ${jk} is redder than the one before`);
+    last = r;
+    near(Math.max(...nearInfraredColor(jk)), 1, 1e-12, 'peak 1');
+  }
+  // A0 (J-K 0, B-V 0) is bluish white, as starColor(0) gives.
+  assert.ok(nearInfraredColor(0)[2] >= nearInfraredColor(0)[0]);
+  // Two magnitudes of J-K excess is A_V 11.8: green falls to a fifth of red and blue below a fiftieth.
+  const hidden = nearInfraredColor(2.9);
+  assert.ok(hidden[0] === 1 && hidden[1] < 0.3 && hidden[2] < 0.02, `dust-hidden source ${hidden}`);
+  assert.ok(nearInfraredColor(0.6, 2)[0] - nearInfraredColor(0.6, 2)[2] > nearInfraredColor(0.6)[0] - nearInfraredColor(0.6)[2]);
+  assert.throws(() => nearInfraredColor(0, 3.5), RangeError);
+  assert.deepEqual(nearInfraredColor(NaN), [1, 1, 1]);
+});
+
+test('parsePointSources reads 12-byte records onto the sphere and refuses partial or off-sky ones', () => {
+  const bytes = new ArrayBuffer(24),
+    view = new DataView(bytes);
+  view.setFloat32(0, 192.85948, true);
+  view.setFloat32(4, 27.12825, true);
+  view.setInt16(8, 850, true);
+  view.setInt16(10, 6420, true);
+  view.setFloat32(12, 266.405, true);
+  view.setFloat32(16, -28.936, true);
+  view.setInt16(20, -120, true);
+  view.setInt16(22, 14999, true);
+  const s = parsePointSources(bytes, { radius: 40 });
+  assert.equal(s.count, 2);
+  near(s.positions[1], 40, 1e-4, 'pole at the radius');
+  near(s.positions[5], -40, 1e-2, 'centre at -z');
+  near(s.colorIndex[0], 0.85, 1e-6, 'J-Ks');
+  near(s.magnitude[1], 14.999, 1e-6, 'Ks');
+  assert.equal(parsePointSources(new Uint8Array(bytes, 12, 12)).count, 1, 'a view reads from its offset');
+  assert.throws(() => parsePointSources(new ArrayBuffer(13)), (e) => e instanceof MargoError && e.code === 'failed');
+  view.setFloat32(4, 91, true);
+  assert.throws(() => parsePointSources(bytes), /off the sky/);
+  assert.throws(() => parsePointSources(new ArrayBuffer(0), { radius: 0 }), RangeError);
+});
+
+test('pointSourceLook brightens and grows the brighter sources and caps the brightest', () => {
+  const sources = { count: 3, colorIndex: new Float32Array([0.3, 0.3, 0.3]), magnitude: new Float32Array([2, 6, 11]) };
+  const { colors, sizes } = pointSourceLook(sources, { brightness: 4, compression: 0.5 });
+  const light = (i) => Math.max(colors[i * 4], colors[i * 4 + 1], colors[i * 4 + 2]);
+  near(light(1), 4, 1e-5, 'reference magnitude');
+  near(light(0), 4 * Math.min(4, 10 ** (0.8)), 1e-4, 'capped at four times');
+  near(light(2), 4 * 10 ** -1, 1e-5, 'five magnitudes fainter at compression 0.5');
+  assert.ok(sizes[0] === 3 && sizes[1] === 3 && sizes[2] < sizes[1] && sizes[2] > 1);
+  assert.equal(colors[3], 1);
+  assert.throws(() => pointSourceLook(sources, { compression: 0.1 }), RangeError);
+});
+
+test('pointSourceLook saturation keeps luminance while no channel clips, and spreads the channels', () => {
+  const sources = { count: 1, colorIndex: new Float32Array([0.6]), magnitude: new Float32Array([6]) };
+  const plain = pointSourceLook(sources).colors,
+    rich = pointSourceLook(sources, { saturation: 1.5 }).colors,
+    grey = pointSourceLook(sources, { saturation: 0 }).colors;
+  const y = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  assert.ok(rich[2] > 0, 'no channel clips');
+  near(y(rich), y(plain), 1e-5, 'luminance kept');
+  assert.ok(rich[0] - rich[2] > plain[0] - plain[2], 'redder');
+  near(grey[0], grey[2], 1e-6, 'grey at 0');
+  assert.throws(() => pointSourceLook(sources, { saturation: 4 }), RangeError);
 });

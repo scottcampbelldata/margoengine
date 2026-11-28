@@ -2372,6 +2372,51 @@ fades from the centre, the bulge, and the Great Rift's dust from Aquila to Sagit
 real star clouds. On a Radeon 680M every sampled pixel held the model's radiance within 0.32% at 40, 60 and 90 degrees
 of view.
 
+### Survey catalogues on the sky sphere
+
+The same entry places a star survey around the viewer in the galactic frame, for exhibits that show a catalogue rather
+than a site's sky. `galacticDirection(ra, dec)` gives a J2000 direction as a unit vector with the galactic centre at
+-z, the north galactic pole up (+y) and longitude rising to the left (l 90 at -x); `galacticOfDirection` turns it back.
+`fetchPointSources(url)` and `parsePointSources(bytes, {radius})` read packed records of 12 bytes (float32 RA and
+Dec in degrees, int16 J-Ks and int16 Ks in thousandths of a magnitude, little-endian; gzip or plain) onto a sphere of
+`radius`. `nearInfraredColor(jk, saturation)` colours a J-Ks index: B-V along the main sequence of Bessell and Brett
+(PASP 100, 1988), then `starColor`'s Planck colour, and past the M5 end (J-K 0.9) an M5 star behind dust, with A_V =
+5.9 E(J-K) (Rieke and Lebofsky, ApJ 288, 1985) and each channel dimmed by A_V (550 nm / wavelength)^1.3, near the
+optical curve of Cardelli, Clayton and Mathis (ApJ 345, 1989). `pointSourceLook(sources, options)` turns colour
+and Ks magnitude into HDR float colours and sizes for a `PointCloud` from `@margoengine/points` with additive light:
+the flux 10^(-0.4 (Ks - referenceMagnitude)) raised to `compression` (default 0.45, a display stretch as Lupton et
+al., PASP 116, 2004, discuss), times `brightness` (default 4), capped at 4 times it; sizes from `minSize` (1) to
+`minSize + sizeRange` (3); `saturation` (1) as above.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PointsPlugin, PointCloud} from 'margoengine/points';
+import {galacticDirection, galacticOfDirection, parsePointSources, pointSourceLook} from 'margoengine/sky/milky-way';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const points = PointsPlugin.attach(engine);
+// Two sources: Sagittarius A* (J-Ks 2.0, Ks 9) and a star near the north galactic pole (J-Ks 0.3, Ks 6).
+const bytes = new DataView(new ArrayBuffer(24));
+[[266.4168, -29.0078, 2000, 9000], [192.86, 27.13, 300, 6000]].forEach(([ra, dec, jk, ks], i) => {
+  bytes.setFloat32(i * 12, ra, true);
+  bytes.setFloat32(i * 12 + 4, dec, true);
+  bytes.setInt16(i * 12 + 8, jk, true);
+  bytes.setInt16(i * 12 + 10, ks, true);
+});
+const sources = parsePointSources(bytes.buffer, {radius: 40});
+const {colors, sizes} = pointSourceLook(sources, {brightness: 0.5, saturation: 1.5});
+points.add(new PointCloud({positions: sources.positions, colors, sizes, colorFormat: 'float',
+  material: {size: 1, shape: 'round', transparent: true, blending: 'additive', depthWrite: false}}));
+engine.camera.position = [0, 0, 0.001]; // at the centre, looking down -z at the galactic centre
+engine.camera.target = [0, 0, 0];
+console.log(galacticOfDirection(galacticDirection(266.4168, -29.0078))); // about {l: 359.94, b: -0.05}
+engine.render();
+```
+
+The colours are presentation choices: 2MASS measured near-infrared light, and the extinction step assumes an M5 star
+behind the dust. The Bessell-Brett and 2MASS systems differ by under 0.05 mag in J-K (Carpenter, AJ 121, 2001), which
+the colour ignores. The demo `demos/the-million-stars` shows one million 2MASS sources this way.
+
 ## Aurora
 
 `@margoengine/sky/aurora` adds animated northern lights: curtains in arcs running east-west north of the world

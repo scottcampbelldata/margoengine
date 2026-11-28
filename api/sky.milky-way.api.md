@@ -29,12 +29,51 @@ export interface MilkyWayOptions extends Partial<Observer>, AstroOptions {
     horizon?: boolean;
 }
 
+export interface PointSourceLookOptions {
+    referenceMagnitude?: number;
+    compression?: number;
+    brightness?: number;
+    minSize?: number;
+    sizeRange?: number;
+    saturation?: number;
+}
+
+export interface PointSources {
+    readonly count: number;
+    readonly positions: Float32Array;
+    readonly colorIndex: Float32Array;
+    readonly magnitude: Float32Array;
+}
+
+export function fetchPointSources(url: string | URL, options?: {
+    signal?: AbortSignal;
+    radius?: number;
+}): Promise<PointSources>;
+
 export function galacticCoordinates(direction: readonly [number, number, number], date: Date, observer: Observer, options?: AstroOptions): {
     l: number;
     b: number;
 };
 
+export function galacticDirection<T extends number[] | Float32Array = number[]>(ra: number, dec: number, out?: T, offset?: number): T;
+
+export function galacticOfDirection(direction: readonly [number, number, number]): {
+    l: number;
+    b: number;
+};
+
 export function milkyWayBrightness(l: number, b: number): number;
+
+export function nearInfraredColor(jk: number, saturation?: number): readonly [number, number, number];
+
+export function parsePointSources(bytes: ArrayBuffer | ArrayBufferView, options?: {
+    radius?: number;
+}): PointSources;
+
+export function pointSourceLook(sources: Pick<PointSources, 'count' | 'colorIndex' | 'magnitude'>, options?: PointSourceLookOptions): {
+    colors: Float32Array;
+    sizes: Float32Array;
+};
 
 // Not exported from this entry, but used by the exports above:
 

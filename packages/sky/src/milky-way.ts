@@ -7,8 +7,10 @@
 // and scaled with the same magnitude-0 brightness as AstroSky's stars, so band and stars keep their real ratio.
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 import {
   skyMatrix,
+  starColor,
   sunPosition,
   type AstroOptions,
   type AstroSky,
@@ -69,6 +71,200 @@ export function galacticCoordinates(
     gz = G[6] * ex + G[7] * ey + G[8] * ez,
     l = Math.atan2(gy, gx) / rad;
   return { l: l < 0 ? l + 360 : l, b: Math.asin(Math.max(-1, Math.min(1, gz))) / rad };
+}
+
+/**
+ * The direction of a J2000 right ascension and declination (degrees) in the galactic display frame, as a unit vector:
+ * y toward the north galactic pole, -z toward the galactic centre (l 0, b 0) and -x toward l 90, so a viewer at the
+ * origin looking down -z with y up sees the sky as it stands overhead, longitude rising to the left. The Hipparcos
+ * rotation, as {@link galacticCoordinates}; no observer, date or refraction: the frame of a survey, not of a site.
+ * @throws TypeError for a non-finite angle.
+ * @example galacticDirection(266.405, -28.936); // about [0, 0, -1], Sagittarius A*
+ */
+export function galacticDirection<T extends number[] | Float32Array = number[]>(
+  ra: number,
+  dec: number,
+  out: T = [0, 0, 0] as T,
+  offset = 0,
+): T {
+  if (!Number.isFinite(ra) || !Number.isFinite(dec)) throw new TypeError('Pass the RA and Dec as finite degrees.');
+  const a = ra * rad,
+    d = dec * rad,
+    c = Math.cos(d),
+    ex = c * Math.cos(a),
+    ey = c * Math.sin(a),
+    ez = Math.sin(d);
+  out[offset] = -(G[3] * ex + G[4] * ey + G[5] * ez);
+  out[offset + 1] = G[6] * ex + G[7] * ey + G[8] * ez;
+  out[offset + 2] = -(G[0] * ex + G[1] * ey + G[2] * ez);
+  return out;
+}
+
+/**
+ * Galactic longitude and latitude, in degrees, of a direction in the frame of {@link galacticDirection}.
+ * @throws TypeError for a zero or non-finite direction.
+ * @example galacticOfDirection([0, 0, -1]); // { l: 0, b: 0 }
+ */
+export function galacticOfDirection(direction: readonly [number, number, number]): { l: number; b: number } {
+  const [x, y, z] = direction ?? [],
+    n = Math.hypot(x, y, z);
+  if (!(n > 0 && Number.isFinite(n))) throw new TypeError('Pass the direction as three finite numbers, not all 0.');
+  const l = Math.atan2(-x, -z) / rad;
+  return { l: l < 0 ? l + 360 : l + 0, b: Math.asin(Math.max(-1, Math.min(1, y / n))) / rad };
+}
+
+// The main-sequence J-K against B-V of Bessell and Brett (PASP 100, 1988, table II), B0 to M5.
+const dwarfJK = [-0.16, -0.1, 0, 0.16, 0.31, 0.5, 0.72, 0.84, 0.9],
+  dwarfBV = [-0.3, -0.17, 0, 0.3, 0.58, 0.81, 1.15, 1.4, 1.64];
+
+/**
+ * Linear RGB of a star, peak 1, from its near-infrared J-Ks index: B-V read off the dwarf sequence of Bessell and
+ * Brett (1988), then the Planck colour of `starColor` from `@margoengine/sky/astro`. A J-Ks past the sequence's M5 end
+ * (0.9) is read as an M5 star behind dust: the excess E(J-K) gives A_V = 5.9 E(J-K) (Rieke and Lebofsky, ApJ 288,
+ * 1985) and each channel is dimmed by A_V (550 nm / wavelength)^1.3, a power law close to the optical extinction curve
+ * of Cardelli, Clayton and Mathis (ApJ 345, 1989), so dust-hidden sources turn deep red. `saturation` (0 to 3, default
+ * 1) scales each channel's distance from the Rec. 709 luminance, clipped at 0. The 2MASS and Bessell-Brett systems
+ * differ by under 0.05 mag in J-K (Carpenter, AJ 121, 2001), which this ignores.
+ * @throws RangeError for a saturation outside 0 to 3.
+ * @example nearInfraredColor(0.31); // a Sun-like G0, near white
+ */
+export function nearInfraredColor(jk: number, saturation = 1): readonly [number, number, number] {
+  if (!(saturation >= 0 && saturation <= 3)) throw new RangeError('Pass saturation from 0 to 3.');
+  if (!Number.isFinite(jk)) return [1, 1, 1];
+  let bv = dwarfBV[8];
+  if (jk <= dwarfJK[0]) bv = dwarfBV[0];
+  else if (jk < dwarfJK[8]) {
+    let i = 1;
+    while (jk > dwarfJK[i]) i++;
+    const t = (jk - dwarfJK[i - 1]) / (dwarfJK[i] - dwarfJK[i - 1]);
+    bv = dwarfBV[i - 1] + t * (dwarfBV[i] - dwarfBV[i - 1]);
+  }
+  const av = 5.9 * Math.max(0, jk - dwarfJK[8]),
+    c = starColor(bv).map((v, k) => v * 10 ** (-0.4 * av * (550 / [610, 550, 465][k]) ** 1.3)),
+    top = Math.max(...c),
+    y = (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / top;
+  return [0, 1, 2].map((k) => Math.max(0, y + (c[k] / top - y) * saturation)) as unknown as readonly [
+    number,
+    number,
+    number,
+  ];
+}
+
+/** Point sources read by {@link parsePointSources}, in record order. */
+export interface PointSources {
+  readonly count: number;
+  /** xyz per source in the frame of {@link galacticDirection}, times `radius`. */
+  readonly positions: Float32Array;
+  /** J-Ks colour index per source, magnitudes. */
+  readonly colorIndex: Float32Array;
+  /** Ks magnitude per source. */
+  readonly magnitude: Float32Array;
+}
+
+/**
+ * Reads packed point sources, 12 bytes each, little-endian: float32 RA and Dec (J2000 degrees), int16 J-Ks and int16
+ * Ks in thousandths of a magnitude (a 2MASS Point Source Catalog extract, Skrutskie et al., AJ 131, 2006), and places
+ * each on a sphere of `radius` (default 1) in the galactic display frame.
+ * @throws MargoError `'failed'` for a partial record or a direction off the sky; RangeError for a bad radius.
+ * @example parsePointSources(new Float32Array([266.4, -28.9, 0]).buffer, { radius: 40 }).count; // 1
+ */
+export function parsePointSources(
+  bytes: ArrayBuffer | ArrayBufferView,
+  options: { radius?: number } = {},
+): PointSources {
+  const radius = options.radius ?? 1;
+  if (!(radius > 0 && Number.isFinite(radius))) throw new RangeError('Pass the radius as a finite number above 0.');
+  const view = ArrayBuffer.isView(bytes)
+    ? new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+    : new DataView(bytes);
+  if (view.byteLength % 12)
+    throw new MargoError('failed', `Point sources take 12 bytes each; ${view.byteLength} bytes leave a partial record`);
+  const count = view.byteLength / 12,
+    positions = new Float32Array(count * 3),
+    colorIndex = new Float32Array(count),
+    magnitude = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    const o = i * 12,
+      ra = view.getFloat32(o, true),
+      dec = view.getFloat32(o + 4, true);
+    if (!(ra >= 0 && ra <= 360 && dec >= -90 && dec <= 90))
+      throw new MargoError('failed', `Point source ${i + 1} lies off the sky (RA ${ra}, Dec ${dec})`);
+    galacticDirection(ra, dec, positions, i * 3);
+    positions[i * 3] *= radius;
+    positions[i * 3 + 1] *= radius;
+    positions[i * 3 + 2] *= radius;
+    colorIndex[i] = view.getInt16(o + 8, true) / 1000;
+    magnitude[i] = view.getInt16(o + 10, true) / 1000;
+  }
+  return { count, positions, colorIndex, magnitude };
+}
+
+/**
+ * Fetches and reads packed point sources ({@link parsePointSources}), gzip or plain.
+ * @throws MargoError `'failed'` for an HTTP error or bad records; the signal's reason on abort.
+ */
+export async function fetchPointSources(
+  url: string | URL,
+  options: { signal?: AbortSignal; radius?: number } = {},
+): Promise<PointSources> {
+  const response = await fetch(url, { signal: options.signal });
+  if (!response.ok)
+    throw new MargoError('failed', `Point sources ${String(url)} answered HTTP ${response.status}; check the URL`);
+  let bytes: ArrayBuffer = await response.arrayBuffer();
+  const head = new Uint8Array(bytes, 0, Math.min(2, bytes.byteLength));
+  if (head[0] === 0x1f && head[1] === 0x8b)
+    bytes = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+  options.signal?.throwIfAborted();
+  return parsePointSources(bytes, options);
+}
+
+/** How {@link pointSourceLook} turns magnitudes into light. */
+export interface PointSourceLookOptions {
+  /** Ks magnitude drawn at `brightness`. Default 6. */
+  referenceMagnitude?: number;
+  /** Exponent on the flux, 0.2 to 1: 1 keeps true flux ratios, lower lifts the faint ones. Default 0.45. */
+  compression?: number;
+  /** Linear light of a source at the reference magnitude. Default 4. */
+  brightness?: number;
+  /** Size of the faintest source, in the cloud's size unit. Default 1. */
+  minSize?: number;
+  /** Extra size of a source at the reference magnitude or brighter. Default 2. */
+  sizeRange?: number;
+  /** Saturation about each colour's Rec. 709 luminance, 0 to 3: 0 is grey, 1 the Planck colour. Default 1. */
+  saturation?: number;
+}
+
+/**
+ * HDR colours (linear RGBA floats, for a cloud with `colorFormat: 'float'` and additive blending) and sizes for point
+ * sources: the {@link nearInfraredColor} of each J-Ks times its Ks flux 10^(-0.4 (Ks - reference)) raised to
+ * `compression`, a display stretch of the kind Lupton et al. (PASP 116, 2004) give for survey images, capped at 4 times
+ * `brightness`, with `saturation` applied to each colour; brighter sources draw larger, up to `minSize + sizeRange`.
+ * @throws RangeError for a compression outside 0.2 to 1 or a saturation outside 0 to 3.
+ * @example pointSourceLook(parsePointSources(bytes)).colors.length; // 4 per source
+ */
+export function pointSourceLook(
+  sources: Pick<PointSources, 'count' | 'colorIndex' | 'magnitude'>,
+  options: PointSourceLookOptions = {},
+): { colors: Float32Array; sizes: Float32Array } {
+  const { referenceMagnitude = 6, compression = 0.45, brightness = 4, minSize = 1, sizeRange = 2, saturation = 1 } = options;
+  if (!(compression >= 0.2 && compression <= 1)) throw new RangeError('Pass compression from 0.2 to 1.');
+  const n = sources.count,
+    colors = new Float32Array(n * 4),
+    sizes = new Float32Array(n),
+    // One colour per 0.02 mag of J-Ks from -1 to 5, so a million sources run no Planck sums of their own.
+    table = new Float32Array(301 * 3);
+  for (let i = 0; i <= 300; i++) table.set(nearInfraredColor(-1 + i * 0.02, saturation), i * 3);
+  for (let i = 0; i < n; i++) {
+    const k = Math.max(0, Math.min(300, Math.round((sources.colorIndex[i] + 1) / 0.02))) * 3,
+      level = 10 ** (-0.4 * compression * (sources.magnitude[i] - referenceMagnitude)),
+      light = brightness * Math.min(level, 4);
+    colors[i * 4] = table[k] * light;
+    colors[i * 4 + 1] = table[k + 1] * light;
+    colors[i * 4 + 2] = table[k + 2] * light;
+    colors[i * 4 + 3] = 1;
+    sizes[i] = minSize + sizeRange * Math.min(1, level);
+  }
+  return { colors, sizes };
 }
 
 /** {@link MilkyWay} settings, read every frame from `milkyWay.options`. All optional, given `astro` or an observer. */
