@@ -174,6 +174,27 @@ engine.start();
 `model` is a light `Model` or a `PBRModel`; `loader` tells them apart, and with `'gltf/pbr'` the result also holds the
 `reason` the light loader gave.
 
+Both shapes share `root`, `nodes`, `meshes`, `dispose()` and `Symbol.dispose`, so code that uses only those needs no
+branch on `loader`. The light loader lists `nodes` depth first in file order (a node, then its children as the file
+lists them, then the next scene root) and holds only the loaded scene's nodes; gltf/pbr's `nodes` is indexed by glTF
+node. The two agree for a file that lists its nodes depth first, as most exporters write them; to find a node in any
+file, look it up by name:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { loadAuto } from 'margoengine/gltf/auto';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const { model } = await loadAuto(engine, '/any.glb');
+const turntable = engine.createMesh();
+model.root.setParent(turntable); // the root is a Mesh with either loader
+const door = model.nodes.find((node) => node.name === 'Door'); // a node by name, with either loader
+door?.setRotation([0, Math.PI / 2, 0]);
+console.log(`${model.nodes.length} nodes, ${model.meshes.length} drawn`);
+engine.start();
+// On teardown: model.dispose(); engine.dispose();
+```
+
 ### Cameras and lights as data
 
 `@margoengine/gltf/scene-data` accepts nodes with a glTF camera or a `KHR_lights_punctual` light, and hands them back as

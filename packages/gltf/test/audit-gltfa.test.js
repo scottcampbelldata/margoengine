@@ -425,3 +425,34 @@ test('KB-GLTFA A8: `using` disposes a light model, as it does a PBRModel', async
     engine.dispose();
   }
 });
+
+test('KB-GLTFA A7: the light loader lists model.nodes and model.meshes depth first in file order', async () => {
+  const { engine } = await headlessEngine();
+  try {
+    const { doc, bytes } = triangle({
+      // One mesh per node, told apart by its material's roughness (0.1 for a0 ... 0.4 for b).
+      meshes: [0.1, 0.2, 0.3, 0.4].map((_, material) => ({ primitives: [{ attributes: { POSITION: 0 }, material }] })),
+      materials: [0.1, 0.2, 0.3, 0.4].map((roughnessFactor) => ({ pbrMetallicRoughness: { roughnessFactor } })),
+      nodes: [
+        { name: 'a', children: [2, 3] },
+        { name: 'b', mesh: 3 },
+        { name: 'a0', mesh: 0 },
+        { name: 'a1', mesh: 1, children: [4] },
+        { name: 'a1x', mesh: 2 },
+      ],
+      scenes: [{ nodes: [0, 1] }],
+    });
+    using model = parseGLTF(engine, doc, [bytes]);
+    assert.deepEqual(
+      model.nodes.map((n) => n.name),
+      ['a', 'a0', 'a1', 'a1x', 'b'],
+    );
+    const tags = [0.1, 0.2, 0.3, 0.4].map(Math.fround);
+    assert.deepEqual(
+      model.meshes.map((m) => tags.findIndex((v) => m.material.data.includes(v))),
+      [0, 1, 2, 3],
+    );
+  } finally {
+    engine.dispose();
+  }
+});

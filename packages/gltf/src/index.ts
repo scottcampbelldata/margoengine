@@ -167,7 +167,12 @@ function transform(mesh: Mesh, node: GLTFNode, index: number): void {
 /** A parsed glTF scene: the root mesh handle, every mesh and node handle, and dispose() to release them. */
 export interface Model {
   root: MeshHandle;
+  /** The drawn meshes, one per triangle primitive, in the order of `nodes` and then primitive order. */
   meshes: readonly MeshHandle[];
+  /**
+   * The loaded scene's nodes, depth first in file order: each node, then its children as the file lists them, then
+   * the next scene root (KB-GLTFA A7). Nodes outside the scene are not here; gltf/pbr's `nodes` is indexed by node.
+   */
   nodes: readonly MeshHandle[];
   dispose(): void;
   /** The same as `dispose()`, so `using model = parseGLTF(...)` releases it (KB-GLTFA A8). */
@@ -441,7 +446,9 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
   try {
     const root = engine.createMesh();
     created.push(root);
-    const stack = roots.map((id: unknown) => ({ id: integer(id, 'root'), parent: root }));
+    // Depth first in file order: roots and children are pushed reversed so the stack pops them first to last,
+    // and model.nodes and model.meshes list a parent before its children and siblings as the file lists them.
+    const stack = roots.map((id: unknown) => ({ id: integer(id, 'root'), parent: root })).reverse();
     while (stack.length) {
       const { id, parent } = stack.pop()!,
         node = entry(nodes, id, 'node');
@@ -463,7 +470,8 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
           renderable.push(child);
         }
       }
-      for (const child of node.children ?? []) stack.push({ id: child, parent: mesh });
+      const children = node.children ?? [];
+      for (let i = children.length - 1; i >= 0; i--) stack.push({ id: children[i], parent: mesh });
     }
     if (!renderable.length && !extensions.some((extension) => extension.allowEmptyScene))
       throw margoError('failed', 'glTF contains no renderable meshes; add a mesh with triangle primitives');
