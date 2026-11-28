@@ -16709,6 +16709,26 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   (`inner`, `innerFade`). 98.6 percent covered; the whole-scene frames read as a meadow.
 - **Regression:** `packages/biomes/tests/meadow-grass-check.mjs` (real GPU).
 
+### Fixed 2026-11-28: a Material mesh given to a `GLTFWeather` under the scene's `Puddles` failed to compile (KB-WEATHER-GLTFTWICE1, weather, materials)
+
+- **Repro:** Last Tram: `Puddles.attach(engine, {...})` and `GLTFWeather.attach(engine, {puddles: {...}})`, then
+  `gltfWeather.add(model)` on a model built from Material meshes (the film passes every model to its receivers, a
+  `GLTFWeather` among them). The shader failed with "redeclaration of 'WeatherPuddles'" and of every
+  `weather_puddle_*` function, and had it compiled the surface would have been wetted twice.
+- **Cause:** the KB-WEATHER-MATERIALSWET1 fix joins every Material mesh to the scene's `materialSurface` effects by
+  itself, and a Material mesh is a gltf/pbr model, so `GLTFWeather.add` gave it a second effect carrying the same
+  puddle and snow WGSL. Nothing told one side about the other.
+- **Fix:** the explicit call wins. `GLTFWeather.add` counts the model in a registry the weather entries share
+  (`packages/weather/src/gltf-served.ts`) and its remover and `dispose` count it out; the `materialSurface` effect of
+  `Puddles`, `Snow` and `PrecipitationCover` gains `skips(model)`, true while any `GLTFWeather` has the model, and the
+  materials queue (`packages/materials/src/scene-surfaces.ts`) joins a mesh any of its scene's effects skips to none of
+  them, so it takes puddles, snow and cover from its `GLTFWeather` alone. Regression:
+  `packages/weather/tests/material-wet-browser.mjs` (WebGPU and the WebGL2 layer) draws a Material ground given to a
+  `GLTFWeather` under the scene's `Puddles`: it compiles and matches the scene's Puddles alone and the GLTFWeather alone
+  (mean difference 0), where before the fix the page threw the eight redeclaration errors. Unit tests:
+  `packages/weather/tests/material-surface.test.js` (the skip follows every GLTFWeather that has the model) and
+  `packages/materials/tests/scene-surfaces.test.js` (a skipped mesh joins none and rejoins when handed back).
+
 ### Fixed 2026-11-28: Puddles and Snow left `@margoengine/materials` surfaces dry (KB-WEATHER-MATERIALSWET1, weather, materials)
 
 - **Repro:** Last Tram (`examples/showcase-films/last-tram.js`) with `Puddles.attach(engine, {wetness: 0.98, rain:
