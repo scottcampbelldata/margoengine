@@ -45,6 +45,28 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   start while the arm turns `w h` within it would push steadily outward. The Watt governor rig of
   `@margoengine/machinery/rigs` uses point-mass balls (I = 1e-5 m L^2) and 32 substeps, which settle within 0.001 degrees.
   Physics lane.
+### Checked 2026-11-28, no engine defect: the Arms-wide walk's side view shows the capture's own low, locked arms (KB-RIG-ARMS2, rigging, animation, demo take)
+
+- **Repro:** demos/the-mocap-theatre, "Arms-wide walk", Elias, Side view at 1.05 s: the near sleeve runs down the
+  torso and the hand juts back at waist height. Scott: "human arms do not bend like that", "his arms are on backwards".
+- **Checked and ruled out:** the loader matches an independent BVH reader to 9e-16 m; Elias's upper arms and forearms
+  point within 0.5 degrees of the capture's on every frame of both takes; his rest alignment gives palms down, thumbs
+  forward and elbow creases forward, the Xsens T-pose (MVN whitepaper: every segment frame equals the global frame in
+  the T-pose, arms horizontal, thumbs forward), and no arm bone is twisted, mirrored or swapped (humeral twist about 13
+  degrees, forearm roll under 10, hand turn under 14); his skinned forearm and hand vertices stay within 2 mm of their
+  bones and the upper arm within 1 cm (armpit blend).
+- **Cause:** the capture. The 100STYLE Aeroplane excerpt holds the arms 23 to 35 degrees below horizontal with the
+  elbows locked 3 to 6.5 degrees past straight and a 8 to 14 degree carrying angle, wrists about 13 degrees up and 13
+  toward the little finger. From a pure side view the near arm points almost at the camera, so it foreshortens into a
+  column down the torso and the locked elbow and wrist turn the hand back. The source stick figure drawn from the same
+  view does the same. A pose driven through the same retarget with the arms 5 degrees below horizontal and the elbows
+  softly bent reads as arms out wide from every side.
+- **Open:** the shipped datasets hold no better arms-out take (CMU 35 and the CMU subject 2 and 16 fixtures are walks,
+  runs and jumps). A new 100STYLE segment or style needs Scott's go to download.
+- **Guard:** `tests/mocap-theatre-arms.test.js` checks every frame of both takes for arm direction against the capture,
+  elbow flexion -10 to 150 degrees, carrying angle up to 20, forearm roll, pronation and wrist ranges, and the skin
+  following its bones; an upper arm twisted 180 degrees in the rest alignment fails it (walk elbows read -21.7).
+
 ### Fixed 2026-11-28: retargeted mocap hands kept the character's fanned bind fingers, a few degrees off the capture (KB-RIG-FLATHAND1, rigging, animation)
 
 - **Repro:** demos/the-mocap-theatre, "Arms-wide walk" (100STYLE Aeroplane BVH, Xsens), Elias at 1.05 s in Front and
