@@ -4689,6 +4689,30 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   order and no select on the radius; fails before) and the GPU check above, which passes after on AMD, the RTX A6000 and
   `MARGO_COMPAT=1`.
 
+### Fixed 2026-11-28: the rain shafts' light over a small lit yard was speckle, one step in hundreds of metres (KB-SKY-RAINSTEP1, sky)
+
+- **Repro:** Last Tram sky stills (sky-round-4) show a grainy, even orange sky with no curtains; on the bench, the film's
+  deck, scud, mist, ground lights and four rain cells from the yard looking north at 10 degrees: the drops' light has a
+  mean neighbour difference of 0.21 of its mean (the whole sky 0.09), bright speckles over the horizon.
+  `node packages/sky/test/features-check.mjs rain-shaft` case `yard` (a 140 m lit disc under the camera in 1 to 4 mm/h):
+  0.68 at origin/main 981400fadb.
+- **Cause:** `cloudRain` in `packages/sky/src/rain-shafts.ts` marched the air band in 16 even steps (500 m over 8 km)
+  and took the ground lights at one point per step, at the drop's own height. The light of a disc on the drops changes
+  over its radius and the drop's height, a few tens to a hundred metres near the camera, so a yard under the camera was
+  hit by no step or by one, and each pixel's jitter decided which.
+- **Measured first, ruled out:** that the drops' light was on another scale from the deck's (the coordinator's
+  suspect). Under an overcast base lit by an even ground the rain keeps the base's brightness (1.15 times it,
+  `features-check.mjs rain-shaft` case `even`), so the shafts show only where the light round them differs from the
+  base's behind them. In the film the drops' light without the yard (0.002 to 0.009) is what they hide where the base
+  behind is even and a quarter of it where the base is over the city; the even glow was the near air over the yard,
+  the rain's optical depth and the mist.
+- **Fix:** the steps grow with distance from a second step of a quarter of the smallest cell or ground light radius
+  (`cloudStepPower`, as the cloud march spaces its steps; `rainNearStep` written in cell 0's spare float), each sample
+  stratified in its own step, and each step takes the ground lights' mean along its own ground track
+  (`cloudGroundTrack`, the closed-form line integral the mist already uses) in place of one point.
+- **Regression:** `features-check.mjs rain-shaft` case `yard`: the drops' light within 5 percent of the CPU integral
+  (0.998) and a neighbour difference under 0.03 (0.008 after, 0.68 before), WebGPU and `MARGO_COMPAT=1`.
+
 ### Fixed 2026-11-28: sleet's rain drew the drops of the whole precipitation's intensity, not of its own share (KB-SKY-SLEETLAW1, sky)
 
 - **Repro:** `node scripts/run-with-timeout.mjs --max=6 -- node packages/sky/test/features-check.mjs sleet` on an RTX

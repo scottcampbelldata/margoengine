@@ -32,6 +32,12 @@ const checks = {
     assert.ok(r.lamps.dark === 0 && r.lamps.lit > 1e-4, `a city under the shaft lights it by night (${s})`);
     assert.ok(r.day > 1e-3, `by day the shaft is lit (${s})`);
     assert.ok(r.streaks.opacity > 0.2 && r.streaks.contrast > 0.08, `streaks break the shaft into curtains (${s})`);
+    // A small lit yard under the camera: the drops' light is the CPU integral within 5% and smooth from pixel to pixel
+    // (KB-SKY-RAINSTEP1: 0.68 mean neighbour difference over the mean with even steps and point samples, 0.008 now).
+    assert.ok(Math.abs(r.yard.ratio - 1) < 0.05, `the yard's light on the drops is the CPU integral (${s})`);
+    assert.ok(r.yard.speckle < 0.03, `the drops over a lit yard are not speckled (${s})`);
+    // In an even light under an overcast base the rain keeps the base's brightness (measured 1.08 to 1.11).
+    assert.ok(r.even.deck > 0.01 && Math.abs(r.even.rain / r.even.deck - 1) < 0.25, `rain and deck on one scale (${s})`);
     console.log(`ok rain-shaft ${samples}x: ${s}`);
     return r;
   },

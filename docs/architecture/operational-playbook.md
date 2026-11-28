@@ -10742,6 +10742,15 @@ twin to the field. Cost: nothing for clouds without rain (the code loads by `imp
 in the air band. Missing: one fall speed per layer, isotropic phase, `WeatherDrive` does not pass its cells, and no
 photograph comparison is automated.
 
+KB-SKY-RAINSTEP1 (2026-11-28): the rain march's steps grow with distance (`cloudStepPower`, second step a quarter of the
+smallest cell or ground light radius) with each sample stratified inside its own step, and each step takes the ground
+lights' closed-form mean along its ground track (`cloudGroundTrack`) instead of one point: a 140 m lit yard under the
+camera went from a neighbour difference of 0.68 of the mean to 0.008, its light the CPU integral to 0.2 percent
+(`features-check.mjs rain-shaft` cases `yard` and `even`, WebGPU and `MARGO_COMPAT=1`). Case `even` records that the
+drops and the deck are on one scale: under an overcast base lit by an even ground heavy rain keeps 1.15 times the
+base's brightness. Cost: the same 16 steps, plus one closed-form track mean per ground light per step in place of a
+point value.
+
 ## Cloud base lit from below: ground lights and mist (section 5 evidence, 2026-11-28)
 
 GPU maths change in `packages/sky/src/volumetric-clouds.ts`, both backends from one WGSL source. `groundLights` (at

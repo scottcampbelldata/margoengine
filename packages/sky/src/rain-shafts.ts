@@ -14,6 +14,10 @@
 // 3.647e-4 R^0.63 per metre (R in mm/h). The
 // drops scatter the light round them isotropically, as the layer's mist does: the ground's (the sky light's lower half
 // and the ground lights at the drop's own place and height) and the deck's, plus the sun and moon through the deck.
+// The steps grow with distance (cloudStepPower, the cloud march's spacing) from a second step of a quarter of the
+// smallest cell or ground light radius, one stratified sample in each, and each step takes the ground lights' mean
+// along its own ground track (cloudGroundTrack, the mist's closed form), so a small lit yard under the camera is
+// sampled where its light changes rather than by one step in hundreds of metres (KB-SKY-RAINSTEP1).
 
 /** What a layer needs to draw rain shafts: its WGSL. */
 export interface RainShafts {
@@ -49,12 +53,14 @@ fn cloudRain(d:vec3f,far:f32,jitter:f32)->vec4f {
   if(!up){return vec4f(0,0,0,1);}a=cloudShell(d,low).y;b=cloudShell(d,high).y;
  }
  b=min(b,min(far,a+clouds.shape.z));if(b<=a){return vec4f(0,0,0,1);}
- let n=u32(clouds.rain[0].y);let dt=(b-a)/f32(n);let streaks=clouds.rain[2].x;let r=clouds.rain[2].y;
+ let n=u32(clouds.rain[0].y);let nf=f32(n);let span=b-a;let power=cloudStepPower(span,nf,clouds.rainCells[1].w);
+ let streaks=clouds.rain[2].x;let r=clouds.rain[2].y;
  let above=textureLoad(skyLight,vec2i(0,0),0).rgb*clouds.link.z;let sky=textureLoad(skyLight,vec2i(1,0),0).rgb+clouds.look.w*above;
  let lit=clouds.sunColor.rgb*clouds.sun.w*clouds.link.x*clouds.rain[2].z+clouds.moonColor.rgb*clouds.moon.w*clouds.link.y*clouds.rain[2].w*0.15;
  var transmittance=1.0;var light=vec3f(0);
  for(var k=0u;k<n;k++){
-  let t=a+(f32(k)+jitter)*dt;let p=e+d*t;let h=cloudAltitude(clouds,p);
+  let u=f32(k)/nf;let t0=a+span*select(pow(u,power),0.0,k==0u);let t1=a+span*pow(u+1.0/nf,power);let dt=t1-t0;
+  let t=a+span*pow(max((f32(k)+jitter)/nf,1e-7),power);let p=e+d*t;let h=cloudAltitude(clouds,p);
   var rate=cloudRainAt(p.xz,h);if(rate<=0.0){continue;}
   if(streaks>0.0){
    let tau=(clouds.rain[0].z-max(h,0.0))/clouds.rain[0].w;let s=(p.xz-clouds.rain[1].xy*tau)/3000.0;
@@ -62,7 +68,7 @@ fn cloudRain(d:vec3f,far:f32,jitter:f32)->vec4f {
    rate*=mix(1.0,2.0*fibre,streaks);
   }
   let sigma=3.647e-4*pow(rate,0.63);let step=exp(-sigma*dt);
-  let source=0.5*((1.0+r)*(sky+cloudGround(p.xz,max(h,0.0)))+(1.0-r)*above)+lit;
+  let source=0.5*((1.0+r)*(sky+cloudGroundTrack((e+d*t0).xz,(e+d*t1).xz,max(h,0.0)))+(1.0-r)*above)+lit;
   light+=transmittance*(1.0-step)*source;transmittance*=step;
  }
  return vec4f(light,transmittance);

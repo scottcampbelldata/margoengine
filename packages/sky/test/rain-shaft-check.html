@@ -65,6 +65,27 @@ function compare(f,options,eye,seconds=0,band){
  const mid=-Math.log(Math.max(lum(f.v,4*((f.h/2-8)*f.w+f.w/2)),1e-6));
  return {pixels:n,meanError:err/Math.max(n,1),worst,ratio:gpu/Math.max(cpu,1e-9),thin,peak,mid};
 }
+// The rain's light along the pixel (x, y) ray by the CPU twin: Beer-Lambert in the rate's extinction, the source half
+// the disc law of `light` at each point's height (a deck without cover reflects nothing, no sky or moon by night).
+function light(options,disc,eye,x,y,w,h){
+ const t=Math.tan(FOV*Math.PI/360),cx=((x+0.5)/w*2-1)*t*(w/h),cy=(1-(y+0.5)/h*2)*t,l=Math.hypot(cx,cy,1),d=[cx/l,cy/l,-1/l];
+ const n=20000,dt=MAX/n,R=PLANET_RADIUS;let T=1,L=0;
+ for(let k=0;k<n;k++){
+  const s=(k+0.5)*dt,p=[eye[0]+d[0]*s,eye[1]+d[1]*s,eye[2]+d[2]*s],alt=Math.hypot(p[0],p[1]+R,p[2])-R;
+  if(alt<0||alt>=650)break;
+  const sigma=rainExtinction(cloudRainRate(options,p[0],alt,p[2])),rho2=disc.radius**2,R2=alt*alt+rho2,f=R2/(R2+(p[0]-disc.x)**2+(p[2]-disc.z)**2);
+  const step=Math.exp(-sigma*dt);L+=T*(1-step)*0.5*disc.color[1]*(rho2/R2)*f*f;T*=step;
+ }
+ return L;
+}
+// Over the rows above the horizon: the GPU light's mean over the CPU's (every 8th pixel) and the mean neighbour
+// difference over the mean light (the speckle).
+function glow(f,options,disc,eye){
+ let gpu=0,cpu=0,diff=0,sum=0;
+ for(let y=4;y<f.h/2-8;y+=8)for(let x=4;x<f.w;x+=8){gpu+=f.v[4*(y*f.w+x)+1];cpu+=light(options,disc,eye,x,y,f.w,f.h);}
+ for(let y=0;y<f.h/2-4;y++)for(let x=0;x<f.w-1;x++){const a=f.v[4*(y*f.w+x)+1];diff+=Math.abs(a-f.v[4*(y*f.w+x+1)+1]);sum+=a;}
+ return {ratio:gpu/Math.max(cpu,1e-12),speckle:diff/Math.max(sum,1e-12),cpu:cpu};
+}
 const mean=({v},pick)=>{let s=0,n=0;for(let i=0;i<v.length/4;i++)if(!pick||pick(i)){s+=lum(v,4*i);n++;}return n?s/n:0;};
 // The column means of the rows just over the horizon (transmittance, by night over white).
 function columns({w,h,v}){
@@ -108,6 +129,21 @@ window.check={samples:sceneSamples,
   const even=columns(await frame(dense(0),ground)),streaked=columns(await frame(dense(1),ground));
   let change=0,opaque=0;for(let x=0;x<even.length;x++){change+=Math.abs(streaked[x]-even[x]);opaque+=1-even[x];}
   r.streaks={contrast:change/opaque,opacity:opaque/even.length};
+  // By night a small lit yard (140 m) under the camera in light rain: the light of the drops over it against the CPU
+  // integral of the source the march takes (half the ground's light at each drop's own height, the deck's share 0 with
+  // no cover), and the pixel to pixel spread of that light (KB-SKY-RAINSTEP1: with even steps of hundreds of metres
+  // one step in many landed over the yard and the sky was speckled).
+  engine.scene.background='#000000';
+  const yard={color:[1,1,1],x:0,z:0,radius:140},wet=deckOf({groundLights:[yard],rain:{cells:[{x:0,z:-1500,radius:1500,rate:4}],streaks:0}});
+  const lit=await frame(alone({groundLights:[yard],rain:{cells:[{x:0,z:-1500,radius:1500,rate:4}],streaks:0}}),ground);
+  r.yard=glow(lit,wet,yard,ground);
+  // One scale for the drops and the deck: under an overcast deck lit from below by an even ground (the light round
+  // the drops the same everywhere), heavy rain in front of the base keeps its brightness within a few tens of
+  // percent, so the shafts show only where the light round them differs from the base's behind them.
+  const flat={groundLights:[{color:[0.1,0.1,0.1],x:0,z:0,radius:1e6}],coverage:1,density:0.3,groundAlbedo:0};
+  const sky=(i)=>Math.floor(i/f0.w)<f0.h/2-8;
+  const f0=await frame(alone({...flat,rain:{cells:[]}}),ground,0,10),f1=await frame(alone({...flat,rain:{cells:[{x:0,z:-2000,radius:1500,rate:20}],streaks:0}}),ground,0,10);
+  r.even={deck:mean(f0,sky),rain:mean(f1,sky)};
   return {validation:(await device.popErrorScope())?.message??null,errors,...r};
  }};
 window.ready=true;

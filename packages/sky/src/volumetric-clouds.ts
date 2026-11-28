@@ -1069,6 +1069,20 @@ function writeRain(
     v[o + 5] = vel[1];
     v[o + 6] = c.reach ?? 0;
   });
+  // The near step (cell 0's spare float): the march's steps grow with distance from a second step of a quarter of the
+  // smallest cell or ground light radius, so the light of a small lit disc under the camera is sampled where it
+  // changes instead of by one step in hundreds of metres (cloudStepPower, as the cloud march spaces its steps).
+  v[331] = rainNearStep(options);
+}
+/**
+ * The longest second step of the rain march, metres: a quarter of the smallest radius among the rain cells and the
+ * ground lights, the lengths over which the rate and the ground lights' light on the drops change.
+ */
+function rainNearStep(options: VolumetricCloudOptions): number {
+  let r = Infinity;
+  for (const c of options.rain?.cells ?? []) r = Math.min(r, c.radius);
+  for (const g of options.groundLights ?? []) r = Math.min(r, g.radius ?? 1000);
+  return 0.25 * r;
 }
 /** Height of a world point over the planet's surface, metres (the field's `cloudAltitude`, in double precision). */
 const cameraAltitude = (p: ArrayLike<number>): number =>
