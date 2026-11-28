@@ -6909,7 +6909,37 @@ Enable `{ rigid: true }` on `VortexForcing` to apply drag and torque to selected
 loads and retained limit crossings. Enable `{ water: true }` to contribute spatial pressure gradients
 and wind stress on a matching shallow-water grid. Use `StormVortex.inverseBarometer()` for an open
 boundary's pressure correction. If another producer already supplies the wind stress, use
-`water.windStress: false`.
+`water.windStress: false`. Use the same positive `timeScale` as the connected world solver
+(default 1). Track speed stays in metres per simulated second. The solver publishes only a finite and
+complete trial. Its outputs carry the current signed origin cell.
+
+Use the optional native sampler with `VortexForcing.load({ water: true, threads: 1 })`. One
+participant is the default. Two or four need shared world memory and an isolated Worker in browsers.
+The ordinary synchronous constructor and custom vortex profiles use the scalar sampler.
+`StormVortex.waterProfile()` copies the built-in coefficients. `readNativeWork()` copies native wet-cell,
+pressure, wind and SIMD counts after an accepted native step. Dispose when the world stops using native
+helpers. The following example couples the native sampler to actual shallow water.
+
+```ts
+import { TerrainBed } from '@margoengine/physics/earth';
+import { ShallowWaterSolver } from '@margoengine/physics/hydro';
+import { StormVortex, VortexForcing } from '@margoengine/physics/vortices';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const grid = { columns: 4, rows: 4, width: 4000, depth: 4000, centre: [0, 0] } as const;
+const bed = new TerrainBed();
+const water = new ShallowWaterSolver('coastal-water');
+using storm = await VortexForcing.load({ id: 'coastal-storm', water: true });
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+world.add(bed, { ...grid, elevations: () => -4 });
+world.add(water, { bed: bed.bed, depth: 4 });
+world.add(storm, {
+  vortex: new StormVortex({ center: [-28000, 0], radius: 30000, pressureDrop: 8500 }),
+  water: { width: 4, depth: 4, spacing: [1000, 1000], origin: [-1500, -1500] },
+});
+world.advance(1);
+console.log(storm.weather().pressure, storm.readNativeWork()?.wetCells);
+```
 
 ## Seismic waves and ground motion
 

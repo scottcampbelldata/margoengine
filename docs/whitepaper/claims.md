@@ -7151,3 +7151,12 @@ terrain and recharge in owning memory. Four native participants reproduce the sa
 one. The calibrated cutaway transfers 0.308065 m³ into resolved shallow water and replays exact state
 and pixels on both backends. The laboratory diagnostic records early arrival and deficient modeled
 outflow under measured metered rainfall. [Independent results and limits](../limits.md#groundwater-and-springs-hydro-06).
+
+### ATMO-05 accepted vortex loads and coastal response
+
+Signed vortex probes, rigid loads and shallow-water input retain their accepted banks through a rejected
+sample. Optional native surface rows agree with the scalar path across five prescribed natural vortex
+profiles and one, two and four participants. The coastal fixture isolates pressure and wind and repeats
+the accepted surface and every captured pixel independently on WebGPU and WebGL2. Independent Isabel
+dropsonde profiles and high-wind marine drag intervals expose limitations of the prescribed storm and
+stress models. [Observed values and limits](../limits.md#atmo-05-accepted-storm-forcing-and-observations).

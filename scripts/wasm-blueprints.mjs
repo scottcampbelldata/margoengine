@@ -410,6 +410,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'vortex-water-kernel',
+    crate: 'packages/physics/vortex-water-kernel',
+    blueprint: 'packages/physics/src/vortices/vortex-water-kernel.wasm',
+    script: 'packages/physics/scripts/build-vortex-water-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'vortex-water-kernel-shared',
+    crate: 'packages/physics/vortex-water-kernel',
+    blueprint: 'packages/physics/src/vortices/vortex-water-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-vortex-water-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'viscoplastic-kernel',
     crate: 'packages/physics/viscoplastic-kernel',
     blueprint: 'packages/physics/src/viscoplastic/viscoplastic-kernel.wasm',

@@ -226,6 +226,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/vortex-water-kernel.wasm',
+    label: 'vortex-water-kernel.wasm',
+    kind: 'Rust SIMD vortex pressure and wind stress',
+    measure: 'file',
+    when: 'VortexForcing.load() from the optional /vortices entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/vortex-water-kernel-shared.wasm',
+    label: 'vortex-water-kernel-shared.wasm',
+    kind: 'Rust SIMD vortex pressure and wind stress with helper workers',
+    measure: 'file',
+    when: 'VortexForcing.load() with threads: 2 or 4 from the optional /vortices entry',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/loads-kernel.wasm',
     label: 'loads-kernel.wasm',
     kind: 'Rust SIMD batch for hydrodynamic wrenches',

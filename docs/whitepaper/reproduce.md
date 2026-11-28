@@ -5415,3 +5415,14 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
 - Run `node packages/physics/scripts/hydro06-glass-beads-measured.mjs` for separate metered rainfall and
   held-out measured discharge. Check the stated rainfall-clock alignment and the plotted allowance separately
   from the conductivity and grid sensitivity. [Guérin et al. (2014)](https://doi.org/10.1017/jfm.2014.590).
+
+### ATMO-05 native storm forcing and observed storm profiles
+
+- Build Physics with `node packages/physics/scripts/build.js`, then run
+  `node --test packages/physics/tests/coupling/vortices.test.js packages/physics/tests/coupling/vortex-water-workers.test.js`.
+- Run `npm run test:gpu:vortex-water-workers -w @margoengine/physics` to check actual Chromium helpers and
+  work counts. Run `npm run test:gpu:cyclone-film -w @margoengine/water` for separate full state and RGBA
+  replay on WebGPU and WebGL2.
+- Run `node packages/physics/scripts/atmo05-storm-measured.mjs` for the NOAA B-deck initialized Isabel
+  diagnostic and the independent Montgomery et al. and Powell et al. observations. The diagnostic
+  exposes the current model discrepancies. [Measured limits](../limits.md#atmo-05-accepted-storm-forcing-and-observations).

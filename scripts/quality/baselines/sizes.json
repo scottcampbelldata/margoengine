@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22111145,
+  "total": 22116203,
   "history": [
     {
       "date": "2026-10-24",
@@ -15995,6 +15995,12 @@
       "commit": "g04-flow-ink",
       "reason": "G04 new optional @margoengine/sciviz/flow-ink: 0 to 3756 B gzip, ceiling 4012 B. Ink strokes along traces with OKLab value colours and travelling highlights for the two wind demos; its own entry so sciviz/flow (tracing and particles) stays at its measured size. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "atmo-05-native-vortex-water",
+      "reason": "ATMO-05 @margoengine/physics/vortices 5197 to 10204 B gzip, ceiling 5453 to 10511 B. The optional vortex entry stages weather, body and water fields together on a signed clock. Native helpers sample the pressure slopes and stress on disjoint wet rows. Another package would duplicate the profile coefficients and field ABI. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16932,7 +16938,7 @@
     "@margoengine/physics/underwater": 8242,
     "@margoengine/physics/vegetation": 12889,
     "@margoengine/physics/viscoplastic": 8812,
-    "@margoengine/physics/vortices": 5453,
+    "@margoengine/physics/vortices": 10511,
     "@margoengine/physics/waves": 13351,
     "@margoengine/physics/world": 18156,
     "@margoengine/physics/wrapped-rope": 5162,

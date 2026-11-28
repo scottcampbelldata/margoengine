@@ -15790,8 +15790,8 @@
         "gzip": 8035
       },
       "./vortices": {
-        "raw": 13162,
-        "gzip": 5197
+        "raw": 27227,
+        "gzip": 10204
       },
       "./snowpack": {
         "raw": 21766,
@@ -20348,6 +20348,16 @@
       "raw": 3899,
       "gzip": 1808,
       "brotli": 1635
+    },
+    "packages/physics/dist/vortex-water-kernel.wasm": {
+      "raw": 6443,
+      "gzip": 2502,
+      "brotli": 2324
+    },
+    "packages/physics/dist/vortex-water-kernel-shared.wasm": {
+      "raw": 6443,
+      "gzip": 2502,
+      "brotli": 2320
     }
   },
   "splits": {

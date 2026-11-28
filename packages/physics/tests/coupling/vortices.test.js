@@ -3,7 +3,12 @@ import test from 'node:test';
 import { Hurricane, hollandPressure } from '@margoengine/sky/hurricane';
 import { Tornado } from '@margoengine/sky/tornado';
 import { TerrainBed } from '../../dist/earth.js';
-import { FORCING_WORDS, ShallowWaterSolver, SURFACE_WATER_FORCING_FIELD } from '../../dist/hydro.js';
+import {
+  FORCING_WORDS,
+  ShallowWaterSolver,
+  SURFACE_WATER_FIELD,
+  SURFACE_WATER_FORCING_FIELD,
+} from '../../dist/hydro.js';
 import { Physics } from '../../dist/index.js';
 import { PlantSway } from '../../dist/vegetation.js';
 import { StormVortex, VortexForcing, stormWaterDrag } from '../../dist/vortices.js';
@@ -142,7 +147,8 @@ test('the live shallow-water grid receives both pressure gradient and extreme wi
   close(values[FORCING_WORDS], (expectedX + stress * wind.velocity[0]) / rhoWater);
   close(values[FORCING_WORDS + 1], (expectedZ + stress * wind.velocity[2]) / rhoWater);
   assert.ok(expectedX < 0 && expectedZ > 0 && wind.velocity[2] < 0);
-  assert.equal(stormWaterDrag(120), stormWaterDrag(33));
+  assert.equal(stormWaterDrag(120), 0.0026);
+  assert.equal(stormWaterDrag(33), 0.0026);
   world.advance(48);
   assert.ok(Math.hypot(...water.sample(50, -10).velocity) > 0);
   close(water.volume(), initial, 64 * Number.EPSILON * initial);
@@ -179,4 +185,63 @@ test('moving vortex probe outputs replay across frame rates, seek and both memor
   plain.advance(60);
   shared.advance(60);
   assert.equal(plain.hash(), shared.hash());
+});
+
+test('VortexForcing stages probes and wet-grid banks together and retains accepted state after a late invalid depth', () => {
+  using forcing = new VortexForcing('scaled-cyclone', { water: true, timeScale: 60 });
+  const storm = new StormVortex({ radius: 300, translation: [5, 0] });
+  const cell = [-5, 2, 7];
+  const world = new PhysicsWorld({ rate: fps, memory: worldMemory(false) }).add(
+    forcing,
+    { vortex: storm, probes: [[300, 10, 0]], water: { width: 2, depth: 1, spacing: [25, 25], origin: [300, 0] } },
+    cell,
+  );
+  const offset = [cell[0] * 4096, cell[1] * 4096, cell[2] * 4096];
+  const bank = new WebAssembly.Memory({ initial: 1 });
+  const field = SURFACE_WATER_FIELD.name;
+  const region = { name: 'separate surface', memory: bank, type: 'f32', layout: 1, byteOffset: 128, byteLength: 24 };
+  const values = new Float32Array(bank.buffer, 128, 6);
+  values.set([1, 0, 0, 2, 0, 0]);
+  const context = (tick, r = region) => ({
+    tick,
+    level: 0,
+    seed: 9,
+    cell,
+    inputs: new Map([[field, { field, region: r, tick, cell }]]),
+  });
+  const before = world.takeSnapshot();
+  forcing.step(context(0), dt);
+  close(forcing.weather().pressure, storm.pressureAt(300 + offset[0], offset[2], 1));
+  const waterPort = forcing.exportPorts(0).find((port) => port.field === SURFACE_WATER_FORCING_FIELD.name);
+  assert.ok(regionWords(world.memory, waterPort.region).some((value) => value !== 0));
+  const accepted = world.takeSnapshot();
+  values[3] = NaN;
+  assert.throws(
+    () => forcing.step(context(1), dt),
+    (error) => error.code === 'state' && /finite nonnegative depth.*errors#vortex/.test(error.message),
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  assert.throws(() => forcing.step(context(1, { ...region, byteOffset: 129 }), dt), /aligned vortex input.*#vortex/);
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  values[3] = 2;
+  world.shiftOrigin([3, -2, 1]);
+  assert.deepEqual(
+    forcing.exportPorts(0).map(({ cell }) => cell),
+    Array(3).fill([-8, 4, 6]),
+  );
+  world.restoreSnapshot(before.bytes);
+  assert.deepEqual(
+    forcing.exportPorts(0).map(({ cell }) => cell),
+    Array(3).fill(cell),
+  );
+  forcing.step(context(0), dt);
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+});
+
+test('StormVortex refuses out-of-range sample and origin without changing the caller sample', () => {
+  const target = { velocity: [1, 2, 3], density: 4, temperature: 5 };
+  assert.throws(() => new StormVortex({ cell: [0, 0, 2 ** 31] }), /signed 32-bit.*errors#vortex/);
+  const storm = new StormVortex({ translation: [1e308, 0] });
+  assert.throws(() => storm.sample(0, 10, 0, 2, target), /wind sample radius.*errors#vortex/);
+  assert.deepEqual(target, { velocity: [1, 2, 3], density: 4, temperature: 5 });
 });

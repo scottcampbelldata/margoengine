@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'vortex',
+    title: '@margoengine/physics/vortices natural storm forcing and wet-grid sampling',
+    kind: 'family',
+    messages: [],
+    cause: 'Vortex parameters, sampled wind or pressure, a coupled input bank, or a trial force exceeded the usable range.',
+    fix: 'Use finite SI vortex and grid parameters and three signed origin coordinates. Provide matching registered depth or rigid body banks in their owning memories. Reduce forcing or use smaller local coordinates if a trial overflows. Use shared memory for native helpers.',
+  },
+  {
     id: 'groundwater',
     title: '@margoengine/physics/groundwater unconfined aquifer, springs and seepage',
     kind: 'family',

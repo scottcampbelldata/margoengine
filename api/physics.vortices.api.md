@@ -34,6 +34,7 @@ export class StormVortex implements Wind {
         coriolis: number;
         spin: number;
     });
+    waterProfile(): VortexWaterProfile;
     static fromHurricane(s: HurricaneVortexProfile, cell?: FlowCell): StormVortex;
     pressureDeficit(x: number, z: number, t?: number): number;
     pressureAt(x: number, z: number, t?: number): number;
@@ -82,18 +83,19 @@ export class VortexForcing implements Solver<VortexParams> {
     readonly id: string;
     readonly probeField: FieldDescriptor;
     readonly loadField: FieldDescriptor;
-    constructor(id?: string, options?: {
-        rigid?: boolean;
-        water?: boolean;
-    });
+    constructor(id?: string, options?: VortexForcingOptions);
+    static load(options?: VortexForcingLoadOptions): Promise<VortexForcing>;
+    [Symbol.dispose](): void;
     describe(): {
         id: string;
         rate: 0;
         stableRate: () => 0;
+        timeScale: () => number;
         fields: FieldUse[];
     };
     init(host: SolverHost, params: VortexParams): void;
     step(context: StepContext, dt: number): void;
+    readNativeWork(): VortexWaterWorkCounts | undefined;
     exportPorts(tick: number): readonly Port[];
     importPorts(): void;
     stateRegions(): readonly Region[];
@@ -102,6 +104,18 @@ export class VortexForcing implements Solver<VortexParams> {
         pressure: number;
     };
     load(index?: number): VortexLoadReading;
+}
+
+export interface VortexForcingLoadOptions extends VortexForcingOptions {
+    id?: string;
+    threads?: 1 | 2 | 4;
+    signal?: AbortSignal;
+}
+
+export interface VortexForcingOptions {
+    rigid?: boolean;
+    water?: boolean;
+    timeScale?: number;
 }
 
 export type VortexKind = 'cyclone' | 'tornado' | 'waterspout' | 'dustDevil' | 'fireWhirl';
@@ -132,6 +146,44 @@ export interface VortexWaterGrid {
     level?: number;
     density?: number;
     windStress?: boolean;
+}
+
+export interface VortexWaterProfile {
+    readonly family: 0 | 1 | 2;
+    readonly cx: number;
+    readonly cz: number;
+    readonly vx: number;
+    readonly vz: number;
+    readonly radius: number;
+    readonly deficit: number;
+    readonly shape: number;
+    readonly density: number;
+    readonly coriolis: number;
+    readonly spin: number;
+    readonly radial: number;
+    readonly tangential: number;
+    readonly surface: number;
+    readonly height: number;
+    readonly roughness: number;
+    readonly ground: number;
+    readonly decay: number;
+    readonly peak: number;
+    readonly secondaryRadius: number;
+    readonly secondaryWidth: number;
+    readonly secondaryStrength: number;
+}
+
+export interface VortexWaterWorkCounts extends VortexWaterWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly VortexWaterWorkerWork[];
+}
+
+export interface VortexWaterWorkerWork {
+    readonly cells: number;
+    readonly wetCells: number;
+    readonly pressureSamples: number;
+    readonly windSamples: number;
+    readonly pairedRadiusLanes: number;
 }
 
 export function stormWaterDrag(speed: number): number;

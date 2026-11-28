@@ -114,6 +114,8 @@
 <tr><th scope="row"><code>surf-force-kernel-shared.wasm</code></th><td>Rust SIMD surf radiation stress with helper workers</td><td class="num">4,696</td><td class="num">2,362</td><td class="num">2,217</td><td>SurfSolver.load() with threads: 2 or 4 from the optional /surf entry</td></tr>
 <tr><th scope="row"><code>surge-potential-kernel.wasm</code></th><td>Rust SIMD astronomical and pressure surge potential</td><td class="num">3,899</td><td class="num">1,808</td><td class="num">1,635</td><td>SurgeSolver.load() from the optional /surge entry</td></tr>
 <tr><th scope="row"><code>surge-potential-kernel-shared.wasm</code></th><td>Rust SIMD surge potential with helper workers</td><td class="num">3,899</td><td class="num">1,808</td><td class="num">1,635</td><td>SurgeSolver.load() with threads: 2 or 4 from the optional /surge entry</td></tr>
+<tr><th scope="row"><code>vortex-water-kernel.wasm</code></th><td>Rust SIMD vortex pressure and wind stress</td><td class="num">6,443</td><td class="num">2,502</td><td class="num">2,324</td><td>VortexForcing.load() from the optional /vortices entry</td></tr>
+<tr><th scope="row"><code>vortex-water-kernel-shared.wasm</code></th><td>Rust SIMD vortex pressure and wind stress with helper workers</td><td class="num">6,443</td><td class="num">2,502</td><td class="num">2,320</td><td>VortexForcing.load() with threads: 2 or 4 from the optional /vortices entry</td></tr>
 <tr><th scope="row"><code>loads-kernel.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches</td><td class="num">7,761</td><td class="num">2,926</td><td class="num">2,525</td><td>LoadSolver.load() from the optional /loads entry</td></tr>
 <tr><th scope="row"><code>loads-kernel-shared.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches, shared world memory</td><td class="num">7,761</td><td class="num">2,926</td><td class="num">2,524</td><td>LoadSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>thin-film-kernel-shared.wasm</code></th><td>Rust SIMD conservative thin-film flow and capillarity, shared world memory</td><td class="num">32,746</td><td class="num">12,619</td><td class="num">10,892</td><td>ThinFilmSolver.load() with shared world memory support</td></tr>
@@ -5046,7 +5048,7 @@
 <tr><td><code>./pack-ice</code></td><td class="num">19,493</td><td class="num">7,523</td></tr>
 <tr><td><code>./runoff</code></td><td class="num">18,565</td><td class="num">7,205</td></tr>
 <tr><td><code>./drainage-fog</code></td><td class="num">20,311</td><td class="num">8,035</td></tr>
-<tr><td><code>./vortices</code></td><td class="num">13,162</td><td class="num">5,197</td></tr>
+<tr><td><code>./vortices</code></td><td class="num">27,227</td><td class="num">10,204</td></tr>
 <tr><td><code>./snowpack</code></td><td class="num">21,766</td><td class="num">8,220</td></tr>
 <tr><td><code>./airborne</code></td><td class="num">28,184</td><td class="num">11,148</td></tr>
 <tr><td><code>./aeolian</code></td><td class="num">23,224</td><td class="num">8,989</td></tr>

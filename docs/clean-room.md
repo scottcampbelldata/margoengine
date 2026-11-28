@@ -1039,12 +1039,27 @@ John D. Holmes, “Trajectories of spheres in strong winds with application to w
 supplies quadratic relative drag. The rigid adapter analytically averages that drag over a world
 tick with frozen wind and a fixed pressure lever. The surface-water source uses the pressure-gradient
 term from Luettich, Westerink and Scheffner's ADCIRC formulation (1992). Garratt (1977) supplies
-the linear 10 m drag fit and Donelan et al. (2004) motivate its saturation above 33 m/s. The plateau
-uses the value of the linear closure at the transition.
+the linear 10 m drag fit. Milan Curcic and Brian K. Haus, “Revised Estimates of Ocean Surface Drag
+in Strong Winds” (2020), report a 0.0026 plateau in their new short-fetch measurements and revise a
+10 m extrapolation error in the original Donelan et al. data. The existing Garratt ramp intersects
+that new laboratory plateau at about 27.6 m/s. It remains a simple short-fetch stress closure.
 [Holmes](https://doi.org/10.1016/j.jweia.2003.09.031),
 [ADCIRC](https://adcirc.org/home/documentation/adcirc-related-publications/),
 [Garratt](https://journals.ametsoc.org/view/journals/mwre/105/7/1520-0493_1977_105_0915_rodcoo_2_0_co_2.xml),
-and [Donelan et al.](https://doi.org/10.1029/2004GL019460).
+[Donelan et al.](https://doi.org/10.1029/2004GL019460), and [Curcic and Haus](https://doi.org/10.1029/2020GL087647).
+
+The optional water kernel evaluates four pressure points and an optional wind sample per wet cell. It
+pairs the independent horizontal radius evaluations in f64x2 lanes and uses the same pinned scalar
+functions for Holland and compact profiles. Each worker writes disjoint rows. Accepted probes, loads and
+water all publish after the candidate succeeds.
+
+Michael T. Montgomery, Michael M. Bell, Sim D. Aberson and Michael L. Black, “Hurricane Isabel (2003):
+New Insights into the Physics of Intense Storms. Part I” (2006), supply the held-out dropsonde speeds
+and radial direction. The separate NOAA/NHC B-deck supplies only pressure, radius of maximum wind
+and latitude. Mark D. Powell, Peter J. Vickery and Timothy A. Reinhold, “Reduced drag coefficient for
+high wind speeds in tropical cyclones” (2003), supply independent field drag over four wind bins.
+None of those observed upper winds or drag values set model parameters. [Isabel observations](https://doi.org/10.1175/BAMS-87-10-1335).
+[NOAA best-track archive](https://ftp.nhc.noaa.gov/atcf/archive/2003/bal132003.dat.gz). [Field drag](https://doi.org/10.1038/nature01481).
 
 ### Seismic waves and ground shaking (EARTH-08)
 

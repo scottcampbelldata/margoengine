@@ -146,6 +146,11 @@
       <p><strong>Cause.</strong> A rigid body, collider, shape, scene query or world setting got an input it cannot use (code unsupported): a position, velocity, force, direction or box that is not three finite numbers (or a zero direction), a rotation that is not a quaternion of finite numbers, a mass, density, damping, size, radius, speed or time that is negative or not finite, a shape name or body type that does not exist, a body, collider or row that was removed or belongs to another world, a body of the wrong type for the call (a next velocity on a body that is not kinematicPosition), a mesh from another engine, a solver option outside its range, or a hierarchy deeper than 64 nodes.</p>
       <p><strong>Fix.</strong> Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (<code>dynamic</code>, <code>fixed</code>, <code>kinematicPosition</code>, <code>kinematicVelocity</code>), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.</p>
     </section>
+    <section id="vortex">
+      <h2><a href="#vortex">@margoengine/physics/vortices natural storm forcing and wet-grid sampling</a></h2>
+      <p><strong>Cause.</strong> Vortex parameters, sampled wind or pressure, a coupled input bank, or a trial force exceeded the usable range.</p>
+      <p><strong>Fix.</strong> Use finite SI vortex and grid parameters and three signed origin coordinates. Provide matching registered depth or rigid body banks in their owning memories. Reduce forcing or use smaller local coordinates if a trial overflows. Use shared memory for native helpers.</p>
+    </section>
     <section id="groundwater">
       <h2><a href="#groundwater">@margoengine/physics/groundwater unconfined aquifer, springs and seepage</a></h2>
       <p><strong>Cause.</strong> Aquifer data, a recharge or terrain bank, a time step or an outlet rate exceeds the usable range.</p>

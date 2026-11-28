@@ -8,6 +8,9 @@ import {
   hollandGradient,
   oneMinusDecay,
 } from '../../../shared/vortex-balance.js';
+import { checkCell } from '../world/solver.js';
+import { vortexError } from './errors.js';
+import type { VortexWaterProfile } from './kernel.js';
 
 /** Natural atmospheric vortices with a shared spatial wind contract. */
 export type VortexKind = 'cyclone' | 'tornado' | 'waterspout' | 'dustDevil' | 'fireWhirl';
@@ -87,13 +90,21 @@ const EARTH_ROTATION = 7.292115e-5;
 
 function bounded(value: number, label: string, min = -Infinity, max = Infinity): number {
   if (!Number.isFinite(value) || value < min || value > max)
-    throw new RangeError(`Invalid vortex ${label}. Pass a finite SI value in the documented range.`);
+    throw vortexError(`Invalid vortex ${label}. Pass a finite SI value in the documented range.`);
   return value;
 }
 
 function positive(value: number, label: string): number {
-  if (!(bounded(value, label) > 0)) throw new RangeError(`Vortex ${label} must be positive. Pass a value above zero.`);
+  if (!(bounded(value, label) > 0)) throw vortexError(`Vortex ${label} must be positive. Pass a value above zero.`);
   return value;
+}
+
+export function requireVortexCell(cell: FlowCell): void {
+  try {
+    checkCell(cell);
+  } catch (cause) {
+    throw vortexError('Use three signed 32-bit integer coordinates for the vortex origin.', 'state', cause);
+  }
 }
 
 /** Surface pressure and height-dependent velocity from one translating natural vortex. */
@@ -126,13 +137,13 @@ export class StormVortex implements Wind {
   private readonly secondary: StormVortexOptions['secondary'];
 
   constructor(options: StormVortexOptions = {}, balance?: { coriolis: number; spin: number }) {
+    if (!options) throw vortexError('Pass vortex options as an object or omit them.');
     this.kind = options.kind ?? 'cyclone';
+    if (!Object.hasOwn(DEFAULTS, this.kind))
+      throw vortexError('Unknown vortex kind. Pass a cyclone, tornado, waterspout, dustDevil, or fireWhirl.');
     const defaults = DEFAULTS[this.kind];
-    if (!defaults)
-      throw new RangeError('Unknown vortex kind. Pass a cyclone, tornado, waterspout, dustDevil, or fireWhirl.');
     const copiedCell = options.cell ?? [0, 0, 0];
-    if (copiedCell.some((value) => !Number.isInteger(value)))
-      throw new RangeError('Vortex origin needs three integer cells. Pass the world cell coordinates.');
+    requireVortexCell(copiedCell);
     this.cell = [...copiedCell];
     this.cx = bounded(options.center?.[0] ?? 0, 'centre x');
     this.cz = bounded(options.center?.[1] ?? 0, 'centre z');
@@ -145,7 +156,7 @@ export class StormVortex implements Wind {
     );
     this.deficit = bounded(options.pressureDrop ?? defaults.deficit, 'pressure drop', 0);
     if (this.deficit >= this.ambientPressure)
-      throw new RangeError('Vortex pressure deficit reaches vacuum. Use a deficit smaller than ambient pressure.');
+      throw vortexError('Vortex pressure deficit reaches vacuum. Use a deficit smaller than ambient pressure.');
     this.density = positive(options.density ?? 1.15, 'air density');
     this.temperature = positive(options.temperature ?? 288.15, 'temperature');
     this.shape = positive(options.shape ?? 1.6, 'Holland exponent');
@@ -160,16 +171,23 @@ export class StormVortex implements Wind {
     this.surface = bounded(options.surfaceFactor ?? (this.kind === 'cyclone' ? 0.9 : 1), 'surface factor', 0, 1);
     this.height = positive(options.scaleHeight ?? defaults.height, 'scale height');
     this.roughness = positive(options.roughness ?? 0.03, 'roughness length');
-    if (this.roughness >= 10)
-      throw new RangeError('Vortex roughness must be below the 10 m reference height. Pass a smaller value.');
+    if (this.roughness >= 10 || !Number.isFinite(10 / this.roughness))
+      throw vortexError('Use representable positive vortex roughness below the 10 m reference height.');
     this.ground = bounded(options.groundY ?? 0, 'ground height');
     this.decay = positive(options.decay ?? 1, 'Rankine exponent');
+    if (
+      options.compactProfile !== undefined &&
+      options.compactProfile !== 'rankine' &&
+      options.compactProfile !== 'burgers'
+    )
+      throw vortexError('Use rankine or burgers as the compact vortex profile.');
     this.burgers = options.compactProfile !== 'rankine';
     this.updraft = bounded(options.updraft ?? defaults.updraft, 'updraft', 0);
     this.peak =
       this.kind === 'cyclone'
         ? Math.sqrt((this.shape * this.deficit) / (this.density * Math.E))
         : compactPeakWind(this.deficit, this.density, this.decay, this.burgers);
+    bounded(this.peak, 'peak wind', 0);
     const secondary = options.secondary;
     if (secondary)
       this.secondary = {
@@ -177,6 +195,35 @@ export class StormVortex implements Wind {
         width: positive(secondary.width, 'outer width'),
         strength: bounded(secondary.strength, 'outer strength', 0),
       };
+    if (this.secondary) bounded(this.secondary.strength * this.peak, 'secondary peak wind', 0);
+  }
+
+  /** Copies the fixed coefficients used by the optional batch sampler for shallow water. */
+  waterProfile(): VortexWaterProfile {
+    return {
+      family: this.kind === 'cyclone' ? 0 : this.burgers ? 2 : 1,
+      cx: this.cx,
+      cz: this.cz,
+      vx: this.vx,
+      vz: this.vz,
+      radius: this.radius,
+      deficit: this.deficit,
+      shape: this.shape,
+      density: this.density,
+      coriolis: this.coriolis,
+      spin: this.spin,
+      radial: this.radial,
+      tangential: this.tangential,
+      surface: this.surface,
+      height: this.height,
+      roughness: this.roughness,
+      ground: this.ground,
+      decay: this.decay,
+      peak: this.peak,
+      secondaryRadius: this.secondary?.radius ?? 0,
+      secondaryWidth: this.secondary?.width ?? 1,
+      secondaryStrength: this.secondary?.strength ?? 0,
+    };
   }
 
   /** Bind a snapshot of the Sky Hurricane's existing profile, using the same moving centre and eyewall. */
@@ -200,10 +247,15 @@ export class StormVortex implements Wind {
 
   /** Deficit from ambient, Pa, evaluated directly to retain the weak outer gradient. */
   pressureDeficit(x: number, z: number, t = 0): number {
-    const r = hypot(x - this.cx - this.vx * t, z - this.cz - this.vz * t);
-    return this.kind === 'cyclone'
-      ? hollandDeficit(r, this.radius, this.shape, this.deficit)
-      : compactDeficit(r / this.radius, this.deficit, this.decay, this.burgers);
+    const r = bounded(hypot(x - this.cx - this.vx * t, z - this.cz - this.vz * t), 'pressure sample radius', 0);
+    return bounded(
+      this.kind === 'cyclone'
+        ? hollandDeficit(r, this.radius, this.shape, this.deficit)
+        : compactDeficit(r / this.radius, this.deficit, this.decay, this.burgers),
+      'sampled pressure deficit',
+      0,
+      this.ambientPressure,
+    );
   }
 
   /** Surface pressure at a point, Pa. */
@@ -213,15 +265,16 @@ export class StormVortex implements Wind {
 
   /** Static inverse-barometer level rise, in metres, to use at an open water boundary. */
   inverseBarometer(x: number, z: number, t = 0, waterDensity = 1025, g = 9.80665): number {
-    return this.pressureDeficit(x, z, t) / (positive(waterDensity, 'water density') * positive(g, 'gravity'));
+    const weight = positive(positive(waterDensity, 'water density') * positive(g, 'gravity'), 'water weight density');
+    return bounded(this.pressureDeficit(x, z, t) / weight, 'inverse-barometer elevation', 0);
   }
 
   sample(x: number, y: number, z: number, t: number, out?: FlowSample): FlowSample {
     const result = out ?? { velocity: [0, 0, 0], density: 0, temperature: 0 };
     const dx = x - this.cx - this.vx * t,
       dz = z - this.cz - this.vz * t;
-    const r = hypot(dx, dz),
-      h = Math.max(0, y - this.ground);
+    const r = bounded(hypot(dx, dz), 'wind sample radius', 0),
+      h = Math.max(0, bounded(y - this.ground, 'wind sample height'));
     let speed =
       this.kind === 'cyclone'
         ? hollandGradient(r, this.radius, this.shape, this.deficit, this.density, this.coriolis)
@@ -237,18 +290,25 @@ export class StormVortex implements Wind {
     const s = r > 0 ? (speed * this.surface * heightFactor) / r : 0;
     const radial = this.radial * s,
       tangent = this.tangential * this.spin * s;
-    result.velocity[0] = tangent * dz - radial * dx;
-    result.velocity[2] = -tangent * dx - radial * dz;
     const normalRadius = r / this.radius;
-    result.velocity[1] =
-      this.updraft * exp(-normalRadius * normalRadius - h / this.height) * oneMinusDecay(h / this.radius);
+    const u = bounded(tangent * dz - radial * dx, 'sampled east wind');
+    const w = bounded(-tangent * dx - radial * dz, 'sampled north wind');
+    const v = bounded(
+      this.updraft * exp(-normalRadius * normalRadius - h / this.height) * oneMinusDecay(h / this.radius),
+      'sampled vertical wind',
+    );
+    if (!result.velocity || result.velocity.length !== 3)
+      throw vortexError('Use a flow sample with three writable velocity components.');
+    result.velocity[0] = u;
+    result.velocity[1] = v;
+    result.velocity[2] = w;
     result.density = this.density;
     result.temperature = this.temperature;
     return result;
   }
 }
 
-/** Neutral ocean drag closure with the high-wind saturation of Donelan et al. (2004). */
+/** Neutral ocean drag with the short-fetch laboratory ceiling of Curcic and Haus (2020). */
 export function stormWaterDrag(speed: number): number {
-  return (0.75 + 0.067 * Math.min(33, bounded(speed, '10 m wind', 0))) * 1e-3;
+  return Math.min(0.0026, (0.75 + 0.067 * bounded(speed, '10 m wind', 0)) * 1e-3);
 }

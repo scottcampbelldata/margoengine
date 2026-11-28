@@ -578,3 +578,15 @@ Not in the catalog: staged construction (placement of pieces, stacking, scaffold
   0.0417 m deep. Both backends independently repeat full accepted state and RGBA through hold, restore,
   re-advance and rewind. The idealized take uses one-way exchange. Rain transit, saturated backflow
   and field-scale groundwater response remain open.
+
+### ATMO-05 automated cyclone crossing and inundation
+
+- `packages/water/test/cyclone-film.browser.mjs` drives a signed coastal shelf with the native moving
+  Holland field. After five physical hours, the pressure and boundary transfer raise the surveyed shore
+  by 0.719 m. Wind adds another 1.885 m, and the previously dry inland gauge is 1.789 m deep with
+  1.094 m/s landward flow. The gauge stays dry with pressure alone and with the unforced control.
+- Both renderers draw the accepted ShallowWater surface and independently reproduce full accepted state
+  and RGBA through hold, restore, re-advance and rewind. The fixed-camera cutaway uses ×320 vertical
+  exaggeration, and one display second represents one physical hour. The prescribed field and one-way
+  water transfer have [measured limits](limits.md#atmo-05-accepted-storm-forcing-and-observations).
+  The CY-14 film take and its run-up, foam and coastal vegetation review remain open.

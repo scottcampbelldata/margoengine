@@ -12386,3 +12386,7 @@ K23 distributes independent plate, samara and sphere rows before deterministic h
 ### HYDRO-06 accepted aquifer columns and native face setup
 
 Native participants build disjoint conductance, storage and spring activity rows. The caller keeps PCG and conservative volume recovery in the same order. The aquifer reads its signed terrain and recharge banks from their owning memory. It commits all four published columns, storage, balances and work only after the trial is finite. Browser evidence covers actual native helpers and separate exact surface-water replay. The glass-bead diagnostic records the missing recharge transit delay.
+
+### ATMO-05 accepted vortex forcing and coastal transfer
+
+The vortex solver stages field probes, rigid loads and water forcing together. It reads each adopted field in its owning memory and publishes its current signed cell. Optional native helpers evaluate disjoint wet-cell pressure and wind rows with paired face sampling. The native browser test observes three helpers. The Water fixture drives the live shallow-water surface and compares complete state and pixels independently on both backends. Isabel dropsondes and marine drag observations record the limitations of the prescribed height profile and short-fetch drag cap.

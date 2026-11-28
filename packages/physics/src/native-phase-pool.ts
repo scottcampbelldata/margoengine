@@ -140,6 +140,11 @@ type NativePhaseSolver =
       readonly subject: 'Groundwater';
       readonly phaseExport: 'groundwater_thread_phase';
       readonly phase: 'aquifer conductance';
+    }
+  | {
+      readonly subject: 'Vortex water stress';
+      readonly phaseExport: 'vortex_water_thread_phase';
+      readonly phase: 'water pressure and stress';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };

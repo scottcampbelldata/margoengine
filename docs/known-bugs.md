@@ -24734,3 +24734,13 @@ Native body rows, pending calving, freshwater and signed wakes stage before acce
 - **Fix:** Validate the complete trial columns, budgets and storage before accepting them. Use the input bank
   that owns each field and publish the live world cell. The previous state and work receipt survive rejection.
 - **Regression:** [groundwater coupling](../packages/physics/tests/coupling/groundwater.test.js).
+
+### KB-VORTEX-ACCEPTED1 — A late forcing error could leave partially updated vortex outputs (FIXED)
+
+- **Repro:** Update a probe with a moving vortex, then supply a late invalid wet-grid depth or a foreign field
+  whose words are misaligned. The old step could publish new probes before rejecting the coupled input.
+- **Cause:** Wind and pressure, rigid loads and water contributions were written in order directly into
+  the accepted banks, and the exported cell was the last sampled cell.
+- **Fix:** Read input in owning memory, stage finite outputs across the entire solver and publish the
+  live signed cell. Use coded errors with a fix for inconsistent input. The coupled clock is explicit.
+- **Regression:** [vortex coupling](../packages/physics/tests/coupling/vortices.test.js).

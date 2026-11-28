@@ -12,9 +12,13 @@ notes one change's size or behaviour and its evidence. Every number has a row in
   a radial pressure profile with a height envelope. It represents no storm formation, terrain interaction,
   or evolving supercell. Bodies use configured drag area and a pressure lever. Their load field records
   threshold crossings for structural consumers. Water sees spatial atmospheric pressure and wind stress.
-  The neutral drag coefficient saturates above 33 m/s. The physics wind keeps its full speed. WeatherRegions
-  keeps its 60 m/s styling range. The standalone GPU Flood retains its scalar preview settings.
-  The optional physical entry is 6,113 bytes gzip.
+  The existing neutral ramp reaches the short-fetch laboratory ceiling of 0.0026 at about 27.6 m/s.
+  The physics wind keeps its full speed. WeatherRegions keeps its 60 m/s styling range. The standalone
+  GPU Flood retains its scalar preview settings. The scalar and native wet-grid samplers agree in the
+  mixed natural vortex fixtures. Each native helper owns disjoint wet-grid rows.
+  The optional physical entry is 10,204 B gzip with a 10,511 B ceiling. Each lazy native variant is
+  6,443 B raw or 2,502 B gzip. Core and stage receive zero bytes.
+  Independent observations and the coupled renderer proof appear in [the ATMO-05 comparison](#atmo-05-accepted-storm-forcing-and-observations).
 
 - Seismic waves (EARTH-08, 2026-11-26). One plane-strain section resolves in-plane P and SV, with
   a level, traction-free top. Pick cell spacing for the shortest wavelength in the scene. The world
@@ -12034,3 +12038,17 @@ Workers advance independent bodies including vacant release rows. Admission and 
 Measured Burton Figure 5 intervals for 10° to 45°, 45° to 80°, and 10° to 90° are 0.620, 0.278 and 0.998 s. The model takes 0.431, 0.167 and 0.636 s. Each interval misses its conservative readout and release bound. The model reaches 114.28° against 96.07° observed. Halving the integration interval changes the 10° to 90° duration by 0.00010 s. In the separate Heller comparison the measured marker peaks at 0.214 m/s versus 0.403 m/s in the free-body model. The guide assembly restrains surge and contributes rod inertia, so that comparison leaves the effect of those differences unresolved. Added inertia, water feedback and radiation damping, heat-driven melt, irregular shapes, grounding, ship contact and quantitative capsize accuracy remain open.
 
 The optional entry grows from 4,339 to 6,937 B gzip with a 7,193 B ceiling. Both Wasm assets use 9,776 B raw and 4,693 B gzip, with plain and shared Brotli sizes 4,114 and 4,107 B. Core and stage receive zero bytes. [Tests and measured record](whitepaper/reproduce.md#ice-03-native-iceberg-rows-and-capsize-measurements)
+
+### ATMO-05 accepted storm forcing and observations
+
+The prescribed vertical profile misses Hurricane Isabel's observed eyewall jet by about 28.2 m/s.
+At a 42 km radius and 1 km height it gives 47.8 m/s, against 76 ± 6 m/s observed. The separate observed
+radial component at 1.5 km is weakly outward (+1.7 m/s), while the model remains inward (−18.2 m/s).
+Changing the archived pressure, radius and latitude within the observed window retains the jet deficit.
+[Montgomery et al. (2006)](https://doi.org/10.1175/BAMS-87-10-1335).
+
+For 27.31, 32.97, 40.92 and 50.80 m/s 10 m wind, the revised closure gives drag coefficients
+2.580, 2.600, 2.600 and 2.600 × 10⁻³. The independent field estimates are 1.960, 2.145, 1.860 and
+1.499 × 10⁻³. Each predicted value exceeds the plotted upper 95% limit plus the figure readout allowance.
+A prescribed drag plateau cannot resolve the observed high-wind decline or wave-age dependence.
+[Powell et al. (2003)](https://doi.org/10.1038/nature01481).
