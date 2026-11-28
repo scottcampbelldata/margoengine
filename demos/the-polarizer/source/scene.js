@@ -2,7 +2,9 @@ import { Engine } from '@margoengine/core';
 import { Clustered } from '@margoengine/clustered';
 import { Shadows } from '@margoengine/shadows';
 import { createInstrument } from './model.js';
-import { transmissionAt } from './optics.js';
+import { malus } from '@margoengine/optics/polarization';
+
+const transmissionAt = (degrees) => malus(degrees * Math.PI / 180);
 
 const canvas = document.querySelector('#optics');
 const loading = document.querySelector('#loading');

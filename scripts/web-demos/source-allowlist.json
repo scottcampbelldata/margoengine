@@ -316,7 +316,7 @@
    "R1": 3,
    "R3": 3,
    "R4": 1,
-   "R5": 423
+   "R5": 412
   },
   "the-baked-room": {
    "R1": 31,
@@ -385,7 +385,7 @@
   },
   "the-camera-obscura": {
    "R4": 1,
-   "R5": 369
+   "R5": 365
   },
   "the-canal-lock": {
    "R2": 1,
@@ -491,7 +491,7 @@
    "R1": 3,
    "R3": 1,
    "R4": 1,
-   "R5": 362
+   "R5": 338
   },
   "the-domino-cascade": {
    "R2": 1,
@@ -723,7 +723,7 @@
   "the-michelson-interferometer": {
    "R1": 3,
    "R4": 1,
-   "R5": 368
+   "R5": 365
   },
   "the-mirror-hall": {
    "R1": 28,
@@ -814,7 +814,7 @@
   },
   "the-polarizer": {
    "R4": 1,
-   "R5": 336
+   "R5": 332
   },
   "the-print-shop": {
    "R3": 2,
