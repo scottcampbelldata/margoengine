@@ -50,6 +50,34 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### AERO-03 four-point pass
+
+- Point 5 (0fbedc538b). `packages/physics/tests/flight.test.js` covers coded wind, geometry
+  and load failures, preservation of accepted wrench on a late malformed sample, and recovery
+  from an unrepresentable combined force without losing the original rigid force. It checks exact
+  sub-metre wing results far from the origin, huge and subnormal rotor directions, invalid radial
+  callback data and envelope atmosphere failures. `packages/physics/tests/coupling/air.test.js`
+  checks actual wing and rotor queries across the signed rigid and flow cells and exact replay.
+- Point 6 (0fbedc538b). `packages/physics/tests/coupling/wing-lattice-workers.test.js` checks
+  51- and 95-panel mixed-stall flights, exact scalar and native 1/2/4 forces and circulation and
+  signed-cell rigid replay. A rejected load leaves the native work receipt intact.
+  `packages/physics/tests/wing-lattice-workers.browser.mjs` runs three nested helpers from packaged
+  assets. The final load counts 13 solves, 6,435 paired matrix and 6,435 paired wake interactions,
+  plus 119,899 paired elimination updates. The 51-panel checkpoint hash is ac29322ae8e29565.
+- Point 7 (0fbedc538b). `packages/physics/tests/aviary-flight.browser.mjs` compares a held
+  glide with one prescribed downstroke on the same rigid paper crane. Vertical velocity changes
+  from −0.325 to +0.631 m/s and height rises 5.05 cm relative to the glide. The accepted lift
+  impulse accounts for the momentum change. WebGPU and WebGL2 repeat their own complete pixels
+  and world snapshots exactly. AVIARY-2 and AVIARY-4 and the original AVIARY-3 timeline stay open.
+- Point 8 (0fbedc538b). `docs/limits.md` records thin quasi-steady wings, axial annuli,
+  dense matrix storage and the absence of unsteady wake or rotor crossflow. Analytic finite-wing,
+  stall, rotor momentum bounds and lifting gas are checked in `packages/physics/tests/flight.test.js`.
+- Point 2 stays open. `packages/physics/scripts/aero03-rotor-measured.mjs` holds out NASA integrated
+  thrust. The solver overpredicts all 12 unambiguous results by 36–52%. At 1,250 rpm the predicted versus measured
+  thrust coefficients are .003246/.00213 at 5°, .006429/.00459 at 8° and .011267/.00796 at 12°. The
+  script reports the anomalous printed value separately and distinguishes print resolution from
+  unreported instrument uncertainty. [Caradonna and Tung, NASA TM-81232](https://ntrs.nasa.gov/citations/19820004169).
+
 ### ATMO-09 four-point pass
 
 - Point 5 (c885f8db50). `packages/physics/tests/coupling/surface-energy.test.js` checks end-of-step
