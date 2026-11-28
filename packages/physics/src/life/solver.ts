@@ -16,10 +16,11 @@ import {
   type SolverHost,
   type StepContext,
 } from '../world/solver.js';
-import { instantiateSwimKernel, loadSwimKernel, type SwimKernelBuilds } from './kernel.js';
+import { instantiateSwimKernel, loadSwimKernel, type SwimKernelBuilds, type SwimWorkCounts } from './kernel.js';
 import {
   ellipsoidArea,
   finite,
+  maximumTailFrequency,
   positive,
   recoil,
   rotate,
@@ -40,8 +41,8 @@ import {
 } from './wake.js';
 
 export { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT } from './wake.js';
+export type { SwimWorkerWork, SwimWorkCounts } from './kernel.js';
 
-const ORIGIN: Cell = [0, 0, 0];
 const BODY_WORDS = 19;
 const PARAMETER_WORDS = 28;
 const MEDIUM_WORDS = 28;
@@ -110,7 +111,7 @@ export interface SwimBody {
   readonly tail: SwimTail;
   /** Open-loop tail cycles per second (default 0). */
   readonly frequency?: number;
-  /** Maximum feedback-controlled tail frequency, Hz (default the greater of the open-loop frequency and 3). */
+  /** Maximum feedback-controlled tail frequency, Hz (default the greater of open-loop frequency and the published fast bound for this body length). */
   readonly maximumFrequency?: number;
   /** Seconds in the powered part of a repeated burst-and-coast period (default no periodic coasting). */
   readonly burstSeconds?: number;
@@ -162,6 +163,8 @@ export interface SwimOptions {
     readonly wake?: string;
     readonly contacts?: string;
   };
+  /** Number of native partitions including the caller. Defaults to one. */
+  readonly threads?: number;
   readonly signal?: AbortSignal;
 }
 
@@ -206,9 +209,11 @@ interface BodyConfiguration {
 }
 
 function configure(body: SwimBody): BodyConfiguration {
+  if (!body || typeof body !== 'object')
+    throw new MargoError('state', 'A swimmer body is missing. Pass dimensions, mass, position and tail.');
   const { tail, fins } = body;
   if (!tail || (tail.plane !== undefined && tail.plane !== 'lateral' && tail.plane !== 'vertical'))
-    throw new RangeError('Give each swimmer a tail with a lateral or vertical deformation plane.');
+    throw new MargoError('state', 'Give each swimmer a tail with a lateral or vertical deformation plane.');
   const mass = positive(body.mass, 'mass');
   const length = positive(body.length, 'length');
   const width = positive(body.width, 'width');
@@ -217,22 +222,28 @@ function configure(body: SwimBody): BodyConfiguration {
   const orientation = body.orientation ?? [0, 0, 0, 1];
   const norm = hypot(hypot(orientation[0], orientation[1], orientation[2]), orientation[3]);
   if (orientation.length !== 4 || !orientation.every(Number.isFinite) || !Number.isFinite(norm) || !(norm > 0))
-    throw new RangeError('Pass a nonzero finite orientation quaternion for the swimmer.');
+    throw new MargoError('state', 'Pass a nonzero finite orientation quaternion for the swimmer.');
   const manual = finite(body.frequency ?? 0, 'frequency', 0);
-  const maximum = finite(body.maximumFrequency ?? Math.max(manual, 3), 'maximumFrequency', manual);
+  const maximum = finite(
+    body.maximumFrequency ?? Math.max(manual, maximumTailFrequency(length)),
+    'maximumFrequency',
+    manual,
+  );
   const finFrequency = finite(fins?.strokeFrequency ?? 0, 'fins.strokeFrequency', 0);
   if (Math.max(maximum, finFrequency) * RESOLUTION > rateOf(7))
-    throw new RangeError(
+    throw new MargoError(
+      'state',
       'Reduce the requested beat frequency so the world clock can resolve at least 32 samples per cycle.',
     );
   const steering = vector(body.steering ?? ZERO, 'steering');
   if (steering.some((axis) => Math.abs(axis) > 1))
-    throw new RangeError('Set each steering component between -1 and 1.');
+    throw new MargoError('state', 'Set each steering component between -1 and 1.');
   const burst = finite(body.burstSeconds ?? 0, 'burstSeconds', 0);
   const coast = finite(body.coastSeconds ?? 0, 'coastSeconds', 0);
-  if (coast && !burst) throw new RangeError('Set burstSeconds to a positive duration when enabling periodic coasting.');
+  if (coast && !burst)
+    throw new MargoError('state', 'Set burstSeconds to a positive duration when enabling periodic coasting.');
   const [cx = 1, cy = 1] = body.crossflowDrag ?? [];
-  return {
+  const configuration: BodyConfiguration = {
     parameters: [
       mass,
       length,
@@ -271,10 +282,21 @@ function configure(body: SwimBody): BodyConfiguration {
     coast,
     targets: targetWords(body.target ?? null),
   };
+  if (!configuration.parameters.every(Number.isFinite) || !configuration.recoil.every(Number.isFinite))
+    throw new MargoError(
+      'state',
+      'Swimmer geometry or tail motion exceeds finite SI bounds. Reduce the dimensions or use a longer wavelength.',
+    );
+  return configuration;
 }
 
 function targetWords(target: SwimTarget | null): readonly number[] {
   if (target === null) return [0, 0, 0, 0];
+  if (typeof target !== 'object')
+    throw new MargoError(
+      'state',
+      'Invalid swimming target. Pass a target position or velocity vector, or null to clear it.',
+    );
   if ('position' in target) {
     const position = vector(target.position, 'target.position');
     return [3, ...position];
@@ -287,8 +309,12 @@ function words(host: SolverHost, region: Region): Float64Array {
 }
 
 function fieldCell(cell: FlowCell): void {
-  if (!cell || cell.length !== 3 || !cell.every(Number.isSafeInteger))
-    throw new RangeError('Use a water field with three integer origin-cell coordinates.');
+  if (
+    !cell ||
+    cell.length !== 3 ||
+    ![cell[0], cell[1], cell[2]].every((axis) => Number.isInteger(axis) && axis >= -2147483648 && axis <= 2147483647)
+  )
+    throw new MargoError('state', 'Use a water field with three integer origin-cell coordinates.');
 }
 
 function skinFriction(reynolds: number, transition: number): number {
@@ -343,6 +369,8 @@ export class SwimSolver implements Solver<SwimParams> {
   private host?: SolverHost;
   private lease?: Lease;
   private kernel?: ReturnType<typeof instantiateSwimKernel>;
+  private acceptedWork?: SwimWorkCounts;
+  private disposed = false;
   private models: readonly BodyConfiguration[] = [];
   private sea?: SeaSurface;
   private flow?: SeaWater;
@@ -389,7 +417,9 @@ export class SwimSolver implements Solver<SwimParams> {
       passiveReaction = false,
       passiveReactionField,
     } = options;
-    if (!isRateLevel(level)) throw new RangeError('Choose a swim rate level from 0 to 7.');
+    if (typeof id !== 'string' || !id || id.trim() !== id)
+      throw new MargoError('state', 'Invalid swimming solver ID. Pass a nonempty string without surrounding spaces.');
+    if (!isRateLevel(level)) throw new MargoError('state', 'Choose a swim rate level from 0 to 7.');
     this.id = id;
     this.preferred = level;
     this.readSchoolIntent = readSchoolIntent;
@@ -412,7 +442,27 @@ export class SwimSolver implements Solver<SwimParams> {
 
   /** Loads the optional kernel. Add the result to a PhysicsWorld with SwimParams. */
   static async load(options: SwimOptions = {}): Promise<SwimSolver> {
-    return new SwimSolver(await loadSwimKernel(options.signal), options);
+    if (!options || typeof options !== 'object' || Array.isArray(options))
+      throw new MargoError('state', 'Invalid swimming load options. Pass a SwimOptions object or omit it.');
+    const builds = await loadSwimKernel(options.signal, options.threads);
+    try {
+      return new SwimSolver(builds, options);
+    } catch (error) {
+      builds.pool?.close();
+      throw error;
+    }
+  }
+
+  [Symbol.dispose](): void {
+    this.disposed = true;
+    this.builds.pool?.close();
+  }
+
+  /** Actual native work recorded for the most recently accepted swim tick. */
+  workCounts(): SwimWorkCounts {
+    const work = this.acceptedWork;
+    if (!work) throw new MargoError('state', 'Swimming work needs a world. Add the swimmer first.');
+    return { ...work, workers: work.workers.map((worker) => ({ ...worker })) };
   }
 
   describe(): SolverDescription {
@@ -450,27 +500,31 @@ export class SwimSolver implements Solver<SwimParams> {
   }
 
   init(host: SolverHost, params: SwimParams): void {
+    if (this.disposed) throw new MargoError('disposed', 'The swimmer is disposed. Load a new swimmer for this world.');
     if (this.host) throw new MargoError('state', 'The swimmer already belongs to a world. Load another instance.');
+    if (!params || typeof params !== 'object' || Array.isArray(params))
+      throw new MargoError('state', 'Swimming needs an options object. Pass swimmer bodies and optional water fields.');
     const { bodies, sea, flow = sea?.water } = params;
-    if (!Array.isArray(bodies) || bodies.length === 0) throw new RangeError('Configure at least one swimmer body.');
+    if (!Array.isArray(bodies) || bodies.length === 0)
+      throw new MargoError('state', 'Configure at least one swimmer body.');
     if (sea && params.flow)
-      throw new RangeError('Pass sea alone for a free surface or flow alone for an all-water domain.');
+      throw new MargoError('state', 'Pass sea alone for a free surface or flow alone for an all-water domain.');
     if (sea) {
       fieldCell(sea.cell);
       if (typeof sea.sample !== 'function' || !flow)
-        throw new RangeError('Pass a SeaSurface exposing both surface and water samplers.');
+        throw new MargoError('state', 'Pass a SeaSurface exposing both surface and water samplers.');
     }
     if (flow) {
       fieldCell(flow.cell);
       if (flow.medium !== 'water' || typeof flow.sample !== 'function')
-        throw new RangeError('Pass a water FlowField for the swimming medium.');
+        throw new MargoError('state', 'Pass a water FlowField for the swimming medium.');
     }
-    const models = bodies.map(configure);
+    const models = Array.from(bodies, configure);
     const density = finite(params.density ?? 1025, 'density', 0);
     this.viscosity = positive(params.kinematicViscosity ?? 1.05e-6, 'kinematicViscosity');
     const transition = positive(params.transitionReynolds ?? 5e5, 'transitionReynolds');
     if (transition < 1e5)
-      throw new RangeError('Set the skin-friction transition at Reynolds number 100,000 or greater.');
+      throw new MargoError('state', 'Set the skin-friction transition at Reynolds number 100,000 or greater.');
     this.transition = transition;
     this.cellSize = positive(params.cellSize ?? 4096, 'cellSize');
     this.density = density;
@@ -507,6 +561,7 @@ export class SwimSolver implements Solver<SwimParams> {
     this.models = models;
     this.lease = lease;
     this.kernel = kernel;
+    this.acceptedWork = kernel.workCounts();
     this.host = host;
   }
 
@@ -551,7 +606,7 @@ export class SwimSolver implements Solver<SwimParams> {
   ): SwimSpinePoint {
     const { host, lease, model } = this.member(row);
     if (!Number.isFinite(fraction) || fraction < 0 || fraction > 1)
-      throw new RangeError('Sample the spine at a fraction between the head (0) and tail (1).');
+      throw new MargoError('state', 'Sample the spine at a fraction between the head (0) and tail (1).');
     const values = words(host, lease.bodies);
     const offset = row * BODY_WORDS;
     return spine(
@@ -567,11 +622,13 @@ export class SwimSolver implements Solver<SwimParams> {
 
   /** Updates a command between advances. These values are part of world snapshots and hashes. */
   setControl(row: number, control: SwimControl): void {
+    if (!control || typeof control !== 'object' || Array.isArray(control))
+      throw new MargoError('state', 'Invalid swimming control. Pass an object with effort, buoyancy or target.');
     const { host, lease } = this.member(row);
     const values = words(host, lease.command);
     const at = row * COMMAND_WORDS;
     const effort = finite(control.effort ?? values[at]!, 'effort', 0);
-    if (effort > 1) throw new RangeError('Set effort to a fraction between 0 and 1.');
+    if (effort > 1) throw new MargoError('state', 'Set effort to a fraction between 0 and 1.');
     const buoyancy = finite(control.buoyancy ?? values[at + 1]!, 'buoyancy', 0);
     const target = control.target === undefined ? undefined : targetWords(control.target);
     values[at] = effort;
@@ -583,11 +640,12 @@ export class SwimSolver implements Solver<SwimParams> {
     const { host, lease } = this;
     if (!host || !lease) throw new MargoError('state', 'Add the swimmer to a PhysicsWorld first.');
     const model = this.models[row];
-    if (!Number.isInteger(row) || !model) throw new RangeError('Use the index of a configured swimmer body.');
+    if (!Number.isInteger(row) || !model) throw new MargoError('state', 'Use the index of a configured swimmer body.');
     return { host, lease, model };
   }
 
   step(context: StepContext, dt: number): void {
+    if (this.disposed) throw new MargoError('disposed', 'The swimmer is disposed. Load a new swimmer for this world.');
     const { host, lease, kernel, models } = this;
     if (!host || !lease || !kernel) throw new MargoError('state', 'Add the swimmer to a PhysicsWorld before stepping.');
     const input = context.inputs.get(this.fields.intent.name);
@@ -657,17 +715,18 @@ export class SwimSolver implements Solver<SwimParams> {
       lease.nextWake.byteOffset,
     ] as const;
     const passive = lease.passive;
-    const status = passive
-      ? kernel.passive(...args, passive.next.byteOffset, models.length, dt)
-      : kernel.step(...args, models.length, dt);
+    const status = kernel.apply(...args, passive?.next.byteOffset ?? 0, models.length, dt);
     if (status)
-      throw new RangeError(
+      throw new MargoError(
+        'state',
         'Swimming integration exceeded its numeric range. Use smaller loads or consistent swimmer dimensions in SI units.',
       );
+    const work = kernel.workCounts();
     words(host, lease.bodies).set(words(host, lease.next));
     words(host, lease.kinematics).set(words(host, lease.nextKinematics));
     words(host, lease.wake).set(words(host, lease.nextWake));
     if (passive) words(host, passive.current).set(words(host, passive.next));
+    this.acceptedWork = work;
   }
 
   private water(
@@ -691,12 +750,23 @@ export class SwimSolver implements Solver<SwimParams> {
       const surfaceX = x + (cell[0] - sea.cell[0]) * cellSize;
       const surfaceY = y + (cell[1] - sea.cell[1]) * cellSize;
       const surfaceZ = z + (cell[2] - sea.cell[2]) * cellSize;
-      const { height, normal } = sea.sample(surfaceX, surfaceZ, t, this.surface);
+      if (![surfaceX, surfaceY, surfaceZ].every(Number.isFinite))
+        throw new MargoError(
+          'state',
+          'Swimmer surface coordinates exceed finite metres. Use a closer origin cell or smaller positions.',
+        );
+      const sampled = sea.sample(surfaceX, surfaceZ, t, this.surface);
+      if (!sampled?.normal)
+        throw new MargoError(
+          'state',
+          'The swimmer surface sample has no normal. Return a SeaSurfaceSample with an upward normal.',
+        );
+      const { height, normal } = sampled;
       const nx = normal[0],
         ny = normal[1],
         nz = normal[2];
       if (!Number.isFinite(height) || ![nx, ny, nz].every(Number.isFinite) || !(ny > 0))
-        throw new RangeError('Provide a finite sea elevation and an upward surface normal.');
+        throw new MargoError('state', 'Provide a finite sea elevation and an upward surface normal.');
       const qx = body[at + 6]!,
         qy = body[at + 7]!,
         qz = body[at + 8]!,
@@ -722,7 +792,17 @@ export class SwimSolver implements Solver<SwimParams> {
       position[0] = x + worldBuoyancy[0] + (cell[0] - flow.cell[0]) * cellSize;
       position[1] = y + worldBuoyancy[1] + (cell[1] - flow.cell[1]) * cellSize;
       position[2] = z + worldBuoyancy[2] + (cell[2] - flow.cell[2]) * cellSize;
+      if (!position.every(Number.isFinite))
+        throw new MargoError(
+          'state',
+          'Swimmer flow coordinates exceed finite metres. Use a closer origin cell or smaller positions.',
+        );
       const first = flow.sample(...position, t, this.sample);
+      if (!first?.velocity)
+        throw new MargoError(
+          'state',
+          'The swimmer water sample has no velocity. Return a finite three-component flow.',
+        );
       const u = finite(first.velocity[0], 'water velocity');
       const v = finite(first.velocity[1], 'water velocity');
       const w = finite(first.velocity[2], 'water velocity');
@@ -736,6 +816,11 @@ export class SwimSolver implements Solver<SwimParams> {
           t + dt,
           this.later,
         );
+        if (!second?.velocity)
+          throw new MargoError(
+            'state',
+            'The next swimmer water sample has no velocity. Return a finite three-component flow.',
+          );
         if (finite(second.density, 'water density', 0) > 0) {
           result[offset + 3] = (finite(second.velocity[0], 'water velocity') - u) / dt;
           result[offset + 4] = (finite(second.velocity[1], 'water velocity') - v) / dt;
@@ -757,14 +842,20 @@ export class SwimSolver implements Solver<SwimParams> {
       : 0;
   }
 
+  /** Current origin of swimmer positions and wakes, in signed world cells. */
+  get cell(): Cell {
+    if (!this.host) throw new MargoError('state', 'The swimmer has no origin. Add it to a PhysicsWorld first.');
+    return this.host.cell;
+  }
+
   exportPorts(tick: number): readonly Port[] {
-    const { lease, fields } = this;
-    return lease
+    const { lease, fields, host } = this;
+    return lease && host
       ? [
-          { field: fields.kinematics.name, region: lease.kinematics, tick, cell: ORIGIN },
-          { field: fields.wake.name, region: lease.wake, tick, cell: ORIGIN },
+          { field: fields.kinematics.name, region: lease.kinematics, tick, cell: host.cell },
+          { field: fields.wake.name, region: lease.wake, tick, cell: host.cell },
           ...(fields.passive && lease.passive
-            ? [{ field: fields.passive.name, region: lease.passive.current, tick, cell: ORIGIN }]
+            ? [{ field: fields.passive.name, region: lease.passive.current, tick, cell: host.cell }]
             : []),
         ]
       : [];

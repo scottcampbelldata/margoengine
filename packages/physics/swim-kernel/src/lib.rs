@@ -1,6 +1,9 @@
 #![no_std]
 
-use core::arch::wasm32::{f64x2, f64x2_extract_lane, f64x2_floor, f64x2_mul, f64x2_sqrt};
+use core::arch::wasm32::{
+    f64x2, f64x2_add, f64x2_div, f64x2_extract_lane, f64x2_floor, f64x2_mul, f64x2_splat,
+    f64x2_sqrt,
+};
 use core::f64::consts::{PI, TAU};
 use core::panic::PanicInfo;
 
@@ -54,6 +57,22 @@ fn rotate(q: [f64; 4], v: Vec3, inverse: bool) -> Vec3 {
     let vector = [q[0] * s, q[1] * s, q[2] * s];
     let t = scale(cross(vector, v), 2.0);
     add(v, add(scale(t, q[3]), cross(vector, t)))
+}
+
+// Both implicit diagonal updates have independent axis components. Group X
+// and Y in SIMD and preserve the scalar multiply, add and divide order.
+fn implicit_axes(mass: Vec3, velocity: Vec3, force: Vec3, damping: Vec3, dt: f64) -> Vec3 {
+    let dt_pair = f64x2_splat(dt);
+    let mass_pair = f64x2(mass[0], mass[1]);
+    let momentum = f64x2_mul(mass_pair, f64x2(velocity[0], velocity[1]));
+    let kick = f64x2_mul(dt_pair, f64x2(force[0], force[1]));
+    let resistance = f64x2_mul(dt_pair, f64x2(damping[0], damping[1]));
+    let pair = f64x2_div(f64x2_add(momentum, kick), f64x2_add(mass_pair, resistance));
+    [
+        f64x2_extract_lane::<0>(pair),
+        f64x2_extract_lane::<1>(pair),
+        (mass[2] * velocity[2] + dt * force[2]) / (mass[2] + dt * damping[2]),
+    ]
 }
 
 fn advance_orientation(q: [f64; 4], omega: Vec3, dt: f64) -> [f64; 4] {
@@ -148,7 +167,7 @@ fn step(
     m: &Medium,
     dt: f64,
     passive: Option<&mut core::mem::MaybeUninit<Wake>>,
-) -> (Body, Wake, Wake) {
+) -> Option<(Body, Wake, Wake)> {
     let q = body.orientation;
     let flow = rotate(q, m.flow, true);
     let water_acceleration = rotate(q, m.acceleration, true);
@@ -290,6 +309,13 @@ fn step(
         multiply(mass, add(goal, scale(relative, -1.0))),
         1.0 / p.response,
     );
+    if !(lift_capacity >= 0.0
+        && lift_capacity.is_finite()
+        && scull_capacity >= 0.0
+        && scull_capacity.is_finite())
+    {
+        return None;
+    }
     let mut fin = if has_target {
         [
             demand[0].clamp(-lift_capacity, lift_capacity),
@@ -350,15 +376,9 @@ fn step(
     );
     force = add(force, fin);
 
-    let mut next_relative = [0.0; 3];
+    let next_relative = implicit_axes(mass, relative, force, damping, dt);
     let total_inertia = add(inertia, added_inertia);
-    let mut next_angular = [0.0; 3];
-    for axis in 0..3 {
-        next_relative[axis] =
-            (mass[axis] * relative[axis] + dt * force[axis]) / (mass[axis] + dt * damping[axis]);
-        next_angular[axis] = (total_inertia[axis] * body.angular[axis] + dt * torque[axis])
-            / (total_inertia[axis] + dt * rotational_damping[axis]);
-    }
+    let next_angular = implicit_axes(total_inertia, body.angular, torque, rotational_damping, dt);
     // The rigid-frame rotation has been canceled analytically; apply the increment
     // on the old frame before advancing the orientation independently.
     let next_velocity = rotate(q, add(next_relative, flow), false);
@@ -398,18 +418,31 @@ fn step(
             drag_cross_force,
             scale(multiply(damping, next_relative), -1.0),
         );
-        receipt.write(Wake {
+        let water_reaction = Wake {
             position: add(body.position, rotate(q, m.buoyancy_offset, false)),
             impulse: scale(rotate(q, drag, false), -dt),
             radius: 0.5 * sqrt(p.width * p.height),
             wet: m.wet,
-        });
+        };
+        if !water_reaction.finite() {
+            return None;
+        }
+        receipt.write(water_reaction);
     }
-    (
-        next,
-        wake(-length * 0.5, [0.0, 0.0, thrust], p.tail_span * 0.5),
-        wake(-p.fin_arm, fin, sqrt(p.fin_area / PI)),
-    )
+    let tail = wake(-length * 0.5, [0.0, 0.0, thrust], p.tail_span * 0.5);
+    let fin = wake(-p.fin_arm, fin, sqrt(p.fin_area / PI));
+    (tail.finite() && fin.finite()).then_some((next, tail, fin))
+}
+
+impl Wake {
+    fn finite(&self) -> bool {
+        self.position
+            .into_iter()
+            .chain(self.impulse)
+            .all(f64::is_finite)
+            && self.radius.is_finite()
+            && self.wet.is_finite()
+    }
 }
 
 /// Each pointer is a nonoverlapping f64-aligned region allocated and sized by the host.
@@ -477,13 +510,15 @@ unsafe fn integrate(
             } else {
                 Some(&mut *passive.add(index))
             };
-            let (body, tail, fin) = step(
+            let Some((body, tail, fin)) = step(
                 &*input.add(index),
                 &*parameters.add(index),
                 &*medium.add(index),
                 dt,
                 receipt,
-            );
+            ) else {
+                return 1;
+            };
             let values = core::slice::from_raw_parts((&body as *const Body).cast::<f64>(), 19);
             if values.iter().any(|value| !value.is_finite()) {
                 return 1;
@@ -498,4 +533,86 @@ unsafe fn integrate(
         }
     }
     0
+}
+
+#[repr(C)]
+struct Job {
+    input: *const Body,
+    parameters: *const Parameters,
+    medium: *const Medium,
+    output: *mut Body,
+    kinematics: *mut Motion,
+    wakes: *mut Wake,
+    passive: *mut core::mem::MaybeUninit<Wake>,
+    count: usize,
+    receipts: *mut u32,
+    reserved: u32,
+    dt: f64,
+}
+
+const _: () = assert!(core::mem::size_of::<Job>() == 48);
+
+unsafe fn apply(job: *const Job, part: u32, parts: u32) -> Option<()> {
+    let job = unsafe { job.as_ref()? };
+    if part >= parts
+        || job.input.is_null()
+        || job.parameters.is_null()
+        || job.medium.is_null()
+        || job.output.is_null()
+        || job.kinematics.is_null()
+        || job.wakes.is_null()
+        || job.count > isize::MAX as usize / size_of::<Parameters>()
+        || !(job.dt > 0.0 && job.dt.is_finite())
+    {
+        return None;
+    }
+    let count = job.count as u64;
+    let first = (u64::from(part) * count / u64::from(parts)) as usize;
+    let end = ((u64::from(part) + 1) * count / u64::from(parts)) as usize;
+    let rows = end - first;
+    let has_passive = !job.passive.is_null();
+    unsafe {
+        // A participant's output, two actuator rows and optional passive
+        // row all use the same disjoint body interval. Inputs stay immutable.
+        let passive = if has_passive {
+            job.passive.add(first)
+        } else {
+            core::ptr::null_mut()
+        };
+        if integrate(
+            job.input.add(first),
+            job.parameters.add(first),
+            job.medium.add(first),
+            job.output.add(first),
+            job.kinematics.add(first),
+            job.wakes.add(2 * first),
+            passive,
+            rows,
+            job.dt,
+        ) != 0
+        {
+            return None;
+        }
+        if !job.receipts.is_null() {
+            let receipt = job.receipts.add(2 * part as usize);
+            receipt.write(rows as u32);
+            receipt
+                .add(1)
+                .write(if has_passive { rows as u32 } else { 0 });
+        }
+    }
+    Some(())
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn swim_apply(job: *const Job) -> u32 {
+    u32::from(unsafe { apply(job, 0, 1) }.is_none())
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn swim_thread_phase(job: *const Job, stage: u32, part: u32, parts: u32) -> u32 {
+    if stage != 0 {
+        return 1;
+    }
+    u32::from(unsafe { apply(job, part, parts) }.is_none())
 }

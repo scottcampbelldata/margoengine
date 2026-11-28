@@ -74,6 +74,7 @@ export interface SwimOptions {
         readonly wake?: string;
         readonly contacts?: string;
     };
+    readonly threads?: number;
     readonly signal?: AbortSignal;
 }
 
@@ -109,12 +110,15 @@ export interface SwimReading {
 export class SwimSolver implements Solver<SwimParams> {
     private constructor();
     static load(options?: SwimOptions): Promise<SwimSolver>;
+    [Symbol.dispose](): void;
+    workCounts(): SwimWorkCounts;
     describe(): SolverDescription;
     init(host: SolverHost, params: SwimParams): void;
     read(row: number, out?: SwimReading): SwimReading;
     sampleSpine(row: number, fraction: number, out?: SwimSpinePoint): SwimSpinePoint;
     setControl(row: number, control: SwimControl): void;
     step(context: StepContext, dt: number): void;
+    get cell(): Cell;
     exportPorts(tick: number): readonly Port[];
     importPorts(_tick: number): void;
     stateRegions(): readonly Region[];
@@ -139,6 +143,17 @@ export type SwimTarget = {
     readonly velocity: Vec3;
     readonly relativeToWater?: boolean;
 };
+
+export interface SwimWorkCounts extends SwimWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly SwimWorkerWork[];
+}
+
+export interface SwimWorkerWork {
+    readonly bodies: number;
+    readonly simdAxisPairs: number;
+    readonly passiveReactions: number;
+}
 
 export function swimPropulsion(tail: SwimTail, frequency: number, speed: number, density?: number, out?: SwimPropulsion): SwimPropulsion;
 

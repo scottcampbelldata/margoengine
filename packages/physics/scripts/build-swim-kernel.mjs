@@ -62,6 +62,10 @@ assert.equal(typeof instance.exports.swim_step, 'function');
 assert.equal(instance.exports.swim_step.length, 8);
 assert.equal(typeof instance.exports.swim_step_passive, 'function');
 assert.equal(instance.exports.swim_step_passive.length, 9);
+assert.equal(typeof instance.exports.swim_apply, 'function');
+assert.equal(instance.exports.swim_apply.length, 1);
+assert.equal(typeof instance.exports.swim_thread_phase, 'function');
+assert.equal(instance.exports.swim_thread_phase.length, 4);
 
 const target = fileURLToPath(new URL('../src/life/swim-kernel' + (shared ? '-shared' : '') + '.wasm', import.meta.url));
 writeFileSync(target, bytes);

@@ -240,6 +240,8 @@ How it works. Each froxel adds every volume's extinction at its sample point to 
 
 Limits: every froxel tests every volume, so the froxel pass grows with the volume count (not timed); boxes are axis-aligned; a volume thinner than a froxel (about 8 x 8 pixels across and a slice deep with the default grid) is blurred over its froxel and its neighbours (the 3 x 3 tent); a moved volume shows over `temporal`'s history like any change; no volume carves fog out of the global fog. Real-GPU check: `npm run test:fog-volumes:browser` (the integrated volume of a box, a sphere and a noisy box equals a CPU mirror of the froxel pass, every froxel; each volume's fog takes its albedo; a moved sphere moves its fog on the next frame).
 
+The [BB-7 ray cutaway](../../docs/physics-demo-review.md) uses `FogVolumes` to draw the suspended sand that the swimmer lifts from `TerrainBed`. Run `npm run test:gpu:swim-sediment -w @margoengine/environment` for both renderers. The technical geometry follows the accepted body orientation and fin-tip displacement in metres. The fixed camera shows the sand lift, move with the bottom current and settle onto the changed bed. The shot holds the world before the trigger and after settling, and snapshot replay reproduces the ray, puff and bed frames exactly.
+
 ## Sparse density grids (VDB volumes, spray mist)
 
 `@margoengine/environment/density-volume` is a heterogeneous medium on a sparse grid for `VolumetricFog`: smoke, steam or spray mist with detail anywhere in the world, written by a program, splatted from particles or read from an OpenVDB file. It goes into the fog's froxel grid as its `volumes`, so it is lit by the sun, its shafts and shadows, the ambient and clustered lights with the fog's phase function and reprojection:

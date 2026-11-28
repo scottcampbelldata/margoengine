@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21735128,
+  "total": 21738709,
   "history": [
     {
       "date": "2026-10-24",
@@ -15509,6 +15509,12 @@
       "commit": "fbabe71501",
       "reason": "studio/bench: new stage kit entry for the web demos (openBench); every optional part is a lazy import",
       "grew": 15
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "life03-native-swim-workers",
+      "reason": "LIFE-03: Physics life grows from 6,884 to 10,176 B gzip (ceiling 6,901 to 10,482) for signed ports, coded bounds, body-length tail limits and optional SIMD worker phases. The same optional entry keeps the control, ordinary and reciprocal passive routes on one body state. A separate worker entry would duplicate the checked body and field bindings. Core and Stage gain no bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16398,7 +16404,7 @@
     "@margoengine/physics/landscape": 7764,
     "@margoengine/physics/lava": 9824,
     "@margoengine/physics/legged": 10415,
-    "@margoengine/physics/life": 6901,
+    "@margoengine/physics/life": 10482,
     "@margoengine/physics/lightning": 9072,
     "@margoengine/physics/loads": 74232,
     "@margoengine/physics/locomotion": 6808,

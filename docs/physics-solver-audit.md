@@ -50,6 +50,32 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### LIFE-03 four-point pass
+
+- Point 5. `life03-acceptance.test.js` verifies the production feedback frequency against the fast-envelope
+  equation at three body lengths, preserves an explicit override, and checks that invalid controls and
+  unrepresentable propulsion leave accepted values intact. `swim-threads.test.js` also checks native numeric
+  errors and preserves the accepted body and wake fields. Exported ports carry the live signed origin.
+- Point 6. `swim-threads.test.js` and `swim-threads.browser.mjs` compare ordinary and reciprocal passive routes
+  across signed origin shifts and exact snapshots. A four-partition run integrates 4,099 bodies, 8,198 SIMD
+  axis pairs and 4,099 passive reaction rows. Isolated Chromium uses three actual helpers. The real seven-body
+  passive transfer into shallow water closes 5.36112 N·s at less than 3.56e-15 N·s absolute residual.
+- Point 7. `environment/tests/swim-sediment.browser.mjs` draws the accepted body orientation and 10 cm fin
+  motion and reads the pectoral impulse before positive sand release. The live plume travels 17.1 pixels
+  and leaves 674.8 µm of settled relief with zero net settled bed-volume change. Both renderers reproduce
+  the starting hold, release, downstream pass and settled bed after seek. This is the BB-7 technical cutaway.
+  The editable original shot and tail vortex and bubble rendering remain open.
+- Point 8. Physics and Environment READMEs and `docs/limits.md` document the fit and control limits, work
+  and origin requirements, the cutaway's scope and the reduced body, fin and wake models.
+- Point 2 remains open. `life03-swim-measured.mjs` uses three independent Sparks et al. juvenile rainbow trout
+  tail records and compares reached calculated speeds against the withheld speeds. The measured 0.22, 0.48
+  and 0.74 m/s compare to 0.253, 0.421 and 0.541 m/s. Reached Strouhal values 0.324, 0.316 and 0.310 fall within
+  the published 0.2–0.4 range. Body morphology is estimated from separate same-species measurements. The
+  highest-speed result still misses by 12.8% with the form-drag term removed and remains outside the geometry
+  sensitivity band. The papers used by the fast frequency fit are excluded from held-out scoring.
+  [Sparks et al.](https://doi.org/10.1242/jeb.247873) · [Webb et al.](https://doi.org/10.1242/jeb.109.1.77) ·
+  [Taylor et al.](https://doi.org/10.1038/nature02000)
+
 ### ATMO-06 four-point pass
 
 - Point 5. `a65111cd3a`. `airborne-acceptance.test.js` reproduces a bad Wind sample after a previous parcel was sampled and

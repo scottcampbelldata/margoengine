@@ -13,4 +13,6 @@ export {
   type SwimParams,
   type SwimReading,
   type SwimTarget,
+  type SwimWorkerWork,
+  type SwimWorkCounts,
 } from './solver.js';

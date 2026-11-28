@@ -6921,3 +6921,12 @@ replay across memory and partition counts. The 4,099-parcel case reports 8,198 S
 The 219 retained trajectories move 24.74 m. The volume changes 5,258 and 5,262 pixels on the two backends.
 `packages/physics/scripts/atmo06-droplet-settling.mjs` retains the measured discrepancies for settling
 and evaporation. Field validation across regimes remains open.
+
+### Size-dependent swimmer control and accepted ray sediment (LIFE-03)
+
+The production feedback cap satisfies the published equation at three lengths in `life03-acceptance.test.js`.
+The native worker fixtures verify exact acceptance and far-origin rewind and count 8,198 SIMD axis pairs for
+4,099 bodies. An actual passive load into shallow water conserves 5.36112 N·s with less than 3.56e-15 N·s
+absolute residual. `environment/tests/swim-sediment.browser.mjs` draws the accepted fin stroke and the downstream
+sand. Both renderers reproduce a settled bed with zero net volume change. The independent trout comparison in
+`life03-swim-measured.mjs` keeps cruise-speed misses open.

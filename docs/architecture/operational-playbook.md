@@ -11816,3 +11816,11 @@ contact and mass fold commits parcels, work and the registry fields. The accepte
 snapshot layout across worker counts. The Environment layer maps accepted sea spray to local optical depth
 on the existing volume pass. CPU tests verify candidate rejection and cross-section. The fixed-camera
 browser fixture covers both renderers and the restoration of the same draw state.
+
+### LIFE-03 swimming workers and the pectoral wake cutaway
+
+The optional native swimmer applies the same diagonal updates to independent body rows, with X/Y SIMD.
+A shared world can split ordinary and passive-reaction rows across workers. The caller checks replies before
+committing all fields. World-cell metadata comes directly from the swimmer's host. A reciprocal passive-load
+fixture verifies the shallow-water impulse and the BB-7 cutaway renders the accepted fin-to-sediment transfer
+through the final settled bed on both renderers.

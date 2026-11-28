@@ -15862,6 +15862,14 @@ publications and this repository's field contracts.
 
 ### Aquatic locomotion (LIFE-03, `@margoengine/physics/life`)
 
+- Jesús Sánchez-Rodríguez, Christophe Raufaste and Médéric Argentina, “Scaling the tail beat frequency and
+  swimming speed in underwater undulatory swimming” (2023). Equation 4 relates length and the fast frequency
+  envelope. Figure 1 reports the fit `f₀ = 22 Hz, Lc = 0.4 m, κ = 4`. The code solves the monotone
+  polynomial in a scaled bracket even for very long bodies. [Primary paper](https://doi.org/10.1038/s41467-023-41368-6)
+- Sparks et al. (2024), Table 1 still, free-stream trout trials. The diagnostic drives the measured waveform
+  from rest with no target velocity. Webb et al. (1984) gives independent same-species morphology for estimated
+  geometry. [Sparks et al.](https://doi.org/10.1242/jeb.247873) · [Webb et al.](https://doi.org/10.1242/jeb.109.1.77)
+
 - M. J. Lighthill, [Note on the swimming of slender fish](https://doi.org/10.1017/S0022112060001110) (1960),
   equations 6–7 and 13–16. Read the trailing-edge momentum and power integrals. For a sinusoidal travelling
   wave of angular frequency ω and wavenumber k with zero trailing envelope slope, mean thrust is

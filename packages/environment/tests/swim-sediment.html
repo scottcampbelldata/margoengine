@@ -11,15 +11,18 @@
     import { Engine, Geometry, PbrMaterial } from '/packages/core/dist/index.js';
     import { FogVolumes } from '/packages/environment/dist/fog-volumes.js';
     import { VolumetricFog } from '/packages/environment/dist/volumetric.js';
-    import { toGeometry } from '/packages/geometry/dist/utils.js';
+    import { sphereGeometry } from '/packages/geometry/dist/index.js';
+    import { computeVertexNormals, toGeometry } from '/packages/geometry/dist/utils.js';
+    import { FilmClock } from '/packages/math/dist/clock.js';
     import { TerrainBed } from '/packages/physics/dist/earth.js';
     import { Physics } from '/packages/physics/dist/index.js';
-    import { SwimSolver } from '/packages/physics/dist/life.js';
+    import { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT, SwimSolver } from '/packages/physics/dist/life.js';
     import { KVLCC2_L7, ShipSolver } from '/packages/physics/dist/ship.js';
     import { TracerSolver } from '/packages/physics/dist/tracers.js';
-    import { PhysicsWorld, RigidSolver } from '/packages/physics/dist/world.js';
+    import { PhysicsWorld, regionWords, RigidSolver } from '/packages/physics/dist/world.js';
     import { Bloom } from '/packages/post/dist/bloom.js';
     import { heightfieldGeometry } from '/packages/terrain/dist/index.js';
+    import { waitForPipelines } from '/scripts/support/gpu-ready.js';
 
     const mode = new URLSearchParams(location.search);
     const transition = mode.has('transition');
@@ -32,19 +35,50 @@
     engine.scene.background = '#173c4b';
     const sand = new PbrMaterial({ color: '#626455', roughness: 0.96 });
     const sandMesh = engine.createMesh().setMaterial(sand);
-    const silhouette = new PbrMaterial({ color: '#24383a', doubleSided: true, roughness: 0.58 });
-    const wing = (side) => engine.createMesh().setMaterial(silhouette).setGeometry(new Geometry(
-      [0, 0.015, -0.16, 0, 0.005, 0.18, side * 0.2, 0, 0.12, side * 0.38, -0.025, -0.03, side * 0.19, -0.005, -0.12],
-      [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0],
-      side < 0 ? [0, 2, 1, 0, 3, 2, 0, 4, 3] : [0, 1, 2, 0, 2, 3, 0, 3, 4],
-    ));
     const tunnel = mode.has('thruster');
-    const left = tunnel ? null : wing(-1);
-    const right = tunnel ? null : wing(1);
+    const silhouette = new PbrMaterial({ color: '#304746', doubleSided: true, roughness: 0.63 });
+    const rayRoot = tunnel ? null : engine.createMesh();
+    const wings = tunnel ? [] : [-1, 1].map(side => ({ side, mesh: engine.createMesh().setParent(rayRoot).setMaterial(silhouette) }));
+    const rayMeshes = wings.map(({ mesh }) => mesh);
+    if (rayRoot) {
+      const body = sphereGeometry(1, 24, 16);
+      const shape = new Geometry(body.positions, body.normals, body.indices);
+      rayMeshes.push(
+        engine.createMesh().setParent(rayRoot).setGeometry(shape).setMaterial(silhouette)
+          .setScale([0.098, 0.038, 0.192]).setPosition([0, 0, 0.02]),
+        engine.createMesh().setParent(rayRoot).setGeometry(shape).setMaterial(silhouette)
+          .setScale([0.012, 0.014, 0.225]).setPosition([0, -0.004, -0.325]),
+      );
+    }
+    // A technical disc section with a fixed root and a measured tip. Solver displacement is metres, not roll.
+    function finGeometry(side, tip) {
+      const span = 12;
+      const chords = 8;
+      const positions = [];
+      const indices = [];
+      for (let s = 0; s <= span; s++) {
+        const u = s / span;
+        const x = side * (0.065 + 0.315 * u);
+        const chordHalf = 0.17 * Math.sqrt(1 - 0.997 * u * u);
+        for (let t = 0; t <= chords; t++) {
+          const chord = t / chords;
+          const z = 0.023 - 0.062 * u * u + (2 * chord - 1) * chordHalf;
+          const camber = 0.024 * (1 - u) * (4 * chord * (1 - chord));
+          positions.push(x, camber + u * u * tip, z);
+          if (s === span || t === chords) continue;
+          const a = s * (chords + 1) + t;
+          const b = a + chords + 1;
+          if (side < 0) indices.push(a, b, b + 1, a, b + 1, a + 1);
+          else indices.push(a, b + 1, b, a, a + 1, b + 1);
+        }
+      }
+      return toGeometry(computeVertexNormals({ positions, indices, normals: new Float32Array(positions.length) }));
+    }
     const errors = [];
     engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
 
-    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+    const clock = new FilmClock({ fps: 60 });
+    const world = new PhysicsWorld({ rate: clock.fps });
     const swim = tunnel ? null : await SwimSolver.load();
     const tracers = tunnel ? TracerSolver.withBedWash() : TracerSolver.withBedChange();
     const terrain = new TerrainBed();
@@ -96,6 +130,11 @@
         horizontalDiffusivity: 0.001, verticalDiffusivity: 0,
       }).couple([swim.id, 'tracers', 'bed'], 'staggered');
     }
+    const start = 12;
+    const end = 180;
+    const beginning = tunnel ? undefined : world.takeSnapshot();
+    let checkpoint;
+    let physicalFrame = 0;
     const medium = new FogVolumes();
     const fog = VolumetricFog.attach(engine, {
       density: 0, temporal: 0, grid: [56, 34, 44], range: 3.5, ambient: [0.64, 0.72, 0.7],
@@ -105,9 +144,29 @@
     let bedRevision = -1;
     let minHeight = bedHeight;
     let maxHeight = bedHeight;
-    window.step = async (frame, show) => {
-      if (thruster) thruster.thruster = frame > 0 && frame <= 20 ? 1 : 0;
-      world.advance(frame);
+    let finTip;
+    let tipHeights = [];
+    const draw = async () => {
+      engine.render({ delta: 0 });
+      await engine.gpu.queue.onSubmittedWorkDone();
+    };
+    engine.gpu.pushErrorScope('validation');
+    window.shot = { start, end };
+    window.step = async (frame, show, action, showRay = true) => {
+      clock.frame = frame;
+      const target = tunnel ? frame : Math.max(0, Math.min(end, clock.frame - start));
+      if (!tunnel && action === 'restore') {
+        world.restoreSnapshot(checkpoint.snapshot.bytes);
+        physicalFrame = checkpoint.frame;
+        bedRevision = -1;
+      } else if (!tunnel && target < physicalFrame) {
+        world.restoreSnapshot(beginning.bytes);
+        physicalFrame = 0;
+        bedRevision = -1;
+      }
+      if (thruster) thruster.thruster = target > 0 && target <= 20 ? 1 : 0;
+      world.advance(target);
+      physicalFrame = target;
       if (terrain.revisions() !== bedRevision) {
         bedRevision = terrain.revisions();
         const mesh = toGeometry(heightfieldGeometry((x, z) => bed.sample(x, z).elevation, groundGrid));
@@ -119,11 +178,23 @@
           maxHeight = Math.max(maxHeight, mesh.vertices[i]);
         }
       }
+      let pose;
       if (swim) {
-        const ray = swim.read(0);
-        for (const mesh of [left, right]) mesh.setPosition(ray.position);
-        left.setRotation([0, 0, -ray.finDisplacement]);
-        right.setRotation([0, 0, ray.finDisplacement]);
+        pose = swim.read(0);
+        for (const mesh of rayMeshes) mesh.visible = showRay;
+        rayRoot.setPosition(pose.position).setQuaternion(pose.orientation);
+        if (pose.finDisplacement !== finTip) {
+          finTip = pose.finDisplacement;
+          tipHeights = wings.map(({ side, mesh }) => {
+            const geometry = finGeometry(side, finTip);
+            mesh.setGeometry(geometry);
+            return geometry.vertices.at(-5);
+          });
+        }
+        const wake = world.fields.port(SWIM_WAKE_FIELD.name);
+        if (!wake || wake.region.type !== 'f64' || wake.region.layout !== SWIM_WAKE_LAYOUT)
+          throw new Error('The ray scene needs the accepted pectoral wake.');
+        pose = { ...pose, tipHeights, pectoral: Array.from(regionWords(world.memory, wake.region).subarray(8, 16)) };
       }
       medium.volumes = [...tracers.particlesOf()].filter((particle) => particle.state === 'water').map((particle) => {
         const material = tracers.materialList[particle.material];
@@ -133,10 +204,19 @@
           density: massExtinction * particle.mass / volume, edge: plumeRadius * 0.48 };
       });
       fog.options.volumes = show ? medium : undefined;
-      engine.render({ delta: 0 });
-      await engine.gpu.queue.onSubmittedWorkDone();
-      return { mass: tracers.budget.water, eroded: tracers.jetErosion,
+      fog.resetTime();
+      await waitForPipelines(draw, { ready: () => !!fog.texture });
+      const snapshot = tunnel ? undefined : world.takeSnapshot();
+      if (action === 'save') checkpoint = { frame: physicalFrame, snapshot };
+      return { physicalFrame, pose, hash: snapshot?.hash, mass: tracers.budget.water, eroded: tracers.jetErosion,
         minHeight, maxHeight, bedVolume: terrain.volume(bedHeight), errors: errors.splice(0) };
+    };
+    window.finish = async () => {
+      fog.options.volumes = undefined;
+      medium.dispose();
+      const validation = (await engine.gpu.popErrorScope())?.message ?? null;
+      engine.dispose();
+      return { validation, errors };
     };
     window.ready = true;
   </script>

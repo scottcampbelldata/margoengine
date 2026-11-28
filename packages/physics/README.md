@@ -6559,7 +6559,7 @@ import { SwimSolver } from '@margoengine/physics/life';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
-const swim = await SwimSolver.load();
+using swim = await SwimSolver.load();
 world.add(swim, {
   bodies: [{
     position: [0, -2, 0],
@@ -6575,7 +6575,7 @@ world.add(swim, {
 world.advance(60);
 const fish = swim.read(0);
 const tail = swim.sampleSpine(0, 1);
-console.log(fish.position, fish.orientation, tail.position, fish.finDisplacement);
+console.log(fish.position, fish.orientation, tail.position, fish.finDisplacement, swim.workCounts());
 ```
 
 Local axes are +z forward, +y dorsal and +x right. Supply a tail's one-sided excursion, full span
@@ -6589,7 +6589,11 @@ to 1 and use elliptical strips. Axial added mass defaults to zero in the slender
 Initial velocity and angular velocity default to zero and orientation to identity. Open-loop `frequency`
 defaults to zero. A `target` can specify a position or a world velocity, optionally relative to the water.
 Feedback chooses the beat frequency and fin forces, bounded by the supplied fins and `maximumFrequency`
-(default at least 3 Hz). `responseSeconds` defaults to 1 s. `burstSeconds` and `coastSeconds` select a
+(defaults to the greater of the explicit open-loop frequency and the fast envelope for body length).
+The envelope follows Sánchez-Rodríguez, Raufaste and Argentina (2023), equation 4 and Figure 1. Its
+fitted constants are 22 Hz, a crossover length of 0.4 m and curvature 4. Short swimmers can use higher
+frequencies and long swimmers have lower ceilings. Supply an authored `maximumFrequency` to choose
+another limit. `responseSeconds` defaults to 1 s. `burstSeconds` and `coastSeconds` select a
 periodic duty cycle. `setControl(row, { effort, buoyancy, target })` changes the normalized effort, displaced
 volume multiplier or target between advances. The world saves these commands in its snapshots.
 `fins.area` is the combined area. Lift and drag coefficients default to 1. Scull amplitude and frequency
@@ -6609,6 +6613,12 @@ the published step. Use `fields` to name separate ports for different groups.
 `SwimSolver.load({ id, level, signal })` accepts a solver id (default `swim`), preferred level (default 0)
 and load cancellation. The world raises the rate to resolve the stroke or angular motion. The entry loads its
 own Wasm on demand and uses either plain or shared world memory.
+
+`swim.cell` identifies the origin of sampled positions and wake ports. The solver can use
+`SwimSolver.load({ threads: 4 })` with shared world memory. The caller and three helpers integrate
+independent body rows and publish only after every native candidate passes. For a browser, run a shared
+world in an isolated Worker. One partition is the default. `workCounts()` reports the native bodies,
+paired SIMD axis updates and passive reaction rows in the last accepted tick. Dispose the solver when finished.
 
 ## Falling light bodies
 

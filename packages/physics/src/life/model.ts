@@ -1,4 +1,5 @@
 import type { MutableVec3, Vec3 } from '@margoengine/math';
+import { MargoError } from '@margoengine/math/errors';
 import { cos, hypot, sin } from '@margoengine/math/pinned';
 
 export const TAU = 2 * Math.PI;
@@ -6,20 +7,38 @@ export const ZERO: Vec3 = [0, 0, 0];
 
 export function finite(value: number, name: string, minimum = -Infinity): number {
   if (!Number.isFinite(value) || value < minimum)
-    throw new RangeError('Set ' + name + ' to a finite number in its documented SI range.');
+    throw new MargoError('state', 'Set ' + name + ' to a finite number in its documented SI range.');
   return value;
 }
 
 export function positive(value: number, name: string): number {
   if (!Number.isFinite(value) || value <= 0)
-    throw new RangeError('Set ' + name + ' to a finite positive number in SI units.');
+    throw new MargoError('state', 'Set ' + name + ' to a finite positive number in SI units.');
   return value;
 }
 
 export function vector(values: Vec3, name: string): Vec3 {
-  if (!values || values.length !== 3 || !values.every(Number.isFinite))
-    throw new RangeError('Set ' + name + ' to a finite three-component vector in SI units.');
+  if (!values || values.length !== 3 || ![values[0], values[1], values[2]].every(Number.isFinite))
+    throw new MargoError('state', 'Set ' + name + ' to a finite three-component vector in SI units.');
   return [...values];
+}
+
+/** Fast frequency envelope from Sánchez-Rodríguez, Raufaste and Argentina (2023), Eq. 4 and Fig. 1. */
+export function maximumTailFrequency(length: number): number {
+  const crossover = 0.4;
+  // Solve for f/f0 times max(1,L/Lc). This keeps the root bracket in [0,1] for all positive lengths.
+  const forceScale = length > crossover ? 1 : length / crossover;
+  const frequencyScale = length > crossover ? crossover / length : 1;
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 53; i++) {
+    const mid = (lo + hi) / 2;
+    const frequency = mid * frequencyScale;
+    const force = mid * forceScale;
+    if (force * force * (1 + 4 * frequency) + frequency > 1) hi = mid;
+    else lo = mid;
+  }
+  return (lo + hi) * 0.5 * 22 * frequencyScale;
 }
 
 /** One-sided tail displacement, full tail span and travelling wavelength in metres. */
@@ -51,6 +70,8 @@ export function swimPropulsion(
   density = 1025,
   out: SwimPropulsion = { thrust: 0, power: 0, efficiency: 0, strouhal: 0 },
 ): SwimPropulsion {
+  if (!tail || typeof tail !== 'object')
+    throw new MargoError('state', 'Swimming propulsion needs tail geometry. Pass amplitude, span and wavelength.');
   const { amplitude, span, wavelength } = tail;
   finite(amplitude, 'tail.amplitude', 0);
   positive(span, 'tail.span');
@@ -62,10 +83,20 @@ export function swimPropulsion(
   const flowFrequency = (TAU * speed) / wavelength;
   const scale = (density * Math.PI * span * span * amplitude * amplitude) / 16;
   const difference = omega - flowFrequency;
-  out.thrust = frequency ? scale * difference * (omega + flowFrequency) : 0;
-  out.power = frequency ? 2 * scale * speed * omega * difference : 0;
-  out.efficiency = out.power > 0 ? (1 + flowFrequency / omega) / 2 : 0;
-  out.strouhal = amplitude && frequency ? (2 * amplitude * frequency) / speed : 0;
+  const powered = frequency > 0 && amplitude > 0 && density > 0,
+    thrust = powered ? scale * difference * (omega + flowFrequency) : 0,
+    power = powered ? 2 * scale * speed * omega * difference : 0,
+    efficiency = power > 0 ? (1 + flowFrequency / omega) / 2 : 0,
+    strouhal = amplitude && frequency ? (2 * (amplitude * frequency)) / speed : 0;
+  if (!Number.isFinite(thrust) || !Number.isFinite(power) || (speed > 0 && !Number.isFinite(strouhal)))
+    throw new MargoError(
+      'state',
+      'Swimming propulsion exceeds finite SI units. Reduce amplitude, beat frequency or body scale.',
+    );
+  out.thrust = thrust;
+  out.power = power;
+  out.efficiency = efficiency;
+  out.strouhal = strouhal;
   return out;
 }
 
