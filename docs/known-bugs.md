@@ -15830,9 +15830,7 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   `packages/physics/tests/coupling/schooling.test.js` check force, curvature, relative coasting, and a school
   responding to a moving predator. BB-4, BB-6 and AVIARY-3 still have open shot checks in the demo review.
 
-## Open defects
-
-### Open 2026-11-27: the create-margo web starter passes its 85,600 B bound (KB-SIZE-STARTER1)
+### Fixed 2026-11-28: the create-margo web starter passed its 85,600 B bound (KB-SIZE-STARTER1)
 
 - **Repro:** `npm run build:packages`, then `node --test --test-name-pattern="the web template" tests/create-margo.test.js`:
   86,252 B gzip against a bound of 85,600 B. It measured 85,171 B at 1a2eb0a5e8.
@@ -15848,8 +15846,11 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   code behind another `import()` or into its own file cannot lower the figure while `load(url)` reads EXR files.
 - **Measured and not taken:** the EXR colour spaces as a table in place of the switch is 31 B larger;
   `build.modulePreload: false` in the template saves 107 B and gives up preloading a lazy chunk's imports.
-- **Left:** Scott's decision. Each earlier raise of this bound was Scott's (docs/limits.md, "Web template bundle"). The
-  choices are a bound above 85,939 B, or a change to what the starter ships or what the test counts.
+- **Fix:** Scott, 2026-11-28: "Raise it". The bound is 85,939 B (it was under 85,600 B), the size measured again on
+  main at 765f4e1260. Test: `tests/create-margo.test.js`, "the web template type-checks and builds"; the figures are in
+  docs/limits.md, "Web template bundle".
+
+## Open defects
 
 ### Open 2026-11-27: five Fauld shot cameras still cannot see their subject (shot generator, KB-SHOT-FAULDSIGHT1)
 

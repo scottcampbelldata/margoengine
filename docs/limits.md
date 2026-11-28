@@ -7823,8 +7823,12 @@ The root water entry measures 32,655 B minified and gzipped, up from 32,150 B. I
 
 ## Web template bundle
 
-The `create-margo` web starter's production build (every JS chunk, lazy ones included, gzip level 9) must stay below
-85,600 B (`tests/create-margo.test.js`, "the web template type-checks and builds"). Scott approved the increase from
+The `create-margo` web starter's production build (every JS chunk, lazy ones included, gzip level 9) must not pass
+85,939 B (`tests/create-margo.test.js`, "the web template type-checks and builds"). Scott approved the increase from
+85,600 B on 2026-11-28 ("Raise it", KB-SIZE-STARTER1). The starter measured 86,252 B against 85,171 B at 1a2eb0a5e8:
+environment 710 B (the EXR readers' colour spaces, a1bb0f5275), core 238 B (snapshot rendering, multi-draw and the
+core fixes since), shadows 57 B (`Shadows.ready`, dd7fea3b5a), the other 76 B not traced. 993b014c8a took 313 B out (a
+namespace import of the environment shaders), leaving 85,939 B. The earlier increase, from
 85,000 B on 2026-11-26 for two shadows changes, each measured by rebuilding the starter with the shadows sources from
 before it: the instanced cascade fit (KB-SHADOW-INSTFIT1, b6781020ba) costs 456 B and the turning penumbra jitter
 (KB-LOOK-TV-PENUMBRA1, 5feaab3d71) 122 B. The instanced fit's minified code holds no duplication; its bounds walk was

@@ -130,7 +130,8 @@ for (const [template, { main, imports }] of Object.entries(templates))
     // dropping Vite's modulepreload polyfill brought it to 84,852 B (docs/limits.md).
     // Scott, 2026-11-26: 85,600 B for the shadows instanced cascade fit (b6781020ba, +456 B) and the turning penumbra
     // jitter (5feaab3d71, +122 B); the starter measures 85,479 B after the nodeBounds rewrite (60b48b6d68).
-    if (template === 'web') assert.ok(gzip > 10_000 && gzip < 85_600, `unexpected bundle size ${gzip}`);
+    // Scott, 2026-11-28 ("Raise it"): at most 85,939 B, the figure after 993b014c8a took 313 B out (KB-SIZE-STARTER1).
+    if (template === 'web') assert.ok(gzip > 10_000 && gzip <= 85_939, `unexpected bundle size ${gzip}`);
     else assert.ok(gzip > 10_000, `unexpected bundle size ${gzip}`);
     // Every browser the web starter runs in has modulepreload, so its start-up code carries no polyfill for it.
     if (template === 'web')
