@@ -245,7 +245,9 @@ window.check={
   const views=[[[18,22,14],[18,1,32]],[[-4,8,-4],[40,1,40]],[[50,10,30],[40,1,42]]],images={},stats={};
   for(const mode of ['greedy','naive']){const {w,keys}=make();renderer=attach(w,keys,mode);await ready(renderer,w,keys,mode);
    const removers=[shadows.add(renderer,{static:true}),clustered.add(renderer),fog.add(renderer)];
-   engine.render({delta:Math.PI/2/1.6});look(...views[0]);await until((i)=>at(i,[12,1,32])[0]<at(i,[20,1,32])[0]*0.5);
+   // Both meshes from the same shadow clock: the soft filter turns its noise each frame whose clock moves (`jitter`,
+   // KB-LOOK-TV-PENUMBRA1), so without this the naive mesh drew the second turn and its penumbra differed by 1 percent.
+   shadows.resetTime();engine.render({delta:Math.PI/2/1.6});look(...views[0]);await until((i)=>at(i,[12,1,32])[0]<at(i,[20,1,32])[0]*0.5);
    images[mode]=[];for(const v of views){look(...v);images[mode].push(await shot(6));}
    stats[mode]={...renderer.stats};for(const r of removers)r();renderer.dispose();}
   drop(shadows);drop(clustered);drop(fog);

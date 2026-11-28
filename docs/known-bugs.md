@@ -16021,7 +16021,7 @@ suspect from its date and subject and was not tested.
 
 | Check (command) | Failure | Suspect |
 | --- | --- | --- |
-| `node packages/voxel/tests/render-lighting-browser-check.mjs` | `4x lit greedy vs naive view 0`: 360 pixels differ on the workstation (382 on Linux), 92 two by two blocks where 0 are allowed; sampled values differ by about 1 percent | none |
+| `node packages/voxel/tests/render-lighting-browser-check.mjs` | `4x lit greedy vs naive view 0`: 360 pixels differ on the workstation (382 on Linux), 92 two by two blocks where 0 are allowed; sampled values differ by about 1 percent | **Fixed 2026-11-28.** Bisected to 5feaab3d71 (KB-LOOK-TV-PENUMBRA1): the soft filter turns its noise each frame whose clock moves, and the check's one Shadows plugin drew the greedy mesh at turn 1 and the naive mesh at turn 2. The check now calls `shadows.resetTime()` before each mesh's moving frame; edge pixels are back to 141, 266 and 172 of 76,800 at 4x, WebGPU and the WebGL2 layer |
 | `node scripts/modern-browser-tests.js` (also `--pipeline-delay=300` on Linux) | `Moon not visible over the base engine: 0` | none |
 | `node scripts/modern-xr-tests.js` | `AR alpha`: `wrong` 1,337 pixels (1,328 on Linux). `tests/modern-xr-passes.ts` still requires alpha to equal the brightest channel where nothing wrote depth | cee7c8b46a (KB-XR-ARNODEPTH1) gives depthless content its coverage as alpha |
 | `node scripts/lifecycle-browser-tests.mjs`, scenario D, stage loop | the first frame after a 30 s background tab runs physics steps (1 on the workstation, 2 on Linux), 0 required | physics lane; the late physics step (KB-PHYS-FRAMEORDER1) |
