@@ -219,7 +219,9 @@ engine.start();
 
 Each entry holds the node's `name`, its `node` handle, and its world `position`, `direction` and `matrix` at load with the
 model at its origin; the projection or light values follow glTF's names and units, with the defaults filled in. Only
-nodes of the loaded scene count. A file still needs a mesh: one with only cameras and lights is refused.
+nodes of the loaded scene count. A file with only cameras and lights, and no mesh, loads too, with `model.meshes` empty; so
+does one in gltf/pbr, whose `model.cameras` and `model.lights` hold them (KB-GLTFA A3). A file that yields nothing to draw
+and no camera or light is still refused.
 
 This ESM package includes TypeScript declarations and requires `@margoengine/core` 1.0.0. See the supported glTF subset and lifecycle guide before importing assets.
 

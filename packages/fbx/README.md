@@ -212,7 +212,7 @@ Each camera or light sits on a child of its FBX node (`Hero camera`, `Bulb light
 
 Light intensity is FBX's percentage over 100: a value of 100 becomes 1 candela (point, spot) or 1 lux (directional). FBX has no physical unit, so a tool's scale comes through: Blender writes watts x 100, and a 250 W lamp arrives as 250. Change `model.lights[i].intensity` to suit. Area and volume lights become point lights, with the FBX kind in `extras.fbxLightType` and the falloff in `extras.fbxDecayType`, since glTF lights always fall off with the square of distance. `FarAttenuationEnd` becomes `range` when `EnableFarAttenuation` is on.
 
-Not read: curves on camera or light properties (lens, colour, intensity), which are left out and do not stop the import; `LookAtProperty` aim targets; camera switchers. A file holding only cameras and lights converts to a GLB, but `parseFBX` refuses it, as a gltf/pbr model needs a mesh.
+Not read: curves on camera or light properties (lens, colour, intensity), which are left out and do not stop the import; `LookAtProperty` aim targets; camera switchers. A file holding only cameras and lights converts to a GLB, and `parseFBX` loads it as a gltf/pbr model with no mesh and its `cameras` and `lights`.
 
 Proof: two scenes from Blender's own exporter (`test/fixtures/blender-shot.py`), Y up and Z up, match Blender's reported camera and light positions and directions, field of view, clip planes, cone angles, colours and energies. `OrthoZoom` and the `GateFit` rule are proved on Blender's files only.
 

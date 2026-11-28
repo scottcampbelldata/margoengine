@@ -491,3 +491,27 @@ test('KB-GLTFA A9: a gltf/pbr parse that throws closes the images it was given, 
   model.dispose();
   assert.equal(record.closed, 1);
 });
+
+test('KB-GLTFA A3: a gltf/pbr file with only a camera loads with its camera and an empty scene', async (t) => {
+  const { parseGLTF: parse } = await import('../dist/pbr.js');
+  const pbr = await gpuEngine(t);
+  const doc = {
+    asset: { version: '2.0' },
+    cameras: [{ type: 'perspective', perspective: { yfov: 0.8, znear: 0.1 } }],
+    nodes: [{ name: 'Shot', camera: 0, translation: [0, 1, 5] }],
+    scenes: [{ nodes: [0] }],
+  };
+  const model = parse(pbr.engine, doc);
+  try {
+    assert.equal(model.cameras.length, 1);
+    assert.equal(model.cameras[0].node, model.nodes[0]);
+    assert.equal(model.primitives.length, 0);
+  } finally {
+    model.dispose();
+  }
+  // A file that yields nothing at all is still refused.
+  assert.throws(() => parse(pbr.engine, { asset: { version: '2.0' }, nodes: [{}], scenes: [{ nodes: [0] }] }), {
+    code: 'failed',
+    message: /^glTF contains no renderable meshes/,
+  });
+});

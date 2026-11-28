@@ -2647,8 +2647,17 @@ export class PBRModel implements EnginePlugin {
           doc.extensions?.[name] &&
           (doc.nodes?.some((node) => node.extensions?.[name]) || doc.scenes?.some((scene) => scene.extensions?.[name])),
       );
-      if (!this.primitives.length && !this.pointsAndLines.length && !this.splatPrimitives.length && !audioOnly)
-        throw margoError('failed', 'glTF contains no renderable meshes; add a mesh with triangle primitives');
+      // A file with only cameras or lights is valid glTF 2.0 (a mesh is optional on a node, 5.25): it loads with an empty
+      // scene and its cameras and lights (KB-GLTFA A3). A file that yields nothing at all is still refused.
+      if (
+        !this.primitives.length &&
+        !this.pointsAndLines.length &&
+        !this.splatPrimitives.length &&
+        !this.cameras.length &&
+        !this.lights.length &&
+        !audioOnly
+      )
+        throw margoError('failed', 'glTF contains no renderable meshes, cameras or lights; add a mesh with triangle primitives');
       const source: PBRSource = this;
       for (const node of this.created) Object.defineProperty(node, cpuSource, { value: source, configurable: true });
       // The primitives of each node, in one pass: nodes in first-primitive order, primitives in model order.

@@ -177,8 +177,9 @@ test('a file with only a camera converts with the extension and still reports no
   const bytes = fbx([cameraAttribute(number('FieldOfView', 40))]);
   await assert.rejects(convertFBX(bytes), /no mesh geometry/);
   assert.equal((await read(bytes)).cameras.length, 1);
-  // gltf/pbr's model needs a mesh to draw, so such a file stops at the GLB, with its error.
-  await assert.rejects(parseFBX(await headlessEngine(), bytes, { extensions }), /no renderable meshes/);
+  // A camera-only glTF is valid glTF 2.0, so gltf/pbr builds it with its camera and no mesh (KB-GLTFA A3): on this
+  // engine without WebGPU the only refusal left is attaching the model, not "no renderable meshes".
+  await assert.rejects(parseFBX(await headlessEngine(), bytes, { extensions }), /PBRModel requires WebGPU/);
 });
 
 test('aperture modes: vertical, horizontal, both and focal length give the same view', async () => {
