@@ -60,3 +60,20 @@ test('the fog option checks lightDecay', () => {
   assert.throws(() => fog.validate({ depth, lightDecay: [0, Number.NaN, 0] }));
   assert.throws(() => fog.validate({ depth, lightDecay: [0, 0] }));
 });
+
+// KB-SKY-HAZETINT1 (Above the Treeline look round 6): a sky-coloured haze took the horizon's own colour at every distance,
+// so far ranges under clear mountain air faded to the white-grey horizon and never turned blue.
+test('fogAirLight: a thin haze is bluer than the horizon, a thick one is the horizon, and off or green is 1', async () => {
+  const { fogAirLight, FOG_RAYLEIGH } = await import('../dist/index.js');
+  const thin = fogAirLight(FOG_RAYLEIGH, 4e-5, 3500, 0.6);
+  assert.equal(thin[1], 1);
+  assert.ok(thin[2] > 1.15 && thin[0] < 0.93, `thin clear-air haze 15 km out: ${thin}`);
+  const thick = fogAirLight(FOG_RAYLEIGH, 4e-5, 3500, 40);
+  for (const v of thick) assert.ok(Math.abs(v - 1) < 1e-6, `a haze that hides fully is the horizon's colour: ${thick}`);
+  for (const v of fogAirLight([0, 0, 0], 4e-5, 3500, 0.6)) assert.equal(v, 1);
+  // Dense fog is mostly aerosol: the air's share is small, so it stays the sky's colour.
+  const fog = fogAirLight(FOG_RAYLEIGH, 0.01, 0, 0.6);
+  for (const v of fog) assert.ok(Math.abs(v - 1) < 0.003, `dense fog: ${fog}`);
+  // Higher eyes look through thinner air: less tint.
+  assert.ok(fogAirLight(FOG_RAYLEIGH, 4e-5, 8000, 0.6)[2] < thin[2]);
+});

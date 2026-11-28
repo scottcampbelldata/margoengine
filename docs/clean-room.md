@@ -20339,3 +20339,39 @@ Yanzhuo Xue et al. (2024), [A combined experimental and numerical approach to pr
 ### ICE-01 independent column thermodynamics and ordered surface drift
 
 Perry Bartelt and Michael Lehning (2002), [A physical SNOWPACK model for the Swiss avalanche warning, Part I](https://doi.org/10.1016/S0165-232X(02)00074-5), describe the layer-scale heat and mass balances. John Pomeroy and Donald Gray (1990), [Saltation of snow](https://doi.org/10.1029/WR026i007p01583), give the threshold and equilibrium transport used in the current drift phase. Michael Lehning, Henning Löwe, Michael Ryser and Norbert Raderschall (2008), [Inhomogeneous precipitation distribution and snow transport in steep terrain](https://doi.org/10.1029/2007WR006545), separate surface saltation from suspension and preferential deposition. Margo retains the reduced layer balances and the ordered redistribution. Each worker evolves independent columns once the redistributed mass arrives. The accepted state publishes together after checking candidate values.
+
+
+## Far mountains on the horizon ring and the air's tint in sky-coloured haze (2026-11-28, Above the Treeline round 6)
+
+Problem: past an 8 km world the horizon ring (`@margoengine/biomes` horizon.ts) drew peaks on 128 m texels of ridged
+value noise, so a crest was one corner and peaks were straight-sided cones; and the sky fog in the sky's colour gave
+every distance the horizon's own white-grey, so far ranges under clear air never turned blue (KB-BIOMES-HORIZONCONE1,
+KB-SKY-HAZETINT1).
+
+Sources read (papers and articles only, no code):
+- F. K. Musgrave, "Procedural fractal terrains", in D. S. Ebert et al., Texturing and Modeling: A Procedural Approach,
+  3rd ed., Morgan Kaufmann, 2003, ch. 16 (hybrid multifractal: each octave weighted by the signal so far, rough peaks
+  over smoother valleys; ridged multifractal).
+- I. Quilez, "Value noise derivatives", 2008, and "Gradient noise derivatives", 2017, https://iquilezles.org/articles/
+  (analytic noise derivatives; damping each octave by the slope accumulated so far, an eroded look).
+- G. Cordonnier, J. Braun, M.-P. Cani, B. Benes, E. Galin, A. Peytavie and E. Guerin, "Large scale terrain generation
+  from tectonic uplift and fluvial erosion", Computer Graphics Forum 35(2), 2016, https://doi.org/10.1111/cgf.12820
+  (eroded relief keeps steep flanks smooth at fine scale and puts detail in valleys and on shoulders; compared, not
+  simulated here, since the ring is built synchronously for 3 million corners).
+- K. Perlin, "Improving noise", SIGGRAPH 2002, https://doi.org/10.1145/566654.566636 (gradient noise, quintic fade).
+- I. Quilez, "Domain warping", 2002, https://iquilezles.org/articles/warp/ (a low octave warps the lattice away).
+- F. Losasso and H. Hoppe, "Geometry clipmaps", SIGGRAPH 2004, https://doi.org/10.1145/1015706.1015799 (a coarse far
+  field round a detailed centre).
+- S. Hillaire, "A Scalable and Production Ready Sky and Atmosphere Rendering Technique", EGSR 2020,
+  https://doi.org/10.1111/cgf.14050 (Table 1: Earth's Rayleigh scattering 5.802, 13.558, 33.1 per Mm; scale height
+  8 km; aerial perspective as in-scatter times one minus transmittance per channel).
+- E. Bruneton and F. Neyret, "Precomputed Atmospheric Scattering", EGSR 2008,
+  https://doi.org/10.1111/j.1467-8659.2008.01245.x (in-scatter along the view ray to a surface).
+- W. C. Malm, Introduction to Visibility, Cooperative Institute for Research in the Atmosphere, Colorado State
+  University, 1999 (visual range 3.912 over the extinction coefficient; clean Rocky Mountain air of 100 to 200 km
+  visual range is an extinction near 2e-5 to 4e-5 per metre, used for the film's haze density).
+
+Margo's own: the massif and ridge mix, the softened ridge fold sqrt(n^2 + e^2), the power 1.4 that matches main's
+height distribution, the ring texel of up to 32 m and a 64th of the world; the haze's spectral factor (1 - e^(-x k)) / (1 - e^(-x))
+with k = 1 + (rayleigh - rayleigh green) / density on one opacity (biomes tests/horizon.test.js, sky
+test/fog-height-falloff.test.js and test/fog-below-check.mjs).

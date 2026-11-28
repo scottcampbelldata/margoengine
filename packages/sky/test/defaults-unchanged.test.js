@@ -50,6 +50,10 @@
 // Recorded again with KB-SKY-BAREBELOW1 (2026-11-28, Above the Treeline): a pixel nothing was drawn on below the
 // horizon takes the fog to infinity (the ground past the scene's end, hidden), so fog and fogColour changed text; no
 // command and no buffer write changed, and only those pixels draw differently.
+// Recorded again with KB-SKY-HAZETINT1 (2026-11-28, Above the Treeline round 6): a sky-coloured haze holds the clear
+// air's Rayleigh share (fog.rayleigh), so fog and fogColour changed text and fog's buffer writes gained the two tint
+// floats; fogColour (a fixed colour) writes zeros there and draws as before, and fog at its density of 0.01 per metre
+// moves each channel by under 0.2 percent.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';

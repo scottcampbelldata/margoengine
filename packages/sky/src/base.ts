@@ -179,6 +179,18 @@ export interface SkyFogOptions {
    * (haze that absorbs nothing, as clean fog): every ray below the horizon takes the fog's colour as it is.
    */
   lightDecay?: Vec3;
+  /**
+   * The clear air's Rayleigh scattering inside the haze, red, green and blue, per metre at sea level (thinning by e every
+   * 8 km of the eye's height), used when the fog takes the sky's colour (no `color`; KB-SKY-HAZETINT1). The haze's
+   * total extinction is `density`; this much of it is the air's own blue-weighted share, so at a short or moderate
+   * optical depth x the in-scattered light is the sky's horizon colour times (1 - e^(-x k)) / (1 - e^(-x)) per channel,
+   * with k = 1 + (rayleigh - rayleigh green) / density: bluer for a thin haze, the horizon's own colour for a thick
+   * one, as aerial perspective is (Hillaire 2020; E. Bruneton and F. Neyret 2008; the transmittance per channel
+   * approximated by the haze's single opacity). Default [5.802e-6, 1.3558e-5, 3.31e-5] (Hillaire 2020 Table 1, Earth's
+   * Rayleigh scattering at sea level); [0, 0, 0] gives every distance the sky's colour as it is. Over 0.05 / density
+   * a channel is held at k 0.05 to 20.
+   */
+  rayleigh?: Vec3;
 }
 /** One glow a fire puts on a haze (`fog.fireSpots`) or on the smoke layer over it (`atmosphere.fireSpots`). */
 export interface SkyFireSpot {

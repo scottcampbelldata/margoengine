@@ -1214,6 +1214,19 @@ far plane or its edge) takes the fog at infinity, its colour times the `lightDec
 world's end shows as haze, not as the sky's own horizon colour (KB-SKY-BAREBELOW1). The sky above the horizon is the
 sky's.
 
+A sky-coloured haze (no `color`) holds the clear air's own Rayleigh scattering, `rayleigh` (red, green and blue per
+metre at sea level, default `[5.802e-6, 1.3558e-5, 3.31e-5]`, Hillaire 2020 Table 1, thinning by e every 8 km of the
+eye's height): at an optical depth x each channel's in-scatter is the sky's colour times
+`(1 - e^(-x k)) / (1 - e^(-x))`, k = 1 + (rayleigh - rayleigh green) / density, so a thin haze over far mountains is
+bluer than the horizon behind them and a thick one is the horizon's own colour (KB-SKY-HAZETINT1). `[0, 0, 0]` turns it
+off; a fixed `color` never takes it. `fogAirLight(rayleigh, density, eyeY, optical)` returns the factor on the CPU:
+
+```ts
+import { fogAirLight, FOG_RAYLEIGH } from 'margoengine/sky';
+const [r, g, b] = fogAirLight(FOG_RAYLEIGH, 4e-5, 3500, 0.6);
+console.log(b > g && g > r); // true: the haze 15 km out over clear mountain air is blue
+```
+
 `lightDecay` (red, green and blue, per unit optical depth, default `[0, 0, 0]`) darkens the haze a ray meets below the
 horizon: it lies deeper in the layer, lit by e^(-k tau) of the light at the eye at a vertical optical depth tau under
 it (the two-stream diffusion mode of an absorbing haze, Meador and Weaver 1980). A ray down at sine d of optical depth x

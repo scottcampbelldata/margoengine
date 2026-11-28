@@ -11,7 +11,7 @@
 // the angle it is seen at. The sky above the horizon is unchanged.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
-import { fogBelowLight } from '../dist/index.js';
+import { fogAirLight, fogBelowLight, FOG_RAYLEIGH } from '../dist/index.js';
 const port = 5236,
   context = await openBrowser({ startPath: '/packages/sky/test/fog-below-check.html', port }),
   { page, hardware } = context,
@@ -81,6 +81,40 @@ try {
   assert.ok(columnSpread < 2e-3, `the flat haze varies down the middle column: ${columnSpread}`);
   // With it each pixel takes its own ray's share, to the precision of the half-float capture.
   assert.ok(worst < 4e-3, `haze below the horizon off the CPU mirror by ${worst}`);
+  // KB-SKY-HAZETINT1: a thin haze over a black ground, the air's tint on (default) and off. Main drew every channel of
+  // the sky-coloured haze in the horizon's own colour at every distance (ratio 1), so far mountains under clear air
+  // took the white horizon, never the blue of the air in front of them.
+  const density = 4e-5,
+    air = await page.evaluate((d) => window.check.air(d), density);
+  assert.equal(air.error, null);
+  assert.deepEqual(air.errors, []);
+  let tinted = 0,
+    airOff = 0,
+    blue = 0;
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const nx = ((x + 0.5) / width) * 2 - 1,
+        ny = 1 - ((y + 0.5) / height) * 2,
+        ray = norm([0, 1, 2].map((i) => forward[i] + right[i] * nx * t * camera.aspect + up[i] * ny * t)),
+        p = (y * width + x) * 4;
+      if (!(ray[1] < -0.03)) continue;
+      const s = camera.eye[1] / -ray[1],
+        hz = camera.eye[2] + ray[2] * s,
+        hx = camera.eye[0] + ray[0] * s;
+      if (!(hz > -54000 && Math.abs(hx) < 29000)) continue;
+      const want = fogAirLight(FOG_RAYLEIGH, density, camera.eye[1], density * s);
+      for (let c = 0; c < 3; c++) {
+        const ratio = air.tinted[p + c] / air.plain[p + c];
+        airOff = Math.max(airOff, Math.abs(ratio - want[c]) / Math.max(0.02, Math.abs(want[c] - 1)));
+      }
+      blue = Math.max(blue, air.tinted[p + 2] / air.plain[p + 2]);
+      tinted++;
+    }
+  console.log(`air: ${tinted} ground pixels, worst off the CPU mirror ${airOff.toFixed(3)} of the tint, bluest ${blue.toFixed(3)}`);
+  assert.ok(tinted > width * height * 0.2, `too little thin-hazed ground: ${tinted}`);
+  assert.ok(blue > 1.15, `the thin haze is not bluer than the horizon: ${blue}`);
+  // The black ground's own sheen and the half-float capture: within a quarter of the tint itself.
+  assert.ok(airOff < 0.25, `the air's tint off the CPU mirror by ${airOff} of itself`);
   const color = [0.31, 0.45, 0.61],
     bare = await page.evaluate((c) => window.check.bare(c), color);
   assert.equal(bare.error, null);

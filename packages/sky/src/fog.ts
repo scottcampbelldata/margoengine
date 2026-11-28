@@ -46,6 +46,11 @@ ${fireTrackWgsl('fireHaze', (part) => `fog[${part ? 4 : 3}u+2u*i]`)}@fragment fn
  // A zero footprint takes the sky's gradient without the stylized night's stars and moon.
  let ray=offset/max(distance,0.0001);var color=fog[1].rgb;if(fog[1].w<0.5){color=skyRadiance(normalize(vec3f(ray.x,max(0.0001,ray.y),ray.z)),0.0);
  if(frame.moonColor.w>0.0&&frame.clouds.x>0.0){let under=(overcastLight(1.0)*(${(9 / 7).toFixed(6)}*(1.0+2.0*max(ray.y,0.0))/3.0)+vec3f(0.006,0.01,0.02)*frame.moonColor.w)*(1.0-clamp(frame.sun.w,0.0,1.0));color=mix(color,under,clamp(frame.clouds.x,0.0,1.0));}
+
+ // The clear air's blue-weighted share of the haze (fog.rayleigh, KB-SKY-HAZETINT1): per channel the in-scatter of
+ // optical depth x k over the haze's one opacity; the green channel's k is 1.
+ if(any(fog[2].zw!=vec2f(0.0))){let k=clamp(vec3f(1.0)+vec3f(fog[2].z,0.0,fog[2].w)*exp(-max(frame.eye.y,0.0)/8000.0),vec3f(0.05),vec3f(20.0));
+ color*=select((vec3f(1.0)-exp(-x*k))/(1.0-exp(-x)),k,x<1e-4);}
  color=color*exp2(frame.settings.y);}
  if(ray.y<0.0){color*=fogBelowLight(-ray.y,x);}
  if(fog[3].w>0.0&&!bare){color+=fireHaze(frame.eye.xz,mix(frame.eye.xz,world.xz,min(1.0,2.0/max(fog[0].x*distance,1e-6))));}
@@ -130,11 +135,40 @@ export function fogBelowLight(decay: readonly number[], rayY: number, optical: n
   }) as [number, number, number];
 }
 
+/** Hillaire 2020 Table 1: Earth's Rayleigh scattering at sea level, per metre, red, green and blue. */
+export const FOG_RAYLEIGH: readonly [number, number, number] = [5.802e-6, 1.3558e-5, 3.31e-5];
+
+/**
+ * The factor on the sky-coloured haze's colour, red, green and blue, as the fog shader computes it (KB-SKY-HAZETINT1):
+ * with `rayleigh` the clear air's scattering per metre at sea level (`fog.rayleigh`), the haze's `density` per metre, an
+ * eye `eyeY` metres up (the air thins by e every 8 km) and the fog's exponent `optical` x (opacity 1 - e^(-x)), each
+ * channel takes (1 - e^(-x k)) / (1 - e^(-x)) with k = 1 + (rayleigh - rayleigh green) / density, held to 0.05 to 20:
+ * k for a thin haze, 1 for one that hides fully. Green is always 1.
+ * @example fogAirLight(FOG_RAYLEIGH, 4e-5, 3500, 0.6); // about [0.92, 1, 1.18]: the haze over far mountains is bluer
+ */
+export function fogAirLight(
+  rayleigh: readonly number[],
+  density: number,
+  eyeY: number,
+  optical: number,
+): [number, number, number] {
+  const thin = Math.exp(-Math.max(eyeY, 0) / 8000); // float division: the air's scale height
+  return [0, 1, 2].map((i) => {
+    const k = Math.min(20, Math.max(0.05, 1 + ((rayleigh[i] - rayleigh[1]) / density) * thin)); // float division
+    return optical < 1e-4 ? k : (1 - Math.exp(-optical * k)) / (1 - Math.exp(-optical)); // float division
+  }) as [number, number, number];
+}
+
 /** Distance and height fog over the scene depth (`fog` option), in the sky's colour or a fixed one. */
 export const fog: NonNullable<SkyFeatures['fog']> = {
   validate(fog) {
     if (fog?.color) finiteVector(fog.color, 3, 'Fog color');
     checkFireSpots(fog?.fireSpots, 'fog.fireSpots');
+    if (fog?.rayleigh !== undefined) {
+      finiteVector(fog.rayleigh, 3, 'Fog rayleigh');
+      if (fog.rayleigh.some((k) => !(k >= 0) || !(k <= 1)))
+        throw new RangeError('Invalid sky fog rayleigh; give three numbers from 0 to 1 per metre.');
+    }
     if (fog?.lightDecay !== undefined) {
       finiteVector(fog.lightDecay, 3, 'Fog lightDecay');
       if (fog.lightDecay.some((k) => !(Math.fround(k) >= 0) || !Number.isFinite(Math.fround(k))))
@@ -254,6 +288,11 @@ export const fog: NonNullable<SkyFeatures['fog']> = {
         values[7] = +!!fog.color;
         values[8] = fog.scaleHeight ? 1 / fog.scaleHeight : 0;
         values[9] = fog.base ?? 0;
+        // The air's blue-weighted share of a sky-coloured haze (KB-SKY-HAZETINT1): red and blue less green, per density.
+        const air = fog.color ? [0, 0, 0] : (fog.rayleigh ?? FOG_RAYLEIGH),
+          per = 1 / Math.max(values[0], 1e-9); // float division: per unit of the haze's density
+        values[10] = (air[0] - air[1]) * per;
+        values[11] = (air[2] - air[1]) * per;
         writeFireSpots(values, 12, fog.fireSpots);
         values.set(fog.lightDecay ?? [0, 0, 0], 76);
         c.device.queue.writeBuffer(uniform, 0, values as Float32Array<ArrayBuffer>);

@@ -36,7 +36,7 @@ function block(options) {
 
 test('every row is well formed and names are unique', () => {
   assert.equal(byName.size, SKY_SETTINGS.length);
-  assert.equal(SKY_SETTINGS.length, 171);
+  assert.equal(SKY_SETTINGS.length, 172);
   for (const s of SKY_SETTINGS) {
     assert.ok(typeof s.about === 'string' && s.about.length > 10, s.name);
     assert.ok(['number', 'color', 'choice', 'gradient'].includes(s.kind), s.name);

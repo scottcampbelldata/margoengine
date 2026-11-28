@@ -874,6 +874,14 @@ export const SKY_SETTINGS: readonly SkySetting[] = [
     2,
     "How fast the haze's light falls with depth below the eye, per unit optical depth (0: rays below the horizon keep the fog colour).",
   ),
+  c(
+    'fog.rayleigh',
+    'fog',
+    [5.802e-6, 1.3558e-5, 3.31e-5],
+    0,
+    0.0001,
+    "The clear air's Rayleigh scattering per metre inside a sky-coloured haze: thin haze turns blue (0: the sky's colour).",
+  ),
   choice('fog.falloff', 'fog', ['exp2', 'exp'], "How fog thickens with distance: 'exp2' softer near the camera."),
   {
     ...c('fog.color', 'fog', [1, 1, 1], 0, 4, "Fixed fog colour; null takes the sky's colour in the view direction."),

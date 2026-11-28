@@ -199,6 +199,7 @@ export interface SkyFogOptions {
     color?: Vec3;
     fireSpots?: readonly SkyFireSpot[];
     lightDecay?: Vec3;
+    rayleigh?: Vec3;
 }
 
 export interface SkyGradientStop {

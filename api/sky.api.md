@@ -6,6 +6,8 @@
 import { EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
+export const FOG_RAYLEIGH: readonly [number, number, number];
+
 export const MOON_EXTINCTION = 0.172;
 
 export const MOON_PHASES: Readonly<Record<MoonPhaseName, {
@@ -143,6 +145,7 @@ export interface SkyFogOptions {
     color?: Vec3;
     fireSpots?: readonly SkyFireSpot[];
     lightDecay?: Vec3;
+    rayleigh?: Vec3;
 }
 
 export interface SkyGradientStop {
@@ -244,6 +247,8 @@ export interface SkyOptions {
 export function cloudHaze(clear: readonly number[], sunlight: readonly number[], sunUp: number, up: number, coverage: number, T: number, above?: readonly number[], units?: number): [number, number, number];
 
 export function cloudTransmittance(cover: number): number;
+
+export function fogAirLight(rayleigh: readonly number[], density: number, eyeY: number, optical: number): [number, number, number];
 
 export function fogBelowLight(decay: readonly number[], rayY: number, optical: number): [number, number, number];
 
