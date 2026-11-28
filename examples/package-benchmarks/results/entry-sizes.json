@@ -15674,8 +15674,8 @@
         "gzip": 14183
       },
       "./seakeeping": {
-        "raw": 131025,
-        "gzip": 48146
+        "raw": 146439,
+        "gzip": 53151
       },
       "./celestial": {
         "raw": 20227,
@@ -19349,6 +19349,16 @@
       "raw": 1352,
       "gzip": 727,
       "brotli": 642
+    },
+    "packages/physics/dist/flood-volume-kernel.wasm": {
+      "raw": 4930,
+      "gzip": 2471,
+      "brotli": 2210
+    },
+    "packages/physics/dist/flood-volume-kernel-shared.wasm": {
+      "raw": 4930,
+      "gzip": 2471,
+      "brotli": 2210
     },
     "packages/physics/dist/loads-kernel.wasm": {
       "raw": 7761,

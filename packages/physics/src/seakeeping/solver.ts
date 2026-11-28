@@ -79,11 +79,13 @@ import {
   AIR_DENSITY,
   ATMOSPHERE,
   type Compartment,
+  COMPARTMENT_WORDS,
   FLOOD_OPENING_GRID,
   Flooding,
   type Opening,
   volumeBelow,
 } from './flooding.js';
+import type { FloodVolumeKernel } from './flood-volume-kernel.js';
 import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from '../world/flooding.js';
 import { buildHullMemory, type HullMemory, type HullWaveMemory, type RadiationPair, stillWaterline } from './memory.js';
 import { panelDampingKernels, panelDiffraction } from './panel-runtime.js';
@@ -172,6 +174,16 @@ export interface HullDeckSurface extends Deck {
   readonly depth: Float64Array;
 }
 
+/** Accepted contents of a configured flood compartment. */
+export interface HullFloodedCompartment {
+  /** Floodwater volume, in m³. */
+  readonly waterVolume: number;
+  /** Trapped air mass, in kg. */
+  readonly airMass: number;
+  /** Remaining cargo mass, in kg. */
+  readonly cargoMass: number;
+}
+
 /** What a {@link HullSolver} is made from. */
 export interface HullParams {
   /** The hulls, each on its own body row. */
@@ -182,6 +194,8 @@ export interface HullParams {
    * solver's own origin cell, or anything with `elevation` (and `pressure`, `density`).
    */
   readonly sea: SeaSurface | SeaQuery;
+  /** Optional caller-owned Wasm volume kernel. Keep it open until the world has finished using it. */
+  readonly floodVolumeKernel?: FloodVolumeKernel;
   /** The solver's rate level, 60 * 2^level steps a second (default 0); step with the rigid solver. */
   readonly level?: RateLevel;
   /** Side length of an origin cell, m (default 4096). Match PhysicsWorld.cellSize for a separate rigid origin. */
@@ -878,7 +892,9 @@ export class HullSolver implements Solver<HullParams> {
           );
         continue;
       }
-      const flooding = new Flooding(hull.compartments, hull.openings ?? []);
+      const flooding = params.floodVolumeKernel
+        ? new Flooding(hull.compartments, hull.openings ?? [], params.floodVolumeKernel)
+        : new Flooding(hull.compartments, hull.openings ?? []);
       this.floods.set(hull, { flooding, at: words, record: records });
       words += flooding.words;
       for (let k = 0; k < flooding.openingCount; k++) if (flooding.ends(k)[1] === -1) records++;
@@ -2640,6 +2656,23 @@ export class HullSolver implements Solver<HullParams> {
   }
 
   importPorts(_tick: number): void {}
+
+  /** Copy accepted water, air and cargo in the hull's configured compartment order. */
+  floodedCompartments(row: number): readonly HullFloodedCompartment[] | undefined {
+    if (this.updating)
+      throw hullError('state', 'The hull is stepping. Read its accepted flood contents between world steps.');
+    if (!this.host) return undefined;
+    const hull = this.hulls.find((candidate) => candidate.row === row);
+    if (!hull) throw hullError('unsupported', `No hull owns body row ${row}. Use a hull row from this solver.`);
+    const model = this.floods.get(hull);
+    if (!model || !this.flood) return undefined;
+    const start = this.flood.byteOffset + model.at * Float64Array.BYTES_PER_ELEMENT;
+    const words = new Float64Array(this.host.memory.buffer, start, model.flooding.words);
+    return model.flooding.compartments.map((_, index) => {
+      const at = index * COMPARTMENT_WORDS;
+      return { waterVolume: words[at]!, airMass: words[at + 1]!, cargoMass: words[at + 2]! };
+    });
+  }
 
   /** Copy a live hull's accepted deck grid. Undefined before a deck update or when green water is disabled. */
   deckSurface(row: number): HullDeckSurface | undefined {

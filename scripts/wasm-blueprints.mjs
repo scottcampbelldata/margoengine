@@ -123,6 +123,20 @@ export const BLUEPRINTS = [
     script: 'packages/physics/scripts/build-hull-slamming-kernel.mjs',
   },
   {
+    name: 'flood-volume-kernel',
+    crate: 'packages/physics/flood-volume-kernel',
+    blueprint: 'packages/physics/src/seakeeping/flood-volume-kernel.wasm',
+    script: 'packages/physics/scripts/build-flood-volume-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'flood-volume-kernel-shared',
+    crate: 'packages/physics/flood-volume-kernel',
+    blueprint: 'packages/physics/src/seakeeping/flood-volume-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-flood-volume-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'loads-kernel',
     crate: 'packages/physics/loads-kernel',
     blueprint: 'packages/physics/src/loads/loads-kernel.wasm',

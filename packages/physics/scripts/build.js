@@ -29,7 +29,7 @@ const exposeOptionalUrls = {
     return {
       code: code
         .replace(
-          /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|cloud-projection|vegetation|wind-traction|wing-lattice|foam-transport|entry-profile|accretion|room-sound|outdoor-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|hull-slamming|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
+          /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|cloud-projection|vegetation|wind-traction|wing-lattice|foam-transport|entry-profile|accretion|room-sound|outdoor-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|hull-slamming|flood-volume|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
           '',
         )
         .replace(
@@ -247,6 +247,8 @@ for (const name of ['pack-ice-kernel.wasm', 'pack-ice-kernel-shared.wasm'])
 
 await copyFile(resolve(root, 'src/seakeeping/hull-panel-kernel.wasm'), resolve(dist, 'hull-panel-kernel.wasm'));
 await copyFile(resolve(root, 'src/seakeeping/hull-slamming-kernel.wasm'), resolve(dist, 'hull-slamming-kernel.wasm'));
+await copyFile(resolve(root, 'src/seakeeping/flood-volume-kernel.wasm'), resolve(dist, 'flood-volume-kernel.wasm'));
+await copyFile(resolve(root, 'src/seakeeping/flood-volume-kernel-shared.wasm'), resolve(dist, 'flood-volume-kernel-shared.wasm'));
 await copyFile(resolve(root, 'src/sea/wake-fft.wasm'), resolve(dist, 'wake-fft.wasm'));
 for (const name of ['loads-kernel.wasm', 'loads-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/loads', name), resolve(dist, name));

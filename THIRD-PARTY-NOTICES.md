@@ -658,3 +658,7 @@ https://doi.org/10.1016/j.oceaneng.2008.06.012. The measured diagnostic
 `packages/physics/scripts/sea11-wedge-measured.mjs` transcribes twelve factual force and penetration
 coordinates from the data markers in Fig. 4(g), (j) and (l), with credit. The article is copyright Elsevier.
 Its figures, PDF, fitted curves and software are absent from the package.
+
+### SEA-10 model-basin flooding readings
+
+`packages/physics/scripts/sea10-ruponen-measured.mjs` contains fifteen sparse numeric water-level readings with local plotted ranges from Pekka Ruponen (2007), *Progressive flooding of a damaged passenger ship*, Figures 5.8–5.10. The Aalto dissertation SHA-256 is `06e86b6039149248018926c0f6716fd0f727362cd546b06abe8334c70105cc58`. The file contains independently authored simulation code and transcribed measurement facts. It redistributes no publication, plots, source code or dataset. [Ruponen dissertation](https://urn.fi/urn:nbn:fi:tkk-010597) · [Ruponen, Sundell and Larmela (2007)](https://doi.org/10.3233/SHP-2007-isp032) · [Dankowski dissertation (2013)](https://tore.tuhh.de/entities/publication/c9f6ab74-3ae3-4dae-8aa1-ff7bf96a86b2)

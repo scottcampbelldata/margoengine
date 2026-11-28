@@ -102,6 +102,8 @@
 <tr><th scope="row"><code>hull-panel-thread.js</code></th><td>Private hull frequency solve helper</td><td class="num">1,099</td><td class="num">630</td><td class="num">543</td><td>bakeHullPanels() with threads: 2 or 4 from the optional /seakeeping entry</td></tr>
 <tr><th scope="row"><code>hull-slamming-kernel.wasm</code></th><td>Rust SIMD Wagner strip slamming quadrature</td><td class="num">20,492</td><td class="num">8,775</td><td class="num">7,665</td><td>bakeHullSlamming() from the optional /seakeeping entry</td></tr>
 <tr><th scope="row"><code>hull-slamming-thread.js</code></th><td>Private hull slamming station worker</td><td class="num">1,352</td><td class="num">727</td><td class="num">642</td><td>bakeHullSlamming() with threads: 2 or 4 from the optional /seakeeping entry</td></tr>
+<tr><th scope="row"><code>flood-volume-kernel.wasm</code></th><td>Rust SIMD compartment volume clipping</td><td class="num">4,930</td><td class="num">2,471</td><td class="num">2,210</td><td>loadFloodVolumeKernel() from the optional /seakeeping entry</td></tr>
+<tr><th scope="row"><code>flood-volume-kernel-shared.wasm</code></th><td>Rust SIMD compartment volume clipping, with helper workers</td><td class="num">4,930</td><td class="num">2,471</td><td class="num">2,210</td><td>loadFloodVolumeKernel() with threads: 2 or 4 from the optional /seakeeping entry</td></tr>
 <tr><th scope="row"><code>loads-kernel.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches</td><td class="num">7,761</td><td class="num">2,926</td><td class="num">2,525</td><td>LoadSolver.load() from the optional /loads entry</td></tr>
 <tr><th scope="row"><code>loads-kernel-shared.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches, shared world memory</td><td class="num">7,761</td><td class="num">2,926</td><td class="num">2,524</td><td>LoadSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>thin-film-kernel-shared.wasm</code></th><td>Rust SIMD conservative thin-film flow and capillarity, shared world memory</td><td class="num">30,756</td><td class="num">11,743</td><td class="num">10,152</td><td>ThinFilmSolver.load() with shared world memory support</td></tr>
@@ -5000,7 +5002,7 @@
 <tr><td><code>./entry</code></td><td class="num">36,117</td><td class="num">14,182</td></tr>
 <tr><td><code>./flip</code></td><td class="num">38,669</td><td class="num">13,878</td></tr>
 <tr><td><code>./sea</code></td><td class="num">36,863</td><td class="num">14,183</td></tr>
-<tr><td><code>./seakeeping</code></td><td class="num">131,025</td><td class="num">48,146</td></tr>
+<tr><td><code>./seakeeping</code></td><td class="num">146,439</td><td class="num">53,151</td></tr>
 <tr><td><code>./celestial</code></td><td class="num">20,227</td><td class="num">9,486</td></tr>
 <tr><td><code>./life</code></td><td class="num">26,328</td><td class="num">10,317</td></tr>
 <tr><td><code>./crush</code></td><td class="num">59,905</td><td class="num">21,351</td></tr>

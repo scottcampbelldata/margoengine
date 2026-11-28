@@ -141,6 +141,7 @@
     "@margoengine/materials": "^1.0.0"
   },
   "scripts": {
+    "test:gpu:flooding-film": "cd ../.. && node packages/water/test/flooding-film.browser.mjs && node packages/water/test/flooding-film.browser.mjs --compat",
     "test:gpu:wave-impact-film": "cd ../.. && node packages/water/test/wave-impact-film.browser.mjs && node packages/water/test/wave-impact-film.browser.mjs --compat",
     "test:gpu:seakeeping-film": "cd ../.. && node packages/water/test/seakeeping-film.browser.mjs && node packages/water/test/seakeeping-film.browser.mjs --compat",
     "test:gpu:entry-film": "cd ../.. && node packages/water/test/entry-film.browser.mjs && node packages/water/test/entry-film.browser.mjs --compat",

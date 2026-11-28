@@ -7058,3 +7058,7 @@ The two- and four-participant cases produce the scalar column values. The 77 × 
 27,720 resolved rows in eight CFL intervals. The separate ParisFog optical diagnostic misses five of six
 F32 visibility samples, so quantitative validation still needs work.
 [Physics and sources](../clean-room.md#drainage-fog-and-its-live-medium-atmo-08).
+
+### SEA-10 accepted progressive flooding
+
+A dry compartment supplies no water head, including where the middle of a floor aperture is below the compartment's geometric floor. The native clip matches the scalar table at 1, 2 and 4 participants and after signed-origin replay, with 6,624 f64x2 triangle evaluations in a representative coupled run. The cutaway checks late and early isolation, accepted water volumes, hull list, trim and sinkage with exact replay on both renderers. The Ruponen basin measurements still disagree with the model. [Evidence and limits](../limits.md#progressive-flooding-evidence-and-limits-sea-10)

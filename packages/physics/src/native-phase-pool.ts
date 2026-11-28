@@ -65,6 +65,11 @@ type NativePhaseSolver =
       readonly subject: 'Entry profile';
       readonly phaseExport: 'entry_profile_thread_phase';
       readonly phase: 'section clipping';
+    }
+  | {
+      readonly subject: 'Flood volume';
+      readonly phaseExport: 'flood_volume_thread_phase';
+      readonly phase: 'compartment clipping';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };

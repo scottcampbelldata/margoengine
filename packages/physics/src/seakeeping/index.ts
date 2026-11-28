@@ -16,6 +16,7 @@ export {
 export {
   type Hull,
   type HullDeckSurface,
+  type HullFloodedCompartment,
   type HullParams,
   type HullWake,
   HullSolver,
@@ -53,6 +54,12 @@ export {
   PERMEABILITY,
   volumeBelow,
 } from './flooding.js';
+export {
+  type FloodVolumeKernel,
+  type FloodVolumeWorkCounts,
+  type FloodVolumeWorkerWork,
+  loadFloodVolumeKernel,
+} from './flood-volume-kernel.js';
 export { BREACH_CARGO, type BreachCargo, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from '../world/flooding.js';
 export { eddyRollCoefficient, FRICTION, frictionGirth } from './viscous.js';
 export {

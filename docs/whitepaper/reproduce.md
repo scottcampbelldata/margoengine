@@ -5217,3 +5217,17 @@ Build packages. `node packages/usdz/scripts/test-real-reset.mjs <cache> --downlo
 `node packages/splats/scripts/test-real-sequence.mjs <cache> --download` fetches 14 pinned PLY frames (10 MB) and plays
 them on the GPU. Without the files: `node --test packages/usdz/tests/reset-robot.test.js
 packages/splats/test/animate-ply.test.js` and `node packages/splats/test/gpu/check.mjs`.
+
+### SEA-10 progressive flooding
+
+```sh
+node --test packages/physics/tests/flooding.test.js packages/physics/tests/coupling/flood-volume-workers.test.js packages/physics/tests/coupling/breaches.test.js packages/physics/tests/coupling/crush-shell-flood.test.js
+npm run test:gpu:flood-volume-workers -w @margoengine/physics
+npm run test:gpu:flooding-film -w @margoengine/water
+node packages/physics/scripts/sea10-ruponen-measured.mjs --check-warnings
+node packages/physics/scripts/sea10-ruponen-measured.mjs --through=20
+```
+
+The two fixed-camera backends compare early and late emergency isolation with the same triangle hull on the same water. They check accepted snapshots, compartment levels derived from accepted volumes, mesh motion, same-backend pixels and the external and internal water balance. Code-built geometry may use the same APIs as an imported hull, provided both pass the same body-local physical mesh.
+
+Ruponen's Case A Test 06 gauge markers from Figures 5.8–5.10 were held out. The script fixes the geometry, initial pose, water density and time-dependent breach from the source test arrangement and uses discharge from independent drainage work. It reports local readout ranges, step-size sensitivity and per-room water and gas residuals. This is a failed measured validation, with a reusable comparison and a passing deterministic warning check. [Ruponen dissertation](https://urn.fi/urn:nbn:fi:tkk-010597) · [Ruponen, Sundell and Larmela, ship-model experiments (2007)](https://doi.org/10.3233/SHP-2007-isp032)

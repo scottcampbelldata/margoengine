@@ -12107,3 +12107,7 @@ gate on a fixture tree) and `tests/wgsl-redeclared.test.js` (the water clash, ev
 locals, members or comments); every test file reaching those harnesses ran with the check on. Missing: package tests
 with their own mock device (about 340 files) do not call the check unless they import it, and the gate measures bytes,
 not how many concerns a file holds.
+
+### SEA-10 flood-table clipping and accepted compartment state
+
+The optional Rust variant uses f64x2 pairs without changing the triangle or fan summation order of the TypeScript volume integrals. The shared variant partitions sample planes across the caller and up to three private workers. Scalar and native world snapshots match through signed-origin replay. Compartment reads copy accepted world state. A failed non-finite sea query restores the previous level table and keeps the last accepted flood result. The same WebGPU and WebGL2 fixed-camera fixture checks a hull that changes list, trim and draft because its tanks fill. Ruponen's independent basin curves still disagree. [Verification and limits](../limits.md#progressive-flooding-evidence-and-limits-sea-10)

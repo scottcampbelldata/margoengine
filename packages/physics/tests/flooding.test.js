@@ -32,6 +32,41 @@ function run(flooding, seconds, rate = 60, each = () => {}, sea = still) {
   return state;
 }
 
+test('Flooding rejects a bad second sea query without changing state, output or the accepted plane table', () => {
+  const make = () => new Flooding(
+    [{ mesh: cuboid([-2, -1.5, -1], [2, 0.5, 1]), water: 0.5 }],
+    [
+      { from: 0, to: 'outside', centre: [-1, -1.5, 0], normal: [0, -1, 0], width: 0.1, height: 0.1 },
+      { from: 0, to: 'outside', centre: [1, 0.5, 0], normal: [0, 1, 0], width: 0.15, height: 0.15 },
+    ],
+  );
+  const flood = make(), reference = make();
+  const state = new Float64Array(flood.words), refState = new Float64Array(reference.words);
+  flood.initialise(state);
+  reference.initialise(refState);
+  const dt = 1 / 60;
+  const output = flood.step(state, upright, still, 0, dt, RHO, G);
+  reference.step(refState, upright, still, 0, dt, RHO, G);
+  const acceptedState = state.slice(), acceptedOutput = structuredClone(output);
+  const acceptedLevel = flood.levelOf(0, state[0]);
+  const moved = { position: [1, 0.2, 3], rotation: [0, 0, 0.2, Math.sqrt(0.96)] };
+  let calls = 0;
+  const invalid = { elevation: () => ++calls === 2 ? NaN : 0 };
+  assert.throws(() => flood.step(state, moved, invalid, dt, dt, RHO, G), {
+    code: 'failed', message: /Return a finite local height.*#hull-flooding/,
+  });
+  assert.equal(calls, 2);
+  assert.throws(() => flood.step(state, moved, still, dt, dt, RHO, Infinity), {
+    code: 'unsupported', message: /positive SI step, density and gravity.*#hull-flooding/,
+  });
+  assert.deepEqual(state, acceptedState);
+  assert.deepEqual(output, acceptedOutput);
+  assert.equal(flood.levelOf(0, state[0]), acceptedLevel);
+  assert.equal(flood.convergenceWarning, undefined);
+  assert.deepEqual(flood.step(state, moved, still, dt, dt, RHO, G), reference.step(refState, moved, still, dt, dt, RHO, G));
+  assert.deepEqual(state, refState);
+});
+
 test('volumeBelow: a cube cut level and on a slant, its volume and centre exact', () => {
   const cube = cuboid([0, 0, 0], [1, 1, 1]),
     moment = [0, 0, 0],
@@ -52,6 +87,20 @@ test('volumeBelow: a cube cut level and on a slant, its volume and centre exact'
   ])
     assert.ok(Math.abs(moment[k] / slant - want) < 1e-14, `centre ${k}: ${moment[k] / slant}`);
   assert.ok(Math.abs(volumeBelow(cube, [0, 1, 0], Infinity) - 1) < 1e-14);
+});
+
+test('Flooding: the midplane of a stair cut does not draw water from an empty upper compartment', () => {
+  const flood = new Flooding(
+    [{ mesh: cuboid([0, -1, 0], [1, 0, 1]) }, { mesh: cuboid([0, 0.01, 0], [1, 1, 1]) }],
+    [{ from: 0, to: 1, centre: [0.5, 0.005, 0.5], normal: [0, 1, 0], width: 0.1, height: 0.1 }],
+  );
+  const state = new Float64Array(flood.words);
+  flood.initialise(state);
+  const result = flood.step(state, upright, still, 0, 1 / 60, RHO, G);
+  assert.equal(result.level[1], 0.01);
+  assert.equal(result.water[0], 0);
+  assert.equal(state[0], 0);
+  assert.equal(state[3], 0);
 });
 
 test('Flooding: a vented box filling through a hole in its bottom follows Torricelli, first order in the step', () => {

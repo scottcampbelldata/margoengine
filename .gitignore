@@ -22,6 +22,7 @@ packages/physics/outdoor-sound-kernel/target/
 packages/physics/foam-transport-kernel/target/
 packages/physics/entry-profile-kernel/target/
 packages/physics/hull-slamming-kernel/target/
+packages/physics/flood-volume-kernel/target/
 packages/physics2d/kernel/target/
 packages/physics2d/kernel/wasm-check/target/
 packages/sciviz/kernel/target/

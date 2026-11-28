@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21974848,
+  "total": 21980003,
   "history": [
     {
       "date": "2026-10-24",
@@ -15749,6 +15749,12 @@
       "commit": "39b027001b",
       "reason": "scatter 29,682 to 30,432 B gzip (ceiling 30,263 to 31,345) and scatter/grass 3,047 to 3,432 B (ceiling 3,303 to 3,688), measured at 39b027001b and with the change: Scatter clumps (patches of one kind of plant), clearings (grass thinning around a boulder) and reach (the parts of one plant keeping the same instances), and grass blades turning in hue, yellowing, dying back from the tip and tinting the light through them by measured leaf transmittance (plants round 1, Above the Treeline). The options compile into the distribute and vertex shaders only when set; a separate entry would copy the distribute shader builder and the blade generator to save under 800 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "sea-10-progressive-flooding-volume-tables",
+      "reason": "SEA-10 @margoengine/physics/seakeeping 48146 to 53151 B gzip, @margoengine/physics/seakeeping 49591 to 54746 B ceiling. The seakeeping entry keeps the transactional flood state, coded diagnostics and accepted compartment copy beside the hull integrator. Splitting the integrator would duplicate the existing state and ports. Both geometry assets and the native helpers load only when requested. Core and stage are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16664,7 +16670,7 @@
     "@margoengine/physics/runoff": 7192,
     "@margoengine/physics/schooling": 5102,
     "@margoengine/physics/sea": 14609,
-    "@margoengine/physics/seakeeping": 49591,
+    "@margoengine/physics/seakeeping": 54746,
     "@margoengine/physics/sediment": 8101,
     "@margoengine/physics/seismic": 5266,
     "@margoengine/physics/ship": 36541,

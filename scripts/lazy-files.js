@@ -130,6 +130,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/flood-volume-kernel.wasm',
+    label: 'flood-volume-kernel.wasm',
+    kind: 'Rust SIMD compartment volume clipping',
+    measure: 'file',
+    when: 'loadFloodVolumeKernel() from the optional /seakeeping entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/flood-volume-kernel-shared.wasm',
+    label: 'flood-volume-kernel-shared.wasm',
+    kind: 'Rust SIMD compartment volume clipping, with helper workers',
+    measure: 'file',
+    when: 'loadFloodVolumeKernel() with threads: 2 or 4 from the optional /seakeeping entry',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/loads-kernel.wasm',
     label: 'loads-kernel.wasm',
     kind: 'Rust SIMD batch for hydrodynamic wrenches',

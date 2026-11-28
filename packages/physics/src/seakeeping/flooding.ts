@@ -35,7 +35,10 @@
 // mixed with the water flowing out.
 
 import { hypot, pow } from '@margoengine/math/pinned';
+import type { MargoError } from '@margoengine/math/errors';
 import { settlingVelocity } from '../tracers.js';
+import { floodError } from './flood-errors.js';
+import type { FloodVolumeKernel } from './flood-volume-kernel.js';
 import type { ShellAperture } from './shell-opening.js';
 import { BREACH_CARGO, type BreachCargo } from '../world/flooding.js';
 import type { HullMesh, Vec3 } from './wetted.js';
@@ -117,6 +120,23 @@ export interface Opening {
 /** f64 words of a compartment's state: its water (m^3), its air (kg) and its cargo left (kg). */
 export const COMPARTMENT_WORDS = 3;
 
+function finiteVector(value: readonly number[] | undefined, length: number): boolean {
+  if (value?.length !== length) return false;
+  for (let component = 0; component < length; component++) {
+    if (!Number.isFinite(value[component])) return false;
+  }
+  return true;
+}
+
+function floodElevation(sea: Surface, x: number, z: number, t: number): number {
+  if (!Number.isFinite(x) || !Number.isFinite(z))
+    throw floodError('failed', 'A flood opening is outside the numerical range. Use a local hull pose and opening coordinates.');
+  const height = sea.elevation(x, z, t);
+  if (!Number.isFinite(height))
+    throw floodError('failed', 'The sea returned a non-finite flood elevation. Return a finite local height at every opening.');
+  return height;
+}
+
 /** What a flooding step leaves: per opening its flows, per compartment its water's weight and where it acts. */
 export interface FloodResult {
   /** Per opening: water m^3/s, air kg/s and cargo kg/s from `from` toward `to`, and 1 where it is open. */
@@ -133,10 +153,7 @@ export interface FloodResult {
   /** Per compartment: its water level (world height) and its air's pressure (Pa). */
   readonly level: Float64Array;
   readonly pressure: Float64Array;
-  /**
-   * The sweeps the step took for the water and for the air: under the limit (200) it settled; at it, the step went on
-   * from the last sweep's levels unsettled (a network too stiff for the step: take a shorter step).
-   */
+  /** The water and air sweeps of the last accepted step. Read `Flooding.convergenceWarning` if either reaches the limit. */
   readonly sweeps: Float64Array;
 }
 
@@ -359,24 +376,43 @@ export class Flooding {
   private readonly openings: readonly OpeningShape[];
   private readonly tables: Float64Array;
   private readonly heights: Float64Array;
-  private readonly lows: Float64Array;
   private readonly capacity: Float64Array;
   /** The attitude (the world's up in the body's frame) and the height the tables were made for. */
   private up: Vec3 = [Number.NaN, Number.NaN, Number.NaN];
+  private base = 0;
+  private active = false;
+  private unsettled = 0;
   private readonly relative: Float64Array;
-  private readonly relativeLows: Float64Array;
+  private readonly candidateState: Float64Array;
+  private readonly candidateResult: FloodResult;
+  private readonly volumeHeights: Float64Array | undefined;
+  private readonly volumeValues: Float64Array | undefined;
   readonly result: FloodResult;
 
-  constructor(compartments: readonly Compartment[], openings: readonly Opening[]) {
+  constructor(compartments: readonly Compartment[], openings: readonly Opening[]);
+  constructor(compartments: readonly Compartment[], openings: readonly Opening[], volumeKernel: FloodVolumeKernel);
+  constructor(
+    compartments: readonly Compartment[],
+    openings: readonly Opening[],
+    private readonly volumeKernel?: FloodVolumeKernel,
+  ) {
     if (!Array.isArray(compartments) || compartments.length === 0)
-      throw new TypeError('Flooding needs one or more compartments: pass {compartments: [{mesh}], openings}.');
+      throw floodError('unsupported', 'Flooding needs one or more compartments: pass {compartments: [{mesh}], openings}.');
+    if (openings != null && !Array.isArray(openings))
+      throw floodError('unsupported', 'Flooding openings must be an array. Supply the openings or an empty array.');
     this.compartments = compartments.map((c: Compartment, i: number) => {
-      const { vertices, indices } = c.mesh ?? {};
+      const { vertices, indices } = c?.mesh ?? {};
       if (!vertices || !indices || vertices.length % 3 !== 0 || indices.length % 3 !== 0 || indices.length === 0)
-        throw new RangeError(`Compartment ${i}'s mesh is not whole; pass vertices and triangles wound outward.`);
+        throw floodError('unsupported', `Compartment ${i}'s mesh is not whole; pass vertices and triangles wound outward.`);
+      for (let word = 0; word < vertices.length; word++)
+        if (!Number.isFinite(vertices[word]))
+          throw floodError('unsupported', `Compartment ${i} has an invalid vertex. Supply finite body-local metres.`);
+      for (let k = 0; k < indices.length; k++)
+        if (!Number.isInteger(indices[k]) || indices[k]! < 0 || indices[k]! >= vertices.length / 3)
+          throw floodError('unsupported', `Compartment ${i} names an invalid vertex. Keep triangles inside the vertex array.`);
       const permeability = c.permeability ?? PERMEABILITY;
       if (!(permeability > 0 && permeability <= 1))
-        throw new RangeError(`Compartment ${i}'s permeability is ${permeability}; pass a share above 0, at most 1.`);
+        throw floodError('unsupported', `Compartment ${i}'s permeability is ${permeability}; pass a share above 0, at most 1.`);
       const cargo = c.cargo ?? null;
       let grain = 0,
         density = 1000,
@@ -384,46 +420,52 @@ export class Flooding {
       if (cargo) {
         const known = CARGO[cargo.material];
         if (!known)
-          throw new RangeError(
+          throw floodError(
+            'unsupported',
             `Compartment ${i}'s cargo is '${cargo.material}'; pass one of ${BREACH_CARGO.join(', ')}.`,
           );
         if (!(cargo.mass >= 0 && Number.isFinite(cargo.mass)))
-          throw new RangeError(`Compartment ${i}'s cargo mass is ${cargo.mass} kg; pass a finite mass of 0 or more.`);
+          throw floodError('unsupported', `Compartment ${i}'s cargo mass is ${cargo.mass} kg; pass a finite mass of 0 or more.`);
         grain = cargo.diameter ?? known[1];
         density = cargo.density ?? known[0];
         packing = cargo.packing ?? 0.6;
-        if (!(grain >= 0 && density > 0 && packing > 0 && packing <= 1))
-          throw new RangeError(
+        if (!(Number.isFinite(grain) && grain >= 0 && Number.isFinite(density) && density > 0 && packing > 0 && packing <= 1))
+          throw floodError(
+            'unsupported',
             `Compartment ${i}'s cargo has diameter ${grain} m, density ${density} kg/m^3 and packing ${packing}; pass a diameter of 0 or more, a density above 0 and a packing above 0, at most 1.`,
           );
       }
       const free = permeability * volumeBelow(c.mesh, [0, 1, 0], Infinity),
         water = c.water ?? 0;
-      if (!(free > 0))
-        throw new RangeError(`Compartment ${i}'s mesh holds no volume (${free} m^3); wind its triangles outward.`);
+      if (!(free > 0 && Number.isFinite(free) && Number.isFinite(AIR_DENSITY * free)))
+        throw floodError('unsupported', `Compartment ${i}'s mesh holds no volume (${free} m^3); wind its triangles outward.`);
       if (!(water >= 0 && water < free))
-        throw new RangeError(
+        throw floodError(
+          'unsupported',
           `Compartment ${i} starts with ${water} m^3 of water in ${free} m^3 of free space; pass 0 or more and less than its space (a full tank's water goes in the body's mass).`,
         );
       return { mesh: c.mesh, permeability, cargo, grain, density, packing, water, free };
     });
     const n = this.compartments.length;
     this.openings = (openings ?? []).map((o, i) => {
+      if (!o || !finiteVector(o.centre, 3) || !finiteVector(o.normal, 3) || (o.axis && !finiteVector(o.axis, 3)))
+        throw floodError('unsupported', `Opening ${i}'s centre, normal or axis is invalid. Use three finite SI components each.`);
       const to = o.to === 'outside' ? -1 : o.to;
       const shellSeam = o.shellSeam !== undefined;
       if (shellSeam && (o.crushPatch !== undefined || o.girderJoint !== undefined || o.collapse !== undefined))
-        throw new RangeError('Use the live shell geometry as the sole structural trigger on a shell opening.');
+        throw floodError('unsupported', 'Use the live shell geometry as the sole structural trigger on a shell opening.');
       if (
         !(Number.isInteger(o.from) && o.from >= 0 && o.from < n) ||
         !(to === -1 || (Number.isInteger(to) && to >= 0 && to < n && to !== o.from))
       )
-        throw new RangeError(
+        throw floodError(
+          'unsupported',
           `Opening ${i} joins ${o.from} to ${String(o.to)}; name a compartment index under ${n} for from, and another or 'outside' for to.`,
         );
       if (!(o.width > 0 && o.height > 0 && Number.isFinite(o.width) && Number.isFinite(o.height)))
-        throw new RangeError(`Opening ${i} is ${o.width} by ${o.height} m; pass a finite width and height above 0.`);
+        throw floodError('unsupported', `Opening ${i} is ${o.width} by ${o.height} m; pass a finite width and height above 0.`);
       const nl = hypot(o.normal[0], o.normal[1], o.normal[2]);
-      if (!(nl > 0)) throw new RangeError(`Opening ${i}'s normal has no length; pass the direction it faces.`);
+      if (!(nl > 0 && Number.isFinite(nl))) throw floodError('unsupported', `Opening ${i}'s normal has no usable length; pass the direction it faces.`);
       const nn: Vec3 = [o.normal[0] / nl, o.normal[1] / nl, o.normal[2] / nl];
       let ax: Vec3 = o.axis ?? [nn[2], 0, -nn[0]];
       // Take the normal's part out of the axis; a horizontal opening's default axis is x.
@@ -434,7 +476,7 @@ export class Flooding {
         ax = [1 - dot * nn[0], -dot * nn[1], -dot * nn[2]];
       }
       const al = hypot(ax[0], ax[1], ax[2]);
-      if (!(al > 1e-9)) throw new RangeError(`Opening ${i}'s axis lies along its normal; pass an axis in its plane.`);
+      if (!(al > 1e-9)) throw floodError('unsupported', `Opening ${i}'s axis lies along its normal; pass an axis in its plane.`);
       ax = [ax[0] / al, ax[1] / al, ax[2] / al];
       const up: Vec3 = [nn[1] * ax[2] - nn[2] * ax[1], nn[2] * ax[0] - nn[0] * ax[2], nn[0] * ax[1] - nn[1] * ax[0]],
         corners = new Float64Array(GRID * GRID * 12);
@@ -448,19 +490,23 @@ export class Flooding {
           }
       const cd = o.discharge ?? DISCHARGE;
       if (!(cd > 0 && cd <= 1))
-        throw new RangeError(`Opening ${i}'s discharge coefficient is ${cd}; pass one above 0, at most 1.`);
+        throw floodError('unsupported', `Opening ${i}'s discharge coefficient is ${cd}; pass one above 0, at most 1.`);
       const collapse = o.collapse ?? Infinity,
         opens =
           o.opens ??
           (o.collapse === undefined && o.crushPatch === undefined && o.girderJoint === undefined ? 0 : Infinity),
         closes = o.closes ?? Infinity;
       if (!(collapse > 0) || Number.isNaN(opens) || Number.isNaN(closes))
-        throw new RangeError(
+        throw floodError(
+          'unsupported',
           `Opening ${i} gives way at ${collapse} m of head; pass a head above 0, and times as numbers.`,
         );
+      const area = (o.width * o.height) / (GRID * GRID);
+      if (!(area > 0 && Number.isFinite(area)) || !corners.every(Number.isFinite))
+        throw floodError('unsupported', `Opening ${i} overflows in body space. Use finite metre centres and dimensions.`);
       return {
         corners,
-        area: (o.width * o.height) / (GRID * GRID),
+        area,
         cd,
         from: o.from,
         to,
@@ -473,11 +519,9 @@ export class Flooding {
     this.tables = new Float64Array(n * LEVELS);
     this.heights = new Float64Array(n * LEVELS);
     this.relative = new Float64Array(n * LEVELS);
-    this.relativeLows = new Float64Array(n);
-    this.lows = new Float64Array(n);
     this.capacity = new Float64Array(n);
     const m = this.openings.length;
-    this.result = {
+    const makeResult = (): FloodResult => ({
       water: new Float64Array(m),
       air: new Float64Array(m),
       cargo: new Float64Array(m),
@@ -489,7 +533,14 @@ export class Flooding {
       level: new Float64Array(n),
       pressure: new Float64Array(n),
       sweeps: new Float64Array(2),
-    };
+    });
+    this.result = makeResult();
+    this.candidateResult = makeResult();
+    this.candidateState = new Float64Array(n * COMPARTMENT_WORDS + m);
+    if (volumeKernel) {
+      this.volumeHeights = new Float64Array(LEVELS - 1);
+      this.volumeValues = new Float64Array(LEVELS - 1);
+    }
   }
 
   /** f64 words of the state. */
@@ -504,19 +555,26 @@ export class Flooding {
 
   /** Opening `i`: the compartment it opens from, and -1 for the outside or the compartment it opens to. */
   ends(i: number): readonly [number, number] {
-    const o = this.openings[i]!;
+    const o = this.openings[i];
+    if (!o) throw floodError('unsupported', 'The opening index is invalid. Use an opening in this Flooding model.');
     return [o.from, o.to];
   }
 
   /** Permanently opens an opening, using its existing saved failure word. */
   failOpening(state: Float64Array, opening: number): void {
-    if (state.length !== this.words || !Number.isSafeInteger(opening) || opening < 0 || opening >= this.openingCount)
-      throw new RangeError('Pass the Flooding state and the index of an existing opening to failOpening.');
+    if (this.active)
+      throw floodError('state', 'Flooding is stepping. Open a breach between steps.');
+    if (!(state instanceof Float64Array) || state.length !== this.words ||
+      !Number.isSafeInteger(opening) || opening < 0 || opening >= this.openingCount)
+      throw floodError('unsupported', 'Pass the Flooding state and the index of an existing opening to failOpening.');
     state[this.compartments.length * COMPARTMENT_WORDS + opening] = 1;
   }
 
   /** The state at the start: each compartment's water, its air at the atmosphere's pressure, its cargo. */
   initialise(state: Float64Array): void {
+    if (this.active)
+      throw floodError('state', 'Flooding is stepping. Initialise its state between steps.');
+    this.checkStateLayout(state);
     this.compartments.forEach((c, i) => {
       state[i * COMPARTMENT_WORDS] = c.water;
       state[i * COMPARTMENT_WORDS + 1] = AIR_DENSITY * (c.free - c.water);
@@ -530,11 +588,16 @@ export class Flooding {
    * volumes depend on the hull's attitude alone, so they are made again only when it has turned; the heights follow
    * the hull's height.
    */
-  private tabulate(u: Vec3, base: number): void {
+  private tabulate(u: Vec3, base: number, native = true): void {
+    this.base = base;
     const last = this.up;
     if (last[0] === u[0] && last[1] === u[1] && last[2] === u[2]) {
-      for (let k = 0; k < this.heights.length; k++) this.heights[k] = base + this.relative[k]!;
-      for (let k = 0; k < this.lows.length; k++) this.lows[k] = base + this.relativeLows[k]!;
+      for (let k = 0; k < this.heights.length; k++) {
+        const height = base + this.relative[k]!;
+        if (!Number.isFinite(height))
+          throw floodError('failed', 'A flood plane overflowed. Use a local hull pose and mesh in SI metres.');
+        this.heights[k] = height;
+      }
       return;
     }
     this.up = [u[0], u[1], u[2]];
@@ -547,23 +610,45 @@ export class Flooding {
         lo = Math.min(lo, s);
         hi = Math.max(hi, s);
       }
+      const heights = this.volumeHeights;
+      const values = this.volumeValues;
+      if (native && this.volumeKernel && heights && values) {
+        for (let k = 1; k < LEVELS; k++) heights[k - 1] = lo + ((hi - lo) * k) / (LEVELS - 1);
+        this.volumeKernel.volumes(c.mesh, u, heights, values);
+      }
       let last = 0;
       for (let k = 0; k < LEVELS; k++) {
         const s = lo + ((hi - lo) * k) / (LEVELS - 1),
-          volume = k === 0 ? 0 : Math.max(last, c.permeability * volumeBelow(c.mesh, u, s));
+          raw = k === 0 ? 0 : native && values ? values[k - 1]! : volumeBelow(c.mesh, u, s),
+          volume = Math.max(last, c.permeability * raw);
+        if (!Number.isFinite(volume) || !Number.isFinite(base + s))
+          throw floodError('failed', 'A compartment volume or plane overflowed. Use a closed mesh in local SI metres.');
         this.tables[i * LEVELS + k] = volume;
         this.relative[i * LEVELS + k] = s;
         this.heights[i * LEVELS + k] = base + s;
         last = volume;
       }
-      this.relativeLows[i] = lo;
-      this.lows[i] = base + lo;
       this.capacity[i] = last;
     });
   }
 
   /** The world height of compartment `i`'s water at `volume` (m^3 of water). */
   levelOf(i: number, volume: number): number {
+    if (this.active)
+      throw floodError('state', 'Flooding is stepping. Read the accepted compartment level between steps.');
+    if (!Number.isSafeInteger(i) || i < 0 || i >= this.compartments.length || !Number.isFinite(volume))
+      throw floodError('unsupported', 'The flood level query is invalid. Use a valid compartment and a finite volume.');
+    return this.levelAt(i, volume);
+  }
+
+  /** A coded warning for the last accepted direct step, if either implicit solve exhausted its sweeps. */
+  get convergenceWarning(): MargoError | undefined {
+    if (this.unsettled === 0) return undefined;
+    const phase = this.unsettled === 3 ? 'water and air' : this.unsettled === 1 ? 'water' : 'air';
+    return floodError('failed', `The flood ${phase} solve reached ${SWEEPS} sweeps. Reduce the step and check flow and mass balance.`);
+  }
+
+  private levelAt(i: number, volume: number): number {
     const t = this.tables,
       h = this.heights,
       at = i * LEVELS;
@@ -595,12 +680,78 @@ export class Flooding {
     g: number,
     live?: ReadonlyMap<number, ShellAperture>,
   ): FloodResult {
+    this.checkStateLayout(state);
+    if (this.active)
+      throw floodError('state', 'Flooding is already stepping. Keep sea queries synchronous and free of solver calls.');
+    if (!pose || !finiteVector(pose.position, 3) || !finiteVector(pose.rotation, 4))
+      throw floodError('unsupported', 'The flood pose is invalid. Supply a finite local position and a unit quaternion.');
+    const [qx, qy, qz, qw] = pose.rotation;
+    if (Math.abs(qx * qx + qy * qy + qz * qz + qw * qw - 1) > 1e-5)
+      throw floodError('unsupported', 'The flood pose has a scaled rotation. Normalise its quaternion before stepping.');
+    if (!sea || typeof sea.elevation !== 'function')
+      throw floodError('unsupported', 'Flooding needs a sea surface. Supply elevation(x, z, time) in local metres.');
+    if (!Number.isFinite(t) || !(dt > 0 && Number.isFinite(dt)) || !(rho > 0 && Number.isFinite(rho)) ||
+      !(g > 0 && Number.isFinite(g) && Number.isFinite(rho * g)))
+      throw floodError('unsupported', 'The flood step or fluid is invalid. Use finite time and positive SI step, density and gravity.');
+    const compartmentWords = this.compartments.length * COMPARTMENT_WORDS;
+    for (let word = 0; word < state.length; word++) {
+      const value = state[word]!;
+      if (!Number.isFinite(value) || value < 0 || (word >= compartmentWords && value !== 0 && value !== 1) ||
+        (word < compartmentWords && word % COMPARTMENT_WORDS === 1 && !Number.isFinite(RT * value)))
+        throw floodError('unsupported', 'The flood state is invalid. Restore a valid snapshot or initialise this model’s state.');
+    }
+    const oldUp = this.up;
+    const oldBase = this.base;
+    this.candidateState.set(state);
+    this.active = true;
+    try {
+      const unsettled = this.advance(this.candidateState, pose, sea, t, dt, rho, g, live);
+      const keys = Object.keys(this.result) as (keyof FloodResult)[];
+      if (!this.candidateState.every(Number.isFinite) || keys.some((key) => !this.candidateResult[key].every(Number.isFinite)))
+        throw floodError('failed', 'A flood result exceeds numerical range. Reduce the fluid scales or step size.');
+      state.set(this.candidateState);
+      for (const key of keys) this.result[key].set(this.candidateResult[key]);
+      this.unsettled = unsettled;
+      return this.result;
+    } catch (cause) {
+      if (this.up !== oldUp || this.base !== oldBase) this.restoreTables(oldUp, oldBase);
+      throw cause;
+    } finally {
+      this.active = false;
+    }
+  }
+
+  private checkStateLayout(state: Float64Array): void {
+    if (!(state instanceof Float64Array) || state.length !== this.words)
+      throw floodError('unsupported', `Flooding needs ${this.words} Float64 state words. Initialise that array with this model.`);
+  }
+
+  private restoreTables(up: Vec3, base: number): void {
+    if (Number.isFinite(up[1])) {
+      this.tabulate(up, base, false);
+      return;
+    }
+    this.up = up;
+    this.base = base;
+    for (const words of [this.tables, this.heights, this.relative, this.capacity]) words.fill(0);
+  }
+
+  private advance(
+    state: Float64Array,
+    pose: Pose,
+    sea: Surface,
+    t: number,
+    dt: number,
+    rho: number,
+    g: number,
+    live?: ReadonlyMap<number, ShellAperture>,
+  ): number {
     const q = pose.rotation,
       // The world's up in the body's frame: the conjugate rotation of y.
       u: Vec3 = [2 * (q[0] * q[1] + q[3] * q[2]), 1 - 2 * (q[0] * q[0] + q[2] * q[2]), 2 * (q[1] * q[2] - q[3] * q[0])],
       n = this.compartments.length,
       openings = this.openings,
-      r = this.result;
+      r = this.candidateResult;
     this.tabulate(u, pose.position[1]);
     const toWorld = (x: number, y: number, z: number): Vec3 => {
       const [qx, qy, qz, qw] = q,
@@ -616,7 +767,16 @@ export class Flooding {
     // Each opening's cells: their height spans (world), and the sea's level at the opening.
     const spans = openings.map((o, index) => {
       const aperture = o.shellSeam ? live?.get(index) : undefined;
-      if (aperture) return aperture.spans;
+      if (aperture) {
+        const { centre, spans, stripAreas } = aperture;
+        if (
+          !finiteVector(centre, 3) || !(spans instanceof Float64Array) || !(stripAreas instanceof Float64Array) ||
+          spans.length !== 2 * stripAreas.length || !stripAreas.length ||
+          !stripAreas.every((area) => Number.isFinite(area) && area >= 0) ||
+          !spans.every((height, word) => Number.isFinite(height) && (word % 2 === 0 || height >= spans[word - 1]!))
+        ) throw floodError('unsupported', 'A shell aperture has invalid strips. Supply finite heights and matching nonnegative areas.');
+        return spans;
+      }
       const s = new Float64Array(GRID * GRID * 2);
       for (let c = 0; c < GRID * GRID; c++) {
         let lo = Infinity,
@@ -627,6 +787,8 @@ export class Flooding {
           lo = Math.min(lo, h);
           hi = Math.max(hi, h);
         }
+        if (!Number.isFinite(lo) || !Number.isFinite(hi))
+          throw floodError('failed', 'An opening span overflowed. Use a local hull pose and opening geometry in SI metres.');
         s[c * 2] = lo;
         s[c * 2 + 1] = hi;
       }
@@ -635,11 +797,11 @@ export class Flooding {
     const seaLevel = openings.map((o, index) => {
       if (o.to !== -1) return 0;
       const aperture = o.shellSeam ? live?.get(index) : undefined;
-      if (aperture) return sea.elevation(aperture.centre[0], aperture.centre[2], t);
+      if (aperture) return floodElevation(sea, aperture.centre[0], aperture.centre[2], t);
       const c = o.corners,
         mid = (k: number) => (c[k]! + c[(GRID * GRID * 4 - 1) * 3 + k]!) / 2,
         w = toWorld(mid(0), mid(1), mid(2));
-      return sea.elevation(w[0], w[2], t);
+      return floodElevation(sea, w[0], w[2], t);
     });
     const outside = openings.map((_, k) => ({ p: ATMOSPHERE, level: seaLevel[k]!, wet: seaLevel[k]! }));
     // Which openings are open: in their window, or given way under the head across them at the step's start.
@@ -650,7 +812,8 @@ export class Flooding {
     const setSide = (i: number, volume: number, air: number, pressed = 0) => {
       const s = sides[i]!,
         free = this.capacity[i]! - volume;
-      s.level = this.levelOf(i, volume);
+      // An empty room's floor is a geometric datum, not a source of water or hydrostatic head under an opening.
+      s.level = volume > 0 ? this.levelAt(i, volume) : -Infinity;
       s.wet = free > 0 ? s.level : Infinity;
       s.p = free > 0 ? (RT * air) / free : air > 0 ? Infinity : pressed;
     };
@@ -746,6 +909,7 @@ export class Flooding {
       }
       return best;
     };
+    let unsettled = 3;
     r.sweeps[0] = SWEEPS;
     for (let sweep = 0; sweep < SWEEPS; sweep++) {
       let moved = 0;
@@ -788,6 +952,7 @@ export class Flooding {
       }
       if (moved < SETTLED) {
         r.sweeps[0] = sweep + 1;
+        unsettled &= ~1;
         break;
       }
     }
@@ -831,6 +996,7 @@ export class Flooding {
       }
       if (moved < SETTLED) {
         r.sweeps[1] = sweep + 1;
+        unsettled &= ~2;
         break;
       }
     }
@@ -858,7 +1024,7 @@ export class Flooding {
       }
       // The cargo's top: the level its bulk fills (grains, packed, and the space between).
       const bulk = left / (c.density * c.packing),
-        topLevel = this.levelOf(o.from, Math.min(bulk * c.permeability, this.capacity[o.from]!)),
+        topLevel = this.levelAt(o.from, Math.min(bulk * c.permeability, this.capacity[o.from]!)),
         span = spans[k]!,
         water = sides[o.from]!.level,
         cellAreas = o.shellSeam ? live?.get(k)?.stripAreas : undefined;
@@ -907,9 +1073,10 @@ export class Flooding {
     // The floodwater's mass and centre, and the cargo lost and where it came from (the layer between its tops then and now).
     const moment: [number, number, number] = [0, 0, 0],
       other: [number, number, number] = [0, 0, 0];
+    r.lostCentre.fill(0);
     for (let i = 0; i < n; i++) {
       const c = this.compartments[i]!,
-        level = this.levelOf(i, v[i]!) - pose.position[1];
+        level = this.levelAt(i, v[i]!) - pose.position[1];
       r.level[i] = level + pose.position[1];
       r.pressure[i] = vAir[i]! > 0 ? pressure[i]! : sides[i]!.p;
       const volume = v[i]! > 0 ? volumeBelow(c.mesh, u, level, moment) : 0;
@@ -923,9 +1090,8 @@ export class Flooding {
         r.lost[i] = lost;
         if (lost > 0) {
           const bulk = (m: number) => (c.grain > 0 ? m / (c.density * c.packing) : m / c.density) * c.permeability,
-            topThen = this.levelOf(i, Math.min(bulk(c.cargo.mass), this.capacity[i]!)) - pose.position[1],
-            topNow =
-              this.levelOf(i, Math.min(bulk(state[i * COMPARTMENT_WORDS + 2]!), this.capacity[i]!)) - pose.position[1],
+            topThen = this.levelAt(i, Math.min(bulk(c.cargo.mass), this.capacity[i]!)) - pose.position[1],
+            topNow = this.levelAt(i, Math.min(bulk(state[i * COMPARTMENT_WORDS + 2]!), this.capacity[i]!)) - pose.position[1],
             then = volumeBelow(c.mesh, u, topThen, moment),
             now = volumeBelow(c.mesh, u, topNow, other),
             layer = then - now,
@@ -941,6 +1107,6 @@ export class Flooding {
         }
       }
     }
-    return r;
+    return unsettled;
   }
 }

@@ -141,6 +141,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'hull-flooding',
+    title: '@margoengine/physics/seakeeping damage, flooding and loss of buoyancy',
+    kind: 'family',
+    messages: [],
+    cause: 'A compartment, opening, damaged-shell aperture, state, sea query or implicit flood step is invalid.',
+    fix: 'Use closed body-local compartments, finite SI dimensions and rates, a unit quaternion and finite sea heights. Initialise the state with the same Flooding model. Use a shorter step or smaller geometric scales when a stiff compartment network does not settle.',
+  },
+  {
     id: 'ship-seakeeping',
     title: '@margoengine/physics/seakeeping hulls, sea queries and loads',
     kind: 'family',

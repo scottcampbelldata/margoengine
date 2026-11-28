@@ -20062,3 +20062,9 @@ object competes for ground: density as a field, thinned by a probability). Deriv
 and tip dieback per blade by hashes of the blade, the transmittance over reflectance ratio as a per channel tint,
 the two-octave value-noise patch mask with a soft rim against a per instance hash, and the smoothstep clearing
 product.
+
+### SEA-10 compartment volume tables and dry openings
+
+Pekka Ruponen (2007), *Progressive flooding of a damaged passenger ship*, treats room permeability, the free-surface level, air pressure and mass balance in Chapters 3–5. A room with no water has no hydrostatic head, even when an aperture in a thick floor lies below the room's geometric lower bound. Hendrik Dankowski (2013), *A fast and explicit method for simulating flooding and sinkage scenarios of ships*, supplies the independent reconstruction of Case A geometry in Chapter 4. The early comparator uses Ruponen's own initial breach submergence and no fitted measurement outcomes. [Ruponen dissertation](https://urn.fi/urn:nbn:fi:tkk-010597) · [Dankowski dissertation](https://tore.tuhh.de/entities/publication/c9f6ab74-3ae3-4dae-8aa1-ff7bf96a86b2)
+
+Ivan E. Sutherland and Gary W. Hodgman (1974), *Reentrant polygon clipping*, describe successive plane cuts. Brian Mirtich (1996), *Fast and Accurate Computation of Polyhedral Mass Properties*, derives volume integrals from the boundary. The optional native phase clips the same body-local triangle fan for each level as `volumeBelow`. It preserves triangle and fan summation order, with paired f64x2 geometry and private workers handling disjoint plane ranges. No companion code was read or imported. [Sutherland and Hodgman](https://doi.org/10.1145/360767.360802) · [Mirtich](https://doi.org/10.1080/10867651.1996.10487458)
