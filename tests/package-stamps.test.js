@@ -138,8 +138,13 @@ test('the build writes a stamp after each package and clears it before', () => {
   const report = readFileSync(new URL('../scripts/api-report.js', import.meta.url), 'utf8');
   assert.match(report, /rebuildStalePackages\(root, /, 'the API report rebuilds stale packages before it reads dist');
   const fresh = readFileSync(new URL('../scripts/support/fresh-dist.mjs', import.meta.url), 'utf8');
-  assert.match(fresh, /names = stale\(root\)/, 'and that step finds them by their stamps (KB-API-SURFACE-CHURN1)');
-  assert.match(fresh, /stale = stalePackages/, 'the default finder is stalePackages');
+  // Since KB-TOOL-APISCOPE1 (88b1ae244b) the finder takes the scope `only` as well.
+  assert.match(fresh, /names = stale\(root, only\)/, 'and that step finds them by their stamps (KB-API-SURFACE-CHURN1)');
+  assert.match(
+    fresh,
+    /stale = \(root, only\) => stalePackages\(root, undefined, only\)/,
+    'the default finder is stalePackages',
+  );
 });
 
 // Regression (KB-RM4, 2026-11-11): lightmap's Cycles test imports scripts/cornell-cycles.py, and Python wrote
