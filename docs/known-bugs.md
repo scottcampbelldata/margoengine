@@ -6,6 +6,25 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: the animator README's fitted-body example loaded no model and failed its asset test (KB-ANIM-IKREADME1, animator)
+
+- **Repro:** `node --test packages/animator/test/readme-assets.test.js` on main after c17577b174: "standalone example
+  loads its required model" for "Solvers on a fitted body".
+- **Cause:** the example fitted a hand-typed eight-joint rig; every animator README example runs against authored model
+  data, and the test holds that.
+- **Fix:** the example fits the body to the bundled Quaternius mannequin and aims its look; it runs (animator and
+  weather README examples, 57 of 57).
+- **Regression:** that test.
+
+### Open 2026-11-28: the human anatomy table does not read Unreal mannequin or KayKit bone names (KB-RIG-UENAMING1, rigging)
+
+- **Repro:** `fitAnatomy` with `species: human` on `examples/assets/quaternius/UAL1_Standard_RM.glb` (pelvis,
+  upperarm_l, thigh_l) or on a KayKit character throws "This rig needs a left and a right joint to read its facing".
+- **Cause:** `nameHuman` (packages/rigging/src/anatomy-human.ts) knows the HAnim, segment-named, joint-named and
+  retarget preset namings only.
+- **Fix needed:** the two namings in the table's aliases (or as retarget presets), with a fit test on both bundled
+  models. Until then pass `map`, as the animator README does.
+
 ### Open 2026-11-28: every `procedural:rock` of a biome is the same stone (KB-BIOMES-ROCKSEED1, biomes)
 
 - **Repro:** Above the Treeline before 2026-11-28 (talus of `procedural:rock` over the upper meadow and scree): every

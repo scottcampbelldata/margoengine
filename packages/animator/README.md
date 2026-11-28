@@ -528,30 +528,46 @@ The torso is a damped Gauss-Newton solve (Levenberg 1944, Marquardt 1963); the c
 `solveLimbIK` is the limb solver itself: two-bone IK by swivel angle (Tolani, Goswami and Badler 2000). The hinge turns only about its own axis between straight and its stop; the pole picks the swivel inside the shoulder's or hip's reach and twist; with no pole a bent limb keeps its side and a straight one takes the swivel that leaves the shoulder or hip nearest neutral.
 
 ```ts
-import type { RigJoint } from 'margoengine/rigging';
+import { EngineKernel } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf/pbr';
+import { Animation } from 'margoengine/animation';
+import { Animator, addLookAt } from 'margoengine/animator';
+import { jointOf, setAnatomy } from 'margoengine/animator/ik';
 import { fitAnatomy } from 'margoengine/rigging/anatomy';
 import { human } from 'margoengine/rigging/anatomy/human';
-import { jointOf, solveLimbIK } from 'margoengine/animator/ik';
 
-const rig: RigJoint[] = [
-  { name: 'Hips', parent: -1, position: [0, 1, 0] },
-  { name: 'Spine', parent: 0, position: [0, 1.1, 0] },
-  { name: 'Head', parent: 1, position: [0, 1.6, 0] },
-  { name: 'LeftUpLeg', parent: 0, position: [0.1, 0.95, 0] },
-  { name: 'RightUpLeg', parent: 0, position: [-0.1, 0.95, 0] },
-  { name: 'LeftArm', parent: 1, position: [0.2, 1.45, 0] },
-  { name: 'LeftForeArm', parent: 5, position: [0.48, 1.45, 0] },
-  { name: 'LeftHand', parent: 6, position: [0.74, 1.45, 0] },
-];
-const body = fitAnatomy(rig, { species: human });
-// The left arm, straight out in the rest pose, reaching to a point in front of the chest.
-const solved = solveLimbIK({
-  root: [0.2, 1.45, 0], mid: [0.48, 1.45, 0], end: [0.74, 1.45, 0],
-  upperRotation: [0, 0, 0, 1], lowerRotation: [0, 0, 0, 1],
-  target: [0.25, 1.3, 0.35],
-  hinge: jointOf(body, 6)!, ball: jointOf(body, 5),
-});
-console.log(solved.reached, Math.round(solved.flexion), solved.mid[1] < 1.45); // true 89 true: the elbow hangs below the shoulder
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
+const model = await loadGLTF(engine, '/UAL1_Standard_RM.glb'); // bundled Quaternius mannequin (CC0)
+const nodes = model.asset.doc.nodes!;
+const node = (name: string) => nodes.findIndex((n) => n.name === name);
+
+// The body is fitted to the model's own nodes, index for index, from their rest pose.
+const parents = nodes.map(() => -1);
+nodes.forEach((n, i) => n.children?.forEach((child) => (parents[child] = i)));
+const rest = nodes.flatMap((n) => [
+  ...(n.translation ?? [0, 0, 0]),
+  ...(n.rotation ?? [0, 0, 0, 1]),
+  ...(n.scale ?? [1, 1, 1]),
+]);
+// This model names its bones as Unreal's mannequin does, which the human table does not read by name, so map them.
+const map: Record<string, string> = {
+  humanoid_root: 'pelvis', vl3: 'spine_01', vt12: 'spine_02', vt6: 'spine_03', vc7: 'neck_01', vc1: 'Head',
+};
+for (const s of ['l', 'r'])
+  Object.assign(map, {
+    [`${s}_sternoclavicular`]: `clavicle_${s}`, [`${s}_shoulder`]: `upperarm_${s}`,
+    [`${s}_elbow`]: `lowerarm_${s}`, [`${s}_radiocarpal`]: `hand_${s}`,
+    [`${s}_hip`]: `thigh_${s}`, [`${s}_knee`]: `calf_${s}`,
+    [`${s}_talocrural`]: `foot_${s}`, [`${s}_metatarsophalangeal_1`]: `ball_${s}`,
+  });
+const body = fitAnatomy({ names: nodes.map((n) => n.name!), parents, rest }, { species: human, map });
+
+const animator = Animator.attach(Animation.attach(model), { initial: 'idle', states: { idle: 'Idle_Loop' } });
+setAnatomy(animator, body);
+// A target behind the shoulder: the look stops where the trunk's and neck's ranges end.
+addLookAt(animator, { joints: [node('spine_03'), node('neck_01'), node('Head')], target: [1, 1.6, -2] });
+engine.start();
+console.log(body.restPose, jointOf(body, node('lowerarm_l'))?.kind); // T hinge
 ```
 
 | Function | What it does |
