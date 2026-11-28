@@ -18,8 +18,10 @@ const G = 9.81;
  * Forty dominoes of height H (thickness 0.15 H, width 0.5 H, pine) `ratio` H apart on a floor, the first tipped; the wave's
  * speed over dominoes 10 to 35 (a domino counts as struck once it has turned 0.2 rad), over sqrt(g H).
  */
-function wave(ratio, H, options = {}) {
-  const physics = new Physics(null, options),
+function wave(ratio, H, { solver, ...options } = {}) {
+  const physics = new Physics(null, options);
+  if (solver) physics.setSolver(solver);
+  const
     T = 0.15 * H,
     gap = ratio * H,
     count = 40;
@@ -42,13 +44,18 @@ function wave(ratio, H, options = {}) {
       }),
     );
   dominoes[0].applyImpulseAtPoint([0.9 * Math.sqrt(G * H) * dominoes[0].mass, 0, 0], [0, H, 0]);
-  const struck = new Array(count).fill(-1);
+  // A domino is struck when its tilt passes 0.2 rad, timed between the two steps either side of it by the tilt's straight
+  // line: counted in whole steps a speed is good only to 2 percent.
+  const struck = new Array(count).fill(-1),
+    tilts = new Array(count).fill(0);
   for (let step = 1; step <= 1200 && struck[count - 1] < 0; step++) {
     physics.step();
     for (let i = 0; i < count; i++) {
       if (struck[i] >= 0) continue;
-      const q = dominoes[i].rotation;
-      if (2 * Math.asin(Math.min(1, Math.hypot(q[0], q[1], q[2]))) > 0.2) struck[i] = step * physics.fixedTimestep;
+      const q = dominoes[i].rotation,
+        tilt = 2 * Math.asin(Math.min(1, Math.hypot(q[0], q[1], q[2])));
+      if (tilt > 0.2) struck[i] = (step - 1 + (0.2 - tilts[i]) / (tilt - tilts[i])) * physics.fixedTimestep;
+      tilts[i] = tilt;
     }
   }
   assert.ok(struck[35] > 0, `the wave reached domino 35 at d/H ${ratio}`);
@@ -82,11 +89,16 @@ test('the high tier agrees, and dominoes of a real 48 mm height lie in the band 
 
 // KB-PHYS-DOMINOSCALE1: the separating axis test held a face as the reference while it lost by up to 1 mm, a bias fixed in
 // metres; on a domino 7 mm thick that kept the domino's own side as the normal while its edge pressed on the next one. The
-// bias now follows the smaller shape below a reach of 0.2 m. Two rows the same in every dimensionless number, the 0.2 m row at
-// the defaults and the 48 mm row with its tolerances (`lengthUnit`) and step scaled to it (lengths by 0.24, times by its
-// square root, Froude similarity), must give one speed. The bound is the measure's own grain: struck times are counted in
-// whole steps, about 70 over the 25 dominoes, so each speed is good to 1.5 percent, 0.05 for two. Before the fix the 48 mm row
-// ran 0.14 and 0.18 slower at these spacings.
+// bias now follows the smaller shape below a reach of 0.2 m. Two rows the same in every dimensionless number must give one
+// speed: the 0.2 m row at the defaults, and the 48 mm row with lengths, tolerances (`lengthUnit`) scaled by 0.24 and times by
+// its square root, Froude similarity with g held (Buckingham's pi theorem: a speed over sqrt(g H) depends only on the
+// dimensionless groups; Langhaar, "Dimensional Analysis and Theory of Models", 1951, ch. 5). Every time in the solver scales
+// with the step, the contacts' stiffness too: it is a frequency, so the 48 mm row's is 120 / sqrt(0.24) Hz. Left at 120 Hz
+// the 0.2 m row's contacts sat at a quarter of its substep rate and the 48 mm row's at an eighth, half as stiff over a fall,
+// and the small row kept to the slower of the two speeds the large row falls into by chance (a thousandth more or less of
+// the first push moves the 0.2 m row between 1.587 and 1.616; the 48 mm row stayed at 1.586). Struck times are timed between
+// steps, so the bound, 0.05, is the two rows' chaotic spread, not the step's grain. Before the fix the 48 mm row ran 0.14
+// and 0.18 slower at these spacings.
 test('a row scaled in every dimension topples at one speed (KB-PHYS-DOMINOSCALE1)', () => {
   const scale = 0.048 / 0.2;
   for (const ratio of [0.23, 0.33]) {
@@ -94,6 +106,7 @@ test('a row scaled in every dimension topples at one speed (KB-PHYS-DOMINOSCALE1
       small = wave(ratio, 0.048, {
         lengthUnit: scale,
         fixedTimestep: Math.sqrt(scale) / 60,
+        solver: { contactHertz: 120 / Math.sqrt(scale) },
       });
     assert.ok(
       Math.abs(small - large) <= 0.05,
