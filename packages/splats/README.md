@@ -225,6 +225,51 @@ console.log(lod.selected.length, lod.drawn);
   188 of 262,144 channels differ (exact depth ties blend in another order); 400 units away the root alone. A procedural stand-in of 16,777,216 splats (256 leaves of 65,536) streams within a
   2,097,152 budget (1,110,016 drawn, 16 leaves near the camera).
 
+## Streaming a capture as it downloads (`./progressive`)
+
+`loadProgressiveSplats(engine, response.body, { format })` draws a PLY, raw `.splat` or SPZ capture while it is still
+downloading: it reserves the whole cloud from the header (or `count` for raw `.splat`), adds it to the scene and
+writes each batch as its bytes arrive, largest visible splats first in each batch. Call `engine.start()` before you
+await it to see the frames fill in. `readSplatsProgressive(source, options)` is the decoder alone, an async generator
+of `{ first, total, data }` batches for your own upload.
+
+```ts
+import { readSplatsProgressive } from 'margoengine/splats/progressive';
+
+// Three raw .splat records: position, scale, RGBA and a rotation quaternion, 32 bytes each.
+const records = new Uint8Array(32 * 3);
+const view = new DataView(records.buffer);
+for (let i = 0; i < 3; i++) {
+  view.setFloat32(i * 32, i, true); // x
+  for (let k = 0; k < 3; k++) view.setFloat32(i * 32 + 12 + k * 4, 0.1, true); // scale
+  records.set([255, 255, 255, 255, 255, 128, 128, 128], i * 32 + 24); // white, opaque, identity rotation
+}
+async function* network() {
+  yield records.subarray(0, 40); // one whole record and part of the next
+  yield records.subarray(40);
+}
+for await (const batch of readSplatsProgressive(network(), { format: 'splat', count: 3, batchSize: 2 }))
+  console.log(batch.first, batch.total, batch.data.positions.length / 3); // 0 3 1, then 1 3 2
+
+const controller = new AbortController();
+const reads = readSplatsProgressive(network(), { format: 'splat', count: 3, batchSize: 1, signal: controller.signal });
+console.log((await reads.next()).value.first); // 0
+controller.abort(new Error('user left'));
+await reads.next().catch((error) => console.log(error.message)); // user left
+```
+
+- `source` is a `ReadableStream<Uint8Array>` (such as `response.body`) or any `AsyncIterable<Uint8Array>`.
+- `format` is required (`'ply'`, `'splat'` or `'spz'`); `count` is required for `'splat'`; `batchSize` (default
+  16,384) caps the records in one batch. A batch is emitted as soon as whole records are in, so a partial record waits
+  for the next chunk; SPZ's last batch replaces its colour-only preview with full spherical harmonics.
+- `signal` stops the load at once, also while a read is still pending and between batches already decoded from the
+  same chunk: the pending `next()` rejects with the signal's reason without waiting for the network.
+- The reader owns the source while it runs and closes it on every early stop (abort, an error, or a `break` out of
+  your `for await`): a stream's reader is cancelled and its lock released; an async iterable's `return()` is called.
+  A source that ends normally is not cancelled. Do not read the same stream elsewhere while the load runs.
+- `loadProgressiveSplats` disposes the half-written cloud and removes it from the scene on abort or failure, and
+  rejects with a `RangeError` for a stream with no splats or a truncated one (check the file).
+
 ## One sort for many clouds (`./set`)
 
 Separate `Splats` clouds sort and draw one after the other, so where two captures overlap the one drawn last covers the
