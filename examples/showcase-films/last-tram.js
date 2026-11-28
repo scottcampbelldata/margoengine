@@ -123,6 +123,35 @@ export async function buildDepot(engine, shop, cluster) {
   const depot = await loadGLTF(engine, libraryAsset('north-yard/industrial-buildings.glb'), {
     decoders: { instancing },
   });
+  // Approach side of the yard: four original buildings (north-yard/build_approach_buildings.py, Blender, CC0 maps),
+  // each front facing the track, set back behind the fence.
+  const approach = await Promise.all(
+    [
+      ['approach-substation', -27, 7.4],
+      ['approach-warehouse-b', -41, 8.6],
+      ['approach-warehouse-a', -61.5, 8.4],
+      ['approach-shed', -85, 8.2],
+    ].map(async ([name, s, setback]) => {
+      const model = await loadGLTF(engine, libraryAsset('north-yard/' + name + '.glb'));
+      const { heading } = frame(s);
+      model.root.setPosition(along(s, setback, -0.1)).setRotation([0, heading - quarter, 0]);
+      return model;
+    }),
+  );
+  // A steel palisade between the track and the approach buildings, 13 m panels end to end, and the yard's clutter
+  // (a parked flat wagon, sleepers, rails, cable drums, drums, a relay cabinet) on the open ground across the track.
+  const placed = async (name, s, offset, turn) => {
+    const model = await loadGLTF(engine, libraryAsset('north-yard/' + name + '.glb'));
+    const { heading } = frame(s);
+    model.root.setPosition(along(s, offset, -0.1)).setRotation([0, heading + turn, 0]);
+    return model;
+  };
+  approach.push(
+    ...(await Promise.all([
+      ...[-89.5, -76.5, -63.5, -50.5, -37.5, -24.5].map((s) => placed('yard-fence', s, 4.95, 0)),
+      placed('yard-props', -60, -6.9, 0),
+    ])),
+  );
   const random = rng(72291);
   const grit = finishTexture(2891, { r: 211, grain: 47, mottling: 30 });
   const brushed = finishTexture(21392, { r: 199, grain: 28, streak: true, mottling: 20 });
@@ -138,7 +167,7 @@ export async function buildDepot(engine, shop, cluster) {
   const shelter = look('#6e7472', 0.7, 0.15, grit),
     mortar = look('#35393b', 0.91, 0.06, grit);
   const platform = look('#5e666b', 0.39, 0.15, grit),
-    asphalt = look('#243039', 0.26, 0.09, grit);
+    asphalt = look('#272e34', 0.44, 0.02, grit);
   const dark = look('#172127', 0.52, 0.24),
     offWhite = look('#bcb5a4', 0.35, 0.36, grit);
   const rubber = look('#17191c', 0.78, 0.09),
@@ -191,7 +220,7 @@ export async function buildDepot(engine, shop, cluster) {
   const wetGround = engine
     .createMesh()
     .setGeometry(coreBox(210, 0.16, 205))
-    .setMaterial(new PbrMaterial({ color: '#333b42', roughness: 0.46 }))
+    .setMaterial(new PbrMaterial({ color: '#30363b', roughness: 0.72 }))
     .setPosition([3, -0.2, -15]);
   wetGround.name = 'Rain-darkened concrete and pooling water';
 
@@ -345,14 +374,9 @@ export async function buildDepot(engine, shop, cluster) {
   // Approach is bounded by the working yard, with an open view along the curve.
   for (let s = -96; s < -22; s += 6.4) {
     const { heading } = frame(s);
-    box([0.29, 1.57, 6.45], mortar, along(s, 4.95, 0.68), [0, heading, 0], undefined, 0.026);
-    box([0.45, 0.115, 6.45], structure, along(s, 4.95, 1.49), [0, heading, 0], undefined, 0.027);
-    box([0.26, 1.98, 0.29], structure, along(s - 2.9, 4.94, 0.89), [0, heading, 0], undefined, 0.019);
-    for (let j = 0; j < 3; j++) {
-      box([0.014, 2.25, 0.031], dark, along(s + j * 1.71 - 2.3, 5.85, 1.025), [0, heading, 0]);
-      const h = 2.1 + random() * 2.6;
-      box([2.05, h, 2.33], structure, along(s + j * 1.85 - 1.54, 9.7 + random() * 3, h / 2 - 0.09), [0, heading, 0]);
-    }
+    // The yard's palisade (yardFence below) and buildings (approach above) stand here; the draws keep the scatter's
+    // sequence.
+    for (let j = 0; j < 6; j++) random();
     if (s < -42 && Math.round(s) % 2 === 0) {
       box([1.3, 0.17, 0.37], structure, along(s, 6.8, 3.66), [0, heading, 0], undefined, 0.041);
       ring([0.079, 0.094, 3.63], structure, along(s, 7.32, 1.65), undefined, undefined, 16);
@@ -619,7 +643,17 @@ export async function buildDepot(engine, shop, cluster) {
     angle: 0.31,
     penumbra: 0.74,
   }));
-  const lamps = [...lights, ...heads];
+  // The saloon lights: two ceiling lamps per module, so the cabins glow through the windows and light their seats.
+  const cabin = Array.from({ length: 6 }, () => ({
+    position: [0, 2.4, 0],
+    direction: [0, -1, 0],
+    range: 4.6,
+    color: [1, 0.92, 0.8],
+    intensity: 26,
+    angle: 1.35,
+    penumbra: 0.85,
+  }));
+  const lamps = [...lights, ...heads, ...cabin];
   const chase = (s, x, y, z) => {
     const p = along(s, x, y);
     const { forward } = frame(s);
@@ -662,6 +696,7 @@ export async function buildDepot(engine, shop, cluster) {
       const bodyS = s - 3.95 - i * (length + 0.37);
       const { center, heading } = frame(bodyS);
       car.setPosition(center).setRotation([0, heading, 0]);
+      for (const k of [0, 1]) cabin[i * 2 + k].position = chase(bodyS, 0, 2.42, k ? 1.65 : -1.65);
       if (i < bellows.length) {
         const joint = frame(bodyS - (length + 0.37) / 2);
         bellows[i].setPosition(joint.center).setRotation([0, joint.heading, 0]);
@@ -703,14 +738,14 @@ export async function buildDepot(engine, shop, cluster) {
         27,
         35,
         [
-          [-1.48, 0.31, -4.2],
-          [-0.36, 0.51, -4.9],
+          [-2.35, 0.3, -3.6],
+          [-0.62, 0.36, -4.95],
         ],
         [
-          [-1.68, 0.52, -4.7],
-          [-0.32, 0.54, -5.11],
+          [-2.45, 0.34, -4.1],
+          [-0.6, 0.38, -5.15],
         ],
-        43,
+        36,
       );
     if (time >= 44 && time < 52)
       return follow(
@@ -770,7 +805,7 @@ export async function buildDepot(engine, shop, cluster) {
   return {
     apply,
     cues,
-    models: [depot],
+    models: [depot, ...approach],
     effects: [ssr],
     receivers: [fog, ssr],
     dispose() {
@@ -778,6 +813,7 @@ export async function buildDepot(engine, shop, cluster) {
       grit.dispose();
       brushed.dispose();
       depot.dispose();
+      for (const model of approach) model.dispose();
     },
     inspection: { frontPosition },
   };

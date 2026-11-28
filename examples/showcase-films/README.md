@@ -18,6 +18,8 @@ Each cabin seat and platform bench has four supports that meet its floor or plat
 
 North Yard's service depot and four neighboring industrial buildings use the CC0 [Modular Factory Facade](https://polyhaven.com/a/modular_factory_facade) by James Ray Cock. The 12.3 MB retiled GLB uses the original 1K material maps. Margo's PBR glTF importer draws the repeated facade pieces through GPU instancing. To rebuild it, download the 1K glTF asset with its dependencies and run `node examples/showcase-films/assemble-north-yard.mjs <kit-directory> examples/showcase-films/assets/north-yard/industrial-buildings.glb`.
 
+The approach to the yard is lined with four brick buildings (a substation, two warehouses and a shed), a palisade fence and a yard of pallets, drums and a works trailer. They are built in Blender from CC0 Poly Haven textures by `build_approach_buildings.py` and `build_yard_props.py` in the asset library's `showcase-films/north-yard/` folder, whose `LABEL.md` names each texture and its source. Six cabin lamps light the saloon through the windows.
+
 ## Above the Treeline
 
 A single rising camera move starts in bunchgrass and pulls back to show the forest thinning above a Rocky Mountain valley. The Biomes alpine placement graph brings shorter firs into sheltered pockets. The fixed terrain anchor holds the ridges through the pullback, and the far forest takes its height from the rendered terrain triangles. The volumetric clouds and aerial haze are rendered with the terrain.

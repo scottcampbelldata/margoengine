@@ -282,7 +282,7 @@ export async function openFilm({ title, build, night = false, far = 75, camera, 
       lightSize: 0.2,
       ...look.shadows,
     });
-    const clustered = Clustered.attach(engine, { maxLights: 24 });
+    const clustered = Clustered.attach(engine, { maxLights: 32 });
     const film = await build(engine, workshopScene, clustered, shadows);
     for (const model of [...workshopScene.finish(), ...(film.models ?? [])]) {
       light.add(model);
