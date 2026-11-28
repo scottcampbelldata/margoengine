@@ -852,6 +852,48 @@ peers: install both with this entry) and takes an `AbortSignal`.
 - A mesh with nothing to spare (a box, a crossed card) keeps its shape, so a ring may keep more than its ratio.
 - Limits: positions and normals only (core Geometry has nothing else); up to 200,000 vertices.
 
+## Needle and leaf levels: `@margoengine/scatter/foliage`
+
+`foliageLODs` makes lighter levels of a mesh of many small pieces (needles, leaves, leaf cards) without thinning the
+crown. Edge collapse (`scatterLODs`, or an exported decimation) removes their area; here whole pieces are removed in an
+even, seeded order and the rest grow until the level's silhouettes along x, y and z cover what the source's cover. Thin
+pieces widen first, down to `slender` times longer than wide (default 4), then grow both ways; pieces over 8 times the
+median area (stems) keep their size. Texture coordinates stay with their vertices, and each level's pieces are a subset
+of the level before.
+
+```ts
+import {foliageLODs} from '@margoengine/scatter/foliage';
+
+// 2,000 flat needles, 6 cm by 3 mm, in a cone.
+const positions: number[] = [], normals: number[] = [], indices: number[] = [];
+for (let n = 0; n < 2000; n++) {
+  const h = (n * 0.618) % 1, a = n * 2.4, r = (1 - h) * 1.2 * ((n * 0.755) % 1);
+  const x = r * Math.cos(a), y = h * 4, z = r * Math.sin(a), first = n * 4;
+  for (const [i, j] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    positions.push(x + i * 0.03 * Math.cos(n), y + j * 0.0015, z + i * 0.03 * Math.sin(n));
+    normals.push(-Math.sin(n), 0, Math.cos(n));
+  }
+  indices.push(first, first + 1, first + 2, first, first + 2, first + 3);
+}
+const levels = foliageLODs({positions, normals, indices}, {triangles: [4000, 800, 200]});
+console.log(levels.map((l) => l.triangles), levels.map((l) => Math.round(l.coverage * 10) / 10)); // [4000,800,200] [1,1,1]
+```
+
+Each level is `{positions, normals, indices, uvs?}` plus `triangles`, `elements`, `area` and `coverage`: build
+`new Geometry(positions, normals, indices)` per level for `Scatter`'s three rings and pass the three `uvs` as
+`textures.uvs`. `area` as an option holds a surface area instead of the silhouette (the source's area keeps the
+lighting's optical depth and draws a dense crown fuller). `libraryParts` of `@margoengine/scenes/library` does all of
+this from one model with `foliageTriangles`. Measured on the CC0 fir scan `fir_tree_01` (4,066,119 needle triangles,
+silhouette 35.2 to 35.6 m2): exported decimations of 76,892, 7,800 and 2,282 triangles cover 8.8, 1.9 and 0.8 m2;
+these levels at the same counts cover 35.3, 35.5 and 34.5 m2, built in about 1.5 s on the CPU. Limits: give it foliage
+only (one connected piece cannot be pruned); weld a mesh whose leaves are split at seams first; grown pieces are
+broader and catch more even light than the needles they replace, so up close the crown reads coarser and a little
+brighter than the scan. Method: Cook, Halstead, Planck and Ryu,
+[Stochastic Simplification of Aggregate Detail](https://graphics.pixar.com/library/StochasticSimplification/), SIGGRAPH
+2007; coverage kept as in Neubert, Pirk, Deussen and Dachsbacher,
+[Improved Model- and View-Dependent Pruning of Large Botanical Scenes](https://diglib.eg.org/handle/10.1111/v30i6pp1708-1718),
+Computer Graphics Forum 30(6), 2011.
+
 ## Procedural grass blades: `@margoengine/scatter/grass`
 
 `GrassScatter` is a `Scatter` that takes no mesh: every instance is a clump of blades the vertex stage builds on the

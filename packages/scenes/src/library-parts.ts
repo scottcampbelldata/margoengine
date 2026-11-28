@@ -18,6 +18,15 @@ export interface LibraryPartsOptions extends Omit<LibraryMeshOptions, 'color' | 
    * or a name with twig, leaf, needle, foliage or frond in it.
    */
   readonly foliage?: (name: string) => boolean;
+  /**
+   * Triangles of each foliage part's near, middle and far levels, made from one model with `foliageLODs` of
+   * `@margoengine/scatter/foliage`: whole needles or leaves are removed and the rest grow until each level covers what
+   * the model covers, where an exported decimation thins the crown. Takes one URL; `maxTriangles` then bounds the
+   * other parts only. Default: foliage draws as the file holds it.
+   */
+  readonly foliageTriangles?: readonly [near: number, middle: number, far: number];
+  /** Reads only the node of this name and its children, as one model of a file holding several. Default: the scene. */
+  readonly node?: string;
   /** Decodes an image file. Default `createImageBitmap` on the fetched bytes. */
   readonly decode?: (bytes: ArrayBuffer, mimeType: string) => Promise<ScatterImage>;
 }
@@ -70,7 +79,8 @@ const FOLIAGE = /twig|leaf|leaves|needle|foliage|frond/i;
  * metallic-roughness images; the metallic-roughness image is read as occlusion-roughness-metal (R occlusion, the
  * packing of Poly Haven and most scan libraries). BLEND materials draw as MASK (a scatter has no sorted blending).
  * Heavy scans need a lighter level first (`maxTriangles`, counted per part). Three URLs (near, middle, far levels of
- * one model, such as decimations of a scan) give each part one geometry per LOD ring, matched by material name.
+ * one model, such as decimations of a scan) give each part one geometry per LOD ring, matched by material name. With
+ * `foliageTriangles` one URL gives each foliage part three levels that keep its crown.
  * @throws TypeError for a document with no textured triangles; RangeError for a part over `maxTriangles`; Error for a
  *   file that does not load.
  * @example
@@ -85,6 +95,8 @@ export async function libraryParts(
     // Three levels of one model, finest first: each material's part draws one level per LOD ring, the near level's maps.
     if (!Array.isArray(url) || url.length !== 3)
       throw new TypeError('libraryParts takes one URL or three; pass a string or [near, middle, far]');
+    if (options.foliageTriangles)
+      throw new TypeError('libraryParts foliageTriangles makes the levels from one model; pass one URL, not three');
     const levels = await Promise.all(url.map((u) => libraryParts(u, options)));
     return levels[0].map((near) => {
       const at = levels.map((l) => l.find((p) => p.name === near.name));
@@ -100,6 +112,9 @@ export async function libraryParts(
       } as unknown as LibraryTexturedPart;
     });
   }
+  const budgets = options.foliageTriangles;
+  if (budgets !== undefined && (!Array.isArray(budgets) || budgets.length !== 3))
+    throw new TypeError('libraryParts foliageTriangles takes three triangle budgets: [near, middle, far]');
   const get = options.fetch ?? (globalThis.fetch as unknown as NonNullable<LibraryMeshOptions['fetch']>),
     init = options.signal ? { signal: options.signal } : {},
     response = await get(url, init);
@@ -148,10 +163,11 @@ export async function libraryParts(
   };
   type Group = { positions: number[]; normals: number[]; uvs: number[]; indices: number[] };
   const groups = new Map<number, Group>();
-  const visit = (id: number, parent: number[]) => {
+  const visit = (id: number, parent: number[], within: boolean) => {
     const node = doc.nodes![id],
-      m = mul(parent, nodeMatrix(node));
-    if (node.mesh !== undefined)
+      m = mul(parent, nodeMatrix(node)),
+      inside = within || (node as { name?: string }).name === options.node;
+    if (inside && node.mesh !== undefined)
       for (const p of doc.meshes![node.mesh].primitives) {
         const a = p.attributes;
         if ((p.mode ?? 4) !== 4 || a.POSITION === undefined || a.NORMAL === undefined || a.TEXCOORD_0 === undefined)
@@ -183,13 +199,16 @@ export async function libraryParts(
           p.indices !== undefined ? read(p.indices, 1, true) : Uint32Array.from({ length: count }, (_, i) => i);
         for (const i of idx) g.indices.push(first + i);
       }
-    for (const c of node.children ?? []) visit(c, m);
+    for (const c of node.children ?? []) visit(c, m, inside);
   };
   const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-  for (const r of doc.scenes?.[doc.scene ?? 0]?.nodes ?? doc.nodes.map((_, i) => i)) visit(r, identity);
+  for (const r of doc.scenes?.[doc.scene ?? 0]?.nodes ?? doc.nodes.map((_, i) => i))
+    visit(r, identity, options.node === undefined);
   if (!groups.size)
     throw new TypeError(
-      `libraryParts: ${url} holds no triangles with positions, normals and uvs; export the model with normals and TEXCOORD_0`,
+      options.node === undefined
+        ? `libraryParts: ${url} holds no triangles with positions, normals and uvs; export the model with normals and TEXCOORD_0`
+        : `libraryParts: ${url} has no node named ${options.node} with textured triangles; pass the name of a node in the file`,
     );
   // One frame for every part: the base of the whole model on y = 0, centred on x = z = 0.
   let minY = Infinity,
@@ -232,17 +251,22 @@ export async function libraryParts(
       );
     return images.get(source);
   };
+  const foliageLODs = budgets ? (await import('@margoengine/scatter/foliage')).foliageLODs : undefined;
+  options.signal?.throwIfAborted();
   const parts: Promise<LibraryTexturedPart>[] = [];
   for (const [key, g] of groups) {
-    const triangles = g.indices.length / 3;
-    if (triangles > most)
-      throw new RangeError(
-        `libraryParts: ${url} has ${triangles} triangles in one part, over maxTriangles ${most}; export a lighter level of it`,
-      );
-    const mat: Material = doc.materials?.[key] ?? {},
+    const triangles = g.indices.length / 3,
+      mat: Material = doc.materials?.[key] ?? {},
       pbr = mat.pbrMetallicRoughness ?? {},
       name = mat.name ?? `material ${key}`,
-      positions = new Float32Array(g.positions.length);
+      masked = mat.alphaMode === 'MASK' || mat.alphaMode === 'BLEND',
+      kind = masked || isFoliage(name) ? ('foliage' as const) : (options.kind ?? 'bark'),
+      pruned = kind === 'foliage' ? foliageLODs : undefined;
+    if (!pruned && triangles > most)
+      throw new RangeError(
+        `libraryParts: ${url} has ${triangles} triangles in one part, over maxTriangles ${most}; export a lighter level of it (foliage parts: pass foliageTriangles)`,
+      );
+    const positions = new Float32Array(g.positions.length);
     for (let i = 0; i < positions.length; i += 3) {
       positions[i] = (g.positions[i] - cx) * k;
       positions[i + 1] = (g.positions[i + 1] - minY) * k;
@@ -261,8 +285,19 @@ export async function libraryParts(
       uvs[i] = c * u + s * v + ox;
       uvs[i + 1] = -s * u + c * v + oy;
     }
-    const masked = mat.alphaMode === 'MASK' || mat.alphaMode === 'BLEND',
-      f = pbr.baseColorFactor ?? [1, 1, 1, 1],
+    let geometry: LibraryTexturedPart['geometry'] = {
+        positions,
+        normals: Float32Array.from(g.normals),
+        indices: Uint32Array.from(g.indices),
+      },
+      coords: ScatterTextures['uvs'] = uvs;
+    if (pruned) {
+      const levels = pruned({ ...geometry, uvs }, { triangles: budgets! });
+      const [a, b, c] = levels.map((l) => ({ positions: l.positions, normals: l.normals, indices: l.indices }));
+      geometry = [a, b, c];
+      coords = [levels[0].uvs!, levels[1].uvs!, levels[2].uvs!];
+    }
+    const f = pbr.baseColorFactor ?? [1, 1, 1, 1],
       [baseColor, normal, orm] = [
         image(pbr.baseColorTexture),
         image(mat.normalTexture),
@@ -270,12 +305,12 @@ export async function libraryParts(
       ];
     parts.push(
       Promise.all([baseColor, normal, orm]).then(([b, n, o]) => ({
-        geometry: { positions, normals: Float32Array.from(g.normals), indices: Uint32Array.from(g.indices) },
+        geometry,
         color: [f[0], f[1], f[2]] as const,
-        kind: masked || isFoliage(name) ? 'foliage' : (options.kind ?? 'bark'),
+        kind,
         name,
         textures: {
-          uvs,
+          uvs: coords,
           ...(b ? { baseColor: b } : {}),
           ...(n ? { normal: n } : {}),
           ...(o ? { occlusionRoughnessMetal: o } : {}),

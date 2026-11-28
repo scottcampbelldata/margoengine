@@ -104,3 +104,62 @@ test('libraryParts splits a glTF by material with its uvs, texture transform and
   assert.equal(rings[1].textures.uvs.length, 3);
   assert.equal(rings[1].textures.alphaCutoff, 0.3);
 });
+
+// KB-SCATTER-TEX2: one model gives each foliage part three levels that cover what it covers; `node` picks one model.
+test('libraryParts foliageTriangles prunes foliage into three levels of one node and leaves bark alone', async () => {
+  const { libraryParts } = await import('@margoengine/scenes/library');
+  // 40 needle triangles apart from each other, one bark triangle, and a second node that must not be read.
+  const needles = 40,
+    count = needles * 3 + 3,
+    bin = new ArrayBuffer(count * 32),
+    f = new Float32Array(bin);
+  for (let v = 0; v < count; v++) {
+    const n = Math.floor(v / 3),
+      c = v % 3;
+    f.set([n * 0.1 + (c === 1 ? 0.05 : 0), c === 2 ? 0.01 : 0, 0], v * 3);
+    f.set([0, 0, 1], count * 3 + v * 3);
+    f.set([n / 100, c / 2], count * 6 + v * 2);
+  }
+  const view = (byteOffset, byteLength) => ({ buffer: 0, byteOffset, byteLength }),
+    part = (first, n, material) => {
+      const at = doc.accessors.length;
+      doc.accessors.push(
+        { bufferView: 0, byteOffset: first * 12, componentType: 5126, count: n, type: 'VEC3' },
+        { bufferView: 1, byteOffset: first * 12, componentType: 5126, count: n, type: 'VEC3' },
+        { bufferView: 2, byteOffset: first * 8, componentType: 5126, count: n, type: 'VEC2' },
+      );
+      return { attributes: { POSITION: at, NORMAL: at + 1, TEXCOORD_0: at + 2 }, material };
+    },
+    doc = {
+      asset: { version: '2.0' },
+      buffers: [{ uri: 'f.bin', byteLength: bin.byteLength }],
+      bufferViews: [view(0, count * 12), view(count * 12, count * 12), view(count * 24, count * 8)],
+      accessors: [],
+      meshes: [],
+      materials: [{ name: 'fir_twig' }, { name: 'fir_bark' }],
+      nodes: [
+        { name: 'a', mesh: 0 },
+        { name: 'b', mesh: 1 },
+      ],
+    };
+  doc.meshes = [{ primitives: [part(0, needles * 3, 0), part(needles * 3, 3, 1)] }, { primitives: [part(0, 3, 1)] }];
+  const fetch = async (url) => ({
+    ok: true,
+    status: 200,
+    json: async () => doc,
+    arrayBuffer: async () => (url.endsWith('f.bin') ? bin : new ArrayBuffer(0)),
+  });
+  const parts = await libraryParts('/fir.gltf', { fetch, node: 'a', maxTriangles: 10, foliageTriangles: [20, 8, 4] });
+  const [twig, bark] = ['fir_twig', 'fir_bark'].map((name) => parts.find((p) => p.name === name));
+  assert.equal(twig.kind, 'foliage');
+  assert.deepEqual(
+    twig.geometry.map((g) => g.indices.length / 3),
+    [20, 8, 4],
+  );
+  twig.geometry.forEach((g, i) => assert.equal(twig.textures.uvs[i].length / 2, g.positions.length / 3));
+  assert.equal(bark.geometry.indices.length, 3, 'node a only, and bark as the file holds it');
+  await assert.rejects(libraryParts('/fir.gltf', { fetch, node: 'a', maxTriangles: 10 }), /foliageTriangles/);
+  await assert.rejects(libraryParts('/fir.gltf', { fetch, node: 'c' }), /no node named c/);
+  await assert.rejects(libraryParts('/fir.gltf', { fetch, foliageTriangles: [4] }), TypeError);
+  await assert.rejects(libraryParts(['/a', '/b', '/c'], { fetch, foliageTriangles: [4, 2, 1] }), TypeError);
+});

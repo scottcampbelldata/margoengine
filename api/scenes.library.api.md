@@ -62,6 +62,8 @@ export interface LibraryMeshPart {
 export interface LibraryPartsOptions extends Omit<LibraryMeshOptions, 'color' | 'kind'> {
     readonly kind?: 'bark' | 'stone';
     readonly foliage?: (name: string) => boolean;
+    readonly foliageTriangles?: readonly [near: number, middle: number, far: number];
+    readonly node?: string;
     readonly decode?: (bytes: ArrayBuffer, mimeType: string) => Promise<ScatterImage>;
 }
 

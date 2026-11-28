@@ -58,6 +58,10 @@
       "types": "./dist/imposter.d.ts",
       "import": "./dist/imposter.js"
     },
+    "./foliage": {
+      "types": "./dist/foliage.d.ts",
+      "import": "./dist/foliage.js"
+    },
     "./textured": {
       "types": "./dist/textured.d.ts",
       "import": "./dist/textured.js"

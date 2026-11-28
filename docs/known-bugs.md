@@ -2575,6 +2575,29 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   report the coded error (the parent reports `MargoError: [Invalid CommandBuffer] is invalid due to a previous error`
   and fails it); the WebGL2 layer must draw it. `tests/support/core-draw-gpu.js` gains the device's error scopes.
 
+### Fixed 2026-11-27: a scanned fir's lighter levels drew as thin skeleton trees (KB-SCATTER-TEX2, scatter, scenes)
+
+- **Repro:** `fir_tree_01` (CC0 scan, 4,066,119 needle triangles on tree a, no alpha cards) decimated to the
+  `forest/fir_tree_01_a_{near,middle,far}` levels and drawn by the timber valley's scatter (creek and aerial views).
+- **Cause:** edge collapse removes the area of separate needles: the levels keep 35.8, 6.8 and 2.8 of 367.5 m2, and
+  their silhouettes cover 8.8, 1.9 and 0.8 of 35.4 m2. The engine had no level builder for aggregate foliage.
+- **Fix:** `@margoengine/scatter/foliage` `foliageLODs` removes whole pieces and grows the rest until the silhouettes
+  match (Cook et al. 2007; Neubert et al. 2011), and `libraryParts` takes `foliageTriangles` and `node`. Same triangle
+  counts from the full scan: 35.3, 35.5 and 34.5 m2 (engine stills of the three levels read close to the full scan).
+- **Regression:** `packages/scatter/test/foliage.test.js` (silhouette at 5 and 25 times fewer needles; the same needles
+  removed without growth cover under a tenth), `packages/scenes/test/library-parts.test.js`.
+- **To use it:** the asset library's old level files are unchanged; load the full scan with `foliageTriangles`.
+
+### Open 2026-11-27: some near firs in the timber valley lean about 20 degrees (KB-SCENES-FIRLEAN1, scenes, biomes)
+
+- **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=creek --library=<asset library>
+  "--query=fir=<fir_tree_01_a levels>"` (lane B frames of 2026-11-17): trees on the creek banks lean toward the valley
+  floor, the nearest right one by about 24 degrees.
+- **Ruled out:** the scan is upright (trunk x -0.53 to 0.60 m over 17.5 m; stills of all its levels stand straight),
+  `BiomeObjects` sets no `alignToGround`, and the trunk's wind reach (about 1.1 m at full strength) gives under half
+  that angle.
+- **Cause:** not found; next step is a frame with the weather's wind at 0 to separate wind from placement.
+
 ### Open 2026-11-26: the far sea shows even parallel rows of crests, as Water's default sea is a sum of eight trains (KB-WATER-FARROWS1, water, SEA-02)
 
 - **Repro:** the Kitty Hawk film's shot s18 (`examples/kitty-hawk`, 3.6 m up over the dune coast's sea): from a few

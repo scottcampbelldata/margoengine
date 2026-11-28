@@ -4551,6 +4551,10 @@
       "types": "./dist/scatter/imposter.d.ts",
       "import": "./dist/scatter/imposter.js"
     },
+    "./scatter/foliage": {
+      "types": "./dist/scatter/foliage.d.ts",
+      "import": "./dist/scatter/foliage.js"
+    },
     "./scatter/textured": {
       "types": "./dist/scatter/textured.d.ts",
       "import": "./dist/scatter/textured.js"

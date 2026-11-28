@@ -19359,3 +19359,15 @@ the pieces of equal path length are derived and measured here.
 ## Stepping: biped footfall walking (2026-11-27)
 
 Built from papers and published gait data, no code read: Jacquelin Perry and Judith Burnfield, Gait Analysis: Normal and Pathological Function, 2nd ed., 2010 (knee angles by gait phase, heel-off near 31 percent, toe extension at toe-off); J. B. de C. M. Saunders, Verne Inman and Howard Eberhart, The major determinants in normal and pathological gait, J Bone Joint Surg 1953, https://pubmed.ncbi.nlm.nih.gov/13069543/ (pelvic list, knee flexion and heel rise as determinants); Steven Gard, Steve Miff and Arthur Kuo, Comparison of kinematic and kinetic methods for computing the vertical motion of the body center of mass during walking, Hum Mov Sci 2004, https://pubmed.ncbi.nlm.nih.gov/15541514/ (vertical travel); Robert Riener, Marco Rabuffetti and Carlo Frigo, Stair ascent and descent at different inclinations, Gait Posture 2002, https://pubmed.ncbi.nlm.nih.gov/11869914/ (knee range stepping up); Lucas Kovar, John Schreiner and Michael Gleicher, Footskate Cleanup for Motion Capture Editing, 2002, https://graphics.cs.wisc.edu/Papers/2002/KSG02/ (pinned heel and toe contacts); Stelian Coros, Philippe Beaudoin, KangKang Yin and Michiel van de Panne, Synthesis of Constrained Walking Skills, 2008, https://www.cs.ubc.ca/~van/papers/2008-TOG-constrainedWalking/index.html (planning a body path to constrained footfalls); Steven Collins, Peter Adamczyk and Arthur Kuo, Dynamic arm swinging in human walking, 2009, https://pmc.ncbi.nlm.nih.gov/articles/PMC2817299/ ; Jonathan Matthis, Sean Barton and Brett Fajen, The critical phase for visual control of human walking over complex terrain, 2017, https://pmc.ncbi.nlm.nih.gov/articles/PMC5558990/ . Combined: a reach ceiling per planted leg at a loaded knee angle, an inverted-pendulum pelvis below it, a terminal-stance heel rise and standing list. The planner moved from the stepping-stones demo, where it was written for Margo.
+
+## Foliage levels: scatter/foliage (2026-11-27)
+
+Written from the papers' descriptions only; no other engine's or tool's code was read. Sources: R. L. Cook, J.
+Halstead, M. Planck and D. Ryu, "Stochastic simplification of aggregate detail", SIGGRAPH 2007,
+https://graphics.pixar.com/library/StochasticSimplification/ (remove a random subset of an aggregate and scale up what
+remains, thin elements by their width); B. Neubert, S. Pirk, O. Deussen and C. Dachsbacher, "Improved model- and
+view-dependent pruning of large botanical scenes", Computer Graphics Forum 30(6), 2011,
+https://diglib.eg.org/handle/10.1111/v30i6pp1708-1718 (keep the projected coverage; overlap makes area alone wrong).
+Derived here: the elements as connected pieces, the golden-ratio order along a Morton curve with nested levels, the
+slenderness limit, the stem threshold of 8 median areas and the secant search of one scale against point-sampled
+silhouettes along the three axes.

@@ -6858,3 +6858,12 @@ dimming of the core, any speed figure.
 ### Stepping (2026-11-27, KB-STEP-CROUCH1)
 
 A biped walking planned footfalls with `@margoengine/animator/stepping` keeps its loaded knee near straight and its pelvis travel near human values: on level 0.62 m strides a single-support knee median of 17 degrees, a swing peak of 66 and 4.7 cm of vertical travel. Proof: tests/modern-animator-stepping.test.js bounds these against Perry and Burnfield 2010 and Gard, Miff and Kuo 2004, and the stepping stones against stair data; reproduce with `node --test tests/modern-animator-stepping.test.js`. Kinematic only; no claim about dynamics or speed.
+
+## Foliage levels keep a crown's silhouette (`@margoengine/scatter/foliage`, 2026-11-27)
+
+Claim: on the CC0 fir scan `fir_tree_01` (4,066,119 needle triangles), levels of 76,890, 7,797 and 2,281 triangles
+cover 35.3, 35.5 and 34.5 m2 seen from the side, where exported edge-collapse decimations of the same counts cover 8.8,
+1.9 and 0.8 m2 and the scan covers 35.4 (point samples 1 cm apart). Proof: `packages/scatter/test/foliage.test.js`
+(synthetic crown, coverage within 12 percent at 25 times fewer needles; the same needles without growth under a tenth);
+the fir figures are from one run on the asset library's scan with `foliageLODs` and defaults. Not claimed: a match of
+colour or shading up close, or any frame-time figure.

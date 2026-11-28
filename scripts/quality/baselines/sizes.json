@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21692645,
+  "total": 21698511,
   "history": [
     {
       "date": "2026-10-24",
@@ -15380,6 +15380,12 @@
       "commit": "hydro-04-numeric-range-and-surface",
       "reason": "HYDRO-04 physics/landscape grows from 4282 to 5066 B gzip (ceiling 4538 to 5322) for input validation, transactional material and bed state, and TerrainBed float32 checks. The optional plain/shared native assets grow from 5235/5302 to 11788/11848 B gzip for finite multi-flow routing and scaled incision, grain and diffusion arithmetic. A split would duplicate accepted arena state and the receiver graph. Core and Stage gain zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-e-foliage",
+      "reason": "KB-SCATTER-TEX2: new optional entry scatter/foliage (3,246 B: silhouette-matched needle pruning), and libraryParts gains foliageTriangles and node (about 320 B in scenes/library and the Fauld scenes that import it); the pruning loads only when asked for",
+      "grew": 5
     }
   ],
   "items": {
@@ -16531,6 +16537,7 @@
     "@margoengine/save/slots": 6151,
     "@margoengine/scatter": 30263,
     "@margoengine/scatter/attributes": 2319,
+    "@margoengine/scatter/foliage": 3502,
     "@margoengine/scatter/grass": 2855,
     "@margoengine/scatter/imposter": 2968,
     "@margoengine/scatter/interact": 3574,
@@ -16559,11 +16566,11 @@
     "@margoengine/scene/tags": 2932,
     "@margoengine/scenes": 4642,
     "@margoengine/scenes/dune-coast": 7618,
-    "@margoengine/scenes/fauld-blast": 10004,
-    "@margoengine/scenes/fauld-countryside": 8214,
-    "@margoengine/scenes/fauld-crater": 8214,
+    "@margoengine/scenes/fauld-blast": 10579,
+    "@margoengine/scenes/fauld-countryside": 8841,
+    "@margoengine/scenes/fauld-crater": 8804,
     "@margoengine/scenes/fauld-tunnels": 13903,
-    "@margoengine/scenes/library": 4468,
+    "@margoengine/scenes/library": 5040,
     "@margoengine/scenes/look-family": 1100,
     "@margoengine/scenes/shot-settings": 1718,
     "@margoengine/scenes/timber-valley": 6406,

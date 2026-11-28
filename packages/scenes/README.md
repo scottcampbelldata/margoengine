@@ -252,8 +252,13 @@ console.log(rock.geometry.indices.length / 3, rock.kind); // 1 stone
 `libraryParts(url, options)` loads a scanned model with its textures instead: one part per glTF material, each with its
 TEXCOORD_0 (KHR_texture_transform applied), base colour, normal and metallic-roughness images (R read as occlusion, the
 packing of Poly Haven scans), MASK and BLEND materials and names with twig, leaf or needle as `foliage` with an alpha
-cut-out. Three URLs (near, middle and far levels of one model) give each part a geometry per LOD ring. Scans are heavy:
-decimate them into levels first (the 1910 conifer is `plants/fir_tree_01/forest/fir_tree_01_a_{near,middle,far}.gltf`
+cut-out. Three URLs (near, middle and far levels of one model) give each part a geometry per LOD ring. Or give one URL
+and `foliageTriangles: [near, middle, far]`: each foliage part's levels are made by `foliageLODs` of
+`@margoengine/scatter/foliage`, which removes whole needles and grows the rest until each level covers what the model
+covers, where an edge-collapse decimation leaves a skeleton; `node` reads one model of a file holding several (the whole
+scan: `libraryParts('/asset-library/big-burn-1910/plants/fir_tree_01/fir_tree_01_2k.gltf', {node:
+'fir_tree_01_a_LOD0', foliageTriangles: [76000, 8000, 2000]})`, a 480 MB download). Scans are heavy:
+decimate their wood into levels first (the 1910 conifer is `plants/fir_tree_01/forest/fir_tree_01_a_{near,middle,far}.gltf`
 in the asset library, 90,000, 20,000 and 11,371 faces).
 
 ```ts
