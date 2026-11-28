@@ -156,6 +156,6 @@
     "test:browser:occlusion": "cd ../.. && node packages/scatter/test/occlusion.browser.mjs",
     "test:browser:attributes": "cd ../.. && node packages/scatter/test/attributes.browser.mjs",
     "test:browser:grass": "cd ../.. && node packages/scatter/test/grass.browser.mjs",
-    "test:browser:velocity": "cd ../.. && node packages/scatter/test/velocity.browser.mjs && node packages/scatter/test/velocity.browser.mjs --compat"
+    "test:browser:velocity": "cd ../.. && node packages/scatter/test/velocity.browser.mjs && node packages/scatter/test/velocity.browser.mjs --compat && node packages/scatter/test/velocity-tiles.browser.mjs && node packages/scatter/test/velocity-tiles.browser.mjs --compat"
   }
 }

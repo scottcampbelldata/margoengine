@@ -1011,6 +1011,9 @@ and `MotionBlur` smears them along the gust at film shutters.
 - Plant states (`@margoengine/scatter/states`) and interaction bends are posed as they are now in both frames: their
   own change between frames is not in the vector.
 - WebGPU and the full WebGL2 layer. Nothing is drawn before the scatter's first frame or after `dispose()`.
+- Streamed scatters work too: a `ScatterTiles` forest remakes its ring, record and table buffers as tiles come and
+  go, and the pass makes its bind groups again whenever one of those buffers is replaced, so a ring that grows on the
+  frame a tile arrives is drawn from its new buffer.
 
 ```ts
 import {Engine} from 'margoengine/core';
@@ -1035,7 +1038,9 @@ for (let i = 0; i < 4; i++) engine.render({delta: 1 / 24});
 
 Real-GPU proof: `node packages/scatter/test/velocity.browser.mjs` (and with `MARGO_COMPAT=1`): a still camera over a
 meadow in wind has no vectors without the pass, vectors along the wind with it (diffuse and PBR, 4,000 and 700,000
-clumps), and none at wind strength 0.
+clumps), and none at wind strength 0. `node packages/scatter/test/velocity-tiles.browser.mjs` (and `--compat`) streams `ScatterTiles`
+tiles in and out with the pass attached, so the rings grow, the record pool grows and the rings shrink, and every
+frame must submit without a destroyed buffer (KB-SCATTER-VELTILES1).
 
 ## Film time: seeking the wind to a cut
 

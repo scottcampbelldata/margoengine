@@ -6,6 +6,19 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: scatter motion vectors drew a streamed forest from destroyed buffers (KB-SCATTER-VELTILES1, scatter)
+
+- **Repro:** a `ScatterTiles` scatter with `ScatterVelocity` added to TAA; stream a tile in with `setTile` so a ring
+  needs more instances. The next frame's submit failed with "[Buffer (unlabeled)] used in submit while destroyed"
+  (found by lane B's forest film shots, one velocity pass per swaying scatter).
+- **Cause:** `ScatterTiles` destroys and remakes its LOD ring instance buffers, and its record and table buffers, as the
+  held tiles change, and tells the colour pass (`instancesChanged`). `ScatterVelocity` (`packages/scatter/src/velocity.ts`)
+  made its ring bind groups once per pipeline and view and kept them, so they still pointed at the destroyed buffers.
+- **Fix:** each view keeps, with its bind groups, the buffers they were made from (instance rings, the WebGL2 route's
+  counts, the pose bindings) and makes them again when any of them is replaced. Regression:
+  `packages/scatter/test/velocity-tiles.browser.mjs` (WebGPU and `--compat`; fails with the destroyed-buffer error
+  without the fix).
+
 ### Fixed 2026-11-28: a soft body held off the ground only after its vertex-block passes sank by twice its load (KB-SOFT-CONTACTSPLIT1, physics soft kernel)
 
 - **Repro:** a 10 cm cube of 1 MPa rubber on `setSolver('vertex-block')`, standing on a fixed floor, pressed by 100 N on

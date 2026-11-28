@@ -71,8 +71,20 @@ interface View {
   uniform: GPUBuffer;
   /** The last frame's eye and footprint, wind and sway, once drawn. */
   last?: Float32Array;
-  groups: Map<GPURenderPipeline, GPUBindGroup[]>;
+  /** Each pipeline's ring bind groups and the buffers they were made with. */
+  groups: Map<GPURenderPipeline, { bound: GPUBuffer[]; groups: GPUBindGroup[] }>;
 }
+
+// Every buffer a ring's bind groups read: the instance rings, the route's counts and the pose bindings. A scatter that
+// replaces one (ScatterTiles grows and shrinks its rings and its record and table buffers as tiles stream, and destroys
+// the old ones) makes the cached groups stale, so they are made again whenever this list changes.
+const boundBuffers = (parts: ScatterVelocityParts): GPUBuffer[] => [
+  ...parts.instances,
+  ...(parts.route ? [parts.route.count(0).buffer] : []),
+  ...parts.entries().map((e) => e.buffer),
+];
+const same = (a: readonly GPUBuffer[], b: readonly GPUBuffer[]) =>
+  a.length === b.length && a.every((x, i) => x === b[i]);
 
 /**
  * A `TAAVelocityPass` for one Scatter (a `GrassScatter`, a forest, any scatter with wind): `taa.add(new
@@ -167,9 +179,10 @@ export class ScatterVelocity {
     cover: boolean,
   ): void {
     const pipeline = this.pipeline(device, parts, frame, split, cover);
-    let groups = view.groups.get(pipeline);
-    if (!groups) {
-      groups = parts.instances.map((buffer, i) =>
+    const bound = boundBuffers(parts);
+    let held = view.groups.get(pipeline);
+    if (!held || !same(held.bound, bound)) {
+      const groups = parts.instances.map((buffer, i) =>
         device.createBindGroup({
           layout: pipeline.getBindGroupLayout(0),
           entries: [
@@ -180,10 +193,10 @@ export class ScatterVelocity {
           ].map((resource, binding) => ({ binding, resource })),
         }),
       );
-      view.groups.set(pipeline, groups);
+      view.groups.set(pipeline, (held = { bound, groups }));
     }
     pass.setPipeline(pipeline);
-    pass.setBindGroup(0, groups[ring]);
+    pass.setBindGroup(0, held.groups[ring]);
     pass.setVertexBuffer(0, parts.vertices[ring]);
     pass.setIndexBuffer(parts.indices[ring], 'uint32');
     if (parts.route) pass.drawIndexed(parts.counts[ring], parts.route.capacity);
