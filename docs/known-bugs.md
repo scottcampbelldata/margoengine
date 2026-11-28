@@ -19634,6 +19634,21 @@ Audio follow-up (sweep L6, 2026-11-11, still open): not reproduced; the whole su
 ### Batch 273 Firefox scope and concurrent landing blockers
 
 **Status:** open, deferred (Scott: ignore for now): physical-device certification still open (hardware check).
+
+**Checked 2026-11-28 on main 31585d1f5a.** Only certification is open; the rest of this entry is history.
+
+- Open: full-package and physical-device certification. Real phones, Safari's feature rows after `canvasRead`, the iOS
+  Simulator and a headset are still unmeasured ([limits.md](limits.md), "Browser matrix (batch 273, 2026-11-15)").
+- Not measured again: the shipped Firefox 159.0.1 receipt below, its null native adapter included (the workstation has
+  no installed Firefox). The reruns of 2026-11-27 use Playwright's Firefox 157.0, where 48 native WebGPU rows pass.
+- Closed, the merge markers: `tests/integration-json.test.js` passes.
+- Closed, the Batch 258 forms faults: `packages/ui/tests/forms.test.js` passes, and `forms-browser.mjs` passes on
+  WebGPU and on the WebGL2 compatibility layer.
+- Closed, the duplicate MCP request ids and the GPU planner registrations: `packages/mcp/tests/server.test.js` and
+  `tests/gpu-browser-registration.test.js` pass.
+- Not defects: the colour picker's 64 by 64 cell square is its documented scope ([limits.md](limits.md), "Batch 258
+  forms scope"; a continuous shader is polish), and assistive-technology certification needs a person.
+
 Shipped Firefox159.0.1 now launches through the package-owned BiDi transport and
 passes the scoped46 numeric cases,733 render pipelines and477 legal compute
 pipelines plus the required negative pipeline rejection. The old patched-browser
