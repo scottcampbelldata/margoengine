@@ -249,6 +249,30 @@ console.log(biomes[0].plants?.[0].mesh, climate.latitude, relief.base); // proce
 The ages and their sizes follow the Forest Vegetation Simulator's Inland Empire variant (Wykoff height-diameter and
 Crookston crown width equations), as `@margoengine/procedural/conifers` documents.
 
+## Meadow grass and stones
+
+A detail drawing `procedural:grass` (every preset's grass) takes measured leaf green, linear (0.1617, 0.2024,
+0.0917): ripgut brome and wild oat leaves, ECOSTRESS Spectral Library 1.0 samples VH350 and VH352 (Meerdink, Hook,
+Roberts and Abbott, Remote Sensing of Environment 230, 2019, https://doi.org/10.1016/j.rse.2019.05.015), integrated
+under a 6504 K black body. For bunchgrass up close, draw a `GrassScatter` from `@margoengine/scatter/grass` over the
+view's heightmap (tussocks with cured blades).
+
+`procedural:rock` draws `generateRockMesh` at 2,880, 720 and 180 triangles in the near, middle and far rings, in
+measured granite, linear (0.2709, 0.224, 0.1869) (ECOSTRESS samples Granite_H2, H3 and H5, the `granite` of
+`@margoengine/materials`).
+
+```js
+import { defineBiome } from '@margoengine/biomes';
+const meadow = defineBiome({
+  id: 'upper-meadow',
+  climate: { height: [2900, 3500], slope: [null, 32] },
+  ground: [{ material: 'grass' }],
+  rocks: [{ id: 'talus', mesh: 'procedural:rock', density: 80, radius: 0.3 }],
+  details: [{ id: 'bunchgrass', mesh: 'procedural:grass', density: 18, blades: true }],
+});
+console.log(meadow.details[0].mesh, meadow.rocks[0].mesh);
+```
+
 ## Look families for the ground: `@margoengine/biomes/view`
 
 `BIOME_LOOKS` holds the ground-material look families: `natural` keeps every material, `animatedFeature` draws the ground as broad

@@ -109,9 +109,10 @@ test('each tree, shrub and rock part gets its LOD mesh chain, per-instance tint 
         levels((detail) => procedural[make]({ detail }).indices.length / 3),
         `${key} part ${part}`,
       );
-  // The rock mesh has no detail levels (180 triangles): one mesh in every ring.
+  // The rock is subdivided finer near (film look 2026-11-28: a 180-triangle stone a metre or two from the lens showed
+  // its facets along the outline): 2,880, 720 and 180 triangles in the near, middle and far rings.
   const rock = byMesh.get('rock')[0];
-  assert.equal(new Set(rock.geometries).size, 1);
+  assert.deepEqual(triangles(rock), [2880, 720, 180]);
   // Rings at 150, 400 and 1,000 m for canopy trees (45, 120 and 300 m for the rest), switched hard: a dithered fade
   // between the meshes cost 1.2 ms at shot 01 and 5.6 ms at shot 02 with shadows on the A6000 (limit 0.5 ms).
   assert.deepEqual(broadleaf.trunk.options.lod, [150, 400, 1000]);
@@ -579,4 +580,21 @@ test('setCapture shares the hook with every lit part and detail scatter, release
   assert.equal(calls, 1);
   for (const s of lit) assert.equal(s[key], undefined);
   assert.throws(() => objects.setCapture(hook), TypeError);
+});
+
+// Film look 2026-11-28 ("Above the Treeline"): a meadow's `procedural:grass` detail drew in a saturated (0.2, 0.4,
+// 0.06), twice the measured green and half the blue, which read as bright cut-out cards from 5 m to 50 m. It now takes
+// measured leaf green (ECOSTRESS VH350 and VH352).
+test('grass details take measured leaf green', async () => {
+  const attached = [],
+    engine = { camera: { position: [0, 0, 0] }, use: (effect) => attached.push(effect) },
+    placement = {
+      tile() {},
+      species: [],
+      details: [{ id: 'bunchgrass', mesh: 'procedural:grass', density: 18 }],
+      tileSize: 256,
+    };
+  await BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds: [-512, -512, 512, 512] });
+  const grass = attached.at(-1);
+  assert.deepEqual([...grass.options.material.data.slice(0, 3)].map((v) => +v.toFixed(4)), [0.1617, 0.2024, 0.0917]);
 });

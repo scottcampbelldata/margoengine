@@ -5,7 +5,7 @@
 // placement's detail map, so grass is drawn per frame and never stored. Meshes come from `@margoengine/procedural`
 // (the `procedural:<name>` keys of the presets). Scatter, its tiles entry, procedural and core are loaded on attach.
 import type { EngineKernel, Geometry, PbrMaterial } from '@margoengine/core';
-import type { Scatter } from '@margoengine/scatter';
+import type { Scatter, ScatterOptions } from '@margoengine/scatter';
 import type { ScatterTiles } from '@margoengine/scatter/tiles';
 import type { ScatterStateSource, ScatterTextures } from '@margoengine/scatter';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
@@ -192,7 +192,10 @@ const BARK = [0.22, 0.14, 0.08] as const,
   BIRCH = [0.26, 0.36, 0.07] as const,
   PALM = [0.1, 0.32, 0.07] as const,
   NEEDLE = [0.04, 0.17, 0.07] as const,
-  STONE = [0.4, 0.37, 0.33] as const,
+  // Granite: ECOSTRESS Spectral Library 1.0 samples Granite_H2, H3 and H5 (JHU, directional hemispherical), the mean of
+  // @margoengine/materials measured `granite`. Until 2026-11-28 it was (0.4, 0.37, 0.33), half again too bright.
+  STONE = [0.2709, 0.224, 0.1869] as const,
+  GREEN_GRASS = [0.1617, 0.2024, 0.0917] as const,
   DRY = [0.45, 0.33, 0.11] as const,
   // A green leaf reflects about a tenth of green light and half that of blue and red (PROSPECT, Jacquemoud and Baret
   // 1990; LOPEX93 leaf spectra, Hosgood et al. 1995).
@@ -241,7 +244,7 @@ const CHAR = [0.035, 0.03, 0.028] as const;
 /**
  * The parts of a mesh key: trees are wood and foliage, the rest one mesh. Unknown keys draw as a shrub. Meshes with
  * detail levels (trees, palms, birch, acacia, shrubs) give each part the {@link OBJECT_LOD_DETAIL} chain, one geometry
- * per LOD ring; the others (rocks, cacti, snags, ground cover) one geometry for every ring.
+ * per LOD ring, as do rocks (finer subdivision near); the others (cacti, snags, ground cover) one geometry for every ring.
  */
 function partsOf(
   key: string,
@@ -337,7 +340,14 @@ function partsOf(
     case 'snag':
       return tree([p.generateSnagMesh()], LEAF);
     case 'rock':
-      return [{ geometry: make(p.generateRockMesh()), color: STONE, kind: 'stone' }];
+      // Subdivided finer up close (2,880, 720 and 180 triangles), so a stone a metre or two from the lens shows no facets.
+      return [
+        {
+          geometry: rings(chain((detail) => p.generateRockMesh(1, undefined, { detail }))),
+          color: STONE,
+          kind: 'stone',
+        },
+      ];
     case 'cactus':
       return [{ geometry: make(p.generateCactusMesh()), color: [0.13, 0.3, 0.1], kind: 'bark' }];
     case 'tundra-shrub':
@@ -348,7 +358,9 @@ function partsOf(
         DWARF_BIRCH,
       );
     case 'grass':
-      return [{ geometry: make(p.generateGrassMesh(3)), color: [0.2, 0.4, 0.06], kind: 'foliage', blades: true }];
+      // Green grass leaves: ripgut brome and wild oat, ECOSTRESS Spectral Library 1.0 samples VH350 and VH352, the
+      // path of looks.ts. Until 2026-11-28 it was (0.2, 0.4, 0.06), twice the measured green and half the blue.
+      return [{ geometry: make(p.generateGrassMesh(3)), color: GREEN_GRASS, kind: 'foliage', blades: true }];
     case 'fern':
       return [{ geometry: make(p.generateFernMesh()), color: [0.08, 0.28, 0.07], kind: 'foliage' }];
     case 'sedge':
@@ -612,7 +624,7 @@ export class BiomeObjects implements Disposable {
           device: undefined as GPUDevice | undefined,
           scatter: undefined as unknown as Scatter,
         };
-      entry.scatter = this.#modules.scatter.Scatter.attach(this.#engine, parts[0].geometry, {
+      const common: ScatterOptions = {
         count: Math.min(400000, Math.max(1000, Math.round(d.density * area * area * 0.25))),
         area: [area, area],
         follow: true,
@@ -630,7 +642,8 @@ export class BiomeObjects implements Disposable {
         wind: [1, 0, 0.5],
         ...(parts[0].blades ? { blades: {} } : {}),
         ...this.#states(d.mesh, parts[0].kind),
-      });
+      };
+      entry.scatter = this.#modules.scatter.Scatter.attach(this.#engine, parts[0].geometry, common);
       this.#details.push(entry);
     }
   }
