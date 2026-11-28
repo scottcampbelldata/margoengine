@@ -4,10 +4,12 @@ import assert from 'node:assert/strict';
 import {
   loadRigs, scotchYokeRig, genevaRig, oldhamRig, epicyclicRig, openRig, keyedRig, signedReading, describeCheck,
   harmonicDriveRig, integratorRig, archimedesScrewRig, stroboscopeRig, togglePressRig, gimbalRig, differentialRig, wattGovernorRig,
+  roseEngineRig, reuleauxRig,
 } from '../dist/rigs.js';
 import {
   genevaPose, epicyclicSpeeds, genevaCrankRadius, harmonicDriveRatio, ballDiskIntegrator, archimedesScrewPose, stroboscopicPose,
   togglePressPose, gimbalPose, differentialPose, wattGovernorEquilibrium,
+  roseEnginePose, reuleauxPose,
 } from '../dist/mechanisms.js';
 
 await loadRigs();
@@ -252,4 +254,47 @@ test("Watt governor rig: the arms swing out under gravity and settle on Maxwell'
   still.spin(0, 2);
   assert.ok(Math.abs(still.pose().arm - 0.05) < 1e-3, 'below lift-off the arms rest on their stop');
   assert.throws(() => rig.spin(-1, 1), RangeError);
+});
+
+test('Rose engine rig: a follower held 0.2 m off its centre in the rosette groove rocks the headstock and cuts the exact curve', () => {
+  const rosette = { lobes: 6, amplitude: 0.015, overtone: 0.0028 };
+  using rig = roseEngineRig(rosette, { toolRadius: 0.125 });
+  let worst = 0;
+  for (let degrees = 5; degrees <= 360 * 3; degrees += 5) {
+    const pose = rig.drive(degrees * deg, false),
+      exact = roseEnginePose(degrees * deg, rosette, 0.125);
+    worst = Math.max(worst, Math.abs(pose.shift - exact.shift), Math.hypot(pose.cut[0] - exact.cut[0], pose.cut[1] - exact.cut[1]));
+    assert.equal(pose.contact, exact.contact);
+    assert.equal(pose.period, exact.period);
+  }
+  // The rows read speeds at a substep start, so the follower own acceleration leaves a steady lag of a h^2 / (2 c): about 40 um here.
+  assert.ok(worst < 8e-5, `worst gap ${worst} m over three turns`);
+  assert.ok(rig.check.ever < 8e-5, `check ${rig.check.ever} m`);
+  assert.equal(describeCheck(rig.check).endsWith('µm'), true);
+  assert.throws(() => roseEngineRig(rosette, { toolRadius: 0.01 }), RangeError);
+  assert.throws(() => roseEngineRig(rosette, { points: 4 }), RangeError);
+});
+
+test('Rose engine rig: rosettes of other lobe counts, turned both ways, keep the cut exact', () => {
+  for (const rosette of [{ lobes: 9, amplitude: 0.0125, overtone: 0.0022 }, { lobes: 3, amplitude: 0.04 }]) {
+    using rig = roseEngineRig(rosette, { toolRadius: rosette.lobes === 3 ? 0.3 : 0.125 });
+    for (const degrees of [90, -200, 360, 10]) {
+      const pose = rig.drive(degrees * deg, false);
+      assert.ok(Math.abs(pose.shift - roseEnginePose(degrees * deg, rosette, rosette.lobes === 3 ? 0.3 : 0.125).shift) < 1.2e-4, `${rosette.lobes} lobes at ${degrees}`);
+    }
+  }
+});
+
+test('Reuleaux rig: the triangle keeps its centre on the exact nearly square path, in contact with all four walls', () => {
+  using rig = reuleauxRig(0.456);
+  let worst = 0;
+  for (let degrees = 3; degrees <= 360 * 2; degrees += 3) {
+    const pose = rig.drive(degrees * deg, false),
+      exact = reuleauxPose(degrees * deg, 0.456);
+    worst = Math.max(worst, Math.hypot(pose.center[0] - exact.center[0], pose.center[1] - exact.center[1]));
+    assert.ok(Math.abs(pose.span[0] - 0.456) < 2e-4 && Math.abs(pose.span[1] - 0.456) < 2e-4, 'constant width');
+  }
+  assert.ok(worst < 2e-4, `worst gap ${worst} m over two turns`);
+  assert.throws(() => reuleauxRig(-1), RangeError);
+  assert.throws(() => reuleauxRig(1, { subdivisions: 2 }), RangeError);
 });

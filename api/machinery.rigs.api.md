@@ -115,6 +115,17 @@ export interface OldhamRigPose {
     orbitRadius: number;
 }
 
+export interface ReuleauxRigOptions extends RigOptions {
+    subdivisions?: number;
+}
+
+export interface ReuleauxRigPose {
+    angle: number;
+    center: [number, number];
+    contacts: [[number, number], [number, number], [number, number], [number, number]];
+    span: [number, number];
+}
+
 export interface RigCheck {
     worst: number;
     last: number;
@@ -127,6 +138,19 @@ export interface RigOptions {
     angle?: number;
     maxStep?: number;
     signal?: AbortSignal;
+}
+
+export interface RoseEngineRigOptions extends RigOptions {
+    toolRadius?: number;
+    points?: number;
+}
+
+export interface RoseEngineRigPose {
+    angle: number;
+    shift: number;
+    contact: number;
+    cut: [number, number];
+    period: number;
 }
 
 export interface ScotchYokeRigPose {
@@ -221,6 +245,10 @@ export function oldhamRig(offset: number, options?: RigOptions): MechanismRig<Ol
 
 export function openRig<Args extends unknown[], R>(make: (...args: Args) => R, ...args: Args): Promise<R>;
 
+export function reuleauxRig(width: number, options?: ReuleauxRigOptions): MechanismRig<ReuleauxRigPose>;
+
+export function roseEngineRig(rosette: Rosette, options?: RoseEngineRigOptions): MechanismRig<RoseEngineRigPose>;
+
 export function scotchYokeRig(radius: number, options?: RigOptions): MechanismRig<ScotchYokeRigPose>;
 
 export function signedReading(value: number, unit: string, digits?: number): string;
@@ -246,6 +274,12 @@ interface HarmonicDriveSpec {
 }
 
 type Quat = [number, number, number, number];
+
+interface Rosette {
+    lobes: number;
+    amplitude: number;
+    overtone?: number;
+}
 
 interface WattGovernorSpec {
     arm: number;

@@ -241,6 +241,8 @@ console.log(train.drive(1).ring, train.check.ever);
 | `togglePressRig` | the upper link is the crank, the lower link hinged at the knee, the ram on a slide | 4.4 µm over a closing stroke and back |
 | `gimbalRig` | light rings on frictionless hinges (outer about the mount's y, inner about its x) round a rotor free about its own axis; `locked` fixes the rings | 0.0001 degrees over four tilts |
 | `differentialRig` | side gears and a spider pinion as a multibody on the carrier, the bevel meshes as couplings of their joint coordinates (`coupleDofs`), the road a gear on the left side (`setSplit`) | 0.005 degrees over 14 carrier turns |
+| `roseEngineRig` | the rosette is the turning cam, its groove a closed path joint (Catmull-Rom through `points` per turn) holding a follower on the headstock's slide by a point 0.2 m off its centre; the rock and the cut are the follower's | 41 µm over three turns (the steady lag a h^2 / 2c of the path row at 2 degrees a step; 3.5 µm at share 1) |
+| `reuleauxRig` | four fixed walls a width apart and a convex-hull triangle (`subdivisions` an arc) free in the plane with its turn locked to the input: the wall contacts place its centre | 0.7 mm of 456 mm over two turns (contact softness) |
 | `wattGovernorRig` | two point-mass arms on damped hinges of the spindle under gravity, on a stop at low speed; `spin(rpm, seconds)` runs the world, `settle(rpm)` runs it until still; read `check.last`, the gap to Maxwell's balance now | 0.001 degrees settled, about 4 s after a speed change |
 
 The joints are rows of the solver's sequential-impulse solve (Catto 2005; Baraff 1996); the closed forms are Reuleaux (1876) and Willis (1841). Without gravity, friction or load the rigs are kinematic chains solved by the dynamics: they show the solver holds each mechanism to its exact pose. The Watt governor is the one with real dynamics: gravity pulls the balls, the spin swings them out, and a drag on each hinge (which acts only while an arm swings, so it cannot move the balance) settles them where `w^2 L cos(a) = g` (Maxwell, "On Governors", 1868). The differential's meshes are relative to the carrier: the side gears' and the spider's hinge angles are joint coordinates of a multibody tree rooted on the carrier, and couplings hold `left + right` and `spider + (zs / zp) left` fixed, as Rapier's multibody DOF couplings do; `describeCheck(check, 'last')` reads a settling rig's gap now.
@@ -264,6 +266,17 @@ console.log(screw.drive(4 * Math.PI, false).travel); // 0.696 m: two pitches
 
 using strobe = stroboscopeRig({ rpm: 120, flashRate: 14 });
 console.log(strobe.advance(1).sampled); // where the 14th flash caught the rotor
+```
+
+```ts
+import { loadRigs, roseEngineRig, reuleauxRig } from 'margoengine/machinery/rigs';
+
+await loadRigs();
+using rose = roseEngineRig({ lobes: 6, amplitude: 0.015 }, { toolRadius: 0.125 });
+console.log(rose.drive(Math.PI / 6, false).shift); // about 0.015: the rosette has pushed the headstock out its full swing
+
+using square = reuleauxRig(0.456);
+console.log(square.drive(Math.PI / 4).span); // about [0.456, 0.456]: constant width, all four walls touched
 ```
 
 ```ts

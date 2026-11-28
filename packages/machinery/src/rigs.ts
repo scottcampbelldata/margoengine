@@ -15,11 +15,16 @@ import {
   gimbalPose,
   harmonicDriveRatio,
   oldhamPose,
+  reuleauxOutline,
+  reuleauxPose,
+  roseEnginePose,
+  rosetteModulation,
   scotchYokePose,
   togglePressPose,
   wattGovernorEquilibrium,
   type EpicyclicTeeth,
   type HarmonicDriveSpec,
+  type Rosette,
   type WattGovernorSpec,
 } from './mechanisms.js';
 
@@ -1239,6 +1244,150 @@ export function wattGovernorRig(options: WattGovernorRigOptions): WattGovernorRi
     { arm: options.arm, pickoff: options.pickoff, link: options.link, gravity: options.gravity },
     options,
   );
+}
+
+/** Options of {@link roseEngineRig}. */
+export interface RoseEngineRigOptions extends RigOptions {
+  /** The tool's distance from the spindle with the rosette swing at zero, metres (default 1). */
+  toolRadius?: number;
+  /** Points round the rosette groove, 8 or more (default 720). */
+  points?: number;
+}
+/** Pose of {@link roseEngineRig}: the rocking headstock and the cut, from the solver. */
+export interface RoseEngineRigPose {
+  /** The spindle angle, unwrapped. */
+  angle: number;
+  /** The headstock rock off its rest line, metres. */
+  shift: number;
+  /** Where the work turns under the tool: the angle in the work frame. */
+  contact: number;
+  /** The point the tool cuts in the work frame. */
+  cut: [number, number];
+  /** The spindle angle over which the pattern repeats. */
+  period: number;
+}
+
+class RoseEngine extends Rig<RoseEngineRigPose> {
+  private readonly follower: PhysicsBody;
+  constructor(
+    private readonly rosette: Rosette,
+    private readonly toolRadius: number,
+    points: number,
+    options: RigOptions,
+  ) {
+    super('m', options);
+    const module = physicsModule(),
+      groove = Array.from({ length: points }, (_, i): [number, number, number] => {
+        const phi = (i * 2 * Math.PI) / points,
+          radius = toolRadius + rosetteModulation(rosette, phi);
+        return [radius * Math.cos(phi), radius * Math.sin(phi), 0];
+      }),
+      start: [number, number, number] = [toolRadius + rosetteModulation(rosette, -this.input), 0, 0.2];
+    // The rosette is the turning cam and its groove a closed path in its frame. The headstock rides a slide along x and is held to
+    // the groove by a point 0.2 m off its centre, the way a real follower pin sits off the axis of its slide.
+    this.follower = point(this.physics, start);
+    this.physics.addJoint(this.ground, this.follower, { type: 'prismatic', axis: [1, 0, 0], anchorA: start });
+    new module.PathJoint(this.physics, this.crank, this.follower, { points: groove, closed: true, anchor: [0, 0, -0.2] });
+  }
+  protected gap(): number {
+    return Math.abs(this.follower.position[0] - (this.toolRadius + rosetteModulation(this.rosette, -this.input)));
+  }
+  pose(): RoseEngineRigPose {
+    const x = this.follower.position[0],
+      contact = -this.input;
+    return {
+      angle: this.input,
+      shift: this.toolRadius - x,
+      contact,
+      cut: [x * Math.cos(contact), x * Math.sin(contact)],
+      period: (2 * Math.PI) / this.rosette.lobes,
+    };
+  }
+}
+
+/**
+ * A rose engine: the spindle turns a rosette whose groove (radius `toolRadius + m(t)`, {@link rosetteModulation}) holds a follower
+ * on the headstock slide, so the headstock rocks `m` as the work turns under a fixed tool and the tool cuts the rosette curve.
+ * The follower is a dynamic body on a slide held to the groove by a path joint on the turning cam; the rock and the cut are the
+ * solver's, and the check is the follower against `toolRadius + m(-angle)` ({@link roseEnginePose}).
+ */
+export function roseEngineRig(rosette: Rosette, options: RoseEngineRigOptions = {}): MechanismRig<RoseEngineRigPose> {
+  const toolRadius = finite(options.toolRadius ?? 1, 'Tool radius'),
+    points = finite(options.points ?? 720, 'Groove points');
+  roseEnginePose(0, rosette, toolRadius);
+  if (!(toolRadius > Math.abs(rosette.amplitude) + Math.abs(rosette.overtone ?? 0)))
+    throw new RangeError(`The tool radius must exceed the rosette swing; got ${toolRadius}.`);
+  if (!(Number.isInteger(points) && points >= 8)) throw new RangeError(`The groove needs 8 or more points; got ${points}.`);
+  return new RoseEngine(rosette, toolRadius, points, options);
+}
+
+/** Options of {@link reuleauxRig}. */
+export interface ReuleauxRigOptions extends RigOptions {
+  /** Points an arc of the triangle collision hull, 4 or more (default 64: the chord is 15 um off the arc at 0.456 m). */
+  subdivisions?: number;
+}
+/** Pose of {@link reuleauxRig}, as {@link ReuleauxPose}: the centre and the contacts the solver triangle makes with the square. */
+export interface ReuleauxRigPose {
+  angle: number;
+  center: [number, number];
+  contacts: [[number, number], [number, number], [number, number], [number, number]];
+  span: [number, number];
+}
+
+class Reuleaux extends Rig<ReuleauxRigPose> {
+  private readonly triangle: PhysicsBody;
+  constructor(
+    private readonly width: number,
+    subdivisions: number,
+    options: RigOptions,
+  ) {
+    super('m', options);
+    const physics = this.physics,
+      half = width / 2,
+      thick = 0.2,
+      hull = reuleauxOutline(width, subdivisions).flatMap(([x, y]) => [x, y, -0.02, x, y, 0.02]),
+      start = reuleauxPose(this.input, width).center;
+    // The square is four fixed walls a width apart; the triangle is a convex hull free in the plane with its turn locked to the
+    // input, so the contacts with the walls alone place its centre (it touches all four at every angle).
+    for (const [x, y] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const)
+      physics.addBody(null, {
+        type: 'fixed',
+        position: [x * (half + thick), y * (half + thick), 0],
+        colliders: { shape: 'box', halfExtents: x ? [thick, half + 2 * thick, 0.05] : [half + 2 * thick, thick, 0.05] },
+      });
+    this.triangle = physics.addBody(null, {
+      type: 'dynamic',
+      position: [start[0], start[1], 0],
+      rotation: zTurn(this.input),
+      colliders: { shape: 'convexHull', points: hull, mass: 1 },
+    });
+    physics.addJoint(this.crank, this.triangle, { type: 'generic', locked: ['linZ', 'angX', 'angY', 'angZ'] });
+  }
+  protected gap(): number {
+    const exact = reuleauxPose(this.input, this.width).center,
+      p = this.triangle.position;
+    return Math.hypot(p[0] - exact[0], p[1] - exact[1]);
+  }
+  pose(): ReuleauxRigPose {
+    const exact = reuleauxPose(this.input, this.width),
+      p = this.triangle.position,
+      center: [number, number] = [p[0], p[1]],
+      move = [center[0] - exact.center[0], center[1] - exact.center[1]],
+      contacts = exact.contacts.map(([x, y]): [number, number] => [x + move[0]!, y + move[1]!]) as ReuleauxRigPose['contacts'];
+    return { angle: this.input, center, contacts, span: [contacts[0][0] - contacts[2][0], contacts[1][1] - contacts[3][1]] };
+  }
+}
+
+/**
+ * A Reuleaux triangle of `width` turning in a square of the same side: four fixed walls and a convex-hull triangle whose turn is
+ * locked to the input and whose centre is free in the plane, so the solver contacts with the walls place it. The centre and the
+ * contacts are the solver's; the check is the centre against {@link reuleauxPose}.
+ */
+export function reuleauxRig(width: number, options: ReuleauxRigOptions = {}): MechanismRig<ReuleauxRigPose> {
+  if (!(width > 0 && Number.isFinite(width))) throw new RangeError(`Width must be above 0; got ${width}.`);
+  const subdivisions = finite(options.subdivisions ?? 64, 'Subdivisions');
+  if (!(Number.isInteger(subdivisions) && subdivisions >= 4)) throw new RangeError(`An arc needs 4 or more subdivisions; got ${subdivisions}.`);
+  return new Reuleaux(width, subdivisions, options);
 }
 
 /**

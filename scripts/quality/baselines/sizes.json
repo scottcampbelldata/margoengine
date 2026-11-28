@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21729517,
+  "total": 21730684,
   "history": [
     {
       "date": "2026-10-24",
@@ -15468,6 +15468,11 @@
       "commit": "heat-haze-ground-1",
       "reason": "post/heat-haze moves from 13265 to 14822 B gzip and its ceiling from 13265 to 15267 B: the hot ground layer (the road mirage), a closed-form ray through a stratified hot layer walked against the scene depth, with its CPU twins inferiorMirageAngle and mirageRay. A separate entry would duplicate the post-stack, depth and uniform handling of the same pass for about 1.5 kB.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "rigs-rose-reuleaux",
+      "reason": "Two more mechanism rigs on the solver so their demos show physics against exact: roseEngineRig (a follower on a slide held 0.2 m off its centre to the rosette groove by a path joint on the turning cam) and reuleauxRig (a convex-hull triangle with its turn locked to the input between four fixed walls, the contacts placing its centre). @margoengine/machinery/rigs 7472 to 8636 B gzip (ceiling 7728 to 8895 B). A split per rig would add an entry and a request each, and each demo loads one solver anyway."
     }
   ],
   "items": {
@@ -16149,7 +16154,7 @@
     "@margoengine/machinery/metrology": 2911,
     "@margoengine/machinery/overlays": 2296,
     "@margoengine/machinery/react": 4713,
-    "@margoengine/machinery/rigs": 7728,
+    "@margoengine/machinery/rigs": 8895,
     "@margoengine/machinery/section": 4575,
     "@margoengine/machinery/spatial": 16699,
     "@margoengine/machinery/surface": 14297,
