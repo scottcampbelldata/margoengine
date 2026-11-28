@@ -213,13 +213,15 @@ export const shotStep = async ({
     if (kept !== null && capture) {
       // capture() starts its copy before its first await, so the frame is read before the browser presents it.
       const { size, via, render, done } = await shot.capture(canvas, { sub, subs: subs.length });
+      // The masks follow the shutter as the frame does: every sub-frame adds into them (KB-SHOT-SHUTTERMASK1).
+      if (masks && !done) await shot.masks({ ...masks, engine, png, sub, subs: subs.length });
       if (done) {
         result = { size, via, render, samples: shot.samples, sha256: await shot.hash() };
         if (thumbnail !== undefined) shot.thumbnail(thumbnail);
         if (png || (expectHash && result.sha256 !== expectHash)) result.png = await shot.png();
         // The frame before its dither, for the look checks that need more than 8 bits (KB-LOOK-TV-TINTRES1).
         if (precise) result.precise = shot.precise();
-        if (masks) result.aovs = await shot.masks({ ...masks, engine, png });
+        if (masks) result.aovs = await shot.masks({ ...masks, engine, png, sub, subs: subs.length });
         if (skyCoverage) {
           const covered = await shot.skyCoverage({ engine, png });
           if (covered) result.aovs = { ...result.aovs, ...covered };

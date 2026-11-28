@@ -213,14 +213,19 @@ function sameSize(a: { width: number; height: number }, b: { width: number; heig
 }
 
 /** Inside flags of a mask, one per pixel, or all inside when no mask is given. */
-function maskBits(frame: { width: number; height: number }, mask: LookMask | undefined, what: string): Uint8Array {
+function maskBits(
+  frame: { width: number; height: number },
+  mask: LookMask | undefined,
+  what: string,
+  least = 128,
+): Uint8Array {
   const count = frame.width * frame.height,
     bits = new Uint8Array(count);
   if (!mask) return bits.fill(1);
   sameSize(frame, mask, `${what} mask`);
   const step = mask.data.length === count ? 1 : mask.data.length === count * 4 ? 4 : 0;
   if (!step) throw rangeError(`The ${what} mask holds one byte or four per pixel`, 'headless');
-  for (let i = 0; i < count; i++) bits[i] = mask.data[i * step] >= 128 ? 1 : 0;
+  for (let i = 0; i < count; i++) bits[i] = mask.data[i * step] >= least ? 1 : 0;
   return bits;
 }
 
@@ -1938,11 +1943,12 @@ export async function checkShot({
     for (const one of entry.pool ?? []) {
       signal?.throwIfAborted();
       const m: Record<string, LookMask> = {};
-      for (const [aov, path] of Object.entries(one.aovs ?? {}))
-        if (GROUND_AOVS.includes(aov)) m[aov] = await png(path);
+      for (const [aov, path] of Object.entries(one.aovs ?? {})) if (GROUND_AOVS.includes(aov)) m[aov] = await png(path);
       if (!m.lit || !m.shadow) continue;
       const p = await precise(one.precise);
-      pool.push(groundSample({ precise: p, lit: m.lit, shadow: m.shadow, albedo: withAlbedo ? albedoOf(p, m) : undefined }));
+      pool.push(
+        groundSample({ precise: p, lit: m.lit, shadow: m.shadow, albedo: withAlbedo ? albedoOf(p, m) : undefined }),
+      );
     }
     const probe: LookProbe = {
       name,
@@ -2418,7 +2424,12 @@ export function shimmerMoving(
       count++;
       if (Math.abs(a[i] - sampleLuma(b, width, height, tx, ty)) > threshold) off++;
     }
-  return result('shimmerMoving', percent(off, count), bound, back ? { pixels: count, off, occluded } : { pixels: count, off });
+  return result(
+    'shimmerMoving',
+    percent(off, count),
+    bound,
+    back ? { pixels: count, off, occluded } : { pixels: count, off },
+  );
 }
 
 /**
@@ -2765,7 +2776,10 @@ function inset(width: number, height: number, inside: Uint8Array, r: number): Ui
 // motion blur, depth of field and bloom, so a pixel on a mask's edge holds light from both sides of it: a mixed
 // pixel (Fisher, "The pixel: a snare and a delusion", 1997). Lit and shadowed ground are therefore averaged over
 // their interiors, as patch colour is read in a patch's centre away from its edges (ISO 14524), a GROUND_INSET of
-// the frame in from every edge (KB-LOOK-TV-BOUNCE1: thin shadows between plants took the lit ground's light).
+// the frame in from every edge (KB-LOOK-TV-BOUNCE1: thin shadows between plants took the lit ground's light). The
+// shot tool's masks are the share of each pixel's area and of the open shutter a mask covers, so only pixels a mask
+// covers whole count (KB-SHOT-SHUTTERMASK1: with masks of the last sub-frame alone, ground the camera's motion blurred
+// across a lit and a shaded patch sat inside both interiors).
 //
 // T6 compares one surface in sun and in shade, and a frame's lit and shadowed ground are seldom the same surface: in
 // the timber-valley blowup the shadowed ground read brighter than the lit ground (103 % bounce), which no single
@@ -2782,7 +2796,10 @@ function inset(width: number, height: number, inside: Uint8Array, r: number): Ui
  * The albedo of a probe's masks: `albedo-r`, `albedo-g` and `albedo-b` (grey masks of one sRGB coded channel each, as
  * the shot tool writes an AOV) as one RGBA image, or undefined without all three.
  */
-export function albedoOf(frame: { width: number; height: number }, masks: Record<string, LookMask>): LookImage | undefined {
+export function albedoOf(
+  frame: { width: number; height: number },
+  masks: Record<string, LookMask>,
+): LookImage | undefined {
   const planes = ['albedo-r', 'albedo-g', 'albedo-b'].map((name) => masks[name]);
   if (planes.some((plane) => !plane)) return undefined;
   const count = frame.width * frame.height,
@@ -2853,7 +2870,11 @@ function groundStrata({ frame, precise, lit, shadow, albedo }: GroundFrame): Map
     throw rangeError('A precise frame holds three floats per pixel (RGB, sRGB coded 0 to 1)', 'headless');
   if (precise && frame) sameSize(frame, precise, 'precise frame');
   const r = Math.max(1, Math.round(Math.min(size.width, size.height) * GROUND_INSET)),
-    masks = [lit, shadow].map((mask, i) => inset(size.width, size.height, maskBits(size, mask, i ? 'shadow' : 'lit'), r));
+    // Only pixels the mask covers whole (255): the shot tool's masks are the share of each pixel's area and of the
+    // open shutter they cover, and a pixel part lit, part shaded mixes both sides (KB-SHOT-SHUTTERMASK1).
+    masks = [lit, shadow].map((mask, i) =>
+      inset(size.width, size.height, maskBits(size, mask, i ? 'shadow' : 'lit', 255), r),
+    );
   if (albedo) {
     sameSize(size, albedo, 'albedo');
     if (albedo.data.length !== size.width * size.height * 4)
@@ -2963,8 +2984,7 @@ function pooled(options: BounceOptions, frame: LookImage, value: GroundValue, va
       // A copy: a sample may be pooled again by the next check.
       if (!to) all.set(key, { n: [...at.n], Y: [...at.Y], b: [...at.b], Y2: [...at.Y2], b2: [...at.b2] });
       else
-        for (const field of ['n', 'Y', 'b', 'Y2', 'b2'] as const)
-          for (const k of [0, 1]) to[field][k] += at[field][k];
+        for (const field of ['n', 'Y', 'b', 'Y2', 'b2'] as const) for (const k of [0, 1]) to[field][k] += at[field][k];
     }
   }
   const p = poolStrata(all.values(), value, variance);
@@ -3000,9 +3020,9 @@ function groundCheck(
 
 /**
  * T6: the mean luminance of the shadowed ground as a percent of the lit ground's, in linear light, each averaged over
- * its mask's interior ({@link GROUND_INSET} in from the edges, where the frame mixes both sides). Shadow that holds
- * 10 to 35 percent of the sunlit value carries bounce and sky light; under 10 is crushed, over 35 flat. With
- * `albedo` the lit and shadowed ground are compared surface for like surface ({@link GROUND_ALBEDO_LEVELS}).
+ * its mask's interior (pixels the mask covers whole, {@link GROUND_INSET} in from the edges, where the frame mixes both
+ * sides). Shadow that holds 10 to 35 percent of the sunlit value carries bounce and sky light; under 10 is crushed,
+ * over 35 flat. With `albedo` the lit and shadowed ground are compared surface for like surface ({@link GROUND_ALBEDO_LEVELS}).
  */
 export function bounce(frame: LookImage, { lit, shadow, bound }: BounceOptions): LookResult;
 export function bounce(frame: LookImage, options: BounceOptions): LookResult {

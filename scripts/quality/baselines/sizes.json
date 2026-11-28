@@ -15593,6 +15593,12 @@
       "commit": "2945877d37",
       "reason": "KB-TUNDRA-GROUNDNOISE1: terrain's bump relief reads the layer's 128-texel mip through a cubic B-spline (the shader text rides in every terrain entry; terrain/stream passes its headroom, 16,400 B), core bytes unchanged. KB-TUNDRA-GRASS1: procedural gains generateSedgeMesh and generateLichenMesh (19,689 B whole package), which the tundra preset draws; a separate entry would add a request for two small builders. studio/bench 13,599 B: grown by 516793fa90 (the bench frames its subject, its key light and cyclorama bounds), which landed without this record; kept.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "tintres1-shutter-masks",
+      "reason": "KB-SHOT-SHUTTERMASK1: T6 reads only ground its masks cover whole (255), as the shot tool's masks now follow the shutter: headless/look 19,492 to 19,498 B gzip measured (ceiling 19492 to 19498). One threshold argument on the shared mask helper; a second entry would repeat the ground strata.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16093,7 +16099,7 @@
     "@margoengine/headless/formats": 5809,
     "@margoengine/headless/frames": 2152,
     "@margoengine/headless/gif": 374,
-    "@margoengine/headless/look": 19492,
+    "@margoengine/headless/look": 19498,
     "@margoengine/headless/null": 3411,
     "@margoengine/headless/stage": 3972,
     "@margoengine/headless/tiles": 2829,

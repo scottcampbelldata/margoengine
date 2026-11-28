@@ -389,9 +389,15 @@ test('T8 motionBlur: a frame drawn from sub-frames over a 180 degree shutter pas
       return Math.round(30 + 190 * (cover / subframes));
     });
   const film = motionBlur(exposed(180), motion);
-  assert.ok(film.detail.edges > 0 && film.value === 0 && film.pass, `180 degrees: ${film.value} of ${film.detail.edges}`);
+  assert.ok(
+    film.detail.edges > 0 && film.value === 0 && film.pass,
+    `180 degrees: ${film.value} of ${film.detail.edges}`,
+  );
   const strobe = motionBlur(exposed(180, 1), motion);
-  assert.ok(strobe.detail.edges > 0 && strobe.value === 100, `one sub-frame: ${strobe.value} of ${strobe.detail.edges}`);
+  assert.ok(
+    strobe.detail.edges > 0 && strobe.value === 100,
+    `one sub-frame: ${strobe.value} of ${strobe.detail.edges}`,
+  );
   // A 90 degree frame smears a quarter of the travel: sharp against the 180 degree standard, clean at its own angle.
   assert.equal(motionBlur(exposed(90), motion).value, 100);
   assert.equal(motionBlur(exposed(90), motion, { shutter: 90 }).value, 0);
@@ -499,6 +505,36 @@ test('T6 bounce and shadowTint read the ground masks inside their edges, where t
     none = bounce(blurred, { lit, shadow: thin });
   assert.equal(none.pass, false);
   assert.match(none.missing, /lit and shadowed ground/);
+});
+
+test('T6 counts only ground its masks cover whole, over the pixel and the shutter (KB-SHOT-SHUTTERMASK1)', () => {
+  // The shot tool's masks are the share of each pixel's area and open shutter a mask covers. A band the camera's motion
+  // swept from shade into sun is lit for 5 of 8 sub-frames (mask 159) and its frame mixes both: read as lit ground it
+  // dragged the lit mean toward the shade.
+  const size = 64,
+    sun = [200, 180, 140],
+    shade = [96, 92, 100],
+    swept = (x) => x >= 8 && x < 20,
+    part = 159,
+    lit = { width: size, height: size, data: new Uint8Array(size * size) },
+    shadow = { width: size, height: size, data: new Uint8Array(size * size) };
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      lit.data[y * size + x] = swept(x) ? part : x < 32 ? 255 : 0;
+      shadow.data[y * size + x] = swept(x) ? 255 - part : x < 32 ? 0 : 255;
+    }
+  const frame = image(size, size, (x) => (swept(x) ? mix(shade, sun, part / 255) : x < 32 ? sun : shade)),
+    clean = image(size, size, (x) => (x < 32 ? sun : shade)),
+    hard = mask(size, size, (x) => x < 32 && !swept(x)),
+    hardShadow = mask(size, size, (x) => x >= 32),
+    truth = bounce(clean, { lit: hard, shadow: hardShadow }),
+    seen = bounce(frame, { lit, shadow });
+  assert.ok(Math.abs(seen.value - truth.value) < 1e-9, `swept ${seen.value}, truth ${truth.value}`);
+  assert.equal(seen.detail.lit, truth.detail.lit, 'the swept band is not lit ground');
+  assert.ok(
+    Math.abs(shadowTint(frame, { lit, shadow }).value - shadowTint(clean, { lit: hard, shadow: hardShadow }).value) <
+      1e-9,
+  );
 });
 
 test('T6 bounce and shadowTint compare like surfaces when given the albedo (KB-LOOK-TV-TINTMATCH1)', () => {
@@ -854,7 +890,12 @@ test('T6 reads the precise frame, pools frames and gives its standard error (KB-
   assert.equal(three.detail.lit, 3 * one.detail.lit);
   assert.ok(Math.abs(three.value - one.value) < 0.02, `pooled ${three.value} against one ${one.value}`);
   // Identical frames repeat the same pixels: the batch-means error is 0 and the pixels' error, smaller by root 3, stays.
-  const same = shadowTint(frame, { lit, shadow, precise: precise(), pool: [precise(), precise()].map((p) => ({ precise: p, lit, shadow })) });
+  const same = shadowTint(frame, {
+    lit,
+    shadow,
+    precise: precise(),
+    pool: [precise(), precise()].map((p) => ({ precise: p, lit, shadow })),
+  });
   assert.ok(Math.abs(same.detail.se - one.detail.se / Math.sqrt(3)) < 1e-3, `se ${same.detail.se}`);
   // Frames that disagree: the batch-means error is the larger and is used.
   const apart = (lift) => {
@@ -862,7 +903,12 @@ test('T6 reads the precise frame, pools frames and gives its standard error (KB-
       for (let i = 2; i < p.data.length; i += 3) if ((i / 3) % size >= 16) p.data[i] += lift / 255;
       return p;
     },
-    spread = shadowTint(frame, { lit, shadow, precise: apart(-2), pool: [apart(2), apart(0)].map((p) => ({ precise: p, lit, shadow })) });
+    spread = shadowTint(frame, {
+      lit,
+      shadow,
+      precise: apart(-2),
+      pool: [apart(2), apart(0)].map((p) => ({ precise: p, lit, shadow })),
+    });
   assert.ok(spread.detail.se > 0.3, `the frames' spread sets the error: ${spread.detail.se}`);
   // A pooled frame cut to its strata gives the same, and pooling it again (the next check) leaves it as it was.
   const samples = [precise(0.5), precise()].map((p) => groundSample({ precise: p, lit, shadow })),
@@ -872,7 +918,10 @@ test('T6 reads the precise frame, pools frames and gives its standard error (KB-
   assert.deepEqual(twice, once);
   // bounce reads the precise frame too, and a frame of the wrong length throws.
   assert.ok(bounce(frame, { lit, shadow, precise: precise() }).detail.se > 0);
-  assert.throws(() => shadowTint(frame, { lit, shadow, precise: { width: size, height: size, data: new Float32Array(3) } }), RangeError);
+  assert.throws(
+    () => shadowTint(frame, { lit, shadow, precise: { width: size, height: size, data: new Float32Array(3) } }),
+    RangeError,
+  );
 });
 
 test('checkShot passes a probe its precise frame and pooled frames for T6 (KB-LOOK-TV-TINTRES1)', async () => {

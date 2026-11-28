@@ -886,6 +886,36 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Sent back, then found (2026-11-27):** the blowup early shadowTint flip is deterministic and not TAA's colour: see
   KB-POST-MRTJITTER1.
 
+### Fixed 2026-11-28: a motion-blurred frame's masks were its last sub-frame's alone (KB-SHOT-SHUTTERMASK1, shot tool)
+
+- **Repro (before):** any shot with `subframes` above 1, for example the timber-valley blowup (8 sub-frames, 180
+  degree shutter, the camera 26 pixels a frame at mid): the kept frame is the mean of its sub-frames, but
+  `shotStep` (`tools/shot/render.mjs`) read the masks once, after the last sub-frame, so ground the camera swept from
+  shade into sun during the shutter counted as wholly lit or wholly shaded while its frame mixed both.
+  `tools/shot/test/look-masks-check.mjs` with 4 sub-frames over a full shutter: 0 lit-mask pixels between 0 and 255.
+- **Cause:** the driver's `masks()` read each page texture once, at the frame's end.
+- **Fix:** every sub-frame's masks add into a half-float target with blend weight 1 / `subframes`
+  (`tools/shot/driver.js`, `sumMask`), read with the last, so each pixel is the share of its area and of the open
+  shutter the mask covered; exact floats stay the last sub-frame's (the probe's view-projection). T6 (`bounce`,
+  `shadowTint` in `packages/headless/src/look.ts`) counts only ground a mask covers whole (255) before its inset.
+  Docs: `docs/shots.md`, the headless README T6 rows.
+- **After:** 42,799 lit and 14,991 shadow pixels between 0 and 255 in the check (0 with one sub-frame). On the blowup
+  the T6 drift of KB-LOOK-TV-TINTRES1 is unchanged with the shutter closed (per-frame spread 3.6 b* against 3.4),
+  so this was not its cause.
+- **Regression:** `tests/shot-step.test.js` ("shotStep hands every sub-frame of a kept frame to the masks"),
+  `tools/shot/test/look-masks-check.mjs` (`npm run test:shot`, WebGPU), `packages/headless/tests/look-clean.test.js`
+  ("T6 counts only ground its masks cover whole").
+
+### Fixed 2026-11-28: the look-masks GPU check failed since T1 asked for 2,055 penumbra pixels (KB-SHOT-LOOKMASKSIZE1, shot tool tests)
+
+- **Repro (before):** `node tools/shot/test/look-masks-check.mjs` on 13124e4f1a: "penumbra has its input", missing
+  "2055 interior pixels of penumbra (233 found)", every run since a14017bb5a (KB-LOOK-TV-PENUMBRA2).
+- **Cause:** the check's shot rendered 480 x 270, so the box shadows' soft edge held 233 interior pixels, under T1's
+  `PENUMBRA_MIN_PIXELS` (the 5 percent relative error of its grain estimate).
+- **Fix:** the check renders 1920 x 1080 (the penumbra's area grows with the square of the size); its pixel floors
+  scale by 16. The bar is unchanged.
+- **Regression:** `tools/shot/test/look-masks-check.mjs` itself (`npm run test:shot`).
+
 ### Open 2026-11-28: the blowup's T6 floor (0.0448 b*) is below what its probe frames can resolve (KB-LOOK-TV-TINTRES1, headless look check)
 
 - **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-blowup.json --once --seconds 1.1 --out <folder>`

@@ -16,7 +16,7 @@ import { lookShot } from '../look.mjs';
 const root = resolve(import.meta.dirname, '../../..');
 process.chdir(root);
 const MASKS = ['penumbra', 'subject', 'lit', 'shadow'];
-const file = parseShot({
+const source = {
   format: 'margo-cutscene',
   version: 1,
   duration: 1,
@@ -35,7 +35,9 @@ const file = parseShot({
     version: 1,
     id: 'look-masks',
     seed: 7,
-    size: [480, 270],
+    // Large enough for T1's grain estimate (PENUMBRA_MIN_PIXELS, 2,055 interior pixels): at 480 x 270 the soft edge held
+    // 233, and its area grows with the square of the frame's size.
+    size: [1920, 1080],
     supersample: 1,
     fps: 30,
     seconds: 0.5,
@@ -53,7 +55,8 @@ const file = parseShot({
       aovs: 'shotScene.aovs',
     },
   },
-});
+};
+const file = parseShot(source);
 const out = join(root, 'test-results', 'shots', 'look-masks-check');
 rmSync(out, { recursive: true, force: true });
 const manifest = await shoot(file, { out, runs: 1, log: () => {} });
@@ -76,10 +79,10 @@ const inside = (name) => {
   return { n, luma: y / n };
 };
 const seen = Object.fromEntries(MASKS.map((name) => [name, inside(name)]));
-assert.ok(seen.lit.n > 5000, `lit ground fills the floor (${seen.lit.n} px)`);
-assert.ok(seen.shadow.n > 300, `the boxes put shaded ground down (${seen.shadow.n} px)`);
-assert.ok(seen.penumbra.n > 30, `with a soft edge (${seen.penumbra.n} px)`);
-assert.ok(seen.subject.n > 200, `the gltf subject is in view (${seen.subject.n} px)`);
+assert.ok(seen.lit.n > 80000, `lit ground fills the floor (${seen.lit.n} px)`);
+assert.ok(seen.shadow.n > 4800, `the boxes put shaded ground down (${seen.shadow.n} px)`);
+assert.ok(seen.penumbra.n > 480, `with a soft edge (${seen.penumbra.n} px)`);
+assert.ok(seen.subject.n > 3200, `the gltf subject is in view (${seen.subject.n} px)`);
 assert.ok(
   seen.shadow.luma < 0.7 * seen.lit.luma,
   `the frame is darker in the shadow mask (${seen.shadow.luma} against ${seen.lit.luma})`,
@@ -105,3 +108,30 @@ console.log(
       .map((name) => `${name} ${rows[name].value}`)
       .join(', '),
 );
+
+// KB-SHOT-SHUTTERMASK1: a frame of sub-frames over the shutter is their mean, so its masks must be too. The same shot
+// with 4 sub-frames over a full shutter: the camera moves within the frame, so the box shadows' edges sweep pixels that
+// were lit for part of the shutter, and those read between 0 and 255 in the lit and shadow masks. The masks of the
+// last sub-frame alone (before the fix) are as hard as one sub-frame's.
+const share = (png) => {
+  let between = 0;
+  for (let i = 0; i < png.data.length; i += 4) if (png.data[i] > 0 && png.data[i] < 255) between++;
+  return between;
+};
+const blurred = parseShot({
+  ...source,
+  shot: { ...source.shot, id: 'look-masks-shutter', subframes: 4, shutter: 360 },
+});
+const outBlur = join(root, 'test-results', 'shots', 'look-masks-shutter-check');
+rmSync(outBlur, { recursive: true, force: true });
+const blurManifest = await shoot(blurred, { out: outBlur, runs: 1, log: () => {} }),
+  blurProbe = blurManifest.probes.open;
+for (const name of ['lit', 'shadow']) {
+  const hard = share(masks[name]),
+    soft = share(await decodePNG(readFileSync(join(outBlur, blurProbe.aovs[name]))));
+  assert.ok(
+    soft >= 1600 && soft >= 3 * hard,
+    `the ${name} mask follows the shutter: ${soft} pixels between 0 and 255 with 4 sub-frames, ${hard} with one`,
+  );
+  console.log(`ok ${name} mask over the shutter: ${soft} partial pixels (one sub-frame: ${hard})`);
+}

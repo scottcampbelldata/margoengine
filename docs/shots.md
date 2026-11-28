@@ -309,6 +309,13 @@ foam history is private today), recorded in `docs/limits.md`.
 Each probe also gets its masks, `probes/<name>.<mask>.png`, and each frame record in the manifest gets `aovs`:
 name to `{file, sha256, mean}`, where `mean` is the share of the frame the mask covers (0 to 1).
 
+A kept frame of more than one sub-frame (`subframes`, the shutter's motion blur) is their mean, so its masks are too:
+every sub-frame's masks add into a half-float target with weight 1 / `subframes`, and each pixel of the mask is the
+share of its area and of the open shutter that mask covered. A pixel the camera swept from shade into sun reads between
+0 and 255 in both `lit` and `shadow`, as its frame mixes both. `sky` and `water` are worked out from the mean `geometry`
+with the last sub-frame's camera, and a mask read exactly (`depth` of a moving probe) keeps the last sub-frame's
+floats, the frame the probe's `viewProjection` is of (KB-SHOT-SHUTTERMASK1).
+
 - **`sky-coverage`** is the sky's own record of where it drew (KB-HEARTH-CLIP1). A shot with probes and no `sky` mask
   switches on `coverage` on the page engine's sky (`@margoengine/sky`, the scene plugin with a `coverageTexture`)
   before its frames are drawn, and reads that texture after each probe frame like a page mask: 1 where the sky shows,

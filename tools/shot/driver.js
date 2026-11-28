@@ -220,26 +220,38 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
   const reader = (device) => {
     let found = readers.get(device);
     if (found) return found;
-    const make = (sampleType, type, load) => {
+    // `sum` makes the shutter's pipeline: the value as grey reads it (NaN and below 0 as 0, above 1 as 1) added into
+    // an r16float target with the blend constant 1 / sub-frames, so the target ends as the shutter's mean.
+    const make = (sampleType, type, load, sum = false) => {
       const layout = device.createBindGroupLayout({
           entries: [{ binding: 0, visibility: 2, texture: { sampleType } }],
         }),
+        value = sum ? `min(select(0.0,v,v>0.0),1.0)` : 'v',
         module = device.createShaderModule({
           code: `@group(0) @binding(0) var source:${type};
 @vertex fn vs(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{let p=vec2f(f32((i<<1u)&2u),f32(i&2u));return vec4f(p*2.0-1.0,0.0,1.0);}
-@fragment fn fs(@builtin(position) p:vec4f)->@location(0) vec4f{return vec4f(${load},0.0,0.0,1.0);}`,
+@fragment fn fs(@builtin(position) p:vec4f)->@location(0) vec4f{let v=${load};return vec4f(${value},0.0,0.0,1.0);}`,
         });
-      const pipeline = device.createRenderPipeline({
-        layout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
-        vertex: { module, entryPoint: 'vs' },
-        fragment: { module, entryPoint: 'fs', targets: [{ format: 'r32float' }] },
-        primitive: { topology: 'triangle-list' },
-      });
+      const add = { operation: 'add', srcFactor: 'constant', dstFactor: 'one' },
+        pipeline = device.createRenderPipeline({
+          layout: device.createPipelineLayout({ bindGroupLayouts: [layout] }),
+          vertex: { module, entryPoint: 'vs' },
+          fragment: {
+            module,
+            entryPoint: 'fs',
+            targets: [sum ? { format: 'r16float', blend: { color: add, alpha: add } } : { format: 'r32float' }],
+          },
+          primitive: { topology: 'triangle-list' },
+        });
       return { layout, pipeline };
     };
+    const colour = ['unfilterable-float', 'texture_2d<f32>', 'textureLoad(source,vec2i(p.xy),0).r'],
+      depth = ['depth', 'texture_depth_2d', 'textureLoad(source,vec2i(p.xy),0)'];
     found = {
-      color: make('unfilterable-float', 'texture_2d<f32>', 'textureLoad(source,vec2i(p.xy),0).r'),
-      depth: make('depth', 'texture_depth_2d', 'textureLoad(source,vec2i(p.xy),0)'),
+      color: make(...colour),
+      depth: make(...depth),
+      sumColor: make(...colour, true),
+      sumDepth: make(...depth, true),
     };
     readers.set(device, found);
     return found;
@@ -248,7 +260,7 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
    * A texture's first channel as 8-bit grey, row 0 at the top: 0 to 1 maps to 0 to 255, NaN and below 0 to 0. With
    * `exact` also the values themselves as floats (`value`, NaN and below 0 as 0) and the texture's `format`.
    */
-  const readMask = async (device, name, texture, exact) => {
+  const checkMask = (name, texture) => {
     if (!texture || typeof texture.createView !== 'function')
       throw new Error(`the page gave no texture for the ${name} mask`);
     if (texture.sampleCount > 1 || texture.dimension !== '2d')
@@ -256,6 +268,64 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
         `the ${name} mask must be a single-sample 2D texture (it is ${texture.sampleCount}x ${texture.dimension})`,
       );
     if (!(texture.usage & 4)) throw new Error(`the ${name} mask texture needs TEXTURE_BINDING usage to be read`);
+  };
+  // The shutter's masks: name to its r16float sum, kept between a kept frame's sub-frames (KB-SHOT-SHUTTERMASK1).
+  const shutter = new Map();
+  /**
+   * Adds sub-frame `sub` of `subs` of a mask into its shutter target, which ends as the mean of the `subs` sub-frames
+   * (sub-frame 0 clears it). Resolves the target.
+   */
+  const sumMask = async (device, name, texture, sub, subs) => {
+    checkMask(name, texture);
+    const { width, height } = texture,
+      depth = texture.format.startsWith('depth'),
+      { layout, pipeline } = reader(device)[depth ? 'sumDepth' : 'sumColor'];
+    let target = shutter.get(name);
+    if (sub === 0 || !target || target.width !== width || target.height !== height || target.device !== device) {
+      target?.texture.destroy();
+      target = {
+        device,
+        width,
+        height,
+        texture: device.createTexture({ size: [width, height], format: 'r16float', usage: 0x10 | 0x04 }),
+        count: 0,
+      };
+      shutter.set(name, target);
+    }
+    if (target.count !== sub)
+      throw new Error(`the ${name} mask summed ${target.count} sub-frames before sub-frame ${sub}`);
+    device.pushErrorScope('validation');
+    const encoder = device.createCommandEncoder(),
+      pass = encoder.beginRenderPass({
+        colorAttachments: [
+          {
+            view: target.texture.createView(),
+            loadOp: sub === 0 ? 'clear' : 'load',
+            storeOp: 'store',
+            clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          },
+        ],
+      }),
+      view = texture.createView({
+        dimension: '2d',
+        mipLevelCount: 1,
+        arrayLayerCount: 1,
+        ...(depth ? { aspect: 'depth-only' } : {}),
+      });
+    pass.setPipeline(pipeline);
+    pass.setBlendConstant([1 / subs, 1 / subs, 1 / subs, 1 / subs]);
+    pass.setBindGroup(0, device.createBindGroup({ layout, entries: [{ binding: 0, resource: view }] }));
+    pass.draw(3);
+    pass.end();
+    device.queue.submit([encoder.finish()]);
+    const error = await device.popErrorScope();
+    if (error)
+      throw new Error(`the ${name} mask (${texture.format}) cannot be summed over the shutter: ${error.message}`);
+    target.count++;
+    return target.texture;
+  };
+  const readMask = async (device, name, texture, exact) => {
+    checkMask(name, texture);
     const depth = texture.format.startsWith('depth'),
       { layout, pipeline } = reader(device)[depth ? 'depth' : 'color'],
       { width, height } = texture,
@@ -544,16 +614,34 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
      * the plane y = `horizon.y`. Resolves name: {sha256 of the grey bytes, mean 0 to 1, png in base64 when `png`};
      * a page mask named in `exact` also has `exact` (its floats in base64) and `format`.
      */
-    async masks({ hook, names, derived, horizon, engine, png, exact = [] }) {
+    async masks({ hook, names, derived, horizon, engine, png, exact = [], sub = 0, subs = 1 }) {
       const give = get(hook);
       if (typeof give !== 'function') throw new Error(`${hook} is not a function in the page`);
       const given = await give({ names: names.filter((name) => !derived.includes(name)) });
       if (!given?.device || !given.textures)
         throw new Error(`${hook} must return {device, textures: {name: GPUTexture}}`);
       const read = {};
-      for (const name of names)
-        if (!derived.includes(name))
-          read[name] = await readMask(given.device, name, given.textures[name], exact.includes(name));
+      if (subs > 1) {
+        // A kept frame of sub-frames over the shutter is their mean, so its masks are too: each pixel the share of the
+        // open shutter it showed that mask (KB-SHOT-SHUTTERMASK1: the last sub-frame's masks alone put ground the frame
+        // blurred with its neighbours inside the lit and shadow interiors). A mask's exact values stay the last
+        // sub-frame's, the one the probe's view-projection is of.
+        const sums = {};
+        for (const name of names)
+          if (!derived.includes(name)) sums[name] = await sumMask(given.device, name, given.textures[name], sub, subs);
+        if (sub < subs - 1) return null;
+        for (const name of names) {
+          if (derived.includes(name)) continue;
+          read[name] = await readMask(given.device, name, sums[name], false);
+          if (exact.includes(name)) {
+            const last = await readMask(given.device, name, given.textures[name], true);
+            read[name] = { ...read[name], value: last.value, format: last.format };
+          }
+        }
+      } else
+        for (const name of names)
+          if (!derived.includes(name))
+            read[name] = await readMask(given.device, name, given.textures[name], exact.includes(name));
       if (derived.length) {
         const camera = get(engine)?.camera;
         if (!camera) throw new Error(`no engine camera at ${engine} for the sky and water masks`);

@@ -103,3 +103,44 @@ test("shotStep calls the page's film hook with the sub-frame's exact time, after
     delete globalThis.__margoShot;
   }
 });
+
+// KB-SHOT-SHUTTERMASK1: a kept frame of sub-frames over the shutter is their mean, but its masks were read once, after
+// the last sub-frame, so ground the frame blurred with its neighbours sat inside the lit and shadow interiors T6 reads.
+// Every sub-frame now adds into the masks, which resolve with the last.
+test('shotStep hands every sub-frame of a kept frame to the masks, which resolve with the last', async () => {
+  const calls = [],
+    page = standIn(calls),
+    masks = { hook: 'page.aovs', names: ['lit'], derived: [] };
+  page.capture = async (canvas, { sub, subs }) => ({
+    size: [4, 2],
+    via: 'gpu',
+    render: [4, 2],
+    done: sub === subs - 1,
+  });
+  page.hash = async () => 'hash';
+  page.masks = async (options) => {
+    calls.push(['masks', options.sub, options.subs]);
+    return options.sub === options.subs - 1 ? { lit: { mean: 0.5 } } : null;
+  };
+  globalThis.__margoShot = page;
+  try {
+    const subs = [0, 1, 2].map((k) => ({
+      time: { ms: 16 + k, seconds: k / 100 },
+      camera: null,
+      state: null,
+      settings: null,
+    }));
+    const result = await shotStep({ ...args(subs[0]), subs, kept: 0, capture: true, canvas: '#c', masks });
+    assert.deepEqual(
+      calls.filter((c) => c[0] === 'masks'),
+      [
+        ['masks', 0, 3],
+        ['masks', 1, 3],
+        ['masks', 2, 3],
+      ],
+    );
+    assert.deepEqual(result.aovs, { lit: { mean: 0.5 } });
+  } finally {
+    delete globalThis.__margoShot;
+  }
+});
