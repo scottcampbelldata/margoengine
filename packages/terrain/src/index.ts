@@ -486,12 +486,16 @@ export class Terrain implements EnginePlugin {
     this.ringCount = geometry.ring.length;
     this.rules = upload(this.ruleData(), GPUBufferUsage.STORAGE);
     this.rulesShift.set(this.shiftValues);
+    // Anisotropic: seen from eye height a pixel's footprint on the ground is many times longer than wide, and an
+    // isotropic filter takes the mip level of the long side, smearing the ground into flat blotches a few metres out
+    // (KB-TERRAIN-GRAZESMEAR1). 16 is WebGPU's largest; it needs every filter linear, as here.
     this.sampler = this.device.createSampler({
       addressModeU: 'repeat',
       addressModeV: 'repeat',
       magFilter: 'linear',
       minFilter: 'linear',
       mipmapFilter: 'linear',
+      maxAnisotropy: 16,
     });
     const vertex = GPUShaderStage.VERTEX,
       fragment = GPUShaderStage.FRAGMENT;

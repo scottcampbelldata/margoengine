@@ -79,6 +79,47 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `add` and `steps` split each tile's records among them by the record's variant nibble, so density is unchanged and
   neighbouring stones differ. Test: `packages/biomes/tests/objects.test.js` ("a procedural:rock species draws eight
   seeded stones and splits its records among them").
+### Fixed 2026-11-28: the ground between a meadow's far tussocks smeared into flat blotches at low angles (KB-TERRAIN-GRAZESMEAR1, terrain)
+
+- **Repro (before):** the FG-16 whole scene (a BiomeView temperate meadow from 0.9 to 6 m up, Bruneton sky, shadows,
+  TAA, auto-exposed tonemap): past a few metres the ground texture between the grass clumps read as soft blotches with
+  no grain. `node packages/terrain/test/anisotropy.browser.mjs`: flat ground with one grey value-noise texture seen 3.4
+  degrees down from 1.2 m kept a luma deviation along the rows of 2.36 past about 25 m and 4.53 nearer (RTX A6000).
+- **Cause:** the terrain's one layer sampler (`packages/terrain/src/index.ts`) filtered isotropically. Seen from eye
+  height a pixel's footprint on the ground is 10 to 40 times longer than it is wide, and an isotropic filter takes the
+  mip level of the long side, so the detail across the view averaged away.
+- **Fix:** the sampler filters anisotropically, `maxAnisotropy: 16` (WebGPU's largest; every filter is linear, as it
+  needs). The WebGL2 layer maps it to `EXT_texture_filter_anisotropic`. The same rows now hold 4.35 and 6.93 on both
+  backends, and the meadow frames show the ground's grain between the tussocks.
+- **Regression:** `packages/terrain/test/anisotropy.browser.mjs` (real GPU; `MARGO_COMPAT=1` for the WebGL2 layer).
+
+### Open 2026-11-28: a broadleaf tree (oak, beech, alder) reads as a few smooth lime blobs (KB-PROCEDURAL-OAKBLOB1, procedural, biomes)
+
+- **Repro:** the FG-16 meadow frames (`BiomeView` temperate preset, its oaks 50 to 300 m away): each crown is two or
+  three smooth rounded lobes with dark tufts painted on, no sky through the crown and no limbs, against a real open
+  grown oak at that distance (a ragged, gappy crown of leaf clusters on visible limbs, darker olive than the grass).
+- **Cause:** `generateTreeMesh('broadleaf')` (`packages/procedural/src/foliage.ts`) builds the crown as merged closed
+  lobes fitted to a hull, and `@margoengine/biomes` draws it with one flat colour. The conifers got a branch, shoot
+  and imposter system (`@margoengine/procedural/conifers`, Weber and Penn 1995; Cook et al. 2007); the broadleaf kinds
+  never did. The leaf colour `LEAF` (0.14, 0.3, 0.05) is also about 2.7 times a measured leaf's green reflectance
+  (PROSPECT; LOPEX93), set brighter on purpose in biomes look round 1 when the crowns had no self-shadowing; judge it
+  again once the crown has gaps.
+- **Fix needed:** a broadleaf crown built as limbs carrying leaf clusters with gaps (space colonisation, which
+  `@margoengine/procedural/trees` already grows, then clustered leaf cards), near, middle and imposter levels as the
+  conifers have, judged on whole-scene frames. A planner-sized job across procedural and biomes.
+
+### Open 2026-11-28: a meadow seen from a few metres up shows the edge of the dense near grass as a band (KB-BIOMES-GRASSRING1, biomes, scatter)
+
+- **Repro:** the FG-16 wide shot (camera 6 m up): the ground within 20 m is a dense sward and beyond it the grass
+  thins at once, a visible line across the frame about 17 degrees below the horizon. From 0.9 m it sits 3 degrees down
+  and hardly shows.
+- **Cause:** KB-BIOMES-SPARSEGRASS1's near layer holds 3 clumps a square metre per unit of density (120 for the
+  temperate preset) and the field across `detailRadius` about 15 (its million candidates); the near layer only shrinks
+  its clumps over its last 4 m (`edgeShrink`) while the field fades in over the same 4 m (`inner`, `innerFade`), so the
+  density falls about eight times within 4 m (`packages/biomes/src/objects.ts`, `NEAR_GRASS`).
+- **Fix needed:** thin the near layer with distance and widen the clumps that stay so the covered share of the ground
+  holds (the aggregate-detail rule of Cook, Halstead, Planck and Ryu 2007), meeting the field's density at its edge,
+  in `@margoengine/scatter` as an option with a test, then used by biomes.
 
 ### Fixed 2026-11-28: the lens drops' glint added light over empty pixels without covering them (KB-WEATHER-LENSGLINT1, weather)
 

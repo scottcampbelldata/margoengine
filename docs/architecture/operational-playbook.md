@@ -707,8 +707,15 @@ frame). The worst thing was the grass itself: a three-blade clump mesh at 7 clum
 of the ground from 0.9 m, tufts over soil with a hard edge at `detailRadius`. BiomeObjects now draws it as GrassScatter
 tussocks, 120 clumps a square metre within 20 m and the field fading in behind, 98.6 percent covered
 (`packages/biomes/tests/meadow-grass-check.mjs`); the truck smears the near blades along the motion and the still
-shot keeps them sharp. Weak spots left in those frames: the oaks are low-poly blobs beside the grass, and the ground
-texture between far tussocks reads as a smear at grazing angles.
+shot keeps them sharp. Weak spots left in those frames: the oaks are low-poly blobs beside the grass
+(KB-PROCEDURAL-OAKBLOB1, open), and the ground texture between far tussocks read as a smear at grazing angles.
+
+The smear was the terrain's layer sampler filtering isotropically (KB-TERRAIN-GRAZESMEAR1): from eye height a pixel's
+footprint on the ground is 10 to 40 times longer than wide, and the mip level of the long side averaged the detail
+across the view away. The sampler now asks for 16-sample anisotropic filtering on both backends (the WebGL2 layer
+through `EXT_texture_filter_anisotropic`); grey noise seen 3.4 degrees down from 1.2 m keeps a row luma deviation of
+4.35 past 25 m where it had 2.36 (`packages/terrain/test/anisotropy.browser.mjs`, the same on the layer). The wide shot from 6 m also shows the 20 m edge of the
+dense grass layer as a band (KB-BIOMES-GRASSRING1, open).
 
 ### Section 5 evidence: suspended sediment in the flood (water/flood FG-13, 2026-11-24)
 

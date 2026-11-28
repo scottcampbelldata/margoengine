@@ -22,7 +22,8 @@ for(let s=128;s>=1;s>>=1){const p=levels[levels.length-1],q=new Uint8Array(s*s*4
 const grain=[levels[0].map((v,k)=>k%4===3?255:Math.round(v+36*(hash((k>>2)%256,k>>10,7)-0.5)))];
 for(let s=128;s>=1;s>>=1){const p=grain[grain.length-1],q=new Uint8Array(s*s*4),w=s*2;for(let y=0;y<s;y++)for(let x=0;x<s;x++)for(let c=0;c<4;c++){const a=(2*y*w+2*x)*4+c;q[(y*s+x)*4+c]=(p[a]+p[a+4]+p[a+w*4]+p[a+w*4+4]+2)>>2;}grain.push(q);}
 // `close`: 2 m off the ground, a 1.6 cm texel about two pixels. `slope`: 20 degrees off a 55 degree face, its fall line up the screen. `high`: straight down from 1.52 km, where 96 m is 14 pixels.
-const views={close:{position:[0,1.2,1.6],target:[0,0,0]},near:{position:[0,6,10],target:[0,0,0]},far:{position:[0,60,20],target:[0,0,0]},slope:{position:[24.58,-17.2,0],target:[0,0,0]},high:{position:[0,1520.3,0.01],target:[0,0,0]}};
+// `graze`: 1.2 m off flat ground looking 3.4 degrees down, a pixel's footprint 10 to 40 times as long as it is wide.
+const views={graze:{position:[0,1.2,150],target:[0,0,130]},close:{position:[0,1.2,1.6],target:[0,0,0]},near:{position:[0,6,10],target:[0,0,0]},far:{position:[0,60,20],target:[0,0,0]},slope:{position:[24.58,-17.2,0],target:[0,0,0]},high:{position:[0,1520.3,0.01],target:[0,0,0]}};
 const SLOPE=Math.tan(55*Math.PI/180),scenes={slope:{size:400,height:(x)=>-x*SLOPE},high:{size:8000,height:()=>0}};
 window.check={
   // Attaches a terrain with `layer` options on every layer, renders it from `view` and keeps its pixels as `name`.
@@ -62,6 +63,13 @@ window.check={
     const d=kept.get(name),luma=(x,y)=>{const k=(y*256+x)*4;return 0.2126*d[k]+0.7152*d[k+1]+0.0722*d[k+2];};let sum=0,n=0;
     for(let y=65;y<255;y++)for(let x=1;x<255;x++){let m=0;for(let j=-1;j<2;j++)for(let i=-1;i<2;i++)m+=luma(x+i,y+j);sum+=Math.abs(luma(x,y)-m/9);n++;}
     return {grain:sum/n};
+  },
+  // Detail across the view in rows y0..y1 - 1 of a kept image: the mean, over those rows, of the luma deviation along the
+  // row (each row about its own mean, so the fall of light with distance does not count).
+  rows(name,y0,y1){
+    const d=kept.get(name),luma=(x,y)=>{const k=(y*256+x)*4;return 0.2126*d[k]+0.7152*d[k+1]+0.0722*d[k+2];};let total=0;
+    for(let y=y0;y<y1;y++){let s=0,q=0;for(let x=0;x<256;x++){const v=luma(x,y);s+=v;q+=v*v;}total+=Math.sqrt(Math.max(0,q/256-(s/256)**2));}
+    return total/(y1-y0);
   },
   // The luma autocorrelation of the middle of a kept image at a lag of (dx, dy) pixels.
   correlation(name,dx,dy){
