@@ -59,3 +59,47 @@ test('mergeVertices never makes more hash calls than the parent on an early matc
   );
   assert.deepEqual([...out.indices], [0, 0, 1]);
 });
+
+test('with no tolerance a vertex looks in its own cell only, and merges as before', () => {
+  // Every corner of a cube's 12 triangles stored on its own: 36 vertices, 8 places.
+  const corners = [
+      0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7,
+    ],
+    places = [
+      [0, 0, 0],
+      [1, 0, 0],
+      [1, 1, 0],
+      [0, 1, -0],
+      [0, 0, 1],
+      [1, 0, 1],
+      [1, 1, 1],
+      [0, 1, 1],
+    ],
+    positions = new Float32Array(corners.flatMap((v) => places[v])),
+    data = {
+      positions,
+      normals: new Float32Array(0),
+      uvs: new Float32Array(0),
+      indices: Uint32Array.from(corners.keys()),
+    };
+  const imul = Math.imul;
+  let calls = 0;
+  Math.imul = (a, b) => {
+    calls++;
+    return imul(a, b);
+  };
+  let merged;
+  try {
+    merged = mergeVertices(data, { tolerance: 0, positionOnly: true });
+  } finally {
+    Math.imul = imul;
+  }
+  assert.equal(calls, 36 * 3);
+  assert.equal(merged.positions.length / 3, 8);
+  merged.indices.forEach((v, c) =>
+    assert.deepEqual(
+      [...merged.positions.subarray(v * 3, v * 3 + 3)].map((x) => x || 0),
+      places[corners[c]].map((x) => x || 0),
+    ),
+  );
+});

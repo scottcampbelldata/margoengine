@@ -95,24 +95,26 @@ export function mergeVertices(data: GeometryData, options: MergeVerticesOptions 
   // afterwards, so a scan never makes more Math.imul calls than recomputing them would, and an unmatched vertex
   // makes 9 instead of 48 (Teschner et al. 2003 hash, exact cell checks unchanged).
   const factorY = new Int32Array(3),
-    factorZ = new Int32Array(3);
+    factorZ = new Int32Array(3),
+    // With no tolerance only equal values match, and those share a cell: no neighbor can hold one.
+    reach = tolerance > 0 ? 1 : 0;
   for (let i = 0; i < count; i++) {
     const cx = Math.floor(P[i * 3] / cell),
       cy = Math.floor(P[i * 3 + 1] / cell),
       cz = Math.floor(P[i * 3 + 2] / cell);
     let match = -1,
       centerX = 0;
-    search: for (let dx = -1; dx <= 1; dx++) {
+    search: for (let dx = -reach; dx <= reach; dx++) {
       const x = cx + dx,
         factorX = Math.imul(x, 73856093);
       if (dx === 0) centerX = factorX;
-      for (let dy = -1; dy <= 1; dy++) {
+      for (let dy = -reach; dy <= reach; dy++) {
         const y = cy + dy;
-        if (dx === -1) factorY[dy + 1] = Math.imul(y, 19349663);
+        if (dx === -reach) factorY[dy + 1] = Math.imul(y, 19349663);
         const hash = factorX ^ factorY[dy + 1];
-        for (let dz = -1; dz <= 1; dz++) {
+        for (let dz = -reach; dz <= reach; dz++) {
           const z = cz + dz;
-          if (dx === -1 && dy === -1) factorZ[dz + 1] = Math.imul(z, 83492791);
+          if (dx === -reach && dy === -reach) factorZ[dz + 1] = Math.imul(z, 83492791);
           const bucket = buckets.get(hash ^ factorZ[dz + 1]);
           if (!bucket) continue;
           for (let n = 0; n < bucket.length; n++) {
