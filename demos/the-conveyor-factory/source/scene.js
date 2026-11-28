@@ -10,7 +10,7 @@ export async function connect(bench,source,signal,fail,onResize){
     m[10]=webgpu?1/r:-2/r;
     m[14]=webgpu?far/r:-(far+near)/r;m[15]=1;
   };
-  const art=createAisle(engine);
+  const art=createAisle(engine,(mesh,options)=>bench.add(mesh,options));
   const motor=el('motor'),gear=el('speed'),feed=el('feed'),status=el('status');
   const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
   let rig,format,phase=0,frame=0,last=0,carry=0,pausedFor=0,receipt=null;

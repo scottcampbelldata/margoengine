@@ -25,8 +25,8 @@ async function start(){
   const bench=await openBench(element('stage'),{
     signal,pixelRatio:2,maxWidth:4096,capacity:650,startupTimeout:12000,
     camera:{position:[3.05,6.10,8.35],target:[.075,.97,0],near:.09,far:40},
-    background:'#344c5b',backdrop:false,contact:false,environment:false,shadows:false,
-    light:{direction:[-4,7,5],intensity:2.75,color:[1,.93,.80],ambient:.96,ambientColor:[.74,.88,.99]},
+    background:'#344c5b',backdrop:false,contact:false,environment:false,shadows:{bounds:{min:[-3.5,-.1,-1.9],max:[3.5,2.3,1.9]}},
+    light:{direction:[-4,7,5],intensity:3.1,color:[1,.93,.80],ambient:.55,ambientColor:[.74,.88,.99]},
     onError:fail,onResize:()=>resized(),
   });
   performance.mark('factory-device');

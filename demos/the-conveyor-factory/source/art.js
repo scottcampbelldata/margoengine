@@ -14,19 +14,20 @@ const finishes={
 const badges=['teal','ochre','coral'];
 const half=x=>x*.5;
 const usableBelt=belt.end-belt.start;
-const ribCount=27,ribStep=usableBelt/ribCount;
-const cartonKinds=['card','paper','chestnut'];
+const ribCount=27,ribStep=usableBelt/ribCount,cartonKinds=['card','paper','chestnut'];
 function rounded(dim,radius){
   const {positions,normals,indices}=roundedBoxGeometry(...dim,1,radius);
   return new Geometry(positions,normals,indices);
 }
-export function createAisle(engine){
+export function createAisle(engine,cast){
   const mesh=box(1,1,1),packMesh=rounded([1,1,1],.076);
   const materials=Object.fromEntries(Object.entries(finishes).map(([name,[color,roughness,metalness]])=>
     [name,new PbrMaterial({color,roughness,metalness,doubleSided:false})]));
   function part(name,p,size,roll=0,parent=null,geometry=mesh){
     const object=engine.createMesh(parent).setGeometry(geometry).setMaterial(materials[name]).setPosition(p).setScale(size);
     if(roll)object.rotation.z=roll;
+    // Everything but the floor casts the sun's shadow; ribs and cartons move, the rest is still.
+    if(name!=='ground')(parent?.drops??[]).push(cast(object,{contact:false,static:!parent&&name!=='rib'}));
     return object;
   }
   function fixture(name,p,size,radius,roll=0,parent=null){
@@ -91,7 +92,7 @@ export function createAisle(engine){
   });
   const drawn=new Map();
   function carton(entity){
-    const root=engine.createMesh();
+    const root=engine.createMesh();root.drops=[];
     const [w,h,d]=entity.size;
     part(cartonKinds[entity.variant%3],[0,0,0],[w,h,d],0,root,packMesh);
     part('tape',[0,half(h)+.001,0],[w*.96,.004,d*.23],0,root);
@@ -111,7 +112,7 @@ export function createAisle(engine){
     }
   }
   function reset(){
-    for(const root of drawn.values())root.dispose();
+    for(const root of drawn.values()){for(const drop of root.drops)drop();root.dispose();}
     drawn.clear();
   }
   return {sync,reset};
