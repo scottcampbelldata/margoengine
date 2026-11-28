@@ -20,6 +20,16 @@ npx --yes serve the-orrery
 
 Any static file server works. The pages do not need a build step.
 
+## Rebuild a demo from its source
+
+Each folder keeps the code it was built from in `source/`. After changing a demo or an engine package it uses, rebuild it from the repository root (packages built first with `npm run build:packages`):
+
+```sh
+node scripts/web-demos/build.mjs newtons-cradle
+```
+
+That bundles `source/` against this checkout's packages, replaces `index.html` and the hashed files in `assets/`, and refreshes `downloads/newtons-cradle.zip`. Pass several names, or `--all`. Demos use only engine packages: a simulation, model or effect a demo needs belongs in its package, never in `source/`.
+
 ## Exhibits
 
 | Exhibit | What it shows | Live | Zip |
