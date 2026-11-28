@@ -1938,6 +1938,7 @@ class KernelWorld {
         byteOffset: number;
         byteLength: number;
     }[];
+    workspaceColumns(): ReadonlySet<string>;
     snapshot(): Uint8Array;
     restore(snapshot: Uint8Array): this;
     reserve(bodies: number, colliders?: number): this;
