@@ -17434,6 +17434,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix needed:** a view-dependent or soft-alpha bake (fewer artefacts than three fixed views), or a horizontal cap
   card, judged on the same measure; the test holds the imposter at its measured ceiling (0.16 coverage, 0.25
   luminance) until then.
+- **Progress (middle ring, 2026-11-28):** the open-grown oak (wider crown, 7,248 near card faces) made every fourth
+  card at one width fail: at 2.25 times the side coverage was 9.0 percent off, at 1.9 coverage passed and luminance was
+  7.5 (the near tree's own 45 degree change 5.28 and 4.71). The cause: every k-th card samples all cards, while the
+  view shows mostly the bright outer ones (visible pixels by light row 37.7, 33.3 and 21.4 percent against a card
+  population of 28.6, 42.1 and 29.2), so the middle ring was 3.3 percent darker at equal cover. The middle ring is now
+  chosen by visibility (stratified pruning over 12 views, per-mass sizes solved to the near coverage;
+  `middleCards` in `broadleaves.ts`). Measured, worst of 24 views against the tree's own change: oak seeds 1 to 5
+  coverage 1.9 to 2.6 percent (own 4.5 to 6.7), luminance 1.8 to 4.9 (own 4.7 to 9.1); old and sapling oak and beech
+  seeds 1 and 2 pass. Still failing, the middle ring of the black alder: seed 1 luminance 5.73 against 5.42, seed 2
+  coverage 6.24 against 3.87 and luminance 5.65 against 5.05, seed 3 luminance 6.57 against 5.16 (its middle wood
+  takes up to 2,900 of the 4,000 triangles, leaving it 255 to 360 cards). `test/broadleaf-lod.test.js` holds oak
+  seeds 1 to 3. The imposter part stays open.
 
 ### Open 2026-11-28: a broadleaf tree (oak, beech, alder) reads as a few smooth lime blobs (KB-PROCEDURAL-OAKBLOB1, procedural, biomes)
 
@@ -17461,6 +17473,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   where the photos are a fresh mid green; (3) the far imposters are dark round blobs (KB-PROCEDURAL-OAKIMPOSTER1);
   (4) one mature oak takes about 0.5 s to grow (plan bound 30 ms; move the loop to `trees-kernel` or cut the work).
   The sync default (step C) is not done.
+- **Progress (oak form, 2026-11-28):** for (1), the oak's crown now runs from Hemery's line to the free-standing
+  crowns of Coombes, Martin and Slater 2019 (25.5 dbh at `open` 1), its open-grown height levels off at 21.3 m (Bean),
+  limbs pitch from -22 degrees, spray cards tilt 40 to 65 degrees and fill masses go wherever a sampled spot lies a
+  mass radius outside every mass: the meadow oak is 18.8 m tall and 19.8 m wide. The hull-gap band was measured on five
+  photographed open-grown oaks (0.10 to 0.19, inner up to 0.09; bars 0.10 to 0.20 and 0.10): seeds 1 to 3 pass, and of
+  seeds 1 to 10, 7 pass; seeds 5, 6 and 9 read 0.206 to 0.217 (holes inside the crown). (2) to (4) and step C open.
 
 ### Fixed 2026-11-28: a meadow seen from a few metres up showed the edge of the dense near grass as a band (KB-BIOMES-GRASSRING1, biomes, scatter)
 
@@ -21410,6 +21428,24 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   order and no select on the radius; fails before) and the GPU check above, which passes after on AMD, the RTX A6000 and
   `MARGO_COMPAT=1`.
 
+### Fixed 2026-11-28: sleet's rain drew the drops of the whole precipitation's intensity, not of its own share (KB-SKY-SLEETLAW1, sky)
+
+- **Repro:** `node scripts/run-with-timeout.mjs --max=6 -- node packages/sky/test/features-check.mjs sleet` on an RTX
+  A6000 (origin/main 50e4e322ce, after `npm run build:packages`), WebGPU and `MARGO_COMPAT=1` alike: "sleet off by more
+  than one half-float step", 354 of 399 rain-only pixels differ from the rain drawn alone (worst 0.43), against a 1 %
+  budget. It passed on 8d31e3f9d5.
+- **Cause:** 7c9dbd15d2 gave each raindrop a size from Marshall and Palmer's law. Without `rainRate`, `drawKind` in
+  `packages/sky/src/weather.ts` read the law at `80 * intensity^3` of the whole precipitation, while the rain's
+  particles are its share of it: sleet at 0.6 with half snow drew rain at 0.3's particles with rain at 0.6's drops
+  (bigger, faster, other streaks).
+- **Fix:** the law reads `80 * (intensity * share)^3`, the rain's own rate, so sleet's rain is the rain at its share of
+  the intensity; plain rain (share 1) and an explicit `rainRate` or `rainFrom` are unchanged.
+- **Regression:** `packages/sky/test/sleet.test.js` "sleet's rain takes the drop sizes of the rain drawn alone at its
+  share of the intensity" (the law's slots of the rain uniform; fails before) and the GPU check above, which passes after
+  on WebGPU and the WebGL2 layer: 399 and 431 rain pixels at 4x and 1x, 0 off by a step.
+- **Source:** J. S. Marshall and W. McK. Palmer, "The distribution of raindrops with size", J. Meteor. 5, 165 to 166,
+  1948, https://doi.org/10.1175/1520-0469(1948)005%3C0165:TDORWS%3E2.0.CO;2 (the law is of a rain's own rainfall rate).
+
 ### Open 2026-11-27: four package GPU checks fail on main and failed before the clear colour fix too (KB-GPU-PRECHECKS1, split from KB-CLEAR-CHECKS1)
 
 - **Repro:** `npm run build:packages` on c886aef6c, Intel Arc 140V (Windows, Edge 158), each under
@@ -21452,6 +21488,12 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   under `node scripts/run-with-timeout.mjs --max=6 --`: the clustered sphere-light check (no failures), the biomes
   browser check, the SSAO GPU check and `sky/test/features-check.mjs sleet astro hillaire`. The failures are seen on
   the Intel Arc 140V only, so the row waits for a run on that laptop.
+- **Rechecked 2026-11-28 on the RTX A6000 (origin/main 50e4e322ce), WebGPU and `MARGO_COMPAT=1`:** the clustered and
+  SSAO checks pass. Two had gone red on main since 8d31e3f9d5, on both backends: sleet, from 7c9dbd15d2 (fixed,
+  KB-SKY-SLEETLAW1 above), and the biomes check's "rock light and dark under 2.5x BASE's 0.0415" (0.108), bisected to
+  fefe0bad71, whose BiomeView `relief` default (TerrainReliefLighting) shades both the look and the mask and so lifts
+  the ratio's spread (0.070 with `relief: false`). It passes again after ba2399ec11 (rock faces keep their texture):
+  0.095 on WebGPU, 0.094 on the layer. The Arc rows still wait for that laptop.
 
 ### Fixed 2026-11-27: flame-check `graded` failed on main on both backends (KB-FLAME-GRADEDBG1, vfx)
 
