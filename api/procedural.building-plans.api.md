@@ -212,6 +212,7 @@ interface BuildingRuleOptions {
     readonly interior?: BuildingInterior;
     readonly stairs?: boolean;
     readonly stairShape?: 'auto' | 'winder';
+    readonly escapeStair?: boolean;
     readonly ramps?: boolean;
     readonly fixtures?: boolean;
     readonly softFurnishings?: boolean;
@@ -222,6 +223,7 @@ interface BuildingRuleOptions {
 
 interface BuildingStair {
     readonly floor: number;
+    readonly escape?: boolean;
     readonly kind: 'dog-leg' | 'straight' | 'winder' | 'spiral' | 'ladder';
     readonly winders?: {
         readonly count: number;

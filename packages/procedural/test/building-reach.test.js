@@ -182,7 +182,7 @@ const STAIR_CODE = {
 
 function check(b, o, label, wrong, kinds) {
   const style = o.style;
-  assert.equal(b.stairs.length, b.floors.length - 1, label);
+  assert.equal(b.stairs.filter((s) => !s.escape).length, b.floors.length - 1, label);
   for (const s of b.stairs) {
     kinds[s.kind] = (kinds[s.kind] ?? 0) + 1;
     const storey = b.floors[s.floor + 1] - b.floors[s.floor];
@@ -255,6 +255,77 @@ test('bay windows on every side leave every storey reached on foot', () => {
   }
   assert.deepEqual(wrong.slice(0, 20), [], `${wrong.length} failures`);
   assert.ok(bays > 1500, `${bays} bays`);
+});
+
+// Japan, Order arts. 120 and 121 (https://laws.e-gov.go.jp/api/1/lawdata/325CO0000000338); IBC 2021 1007.1.1
+// (https://www3.iccsafe.org/cs/committeeArea/pdf_file/BU_21_86_22.pdf) and Table 1006.3.4(2).
+test('large buildings get a second stair where the code asks, walked to from every room', () => {
+  const styles = ['japan-2011-house', 'japan-2011-concrete', 'western-1910-brick', 'western-1910-false-front'],
+    wrong = [],
+    kinds = {};
+  let asked = 0,
+    placed = 0,
+    half = 0;
+  seed(9001);
+  for (let i = 0; i < 400; i++) {
+    const style = styles[i % 4],
+      storey = range(2.8, 3.4),
+      o = { style, width: range(8, 58), depth: range(6, 26), storeys: Array(2 + (i % 5)).fill(storey) },
+      b = generateBuilding(o),
+      label = `#${i} ${style} ${o.width.toFixed(2)} x ${o.depth.toFixed(2)} x ${o.storeys.length}`,
+      second = b.stairs.filter((s) => s.escape),
+      wanted = b.escapes.filter((e) => e.required);
+    check(b, o, label, wrong, kinds);
+    assert.equal(b.escapes.length, o.storeys.length - 1, label);
+    asked += wanted.length;
+    for (const e of b.escapes) {
+      assert.ok(Number.isFinite(e.walk) && e.walk > 0, `${label}: the walk on floor ${e.floor}`);
+      assert.equal(e.stairs, second.some((s) => s.floor === e.floor - 1) ? 2 : 1, label);
+      if (e.required && e.stairs === 2) {
+        placed++;
+        if (e.apart >= e.diagonal / 2) half++;
+        assert.ok(e.apart >= e.diagonal / 4 - 1e-9, `${label}: the stairs stand ${e.apart} apart`);
+        assert.ok(e.shared <= e.walk + 1e-9 || e.shared <= e.walkLimit, label);
+      }
+    }
+    if (!second.length) continue;
+    // It runs from the ground up with no gap, stays off the first, and is a stair, not a spiral or a ladder.
+    second.forEach((s, k) => {
+      assert.equal(s.floor, k, label);
+      assert.ok(['dog-leg', 'straight', 'winder'].includes(s.kind), `${label}: ${s.kind}`);
+      const first = b.stairs.find((q) => !q.escape && q.floor === k);
+      assert.ok(
+        s.min[0] >= first.max[0] || s.max[0] <= first.min[0] || s.min[1] >= first.max[1] || s.max[1] <= first.min[1],
+        `${label}: the stairs cross on floor ${k}`,
+      );
+    });
+    // Walking by the second stair alone reaches every room of the floors it serves.
+    wrong.push(...unreached({ ...b, stairs: [...second, ...b.stairs.filter((s) => !s.escape)] }, `${label} by escape`));
+  }
+  assert.deepEqual(wrong.slice(0, 20), [], `${wrong.length} failures`);
+  assert.ok(asked > 400 && placed > asked * 0.97, `${placed} of ${asked}`);
+  assert.ok(half > placed * 0.97, `${half} of ${placed} half the diagonal apart`);
+});
+
+test('a second stair follows the thresholds of the code, and can be left out', () => {
+  const stairs = (o) => generateBuilding(o).stairs.filter((s) => s.escape).length,
+    house = { style: 'japan-2011-house', width: 12, depth: 10, storeys: [2.9, 2.9] };
+  // 2F of a wooden house: more than 200 m2 of rooms (item 6, directly over the ground floor).
+  assert.equal(stairs(house), 0);
+  assert.equal(stairs({ ...house, width: 24, depth: 12 }), 1);
+  assert.equal(generateBuilding({ ...house, width: 24, depth: 12 }).escapes[0].required, 'area');
+  assert.equal(stairs({ ...house, width: 24, depth: 12, escapeStair: false }), 0);
+  assert.equal(generateBuilding({ ...house, width: 24, depth: 12, escapeStair: false }).escapes[0].stairs, 1);
+  // A fire-resistive one doubles the area (para. 2) and walks 50 m (art. 120).
+  const concrete = generateBuilding({ style: 'japan-2011-concrete', width: 22, depth: 14, storeys: [3.6, 3.6] });
+  assert.equal(concrete.escapes[0].required, null);
+  assert.equal(concrete.escapes[0].walkLimit, 50);
+  assert.equal(stairs(concrete.options), 0);
+  // A third storey of a western commercial block has no single exit; a one-family house keeps its one stair.
+  const brick = generateBuilding({ style: 'western-1910-brick' });
+  assert.equal(brick.escapes[1].required, 'storey');
+  assert.equal(brick.stairs.filter((s) => s.escape).length, 2);
+  assert.equal(stairs({ style: 'western-1910-house', width: 30, depth: 14, storeys: [3, 3, 3] }), 0);
 });
 
 test('winder stairs reach every storey too, and come first where asked', () => {

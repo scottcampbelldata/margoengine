@@ -142,6 +142,7 @@ interface BuildingRuleOptions {
     readonly interior?: BuildingInterior;
     readonly stairs?: boolean;
     readonly stairShape?: 'auto' | 'winder';
+    readonly escapeStair?: boolean;
     readonly ramps?: boolean;
     readonly fixtures?: boolean;
     readonly softFurnishings?: boolean;

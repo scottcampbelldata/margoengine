@@ -992,7 +992,7 @@ pan and roll at `near` detail), shingle or standing seam metal, ridge and hip ca
 braces and a chimney that clears the roof by the building code. `detail` (`far`, `mid`, `near`) sets how much small
 geometry there is, so a whole town can be `mid` and the hero house `near`.
 
-It returns `{parts, palette, options, floors, eaves, top, openings, bayWindows, footprint, roofHeight(x, z), chimney, steps,
+It returns `{parts, palette, options, floors, eaves, top, openings, bayWindows, escapes, footprint, roofHeight(x, z), chimney, steps,
 railings, rooms, furniture, doorways, stairs}`: one `GeometryData` per part (`walls`, `interior`, `furniture`,
 `stairs`, `fixtures`, `metalwork`, `fabric`, `mats`, `trim`, `roof`, `glass`, `frames`, `doors`, `base`,
 `porch`, `awning`, `chimney`, `gutters`; a part with nothing in it is left out), all in world space with UVs in metres
@@ -1027,6 +1027,26 @@ const front = generateBuilding({width: 10.92, balcony: 0, bayWindows: [0, 3], ba
 console.log(front.bayWindows.length, front.bayWindows[0].lights.length, front.bayWindows[0].depth.toFixed(2)); // 4 3 0.45
 const tall = generateBuilding({style: 'western-1910-house', bayWindows: [0], bayWindowFrom: 'floor', bayWindowFloors: [0]});
 console.log(tall.bayWindows[0].ledge === tall.floors[0]); // true
+```
+
+A storey that the style's code does not allow one stair gets a second (`escapeStair`, on by default), from the ground
+up to the highest such storey, as far from the first as the rooms hold one. Japan (Enforcement Order arts. 120 and
+121, https://laws.e-gov.go.jp/api/1/lawdata/325CO0000000338): habitable rooms on the 6th floor or above, over 200 m2
+of them on the second floor or 100 m2 on another (both doubled for the concrete and warehouse styles), or a room more
+than 40 m (50 m) of walking from the stair. The western commercial styles (IBC Table 1006.3.4(2) for business areas, as
+summarised at https://datadrivenaec.com/insights/ibc-exit-requirements): a third storey, over 29 occupants at 150 sq ft
+each on the second, or more than 75 ft of walking. The one-family `western-1910-house` keeps one stair (IRC). The two
+stand at least half the floor's diagonal apart where the plan allows (IBC 2021 1007.1.1,
+https://www3.iccsafe.org/cs/committeeArea/pdf_file/BU_21_86_22.pdf), else a third or a quarter. `escapes` reports for
+each upper storey why it asks for two, the stairs it has, the farthest walk, the walk the two ways share and how far
+apart they are; `stairs` marks the second one's flights with `escape`.
+
+```ts
+import {generateBuilding} from 'margoengine/procedural/building-rules';
+const block = generateBuilding({style: 'japan-2011-house', width: 24, depth: 12});
+const [floor] = block.escapes;
+console.log(floor.required, floor.stairs, block.stairs.filter((s) => s.escape).length); // area 2 1
+console.log(floor.apart! >= floor.diagonal / 2, floor.shared! <= floor.walkLimit / 2); // true true
 ```
 
 `townBuildings(lots, {styles, margin, detail, seed, override})` turns the lots of a settlement layout (the `houses` of
@@ -1076,6 +1096,7 @@ console.log(town.length, Object.keys(town[0].parts).length > 5); // 1 true
 | `interior` | `rooms` (`cells` at `far`) | `rooms`, `cells`, `none` | what stands behind the windows |
 | `stairs` | true | | stairs between the storeys of furnished rooms, with their wells and guards |
 | `stairShape` | `auto` | `auto`, `winder` | which stair is tried first: a dog-leg or straight flight, or a winder stair |
+| `escapeStair` | true | | a second stair where the style's code asks a storey for two |
 | `ramps` | false | | ramps at the front doors instead of steps, and between joined floors where one fits |
 | `fixtures` | true | | kitchen, bathroom and toilet rooms with their fixtures |
 | `softFurnishings` | true | | tatami, rugs, curtains, bedding and cushions in homes |

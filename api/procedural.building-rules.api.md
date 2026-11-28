@@ -40,6 +40,7 @@ export interface Building {
     readonly rooms: readonly BuildingRoom[];
     readonly furniture: readonly BuildingFurniture[];
     readonly stairs: readonly BuildingStair[];
+    readonly escapes: readonly BuildingEscape[];
     readonly doorways: readonly BuildingDoorway[];
 }
 
@@ -76,6 +77,17 @@ export interface BuildingDoorway {
     readonly width: number;
     readonly height: number;
     readonly normal: 'x' | 'z';
+}
+
+export interface BuildingEscape {
+    readonly floor: number;
+    readonly required: 'area' | 'storey' | 'walk' | null;
+    readonly stairs: number;
+    readonly walk: number;
+    readonly walkLimit: number;
+    readonly apart?: number;
+    readonly diagonal: number;
+    readonly shared?: number;
 }
 
 export interface BuildingFurniture {
@@ -180,6 +192,7 @@ export interface BuildingRuleOptions {
     readonly interior?: BuildingInterior;
     readonly stairs?: boolean;
     readonly stairShape?: 'auto' | 'winder';
+    readonly escapeStair?: boolean;
     readonly ramps?: boolean;
     readonly fixtures?: boolean;
     readonly softFurnishings?: boolean;
@@ -190,6 +203,7 @@ export interface BuildingRuleOptions {
 
 export interface BuildingStair {
     readonly floor: number;
+    readonly escape?: boolean;
     readonly kind: 'dog-leg' | 'straight' | 'winder' | 'spiral' | 'ladder';
     readonly winders?: {
         readonly count: number;
@@ -231,5 +245,5 @@ type Resolved = Required<Omit<BuildingRuleOptions, 'origin'>> & {
     origin: readonly [number, number, number];
 };
 
-type StyleSet = Omit<Resolved, 'style' | 'origin' | 'yaw' | 'seed' | 'detail' | 'interior' | 'stairs' | 'stairShape' | 'ramps' | 'fixtures' | 'softFurnishings'>;
+type StyleSet = Omit<Resolved, 'style' | 'origin' | 'yaw' | 'seed' | 'detail' | 'interior' | 'stairs' | 'stairShape' | 'escapeStair' | 'ramps' | 'fixtures' | 'softFurnishings'>;
 ```

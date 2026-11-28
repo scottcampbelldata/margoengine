@@ -49,7 +49,7 @@ test('every house, shop block and public building has a stair from each storey t
     const b = generateBuilding({ style }),
       japan = style.startsWith('japan'),
       large = style === 'japan-2011-concrete';
-    assert.equal(b.stairs.length, b.floors.length - 1, style);
+    assert.equal(b.stairs.filter((s) => !s.escape).length, b.floors.length - 1, style);
     assert.ok(b.parts.stairs, style);
     for (const s of b.stairs) {
       const storey = b.floors[s.floor + 1] - b.floors[s.floor];
@@ -395,7 +395,7 @@ function treadAt(b, x, z, most) {
 test('a winder stair climbs its walking line one riser at a time from floor to floor', () => {
   for (const style of ['japan-2011-house', 'japan-2011-concrete', 'western-1910-house', 'western-1910-brick']) {
     const b = generateBuilding({ style, stairShape: 'winder' });
-    assert.equal(b.stairs.length, b.floors.length - 1, style);
+    assert.equal(b.stairs.filter((s) => !s.escape).length, b.floors.length - 1, style);
     for (const s of b.stairs) {
       assert.equal(s.kind, 'winder', style);
       // Across the stair runs from the foot to the head; along it runs from them into the footprint.

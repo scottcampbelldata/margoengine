@@ -47,6 +47,8 @@ import {
 import { WINDOW_FIT, type WindowFit } from './building-windows.js';
 import { buildBay, placeBays, type BuildingBayFrom, type BuildingBayShape } from './building-bays.js';
 export type { BuildingBayFrom, BuildingBayShape } from './building-bays.js';
+import type { BuildingEscape } from './building-escape.js';
+export type { BuildingEscape } from './building-escape.js';
 
 /** The style sets. Each is a full set of defaults; any option given overrides it. */
 export type BuildingStyle =
@@ -193,6 +195,11 @@ export interface BuildingRuleOptions {
    */
   readonly stairShape?: 'auto' | 'winder';
   /**
+   * A second stair where the style's code asks a storey for two (floor area, storey height or a room's walk), as far
+   * from the first as the plan holds one. Default true.
+   */
+  readonly escapeStair?: boolean;
+  /**
    * Ramps where the rules allow them: at each front door in place of its steps (1 in 12, at most 30 in of rise a run
    * with a 60 in landing between runs, handrails and kerbs), and in a joined plan between floors at most 30 in apart,
    * where a run fits. Default false.
@@ -291,6 +298,8 @@ export interface Building {
   readonly furniture: readonly BuildingFurniture[];
   /** Stairs built, one entry from each storey to the next (empty when no room can hold one), local metres. */
   readonly stairs: readonly BuildingStair[];
+  /** What each storey over the ground floor asks of its way out and has (furnished buildings with stairs). */
+  readonly escapes: readonly BuildingEscape[];
   /** Doorways through partition walls, local metres. */
   readonly doorways: readonly BuildingDoorway[];
 }
@@ -339,6 +348,8 @@ export type BuildingRoomUse = 'living' | 'kitchen' | 'bathroom' | 'bedroom' | 'o
 export interface BuildingStair {
   /** The storey it starts on. */
   readonly floor: number;
+  /** True for the flights of a second, escape stair. */
+  readonly escape?: boolean;
   readonly kind: 'dog-leg' | 'straight' | 'winder' | 'spiral' | 'ladder';
   /** A winder stair's turn: its treads, and their depth on the walking line and at the well. */
   readonly winders?: { readonly count: number; readonly walk: number; readonly narrow: number };
@@ -386,6 +397,7 @@ type StyleSet = Omit<
   | 'interior'
   | 'stairs'
   | 'stairShape'
+  | 'escapeStair'
   | 'ramps'
   | 'fixtures'
   | 'softFurnishings'
@@ -815,6 +827,7 @@ export function resolveBuildingOptions(options: BuildingRuleOptions = {}): Resol
     interior: pick(o, 'interior', ['rooms', 'cells', 'none'], o.detail === 'far' ? 'cells' : 'rooms'),
     stairs: bool(o, 'stairs', true),
     stairShape: pick(o, 'stairShape', ['auto', 'winder'], 'auto'),
+    escapeStair: bool(o, 'escapeStair', true),
     ramps: bool(o, 'ramps', false),
     fixtures: bool(o, 'fixtures', true),
     softFurnishings: bool(o, 'softFurnishings', true),

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21494899,
+  "total": 21498884,
   "history": [
     {
       "date": "2026-10-24",
@@ -15163,6 +15163,12 @@
       "commit": "lane-e-3mf-corpus",
       "reason": "lane E 2026-11-27 (KB-LOAD-CREASE1, KB-LOAD-PBRGROUPS1): createMeshes and createPBRMeshes smooth within a crease angle through geometry/utils creasedNormals, so a file without normals keeps its sharp edges; a separate entry would leave the default wrong.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "building-second-stair",
+      "reason": "A second escape stair where Japan Order arts. 120 and 121 or IBC Table 1006.3.4(2) ask for two (limits row Building rules): measured gzip building-rules 24,940 to 26,235, building-plans 35,115 to 36,405, city 38,235 to 39,519. generateBuilding is synchronous and plans the stair with the floors, and a code-following building is the default, so a split entry would leave it out until a second import.",
+      "grew": 3
     }
   ],
   "items": {
@@ -16157,12 +16163,12 @@
     "@margoengine/post/trail": 3766,
     "@margoengine/post/upscale": 5068,
     "@margoengine/procedural": 18709,
-    "@margoengine/procedural/building-plans": 36169,
-    "@margoengine/procedural/building-rules": 25689,
+    "@margoengine/procedural/building-plans": 37498,
+    "@margoengine/procedural/building-rules": 27023,
     "@margoengine/procedural/building-settings": 6573,
     "@margoengine/procedural/buildings": 1758,
     "@margoengine/procedural/caves": 1677,
-    "@margoengine/procedural/city": 39383,
+    "@margoengine/procedural/city": 40705,
     "@margoengine/procedural/conifer-settings": 2447,
     "@margoengine/procedural/conifer-species": 2249,
     "@margoengine/procedural/conifers": 6159,
