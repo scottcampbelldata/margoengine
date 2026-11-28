@@ -18,6 +18,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `tests/demo-source-data.test.js`); the rest need the same restore where the built page ships the file under a
   content hash, and the original data where Vite inlined it.
 
+### Open 2026-11-28: the limits row of the USD texture factors has no escape hatch cell (KB-LIMITS-USDZCELL1, usdz, docs)
+
+- **Repro:** `node --test tests/claims-file.test.js`: "line 1290: 4 cells, header has 5" for the docs/limits.md row
+  "USD preview surface texture factors (`@margoengine/usdz`, 2026-11-28)".
+- **Cause:** 86ed5fd5a4 (KB-USDZ-FACTORS1) added the row with Limit, Starts at, Why and What you see, and no Escape
+  hatch. Neither the commit message, its README lines nor its known-bugs entry name one, so the cell cannot be filled
+  from that commit's own text, and the test forbids padding it.
+- **Fix wanted (the usdz importer author):** the row's fifth cell, stating what a page does when the clamped 8-bit pixels
+  or the unread constant `occlusion` matter (or "none" with the reason), then `tests/claims-file.test.js` passes.
+
 ### Open 2026-11-28: a film seek cannot move GPU cloth, so it restarts at every cut (KB-FILM-CLOTH1, physics gpu-cloth)
 
 - **Repro:** a cloth from `@margoengine/physics/gpu-cloth` in a film rendered scene by scene: `seek` from
