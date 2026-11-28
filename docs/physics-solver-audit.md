@@ -50,6 +50,33 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### DYN-05 four-point pass
+
+- Point 5 (`59abbb0f64`). `packages/physics/tests/coupling/rail.test.js` verifies equal projected
+  outer-rail acceleration in forward and reverse for both curve hands. It checks coded rejection of
+  malformed survey and contact input, signed-cell publication, and an overflow after native prediction
+  that leaves the accepted car and wire regions and work receipts unchanged.
+- Point 6 (`59abbb0f64`). `packages/physics/tests/coupling/rail-wire-workers.test.js` checks the
+  pinned-end discrete wave mode and exact plain/shared replay with one, two and four participants,
+  a moving pantograph and a signed origin shift. The 4,099-node test performs 3,415 velocity
+  and 4,097 position updates, for 7,512 f64x2 visits per step.
+  `packages/physics/tests/rail-wire-workers.browser.mjs` verifies both bundle-emitted native assets
+  and starts three actual helpers on the 1,027-node catenary.
+- Point 7 (`59abbb0f64`). `packages/physics/tests/rail.browser.mjs` records both directions at stations
+  54.996 m and 55.004 m on a surveyed 100 m wet curve. Both cars sway outward by 45.518 mm and roll outward
+  by 5.133°. The marker moves outward by about 15 pixels. Both renderers reproduce their held and replayed
+  frames exactly. The straight running and powered pantograph cases also pass. The original Last Tram
+  and City to Street shots await integration.
+- Point 8 (`59abbb0f64`). `docs/limits.md` records fixed creep and Hertz coefficients, omitted spin
+  creepage and wheel/rail profiles, the missing Nadal criterion and off-track collision, world-Y
+  catenary geometry, and the absent messenger, droppers, wire bending and wind. The analytic
+  `rail.test.js` and `rail-wire-workers.test.js` cases cover the reduced geometry and wave model.
+- Point 2 stays open. `packages/physics/scripts/dyn05-vtrack-measured.mjs` holds out 19 measured lateral
+  adhesion samples from Krishnan et al. (2025). Stock dry contact misses 14 uncertainty bands.
+  At the largest slip it predicts 0.295–0.297 against 0.375–0.394 measured. Scaling the linear
+  coefficient from the reported contact ellipse also misses 18 samples. The diagnostic covers
+  scaled dry lateral contact. Measured train motion and catenary response remain open.
+
 ### EARTH-07 four-point pass
 
 - Point 5 (`5348518fdc`). `packages/physics/tests/coupling/aeolian.test.js` checks signed wind sampling with
