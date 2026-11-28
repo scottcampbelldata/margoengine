@@ -20,8 +20,9 @@ const {width,height}=canvas.getBoundingClientRect(),ratio=Math.min(devicePixelRa
 const opening=openBench(canvas,{
   exhibit:viewport,signal,pixelRatio:1.8,maxWidth:1330,startupTimeout:8500,compat:{minimumTier:'half-float'},
   camera:cameraFor(Math.round(width*ratio)||1,Math.round(height*ratio)||1),
-  background:'#554754',backdrop:false,environment:false,shadows:false,
-  light:{direction:[-.49,.68,.67],intensity:3.7,color:[1,.909,.752],ambient:.58,ambientColor:[.84,.96,1.08]},
+  // The sun's shadow covers the plinth and the tallest plant it can grow.
+  background:'#554754',backdrop:false,environment:false,shadows:{bounds:{min:[-.9,-.02,-.9],max:[.9,1.3,.9]}},
+  light:{direction:[-.6,.78,.2],intensity:3.7,color:[1,.909,.752],ambient:.58,ambientColor:[.84,.96,1.08]},
   // The glasshouse bed's soft contact shadow, baked once: the plinth and glazing never move.
   contact:{position:[0,.004,0],size:[1.34,1.25],height:.36,opacity:.78,blur:.022,resolution:256,static:true,
     color:[.014,.009,.012],toneMapped:true},

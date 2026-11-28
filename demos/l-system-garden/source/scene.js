@@ -31,11 +31,12 @@ export function mount({opening,canvas,viewport,loading,status,controls,signal,fa
     const extendsPrevious=spec.kind===live.kind&&prior.length>0&&next.organs.length>prior.length&&
       prior.every((organ,i)=>sameOrgan(organ,next.organs[i]));
     const addition=extendsPrevious?{...next,organs:next.organs.slice(prior.length)}:next;
-    const grown=plantArt(addition,spec.kind).map(piece=>({mesh:add(piece),role:piece.role}));
+    // Every organ casts the sun's shadow onto the bowl and plinth; the baked contact shadow stays the bed's.
+    const grown=plantArt(addition,spec.kind).map(piece=>{const mesh=add(piece);return {mesh,role:piece.role,drop:bench.add(mesh,{contact:false})};});
     const keep=[];
     for(const item of pieces){
       if(extendsPrevious&&item.role!=='stem')keep.push(item);
-      else item.mesh.dispose();
+      else{item.drop();item.mesh.dispose();}
     }
     pieces=[...keep,...grown];
     plant=next;
