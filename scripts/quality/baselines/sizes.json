@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21939889,
+  "total": 21941432,
   "history": [
     {
       "date": "2026-10-24",
@@ -15713,6 +15713,12 @@
       "commit": "sea-08-guarded-hull-panel-workers",
       "reason": "SEA-08 @margoengine/physics/seakeeping 42698 to 45195 B gzip, @margoengine/physics 993414 to 993422 B gzip, @margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table)) 107005 to 107013 B gzip, @margoengine/physics/seakeeping 43883 to 46551 B ceiling. The seakeeping entry keeps step rollback, signed rigid origins, and the optional frequency dispatch. A separate solver entry would duplicate the live hull API and data conversion. The Wasm asset and worker are requested only by the optional bake. Core and stage are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "7c9dbd15d2",
+      "reason": "sky/weather 12,314 B gzip (ceiling 11,740 to 12,684): each raindrop draws its own size, fall speed, streak and light, with rain sheets and gusts (7c9dbd15d2), after the centroid-sampled streak varyings (a99625931f). weather/puddles 4,020 B (ceiling 3,984 to 4,276) and weather/gltf 6,032 B (ceiling 5,981 to 6,288): the patchy water film on damp ground and the rain-roughened puddles (ef8c29fafa), in the puddle WGSL both entries draw. All three are what the optional entry is imported for; a split would leave the default rain as one field of identical streaks and a wet floor a mirror.",
+      "grew": 3
     }
   ],
   "items": {
@@ -17080,7 +17086,7 @@
     "@margoengine/sky/volumetric-clouds": 17552,
     "@margoengine/sky/volumetric-clouds base (without hurricane storm field)": 13393,
     "@margoengine/sky/volumetric-clouds lazy hurricane storm field": 4617,
-    "@margoengine/sky/weather": 11740,
+    "@margoengine/sky/weather": 12684,
     "@margoengine/sky/weather-fx": 5533,
     "@margoengine/splats": 32003,
     "@margoengine/splats/animate": 3683,
@@ -17438,14 +17444,14 @@
     "@margoengine/weather/data": 2788,
     "@margoengine/weather/drive": 9747,
     "@margoengine/weather/eruption": 10430,
-    "@margoengine/weather/gltf": 5981,
+    "@margoengine/weather/gltf": 6288,
     "@margoengine/weather/hail": 5699,
     "@margoengine/weather/hail-physics": 1312,
     "@margoengine/weather/lava": 15750,
     "@margoengine/weather/lava-settings": 4046,
     "@margoengine/weather/lens": 4654,
     "@margoengine/weather/precipitation": 3923,
-    "@margoengine/weather/puddles": 3984,
+    "@margoengine/weather/puddles": 4276,
     "@margoengine/weather/regions": 2864,
     "@margoengine/weather/settings": 9476,
     "@margoengine/weather/snow": 4616,
