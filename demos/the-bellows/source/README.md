@@ -12,7 +12,7 @@ The instrument is an original exhibit design with an inspection inlet at the top
 
 ## Implementation
 
-- `pump.js` defines the common footprint, loft volume, signed flow and stroke trajectory.
+- `pump.js` defines the common footprint and the stroke trajectory, and asks `@margoengine/physics/hydraulics` (`hingedBellows`) for the loft volume and the signed flow through each check valve.
 - `craft.js` and `instrument.js` model the cut intake, walnut grain, brass hardware, mechanical folds, reeds, and air traces directly in Margo.
 - `scene.js` handles the controls and rendering. Native WebGPU is preferred. Add `?backend=webgl2` to request the Margo compatibility backend with identical artwork.
 - From the showcase root, build with `node build.mjs the-bellows` and the public Margo checkout pinned by the showcase.

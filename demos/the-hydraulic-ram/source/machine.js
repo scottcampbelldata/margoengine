@@ -128,7 +128,7 @@ function valves(add,mats){
   add(tube(exit,.021,28),mats.gold,'Waste discharge spout');
   return sample=>{
     waste.root.setPosition([wasteX,.201+.023*(1-sample.gate),0]);
-    delivery.root.setPosition([chamberX,.186+.014*Math.min(1,sample.check/.0005),0]);
+    delivery.root.setPosition([chamberX,.186+.014*Math.min(1,sample.checkFlow/.0005),0]);
   };
 }
 
@@ -175,7 +175,7 @@ function movingWater(add,mats){
   }));
   const phases=[.1,.3,.2,.35];
   return (sample,delta)=>{
-    const rates=[sample.q,sample.check,sample.delivered,sample.waste];
+    const rates=[sample.driveFlow,sample.checkFlow,sample.deliveryFlow,sample.wasteFlow];
     for(const [i,{route,z,lim,marks}] of sets.entries()){
       const speed=rates[i];
       phases[i]=((phases[i]+delta*speed/lim*.38)%1+1)%1;
@@ -223,9 +223,9 @@ export function buildRam(engine,shadows){
   let lit;
   return {
     update(sample,delta){
-      const surge=sample.p>10000;
+      const surge=sample.pressure>10000;
       if(surge!==lit){mats.pulse.color.set(surge?'#5cafab':'#317a83');lit=surge;}
-      alter(sample);level(sample.water);flow(sample,delta);
+      alter(sample);level(sample.vesselWater);flow(sample,delta);
     },
     anchors:[[-.245,.303,0],[.146,crown+.056,0],[.430,.438,0]],
     dispose(){for(const mesh of all.reverse())mesh.dispose();for(const m of Object.values(mats))m.dispose();for(const map of Object.values(maps))map.dispose();},

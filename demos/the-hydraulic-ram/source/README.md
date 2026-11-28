@@ -4,7 +4,7 @@ Raise or lower the delivery height and compare how much water is lifted on each 
 
 ## Lumped physical model
 
-The modeled source is 1.6 m above the pump. An 8 m, 42 mm drive line supplies a compliant junction. The indicated delivery height is the static pressure load of an external riser, above the pump datum. The visible tube is a compact representation of the rig. The model uses 998.2 kg/m³ water.
+The modeled source is 1.6 m above the pump. An 8 m, 42 mm drive line supplies a compliant junction. The indicated delivery height is the static pressure load of an external riser, above the pump datum. The visible tube is a compact representation of the rig. The model uses water at 20 °C, 998.21 kg/m³ (Kell 1975).
 
 The drive momentum balance is I dQᵈ/dt = ρgHₛ − p − K Qᵈ|Qᵈ|. Here I = ρL/A, p is junction gauge pressure, and the quadratic resistance K is 1.14 × 10¹⁰ Pa·s²/m⁶. The single junction storage relation is C dp/dt = Qᵈ − Qʷ − Qᶜ with effective compliance C = 7.5 × 10⁻¹⁰ m³/Pa. Flow to waste is proportional to the waste opening and √max(p,0). Flow through the delivery check is proportional to √max(p − pₐ,0). Flow up the riser is proportional to √max(pₐ − ρgHᵈ,0).
 
@@ -16,7 +16,7 @@ The assumed orifice coefficients, waste threshold and effective compliance descr
 
 ## Implementation
 
-- `cycle.js` solves the water-column, valve and air-pocket states and tracks conserved water volumes.
+- `cycle.js` holds the rig's dimensions and valve settings; `@margoengine/physics/hydraulics` (`HydraulicRam`) integrates the water column, valves and air pocket, tracks the conserved water volumes and finds the repeating cycle.
 - `craft.js` and `machine.js` build the bench, transparent vessel, valves and traced flow directly in Margo.
 - `scene.js` implements the controls. Native Margo WebGPU opens first. Add `?backend=webgl2` to request the Margo compatibility renderer with the same artwork.
 - Build from the showcase root with `node build.mjs the-hydraulic-ram` and the verified public Margo revision pinned by the showcase.

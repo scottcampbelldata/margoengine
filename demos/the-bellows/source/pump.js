@@ -1,3 +1,7 @@
+// The bellows' board outline and handle stroke. The chamber's volume and the air through its two check valves come
+// from @margoengine/physics/hydraulics (`hingedBellows`, the exact ruled volume between two hinged boards).
+import { hingedBellows } from '@margoengine/physics/hydraulics';
+
 const curves = [
   [[.012,0],[.001,.023],[.067,.036],[.108,.052]],
   [[.108,.052],[.142,.067],[.193,.132],[.265,.131]],
@@ -18,28 +22,22 @@ export const hi = .575;
 export const intake = [.251,0,-.016];
 export const nozzle = [-.228,.045,0];
 
-let sum = 0;
-let first = 0;
-for(const [i,[x,z]] of flange.entries()) {
-  const [a,b] = flange[(i+1)%flange.length];
-  const cross = x*b-a*z;
-  sum += cross;
-  first += (x+a)*cross;
-}
-export const area = Math.abs(sum*.5);
-export const firstMoment = Math.abs(first/6);
+const bellows = hingedBellows({ outline: flange, gap });
+export const area = bellows.area;
+export const firstMoment = bellows.firstMoment;
 export const angleAt = (lift) => lo+(hi-lo)*Math.max(0,Math.min(1,lift));
-export const volume = (angle) => area*gap*(1+Math.cos(angle))/2+firstMoment*Math.sin(angle);
+export const volume = (angle) => bellows.volume(angle);
 export const strokeCapacity = 1000*(volume(hi)-volume(lo));
 
+/** The chamber at handle lift `lift` (0 to 1) moving at `perSecond` lifts per second, in litres and L/s. */
 export function response(lift, perSecond) {
   const angle = angleAt(lift);
-  const delta = (firstMoment*Math.cos(angle)-area*gap*Math.sin(angle)/2)*(hi-lo)*perSecond;
+  const air = bellows.flow(angle, (hi-lo)*perSecond);
   return {
     angle,
-    liters:1000*volume(angle),
-    intake:1000*Math.max(0,delta),
-    outlet:1000*Math.max(0,-delta),
+    liters:1000*air.volume,
+    intake:1000*air.intake,
+    outlet:1000*air.outlet,
   };
 }
 

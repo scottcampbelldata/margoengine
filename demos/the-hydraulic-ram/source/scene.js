@@ -61,9 +61,9 @@ function controlData(){
 }
 
 function phaseData(state){
-  pressure.value=(state.air/1000).toFixed(1);
-  const charging=state.phase===1 || (state.phase===2 && state.q>state.check);
-  const current=state.check>.00001?'pulse':state.phase===0?'accel':charging?'close':'recover';
+  pressure.value=(state.airPressure/1000).toFixed(1);
+  const charging=state.phase===1 || (state.phase===2 && state.driveFlow>state.checkFlow);
+  const current=state.checkFlow>.00001?'pulse':state.phase===0?'accel':charging?'close':'recover';
   if(current===stage)return;
   stage=current;
   const order=current==='accel'?0:current==='recover'?2:1;
