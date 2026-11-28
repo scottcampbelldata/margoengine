@@ -6,8 +6,12 @@ import {axisAngleToQuaternion,multiplyQuaternions} from '@margoengine/math/quat'
 
 export const recordings={
   walk:{name:'Natural walk',credit:'Carnegie Mellon · ASF / AMC',width:'35_01 optical capture'},
-  brisk:{name:'Arms-wide walk',credit:'Ian Mason · BVH',width:'100STYLE “Aeroplane” capture'},
+  // Held off the stage (KB-RIG-ARMS2): its elbows sit past straight on every frame, in the capture itself.
+  brisk:{name:'Arms-wide walk',credit:'Ian Mason · BVH',width:'100STYLE “Aeroplane” capture',held:'KB-RIG-ARMS2'},
 };
+
+// The takes the stage offers: every recording that is not held.
+export const listed=Object.keys(recordings).filter(name=>!recordings[name].held);
 
 const xSensHumanoid={Hips:'hips',Chest:'spine',Chest2:'chest',Chest4:'upperChest',Neck:'neck',Head:'head'};
 for(const side of ['Left','Right']){

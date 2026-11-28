@@ -1,6 +1,6 @@
 import {theatre} from './theatre.js';
 import {performer,readPerformer} from './performer.js';
-import {capture,readCapture,recordings} from './captures.js';
+import {capture,listed,readCapture,recordings} from './captures.js';
 import {showRig} from './source-rig.js';
 
 const nextFrame=()=>new Promise(resolve=>requestAnimationFrame(resolve));
@@ -16,10 +16,11 @@ export async function mount({engine,actor,takes,canvas,notice,signal,size,fail})
   theatre(engine);
   const lead=performer(engine,readPerformer(actor));
   const ghost=showRig(engine);
-  const clips=Object.fromEntries(Object.entries(takes).map(([name,text])=>
+  const clips=Object.fromEntries(Object.entries(takes).filter(([name])=>listed.includes(name)).map(([name,text])=>
     [name,capture(name,readCapture(name,text),lead.skeleton)]));
   performance.mark('mocap-stage');
-  const keys=Object.keys(clips);
+  // A take gets a button only when there is another to switch to.
+  const keys=Object.keys(clips).filter(get);
   const play=get('play'),seek=get('seek'),timeText=get('time'),caption=get('take'),counts=get('rig-count'),angle=get('angle');
   let active=clips.walk,time=.420,playing=false,previous,renderAt=0,frame=0,draws=0,queued=0,applied=0,dirty=true;
 
@@ -28,7 +29,7 @@ export async function mount({engine,actor,takes,canvas,notice,signal,size,fail})
     const recording=recordings[name];
     for(const key of keys)get(key).setAttribute('aria-pressed',String(key===name));
     seek.max=active.duration.toFixed(3);
-    caption.textContent=recording.credit;
+    caption.textContent=keys.length?recording.credit:recording.name+' · '+recording.credit;
     counts.textContent=active.mapped+' joints mapped · '+recording.width;
     data.clip=name;
     data.joints=String(active.mapped);

@@ -2,7 +2,13 @@
 // ranges a human arm can reach, and Elias's skinned mesh checked against his bones. Guards KB-RIG-ARMS2: Scott saw arms
 // that "do not bend like that" in the Arms-wide walk's side view; these hold the transfer and the skin to anatomy.
 //
-// Ranges: elbow flexion 0 to 150 degrees with up to 10 of hyperextension, a carrying angle (valgus) of 5 to 20 degrees
+//
+// Third report (2026-11-28): Scott saw the Aeroplane take's elbows bend the wrong way in the source stick figure too. A
+// referee that is not Margo (Blender's BVH importer, fixtures/mocap-theatre/aeroplane-referee.json) reads the file to
+// the same joint positions, so the reading is right and the capture itself holds both elbows past straight on every
+// frame. A take like that is held off the stage: no take the page lists may pass straight by more than 2 degrees.
+//
+// Ranges: elbow flexion 0 to 150 degrees with no more than 2 past straight on a listed take, a carrying angle (valgus) of 5 to 20 degrees
 // (Paraskevas et al. 2004, "Study of the carrying angle of the human elbow joint in full extension", Surgical and
 // Radiologic Anatomy 26:19-23; Zampagni et al. 2008, "Estimating the elbow carrying angle with an electrogoniometer",
 // Ergonomics 51(2)); wrist flexion and extension within about 70 degrees, forearm pronation and supination within
@@ -12,11 +18,13 @@
 // (Magnenat-Thalmann, Laperriere and Thalmann 1988, "Joint-dependent local deformations for hand animation and object
 // grasping", Graphics Interface), so in that bone's own frame a forearm or hand vertex barely moves.
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { gunzipSync } from 'node:zlib';
-import { Skeleton, Skin } from '../packages/animation/dist/index.js';
-import { capture, readCapture } from '../demos/the-mocap-theatre/source/captures.js';
+import { Skeleton, Skin, applyKeyframeClip, createKeyframeClip } from '../packages/animation/dist/index.js';
+import { parseBVH } from '../packages/loaders/dist/mocap.js';
+import { capture, listed, readCapture, recordings } from '../demos/the-mocap-theatre/source/captures.js';
 import { readPerformer } from '../demos/the-mocap-theatre/source/performer.js';
 
 const dir = new URL('../demos/the-mocap-theatre/source/', import.meta.url);
@@ -123,8 +131,12 @@ test("Elias's bind pose has the bent elbows the anatomy checks read their crease
   for (const side of SIDES) assert.ok(anatomy[side].bend > 30, `${side} bind elbow bend ${anatomy[side].bend}`);
 });
 
-test('every frame of both retargeted takes keeps both arms inside human joint ranges', () => {
+// The furthest either elbow sits past straight in a take, in degrees (negative is past straight).
+const pastStraight = {};
+
+test('every frame of every listed take keeps both arms inside human joint ranges', () => {
   for (const { name, target, take } of takes()) {
+    const shown = listed.includes(name);
     const frames = Math.round(take.duration * 30);
     const worst = {};
     for (let f = 0; f <= frames; f++) {
@@ -156,7 +168,8 @@ test('every frame of both retargeted takes keeps both arms inside human joint ra
             `${where}: segment ${i} is ${deg(Math.acos(Math.min(1, dot(want, have)))).toFixed(2)} degrees off the capture`,
           );
         }
-        assert.ok(m.flexion >= -10 && m.flexion <= 150, `${where}: elbow flexion ${m.flexion.toFixed(1)} degrees`);
+        if (!shown) continue;
+        assert.ok(m.flexion >= -2 && m.flexion <= 150, `${where}: elbow flexion ${m.flexion.toFixed(1)} degrees`);
         assert.ok(m.valgus <= 20, `${where}: forearm ${m.valgus.toFixed(1)} degrees off the elbow's hinge plane`);
         assert.ok(Math.abs(m.forearmRoll) <= 30, `${where}: forearm rolled ${m.forearmRoll.toFixed(1)} degrees`);
         assert.ok(
@@ -167,12 +180,71 @@ test('every frame of both retargeted takes keeps both arms inside human joint ra
       }
     }
     // The ranges these takes actually use (2026-11-28): walk elbows 18 to 32 degrees of flexion; the Aeroplane
-    // capture's elbows locked 3 to 6.5 degrees past straight with a 8 to 14 degree carrying angle.
-    if (name === 'brisk')
-      for (const side of SIDES)
-        assert.ok(worst[`${side} flexion`].max < 0, `${side} Aeroplane elbows are locked straight`);
+    // capture's elbows 3 to 6.5 degrees past straight with a 8 to 14 degree carrying angle.
+    pastStraight[name] = Math.min(...SIDES.map((side) => worst[`${side} flexion`].min));
     if (name === 'walk')
       for (const side of SIDES) assert.ok(worst[`${side} flexion`].min > 10, `${side} walking elbows stay bent`);
+  }
+});
+
+test('a take whose elbows pass straight is held off the stage, and only such a take is held', () => {
+  const page = readFileSync(new URL('../index.html', dir), 'utf8'),
+    start = readFileSync(new URL('start.js', dir), 'utf8');
+  assert.ok(listed.length > 0, 'the stage lists a take');
+  for (const name of Object.keys(recordings)) {
+    const past = pastStraight[name] < -2,
+      held = Boolean(recordings[name].held),
+      onPage = page.includes(`id="${name}"`) || start.includes(`${name}.motion`);
+    assert.equal(held, past, `${name}: elbows reach ${pastStraight[name].toFixed(1)} degrees, held is ${held}`);
+    assert.equal(listed.includes(name), !held, `${name} is listed only when it is not held`);
+    assert.equal(onPage, !held, `${name}: the page offers or loads it only when it is not held`);
+  }
+});
+
+// The referee: Blender's BVH importer read the shipped Aeroplane take; its joint positions are the fixture.
+const referee = JSON.parse(readFileSync(new URL('./fixtures/mocap-theatre/aeroplane-referee.json', import.meta.url)));
+
+test('the Aeroplane take reads joint for joint as the referee reads it, and the stage draws that skeleton', () => {
+  const packed = read('brisk.motion');
+  assert.equal(createHash('sha256').update(packed).digest('hex'), referee.takeSha256, 'the fixture is of this take');
+  const data = parseBVH(packed.toString(), { scale: 0.01 }),
+    plain = new Skeleton(data.bones),
+    clip = createKeyframeClip(data.clip),
+    names = Object.keys(referee.frames[0]).filter((n) => !n.endsWith('_End'));
+  assert.equal(names.length, data.bones.length, 'the referee and the loader see the same joints');
+  // The stage plays the take in place, turned to face the front: the same skeleton about its hips.
+  const staged = capture('brisk', readCapture('brisk', packed.toString()), new Skeleton(bones)),
+    first = referee.frames[0].Hips,
+    last = referee.frames[data.frames - 1].Hips,
+    heading = Math.atan2(last[0] - first[0], last[2] - first[2]),
+    c = Math.cos(heading),
+    s = Math.sin(heading),
+    turn = (v) => [v[0] * c - v[2] * s, v[1], v[0] * s + v[2] * c];
+  for (const [f, joints] of Object.entries(referee.frames)) {
+    applyKeyframeClip(clip, plain, f * data.frameTime);
+    staged.draw(f * data.frameTime);
+    const hips = plain.index('Hips');
+    for (const name of names) {
+      const i = plain.index(name),
+        off = Math.hypot(...sub(at(plain, i), joints[name]));
+      assert.ok(off < 2e-4, `frame ${f} ${name}: the loader is ${off.toExponential(2)} m off the referee`);
+      const want = turn(sub(joints[name], joints.Hips)),
+        have = sub(at(staged.source, i), at(staged.source, hips)),
+        apart = Math.hypot(...sub(want, have));
+      assert.ok(apart < 2e-4, `frame ${f} ${name}: the stage's skeleton is ${apart.toExponential(2)} m off the referee`);
+    }
+  }
+  // What the referee itself shows: both forearms leave the upper arm's line toward the back of the body.
+  for (const joints of Object.values(referee.frames)) {
+    const up = unit(sub(joints.Neck, joints.Hips)),
+      forward = unit(cross(up, sub(joints.RightHip, joints.LeftHip)));
+    assert.ok(dot(sub(joints.RightToe, joints.RightAnkle), forward) > 0, 'forward is where the toes point');
+    for (const side of SIDES) {
+      const ua = unit(sub(joints[side + 'Elbow'], joints[side + 'Shoulder'])),
+        fa = unit(sub(joints[side + 'Wrist'], joints[side + 'Elbow']));
+      const lean = deg(Math.asin(dot(sub(fa, ua.map((x) => x * dot(fa, ua))), forward)));
+      assert.ok(lean < -5 && lean > -15, `the referee's ${side} forearm leans ${lean.toFixed(1)} degrees forward`);
+    }
   }
 });
 

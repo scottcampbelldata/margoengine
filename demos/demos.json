@@ -2307,7 +2307,7 @@
   {
     "slug": "the-mocap-theatre",
     "title": "The Mocap Theatre",
-    "description": "Watch two real walk recordings. Their captured joints move on the left and drive the same performer on the right.",
+    "description": "Watch a real walk recording. Its captured joints move on the left and drive a performer on the right.",
     "category": "People and Characters",
     "tags": [
       "character",

@@ -3,7 +3,6 @@ import {applyQualityTier} from '@margoengine/quality';
 import {demoStatus} from 'margo-demo-status';
 import actorURL from './performer.skin?url';
 import walkURL from './walk.motion?url';
-import briskURL from './brisk.motion?url';
 
 const canvas=document.querySelector('#view'),notice=document.querySelector('#notice');
 const message=document.querySelector('#status'),status=demoStatus(canvas,message,document.querySelector('#error'));
@@ -59,6 +58,5 @@ const device=connect().then(value=>{
 });
 const actor=packed(actorURL).then(response=>response.arrayBuffer());
 const walk=packed(walkURL).then(response=>response.text());
-const brisk=packed(briskURL).then(response=>response.text());
-Promise.all([stage,device,actor,walk,brisk]).then(([{mount},engine,actor,walk,brisk])=>
-  mount({engine,actor,takes:{walk,brisk},canvas,notice,signal,size,fail})).catch(fail);
+Promise.all([stage,device,actor,walk]).then(([{mount},engine,actor,walk])=>
+  mount({engine,actor,takes:{walk},canvas,notice,signal,size,fail})).catch(fail);
