@@ -64,6 +64,20 @@ export const BLUEPRINTS = [
     deflated: true,
   },
   {
+    name: 'ageing-kernel',
+    crate: 'packages/physics/ageing-kernel',
+    blueprint: 'packages/physics/src/ageing/ageing-kernel.wasm',
+    script: 'packages/physics/scripts/build-ageing-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'ageing-kernel-shared',
+    crate: 'packages/physics/ageing-kernel',
+    blueprint: 'packages/physics/src/ageing/ageing-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-ageing-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'ice-thermal-kernel',
     crate: 'packages/physics/ice-thermal-kernel',
     blueprint: 'packages/physics/src/ice/ice-thermal-kernel.wasm',

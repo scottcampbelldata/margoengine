@@ -5492,3 +5492,11 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
   `npm run test:gpu:forest-film -w @margoengine/biomes` for the locked-camera view on both renderers.
 - Run `node packages/biomes/scripts/bio03-forest-measured.mjs` for independent survival comparisons
   and the initial-crown sensitivity.
+
+### BIO-04 material columns, native participants and exposure diagnostics
+
+- Build Physics with `node packages/physics/scripts/build.js`. Run
+  `node --test packages/physics/tests/ageing.test.js packages/physics/tests/coupling/ageing.test.js packages/physics/tests/coupling/ageing-workers.test.js`.
+- Run `npm run test:gpu:ageing-workers -w @margoengine/physics` and
+  `npm run test:gpu:ageing-film -w @margoengine/physics` for packaged helper and dual-renderer replay.
+- Run `node packages/physics/scripts/bio04-ageing-measured.mjs` to compare the outdoor coupon losses.

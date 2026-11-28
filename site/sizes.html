@@ -92,6 +92,8 @@
 <tr><th scope="row"><code>wind-traction-kernel-shared.wasm</code></th><td>Shared Rust SIMD wind traction and torque</td><td class="num">2,507</td><td class="num">1,165</td><td class="num">1,034</td><td>WindForce.create() with multiple threads; independent native wrench probes</td></tr>
 <tr><th scope="row"><code>drainage-fog-kernel.wasm</code></th><td>Rust SIMD radiation fog and cold-air drainage</td><td class="num">13,174</td><td class="num">5,419</td><td class="num">4,801</td><td>DrainageFog.load() from the optional /drainage-fog entry</td></tr>
 <tr><th scope="row"><code>drainage-fog-kernel-shared.wasm</code></th><td>Rust SIMD radiation fog and cold-air drainage, shared world memory</td><td class="num">13,174</td><td class="num">5,419</td><td class="num">4,822</td><td>DrainageFog.load() with shared world memory support</td></tr>
+<tr><th scope="row"><code>ageing-kernel.wasm</code></th><td>Rust SIMD material ageing</td><td class="num">6,058</td><td class="num">2,782</td><td class="num">2,616</td><td>MaterialAgeingSolver.load() from the optional /ageing entry with plain world memory</td></tr>
+<tr><th scope="row"><code>ageing-kernel-shared.wasm</code></th><td>Rust SIMD material ageing, shared world memory</td><td class="num">6,058</td><td class="num">2,782</td><td class="num">2,616</td><td>MaterialAgeingSolver.load() from the optional /ageing entry with shared world memory</td></tr>
 <tr><th scope="row"><code>ice-thermal-kernel.wasm</code></th><td>Rust SIMD ice phase-energy balance</td><td class="num">1,300</td><td class="num">803</td><td class="num">741</td><td>IceSolver.load() from the optional /ice entry with plain world memory</td></tr>
 <tr><th scope="row"><code>ice-thermal-kernel-shared.wasm</code></th><td>Rust SIMD ice phase-energy balance, shared world memory</td><td class="num">1,300</td><td class="num">803</td><td class="num">743</td><td>IceSolver.load() from the optional /ice entry with shared world memory</td></tr>
 <tr><th scope="row"><code>iceberg-kernel.wasm</code></th><td>Rust SIMD iceberg hydrostatics and rigid-body dynamics</td><td class="num">9,776</td><td class="num">4,693</td><td class="num">4,114</td><td>IcebergSolver.load() from the optional /iceberg entry</td></tr>
@@ -5013,7 +5015,7 @@
 <tr><td><code>./strands</code></td><td class="num">14,451</td><td class="num">5,915</td></tr>
 <tr><td><code>./synoptic</code></td><td class="num">15,555</td><td class="num">6,377</td></tr>
 <tr><td><code>./clouds</code></td><td class="num">31,804</td><td class="num">11,625</td></tr>
-<tr><td><code>./ageing</code></td><td class="num">9,179</td><td class="num">4,128</td></tr>
+<tr><td><code>./ageing</code></td><td class="num">19,716</td><td class="num">8,069</td></tr>
 <tr><td><code>./accretion</code></td><td class="num">12,282</td><td class="num">5,110</td></tr>
 <tr><td><code>./room-sound</code></td><td class="num">23,677</td><td class="num">9,137</td></tr>
 <tr><td><code>./modal-sound</code></td><td class="num">31,822</td><td class="num">11,973</td></tr>

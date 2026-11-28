@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'ageing',
+    title: '@margoengine/physics/ageing climate exposure, substrate and retained coatings',
+    kind: 'family',
+    messages: [],
+    cause: 'A material, climate row, coating input or candidate evolution lies outside its usable range.',
+    fix: 'Choose finite material and climate values in the documented units. Publish aligned exposure rows in the memory that owns them, with the solver’s signed origin. Reduce exposure time or rates on overflow. Use shared world memory with optional helpers.',
+  },
+  {
     id: 'forest',
     title: '@margoengine/biomes/forest competition, crown fields and site exposure',
     kind: 'family',

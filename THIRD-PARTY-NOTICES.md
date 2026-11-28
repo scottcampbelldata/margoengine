@@ -771,3 +771,11 @@ in the Pacific Northwest, USA*](https://doi.org/10.1016/j.foreco.2025.122724), Â
 The diagnostic transcribes sparse survival means and reported intervals. Independent plot layout facts are
 from Robert O. Curtis, Sheel Bansal and Constance A. Harrington (2016),
 [USDA Forest Service PNW-RP-607](https://pubs.usgs.gov/publication/70173842).
+
+### BIO-04 atmospheric corrosion coupon observations
+
+Rosa Vera et al. (2022), [*Corrosion Behavior of Copper Exposed in Marine Tropical Atmosphere in Rapa Nui
+(Easter Island) Chile 20 Years after MICAT*](https://doi.org/10.3390/met12122082), and Luca Paterlini et al.
+(2024), [*Atmospheric Corrosion of Different Steel Types in Urban and Marine Exposure*](https://doi.org/10.3390/ma17246211),
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The diagnostic converts a few reported deposition,
+ambient climate and penetration values to solver units. It includes no figures or source code.

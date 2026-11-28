@@ -15638,8 +15638,8 @@
         "gzip": 11625
       },
       "./ageing": {
-        "raw": 9179,
-        "gzip": 4128
+        "raw": 19716,
+        "gzip": 8069
       },
       "./accretion": {
         "raw": 12282,
@@ -20373,6 +20373,16 @@
       "raw": 1118,
       "gzip": 601,
       "brotli": 505
+    },
+    "packages/physics/dist/ageing-kernel.wasm": {
+      "raw": 6058,
+      "gzip": 2782,
+      "brotli": 2616
+    },
+    "packages/physics/dist/ageing-kernel-shared.wasm": {
+      "raw": 6058,
+      "gzip": 2782,
+      "brotli": 2616
     }
   },
   "splits": {

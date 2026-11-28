@@ -1,4 +1,4 @@
-import { MargoError } from '@margoengine/math/errors';
+import { ageingError } from './errors.js';
 import { exp, pow } from '@margoengine/math/pinned';
 
 /** Length of a model year in seconds, using 365.25 days. */
@@ -24,10 +24,7 @@ const NEUTRAL_RECESSION = 18.8e-6;
 
 export function bounded(value: number, low: number, high: number, quantity: string): number {
   if (!Number.isFinite(value) || value < low || value > high)
-    throw new MargoError(
-      'state',
-      `Material ageing ${quantity} is out of range. Pass a number from ${low} through ${high}.`,
-    );
+    throw ageingError(`Material ageing ${quantity} is out of range. Pass a number from ${low} through ${high}.`);
   return value;
 }
 
@@ -67,8 +64,7 @@ export function corrosionRate(metal: AgeingMetal, tC: number, rh: number, sulphu
 
 /** First-year atmospheric penetration in metres, from ISO 9223 §8.2. Supply annualized exposure. */
 export function atmosphericMetalLoss(metal: AgeingMetal, exposure: AtmosphericExposure = {}): number {
-  if (metal !== 'steel' && metal !== 'copper')
-    throw new MargoError('state', 'Use steel or copper for atmospheric metal ageing.');
+  if (metal !== 'steel' && metal !== 'copper') throw ageingError('Use steel or copper for atmospheric metal ageing.');
   const t = bounded(exposure.temperature ?? 293.15, 173.15, 373.15, 'temperature in K') - 273.15;
   const humidity = 100 * bounded(exposure.relativeHumidity ?? 0.7, 0, 1, 'relative humidity');
   const sulphur = bounded(exposure.sulphurDioxide ?? 4, 0, 1e6, 'sulphur dioxide deposition');

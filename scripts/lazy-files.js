@@ -47,6 +47,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/ageing-kernel.wasm',
+    label: 'ageing-kernel.wasm',
+    kind: 'Rust SIMD material ageing',
+    measure: 'file',
+    when: 'MaterialAgeingSolver.load() from the optional /ageing entry with plain world memory',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/ageing-kernel-shared.wasm',
+    label: 'ageing-kernel-shared.wasm',
+    kind: 'Rust SIMD material ageing, shared world memory',
+    measure: 'file',
+    when: 'MaterialAgeingSolver.load() from the optional /ageing entry with shared world memory',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/ice-thermal-kernel.wasm',
     label: 'ice-thermal-kernel.wasm',
     kind: 'Rust SIMD ice phase-energy balance',

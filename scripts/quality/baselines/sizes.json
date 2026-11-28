@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22148571,
+  "total": 22152512,
   "history": [
     {
       "date": "2026-10-24",
@@ -16050,6 +16050,12 @@
       "commit": "bio-03-forest-native-competition",
       "reason": "BIO-03 forest 7254 to 10378 B gzip, cap 7450 to 10690 B, growth 8686 to 8689 B gzip, cap 8947 to 8947 B, shared optional worker 585 to 601 B gzip, cap 841 to 841 B. The forest entry stages the annual ecology and joins disjoint native query blocks. It shares the existing isolated Biomes worker. Splitting the transitions would duplicate the stand and publication contract. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "bio-04-ageing-native-columns",
+      "reason": "BIO-04 @margoengine/physics/ageing 4128 to 8069 B gzip, ceiling 4384 to 8325 B. The ageing entry stages independent material and exposure rows with optional SIMD workers. Splitting the native path from the entry would duplicate the patch layout, clock and accepted readout. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16916,7 +16922,7 @@
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 906959,
     "@margoengine/physics/accretion": 5366,
     "@margoengine/physics/aeolian": 8969,
-    "@margoengine/physics/ageing": 4384,
+    "@margoengine/physics/ageing": 8325,
     "@margoengine/physics/airborne": 11199,
     "@margoengine/physics/boundary-layer": 5681,
     "@margoengine/physics/breakable": 19997,

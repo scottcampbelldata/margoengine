@@ -7487,7 +7487,7 @@ import { AGEING_YEAR, MaterialAgeingSolver } from '@margoengine/physics/ageing';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
 const world = new PhysicsWorld({ rate: { num: 24, den: 1 } });
-const ageing = new MaterialAgeingSolver();
+using ageing = await MaterialAgeingSolver.load();
 world.add(ageing, {
   timeScale: AGEING_YEAR,
   exposure: { temperature: 293.15, relativeHumidity: 0.8, sulphurDioxide: 7, chloride: 25 },
@@ -7520,14 +7520,20 @@ of 60 µm/year. Specify current density in A/m² for the actual alloy and water 
 Default full-supply recruitment is 0.01 per day. Wet and dry removal default to 0.002 and 0.05 per day.
 Larval supply defaults to 1.
 
-For changing exposure, construct `new MaterialAgeingSolver({ readExposure: true })`
-and publish to its `exposureField`. Use `writeAgeingExposure` to fill one layout-1 f64 broadcast
+For changing exposure, use `MaterialAgeingSolver.load({ readExposure: true })`
+and publish to its `exposureField` in the same signed origin cell. Use `writeAgeingExposure` to fill one layout-1 f64 broadcast
 row or one row per patch. Row order is temperature in K, RH fraction, SO₂ and chloride in mg/(m² day),
 immersed fraction, incident rain in m/s, rain pH, corrosion current in A/m², dry carbonate recession in
 m/s and larval supply fraction. Fixed exposure defaults remain available before a producer's first tick.
 The solver's default ID and field prefix are `ageing`. Choose a separate `id` per group in one world.
 Its `stateField` has layout-1 f64 rows holding remaining and consumed metres, total and inner
 coating metres, rot activity, fouled fraction and environmental seconds.
+
+The asynchronous load uses the optional SIMD kernel. Set `threads` to 2 or 4 for a shared world running in
+Node or an isolated browser worker. The default is one participant. `ageing.readNativeWork()` reports the
+accepted patch counts. Dispose the solver when finished to release native helpers. The synchronous constructor
+runs the same state equations in JavaScript. Both check a borrowed exposure bank in the owning memory and
+retain accepted patch state when a trial is rejected.
 
 ## Iceberg capsize and calving
 

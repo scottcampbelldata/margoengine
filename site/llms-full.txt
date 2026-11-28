@@ -15089,7 +15089,29 @@ diffuse layer transport for the metal colors and a coverage mix for the aggregat
 The material consumes linear PBR values. Multi-spectral gloss, grain, individual corrosion
 pits and run-off streak geometry require authored patch variation or other algorithms.
 
-The optional Physics ageing entry measures 4,922 bytes gzip.
+The accepted history and surface use 96 bytes per patch. The corresponding trial adds 96. Optional native
+execution adds 72 bytes of model input and 80 bytes of climate input per patch, a 32-byte job and 48 bytes
+of counters per participant, plus a 64 KiB stack with alignment per participant. The registry mirrors the
+surface. Optional workers join before the complete state changes. A rejected trial leaves the accepted fields intact. The optional entry measures 8,069 B gzip. Each lazy, slot-free Wasm variant is
+6,058 B raw and 2,782 B gzip.
+
+### BIO-04 measured copper and carbon-steel coupon losses
+
+For Rapa Nui copper exposed between April 2010 and April 2013, the measured cumulative losses are
+2.10 and 3.75 µm at years one and three. The ISO-based production path predicts 1.26 and 2.83 µm
+using independent year-specific deposition values and weather read from the publication. The weather
+readout sensitivity spans 1.14–1.40 and 2.57–3.13 µm. It remains below the observed reporting bands.
+[Vera et al. (2022), Table 1 and Figs. 3 and 6](https://doi.org/10.3390/met12122082).
+
+Milan carbon-steel coupons lost 6.92 µm over ten months. The model predicts 5.28 µm when the first-year
+ambient averages stand in for the shorter exposure window and chloride is set to zero as treated by
+the investigators. A 0.4 mg/(m² day) chloride sensitivity gives 6.12 µm. The diagnostic uses the
+published atmospheric SO₂ concentration converted to deposition. Neither study's measured loss is fitted
+or used as an input. Refining from 12 to 48 updates per exposure year changes the predictions by less
+than 4 × 10⁻¹⁵ µm. The coupon comparisons test two settings for uniform atmospheric penetration.
+Pitting, fine runoff streaks, measured spectra and predictive marine current remain open.
+[Paterlini et al. (2024), Tables 6 and 9](https://doi.org/10.3390/ma17246211).
+[Diagnostic](../packages/physics/scripts/bio04-ageing-measured.mjs).
 
 ### Iceberg rigid-body dynamics and calving (ICE-03)
 
@@ -41441,8 +41463,9 @@ geometry contract needed for independent impulse and animation consumers.
 A material-ageing world needs local deposition and annual climate values for atmospheric loss,
 and needs corrosion current and larval supply for site-specific wreck decay. Existing weather
 and sea fields leave out those quantities. A fixed `AgeingExposure` or a publisher writing
-`ageing.exposureField` supplies them explicitly. Run the changing-exposure and wreck cases in
-`packages/physics/tests/coupling/ageing.test.js` for a replayable producer example.
+`ageing.exposureField` supplies them explicitly. The civil coupon witness transforms accepted HYDRO-01
+water level into local immersed fraction and uses a prescribed current. Predicting site current and
+biological supply remains open. [Live immersion witness](physics-demo-review.md#bio-04-live-shallow-water-exposure-witness).
 See [Framework requests](physics-work-queue.md#framework-requests) for the shared layout.
 
 ### Ice impacts and long-wave inundation (PA-15 and PA-25)

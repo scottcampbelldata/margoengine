@@ -12451,3 +12451,11 @@ disturbance, growth, recruitment and output aggregation. Signed field leases are
 memory and only the accepted patch fields are published. A fixed-camera wind witness exercises
 permanent leeward orientation on the two renderers. Measured Douglas-fir survival bounds the
 unfitted reduced stand closure.
+
+### BIO-04 accepted material columns, native work and PBR replay
+
+Native SIMD helpers update independent material columns with the existing pinned equation order.
+A private trial stores substrate, coating, decay, fouling and elapsed fields until all patches accept.
+Borrowed signed exposure is checked in its owning memory. The accepted readout continues to drive
+the existing diffuse-film material API. A technical witness ties shallow-water immersion to visible
+coatings and exact frame replay. Outdoor coupon losses quantify limits of the reduced columns.

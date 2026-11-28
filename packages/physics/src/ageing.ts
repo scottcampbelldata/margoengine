@@ -1,5 +1,12 @@
-import { MargoError } from '@margoengine/math/errors';
 import { pow } from '@margoengine/math/pinned';
+import { ageingError } from './ageing/errors.js';
+import {
+  bindAgeingKernel,
+  loadAgeingKernels,
+  type AgeingKernel,
+  type AgeingKernelBuilds,
+  type AgeingNativeWorkCounts,
+} from './ageing/kernel.js';
 import { backedFilm, type Rgb } from './ageing/optics.js';
 import {
   AGEING_YEAR,
@@ -28,6 +35,7 @@ import type {
   StepContext,
 } from './world/solver.js';
 
+export type { AgeingNativeWorkCounts, AgeingNativeWorkerWork } from './ageing/kernel.js';
 export { type WeatheringFilm, weatheringFilm } from './ageing/optics.js';
 export { AGEING_YEAR, type AgeingMetal, atmosphericMetalLoss, type AtmosphericExposure } from './ageing/processes.js';
 
@@ -35,7 +43,8 @@ const F64 = Float64Array.BYTES_PER_ELEMENT;
 const DAY = 86400;
 const HISTORY_WORDS = 5;
 const LAYOUT = 1;
-const ZERO_CELL = [0, 0, 0] as const;
+const MODEL_WORDS = 9;
+const MATERIAL_CODE = { steel: 0, copper: 1, wood: 2, limestone: 3 } as const;
 const DEFAULT_CURRENT = defaultMarineCurrent();
 const COPPER_CARBONATE_RATIO = (0.221116 * 8960) / (2 * 0.063546 * 4000);
 
@@ -124,6 +133,13 @@ export interface MaterialAgeingOptions {
   readonly readExposure?: boolean;
 }
 
+/** Optional native kernel and helper setup for material ageing. */
+export interface MaterialAgeingLoadOptions extends MaterialAgeingOptions {
+  /** Native participants, including the caller. Default 1. More participants require a shared world. */
+  readonly threads?: 1 | 2 | 4;
+  readonly signal?: AbortSignal;
+}
+
 /**
  * The state of one ageing patch: remaining, consumed, coating and inner coating thickness in metres, rot
  * activity, fouled fraction and exposure time in seconds.
@@ -167,6 +183,9 @@ interface Data {
   readonly patches: readonly Patch[];
   readonly history: Region;
   readonly surface: Region;
+  readonly trialHistory: Region;
+  readonly trialSurface: Region;
+  readonly native?: { readonly kernel: AgeingKernel; readonly climate: Region };
 }
 
 const PALETTE = {
@@ -204,8 +223,15 @@ function packExposure(exposure: AgeingExposure) {
 
 /** Write one exposure row in the units and order of {@link AGEING_EXPOSURE_WORDS}. */
 export function writeAgeingExposure(out: Float64Array, exposure: AgeingExposure, row = 0): void {
-  if (!Number.isSafeInteger(row) || row < 0 || (row + 1) * AGEING_EXPOSURE_WORDS > out.length)
-    throw new MargoError('state', 'Use an exposure row that fits in the supplied Float64Array.');
+  if (
+    Object.prototype.toString.call(out) !== '[object Float64Array]' ||
+    !Number.isSafeInteger(row) ||
+    row < 0 ||
+    (row + 1) * AGEING_EXPOSURE_WORDS > out.length
+  )
+    throw ageingError('Use an exposure row that fits in the supplied Float64Array.');
+  if (!exposure || typeof exposure !== 'object')
+    throw ageingError('Supply an object with the material exposure values.');
   out.set(packExposure(exposure), row * AGEING_EXPOSURE_WORDS);
 }
 
@@ -225,9 +251,9 @@ function readExposure(values: Float64Array, offset: number): Climate {
 }
 
 function prepare(patch: AgeingPatch, exposure: AgeingExposure): Patch {
-  const material = patch.material;
+  const material = patch?.material;
   if (!Object.hasOwn(PALETTE, material))
-    throw new MargoError('state', 'Choose steel, copper, wood, or limestone as the material substrate.');
+    throw ageingError('Choose steel, copper, wood, or limestone as the material substrate.');
   const isMetal = metal(material);
   const thickness = bounded(patch.thickness ?? (isMetal ? 0.01 : 0.05), 1e-9, 1e6, 'initial thickness');
   const loss = bounded(patch.initialLoss ?? 0, 0, thickness, 'initial consumed thickness');
@@ -250,6 +276,60 @@ function prepare(patch: AgeingPatch, exposure: AgeingExposure): Patch {
     ],
     transition: isMetal ? pow(20, METAL[material].exponent) : 0,
   };
+}
+
+function floatBank(host: SolverHost, region: Region): Float64Array {
+  return regionWords(host.memory, region) as Float64Array;
+}
+
+function collectClimates(host: SolverHost, input: Port, field: string, patches: number): readonly Climate[] {
+  const { layout, type, byteOffset, byteLength, memory = host.memory } = input.region;
+  const bytes = AGEING_EXPOSURE_WORDS * F64;
+  if (
+    input.field !== field ||
+    layout !== LAYOUT ||
+    type !== 'f64' ||
+    (byteLength !== bytes && byteLength !== bytes * patches) ||
+    !Number.isSafeInteger(byteOffset) ||
+    byteOffset < 0 ||
+    byteOffset % F64 !== 0 ||
+    byteOffset + byteLength > memory.buffer.byteLength
+  ) {
+    throw ageingError('Publish one layout-1 f64 exposure row or one row per patch, aligned in its owning memory.');
+  }
+  if (input.cell.length !== 3 || input.cell.some((coordinate, axis) => coordinate !== host.cell[axis]))
+    throw ageingError('Use the material ageing solver’s signed origin for its exposure port.');
+  const view = new Float64Array(memory.buffer, byteOffset, byteLength / F64);
+  return Array.from({ length: byteLength / bytes }, (_, i) => readExposure(view, i * AGEING_EXPOSURE_WORDS));
+}
+
+function bindNative(
+  host: SolverHost,
+  builds: AgeingKernelBuilds,
+  patches: readonly Patch[],
+  allocate: (name: string, stride: number) => Region,
+): NonNullable<Data['native']> {
+  const models = allocate('ageing-native-models', MODEL_WORDS);
+  const climate = allocate('ageing-native-climate', AGEING_EXPOSURE_WORDS);
+  const kernel = bindAgeingKernel(host, builds, models, patches.length);
+  const words = floatBank(host, models);
+  for (const [i, patch] of patches.entries()) {
+    words.set(
+      [
+        MATERIAL_CODE[patch.material],
+        patch.thickness,
+        patch.multiplier,
+        patch.retention,
+        patch.innerScale,
+        patch.settlement,
+        patch.wetRemoval,
+        patch.dryRemoval,
+        patch.transition,
+      ],
+      i * MODEL_WORDS,
+    );
+  }
+  return { kernel, climate };
 }
 
 function updatePatch(patch: Patch, climate: Climate, state: Float64Array, at: number, seconds: number): void {
@@ -342,9 +422,14 @@ export class MaterialAgeingSolver implements Solver<MaterialAgeingParams> {
   readonly stateField: FieldDescriptor;
   readonly #readExposure: boolean;
   #data?: Data;
+  #builds?: AgeingKernelBuilds;
+  #disposed = false;
 
-  constructor({ id = 'ageing', readExposure = false }: MaterialAgeingOptions = {}) {
-    if (!id) throw new MargoError('state', 'Use a nonempty material ageing solver ID.');
+  constructor({ id, readExposure }?: MaterialAgeingOptions);
+  constructor(options: MaterialAgeingOptions = {}) {
+    const { id = 'ageing', readExposure = false } = options ?? {};
+    if (typeof id !== 'string' || !id.trim() || id !== id.trim())
+      throw ageingError('Use a nonempty material ageing solver ID without outer whitespace.');
     this.id = id;
     this.#readExposure = readExposure;
     this.exposureField = descriptor(
@@ -353,6 +438,25 @@ export class MaterialAgeingSolver implements Solver<MaterialAgeingParams> {
       'K, 1, mg/(m² day), mg/(m² day), 1, m/s, pH, A/m², m/s, 1',
     );
     this.stateField = descriptor(`${id}.state`, 'materialAgeing', 'm, m, m, m, 1, 1, s');
+  }
+
+  /** Prepare the optional native patch step before adding this solver to a PhysicsWorld. */
+  static async load(options: MaterialAgeingLoadOptions = {}): Promise<MaterialAgeingSolver> {
+    const solver = new MaterialAgeingSolver(options);
+    solver.#builds = await loadAgeingKernels(options?.signal, options?.threads);
+    return solver;
+  }
+
+  /** Release any native helpers and invalidate the solver. */
+  [Symbol.dispose](): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    this.#builds?.[Symbol.dispose]();
+  }
+
+  /** Native work for the most recent accepted step, or undefined for the synchronous solver. */
+  readNativeWork(): AgeingNativeWorkCounts | undefined {
+    return this.#live().native?.kernel.workCounts();
   }
 
   describe(): SolverDescription {
@@ -367,57 +471,75 @@ export class MaterialAgeingSolver implements Solver<MaterialAgeingParams> {
     };
   }
 
-  init(host: SolverHost, { patches, exposure = {}, timeScale = 1 }: MaterialAgeingParams): void {
-    if (this.#data) throw new MargoError('attached', 'Create a new MaterialAgeingSolver for the next world.');
-    if (!patches?.length) throw new MargoError('state', 'Add at least one material ageing patch.');
-    const models = patches.map((patch) => prepare(patch, exposure));
+  init(host: SolverHost, { patches, exposure, timeScale }: MaterialAgeingParams): void;
+  init(host: SolverHost, params: MaterialAgeingParams): void {
+    if (this.#disposed) throw ageingError('Load a new material ageing solver after disposal.', 'disposed');
+    if (this.#data) throw ageingError('Create a new MaterialAgeingSolver for the next world.', 'attached');
+    const patches = params?.patches;
+    if (!Array.isArray(patches) || !patches.length) throw ageingError('Add at least one material ageing patch.');
+    const { exposure = {}, timeScale = 1 } = params;
+    const models = Array.from(patches, (patch) => prepare(patch, exposure));
     const scale = bounded(timeScale, 0, 1e18, 'time scale');
-    const history = host.allocate('ageing-depth-and-exposure', models.length * HISTORY_WORDS * F64, 'f64', LAYOUT);
-    const surface = host.allocate('ageing-surface', models.length * AGEING_STATE_WORDS * F64, 'f64', LAYOUT);
-    const state = regionWords(host.memory, history) as Float64Array;
-    const out = regionWords(host.memory, surface) as Float64Array;
+    const alloc = (name: string, stride: number) => host.allocate(name, models.length * stride * F64, 'f64', LAYOUT);
+    const history = alloc('ageing-depth-and-exposure', HISTORY_WORDS);
+    const surface = alloc('ageing-surface', AGEING_STATE_WORDS);
+    const trialHistory = alloc('ageing-trial-history', HISTORY_WORDS);
+    const trialSurface = alloc('ageing-trial-surface', AGEING_STATE_WORDS);
+    const native = this.#builds && bindNative(host, this.#builds, models, alloc);
+    const state = floatBank(host, history);
+    const out = floatBank(host, surface);
     for (const [i, patch] of models.entries()) {
       const at = i * HISTORY_WORDS;
       state.set(patch.initial, at);
       publish(patch, state, at, out, i);
     }
-    this.#data = { host, timeScale: scale, patches: models, history, surface };
+    this.#data = { host, timeScale: scale, patches: models, history, surface, trialHistory, trialSurface, native };
   }
 
   step(context: StepContext, dt: number): void {
     const data = this.#live();
     const { patches, host } = data;
     const input = context.inputs.get(this.exposureField.name);
-    let climates: readonly Climate[] | undefined;
-    if (input) {
-      const bytes = AGEING_EXPOSURE_WORDS * F64;
-      const { region } = input;
-      if (
-        region.layout !== LAYOUT ||
-        region.type !== 'f64' ||
-        (region.byteLength !== bytes && region.byteLength !== bytes * patches.length)
-      )
-        throw new MargoError('state', 'Use one layout-1 f64 exposure row or one row for every ageing patch.');
-      const rows = regionWords(host.memory, region) as Float64Array;
-      climates = Array.from({ length: rows.length / AGEING_EXPOSURE_WORDS }, (_, i) =>
-        readExposure(rows, i * AGEING_EXPOSURE_WORDS),
-      );
+    if (!Number.isFinite(dt) || dt < 0)
+      throw ageingError('Advance material ageing with a finite nonnegative duration.');
+    const climates = input && collectClimates(host, input, this.exposureField.name, patches.length);
+    const history = floatBank(host, data.history);
+    const state = floatBank(host, data.trialHistory);
+    const out = floatBank(host, data.trialSurface);
+    state.set(history);
+    const seconds = data.timeScale * dt;
+    if (data.native) {
+      const climate = floatBank(host, data.native.climate);
+      for (let i = 0; i < patches.length; i++)
+        climate.set(climates?.[climates.length === 1 ? 0 : i] ?? patches[i]!.climate, i * AGEING_EXPOSURE_WORDS);
+      if (data.native.kernel.run(data.trialHistory, data.trialSurface, data.native.climate, seconds) !== 0)
+        throw ageingError(
+          'The trial ageing step exceeds the numeric range. Reduce exposure time or material rates.',
+          'failed',
+        );
+    } else {
+      for (const [i, patch] of patches.entries()) {
+        const climate = climates?.[climates.length === 1 ? 0 : i] ?? patch.climate;
+        const at = i * HISTORY_WORDS;
+        updatePatch(patch, climate, state, at, seconds * patch.multiplier);
+        publish(patch, state, at, out, i);
+      }
+      if (!state.every(Number.isFinite) || !out.every(Number.isFinite))
+        throw ageingError(
+          'The trial ageing step exceeds the numeric range. Reduce exposure time or material rates.',
+          'failed',
+        );
     }
-    const state = regionWords(host.memory, data.history) as Float64Array;
-    const out = regionWords(host.memory, data.surface) as Float64Array;
-    for (const [i, patch] of patches.entries()) {
-      const climate = climates?.[climates.length === 1 ? 0 : i] ?? patch.climate;
-      const at = i * HISTORY_WORDS;
-      updatePatch(patch, climate, state, at, data.timeScale * dt * patch.multiplier);
-      publish(patch, state, at, out, i);
-    }
+    history.set(state);
+    floatBank(host, data.surface).set(out);
+    data.native?.kernel.accept();
   }
 
   /** Copy one patch's current state. */
   read(index: number): AgeingState {
     const data = this.#live();
     this.#checkPatch(index, data.patches.length);
-    const words = regionWords(data.host.memory, data.surface) as Float64Array;
+    const words = floatBank(data.host, data.surface);
     const at = index * AGEING_STATE_WORDS;
     return {
       remainingThickness: words[at]!,
@@ -438,7 +560,8 @@ export class MaterialAgeingSolver implements Solver<MaterialAgeingParams> {
   }
 
   exportPorts(tick: number): readonly Port[] {
-    return [{ field: this.stateField.name, region: this.#live().surface, tick, cell: ZERO_CELL }];
+    const { host, surface } = this.#live();
+    return [{ field: this.stateField.name, region: surface, tick, cell: host.cell }];
   }
 
   importPorts(): void {}
@@ -454,11 +577,12 @@ export class MaterialAgeingSolver implements Solver<MaterialAgeingParams> {
 
   #checkPatch(index: number, count: number): void {
     if (!Number.isSafeInteger(index) || index < 0 || index >= count)
-      throw new MargoError('state', `Choose a material ageing patch from index 0 through ${count - 1}.`);
+      throw ageingError(`Choose a material ageing patch from index 0 through ${count - 1}.`);
   }
 
   #live(): Data {
-    if (!this.#data) throw new MargoError('state', 'Add the material ageing solver to a PhysicsWorld first.');
+    if (this.#disposed) throw ageingError('Load a new material ageing solver after disposal.', 'disposed');
+    if (!this.#data) throw ageingError('Add the material ageing solver to a PhysicsWorld first.');
     return this.#data;
   }
 }

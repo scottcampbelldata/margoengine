@@ -29,15 +29,15 @@ class SampleExposure {
     return { id: 'exposure', fields: [{ field: this.field, access: 'write' }], rate: 0, stableRate: () => 0 };
   }
   init(host) {
-    this.memory = host.memory;
+    this.host = host;
     this.region = host.allocate('data', AGEING_EXPOSURE_WORDS * this.count * 8, 'f64', 1);
   }
   step({ tick }) {
-    const out = regionWords(this.memory, this.region);
+    const out = regionWords(this.host.memory, this.region);
     for (let i = 0; i < this.count; i++) writeAgeingExposure(out, this.exposure(tick, i), i);
   }
   exportPorts(tick) {
-    return [{ field: this.field.name, region: this.region, tick, cell: CENTRE }];
+    return [{ field: this.field.name, region: this.region, tick, cell: this.host.cell }];
   }
   importPorts() {}
   stateRegions() {
@@ -181,6 +181,79 @@ test('Calcite recession tracks clean rainfall, excess-proton mass balance and in
   const loss = 18.8e-6 + ((excessMolPerCubicMetre / 2) * 0.1000869) / 2710 + 1e-6;
   near(solver.read(1).consumedThickness, loss, 1e-19);
   assert.equal(solver.read(2).consumedThickness, 0);
+});
+
+test('material ageing publishes signed state and replays registered marine exposure across an origin shift', () => {
+  const cell = [-8, 5, 17];
+  const shift = [2, -3, 1];
+  const wet = { submerged: 1, corrosionCurrent: 0.25, larvalSupply: 1 };
+  const solver = new MaterialAgeingSolver({ readExposure: true });
+  const source = new SampleExposure(solver.exposureField, 1, () => wet);
+  const world = new PhysicsWorld({ rate: FPS, memory: worldMemory(false) })
+    .add(solver, { patches: [{ material: 'steel' }], timeScale: AGEING_YEAR }, cell)
+    .add(source, {}, cell);
+  world.advance(10);
+  const first = world.takeSnapshot();
+  assert.deepEqual(world.fields.port(solver.stateField.name).cell, cell);
+  world.shiftOrigin(shift);
+  world.advance(20);
+  assert.deepEqual(world.fields.port(solver.stateField.name).cell, [-10, 8, 16]);
+  assert.ok(solver.read(0).consumedThickness > 0);
+  const after = world.takeSnapshot();
+  world.restoreSnapshot(first.bytes);
+  world.shiftOrigin(shift);
+  world.advance(20);
+  assert.deepEqual(world.takeSnapshot().bytes, after.bytes);
+});
+
+test('material ageing validates borrowed exposure and keeps every accepted row through rejection', () => {
+  const cell = [-7, 4, -2];
+  const solver = new MaterialAgeingSolver();
+  const world = new PhysicsWorld({ rate: FPS, memory: worldMemory(false) }).add(
+    solver,
+    { patches: [{ material: 'steel' }, { material: 'copper' }], timeScale: AGEING_YEAR },
+    cell,
+  );
+  const memory = new WebAssembly.Memory({ initial: 1 });
+  const values = new Float64Array(memory.buffer, 32, 2 * AGEING_EXPOSURE_WORDS);
+  const quiet = { submerged: 1, corrosionCurrent: 0, larvalSupply: 0 };
+  writeAgeingExposure(values, { ...quiet, corrosionCurrent: 0.1 }, 0);
+  writeAgeingExposure(values, quiet, 1);
+  const field = solver.exposureField.name;
+  const port = {
+    field,
+    tick: 0,
+    cell,
+    region: {
+      name: 'borrowed-weather',
+      type: 'f64',
+      layout: 1,
+      byteOffset: 32,
+      byteLength: values.byteLength,
+      memory,
+    },
+  };
+  const step = (input, dt = 1 / 60) =>
+    solver.step({ tick: 0, level: 0, seed: 0, cell, inputs: new Map([[field, input]]) }, dt);
+  const before = world.takeSnapshot();
+  values[values.length - 1] = Number.NaN;
+  assert.throws(() => step(port), { code: 'state', message: /larval supply.*errors#ageing/ });
+  assert.throws(() => step({ ...port, cell: CENTRE }), { code: 'state', message: /signed origin.*errors#ageing/ });
+  assert.throws(() => step({ ...port, region: { ...port.region, byteOffset: 33 } }), {
+    code: 'state',
+    message: /aligned in its owning memory.*errors#ageing/,
+  });
+  assert.deepEqual(world.takeSnapshot().bytes, before.bytes);
+  values[values.length - 1] = 0;
+  assert.throws(() => step(port, Number.MAX_VALUE), { code: 'failed', message: /Reduce exposure time.*errors#ageing/ });
+  assert.deepEqual(world.takeSnapshot().bytes, before.bytes);
+  step(port);
+  assert.ok(solver.read(0).consumedThickness > 0);
+  assert.equal(solver.read(1).consumedThickness, 0);
+  const accepted = world.takeSnapshot();
+  world.restoreSnapshot(before.bytes);
+  step(port);
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
 });
 
 test('MaterialAgeingSolver preserves material and field states across film rates, shared memory and seeks', () => {

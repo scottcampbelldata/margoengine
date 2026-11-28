@@ -24461,8 +24461,9 @@ geometry contract needed for independent impulse and animation consumers.
 A material-ageing world needs local deposition and annual climate values for atmospheric loss,
 and needs corrosion current and larval supply for site-specific wreck decay. Existing weather
 and sea fields leave out those quantities. A fixed `AgeingExposure` or a publisher writing
-`ageing.exposureField` supplies them explicitly. Run the changing-exposure and wreck cases in
-`packages/physics/tests/coupling/ageing.test.js` for a replayable producer example.
+`ageing.exposureField` supplies them explicitly. The civil coupon witness transforms accepted HYDRO-01
+water level into local immersed fraction and uses a prescribed current. Predicting site current and
+biological supply remains open. [Live immersion witness](physics-demo-review.md#bio-04-live-shallow-water-exposure-witness).
 See [Framework requests](physics-work-queue.md#framework-requests) for the shared layout.
 
 ### Ice impacts and long-wave inundation (PA-15 and PA-25)

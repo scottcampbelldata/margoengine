@@ -7220,3 +7220,11 @@ late invalid patch or rejected recruitment callback. Native work is accepted onl
 One, two and four participants agree on retained stand state. A fixed-camera ridge witness exercises
 permanent leeward growth opposite an upright sheltered control. Reported survival from Wind River
 bounds the generic stand model. [Measured limits](../limits.md#bio-03-douglas-fir-survival-in-the-wind-river-spacing-trial).
+
+### BIO-04 accepted material columns and live immersion replay
+
+The optional native ageing path preserves complete accepted material rows with one, two or four participants.
+A signed exposure port reads aligned rows from its actual memory. Rejected climate or native steps retain
+the previous substrate, coating, fouling and elapsed state. A fixed-camera case drives PBR from accepted
+layers after real shallow-water wetting and drainage. Its comparisons establish renderer replay and physical
+charge balance under prescribed current. Independent field measurements quantify limits on loss prediction.

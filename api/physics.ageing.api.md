@@ -28,6 +28,20 @@ export type AgeingMaterial = AgeingMetal | 'wood' | 'limestone';
 
 export type AgeingMetal = 'steel' | 'copper';
 
+export interface AgeingNativeWorkCounts extends AgeingNativeWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly AgeingNativeWorkerWork[];
+}
+
+export interface AgeingNativeWorkerWork {
+    readonly patches: number;
+    readonly pairedPatches: number;
+    readonly steel: number;
+    readonly copper: number;
+    readonly wood: number;
+    readonly limestone: number;
+}
+
 export interface AgeingPatch {
     readonly material: AgeingMaterial;
     readonly thickness?: number;
@@ -64,6 +78,11 @@ export interface FoulingRates {
     readonly dryRemoval?: number;
 }
 
+export interface MaterialAgeingLoadOptions extends MaterialAgeingOptions {
+    readonly threads?: 1 | 2 | 4;
+    readonly signal?: AbortSignal;
+}
+
 export interface MaterialAgeingOptions {
     readonly id?: string;
     readonly readExposure?: boolean;
@@ -80,6 +99,9 @@ export class MaterialAgeingSolver implements Solver<MaterialAgeingParams> {
     readonly exposureField: FieldDescriptor;
     readonly stateField: FieldDescriptor;
     constructor({ id, readExposure }?: MaterialAgeingOptions);
+    static load(options?: MaterialAgeingLoadOptions): Promise<MaterialAgeingSolver>;
+    [Symbol.dispose](): void;
+    readNativeWork(): AgeingNativeWorkCounts | undefined;
     describe(): SolverDescription;
     init(host: SolverHost, { patches, exposure, timeScale }: MaterialAgeingParams): void;
     step(context: StepContext, dt: number): void;

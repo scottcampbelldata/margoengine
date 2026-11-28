@@ -167,6 +167,11 @@ type NativePhaseSolver =
       readonly phase: 'audio blocks';
     }
   | {
+      readonly subject: 'Material ageing';
+      readonly phaseExport: 'ageing_thread_phase';
+      readonly phase: 'material exposure patches';
+    }
+  | {
       readonly subject: 'Seismic';
       readonly phaseExport: 'seismic_thread_phase';
       readonly phase: 'velocity and stress stencil';

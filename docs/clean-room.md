@@ -20820,3 +20820,32 @@ F. Brüchert and B. Gardiner, [*The effect of wind exposure on the tree aerial a
 of Sitka spruce* (2006)](https://doi.org/10.3732/ajb.93.10.1512), measured crown dimensions along windward
 and leeward axes. The renderer witness uses the existing growth-area weighting and a civil exposure field,
 with authored tree geometry and no calibration of lean to that study.
+
+### BIO-04 accepted patches and native ageing
+
+J. Dorsey and P. Hanrahan, [*Modeling and Rendering of Metallic Patinas* (1996)](https://graphics.stanford.edu/papers/patina/),
+separate chemical transformation from diffuse optical transport. J. Gu et al., [*Time-Varying Surface
+Appearance* (2006)](https://cave.cs.columbia.edu/old/publications/pdfs/Gu_TOG06.pdf), relate spatial texture
+to the timing of appearance changes. The solver keeps independent material patches, applies the existing
+Kubelka–Munk readout for their accepted layers, and processes disjoint native blocks without reordering
+a column's operations. SIMD handles physical terms shared by consecutive rows and the pinned Rust
+transcendentals preserve the existing scalar material branches. The synchronous entry remains available
+for callers that create the solver without loading a native kernel.
+
+The atmospheric state continues to use the specified [ISO 9223:2012 dose response](https://www.iso.org/standard/53499.html)
+and [ISO 9224:2012 long-term curve](https://www.iso.org/standard/53500.html).
+The immersion witness maps a resolved waterline to prescribed uniform-current wet exposure, using the
+[ASTM G102-23](https://store.astm.org/standards/g102) Faraday balance for consumed material. The test separates
+a real wetting condition from its assumed current and optical parameters.
+
+### BIO-04 independent outdoor corrosion observations
+
+R. Vera et al., [*Corrosion Behavior of Copper Exposed in Marine Tropical Atmosphere in Rapa Nui
+(Easter Island) Chile 20 Years after MICAT* (2022)](https://doi.org/10.3390/met12122082), reports
+independent copper coupons exposed after the original dose-response calibration. The inputs
+come from Table 1 and meteorology in Fig. 3. Penetration read separately from §3.2 and Fig. 6 is
+compared after one and three years. L. Paterlini, A. Brenna, F. Ceriani, M. Gamba, M. Ormellese
+and F. Bolzoni, [*Atmospheric Corrosion of Different Steel Types in Urban and Marine Exposure* (2024)](https://doi.org/10.3390/ma17246211),
+supply a second, bare carbon-steel regime. The ten-month comparison uses independently reported
+first-year meteorology as a proxy and the ISO 9223 concentration-to-deposition conversion for SO₂.
+The script records extraction precision and climate sensitivity separately from measurement uncertainty.

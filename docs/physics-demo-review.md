@@ -668,3 +668,14 @@ upright changes 16,285 exposed pixels and zero sheltered pixels. Both renderers 
 snapshots and pixels through held frames, two checkpoint restores, re-advance and rewind. The scene
 uses authored tree geometry and compresses each modeled year to one edit second. The original TREE-3
 shot remains open. [Browser test](../packages/biomes/tests/forest-film.browser.mjs).
+
+### BIO-04 live shallow-water exposure witness
+
+A metered inlet fills one of two matched steel-coupon trays. Real HYDRO-01 surface water reaches
+118.08 mm at the exposed gauge. The adapter computes immersion independently for eight panel bands
+from the accepted waterline. At the bottom band, 29.11 µm of steel is consumed and 42.51 µm of
+oxide is retained after the outlet drains below the coupon. The dry control keeps its initial loss
+and appearance. The test closes the hydraulic ledger and compares charge and oxide with its prescribed
+0.018 A/m² current. One model-age year occupies one edit second. PBR reads the accepted layers with
+an authored palette. Both renderers independently replay full solver snapshots and RGBA through held
+frames, prefill and immersed restores, re-advance and rewind. [Browser test](../packages/physics/tests/ageing-film.browser.mjs).
