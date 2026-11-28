@@ -10,7 +10,7 @@ import {
 import { MargoError } from '@margoengine/math/errors';
 import { finiteVector } from '@margoengine/math/validate';
 import type { Vec3 } from '@margoengine/math';
-import { cloudLayerFor, type MutableCloudLayer } from './cloud-types.js';
+import { cloudLayerFor, isCloudLayerName, type MutableCloudLayer } from './cloud-types.js';
 import { ParticleOverlay } from '../../shared/particle-overlay.js';
 import { fullscreen } from '../../shared/gpu.js';
 import { applyView, viewSize } from '../../shared/view-rect.js';
@@ -1418,7 +1418,7 @@ export class Weather implements EnginePlugin {
     for (const [name, plugin] of plugins) {
       const o = (plugin as { options?: unknown }).options;
       if (typeof o !== 'object' || o === null) continue;
-      if (name === 'sky:volumetric-clouds') {
+      if (isCloudLayerName(name)) {
         const deck = o as {
           flash?: unknown;
           weather?: { cloud: number };

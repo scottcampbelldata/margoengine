@@ -6,6 +6,32 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: a world built again named its GLTFWeather effects otherwise, so a seek did not match a run (KB-WEATHER-GLTFSEEK1, weather)
+
+- **Repro:** `node --test packages/weather/tests/seek.test.js`: "a weather replayed 1 steps equals a continuous run"
+  failed with `name: 'weather-gltf-2'` against `'weather-gltf'`.
+- **Cause:** the KB-WEATHER-GLTFTWO1 fix named each effect by a counter over every `GLTFWeather` the program had made
+  (`packages/weather/src/gltf.ts`), so the second world of a seek, or a film's second shot, got new names, and a
+  lookup by name found nothing.
+- **Fix:** option `name` (default `'weather-gltf'`); `GLTFWeather.attach` without one takes the first free of
+  `weather-gltf`, `weather-gltf-2`, ... in the engine's scene, so the names follow the scene.
+- **Regression:** `packages/weather/tests/gltf.test.js` ("GLTFWeather names follow the scene"); `seek.test.js`.
+
+### Fixed 2026-11-28: a second VolumetricClouds layer on one engine threw "Invalid plugin" (KB-SKY-CLOUDTWO1, sky, weather)
+
+- **Repro:** `VolumetricClouds.attach(engine, {bottom: 650, top: 1300})` and then a second
+  `VolumetricClouds.attach(engine, {bottom: 250, top: 450})` (low scud under a rain deck): the engine threw
+  `Invalid plugin`.
+- **Cause:** the plugin's `name` and its frame-graph pass were both the fixed text `'sky:volumetric-clouds'`
+  (`packages/sky/src/volumetric-clouds.ts`), and core refuses a second plugin of one name (the class of
+  KB-WEATHER-GLTFTWO1). `Weather`'s flash link and `WeatherDrive` looked a layer up by that exact name, so they could
+  reach one layer only.
+- **Fix:** option `name` (default `'sky:volumetric-clouds'`), fixed text so a world built again names its layers the
+  same; the pass takes the plugin's name. `Weather` and `WeatherDrive` reach every layer named
+  `'sky:volumetric-clouds'` or `'sky:volumetric-clouds:<name>'` (`isCloudLayerName`).
+- **Regression:** `packages/sky/test/cloud-layers.test.js`; `packages/weather/tests/air.test.js` ("the drive finds
+  every cloud layer by the name prefix").
+
 ### Fixed 2026-11-28: an explicit fitAnatomy map threw when the table's naming had read the same bone (KB-RIG-MAPWINS1, rigging)
 
 - **Repro:** the animator README example "Solvers on a fitted body": `fitAnatomy` on the UAL1 mannequin with

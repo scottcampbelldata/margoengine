@@ -20,6 +20,7 @@ import { linearHdr } from '../../shared/hdr-format.js';
 import { fireSkyWgsl, writeFireSpots, writeHazeFires } from './fire-spots.js';
 import type { SkyFireSpot } from './base.js';
 import {
+  CLOUD_LAYER_NAME,
   cloudDeckTransmittance,
   cloudLayerFor,
   type CloudLayer,
@@ -30,6 +31,8 @@ import {
 import type { Hurricane, HurricaneOptions } from './hurricane.js';
 import type { StormField } from './storm-field.js';
 export {
+  CLOUD_LAYER_NAME,
+  isCloudLayerName,
   cloudDeckTransmittance,
   cloudLayerFor,
   cloudTransmission,
@@ -105,6 +108,14 @@ export interface VolumetricCloudSky {
 }
 /** {@link VolumetricClouds} settings, read every frame from `clouds.options`. Lengths are metres, speeds metres per second. */
 export interface VolumetricCloudOptions {
+  /**
+   * The layer's plugin name, fixed for its lifetime. Each layer on one engine needs its own: a second layer under the
+   * same name is refused by the engine. `Weather` (its lightning flash) and `WeatherDrive` (`@margoengine/weather`) find
+   * every layer whose name is `'sky:volumetric-clouds'` or starts with `'sky:volumetric-clouds:'`, so keep that prefix
+   * for a layer they should reach. Fixed text rather than a counter, so a world built again (a seek, a second shot) names
+   * its layers the same. Default `'sky:volumetric-clouds'`.
+   */
+  name?: string;
   /** The sky that lights the clouds (sun, its colour, exposure, sky light, moon). Without one, `sunDirection` and `ambient` light them. */
   sky?: VolumetricCloudSky;
   /** Direction toward the sun when no `sky` is given; normalized. Default [0.3, 0.6, 0.4]. */
@@ -811,6 +822,7 @@ export function cloudGroundLight(
 }
 /** Floats in the `Clouds` uniform ({@link cloudField}): the buffers of the clouds, their shadows and shafts hold this many. */
 export const CLOUD_FLOATS = 300;
+
 let loadedStorm: StormField | undefined, loading: Promise<StormField> | undefined, loadError: unknown;
 /** Whether the options draw a storm: a `hurricane`, or `type: 'hurricane'`. */
 export const wantsStorm = (options: VolumetricCloudOptions): boolean =>
@@ -873,7 +885,8 @@ const inRange = (value: number, low: number, high: number) => Number.isFinite(va
  * `dispose()`, `'state'` when the camera matrix is not invertible.
  */
 export class VolumetricClouds implements EnginePlugin {
-  readonly name: string = 'sky:volumetric-clouds';
+  /** The plugin's name and its frame-graph pass's, from the `name` option (fixed at construction). */
+  readonly name: string;
   private engine?: Engine;
   private uniform?: GPUBuffer;
   private volumes?: CloudVolumes;
@@ -929,6 +942,10 @@ export class VolumetricClouds implements EnginePlugin {
   readonly drift = new Float64Array(5);
   constructor(readonly options: VolumetricCloudOptions = {}) {
     this.validate();
+    const name = options.name ?? CLOUD_LAYER_NAME;
+    if (typeof name !== 'string' || name.length === 0 || name.length > 200)
+      throw new TypeError('VolumetricClouds name must be a non-empty string of at most 200 characters');
+    this.name = name;
   }
   static attach(engine: EngineKernel, options: VolumetricCloudOptions = {}): VolumetricClouds {
     const clouds = new VolumetricClouds(options);
@@ -1045,8 +1062,9 @@ export class VolumetricClouds implements EnginePlugin {
   }
   registerPasses(graph: FrameGraph): void {
     // After the sky (2) and before its fog (5): the clouds composite over the sky backdrop, and fog over them.
+    // The pass takes the plugin's name, so a second layer adds its own pass (KB-SKY-CLOUDTWO1).
     graph.add({
-      name: 'sky:volumetric-clouds',
+      name: this.name,
       order: 3,
       execute: (c) => {
         if (c.backend === 'webgpu') this.draw(c);

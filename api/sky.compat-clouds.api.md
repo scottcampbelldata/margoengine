@@ -59,6 +59,7 @@ export interface VolumetricCloudFlash {
 }
 
 export interface VolumetricCloudOptions {
+    name?: string;
     sky?: VolumetricCloudSky;
     sunDirection?: Vec3;
     weather?: CloudWeather;

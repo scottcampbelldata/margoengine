@@ -147,3 +147,8 @@ export function cloudDeckTransmittance(layer: CloudLayer, up: number): number {
   const tau = (layer.density * (layer.top - layer.bottom) * 0.35) / Math.max(0.1, Math.min(1, up));
   return 1 - layer.coverage + layer.coverage * cloudTransmission(tau);
 }
+/** The plugin name of a cloud layer, and the prefix (with a colon after it) every other layer's name starts with. */
+export const CLOUD_LAYER_NAME = 'sky:volumetric-clouds';
+/** Whether a plugin name is a cloud layer's: `'sky:volumetric-clouds'` or `'sky:volumetric-clouds:<anything>'`. */
+export const isCloudLayerName = (name: string): boolean =>
+  name === CLOUD_LAYER_NAME || name.startsWith(`${CLOUD_LAYER_NAME}:`);

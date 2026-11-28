@@ -190,6 +190,7 @@ interface VolumetricCloudFlash {
 }
 
 interface VolumetricCloudOptions {
+    name?: string;
     sky?: VolumetricCloudSky;
     sunDirection?: Vec3;
     weather?: CloudWeather;

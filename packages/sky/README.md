@@ -442,6 +442,7 @@ over the empty sky.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
+| `name` | `'sky:volumetric-clouds'` | the layer's plugin name, fixed for its life; each layer on one engine needs its own. `Weather`'s flash and `WeatherDrive` reach every layer named `'sky:volumetric-clouds'` or `'sky:volumetric-clouds:<name>'` (`isCloudLayerName`), so a second layer is `{name: 'sky:volumetric-clouds:low'}` |
 | `sky` | none | the `Sky` that lights the clouds |
 | `weather` | none | a weather state `{cloud, rain?, lightning?}` (0 to 1 each): its cloud type gives `coverage`, `bottom`, `top` and `density` for each left unset (below); the weather drive writes it |
 | `type` | none | `'cumulus'`, `'stratus'` or `'storm'` forces that type's base, tops and density whatever the `weather` says (with no weather its `cloud` is 0.5); `'hurricane'` is the hurricane deck, 500 to 15,000 m, drawing the default storm at the origin; `cloudLayerFor(weather, out, type)` gives the same layer |

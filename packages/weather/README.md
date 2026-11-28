@@ -236,8 +236,9 @@ const remove = imported.add(kerb); // the kerb is wetted once, by the GLTFWeathe
 remove(); // and by the scene's Puddles again
 ```
 
-A scene may hold several `GLTFWeather` effects, each with its own settings and models (each takes its own plugin name,
-`weather-gltf`, `weather-gltf-2`, ...). Water stands only on surfaces that can hold it: give props, roofs and vehicles,
+A scene may hold several `GLTFWeather` effects, each with its own settings and models (each takes its own plugin name:
+the `name` option, or with none `attach` takes the first free of `weather-gltf`, `weather-gltf-2`, ... in the scene,
+so a world built again for a seek or a second shot names its effects as the first build did; KB-WEATHER-GLTFSEEK1). Water stands only on surfaces that can hold it: give props, roofs and vehicles,
 whose small tops and edges shed it, an effect with `coverage: 0`, so they darken and gloss in the rain while the ground
 pools (`tests/material-wet-browser.mjs`, KB-WEATHER-GLTFTWO1, WebGPU and the WebGL2 layer).
 

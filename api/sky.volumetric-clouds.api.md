@@ -8,6 +8,8 @@ import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
 export const CLOUD_FLOATS = 300;
 
+export const CLOUD_LAYER_NAME = "sky:volumetric-clouds";
+
 export interface CloudGroundLight {
     color: Vec3;
     x: number;
@@ -64,6 +66,7 @@ export interface VolumetricCloudFlash {
 }
 
 export interface VolumetricCloudOptions {
+    name?: string;
     sky?: VolumetricCloudSky;
     sunDirection?: Vec3;
     weather?: CloudWeather;
@@ -154,6 +157,8 @@ export function cloudLayerFor(weather: CloudWeather, out?: MutableCloudLayer, ty
 export function cloudTransmission(tau: number): number;
 
 export function cloudTypeWeights(weather: CloudWeather): CloudTypeWeights;
+
+export const isCloudLayerName: (name: string) => boolean;
 
 export function layerOf(options: VolumetricCloudOptions, out?: MutableCloudLayer): CloudLayer;
 

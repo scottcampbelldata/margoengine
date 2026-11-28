@@ -361,8 +361,8 @@ export interface DriveOptions {
    */
   windAloft?: number;
   /**
-   * Find the targets by name among the scene's plugins when none is given: the sky (`sky`), cloud layer
-   * (`sky:volumetric-clouds`), fog volume (`volumetric-fog`), rain and snow (`weather`) and `hail`. A target handed in
+   * Find the targets by name among the scene's plugins when none is given: the sky (`sky`), cloud layers
+   * (`sky:volumetric-clouds` and every `sky:volumetric-clouds:<name>`), fog volume (`volumetric-fog`), rain and snow (`weather`) and `hail`. A target handed in
    * wins; false turns discovery off. Default true.
    */
   auto?: boolean;
@@ -799,7 +799,22 @@ export class WeatherDrive {
           : undefined;
       },
       skyTarget = o.sky ?? find<SkyTarget>(FOUND.sky),
-      cloudTargets = o.clouds !== undefined ? list(o.clouds) : list(find<CloudLayerTarget>(FOUND.clouds)),
+      // Every cloud layer: `sky:volumetric-clouds` and each `sky:volumetric-clouds:<name>` (a scud layer under the
+      // deck, KB-SKY-CLOUDTWO1), so a second layer is driven as the first is.
+      cloudTargets =
+        o.clouds !== undefined
+          ? list(o.clouds)
+          : found
+            ? ([...found]
+                .filter(
+                  ([n, p]) =>
+                    (n === FOUND.clouds || n.startsWith(`${FOUND.clouds}:`)) &&
+                    p !== (this as object) &&
+                    typeof (p as CloudLayerTarget).options === 'object' &&
+                    (p as CloudLayerTarget).options !== null,
+                )
+                .map(([, p]) => p) as CloudLayerTarget[])
+            : [],
       volumeTargets = o.fogVolumes !== undefined ? list(o.fogVolumes) : list(find<FogVolumeTarget>(FOUND.fogVolumes)),
       rainTarget = o.precipitation ?? find<PrecipitationTarget>(FOUND.precipitation),
       hailTarget = o.hail ?? find<PrecipitationTarget>(FOUND.hail);

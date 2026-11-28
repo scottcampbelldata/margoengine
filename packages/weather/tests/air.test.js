@@ -137,3 +137,18 @@ test('vane: rain, hail and cloud drift all move within 5 degrees of the wind fie
     ground = Math.hypot(sample[0], sample[2]);
   assert.ok(speed > 2 * ground * 0.9 && speed < 2.6 * ground * 1.1);
 });
+
+test('the drive finds every cloud layer by the name prefix (KB-SKY-CLOUDTWO1)', () => {
+  const deck = { name: 'sky:volumetric-clouds', options: { coverage: 0, bottom: 1500 } },
+    scud = { name: 'sky:volumetric-clouds:scud', options: { coverage: 0, bottom: 300 } },
+    stranger = { name: 'sky:volumetric-cloudsx', options: { coverage: 0 } },
+    engine = sceneWith(deck, scud, stranger),
+    weather = new WeatherMachine('storm', { seed: 2 });
+  WeatherDrive.attach(engine, { weather });
+  engine.plugins.get('weather-drive').update(0);
+  assert.equal(deck.options.coverage, weather.state.cloud);
+  assert.equal(scud.options.coverage, weather.state.cloud);
+  assert.equal(stranger.options.coverage, 0);
+  // Each layer drifts at the wind of its own base: the low one slower than the deck in a power-law profile.
+  assert.ok(Math.hypot(...scud.options.wind) < Math.hypot(...deck.options.wind));
+});

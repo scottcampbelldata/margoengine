@@ -76,3 +76,19 @@ test('snow lifts an MToon outline hull with its body, and a shader without the s
   const surface = input.replace('o.clip=f.camera*p; o.position=p.xyz;', 'o.clip=f.camera*p;o.position=p.xyz;');
   assert.throws(() => effect.shader(surface, 2), { code: 'unsupported' });
 });
+
+// KB-WEATHER-GLTFSEEK1: a world built twice names its effects the same, and two in one scene still differ.
+test('GLTFWeather names follow the scene, not a count of every effect ever made', async () => {
+  const { tracedGPU } = await import('../../../tests/support/gpu-trace.js');
+  const build = () => {
+    const h = tracedGPU();
+    return [GLTFWeather.attach(h.engine, {}), GLTFWeather.attach(h.engine, { puddles: { coverage: 0 } })];
+  };
+  const first = build().map((e) => e.name),
+    second = build().map((e) => e.name);
+  assert.deepEqual(first, ['weather-gltf', 'weather-gltf-2']);
+  assert.deepEqual(second, first);
+  assert.equal(new GLTFWeather({ name: 'weather-gltf:props' }).name, 'weather-gltf:props');
+  assert.equal(new GLTFWeather().name, 'weather-gltf');
+  assert.throws(() => new GLTFWeather({ name: '' }), TypeError);
+});

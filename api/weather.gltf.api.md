@@ -26,6 +26,7 @@ export class GLTFWeather implements EnginePlugin {
 }
 
 export interface GLTFWeatherOptions {
+    name?: string;
     cover?: Pick<PrecipitationCover, 'shader' | 'bindings'>;
     puddles?: PuddleOptions;
     snow?: SnowOptions;

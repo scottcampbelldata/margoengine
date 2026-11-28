@@ -16,6 +16,12 @@ export interface WeatherGLTFModel {
 
 /** Wet ground and snow settings; both default to their core-mesh entry's defaults. */
 export interface GLTFWeatherOptions {
+  /**
+   * The effect's plugin name, fixed for its life; each effect in one scene needs its own. `GLTFWeather.attach` without
+   * one takes the first free of `weather-gltf`, `weather-gltf-2`, `weather-gltf-3`, ... in the engine's scene, so a world
+   * built again names its effects as the first build did (a seek, a second shot). Default `'weather-gltf'`.
+   */
+  name?: string;
   /** Optional shared precipitation cover. Default none. */
   cover?: Pick<PrecipitationCover, 'shader' | 'bindings'>;
   /** Wetness, standing water and rain rings. Default {}. */
@@ -45,14 +51,14 @@ class SnowValues extends Snow {
  * texture coordinates and material extensions remain intact. WebGPU only.
  * @throws MargoError for unsupported backends, mismatched shaders or disposed use.
  */
-let instances = 0;
-
 export class GLTFWeather implements EnginePlugin {
   /**
-   * Plugin name, unique to each effect (`weather-gltf`, then `weather-gltf-2`, ...), so one scene can hold several:
-   * ground that pools water beside props whose small tops shed it (KB-WEATHER-GLTFTWO1).
+   * Plugin name, the `name` option (`attach` picks the first free `weather-gltf`, `weather-gltf-2`, ... in the scene),
+   * so one scene can hold several: ground that pools water beside props whose small tops shed it (KB-WEATHER-GLTFTWO1).
+   * Until 2026-11-28 a counter over every effect ever made named them, so a world built again (a seek, a second shot)
+   * got other names than the first (KB-WEATHER-GLTFSEEK1).
    */
-  readonly name: string = instances++ ? `weather-gltf-${instances}` : 'weather-gltf';
+  readonly name: string;
   private engine?: Engine;
   private uniform?: GPUBuffer;
   private readonly values = new Float32Array(20);
@@ -62,14 +68,25 @@ export class GLTFWeather implements EnginePlugin {
   private disposed = false;
 
   constructor(readonly options: GLTFWeatherOptions = {}) {
+    const name = options.name ?? 'weather-gltf';
+    if (typeof name !== 'string' || name.length === 0)
+      throw new TypeError('GLTFWeather name must be a non-empty string');
+    this.name = name;
     this.puddles = new PuddleValues(options.puddles ?? (options.puddles = {}));
     this.snow = new SnowValues(options.snow ?? (options.snow = {}));
   }
 
   /** Attaches one effect; call add(model) for each imported model to weather. */
   static attach(engine: EngineKernel, options: GLTFWeatherOptions = {}): GLTFWeather {
+    const runtime = engineRuntime(engine);
+    if (options.name === undefined) {
+      const taken = (runtime as { plugins?: ReadonlyMap<string, unknown> }).plugins;
+      let name = 'weather-gltf';
+      for (let i = 2; taken?.has(name); i++) name = `weather-gltf-${i}`;
+      options.name = name;
+    }
     const effect = new GLTFWeather(options);
-    engineRuntime(engine).use(effect);
+    runtime.use(effect);
     return effect;
   }
 
