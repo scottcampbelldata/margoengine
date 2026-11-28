@@ -50,13 +50,17 @@ await postBrowser(
       // MeshBlend and SceneTargets, then SSR and SceneTargets (one post stack each): the water in two effects a frame.
       const blend = MeshBlend.attach(engine);
       blend.tag(water, 0.2);
-      for (let i = 0; i < 4; i++) engine.render({ delta: 0 });
-      await device.queue.onSubmittedWorkDone();
+      await (await import('/scripts/support/gpu-ready.js')).waitForPipelines(async () => {
+        engine.render({ delta: 0 });
+        await device.queue.onSubmittedWorkDone();
+      });
       blend.dispose();
       const ssr = SSR.attach(engine);
       ssr.add(water);
-      for (let i = 0; i < 4; i++) engine.render({ delta: 0 });
-      await device.queue.onSubmittedWorkDone();
+      await (await import('/scripts/support/gpu-ready.js')).waitForPipelines(async () => {
+        engine.render({ delta: 0 });
+        await device.queue.onSubmittedWorkDone();
+      });
       const read = async (name) => {
         const texture = targets.texture(name),
           { width, height, format } = texture,

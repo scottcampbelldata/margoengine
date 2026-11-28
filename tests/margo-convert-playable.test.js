@@ -199,9 +199,11 @@ test('the file runs in Chromium with the network blocked, with MRAID and without
       };
     });
     contexts.push(ad.context);
+    // fixed-wait: a check that nothing happens: no result before the ad container is ready
     await ad.page.waitForTimeout(500);
     assert.equal(await ad.page.evaluate(() => document.body.dataset.result ?? null), null, 'waits for ready');
     await ad.page.evaluate(() => window.__fire('ready'));
+    // fixed-wait: a check that nothing happens: no result before the ad is viewable
     await ad.page.waitForTimeout(300);
     assert.equal(await ad.page.evaluate(() => document.body.dataset.result ?? null), null, 'waits for viewable');
     await ad.page.evaluate(() => window.__fire('viewableChange', true));

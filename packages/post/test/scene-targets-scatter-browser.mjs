@@ -142,8 +142,10 @@ await postBrowser(
             const ssr = SSR.attach(engine);
             ssr.add(shaded);
             ssr.add(lit);
-            for (let i = 0; i < 3; i++) engine.render({ delta: 0 });
-            await device.queue.onSubmittedWorkDone();
+            await (await import('/scripts/support/gpu-ready.js')).waitForPipelines(async () => {
+              engine.render({ delta: 0 });
+              await device.queue.onSubmittedWorkDone();
+            });
             ssr.dispose();
             if (errors.length) throw new Error(errors.join('\n'));
           },

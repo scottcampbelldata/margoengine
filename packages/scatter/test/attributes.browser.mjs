@@ -15,6 +15,7 @@ const routeChunk = await compatChunkFile(new URL('../../shadows/dist/', import.m
 let release;
 const released = new Promise((done) => (release = done));
 await b.page.route(`**/packages/shadows/dist/${routeChunk}`, async (route) => {
+  // fixed-wait: a bound on the hold, not a wait: the page releases it, and a page that awaits ready never does
   await Promise.race([released, new Promise((done) => setTimeout(done, 10000))]);
   await route.continue();
 });

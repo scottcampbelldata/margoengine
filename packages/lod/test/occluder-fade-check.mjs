@@ -44,10 +44,10 @@ try {
         engine.gpu.addEventListener('uncapturederror', (e) => gpu.push(e.error.message));
         // Red, green and blue pixels of a 32 by 32 block (four whole tiles) centred `dx` pixels right of the middle.
         const count = async (dx = 0) => {
-          for (let i = 0; i < 2; i++) {
+          await (await import('/scripts/support/gpu-ready.js')).waitForPipelines(async () => {
             engine.render({ delta: 0 });
             await engine.gpu.queue.onSubmittedWorkDone();
-          }
+          });
           engine.render({ delta: 0 });
           const copy = new OffscreenCanvas(size, size).getContext('2d', { willReadFrequently: true });
           copy.drawImage(canvas, 0, 0);

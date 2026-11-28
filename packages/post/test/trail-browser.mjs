@@ -51,8 +51,10 @@ await postBrowser(
       trail.move(0.9, 0.5);
       await frame();
       const first = await read(trail);
+      // fixed-wait: the decay clock: 60 frames of 1/60 s are the second the assert measures
       for (let i = 0; i < 60; i++) await frame();
       const second = await read(trail);
+      // fixed-wait: the decay clock: four more seconds, long enough for the trail to reach black
       for (let i = 0; i < 240; i++) await frame();
       const third = await read(trail);
       trail.dispose();

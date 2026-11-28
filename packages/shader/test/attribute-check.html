@@ -1,5 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>Vertex attribute check</title><style>body{margin:0}#host{width:400px;height:400px}</style></head><body><div id="host"></div>
 <script type="module">
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 import {createStage} from '/packages/stage/dist/index.js';
 import {planeGeometry} from '/packages/geometry/dist/index.js';
 import {Material,createMesh,createInstancedMesh} from '/packages/materials/dist/index.js';
@@ -55,7 +56,7 @@ const integers=reference=>{dark();const s=soup(),n=s.ids.length;
   const id=attribute('id','u32'),sign=attribute('sign','vec2i');
   return createMesh(engine,{positions:s.positions,normals:s.normals,attributes:{id:{data:s.ids,type:'u32'},sign:{data:s.signs,type:'vec2i'}}},
     new NodeMaterial({...flat,emissiveNode:vec3(id.div(1000003).mod(4).toFloat().div(4),select(sign.x.lessThan(0),1,0.25),sign.y.toFloat().div(12))}));};
-const draw=async()=>{for(let i=0;i<3;i++){engine.render();await device.queue.onSubmittedWorkDone();}};
+const draw=()=>waitForPipelines(async()=>{engine.render();await device.queue.onSubmittedWorkDone();});
 const scenarios={
   cpuPair:()=>pair(true),pair:()=>pair(false),instanced:()=>pair(false,instanced),
   cpuShadow:()=>shadowed(true),shadow:()=>shadowed(false),
@@ -75,6 +76,7 @@ const scenarios={
   async passes(){sun();const m=new NodeMaterial({...look,emissiveNode:attribute('tint','vec3f'),positionNode:positionLocal.add(vec3(0,time.sin().mul(0.1),attribute('lift','f32')))});
     const meshes=[0,1].map(s=>place(createMesh(engine,withData(s),m),s?1:-1));
     const ssao=SSAO.attach(engine);for(const mesh of meshes)ssao.add(mesh);const taa=TAA.attach(engine);for(const mesh of meshes)taa.add?.(mesh);
+    // fixed-wait: the subject: six moves, each frame binding the attribute in SSAO and TAA velocity passes
     for(let i=0;i<6;i++){meshes[0].root.setPosition([-1+i*0.02,0,0]);engine.render();await device.queue.onSubmittedWorkDone();}
     return {destroy(){engine.removePlugin(taa.name);engine.removePlugin(ssao.name);for(const mesh of meshes)mesh.destroy();}};},
 };

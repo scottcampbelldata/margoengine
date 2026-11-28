@@ -1,5 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>Deform nodes check</title><style>body{margin:0}#host{width:400px;height:400px}</style></head><body><div id="host"></div>
 <script type="module">
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 import {createStage} from '/packages/stage/dist/index.js';
 import {planeGeometry} from '/packages/geometry/dist/index.js';
 import {Material,Texture,createMesh} from '/packages/materials/dist/index.js';
@@ -88,7 +89,7 @@ const scenarios={
   resized:async()=>{
     const image={data:new Uint8Array(4*4*4).fill(51),width:4,height:4},depth=new Texture(image,{mipmaps:false,colorSpace:'linear'});
     const mesh=shadowed(base,{positionNode:positionLocal.add(vec3(0,0,texture(depth,uv(),0).x))});
-    for(let i=0;i<2;i++){engine.render();await device.queue.onSubmittedWorkDone();}
+    await waitForPipelines(async()=>{engine.render();await device.queue.onSubmittedWorkDone();});
     Object.assign(image,{data:new Uint8Array(8*8*4).fill(102),width:8,height:8});depth.update();
     return {destroy(){mesh.destroy();depth.dispose();}};
   },

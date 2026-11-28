@@ -90,10 +90,10 @@ try {
     await waitForPipelines(frame);
     await flood.settle();
     const still = async () => {
-      for (let i = 0; i < 5; i++) {
+      await waitForPipelines(async () => {
         engine.render({ delta: 0 });
         await device.queue.onSubmittedWorkDone();
-      }
+      });
       engine.render({ delta: 0 });
       const pixels = new OffscreenCanvas(canvas.width, canvas.height).getContext('2d');
       pixels.drawImage(canvas, 0, 0);

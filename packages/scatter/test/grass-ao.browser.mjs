@@ -67,8 +67,10 @@ await postBrowser(
       window.check = {
         async frame(enabled) {
           effect.enabled = enabled;
-          for (let i = 0; i < 3; i++) engine.render({ delta: 0 });
-          await gpu.queue.onSubmittedWorkDone();
+          await waitForPipelines(async () => {
+            engine.render({ delta: 0 });
+            await gpu.queue.onSubmittedWorkDone();
+          });
           return errors.splice(0);
         },
         async visibility() {

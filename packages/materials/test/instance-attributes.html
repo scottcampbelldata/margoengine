@@ -143,6 +143,7 @@ window.check={
     const data=instanceAttributes(1,{shift:'f32'}),
       mesh=createMesh(engine,quad(0.4),new PbrMaterial({features:[materialPlugin({name:'move',instanceAttributes:data,vertex:'position.x += move_shift;'})]}));
     TAA.attach(engine);
+    // fixed-wait: the subject: six moves, each frame drawing velocity from the last position
     for(let i=0;i<6;i++){mesh.root.setPosition([i*0.1,0,0]);data.set('shift',0,i*0.05);await render(1);}
     engine.dispose();return {errors,moved};
   },

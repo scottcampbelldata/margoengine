@@ -36,6 +36,7 @@ window.check = {
     const pixels = [];
     for (const r of reads) { await r.mapAsync(GPUMapMode.READ); pixels.push([...new Uint16Array(r.getMappedRange().slice(0, 8))].map(half)); r.unmap(); }
     await depthRead.mapAsync(GPUMapMode.READ); const d = new Float32Array(depthRead.getMappedRange().slice(0, 4))[0]; depthRead.unmap();
+    // fixed-wait: a check that nothing happens: no late GL error arrives in this time
     await new Promise((r) => setTimeout(r, 50));
     return { pixels, depth: d, errors, scoped: scoped?.message ?? null };
   },

@@ -78,8 +78,8 @@ async function main() {
     info: () => ({ vendor: device().adapterInfo?.vendor ?? null, errors: errors.splice(0), gl: device().gl ? device().gl.getError() : 0 }),
     async settle() {
       await waitForPipelines(frame);
-      // The sky's light is built on its first ambient frame and the terrain's shader follows on the next.
-      for (let i = 0; i < 4; i++) await frame();
+      // The sky's light is built on its first ambient frame and the terrain's shader follows on the next: a second wait
+      // draws until that shader has compiled too.
       await waitForPipelines(frame);
     },
   };

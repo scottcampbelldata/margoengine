@@ -162,6 +162,7 @@ window.check = {
       if (descriptor.usage & GPUBufferUsage.STORAGE) made++;
       return create.call(device, descriptor);
     };
+    // fixed-wait: the subject, not a wait: three picks with a frame each must make no new storage buffers
     for (let i = 0; i < 3; i++) {
       await engine.pick(128, 128);
       await frame();

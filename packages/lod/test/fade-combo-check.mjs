@@ -91,10 +91,10 @@ try {
           engine.gpu.addEventListener('uncapturederror', (e) => gpu.push(e.error.message));
           // The block, a letter per pixel: r, g or b for the colour that leads, ? for none.
           const grab = async () => {
-            for (let i = 0; i < 2; i++) {
+            await (await import('/scripts/support/gpu-ready.js')).waitForPipelines(async () => {
               engine.render({ delta: 0 });
               await engine.gpu.queue.onSubmittedWorkDone();
-            }
+            });
             engine.render({ delta: 0 });
             const copy = new OffscreenCanvas(size, size).getContext('2d', {
               willReadFrequently: true,

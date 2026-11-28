@@ -28,6 +28,7 @@ test('waits', () => { writeFileSync(${JSON.stringify(pidFile)}, String(process.p
     runner.stderr.on('data', (d) => (out += d));
     const closed = new Promise((done) => runner.once('close', done));
     const deadline = Date.now() + 30_000;
+    // fixed-wait: the poll interval of a loop that checks for the pid file, bound 30 s
     while (!existsSync(pidFile) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50));
     assert.ok(existsSync(pidFile), 'the test file started');
     process.kill(Number(readFileSync(pidFile, 'utf8')), 'SIGKILL');

@@ -58,10 +58,10 @@ try {
         .setPosition([0, -0.5, 0]);
       const device = engine.gpu;
       device.pushErrorScope('validation');
-      for (let frame = 0; frame < 4; frame++) {
+      await (await import('/scripts/support/gpu-ready.js')).waitForPipelines(async () => {
         engine.render({ delta: 0 });
         await device.queue.onSubmittedWorkDone();
-      }
+      });
       engine.render({ delta: 0 });
       // Read in the render's task: the canvas texture is presented when it ends.
       const copy = new OffscreenCanvas(128, 128).getContext('2d');

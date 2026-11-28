@@ -79,8 +79,10 @@ await postBrowser(
         });
         targets.add(quad, { subject: true });
         targets.add(water, { ground: false });
-        for (let i = 0; i < 3; i++) engine.render({ delta: 0 });
-        await device.queue.onSubmittedWorkDone();
+        await (await import('/scripts/support/gpu-ready.js')).waitForPipelines(async () => {
+          engine.render({ delta: 0 });
+          await device.queue.onSubmittedWorkDone();
+        });
         const read = async (name) => {
           const texture = targets.texture(name),
             { width, height } = texture,

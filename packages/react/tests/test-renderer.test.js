@@ -146,6 +146,7 @@ test('Html on a canvas outside a DOM document refuses with a coded error and lea
       );
       return true;
     });
+    // fixed-wait: a check that nothing happens: no unhandled rejection arrives in this time
     await new Promise((resolve) => setTimeout(resolve, 50));
     assert.deepEqual(unhandled, []);
   } finally {

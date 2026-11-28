@@ -178,6 +178,7 @@ await postBrowser(
       await page.evaluate(() => window.t.taa());
       // Several frames, so several jitter phases: the last read is the phase the frame drew with.
       const phases = [];
+      // fixed-wait: the subject: each frame is another jitter phase, read one by one
       for (let i = 0; i < 3; i++) {
         await page.evaluate(() => window.t.frames(1));
         phases.push(await page.evaluate(() => window.t.read()));

@@ -160,10 +160,29 @@ await runSuite(
         });
         let state = null;
         stream.ready().catch((e) => (state = e.message));
-        for (let i = 0; i < 60; i++) {
+        // Until the failed tile has been reported and every other tile of both windows (4 by 4, the default) is in but
+        // the held one (a long bound only a real failure reaches), then a second of frames so every 0.5 s fade has ended.
+        const settled = (w, skip = () => false) => {
+          if (!w) return false;
+          for (let dz = 0; dz < 4; dz++)
+            for (let dx = 0; dx < 4; dx++) {
+              const x = w.tile[0] + dx,
+                z = w.tile[1] + dz;
+              if (!skip(x, z) && !w.resident(x, z)) return false;
+            }
+          return true;
+        };
+        for (
+          let i = 0;
+          i < 3000 &&
+          !(state && settled(stream, (x, z) => z === 0 && (x === 0 || x === -1)) && settled(ring.tiles));
+          i++
+        ) {
           await tick();
           frame(view.engine);
         }
+        // fixed-wait: the fade clock: 60 frames of 1/60 s, twice the 0.5 s fade
+        for (let i = 0; i < 60; i++) frame(view.engine);
         const probes = { late: [30, 30], empty: [-34, -34], failed: [-34, 30], loaded: [30, -34] },
           read = () =>
             Object.fromEntries(
@@ -174,9 +193,11 @@ await runSuite(
         release();
         await tick();
         // One frame uploads the tile and starts its fade; 15 more of 1/60 s pass about half of the 0.5 s.
+        // fixed-wait: the fade clock: 15 frames of 1/60 s are the half fade the assert reads
         for (let i = 0; i < 15; i++) frame(view.engine);
         const half = read(),
           halfGPU = await compare(view.engine, stream, ring);
+        // fixed-wait: the fade clock: 40 more frames end the 0.5 s fade
         for (let i = 0; i < 40; i++) frame(view.engine);
         const full = read(),
           fullGPU = await compare(view.engine, stream, ring);
