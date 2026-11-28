@@ -1987,7 +1987,13 @@ export async function checkShot({
       compat: entry.compat ? await png(entry.compat) : undefined,
       viewProjection: entry.viewProjection,
       still: entry.still ? await Promise.all(entry.still.map(png)) : undefined,
-      moving: entry.moving ? { ...(await movingFrames(entry.moving, frame, read, png)), shutter: exposed } : undefined,
+      moving: entry.moving
+        ? {
+            ...(await movingFrames(entry.moving, frame, read, png)),
+            shutter: exposed,
+            subframes: exposed ? subframes : undefined,
+          }
+        : undefined,
       light: entry.light,
     };
     const own = entry.lookBounds ? { ...bounds, ...entry.lookBounds } : bounds;
@@ -2407,6 +2413,13 @@ export interface MovingFrames {
    * blur reach. Default 32, `MotionBlur`'s default.
    */
   maxBlur?: number;
+  /**
+   * How many sub-frames over the open shutter the frame is the mean of (the shot tool's kept frames), 1 to 4096.
+   * Default 1: one frame drawn with its motion blur centred on its velocity. With more, `velocity` is the last
+   * sub-frame's (the shot tool records it so), and a moving surface's trail over the shutter lies behind it, which
+   * `shimmerMoving`'s blur reach follows (KB-SCATTER-FRINGEVEL1).
+   */
+  subframes?: number;
 }
 
 function sampleLuma(y: Float32Array, width: number, height: number, x: number, v: number): number {
@@ -2460,12 +2473,14 @@ function outsideTaps(
  * the four pixels of the next frame around where it lands is the shimmer (see `outsideTaps`: a blend of those four is
  * the warp resampling an edge, not a change). Pixels whose target leaves the frame are not counted. With `velocity`,
  * a pixel a moving surface's motion blur reaches is left out too (`blurReach`: McGuire, Hennessy, Bukowski and Osman
- * 2012 tile-max, capped at `maxBlur`), counted in `detail.blurred`.
- * @throws RangeError for a shutter not more than 0 and up to 360 degrees, or a maxBlur not 1 to 128 pixels.
+ * 2012 tile-max, capped at `maxBlur`), and with `nextVelocity` and `back` a pixel landing where the next frame's
+ * movers smear, counted in `detail.blurred`.
+ * @throws RangeError for a shutter not more than 0 and up to 360 degrees, a maxBlur not 1 to 128 pixels, or subframes
+ * not a whole number from 1 to 4096.
  */
 export function shimmerMoving(
   frame: LookImage,
-  { next, motion, back, velocity, nextVelocity, shutter = 180, maxBlur = 32 }: MovingFrames,
+  { next, motion, back, velocity, nextVelocity, shutter = 180, maxBlur = 32, subframes = 1 }: MovingFrames,
   { mask, bound, threshold = 6 }: FlickerOptions & { threshold?: number } = {},
 ): LookResult {
   const { width, height } = frame;
@@ -2489,10 +2504,24 @@ export function shimmerMoving(
   }
   if (!(shutter > 0 && shutter <= 360)) throw rangeError('The shutter is more than 0 and up to 360 degrees', 'headless');
   if (!(maxBlur >= 1 && maxBlur <= 128)) throw rangeError('maxBlur is 1 to 128 pixels', 'headless');
+  if (!(Number.isInteger(subframes) && subframes >= 1 && subframes <= 4096))
+    throw rangeError('subframes is a whole number from 1 to 4096', 'headless');
   const a = luma(frame),
     b = luma(next),
     inside = maskBits(frame, mask, 'shimmerMoving'),
-    reach = velocity ? blurReach(motion, velocity, shutter / 360, maxBlur) : undefined;
+    reach = velocity ? blurReach(motion, velocity, shutter / 360, maxBlur, subframes) : undefined,
+    // The next frame's smear the same way, its camera motion the back motion turned round (each of its pixels moved
+    // back here, so forward by the opposite): a pixel landing in a mover's trail there changes on purpose too.
+    reachNext =
+      nextVelocity && back
+        ? blurReach(
+            { width, height, data: back.data.map((d) => -d) },
+            nextVelocity,
+            shutter / 360,
+            maxBlur,
+            subframes,
+          )
+        : undefined;
   let count = 0,
     off = 0,
     occluded = 0,
@@ -2516,7 +2545,7 @@ export function shimmerMoving(
         animated++;
         continue;
       }
-      if (reach && reach[i]) {
+      if ((reach && reach[i]) || (reachNext && reachNext[Math.round(ty) * width + Math.round(tx)])) {
         blurred++;
         continue;
       }
@@ -2539,47 +2568,69 @@ export function shimmerMoving(
 
 /**
  * The pixels a moving surface's motion blur smears over: 1 where a surface the engine moves other than the camera
- * (|v - f| > 0.5 px, as `animatedAt`) lies within its own blur radius, which is half its motion over the open shutter
- * (`share` of the frame) and at most `maxBlur`, the radius `MotionBlur` draws. The search is the reconstruction filter's
- * (M. McGuire, P. Hennessy, M. Bukowski and B. Osman, "A Reconstruction Filter for Plausible Motion Blur", I3D 2012,
- * https://doi.org/10.1145/2159616.2159639): the longest radius per `maxBlur` tile, the longest over each tile's 3 x 3
- * neighbours, then a walk along that neighbourhood radius, one sample per pixel each way; a pixel is in reach when a
- * moving sample's own radius covers the distance to it. No pixel beyond the radius the blur really draws is left out.
+ * (|v - f| > 0.5 px, as `animatedAt`) smears over a pixel whose own surface moves otherwise (their velocities more than
+ * half a pixel apart). The smear is drawn in screen space, so it follows the mover's whole velocity, the camera's part
+ * included: a leaf near the lens moving 63 px a frame, 10 px of it its sway, smears 31 px over the still sky behind it
+ * at 180 degrees (KB-SCATTER-FRINGEVEL1). A frame drawn once is blurred centred on its velocity, half its travel over
+ * the open shutter (`share` of the frame) each way, at most `maxBlur`, the radius `MotionBlur` draws. A frame that is
+ * the mean of `subframes` sub-frames, each at the middle of its slice of the shutter, holds the last sub-frame's
+ * velocity, so the trail runs back from there over its travel between the first and last sub-frame, plus each
+ * sub-frame's own blur over its slice (half a slice's travel, at most `maxBlur`) at either end. The search is the
+ * reconstruction filter's (M. McGuire, P. Hennessy, M. Bukowski and B. Osman, "A Reconstruction Filter for Plausible
+ * Motion Blur", I3D 2012, https://doi.org/10.1145/2159616.2159639): the longest trail per tile, the longest over each
+ * tile's 3 x 3 neighbours, then a walk along that one, one sample per pixel each way; a pixel is in reach when a moving
+ * sample's trail on that side covers the distance to it. Tiles are the longest trail across, at least `maxBlur` and at
+ * most 128 pixels, and no trail is taken longer than a tile, so no pixel beyond the smear the frame holds is left out.
  */
-function blurReach(motion: LookMotion, velocity: LookMotion, share: number, maxBlur: number): Uint8Array {
+function blurReach(
+  motion: LookMotion,
+  velocity: LookMotion,
+  share: number,
+  maxBlur: number,
+  subframes: number,
+): Uint8Array {
   const { width, height } = motion,
     n = width * height,
-    rx = new Float32Array(n),
-    ry = new Float32Array(n),
+    behind = new Float32Array(n),
+    ahead = new Float32Array(n),
     moving = new Uint8Array(n),
-    k = Math.ceil(maxBlur),
+    out = new Uint8Array(n),
+    v = velocity.data;
+  // Each mover's trail behind it and ahead of it, along its screen velocity.
+  let longest = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = v[i * 2] - motion.data[i * 2],
+      dy = v[i * 2 + 1] - motion.data[i * 2 + 1];
+    if (!(dx * dx + dy * dy > 0.25)) continue;
+    const travel = Math.hypot(v[i * 2], v[i * 2 + 1]) * share,
+      blur = Math.min(travel / (2 * subframes), maxBlur);
+    moving[i] = 1;
+    ahead[i] = blur;
+    behind[i] = (travel * (subframes - 1)) / subframes + blur;
+    if (behind[i] > longest) longest = behind[i];
+  }
+  const k = Math.ceil(Math.min(128, Math.max(maxBlur, longest))),
     tw = Math.ceil(width / k),
     th = Math.ceil(height / k),
     tiles = new Float32Array(tw * th * 2),
-    near = new Float32Array(tw * th * 2),
-    out = new Uint8Array(n);
-  for (let i = 0; i < n; i++) {
-    const dx = velocity.data[i * 2] - motion.data[i * 2],
-      dy = velocity.data[i * 2 + 1] - motion.data[i * 2 + 1],
-      l2 = dx * dx + dy * dy;
-    if (!(l2 > 0.25)) continue;
-    const l = Math.sqrt(l2),
-      r = Math.min(l * share * 0.5, maxBlur) / l;
-    moving[i] = 1;
-    rx[i] = dx * r;
-    ry[i] = dy * r;
-  }
-  const longest = (into: Float32Array, j: number, x: number, y: number) => {
+    near = new Float32Array(tw * th * 2);
+  const keep = (into: Float32Array, j: number, x: number, y: number) => {
     if (x * x + y * y > into[j * 2] ** 2 + into[j * 2 + 1] ** 2) {
       into[j * 2] = x;
       into[j * 2 + 1] = y;
     }
   };
-  for (let y = 0; y < height; y++)
-    for (let x = 0; x < width; x++) {
-      const i = y * width + x;
-      if (moving[i]) longest(tiles, Math.floor(y / k) * tw + Math.floor(x / k), rx[i], ry[i]);
-    }
+  for (let i = 0; i < n; i++) {
+    if (!moving[i]) continue;
+    behind[i] = Math.min(behind[i], k);
+    const l = Math.hypot(v[i * 2], v[i * 2 + 1]),
+      x = i % width,
+      y = (i - x) / width;
+    // A mover the camera holds still on screen (its sway cancels the camera's) smears nowhere.
+    if (!(l > 0)) continue;
+    const r = Math.max(behind[i], ahead[i]) / l;
+    keep(tiles, Math.floor(y / k) * tw + Math.floor(x / k), v[i * 2] * r, v[i * 2 + 1] * r);
+  }
   for (let ty = 0; ty < th; ty++)
     for (let tx = 0; tx < tw; tx++)
       for (let oy = -1; oy <= 1; oy++)
@@ -2588,7 +2639,7 @@ function blurReach(motion: LookMotion, velocity: LookMotion, share: number, maxB
             sy = ty + oy;
           if (sx < 0 || sy < 0 || sx >= tw || sy >= th) continue;
           const j = sy * tw + sx;
-          longest(near, ty * tw + tx, tiles[j * 2], tiles[j * 2 + 1]);
+          keep(near, ty * tw + tx, tiles[j * 2], tiles[j * 2 + 1]);
         }
   for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {
@@ -2597,13 +2648,24 @@ function blurReach(motion: LookMotion, velocity: LookMotion, share: number, maxB
         vy = near[t * 2 + 1],
         l = Math.hypot(vx, vy);
       if (l < 0.5) continue;
-      const steps = Math.ceil(l);
-      for (let s = -steps; s <= steps && !out[y * width + x]; s++) {
+      const p = y * width + x,
+        px = v[p * 2],
+        py = v[p * 2 + 1],
+        steps = Math.ceil(l);
+      for (let s = -steps; s <= steps && !out[p]; s++) {
         const qx = Math.round(x + (vx * s) / steps),
           qy = Math.round(y + (vy * s) / steps);
         if (qx < 0 || qy < 0 || qx >= width || qy >= height) continue;
         const q = qy * width + qx;
-        if (moving[q] && (qx - x) ** 2 + (qy - y) ** 2 <= (Math.hypot(rx[q], ry[q]) + 0.5) ** 2) out[y * width + x] = 1;
+        if (!moving[q]) continue;
+        const wx = v[q * 2],
+          wy = v[q * 2 + 1];
+        // A mover's smear over a surface moving with it changes nothing there.
+        if (!((wx - px) ** 2 + (wy - py) ** 2 > 0.25)) continue;
+        const dx = x - qx,
+          dy = y - qy,
+          side = dx * wx + dy * wy <= 0 ? behind[q] : ahead[q];
+        if (dx * dx + dy * dy <= (side + 0.5) ** 2) out[p] = 1;
       }
     }
   return out;

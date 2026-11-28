@@ -650,6 +650,19 @@ one warning over two frames; exactly the need or no limit: traced, no warning; a
 copy per level runs in order; at the full level no copy). Missing: a run on a real OpenGL ES or Direct3D 11 class
 device.
 
+### Section 5 evidence: the blur reach follows a mover's whole screen motion and its sub-frames (headless look, KB-SCATTER-FRINGEVEL1, 2026-11-28)
+
+The soft fringe of a near swaying leaf that held the sky's velocity was the leaf's own trail across the shutter: the
+shot tool's geometry mask is the mean over 8 sub-frames (it steps in eighths there, 32 to 223), while depth and velocity
+are the last sub-frame's, where the sky really is. TAA's velocity and `ScatterVelocity` were right. `shimmerMoving` now
+sizes a mover's smear from its whole screen velocity (camera included) against pixels moving otherwise, runs it back
+over the sub-frames' travel (`MovingFrames.subframes`, passed by `checkShot`), and applies the same reach to the next
+frame (with `nextVelocity` and `back`). Evidence: `packages/headless/tests/look-clean.test.js` (FRINGEVEL1 test fails
+on the old reach, 80 against 768 pixels). Blowup render (8 sub-frames, 180 degrees): shimmerMoving early 0.44 to 0.28,
+mid 1.72 to 0.53; the leaf band at x 1680 to 1920 went from about 16,500 off pixels to about 1,700. Missing: mid's
+residual 0.53 is one-pixel rims on near conifer sprays against the sky whose sway is under half a pixel past the camera
+(v - f about 0.3 px), a separate cause under KB-LOOK-TV-SHIMMER2.
+
 ### Section 5 evidence: the moving-frame look checks know blur reach and stepped trails (headless look, KB-LOOK-TV-SHIMMER2, KB-LOOK-TV-SUBSTEP1, 2026-11-28)
 
 `shimmerMoving` with the engine velocity leaves out the pixels a moving surface's own motion blur reaches: half its

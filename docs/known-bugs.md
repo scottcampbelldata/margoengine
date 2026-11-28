@@ -723,6 +723,25 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   against 35,849). Regression: `packages/scatter/test/velocity.browser.mjs` (the `coverage: false` run against the
   default, WebGPU and `MARGO_COMPAT=1`).
 
+### Fixed 2026-11-28: a swaying near leaf's soft fringe read as shimmer, its trail holding the sky's velocity (KB-SCATTER-FRINGEVEL1, headless look)
+
+- **Repro (before):** `shimmerMoving` on the timber-valley blowup mid probe (8 sub-frames, 180 degrees, with the engine
+  velocity): 1.72 percent off (bound 0.5), most in a band along the near leaves' soft edges at x 1700 to 1920. Row 460,
+  x 1716 to 1756: geometry 16 to 223 of 255, depth 0 and the sky's velocity; the leaf's own starts at x 1755.
+- **Cause:** not scatter. The geometry mask is the mean over the sub-frames (it steps in eighths, 32, 64 ... 223), while
+  depth and velocity are the last sub-frame's: the fringe is the leaf's trail across the shutter, sky by the last
+  sub-frame, so TAA's velocity and `ScatterVelocity` were right. The leaf, near the lens, moves 63 px a frame on screen
+  (53 px of it the camera's parallax), but `shimmerMoving`'s blur reach sized its smear from its motion past the camera
+  (10 px, a 2.5 px reach) and centred it, when the 8 sub-frames lay a 30 px trail behind its last position
+  (`packages/headless/src/look.ts`, `blurReach`).
+- **Fix:** the reach takes the mover's whole screen velocity against pixels whose surface moves otherwise, runs back over
+  the travel between the first and last sub-frame plus half a slice's blur (`MovingFrames.subframes`, which `checkShot`
+  passes from the render), reaches half a slice ahead, and is applied to the next frame too with `nextVelocity` and
+  `back`. Mid 1.72 to 0.53, early 0.44 to 0.28. The 0.53 left is one-pixel rims on near conifer sprays whose sway is
+  under half a pixel past the camera (KB-LOOK-TV-SHIMMER2).
+- **Regression:** `packages/headless/tests/look-clean.test.js`, "(KB-SCATTER-FRINGEVEL1)" (80 pixels reached before,
+  768 now).
+
 ### Open 2026-11-28: a spinning bullet's strike at 300 m/s throws it sideways by a speed that follows the substeps, as substeps reuse the step's contacts (KB-PHYS-CCDKNOCK1, physics kernel, contacts)
 
 - **Repro:** `packages/physics/tests/next-ccd.test.js`'s dynamic plate scene, seed 9, bullet 64 alone with the plate (a 4 x 4 x

@@ -795,6 +795,31 @@ const row = shimmerMoving(image(), { next: image(), motion, velocity });
 console.log(row.detail.animated, row.detail.blurred); // 4 16: its 2 px smear each way is left out
 ```
 
+**T4 follows a mover's whole screen motion and its sub-frames** (KB-SCATTER-FRINGEVEL1, 2026-11-28). The smear is drawn
+in screen space, so its length is the mover's whole velocity over the shutter, the camera's part included: a leaf near
+the lens moving 63 px a frame, 10 px of it its sway, smears 31 px over the still sky behind it, not the 2.5 px its sway
+alone gives. Only pixels whose own surface moves otherwise (velocities more than half a pixel apart) are reached. A
+frame that is the mean of `MovingFrames.subframes` sub-frames (the shot tool's kept frames; `checkShot` passes the
+render's `subframes` when it has a shutter) holds the last sub-frame's velocity, so the trail runs back from the mover
+over its travel between the first and last sub-frame, plus half a slice's blur at either end, and reaches only half a
+slice ahead. With `nextVelocity` and `back`, a pixel landing in the next frame's trail is left out the same way.
+
+```js
+import { shimmerMoving } from '@margoengine/headless/look';
+
+const width = 64,
+  height = 2,
+  image = () => ({ width, height, data: new Uint8Array(width * height * 4).fill(128) }),
+  motion = { width, height, data: new Float32Array(width * height * 2) },
+  velocity = { width, height, data: new Float32Array(width * height * 2) };
+for (let y = 0; y < height; y++) {
+  motion.data[(y * width + 50) * 2] = 53; // a near leaf at column 50: the camera moves it 53 px
+  velocity.data[(y * width + 50) * 2] = 63; // and its sway 10 px more
+}
+const row = shimmerMoving(image(), { next: image(), motion, velocity, subframes: 8 });
+console.log(row.detail.blurred); // 64: 30 px of trail behind the leaf and 2 px ahead, in each row
+```
+
 **T8 fails a stepped trail** (KB-LOOK-TV-SUBSTEP1, 2026-11-28). A frame drawn as sharp copies, one per sub-frame, spans
 the shutter's smear but climbs in jumps between flat steps. `motionBlur` also calls an edge sharp when its ramp (the run
 between 10 and 90 percent around the edge, at least 8 pixels) climbs one way in three or more separate jumps, each over
