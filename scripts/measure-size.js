@@ -13,6 +13,8 @@ export const compactOutput = {
 export const external = [
   '@margoengine/core',
   '@margoengine/core/extension',
+  // The shared helpers a data entry imports from math (scripts/support/math-external.mjs), shared by apps like core's.
+  '@margoengine/math/helpers',
   '@margoengine/animation',
   '@margoengine/gltf/pbr',
   '@margoengine/gltf/pbr-model',

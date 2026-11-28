@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 import {
   declaresMath,
   mathExternal,
+  DATA_HELPERS_ENTRY,
   HELPERS_ENTRY,
   SHARED_HELPERS,
   sharedHelpers,
@@ -151,6 +152,19 @@ test('sharedHelpers redirects packages/shared/errors.js and hypot.js only for a 
   assert.equal(on.resolveId('@margoengine/core', importer), null);
   assert.equal(sharedHelpers({ name: '@margoengine/shadows' }).resolveId('../../shared/hypot.js', importer), null);
   assert.equal(sharedHelpers({ name: '@margoengine/sky', ...core }).resolveId('../../shared/hypot.js', importer), null);
+});
+
+test('the glTF data entries take the shared helpers from math, never core (KB-GLTF-DATADEP1)', () => {
+  const gltf = sharedHelpers({ name: '@margoengine/gltf', peerDependencies: { '@margoengine/core': '^1.0.0' } }),
+    from = (file) => join(root, file).replaceAll('\\', '/'),
+    math = { id: DATA_HELPERS_ENTRY, external: true, moduleSideEffects: false },
+    core = { id: HELPERS_ENTRY, external: true, moduleSideEffects: false };
+  assert.equal(DATA_HELPERS_ENTRY, '@margoengine/math/helpers');
+  for (const file of ['packages/gltf/src/accessor.ts', 'packages/gltf/src/asset.ts', 'packages/gltf/src/draco-state.ts'])
+    assert.deepEqual(gltf.resolveId('../../shared/errors.js', from(file)), math, file);
+  for (const file of ['packages/shared/glb.js', 'packages/shared/loading.js'])
+    assert.deepEqual(gltf.resolveId('./errors.js', from(file)), math, file);
+  assert.deepEqual(gltf.resolveId('../../shared/errors.js', from('packages/gltf/src/index.ts')), core);
 });
 
 test('@margoengine/math/helpers exports exactly the shared helpers, and core/extension exports each of them', async () => {

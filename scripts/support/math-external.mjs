@@ -65,6 +65,22 @@ const CORE = '@margoengine/core';
 export const declaresCore = (manifest) => Boolean({ ...manifest.dependencies, ...manifest.peerDependencies }[CORE]);
 
 const SHARED = resolve(dirname(fileURLToPath(import.meta.url)), '../../packages/shared');
+/**
+ * Files of a SHARED_HELPERS package that its data entries load (no core, no GPU: tests/modern-data-subpaths.test.js).
+ * They import the same helpers from `@margoengine/math/helpers`, which the package declares, so a data entry needs no
+ * core and the dist still holds no copy (KB-GLTF-DATADEP1).
+ */
+const DATA_IMPORTERS = new Set(
+  [
+    'packages/gltf/src/accessor.ts',
+    'packages/gltf/src/asset.ts',
+    'packages/gltf/src/draco-state.ts',
+    'packages/shared/glb.js',
+    'packages/shared/loading.js',
+  ].map((file) => resolve(dirname(fileURLToPath(import.meta.url)), '../..', file)),
+);
+/** Where a data importer takes the shared helpers from. */
+export const DATA_HELPERS_ENTRY = '@margoengine/math/helpers';
 const HELPER_FILES = new Set(['errors.js', 'hypot.js'].map((file) => join(SHARED, file)));
 
 /**
@@ -82,7 +98,9 @@ export function sharedHelpers(manifest) {
       if (!on || !importer || !/^\.{1,2}\//.test(source)) return null;
       const target = resolve(dirname(importer.split('?')[0]), source);
       // Side-effect free, as the entry is: a module that imports nothing from it then keeps no bare import of it.
-      return HELPER_FILES.has(target) ? { id: HELPERS_ENTRY, external: true, moduleSideEffects: false } : null;
+      if (!HELPER_FILES.has(target)) return null;
+      const id = DATA_IMPORTERS.has(resolve(importer.split('?')[0])) ? DATA_HELPERS_ENTRY : HELPERS_ENTRY;
+      return { id, external: true, moduleSideEffects: false };
     },
   };
 }

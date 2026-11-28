@@ -1,5 +1,5 @@
 // Accessor reading shared by the loader and its optional entries (glTF 2.0 specification, section 3.6.2).
-import { fault, rangeError, typeError } from '@margoengine/core/extension';
+import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { COMPONENT_BYTES, readComponent } from '../../shared/accessor.js';
 import type { GLTFAccessor, GLTFDocument } from '../../shared/gltf.js';
 

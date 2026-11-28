@@ -51,17 +51,6 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   occlusion strength) and the file's image is kept; anything else is written into the pixels when the model is created.
 - **Regression:** `packages/usdz/tests/texture-factors.test.js`.
 
-### Open 2026-11-28: gltf/asset, a data entry, imports core/extension (KB-GLTF-DATADEP1, gltf)
-
-- **Repro:** `cd packages/splats && npm test` (or `node --test tests/modern-data-subpaths.test.js`): "native asset
-  and splat data entries require no GPU renderer or shaders" fails with "Unexpected data dependency:
-  @margoengine/core/extension".
-- **Cause:** 26ebdfa169 moved the throws of `packages/gltf/src/accessor.ts` (and the root) to core/extension's
-  `typeError`, `rangeError` and `fault` to fit the 30 KiB core plus glTF gate; `accessor.ts` is shared with the
-  `./asset` chunk, so the data entry now loads core's extension module. The errors need a home a data entry may import
-  (`@margoengine/math/errors` holds only `MargoError`) without growing the glTF root.
-- **For:** the gltf lane. Found by the splats lane, which did not change gltf.
-
 ### Open 2026-11-28: the water surface program takes over 5 s to link on the WebGL2 layer (KB-WATER-GL2LINK1, water)
 
 - **Repro:** `demos/ten-thousand-trees/?backend=webgl2` (BiomeView with `water: { rivers: 'auto' }`) on Chrome, ANGLE
