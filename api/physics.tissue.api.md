@@ -2570,6 +2570,9 @@ interface SoftVolumeOptions {
     readonly radius?: number;
     readonly pressure?: number;
     readonly ambientPressure?: number;
+    readonly tier?: 'surface' | 'cells';
+    readonly cellSize?: number;
+    readonly material?: CellMaterial;
 }
 
 interface Solver<Params = unknown> {

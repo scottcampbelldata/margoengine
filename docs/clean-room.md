@@ -58,6 +58,27 @@ source was read. [Teschner et al. 2003](https://matthias-research.github.io/page
 [Nealen et al. 2006](https://doi.org/10.1111/j.1467-8659.2006.01000.x),
 [Achenbach 1972](https://doi.org/10.1017/S0022112072000807).
 
+The `'cells'` tier (`packages/physics/src/soft-stuffing.ts`) fills the mesh by isosurface stuffing, from François
+Labelle and Jonathan Richard Shewchuk, "Isosurface Stuffing: Fast Tetrahedral Meshes with Good Dihedral Angles" (ACM
+Transactions on Graphics 26(3), SIGGRAPH 2007): the body-centred cubic lattice, cut points on the edges that cross the
+surface, the warp of a lattice vertex onto a cut point nearer than 0.24999 of a long edge or 0.41189 of a short one, and
+the stencils by sign. Where a stencil leaves a quadrilateral, its diagonal runs through its lowest-numbered vertex, and
+prisms split by the rule of Julien Dompierre, Paul Labbé, Marie-Gabrielle Vallet and Ricardo Camarero, "How to
+Subdivide Pyramids, Prisms and Hexahedra into Tetrahedra" (8th International Meshing Roundtable, 1999), so neighbouring
+cells agree; that rule is not the paper's parity rule, so the paper's angle proof does not carry over, and the tests hold
+the paper's bounds on the meshes they build. Cut points are where the edge meets a triangle (Tomas Möller and Ben
+Trumbore, "Fast, Minimum Storage Ray/Triangle Intersection", Journal of Graphics Tools 2(1), 1997). Constrained
+Delaunay refinement (Hang Si, "TetGen, a Delaunay-Based Quality Tetrahedral Mesh Generator", ACM TOMS 41(2), 2015;
+Jonathan Shewchuk, "Tetrahedral Mesh Generation by Delaunay Refinement", SoCG 1998) was weighed: it keeps the input's own
+vertices on the boundary, but a lattice fill is linear in the cells, needs no exact predicates and conforms by
+construction. The tier is checked against Heinrich Hertz, "Über die Berührung fester elastischer Körper" (Journal für
+die reine und angewandte Mathematik 92, 1882), with K. L. Johnson, *Contact Mechanics* (Cambridge, 1985), chapter 4, for
+its range. Written from the papers; no mesher's source was read.
+[Labelle and Shewchuk 2007](https://doi.org/10.1145/1276377.1276448),
+[Möller and Trumbore 1997](https://doi.org/10.1080/10867651.1997.10487468),
+[Si 2015](https://doi.org/10.1145/2629697),
+[Shewchuk 1998](https://doi.org/10.1145/276884.276899).
+
 ### Breakable objects and Voronoi fracture (BREAK-01)
 
 Saty Raghavachary, “Fracture Generation on Polygonal Meshes Using Voronoi Polygons” (ACM SIGGRAPH 2002 Conference

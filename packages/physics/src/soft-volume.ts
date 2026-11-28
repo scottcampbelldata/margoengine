@@ -135,6 +135,24 @@ export function insideMesh(point: V, vertices: ArrayLike<number>, indices: Array
   return crossings % 2 === 1;
 }
 
+/**
+ * The x of every crossing of the line (y, z) along x with the mesh, counted as {@link insideMesh} counts them: a point (x, y, z)
+ * is inside when an odd number of these lie beyond x. One call serves a whole row of points.
+ */
+export function rowCrossings(y: number, z: number, vertices: ArrayLike<number>, indices: ArrayLike<number>): number[] {
+  const hits: number[] = [],
+    point: V = [0, y, z];
+  for (let t = 0; t < indices.length / 3; t++) {
+    const [p, q, r] = corners(vertices, indices, t),
+      n = cross(sub(q, p), sub(r, p));
+    if (n[0] === 0) continue;
+    const s0 = side(p, q, point);
+    if (s0 !== side(q, r, point) || s0 !== side(r, p, point)) continue;
+    hits.push(p[0] - (n[1] * (y - p[1]) + n[2] * (z - p[2])) / n[0]);
+  }
+  return hits;
+}
+
 /** A skin: mesh vertices (flat) each bound to the cell that holds it, with the barycentric coordinates there. */
 export interface Skin {
   vertices: Float32Array;
@@ -334,9 +352,7 @@ export function weldMesh(
       for (let dy = -1; dy <= 1 && found < 0; dy++)
         for (let dz = -1; dz <= 1 && found < 0; dz++)
           for (const p of cells.get(key(ix + dx, iy + dy, iz + dz)) ?? [])
-            if (
-              Math.hypot(positions[p * 3]! - x, positions[p * 3 + 1]! - y, positions[p * 3 + 2]! - z) <= tolerance
-            ) {
+            if (Math.hypot(positions[p * 3]! - x, positions[p * 3 + 1]! - y, positions[p * 3 + 2]! - z) <= tolerance) {
               found = p;
               break;
             }

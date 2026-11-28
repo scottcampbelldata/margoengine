@@ -1845,6 +1845,33 @@ console.log(ball.centerOfMass(), ball.surfaceVolume());
   mass is density times its volume (and it floats at that density in `SoftBodies.water`); `radius` 0.01 m, the contact
   thickness of its surface; `pressure`, an absolute fill pressure in Pa that makes it a sealed shell of gas (see below)
   in place of a held volume, with `ambientPressure` (default 101,325 Pa) outside.
+- **Two tiers, one option.** `tier: 'surface'` (the default) is the fast tier above: the mesh's own vertices are the
+  particles. `tier: 'cells'` is the high-fidelity tier: the mesh is filled with tetrahedra fitted to its surface by
+  isosurface stuffing (Labelle and Shewchuk 2007; a body-centred cubic lattice of `cellSize` metres, default an eighth
+  of the mesh's smallest extent, cut and warped onto the surface, dihedral angles within 10.8 to 164.8 degrees), elastic
+  by `material` (a `CellMaterial`, default 100 kPa rubber; its density is `density`), solved by the vertex-block solver,
+  and the source mesh rides in the cells as a skin (`body.meshVertices()`), drawn by `drawSoftBody` with its own uvs. Its
+  squash and contact follow the measured modulus: a hemisphere of 1 MPa rubber pressed on the floor meets Hertz contact
+  within 4% at 80 pieces of 20 passes a step (`SoftBodies.attach(physics, {substeps: 80, iterations: 20})`); at the
+  default 8 x 2 it is softer, so give a measured body the passes. `stiffness`, `damping` and `pressure` are the surface
+  tier's (a gas needs a hollow shell).
+
+  <!-- example:node -->
+  ```js
+  import { Physics } from '@margoengine/physics';
+  import { CellMaterial, SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+  import { sphereGeometry } from '@margoengine/geometry/primitives';
+
+  await Physics.load();
+  const physics = new Physics(null);
+  physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [5, 0.5, 5] } });
+  const soft = await SoftBodies.attach(physics, { substeps: 20, iterations: 10 });
+  const rubber = Object.assign(new CellMaterial(), { youngsModulus: 2e6, poissonRatio: 0.45 });
+  const mesh = sphereGeometry(0.1, 16, 12);
+  const ball = soft.create(SoftBodyDesc.volume(mesh, { tier: 'cells', material: rubber, density: 1100 }).setTranslation([0, 0.5, 0]));
+  for (let i = 0; i < 30; i++) physics.step();
+  console.log(ball.numCells(), ball.centerOfMass());
+  ```
 - **Anchoring.** Every `SoftBodyDesc` setting applies to the description it returns: `setPinnedParticles([i])` pins a
   particle, `setParticleKinematicTarget(i, position)` on the body drags one, `attachParticle(i, rigidBody)` ties
   one to a rigid body; `setMass`, `setVolumeFactor` (inflate or deflate), `setGravityScale`, `setAirDrag` (default on:

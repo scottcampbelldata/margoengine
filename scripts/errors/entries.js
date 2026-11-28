@@ -40,8 +40,8 @@ export const entries = [
     kind: 'family',
     messages: [],
     cause:
-      'SoftBodyDesc.volume was given no mesh, vertices that are not whole vertices of the stride or not finite, indices that are not triangles or not vertices of the mesh, a mesh that is open or wound inward after welding, or an option out of range (a negative weld, stiffness, damping or radius, a density that is not above 0); or a soft debugRender was given a stress range that is not a positive fraction.',
-    fix: 'Pass a closed mesh: a `@margoengine/geometry` primitive `{positions, indices}`, a core `Geometry`, or `{vertices, indices, stride}` with the position first; triangles wound counter-clockwise seen from outside; raise `weld` (metres) until the seams close, or close the holes; keep `stiffness` (Hz), `damping` and `radius` (metres) 0 or more and `density` (kg/m^3) above 0; pass a `stressRange` such as 0.2.',
+      'SoftBodyDesc.volume was given no mesh, vertices that are not whole vertices of the stride or not finite, indices that are not triangles or not vertices of the mesh, a mesh that is open or wound inward after welding, or an option out of range (a negative weld, stiffness, damping or radius, a density that is not above 0, a tier other than surface or cells, a cellSize that is not above 0, a material that is not a CellMaterial, or a gas pressure on the solid cells tier); or a soft debugRender was given a stress range that is not a positive fraction.',
+    fix: 'Pass a closed mesh: a `@margoengine/geometry` primitive `{positions, indices}`, a core `Geometry`, or `{vertices, indices, stride}` with the position first; triangles wound counter-clockwise seen from outside; raise `weld` (metres) until the seams close, or close the holes; keep `stiffness` (Hz), `damping` and `radius` (metres) 0 or more and `density` (kg/m^3) above 0; pick `tier` `surface` (a gas is a hollow shell) or `cells` with a positive `cellSize` and a `CellMaterial`; pass a `stressRange` such as 0.2.',
   },
   {
     id: 'characters',

@@ -27,6 +27,7 @@ import {
   weldMesh,
 } from './soft-volume.js';
 import { adaptiveTear } from './soft-adaptive-tear.js';
+import { stuffMesh } from './soft-stuffing.js';
 import { crossesBlade, type SoftDestination, type SoftSplit, splitBody } from './soft-split.js';
 import {
   bindTensileSeam,
@@ -1078,6 +1079,19 @@ export interface SoftVolumeOptions {
   readonly pressure?: number;
   /** Absolute pressure outside a gas shell, in Pa (default 101,325). */
   readonly ambientPressure?: number;
+  /**
+   * How the body is built (default `'surface'`). `'surface'` is the fast tier: the mesh's own vertices are the particles, its
+   * edges springs of `stiffness` and `damping`, and it holds a volume or a gas. `'cells'` is the high-fidelity tier: the mesh is
+   * filled with tetrahedra fitted to its surface (isosurface stuffing, Labelle and Shewchuk 2007), elastic by `material`, and the
+   * mesh rides in them as a skin (`body.meshVertices()`), so its squash, bounce and contact follow a measured modulus. Its
+   * cells are on the `'vertex-block'` solver; its stiffness converges with the soft world's passes (`substeps` times
+   * `iterations`): Hertz contact is met within 4% at 80 x 20, and the default 8 x 2 is softer (docs/limits.md).
+   */
+  readonly tier?: 'surface' | 'cells';
+  /** `'cells'` tier: the lattice spacing in metres (default an eighth of the mesh's smallest extent); smaller is finer. */
+  readonly cellSize?: number;
+  /** `'cells'` tier: what the cells are made of (default `new CellMaterial()`, 100 kPa rubber); its density is `density`. */
+  readonly material?: CellMaterial;
 }
 
 /** What `debugRender` draws of soft bodies (see {@link SoftBodies.debugRender} and {@link SoftBody.debugRender}). */
@@ -1575,7 +1589,8 @@ export class SoftBodyDesc {
    * sealed shell of gas at that absolute pressure. It weighs `density` times its volume (and displaces water at that
    * density) unless `setMass` says otherwise. `body.sourceMesh` keeps each source vertex's particle and texture
    * coordinates, so `drawSoftBody(engine, body, {material})` (`@margoengine/gltf/soft-mesh`) draws the mesh, seams and
-   * texture kept.
+   * texture kept. With `tier: 'cells'` it is a solid instead: tetrahedra fitted to the mesh (see {@link SoftVolumeOptions.tier}),
+   * elastic by a measured `material`, the mesh riding in them as the skin.
    * @throws MargoError (`unsupported`) for a mesh that is empty, not triangles, open or wound inward after welding, or an
    * option out of range.
    */
@@ -1588,6 +1603,9 @@ export class SoftBodyDesc {
       radius = 0.01,
       pressure,
       ambientPressure,
+      tier = 'surface',
+      cellSize,
+      material,
     } = options;
     const flat = mesh && 'positions' in mesh,
       vertices = flat ? mesh.positions : mesh?.vertices,
@@ -1628,12 +1646,8 @@ export class SoftBodyDesc {
     const volume = meshVolume(welded.positions, welded.triangles);
     if (!(volume > 0))
       throw volumeError("The mesh's triangles face inward (its volume is negative); reverse their winding.");
-    const desc = SoftBodyDesc.trimesh(welded.positions, welded.triangles)
-      .setShapeMatching(false)
-      .setSoftness(stiffness, damping)
-      .setParticleRadius(radius)
-      .setDensity(density)
-      .setMass(density * volume);
+    if (tier !== 'surface' && tier !== 'cells')
+      throw volumeError(`tier is 'surface' or 'cells' (got ${String(tier)}).`);
     // Texture coordinates to draw it with: a geometry primitive's uvs, or TEXCOORD_0 at floats 12 and 13 of a glTF primitive's
     // packed vertex (position and 1, normal, tangent, uv0, uv1, colour).
     const given = flat ? mesh.uvs : undefined,
@@ -1643,6 +1657,43 @@ export class SoftBodyDesc {
           : !flat && 'definition' in mesh && stride === 20
             ? Float32Array.from({ length: count * 2 }, (_, i) => vertices[((i / 2) | 0) * 20 + 12 + (i % 2)]!)
             : null;
+    if (tier === 'cells') {
+      if (pressure !== undefined)
+        throw volumeError("A gas fill needs the 'surface' tier, a hollow shell; the 'cells' tier is solid.");
+      const { min, max } = boundsOf(welded.positions),
+        size = cellSize ?? Math.min(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 8;
+      positive(size, 'cellSize (metres)');
+      if (material !== undefined && !(material instanceof CellMaterial))
+        throw volumeError('material must be a CellMaterial.');
+      const stuffed = stuffMesh(welded.positions, welded.triangles, size),
+        cellMaterial = (material ?? new CellMaterial()).clone();
+      cellMaterial.density = density;
+      const desc = new SoftBodyDesc(stuffed.positions)
+        .setCells(stuffed.cells, cellMaterial)
+        .setSurface()
+        .setParticleRadius(radius)
+        .setDensity(density)
+        .setSolver('vertex-block');
+      desc.setSkin(
+        Float64Array.from({ length: count * 3 }, (_, i) => vertices[((i / 3) | 0) * stride + (i % 3)]!),
+        indices,
+      );
+      // Each source vertex's particle: the corner of its cell it weighs most on.
+      const skin = desc.skin!,
+        particles = Uint32Array.from({ length: count }, (_, v) => {
+          let best = 0;
+          for (let k = 1; k < 4; k++) if (skin.weight[v * 4 + k]! > skin.weight[v * 4 + best]!) best = k;
+          return desc.cells[skin.cell[v]! * 4 + best]!;
+        });
+      desc.sourceMesh = { particles, indices: Uint32Array.from(indices), uvs };
+      return desc;
+    }
+    const desc = SoftBodyDesc.trimesh(welded.positions, welded.triangles)
+      .setShapeMatching(false)
+      .setSoftness(stiffness, damping)
+      .setParticleRadius(radius)
+      .setDensity(density)
+      .setMass(density * volume);
     desc.sourceMesh = { particles: welded.particleOf, indices: Uint32Array.from(indices), uvs };
     return pressure === undefined
       ? desc.setVolumeFactor(1)

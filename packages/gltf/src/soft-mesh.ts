@@ -65,9 +65,10 @@ export class SoftSurface {
       throw new TypeError(
         'This soft body has no triangles to draw (a rope or a bare particle set); draw a rope with @margoengine/lines, or build the body with cloth, trimesh, sphere or setSkin.',
       );
-    // A body made by SoftBodyDesc.volume draws the mesh it came from: each vertex follows its welded particle.
+    // A body made by SoftBodyDesc.volume draws the mesh it came from: each vertex follows its welded particle, or on the
+    // 'cells' tier rides in its cell as the skin; either way with the mesh's own texture coordinates.
     const welded = this.skinned ? null : body.sourceMesh,
-      uvs = given ?? welded?.uvs ?? undefined,
+      uvs = given ?? body.sourceMesh?.uvs ?? undefined,
       count = this.skinned ? body.meshVertices().length / 3 : welded ? welded.particles.length : body.numParticles(),
       grid = this.skinned || uvs || welded ? null : body.grid;
     let source: Uint32Array, indices: Uint32Array, flat: Float32Array;
@@ -111,7 +112,9 @@ export class SoftSurface {
           }
       } else {
         const p = this.skinned ? body.meshVertices() : body.particlePositions();
-        flat = planarUVs(welded ? Float32Array.from({ length: count * 3 }, (_, i) => p[source[(i / 3) | 0]! * 3 + (i % 3)]!) : p);
+        flat = planarUVs(
+          welded ? Float32Array.from({ length: count * 3 }, (_, i) => p[source[(i / 3) | 0]! * 3 + (i % 3)]!) : p,
+        );
       }
     }
     this.source = source;
@@ -395,7 +398,9 @@ function sheetModel(
     new GLTFAsset(
       {
         asset: { version: '2.0' },
-        materials: [{ doubleSided: true, pbrMetallicRoughness: { metallicFactor: 0, roughnessFactor: 0.8 }, ...material }],
+        materials: [
+          { doubleSided: true, pbrMetallicRoughness: { metallicFactor: 0, roughnessFactor: 0.8 }, ...material },
+        ],
         ...(textures.length ? { textures, images: images.map(() => ({})) } : {}),
         meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }],
         nodes: [{ mesh: 0 }],

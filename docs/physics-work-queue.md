@@ -428,7 +428,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | ID | Solver | State today | Owner | Status |
 | --- | --- | --- | --- | --- |
 | DYN-08 | Large-scale GPU rigid dynamics | none | Open | OPEN |
-| SOFT-04 | Volumetric solids (FEM) | native FEM, Projective Dynamics and finite-chain rubber with reciprocal contact, cutting and fracture; `SoftBodyDesc.volume` from any mesh | Claude (laptop), on Scott's order, 2026-11-27 | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a0de32ed1b |
+| SOFT-04 | Volumetric solids (FEM) | native FEM, Projective Dynamics and finite-chain rubber with reciprocal contact, cutting and fracture; `SoftBodyDesc.volume` from any mesh, its `tier: 'cells'` isosurface-stuffed and Hertz-checked | Claude (laptop), on Scott's order, 2026-11-27 | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a0de32ed1b |
 | SOFT-06 | Pressure bodies | physics/soft with sealed gas and rigid contact; `SoftBodyDesc.volume(mesh, {pressure})` | Claude (laptop), on Scott's order, 2026-11-27 | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a82ff99eb9 |
 | BREAK-04 | Exterior ballistics | partial | Open | OPEN |
 | BREAK-05 | Terminal ballistics and impact damage | stand-in | Open | OPEN |
