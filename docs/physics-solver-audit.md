@@ -3161,3 +3161,14 @@ Warm-period water equivalent, storm-by-storm layers, microstructure and weak lay
 - Point 8 (a71611f852). `packages/physics/scripts/ice03-capsize-measured.mjs` checks Burton's held-out motion after initialization. Modeled and measured 10° to 90° times are 0.636 and 0.998 s, outside the 0.10 s allowance. Observed maximum roll is 96.07° versus 114.28° modeled. The separate Heller comparison retains the guided tank versus free-body difference, with 0.214 m/s observed and 0.403 m/s modeled marker speed. [Evidence and limits](limits.md#ice-03-accepted-calving-and-independent-capsize-measurements)
 
 Measured timing and wave amplitudes, added inertia and radiation damping, two-way water feedback, grounding, irregular shape and fracture, and original shots remain open. The row stays REOPENED at four points.
+
+### ICE-02 Glacier and ice-sheet flow
+
+#### ICE-02 four-point pass
+
+- Point 5 (72e4b4d57b). `packages/physics/tests/coupling/glacier.test.js` rejects an unrepresentable ice inventory, an overflowing trial and a negative paused tick with coded fixes. The rejected step preserves accepted bytes and work state. All six native-backed ports keep the live signed cell across a shift and restore, then replay without drift.
+- Point 6 (72e4b4d57b). `packages/physics/tests/coupling/glacier-workers.test.js` compares complete physical banks across 1, 2 and 4 native participants on 437 and 567 cells. Both match the previous plain and shared Wasm in a separate old-asset comparison. `packages/physics/tests/glacier-workers.browser.mjs` starts three actual Chromium helpers. The 437-cell case records 777 conductances, 756 evaluated in paired SIMD lanes, and 380 crevasse roots. The conservative solve and release reductions keep their original order.
+- Point 7 (72e4b4d57b). `packages/water/test/glacier-calving-film.browser.mjs` releases 36.450 m³ from accepted grounded ice into the registered iceberg path, closing the ice ledger. The resulting wake raises a gauge 5.5 m away by 16.44 cm after 3 s. The closed marine control stays flat. Water reads back the computed gauge within 20 µm. Both renderers independently reproduce complete snapshots and RGBA through hold, restore, re-advance and rewind.
+- Point 8 (72e4b4d57b). `packages/physics/scripts/ice02-glacier-velocity-measured.mjs` runs with separately observed thickness and surface slope, with fixed Glen softness. Athabasca reports 49.6 m/yr depth-mean speed versus 75.99 m/yr modeled. Greenland reports 4.6 m/yr deformation, [0.4, 10.8] m/yr, versus 19.46 m/yr modeled. The solver also misses the 114.8 m/yr observed total surface speed where basal sliding dominates. [Measured comparisons and limits](limits.md#grounded-glacier-and-ice-sheet-flow-ice-02)
+
+Basal sliding, longitudinal and transverse stress, temperature and floating shelves, subcell calving, and the wider physical validation and couplings remain open. The row stays REOPENED at four points.
