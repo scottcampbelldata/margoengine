@@ -15442,8 +15442,8 @@
         "gzip": 5010
       },
       "./lightning": {
-        "raw": 24159,
-        "gzip": 8807
+        "raw": 24186,
+        "gzip": 8823
       },
       "./explosive": {
         "raw": 41750,
@@ -15602,8 +15602,8 @@
         "gzip": 4898
       },
       "./tsunami": {
-        "raw": 23250,
-        "gzip": 8883
+        "raw": 23277,
+        "gzip": 8899
       },
       "./pack-ice": {
         "raw": 11423,
@@ -15658,8 +15658,8 @@
         "gzip": 5574
       },
       "./lava": {
-        "raw": 17759,
-        "gzip": 7046
+        "raw": 25165,
+        "gzip": 9567
       },
       "./dfsph": {
         "raw": 19974,
@@ -19187,14 +19187,14 @@
       "brotli": 3875
     },
     "packages/physics/dist/lava-kernel.wasm": {
-      "raw": 13839,
-      "gzip": 6049,
-      "brotli": 5486
+      "raw": 19038,
+      "gzip": 8497,
+      "brotli": 7568
     },
     "packages/physics/dist/lava-kernel-shared.wasm": {
-      "raw": 13839,
-      "gzip": 6049,
-      "brotli": 5489
+      "raw": 19038,
+      "gzip": 8497,
+      "brotli": 7569
     },
     "packages/physics/dist/snowpack-kernel.wasm": {
       "raw": 6455,

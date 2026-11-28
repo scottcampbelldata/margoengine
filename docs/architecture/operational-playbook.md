@@ -11332,6 +11332,10 @@ drainage limit. Physics publishes only after checking every solver surface, heat
 Weather draws the accepted column skin and crust directly. Fixed-camera GPU tests compare the
 timed early surface, advanced front, cooled crust and exact replay on both renderers.
 
+Shared lava workers partition the stability calculation, independent face sweeps and per-cell source
+and cooling updates. They join between sweeps and fold ledgers in grid order. Exact Node and Chromium
+replay, worker counts on two large grids, and rejection of late publication cover this path.
+
 ### Native free-surface preview water (FLUID-02)
 
 The optional PBF module uses a SIMD kernel in an imported PhysicsWorld arena without static slots or startup

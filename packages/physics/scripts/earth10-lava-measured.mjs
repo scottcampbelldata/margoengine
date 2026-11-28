@@ -7,7 +7,7 @@
 // and scoring are performed below. Coordinates and thermal inputs are independent
 // of measured held-out fronts.
 // Run after building Physics:
-// node packages/physics/scripts/earth10-lava-measured.mjs [A|D|both] [inertial|terminal] [throughSeconds] [fineMetres]
+// node packages/physics/scripts/earth10-lava-measured.mjs [A|C|D|both|all] [inertial|terminal] [throughSeconds] [fineMetres]
 // Thin-film reference: Huppert (1982), https://doi.org/10.1017/S0022112082001797.
 // Benchmark geometry/measurements: Cordonnier, Lev & Garel (2016), https://doi.org/10.1144/SP426.7.
 import assert from 'node:assert/strict';
@@ -17,16 +17,19 @@ import { LavaSolver } from '../dist/lava.js';
 import { PhysicsWorld, worldMemory } from '../dist/world.js';
 
 const data = JSON.parse(await readFile(new URL('./fixtures/earth10-dietterich-2017.json', import.meta.url), 'utf8'));
-const [requested = 'both', transport = 'inertial', throughSeconds, fineMetres = '0.01'] = process.argv.slice(2);
-assert.ok(requested === 'A' || requested === 'D' || requested === 'both', 'Choose A, D or both.');
+const [requested = 'both', transport = 'inertial', throughSeconds, fineMetres] = process.argv.slice(2);
+assert.ok(['A', 'C', 'D', 'both', 'all'].includes(requested), 'Choose A, C, D, both (A and D), or all.');
 assert.ok(transport === 'inertial' || transport === 'terminal', 'Choose inertial or terminal transport.');
 const horizon = throughSeconds === undefined ? Infinity : Number(throughSeconds);
-const fineSpacing = Number(fineMetres);
+const specifiedSpacing = fineMetres === undefined ? undefined : Number(fineMetres);
 assert.ok(
   throughSeconds === undefined || (horizon > 0 && Number.isFinite(horizon)),
   'Use a finite positive observation horizon.',
 );
-assert.ok(fineSpacing > 0 && Number.isFinite(fineSpacing), 'Use a finite positive grid spacing in metres.');
+assert.ok(
+  specifiedSpacing === undefined || (specifiedSpacing > 0 && Number.isFinite(specifiedSpacing)),
+  'Use a finite positive grid spacing in metres.',
+);
 const dist = new URL('../dist/', import.meta.url);
 async function artifactHashes() {
   const artifacts = ['lava.js', 'lava-kernel.wasm'];
@@ -53,16 +56,21 @@ if (transport === 'terminal') {
     'Build a Physics distribution that supports terminal lava transport.',
   );
 }
-const threshold = 0.0001; // Model's published 0.1 mm vertical grid spacing, fixed across both horizontal grids.
+const threshold = 0.0001; // Published BM-A and BM-D vertical spacing, used as a common depth contour.
 const thresholdChecks = [threshold / 2, threshold, 2 * threshold];
 
 function setup(which, dx) {
   const { inputs } = data[which];
   const slope = (inputs.slopeDegrees * Math.PI) / 180;
   const cos = Math.cos(slope);
-  const [width, depth] = inputs.extentCm.map((value) => value / 100);
+  // A centred, cropped patch suffices for the early axisymmetric run. The
+  // observations are accepted only while every contour stays inside it.
+  const [width, depth] = which === 'C' ? [0.08, 0.08] : inputs.extentCm.map((value) => value / 100);
   const [nx, nz] = [Math.ceil((width * cos) / dx), Math.ceil(depth / dx)];
-  const [vx, vz] = [(inputs.sourceCenterCm[0] * cos) / 100, inputs.sourceCenterCm[1] / 100];
+  const [vx, vz] =
+    which === 'C'
+      ? [0.5 * nx * dx, 0.5 * nz * dx]
+      : [(inputs.sourceCenterCm[0] * cos) / 100, inputs.sourceCenterCm[1] / 100];
   const halfSide = inputs.sourceSideCm / 200;
   const bed = Float64Array.from({ length: nx * nz }, (_, i) => (vx - ((i % nx) + 0.5) * dx) * Math.tan(slope));
   const overlap = (cell, center, radius) =>
@@ -112,8 +120,10 @@ function setup(which, dx) {
           emissivity: inputs.emissivity,
         }
       : {
-          liquidus: hot,
-          solidus: hot - 1,
+          // C tests only the kinematics of the fully liquid, isoviscous
+          // regime. Its temperature is passive in the published benchmark.
+          liquidus: which === 'C' ? ambient - 1 : hot,
+          solidus: which === 'C' ? ambient - 2 : hot - 1,
           viscosityRise: 0,
           latentHeat: 0,
           conductivity: 0,
@@ -144,12 +154,14 @@ function measure(lava, [nx, nz], dx, cos, vx, vz) {
     loZ: Infinity,
     hiZ: -Infinity,
     touchesUpstream: false,
+    occupied: 0,
   }));
   for (let z = 0; z < nz; z++) {
     for (let x = 0; x < nx; x++) {
       const depth = lava.sample(x, z).depth;
       for (const p of probes) {
         if (depth < p.cut) continue;
+        p.occupied++;
         p.hiX = Math.max(p.hiX, x + 1);
         p.loZ = Math.min(p.loZ, z);
         p.hiZ = Math.max(p.hiZ, z + 1);
@@ -161,6 +173,7 @@ function measure(lava, [nx, nz], dx, cos, vx, vz) {
     x: Math.max(0, (p.hiX * dx - vx) / cos),
     width: Math.max(0, (p.hiZ - p.loZ) * dx),
     crossExtent: Math.max(0, p.hiZ * dx - vz, vz - p.loZ * dx),
+    radius: Math.sqrt(p.occupied / Math.PI) * dx,
     touchesUpstream: p.touchesUpstream,
     touchesOuterEdge: p.hiX === nx || p.loZ === 0 || p.hiZ === nz,
   }));
@@ -170,9 +183,10 @@ async function simulate(which, dx) {
   const { options, cos, vx, vz, supply } = setup(which, dx);
   const lava = await LavaSolver.load();
   const world = new PhysicsWorld({ rate, memory: worldMemory(false) }).add(lava, options);
-  const records = data[which].measuredXY.filter(([t]) => t > 0 && t <= horizon);
+  const measured = which === 'C' ? data.C.measuredRadius : data[which].measuredXY;
+  const records = measured.filter(([t]) => t > 0 && t <= horizon);
   assert.ok(records.length > 0, 'Extend the observation horizon to the first measured point.');
-  const points = records.map(([time, x, y]) => {
+  const points = records.map(([time, ...distances]) => {
     const frames = time * rate.num;
     const lowerFrame = Math.floor(frames);
     const upperFrame = Math.ceil(frames);
@@ -182,7 +196,14 @@ async function simulate(which, dx) {
     const upper = upperFrame === lowerFrame ? lower : measure(lava, options.cells, dx, cos, vx, vz);
     const nearest = Math.round(frames);
     const front = nearest === lowerFrame ? lower : upper;
-    return { measuredTime: time, time: nearest / rate.num, measured: [x / 100, y / 100], front, lower, upper };
+    return {
+      measuredTime: time,
+      time: nearest / rate.num,
+      measured: distances.map((cm) => cm / 100),
+      front,
+      lower,
+      upper,
+    };
   });
   const { suppliedVolume, storedVolume, environmentalHeat } = lava.budget;
   const finalFrame = Math.ceil(points.at(-1).measuredTime * rate.num);
@@ -195,7 +216,8 @@ async function simulate(which, dx) {
 }
 
 function gradeRows(coarse, fine, axis, dimension, reportedPrecision) {
-  let squares = 0;
+  let coarseSquares = 0;
+  const fineSquares = thresholdChecks.map(() => 0);
   let observed = 0;
   let outOfAllowance = 0;
   let maxDeviation = 0;
@@ -215,7 +237,8 @@ function gradeRows(coarse, fine, axis, dimension, reportedPrecision) {
       fine.dx * (axis === 'x' ? 1 / fine.cos : axis === 'width' ? 2 : 1) +
       Math.abs(predicted - other) +
       thresholdShift;
-    squares += error * error;
+    coarseSquares += (other - target) ** 2;
+    for (let j = 0; j < fineSquares.length; j++) fineSquares[j] += (record.front[j][axis] - target) ** 2;
     observed += target;
     outOfAllowance += Number(Math.abs(error) > allowance);
     maxDeviation = Math.max(maxDeviation, Math.abs(error));
@@ -229,26 +252,58 @@ function gradeRows(coarse, fine, axis, dimension, reportedPrecision) {
       allowance,
     };
   });
-  const nrmse = Math.sqrt(squares / offsets.length) / (observed / offsets.length);
-  return { nrmse, maxDeviation, outOfAllowance, first: offsets[0], last: offsets.at(-1) };
+  const normalise = (squares) => Math.sqrt(squares / offsets.length) / (observed / offsets.length);
+  const contourNrmse = fineSquares.map(normalise);
+  return {
+    nrmse: contourNrmse[1],
+    coarseNrmse: normalise(coarseSquares),
+    contourNrmse,
+    maxDeviation,
+    outOfAllowance,
+    first: offsets[0],
+    last: offsets.at(-1),
+  };
 }
 
-for (const which of requested === 'both' ? ['A', 'D'] : [requested]) {
+const cases = { both: ['A', 'D'], all: ['A', 'C', 'D'] };
+for (const which of cases[requested] ?? [requested]) {
+  const fineSpacing = specifiedSpacing ?? (which === 'C' ? 0.002 : 0.01);
   const coarse = await simulate(which, 2 * fineSpacing);
   const fine = await simulate(which, fineSpacing);
-  // The benchmark's 6 cm square has X=Y=3 cm in the BM-D OpenFOAM t=0 row,
-  // consistent with one-sided extents measured from the vent centre. Retain
-  // the widths as a diagnostic. X is measured along the sloping plane.
-  const longitudinal = gradeRows(coarse, fine, 'x', 0, 0.000005);
-  const crossSlopeWidth = gradeRows(coarse, fine, 'width', 1, 0.000005);
-  const crossSlopeExtent = gradeRows(coarse, fine, 'crossExtent', 1, 0.000005);
   const edgeCounts = [coarse, fine].map(({ points }) => ({
     upstream: points.filter((p) => p.front[1].touchesUpstream).length,
     downstreamOrSide: points.filter((p) => p.front[1].touchesOuterEdge).length,
   }));
   // Dietterich et al. §Assessment of model accuracy call <10% NRMSE a good fit.
-  // A patch-edge hit rejects the unconfined downstream/side comparison.
-  const hasPublishedLongitudinalFit = longitudinal.nrmse < 0.1 && edgeCounts.every((v) => v.downstreamOrSide === 0);
+  let scores;
+  if (which === 'C') {
+    // Garel et al. camera radii measure the physical outline. The area-equivalent
+    // radius is a deterministic estimator for a nearly axisymmetric outline.
+    const radius = gradeRows(coarse, fine, 'radius', 0, 0.000005);
+    const openPatch = [coarse, fine].every(({ points }) =>
+      points.every(({ front }) => front.every((p) => !p.touchesUpstream && !p.touchesOuterEdge)),
+    );
+    const meetsPublishedErrorBar =
+      openPatch &&
+      radius.outOfAllowance === 0 &&
+      radius.coarseNrmse < 0.1 &&
+      radius.contourNrmse.every((nrmse) => nrmse < 0.1);
+    if (transport === 'terminal' && throughSeconds === undefined && fineMetres === undefined)
+      assert.ok(
+        meetsPublishedErrorBar,
+        `BM-C held-out radius misses the published error bar: ${JSON.stringify(radius)}`,
+      );
+    scores = { radius, meetsPublishedErrorBar };
+  } else {
+    // In the BM-D OpenFOAM t=0 row, the benchmark's 6 cm square has X=Y=3 cm,
+    // consistent with one-sided extents from the vent centre. Compare total
+    // width as a sensitivity and measure X along the sloping plane.
+    const longitudinal = gradeRows(coarse, fine, 'x', 0, 0.000005);
+    const crossSlopeWidth = gradeRows(coarse, fine, 'width', 1, 0.000005);
+    const crossSlopeExtent = gradeRows(coarse, fine, 'crossExtent', 1, 0.000005);
+    const meetsPublishedErrorBar = longitudinal.nrmse < 0.1 && edgeCounts.every((v) => v.downstreamOrSide === 0);
+    scores = { longitudinal, crossSlopeWidth, crossSlopeExtent, meetsPublishedErrorBar };
+  }
   console.log(
     JSON.stringify(
       {
@@ -259,12 +314,9 @@ for (const which of requested === 'both' ? ['A', 'D'] : [requested]) {
         observations: fine.points.length,
         spacing: [coarse.dx, fine.dx],
         cells: [coarse.cells, fine.cells],
-        threshold,
+        depthContours: thresholdChecks,
         edgeCounts,
-        longitudinal,
-        crossSlopeWidth,
-        crossSlopeExtent,
-        hasPublishedLongitudinalFit,
+        ...scores,
         volume: fine.storedVolume,
         suppliedVolume: fine.suppliedVolume,
         environmentalHeat: fine.environmentalHeat,

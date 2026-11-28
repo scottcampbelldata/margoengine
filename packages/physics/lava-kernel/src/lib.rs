@@ -380,6 +380,56 @@ impl Grid {
         self.width * self.rows
     }
 
+    unsafe fn terminal_cell_bound(
+        &self,
+        current: *const Lava,
+        bed: *const f64,
+        model: &Model,
+        x: usize,
+        z: usize,
+        remaining: f64,
+        forward_rates: *mut f64,
+    ) -> f64 {
+        let i = x + z * self.width;
+        let value = *current.add(i);
+        let mut outflow = 0.0;
+        let mut derivative = 0.0;
+        for (face, neighbor) in [
+            (x > 0).then(|| i - 1),
+            (x + 1 < self.width).then(|| i + 1),
+            (z > 0).then(|| i - self.width),
+            (z + 1 < self.rows).then(|| i + self.width),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let Some(neighbor) = neighbor else { continue };
+            let (rate, sensitivity) = terminal_face(
+                value,
+                *bed.add(i),
+                *current.add(neighbor),
+                *bed.add(neighbor),
+                model,
+            );
+            if !(rate.is_finite() && sensitivity.is_finite()) {
+                return f64::NAN;
+            }
+            if !forward_rates.is_null() && face % 2 == 1 {
+                forward_rates.add(2 * i + face / 2).write(rate);
+            }
+            outflow += rate.max(0.0);
+            derivative += sensitivity;
+        }
+        let mut step = remaining;
+        if outflow > 0.0 {
+            step = step.min(0.4 * model.spacing * (value.depth / outflow));
+        }
+        if derivative > 0.0 {
+            step = step.min(0.4 * model.spacing / derivative);
+        }
+        step
+    }
+
     unsafe fn terminal_step_bound(
         &self,
         current: *const Lava,
@@ -390,41 +440,35 @@ impl Grid {
         let mut step = remaining;
         for z in 0..self.rows {
             for x in 0..self.width {
-                let i = x + z * self.width;
-                let value = *current.add(i);
-                let mut outflow = 0.0;
-                let mut derivative = 0.0;
-                for neighbor in [
-                    (x > 0).then(|| i - 1),
-                    (x + 1 < self.width).then(|| i + 1),
-                    (z > 0).then(|| i - self.width),
-                    (z + 1 < self.rows).then(|| i + self.width),
-                ]
-                .into_iter()
-                .flatten()
-                {
-                    let (rate, sensitivity) = terminal_face(
-                        value,
-                        *bed.add(i),
-                        *current.add(neighbor),
-                        *bed.add(neighbor),
-                        model,
-                    );
-                    if !(rate.is_finite() && sensitivity.is_finite()) {
-                        return f64::NAN;
-                    }
-                    outflow += rate.max(0.0);
-                    derivative += sensitivity;
+                let local = self.terminal_cell_bound(
+                    current,
+                    bed,
+                    model,
+                    x,
+                    z,
+                    step,
+                    core::ptr::null_mut(),
+                );
+                if !local.is_finite() {
+                    return f64::NAN;
                 }
-                if outflow > 0.0 {
-                    step = step.min(0.4 * model.spacing * (value.depth / outflow));
-                }
-                if derivative > 0.0 {
-                    step = step.min(0.4 * model.spacing / derivative);
-                }
+                step = local;
             }
         }
         step
+    }
+
+    fn conductive_exchange(p: Lava, q: Lava, model: &Model, gain: f64) -> Option<f64> {
+        if model.conductivity > 0.0 && p.depth > 0.0 && q.depth > 0.0 {
+            let ta = model.phase(p.depth, p.heat).0;
+            let tb = model.phase(q.depth, q.heat).0;
+            Some(
+                model.conductivity / model.density * p.depth.min(q.depth) * (ta - tb) * gain
+                    / model.spacing,
+            )
+        } else {
+            None
+        }
     }
 
     unsafe fn conduct_between(
@@ -435,17 +479,67 @@ impl Grid {
         model: &Model,
         gain: f64,
     ) {
-        let p = *current.add(i);
-        let q = *current.add(k);
-        if model.conductivity > 0.0 && p.depth > 0.0 && q.depth > 0.0 {
-            let ta = model.phase(p.depth, p.heat).0;
-            let tb = model.phase(q.depth, q.heat).0;
-            let exchange =
-                model.conductivity / model.density * p.depth.min(q.depth) * (ta - tb) * gain
-                    / model.spacing;
+        if let Some(exchange) =
+            Self::conductive_exchange(*current.add(i), *current.add(k), model, gain)
+        {
             (*trial.add(i)).heat -= exchange;
             (*trial.add(k)).heat += exchange;
         }
+    }
+
+    unsafe fn terminal_gather(
+        &self,
+        current: *const Lava,
+        rates: *const f64,
+        model: &Model,
+        dt: f64,
+        x: usize,
+        z: usize,
+    ) -> Lava {
+        let i = x + z * self.width;
+        let mut value = *current.add(i);
+        value.qx = 0.0;
+        value.qz = 0.0;
+        let gain = dt / model.spacing;
+        // Preserve the serial z-major, X-first scatter order for this cell:
+        // previous Z row, previous X cell, then its own X and Z faces.
+        for (axis, neighbor, lower) in [
+            (1, (z > 0).then(|| i - self.width), false),
+            (0, (x > 0).then(|| i - 1), false),
+            (0, (x + 1 < self.width).then(|| i + 1), true),
+            (1, (z + 1 < self.rows).then(|| i + self.width), true),
+        ] {
+            let Some(neighbor) = neighbor else { continue };
+            let (left, right) = if lower { (i, neighbor) } else { (neighbor, i) };
+            let a = *current.add(left);
+            let b = *current.add(right);
+            let rate = *rates.add(2 * left + axis);
+            if rate != 0.0 {
+                let donor = if rate > 0.0 { a } else { b };
+                let depth = rate * gain;
+                let heat = depth * (donor.heat / donor.depth);
+                if lower {
+                    value.depth -= depth;
+                    value.heat -= heat;
+                } else {
+                    value.depth += depth;
+                    value.heat += heat;
+                }
+                if axis == 0 {
+                    value.qx += 0.5 * rate;
+                } else {
+                    value.qz += 0.5 * rate;
+                }
+            }
+            if let Some(exchange) = Self::conductive_exchange(a, b, model, gain) {
+                if lower {
+                    value.heat -= exchange;
+                } else {
+                    value.heat += exchange;
+                }
+            }
+        }
+        value
     }
 
     unsafe fn update_terminal(
@@ -497,6 +591,46 @@ impl Grid {
         }
     }
 
+    fn sweep(&self, axis: usize) -> (usize, usize, usize, usize) {
+        if axis == 0 {
+            (self.rows, self.width, 1, self.width)
+        } else {
+            (self.width, self.rows, self.width, 1)
+        }
+    }
+
+    unsafe fn inertial_line(
+        &self,
+        current: *const Lava,
+        trial: *mut Lava,
+        bed: *const f64,
+        model: &Model,
+        dt: f64,
+        axis: usize,
+        line: usize,
+    ) {
+        let (_, width, stride, line_stride) = self.sweep(axis);
+        let i = line * line_stride;
+        let mut a = Primitive::get(*current.add(i), *bed.add(i), model, axis);
+        let (_, lower) = face(a.reflect(), a, model);
+        let gain = dt / model.spacing;
+        apply(&mut *trial.add(i), lower, gain, axis);
+        for j in 0..width - 1 {
+            let i = i + j * stride;
+            let k = i + stride;
+            let b = Primitive::get(*current.add(k), *bed.add(k), model, axis);
+            let (x, y) = face(a, b, model);
+            apply(&mut *trial.add(i), x, -gain, axis);
+            apply(&mut *trial.add(k), y, gain, axis);
+            // Equal and opposite lateral conduction between filled columns.
+            Self::conduct_between(current, trial, i, k, model, gain);
+            a = b;
+        }
+        let last = i + (width - 1) * stride;
+        let (upper, _) = face(a, a.reflect(), model);
+        apply(&mut *trial.add(last), upper, -gain, axis);
+    }
+
     unsafe fn update(
         &self,
         current: *const Lava,
@@ -507,30 +641,8 @@ impl Grid {
     ) {
         trial.copy_from_nonoverlapping(current, self.count());
         for axis in 0..2 {
-            let (lines, width, stride, line_stride) = if axis == 0 {
-                (self.rows, self.width, 1, self.width)
-            } else {
-                (self.width, self.rows, self.width, 1)
-            };
-            for line in 0..lines {
-                let i = line * line_stride;
-                let mut a = Primitive::get(*current.add(i), *bed.add(i), model, axis);
-                let (_, lower) = face(a.reflect(), a, model);
-                let gain = dt / model.spacing;
-                apply(&mut *trial.add(i), lower, gain, axis);
-                for j in 0..width - 1 {
-                    let i = i + j * stride;
-                    let k = i + stride;
-                    let b = Primitive::get(*current.add(k), *bed.add(k), model, axis);
-                    let (x, y) = face(a, b, model);
-                    apply(&mut *trial.add(i), x, -gain, axis);
-                    apply(&mut *trial.add(k), y, gain, axis);
-                    Self::conduct_between(current, trial, i, k, model, gain);
-                    a = b;
-                }
-                let last = i + (width - 1) * stride;
-                let (upper, _) = face(a, a.reflect(), model);
-                apply(&mut *trial.add(last), upper, -gain, axis);
+            for line in 0..self.sweep(axis).0 {
+                self.inertial_line(current, trial, bed, model, dt, axis, line);
             }
         }
     }
@@ -576,6 +688,172 @@ fn cooling(cell: Lava, bed: f64, model: &Model, dt: f64) -> (f64, f64) {
     (budget, wet_part)
 }
 
+struct Tick<'a> {
+    model: &'a Model,
+    dt: f64,
+    start: f64,
+    area: f64,
+    heat_scale: f64,
+    terminal: bool,
+}
+
+impl<'a> Tick<'a> {
+    fn new(model: &'a Model, dt: f64, start: f64, terminal: bool) -> Option<Self> {
+        let area = model.spacing * model.spacing;
+        let heat_scale = model.density * area;
+        if !(dt > 0.0
+            && dt.is_finite()
+            && start.is_finite()
+            && heat_scale > 0.0
+            && heat_scale.is_finite())
+        {
+            return None;
+        }
+        Some(Self {
+            model,
+            dt,
+            start,
+            area,
+            heat_scale,
+            terminal,
+        })
+    }
+
+    unsafe fn receive_ice(
+        &self,
+        count: usize,
+        current: *mut Lava,
+        ice: *const f64,
+        budget: *mut f64,
+    ) -> i32 {
+        // The caller maps absorbed ICE-05 power once per published interval to the owning cell.
+        for i in 0..count {
+            let volume = &mut *current.add(i);
+            let draw = *ice.add(i) * self.dt / self.heat_scale;
+            if draw > volume.heat || !draw.is_finite() {
+                return 2;
+            }
+            let old = self.model.phase(volume.depth, volume.heat).1;
+            volume.heat -= draw;
+            let next = self.model.phase(volume.depth, volume.heat).1;
+            let ratio = if old > 0.0 {
+                (next / old).min(1.0)
+            } else {
+                0.0
+            };
+            volume.qx *= ratio;
+            volume.qz *= ratio;
+            *budget.add(3) += draw * self.heat_scale;
+        }
+        0
+    }
+
+    fn inertial_speed(&self, state: Lava, vent: &Source, t: f64, remaining: f64) -> f64 {
+        let mobile = state.depth * self.model.phase(state.depth, state.heat).1;
+        let extra = if self.start + t < vent.end && self.start + self.dt > vent.start {
+            vent.flux * remaining
+        } else {
+            0.0
+        };
+        let spread = if mobile > 0.0 {
+            length(state.qx, state.qz) / mobile
+        } else {
+            0.0
+        };
+        spread + sqrt(self.model.gravity * (mobile + extra))
+    }
+
+    fn microstep(&self, bound: f64, t: f64) -> Option<f64> {
+        if !bound.is_finite() {
+            return None;
+        }
+        let mut sub = if self.terminal {
+            bound
+        } else if bound > 0.0 {
+            (self.dt - t).min(0.4 * self.model.spacing / bound)
+        } else {
+            self.dt - t
+        };
+        if self.model.conductivity > 0.0 {
+            sub = sub.min(
+                0.2 * self.area * self.model.density * self.model.cp / self.model.conductivity,
+            );
+        }
+        if !sub.is_finite() || t + sub <= t {
+            return None;
+        }
+        Some(sub)
+    }
+
+    fn finish_cell(
+        &self,
+        state: &mut Lava,
+        vent: &Source,
+        bed: f64,
+        t: f64,
+        sub: f64,
+    ) -> Option<[f64; 4]> {
+        let vent_time =
+            ((self.start + t + sub).min(vent.end) - (self.start + t).max(vent.start)).max(0.0);
+        let inflow = vent_time * vent.flux;
+        state.depth += inflow;
+        state.heat += inflow * vent.heat;
+        let added_volume = inflow * self.area;
+        let added_heat = inflow * vent.heat * self.heat_scale;
+        if state.depth < 0.0
+            || state.heat < 0.0
+            || !state.depth.is_finite()
+            || !state.heat.is_finite()
+        {
+            return None;
+        }
+        let old = self.model.phase(state.depth, state.heat).1;
+        let (loss, water) = cooling(*state, bed, self.model, sub);
+        if !(loss.is_finite() && water.is_finite()) {
+            return None;
+        }
+        state.heat -= loss;
+        let (temperature, liquid) = self.model.phase(state.depth, state.heat);
+        if !(state.heat.is_finite()
+            && state.heat >= 0.0
+            && temperature.is_finite()
+            && liquid.is_finite())
+        {
+            return None;
+        }
+        let q = length(state.qx, state.qz);
+        let h = state.depth * liquid;
+        let scale = if h > 0.0 && q > 0.0 && old > 0.0 {
+            let solidification = (liquid / old).min(1.0);
+            if self.terminal {
+                solidification
+            } else {
+                resistance(q, h, temperature, self.model, sub) / q * solidification
+            }
+        } else {
+            0.0
+        };
+        state.qx *= scale;
+        state.qz *= scale;
+        if !state.qx.is_finite() || !state.qz.is_finite() {
+            return None;
+        }
+        Some([
+            added_volume,
+            added_heat,
+            loss * self.heat_scale,
+            water * self.heat_scale,
+        ])
+    }
+}
+
+unsafe fn add_ledger(budget: *mut f64, ledger: [f64; 4]) {
+    *budget.add(0) += ledger[0];
+    *budget.add(1) += ledger[1];
+    *budget.add(2) += ledger[2];
+    *budget.add(4) += ledger[3];
+}
+
 #[unsafe(no_mangle)]
 unsafe extern "C" fn lava_step(
     current: *mut Lava,
@@ -590,37 +868,15 @@ unsafe extern "C" fn lava_step(
     dt: f64,
     start: f64,
     terminal: u32,
+    receipt: *mut u32,
 ) -> i32 {
-    let model = &*model;
-    let grid = Grid { width, rows };
-    let area = model.spacing * model.spacing;
-    let heat_scale = model.density * area;
-    if !(dt > 0.0
-        && dt.is_finite()
-        && start.is_finite()
-        && heat_scale > 0.0
-        && heat_scale.is_finite())
-    {
+    let Some(tick) = Tick::new(&*model, dt, start, terminal != 0) else {
         return 1;
-    }
-    // The caller maps absorbed ICE-05 power once per published interval to the owning cell.
-    for i in 0..grid.count() {
-        let volume = &mut *current.add(i);
-        let draw = *ice.add(i) * dt / heat_scale;
-        if draw > volume.heat || !draw.is_finite() {
-            return 2;
-        }
-        let old = model.phase(volume.depth, volume.heat).1;
-        volume.heat -= draw;
-        let next = model.phase(volume.depth, volume.heat).1;
-        let ratio = if old > 0.0 {
-            (next / old).min(1.0)
-        } else {
-            0.0
-        };
-        volume.qx *= ratio;
-        volume.qz *= ratio;
-        *budget.add(3) += draw * heat_scale;
+    };
+    let grid = Grid { width, rows };
+    let status = tick.receive_ice(grid.count(), current, ice, budget);
+    if status != 0 {
+        return status;
     }
     let mut t = 0.0;
     let mut steps = 0;
@@ -629,103 +885,283 @@ unsafe extern "C" fn lava_step(
             return 3;
         }
         steps += 1;
-        let mut sub = dt - t;
-        if terminal != 0 {
-            sub = grid.terminal_step_bound(current, bed, model, sub);
+        let remaining = dt - t;
+        let bound = if tick.terminal {
+            grid.terminal_step_bound(current, bed, tick.model, remaining)
         } else {
             let mut speed: f64 = 0.0;
             for i in 0..grid.count() {
-                let state = *current.add(i);
-                let mobile = state.depth * model.phase(state.depth, state.heat).1;
-                let vent = &*source.add(i);
-                let extra = if start + t < vent.end && start + dt > vent.start {
-                    vent.flux * sub
-                } else {
-                    0.0
-                };
-                let spread = if mobile > 0.0 {
-                    length(state.qx, state.qz) / mobile
-                } else {
-                    0.0
-                };
-                let local = spread + sqrt(model.gravity * (mobile + extra));
+                let local = tick.inertial_speed(*current.add(i), &*source.add(i), t, remaining);
                 if !local.is_finite() {
                     return 1;
                 }
                 speed = speed.max(local);
             }
-            if speed > 0.0 {
-                sub = sub.min(0.4 * model.spacing / speed);
-            }
-        }
-        if !sub.is_finite() {
+            speed
+        };
+        let Some(sub) = tick.microstep(bound, t) else {
             return 1;
-        }
-        if model.conductivity > 0.0 {
-            sub = sub.min(0.2 * area * model.density * model.cp / model.conductivity);
-        }
-        if !sub.is_finite() || t + sub <= t {
-            return 1;
-        }
-        if terminal != 0 {
-            grid.update_terminal(current, trial, bed, model, sub);
+        };
+        if tick.terminal {
+            grid.update_terminal(current, trial, bed, tick.model, sub);
         } else {
-            grid.update(current, trial, bed, model, sub);
+            grid.update(current, trial, bed, tick.model, sub);
         }
         for i in 0..grid.count() {
-            let state = &mut *trial.add(i);
-            let vent = &*source.add(i);
-            let vent_time =
-                ((start + t + sub).min(vent.end) - (start + t).max(vent.start)).max(0.0);
-            let inflow = vent_time * vent.flux;
-            state.depth += inflow;
-            state.heat += inflow * vent.heat;
-            *budget.add(0) += inflow * area;
-            *budget.add(1) += inflow * vent.heat * heat_scale;
-            if state.depth < 0.0
-                || state.heat < 0.0
-                || !state.depth.is_finite()
-                || !state.heat.is_finite()
-            {
+            let Some(ledger) =
+                tick.finish_cell(&mut *trial.add(i), &*source.add(i), *bed.add(i), t, sub)
+            else {
                 return 1;
-            }
-            let old = model.phase(state.depth, state.heat).1;
-            let (loss, water) = cooling(*state, *bed.add(i), model, sub);
-            if !(loss.is_finite() && water.is_finite()) {
-                return 1;
-            }
-            state.heat -= loss;
-            *budget.add(2) += loss * heat_scale;
-            *budget.add(4) += water * heat_scale;
-            let (temperature, liquid) = model.phase(state.depth, state.heat);
-            if !(state.heat.is_finite()
-                && state.heat >= 0.0
-                && temperature.is_finite()
-                && liquid.is_finite())
-            {
-                return 1;
-            }
-            let q = length(state.qx, state.qz);
-            let h = state.depth * liquid;
-            let scale = if h > 0.0 && q > 0.0 && old > 0.0 {
-                let solidification = (liquid / old).min(1.0);
-                if terminal != 0 {
-                    solidification
-                } else {
-                    resistance(q, h, temperature, model, sub) / q * solidification
-                }
-            } else {
-                0.0
             };
-            state.qx *= scale;
-            state.qz *= scale;
-            if !state.qx.is_finite() || !state.qz.is_finite() {
-                return 1;
-            }
+            add_ledger(budget, ledger);
         }
         current.copy_from_nonoverlapping(trial, grid.count());
         t = (t + sub).min(dt);
     }
+    if !receipt.is_null() {
+        receipt.write(steps as u32);
+    }
+    0
+}
+
+// The host publishes this arena descriptor before launching a worker phase.
+// Only the owning agent changes the clock and region offsets between barriers.
+#[repr(C)]
+struct ThreadJob {
+    current: u32,
+    trial: u32,
+    bed: u32,
+    source: u32,
+    model: u32,
+    nx: u32,
+    nz: u32,
+    ice: u32,
+    budget: u32,
+    terminal_rates: u32,
+    local_ledger: u32,
+    bounds: u32,
+    terminal: u32,
+    steps: u32,
+    dt: f64,
+    start: f64,
+    t: f64,
+    sub: f64,
+}
+
+const _: () = assert!(core::mem::size_of::<ThreadJob>() == 88);
+
+impl ThreadJob {
+    unsafe fn tick(&self) -> Option<Tick<'_>> {
+        Tick::new(
+            &*(self.model as *const Model),
+            self.dt,
+            self.start,
+            self.terminal != 0,
+        )
+    }
+
+    fn grid(&self) -> Option<Grid> {
+        let width = self.nx as usize;
+        let rows = self.nz as usize;
+        if width.checked_mul(rows)? == 0 {
+            return None;
+        }
+        Some(Grid { width, rows })
+    }
+
+    fn active(&self) -> bool {
+        self.t >= 0.0 && self.t < self.dt
+    }
+}
+
+fn partition(len: usize, part: u32, parts: u32) -> core::ops::Range<usize> {
+    let len = len as u64;
+    let part = u64::from(part);
+    let parts = u64::from(parts);
+    (part * len / parts) as usize..((part + 1) * len / parts) as usize
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn lava_thread_begin(job: *mut ThreadJob) -> i32 {
+    let Some(job) = job.as_mut() else {
+        return 1;
+    };
+    let Some(grid) = job.grid() else {
+        return 1;
+    };
+    job.steps = 0;
+    job.t = 0.0;
+    job.sub = 0.0;
+    let Some(tick) = job.tick() else {
+        return 1;
+    };
+    tick.receive_ice(
+        grid.count(),
+        job.current as *mut Lava,
+        job.ice as *const f64,
+        job.budget as *mut f64,
+    )
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn lava_thread_phase(
+    job: *const ThreadJob,
+    stage: u32,
+    part: u32,
+    parts: u32,
+) -> i32 {
+    let Some(job) = job.as_ref() else {
+        return 1;
+    };
+    if part >= parts || stage > 3 || !job.active() {
+        return 1;
+    }
+    if job.steps as usize >= MAX_MICROSTEPS {
+        return 3;
+    }
+    let Some(grid) = job.grid() else {
+        return 1;
+    };
+    let Some(tick) = job.tick() else {
+        return 1;
+    };
+    let current = job.current as *const Lava;
+    let trial = job.trial as *mut Lava;
+    let bed = job.bed as *const f64;
+    let source = job.source as *const Source;
+    if stage == 0 {
+        let remaining = job.dt - job.t;
+        let mut bound: f64 = if tick.terminal { remaining } else { 0.0 };
+        for i in partition(grid.count(), part, parts) {
+            let local = if tick.terminal {
+                let Some(z) = i.checked_div(grid.width) else {
+                    return 1;
+                };
+                let x = i - z * grid.width;
+                grid.terminal_cell_bound(
+                    current,
+                    bed,
+                    tick.model,
+                    x,
+                    z,
+                    bound,
+                    job.terminal_rates as *mut f64,
+                )
+            } else {
+                tick.inertial_speed(*current.add(i), &*source.add(i), job.t, remaining)
+            };
+            if !local.is_finite() {
+                return 1;
+            }
+            bound = if tick.terminal {
+                local
+            } else {
+                bound.max(local)
+            };
+        }
+        (job.bounds as *mut f64).add(part as usize).write(bound);
+        return 0;
+    }
+    if !(job.sub > 0.0 && job.sub <= job.dt - job.t) {
+        return 1;
+    }
+    if stage < 3 {
+        if tick.terminal {
+            return 1;
+        }
+        let axis = (stage - 1) as usize;
+        for line in partition(grid.sweep(axis).0, part, parts) {
+            if axis == 0 {
+                let first = line * grid.width;
+                trial
+                    .add(first)
+                    .copy_from_nonoverlapping(current.add(first), grid.width);
+            }
+            grid.inertial_line(current, trial, bed, tick.model, job.sub, axis, line);
+        }
+        return 0;
+    }
+    let ledger = job.local_ledger as *mut [f64; 4];
+    for i in partition(grid.count(), part, parts) {
+        let value = &mut *trial.add(i);
+        if tick.terminal {
+            let Some(z) = i.checked_div(grid.width) else {
+                return 1;
+            };
+            let x = i - z * grid.width;
+            *value = grid.terminal_gather(
+                current,
+                job.terminal_rates as *const f64,
+                tick.model,
+                job.sub,
+                x,
+                z,
+            );
+        }
+        let Some(receipt) = tick.finish_cell(value, &*source.add(i), *bed.add(i), job.t, job.sub)
+        else {
+            return 1;
+        };
+        ledger.add(i).write(receipt);
+    }
+    0
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn lava_thread_plan(job: *mut ThreadJob, parts: u32) -> i32 {
+    let Some(job) = job.as_mut() else {
+        return 1;
+    };
+    if parts == 0 || !job.active() || job.sub != 0.0 {
+        return 1;
+    }
+    if job.steps as usize >= MAX_MICROSTEPS {
+        return 3;
+    }
+    let Some(tick) = job.tick() else {
+        return 1;
+    };
+    let bounds = job.bounds as *const f64;
+    let mut bound: f64 = if tick.terminal { job.dt - job.t } else { 0.0 };
+    for part in 0..parts as usize {
+        let local = *bounds.add(part);
+        if !local.is_finite() {
+            return 1;
+        }
+        bound = if tick.terminal {
+            bound.min(local)
+        } else {
+            bound.max(local)
+        };
+    }
+    if let Some(sub) = tick.microstep(bound, job.t) {
+        job.sub = sub;
+        0
+    } else {
+        1
+    }
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn lava_thread_accept(job: *mut ThreadJob) -> i32 {
+    let Some(job) = job.as_mut() else {
+        return 1;
+    };
+    if !job.active() || !(job.sub > 0.0 && job.sub <= job.dt - job.t) {
+        return 1;
+    }
+    let Some(grid) = job.grid() else {
+        return 1;
+    };
+    let ledger = job.local_ledger as *const [f64; 4];
+    let budget = job.budget as *mut f64;
+    for i in 0..grid.count() {
+        add_ledger(budget, *ledger.add(i));
+    }
+    (job.current as *mut Lava).copy_from_nonoverlapping(job.trial as *const Lava, grid.count());
+    job.t = (job.t + job.sub).min(job.dt);
+    job.steps += 1;
+    job.sub = 0.0;
     0
 }
 

@@ -28,6 +28,7 @@
     "test:browser:terramechanics": "cd ../.. && node packages/physics/tests/terramechanics.browser.mjs",
     "test:browser:granular-flow": "cd ../.. && node packages/physics/tests/granular-flow.browser.mjs",
     "test:browser:lava": "cd ../.. && node packages/physics/tests/lava.browser.mjs",
+    "test:gpu:lava-threads": "cd ../.. && node packages/physics/tests/lava-threads.browser.mjs",
     "test:browser:lightning": "cd ../.. && node packages/physics/tests/lightning.browser.mjs && node packages/physics/tests/lightning.browser.mjs --compat",
     "test:browser:gpu-cloth": "cd ../.. && node packages/physics/tests/gpu-cloth-check.mjs && node packages/physics/tests/gpu-cloth-check.mjs --compat",
     "test:browser:floating": "cd ../.. && node packages/physics/tests/floating-example.browser.mjs && node packages/physics/tests/floating-example.browser.mjs --compat",

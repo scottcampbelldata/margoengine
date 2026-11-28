@@ -21,7 +21,12 @@ export interface LavaKernel {
     dt: number,
     start: number,
     terminal: number,
+    receipt: number,
   ): number;
+  lava_thread_begin(job: number): number;
+  lava_thread_plan(job: number, parts: number): number;
+  lava_thread_phase(job: number, stage: number, part: number, parts: number): number;
+  lava_thread_accept(job: number): number;
   lava_publish(
     state: number,
     bed: number,

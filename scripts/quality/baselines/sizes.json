@@ -15304,6 +15304,12 @@
       "commit": "earth-10-terminal-and-surface",
       "reason": "EARTH-10 physics/lava goes from 5891 to 7046 B gzip, cap 6147 to 7302 B, for terminal transport selection, staged publication and the accepted surface binding. Weather lava moves from 11999 to 15291 B, cap 12346 to 15750 B, to draw accepted hot skin and crust in both renderers. Splitting would duplicate the existing Kelvin-to-emission and lighting support. Both lazy native assets move from 4127 to 6049 B. Core and Stage are unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "earth-10-native-workers",
+      "reason": "EARTH-10 physics/lava goes from 7046 to 9567 B gzip and its ceiling from 7302 to 9824 B. That adds shared worker scheduling, exact ordered gathers and work counts. Both lazy SIMD assets go from 6049 to 8497 B. Existing sea and lightning callers reuse the transport, growing 16 B each within their caps. Splitting the optional lava entry would duplicate the state and worker ABI binding. Core and Stage gain zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16186,7 +16192,7 @@
     "@margoengine/physics/ice": 3483,
     "@margoengine/physics/iceberg": 4595,
     "@margoengine/physics/landscape": 4538,
-    "@margoengine/physics/lava": 7302,
+    "@margoengine/physics/lava": 9824,
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
     "@margoengine/physics/lightning": 9072,

@@ -99,15 +99,19 @@ them; the rest is a record of what a stronger solver would need.
 
 ### EARTH-10 four-point pass
 
-- Point 5. `lava-extremes.test.js` checks coded corrections for malformed grids, unrepresentable input and ICE receipts,
+- Point 5. `bd89d5b702`. `lava-extremes.test.js` checks coded corrections for malformed grids, unrepresentable input and ICE receipts,
   rejects an overflowing aggregate and an unresolved time step without publishing any candidate state, and samples
   TerrainBed in the live world cell. `lava-terminal.test.js` checks yielded and Newtonian discharge, nonnegative wet/dry
   columns, enthalpy and volume conservation and exact replay. `lava.test.js` checks radiation and convection with
   conductivity set to zero.
-- Point 7. Weather's `lava-surface.browser.mjs` draws the accepted dry grid, timed vent, moving front and cooled crust at
+- Point 6. `lava-threads.test.js` compares plain Wasm and shared Wasm on one, two and four threads for
+  both physical tiers, with real TerrainBed and SEA-06, a far origin shift and exact replay. Four threads update
+  12,513 cells and 25,252 faces at 129 x 97, and 49,601 cells and 99,652 faces at 257 x 193 in one inertial
+  microstep. `lava-threads.browser.mjs` exercises three nested helpers and exact replay in Chromium.
+- Point 7. `bd89d5b702`. Weather's `lava-surface.browser.mjs` draws the accepted dry grid, timed vent, moving front and cooled crust at
   one camera on WebGPU and WebGL2. It verifies exact seek, no emission from cooled crust, detachment, and the same accepted
   solver bytes on both paths. The source supports an explicit render cell.
-- Point 8. The package READMEs and `docs/limits.md` record the inertial and terminal tiers, timestep bound, fixed
+- Point 8. `bd89d5b702`. The package READMEs and `docs/limits.md` record the inertial and terminal tiers, timestep bound, fixed
   substrate, lumped column enthalpy, static sea level and the remaining crust, tube, crystal and water feedback gaps.
 - Point 2 remains open. The Dietterich et al. benchmark gives viscosity and source flux separately from the held-out
   front length and width. In BMA the terminal tier lowers the downslope normalised RMS error from 380.34% to 20.93%
@@ -116,6 +120,10 @@ them; the rest is a record of what a stronger solver would need.
   first second still overpredicts downslope advance by 42.86 mm against a 20.55 mm allowance. Its 12 s prefix misses all
   ten downslope bounds and has 38.99% normalised RMS error. The full BMD run reached the hard timeout. Reproduce with
   `node packages/physics/scripts/earth10-lava-measured.mjs A terminal` and the same command with `D terminal 12`.
+  The independent BMC flat-bed optical footprint case gives 7.43% and 2.02% normalised RMS radius error at 4 mm and
+  2 mm. All fourteen fine-grid frames in the 35-100 s window meet the derived grid and contour bounds. This
+  covers isoviscous spreading at the independently published input rate and viscosity. Reproduce with
+  `node packages/physics/scripts/earth10-lava-measured.mjs C terminal`.
   Analytic and conservation cases cover the equations implemented here. [Dietterich et al. (2017), workbook and experiment](https://doi.org/10.1186/s13617-017-0061-x)
 
 ## Film set first: the underwater and boat films

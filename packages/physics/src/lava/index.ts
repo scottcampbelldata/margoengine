@@ -9,8 +9,9 @@ import {
   ICE_MELTWATER_FIELD,
   ICE_STEAM_FIELD,
 } from '../ice/index.js';
+import type { NativePhasePool } from '../native-phase-pool.js';
 import { WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS } from '../sea/wake.js';
-import { DYNAMIC_BASE, MAX_MEMORY_PAGES, regionWords, STACK_BYTES } from '../world/memory.js';
+import { DYNAMIC_BASE, isShared, MAX_MEMORY_PAGES, regionWords, STACK_BYTES } from '../world/memory.js';
 import type {
   Cell,
   FieldDescriptor,
@@ -28,6 +29,10 @@ export const LAVA_LAYOUT = 1;
 /** Depth, bulk temperature, skin temperature, crust depth, X and Z discharge, surface altitude and areal enthalpy. */
 export const LAVA_WORDS = 8;
 const F64 = Float64Array.BYTES_PER_ELEMENT;
+const U32 = Uint32Array.BYTES_PER_ELEMENT;
+const MAX_THREADS = 64;
+const JOB_POINTER_WORDS = 14;
+const JOB_BYTES = JOB_POINTER_WORDS * U32 + 4 * F64;
 const ICE_FEEDBACK = [ICE_HEAT_ABSORPTION_FIELD, ICE_MELTWATER_FIELD, ICE_STEAM_FIELD] as const;
 type Pair = readonly [number, number];
 type Grid = number | ArrayLike<number>;
@@ -40,6 +45,8 @@ export interface LavaLoadOptions {
   readonly terrain?: BedShape;
   /** Adds bidirectional ICE-05 heat, meltwater and steam ports. Defaults to false. */
   readonly exchangeIce?: boolean;
+  /** Wasm threads, including the caller. Defaults to one. Shared workers require a shared-memory world. */
+  readonly threads?: number;
   readonly signal?: AbortSignal;
 }
 
@@ -186,6 +193,23 @@ interface IceSite {
   readonly temperature: number;
 }
 
+/** Work assigned to a single native partition during the last successful runtime tick. */
+export interface LavaWorkerWork {
+  /** Cells examined for the explicit time bound, once per microstep. */
+  readonly boundCells: number;
+  /** Face fluxes applied to transport, including reflecting faces in the inertial tier. */
+  readonly transportFaces: number;
+  /** Cells advanced through the local source, resistance and cooling stage. */
+  readonly localCells: number;
+}
+
+/** Deterministic native execution counts. They are recomputed on replay. */
+export interface LavaWorkCounts extends LavaWorkerWork {
+  readonly threads: number;
+  readonly microsteps: number;
+  readonly workers: readonly LavaWorkerWork[];
+}
+
 interface State {
   readonly host: SolverHost;
   readonly kernel: LavaKernel;
@@ -218,6 +242,9 @@ interface State {
   readonly budget: Region;
   readonly nextBudget: Region;
   readonly regions: readonly Region[];
+  readonly stepReceipt: Region;
+  readonly threadJob?: Region;
+  microsteps: number;
 }
 
 function scalar(label: string, value: number, lower = -Infinity, upper = Infinity): number {
@@ -292,6 +319,8 @@ export class LavaSolver implements Solver<LavaOptions> {
   private readonly terrain?: BedShape;
   private readonly fields: readonly FieldUse[];
   private state?: State;
+  private threads?: NativePhasePool;
+  private disposed = false;
 
   private constructor(
     private readonly builds: LavaBuilds,
@@ -320,9 +349,35 @@ export class LavaSolver implements Solver<LavaOptions> {
     ];
   }
 
-  /** Loads the optional SIMD kernels. */
-  static async load({ id = 'lava', terrain, exchangeIce = false, signal }: LavaLoadOptions = {}): Promise<LavaSolver> {
-    return new LavaSolver(await loadLavaBuilds(signal), id, terrain, exchangeIce);
+  /** Loads the optional SIMD kernels and any requested worker threads. */
+  static async load({
+    id = 'lava',
+    terrain,
+    exchangeIce = false,
+    threads = 1,
+    signal,
+  }: LavaLoadOptions = {}): Promise<LavaSolver> {
+    if (!Number.isSafeInteger(threads) || threads < 1 || threads > MAX_THREADS)
+      throw new MargoError('state', `Choose a whole number of lava threads from 1 to ${MAX_THREADS}.`);
+    const builds = await loadLavaBuilds(signal);
+    const solver = new LavaSolver(builds, id, terrain, exchangeIce);
+    if (threads > 1) {
+      if (!builds.shared)
+        throw new MargoError('unsupported', 'Use a shared-memory runtime for lava threads or load with threads: 1.');
+      const { createNativePhasePool } = await import('../native-phase-pool.js');
+      solver.threads = await createNativePhasePool(threads, {
+        subject: 'Lava',
+        phaseExport: 'lava_thread_phase',
+        signal,
+      });
+    }
+    return solver;
+  }
+
+  /** Stop optional workers. Remove the solver from its world before disposal. */
+  [Symbol.dispose](): void {
+    this.disposed = true;
+    this.threads?.close();
   }
 
   describe() {
@@ -330,8 +385,12 @@ export class LavaSolver implements Solver<LavaOptions> {
   }
 
   init(host: SolverHost, options: LavaOptions): void {
+    this.assertActive();
     if (this.state)
       throw new MargoError('state', 'LavaSolver is already attached. Load a new solver for a second world.');
+    const threads = this.threads;
+    if (threads && !isShared(host.memory))
+      throw new MargoError('unsupported', 'Use worldMemory(true) for lava threads or load with threads: 1.');
     if (options?.cells?.length !== 2)
       throw new MargoError('state', 'Invalid lava grid. Use positive whole X and Z cell counts.');
     const nx = integer('X cell count', options.cells[0], 1);
@@ -343,14 +402,20 @@ export class LavaSolver implements Solver<LavaOptions> {
       throw new MargoError('state', 'Invalid lava vents or ice contacts. Use arrays of cell records.');
     const fieldWords = LAVA_WORDS + 1 + WAKE_SOURCE_WORDS;
     const wordsPerCell = 3 * 4 + 2 + 4 + 2 * (fieldWords + 1) + 1 + 2 * fieldWords;
-    const requested = F64 * (wordsPerCell * count + 4 * Math.min(count, Math.max(contacts.length, 1)) + 44);
-    if (requested + DYNAMIC_BASE + STACK_BYTES >= MAX_MEMORY_PAGES * 65536)
-      throw new MargoError('state', 'Lava grid exceeds wasm32 arena capacity. Use fewer cells.');
-    const spacing = positive('spacing', options.spacing);
     const transport = options.transport === undefined ? 'inertial' : options.transport;
     if (transport !== 'inertial' && transport !== 'terminal')
       throw new MargoError('state', 'Use inertial or terminal lava transport.');
     const terminal = transport === 'terminal';
+    const threadBytes = threads
+      ? F64 * ((terminal ? 6 : 4) * count + threads.count) +
+        U32 * threads.controlWords +
+        JOB_BYTES +
+        (threads.count - 1) * (STACK_BYTES + 16)
+      : 0;
+    const requested = F64 * (wordsPerCell * count + 4 * Math.min(count, Math.max(contacts.length, 1)) + 44);
+    if (requested + threadBytes + DYNAMIC_BASE + STACK_BYTES >= MAX_MEMORY_PAGES * 65536)
+      throw new MargoError('state', 'Lava grid exceeds wasm32 arena capacity. Use fewer cells or worker threads.');
+    const spacing = positive('spacing', options.spacing);
     const volumeArea = positive('cell area', spacing * spacing);
     const lower = options.origin ?? [0, 0];
     if (lower.length !== 2) throw new MargoError('state', 'Invalid lava origin. Use two local X and Z coordinates.');
@@ -495,6 +560,8 @@ export class LavaSolver implements Solver<LavaOptions> {
     const nextHeatRequest = allocate('lava-candidate-ice-heat-flux', Math.max(sites.length, 1), ICE_FIELD_LAYOUT);
     const budget = allocate('lava-budget', 12);
     const nextBudget = allocate('lava-next-budget', 12);
+    const stepReceipt = host.allocate('lava-step-receipt', U32, 'u32', LAVA_LAYOUT);
+    const threadJob = threads && host.allocate('lava-thread-job', JOB_BYTES, 'u32', LAVA_LAYOUT);
 
     const s: State = {
       host,
@@ -528,6 +595,9 @@ export class LavaSolver implements Solver<LavaOptions> {
       budget,
       nextBudget,
       regions: [lava, bed, model, vents, samples, deposits, sources, submerged, heatRequest, budget],
+      stepReceipt,
+      threadJob,
+      microsteps: 0,
     };
     words(s, model).set(params);
     words(s, nextBed).set(bedInitial);
@@ -558,10 +628,54 @@ export class LavaSolver implements Solver<LavaOptions> {
     b[8] = b[6]!;
     b[9] = b[7]!;
     this.accept(s);
+    if (threads && threadJob) this.bindWorkers(s, threads, threadJob);
     this.state = s;
   }
 
+  private bindWorkers(s: State, threads: NativePhasePool, job: Region): void {
+    const { host } = s;
+    const rates = s.terminal
+      ? host.allocate('lava-thread-face-rates', 2 * F64 * s.count, 'f64', LAVA_LAYOUT)
+      : undefined;
+    const ledger = host.allocate('lava-thread-ledger', 4 * F64 * s.count, 'f64', LAVA_LAYOUT);
+    const bounds = host.allocate('lava-thread-bounds', F64 * threads.count, 'f64', LAVA_LAYOUT);
+    const control = host.allocate('lava-thread-control', U32 * threads.controlWords, 'i32', LAVA_LAYOUT);
+    const stackTops = Array.from({ length: threads.count - 1 }, (_, part) => {
+      const stack = host.allocate(`lava-worker-stack-${part + 1}`, STACK_BYTES, 'u8', LAVA_LAYOUT);
+      return stack.byteOffset + stack.byteLength;
+    });
+    new Uint32Array(host.memory.buffer, job.byteOffset, JOB_POINTER_WORDS).set([
+      s.working.byteOffset,
+      s.trial.byteOffset,
+      s.nextBed.byteOffset,
+      s.vents.byteOffset,
+      s.model.byteOffset,
+      s.nx,
+      s.nz,
+      s.icePower.byteOffset,
+      s.nextBudget.byteOffset,
+      rates?.byteOffset ?? 0,
+      ledger.byteOffset,
+      bounds.byteOffset,
+      s.terminal ? 1 : 0,
+      0,
+    ]);
+    threads.init({
+      module: this.builds.shared!,
+      memory: host.memory,
+      control: control.byteOffset,
+      job: job.byteOffset,
+      stackTops,
+    });
+  }
+
+  private assertActive(): void {
+    if (this.disposed)
+      throw new MargoError('state', 'LavaSolver was disposed. Load a new solver before adding or stepping lava.');
+  }
+
   private live(): State {
+    this.assertActive();
     if (!this.state)
       throw new MargoError('state', 'LavaSolver is unattached. Add it to a PhysicsWorld and initialise it.');
     return this.state;
@@ -631,20 +745,9 @@ export class LavaSolver implements Solver<LavaOptions> {
     words(s, s.nextBudget).set(words(s, s.budget));
     this.prepareBed(s, context);
     this.receiveIce(s, context, interval);
-    const result = s.kernel.lava_step(
-      s.working.byteOffset,
-      s.trial.byteOffset,
-      s.nextBed.byteOffset,
-      s.vents.byteOffset,
-      s.model.byteOffset,
-      s.nx,
-      s.nz,
-      s.icePower.byteOffset,
-      s.nextBudget.byteOffset,
-      interval,
-      start,
-      s.terminal ? 1 : 0,
-    );
+    const result = s.threadJob
+      ? this.stepThreaded(s, s.threadJob, interval, start)
+      : this.stepSerial(s, interval, start);
     if (result === 3)
       throw new MargoError(
         'state',
@@ -657,6 +760,44 @@ export class LavaSolver implements Solver<LavaOptions> {
       );
     this.preparePublication(s, 0, interval);
     this.accept(s);
+    const receipt = s.threadJob ? s.threadJob.byteOffset + (JOB_POINTER_WORDS - 1) * U32 : s.stepReceipt.byteOffset;
+    s.microsteps = new Uint32Array(s.host.memory.buffer, receipt, 1)[0]!;
+  }
+
+  private stepSerial(s: State, dt: number, start: number): number {
+    return s.kernel.lava_step(
+      s.working.byteOffset,
+      s.trial.byteOffset,
+      s.nextBed.byteOffset,
+      s.vents.byteOffset,
+      s.model.byteOffset,
+      s.nx,
+      s.nz,
+      s.icePower.byteOffset,
+      s.nextBudget.byteOffset,
+      dt,
+      start,
+      s.terminal ? 1 : 0,
+      s.stepReceipt.byteOffset,
+    );
+  }
+
+  private stepThreaded(s: State, job: Region, dt: number, start: number): number {
+    const { kernel, host } = s;
+    const threads = this.threads!;
+    const time = new Float64Array(host.memory.buffer, job.byteOffset + JOB_POINTER_WORDS * U32, 4);
+    time[0] = dt;
+    time[1] = start;
+    let status = kernel.lava_thread_begin(job.byteOffset);
+    const phase = (stage: number) =>
+      threads.phase(stage, () => kernel.lava_thread_phase(job.byteOffset, stage, 0, threads.count));
+    while (status === 0 && time[2]! < dt) {
+      status = phase(0) || kernel.lava_thread_plan(job.byteOffset, threads.count);
+      if (status) break;
+      if (!s.terminal) status = phase(1) || phase(2);
+      if (!status) status = phase(3) || kernel.lava_thread_accept(job.byteOffset);
+    }
+    return status;
   }
 
   private preparePublication(s: State, initial: number, dt: number): void {
@@ -757,6 +898,37 @@ export class LavaSolver implements Solver<LavaOptions> {
       spacing: s.spacing,
       origin: [s.origin[0], s.origin[1]],
       offset: [translation(0), translation(1), translation(2)],
+    };
+  }
+
+  /** Count the last successful runtime tick. Receipts stay outside snapshots and are recomputed on replay. */
+  workCounts(): LavaWorkCounts {
+    const s = this.live();
+    const threads = this.threads?.count ?? 1;
+    const microsteps = s.microsteps;
+    const boundary = (length: number, part: number) => Math.floor((length * part) / threads);
+    const workers = Array.from({ length: threads }, (_, part): LavaWorkerWork => {
+      const begin = boundary(s.count, part);
+      const end = boundary(s.count, part + 1);
+      const cells = end - begin;
+      const rowEnds = Math.floor(end / s.nx) - Math.floor(begin / s.nx);
+      const terminalFaces = cells - rowEnds + Math.max(0, Math.min(end, s.count - s.nx) - begin);
+      const inertialRows = boundary(s.nz, part + 1) - boundary(s.nz, part);
+      const inertialColumns = boundary(s.nx, part + 1) - boundary(s.nx, part);
+      const faces = s.terminal ? terminalFaces : inertialRows * (s.nx + 1) + inertialColumns * (s.nz + 1);
+      return {
+        boundCells: microsteps * cells,
+        transportFaces: microsteps * faces,
+        localCells: microsteps * cells,
+      };
+    });
+    return {
+      threads,
+      microsteps,
+      workers,
+      boundCells: microsteps * s.count,
+      transportFaces: microsteps * (2 * s.count + (s.terminal ? -1 : 1) * (s.nx + s.nz)),
+      localCells: microsteps * s.count,
     };
   }
 

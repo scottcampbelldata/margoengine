@@ -17316,6 +17316,8 @@ The marine output uses the exact geometric difference of consecutive occupied su
   The documented option emits a brief visual event after mechanically measured contact loss.
   [Dataset](https://pmc.ncbi.nlm.nih.gov/articles/PMC7378579/)
 
+- Martin Lilleeng Saetra and Andre Rigland Brodtkorb, [Shallow Water Simulations on Multiple GPUs](https://doi.org/10.1007/978-3-642-28145-7_6), 2012, sections 2 and 4. Their separated face sweeps and row decomposition motivate the native inertial partition. Our X sweep owns whole rows and the Z sweep owns whole columns, with a join after each. The terminal tier assigns forward faces to their cells, gathers each cell's neighbours in serial arithmetic order, and reduces the per-cell source and cooling ledgers in that same order.
+
 ## Watertight inside test of a closed mesh (KB-SOFT-HOLLOWBOX1)
 
 `packages/physics/src/soft-volume.ts`, `insideMesh` and `side`: a point is inside a closed mesh when a ray along +x crosses an odd number of triangles, each triangle tested by the sign of the point against its three edges seen along the ray.

@@ -8704,6 +8704,12 @@ terminal Bingham discharge. Omit initial discharge in this mode. Zero `conductiv
 and basal conduction and uses the well-mixed bulk as the exposed surface. Set `emissivity`,
 `convection` and `waterHeatTransfer` to zero for a thermally isolated sheet.
 
+Load with `threads: 2` to `threads: 64` to split the native grid work, and give `PhysicsWorld` a
+`worldMemory(true)` arena. Run the shared solver in Node or a cross-origin-isolated browser worker.
+The rendering window can run the default `threads: 1`. Use `using` on the solver or call its
+`[Symbol.dispose]()` after removing it from the world. `workCounts()` reports the last successful
+runtime tick's cell visits and face fluxes per worker. Seeking recomputes the counts as ticks run.
+
 In a rendered scene, attach `LavaSurface` from `@margoengine/weather/lava` with
 `source: () => lava.surfaceSource(renderCell)`. Advance the physics world before the frame.
 Omit `renderCell` when the stage uses the solver's origin cell. The renderer uses the accepted depth,

@@ -34,6 +34,7 @@ export interface LavaLoadOptions {
     readonly id?: string;
     readonly terrain?: BedShape;
     readonly exchangeIce?: boolean;
+    readonly threads?: number;
     readonly signal?: AbortSignal;
 }
 
@@ -86,7 +87,8 @@ export class LavaSolver implements Solver<LavaOptions> {
     readonly depositField: FieldDescriptor;
     readonly seaSourceField: FieldDescriptor;
     private constructor();
-    static load({ id, terrain, exchangeIce, signal }?: LavaLoadOptions): Promise<LavaSolver>;
+    static load({ id, terrain, exchangeIce, threads, signal }?: LavaLoadOptions): Promise<LavaSolver>;
+    [Symbol.dispose](): void;
     describe(): {
         id: string;
         fields: readonly FieldUse[];
@@ -100,6 +102,7 @@ export class LavaSolver implements Solver<LavaOptions> {
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
     surfaceSource(renderCell?: Cell): LavaSurfaceFrame;
+    workCounts(): LavaWorkCounts;
     sample(x: number, z: number): LavaSample;
     get budget(): LavaBudget;
 }
@@ -119,6 +122,18 @@ export interface LavaVent {
     readonly temperature?: number;
     readonly start?: number;
     readonly end?: number;
+}
+
+export interface LavaWorkCounts extends LavaWorkerWork {
+    readonly threads: number;
+    readonly microsteps: number;
+    readonly workers: readonly LavaWorkerWork[];
+}
+
+export interface LavaWorkerWork {
+    readonly boundCells: number;
+    readonly transportFaces: number;
+    readonly localCells: number;
 }
 
 // Not exported from this entry, but used by the exports above:

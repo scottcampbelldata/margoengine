@@ -48,6 +48,47 @@
       [160, 24.469, 6.77]
     ]
   },
+  "C": {
+    "experiment": "Garel et al. (2012), experiment C14, https://doi.org/10.1029/2011JB008698, Table 1 and Figure 3b.",
+    "inputRanges": [
+      "BM-C parameters!B5:B9",
+      "BM-C model setup!B3:C5",
+      "BM-C model setup!B11"
+    ],
+    "observationRange": "BM-C R!A3:B16",
+    "observationFields": [
+      "time_s",
+      "optical_front_radius_cm"
+    ],
+    "inputs": {
+      "slopeDegrees": 0,
+      "flowMlPerS": 0.022,
+      "viscosityPaS": 3.4,
+      "densityKgPerM3": 954,
+      "sourceSideCm": 0.2,
+      "sourceCenterCm": [10.1, 10.1],
+      "extentCm": [20.2, 20.2],
+      "supplySeconds": 1600,
+      "inletCelsius": 42,
+      "ambientCelsius": 20
+    },
+    "measuredRadius": [
+      [35, 1.4854],
+      [40, 1.5542],
+      [45, 1.6152],
+      [50, 1.7054],
+      [55, 1.7716],
+      [60, 1.849],
+      [65, 1.9263],
+      [70, 2.0054],
+      [75, 2.0853],
+      [80, 2.1584],
+      [85, 2.2125],
+      [90, 2.283],
+      [95, 2.3423],
+      [100, 2.3268]
+    ]
+  },
   "D": {
     "inputRanges": ["BM-D parameters!B2:B12", "BM-D model setup!B3:C5", "BM-D model setup!B9", "BM-D model setup!B17"],
     "observationRange": "BM-D XY!A3:C47",
