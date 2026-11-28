@@ -913,9 +913,9 @@ export class BiomeObjects implements Disposable {
     const tinted = this.#options.seasons!.colorAt(mean, x, z);
     // A material factor is at most 1, so a tint brighter than the mean in some channel (autumn yellow) keeps its hue
     // at the largest factor that fits: the canopy turns the right colour, at most as bright as its summer atlas.
-    const ratio = tinted.map((c, i) => (mean[i] > 0 ? c / mean[i] : 1)),
+    const ratio = tinted.map((c, i) => (mean[i] > 0 ? c / mean[i] : 1)), // float division: a colour, mean[i] > 0
       fit = Math.max(1, ...ratio.map((r, i) => r * base[i]));
-    return base.map((c, i) => (c * ratio[i]) / fit) as [number, number, number];
+    return base.map((c, i) => (c * ratio[i]) / fit) as [number, number, number]; // float division: fit >= 1
   }
 
   /** Foliage materials that follow the seasons (with `seasons` set): one per seasonal species part and detail. */
