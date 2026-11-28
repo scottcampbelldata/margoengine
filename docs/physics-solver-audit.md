@@ -3335,3 +3335,14 @@ High-precision apparent limbs and eclipse contact times, full Earth-orientation 
 - Point 8 (58d338d44e). `packages/physics/scripts/space03-accretion-measured.mjs` uses separately measured stellar mass and distance to project traced vacuum widths, 52.080, 51.288 and 48.494 µas at spins 0, 0.5 and 0.9. The independent EHT emission diameter is 51.8 ± 2.3 µas. Comparing the two observables leaves emission validation open. [Observed limits](limits.md#space-03-observed-sagittarius-a-emission-and-exterior-geodesic-widths)
 
 A relativistic disk heat and stress closure, emission and light transfer, the original Event Horizon binding and measured transport validation remain open. The row stays REOPENED at four points.
+
+### LIFE-01 Legged locomotion
+
+#### LIFE-01 four-point pass
+
+- Point 5 (5123bed666). `packages/physics/tests/coupling/legged.test.js` covers signed stage contacts and deck impulses. It rejects a bad rigid offset, a later invalid or reentrant bed callback and misaligned borrowed controls. Rejection retains exact accepted drive, pose, anchors, contacts, gait and work; valid foreign rows replay byte-for-byte.
+- Point 6 (5123bed666). `packages/physics/tests/coupling/legged-workers.test.js` and `packages/physics/tests/legged-workers.browser.mjs` exercise mixed batches of 73 and 117 bipeds and quadrupeds with signed live terrain and applied loads. Existing native SIMD computes 291 and 467 contact rows with 127 and 204 paired stance dots. Complete snapshots and reactions agree at 1, 2 and 4 participants, including three concurrent Chromium helpers.
+- Point 7 (5123bed666). `packages/physics/tests/legged-film.browser.mjs` places the weighted horse from actual accepted body and contact ports. The same drive produces a level trot and a walk on a 13% uphill slope, with loaded hoof pads fixed to accepted contact points. Both renderers replay the complete solver state and raw RGBA.
+- Point 8 (5123bed666). `packages/physics/scripts/life01-legged-measured.mjs` compares measured walk and trot from 62 instrumented horses. Using cohort mass and mean speed only, the default representative bodies cycle 7.6–12.7 strides/min faster and put 13.1–15.6 percentage points less vertical impulse on the forelimbs. The gap persists over speed and leg-length sensitivity. [Measured limits](limits.md#life-01-measured-treadmill-gait-and-forelimb-loading)
+
+Articulated gait, measured conformations and fore-hind load distribution, original films, rider and water exchanges remain open. The row stays REOPENED at four points.
