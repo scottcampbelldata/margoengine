@@ -548,6 +548,10 @@ first: each names its scope, its evidence file and how to reproduce it.
   Replay gives the same hash with different frame rates, snapshots and memory modes. Reproduce with
   `node --test packages/physics/tests/coupling/surface-energy.test.js packages/weather/tests/surface-energy.test.js`
   after building Physics and Weather. The original valley scene still needs a complete rainfall-runoff and flood chain.
+  The optional native grid in `packages/weather/tests/surface-energy-workers.test.js` matches every accepted
+  TypeScript output with one, two and four participants. `surface-energy-surface.browser.mjs` renders real
+  rain, darkening, saturated runoff and drying on both backends with exact rewind. The Col de Porte
+  measured snow-skin comparison finds a 4.87 K nighttime RMSE and a 1.01 K daytime RMSE.
 
 - GPU flocking (LIFE-04, parity bar P14, `@margoengine/vfx/flocking`): 16,384 boids step on WebGPU with separation,
   alignment, cohesion, a vision cone, a predator and an obstacle, and draw as one instanced draw. Sixty steps from the

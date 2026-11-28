@@ -184,6 +184,9 @@
 <tr class="group"><th scope="rowgroup" colspan="6"><code>@margoengine/weather</code></th></tr>
 <tr><th scope="row"><code>mann-fft.wasm</code></th><td>Rust SIMD atmospheric turbulence FFT</td><td class="num">25,652</td><td class="num">10,306</td><td class="num">8,962</td><td>MannBox.create(), only from weather/turbulence; one private plan per participating thread</td></tr>
 <tr><th scope="row"><code>workers/mann-fft.js</code></th><td>Mann turbulence component FFT worker</td><td class="num">1,599</td><td class="num">832</td><td class="num">699</td><td>MannBox.create({ threads: 2 or 3 }); one worker asset shared by the independent component helpers</td></tr>
+<tr><th scope="row"><code>surface-energy-kernel.wasm</code></th><td>Independent surface-energy patch bisection (Rust, SIMD)</td><td class="num">7,688</td><td class="num">2,934</td><td class="num">2,638</td><td>SurfaceEnergySolver.load() with one participant</td></tr>
+<tr><th scope="row"><code>surface-energy-kernel-shared.wasm</code></th><td>Shared surface-energy patch bisection (Rust, SIMD)</td><td class="num">7,688</td><td class="num">2,934</td><td class="num">2,638</td><td>SurfaceEnergySolver.load() with two or four participants</td></tr>
+<tr><th scope="row"><code>workers/surface-energy.js</code></th><td>Deterministic surface-energy batch worker</td><td class="num">1,321</td><td class="num">654</td><td class="num">561</td><td>SurfaceEnergySolver.load() with two or four participants</td></tr>
 </tbody>
 <tbody data-lazy-package="@margoengine/compute">
 <tr class="group"><th scope="rowgroup" colspan="6"><code>@margoengine/compute</code></th></tr>
@@ -4017,7 +4020,7 @@
 <tr><td><code>./turbulence</code></td><td class="num">13,442</td><td class="num">5,597</td></tr>
 <tr><td><code>./boundary-layer</code></td><td class="num">15,471</td><td class="num">6,278</td></tr>
 <tr><td><code>./precipitation</code></td><td class="num">10,030</td><td class="num">3,852</td></tr>
-<tr><td><code>./surface-energy</code></td><td class="num">7,509</td><td class="num">3,360</td></tr>
+<tr><td><code>./surface-energy</code></td><td class="num">18,727</td><td class="num">7,459</td></tr>
 <tr><td><code>./lava</code></td><td class="num">38,994</td><td class="num">15,364</td></tr>
 <tr><td><code>./lava-settings</code></td><td class="num">8,873</td><td class="num">3,790</td></tr>
 <tr><td><code>./regions</code></td><td class="num">6,982</td><td class="num">2,636</td></tr>

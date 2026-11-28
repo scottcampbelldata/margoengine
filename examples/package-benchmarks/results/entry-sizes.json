@@ -18994,8 +18994,8 @@
         "gzip": 3852
       },
       "./surface-energy": {
-        "raw": 7509,
-        "gzip": 3360
+        "raw": 18727,
+        "gzip": 7459
       },
       "./lava": {
         "raw": 38994,
@@ -20144,6 +20144,21 @@
       "raw": 1558039,
       "gzip": 574912,
       "brotli": 424250
+    },
+    "packages/weather/dist/surface-energy-kernel.wasm": {
+      "raw": 7688,
+      "gzip": 2934,
+      "brotli": 2638
+    },
+    "packages/weather/dist/surface-energy-kernel-shared.wasm": {
+      "raw": 7688,
+      "gzip": 2934,
+      "brotli": 2638
+    },
+    "packages/weather/dist/workers/surface-energy.js": {
+      "raw": 1321,
+      "gzip": 654,
+      "brotli": 561
     }
   },
   "splits": {

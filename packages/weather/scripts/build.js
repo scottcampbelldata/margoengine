@@ -7,7 +7,8 @@ await import('../../../scripts/build-optional.js');
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dist = distDir(root);
-await copyFile(join(root, 'src/mann-fft.wasm'), join(dist, 'mann-fft.wasm'));
+const nativeAssets = ['mann-fft.wasm', 'surface-energy-kernel.wasm', 'surface-energy-kernel-shared.wasm'];
+await Promise.all(nativeAssets.map((file) => copyFile(join(root, 'src', file), join(dist, file))));
 
 // Keep the Wasm external in the package build and in downstream Vite library builds.
 // The source ignores the first asset transform. The published URL keeps no-inline for the second.

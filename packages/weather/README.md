@@ -92,13 +92,38 @@ console.log(wetColor([0.35, 0.22, 0.13], patch.wetness), patch.temperature);
 Supply `inputs` to bind any forcing option to an upstream field. The default reader reads one layout-1 f32 or f64 word.
 A pure `sample(memory, port, context)` projection can read a point in a grid or obtain local sunlight from a celestial
 port. A `Precipitation` field can supply patch rain and snow, with rates converted from mm/h of water equivalent.
-Bound and published forcing ports take precedence over the sample and over the fallback options.
+Precipitation is sampled at the end of the solver's interval. Bound and published forcing ports take precedence over
+the sample and over the fallback options.
 
-Every output region uses layout 1 and f64. `temperatureField` and `wetnessField` each publish one value.
-`energyFluxField` publishes net radiation, sensible, latent, ground and melt heat flux in W/m², in that order.
+Every output region uses layout 1 and f64. `temperatureField` and `wetnessField` each publish one value per patch.
+`energyFluxField` publishes net radiation, sensible, latent, ground and melt heat flux in W/m², in that order per patch.
 `waterFluxField` publishes evaporation, melt and runoff in kg/(m² s). Negative evaporation is condensation.
 `fuelMoistureField` publishes the 1-, 10- and 100-hour dead-fuel fractions by dry weight, in that order.
 Use `albedo` and `surfaceResistance` inputs to accept cover changes such as a burn scar.
+
+Provide `grid` when several nearby patches need independent storage and forcing. The origin is the first patch
+centre in the solver's signed cell, and the spacing follows X then Z. Per-patch overrides and output records
+run X fastest. Set `patchStride` to the number of source words between neighboring patches for a dense layout-1 input
+in the same cell. Its default zero uses one uniform word. Set `grid.cellSize` to the world's size when it differs
+from 4,096 m. A legacy one-patch `precipitation.position` stays in the precipitation field's own cell.
+
+```ts
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { SurfaceEnergySolver } from '@margoengine/weather/surface-energy';
+
+using ground = await SurfaceEnergySolver.load({}, { threads: 2 });
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(ground, {
+  initialWater: 0,
+  grid: { columns: 2, rows: 1, spacing: [2, 2], patches: [{ rain: 2e-5 }, {}] },
+});
+world.advance(60);
+console.log(ground.readPatch(0).water, ground.readPatch(1).water, ground.workCounts());
+```
+
+The threaded example runs in Node or a cross-origin-isolated browser worker. `load` defaults to one native
+participant and can also use four. The count includes the caller. Workers share private native scratch.
+`new SurfaceEnergySolver()` uses TypeScript without loading assets. `read()` still returns the first patch.
+An invalid forcing value, clock or numeric result rejects the entire step before any port is replaced.
 
 ## Puddles and wet ground
 

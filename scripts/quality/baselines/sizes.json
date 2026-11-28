@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21848132,
+  "total": 21853141,
   "history": [
     {
       "date": "2026-10-24",
@@ -15629,6 +15629,12 @@
       "commit": "lane-e-water-alpharim",
       "reason": "KB-WATER-ALPHARIM1: the display composites of water caustics and underwater and weather lens build through displayFor on a transparent canvas. Measured gzip: water/caustics 6,395 to 6,703 B, water/underwater 9,071 to 9,366 B, weather/lens 4,075 to 4,398 B. The bytes are the straight-colour shader rewrite that stops the light rim; a split would need a lazy import in front of every pipeline build for about 300 B.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "atmo09-native-surface-patches",
+      "reason": "ATMO-09: surface-energy grows from 3360 to 7459 B gzip (ceiling 3616 to 7715) for signed-grid forcing, transactional budgets and the optional native batch. A separate public entry would duplicate the scalar and gridded field contracts. The one separately loaded worker is 654 B gzip, ceiling 910; each Wasm variant is 7,688 B raw and 2,934 B gzip. Weather root, Core and Stage add no new entry dependency.",
+      "grew": 2
     }
   ],
   "items": {
@@ -17342,6 +17348,7 @@
     "@margoengine/water/wake": 3362,
     "@margoengine/weather": 9423,
     "@margoengine/weather dist/workers/mann-fft.js": 1088,
+    "@margoengine/weather dist/workers/surface-energy.js": 910,
     "@margoengine/weather/audio": 1908,
     "@margoengine/weather/avalanche": 7451,
     "@margoengine/weather/boundary-layer": 6534,
@@ -17361,7 +17368,7 @@
     "@margoengine/weather/settings": 9476,
     "@margoengine/weather/snow": 4616,
     "@margoengine/weather/snow-drift": 5806,
-    "@margoengine/weather/surface-energy": 3616,
+    "@margoengine/weather/surface-energy": 7715,
     "@margoengine/weather/synoptic": 1196,
     "@margoengine/weather/turbulence": 5853,
     "@margoengine/webgl2-compat": 131958,

@@ -757,6 +757,30 @@ export const LAZY_FILES = [
     measure: 'file',
     when: 'MannBox.create({ threads: 2 or 3 }); one worker asset shared by the independent component helpers',
   },
+  {
+    package: '@margoengine/weather',
+    file: 'packages/weather/dist/surface-energy-kernel.wasm',
+    label: 'surface-energy-kernel.wasm',
+    kind: 'Independent surface-energy patch bisection (Rust, SIMD)',
+    measure: 'file',
+    when: 'SurfaceEnergySolver.load() with one participant',
+  },
+  {
+    package: '@margoengine/weather',
+    file: 'packages/weather/dist/surface-energy-kernel-shared.wasm',
+    label: 'surface-energy-kernel-shared.wasm',
+    kind: 'Shared surface-energy patch bisection (Rust, SIMD)',
+    measure: 'file',
+    when: 'SurfaceEnergySolver.load() with two or four participants',
+  },
+  {
+    package: '@margoengine/weather',
+    file: 'packages/weather/dist/workers/surface-energy.js',
+    label: 'workers/surface-energy.js',
+    kind: 'Deterministic surface-energy batch worker',
+    measure: 'file',
+    when: 'SurfaceEnergySolver.load() with two or four participants',
+  },
   // Third-party Wasm runtimes.
   {
     package: '@margoengine/compute',

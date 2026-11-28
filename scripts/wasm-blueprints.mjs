@@ -97,6 +97,20 @@ export const BLUEPRINTS = [
     script: 'packages/weather/scripts/build-mann-fft.mjs',
   },
   {
+    name: 'surface-energy-kernel',
+    crate: 'packages/weather/surface-energy-kernel',
+    blueprint: 'packages/weather/src/surface-energy-kernel.wasm',
+    script: 'packages/weather/scripts/build-surface-energy-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'surface-energy-kernel-shared',
+    crate: 'packages/weather/surface-energy-kernel',
+    blueprint: 'packages/weather/src/surface-energy-kernel-shared.wasm',
+    script: 'packages/weather/scripts/build-surface-energy-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'hull-panel-kernel',
     crate: 'packages/physics/hull-panel-kernel',
     blueprint: 'packages/physics/src/seakeeping/hull-panel-kernel.wasm',

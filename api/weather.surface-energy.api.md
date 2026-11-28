@@ -21,10 +21,25 @@ export interface SurfaceEnergyForcing {
     readonly surfaceResistance?: number;
 }
 
+export interface SurfaceEnergyGrid {
+    readonly columns: number;
+    readonly rows: number;
+    readonly origin?: readonly [number, number, number];
+    readonly spacing: readonly [number, number];
+    readonly patches?: readonly Omit<SurfaceEnergyOptions, 'grid'>[];
+    readonly cellSize?: number;
+}
+
 export interface SurfaceEnergyInput {
     readonly field: FieldDescriptor;
     readonly word?: number;
+    readonly patchStride?: number;
     readonly sample?: (memory: WebAssembly.Memory, port: Port, context: StepContext) => number;
+}
+
+export interface SurfaceEnergyLoadOptions {
+    readonly threads?: number;
+    readonly signal?: AbortSignal;
 }
 
 export interface SurfaceEnergyOptions extends SurfaceEnergyForcing {
@@ -35,6 +50,7 @@ export interface SurfaceEnergyOptions extends SurfaceEnergyForcing {
     readonly initialTemperature?: number;
     readonly initialWater?: number;
     readonly initialSnow?: number;
+    readonly grid?: SurfaceEnergyGrid;
 }
 
 export interface SurfaceEnergySample {
@@ -69,6 +85,7 @@ export class SurfaceEnergySolver implements Solver<SurfaceEnergyOptions> {
     readonly waterFluxField: FieldDescriptor;
     readonly fuelMoistureField: FieldDescriptor;
     constructor(setup?: SurfaceEnergySetup);
+    static load(setup?: SurfaceEnergySetup, options?: SurfaceEnergyLoadOptions): Promise<SurfaceEnergySolver>;
     describe(): SolverDescription;
     init(host: SolverHost, options?: SurfaceEnergyOptions): void;
     step(context: StepContext, dt: number): void;
@@ -77,6 +94,22 @@ export class SurfaceEnergySolver implements Solver<SurfaceEnergyOptions> {
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
     read(): SurfaceEnergySample;
+    readPatch(index: number): SurfaceEnergySample;
+    workCounts(): SurfaceEnergyWorkCounts | undefined;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+export interface SurfaceEnergyWorkCounts extends SurfaceEnergyWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly SurfaceEnergyWorkerWork[];
+}
+
+export interface SurfaceEnergyWorkerWork {
+    readonly rows: number;
+    readonly pairs: number;
+    readonly balanceEvaluations: number;
+    readonly pairedBalanceEvaluations: number;
 }
 
 // Not exported from this entry, but used by the exports above:

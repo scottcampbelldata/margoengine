@@ -11036,13 +11036,14 @@ Remaining evidence includes scalability for stiff heat grids with the shared spa
 
 ### Surface energy and soil water (ATMO-09)
 
-The weather entry uses one world-clock `SurfaceEnergySolver` per patch. The monotone local heat balance advances
-implicitly, and the liquid and snow stores limit evaporation and melting to the water available. Incoming climate and
-land-cover fields can be resolved at the coupling tick. Consumers read temperature, evapotranspiration, melt, runoff,
-wetness and the three dead-fuel timelags from f64 registry ports. All prognostic state is in world-owned regions.
-Tests prove the implicit solution against an analytic linear case, close both storage budgets, and require identical
-replay in plain and shared memory. The RITS-10 surface fixture verifies that rain darkens dry ground and produces runoff
-after saturation. The finished shot still requires the watershed and flood-depth solvers.
+The weather entry uses a world-clock `SurfaceEnergySolver` for one patch or a rectangular batch.
+The optional Rust kernel evaluates pairs of independent heat brackets and publishes deterministic
+per-participant work. Prepared forcing and all prognostic arrays remain staged until every row solves.
+The original scalar and optional native paths preserve the same heat and water budgets and the same
+signed-cell snapshots. Tests cover forcing at the end of the clock interval and atomic rollback.
+The RITS-10 fixture drives accepted surface wetness into actual materials from a moving rain band,
+covering saturation, runoff and drying on both renderers. The original rainfall-runoff and flood
+integration remains open.
 
 ### Section 5 evidence for two-mode plant motion (BIO-01)
 

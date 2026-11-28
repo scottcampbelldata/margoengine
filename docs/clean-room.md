@@ -15521,12 +15521,27 @@ The finite-precision check used JPL's official DE440s BSP (32,726,016 bytes, SHA
   and J. E. Deeming, [The National Fire-Danger Rating System, Basic Equations](https://research.fs.usda.gov/treesearch/27298),
   1985.
 
-For one patch per instance, backward Euler adds a positive heat-capacity slope to the monotone outgoing energy
-balance. A bracketed scalar solve conserves storage and boundary fluxes to f64 roundoff. The water budget limits
-evaporation to available liquid, caps snow fusion at the remaining snow mass and sends liquid overflow to runoff.
-These are fixed-size calculations per patch and run in TypeScript. The tests compare the linear result to its closed
+Backward Euler adds a positive heat-capacity slope to the monotone outgoing energy balance at each patch.
+A bracketed solve conserves storage and boundary fluxes to f64 roundoff. The water budget limits evaporation
+to available liquid, caps snow fusion at the remaining snow mass and sends liquid overflow to runoff.
+Patches have no lateral cross terms, so the optional Rust kernel evaluates two residuals at a time with f64x2
+and finishes the independent brackets in canonical patch order. The scalar tail uses the same equations.
+The TypeScript path needs no batch assets. The tests compare the linear result to its closed
 form, check both budgets, exercise rain and dew, and verify that the material darkens as the RITS-10 ground wets.
-The implementation was written from the publications and Margo's existing interfaces.
+The implementation uses the publications and Margo's existing interfaces.
+
+- S. Morin, Y. Lejeune, B. Lesaffre, J.-M. Panel, D. Poncet, P. David and J. Sudul, *An 18-yr,
+  hourly resolution dataset of meteorological observations at the Col de Porte site* (2012).
+  Incoming irradiance, ambient air and deep soil temperature drive the comparison. The previous
+  snow water equivalent, albedo and starting temperature initialize each run. Three later radiometric
+  temperatures per run remain held out. The retrieval convention in §2.3.4 supplies an emissivity-1
+  sensitivity case alongside the default 0.97. Neither uses the later observations as inputs.
+  [Paper](https://doi.org/10.5194/essd-4-13-2012)
+  [Dataset](https://doi.org/10.1594/PANGAEA.774249)
+- S. A. Twomey, C. F. Bohren and J. L. Mergenthaler, *Reflectance and albedo differences between wet
+  and dry surfaces* (1986), explains the optical effect of wetting. The technical cutaway feeds
+  the existing `wetColor` and `wetRoughness` material functions with the solver's accepted wetness.
+  [Paper](https://doi.org/10.1364/AO.25.000431)
 
 
 ### Point-mass steering (PA-83, LIFE-04)

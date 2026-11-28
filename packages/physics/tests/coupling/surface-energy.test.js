@@ -27,6 +27,112 @@ function near(actual, expected, tolerance) {
   assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} against ${expected} ± ${tolerance}`);
 }
 
+test('the gridded surface samples precipitation in X-fast signed cells at the step end', () => {
+  const calls = [];
+  let bad = false;
+  const field = {
+    cell: [-2, 4, 0],
+    sample(x, y, z, time) {
+      calls.push([x, y, z, time]);
+      return {
+        rain: { rate: bad && x === -254 && z === -508 ? NaN : x === -254 && z === -510 && time > 0 ? 3600 : 0 },
+        snow: { rate: 0 },
+        graupel: { rate: 0 },
+        hail: { rate: 0 },
+      };
+    },
+  };
+  const { world, solver } = make(
+    {
+      ...quiet,
+      humidity: 1,
+      grid: { columns: 2, rows: 2, spacing: [1, 2], origin: [1, 0, 2], cellSize: 256 },
+    },
+    { precipitation: { field } },
+  );
+  const cell = [-3, 5, -2];
+  world.shiftOrigin([3, -5, 2]);
+  world.advance(1);
+  assert.deepEqual(calls, [
+    [-255, 256, -510, 1 / 60],
+    [-254, 256, -510, 1 / 60],
+    [-255, 256, -508, 1 / 60],
+    [-254, 256, -508, 1 / 60],
+  ]);
+  assert.deepEqual(solver.read(), solver.readPatch(0));
+  assert.deepEqual(
+    Array.from({ length: 4 }, (_, i) => solver.readPatch(i).water),
+    [0, 1 / 60, 0, 0],
+  );
+  const wetness = world.fields.port(solver.wetnessField.name);
+  assert.deepEqual(wetness.cell, cell);
+  assert.deepEqual(Array.from(regionWords(world.memory, wetness.region)), [0, 1 / 900, 0, 0]);
+  const accepted = world.takeSnapshot();
+  bad = true;
+  assert.throws(() => solver.step({ tick: 1, level: 0, cell, seed: 0, inputs: new Map() }, 1 / 60), {
+    name: 'MargoError',
+    code: 'state',
+    message: /precipitation rain rate; pass a finite value/,
+  });
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+});
+
+test('a late strided grid input leaves all patch budgets and registry bytes accepted on failure', () => {
+  const irradiance = {
+    name: 'surface-test-irradiance',
+    kind: 'scalarSeries',
+    quantity: 'shortwave',
+    unit: 'W/m^2',
+    centring: 'cell',
+  };
+  const { world, solver } = make(
+    {
+      ...quiet,
+      heatCapacity: 60,
+      grid: {
+        columns: 3,
+        rows: 1,
+        spacing: [1, 1],
+        patches: [{ albedo: 0.3 }, { albedo: 0.1 }, { emissivity: 1 }],
+      },
+    },
+    { inputs: { shortwave: { field: irradiance, word: 1, patchStride: 2 } } },
+  );
+  let region;
+  world.add(
+    {
+      describe: () => ({
+        id: 'surface-test-input',
+        rate: 0,
+        stableRate: () => 0,
+        fields: [{ field: irradiance, access: 'write' }],
+      }),
+      init(host) {
+        region = host.allocate('shortwave', 6 * 8, 'f64', 1);
+        regionWords(host.memory, region).set([0, 100, 0, 200, 0, 300]);
+      },
+      step() {},
+      importPorts() {},
+      exportPorts: (tick) => [{ field: irradiance.name, region, tick, cell: [0, 0, 0] }],
+      stateRegions: () => [region],
+      extraState: () => [],
+    },
+    {},
+  );
+  world.advance(2);
+  assert.ok(solver.readPatch(1).temperature > solver.readPatch(0).temperature);
+  const port = { field: irradiance.name, region, tick: 2, cell: [0, 0, 0] };
+  const inputs = new Map([[irradiance.name, port]]);
+  regionWords(world.memory, region)[5] = Number.MAX_VALUE;
+  const accepted = world.takeSnapshot();
+  assert.throws(() => solver.step({ tick: 2, level: 0, cell: port.cell, seed: 0, inputs }, 1 / 60), {
+    name: 'MargoError',
+    code: 'state',
+    message: /floating-point range; reduce fluxes/,
+  });
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+});
+
 test('surface temperature approaches the backward-Euler solution of a linear heat budget', () => {
   const heatCapacity = 1800;
   const resistance = 100;
