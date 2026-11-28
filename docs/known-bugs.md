@@ -6,6 +6,20 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: a scene warmed with warmUp drew aerial perspective from empty atmosphere tables, so far hills had no haze (KB-SKY-TABLESKEY1, sky)
+
+- **Repro:** `scripts/web-demos/still-frame.mjs ten-thousand-trees` on main 4469d88656 (it calls `warmUp` of
+  `@margoengine/quality` before its first frame), on WebGPU and on the WebGL2 layer: the distant hills have no blue
+  haze. The same build rendered without stopping at a missing pipeline shows the haze; the two frames differ by a mean
+  of 2.9 levels per channel, in the far terrain.
+- **Cause:** `AtmosphereTables.upload` (`packages/sky/src/atmosphere-luts.ts`) stored the atmosphere's key before it
+  made its two compute pipelines. warmUp's stopped-frame route throws at the first pipeline that is still compiling,
+  the transmittance table's included; the retried frame then found the key already stored and never baked either
+  table, for as long as the atmosphere did not change.
+- **Fix:** the key is stored after both tables are encoded, so a frame stopped anywhere before that bakes them on the
+  next frame.
+- **Regression:** `packages/sky/test/aerial.test.js` (a transmittance pipeline that throws once: the next frame
+  dispatches the 32 x 8 and 32 x 32 bakes once each; 0 and 0 before the fix).
 ### Fixed 2026-11-28: a world built again named its GLTFWeather effects otherwise, so a seek did not match a run (KB-WEATHER-GLTFSEEK1, weather)
 
 - **Repro:** `node --test packages/weather/tests/seek.test.js`: "a weather replayed 1 steps equals a continuous run"

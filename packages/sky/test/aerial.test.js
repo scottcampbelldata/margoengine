@@ -101,6 +101,46 @@ test('aerial perspective builds its tables once, its volume every frame, and dra
   sky.dispose();
 });
 
+test('a pipeline that is not ready yet stops the tables once, and the next frame still bakes them', () => {
+  // warmUp of @margoengine/quality stops a frame at the first pipeline still compiling; the retried frame must bake
+  // the transmittance (32 x 8 groups) and multiple scattering (32 x 32) tables, or the air draws from empty tables.
+  const h = tracedGPU();
+  h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array([1, 1, 1, 0.15]) };
+  const depth = depthOf(h),
+    sky = new Sky({ hours: 10, timeScale: 0, turbidity: 3 }),
+    aerial = new AerialPerspective({ sky, depth: () => depth }),
+    gpu = h.engine.gpu,
+    create = gpu.createComputePipeline;
+  let refused = 0;
+  gpu.createComputePipeline = function (descriptor) {
+    if (refused === 0 && descriptor.compute.module.code.includes('vec2u(256,64)')) {
+      refused++;
+      throw Object.assign(new Error('still compiling'), { code: 'Compiling' });
+    }
+    return create.call(this, descriptor);
+  };
+  h.engine.use(sky);
+  h.engine.use(aerial);
+  const frame = () => {
+    sky.onPreUpdate(h.context.delta);
+    aerial.onPreUpdate(h.context.delta);
+    h.context.bindings = [];
+    h.engine.frameGraph.execute(h.context);
+  };
+  const bakes = () => {
+    const list = h.commands('short');
+    return [list.filter((c) => c === 'dispatch 32 8').length, list.filter((c) => c === 'dispatch 32 32').length];
+  };
+  assert.throws(frame, /still compiling/);
+  assert.equal(refused, 1, 'the frame stopped at the tables');
+  frame();
+  assert.deepEqual(bakes(), [1, 1], 'the retried frame bakes both tables');
+  frame();
+  assert.deepEqual(bakes(), [1, 1], 'and only once');
+  aerial.dispose();
+  sky.dispose();
+});
+
 test('a wide planet keeps the eye above its ground in Float32, for the sky and the air', () => {
   // At 60,000 km a Float32 step is about 4 m: a metre of clearance rounded away, the eye sat on the ground sphere,
   // sphereHit took the far root from it and every upward ray met the ground at 0, so the sky and the air were black.

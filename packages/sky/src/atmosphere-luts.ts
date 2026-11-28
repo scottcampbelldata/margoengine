@@ -282,7 +282,9 @@ export class AtmosphereTables {
     d.queue.writeBuffer(this.uniform, 0, this.values as Float32Array<ArrayBuffer>);
     const key = Array.from(this.values.subarray(16, 34)).join() + ':' + Array.from(this.values.subarray(48, 55)).join();
     if (key === this.key) return;
-    this.key = key;
+    // The key is kept only once both tables are encoded: a pipeline creation that throws (warmUp of
+    // @margoengine/quality stops a warm frame there until the pipeline has compiled) left the key set, so the retried
+    // frame skipped the tables and the air drew from empty ones for good (KB-SKY-TABLESKEY1).
     const [t, m] = (this.pipelines ??= [
       d.createComputePipeline({
         layout: 'auto',
@@ -323,6 +325,7 @@ export class AtmosphereTables {
     );
     pass.dispatchWorkgroups(32, 32);
     pass.end();
+    this.key = key;
   }
   /** Frees the tables and the uniform. */
   dispose(): void {
