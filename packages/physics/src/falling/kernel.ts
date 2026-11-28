@@ -2,6 +2,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { createNativePhasePool, type NativePhasePool } from '../native-phase-pool.js';
 import { canShareMemory, isShared, STACK_BYTES } from '../world/memory.js';
 import type { Region, SolverHost } from '../world/solver.js';
+import { fallingError } from './errors.js';
 
 const JOB_BYTES = 40;
 const WORK_WORDS = 3;
@@ -59,9 +60,9 @@ async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Modu
     } else {
       const response = await fetch(url, { signal });
       if (!response.ok)
-        throw new MargoError(
-          'failed',
+        throw fallingError(
           'Falling solver Wasm request failed. Provide its Wasm assets at the expected URL.',
+          'failed',
         );
       bytes = await response.arrayBuffer();
     }
@@ -71,12 +72,10 @@ async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Modu
   } catch (cause) {
     signal?.throwIfAborted();
     if (cause instanceof MargoError) throw cause;
-    throw Object.assign(
-      new MargoError(
-        'failed',
-        'Falling solver Wasm failed to load. Use a SIMD-capable runtime and serve its kernel assets.',
-      ),
-      { cause },
+    throw fallingError(
+      'Falling solver Wasm failed to load. Use a SIMD-capable runtime and serve its kernel assets.',
+      'failed',
+      cause,
     );
   }
 }
@@ -84,11 +83,11 @@ async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Modu
 export async function loadFallingBuilds(signal?: AbortSignal, threads = 1): Promise<FallingBuilds> {
   signal?.throwIfAborted();
   if (threads !== 1 && threads !== 2 && threads !== 4)
-    throw new MargoError('unsupported', 'Choose 1, 2 or 4 falling-body native participants.');
+    throw fallingError('Choose 1, 2 or 4 falling-body native participants.', 'unsupported');
   if (threads > 1 && !canShareMemory())
-    throw new MargoError(
-      'unsupported',
+    throw fallingError(
       'Use Node or an isolated browser worker for falling bodies, or choose threads: 1.',
+      'unsupported',
     );
   const [plain, shared] = await Promise.all([
     threads === 1
@@ -118,7 +117,11 @@ export async function loadFallingBuilds(signal?: AbortSignal, threads = 1): Prom
   } catch (cause) {
     close();
     signal?.throwIfAborted();
-    throw cause;
+    throw fallingError(
+      'Start falling-body helpers in Node or an isolated browser worker, or choose threads: 1.',
+      'failed',
+      cause,
+    );
   }
 }
 
@@ -134,24 +137,29 @@ export function fallingStep(host: SolverHost, builds: FallingBuilds): FallingSte
   const pool = builds.pool;
   const module = isShared(host.memory) ? builds.shared : builds.plain;
   if (!module)
-    throw new MargoError(
-      'unsupported',
+    throw fallingError(
       pool
         ? 'Use shared world memory for falling-body helpers, or choose threads: 1.'
         : 'Shared falling solver Wasm is unavailable. Use plain world memory on this host.',
+      'unsupported',
     );
   const stack = host.allocate('falling-kernel-stack', STACK_BYTES + 8, 'u8', 1);
   const threads = pool?.count ?? 1;
   const region = host.allocate('falling-native-job', JOB_BYTES + 8 * WORK_WORDS * threads, 'u8', 1);
   const job = region.byteOffset;
   const work = job + JOB_BYTES;
-  const { exports } = new WebAssembly.Instance(module, { env: { memory: host.memory } });
+  let exports: WebAssembly.Exports;
+  try {
+    ({ exports } = new WebAssembly.Instance(module, { env: { memory: host.memory } }));
+  } catch (cause) {
+    throw fallingError('Use a world with memory matching the falling solver Wasm asset.', 'failed', cause);
+  }
   if (
     !(exports.__stack_pointer instanceof WebAssembly.Global) ||
     typeof exports.falling_step !== 'function' ||
     typeof exports.falling_thread_phase !== 'function'
   )
-    throw new MargoError('version', 'Falling solver Wasm has incompatible exports. Run the falling kernel build.');
+    throw fallingError('Falling solver Wasm has incompatible exports. Run the falling kernel build.', 'version');
   exports.__stack_pointer.value = stackTop(stack);
   const serial = exports.falling_step as KernelExports['falling_step'];
   const phase = exports.falling_thread_phase as Stage;
@@ -160,7 +168,11 @@ export function fallingStep(host: SolverHost, builds: FallingBuilds): FallingSte
     const stackTops = Array.from({ length: threads - 1 }, (_, i) =>
       stackTop(host.allocate(`falling-helper-stack-${i}`, STACK_BYTES + 8, 'u8', 1)),
     );
-    pool.init({ memory: host.memory, module, job, control: control.byteOffset, stackTops });
+    try {
+      pool.init({ memory: host.memory, module, job, control: control.byteOffset, stackTops });
+    } catch (cause) {
+      throw fallingError('Use matching falling solver Wasm and helper assets, or choose threads: 1.', 'failed', cause);
+    }
   }
   return {
     run(models, sections, air, state, next, count, dt) {
@@ -168,7 +180,11 @@ export function fallingStep(host: SolverHost, builds: FallingBuilds): FallingSte
       const buffer = host.memory.buffer;
       new Uint32Array(buffer, job, 8).set([models, sections, air, state, next, work, count, 0]);
       new Float64Array(buffer, job + 32, 1)[0] = dt;
-      return pool.phase(0, () => phase(job, 0, 0, threads));
+      try {
+        return pool.phase(0, () => phase(job, 0, 0, threads));
+      } catch (cause) {
+        throw fallingError('Run matching falling solver helpers and Wasm, or choose threads: 1.', 'failed', cause);
+      }
     },
     workCounts() {
       const receipt = new Float64Array(host.memory.buffer, work, WORK_WORDS * threads);

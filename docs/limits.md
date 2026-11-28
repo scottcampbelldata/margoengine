@@ -9806,9 +9806,18 @@ created at setup. Supply a world-scale placement and advance the world before re
 emission, chip splashes and collision-driven emission are independent effects. The world-stepped draw uses
 the supplied diameter, positions and velocities.
 
-The optional falling entry measures 6,259 B min+gzip. Each lazy Wasm build is 10,109 B,
-4,273 B gzip. The Hail overlay measures 5,443 B and its optional world adapter 1,056 B min+gzip.
-Core and stage remain at 24,820 B min+gzip combined.
+Two independent Norway maple drop studies test the sycamore-based fixed-axis model. The solver predicts
+0.776 and 0.723 m/s against observed means and sample spreads of 1.00 ± 0.10 and 1.10 ± 0.24 m/s.
+The predicted spin rates are 21.11 and 14.97 Hz against 16 ± 5 and 12.96 ± 4.39 Hz. Refining the
+blade strips and solver step does not resolve either speed gap. Varying the measured wing loading
+over its published spread leaves both speeds low. The model does not resolve the observed 12 ± 5°
+cone in the first study. [Ortega-Jimenez et al. (2019)](https://doi.org/10.1098/rsif.2018.0456).
+[Nave et al. (2021)](https://doi.org/10.3390/biomimetics6020023).
+
+The optional falling entry measures 8,693 B min+gzip with an 8,954 B ceiling. Each unchanged lazy Wasm
+build measures 10,501 B raw and 4,498 B gzip. Accepted pose preparation adds one 104 B scratch row per body.
+Draw preparation adds one 32 B scratch row per sphere. The Hail overlay measures 5,443 B and its optional
+world adapter 1,056 B min+gzip. Core and stage receive zero bytes.
 
 ### Moist convection and resolved cloud extinction (ATMO-03)
 

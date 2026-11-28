@@ -558,3 +558,12 @@ Not in the catalog: staged construction (placement of pieces, stacking, scaffold
   full state and RGBA through hold, restore, re-advance and rewind. The scene demonstrates contact and
   gait direction. It uses a prescribed planar wave and a cloth runway. Independent animal speed comparisons
   and the existing model limits are recorded separately in [limits](limits.md#ground-animal-locomotion-life-02).
+
+### AERO-05 automated samara release in still air and vacuum
+
+- `packages/environment/tests/samara-film.browser.mjs` draws an original 36.8 mm samara from the
+  solver's accepted pose in two calibrated drop lanes. The same cue releases both takes. After 64/240 s
+  the seed in still air is 12.82 cm higher than the analytic vacuum control and spins at 25.45 rad/s.
+- Both backends reproduce their complete accepted state and full RGBA through hold, restore, re-advance
+  and rewind. The axis is fixed. Independent descent and cone checks remain outside the accepted model
+  accuracy documented in [limits](limits.md#falling-plates-winged-seeds-and-hail-aero-05).

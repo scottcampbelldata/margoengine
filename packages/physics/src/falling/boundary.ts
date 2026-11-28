@@ -1,7 +1,7 @@
-import { MargoError } from '@margoengine/math/errors';
 import { hypot } from '@margoengine/math/pinned';
 import type { Physics } from '../physics.js';
-import { dot, type Vector } from './model.js';
+import { fallingError } from './errors.js';
+import { dot, finiteVector, type Vector } from './model.js';
 
 /** First blocking contact of a sphere swept along a segment. */
 export interface FallingHit {
@@ -68,27 +68,31 @@ export function collideSphere(
   let samePoint = false;
   for (;;) {
     const end = step(centre, remaining, 1);
+    const query = step(centre, originShift, 1);
+    if (!finiteVector(end) || !finiteVector(query) || !finiteVector(velocity))
+      throw fallingError('Falling sweep overflowed. Use local origins, lower speeds or shorter steps.', 'failed');
     if (end[0] === centre[0] && end[1] === centre[1] && end[2] === centre[2]) return { centre, velocity };
-    const hit = boundary.sweep(step(centre, originShift, 1), remaining, radius);
-    if (!hit) return { centre: end, velocity };
-    const scale = hypot(...hit.normal);
+    const hit = boundary.sweep(query, remaining, radius);
+    if (hit === null) return { centre: end, velocity };
+    const normalInput = hit?.normal;
+    const scale = finiteVector(normalInput) ? hypot(normalInput[0], normalInput[1], normalInput[2]) : 0;
     if (
-      !Number.isFinite(hit.fraction) ||
+      !Number.isFinite(hit?.fraction) ||
       hit.fraction < 0 ||
       hit.fraction > 1 ||
       !Number.isFinite(scale) ||
       !(scale > 0)
     )
-      throw new MargoError(
-        'failed',
+      throw fallingError(
         'Falling boundary produced an invalid contact. Provide a segment fraction and a nonzero finite outward normal.',
+        'failed',
       );
-    const normal = hit.normal.map((n) => n / scale) as [number, number, number];
+    const normal: Vector = [hit.normal[0] / scale, hit.normal[1] / scale, hit.normal[2] / scale];
     const normalDistance = dot(remaining, normal);
     if (!(normalDistance < 0))
-      throw new MargoError(
-        'failed',
+      throw fallingError(
         'Falling boundary returned a contact without approach. Use null for tangent and departing sweeps.',
+        'failed',
       );
     const next = step(centre, remaining, hit.fraction);
     const madeProgress = next[0] !== centre[0] || next[1] !== centre[1] || next[2] !== centre[2];

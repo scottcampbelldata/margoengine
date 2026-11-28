@@ -6741,7 +6741,7 @@ substeps inside each tick. Densities and velocities are in SI units.
 import { FallingSolver } from '@margoengine/physics/falling';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const falling = await FallingSolver.load();
+using falling = await FallingSolver.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
 world.add(falling, {
   bodies: [
@@ -6771,7 +6771,10 @@ the solver uses motionless standard sea-level air. A wind with zero density give
 `falling.poseField` publishes layout-1 f64 rows in input order, in the solver's origin cell.
 Each row holds position xyz, quaternion xyzw, linear velocity xyz and angular velocity xyz.
 `falling.pose(index)` copies a row. `writeSpheres` writes the positions, radii and velocities of rounded
-bodies to a supplied f32 draw buffer in their original order.
+bodies to a supplied f32 draw buffer in their original order. Set the draw offset to the solver's cell in
+the renderer's coordinate system. The solver refuses an unrepresentable draw row before replacing any caller
+data. Air and boundary callbacks are read-only. A failed sample, collision or numeric step preserves the
+previous accepted poses and native work receipt.
 
 ## Pedestrian contact and crowd motion
 

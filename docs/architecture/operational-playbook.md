@@ -12346,3 +12346,7 @@ The glacier kernel joins disjoint paired face-conductance rows before the ordere
 ### LIFE-02 accepted contacts and independent animal rows
 
 Ground locomotion copies terrain samples into trial geometry before the body phase. Acquiring the post-callback view preserves valid plain-memory growth. The two pose and contact publications and their native work receipt update after the entire candidate succeeds. Shared native participants advance disjoint bodies and preserve each ordered contact sum. The fixed-camera snake test reads accepted TerrainBed contacts at a signed cell. The independent Hu incline diagnostic retains the observed direction-change mismatch.
+
+### AERO-05 accepted falling bodies and renderer transfer
+
+K23 distributes independent plate, samara and sphere rows before deterministic host sweeps. The falling caller checks every world-space pose in its scratch bank before replacing accepted state. It also checks all f32 draw rows before copying to the caller. The registered pose field carries the live signed origin. The mixed native fixture and separate WebGPU and WebGL2 scene cover accepted outputs. Published natural seed comparisons record the fixed-axis descent deficit and missing coning.

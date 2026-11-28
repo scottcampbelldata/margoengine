@@ -16263,6 +16263,15 @@ Margo Engine's own field and solver specifications.
   Jonathan McConnell and Tuhin Das, *Reduced Order Modeling of an Autorotating Samara for
   Steady-State and Dynamic Analysis* (2022), [doi:10.1016/j.ifacol.2022.11.163](https://doi.org/10.1016/j.ifacol.2022.11.163),
   discusses time integration of blade torques and lift and the effect of degrees of freedom removed.
+- Victor Manuel Ortega-Jimenez, Noah Suk-Won Kim and Robert Dudley, *Superb autorotator: rapid decelerations
+  in impulsively launched samaras* (2019), [doi:10.1098/rsif.2018.0456](https://doi.org/10.1098/rsif.2018.0456),
+  reports separate natural free-drop morphology, speed, spin and cone statistics in Table 1.
+  Only the five natural hand drops inform the comparison. Published speed, spin and cone are held out.
+- Gary K. Nave Jr. et al., *Wind Dispersal of Natural and Biomimetic Maple Samaras* (2021),
+  [doi:10.3390/biomimetics6020023](https://doi.org/10.3390/biomimetics6020023), Table 1 gives the
+  independent Norway maple still-air cohort. Mean measured mass, length, wing loading and centre of mass
+  determine the input rectangle and its axis. The measured lab speed and spin are held out. Both cohorts
+  retain the Rezgui polar and the production blade pitch. No external models, source code or video are bundled.
 - Frank W. J. Olver et al., NIST DLMF [§3.5(v)](https://dlmf.nist.gov/3.5.v) gives Gauss–Legendre
   quadrature. Three nodes exactly integrate the cubic radius moment in the opposed-blade
   test. Ernst Hairer, Syvert P. Nørsett and Gerhard Wanner, *Solving Ordinary Differential

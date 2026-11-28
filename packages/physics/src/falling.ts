@@ -1,12 +1,13 @@
 import { DRY_AIR_GAS_CONSTANT, SEA_LEVEL_PRESSURE, SEA_LEVEL_TEMPERATURE } from '@margoengine/math/atmosphere';
-import { MargoError } from '@margoengine/math/errors';
 import type { FlowSample, Wind } from '@margoengine/math/fields';
 import { hypot } from '@margoengine/math/pinned';
 import { collideSphere, type FallingBoundary } from './falling/boundary.js';
+import { fallingError } from './falling/errors.js';
 import { type FallingBuilds, type FallingWorkCounts, fallingStep, loadFallingBuilds } from './falling/kernel.js';
 import {
   AIR_WORDS,
   dot,
+  finiteVector,
   type FallingBody,
   type FallingFrame,
   type FallingSphereSetup,
@@ -21,6 +22,7 @@ import {
   worldVector,
 } from './falling/model.js';
 import {
+  checkCell,
   type FieldDescriptor,
   type Port,
   RATE_LEVELS,
@@ -91,6 +93,8 @@ interface Data {
   readonly bladeGeometry: Region;
   readonly samples: Region;
   readonly poses: Region;
+  readonly poseCandidate: Float64Array;
+  readonly drawCandidate: Float32Array;
   readonly frames: readonly FallingFrame[];
   readonly wind: Wind | undefined;
   readonly boundary: FallingBoundary | undefined;
@@ -105,6 +109,14 @@ const LAYOUT = 1;
 const F64 = Float64Array.BYTES_PER_ELEMENT;
 const STILL = SEA_LEVEL_PRESSURE / (DRY_AIR_GAS_CONSTANT * SEA_LEVEL_TEMPERATURE);
 const CENTRE = [0, 0, 0] as const;
+
+function requireCell(cell: Vector): void {
+  try {
+    checkCell(cell);
+  } catch (cause) {
+    throw fallingError('Use three signed 32-bit integer coordinates for each falling origin.', 'state', cause);
+  }
+}
 
 function cellDelta(from: Vector, to: Vector, size: number): Vector {
   return [(from[0] - to[0]) * size, (from[1] - to[1]) * size, (from[2] - to[2]) * size];
@@ -126,6 +138,9 @@ function publishPoses(state: Float64Array, frames: readonly FallingFrame[], out:
     out[o + 10] = frame.z[0] * spin;
     out[o + 11] = frame.z[1] * spin;
     out[o + 12] = frame.z[2] * spin;
+    for (let word = o; word < o + FALLING_BODY_WORDS; word++) {
+      if (!Number.isFinite(out[word])) throw indexError(index);
+    }
   }
 }
 
@@ -142,6 +157,7 @@ export class FallingSolver implements Solver<FallingParams> {
   #data?: Data;
   #nativeWork?: FallingWorkCounts;
   #disposed = false;
+  #running = false;
 
   private constructor(id: string, rate: RateLevel, builds: FallingBuilds) {
     this.id = id;
@@ -158,20 +174,27 @@ export class FallingSolver implements Solver<FallingParams> {
 
   /** Fetches and compiles the optional kernel. Add the result to a world to start it. */
   static async load(options: FallingLoadOptions = {}): Promise<FallingSolver> {
+    if (!options) throw fallingError('Pass falling load options as an object, or omit them.');
     const id = options.id ?? 'falling';
     const rate = options.rate ?? 2;
     if (typeof id !== 'string' || id.trim().length === 0)
-      throw new TypeError('Falling solver ID is empty. Provide a nonempty ID.');
+      throw fallingError('Falling solver ID is empty. Provide a nonempty ID.');
     if (!Number.isInteger(rate) || rate < 0 || rate >= RATE_LEVELS)
-      throw new RangeError('Falling solver rate is invalid. Pass one of the world rate levels 0 to 7.');
+      throw fallingError('Falling solver rate is invalid. Pass one of the world rate levels 0 to 7.');
     return new FallingSolver(id, rate, await loadFallingBuilds(options.signal, options.threads));
   }
 
   /** Releases native helpers after the containing world finishes using this solver. */
   [Symbol.dispose](): void {
     if (this.#disposed) return;
+    this.#requireIdle();
     this.#disposed = true;
     this.#builds[Symbol.dispose]();
+  }
+
+  #requireIdle(): void {
+    if (this.#disposed) throw fallingError('This falling solver was disposed. Load a new instance.', 'disposed');
+    if (this.#running) throw fallingError('Call the solver between steps. Use read-only air and boundary callbacks.');
   }
 
   describe(): SolverDescription {
@@ -184,37 +207,40 @@ export class FallingSolver implements Solver<FallingParams> {
   }
 
   init(host: SolverHost, params: FallingParams): void {
-    if (this.#disposed) throw new MargoError('disposed', 'This falling solver was disposed. Load a new instance.');
-    if (this.#data) throw new MargoError('state', 'This falling solver belongs to a world. Load a new instance.');
+    this.#requireIdle();
+    if (this.#data) throw fallingError('This falling solver belongs to a world. Load a new instance.', 'attached');
+    this.#running = true;
     try {
       this.#initialize(host, params);
     } catch (cause) {
-      if (this.#builds.pool) this[Symbol.dispose]();
+      if (this.#builds.pool) {
+        this.#disposed = true;
+        this.#builds[Symbol.dispose]();
+      }
       throw cause;
+    } finally {
+      this.#running = false;
     }
   }
 
   #initialize(host: SolverHost, params: FallingParams): void {
-    const { bodies, wind, boundary, cellSize = 4096 } = params;
+    const { bodies, wind, boundary, cellSize = 4096 } = params ?? {};
     if (!Array.isArray(bodies) || bodies.length === 0)
-      throw new RangeError('There are no falling bodies. Supply an array with at least one body.');
-    if (
-      wind &&
-      (wind.medium !== 'air' ||
-        typeof wind.sample !== 'function' ||
-        wind.cell?.length !== 3 ||
-        !wind.cell.every(Number.isSafeInteger))
-    )
-      throw new TypeError('Falling solver wind is invalid. Use an air Wind with a sampler and an integer origin cell.');
-    if (
-      boundary &&
-      (typeof boundary.sweep !== 'function' ||
-        boundary.cell?.length !== 3 ||
-        !boundary.cell.every(Number.isSafeInteger))
-    )
-      throw new TypeError('Invalid falling boundary. Provide a swept-sphere query and an integer origin cell.');
+      throw fallingError('There are no falling bodies. Supply an array with at least one body.');
+    if (wind) {
+      if (wind.medium !== 'air' || typeof wind.sample !== 'function')
+        throw fallingError(
+          'Falling solver wind is invalid. Use an air Wind with a sampler and an integer origin cell.',
+        );
+      requireCell(wind.cell);
+    }
+    if (boundary) {
+      if (typeof boundary.sweep !== 'function')
+        throw fallingError('Invalid falling boundary. Provide a swept-sphere query and an integer origin cell.');
+      requireCell(boundary.cell);
+    }
     if (!Number.isSafeInteger(cellSize) || cellSize < 1 || cellSize > 1048576 || (cellSize & (cellSize - 1)) !== 0)
-      throw new RangeError('Falling solver cell size is invalid. Pass the containing world’s power-of-two cell size.');
+      throw fallingError('Falling solver cell size is invalid. Pass the containing world’s power-of-two cell size.');
     let sectionWords = 0;
     const prepared = Array.from(bodies, (body) => {
       const model = prepareFalling(body, host.gravity, sectionWords / SECTION_WORDS);
@@ -257,6 +283,8 @@ export class FallingSolver implements Solver<FallingParams> {
       bladeGeometry,
       samples,
       poses,
+      poseCandidate: new Float64Array(frames.length * FALLING_BODY_WORDS),
+      drawCandidate: new Float32Array(sphereCount * FALLING_SPHERE_DRAW_WORDS),
       frames,
       wind,
       boundary,
@@ -269,14 +297,14 @@ export class FallingSolver implements Solver<FallingParams> {
   }
 
   #ready(): Data {
-    if (!this.#data)
-      throw new MargoError('state', 'Falling solver has no world. Add it before reading or stepping bodies.');
+    if (!this.#data) throw fallingError('Falling solver has no world. Add it before reading or stepping bodies.');
     return this.#data;
   }
 
   #sampleAir(data: Data, context: StepContext, dt: number): void {
     const { wind, customDrag, frames, host, dynamic, samples, cellSize, spheres, gravity } = data;
     if (!wind && !customDrag) return;
+    if (wind) requireCell(wind.cell);
     const [dx, dy, dz] = wind ? cellDelta(context.cell, wind.cell, cellSize) : CENTRE;
     const half = dt / 2;
     const time = context.tick / rateOf(context.level) + half;
@@ -294,17 +322,19 @@ export class FallingSolver implements Solver<FallingParams> {
           p[i + 1]! + half * p[i + 3]!,
           p[i + 6]! + half * p[i + 7]!,
         );
-        ({ velocity, density, temperature } = wind.sample(x + dx, y + dy, z + dz, time, this.#sample));
+        if (!finiteVector([x + dx, y + dy, z + dz]) || !Number.isFinite(time))
+          throw fallingError('Falling air sample overflows. Use local origins and a finite world step.', 'failed');
+        const air = wind.sample(x + dx, y + dy, z + dz, time, this.#sample);
         if (
-          velocity?.length !== 3 ||
-          !velocity.every(Number.isFinite) ||
-          !Number.isFinite(density) ||
-          density < 0 ||
-          !(Number.isFinite(temperature) && temperature > 0)
+          !finiteVector(air?.velocity) ||
+          !Number.isFinite(air.density) ||
+          air.density < 0 ||
+          !(Number.isFinite(air.temperature) && air.temperature > 0)
         )
-          throw new RangeError(
+          throw fallingError(
             'Falling solver sampled invalid air. Use a sampler that returns finite velocity, nonnegative density and positive kelvin.',
           );
+        ({ velocity, density, temperature } = air);
       }
       const o = index * AIR_WORDS;
       const sphere = spheres[index];
@@ -313,9 +343,12 @@ export class FallingSolver implements Solver<FallingParams> {
         sample.density = density;
         sample.temperature = temperature;
         sample.gravity = gravity;
-        const area = sphere.area * sphere.drag(sample);
-        if (!Number.isFinite(area) || area < 0)
-          throw new RangeError('Falling solver drag law is invalid. Provide a finite nonnegative coefficient.');
+        const coefficient = sphere.drag(sample);
+        if (!Number.isFinite(coefficient) || coefficient < 0)
+          throw fallingError('Falling solver drag law is invalid. Provide a finite nonnegative coefficient.');
+        const area = sphere.area * coefficient;
+        if (!Number.isFinite(area))
+          throw fallingError('Falling drag area overflows. Use a smaller diameter or drag coefficient.');
         words(host, samples)[o + 4] = area;
       }
       const air = words(host, samples);
@@ -329,6 +362,7 @@ export class FallingSolver implements Solver<FallingParams> {
   #contact(data: Data, context: StepContext): void {
     const { boundary, spheres, host, dynamic, trial, cellSize } = data;
     if (!boundary) return;
+    requireCell(boundary.cell);
     const originShift = cellDelta(context.cell, boundary.cell, cellSize);
     for (let body = 0; body < spheres.length; body++) {
       const sphere = spheres[body];
@@ -359,10 +393,21 @@ export class FallingSolver implements Solver<FallingParams> {
   }
 
   step(context: StepContext, dt: number): void {
-    if (this.#disposed) throw new MargoError('disposed', 'This falling solver was disposed. Load a new instance.');
+    this.#requireIdle();
+    if (!Number.isFinite(dt) || dt < 0) throw fallingError('Pass a finite nonnegative falling step in seconds.');
+    requireCell(context.cell);
+    this.#running = true;
+    try {
+      this.#advance(context, dt);
+    } finally {
+      this.#running = false;
+    }
+  }
+
+  #advance(context: StepContext, dt: number): void {
     const data = this.#ready();
     this.#sampleAir(data, context, dt);
-    const { host, dynamic, trial, models, bladeGeometry, samples, poses, frames } = data;
+    const { host, dynamic, trial, models, bladeGeometry, samples, poses, poseCandidate, frames } = data;
     const code = data.native.run(
       models.byteOffset,
       bladeGeometry.byteOffset,
@@ -375,7 +420,8 @@ export class FallingSolver implements Solver<FallingParams> {
     if (code) throw indexError(code - 1);
     this.#contact(data, context);
     const next = words(host, trial);
-    publishPoses(next, frames, words(host, poses));
+    publishPoses(next, frames, poseCandidate);
+    words(host, poses).set(poseCandidate);
     words(host, dynamic).set(next);
     this.#nativeWork = data.native.workCounts();
   }
@@ -389,7 +435,8 @@ export class FallingSolver implements Solver<FallingParams> {
   importPorts(_tick: number): void {}
 
   exportPorts(tick: number): readonly Port[] {
-    return [{ field: this.poseField.name, region: this.#ready().poses, tick, cell: CENTRE }];
+    const { host, poses } = this.#ready();
+    return [{ field: this.poseField.name, region: poses, tick, cell: host.cell }];
   }
 
   stateRegions(): readonly Region[] {
@@ -411,16 +458,10 @@ export class FallingSolver implements Solver<FallingParams> {
    * Set offset to the solver cell's origin in the rendering coordinate system.
    */
   writeSpheres(out: Float32Array, offset: Vector = CENTRE): void {
-    const { host, poses, spheres, sphereCount } = this.#ready();
-    const count = out.length / FALLING_SPHERE_DRAW_WORDS;
-    if (
-      !(out instanceof Float32Array) ||
-      !Number.isInteger(count) ||
-      count > sphereCount ||
-      offset?.length !== 3 ||
-      !offset.every(Number.isFinite)
-    )
-      throw new RangeError(
+    const { host, poses, spheres, sphereCount, drawCandidate } = this.#ready();
+    const count = out instanceof Float32Array ? out.length / FALLING_SPHERE_DRAW_WORDS : -1;
+    if (count < 0 || !Number.isInteger(count) || count > sphereCount || !finiteVector(offset))
+      throw fallingError(
         'Invalid falling sphere draw buffer. Pass eight f32 words per requested sphere and a finite xyz offset.',
       );
     const values = words(host, poses);
@@ -430,23 +471,30 @@ export class FallingSolver implements Solver<FallingParams> {
       if (!shape) continue;
       const at = index * FALLING_BODY_WORDS;
       const target = emitted * FALLING_SPHERE_DRAW_WORDS;
-      out[target] = values[at]! + offset[0];
-      out[target + 1] = values[at + 1]! + offset[1];
-      out[target + 2] = values[at + 2]! + offset[2];
-      out[target + 3] = shape.radius;
-      out[target + 4] = values[at + 7]!;
-      out[target + 5] = values[at + 8]!;
-      out[target + 6] = values[at + 9]!;
-      out[target + 7] = 0;
+      drawCandidate[target] = values[at]! + offset[0];
+      drawCandidate[target + 1] = values[at + 1]! + offset[1];
+      drawCandidate[target + 2] = values[at + 2]! + offset[2];
+      drawCandidate[target + 3] = shape.radius;
+      drawCandidate[target + 4] = values[at + 7]!;
+      drawCandidate[target + 5] = values[at + 8]!;
+      drawCandidate[target + 6] = values[at + 9]!;
+      drawCandidate[target + 7] = 0;
+      for (let word = target; word < target + FALLING_SPHERE_DRAW_WORDS - 1; word++) {
+        if (!Number.isFinite(drawCandidate[word]))
+          throw fallingError(
+            'Sphere draw data exceeds f32 range. Use a nearby render origin and smaller local speeds.',
+          );
+      }
       emitted++;
     }
+    out.set(drawCandidate.subarray(0, out.length));
   }
 
   /** Copies the latest pose of the indexed body. */
   pose(index: number): FallingPose {
     const { host, poses, frames } = this.#ready();
     if (!Number.isSafeInteger(index) || index < 0 || index >= frames.length)
-      throw new RangeError('Falling body index is outside the port. Use an index from the supplied bodies array.');
+      throw fallingError('Falling body index is outside the port. Use an index from the supplied bodies array.');
     const values = words(host, poses);
     const at = index * FALLING_BODY_WORDS;
     return {

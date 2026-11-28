@@ -24634,3 +24634,13 @@ Native body rows, pending calving, freshwater and signed wakes stage before acce
 - **Fix:** Obtain current views after callbacks, refuse reentrant writes, validate the owning bed bank and publish
   the host's live cell. A failed trial leaves the accepted pose, anchors, contacts and work receipt intact.
 - **Regression:** [locomotion coupling](../packages/physics/tests/coupling/locomotion.test.js).
+
+### KB-FALLING-ACCEPTED1 — Falling callbacks and output could bypass accepted state (FIXED)
+
+- **Repro:** Return a missing normal from the second sphere's sweep, call the solver recursively from its air
+  sampler, or request a draw buffer containing one finite f32 position and one position above f32 range.
+- **Cause:** Raw sample access exposed language errors and allowed callbacks to enter the same scratch state.
+  Pose publication and f32 conversion wrote directly into accepted or caller-owned buffers.
+- **Fix:** Refuse reentry, validate candidate samples and complete pose and draw buffers, and publish all accepted
+  rows together. The pose port reports the live signed origin. Previous accepted work remains readable after rejection.
+- **Regression:** [falling coupling](../packages/physics/tests/coupling/falling.test.js).

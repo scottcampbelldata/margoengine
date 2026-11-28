@@ -1,5 +1,6 @@
-import { MargoError } from '@margoengine/math/errors';
+import type { MargoError } from '@margoengine/math/errors';
 import { cos, hypot, sin } from '@margoengine/math/pinned';
+import { fallingError } from './errors.js';
 
 export type Vector = readonly [number, number, number];
 export type Rotation = readonly [number, number, number, number];
@@ -137,15 +138,18 @@ export function worldVector(frame: FallingFrame, x: number, y: number, z: number
   ];
 }
 
+export function finiteVector(value: Vector | undefined): value is Vector {
+  return value?.length === 3 && Number.isFinite(value[0]) && Number.isFinite(value[1]) && Number.isFinite(value[2]);
+}
+
 function vector(value: Vector, label: string): Vector {
-  if (value?.length !== 3 || !value.every(Number.isFinite))
-    throw new RangeError(label + ' exceeds its domain. Pass three finite Cartesian components.');
+  if (!finiteVector(value)) throw fallingError(label + ' exceeds its domain. Pass three finite Cartesian components.');
   return value;
 }
 
 function scalar(value: number, label: string, zeroAllowed = false): number {
   if (!Number.isFinite(value) || (zeroAllowed ? value < 0 : value <= 0))
-    throw new RangeError(
+    throw fallingError(
       label + ' exceeds its domain. Pass a finite ' + (zeroAllowed ? 'nonnegative' : 'positive') + ' value.',
     );
   return value;
@@ -154,7 +158,7 @@ function scalar(value: number, label: string, zeroAllowed = false): number {
 function frameFor(span: Vector): FallingFrame {
   vector(span, 'Falling body spin axis');
   const scale = Math.max(Math.abs(span[0]), Math.abs(span[1]), Math.abs(span[2]));
-  if (scale === 0) throw new RangeError('Falling body spin axis is zero. Pass a nonzero direction.');
+  if (scale === 0) throw fallingError('Falling body spin axis is zero. Pass a nonzero direction.');
   const [sx, sy, sz] = span.map((v) => v / scale) as [number, number, number];
   const norm = hypot(sx, sy, sz);
   const z = [sx / norm, sy / norm, sz / norm] as const;
@@ -200,10 +204,10 @@ const GAUSS_WEIGHTS = [5 / 9, 8 / 9, 5 / 9] as const;
 
 function bladeNodes(parts: readonly FallingBladeSection[]): number[] {
   if (!Array.isArray(parts) || parts.length === 0)
-    throw new RangeError('Samara blade has no strips. Supply at least one radial strip.');
+    throw fallingError('Samara blade has no strips. Supply at least one radial strip.');
   const nodes: number[] = [];
   for (const part of parts) {
-    if (part == null) throw new TypeError('Missing samara strip. Provide a radial strip object at every index.');
+    if (part == null) throw fallingError('Missing samara strip. Provide a radial strip object at every index.');
     const start = scalar(part.start, 'Samara strip start radius', true);
     const end = scalar(part.end, 'Samara strip end radius');
     const chord = scalar(part.chord, 'Samara strip chord');
@@ -212,7 +216,7 @@ function bladeNodes(parts: readonly FallingBladeSection[]): number[] {
     const half = (end - start) / 2;
     const area = half * chord;
     if (!(area > 0) || ![pitch, azimuth, area].every(Number.isFinite))
-      throw new RangeError(
+      throw fallingError(
         'Samara blade strip is invalid. Provide finite angles and radii with end above start and positive area.',
       );
     const sinPitch = sin(pitch);
@@ -235,7 +239,7 @@ function bladeNodes(parts: readonly FallingBladeSection[]): number[] {
 
 export function prepareFalling(body: FallingBody, gravity: Vector, sectionStart: number) {
   if (body?.kind !== 'plate' && body?.kind !== 'sphere' && body?.kind !== 'samara')
-    throw new TypeError('Unknown falling body form. Set kind to plate, sphere or samara.');
+    throw fallingError('Unknown falling body form. Set kind to plate, sphere or samara.');
   const mass = scalar(body.mass, 'Falling body mass');
   const up: Vector = gravity.some((value) => value !== 0) ? [-gravity[0], -gravity[1], -gravity[2]] : [0, 1, 0];
   const axis =
@@ -255,7 +259,7 @@ export function prepareFalling(body: FallingBody, gravity: Vector, sectionStart:
     const coefficient = typeof drag === 'function' ? 0 : scalar(drag, 'Sphere drag', true);
     const restitution = scalar(body.restitution ?? 0, 'Sphere restitution', true);
     if (!(radius > 0 && area > 0 && restitution <= 1))
-      throw new RangeError(
+      throw fallingError(
         'Sphere shape or restitution exceeds its domain. Use a representable diameter and restitution in [0, 1].',
       );
     sphere = { radius, area, restitution, drag };
@@ -266,7 +270,7 @@ export function prepareFalling(body: FallingBody, gravity: Vector, sectionStart:
     const span = scalar(body.span ?? body.chord, 'Plate span');
     const inertia = scalar(body.pitchInertia ?? (mass * (a * a + b * b)) / 4, 'Plate pitch inertia');
     if (!(a > 0 && b <= a))
-      throw new RangeError(
+      throw fallingError(
         'Plate cross section exceeds its domain. Use positive chord and thickness no larger than the chord.',
       );
     const edgeDrag = scalar(body.edgeDrag ?? 0.4, 'Plate edge drag', true);
@@ -289,7 +293,7 @@ export function prepareFalling(body: FallingBody, gravity: Vector, sectionStart:
     omega = body.angularVelocity ?? 0;
   } else {
     if (body.inducedDrag !== undefined && typeof body.inducedDrag !== 'boolean')
-      throw new TypeError('Invalid samara pressure drag setting. Set inducedDrag to true or false.');
+      throw fallingError('Invalid samara pressure drag setting. Set inducedDrag to true or false.');
     sections = bladeNodes(body.sections);
     parameters.push(
       scalar(body.volume ?? 0, 'Samara volume', true),
@@ -326,15 +330,15 @@ export function prepareFalling(body: FallingBody, gravity: Vector, sectionStart:
     dot(v, frame.z),
   ];
   if (!parameters.every(Number.isFinite) || !initial.every(Number.isFinite))
-    throw new RangeError('Falling body geometry or state overflows. Use finite, representable SI inputs.');
+    throw fallingError('Falling body geometry or state overflows. Use finite, representable SI inputs.');
   return { parameters, initial, frame, sphere, sections };
 }
 
 export function indexError(index: number): MargoError {
-  return new MargoError(
-    'failed',
+  return fallingError(
     'Falling body ' +
       index +
       ' exceeded finite integration precision. Check its mass, dimensions, flow and initial speed.',
+    'failed',
   );
 }

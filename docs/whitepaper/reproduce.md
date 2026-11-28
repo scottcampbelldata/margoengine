@@ -5393,3 +5393,14 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
 - Run `node packages/physics/scripts/life02-slithering-measured.mjs` for independent flat and incline comparisons.
   This diagnostic uses published cloth friction and shape inputs, scores complete strides, and identifies samples
   that exceed the measured runway dimensions. [Hu et al. (2009)](https://doi.org/10.1073/pnas.0812533106).
+
+### AERO-05 native falling bodies and held-out seed measurements
+
+- Build Physics with `node packages/physics/scripts/build.js`.
+- Run `node --test packages/physics/tests/coupling/falling.test.js packages/physics/tests/coupling/falling-workers.test.js`
+  for the accepted body banks, air and contact rejection, signed replay and independent native rows.
+- Run `npm run test:gpu:falling-workers -w @margoengine/physics` to start the actual browser helpers and
+  `npm run test:gpu:samara-film -w @margoengine/environment` for fixed-camera WebGPU and WebGL2 snapshots and frames.
+- Run `node packages/physics/scripts/aero05-samara-measured.mjs` for two independent free-drop cohorts.
+  The script uses measured morphology, a separately published blade model and unchanged pitch.
+  It reports held-out speed and spin, spatial and temporal refinement and missing coning.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22103408,
+  "total": 22104093,
   "history": [
     {
       "date": "2026-10-24",
@@ -15977,6 +15977,12 @@
       "commit": "oakimposter1-middle-ring",
       "reason": "@margoengine/procedural/broadleaves 12,190 to 14,255 B gzip, ceiling 12,556 to 14683 B: the middle LOD ring is chosen by visibility (an orthographic z-buffer over 12 views of the near tree, stratified pruning per foliage mass and a per-mass size solve, KB-PROCEDURAL-OAKIMPOSTER1), and the open-grown oak form. broadleafLevels always builds the middle ring for scatter, so a lazy split would load the same bytes on every leafed tree. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "aero-05-accepted-falling-rows",
+      "reason": "AERO-05 @margoengine/physics/falling 8015 to 8693 B gzip, ceiling 8271 to 8954 B. The optional falling entry stages accepted poses, sweeps and f32 draw transfer together across all body types. Separating entries would duplicate validation and state ownership. Native assets are unchanged. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16857,7 +16863,7 @@
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 14608,
     "@margoengine/physics/explosive": 16052,
-    "@margoengine/physics/falling": 8269,
+    "@margoengine/physics/falling": 8954,
     "@margoengine/physics/flight": 12898,
     "@margoengine/physics/flip": 14295,
     "@margoengine/physics/foam": 14188,

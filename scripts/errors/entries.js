@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'falling',
+    title: '@margoengine/physics/falling plates, winged seeds and swept grains',
+    kind: 'family',
+    messages: [],
+    cause: 'A body dimension, sampled air property, sweep, native step or draw coordinate exceeds the usable range.',
+    fix: 'Use finite SI body data, signed cells and air or boundary samples as requested. Keep callbacks read-only. Lower the time step or use local coordinates if the trial or f32 draw range is exceeded. Use 1, 2 or 4 native participants with shared memory for helpers.',
+  },
+  {
     id: 'locomotion',
     title: '@margoengine/physics/locomotion ground animal state, terrain and gait',
     kind: 'family',

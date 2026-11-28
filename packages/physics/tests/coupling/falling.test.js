@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { FALLING_BODY_WORDS, FallingSolver, fallingBoundaryFromPhysics } from '../../dist/falling.js';
+import {
+  FALLING_BODY_WORDS,
+  FALLING_SPHERE_DRAW_WORDS,
+  FallingSolver,
+  fallingBoundaryFromPhysics,
+} from '../../dist/falling.js';
 import { Physics } from '../../dist/index.js';
 import { PhysicsWorld, rateOf, regionWords, worldMemory } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
@@ -356,4 +361,96 @@ test('FallingSolver derives samara autorotation and reverses it when the blade p
   // endpoint makes 1500 an outer bound on rpm per m/s.
   const rpmPerDescent = (left.angularVelocity[1] * 60) / (2 * Math.PI * -left.velocity[1]);
   assert.ok(rpmPerDescent >= 1200 && rpmPerDescent <= 1500, `observed slope ${rpmPerDescent}`);
+});
+
+test('FallingSolver rejects late invalid air, sweeps and reentrancy without publishing any accepted row', async () => {
+  using fall = await FallingSolver.load({ rate: 0 });
+  const memory = worldMemory(false);
+  const cell = [-6, 2, 7];
+  const context = { tick: 0, level: 0, seed: 9, cell, inputs: new Map() };
+  let action;
+  let sampled = 0;
+  const air = {
+    medium: 'air',
+    cell,
+    sample(x, _y, _z, _time, out) {
+      sampled++;
+      if (action === 'reenter' && x > 1) fall.step(context, 1 / 60);
+      if (action === 'grow') {
+        action = undefined;
+        memory.grow(1);
+      }
+      out.density = action === 'air' && x > 1 ? NaN : 1.2;
+      out.temperature = temperature;
+      return out;
+    },
+  };
+  const boundary = {
+    cell,
+    sweep(centre) {
+      return action === 'sweep' && centre[0] > 1 ? { fraction: 0.5 } : null;
+    },
+  };
+  const bodies = [0, 2].map((x) => ({
+    kind: 'sphere',
+    diameter: 0.02,
+    mass: 0.01,
+    position: [x, 3, 0],
+    velocity: [0, -1, 0],
+    drag: () => (action === 'drag' && x > 1 ? 1n : 0.47),
+  }));
+  const world = new PhysicsWorld({ rate, memory }).add(fall, { bodies, wind: air, boundary }, cell);
+  const before = world.takeSnapshot();
+  for (const [failure, repair] of [
+    ['air', /sampled invalid air.*errors#falling/],
+    ['reenter', /between steps.*read-only.*errors#falling/],
+    ['drag', /drag law.*finite nonnegative.*errors#falling/],
+    ['sweep', /invalid contact.*outward normal.*errors#falling/],
+  ]) {
+    action = failure;
+    sampled = 0;
+    assert.throws(() => fall.step(context, 1 / 60), repair);
+    assert.equal(sampled, 2);
+    assert.deepEqual(world.takeSnapshot().bytes, before.bytes);
+    assert.equal(fall.readNativeWork(), undefined);
+  }
+  action = 'grow';
+  const buffer = memory.buffer;
+  fall.step(context, 1 / 60);
+  assert.notEqual(memory.buffer, buffer);
+  assert.ok(fall.pose(0).position[1] < 3 && fall.pose(1).position[1] < 3);
+  const accepted = world.takeSnapshot();
+  const work = fall.readNativeWork();
+  assert.equal(work.bodies, 2);
+  assert.deepEqual(fall.exportPorts(0)[0].cell, cell);
+  world.shiftOrigin([5, -4, 2]);
+  assert.deepEqual(fall.exportPorts(0)[0].cell, [-11, 6, 5]);
+  world.restoreSnapshot(before.bytes);
+  assert.deepEqual(fall.exportPorts(0)[0].cell, cell);
+  fall.step(context, 1 / 60);
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  action = 'sweep';
+  assert.throws(() => fall.step(context, 1 / 60), /invalid contact.*#falling/);
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  assert.deepEqual(fall.readNativeWork(), work);
+});
+
+test('FallingSolver refuses an unrepresentable draw row without overwriting the caller buffer', async () => {
+  using fall = await FallingSolver.load();
+  const bodies = [0.5, 1e40].map((x) => ({
+    kind: 'sphere',
+    mass: 0.2,
+    diameter: 0.1,
+    position: [x, 1, 0],
+  }));
+  new PhysicsWorld({ rate }).add(fall, { bodies });
+  const out = new Float32Array(2 * FALLING_SPHERE_DRAW_WORDS).fill(9);
+  assert.throws(
+    () => fall.writeSpheres(out),
+    (error) => error.code === 'state' && /f32 range.*nearby render origin.*errors#falling/.test(error.message),
+  );
+  assert.ok(out.every((value) => value === 9));
+  fall.writeSpheres(out.subarray(0, FALLING_SPHERE_DRAW_WORDS));
+  assert.equal(out[0], 0.5);
+  assert.equal(fall.pose(1).position[0], 1e40);
 });

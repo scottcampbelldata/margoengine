@@ -705,3 +705,13 @@ Samuel Morin, Yves Lejeune, Bernard Lesaffre, Jean-Michel Panel, Daniel Poncet, 
 
 - Burton et al. (2012), [Laboratory investigations of iceberg capsize dynamics](https://doi.org/10.1029/2011JF002055). The diagnostic uses sparse factual readings from Figure 5. The [archived measurements](https://doi.org/10.7265/N56H4FCJ) carry CC BY-NC 4.0 and are referenced separately.
 - Heller et al. (2019), [Large-scale experiments into the tsunamigenic potential of different iceberg calving mechanisms](https://doi.org/10.1038/s41598-018-36634-3), CC BY 4.0. The motion file is supplied externally from the authors' [SPHERIC Test 15](https://www.spheric-sph.org/tests/test-15). The engine bundles neither archive.
+
+### AERO-05 samara measurements
+
+`packages/physics/scripts/aero05-samara-measured.mjs` transcribes a small set of Norway maple morphology and
+still-air laboratory descent and spin statistics from Table 1 of Gary K. Nave Jr., Nathaniel Hall, Katrina Somers,
+Brock Davis, Hope Gruszewski, Craig Powers, Michael Collver, David G. Schmale III and Shane D. Ross,
+[*Wind Dispersal of Natural and Biomimetic Maple Samaras*](https://doi.org/10.3390/biomimetics6020023),
+Biomimetics 6(2), 23 (2021), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+The script converts to SI and derives representative planform area from mean wing loading. Original figures, video,
+models and raw records are not included.

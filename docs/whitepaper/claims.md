@@ -7133,3 +7133,11 @@ Ground locomotion retains accepted row state if a later terrain sample fails and
 its owning memory. Independent native participants preserve complete accepted bytes with the same mixed body
 group. The reduced snake model predicts a direction reversal at shallower slopes than measured under
 independent cloth friction and prescribed shape inputs. [Scope and measured error](../limits.md#ground-animal-locomotion-life-02).
+
+### AERO-05 accepted flight rows and independent samara drops
+
+Mixed plate, seed and sphere snapshots agree across one, two and four native participants at signed cells.
+A rejected air sample or late contact preserves accepted pose and work. The calibrated two-lane test shows
+the existing seed model develops spin and loses less height than a vacuum drop. Both backends repeat complete
+accepted state and captured pixels. Independent Norway maple measurements show the fixed-axis model
+underestimates descent speed in both cohorts. [Observed spread and limits](../limits.md#falling-plates-winged-seeds-and-hail-aero-05).
