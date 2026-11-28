@@ -4363,7 +4363,7 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   `packages/physics/tests/coupling/loads-paddle.test.js` and `loads-wading.test.js` check wet momentum,
   drying rejection and replay.
 
-### Open 2026-11-27: a limp ragdoll's spine is drawn 7 cm off its body after a 3 s fall (KB-RAGDOLL-LIMPDRAW1, ragdoll or physics)
+### Fixed 2026-11-28: a limp ragdoll's spine was drawn 7 cm off its body after a 3 s fall (KB-RAGDOLL-LIMPDRAW1, physics)
 
 - **Repro:** `node --test --test-name-pattern="limp: the ragdoll falls" packages/ragdoll/tests/ragdoll.test.js` on main at
   256a80a04, with the DYN-07 changes taken out and physics and ragdoll rebuilt: "spine drawn at its body: 0.069 is not 0
@@ -4383,11 +4383,9 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   floor and no gravity: a 1 g hub with three 15 g arms started 2 cm off their anchors is still 3.2 mm open after 1 s and
   0.26 mm after 2 s, where a path of the same bodies closes in a step. With sleep on (the JS default) the island can sleep
   with the gap open (1.0 cm, frozen).
-- **Next:** solve a tree of locks exactly, as paths are now: Baraff 1996 ("Linear-time dynamics using Lagrange multipliers")
-  factors any acyclic joint graph in linear time with no fill, ordered leaves first, so a hub between heavy arms is solved
-  with them. A solver design change in `joints.rs` (path factors, `push_share`, the warm start's search): plan it first, then
-  keep `tests/joints.rs` trees, rings, grids and `stability.rs` webs to their bars.
-
+- **Fixed 2026-11-28:** the paths that meet at branch bodies are one group (`group_trees`, `kernel/src/joints.rs`, union-find over the paths, Tarjan 1975, Efficiency of a good but not linear set union algorithm, https://doi.org/10.1145/321879.321884), and a group whose moving bodies hold no loop (its joints between two moving bodies one fewer than those bodies) is a tree: its paths are listed together and the lock projection solves the whole tree exactly in one Newton step on its matrix J W G^T, which takes any topology (Baraff 1996, Linear-time dynamics using Lagrange multipliers, https://www.cs.cmu.edu/~baraff/papers/sig96.pdf, solves any acyclic joint graph exactly). A second cause showed once the tree was one solve: `push_share` read each joint's push on the hub as its own, and each alone spins a 1 g hub hard where the three nearly cancel, so the step was cut to a share that closed 3e-5 m an iterate and a swinging hub opened 1.65 mm in half a second. A body's gain is now summed over every joint of the path or tree that holds it, as it was for the two joints of a body inside a path. A group with a loop (rings, grids) stays loose and is left to the passes (KB-PHYS-LOCKGRIDSLOW1).
+- **Measured:** the native hub started 2 cm off, no gravity: 4.0e-3 m open after a step before, 8.3e-9 m now; hung by an arm and swinging 3 s: 1.3e-6 m (before: 0.8 mm from the first step, 4 mm started off). `ragdoll.test.js` 22 of 22, "limp: the ragdoll falls" included (bar 0.02).
+- **Regression:** `a_light_hub_between_heavy_arms_holds_its_joints` in `packages/physics/kernel/tests/joints.rs` (fails after one step without the tree group, and at 2.3 mm in the swing with the group but per-joint gains); "limp: the ragdoll falls, its joints hold together" in `packages/ragdoll/tests/ragdoll.test.js`.
 ### Open 2026-11-27: a flexible pipe in strongly sheared flow swings 40 % short of the measurement across it (KB-PHYS-RODVIVSHEAR1, physics loads)
 
 - **Repro:** `packages/physics/tests/rod-viv.test.js`, Fu et al. (2025)'s linearly sheared pipe at 1.0 m/s (their Fig. 12):

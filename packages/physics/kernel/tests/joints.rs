@@ -1283,3 +1283,55 @@ fn an_exact_path_closes_its_share_of_a_gap_each_substep() {
         assert!((left - expected).abs() < 0.01, "a share of {share} at {substeps} substeps leaves {left} m, not {expected}");
     }
 }
+
+/// A 1 g hub (a ball of r 0.05) with three arms of two 15 g links of 0.2 m, out along +y, -x and +x tilted down, on spherical
+/// joints, the hub started `off` along x from where its joints hold; with `hang` the first arm's end is pinned to a fixed body.
+/// The widest any joint opens after the first step, and over `seconds`.
+fn light_hub(off: f32, gravity: bool, hang: bool, seconds: f32) -> (f32, f32) {
+    let mut w = world(16);
+    if !gravity {
+        w.header_mut().gravity = [0.0, 0.0, 0.0];
+    }
+    let hub = point(&mut w, v3(off, 0.0, 0.0), 0.001, 1e-6);
+    let mut joints = vec![];
+    let dirs = [v3(0.0, 1.0, 0.0), v3(-0.6, -0.8, 0.0), v3(0.6, -0.8, 0.0)];
+    let mut tip = 0;
+    for (d, dir) in dirs.iter().enumerate() {
+        let mut above = hub;
+        let mut on_above = dir.scale(0.05);
+        for i in 0..2 {
+            let link = point(&mut w, dir.scale(0.05 + 0.1 + 0.2 * i as f32), 0.015, 5e-5);
+            joints.push(spherical(&mut w, above, link, on_above, dir.scale(-0.1)));
+            above = link;
+            on_above = dir.scale(0.1);
+        }
+        if d == 0 {
+            tip = above;
+        }
+    }
+    if hang {
+        let top = anchor(&mut w);
+        joints.push(spherical(&mut w, top, tip, dirs[0].scale(0.45), dirs[0].scale(0.1)));
+    }
+    w.step(DT);
+    let first = worst_gap(&w, &joints);
+    let mut worst = first;
+    for _ in 1..(seconds * 60.0) as usize {
+        w.step(DT);
+        worst = worst.max(worst_gap(&w, &joints));
+    }
+    (first, worst)
+}
+
+#[test]
+fn a_light_hub_between_heavy_arms_holds_its_joints() {
+    // KB-RAGDOLL-LIMPDRAW1: a path ends at every branch, so the three paths at a hub met only by Gauss-Seidel at the loose
+    // share, and each arm's push moved the light hub back and forth: started 2 cm off, the hub's joints stood 3.2 mm open after
+    // a second, and a limp ragdoll's 1 g hips stood 2 cm off its thighs and spine. The tree is one exact projection now.
+    let (first, worst) = light_hub(0.02, false, false, 1.0);
+    println!("light hub, no gravity: {first:.2e} m after a step, {worst:.2e} m over 1 s");
+    assert!(first < 1e-4, "the hub's joints stood {first} m open after a step");
+    let (_, worst) = light_hub(0.02, true, true, 3.0);
+    println!("light hub hung by an arm, swinging 3 s: worst gap {worst:.2e} m");
+    assert!(worst < 5e-4, "a joint opened by {worst} m");
+}

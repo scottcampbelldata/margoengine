@@ -810,6 +810,7 @@ impl World {
             }
         }
         self.header_mut().joint_solving = solving as u32;
+        self.group_trees(solving);
         // The first joint listed on each island keeps its sums for the warm start.
         let moves = |w: &World, body: usize| w.flags(body) & KIND == DYNAMIC && w.is_awake(body);
         for i in 0..solving {
@@ -839,6 +840,172 @@ impl World {
         self.place_newton(solving);
     }
 
+    /// The last list place of the projection's group that starts at `first`: its path, and the paths of its tree after it
+    /// (`group_trees`, SOLVE_EXACT 2).
+    fn group_last(&self, first: usize, solving: usize) -> usize {
+        let mut last = first;
+        while last + 1 < solving && (self.uu(SOLVE_VIA, last + 1) != NONE || self.uu(SOLVE_EXACT, last + 1) == 2) {
+            last += 1;
+        }
+        last
+    }
+
+    /// Joins into one group the paths that meet at a branch body, and makes a group whose moving bodies hold no loop (its joints
+    /// between two moving bodies one fewer than those bodies) a tree: one exact solve of the lock projection, its paths listed
+    /// together in their order, the first marked 1 in SOLVE_EXACT and the rest 2, at joint_share. A path ends at every branch
+    /// (`walk_path`), so the paths of a tree met at its hubs only loosely, by Gauss-Seidel at joint_loose_share, and a light hub
+    /// between heavy arms was moved back and forth by each arm's push in turn: a ragdoll's 1 g hips between 15 g thighs stood
+    /// 2 cm off its joints after a fall (KB-RAGDOLL-LIMPDRAW1). The projection's Newton matrix J W G^T takes any topology, and a
+    /// tree's whole is solved exactly as any acyclic joint graph is (Baraff 1996, Linear-time dynamics using Lagrange
+    /// multipliers). A group with a loop stays loose and is left to the passes (`project_to`). The paths are joined by
+    /// union-find, each group's root its lowest list place (Tarjan 1975, Efficiency of a good but not linear set union
+    /// algorithm, https://doi.org/10.1145/321879.321884). Scratch: a branch body's first path in LOCK_SUM_0 and a counted body
+    /// in LOCK_SUM_1, both zero again after (`move_path` keeps them zero between its moves); per path place the parent in
+    /// JOINT_ORDER and the counts in SOLVE_NEWTON, SOLVE_LEAD and JOINT_TEMP, which `prepare_joints` writes again after this.
+    fn group_trees(&mut self, solving: usize) {
+        fn path_end(w: &World, i: usize, solving: usize) -> usize {
+            let mut end = i + 1;
+            while end < solving && w.uu(SOLVE_VIA, end) != NONE {
+                end += 1;
+            }
+            end
+        }
+        fn find(w: &World, mut p: usize) -> usize {
+            while w.uu(JOINT_ORDER, p) as usize != p {
+                p = w.uu(JOINT_ORDER, p) as usize;
+            }
+            p
+        }
+        let locks = |w: &World, k: usize| lock_rows(w.uu(JOINT_FLAGS, w.uu(SOLVE_JOINTS, k) as usize)).0 != 0;
+        let ends = |w: &World, k: usize| {
+            let row = w.uu(SOLVE_JOINTS, k) as usize;
+            [w.uu(JOINT_A, row) as usize, w.uu(JOINT_B, row) as usize]
+        };
+        let moves = |w: &World, body: usize| w.flags(body) & KIND == DYNAMIC && w.is_awake(body);
+        let mut any = false;
+        let mut i = 0;
+        while i < solving {
+            let end = path_end(self, i, solving);
+            self.set_u(JOINT_ORDER, i, i as u32);
+            for k in i..end {
+                if !locks(self, k) {
+                    continue;
+                }
+                for body in ends(self, k) {
+                    if !self.branches(body) {
+                        continue;
+                    }
+                    any = true;
+                    let seen = self.uu(LOCK_SUM_0, body);
+                    if seen == 0 {
+                        self.set_u(LOCK_SUM_0, body, i as u32 + 1);
+                        continue;
+                    }
+                    let (x, y) = (find(self, i), find(self, seen as usize - 1));
+                    if x != y {
+                        let (low, high) = if x < y { (x, y) } else { (y, x) };
+                        self.set_u(JOINT_ORDER, high, low as u32);
+                    }
+                }
+            }
+            i = end;
+        }
+        if !any {
+            return;
+        }
+        // Each group's moving bodies, its joints between two of them and its paths, at its root.
+        let mut i = 0;
+        while i < solving {
+            let end = path_end(self, i, solving);
+            for column in [SOLVE_NEWTON, SOLVE_LEAD, JOINT_TEMP] {
+                self.set_u(column, i, 0);
+            }
+            i = end;
+        }
+        let mut i = 0;
+        while i < solving {
+            let end = path_end(self, i, solving);
+            let root = find(self, i);
+            self.set_u(JOINT_TEMP, root, self.uu(JOINT_TEMP, root) + 1);
+            for k in i..end {
+                if !locks(self, k) {
+                    continue;
+                }
+                let [a, b] = ends(self, k);
+                if moves(self, a) && moves(self, b) {
+                    self.set_u(SOLVE_LEAD, root, self.uu(SOLVE_LEAD, root) + 1);
+                }
+                for body in [a, b] {
+                    if moves(self, body) && self.uu(LOCK_SUM_1, body) == 0 {
+                        self.set_u(LOCK_SUM_1, body, 1);
+                        self.set_u(SOLVE_NEWTON, root, self.uu(SOLVE_NEWTON, root) + 1);
+                    }
+                }
+            }
+            i = end;
+        }
+        let share = self.header().joint_share;
+        let mut i = 0;
+        while i < solving {
+            let end = path_end(self, i, solving);
+            let root = find(self, i);
+            if self.uu(JOINT_TEMP, root) > 1 && self.uu(SOLVE_LEAD, root) + 1 == self.uu(SOLVE_NEWTON, root) {
+                for k in i..end {
+                    self.set_u(SOLVE_EXACT, k, 1);
+                    self.set_s(SOLVE_SHARE, k, share);
+                }
+                if root != i {
+                    self.set_u(SOLVE_EXACT, i, 2);
+                }
+            }
+            i = end;
+        }
+        // A tree's paths together, at the place of its first; every other path keeps its place in the order.
+        let mut i = 0;
+        while i < solving {
+            let end = path_end(self, i, solving);
+            let key = if self.uu(SOLVE_EXACT, i) != 0 { find(self, i) } else { i };
+            self.set_u(JOINT_TEMP, i, key as u32);
+            self.set_u(SOLVE_LEAD, i, 0);
+            i = end;
+        }
+        let mut i = 0;
+        while i < solving {
+            let end = path_end(self, i, solving);
+            let key = self.uu(JOINT_TEMP, i) as usize;
+            self.set_u(SOLVE_LEAD, key, self.uu(SOLVE_LEAD, key) + (end - i) as u32);
+            i = end;
+        }
+        let mut placed = 0u32;
+        let mut i = 0;
+        while i < solving {
+            let end = path_end(self, i, solving);
+            let key = self.uu(JOINT_TEMP, i) as usize;
+            if key == i {
+                self.set_u(SOLVE_NEWTON, i, placed);
+                placed += self.uu(SOLVE_LEAD, i);
+            }
+            let at = self.uu(SOLVE_NEWTON, key);
+            self.set_u(SOLVE_NEWTON, key, at + (end - i) as u32);
+            for k in i..end {
+                for body in ends(self, k) {
+                    self.set_u(LOCK_SUM_0, body, 0);
+                    self.set_u(LOCK_SUM_1, body, 0);
+                }
+                self.set_u(JOINT_ORDER, k, at + (k - i) as u32);
+            }
+            i = end;
+        }
+        for column in [SOLVE_JOINTS, SOLVE_VIA, SOLVE_SHARE, SOLVE_EXACT] {
+            for k in 0..solving {
+                self.set_u(JOINT_TEMP, self.uu(JOINT_ORDER, k) as usize, self.uu(column, k));
+            }
+            for k in 0..solving {
+                self.set_u(column, k, self.uu(JOINT_TEMP, k));
+            }
+        }
+    }
+
     /// Gives each path of the solving joints its own slice of NEWTON for the locks' Newton solve (`newton_right`), sized by its
     /// lock rows, so islands solving at once never share one; grows NEWTON when the paths need more. A copy of the world's bytes
     /// keeps every solve. When memory cannot hold them, every path is marked NONE and the step reports the failure.
@@ -848,7 +1015,7 @@ impl World {
         while first < solving {
             let mut rows = lock_rows(self.uu(JOINT_FLAGS, self.uu(SOLVE_JOINTS, first) as usize)).0 as u64;
             let mut last = first;
-            while last + 1 < solving && self.uu(SOLVE_VIA, last + 1) != NONE {
+            while last + 1 < solving && (self.uu(SOLVE_VIA, last + 1) != NONE || self.uu(SOLVE_EXACT, last + 1) == 2) {
                 last += 1;
                 rows += lock_rows(self.uu(JOINT_FLAGS, self.uu(SOLVE_JOINTS, last) as usize)).0 as u64;
             }
@@ -2065,30 +2232,46 @@ impl World {
         [(body_a.linear, body_a.angular, view.arms[0]), (body_b.linear, body_b.angular, view.arms[1])]
     }
 
-    /// How much of a path's push to take. See the head of this file. A body between two joints gains from both.
-    fn push_share(&self, first: usize, last: usize, asked: f32, h: f32) -> f32 {
+    /// How much of a path's push to take. See the head of this file. A body gains from every joint of the path or tree that holds
+    /// it, summed (LOCK_SUM_0 to 6 as f32: its linear and turning gain, and the longest arm it is held by, zero again after).
+    /// Read joint by joint, a light hub between three heavy arms took each arm's push as its own and the step was cut to a
+    /// share that closed 3e-5 m an iterate, where the three pushes on the hub nearly cancel (KB-RAGDOLL-LIMPDRAW1,
+    /// `a_light_hub_between_heavy_arms_holds_its_joints`). A body between two joints of a path gains from both, as before.
+    fn push_share(&mut self, first: usize, last: usize, asked: f32, h: f32) -> f32 {
         let (mut top, mut turn) = (0.0f32, 0.0f32);
-        let mut carried = (v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0), 0.0f32);
+        let sum = |w: &World, body: usize, k: usize| f32::from_bits(w.uu(LOCK_SUM_0 + k, body));
         for i in first..=last {
             let row = self.uu(SOLVE_JOINTS, i) as usize;
             let gains = self.gains(row);
-            let from = if i > first { self.uu(SOLVE_VIA, i) } else { NONE };
-            let onward = if i < last { self.uu(SOLVE_VIA, i + 1) } else { NONE };
-            for (gain, body) in gains.iter().zip([self.uu(JOINT_A, row), self.uu(JOINT_B, row)]) {
-                if body == onward {
-                    carried = *gain;
-                } else {
-                    let whole = if body == from { (gain.0.add(carried.0), gain.1.add(carried.1), gain.2.max(carried.2)) } else { *gain };
-                    let spin = sqrt(whole.1.dot(whole.1));
-                    top = top.max(sqrt(whole.0.dot(whole.0)) + whole.2 * spin);
-                    let now = self.v(ANGULAR_X, body as usize);
-                    let then = now.add(whole.1);
-                    turn = turn.max(sqrt(then.dot(then)) - sqrt(now.dot(now)));
-                    if whole.2 > 0.0 {
-                        let now = self.v(LINEAR_X, body as usize);
-                        let then = now.add(whole.0);
-                        turn = turn.max((sqrt(then.dot(then)) - sqrt(now.dot(now))) / whole.2);
-                    }
+            for (gain, body) in gains.iter().zip([self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize]) {
+                let parts = [gain.0.x, gain.0.y, gain.0.z, gain.1.x, gain.1.y, gain.1.z];
+                for (k, part) in parts.into_iter().enumerate() {
+                    self.set_u(LOCK_SUM_0 + k, body, (sum(self, body, k) + part).to_bits());
+                }
+                self.set_u(LOCK_SUM_0 + 6, body, sum(self, body, 6).max(gain.2).to_bits());
+            }
+        }
+        for i in first..=last {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            for body in [self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize] {
+                let whole = (v3(sum(self, body, 0), sum(self, body, 1), sum(self, body, 2)), v3(sum(self, body, 3), sum(self, body, 4), sum(self, body, 5)), sum(self, body, 6));
+                let spin = sqrt(whole.1.dot(whole.1));
+                top = top.max(sqrt(whole.0.dot(whole.0)) + whole.2 * spin);
+                let now = self.v(ANGULAR_X, body);
+                let then = now.add(whole.1);
+                turn = turn.max(sqrt(then.dot(then)) - sqrt(now.dot(now)));
+                if whole.2 > 0.0 {
+                    let now = self.v(LINEAR_X, body);
+                    let then = now.add(whole.0);
+                    turn = turn.max((sqrt(then.dot(then)) - sqrt(now.dot(now))) / whole.2);
+                }
+            }
+        }
+        for i in first..=last {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            for body in [self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize] {
+                for k in 0..7 {
+                    self.set_u(LOCK_SUM_0 + k, body, 0);
                 }
             }
         }
@@ -2561,10 +2744,7 @@ impl World {
             let mut first = from;
             // Each path's step and the gap it stood at, for a backtracking line search on the gap, in its joints' LockStep.
             while first < solving {
-                let mut last = first;
-                while last + 1 < solving && self.uu(SOLVE_VIA, last + 1) != NONE {
-                    last += 1;
-                }
+                let last = self.group_last(first, solving);
                 let lead = self.uu(SOLVE_JOINTS, first) as usize;
                 // A loose path, of a loop, is not projected: its passes close its share of the gap, as before the projection
                 // (`solve_path`), and `shed_locks` takes no midpoint move from its bodies. Stepped by its share an iterate, the
@@ -2590,7 +2770,16 @@ impl World {
                 // (`an_exact_path_closes_its_share_of_a_gap_each_substep`). Near a pose where the rows turn dependent the step is
                 // a Gauss-Newton step past its first order model, so it is cut by `push_share` as the pushing pass's bias was
                 // (Buss and Kim 2005; see the head of this file).
-                let asked = self.path_right_to(first, last, 1.0 / h, to);
+                let mut asked = 0.0f32;
+                let mut start = first;
+                while start <= last {
+                    let mut end = start;
+                    while end < last && self.uu(SOLVE_VIA, end + 1) != NONE {
+                        end += 1;
+                    }
+                    asked += self.path_right_to(start, end, 1.0 / h, to);
+                    start = end + 1;
+                }
                 self.newton_right(first, last, 1.0 / h, to, counted);
                 let by = h * self.push_share(first, last, asked, h);
                 let before = self.widest_lock(first, last, to);
@@ -2634,10 +2823,7 @@ impl World {
                 let mut cut = false;
                 let mut first = from;
                 while first < solving {
-                    let mut last = first;
-                    while last + 1 < solving && self.uu(SOLVE_VIA, last + 1) != NONE {
-                        last += 1;
-                    }
+                    let last = self.group_last(first, solving);
                     let (path, next) = ((first, last), last + 1);
                     first = next;
                     let lead = unsafe { *self.lock_step(self.uu(SOLVE_JOINTS, path.0) as usize) };
