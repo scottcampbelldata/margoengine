@@ -63,7 +63,17 @@ const writeMotion = (out, file, motion) =>
  * `probes/<name>.next-velocity.f32`, the engine's own motion of each pixel of the probe and of the next frame, in pixels.
  * @param {{ out: string, name: string, nextFile: string, next?: { eye?: number[], depth?: { file: string, exact?: string }, water?: { file: string }, velocity?: { file: string, jitter: number[], scale: number } }, velocity?: { file: string, jitter: number[], scale: number }, eye: number[], viewProjection: number[], nextViewProjection: number[], shot: { moving: { depthScale: number }, horizon: { y: number } | null, aovs: string[] } }} options
  */
-export async function writeMoving({ out, name, nextFile, next, velocity, eye, viewProjection, nextViewProjection, shot }) {
+export async function writeMoving({
+  out,
+  name,
+  nextFile,
+  next,
+  velocity,
+  eye,
+  viewProjection,
+  nextViewProjection,
+  shot,
+}) {
   const water = shot.aovs.includes('water'),
     { ndc, width, height } = await ndcOf({
       out,
@@ -88,7 +98,11 @@ export async function writeMoving({ out, name, nextFile, next, velocity, eye, vi
     viewProjection: nextViewProjection,
     shot,
   });
-  writeMotion(out, `probes/${name}.back.f32`, reprojectionMotion(after.ndc, nextViewProjection, viewProjection, width, height));
+  writeMotion(
+    out,
+    `probes/${name}.back.f32`,
+    reprojectionMotion(after.ndc, nextViewProjection, viewProjection, width, height),
+  );
   const moved = { ...entry, back: `probes/${name}.back.f32` };
   if (velocity?.file) {
     writeMotion(out, `probes/${name}.velocity.f32`, velocityInPixels(out, velocity, width, height));

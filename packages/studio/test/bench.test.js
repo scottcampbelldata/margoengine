@@ -136,12 +136,21 @@ test('a mesh added with fit: false stays out of the auto-fit box, so a big floor
   addSubject(subjects, subject, true);
   assert.equal(subjects.size, 1, 'the excluded floor is not registered');
   const found = await subjectBox(subjects);
-  assert.ok(found.max[0] - found.min[0] < 1.5 && found.max[2] - found.min[2] < 1.5, 'the box is the 1 m subject, not the 140 m floor');
+  assert.ok(
+    found.max[0] - found.min[0] < 1.5 && found.max[2] - found.min[2] < 1.5,
+    'the box is the 1 m subject, not the 140 m floor',
+  );
   const camera = { fov: 35, position: [-1.87, 6.02, 7.72], target: [0, 0.16, 0] },
     framed = frameView(camera, found, 0.8, 1.6),
-    swamped = frameView(camera, (await subjectBox([floor, subject])), 0.8, 1.6);
-  assert.ok(Math.hypot(...framed.position.map((v, a) => v - framed.target[a])) < 8, 'the camera comes in on the subject');
-  assert.ok(Math.hypot(...swamped.position.map((v, a) => v - swamped.target[a])) > 100, 'counting the floor would pull the camera far out');
+    swamped = frameView(camera, await subjectBox([floor, subject]), 0.8, 1.6);
+  assert.ok(
+    Math.hypot(...framed.position.map((v, a) => v - framed.target[a])) < 8,
+    'the camera comes in on the subject',
+  );
+  assert.ok(
+    Math.hypot(...swamped.position.map((v, a) => v - swamped.target[a])) > 100,
+    'counting the floor would pull the camera far out',
+  );
   removeFloor();
   const removeSubject = addSubject(subjects, subject, true);
   removeSubject();
@@ -151,7 +160,12 @@ test('a mesh added with fit: false stays out of the auto-fit box, so a big floor
 
 test('coveOrbitLimits keeps the frame inside a cove: no edge ray turns past the open sides', () => {
   // Regression: orbiting the CAD bench about 90 degrees looked past the cove's open side onto the clear colour.
-  for (const [fov, aspect] of [[36, 16 / 9], [36, 1.36], [50, 1], [20, 0.6]]) {
+  for (const [fov, aspect] of [
+    [36, 16 / 9],
+    [36, 1.36],
+    [50, 1],
+    [20, 0.6],
+  ]) {
     const { azimuth, maxPolar } = coveOrbitLimits(fov, aspect),
       half = Math.atan(Math.tan((fov * Math.PI) / 360) * aspect);
     assert.equal(azimuth[0], -azimuth[1]);

@@ -58,7 +58,10 @@ try {
       }
     const S = 128,
       canvas = document.body.appendChild(document.createElement('canvas'));
-    const engine = await Engine.create(canvas, { exactSize: [S, S], camera: { position: [0, 0, 3.4], target: [0, 0, 0] } });
+    const engine = await Engine.create(canvas, {
+      exactSize: [S, S],
+      camera: { position: [0, 0, 3.4], target: [0, 0, 0] },
+    });
     const gpuErrors = [];
     engine.gpu.addEventListener('uncapturederror', (ev) => gpuErrors.push(ev.error.message));
     const environment = await Environment.attach(engine, studio());

@@ -75,7 +75,9 @@ export class AttributeReads implements Resource {
           `Mesh geometry has no attribute '${name}', which its material reads; add attributes: {${name}: {data, type: '${t}'}}`,
         );
       if (given.type !== t)
-        throw new TypeError(`Mesh geometry attribute '${name}' is ${given.type}, and its material reads it as ${t}; give the geometry a ${t} attribute named '${name}'`);
+        throw new TypeError(
+          `Mesh geometry attribute '${name}' is ${given.type}, and its material reads it as ${t}; give the geometry a ${t} attribute named '${name}'`,
+        );
       if (given.data?.length !== total * size)
         throw new RangeError(
           `Mesh geometry attribute '${name}' needs ${total * size} values (${total} vertices of ${t}), not ${given.data?.length}`,

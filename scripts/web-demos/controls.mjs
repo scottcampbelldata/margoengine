@@ -381,7 +381,13 @@ function probe() {
     for (let i = 0; i < 2 && up && up !== document.body; i++, up = up.parentElement) {
       if (up.querySelectorAll(SEL).length > 1 || clean(up.textContent).length > 120) break;
       // A button has no value label: a status line beside it ("Preparing the photon bake") is what it changes.
-      if (!el.matches('input,select,textarea,[role=slider],[role=spinbutton]') && [...up.querySelectorAll('[role=status],[role=alert],[aria-live],output')].some((s) => !roots.includes(s) && !el.contains(s))) break;
+      if (
+        !el.matches('input,select,textarea,[role=slider],[role=spinbutton]') &&
+        [...up.querySelectorAll('[role=status],[role=alert],[aria-live],output')].some(
+          (s) => !roots.includes(s) && !el.contains(s),
+        )
+      )
+        break;
       roots.push(up);
     }
     return roots;
@@ -423,7 +429,10 @@ function probe() {
     const out = [];
     // Pictures first, then still images: a path-traced page shows a traced still until its live view starts, and a
     // setting may swap one still for another.
-    for (const el of [...document.querySelectorAll('canvas,svg,video,[role=img]'), ...document.querySelectorAll('img')]) {
+    for (const el of [
+      ...document.querySelectorAll('canvas,svg,video,[role=img]'),
+      ...document.querySelectorAll('img'),
+    ]) {
       if (el.tagName.toLowerCase() === 'svg' && el.parentElement?.closest('svg')) continue;
       if (el.closest(SEL)) continue;
       if (el.getAttribute('role') === 'img' && el.querySelector('canvas,svg')) continue;
@@ -676,7 +685,10 @@ class Session {
       .waitForFunction(
         () => {
           // data-error="false" (glsl-welcome's status line) means no error.
-          if (document.querySelector('[data-error]:not([data-error="false"]):not([data-error=""]), [data-state="error"]')) return 'error';
+          if (
+            document.querySelector('[data-error]:not([data-error="false"]):not([data-error=""]), [data-state="error"]')
+          )
+            return 'error';
           return document.querySelector('[data-ready], [data-state="ready"]') ? 'ready' : false;
         },
         null,
@@ -914,7 +926,12 @@ async function setValue(s, p, v) {
       // A typed field in a form with a submit button ("Lower limit" then "Apply range") acts when Enter submits the
       // form, as a visitor would press it. The page handles the submit; the window listener, last in line, only
       // stops a form without a handler from leaving the page.
-      if (!el.form || !/^(number|text|search)$/.test(el.type) || !el.form.querySelector('[type=submit],button:not([type])')) return false;
+      if (
+        !el.form ||
+        !/^(number|text|search)$/.test(el.type) ||
+        !el.form.querySelector('[type=submit],button:not([type])')
+      )
+        return false;
       const stay = (e) => e.preventDefault();
       window.addEventListener('submit', stay);
       try {
@@ -1122,7 +1139,8 @@ function refine(c, d) {
   }
   const slug = d?.slug ?? d?.demo?.replace(/@.*$/, ''),
     rows = byDesign.filter(
-      (x) => x.demo === slug && c.label?.startsWith(x.control) && (!x.backend || x.backend === (d?.backend ?? 'webgpu')),
+      (x) =>
+        x.demo === slug && c.label?.startsWith(x.control) && (!x.backend || x.backend === (d?.backend ?? 'webgpu')),
     );
   // Stops that draw the same picture by design (a value the picture does not show): reported with the reason.
   const alike = rows.find((x) => x.stops);
@@ -1647,7 +1665,8 @@ function writeMarkdown() {
     for (const c of all(d)) {
       if (c.verdict === 'live' && /acts only while/.test(c.note ?? ''))
         whileRunning.push(`- ${slugOf(d)} (${backendOf(d)}): ${c.label} (${c.note})`);
-      if (c.stopsByDesign) unclear.push({ where: `${slugOf(d)} (${backendOf(d)})`, label: c.label, note: c.stopsByDesign });
+      if (c.stopsByDesign)
+        unclear.push({ where: `${slugOf(d)} (${backendOf(d)})`, label: c.label, note: c.stopsByDesign });
       if (c.verdict === 'unsure')
         unclear.push({
           where: `${slugOf(d)} (${backendOf(d)})`,
@@ -1732,7 +1751,8 @@ if (usage) {
   // Nothing to run: the usage line above is the whole output.
 } else if (mdOnly) {
   // Judge again with the current rules: a dead control that an older rule called unsure goes back to dead first.
-  const REFINED = /^(by design|a tool or|the page asks for|a sound control|a speed or playback|a drag handle|already holds)/;
+  const REFINED =
+    /^(by design|a tool or|the page asks for|a sound control|a speed or playback|a drag handle|already holds)/;
   for (const d of Object.values(report.demos))
     for (const c of d.controls ?? [])
       if (c.verdict === 'unsure' && REFINED.test(c.note ?? '')) Object.assign(c, { verdict: 'dead', note: undefined });

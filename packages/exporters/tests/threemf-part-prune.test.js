@@ -61,7 +61,9 @@ test('each separate part carries only the entries its object uses, and reads bac
       assert.equal(body.match(/<base /g).length, 1, name);
     for (const [, body] of text.matchAll(/<m:pb(?:metallic|specular)displayproperties [^>]*>(.*?)<\/m:pb/g))
       assert.equal(body.match(/<m:pb/g).length, 1, name);
-    for (const [, body] of text.matchAll(/<m:translucentdisplayproperties [^>]*>(.*?)<\/m:translucentdisplayproperties>/g))
+    for (const [, body] of text.matchAll(
+      /<m:translucentdisplayproperties [^>]*>(.*?)<\/m:translucentdisplayproperties>/g,
+    ))
       assert.equal(body.match(/<m:translucent /g).length, 1, name);
   }
   const one = await parse3MFMaterials(together),

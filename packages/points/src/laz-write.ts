@@ -73,7 +73,10 @@ export function compressLAZ(input: ArrayBuffer | Uint8Array, options: LazWriteOp
     kept = 0;
   for (let i = 0, total = view.getUint32(100, true); i < total; i++) {
     const size = next + 54 <= pointDataOffset ? 54 + view.getUint16(next + 20, true) : Number.POSITIVE_INFINITY;
-    if (next + size > pointDataOffset) throw new TypeError('A variable length record runs into the points; the LAS file is damaged, so pass an intact one');
+    if (next + size > pointDataOffset)
+      throw new TypeError(
+        'A variable length record runs into the points; the LAS file is damaged, so pass an intact one',
+      );
     if (view.getUint16(next + 18, true) !== 22204) {
       records.push(file.subarray(next, next + size));
       kept++;

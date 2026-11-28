@@ -245,7 +245,8 @@ export async function loadSurfaceEnergyKernel({
             if (Atomics.load(control, slots.fault)) throw workerFailure ?? new Error('Native worker trapped.');
             if (done === helpers.length) break;
             const remaining = expires - performance.now();
-            if (remaining <= 0) throw new Error('Native helpers timed out after 10 s; check that the worker and Wasm assets are served.');
+            if (remaining <= 0)
+              throw new Error('Native helpers timed out after 10 s; check that the worker and Wasm assets are served.');
             Atomics.wait(control, slots.done, done, remaining);
           }
           for (let part = 0; part < helpers.length; part++) status ||= Atomics.load(control, slots.status + part);

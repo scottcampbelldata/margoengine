@@ -31,7 +31,9 @@ test('the surface hook wraps the whole gltf/pbr surface and chains a second entr
   assert.equal(count(once, 'fn weather_dry_surface(i:Out,front:bool)->Surface {'), 1);
   // The new surface reads the dry one (every map and feature read the material made) and then runs the code.
   const wrapper = once.slice(once.indexOf('fn surface(i:Out,front:bool)->Surface {'));
-  assert.ok(wrapper.startsWith('fn surface(i:Out,front:bool)->Surface {var s=weather_dry_surface(i,front);{let weatherWater='));
+  assert.ok(
+    wrapper.startsWith('fn surface(i:Out,front:bool)->Surface {var s=weather_dry_surface(i,front);{let weatherWater='),
+  );
   assert.ok(wrapper.trimEnd().endsWith('return s;}'));
   const twice = new Snow({ cover: 1 }).materialSurface.shader(once, 2);
   assert.ok(twice.includes('var s=weather_dry_surface(i,front);{let weatherCover='));
@@ -52,7 +54,10 @@ test('Puddles wets a Material surface with its core WGSL bound in group 2, with 
   assert.match(code, /@group\(2\) @binding\(166\) var<uniform> weatherPuddles:WeatherPuddles;/);
   assert.doesNotMatch(code, /@group\(0\) @binding\(160\)/);
   assert.equal(count(code, 'fn weather_noise('), 1);
-  assert.match(code, /weather_puddle_surface\(i\.position,s\.n,s\.base\.rgb,s\.roughness,s\.metal,true,weatherPuddles\)/);
+  assert.match(
+    code,
+    /weather_puddle_surface\(i\.position,s\.n,s\.base\.rgb,s\.roughness,s\.metal,true,weatherPuddles\)/,
+  );
   assert.ok(code.indexOf('let weatherWater=') > code.indexOf('fn weather_dry_surface('));
   assert.equal(effect.shader(input, 2), code, 'cached');
   puddles.options.wetSurfaces = false;

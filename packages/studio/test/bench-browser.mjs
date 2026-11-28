@@ -59,7 +59,12 @@ try {
   // disc did in the top-left corner when it was 40 wide. Read on the empty set, where no shadow can match it.
   let clear = 0;
   for (let k = 0; k < off.data.length; k += 4)
-    if (Math.abs(off.data[k] - 0x77) <= 3 && Math.abs(off.data[k + 1] - 0x73) <= 3 && Math.abs(off.data[k + 2] - 0x6d) <= 3) clear++;
+    if (
+      Math.abs(off.data[k] - 0x77) <= 3 &&
+      Math.abs(off.data[k + 1] - 0x73) <= 3 &&
+      Math.abs(off.data[k + 2] - 0x6d) <= 3
+    )
+      clear++;
   assert.equal(clear, 0, `pixels of the clear colour past the cyclorama edge: ${clear}`);
   // A key, not a flat fill: the box's shadow core sits well under the lit floor (it was 0.86 of it with the softbox fill
   // at 0.55 and the key at 2.6).
@@ -71,7 +76,10 @@ try {
   for (let y = Math.round(0.84 * on.height); y < Math.round(0.97 * on.height); y++)
     for (let x = Math.round(0.86 * on.width); x < on.width; x++) {
       const k = (y * on.width + x) * 4;
-      gnomon = Math.max(gnomon, (off.data[k] + off.data[k + 1] + off.data[k + 2] - on.data[k] - on.data[k + 1] - on.data[k + 2]) / 3);
+      gnomon = Math.max(
+        gnomon,
+        (off.data[k] + off.data[k + 1] + off.data[k + 2] - on.data[k] - on.data[k + 1] - on.data[k + 2]) / 3,
+      );
     }
   assert(gnomon > 35, `the gnomon shadow darkens the floor by ${gnomon} levels`);
   Object.assign(ground, { clear, shade, gnomon });
@@ -96,7 +104,10 @@ try {
       }
     }
   const span = (bottom - top + 1) / framed.height;
-  assert(span > 0.6 && top > 0 && bottom < framed.height - 1, `the framed box spans ${span} of the height, rows ${top}..${bottom}`);
+  assert(
+    span > 0.6 && top > 0 && bottom < framed.height - 1,
+    `the framed box spans ${span} of the height, rows ${top}..${bottom}`,
+  );
   await page.evaluate(() => window.framed.dispose());
   Object.assign(ground, { span });
   const closed = await page.evaluate(() => window.check.dispose());

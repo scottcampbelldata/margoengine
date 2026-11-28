@@ -210,7 +210,11 @@ test('identicalStops finds two stops of one control that give the same picture (
   );
   // the-chain-fountain: the middle of 1 to 2.4 in steps of 0.1 is 1.7000000000000002, which the input holds as 1.7.
   assert.deepEqual(
-    identicalStops([stop('start', '1.7', fringesA), stop('max', '2.4', fringesB), stop('middle', '1.7000000000000002', fringesA)]),
+    identicalStops([
+      stop('start', '1.7', fringesA),
+      stop('max', '2.4', fringesB),
+      stop('middle', '1.7000000000000002', fringesA),
+    ]),
     [],
     'one value written two ways is not a dead stop',
   );
@@ -234,10 +238,17 @@ test('periodOf: whole turns and a day of minutes or hours', () => {
   // the-sky-clock: 0 to 1439 minutes in steps of 1 is one day.
   assert.equal(periodOf({ label: 'Time of day (UTC)', min: '0', max: '1439', step: '1' }), 1440);
   assert.equal(periodOf({ label: 'Hour (UTC)', min: '0', max: '23', step: '1' }), 24);
-  assert.equal(periodOf({ label: 'Discharge', min: '0', max: '1439', step: '1' }), 0, 'not without a clock in its name');
+  assert.equal(
+    periodOf({ label: 'Discharge', min: '0', max: '1439', step: '1' }),
+    0,
+    'not without a clock in its name',
+  );
   assert.equal(periodOf({ label: 'Time of day', min: '0', max: '1440', step: '1' }), 0, 'not when both ends are held');
   // A saved record keeps its ends only in its step names.
-  assert.equal(periodOf({ label: 'Time of day', steps: [{ action: 'to max (1439)' }, { action: 'to min (0)' }] }), 1440);
+  assert.equal(
+    periodOf({ label: 'Time of day', steps: [{ action: 'to max (1439)' }, { action: 'to min (0)' }] }),
+    1440,
+  );
 });
 
 test('visiblyApart: a thin part that moves a few pixels at full size is a visible difference', () => {
@@ -246,12 +257,16 @@ test('visiblyApart: a thin part that moves a few pixels at full size is a visibl
       height = 100,
       data = new Uint8Array(width * height * 3).fill(40);
     for (const [x0, y0, w, h, v] of boxes)
-      for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) data.fill(v, (y * width + x) * 3, (y * width + x) * 3 + 3);
+      for (let y = y0; y < y0 + h; y++)
+        for (let x = x0; x < x0 + w; x++) data.fill(v, (y * width + x) * 3, (y * width + x) * 3 + 3);
     return { width, height, data };
   };
   // A bimetal strip 2 px thick and 120 px long whose tip rises 3 px (the-bimetal-switch, 20 and 24 degrees).
   const cold = big([[40, 50, 120, 2, 200]]),
-    warm = big([[40, 50, 80, 2, 200], [120, 47, 40, 2, 200]]);
+    warm = big([
+      [40, 50, 80, 2, 200],
+      [120, 47, 40, 2, 200],
+    ]);
   assert.equal(visiblePixels(cold, cold), 0);
   assert.equal(visiblePixels(cold, warm), 160);
   assert.equal(visiblyApart(cold, warm), true);

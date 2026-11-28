@@ -174,8 +174,7 @@ await runSuite(
         };
         for (
           let i = 0;
-          i < 3000 &&
-          !(state && settled(stream, (x, z) => z === 0 && (x === 0 || x === -1)) && settled(ring.tiles));
+          i < 3000 && !(state && settled(stream, (x, z) => z === 0 && (x === 0 || x === -1)) && settled(ring.tiles));
           i++
         ) {
           await tick();

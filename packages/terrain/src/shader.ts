@@ -88,7 +88,10 @@ export const originShader = (code: string): string =>
     : code
         .replace('ambient:vec4f}', 'ambient:vec4f,anchor:vec4f}')
         .replace(/struct Layer \{([^}]*)\}/, 'struct Layer {$1,wrap:vec4f,tone:vec4f}')
-        .replace('fn terrainPatchXZ(p:vec3f)->vec2f {return p.xz;}', 'fn terrainPatchXZ(p:vec3f)->vec2f {return p.xz+frame.anchor.xy;}')
+        .replace(
+          'fn terrainPatchXZ(p:vec3f)->vec2f {return p.xz;}',
+          'fn terrainPatchXZ(p:vec3f)->vec2f {return p.xz+frame.anchor.xy;}',
+        )
         .split('let p=position*scale;')
         .join('let p=(position+layerRules[layer].wrap.xyz)*scale;')
         .replace(

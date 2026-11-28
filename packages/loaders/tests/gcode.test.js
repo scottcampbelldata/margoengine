@@ -283,21 +283,34 @@ test('regression: arcP chooses LinuxCNC turns (default) or Marlin complete circl
 
 test('toolpathBeads: a closed stadium bead under the path, wound outward, with the slicer section area', async () => {
   const { toolpathBeads } = await import('../dist/gcode.js');
-  const width = 0.45, height = 0.2, z = 1.4;
-  const bead = toolpathBeads([0, 0, z, 10, 0, z, 10, 0, z, 10, 0, z + 1, 5, 5, z, 5, 5, z], { width, height, round: 16 });
+  const width = 0.45,
+    height = 0.2,
+    z = 1.4;
+  const bead = toolpathBeads([0, 0, z, 10, 0, z, 10, 0, z, 10, 0, z + 1, 5, 5, z, 5, 5, z], {
+    width,
+    height,
+    round: 16,
+  });
   // Only the first segment draws: the vertical and zero-length ones are skipped.
-  const p = bead.positions, nrm = bead.normals, idx = bead.indices;
-  let volume = 0, zMin = Infinity, zMax = -Infinity;
+  const p = bead.positions,
+    nrm = bead.normals,
+    idx = bead.indices;
+  let volume = 0,
+    zMin = Infinity,
+    zMax = -Infinity;
   for (let i = 2; i < p.length; i += 3) (zMin = Math.min(zMin, p[i])), (zMax = Math.max(zMax, p[i]));
   assert.ok(Math.abs(zMax - z) < 1e-6 && Math.abs(zMin - (z - height)) < 1e-6, `${zMin} ${zMax}`);
   for (let t = 0; t < idx.length; t += 3) {
     const [a, b, c] = [idx[t], idx[t + 1], idx[t + 2]].map((k) => [p[k * 3], p[k * 3 + 1], p[k * 3 + 2]]);
-    const e1 = b.map((v, k) => v - a[k]), e2 = c.map((v, k) => v - a[k]);
+    const e1 = b.map((v, k) => v - a[k]),
+      e2 = c.map((v, k) => v - a[k]);
     const face = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
     const k = idx[t];
     // Every triangle faces the way its vertex normals point (outward), so back-face culling keeps the outside.
     assert.ok(face[0] * nrm[k * 3] + face[1] * nrm[k * 3 + 1] + face[2] * nrm[k * 3 + 2] > -1e-12, `triangle ${t / 3}`);
-    volume += (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6;
+    volume +=
+      (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])) /
+      6;
   }
   // Closed and outward: the divergence-theorem volume is the length times (w - h) h + PI (h / 2)^2.
   const section = (width - height) * height + Math.PI * (height / 2) ** 2;

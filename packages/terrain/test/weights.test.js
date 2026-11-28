@@ -207,7 +207,9 @@ test('patches compiles the patch blend into the weighted shader only when asked,
   assert.match(code, /let weight=terrainPatchWeights\[layer\];/);
   assert.match(code, /var p=xz\*0\.0500000000;var cell=20\.0000000;/);
   assert.match(code, /let t=w\+0\.500000000\*terrainPatch\(/);
-  const defaults = modules(rig(two, 5, undefined, undefined, { patches: {} }).frame()).find((c) => c.includes('@fragment'));
+  const defaults = modules(rig(two, 5, undefined, undefined, { patches: {} }).frame()).find((c) =>
+    c.includes('@fragment'),
+  );
   assert.match(defaults, /var cell=14\.0000000;/);
   assert.match(defaults, /let t=w\+0\.600000000\*/);
   for (const patches of [null, { size: 0.1 }, { size: Number.NaN }, { contrast: 0 }, { contrast: 1.5 }])

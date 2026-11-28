@@ -101,28 +101,28 @@ export class Fft {
           }
         }
       } else
-      for (let q = 0; q < s; q++)
-        for (let j1 = 0; j1 < m; j1++)
-          for (let k2 = 0; k2 < p; k2++) {
-            let re = 0,
-              im = 0;
-            for (let j2 = 0; j2 < p; j2++) {
-              const at = 2 * (q + s * (j1 + m * j2)),
-                t = 2 * (((j2 * k2) % p) * stepP),
+        for (let q = 0; q < s; q++)
+          for (let j1 = 0; j1 < m; j1++)
+            for (let k2 = 0; k2 < p; k2++) {
+              let re = 0,
+                im = 0;
+              for (let j2 = 0; j2 < p; j2++) {
+                const at = 2 * (q + s * (j1 + m * j2)),
+                  t = 2 * (((j2 * k2) % p) * stepP),
+                  wr = w[t]!,
+                  wi = sign * w[t + 1]!,
+                  xr = x[at]!,
+                  xi = x[at + 1]!;
+                re += xr * wr - xi * wi;
+                im += xr * wi + xi * wr;
+              }
+              const t = 2 * ((j1 * k2 * stepC) % n),
                 wr = w[t]!,
                 wi = sign * w[t + 1]!,
-                xr = x[at]!,
-                xi = x[at + 1]!;
-              re += xr * wr - xi * wi;
-              im += xr * wi + xi * wr;
+                to = 2 * (q + s * (k2 + p * j1));
+              y[to] = re * wr - im * wi;
+              y[to + 1] = re * wi + im * wr;
             }
-            const t = 2 * ((j1 * k2 * stepC) % n),
-              wr = w[t]!,
-              wi = sign * w[t + 1]!,
-              to = 2 * (q + s * (k2 + p * j1));
-            y[to] = re * wr - im * wi;
-            y[to + 1] = re * wi + im * wr;
-          }
       const swap = x;
       x = y;
       y = swap;

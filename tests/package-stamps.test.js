@@ -139,7 +139,11 @@ test('the build writes a stamp after each package and clears it before', () => {
   assert.match(report, /rebuildStalePackages\(root, /, 'the API report rebuilds stale packages before it reads dist');
   const fresh = readFileSync(new URL('../scripts/support/fresh-dist.mjs', import.meta.url), 'utf8');
   // Since KB-TOOL-APISCOPE1 (88b1ae244b) the finder takes the scope `only` as well.
-  assert.match(fresh, /names = stale\(root, only\)/, 'and that step finds them by their stamps (KB-API-SURFACE-CHURN1)');
+  assert.match(
+    fresh,
+    /names = stale\(root, only\)/,
+    'and that step finds them by their stamps (KB-API-SURFACE-CHURN1)',
+  );
   assert.match(
     fresh,
     /stale = \(root, only\) => stalePackages\(root, undefined, only\)/,

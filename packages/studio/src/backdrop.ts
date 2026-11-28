@@ -138,7 +138,12 @@ function wrappedCove(width: number, depth: number, height: number, radius: numbe
     }
   // The flat floor between the first and last stations, its rim being row 0 of the strip.
   const base = positions.length / 3;
-  for (const [x, z] of [[-hx, hz], [hx, hz], [hx, bz], [-hx, bz]]) {
+  for (const [x, z] of [
+    [-hx, hz],
+    [hx, hz],
+    [hx, bz],
+    [-hx, bz],
+  ]) {
     positions.push(x, 0, z);
     normals.push(0, 1, 0);
   }
@@ -204,7 +209,13 @@ const rigs: Record<StagingPreset, readonly StudioLight[]> = {
     { direction: [0, 1, 0], width: 2, height: 2, intensity: 0.35, softness: 0.5 },
     ...[0.36, 0.3, 0.24, 0.2, 0.24, 0.3].map((intensity, i) => {
       const a = Math.PI / 4 + (i * Math.PI) / 3;
-      return { direction: [-Math.sin(a), 0.22, Math.cos(a)] as [number, number, number], width: 1.2, height: 0.9, intensity, softness: 0.3 };
+      return {
+        direction: [-Math.sin(a), 0.22, Math.cos(a)] as [number, number, number],
+        width: 1.2,
+        height: 0.9,
+        intensity,
+        softness: 0.3,
+      };
     }),
   ],
 };

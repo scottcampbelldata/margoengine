@@ -4,7 +4,7 @@ import { geometryData } from '@margoengine/geometry/utils';
 import { Material } from '@margoengine/materials';
 import { Toon } from '@margoengine/toon';
 import { Hatching } from '@margoengine/toon/hatch';
-import { blend, mix, ramp, rng, shotAt } from './film.js';
+import { blend, ramp, rng, shotAt } from './film.js';
 
 const tau = Math.PI * 2;
 const paperColors = [

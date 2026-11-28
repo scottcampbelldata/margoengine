@@ -97,7 +97,10 @@ await runSuite(
         for (let y = top; y < height; y++)
           for (let x = 0; x < width; x++) {
             const i = (y * width + x) * 4,
-              d = Math.abs(p.data[i] - q.data[i]) + Math.abs(p.data[i + 1] - q.data[i + 1]) + Math.abs(p.data[i + 2] - q.data[i + 2]);
+              d =
+                Math.abs(p.data[i] - q.data[i]) +
+                Math.abs(p.data[i + 1] - q.data[i + 1]) +
+                Math.abs(p.data[i + 2] - q.data[i + 2]);
             if (d > 24) changed++;
           }
         return changed / (width * (height - top));

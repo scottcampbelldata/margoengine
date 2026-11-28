@@ -2554,7 +2554,8 @@ export class LavaSurface implements EnginePlugin {
   }
 
   setup(engine: Engine): void {
-    if (this.disposed) throw new MargoError('disposed', 'This LavaSurface was disposed. You must create a new lava surface.');
+    if (this.disposed)
+      throw new MargoError('disposed', 'This LavaSurface was disposed. You must create a new lava surface.');
     // The small WebGL2 preview has no frame-graph draw for the surface: refuse it so /auto escalates to WebGPU (or to
     // the WebGL2 compatibility layer, which runs the WebGPU pass).
     requireWebGPU(engine, 'LavaSurface');
@@ -2595,7 +2596,10 @@ export class LavaSurface implements EnginePlugin {
     const bytes = words * Float32Array.BYTES_PER_ELEMENT;
     const limits = context.device.limits;
     if (!Number.isSafeInteger(count) || bytes > Math.min(limits.maxBufferSize, limits.maxStorageBufferBindingSize))
-      throw new MargoError('state', 'The lava grid exceeds render device storage. You must divide it into smaller patches.');
+      throw new MargoError(
+        'state',
+        'The lava grid exceeds render device storage. You must divide it into smaller patches.',
+      );
     const f64 = Float64Array.BYTES_PER_ELEMENT;
     if (
       !(memory instanceof WebAssembly.Memory) ||

@@ -191,7 +191,9 @@ export class FogGrid implements VolumetricMediumSource {
     color: Vec3 = [1, 1, 1],
   ) {
     if (!source || typeof source.writeColumnData !== 'function')
-      throw new TypeError('Invalid fog grid source. You must supply an attached DrainageFog solver or a FogColumnSource.');
+      throw new TypeError(
+        'Invalid fog grid source. You must supply an attached DrainageFog solver or a FogColumnSource.',
+      );
     if (!vec3(color, 0, 1)) throw new RangeError('Invalid fog grid color. Use three linear albedo values in [0, 1].');
     this.color = [...color];
   }

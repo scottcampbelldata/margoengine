@@ -210,7 +210,12 @@ export function identicalStops(stops, { period = 0, step = 0 } = {}) {
     for (let j = i + 1; j < steady.length; j++) {
       const a = steady[i],
         b = steady[j];
-      if (a.value === b.value || same(a.value, b.value) || wraps(a.value, b.value) || a.frames.length !== b.frames.length)
+      if (
+        a.value === b.value ||
+        same(a.value, b.value) ||
+        wraps(a.value, b.value) ||
+        a.frames.length !== b.frames.length
+      )
         continue;
       if (a.frames.some((f, k) => f.width !== b.frames[k].width || f.height !== b.frames[k].height)) continue;
       if (a.frames.every((f, k) => !compareRegion(f, b.frames[k], b.noise[k]).changed)) pairs.push([a.name, b.name]);
@@ -224,12 +229,15 @@ export function identicalStops(stops, { period = 0, step = 0 } = {}) {
  */
 export function periodOf(c) {
   // A live control carries min and max; a saved record keeps them only in its step names ("to max (360)").
-  const end = (which) => c[which] ?? /\(([-+\d.e]+)\)/.exec((c.steps ?? []).find((s) => s.action?.startsWith(`to ${which} `))?.action ?? '')?.[1];
+  const end = (which) =>
+    c[which] ??
+    /\(([-+\d.e]+)\)/.exec((c.steps ?? []).find((s) => s.action?.startsWith(`to ${which} `))?.action ?? '')?.[1];
   const span = Number(end('max')) - Number(end('min'));
   if (Math.abs(span - 2 * Math.PI) < 1e-3) return 2 * Math.PI;
   // A clock: minutes or hours of a day, where the last stop is one step before the first again (1439 then 0).
   const step = Number(c.step ?? 1) || 1;
-  if (/\b(time|clock|hour|minute|o'?clock)\b/i.test(c.label ?? '') && [1440, 24].includes(span + step)) return span + step;
+  if (/\b(time|clock|hour|minute|o'?clock)\b/i.test(c.label ?? '') && [1440, 24].includes(span + step))
+    return span + step;
   return span >= 360 &&
     /°|\b(deg|degrees|turn|rotat\w*|angle|heading|yaw|bearing|azimuth|spin|hue|longitude)\b/i.test(c.label ?? '')
     ? 360

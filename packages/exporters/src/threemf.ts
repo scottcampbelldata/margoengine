@@ -630,8 +630,7 @@ interface Resource {
 /** The property groups whose entries are named by index, which a model part may carry pruned to the ones it uses. */
 const INDEXED =
   /^(?:basematerials|m:(?:colorgroup|texture2dgroup|compositematerials|multiproperties|pbspeculardisplayproperties|pbmetallicdisplayproperties|translucentdisplayproperties))$/;
-const attributeOf = (tag: string, name: string): string | undefined =>
-  new RegExp(` ${name}="([^"]*)"`).exec(tag)?.[1];
+const attributeOf = (tag: string, name: string): string | undefined => new RegExp(` ${name}="([^"]*)"`).exec(tag)?.[1];
 const numbers = (list: string | undefined): number[] => (list ? list.split(' ').map(Number) : []);
 const namedIds = (xml: string): string[] => [...xml.matchAll(REFERENCE)].flatMap(([, ids]) => ids.split(' '));
 
@@ -754,7 +753,10 @@ function prunedPart(
         layers.length
           ? entries[old].replace(
               / pindices="([^"]*)"/,
-              (_, row: string) => ` pindices="${numbers(row).map((i, j) => index(String(layers[j]), i)).join(' ')}"`,
+              (_, row: string) =>
+                ` pindices="${numbers(row)
+                  .map((i, j) => index(String(layers[j]), i))
+                  .join(' ')}"`,
             )
           : entries[old],
       );
@@ -764,7 +766,10 @@ function prunedPart(
       const pid = attributeOf(tag, 'pid');
       return pid === undefined
         ? tag
-        : tag.replace(/ (pindex|p1|p2|p3|p)="(\d+)"/g, (_, name: string, old: string) => ` ${name}="${index(pid, old)}"`);
+        : tag.replace(
+            / (pindex|p1|p2|p3|p)="(\d+)"/g,
+            (_, name: string, old: string) => ` ${name}="${index(pid, old)}"`,
+          );
     });
   return { own, xml };
 }
@@ -1735,7 +1740,9 @@ export async function export3MF(
           "3MF writes boolean operations on a node's own object; use assembly: false or 'components'",
         );
       if (info.slices || info.alternatives)
-        throw new RangeError('3MF a boolean shape takes no slices or alternatives on the same node; remove them from it');
+        throw new RangeError(
+          '3MF a boolean shape takes no slices or alternatives on the same node; remove them from it',
+        );
       for (const { operation = 'union', operands } of info.steps) {
         if (!OPERATIONS.includes(operation))
           throw new RangeError(`3MF boolean operation must be one of ${OPERATIONS.join(', ')}`);
@@ -1767,18 +1774,26 @@ export async function export3MF(
     if (resolutions.some((r) => r !== undefined && !RESOLUTIONS.includes(r)))
       throw new RangeError(`3MF model resolution must be one of ${RESOLUTIONS.join(', ')}`);
     if (info.modelResolution !== undefined || info.alternatives) {
-      if (!production) throw new RangeError('3MF alternatives and model resolutions need the production extension; set the production option');
+      if (!production)
+        throw new RangeError(
+          '3MF alternatives and model resolutions need the production extension; set the production option',
+        );
       if (together)
         throw new RangeError("3MF alternatives stand for a node's own object; use assembly: false or 'components'");
     }
     if (info.itemPartNumber !== undefined) {
       if (type === 'other')
-        throw new RangeError('3MF keeps an other object out of the build, so it has no build item for itemPartNumber; remove itemPartNumber or choose another object type');
+        throw new RangeError(
+          '3MF keeps an other object out of the build, so it has no build item for itemPartNumber; remove itemPartNumber or choose another object type',
+        );
       if (!ownItems)
         throw new RangeError(
           '3MF writes this scene as one build item; give its itemPartNumber in the options, or use assembly: false',
         );
-      if (itemNumber !== undefined) throw new RangeError('3MF itemPartNumber is given twice for one build item; give it in the node or in the options, not both');
+      if (itemNumber !== undefined)
+        throw new RangeError(
+          '3MF itemPartNumber is given twice for one build item; give it in the node or in the options, not both',
+        );
     }
     return info;
   };

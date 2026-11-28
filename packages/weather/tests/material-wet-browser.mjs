@@ -6,7 +6,10 @@
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 
-const { page, close } = await openBrowser({ startPath: '/packages/weather/tests/material-wet-check.html', port: 'free' });
+const { page, close } = await openBrowser({
+  startPath: '/packages/weather/tests/material-wet-check.html',
+  port: 'free',
+});
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
 try {

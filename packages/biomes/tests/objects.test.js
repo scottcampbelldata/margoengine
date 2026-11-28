@@ -597,7 +597,10 @@ test('grass details take measured leaf green', async () => {
     };
   await BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds: [-512, -512, 512, 512] });
   const grass = attached.at(-1);
-  assert.deepEqual([...grass.options.material.data.slice(0, 3)].map((v) => +v.toFixed(4)), [0.1617, 0.2024, 0.0917]);
+  assert.deepEqual(
+    [...grass.options.material.data.slice(0, 3)].map((v) => +v.toFixed(4)),
+    [0.1617, 0.2024, 0.0917],
+  );
 });
 
 // KB-BIOMES-ROCKSEED1: every procedural:rock of a biome was one stone (seed 1 for every species and record), so a talus
@@ -639,7 +642,9 @@ test('a procedural:rock species draws eight seeded stones and splits its records
     const setTile = stone.setTile.bind(stone),
       removeTile = stone.removeTile.bind(stone);
     // After the call: setTile removes the tile it replaces first.
-    stone.setTile = (key, origin, side, records) => (setTile(key, origin, side, records), held.set(stone, records.length / 8));
+    stone.setTile = (key, origin, side, records) => (
+      setTile(key, origin, side, records), held.set(stone, records.length / 8)
+    );
     stone.removeTile = (key) => (held.delete(stone), removeTile(key));
   }
   objects.add(tile, 10);

@@ -130,5 +130,8 @@ test('a package chunk whose inner hash holds a dash is found by the name before 
     '{const simd=true;const link=document.createElement("link");link.href=["./assets/wasm-zd5jb-Ua-BCKdNKAj.js","./assets/wasm-scalar-Bn0YilDN-BO7h_dD5.js"][simd?0:1];document.head.append(link);}';
   const files = ['wasm-Q1w2E3r4-Zz9_x-yW.js', 'wasm-scalar-Bn0YilDN-C1d2E3f4.js', 'wasm-threads-BDAXJOYE-CEkhc5NL.js'];
   const { text } = rewritePreload(script, files);
-  assert.match(text, /\["\.\/assets\/wasm-Q1w2E3r4-Zz9_x-yW\.js","\.\/assets\/wasm-scalar-Bn0YilDN-C1d2E3f4\.js"\]\[simd\?0:1\]/);
+  assert.match(
+    text,
+    /\["\.\/assets\/wasm-Q1w2E3r4-Zz9_x-yW\.js","\.\/assets\/wasm-scalar-Bn0YilDN-C1d2E3f4\.js"\]\[simd\?0:1\]/,
+  );
 });

@@ -122,6 +122,10 @@ test('the written-out radix-2 stage gives the generic stage bits, -0 inputs incl
         const data = Float64Array.from({ length: 2 * n }, (_, i) => (fill === 'random' ? next() : i % 3 ? -0 : 0)),
           got = data.slice();
         new Fft(n).transform(got, inverse);
-        assert.deepEqual(Array.from(got, toHex), Array.from(generic(n, data, inverse), toHex), `${n} ${inverse} ${fill}`);
+        assert.deepEqual(
+          Array.from(got, toHex),
+          Array.from(generic(n, data, inverse), toHex),
+          `${n} ${inverse} ${fill}`,
+        );
       }
 });

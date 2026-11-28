@@ -26,7 +26,7 @@ const spectra = fixture('surface-spectra.json');
 const pbi = fixture('physicallybased.json');
 const close = (got, want, tol, label) => assert.ok(Math.abs(got - want) <= tol, `${label}: ${got} against ${want}`);
 
-test('metals: F0 within 0.002 of the papers\' n and k through the spectral integrator; n, k within 0.1 percent', () => {
+test("metals: F0 within 0.002 of the papers' n and k through the spectral integrator; n, k within 0.1 percent", () => {
   assert.deepEqual(Object.keys(METALS).sort(), Object.keys(optical.metals).sort());
   for (const [name, row] of Object.entries(METALS)) {
     const { points } = optical.metals[name];
@@ -47,7 +47,7 @@ test('metals: known anchors (Johnson and Christy 1972 gold, silver, copper)', ()
   [0.955, 0.638, 0.538].forEach((v, i) => close(METALS.copper.color[i], v, 0.04, `copper vs Hoffman [${i}]`));
 });
 
-test('dielectrics: IOR within 1e-4 and Abbe number within 0.1 of the papers\' dispersion formulas', () => {
+test("dielectrics: IOR within 1e-4 and Abbe number within 0.1 of the papers' dispersion formulas", () => {
   for (const [name, entry] of Object.entries(optical.dielectrics)) {
     const { nd, abbe } = dispersion(entry.formula);
     close(DIELECTRICS[name].ior, nd, 1e-4, `${name} ior`);
@@ -68,7 +68,10 @@ test('surfaces: albedo within 0.002 of the mean of the named ECOSTRESS samples; 
     }
     const samples = spectra.surfaces[name];
     assert.ok(samples, `${name} has spectra`);
-    assert.deepEqual([...row.samples], samples.map((s) => s.sample));
+    assert.deepEqual(
+      [...row.samples],
+      samples.map((s) => s.sample),
+    );
     albedo(samples.map((s) => s.reflectance)).forEach((v, i) => close(row.color[i], v, 0.002, `${name} albedo[${i}]`));
   }
 });
@@ -91,7 +94,8 @@ test('provenance and citations: every row is measured, derived or art and names 
   for (const row of [...Object.values(METALS), ...Object.values(DIELECTRICS), ...Object.values(SURFACES)]) {
     counts[row.provenance]++;
     assert.ok(SOURCES[row.source], 'source index');
-    if (row.provenance !== 'measured') assert.ok(row.note || SOURCES[row.source].includes('physicallybased'), 'non-measured rows say why');
+    if (row.provenance !== 'measured')
+      assert.ok(row.note || SOURCES[row.source].includes('physicallybased'), 'non-measured rows say why');
   }
   assert.equal(counts.measured + counts.derived + counts.art, Object.keys(materials).length);
   assert.ok(counts.measured >= 50, JSON.stringify(counts));

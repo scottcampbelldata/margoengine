@@ -898,9 +898,7 @@ test('each flake falls at the measured speed of its own size, Locatelli and Hobb
     'Speed from the flake size',
   );
   assert.ok(code.includes(' let fall=f32(k)*0.001953125;'));
-  assert.ok(
-    code.includes(' let fallen=-f32((k*u32(w.drift.y))&0xffffffu)*5.9604645e-8*size.y;'),
-  );
+  assert.ok(code.includes(' let fallen=-f32((k*u32(w.drift.y))&0xffffffu)*5.9604645e-8*size.y;'));
   assert.ok(code.includes(' let rel=fract((start+vec3f(w.drift.x,fallen,w.drift.z)-w.eye.xyz)/size)-0.5;'));
   // Twin over the flakes the shader draws (hash seed 1): every flake's speed is the law at its size, to half a step.
   const rnd = (i, k) => (pcg((i * 4 + k + 1) >>> 0) >>> 8) * 5.9604645e-8;
@@ -940,7 +938,7 @@ test('each flake falls at the measured speed of its own size, Locatelli and Hobb
   assert.equal(uniform(h)[41], 9, 'Rain keeps its 9 m/s');
   assert.equal(
     uniform(h)[25],
-    Math.floor((((2000.6 / (512 * 16)) % 1) + 1) % 1 * 16777216),
+    Math.floor(((((2000.6 / (512 * 16)) % 1) + 1) % 1) * 16777216),
     'Rain falls drop by drop too: the same exact 24-bit fall phase, each drop k / 512 m/s',
   );
   weather.dispose();
@@ -1321,20 +1319,29 @@ test('each raindrop draws its own size, fall, streak and light, so rain is not a
     law = rainDropSizeLaw(R);
   assert.ok(Math.abs(law.lambda - 4.1 * R ** -0.21) < 1e-12 && law.low === 0.5 && law.span > 0.99);
   const median = rainDropSample(0.5, R);
-  assert.ok(Math.abs(median - (0.5 + Math.log(2 - law.span) / -law.lambda + Math.log(2) / law.lambda)) < 0.01, `median ${median}`);
+  assert.ok(
+    Math.abs(median - (0.5 + Math.log(2 - law.span) / -law.lambda + Math.log(2) / law.lambda)) < 0.01,
+    `median ${median}`,
+  );
   assert.ok(Math.abs(median - 0.81) < 0.01, `median ${median}`);
   const small = rainDropSample(0.05, R),
     big = rainDropSample(0.995, R);
   assert.ok(small >= 0.5 && big <= 6 && big > 2.5, `${small} to ${big} mm`);
   assert.ok(rainFallSpeed(big) / rainFallSpeed(small) > 2.5, 'Big drops fall, and so streak, over twice as far');
-  assert.ok(rainStreakWeight(big) > 1.4 * rainStreakWeight(small), 'Big drops leave brighter streaks (Garg and Nayar 2006)');
+  assert.ok(
+    rainStreakWeight(big) > 1.4 * rainStreakWeight(small),
+    'Big drops leave brighter streaks (Garg and Nayar 2006)',
+  );
   const mean = rainStreakMean(R);
   assert.ok(mean > rainStreakWeight(small) && mean < rainStreakWeight(big));
   // The uniform carries the law, the fall scale, sheets, gusts, the mean's inverse and the gust clock.
   const { h, weather } = rig({ precipitation: 'rain', intensity: 1, fadeSeconds: 0, rainRate: R, wind: [2, 0] });
   h.frame();
   let u = uniform(h);
-  assert.deepEqual([u[48], u[49], u[50], u[51], u[52], u[53]], [law.lambda, law.span, 0.5, 1, 0.5, 0.5].map(Math.fround));
+  assert.deepEqual(
+    [u[48], u[49], u[50], u[51], u[52], u[53]],
+    [law.lambda, law.span, 0.5, 1, 0.5, 0.5].map(Math.fround),
+  );
   assert.ok(Math.abs(u[54] - 1 / mean) < 1e-4);
   weather.options.rainRate = undefined;
   weather.options.intensity = 0.5;
@@ -1353,7 +1360,13 @@ test('each raindrop draws its own size, fall, streak and light, so rain is not a
   const code = snowShader({ precipitation: 'rain', intensity: 1, fadeSeconds: 0 });
   assert.ok(code.includes('fn dropSize(ii:u32)->f32 {return w.rain.z-log(1.0-rnd(ii,3u)*w.rain.y)/w.rain.x;}'));
   assert.ok(code.includes('max(0.1,9.65-10.3*exp(-0.6*d))*w.rain.w'));
-  for (const bad of [{ dropSizes: [4, 1] }, { dropSizes: [0, 2] }, { dropSizes: [1] }, { rainVariation: 2 }, { gusts: -1 }])
+  for (const bad of [
+    { dropSizes: [4, 1] },
+    { dropSizes: [0, 2] },
+    { dropSizes: [1] },
+    { rainVariation: 2 },
+    { gusts: -1 },
+  ])
     assert.throws(() => new Weather(bad), /dropSizes|rainVariation|gusts/);
 });
 

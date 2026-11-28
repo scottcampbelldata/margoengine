@@ -323,19 +323,25 @@ export class MeshDebugView implements EnginePlugin {
    * @throws TypeError or RangeError for an unknown option or an invalid value; MargoError `'disposed'`.
    */
   set(options: MeshDebugViewOptions): this {
-    if (this.disposed) throw fault('disposed', 'MeshDebugView was disposed; attach a new MeshDebugView', 'mesh-debug-view');
+    if (this.disposed)
+      throw fault('disposed', 'MeshDebugView was disposed; attach a new MeshDebugView', 'mesh-debug-view');
     if (!options || typeof options !== 'object')
       throw typeError('MeshDebugView options must be an object; pass { mode: ... }', 'mesh-debug-view');
     for (const key of Object.keys(options))
       if (!Object.hasOwn(defaults, key))
-        throw typeError(`MeshDebugView has no option '${key}'; use ${Object.keys(defaults).join(', ')}`, 'mesh-debug-view');
+        throw typeError(
+          `MeshDebugView has no option '${key}'; use ${Object.keys(defaults).join(', ')}`,
+          'mesh-debug-view',
+        );
     const given = Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined)),
       s = { ...defaults, ...this.settings, ...given } as Required<MeshDebugViewOptions>,
       multiply = options.multiply === undefined ? this.multiplied : options.multiply;
-    if (!modes.includes(s.mode)) throw typeError(`MeshDebugView mode must be one of ${modes.join(', ')}`, 'mesh-debug-view');
+    if (!modes.includes(s.mode))
+      throw typeError(`MeshDebugView mode must be one of ${modes.join(', ')}`, 'mesh-debug-view');
     if (multiply !== null && typeof multiply !== 'boolean')
       throw typeError('MeshDebugView multiply must be true, false or null', 'mesh-debug-view');
-    if (typeof s.enabled !== 'boolean') throw typeError('MeshDebugView enabled must be true or false', 'mesh-debug-view');
+    if (typeof s.enabled !== 'boolean')
+      throw typeError('MeshDebugView enabled must be true or false', 'mesh-debug-view');
     const range = (key: 'wireWidth' | 'vertexRadius' | 'uvScale' | 'specularPower', low: number, high: number) => {
       const v = s[key];
       if (!(typeof v === 'number' && v >= low && v <= high))
@@ -383,7 +389,8 @@ export class MeshDebugView implements EnginePlugin {
   }
 
   setup(engine: Engine): void {
-    if (this.disposed) throw fault('disposed', 'MeshDebugView was disposed; attach a new MeshDebugView', 'mesh-debug-view');
+    if (this.disposed)
+      throw fault('disposed', 'MeshDebugView was disposed; attach a new MeshDebugView', 'mesh-debug-view');
     const limits = engine.gpu?.limits as (GPUSupportedLimits & { maxStorageBuffersInVertexStage?: number }) | undefined;
     if (!limits || limits.maxStorageBuffersInVertexStage === 0)
       throw fault(

@@ -440,7 +440,14 @@ type ObjectsPassContext = Extract<PassContext, { backend: 'webgpu' }>;
  * One detail kind: its scatter (and, for blade grass, the dense layer near the camera), its density map's CPU copy and
  * the texture of the device it was last made on.
  */
-type Detail = { id: string; scatter: Scatter; near?: Scatter; texture?: GPUTexture; device?: GPUDevice; data: Uint8Array };
+type Detail = {
+  id: string;
+  scatter: Scatter;
+  near?: Scatter;
+  texture?: GPUTexture;
+  device?: GPUDevice;
+  data: Uint8Array;
+};
 
 /** Metres around the camera of blade grass's dense near layer, and its clumps a square metre per unit of density. */
 const NEAR_GRASS = { radius: 20, perDensity: 3 } as const;
@@ -650,27 +657,27 @@ export class BiomeObjects implements Disposable {
           const list: ScatterTiles[] = [];
           for (const part of form)
             list.push(
-            this.#modules.tiles.ScatterTiles.attach(this.#engine, part.geometry, {
-              bounds,
-              heightmap,
-              slots,
-              slotSize,
-              lod: [r * 0.15, r * 0.4, r],
-              lodFade: 0,
-              // Lit by the engine's sun and sky and shadowed by an attached Shadows, like the terrain under it.
-              material: this.#material(part.color, seasonal && part.kind === 'foliage'),
-              // Each object its own tint; leaves shade as clusters (a few vertex operations, shadows unchanged).
-              ...OBJECT_LOOKS[part.kind],
-              maxSlope: 90,
-              // Plants sway with a light breeze; stone does not.
-              ...(part.kind === 'stone' ? {} : { wind: [1, 0, 0.25] as const }),
-              // A scanned part draws its own maps (base colour with a cut-out, normal, occlusion-roughness-metal).
-              ...(part.textures ? { textures: part.textures } : {}),
-              ...this.#states(key, part.kind),
-              // A tree's canopy draws the trunk's objects: one set of records, culling and rings for both.
-              ...(list.length ? { share: list[0] } : {}),
-            }),
-          );
+              this.#modules.tiles.ScatterTiles.attach(this.#engine, part.geometry, {
+                bounds,
+                heightmap,
+                slots,
+                slotSize,
+                lod: [r * 0.15, r * 0.4, r],
+                lodFade: 0,
+                // Lit by the engine's sun and sky and shadowed by an attached Shadows, like the terrain under it.
+                material: this.#material(part.color, seasonal && part.kind === 'foliage'),
+                // Each object its own tint; leaves shade as clusters (a few vertex operations, shadows unchanged).
+                ...OBJECT_LOOKS[part.kind],
+                maxSlope: 90,
+                // Plants sway with a light breeze; stone does not.
+                ...(part.kind === 'stone' ? {} : { wind: [1, 0, 0.25] as const }),
+                // A scanned part draws its own maps (base colour with a cut-out, normal, occlusion-roughness-metal).
+                ...(part.textures ? { textures: part.textures } : {}),
+                ...this.#states(key, part.kind),
+                // A tree's canopy draws the trunk's objects: one set of records, culling and rings for both.
+                ...(list.length ? { share: list[0] } : {}),
+              }),
+            );
           heads.push(list[0]);
           all.push(...list);
         }
@@ -696,21 +703,19 @@ export class BiomeObjects implements Disposable {
           scatter: undefined as unknown as Scatter,
           near: undefined as Scatter | undefined,
         };
-      const seasonal = !!seasons?.world.biomes.some(
-          (b) => b.tint?.seasonal && b.details?.some((r) => r.id === d.id),
-        ),
+      const seasonal = !!seasons?.world.biomes.some((b) => b.tint?.seasonal && b.details?.some((r) => r.id === d.id)),
         shared = {
-        area: [area, area] as [number, number],
-        follow: true,
-        bounds,
-        heightmap,
-        densityMap: () => this.#detail(entry, width, depth),
-        lod: [detailRadius * 0.3, detailRadius * 0.6, detailRadius] as [number, number, number],
-        lodFade: 0,
-        edgeShrink: detailRadius * 0.2,
-        maxSlope: 60,
-        wind: [1, 0, 0.5] as [number, number, number],
-      };
+          area: [area, area] as [number, number],
+          follow: true,
+          bounds,
+          heightmap,
+          densityMap: () => this.#detail(entry, width, depth),
+          lod: [detailRadius * 0.3, detailRadius * 0.6, detailRadius] as [number, number, number],
+          lodFade: 0,
+          edgeShrink: detailRadius * 0.2,
+          maxSlope: 60,
+          wind: [1, 0, 0.5] as [number, number, number],
+        };
       // Meadow grass is GrassScatter's GPU-built tussocks (KB-BIOMES-SPARSEGRASS1): eight blades a clump with cured
       // leaves and a brightness spread. The three-blade clump mesh at the old 400,000 cap left about 20 blades a square
       // metre, a field of tufts on bare ground. A dense layer of NEAR_GRASS.perDensity clumps a square metre per unit of

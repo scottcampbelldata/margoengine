@@ -376,9 +376,14 @@ export interface ToolpathBeadMesh {
 export function toolpathBeads(segments: ArrayLike<number>, options: ToolpathBeadOptions = {}): ToolpathBeadMesh {
   const width = options.width ?? 0.45,
     round = options.round ?? 3;
-  if (!(width > 0) || !Number.isFinite(width) || !(options.height === undefined || (options.height > 0 && Number.isFinite(options.height))))
+  if (
+    !(width > 0) ||
+    !Number.isFinite(width) ||
+    !(options.height === undefined || (options.height > 0 && Number.isFinite(options.height)))
+  )
     throw new RangeError('Invalid bead size; pass a positive finite width and height');
-  if (!Number.isInteger(round) || round < 1 || round > 16) throw new RangeError('Invalid bead round; pass an integer 1 to 16');
+  if (!Number.isInteger(round) || round < 1 || round > 16)
+    throw new RangeError('Invalid bead round; pass an integer 1 to 16');
   if (segments.length % 6) throw new RangeError('Invalid toolpath segments; pass two xyz points per segment');
   const height = Math.min(options.height ?? 0.2, width),
     r = height / 2,
@@ -412,22 +417,41 @@ export function toolpathBeads(segments: ArrayLike<number>, options: ToolpathBead
     return v++;
   };
   for (let s = 0; s < segments.length; s += 6) {
-    const ax = segments[s], ay = segments[s + 1], az = segments[s + 2];
-    const bx = segments[s + 3], by = segments[s + 4], bz = segments[s + 5];
-    const dx = bx - ax, dy = by - ay, length = Math.hypot(dx, dy);
+    const ax = segments[s],
+      ay = segments[s + 1],
+      az = segments[s + 2];
+    const bx = segments[s + 3],
+      by = segments[s + 4],
+      bz = segments[s + 5];
+    const dx = bx - ax,
+      dy = by - ay,
+      length = Math.hypot(dx, dy);
     if (!(length > 1e-9 * Math.max(1, width))) continue;
     // Across the path (the direction times -Z, so the right side is on the right of travel), up is +Z.
-    const ux = dx / length, uy = dy / length, sx = uy, sy = -ux;
+    const ux = dx / length,
+      uy = dy / length,
+      sx = uy,
+      sy = -ux;
     const first = v;
-    for (const [px, py, pz] of [[ax, ay, az], [bx, by, bz]])
-      for (const [across, up, na, nu] of ring) put(px + sx * across, py + sy * across, pz - r + up, sx * na, sy * na, nu);
+    for (const [px, py, pz] of [
+      [ax, ay, az],
+      [bx, by, bz],
+    ])
+      for (const [across, up, na, nu] of ring)
+        put(px + sx * across, py + sy * across, pz - r + up, sx * na, sy * na, nu);
     for (let i = 0; i < n; i++) {
-      const a0 = first + i, a1 = first + ((i + 1) % n), b0 = a0 + n, b1 = a1 + n;
+      const a0 = first + i,
+        a1 = first + ((i + 1) % n),
+        b0 = a0 + n,
+        b1 = a1 + n;
       indices.set([a0, a1, b0, a1, b1, b0], t);
       t += 6;
     }
     // Flat caps facing back along and forward along the path, as fans over the convex section.
-    for (const [end, px, py, pz, sign] of [[0, ax, ay, az, -1], [1, bx, by, bz, 1]] as const) {
+    for (const [end, px, py, pz, sign] of [
+      [0, ax, ay, az, -1],
+      [1, bx, by, bz, 1],
+    ] as const) {
       const cap = v;
       for (const [across, up] of ring) put(px + sx * across, py + sy * across, pz - r + up, ux * sign, uy * sign, 0);
       for (let i = 1; i < n - 1; i++) {

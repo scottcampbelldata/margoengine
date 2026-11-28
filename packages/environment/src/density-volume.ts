@@ -656,7 +656,10 @@ export class SeaSprayDensityVolume extends DensityVolume {
     }
     const parcels = this.source.readParticles();
     if (!Array.isArray(parcels))
-      throw new MargoError('state', 'Invalid sea spray frame. You must return the accepted airborne parcels as an array.');
+      throw new MargoError(
+        'state',
+        'Invalid sea spray frame. You must return the accepted airborne parcels as an array.',
+      );
 
     const positions: number[] = [];
     const weights: number[] = [];

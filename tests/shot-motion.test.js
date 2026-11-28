@@ -90,9 +90,14 @@ test('writeMoving writes the next frame and the camera motion of a still world b
         shot,
       }),
       backBytes = readFileSync(join(out, both.back)),
-      back = new Float32Array(backBytes.buffer.slice(backBytes.byteOffset, backBytes.byteOffset + backBytes.byteLength));
+      back = new Float32Array(
+        backBytes.buffer.slice(backBytes.byteOffset, backBytes.byteOffset + backBytes.byteLength),
+      );
     assert.equal(both.back, 'probes/open.back.f32');
-    assert.ok(Math.abs(back[centre * 2] + motion[centre * 2]) < 0.1, `back ${back[centre * 2]} against ${motion[centre * 2]}`);
+    assert.ok(
+      Math.abs(back[centre * 2] + motion[centre * 2]) < 0.1,
+      `back ${back[centre * 2]} against ${motion[centre * 2]}`,
+    );
   } finally {
     rmSync(out, { recursive: true, force: true });
   }

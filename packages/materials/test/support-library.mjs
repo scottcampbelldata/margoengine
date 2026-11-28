@@ -41,7 +41,12 @@ export function refractiveIndex(f, nm) {
     return Math.sqrt(n2);
   }
   if (f.form === 'power') return f.c1 + f.c2 * l ** f.p2 + f.c4 * l ** f.p4;
-  if (f.form === 'table') return lerpTable([...f.points].sort((a, b) => a[0] - b[0]), nm, 1);
+  if (f.form === 'table')
+    return lerpTable(
+      [...f.points].sort((a, b) => a[0] - b[0]),
+      nm,
+      1,
+    );
   throw new Error('unknown formula ' + f.form);
 }
 /** n at the helium d line (587.56 nm) and the Abbe number (nd - 1) / (nF - nC). */

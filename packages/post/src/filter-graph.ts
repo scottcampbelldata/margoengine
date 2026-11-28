@@ -370,7 +370,9 @@ export class ImageFilterGraph {
     if (input.texture?.width !== width || input.texture.height !== height) {
       const limit = this.gpu.limits.maxTextureDimension2D;
       if (width > limit || height > limit)
-        throw new RangeError(`ImageFilterGraph image ${input.name} is above this device's ${limit} texel limit; reduce the image to fit${HELP}`);
+        throw new RangeError(
+          `ImageFilterGraph image ${input.name} is above this device's ${limit} texel limit; reduce the image to fit${HELP}`,
+        );
       input.texture?.destroy();
       // COPY_DST, TEXTURE_BINDING and RENDER_ATTACHMENT, which an external image copy needs.
       input.texture = this.gpu.createTexture({ size: [width, height], format: 'rgba8unorm', usage: 0x2 | 0x4 | 0x10 });

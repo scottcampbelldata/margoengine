@@ -435,7 +435,10 @@ export class GPUClothMesh implements EnginePlugin {
     { material, images = [] }: GPUClothMeshOptions = {},
   ) {
     if (!(cloth?.vertices instanceof Float32Array) || !(cloth.indices instanceof Uint32Array))
-      throw new MargoError('unsupported', 'drawGPUCloth takes a GPUCloth of @margoengine/physics/gpu-cloth; pass the cloth that entry creates.');
+      throw new MargoError(
+        'unsupported',
+        'drawGPUCloth takes a GPUCloth of @margoengine/physics/gpu-cloth; pass the cloth that entry creates.',
+      );
     this.held = cloth.vertices.slice();
     this.spare = cloth.vertices.slice();
     this.model = sheetModel(engine, this.held, cloth.indices, material, images);

@@ -568,7 +568,10 @@ const quad = (w: number, h: number) => [-w, -h, 0, w, -h, 0, w, h, 0, -w, h, 0];
 
 function check(look: object, defaults: object, what: string): void {
   for (const [key, value] of Object.entries(look)) {
-    if (!(key in defaults)) throw new TypeError(`optics/screens ${what}: unknown look field ${key}; use one of ${Object.keys(defaults).join(', ')}`);
+    if (!(key in defaults))
+      throw new TypeError(
+        `optics/screens ${what}: unknown look field ${key}; use one of ${Object.keys(defaults).join(', ')}`,
+      );
     const numbers = typeof value === 'number' ? [value] : Array.isArray(value) ? value : [];
     if (numbers.some((x) => typeof x !== 'number' || !Number.isFinite(x)))
       throw new RangeError(`optics/screens ${what}: ${key} must hold finite numbers`);

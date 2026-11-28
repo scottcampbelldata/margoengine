@@ -38,7 +38,10 @@ test('parse3MF reads 10,000 model parts by default (KB-3MF-PARTLIMIT1)', async (
 
 test('maxModelParts refuses a package naming more parts, the root counted', async () => {
   const file = pack(4);
-  await assert.rejects(parse3MF(file, { maxModelParts: 4 }), (e) => e.code === 'limit' && /maxModelParts/.test(e.message));
+  await assert.rejects(
+    parse3MF(file, { maxModelParts: 4 }),
+    (e) => e.code === 'limit' && /maxModelParts/.test(e.message),
+  );
   assert.equal((await parse3MF(file, { maxModelParts: 5 })).indices.length, 12);
   for (const bad of [0, -1, 1.5, NaN])
     await assert.rejects(parse3MF(file, { maxModelParts: bad }), (e) => e.code === 'range');

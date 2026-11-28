@@ -49,7 +49,7 @@ test('a wrapped cove closes both sides and both back corners with unit normals, 
     v = g.vertices,
     count = v.length / 6;
   assert(count > 100);
-  let low = [Infinity, Infinity, Infinity],
+  const low = [Infinity, Infinity, Infinity],
     high = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < v.length; i += 6) {
     assert(Math.abs(Math.hypot(v[i + 3], v[i + 4], v[i + 5]) - 1) < 1e-6);
@@ -75,12 +75,22 @@ test('a wrapped cove closes both sides and both back corners with unit normals, 
     for (let i = 0; i < v.length; i += 6) if (v[i + 1] === 4 && test(v[i], v[i + 2])) return true;
     return false;
   };
-  assert(wallAt((x) => x === -3), 'left wall top');
-  assert(wallAt((x) => x === 3), 'right wall top');
-  assert(wallAt((x, z) => z === -2.5), 'back wall top');
+  assert(
+    wallAt((x) => x === -3),
+    'left wall top',
+  );
+  assert(
+    wallAt((x) => x === 3),
+    'right wall top',
+  );
+  assert(
+    wallAt((x, z) => z === -2.5),
+    'back wall top',
+  );
   // The back corner is a vertical quarter cylinder of the bend radius about the inset corner (-2, -1.5).
   const corner = [];
-  for (let i = 0; i < v.length; i += 6) if (v[i + 1] === 4 && v[i] < -2 + 1e-9 && v[i + 2] < -1.5 + 1e-9) corner.push([v[i], v[i + 2]]);
+  for (let i = 0; i < v.length; i += 6)
+    if (v[i + 1] === 4 && v[i] < -2 + 1e-9 && v[i + 2] < -1.5 + 1e-9) corner.push([v[i], v[i + 2]]);
   assert(corner.length >= 16);
   for (const [x, z] of corner) assert(Math.abs(Math.hypot(x + 2, z + 1.5) - 1) < 1e-6);
   assert.throws(() => backdropGeometry({ width: 2, radius: 1, sides: true }), RangeError);
@@ -118,7 +128,7 @@ test('the tent rig rings the horizon: a vertical mirror at any heading reflects 
   assert.equal(stagingRoom('tent').floor[0], 0.35);
   const at = (azimuth, elevation) => {
     // Equirect: column by azimuth, row 0 at the top (elevation PI / 2).
-    const x = Math.min(width - 1, Math.floor((((azimuth / (2 * Math.PI)) % 1) + 1) % 1 * width)),
+    const x = Math.min(width - 1, Math.floor(((((azimuth / (2 * Math.PI)) % 1) + 1) % 1) * width)),
       y = Math.min(height - 1, Math.floor((0.5 - elevation / Math.PI) * height));
     return image.data[(y * width + x) * 4];
   };
@@ -136,13 +146,15 @@ test('the tent rig rings the horizon: a vertical mirror at any heading reflects 
   // Regression: the overhead box at 3 over a ceiling of 1 (radiance 4) and the panels over 0.8 walls clipped a
   // polished aluminium top to white on the CAD bench. No direction of the tent is brighter than its cloth (1).
   let peak = 0;
-  for (let i = 0; i < image.data.length; i += 4) peak = Math.max(peak, image.data[i], image.data[i + 1], image.data[i + 2]);
+  for (let i = 0; i < image.data.length; i += 4)
+    peak = Math.max(peak, image.data[i], image.data[i + 1], image.data[i + 2]);
   assert(peak <= 1 + 1e-6 && peak > 0.9, `brightest tent direction ${peak}`);
   // Straight up is the overhead diffuser, within the cloth's range, so an upward face is lit from above.
   assert(at(0, Math.PI / 2 - 0.01) > 0.85, `overhead ${at(0, Math.PI / 2 - 0.01)}`);
   const soft = studio({ width, lights: stagingLights('soft') });
   let softLow = Infinity;
-  for (let x = 0; x < width; x += 4) softLow = Math.min(softLow, soft.data[(Math.floor(0.45 * height) * width + x) * 4]);
+  for (let x = 0; x < width; x += 4)
+    softLow = Math.min(softLow, soft.data[(Math.floor(0.45 * height) * width + x) * 4]);
   assert(softLow < 0.5, `soft leaves headings on the bare walls (${softLow})`);
 });
 test('backdrop is an ordinary owned mesh and using cleanup is idempotent', () => {

@@ -615,7 +615,10 @@ export async function openBench(canvas: HTMLCanvasElement, options: BenchOptions
     get failed() {
       return failed;
     },
-    add(mesh, { shadow = true, contact: casts = true, static: still = false, fit: framed = mesh !== backdrop?.mesh } = {}) {
+    add(
+      mesh,
+      { shadow = true, contact: casts = true, static: still = false, fit: framed = mesh !== backdrop?.mesh } = {},
+    ) {
       const removers: (() => void)[] = [];
       removers.push(addSubject(subjects, mesh, framed));
       if (shadow && shadows && 'id' in (mesh as object))

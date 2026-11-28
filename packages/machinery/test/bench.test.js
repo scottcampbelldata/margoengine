@@ -90,7 +90,10 @@ test('show finishes a part, registers it for shadows and shares materials', () =
   assert.deepEqual(cad.deck.position, [0, 0.01 - 0.02, 0]);
   assert.equal(cad.deckTop, 0.01);
   // The default plate is the measured gabbro (black granite), not the lighter basalt it once borrowed.
-  assert.deepEqual([...cad.deck.material.data.slice(0, 3)].map((v) => +v.toFixed(4)), [...SURFACES.gabbro.color].map((v) => +v.toFixed(4)));
+  assert.deepEqual(
+    [...cad.deck.material.data.slice(0, 3)].map((v) => +v.toFixed(4)),
+    [...SURFACES.gabbro.color].map((v) => +v.toFixed(4)),
+  );
   // By default the plate rests on the floor at y 0 and parts rest on its top.
   const resting = CadBench.attach(fakeEngine(), { deck: { thickness: 0.05 }, edges: false });
   assert.deepEqual(resting.deck.position, [0, 0.025, 0]);
@@ -100,7 +103,10 @@ test('show finishes a part, registers it for shadows and shares materials', () =
   const a = cad.show(box(0.1, 0.04, 0.06), { finish: 'anodised' }),
     b = cad.show(box(0.02, 0.02, 0.02), { finish: 'anodised' });
   assert.equal(a.material, b.material, 'one material per finish');
-  assert.deepEqual([...a.material.data.slice(0, 3)].map((v) => +v.toFixed(5)), [...cadFinish('anodised').color].map((v) => +v.toFixed(5)));
+  assert.deepEqual(
+    [...a.material.data.slice(0, 3)].map((v) => +v.toFixed(5)),
+    [...cadFinish('anodised').color].map((v) => +v.toFixed(5)),
+  );
   assert.notEqual(cad.material('machined'), a.material);
   assert.equal(b.edges, null);
   assert.deepEqual(registered, [a.mesh, b.mesh]);
@@ -139,7 +145,10 @@ test('mark draws a three-axis cross at a point through the bench lines and remov
   const stride = mark.line.points.length / mark.line.count;
   assert.deepEqual(
     Array.from({ length: 18 }, (_, i) => +mark.line.points[Math.floor(i / 3) * stride + (i % 3)].toFixed(6)),
-    [0.005, 0.02, -0.03, 0.015, 0.02, -0.03, 0.01, 0.015, -0.03, 0.01, 0.025, -0.03, 0.01, 0.02, -0.035, 0.01, 0.02, -0.025],
+    [
+      0.005, 0.02, -0.03, 0.015, 0.02, -0.03, 0.01, 0.015, -0.03, 0.01, 0.025, -0.03, 0.01, 0.02, -0.035, 0.01, 0.02,
+      -0.025,
+    ],
   );
   mark.remove();
   mark.remove();

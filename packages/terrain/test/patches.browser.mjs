@@ -67,7 +67,10 @@ await runSuite(
           textures: (gpu) => ({
             heightmap: plane(gpu, 2, new Float32Array(4), 'r32float', 4),
             layers: colours(gpu),
-            weights: [plane(gpu, side, weights, 'rgba8unorm', 4), plane(gpu, side, new Uint8Array(side * side * 4), 'rgba8unorm', 4)],
+            weights: [
+              plane(gpu, side, weights, 'rgba8unorm', 4),
+              plane(gpu, side, new Uint8Array(side * side * 4), 'rgba8unorm', 4),
+            ],
           }),
         });
         engine.lighting.direction.set([0.001, 1, 0.002, 4]);
@@ -122,7 +125,8 @@ await runSuite(
     assert.ok(result.mixPatched.red + result.mixPatched.green > 0.75, 'most pixels are one layer, not the mix');
     assert.ok(result.pure <= 1, `a weight of 1 draws as painted (largest difference ${result.pure})`);
     assert.ok(
-      Math.abs(result.farPatched.mean - result.farPlain.mean) < 0.03 && result.farPatched.red + result.farPatched.green < 0.05,
+      Math.abs(result.farPatched.mean - result.farPlain.mean) < 0.03 &&
+        result.farPatched.red + result.farPatched.green < 0.05,
       'far ground is the painted mix again',
     );
   },

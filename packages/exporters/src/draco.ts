@@ -353,7 +353,9 @@ export async function encodeDraco(
     );
   for (const [name, input] of Object.entries(geometry.attributes ?? {})) {
     if (attributes.some((a) => a.semantic === name))
-      throw new TypeError(`encodeDraco attributes.${name}: the name is taken by a standard attribute; use another name`);
+      throw new TypeError(
+        `encodeDraco attributes.${name}: the name is taken by a standard attribute; use another name`,
+      );
     add(name, 'GENERIC', input, genericBits);
   }
   let corners = new Uint32Array(0);
