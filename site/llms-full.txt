@@ -16345,6 +16345,19 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: shrubs drew as flat bright green blobs on the slopes (KB-SHRUB-BLOBS1; procedural, biomes)
+
+- **What:** in timber-valley stills every shrub on the slopes was a smooth mint to lime dome with a hard outline.
+- **Cause:** `generateShrubMesh` was three closed smooth hemispheres, and biomes painted them the broadleaf green,
+  linear (0.14, 0.3, 0.05), about three times a leaf's reflectance.
+- **Fix:** the shrub is separate leaves in the same box (spherical leaf angles, normals out of the shrub; 1,080, 432 and
+  144 triangles by detail level, each level keeping the full level's cover: Cook, Halstead, Planck and Ryu, "Stochastic
+  simplification of aggregate detail", SIGGRAPH 2007, https://graphics.pixar.com/library/StochasticSimplification/),
+  and biomes paints it (0.065, 0.11, 0.035) (Jacquemoud and Baret, "PROSPECT: a model of leaf optical properties
+  spectra", Remote Sensing of Environment 34, 1990, https://doi.org/10.1016/0034-4257(90)90100-Z; Hosgood et al.,
+  "Leaf Optical Properties EXperiment 93", JRC EUR 16095 EN, 1995).
+- **Regression:** `packages/procedural/test/shrub-leaves.test.js`.
+
 ### Open 2026-11-28: the USD importers drop texture factors, and the default one emission and occlusion (KB-USDZ-FACTORS1, usdz)
 
 - **What:** a textured file written by `exportUSDZ` reads back through `@margoengine/usdz` with a white base colour
