@@ -2118,6 +2118,7 @@
       "radialPlacements",
       "randomPlacements",
       "scatterCullShader",
+      "screenRingCode",
       "spacePlacements",
       "splitDeclaration",
       "swayFrequency",
