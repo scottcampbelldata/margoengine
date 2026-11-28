@@ -1345,7 +1345,11 @@ export function buildInterior(
     soft = o.softFurnishings;
   layout.forEach((floor, k) => {
     const fy = floors[k],
-      cy = ceilingOf(k);
+      cy = ceilingOf(k),
+      // The flights rising from this storey and arriving at it.
+      flights = plans.flatMap((p) =>
+        [k - 1, k].filter((j) => j >= 0 && j < p.flights.length).map((j) => flightRect(p, j)),
+      );
     out.doorways.push(...floor.doors);
     floor.rooms.forEach((room, index) => {
       const { x0: rx0, x1: rx1, z0: rz0, z1: rz1 } = room,
@@ -1685,7 +1689,12 @@ export function buildInterior(
               s.axis === 'z' ? [a, y, s.plane + sign * off] : [s.plane + sign * off, y, a],
             normal: V3 = s.axis === 'z' ? [0, 0, sign] : [sign, 0, 0],
             rod = metal.triangles,
-            drape = cloth.triangles;
+            drape = cloth.triangles,
+            [ax, , az] = point(lo, 0, 0),
+            [bx, , bz] = point(hi, 0, 0.11),
+            cover = { x0: Math.min(ax, bx), x1: Math.max(ax, bx), z0: Math.min(az, bz), z1: Math.max(az, bz) };
+          // A window behind a stair stays bare: its curtains would hang through the flight.
+          if (flights.some((r) => overlaps(r, cover))) continue;
           metal.beam(point(lo, top, 0.07), point(hi, top, 0.07), 0.02, 0.02);
           for (const [from, to] of [
             [lo, lo + width],

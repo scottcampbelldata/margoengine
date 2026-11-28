@@ -307,6 +307,35 @@ test('large buildings get a second stair where the code asks, walked to from eve
   assert.ok(half > placed * 0.97, `${half} of ${placed} half the diagonal apart`);
 });
 
+test('no curtain hangs through a stair', () => {
+  const wrong = [];
+  let beside = 0;
+  seed(9001);
+  const styles = ['japan-2011-house', 'japan-2011-concrete', 'western-1910-brick', 'western-1910-false-front'];
+  for (let i = 0; i < 400; i++) {
+    const style = styles[i % 4],
+      storey = range(2.8, 3.4),
+      o = { style, width: range(8, 58), depth: range(6, 26), storeys: Array(2 + (i % 5)).fill(storey) },
+      b = generateBuilding(o),
+      p = b.parts.fabric?.positions ?? [];
+    for (const s of b.stairs) {
+      const lo = b.floors[s.floor],
+        hi = b.floors[s.floor + 1];
+      for (let v = 0; v < p.length; v += 3) {
+        const inside = Math.min(p[v] - s.min[0], s.max[0] - p[v], p[v + 2] - s.min[1], s.max[1] - p[v + 2]);
+        if (inside > -0.5 && p[v + 1] > lo && p[v + 1] < hi) beside++;
+        // From over the floor to under the ceiling, and on the storey the flight arrives at.
+        if (inside > 0.01 && p[v + 1] > lo + 0.03 && p[v + 1] < hi + 2) {
+          wrong.push(`#${i} ${style} ${o.width.toFixed(2)} x ${o.depth.toFixed(2)} floor ${s.floor}`);
+          break;
+        }
+      }
+    }
+  }
+  assert.deepEqual(wrong.slice(0, 20), [], `${wrong.length} failures`);
+  assert.ok(beside > 0, 'curtains still hang beside stairs');
+});
+
 test('a second stair follows the thresholds of the code, and can be left out', () => {
   const stairs = (o) => generateBuilding(o).stairs.filter((s) => s.escape).length,
     house = { style: 'japan-2011-house', width: 12, depth: 10, storeys: [2.9, 2.9] };

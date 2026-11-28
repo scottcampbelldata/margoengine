@@ -1156,7 +1156,7 @@ and a bathroom (tub, water closet and washbasin, the 1910 closet with a high tan
 only two rooms; a concrete public building has a toilet room on each floor. A fixture keeps clear floor in front of it,
 and a water closet the room beside it that IRC R307.1 asks for. With `softFurnishings`, Japanese homes are laid with
 Edo-ma tatami (no four corners meeting) and sleep on futons, western homes have a rug and made beds with pillows and
-blankets, and the windows of living rooms and bedrooms have a pair of curtains. Nothing taller than a sill stands
+blankets, and the windows of living rooms and bedrooms have a pair of curtains, except a window behind a stair. Nothing taller than a sill stands
 before a window.
 
 ```ts
