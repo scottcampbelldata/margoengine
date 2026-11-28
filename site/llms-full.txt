@@ -17166,8 +17166,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   (`kernel/tests/stability.rs` `a_web_of_joints_stays_in_the_numbers` allows 1e-6).
 - **Regression:** `packages/physics/kernel/tests/solver.rs`
   `a_plate_held_near_its_friction_rides_a_deck_pitching_far_from_it` (the plate 60 m out at 1.3 times the demand stays
-  within 0.1 mm for 36 s; it slid 2.27 mm). The chair of five colliders still creeps on the storm deck, 2.8 cm (it was
-  2.0): that is several pairs on one body, KB-PHYS-MULTIPAIRCREEP1, still open.
+  within 0.1 mm for 36 s; it slid 2.27 mm). The chair of five colliders still crept on the storm deck, 2.8 cm (it was
+  2.0): that was several pairs on one body, KB-PHYS-MULTIPAIRCREEP1, fixed 2026-11-28.
 
 ### Fixed 2026-11-28: a contact's resting depth jumped between two branches, so a small change of g flipped it (KB-PHYS-RESTDEPTH1, physics kernel, contact solver)
 
@@ -21080,33 +21080,42 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   `packages/physics/tests/surge.test.js` (a wind with no scale, a wind at 60, and a sky at 1, each refused by a water at
   600; a wind at 600 accepted).
 
-### Open 2026-11-26: a body that touches through several colliders creeps under a changing load that one collider holds (KB-PHYS-MULTIPAIRCREEP1, physics kernel)
+### Fixed 2026-11-28: a body that touches through several colliders crept under a changing load that one collider holds (KB-PHYS-MULTIPAIRCREEP1, physics kernel)
 
 - **Repro:** the storm deck of `packages/physics/tests/deck-props.test.js` (roll 20 degrees at 12 s, pitch 4 degrees at 9 s,
-  heave 2 m at 9 s, the prop 57 m aft), friction 1.3 times the deck's friction demand, 36 s at 8 substeps. A plate of one
-  box collider moved 1.5 mm (0.9 mm since KB-PHYS-CONECUT1 made a pair's friction converge: the one-pair part of this
-  creep). The same plate cut into two box colliders on one body moves 7.2 mm, and cut into four it
-  moves 10.5 mm. The test's chair (a seat on four legs, five colliders) creeps 2.0 cm. HEAD before this change gave
-  the chair 2.4 cm, so it is not new. The same loads on a fixed floor (gravity turned to the deck's specific force at the
-  prop) move the chair 2.4 mm and a single box 0.02 mm. A constant load holds it: on a floor tilted to tan 0.47 against
-  friction 0.72 the chair stays within 0.45 mm for 36 s.
-- **Cause, as measured:** each pair's friction is solved alone, with a cone of its own points' normal impulses. When the
-  load changes, the pair solved first takes the change and saturates its share of the cone while the body's other pairs
-  still hold. The relaxing pass then cuts that pair's anchors toward its points. The body did not slide, but the cut
-  pair's share of the load is lost, and the other pairs only take it up once the body has slipped far enough to pull on
-  their anchors. Each swing of the load ratchets the body along. Leg loads on the moving deck also swing between legs
-  from step to step, which feeds it. It does not depend on the leg spread, the feet's size, the legs' height, the
-  contact frequency (30 to 120 Hz) or the passes (2 to 8), and turning the order the pairs are solved in each substep
-  did not help.
-- **Tried, and not kept:** cutting an anchor only where the saturated impulse pulls toward it; cutting it only beyond
-  the impulse it already held; letting it follow by no more than the substep's own slide at the point. Each held the
-  chair better on the deck or not at all, and each made the chair resting on the tilted floor rock on its light legs
-  and creep 5 to 23 cm. The per-point cut is what takes the energy out of a saturated anchor's pull, so a fix must
-  keep that.
-- **Plan:** treat the anchors of all the pairs between two bodies as one patch: judge a cut on the patch's total
-  friction against its total cone (and its twist against its spread), the limit surface of Goyal, Ruina and Papadopoulos
-  (1991) across colliders, so one pair saturating while the patch holds moves no anchor. Until then, a prop that must
-  hold on a moving deck is best made with one collider where it touches.
+  heave 2 m at 9 s, the prop 60 m aft), friction 1.3 times the deck's friction demand, 36 s at 8 substeps, ported to the
+  kernel in doubles. A plate of one box collider moved 0.85 mm; the same plate cut into two box colliders on one body moved
+  4.7 mm, and cut into four 11.8 mm. The test's chair (a seat on four legs, five colliders) crept 2.9 cm, and kept creeping
+  (about 1 cm more each 36 s). A constant load held it: on a floor tilted to tan 0.47 against friction 0.72 the chair stayed
+  within a micron.
+- **Cause, as measured:** three things, each one pair at a time. (1) Each pair's friction was solved alone, with a cone of
+  its own points' normal impulses: when the load changed, the pair solved first took the change and met its share of the
+  cone while the body's other pairs still held, and its anchors were cut. (2) Anchors cut one point at a time agree with no
+  move of the body, so the points pushed against each other at their cones; on a body of several colliders the normal load
+  is shared among many points in no fixed way, and a lightly loaded point met its cone in nearly every substep while the
+  patch held well inside its limit surface ((|F| / C)^2 + (T / T_max)^2 at most 0.68 for the chair). (3) A point the narrow
+  phase finds new starts with no anchor: when a leg of the rocking chair lifted and came down again, its four points let go
+  of where the chair stood, and the chair crept along with each rock. Sweeping the patch's friction to convergence alone
+  took the two-box plate to 1.3 mm and the chair to 1.3 cm; more sweeps (64, 256) did not help, and 256 tipped the chair.
+  Handing a cut point's lost pull to the uncut anchors made it far worse (the two-box plate 10.8 cm). Fitting the anchors
+  with a shift and a turn by least squares held the deck props, but its turn, read from a few loaded points close together,
+  reached lightly loaded points far off that took load the next step: in a stack of three bodies of two boxes each the
+  anchors grew to hundreds of metres in two seconds and the top two slid off at 7 cm/s (`compound_boxes_stack`).
+- **Fix:** the pairs between the same two bodies whose normals agree are one friction patch (`group_patches` in
+  `kernel/src/solver.rs`, from the step's canonical lists, so it is the same at any thread count). In the relaxing pass a
+  patch's pairs leave their friction to its last pair, which sweeps every point of the patch until it settles or 16 sweeps
+  (`patch_friction`); the anchors are still cut point by point from the last sweep, and then all take the patch's shift,
+  the mean of its anchors weighted by each point's normal impulse (`fit_patch_anchors`), which never reaches past the
+  anchors it is taken of. The same mean is taken once a step when the patch is made, so a point new this step (no load yet)
+  takes the patch's anchor. A body with one collider, and the pushing pass, take the path they took before. The plates of
+  one, two and four colliders now move 0.85, 0.92 and 0.86 mm, and the chair 1.3 mm; the tilted chair stays within 0.03 mm.
+- **Regression:** `packages/physics/kernel/tests/solver.rs`
+  `a_plate_cut_into_four_colliders_rides_the_storm_deck_as_one_collider_does` (each under 1 mm, and two or four colliders
+  no more than one plus 0.1 mm; they moved 4.7 and 11.8 mm), `a_chair_rides_the_storm_deck_as_a_plate_does` (under 2 mm;
+  2.9 cm) and the guard `a_chair_rests_on_a_floor_tilted_near_its_friction` (under 0.5 mm and 1 mrad, which gates on
+  single anchors failed at 5 to 23 cm); `kernel/tests/compound.rs` `compound_boxes_stack` guards the fit;
+  `packages/physics/tests/deck-props.test.js` holds the chair to 2 mm with the plate. `kernel/tests/threads.rs` carries a
+  chair and a four-box plate in its scene, bit for bit at 1 to 8 threads.
 
 ### Fixed 2026-11-26: a prop on a deck that rolls and pitches at once slid where its friction held it (KB-PHYS-SPINBCH1, physics kernel)
 
@@ -21136,7 +21145,7 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   Clamping the anchors to what the cone can pull in a substep instead made a cube at tan 0.49 against mu 0.5 creep and a
   pyramid sleep late, so it was not kept. Gating the relaxing pass's cut by the impulse's direction, or by the impulse
   the pushing pass held, took the 32-substep slip from 4 cm to 2.5 mm, but let a resting chair rock and creep
-  (KB-PHYS-MULTIPAIRCREEP1), so neither was kept.
+  (`a_chair_rests_on_a_floor_tilted_near_its_friction` guards it, KB-PHYS-MULTIPAIRCREEP1), so neither was kept.
 - **Plan:** ration the anchors' pull to the cone over the step rather than the substep, or solve the anchor and the
   relaxing take-back as one friction row. Until then, keep a world that carries loose props on a moving deck at 16
   substeps or fewer (the default is 8).
