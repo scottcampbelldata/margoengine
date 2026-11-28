@@ -2494,7 +2494,7 @@ impl World {
             // Two units in the last place of the largest coordinate of the joint's two bodies, at most: an anchor sits within the
             // body's own reach of its centre, which a factor of two covers for any body a joint holds at its surface.
             let far = [self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize].iter().fold(0.0f32, |most, &b| {
-                let c = self.v(CENTER_X, b);
+                let c = self.pose_center(b);
                 most.max(c.x.abs()).max(c.y.abs()).max(c.z.abs())
             });
             let coarse = 4.0 * f32::EPSILON * far;
