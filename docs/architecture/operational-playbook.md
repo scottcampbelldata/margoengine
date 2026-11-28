@@ -5676,7 +5676,8 @@ previous unbounded shutdown while validating this consolidation.
 
 
 
-The required-fixture audit is tracked in the missing-test-items audit.
+The required-fixture audit was tracked in `docs/work-lists/missing-test-items.md`, removed from the tree in
+7dcdf1df35 (`git show 7dcdf1df35^:docs/work-lists/missing-test-items.md` prints it).
 The verify root suite now runs `tests/fixture-skips.test.js`, which parses test/proof syntax with
 `scripts/check-fixture-skips.mjs` and rejects the audited missing-file skip/early-success patterns.
 Required reads also reject absent files and Git LFS pointers with an exact path and recovery command.

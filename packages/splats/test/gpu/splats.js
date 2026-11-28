@@ -856,6 +856,68 @@ window.check.animate = async (o) => {
   const d = await cloud.read();
   return { positions: [...d.positions], covariances: [...d.covariances], colors: [...d.colors] };
 };
+// ./animate with files: the frames at `urls` (PLY, the same splats in the same order) played as a sequence. At each
+// time `frame + part` (in frames, wrapping past the last) the cloud read back is compared with the mix of the two
+// frames worked out here; at each `still` frame the sequence's picture is compared with a plain cloud of that frame.
+window.check.sequenceFiles = async ({ urls, fps = 30, times, stills }) => {
+  const frames = await Promise.all(urls.map(async (url) => parsePly(await (await fetch(url)).arrayBuffer()))),
+    count = frames[0].positions.length / 3,
+    low = [Infinity, Infinity, Infinity],
+    high = [-Infinity, -Infinity, -Infinity];
+  for (const frame of frames)
+    for (let i = 0; i < frame.positions.length; i++) {
+      low[i % 3] = Math.min(low[i % 3], frame.positions[i]);
+      high[i % 3] = Math.max(high[i % 3], frame.positions[i]);
+    }
+  const target = low.map((x, k) => (x + high[k]) / 2),
+    size = Math.hypot(...high.map((x, k) => x - low[k])),
+    camera = { position: [target[0], target[1], target[2] + size * 1.4], target, near: size / 100, far: size * 10 };
+  const start = async (data) => {
+    engine?.dispose();
+    canvas?.remove();
+    extras = [];
+    canvas = document.body.appendChild(document.createElement('canvas'));
+    canvas.style.cssText = 'width:256px;height:256px;display:block';
+    engine = await Engine.create(canvas, { backend: 'webgpu', camera });
+    engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+    return Splats.attach(engine, data);
+  };
+  const plain = [];
+  for (const k of stills) {
+    await start(frames[k]);
+    await waitForPipelines(draw);
+    await draw();
+    plain.push(canvas.toDataURL('image/png'));
+  }
+  const cloud = await start(frames[0]),
+    sequence = SplatSequence.attach(engine, cloud, frames, { fps });
+  sequence.playing = false;
+  await waitForPipelines(draw);
+  const worst = { positions: 0, covariances: 0, colors: 0 };
+  let moved = 0;
+  for (const time of times) {
+    const from = Math.floor(time) % frames.length,
+      to = (from + 1) % frames.length,
+      part = time - Math.floor(time);
+    sequence.time = time / fps;
+    await draw();
+    const read = await cloud.read();
+    for (const key of Object.keys(worst))
+      for (let i = 0; i < read[key].length; i++) {
+        const expected = frames[from][key][i] * (1 - part) + frames[to][key][i] * part;
+        worst[key] = Math.max(worst[key], Math.abs(read[key][i] - expected));
+      }
+    for (let i = 0; i < read.positions.length; i++)
+      moved = Math.max(moved, Math.abs(read.positions[i] - frames[0].positions[i]));
+  }
+  const played = [];
+  for (const k of stills) {
+    sequence.time = k / fps;
+    await draw();
+    played.push(canvas.toDataURL('image/png'));
+  }
+  return { count, frames: frames.length, worst, moved, plain, played };
+};
 // Anti-aliasing: three splats on the view axis (two of variance 1e-4 at distances 3 and 23, one of 1e-2 at 3), drawn
 // with `antialias` off and on; returns each splat's projected opacity (ellipse centre w) both ways.
 window.check.antialias = async () => {

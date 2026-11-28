@@ -471,6 +471,14 @@ const ASSETS = [
     'real-file test: public texture samples, downloaded by URL, checked by SHA-256 and never in the repository or a tarball. webp: libwebp-test-data (states no licence, not redistributed); dds: Pillow and DirectX samples at the pinned URLs; ktx2 (batch 134 corpus): KTX2-Samples by Don McCurdy (CC BY-SA 4.0), Khronos glTF-Sample-Assets 8f492390 CarConcept (CC BY 4.0, Darmstadt Graphics Group GmbH, Eric Chadwick) and FlightHelmet (CC0 1.0, Gary Hsu), logos and trademarks excluded. Test data only, never run or shipped.',
   ],
   [
+    'packages/splats/test/real-files/manifest.json',
+    'real-file test: a 14-frame animated Gaussian splat sequence (tiger_0.ply to tiger_13.ply) from https://huggingface.co/datasets/Langelaw/4dgs at 2341b6c7a7e3c6e489d6563e866cd64f431bc7d3 (MIT, as the dataset card states), downloaded by URL, checked by SHA-256 and never in the repository or a tarball. Test data only.',
+  ],
+  [
+    'packages/usdz/tests/real-files/manifest.json',
+    "real-file test: resetXformStack.usda from https://github.com/PixarAnimationStudios/OpenUSD at ee47c679abde5b467a7b6a41f3b2285564a4222e (Tomorrow Open Source Technology License 1.0, Pixar and the OpenUSD authors) and the Rizon 4s robot stage from https://github.com/flexivrobotics/isaac_sim_ws at 9378b06fea73e338dc05cc047272b47c74101379 (Apache-2.0, Flexiv Robotics), downloaded by URL, checked by SHA-256 and never in the repository or a tarball. The manifest records OpenUSD's answers for them (world matrices and sampled mesh points). Test data only.",
+  ],
+  [
     'packages/loaders/tests/real-files/manifest.json',
     "real-file test: 186 public sample files, downloaded by URL and never in the repository or a tarball; each one's source, author and licence is in this manifest (public domain, CC0, CC BY, BSD, MIT, Apache-2.0, OFL and sample-file notices). Added PDAL PTS (BSD-3-Clause), Open Babel chemistry XYZ (GPL-2.0), Slic3r zipped AMF (AGPL-3.0) and Takeshi Takahashi's LDraw MPD (CCAL/CC-BY-2.0), with four CC-BY-4.0 sticker dependencies and the existing CC-BY-2.0 library archive. Licence-source links and pinned hashes are retained per entry; no parser or implementation code is fetched. Added 62 COLLADA 1.5 kinematics conformance files from KhronosGroup/COLLADA-CTS at 61f2a560cbb2a06ee62da8025241f6b08d06bfd9 (Copyright (c) 2012 The Khronos Group Inc., MIT-style permission notice in its LICENSE.md, SHA-256 per file in the manifest); 2Dhatch.dxf is from jscad/sample-files (MIT). Test data only, never run or shipped.",
   ],

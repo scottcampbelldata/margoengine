@@ -5193,3 +5193,11 @@ each runs `Shadows` and `VirtualShadows`).
 ## Plugin line style round trip (exporters and gltf/strokes, 2026-11-27)
 
 Build packages, then `node --test packages/exporters/tests/plugin-lines-points.test.js`.
+
+## Real reset stacks and an animated splat sequence (usdz, splats/animate, 2026-11-27)
+
+Build packages. `node packages/usdz/scripts/test-real-reset.mjs <cache> --download` fetches two pinned USD stages
+(about 1.1 MB) outside the repository and compares them with OpenUSD's recorded answers.
+`node packages/splats/scripts/test-real-sequence.mjs <cache> --download` fetches 14 pinned PLY frames (10 MB) and plays
+them on the GPU. Without the files: `node --test packages/usdz/tests/reset-robot.test.js
+packages/splats/test/animate-ply.test.js` and `node packages/splats/test/gpu/check.mjs`.

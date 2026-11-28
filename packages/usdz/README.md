@@ -194,6 +194,8 @@ console.log(asset.meshes.length); // 1: the three instances share one sphere
 ## Reset transform stacks
 
 A prim whose `xformOpOrder` holds `!resetXformStack!` lands where it was authored, whatever its parents do: its parents' transforms are left out, moving ones included, and every op up to the last reset is ignored. It needs no entry or option, in any reader of this package. `/anim` plays what comes after the reset and nothing before it.
+Checked against OpenUSD on its own reset test stage and on a robot exported by Isaac Sim
+(`scripts/test-real-reset.mjs`), and on a stand-in stage for animated stacks.
 
 ```ts
 import {parseUSDA} from 'margoengine/usdz';

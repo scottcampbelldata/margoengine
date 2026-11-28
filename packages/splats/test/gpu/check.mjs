@@ -16,6 +16,7 @@ import { decodePNG } from '../../../../tests/support/png.js';
 import { encodeWebpLossless } from '../../src/webp.ts';
 import { checkStreamedSog } from './lod-sog-check.mjs';
 import { checkModifiers } from './modify-check.mjs';
+import { FRAMES, plyFrame } from '../fixtures/ply-frames.js';
 
 const context = await openBrowser({ startPath: '/packages/splats/test/gpu/splats.html', port: 'free' }),
   { page } = context;
@@ -456,6 +457,26 @@ try {
     close(s.covariances.slice(12, 18), [0.00125, 0.00075, 0, 0.00125, 0, 0.001], 'skin blend');
     close(s.colors, [1, 0, 0, 0.9, 1, 0, 0, 0.9, 1, 0, 0, 0.5], 'skin keeps colours');
     report.animate = { sequence: r.positions.slice(0, 3), skin: s.positions };
+  }
+  // ./animate with files: three PLY frames of Margo's own, in a per-frame capture's layout, play as the mix of the two
+  // frames around each time, and each frame draws as a plain cloud of it.
+  {
+    await page.route('**/ply-frames/*', (route) =>
+      route.fulfill({
+        contentType: 'application/octet-stream',
+        body: Buffer.from(plyFrame(Number(route.request().url().split('/').pop()))),
+      }),
+    );
+    const r = await page.evaluate((o) => window.check.sequenceFiles(o), {
+      urls: Array.from({ length: FRAMES }, (_, f) => `/ply-frames/${f}`),
+      times: [0, 0.25, 1, 1.5, 2.75],
+      stills: [0, 2],
+    });
+    for (const [key, off] of Object.entries(r.worst)) assert.ok(off < 1e-5, `PLY sequence ${key} off by ${off}`);
+    assert.ok(r.moved > 0.15, `the PLY frames move: ${r.moved}`);
+    assert.deepEqual(r.played, r.plain, 'each PLY frame of the sequence draws as a plain cloud of the frame');
+    assert.notEqual(r.played[0], r.played[1], 'the two frames draw differently');
+    report['animate ply'] = r.worst;
   }
   // ./data: the SOG writer's WebP images decode in the browser (createImageBitmap, then a WebGPU texture without
   // premultiplication or colour conversion) to the exact pixels written, alpha included.

@@ -192,6 +192,8 @@ const TOOLS = {
     'paired volume timing against VTK.js, installed outside the repository; run directly',
   'packages/splats/scripts/truck-photo.mjs':
     'external Truck photograph comparison (data outside the repository), run directly',
+  'packages/splats/scripts/test-real-sequence.mjs':
+    'opt-in playing of a downloaded animated splat sequence (data outside the repository), run directly',
   'packages/loaders/scripts/real-files-render.mjs':
     'opt-in drawing of downloaded public files, and the Lottie frames of test:real-files, run directly by that script',
   'packages/netcode/tests/webtransport-proof/proof.mjs':
