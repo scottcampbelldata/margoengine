@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21933588,
+  "total": 21937221,
   "history": [
     {
       "date": "2026-10-24",
@@ -15701,6 +15701,12 @@
       "commit": "sky ground lights",
       "reason": "VolumetricClouds groundLights and mist (a low deck lit from below by a town, Kyba et al. 2011, Kocifaj 2007): gzip measured before and after on the same build (workstation, build-modern --only=sky): sky/volumetric-clouds 15,860 to 17,040 B (base without the storm field 12,038 to 13,003), compat-clouds 29,489 to 30,601 (base 25,405 to 26,515); ceilings to measured plus headroom (17,552, 13,393, 31,520, 27,311). cloud-shadows 8,577 to 8,588 and shafts 12,454 to 12,467 stay under theirs. The bytes are the ground-light loop in the march, its closed-form track along the mist's ray, the mist's composite in the picture shader, the CPU packing and checks, and the CPU twin cloudGroundLight. They run inside the shader and uniform the entry already builds; a lazy split would add a second pipeline build to every night scene that uses them, as the storm field's split does, for about 1 kB.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "67b180f9fe",
+      "reason": "humans/fit 31,219 to 31,573 B gzip (ceiling 31,398 to 32,521): TriangleGrid keeps each triangle's padded box and skips a triangle whose box lies past the closest point found, and closestOnTriangle reads its corners by index and makes no arrays (2f71e99f4f). The same results bit for bit, 1.73 million closest points instead of 41.2 million for the townsman at rest, and fit.test.js runs in 94 s instead of 357 s, which CI's hang watch had been stopping; the 354 B are that pruning, and a split would put the grid in a second file for every fitOutfit and fitPenetration caller. machinery/bench is a new entry, 2,253 B gzip (ceiling 2,509). Its edge to @margoengine/lines is deliberate: CadBench draws feature edges and its datum marks as Lines, attaches the Lines plugin when it is made, and CadBench.attach and show() are synchronous, so a lazy import() would make both asynchronous for an entry whose whole job is those lines. machinery/dimensions carries the same recorded edge.",
+      "grew": 3
     }
   ],
   "items": {
@@ -16224,7 +16230,7 @@
     "@margoengine/humans/body": 7899,
     "@margoengine/humans/cast": 15351,
     "@margoengine/humans/crowd": 1516,
-    "@margoengine/humans/fit": 31398,
+    "@margoengine/humans/fit": 32521,
     "@margoengine/humans/wardrobe": 2784,
     "@margoengine/ifc": 3434,
     "@margoengine/ifc dist/workers/ifc-stream.js": 4259,
@@ -16378,6 +16384,7 @@
     "@margoengine/lod/stream": 1778,
     "@margoengine/machinery": 31736,
     "@margoengine/machinery/assembly": 1105,
+    "@margoengine/machinery/bench": 2509,
     "@margoengine/machinery/clearance": 1613,
     "@margoengine/machinery/dimensions": 4699,
     "@margoengine/machinery/edges": 4929,
@@ -17571,6 +17578,7 @@
     "leak @margoengine/loaders/threemf-mesh -> @margoengine/materials": 1,
     "leak @margoengine/lod -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/lod/occluder-fade -> @margoengine/bvh": 1,
+    "leak @margoengine/machinery/bench -> @margoengine/lines": 1,
     "leak @margoengine/machinery/dimensions -> @margoengine/lines": 1,
     "leak @margoengine/machinery/dimensions -> @margoengine/text": 1,
     "leak @margoengine/machinery/react -> @margoengine/react": 1,
