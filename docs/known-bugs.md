@@ -2416,6 +2416,31 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   190 and 205, and at the fitted density the top darkens toward the faces the sun does not light, where MagicaVoxel's
   stays flat across and rises toward the sun. One colour, one density and one sun angle are on disk; telling its
   model apart needs MagicaVoxel renders at other densities, colours and sun angles, and a view of the side faces.
+- **Measured and rejected 2026-11-27 (KB1673, KB1664 job 1): the diffuse interface with the sun sampled inside the
+  volume.** The two models each match half of what is on disk: the sun-lit cloud of the mapping (sun sampled at each
+  scattering point through its own volume) matches the sun-lit top and its slope toward the sun, the diffuse interface
+  (`subsurface`) the sky-lit level, the crisp edges and the black shadow. Joined (a local build, not kept): a
+  `subsurface` volume that is also `sunlit` samples the sun at every scattering point of its walk, through its own
+  volume only, leaves the sun out where the walk leaves, and keeps the sky to the exit lobe. This is plain next-event
+  estimation in a medium (Novak, Georgiev, Hanika and Jarosz, "Monte Carlo Methods for Volumetric Light Transport
+  Simulation", Eurographics STAR 2018, <https://doi.org/10.1111/cgf.13383>), which connects straight through the
+  boundary; Koerner, Novak, Kutz, Habel and Jarosz, "Subdivision Next-Event Estimation for Path-Traced Subsurface
+  Scattering", EGSR 2016, <https://doi.org/10.2312/sre.20161214>, show such a connection is not consistent with a
+  boundary that bends light, and Wrenninge, Villemin and Hery, "Path Traced Subsurface Scattering using Anisotropic
+  Phase Functions and Non-Exponential Free Flights", Pixar Technical Memo 17-07, 2017,
+  <https://graphics.pixar.com/library/PathTracedSubsurface/paper.pdf>, gather light only where the walk leaves, as
+  the tracer's `subsurface` does; whether MagicaVoxel makes the straight connection was the question. Measured on the
+  `_sss` cloud tile of board G (`_d` 0.05, white, on a black base; 512 samples; WebGPU, RTX A6000; green channel,
+  8-bit; centre, then five points across the top toward the sun, then the rim on the sun side): MagicaVoxel, sun at 60
+  degrees: 189, 182 to 201, rim 206; sky: 135, rim 138. The mapping as it is: 191, 184 to 199, rim 187; sky 137, rim
+  132. Joined at extinction 0.7 a voxel (the mapping's): 194, a hump 183, 196, 190; sky 145. At 3 and at 10: 203 flat
+  across; sky 135, rim 144. So the walk does not take its sun light by straight connections from inside a diffuse
+  interface: dense enough for the sky level, the sun reaches only the first voxel and the top is flat and 14 levels
+  bright; at the cloud's density the walk leaves through the side faces and the top humps. Rejected; the mapping is
+  unchanged. What is left is the sun-facing rim, 19 levels darker than MagicaVoxel's (187 against 206; corners 173
+  against 200): light entering through the sun-facing side and leaving through the top near the edge. Telling that
+  apart still needs the side-view and other-density renders that `tests/magicavoxel/sss-refs.cjs` writes the scenes for
+  (on hold).
 
 ### Fixed 2026-11-26: on ANGLE Direct3D 11 a nested loop's `continue` ran the outer loop's update, and a lone case ran whatever the selector (KB-LOOP-D3D11, KB-SW2, webgl2-compat)
 
