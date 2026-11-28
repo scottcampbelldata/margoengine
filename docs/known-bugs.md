@@ -118,6 +118,31 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** one helper (`packages/shared/occlude-ambient.js`) multiplies every ambient term. Test:
   `packages/scatter/test/contact.browser.mjs` (1.000 against 0.502 before and after).
 
+### Open 2026-11-28: the timber-valley blowup shows single bright pixels through conifer foliage, 15 and 46 ppm (KB-LOOK-TV-SPECKLE, procedural, biomes)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-blowup.json --once --seconds 1.1` (RTX A6000,
+  WebGPU, supersample 2, 8 sub-frames, TAA): `speckle` early 21.3 ppm and mid 46.4 ppm, bound 5 (`animatedFeature`).
+  38 of 44 early speckles are bright: sky or fire glow through a gap in dark foliage.
+- **Cause 1 (fixed):** a conifer spray's band started 12 percent along its branch and narrow, so the sprays of a whorl
+  never met round the stem; sky showed beside the trunk at every whorl of the near firs (1261,603 and 1271,681 on the
+  early probe). `generateConiferMesh` now starts each whorled spray at the stem's axis with its inner rows covering the
+  angle to the next spray. Regression: `packages/procedural/test/conifer-hub.test.js` (a ring round the stem at every
+  whorl is 100 percent open before, 0 after). Early 44 to 31 speckles (21.3 to 15.0 ppm); mid 96 to 95.
+- **Cause 2 (open):** most of what is left, and nearly all of mid, sits in the smoke band at y 945 and below: distant
+  firs whose sprays are a pixel wide or less draw their tiers as dotted lines against the fire glow, and gaps between
+  the outer sprays of mid-distance crowns. Next: check which conifer level those trees draw at (`coniferLevels` rings in
+  the timber-valley biome) and whether a sub-pixel spray should already be the middle or imposter level.
+
+### Open 2026-11-28: a swaying near leaf's soft fringe keeps the sky's velocity (KB-SCATTER-FRINGEVEL1, scatter velocity)
+
+- **Repro:** the same blowup render, mid probe, row 460, x 1716 to 1756: the near leaf's soft edge (geometry coverage 16
+  to 223 of 255, luma 134 to 56) holds depth 0 and the sky's velocity; the leaf's own motion, about 11 px a frame past
+  the camera, starts only at full coverage (x 1756). When the leaf moves on, its trailing fringe reads as shimmer: all
+  of mid's `shimmerMoving` 1.72 percent is this band (x 1700 to 1920).
+- **Cause (to trace):** `ScatterVelocity`'s dominant pass (`coverage` 0.5) should give a pixel mostly covered by a blade
+  the blade's motion. Pixels at 60 to 87 percent coverage still read the sky's here. Not depth of field: the scene draws
+  none.
+
 ### Open 2026-11-28: motionBlur calls a correctly smeared mover narrower than its smear sharp (KB-LOOK-TV-MBNARROW1, headless look)
 
 - **Repro:** a bar 12 px wide moving 64 px a frame, exposed over a 180 degree shutter as a continuous smear (256
@@ -128,18 +153,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Next:** judge the ramp against min(smear, the bar's width along the motion), read from the profile (ramp plus
   plateau spans the smear); needs a ruling on the check, since it changes what passes.
 
-### Open 2026-11-28: shimmerMoving reads a defocused swaying leaf's soft edge as shimmer (KB-LOOK-TV-SHIMMER2, rest, headless look)
+### Open 2026-11-28: shimmerMoving reads a defocused swaying leaf's soft edge as shimmer (KB-LOOK-TV-SHIMMER2, rest, headless look, scatter)
 
 - **Repro:** `DIR=<blowup render> node` with `shimmerMoving` on the timber-valley blowup mid probe (8 sub-frames,
   180 degrees, `moving.velocity: true`): 1.72 percent off (bound 0.5), all in a band along the soft edges of the large
   out-of-focus foreground leaves at x 1700 to 1920.
-- **Cause:** depth of field spreads each near leaf 20 px and more past the pixels that carry its velocity, so the sky
-  its bokeh covers changes on purpose but has the camera's velocity. The motion-blur reach (below) covers the motion
-  smear only. The frame looks right there.
+- **Cause:** each near leaf's soft fringe, 20 px and more, carries the sky's velocity, not the leaf's
+  (KB-SCATTER-FRINGEVEL1), so the check takes it for still sky that changed.
 - **Done:** with `velocity`, shimmerMoving now leaves out what a moving surface's motion blur reaches (McGuire et al.
   2012 tile-max, capped at `maxBlur`): mid 2.02 to 1.72, early 0.48 to 0.44. Regression in
   `packages/headless/tests/look-clean.test.js` (a static edge flashing 7 px from a swaying branch still fails).
-- **Next:** asked for a ruling to add the moving surface's own circle-of-confusion radius to the reach.
+- **Next:** the band is not depth of field (the scene draws none): the fringe of a near leaf holds the sky's velocity,
+  KB-SCATTER-FRINGEVEL1 above.
 
 ### Fixed 2026-11-28: a voxel path tracer render reset AMD's integrated graphics within seconds (KB4037, voxel-pathtracer; was "Batch 160 AMD voxel denoise watchdog")
 

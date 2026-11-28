@@ -1527,7 +1527,9 @@ buttress most).
 - `generateConiferMesh(species, {age, height, basalArea, detail, condition, seed})`: `{trunk, canopy, form, whorls}`,
   standing on y = 0. `detail` 2 (near: limbs, sprays and cross bands, at most about 12,000 triangles), 1 (middle, about
   1,000) or 0 (crown tiers). `condition` `'live'`, `'snag'` (broken top, branch stubs, no needles) or `'burnt'`
-  (bare limbs, a fire scar at the butt).
+  (bare limbs, a fire scar at the butt). A whorled species' sprays start at the stem and close round it: each one's
+  inner rows cover the angle to the next spray (half the spacing plus the yaw jitter), so no sky shows between the
+  bases of a whorl beside the trunk (KB-LOOK-TV-SPECKLE).
 - `generateConiferImposter(mesh, {size, needles, bark, cards})`: three crossed cards and an RGBA image of the tree's
   silhouette baked side on (needles and bark, darker deeper in the crown, alpha the coverage); the right half of the
   image is the needle colour solid, for the nearer levels (`solidUv`).

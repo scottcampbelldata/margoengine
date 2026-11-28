@@ -238,7 +238,12 @@ function profile(s: (typeof CONIFER_SPECIES)[ConiferSpecies], age: number): (z: 
   return (z) => raw(z) / max;
 }
 
-// One branch's foliage: a cupped band along the branch path and (detail 2) a narrower upright band across it.
+// One branch's foliage: a cupped band along the branch path and (detail 2) a narrower upright band across it. With
+// `around` sprays sharing the whorl (whorled species), the cupped band starts at the stem and its inner rows are at least as wide as the
+// angle to the next spray (a straight band of half width r tan(a) covers a = pi / around + 0.2 each side, half the
+// spacing plus the 0.2 radian yaw jitter, at most 1.4; r the first row's distance from the stem's axis), from a hub row
+// on the axis, so a whorl's sprays meet round
+// the stem and no sky shows between their bases (KB-LOOK-TV-SPECKLE); a spray alone (around 0) starts 12 percent out.
 function spray(
   m: Mesh,
   at: (t: number) => readonly [number, number, number],
@@ -250,28 +255,36 @@ function spray(
   cx: number,
   cy: number,
   cz: number,
+  around = 0,
 ): void {
   const rows = detail === 2 ? 4 : 3,
     band = (upright: boolean, width: number) => {
-      const cols = detail === 2 && !upright ? 2 : 1;
+      const cols = detail === 2 && !upright ? 2 : 1,
+        hub = !upright && around > 0,
+        inner = Math.hypot(at(0.12)[0], at(0.12)[2]);
       const first = m.p.length / 3;
-      for (let i = 0; i <= rows; i++) {
-        const t = 0.12 + (0.88 * i) / rows,
-          w =
+      for (let i = hub ? -1 : 0; i <= rows; i++) {
+        const t = i < 0 ? 0 : 0.12 + (0.88 * i) / rows,
+          [ax, py, az] = at(t),
+          // The hub row stands on the stem's axis, inside the trunk, so the band is a strip round the stem's surface.
+          px = i < 0 ? 0 : ax,
+          pz = i < 0 ? 0 : az,
+          closing = hub && i <= 0 ? 1.05 * Math.tan(Math.min(1.4, Math.PI / around + 0.2)) * inner : 0,
+          own =
             width *
-            Math.sin(Math.PI * Math.min(1, 0.15 + 0.85 * ((t - 0.12) / 0.88))) ** 0.7 *
+            Math.sin(Math.PI * Math.min(1, 0.15 + 0.85 * (Math.max(0, t - 0.12) / 0.88))) ** 0.7 *
             Math.min(1, 0.3 + 2 * t),
-          [px, py, pz] = at(t);
+          w = Math.max(closing, own);
         for (let j = 0; j <= cols; j++) {
           const u = (j / cols) * 2 - 1,
             l = u * w,
             x = upright ? px : px - dz * l,
-            y = upright ? py + l * 0.8 : py - 0.3 * w * u * u,
+            y = upright ? py + l * 0.8 : py - 0.3 * Math.min(w, own) * u * u,
             z = upright ? pz : pz + dx * l;
           m.vertex(x, y, z, t, j / cols, x - cx, y - cy, z - cz);
         }
       }
-      for (let i = 0; i < rows; i++)
+      for (let i = 0; i < rows + (hub ? 1 : 0); i++)
         for (let j = 0; j < cols; j++) {
           const a = first + i * (cols + 1) + j,
             c = a + cols + 1;
@@ -374,7 +387,7 @@ export function generateConiferMesh(species: ConiferSpecies, options: ConiferMes
           };
         if (live) {
           const half = length * 0.34 * s.fill * Math.min(2.2, Math.sqrt(merged));
-          spray(canopy, at, dx, dz, length, half, detail, 0, h - halfWidth * 0.35, 0);
+          spray(canopy, at, dx, dz, length, half, detail, 0, h - halfWidth * 0.35, 0, s.whorled ? count : 0);
         }
         if (detail === 2 || condition === 'burnt') {
           // Limbs: full and thinning outward (live, burnt with its fine twigs gone), or stubs on a snag.
