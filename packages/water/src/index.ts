@@ -646,18 +646,18 @@ fn noise(p:vec2f)->vec3f {
 }
 // One ripple layer's world-space slope. Each layer turns the wind frame by its own angle (cos, sin) and scales it by
 // non-integer ratios, so no two layers share a lattice axis or spacing.
-// A ripple layer in two halves around its noise (KB-WATER-GL2LINK1): rippleAt places the layer, rippleSlope turns its
+// A ripple layer in two halves around its noise (KB-WATER-GL2LINK1): rippleLayerAt places the layer, rippleLayerSlope turns its
 // noise into slope. Each half is called with the layer's own literal arguments, as the one function was, so every value
 // is the one it computed; only the noise call moves into the loop below.
 struct NoiseLayer {basis:mat2x2f,scale:vec2f,at:vec2f,detail:f32}
-fn rippleAt(xz:vec2f,turn:vec2f,scale:vec2f,drift:vec2f,offset:vec2f,pixelX:vec2f,pixelY:vec2f)->NoiseLayer {
+fn rippleLayerAt(xz:vec2f,turn:vec2f,scale:vec2f,drift:vec2f,offset:vec2f,pixelX:vec2f,pixelY:vec2f)->NoiseLayer {
  let w=frame.waves[0].wave.xy;let along=vec2f(w.x*turn.x-w.y*turn.y,w.x*turn.y+w.y*turn.x);let across=vec2f(-along.y,along.x);
  let basis=mat2x2f(along,across);let local=transpose(basis);
  let width=max(length((local*pixelX)*scale),length((local*pixelY)*scale));
  let detail=1.0-smoothstep(0.25,1.0,width);
  return NoiseLayer(basis,scale,(local*xz)*scale+frame.settings.x*drift+offset,detail);
 }
-fn rippleSlope(o:NoiseLayer,noise:vec2f)->vec2f {
+fn rippleLayerSlope(o:NoiseLayer,noise:vec2f)->vec2f {
  if(o.detail<=0.0){return vec2f(0);}
  let n=noise*o.scale;
  return (o.basis*n)*o.detail;
@@ -897,19 +897,19 @@ ${displayShader}
  // Agitation, chop and two micro layers turned 11, -21, 30 and -41 degrees from the wind. Weights keep the former
  // value-noise slope (RMS 0.39 per axis against gradient noise's 0.62).
  let p=i.world.xz;
- let ripples=array<NoiseLayer,5>(rippleAt(p,vec2f(0.98200,0.18886),vec2f(0.22,0.16),vec2f(-0.09,0.03),vec2f(0),pixelX,pixelY),
-  rippleAt(p,vec2f(0.93233,-0.36162),vec2f(0.57,0.42),vec2f(-0.17,-0.06),vec2f(3.17,9.23),pixelX,pixelY),
-  rippleAt(p,vec2f(0.86281,0.50553),vec2f(1.8,0.65),vec2f(-0.5,0.12),vec2f(0),pixelX,pixelY),
-  rippleAt(p,vec2f(0.75836,-0.65183),vec2f(3.4,1.9),vec2f(-0.7,0.2),vec2f(7.13,3.71),pixelX,pixelY),
-  rippleAt(p,vec2f(0.99619,-0.08716),vec2f(0.11,0.075),vec2f(-0.3,0.05),vec2f(1.9,6.4),pixelX,pixelY));
+ let ripples=array<NoiseLayer,5>(rippleLayerAt(p,vec2f(0.98200,0.18886),vec2f(0.22,0.16),vec2f(-0.09,0.03),vec2f(0),pixelX,pixelY),
+  rippleLayerAt(p,vec2f(0.93233,-0.36162),vec2f(0.57,0.42),vec2f(-0.17,-0.06),vec2f(3.17,9.23),pixelX,pixelY),
+  rippleLayerAt(p,vec2f(0.86281,0.50553),vec2f(1.8,0.65),vec2f(-0.5,0.12),vec2f(0),pixelX,pixelY),
+  rippleLayerAt(p,vec2f(0.75836,-0.65183),vec2f(3.4,1.9),vec2f(-0.7,0.2),vec2f(7.13,3.71),pixelX,pixelY),
+  rippleLayerAt(p,vec2f(0.99619,-0.08716),vec2f(0.11,0.075),vec2f(-0.3,0.05),vec2f(1.9,6.4),pixelX,pixelY));
  var rippleNoise:array<vec2f,5>;
  for(var k=0u;k<waterLoops(5u);k++){rippleNoise[k]=vec2f(0);if(ripples[k].detail>0.0){rippleNoise[k]=noise(ripples[k].at).yz;}}
- let slope=rippleSlope(ripples[0],rippleNoise[0])*0.186
-  +rippleSlope(ripples[1],rippleNoise[1])*0.062
-  +rippleSlope(ripples[2],rippleNoise[2])*0.0112
-  +rippleSlope(ripples[3],rippleNoise[3])*0.0037;
+ let slope=rippleLayerSlope(ripples[0],rippleNoise[0])*0.186
+  +rippleLayerSlope(ripples[1],rippleNoise[1])*0.062
+  +rippleLayerSlope(ripples[2],rippleNoise[2])*0.0112
+  +rippleLayerSlope(ripples[3],rippleNoise[3])*0.0037;
  let chop=frame.grid.w;
- let windSea=rippleSlope(ripples[4],rippleNoise[4])*0.5;
+ let windSea=rippleLayerSlope(ripples[4],rippleNoise[4])*0.5;
  let w=frame.waves[0].wave.xy;let basis=mat2x2f(w,vec2f(-w.y,w.x));let local=transpose(basis);let q=local*p;
  // A broad, advecting wind patch varies the short-wave slope. Long-wave displacement stays in the authored trains.
  var shortWaves=vec2f(0);var gain=1.0;

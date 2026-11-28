@@ -201,21 +201,37 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/water/src/index.ts`); the dune coast attaches no physics wake, so the cause is in the water package, not
   water physics, unless the trace finds otherwise.
 
-### Open 2026-11-28: the WaterWake README example runs out its 20 s page limit (KB-WATER-WAKEREADME1, physics solver SEA-04)
+### Fixed 2026-11-28: the WaterWake README example ran out its 20 s page limit (KB-WATER-WAKEREADME1, physics solver SEA-04)
 
 - **Repro:** `npm run check:readme-run -- --packages=water` on the workstation (RTX A6000, Node 26): "water/readme-a-physics-
   wake-drawn-waterwake-m-224548: Example did not finish within 20 s while settling". The example advances a
-  `WakeSolver` on a 256 x 128 grid for ten seconds at 30 Hz (`world.advance(10 * 30)`) before one frame.
-- **Measured (`.lane/wake-time.mjs`, the example's solver alone in Node):** 40.9 ms a step with the TypeScript FFT,
-  12.3 s for the 300 steps; with `await WakeSolver.load()` (the Wasm FFT) 29 ms a step, 8.6 s. Each step makes 10
-  real 2D transforms of the grid (6 forward, 4 inverse), 3.85 ms each, 94 percent of the step (`RealFft2` of
-  `@margoengine/math/fft`, the generic mixed-radix Stockham loop). `updateWaterVelocity`, added with the capillary and
-  current modes (75ee9d9129, 2026-11-27), takes a forward and an inverse transform of the potential every step for the
-  surface rise, although `step` has just held the new potential's spectrum.
-- **Cause:** the page's 300 wake steps alone take 12 s of the 20 s, before the browser, the Water and the frame; the
-  per-step transform count grew past what the example's limit holds. Owner: SEA-04 (Codex, docs/physics-work-queue.md).
-  A fix reuses the step's spectrum for the rise (one forward transform fewer) or makes the shared FFT's radix-2 and
-  radix-4 stages cheaper, bit for bit with its Rust twin; the README limit and the example's ten seconds stay.
+  `WakeSolver` on a 256 x 128 grid for ten seconds (`world.advance(10 * 30)` frames at 30 Hz) before one frame.
+- **Measured (lane C, the example's solver alone in Node, counting calls):** the wake steps at its default 60 Hz
+  (rate level 0), so the ten seconds are 598 steps, each 3 forward and 2 inverse real 2D transforms (the earlier note's
+  "10 a step" counted two steps a frame; this example has no current, tension or viscosity, so `updateWaterVelocity`
+  takes no transform). 31.1 ms a step, 18.6 s, 96 percent in `RealFft2` of `@margoengine/math/fft`.
+- **Cause:** `RealFft2.forward` ran the whole complex 2D transform, every one of the nx columns, and kept nx / 2 + 1 of
+  them; and the Stockham loop ran every radix-2 stage (all of a 256-point transform) through its generic p-loop, with a
+  modulo and a table index for each of the 4 terms of each output pair.
+- **Fix (`packages/math/src/fft.ts`):** `forward` transforms the rows and only the columns it keeps, each column being
+  its own transform; the radix-2 stage is written out with the same operations in the same order (a sum still starts
+  at 0, so a -0 sum stays +0), so every result keeps the Rust twin's bits (kernel-common's `fft.rs` is untouched).
+  Measured the same way: 9.5 ms a step, 5.7 s for the example's solver; the README example passes (55 of 55 water
+  examples). The README's limit and its ten seconds did not change.
+- **Regression:** `packages/math/test/fft.test.js`: a 16 x 8 forward runs 8 rows and 9 columns (24 before; fails on the
+  parent), the written-out stage matches the generic loop bit for bit at lengths 2 to 1,024 with random and signed-zero
+  inputs, and the existing Rust vectors still match.
+
+### Fixed 2026-11-28: a Water with interactive Ripples failed to compile, "redeclaration of 'rippleAt'" (water)
+
+- **Repro:** `npm run check:readme-run -- --packages=water`: "water/readme-interactive-ripples-...: GPU: Error while parsing
+  WGSL: redeclaration of 'rippleAt'". Any Water with `Ripples.attach` drew nothing.
+- **Cause:** bfb7d64cd8 (KB-WATER-GL2LINK1) split a ripple layer around its noise into WGSL `rippleAt` and `rippleSlope`
+  in the surface program; the Ripples chunk that the same program includes already declares `rippleAt` (its field read).
+- **Fix:** the surface's halves are `rippleLayerAt` and `rippleLayerSlope` (`packages/water/src/index.ts`); the same
+  calls with the same arguments, so the pixels do not change.
+- **Regression:** `packages/water/test/water.test.js`, "a Water with Ripples attached declares each WGSL function once"
+  (fails on the parent with `['rippleAt']`).
 
 ### Fixed 2026-11-28: the water surface program took over 5 s to link on the WebGL2 layer (KB-WATER-GL2LINK1, water)
 
@@ -233,7 +249,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** each repeated call sits once in a loop over an array of its arguments, every argument written out as before,
   and the loop's bound is `waterLoops(n)` = n + `frame.sea.z`, a frame uniform lane Water always leaves 0, so no compiler
   can count it (the rule of KB-COMPAT-FXCTIME1). The sums around the calls keep their written order. A ripple layer and
-  a capillary octave are split around their noise (`rippleAt`/`rippleSlope`, `shortOctaveAt`/`shortOctaveSlope`), each
+  a capillary octave are split around their noise (`rippleLayerAt`/`rippleLayerSlope`, `shortOctaveAt`/`shortOctaveSlope`), each
   half called with the layer's literal arguments: a first version read the octaves' wavenumbers from a table, so
   `k/3.77` and `9.81/k` were divided at run time where the literal had been folded, and 84 of 307,200 bytes of a sea
   frame came out 1/255 apart on WebGPU; a ripple loop that summed its weighted layers in the loop moved one byte on the

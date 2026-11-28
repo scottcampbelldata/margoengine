@@ -206,7 +206,7 @@ test('ripple normals use gradient noise on five separately turned lattices (the 
   assert.match(code, /fn rippleGradient\(cell:vec2i\)->vec2f/);
   assert.match(code, /f\*f\*f\*\(10\.0\+f\*\(6\.0\*f-15\.0\)\)/);
   assert.doesNotMatch(code, /6\.0\*f\*\(1\.0-f\)/);
-  const turns = [...code.matchAll(/rippleAt\(p,vec2f\(([-\d.]+),([-\d.]+)\)/g)].map((m) => [+m[1], +m[2]]);
+  const turns = [...code.matchAll(/rippleLayerAt\(p,vec2f\(([-\d.]+),([-\d.]+)\)/g)].map((m) => [+m[1], +m[2]]);
   assert.equal(turns.length, 5);
   const angles = turns.map(([c, s]) => {
     assert.ok(Math.abs(Math.hypot(c, s) - 1) < 1e-4, 'Turns rotate without scaling');
@@ -696,4 +696,23 @@ test('spray draws as broken mist and fine drops streaked along their motion, not
   has('/sqrt(i.uv.w)', 'a streak spreads the same spray over its length');
   has('size=(0.08+0.14*(p.velocity.w-2.0))', 'clumps 0.08 to 0.35 m, not 0.15 to 0.4');
   effect.dispose();
+});
+
+// Regression (2026-11-28): bfb7d64cd8 named the surface's ripple-layer half `rippleAt`, the name the Ripples chunk
+// gives its field read, so a Water with Ripples attached failed to compile ("redeclaration of 'rippleAt'", the
+// interactive ripples README example). Every function of the composed surface program is declared once.
+test('a Water with Ripples attached declares each WGSL function once', async () => {
+  const { Ripples } = await import('../dist/ripples.js');
+  const h = optionalGPU(),
+    water = new Water({ segments: 4 });
+  h.engine.use(water);
+  Ripples.attach(h.engine, { surface: water, size: 32, followCamera: false, cpu: true });
+  h.frame();
+  const codes = h.pipelines.map((p) => p.fragment?.module.code).filter((c) => c?.includes('rippleSample('));
+  assert.ok(codes.length > 0, 'the surface draws the ripple field');
+  for (const code of codes) {
+    const names = [...code.matchAll(/\bfn\s+(\w+)\s*\(/g)].map((m) => m[1]),
+      twice = names.filter((n, i) => names.indexOf(n) !== i);
+    assert.deepEqual(twice, []);
+  }
 });
