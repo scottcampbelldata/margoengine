@@ -427,8 +427,9 @@ export class CompatBuffer {
       // destroyed its own buffer is not sent looking for a device loss (KB-SHOT-COMPATLOST1).
       if (this.device.destroyed) {
         this.mapState = 'unmapped';
+        // With the loss's own message: an intermittent loss must say what caused it (KB-COMPAT-LOSTWHY1).
         throw new DOMException(
-          'The device was lost before the buffer mapped; map it again on the restored device',
+          `The device was lost before the buffer mapped (${this.device.lostMessage || 'no reason given'}); map it again on the restored device`,
           'AbortError',
         );
       }

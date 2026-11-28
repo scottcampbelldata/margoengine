@@ -1661,6 +1661,22 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   1965), which sums to 0.525 on a sphere. Regression: `packages/physics/tests/soft-volume.test.js` ("a closed volume
   feels the air on its windward side").
 
+### Open 2026-11-27: on WebKit's Windows build the voxel traversal on the WebGL2 layer now and then loses its device (KB-COMPAT-LOSTWHY1, webgl2-compat)
+
+- **Repro:** Playwright WebKit 27.2 on Windows 11, RTX A6000:
+  `node scripts/run-with-timeout.mjs -- node packages/webgl2-compat/scripts/browser-matrix.mjs --browser=webkit --cases=voxel-pathtracer`.
+  Four runs from 22:05 to 22:12 gave the layer row "AbortError: The device was lost before the buffer mapped"; seven
+  runs after 22:13 passed (19,200 of 19,200 pixels agree in both views). The same page under the harness
+  (`MARGO_COMPAT=1`, `openBrowser({browserName:'webkit'})`) passed every time.
+- **Cause:** not found. The layer's device context fired no `webglcontextlost` (a listener on every WebGL2 context the
+  pages made saw only the probe context's own release), and the System log has no display driver reset then. The other
+  ways the layer loses a device are a failed load of its lazy compute or read-back part and `destroy()`; the error did
+  not say which.
+- **Margo:** the map's `AbortError` now carries the loss's message ("... mapped (The compute part of the WebGL2
+  compatibility layer did not load: ...); map it again ..."), so the next occurrence names its cause
+  (`test/task-polling.test.js`, "a map aborted by its own buffer destroy names the destroy, and a device loss names the
+  loss"). Open until a failing run is read with it.
+
 ### Open (below Margo) 2026-11-27: on WebKit's Windows build the WebGL2 layer copies unpremultiplied ImageBitmaps wrong (KB-WEBKIT-BITMAPALPHA1, browser; webgl2-compat)
 
 - **Repro:** Playwright WebKit 27.2 on Windows 11:

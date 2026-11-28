@@ -188,6 +188,17 @@ test('a map aborted by its own buffer destroy names the destroy, and a device lo
     pending((b) => (b.device.destroyed = true)),
     { name: 'AbortError', message: /^The device was lost before the buffer mapped/ },
   );
+  // KB-COMPAT-LOSTWHY1: the abort names why the device was lost, so an intermittent loss is diagnosable.
+  await assert.rejects(
+    pending((b) => {
+      b.device.destroyed = true;
+      b.device.lostMessage = 'The WebGL2 context was lost';
+    }),
+    {
+      name: 'AbortError',
+      message: /^The device was lost before the buffer mapped \(The WebGL2 context was lost\); map it again/,
+    },
+  );
 });
 
 test('nonforcing settlement does not block on a readback and leaves every later write queued', () => {

@@ -370,6 +370,8 @@ export class CompatDevice extends EventTarget {
   /** See {@link CompatGPUOptions.cpuWorkBudget}; may be raised or lowered at any time. */
   cpuWorkBudget: number;
   destroyed = false;
+  /** Why the device was lost (its `lost` message), once it is; a map the loss aborts names it. */
+  lostMessage = '';
   onuncapturederror: ((event: Event) => void) | null = null;
   /** The sampler that loads and size queries use (no filtering, every level). */
   readonly loadSampler: WebGLSampler;
@@ -637,6 +639,7 @@ export class CompatDevice extends EventTarget {
   lose(reason: 'destroyed' | 'unknown', message: string): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.lostMessage = message;
     this.unlisten();
     this.resolveLost({ reason, message });
   }

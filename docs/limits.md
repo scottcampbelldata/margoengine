@@ -1761,6 +1761,24 @@ only: no timings.
   composites a `premultiplyAlpha: 'none'` bitmap as premultiplied, and the layer tells a straight bitmap from a
   premultiplied one by such a draw, so partly transparent straight bitmaps are copied wrong
   ([known-bugs.md](known-bugs.md), KB-WEBKIT-BITMAPALPHA1). Safari 27.2 on macOS kept both copy rules on 2026-11-15.
+### Rerun 2026-11-27, later (Windows 11, packages built at 48cc31cce9)
+
+| Browser | Rows | Bugs |
+| --- | --- | --- |
+| Firefox 157.0 (Playwright's build), RTX A6000 | 95: native 48 pass; layer 44 pass, 1 refusal, 2 differences | 0 |
+| WebKit 27.2, Playwright's Windows build | 88: native 8 refusals, 33 unmeasured; layer 44 pass, 1 unmeasured | 1 (bitmapCopies, KB-WEBKIT-BITMAPALPHA1, the browser's) |
+
+- WebKit: the materials case now runs (8 layer passes): its page made a canvas `captureStream` at load, which this
+  build lacks, so the whole page failed and the matrix called every row a bug. The page now leaves its video scenario
+  out there, and the `external` probe, whose input is a `VideoFrame`, is `unmeasured` naming it
+  (`test/browser-matrix.test.js`, "a probe or scenario whose input needs an API the browser lacks").
+- WebKit: the voxel traversal on the layer failed four runs in a row (22:05 to 22:12, "the device was lost before the
+  buffer mapped", with no WebGL context loss and no GPU reset in the System log), then passed seven runs in a row. The
+  cause was not found; the map's error now names the loss's own message (KB-COMPAT-LOSTWHY1 in
+  [known-bugs.md](known-bugs.md)).
+- Firefox: as at b958f1a9b6; GTAO creases differ by at most 0.023 (mean gap 0.00074).
+- Not run here: the Android emulator (no Android SDK or emulator on this workstation; the 2026-11-15 row stands).
+
 - Still not measured: real phones, Safari's feature rows after `canvasRead` with an unlocked screen, the iOS
   Simulator, a headset, and the integrated-GPU frame budget (timing, deferred by the build phase).
 

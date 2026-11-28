@@ -321,6 +321,7 @@ class CompatDevice extends EventTarget {
     };
     cpuWorkBudget: number;
     destroyed: boolean;
+    lostMessage: string;
     onuncapturederror: ((event: Event) => void) | null;
     readonly loadSampler: WebGLSampler;
     frame: number;
