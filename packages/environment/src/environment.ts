@@ -5,7 +5,7 @@ import { engineRuntime, type Engine } from '@margoengine/core/extension';
 import type { FloatImage } from './hdr.js';
 import { HALF_MAX, lightingPeak, lightingScale, sanitizeLighting, toHalfLighting } from './half.js';
 import { evaluateSH } from './sh.js';
-import * as wgsl from './shaders.js';
+import { brdfLut, downsample, equirectToCube, prefilter, sphericalHarmonics } from './shaders.js';
 import { MargoError } from '@margoengine/math/errors';
 import { lostRebuild, reportRestore } from './restore-report.js';
 import { type BorrowSlot, borrow, lend, relend } from '../../shared/borrowed.js';
@@ -119,7 +119,10 @@ function dropLut(device: GPUDevice, lut: SharedLut): void {
   if (pool?.get(lut.key) === lut) pool.delete(lut.key);
   lut.buffer.destroy();
 }
-type ComputeKey = 'equirectToCube' | 'downsample' | 'sphericalHarmonics' | 'brdfLut';
+// Each shader is named: a namespace import indexed by a key keeps every shader of shaders.ts in the apps that light a
+// scene, ImageBackground's among them (tests/environment-shaders-tree-shake.test.js).
+const computeShaders = { equirectToCube, downsample, sphericalHarmonics, brdfLut };
+type ComputeKey = keyof typeof computeShaders;
 const pipelineCache = /* @__PURE__ */ new WeakMap<GPUDevice, Map<string, GPUComputePipeline | GPURenderPipeline>>();
 function cached<T extends GPUComputePipeline | GPURenderPipeline>(device: GPUDevice, key: string, create: () => T): T {
   let cache = pipelineCache.get(device);
@@ -132,14 +135,14 @@ const pipeline = (device: GPUDevice, key: ComputeKey): GPUComputePipeline =>
   cached(device, key, () =>
     device.createComputePipeline({
       layout: 'auto',
-      compute: { module: device.createShaderModule({ code: wgsl[key] }), entryPoint: 'main' },
+      compute: { module: device.createShaderModule({ code: computeShaders[key] }), entryPoint: 'main' },
     }),
   );
 // The prefilter is a fragment pass: cube sampling with explicit LOD in compute shaders reads stale seam
 // texels on some Vulkan implementations (SwiftShader), while the fragment path is reliable everywhere.
 const prefilterPipeline = (device: GPUDevice): GPURenderPipeline =>
   cached(device, 'prefilter', () => {
-    const module = device.createShaderModule({ code: wgsl.prefilter });
+    const module = device.createShaderModule({ code: prefilter });
     return device.createRenderPipeline({
       layout: 'auto',
       vertex: { module, entryPoint: 'vertexMain' },
