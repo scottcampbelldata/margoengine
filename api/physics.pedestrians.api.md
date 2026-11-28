@@ -35,6 +35,8 @@ export interface PedestrianBody {
 export class PedestrianCrowd implements Solver<PedestrianParams> {
     private constructor();
     static load(options?: PedestrianOptions): Promise<PedestrianCrowd>;
+    [Symbol.dispose](): void;
+    readNativeWork(): PedestrianWorkCounts | undefined;
     describe(): SolverDescription;
     init(host: SolverHost, params: PedestrianParams): void;
     setPreferredVelocity(row: number, velocity: Vec2 | null): void;
@@ -54,6 +56,7 @@ export interface PedestrianGround {
 export interface PedestrianOptions {
     readonly id?: string;
     readonly level?: RateLevel;
+    readonly threads?: 1 | 2 | 4;
     readonly readIntent?: boolean;
     readonly readForces?: boolean;
     readonly fields?: {
@@ -95,6 +98,19 @@ export interface PedestrianReading {
 }
 
 export type PedestrianSegment = readonly [Vec2, Vec2];
+
+export interface PedestrianWorkCounts extends PedestrianWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly PedestrianWorkerWork[];
+}
+
+export interface PedestrianWorkerWork {
+    readonly driven: number;
+    readonly wallChecks: number;
+    readonly wallContacts: number;
+    readonly integrated: number;
+    readonly pairedDots: number;
+}
 
 // Not exported from this entry, but used by the exports above:
 

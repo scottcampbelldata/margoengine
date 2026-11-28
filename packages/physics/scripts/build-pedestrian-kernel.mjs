@@ -55,10 +55,19 @@ const memory = new WebAssembly.Memory({ initial: DYNAMIC_BASE / PAGE + 1, maximu
 const all = new Uint8Array(memory.buffer);
 all.subarray(0, base).fill(0xa7);
 all.subarray(end).fill(0xa7);
-const instance = new WebAssembly.Instance(new WebAssembly.Module(bytes), { env: { memory } });
+const module = new WebAssembly.Module(bytes);
+const instance = new WebAssembly.Instance(module, { env: { memory } });
+for (const name of ['pedestrian_prepare', 'pedestrian_pairs', 'pedestrian_thread_phase'])
+  assert.equal(typeof instance.exports[name], 'function');
+// Helpers instantiate only after the leader in the same arena. Reinstantiating
+// may use slot 10's initialization words, but must leave all live storage outside it alone.
+if (shared) {
+  const slotBytes = all.slice(base, end);
+  for (let thread = 1; thread < 4; thread++) new WebAssembly.Instance(module, { env: { memory } });
+  assert.deepEqual(all.slice(base, end), slotBytes);
+}
 assert.ok(all.subarray(0, base).every((byte) => byte === 0xa7));
 assert.ok(all.subarray(end).every((byte) => byte === 0xa7));
-assert.equal(typeof instance.exports.pedestrian_step, 'function');
 
 const target = fileURLToPath(
   new URL('../src/pedestrians/pedestrian-kernel' + (shared ? '-shared' : '') + '.wasm', import.meta.url),

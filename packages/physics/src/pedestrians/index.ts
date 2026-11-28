@@ -12,3 +12,4 @@ export {
   type PedestrianReading,
   type PedestrianSegment,
 } from './solver.js';
+export { type PedestrianWorkerWork, type PedestrianWorkCounts } from './kernel.js';

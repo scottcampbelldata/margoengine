@@ -231,6 +231,13 @@ What it shows: night plaza and foyer of Aster Hall with a crowd of suited visito
 Handled acceptably: day-to-night crowd count reads as busy; the walk cycle itself has believable arm and leg phasing on close figures; the glass facade is lit with consistent reflections; people keep to the same side of the doorways without teleporting.
 Not in the catalog: none (all items map to LIFE-05, DYN-07, SOFT-01/03).
 
+The LIFE-05 technical concourse uses the same sloping NavMesh and captured characters in two matched
+crossings. The registered anticipation on the first step agrees with the independently calculated
+1.765 s collision time and 0.4838 N equal and opposite force. The case with anticipation retains
+1.38 mm of model clearance and zero contact through the crossing. Both renderers replay the accepted
+pose, walk distance and raw RGBA exactly. The original Opening Night and City-to-Street bindings
+remain open. [Technical replay](../packages/physics/tests/pedestrian-film.browser.mjs)
+
 ### Inside the Concert Hall (inside-the-concert-hall)
 What it shows: a camera tour of an empty concert hall with a grand piano, seats, ceiling panels and a building section; no people.
 | ID | Time | What is wrong (observed) | What real physics does | Solver | Solver state | Needed for AAA | Status |

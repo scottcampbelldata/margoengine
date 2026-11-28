@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22163185,
+  "total": 22166028,
   "history": [
     {
       "date": "2026-10-24",
@@ -16080,6 +16080,12 @@
       "commit": "life-01-accepted-stance-replay",
       "reason": "LIFE-01 @margoengine/physics/legged 13307 to 13912 B gzip, ceiling 13707 to 14330 B. The controlled ground route stages contact acceptance before publishing gait and rigid deck reactions. A split would duplicate the arena layouts, validation and native phase dispatch. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "life-05-pedestrian-native-phases",
+      "reason": "LIFE-05 @margoengine/physics/pedestrians 4432 to 7275 B gzip, ceiling 4688 to 7531 B. The pedestrian entry validates signed input and stages ground publication with optional native drive and wall phases. Splitting workers out of the entry would duplicate body and contact layout, lifecycle and ground reads. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16989,7 +16995,7 @@
     "@margoengine/physics/outdoor-sound": 8569,
     "@margoengine/physics/pack-ice": 7778,
     "@margoengine/physics/pbf": 5833,
-    "@margoengine/physics/pedestrians": 4688,
+    "@margoengine/physics/pedestrians": 7531,
     "@margoengine/physics/rail": 12367,
     "@margoengine/physics/robots": 5083,
     "@margoengine/physics/rod": 4755,

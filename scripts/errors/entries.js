@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'pedestrians',
+    title: '@margoengine/physics/pedestrians walking motion, ground and force fields',
+    kind: 'family',
+    messages: [],
+    cause: 'An input row, ground sample or candidate pedestrian step cannot produce a finite accepted pose or force.',
+    fix: 'Use finite SI positions, controls and a positive substep. Publish aligned f64 inputs in the owning memory and supply finite walkable heights. Change targets and dispose helpers between world steps.',
+  },
+  {
     id: 'legged',
     title: '@margoengine/physics/legged locomotion, gait drives and reactive deck support',
     kind: 'family',

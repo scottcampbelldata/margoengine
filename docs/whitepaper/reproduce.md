@@ -5524,3 +5524,9 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
 - Build Physics with `node packages/physics/scripts/build.js`. Run `node --test packages/physics/tests/legged.test.js packages/physics/tests/coupling/legged.test.js packages/physics/tests/coupling/legged-workers.test.js packages/physics/tests/locomotion.test.js packages/physics/tests/coupling/locomotion.test.js packages/horses/test/legged-drive.test.js`.
 - Run `npm run test:gpu:legged-workers -w @margoengine/physics` and `npm run test:gpu:legged-film -w @margoengine/physics` for the native participant and dual-renderer technical figures.
 - Run `node packages/physics/scripts/life01-legged-measured.mjs` for the independent instrumented-treadmill comparison and geometry and speed sensitivities.
+
+### LIFE-05 pedestrian contact, native workers and station measurements
+
+- Build Physics with `node packages/physics/scripts/build.js`. Run `node --test packages/physics/tests/pedestrians.test.js packages/physics/tests/coupling/pedestrians.test.js packages/physics/tests/coupling/pedestrian-workers.test.js`.
+- Run `npm run test:gpu:pedestrian-workers -w @margoengine/physics` and `npm run test:gpu:pedestrian-film -w @margoengine/physics` for the native participants and the fixed-camera signed NavMesh witness.
+- Run `node packages/physics/scripts/life05-pedestrian-measured.mjs` for ordinary single-file station observations, wall and turn sensitivity and the settled speed comparison.

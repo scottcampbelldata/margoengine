@@ -7244,3 +7244,7 @@ Candidates store centreline, frame, swept capsule history and reaction separatel
 ### LIFE-01 accepted contact handoff and treadmill limits
 
 The legged wrapper checks signed intent, load and rigid rows before preparing its trial. Coupled deck impulses and gait use the trial contacts before accepting the ground pose. Invalid support leaves drive parameters, gait, anchors, work and reactions unchanged. The existing optional SIMD kernel runs disjoint bodies with up to four participants. A fixed-camera TerrainBed witness binds real accepted legs to the weighted horse in both renderers. Independent treadmill data quantify cadence and fore/hind impulse errors of the nominal reduced body. [Measured gait bounds](../limits.md#life-01-measured-treadmill-gait-and-forelimb-loading)
+
+### LIFE-05 accepted pedestrian publication and measured headway gap
+
+The pedestrian solver reads signed force and intent rows from their owning memory. Ground callbacks can grow the arena, and a rejected callback leaves every accepted field and the native receipt intact. Optional participants evaluate independent drive and wall integration while preserving the pair sequence. A fixed-camera NavMesh witness uses accepted motion to place the articulated walkers on both renderers. Independent single-file timing identifies the remaining steady following deficit. [Measured station results](../limits.md#life-05-measured-single-file-walking)

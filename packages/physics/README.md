@@ -6804,11 +6804,11 @@ on the PhysicsWorld clock with physical contact forces and a separate response t
 A person can turn their elliptical torso through a narrow aperture. The solver reads a NavMesh route and
 height surface, so walkable grades and the positions used to animate feet stay in the same coordinate system.
 
-```js
+```ts
 import { PedestrianCrowd } from '@margoengine/physics/pedestrians';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const crowd = await PedestrianCrowd.load();
+using crowd = await PedestrianCrowd.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
 world.add(crowd, {
   bodies: [
@@ -6841,13 +6841,20 @@ default radius of 1 m. Walkers reduce their preferred speed above the default pa
 of 5.4 people/m², with `densityResponse` defaulting to 1. Set `packingDensity: 0` to disable that
 response. The aperture shoulder clearance defaults to 0.01 m per side.
 
-`PedestrianCrowd.load({ id, level, signal, readIntent, readForces, fields })` loads SIMD Wasm on
+`PedestrianCrowd.load({ id, level, threads, signal, readIntent, readForces, fields })` loads SIMD Wasm on
 demand. Defaults are id `pedestrians`, preferred level 0 and both input ports disabled. When enabled,
 write `PEDESTRIAN_INTENT_FIELD` with [vx, vz] and `PEDESTRIAN_FORCE_FIELD` with [fx, fz], one
 f64 row per walker. Readers can use `PEDESTRIAN_KINEMATICS_FIELD` for motion and accumulated
 stride distance, and `PEDESTRIAN_CONTACT_FIELD` for [fx, fz, normalLoad, density,
 anticipatoryFx, anticipatoryFz]. All four use `PEDESTRIAN_LAYOUT`. Use different `fields` names for
-multiple groups within one world. The same kernel runs in plain and shared world memory.
+multiple groups within one world. Input rows are aligned in the memory named by the port. Publications
+use the solver's signed cell, including after an origin shift. An invalid ground height or control
+leaves the accepted pose, contacts and route cursor intact. Update targets between steps.
+
+The default is one native participant. Use two or four with shared world memory in Node or an
+isolated browser worker. They split independent drive and wall-integration rows. Walker-to-walker
+impulses retain canonical order. `readNativeWork()` gives accepted row, wall and SIMD counts.
+Stop advancing the world before disposing the group. [Pedestrian error remedies](https://margoengine.com/errors#pedestrians)
 
 ## Landscape evolution
 

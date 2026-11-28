@@ -14728,7 +14728,29 @@ offset. The solver raises the dyadic rate so ideally dt·√(2k/m)≤1/2 for the
 per tick stays inside half the shortest footprint radius. Multi-floor surfaces use separate groups or
 walkable route guidance with a height sampler. Injury, fall and ragdoll transitions use external
 consumers of the force/pose ports. Doorway and terrain fixtures use simulated actors and route geometry.
-The optional JavaScript entry is 4,590 B gzip. The plain and shared Wasm assets are 12,041 B and 12,129 B raw.
+The optional JavaScript entry is 7,275 B gzip against a 7,531 B ceiling. The plain Wasm is 12,620 B raw
+and 6,086 B gzip. The shared Wasm is 12,708 B raw and 6,146 B gzip. Both use the existing static slot for
+Rust's sort metadata and have a separate stack per native participant. Core and stage receive zero bytes.
+
+The candidate movement, route cursor and projected ground publication are staged together. The two optional
+worker phases partition drive and wall/integration rows. Pair order, spatial sort and encounter and density
+accumulation retain their original serial order. The opted-in workers use the same arithmetic and states
+as the caller.
+
+The execution descriptor is 56 B plus 40 B per participant for work. The existing Wasm static slot has
+884 B of Rust metadata in plain memory and 888 B in shared memory. Each participant uses its own
+65,544 B stack plus the pool control block. Re-instantiation in the existing slot preserves the same bytes.
+
+#### LIFE-05 measured single-file walking
+
+Seyfried et al. report station-mean speeds of 1.24, 0.90 and 0.56 m/s with 1, 15 and 20 participants in their
+17.3 m loop. Using the original 1.34 m/s free-speed default, the production crowd gives about 1.318 m/s
+in all three cases. At 15 and 20 walkers the absolute misses are 0.418 and 0.758 m/s. Corresponding count-based
+station means are 0.821 and 1.095 people/m, compared with 0.77 and 1.07 people/m from the manual fractional
+estimator. The experiment used a 2 m station. An unreported bend profile is reconstructed from the recorded
+lengths and widths. Doubling wall resolution changes the estimate by under 0.00004 m/s. A second
+bend profile changes the 20-person result by about 0.016 m/s. The model lacks a validated steady headway-speed
+relationship for following at equal velocity. No reported speed sets any input or parameter. [Seyfried et al. 2005](https://doi.org/10.1088/1742-5468/2005/10/P10002)
 
 ### Landscape evolution (HYDRO-04)
 
@@ -41449,6 +41471,14 @@ CITY-TO-STREET-2 still needs vehicle and rail actors. Run
 `node --test packages/physics/tests/coupling/pedestrians.test.js` after building Physics and NavMesh
 to reproduce the measured contact impulses, doorway release and real route grade.
 See LIFE-05 in [Framework requests](physics-work-queue.md#framework-requests).
+
+### Pedestrian speed at steady single-file headway (LIFE-05)
+
+The published single-file diagnostic reaches nearly the free-speed pace with 15 and 20 equally spaced
+walkers, while the independent experiment slows to 0.90 and 0.56 m/s. A closing-speed anticipation term
+can steer approaching pairs. It leaves an equal-speed pair without a future collision, and the sparse
+spacing is below the current compression response. A validated steady following law is still needed.
+Run `node packages/physics/scripts/life05-pedestrian-measured.mjs`. [Measured station limits](limits.md#life-05-measured-single-file-walking)
 
 ## Fixed: geological erosion lacked physical time and multidirectional routing (PA-39)
 

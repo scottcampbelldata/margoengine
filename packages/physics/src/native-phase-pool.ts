@@ -187,6 +187,11 @@ type NativePhaseSolver =
       readonly phase: 'point prediction';
     }
   | {
+      readonly subject: 'Pedestrians';
+      readonly phaseExport: 'pedestrian_thread_phase';
+      readonly phase: 'walker drive and wall integration';
+    }
+  | {
       readonly subject: 'Seismic';
       readonly phaseExport: 'seismic_thread_phase';
       readonly phase: 'velocity and stress stencil';

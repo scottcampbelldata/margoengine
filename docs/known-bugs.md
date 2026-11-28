@@ -24387,6 +24387,14 @@ CITY-TO-STREET-2 still needs vehicle and rail actors. Run
 to reproduce the measured contact impulses, doorway release and real route grade.
 See LIFE-05 in [Framework requests](physics-work-queue.md#framework-requests).
 
+### Pedestrian speed at steady single-file headway (LIFE-05)
+
+The published single-file diagnostic reaches nearly the free-speed pace with 15 and 20 equally spaced
+walkers, while the independent experiment slows to 0.90 and 0.56 m/s. A closing-speed anticipation term
+can steer approaching pairs. It leaves an equal-speed pair without a future collision, and the sparse
+spacing is below the current compression response. A validated steady following law is still needed.
+Run `node packages/physics/scripts/life05-pedestrian-measured.mjs`. [Measured station limits](limits.md#life-05-measured-single-file-walking)
+
 ## Fixed: geological erosion lacked physical time and multidirectional routing (PA-39)
 
 Fractional passes through the original biome erosion tool routed each cell to one receiver and did not describe

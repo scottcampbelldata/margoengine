@@ -126,6 +126,32 @@ struct Grid {
     row: u32,
 }
 
+#[repr(C)]
+struct StepJob {
+    before: *const Walker,
+    profiles: *const Profile,
+    commands: *const Command,
+    walls: *const Edge,
+    wall_count: usize,
+    gates: *const Edge,
+    gate_count: usize,
+    settings: *const Settings,
+    after: *mut Walker,
+    grid: *mut Grid,
+    count: usize,
+    work: *mut Work,
+    dt: f64,
+}
+
+#[repr(C)]
+struct Work {
+    driven: f64,
+    wall_checks: f64,
+    wall_contacts: f64,
+    integrated: f64,
+    paired_dots: f64,
+}
+
 impl Grid {
     fn key(self) -> (i32, i32, u32) {
         (self.x, self.z, self.row)
@@ -252,11 +278,11 @@ fn contact(
     inverse_mass: f64,
     cfg: &Settings,
     dt: f64,
-) -> (V, f64) {
+) -> (V, f64, bool) {
     let vn = dot(speed, normal);
     let free_overlap = overlap - dt * vn;
     if free_overlap <= 0.0 {
-        return ([0.0; 2], 0.0);
+        return ([0.0; 2], 0.0, false);
     }
     let damping = if vn < 0.0 { cfg.damping } else { 0.0 };
     let normal_impulse = (dt * (cfg.stiffness * free_overlap - damping * vn)
@@ -269,6 +295,7 @@ fn contact(
     (
         add(scale(normal, normal_impulse), scale(tangent, slide)),
         normal_impulse,
+        true,
     )
 }
 
@@ -298,11 +325,10 @@ fn pairs(grid: &[Grid], mut visit: impl FnMut(usize, usize)) {
     }
 }
 
-fn step(
+fn prepare(
     before: &[Walker],
     profiles: &[Profile],
     commands: &[Command],
-    walls: &[Edge],
     gates: &[Edge],
     cfg: &Settings,
     after: &mut [Walker],
@@ -364,6 +390,17 @@ fn step(
         after[i].avoidance_force = add(after[i].avoidance_force, anticipatory);
         after[j].avoidance_force = sub(after[j].avoidance_force, anticipatory);
     });
+    true
+}
+
+fn drive(
+    before: &[Walker],
+    profiles: &[Profile],
+    commands: &[Command],
+    cfg: &Settings,
+    after: &mut [Walker],
+    dt: f64,
+) {
     for (row, next) in after.iter_mut().enumerate() {
         let old = &before[row];
         let profile = &profiles[row];
@@ -395,6 +432,16 @@ fn step(
             ),
         );
     }
+}
+
+fn pair_contacts(
+    before: &[Walker],
+    profiles: &[Profile],
+    cfg: &Settings,
+    after: &mut [Walker],
+    grid: &[Grid],
+    dt: f64,
+) {
     pairs(grid, |i, j| {
         let a = &before[i];
         let b = &before[j];
@@ -404,7 +451,7 @@ fn step(
         let radius_j = radius(&profiles[j], after[j].heading, normal);
         let overlap = radius_i + radius_j - norm(relative);
         let rel_v = sub(after[i].velocity, after[j].velocity);
-        let (pair_impulse, load) = contact(
+        let (pair_impulse, load, _) = contact(
             rel_v,
             normal,
             overlap,
@@ -427,13 +474,27 @@ fn step(
             dt,
         );
     });
+}
+
+fn finish(
+    profiles: &[Profile],
+    walls: &[Edge],
+    cfg: &Settings,
+    after: &mut [Walker],
+    dt: f64,
+    work: &mut Work,
+) -> bool {
+    work.wall_checks = after.len() as f64 * walls.len() as f64;
+    work.wall_contacts = 0.0;
+    work.integrated = after.len() as f64;
+    let mut tangential_dots = 0.0;
     for (row, next) in after.iter_mut().enumerate() {
         for wall in walls {
             let (delta, _) = nearest(wall, next.position);
             let along = sub(wall.b, wall.a);
             let normal = direction(delta, direction(side(along), [0.0, 1.0]));
             let overlap = radius(&profiles[row], next.heading, normal) - norm(delta);
-            let (value, load) = contact(
+            let (value, load, tangent) = contact(
                 next.velocity,
                 normal,
                 overlap,
@@ -441,6 +502,8 @@ fn step(
                 cfg,
                 dt,
             );
+            work.wall_contacts += u32::from(load > 0.0) as f64;
+            tangential_dots += u32::from(tangent) as f64;
             impulse(next, value, load, profiles[row].inverse_mass, dt);
         }
         let travel = scale(next.velocity, dt);
@@ -451,35 +514,82 @@ fn step(
             return false;
         }
     }
+    // The drive steering norm and travel norm each use one two-component dot.
+    // Each wall always evaluates two nearest, two normal, two radius, one
+    // separation and one normal-contact dot, plus the tangent when applicable.
+    work.paired_dots = work.driven + work.integrated + 8.0 * work.wall_checks + tangential_dots;
     true
 }
 
 #[unsafe(no_mangle)]
-unsafe extern "C" fn pedestrian_step(
-    before: *const Walker,
-    profile: *const Profile,
-    commands: *const Command,
-    walls: *const Edge,
-    wall_count: usize,
-    gates: *const Edge,
-    gate_count: usize,
-    settings: *const Settings,
-    after: *mut Walker,
-    grid: *mut Grid,
-    count: usize,
-    dt: f64,
-) -> i32 {
+unsafe extern "C" fn pedestrian_prepare(job: *const StepJob) -> u32 {
+    let job = unsafe { &*job };
     unsafe {
-        i32::from(!step(
-            slice::from_raw_parts(before, count),
-            slice::from_raw_parts(profile, count),
-            slice::from_raw_parts(commands, count),
-            slice::from_raw_parts(walls, wall_count),
-            slice::from_raw_parts(gates, gate_count),
-            &*settings,
-            slice::from_raw_parts_mut(after, count),
-            slice::from_raw_parts_mut(grid, count),
-            dt,
+        u32::from(!prepare(
+            slice::from_raw_parts(job.before, job.count),
+            slice::from_raw_parts(job.profiles, job.count),
+            slice::from_raw_parts(job.commands, job.count),
+            slice::from_raw_parts(job.gates, job.gate_count),
+            &*job.settings,
+            slice::from_raw_parts_mut(job.after, job.count),
+            slice::from_raw_parts_mut(job.grid, job.count),
+            job.dt,
         ))
     }
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn pedestrian_pairs(job: *const StepJob) {
+    let job = unsafe { &*job };
+    unsafe {
+        pair_contacts(
+            slice::from_raw_parts(job.before, job.count),
+            slice::from_raw_parts(job.profiles, job.count),
+            &*job.settings,
+            slice::from_raw_parts_mut(job.after, job.count),
+            slice::from_raw_parts(job.grid, job.count),
+            job.dt,
+        );
+    }
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn pedestrian_thread_phase(
+    job: *const StepJob,
+    stage: u32,
+    part: usize,
+    parts: usize,
+) -> u32 {
+    if stage >= 2 || !matches!(parts, 1 | 2 | 4) || part >= parts {
+        return 1;
+    }
+    let job = unsafe { &*job };
+    let from = part * job.count / parts;
+    let count = (part + 1) * job.count / parts - from;
+    // Each participant borrows only its disjoint destination and receipt. Both
+    // joins are complete before the caller sees or modifies the full row range.
+    let after = unsafe { slice::from_raw_parts_mut(job.after.add(from), count) };
+    let profiles = unsafe { slice::from_raw_parts(job.profiles.add(from), count) };
+    let settings = unsafe { &*job.settings };
+    let work = unsafe { &mut *job.work.add(part) };
+    if stage == 0 {
+        drive(
+            unsafe { slice::from_raw_parts(job.before.add(from), count) },
+            profiles,
+            unsafe { slice::from_raw_parts(job.commands.add(from), count) },
+            settings,
+            after,
+            job.dt,
+        );
+        work.driven = count as f64;
+        return 0;
+    }
+    u32::from(!finish(
+        profiles,
+        unsafe { slice::from_raw_parts(job.walls, job.wall_count) },
+        settings,
+        after,
+        job.dt,
+        work,
+    ))
 }

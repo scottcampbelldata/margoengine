@@ -15710,8 +15710,8 @@
         "gzip": 9785
       },
       "./pedestrians": {
-        "raw": 10894,
-        "gzip": 4432
+        "raw": 18842,
+        "gzip": 7275
       },
       "./schooling": {
         "raw": 12270,
@@ -19795,14 +19795,14 @@
       "brotli": 4793
     },
     "packages/physics/dist/pedestrian-kernel.wasm": {
-      "raw": 12041,
-      "gzip": 5695,
-      "brotli": 5142
+      "raw": 12620,
+      "gzip": 6086,
+      "brotli": 5513
     },
     "packages/physics/dist/pedestrian-kernel-shared.wasm": {
-      "raw": 12129,
-      "gzip": 5757,
-      "brotli": 5210
+      "raw": 12708,
+      "gzip": 6146,
+      "brotli": 5576
     },
     "packages/weather/dist/mann-fft.wasm": {
       "raw": 25652,

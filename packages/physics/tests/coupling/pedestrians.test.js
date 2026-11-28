@@ -259,6 +259,102 @@ function portWriter(field, values) {
   };
 }
 
+test('pedestrian ground may grow plain memory or reject a later row without losing accepted state', async () => {
+  const cell = [-13, 7, -4];
+  const world = new PhysicsWorld({ rate, memory: worldMemory(false) })
+    .add(portWriter(PEDESTRIAN_INTENT_FIELD, [0.3, 0, -0.2, 0.2]), {})
+    .add(portWriter(PEDESTRIAN_FORCE_FIELD, [0, 0, 0, 0]), {});
+  using solver = await PedestrianCrowd.load({ readIntent: true, readForces: true });
+  let grow = false;
+  let reject = false;
+  let reenter;
+  const ground = {
+    locate: () => 0,
+    heightAt(_polygon, x) {
+      if (grow) {
+        world.memory.grow(1);
+        grow = false;
+      }
+      if (x > 1) {
+        reenter?.();
+        if (reject) return NaN;
+      }
+      return 0.05 * x;
+    },
+  };
+  world.add(
+    solver,
+    {
+      bodies: [{ position: [-2, -0.1, 0] }, { position: [2, 0.1, 2] }],
+      ground,
+      stiffness: 0,
+    },
+    cell,
+  );
+  for (const port of solver.exportPorts(-1)) assert.deepEqual(port.cell, cell);
+  world.advance(10);
+  const saved = world.takeSnapshot().bytes.slice();
+  const receipt = solver.readNativeWork();
+  const memory = new WebAssembly.Memory({ initial: 1 });
+  const borrow = (field, byteOffset, values) => {
+    new Float64Array(memory.buffer, byteOffset, values.length).set(values);
+    return {
+      field: field.name,
+      tick: 0,
+      cell: [-7, -2, 13],
+      region: {
+        name: field.name,
+        type: 'f64',
+        layout: PEDESTRIAN_LAYOUT,
+        byteOffset,
+        byteLength: 8 * values.length,
+        memory,
+      },
+    };
+  };
+  const intent = borrow(PEDESTRIAN_INTENT_FIELD, 24, [0.5, 0.1, -0.2, 0.8]);
+  const force = borrow(PEDESTRIAN_FORCE_FIELD, 72, [45, 0, 0, 50]);
+  const context = {
+    cell,
+    tick: 0,
+    level: 0,
+    seed: 0,
+    inputs: new Map([
+      [intent.field, intent],
+      [force.field, force],
+    ]),
+  };
+  const rejected = (message) => {
+    assert.throws(() => solver.step(context, dt), { code: 'state', message });
+    assert.deepEqual(world.takeSnapshot().bytes, saved);
+    assert.deepEqual(solver.readNativeWork(), receipt);
+  };
+  reject = true;
+  rejected(/finite walkable height.*#pedestrians/);
+  reject = false;
+  reenter = () => solver.setPreferredVelocity(0, [2, 1]);
+  rejected(/after the current step finishes.*#pedestrians/);
+  reenter = undefined;
+  intent.region.byteOffset++;
+  rejected(/aligned pedestrian input.*#pedestrians/);
+  intent.region.byteOffset--;
+  const step = () => {
+    solver.step(context, dt);
+    assert.equal(solver.read(0).position[1], 0.05 * solver.read(0).position[0]);
+    return world.takeSnapshot().bytes.slice();
+  };
+  const next = step();
+  world.restoreSnapshot(saved);
+  const oldView = world.memory.buffer;
+  grow = true;
+  assert.deepEqual(step(), next);
+  assert.equal(oldView.byteLength, 0);
+  world.shiftOrigin([3, -4, 10]);
+  for (const port of solver.exportPorts(0)) assert.deepEqual(port.cell, [-16, 11, -14]);
+  world.restoreSnapshot(saved);
+  assert.deepEqual(world.takeSnapshot().bytes, saved);
+});
+
 test('separate registry writers steer or push a body and the reader receives SI contact and kinematic state', async () => {
   const person = { position: origin, mass: 50, responseSeconds: 0.5 };
   const solver = await PedestrianCrowd.load({ readIntent: true, readForces: true });

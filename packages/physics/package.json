@@ -81,6 +81,8 @@
     "test:gpu:glacier-workers": "cd ../.. && node packages/physics/tests/glacier-workers.browser.mjs",
     "test:gpu:locomotion-workers": "cd ../.. && node packages/physics/tests/locomotion-workers.browser.mjs",
     "test:gpu:legged-workers": "cd ../.. && node packages/physics/tests/legged-workers.browser.mjs",
+    "test:gpu:pedestrian-workers": "cd ../.. && node packages/physics/tests/pedestrian-workers.browser.mjs",
+    "test:gpu:pedestrian-film": "cd ../.. && node scripts/run-with-timeout.mjs --max=3 -- node packages/physics/tests/pedestrian-film.browser.mjs && node scripts/run-with-timeout.mjs --max=3 -- node packages/physics/tests/pedestrian-film.browser.mjs --compat",
     "test:gpu:legged-film": "cd ../.. && node scripts/run-with-timeout.mjs --max=3 -- node packages/physics/tests/legged-film.browser.mjs && node scripts/run-with-timeout.mjs --max=3 -- node packages/physics/tests/legged-film.browser.mjs --compat",
     "test:gpu:falling-workers": "cd ../.. && node packages/physics/tests/falling-workers.browser.mjs",
     "test:gpu:groundwater-workers": "cd ../.. && node packages/physics/tests/groundwater-workers.browser.mjs",

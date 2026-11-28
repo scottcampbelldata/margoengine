@@ -1,8 +1,6 @@
 import type { MutableVec2, MutableVec3, Vec2, Vec3 } from '@margoengine/math';
-import { MargoError } from '@margoengine/math/errors';
 import { hypot } from '@margoengine/math/pinned';
 import {
-  type Cell,
   type FieldDescriptor,
   isRateLevel,
   type Port,
@@ -14,9 +12,14 @@ import {
   type SolverHost,
   type StepContext,
 } from '../world/solver.js';
-import { instantiatePedestrianKernel, loadPedestrianKernel, type PedestrianKernelBuilds } from './kernel.js';
+import { pedestrianError } from './errors.js';
+import {
+  instantiatePedestrianKernel,
+  loadPedestrianKernel,
+  type PedestrianKernelBuilds,
+  type PedestrianWorkCounts,
+} from './kernel.js';
 
-const ORIGIN: Cell = [0, 0, 0];
 const BODY_WORDS = 13;
 const PROFILE_WORDS = 6;
 const COMMAND_WORDS = 4;
@@ -143,6 +146,8 @@ export interface PedestrianOptions {
   readonly id?: string;
   /** Preferred dyadic rate level (default 0). */
   readonly level?: RateLevel;
+  /** Native participants for independent walking and wall phases. Defaults to one. */
+  readonly threads?: 1 | 2 | 4;
   /** Read a declared desired-velocity port per walker (default false). */
   readonly readIntent?: boolean;
   /** Read a declared external-force port per walker (default false). */
@@ -182,25 +187,26 @@ interface Model {
 
 function number(value: number, name: string, zero = false): number {
   if (!Number.isFinite(value) || (zero ? value < 0 : value <= 0))
-    throw new RangeError(
+    throw pedestrianError(
       'Set ' + name + ' to a finite ' + (zero ? 'nonnegative' : 'positive') + ' number in SI units.',
     );
   return value;
 }
 
 function horizontal(value: Vec2, name: string): Vec2 {
-  if (!value || value.length !== 2 || !value.every(Number.isFinite))
-    throw new RangeError('Pass two finite XZ values for ' + name + '.');
+  if (value?.length !== 2 || !Number.isFinite(value[0]) || !Number.isFinite(value[1]))
+    throw pedestrianError('Pass two finite XZ values for ' + name + '.');
   return [value[0], value[1]];
 }
 
 function point(value: Vec3): Vec3 {
-  if (!value || value.length !== 3 || !value.every(Number.isFinite))
-    throw new RangeError('Pass finite [x,y,z] positions in the crowd solver cell.');
+  if (value?.length !== 3 || !Number.isFinite(value[0]) || !Number.isFinite(value[1]) || !Number.isFinite(value[2]))
+    throw pedestrianError('Pass finite [x,y,z] positions in the crowd solver cell.');
   return [value[0], value[1], value[2]];
 }
 
 function model(body: PedestrianBody): Model {
+  if (!body) throw pedestrianError('Supply a pedestrian body and finite [x,y,z] position for every row.');
   const heading = horizontal(body.heading ?? FORWARD, 'heading');
   const magnitude = number(hypot(...heading), 'heading length');
   return {
@@ -227,7 +233,7 @@ function flatten(edges: readonly PedestrianSegment[]): readonly number[] {
     const first = horizontal(a, 'segment start');
     const last = horizontal(b, 'segment end');
     if (!(hypot(last[0] - first[0], last[1] - first[1]) > 0))
-      throw new RangeError('Give each wall and aperture two distinct finite endpoints.');
+      throw pedestrianError('Give each wall and aperture two distinct finite endpoints.');
     return [...first, ...last];
   });
 }
@@ -263,15 +269,25 @@ function named(field: FieldDescriptor, name: string | undefined): FieldDescripto
   return name === undefined ? field : { ...field, name };
 }
 
-function input(host: SolverHost, port: Port | undefined, count: number): Float64Array {
+function input(host: SolverHost, port: Port | undefined, field: FieldDescriptor, count: number): Float64Array {
+  const region = port?.region;
+  const size = count * 16;
   if (
-    !port ||
-    port.region.layout !== PEDESTRIAN_LAYOUT ||
-    port.region.type !== 'f64' ||
-    port.region.byteLength !== count * 16
+    !region ||
+    port?.field !== field.name ||
+    region.layout !== PEDESTRIAN_LAYOUT ||
+    region.type !== 'f64' ||
+    region.byteLength !== size
   )
-    throw new MargoError('state', 'Add the declared pedestrian input writer with two f64 values per walker.');
-  return words(host, port.region);
+    throw pedestrianError(
+      'Add the declared pedestrian input writer with two layout-1 f64 values per walker.',
+      'version',
+    );
+  const memory = region.memory ?? host.memory;
+  const offset = region.byteOffset;
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset % 8 !== 0 || offset > memory.buffer.byteLength - size)
+    throw pedestrianError('Publish aligned pedestrian input rows within the memory that owns them.');
+  return new Float64Array(memory.buffer, offset, count * 2);
 }
 
 /** Force-based pedestrian motion with anticipatory avoidance, elliptical contact and turnable shoulders. */
@@ -293,6 +309,8 @@ export class PedestrianCrowd implements Solver<PedestrianParams> {
   private ground?: PedestrianGround;
   private oscillationRate = 0;
   private shortestRadius = 0;
+  private running = false;
+  private disposed = false;
   private readonly groundPoint: MutableVec3 = [0, 0, 0];
 
   private constructor(
@@ -300,7 +318,6 @@ export class PedestrianCrowd implements Solver<PedestrianParams> {
     options: PedestrianOptions,
   ) {
     const { id = 'pedestrians', level = 0, readIntent = false, readForces = false, fields } = options;
-    if (!isRateLevel(level)) throw new RangeError('Choose a pedestrian rate level from 0 to 7.');
     this.id = id;
     this.level = level;
     this.wantsIntent = readIntent;
@@ -315,7 +332,28 @@ export class PedestrianCrowd implements Solver<PedestrianParams> {
 
   /** Loads the optional SIMD kernel. Use a new instance for each group in a PhysicsWorld. */
   static async load(options: PedestrianOptions = {}): Promise<PedestrianCrowd> {
-    return new PedestrianCrowd(await loadPedestrianKernel(options.signal), options);
+    if (typeof (options.id ?? 'pedestrians') !== 'string' || options.id === '' || !isRateLevel(options.level ?? 0))
+      throw pedestrianError('Choose a nonempty pedestrian solver id and a rate level from 0 to 7.');
+    return new PedestrianCrowd(await loadPedestrianKernel(options.signal, options.threads ?? 1), options);
+  }
+
+  /** Releases native helpers after the world has stopped stepping. */
+  [Symbol.dispose](): void {
+    if (this.disposed) return;
+    this.requireIdle();
+    this.disposed = true;
+    this.builds[Symbol.dispose]();
+  }
+
+  /** Work from the most recent accepted pedestrian step. */
+  readNativeWork(): PedestrianWorkCounts | undefined {
+    return this.kernel?.workCounts();
+  }
+
+  private requireIdle(): void {
+    if (this.disposed) throw pedestrianError('Load a new pedestrian group after disposing its helpers.', 'disposed');
+    if (this.running)
+      throw pedestrianError('Change targets, dispose helpers or step the crowd after the current step finishes.');
   }
 
   describe(): SolverDescription {
@@ -355,14 +393,15 @@ export class PedestrianCrowd implements Solver<PedestrianParams> {
   }
 
   init(host: SolverHost, params: PedestrianParams): void {
-    if (this.host) throw new MargoError('state', 'Load another pedestrian group for a separate world.');
-    if (!Array.isArray(params.bodies) || !params.bodies.length)
-      throw new RangeError('Give the pedestrian solver at least one walker.');
+    this.requireIdle();
+    if (this.host) throw pedestrianError('Load another pedestrian group for a separate world.', 'attached');
+    if (!Array.isArray(params?.bodies) || !params.bodies.length)
+      throw pedestrianError('Give the pedestrian solver at least one walker.');
     const models = params.bodies.map(model);
     const walls = flatten(params.walls ?? []);
     const apertures = flatten(params.apertures ?? []);
     if (params.ground && (typeof params.ground.locate !== 'function' || typeof params.ground.heightAt !== 'function'))
-      throw new RangeError('Pass a ground surface with locate and heightAt methods.');
+      throw pedestrianError('Pass a ground surface with locate and heightAt methods.');
     const stiffness = number(params.stiffness ?? 120000, 'stiffness', true);
     let maxRadius = 0;
     let minRadius = Infinity;
@@ -386,6 +425,9 @@ export class PedestrianCrowd implements Solver<PedestrianParams> {
       number(params.apertureMargin ?? 0.01, 'apertureMargin', true),
       maxRadius,
     ];
+    const density0 = 4 / (Math.PI * config[7]! * config[7]!);
+    if (!(density0 > 0 && Number.isFinite(density0)))
+      throw pedestrianError('Use a density radius that produces a finite positive sample area.');
     const kernel = instantiatePedestrianKernel(host, this.builds);
     const lease = allocate(host, models.length, walls.length, apertures.length);
     words(host, lease.settings).set(config);
@@ -395,7 +437,6 @@ export class PedestrianCrowd implements Solver<PedestrianParams> {
     const bodies = words(host, lease.body);
     const profiles = words(host, lease.profile);
     const targets = words(host, lease.targets);
-    const density0 = 4 / (Math.PI * config[7]! * config[7]!);
     const contact = words(host, lease.contact);
     models.forEach((walker, row) => {
       bodies.set(
@@ -421,6 +462,7 @@ export class PedestrianCrowd implements Solver<PedestrianParams> {
 
   /** Overrides the configured path with a desired horizontal world-axis velocity. Null resumes the path. */
   setPreferredVelocity(row: number, velocity: Vec2 | null): void {
+    this.requireIdle();
     const { host, lease } = this.member(row);
     const settings = words(host, lease.targets);
     const at = row * TARGET_WORDS;
@@ -464,20 +506,34 @@ export class PedestrianCrowd implements Solver<PedestrianParams> {
   }
 
   private member(row: number): { host: SolverHost; lease: Lease } {
+    if (this.disposed) throw pedestrianError('Load a new pedestrian group after disposing its helpers.', 'disposed');
     const { host, lease } = this;
-    if (!host || !lease) throw new MargoError('state', 'Add the pedestrian solver to a PhysicsWorld first.');
+    if (!host || !lease) throw pedestrianError('Add the pedestrian solver to a PhysicsWorld first.');
     if (!Number.isInteger(row) || row < 0 || row >= this.models.length)
-      throw new RangeError('Use the row index of a configured pedestrian.');
+      throw pedestrianError('Use the row index of a configured pedestrian.');
     return { host, lease };
   }
 
   step(context: StepContext, dt: number): void {
+    this.requireIdle();
+    if (!(dt > 0 && Number.isFinite(dt))) throw pedestrianError('Pass a finite positive pedestrian step in seconds.');
+    this.running = true;
+    try {
+      this.advance(context, dt);
+    } finally {
+      this.running = false;
+    }
+  }
+
+  private advance(context: StepContext, dt: number): void {
     const { host, lease, kernel, models, fields } = this;
     if (!host || !lease || !kernel)
-      throw new MargoError('state', 'Add the pedestrian solver to a PhysicsWorld before stepping.');
+      throw pedestrianError('Add the pedestrian solver to a PhysicsWorld before stepping.');
     const count = models.length;
-    const intent = this.wantsIntent ? input(host, context.inputs.get(fields.intent.name), count) : undefined;
-    const pushes = this.wantsPush ? input(host, context.inputs.get(fields.force.name), count) : undefined;
+    const intent = this.wantsIntent
+      ? input(host, context.inputs.get(fields.intent.name), fields.intent, count)
+      : undefined;
+    const pushes = this.wantsPush ? input(host, context.inputs.get(fields.force.name), fields.force, count) : undefined;
     const body = words(host, lease.body);
     const commands = words(host, lease.command);
     const target = words(host, lease.nextTargets);
@@ -522,10 +578,10 @@ export class PedestrianCrowd implements Solver<PedestrianParams> {
       const fx = pushes?.[2 * row] ?? 0;
       const fz = pushes?.[2 * row + 1] ?? 0;
       if (![vx, vz, fx, fz].every(Number.isFinite))
-        throw new RangeError('Provide finite XZ pedestrian control velocities and forces.');
+        throw pedestrianError('Provide finite XZ pedestrian control velocities and forces.');
       commands.set([vx, vz, fx, fz], motion);
     }
-    const result = kernel(
+    const result = kernel.run(
       lease.body.byteOffset,
       lease.profile.byteOffset,
       lease.command.byteOffset,
@@ -540,58 +596,54 @@ export class PedestrianCrowd implements Solver<PedestrianParams> {
       dt,
     );
     if (result)
-      throw new RangeError('Crowd integration exceeded its numeric range. Use local cells and comparable SI scales.');
-    this.publish(
-      dt,
-      words(host, lease.next),
-      words(host, lease.kinematics),
-      words(host, lease.nextKinematics),
-      words(host, lease.nextContact),
-    );
+      throw pedestrianError('Crowd integration exceeded its numeric range. Use local cells and comparable SI scales.');
+    this.preparePublication(host, lease, dt);
     words(host, lease.body).set(words(host, lease.next));
     words(host, lease.targets).set(words(host, lease.nextTargets));
     words(host, lease.kinematics).set(words(host, lease.nextKinematics));
     words(host, lease.contact).set(words(host, lease.nextContact));
+    kernel.accept();
   }
 
-  private publish(dt: number, body: Float64Array, last: Float64Array, pose: Float64Array, contact: Float64Array): void {
+  private preparePublication(host: SolverHost, lease: Lease, dt: number): void {
     const surface = this.ground;
     const point = this.groundPoint;
     for (let row = 0; row < this.models.length; row++) {
       const at = row * BODY_WORDS;
       const to = row * KINEMATICS_WORDS;
       const load = row * CONTACT_WORDS;
-      point[0] = body[at]!;
-      point[1] = last[to + 1]!;
-      point[2] = body[at + 1]!;
+      const candidate = words(host, lease.next);
+      const x = candidate[at]!;
+      const z = candidate[at + 1]!;
+      const acceptedHeight = words(host, lease.kinematics)[to + 1]!;
+      point[0] = x;
+      point[1] = acceptedHeight;
+      point[2] = z;
       const index = surface?.locate(point) ?? -1;
-      if (surface && index >= 0) {
-        const y = surface.heightAt(index, point[0], point[2]);
-        if (!Number.isFinite(y)) throw new RangeError('Provide a finite walkable height for the located polygon.');
-        point[1] = y;
-      }
-      pose.set(
-        [
-          ...point,
-          body[at + 2]!,
-          (point[1] - last[to + 1]!) / dt,
-          body[at + 3]!,
-          body[at + 4]!,
-          body[at + 5]!,
-          body[at + 6]!,
-        ],
+      const y = surface && index >= 0 ? surface.heightAt(index, x, z) : acceptedHeight;
+      if (!Number.isFinite(y)) throw pedestrianError('Provide a finite walkable height for the located polygon.');
+      const vertical = (y - acceptedHeight) / dt;
+      if (!Number.isFinite(vertical))
+        throw pedestrianError('Use comparable local heights and step duration for pedestrian vertical motion.');
+      // The ground callback may grow a plain Wasm arena, so reacquire its views here.
+      const body = words(host, lease.next);
+      words(host, lease.nextKinematics).set(
+        [x, y, z, body[at + 2]!, vertical, body[at + 3]!, body[at + 4]!, body[at + 5]!, body[at + 6]!],
         to,
       );
-      contact.set([body[at + 8]!, body[at + 9]!, body[at + 7]!, body[at + 10]!, body[at + 11]!, body[at + 12]!], load);
+      words(host, lease.nextContact).set(
+        [body[at + 8]!, body[at + 9]!, body[at + 7]!, body[at + 10]!, body[at + 11]!, body[at + 12]!],
+        load,
+      );
     }
   }
 
   exportPorts(tick: number): readonly Port[] {
-    const { lease, fields } = this;
-    return lease
+    const { host, lease, fields } = this;
+    return host && lease
       ? [
-          { field: fields.kinematics.name, region: lease.kinematics, tick, cell: ORIGIN },
-          { field: fields.contact.name, region: lease.contact, tick, cell: ORIGIN },
+          { field: fields.kinematics.name, region: lease.kinematics, tick, cell: host.cell },
+          { field: fields.contact.name, region: lease.contact, tick, cell: host.cell },
         ]
       : [];
   }

@@ -12479,3 +12479,8 @@ The optional strand entry treats accepted centreline, frames and swept rigid-con
 ### LIFE-01 accepted controlled stance and deck reactions
 
 The legged wrapper checks alignment and bounds in the owning memory of input rows. GroundLocomotion exposes candidate contacts to the wrapper's accumulator before accepting pose, anchors and contacts. The wrapper retains accepted drive profiles and publishes gait and rigid impulses only through a successful trial. An invalid late bed sample retains the complete world snapshot. Threaded per-body phases reuse the existing optional kernel and preserve signed accepted results. The fixed ridge camera applies accepted feet and body motion to the weighted horse. Independent treadmill observations bound nominal cadence and fore/hind force partition.
+
+
+### LIFE-05 accepted pedestrian state and local native phases
+
+Independent drives and wall integration are partitioned into native SIMD phases. Spatial order, anticipation accumulation, density and walker-to-walker contact use the existing serial sequence. Intent and force are read in their owning memory. The ground projection reacquires views after each callback and publishes signed pose, route cursor and contacts only when all are valid. The fixed camera renders accepted activity beside a matched control. Single-file measurements bound the steady speed error.
