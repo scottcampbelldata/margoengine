@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21985940,
+  "total": 21990921,
   "history": [
     {
       "date": "2026-10-24",
@@ -15791,6 +15791,12 @@
       "commit": "break-03-native-shell-faces",
       "reason": "BREAK-03 @margoengine/physics/crush 21351 to 24368 B gzip, ceiling 21991 to 25100 B. The existing optional solver owns transactional contact and ordered face assembly. A separate solver would duplicate persistent shell and contact state. Native modules and helpers load only when used. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "sea-03-native-wave-pairs",
+      "reason": "SEA-03 @margoengine/physics/rogue 7386 to 12255 B gzip, ceiling 7642 to 12623 B. The optional sea owns its finite spectrum validation, phase preparation and deterministic native pair evaluation. A separate evaluator entry would duplicate the coefficient and envelope ownership. The native modules and helpers load only when used. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16701,7 +16707,7 @@
     "@margoengine/physics/rail": 12367,
     "@margoengine/physics/robots": 5083,
     "@margoengine/physics/rod": 4755,
-    "@margoengine/physics/rogue": 7642,
+    "@margoengine/physics/rogue": 12623,
     "@margoengine/physics/room-sound": 9140,
     "@margoengine/physics/runoff": 7186,
     "@margoengine/physics/schooling": 5102,

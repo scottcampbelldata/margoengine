@@ -23902,3 +23902,7 @@ The new finite-volume entry holds a resting layer on a bank, follows the live te
 ### Fixed zero-acceleration carried-water contact
 
 A zero-gravity frame using a vessel's carried floodwater failed before the contact solve. SEA-10 input validation required positive gravity although the displacement-free carried-water test uses zero. `Flooding` now keeps its pressure and carried mass at a nonnegative prescribed gravity. Zero specific weight contributes zero hydrostatic head. `packages/physics/tests/flooding.test.js` checks the closed tank exactly, and `packages/physics/tests/coupling/crush-contact-inertia.test.js` checks a real hull's wet normal, transverse and sliding impulses.
+
+### Fixed: SEA-03 returned carrier-only normals and pressure below the bed
+
+A placed wave changes the component amplitudes with position. The previous normal used the derivative of carrier phase alone, which disagreed with the derivative of the rendered surface inside the event. The normal now includes both amplitude derivatives in the linear and bound terms. A separate pressure query omitted the wet depth test and evaluated Wheeler stretching below the bed. It now gives zero under the bed consistently with the velocity query. Malformed currents are rejected before writing caller samples. `packages/physics/tests/rogue.test.js` checks both slope axes by converging differences, finite pressure at the bed, zero pressure below it and exact output preservation on rejection.

@@ -12152,3 +12152,7 @@ The optional native matrix phase splits the same cell pressure and face operatio
 ### BREAK-03 ordered shell face assembly and accepted contact
 
 The optional crush entry partitions shell membrane and pressure faces across native workers. Each range writes a private result before the caller assembles face forces in canonical order. The 211-face shared fixture matches the preceding scalar Wasm and reports accepted work across four participants. The fixed-camera dock fender checks exact accepted snapshots and full renderer replay independently on WebGPU and WebGL2. Arbitrary-shape shell contact, automatic tearing and the original EF-11 shot remain open. [Evidence and commands](../whitepaper/reproduce.md#break-03-accepted-shell-and-civilian-fender)
+
+### SEA-03 native wave pairs and surface-to-hull evidence
+
+The nonlinear sea evaluates second-order pair terms in SIMD and reduces them in the original scalar sequence. Optional helpers own disjoint pair ranges, publish intermediate terms, and leave physical sums to the caller. The signed-cell, finite-depth crest matches the scalar normal exactly, including the spatial taper derivative. The accepted surface drives the same live launch that the dual-renderer fixed-camera cutaway shows. The proof leaves two-way feedback and phase-resolved focusing open. [Evidence and commands](../whitepaper/reproduce.md#sea-03-second-order-waves-and-independent-flume-counts)

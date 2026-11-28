@@ -354,6 +354,20 @@ export const BLUEPRINTS = [
     args: ['threaded'],
   },
   {
+    name: 'rogue-pair-kernel',
+    crate: 'packages/physics/rogue-pair-kernel',
+    blueprint: 'packages/physics/src/rogue/rogue-pair-kernel.wasm',
+    script: 'packages/physics/scripts/build-rogue-pair-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'rogue-pair-kernel-shared',
+    crate: 'packages/physics/rogue-pair-kernel',
+    blueprint: 'packages/physics/src/rogue/rogue-pair-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-rogue-pair-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'viscoplastic-kernel',
     crate: 'packages/physics/viscoplastic-kernel',
     blueprint: 'packages/physics/src/viscoplastic/viscoplastic-kernel.wasm',

@@ -141,6 +141,15 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'nonlinear-sea',
+    title: '@margoengine/physics/rogue nonlinear seas and wave groups',
+    kind: 'family',
+    messages: [],
+    cause:
+      'A spectrum grid, placed crest, flow sample, query, or optional wave-pair evaluator could not produce a finite result.',
+    fix: 'Use a wet spectrum with ordered finite frequencies and nonnegative energy, finite local coordinates and a water current in the same cell. Reduce or separate unresolved crests. Choose one native participant on the browser main thread, and load a new sea after disposal.',
+  },
+  {
     id: 'ductile-crush',
     title: '@margoengine/physics/crush ductile contact and shell mechanics',
     kind: 'family',

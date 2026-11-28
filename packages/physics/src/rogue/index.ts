@@ -44,13 +44,32 @@ import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { cos, exp, ln, sin } from '@margoengine/math/pinned';
 import { RandomStream, solverNumber } from '@margoengine/math/random';
 import { bandWidth, wavenumber } from '../waves/spectral.js';
+import { checkSpectrum, rogueError } from './errors.js';
+import { loadRoguePairs, type RoguePairKernel, type RoguePairWorkCounts } from './pair-kernel.js';
 
 export { groupSpacing, heightCorrelation, kappaFor, type RunStatistics, runStatistics, sisters } from './groups.js';
+export type { RoguePairWorkerWork, RoguePairWorkCounts } from './pair-kernel.js';
 
 const TWO_PI = 6.283185307179586;
 const PI = 3.141592653589793;
 const SQRT_PI = 1.772453850905516;
 const ROOT3 = 1.7320508075688772;
+type Envelope = readonly [Float64Array, Float64Array, Float64Array, Float64Array];
+type EventWindow = [weight: number, timeSlope: number, xSlope: number, zSlope: number];
+
+function checkHeightCoordinate(y: number): void {
+  if (!Number.isFinite(y))
+    throw rogueError('unsupported', 'A water query needs a finite y in metres; pass a point in the sea cell.');
+}
+
+function finiteSurface(value: number): number {
+  if (!Number.isFinite(value))
+    throw rogueError(
+      'failed',
+      'The nonlinear surface exceeds numeric range; reduce the spectrum energy or prescribed crest.',
+    );
+  return value;
+}
 /** A crest above this share of H_s is a rogue (Christou and Ewans 2014). */
 export const ROGUE_CREST = 1.25;
 
@@ -123,6 +142,14 @@ export interface NonlinearSeaOptions {
   readonly temperature?: number;
 }
 
+/** Options for the native pair evaluator. */
+export interface NonlinearSeaNativeOptions {
+  /** Total participants, including the caller (default 1). Use Node or an isolated browser worker for 2 or 4. */
+  readonly threads?: 1 | 2 | 4;
+  /** Cancels loading and releases active native helpers on abort. */
+  readonly signal?: AbortSignal;
+}
+
 /** The sea a spectrum describes, to second order, with its rogue waves: elevation, kinematics and statistics. */
 export class NonlinearSea implements SeaSurface {
   /** The sea's statistics. */
@@ -140,6 +167,7 @@ export class NonlinearSea implements SeaSurface {
   private readonly current: FlowField | undefined;
   private readonly temperature: number;
   private readonly flow: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
+  private samplingCurrent = false;
   private readonly g: number;
   private readonly n: number;
   private readonly omega: Float64Array;
@@ -163,35 +191,73 @@ export class NonlinearSea implements SeaSurface {
   private readonly m0: number;
   private readonly cr: Float64Array;
   private readonly ci: Float64Array;
+  private readonly envelope: Envelope;
+  private readonly eventWindow: EventWindow = [0, 0, 0, 0];
+  private nativePairs: RoguePairKernel | undefined;
+  private nativeWork: RoguePairWorkCounts | undefined;
+  private disposed = false;
 
-  /** @throws TypeError without a spectrum; RangeError for a sea without energy or settings out of range. */
+  /** @throws MargoError without a usable spectrum, with settings out of range, or if a placed crest cannot be resolved. */
   constructor(options: NonlinearSeaOptions) {
     const { components = 160, cutoff = 3, seed = 0, at = [0, 0] } = options ?? {};
+    if (!(at?.length === 2 && at.every(Number.isFinite)))
+      throw rogueError(
+        'unsupported',
+        'The spectrum sample point is two finite coordinates; pass [x, z] in the field cell.',
+      );
+    if (options?.spectrum === undefined && options?.waves !== undefined && typeof options.waves?.sample !== 'function')
+      throw rogueError('unsupported', 'The wave field needs a spectrum sample method; pass a WaveSolver.field.');
     const spectrum = options?.spectrum ?? options?.waves?.sample(at[0], at[1]);
     if (!spectrum?.frequencies || !spectrum.energy)
-      throw new TypeError('A nonlinear sea comes from a spectrum: pass {spectrum} or {waves} (a WaveSolver.field).');
+      throw rogueError(
+        'unsupported',
+        'A nonlinear sea comes from a spectrum: pass {spectrum} or {waves} (a WaveSolver.field).',
+      );
+    checkSpectrum(spectrum);
     if (!(Number.isInteger(components) && components >= 1 && components <= 4096))
-      throw new RangeError(
+      throw rogueError(
+        'unsupported',
         `A nonlinear sea has 1 to 4096 components (got ${components}); pass a whole number, or 160.`,
       );
     if (!(cutoff > 1 && cutoff <= 10))
-      throw new RangeError(
+      throw rogueError(
+        'unsupported',
         `The cutoff is above 1 and at most 10 times the peak frequency (got ${cutoff}); pass one, or 3.`,
       );
     if (!(Number.isInteger(seed) && seed >= 0 && seed < 4294967296))
-      throw new RangeError(`A seed is a whole number from 0 to 4294967295 (got ${seed}); pass one.`);
+      throw rogueError('unsupported', `A seed is a whole number from 0 to 4294967295 (got ${seed}); pass one.`);
     const g = options.gravity ?? gravityMagnitude(DEFAULT_GRAVITY);
-    if (!(g > 0)) throw new RangeError(`Gravity's magnitude is above 0 (got ${g}); pass one, or leave it out.`);
+    if (!(g > 0 && Number.isFinite(g)))
+      throw rogueError('unsupported', `Gravity's magnitude is above 0 (got ${g}); pass one, or leave it out.`);
     const { current, temperature = 288.15 } = options;
     if (current !== undefined && typeof current?.sample !== 'function')
-      throw new TypeError("A sea's current is a flow field of water with sample(x, y, z, t); pass one or none.");
+      throw rogueError(
+        'unsupported',
+        "A sea's current is a flow field of water with sample(x, y, z, t); pass one or none.",
+      );
     if (!(temperature > 0 && Number.isFinite(temperature)))
-      throw new RangeError(
+      throw rogueError(
+        'unsupported',
         `A water temperature is finite kelvin above 0 (got ${temperature}); pass kelvin such as 288.15.`,
       );
     this.current = current;
     this.temperature = temperature;
-    this.cell = options.waves?.cell ?? [0, 0, 0];
+    const cell = options.waves?.cell ?? [0, 0, 0];
+    if (cell.length !== 3 || !cell.every(Number.isSafeInteger))
+      throw rogueError(
+        'unsupported',
+        'A wave field cell needs three safe integer indices; pass a field with a valid origin.',
+      );
+    if (
+      current &&
+      !(
+        current.medium === 'water' &&
+        current.cell?.length === 3 &&
+        current.cell.every((index, axis) => index === cell[axis])
+      )
+    )
+      throw rogueError('unsupported', 'The current must be water in the spectrum cell; pass an aligned water field.');
+    this.cell = [cell[0], cell[1], cell[2]];
     this.density = spectrum.density > 0 ? spectrum.density : 1025;
     const sea = this;
     this.water = { medium: 'water', cell: this.cell, sample: (x, y, z, t, out) => sea.below(x, y, z, t, out) };
@@ -208,7 +274,8 @@ export class NonlinearSea implements SeaSurface {
       for (let j = 0; j < nd; j++) marginal[i]! += energy[i * nd + j]! * dtheta;
       if (marginal[i]! > marginal[peak]!) peak = i;
     }
-    if (!(marginal[peak]! > 0)) throw new RangeError('This spectrum carries no energy; pass a sea with waves.');
+    if (!(marginal[peak]! > 0))
+      throw rogueError('unsupported', 'This spectrum carries no energy; pass a sea with waves.');
     const top = cutoff * fs[peak]!,
       // The kept variance per frequency bin, and in all.
       share = new Float64Array(nf);
@@ -218,6 +285,11 @@ export class NonlinearSea implements SeaSurface {
       share[i] = marginal[i]! * bandWidth(fs, i);
       total += share[i]!;
     }
+    if (!(total > 0 && Number.isFinite(total)))
+      throw rogueError(
+        'unsupported',
+        'The kept spectrum variance cannot be represented; pass a finite energetic sea in SI units.',
+      );
     const n = components;
     this.n = n;
     this.omega = new Float64Array(n);
@@ -228,6 +300,7 @@ export class NonlinearSea implements SeaSurface {
     this.im = new Float64Array(n);
     this.cr = new Float64Array(n);
     this.ci = new Float64Array(n);
+    this.envelope = [new Float64Array(n), new Float64Array(n), new Float64Array(n), new Float64Array(n)];
     const random = new RandomStream(seed, solverNumber('rogue')),
       draw: [number, number] = [0, 0],
       amplitude = Math.sqrt((2 * total) / n);
@@ -298,22 +371,46 @@ export class NonlinearSea implements SeaSurface {
     if (this.rogues.length) this.constrain(this.rogues);
   }
 
+  /** Load the same second-order sea with the optional native pair evaluator. Dispose it when its users finish. */
+  static async load(options: NonlinearSeaOptions, native: NonlinearSeaNativeOptions = {}): Promise<NonlinearSea> {
+    native.signal?.throwIfAborted();
+    const sea = new NonlinearSea(options);
+    sea.nativePairs = await loadRoguePairs(sea.kx, sea.kz, sea.bp, sea.bm, native);
+    return sea;
+  }
+
+  /** Last accepted native query's work, or undefined before the first query and for a scalar sea. */
+  readNativeWork(): RoguePairWorkCounts | undefined {
+    const work = this.nativeWork;
+    return work && { ...work, workers: work.workers.map((worker) => ({ ...worker })) };
+  }
+
+  [Symbol.dispose](): void {
+    this.nativePairs?.[Symbol.dispose]();
+    this.disposed = true;
+  }
+
+  private acceptNativeWork(): void {
+    if (this.nativePairs) this.nativeWork = this.nativePairs.workCounts();
+  }
+
   /**
    * A rogue event's window at (x, z, t) and its time slope: (1 - r^2)^2 inside r < 1, r^2 = |X - X_e|^2 / reach^2 + (t -
    * t_e)^2 / span^2, so its event stands at full height and the sea about is untouched.
    */
-  private window(e: number, x: number, z: number, t: number, out: [number, number]): [number, number] {
+  private window(e: number, x: number, z: number, t: number, out: EventWindow): EventWindow {
     const event = this.rogues[e]!,
       dx = (x - event.position[0]) / this.reach,
       dz = (z - event.position[1]) / this.reach,
       dt = t - event.time,
       r2 = dx * dx + dz * dz + (dt * dt) / (this.span * this.span);
     if (!(r2 < 1)) {
-      out[0] = 0;
-      out[1] = 0;
+      out[0] = out[1] = out[2] = out[3] = 0;
     } else {
       out[0] = (1 - r2) * (1 - r2);
       out[1] = (-4 * (1 - r2) * dt) / (this.span * this.span);
+      out[2] = (-4 * (1 - r2) * dx) / this.reach;
+      out[3] = (-4 * (1 - r2) * dz) / this.reach;
     }
     return out;
   }
@@ -323,11 +420,15 @@ export class NonlinearSea implements SeaSurface {
    * the sea's plus every rogue event's under its window there: amplitudes that vary over many wavelengths, so the bound
    * waves of the pair sum ride on the local envelope.
    */
-  private evaluate(x: number, z: number, t: number): void {
+  private evaluate(x: number, z: number, t: number, slopes = false): Envelope | undefined {
+    if (this.disposed) throw rogueError('disposed', 'This nonlinear sea was disposed; construct or load a new sea.');
+    if (!(Number.isFinite(x) && Number.isFinite(z) && Number.isFinite(t)))
+      throw rogueError('unsupported', 'Sea queries need finite local metres and seconds; pass finite x, z and time.');
     const { n, cr, ci } = this;
     let re = this.re,
-      im = this.im;
-    const weight: [number, number] = [0, 0];
+      im = this.im,
+      envelope: Envelope | undefined;
+    const weight = this.eventWindow;
     for (let e = 0; e < this.eventRe.length; e++) {
       const w = this.window(e, x, z, t, weight)[0];
       if (w === 0) continue;
@@ -336,6 +437,10 @@ export class NonlinearSea implements SeaSurface {
         this.localIm.set(this.im);
         re = this.localRe;
         im = this.localIm;
+        if (slopes) {
+          envelope = this.envelope;
+          for (const column of envelope) column.fill(0);
+        }
       }
       const er = this.eventRe[e]!,
         ei = this.eventIm[e]!;
@@ -343,14 +448,42 @@ export class NonlinearSea implements SeaSurface {
         re[m]! += w * er[m]!;
         im[m]! += w * ei[m]!;
       }
+      if (envelope) {
+        const [xr, xi, zr, zi] = envelope,
+          dwx = weight[2],
+          dwz = weight[3];
+        for (let m = 0; m < n; m++) {
+          xr[m]! += dwx * er[m]!;
+          xi[m]! += dwx * ei[m]!;
+          zr[m]! += dwz * er[m]!;
+          zi[m]! += dwz * ei[m]!;
+        }
+      }
     }
     for (let m = 0; m < n; m++) {
-      const phase = this.kx[m]! * x + this.kz[m]! * z - this.omega[m]! * t,
-        c = cos(phase),
+      const phase = this.kx[m]! * x + this.kz[m]! * z - this.omega[m]! * t;
+      if (!Number.isFinite(phase))
+        throw rogueError(
+          'unsupported',
+          'The wave phase exceeds numeric range; query closer to the sea origin or time epoch.',
+        );
+      const c = cos(phase),
         s = sin(phase);
       cr[m] = re[m]! * c + im[m]! * s;
       ci[m] = re[m]! * s - im[m]! * c;
+      if (envelope) {
+        const [xr, xi, zr, zi] = envelope,
+          rx = xr[m]!,
+          ix = xi[m]!,
+          rz = zr[m]!,
+          iz = zi[m]!;
+        xr[m] = rx * c + ix * s;
+        xi[m] = rx * s - ix * c;
+        zr[m] = rz * c + iz * s;
+        zi[m] = rz * s - iz * c;
+      }
     }
+    return envelope;
   }
 
   /** The linear (first-order) surface at (x, z) at time t, m. */
@@ -358,18 +491,20 @@ export class NonlinearSea implements SeaSurface {
     this.evaluate(x, z, t);
     let eta = 0;
     for (let m = 0; m < this.n; m++) eta += this.cr[m]!;
-    return eta;
+    return finiteSurface(eta);
   }
 
   /** The surface elevation at (x, z) at time t, m: linear plus the second-order sum and difference waves, rogues included. */
   elevation(x: number, z: number, t: number): number {
     this.evaluate(x, z, t);
     // a_i a_j cos(psi_i + psi_j) = r_i r_j - q_i q_j; a_i a_j cos(psi_i - psi_j) = r_i r_j + q_i q_j.
-    return this.height();
+    const height = this.height();
+    this.acceptNativeWork();
+    return height;
   }
 
   /** The surface's slope (d eta / dx, d eta / dz) at (x, z, t), linear and second order, from the last `evaluate`. */
-  private slope(): [number, number] {
+  private slope(envelope?: Envelope): [number, number] {
     const { n, cr, ci, bp, bm, kx, kz } = this;
     let sx = 0,
       sz = 0,
@@ -380,15 +515,33 @@ export class NonlinearSea implements SeaSurface {
         xi = kx[i]!,
         zi = kz[i]!;
       // d r / dx = -k_x q, d q / dx = k_x r.
-      sx -= xi * qi;
-      sz -= zi * qi;
+      if (envelope) {
+        sx += envelope[0][i]! - xi * qi;
+        sz += envelope[2][i]! - zi * qi;
+      } else {
+        sx -= xi * qi;
+        sz -= zi * qi;
+      }
       for (let j = i; j < n; j++, p++) {
         const rj = cr[j]!,
           qj = ci[j]!,
           both = qi * rj + ri * qj,
           cross = ri * qj - qi * rj;
-        sx += -bp[p]! * (xi + kx[j]!) * both + bm[p]! * (xi - kx[j]!) * cross;
-        sz += -bp[p]! * (zi + kz[j]!) * both + bm[p]! * (zi - kz[j]!) * cross;
+        const carrierX = -bp[p]! * (xi + kx[j]!) * both + bm[p]! * (xi - kx[j]!) * cross,
+          carrierZ = -bp[p]! * (zi + kz[j]!) * both + bm[p]! * (zi - kz[j]!) * cross;
+        if (envelope) {
+          // In a placed event the amplitude itself varies with x and z. Differentiate both factors of each bound pair.
+          const [dRx, dQx, dRz, dQz] = envelope,
+            rx = dRx[i]! * rj + ri * dRx[j]!,
+            qx = dQx[i]! * qj + qi * dQx[j]!,
+            rz = dRz[i]! * rj + ri * dRz[j]!,
+            qz = dQz[i]! * qj + qi * dQz[j]!;
+          sx += carrierX + (bp[p]! * (rx - qx) + bm[p]! * (rx + qx));
+          sz += carrierZ + (bp[p]! * (rz - qz) + bm[p]! * (rz + qz));
+        } else {
+          sx += carrierX;
+          sz += carrierZ;
+        }
       }
     }
     return [sx, sz];
@@ -396,6 +549,7 @@ export class NonlinearSea implements SeaSurface {
 
   /** The second-order surface from the last `evaluate`. */
   private height(): number {
+    if (this.nativePairs) return this.nativePairs.evaluate(this.cr, this.ci, false)[0];
     const { n, cr, ci, bp, bm } = this;
     let eta = 0,
       p = 0;
@@ -409,7 +563,7 @@ export class NonlinearSea implements SeaSurface {
         eta += bp[p]! * (rr - qq) + bm[p]! * (rr + qq);
       }
     }
-    return eta;
+    return finiteSurface(eta);
   }
 
   /**
@@ -437,9 +591,11 @@ export class NonlinearSea implements SeaSurface {
    * surface and below the bed.
    */
   velocity(x: number, y: number, z: number, t: number): [number, number, number] {
+    checkHeightCoordinate(y);
     this.evaluate(x, z, t);
     const out: [number, number, number] = [0, 0, 0];
     this.orbital(y, this.height(), out);
+    this.acceptNativeWork();
     return out;
   }
 
@@ -448,7 +604,7 @@ export class NonlinearSea implements SeaSurface {
     const { n, cr, ci } = this,
       d = this.depth;
     out[0] = out[1] = out[2] = 0;
-    if (y > surface || (d < 1e6 && y < -d)) return;
+    if (y > surface || (d < 1e6 && (y < -d || surface <= -d))) return;
     const stretched = d < 1e6 ? ((y - surface) * d) / (d + surface) : y - surface,
       f: [number, number, number] = [0, 0, 0];
     for (let m = 0; m < n; m++) {
@@ -460,72 +616,106 @@ export class NonlinearSea implements SeaSurface {
       out[2] += horizontal * this.kz[m]!;
       out[1] += w * f[1] * ci[m]!;
     }
+    if (!out.every(Number.isFinite))
+      throw rogueError(
+        'failed',
+        'The orbital velocity exceeds numeric range; check the depth, frequency grid and wave energy.',
+      );
   }
 
   /** The surface at (x, z) m from the sea's cell at time `t` s (the {@link SeaSurface} contract). */
   sample(x: number, z: number, t: number, out?: SeaSurfaceSample): SeaSurfaceSample {
+    const envelope = this.evaluate(x, z, t, true);
+    let h: number, dx: number, dz: number;
+    if (this.nativePairs) {
+      [h, dx, dz] = this.nativePairs.evaluate(this.cr, this.ci, true, envelope);
+    } else {
+      h = this.height();
+      [dx, dz] = this.slope(envelope);
+    }
+    const length = Math.sqrt(dx * dx + 1 + dz * dz),
+      velocity: [number, number, number] = [0, 0, 0];
+    finiteSurface(length);
+    this.orbital(h, h, velocity);
+    const current = this.readCurrent(x, h, z, t)?.velocity ?? [0, 0, 0];
+    for (let axis = 0; axis < 3; axis++) velocity[axis] = finiteSurface(velocity[axis]! + current[axis]!);
     const s = out ?? { height: 0, normal: [0, 1, 0], velocity: [0, 0, 0], current: [0, 0, 0], depth: 0, density: 0 };
-    this.evaluate(x, z, t);
-    const h = this.height(),
-      [dx, dz] = this.slope(),
-      length = Math.sqrt(dx * dx + 1 + dz * dz);
-    this.orbital(h, h, s.velocity);
     s.height = h;
     s.normal[0] = -dx / length;
     s.normal[1] = 1 / length;
     s.normal[2] = -dz / length;
-    this.currentAt(x, h, z, t, s.current);
-    s.velocity[0] += s.current[0];
-    s.velocity[1] += s.current[1];
-    s.velocity[2] += s.current[2];
+    for (let axis = 0; axis < 3; axis++) {
+      s.current[axis] = current[axis]!;
+      s.velocity[axis] = velocity[axis]!;
+    }
     s.depth = this.depth;
     s.density = this.density;
+    this.acceptNativeWork();
     return s;
   }
 
   /** The water at (x, y, z) at time t: the waves' orbital velocity plus the current; none above the surface or below the bed. */
   private below(x: number, y: number, z: number, t: number, out?: FlowSample): FlowSample {
-    const s = out ?? { velocity: [0, 0, 0], density: 0, temperature: 0 },
-      d = this.depth;
+    checkHeightCoordinate(y);
     this.evaluate(x, z, t);
-    const h = this.height();
-    s.temperature = this.temperature;
-    if (y > h || (d < 1e6 && y < -d)) {
-      s.velocity[0] = s.velocity[1] = s.velocity[2] = 0;
-      s.density = 0;
-      return s;
+    const h = this.height(),
+      d = this.depth,
+      wet = y <= h && (d === Number.POSITIVE_INFINITY || (y >= -d && h > -d)),
+      velocity: [number, number, number] = [0, 0, 0];
+    let temperature = this.temperature;
+    if (wet) {
+      this.orbital(y, h, velocity);
+      const current = this.readCurrent(x, y, z, t);
+      if (current) {
+        for (let axis = 0; axis < 3; axis++) velocity[axis] = finiteSurface(velocity[axis]! + current.velocity[axis]!);
+        temperature = current.temperature;
+      }
     }
-    this.orbital(y, h, s.velocity);
-    if (this.current) {
-      const c = this.current.sample(x, y, z, t, this.flow);
-      s.velocity[0] += c.velocity[0];
-      s.velocity[1] += c.velocity[1];
-      s.velocity[2] += c.velocity[2];
-      s.temperature = c.temperature;
-    }
-    s.density = this.density;
+    const s = out ?? { velocity: [0, 0, 0], density: 0, temperature: 0 };
+    for (let axis = 0; axis < 3; axis++) s.velocity[axis] = velocity[axis]!;
+    s.density = wet ? this.density : 0;
+    s.temperature = temperature;
+    this.acceptNativeWork();
     return s;
   }
 
-  private currentAt(x: number, y: number, z: number, t: number, into: [number, number, number]): void {
-    if (!this.current) {
-      into[0] = into[1] = into[2] = 0;
-      return;
+  private readCurrent(x: number, y: number, z: number, t: number): FlowSample | undefined {
+    if (!this.current) return undefined;
+    if (this.samplingCurrent)
+      throw rogueError('state', 'The current samples its own sea; pass an independent water current.');
+    this.samplingCurrent = true;
+    try {
+      const sample = this.current.sample(x, y, z, t, this.flow);
+      if (
+        !(
+          sample?.velocity?.length === 3 &&
+          sample.velocity.every(Number.isFinite) &&
+          sample.temperature > 0 &&
+          Number.isFinite(sample.temperature)
+        )
+      )
+        throw rogueError(
+          'unsupported',
+          'The water current returned invalid velocity or kelvin; return three finite velocities and positive finite kelvin.',
+        );
+      return sample;
+    } finally {
+      this.samplingCurrent = false;
     }
-    const c = this.current.sample(x, y, z, t, this.flow);
-    into[0] = c.velocity[0];
-    into[1] = c.velocity[1];
-    into[2] = c.velocity[2];
   }
 
   /**
    * Gauge pressure at (x, y, z) at time t, Pa: rho g (head - y), the head linear theory's dynamic head under Wheeler's
-   * stretching plus the second order's rise taken as hydrostatic, so it is 0 at the surface; 0 above it.
+   * stretching plus the second order's rise taken as hydrostatic. It is 0 at or above the surface and below the bed.
    */
   pressure(x: number, y: number, z: number, t: number): number {
+    checkHeightCoordinate(y);
     this.evaluate(x, z, t);
     const h = this.height();
-    if (!(y < h)) return 0;
+    if (!(y < h) || y < -this.depth) {
+      this.acceptNativeWork();
+      return 0;
+    }
     const d = this.depth,
       stretched = d < 1e6 ? ((y - h) * d) / (d + h) : y - h,
       f: [number, number, number] = [0, 0, 0];
@@ -536,7 +726,9 @@ export class NonlinearSea implements SeaSurface {
       head += f[2] * this.cr[m]!;
       linear += this.cr[m]!;
     }
-    return this.density * this.g * (head + (h - linear) - y);
+    const pressure = finiteSurface(this.density * this.g * (head + (h - linear) - y));
+    this.acceptNativeWork();
+    return pressure;
   }
 
   /** The variance of the components' surface before the rogue events, m^2 (the kept spectrum's m0). */
@@ -564,7 +756,8 @@ export class NonlinearSea implements SeaSurface {
             Number.isFinite(r.crest)
           )
         )
-          throw new RangeError(
+          throw rogueError(
+            'unsupported',
             'A rogue wave is {position: [x, z], time, crest} with a crest in metres above 0; pass one.',
           );
         return { position: [r.position[0], r.position[1]] as const, time: r.time, crest: r.crest };
@@ -575,8 +768,18 @@ export class NonlinearSea implements SeaSurface {
         max = region.max ?? [at[0] + 1000, at[1] + 1000],
         from = region.from ?? 0,
         to = region.to ?? from + 3600;
-      if (!(min[0] < max[0] && min[1] < max[1] && from < to && Number.isFinite(to - from)))
-        throw new RangeError(
+      if (
+        !(
+          min?.length === 2 &&
+          max?.length === 2 &&
+          min[0] < max[0] &&
+          min[1] < max[1] &&
+          from < to &&
+          [max[0] - min[0], max[1] - min[1], to - from].every(Number.isFinite)
+        )
+      )
+        throw rogueError(
+          'unsupported',
           'A rogue region is {min: [x, z], max: [x, z], from, to} with min below max and from before to; pass them.',
         );
       list = this.draw(min, max, from, to, seed);
@@ -610,6 +813,11 @@ export class NonlinearSea implements SeaSurface {
       mean = waves * excess,
       random = new RandomStream(seed, solverNumber('rogue events')),
       draw: [number, number] = [0, 0];
+    if (!Number.isFinite(mean))
+      throw rogueError(
+        'unsupported',
+        'The rogue-region count is too large to represent; reduce the sampled area or time span.',
+      );
     random.unitF64(0, 0, 0, draw);
     // Poisson by inversion, in logs so a large mean does not underflow.
     const lnMean = ln(mean);
@@ -621,6 +829,11 @@ export class NonlinearSea implements SeaSurface {
       logP += lnMean - ln(count);
       sum += exp(logP);
     }
+    if (draw[0] > sum)
+      throw rogueError(
+        'failed',
+        'The rogue count exceeded the inversion budget; reduce the sampled area or time span.',
+      );
     for (let e = 0; e < count; e++) {
       random.unitF64(1, e, 0, draw);
       const x = min[0] + draw[0] * (max[0] - min[0]),
@@ -658,7 +871,7 @@ export class NonlinearSea implements SeaSurface {
       slope = new Float64Array(count),
       matrix = new Float64Array(size * size),
       coefficients = new Float64Array(size),
-      weight: [number, number] = [0, 0];
+      weight: EventWindow = [0, 0, 0, 0];
     for (let e = 0; e < count; e++) {
       const { position, time } = events[e]!;
       for (let m = 0; m < n; m++) {
@@ -739,15 +952,19 @@ export class NonlinearSea implements SeaSurface {
         linear[e]! += miss / (gain > 0.5 && gain < 2 ? gain : 1);
         worst = Math.max(worst, Math.abs(miss) / crest);
       }
-      if (worst <= 1e-12) break;
+      if (worst <= 1e-12) return;
     }
+    throw rogueError(
+      'failed',
+      'The prescribed rogue crests did not converge; reduce their heights or separate the events.',
+    );
   }
 }
 
 /**
  * Solves `matrix` x = `rhs` (size by size, row-major) into `out` by Gaussian elimination with partial pivoting; `matrix`
  * and `rhs` are kept.
- * @throws RangeError when the events cannot all be met: two at one place and time.
+ * @throws MargoError when the events cannot all be met: two at one place and time.
  */
 function solve(matrix: Float64Array, rhs: Float64Array, out: Float64Array, size: number): void {
   const a = Float64Array.from(matrix),
@@ -759,7 +976,8 @@ function solve(matrix: Float64Array, rhs: Float64Array, out: Float64Array, size:
     for (let row = col + 1; row < size; row++)
       if (Math.abs(a[row * size + col]!) > Math.abs(a[pivot * size + col]!)) pivot = row;
     if (!(Math.abs(a[pivot * size + col]!) > 1e-12 * largest))
-      throw new RangeError(
+      throw rogueError(
+        'failed',
         'Two rogue waves are too close in place and time to stand as separate crests; move one, or merge them.',
       );
     if (pivot !== col) {
@@ -806,7 +1024,8 @@ export function heightChance(h: number, s: Pick<SeaStatistics, 'kurtosis'>): num
  */
 export function expectedMaximum(waves: number, s: Pick<SeaStatistics, 'kurtosis'>): number {
   if (!(waves >= 1 && Number.isFinite(waves)))
-    throw new RangeError(
+    throw rogueError(
+      'unsupported',
       `The number of waves is 1 or more (got ${waves}); pass one, the record's length over its period.`,
     );
   let sum = 0;
@@ -834,11 +1053,14 @@ export interface SeaStatisticsOptions {
  * the narrowband relation lambda_40 = 2 lambda_3^2 (Tayfun and Fedele 2007), 6 eps^2 for a narrow deep sea.
  */
 export function seaStatistics(spectrum: WaveSpectrumSample, options: SeaStatisticsOptions = {}): SeaStatistics {
+  checkSpectrum(spectrum);
   const g = options.gravity ?? gravityMagnitude(DEFAULT_GRAVITY),
     cutoff = options.cutoff ?? 3;
-  if (!(g > 0)) throw new RangeError(`Gravity's magnitude is above 0 (got ${g}); pass one, or leave it out.`);
+  if (!(g > 0 && Number.isFinite(g)))
+    throw rogueError('unsupported', `Gravity's magnitude is above 0 (got ${g}); pass one, or leave it out.`);
   if (!(cutoff > 1 && cutoff <= 10))
-    throw new RangeError(
+    throw rogueError(
+      'unsupported',
       `The cutoff is above 1 and at most 10 times the peak frequency (got ${cutoff}); pass one, or 3.`,
     );
   const { frequencies: fs, directions: ds, energy } = spectrum,
@@ -851,7 +1073,7 @@ export function seaStatistics(spectrum: WaveSpectrumSample, options: SeaStatisti
     for (let j = 0; j < nd; j++) one[i]! += energy[i * nd + j]! * dtheta;
     if (one[i]! > one[peak]!) peak = i;
   }
-  if (!(one[peak]! > 0)) throw new RangeError('This spectrum carries no energy; pass a sea with waves.');
+  if (!(one[peak]! > 0)) throw rogueError('unsupported', 'This spectrum carries no energy; pass a sea with waves.');
   // Moments in angular frequency: E(omega) = E(f) / (2 pi), d omega = 2 pi df.
   let m0 = 0,
     m1 = 0,
@@ -904,7 +1126,7 @@ export function seaStatistics(spectrum: WaveSpectrumSample, options: SeaStatisti
     skewness = secondOrderSkewness(spectrum, fs[peak]! * cutoff, depth, g),
     kurtosis = dynamic + (2 * skewness * skewness) / 3,
     partial = { kurtosis, skewness };
-  return {
+  const result: SeaStatistics = {
     significantHeight: 4 * Math.sqrt(m0),
     peakPeriod: 1 / fp,
     zeroCrossingPeriod: TWO_PI * Math.sqrt(m0 / m2),
@@ -917,6 +1139,12 @@ export function seaStatistics(spectrum: WaveSpectrumSample, options: SeaStatisti
     rogueCrestChance: crestChance(ROGUE_CREST, partial),
     rogueHeightChance: heightChance(2, partial),
   };
+  if (!Object.values(result).every(Number.isFinite))
+    throw rogueError(
+      'unsupported',
+      'The spectrum moments exceed numeric range; pass a spectrum with resolved frequencies and finite variance in SI units.',
+    );
+  return result;
 }
 
 /**
@@ -997,10 +1225,20 @@ export function pairKernels(
   depth = Number.POSITIVE_INFINITY,
   gravity = gravityMagnitude(DEFAULT_GRAVITY),
 ): { sum: number; difference: number } {
-  if (!(a?.frequency > 0 && b?.frequency > 0 && Number.isFinite(a.direction) && Number.isFinite(b.direction)))
-    throw new RangeError('A wave component is {frequency, direction} with a frequency in Hz above 0; pass two.');
-  if (!(depth > 0) || !(gravity > 0))
-    throw new RangeError(
+  if (
+    !(
+      a?.frequency > 0 &&
+      b?.frequency > 0 &&
+      [a.frequency, b.frequency, a.direction, b.direction].every(Number.isFinite)
+    )
+  )
+    throw rogueError(
+      'unsupported',
+      'A wave component is {frequency, direction} with a frequency in Hz above 0; pass two.',
+    );
+  if (!(depth > 0) || !(gravity > 0 && Number.isFinite(gravity)))
+    throw rogueError(
+      'unsupported',
       `Depth and gravity are above 0 (got ${depth} and ${gravity}); pass them, Infinity for deep water.`,
     );
   const d = depth < 1e6 ? depth : Number.POSITIVE_INFINITY,

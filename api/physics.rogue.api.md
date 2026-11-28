@@ -13,12 +13,20 @@ export class NonlinearSea implements SeaSurface {
     readonly density: number;
     readonly water: SeaWater;
     constructor(options: NonlinearSeaOptions);
+    static load(options: NonlinearSeaOptions, native?: NonlinearSeaNativeOptions): Promise<NonlinearSea>;
+    readNativeWork(): RoguePairWorkCounts | undefined;
+    [Symbol.dispose](): void;
     linearElevation(x: number, z: number, t: number): number;
     elevation(x: number, z: number, t: number): number;
     velocity(x: number, y: number, z: number, t: number): [number, number, number];
     sample(x: number, z: number, t: number, out?: SeaSurfaceSample): SeaSurfaceSample;
     pressure(x: number, y: number, z: number, t: number): number;
     get variance(): number;
+}
+
+export interface NonlinearSeaNativeOptions {
+    readonly threads?: 1 | 2 | 4;
+    readonly signal?: AbortSignal;
 }
 
 export interface NonlinearSeaOptions {
@@ -40,6 +48,17 @@ export interface RogueEvent {
     readonly position: readonly [number, number];
     readonly time: number;
     readonly crest: number;
+}
+
+export interface RoguePairWorkCounts extends RoguePairWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly RoguePairWorkerWork[];
+}
+
+export interface RoguePairWorkerWork {
+    readonly tiles: number;
+    readonly pairs: number;
+    readonly pairedPairs: number;
 }
 
 export interface RogueRegion {

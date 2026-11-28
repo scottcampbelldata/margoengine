@@ -24,6 +24,7 @@ packages/physics/entry-profile-kernel/target/
 packages/physics/hull-slamming-kernel/target/
 packages/physics/flood-volume-kernel/target/
 packages/physics/tracer-random-kernel/target/
+packages/physics/rogue-pair-kernel/target/
 packages/physics2d/kernel/target/
 packages/physics2d/kernel/wasm-check/target/
 packages/sciviz/kernel/target/

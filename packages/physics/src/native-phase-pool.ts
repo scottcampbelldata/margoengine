@@ -85,6 +85,11 @@ type NativePhaseSolver =
       readonly subject: 'Crush shell';
       readonly phaseExport: 'crush_shell_thread_phase';
       readonly phase: 'membrane evaluation';
+    }
+  | {
+      readonly subject: 'Wave pairs';
+      readonly phaseExport: 'rogue_pair_thread_phase';
+      readonly phase: 'second-order interactions';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };

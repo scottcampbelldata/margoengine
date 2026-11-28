@@ -14,12 +14,14 @@
 import { cos, exp, pow, sin } from '@margoengine/math/pinned';
 import type { WaveSpectrumSample } from '@margoengine/math/fields';
 import { bandWidth } from '../waves/spectral.js';
+import { checkSpectrum, rogueError } from './errors.js';
 
 const TWO_PI = 6.283185307179586;
 const PI = 3.141592653589793;
 
 /** The frequency spectrum's moments and its autocovariance pieces, f in Hz. */
 function frequencySpectrum(spectrum: WaveSpectrumSample): { fs: Float64Array; s: Float64Array; df: Float64Array } {
+  checkSpectrum(spectrum);
   const { frequencies: fs, directions: ds, energy } = spectrum,
     nf = fs.length,
     nd = ds.length,
@@ -76,7 +78,8 @@ function elliptic(k: number): [number, number] {
 
 /** The correlation of successive wave heights for Kimura's kappa (his eq. 7): (E - (1 - k^2) K / 2 - pi / 4) / (1 - pi / 4). */
 export function heightCorrelation(kappa: number): number {
-  if (!(kappa >= 0 && kappa < 1)) throw new RangeError(`Kimura's kappa lies in [0, 1) (got ${kappa}); pass one.`);
+  if (!(kappa >= 0 && kappa < 1))
+    throw rogueError('unsupported', `Kimura's kappa lies in [0, 1) (got ${kappa}); pass one.`);
   if (kappa === 0) return 0;
   const [K, E] = elliptic(kappa);
   return (E - 0.5 * (1 - kappa * kappa) * K - PI / 4) / (1 - PI / 4);
@@ -85,7 +88,7 @@ export function heightCorrelation(kappa: number): number {
 /** Kimura's kappa for a correlation of successive heights (the inverse of {@link heightCorrelation}, by bisection). */
 export function kappaFor(correlation: number): number {
   if (!(correlation >= 0 && correlation < 1))
-    throw new RangeError(`A height correlation lies in [0, 1) (got ${correlation}); pass one.`);
+    throw rogueError('unsupported', `A height correlation lies in [0, 1) (got ${correlation}); pass one.`);
   let lo = 0,
     hi = 0.999999;
   for (let i = 0; i < 80; i++) {
@@ -166,17 +169,25 @@ export function runStatistics(
   options: { readonly method?: 'spectral' | 'corrected'; readonly kappa?: number; readonly period?: number } = {},
 ): RunStatistics {
   if (!(threshold > 0 && Number.isFinite(threshold)))
-    throw new RangeError(`A threshold is a finite height in H_s above 0 (got ${threshold}); pass one, such as 1.5.`);
+    throw rogueError(
+      'unsupported',
+      `A threshold is a finite height in H_s above 0 (got ${threshold}); pass one, such as 1.5.`,
+    );
   const f = frequencySpectrum(spectrum),
     m0 = moment(f, 0),
     m1 = moment(f, 1),
     m2 = moment(f, 2);
-  if (!(m0 > 0)) throw new RangeError('This spectrum carries no energy; pass a sea with waves.');
+  if (!(m0 > 0)) throw rogueError('unsupported', 'This spectrum carries no energy; pass a sea with waves.');
   const tz = options.period ?? Math.sqrt(m0 / m2);
+  if (!(tz > 0 && Number.isFinite(tz)))
+    throw rogueError(
+      'unsupported',
+      'The wave-group period needs finite seconds above 0; pass a valid period or a resolved spectrum.',
+    );
   let kappa: number;
   if (options.kappa !== undefined) {
     if (!(options.kappa >= 0 && options.kappa < 0.999))
-      throw new RangeError(`Kimura's kappa lies in [0, 0.999) (got ${options.kappa}); pass one.`);
+      throw rogueError('unsupported', `Kimura's kappa lies in [0, 0.999) (got ${options.kappa}); pass one.`);
     kappa = options.kappa;
   } else {
     const at = (tau: number) => {
@@ -231,7 +242,7 @@ export function groupSpacing(spectrum: WaveSpectrumSample): number {
   const f = frequencySpectrum(spectrum),
     m0 = moment(f, 0),
     m2 = moment(f, 2);
-  if (!(m0 > 0)) throw new RangeError('This spectrum carries no energy; pass a sea with waves.');
+  if (!(m0 > 0)) throw rogueError('unsupported', 'This spectrum carries no energy; pass a sea with waves.');
   const tz = Math.sqrt(m0 / m2),
     step = tz / 400,
     psi = (t: number) => lagged(f, t, m0)[0];
@@ -262,14 +273,18 @@ export function sisters(
   spacing = groupSpacing(spectrum),
 ): { position: [number, number]; time: number; crest: number }[] {
   const heights = typeof crests === 'number' ? [crests, crests, crests] : crests;
-  if (!(heights.length === 3 && heights.every((h) => h > 0 && Number.isFinite(h))))
-    throw new RangeError('Three sisters are three crests in metres above 0 (or one for all three); pass them.');
+  if (!(heights?.length === 3 && heights.every((h) => h > 0 && Number.isFinite(h))))
+    throw rogueError(
+      'unsupported',
+      'Three sisters are three crests in metres above 0 (or one for all three); pass them.',
+    );
   if (!(spacing > 0 && Number.isFinite(spacing)))
-    throw new RangeError(
+    throw rogueError(
+      'unsupported',
       `The sisters' spacing is finite seconds above 0 (got ${spacing}); pass one, or leave it to the sea.`,
     );
   if (!(at?.position?.length === 2 && [...at.position, at.time].every(Number.isFinite)))
-    throw new RangeError('The sisters stand at {position: [x, z], time}; pass them.');
+    throw rogueError('unsupported', 'The sisters stand at {position: [x, z], time}; pass them.');
   return heights.map((crest, k) => ({
     position: [at.position[0], at.position[1]],
     time: at.time + k * spacing,

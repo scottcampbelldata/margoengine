@@ -674,3 +674,7 @@ Its figures, PDF, fitted curves and software are absent from the package.
 ### BREAK-03 steel tube compression measurements
 
 `packages/physics/scripts/break03-steel-tube-measured.mjs` contains specimen, tensile and experimental force scalars from Tables 1, 2 and 4 and sparse numerical readings from Figures 5 and 29. J. Y. Jung measured these specimens for *On the Collision Strength of Ship’s Bow* (1997), Pusan National University. Young Il Park, Jin-Seong Cho and Jeong-Hwan Kim republished the data in *Numerical and Experimental Investigation of Quasi-Static Crushing Behaviors of Steel Tubular Structures*, Materials 15, 2107 (2022), © 2022 the authors. The numeric conversions and production comparison are new. [Publication and data](https://doi.org/10.3390/ma15062107) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+
+### MARINTEK rogue-wave flume comparison (SEA-03)
+
+`packages/physics/scripts/sea03-flume-crests-measured.mjs` transcribes three published gauge crest counts, threshold definitions and wavemaker settings separately from Dematteis, Grafke, Onorato and Vanden-Eijnden, [Experimental Evidence of Hydrodynamic Instantons: The Universal Route to Rogue Waves](https://doi.org/10.1103/PhysRevX.9.041057), Physical Review X 9, 041057, published in 2019 by the American Physical Society. The authors released the paper under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). No raw recordings or figures are included.

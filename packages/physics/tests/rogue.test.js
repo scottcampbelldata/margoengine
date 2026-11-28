@@ -263,3 +263,78 @@ test('a nonlinear sea refuses what it cannot be made from, naming the fix', () =
   );
   assert.throws(() => pairKernels({ frequency: 0, direction: 0 }, { frequency: 0.1, direction: 0 }), /frequency in Hz/);
 });
+
+test('placed-wave normals differentiate the complete spatial envelope in both axes', () => {
+  const spectrum = storm({ height: 4, period: 10 }),
+    event = { position: [-78, 55], time: 80, crest: 6 },
+    sea = new NonlinearSea({ spectrum, components: 39, seed: 17, rogues: [event] }),
+    x = 55,
+    z = -35,
+    time = 89,
+    { normal } = sea.sample(x, z, time);
+  const slope = (axis, h) =>
+    axis === 0
+      ? (sea.elevation(x + h, z, time) - sea.elevation(x - h, z, time)) / (2 * h)
+      : (sea.elevation(x, z + h, time) - sea.elevation(x, z - h, time)) / (2 * h);
+  for (const axis of [0, 1]) {
+    const coarse = slope(axis, 0.04),
+      fine = slope(axis, 0.02),
+      predicted = -normal[axis === 0 ? 0 : 2] / normal[1];
+    // Twice the central difference truncation estimate at the fine step, plus subtraction roundoff.
+    assert.ok(
+      Math.abs(predicted - fine) <= (2 * Math.abs(fine - coarse)) / 3 + 1e-10,
+      `slope ${axis}: ${predicted} vs ${fine}`,
+    );
+  }
+});
+
+test('finite-depth pressure and flow exclude the bed, and invalid input preserves caller samples', () => {
+  const spectrum = oneWave(0.2, 0.15, 8),
+    cell = [-3, 1, -7],
+    waves = { cell, sample: () => spectrum };
+  let valid = true;
+  const current = {
+    cell,
+    medium: 'water',
+    sample() {
+      return { velocity: valid ? [0.3, 0, -0.12] : [0, Infinity, 0], density: 1025, temperature: 286 };
+    },
+  };
+  const sea = new NonlinearSea({ waves, current, components: 1, rogues: false });
+  assert.deepEqual(sea.cell, [-3, 1, -7]);
+  assert.equal(sea.pressure(-8, -9, 13, -1), 0);
+  assert.deepEqual(sea.velocity(-8, -9, 13, -1), [0, 0, 0]);
+  assert.equal(sea.water.sample(-8, -9, 13, -1).density, 0);
+  assert.ok(sea.pressure(-8, -8, 13, -1) > 0);
+  const surface = sea.sample(-8, 13, -1),
+    water = sea.water.sample(-8, -1, 13, -1),
+    expectedSurface = structuredClone(surface),
+    expectedWater = structuredClone(water),
+    hasFix = (error) =>
+      error.code === 'unsupported' && error.message.includes('https://margoengine.com/errors#nonlinear-sea');
+  assert.deepEqual(surface.current, [0.3, 0, -0.12]);
+  assert.equal(water.temperature, 286);
+  valid = false;
+  assert.throws(() => sea.sample(0, 5, 4, surface), hasFix);
+  assert.throws(() => sea.water.sample(0, -1, 5, 4, water), hasFix);
+  assert.throws(() => sea.sample(NaN, 0, 0, surface), hasFix);
+  assert.throws(() => sea.pressure(0, NaN, 0, 0), hasFix);
+  assert.deepEqual(surface, expectedSurface);
+  assert.deepEqual(water, expectedWater);
+  valid = true;
+  sea.sample(-8, 13, -1, surface);
+  sea.water.sample(-8, -1, 13, -1, water);
+  assert.deepEqual(surface, expectedSurface);
+  assert.deepEqual(water, expectedWater);
+  assert.throws(() => new NonlinearSea({ waves, current: { ...current, cell: [0, 0, 0] } }), hasFix);
+});
+
+test('invalid grids, dry depth and non-finite gravity fail with codes before wave construction', () => {
+  const spectrum = oneWave(0.2, 0.15, 8);
+  const hasCode = (error) => error.code === 'unsupported' && error.message.includes('errors#nonlinear-sea');
+  assert.throws(() => new NonlinearSea({ spectrum: { ...spectrum, energy: new Float64Array(1) } }), hasCode);
+  assert.throws(() => new NonlinearSea({ spectrum: { ...spectrum, depth: 0 } }), hasCode);
+  assert.throws(() => new NonlinearSea({ spectrum, gravity: Infinity }), hasCode);
+  assert.throws(() => seaStatistics({ ...spectrum, frequencies: Float64Array.of(0.1, 0.2, 0.19) }), hasCode);
+  assert.throws(() => pairKernels({ frequency: Infinity, direction: 0 }, { frequency: 0.2, direction: 1 }), hasCode);
+});

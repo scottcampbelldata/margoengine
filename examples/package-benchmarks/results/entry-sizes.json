@@ -15726,8 +15726,8 @@
         "gzip": 7413
       },
       "./rogue": {
-        "raw": 18460,
-        "gzip": 7386
+        "raw": 32082,
+        "gzip": 12255
       },
       "./ship": {
         "raw": 90317,
@@ -20284,6 +20284,16 @@
       "raw": 25644,
       "gzip": 11683,
       "brotli": 10109
+    },
+    "packages/physics/dist/rogue-pair-kernel.wasm": {
+      "raw": 4672,
+      "gzip": 2019,
+      "brotli": 1711
+    },
+    "packages/physics/dist/rogue-pair-kernel-shared.wasm": {
+      "raw": 4672,
+      "gzip": 2019,
+      "brotli": 1712
     }
   },
   "splits": {

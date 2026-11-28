@@ -5269,3 +5269,14 @@ node scripts/run-with-timeout.mjs --max=1 -- node packages/physics/scripts/break
 The fixed-camera fixture releases a test carriage against a clamped dock fender and runs a parked control. At the same accepted state it can hide the deformed surface to isolate the contribution to the image. Each backend compares accepted snapshot bytes and full resolved RGBA through hold, restore, re-advance and rewind.
 
 The compression diagnostic takes independent geometry and tensile data from Tables 1 and 2 and holds out the experimental force values and digitized trace and compaction observations. It reports force rounding, compaction readout, input rounding and numerical displacement sensitivity separately. All six steel specimens miss the averaged force and work intervals. [Original measurement publication](https://doi.org/10.3390/ma15062107)
+
+### SEA-03 second-order waves and independent flume counts
+
+```sh
+node scripts/run-with-timeout.mjs --max=2 -- node --test packages/physics/tests/rogue.test.js packages/physics/tests/sisters.test.js packages/physics/tests/coupling/rogue-pair-workers.test.js
+node scripts/run-with-timeout.mjs --max=2 -- npm run test:gpu:rogue-pair-workers -w @margoengine/physics
+node scripts/run-with-timeout.mjs --max=3 -- npm run test:gpu:rogue-film -w @margoengine/water
+node scripts/run-with-timeout.mjs --max=3 -- node packages/physics/scripts/sea03-flume-crests-measured.mjs
+```
+
+The experiment uses a 270 m flume with a measurement at 45 m in 10 m water depth. The wavemaker's target spectrum comes from Equation 3 and Table I of [Dematteis et al. 2019](https://doi.org/10.1103/PhysRevX.9.041057). The check runs both specified normalizations as printed and counts interior local maxima over the same number and duration of records, five 1,500 s records at 40 Hz in each regime. Those synthetic counts are compared to the separate gauge totals in §III. The model does not use measured crest heights, counts or phases as inputs. It preserves the separate effects of rounding of the tabulated significant wave heights and sampling refinement. The paper does not publish per-record counts or all local maxima at the gauge, which limits estimates of repeatability and the uncertainty of the event-window selection.

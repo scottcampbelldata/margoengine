@@ -6234,6 +6234,9 @@ Runs of high waves, the Great Lakes' "three sisters":
 Reading the sea:
 - `elevation(x, z, t)`, `linearElevation(x, z, t)`, `sample(x, z, t)` (height, normal, velocity, current, depth, density), `velocity(x, y, z, t)` (linear theory under Wheeler's stretching), `pressure(x, y, z, t)` and `water`;
 - `statistics`, `rogues` and `variance`.
+- `NonlinearSea.load(options, {threads, signal})` lazily loads the native pair evaluator. It returns the same second-order elevation and normals. The caller participates with one by default, with two or four participants available in Node or an isolated browser worker. Use `using` to release helpers. `readNativeWork()` reports pairs and SIMD work from the last successful query.
+
+Supply an aligned water current with finite velocity and positive kelvin. Dry depths, malformed spectra and invalid current samples throw with a code and a fix. A rejected query leaves its caller-supplied sample intact.
 
 ```ts
 import {NonlinearSea, sisters} from 'margoengine/physics/rogue';
@@ -6251,6 +6254,11 @@ console.log(sea.elevation(0, 0, 600).toFixed(1)); // 18.5
 console.log(sea.elevation(0, 0, 600) - sea.linearElevation(0, 0, 600) > 1); // true: the bound waves lift the crest
 console.log(sea.statistics.rogueCrestChance > Math.exp(-12.5)); // true: crests pass 1.25 H_s more often than Rayleigh's
 console.log(sea.elevation(0, 0, 100) === new NonlinearSea({spectrum, rogues: false}).elevation(0, 0, 100)); // true
+
+// Opt into the same pair evaluation in native Wasm.
+using native = await NonlinearSea.load({spectrum, rogues: sea.rogues});
+console.log(native.elevation(0, 0, 600) === sea.elevation(0, 0, 600)); // true
+console.log(native.readNativeWork()?.pairs); // 12,880 for 160 components
 
 // Lake Superior's three sisters: three crests of 7, 8 and 9 m at one place, one after another.
 const superior = jonswap(

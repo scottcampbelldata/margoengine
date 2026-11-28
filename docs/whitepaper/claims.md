@@ -7074,3 +7074,7 @@ Native ranges apply the existing face matrix with exact published state at 1, 2 
 ### BREAK-03 native shell material and civil fender proof
 
 A malformed rigid input preserves the previous accepted damage and impulse outputs. The optional native shell preserves the existing material and loaded pressure face response and face accumulation order. The 211-face fixture records 38,430 SIMD face evaluations with three helpers and matches the public scalar baseline byte for byte. Both renderers independently replay the clamped dock fender's accepted rebound and permanent set. The lower-order folding law misses mean force and work in all six independent ASTM A500 tube tests. [Bounds and evidence](../limits.md#civilian-shell-contact-and-independent-tube-compression-break-03)
+
+### SEA-03 exact native second-order waves
+
+One, two and four native participants reproduce the scalar height and full normal at the same signed coordinates and time, including placed-wave envelopes. In the fixed-camera cutaway the launch rolls 19.73° as the prescribed crest crosses it, against 0.045° with the placement disabled. WebGPU and WebGL2 each replay their own full images and accepted state exactly. The independent flume comparison leaves extreme crest counts unvalidated for the second-order model. [Evidence and bounds](../limits.md#placed-second-order-waves-and-flume-crest-counts-sea-03)

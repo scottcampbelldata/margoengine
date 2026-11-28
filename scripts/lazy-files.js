@@ -162,6 +162,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/rogue-pair-kernel.wasm',
+    label: 'rogue-pair-kernel.wasm',
+    kind: 'Rust SIMD second-order wave pairs and ordered summation',
+    measure: 'file',
+    when: 'NonlinearSea.load() from the optional /rogue entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/rogue-pair-kernel-shared.wasm',
+    label: 'rogue-pair-kernel-shared.wasm',
+    kind: 'Rust SIMD second-order wave pairs with helper workers',
+    measure: 'file',
+    when: 'NonlinearSea.load() with threads: 2 or 4 from the optional /rogue entry',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/loads-kernel.wasm',
     label: 'loads-kernel.wasm',
     kind: 'Rust SIMD batch for hydrodynamic wrenches',

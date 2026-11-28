@@ -29,7 +29,7 @@ const exposeOptionalUrls = {
     return {
       code: code
         .replace(
-          /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|thin-film-kernel-threaded|crush-shell-kernel-threaded|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|cloud-projection|vegetation|wind-traction|wing-lattice|foam-transport|entry-profile|accretion|room-sound|outdoor-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|hull-slamming|flood-volume|tracer-random|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
+          /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|thin-film-kernel-threaded|crush-shell-kernel-threaded|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|cloud-projection|vegetation|wind-traction|wing-lattice|foam-transport|entry-profile|accretion|room-sound|outdoor-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|rogue-pair|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|hull-slamming|flood-volume|tracer-random|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
           '',
         )
         .replace(
@@ -266,6 +266,8 @@ for (const name of ['thin-film-kernel.wasm', 'thin-film-kernel-shared.wasm', 'th
   await copyFile(resolve(root, 'src/thin-film', name), resolve(dist, name));
 for (const name of ['crush-shell-kernel.wasm', 'crush-shell-kernel-shared.wasm', 'crush-shell-kernel-threaded.wasm'])
   await copyFile(resolve(root, 'src/crush', name), resolve(dist, name));
+for (const name of ['rogue-pair-kernel.wasm', 'rogue-pair-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/rogue', name), resolve(dist, name));
 
 for (const name of ['viscoplastic-kernel.wasm', 'viscoplastic-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/viscoplastic', name), resolve(dist, name));
