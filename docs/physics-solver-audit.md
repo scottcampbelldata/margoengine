@@ -50,6 +50,35 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### SEA-11 four-point pass
+
+- Point 5 (debcbf19fd). `packages/physics/tests/coupling/seakeeping-accepted.test.js` refuses an open
+  mesh, invalid density and oversized dimensions with fixes. A native table must match the hull mesh,
+  sea density and station count, and its inputs are copied. The tapered deck test checks the receiving
+  cell of real interior inlets and verifies the accepted deck surface across restore. The ordinary
+  hull rollback regressions protect the added surface and slam histories.
+- Point 6 (debcbf19fd). `packages/physics/tests/coupling/hull-slamming-workers.test.js` compares scalar
+  and native 1/2/4 ordinary and sheer-hull tables and live signed-origin replay. The 57-station sheer
+  case has zero breadth on the hull-wide top cut and retains its lower profiles. Packaged Chromium
+  in `packages/physics/tests/hull-slamming-workers.browser.mjs` joins three real helpers, cancels a
+  second group, and evaluates 25 stations, 1,200 depths, 37,500 bisections and 600,400 f64x2 midpoint
+  pairs. The same flat-wedge table takes 2,093,050 native bracket comparisons versus 20,377,650
+  in the preceding scalar traversal.
+- Point 7 (debcbf19fd). `packages/water/test/wave-impact-film.browser.mjs` isolates slamming from a
+  matched feature-off launch in a 0.72 m wave. The upward load and vertical speed differ by 69.7 kN
+  and 0.929 m/s. Accepted green water advances 1.04 m, grows from 5.6 to 101.3 L and then drains.
+  WebGPU and WebGL2 replay the full same-backend frames and accepted state, hash c072ae9973f4021f.
+- Point 8 (debcbf19fd). `docs/limits.md` records the vertical Wagner strip assumptions, the native bake
+  boundary and the shallow-water deck grid. `packages/physics/tests/seakeeping.test.js` checks the
+  wedge width and slope and the Ritter deck reference. The original film cuts, local panel pressures,
+  oblique flare slams, breaking spray, structural whipping and deck structure loads remain open.
+- Point 2 stays open. `packages/physics/scripts/sea11-wedge-measured.mjs` compares 12 measured Tveitnes
+  wedge loads without fitting. One falls within the repeatability, plot and phase envelope. For the
+  early 15°, 30° and 45° samples, the model predicts 1,106, 542 and 519 N versus 648, 341 and 166 N.
+  At later samples it underpredicts all three angles. Raising the rate from 240 to 960 Hz changes
+  sampled loads by at most 0.040 N. The paper reports motor speed and the viscous and elastic rig
+  limitations without measuring the entry speed of the impact face.
+
 ### SEA-08 four-point pass
 
 - Point 5 (5b8388a0c0). `packages/physics/tests/coupling/seakeeping-accepted.test.js` rejects invalid
