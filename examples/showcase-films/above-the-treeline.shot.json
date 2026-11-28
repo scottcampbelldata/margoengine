@@ -1,0 +1,49 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 90,
+  "tracks": [],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "above-the-treeline",
+    "kind": "long",
+    "seed": 294876,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "seconds": 90,
+    "msaa": 1,
+    "tier": "high",
+    "kit": null,
+    "subframes": 1,
+    "shutter": 180,
+    "grade": null,
+    "endCard": null,
+    "warmup": 8,
+    "probes": {
+      "opening": 1,
+      "shallow": 6,
+      "meadow": 14,
+      "climb": 24,
+      "trees": 36,
+      "edge": 48,
+      "treeline": 59,
+      "alpine": 69,
+      "summit": 79,
+      "credit": 87
+    },
+    "page": {
+      "path": "examples/showcase-films/above-the-treeline.html",
+      "query": {
+        "capture": 1
+      },
+      "css": "#controls,#status{display:none!important}",
+      "engine": "showcase.engine",
+      "apply": "showcase.apply",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

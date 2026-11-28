@@ -1,0 +1,47 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 90,
+  "tracks": [],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "the-projectionist",
+    "kind": "long",
+    "seed": 46329,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "seconds": 90,
+    "msaa": 1,
+    "tier": "high",
+    "kit": null,
+    "subframes": 1,
+    "shutter": 180,
+    "grade": null,
+    "endCard": null,
+    "warmup": 12,
+    "probes": {
+      "hook": 2.5,
+      "reels": 12.4,
+      "thread": 24.8,
+      "gate": 38.3,
+      "drive": 50.8,
+      "picture": 70.2,
+      "end-card": 87
+    },
+    "page": {
+      "path": "examples/showcase-films/showcase-12-15.html",
+      "query": {
+        "capture": 1,
+        "film": "the-projectionist"
+      },
+      "css": "#controls,#status{display:none!important}",
+      "engine": "showcase.engine",
+      "apply": "showcase.apply",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

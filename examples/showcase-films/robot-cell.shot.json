@@ -1,0 +1,51 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 90,
+  "tracks": [],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "robot-cell",
+    "kind": "long",
+    "seed": 50991,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "seconds": 90,
+    "msaa": 1,
+    "tier": "high",
+    "kit": null,
+    "subframes": 1,
+    "shutter": 180,
+    "grade": null,
+    "endCard": null,
+    "warmup": 6,
+    "probes": {
+      "hook": 2,
+      "wide": 8,
+      "clamp": 19,
+      "raise": 26,
+      "approach": 34,
+      "overhead": 40,
+      "insert": 49,
+      "deliver": 57,
+      "seat": 65,
+      "verify": 71,
+      "retract": 79,
+      "title": 87
+    },
+    "page": {
+      "path": "examples/showcase-films/robot-cell.html",
+      "query": {
+        "capture": 1
+      },
+      "css": "#controls,#status{display:none!important}",
+      "engine": "showcase.engine",
+      "apply": "showcase.apply",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}
