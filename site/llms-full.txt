@@ -31911,8 +31911,16 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   environment 710 B (the EXR readers' colour spaces, a1bb0f5275, KB-EXR-INTEROPID1), core 238 B (snapshot rendering
   and multi-draw, 4ea24d04d1 and c04ed9040d, approved for core, with the smaller core fixes since), shadows 57 B
   (`Shadows.ready`, dd7fea3b5a). Quality and controls add nothing; the other 76 B were not traced.
-- **Left:** each earlier raise of this bound was Scott's (docs/limits.md, "Web template bundle"), so a raise needs that
-  yes. Without it, 652 B must come out: the environment growth alone is a correctness fix's colour tables and parsing.
+- **Taken out 2026-11-28:** 313 B. `environment.ts` took `shaders.ts` as a namespace and picked a compute shader by key,
+  so the starter downloaded ImageBackground's WGSL; the four compute shaders and the prefilter are now named
+  (`packages/environment/tests/environment-shaders-tree-shake.test.js`). The starter measures 85,939 B, 340 B over.
+- **Lazy chunks:** the test counts every chunk. 12,836 B of the 85,939 B are four that the starter never runs
+  (`EnvironmentLighting.load`'s loader 626 B, EXR 7,506 B, HDR 2,654 B, UltraHDR 2,050 B), so moving the EXR colour
+  code behind another `import()` or into its own file cannot lower the figure while `load(url)` reads EXR files.
+- **Measured and not taken:** the EXR colour spaces as a table in place of the switch is 31 B larger;
+  `build.modulePreload: false` in the template saves 107 B and gives up preloading a lazy chunk's imports.
+- **Left:** Scott's decision. Each earlier raise of this bound was Scott's (docs/limits.md, "Web template bundle"). The
+  choices are a bound above 85,939 B, or a change to what the starter ships or what the test counts.
 
 ### Open 2026-11-27: five Fauld shot cameras still cannot see their subject (shot generator, KB-SHOT-FAULDSIGHT1)
 

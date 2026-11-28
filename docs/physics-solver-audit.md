@@ -128,13 +128,13 @@ them; the rest is a record of what a stronger solver would need.
 
 ### FLUID-06 four-point pass
 
-- Point 5. `2e9f76c364`. `viscoplastic-extremes.test.js` checks coded grid, point, rendering and material corrections, the explicit work cap,
+- Point 5. `2e9f76c364` and `e3bd12821b`. `viscoplastic-extremes.test.js` checks coded grid, point, rendering and material corrections, the explicit work cap,
   and both Wasm memory modes keeping their accepted bytes after a cumulative inlet overflows with real outlet motion.
   A stale destination over grown shared memory is also rejected before any accepted records can change.
   `viscoplastic-native.test.js` checks finite scalar and solver reductions, the acoustic speed overflow case and a strictly
   positive deformation gradient over the full step. A tangency and a nearby crossing fail without publishing. A nearby positive
   path matches its closed-form volume change.
-- Point 6. `viscoplastic-threads.test.js` and `viscoplastic-threads.browser.mjs` check deterministic native phases
+- Point 6. `e3bd12821b`. `viscoplastic-threads.test.js` and `viscoplastic-threads.browser.mjs` check deterministic native phases
   against the serial bases, including live terrain, an inlet and escape, optional solvent, floating origin and replay.
   Point-to-grid scatter and implicit solvent PCG retain their original order. Work counts reflect actual material and
   occupied-node visits. Two one-substep grids verify 1,231 and 4,419 material returns and 1,170 and 3,420 occupied rows.
@@ -143,7 +143,7 @@ them; the rest is a record of what a stronger solver would need.
   live TerrainBed contact, with the existing screen-space particle surface. The fixed camera sees 770, 2,323 and 2,985
   changed HDR pixels through the supplied pulse. Both renderers match the accepted state, exact rewind and replay, and
   detachment. `viscoplastic-extremes.test.js` checks compact packing and a live world-cell shift.
-- Point 8. `2e9f76c364`. `docs/limits.md` and the runnable Physics README example document the weakly compressible single material,
+- Point 8. `2e9f76c364` and `e3bd12821b`. `docs/limits.md` and the runnable Physics README example document the weakly compressible single material,
   grid resolution, Coulomb friction, finite work cap, typed renderer handoff, and the remaining PA-60 sediment and scene gaps.
 - Point 2 remains open. Huang and Garcia's independently specified release geometry, volume and rheology drive the kaolinite
   experiment. Twenty digitised measured front positions from the attributed replot remain held out. The 25, 20 and 10 mm
