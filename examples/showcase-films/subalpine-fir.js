@@ -59,7 +59,9 @@ export async function ridgeTrees(firKey, youngFirKey, timberlineFirKey) {
     image(new URL(libraryAsset('subalpine-fir/textures/fir_tree_01_twig_arm_2k.png')), signal),
   ]);
 
-  const rings = generateFirSprayLevels({ regions: atlas });
+  // Subalpine fir keeps live branches nearly to the ground in the open stands at treeline (Alexander, Shearer and
+  // Shepperd 1990, "Abies lasiocarpa", Silvics of North America, USDA Agriculture Handbook 654): crown from 1.1 m.
+  const rings = generateFirSprayLevels({ regions: atlas, crownBase: 1.1 });
   const canopyPart = {
     geometry: rings,
     kind: 'foliage',

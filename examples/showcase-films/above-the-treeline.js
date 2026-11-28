@@ -3,6 +3,7 @@ import { BiomeView } from '@margoengine/biomes/view';
 import { alpineTreelineGraph } from '@margoengine/biomes/treeline';
 import { PbrMaterial } from '@margoengine/core';
 import { DOF } from '@margoengine/dof';
+import { GTAO } from '@margoengine/post/gtao';
 import { loadGLTF } from '@margoengine/gltf/pbr';
 import { libraryParts } from '@margoengine/scenes/library';
 import { GrassScatter } from '@margoengine/scatter/grass';
@@ -103,6 +104,19 @@ function boundaryBiomes() {
       lod: [27, 69, 320],
       color: { hue: 0.02, value: 0.12 },
     }));
+  // Fallen blocks of 1 to 4 m from the same scans, few and far apart, so the slopes show boulders from 100 m and more.
+  const blocks = (density) =>
+    TALUS.map((name) => ({
+      id: 'block-' + name,
+      mesh: 'library:talus-' + name,
+      density: density / TALUS.length,
+      radius: 2.2,
+      size: { kind: 'reverse-j', q: 1.5, max: 6.5 },
+      alignToGround: 0.5,
+      sink: 0.3,
+      lod: [60, 180, 700],
+      color: { hue: 0.02, value: 0.14 },
+    }));
   return [
     defineBiome({
       id: 'subalpine-fir',
@@ -114,8 +128,9 @@ function boundaryBiomes() {
         { material: 'rock', slope: [28, null], weight: 1.8 },
       ],
       plants: [
-        { ...fir, stands: { scale: 62, cover: 0.86 } },
-        { ...youngFir, stands: { scale: 85, cover: 0.76 } },
+        // Closed subalpine fir and spruce below the line, in clumps with glades between (stands of 55 to 70 m).
+        { ...fir, density: 560, stands: { scale: 55, cover: 0.93 } },
+        { ...youngFir, density: 300, stands: { scale: 70, cover: 0.84 } },
       ],
       rocks: stones(51),
       wind: { strength: 0.28, detail: 0.54 },
@@ -124,13 +139,16 @@ function boundaryBiomes() {
       id: 'upper-meadow',
       climate: { height: [altitude + 7, line + 123], slope: [null, 32] },
       weight: 1.05,
+      // Turf with cured grass on the dry spurs, gravel breaking through it and rock on the steeper banks; the view's
+      // patches draw them side by side.
       ground: [
         { material: 'grass', weight: 1.1 },
         { material: 'dry-grass', moisture: [null, 0.55] },
-        { material: 'rock', slope: [27, null], weight: 2.1 },
+        { material: 'gravel', weight: 0.16 },
+        { material: 'rock', slope: [26, null], weight: 1.7 },
       ],
       plants: [{ ...scrub, stands: { scale: 52, cover: 0.57 } }],
-      rocks: stones(84),
+      rocks: [...stones(84), ...blocks(1.6)],
       wind: { strength: 0.59, detail: 0.62 },
       details: [{ id: 'meadow-bunchgrass', mesh: 'procedural:grass', density: 18, light: [0.44, 1], blades: true }],
     }),
@@ -140,10 +158,11 @@ function boundaryBiomes() {
       weight: 3.1,
       ground: [
         { material: 'rock', weight: 1.2 },
-        { material: 'gravel', slope: [9, 37], weight: 0.42 },
+        { material: 'gravel', slope: [9, 37], weight: 0.85 },
         { material: 'grass', slope: [null, 21], height: [null, line + 38], weight: 1.2 },
+        { material: 'dry-grass', slope: [null, 26], weight: 0.45 },
       ],
-      rocks: stones(145),
+      rocks: [...stones(145), ...blocks(4.5)],
     }),
   ];
 }
@@ -203,6 +222,8 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
     }),
     textureResolution: 4,
     radius: 1250,
+    nearRadius: 700,
+    patches: { size: 23, contrast: 0.6 },
     maxSteps: Infinity,
     lookahead: 0,
     sky,
@@ -312,6 +333,9 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
       .setMaterial(new PbrMaterial({ color: '#808080', roughness: 0.9 }));
     stoneSurface.add(mesh, { type: 'granite', seed: i });
   }
+  // Contact shade where the boulders, cobbles and tussocks meet the ground and each other (GTAO, Jimenez et al. 2016).
+  const occlusion = new GTAO({ radius: 0.7, slices: 2, steps: 6 });
+  for (const model of boulders) occlusion.add(model);
   const lens = new DOF({ focalLength: 0.044, focalDistance: 2.1, aperture: 7.1, maxRadius: 8 });
   const cues = [
     [0.2, 4.65, 'Why do the trees stop here?'],
@@ -333,7 +357,7 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
       lens.options.enabled = time < 18;
       return view;
     },
-    effects: [lens],
+    effects: [occlusion, lens],
     cues,
     dispose() {
       world.dispose();
