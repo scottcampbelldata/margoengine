@@ -1592,6 +1592,14 @@ export const entries = [
     kind: 'family',
     messages: [
       'Volume transform must be 16 finite numbers, column-major, affine (last row 0 0 0 1) and invertible',
+      'Stream trace needs a velocity function',
+      'Stream trace needs a positive finite maxStep, tolerance in (0, 1), whole maxSteps of at least 1, positive maxLength and finite minSpeed of at least 0',
+      'Stream trace seed must be three finite numbers',
+      'Stream trace bounds must be [xmin, xmax, ymin, ymax, zmin, zmax], each min below its max',
+      'Stream colours need a mesh with values',
+      'Stream colours must be #rrggbb or [r, g, b] in 0 to 1',
+      'Stream colours need at least two colours',
+      'Stream colour range must be finite',
       'exportSceneSVG needs a finite width and height above 0',
       'ambient must be from 0 to 1',
       'exportSceneSVG needs a camera: pass `camera`, or an engine that has one',
@@ -2780,6 +2788,7 @@ export const entries = [
     kind: 'family',
     messages: [
       'drainageStructure area must be [start, full] square metres with 0 < start < full',
+      'horizonAltitudeMeans needs channels values a height and 1 bin or more',
       'drainageStructure wall and repose must be 0 to 90 degrees and travel above 0 metres',
       'BiomeView rock must be an object',
       'Web Workers are unavailable here; pass createWorker (Node worker threads) or workers: 0',
