@@ -131,7 +131,7 @@ test('a Mann tile reduces far finite coordinates before cell scaling and rejects
   const y = -Number.MAX_VALUE;
   assert.deepEqual(box.sample(x, y, 2), box.sample(x % 120, y % 90, 2));
   const out = [1, 2, 3];
-  assert.throws(() => box.sample(Infinity, 0, 0, out), { code: 'state', message: /Supply finite metres/ });
+  assert.throws(() => box.sample(Infinity, 0, 0, out), { code: 'state', message: /must supply finite metres/ });
   box.w[0] = Infinity;
   assert.throws(() => box.sample(0, 0, 0, out), { code: 'state', message: /Keep the box planes finite/ });
   assert.deepEqual(out, [1, 2, 3]);

@@ -28,8 +28,8 @@ export function bindSurfaceEnergy({ module, memory, part }: SurfaceEnergyWorkerS
   const { exports } = new WebAssembly.Instance(module, { env: { memory } });
   const { __stack_pointer: stack, __data_end: data, surface_energy_apply: apply } = exports;
   if (!(stack instanceof WebAssembly.Global) || !(data instanceof WebAssembly.Global) || data.value !== 0)
-    throw new Error('Build surface energy with the stateless native stack exports.');
-  if (typeof apply !== 'function') throw new Error('Build surface energy with its matching native batch export.');
+    throw new Error('The surface energy Wasm must export the stateless native stack; rebuild it.');
+  if (typeof apply !== 'function') throw new Error('The surface energy Wasm must export its matching native batch function; rebuild it.');
   stack.value = (part + 2) * PAGE;
   return apply as Apply;
 }

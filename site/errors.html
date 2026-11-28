@@ -262,6 +262,12 @@
       <p><strong>Cause.</strong> An optics function was given a number it cannot use: one that is not finite, or zero or negative where only a positive value has a physical meaning (a wavelength, a length, a refractive index). The message names the function, the argument and the value it got.</p>
       <p><strong>Fix.</strong> Pass finite numbers in the units the README gives for that function, above 0 where the message asks for it.</p>
     </section>
+    <section id="cameras">
+      <h2><a href="#cameras">@margoengine/cameras/shots: blending between two framed views</a></h2>
+      <p class="messages"><code>ShotBlend rate must be a finite number above 0; see https://margoengine.com/errors#cameras</code> <code>ShotBlend delta must be a finite number of seconds &gt;= 0; see https://margoengine.com/errors#cameras</code> <code>ShotBlend width and height must be above 0; see https://margoengine.com/errors#cameras</code></p>
+      <p><strong>Cause.</strong> ShotBlend eases a camera between two framed shots. Its rate (how fast the blend follows its goal), the frame time passed to update() and the view size are numbers the maths divides by or scales with, so a rate that is not above 0, a negative or non-finite delta, or a view with no width or height is refused before the camera moves.</p>
+      <p><strong>Fix.</strong> Pass a finite rate above 0 (the default is 15), a frame time in seconds that is 0 or more, and the real width and height of the view in pixels.</p>
+    </section>
     <section id="mesh-debug-view">
       <h2><a href="#mesh-debug-view">@margoengine/inspector/mesh-debug: options, device and mesh size</a></h2>
       <p class="messages"><code>MeshDebugView was disposed; attach a new MeshDebugView; see https://margoengine.com/errors#mesh-debug-view</code> <code>MeshDebugView options must be an object; pass { mode: ... }; see https://margoengine.com/errors#mesh-debug-view</code> <code>MeshDebugView multiply must be true, false or null; see https://margoengine.com/errors#mesh-debug-view</code> <code>MeshDebugView wireWidth must be a number from 0 to 64; see https://margoengine.com/errors#mesh-debug-view</code> <code>MeshDebugView wireColor must be '#rgb', '#rrggbb' or three linear numbers in 0..1; see https://margoengine.com/errors#mesh-debug-view</code> <code>MeshDebugView reads vertices from storage buffers; create the engine on WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#mesh-debug-view</code></p>

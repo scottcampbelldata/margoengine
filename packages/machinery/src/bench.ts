@@ -326,7 +326,7 @@ export class CadBench {
    * @example const mark = cad.mark([0, 0.02, 0]); // later: mark.remove()
    */
   mark(point: Vec3, { size = 0.008, color = '#d2302a', width = 2 }: CadMarkOptions = {}): CadMark {
-    if (this.disposed) throw new TypeError('This CadBench is disposed');
+    if (this.disposed) throw new TypeError('This CadBench is disposed; create a new CadBench');
     if (!Array.isArray(point) || point.length !== 3 || !point.every(Number.isFinite))
       throw new RangeError('mark needs a finite [x, y, z] point');
     if (!(size > 0 && Number.isFinite(size))) throw new RangeError('Mark size must be positive');
