@@ -186,6 +186,15 @@ them; the rest is a record of what a stronger solver would need.
   −1.9 dB measured. Maximum remaining error is 6.97 dB. The publication does not give a complete
   uncertainty band or the lab air conditions. [Rasmussen (1994)](https://doi.org/10.1121/1.411404).
 
+### AERO-02 four-point pass
+
+- Point 5 (582f9bf782). `packages/physics/tests/coupling/sail-state.test.js` checks signed air scale, source coordinates, density and air medium. A late invalid sample and an unrepresentable kick preserve accepted force, circulation, native work and every cloth velocity. The rigid and soft solvers restore their accepted words together. `packages/physics/tests/sail.test.js` and `packages/physics/tests/coupling/sailing.test.js` retain real cloth-to-hull load transfer.
+- Point 6 (582f9bf782). `packages/physics/tests/coupling/sail-workers.test.js` and `packages/physics/tests/sail-workers.browser.mjs` run the existing Rust lattice with 1, 2 and 4 actual participants. The 27- and 55-panel mixed cases run 676 and 900 matrix and wake interactions, with 312 and 210 SIMD pairs for each phase. Their physical bytes match the original scalar output, and each participant configuration exactly restores its own work receipt.
+- Point 7 (582f9bf782). `packages/physics/tests/sail-film.browser.mjs` fills a flexible lug sail with a signed gust on a live lake dinghy. The paired take gives 132.21 N forward load, 16.69 cm of billow and 0.681 m extra hull travel against the lull. An unhindered test closes 66.468 N·s of applied impulse within 0.000456 N·s. Both renderers exactly replay accepted rigid and cloth state and all RGBA bytes.
+- Point 8 (582f9bf782). `packages/physics/scripts/aero02-sail-measured.mjs` scores five independent S3 flume trims against load-cell coefficients that were withheld from the model. At 30° chord incidence it produces 0.488 lift and 0.355 drag against 1.309 and 0.601 measured. Four of five trims miss for each coefficient after measurement and model sensitivity. [Measured bounds](limits.md#aero-02-measured-cambered-sail-polar)
+
+An unsteady shed wake, meaningful post-stall lift, measured cambered-sail agreement and porous canopies remain open. The row stays REOPENED at four points.
+
 ### AERO-03 four-point pass
 
 - Point 5 (0fbedc538b). `packages/physics/tests/flight.test.js` covers coded wind, geometry
