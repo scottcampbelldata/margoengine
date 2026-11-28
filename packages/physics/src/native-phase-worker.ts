@@ -1,3 +1,4 @@
+import { MargoError } from '@margoengine/math/errors';
 import { NATIVE_PHASE_CONTROL as slots, type NativePhaseWorkerStart } from './native-phase-pool.js';
 
 type NativePhase = (job: number, stage: number, part: number, parts: number) => number;
@@ -10,7 +11,8 @@ function run(start: NativePhaseWorkerStart): void {
     const stack = exports.__stack_pointer;
     const kernelPhase = exports[start.phaseExport];
     if (!(stack instanceof WebAssembly.Global) || typeof kernelPhase !== 'function') {
-      throw new Error(
+      throw new MargoError(
+        'failed',
         `Missing native worker export ${start.phaseExport}. You must rebuild the solver's shared Wasm kernel.`,
       );
     }

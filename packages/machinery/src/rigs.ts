@@ -6,6 +6,7 @@
 // using Lagrange Multipliers", SIGGRAPH 1996); the closed forms are Reuleaux, "The Kinematics of Machinery", 1876, and Willis,
 // "Principles of Mechanism", 1841. A Geneva wheel is held by its locking disc between strokes, modelled as the wheel made fixed
 // while the pin is out of every slot, the way the convex arc of the disc holds it in the real drive.
+import { MargoError } from '@margoengine/math/errors';
 import type { Physics, PhysicsBody, PhysicsJoint } from '@margoengine/physics';
 import {
   archimedesScrewPose,
@@ -84,7 +85,7 @@ export interface MechanismRig<Pose> extends Disposable {
 // The solver is another package's heavy entry: it loads with loadRigs, so importing this entry costs only its own bytes.
 let solver: typeof import('@margoengine/physics') | null = null;
 const physicsModule = (): typeof import('@margoengine/physics') => {
-  if (!solver) throw new Error('The physics solver is not loaded; await loadRigs() before making a rig.');
+  if (!solver) throw new MargoError('state', 'The physics solver is not loaded; await loadRigs() before making a rig.');
   return solver;
 };
 

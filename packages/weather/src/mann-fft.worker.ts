@@ -1,3 +1,4 @@
+import { MargoError } from '@margoengine/math/errors';
 import { bindMannFft, type MannFftReply, type MannFftRequest } from './turbulence-native-core.js';
 
 function respond(send: (reply: MannFftReply, transfer?: ArrayBuffer[]) => void) {
@@ -9,7 +10,7 @@ function respond(send: (reply: MannFftReply, transfer?: ArrayBuffer[]) => void) 
         send({ ready: true });
         return;
       }
-      if (!run) throw new Error('Initialize the Mann FFT helper before sending a component.');
+      if (!run) throw new MargoError('state', 'Initialize the Mann FFT helper before sending a component.');
       const { buffer, inverse } = request;
       const products = run(new Float64Array(buffer), inverse);
       send({ buffer, products }, [buffer]);

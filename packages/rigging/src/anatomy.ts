@@ -795,7 +795,7 @@ export function defineSpecies<T extends SpeciesTable>(table: T): T {
   const volumes = new Set<string>();
   for (const volume of table.volumes ?? []) {
     const at = `${table.id} volume ${volume.id}`;
-    if (volumes.has(volume.id)) throw new RangeError(`${at}: the id is used twice`);
+    if (volumes.has(volume.id)) throw new RangeError(`${at}: the id is used twice; give every volume its own id`);
     volumes.add(volume.id);
     known(volume.from, at, 'joint');
     for (const id of volume.to) known(id, at, 'joint');
@@ -804,7 +804,10 @@ export function defineSpecies<T extends SpeciesTable>(table: T): T {
   }
   for (const pair of table.apart ?? [])
     for (const id of pair)
-      if (!volumes.has(id)) throw new RangeError(`${table.id} apart: "${id}" is not a volume of the table`);
+      if (!volumes.has(id))
+        throw new RangeError(
+          `${table.id} apart: "${id}" is not a volume of the table; name only ids listed in volumes`,
+        );
   for (const id of table.feet ?? []) known(id, `${table.id} feet`, 'joint');
   for (const norm of [...table.proportions, ...table.segments, ...table.couplings, ...(table.volumes ?? [])])
     for (const row of norm.rows)

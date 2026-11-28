@@ -6,6 +6,7 @@
 // Costs here are floating point, where the same distance summed in two orders can differ in its last bits, so the search
 // stops only once the cheapest queued key is above the start's by more than a billionth of it (the paper stops on the
 // tie); the extra expansions are ordinary ones, so the distances stay those of the paper's search.
+import { MargoError } from '@margoengine/math/errors';
 import { check, type Diagonal, estimator, index, open, steps } from './grid-search.js';
 import type { CostGrid, GridPath, PathOptions } from './path.js';
 
@@ -144,7 +145,10 @@ export class PathReplanner {
         }
       });
       if (next < 0 || cells.length > cost.length)
-        throw new Error('the grid changed without update(); pass every changed cell to update() before findPath().');
+        throw new MargoError(
+          'state',
+          'The grid changed without update(); pass every changed cell to update() before findPath().',
+        );
       c = next;
       spent += paid;
       cells.push([c % width, Math.floor(c / width)]);

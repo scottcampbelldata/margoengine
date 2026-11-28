@@ -105,7 +105,10 @@ function decompose(m: ArrayLike<number>): { t: number[]; r: number[]; s: number[
 
 const finite = (data: ArrayLike<number>, label: string): void => {
   for (let i = 0; i < data.length; i++)
-    if (!Number.isFinite(data[i])) throw new RangeError(`addBody ${label} holds a value that is not a finite number`);
+    if (!Number.isFinite(data[i]))
+      throw new RangeError(
+        `addBody ${label} holds a value that is not a finite number; replace every NaN and Infinity in it`,
+      );
 };
 
 /**
@@ -121,7 +124,8 @@ export function bodyGLTF(description: BodyDescription): { doc: Record<string, un
   const names = new Map<string, number>();
   bones.forEach((bone, i) => {
     if (!bone || typeof bone.name !== 'string' || !bone.name) throw new TypeError(`addBody bone ${i} needs a name`);
-    if (names.has(bone.name)) throw new TypeError(`addBody bone name ${bone.name} is used twice`);
+    if (names.has(bone.name))
+      throw new TypeError(`addBody bone name ${bone.name} is used twice; give every bone its own name`);
     names.set(bone.name, i);
     if (!Number.isInteger(bone.parent) || bone.parent < -1 || bone.parent >= i)
       throw new RangeError(`addBody bone ${bone.name} parent must be -1 or the index of an earlier bone`);
@@ -159,7 +163,10 @@ export function bodyGLTF(description: BodyDescription): { doc: Record<string, un
   // Bone nodes: each one's local rest matrix is its parent's inverse bind times its own bind.
   const inverses = bones.map((bone) => {
       const inv = invertMatrix(Float64Array.from(bone.bind));
-      if (!inv) throw new RangeError(`addBody bone ${bone.name} bind matrix cannot be inverted`);
+      if (!inv)
+        throw new RangeError(
+          `addBody bone ${bone.name} bind matrix cannot be inverted; pass an invertible bind matrix, with no zero scale`,
+        );
       return inv;
     }),
     rest = bones.map((bone) =>
@@ -195,10 +202,14 @@ export function bodyGLTF(description: BodyDescription): { doc: Record<string, un
       finite(mesh.weights, `mesh ${m} weights`);
       for (let i = 0; i < mesh.indices.length; i++)
         if (!Number.isInteger(mesh.indices[i]) || mesh.indices[i] < 0 || mesh.indices[i] >= n)
-          throw new RangeError(`addBody mesh ${m} index ${i} is not a vertex of the mesh`);
+          throw new RangeError(
+            `addBody mesh ${m} index ${i} is not a vertex of the mesh; keep every index from 0 to the vertex count minus 1`,
+          );
       for (let i = 0; i < mesh.joints.length; i++)
         if (!Number.isInteger(mesh.joints[i]) || mesh.joints[i] < 0 || mesh.joints[i] >= bones.length)
-          throw new RangeError(`addBody mesh ${m} joint ${i} is not a bone index`);
+          throw new RangeError(
+            `addBody mesh ${m} joint ${i} is not a bone index; use a bone number from 0 to the bone count minus 1`,
+          );
       const positions = Float32Array.from(mesh.positions),
         min = [Infinity, Infinity, Infinity],
         max = [-Infinity, -Infinity, -Infinity];
@@ -241,7 +252,9 @@ export function bodyGLTF(description: BodyDescription): { doc: Record<string, un
         channels = clip.channels.map((ch, k) => {
           const node = typeof ch.bone === 'number' ? ch.bone : names.get(ch.bone);
           if (node === undefined || !Number.isInteger(node) || node < 0 || node >= bones.length)
-            throw new RangeError(`addBody clip ${clip.name} channel ${k} names no bone`);
+            throw new RangeError(
+              `addBody clip ${clip.name} channel ${k} names no bone; point its node at a bone number from 0 to the bone count minus 1`,
+            );
           const width = ch.path === 'rotation' ? 4 : ch.path === 'translation' || ch.path === 'scale' ? 3 : 0;
           if (!width)
             throw new TypeError(`addBody clip ${clip.name} channel ${k} path must be rotation, translation or scale`);

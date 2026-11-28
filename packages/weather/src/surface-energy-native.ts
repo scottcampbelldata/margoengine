@@ -239,7 +239,10 @@ export async function loadSurfaceEnergyKernel({
             if (done === helpers.length) break;
             const remaining = expires - performance.now();
             if (remaining <= 0)
-              throw new Error('Native helpers timed out after 10 s; check that the worker and Wasm assets are served.');
+              throw new MargoError(
+                'timeout',
+                'Native helpers timed out after 10 s; check that the worker and Wasm assets are served.',
+              );
             Atomics.wait(control, slots.done, done, remaining);
           }
           for (let part = 0; part < helpers.length; part++) status ||= Atomics.load(control, slots.status + part);
