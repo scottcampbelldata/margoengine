@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
-import { deflateSync } from 'node:zlib';
+import { deflateRawSync, deflateSync } from 'node:zlib';
 import { hitsInLine, hitsInPath, main, scan, scanRepo, selectFiles } from '../scripts/check-banned-terms.mjs';
 import { pdfText } from '../scripts/pdf-text.mjs';
 
@@ -127,6 +127,31 @@ test('the text a PDF shows is read through its fonts, so a banned name in a prin
   assert.notDeepEqual(scan(Buffer.from(pdfText(pdf(`loads ${banned[1]} files`)))), []);
   assert.deepEqual(scan(Buffer.from(pdfText(pdf('loads glTF files')))), []);
   assert.equal(pdfText(Buffer.from('%PDF-1.4\n%%EOF\n')), null);
+});
+
+// PR #885 put a demo download on main whose README held a banned name: the zip is binary, so only its copy on disk was
+// reported (3eb5f2dd23).
+test("a banned name inside a demo's download zip is reported, and an unreadable zip fails", () => {
+  const name = Buffer.from('source/README.md'),
+    text = Buffer.from(['one', `see ${banned[1]}`].join(String.fromCharCode(10))),
+    data = deflateRawSync(text),
+    local = Buffer.alloc(30),
+    central = Buffer.alloc(46),
+    end = Buffer.alloc(22);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(name.length, 26);
+  central.writeUInt32LE(0x02014b50, 0);
+  central.writeUInt16LE(8, 10);
+  central.writeUInt32LE(data.length, 20);
+  central.writeUInt16LE(name.length, 28);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(1, 10);
+  end.writeUInt32LE(30 + name.length + data.length, 16);
+  const zip = Buffer.concat([local, name, data, central, name, end]);
+  const found = scanRepo(() => zip, ['demos/downloads/example.zip']);
+  assert.equal(found.length, 1, found.join(' / '));
+  assert.ok(found[0].startsWith('demos/downloads/example.zip!source/README.md:2: banned term '), found[0]);
+  assert.match(scanRepo(() => zip.subarray(0, 40), ['demos/downloads/example.zip'])[0], /unreadable zip/);
 });
 
 test('no tracked file, and no tracked PDF page, contains a banned term', () => {

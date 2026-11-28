@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inflateRawSync } from 'node:zlib';
 import { machinePathAllowed, machinePathLines } from './machine-paths.mjs';
 import { pdfText } from './pdf-text.mjs';
 
@@ -61,6 +62,48 @@ export function scan(buffer) {
   return hits;
 }
 
+/** The entries of a zip archive as `{ name, data }`, or null when it cannot be read (stored and deflated entries). */
+export function zipEntries(buffer) {
+  try {
+    const end = buffer.lastIndexOf(Buffer.from([0x50, 0x4b, 5, 6]));
+    if (end < 0) return null;
+    const entries = [];
+    let at = buffer.readUInt32LE(end + 16);
+    for (let i = buffer.readUInt16LE(end + 10); i > 0; i--) {
+      if (buffer.readUInt32LE(at) !== 0x02014b50) return null;
+      const method = buffer.readUInt16LE(at + 10),
+        size = buffer.readUInt32LE(at + 20),
+        length = buffer.readUInt16LE(at + 28),
+        local = buffer.readUInt32LE(at + 42),
+        name = buffer.toString('utf8', at + 46, at + 46 + length),
+        start = local + 30 + buffer.readUInt16LE(local + 26) + buffer.readUInt16LE(local + 28),
+        raw = buffer.subarray(start, start + size);
+      if ((method !== 0 && method !== 8) || raw.length !== size) return null;
+      entries.push({ name, data: method ? inflateRawSync(raw) : raw });
+      at += 46 + length + buffer.readUInt16LE(at + 30) + buffer.readUInt16LE(at + 32);
+    }
+    return entries;
+  } catch {
+    return null;
+  }
+}
+
+/** The problems inside a demo's download zip: each entry's name and text, like a tracked file's. */
+function zipProblems(file, buffer) {
+  const entries = zipEntries(buffer);
+  if (!entries) return [`${file}: unreadable zip; the banned-terms check must be able to read every demo download`];
+  const out = [];
+  for (const { name, data } of entries) {
+    for (const id of new Set(hitsInPath(name)))
+      out.push(`${file}!${name}: banned term ${id} in the file or folder name; rename it and rebuild the zip`);
+    for (const line of machinePathLines(data))
+      out.push(`${file}!${name}:${line}: absolute machine path; fix the source and rebuild the zip`);
+    for (const { line, id } of scan(data))
+      out.push(`${file}!${name}:${line}: banned term ${id}; remove it from the source and rebuild the zip`);
+  }
+  return out;
+}
+
 const allowed = (file) => LIST.allow.some((a) => a.path === file) || file === 'scripts/banned-terms.json';
 
 const tracked = () =>
@@ -94,6 +137,10 @@ export function scanRepo(read = (path) => readFileSync(path), files = tracked(),
         continue;
       }
       out.push(`${file}: could not be read (${error?.code ?? error}); rerun once the process writing it has finished`);
+      continue;
+    }
+    if (file.startsWith('demos/') && file.endsWith('.zip')) {
+      if (!termsAllowed) out.push(...zipProblems(file, data));
       continue;
     }
     if (file.endsWith('.pdf')) {
