@@ -30,22 +30,6 @@ export const LAZY_FILES = [
     when: 'WindForce.create() with multiple threads; independent native wrench probes',
   },
   {
-    package: '@margoengine/weather',
-    file: 'packages/weather/dist/mann-fft.wasm',
-    label: 'mann-fft.wasm',
-    kind: 'Rust SIMD atmospheric turbulence FFT',
-    measure: 'file',
-    when: 'MannBox.create(), only from weather/turbulence; one private plan per participating thread',
-  },
-  {
-    package: '@margoengine/weather',
-    file: 'packages/weather/dist/workers/mann-fft.js',
-    label: 'workers/mann-fft.js',
-    kind: 'Mann turbulence component FFT worker',
-    measure: 'file',
-    when: 'MannBox.create({ threads: 2 or 3 }); one worker asset shared by the independent component helpers',
-  },
-  {
     package: '@margoengine/physics',
     file: 'packages/physics/dist/drainage-fog-kernel.wasm',
     label: 'drainage-fog-kernel.wasm',
@@ -756,6 +740,22 @@ export const LAZY_FILES = [
     kind: 'Shared pedestrian contact and avoidance kernel (Rust, SIMD)',
     measure: 'file',
     when: 'PedestrianCrowd.load() in a runtime with shared world memory',
+  },
+  {
+    package: '@margoengine/weather',
+    file: 'packages/weather/dist/mann-fft.wasm',
+    label: 'mann-fft.wasm',
+    kind: 'Rust SIMD atmospheric turbulence FFT',
+    measure: 'file',
+    when: 'MannBox.create(), only from weather/turbulence; one private plan per participating thread',
+  },
+  {
+    package: '@margoengine/weather',
+    file: 'packages/weather/dist/workers/mann-fft.js',
+    label: 'workers/mann-fft.js',
+    kind: 'Mann turbulence component FFT worker',
+    measure: 'file',
+    when: 'MannBox.create({ threads: 2 or 3 }); one worker asset shared by the independent component helpers',
   },
   // Third-party Wasm runtimes.
   {
