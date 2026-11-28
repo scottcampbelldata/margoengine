@@ -6199,7 +6199,7 @@ FXAA a depthless line's one-pixel rim is partly covered, colour and alpha alike,
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
 | Mechanism poses (`@margoengine/machinery/mechanisms`, 2026-11-27) (LIM-679) | Enforced by method: each function is the rigid, frictionless, backlash-free closed form of its mechanism. The Geneva drive is external with tangential pin entry; the harmonic drive ratio assumes a two-lobe wave generator and `flexsplinePoint` is a drawing aid, not an elastic flexspline; the Watt governor is Maxwell's conical-pendulum equilibrium (massless arms, no sleeve load, no hunting dynamics); the Archimedes screw bucket is a 1,600-slice integral (within 1e-7 m^3 of 6,400 slices on the demo screw). Entry 3,864 B gzip. | Closed forms are the exact solution a joint model tracks and a readout shows. | The physics-joint models in `tests/machinery-mechanisms-physics.test.js` (a hinge motor, sliders, a pin in a slot, a gear joint) follow the poses to 2e-4 m and 2e-3 rad at 60 Hz. | For loads, friction, backlash or governor dynamics, build the mechanism from `@margoengine/physics` joints and step it. |
-| Mechanism rigs on physics (`@margoengine/machinery/rigs`, 2026-11-27) (LIM-680) | Enforced by method: fourteen rigs (Scotch yoke, Geneva, Oldham, epicyclic, harmonic drive, ball-and-disk integrator, Archimedes screw, stroboscope, toggle press, gimbal, differential, Watt governor, rose engine, Reuleaux drive) on `@margoengine/physics` joints, with no gravity, friction or load but the governor's gravity and hinge drag; the input is a position-driven body stepped at most 2 degrees per 60 Hz step. Measured gaps against the closed forms: 1.4 µm (yoke), 0.004 degrees (Geneva), 2 µm (Oldham), 0.0003 degrees (epicyclic), 0.00002 degrees (harmonic), 0.0002 degrees (integrator), 2.3 µm over 4.7 turns (screw; the gear and rack rows read their error from the poses since 2026-11-28, so a rack driven 100 turns holds the exact travel to 3.7 µm from z 0 and 9.8 µm from z 50 m, `packages/physics/kernel/tests/coupling_exact.rs`), 0.0004 degrees (stroboscope), 4.4 µm (toggle press), 0.0001 degrees (gimbal), 0.005 degrees over 14 turns (differential), and the governor's arms settled within 0.001 degrees of Maxwell's balance about 4 s after a speed change (at 32 substeps; at 8 they settle 0.04 to 0.1 degrees off, KB-PHYS-SPINBIAS1), 41 µm (rose engine: a follower held 0.2 m off its centre in the groove of a rosette, the path row's steady lag a h^2 / 2c) and 0.7 mm of a 456 mm width (Reuleaux drive: a hull triangle between four fixed walls, the contacts' softness), tested to 2e-5 m and 5e-4 rad (`packages/machinery/test/rigs.test.js`). A demo that loads a rig carries the physics solver: the four mechanism demo zips grew from about 0.32 MB to 1.25 MB. | The solver holding the exact pose is the claim; loads are not modelled yet. | `packages/machinery/test/rigs.test.js` | The Sarrus rig, whose overconstrained loop the solver holds only to about 1 mm so far, is still to build (KB-PHYS-SARRUSLOOP1, cause found, open). A follower in a three-lobed groove sits a h^2 / (2 c) from the exact pose over 50 turns, 17 µm at the default share c of 0.2 and 3.5 µm at 1 (KB-PHYS-PATHMOVINGBASE1 fixed). |
+| Mechanism rigs on physics (`@margoengine/machinery/rigs`, 2026-11-27) (LIM-680) | Enforced by method: fourteen rigs (Scotch yoke, Geneva, Oldham, epicyclic, harmonic drive, ball-and-disk integrator, Archimedes screw, stroboscope, toggle press, gimbal, differential, Watt governor, rose engine, Reuleaux drive) on `@margoengine/physics` joints, with no gravity, friction or load but the governor's gravity and hinge drag; the input is a position-driven body stepped at most 2 degrees per 60 Hz step. Measured gaps against the closed forms: 1.4 µm (yoke), 0.004 degrees (Geneva), 2 µm (Oldham), 0.0003 degrees (epicyclic), 0.00002 degrees (harmonic), 0.0002 degrees (integrator), 2.3 µm over 4.7 turns (screw; the gear and rack rows read their error from the poses since 2026-11-28, so a rack driven 100 turns holds the exact travel to 3.7 µm from z 0 and 9.8 µm from z 50 m, `packages/physics/kernel/tests/coupling_exact.rs`), 0.0004 degrees (stroboscope), 4.4 µm (toggle press), 0.0001 degrees (gimbal), 0.005 degrees over 14 turns (differential), and the governor's arms settled within 0.001 degrees of Maxwell's balance about 4 s after a speed change (at 32 substeps; at 8 they settle 0.04 to 0.1 degrees off, KB-PHYS-SPINBIAS1), 41 µm (rose engine: a follower held 0.2 m off its centre in the groove of a rosette, the path row's steady lag a h^2 / 2c) and 0.72 mm of a 456 mm width at 2 degrees a step, 0.10 mm at 3 (Reuleaux drive: a hull triangle between four fixed walls; measured again 2026-11-28, cause open, KB-PHYS-REULEAUXWALLS1), tested to 2e-5 m and 5e-4 rad (`packages/machinery/test/rigs.test.js`). A demo that loads a rig carries the physics solver: the four mechanism demo zips grew from about 0.32 MB to 1.25 MB. | The solver holding the exact pose is the claim; loads are not modelled yet. | `packages/machinery/test/rigs.test.js` | The Sarrus rig is still to build: the solver holds its overconstrained loop only to 3.4 mm, and the fix (a wrong sum in the push's turn bound; 1.4e-5 m with it) is built and waits on the run-away it uncovers in islands that step at a finer level (KB-PHYS-SARRUSLOOP1, KB-PHYS-LEVELSPIN1, both open). A follower in a three-lobed groove sits a h^2 / (2 c) from the exact pose over 50 turns, 17 µm at the default share c of 0.2 and 3.5 µm at 1 (KB-PHYS-PATHMOVINGBASE1 fixed). |
 | Hand-built meshes and parts (`@margoengine/geometry/builder`, `/parts`, 2026-11-28) | Enforced by method: vertex colours are linear RGBA, four floats per vertex; the builder's weld distance is 1e-7 and its crease angle defaults to 30 degrees; a ring-sector contact shadow needs a falloff exponent above 0; a pipe, helix or ribbon along a curve keeps its frame by rotation-minimizing frames with the double-reflection step, so it does not twist but a closed curve's end frame can differ from its start by the curve's holonomy; no boolean cuts. Sources: Wang, Juttler, Zheng and Liu, "Computation of rotation minimizing frames" (ACM Transactions on Graphics, 2008); Thurmer and Wuthrich, "Computing vertex normals from polygonal facets" (Journal of Graphics Tools, 1998); Piegl and Tiller, "The NURBS Book" (Springer, 1997). | Plain mesh building is arithmetic over arrays, so no limit beyond the 1,000,000 vertices of a geometry. | A closed pipe shows a small twist seam where its first and last frames meet. | Rotate the pipe's start frame by the holonomy, or sweep with `@margoengine/geometry` sweeps. |
 | NURBS surfaces (`@margoengine/geometry/nurbs`) | Enforced by method: no trimming curves, knot insertion or degree elevation; `NurbsCurve.tessellate` halves a span at most 12 times. | Trimming needs a boundary representation, which this engine does not carry; revolves, control nets and whole patches do not. | A trimmed patch meshes untrimmed. | Cut the mesh with `@margoengine/mesh-edit`. |
 | Mesh surface sampler (`@margoengine/geometry/sample`) | Enforced by method: points are independent random draws, so they can clump; there is no minimum spacing. Vertex weights are linear across each triangle. | Independent draws cost one search each and need no neighbour lookups. | Two points can land close together. | `@margoengine/scatter` for spaced placement on terrain. |
@@ -16627,10 +16627,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   points per arc between four fixed walls at zero clearance, its turn locked to the input, sits 0.6 to 0.7 mm off the
   exact centre over a 456 mm travel. More substeps, more iterations, the high-fidelity tier and zero friction gave at best
   0.52 mm; a 24-point hull measured 0.16 mm.
-- **Measured again 2026-11-28 on `main` (the 0.6 to 0.7 mm above is stale):** over two turns in 2 degree 60 Hz steps the
-  64-point hull's worst gap is 9.8e-5 m read every 3 degrees and 3.0e-4 m at any step; the 24-point hull reads 1.5e-4 m
-  and 1.8e-4 m. Driven to 45 degrees and left for 300 steps it settles to 7.8e-6 m, so the offset is made while the
-  triangle moves and is not a resting state.
+- **Measured again 2026-11-28 on `main` (13124e4f1a), over two turns, one `drive` call a 60 Hz step:** the gap depends
+  on the step. At 3 degrees a step (what `rigs.test.js` drives, bar 2e-4 m) the 64-point hull's worst gap is 9.8e-5 m and
+  the 24-point hull's 1.5e-4 m. At 2 degrees a step they are 7.2e-4 m and 2.9e-3 m, so the 0.6 to 0.7 mm above stands
+  for 2 degree steps (an earlier note here called it stale and gave 3.0e-4 m; that figure did not reproduce). Driven to
+  45 degrees and left for 300 steps it settles to 7.8e-6 m, so the offset is made while the triangle moves and is not a
+  resting state.
 - **Cause:** not found yet. Ruled out: the allowed penetration (0 to 2e-4 m reads the same) and the hull build (all 192
   and 72 outline points are kept, no faces merged). It is not KB-PHYS-SARRUSLOOP1's cut: the rig has one joint and no
   path. The lead: the box-against-hull contact may take the normal of a hull facet (0.94 degrees a facet at 64 points)
@@ -16662,18 +16664,67 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   | fix alone | 5,965 rad/s, 1,239 | 4.4e8 rad/s at step 1948, then NaN and the world stops | 289 rad/s, 0 | 858 rad/s, 0 |
   | fix and a damped push | 2,401 rad/s, 609 | 1,703 rad/s, 725 | 777 rad/s, 0 | 261 rad/s, 0 |
 
-  "Levels" are the islands' own substep levels (`adaptive_substeps`). With them off no build passes 1,000 rad/s; with
-  them on `main` already does in the sweeps run. The median gap of the scene's sliding locks, levels on, block solver:
-  5.3e-2 m on `main`, 3.5e-3 m with the fix, 2.7e-2 m with the fix and the damped push; mean kinetic energy 1.4e4, 3.3e4
-  and 4.0e4 J. So the fix holds the joints closer and the scene carries more energy: not yet a state that can be called
-  more correct. The path that starts the run-away is a chain from a fixed body through three bodies (a ball joint with its
-  anchors 4.5 m apart, a ball joint 1.7 m apart, a weld 0.5 m apart): errors no push can close, asked for again every
-  substep. The lead, not proven: the turn bound (TURN, 0.2 rad) is per substep, an island that spins is given up to 128
-  substeps a step, so what the relaxing pass leaves of a cut push grows with the level it raises. The damped push
-  (Levenberg 1944, Marquardt 1963, Wampler 1986, Nakamura and Hanafusa 1986: (K + mu^2 D) x = b on the path's factors,
-  taken only where the exact push breaks the bound) is built and stops the NaN, and does not remove the spin.
-  Next: bound what a cut push leaves in the speeds across substep levels, then land the fix with the replay figures.
-  The access violation that followed the NaN was a separate bug, fixed (KB-PHYS-RETIREDPAIR1). Physics lane.
+  "Levels" are the islands' own substep levels (`adaptive_substeps`). That table is the fixture's seed only, and two things
+  read from it were wrong. Over five seeds of the scene (the stream's seed xor n * 0x9E3779B9, n 0 to 4) `main` itself
+  passes 1,000 rad/s in each of the four builds: worst 5,040 rad/s (sweeps) and 4,660 (block) with levels on, 1,280 and
+  17,000 with levels off. So a spin over 1,000 rad/s is this scene's own and no sign of a defect, and "with levels off no
+  build passes 1,000 rad/s" held for one seed. What the fix changes: 2 of 10 runs with levels on leave the numbers (seed 0
+  with the sweeps at step 1948, seed 3 with the block solver at step 509) and 0 of 10 with levels off. That run-away is
+  KB-PHYS-LEVELSPIN1 below, a defect of its own; the wrong sum had been cutting the pushes that feed it.
+- **State:** the fix is not on `main`. Alone it passes `a_web_of_joints_stays_in_the_numbers`; the whole kernel suite has
+  not been run on it. It lands with `sarrus_loop.rs` once KB-PHYS-LEVELSPIN1 is fixed, and the Sarrus rig and its demo
+  wait for it. The damped push (Levenberg 1944, Marquardt 1963, Wampler 1986, Nakamura and Hanafusa 1986) stops both
+  run-aways and is not worth landing: over the same seeds it has the fastest spins of any build (35,200 and 90,000 rad/s
+  with levels on, 15,300 with levels off). The access violation that followed the first run-away was a separate bug,
+  fixed (KB-PHYS-RETIREDPAIR1). Physics lane.
+
+### Open 2026-11-28: an island's substep level and its spin feed each other (KB-PHYS-LEVELSPIN1, physics solver)
+
+- **Repro:** the replay scene (`kernel/tests/replay.rs`) with `adaptive_substeps` on and `push_share` summing a shared
+  body's gains rightly (the fix of KB-PHYS-SARRUSLOOP1 above, not on `main`). Fixture seed, sweeps: the fastest spin is
+  67 rad/s at step 1900 with its island at level 1, 528 at step 1920 (level 4), 2,226 at 1937 (level 6), 33,845 at 1940
+  (level 6), 4.4e8 at 1948 (level 7), then not a number. Seed 3, block solver: 6.6e8 rad/s at step 509. On `main` the
+  same scene reaches 4,431 rad/s (sweeps) and 4,660 (block, seed 1) with levels on.
+- **Cause, as far as it is measured:** `island_level` (`kernel/src/tilt.rs`) gives an island the least level at which no
+  body in contact turns over 0.505 rad a substep at its present spin. In an island whose joints cannot close and whose
+  bodies touch, a finer level makes more spin, so the level the spin asks for is never reached and the island climbs to
+  the finest (7,680 substeps a second). Step size chosen from the state is a feedback loop (Gustafsson 1991; Soderlind
+  2002), and this one's gain is over one. Measured by switching one change on 40 steps before each run-away (step 1900
+  of seed 0 with the sweeps, step 470 of seed 3 with the block solver; the state up to there is the same) and running
+  400 steps on. Fastest spin in rad/s, and the highest level any body's island took:
+
+  | Change | Seed 0, sweeps | Seed 3, block |
+  | --- | --- | --- |
+  | none | 4.4e8, then not a number; level 7 | 6.6e8, then not a number; level 7 |
+  | the level does not answer spin (tilt only) | 326; level 1 | 583; level 0 |
+  | the push's turn bound (TURN, 0.2 rad a substep) taken as 2^-level of itself | 3,149; level 7 | 1,574; level 6 |
+  | a cut push taken back out of the speeds once the poses have moved | 839; level 5 | 10,256; level 7 |
+  | both of those | 650; level 5 | 1,782; level 6 |
+  | the push's speed cap without its turning term (arm times spin) | 611; level 5 | 1,766; level 6 |
+  | the push's speed cap (`joint_max_push`) taken as 2^-level of itself | 2,531; level 7 | 159,730; level 7 |
+  | cap and turn bound 2^-level, no turning term | 415; level 4 | 1,202; level 6 |
+  | the damped push | 2,387; level 7 | 2,617; level 7 |
+  | the level does not answer bodies a joint holds | 840; level 5 | 1,347; level 6 |
+  | the level answers only bodies a joint holds | 978; level 5 | 5,235; level 7 |
+  | the level does not answer an island with a push cut or capped in the step before | 537; level 5 | 1,134; level 5 |
+
+  So no change to the joints' push cuts the loop: each lowers the peak and none holds the level down. Only taking the
+  spin out of the level does, and the spin that raises the level is carried by jointed and free bodies alike. The first
+  lead (TURN is a turn per substep, so a cut push leaves more spin at a finer level) is one term of the loop and not its
+  cause. A ledger of the kinetic energy each stage of a substep adds, over the fixture's run-away: the energy comes in
+  through the contacts' warm start (5.7e10 J in step 1937, 1.9e11 in 1938, 1.9e13 in 1943), the joints' warm start and
+  path solve take most of it out again, and the path's position push adds under a tenth of what the contacts do.
+- **Ruled out as fixes:** the turn bound taken as 2^-level (a push then turns a body at the same rate at every level):
+  `a_web_of_joints_stays_in_the_numbers` (`kernel/tests/stability.rs`) fails with it, seed 59 gaining 1.76e8 J over the
+  1.35e11 J its kinematic bodies did, where the fix alone passes. Dropping the spin rule: it is what keeps a bar through
+  a wall from gaining energy (`kernel/tests/spin_energy.rs`, 19 percent at 0.6 rad a substep). Over the five seeds, whole
+  runs, none of the push changes is told from another by its spins: the scene is chaotic and the spread between seeds
+  (176 to 5,040 rad/s on `main`) is wider than any difference between builds.
+- **Not tried yet:** why the contacts' warm start holds that much (what a contact remembers of stopping a joint's push
+  is no load, and a joint's own push is the one thing the joints do not remember); the spin rule's own cause, the
+  inverse inertia the contacts' relaxing pass reads at the turned pose, taken from the rows' pose so the level need not
+  answer spin at all; a level held where the last raise did not lower the turn a substep.
+- **For:** the physics lane. KB-PHYS-SARRUSLOOP1's fix waits on this.
 
 ### Open 2026-11-28: a ball on a spinning hinge settles off its balance in proportion to its inertia (KB-PHYS-SPINBIAS1, physics solver)
 
