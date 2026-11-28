@@ -587,6 +587,41 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Sent back, then found (2026-11-27):** the blowup early shadowTint flip is deterministic and not TAA's colour: see
   KB-POST-MRTJITTER1.
 
+### Open 2026-11-28: the blowup's T6 floor (0.0448 b*) is below what its probe frames can resolve (KB-LOOK-TV-TINTRES1, headless look check)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-blowup.json --once --seconds 1.1 --out <folder>`
+  (RTX A6000, WebGPU, after KB-LOOK-TV-TINTMATCH1): early bounce 82.8 percent and shadowTint 0.40 b* (pass), mid bounce
+  103.7 percent and shadowTint -0.55 b* (fail; bounds 29.7 to 100 percent and 0.0448 to 100 b* from `lightBounds`,
+  diffuse fraction 0.990). Like surfaces only: 128 of 304 interior pixels in one albedo stratum at mid.
+- **Measured:** the ground masks' interiors are 250 lit and 54 shadowed pixels of 2 million (the shadows are strips
+  between plants). The standard error of the lit minus shadow b* is 0.144 at mid and 0.203 early, 3 to 4.5 times the
+  0.0448 floor, and one 8-bit blue code is 0.39 b* at the ground's colour (about 50, 30, 3). Cutting the matched
+  ground further by distance as well (the depth AOV, 32, 16 or 8 levels) gives mid 0.37, 1.48 and -0.55 b* and bounce
+  97.8, 88.3 and 103.7 percent: the value follows the binning, not the light. Under a pall that passes 1 percent of
+  the light as beam, lit and shadowed ground of one surface differ by about the floor itself, and nothing in these
+  frames shows a light that brightens or warms shade (bounce near 100 percent is what the light predicts).
+- **Needs a ruling (manager):** the bound stays 0.0448. Either the check reports that it cannot run when the
+  difference's standard error exceeds the bound it tests (an instrument-resolution rule), or the probe is measured on
+  the float frame or with more shadow interior. Not changed.
+
+### Fixed 2026-11-28: T6 compared different surfaces in the sun and in the shade (KB-LOOK-TV-TINTMATCH1, headless look check)
+
+- **Repro (before):** the timber-valley blowup, `--once --seconds 1.1`: mid bounce 103.6 percent and shadowTint 0.036
+  b* (bound 0.0448), with and without TAA. Shadowed ground brighter than lit ground cannot happen for one surface under
+  one light: the lit and shadow masks held different surfaces, so the check measured their albedo difference.
+- **Cause:** `bounce` and `shadowTint` (`packages/headless/src/look.ts`) averaged all lit and all shadowed ground
+  interiors, whatever the surface.
+- **Fix:** they take an optional `albedo` (`albedoOf(frame, masks)` builds it from grey masks `albedo-r`, `albedo-g`,
+  `albedo-b`; `checkProbe` passes it on). The ground is cut into strata of like albedo (`GROUND_ALBEDO_LEVELS`, 16 per
+  sRGB channel), each stratum's lit and shadowed means are compared alone and the strata pooled with the
+  Cochran-Mantel-Haenszel weight n_lit n_shadow / (n_lit + n_shadow) (Cochran 1954, doi:10.2307/3001616; Mantel and
+  Haenszel 1959, doi:10.1093/jnci/22.4.719); a surface seen on one side only does not count, and with no stratum on both
+  sides the check reports `missing`. The timber-valley shot page draws the albedo with a second `SceneTargets` (one takes
+  at most 7 outputs) and every timber-valley shot lists the three masks. Bounds unchanged. Regression:
+  `packages/headless/tests/look-clean.test.js` ("compare like surfaces"): sand mostly lit, ash mostly shaded under one
+  light; the old masks read the tint more than 5 b* too warm and the bounce under half of either surface's, the strata
+  give a value between the two surfaces' own. After the fix the blowup still misses at mid: KB-LOOK-TV-TINTRES1.
+
 ### Fixed 2026-11-27: the aftermath shot no longer loaded: burning the valley out took longer than the shot tool waits (KB-SCENES-BURNTSLOW1, vfx)
 
 - **Repro (before):** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-aftermath.json --once --seconds 1.1 --out <folder>`

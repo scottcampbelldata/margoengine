@@ -10346,6 +10346,13 @@ shaded against 0.99999 lit, the frame darker inside the shaded mask, 1 everywher
 tools/shot/test/look-masks-check.mjs (every mask check runs on a real shot). Missing: local lights' shadows in the
 visibility, core meshes as the subject.
 
+**T6 compares like surfaces (KB-LOOK-TV-TINTMATCH1, 2026-11-28).** With an albedo (`albedo-r`, `albedo-g`, `albedo-b`
+masks, `albedoOf`) `bounce` and `shadowTint` compare lit and shadowed ground within strata of like albedo (16 levels per
+sRGB channel), pooled with Cochran-Mantel-Haenszel weights; bounds unchanged. Evidence: headless tests/look-clean.test.js
+(two surfaces under one light); the blowup's mid T6 went from 103.6 percent and 0.036 b* (different surfaces) to 103.7
+and -0.55 over 128 matched pixels. Missing: a resolution rule, since the blowup's difference has a standard error of
+0.14 b* against a 0.0448 floor (KB-LOOK-TV-TINTRES1).
+
 **T6 reads the masks' interiors (KB-LOOK-TV-BOUNCE1, 2026-11-26).** The masks are a sharp capture; the frame is resolved
 from supersamples with motion blur, depth of field and bloom, so a pixel on a mask's edge holds both sides. `bounce` and
 `shadowTint` (`@margoengine/headless/look`) average each ground mask's interior, `GROUND_INSET` (1/360 of the frame's

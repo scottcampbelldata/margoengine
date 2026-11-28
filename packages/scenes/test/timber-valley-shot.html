@@ -28,6 +28,14 @@ const targets=SceneTargets.attach(engine,{outputs:{
   plants:{wgsl:'vec4f(1.0-t.ground, 0, 0, 1)',format:'r8unorm'}}});
 targets.add(scene.parts.view.terrain);
 if(scene.parts.view.objects)targets.add(scene.parts.view.objects,{ground:false});
+// The surface colour, one sRGB coded channel per mask, so T6 compares lit and shadowed ground of a like albedo
+// (@margoengine/headless/look albedoOf, KB-LOOK-TV-TINTMATCH1). A second SceneTargets: one takes at most 7 outputs.
+const surface=SceneTargets.attach(engine,{outputs:{
+  albedoR:{wgsl:'vec4f(pow(clamp(t.albedo.r, 0.0, 1.0), 1.0 / 2.2), 0, 0, 1)',format:'r8unorm'},
+  albedoG:{wgsl:'vec4f(pow(clamp(t.albedo.g, 0.0, 1.0), 1.0 / 2.2), 0, 0, 1)',format:'r8unorm'},
+  albedoB:{wgsl:'vec4f(pow(clamp(t.albedo.b, 0.0, 1.0), 1.0 / 2.2), 0, 0, 1)',format:'r8unorm'}}});
+surface.add(scene.parts.view.terrain);
+if(scene.parts.view.objects)surface.add(scene.parts.view.objects,{ground:false});
 
 // The scene's own clocks (the weather drive, the fire front and the sky are engine plugins) run on the engine's frames,
 // and the shot tool's clock is the engine's: they follow the shot clock with nothing more. `apply` once also stepped them
@@ -39,7 +47,7 @@ const lag={weather:0.1,fire:0.1+(scene.parts.fireFront?.options.step??0.5)};
 let first=null;
 globalThis.timberShot={
   engine,scene,
-  aovs:()=>({device:engine.gpu,textures:Object.fromEntries(['geometry','depth','penumbra','subject','lit','shadow','plants'].map(n=>[n,targets.texture(n)]))}),
+  aovs:()=>({device:engine.gpu,textures:{...Object.fromEntries(['geometry','depth','penumbra','subject','lit','shadow','plants'].map(n=>[n,targets.texture(n)])),...Object.fromEntries(['r','g','b'].map(c=>['albedo-'+c,surface.texture('albedo'+c.toUpperCase())]))}}),
   async apply(state,{time}){
     const now=clocks();
     if(first===null){first={time,...now};return;}

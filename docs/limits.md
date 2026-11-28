@@ -9097,6 +9097,13 @@ interior pixels (5 percent relative standard error), and report the check as mis
 a frame whose plants are all in the penumbra, or that holds plants of very different detail in and out of it, cannot
 be judged by it.
 
+## T6 like surfaces (headless/look, KB-LOOK-TV-TINTMATCH1, 2026-11-28)
+
+With an albedo, `bounce` and `shadowTint` compare only ground of like albedo, 16 levels per sRGB channel (16 codes); a
+surface lit or shaded alone is left out, and ground in no shared stratum makes the check report `missing`. Distance
+is not stratified, and a small shadow interior (54 pixels on the blowup) cannot resolve a floor of 0.0448 b*
+(standard error 0.14 b*, KB-LOOK-TV-TINTRES1). headless/look measures 18,518 B min+gzip (ceiling 18,587 B).
+
 ## T6 limits that follow the light (headless/look `lightBounds`, KB-LOOK-TV-PALL1, 2026-11-26)
 
 `bounce` and `shadowTint` keep 10 to 35 percent and 3 to 100 b* for a probe whose light is a clear sun (diffuse fraction

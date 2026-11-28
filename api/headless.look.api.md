@@ -18,6 +18,7 @@ export interface BlocksOptions {
 export interface BounceOptions {
     lit: LookMask;
     shadow: LookMask;
+    albedo?: LookImage;
     bound?: LookBound;
 }
 
@@ -103,6 +104,8 @@ export interface FoamEdgesOptions {
     hardWidth?: number;
     bound?: LookBound;
 }
+
+export const GROUND_ALBEDO_LEVELS = 16;
 
 export const GROUND_INSET: number;
 
@@ -298,6 +301,11 @@ export interface WaterSeamOptions {
     water: LookMask;
     bound?: LookBound;
 }
+
+export function albedoOf(frame: {
+    width: number;
+    height: number;
+}, masks: Record<string, LookMask>): LookImage | undefined;
 
 export function banding(frame: LookImage, options?: BandingOptions): LookResult;
 

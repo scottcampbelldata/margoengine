@@ -143,7 +143,8 @@ The other masks the clean-frame checks read are page masks by name: list `penumb
 shadow visibility: outputs `{penumbra: 'penumbra', lit: 'litGround', shadow: 'shadedGround', subject: 'subject'}`,
 with the subject model added as `targets.add(model, {subject: true})` (its README, "Sun light and the look masks",
 has the limits). `penumbra` feeds `penumbra` (T1 grain in soft shadow edges), `subject` feeds `silhouette` and
-`silhouetteShape` (T5), and `lit` with `shadow` feed `bounce` and `shadowTint` (T6). `tools/shot/test/look-masks-check.mjs`
+`silhouetteShape` (T5), and `lit` with `shadow` feed `bounce` and `shadowTint` (T6); `albedo-r`, `albedo-g` and `albedo-b`
+(one sRGB coded channel of the surface colour each) make T6 compare like surfaces only (KB-LOOK-TV-TINTMATCH1). `tools/shot/test/look-masks-check.mjs`
 (in `npm run test:shot`) renders the test scene with `?aov=look` (Shadows on every mesh, a gltf box as the subject) at
 480 x 270 with the moving evidence, and every one of those checks and `shimmerMoving` and `motionBlur` runs on the
 shot's own masks: 70,136 lit, 3,476 shaded, 1,773 penumbra and 1,826 subject pixels, the frame darker inside the

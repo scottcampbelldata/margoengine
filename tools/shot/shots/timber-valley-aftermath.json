@@ -88,6 +88,9 @@
       "subject",
       "lit",
       "shadow",
+      "albedo-r",
+      "albedo-g",
+      "albedo-b",
       "sky"
     ],
     "horizon": {

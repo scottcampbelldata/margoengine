@@ -7,7 +7,9 @@ import { readFileSync } from 'node:fs';
 import { encodePNG } from '../dist/index.js';
 import { decodePNG } from '../dist/compare.js';
 import {
+  GROUND_ALBEDO_LEVELS,
   GROUND_INSET,
+  albedoOf,
   LOOK_CHECKS,
   LOOK_FAMILY_BOUNDS,
   LOOK_FAMILY_NAMES,
@@ -496,6 +498,81 @@ test('T6 bounce and shadowTint read the ground masks inside their edges, where t
     none = bounce(blurred, { lit, shadow: thin });
   assert.equal(none.pass, false);
   assert.match(none.missing, /lit and shadowed ground/);
+});
+
+test('T6 bounce and shadowTint compare like surfaces when given the albedo (KB-LOOK-TV-TINTMATCH1)', () => {
+  // The timber-valley blowup read mid bounce 103 percent and shadowTint 0.036 b* (bound 0.0448): shadowed ground
+  // brighter than lit ground, which one surface under one light cannot be. Its lit and shadow masks held different
+  // surfaces. Here one light falls on two surfaces, warm sand and grey ash: the lit mask is mostly sand, the shadow
+  // mask mostly ash. Without the albedo the masks mix the surfaces and the checks measure sand against ash; with it
+  // each surface is compared with itself and the pooled values are the light's own.
+  const size = 64,
+    encode = (v) => {
+      const c = Math.min(1, Math.max(0, v));
+      return Math.round(255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055));
+    },
+    sun = [0.9, 0.8, 0.6],
+    sky = [0.12, 0.13, 0.16],
+    sand = [0.55, 0.45, 0.3],
+    ash = [0.1, 0.1, 0.11],
+    lit = mask(size, size, (x) => x < 32),
+    shadow = mask(size, size, (x) => x >= 32),
+    // Lit: rows 0 to 7 ash, the rest sand. Shadow: rows 0 to 55 ash, the rest sand.
+    surface = (x, y) => (x < 32 ? (y < 8 ? ash : sand) : y < 56 ? ash : sand),
+    shade = (a, inSun) => a.map((v, c) => encode(v * (sky[c] + (inSun ? sun[c] : 0)))),
+    frame = image(size, size, (x, y) => shade(surface(x, y), x < 32)),
+    grey = (c) => mask(size, size, () => false),
+    plane = (c) => {
+      const m = grey(c);
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) m.data[y * size + x] = encode(surface(x, y)[c]);
+      return m;
+    },
+    albedo = albedoOf(frame, { 'albedo-r': plane(0), 'albedo-g': plane(1), 'albedo-b': plane(2) }),
+    // Each surface alone, a frame of nothing but it, lit on the left and shaded on the right.
+    alone = (a) => image(size, size, (x) => shade(a, x < 32)),
+    truth = (check) => [sand, ash].map((a) => check(alone(a), { lit, shadow }).value);
+  assert.equal(GROUND_ALBEDO_LEVELS, 16);
+  assert.equal(albedoOf(frame, { 'albedo-r': plane(0) }), undefined, 'all three planes or none');
+  const mixedTint = shadowTint(frame, { lit, shadow }),
+    tint = shadowTint(frame, { lit, shadow, albedo }),
+    mixedBounce = bounce(frame, { lit, shadow }),
+    matched = bounce(frame, { lit, shadow, albedo }),
+    [sandTint, ashTint] = truth(shadowTint),
+    [sandBounce, ashBounce] = truth(bounce);
+  // The old masks mix the surfaces: sand in sun against ash in shade reads a far warmer and darker shadow than the
+  // light gives either surface.
+  assert.ok(mixedTint.value > sandTint + 5, `mixed tint ${mixedTint.value} against sand ${sandTint}`);
+  assert.ok(mixedBounce.value < Math.min(sandBounce, ashBounce) / 2, `mixed bounce ${mixedBounce.value}`);
+  // Like for like: the pooled value lies between the two surfaces' own and is their Cochran-Mantel-Haenszel mean.
+  const lo = Math.min(sandTint, ashTint),
+    hi = Math.max(sandTint, ashTint);
+  assert.ok(tint.value >= lo - 1e-9 && tint.value <= hi + 1e-9, `tint ${tint.value} in ${lo} to ${hi}`);
+  assert.ok(
+    matched.value >= Math.min(sandBounce, ashBounce) - 1e-9 && matched.value <= Math.max(sandBounce, ashBounce) + 1e-9,
+    `bounce ${matched.value}`,
+  );
+  assert.equal(tint.detail.strata, 2);
+  assert.equal(tint.detail.matched, tint.detail.lit + tint.detail.shadow);
+  // A surface seen only in the sun is not compared: with the shadow all ash and the lit ground all sand nothing matches.
+  const apart = (x) => (x < 32 ? sand : ash),
+    split = image(size, size, (x) => shade(apart(x), x < 32)),
+    splitAlbedo = albedoOf(split, {
+      'albedo-r': mask(size, size, () => false),
+      'albedo-g': mask(size, size, () => false),
+      'albedo-b': mask(size, size, () => false),
+    });
+  for (let i = 0; i < size * size; i++)
+    for (let c = 0; c < 3; c++) splitAlbedo.data[i * 4 + c] = encode(apart(i % size)[c]);
+  const none = shadowTint(split, { lit, shadow, albedo: splitAlbedo });
+  assert.equal(none.pass, false);
+  assert.match(none.missing, /like albedo/);
+  // checkProbe builds the albedo from the probe's masks.
+  const probe = checkProbe({
+    name: 'two surfaces',
+    frame,
+    masks: { lit, shadow, 'albedo-r': plane(0), 'albedo-g': plane(1), 'albedo-b': plane(2) },
+  }).find((row) => row.check === 'shadowTint');
+  assert.ok(Math.abs(probe.value - tint.value) < 1e-9, `${probe.value} ${tint.value}`);
 });
 
 test('T6 limits follow the light: a clear sun keeps 10 to 35 percent and 3 b*, a pall moves them, wrong bounce fails', () => {

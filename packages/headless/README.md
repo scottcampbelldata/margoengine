@@ -682,8 +682,8 @@ console.log(lookReport([{ name: 'hearth', frame, results: rows }]).markdown.spli
 | `motionBlur` | T8: % of edge centres of pixels moving over 8 pixels a frame whose edge is narrower than half the shutter's smear (`shutter` degrees, default 180, smear `shutter / 360` of the travel; `checkShot` reads the angle from `manifest.render` when the shot drew sub-frames) | 5 | `moving` |
 | `silhouette` | T5: % of the subject's outline with 15 L* or more against what is behind | [80, 100] | the `subject` mask |
 | `silhouetteShape` | T5: % of the subject (at 320 x 180, three L* values) in one value | [70, 100] | the `subject` mask |
-| `bounce` | T6: shadowed ground luminance as a % of the lit ground's, linear light, each over its mask's interior (`GROUND_INSET`, 1/360 of the shorter side, in from every edge, where the frame mixes both sides) | [10, 35] under a clear sun; a probe's `light` moves it (`lightBounds`) | the `lit` and `shadow` masks |
-| `shadowTint` | T6: lit b* minus shadow b*, points: shadows cooler than the sun, over the masks' interiors as `bounce` | [3, 100] under a clear sun; a probe's `light` moves it (`lightBounds`) | the `lit` and `shadow` masks |
+| `bounce` | T6: shadowed ground luminance as a % of the lit ground's, linear light, each over its mask's interior (`GROUND_INSET`, 1/360 of the shorter side, in from every edge, where the frame mixes both sides) | [10, 35] under a clear sun; a probe's `light` moves it (`lightBounds`) | the `lit` and `shadow` masks; with `albedo-r`, `albedo-g` and `albedo-b`, like surfaces only |
+| `shadowTint` | T6: lit b* minus shadow b*, points: shadows cooler than the sun, over the masks' interiors as `bounce` | [3, 100] under a clear sun; a probe's `light` moves it (`lightBounds`) | the `lit` and `shadow` masks; with `albedo-r`, `albedo-g` and `albedo-b`, like surfaces only |
 | `nightLuma`, `nightPeak` | T7: mean luma, and the luma of the brightest 1%, of a night frame | [24, 255], [180, 255] | the frame; run only when a shot names them |
 
 | Export | What it does |
@@ -695,7 +695,7 @@ console.log(lookReport([{ name: 'hearth', frame, results: rows }]).markdown.spli
 | `flip(test, reference, { pixelsPerDegree?, map? })` | FLIP (Andersson et al. 2020): the difference a viewer sees flipping between two frames, 0 to 1 per pixel, as `{ mean, p50, p95, p99, max }` and the per-pixel `map` with `map: true`. 67 pixels per degree is a 4K monitor at 0.7 m; a phone at 30 cm showing 1080 pixels across 6.5 cm is about 87. `difference(frame, other, 'reference' or 'backends')` is its check row. |
 | `hdrFlip(test, reference, { pixelsPerDegree?, map?, toneMapper?, startExposure?, stopExposure?, exposureMap? })` | HDR-FLIP (Andersson, Nilsson, Shirley and Akenine-Moller 2021) on two linear float frames (RGBA, Float32 or half floats): the largest FLIP error over a range of exposures, pooled as `flip`'s, with `startExposure`, `stopExposure`, `exposures` and, with `exposureMap: true`, the exposure that gave each pixel its error. See "HDR-FLIP" below. |
 | `horizonLine(viewProjection, width, height)`, `maskTopEdge(mask)` | The row per column of the horizon of horizontal planes (column-major view-projection, WebGPU clip space) and of a mask's top edge. NaN where there is none. |
-| `stairs`, `colourEdges`, `chromaSmear`, `penumbra`, `penumbraPlants`, `shimmerMoving`, `motionBlur`, `silhouette`, `silhouetteShape`, `bounce`, `shadowTint`, `nightLuma`, `nightPeak`, `reprojectionMotion(depth, viewProjection, nextViewProjection, width, height)`, `depthFromDistance(distance, eye, viewProjection, width, height, { water, plane, far })` (NDC depth from each pixel's distance to the eye, for `reprojectionMotion`; pixels with no distance meet the sea plane where `water` is 128 or more, or are `far` away), `detailKeptFloor(family)` (T7: 0.5, and 0.6 for `animatedFeature`, as `LOOK_FAMILY_DETAIL_KEPT`) | The clean-frame checks (below), each alone with its `bound`; `reprojectionMotion` gives the motion of every pixel of a still world seen by a moving camera. |
+| `stairs`, `colourEdges`, `chromaSmear`, `penumbra`, `penumbraPlants`, `shimmerMoving`, `motionBlur`, `silhouette`, `silhouetteShape`, `bounce`, `shadowTint`, `albedoOf(frame, masks)`, `GROUND_ALBEDO_LEVELS`, `nightLuma`, `nightPeak`, `reprojectionMotion(depth, viewProjection, nextViewProjection, width, height)`, `depthFromDistance(distance, eye, viewProjection, width, height, { water, plane, far })` (NDC depth from each pixel's distance to the eye, for `reprojectionMotion`; pixels with no distance meet the sea plane where `water` is 128 or more, or are `far` away), `detailKeptFloor(family)` (T7: 0.5, and 0.6 for `animatedFeature`, as `LOOK_FAMILY_DETAIL_KEPT`) | The clean-frame checks (below), each alone with its `bound`; `reprojectionMotion` gives the motion of every pixel of a still world seen by a moving camera. |
 | `LOOK_FAMILY_BOUNDS`, `LOOK_FAMILY_NAMES`, `familyBounds(name)` | The look families and their bounds. |
 | `luma(frame)`, `lookBound(bound)`, `LOOK_CHECKS` | BT.709 luma on 0 to 255, a bound as `[low, high]`, and each check's default bound, unit and meaning. |
 
@@ -722,6 +722,30 @@ const { diffuse, bounce, shadowTint } = lightBounds({
   ambient: [0.33, 0.29, 0.27],
 });
 console.log(diffuse.toFixed(2), bounce.map(Math.round), shadowTint[0].toFixed(2)); // 0.95 [ 28, 99 ] 0.24
+```
+
+**T6 compares like surfaces** (KB-LOOK-TV-TINTMATCH1, 2026-11-28). `bounce` and `shadowTint` take an optional `albedo`,
+an RGBA image of each pixel's surface colour (sRGB coded): the lit and shadowed ground are then cut into strata of like
+albedo (`GROUND_ALBEDO_LEVELS`, 16 per channel), each stratum's lit and shadowed means are compared alone, and the
+strata are pooled with the Cochran-Mantel-Haenszel weight n_lit x n_shadow / (n_lit + n_shadow) (Cochran 1954, Mantel
+and Haenszel 1959), so a surface seen only in the sun or only in the shade does not count. `albedoOf(frame, masks)`
+builds it from three grey masks `albedo-r`, `albedo-g` and `albedo-b` (one channel each, as the shot tool writes an
+AOV), and `checkProbe` passes it on when a probe has all three. Each row then records `detail.matched` (pixels in strata
+both sides hold) and `detail.strata`; with no stratum on both sides the check reports `missing`. Without an albedo the
+ground is one stratum, as before. Bounds unchanged. The timber-valley blowup read mid bounce 103.6 percent (shadowed
+ground brighter than lit, which one surface under one light cannot be) and shadowTint 0.036 b*: its masks held
+different surfaces.
+
+```js
+import { albedoOf, shadowTint } from '@margoengine/headless/look';
+const size = 64,
+  plane = (v) => ({ width: size, height: size, data: new Uint8Array(size * size).fill(v) }),
+  half = (left) => ({ width: size, height: size, data: Uint8Array.from({ length: size * size }, (_, i) => ((i % size < 32) === left ? 255 : 0)) }),
+  frame = { width: size, height: size, data: new Uint8Array(size * size * 4) };
+for (let i = 0; i < size * size; i++) frame.data.set(i % size < 32 ? [214, 180, 130, 255] : [92, 88, 96, 255], i * 4);
+const albedo = albedoOf(frame, { 'albedo-r': plane(180), 'albedo-g': plane(150), 'albedo-b': plane(110) });
+const row = shadowTint(frame, { lit: half(true), shadow: half(false), albedo });
+console.log(row.value.toFixed(1), row.pass, row.detail.strata); // 34.1 true 1
 ```
 
 **Clean frames and look families.** The clean-frame checks are the look bar of the animated-feature film (T1 to T8, private roadmap section 3): no grain, banding, stairs or shimmer, shapes that read, bounce light in the shadows, colour that survives YouTube's 4:2:0 H.264 and motion that is blurred. `checkProbe(probe, bounds, { family: 'animatedFeature' })` (or `lookFamily: "animatedFeature"` in a shot file) holds every check the probe can run to the family's bound: grain 0.5 codes, penumbra 0.7, penumbraPlants 1, speckle 5 ppm, banding 0.2%, stairs 1%, still shimmer 0.1% and flicker 0.3, `shimmerMoving` 0.5%, crush 0.1%, the reference FLIP 0.04, plus the ranges above. A check whose input the probe lacks is left out under a family (a shot that names it in `lookBounds` still fails it as missing); a mask that marks no pixel counts as lacking, so a frame with no subject or no shaded ground runs no `silhouette` or `bounce`, and a shot's own `lookBounds` win by name. `natural` keeps every default. `stairs` and `colourEdges` read the frame alone. A step was once judged against the climb along its own row, which misread an antialiased edge near a pixel axis (one pixel of coverage 0.1 per row is a tenth of the climb on one side and nine tenths on the other): a 16 sample per pixel render of the storm-light shot read 15% `stairs`. They now look for a value between the plateaus around the step; on that shot msaa 1 reads 5.70% over the whole frame (5.98% on the crop in `tests/fixtures/look-real`, against 30.6% by the old test), msaa 4 at supersample 1, 1.5 and 2 read 0.10, 0.00 and 0.01%, and the 16 sample reference 0.00%. The flood draft shots (msaa 1, supersample 1) read 2.7 to 22.7%, which is real aliasing: they are not rendered at the film setting.

@@ -1548,11 +1548,13 @@ export function checkProbe(
     bounds[name] ?? (probe.light ? lightBounds(probe.light, { [name]: fam[name] })[name] : fam[name]);
   const noted = (row: LookResult): LookResult =>
     probe.light ? { ...row, detail: { ...row.detail, diffuse: lightBounds(probe.light).diffuse } } : row;
+  // The albedo AOV, one grey mask per sRGB channel (`albedo-r`, `albedo-g`, `albedo-b`), makes T6 compare like surfaces.
+  const albedo = albedoOf(frame, masks);
   run('bounce', ground, () =>
-    noted(bounce(frame, { lit: masks.lit, shadow: masks.shadow, bound: followed('bounce') })),
+    noted(bounce(frame, { lit: masks.lit, shadow: masks.shadow, albedo, bound: followed('bounce') })),
   );
   run('shadowTint', ground, () =>
-    noted(shadowTint(frame, { lit: masks.lit, shadow: masks.shadow, bound: followed('shadowTint') })),
+    noted(shadowTint(frame, { lit: masks.lit, shadow: masks.shadow, albedo, bound: followed('shadowTint') })),
   );
   // A night shot names these (a daylight frame is not a failed night): no family runs them.
   if ('nightLuma' in bounds) rows.push(nightLuma(frame, { bound: bounds.nightLuma }));
@@ -2636,6 +2638,11 @@ export interface BounceOptions {
   lit: LookMask;
   /** Where the ground is in shadow. */
   shadow: LookMask;
+  /**
+   * The surface colour of each pixel, RGBA sRGB coded (an albedo AOV): the lit and shadowed ground are then compared
+   * within strata of like albedo. Unset, all ground is one stratum.
+   */
+  albedo?: LookImage;
   bound?: LookBound;
 }
 
@@ -2675,55 +2682,142 @@ function inset(width: number, height: number, inside: Uint8Array, r: number): Ui
 // pixel (Fisher, "The pixel: a snare and a delusion", 1997). Lit and shadowed ground are therefore averaged over
 // their interiors, as patch colour is read in a patch's centre away from its edges (ISO 14524), a GROUND_INSET of
 // the frame in from every edge (KB-LOOK-TV-BOUNCE1: thin shadows between plants took the lit ground's light).
-function meanLab(frame: LookImage, mask: LookMask, what: string) {
+//
+// T6 compares one surface in sun and in shade, and a frame's lit and shadowed ground are seldom the same surface: in
+// the timber-valley blowup the shadowed ground read brighter than the lit ground (103 % bounce), which no single
+// surface under one light can do, so the masks' own albedo difference outweighed the light's. With an albedo the
+// ground is cut into strata of like surface (GROUND_ALBEDO_LEVELS per sRGB channel) and each stratum's lit and
+// shadowed means are compared alone, the strata pooled with the Cochran-Mantel-Haenszel weight n_lit n_shadow /
+// (n_lit + n_shadow) (W. G. Cochran, "Some methods for strengthening the common chi-squared tests", Biometrics 10(4),
+// 417-451, 1954, https://doi.org/10.2307/3001616; N. Mantel and W. Haenszel, "Statistical aspects of the analysis of
+// data from retrospective studies of disease", JNCI 22(4), 719-748, 1959, https://doi.org/10.1093/jnci/22.4.719), so
+// a surface that is only lit or only shaded does not count (KB-LOOK-TV-TINTMATCH1). Without an albedo the ground is
+// one stratum, as before.
+
+/**
+ * The albedo of a probe's masks: `albedo-r`, `albedo-g` and `albedo-b` (grey masks of one sRGB coded channel each, as
+ * the shot tool writes an AOV) as one RGBA image, or undefined without all three.
+ */
+export function albedoOf(frame: { width: number; height: number }, masks: Record<string, LookMask>): LookImage | undefined {
+  const planes = ['albedo-r', 'albedo-g', 'albedo-b'].map((name) => masks[name]);
+  if (planes.some((plane) => !plane)) return undefined;
+  const count = frame.width * frame.height,
+    data = new Uint8Array(count * 4);
+  planes.forEach((plane, c) => {
+    sameSize(frame, plane!, `${['albedo-r', 'albedo-g', 'albedo-b'][c]} mask`);
+    const step = plane!.data.length === count ? 1 : plane!.data.length === count * 4 ? 4 : 0;
+    if (!step) throw rangeError('An albedo mask holds one byte or four per pixel', 'headless');
+    for (let i = 0; i < count; i++) data[i * 4 + c] = plane!.data[i * step];
+  });
+  for (let i = 0; i < count; i++) data[i * 4 + 3] = 255;
+  return { width: frame.width, height: frame.height, data };
+}
+
+/** Levels per sRGB channel of the albedo strata {@link bounce} and {@link shadowTint} compare within: 16 (16 codes). */
+export const GROUND_ALBEDO_LEVELS = 16;
+
+interface GroundStratum {
+  n: [number, number];
+  Y: [number, number];
+  b: [number, number];
+}
+
+function groundStrata(frame: LookImage, { lit, shadow, albedo }: BounceOptions): Map<number, GroundStratum> {
   const r = Math.max(1, Math.round(Math.min(frame.width, frame.height) * GROUND_INSET)),
-    inside = inset(frame.width, frame.height, maskBits(frame, mask, what), r);
-  let n = 0,
-    Y = 0,
-    b = 0;
-  for (let i = 0, j = 0; i < inside.length; i++, j += 4) {
-    if (!inside[i]) continue;
-    n++;
-    Y +=
+    masks = [lit, shadow].map((mask, i) => inset(frame.width, frame.height, maskBits(frame, mask, i ? 'shadow' : 'lit'), r));
+  if (albedo) {
+    sameSize(frame, albedo, 'albedo');
+    if (albedo.data.length !== frame.width * frame.height * 4)
+      throw rangeError('The albedo holds four bytes per pixel (RGBA, sRGB coded)', 'headless');
+  }
+  const strata = new Map<number, GroundStratum>(),
+    q = 256 / GROUND_ALBEDO_LEVELS;
+  for (let i = 0, j = 0; i < masks[0].length; i++, j += 4) {
+    if (!masks[0][i] && !masks[1][i]) continue;
+    const side = masks[0][i] ? 0 : 1;
+    const key = albedo
+      ? (Math.floor(albedo.data[j] / q) * GROUND_ALBEDO_LEVELS + Math.floor(albedo.data[j + 1] / q)) *
+          GROUND_ALBEDO_LEVELS +
+        Math.floor(albedo.data[j + 2] / q)
+      : 0;
+    let at = strata.get(key);
+    if (!at) strata.set(key, (at = { n: [0, 0], Y: [0, 0], b: [0, 0] }));
+    at.n[side]++;
+    at.Y[side] +=
       0.2126729 * srgbToLinear(frame.data[j]) +
       0.7151522 * srgbToLinear(frame.data[j + 1]) +
       0.072175 * srgbToLinear(frame.data[j + 2]);
-    b += lab(frame.data[j], frame.data[j + 1], frame.data[j + 2])[2];
+    at.b[side] += lab(frame.data[j], frame.data[j + 1], frame.data[j + 2])[2];
   }
-  return { n, Y: n ? Y / n : 0, b: n ? b / n : 0 };
+  return strata;
+}
+
+/**
+ * The strata's pooled value of `value(lit, shadow)` (each side's mean Y and b*), with the pixels behind it: `lit` and
+ * `shadow` count the masks' interiors, `matched` the pixels in strata both sides hold, `strata` those strata.
+ */
+function pooled(
+  options: BounceOptions,
+  frame: LookImage,
+  value: (lit: { Y: number; b: number }, shadow: { Y: number; b: number }) => number,
+) {
+  let lit = 0,
+    shadow = 0,
+    matched = 0,
+    strata = 0,
+    sum = 0,
+    weights = 0;
+  for (const at of groundStrata(frame, options).values()) {
+    lit += at.n[0];
+    shadow += at.n[1];
+    if (!at.n[0] || !at.n[1]) continue;
+    const mean = (side: number) => ({ Y: at.Y[side] / at.n[side], b: at.b[side] / at.n[side] }),
+      v = value(mean(0), mean(1));
+    if (!Number.isFinite(v)) continue;
+    const w = (at.n[0] * at.n[1]) / (at.n[0] + at.n[1]);
+    matched += at.n[0] + at.n[1];
+    strata++;
+    sum += w * v;
+    weights += w;
+  }
+  const detail: Record<string, number> = options.albedo ? { lit, shadow, matched, strata } : { lit, shadow };
+  return { value: weights ? sum / weights : Number.NaN, detail };
+}
+
+function groundCheck(
+  name: 'bounce' | 'shadowTint',
+  frame: LookImage,
+  options: BounceOptions,
+  value: (lit: { Y: number; b: number }, shadow: { Y: number; b: number }) => number,
+): LookResult {
+  const { value: v, detail } = pooled(options, frame, value);
+  if (!Number.isFinite(v))
+    return {
+      ...result(name, Number.NaN, options.bound, detail),
+      pass: false,
+      missing: options.albedo ? 'lit and shadowed ground of a like albedo' : 'lit and shadowed ground pixels',
+    };
+  return result(name, v, options.bound, detail);
 }
 
 /**
  * T6: the mean luminance of the shadowed ground as a percent of the lit ground's, in linear light, each averaged over
  * its mask's interior ({@link GROUND_INSET} in from the edges, where the frame mixes both sides). Shadow that holds
- * 10 to 35 percent of the sunlit value carries bounce and sky light; under 10 is crushed, over 35 flat.
+ * 10 to 35 percent of the sunlit value carries bounce and sky light; under 10 is crushed, over 35 flat. With
+ * `albedo` the lit and shadowed ground are compared surface for like surface ({@link GROUND_ALBEDO_LEVELS}).
  */
-export function bounce(frame: LookImage, { lit, shadow, bound }: BounceOptions): LookResult {
-  const l = meanLab(frame, lit, 'lit'),
-    s = meanLab(frame, shadow, 'shadow');
-  if (!l.n || !s.n || !l.Y)
-    return {
-      ...result('bounce', Number.NaN, bound, { lit: l.n, shadow: s.n }),
-      pass: false,
-      missing: 'lit and shadowed ground pixels',
-    };
-  return result('bounce', (100 * s.Y) / l.Y, bound, { lit: l.n, shadow: s.n });
+export function bounce(frame: LookImage, { lit, shadow, bound }: BounceOptions): LookResult;
+export function bounce(frame: LookImage, options: BounceOptions): LookResult {
+  return groundCheck('bounce', frame, options, (l, s) => (l.Y ? (100 * s.Y) / l.Y : Number.NaN));
 }
 
 /**
  * T6: how much cooler (lower b*) the shadowed ground is than the lit ground, in CIE b* points (at least 3), over the
- * masks' interiors as {@link bounce}.
+ * masks' interiors and, with `albedo`, surface for like surface, as {@link bounce}.
  */
-export function shadowTint(frame: LookImage, { lit, shadow, bound }: BounceOptions): LookResult {
-  const l = meanLab(frame, lit, 'lit'),
-    s = meanLab(frame, shadow, 'shadow');
-  if (!l.n || !s.n)
-    return {
-      ...result('shadowTint', Number.NaN, bound, { lit: l.n, shadow: s.n }),
-      pass: false,
-      missing: 'lit and shadowed ground pixels',
-    };
-  return result('shadowTint', l.b - s.b, bound, { lit: l.n, shadow: s.n });
+export function shadowTint(frame: LookImage, { lit, shadow, bound }: BounceOptions): LookResult;
+export function shadowTint(frame: LookImage, options: BounceOptions): LookResult {
+  return groundCheck('shadowTint', frame, options, (l, s) => l.b - s.b);
 }
 
 /**
