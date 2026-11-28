@@ -520,7 +520,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | FIRE-01 | Wildfire spread | partial | Open | OPEN |
 | FIRE-02 | Flame and fireball | stand-in | Open | OPEN |
 | FIRE-03 | Integral plume and thermal model | partial | Claude | CLAIMED (Fauld film) |
-| BIO-01 | Plant mechanics under wind and water | modal sway, windthrow and rigid impacts | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a4d123a968 |
+| BIO-01 | Plant mechanics under wind and water | modal sway, windthrow and rigid impacts | Codex | BUILDING (codex/physics-bio-01-four-point; four-point pass; [audit](physics-solver-audit.md)), prior landing a4d123a968 |
 | DYN-07 | Dynamic character, balance, push response | partial: shared debug view and character-ragdoll bridge landed | Claude (laptop), taken over from Gemini on Scott's order, 2026-11-27 | BUILDING |
 | AERO-01 | Aerodynamic loads on bodies | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 48b593a13 |
 | AERO-02 | Membrane aerodynamics (FSI) | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 2f1860412 |
