@@ -391,9 +391,11 @@ export class PickingPrimitives {
       values[32] = p.alpha ?? 1;
       values[33] = p.cutoff ?? 0;
       values[34] = p.texCoord ?? 0;
-      values[35] = Math.sign(
-        m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]),
-      );
+      // The node's handedness: a determinant of 0 (a zero scale) is not mirrored, so the facing test keeps working.
+      values[35] =
+        m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]) < 0
+          ? -1
+          : 1;
       values.set(p.alphaTransform ?? identityUV, 36);
       values[44] = ids[index];
       values[45] =
@@ -552,8 +554,12 @@ function instancedPick(code: string, mask: boolean): string {
       '@location(1) alpha:f32}',
       '@location(1) alpha:f32,@location(2) @interpolate(flat) pickRow:u32,@location(7) @interpolate(flat) pickFace:f32}',
     )
-    // A mirrored row (negative determinant) turns its triangles' winding: its faces are tested the other way round.
-    .replace('var o:Out;', 'var o:Out;o.pickRow=margoRow;o.pickFace=sign(dot(cross(i.m0.xyz,i.m1.xyz),i.m2.xyz));')
+    // A mirrored row (negative determinant) turns its triangles' winding: its faces are tested the other way round. A
+    // row flattened by a zero scale (determinant 0) is not mirrored: sign() gave 0 there and failed every facing test.
+    .replace(
+      'var o:Out;',
+      'var o:Out;o.pickRow=margoRow;o.pickFace=select(-1.0,1.0,dot(cross(i.m0.xyz,i.m1.xyz),i.m2.xyz)>=0.0);',
+    )
     .replace('let facing=front==(f.settings.w>0.0);', 'let facing=front==(f.settings.w*i.pickFace>0.0);');
   if (!out.includes(row)) out = out.replace('@vertex fn vertex(', `@vertex fn vertex(${row},`);
   if (!mask) out = out.replace('return u32(f.info.x);', 'return u32(f.info.x)+i.pickRow;');

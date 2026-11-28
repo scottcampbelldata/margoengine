@@ -253,6 +253,27 @@ test('Distinct PBR primitives retain distinct uniforms, UV1 affine alpha, mirror
   h.cleanup();
 });
 
+test('A node flattened by a zero scale keeps the facing test (handedness 1, never 0)', async () => {
+  // sign() of a determinant of 0 gave a handedness of 0, so f.settings.w>0 failed for every face and a one-sided surface
+  // on a zero-scale node could never be picked from its front (KB-GLTFA B1's class, selection). The instance rows' twin
+  // in the pick shader is held by tests/modern-zero-determinant-normals.test.js.
+  const handedness = async (scale) => {
+    const h = harness(),
+      node = h.node(0);
+    node.matrix[10] = scale;
+    h.picking.add({ pickingPrimitives: [h.primitive(node)] });
+    await h.picking.onPick(64, 48);
+    const [[, group]] = h.passes.at(-1).groups,
+      value = new Float32Array(group.entries[0].resource.buffer.data)[35];
+    h.picking.dispose();
+    h.cleanup();
+    return value;
+  };
+  assert.equal(await handedness(0), 1, 'a zero-scale node is not mirrored');
+  assert.equal(await handedness(-1), -1, 'a mirrored node still is');
+  assert.equal(await handedness(1), 1);
+});
+
 test('Picking skips hidden ancestors and disposed nodes, and unregistration restores the core capture path', async () => {
   const h = harness(),
     mesh = h.node(0),
