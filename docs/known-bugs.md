@@ -17946,6 +17946,25 @@ Regression: packages/gltf/test/node-images.test.js, six PNG/JPEG source cases fa
   (17, 17, 19), half or a quarter of `stepTrigger` (16, 23), and the four together (18). Seed-san falls the same in every
   variant, so its cause is elsewhere: next look at its stance foot's sole (contact points and the `room` ankle torque bound,
   `carryWeight` around line 630) and at what the upper body does in the first 12 frames of a sideways push.
+- **Seed-san's sole and step, measured (lane P, 2026-11-28, second pass):** the sole is not the fault. Seed-san's fitted sole reaches
+  0.198 m ahead of the ankle, 0.030 m behind and 0.045 m to each side; its mesh reaches 0.044 m behind the ankle, and the extra
+  1.4 cm sits above the 2 cm band `soleOf` takes. `minWeight` 0.05 to 0.5 fits the same sole. The stance ankle's own motor is not
+  it either: its rod gains scaled by 0, 0.25 or 4 leave Seed-san at 6 of 8. What fells Seed-san is the step. A 0.2 m/s push
+  backward fells it: the capture point lies 0.035 m behind the ankles, just past the 0.030 m heel, and `stepTrigger` (0.2 of
+  the reach, 0.146 m) holds the step back for 52 frames while the capture point drifts out. Then `room` is 0 (it stands at
+  97.6 percent of its leg, past the 0.9 factor, finding a above), so the step lands under the hips, forward of where the foot
+  stood. The trailing foot steps first on a sideways push (`lifted` wins over the landing check), a crossing step. Each lever,
+  measured over the seven figures and four directions, seed 1 (seeds 1 and 2 read the same), falls at 0.5 / 1 / 1.5 m/s
+  against a baseline of 5 / 9 / 11: a trigger on the capture point leaving the hull of both soles (Pratt 2006; Koolen et al.,
+  "Capturability-based analysis and control of legged locomotion, Part 1", IJRR 2012) 21 of 56 at 1 m/s against 18; that
+  trigger with the true hip height and 0.998 extension 26 of 56; the true hip height and 0.998 extension alone 5 / 8 / 21; the
+  0.998 extension alone 4 / 9 / 12; the trailing-foot rule off 18 of 56; the shortest step at 0.8 or 1.2 of 1/omega (the
+  doc says half a natural period, the code 0.4) 17 and 18 of 56; the ankle bound kept through single support 4 / 11 / 13. With
+  the hull trigger and the true reach, Seed-san's 0.2 m/s backward step lands 4 cm back and the capture point comes back
+  between the feet by frame 30, but both feet stand toe-up on their heels at 0.2 to 0.4 rad and the trailing foot slides
+  0.36 m forward on its heel, so the figure falls backward anyway. Next: why a stance foot that the bound holds stays toe-up
+  after a step (the foot load `foot` against the real contact force), and step execution for a straight-legged figure; the
+  levers above all trade one figure's falls for another's, so none landed.
 
 ### Fixed 2026-11-11: npm run verify hung once in its unit test step
 
