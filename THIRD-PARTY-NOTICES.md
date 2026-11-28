@@ -746,3 +746,11 @@ C. Gau and R. Viskanta (1986), [*Melting and Solidification of a Pure Metal on a
 Fig. 2(a), supplies nine sparse SI distances transcribed from the experimental trace reproduced by S. Meyer
 (2016), [*A Fluid Dynamics Approach for Solid-Liquid Phase Change in Binary and Elemental Melts*](https://publikationen.bibliothek.kit.edu/1000058183/3880102),
 Fig. 5.8. The diagnostic bundles those reported facts and the independently tabulated material constants.
+
+### SOUND-04 simply supported plate observations
+
+Patrick Dumond, Dominic Monette, Fadi Alladkani, James Akl and Inès Chikhaoui (2019),
+[*Simplified setup for the vibration study of plates with simply-supported boundary conditions*](https://doi.org/10.1016/j.mex.2019.09.023),
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The diagnostic transcribes only the
+dimensions and mode readings for plates 1 and 4 and nominal material inputs from Tables 3–5,
+converting quantities to SI.

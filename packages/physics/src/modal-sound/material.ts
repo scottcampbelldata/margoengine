@@ -1,4 +1,4 @@
-import { MargoError } from '@margoengine/math/errors';
+import { modalSoundError } from './errors.js';
 
 /** A damped sinusoidal pressure mode, with signed excitation and radiation gain combined. */
 export interface ModalMode {
@@ -65,8 +65,7 @@ const TABLE = {
 
 /** Return a fresh copy of an authored modal material, suitable for customization. */
 export function modalPreset(preset: ModalPreset): ModalMaterial {
-  if (!Object.hasOwn(TABLE, preset))
-    throw new MargoError('state', 'Use the wood, metal, glass or bell modal sound preset.');
+  if (!Object.hasOwn(TABLE, preset)) throw modalSoundError('Use the wood, metal, glass or bell modal sound preset.');
   return {
     modes: TABLE[preset].map(([frequency, decay, gain], i) => ({
       frequency,

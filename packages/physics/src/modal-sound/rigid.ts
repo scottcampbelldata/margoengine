@@ -1,4 +1,3 @@
-import { MargoError } from '@margoengine/math/errors';
 import type { PhysicsBody } from '../body.js';
 import type { PhysicsJoint } from '../joints.js';
 import type { KernelWorld } from '../kernel.js';
@@ -13,6 +12,7 @@ import {
   type StepContext,
 } from '../world/solver.js';
 import { RigidSolver, type RigidSolverParams } from '../world/solvers/rigid.js';
+import { modalSoundError } from './errors.js';
 import { limited, MODAL_CONTACT_WORDS, modalFractureImpulse } from './model.js';
 
 type Vector = readonly [number, number, number];
@@ -53,7 +53,7 @@ export interface ModalContactRigidOptions extends RigidSolverParams {
 }
 
 interface Data {
-  readonly memory: WebAssembly.Memory;
+  readonly host: SolverHost;
   readonly physics: ModalContactRigidOptions['physics'];
   readonly contact: Region;
   readonly fracture: Region | undefined;
@@ -151,7 +151,7 @@ function emit(out: Float64Array, track: number | undefined, i: number, sp: numbe
 
 function contactLoads(data: Data, kernel: KernelWorld, dt: number): void {
   const c = kernel.columns;
-  const out = regionWords(data.memory, data.contact) as Float64Array;
+  const out = regionWords(data.host.memory, data.contact) as Float64Array;
   out.fill(0);
   for (let order = 0; order < kernel.solvingPairs; order++) {
     const pair = c.solvePairs[order]!;
@@ -220,40 +220,33 @@ export class ModalContactRigidSolver extends RigidSolver {
   }
 
   override init(host: SolverHost, options: ModalContactRigidOptions): void {
-    const { physics, emitters } = options;
+    const { physics, emitters } = options ?? {};
     if (!physics || physics.fixedTimestep * rateOf(this.#sound.rate) !== 1)
-      throw new MargoError(
-        'state',
-        'Match the rigid fixedTimestep to the dyadic rate passed to ModalSoundSolver.load.',
-      );
-    if (!emitters.length) throw new MargoError('state', 'Pass at least one modal rigid emitter in track order.');
+      throw modalSoundError('Match the rigid fixedTimestep to the dyadic rate passed to ModalSoundSolver.load.');
+    if (!Array.isArray(emitters) || !emitters.length)
+      throw modalSoundError('Pass at least one modal rigid emitter in track order.');
     const inWorld = (body: PhysicsBody) =>
       body.valid && body.colliders.some((collider) => physics.colliderOf(collider.handle) === collider);
     const trackByBody = new Map<number, readonly [PhysicsBody, number]>();
     for (const [track, body] of emitters.entries()) {
       if (body === null) continue;
-      if (!inWorld(body) || trackByBody.has(body.row))
-        throw new MargoError(
-          'state',
+      if (!body || !inWorld(body) || trackByBody.has(body.row))
+        throw modalSoundError(
           'Pass distinct collider-bearing bodies from this Physics instance as modal rigid emitters.',
         );
       trackByBody.set(body.row, [body, track]);
     }
     const shares = new Map<PhysicsJoint, { energy: number; fraction: number }>();
     const breaks = this.#breaks.map(({ joint, track, energy, effectiveMass, energyFraction = 1 }) => {
-      if (!joint.valid || !physics.jointsOf(joint.bodyA).includes(joint))
-        throw new MargoError(
-          'state',
-          'Pass a live rigid joint from this Physics instance in each modal fracture mapping.',
-        );
+      if (!joint?.valid || !physics.jointsOf(joint.bodyA).includes(joint))
+        throw modalSoundError('Pass a live rigid joint from this Physics instance in each modal fracture mapping.');
       if (!Number.isInteger(track) || track < 0 || track >= emitters.length)
-        throw new MargoError('state', 'Set the modal fracture track to a zero-based index in the emitters array.');
+        throw modalSoundError('Set the modal fracture track to a zero-based index in the emitters array.');
       const impulse = modalFractureImpulse(energy, effectiveMass, energyFraction);
       const previous = shares.get(joint);
       const fraction = (previous?.fraction ?? 0) + energyFraction;
       if (fraction > 1 || (previous && previous.energy !== energy))
-        throw new MargoError(
-          'state',
+        throw modalSoundError(
           'Use one energy for each rupturing joint and keep its total energy fractions at or below 1.',
         );
       shares.set(joint, { energy, fraction });
@@ -263,7 +256,7 @@ export class ModalContactRigidSolver extends RigidSolver {
     const rollingResistance = limited(options.rollingResistance ?? 0.025, 0, 1, 'rolling resistance');
     super.init(host, options);
     this.#data = {
-      memory: host.memory,
+      host,
       physics,
       contact: host.allocate('modal-rigid-contacts', emitters.length * MODAL_CONTACT_WORDS * 8, 'f64', 1),
       fracture: breaks.length ? host.allocate('modal-rigid-fractures', emitters.length * 8, 'f64', 1) : undefined,
@@ -286,7 +279,7 @@ export class ModalContactRigidSolver extends RigidSolver {
     super.step(context, dt);
     if (data.trackByBody.size) contactLoads(data, kernel, dt);
     if (data.fracture) {
-      const out = regionWords(data.memory, data.fracture) as Float64Array;
+      const out = regionWords(data.host.memory, data.fracture) as Float64Array;
       out.fill(0);
       for (const [index, binding] of data.breaks.entries())
         if (!data.wasBroken[index] && binding.joint.valid && binding.joint.broken)
@@ -295,11 +288,12 @@ export class ModalContactRigidSolver extends RigidSolver {
   }
 
   override exportPorts(tick: number): readonly Port[] {
-    const { contact, fracture } = this.#data!;
+    const { contact, fracture, host } = this.#data!;
+    const cell = host.cell;
     return [
       ...super.exportPorts(tick),
-      { field: this.#sound.contactField.name, region: contact, tick, cell: CENTRE },
-      ...(fracture ? [{ field: this.#sound.fractureField.name, region: fracture, tick, cell: CENTRE }] : []),
+      { field: this.#sound.contactField.name, region: contact, tick, cell },
+      ...(fracture ? [{ field: this.#sound.fractureField.name, region: fracture, tick, cell }] : []),
     ];
   }
 

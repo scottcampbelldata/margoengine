@@ -1,4 +1,4 @@
-import { MargoError } from '@margoengine/math/errors';
+import { modalSoundError } from './errors.js';
 
 /** Five f64 words per track: impact impulse, scrape power, power × scrape speed, roll power, power × roll speed. */
 export const MODAL_CONTACT_WORDS = 5;
@@ -7,10 +7,7 @@ export const MAX_LOAD = 1e12;
 
 export function limited(value: number, min: number, max: number, name: string): number {
   if (!Number.isFinite(value) || value < min || value > max)
-    throw new MargoError(
-      'state',
-      `Modal sound ${name} is out of range. Pass a finite value from ${min} through ${max}.`,
-    );
+    throw modalSoundError(`Modal sound ${name} is out of range. Pass a finite value from ${min} through ${max}.`);
   return value;
 }
 

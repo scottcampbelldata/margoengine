@@ -24857,3 +24857,12 @@ Native body rows, pending calving, freshwater and signed wakes stage before acce
 - **Fix:** Read input in owning memory, stage finite outputs across the entire solver and publish the
   live signed cell. Use coded errors with a fix for inconsistent input. The coupled clock is explicit.
 - **Regression:** [vortex coupling](../packages/physics/tests/coupling/vortices.test.js).
+
+### Open: SOUND-04 acoustic modes and source coverage
+
+SOUND-04 accepts source-specific resonant frequencies, gains and damping, with authored examples for
+four material categories. Contact and joint rupture are live. Geometry-derived modes, location-dependent
+excitation and pressure radiation remain open, as do the solid fracture, ice, fluid, combustion and
+thunder sources in the coupling map. The simply supported plate comparison reproduces supplied
+frequencies in PCM and records discrepancies against independent measurements.
+[SOUND-04 measured limits](limits.md#sound-04-simply-supported-aluminum-plates).

@@ -7098,10 +7098,16 @@ defaults to 0.025.
 
 Use `ModalSoundSolver.load({ id, rate, inputs, signal })` to set the field prefix, dyadic rate, declared input
 owners and load cancellation. Defaults are `modalSound`, level 0 (60 Hz) and `contacts`. Match the rigid
-fixed timestep to this rate. Select `both` to include fractures, then map joints in the rigid solver's
+fixed timestep to this rate. Add the rigid and modal solvers in the same signed world cell. Select `both` to include fractures, then map joints in the rigid solver's
 `jointBreaks` setup or add a separate fracture producer. Each joint mapping provides its track, released
 strain energy in J, effective mass in kg and optional fraction of that joint's energy (default 1).
 `modalFractureImpulse` converts those values to an equivalent impulse for a fragment starting at rest.
+
+For multiple independent tracks in a shared world, set `threads` to 2 or 4 when loading the solver in Node
+or an isolated browser worker. The default uses one native participant. Use `using` or call
+`sound[Symbol.dispose]()` after the world is finished. `sound.readNativeWork()` reports the tracks, PCM
+samples, paired modal updates and roughness rotations of the last accepted block for each participant.
+A rejected port or native block leaves the prior sound state and retained PCM intact.
 
 The default sample rate is 48 kHz. Use `copyBlock(track)` for the latest world step or `copySince(cursor, track)`
 to collect every retained sample after an advance. Keep one cursor per track. The default history is 0.25 s

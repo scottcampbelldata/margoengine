@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22138429,
+  "total": 22141273,
   "history": [
     {
       "date": "2026-10-24",
@@ -16031,6 +16031,12 @@
       "commit": "fire-06-native-thermal-phases",
       "reason": "FIRE-06 @margoengine/physics/thermal 6649 to 9686 B gzip, ceiling 6905 to 9977 B. The thermal entry validates borrowed fields and runs ordered SIMD heat phases with native helpers. Splitting would duplicate the thermal field and scratch contract. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "sound-04-native-modal-batches",
+      "reason": "SOUND-04 @margoengine/physics/modal-sound 9212 to 11973 B gzip, ceiling 9489 to 12333 B. The modal sound entry stages PCM and routes disjoint track batches through optional SIMD helpers. Splitting would duplicate the audio clock and accepted track state. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16933,7 +16939,7 @@
     "@margoengine/physics/loads": 76595,
     "@margoengine/physics/locomotion": 10015,
     "@margoengine/physics/meshfiles": 2857,
-    "@margoengine/physics/modal-sound": 9489,
+    "@margoengine/physics/modal-sound": 12333,
     "@margoengine/physics/mooring": 3744,
     "@margoengine/physics/orbit": 6880,
     "@margoengine/physics/outdoor-sound": 8569,

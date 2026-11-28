@@ -5464,3 +5464,13 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
   `npm run test:gpu:thermal-film -w @margoengine/physics` for per-renderer kiln replay.
 - Run `node packages/physics/scripts/fire06-gallium-measured.mjs` for the independent front comparisons,
   cold-wall sensitivity and grid refinement.
+
+### SOUND-04 native modal sound and plate diagnostic
+
+- Build Physics with `node packages/physics/scripts/build.js`. Run
+  `node --test packages/physics/tests/modal-sound.test.js packages/physics/tests/coupling/modal-sound.test.js packages/physics/tests/coupling/modal-sound-workers.test.js`.
+- Run `npm run test:gpu:modal-sound-workers -w @margoengine/physics` for the isolated-browser
+  native participant check and `npm run test:gpu:modal-sound-film -w @margoengine/physics`
+  for the fixed-camera contact scene on both renderers.
+- Run `node packages/physics/scripts/sound04-modes-measured.mjs` to compare production PCM
+  frequency readout with the independent plate measurements and rounding sensitivity.

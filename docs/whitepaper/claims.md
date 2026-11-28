@@ -7195,3 +7195,12 @@ Explicit native participant counts 1, 2 and 4 reproduce complete accepted heat f
 The renderer witness drives live emission and thermoelastic bow from the same heat grid with a matched
 insulated control. Each renderer repeats complete accepted state and RGBA. Independently measured gallium
 fronts quantify the missing melt convection in the thermal entry. [Measured limits](../limits.md#fire-06-gallium-melting-across-a-heated-vertical-plate).
+
+### SOUND-04 independent SIMD track replay
+
+One, two and four native participants retain the same complete accepted sound state and PCM history.
+The packaged browser test records seven live tracks and 6,606 SIMD complex mode updates in a 367-sample
+block. A separate fixed-camera technical scene drives its struck bar and PCM scope from accepted rigid
+contact and checks exact PCM, simulation state and pixels within each renderer. Measured plate observations
+bound the independent thin-plate model used to supply diagnostic frequencies.
+[SOUND-04 measured limits](../limits.md#sound-04-simply-supported-aluminum-plates).

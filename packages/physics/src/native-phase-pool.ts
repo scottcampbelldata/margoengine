@@ -162,6 +162,11 @@ type NativePhaseSolver =
       readonly phase: 'enthalpy decode and conduction stencil';
     }
   | {
+      readonly subject: 'Modal sound';
+      readonly phaseExport: 'modal_sound_thread_phase';
+      readonly phase: 'audio blocks';
+    }
+  | {
       readonly subject: 'Seismic';
       readonly phaseExport: 'seismic_thread_phase';
       readonly phase: 'velocity and stress stencil';

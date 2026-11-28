@@ -287,7 +287,54 @@ test('ModalContactRigidSolver separates relative slip from a rolling point with 
   assert.ok(power[3] > 40 * power[1], `roll rejects sliding: ${power}`);
 });
 
-test('ModalContactRigidSolver sounds a real joint rupture once and replays before and after the break', async () => {
+test('ModalSoundSolver uses owning contact regions and preserves every accepted track when a late input fails', async () => {
+  const position = [-7, 4, -2];
+  const sound = await ModalSoundSolver.load({ inputs: 'none' });
+  const world = new PhysicsWorld({ rate: FPS }).add(sound, { tracks: [...oneMode, ...oneMode] }, position);
+  world.advance(1);
+  const baseline = world.takeSnapshot();
+  const lastWork = sound.readNativeWork();
+  const memory = new WebAssembly.Memory({ initial: 1 });
+  const byteOffset = 32;
+  const byteLength = 2 * MODAL_CONTACT_WORDS * Float64Array.BYTES_PER_ELEMENT;
+  const borrowed = new Float64Array(memory.buffer, byteOffset, 2 * MODAL_CONTACT_WORDS);
+  borrowed[0] = 0.4;
+  borrowed[MODAL_CONTACT_WORDS] = 0.6;
+  borrowed[MODAL_CONTACT_WORDS + 3] = -1;
+  const port = {
+    field: sound.contactField.name,
+    cell: position,
+    tick: 1,
+    region: { name: 'borrowed-sound-loads', type: 'f64', layout: 1, byteOffset, byteLength, memory },
+  };
+  const step = (input) =>
+    sound.step({ tick: 1, level: 0, seed: 0, inputs: new Map([[port.field, input]]), cell: position }, 1 / 60);
+  assert.throws(() => step(port), { code: 'state', message: /rolling power.*errors#modal-sound/ });
+  assert.throws(() => step({ ...port, cell: centre }), { code: 'state', message: /signed cell.*errors#modal-sound/ });
+  assert.throws(() => step({ ...port, region: { ...port.region, byteOffset: 33 } }), {
+    code: 'state',
+    message: /aligned.*owning memory.*errors#modal-sound/,
+  });
+  assert.deepEqual(world.takeSnapshot().bytes, baseline.bytes);
+  assert.deepEqual(sound.readNativeWork(), lastWork);
+  borrowed[MODAL_CONTACT_WORDS + 3] = 0;
+  step(port);
+  for (const [track, impulse] of [0.4, 0.6].entries()) {
+    const block = sound.copyBlock(track);
+    assert.equal(block.firstSample, 800);
+    assert.equal(block.samples.length, 800);
+    for (const [sample, value] of block.samples.entries()) {
+      const t = sample / 48000;
+      near(value, impulse * mode.gain * Math.exp(-mode.decay * t) * Math.sin(2 * Math.PI * mode.frequency * t), 8e-9);
+    }
+  }
+  const accepted = world.takeSnapshot();
+  world.restoreSnapshot(baseline.bytes);
+  step(port);
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+});
+
+test('ModalContactRigidSolver sounds one real joint rupture and replays across a signed origin shift', async () => {
   await Physics.load();
   const sound = await ModalSoundSolver.load({ inputs: 'both' });
   const world = new PhysicsWorld({ rate: FPS, memory: worldMemory(false) });
@@ -301,7 +348,15 @@ test('ModalContactRigidSolver sounds a real joint rupture once and replays befor
   const rigid = new ModalContactRigidSolver(sound, {
     jointBreaks: [{ joint, track: 0, energy: 0.25, effectiveMass: 0.5 }],
   });
-  world.add(rigid, { physics, emitters: [weight] }).add(sound, { tracks: oneMode });
+  const cell = [-27, 5, 12];
+  const delta = [2, -7, 4];
+  const shifted = [-29, 12, 8];
+  world.add(rigid, { physics, emitters: [weight] }, cell).add(sound, { tracks: oneMode }, cell);
+  const soundPorts = () =>
+    [...rigid.exportPorts(0), ...sound.exportPorts(0)]
+      .filter((port) => port.field.startsWith(`${sound.id}.`))
+      .map((port) => port.cell);
+  assert.deepEqual(soundPorts(), Array(4).fill(cell));
   const start = world.takeSnapshot();
   let onset;
   let atBreak;
@@ -313,6 +368,8 @@ test('ModalContactRigidSolver sounds a real joint rupture once and replays befor
       if (!onset) {
         onset = f;
         atBreak = world.takeSnapshot();
+        world.shiftOrigin(delta);
+        assert.deepEqual(soundPorts(), Array(4).fill(shifted));
       }
       for (let i = 0; i < block.samples.length; i++) {
         const t = ((f - onset) * 800 + i) / 48000;
@@ -325,12 +382,16 @@ test('ModalContactRigidSolver sounds a real joint rupture once and replays befor
     }
   }
   assert.ok(onset && onset <= 10);
-  const final = world.hash();
+  const final = world.takeSnapshot();
   world.restoreSnapshot(atBreak.bytes);
+  assert.deepEqual(soundPorts(), Array(4).fill(cell));
+  world.shiftOrigin(delta);
   world.advance(16);
-  assert.equal(world.hash(), final);
+  assert.deepEqual(world.takeSnapshot().bytes, final.bytes);
   world.restoreSnapshot(start.bytes);
+  world.advance(onset);
+  world.shiftOrigin(delta);
   world.advance(16);
-  assert.equal(world.hash(), final);
+  assert.deepEqual(world.takeSnapshot().bytes, final.bytes);
   physics.dispose();
 });

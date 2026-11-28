@@ -65,6 +65,7 @@ export interface ModalSoundLoadOptions {
     readonly id?: string;
     readonly rate?: RateLevel;
     readonly inputs?: 'contacts' | 'fractures' | 'both' | 'none';
+    readonly threads?: 1 | 2 | 4;
     readonly signal?: AbortSignal;
 }
 
@@ -82,7 +83,9 @@ export class ModalSoundSolver implements Solver<ModalSoundParams> {
     readonly pcmField: FieldDescriptor;
     readonly clockField: FieldDescriptor;
     private constructor();
-    static load({ id, rate, inputs, signal }?: ModalSoundLoadOptions): Promise<ModalSoundSolver>;
+    static load({ id, rate, inputs, signal, threads }?: ModalSoundLoadOptions): Promise<ModalSoundSolver>;
+    [Symbol.dispose](): void;
+    readNativeWork(): ModalSoundWorkCounts | undefined;
     describe(): SolverDescription;
     init(host: SolverHost, { sampleRate, tracks, historySeconds }?: ModalSoundParams): void;
     step(context: StepContext, dt: number): void;
@@ -96,6 +99,18 @@ export class ModalSoundSolver implements Solver<ModalSoundParams> {
 
 export interface ModalSoundTrack {
     readonly material?: ModalMaterial | ModalPreset;
+}
+
+export interface ModalSoundWorkCounts extends ModalSoundWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly ModalSoundWorkerWork[];
+}
+
+export interface ModalSoundWorkerWork {
+    readonly tracks: number;
+    readonly pcmSamples: number;
+    readonly modeUpdates: number;
+    readonly textureUpdates: number;
 }
 
 export function modalFractureImpulse(energy: number, effectiveMass: number, energyFraction?: number): number;

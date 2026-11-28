@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'modal-sound',
+    title: '@margoengine/physics/modal-sound contact tracks and PCM blocks',
+    kind: 'family',
+    messages: [],
+    cause: 'A track, borrowed contact bank, native helper or audio cursor is outside the supported format or range.',
+    fix: 'Publish aligned f64 contact rows in their owning memory, using the source cell of the sound solver. Choose finite material parameters and a retained sample cursor. Use shared memory for two or four native participants, or choose one.',
+  },
+  {
     id: 'thermal',
     title: '@margoengine/physics/thermal heat, phase change and solid equilibrium',
     kind: 'family',

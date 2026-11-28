@@ -10083,8 +10083,33 @@ geometry-dependent roughness, and elastic radiation into the room require additi
 The optional joint route computes equivalent scalar fracture excitation from supplied energy and mass.
 A brittle-fracture producer can publish per-track excitation in the same field layout.
 
-The optional entry measures 9,736 bytes gzip. Its plain and shared Wasm files each measure 1,567 bytes
-raw, fetched only when the caller loads the solver.
+Each native participant renders disjoint whole tracks and preserves authored mode order within a track.
+One track is one work unit. The plain and shared Wasm builds use the same f64 SIMD complex recurrence.
+World memory holds 96 bytes per mode, 544 bytes per track for the surface states, drive and track job,
+two PCM block banks at 8 bytes per block-capacity sample and a history ring at 4 bytes per retained sample
+per track. This excludes registry mirrors, the 72 bytes of clock and history metadata and kernel working
+records. Native work uses a 16-byte batch record, 32 bytes of counters and a 64 KiB stack plus alignment
+per participant, and control words in shared mode. A port must match the sound solver's signed cell.
+A rejected batch leaves the last accepted state, PCM and clock intact.
+
+The optional entry measures 11,973 bytes gzip. Its plain and shared Wasm files each measure 2,470 bytes
+raw and 1,299 bytes gzip. Native assets load on demand.
+
+### SOUND-04 simply supported aluminum plates
+
+The published plate dimensions and separate 6061-T6 material inputs give ideal Kirchhoff–Love frequencies
+for six modes on each of two plates. The diagnostic feeds these predictions into the audio-rate resonator
+and reads them back from production PCM. Doubling the sample rate from 24 to 48 kHz moves the inferred
+frequencies at most 0.000031 Hz. The two calculated fundamentals are 89.05 and 135.21 Hz. The measured
+speaker readings are 92.4 and 141.4 Hz, and the hammer readings are 90.4 and 139.8 Hz. Across 24 measurements,
+maximum discrepancies are 14.19 Hz in absolute terms and 6.31% in relative terms, at distinct modes. Only five
+readings overlap the bands for published rounding and PCM readout. The paper gives no total measurement
+uncertainty and its two methods disagree by up to 20.5 Hz. None of those measurements sets the predictions.
+The solver accepts frequencies as inputs. This comparison bounds the supplied thin-plate model plus runtime
+frequency readout. Geometry-dependent modes, pressure transfer, gains and decay still require separate evidence.
+[Dumond et al. (2019), Tables 3–5](https://doi.org/10.1016/j.mex.2019.09.023).
+[Leissa (1969)](https://ntrs.nasa.gov/citations/19700009156).
+[Diagnostic](../packages/physics/scripts/sound04-modes-measured.mjs).
 
 ### Radiation fog and cold-air pooling (ATMO-08)
 

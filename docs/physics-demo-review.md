@@ -635,3 +635,14 @@ control remains exactly 1350 K and flat. The cutaway labels its 15× display-onl
 deformation controls verify independently visible changes. WebGPU and WebGL2 each repeat all RGBA pixels
 and complete accepted state at held frames, restore, re-advance and rewind. Original film shots remain open.
 [Browser test](../packages/physics/tests/thermal-film.browser.mjs).
+
+### SOUND-04 steel bar contact and audio witness
+
+Two released brass spheres fall toward matched steel bars in the 768 × 432 fixed-camera cutaway.
+At frame 14 a sphere falls through the 0.24 m gap and delivers 0.6867 N·s of accepted contact impulse.
+The live sound track rings at the supplied 431.86 Hz first free–free mode. Its 28,800 samples match the
+analytic ring within 1.49 × 10⁻⁸ of normalized PCM, with a peak of 0.4223. A raised catcher keeps
+the other striker off the steel and the matched track stays identically silent. The scope uses accepted
+PCM. Each renderer repeats full accepted state, PCM bytes and RGBA before contact, during ringing,
+after restore and re-advance, and on rewind. This is a technical witness with an ideal beam mode and
+authored gain and decay. [Browser test](../packages/physics/tests/modal-sound-film.browser.mjs).

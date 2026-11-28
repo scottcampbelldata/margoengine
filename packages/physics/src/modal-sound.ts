@@ -1,8 +1,14 @@
-import { MargoError } from '@margoengine/math/errors';
 import { cos, exp, sin } from '@margoengine/math/pinned';
 import { RandomStream, solverNumber } from '@margoengine/math/random';
-import { loadModalSoundBuilds, modalSoundBlock, type ModalSoundBuilds } from './modal-sound/kernel.js';
-import { modalPreset, type ModalMaterial, type ModalPreset } from './modal-sound/material.js';
+import { modalSoundError } from './modal-sound/errors.js';
+import {
+  bindModalSoundBatch,
+  loadModalSoundBuilds,
+  type ModalSoundBuilds,
+  type ModalSoundJob,
+  type ModalSoundWorkCounts,
+} from './modal-sound/kernel.js';
+import { modalPreset, type ModalMaterial, type ModalMode, type ModalPreset } from './modal-sound/material.js';
 import { limited, MAX_LOAD, MODAL_CONTACT_WORDS } from './modal-sound/model.js';
 import { regionWords } from './world/memory.js';
 import {
@@ -18,6 +24,7 @@ import {
   type StepContext,
 } from './world/solver.js';
 
+export type { ModalSoundWorkCounts, ModalSoundWorkerWork } from './modal-sound/kernel.js';
 export { modalPreset, type ModalMaterial, type ModalMode, type ModalPreset } from './modal-sound/material.js';
 export {
   ModalContactRigidSolver,
@@ -41,7 +48,6 @@ const LAYOUT = 1;
 const MAX_WASM_BYTES = 0xffffffff;
 const MAX_SPEED = 1e4;
 
-const CELLS = [0, 0, 0] as const;
 const SPATIAL_RATIOS = [0.71, 1.13, 1.87, 2.79] as const;
 const WEIGHTS = [0.52, 0.24, 0.15, 0.09] as const;
 
@@ -57,7 +63,9 @@ export interface ModalSoundLoadOptions {
   readonly rate?: RateLevel;
   /** Input field owners the world will include. Defaults to 'contacts'. */
   readonly inputs?: 'contacts' | 'fractures' | 'both' | 'none';
-  /** Cancel fetching or compiling the modal kernel. */
+  /** Native participants, including the caller. Default 1. More participants require a shared world. */
+  readonly threads?: 1 | 2 | 4;
+  /** Cancel fetching or compiling the modal kernel and starting helpers. */
   readonly signal?: AbortSignal;
 }
 
@@ -94,17 +102,19 @@ interface Track {
 
 interface Data {
   readonly host: SolverHost;
-  readonly run: ReturnType<typeof modalSoundBlock>;
+  readonly batch: ReturnType<typeof bindModalSoundBatch>;
   readonly tracks: readonly Track[];
   readonly sampleRate: number;
   readonly blockCapacity: number;
   readonly ringCapacity: number;
   readonly envelopeStep: number;
-  readonly models: Region;
   readonly oscillators: Region;
   readonly surface: Region;
   readonly drive: Region;
   readonly output: Region;
+  readonly trialOscillators: Region;
+  readonly trialSurface: Region;
+  readonly trialOutput: Region;
   readonly ring: Region;
   readonly clock: Region;
   readonly history: Region;
@@ -115,14 +125,16 @@ function f64(host: SolverHost, region: Region): Float64Array {
 }
 
 function prepare(tracks: readonly ModalSoundTrack[], sampleRate: number): { tracks: Track[]; models: Float64Array } {
-  if (!tracks.length) throw new MargoError('state', 'Add at least one modal sound track.');
+  if (!Array.isArray(tracks) || !tracks.length) throw modalSoundError('Add at least one modal sound track.');
   const result: Track[] = [];
   const coefficients: number[] = [];
-  for (const track of tracks) {
+  for (const track of tracks as readonly ModalSoundTrack[]) {
+    if (!track || typeof track !== 'object') throw modalSoundError('Give each modal sound track an options object.');
     const setting = track.material ?? 'wood';
     const material = typeof setting === 'string' ? modalPreset(setting) : setting;
+    if (!Array.isArray(material?.modes) || !material.modes.length)
+      throw modalSoundError('Give every modal sound track at least one resonant mode.');
     const count = material.modes.length;
-    if (!count) throw new MargoError('state', 'Give every modal sound track at least one resonant mode.');
     result.push({
       firstMode: coefficients.length / MODE_WORDS,
       modes: count,
@@ -131,7 +143,9 @@ function prepare(tracks: readonly ModalSoundTrack[], sampleRate: number): { trac
       scrapeSpacing: limited(material.scrapeSpacing ?? 0.006, 1e-4, 10, 'scrape spacing in m'),
       rollSpacing: limited(material.rollSpacing ?? 0.024, 1e-4, 10, 'roll spacing in m'),
     });
-    for (const mode of material.modes) {
+    for (const mode of material.modes as readonly ModalMode[]) {
+      if (!mode || typeof mode !== 'object')
+        throw modalSoundError('Supply frequency, decay and gain for each modal oscillator.');
       const omega = TAU * limited(mode.frequency, 20, 0.45 * sampleRate, 'mode frequency in Hz');
       const alpha = limited(mode.decay, 0, 10000, 'mode decay in 1/s');
       const e = exp(-alpha / sampleRate);
@@ -154,14 +168,33 @@ function prepare(tracks: readonly ModalSoundTrack[], sampleRate: number): { trac
   return { tracks: result, models: Float64Array.from(coefficients) };
 }
 
-function read(data: Data, port: Port | undefined, words: number): Float64Array | undefined {
+function read(
+  context: StepContext,
+  fallback: WebAssembly.Memory,
+  field: FieldDescriptor,
+  words: number,
+): Float64Array | undefined {
+  const port = context.inputs.get(field.name);
   if (!port) return undefined;
-  if (port.region.type !== 'f64' || port.region.layout !== LAYOUT || port.region.byteLength !== words * F64)
-    throw new MargoError(
-      'state',
-      `Modal sound field "${port.field}" has incompatible rows. Use layout 1 and ${words} f64 words.`,
+  const { type, layout, byteOffset, byteLength, memory = fallback } = port.region;
+  if (
+    port.field !== field.name ||
+    type !== 'f64' ||
+    layout !== LAYOUT ||
+    byteLength !== words * F64 ||
+    !Number.isSafeInteger(byteOffset) ||
+    byteOffset < 0 ||
+    byteOffset % F64 !== 0 ||
+    byteOffset + byteLength > memory.buffer.byteLength
+  )
+    throw modalSoundError(
+      `Modal sound field "${field.name}" has incompatible rows. Publish ${words} aligned layout-1 f64 words in their owning memory.`,
     );
-  return regionWords(data.host.memory, port.region) as Float64Array;
+  if (port.cell.length !== 3 || port.cell.some((value, axis) => value !== context.cell[axis]))
+    throw modalSoundError(
+      `Modal sound field "${field.name}" has a different origin. Publish it in the sound solver's signed cell.`,
+    );
+  return new Float64Array(memory.buffer, byteOffset, words);
 }
 
 function texture(
@@ -204,6 +237,7 @@ export class ModalSoundSolver implements Solver<ModalSoundParams> {
   readonly #builds: ModalSoundBuilds;
   readonly #inputs: NonNullable<ModalSoundLoadOptions['inputs']>;
   #data?: Data;
+  #disposed = false;
 
   private constructor(
     id: string,
@@ -227,12 +261,34 @@ export class ModalSoundSolver implements Solver<ModalSoundParams> {
     rate = 0,
     inputs = 'contacts',
     signal,
+    threads = 1,
   }: ModalSoundLoadOptions = {}): Promise<ModalSoundSolver> {
-    if (!id || !Number.isInteger(rate) || rate < 0 || rate >= RATE_LEVELS)
-      throw new MargoError('state', 'Use a nonempty modal sound ID and a rate level from 0 through 7.');
+    if (
+      typeof id !== 'string' ||
+      !id.trim() ||
+      id !== id.trim() ||
+      !Number.isInteger(rate) ||
+      rate < 0 ||
+      rate >= RATE_LEVELS
+    )
+      throw modalSoundError(
+        'Use a nonempty modal sound ID without outer whitespace and a rate level from 0 through 7.',
+      );
     if (inputs !== 'contacts' && inputs !== 'fractures' && inputs !== 'both' && inputs !== 'none')
-      throw new MargoError('state', 'Choose contacts, fractures, both or none for modal sound inputs.');
-    return new ModalSoundSolver(id, rate, inputs, await loadModalSoundBuilds(signal));
+      throw modalSoundError('Choose contacts, fractures, both or none for modal sound inputs.');
+    return new ModalSoundSolver(id, rate, inputs, await loadModalSoundBuilds(signal, threads));
+  }
+
+  /** Release the native helpers and invalidate this solver. */
+  [Symbol.dispose](): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    this.#builds[Symbol.dispose]();
+  }
+
+  /** Native counts for the most recent accepted audio block. */
+  readNativeWork(): ModalSoundWorkCounts | undefined {
+    return this.#live().batch.workCounts();
   }
 
   describe(): SolverDescription {
@@ -254,16 +310,37 @@ export class ModalSoundSolver implements Solver<ModalSoundParams> {
   }
 
   init(host: SolverHost, { sampleRate = 48000, tracks = [{}], historySeconds = 0.25 }: ModalSoundParams = {}): void {
+    if (this.#disposed) throw modalSoundError('Load a new modal sound solver after disposal.', 'disposed');
     if (this.#data)
-      throw new MargoError('attached', 'Modal sound is already attached. Load a new solver for the next world.');
+      throw modalSoundError('Modal sound is already attached. Load a new solver for the next world.', 'attached');
     if (!Number.isInteger(sampleRate) || sampleRate < 8000 || sampleRate > 96000)
-      throw new MargoError('state', 'Set modal sound sampleRate to a whole number from 8000 through 96000 Hz.');
+      throw modalSoundError('Set modal sound sampleRate to a whole number from 8000 through 96000 Hz.');
     const prepared = prepare(tracks, sampleRate);
     const blockCapacity = Math.ceil(sampleRate / rateOf(this.rate));
     const historyLimit = Math.floor(MAX_WASM_BYTES / (tracks.length * F32)) / sampleRate;
     const history = limited(historySeconds, 1 / rateOf(this.rate), historyLimit, 'history duration in s');
     const ringCapacity = Math.ceil(sampleRate * history);
     const alloc = (name: string, words: number) => host.allocate(name, words * F64, 'f64', LAYOUT);
+    const allocPCM = (name: string, capacity: number) =>
+      host.allocate(name, capacity * tracks.length * F32, 'f32', LAYOUT);
+    const modelWords = prepared.models.length;
+    const oscillatorWords = (2 * modelWords) / MODE_WORDS;
+    const surfaceWords = tracks.length * SURFACE_WORDS;
+    const models = alloc('modal-models', modelWords);
+    const drive = alloc('modal-drive', tracks.length * DRIVE_WORDS);
+    const trialOscillators = alloc('modal-trial-oscillators', oscillatorWords);
+    const trialSurface = alloc('modal-trial-surfaces', surfaceWords);
+    const trialOutput = allocPCM('modal-trial-pcm', blockCapacity);
+    const jobs = prepared.tracks.map(
+      (track, index): ModalSoundJob => [
+        models.byteOffset + track.firstMode * MODE_WORDS * F64,
+        trialOscillators.byteOffset + track.firstMode * 2 * F64,
+        track.modes,
+        trialSurface.byteOffset + index * SURFACE_WORDS * F64,
+        drive.byteOffset + index * DRIVE_WORDS * F64,
+        trialOutput.byteOffset + index * blockCapacity * F32,
+      ],
+    );
     const data: Data = {
       host,
       sampleRate,
@@ -271,17 +348,19 @@ export class ModalSoundSolver implements Solver<ModalSoundParams> {
       ringCapacity,
       envelopeStep: 1 - exp(-1 / (0.003 * sampleRate)),
       tracks: prepared.tracks,
-      run: modalSoundBlock(host, this.#builds),
-      models: alloc('modal-models', prepared.models.length),
-      oscillators: alloc('modal-oscillators', (2 * prepared.models.length) / MODE_WORDS),
-      surface: alloc('modal-surfaces', tracks.length * SURFACE_WORDS),
-      drive: alloc('modal-drive', tracks.length * DRIVE_WORDS),
-      output: host.allocate('modal-pcm', blockCapacity * tracks.length * F32, 'f32', LAYOUT),
-      ring: host.allocate('modal-pcm-history', ringCapacity * tracks.length * F32, 'f32', LAYOUT),
+      oscillators: alloc('modal-oscillators', oscillatorWords),
+      surface: alloc('modal-surfaces', surfaceWords),
+      drive,
+      output: allocPCM('modal-pcm', blockCapacity),
+      trialOscillators,
+      trialSurface,
+      trialOutput,
+      ring: allocPCM('modal-pcm-history', ringCapacity),
       clock: alloc('modal-pcm-clock', 5),
       history: alloc('modal-history', 4),
+      batch: bindModalSoundBatch(host, this.#builds, jobs),
     };
-    f64(host, data.models).set(prepared.models);
+    f64(host, models).set(prepared.models);
     f64(host, data.clock).set([sampleRate, 0, 0, blockCapacity, tracks.length]);
     f64(host, data.history).set([0, -1, -1, 0]);
     this.#data = data;
@@ -292,20 +371,19 @@ export class ModalSoundSolver implements Solver<ModalSoundParams> {
     const { host, sampleRate, tracks } = data;
     const contactPort = context.inputs.get(this.contactField.name);
     const fracturePort = context.inputs.get(this.fractureField.name);
-    const loads = read(data, contactPort, tracks.length * MODAL_CONTACT_WORDS);
-    const fractures = read(data, fracturePort, tracks.length);
+    const loads = read(context, host.memory, this.contactField, tracks.length * MODAL_CONTACT_WORDS);
+    const fractures = read(context, host.memory, this.fractureField, tracks.length);
     const history = f64(host, data.history);
     const clock = f64(host, data.clock);
     const scratch = f64(host, data.drive);
-    const output = regionWords(host.memory, data.output) as Float32Array;
     const frequency = rateOf(context.level);
     const available = history[0]! + sampleRate;
     const samples = Math.floor(available / frequency);
     if (context.level !== this.rate || dt * frequency !== 1)
-      throw new MargoError(
-        'state',
-        'Modal sound is on an incompatible clock. Schedule it at the rate declared during load.',
-      );
+      throw modalSoundError('Modal sound is on an incompatible clock. Schedule it at the rate declared during load.');
+    const first = clock[1]! + clock[2]!;
+    if (!Number.isSafeInteger(first + samples))
+      throw modalSoundError('The audio cursor exceeds its integer range. Start a new sound solver for this take.');
     const newContact = contactPort !== undefined && contactPort.tick !== history[1];
     const newFracture = fracturePort !== undefined && fracturePort.tick !== history[2];
     for (const [index, track] of tracks.entries()) {
@@ -319,9 +397,15 @@ export class ModalSoundSolver implements Solver<ModalSoundParams> {
       texture(drive, 0, scrapePower, loads?.[j + 2] ?? 0, track.scrapeRoughness, track.scrapeSpacing, sampleRate);
       texture(drive, 1, rollPower, loads?.[j + 4] ?? 0, track.rollRoughness, track.rollSpacing, sampleRate);
     }
+    const oscillators = f64(host, data.oscillators);
+    const acceptedSurface = f64(host, data.surface);
+    const trialOscillators = f64(host, data.trialOscillators);
+    const surface = f64(host, data.trialSurface);
+    const output = regionWords(host.memory, data.trialOutput) as Float32Array;
+    trialOscillators.set(oscillators);
+    surface.set(acceptedSurface);
     if (!history[3]) {
       const random = new RandomStream(context.seed, solverNumber(this.id));
-      const surface = f64(host, data.surface);
       for (let index = 0; index < tracks.length; index++) {
         for (let b = 0; b < BANDS; b++) {
           const phase = TAU * random.unitF64(0, index, b)[0];
@@ -332,21 +416,19 @@ export class ModalSoundSolver implements Solver<ModalSoundParams> {
       }
     }
     output.fill(0);
-    const first = clock[1]! + clock[2]!;
+    if (data.batch.run(samples) !== 0)
+      throw modalSoundError(
+        'The trial sound block exceeds the numeric range. Reduce contact loads or mode gains.',
+        'failed',
+      );
+    oscillators.set(trialOscillators);
+    acceptedSurface.set(surface);
+    (regionWords(host.memory, data.output) as Float32Array).set(output);
     const ring = regionWords(host.memory, data.ring) as Float32Array;
     const wrap = first % data.ringCapacity;
     const split = Math.min(samples, data.ringCapacity - wrap);
-    for (const [index, track] of tracks.entries()) {
+    for (let index = 0; index < tracks.length; index++) {
       const row = index * data.blockCapacity;
-      data.run(
-        data.models.byteOffset + track.firstMode * MODE_WORDS * F64,
-        data.oscillators.byteOffset + track.firstMode * 2 * F64,
-        track.modes,
-        data.surface.byteOffset + index * SURFACE_WORDS * F64,
-        data.drive.byteOffset + index * DRIVE_WORDS * F64,
-        data.output.byteOffset + row * F32,
-        samples,
-      );
       ring.set(output.subarray(row, row + split), index * data.ringCapacity + wrap);
       if (split < samples) ring.set(output.subarray(row + split, row + samples), index * data.ringCapacity);
     }
@@ -380,7 +462,7 @@ export class ModalSoundSolver implements Solver<ModalSoundParams> {
     const end = clock[1]! + clock[2]!;
     const oldest = Math.max(0, end - data.ringCapacity);
     if (!Number.isSafeInteger(firstSample) || firstSample < oldest || firstSample > end)
-      throw new MargoError('state', `Audio cursor is outside history. Choose a sample from ${oldest} through ${end}.`);
+      throw modalSoundError(`Audio cursor is outside history. Choose a sample from ${oldest} through ${end}.`);
     if (firstSample === end) return null;
     const samples = new Float32Array(end - firstSample);
     const ring = regionWords(data.host.memory, data.ring) as Float32Array;
@@ -394,9 +476,10 @@ export class ModalSoundSolver implements Solver<ModalSoundParams> {
 
   exportPorts(tick: number): readonly Port[] {
     const data = this.#live();
+    const cell = data.host.cell;
     return [
-      { field: this.pcmField.name, region: data.output, cell: CELLS, tick },
-      { field: this.clockField.name, region: data.clock, cell: CELLS, tick },
+      { field: this.pcmField.name, region: data.output, cell, tick },
+      { field: this.clockField.name, region: data.clock, cell, tick },
     ];
   }
 
@@ -413,14 +496,14 @@ export class ModalSoundSolver implements Solver<ModalSoundParams> {
 
   #checkTrack(track: number, count: number): void {
     if (!Number.isInteger(track) || track < 0 || track >= count)
-      throw new MargoError(
-        'state',
+      throw modalSoundError(
         `Modal sound track index is out of range. Choose a whole index from 0 through ${count - 1}.`,
       );
   }
 
   #live(): Data {
-    if (!this.#data) throw new MargoError('state', 'Add the modal sound solver to a PhysicsWorld first.');
+    if (this.#disposed) throw modalSoundError('Load a new modal sound solver after disposal.', 'disposed');
+    if (!this.#data) throw modalSoundError('Add the modal sound solver to a PhysicsWorld first.');
     return this.#data;
   }
 }

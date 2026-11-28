@@ -22,6 +22,14 @@ test('ModalSoundSolver verifies bounds, optional inputs, channel isolation and o
   assert.throws(() => modalFractureImpulse(-1, 2), /released energy/);
   assert.equal(modalFractureImpulse(4, 3, 0.375), 3);
   const invalid = await ModalSoundSolver.load();
+  assert.throws(() => new PhysicsWorld().add(invalid, { tracks: [null] }), {
+    code: 'state',
+    message: /options object.*errors#modal-sound/,
+  });
+  assert.throws(() => new PhysicsWorld().add(invalid, { tracks: [{ material: {} }] }), {
+    code: 'state',
+    message: /one resonant mode.*errors#modal-sound/,
+  });
   assert.throws(() => new PhysicsWorld().add(invalid, { tracks: oneMode, sampleRate: 499 }), /sampleRate/);
   assert.throws(
     () =>

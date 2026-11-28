@@ -12424,3 +12424,13 @@ own memory and heat and mechanical outputs carry the live signed cell. The civil
 all accepted solver bytes and RGBA independently on WebGPU and WebGL2. Independent gallium melt fronts
 show the effect of omitted convection. Backward Euler remains single-participant and original films
 await installation.
+
+### SOUND-04 independent native audio tracks and accepted PCM
+
+The optional modal sound entry preserves authored mode order within each track while scheduling
+whole tracks across one, two or four native participants. The SIMD complex recurrence, seeded roughness
+and integer sample clock keep the PCM sequence deterministic. Native work and staged oscillator, surface
+and PCM banks are accepted only after every participant succeeds. Borrowed rows are read from their
+owning memory and PCM and contact ports carry signed origins. A fixed-camera civil rig compares live
+contact audio and exact renderer replay. Independent plate readings give a limit for the analytic
+model supplying diagnostic frequencies.

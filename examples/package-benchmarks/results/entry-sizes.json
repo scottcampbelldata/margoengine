@@ -15650,8 +15650,8 @@
         "gzip": 9137
       },
       "./modal-sound": {
-        "raw": 23950,
-        "gzip": 9212
+        "raw": 31822,
+        "gzip": 11973
       },
       "./outdoor-sound": {
         "raw": 22064,
@@ -19675,14 +19675,14 @@
       "brotli": 1242
     },
     "packages/physics/dist/modal-sound-kernel.wasm": {
-      "raw": 1567,
-      "gzip": 919,
-      "brotli": 816
+      "raw": 2470,
+      "gzip": 1299,
+      "brotli": 1168
     },
     "packages/physics/dist/modal-sound-kernel-shared.wasm": {
-      "raw": 1567,
-      "gzip": 919,
-      "brotli": 816
+      "raw": 2470,
+      "gzip": 1299,
+      "brotli": 1164
     },
     "packages/physics/dist/falling-kernel.wasm": {
       "raw": 10501,

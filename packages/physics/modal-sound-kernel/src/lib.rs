@@ -117,3 +117,95 @@ extern "C" fn modal_sound_block(
         phase[1] /= norm;
     }
 }
+
+#[repr(C)]
+struct TrackJob {
+    models: *const Oscillator,
+    oscillators: *mut [f64; 2],
+    modes: usize,
+    surface: *mut SurfaceState,
+    drive: *const Drive,
+    pcm: *mut f32,
+}
+
+#[repr(C)]
+struct Work {
+    tracks: f64,
+    pcm_samples: f64,
+    mode_updates: f64,
+    texture_updates: f64,
+}
+
+#[repr(C)]
+struct Batch {
+    tracks: *const TrackJob,
+    track_count: usize,
+    samples: usize,
+    work: *mut Work,
+}
+
+const _: [(); 24] = [(); size_of::<TrackJob>()];
+const _: [(); 16] = [(); size_of::<Batch>()];
+
+/// Each participant renders whole tracks to disjoint scratch rows, in authored mode order.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn modal_sound_thread_phase(
+    batch: &Batch,
+    stage: u32,
+    part: usize,
+    parts: usize,
+) -> u32 {
+    if stage != 0 || !matches!(parts, 1 | 2 | 4) || part >= parts {
+        return 1;
+    }
+    if batch.track_count == 0
+        || batch.track_count > isize::MAX as usize / size_of::<TrackJob>()
+        || batch.samples > isize::MAX as usize / size_of::<f32>()
+    {
+        return 1;
+    }
+    let first = part * batch.track_count / parts;
+    let end = (part + 1) * batch.track_count / parts;
+    let mut mode_updates = 0.0;
+    unsafe {
+        for track in first..end {
+            let job = &*batch.tracks.add(track);
+            if job.modes == 0 || job.modes > isize::MAX as usize / size_of::<Oscillator>() {
+                return 1;
+            }
+            modal_sound_block(
+                job.models,
+                job.oscillators,
+                job.modes,
+                job.surface,
+                job.drive,
+                job.pcm,
+                batch.samples,
+            );
+            let surface = &*job.surface;
+            if !surface.scrape.is_finite()
+                || !surface.roll.is_finite()
+                || !surface.phase.iter().flatten().all(|x| x.is_finite())
+                || !core::slice::from_raw_parts(job.oscillators, job.modes)
+                    .iter()
+                    .flatten()
+                    .all(|x| x.is_finite())
+                || !core::slice::from_raw_parts(job.pcm, batch.samples)
+                    .iter()
+                    .all(|x| x.is_finite())
+            {
+                return 1;
+            }
+            mode_updates += job.modes as f64 * batch.samples as f64;
+        }
+        let tracks = (end - first) as f64;
+        let pcm_samples = tracks * batch.samples as f64;
+        batch.work.add(part).write(Work {
+            tracks,
+            pcm_samples,
+            mode_updates,
+            texture_updates: pcm_samples * TEXTURE_BANDS as f64,
+        });
+    }
+    0
+}

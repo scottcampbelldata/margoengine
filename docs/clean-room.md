@@ -20750,3 +20750,28 @@ the [NIST-JANAF heat capacity of mullite (Chase, 1998)](https://webbook.nist.gov
 and the [BSEE ceramic material properties report, Table 5.2](https://www.bsee.gov/sites/bsee.gov/files/tap-technical-assessment-program/138aa.pdf).
 Reported bow is the small-strain equilibrium. The display multiplies displacement by 15 and
 renders emission from the simulated surface temperature through the existing spectral glow helper.
+
+### SOUND-04 accepted PCM and independent track work
+
+The native jobs partition whole tracks. Each summed output uses the original ordered mode iteration
+and the existing SIMD recurrence updates both real and imaginary coordinates together. Independent PCM
+and oscillator work follows the sum of damped modal responses in K. van den Doel, P. G. Kry and D. K. Pai,
+[*FoleyAutomatic* (2001), Eq. 1](https://www.cs.ubc.ca/labs/lci/papers/docs2001/van-foleyautomatic.pdf).
+Each trial reads the prior accepted oscillators and surface phase, and the caller accepts those banks
+and PCM only when every native participant succeeds.
+
+J. F. O'Brien, C. Shen and C. M. Gatchalian,
+[*Synthesizing Sounds from Rigid-Body Simulations* (2002)](https://jamesobrien.com/papers/Obrien-SSR-2002-07/index.html)
+describes projecting contact forces onto modes computed from geometry. The runtime still accepts supplied
+modes. The thin-plate diagnostic uses A. W. Leissa, [*Vibration of Plates* (1969), NASA SP-160](https://ntrs.nasa.gov/citations/19700009156).
+For a simply supported rectangular plate, the double sine yields
+`omega² = D ((m pi/a)² + (n pi/b)²)² / (rho h)`, where `D = E h³/(12(1-nu²))`.
+Material and dimensions are independent of the comparison values in P. Dumond, D. Monette, F. Alladkani,
+J. Akl and I. Chikhaoui, [*Simplified setup for the vibration study of plates with simply-supported boundary conditions* (2019)](https://doi.org/10.1016/j.mex.2019.09.023).
+Tables 3–4 furnish nominal geometry and material inputs and Table 5 furnishes both measured frequency series.
+The script documents the density unit correction, numerical readout bands and the limits of ideal supports.
+
+The technical striker fixture uses the first elastic free–free Euler–Bernoulli beam mode evaluated from
+its displayed bar geometry. The nodal locations illustrate the shape of this mode. Damping and PCM gain are
+authored. [F. A. Khasawneh and D. Segalman, *Exact and numerically stable expressions for Euler-Bernoulli
+and Timoshenko beam modes* (2019)](https://arxiv.org/abs/1811.03222).
