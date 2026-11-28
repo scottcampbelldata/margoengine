@@ -3216,3 +3216,14 @@ Unsaturated recharge transit, multilayer and confined transient response, wells 
 - Point 8 (e56545a625). `packages/physics/scripts/atmo05-storm-measured.mjs` initializes Isabel from NOAA B-deck pressure and track fields and compares independent dropsonde and marine drag measurements. The modeled 1 km tangential speed is 47.757 m/s against 76 ± 6 m/s observed. The four high-wind stress samples exceed the independent Powell intervals. [Measured limits](limits.md#atmo-05-accepted-storm-forcing-and-observations)
 
 Dynamic inflow and eyewall structure, reciprocal air–water feedback, remaining package coupling and the CY-14 film shot remain open. The row stays REOPENED at four points.
+
+### EARTH-05 Terramechanics
+
+#### EARTH-05 four-point pass
+
+- Point 5 (cdefe2ee68). `packages/physics/tests/coupling/terramechanics.test.js` checks signed foreign terrain and load arrays, malformed late rows, memory growth while sampling the floor, and exact preservation of every accepted bank on rejection. `packages/physics/tests/coupling/resistive-soil-workers.test.js` also checks that foreign terrain and rigid rows produce the same accepted resistive wrench as local inputs.
+- Point 6 (cdefe2ee68). `packages/physics/tests/coupling/resistive-soil-workers.test.js` compares 545 and 746 physical samples across one, two and four native participants and exact signed replay. `packages/physics/tests/resistive-soil-workers.browser.mjs` observes three Chromium helpers and 273 SIMD sample pairs spread across all four participants for one body. Ordered deposition and wrench summation are retained. The new native path also matches the previous binaries on both fixtures.
+- Point 7 (cdefe2ee68). `packages/physics/tests/terramechanics-film.browser.mjs` draws a native single-wheel soil bin. The driven rut is 126.60 mm versus 31.59 mm braked, and ATMO-06 receives 3.681 g versus 0.829 g. Each renderer independently reproduces all accepted state and raw RGBA through hold, immediate snapshot restore, re-advance and rewind using the accepted wheel pose port.
+- Point 8 (cdefe2ee68). `packages/physics/scripts/earth05-plates-measured.mjs` compares independent slender plates and repeated loading. The resolved tier predicts 27.89 and 29.38 mm versus 36.90 and 39.49 mm observed for the 1:5 and 1:7 plates at 48 kPa. The normalized tenth-cycle sinkage remains 1.0 versus 1.719 observed. [Measured limits](limits.md#independent-plate-shape-and-repeated-pressure)
+
+Slender footprint pressure, cumulative same-peak compaction, remaining belt and animal coupling, and the original film takes remain open. The row stays REOPENED at four points.
