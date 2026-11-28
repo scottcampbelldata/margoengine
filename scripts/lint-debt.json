@@ -226,9 +226,6 @@
   "packages/gltf/src/meshopt.ts": [
     "lint/correctness/noUnusedImports"
   ],
-  "packages/gltf/src/soft-mesh.ts": [
-    "format"
-  ],
   "packages/gltf/test/physics.test.js": [
     "lint/correctness/noUnusedVariables"
   ],
@@ -417,13 +414,6 @@
     "format"
   ],
   "packages/physics/src/fields.ts": [
-    "format"
-  ],
-  "packages/physics/src/gpu-cloth-sim.ts": [
-    "format",
-    "lint/correctness/noUnusedVariables"
-  ],
-  "packages/physics/src/gpu-cloth.ts": [
     "format"
   ],
   "packages/physics/src/index.ts": [
@@ -669,9 +659,6 @@
   "packages/scene/tests/emitter.test.js": [
     "format"
   ],
-  "packages/scenes/test/fauld-tunnels.test.js": [
-    "format"
-  ],
   "packages/sciviz/scripts/audit-accessibility.mjs": [
     "format"
   ],
@@ -855,9 +842,6 @@
   "packages/sciviz/src/volume-quality.ts": [
     "format"
   ],
-  "packages/sciviz/src/volume.ts": [
-    "format"
-  ],
   "packages/sciviz/tests/a11y-browser.mjs": [
     "lint/correctness/noUnusedVariables"
   ],
@@ -1005,9 +989,6 @@
     "format"
   ],
   "packages/sciviz/tests/notebook-fixtures.mjs": [
-    "format"
-  ],
-  "packages/sciviz/tests/nrrd.test.js": [
     "format"
   ],
   "packages/sciviz/tests/omezarr.test.js": [
@@ -1222,9 +1203,6 @@
   "packages/sky/src/settings.ts": [
     "format"
   ],
-  "packages/sky/test/features-check.mjs": [
-    "format"
-  ],
   "packages/sky/test/scene-owner.test.js": [
     "lint/correctness/noUnusedImports"
   ],
@@ -1243,9 +1221,6 @@
   ],
   "packages/studio/test/pathtrace.test.js": [
     "lint/correctness/noUnusedVariables"
-  ],
-  "packages/taa/test/reactive-mask.test.js": [
-    "format"
   ],
   "packages/terrain/src/planet.ts": [
     "lint/style/useImportType"
@@ -1293,9 +1268,6 @@
     "format"
   ],
   "packages/vfx/src/mesh.ts": [
-    "format"
-  ],
-  "packages/vfx/test/flame.test.js": [
     "format"
   ],
   "packages/vfx/test/flocking.test.js": [
@@ -1436,22 +1408,7 @@
   "packages/water/src/liquid-band.ts": [
     "format"
   ],
-  "packages/water/src/liquid-mpm-sim.ts": [
-    "format"
-  ],
-  "packages/water/src/liquid-mpm.ts": [
-    "format"
-  ],
   "packages/water/src/liquid.ts": [
-    "format"
-  ],
-  "packages/water/src/ripple-field.ts": [
-    "format"
-  ],
-  "packages/water/src/ripples.ts": [
-    "format"
-  ],
-  "packages/water/src/sea-state.ts": [
     "format"
   ],
   "packages/water/src/sea-surface.ts": [
@@ -1497,9 +1454,6 @@
     "format"
   ],
   "packages/water/test/gpu-liquid-check.mjs": [
-    "format"
-  ],
-  "packages/water/test/gpu-liquid.test.js": [
     "format"
   ],
   "packages/water/test/ice.browser.mjs": [
@@ -1575,9 +1529,6 @@
     "format"
   ],
   "packages/water/test/wake-agreement.browser.mjs": [
-    "format"
-  ],
-  "packages/weather/tests/air-load.test.js": [
     "format"
   ],
   "packages/weather/tests/scene-owner-class.test.js": [

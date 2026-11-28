@@ -414,8 +414,7 @@ export function prepareRetarget(
     throw new RangeError(`Retarget maps no bones from ${from} to ${to}; check the presets`);
   const hip = targetBones.has('hips') && sourceBones.has('hips') ? target.names[targetBones.get('hips')!] : undefined;
   const turned = new Set<number>(),
-    aligned =
-      options.alignRest === false ? target : alignRestPose(source, target, sourceBones, targetBones, turned),
+    aligned = options.alignRest === false ? target : alignRestPose(source, target, sourceBones, targetBones, turned),
     hold = [...turned].filter((b) => !names[target.names[b]]).map((b) => target.names[b]);
   return { target: aligned, names, ...(hip ? { hip } : {}), from, to, unmapped, hold };
 }

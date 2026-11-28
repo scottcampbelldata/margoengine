@@ -447,7 +447,10 @@ test('a fingerless T-pose source (a BVH End Site hand) lays the target hand and 
       sourceIndex = (b) => source.names.indexOf(b),
       targetIndex = (b) => target.names.indexOf(b);
     // Source hand direction: the wrist's frame carries the forearm-continuing rest segment (+x).
-    const hand = rotateByQuaternion([1, 0, 0], [0, 1, 2, 3, 4, 5].reduce((q, b) => multiplyQuaternions(q, pose.subarray(b * 10 + 3, b * 10 + 7)), [0, 0, 0, 1]));
+    const hand = rotateByQuaternion(
+      [1, 0, 0],
+      [0, 1, 2, 3, 4, 5].reduce((q, b) => multiplyQuaternions(q, pose.subarray(b * 10 + 3, b * 10 + 7)), [0, 0, 0, 1]),
+    );
     for (const [a, b] of [
       ['leftUpperArm', 'leftLowerArm'],
       ['leftLowerArm', 'leftHand'],
@@ -458,14 +461,20 @@ test('a fingerless T-pose source (a BVH End Site hand) lays the target hand and 
         `${a} follows the source`,
       );
     const targetHand = direction(t, targetIndex('leftHand'), targetIndex('leftMiddleProximal'));
-    assert.ok(degreesBetween(hand, targetHand) < 1e-6, `hand follows the source hand (${degreesBetween(hand, targetHand)} deg)`);
+    assert.ok(
+      degreesBetween(hand, targetHand) < 1e-6,
+      `hand follows the source hand (${degreesBetween(hand, targetHand)} deg)`,
+    );
     for (const [finger] of FINGERS)
       for (const [a, b] of [
         ['Proximal', 'Intermediate'],
         ['Intermediate', 'Distal'],
       ]) {
         const d = direction(t, targetIndex(`left${finger}${a}`), targetIndex(`left${finger}${b}`));
-        assert.ok(degreesBetween(d, hand) < 1e-6, `${finger} ${a} lies along the hand (${degreesBetween(d, hand)} deg)`);
+        assert.ok(
+          degreesBetween(d, hand) < 1e-6,
+          `${finger} ${a} lies along the hand (${degreesBetween(d, hand)} deg)`,
+        );
       }
   }
 });
@@ -482,5 +491,7 @@ test('one source finger segment (CMU lfingers) drives every long finger of the t
     at = (b) => target.names.indexOf(b),
     middle = direction(t, at('leftMiddleProximal'), at('leftMiddleIntermediate'));
   for (const finger of ['Index', 'Little'])
-    assert.ok(degreesBetween(direction(t, at(`left${finger}Proximal`), at(`left${finger}Intermediate`)), middle) < 1e-6);
+    assert.ok(
+      degreesBetween(direction(t, at(`left${finger}Proximal`), at(`left${finger}Intermediate`)), middle) < 1e-6,
+    );
 });

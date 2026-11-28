@@ -16,7 +16,15 @@ const random = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 214748
 function file(frames) {
   const names = ['Hips', 'Chest', 'Collar', 'Shoulder', 'Elbow', 'Wrist', 'Leg'],
     parents = [-1, 0, 1, 2, 3, 4, 0],
-    offsets = [[0, 0, 0], [0, 12, -0.5], [3, 7, 0], [15, 0, 0.2], [31, 0, 0], [25, 0.3, 0], [-10, 0, 0]],
+    offsets = [
+      [0, 0, 0],
+      [0, 12, -0.5],
+      [3, 7, 0],
+      [15, 0, 0.2],
+      [31, 0, 0],
+      [25, 0.3, 0],
+      [-10, 0, 0],
+    ],
     channels = names.map((_, i) => {
       const order = ORDERS[i % 6].split('').map((a) => `${a}rotation`);
       return i === 0 || i === 3 ? ['Xposition', 'Yposition', 'Zposition', ...order] : order;

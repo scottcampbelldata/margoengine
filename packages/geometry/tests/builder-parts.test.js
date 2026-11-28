@@ -109,7 +109,10 @@ test('GeometryBuilder: flat faces take their normal from the winding, colours an
   // The flipped quad on x = 0 winds toward -x reversed, so it faces +x.
   const q = d.indices[3];
   assert.deepEqual(normal(q), [1, 0, 0]);
-  assert.deepEqual(Array.from(d.colors.subarray(0, 4)).map((v) => +v.toFixed(3)), [0.2, 0.4, 0.6, 1]);
+  assert.deepEqual(
+    Array.from(d.colors.subarray(0, 4)).map((v) => +v.toFixed(3)),
+    [0.2, 0.4, 0.6, 1],
+  );
   assert.deepEqual(Array.from(d.colors.subarray(q * 4, q * 4 + 4)), [0, 0, 0, 1]);
   assertOutward(d);
   // Without colours: none stored.
@@ -132,7 +135,10 @@ test('GeometryBuilder: polygon with a hole triangulates to the right area, facin
   const d = new GeometryBuilder({ weld: false }).polygon(square, { holes: [hole] }).data();
   let area = 0;
   for (let t = 0; t < d.indices.length; t += 3) {
-    const [a, b, c] = [d.indices[t], d.indices[t + 1], d.indices[t + 2]].map((i) => [d.positions[i * 3], d.positions[i * 3 + 2]]);
+    const [a, b, c] = [d.indices[t], d.indices[t + 1], d.indices[t + 2]].map((i) => [
+      d.positions[i * 3],
+      d.positions[i * 3 + 2],
+    ]);
     area += Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])) / 2;
   }
   close(area, 3);
@@ -174,7 +180,8 @@ test('GeometryBuilder.grid: a unit sphere patch has outward unit normals and (u,
   };
   const d = new GeometryBuilder().grid(32, 16, sphere).data();
   for (let i = 0; i < d.positions.length; i += 3) {
-    const dotp = d.positions[i] * d.normals[i] + d.positions[i + 1] * d.normals[i + 1] + d.positions[i + 2] * d.normals[i + 2];
+    const dotp =
+      d.positions[i] * d.normals[i] + d.positions[i + 1] * d.normals[i + 1] + d.positions[i + 2] * d.normals[i + 2];
     close(dotp, 1, 1e-3);
   }
   assertOutward(d);
@@ -183,7 +190,15 @@ test('GeometryBuilder.grid: a unit sphere patch has outward unit normals and (u,
 
 test('placementMatrix: yaw, pitch, roll and scale act as documented', () => {
   const m = placementMatrix({ yaw: Math.PI / 2, position: [1, 2, 3], scale: 2 });
-  const p = applyMatrix4({ positions: new Float32Array([1, 0, 0]), normals: new Float32Array([1, 0, 0]), uvs: new Float32Array(2), indices: new Uint32Array(0) }, m);
+  const p = applyMatrix4(
+    {
+      positions: new Float32Array([1, 0, 0]),
+      normals: new Float32Array([1, 0, 0]),
+      uvs: new Float32Array(2),
+      indices: new Uint32Array(0),
+    },
+    m,
+  );
   // +x yawed a quarter turn about +y goes to -z.
   close(p.positions[0], 1);
   close(p.positions[1], 2);
@@ -209,7 +224,10 @@ test('append, placeGeometry and tintGeometry keep colours through merge, weld an
   assert.equal(flat.colors.length, flat.indices.length * 4);
   const kept = applyMatrix4(merged, placementMatrix({ scale: 2 }));
   assert.equal(kept.colors, merged.colors);
-  const built = new GeometryBuilder({ colors: true }).append(box, { color: '#00ff00', position: [0, 1, 0] }).append(red).data();
+  const built = new GeometryBuilder({ colors: true })
+    .append(box, { color: '#00ff00', position: [0, 1, 0] })
+    .append(red)
+    .data();
   assert.equal(built.colors.length, (built.positions.length / 3) * 4);
   close(volume(built), 2 * volume(box), 1e-4);
 });
@@ -244,16 +262,49 @@ test('turnedGeometry: a capped cylinder is closed, outward and of the right volu
   let maxZ = 0;
   for (let i = 2; i < z.positions.length; i += 3) maxZ = Math.max(maxZ, z.positions[i]);
   close(maxZ, h);
-  for (const axis of ['x', 'y', 'z']) assert.ok(volume(turnedGeometry([[0, 0], [1, 0], [0, 1]], { axis })) > 0);
+  for (const axis of ['x', 'y', 'z'])
+    assert.ok(
+      volume(
+        turnedGeometry(
+          [
+            [0, 0],
+            [1, 0],
+            [0, 1],
+          ],
+          { axis },
+        ),
+      ) > 0,
+    );
   // A ring profile loop closes on itself, and a partial sweep gets end caps.
-  const ring = turnedGeometry([[1, 0], [2, 0], [2, 1], [1, 1], [1, 0]]);
+  const ring = turnedGeometry([
+    [1, 0],
+    [2, 0],
+    [2, 1],
+    [1, 1],
+    [1, 0],
+  ]);
   assertClosed(ring);
   // A 48-gon ring: (n / 2) sin(2 pi / n) (R^2 - r^2) h.
   close(volume(ring), 24 * Math.sin(Math.PI / 24) * 3, 1e-4);
-  const half = turnedGeometry([[0, 0], [1, 0], [1, 1], [0, 1]], { sweep: Math.PI, segments: 128 });
+  const half = turnedGeometry(
+    [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ],
+    { sweep: Math.PI, segments: 128 },
+  );
   close(volume(half), Math.PI / 2, 1e-3);
   assert.throws(() => turnedGeometry([[1, 0]]), RangeError);
-  assert.throws(() => turnedGeometry([[-1, 0], [1, 1]]), RangeError);
+  assert.throws(
+    () =>
+      turnedGeometry([
+        [-1, 0],
+        [1, 1],
+      ]),
+    RangeError,
+  );
 });
 
 test('rotationMinimizingFrames: no twist about a planar curve, and a closed loop meets itself', () => {
@@ -305,7 +356,21 @@ test('pipeGeometry: a straight pipe matches the cylinder volume; bends stay clos
   assertClosed(loop);
   // A polygonal torus of radii 1 and 0.1 (Pappus over a 16-gon section and a 64-gon path).
   close(volume(loop), 8 * Math.sin(Math.PI / 8) * 0.01 * 128 * Math.sin(Math.PI / 64), 0.001);
-  const square = pipeGeometry([[0, 0, 0], [0, 1, 0]], 1, { section: [[-1, -1], [1, -1], [1, 1], [-1, 1]] });
+  const square = pipeGeometry(
+    [
+      [0, 0, 0],
+      [0, 1, 0],
+    ],
+    1,
+    {
+      section: [
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1],
+      ],
+    },
+  );
   close(volume(square), 4, 1e-4);
 });
 
@@ -370,7 +435,8 @@ test('chamferBoxGeometry: chamfered and rounded boxes keep their outer size', ()
   const ext = [0, 1, 2].map((k) => {
     let lo = Infinity,
       hi = -Infinity;
-    for (let i = k; i < box.positions.length; i += 3) (lo = Math.min(lo, box.positions[i])), (hi = Math.max(hi, box.positions[i]));
+    for (let i = k; i < box.positions.length; i += 3)
+      (lo = Math.min(lo, box.positions[i])), (hi = Math.max(hi, box.positions[i]));
     return hi - lo;
   });
   ext.forEach((e, k) => close(e, [2, 1, 3][k], 1e-5));
@@ -384,7 +450,10 @@ test('ringSectorGeometry: flat annulus area, solid ring volume, superellipse squ
   const area = (d) => {
     let a = 0;
     for (let t = 0; t < d.indices.length; t += 3) {
-      const [p, q, r] = [d.indices[t], d.indices[t + 1], d.indices[t + 2]].map((i) => [d.positions[i * 3], d.positions[i * 3 + 2]]);
+      const [p, q, r] = [d.indices[t], d.indices[t + 1], d.indices[t + 2]].map((i) => [
+        d.positions[i * 3],
+        d.positions[i * 3 + 2],
+      ]);
       a += Math.abs((q[0] - p[0]) * (r[1] - p[1]) - (r[0] - p[0]) * (q[1] - p[1])) / 2;
     }
     return a;
@@ -449,9 +518,18 @@ test('strokeGeometry: one quad per segment of the given width, facing the axis',
   ]) {
     const s = strokeGeometry(
       [
-        [[0, 0], [1, 0]],
-        [[0, 0], [0, 2]],
-        [[3, 3], [3, 3]],
+        [
+          [0, 0],
+          [1, 0],
+        ],
+        [
+          [0, 0],
+          [0, 2],
+        ],
+        [
+          [3, 3],
+          [3, 3],
+        ],
       ],
       0.1,
       { axis },
@@ -460,10 +538,20 @@ test('strokeGeometry: one quad per segment of the given width, facing the axis',
     for (let i = k; i < s.normals.length; i += 3) close(s.normals[i], 1);
     assertOutward(s);
   }
-  const s = strokeGeometry([[[0, 0], [2, 0]]], 0.1, { axis: 'z' });
+  const s = strokeGeometry(
+    [
+      [
+        [0, 0],
+        [2, 0],
+      ],
+    ],
+    0.1,
+    { axis: 'z' },
+  );
   let lo = Infinity,
     hi = -Infinity;
-  for (let i = 1; i < s.positions.length; i += 3) (lo = Math.min(lo, s.positions[i])), (hi = Math.max(hi, s.positions[i]));
+  for (let i = 1; i < s.positions.length; i += 3)
+    (lo = Math.min(lo, s.positions[i])), (hi = Math.max(hi, s.positions[i]));
   close(hi - lo, 0.1);
 });
 

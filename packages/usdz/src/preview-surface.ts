@@ -128,7 +128,6 @@ function surface(read: SurfaceRead): USDSurface | undefined {
       metallicFactor: scalar('metallic', 0),
     },
   };
-  const p = material.pbrMetallicRoughness!;
   material.extras = {
     usdPreviewStraightAlpha: true,
     usdPreviewReaders: readers,

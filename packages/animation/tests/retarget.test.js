@@ -227,6 +227,9 @@ test('held bones are written at the rig rest by apply and keyed by clip; unknown
   retarget.apply(s, t);
   near(t.getPose(3).rotation, bent, 1e-12, 'apply writes the held rest');
   const clip = retarget.clip(createKeyframeClip({ name: 'still', tracks: [] }));
-  assert.ok(clip.tracks.some((track) => track.target === 'Finger' && track.path === 'rotation'), 'clip keys it');
+  assert.ok(
+    clip.tracks.some((track) => track.target === 'Finger' && track.path === 'rotation'),
+    'clip keys it',
+  );
   assert.throws(() => new Retarget(retargetRig(s), rig, { hold: ['Tail'] }), RangeError);
 });

@@ -246,7 +246,14 @@ export function pointSourceLook(
   sources: Pick<PointSources, 'count' | 'colorIndex' | 'magnitude'>,
   options: PointSourceLookOptions = {},
 ): { colors: Float32Array; sizes: Float32Array } {
-  const { referenceMagnitude = 6, compression = 0.45, brightness = 4, minSize = 1, sizeRange = 2, saturation = 1 } = options;
+  const {
+    referenceMagnitude = 6,
+    compression = 0.45,
+    brightness = 4,
+    minSize = 1,
+    sizeRange = 2,
+    saturation = 1,
+  } = options;
   if (!(compression >= 0.2 && compression <= 1)) throw new RangeError('Pass compression from 0.2 to 1.');
   const n = sources.count,
     colors = new Float32Array(n * 4),

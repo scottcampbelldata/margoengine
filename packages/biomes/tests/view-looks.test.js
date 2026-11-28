@@ -54,7 +54,9 @@ test('regression: the needles and dry-grass grounds are measured litter, not ora
     ['dry-grass', [0.3476, 0.2394, 0.0983]],
   ]) {
     const got = MATERIALS[key].color.map(linear);
-    want.forEach((w, i) => assert.ok(Math.abs(got[i] - w) < 0.002, `${key} linear channel ${i}: ${got[i]} against ${w}`));
+    want.forEach((w, i) =>
+      assert.ok(Math.abs(got[i] - w) < 0.002, `${key} linear channel ${i}: ${got[i]} against ${w}`),
+    );
   }
   const [r, , b] = MATERIALS.needles.color.map(linear);
   assert.ok(b / r > 0.36 && b / r < 0.44, `needles blue over red ${b / r}`);

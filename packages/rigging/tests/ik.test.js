@@ -268,7 +268,7 @@ test('a bent elbow stays on its own side when the pole points the other way (pla
   for (let b = 0; b < 4; b++) assert.ok(distance(at(own, b), at(same, b)) < 1e-12);
 });
 
-test('a two-bone arm bends as a hinge about the forearm bone\'s own axis, whatever the pole (planner arms)', () => {
+test("a two-bone arm bends as a hinge about the forearm bone's own axis, whatever the pole (planner arms)", () => {
   // Forearm bent 40 degrees about its local x at rest. Shortest-arc turns left the upper arm's twist to chance, so when
   // the bend plane swung the forearm's local rotation picked up swing about y and z: the forearm went sideways or back.
   const half = (-40 * Math.PI) / 360,

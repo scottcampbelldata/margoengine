@@ -17,7 +17,8 @@ export const INCONCLUSIVE_MASK = 0.5;
 
 /** @param {{width:number,height:number,data:Uint8Array}} a @param {{width:number,height:number,data:Uint8Array}} b */
 export function diffFrames(a, b, delta = PIXEL_DELTA) {
-  if (a.width !== b.width || a.height !== b.height) throw new Error(`frame sizes differ: ${a.width}x${a.height} and ${b.width}x${b.height}`);
+  if (a.width !== b.width || a.height !== b.height)
+    throw new Error(`frame sizes differ: ${a.width}x${a.height} and ${b.width}x${b.height}`);
   const n = a.width * a.height,
     mask = new Uint8Array(n);
   let count = 0,
@@ -87,7 +88,8 @@ export function compareRegion(before, after, noise) {
   const reasons = [];
   if (outside >= MIN_PIXELS && noise.maskFraction < 0.9) reasons.push(`${outside} px changed outside the moving area`);
   if (d.count >= 2 * noise.count + MIN_PIXELS) reasons.push(`${d.count} px changed against ${noise.count} px of noise`);
-  if (d.mean >= 0.5 && d.mean >= 2 * noise.mean + 0.5) reasons.push(`mean change ${d.mean.toFixed(2)} against ${noise.mean.toFixed(2)} of noise`);
+  if (d.mean >= 0.5 && d.mean >= 2 * noise.mean + 0.5)
+    reasons.push(`mean change ${d.mean.toFixed(2)} against ${noise.mean.toFixed(2)} of noise`);
   return {
     changed: reasons.length > 0,
     reasons,
@@ -128,7 +130,8 @@ export function textChanges(before, after, noisy = new Set(), own = new Set()) {
 /** Keys whose text changed between two snapshots taken with no input. */
 export function noisyKeys(a, b) {
   const out = new Set();
-  for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) if ((a[key] ?? '') !== (b[key] ?? '')) out.add(key);
+  for (const key of new Set([...Object.keys(a), ...Object.keys(b)]))
+    if ((a[key] ?? '') !== (b[key] ?? '')) out.add(key);
   return out;
 }
 
@@ -159,7 +162,11 @@ export function judgeStep(step) {
 export function judgeControl(steps) {
   if (!steps.length) return { verdict: 'skipped', labelOnly: false };
   if (steps.some((s) => s.verdict === 'live')) return { verdict: 'live', labelOnly: false };
-  const verdict = steps.some((s) => s.verdict === 'unsure') ? 'unsure' : steps.some((s) => s.verdict === 'unreachable') ? 'unreachable' : 'dead';
+  const verdict = steps.some((s) => s.verdict === 'unsure')
+    ? 'unsure'
+    : steps.some((s) => s.verdict === 'unreachable')
+      ? 'unreachable'
+      : 'dead';
   return { verdict, labelOnly: steps.some((s) => s.labelOnly) };
 }
 

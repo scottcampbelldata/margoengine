@@ -101,7 +101,16 @@ test('every set on an engine shares one RawShaders plugin, and parts carry one v
   const beam = glow.beam(parent, { opacity: 0.83 });
   assert.equal(beam.mesh.getAttribute('a').data.length, 8 * 4);
   assert.equal(beam.mesh.getAttribute('d').data[3], Math.fround(0.83));
-  const facet = solid.facet(parent, [[0, 0, 0], [1, 0, 0], [0, 1, 0]], [0, 0, 1], { tint: [0, 1, 0] });
+  const facet = solid.facet(
+    parent,
+    [
+      [0, 0, 0],
+      [1, 0, 0],
+      [0, 1, 0],
+    ],
+    [0, 0, 1],
+    { tint: [0, 1, 0] },
+  );
   assert.deepEqual([...facet.mesh.getAttribute('direction').data], [0, 0, 1, 0, 0, 1, 0, 0, 1]);
   glow.dispose();
   solid.dispose();

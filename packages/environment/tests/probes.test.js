@@ -504,7 +504,9 @@ test('the exact prefilter of a 256 px probe loops over at most 2^14 source texel
       if (!pass.spied) {
         const dispatch = pass.dispatchWorkgroups;
         pass.spied = true;
-        pass.dispatchWorkgroups = (x, y, z) => (calls.push(['pass.dispatchWorkgroups', x, y]), dispatch?.call(pass, x, y, z));
+        pass.dispatchWorkgroups = (x, y, z) => (
+          calls.push(['pass.dispatchWorkgroups', x, y]), dispatch?.call(pass, x, y, z)
+        );
       }
       return pass;
     };
@@ -533,7 +535,10 @@ test('the exact prefilter of a 256 px probe loops over at most 2^14 source texel
     const size = 256 >> slot,
       own = chunks.filter((c) => c.slot === slot);
     assert.equal(own[0].first, 0);
-    assert.ok(own.every((c) => c.source === own[0].source), "every chunk reads the probe's level 0");
+    assert.ok(
+      own.every((c) => c.source === own[0].source),
+      "every chunk reads the probe's level 0",
+    );
     assert.equal(own.at(-1).end, 256 * 256, 'the last chunk reaches the last source texel and stores');
     for (let k = 0; k < own.length; k++) {
       if (k > 0) assert.equal(own[k].first, own[k - 1].end, 'chunks cover the source in order');

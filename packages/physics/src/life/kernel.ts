@@ -147,8 +147,7 @@ export function instantiateSwimKernel(
   }
 
   const apply: SwimPassiveStep = (body, parameters, medium, next, kinematics, wake, passive, count, dt) => {
-    if (Boolean(passive) !== withPassive || !Number.isSafeInteger(count) || count < 0 || count > 0xffffffff)
-      return 1;
+    if (Boolean(passive) !== withPassive || !Number.isSafeInteger(count) || count < 0 || count > 0xffffffff) return 1;
     const { buffer } = host.memory;
     const header = new Uint32Array(buffer, ptr, 8);
     header[0] = body;
@@ -188,5 +187,10 @@ export function instantiateSwimKernel(
     });
     return { threads, bodies, simdAxisPairs: 2 * bodies, passiveReactions, workers };
   }
-  return { step: exports.swim_step as SwimStep, passive: exports.swim_step_passive as SwimPassiveStep, apply, workCounts };
+  return {
+    step: exports.swim_step as SwimStep,
+    passive: exports.swim_step_passive as SwimPassiveStep,
+    apply,
+    workCounts,
+  };
 }

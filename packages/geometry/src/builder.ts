@@ -107,7 +107,11 @@ export interface PlaceOptions {
 export function placementMatrix(options: PlaceOptions = {}): Float64Array {
   const { position = [0, 0, 0], yaw = 0, pitch = 0, roll = 0, scale = 1, matrix } = options;
   const s = typeof scale === 'number' ? [scale, scale, scale] : scale;
-  if (![...Array.from(position), ...Array.from(s), yaw, pitch, roll].every(Number.isFinite) || s.length !== 3 || position.length !== 3)
+  if (
+    ![...Array.from(position), ...Array.from(s), yaw, pitch, roll].every(Number.isFinite) ||
+    s.length !== 3 ||
+    position.length !== 3
+  )
     throw new RangeError('Invalid placement; pass finite position, scale and angles');
   const cy = Math.cos(yaw),
     sy = Math.sin(yaw),
@@ -256,7 +260,12 @@ export class GeometryBuilder {
     return this;
   }
 
-  #face(points: readonly P3[], uvs: readonly (readonly number[])[], triangles: readonly number[], options: FaceOptions) {
+  #face(
+    points: readonly P3[],
+    uvs: readonly (readonly number[])[],
+    triangles: readonly number[],
+    options: FaceOptions,
+  ) {
     const normal = unit3(newell(points));
     const color = options.color === undefined ? this.#color : parseColor(options.color);
     const base = this.vertexCount;
@@ -274,14 +283,33 @@ export class GeometryBuilder {
   /** A flat triangle a, b, c. */
   triangle(a: P3, b: P3, c: P3, options: FaceOptions = {}): this {
     check([a, b, c], 'GeometryBuilder.triangle');
-    this.#face([a, b, c], options.uvs ?? [[0, 0], [1, 0], [0, 1]], [0, 1, 2], options);
+    this.#face(
+      [a, b, c],
+      options.uvs ?? [
+        [0, 0],
+        [1, 0],
+        [0, 1],
+      ],
+      [0, 1, 2],
+      options,
+    );
     return this;
   }
 
   /** A flat quad a, b, c, d (two triangles, split along a to c). */
   quad(a: P3, b: P3, c: P3, d: P3, options: FaceOptions = {}): this {
     check([a, b, c, d], 'GeometryBuilder.quad');
-    this.#face([a, b, c, d], options.uvs ?? [[0, 0], [1, 0], [1, 1], [0, 1]], [0, 1, 2, 0, 2, 3], options);
+    this.#face(
+      [a, b, c, d],
+      options.uvs ?? [
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+      ],
+      [0, 1, 2, 0, 2, 3],
+      options,
+    );
     return this;
   }
 
@@ -303,7 +331,8 @@ export class GeometryBuilder {
     const e2 = cross3(n, e1);
     const all = [...points, ...holes.flat()];
     const flat: number[] = [];
-    for (const p of all) flat.push(p[0] * e1[0] + p[1] * e1[1] + p[2] * e1[2], p[0] * e2[0] + p[1] * e2[1] + p[2] * e2[2]);
+    for (const p of all)
+      flat.push(p[0] * e1[0] + p[1] * e1[1] + p[2] * e1[2], p[0] * e2[0] + p[1] * e2[1] + p[2] * e2[2]);
     const holeStarts: number[] = [];
     let at = points.length;
     for (const hole of holes) {
@@ -316,7 +345,8 @@ export class GeometryBuilder {
       const i = tris[t],
         j = tris[t + 1],
         k = tris[t + 2];
-      const area = (flat[j * 2] - flat[i * 2]) * (flat[k * 2 + 1] - flat[i * 2 + 1]) -
+      const area =
+        (flat[j * 2] - flat[i * 2]) * (flat[k * 2 + 1] - flat[i * 2 + 1]) -
         (flat[k * 2] - flat[i * 2]) * (flat[j * 2 + 1] - flat[i * 2 + 1]);
       if (area < 0) (tris[t + 1] = k), (tris[t + 2] = j);
     }

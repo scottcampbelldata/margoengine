@@ -6,7 +6,8 @@ import { ShotBlend } from '../dist/shots.js';
 // ShotBlend replaces the overview/close-up camera move every optics demo wrote by hand: an eased blend between two
 // eye-target shots, a portrait back-off and an optional field of view.
 
-const near = (actual, expected) => actual.forEach((v, i) => assert.ok(Math.abs(v - expected[i]) < 1e-12, `${actual} vs ${expected}`));
+const near = (actual, expected) =>
+  actual.forEach((v, i) => assert.ok(Math.abs(v - expected[i]) < 1e-12, `${actual} vs ${expected}`));
 const wide = { target: [0, 0.2, 0], offset: [1, 1, 2], fit: 1.2, fov: 42 };
 const close = { target: [0.4, 0.3, 0], offset: [0.2, 0.1, 0.5], fit: 1, fov: 38 };
 

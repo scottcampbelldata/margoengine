@@ -257,7 +257,12 @@ function gaitFor(foot: StepFoot, span: number) {
     const heelPitch = -0.16 + 0.065 * clamp((rise + 0.025) / 0.2);
     // Pre-swing: the foot keeps rolling over its toe from the heel rise it carried out of terminal stance.
     if (phase <= leave)
-      return boot(from.location, from.yaw, mix(rolled, toePitch, ease(phase, rolled > 0 ? 0 : leave * 0.34, leave)), toe);
+      return boot(
+        from.location,
+        from.yaw,
+        mix(rolled, toePitch, ease(phase, rolled > 0 ? 0 : leave * 0.34, leave)),
+        toe,
+      );
     if (phase >= land)
       return boot(to.location, to.yaw, heelPitch * (1 - ease(phase, land, Math.min(1, land + 0.16))), heel);
     const u = (phase - leave) / (land - leave);
@@ -290,8 +295,15 @@ function gaitFor(foot: StepFoot, span: number) {
       middle[2] += ankleAt[2];
       return middle;
     };
-    const from = step === 0 || step === count ? standing(origin.location, fixed.location) : between(origin.location, fixed.location, 0.56);
-    const to = active ? (step === count - 1 ? standing(fixed.location, landing) : between(fixed.location, landing, 0.56)) : from;
+    const from =
+      step === 0 || step === count
+        ? standing(origin.location, fixed.location)
+        : between(origin.location, fixed.location, 0.56);
+    const to = active
+      ? step === count - 1
+        ? standing(fixed.location, landing)
+        : between(fixed.location, landing, 0.56)
+      : from;
     const side = swing === 0 ? 1 : -1;
     const takeoff = step === 0 ? 0.25 : 0.158;
     const land = step === count - 1 ? 0.79 : 0.82;
@@ -321,8 +333,14 @@ function gaitFor(foot: StepFoot, span: number) {
     const transfer = smooth(phase);
     const x = mix(mix(from[0], to[0], transfer), fixed.location[0], 0.53 * brace);
     const z = active
-      ? hermite(path.stations[step]!, path.stations[step + 1]!, path.zSlopes[step]!, path.zSlopes[step + 1]!,
-          path.durations[step]!, phase)
+      ? hermite(
+          path.stations[step]!,
+          path.stations[step + 1]!,
+          path.zSlopes[step]!,
+          path.zSlopes[step + 1]!,
+          path.durations[step]!,
+          phase,
+        )
       : from[2];
     const list =
       (1 - activity) * Math.max(-0.12, Math.min(0.12, Math.atan2(feet[0].ankle[1] - feet[1].ankle[1], span)));
@@ -332,13 +350,31 @@ function gaitFor(foot: StepFoot, span: number) {
     const coming = active ? Math.min(0.65, Math.max(-0.65, next.location[0] - fixed.location[0])) : 0;
     const anticipation = active ? 0.4 * Math.sin(2 * Math.PI * phase) ** 2 + 0.6 * brace : 0;
     return {
-      x, y, z, feet, next, list, rhythm, activity, brace, absorb, anticipation, coming, settling,
+      x,
+      y,
+      z,
+      feet,
+      next,
+      list,
+      rhythm,
+      activity,
+      brace,
+      absorb,
+      anticipation,
+      coming,
+      settling,
       sway: Math.cos(rhythm) * activity,
       lean: (fixed.location[0] - x) * brace,
     };
   };
-  return { sample, ankleZ: ankleAt[2], initial: (start: readonly [Vec3, Vec3]): [Footfall, Footfall] =>
-    [{ location: start[0], yaw: 0.078 }, { location: start[1], yaw: -0.078 }] };
+  return {
+    sample,
+    ankleZ: ankleAt[2],
+    initial: (start: readonly [Vec3, Vec3]): [Footfall, Footfall] => [
+      { location: start[0], yaw: 0.078 },
+      { location: start[1], yaw: -0.078 },
+    ],
+  };
 }
 
 function finiteLeg(leg: StepLeg): void {
@@ -425,13 +461,27 @@ export function createStepper(options: Stepping): Stepper {
     root,
     count,
     durations: path.durations,
-    get feet() { return current.feet; },
-    get motion(): StepMotion { return current; },
-    get step() { return step; },
-    get phase() { return phase; },
-    get time() { return time; },
-    get moving() { return moving; },
-    get completed() { return completed; },
+    get feet() {
+      return current.feet;
+    },
+    get motion(): StepMotion {
+      return current;
+    },
+    get step() {
+      return step;
+    },
+    get phase() {
+      return phase;
+    },
+    get time() {
+      return time;
+    },
+    get moving() {
+      return moving;
+    },
+    get completed() {
+      return completed;
+    },
     pelvisHeight,
     start() {
       if (moving) return;
@@ -491,12 +541,17 @@ function planPelvis(
   // filtered window maximum of that excess: at every sample the result is at or below the limit, and nowhere else is
   // it lowered (a flat subtraction of the worst case would hold the knees bent all the way).
   const radius = 10;
-  const weights = Array.from({ length: 2 * radius + 1 }, (_, i) => 0.5 + 0.5 * Math.cos((Math.PI * (i - radius)) / (radius + 1)));
+  const weights = Array.from(
+    { length: 2 * radius + 1 },
+    (_, i) => 0.5 + 0.5 * Math.cos((Math.PI * (i - radius)) / (radius + 1)),
+  );
   const sum = weights.reduce((total, value) => total + value, 0);
   const at = (values: ArrayLike<number>, i: number): number => values[Math.min(samples - 1, Math.max(0, i))]!;
   const filter = (values: ArrayLike<number>): Float64Array =>
-    Float64Array.from({ length: samples }, (_, i) =>
-      weights.reduce((total, weight, j) => total + at(values, i + j - radius) * weight, 0) / sum);
+    Float64Array.from(
+      { length: samples },
+      (_, i) => weights.reduce((total, weight, j) => total + at(values, i + j - radius) * weight, 0) / sum,
+    );
   const filtered = filter(limit);
   const excess = filtered.map((value, i) => Math.max(0, value - limit[i]!));
   const widest = Float64Array.from({ length: samples }, (_, i) => {

@@ -230,9 +230,19 @@ test('hot ground: the mirage edge is acos(n_hot / n_air) (Hagen et al. 2026: 0.1
     nh = 1 + airRefractivity(T0 + 5);
   near(inferiorMirageAngle(5, { ambient: T0 }), Math.acos(nh / na), 1e-4, 'far eye against Hagen equation 13');
   near(deg(inferiorMirageAngle(5, { ambient: T0, eye: 0.1 })), 0.167, 0.01, 'Hagen et al. 10 cm lens, 5 K');
-  near(inferiorMirageAngle(20, { ambient: T0 }) / inferiorMirageAngle(5, { ambient: T0 }), 2, 0.03, 'four times the excess');
+  near(
+    inferiorMirageAngle(20, { ambient: T0 }) / inferiorMirageAngle(5, { ambient: T0 }),
+    2,
+    0.03,
+    'four times the excess',
+  );
   assert.equal(inferiorMirageAngle(0), 0);
-  near(inferiorMirageAngle(5, { strength: 2 }) / inferiorMirageAngle(5), Math.SQRT2, 1e-5, 'strength scales the change of n (under the arctangent)');
+  near(
+    inferiorMirageAngle(5, { strength: 2 }) / inferiorMirageAngle(5),
+    Math.SQRT2,
+    1e-5,
+    'strength scales the change of n (under the arctangent)',
+  );
   assert.throws(() => inferiorMirageAngle(61), RangeError);
 });
 

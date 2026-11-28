@@ -109,8 +109,10 @@ async function capture() {
           // Anything laid over the scene (a view button, a toolbar, a caption, a coordinates label) is page chrome, not the
           // picture: hide each box beside the canvas's own ancestors that overlaps it. Other canvases (a 2D label or trail
           // layer drawn by the scene) and boxes holding one are part of the picture and stay.
-          const { canvas, ...rect } = best, area = canvas.getBoundingClientRect();
-          const overlaps = (r) => r.right > area.left && r.left < area.right && r.bottom > area.top && r.top < area.bottom;
+          const { canvas, ...rect } = best,
+            area = canvas.getBoundingClientRect();
+          const overlaps = (r) =>
+            r.right > area.left && r.left < area.right && r.bottom > area.top && r.top < area.bottom;
           for (let holder = canvas.parentElement; holder; holder = holder.parentElement) {
             for (const el of holder.children) {
               if (el.contains(canvas) || el.matches('canvas') || el.querySelector('canvas')) continue;

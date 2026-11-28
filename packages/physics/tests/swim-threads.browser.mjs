@@ -48,7 +48,10 @@ try {
   assert.match(outcome.windowError.message, /worker.*threads: 1/i);
   assert.equal(outcome.error, undefined, outcome.error);
   const { suites, far } = outcome;
-  assert.deepEqual(suites.map(({ baseline }) => baseline.passive), [false, true]);
+  assert.deepEqual(
+    suites.map(({ baseline }) => baseline.passive),
+    [false, true],
+  );
   for (const { baseline, reports } of suites) {
     assert.deepEqual(
       reports.map(({ shared, threads, helpers }) => [shared, threads, helpers]),

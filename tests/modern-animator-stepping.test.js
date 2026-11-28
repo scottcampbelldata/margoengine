@@ -30,10 +30,15 @@ function walk(options) {
       feet: stepper.feet.map((foot) => ({ ...foot, ankle: [...foot.ankle] })),
       knees: legs.map((leg, i) => {
         const [x, y, z] = leg.hip;
-        const hip = [stepper.root[0] + x, stepper.root[1] + y + (i ? -0.5 : 0.5) * 0.2268 * Math.sin(list),
-          stepper.root[2] + z];
-        return { flexion: kneeFlexionAt(leg, distance(hip, stepper.feet[i].ankle)) / DEG,
-          stretch: distance(hip, stepper.feet[i].ankle) - (leg.thigh + leg.shin) };
+        const hip = [
+          stepper.root[0] + x,
+          stepper.root[1] + y + (i ? -0.5 : 0.5) * 0.2268 * Math.sin(list),
+          stepper.root[2] + z,
+        ];
+        return {
+          flexion: kneeFlexionAt(leg, distance(hip, stepper.feet[i].ankle)) / DEG,
+          stretch: distance(hip, stepper.feet[i].ankle) - (leg.thigh + leg.shin),
+        };
       }),
     });
   };
@@ -48,18 +53,23 @@ function walk(options) {
 
 const median = (values) => values.sort((a, b) => a - b)[values.length >> 1];
 const singleSupport = (frames) =>
-  frames.filter((f) => (f.feet[0].pin === null) !== (f.feet[1].pin === null))
+  frames
+    .filter((f) => (f.feet[0].pin === null) !== (f.feet[1].pin === null))
     .map((f) => f.knees[f.feet[0].pin ? 0 : 1].flexion);
 const swing = (frames) => frames.flatMap((f) => f.knees.filter((_, i) => f.feet[i].pin === null).map((k) => k.flexion));
 
 const level = {
-  start: [[0.1, 0, 0], [-0.1, 0, 0.31]],
+  start: [
+    [0.1, 0, 0],
+    [-0.1, 0, 0.31],
+  ],
   routes: [[...Array.from({ length: 9 }, (_, i) => [i % 2 ? -0.1 : 0.1, 0, 0.31 + 0.62 * (i + 1)]), [-0.1, 0, 5.89]]],
 };
 
 test('level walking: knees and pelvis travel match published human gait', () => {
   const { frames } = walk(level);
-  const first = frames[0], last = frames.at(-1);
+  const first = frames[0],
+    last = frames.at(-1);
   for (const knee of [...first.knees, ...last.knees]) assert.ok(knee.flexion < 15, `standing knee ${knee.flexion}`);
   const loaded = median(singleSupport(frames));
   assert.ok(loaded >= 5 && loaded <= 22, `single-support knee median ${loaded}`);
@@ -77,10 +87,24 @@ test('level walking: knees and pelvis travel match published human gait', () => 
 });
 
 test('stepping stones: knees stay in the range people use on stones and stairs', () => {
-  const stones = [[0.21, 0.16, -1.33], [-0.13, 0.21, -0.78], [0.23, 0.29, -0.18], [-0.18, 0.17, 0.43],
-    [0.18, 0.22, 1.02], [-0.17, 0.11, 1.54], [0.23, 0.082, 1.94], [-0.2, 0.079, 2.19]];
+  const stones = [
+    [0.21, 0.16, -1.33],
+    [-0.13, 0.21, -0.78],
+    [0.23, 0.29, -0.18],
+    [-0.18, 0.17, 0.43],
+    [0.18, 0.22, 1.02],
+    [-0.17, 0.11, 1.54],
+    [0.23, 0.082, 1.94],
+    [-0.2, 0.079, 2.19],
+  ];
   const routes = [-0.14, 0, 0.14].map((offset) => stones.map((s, i) => (i === 2 ? [s[0] + offset, s[1], s[2]] : s)));
-  const { frames } = walk({ start: [[0.174, 0.081, -2.15], [-0.17, 0.075, -1.94]], routes });
+  const { frames } = walk({
+    start: [
+      [0.174, 0.081, -2.15],
+      [-0.17, 0.075, -1.94],
+    ],
+    routes,
+  });
   for (const knee of [...frames[0].knees, ...frames.at(-1).knees])
     assert.ok(knee.flexion < 20, `standing knee ${knee.flexion}`);
   const loaded = median(singleSupport(frames));
@@ -95,19 +119,37 @@ test('planted contacts hold still and the swing foot moves continuously', () => 
   const { frames } = walk(level);
   for (let n = 1; n < frames.length; n++) {
     for (let i = 0; i < 2; i++) {
-      const a = frames[n - 1].feet[i], b = frames[n].feet[i];
+      const a = frames[n - 1].feet[i],
+        b = frames[n].feet[i];
       assert.ok(distance(a.ankle, b.ankle) < 0.08, `ankle jump ${distance(a.ankle, b.ankle)} m at frame ${n}`);
       // 8 cm a frame at 60 frames a second: a swing foot peaks near 4 m/s in brisk walking.
       if (a.pin && b.pin && a.pin === b.pin) assert.ok(distance(a.reference, b.reference) < 1e-9, 'planted pin slid');
     }
-    assert.ok(Math.abs(frames[n].root[1] - frames[n - 1].root[1]) < 0.64 / 60 + 1e-3, 'pelvis faster than its lift rate');
+    assert.ok(
+      Math.abs(frames[n].root[1] - frames[n - 1].root[1]) < 0.64 / 60 + 1e-3,
+      'pelvis faster than its lift rate',
+    );
   }
 });
 
 test('standing on uneven ground lists the pelvis instead of crouching', () => {
-  const start = [[0.15, 0.03, 0], [-0.15, 0, 0.25]];
-  const { stepper, frames } = walk({ start, routes: [[[0.15, 0, 0.9], [-0.15, 0, 1.15]]] });
-  assert.ok(frames[0].knees.every((k) => k.flexion < 15), `standing knees ${frames[0].knees.map((k) => k.flexion)}`);
+  const start = [
+    [0.15, 0.03, 0],
+    [-0.15, 0, 0.25],
+  ];
+  const { stepper, frames } = walk({
+    start,
+    routes: [
+      [
+        [0.15, 0, 0.9],
+        [-0.15, 0, 1.15],
+      ],
+    ],
+  });
+  assert.ok(
+    frames[0].knees.every((k) => k.flexion < 15),
+    `standing knees ${frames[0].knees.map((k) => k.flexion)}`,
+  );
   stepper.reset();
   const listed = stepper.motion.list;
   assert.ok(listed > 0.1 && listed <= 0.12, `list ${listed}`);
@@ -124,8 +166,25 @@ test('leg reach and knee flexion are inverse', () => {
 
 test('bad options are rejected with a fix', () => {
   assert.throws(() => createStepper({ legs, start: level.start, routes: [] }), RangeError);
-  assert.throws(() => createStepper({ legs, start: level.start, routes: [[[0, 0, 1]], [[0, 0, 1], [0, 0, 2]]] }), RangeError);
-  assert.throws(() => createStepper({ legs: [legs[1], legs[0]], start: level.start, routes: level.routes }), RangeError);
+  assert.throws(
+    () =>
+      createStepper({
+        legs,
+        start: level.start,
+        routes: [
+          [[0, 0, 1]],
+          [
+            [0, 0, 1],
+            [0, 0, 2],
+          ],
+        ],
+      }),
+    RangeError,
+  );
+  assert.throws(
+    () => createStepper({ legs: [legs[1], legs[0]], start: level.start, routes: level.routes }),
+    RangeError,
+  );
   assert.throws(() => createStepper({ legs, start: level.start, routes: level.routes, kneeFlexion: 2 }), RangeError);
   const stepper = createStepper({ legs, start: level.start, routes: level.routes });
   assert.throws(() => stepper.update(-1), RangeError);

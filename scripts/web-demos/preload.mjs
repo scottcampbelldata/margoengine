@@ -3,13 +3,12 @@
 //   compatibility layer's chunks when WebGPU is missing or ?backend=webgl2 asks for it;
 // - <link rel="modulepreload"> for the chunk the entry imports on start (Vite only preloads static imports).
 // A rebuild renames the chunks they point at, so build.mjs rewrites both from the new build with these helpers.
-import { createHash } from "node:crypto";
+import { createHash } from 'node:crypto';
 
 // Older pages name the same script inline-<8 hex>.js.
-export const preloadTag =
-  /<script src="\.\/assets\/((?:webgl2-preload|inline)-[A-Za-z0-9_-]{8}\.js)"><\/script>/;
+export const preloadTag = /<script src="\.\/assets\/((?:webgl2-preload|inline)-[A-Za-z0-9_-]{8}\.js)"><\/script>/;
 
-const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** The built chunk in `files` for a chunk name without its hash (`scene` finds `scene-CwdSZCFK.js`), or undefined. */
 function chunk(base, files) {
@@ -36,7 +35,7 @@ function listOf(script) {
   if (loop) return { list: loop[1], pick: false };
   const pick = pickList.exec(script);
   if (pick) return { list: pick[1], pick: true };
-  throw new Error("webgl2-preload: no chunk list in the script");
+  throw new Error('webgl2-preload: no chunk list in the script');
 }
 
 /** The chunk names a preload script points at with their build hash taken off: `./assets/errors-DkwPZuAq.js` is `errors`. */
@@ -55,21 +54,15 @@ function rewritePick(script, files) {
     bases = preloadBases(script),
     found = bases.map((base) => chunk(base, files)),
     missing = bases.findIndex((_, i) => !found[i]);
-  if (missing >= 0)
-    throw new Error(`webgl2-preload: no single built chunk named ${bases[missing]}`);
-  const text = script.replace(
-    list,
-    JSON.stringify(found.map((file) => `./assets/${file}`)),
-  );
-  const hash = createHash("sha256").update(text).digest("hex").slice(0, 8);
+  if (missing >= 0) throw new Error(`webgl2-preload: no single built chunk named ${bases[missing]}`);
+  const text = script.replace(list, JSON.stringify(found.map((file) => `./assets/${file}`)));
+  const hash = createHash('sha256').update(text).digest('hex').slice(0, 8);
   return { name: `inline-${hash}.js`, text };
 }
 
 /** The chunks a built chunk's `text` imports statically (`import"./x.js"`, `from"./x.js"`); `import("./x.js")` is not. */
 export function staticImports(text) {
-  return [...text.matchAll(/(?:\bfrom|\bimport)\s*["']\.\/([^"']+\.js)["']/g)].map(
-    (m) => m[1],
-  );
+  return [...text.matchAll(/(?:\bfrom|\bimport)\s*["']\.\/([^"']+\.js)["']/g)].map((m) => m[1]);
 }
 
 /**
@@ -96,7 +89,7 @@ export function rewritePreload(script, files, read) {
   const text =
     `if(!navigator.gpu||new URLSearchParams(location.search).get("backend")==="webgl2"){for(const href of ${JSON.stringify(hrefs)})` +
     `{const link=document.createElement("link");link.rel="modulepreload";link.crossOrigin="anonymous";link.href=href;document.head.append(link);}}`;
-  const hash = createHash("sha256").update(text).digest("hex").slice(0, 8);
+  const hash = createHash('sha256').update(text).digest('hex').slice(0, 8);
   return { name: `webgl2-preload-${hash}.js`, text };
 }
 
@@ -110,16 +103,12 @@ export function carriedPreloads(before, after, files) {
   const links = [],
     entry = before.search(/<script type="module"/),
     added = entry < 0 ? before : before.slice(0, entry);
-  for (const [, href] of added.matchAll(
-    /<link rel="modulepreload" crossorigin href="\.\/assets\/([^"]+)">/g,
-  )) {
+  for (const [, href] of added.matchAll(/<link rel="modulepreload" crossorigin href="\.\/assets\/([^"]+)">/g)) {
     const base = /^(.+)-[A-Za-z0-9_-]{8}\.js$/.exec(href)?.[1];
     const next = base && chunk(base, files);
     if (!next) throw new Error(`modulepreload: no built chunk for ${href}`);
     if (!after.includes(`href="./assets/${next}"`))
-      links.push(
-        `<link rel="modulepreload" crossorigin href="./assets/${next}">`,
-      );
+      links.push(`<link rel="modulepreload" crossorigin href="./assets/${next}">`);
   }
-  return links.join("");
+  return links.join('');
 }

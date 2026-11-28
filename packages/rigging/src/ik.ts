@@ -476,14 +476,21 @@ function chainRotations(
 ): number[][] {
   const out: number[][] = [],
     bones = rotations.length - 1,
-    bone = (points: Float64Array, i: number): number[] => [0, 1, 2].map((c) => points[i * 3 + 3 + c] - points[i * 3 + c]);
+    bone = (points: Float64Array, i: number): number[] =>
+      [0, 1, 2].map((c) => points[i * 3 + 3 + c] - points[i * 3 + c]);
   for (let i = 0; i < bones; i++) {
     const from = bone(before, i),
       to = bone(after, i);
     let turn: number[] = rotationBetween(from, to);
     // The bend this bone hinges in: at its far joint, or for the last bone at its near one.
     const joint = i + 1 < bones ? i + 1 : i;
-    if (joint >= 1) turn = keepHinge(turn, to, bendAxis(bone(before, joint - 1), bone(before, joint)), bendAxis(bone(after, joint - 1), bone(after, joint)));
+    if (joint >= 1)
+      turn = keepHinge(
+        turn,
+        to,
+        bendAxis(bone(before, joint - 1), bone(before, joint)),
+        bendAxis(bone(after, joint - 1), bone(after, joint)),
+      );
     if (weight < 1) turn = partial(turn, weight);
     out.push(normalizeQuaternion(multiplyQuaternions(turn, rotations[i])));
   }

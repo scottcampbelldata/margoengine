@@ -135,8 +135,7 @@ export class WaterBanks implements EnginePlugin {
     if (typeof options.heightmap !== 'function')
       throw rangeError('Water banks heightmap must be a function returning an r32float texture', 'geometry');
     const pair = (v: unknown, min: number, label: string): readonly [number, number] => {
-      if (!Array.isArray(v) || v.length !== 2)
-        throw rangeError(`Water banks ${label} must be [x, z]`, 'geometry');
+      if (!Array.isArray(v) || v.length !== 2) throw rangeError(`Water banks ${label} must be [x, z]`, 'geometry');
       return [scalar(v[0], min, 1e7, label), scalar(v[1], min, 1e7, label)];
     };
     const origin = pair(options.origin, -1e7, 'origin'),
@@ -147,7 +146,8 @@ export class WaterBanks implements EnginePlugin {
       cell = options.cell ?? 1;
     if (!(Number.isFinite(cell) && cell > 0 && cell <= 1e5))
       throw rangeError('Water banks cell must be above 0 and at most 100,000', 'geometry');
-    this.centre = options.centre === undefined || options.centre === 'camera' ? 'camera' : pair(options.centre, -1e7, 'centre');
+    this.centre =
+      options.centre === undefined || options.centre === 'camera' ? 'camera' : pair(options.centre, -1e7, 'centre');
     this.surface = options.surface;
     this.heightmap = options.heightmap;
     this.values.set([
@@ -191,7 +191,11 @@ export class WaterBanks implements EnginePlugin {
       vertex: false,
       count: 2,
       shader: (code, binding) => {
-        if (code.split(vertexMark).length !== 2 || code.split(vertexHead).length !== 2 || code.split(dryMark).length !== 2)
+        if (
+          code.split(vertexMark).length !== 2 ||
+          code.split(vertexHead).length !== 2 ||
+          code.split(dryMark).length !== 2
+        )
           throw fault(
             'unsupported',
             'Water banks need a bounded Water surface (horizon false) from the same water package version',

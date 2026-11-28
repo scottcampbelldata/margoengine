@@ -42,7 +42,11 @@ try {
       }
     return sum / n;
   };
-  if (process.argv.includes('--save')) (await import('node:fs')).writeFileSync(`test-results/bench-${compat ? 'webgl2' : 'webgpu'}.png`, await page.locator('canvas').screenshot());
+  if (process.argv.includes('--save'))
+    (await import('node:fs')).writeFileSync(
+      `test-results/bench-${compat ? 'webgl2' : 'webgpu'}.png`,
+      await page.locator('canvas').screenshot(),
+    );
   const reds = on.data.filter((_, i) => i % 4 === 0);
   const ground = {
     with: mean(on, 0.15, 0.6, 0.45, 0.85),

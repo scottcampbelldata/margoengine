@@ -37,14 +37,25 @@ try {
         .setQuaternion([0, Math.SQRT1_2, 0, Math.SQRT1_2])
         .setScale([0.08, 0.08, 2.4]);
       const beam = glow.beam(beamAnchor);
-      const detector = glow.fringes(engine.createMesh().setPosition([0.8, -0.4, 0]), 0.5, { frequency: 1, markWeight: 0 });
+      const detector = glow.fringes(engine.createMesh().setPosition([0.8, -0.4, 0]), 0.5, {
+        frequency: 1,
+        markWeight: 0,
+      });
       glow.plate(engine.createMesh().setPosition([-0.8, -0.4, 0]), 0.35, 0.3);
       glow.spot(engine.createMesh().setPosition([0, -0.4, 0]), 0.15, 0.15, { fade: 1, innerFalloff: 2 });
       // A lens face and a reticle off to the sides: their WGSL (derivatives in uniform control flow) must compile.
       glow.lens(engine.createMesh().setPosition([1.3, 0.5, 0]), 0.2, {}, { sagU: -0.002 });
       const reticle = glow.reticle(engine.createMesh().setPosition([-1.3, 0.1, 0]), 0.15, 0.12);
       reticle.set({ spotRadius: [0.03, 0.01], hueMix: 0.2 });
-      solid.facet(engine.createMesh().setPosition([0, 0.1, 0]), [[-0.1, 0, 0], [0.1, 0, 0], [0, 0.15, 0]], [0, 0, 1]);
+      solid.facet(
+        engine.createMesh().setPosition([0, 0.1, 0]),
+        [
+          [-0.1, 0, 0],
+          [0.1, 0, 0],
+          [0, 0.15, 0],
+        ],
+        [0, 0, 1],
+      );
       const copy = new OffscreenCanvas(W, H),
         context = copy.getContext('2d', { willReadFrequently: true });
       const frame = async () => {
@@ -100,14 +111,27 @@ try {
       solid.dispose();
       engine.dispose();
       canvas.remove();
-      return { backend, compat: isCompatDevice(device), axis, off, bright, dark, hidden, facet, lit, validation, pixels: [...final] };
+      return {
+        backend,
+        compat: isCompatDevice(device),
+        axis,
+        off,
+        bright,
+        dark,
+        hidden,
+        facet,
+        lit,
+        validation,
+        pixels: [...final],
+      };
     }
     const native = await scene('webgpu');
     const { install } = await import('/packages/webgl2-compat/dist/index.js');
     await install({ force: true });
     const compat = await scene('webgl2');
     let total = 0;
-    for (let i = 0; i < native.pixels.length; i++) if (i % 4 !== 3) total += Math.abs(native.pixels[i] - compat.pixels[i]);
+    for (let i = 0; i < native.pixels.length; i++)
+      if (i % 4 !== 3) total += Math.abs(native.pixels[i] - compat.pixels[i]);
     const meanDiff = total / ((native.pixels.length / 4) * 3);
     for (const r of [native, compat]) delete r.pixels;
     return { native, compat, meanDiff };

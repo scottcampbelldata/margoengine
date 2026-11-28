@@ -5,174 +5,130 @@
 // This script bundles source/ against the engine packages in this checkout with Vite, writes a new
 // index.html and assets/, removes the previous build's hashed chunks, and refreshes downloads/<name>.zip.
 // Files in assets/ without a build hash (data the page fetches by name) are kept.
-import { spawnSync } from "node:child_process";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { build } from "vite";
-import { carriedPreloads, preloadTag, rewritePreload } from "./preload.mjs";
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { build } from 'vite';
+import { carriedPreloads, preloadTag, rewritePreload } from './preload.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const repo = path.resolve(here, "../..");
-const demos = path.join(repo, "demos");
-const hashed =
-  /-[A-Za-z0-9_-]{8}\.(?:js|css|wasm|png|jpe?g|webp|svg|woff2?|bin|glb|ktx2|hdr|json)$/;
+const repo = path.resolve(here, '../..');
+const demos = path.join(repo, 'demos');
+const hashed = /-[A-Za-z0-9_-]{8}\.(?:js|css|wasm|png|jpe?g|webp|svg|woff2?|bin|glb|ktx2|hdr|json)$/;
 
 const args = process.argv.slice(2);
-const zip = !args.includes("--no-zip");
-let names = args.filter((a) => !a.startsWith("--"));
-if (args.includes("--all")) {
-  names = fs
-    .readdirSync(demos)
-    .filter((n) => fs.existsSync(path.join(demos, n, "source")));
+const zip = !args.includes('--no-zip');
+let names = args.filter((a) => !a.startsWith('--'));
+if (args.includes('--all')) {
+  names = fs.readdirSync(demos).filter((n) => fs.existsSync(path.join(demos, n, 'source')));
 }
 if (!names.length) {
-  console.error(
-    "usage: node scripts/web-demos/build.mjs <demo> [demo...] | --all [--no-zip]",
-  );
+  console.error('usage: node scripts/web-demos/build.mjs <demo> [demo...] | --all [--no-zip]');
   process.exitCode = 2;
 }
 
 /** The source module the built page started from: the one no other source module imports. */
 function entryOf(dir) {
-  const source = path.join(dir, "source");
-  const files = fs
-    .readdirSync(source)
-    .filter((f) => /\.(?:m?js|ts)$/.test(f) && !/\.test\./.test(f));
+  const source = path.join(dir, 'source');
+  const files = fs.readdirSync(source).filter((f) => /\.(?:m?js|ts)$/.test(f) && !/\.test\./.test(f));
   const imported = new Set();
   for (const f of files) {
-    const text = fs.readFileSync(path.join(source, f), "utf8");
-    for (const m of text.matchAll(
-      /(?:from|import)\s*\(?\s*['"]\.\/([^'"]+)['"]/g,
-    ))
-      imported.add(m[1].replace(/\?.*$/, ""));
+    const text = fs.readFileSync(path.join(source, f), 'utf8');
+    for (const m of text.matchAll(/(?:from|import)\s*\(?\s*['"]\.\/([^'"]+)['"]/g))
+      imported.add(m[1].replace(/\?.*$/, ''));
   }
-  const roots = files.filter(
-    (f) => !imported.has(f) && !imported.has(f.replace(/\.(?:m?js|ts)$/, "")),
-  );
-  for (const preferred of [
-    "scene.js",
-    "main.js",
-    "app.js",
-    "start.js",
-    "index.js",
-  ])
+  const roots = files.filter((f) => !imported.has(f) && !imported.has(f.replace(/\.(?:m?js|ts)$/, '')));
+  for (const preferred of ['scene.js', 'main.js', 'app.js', 'start.js', 'index.js'])
     if (roots.includes(preferred)) return preferred;
   if (roots.length === 1) return roots[0];
-  throw new Error(
-    `${path.basename(dir)}: cannot tell the entry module among ${roots.join(", ") || "none"}`,
-  );
+  throw new Error(`${path.basename(dir)}: cannot tell the entry module among ${roots.join(', ') || 'none'}`);
 }
 
 /** The page's HTML with the built script and stylesheet swapped for the source ones. */
 function sourceHtml(dir, entry) {
-  let html = fs
-    .readFileSync(path.join(dir, "index.html"), "utf8")
-    .replace(preloadTag, "");
-  html = html.replace(
-    /\s*<script type="module"[^>]*src="\.\/assets\/[^"]+"[^>]*><\/script>/g,
-    "",
-  );
-  html = html.replace(
-    /\s*<link rel="modulepreload"[^>]*href="\.\/assets\/[^"]+"[^>]*>/g,
-    "",
-  );
-  html = html.replace(
-    /\s*<link rel="stylesheet"[^>]*href="\.\/assets\/[^"]+"[^>]*>/g,
-    "",
-  );
-  const css = fs.existsSync(path.join(dir, "source", "style.css"))
+  let html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8').replace(preloadTag, '');
+  html = html.replace(/\s*<script type="module"[^>]*src="\.\/assets\/[^"]+"[^>]*><\/script>/g, '');
+  html = html.replace(/\s*<link rel="modulepreload"[^>]*href="\.\/assets\/[^"]+"[^>]*>/g, '');
+  html = html.replace(/\s*<link rel="stylesheet"[^>]*href="\.\/assets\/[^"]+"[^>]*>/g, '');
+  const css = fs.existsSync(path.join(dir, 'source', 'style.css'))
     ? `\n  <link rel="stylesheet" href="../source/style.css">`
-    : "";
-  return html.replace(
-    "</head>",
-    `  <script type="module" src="../source/${entry}"></script>${css}\n</head>`,
-  );
+    : '';
+  return html.replace('</head>', `  <script type="module" src="../source/${entry}"></script>${css}\n</head>`);
 }
 
 const failures = [];
 for (const name of names) {
   const dir = path.join(demos, name);
-  const work = path.join(dir, ".build");
-  const out = path.join(dir, ".build-out");
+  const work = path.join(dir, '.build');
+  const out = path.join(dir, '.build-out');
   try {
     const entry = entryOf(dir);
     // The WebGL2 preload hint, if the page has one: rewritten for the new chunk names after the build.
-    const shipped = fs.readFileSync(path.join(dir, "index.html"), "utf8"),
+    const shipped = fs.readFileSync(path.join(dir, 'index.html'), 'utf8'),
       preload = preloadTag.exec(shipped)?.[1],
-      preloadScript =
-        preload && fs.readFileSync(path.join(dir, "assets", preload), "utf8");
+      preloadScript = preload && fs.readFileSync(path.join(dir, 'assets', preload), 'utf8');
     fs.rmSync(work, { recursive: true, force: true });
     fs.rmSync(out, { recursive: true, force: true });
     fs.mkdirSync(work);
-    fs.writeFileSync(path.join(work, "index.html"), sourceHtml(dir, entry));
+    fs.writeFileSync(path.join(work, 'index.html'), sourceHtml(dir, entry));
     await build({
       root: work,
-      base: "./",
-      logLevel: "warn",
+      base: './',
+      logLevel: 'warn',
       configFile: false,
       publicDir: false,
       resolve: {
         alias: [
           {
-            find: "margo-demo-status",
-            replacement: path.join(here, "demo-status.js"),
+            find: 'margo-demo-status',
+            replacement: path.join(here, 'demo-status.js'),
           },
           {
             find: /^margo-boulder\/(.*)$/,
-            replacement: path.join(repo, "examples/boulder/$1.js"),
+            replacement: path.join(repo, 'examples/boulder/$1.js'),
           },
         ],
       },
-      worker: { format: "es" },
+      worker: { format: 'es' },
       build: {
         outDir: out,
         emptyOutDir: true,
-        target: "es2022",
-        assetsDir: "assets",
+        target: 'es2022',
+        assetsDir: 'assets',
         chunkSizeWarningLimit: 100000,
         reportCompressedSize: false,
       },
     });
     // The new page and preload script are made before the demo folder is touched, so a build that cannot carry a
     // preload leaves the shipped page and its chunks as they were.
-    const built = fs.readdirSync(path.join(out, "assets"));
-    let page = fs.readFileSync(path.join(out, "index.html"), "utf8"),
+    const built = fs.readdirSync(path.join(out, 'assets'));
+    let page = fs.readFileSync(path.join(out, 'index.html'), 'utf8'),
       head = carriedPreloads(shipped, page, built);
     const next =
       preloadScript &&
-      rewritePreload(preloadScript, built, (f) =>
-        fs.readFileSync(path.join(out, "assets", f), "utf8"),
-      );
+      rewritePreload(preloadScript, built, (f) => fs.readFileSync(path.join(out, 'assets', f), 'utf8'));
     if (next) head += `<script src="./assets/${next.name}"></script>`;
-    page = page.replace("<head>", `<head>${head}`);
-    const assets = path.join(dir, "assets");
+    page = page.replace('<head>', `<head>${head}`);
+    const assets = path.join(dir, 'assets');
     fs.mkdirSync(assets, { recursive: true });
-    for (const f of fs.readdirSync(assets))
-      if (hashed.test(f)) fs.rmSync(path.join(assets, f));
-    for (const f of built)
-      fs.copyFileSync(path.join(out, "assets", f), path.join(assets, f));
+    for (const f of fs.readdirSync(assets)) if (hashed.test(f)) fs.rmSync(path.join(assets, f));
+    for (const f of built) fs.copyFileSync(path.join(out, 'assets', f), path.join(assets, f));
     if (next) fs.writeFileSync(path.join(assets, next.name), next.text);
-    fs.writeFileSync(path.join(dir, "index.html"), page);
+    fs.writeFileSync(path.join(dir, 'index.html'), page);
     if (zip) {
-      const target = path.join(demos, "downloads", `${name}.zip`);
+      const target = path.join(demos, 'downloads', `${name}.zip`);
       fs.rmSync(target, { force: true });
       // The zip holds the folder's contents (index.html, assets/, source/ ...), as the gallery's downloads always have.
       // bsdtar writes zip with -a. Windows ships it as System32/tar.exe; elsewhere it is bsdtar.
       const tar =
-        process.platform === "win32"
-          ? path.join(
-              process.env.SystemRoot ?? "C:/Windows",
-              "System32",
-              "tar.exe",
-            )
-          : "bsdtar";
-      const entries = fs
-        .readdirSync(dir)
-        .filter((f) => f !== ".build" && f !== ".build-out");
-      const r = spawnSync(tar, ["-a", "-c", "-f", target, ...entries], {
+        process.platform === 'win32'
+          ? path.join(process.env.SystemRoot ?? 'C:/Windows', 'System32', 'tar.exe')
+          : 'bsdtar';
+      const entries = fs.readdirSync(dir).filter((f) => f !== '.build' && f !== '.build-out');
+      const r = spawnSync(tar, ['-a', '-c', '-f', target, ...entries], {
         cwd: dir,
-        stdio: "inherit",
+        stdio: 'inherit',
       });
       if (r.status !== 0) throw new Error(`zip failed for ${name}`);
     }
@@ -186,6 +142,6 @@ for (const name of names) {
   }
 }
 if (failures.length) {
-  console.error(`${failures.length} failed: ${failures.join(" ")}`);
+  console.error(`${failures.length} failed: ${failures.join(' ')}`);
   process.exitCode = 1;
 }

@@ -317,13 +317,19 @@ test('preciseSinCos is preciseSin and preciseCos from one reduction, written as 
   const pair = preciseMathWgsl(['preciseSinCos']),
     sin = preciseMathWgsl(['preciseSin']),
     cos = preciseMathWgsl(['preciseCos']);
-  const body = (code, name) => code.slice(code.indexOf(`fn ${name}(`), code.indexOf('\n}\n', code.indexOf(`fn ${name}(`)));
+  const body = (code, name) =>
+    code.slice(code.indexOf(`fn ${name}(`), code.indexOf('\n}\n', code.indexOf(`fn ${name}(`)));
   const p = body(pair, 'preciseSinCos'),
     s = body(sin, 'preciseSin'),
     c = body(cos, 'preciseCos');
   assert.equal(p.match(/pmReduceTrig\(/g).length, 1, 'one reduction');
   // The same early returns, kernels and quadrant selections as the two functions.
-  for (const line of ['if (pmExponent(x) == 255u)', 'if (a < 0.000244140625)', 'let r = pmReduceTrig(a);', 'let s = pmSinK(r.hi, r.lo); let c = pmCosK(r.hi, r.lo);'])
+  for (const line of [
+    'if (pmExponent(x) == 255u)',
+    'if (a < 0.000244140625)',
+    'let r = pmReduceTrig(a);',
+    'let s = pmSinK(r.hi, r.lo); let c = pmCosK(r.hi, r.lo);',
+  ])
     assert.ok(p.includes(line) && s.includes(line) && c.includes(line), line);
   const select = (code) => code.match(/select\(select\(select\([^;]*\)/)[0];
   assert.ok(p.includes(`let vs = ${select(s)}`), 'the sine quadrant as preciseSin selects it');

@@ -53,7 +53,10 @@ export interface BenchOptions {
   /** Engine start-up timeout in ms before the WebGL2 layer is tried. Default 8000. */
   startupTimeout?: number;
   /** Other `Engine.create` options, passed through. */
-  engine?: Omit<StartEngineOptions, 'loadCompat' | 'forceCompat' | 'signal' | 'camera' | 'capacity' | 'exactSize' | 'antialias' | 'startupTimeout'>;
+  engine?: Omit<
+    StartEngineOptions,
+    'loadCompat' | 'forceCompat' | 'signal' | 'camera' | 'capacity' | 'exactSize' | 'antialias' | 'startupTimeout'
+  >;
   /** Loads the WebGL2 compatibility layer. Default `() => import('@margoengine/webgl2-compat')`. */
   loadCompat?: StartEngineOptions['loadCompat'];
   /** Options for the layer's `install`, such as `{ minimumTier: 'half-float' }`. Default none. */
@@ -135,7 +138,8 @@ export interface Bench {
 
 const normalize = (v: Vec3) => {
   const l = Math.hypot(v[0], v[1], v[2]);
-  if (!(l > 0) || !Number.isFinite(l)) throw rangeError('Invalid light direction; pass a finite nonzero vector', 'arguments');
+  if (!(l > 0) || !Number.isFinite(l))
+    throw rangeError('Invalid light direction; pass a finite nonzero vector', 'arguments');
   return [v[0] / l, v[1] / l, v[2] / l];
 };
 const forcedCompat = () => {
@@ -155,7 +159,8 @@ const forcedCompat = () => {
 export async function openBench(canvas: HTMLCanvasElement, options: BenchOptions = {}): Promise<Bench> {
   if (!canvas || typeof (canvas as { getContext?: unknown }).getContext !== 'function')
     throw typeError('openBench needs a canvas element', 'arguments');
-  if (!options || typeof options !== 'object') throw typeError('Invalid bench options; pass an options object', 'arguments');
+  if (!options || typeof options !== 'object')
+    throw typeError('Invalid bench options; pass an options object', 'arguments');
   const exhibit = options.exhibit ?? canvas,
     pixelRatio = options.pixelRatio ?? 2,
     maxWidth = options.maxWidth ?? 2560;
@@ -294,10 +299,12 @@ export async function openBench(canvas: HTMLCanvasElement, options: BenchOptions
     if (env !== false) {
       const settings = typeof env === 'string' ? { preset: env } : (env ?? {});
       loads.push(
-        stagingLighting(engine, settings.preset ?? 'soft', { width: settings.width ?? 256, signal: outer }).then((value) => {
-          lighting = value;
-          lighting.environment.intensity = settings.intensity ?? 0.55;
-        }),
+        stagingLighting(engine, settings.preset ?? 'soft', { width: settings.width ?? 256, signal: outer }).then(
+          (value) => {
+            lighting = value;
+            lighting.environment.intensity = settings.intensity ?? 0.55;
+          },
+        ),
       );
     }
     if (options.tonemap)
@@ -396,7 +403,8 @@ export async function openBench(canvas: HTMLCanvasElement, options: BenchOptions
     },
     add(mesh, { shadow = true, contact: casts = true, static: still = false } = {}) {
       const removers: (() => void)[] = [];
-      if (shadow && shadows && 'id' in (mesh as object)) removers.push(shadows.add(mesh as MeshHandle, { static: still }));
+      if (shadow && shadows && 'id' in (mesh as object))
+        removers.push(shadows.add(mesh as MeshHandle, { static: still }));
       if (casts && contact) removers.push(contact.add(mesh));
       return () => {
         for (const remove of removers.splice(0)) remove();

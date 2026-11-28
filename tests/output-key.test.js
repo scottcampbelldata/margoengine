@@ -17,7 +17,11 @@ test('OutputKey reports a change only when a field differs, and again after rese
   assert.equal(key.changed({ ...output, format: 'bgra8unorm' }, false), true, 'format');
   assert.equal(key.changed({ ...output, format: 'bgra8unorm', multisample: { count: 1 } }, false), true, 'samples');
   assert.equal(key.changed({ format: 'bgra8unorm', multisample: { count: 1 }, hdr: true }, false), true, 'hdr');
-  assert.equal(key.changed({ format: 'bgra8unorm', multisample: { count: 1 }, hdr: true }, true), true, 'premultiplied');
+  assert.equal(
+    key.changed({ format: 'bgra8unorm', multisample: { count: 1 }, hdr: true }, true),
+    true,
+    'premultiplied',
+  );
   assert.equal(key.changed({ format: 'bgra8unorm', multisample: { count: 1 }, hdr: true }, true, 5), true, 'extra');
   assert.equal(key.changed({ format: 'bgra8unorm', multisample: { count: 1 }, hdr: true }, true, 5), false);
   assert.equal(key.changed({ format: 'bgra8unorm', multisample: {} }, false), true, 'an unset sample count is a value');

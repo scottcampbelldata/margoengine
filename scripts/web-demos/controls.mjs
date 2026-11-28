@@ -27,7 +27,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import sharp from 'sharp';
-import { compareRegion, identicalStops, judgeControl, judgeStep, motionChanged, noiseFloor, noisyKeys, stalled, textChanges } from './controls-compare.mjs';
+import {
+  compareRegion,
+  identicalStops,
+  judgeControl,
+  judgeStep,
+  motionChanged,
+  noiseFloor,
+  noisyKeys,
+  stalled,
+  textChanges,
+} from './controls-compare.mjs';
 import { killTree } from '../run-with-timeout.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -61,7 +71,9 @@ if (flag('all')) names = catalog.map((d) => d.slug).filter((n) => fs.existsSync(
 const report = fs.existsSync(reportFile) ? JSON.parse(fs.readFileSync(reportFile, 'utf8')) : { demos: {} };
 const mdOnly = flag('md-only');
 if (!names.length && !mdOnly) {
-  console.error('usage: node scripts/web-demos/controls.mjs <demo> [demo...] | --all [--resume] [--save-frames] [--no-confirm]');
+  console.error(
+    'usage: node scripts/web-demos/controls.mjs <demo> [demo...] | --all [--resume] [--save-frames] [--no-confirm]',
+  );
   process.exit(2);
 }
 
@@ -70,7 +82,10 @@ class Timeout extends Error {}
 /** Rejects with a Timeout when `promise` takes longer than `ms`. */
 function within(promise, ms, what) {
   let timer;
-  return Promise.race([promise, new Promise((_, reject) => (timer = setTimeout(() => reject(new Timeout(`${what} took over ${ms} ms`)), ms)))]).finally(() => clearTimeout(timer));
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => (timer = setTimeout(() => reject(new Timeout(`${what} took over ${ms} ms`)), ms))),
+  ]).finally(() => clearTimeout(timer));
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -101,7 +116,13 @@ function probe() {
   }
   for (const C of [window.WebGL2RenderingContext, window.WebGLRenderingContext]) {
     if (!C) continue;
-    for (const m of ['drawArrays', 'drawElements', 'drawArraysInstanced', 'drawElementsInstanced', 'drawRangeElements']) {
+    for (const m of [
+      'drawArrays',
+      'drawElements',
+      'drawArraysInstanced',
+      'drawElementsInstanced',
+      'drawRangeElements',
+    ]) {
       const f = C.prototype[m];
       if (f)
         C.prototype[m] = function (...a) {
@@ -147,7 +168,13 @@ function probe() {
           d.set.call(this, v);
         },
       });
-    for (const m of ['setValueAtTime', 'linearRampToValueAtTime', 'exponentialRampToValueAtTime', 'setTargetAtTime', 'setValueCurveAtTime']) {
+    for (const m of [
+      'setValueAtTime',
+      'linearRampToValueAtTime',
+      'exponentialRampToValueAtTime',
+      'setTargetAtTime',
+      'setValueCurveAtTime',
+    ]) {
       const f = AudioParam.prototype[m];
       if (f)
         AudioParam.prototype[m] = function (...a) {
@@ -178,7 +205,9 @@ function probe() {
     }
     return anchorClick.apply(this, a);
   };
-  addEventListener('unhandledrejection', (e) => state.errors.push(`unhandled rejection: ${e.reason?.message ?? e.reason}`));
+  addEventListener('unhandledrejection', (e) =>
+    state.errors.push(`unhandled rejection: ${e.reason?.message ?? e.reason}`),
+  );
 
   const SEL =
     'input,select,textarea,button,summary,[role=slider],[role=switch],[role=button],[role=tab],[role=checkbox],[role=radio],[role=spinbutton],[role=menuitemradio],[role=menuitemcheckbox]';
@@ -213,8 +242,14 @@ function probe() {
     b.getAttribute('aria-pressed') === 'true' ||
     ['true', 'page', 'step', 'location'].includes(b.getAttribute('aria-current') ?? '') ||
     b.getAttribute('aria-selected') === 'true' ||
-    /(^|\s)(active|selected|current|is-active|is-selected)(\s|$)/.test(typeof b.className === 'string' ? b.className : '');
-  const base = (b) => (typeof b.className === 'string' ? b.className : '').replace(/(^|\s)(active|selected|current|is-active|is-selected)(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim();
+    /(^|\s)(active|selected|current|is-active|is-selected)(\s|$)/.test(
+      typeof b.className === 'string' ? b.className : '',
+    );
+  const base = (b) =>
+    (typeof b.className === 'string' ? b.className : '')
+      .replace(/(^|\s)(active|selected|current|is-active|is-selected)(?=\s|$)/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   const kindOf = (el) => {
     const tag = el.tagName.toLowerCase(),
       role = el.getAttribute('role');
@@ -244,21 +279,34 @@ function probe() {
     if (row.length > 1 && row.filter(chosen).length === 1) {
       const pressed = row.every((b) => b.hasAttribute('aria-pressed')),
         alike = row.every((b) => base(b) === base(el));
-      if (pressed || (alike && row.some((b) => b.hasAttribute('aria-current') || b.hasAttribute('aria-selected') || base(b) !== b.className.trim()))) return 'radio';
+      if (
+        pressed ||
+        (alike &&
+          row.some(
+            (b) => b.hasAttribute('aria-current') || b.hasAttribute('aria-selected') || base(b) !== b.className.trim(),
+          ))
+      )
+        return 'radio';
     }
     return 'button';
   };
   const groupOf = (el, kind) => {
     if (kind !== 'radio') return null;
     if (el.tagName === 'INPUT') return `${el.form ? pathOf(el.form) : 'page'}|${el.name || pathOf(el.parentElement)}`;
-    const g = (el.getAttribute('role') ? el.closest('[role=radiogroup],[role=tablist],[role=menu],[role=menubar]') : null) ?? el.parentElement;
+    const g =
+      (el.getAttribute('role') ? el.closest('[role=radiogroup],[role=tablist],[role=menu],[role=menubar]') : null) ??
+      el.parentElement;
     return pathOf(g);
   };
   const nameOf = (el) => {
     const by = el.getAttribute('aria-labelledby');
     const text =
       el.getAttribute('aria-label') ||
-      (by && by.split(/\s+/).map((id) => document.getElementById(id)?.textContent ?? '').join(' ')) ||
+      (by &&
+        by
+          .split(/\s+/)
+          .map((id) => document.getElementById(id)?.textContent ?? '')
+          .join(' ')) ||
       labelsOf(el)
         .map((l) => {
           const copy = l.cloneNode(true);
@@ -274,12 +322,16 @@ function probe() {
       el.tagName.toLowerCase();
     let label = clean(text);
     if (el.type === 'radio' || el.getAttribute('role') === 'radio') {
-      const legend = clean(el.closest('fieldset')?.querySelector('legend')?.textContent ?? el.closest('[role=radiogroup]')?.getAttribute('aria-label'));
+      const legend = clean(
+        el.closest('fieldset')?.querySelector('legend')?.textContent ??
+          el.closest('[role=radiogroup]')?.getAttribute('aria-label'),
+      );
       if (legend && !label.startsWith(legend)) label = `${legend}: ${label}`;
     }
     return label.slice(0, 90);
   };
-  const isDisabled = (el) => el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true' || !!el.closest('[inert]');
+  const isDisabled = (el) =>
+    el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true' || !!el.closest('[inert]');
   const list = () => {
     const out = [];
     for (const el of document.querySelectorAll(SEL)) {
@@ -299,7 +351,10 @@ function probe() {
         max: el.max,
         step: el.step,
         value: el.value,
-        options: el.tagName === 'SELECT' ? [...el.options].map((o) => ({ label: clean(o.textContent), disabled: o.disabled })) : undefined,
+        options:
+          el.tagName === 'SELECT'
+            ? [...el.options].map((o) => ({ label: clean(o.textContent), disabled: o.disabled }))
+            : undefined,
         selectedIndex: el.selectedIndex,
       });
     }
@@ -309,8 +364,11 @@ function probe() {
   // targets, and a small wrapper that holds this control and nothing else.
   const ownRoots = (el) => {
     const roots = [el, ...labelsOf(el)];
-    if (el.id) for (const o of document.querySelectorAll('output')) if (o.htmlFor && [...o.htmlFor].includes(el.id)) roots.push(o);
-    for (const id of (el.getAttribute('aria-labelledby') ?? '').split(/\s+/)) if (id && document.getElementById(id)) roots.push(document.getElementById(id));
+    if (el.id)
+      for (const o of document.querySelectorAll('output'))
+        if (o.htmlFor && [...o.htmlFor].includes(el.id)) roots.push(o);
+    for (const id of (el.getAttribute('aria-labelledby') ?? '').split(/\s+/))
+      if (id && document.getElementById(id)) roots.push(document.getElementById(id));
     let up = el.parentElement;
     for (let i = 0; i < 2 && up && up !== document.body; i++, up = up.parentElement) {
       if (up.querySelectorAll(SEL).length > 1 || clean(up.textContent).length > 120) break;
@@ -332,7 +390,9 @@ function probe() {
       if (!valued && !shown(el)) continue;
       const key = pathOf(el);
       if (own) out[key] = own;
-      if (valued) out[`${key}#value`] = el.type === 'checkbox' || el.type === 'radio' ? String(el.checked) : String(el.value ?? '');
+      if (valued)
+        out[`${key}#value`] =
+          el.type === 'checkbox' || el.type === 'radio' ? String(el.checked) : String(el.value ?? '');
       if (++n > 4000) break;
     }
     return out;
@@ -341,11 +401,12 @@ function probe() {
     const el = document.querySelector(p);
     if (!el) return [];
     const keys = new Set();
-    for (const r of ownRoots(el)) for (const e of [r, ...r.querySelectorAll('*')]) {
-      const k = pathOf(e);
-      keys.add(k);
-      keys.add(`${k}#value`);
-    }
+    for (const r of ownRoots(el))
+      for (const e of [r, ...r.querySelectorAll('*')]) {
+        const k = pathOf(e);
+        keys.add(k);
+        keys.add(`${k}#value`);
+      }
     return [...keys];
   };
   const regions = () => {
@@ -361,7 +422,13 @@ function probe() {
         right = Math.min(innerWidth, r.right),
         bottom = Math.min(innerHeight, r.bottom);
       if (right - x < 32 || bottom - y < 32) continue;
-      out.push({ x: Math.round(x), y: Math.round(y), width: Math.floor(right - x), height: Math.floor(bottom - y), tag: el.tagName.toLowerCase() });
+      out.push({
+        x: Math.round(x),
+        y: Math.round(y),
+        width: Math.floor(right - x),
+        height: Math.floor(bottom - y),
+        tag: el.tagName.toLowerCase(),
+      });
     }
     return out.slice(0, 8);
   };
@@ -373,7 +440,10 @@ function probe() {
     }
     return best?.c ?? null;
   };
-  const describe = (el) => (el ? `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}${typeof el.className === 'string' && el.className ? `.${el.className.trim().split(/\s+/).join('.')}` : ''}` : 'nothing');
+  const describe = (el) =>
+    el
+      ? `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}${typeof el.className === 'string' && el.className ? `.${el.className.trim().split(/\s+/).join('.')}` : ''}`
+      : 'nothing';
   const hits = (el, t, x, y) => {
     const hit = document.elementFromPoint(x, y);
     if (!hit) return { ok: false, by: 'nothing' };
@@ -381,7 +451,8 @@ function probe() {
     const label = hit.closest('label');
     if (label && (label.control === el || labelsOf(el).includes(label))) return { ok: true };
     // A face of a CSS 3D widget (a view cube) that is turned away is hidden by design, not covered.
-    for (let a = el.parentElement, i = 0; a && i < 4; a = a.parentElement, i++) if (getComputedStyle(a).transformStyle === 'preserve-3d' && a.contains(hit)) return { ok: true, face: true };
+    for (let a = el.parentElement, i = 0; a && i < 4; a = a.parentElement, i++)
+      if (getComputedStyle(a).transformStyle === 'preserve-3d' && a.contains(hit)) return { ok: true, face: true };
     return { ok: false, by: describe(hit) };
   };
   const layout = (paths) => {
@@ -394,7 +465,8 @@ function probe() {
       const t = target(el);
       t.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
       const r = t.getBoundingClientRect();
-      const off = r.width < 1 || r.height < 1 || r.right <= 0 || r.bottom <= 0 || r.left >= innerWidth || r.top >= innerHeight;
+      const off =
+        r.width < 1 || r.height < 1 || r.right <= 0 || r.bottom <= 0 || r.left >= innerWidth || r.top >= innerHeight;
       const clipped = !off && (r.left < -1 || r.right > innerWidth + 1);
       let covered = null,
         face = false;
@@ -413,7 +485,11 @@ function probe() {
       out[p] = { off, clipped, covered, ...(face ? { face } : {}) };
     }
     scrollTo({ left: sx, top: sy, behavior: 'instant' });
-    return { controls: out, overflow: document.documentElement.scrollWidth > innerWidth + 1, scrollWidth: document.documentElement.scrollWidth };
+    return {
+      controls: out,
+      overflow: document.documentElement.scrollWidth > innerWidth + 1,
+      scrollWidth: document.documentElement.scrollWidth,
+    };
   };
   const invites = () => {
     const c = scene();
@@ -421,11 +497,18 @@ function probe() {
     const cur = getComputedStyle(c).cursor;
     // Only an explicit invitation counts: a grab cursor, or text that tells the reader to drag the view.
     if (/grab|move|all-scroll/.test(cur)) return `cursor: ${cur}`;
-    const hint = document.body.innerText.match(/[^.\n]*\b(drag|swipe)\s+(to|the|on|across|or|and|it|in|anywhere)\b[^.\n]*/i);
+    const hint = document.body.innerText.match(
+      /[^.\n]*\b(drag|swipe)\s+(to|the|on|across|or|and|it|in|anywhere)\b[^.\n]*/i,
+    );
     return hint ? hint[0].trim().slice(0, 120) : false;
   };
   window.__ctl = Object.freeze({
-    counters: () => ({ raf: state.raf, frames: state.frames, events: state.events.length, errors: state.errors.length }),
+    counters: () => ({
+      raf: state.raf,
+      frames: state.frames,
+      events: state.events.length,
+      errors: state.errors.length,
+    }),
     eventsSince: (i) => state.events.slice(i),
     errorsSince: (i) => state.errors.slice(i),
     list,
@@ -448,14 +531,36 @@ function probe() {
     state: (p) => {
       const el = document.querySelector(p);
       if (!el) return null;
-      return { checked: !!el.checked || el.getAttribute('aria-checked') === 'true' || el.getAttribute('aria-selected') === 'true', pressed: el.getAttribute('aria-pressed') ?? el.getAttribute('aria-expanded'), text: clean(el.textContent), value: el.value };
+      return {
+        checked:
+          !!el.checked || el.getAttribute('aria-checked') === 'true' || el.getAttribute('aria-selected') === 'true',
+        pressed: el.getAttribute('aria-pressed') ?? el.getAttribute('aria-expanded'),
+        text: clean(el.textContent),
+        value: el.value,
+      };
     },
   });
 }
 
 // ---------------------------------------------------------------------------------------------------------------
 // Serving and the browser.
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.glb': 'model/gltf-binary', '.ktx2': 'image/ktx2', '.hdr': 'image/vnd.radiance', '.bin': 'application/octet-stream' };
+const types = {
+  '.html': 'text/html',
+  '.js': 'text/javascript',
+  '.mjs': 'text/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.wasm': 'application/wasm',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.woff2': 'font/woff2',
+  '.glb': 'model/gltf-binary',
+  '.ktx2': 'image/ktx2',
+  '.hdr': 'image/vnd.radiance',
+  '.bin': 'application/octet-stream',
+};
 const server = http
   .createServer((req, res) => {
     let file = path.join(demos, decodeURIComponent(new URL(req.url, 'http://x').pathname));
@@ -515,14 +620,21 @@ class Session {
     this.frameSeq = 0;
   }
   async open() {
-    this.context = await browser.newContext({ viewport: DESKTOP, deviceScaleFactor: 1, reducedMotion: this.reducedMotion, acceptDownloads: true });
+    this.context = await browser.newContext({
+      viewport: DESKTOP,
+      deviceScaleFactor: 1,
+      reducedMotion: this.reducedMotion,
+      acceptDownloads: true,
+    });
     await this.context.addInitScript(probe);
     this.page = await this.context.newPage();
     const page = this.page;
     page.on('console', (m) => {
       if (m.type() === 'error') this.consoleErrors.push({ at: Date.now(), text: m.text().slice(0, 300) });
     });
-    page.on('pageerror', (e) => this.consoleErrors.push({ at: Date.now(), text: `page error: ${e.message}`.slice(0, 300) }));
+    page.on('pageerror', (e) =>
+      this.consoleErrors.push({ at: Date.now(), text: `page error: ${e.message}`.slice(0, 300) }),
+    );
     page.on('dialog', (d) => {
       this.nodeEvents.push(`showed a ${d.type()} dialog`);
       d.dismiss().catch(() => {});
@@ -544,7 +656,10 @@ class Session {
   async load() {
     this.loaded = false;
     const page = this.page;
-    await page.goto(`http://localhost:${port}/${this.slug}/${this.backend === 'webgl2' ? '?backend=webgl2' : ''}`, { waitUntil: 'load', timeout: loadTimeout });
+    await page.goto(`http://localhost:${port}/${this.slug}/${this.backend === 'webgl2' ? '?backend=webgl2' : ''}`, {
+      waitUntil: 'load',
+      timeout: loadTimeout,
+    });
     this.loaded = true;
     const state = await page
       .waitForFunction(
@@ -557,7 +672,15 @@ class Session {
       )
       .then((h) => h.jsonValue())
       .catch(() => 'not-ready');
-    const error = state === 'error' ? await this.eval(() => document.querySelector('[data-error]')?.dataset.error ?? document.querySelector('[role=alert]')?.textContent ?? 'error') : null;
+    const error =
+      state === 'error'
+        ? await this.eval(
+            () =>
+              document.querySelector('[data-error]')?.dataset.error ??
+              document.querySelector('[role=alert]')?.textContent ??
+              'error',
+          )
+        : null;
     await sleep(1500);
     this.scrollY = await this.eval(() => window.__ctl.revealScene());
     await sleep(300);
@@ -572,7 +695,11 @@ class Session {
   /** Pictures, readouts and counters now. `dims` fixes the working size of each picture to the earlier capture. */
   async capture(dims) {
     await this.eval((y) => scrollTo({ left: 0, top: y, behavior: 'instant' }), this.scrollY);
-    const info = await this.eval(() => ({ regions: window.__ctl.regions(), text: window.__ctl.text(), counters: window.__ctl.counters() }));
+    const info = await this.eval(() => ({
+      regions: window.__ctl.regions(),
+      text: window.__ctl.text(),
+      counters: window.__ctl.counters(),
+    }));
     const frames = [];
     let shot = null;
     if (info.regions.length) {
@@ -580,7 +707,16 @@ class Session {
         y0 = Math.min(...info.regions.map((r) => r.y)),
         x1 = Math.max(...info.regions.map((r) => r.x + r.width)),
         y1 = Math.max(...info.regions.map((r) => r.y + r.height));
-      shot = await within(this.page.screenshot({ clip: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 }, type: 'png', caret: 'hide', timeout: 15000 }), 20000, 'a screenshot');
+      shot = await within(
+        this.page.screenshot({
+          clip: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 },
+          type: 'png',
+          caret: 'hide',
+          timeout: 15000,
+        }),
+        20000,
+        'a screenshot',
+      );
       const meta = await sharp(shot).metadata();
       for (let i = 0; i < info.regions.length; i++) {
         const r = info.regions[i];
@@ -590,7 +726,12 @@ class Session {
           height = Math.max(1, Math.min(r.height, meta.height - top));
         const w = dims?.[i]?.width ?? Math.min(WORK, width),
           h = dims?.[i]?.height ?? Math.max(1, Math.round((height * w) / width));
-        const data = await sharp(shot).extract({ left, top, width, height }).resize(w, h, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+        const data = await sharp(shot)
+          .extract({ left, top, width, height })
+          .resize(w, h, { fit: 'fill' })
+          .removeAlpha()
+          .raw()
+          .toBuffer();
         frames.push({ width: w, height: h, data, tag: r.tag, box: [r.x, r.y, r.width, r.height] });
       }
     }
@@ -611,10 +752,12 @@ class Session {
     const own = new Set(await this.eval((p) => window.__ctl.ownKeys(p), control.path));
     const how = await act();
     await sleep(this.wait);
-    const regionsMatch = (c) => c.frames.length === pre.b.frames.length && c.frames.every((f, i) => f.tag === pre.b.frames[i].tag && f.box.join() === pre.b.frames[i].box.join());
-    let q0 = await this.capture(pre.b.frames);
+    const regionsMatch = (c) =>
+      c.frames.length === pre.b.frames.length &&
+      c.frames.every((f, i) => f.tag === pre.b.frames[i].tag && f.box.join() === pre.b.frames[i].box.join());
+    const q0 = await this.capture(pre.b.frames);
     await sleep(this.wait);
-    let q1 = await this.capture(pre.b.frames);
+    const q1 = await this.capture(pre.b.frames);
     const nav = this.navigated > navAt;
     const layoutChanged = !nav && (!regionsMatch(q0) || !regionsMatch(q1));
     const regions = [],
@@ -641,15 +784,29 @@ class Session {
     const pageEvents = await this.eval((i) => window.__ctl.eventsSince(i), pre.b.counters.events);
     const pageErrors = await this.eval((i) => window.__ctl.errorsSince(i), pre.b.counters.errors);
     // Side effects the page also makes with no input (a sound loop ramping its gain) are noise, like the pictures.
-    const idle = new Set((await this.eval((i) => window.__ctl.eventsSince(i), pre.a.counters.events)).slice(0, pre.b.counters.events - pre.a.counters.events));
-    const events = [...new Set([...pageEvents.filter((e) => !idle.has(e)), ...this.nodeEvents.slice(eventsAt), ...(nav ? ['went to another page'] : [])])];
+    const idle = new Set(
+      (await this.eval((i) => window.__ctl.eventsSince(i), pre.a.counters.events)).slice(
+        0,
+        pre.b.counters.events - pre.a.counters.events,
+      ),
+    );
+    const events = [
+      ...new Set([
+        ...pageEvents.filter((e) => !idle.has(e)),
+        ...this.nodeEvents.slice(eventsAt),
+        ...(nav ? ['went to another page'] : []),
+      ]),
+    ];
     const verdict = judgeStep({ regions, motion, text, events, layoutChanged });
     // A dead input may still have changed a few pixels too faintly to see at the working size (a 1 px tracer):
     // measured at full size and reported, the verdict stays dead because a viewer sees nothing either.
     let faint = null;
-    if (verdict.verdict === 'dead' && pre.a.shot && pre.b.shot && q0.shot) faint = await faintChange(pre.a.shot, pre.b.shot, q0.shot);
+    if (verdict.verdict === 'dead' && pre.a.shot && pre.b.shot && q0.shot)
+      faint = await faintChange(pre.a.shot, pre.b.shot, q0.shot);
     const errors = [...this.consoleErrors.slice(errorsAt).map((e) => e.text), ...pageErrors];
-    const sample = text.changed.slice(0, 3).map((k) => `${(pre.b.text[k] ?? '').slice(0, 40)} -> ${(q0.text[k] ?? q1.text[k] ?? '').slice(0, 40)}`);
+    const sample = text.changed
+      .slice(0, 3)
+      .map((k) => `${(pre.b.text[k] ?? '').slice(0, 40)} -> ${(q0.text[k] ?? q1.text[k] ?? '').slice(0, 40)}`);
     if (saveFrames && pre.b.shot && q0.shot && (saveFrames === 'all' || verdict.verdict !== 'live')) {
       const dir = path.join(reportDir, 'frames', this.slug);
       fs.mkdirSync(dir, { recursive: true });
@@ -664,7 +821,15 @@ class Session {
       evidence: verdict.evidence,
       labelOnly: verdict.labelOnly,
       ...(faint ? { faint } : {}),
-      pictures: regions.map((r) => ({ count: r.count, outside: r.outside, mean: r.mean, noiseCount: r.noiseCount, noiseMean: r.noiseMean, conclusive: r.conclusive, late: !!r.late })),
+      pictures: regions.map((r) => ({
+        count: r.count,
+        outside: r.outside,
+        mean: r.mean,
+        noiseCount: r.noiseCount,
+        noiseMean: r.noiseMean,
+        conclusive: r.conclusive,
+        late: !!r.late,
+      })),
       readouts: sample,
       errors,
     };
@@ -680,7 +845,13 @@ class Session {
 async function faintChange(a, b, c) {
   const raw = (png) => sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const [A, B, C] = await Promise.all([raw(a), raw(b), raw(c)]);
-  if (A.info.width !== C.info.width || A.info.height !== C.info.height || B.info.width !== C.info.width || B.info.height !== C.info.height) return null;
+  if (
+    A.info.width !== C.info.width ||
+    A.info.height !== C.info.height ||
+    B.info.width !== C.info.width ||
+    B.info.height !== C.info.height
+  )
+    return null;
   const count = (x, y) => {
     let n = 0,
       max = 0;
@@ -730,14 +901,23 @@ async function click(s, p) {
     const r = el?.getBoundingClientRect();
     return !!r && r.width > 0 && r.height > 0 && el.checkVisibility({ checkOpacity: true });
   }, p);
-  const loc = visible ? s.page.locator(p).first() : s.page.locator(`label[for="${await s.eval((p) => document.querySelector(p)?.id ?? '', p)}"]`).first();
+  const loc = visible
+    ? s.page.locator(p).first()
+    : s.page.locator(`label[for="${await s.eval((p) => document.querySelector(p)?.id ?? '', p)}"]`).first();
   try {
     await loc.click({ timeout: 2500 });
     return 'click';
   } catch {
     await s.eval((p) => {
       const el = document.querySelector(p);
-      for (const t of ['pointerdown', 'mousedown', 'pointerup', 'mouseup']) el.dispatchEvent(new (t.startsWith('pointer') ? PointerEvent : MouseEvent)(t, { bubbles: true, cancelable: true, composed: true }));
+      for (const t of ['pointerdown', 'mousedown', 'pointerup', 'mouseup'])
+        el.dispatchEvent(
+          new (t.startsWith('pointer') ? PointerEvent : MouseEvent)(t, {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+          }),
+        );
       el.click();
     }, p);
     return 'events sent (a real click could not reach it)';
@@ -770,14 +950,22 @@ function sliderValues(c) {
   if (step > 0) mid = min + Math.round((mid - min) / step) * step;
   const cur = Number(c.value);
   const out = [];
-  for (const [name, v] of [['max', max], ['min', min], ['middle', mid]]) if (v !== (out.length ? out.at(-1)[1] : cur)) out.push([name, v]);
+  for (const [name, v] of [
+    ['max', max],
+    ['min', min],
+    ['middle', mid],
+  ])
+    if (v !== (out.length ? out.at(-1)[1] : cur)) out.push([name, v]);
   return out;
 }
 function numberValues(c) {
   if (c.min !== '' && c.max !== '') return sliderValues(c);
   const cur = Number(c.value) || 0,
     step = Number(c.step) > 0 ? Number(c.step) : 1;
-  return [['up', cur + step * 5], ['down', cur - step * 5]];
+  return [
+    ['up', cur + step * 5],
+    ['down', cur - step * 5],
+  ];
 }
 function shiftedValue(c) {
   const t = c.value;
@@ -802,9 +990,15 @@ async function testControl(s, c, group, plan = {}) {
   let pre;
   // The settled picture at each stop of a slider or select, to find stops that draw the same picture.
   const stops = [];
-  const stopOf = (name, value, pair) => ({ name, value: String(value), frames: pair.b.frames, noise: pair.b.frames.map((f, i) => noiseFloor(pair.a.frames[i], f)) });
+  const stopOf = (name, value, pair) => ({
+    name,
+    value: String(value),
+    frames: pair.b.frames,
+    noise: pair.b.frames.map((f, i) => noiseFloor(pair.a.frames[i], f)),
+  });
   const run = async (control, name, act, value) => {
-    if (value !== undefined && !stops.length) stops.push(stopOf('start', control.kind === 'select' ? control.selectedIndex : control.value ?? 'start', pre));
+    if (value !== undefined && !stops.length)
+      stops.push(stopOf('start', control.kind === 'select' ? control.selectedIndex : (control.value ?? 'start'), pre));
     const { result, post } = await s.step(control, pre, name, act);
     if (result.verdict === 'dead' && /could not reach/.test(result.how)) result.verdict = 'unreachable';
     rec(control).steps.push(result);
@@ -815,19 +1009,39 @@ async function testControl(s, c, group, plan = {}) {
   let stopSound = null;
   if (SOUND.test(c.label) && c.kind !== 'button') {
     const player = await s.eval(() =>
-      window.__ctl.list().find((x) => x.kind === 'button' && !x.disabled && /\b(play|listen|hear|start|sound on)\b/i.test(x.label) && !/\b(stop|pause)\b/i.test(x.label)),
+      window.__ctl
+        .list()
+        .find(
+          (x) =>
+            x.kind === 'button' &&
+            !x.disabled &&
+            /\b(play|listen|hear|start|sound on)\b/i.test(x.label) &&
+            !/\b(stop|pause)\b/i.test(x.label),
+        ),
     );
     if (player) {
       await click(s, player.path);
       await sleep(s.wait);
       stopSound = async () => {
-        const stop = await s.eval(() => window.__ctl.list().find((x) => x.kind === 'button' && !x.disabled && /\b(stop|pause)\b/i.test(x.label)));
+        const stop = await s.eval(() =>
+          window.__ctl.list().find((x) => x.kind === 'button' && !x.disabled && /\b(stop|pause)\b/i.test(x.label)),
+        );
         if (stop) await click(s, stop.path);
       };
     }
   }
   try {
-    const out = await operate(s, c, group, plan, records, rec, run, () => pre, (v) => (pre = v));
+    const out = await operate(
+      s,
+      c,
+      group,
+      plan,
+      records,
+      rec,
+      run,
+      () => pre,
+      (v) => (pre = v),
+    );
     const same = stops.length > 2 ? identicalStops(stops, { period: periodOf(c) }) : [];
     const r = records.find((x) => x.path === c.path);
     if (same.length && r) r.sameStops = same;
@@ -847,35 +1061,77 @@ function refine(c, d) {
     // Records made before whole turns were recognised: drop pairs such as -180 and 180 degrees.
     const valueOf = (name) => Number(/\(([-+\d.e]+)\)\s*$/.exec(name)?.[1]);
     const turns = (a, b) => Math.abs(valueOf(a) - valueOf(b)) / period;
-    c.sameStops = c.sameStops.filter(([a, b]) => { const t = turns(a, b); return !(t > 0.5 && Math.abs(t - Math.round(t)) < 1e-6); });
+    c.sameStops = c.sameStops.filter(([a, b]) => {
+      const t = turns(a, b);
+      return !(t > 0.5 && Math.abs(t - Math.round(t)) < 1e-6);
+    });
     if (!c.sameStops.length) delete c.sameStops;
   }
   if (c.verdict !== 'dead') return c;
-  const hint = d?.dragHint ?? pageText(d?.slug ?? d?.demo).match(/[^.]*\b(drag|swipe)\b[^.]*/i)?.[0]?.trim() ?? '';
-  if (c.kind === 'canvas-drag' && /\b(draw|paint|sketch|brush|lasso|box|select|place|cut|carve|sculpt|stroke)/i.test(hint))
-    return Object.assign(c, { verdict: 'unsure', note: `the page asks for a particular gesture: "${hint.slice(0, 100)}"` });
-  if (TOOL.test(c.label)) return Object.assign(c, { verdict: 'unsure', note: 'a tool or mode for the next click or drag on the scene; nothing to see until then' });
-  if (c.kind !== 'canvas-drag' && HANDLE.test(c.label)) return Object.assign(c, { verdict: 'unsure', note: 'a drag handle: it acts when dragged, and a click does nothing by design' });
+  const hint =
+    d?.dragHint ??
+    pageText(d?.slug ?? d?.demo)
+      .match(/[^.]*\b(drag|swipe)\b[^.]*/i)?.[0]
+      ?.trim() ??
+    '';
+  if (
+    c.kind === 'canvas-drag' &&
+    /\b(draw|paint|sketch|brush|lasso|box|select|place|cut|carve|sculpt|stroke)/i.test(hint)
+  )
+    return Object.assign(c, {
+      verdict: 'unsure',
+      note: `the page asks for a particular gesture: "${hint.slice(0, 100)}"`,
+    });
+  if (TOOL.test(c.label))
+    return Object.assign(c, {
+      verdict: 'unsure',
+      note: 'a tool or mode for the next click or drag on the scene; nothing to see until then',
+    });
+  if (c.kind !== 'canvas-drag' && HANDLE.test(c.label))
+    return Object.assign(c, {
+      verdict: 'unsure',
+      note: 'a drag handle: it acts when dragged, and a click does nothing by design',
+    });
   const held = alreadyHeld(c, d);
-  if (held) return Object.assign(c, { verdict: 'unsure', note: `already holds ${held}, what a click puts there; its neighbours holding other values changed the picture` });
+  if (held)
+    return Object.assign(c, {
+      verdict: 'unsure',
+      note: `already holds ${held}, what a click puts there; its neighbours holding other values changed the picture`,
+    });
   // On a page you draw on (a brush, a sculpting tool, planting points), the tools and brushes act on the next stroke.
   const gesture = pageText(d?.slug ?? d?.demo).match(GESTURE);
-  if (gesture && c.kind !== 'canvas-drag') return Object.assign(c, { verdict: 'unsure', note: `a tool or brush for the next stroke on a page that says "${gesture[0].trim().slice(0, 80)}"` });
+  if (gesture && c.kind !== 'canvas-drag')
+    return Object.assign(c, {
+      verdict: 'unsure',
+      note: `a tool or brush for the next stroke on a page that says "${gesture[0].trim().slice(0, 80)}"`,
+    });
   const steps = [...(c.steps ?? []), ...(c.confirm?.steps ?? [])];
-  if (SOUND.test(c.label)) Object.assign(c, { verdict: 'unsure', note: 'a sound control: nothing to see, and no sound setting changed' });
+  if (SOUND.test(c.label))
+    Object.assign(c, { verdict: 'unsure', note: 'a sound control: nothing to see, and no sound setting changed' });
   else if (PLAYBACK.test(c.label) && steps.every((st) => (st.pictures ?? []).every((p) => p.noiseCount === 0)))
     Object.assign(c, { verdict: 'unsure', note: 'a speed or playback control and nothing was playing' });
   return c;
 }
-const START = /\b(play|run|start|spin|release|drop|launch|fire|go|animate|tip|swing|pump|drive|wind|roll|pour|flow|turn on|switch on)\b/i;
-const GESTURE = /[^.]*\b(drag|tap|click)\b[^.]{0,60}\b(strokes?|draw(?!\s+order)|paint|recolou?r|brush|plant|place|erase|sculpt|carve|tap the map)\b[^.]*|[^.]*\bchoose a \w+, then (tap|click|drag)[^.]*/i;
+const START =
+  /\b(play|run|start|spin|release|drop|launch|fire|go|animate|tip|swing|pump|drive|wind|roll|pour|flow|turn on|switch on)\b/i;
+const GESTURE =
+  /[^.]*\b(drag|tap|click)\b[^.]{0,60}\b(strokes?|draw(?!\s+order)|paint|recolou?r|brush|plant|place|erase|sculpt|carve|tap the map)\b[^.]*|[^.]*\bchoose a \w+, then (tap|click|drag)[^.]*/i;
 const pageTexts = new Map();
 /** The static text of a demo page, for instructions such as "Drag over the clay to make a stroke". */
 function pageText(slug) {
   if (!slug) return '';
   if (!pageTexts.has(slug)) {
     const file = path.join(demos, slug, 'index.html');
-    pageTexts.set(slug, fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, ' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ') : '');
+    pageTexts.set(
+      slug,
+      fs.existsSync(file)
+        ? fs
+            .readFileSync(file, 'utf8')
+            .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, ' ')
+            .replace(/<[^>]*>/g, ' ')
+            .replace(/\s+/g, ' ')
+        : '',
+    );
   }
   return pageTexts.get(slug);
 }
@@ -884,7 +1140,10 @@ const HANDLE = /^(drag|grab|move|reorder|resize)\b/i;
 function periodOf(c) {
   const span = Number(c.max) - Number(c.min);
   if (Math.abs(span - 2 * Math.PI) < 1e-3) return 2 * Math.PI;
-  return span >= 360 && /°|\b(deg|degrees|turn|rotat\w*|angle|heading|yaw|bearing|azimuth|spin|hue|longitude)\b/i.test(c.label ?? '') ? 360 : 0;
+  return span >= 360 &&
+    /°|\b(deg|degrees|turn|rotat\w*|angle|heading|yaw|bearing|azimuth|spin|hue|longitude)\b/i.test(c.label ?? '')
+    ? 360
+    : 0;
 }
 /**
  * A grid of cells named "Row 2, column 4, Saffron": a click paints the cell with the current colour, so a cell that
@@ -896,10 +1155,19 @@ function alreadyHeld(c, d) {
   const own = split(c.label);
   if (!own || !d?.controls) return '';
   const shape = (s) => s.replace(/\d+/g, '#');
-  const same = d.controls.filter((o) => o.kind === c.kind && split(o.label) && shape(split(o.label)[1]) === shape(own[1]));
-  const dead = same.filter((o) => o.verdict === 'dead' || (o.verdict === 'unsure' && o.note?.startsWith('already holds')));
+  const same = d.controls.filter(
+    (o) => o.kind === c.kind && split(o.label) && shape(split(o.label)[1]) === shape(own[1]),
+  );
+  const dead = same.filter(
+    (o) => o.verdict === 'dead' || (o.verdict === 'unsure' && o.note?.startsWith('already holds')),
+  );
   const live = same.filter((o) => o.verdict === 'live');
-  if (live.length < 3 || dead.some((o) => split(o.label)[2] !== own[2]) || live.some((o) => split(o.label)[2] === own[2])) return '';
+  if (
+    live.length < 3 ||
+    dead.some((o) => split(o.label)[2] !== own[2]) ||
+    live.some((o) => split(o.label)[2] === own[2])
+  )
+    return '';
   return own[2];
 }
 // "Draw" alone is a tool; "Reverse draw order" is a setting that should change the picture.
@@ -927,7 +1195,8 @@ async function operate(s, c, group, plan, records, rec, run, getPre, setPre) {
     for (const k of ['End', 'Home', 'PageUp']) await run(c, `key ${k}`, () => keys(s, c.path, k), k);
   } else if (c.kind === 'select') {
     const opts = c.options.map((o, i) => ({ ...o, i })).filter((o) => o.i !== c.selectedIndex && !o.disabled);
-    const pick = opts.length > 8 ? Array.from({ length: 8 }, (_, k) => opts[Math.round((k * (opts.length - 1)) / 7)]) : opts;
+    const pick =
+      opts.length > 8 ? Array.from({ length: 8 }, (_, k) => opts[Math.round((k * (opts.length - 1)) / 7)]) : opts;
     if (!pick.length) return [{ ...rec(c), skipped: 'only one option' }];
     setPre(await s.pre());
     for (const o of pick) await run(c, `option "${o.label}"`, () => setIndex(s, c.path, o.i), o.i);
@@ -953,7 +1222,8 @@ async function operate(s, c, group, plan, records, rec, run, getPre, setPre) {
       for (const m of members) {
         if (m.path === home.path || m.disabled) continue;
         await run(m, 'choose', () => click(s, m.path));
-        if (members.length <= 6 || m === members.filter((x) => x.path !== home.path).at(-1)) await run(home, `choose again after "${m.label}"`, () => click(s, home.path));
+        if (members.length <= 6 || m === members.filter((x) => x.path !== home.path).at(-1))
+          await run(home, `choose again after "${m.label}"`, () => click(s, home.path));
         else await click(s, home.path);
       }
       if (!records.find((r) => r.path === home.path)) rec(home);
@@ -969,10 +1239,15 @@ async function operate(s, c, group, plan, records, rec, run, getPre, setPre) {
       if (plan.only) {
         const sibling = await s.eval((p) => {
           const el = document.querySelector(p);
-          const near = [...(el?.parentElement?.children ?? [])].find((b) => b !== el && b.matches('button:not(:disabled)') && b.checkVisibility());
+          const near = [...(el?.parentElement?.children ?? [])].find(
+            (b) => b !== el && b.matches('button:not(:disabled)') && b.checkVisibility(),
+          );
           if (!near) return null;
           const parts = [];
-          for (let e = near; e && e !== document.body && e.parentElement; e = e.parentElement) parts.unshift(`${e.tagName.toLowerCase()}:nth-child(${Array.prototype.indexOf.call(e.parentElement.children, e) + 1})`);
+          for (let e = near; e && e !== document.body && e.parentElement; e = e.parentElement)
+            parts.unshift(
+              `${e.tagName.toLowerCase()}:nth-child(${Array.prototype.indexOf.call(e.parentElement.children, e) + 1})`,
+            );
           return `body > ${parts.join(' > ')}`;
         }, c.path);
         if (sibling) await click(s, sibling);
@@ -992,7 +1267,13 @@ async function operate(s, c, group, plan, records, rec, run, getPre, setPre) {
     const before = await s.eval((p) => window.__ctl.state(p), c.path);
     await run(c, 'click', () => click(s, c.path));
     const after = await s.eval((p) => window.__ctl.state(p), c.path);
-    if (before && after && (before.pressed !== after.pressed || before.text !== after.text) && rec(c).steps.at(-1).verdict !== 'live') await run(c, 'click again', () => click(s, c.path));
+    if (
+      before &&
+      after &&
+      (before.pressed !== after.pressed || before.text !== after.text) &&
+      rec(c).steps.at(-1).verdict !== 'live'
+    )
+      await run(c, 'click again', () => click(s, c.path));
     else if (before && after && before.pressed !== after.pressed) await click(s, c.path);
   } else {
     return [{ ...rec(c), skipped: `${c.kind} input is not operated (free text or file)` }];
@@ -1005,7 +1286,14 @@ async function operate(s, c, group, plan, records, rec, run, getPre, setPre) {
 async function runDemo(slug, backend) {
   const started = Date.now();
   const s = new Session(slug, { reducedMotion: 'reduce', wait: WAIT, backend });
-  const out = { demo: backend === 'webgpu' ? slug : `${slug}@${backend}`, slug, backend, checked: new Date().toISOString(), status: 'ok', controls: [] };
+  const out = {
+    demo: backend === 'webgpu' ? slug : `${slug}@${backend}`,
+    slug,
+    backend,
+    checked: new Date().toISOString(),
+    status: 'ok',
+    controls: [],
+  };
   let budget = 90000;
   const deadline = () => started + budget;
   try {
@@ -1087,7 +1375,9 @@ async function runDemo(slug, backend) {
             round,
             verdict: r.skipped ? 'skipped' : r.failed ? 'failed' : soundAware(j.verdict, r.label),
             labelOnly: j.labelOnly,
-            textOnly: j.verdict === 'live' && (r.steps ?? []).every((st) => st.verdict !== 'live' || st.evidence.every((e) => /readout/.test(e))),
+            textOnly:
+              j.verdict === 'live' &&
+              (r.steps ?? []).every((st) => st.verdict !== 'live' || st.evidence.every((e) => /readout/.test(e))),
             errors,
             layout: { desktop: desk.controls[r.path] ?? null, mobile: mob.controls[r.path] ?? null },
           });
@@ -1103,14 +1393,23 @@ async function runDemo(slug, backend) {
     out.stalled = stalled({ frames: out.framesPerSecond }, { frames: out.framesAtEnd });
     // A page with a canvas that never drew a frame and never changed its picture while being operated is stuck.
     out.framesTotal = e1.frames;
-    const pictureChanged = out.controls.some((c) => (c.steps ?? []).some((st) => st.pictures?.some((p) => p.count > 0)));
-    out.noFrames = e1.frames === 0 && !pictureChanged && (await s.eval(() => document.querySelectorAll('canvas').length)) > 0;
-    out.errorsAfterLoad = s.consoleErrors.slice(out.loadErrors.length).map((e) => e.text).slice(0, 20);
+    const pictureChanged = out.controls.some((c) =>
+      (c.steps ?? []).some((st) => st.pictures?.some((p) => p.count > 0)),
+    );
+    out.noFrames =
+      e1.frames === 0 && !pictureChanged && (await s.eval(() => document.querySelectorAll('canvas').length)) > 0;
+    out.errorsAfterLoad = s.consoleErrors
+      .slice(out.loadErrors.length)
+      .map((e) => e.text)
+      .slice(0, 20);
   } catch (error) {
     out.status = error instanceof Timeout ? 'hung' : 'failed';
     out.error = error.message.split('\n')[0].slice(0, 300);
   } finally {
-    const closed = await within(s.close(), 20000, 'closing').then(() => true, () => false);
+    const closed = await within(s.close(), 20000, 'closing').then(
+      () => true,
+      () => false,
+    );
     if (!closed || out.status === 'hung') await restartBrowser();
   }
   out.seconds = Math.round((Date.now() - started) / 1000);
@@ -1127,14 +1426,24 @@ async function confirm(slug, backend, c, { running = false } = {}) {
     const list = await s.eval(() => window.__ctl.list());
     if (c.kind === 'canvas-drag') list.push({ path: 'canvas', kind: 'canvas-drag', label: 'Drag on the scene' });
     // A button whose label follows the page's mode (Fly to / Replay) is found by its place on a fresh page.
-    const found = list.find((x) => x.path === c.path && x.label === c.label) ?? list.find((x) => x.path === c.path && x.kind === c.kind) ?? list.find((x) => x.label === c.label && x.kind === c.kind);
+    const found =
+      list.find((x) => x.path === c.path && x.label === c.label) ??
+      list.find((x) => x.path === c.path && x.kind === c.kind) ??
+      list.find((x) => x.label === c.label && x.kind === c.kind);
     if (!found) return { verdict: 'not found again' };
     if (found.disabled) return { verdict: 'disabled' };
     const group = found.kind === 'radio' ? list.filter((m) => m.kind === 'radio' && m.group === found.group) : null;
     // The third try: many controls (a coil current, a drag factor) act only while something runs. Start it first.
     let starter = null;
     if (running) {
-      starter = list.find((x) => x.kind === 'button' && !x.disabled && x.path !== found.path && START.test(x.label) && !/\b(stop|pause|reset)\b/i.test(x.label));
+      starter = list.find(
+        (x) =>
+          x.kind === 'button' &&
+          !x.disabled &&
+          x.path !== found.path &&
+          START.test(x.label) &&
+          !/\b(stop|pause|reset)\b/i.test(x.label),
+      );
       if (!starter) return { verdict: 'nothing to start' };
       await click(s, starter.path);
       await sleep(1000);
@@ -1142,11 +1451,20 @@ async function confirm(slug, backend, c, { running = false } = {}) {
     const records = await within(testControl(s, found, group, { only: true }), 120000, 'confirming');
     const r = records.find((x) => x.path === found.path) ?? records[0];
     const j = judgeControl(r.steps ?? []);
-    return { verdict: soundAware(j.verdict, r.label), labelOnly: j.labelOnly, steps: r.steps, errors: [...new Set((r.steps ?? []).flatMap((st) => st.errors))], ...(starter ? { started: starter.label } : {}) };
+    return {
+      verdict: soundAware(j.verdict, r.label),
+      labelOnly: j.labelOnly,
+      steps: r.steps,
+      errors: [...new Set((r.steps ?? []).flatMap((st) => st.errors))],
+      ...(starter ? { started: starter.label } : {}),
+    };
   } catch (error) {
     return { verdict: error instanceof Timeout ? 'hung' : 'failed', note: error.message.split('\n')[0].slice(0, 200) };
   } finally {
-    const closed = await within(s.close(), 20000, 'closing').then(() => true, () => false);
+    const closed = await within(s.close(), 20000, 'closing').then(
+      () => true,
+      () => false,
+    );
     if (!closed) await restartBrowser();
   }
 }
@@ -1173,36 +1491,86 @@ const expected = {
 };
 function problemsOf(d) {
   const rows = [];
-  if (d.status !== 'ok') rows.push({ label: '(page)', expected: 'the page loads and is marked ready', happened: `${d.status}${d.error ? `: ${d.error}` : ''}` });
-  if (d.noFrames) rows.push({ label: '(page)', expected: 'the scene draws', happened: 'no frame was drawn and no picture changed while its controls were operated' });
-  if (d.stalled) rows.push({ label: '(page)', expected: 'the scene keeps drawing', happened: `drew ${d.framesPerSecond} frames a second at the start and none at the end` });
-  if (d.horizontalScroll?.mobile) rows.push({ label: '(page)', expected: 'no sideways scroll at 390 px', happened: `the page is ${d.horizontalScroll.mobileWidth} px wide` });
+  if (d.status !== 'ok')
+    rows.push({
+      label: '(page)',
+      expected: 'the page loads and is marked ready',
+      happened: `${d.status}${d.error ? `: ${d.error}` : ''}`,
+    });
+  if (d.noFrames)
+    rows.push({
+      label: '(page)',
+      expected: 'the scene draws',
+      happened: 'no frame was drawn and no picture changed while its controls were operated',
+    });
+  if (d.stalled)
+    rows.push({
+      label: '(page)',
+      expected: 'the scene keeps drawing',
+      happened: `drew ${d.framesPerSecond} frames a second at the start and none at the end`,
+    });
+  if (d.horizontalScroll?.mobile)
+    rows.push({
+      label: '(page)',
+      expected: 'no sideways scroll at 390 px',
+      happened: `the page is ${d.horizontalScroll.mobileWidth} px wide`,
+    });
   for (const c of d.controls ?? []) {
     const what = [];
     if (c.verdict === 'dead') {
-      what.push(c.labelOnly ? 'only its own label changed; the picture and readouts did not' : `nothing changed (${(c.steps ?? []).map((s) => s.action).join(', ')})`);
+      what.push(
+        c.labelOnly
+          ? 'only its own label changed; the picture and readouts did not'
+          : `nothing changed (${(c.steps ?? []).map((s) => s.action).join(', ')})`,
+      );
       const f = [...(c.steps ?? []), ...(c.confirm?.steps ?? [])].find((s) => s.faint)?.faint;
       if (f) what.push(`${f.pixels} pixels changed by at most ${f.max}/255, too faint to see`);
     }
     if (c.verdict === 'failed') what.push(`could not be operated: ${c.failed}`);
-    if (c.verdict === 'live' && c.sameStops?.length && (c.steps ?? []).some((st) => st.evidence.some((e) => e.startsWith('picture'))))
+    if (
+      c.verdict === 'live' &&
+      c.sameStops?.length &&
+      (c.steps ?? []).some((st) => st.evidence.some((e) => e.startsWith('picture')))
+    )
       what.push(`partly dead: ${c.sameStops.map(([a, b]) => `${a} and ${b}`).join(', ')} give the same picture`);
-    if (c.verdict === 'unreachable' && !c.layout?.desktop?.face) what.push('a real click cannot reach it, and sending its events directly did nothing');
+    if (c.verdict === 'unreachable' && !c.layout?.desktop?.face)
+      what.push('a real click cannot reach it, and sending its events directly did nothing');
     if (c.errors?.length) what.push(`errors: ${c.errors.slice(0, 2).join(' | ')}`);
     const L = c.layout ?? {};
-    for (const [name, l] of [['1440x900', L.desktop], ['390x844', L.mobile]]) {
+    for (const [name, l] of [
+      ['1440x900', L.desktop],
+      ['390x844', L.mobile],
+    ]) {
       if (!l) continue;
       if (l.off) what.push(`off-screen at ${name}`);
       else if (l.clipped) what.push(`cut off at the side at ${name}`);
       if (l.covered) what.push(`covered at ${name} (${l.covered.where}) by ${l.covered.by}`);
     }
-    if (what.length) rows.push({ label: c.label, kind: c.kind, expected: expected[c.kind] ?? 'it does something', happened: what.join('; '), dead: c.verdict === 'dead' });
+    if (what.length)
+      rows.push({
+        label: c.label,
+        kind: c.kind,
+        expected: expected[c.kind] ?? 'it does something',
+        happened: what.join('; '),
+        dead: c.verdict === 'dead',
+      });
   }
   return rows;
 }
 /** How bad a demo's problems are, for the worst-first list: page faults weigh most, then dead controls. */
 function severity(d, rows) {
-  return rows.reduce((sum, r) => sum + (r.label === '(page)' ? (/sideways/.test(r.expected) ? 1 : 5) : r.dead || /errors:|cannot reach/.test(r.happened) ? 3 : 1), 0);
+  return rows.reduce(
+    (sum, r) =>
+      sum +
+      (r.label === '(page)'
+        ? /sideways/.test(r.expected)
+          ? 1
+          : 5
+        : r.dead || /errors:|cannot reach/.test(r.happened)
+          ? 3
+          : 1),
+    0,
+  );
 }
 function writeMarkdown() {
   const ds = Object.values(report.demos).sort((a, b) => a.demo.localeCompare(b.demo));
@@ -1221,8 +1589,14 @@ function writeMarkdown() {
     dead += all(d).filter((c) => c.verdict === 'dead').length;
     unsure += all(d).filter((c) => c.verdict === 'unsure').length;
     for (const c of all(d)) {
-      if (c.verdict === 'live' && /acts only while/.test(c.note ?? '')) whileRunning.push(`- ${slugOf(d)} (${backendOf(d)}): ${c.label} (${c.note})`);
-      if (c.verdict === 'unsure') unclear.push({ where: `${slugOf(d)} (${backendOf(d)})`, label: c.label, note: c.note ?? 'the picture moves too much on its own to tell' });
+      if (c.verdict === 'live' && /acts only while/.test(c.note ?? ''))
+        whileRunning.push(`- ${slugOf(d)} (${backendOf(d)}): ${c.label} (${c.note})`);
+      if (c.verdict === 'unsure')
+        unclear.push({
+          where: `${slugOf(d)} (${backendOf(d)})`,
+          label: c.label,
+          note: c.note ?? 'the picture moves too much on its own to tell',
+        });
     }
     const rows = problemsOf(d);
     if (!rows.length) continue;
@@ -1240,24 +1614,41 @@ function writeMarkdown() {
   const cell = (t) => String(t).replace(/\|/g, '/');
   const table = ['| Demo | Backend | Control | Expected | What happened |', '| --- | --- | --- | --- | --- |'];
   for (const e of [...ranked].sort((a, b) => a.slug.localeCompare(b.slug)))
-    for (const r of e.rows.values()) table.push(`| ${e.slug} | ${r.backends.size > 1 ? 'both' : [...r.backends][0]} | ${cell(r.label)} | ${r.expected} | ${cell(r.happened)} |`);
+    for (const r of e.rows.values())
+      table.push(
+        `| ${e.slug} | ${r.backends.size > 1 ? 'both' : [...r.backends][0]} | ${cell(r.label)} | ${r.expected} | ${cell(r.happened)} |`,
+      );
   const lines = [
     '# Dead and broken demo controls',
     '',
     `Made by \`node scripts/web-demos/controls.mjs --all\` (WebGPU and \`?backend=webgl2\`) on ${report.generated?.slice(0, 10) ?? 'unknown'}; the full record is \`demos/.reports/controls.json\`. ${ds.length} demo runs, ${controls} controls operated, ${dead} dead, ${unsure} unsure, ${ranked.length} demos with at least one problem.`,
     '',
-    'A control is dead when neither the canvas (beyond its own motion) nor any readout outside its own label changed: on the first pass with reduced motion, again on a fresh page with normal motion and a longer wait, and a third time after pressing the page\'s start button when it has one. Partly dead: two stops of the same slider or select draw the same picture.',
+    "A control is dead when neither the canvas (beyond its own motion) nor any readout outside its own label changed: on the first pass with reduced motion, again on a fresh page with normal motion and a longer wait, and a third time after pressing the page's start button when it has one. Partly dead: two stops of the same slider or select draw the same picture.",
     '',
     '## Worst first',
     '',
-    ...ranked.slice(0, 30).map((e) => `- ${e.slug}: ${[...e.rows.values()].map((r) => `${r.label} (${r.happened.split(';')[0]})`).join('; ').slice(0, 300)}`),
+    ...ranked.slice(0, 30).map(
+      (e) =>
+        `- ${e.slug}: ${[...e.rows.values()]
+          .map((r) => `${r.label} (${r.happened.split(';')[0]})`)
+          .join('; ')
+          .slice(0, 300)}`,
+    ),
     '',
     '## Every problem',
     '',
     ...table,
     '',
   ];
-  if (whileRunning.length) lines.push('## Controls that act only while something runs', '', 'At rest, moving these changes only their own label. Worth a hint or a visible effect at rest.', '', ...whileRunning, '');
+  if (whileRunning.length)
+    lines.push(
+      '## Controls that act only while something runs',
+      '',
+      'At rest, moving these changes only their own label. Worth a hint or a visible effect at rest.',
+      '',
+      ...whileRunning,
+      '',
+    );
   if (unclear.length) {
     // A grid of 144 cells with the same reason reads as one line.
     const groups = new Map();
@@ -1267,7 +1658,9 @@ function writeMarkdown() {
       groups.get(key).labels.push(u.label);
     }
     const said = [...groups.values()].flatMap((g) =>
-      g.labels.length > 3 ? [`- ${g.where}: ${g.labels.length} controls such as ${g.labels.slice(0, 2).join('; ')} (${g.note})`] : g.labels.map((l) => `- ${g.where}: ${l} (${g.note})`),
+      g.labels.length > 3
+        ? [`- ${g.where}: ${g.labels.length} controls such as ${g.labels.slice(0, 2).join('; ')} (${g.note})`]
+        : g.labels.map((l) => `- ${g.where}: ${l} (${g.note})`),
     );
     lines.push('## Could not tell', '', ...said, '');
   }
@@ -1282,7 +1675,8 @@ if (mdOnly) {
   // Judge again with the current rules: a dead control that an older rule called unsure goes back to dead first.
   const REFINED = /^(a tool or|the page asks for|a sound control|a speed or playback|a drag handle|already holds)/;
   for (const d of Object.values(report.demos))
-    for (const c of d.controls ?? []) if (c.verdict === 'unsure' && REFINED.test(c.note ?? '')) Object.assign(c, { verdict: 'dead', note: undefined });
+    for (const c of d.controls ?? [])
+      if (c.verdict === 'unsure' && REFINED.test(c.note ?? '')) Object.assign(c, { verdict: 'dead', note: undefined });
   for (const d of Object.values(report.demos)) for (const c of d.controls ?? []) refine(c, d);
   save();
   writeMarkdown();
@@ -1291,35 +1685,43 @@ if (mdOnly) {
 }
 await openBrowser();
 let n = 0;
-for (const slug of names) for (const backend of backends) {
-  n++;
-  if (flag('resume') && report.demos[backend === 'webgpu' ? slug : `${slug}@${backend}`]) continue;
-  const d = await runDemo(slug, backend);
-  if (!flag('no-confirm')) {
-    const flagged = d.controls.filter((c) => c.verdict === 'dead' || c.verdict === 'unsure');
-    for (const c of flagged.slice(0, 12)) {
-      const again = await confirm(slug, backend, c);
-      c.confirm = again;
-      if (again.verdict === 'live') c.verdict = 'live';
-      else if (again.verdict === 'dead' && c.verdict === 'unsure') c.verdict = 'dead';
-      if (again.errors?.length) c.errors = [...new Set([...(c.errors ?? []), ...again.errors])];
-      if (c.verdict === 'dead' || c.verdict === 'unsure') {
-        const third = await confirm(slug, backend, c, { running: true });
-        c.whileRunning = third;
-        if (third.verdict === 'live') Object.assign(c, { verdict: 'live', note: `acts only while "${third.started}" runs; at rest only its label changes` });
-        if (third.errors?.length) c.errors = [...new Set([...(c.errors ?? []), ...third.errors])];
+for (const slug of names)
+  for (const backend of backends) {
+    n++;
+    if (flag('resume') && report.demos[backend === 'webgpu' ? slug : `${slug}@${backend}`]) continue;
+    const d = await runDemo(slug, backend);
+    if (!flag('no-confirm')) {
+      const flagged = d.controls.filter((c) => c.verdict === 'dead' || c.verdict === 'unsure');
+      for (const c of flagged.slice(0, 12)) {
+        const again = await confirm(slug, backend, c);
+        c.confirm = again;
+        if (again.verdict === 'live') c.verdict = 'live';
+        else if (again.verdict === 'dead' && c.verdict === 'unsure') c.verdict = 'dead';
+        if (again.errors?.length) c.errors = [...new Set([...(c.errors ?? []), ...again.errors])];
+        if (c.verdict === 'dead' || c.verdict === 'unsure') {
+          const third = await confirm(slug, backend, c, { running: true });
+          c.whileRunning = third;
+          if (third.verdict === 'live')
+            Object.assign(c, {
+              verdict: 'live',
+              note: `acts only while "${third.started}" runs; at rest only its label changes`,
+            });
+          if (third.errors?.length) c.errors = [...new Set([...(c.errors ?? []), ...third.errors])];
+        }
+        refine(c, d);
       }
-      refine(c, d);
+      for (const c of flagged.slice(12))
+        c.confirm = { verdict: 'not confirmed', note: 'more than 12 flagged controls on the page' };
+      for (const c of d.controls) refine(c, d);
     }
-    for (const c of flagged.slice(12)) c.confirm = { verdict: 'not confirmed', note: 'more than 12 flagged controls on the page' };
-    for (const c of d.controls) refine(c, d);
+    report.demos[d.demo] = d;
+    save();
+    const counts = {};
+    for (const c of d.controls) counts[c.verdict] = (counts[c.verdict] ?? 0) + 1;
+    console.log(
+      `[${n}/${names.length * backends.length}] ${d.demo}: ${d.status}${d.renderer ? ` (${d.renderer})` : ''} in ${d.seconds} s ${JSON.stringify(counts)}`,
+    );
   }
-  report.demos[d.demo] = d;
-  save();
-  const counts = {};
-  for (const c of d.controls) counts[c.verdict] = (counts[c.verdict] ?? 0) + 1;
-  console.log(`[${n}/${names.length * backends.length}] ${d.demo}: ${d.status}${d.renderer ? ` (${d.renderer})` : ''} in ${d.seconds} s ${JSON.stringify(counts)}`);
-}
 await browser.close().catch(() => {});
 try {
   killTree(browserServer.process());

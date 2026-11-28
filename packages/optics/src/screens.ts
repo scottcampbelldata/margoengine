@@ -555,7 +555,9 @@ export function packReticle(look: Required<ReticleLook>, halfSize: readonly [num
 }
 
 /** Two crossed quads along +z from 0 to 1, u across, v along: the shape a beam's mesh is scaled and turned into. */
-export const BEAM_POSITIONS: readonly number[] = [-1, 0, 0, 1, 0, 0, 1, 0, 1, -1, 0, 1, 0, -1, 0, 0, 1, 0, 0, 1, 1, 0, -1, 1];
+export const BEAM_POSITIONS: readonly number[] = [
+  -1, 0, 0, 1, 0, 0, 1, 0, 1, -1, 0, 1, 0, -1, 0, 0, 1, 0, 0, 1, 1, 0, -1, 1,
+];
 const BEAM_UV = [-1, 0, 1, 0, 1, 1, -1, 1, -1, 0, 1, 0, 1, 1, -1, 1];
 const BEAM_INDEX = [0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7];
 const QUAD_UV = [-1, -1, 1, -1, 1, 1, -1, 1];
@@ -611,7 +613,12 @@ export class OpticsScreens {
 
   #part<L extends object>(
     parent: Mesh,
-    shape: { positions: readonly number[]; uv: readonly number[]; index: readonly number[]; normal?: readonly number[] },
+    shape: {
+      positions: readonly number[];
+      uv: readonly number[];
+      index: readonly number[];
+      normal?: readonly number[];
+    },
     kind: number | ((look: Required<L>) => number),
     defaults: Required<L>,
     pack: (look: Required<L>) => ScreenSlots,

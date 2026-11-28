@@ -422,7 +422,8 @@ export function heatedAirLayer(options: HeatedAirOptions): HeatedAir {
   const ambient = options.ambient + 273.15,
     heat = options.surface - options.ambient,
     depth = options.depth;
-  if (!(ambient > 0) || !(ambient + heat > 0)) throw new RangeError('heatedAirLayer: temperatures must be above absolute zero');
+  if (!(ambient > 0) || !(ambient + heat > 0))
+    throw new RangeError('heatedAirLayer: temperatures must be above absolute zero');
   const density = ciddorRefractivity(options.wavelength ?? 550) * 288.15;
   const excess = (y: number) => heat * Math.exp(-Math.max(0, y) / depth);
   return {
@@ -434,7 +435,10 @@ export function heatedAirLayer(options: HeatedAirOptions): HeatedAir {
       return (density * e) / (depth * kelvin * kelvin);
     },
     step: (y, slope) =>
-      Math.max(3.25 * depth, Math.min(400 * depth, 9.5 * depth + 67 * y, (0.05 * depth + 0.105 * y) / Math.max(Math.abs(slope), 0.002))),
+      Math.max(
+        3.25 * depth,
+        Math.min(400 * depth, 9.5 * depth + 67 * y, (0.05 * depth + 0.105 * y) / Math.max(Math.abs(slope), 0.002)),
+      ),
     heightAt: (n) => {
       if (!heat || !(n > 1)) return NaN;
       const ratio = (density / (n - 1) - ambient) / heat;
@@ -510,7 +514,8 @@ export function tracePolygon(
       if (!denominator) continue;
       const distance = perp(offset, edge) / denominator,
         across = perp(offset, d) / denominator;
-      if (distance > 1e-9 && across >= 0 && across <= 1 && (!best || distance < best.distance)) best = { distance, edge: e };
+      if (distance > 1e-9 && across >= 0 && across <= 1 && (!best || distance < best.distance))
+        best = { distance, edge: e };
     }
     return best;
   };
@@ -522,7 +527,10 @@ export function tracePolygon(
   };
   const hitIn = first(origin, direction, -1);
   if (!hitIn) return null;
-  const entry: [number, number] = [origin[0] + direction[0] * hitIn.distance, origin[1] + direction[1] * hitIn.distance];
+  const entry: [number, number] = [
+    origin[0] + direction[0] * hitIn.distance,
+    origin[1] + direction[1] * hitIn.distance,
+  ];
   const inside = refractVector(direction, normalOf(hitIn.edge), ambient / index) as [number, number] | null;
   if (!inside) return null;
   const hitOut = first(entry, inside, hitIn.edge);

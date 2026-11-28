@@ -39,7 +39,8 @@ await runSuite(
       for (let j = 0; j < M; j++)
         for (let i = 0; i < M; i++) {
           let low = Infinity;
-          for (let v = j * 8; v <= j * 8 + 8; v++) for (let u = i * 8; u <= i * 8 + 8; u++) low = Math.min(low, heights[v * N + u]);
+          for (let v = j * 8; v <= j * 8 + 8; v++)
+            for (let u = i * 8; u <= i * 8 + 8; u++) low = Math.min(low, heights[v * N + u]);
           ground[j * M + i] = low;
         }
       const canvas = document.createElement('canvas');
@@ -69,7 +70,12 @@ await runSuite(
         layers: Array.from({ length: 4 }, () => ({ height: [-500, 500], slope: [0, 1], scale: 0.25 })),
         textures(gpu) {
           const layers = gpu.createTexture({ size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6 });
-          gpu.queue.writeTexture({ texture: layers }, new Uint8Array(16).fill(120), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 4]);
+          gpu.queue.writeTexture(
+            { texture: layers },
+            new Uint8Array(16).fill(120),
+            { bytesPerRow: 4, rowsPerImage: 1 },
+            [1, 1, 4],
+          );
           return { heightmap: fine, layers };
         },
       });
@@ -112,7 +118,8 @@ await runSuite(
       // Screen x and y to world x and z on the ground, 300 m below a 60 degree pinhole.
       const f = H / 2 / Math.tan(Math.PI / 6),
         world = (p) => ((p + 0.5 - W / 2) * (300 - LEVEL)) / f,
-        isWater = (d, o) => Math.abs(d[o] - plain[o]) + Math.abs(d[o + 1] - plain[o + 1]) + Math.abs(d[o + 2] - plain[o + 2]) > 24;
+        isWater = (d, o) =>
+          Math.abs(d[o] - plain[o]) + Math.abs(d[o + 1] - plain[o + 1]) + Math.abs(d[o + 2] - plain[o + 2]) > 24;
       const column = Math.round((CX * f) / (300 - LEVEL) + W / 2 - 0.5);
       const count = (d) => {
         let centre = 0,
@@ -147,9 +154,15 @@ await runSuite(
     console.log(JSON.stringify({ mode, without: r.without, withBanks: r.withBanks, restored: r.restored }));
     assert.equal(r.error, null);
     // Without banks the coarse rings hide the channel far off: water in well under nine tenths of its rows.
-    assert.ok(r.without.centre < r.without.rows * 0.9, `without banks the channel showed in ${r.without.centre} of ${r.without.rows} rows`);
+    assert.ok(
+      r.without.centre < r.without.rows * 0.9,
+      `without banks the channel showed in ${r.without.centre} of ${r.without.rows} rows`,
+    );
     // With banks the channel shows in every row and nowhere past its walls.
-    assert.ok(r.withBanks.centre >= r.withBanks.rows - 2, `banks: water in ${r.withBanks.centre} of ${r.withBanks.rows} rows`);
+    assert.ok(
+      r.withBanks.centre >= r.withBanks.rows - 2,
+      `banks: water in ${r.withBanks.centre} of ${r.withBanks.rows} rows`,
+    );
     assert.equal(r.withBanks.outside, 0, `banks: ${r.withBanks.outside} water pixels past the walls`);
     // Disposing gives the plain water back.
     assert.equal(r.restored.centre, r.without.centre);

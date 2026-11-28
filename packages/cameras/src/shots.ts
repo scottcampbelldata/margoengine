@@ -48,7 +48,8 @@ export class ShotBlend {
   readonly #still?: { readonly matches: boolean };
 
   constructor(camera: Camera, from: Shot, to: Shot, { rate = 15, still }: ShotBlendOptions = {}) {
-    if (!(rate > 0) || !Number.isFinite(rate)) throw rangeError('ShotBlend rate must be a finite number above 0', 'cameras');
+    if (!(rate > 0) || !Number.isFinite(rate))
+      throw rangeError('ShotBlend rate must be a finite number above 0', 'cameras');
     this.#camera = camera;
     this.from = from;
     this.to = to;
@@ -66,11 +67,14 @@ export class ShotBlend {
    * true while the blend is still moving, so a page that renders on demand knows to draw another frame.
    */
   update(delta: number, width: number, height: number): boolean {
-    if (!(delta >= 0) || !Number.isFinite(delta)) throw rangeError('ShotBlend delta must be a finite number of seconds >= 0', 'cameras');
+    if (!(delta >= 0) || !Number.isFinite(delta))
+      throw rangeError('ShotBlend delta must be a finite number of seconds >= 0', 'cameras');
     if (!(width > 0 && height > 0)) throw rangeError('ShotBlend width and height must be above 0', 'cameras');
     const { from, to, goal } = this;
     const b = (this.blend =
-      this.#still?.matches || Math.abs(this.blend - goal) < 0.001 ? goal : lerp(goal, this.blend, Math.exp(-delta * this.#rate)));
+      this.#still?.matches || Math.abs(this.blend - goal) < 0.001
+        ? goal
+        : lerp(goal, this.blend, Math.exp(-delta * this.#rate)));
     const fit = Math.max(1, (lerp(from.fit ?? 1, to.fit ?? 1, b) * height) / width);
     const at = (i: number) => lerp(from.target[i], to.target[i], b);
     const target: Vec3 = [at(0), at(1), at(2)];

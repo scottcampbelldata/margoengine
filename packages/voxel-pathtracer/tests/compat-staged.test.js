@@ -603,7 +603,11 @@ for (const [name, attach] of cases)
       for (const code of h.modules.filter((m) => /@fragment fn stage\(/.test(m))) {
         if (!functions(code).has('wideRay')) continue;
         const copies = inlinedCopies(code, 'wideRay').copies;
-        assert.equal(copies.get('pmReduceTrig'), 2, `${name}: ${copies.get('pmReduceTrig')} trig reductions in wideRay`);
+        assert.equal(
+          copies.get('pmReduceTrig'),
+          2,
+          `${name}: ${copies.get('pmReduceTrig')} trig reductions in wideRay`,
+        );
         assert.equal(copies.get('preciseSin') ?? 0, 0);
         assert.equal(copies.get('preciseCos') ?? 0, 0);
         rays++;

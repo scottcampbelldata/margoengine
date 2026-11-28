@@ -231,7 +231,10 @@ test('the Aeroplane take reads joint for joint as the referee reads it, and the 
       const want = turn(sub(joints[name], joints.Hips)),
         have = sub(at(staged.source, i), at(staged.source, hips)),
         apart = Math.hypot(...sub(want, have));
-      assert.ok(apart < 2e-4, `frame ${f} ${name}: the stage's skeleton is ${apart.toExponential(2)} m off the referee`);
+      assert.ok(
+        apart < 2e-4,
+        `frame ${f} ${name}: the stage's skeleton is ${apart.toExponential(2)} m off the referee`,
+      );
     }
   }
   // What the referee itself shows: both forearms leave the upper arm's line toward the back of the body.
@@ -242,7 +245,17 @@ test('the Aeroplane take reads joint for joint as the referee reads it, and the 
     for (const side of SIDES) {
       const ua = unit(sub(joints[side + 'Elbow'], joints[side + 'Shoulder'])),
         fa = unit(sub(joints[side + 'Wrist'], joints[side + 'Elbow']));
-      const lean = deg(Math.asin(dot(sub(fa, ua.map((x) => x * dot(fa, ua))), forward)));
+      const lean = deg(
+        Math.asin(
+          dot(
+            sub(
+              fa,
+              ua.map((x) => x * dot(fa, ua)),
+            ),
+            forward,
+          ),
+        ),
+      );
       assert.ok(lean < -5 && lean > -15, `the referee's ${side} forearm leans ${lean.toFixed(1)} degrees forward`);
     }
   }

@@ -44,9 +44,7 @@ export function plume(solver, shared, count, flowing = false) {
       humidity: 0.68,
       wind: field,
       turbulence: { rms: [0.28, 0.11, 0.16], time: 0.33 },
-      sources: flowing
-        ? [{ kind: 'freshwater-mist', diameter: 180e-6, rate: 0.003, position: [0.5, 11.5, -0.9] }]
-        : [],
+      sources: flowing ? [{ kind: 'freshwater-mist', diameter: 180e-6, rate: 0.003, position: [0.5, 11.5, -0.9] }] : [],
       bounds: [
         [-3.4, 1, -3.4],
         [3.4, 30, 3.4],
@@ -136,8 +134,8 @@ export async function runPlume(shared, threads) {
         shiftedCell: accepted.cell,
         restoredCell: restored.cell,
         cellsAgree: accepted.cellsAgree && restored.cellsAgree,
-        originShiftExact: equal(beforeShift.particles, final.afterShift.particles) &&
-          equal(beforeShift.mass, final.afterShift.mass),
+        originShiftExact:
+          equal(beforeShift.particles, final.afterShift.particles) && equal(beforeShift.mass, final.afterShift.mass),
         hash: final.snapshot.hash,
         exactReplay: final.snapshot.hash === replay.snapshot.hash && equal(final.snapshot.bytes, replay.snapshot.bytes),
         particlesChanged: !equal(initial.particles, accepted.particles),
@@ -188,4 +186,5 @@ async function chromium() {
   }
 }
 
-if (typeof DedicatedWorkerGlobalScope !== 'undefined' && globalThis instanceof DedicatedWorkerGlobalScope) await chromium();
+if (typeof DedicatedWorkerGlobalScope !== 'undefined' && globalThis instanceof DedicatedWorkerGlobalScope)
+  await chromium();

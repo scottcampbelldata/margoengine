@@ -143,7 +143,9 @@ export class AirbornePhase {
     const pool = this.pool;
     if (pool) {
       const control = host.allocate('airborne-worker-control', U32 * pool.controlWords, 'i32', 1);
-      const stackTops = Array.from({ length: pool.count - 1 }, (_, part) => stackTop(host, `airborne-stack-${part + 1}`));
+      const stackTops = Array.from({ length: pool.count - 1 }, (_, part) =>
+        stackTop(host, `airborne-stack-${part + 1}`),
+      );
       pool.init({ memory: host.memory, module, job: job.byteOffset, control: control.byteOffset, stackTops });
     }
     this.binding = { host, job, receipts, kernel: exports as unknown as Kernel };
@@ -165,7 +167,10 @@ export class AirbornePhase {
       (candidateParcels.byteOffset < forcing.byteOffset + forcingBytes &&
         forcing.byteOffset < candidateParcels.byteOffset + parcelBytes)
     )
-      throw new MargoError('state', 'Invalid airborne integration batch. Give separate world regions and a finite step.');
+      throw new MargoError(
+        'state',
+        'Invalid airborne integration batch. Give separate world regions and a finite step.',
+      );
     if (count === 0) {
       this.accepted.fill(0);
       return;
@@ -178,15 +183,23 @@ export class AirbornePhase {
     header[2] = count;
     new Float64Array(buffer, ptr + 4 * U32, 1)[0] = dt;
     const pool = this.pool;
-    const status = pool ? pool.phase(0, () => kernel.airborne_thread_phase(ptr, 0, 0, pool.count)) : kernel.airborne_apply(ptr);
+    const status = pool
+      ? pool.phase(0, () => kernel.airborne_thread_phase(ptr, 0, 0, pool.count))
+      : kernel.airborne_apply(ptr);
     if (status !== 0)
-      throw new MargoError('state', 'Airborne integration could not accept this batch. Reduce the parcel count or step.');
+      throw new MargoError(
+        'state',
+        'Airborne integration could not accept this batch. Reduce the parcel count or step.',
+      );
     const recorded = new Uint32Array(buffer, receipts.byteOffset, this.accepted.length);
     let parcels = 0;
     for (let i = 0; i < recorded.length; i += RECEIPT_WORDS) {
       const rows = recorded[i]!;
       if (recorded[i + 1]! > rows)
-        throw new MargoError('failed', 'Airborne integration returned invalid evaporation work. Rebuild the Wasm assets.');
+        throw new MargoError(
+          'failed',
+          'Airborne integration returned invalid evaporation work. Rebuild the Wasm assets.',
+        );
       parcels += rows;
     }
     if (parcels !== count)

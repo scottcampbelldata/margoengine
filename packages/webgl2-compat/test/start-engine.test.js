@@ -20,7 +20,12 @@ test('a browser without WebGPU falls back to the full layer, installed with forc
   const stop = new Error('layer reached');
   await assert.rejects(
     startEngine(canvas(), {
-      loadCompat: async () => ({ install: async (options) => { calls.push(options); throw stop; } }),
+      loadCompat: async () => ({
+        install: async (options) => {
+          calls.push(options);
+          throw stop;
+        },
+      }),
     }),
     (error) => error === stop,
   );
@@ -34,7 +39,14 @@ test('forceCompat goes to the layer without asking WebGPU for an adapter', async
   await assert.rejects(
     startEngine(canvas(), {
       forceCompat: true,
-      loadCompat: async () => { loads++; return { install: async () => { throw stop; } }; },
+      loadCompat: async () => {
+        loads++;
+        return {
+          install: async () => {
+            throw stop;
+          },
+        };
+      },
     }),
     (error) => error === stop,
   );
@@ -43,7 +55,14 @@ test('forceCompat goes to the layer without asking WebGPU for an adapter', async
 
 test('an error that is not a missing or silent WebGPU rejects and never loads the layer', async (t) => {
   const broken = new Error('adapter broke');
-  withNavigator(t, { userAgent: 'test', gpu: { requestAdapter: async () => { throw broken; } } });
+  withNavigator(t, {
+    userAgent: 'test',
+    gpu: {
+      requestAdapter: async () => {
+        throw broken;
+      },
+    },
+  });
   await assert.rejects(
     startEngine(canvas(), { loadCompat: () => assert.fail('no layer for other errors') }),
     (error) => error !== null && error?.code !== 'unsupported' && error?.code !== 'timeout',

@@ -21,7 +21,11 @@ export type PartAxis = 'x' | 'y' | 'z';
 const TAU = Math.PI * 2;
 const sub = (a: P3, b: P3): MutableVec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot = (a: P3, b: P3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const cross = (a: P3, b: P3): MutableVec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const cross = (a: P3, b: P3): MutableVec3 => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+];
 const unit = (a: P3): MutableVec3 => {
   const l = Math.hypot(a[0], a[1], a[2]);
   return l > 0 ? [a[0] / l, a[1] / l, a[2] / l] : [0, 0, 0];
@@ -31,7 +35,8 @@ const positive = (value: number, label: string) => {
   return value;
 };
 const whole = (value: number, min: number, label: string) => {
-  if (!Number.isInteger(value) || value < min) throw new RangeError(`${label} must be a whole number of at least ${min}`);
+  if (!Number.isInteger(value) || value < min)
+    throw new RangeError(`${label} must be a whole number of at least ${min}`);
   return value;
 };
 
@@ -107,8 +112,10 @@ export function turnedGeometry(profile: readonly P2[], options: TurnedOptions = 
     lengths.push(lengths[j - 1] + Math.hypot(profile[j][0] - profile[j - 1][0], profile[j][1] - profile[j - 1][1]));
   const total = lengths.at(-1) || 1;
   for (let j = 1; j < profile.length; j++) {
-    const r0 = profile[j - 1][0], h0 = profile[j - 1][1],
-      r1 = profile[j][0], h1 = profile[j][1];
+    const r0 = profile[j - 1][0],
+      h0 = profile[j - 1][1],
+      r1 = profile[j][0],
+      h1 = profile[j][1];
     if (r0 === r1 && h0 === h1) continue;
     const v0 = lengths[j - 1] / total,
       v1 = lengths[j] / total;
@@ -203,7 +210,11 @@ function turn(v: MutableVec3, axis: MutableVec3, angle: number): MutableVec3 {
     s = Math.sin(angle),
     k = cross(axis, v),
     d = dot(axis, v) * (1 - c);
-  return unit([v[0] * c + k[0] * s + axis[0] * d, v[1] * c + k[1] * s + axis[1] * d, v[2] * c + k[2] * s + axis[2] * d]);
+  return unit([
+    v[0] * c + k[0] * s + axis[0] * d,
+    v[1] * c + k[1] * s + axis[1] * d,
+    v[2] * c + k[2] * s + axis[2] * d,
+  ]);
 }
 
 /** Corners of a polyline rounded with circular arcs of `radius` (rational quadratic, Piegl and Tiller 7.3). */
@@ -240,7 +251,11 @@ function roundCorners(points: readonly P3[], radius: number, steps: number, clos
         b1 = 2 * t * (1 - t) * w,
         b2 = t * t,
         q = b0 + b1 + b2;
-      out.push([(b0 * s[0] + b1 * p[0] + b2 * e[0]) / q, (b0 * s[1] + b1 * p[1] + b2 * e[1]) / q, (b0 * s[2] + b1 * p[2] + b2 * e[2]) / q]);
+      out.push([
+        (b0 * s[0] + b1 * p[0] + b2 * e[0]) / q,
+        (b0 * s[1] + b1 * p[1] + b2 * e[1]) / q,
+        (b0 * s[2] + b1 * p[2] + b2 * e[2]) / q,
+      ]);
     }
   }
   return out;
@@ -257,7 +272,12 @@ interface SweepOptions {
 }
 
 /** Sweeps a 2D section (x along the frame normal, y along the binormal) along a polyline. */
-function sweep(path: readonly P3[], section: readonly P2[], closedSection: boolean, options: SweepOptions): GeometryData {
+function sweep(
+  path: readonly P3[],
+  section: readonly P2[],
+  closedSection: boolean,
+  options: SweepOptions,
+): GeometryData {
   const closed = options.closed ?? false;
   const frames = rotationMinimizingFrames(path, { closed, up: options.up });
   let shape = section.map((p) => [p[0], p[1]] as MutableVec2);
@@ -269,7 +289,14 @@ function sweep(path: readonly P3[], section: readonly P2[], closedSection: boole
     const s = options.scale ? options.scale(along[i] / total) : 1,
       r = frames.normals[i],
       b = frames.binormals[i];
-    return shape.map(([u, v]) => [x[0] + (r[0] * u + b[0] * v) * s, x[1] + (r[1] * u + b[1] * v) * s, x[2] + (r[2] * u + b[2] * v) * s] as MutableVec3);
+    return shape.map(
+      ([u, v]) =>
+        [
+          x[0] + (r[0] * u + b[0] * v) * s,
+          x[1] + (r[1] * u + b[1] * v) * s,
+          x[2] + (r[2] * u + b[2] * v) * s,
+        ] as MutableVec3,
+    );
   });
   const builder = new GeometryBuilder({ smooth: options.crease ?? 180 });
   const steps = closed ? path.length : path.length - 1,
@@ -354,7 +381,8 @@ export function pipeGeometry(points: readonly P3[], radius: number, options: Pip
   let path = pathPoints(points, 'pipeGeometry');
   if (bend > 0) path = roundCorners(path, bend, bendSegments, closed);
   const section =
-    options.section ?? Array.from({ length: sides }, (_, k) => [Math.cos((TAU * k) / sides), Math.sin((TAU * k) / sides)]);
+    options.section ??
+    Array.from({ length: sides }, (_, k) => [Math.cos((TAU * k) / sides), Math.sin((TAU * k) / sides)]);
   const shape = ring2(section, 'pipeGeometry section').map(([x, y]) => [x * radius, y * radius]);
   return sweep(path, shape, true, {
     closed,
@@ -442,8 +470,27 @@ export function ribbonGeometry(points: readonly P3[], width: number, options: Ri
     w = width / 2,
     t = thickness / 2;
   const common = { closed: options.closed, up: options.up, crease: 30 };
-  if (!thickness) return sweep(path, [[0, -w], [0, w]], false, common);
-  return sweep(path, [[-t, -w], [t, -w], [t, w], [-t, w]], true, common);
+  if (!thickness)
+    return sweep(
+      path,
+      [
+        [0, -w],
+        [0, w],
+      ],
+      false,
+      common,
+    );
+  return sweep(
+    path,
+    [
+      [-t, -w],
+      [t, -w],
+      [t, w],
+      [-t, w],
+    ],
+    true,
+    common,
+  );
 }
 
 /** Options of {@link prismGeometry}. */
@@ -545,7 +592,12 @@ export interface ChamferBoxOptions {
  * const tray = chamferBoxGeometry(1.2, 0.08, 0.6, { chamfer: 0.012, radius: 0.06 });
  * ```
  */
-export function chamferBoxGeometry(width: number, height: number, depth: number, options: ChamferBoxOptions = {}): GeometryData {
+export function chamferBoxGeometry(
+  width: number,
+  height: number,
+  depth: number,
+  options: ChamferBoxOptions = {},
+): GeometryData {
   positive(width, 'chamferBoxGeometry width');
   positive(height, 'chamferBoxGeometry height');
   positive(depth, 'chamferBoxGeometry depth');
@@ -616,7 +668,14 @@ export function ringSectorGeometry(inner: number, outer: number, options: RingSe
     // Solid: a prism of the sector outline (a full ring is an outline with a hole).
     if (full) {
       const holes = inner > 0 ? [ring(inner)] : [];
-      return placeY(prismGeometry(outerRing.map(([x, z]) => [x, z]), depth, { bevel, holes, axis: 'y' }), depth / 2);
+      return placeY(
+        prismGeometry(
+          outerRing.map(([x, z]) => [x, z]),
+          depth,
+          { bevel, holes, axis: 'y' },
+        ),
+        depth / 2,
+      );
     }
     const innerRing = inner > 0 ? ring(inner).reverse() : [[0, 0] as MutableVec2];
     return placeY(prismGeometry([...outerRing, ...innerRing], depth, { bevel, axis: 'y' }), depth / 2);
@@ -683,7 +742,8 @@ export interface ScaleMarksOptions {
 export function scaleMarksGeometry(options: ScaleMarksOptions = {}): GeometryData {
   const { kind = 'linear', count = 11, start = 0, spacing = 0.1, radius = 1, major = 5, marks = 'all' } = options;
   whole(count, 1, 'scaleMarksGeometry count');
-  if (!Number.isInteger(major) || major < 0) throw new RangeError('scaleMarksGeometry major must be a whole number >= 0');
+  if (!Number.isInteger(major) || major < 0)
+    throw new RangeError('scaleMarksGeometry major must be a whole number >= 0');
   const length = positive(options.length ?? 0.03, 'scaleMarksGeometry length'),
     majorLength = positive(options.majorLength ?? length * 2, 'scaleMarksGeometry majorLength'),
     width = positive(options.width ?? 0.004, 'scaleMarksGeometry width'),
@@ -740,7 +800,13 @@ export function strokeGeometry(
   positive(width, 'strokeGeometry width');
   const axis = options.axis ?? 'y';
   const at: (a: number, b: number) => MutableVec3 =
-    axis === 'y' ? (a, b) => [a, 0, b] : axis === 'z' ? (a, b) => [a, b, 0] : axis === 'x' ? (a, b) => [0, a, b] : (orient(axis), () => [0, 0, 0]);
+    axis === 'y'
+      ? (a, b) => [a, 0, b]
+      : axis === 'z'
+        ? (a, b) => [a, b, 0]
+        : axis === 'x'
+          ? (a, b) => [0, a, b]
+          : (orient(axis), () => [0, 0, 0]);
   // Counter-clockwise in (a, b) faces +z and +x but -y, whose plane is (x, z).
   const flip = axis === 'y';
   const builder = new GeometryBuilder();

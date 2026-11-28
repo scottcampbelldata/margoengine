@@ -36,7 +36,10 @@ test('ordinary and passive swimmer workers replay the same pulses and signed ori
 });
 
 test('two odd swimmer groups execute counted SIMD linear and angular responses in four partitions', async () => {
-  for (const [count, passive] of [[1027, false], [4099, true]]) {
+  for (const [count, passive] of [
+    [1027, false],
+    [4099, true],
+  ]) {
     using serial = await SwimSolver.load({ passiveReaction: passive });
     using parallel = await SwimSolver.load({ passiveReaction: passive, threads: 4 });
     const { world: plain } = makeSwimmers(serial, false, count);
@@ -117,7 +120,11 @@ test('four-way passive swimmer drag delivers the same horizontal impulse to live
           fish += mass * swim.read(i).velocity[2];
         }
         const waterNow = water.sample(0, 0).velocity[1] * (rho * depth * width * width);
-        maxResidual = Math.max(maxResidual, Math.abs(waterNow - priorWater - returned), Math.abs(fish + waterNow - initial));
+        maxResidual = Math.max(
+          maxResidual,
+          Math.abs(waterNow - priorWater - returned),
+          Math.abs(fish + waterNow - initial),
+        );
         priorWater = waterNow;
         receiptSum += returned;
       }
@@ -138,7 +145,13 @@ test('four-way passive swimmer drag delivers the same horizontal impulse to live
   assert.deepEqual(parallel, serial);
   assert.ok(parallel.receiptSum > 0);
   assert.ok(parallel.maxResidual <= 128 * Number.EPSILON * initial);
-  console.log('LIFE-03 reciprocal water impulse', parallel.receiptSum, 'N s, max residual', parallel.maxResidual, 'N s');
+  console.log(
+    'LIFE-03 reciprocal water impulse',
+    parallel.receiptSum,
+    'N s, max residual',
+    parallel.maxResidual,
+    'N s',
+  );
 });
 
 test('swimmer workers refuse a plain world with a coded workaround', async () => {
@@ -151,7 +164,10 @@ test('swimmer workers refuse a plain world with a coded workaround', async () =>
 });
 
 test('overflowing native fin authority rejects the candidate with prior fields and work intact', async () => {
-  for (const [threads, shared] of [[1, false], [4, true]]) {
+  for (const [threads, shared] of [
+    [1, false],
+    [4, true],
+  ]) {
     using swim = await SwimSolver.load({ threads, passiveReaction: true });
     let excessive = false;
     const water = {
@@ -195,7 +211,10 @@ test('overflowing native fin authority rejects the candidate with prior fields a
       });
       assert.deepEqual(swimmerPorts(world, true, bodies.length), accepted);
       assert.deepEqual(swim.workCounts(), work);
-      assert.deepEqual(bodies.map((_, i) => swim.read(i)), readings);
+      assert.deepEqual(
+        bodies.map((_, i) => swim.read(i)),
+        readings,
+      );
     } finally {
       world.remove(swim.describe().id);
     }

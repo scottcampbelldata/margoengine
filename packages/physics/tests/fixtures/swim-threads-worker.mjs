@@ -68,7 +68,11 @@ export function swimmerPorts(world, passive, count) {
   const words = [6, 16, 8];
   return names.map((name, i) => {
     const port = world.fields.port(name);
-    if (port?.region.type !== 'f64' || port.region.layout !== layouts[i] || port.region.byteLength !== count * words[i] * 8)
+    if (
+      port?.region.type !== 'f64' ||
+      port.region.layout !== layouts[i] ||
+      port.region.byteLength !== count * words[i] * 8
+    )
       throw new Error('Expected the current f64 swimmer kinematics or momentum-return layout.');
     return {
       cell: [...port.cell],
@@ -125,7 +129,8 @@ export async function runSwimmers(shared, threads, passive) {
         shiftedCells: accepted.map(({ cell }) => cell),
         restoredCells: restored.map(({ cell }) => cell),
         acceptedCellAgrees,
-        hashedReplay: final.snapshot.hash === replay.snapshot.hash && equal(final.snapshot.bytes, replay.snapshot.bytes),
+        hashedReplay:
+          final.snapshot.hash === replay.snapshot.hash && equal(final.snapshot.bytes, replay.snapshot.bytes),
         originShiftExact: before.every(({ values }, i) => equal(values, final.after[i].values)),
         tailAndFin: anyImpulse(accepted[1].values, 16) && anyImpulse(accepted[1].values, 16, 8),
         drag: passive ? anyImpulse(accepted[2].values) : !world.fields.port(SWIM_PASSIVE_REACTION_FIELD.name),
@@ -178,4 +183,5 @@ async function chromium() {
   }
 }
 
-if (typeof DedicatedWorkerGlobalScope !== 'undefined' && globalThis instanceof DedicatedWorkerGlobalScope) await chromium();
+if (typeof DedicatedWorkerGlobalScope !== 'undefined' && globalThis instanceof DedicatedWorkerGlobalScope)
+  await chromium();

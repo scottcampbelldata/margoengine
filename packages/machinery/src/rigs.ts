@@ -32,7 +32,8 @@ type Quat = [number, number, number, number];
 const zTurn = (angle: number): Quat => [0, 0, Math.sin(angle / 2), Math.cos(angle / 2)];
 const zAngle = (q: readonly number[]): number => 2 * Math.atan2(q[2]!, q[3]!);
 /** `angle` moved by whole turns to lie within half a turn of `near`. */
-const unwrap = (angle: number, near: number): number => angle + 2 * Math.PI * Math.round((near - angle) / (2 * Math.PI));
+const unwrap = (angle: number, near: number): number =>
+  angle + 2 * Math.PI * Math.round((near - angle) / (2 * Math.PI));
 const finite = (value: number, label: string): number => {
   if (!Number.isFinite(value)) throw new RangeError(`${label} must be a finite number; got ${value}.`);
   return value;
@@ -117,7 +118,11 @@ abstract class Rig<Pose> implements MechanismRig<Pose> {
     options.signal?.addEventListener('abort', () => this.dispose(), { once: true });
   }
 
-  protected disc(position: [number, number, number], angle = 0, type: 'dynamic' | 'kinematicPosition' = 'dynamic'): PhysicsBody {
+  protected disc(
+    position: [number, number, number],
+    angle = 0,
+    type: 'dynamic' | 'kinematicPosition' = 'dynamic',
+  ): PhysicsBody {
     return this.physics.addBody(null, {
       type,
       position,
@@ -144,7 +149,10 @@ abstract class Rig<Pose> implements MechanismRig<Pose> {
     const target = shortest ? unwrap(finite(angle, 'Rig angle'), this.input) : finite(angle, 'Rig angle');
     this.check.worst = 0;
     while (this.input !== target) {
-      let next = Math.abs(target - this.input) <= this.maxStep ? target : this.input + Math.sign(target - this.input) * this.maxStep;
+      let next =
+        Math.abs(target - this.input) <= this.maxStep
+          ? target
+          : this.input + Math.sign(target - this.input) * this.maxStep;
       // Land exactly on a stroke boundary the move crosses, so a joint is made where its loop closes.
       for (const stop of this.stops()) {
         const at = unwrap(stop, (this.input + next) / 2);
@@ -188,7 +196,11 @@ class ScotchYoke extends Rig<ScotchYokeRigPose> {
   ) {
     super('m', options);
     this.yoke = this.disc([scotchYokePose(this.input, radius).slide, 0, 0.05]);
-    this.physics.addJoint(this.ground, this.yoke, { type: 'prismatic', axis: [1, 0, 0], anchorA: [this.yoke.position[0], 0, 0.05] });
+    this.physics.addJoint(this.ground, this.yoke, {
+      type: 'prismatic',
+      axis: [1, 0, 0],
+      anchorA: [this.yoke.position[0], 0, 0.05],
+    });
     // The slot runs along the yoke's y: the pin may slide along it and turn about z.
     this.physics.addJoint(this.yoke, this.crank, {
       type: 'generic',
@@ -250,7 +262,11 @@ class Geneva extends Rig<GenevaRigPose> {
     this.half = Math.PI / 2 - Math.PI / slots;
     this.crankRadius = centerDistance * Math.sin(Math.PI / slots);
     this.wheel = this.disc([centerDistance, 0, 0.05], this.exact());
-    this.physics.addJoint(this.ground, this.wheel, { type: 'revolute', axis: [0, 0, 1], anchorA: [centerDistance, 0, 0.05] });
+    this.physics.addJoint(this.ground, this.wheel, {
+      type: 'revolute',
+      axis: [0, 0, 1],
+      anchorA: [centerDistance, 0, 0.05],
+    });
     this.engage(this.indexing(this.input));
   }
   private exact(): number {
@@ -297,7 +313,12 @@ class Geneva extends Rig<GenevaRigPose> {
   pose(): GenevaRigPose {
     const wheel = this.wheelAngle(),
       turns = Math.round((this.input - this.requested) / (2 * Math.PI));
-    return { driver: this.input, wheel, indexing: this.indexing(this.input), turnWheel: wheel + (turns * 2 * Math.PI) / this.slots };
+    return {
+      driver: this.input,
+      wheel,
+      indexing: this.indexing(this.input),
+      turnWheel: wheel + (turns * 2 * Math.PI) / this.slots,
+    };
   }
 }
 
@@ -309,7 +330,8 @@ class Geneva extends Rig<GenevaRigPose> {
 export function genevaRig(options: GenevaRigOptions = {}): MechanismRig<GenevaRigPose> {
   const slots = options.slots ?? 4,
     centerDistance = options.centerDistance ?? 1;
-  if (!(Number.isInteger(slots) && slots >= 3)) throw new RangeError(`A Geneva wheel has 3 slots or more; got ${slots}.`);
+  if (!(Number.isInteger(slots) && slots >= 3))
+    throw new RangeError(`A Geneva wheel has 3 slots or more; got ${slots}.`);
   if (!(centerDistance > 0 && Number.isFinite(centerDistance)))
     throw new RangeError(`Centre distance must be above 0; got ${centerDistance}.`);
   return new Geneva(slots, centerDistance, options);
@@ -428,7 +450,12 @@ class Epicyclic extends Rig<EpicyclicRigPose> {
     new (physicsModule().GearJoint)(this.physics, this.crank, this.driven, { ratio: -1 / rate });
   }
   private exact(input: number) {
-    const known = this.held === 'carrier' ? { sun: input, carrier: 0 } : this.held === 'sun' ? { ring: input, sun: 0 } : { sun: input, ring: 0 };
+    const known =
+      this.held === 'carrier'
+        ? { sun: input, carrier: 0 }
+        : this.held === 'sun'
+          ? { ring: input, sun: 0 }
+          : { sun: input, ring: 0 };
     return epicyclicSpeeds(this.teeth, known);
   }
   private drivenAngle(): number {
@@ -455,7 +482,8 @@ class Epicyclic extends Rig<EpicyclicRigPose> {
  */
 export function epicyclicRig(teeth: EpicyclicTeeth, options: EpicyclicRigOptions = {}): MechanismRig<EpicyclicRigPose> {
   const held = options.held ?? 'ring';
-  if (!['sun', 'ring', 'carrier'].includes(held)) throw new RangeError(`Held member is sun, ring or carrier; got ${String(held)}.`);
+  if (!['sun', 'ring', 'carrier'].includes(held))
+    throw new RangeError(`Held member is sun, ring or carrier; got ${String(held)}.`);
   epicyclicSpeeds(teeth, { sun: 0, ring: 0 });
   return new Epicyclic(teeth, held, options);
 }
@@ -493,7 +521,10 @@ class Harmonic extends Rig<HarmonicDriveRigPose> {
  * circular spline with the flexspline held) is turned by a gear row at Musser's tooth-count ratio. The check is against
  * {@link harmonicDriveRatio} times the input.
  */
-export function harmonicDriveRig(spec: HarmonicDriveSpec, options: RigOptions = {}): MechanismRig<HarmonicDriveRigPose> {
+export function harmonicDriveRig(
+  spec: HarmonicDriveSpec,
+  options: RigOptions = {},
+): MechanismRig<HarmonicDriveRigPose> {
   harmonicDriveRatio(spec);
   return new Harmonic(spec, options);
 }
@@ -611,7 +642,11 @@ class Screw extends Rig<ArchimedesScrewRigPose> {
     this.band = Math.round(travel / pitch);
     // The water touches nothing, so it has no collider: its mass is given, and it sits on the axis near the origin, where a
     // position's float spacing is finest.
-    this.water = this.physics.addBody(null, { type: 'dynamic', position: [0, 0, travel - this.band * pitch], colliders: [] });
+    this.water = this.physics.addBody(null, {
+      type: 'dynamic',
+      position: [0, 0, travel - this.band * pitch],
+      colliders: [],
+    });
     this.water.setMassProperties({ mass: 1, inertia: [1e-3, 1e-3, 1e-3] });
     this.physics.addJoint(this.ground, this.water, { type: 'prismatic', axis: [0, 0, 1] });
     this.wind();
@@ -790,7 +825,12 @@ export function stroboscopeRig(options: StroboscopeRigOptions): StroboscopeRig {
 }
 
 /** A body of `mass` kg that meets nothing: a link whose only ties are its joints. */
-const point = (physics: Physics, position: [number, number, number], rotation: Quat = [0, 0, 0, 1], mass = 1): PhysicsBody =>
+const point = (
+  physics: Physics,
+  position: [number, number, number],
+  rotation: Quat = [0, 0, 0, 1],
+  mass = 1,
+): PhysicsBody =>
   physics.addBody(null, {
     type: 'dynamic',
     position,
@@ -921,7 +961,12 @@ class Gimbal extends Rig<GimbalRigPose> {
       mount = start.mount,
       outer = times(mount, turnAbout(Y, start.outer)),
       inner = times(outer, turnAbout(X, start.inner));
-    this.mount = physics.addBody(null, { type: 'kinematicPosition', position: [0, 0, 0], rotation: mount, colliders: [] });
+    this.mount = physics.addBody(null, {
+      type: 'kinematicPosition',
+      position: [0, 0, 0],
+      rotation: mount,
+      colliders: [],
+    });
     // Light rings on frictionless hinges about the mount's y and the outer ring's x, and a heavy rotor free about its own z.
     this.outer = point(physics, [0, 0, 0], outer, 1e-4);
     this.inner = point(physics, [0, 0, 0], inner, 1e-4);
@@ -1031,7 +1076,12 @@ class Differential extends Rig<DifferentialRigPose> {
     module.coupleDofs(physics, this.tree, left, right, { ratio: 1 });
     module.coupleDofs(physics, this.tree, spider, left, { ratio: -teeth.side / teeth.pinion });
     // The road under the left wheel: a roller the left side is geared to one for one, turned at (1 + split) times the carrier.
-    this.road = physics.addBody(null, { type: 'kinematicPosition', position: [0, 0, 1], rotation: zTurn(this.input), colliders: [] });
+    this.road = physics.addBody(null, {
+      type: 'kinematicPosition',
+      position: [0, 0, 1],
+      rotation: zTurn(this.input),
+      colliders: [],
+    });
     new module.GearJoint(physics, left, this.road, { ratio: -1 });
   }
   /** Sets how far the left wheel runs ahead per radian of the carrier from now on (a new steering angle). */
@@ -1133,7 +1183,8 @@ class Governor implements WattGovernorRig {
     options.signal?.throwIfAborted();
     this.rpm = this.speed(options.rpm ?? 0);
     this.rest = finite(options.rest ?? 0.05, 'Rest angle');
-    if (!(this.rest >= 0 && this.rest < Math.PI / 2)) throw new RangeError(`The stop is from 0 to pi/2; got ${this.rest}.`);
+    if (!(this.rest >= 0 && this.rest < Math.PI / 2))
+      throw new RangeError(`The stop is from 0 to pi/2; got ${this.rest}.`);
     const damping = finite(options.damping ?? 3.5, 'Damping');
     if (!(damping >= 0)) throw new RangeError(`Damping must be 0 or more; got ${damping}.`);
     const L = spec.arm,
@@ -1153,7 +1204,11 @@ class Governor implements WattGovernorRig {
       ball.setMassProperties({ mass: 1, inertia: [1e-5 * L * L, 1e-5 * L * L, 1e-5 * L * L] });
       ball.setLinearVelocity([0, omega * out, 0]);
       ball.setAngularVelocity([0, 0, omega]);
-      const hinge = physics.addJoint(this.spindle, ball, { type: 'revolute', axis: [0, -side, 0], anchorB: [-out, 0, -down] });
+      const hinge = physics.addJoint(this.spindle, ball, {
+        type: 'revolute',
+        axis: [0, -side, 0],
+        anchorB: [-out, 0, -down],
+      });
       hinge.setLimits(this.rest - start, Math.PI / 2 - start);
       if (damping > 0) hinge.setDamping(damping * L * L);
       return ball;
@@ -1287,7 +1342,11 @@ class RoseEngine extends Rig<RoseEngineRigPose> {
     // the groove by a point 0.2 m off its centre, the way a real follower pin sits off the axis of its slide.
     this.follower = point(this.physics, start);
     this.physics.addJoint(this.ground, this.follower, { type: 'prismatic', axis: [1, 0, 0], anchorA: start });
-    new module.PathJoint(this.physics, this.crank, this.follower, { points: groove, closed: true, anchor: [0, 0, -0.2] });
+    new module.PathJoint(this.physics, this.crank, this.follower, {
+      points: groove,
+      closed: true,
+      anchor: [0, 0, -0.2],
+    });
   }
   protected gap(): number {
     return Math.abs(this.follower.position[0] - (this.toolRadius + rosetteModulation(this.rosette, -this.input)));
@@ -1317,7 +1376,8 @@ export function roseEngineRig(rosette: Rosette, options: RoseEngineRigOptions = 
   roseEnginePose(0, rosette, toolRadius);
   if (!(toolRadius > Math.abs(rosette.amplitude) + Math.abs(rosette.overtone ?? 0)))
     throw new RangeError(`The tool radius must exceed the rosette swing; got ${toolRadius}.`);
-  if (!(Number.isInteger(points) && points >= 8)) throw new RangeError(`The groove needs 8 or more points; got ${points}.`);
+  if (!(Number.isInteger(points) && points >= 8))
+    throw new RangeError(`The groove needs 8 or more points; got ${points}.`);
   return new RoseEngine(rosette, toolRadius, points, options);
 }
 
@@ -1349,7 +1409,12 @@ class Reuleaux extends Rig<ReuleauxRigPose> {
       start = reuleauxPose(this.input, width).center;
     // The square is four fixed walls a width apart; the triangle is a convex hull free in the plane with its turn locked to the
     // input, so the contacts with the walls alone place its centre (it touches all four at every angle).
-    for (const [x, y] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const)
+    for (const [x, y] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const)
       physics.addBody(null, {
         type: 'fixed',
         position: [x * (half + thick), y * (half + thick), 0],
@@ -1373,8 +1438,16 @@ class Reuleaux extends Rig<ReuleauxRigPose> {
       p = this.triangle.position,
       center: [number, number] = [p[0], p[1]],
       move = [center[0] - exact.center[0], center[1] - exact.center[1]],
-      contacts = exact.contacts.map(([x, y]): [number, number] => [x + move[0]!, y + move[1]!]) as ReuleauxRigPose['contacts'];
-    return { angle: this.input, center, contacts, span: [contacts[0][0] - contacts[2][0], contacts[1][1] - contacts[3][1]] };
+      contacts = exact.contacts.map(([x, y]): [number, number] => [
+        x + move[0]!,
+        y + move[1]!,
+      ]) as ReuleauxRigPose['contacts'];
+    return {
+      angle: this.input,
+      center,
+      contacts,
+      span: [contacts[0][0] - contacts[2][0], contacts[1][1] - contacts[3][1]],
+    };
   }
 }
 
@@ -1386,7 +1459,8 @@ class Reuleaux extends Rig<ReuleauxRigPose> {
 export function reuleauxRig(width: number, options: ReuleauxRigOptions = {}): MechanismRig<ReuleauxRigPose> {
   if (!(width > 0 && Number.isFinite(width))) throw new RangeError(`Width must be above 0; got ${width}.`);
   const subdivisions = finite(options.subdivisions ?? 64, 'Subdivisions');
-  if (!(Number.isInteger(subdivisions) && subdivisions >= 4)) throw new RangeError(`An arc needs 4 or more subdivisions; got ${subdivisions}.`);
+  if (!(Number.isInteger(subdivisions) && subdivisions >= 4))
+    throw new RangeError(`An arc needs 4 or more subdivisions; got ${subdivisions}.`);
   return new Reuleaux(width, subdivisions, options);
 }
 

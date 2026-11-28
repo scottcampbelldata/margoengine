@@ -1889,7 +1889,10 @@ export class LightProbes extends ShaderEffect {
         const bytes = Math.max(16, (this.resolution >> 1) ** 2 * 16);
         let sums = resources.prefilterSums;
         if (!sums || sums.size < bytes) {
-          sums = resources.prefilterSums = resources.device.createBuffer({ size: bytes, usage: GPUBufferUsage.STORAGE });
+          sums = resources.prefilterSums = resources.device.createBuffer({
+            size: bytes,
+            usage: GPUBufferUsage.STORAGE,
+          });
           resources.owned.push(sums);
         }
         entries.push({ binding: 6, resource: { buffer: sums } });

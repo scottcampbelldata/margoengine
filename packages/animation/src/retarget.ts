@@ -287,7 +287,8 @@ export class Retarget {
     this.held = new Uint8Array(target.names.length);
     for (const name of hold) {
       const b = typeof name === 'string' ? target.names.indexOf(name) : -1;
-      if (b < 0) throw new RangeError(`Retarget holds ${String(name)}, which the target does not have; fix the hold list`);
+      if (b < 0)
+        throw new RangeError(`Retarget holds ${String(name)}, which the target does not have; fix the hold list`);
       if (this.map[b] < 0) this.held[b] = 1;
     }
     this.sourceNow = space(source);

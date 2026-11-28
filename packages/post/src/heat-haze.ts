@@ -396,7 +396,14 @@ function groundBend(excess: number, ambient: number, pressure: number, strength:
   return (2 * strength * (air - hot)) / (1 + air);
 }
 /** The ground's two shader vec4s: (height, depth, b, fluctuation) and (wind x, wind z, eddy size, clock); b 0 for none. */
-function writeGround(g: HeatGround | undefined, ambient: number, strength: number, clock: number, out: Float32Array, at: number): void {
+function writeGround(
+  g: HeatGround | undefined,
+  ambient: number,
+  strength: number,
+  clock: number,
+  out: Float32Array,
+  at: number,
+): void {
   out.fill(0, at, at + 8);
   if (g === undefined) return;
   if (!g || typeof g !== 'object') throw new TypeError('HeatHaze ground must be a HeatGround object or undefined');

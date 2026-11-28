@@ -30,10 +30,22 @@ await postBrowser(
       const ground = new PbrMaterial({ color: '#2a2a2a', roughness: 1 }),
         red = new PbrMaterial({ color: '#ff2010', roughness: 1 }),
         dark = new PbrMaterial({ color: '#101010', roughness: 1 });
-      engine.createMesh().setGeometry(box(600, 0.1, 3000)).setPosition([0, -0.05, -1500]).setMaterial(ground);
-      engine.createMesh().setGeometry(box(600, 6, 1)).setPosition([0, 3, -2500]).setMaterial(red);
+      engine
+        .createMesh()
+        .setGeometry(box(600, 0.1, 3000))
+        .setPosition([0, -0.05, -1500])
+        .setMaterial(ground);
+      engine
+        .createMesh()
+        .setGeometry(box(600, 6, 1))
+        .setPosition([0, 3, -2500])
+        .setMaterial(red);
       // A box in front of the hot layer's reach, low on the right.
-      engine.createMesh().setGeometry(box(0.3, 0.3, 0.3)).setPosition([0.35, 0.55, -20]).setMaterial(dark);
+      engine
+        .createMesh()
+        .setGeometry(box(0.3, 0.3, 0.3))
+        .setPosition([0.35, 0.55, -20])
+        .setMaterial(dark);
       const layer = { excess: 0, depth: 0.02, fluctuation: 0, time: 0 },
         haze = HeatHaze.attach(engine, { ground: layer });
       window.t = {
@@ -89,7 +101,10 @@ await postBrowser(
       later = await frame({ layer: { time: 0.7 } });
     const rowOf = (angle) => t((a) => window.t.project([0, 1 - Math.tan(a) * 1000, -1000])[1], angle);
     const horizon = await rowOf(0),
-      [boxA, boxB] = [await t(() => window.t.project([0.2, 0.7, -20])), await t(() => window.t.project([0.5, 0.4, -20]))],
+      [boxA, boxB] = [
+        await t(() => window.t.project([0.2, 0.7, -20])),
+        await t(() => window.t.project([0.5, 0.4, -20])),
+      ],
       onBox = (x, y) => x > boxA[0] + 1 && x < boxB[0] - 1 && y > boxA[1] + 1 && y < boxB[1] - 1,
       above = (_x, y) => y < horizon - 2;
     let redBelow = 0,
@@ -118,13 +133,26 @@ await postBrowser(
       rippleAbove: diff(moving, later, above),
     };
     console.log(JSON.stringify(result));
-    if (process.env.MIRAGE_DEBUG) for (let y = 110; y < 145; y++) console.log(y, px(off, 160, y).join(","), px(hot, 160, y).join(","));
+    if (process.env.MIRAGE_DEBUG)
+      for (let y = 110; y < 145; y++) console.log(y, px(off, 160, y).join(','), px(hot, 160, y).join(','));
     assert.equal(result.none, 0, 'no excess draws the frame of the effect off');
     assert.equal(result.zero, 0, 'strength 0 draws the frame of the effect off');
-    assert.ok(result.edgeOff <= Math.ceil(horizon) + 3, `without heat the ground meets the sky at its far edge, 1.2 px under the horizon: ${result.edgeOff}`);
-    assert.ok(Math.abs(result.edge5 - result.want5) <= 1.5, `5 K mirage edge ${result.edge5} px against ${result.want5}`);
-    assert.ok(Math.abs(result.edge20 - result.want20) <= 1.5, `20 K mirage edge ${result.edge20} px against ${result.want20}`);
-    assert.ok(result.edge20 - horizon > 15, `the 20 K band is ${result.edge20 - horizon} px tall through a 4 degree lens`);
+    assert.ok(
+      result.edgeOff <= Math.ceil(horizon) + 3,
+      `without heat the ground meets the sky at its far edge, 1.2 px under the horizon: ${result.edgeOff}`,
+    );
+    assert.ok(
+      Math.abs(result.edge5 - result.want5) <= 1.5,
+      `5 K mirage edge ${result.edge5} px against ${result.want5}`,
+    );
+    assert.ok(
+      Math.abs(result.edge20 - result.want20) <= 1.5,
+      `20 K mirage edge ${result.edge20} px against ${result.want20}`,
+    );
+    assert.ok(
+      result.edge20 - horizon > 15,
+      `the 20 K band is ${result.edge20 - horizon} px tall through a 4 degree lens`,
+    );
     assert.ok(result.redBelow > 200, `the far wall shows mirrored under the horizon: ${result.redBelow} pixels`);
     assert.equal(result.redBelowOff, 0, 'without heat nothing red lies under the horizon');
     assert.equal(result.aboveChanged, 0, 'nothing above the horizon moves');

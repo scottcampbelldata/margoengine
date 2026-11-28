@@ -27,9 +27,12 @@ for (const shared of variant ? [variant === 'shared'] : [false, true]) {
   const arena = new Uint8Array(memory.buffer).fill(0xa7);
   const { exports } = new WebAssembly.Instance(new WebAssembly.Module(bytes), { env: { memory } });
   if (
-    typeof exports.vegetation_step !== 'function' || exports.vegetation_step.length !== 11 ||
-    typeof exports.vegetation_apply !== 'function' || exports.vegetation_apply.length !== 1 ||
-    typeof exports.vegetation_thread_phase !== 'function' || exports.vegetation_thread_phase.length !== 4
+    typeof exports.vegetation_step !== 'function' ||
+    exports.vegetation_step.length !== 11 ||
+    typeof exports.vegetation_apply !== 'function' ||
+    exports.vegetation_apply.length !== 1 ||
+    typeof exports.vegetation_thread_phase !== 'function' ||
+    exports.vegetation_thread_phase.length !== 4
   )
     throw new Error('Vegetation Wasm has the wrong modal ABI. Rebuild the native vegetation assets.');
   if (!arena.every((word) => word === 0xa7))

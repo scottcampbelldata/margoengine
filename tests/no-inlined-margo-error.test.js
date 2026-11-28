@@ -160,7 +160,11 @@ test('the glTF data entries take the shared helpers from math, never core (KB-GL
     math = { id: DATA_HELPERS_ENTRY, external: true, moduleSideEffects: false },
     core = { id: HELPERS_ENTRY, external: true, moduleSideEffects: false };
   assert.equal(DATA_HELPERS_ENTRY, '@margoengine/math/helpers');
-  for (const file of ['packages/gltf/src/accessor.ts', 'packages/gltf/src/asset.ts', 'packages/gltf/src/draco-state.ts'])
+  for (const file of [
+    'packages/gltf/src/accessor.ts',
+    'packages/gltf/src/asset.ts',
+    'packages/gltf/src/draco-state.ts',
+  ])
     assert.deepEqual(gltf.resolveId('../../shared/errors.js', from(file)), math, file);
   for (const file of ['packages/shared/glb.js', 'packages/shared/loading.js'])
     assert.deepEqual(gltf.resolveId('./errors.js', from(file)), math, file);

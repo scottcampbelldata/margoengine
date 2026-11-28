@@ -34,7 +34,17 @@ test('coniferAge: every aged conifer key takes the age, the rest stays', () => {
 });
 
 test('coniferAge: keeps snags and unaged keys, and refuses an unknown age', () => {
-  const biome = { id: 'snags', plants: [{ id: 'a', mesh: 'procedural:conifer-snag', density: 10, radius: 2 }, { id: 'b', mesh: 'procedural:douglas-fir/snag', density: 10, radius: 2 }, { id: 'c', mesh: 'procedural:grand-fir', density: 10, radius: 2 }] };
-  assert.deepEqual(coniferAge([biome], 'old')[0].plants.map((p) => p.mesh), ['procedural:conifer-snag', 'procedural:douglas-fir/snag', 'procedural:grand-fir']);
+  const biome = {
+    id: 'snags',
+    plants: [
+      { id: 'a', mesh: 'procedural:conifer-snag', density: 10, radius: 2 },
+      { id: 'b', mesh: 'procedural:douglas-fir/snag', density: 10, radius: 2 },
+      { id: 'c', mesh: 'procedural:grand-fir', density: 10, radius: 2 },
+    ],
+  };
+  assert.deepEqual(
+    coniferAge([biome], 'old')[0].plants.map((p) => p.mesh),
+    ['procedural:conifer-snag', 'procedural:douglas-fir/snag', 'procedural:grand-fir'],
+  );
   assert.throws(() => coniferAge(rockiesValleyWorld.biomes, 'ancient'), RangeError);
 });

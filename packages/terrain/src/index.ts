@@ -1137,7 +1137,8 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
       texture?.destroy();
     for (const buffer of [this.vertex, this.center, this.ring, this.rules]) buffer?.destroy();
     for (const r of this.rings)
-      for (const buffer of [r.uniform, ...r.shadowUniforms, ...r.localUniforms, ...r.captureUniforms]) buffer?.destroy();
+      for (const buffer of [r.uniform, ...r.shadowUniforms, ...r.localUniforms, ...r.captureUniforms])
+        buffer?.destroy();
     this.textures = undefined;
     this.vertex = this.center = this.ring = this.rules = undefined;
     this.rings = [];

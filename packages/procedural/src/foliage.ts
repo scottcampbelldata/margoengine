@@ -1,4 +1,4 @@
-import { coneGeometry, cylinderGeometry, sphereGeometry, icosahedronGeometry } from '@margoengine/geometry/primitives';
+import { coneGeometry, cylinderGeometry, icosahedronGeometry } from '@margoengine/geometry/primitives';
 import { createRandom } from '@margoengine/math/mathutils';
 import {
   geometryData,
