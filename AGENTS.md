@@ -66,6 +66,11 @@ Scott's rule (2026-10-24): Margo never uses files from other repositories, whate
   "Comparing engines"). Margo's own benchmark scenes, harnesses and scripts are written clean room too.
 - The one exception is large standard files that every engine uses, such as standard sample models, test assets and
   prebuilt decoders. Record each one's source and licence in `THIRD-PARTY-NOTICES.md`.
+- Measured data sets are welcome (Scott, 2026-11-28: "Just use them and put in the third-party notice"): real
+  measurements of people, animals, materials, sky, wind, water and the like (anthropometry, joint ranges, optical
+  constants, spectra, gait data) may be downloaded and copied in under any licence that allows it, share-alike
+  included, each credited in `THIRD-PARTY-NOTICES.md` with source, licence and what was taken. This covers data, never
+  code: Margo never wraps or ships another library (Scott, 2026-11-28: "Just don't rap anything").
 
 ## Bugs: fix the cause, properly
 
