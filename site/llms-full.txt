@@ -4895,6 +4895,7 @@ notes one change's size or behaviour and its evidence. Every number has a row in
   packages/core/tests/zero-scale.browser.mjs (WebGPU and the WebGL2 layer), packages/gltf/test/audit-gltfa.test.js,
   tests/modern-zero-determinant-normals.test.js.
 - River water and the world's edge (KB-BIOMES-RIVERSTEP1, KB-BIOMES-WORLDEDGE1, 2026-11-17): still river water fills a carved channel to three quarters of its depth (at most 1.5 m; 1.5 m over open ground), found 6 m across and 24 m to each bank, never rising downstream and averaged over 9 half cells; it still sits on the 512-cell coupled grid (8 m cells on a 4 km world), so its own waterline is that coarse and the terrain's banks draw the edge. Past the fine clipmap rings the water passes the rings' error (`@margoengine/water/banks`, at most 2 m) and ends where the view's own 2 m heights rise through it, so a creek stays one line of water wherever the view's heightmap holds it; the `riverbed` ground material is still painted under the water (one `heightAt` per texel inside a river's corridor), and past the world's 16 m overview heights (the horizon ring) the creek is that paint only. `horizon` far ground reaches 3 world sizes past each edge (at most 48 km) at a 64th of the world per texel (64 m on 4 km), with no plants and no shadows. Sizes (quality gate bundle measure): `@margoengine/biomes/view` 11,774 to 13,431 B gzip (horizon on by default for land-locked views, so a lazy split would load it anyway and await before the first frame), `@margoengine/biomes/rivers` 2,264 to 2,817 B. Tests: packages/biomes/tests/view.test.js (RIVERSTEP1), tests/horizon.test.js.
+- Water captures (KB-WATER-CAPTURECAM1, 2026-11-28): a Water capture (SSR, SceneTargets) draws from the unjittered camera with frame values of its own; a capture that runs before the very first frame's surface draw holds no water.
 - Frame budgets and film frames (KB-FILM-CLOCK1, 2026-11-17): the live per-frame budgets in milliseconds (terrain `PlanetTerrain` `budget`, biomes `BiomeView` `budget`, gltf `loadGLTFProgressive` `frameBudget`) make a slower machine do less work a frame, so a frame drawn while work is still arriving differs between machines. Each has a work-count twin that replaces it (`maxBuilds`, `maxSteps`, `maxJobs`) and a `clock` option (also `SceneFade`'s third argument); a film uses the counts. The live defaults are unchanged.
 - Film frames on every run (GAP-FILM-READY, KB-FILM-GPUSHARE1, 2026-11-17, LIM-661): a 90-frame rain shot (Bruneton
   sky with clouds, AgX, shadows, Weather rain, 1280x720) read with headless `readPixels` is byte for byte the same in
@@ -16369,6 +16370,22 @@ until it is fixed. Entries are newest first. A heading starts with the state (Op
 an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the regression test that keeps it fixed.
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
+
+### Fixed 2026-11-28: a Water added to SceneTargets drew nothing, and its SSR capture drew with TAA's jittered camera (KB-WATER-CAPTURECAM1; water)
+
+- **Repro (before):** `SceneTargets.add(water, {ground: false})` (`@margoengine/post/mrt`): the targets hold no water
+  pixel once frames move time on (`delta` above 0), with or without TAA (0 px in
+  `packages/post/test/scene-targets-taa-browser.mjs`'s water case).
+- **Cause:** the capture drew only the view its colour pass had drawn this frame, and bound that pass's uniform.
+  `SceneTargets` runs at order -4.5, before the water's colour pass (order 4), so it found no view and drew nothing
+  (`packages/post/test/scene-targets-water-browser.mjs` draws with `delta: 0`, which skips the clear, so it passed);
+  a capture after the pass (SSR) drew from the colour pass's camera, TAA's jittered one.
+- **Fix:** the capture writes frame values of its own from the context's unjittered camera
+  (`packages/shared/temporal-camera.js`) at this frame's time, and before this frame's draw it uses the view drawn last
+  (`packages/water/src/index.ts`).
+- **Regression test:** `node packages/post/test/scene-targets-taa-browser.mjs` (and `--compat`, in post `test:gpu`):
+  the water covers 5,855 px of the targets, and TAA's jitter moves none of them.
+- **Weak spot left:** on the very first frame no surface has been drawn, so that frame's targets hold no water.
 
 ### Fixed 2026-11-28: shrubs drew as flat bright green blobs on the slopes (KB-SHRUB-BLOBS1; procedural, biomes)
 
