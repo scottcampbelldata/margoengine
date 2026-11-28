@@ -11316,6 +11316,11 @@ work at 4,096 microsteps per tick. Its particle adapter compacts active records 
 screen-space liquid passes. A timed flume regression checks the accepted motion and HDR replay
 on both WebGPU and WebGL2.
 
+Optional shared workers own disjoint slices of the active-node list and material slots.
+A barrier separates normalization, the ordered solvent solve, contact and material return.
+The ordered scatter and per-particle escape fold preserve the serial rounding path.
+Worker receipts and stack memory are outside the physical snapshot.
+
 ### Isothermal gas in the existing soft kernel (SOFT-06)
 
 The optional soft kernel adds an isothermal pressure constraint to its closed-surface pass. The rest of the soft step

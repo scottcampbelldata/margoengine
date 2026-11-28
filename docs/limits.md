@@ -10333,7 +10333,16 @@ sediment entrainment still need their own work. The screen-space surface reads a
 using their chosen render radius and float32 positions. Use a nearby render cell and the particle
 limit in the Water package.
 
-The optional viscoplastic entry is 5,925 B gzip with a 6,181 B ceiling. Both Wasm assets are 27,705 B raw and 9,924 B gzip. Core and Stage gain zero bytes.
+The shared path partitions native node normalization and contact and each 27-node
+grid-to-particle return. Particle-to-grid scatter and implicit solvent PCG remain
+serial in their original order. Per-row escape values are folded in particle order.
+The extra scratch is two f64 words per allocated point and a stack per helper.
+Node or a cross-origin-isolated browser worker can run the blocking solver. The
+renderer's optional destination uses a separate ArrayBuffer to protect the physics
+arena, even after shared memory grows. Counts describe work assignments. Wall-clock
+throughput is unmeasured.
+
+The optional viscoplastic entry is 8,570 B gzip with an 8,826 B ceiling. Both Wasm assets are 36,124 B raw and 13,261 B gzip. Core and Stage gain zero bytes.
 
 ### Skeletal tissue attachments (SOFT-05)
 
@@ -10632,7 +10641,7 @@ Receipts describe recent execution, while snapshots retain the physical state.
 
 Lava uses a regular depth-averaged heightfield patch with closed edges. It resolves laminar Bingham resistance, advected crystallisation enthalpy, diffusion, radiative and convective skin transfer and basal cooling. The optional terminal transport removes inertia for creeping flow, using Bingham discharge at each face and conservative enthalpy transport. It requires a thin, slowly varying sheet and has no imposed initial discharge. A point vent omits the real basalt experiment's chute momentum. Terrain, cooled crust and the pressure gradient drive channel confinement and arrest. The shallow-layer aspect-ratio approximation applies to patch-scale flow. Individual crust fractures, elastic lava tubes, three-dimensional overturning and a separate bubble phase need higher-dimensional models. The coastal source is the signed change in displaced volume under a fixed reference sea level. This estimate covers gravity-wave forcing from submerged occupancy. Rapid interface chemistry and water-side multiphase overturning are outside the model.
 
-The native microstep respects transport and thermal diffusion bounds. It refuses a tick above 4,096 explicit microsteps and publishes only finite, accepted volume and heat ledgers. With zero conductivity the well-mixed bulk is exposed, so radiation, convection and the water film act without a conductive skin or basal term. The default positive conductivity resolves a resistive skin. The ICE-05 contact is a 60 Hz staggered heat exchange. Match the terrain and render frames to the lava grid. Weather draws accepted skin emission and basalt coverage from the depth and crust with no guessed exposed crack area. Physics lava is 9,567 B gzip under 9,824 B. Weather lava is 15,291 B under 15,750 B. Both Wasm assets are 19,038 B raw and 8,497 B gzip. Core and Stage gain zero bytes.
+The native microstep respects transport and thermal diffusion bounds. It refuses a tick above 4,096 explicit microsteps and publishes only finite, accepted volume and heat ledgers. With zero conductivity the well-mixed bulk is exposed, so radiation, convection and the water film act without a conductive skin or basal term. The default positive conductivity resolves a resistive skin. The ICE-05 contact is a 60 Hz staggered heat exchange. Match the terrain and render frames to the lava grid. Weather draws accepted skin emission and basalt coverage from the depth and crust with no guessed exposed crack area. Physics lava is 9,594 B gzip under 9,824 B. Weather lava is 15,291 B under 15,750 B. Both Wasm assets are 19,038 B raw and 8,497 B gzip. Core and Stage gain zero bytes.
 
 The optional native worker path needs shared memory and a blocking host (Node or a
 cross-origin-isolated browser worker). On each microstep it partitions stability and local

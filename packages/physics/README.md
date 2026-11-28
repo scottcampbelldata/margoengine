@@ -8219,8 +8219,15 @@ Pass `mud.particleSource()` as `particles` to `ParticleLiquid.attach` from
 `@margoengine/water/liquid`. After advancing or restoring the world, call the effect's
 `update(mud.particleSource())` to draw that accepted tick. The source compacts active points as
 XYZ and velocity in interleaved f32 storage with six floats per point. Pass an optional reusable
-array and a renderer world cell as the first and second arguments. The default uses the solver's
+array with its own ArrayBuffer and a renderer world cell as the first and second arguments. The default uses the solver's
 current cell. Use a nearby renderer cell so float32 still resolves individual grid cells.
+
+Load with `threads: 2` to `threads: 64` to partition the native occupied-node and material-point
+updates. Pass `worldMemory(true)` to PhysicsWorld. Run shared workers in Node or a cross-origin-
+isolated browser worker. In a browser window, the default `threads: 1` serves the render loop
+directly. `workCounts()` reports the last successful tick's actual transfer and occupied-node
+rows. Native steps recompute the receipt on replay. Dispose the solver with `using` or
+`[Symbol.dispose]()` after removing it from the world.
 
 The explicit solver declines ticks that require more than 4,096 microsteps. Increase spacing or
 reduce stiffness or speed in that case. A rejected update leaves the accepted points and ledgers

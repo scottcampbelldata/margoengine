@@ -27,6 +27,7 @@ export interface ViscoplasticLoadOptions {
     readonly id?: string;
     readonly terrain?: BedShape;
     readonly inlet?: FieldDescriptor;
+    readonly threads?: number;
     readonly signal?: AbortSignal;
 }
 
@@ -80,6 +81,7 @@ export class ViscoplasticSolver implements Solver<ViscoplasticOptions> {
     readonly pointField: FieldDescriptor;
     private constructor();
     static load(options?: ViscoplasticLoadOptions): Promise<ViscoplasticSolver>;
+    [Symbol.dispose](): void;
     describe(): {
         id: string;
         fields: readonly FieldUse[];
@@ -88,6 +90,7 @@ export class ViscoplasticSolver implements Solver<ViscoplasticOptions> {
     };
     init(host: SolverHost, options: ViscoplasticOptions): void;
     step(context: StepContext, dt: number): void;
+    workCounts(): ViscoplasticWorkCounts;
     importPorts(_tick: number): void;
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
@@ -96,6 +99,18 @@ export class ViscoplasticSolver implements Solver<ViscoplasticOptions> {
     particleSource(out?: Float32Array, renderCell?: Cell): ViscoplasticParticleSource;
     sample(index: number): ViscoplasticSample;
     get budget(): ViscoplasticBudget;
+}
+
+export interface ViscoplasticWorkCounts extends ViscoplasticWorkerWork {
+    readonly threads: number;
+    readonly substeps: number;
+    readonly particleToGridPoints: number;
+    readonly workers: readonly ViscoplasticWorkerWork[];
+}
+
+export interface ViscoplasticWorkerWork {
+    readonly gridToParticlePoints: number;
+    readonly occupiedNodeRows: number;
 }
 
 // Not exported from this entry, but used by the exports above:

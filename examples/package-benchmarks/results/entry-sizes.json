@@ -15442,8 +15442,8 @@
         "gzip": 5010
       },
       "./lightning": {
-        "raw": 24186,
-        "gzip": 8823
+        "raw": 24210,
+        "gzip": 8839
       },
       "./explosive": {
         "raw": 41750,
@@ -15598,12 +15598,12 @@
         "gzip": 15190
       },
       "./viscoplastic": {
-        "raw": 14726,
-        "gzip": 5925
+        "raw": 22683,
+        "gzip": 8570
       },
       "./tsunami": {
-        "raw": 23277,
-        "gzip": 8899
+        "raw": 23301,
+        "gzip": 8915
       },
       "./pack-ice": {
         "raw": 11423,
@@ -15658,8 +15658,8 @@
         "gzip": 5574
       },
       "./lava": {
-        "raw": 25165,
-        "gzip": 9567
+        "raw": 25194,
+        "gzip": 9594
       },
       "./dfsph": {
         "raw": 19974,
@@ -19147,14 +19147,14 @@
       "brotli": 7824
     },
     "packages/physics/dist/viscoplastic-kernel.wasm": {
-      "raw": 27705,
-      "gzip": 9924,
-      "brotli": 8593
+      "raw": 36124,
+      "gzip": 13261,
+      "brotli": 11319
     },
     "packages/physics/dist/viscoplastic-kernel-shared.wasm": {
-      "raw": 27705,
-      "gzip": 9924,
-      "brotli": 8570
+      "raw": 36124,
+      "gzip": 13261,
+      "brotli": 11257
     },
     "packages/physics/dist/tsunami-kernel.wasm": {
       "raw": 23068,
@@ -19288,8 +19288,8 @@
     },
     "packages/physics/dist/solver-phase-thread.js": {
       "raw": 1592,
-      "gzip": 767,
-      "brotli": 675
+      "gzip": 765,
+      "brotli": 674
     },
     "packages/physics/dist/cloth-kernel.wasm": {
       "raw": 11606,

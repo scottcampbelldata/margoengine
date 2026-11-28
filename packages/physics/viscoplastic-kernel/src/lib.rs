@@ -273,6 +273,18 @@ struct GridSize {
 }
 
 impl Domain {
+    fn from_model(shape: GridSize, material: &Material) -> Self {
+        let min = material.origin;
+        let spacing = material.spacing;
+        let size = Vector::new(f64::from(shape.x), f64::from(shape.y), f64::from(shape.z));
+        Self {
+            shape,
+            spacing,
+            min,
+            max: min.add(size.scale(spacing)),
+        }
+    }
+
     fn index(self, x: u32, y: u32, z: u32) -> usize {
         x as usize
             + (self.shape.x as usize + 3) * (y as usize + (self.shape.y as usize + 3) * z as usize)
@@ -610,10 +622,22 @@ struct Flow {
     escaped_reference: f64,
 }
 
+struct Transfer {
+    occupied: usize,
+    points: usize,
+}
+
+#[derive(Clone, Copy)]
+struct Motion {
+    wave_speed: f64,
+    gravity_speed: f64,
+}
+
 impl Flow {
-    unsafe fn p2g(&self, dt: f64, material: &Material) -> Option<usize> {
+    unsafe fn p2g(&self, dt: f64, material: &Material) -> Option<Transfer> {
         let domain = self.domain;
         let mut occupied = 0;
+        let mut points = 0;
         for i in 0..self.count {
             let p = &*self.points.add(i);
             if p.reference == 0.0 {
@@ -652,12 +676,13 @@ impl Flow {
             if !in_grid {
                 return None;
             }
+            points += 1;
         }
-        Some(occupied)
+        Some(Transfer { occupied, points })
     }
 
-    unsafe fn normalize(&self, occupied: usize, gravity: Vector) -> bool {
-        for i in 0..occupied {
+    unsafe fn normalize(&self, active: core::ops::Range<usize>, gravity: Vector) -> bool {
+        for i in active {
             let node = &mut *self.nodes.add(*self.active.add(i) as usize);
             if !(node.mass.is_finite() && node.mass > 0.0) {
                 return false;
@@ -818,13 +843,13 @@ impl Flow {
         false
     }
 
-    unsafe fn contacts(&self, occupied: usize, material: &Material) {
+    unsafe fn contacts(&self, active: core::ops::Range<usize>, material: &Material) {
         let domain = self.domain;
         let nx = domain.shape.x as usize + 3;
         let ny = domain.shape.y as usize + 3;
         let horizontal = nx * ny;
         let mask = material.walls as u32;
-        for i in 0..occupied {
+        for i in active {
             let key = *self.active.add(i) as usize;
             let z = key.checked_div(horizontal).unwrap_or_else(|| unreachable());
             let rest = key - z * horizontal;
@@ -844,15 +869,23 @@ impl Flow {
         }
     }
 
-    unsafe fn material_step(&mut self, material: &Material, dt: f64) -> bool {
+    unsafe fn material_step(
+        &self,
+        material: &Material,
+        dt: f64,
+        indices: core::ops::Range<usize>,
+        mut escape: impl FnMut(usize, [f64; 2]),
+    ) -> Option<usize> {
         let domain = self.domain;
         let dx2 = domain.spacing * domain.spacing;
         let mask = material.walls as u32;
-        for i in 0..self.count {
+        let mut advanced = 0;
+        for i in indices {
             let p = &mut *self.points.add(i);
             if p.reference == 0.0 {
                 continue;
             }
+            advanced += 1;
             let mut velocity = Vector::ZERO;
             let mut moments = Matrix::ZERO;
             let mut gradient = Matrix::ZERO;
@@ -872,7 +905,7 @@ impl Flow {
                 && affine.finite()
                 && constitutive(p, gradient, material, dt))
             {
-                return false;
+                return None;
             }
 
             let exit = (mask & 1 == 0 && position.x < domain.min.x)
@@ -882,8 +915,7 @@ impl Flow {
                 || (mask & 16 == 0 && position.z < domain.min.z)
                 || (mask & 32 == 0 && position.z > domain.max.z);
             if exit {
-                self.escaped += p.ratio * p.reference;
-                self.escaped_reference += p.reference;
+                escape(i, [p.ratio * p.reference, p.reference]);
                 p.reference = 0.0;
                 p.position = position;
                 p.velocity = velocity;
@@ -902,7 +934,7 @@ impl Flow {
                 let h = b.h
                     - ((position.x - sample.x) * b.n.x + (position.z - sample.z) * b.n.z) / b.n.y;
                 if !(b.n.y > 0.0 && h.is_finite()) {
-                    return false;
+                    return None;
                 }
                 if position.y <= h {
                     position.y = h.min(domain.max.y);
@@ -910,16 +942,16 @@ impl Flow {
                 }
             }
             if !velocity.finite() {
-                return false;
+                return None;
             }
             p.position = position;
             p.velocity = velocity;
             p.affine = affine;
         }
-        true
+        Some(advanced)
     }
 
-    unsafe fn step(&mut self, records: *mut f64, budget: *mut f64, dt: f64) -> u32 {
+    unsafe fn begin(&self, dt: f64) -> Option<Motion> {
         let model = &*self.model;
         let n = self.domain;
         let spacing_square = n.spacing * n.spacing;
@@ -948,78 +980,131 @@ impl Flow {
             && (1.0 / model.exponent).is_finite()
             && model.gravity.finite())
         {
-            return 1;
+            return None;
         }
-        let Some(count) = (n.shape.x as usize)
+        let count = (n.shape.x as usize)
             .checked_add(3)
             .and_then(|x| x.checked_mul((n.shape.y as usize).checked_add(3)?))
-            .and_then(|xy| xy.checked_mul((n.shape.z as usize).checked_add(3)?))
-        else {
-            return 1;
-        };
+            .and_then(|xy| xy.checked_mul((n.shape.z as usize).checked_add(3)?))?;
         self.nodes.write_bytes(0, count);
         let wave_speed = model.wave_speed();
         let gravity_speed = model.gravity.length();
         if !(wave_speed.is_finite() && gravity_speed.is_finite()) {
-            return 1;
+            return None;
         }
+        Some(Motion {
+            wave_speed,
+            gravity_speed,
+        })
+    }
+
+    // Zero step means the tick is complete. Keep the earlier occupied count
+    // when the last live material left before the interval was exhausted.
+    unsafe fn plan(&self, motion: Motion, remaining: f64, substeps: u32) -> Result<f64, u32> {
+        if remaining == 0.0 {
+            return Ok(0.0);
+        }
+        let mut speed: f64 = 0.0;
+        let mut live = false;
+        for i in 0..self.count {
+            let p = &*self.points.add(i);
+            if p.reference > 0.0 {
+                live = true;
+                let velocity = p.velocity.length();
+                if !velocity.is_finite() {
+                    return Err(1);
+                }
+                speed = speed.max(velocity);
+            }
+        }
+        if !live {
+            return Ok(0.0);
+        }
+        if substeps == MAX_SUBSTEPS {
+            return Err(4);
+        }
+        let safe_step = cfl_step(
+            self.domain.spacing,
+            motion.wave_speed,
+            speed,
+            motion.gravity_speed,
+            remaining,
+        );
+        let step = remaining.min(safe_step);
+        if !(safe_step > 0.0 && step.is_finite() && remaining - step < remaining) {
+            return Err(1);
+        }
+        Ok(step)
+    }
+
+    unsafe fn clear_active(&self, occupied: usize) {
+        for i in 0..occupied {
+            self.nodes.add(*self.active.add(i) as usize).write(Node {
+                mass: 0.0,
+                velocity: Vector::ZERO,
+            });
+        }
+    }
+
+    unsafe fn step(
+        &mut self,
+        records: *mut f64,
+        budget: *mut f64,
+        dt: f64,
+        counts: *mut f64,
+    ) -> u32 {
+        let model = &*self.model;
+        let Some(motion) = self.begin(dt) else {
+            return 1;
+        };
         let mut remaining = dt;
         let mut substeps = 0;
         let mut occupied = 0;
-        while remaining > 0.0 {
-            let mut speed: f64 = 0.0;
-            let mut live = false;
-            for i in 0..self.count {
-                let p = &*self.points.add(i);
-                if p.reference > 0.0 {
-                    live = true;
-                    let velocity = p.velocity.length();
-                    if !velocity.is_finite() {
-                        return 1;
-                    }
-                    speed = speed.max(velocity);
-                }
-            }
-            if !live {
-                break;
-            }
-            if substeps == MAX_SUBSTEPS {
-                return 4;
-            }
-            let safe_step = cfl_step(n.spacing, wave_speed, speed, gravity_speed, remaining);
-            if !(safe_step > 0.0) {
-                return 1;
-            }
-            let step = remaining.min(safe_step);
-            let next = remaining - step;
-            if !(step.is_finite() && next < remaining) {
-                return 1;
-            }
-            remaining = next;
-            let Some(count) = self.p2g(step, model) else {
+        let mut work = [0.0; 3];
+        loop {
+            let step = match self.plan(motion, remaining, substeps) {
+                Ok(step) if step > 0.0 => step,
+                Ok(_) => break,
+                Err(status) => return status,
+            };
+            remaining -= step;
+            let Some(transfer) = self.p2g(step, model) else {
                 return 1;
             };
-            occupied = count;
-            if !self.normalize(occupied, model.gravity.scale(step)) {
+            occupied = transfer.occupied;
+            if !self.normalize(0..occupied, model.gravity.scale(step)) {
                 return 1;
             }
             if !self.implicit_viscosity(occupied, model, step) {
                 return 3;
             }
-            self.contacts(occupied, model);
-            if !self.material_step(model, step) {
+            self.contacts(0..occupied, model);
+            let mut escaped = self.escaped;
+            let mut escaped_reference = self.escaped_reference;
+            let Some(advanced) =
+                self.material_step(model, step, 0..self.count, |_, [volume, reference]| {
+                    escaped += volume;
+                    escaped_reference += reference;
+                })
+            else {
                 return 2;
+            };
+            self.escaped = escaped;
+            self.escaped_reference = escaped_reference;
+            if !counts.is_null() {
+                work[0] += transfer.points as f64;
+                work[1] += advanced as f64;
+                work[2] += occupied as f64;
             }
             substeps += 1;
-            for i in 0..occupied {
-                self.nodes.add(*self.active.add(i) as usize).write(Node {
-                    mass: 0.0,
-                    velocity: Vector::ZERO,
-                });
-            }
+            self.clear_active(occupied);
         }
 
-        self.publish(records, budget, substeps, occupied)
+        let status = self.publish(records, budget, substeps, occupied);
+        if status == 0 && !counts.is_null() {
+            counts.copy_from_nonoverlapping(work.as_ptr(), work.len());
+        }
+        status
     }
 
     unsafe fn publish(
@@ -1109,23 +1194,17 @@ unsafe extern "C" fn viscoplastic_step(
     records: *mut f64,
     budget: *mut f64,
     dt: f64,
+    counts: *mut f64,
 ) -> u32 {
-    let min = (*model).origin;
-    let spacing = (*model).spacing;
-    let shape = GridSize {
-        x: nx,
-        y: ny,
-        z: nz,
-    };
-    let max = min.add(Vector::new(f64::from(nx), f64::from(ny), f64::from(nz)).scale(spacing));
-    let domain = Domain {
-        shape,
-        spacing,
-        min,
-        max,
-    };
     Flow {
-        domain,
+        domain: Domain::from_model(
+            GridSize {
+                x: nx,
+                y: ny,
+                z: nz,
+            },
+            &*model,
+        ),
         model,
         points,
         count: count as usize,
@@ -1136,5 +1215,207 @@ unsafe extern "C" fn viscoplastic_step(
         escaped: 0.0,
         escaped_reference: 0.0,
     }
-    .step(records, budget, dt)
+    .step(records, budget, dt, counts)
+}
+
+// This descriptor is written only by the host outside native worker phases.
+#[repr(C)]
+struct ThreadJob {
+    points: u32,
+    count: u32,
+    nx: u32,
+    ny: u32,
+    nz: u32,
+    nodes: u32,
+    active: u32,
+    diffusion: u32,
+    bed: u32,
+    model: u32,
+    records: u32,
+    budget: u32,
+    escapes: u32,
+    part_counts: u32,
+    occupied: u32,
+    substeps: u32,
+    remaining: f64,
+    step: f64,
+    escaped: f64,
+    escaped_reference: f64,
+    wave_speed: f64,
+    gravity_speed: f64,
+}
+
+const _: () = assert!(core::mem::size_of::<ThreadJob>() == 112);
+
+impl ThreadJob {
+    unsafe fn flow(&self) -> Flow {
+        let model = self.model as *const Material;
+        let shape = GridSize {
+            x: self.nx,
+            y: self.ny,
+            z: self.nz,
+        };
+        Flow {
+            domain: Domain::from_model(shape, &*model),
+            model,
+            points: self.points as *mut Grain,
+            count: self.count as usize,
+            nodes: self.nodes as *mut Node,
+            active: self.active as *mut u32,
+            diffusion: self.diffusion as *mut Viscous,
+            bed: self.bed as *const BedNode,
+            escaped: self.escaped,
+            escaped_reference: self.escaped_reference,
+        }
+    }
+
+    fn active(&self) -> bool {
+        self.step > 0.0 && self.step <= self.remaining
+    }
+}
+
+fn partition(len: usize, part: u32, parts: u32) -> core::ops::Range<usize> {
+    let count = len as u64;
+    let index = u64::from(part);
+    let total = u64::from(parts);
+    (index * count / total) as usize..((index + 1) * count / total) as usize
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn viscoplastic_thread_begin(job: *mut ThreadJob, dt: f64) -> u32 {
+    let Some(job) = job.as_mut() else { return 1 };
+    job.occupied = 0;
+    job.substeps = 0;
+    job.remaining = dt;
+    job.step = 0.0;
+    job.escaped = 0.0;
+    job.escaped_reference = 0.0;
+    let Some(motion) = job.flow().begin(dt) else {
+        return 1;
+    };
+    job.wave_speed = motion.wave_speed;
+    job.gravity_speed = motion.gravity_speed;
+    0
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn viscoplastic_thread_plan(job: *mut ThreadJob) -> u32 {
+    let Some(job) = job.as_mut() else { return 1 };
+    if job.step != 0.0 {
+        return 1;
+    }
+    let flow = job.flow();
+    let model = &*flow.model;
+    let motion = Motion {
+        wave_speed: job.wave_speed,
+        gravity_speed: job.gravity_speed,
+    };
+    let step = match flow.plan(motion, job.remaining, job.substeps) {
+        Ok(0.0) => {
+            job.remaining = 0.0;
+            return 0;
+        }
+        Ok(step) => step,
+        Err(status) => return status,
+    };
+    // Scatter in particle order to preserve each node's momentum additions and
+    // the first-touch active-node order used in the solvent dot products.
+    let Some(transfer) = flow.p2g(step, model) else {
+        return 1;
+    };
+    job.occupied = transfer.occupied as u32;
+    job.step = step;
+    0
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn viscoplastic_thread_phase(
+    job: *const ThreadJob,
+    stage: u32,
+    part: u32,
+    parts: u32,
+) -> u32 {
+    let Some(job) = job.as_ref() else { return 1 };
+    if !job.active() || part >= parts {
+        return 1;
+    }
+    let flow = job.flow();
+    let model = &*flow.model;
+    let counts = (job.part_counts as *mut u32).add(2 * part as usize);
+    match stage {
+        0 => {
+            let active = partition(job.occupied as usize, part, parts);
+            counts.write((active.end - active.start) as u32);
+            if !flow.normalize(active.clone(), model.gravity.scale(job.step)) {
+                return 1;
+            }
+            if flow.diffusion.is_null() {
+                flow.contacts(active, model);
+            }
+        }
+        1 => flow.contacts(partition(job.occupied as usize, part, parts), model),
+        2 => {
+            let grains = partition(flow.count, part, parts);
+            let escapes = job.escapes as *mut [f64; 2];
+            escapes
+                .add(grains.start)
+                .write_bytes(0, grains.end - grains.start);
+            let advanced = flow.material_step(model, job.step, grains, |i, pair| {
+                escapes.add(i).write(pair)
+            });
+            let Some(advanced) = advanced else { return 2 };
+            counts.add(1).write(advanced as u32);
+        }
+        _ => return 1,
+    }
+    0
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn viscoplastic_thread_diffuse(job: *const ThreadJob) -> u32 {
+    let Some(job) = job.as_ref() else { return 1 };
+    if !job.active() {
+        return 1;
+    }
+    let flow = job.flow();
+    if flow.implicit_viscosity(job.occupied as usize, &*flow.model, job.step) {
+        0
+    } else {
+        3
+    }
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn viscoplastic_thread_accept(job: *mut ThreadJob) -> u32 {
+    let Some(job) = job.as_mut() else { return 1 };
+    if !job.active() {
+        return 1;
+    }
+    let escapes = job.escapes as *const [f64; 2];
+    for i in 0..job.count as usize {
+        let [volume, reference] = escapes.add(i).read();
+        if reference != 0.0 {
+            job.escaped += volume;
+            job.escaped_reference += reference;
+        }
+    }
+    job.flow().clear_active(job.occupied as usize);
+    job.remaining -= job.step;
+    job.step = 0.0;
+    job.substeps += 1;
+    0
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn viscoplastic_thread_finish(job: *const ThreadJob) -> u32 {
+    let Some(job) = job.as_ref() else { return 1 };
+    if job.remaining != 0.0 || job.step != 0.0 {
+        return 1;
+    }
+    job.flow().publish(
+        job.records as *mut f64,
+        job.budget as *mut f64,
+        job.substeps,
+        job.occupied as usize,
+    )
 }

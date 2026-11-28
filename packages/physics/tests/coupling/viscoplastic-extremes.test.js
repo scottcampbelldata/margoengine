@@ -89,9 +89,14 @@ class LargeOutletFeed {
   }
 }
 
-test('an overflowing cumulative inlet ledger is refused before accepting a new candidate', async () => {
-  for (const shared of [false, true]) {
-    const solver = await ViscoplasticSolver.load({ inlet: field });
+test('an overflowing cumulative inlet ledger is refused before accepting a new candidate', async (t) => {
+  for (const [shared, threads] of [
+    [false, 1],
+    [true, 1],
+    [true, 4],
+  ]) {
+    const solver = await ViscoplasticSolver.load({ inlet: field, threads });
+    t.after(() => solver[Symbol.dispose]());
     const world = new PhysicsWorld({ rate, gravity: [0, 0, 0], memory: worldMemory(shared) })
       .add(new LargeOutletFeed(), {})
       .add(solver, {
@@ -110,12 +115,14 @@ test('an overflowing cumulative inlet ledger is refused before accepting a new c
     assert.ok(solver.budget.injectedReferenceVolume > 1.77e308);
     assert.equal(solver.budget.injectedReferenceVolume, solver.budget.escapedReferenceVolume);
     const before = stateBytes(world, solver);
+    const work = solver.workCounts();
     const acceptedTick = world.tick;
     const saved = world.takeSnapshot();
     for (let pass = 0; pass < 2; pass++) {
       assert.throws(() => world.advance(83), error(/cumulative injected reference volume/));
       assert.equal(world.tick, acceptedTick);
       assert.deepEqual(stateBytes(world, solver), before);
+      assert.deepEqual(solver.workCounts(), work);
       world.restoreSnapshot(saved.bytes);
     }
   }
@@ -140,4 +147,17 @@ test('particle source packs accepted active slots in the current or supplied ren
   world.shiftOrigin(cell);
   assert.deepEqual(solver.exportPorts(0)[0].cell, [0, 0, 0]);
   assert.deepEqual(Array.from(solver.particleSource(out).positions), [...point.position, ...velocity]);
+});
+
+test('a stale shared renderer destination cannot overwrite accepted viscoplastic records', async () => {
+  const solver = await ViscoplasticSolver.load();
+  const world = new PhysicsWorld({ rate, memory: worldMemory(true) }).add(solver, box);
+  const { region } = solver.exportPorts(0)[0];
+  const oldView = new Float32Array(world.memory.buffer, region.byteOffset, 6);
+  world.memory.grow(1);
+  assert.notEqual(oldView.buffer, world.memory.buffer);
+  const before = stateBytes(world, solver);
+  assert.throws(() => solver.particleSource(oldView), error(/standalone ArrayBuffer/));
+  assert.deepEqual(stateBytes(world, solver), before);
+  assert.deepEqual(Array.from(solver.particleSource().positions), [...point.position, 0, 0, 0]);
 });

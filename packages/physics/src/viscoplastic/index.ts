@@ -1,7 +1,8 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { BedSample } from '@margoengine/math/fields';
 import { BED_FIELD, BED_LAYOUT, type BedShape, bedSurface, bedVertexCount } from '../earth/bed.js';
-import { DYNAMIC_BASE, MAX_MEMORY_PAGES, regionWords, STACK_BYTES } from '../world/memory.js';
+import type { NativePhasePool } from '../native-phase-pool.js';
+import { DYNAMIC_BASE, isShared, MAX_MEMORY_PAGES, regionWords, STACK_BYTES } from '../world/memory.js';
 import type {
   Cell,
   FieldDescriptor,
@@ -28,6 +29,9 @@ export const VISCOPLASTIC_INLET_WORDS = 7;
 const NATIVE_WORDS = 27;
 const ORIGIN: Cell = [0, 0, 0];
 const PARTICLE_STRIDE = 6;
+const MAX_THREADS = 64;
+const JOB_HEADER_WORDS = 16;
+const JOB_BYTES = JOB_HEADER_WORDS * Uint32Array.BYTES_PER_ELEMENT + 6 * Float64Array.BYTES_PER_ELEMENT;
 
 type Vector = readonly [number, number, number];
 type Matrix = readonly [Vector, Vector, Vector];
@@ -69,6 +73,8 @@ export interface ViscoplasticLoadOptions {
   readonly terrain?: BedShape;
   /** Inlet descriptor for layout-1 f64 flow-rate rows. */
   readonly inlet?: FieldDescriptor;
+  /** Native threads including the caller. Defaults to one. More threads require a shared-memory world. */
+  readonly threads?: number;
   readonly signal?: AbortSignal;
 }
 
@@ -124,6 +130,25 @@ export interface ViscoplasticBudget {
   readonly occupiedNodes: number;
 }
 
+/** Native node and material rows handled by this worker over the last successful runtime tick. */
+export interface ViscoplasticWorkerWork {
+  readonly gridToParticlePoints: number;
+  readonly occupiedNodeRows: number;
+}
+
+/** Deterministic work counts for the native transfers and occupied-node updates. */
+export interface ViscoplasticWorkCounts extends ViscoplasticWorkerWork {
+  readonly threads: number;
+  readonly substeps: number;
+  readonly particleToGridPoints: number;
+  readonly workers: readonly ViscoplasticWorkerWork[];
+}
+
+interface ThreadScratch {
+  readonly job: Region;
+  readonly counts: Region;
+}
+
 interface State {
   readonly host: SolverHost;
   readonly kernel: ViscoplasticKernel;
@@ -145,6 +170,12 @@ interface State {
   readonly stats: Region;
   readonly counters: Region;
   readonly regions: readonly Region[];
+  readonly threadScratch?: ThreadScratch;
+  readonly serialCounts?: Region;
+  readonly pendingWorkerRows: Float64Array;
+  readonly acceptedWorkerRows: Float64Array;
+  workSubsteps: number;
+  workParticleToGrid: number;
   particles?: Float32Array;
 }
 
@@ -226,6 +257,8 @@ export class ViscoplasticSolver implements Solver<ViscoplasticOptions> {
   private readonly fields: readonly FieldUse[];
   private readonly bedShape?: BedShape;
   private state?: State;
+  private threads?: NativePhasePool;
+  private disposed = false;
 
   private constructor(
     private readonly builds: ViscoplasticBuilds,
@@ -259,16 +292,32 @@ export class ViscoplasticSolver implements Solver<ViscoplasticOptions> {
     ];
   }
 
-  /** Load only the optional native kernels. */
+  /** Load the optional native kernels and any requested shared workers. */
   static async load(options: ViscoplasticLoadOptions = {}): Promise<ViscoplasticSolver> {
     if (options === null || typeof options !== 'object')
       throw new MargoError('state', 'Invalid viscoplastic load options. Pass an options object or omit it.');
-    return new ViscoplasticSolver(
-      await loadViscoplasticBuilds(options.signal),
-      options.id ?? 'viscoplastic',
-      options.inlet,
-      options.terrain,
-    );
+    const threads = options.threads === undefined ? 1 : options.threads;
+    if (!Number.isSafeInteger(threads) || threads < 1 || threads > MAX_THREADS)
+      throw new MargoError('state', `Choose a whole number of viscoplastic threads from 1 to ${MAX_THREADS}.`);
+    const builds = await loadViscoplasticBuilds(options.signal);
+    const solver = new ViscoplasticSolver(builds, options.id ?? 'viscoplastic', options.inlet, options.terrain);
+    if (threads > 1) {
+      if (!builds.shared)
+        throw new MargoError('unsupported', 'Use a shared-memory runtime for viscoplastic threads or use threads: 1.');
+      const { createNativePhasePool } = await import('../native-phase-pool.js');
+      solver.threads = await createNativePhasePool(threads, {
+        subject: 'Viscoplastic',
+        phaseExport: 'viscoplastic_thread_phase',
+        signal: options.signal,
+      });
+    }
+    return solver;
+  }
+
+  /** Close the optional worker set. Remove the solver from the world before disposal. */
+  [Symbol.dispose](): void {
+    this.disposed = true;
+    this.threads?.close();
   }
 
   describe() {
@@ -276,8 +325,12 @@ export class ViscoplasticSolver implements Solver<ViscoplasticOptions> {
   }
 
   init(host: SolverHost, options: ViscoplasticOptions): void {
+    this.assertActive();
     if (this.state)
       throw new MargoError('state', 'ViscoplasticSolver already belongs to a world. Load another solver.');
+    const threads = this.threads;
+    if (threads && !isShared(host.memory))
+      throw new MargoError('unsupported', 'Use worldMemory(true) for viscoplastic threads or load with threads: 1.');
     if (options?.cells?.length !== 3)
       throw new MargoError('state', 'Invalid viscoplastic grid. Use three positive whole cell counts.');
     const cells: Vector = [
@@ -334,11 +387,22 @@ export class ViscoplasticSolver implements Solver<ViscoplasticOptions> {
     ];
     const nodeCount = integer('grid node count', (cells[0] + 3) * (cells[1] + 3) * (cells[2] + 3));
     const terrainWords = this.bedShape ? 4 * (cells[0] + 3) * (cells[2] + 3) : 0;
-    const wordsPerPoint = 2 * (NATIVE_WORDS + VISCOPLASTIC_WORDS);
+    // Include both accepted and candidate buffers plus the world's two port mirrors.
+    const wordsPerPoint = 2 * NATIVE_WORDS + 4 * VISCOPLASTIC_WORDS;
     const nodeBytes = 4 + 8 * (solvent > 0 ? 14 : 4);
-    const requiredBytes = 8 * (wordsPerPoint * count + terrainWords + material.length + 16) + nodeBytes * nodeCount;
+    const workerBytes = threads
+      ? 16 * count +
+        4 * (threads.controlWords + 2 * threads.count) +
+        JOB_BYTES +
+        (threads.count - 1) * (STACK_BYTES + 16)
+      : 24;
+    const requiredBytes =
+      8 * (wordsPerPoint * count + terrainWords + material.length + 16) + nodeBytes * nodeCount + workerBytes;
     if (requiredBytes + DYNAMIC_BASE + STACK_BYTES >= MAX_MEMORY_PAGES * 65536)
-      throw new MargoError('state', 'Viscoplastic grid exceeds wasm32 arena capacity. Use fewer cells or points.');
+      throw new MargoError(
+        'state',
+        'Viscoplastic grid exceeds wasm32 arena capacity. Use fewer cells or points, or reduce threads.',
+      );
     const floats = (name: string, values: number) =>
       host.allocate(name, integer('region bytes', values * 8), 'f64', VISCOPLASTIC_LAYOUT);
     const points = floats('material', count * NATIVE_WORDS);
@@ -357,6 +421,14 @@ export class ViscoplasticSolver implements Solver<ViscoplasticOptions> {
     const terrain = terrainWords ? floats('bed-samples', terrainWords) : undefined;
     const stats = floats('working-budget', 7);
     const counters = floats('volume-budget', 9);
+    const threadScratch = threads
+      ? {
+          job: host.allocate('viscoplastic-thread-job', JOB_BYTES, 'u32', VISCOPLASTIC_LAYOUT),
+          counts: host.allocate('viscoplastic-thread-counts', 8 * threads.count, 'u32', VISCOPLASTIC_LAYOUT),
+        }
+      : undefined;
+    const serialCounts = threads ? undefined : floats('viscoplastic-serial-counts', 3);
+    const partitionWords = 2 * (threads?.count ?? 1);
     const kernel = bindViscoplasticKernel(host, this.builds);
     const s: State = {
       host,
@@ -379,6 +451,12 @@ export class ViscoplasticSolver implements Solver<ViscoplasticOptions> {
       stats,
       counters,
       regions: [points, model, output, counters],
+      threadScratch,
+      serialCounts,
+      pendingWorkerRows: new Float64Array(partitionWords),
+      acceptedWorkerRows: new Float64Array(partitionWords),
+      workSubsteps: 0,
+      workParticleToGrid: 0,
     };
     words(s, model).set(material);
     const records = words(s, output);
@@ -388,10 +466,50 @@ export class ViscoplasticSolver implements Solver<ViscoplasticOptions> {
       initial = finite('total seed volume', initial + setPoint(s, grain, records, i, point, density));
     positive('total seed mass or reserved density', initial > 0 ? initial * density : density);
     words(s, counters).set([initial, 0, 0, 0, initial, initial, seeded.length, 0, 0]);
+    if (threads && threadScratch) this.bindWorkers(s, threads, threadScratch);
     this.state = s;
   }
 
+  private bindWorkers(s: State, threads: NativePhasePool, scratch: ThreadScratch): void {
+    const { host } = s;
+    const escapes = host.allocate('viscoplastic-thread-escapes', 16 * s.count, 'f64', VISCOPLASTIC_LAYOUT);
+    const control = host.allocate('viscoplastic-thread-control', 4 * threads.controlWords, 'i32', VISCOPLASTIC_LAYOUT);
+    const stackTops = Array.from({ length: threads.count - 1 }, (_, index) => {
+      const stack = host.allocate(`viscoplastic-worker-stack-${index + 1}`, STACK_BYTES, 'u8', VISCOPLASTIC_LAYOUT);
+      return stack.byteOffset + stack.byteLength;
+    });
+    new Uint32Array(host.memory.buffer, scratch.job.byteOffset, JOB_HEADER_WORDS).set([
+      s.candidate.byteOffset,
+      s.count,
+      ...s.cells,
+      s.nodes.byteOffset,
+      s.active.byteOffset,
+      s.diffusion?.byteOffset ?? 0,
+      s.terrain?.byteOffset ?? 0,
+      s.model.byteOffset,
+      s.nextOutput.byteOffset,
+      s.stats.byteOffset,
+      escapes.byteOffset,
+      scratch.counts.byteOffset,
+      0,
+      0,
+    ]);
+    threads.init({
+      module: this.builds.shared!,
+      memory: host.memory,
+      job: scratch.job.byteOffset,
+      control: control.byteOffset,
+      stackTops,
+    });
+  }
+
+  private assertActive(): void {
+    if (this.disposed)
+      throw new MargoError('state', 'ViscoplasticSolver was disposed. Load a new solver before adding or stepping it.');
+  }
+
   private live(): State {
+    this.assertActive();
     if (!this.state) throw new MargoError('state', 'ViscoplasticSolver is not initialized. Add it to a PhysicsWorld.');
     return this.state;
   }
@@ -475,19 +593,9 @@ export class ViscoplasticSolver implements Solver<ViscoplasticOptions> {
     candidate.set(current);
     const bed = this.bed(s, context);
     const inlet = this.inject(s, context, candidate, interval);
-    const status = s.kernel.viscoplastic_step(
-      s.candidate.byteOffset,
-      s.count,
-      ...s.cells,
-      s.nodes.byteOffset,
-      s.active.byteOffset,
-      s.diffusion?.byteOffset ?? 0,
-      bed,
-      s.model.byteOffset,
-      s.nextOutput.byteOffset,
-      s.stats.byteOffset,
-      interval,
-    );
+    const status = s.threadScratch
+      ? this.stepThreaded(s, s.threadScratch, bed, interval)
+      : this.stepSerial(s, bed, interval);
     if (status === 2)
       throw new MargoError(
         'state',
@@ -523,6 +631,79 @@ export class ViscoplasticSolver implements Solver<ViscoplasticOptions> {
     counters[6] = delta[6]!;
     counters[7] = delta[4]!;
     counters[8] = delta[5]!;
+    s.workSubsteps = delta[4]!;
+    if (s.serialCounts) {
+      const serial = words(s, s.serialCounts);
+      s.workParticleToGrid = serial[0]!;
+      s.acceptedWorkerRows[0] = serial[2]!;
+      s.acceptedWorkerRows[1] = serial[1]!;
+    } else {
+      s.acceptedWorkerRows.set(s.pendingWorkerRows);
+      let points = 0;
+      for (let at = 1; at < s.acceptedWorkerRows.length; at += 2) points += s.acceptedWorkerRows[at]!;
+      // Both transfers visit the same live input points before the local return can release any of them.
+      s.workParticleToGrid = points;
+    }
+  }
+
+  private stepSerial(s: State, bed: number, interval: number): number {
+    return s.kernel.viscoplastic_step(
+      s.candidate.byteOffset,
+      s.count,
+      ...s.cells,
+      s.nodes.byteOffset,
+      s.active.byteOffset,
+      s.diffusion?.byteOffset ?? 0,
+      bed,
+      s.model.byteOffset,
+      s.nextOutput.byteOffset,
+      s.stats.byteOffset,
+      interval,
+      s.serialCounts!.byteOffset,
+    );
+  }
+
+  private stepThreaded(s: State, scratch: ThreadScratch, bed: number, interval: number): number {
+    const { kernel, host, pendingWorkerRows } = s;
+    const threads = this.threads!;
+    const ptr = scratch.job.byteOffset;
+    // Bed port availability can change between ticks. Its descriptor is otherwise immutable.
+    new Uint32Array(host.memory.buffer, ptr, JOB_HEADER_WORDS)[8] = bed;
+    const time = new Float64Array(host.memory.buffer, ptr + 4 * JOB_HEADER_WORDS, 2);
+    const counts = new Uint32Array(host.memory.buffer, scratch.counts.byteOffset, pendingWorkerRows.length);
+    pendingWorkerRows.fill(0);
+    const phase = (stage: number) =>
+      threads.phase(stage, () => kernel.viscoplastic_thread_phase(ptr, stage, 0, threads.count));
+    let status = kernel.viscoplastic_thread_begin(ptr, interval);
+    while (status === 0) {
+      status = kernel.viscoplastic_thread_plan(ptr);
+      if (status || time[1] === 0) break;
+      status = phase(0);
+      if (!status && s.diffusion) status = kernel.viscoplastic_thread_diffuse(ptr) || phase(1);
+      if (!status) status = phase(2) || kernel.viscoplastic_thread_accept(ptr);
+      if (!status) {
+        for (let i = 0; i < counts.length; i++) pendingWorkerRows[i]! += counts[i]!;
+      }
+    }
+    return status || kernel.viscoplastic_thread_finish(ptr);
+  }
+
+  /** Count accepted native operations from this runtime. Replay recomputes the receipt outside the snapshot. */
+  workCounts(): ViscoplasticWorkCounts {
+    const s = this.live();
+    const threads = this.threads?.count ?? 1;
+    const workers = Array.from({ length: threads }, (_, part) => ({
+      occupiedNodeRows: s.acceptedWorkerRows[2 * part]!,
+      gridToParticlePoints: s.acceptedWorkerRows[2 * part + 1]!,
+    }));
+    return {
+      threads,
+      substeps: s.workSubsteps,
+      particleToGridPoints: s.workParticleToGrid,
+      gridToParticlePoints: workers.reduce((total, worker) => total + worker.gridToParticlePoints, 0),
+      occupiedNodeRows: workers.reduce((total, worker) => total + worker.occupiedNodeRows, 0),
+      workers,
+    };
   }
 
   importPorts(_tick: number): void {}
@@ -552,8 +733,11 @@ export class ViscoplasticSolver implements Solver<ViscoplasticOptions> {
     const required = PARTICLE_STRIDE * count;
     if (out !== undefined && (!(out instanceof Float32Array) || out.length < required))
       throw new MargoError('state', 'Give the viscoplastic renderer a Float32Array with six words per active point.');
-    if (out?.buffer === s.host.memory.buffer)
-      throw new MargoError('state', 'Give the viscoplastic renderer a destination outside the physics arena.');
+    if (out && (!(out.buffer instanceof ArrayBuffer) || out.buffer === s.host.memory.buffer))
+      throw new MargoError(
+        'state',
+        'Give the viscoplastic renderer a standalone ArrayBuffer outside the physics arena.',
+      );
     if (renderCell !== undefined && !vector('render cell', renderCell).every(Number.isSafeInteger))
       throw new MargoError('state', 'Invalid viscoplastic render cell. Use three whole world-cell coordinates.');
     const offset = shift(ORIGIN, s.host.cell, renderCell ?? s.host.cell, s.cellSize);

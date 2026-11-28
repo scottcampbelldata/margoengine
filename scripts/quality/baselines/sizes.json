@@ -15327,6 +15327,12 @@
       "commit": "fluid-06-robustness-and-surface",
       "reason": "FLUID-06 physics/viscoplastic grows from 4898 to 5925 B gzip (cap 5154 to 6181) for transactional input limits and the accepted-particle bridge to the existing liquid renderer. Both optional Wasm assets grow from 6744 to 9924 B gzip for finite reduction checks and certification of the full deformation path. A separate entry would duplicate arena validation and accepted-record access. Core and Stage gain zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "fluid-06-native-workers",
+      "reason": "FLUID-06 physics/viscoplastic grows from 5925 to 8570 B gzip (cap 6181 to 8826) for optional worker phases, exact work receipts and shared render-destination protection. Both optional Wasm assets grow from 9924 to 13261 B gzip for partitioned native node and material work with an ordered escape ledger. A separate entry would duplicate the native ABI and accepted arena access. Existing lava, tsunami and lightning callers reuse the pool inside their caps. Core and Stage gain zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16252,7 +16258,7 @@
     "@margoengine/physics/tsunami": 9006,
     "@margoengine/physics/underwater": 4221,
     "@margoengine/physics/vegetation": 9958,
-    "@margoengine/physics/viscoplastic": 6181,
+    "@margoengine/physics/viscoplastic": 8826,
     "@margoengine/physics/vortices": 5453,
     "@margoengine/physics/waves": 7804,
     "@margoengine/physics/world": 18156,

@@ -22,7 +22,14 @@ export interface ViscoplasticKernel {
     records: number,
     budget: number,
     dt: number,
+    counts: number,
   ): number;
+  viscoplastic_thread_begin(job: number, dt: number): number;
+  viscoplastic_thread_plan(job: number): number;
+  viscoplastic_thread_phase(job: number, stage: number, part: number, parts: number): number;
+  viscoplastic_thread_diffuse(job: number): number;
+  viscoplastic_thread_accept(job: number): number;
+  viscoplastic_thread_finish(job: number): number;
 }
 
 export async function loadViscoplasticBuilds(signal?: AbortSignal): Promise<ViscoplasticBuilds> {

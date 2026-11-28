@@ -6234,6 +6234,10 @@ cumulative inlet overflow leaves all accepted bytes intact.
 [Renderer regression](../../packages/physics/tests/viscoplastic-surface.browser.mjs) ·
 [Rejection tests](../../packages/physics/tests/coupling/viscoplastic-extremes.test.js)
 
+Native workers match the serial accepted state byte for byte through the flume and both solvent settings.
+Four workers partition 4,419 material returns and 3,420 occupied node rows on the larger single-substep case.
+[Worker proof](../../packages/physics/tests/coupling/viscoplastic-threads.test.js)
+
 [Direct tests](../../packages/physics/tests/viscoplastic.test.js) ·
 [Coupling tests](../../packages/physics/tests/coupling/viscoplastic.test.js)
 
