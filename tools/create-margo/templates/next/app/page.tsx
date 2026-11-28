@@ -62,7 +62,7 @@ export default function Page() {
     <main style={{ height: '100vh' }}>
       <Canvas style={{ height: '100%' }} label="Three shapes in the sun. Drag to orbit, scroll to zoom.">
         <Shadows />
-      <Sky hours={16.4} timeScale={0} lighting={{ intensity: 6 }} />
+        <Sky hours={16.4} timeScale={0} lighting={{ intensity: 6 }} />
         <Shapes />
         <ContactShadows />
         <EffectComposer>
