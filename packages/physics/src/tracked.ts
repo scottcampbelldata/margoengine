@@ -166,6 +166,13 @@ export class TrackedVehicle implements PhysicsAttachment {
     const size = Math.hypot(f[0], f[1], f[2]);
     if (!size) throw invalidVehicle('Tracked vehicle forward must be nonzero.');
     this.facing = [f[0] / size, f[1] / size, f[2] / size];
+    // The chassis's sideways axis, up (+Y) cross forward: a forward along up has none, so no track would have a side and
+    // every steer would be ignored.
+    const lateral = cross([0, 1, 0], this.facing);
+    if (!(Math.hypot(lateral[0], lateral[1], lateral[2]) > 1e-6))
+      throw invalidVehicle(
+        'Tracked vehicle forward must not point along the chassis up axis (+Y); pass a horizontal forward.',
+      );
     for (const track of options.tracks) {
       checkVec(track?.position, 'Track position');
       if (!(track.length > 0 && Number.isFinite(track.length)))
@@ -174,6 +181,8 @@ export class TrackedVehicle implements PhysicsAttachment {
       if (!Number.isInteger(count) || count < 2 || count > 64)
         throw invalidVehicle('A track has 2 to 64 road wheels; pass a roadWheels count between 2 and 64.');
       const rest = track.suspensionRestLength ?? 0.3;
+      // A track on the centre line (offset 0) has no lever arm about up, so a steer leaves its speed alone (side 0).
+      const offset = dot(track.position, lateral);
       if (!(rest > 0)) throw invalidVehicle('A track suspensionRestLength must be above 0 metres.');
       this.tracks.push({
         mount: [track.position[0], track.position[1], track.position[2]],
@@ -184,7 +193,7 @@ export class TrackedVehicle implements PhysicsAttachment {
         compression: track.suspensionCompression ?? 4,
         relaxation: track.suspensionRelaxation ?? 5,
         maxForce: track.maxSuspensionForce ?? 20000,
-        side: Math.sign(dot(track.position, cross([0, 1, 0], this.facing))) || 0,
+        side: offset > 0 ? 1 : offset < 0 ? -1 : 0,
         target: 0,
         speed: 0,
         lengths: new Array<number>(count).fill(rest),

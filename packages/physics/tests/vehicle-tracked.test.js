@@ -148,6 +148,19 @@ test('a tank refuses what makes no sense, and a disposed one lets go', () => {
       }),
     coded(/maxSpeed/),
   );
+  // A forward along up leaves the chassis no sideways axis: every track had side 0 and every steer was ignored.
+  for (const forward of [
+    [0, 1, 0],
+    [0, -2, 0],
+  ])
+    assert.throws(
+      () =>
+        new TrackedVehicle(physics, chassis, {
+          tracks: [-1, 1].map((x) => ({ position: [x, 0, 0], length: 2 })),
+          forward,
+        }),
+      coded(/up axis/),
+    );
   const fixed = physics.addBody(null, {
     type: 'fixed',
     colliders: { shape: 'box', halfExtents: [1, 1, 1] },

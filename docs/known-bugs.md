@@ -4566,6 +4566,18 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   `packages/physics/tests/surge.test.js` (a wind with no scale, a wind at 60, and a sky at 1, each refused by a water at
   600; a wind at 600 accepted).
 
+### Fixed 2026-11-28: a tracked vehicle facing along its up axis ignored every steer (KB-PHYS-TRACKEDUP1, physics)
+
+- **Repro:** `new TrackedVehicle(physics, chassis, { tracks: [{ position: [-1, 0, 0], length: 2 }, { position: [1, 0, 0], length: 2 }], forward: [0, 1, 0] })`
+  built a vehicle, and `setInput({ steer: 1 })` drove both belts at the same speed.
+- **Cause:** each track's side was `Math.sign(dot(position, cross(up, forward)))`; with forward along up the cross product is
+  zero, so every side was 0 and the steer term dropped out. The class check `tests/modern-zero-determinant-normals.test.js`
+  flagged the sign of a triple product.
+- **Fix:** the constructor refuses a forward along +Y or -Y with a coded `unsupported` error, and a track's side is read from
+  its offset along the sideways axis, 0 only for a track on the centre line (no lever arm about up, so steer leaves it alone).
+- **Regression:** "a tank refuses what makes no sense, and a disposed one lets go" in
+  `packages/physics/tests/vehicle-tracked.test.js` (forwards [0, 1, 0] and [0, -2, 0] refused).
+
 ### Fixed 2026-11-28: a body that touches through several colliders crept under a changing load that one collider holds (KB-PHYS-MULTIPAIRCREEP1, physics kernel)
 
 - **Repro:** the storm deck of `packages/physics/tests/deck-props.test.js` (roll 20 degrees at 12 s, pitch 4 degrees at 9 s,
