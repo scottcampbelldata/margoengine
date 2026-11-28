@@ -2,7 +2,7 @@
 
 These are standalone web exhibits built with the Margo Engine. Each folder is a complete page you can open locally. A zip of the same files sits in `downloads/` if you want to take one exhibit with you.
 
-A live gallery of all 236 exhibits is at [margo-demos.pages.dev](https://margo-demos.pages.dev/). The same page will also be served at demos.margoengine.com once that name is attached.
+A live gallery of all 236 exhibits is at [demos.margoengine.com](https://demos.margoengine.com/). This folder is the source for that page.
 
 ## Run a demo on your machine
 

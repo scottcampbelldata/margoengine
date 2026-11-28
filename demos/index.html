@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5f6f9">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1020">
+  <meta name="description" content="Interactive web exhibits built with the Margo Engine.">
+  <title>Web demos, Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" href="./fonts/SourceSans3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="./gallery.css?v=20261127g">
+</head>
+<body>
+  <main>
+    <header>
+      <div class="top">
+        <p class="brand"><a href="https://margoengine.com">Margo Engine</a> <span>Web demos</span></p>
+        <p class="links"><a href="https://github.com/scottcampbelldata/margoengine">GitHub</a></p>
+      </div>
+      <h1>Web demos</h1>
+      <p class="lede">236 interactive exhibits. Open one in the browser, or download the files and run them on your own machine.</p>
+      <div class="filters">
+        <label class="search">
+          <span class="search-label">Search</span>
+          <input type="search" id="demo-search" placeholder="Search demos" autocomplete="off" spellcheck="false">
+        </label>
+        <div class="chips" role="group" aria-label="Categories">
+          <button type="button" class="chip is-active" data-category="All" aria-pressed="true">All</button>
+          <button type="button" class="chip" data-category="Mechanisms" aria-pressed="false">Mechanisms</button>
+          <button type="button" class="chip" data-category="Optics and Light" aria-pressed="false">Optics and Light</button>
+          <button type="button" class="chip" data-category="Fluids and Water" aria-pressed="false">Fluids and Water</button>
+          <button type="button" class="chip" data-category="Heat" aria-pressed="false">Heat</button>
+          <button type="button" class="chip" data-category="Waves and Sound" aria-pressed="false">Waves and Sound</button>
+          <button type="button" class="chip" data-category="Space" aria-pressed="false">Space</button>
+          <button type="button" class="chip" data-category="Scenes and Cities" aria-pressed="false">Scenes and Cities</button>
+          <button type="button" class="chip" data-category="People and Characters" aria-pressed="false">People and Characters</button>
+          <button type="button" class="chip" data-category="Rendering and Lighting" aria-pressed="false">Rendering and Lighting</button>
+          <button type="button" class="chip" data-category="CAD and Modeling" aria-pressed="false">CAD and Modeling</button>
+          <button type="button" class="chip" data-category="Data and Science" aria-pressed="false">Data and Science</button>
+          <button type="button" class="chip" data-category="Games" aria-pressed="false">Games</button>
+          <button type="button" class="chip" data-category="Physics" aria-pressed="false">Physics</button>
+          <button type="button" class="chip" data-category="AI and Pathfinding" aria-pressed="false">AI and Pathfinding</button>
+          <button type="button" class="chip" data-category="Editors" aria-pressed="false">Editors</button>
+        </div>
+        <p class="filter-status" id="filter-status" aria-live="polite">Showing 236 of 236</p>
+        <p class="active-tag" id="active-tag" hidden>Tag: <span id="active-tag-name"></span> <button type="button" id="clear-tag">Clear tag</button></p>
+        <p class="filter-empty" id="filter-empty" hidden>No exhibits match. Try another word, or choose All.</p>
+      </div>
+    </header>
+    <section class="grid" aria-label="Demo exhibits">
+    <article class="card" data-slug="event-horizon" data-category="Space" data-tags="space,light">
+      <a class="shot" href="./event-horizon/"><img src="./thumbs/event-horizon.jpg" alt="Event Horizon" width="900" height="579" loading="lazy"></a>
+      <h2>Event Horizon</h2>
+      <p>Orbit a spinning black hole and see light from its accretion disk bend around the shadow.</p>
+      <p class="actions"><a class="open" href="./event-horizon/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/event-horizon.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="earth-from-orbit" data-category="Space" data-tags="space,city,light">
+      <a class="shot" href="./earth-from-orbit/"><img src="./thumbs/earth-from-orbit.jpg" alt="Earth From Orbit" width="900" height="579" loading="lazy"></a>
+      <h2>Earth From Orbit</h2>
+      <p>Move through a day in UTC and watch sunlight cross the real geography of Earth.</p>
+      <p class="actions"><a class="open" href="./earth-from-orbit/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/earth-from-orbit.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="cathedral-light" data-category="Scenes and Cities" data-tags="light,heat">
+      <a class="shot" href="./cathedral-light/"><img src="./thumbs/cathedral-light.jpg" alt="Cathedral Light" width="900" height="579" loading="lazy"></a>
+      <h2>Cathedral Light</h2>
+      <p>Move the sun through an autumn day and watch its light cross a Gothic nave.</p>
+      <p class="actions"><a class="open" href="./cathedral-light/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/cathedral-light.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-night-city" data-category="Scenes and Cities" data-tags="city,light">
+      <a class="shot" href="./the-night-city/"><img src="./thumbs/the-night-city.jpg" alt="The Night City" width="900" height="579" loading="lazy"></a>
+      <h2>The Night City</h2>
+      <p>Scrub through dusk in a city built and lit in Margo Engine.</p>
+      <p class="actions"><a class="open" href="./the-night-city/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-night-city.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-million-stars" data-category="Space" data-tags="space,particles,light">
+      <a class="shot" href="./the-million-stars/"><img src="./thumbs/the-million-stars.jpg" alt="The Million Stars" width="900" height="579" loading="lazy"></a>
+      <h2>The Million Stars</h2>
+      <p>Explore one million real 2MASS point sources and brush their near-infrared colors to see where they sit on the sky.</p>
+      <p class="actions"><a class="open" href="./the-million-stars/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-million-stars.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-wrecking-ball" data-category="Mechanisms" data-tags="pendulum,rigid bodies">
+      <a class="shot" href="./the-wrecking-ball/"><img src="./thumbs/the-wrecking-ball.jpg" alt="The Wrecking Ball" width="900" height="579" loading="lazy"></a>
+      <h2>The Wrecking Ball</h2>
+      <p>Release a miniature crane&#x27;s linked pendulum into stacked blocks and compare how much of the tower falls.</p>
+      <p class="actions"><a class="open" href="./the-wrecking-ball/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-wrecking-ball.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-domino-cascade" data-category="Mechanisms" data-tags="rigid bodies">
+      <a class="shot" href="./the-domino-cascade/"><img src="./thumbs/the-domino-cascade.jpg" alt="The Domino Cascade" width="900" height="579" loading="lazy"></a>
+      <h2>The Domino Cascade</h2>
+      <p>Tip one domino and follow the chain through a spiral, up a staircase and across a bridge.</p>
+      <p class="actions"><a class="open" href="./the-domino-cascade/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-domino-cascade.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-engine-block" data-category="Mechanisms" data-tags="gears">
+      <a class="shot" href="./the-engine-block/"><img src="./thumbs/the-engine-block.jpg" alt="The Engine Block" width="900" height="579" loading="lazy"></a>
+      <h2>The Engine Block</h2>
+      <p>Section, inspect and export an exact four-cylinder CAD casting in Margo Engine.</p>
+      <p class="actions"><a class="open" href="./the-engine-block/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-engine-block.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="inside-a-heat-pump" data-category="Heat" data-tags="heat,water">
+      <a class="shot" href="./inside-a-heat-pump/"><img src="./thumbs/inside-a-heat-pump.jpg" alt="Inside a Heat Pump" width="900" height="579" loading="lazy"></a>
+      <h2>Inside a Heat Pump</h2>
+      <p>Reverse the refrigerant circuit, explore the heat exchangers and take apart a heat pump in Margo Engine.</p>
+      <p class="actions"><a class="open" href="./inside-a-heat-pump/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/inside-a-heat-pump.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="newtons-cradle" data-category="Mechanisms" data-tags="pendulum,rigid bodies">
+      <a class="shot" href="./newtons-cradle/"><img src="./thumbs/newtons-cradle.jpg" alt="Newton&#x27;s Cradle" width="900" height="579" loading="lazy"></a>
+      <h2>Newton&#x27;s Cradle</h2>
+      <p>Release one or two polished steel balls and watch a contact pulse cross Newton&#x27;s cradle.</p>
+      <p class="actions"><a class="open" href="./newtons-cradle/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/newtons-cradle.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-analog-integrator" data-category="Mechanisms" data-tags="gears,linkage">
+      <a class="shot" href="./the-analog-integrator/"><img src="./thumbs/the-analog-integrator.jpg" alt="The Analog Integrator" width="900" height="579" loading="lazy"></a>
+      <h2>The Analog Integrator</h2>
+      <p>A working wheel-and-disk integrator in Margo Engine.</p>
+      <p class="actions"><a class="open" href="./the-analog-integrator/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-analog-integrator.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-archimedes-screw" data-category="Fluids and Water" data-tags="water,gears">
+      <a class="shot" href="./the-archimedes-screw/"><img src="./thumbs/the-archimedes-screw.jpg" alt="The Archimedes Screw" width="900" height="579" loading="lazy"></a>
+      <h2>The Archimedes Screw</h2>
+      <p>Turn an Archimedes screw and see the water pockets carry water from a lower pool to a raised basin.</p>
+      <p class="actions"><a class="open" href="./the-archimedes-screw/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-archimedes-screw.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-astigmatism-bench" data-category="Optics and Light" data-tags="optics,light">
+      <a class="shot" href="./the-astigmatism-bench/"><img src="./thumbs/the-astigmatism-bench.jpg" alt="The Astigmatism Bench" width="900" height="579" loading="lazy"></a>
+      <h2>The Astigmatism Bench</h2>
+      <p>Slide the image plane of an astigmatic lens and see its spot turn from one line into another.</p>
+      <p class="actions"><a class="open" href="./the-astigmatism-bench/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-astigmatism-bench.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-bellows" data-category="Mechanisms" data-tags="linkage">
+      <a class="shot" href="./the-bellows/"><img src="./thumbs/the-bellows.jpg" alt="The Bellows" width="900" height="579" loading="lazy"></a>
+      <h2>The Bellows</h2>
+      <p>Lift and lower the walnut handle. See the leather bellows fold and its two check valves send air one way.</p>
+      <p class="actions"><a class="open" href="./the-bellows/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-bellows.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-bimetal-switch" data-category="Heat" data-tags="heat">
+      <a class="shot" href="./the-bimetal-switch/"><img src="./thumbs/the-bimetal-switch.jpg" alt="The Bimetal Switch" width="900" height="579" loading="lazy"></a>
+      <h2>The Bimetal Switch</h2>
+      <p>Warm two bonded metals and watch their different expansion open an electrical contact.</p>
+      <p class="actions"><a class="open" href="./the-bimetal-switch/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-bimetal-switch.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-birefringence-viewer" data-category="Optics and Light" data-tags="optics,light">
+      <a class="shot" href="./the-birefringence-viewer/"><img src="./thumbs/the-birefringence-viewer.jpg" alt="The Birefringence Viewer" width="900" height="579" loading="lazy"></a>
+      <h2>The Birefringence Viewer</h2>
+      <p>Load a clear disc between crossed polarizers and see the stress emerge in spectral color.</p>
+      <p class="actions"><a class="open" href="./the-birefringence-viewer/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-birefringence-viewer.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-cable-span" data-category="Mechanisms" data-tags="linkage,rigid bodies">
+      <a class="shot" href="./the-cable-span/"><img src="./thumbs/the-cable-span.jpg" alt="The Cable Span" width="900" height="579" loading="lazy"></a>
+      <h2>The Cable Span</h2>
+      <p>Move a proof cart across a suspended footbridge. Watch its twin cables and timber deck find a new equilibrium.</p>
+      <p class="actions"><a class="open" href="./the-cable-span/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-cable-span.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-camera-obscura" data-category="Optics and Light" data-tags="optics,light">
+      <a class="shot" href="./the-camera-obscura/"><img src="./thumbs/the-camera-obscura.jpg" alt="The Camera Obscura" width="900" height="579" loading="lazy"></a>
+      <h2>The Camera Obscura</h2>
+      <p>Slide the ground glass in a cutaway pinhole camera and watch the inverted harbor grow dimmer.</p>
+      <p class="actions"><a class="open" href="./the-camera-obscura/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-camera-obscura.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-canal-lock" data-category="Fluids and Water" data-tags="water">
+      <a class="shot" href="./the-canal-lock/"><img src="./thumbs/the-canal-lock.jpg" alt="The Canal Lock" width="900" height="579" loading="lazy"></a>
+      <h2>The Canal Lock</h2>
+      <p>Take a narrowboat through a working cutaway canal lock and watch the water carry it to the next reach.</p>
+      <p class="actions"><a class="open" href="./the-canal-lock/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-canal-lock.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-capillary-garden" data-category="Fluids and Water" data-tags="water">
+      <a class="shot" href="./the-capillary-garden/"><img src="./thumbs/the-capillary-garden.jpg" alt="The Capillary Garden" width="900" height="579" loading="lazy"></a>
+      <h2>The Capillary Garden</h2>
+      <p>Watch liquid rise into five glass capillaries and change the wetting angle to see how high each column can climb.</p>
+      <p class="actions"><a class="open" href="./the-capillary-garden/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-capillary-garden.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-capstan" data-category="Mechanisms" data-tags="gears">
+      <a class="shot" href="./the-capstan/"><img src="./thumbs/the-capstan.jpg" alt="The Capstan" width="900" height="579" loading="lazy"></a>
+      <h2>The Capstan</h2>
+      <p>Wind a rope around a capstan and see how friction lets you hold a heavier load.</p>
+      <p class="actions"><a class="open" href="./the-capstan/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-capstan.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-chain-fountain" data-category="Mechanisms" data-tags="rigid bodies,particles">
+      <a class="shot" href="./the-chain-fountain/"><img src="./thumbs/the-chain-fountain.jpg" alt="The Chain Fountain" width="900" height="579" loading="lazy"></a>
+      <h2>The Chain Fountain</h2>
+      <p>Run a chain fountain and see how contacts in its feed tray push the falling chain upward.</p>
+      <p class="actions"><a class="open" href="./the-chain-fountain/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-chain-fountain.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-desert-mirage" data-category="Optics and Light" data-tags="optics,light,heat">
+      <a class="shot" href="./the-desert-mirage/"><img src="./thumbs/the-desert-mirage.jpg" alt="The Desert Mirage" width="900" height="579" loading="lazy"></a>
+      <h2>The Desert Mirage</h2>
+      <p>Heat a desert road and trace the light that makes dry asphalt look like water.</p>
+      <p class="actions"><a class="open" href="./the-desert-mirage/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-desert-mirage.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-dichroic-splitter" data-category="Optics and Light" data-tags="optics,light">
+      <a class="shot" href="./the-dichroic-splitter/"><img src="./thumbs/the-dichroic-splitter.jpg" alt="The Dichroic Splitter" width="900" height="579" loading="lazy"></a>
+      <h2>The Dichroic Splitter</h2>
+      <p>Tilt a thin-film dichroic plate and see how it divides white light between two optical paths.</p>
+      <p class="actions"><a class="open" href="./the-dichroic-splitter/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-dichroic-splitter.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-differential" data-category="Mechanisms" data-tags="gears">
+      <a class="shot" href="./the-differential/"><img src="./thumbs/the-differential.jpg" alt="The Differential" width="900" height="579" loading="lazy"></a>
+      <h2>The Differential</h2>
+      <p>See how an open differential lets its wheels turn at different speeds.</p>
+      <p class="actions"><a class="open" href="./the-differential/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-differential.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-diffraction-ruler" data-category="Optics and Light" data-tags="optics,light">
+      <a class="shot" href="./the-diffraction-ruler/"><img src="./thumbs/the-diffraction-ruler.jpg" alt="The Diffraction Ruler" width="900" height="579" loading="lazy"></a>
+      <h2>The Diffraction Ruler</h2>
+      <p>Change the wavelength or groove density to move the diffraction orders across a precision angle scale.</p>
+      <p class="actions"><a class="open" href="./the-diffraction-ruler/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-diffraction-ruler.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-echo-canyon" data-category="Waves and Sound" data-tags="sound">
+      <a class="shot" href="./the-echo-canyon/"><img src="./thumbs/the-echo-canyon.jpg" alt="The Echo Canyon" width="900" height="579" loading="lazy"></a>
+      <h2>The Echo Canyon</h2>
+      <p>Send a sound across a sandstone canyon and compare the delay from each reflected path.</p>
+      <p class="actions"><a class="open" href="./the-echo-canyon/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-echo-canyon.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-eddy-brake" data-category="Mechanisms" data-tags="heat">
+      <a class="shot" href="./the-eddy-brake/"><img src="./thumbs/the-eddy-brake.jpg" alt="The Eddy Brake" width="900" height="579" loading="lazy"></a>
+      <h2>The Eddy Brake</h2>
+      <p>Spin a copper rotor and watch a magnetic field slow it through eddy currents.</p>
+      <p class="actions"><a class="open" href="./the-eddy-brake/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-eddy-brake.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-epicyclic-drive" data-category="Mechanisms" data-tags="gears">
+      <a class="shot" href="./the-epicyclic-drive/"><img src="./thumbs/the-epicyclic-drive.jpg" alt="The Epicyclic Drive" width="900" height="579" loading="lazy"></a>
+      <h2>The Epicyclic Drive</h2>
+      <p>Hold the sun, carrier, or ring and watch three planet gears change motion in a true tooth-count gear train.</p>
+      <p class="actions"><a class="open" href="./the-epicyclic-drive/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-epicyclic-drive.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-flood-table" data-category="Fluids and Water" data-tags="water">
+      <a class="shot" href="./the-flood-table/"><img src="./thumbs/the-flood-table.jpg" alt="The Flood Table" width="900" height="579" loading="lazy"></a>
+      <h2>The Flood Table</h2>
+      <p>Release a reservoir and defend a miniature valley in a live Margo Engine hydraulic simulation.</p>
+      <p class="actions"><a class="open" href="./the-flood-table/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-flood-table.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-foucault-pendulum" data-category="Mechanisms" data-tags="pendulum,space">
+      <a class="shot" href="./the-foucault-pendulum/"><img src="./thumbs/the-foucault-pendulum.jpg" alt="The Foucault Pendulum" width="900" height="579" loading="lazy"></a>
+      <h2>The Foucault Pendulum</h2>
+      <p>Move a Foucault pendulum from one hemisphere to the other and watch its swing turn with Earth</p>
+      <p class="actions"><a class="open" href="./the-foucault-pendulum/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-foucault-pendulum.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-fourier-organ" data-category="Waves and Sound" data-tags="sound">
+      <a class="shot" href="./the-fourier-organ/"><img src="./thumbs/the-fourier-organ.jpg" alt="The Fourier Organ" width="900" height="579" loading="lazy"></a>
+      <h2>The Fourier Organ</h2>
+      <p>Add odd harmonics to a tone and watch a sine wave take on the shape of a square wave.</p>
+      <p class="actions"><a class="open" href="./the-fourier-organ/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-fourier-organ.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-fresnel-lens" data-category="Optics and Light" data-tags="optics,light">
+      <a class="shot" href="./the-fresnel-lens/"><img src="./thumbs/the-fresnel-lens.jpg" alt="The Fresnel Lens" width="900" height="579" loading="lazy"></a>
+      <h2>The Fresnel Lens</h2>
+      <p>Move a lighthouse lamp behind a stepped Fresnel lens to see when its rays emerge parallel.</p>
+      <p class="actions"><a class="open" href="./the-fresnel-lens/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-fresnel-lens.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-geneva-drive" data-category="Mechanisms" data-tags="gears,linkage">
+      <a class="shot" href="./the-geneva-drive/"><img src="./thumbs/the-geneva-drive.jpg" alt="The Geneva Drive" width="900" height="579" loading="lazy"></a>
+      <h2>The Geneva Drive</h2>
+      <p>Turn the crank of a four-slot Geneva drive and watch a continuous turn become one precise step. Built in Margo Engine.</p>
+      <p class="actions"><a class="open" href="./the-geneva-drive/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-geneva-drive.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-gimbal" data-category="Mechanisms" data-tags="gears,linkage">
+      <a class="shot" href="./the-gimbal/"><img src="./thumbs/the-gimbal.jpg" alt="The Gimbal" width="900" height="579" loading="lazy"></a>
+      <h2>The Gimbal</h2>
+      <p>Tilt a precision gyroscope and see what its gimbals do. Built in Margo Engine.</p>
+      <p class="actions"><a class="open" href="./the-gimbal/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-gimbal.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-halo-prism" data-category="Optics and Light" data-tags="optics,light,space">
+      <a class="shot" href="./the-halo-prism/"><img src="./thumbs/the-halo-prism.jpg" alt="The Halo Prism" width="900" height="579" loading="lazy"></a>
+      <h2>The Halo Prism</h2>
+      <p>Trace two refractions through a hexagonal ice prism and find the sharp inner edge of the 22 degree halo.</p>
+      <p class="actions"><a class="open" href="./the-halo-prism/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-halo-prism.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-harmonic-drive" data-category="Mechanisms" data-tags="gears">
+      <a class="shot" href="./the-harmonic-drive/"><img src="./thumbs/the-harmonic-drive.jpg" alt="The Harmonic Drive" width="900" height="579" loading="lazy"></a>
+      <h2>The Harmonic Drive</h2>
+      <p>A working strain-wave gear cutaway in Margo Engine.</p>
+      <p class="actions"><a class="open" href="./the-harmonic-drive/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-harmonic-drive.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-heat-sink" data-category="Heat" data-tags="heat">
+      <a class="shot" href="./the-heat-sink/"><img src="./thumbs/the-heat-sink.jpg" alt="The Heat Sink" width="900" height="579" loading="lazy"></a>
+      <h2>The Heat Sink</h2>
+      <p>Turn on a fan and follow heat through a working model of an electronics heat sink.</p>
+      <p class="actions"><a class="open" href="./the-heat-sink/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-heat-sink.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-hele-shaw-cell" data-category="Fluids and Water" data-tags="water,particles">
+      <a class="shot" href="./the-hele-shaw-cell/"><img src="./thumbs/the-hele-shaw-cell.jpg" alt="The Hele-Shaw Cell" width="900" height="579" loading="lazy"></a>
+      <h2>The Hele-Shaw Cell</h2>
+      <p>Follow colored dye through a thin glass cell and widen a cylinder to divert the flow.</p>
+      <p class="actions"><a class="open" href="./the-hele-shaw-cell/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-hele-shaw-cell.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-hydraulic-jump" data-category="Fluids and Water" data-tags="water">
+      <a class="shot" href="./the-hydraulic-jump/"><img src="./thumbs/the-hydraulic-jump.jpg" alt="The Hydraulic Jump" width="900" height="579" loading="lazy"></a>
+      <h2>The Hydraulic Jump</h2>
+      <p>Speed up water in a laboratory flume and watch shallow flow rise into a deep hydraulic jump.</p>
+      <p class="actions"><a class="open" href="./the-hydraulic-jump/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-hydraulic-jump.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-hydraulic-ram" data-category="Fluids and Water" data-tags="water">
+      <a class="shot" href="./the-hydraulic-ram/"><img src="./thumbs/the-hydraulic-ram.jpg" alt="The Hydraulic Ram" width="900" height="579" loading="lazy"></a>
+      <h2>The Hydraulic Ram</h2>
+      <p>Watch a hydraulic ram pump use a falling stream to lift part of its water above the source.</p>
+      <p class="actions"><a class="open" href="./the-hydraulic-ram/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-hydraulic-ram.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-iridescence-bench" data-category="Optics and Light" data-tags="optics,light">
+      <a class="shot" href="./the-iridescence-bench/"><img src="./thumbs/the-iridescence-bench.jpg" alt="The Iridescence Bench" width="900" height="579" loading="lazy"></a>
+      <h2>The Iridescence Bench</h2>
+      <p>Tune the thickness and angle of a thin film and see white light separate into structural color.</p>
+      <p class="actions"><a class="open" href="./the-iridescence-bench/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-iridescence-bench.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-jewelry-counter" data-category="Optics and Light" data-tags="optics,light">
+      <a class="shot" href="./the-jewelry-counter/"><img src="./thumbs/the-jewelry-counter.jpg" alt="The Jewelry Counter" width="900" height="579" loading="lazy"></a>
+      <h2>The Jewelry Counter</h2>
+      <p>An interactive study of gold, platinum, and round-brilliant gemstone facets, rendered live by Margo Engine.</p>
+      <p class="actions"><a class="open" href="./the-jewelry-counter/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-jewelry-counter.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-light-bench" data-category="Optics and Light" data-tags="light">
+      <a class="shot" href="./the-light-bench/"><img src="./thumbs/the-light-bench.jpg" alt="The Light Bench" width="900" height="579" loading="lazy"></a>
+      <h2>The Light Bench</h2>
+      <p>Turn a slotted steel mask and watch a spotlight carve through a plaster sculpture.</p>
+      <p class="actions"><a class="open" href="./the-light-bench/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-light-bench.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-magnetic-field-mapper" data-category="Mechanisms" data-tags="">
+      <a class="shot" href="./the-magnetic-field-mapper/"><img src="./thumbs/the-magnetic-field-mapper.jpg" alt="The Magnetic Field Mapper" width="900" height="579" loading="lazy"></a>
+      <h2>The Magnetic Field Mapper</h2>
+      <p>Move two magnets and see a board of compass needles trace their combined magnetic field.</p>
+      <p class="actions"><a class="open" href="./the-magnetic-field-mapper/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-magnetic-field-mapper.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-marble-sorter" data-category="Mechanisms" data-tags="rigid bodies">
+      <a class="shot" href="./the-marble-sorter/"><img src="./thumbs/the-marble-sorter.jpg" alt="The Marble Sorter" width="900" height="579" loading="lazy"></a>
+      <h2>The Marble Sorter</h2>
+      <p>Run a gravity-fed marble sorter and steer the rolling glass into either tray.</p>
+      <p class="actions"><a class="open" href="./the-marble-sorter/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-marble-sorter.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-michelson-interferometer" data-category="Optics and Light" data-tags="optics,light">
+      <a class="shot" href="./the-michelson-interferometer/"><img src="./thumbs/the-michelson-interferometer.jpg" alt="The Michelson Interferometer" width="900" height="579" loading="lazy"></a>
+      <h2>The Michelson Interferometer</h2>
+      <p>Translate a mirror by nanometers and watch a Michelson interferometer count the distance in light fringes.</p>
+      <p class="actions"><a class="open" href="./the-michelson-interferometer/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-michelson-interferometer.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-moire-press" data-category="Optics and Light" data-tags="optics,light">
+      <a class="shot" href="./the-moire-press/"><img src="./thumbs/the-moire-press.jpg" alt="The Moiré Press" width="900" height="579" loading="lazy"></a>
+      <h2>The Moiré Press</h2>
+      <p>Turn one precision screen over another and watch their fine lines form broad moving bands.</p>
+      <p class="actions"><a class="open" href="./the-moire-press/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-moire-press.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-oldham-coupling" data-category="Mechanisms" data-tags="gears,linkage">
+      <a class="shot" href="./the-oldham-coupling/"><img src="./thumbs/the-oldham-coupling.jpg" alt="The Oldham Coupling" width="900" height="579" loading="lazy"></a>
+      <h2>The Oldham Coupling</h2>
+      <p>Offset two parallel shafts and watch an Oldham coupling transmit the same rotation as its middle disk orbits.</p>
+      <p class="actions"><a class="open" href="./the-oldham-coupling/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-oldham-coupling.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-orrery" data-category="Space" data-tags="space,gears">
+      <a class="shot" href="./the-orrery/"><img src="./thumbs/the-orrery.jpg" alt="The Orrery" width="900" height="579" loading="lazy"></a>
+      <h2>The Orrery</h2>
+      <p>Run two years through an interactive brass orrery and compare the orbits of Mercury, Venus, Earth and Mars.</p>
+      <p class="actions"><a class="open" href="./the-orrery/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-orrery.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-paper-bridge" data-category="Mechanisms" data-tags="rigid bodies">
+      <a class="shot" href="./the-paper-bridge/"><img src="./thumbs/the-paper-bridge.jpg" alt="The Paper Bridge" width="900" height="579" loading="lazy"></a>
+      <h2>The Paper Bridge</h2>
+      <p>Load two paper spans side by side and see how a crease changes the way a bridge bends.</p>
+      <p class="actions"><a class="open" href="./the-paper-bridge/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-paper-bridge.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-pelton-wheel" data-category="Fluids and Water" data-tags="water,gears">
+      <a class="shot" href="./the-pelton-wheel/"><img src="./thumbs/the-pelton-wheel.jpg" alt="The Pelton Wheel" width="900" height="579" loading="lazy"></a>
+      <h2>The Pelton Wheel</h2>
+      <p>Change the speed of a brass Pelton wheel and watch how its split water jet transfers momentum.</p>
+      <p class="actions"><a class="open" href="./the-pelton-wheel/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-pelton-wheel.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-pinhole-array" data-category="Optics and Light" data-tags="optics,light">
+      <a class="shot" href="./the-pinhole-array/"><img src="./thumbs/the-pinhole-array.jpg" alt="The Pinhole Array" width="900" height="579" loading="lazy"></a>
+      <h2>The Pinhole Array</h2>
+      <p>Change three circular pinholes and compare the resolution of their lensless images.</p>
+      <p class="actions"><a class="open" href="./the-pinhole-array/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-pinhole-array.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-polarizer" data-category="Optics and Light" data-tags="optics,light">
+      <a class="shot" href="./the-polarizer/"><img src="./thumbs/the-polarizer.jpg" alt="The Polarizer" width="900" height="579" loading="lazy"></a>
+      <h2>The Polarizer</h2>
+      <p>Turn the analyzer and watch two polarizers take light from full transmission to extinction.</p>
+      <p class="actions"><a class="open" href="./the-polarizer/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-polarizer.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-resonance-room" data-category="Waves and Sound" data-tags="sound">
+      <a class="shot" href="./the-resonance-room/"><img src="./thumbs/the-resonance-room.jpg" alt="The Resonance Room" width="900" height="579" loading="lazy"></a>
+      <h2>The Resonance Room</h2>
+      <p>Tune a listening room and see where bass builds up or cancels. An interactive acoustic exhibit</p>
+      <p class="actions"><a class="open" href="./the-resonance-room/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-resonance-room.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-retroreflector" data-category="Optics and Light" data-tags="optics,light">
+      <a class="shot" href="./the-retroreflector/"><img src="./thumbs/the-retroreflector.jpg" alt="The Retroreflector" width="900" height="579" loading="lazy"></a>
+      <h2>The Retroreflector</h2>
+      <p>Move a survey lamp at night and follow the three reflections that send the beam back.</p>
+      <p class="actions"><a class="open" href="./the-retroreflector/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-retroreflector.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-reuleaux-drive" data-category="Mechanisms" data-tags="linkage,gears">
+      <a class="shot" href="./the-reuleaux-drive/"><img src="./thumbs/the-reuleaux-drive.jpg" alt="The Reuleaux Drive" width="900" height="579" loading="lazy"></a>
+      <h2>The Reuleaux Drive</h2>
+      <p>Turn a Reuleaux triangle inside a square and trace the motion of its moving center. Built in Margo Engine.</p>
+      <p class="actions"><a class="open" href="./the-reuleaux-drive/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-reuleaux-drive.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-rolling-race" data-category="Mechanisms" data-tags="rigid bodies">
+      <a class="shot" href="./the-rolling-race/"><img src="./thumbs/the-rolling-race.jpg" alt="The Rolling Race" width="900" height="579" loading="lazy"></a>
+      <h2>The Rolling Race</h2>
+      <p>Release a solid disc and hollow ring on the same ramp. See how their mass distribution changes the race.</p>
+      <p class="actions"><a class="open" href="./the-rolling-race/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-rolling-race.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-rose-engine" data-category="Mechanisms" data-tags="gears">
+      <a class="shot" href="./the-rose-engine/"><img src="./thumbs/the-rose-engine.jpg" alt="The Rose Engine" width="900" height="579" loading="lazy"></a>
+      <h2>The Rose Engine</h2>
+      <p>Turn a rose-engine lathe and watch its rosette guide a fine engraved pattern on a silver workpiece.</p>
+      <p class="actions"><a class="open" href="./the-rose-engine/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-rose-engine.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-salt-wedge" data-category="Fluids and Water" data-tags="water">
+      <a class="shot" href="./the-salt-wedge/"><img src="./thumbs/the-salt-wedge.jpg" alt="The Salt Wedge" width="900" height="579" loading="lazy"></a>
+      <h2>The Salt Wedge</h2>
+      <p>Change river discharge and watch the modeled saltwater intrusion retreat beneath the fresh layer of a coastal estuary.</p>
+      <p class="actions"><a class="open" href="./the-salt-wedge/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-salt-wedge.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-sand-pendulum" data-category="Mechanisms" data-tags="pendulum">
+      <a class="shot" href="./the-sand-pendulum/"><img src="./thumbs/the-sand-pendulum.jpg" alt="The Sand Pendulum" width="900" height="579" loading="lazy"></a>
+      <h2>The Sand Pendulum</h2>
+      <p>Release a brass sand pendulum and draw a pattern from two swinging motions.</p>
+      <p class="actions"><a class="open" href="./the-sand-pendulum/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-sand-pendulum.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-sarrus-linkage" data-category="Mechanisms" data-tags="linkage">
+      <a class="shot" href="./the-sarrus-linkage/"><img src="./thumbs/the-sarrus-linkage.jpg" alt="The Sarrus Linkage" width="900" height="579" loading="lazy"></a>
+      <h2>The Sarrus Linkage</h2>
+      <p>A fold-out field platform demonstrating a Sarrus linkage in Margo Engine.</p>
+      <p class="actions"><a class="open" href="./the-sarrus-linkage/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-sarrus-linkage.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-schlieren-bench" data-category="Optics and Light" data-tags="optics,light,heat">
+      <a class="shot" href="./the-schlieren-bench/"><img src="./thumbs/the-schlieren-bench.jpg" alt="The Schlieren Bench" width="900" height="579" loading="lazy"></a>
+      <h2>The Schlieren Bench</h2>
+      <p>Slide a knife edge into a focused beam to reveal otherwise invisible temperature gradients above a heater.</p>
+      <p class="actions"><a class="open" href="./the-schlieren-bench/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-schlieren-bench.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-scotch-yoke" data-category="Mechanisms" data-tags="linkage,gears">
+      <a class="shot" href="./the-scotch-yoke/"><img src="./thumbs/the-scotch-yoke.jpg" alt="The Scotch Yoke" width="900" height="579" loading="lazy"></a>
+      <h2>The Scotch Yoke</h2>
+      <p>Turn a crank and watch its roller drive a piston through a straight slot. A live mechanical exhibit</p>
+      <p class="actions"><a class="open" href="./the-scotch-yoke/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-scotch-yoke.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-seismograph" data-category="Mechanisms" data-tags="pendulum">
+      <a class="shot" href="./the-seismograph/"><img src="./thumbs/the-seismograph.jpg" alt="The Seismograph" width="900" height="579" loading="lazy"></a>
+      <h2>The Seismograph</h2>
+      <p>Tune a tremor, watch the suspended mass and read the trace on a mechanical seismograph rendered in Margo Engine.</p>
+      <p class="actions"><a class="open" href="./the-seismograph/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-seismograph.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-shadow-calendar" data-category="Optics and Light" data-tags="light,space">
+      <a class="shot" href="./the-shadow-calendar/"><img src="./thumbs/the-shadow-calendar.jpg" alt="The Shadow Calendar" width="900" height="579" loading="lazy"></a>
+      <h2>The Shadow Calendar</h2>
+      <p>Follow a working bronze sundial through the day and across seasons.</p>
+      <p class="actions"><a class="open" href="./the-shadow-calendar/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-shadow-calendar.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-siphon" data-category="Fluids and Water" data-tags="water">
+      <a class="shot" href="./the-siphon/"><img src="./thumbs/the-siphon.jpg" alt="The Siphon" width="900" height="579" loading="lazy"></a>
+      <h2>The Siphon</h2>
+      <p>Change the outlet height of a primed siphon and see what drives the water through the glass.</p>
+      <p class="actions"><a class="open" href="./the-siphon/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-siphon.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-stepping-stones" data-category="People and Characters" data-tags="character">
+      <a class="shot" href="./the-stepping-stones/"><img src="./thumbs/the-stepping-stones.jpg" alt="The Stepping Stones" width="900" height="579" loading="lazy"></a>
+      <h2>The Stepping Stones</h2>
+      <p>Shift a stepping stone and watch a digital human shift his weight and plant each foot across the creek.</p>
+      <p class="actions"><a class="open" href="./the-stepping-stones/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-stepping-stones.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-stroboscope" data-category="Optics and Light" data-tags="optics,light">
+      <a class="shot" href="./the-stroboscope/"><img src="./thumbs/the-stroboscope.jpg" alt="The Stroboscope" width="900" height="579" loading="lazy"></a>
+      <h2>The Stroboscope</h2>
+      <p>Sample a turning rotor and see it slow, stop or appear to spin backward.</p>
+      <p class="actions"><a class="open" href="./the-stroboscope/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-stroboscope.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-tidal-clock" data-category="Fluids and Water" data-tags="water">
+      <a class="shot" href="./the-tidal-clock/"><img src="./thumbs/the-tidal-clock.jpg" alt="The Tidal Clock" width="900" height="579" loading="lazy"></a>
+      <h2>The Tidal Clock</h2>
+      <p>Scrub a day of tides in a miniature harbor and compare the changing waterline on spring and neap tides.</p>
+      <p class="actions"><a class="open" href="./the-tidal-clock/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-tidal-clock.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-toggle-press" data-category="Mechanisms" data-tags="linkage">
+      <a class="shot" href="./the-toggle-press/"><img src="./thumbs/the-toggle-press.jpg" alt="The Toggle Press" width="900" height="579" loading="lazy"></a>
+      <h2>The Toggle Press</h2>
+      <p>Straighten two hinged links and see how a manual toggle press trades travel for force. Built in Margo Engine.</p>
+      <p class="actions"><a class="open" href="./the-toggle-press/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-toggle-press.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-venturi-meter" data-category="Fluids and Water" data-tags="water">
+      <a class="shot" href="./the-venturi-meter/"><img src="./thumbs/the-venturi-meter.jpg" alt="The Venturi Meter" width="900" height="579" loading="lazy"></a>
+      <h2>The Venturi Meter</h2>
+      <p>Send water through a transparent Venturi meter. Watch the flow accelerate while the throat pressure falls.</p>
+      <p class="actions"><a class="open" href="./the-venturi-meter/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-venturi-meter.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-vortex-ring" data-category="Fluids and Water" data-tags="water,particles">
+      <a class="shot" href="./the-vortex-ring/"><img src="./thumbs/the-vortex-ring.jpg" alt="The Vortex Ring" width="900" height="579" loading="lazy"></a>
+      <h2>The Vortex Ring</h2>
+      <p>Launch a ring of dye through a dark water tank and see how circulation changes its rise.</p>
+      <p class="actions"><a class="open" href="./the-vortex-ring/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-vortex-ring.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-watt-governor" data-category="Mechanisms" data-tags="gears,linkage">
+      <a class="shot" href="./the-watt-governor/"><img src="./thumbs/the-watt-governor.jpg" alt="The Watt Governor" width="900" height="579" loading="lazy"></a>
+      <h2>The Watt Governor</h2>
+      <p>Change the spindle speed to see how a Watt governor uses two spinning weights to close a steam valve.</p>
+      <p class="actions"><a class="open" href="./the-watt-governor/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-watt-governor.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="a-thousand-lights" data-category="Rendering and Lighting" data-tags="light,shadows,clustered lighting">
+      <a class="shot" href="./a-thousand-lights/"><img src="./thumbs/a-thousand-lights.jpg" alt="A Thousand Lights" width="900" height="579" loading="lazy"></a>
+      <h2>A Thousand Lights</h2>
+      <p>Sweep a thousand colored lights through a basalt hall and watch six of them cast moving shadows.</p>
+      <p class="actions"><a class="open" href="./a-thousand-lights/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/a-thousand-lights.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="ambient-occlusion" data-category="Rendering and Lighting" data-tags="light,shadows,post-processing">
+      <a class="shot" href="./ambient-occlusion/"><img src="./thumbs/ambient-occlusion.jpg" alt="Ambient Occlusion" width="900" height="579" loading="lazy"></a>
+      <h2>Ambient Occlusion</h2>
+      <p>Compare two ambient occlusion methods on a chambered spiral sculpture under the same light.</p>
+      <p class="actions"><a class="open" href="./ambient-occlusion/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/ambient-occlusion.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="area-lights" data-category="Rendering and Lighting" data-tags="light,materials">
+      <a class="shot" href="./area-lights/"><img src="./thumbs/area-lights.jpg" alt="Area Lights" width="900" height="579" loading="lazy"></a>
+      <h2>Area Lights</h2>
+      <p>Slide a sphere, disc, tube or line light along a rail and see its highlight change on nickel, brass and ceramic.</p>
+      <p class="actions"><a class="open" href="./area-lights/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/area-lights.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="bend-it" data-category="CAD and Modeling" data-tags="mesh,curves,deformation">
+      <a class="shot" href="./bend-it/"><img src="./thumbs/bend-it.jpg" alt="Bend It" width="900" height="579" loading="lazy"></a>
+      <h2>Bend It</h2>
+      <p>Bend a segmented footbridge along an editable spline and drag the guide points in plan.</p>
+      <p class="actions"><a class="open" href="./bend-it/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/bend-it.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="big-data-points" data-category="Data and Science" data-tags="point cloud,lidar,real data,terrain">
+      <a class="shot" href="./big-data-points/"><img src="./thumbs/big-data-points.jpg" alt="Big Data Points" width="900" height="579" loading="lazy"></a>
+      <h2>Big Data Points</h2>
+      <p>Turn a real USGS lidar survey of the Kilauea summit and stream up to two million points.</p>
+      <p class="actions"><a class="open" href="./big-data-points/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/big-data-points.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="bounce-light" data-category="Rendering and Lighting" data-tags="light,global illumination,ray tracing">
+      <a class="shot" href="./bounce-light/"><img src="./thumbs/bounce-light.jpg" alt="Bounce Light" width="900" height="579" loading="lazy"></a>
+      <h2>Bounce Light</h2>
+      <p>Compare direct, screen space and ray traced bounce light in a gallery with colored plaster walls.</p>
+      <p class="actions"><a class="open" href="./bounce-light/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/bounce-light.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="candlelight" data-category="Rendering and Lighting" data-tags="light,shadows,bloom">
+      <a class="shot" href="./candlelight/"><img src="./thumbs/candlelight.jpg" alt="Candlelight" width="900" height="579" loading="lazy"></a>
+      <h2>Candlelight</h2>
+      <p>Five candles light a night archive. Freeze the flicker and watch the shadow budget respond.</p>
+      <p class="actions"><a class="open" href="./candlelight/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/candlelight.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="caustic-glass" data-category="Optics and Light" data-tags="optics,light,caustics">
+      <a class="shot" href="./caustic-glass/"><img src="./thumbs/caustic-glass.jpg" alt="Caustic Glass" width="900" height="579" loading="lazy"></a>
+      <h2>Caustic Glass</h2>
+      <p>Shine light through polished, ground and dispersive glass and compare the caustics on a slate table.</p>
+      <p class="actions"><a class="open" href="./caustic-glass/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/caustic-glass.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="charts-you-can-hear" data-category="Data and Science" data-tags="charts,sound,real data,accessibility">
+      <a class="shot" href="./charts-you-can-hear/"><img src="./thumbs/charts-you-can-hear.jpg" alt="Charts You Can Hear" width="900" height="579" loading="lazy"></a>
+      <h2>Charts You Can Hear</h2>
+      <p>Listen to a day of Golden Gate tide readings, then explore the same chart with the keyboard or a table.</p>
+      <p class="actions"><a class="open" href="./charts-you-can-hear/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/charts-you-can-hear.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="cloudscape" data-category="Scenes and Cities" data-tags="sky,clouds,volumetrics,light">
+      <a class="shot" href="./cloudscape/"><img src="./thumbs/cloudscape.jpg" alt="Cloudscape" width="900" height="579" loading="lazy"></a>
+      <h2>Cloudscape</h2>
+      <p>Climb from the ground through a volumetric cumulus layer and watch sun shafts and cloud shadows.</p>
+      <p class="actions"><a class="open" href="./cloudscape/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/cloudscape.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="compute-textures" data-category="Data and Science" data-tags="gpu compute,simulation,procedural">
+      <a class="shot" href="./compute-textures/"><img src="./thumbs/compute-textures.jpg" alt="Compute Textures" width="900" height="579" loading="lazy"></a>
+      <h2>Compute Textures</h2>
+      <p>Run three Gray Scott reaction recipes on a live GPU texture and add reagent with a tap.</p>
+      <p class="actions"><a class="open" href="./compute-textures/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/compute-textures.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="depth-video" data-category="Data and Science" data-tags="point cloud,real data,video">
+      <a class="shot" href="./depth-video/"><img src="./thumbs/depth-video.jpg" alt="Depth Video" width="900" height="579" loading="lazy"></a>
+      <h2>Depth Video</h2>
+      <p>Play a real depth camera recording as a point cloud, switch to camera color and orbit it.</p>
+      <p class="actions"><a class="open" href="./depth-video/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/depth-video.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="directional-lightmaps" data-category="Rendering and Lighting" data-tags="light,baked lighting,materials">
+      <a class="shot" href="./directional-lightmaps/"><img src="./thumbs/directional-lightmaps.jpg" alt="Directional Lightmaps" width="900" height="579" loading="lazy"></a>
+      <h2>Directional Lightmaps</h2>
+      <p>Compare a directional lightmap with an intensity only bake on the same enamel relief.</p>
+      <p class="actions"><a class="open" href="./directional-lightmaps/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/directional-lightmaps.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="edit-and-save-bim" data-category="CAD and Modeling" data-tags="bim,ifc,export,architecture">
+      <a class="shot" href="./edit-and-save-bim/"><img src="./thumbs/edit-and-save-bim.jpg" alt="Edit and Save BIM" width="900" height="579" loading="lazy"></a>
+      <h2>Edit and Save BIM</h2>
+      <p>Change a door&#x27;s properties in an IFC pavilion and download the checked, revised file.</p>
+      <p class="actions"><a class="open" href="./edit-and-save-bim/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/edit-and-save-bim.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="glsl-welcome" data-category="Rendering and Lighting" data-tags="shaders,code">
+      <a class="shot" href="./glsl-welcome/"><img src="./thumbs/glsl-welcome.jpg" alt="GLSL Welcome" width="900" height="579" loading="lazy"></a>
+      <h2>GLSL Welcome</h2>
+      <p>Edit a GLSL fragment shader and watch it run live on a sculpted surface.</p>
+      <p class="actions"><a class="open" href="./glsl-welcome/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/glsl-welcome.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="golden-hour" data-category="Rendering and Lighting" data-tags="light,sky,tone mapping">
+      <a class="shot" href="./golden-hour/"><img src="./thumbs/golden-hour.jpg" alt="Golden Hour" width="900" height="579" loading="lazy"></a>
+      <h2>Golden Hour</h2>
+      <p>Switch between four lighting conditions and three tone mapping looks over the same stone basin.</p>
+      <p class="actions"><a class="open" href="./golden-hour/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/golden-hour.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="gpu-numpy" data-category="Data and Science" data-tags="gpu compute,code,math">
+      <a class="shot" href="./gpu-numpy/"><img src="./thumbs/gpu-numpy.jpg" alt="GPU NumPy" width="900" height="579" loading="lazy"></a>
+      <h2>GPU NumPy</h2>
+      <p>Run array expressions, Fourier transforms, sorts and matrix products on the GPU.</p>
+      <p class="actions"><a class="open" href="./gpu-numpy/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/gpu-numpy.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="ground-projection" data-category="Rendering and Lighting" data-tags="light,environment maps,hdr">
+      <a class="shot" href="./ground-projection/"><img src="./thumbs/ground-projection.jpg" alt="Ground Projection" width="900" height="579" loading="lazy"></a>
+      <h2>Ground Projection</h2>
+      <p>Switch between a distant skydome and a ground projected photo backdrop with real contact.</p>
+      <p class="actions"><a class="open" href="./ground-projection/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/ground-projection.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="hdr-window" data-category="Rendering and Lighting" data-tags="hdr,light,tone mapping">
+      <a class="shot" href="./hdr-window/"><img src="./thumbs/hdr-window.jpg" alt="HDR Window" width="900" height="579" loading="lazy"></a>
+      <h2>HDR Window</h2>
+      <p>Compare standard and extended highlights in a gallery lit from an EXR, with HDR output where your display supports it.</p>
+      <p class="actions"><a class="open" href="./hdr-window/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/hdr-window.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="light-probes" data-category="Rendering and Lighting" data-tags="light,reflections,light probes">
+      <a class="shot" href="./light-probes/"><img src="./thumbs/light-probes.jpg" alt="Light Probes" width="900" height="579" loading="lazy"></a>
+      <h2>Light Probes</h2>
+      <p>Roll a polished sphere through three colored rooms and watch its lighting and reflections change.</p>
+      <p class="actions"><a class="open" href="./light-probes/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/light-probes.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="long-shadows" data-category="Rendering and Lighting" data-tags="shadows,terrain,light">
+      <a class="shot" href="./long-shadows/"><img src="./thumbs/long-shadows.jpg" alt="Long Shadows" width="900" height="579" loading="lazy"></a>
+      <h2>Long Shadows</h2>
+      <p>Watch local and terrain shadows stretch across a five kilometer Alpine railway valley.</p>
+      <p class="actions"><a class="open" href="./long-shadows/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/long-shadows.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="many-goals" data-category="Mechanisms" data-tags="robotics,inverse kinematics,linkage">
+      <a class="shot" href="./many-goals/"><img src="./thumbs/many-goals.jpg" alt="Many Goals" width="900" height="579" loading="lazy"></a>
+      <h2>Many Goals</h2>
+      <p>Give one robot arm three contact targets, change their priorities and measure where each lands.</p>
+      <p class="actions"><a class="open" href="./many-goals/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/many-goals.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="mesh-booleans" data-category="CAD and Modeling" data-tags="mesh,booleans">
+      <a class="shot" href="./mesh-booleans/"><img src="./thumbs/mesh-booleans.jpg" alt="Mesh Booleans" width="900" height="579" loading="lazy"></a>
+      <h2>Mesh Booleans</h2>
+      <p>Carve pockets and a tunnel through a lapis specimen with exact triangle mesh subtraction.</p>
+      <p class="actions"><a class="open" href="./mesh-booleans/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/mesh-booleans.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="model-to-step" data-category="CAD and Modeling" data-tags="cad,b-rep,step,export">
+      <a class="shot" href="./model-to-step/"><img src="./thumbs/model-to-step.jpg" alt="Model to STEP" width="900" height="579" loading="lazy"></a>
+      <h2>Model to STEP</h2>
+      <p>Change a flange&#x27;s bore, export the solid to STEP and import it back to compare.</p>
+      <p class="actions"><a class="open" href="./model-to-step/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/model-to-step.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="molten-words" data-category="Scenes and Cities" data-tags="text,procedural,heat">
+      <a class="shot" href="./molten-words/"><img src="./thumbs/molten-words.jpg" alt="Molten Words" width="900" height="579" loading="lazy"></a>
+      <h2>Molten Words</h2>
+      <p>Type a word, cast it in hot metal and watch it cool in a foundry bed.</p>
+      <p class="actions"><a class="open" href="./molten-words/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/molten-words.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="mountain-day" data-category="Scenes and Cities" data-tags="sky,terrain,light,clouds">
+      <a class="shot" href="./mountain-day/"><img src="./thumbs/mountain-day.jpg" alt="Mountain Day" width="900" height="579" loading="lazy"></a>
+      <h2>Mountain Day</h2>
+      <p>Scrub a full day of sun, clouds, haze and stars over an alpine range.</p>
+      <p class="actions"><a class="open" href="./mountain-day/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/mountain-day.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="night-storm-sky" data-category="Scenes and Cities" data-tags="sky,weather,light">
+      <a class="shot" href="./night-storm-sky/"><img src="./thumbs/night-storm-sky.jpg" alt="Night Storm Sky" width="900" height="579" loading="lazy"></a>
+      <h2>Night Storm Sky</h2>
+      <p>Trigger a lightning strike over a rocky inlet and see it light the storm from inside.</p>
+      <p class="actions"><a class="open" href="./night-storm-sky/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/night-storm-sky.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="paint-the-model" data-category="CAD and Modeling" data-tags="texture painting,mesh,materials">
+      <a class="shot" href="./paint-the-model/"><img src="./thumbs/paint-the-model.jpg" alt="Paint the Model" width="900" height="579" loading="lazy"></a>
+      <h2>Paint the Model</h2>
+      <p>Paint a helmet directly on its 3D surface, with an eraser and undo.</p>
+      <p class="actions"><a class="open" href="./paint-the-model/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/paint-the-model.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="parallax-walls" data-category="Rendering and Lighting" data-tags="materials,shaders">
+      <a class="shot" href="./parallax-walls/"><img src="./thumbs/parallax-walls.jpg" alt="Parallax Walls" width="900" height="579" loading="lazy"></a>
+      <h2>Parallax Walls</h2>
+      <p>Inspect parallax occlusion and triplanar mapping on a masonry vault.</p>
+      <p class="actions"><a class="open" href="./parallax-walls/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/parallax-walls.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="parallel-coordinates" data-category="Data and Science" data-tags="charts,real data">
+      <a class="shot" href="./parallel-coordinates/"><img src="./thumbs/parallel-coordinates.jpg" alt="Parallel Coordinates" width="900" height="579" loading="lazy"></a>
+      <h2>Parallel Coordinates</h2>
+      <p>Brush any mix of eight measurements and compare the linked density and scatter views.</p>
+      <p class="actions"><a class="open" href="./parallel-coordinates/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/parallel-coordinates.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="portals" data-category="Rendering and Lighting" data-tags="portals,stencil,rendering">
+      <a class="shot" href="./portals/"><img src="./thumbs/portals.jpg" alt="Portals" width="900" height="579" loading="lazy"></a>
+      <h2>Portals</h2>
+      <p>Move the camera through two stencil portals that open into intersecting chambers.</p>
+      <p class="actions"><a class="open" href="./portals/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/portals.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="ray-traced-shadows" data-category="Rendering and Lighting" data-tags="shadows,ray tracing">
+      <a class="shot" href="./ray-traced-shadows/"><img src="./thumbs/ray-traced-shadows.jpg" alt="Ray Traced Shadows" width="900" height="579" loading="lazy"></a>
+      <h2>Ray Traced Shadows</h2>
+      <p>Compare raster shadow maps with rays traced through a live triangle BVH.</p>
+      <p class="actions"><a class="open" href="./ray-traced-shadows/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/ray-traced-shadows.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="scene-transitions" data-category="Rendering and Lighting" data-tags="post-processing,shaders">
+      <a class="shot" href="./scene-transitions/"><img src="./thumbs/scene-transitions.jpg" alt="Scene Transitions" width="900" height="579" loading="lazy"></a>
+      <h2>Scene Transitions</h2>
+      <p>Scrub a wipe, a noise dissolve and a chromatic swipe between two scenes.</p>
+      <p class="actions"><a class="open" href="./scene-transitions/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/scene-transitions.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="shapes-from-lines" data-category="CAD and Modeling" data-tags="cad,curves,extrusion">
+      <a class="shot" href="./shapes-from-lines/"><img src="./thumbs/shapes-from-lines.jpg" alt="Shapes From Lines" width="900" height="579" loading="lazy"></a>
+      <h2>Shapes From Lines</h2>
+      <p>Draw an outline, offset it, join it to a ring and extrude a beveled solid.</p>
+      <p class="actions"><a class="open" href="./shapes-from-lines/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/shapes-from-lines.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="shortest-paths" data-category="Data and Science" data-tags="graphs,maps,real data,gpu compute">
+      <a class="shot" href="./shortest-paths/"><img src="./thumbs/shortest-paths.jpg" alt="Shortest Paths" width="900" height="579" loading="lazy"></a>
+      <h2>Shortest Paths</h2>
+      <p>Pick a junction in Washington, D.C. and trace the shortest legal route through its one way streets.</p>
+      <p class="actions"><a class="open" href="./shortest-paths/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/shortest-paths.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="skin-and-wax" data-category="Rendering and Lighting" data-tags="materials,subsurface scattering,light">
+      <a class="shot" href="./skin-and-wax/"><img src="./thumbs/skin-and-wax.jpg" alt="Skin and Wax" width="900" height="579" loading="lazy"></a>
+      <h2>Skin and Wax</h2>
+      <p>Move a light over wax, marble and jade and compare how light scatters beneath each surface.</p>
+      <p class="actions"><a class="open" href="./skin-and-wax/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/skin-and-wax.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="speed" data-category="Rendering and Lighting" data-tags="motion blur,post-processing">
+      <a class="shot" href="./speed/"><img src="./thumbs/speed.jpg" alt="Speed" width="900" height="579" loading="lazy"></a>
+      <h2>Speed</h2>
+      <p>Set one motion blur shutter for a passing train and a spinning turntable.</p>
+      <p class="actions"><a class="open" href="./speed/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/speed.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="sweep-and-loft" data-category="CAD and Modeling" data-tags="cad,b-rep,curves">
+      <a class="shot" href="./sweep-and-loft/"><img src="./thumbs/sweep-and-loft.jpg" alt="Sweep and Loft" width="900" height="579" loading="lazy"></a>
+      <h2>Sweep and Loft</h2>
+      <p>Build a duct by sweeping a profile along a path and a bottle by lofting stacked profiles.</p>
+      <p class="actions"><a class="open" href="./sweep-and-loft/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/sweep-and-loft.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="temporal-upscaling" data-category="Rendering and Lighting" data-tags="upscaling,post-processing">
+      <a class="shot" href="./temporal-upscaling/"><img src="./thumbs/temporal-upscaling.jpg" alt="Temporal Upscaling" width="900" height="579" loading="lazy"></a>
+      <h2>Temporal Upscaling</h2>
+      <p>Compare native resolution with spatial and temporal upscaling on an alpine cableway.</p>
+      <p class="actions"><a class="open" href="./temporal-upscaling/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/temporal-upscaling.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="ten-thousand-trees" data-category="Scenes and Cities" data-tags="forest,terrain,instancing,wind">
+      <a class="shot" href="./ten-thousand-trees/"><img src="./thumbs/ten-thousand-trees.jpg" alt="Ten Thousand Trees" width="900" height="579" loading="lazy"></a>
+      <h2>Ten Thousand Trees</h2>
+      <p>Fly low over an alpine forest of ten thousand trees and push wind through the canopy.</p>
+      <p class="actions"><a class="open" href="./ten-thousand-trees/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/ten-thousand-trees.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-ar-card" data-category="CAD and Modeling" data-tags="ar,export,materials">
+      <a class="shot" href="./the-ar-card/"><img src="./thumbs/the-ar-card.jpg" alt="The AR Card" width="900" height="579" loading="lazy"></a>
+      <h2>The AR Card</h2>
+      <p>Turn a model radio and download a real scale USDZ file for AR Quick Look.</p>
+      <p class="actions"><a class="open" href="./the-ar-card/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-ar-card.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-aurora" data-category="Space" data-tags="sky,space,light">
+      <a class="shot" href="./the-aurora/"><img src="./thumbs/the-aurora.jpg" alt="The Aurora" width="900" height="579" loading="lazy"></a>
+      <h2>The Aurora</h2>
+      <p>Scrub three hours of an Arctic night and watch the aurora, stars and Moon move over a frozen lake.</p>
+      <p class="actions"><a class="open" href="./the-aurora/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-aurora.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-baked-room" data-category="Rendering and Lighting" data-tags="baked lighting,global illumination,light">
+      <a class="shot" href="./the-baked-room/"><img src="./thumbs/the-baked-room.jpg" alt="The Baked Room" width="900" height="579" loading="lazy"></a>
+      <h2>The Baked Room</h2>
+      <p>Bake a room&#x27;s indirect light in the browser and compare denoising settings.</p>
+      <p class="actions"><a class="open" href="./the-baked-room/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-baked-room.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-bim-house" data-category="CAD and Modeling" data-tags="bim,ifc,architecture">
+      <a class="shot" href="./the-bim-house/"><img src="./thumbs/the-bim-house.jpg" alt="The BIM House" width="900" height="579" loading="lazy"></a>
+      <h2>The BIM House</h2>
+      <p>Walk through an IFC courtyard house, inspect its walls and download the IFC4 source.</p>
+      <p class="actions"><a class="open" href="./the-bim-house/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-bim-house.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-biome-map" data-category="Scenes and Cities" data-tags="terrain,procedural,climate">
+      <a class="shot" href="./the-biome-map/"><img src="./thumbs/the-biome-map.jpg" alt="The Biome Map" width="900" height="579" loading="lazy"></a>
+      <h2>The Biome Map</h2>
+      <p>Change rainfall and temperature and watch four biomes move across a 3D continent.</p>
+      <p class="actions"><a class="open" href="./the-biome-map/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-biome-map.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-boolean-bench" data-category="CAD and Modeling" data-tags="cad,b-rep,booleans">
+      <a class="shot" href="./the-boolean-bench/"><img src="./thumbs/the-boolean-bench.jpg" alt="The Boolean Bench" width="900" height="579" loading="lazy"></a>
+      <h2>The Boolean Bench</h2>
+      <p>Union, subtract or intersect two exact solids and toggle their B-rep edges.</p>
+      <p class="actions"><a class="open" href="./the-boolean-bench/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-boolean-bench.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-brain-scan" data-category="Data and Science" data-tags="medical,volume rendering,real data">
+      <a class="shot" href="./the-brain-scan/"><img src="./thumbs/the-brain-scan.jpg" alt="The Brain Scan" width="900" height="579" loading="lazy"></a>
+      <h2>The Brain Scan</h2>
+      <p>Move three MRI slices through a real head scan and compare them with bone from the matching CT.</p>
+      <p class="actions"><a class="open" href="./the-brain-scan/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-brain-scan.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-building-checker" data-category="CAD and Modeling" data-tags="bim,ifc,architecture">
+      <a class="shot" href="./the-building-checker/"><img src="./thumbs/the-building-checker.jpg" alt="The Building Checker" width="900" height="579" loading="lazy"></a>
+      <h2>The Building Checker</h2>
+      <p>Open BCF issue viewpoints in an IFC archive and run its door information checks.</p>
+      <p class="actions"><a class="open" href="./the-building-checker/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-building-checker.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-cad-format-shelf" data-category="CAD and Modeling" data-tags="cad,step,iges,import">
+      <a class="shot" href="./the-cad-format-shelf/"><img src="./thumbs/the-cad-format-shelf.jpg" alt="The CAD Format Shelf" width="900" height="579" loading="lazy"></a>
+      <h2>The CAD Format Shelf</h2>
+      <p>Open six real STEP and IGES files and browse the part trees they import.</p>
+      <p class="actions"><a class="open" href="./the-cad-format-shelf/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-cad-format-shelf.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-cell-microscope" data-category="Data and Science" data-tags="biology,volume rendering,real data">
+      <a class="shot" href="./the-cell-microscope/"><img src="./thumbs/the-cell-microscope.jpg" alt="The Cell Microscope" width="900" height="579" loading="lazy"></a>
+      <h2>The Cell Microscope</h2>
+      <p>Explore a cryo electron microscopy map of ATP synthase as a surface or a volume.</p>
+      <p class="actions"><a class="open" href="./the-cell-microscope/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-cell-microscope.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-chart-wall" data-category="Data and Science" data-tags="charts,space,real data,export">
+      <a class="shot" href="./the-chart-wall/"><img src="./thumbs/the-chart-wall.jpg" alt="The Chart Wall" width="900" height="579" loading="lazy"></a>
+      <h2>The Chart Wall</h2>
+      <p>Explore three decades of exoplanet discoveries in live charts and export your view as SVG.</p>
+      <p class="actions"><a class="open" href="./the-chart-wall/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-chart-wall.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-cine-lens" data-category="Rendering and Lighting" data-tags="depth of field,post-processing,optics">
+      <a class="shot" href="./the-cine-lens/"><img src="./thumbs/the-cine-lens.jpg" alt="The Cine Lens" width="900" height="579" loading="lazy"></a>
+      <h2>The Cine Lens</h2>
+      <p>Focus a projector room and compare depth of field with tilt shift.</p>
+      <p class="actions"><a class="open" href="./the-cine-lens/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-cine-lens.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-city-generator" data-category="Scenes and Cities" data-tags="city,procedural">
+      <a class="shot" href="./the-city-generator/"><img src="./thumbs/the-city-generator.jpg" alt="The City Generator" width="900" height="579" loading="lazy"></a>
+      <h2>The City Generator</h2>
+      <p>Generate a seeded model town with streets, lots and buildings from two eras.</p>
+      <p class="actions"><a class="open" href="./the-city-generator/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-city-generator.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-climate-globe" data-category="Data and Science" data-tags="climate,maps,real data">
+      <a class="shot" href="./the-climate-globe/"><img src="./thumbs/the-climate-globe.jpg" alt="The Climate Globe" width="900" height="579" loading="lazy"></a>
+      <h2>The Climate Globe</h2>
+      <p>Step through 146 years of NASA temperature grids on a globe and inspect any cell.</p>
+      <p class="actions"><a class="open" href="./the-climate-globe/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-climate-globe.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-climbing-robot" data-category="Mechanisms" data-tags="robotics,inverse kinematics,character">
+      <a class="shot" href="./the-climbing-robot/"><img src="./thumbs/the-climbing-robot.jpg" alt="The Climbing Robot" width="900" height="579" loading="lazy"></a>
+      <h2>The Climbing Robot</h2>
+      <p>Watch a jointed robot pick collision checked holds up an overhung climbing wall.</p>
+      <p class="actions"><a class="open" href="./the-climbing-robot/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-climbing-robot.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-colour-grader" data-category="Rendering and Lighting" data-tags="color grading,tone mapping,hdr">
+      <a class="shot" href="./the-colour-grader/"><img src="./thumbs/the-colour-grader.jpg" alt="The Color Grader" width="900" height="579" loading="lazy"></a>
+      <h2>The Color Grader</h2>
+      <p>Compare tone mapping curves and grade a coastal signal room live, then export a LUT.</p>
+      <p class="actions"><a class="open" href="./the-colour-grader/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-colour-grader.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-contour-map" data-category="Data and Science" data-tags="terrain,maps,real data">
+      <a class="shot" href="./the-contour-map/"><img src="./thumbs/the-contour-map.jpg" alt="The Contour Map" width="900" height="579" loading="lazy"></a>
+      <h2>The Contour Map</h2>
+      <p>Read USGS elevation contours on Mount St. Helens and orbit the same terrain in relief.</p>
+      <p class="actions"><a class="open" href="./the-contour-map/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-contour-map.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-curve-lab" data-category="CAD and Modeling" data-tags="curves,math">
+      <a class="shot" href="./the-curve-lab/"><img src="./thumbs/the-curve-lab.jpg" alt="The Curve Lab" width="900" height="579" loading="lazy"></a>
+      <h2>The Curve Lab</h2>
+      <p>Compare four spline families, measure arc length and follow a moving frame along the curve.</p>
+      <p class="actions"><a class="open" href="./the-curve-lab/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-curve-lab.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-cut-house" data-category="CAD and Modeling" data-tags="bim,ifc,sections,architecture">
+      <a class="shot" href="./the-cut-house/"><img src="./thumbs/the-cut-house.jpg" alt="The Cut House" width="900" height="579" loading="lazy"></a>
+      <h2>The Cut House</h2>
+      <p>Scrub a capped section through an IFC floor plan and inspect wall and room records.</p>
+      <p class="actions"><a class="open" href="./the-cut-house/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-cut-house.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-dungeon-maker" data-category="Scenes and Cities" data-tags="procedural,game,collision">
+      <a class="shot" href="./the-dungeon-maker/"><img src="./thumbs/the-dungeon-maker.jpg" alt="The Dungeon Maker" width="900" height="579" loading="lazy"></a>
+      <h2>The Dungeon Maker</h2>
+      <p>Generate a two level stone archive and walk through it with real collisions.</p>
+      <p class="actions"><a class="open" href="./the-dungeon-maker/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-dungeon-maker.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-eclipse" data-category="Space" data-tags="space,sky,light">
+      <a class="shot" href="./the-eclipse/"><img src="./thumbs/the-eclipse.jpg" alt="The Eclipse" width="900" height="579" loading="lazy"></a>
+      <h2>The Eclipse</h2>
+      <p>Scrub the April 8, 2024 total solar eclipse as seen from Dallas, Texas.</p>
+      <p class="actions"><a class="open" href="./the-eclipse/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-eclipse.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-engineering-mesh" data-category="Data and Science" data-tags="simulation,mesh,heat">
+      <a class="shot" href="./the-engineering-mesh/"><img src="./thumbs/the-engineering-mesh.jpg" alt="The Engineering Mesh" width="900" height="579" loading="lazy"></a>
+      <h2>The Engineering Mesh</h2>
+      <p>Move a section through a heated ceramic sleeve and see its temperature on a tetrahedral mesh.</p>
+      <p class="actions"><a class="open" href="./the-engineering-mesh/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-engineering-mesh.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-exploded-assembly" data-category="CAD and Modeling" data-tags="cad,assembly">
+      <a class="shot" href="./the-exploded-assembly/"><img src="./thumbs/the-exploded-assembly.jpg" alt="The Exploded Assembly" width="900" height="579" loading="lazy"></a>
+      <h2>The Exploded Assembly</h2>
+      <p>Pull apart an eight leaf optical iris and identify each of its 22 parts.</p>
+      <p class="actions"><a class="open" href="./the-exploded-assembly/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-exploded-assembly.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-fft-lens" data-category="Data and Science" data-tags="gpu compute,math,space,real data">
+      <a class="shot" href="./the-fft-lens/"><img src="./thumbs/the-fft-lens.jpg" alt="The FFT Lens" width="900" height="579" loading="lazy"></a>
+      <h2>The FFT Lens</h2>
+      <p>Compare a real Webb image with its GPU Fourier reconstruction and drop frequency bands to reveal structure.</p>
+      <p class="actions"><a class="open" href="./the-fft-lens/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-fft-lens.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-fillet-bench" data-category="CAD and Modeling" data-tags="cad,b-rep">
+      <a class="shot" href="./the-fillet-bench/"><img src="./thumbs/the-fillet-bench.jpg" alt="The Fillet Bench" width="900" height="579" loading="lazy"></a>
+      <h2>The Fillet Bench</h2>
+      <p>Compare exact rolling ball fillets and chamfers on the same stock and read the volume.</p>
+      <p class="actions"><a class="open" href="./the-fillet-bench/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-fillet-bench.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-glass-stack" data-category="Rendering and Lighting" data-tags="transparency,materials">
+      <a class="shot" href="./the-glass-stack/"><img src="./thumbs/the-glass-stack.jpg" alt="The Glass Stack" width="900" height="579" loading="lazy"></a>
+      <h2>The Glass Stack</h2>
+      <p>Rotate glass and smoke and compare three ways of drawing transparency.</p>
+      <p class="actions"><a class="open" href="./the-glass-stack/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-glass-stack.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-graph-network" data-category="Data and Science" data-tags="graphs,gpu compute">
+      <a class="shot" href="./the-graph-network/"><img src="./thumbs/the-graph-network.jpg" alt="The Graph Network" width="900" height="579" loading="lazy"></a>
+      <h2>The Graph Network</h2>
+      <p>Tap a port in an invented archipelago to trace its ferry routes in a GPU graph.</p>
+      <p class="actions"><a class="open" href="./the-graph-network/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-graph-network.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-heat-haze" data-category="Heat" data-tags="heat,optics,volumetrics">
+      <a class="shot" href="./the-heat-haze/"><img src="./thumbs/the-heat-haze.jpg" alt="The Heat Haze" width="900" height="579" loading="lazy"></a>
+      <h2>The Heat Haze</h2>
+      <p>Watch heat shimmer rise from a temperature volume over a desert highway.</p>
+      <p class="actions"><a class="open" href="./the-heat-haze/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-heat-haze.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-hollow-cup" data-category="CAD and Modeling" data-tags="cad,b-rep,casting">
+      <a class="shot" href="./the-hollow-cup/"><img src="./thumbs/the-hollow-cup.jpg" alt="The Hollow Cup" width="900" height="579" loading="lazy"></a>
+      <h2>The Hollow Cup</h2>
+      <p>Change a cast cup&#x27;s wall thickness and mold draft and check the exact solid.</p>
+      <p class="actions"><a class="open" href="./the-hollow-cup/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-hollow-cup.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-laser-scan" data-category="Data and Science" data-tags="point cloud,lidar,real data,measurement">
+      <a class="shot" href="./the-laser-scan/"><img src="./thumbs/the-laser-scan.jpg" alt="The Laser Scan" width="900" height="579" loading="lazy"></a>
+      <h2>The Laser Scan</h2>
+      <p>Explore 221,727 USGS lidar returns from Glacier Peak and measure between two points.</p>
+      <p class="actions"><a class="open" href="./the-laser-scan/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-laser-scan.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-lens-kit" data-category="Rendering and Lighting" data-tags="post-processing,optics">
+      <a class="shot" href="./the-lens-kit/"><img src="./thumbs/the-lens-kit.jpg" alt="The Lens Kit" width="900" height="579" loading="lazy"></a>
+      <h2>The Lens Kit</h2>
+      <p>Add flare, streaks and vintage lens effects to a night ferry pier.</p>
+      <p class="actions"><a class="open" href="./the-lens-kit/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-lens-kit.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-lighting-store" data-category="Rendering and Lighting" data-tags="light,photometry,real data">
+      <a class="shot" href="./the-lighting-store/"><img src="./thumbs/the-lighting-store.jpg" alt="The Lighting Store" width="900" height="579" loading="lazy"></a>
+      <h2>The Lighting Store</h2>
+      <p>Compare two measured GE floodlight beams on matching walls at real distances.</p>
+      <p class="actions"><a class="open" href="./the-lighting-store/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-lighting-store.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-living-museum" data-category="People and Characters" data-tags="character,ai,game">
+      <a class="shot" href="./the-living-museum/"><img src="./thumbs/the-living-museum.jpg" alt="The Living Museum" width="900" height="579" loading="lazy"></a>
+      <h2>The Living Museum</h2>
+      <p>Guide a visitor through an evening museum and watch the guard notice, follow and search.</p>
+      <p class="actions"><a class="open" href="./the-living-museum/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-living-museum.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-meadow" data-category="Scenes and Cities" data-tags="grass,wind,sky">
+      <a class="shot" href="./the-meadow/"><img src="./thumbs/the-meadow.jpg" alt="The Meadow" width="900" height="579" loading="lazy"></a>
+      <h2>The Meadow</h2>
+      <p>Walk through a high meadow and watch the grass bend, flatten and recover.</p>
+      <p class="actions"><a class="open" href="./the-meadow/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-meadow.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-measuring-room" data-category="CAD and Modeling" data-tags="cad,measurement">
+      <a class="shot" href="./the-measuring-room/"><img src="./thumbs/the-measuring-room.jpg" alt="The Measuring Room" width="900" height="579" loading="lazy"></a>
+      <h2>The Measuring Room</h2>
+      <p>Click a face, edge or bore on a machined block to measure it directly.</p>
+      <p class="actions"><a class="open" href="./the-measuring-room/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-measuring-room.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-mesh-workshop" data-category="CAD and Modeling" data-tags="mesh,modeling">
+      <a class="shot" href="./the-mesh-workshop/"><img src="./thumbs/the-mesh-workshop.jpg" alt="The Mesh Workshop" width="900" height="579" loading="lazy"></a>
+      <h2>The Mesh Workshop</h2>
+      <p>Use five polygon editing tools on an industrial air housing, with undo.</p>
+      <p class="actions"><a class="open" href="./the-mesh-workshop/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-mesh-workshop.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-mirror-hall" data-category="Rendering and Lighting" data-tags="reflections,ray tracing">
+      <a class="shot" href="./the-mirror-hall/"><img src="./thumbs/the-mirror-hall.jpg" alt="The Mirror Hall" width="900" height="579" loading="lazy"></a>
+      <h2>The Mirror Hall</h2>
+      <p>Compare screen space and ray traced reflections side by side in a gallery.</p>
+      <p class="actions"><a class="open" href="./the-mirror-hall/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-mirror-hall.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-molecule" data-category="Data and Science" data-tags="biology,chemistry,real data">
+      <a class="shot" href="./the-molecule/"><img src="./thumbs/the-molecule.jpg" alt="The Molecule" width="900" height="579" loading="lazy"></a>
+      <h2>The Molecule</h2>
+      <p>Orbit the real structure of green fluorescent protein and pick atoms around its chromophore.</p>
+      <p class="actions"><a class="open" href="./the-molecule/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-molecule.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-murmuration" data-category="Scenes and Cities" data-tags="particles,flocking,gpu compute">
+      <a class="shot" href="./the-murmuration/"><img src="./thumbs/the-murmuration.jpg" alt="The Murmuration" width="900" height="579" loading="lazy"></a>
+      <h2>The Murmuration</h2>
+      <p>Send a disturbance through a simulated flock of 16,384 starlings over a dusk marsh.</p>
+      <p class="actions"><a class="open" href="./the-murmuration/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-murmuration.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-neural-playground" data-category="Data and Science" data-tags="machine learning,gpu compute">
+      <a class="shot" href="./the-neural-playground/"><img src="./thumbs/the-neural-playground.jpg" alt="The Neural Playground" width="900" height="579" loading="lazy"></a>
+      <h2>The Neural Playground</h2>
+      <p>Train a small two class model and plant labeled points to reshape its decision field.</p>
+      <p class="actions"><a class="open" href="./the-neural-playground/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-neural-playground.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-painting" data-category="Rendering and Lighting" data-tags="post-processing,stylized">
+      <a class="shot" href="./the-painting/"><img src="./thumbs/the-painting.jpg" alt="The Painting" width="900" height="579" loading="lazy"></a>
+      <h2>The Painting</h2>
+      <p>Compare three painterly filters on a moving coastline.</p>
+      <p class="actions"><a class="open" href="./the-painting/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-painting.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-path-traced-glasshouse" data-category="Rendering and Lighting" data-tags="path tracing,optics,light">
+      <a class="shot" href="./the-path-traced-glasshouse/"><img src="./thumbs/the-path-traced-glasshouse.jpg" alt="The Path Traced Glasshouse" width="900" height="579" loading="lazy"></a>
+      <h2>The Path Traced Glasshouse</h2>
+      <p>Compare two spectral path traced renders and inspect a live flint prism ray study.</p>
+      <p class="actions"><a class="open" href="./the-path-traced-glasshouse/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-path-traced-glasshouse.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-print-shop" data-category="CAD and Modeling" data-tags="3d printing,export">
+      <a class="shot" href="./the-print-shop/"><img src="./thumbs/the-print-shop.jpg" alt="The Print Shop" width="900" height="579" loading="lazy"></a>
+      <h2>The Print Shop</h2>
+      <p>Scrub all 30 toolpath layers of a print and download the matching 3MF or G-code.</p>
+      <p class="actions"><a class="open" href="./the-print-shop/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-print-shop.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-product-studio" data-category="Rendering and Lighting" data-tags="light,shadows,materials">
+      <a class="shot" href="./the-product-studio/"><img src="./thumbs/the-product-studio.jpg" alt="The Product Studio" width="900" height="579" loading="lazy"></a>
+      <h2>The Product Studio</h2>
+      <p>Frame a radio receiver, render a still with soft disk light shadows and save it as a PNG.</p>
+      <p class="actions"><a class="open" href="./the-product-studio/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-product-studio.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-projector" data-category="Rendering and Lighting" data-tags="light,shadows,optics">
+      <a class="shot" href="./the-projector/"><img src="./thumbs/the-projector.jpg" alt="The Projector" width="900" height="579" loading="lazy"></a>
+      <h2>The Projector</h2>
+      <p>Pass three glass slides through a projector and watch the light fall across a statue.</p>
+      <p class="actions"><a class="open" href="./the-projector/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-projector.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-reach-test" data-category="Mechanisms" data-tags="robotics,inverse kinematics,collision">
+      <a class="shot" href="./the-reach-test/"><img src="./thumbs/the-reach-test.jpg" alt="The Reach Test" width="900" height="579" loading="lazy"></a>
+      <h2>The Reach Test</h2>
+      <p>Drag the target and watch a three link arm reach around a capsule and a block.</p>
+      <p class="actions"><a class="open" href="./the-reach-test/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-reach-test.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-road-builder" data-category="Scenes and Cities" data-tags="roads,procedural,terrain">
+      <a class="shot" href="./the-road-builder/"><img src="./thumbs/the-road-builder.jpg" alt="The Road Builder" width="900" height="579" loading="lazy"></a>
+      <h2>The Road Builder</h2>
+      <p>Draw roads with stitched intersections, banking and markings on fitted ground.</p>
+      <p class="actions"><a class="open" href="./the-road-builder/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-road-builder.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-sculpting-clay" data-category="CAD and Modeling" data-tags="sculpting,mesh,baking">
+      <a class="shot" href="./the-sculpting-clay/"><img src="./thumbs/the-sculpting-clay.jpg" alt="The Sculpting Clay" width="900" height="579" loading="lazy"></a>
+      <h2>The Sculpting Clay</h2>
+      <p>Sculpt a clay study by hand and bake its detail into a downloadable normal map.</p>
+      <p class="actions"><a class="open" href="./the-sculpting-clay/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-sculpting-clay.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-section-saw" data-category="CAD and Modeling" data-tags="cad,sections">
+      <a class="shot" href="./the-section-saw/"><img src="./thumbs/the-section-saw.jpg" alt="The Section Saw" width="900" height="579" loading="lazy"></a>
+      <h2>The Section Saw</h2>
+      <p>Move a cutting plane through a shaft seal and expose its cut faces and hidden edges.</p>
+      <p class="actions"><a class="open" href="./the-section-saw/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-section-saw.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-shader-node-editor" data-category="Rendering and Lighting" data-tags="shaders,materials,code">
+      <a class="shot" href="./the-shader-node-editor/"><img src="./thumbs/the-shader-node-editor.jpg" alt="The Shader Node Editor" width="900" height="579" loading="lazy"></a>
+      <h2>The Shader Node Editor</h2>
+      <p>Wire shader nodes into a glazed material and read the WGSL it generates.</p>
+      <p class="actions"><a class="open" href="./the-shader-node-editor/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-shader-node-editor.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-shadow-lab" data-category="Rendering and Lighting" data-tags="shadows,light">
+      <a class="shot" href="./the-shadow-lab/"><img src="./thumbs/the-shadow-lab.jpg" alt="The Shadow Lab" width="900" height="579" loading="lazy"></a>
+      <h2>The Shadow Lab</h2>
+      <p>Change a light&#x27;s size and see soft shadows, stained glass color and light through leaves.</p>
+      <p class="actions"><a class="open" href="./the-shadow-lab/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-shadow-lab.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-simplifier" data-category="CAD and Modeling" data-tags="mesh,level of detail">
+      <a class="shot" href="./the-simplifier/"><img src="./thumbs/the-simplifier.jpg" alt="The Simplifier" width="900" height="579" loading="lazy"></a>
+      <h2>The Simplifier</h2>
+      <p>Reduce the triangle count of a limestone owl and compare the levels of detail.</p>
+      <p class="actions"><a class="open" href="./the-simplifier/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-simplifier.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-sky-clock" data-category="Space" data-tags="space,sky">
+      <a class="shot" href="./the-sky-clock/"><img src="./thumbs/the-sky-clock.jpg" alt="The Sky Clock" width="900" height="579" loading="lazy"></a>
+      <h2>The Sky Clock</h2>
+      <p>See the sky for any date, UTC time and place on Earth.</p>
+      <p class="actions"><a class="open" href="./the-sky-clock/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-sky-clock.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-sky-survey" data-category="Space" data-tags="space,real data,particles">
+      <a class="shot" href="./the-sky-survey/"><img src="./thumbs/the-sky-survey.jpg" alt="The Sky Survey" width="900" height="579" loading="lazy"></a>
+      <h2>The Sky Survey</h2>
+      <p>Turn an armillary holding 7,195 NASA Fermi gamma ray detections.</p>
+      <p class="actions"><a class="open" href="./the-sky-survey/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-sky-survey.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-solid-modeller" data-category="CAD and Modeling" data-tags="cad,b-rep">
+      <a class="shot" href="./the-solid-modeller/"><img src="./thumbs/the-solid-modeller.jpg" alt="The Solid Modeler" width="900" height="579" loading="lazy"></a>
+      <h2>The Solid Modeler</h2>
+      <p>Build a mounting bracket in four exact B-rep steps and read the volume and mass at each.</p>
+      <p class="actions"><a class="open" href="./the-solid-modeller/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-solid-modeller.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-sort-race" data-category="Data and Science" data-tags="gpu compute,benchmark">
+      <a class="shot" href="./the-sort-race/"><img src="./thumbs/the-sort-race.jpg" alt="The Sort Race" width="900" height="579" loading="lazy"></a>
+      <h2>The Sort Race</h2>
+      <p>Race a million key GPU radix sort against your browser&#x27;s CPU sort and verify both.</p>
+      <p class="actions"><a class="open" href="./the-sort-race/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-sort-race.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-sound-landscape" data-category="Waves and Sound" data-tags="sound,charts">
+      <a class="shot" href="./the-sound-landscape/"><img src="./thumbs/the-sound-landscape.jpg" alt="The Sound Landscape" width="900" height="579" loading="lazy"></a>
+      <h2>The Sound Landscape</h2>
+      <p>Play three clips and follow their audio through live 3D spectrograms.</p>
+      <p class="actions"><a class="open" href="./the-sound-landscape/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-sound-landscape.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-splat-room" data-category="Space" data-tags="gaussian splats,space,real data">
+      <a class="shot" href="./the-splat-room/"><img src="./thumbs/the-splat-room.jpg" alt="The Splat Room" width="900" height="579" loading="lazy"></a>
+      <h2>The Splat Room</h2>
+      <p>Explore a Gaussian splat scan of the Apollo 11 cabin and recolor or erase splats.</p>
+      <p class="actions"><a class="open" href="./the-splat-room/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-splat-room.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-streamtubes" data-category="Fluids and Water" data-tags="flow,air,charts">
+      <a class="shot" href="./the-streamtubes/"><img src="./thumbs/the-streamtubes.jpg" alt="The Streamtubes" width="900" height="579" loading="lazy"></a>
+      <h2>The Streamtubes</h2>
+      <p>Change the tube thickness or isolate either wingtip vortex in a wind tunnel.</p>
+      <p class="actions"><a class="open" href="./the-streamtubes/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-streamtubes.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-stress-glyphs" data-category="Data and Science" data-tags="simulation,stress,math">
+      <a class="shot" href="./the-stress-glyphs/"><img src="./thumbs/the-stress-glyphs.jpg" alt="The Stress Glyphs" width="900" height="579" loading="lazy"></a>
+      <h2>The Stress Glyphs</h2>
+      <p>Rotate a pull around a circular hole and watch the stress field change.</p>
+      <p class="actions"><a class="open" href="./the-stress-glyphs/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-stress-glyphs.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-technical-drawing" data-category="CAD and Modeling" data-tags="cad,drawings,optics">
+      <a class="shot" href="./the-technical-drawing/"><img src="./thumbs/the-technical-drawing.jpg" alt="The Technical Drawing" width="900" height="579" loading="lazy"></a>
+      <h2>The Technical Drawing</h2>
+      <p>Orbit a technical drawing of a refractor with dashed hidden lines.</p>
+      <p class="actions"><a class="open" href="./the-technical-drawing/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-technical-drawing.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-uv-unwrapper" data-category="CAD and Modeling" data-tags="mesh,uv,textures">
+      <a class="shot" href="./the-uv-unwrapper/"><img src="./thumbs/the-uv-unwrapper.jpg" alt="The UV Unwrapper" width="900" height="579" loading="lazy"></a>
+      <h2>The UV Unwrapper</h2>
+      <p>Change a model&#x27;s seams and compare its texture and lightmap UV islands.</p>
+      <p class="actions"><a class="open" href="./the-uv-unwrapper/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-uv-unwrapper.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-weather-radar" data-category="Data and Science" data-tags="weather,radar,real data">
+      <a class="shot" href="./the-weather-radar/"><img src="./thumbs/the-weather-radar.jpg" alt="The Weather Radar" width="900" height="579" loading="lazy"></a>
+      <h2>The Weather Radar</h2>
+      <p>Change a real NEXRAD sweep angle and see the curved beam and reflectivity.</p>
+      <p class="actions"><a class="open" href="./the-weather-radar/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-weather-radar.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-weigh-station" data-category="CAD and Modeling" data-tags="cad,measurement,b-rep">
+      <a class="shot" href="./the-weigh-station/"><img src="./thumbs/the-weigh-station.jpg" alt="The Weigh Station" width="900" height="579" loading="lazy"></a>
+      <h2>The Weigh Station</h2>
+      <p>Pick a part and a metal and read its volume, mass, center of mass and inertia.</p>
+      <p class="actions"><a class="open" href="./the-weigh-station/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-weigh-station.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="toon-town" data-category="Rendering and Lighting" data-tags="stylized,shaders,city">
+      <a class="shot" href="./toon-town/"><img src="./thumbs/toon-town.jpg" alt="Toon Town" width="900" height="579" loading="lazy"></a>
+      <h2>Toon Town</h2>
+      <p>Change pen, dot and cel shading in an illustrated canal village.</p>
+      <p class="actions"><a class="open" href="./toon-town/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/toon-town.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="trees-from-space" data-category="Scenes and Cities" data-tags="procedural,forest">
+      <a class="shot" href="./trees-from-space/"><img src="./thumbs/trees-from-space.jpg" alt="Trees From Space" width="900" height="579" loading="lazy"></a>
+      <h2>Trees From Space</h2>
+      <p>Grow a canopy and roots with space colonization and add barriers to change their path.</p>
+      <p class="actions"><a class="open" href="./trees-from-space/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/trees-from-space.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="volumetric-fog" data-category="Rendering and Lighting" data-tags="volumetrics,light,fog">
+      <a class="shot" href="./volumetric-fog/"><img src="./thumbs/volumetric-fog.jpg" alt="Volumetric Fog" width="900" height="579" loading="lazy"></a>
+      <h2>Volumetric Fog</h2>
+      <p>Watch dawn fog, mist banks and sun shafts through a forest canopy.</p>
+      <p class="actions"><a class="open" href="./volumetric-fog/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/volumetric-fog.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="voronoi-shatter-art" data-category="CAD and Modeling" data-tags="mesh,procedural,fracture">
+      <a class="shot" href="./voronoi-shatter-art/"><img src="./thumbs/voronoi-shatter-art.jpg" alt="Voronoi Shatter Art" width="900" height="579" loading="lazy"></a>
+      <h2>Voronoi Shatter Art</h2>
+      <p>Separate a glazed sculpture into its 35 solid Voronoi cells and put it back together.</p>
+      <p class="actions"><a class="open" href="./voronoi-shatter-art/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/voronoi-shatter-art.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="wind-and-flow-painting" data-category="Fluids and Water" data-tags="flow,gpu compute,simulation">
+      <a class="shot" href="./wind-and-flow-painting/"><img src="./thumbs/wind-and-flow-painting.jpg" alt="Wind and Flow Painting" width="900" height="579" loading="lazy"></a>
+      <h2>Wind and Flow Painting</h2>
+      <p>Release dye streaks into a computed flow and compare its velocity texture.</p>
+      <p class="actions"><a class="open" href="./wind-and-flow-painting/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/wind-and-flow-painting.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="wind-over-america" data-category="Data and Science" data-tags="weather,maps,real data,wind">
+      <a class="shot" href="./wind-over-america/"><img src="./thumbs/wind-over-america.jpg" alt="Wind Over America" width="900" height="579" loading="lazy"></a>
+      <h2>Wind Over America</h2>
+      <p>Step through eight days of NOAA wind over North America.</p>
+      <p class="actions"><a class="open" href="./wind-over-america/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/wind-over-america.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="2d-light-and-shadow" data-category="Rendering and Lighting" data-tags="light,shadows,2d">
+      <a class="shot" href="./2d-light-and-shadow/"><img src="./thumbs/2d-light-and-shadow.jpg" alt="2D Light and Shadow" width="900" height="579" loading="lazy"></a>
+      <h2>2D Light and Shadow</h2>
+      <p>Carry a survey lamp into an underground river chamber. Move the light to see which rock faces it reaches.</p>
+      <p class="actions"><a class="open" href="./2d-light-and-shadow/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/2d-light-and-shadow.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="bone-crowds" data-category="People and Characters" data-tags="character,animation,crowds">
+      <a class="shot" href="./bone-crowds/"><img src="./thumbs/bone-crowds.jpg" alt="Bone Crowds" width="900" height="579" loading="lazy"></a>
+      <h2>Bone Crowds</h2>
+      <p>Follow a caribou migration across a braided river. Every set of hooves moves on its own clock.</p>
+      <p class="actions"><a class="open" href="./bone-crowds/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/bone-crowds.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="bullet-through-paper" data-category="Physics" data-tags="physics,collision">
+      <a class="shot" href="./bullet-through-paper/"><img src="./thumbs/bullet-through-paper.jpg" alt="Bullet Through Paper" width="900" height="579" loading="lazy"></a>
+      <h2>Bullet Through Paper</h2>
+      <p>Send two virtual ceramic blocks toward thin rigid dividers. Swept collision changes what happens between samples.</p>
+      <p class="actions"><a class="open" href="./bullet-through-paper/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/bullet-through-paper.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="character-course" data-category="People and Characters" data-tags="character,animation">
+      <a class="shot" href="./character-course/"><img src="./thumbs/character-course.jpg" alt="Character Course" width="900" height="579" loading="lazy"></a>
+      <h2>Character Course</h2>
+      <p>Cross the gauge station on foot. Climb the steps, ride the ferry, then take the ramp to the lower deck.</p>
+      <p class="actions"><a class="open" href="./character-course/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/character-course.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="compound-shapes" data-category="Physics" data-tags="physics,collision">
+      <a class="shot" href="./compound-shapes/"><img src="./thumbs/compound-shapes.jpg" alt="Compound Shapes" width="900" height="579" loading="lazy"></a>
+      <h2>Compound Shapes</h2>
+      <p>Release two built-up shapes and watch how their mass and shape affect the tumble.</p>
+      <p class="actions"><a class="open" href="./compound-shapes/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/compound-shapes.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="cutscene-studio" data-category="Editors" data-tags="film,editor,camera">
+      <a class="shot" href="./cutscene-studio/"><img src="./thumbs/cutscene-studio.jpg" alt="Cutscene Studio" width="900" height="579" loading="lazy"></a>
+      <h2>Cutscene Studio</h2>
+      <p>Edit a lighthouse scene in three shots. Move a cut, scrub the dialogue, or render the sequence to a video file.</p>
+      <p class="actions"><a class="open" href="./cutscene-studio/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/cutscene-studio.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="drone-volume" data-category="AI and Pathfinding" data-tags="ai,pathfinding,drones">
+      <a class="shot" href="./drone-volume/"><img src="./thumbs/drone-volume.jpg" alt="Drone Volume" width="900" height="579" loading="lazy"></a>
+      <h2>Drone Volume</h2>
+      <p>Send three inspection drones through a conservatory. Their routes can curve around the racks or climb above them.</p>
+      <p class="actions"><a class="open" href="./drone-volume/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/drone-volume.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="globe-flight" data-category="Space" data-tags="space,terrain,flight">
+      <a class="shot" href="./globe-flight/"><img src="./thumbs/globe-flight.jpg" alt="Globe Flight" width="900" height="579" loading="lazy"></a>
+      <h2>Globe Flight</h2>
+      <p>Fly from Earth&#x27;s limb to the summit of Mauna Kea, then turn the island to follow its volcanic ridges.</p>
+      <p class="actions"><a class="open" href="./globe-flight/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/globe-flight.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="height-streaming" data-category="Scenes and Cities" data-tags="terrain,streaming,maps">
+      <a class="shot" href="./height-streaming/"><img src="./thumbs/height-streaming.jpg" alt="Height Streaming" width="900" height="579" loading="lazy"></a>
+      <h2>Height Streaming</h2>
+      <p>Fly the bends of Utah&#x27;s Green River and watch measured terrain load around you as the survey window moves.</p>
+      <p class="actions"><a class="open" href="./height-streaming/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/height-streaming.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="l-system-garden" data-category="Data and Science" data-tags="procedural,plants,simulation">
+      <a class="shot" href="./l-system-garden/"><img src="./thumbs/l-system-garden.jpg" alt="L-System Garden" width="900" height="579" loading="lazy"></a>
+      <h2>L-System Garden</h2>
+      <p>Rewrite a plant&#x27;s growth rules and see each generation take shape.</p>
+      <p class="actions"><a class="open" href="./l-system-garden/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/l-system-garden.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="marching-cubes" data-category="CAD and Modeling" data-tags="meshing,volume,procedural">
+      <a class="shot" href="./marching-cubes/"><img src="./thumbs/marching-cubes.jpg" alt="Marching Cubes" width="900" height="579" loading="lazy"></a>
+      <h2>Marching Cubes</h2>
+      <p>Change the wax&#x27;s surface threshold and watch the lamp&#x27;s moving forms merge or split.</p>
+      <p class="actions"><a class="open" href="./marching-cubes/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/marching-cubes.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="path-traced-voxels" data-category="Rendering and Lighting" data-tags="path tracing,voxels,light">
+      <a class="shot" href="./path-traced-voxels/"><img src="./thumbs/path-traced-voxels.jpg" alt="Path-Traced Voxels" width="900" height="579" loading="lazy"></a>
+      <h2>Path-Traced Voxels</h2>
+      <p>Switch lamps and watch the light reflect off stone and pass through glass.</p>
+      <p class="actions"><a class="open" href="./path-traced-voxels/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/path-traced-voxels.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="pathfinder" data-category="AI and Pathfinding" data-tags="ai,pathfinding">
+      <a class="shot" href="./pathfinder/"><img src="./thumbs/pathfinder.jpg" alt="Pathfinder" width="900" height="579" loading="lazy"></a>
+      <h2>Pathfinder</h2>
+      <p>Drag the gold pin. The lead cart finds a route while the other carts make room for each other.</p>
+      <p class="actions"><a class="open" href="./pathfinder/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/pathfinder.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="pattern-copier" data-category="Data and Science" data-tags="procedural,patterns">
+      <a class="shot" href="./pattern-copier/"><img src="./thumbs/pattern-copier.jpg" alt="Pattern Copier" width="900" height="579" loading="lazy"></a>
+      <h2>Pattern Copier</h2>
+      <p>Draw a swatch. The overlapping model grows it into a woven field by matching 3 by 3 neighborhoods.</p>
+      <p class="actions"><a class="open" href="./pattern-copier/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/pattern-copier.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="pinball" data-category="Games" data-tags="game,physics">
+      <a class="shot" href="./pinball/"><img src="./thumbs/pinball.jpg" alt="Pinball" width="900" height="579" loading="lazy"></a>
+      <h2>Pinball</h2>
+      <p>Launch a steel ball into the Aurora cabinet. Strike the bumpers and work both flippers to keep it on the table.</p>
+      <p class="actions"><a class="open" href="./pinball/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/pinball.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="shape-casts" data-category="Physics" data-tags="physics,collision">
+      <a class="shot" href="./shape-casts/"><img src="./thumbs/shape-casts.jpg" alt="Shape Casts" width="900" height="579" loading="lazy"></a>
+      <h2>Shape Casts</h2>
+      <p>Sweep a probe across four fittings. Inspect every contacted surface, its distance along the sweep, and the direction it faces.</p>
+      <p class="actions"><a class="open" href="./shape-casts/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/shape-casts.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="sharp-sdf-models" data-category="CAD and Modeling" data-tags="sdf,meshing,cad">
+      <a class="shot" href="./sharp-sdf-models/"><img src="./thumbs/sharp-sdf-models.jpg" alt="Sharp SDF Models" width="900" height="579" loading="lazy"></a>
+      <h2>Sharp SDF Models</h2>
+      <p>Carve a miniature lightwell by combining two distance fields. Change the channel width and inspect the corners of the regenerated mesh.</p>
+      <p class="actions"><a class="open" href="./sharp-sdf-models/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/sharp-sdf-models.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="sprite-colliders" data-category="Physics" data-tags="physics,collision,2d">
+      <a class="shot" href="./sprite-colliders/"><img src="./thumbs/sprite-colliders.jpg" alt="Sprite Colliders" width="900" height="579" loading="lazy"></a>
+      <h2>Sprite Colliders</h2>
+      <p>Draw a cutout, then drop it. The press traces the solid pixels, including any holes you erase.</p>
+      <p class="actions"><a class="open" href="./sprite-colliders/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/sprite-colliders.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="state-machine-door" data-category="AI and Pathfinding" data-tags="ai,state machine">
+      <a class="shot" href="./state-machine-door/"><img src="./thumbs/state-machine-door.jpg" alt="State Machine Door" width="900" height="579" loading="lazy"></a>
+      <h2>State Machine Door</h2>
+      <p>Open the vault and switch on the inspection lamp. Hold midway, then resume to see where both states return.</p>
+      <p class="actions"><a class="open" href="./state-machine-door/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/state-machine-door.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-2d-buggy" data-category="Games" data-tags="game,physics,2d">
+      <a class="shot" href="./the-2d-buggy/"><img src="./thumbs/the-2d-buggy.jpg" alt="The 2D Buggy" width="900" height="579" loading="lazy"></a>
+      <h2>The 2D Buggy</h2>
+      <p>Take a dune crawler across Salt Ridge. Watch its two independent springs follow the trail as the buggy climbs, crests, and brakes.</p>
+      <p class="actions"><a class="open" href="./the-2d-buggy/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-2d-buggy.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-2d-sandbox" data-category="Games" data-tags="game,physics,2d">
+      <a class="shot" href="./the-2d-sandbox/"><img src="./thumbs/the-2d-sandbox.jpg" alt="The 2D Sandbox" width="900" height="579" loading="lazy"></a>
+      <h2>The 2D Sandbox</h2>
+      <p>Stack crates at the quarry crossing, build a hinged bridge, then unpin a bank and watch the span fall.</p>
+      <p class="actions"><a class="open" href="./the-2d-sandbox/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-2d-sandbox.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-2d-skeleton" data-category="People and Characters" data-tags="character,animation,2d">
+      <a class="shot" href="./the-2d-skeleton/"><img src="./thumbs/the-2d-skeleton.jpg" alt="The 2D Skeleton" width="900" height="579" loading="lazy"></a>
+      <h2>The 2D Skeleton</h2>
+      <p>Raise the keeper&#x27;s lantern. Reveal the rig to see each joint carry the motion.</p>
+      <p class="actions"><a class="open" href="./the-2d-skeleton/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-2d-skeleton.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-block-tower" data-category="Physics" data-tags="physics,structures">
+      <a class="shot" href="./the-block-tower/"><img src="./thumbs/the-block-tower.jpg" alt="The Block Tower" width="900" height="579" loading="lazy"></a>
+      <h2>The Block Tower</h2>
+      <p>Pull a beam from the stack and see which supports can still carry the load.</p>
+      <p class="actions"><a class="open" href="./the-block-tower/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-block-tower.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-camera-director" data-category="Editors" data-tags="camera,editor,film">
+      <a class="shot" href="./the-camera-director/"><img src="./thumbs/the-camera-director.jpg" alt="The Camera Director" width="900" height="579" loading="lazy"></a>
+      <h2>The Camera Director</h2>
+      <p>Call a shot at a salt-flat observatory. Follow one survey rover, keep both in frame, or give the antenna camera priority.</p>
+      <p class="actions"><a class="open" href="./the-camera-director/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-camera-director.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-changing-maze" data-category="AI and Pathfinding" data-tags="ai,pathfinding">
+      <a class="shot" href="./the-changing-maze/"><img src="./thumbs/the-changing-maze.jpg" alt="The Changing Maze" width="900" height="579" loading="lazy"></a>
+      <h2>The Changing Maze</h2>
+      <p>Slide either wall on the routing table. Only the tiles it touches rebuild, then the shuttle takes the new route.</p>
+      <p class="actions"><a class="open" href="./the-changing-maze/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-changing-maze.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-conveyor-factory" data-category="Physics" data-tags="physics,factory">
+      <a class="shot" href="./the-conveyor-factory/"><img src="./thumbs/the-conveyor-factory.jpg" alt="The Conveyor Factory" width="900" height="579" loading="lazy"></a>
+      <h2>The Conveyor Factory</h2>
+      <p>Start three belts, feed parcels, and watch the chutes sort them into collection bins. Every count comes from a live sensor.</p>
+      <p class="actions"><a class="open" href="./the-conveyor-factory/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-conveyor-factory.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-coral-garden" data-category="Data and Science" data-tags="procedural,biology,simulation">
+      <a class="shot" href="./the-coral-garden/"><img src="./thumbs/the-coral-garden.jpg" alt="The Coral Garden" width="900" height="579" loading="lazy"></a>
+      <h2>The Coral Garden</h2>
+      <p>Advance a living branching model from its holdfast to a full colony. Turn the current to see how the growth rule leans into the flow.</p>
+      <p class="actions"><a class="open" href="./the-coral-garden/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-coral-garden.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-crt-arcade" data-category="Games" data-tags="game,2d">
+      <a class="shot" href="./the-crt-arcade/"><img src="./thumbs/the-crt-arcade.jpg" alt="The CRT Arcade" width="900" height="579" loading="lazy"></a>
+      <h2>The CRT Arcade</h2>
+      <p>Fly the courier through six inspection rings. Match the lit lane before each crossing.</p>
+      <p class="actions"><a class="open" href="./the-crt-arcade/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-crt-arcade.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-flow-field" data-category="AI and Pathfinding" data-tags="ai,pathfinding,crowds">
+      <a class="shot" href="./the-flow-field/"><img src="./thumbs/the-flow-field.jpg" alt="The Flow Field" width="900" height="579" loading="lazy"></a>
+      <h2>The Flow Field</h2>
+      <p>Tap open terrain to move the destination. Twelve thousand moving lights find their way around the ridges.</p>
+      <p class="actions"><a class="open" href="./the-flow-field/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-flow-field.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-game-menu" data-category="Editors" data-tags="ui,menu,editor">
+      <a class="shot" href="./the-game-menu/"><img src="./thumbs/the-game-menu.jpg" alt="The Game Menu" width="900" height="579" loading="lazy"></a>
+      <h2>The Game Menu</h2>
+      <p>Open a tethered ocean survey menu, move through three stations, and keep one tether back to the surface.</p>
+      <p class="actions"><a class="open" href="./the-game-menu/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-game-menu.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-gear-maker" data-category="CAD and Modeling" data-tags="cad,gears,manufacturing">
+      <a class="shot" href="./the-gear-maker/"><img src="./thumbs/the-gear-maker.jpg" alt="The Gear Maker" width="900" height="579" loading="lazy"></a>
+      <h2>The Gear Maker</h2>
+      <p>Cut a fresh set of involute wheels by changing the tooth counts. Turn the input and see both stages mesh at the correct ratio.</p>
+      <p class="actions"><a class="open" href="./the-gear-maker/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-gear-maker.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-guard" data-category="AI and Pathfinding" data-tags="ai,character">
+      <a class="shot" href="./the-guard/"><img src="./thumbs/the-guard.jpg" alt="The Guard" width="900" height="579" loading="lazy"></a>
+      <h2>The Guard</h2>
+      <p>Ring a gallery chime. Watch Rita investigate the sound, search the room, and return to her rounds.</p>
+      <p class="actions"><a class="open" href="./the-guard/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-guard.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-hex-map" data-category="Games" data-tags="game,maps">
+      <a class="shot" href="./the-hex-map/"><img src="./thumbs/the-hex-map.jpg" alt="The Hex Map" width="900" height="579" loading="lazy"></a>
+      <h2>The Hex Map</h2>
+      <p>Lead a survey team through a coastal range. Ridges block sight, and every new route fills in the chart.</p>
+      <p class="actions"><a class="open" href="./the-hex-map/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-hex-map.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-inspector" data-category="Editors" data-tags="editor,debug,rendering">
+      <a class="shot" href="./the-inspector/"><img src="./thumbs/the-inspector.jpg" alt="The Inspector" width="900" height="579" loading="lazy"></a>
+      <h2>The Inspector</h2>
+      <p>Slide the lens out, edit the scene tree, then capture the passes that draw the bench.</p>
+      <p class="actions"><a class="open" href="./the-inspector/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-inspector.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-joint-workshop" data-category="Physics" data-tags="physics,joints">
+      <a class="shot" href="./the-joint-workshop/"><img src="./thumbs/the-joint-workshop.jpg" alt="The Joint Workshop" width="900" height="579" loading="lazy"></a>
+      <h2>The Joint Workshop</h2>
+      <p>Drive two cabinet doors into their mechanical stops and set a jointed pendulum swinging. Show the joint frames to inspect each limit.</p>
+      <p class="actions"><a class="open" href="./the-joint-workshop/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-joint-workshop.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-marble-maze" data-category="Games" data-tags="game,physics">
+      <a class="shot" href="./the-marble-maze/"><img src="./thumbs/the-marble-maze.jpg" alt="The Marble Maze" width="900" height="579" loading="lazy"></a>
+      <h2>The Marble Maze</h2>
+      <p>Roll the marble from the diamond inlay to the brass-rimmed hole.</p>
+      <p class="actions"><a class="open" href="./the-marble-maze/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-marble-maze.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-material-factory" data-category="Rendering and Lighting" data-tags="materials,light,pbr">
+      <a class="shot" href="./the-material-factory/"><img src="./thumbs/the-material-factory.jpg" alt="The Material Factory" width="900" height="579" loading="lazy"></a>
+      <h2>The Material Factory</h2>
+      <p>Generate a finish, then move the light to see what each of its four maps contributes.</p>
+      <p class="actions"><a class="open" href="./the-material-factory/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-material-factory.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-meshlet-statue" data-category="Rendering and Lighting" data-tags="rendering,meshlets">
+      <a class="shot" href="./the-meshlet-statue/"><img src="./thumbs/the-meshlet-statue.jpg" alt="The Meshlet Statue" width="900" height="579" loading="lazy"></a>
+      <h2>The Meshlet Statue</h2>
+      <p>Slide the gallery wall across a bronze sculpture and see how many triangles Margo submits for the same scene.</p>
+      <p class="actions"><a class="open" href="./the-meshlet-statue/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-meshlet-statue.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-mocap-theatre" data-category="People and Characters" data-tags="character,animation,mocap">
+      <a class="shot" href="./the-mocap-theatre/"><img src="./thumbs/the-mocap-theatre.jpg" alt="The Mocap Theatre" width="900" height="579" loading="lazy"></a>
+      <h2>The Mocap Theatre</h2>
+      <p>Watch two real walk recordings. Their captured joints move on the left and drive the same performer on the right.</p>
+      <p class="actions"><a class="open" href="./the-mocap-theatre/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-mocap-theatre.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-noise-lab" data-category="Data and Science" data-tags="procedural,noise,terrain">
+      <a class="shot" href="./the-noise-lab/"><img src="./thumbs/the-noise-lab.jpg" alt="The Noise Lab" width="900" height="579" loading="lazy"></a>
+      <h2>The Noise Lab</h2>
+      <p>Change a single frequency and watch an island, a cloud chamber, and a seamless tile reorganize.</p>
+      <p class="actions"><a class="open" href="./the-noise-lab/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-noise-lab.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-pixel-platformer" data-category="Games" data-tags="game,2d">
+      <a class="shot" href="./the-pixel-platformer/"><img src="./thumbs/the-pixel-platformer.jpg" alt="The Pixel Platformer" width="900" height="579" loading="lazy"></a>
+      <h2>The Pixel Platformer</h2>
+      <p>Cross the headland. Collect three prisms and relight the beacon.</p>
+      <p class="actions"><a class="open" href="./the-pixel-platformer/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-pixel-platformer.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-planner" data-category="AI and Pathfinding" data-tags="ai,planning,character">
+      <a class="shot" href="./the-planner/"><img src="./thumbs/the-planner.jpg" alt="The Planner" width="900" height="579" loading="lazy"></a>
+      <h2>The Planner</h2>
+      <p>At the ridge lookout, Nessa needs a hot supper and a rest. Start the rain and watch her plan find dry fuel under cover.</p>
+      <p class="actions"><a class="open" href="./the-planner/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-planner.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-rewind-button" data-category="Physics" data-tags="physics,rewind">
+      <a class="shot" href="./the-rewind-button/"><img src="./thumbs/the-rewind-button.jpg" alt="The Rewind Button" width="900" height="579" loading="lazy"></a>
+      <h2>The Rewind Button</h2>
+      <p>Roll a brass drum into a stack of ceramic crates. Slide back through the pile-up using the physics engine&#x27;s saved state.</p>
+      <p class="actions"><a class="open" href="./the-rewind-button/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-rewind-button.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-rigid-body-rain" data-category="Physics" data-tags="physics,collision">
+      <a class="shot" href="./the-rigid-body-rain/"><img src="./thumbs/the-rigid-body-rain.jpg" alt="The Rigid Body Rain" width="900" height="579" loading="lazy"></a>
+      <h2>The Rigid Body Rain</h2>
+      <p>Eight hundred blocks and spheres fall into a sculpted basin. Tap any piece to push it.</p>
+      <p class="actions"><a class="open" href="./the-rigid-body-rain/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-rigid-body-rain.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-sleep-map" data-category="Physics" data-tags="physics,sleeping">
+      <a class="shot" href="./the-sleep-map/"><img src="./thumbs/the-sleep-map.jpg" alt="The Sleep Map" width="900" height="579" loading="lazy"></a>
+      <h2>The Sleep Map</h2>
+      <p>Tap a spring bed to wake it. Watch its ceramic beads return to rest.</p>
+      <p class="actions"><a class="open" href="./the-sleep-map/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-sleep-map.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-snapshot-hall" data-category="Rendering and Lighting" data-tags="rendering,instancing">
+      <a class="shot" href="./the-snapshot-hall/"><img src="./thumbs/the-snapshot-hall.jpg" alt="The Snapshot Hall" width="900" height="579" loading="lazy"></a>
+      <h2>The Snapshot Hall</h2>
+      <p>Walk through a specimen archive. Compare three ways of submitting the same hall to the renderer.</p>
+      <p class="actions"><a class="open" href="./the-snapshot-hall/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-snapshot-hall.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-streaming-city" data-category="Scenes and Cities" data-tags="city,streaming">
+      <a class="shot" href="./the-streaming-city/"><img src="./thumbs/the-streaming-city.jpg" alt="The Streaming City" width="900" height="579" loading="lazy"></a>
+      <h2>The Streaming City</h2>
+      <p>Fly across a four-sector district and watch building tiles load as they come into view.</p>
+      <p class="actions"><a class="open" href="./the-streaming-city/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-streaming-city.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-terrain-sculptor" data-category="CAD and Modeling" data-tags="terrain,sculpting,editor">
+      <a class="shot" href="./the-terrain-sculptor/"><img src="./thumbs/the-terrain-sculptor.jpg" alt="The Terrain Sculptor" width="900" height="579" loading="lazy"></a>
+      <h2>The Terrain Sculptor</h2>
+      <p>Shape a volcanic basin. Raise the ground, paint a mineral layer, or open the lava tube beneath it.</p>
+      <p class="actions"><a class="open" href="./the-terrain-sculptor/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-terrain-sculptor.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-ui-layout-editor" data-category="Editors" data-tags="ui,editor">
+      <a class="shot" href="./the-ui-layout-editor/"><img src="./thumbs/the-ui-layout-editor.jpg" alt="The UI Layout Editor" width="900" height="579" loading="lazy"></a>
+      <h2>The UI Layout Editor</h2>
+      <p>Drag widgets onto a live Margo screen. Reorder the layers and see the markup update.</p>
+      <p class="actions"><a class="open" href="./the-ui-layout-editor/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-ui-layout-editor.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="the-voxel-editor" data-category="CAD and Modeling" data-tags="voxels,editor,cad">
+      <a class="shot" href="./the-voxel-editor/"><img src="./thumbs/the-voxel-editor.jpg" alt="The Voxel Editor" width="900" height="579" loading="lazy"></a>
+      <h2>The Voxel Editor</h2>
+      <p>Shape a working harbor model cell by cell. Paint the signal tower, build a beacon, or select a volume and cut it away.</p>
+      <p class="actions"><a class="open" href="./the-voxel-editor/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/the-voxel-editor.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="utility-choices" data-category="AI and Pathfinding" data-tags="ai,utility,character">
+      <a class="shot" href="./utility-choices/"><img src="./thumbs/utility-choices.jpg" alt="Utility Choices" width="900" height="579" loading="lazy"></a>
+      <h2>Utility Choices</h2>
+      <p>Change the weather in a working orchard. Follow the villagers as they weigh hunger, thirst, and fatigue and book a place to meet each need.</p>
+      <p class="actions"><a class="open" href="./utility-choices/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/utility-choices.zip">Download</a></p>
+    </article>
+    <article class="card" data-slug="voxel-world-light" data-category="Rendering and Lighting" data-tags="light,voxels">
+      <a class="shot" href="./voxel-world-light/"><img src="./thumbs/voxel-world-light.jpg" alt="Voxel World Light" width="900" height="579" loading="lazy"></a>
+      <h2>Voxel World Light</h2>
+      <p>Open the shutter to let amber light reach a corner it can&#x27;t see.</p>
+      <p class="actions"><a class="open" href="./voxel-world-light/">Open</a><a class="download" href="https://github.com/scottcampbelldata/margoengine/raw/refs/heads/main/demos/downloads/voxel-world-light.zip">Download</a></p>
+    </article>
+    </section>
+    <footer>
+      <p>Made by Scott Campbell</p>
+      <p><a href="https://margoengine.com">margoengine.com</a> <a href="https://github.com/scottcampbelldata/margoengine">GitHub</a></p>
+    </footer>
+  </main>
+  <script src="./gallery.js?v=20261127g" defer></script>
+</body>
+</html>

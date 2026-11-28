@@ -1,0 +1,2453 @@
+[
+  {
+    "slug": "event-horizon",
+    "title": "Event Horizon",
+    "description": "Orbit a spinning black hole and see light from its accretion disk bend around the shadow.",
+    "category": "Space",
+    "tags": [
+      "space",
+      "light"
+    ]
+  },
+  {
+    "slug": "earth-from-orbit",
+    "title": "Earth From Orbit",
+    "description": "Move through a day in UTC and watch sunlight cross the real geography of Earth.",
+    "category": "Space",
+    "tags": [
+      "space",
+      "city",
+      "light"
+    ]
+  },
+  {
+    "slug": "cathedral-light",
+    "title": "Cathedral Light",
+    "description": "Move the sun through an autumn day and watch its light cross a Gothic nave.",
+    "category": "Scenes and Cities",
+    "tags": [
+      "light",
+      "heat"
+    ]
+  },
+  {
+    "slug": "the-night-city",
+    "title": "The Night City",
+    "description": "Scrub through dusk in a city built and lit in Margo Engine.",
+    "category": "Scenes and Cities",
+    "tags": [
+      "city",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-million-stars",
+    "title": "The Million Stars",
+    "description": "Explore one million real 2MASS point sources and brush their near-infrared colors to see where they sit on the sky.",
+    "category": "Space",
+    "tags": [
+      "space",
+      "particles",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-wrecking-ball",
+    "title": "The Wrecking Ball",
+    "description": "Release a miniature crane's linked pendulum into stacked blocks and compare how much of the tower falls.",
+    "category": "Mechanisms",
+    "tags": [
+      "pendulum",
+      "rigid bodies"
+    ]
+  },
+  {
+    "slug": "the-domino-cascade",
+    "title": "The Domino Cascade",
+    "description": "Tip one domino and follow the chain through a spiral, up a staircase and across a bridge.",
+    "category": "Mechanisms",
+    "tags": [
+      "rigid bodies"
+    ]
+  },
+  {
+    "slug": "the-engine-block",
+    "title": "The Engine Block",
+    "description": "Section, inspect and export an exact four-cylinder CAD casting in Margo Engine.",
+    "category": "Mechanisms",
+    "tags": [
+      "gears"
+    ]
+  },
+  {
+    "slug": "inside-a-heat-pump",
+    "title": "Inside a Heat Pump",
+    "description": "Reverse the refrigerant circuit, explore the heat exchangers and take apart a heat pump in Margo Engine.",
+    "category": "Heat",
+    "tags": [
+      "heat",
+      "water"
+    ]
+  },
+  {
+    "slug": "newtons-cradle",
+    "title": "Newton's Cradle",
+    "description": "Release one or two polished steel balls and watch a contact pulse cross Newton's cradle.",
+    "category": "Mechanisms",
+    "tags": [
+      "pendulum",
+      "rigid bodies"
+    ]
+  },
+  {
+    "slug": "the-analog-integrator",
+    "title": "The Analog Integrator",
+    "description": "A working wheel-and-disk integrator in Margo Engine.",
+    "category": "Mechanisms",
+    "tags": [
+      "gears",
+      "linkage"
+    ]
+  },
+  {
+    "slug": "the-archimedes-screw",
+    "title": "The Archimedes Screw",
+    "description": "Turn an Archimedes screw and see the water pockets carry water from a lower pool to a raised basin.",
+    "category": "Fluids and Water",
+    "tags": [
+      "water",
+      "gears"
+    ]
+  },
+  {
+    "slug": "the-astigmatism-bench",
+    "title": "The Astigmatism Bench",
+    "description": "Slide the image plane of an astigmatic lens and see its spot turn from one line into another.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-bellows",
+    "title": "The Bellows",
+    "description": "Lift and lower the walnut handle. See the leather bellows fold and its two check valves send air one way.",
+    "category": "Mechanisms",
+    "tags": [
+      "linkage"
+    ]
+  },
+  {
+    "slug": "the-bimetal-switch",
+    "title": "The Bimetal Switch",
+    "description": "Warm two bonded metals and watch their different expansion open an electrical contact.",
+    "category": "Heat",
+    "tags": [
+      "heat"
+    ]
+  },
+  {
+    "slug": "the-birefringence-viewer",
+    "title": "The Birefringence Viewer",
+    "description": "Load a clear disc between crossed polarizers and see the stress emerge in spectral color.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-cable-span",
+    "title": "The Cable Span",
+    "description": "Move a proof cart across a suspended footbridge. Watch its twin cables and timber deck find a new equilibrium.",
+    "category": "Mechanisms",
+    "tags": [
+      "linkage",
+      "rigid bodies"
+    ]
+  },
+  {
+    "slug": "the-camera-obscura",
+    "title": "The Camera Obscura",
+    "description": "Slide the ground glass in a cutaway pinhole camera and watch the inverted harbor grow dimmer.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-canal-lock",
+    "title": "The Canal Lock",
+    "description": "Take a narrowboat through a working cutaway canal lock and watch the water carry it to the next reach.",
+    "category": "Fluids and Water",
+    "tags": [
+      "water"
+    ]
+  },
+  {
+    "slug": "the-capillary-garden",
+    "title": "The Capillary Garden",
+    "description": "Watch liquid rise into five glass capillaries and change the wetting angle to see how high each column can climb.",
+    "category": "Fluids and Water",
+    "tags": [
+      "water"
+    ]
+  },
+  {
+    "slug": "the-capstan",
+    "title": "The Capstan",
+    "description": "Wind a rope around a capstan and see how friction lets you hold a heavier load.",
+    "category": "Mechanisms",
+    "tags": [
+      "gears"
+    ]
+  },
+  {
+    "slug": "the-chain-fountain",
+    "title": "The Chain Fountain",
+    "description": "Run a chain fountain and see how contacts in its feed tray push the falling chain upward.",
+    "category": "Mechanisms",
+    "tags": [
+      "rigid bodies",
+      "particles"
+    ]
+  },
+  {
+    "slug": "the-desert-mirage",
+    "title": "The Desert Mirage",
+    "description": "Heat a desert road and trace the light that makes dry asphalt look like water.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light",
+      "heat"
+    ]
+  },
+  {
+    "slug": "the-dichroic-splitter",
+    "title": "The Dichroic Splitter",
+    "description": "Tilt a thin-film dichroic plate and see how it divides white light between two optical paths.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-differential",
+    "title": "The Differential",
+    "description": "See how an open differential lets its wheels turn at different speeds.",
+    "category": "Mechanisms",
+    "tags": [
+      "gears"
+    ]
+  },
+  {
+    "slug": "the-diffraction-ruler",
+    "title": "The Diffraction Ruler",
+    "description": "Change the wavelength or groove density to move the diffraction orders across a precision angle scale.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-echo-canyon",
+    "title": "The Echo Canyon",
+    "description": "Send a sound across a sandstone canyon and compare the delay from each reflected path.",
+    "category": "Waves and Sound",
+    "tags": [
+      "sound"
+    ]
+  },
+  {
+    "slug": "the-eddy-brake",
+    "title": "The Eddy Brake",
+    "description": "Spin a copper rotor and watch a magnetic field slow it through eddy currents.",
+    "category": "Mechanisms",
+    "tags": [
+      "heat"
+    ]
+  },
+  {
+    "slug": "the-epicyclic-drive",
+    "title": "The Epicyclic Drive",
+    "description": "Hold the sun, carrier, or ring and watch three planet gears change motion in a true tooth-count gear train.",
+    "category": "Mechanisms",
+    "tags": [
+      "gears"
+    ]
+  },
+  {
+    "slug": "the-flood-table",
+    "title": "The Flood Table",
+    "description": "Release a reservoir and defend a miniature valley in a live Margo Engine hydraulic simulation.",
+    "category": "Fluids and Water",
+    "tags": [
+      "water"
+    ]
+  },
+  {
+    "slug": "the-foucault-pendulum",
+    "title": "The Foucault Pendulum",
+    "description": "Move a Foucault pendulum from one hemisphere to the other and watch its swing turn with Earth",
+    "category": "Mechanisms",
+    "tags": [
+      "pendulum",
+      "space"
+    ]
+  },
+  {
+    "slug": "the-fourier-organ",
+    "title": "The Fourier Organ",
+    "description": "Add odd harmonics to a tone and watch a sine wave take on the shape of a square wave.",
+    "category": "Waves and Sound",
+    "tags": [
+      "sound"
+    ]
+  },
+  {
+    "slug": "the-fresnel-lens",
+    "title": "The Fresnel Lens",
+    "description": "Move a lighthouse lamp behind a stepped Fresnel lens to see when its rays emerge parallel.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-geneva-drive",
+    "title": "The Geneva Drive",
+    "description": "Turn the crank of a four-slot Geneva drive and watch a continuous turn become one precise step. Built in Margo Engine.",
+    "category": "Mechanisms",
+    "tags": [
+      "gears",
+      "linkage"
+    ]
+  },
+  {
+    "slug": "the-gimbal",
+    "title": "The Gimbal",
+    "description": "Tilt a precision gyroscope and see what its gimbals do. Built in Margo Engine.",
+    "category": "Mechanisms",
+    "tags": [
+      "gears",
+      "linkage"
+    ]
+  },
+  {
+    "slug": "the-halo-prism",
+    "title": "The Halo Prism",
+    "description": "Trace two refractions through a hexagonal ice prism and find the sharp inner edge of the 22 degree halo.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light",
+      "space"
+    ]
+  },
+  {
+    "slug": "the-harmonic-drive",
+    "title": "The Harmonic Drive",
+    "description": "A working strain-wave gear cutaway in Margo Engine.",
+    "category": "Mechanisms",
+    "tags": [
+      "gears"
+    ]
+  },
+  {
+    "slug": "the-heat-sink",
+    "title": "The Heat Sink",
+    "description": "Turn on a fan and follow heat through a working model of an electronics heat sink.",
+    "category": "Heat",
+    "tags": [
+      "heat"
+    ]
+  },
+  {
+    "slug": "the-hele-shaw-cell",
+    "title": "The Hele-Shaw Cell",
+    "description": "Follow colored dye through a thin glass cell and widen a cylinder to divert the flow.",
+    "category": "Fluids and Water",
+    "tags": [
+      "water",
+      "particles"
+    ]
+  },
+  {
+    "slug": "the-hydraulic-jump",
+    "title": "The Hydraulic Jump",
+    "description": "Speed up water in a laboratory flume and watch shallow flow rise into a deep hydraulic jump.",
+    "category": "Fluids and Water",
+    "tags": [
+      "water"
+    ]
+  },
+  {
+    "slug": "the-hydraulic-ram",
+    "title": "The Hydraulic Ram",
+    "description": "Watch a hydraulic ram pump use a falling stream to lift part of its water above the source.",
+    "category": "Fluids and Water",
+    "tags": [
+      "water"
+    ]
+  },
+  {
+    "slug": "the-iridescence-bench",
+    "title": "The Iridescence Bench",
+    "description": "Tune the thickness and angle of a thin film and see white light separate into structural color.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-jewelry-counter",
+    "title": "The Jewelry Counter",
+    "description": "An interactive study of gold, platinum, and round-brilliant gemstone facets, rendered live by Margo Engine.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-light-bench",
+    "title": "The Light Bench",
+    "description": "Turn a slotted steel mask and watch a spotlight carve through a plaster sculpture.",
+    "category": "Optics and Light",
+    "tags": [
+      "light"
+    ]
+  },
+  {
+    "slug": "the-magnetic-field-mapper",
+    "title": "The Magnetic Field Mapper",
+    "description": "Move two magnets and see a board of compass needles trace their combined magnetic field.",
+    "category": "Mechanisms",
+    "tags": []
+  },
+  {
+    "slug": "the-marble-sorter",
+    "title": "The Marble Sorter",
+    "description": "Run a gravity-fed marble sorter and steer the rolling glass into either tray.",
+    "category": "Mechanisms",
+    "tags": [
+      "rigid bodies"
+    ]
+  },
+  {
+    "slug": "the-michelson-interferometer",
+    "title": "The Michelson Interferometer",
+    "description": "Translate a mirror by nanometers and watch a Michelson interferometer count the distance in light fringes.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-moire-press",
+    "title": "The Moiré Press",
+    "description": "Turn one precision screen over another and watch their fine lines form broad moving bands.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-oldham-coupling",
+    "title": "The Oldham Coupling",
+    "description": "Offset two parallel shafts and watch an Oldham coupling transmit the same rotation as its middle disk orbits.",
+    "category": "Mechanisms",
+    "tags": [
+      "gears",
+      "linkage"
+    ]
+  },
+  {
+    "slug": "the-orrery",
+    "title": "The Orrery",
+    "description": "Run two years through an interactive brass orrery and compare the orbits of Mercury, Venus, Earth and Mars.",
+    "category": "Space",
+    "tags": [
+      "space",
+      "gears"
+    ]
+  },
+  {
+    "slug": "the-paper-bridge",
+    "title": "The Paper Bridge",
+    "description": "Load two paper spans side by side and see how a crease changes the way a bridge bends.",
+    "category": "Mechanisms",
+    "tags": [
+      "rigid bodies"
+    ]
+  },
+  {
+    "slug": "the-pelton-wheel",
+    "title": "The Pelton Wheel",
+    "description": "Change the speed of a brass Pelton wheel and watch how its split water jet transfers momentum.",
+    "category": "Fluids and Water",
+    "tags": [
+      "water",
+      "gears"
+    ]
+  },
+  {
+    "slug": "the-pinhole-array",
+    "title": "The Pinhole Array",
+    "description": "Change three circular pinholes and compare the resolution of their lensless images.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-polarizer",
+    "title": "The Polarizer",
+    "description": "Turn the analyzer and watch two polarizers take light from full transmission to extinction.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-resonance-room",
+    "title": "The Resonance Room",
+    "description": "Tune a listening room and see where bass builds up or cancels. An interactive acoustic exhibit",
+    "category": "Waves and Sound",
+    "tags": [
+      "sound"
+    ]
+  },
+  {
+    "slug": "the-retroreflector",
+    "title": "The Retroreflector",
+    "description": "Move a survey lamp at night and follow the three reflections that send the beam back.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-reuleaux-drive",
+    "title": "The Reuleaux Drive",
+    "description": "Turn a Reuleaux triangle inside a square and trace the motion of its moving center. Built in Margo Engine.",
+    "category": "Mechanisms",
+    "tags": [
+      "linkage",
+      "gears"
+    ]
+  },
+  {
+    "slug": "the-rolling-race",
+    "title": "The Rolling Race",
+    "description": "Release a solid disc and hollow ring on the same ramp. See how their mass distribution changes the race.",
+    "category": "Mechanisms",
+    "tags": [
+      "rigid bodies"
+    ]
+  },
+  {
+    "slug": "the-rose-engine",
+    "title": "The Rose Engine",
+    "description": "Turn a rose-engine lathe and watch its rosette guide a fine engraved pattern on a silver workpiece.",
+    "category": "Mechanisms",
+    "tags": [
+      "gears"
+    ]
+  },
+  {
+    "slug": "the-salt-wedge",
+    "title": "The Salt Wedge",
+    "description": "Change river discharge and watch the modeled saltwater intrusion retreat beneath the fresh layer of a coastal estuary.",
+    "category": "Fluids and Water",
+    "tags": [
+      "water"
+    ]
+  },
+  {
+    "slug": "the-sand-pendulum",
+    "title": "The Sand Pendulum",
+    "description": "Release a brass sand pendulum and draw a pattern from two swinging motions.",
+    "category": "Mechanisms",
+    "tags": [
+      "pendulum"
+    ]
+  },
+  {
+    "slug": "the-sarrus-linkage",
+    "title": "The Sarrus Linkage",
+    "description": "A fold-out field platform demonstrating a Sarrus linkage in Margo Engine.",
+    "category": "Mechanisms",
+    "tags": [
+      "linkage"
+    ]
+  },
+  {
+    "slug": "the-schlieren-bench",
+    "title": "The Schlieren Bench",
+    "description": "Slide a knife edge into a focused beam to reveal otherwise invisible temperature gradients above a heater.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light",
+      "heat"
+    ]
+  },
+  {
+    "slug": "the-scotch-yoke",
+    "title": "The Scotch Yoke",
+    "description": "Turn a crank and watch its roller drive a piston through a straight slot. A live mechanical exhibit",
+    "category": "Mechanisms",
+    "tags": [
+      "linkage",
+      "gears"
+    ]
+  },
+  {
+    "slug": "the-seismograph",
+    "title": "The Seismograph",
+    "description": "Tune a tremor, watch the suspended mass and read the trace on a mechanical seismograph rendered in Margo Engine.",
+    "category": "Mechanisms",
+    "tags": [
+      "pendulum"
+    ]
+  },
+  {
+    "slug": "the-shadow-calendar",
+    "title": "The Shadow Calendar",
+    "description": "Follow a working bronze sundial through the day and across seasons.",
+    "category": "Optics and Light",
+    "tags": [
+      "light",
+      "space"
+    ]
+  },
+  {
+    "slug": "the-siphon",
+    "title": "The Siphon",
+    "description": "Change the outlet height of a primed siphon and see what drives the water through the glass.",
+    "category": "Fluids and Water",
+    "tags": [
+      "water"
+    ]
+  },
+  {
+    "slug": "the-stepping-stones",
+    "title": "The Stepping Stones",
+    "description": "Shift a stepping stone and watch a digital human shift his weight and plant each foot across the creek.",
+    "category": "People and Characters",
+    "tags": [
+      "character"
+    ]
+  },
+  {
+    "slug": "the-stroboscope",
+    "title": "The Stroboscope",
+    "description": "Sample a turning rotor and see it slow, stop or appear to spin backward.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-tidal-clock",
+    "title": "The Tidal Clock",
+    "description": "Scrub a day of tides in a miniature harbor and compare the changing waterline on spring and neap tides.",
+    "category": "Fluids and Water",
+    "tags": [
+      "water"
+    ]
+  },
+  {
+    "slug": "the-toggle-press",
+    "title": "The Toggle Press",
+    "description": "Straighten two hinged links and see how a manual toggle press trades travel for force. Built in Margo Engine.",
+    "category": "Mechanisms",
+    "tags": [
+      "linkage"
+    ]
+  },
+  {
+    "slug": "the-venturi-meter",
+    "title": "The Venturi Meter",
+    "description": "Send water through a transparent Venturi meter. Watch the flow accelerate while the throat pressure falls.",
+    "category": "Fluids and Water",
+    "tags": [
+      "water"
+    ]
+  },
+  {
+    "slug": "the-vortex-ring",
+    "title": "The Vortex Ring",
+    "description": "Launch a ring of dye through a dark water tank and see how circulation changes its rise.",
+    "category": "Fluids and Water",
+    "tags": [
+      "water",
+      "particles"
+    ]
+  },
+  {
+    "slug": "the-watt-governor",
+    "title": "The Watt Governor",
+    "description": "Change the spindle speed to see how a Watt governor uses two spinning weights to close a steam valve.",
+    "category": "Mechanisms",
+    "tags": [
+      "gears",
+      "linkage"
+    ]
+  },
+  {
+    "slug": "a-thousand-lights",
+    "title": "A Thousand Lights",
+    "description": "Sweep a thousand colored lights through a basalt hall and watch six of them cast moving shadows.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "light",
+      "shadows",
+      "clustered lighting"
+    ]
+  },
+  {
+    "slug": "ambient-occlusion",
+    "title": "Ambient Occlusion",
+    "description": "Compare two ambient occlusion methods on a chambered spiral sculpture under the same light.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "light",
+      "shadows",
+      "post-processing"
+    ]
+  },
+  {
+    "slug": "area-lights",
+    "title": "Area Lights",
+    "description": "Slide a sphere, disc, tube or line light along a rail and see its highlight change on nickel, brass and ceramic.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "light",
+      "materials"
+    ]
+  },
+  {
+    "slug": "bend-it",
+    "title": "Bend It",
+    "description": "Bend a segmented footbridge along an editable spline and drag the guide points in plan.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "mesh",
+      "curves",
+      "deformation"
+    ]
+  },
+  {
+    "slug": "big-data-points",
+    "title": "Big Data Points",
+    "description": "Turn a real USGS lidar survey of the Kilauea summit and stream up to two million points.",
+    "category": "Data and Science",
+    "tags": [
+      "point cloud",
+      "lidar",
+      "real data",
+      "terrain"
+    ]
+  },
+  {
+    "slug": "bounce-light",
+    "title": "Bounce Light",
+    "description": "Compare direct, screen space and ray traced bounce light in a gallery with colored plaster walls.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "light",
+      "global illumination",
+      "ray tracing"
+    ]
+  },
+  {
+    "slug": "candlelight",
+    "title": "Candlelight",
+    "description": "Five candles light a night archive. Freeze the flicker and watch the shadow budget respond.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "light",
+      "shadows",
+      "bloom"
+    ]
+  },
+  {
+    "slug": "caustic-glass",
+    "title": "Caustic Glass",
+    "description": "Shine light through polished, ground and dispersive glass and compare the caustics on a slate table.",
+    "category": "Optics and Light",
+    "tags": [
+      "optics",
+      "light",
+      "caustics"
+    ]
+  },
+  {
+    "slug": "charts-you-can-hear",
+    "title": "Charts You Can Hear",
+    "description": "Listen to a day of Golden Gate tide readings, then explore the same chart with the keyboard or a table.",
+    "category": "Data and Science",
+    "tags": [
+      "charts",
+      "sound",
+      "real data",
+      "accessibility"
+    ]
+  },
+  {
+    "slug": "cloudscape",
+    "title": "Cloudscape",
+    "description": "Climb from the ground through a volumetric cumulus layer and watch sun shafts and cloud shadows.",
+    "category": "Scenes and Cities",
+    "tags": [
+      "sky",
+      "clouds",
+      "volumetrics",
+      "light"
+    ]
+  },
+  {
+    "slug": "compute-textures",
+    "title": "Compute Textures",
+    "description": "Run three Gray Scott reaction recipes on a live GPU texture and add reagent with a tap.",
+    "category": "Data and Science",
+    "tags": [
+      "gpu compute",
+      "simulation",
+      "procedural"
+    ]
+  },
+  {
+    "slug": "depth-video",
+    "title": "Depth Video",
+    "description": "Play a real depth camera recording as a point cloud, switch to camera color and orbit it.",
+    "category": "Data and Science",
+    "tags": [
+      "point cloud",
+      "real data",
+      "video"
+    ]
+  },
+  {
+    "slug": "directional-lightmaps",
+    "title": "Directional Lightmaps",
+    "description": "Compare a directional lightmap with an intensity only bake on the same enamel relief.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "light",
+      "baked lighting",
+      "materials"
+    ]
+  },
+  {
+    "slug": "edit-and-save-bim",
+    "title": "Edit and Save BIM",
+    "description": "Change a door's properties in an IFC pavilion and download the checked, revised file.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "bim",
+      "ifc",
+      "export",
+      "architecture"
+    ]
+  },
+  {
+    "slug": "glsl-welcome",
+    "title": "GLSL Welcome",
+    "description": "Edit a GLSL fragment shader and watch it run live on a sculpted surface.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "shaders",
+      "code"
+    ]
+  },
+  {
+    "slug": "golden-hour",
+    "title": "Golden Hour",
+    "description": "Switch between four lighting conditions and three tone mapping looks over the same stone basin.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "light",
+      "sky",
+      "tone mapping"
+    ]
+  },
+  {
+    "slug": "gpu-numpy",
+    "title": "GPU NumPy",
+    "description": "Run array expressions, Fourier transforms, sorts and matrix products on the GPU.",
+    "category": "Data and Science",
+    "tags": [
+      "gpu compute",
+      "code",
+      "math"
+    ]
+  },
+  {
+    "slug": "ground-projection",
+    "title": "Ground Projection",
+    "description": "Switch between a distant skydome and a ground projected photo backdrop with real contact.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "light",
+      "environment maps",
+      "hdr"
+    ]
+  },
+  {
+    "slug": "hdr-window",
+    "title": "HDR Window",
+    "description": "Compare standard and extended highlights in a gallery lit from an EXR, with HDR output where your display supports it.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "hdr",
+      "light",
+      "tone mapping"
+    ]
+  },
+  {
+    "slug": "light-probes",
+    "title": "Light Probes",
+    "description": "Roll a polished sphere through three colored rooms and watch its lighting and reflections change.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "light",
+      "reflections",
+      "light probes"
+    ]
+  },
+  {
+    "slug": "long-shadows",
+    "title": "Long Shadows",
+    "description": "Watch local and terrain shadows stretch across a five kilometer Alpine railway valley.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "shadows",
+      "terrain",
+      "light"
+    ]
+  },
+  {
+    "slug": "many-goals",
+    "title": "Many Goals",
+    "description": "Give one robot arm three contact targets, change their priorities and measure where each lands.",
+    "category": "Mechanisms",
+    "tags": [
+      "robotics",
+      "inverse kinematics",
+      "linkage"
+    ]
+  },
+  {
+    "slug": "mesh-booleans",
+    "title": "Mesh Booleans",
+    "description": "Carve pockets and a tunnel through a lapis specimen with exact triangle mesh subtraction.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "mesh",
+      "booleans"
+    ]
+  },
+  {
+    "slug": "model-to-step",
+    "title": "Model to STEP",
+    "description": "Change a flange's bore, export the solid to STEP and import it back to compare.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "cad",
+      "b-rep",
+      "step",
+      "export"
+    ]
+  },
+  {
+    "slug": "molten-words",
+    "title": "Molten Words",
+    "description": "Type a word, cast it in hot metal and watch it cool in a foundry bed.",
+    "category": "Scenes and Cities",
+    "tags": [
+      "text",
+      "procedural",
+      "heat"
+    ]
+  },
+  {
+    "slug": "mountain-day",
+    "title": "Mountain Day",
+    "description": "Scrub a full day of sun, clouds, haze and stars over an alpine range.",
+    "category": "Scenes and Cities",
+    "tags": [
+      "sky",
+      "terrain",
+      "light",
+      "clouds"
+    ]
+  },
+  {
+    "slug": "night-storm-sky",
+    "title": "Night Storm Sky",
+    "description": "Trigger a lightning strike over a rocky inlet and see it light the storm from inside.",
+    "category": "Scenes and Cities",
+    "tags": [
+      "sky",
+      "weather",
+      "light"
+    ]
+  },
+  {
+    "slug": "paint-the-model",
+    "title": "Paint the Model",
+    "description": "Paint a helmet directly on its 3D surface, with an eraser and undo.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "texture painting",
+      "mesh",
+      "materials"
+    ]
+  },
+  {
+    "slug": "parallax-walls",
+    "title": "Parallax Walls",
+    "description": "Inspect parallax occlusion and triplanar mapping on a masonry vault.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "materials",
+      "shaders"
+    ]
+  },
+  {
+    "slug": "parallel-coordinates",
+    "title": "Parallel Coordinates",
+    "description": "Brush any mix of eight measurements and compare the linked density and scatter views.",
+    "category": "Data and Science",
+    "tags": [
+      "charts",
+      "real data"
+    ]
+  },
+  {
+    "slug": "portals",
+    "title": "Portals",
+    "description": "Move the camera through two stencil portals that open into intersecting chambers.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "portals",
+      "stencil",
+      "rendering"
+    ]
+  },
+  {
+    "slug": "ray-traced-shadows",
+    "title": "Ray Traced Shadows",
+    "description": "Compare raster shadow maps with rays traced through a live triangle BVH.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "shadows",
+      "ray tracing"
+    ]
+  },
+  {
+    "slug": "scene-transitions",
+    "title": "Scene Transitions",
+    "description": "Scrub a wipe, a noise dissolve and a chromatic swipe between two scenes.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "post-processing",
+      "shaders"
+    ]
+  },
+  {
+    "slug": "shapes-from-lines",
+    "title": "Shapes From Lines",
+    "description": "Draw an outline, offset it, join it to a ring and extrude a beveled solid.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "cad",
+      "curves",
+      "extrusion"
+    ]
+  },
+  {
+    "slug": "shortest-paths",
+    "title": "Shortest Paths",
+    "description": "Pick a junction in Washington, D.C. and trace the shortest legal route through its one way streets.",
+    "category": "Data and Science",
+    "tags": [
+      "graphs",
+      "maps",
+      "real data",
+      "gpu compute"
+    ]
+  },
+  {
+    "slug": "skin-and-wax",
+    "title": "Skin and Wax",
+    "description": "Move a light over wax, marble and jade and compare how light scatters beneath each surface.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "materials",
+      "subsurface scattering",
+      "light"
+    ]
+  },
+  {
+    "slug": "speed",
+    "title": "Speed",
+    "description": "Set one motion blur shutter for a passing train and a spinning turntable.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "motion blur",
+      "post-processing"
+    ]
+  },
+  {
+    "slug": "sweep-and-loft",
+    "title": "Sweep and Loft",
+    "description": "Build a duct by sweeping a profile along a path and a bottle by lofting stacked profiles.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "cad",
+      "b-rep",
+      "curves"
+    ]
+  },
+  {
+    "slug": "temporal-upscaling",
+    "title": "Temporal Upscaling",
+    "description": "Compare native resolution with spatial and temporal upscaling on an alpine cableway.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "upscaling",
+      "post-processing"
+    ]
+  },
+  {
+    "slug": "ten-thousand-trees",
+    "title": "Ten Thousand Trees",
+    "description": "Fly low over an alpine forest of ten thousand trees and push wind through the canopy.",
+    "category": "Scenes and Cities",
+    "tags": [
+      "forest",
+      "terrain",
+      "instancing",
+      "wind"
+    ]
+  },
+  {
+    "slug": "the-ar-card",
+    "title": "The AR Card",
+    "description": "Turn a model radio and download a real scale USDZ file for AR Quick Look.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "ar",
+      "export",
+      "materials"
+    ]
+  },
+  {
+    "slug": "the-aurora",
+    "title": "The Aurora",
+    "description": "Scrub three hours of an Arctic night and watch the aurora, stars and Moon move over a frozen lake.",
+    "category": "Space",
+    "tags": [
+      "sky",
+      "space",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-baked-room",
+    "title": "The Baked Room",
+    "description": "Bake a room's indirect light in the browser and compare denoising settings.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "baked lighting",
+      "global illumination",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-bim-house",
+    "title": "The BIM House",
+    "description": "Walk through an IFC courtyard house, inspect its walls and download the IFC4 source.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "bim",
+      "ifc",
+      "architecture"
+    ]
+  },
+  {
+    "slug": "the-biome-map",
+    "title": "The Biome Map",
+    "description": "Change rainfall and temperature and watch four biomes move across a 3D continent.",
+    "category": "Scenes and Cities",
+    "tags": [
+      "terrain",
+      "procedural",
+      "climate"
+    ]
+  },
+  {
+    "slug": "the-boolean-bench",
+    "title": "The Boolean Bench",
+    "description": "Union, subtract or intersect two exact solids and toggle their B-rep edges.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "cad",
+      "b-rep",
+      "booleans"
+    ]
+  },
+  {
+    "slug": "the-brain-scan",
+    "title": "The Brain Scan",
+    "description": "Move three MRI slices through a real head scan and compare them with bone from the matching CT.",
+    "category": "Data and Science",
+    "tags": [
+      "medical",
+      "volume rendering",
+      "real data"
+    ]
+  },
+  {
+    "slug": "the-building-checker",
+    "title": "The Building Checker",
+    "description": "Open BCF issue viewpoints in an IFC archive and run its door information checks.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "bim",
+      "ifc",
+      "architecture"
+    ]
+  },
+  {
+    "slug": "the-cad-format-shelf",
+    "title": "The CAD Format Shelf",
+    "description": "Open six real STEP and IGES files and browse the part trees they import.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "cad",
+      "step",
+      "iges",
+      "import"
+    ]
+  },
+  {
+    "slug": "the-cell-microscope",
+    "title": "The Cell Microscope",
+    "description": "Explore a cryo electron microscopy map of ATP synthase as a surface or a volume.",
+    "category": "Data and Science",
+    "tags": [
+      "biology",
+      "volume rendering",
+      "real data"
+    ]
+  },
+  {
+    "slug": "the-chart-wall",
+    "title": "The Chart Wall",
+    "description": "Explore three decades of exoplanet discoveries in live charts and export your view as SVG.",
+    "category": "Data and Science",
+    "tags": [
+      "charts",
+      "space",
+      "real data",
+      "export"
+    ]
+  },
+  {
+    "slug": "the-cine-lens",
+    "title": "The Cine Lens",
+    "description": "Focus a projector room and compare depth of field with tilt shift.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "depth of field",
+      "post-processing",
+      "optics"
+    ]
+  },
+  {
+    "slug": "the-city-generator",
+    "title": "The City Generator",
+    "description": "Generate a seeded model town with streets, lots and buildings from two eras.",
+    "category": "Scenes and Cities",
+    "tags": [
+      "city",
+      "procedural"
+    ]
+  },
+  {
+    "slug": "the-climate-globe",
+    "title": "The Climate Globe",
+    "description": "Step through 146 years of NASA temperature grids on a globe and inspect any cell.",
+    "category": "Data and Science",
+    "tags": [
+      "climate",
+      "maps",
+      "real data"
+    ]
+  },
+  {
+    "slug": "the-climbing-robot",
+    "title": "The Climbing Robot",
+    "description": "Watch a jointed robot pick collision checked holds up an overhung climbing wall.",
+    "category": "Mechanisms",
+    "tags": [
+      "robotics",
+      "inverse kinematics",
+      "character"
+    ]
+  },
+  {
+    "slug": "the-colour-grader",
+    "title": "The Color Grader",
+    "description": "Compare tone mapping curves and grade a coastal signal room live, then export a LUT.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "color grading",
+      "tone mapping",
+      "hdr"
+    ]
+  },
+  {
+    "slug": "the-contour-map",
+    "title": "The Contour Map",
+    "description": "Read USGS elevation contours on Mount St. Helens and orbit the same terrain in relief.",
+    "category": "Data and Science",
+    "tags": [
+      "terrain",
+      "maps",
+      "real data"
+    ]
+  },
+  {
+    "slug": "the-curve-lab",
+    "title": "The Curve Lab",
+    "description": "Compare four spline families, measure arc length and follow a moving frame along the curve.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "curves",
+      "math"
+    ]
+  },
+  {
+    "slug": "the-cut-house",
+    "title": "The Cut House",
+    "description": "Scrub a capped section through an IFC floor plan and inspect wall and room records.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "bim",
+      "ifc",
+      "sections",
+      "architecture"
+    ]
+  },
+  {
+    "slug": "the-dungeon-maker",
+    "title": "The Dungeon Maker",
+    "description": "Generate a two level stone archive and walk through it with real collisions.",
+    "category": "Scenes and Cities",
+    "tags": [
+      "procedural",
+      "game",
+      "collision"
+    ]
+  },
+  {
+    "slug": "the-eclipse",
+    "title": "The Eclipse",
+    "description": "Scrub the April 8, 2024 total solar eclipse as seen from Dallas, Texas.",
+    "category": "Space",
+    "tags": [
+      "space",
+      "sky",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-engineering-mesh",
+    "title": "The Engineering Mesh",
+    "description": "Move a section through a heated ceramic sleeve and see its temperature on a tetrahedral mesh.",
+    "category": "Data and Science",
+    "tags": [
+      "simulation",
+      "mesh",
+      "heat"
+    ]
+  },
+  {
+    "slug": "the-exploded-assembly",
+    "title": "The Exploded Assembly",
+    "description": "Pull apart an eight leaf optical iris and identify each of its 22 parts.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "cad",
+      "assembly"
+    ]
+  },
+  {
+    "slug": "the-fft-lens",
+    "title": "The FFT Lens",
+    "description": "Compare a real Webb image with its GPU Fourier reconstruction and drop frequency bands to reveal structure.",
+    "category": "Data and Science",
+    "tags": [
+      "gpu compute",
+      "math",
+      "space",
+      "real data"
+    ]
+  },
+  {
+    "slug": "the-fillet-bench",
+    "title": "The Fillet Bench",
+    "description": "Compare exact rolling ball fillets and chamfers on the same stock and read the volume.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "cad",
+      "b-rep"
+    ]
+  },
+  {
+    "slug": "the-glass-stack",
+    "title": "The Glass Stack",
+    "description": "Rotate glass and smoke and compare three ways of drawing transparency.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "transparency",
+      "materials"
+    ]
+  },
+  {
+    "slug": "the-graph-network",
+    "title": "The Graph Network",
+    "description": "Tap a port in an invented archipelago to trace its ferry routes in a GPU graph.",
+    "category": "Data and Science",
+    "tags": [
+      "graphs",
+      "gpu compute"
+    ]
+  },
+  {
+    "slug": "the-heat-haze",
+    "title": "The Heat Haze",
+    "description": "Watch heat shimmer rise from a temperature volume over a desert highway.",
+    "category": "Heat",
+    "tags": [
+      "heat",
+      "optics",
+      "volumetrics"
+    ]
+  },
+  {
+    "slug": "the-hollow-cup",
+    "title": "The Hollow Cup",
+    "description": "Change a cast cup's wall thickness and mold draft and check the exact solid.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "cad",
+      "b-rep",
+      "casting"
+    ]
+  },
+  {
+    "slug": "the-laser-scan",
+    "title": "The Laser Scan",
+    "description": "Explore 221,727 USGS lidar returns from Glacier Peak and measure between two points.",
+    "category": "Data and Science",
+    "tags": [
+      "point cloud",
+      "lidar",
+      "real data",
+      "measurement"
+    ]
+  },
+  {
+    "slug": "the-lens-kit",
+    "title": "The Lens Kit",
+    "description": "Add flare, streaks and vintage lens effects to a night ferry pier.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "post-processing",
+      "optics"
+    ]
+  },
+  {
+    "slug": "the-lighting-store",
+    "title": "The Lighting Store",
+    "description": "Compare two measured GE floodlight beams on matching walls at real distances.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "light",
+      "photometry",
+      "real data"
+    ]
+  },
+  {
+    "slug": "the-living-museum",
+    "title": "The Living Museum",
+    "description": "Guide a visitor through an evening museum and watch the guard notice, follow and search.",
+    "category": "People and Characters",
+    "tags": [
+      "character",
+      "ai",
+      "game"
+    ]
+  },
+  {
+    "slug": "the-meadow",
+    "title": "The Meadow",
+    "description": "Walk through a high meadow and watch the grass bend, flatten and recover.",
+    "category": "Scenes and Cities",
+    "tags": [
+      "grass",
+      "wind",
+      "sky"
+    ]
+  },
+  {
+    "slug": "the-measuring-room",
+    "title": "The Measuring Room",
+    "description": "Click a face, edge or bore on a machined block to measure it directly.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "cad",
+      "measurement"
+    ]
+  },
+  {
+    "slug": "the-mesh-workshop",
+    "title": "The Mesh Workshop",
+    "description": "Use five polygon editing tools on an industrial air housing, with undo.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "mesh",
+      "modeling"
+    ]
+  },
+  {
+    "slug": "the-mirror-hall",
+    "title": "The Mirror Hall",
+    "description": "Compare screen space and ray traced reflections side by side in a gallery.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "reflections",
+      "ray tracing"
+    ]
+  },
+  {
+    "slug": "the-molecule",
+    "title": "The Molecule",
+    "description": "Orbit the real structure of green fluorescent protein and pick atoms around its chromophore.",
+    "category": "Data and Science",
+    "tags": [
+      "biology",
+      "chemistry",
+      "real data"
+    ]
+  },
+  {
+    "slug": "the-murmuration",
+    "title": "The Murmuration",
+    "description": "Send a disturbance through a simulated flock of 16,384 starlings over a dusk marsh.",
+    "category": "Scenes and Cities",
+    "tags": [
+      "particles",
+      "flocking",
+      "gpu compute"
+    ]
+  },
+  {
+    "slug": "the-neural-playground",
+    "title": "The Neural Playground",
+    "description": "Train a small two class model and plant labeled points to reshape its decision field.",
+    "category": "Data and Science",
+    "tags": [
+      "machine learning",
+      "gpu compute"
+    ]
+  },
+  {
+    "slug": "the-painting",
+    "title": "The Painting",
+    "description": "Compare three painterly filters on a moving coastline.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "post-processing",
+      "stylized"
+    ]
+  },
+  {
+    "slug": "the-path-traced-glasshouse",
+    "title": "The Path Traced Glasshouse",
+    "description": "Compare two spectral path traced renders and inspect a live flint prism ray study.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "path tracing",
+      "optics",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-print-shop",
+    "title": "The Print Shop",
+    "description": "Scrub all 30 toolpath layers of a print and download the matching 3MF or G-code.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "3d printing",
+      "export"
+    ]
+  },
+  {
+    "slug": "the-product-studio",
+    "title": "The Product Studio",
+    "description": "Frame a radio receiver, render a still with soft disk light shadows and save it as a PNG.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "light",
+      "shadows",
+      "materials"
+    ]
+  },
+  {
+    "slug": "the-projector",
+    "title": "The Projector",
+    "description": "Pass three glass slides through a projector and watch the light fall across a statue.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "light",
+      "shadows",
+      "optics"
+    ]
+  },
+  {
+    "slug": "the-reach-test",
+    "title": "The Reach Test",
+    "description": "Drag the target and watch a three link arm reach around a capsule and a block.",
+    "category": "Mechanisms",
+    "tags": [
+      "robotics",
+      "inverse kinematics",
+      "collision"
+    ]
+  },
+  {
+    "slug": "the-road-builder",
+    "title": "The Road Builder",
+    "description": "Draw roads with stitched intersections, banking and markings on fitted ground.",
+    "category": "Scenes and Cities",
+    "tags": [
+      "roads",
+      "procedural",
+      "terrain"
+    ]
+  },
+  {
+    "slug": "the-sculpting-clay",
+    "title": "The Sculpting Clay",
+    "description": "Sculpt a clay study by hand and bake its detail into a downloadable normal map.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "sculpting",
+      "mesh",
+      "baking"
+    ]
+  },
+  {
+    "slug": "the-section-saw",
+    "title": "The Section Saw",
+    "description": "Move a cutting plane through a shaft seal and expose its cut faces and hidden edges.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "cad",
+      "sections"
+    ]
+  },
+  {
+    "slug": "the-shader-node-editor",
+    "title": "The Shader Node Editor",
+    "description": "Wire shader nodes into a glazed material and read the WGSL it generates.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "shaders",
+      "materials",
+      "code"
+    ]
+  },
+  {
+    "slug": "the-shadow-lab",
+    "title": "The Shadow Lab",
+    "description": "Change a light's size and see soft shadows, stained glass color and light through leaves.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "shadows",
+      "light"
+    ]
+  },
+  {
+    "slug": "the-simplifier",
+    "title": "The Simplifier",
+    "description": "Reduce the triangle count of a limestone owl and compare the levels of detail.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "mesh",
+      "level of detail"
+    ]
+  },
+  {
+    "slug": "the-sky-clock",
+    "title": "The Sky Clock",
+    "description": "See the sky for any date, UTC time and place on Earth.",
+    "category": "Space",
+    "tags": [
+      "space",
+      "sky"
+    ]
+  },
+  {
+    "slug": "the-sky-survey",
+    "title": "The Sky Survey",
+    "description": "Turn an armillary holding 7,195 NASA Fermi gamma ray detections.",
+    "category": "Space",
+    "tags": [
+      "space",
+      "real data",
+      "particles"
+    ]
+  },
+  {
+    "slug": "the-solid-modeller",
+    "title": "The Solid Modeler",
+    "description": "Build a mounting bracket in four exact B-rep steps and read the volume and mass at each.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "cad",
+      "b-rep"
+    ]
+  },
+  {
+    "slug": "the-sort-race",
+    "title": "The Sort Race",
+    "description": "Race a million key GPU radix sort against your browser's CPU sort and verify both.",
+    "category": "Data and Science",
+    "tags": [
+      "gpu compute",
+      "benchmark"
+    ]
+  },
+  {
+    "slug": "the-sound-landscape",
+    "title": "The Sound Landscape",
+    "description": "Play three clips and follow their audio through live 3D spectrograms.",
+    "category": "Waves and Sound",
+    "tags": [
+      "sound",
+      "charts"
+    ]
+  },
+  {
+    "slug": "the-splat-room",
+    "title": "The Splat Room",
+    "description": "Explore a Gaussian splat scan of the Apollo 11 cabin and recolor or erase splats.",
+    "category": "Space",
+    "tags": [
+      "gaussian splats",
+      "space",
+      "real data"
+    ]
+  },
+  {
+    "slug": "the-streamtubes",
+    "title": "The Streamtubes",
+    "description": "Change the tube thickness or isolate either wingtip vortex in a wind tunnel.",
+    "category": "Fluids and Water",
+    "tags": [
+      "flow",
+      "air",
+      "charts"
+    ]
+  },
+  {
+    "slug": "the-stress-glyphs",
+    "title": "The Stress Glyphs",
+    "description": "Rotate a pull around a circular hole and watch the stress field change.",
+    "category": "Data and Science",
+    "tags": [
+      "simulation",
+      "stress",
+      "math"
+    ]
+  },
+  {
+    "slug": "the-technical-drawing",
+    "title": "The Technical Drawing",
+    "description": "Orbit a technical drawing of a refractor with dashed hidden lines.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "cad",
+      "drawings",
+      "optics"
+    ]
+  },
+  {
+    "slug": "the-uv-unwrapper",
+    "title": "The UV Unwrapper",
+    "description": "Change a model's seams and compare its texture and lightmap UV islands.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "mesh",
+      "uv",
+      "textures"
+    ]
+  },
+  {
+    "slug": "the-weather-radar",
+    "title": "The Weather Radar",
+    "description": "Change a real NEXRAD sweep angle and see the curved beam and reflectivity.",
+    "category": "Data and Science",
+    "tags": [
+      "weather",
+      "radar",
+      "real data"
+    ]
+  },
+  {
+    "slug": "the-weigh-station",
+    "title": "The Weigh Station",
+    "description": "Pick a part and a metal and read its volume, mass, center of mass and inertia.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "cad",
+      "measurement",
+      "b-rep"
+    ]
+  },
+  {
+    "slug": "toon-town",
+    "title": "Toon Town",
+    "description": "Change pen, dot and cel shading in an illustrated canal village.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "stylized",
+      "shaders",
+      "city"
+    ]
+  },
+  {
+    "slug": "trees-from-space",
+    "title": "Trees From Space",
+    "description": "Grow a canopy and roots with space colonization and add barriers to change their path.",
+    "category": "Scenes and Cities",
+    "tags": [
+      "procedural",
+      "forest"
+    ]
+  },
+  {
+    "slug": "volumetric-fog",
+    "title": "Volumetric Fog",
+    "description": "Watch dawn fog, mist banks and sun shafts through a forest canopy.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "volumetrics",
+      "light",
+      "fog"
+    ]
+  },
+  {
+    "slug": "voronoi-shatter-art",
+    "title": "Voronoi Shatter Art",
+    "description": "Separate a glazed sculpture into its 35 solid Voronoi cells and put it back together.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "mesh",
+      "procedural",
+      "fracture"
+    ]
+  },
+  {
+    "slug": "wind-and-flow-painting",
+    "title": "Wind and Flow Painting",
+    "description": "Release dye streaks into a computed flow and compare its velocity texture.",
+    "category": "Fluids and Water",
+    "tags": [
+      "flow",
+      "gpu compute",
+      "simulation"
+    ]
+  },
+  {
+    "slug": "wind-over-america",
+    "title": "Wind Over America",
+    "description": "Step through eight days of NOAA wind over North America.",
+    "category": "Data and Science",
+    "tags": [
+      "weather",
+      "maps",
+      "real data",
+      "wind"
+    ]
+  },
+  {
+    "slug": "2d-light-and-shadow",
+    "title": "2D Light and Shadow",
+    "description": "Carry a survey lamp into an underground river chamber. Move the light to see which rock faces it reaches.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "light",
+      "shadows",
+      "2d"
+    ]
+  },
+  {
+    "slug": "bone-crowds",
+    "title": "Bone Crowds",
+    "description": "Follow a caribou migration across a braided river. Every set of hooves moves on its own clock.",
+    "category": "People and Characters",
+    "tags": [
+      "character",
+      "animation",
+      "crowds"
+    ]
+  },
+  {
+    "slug": "bullet-through-paper",
+    "title": "Bullet Through Paper",
+    "description": "Send two virtual ceramic blocks toward thin rigid dividers. Swept collision changes what happens between samples.",
+    "category": "Physics",
+    "tags": [
+      "physics",
+      "collision"
+    ]
+  },
+  {
+    "slug": "character-course",
+    "title": "Character Course",
+    "description": "Cross the gauge station on foot. Climb the steps, ride the ferry, then take the ramp to the lower deck.",
+    "category": "People and Characters",
+    "tags": [
+      "character",
+      "animation"
+    ]
+  },
+  {
+    "slug": "compound-shapes",
+    "title": "Compound Shapes",
+    "description": "Release two built-up shapes and watch how their mass and shape affect the tumble.",
+    "category": "Physics",
+    "tags": [
+      "physics",
+      "collision"
+    ]
+  },
+  {
+    "slug": "cutscene-studio",
+    "title": "Cutscene Studio",
+    "description": "Edit a lighthouse scene in three shots. Move a cut, scrub the dialogue, or render the sequence to a video file.",
+    "category": "Editors",
+    "tags": [
+      "film",
+      "editor",
+      "camera"
+    ]
+  },
+  {
+    "slug": "drone-volume",
+    "title": "Drone Volume",
+    "description": "Send three inspection drones through a conservatory. Their routes can curve around the racks or climb above them.",
+    "category": "AI and Pathfinding",
+    "tags": [
+      "ai",
+      "pathfinding",
+      "drones"
+    ]
+  },
+  {
+    "slug": "globe-flight",
+    "title": "Globe Flight",
+    "description": "Fly from Earth's limb to the summit of Mauna Kea, then turn the island to follow its volcanic ridges.",
+    "category": "Space",
+    "tags": [
+      "space",
+      "terrain",
+      "flight"
+    ]
+  },
+  {
+    "slug": "height-streaming",
+    "title": "Height Streaming",
+    "description": "Fly the bends of Utah's Green River and watch measured terrain load around you as the survey window moves.",
+    "category": "Scenes and Cities",
+    "tags": [
+      "terrain",
+      "streaming",
+      "maps"
+    ]
+  },
+  {
+    "slug": "l-system-garden",
+    "title": "L-System Garden",
+    "description": "Rewrite a plant's growth rules and see each generation take shape.",
+    "category": "Data and Science",
+    "tags": [
+      "procedural",
+      "plants",
+      "simulation"
+    ]
+  },
+  {
+    "slug": "marching-cubes",
+    "title": "Marching Cubes",
+    "description": "Change the wax's surface threshold and watch the lamp's moving forms merge or split.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "meshing",
+      "volume",
+      "procedural"
+    ]
+  },
+  {
+    "slug": "path-traced-voxels",
+    "title": "Path-Traced Voxels",
+    "description": "Switch lamps and watch the light reflect off stone and pass through glass.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "path tracing",
+      "voxels",
+      "light"
+    ]
+  },
+  {
+    "slug": "pathfinder",
+    "title": "Pathfinder",
+    "description": "Drag the gold pin. The lead cart finds a route while the other carts make room for each other.",
+    "category": "AI and Pathfinding",
+    "tags": [
+      "ai",
+      "pathfinding"
+    ]
+  },
+  {
+    "slug": "pattern-copier",
+    "title": "Pattern Copier",
+    "description": "Draw a swatch. The overlapping model grows it into a woven field by matching 3 by 3 neighborhoods.",
+    "category": "Data and Science",
+    "tags": [
+      "procedural",
+      "patterns"
+    ]
+  },
+  {
+    "slug": "pinball",
+    "title": "Pinball",
+    "description": "Launch a steel ball into the Aurora cabinet. Strike the bumpers and work both flippers to keep it on the table.",
+    "category": "Games",
+    "tags": [
+      "game",
+      "physics"
+    ]
+  },
+  {
+    "slug": "shape-casts",
+    "title": "Shape Casts",
+    "description": "Sweep a probe across four fittings. Inspect every contacted surface, its distance along the sweep, and the direction it faces.",
+    "category": "Physics",
+    "tags": [
+      "physics",
+      "collision"
+    ]
+  },
+  {
+    "slug": "sharp-sdf-models",
+    "title": "Sharp SDF Models",
+    "description": "Carve a miniature lightwell by combining two distance fields. Change the channel width and inspect the corners of the regenerated mesh.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "sdf",
+      "meshing",
+      "cad"
+    ]
+  },
+  {
+    "slug": "sprite-colliders",
+    "title": "Sprite Colliders",
+    "description": "Draw a cutout, then drop it. The press traces the solid pixels, including any holes you erase.",
+    "category": "Physics",
+    "tags": [
+      "physics",
+      "collision",
+      "2d"
+    ]
+  },
+  {
+    "slug": "state-machine-door",
+    "title": "State Machine Door",
+    "description": "Open the vault and switch on the inspection lamp. Hold midway, then resume to see where both states return.",
+    "category": "AI and Pathfinding",
+    "tags": [
+      "ai",
+      "state machine"
+    ]
+  },
+  {
+    "slug": "the-2d-buggy",
+    "title": "The 2D Buggy",
+    "description": "Take a dune crawler across Salt Ridge. Watch its two independent springs follow the trail as the buggy climbs, crests, and brakes.",
+    "category": "Games",
+    "tags": [
+      "game",
+      "physics",
+      "2d"
+    ]
+  },
+  {
+    "slug": "the-2d-sandbox",
+    "title": "The 2D Sandbox",
+    "description": "Stack crates at the quarry crossing, build a hinged bridge, then unpin a bank and watch the span fall.",
+    "category": "Games",
+    "tags": [
+      "game",
+      "physics",
+      "2d"
+    ]
+  },
+  {
+    "slug": "the-2d-skeleton",
+    "title": "The 2D Skeleton",
+    "description": "Raise the keeper's lantern. Reveal the rig to see each joint carry the motion.",
+    "category": "People and Characters",
+    "tags": [
+      "character",
+      "animation",
+      "2d"
+    ]
+  },
+  {
+    "slug": "the-block-tower",
+    "title": "The Block Tower",
+    "description": "Pull a beam from the stack and see which supports can still carry the load.",
+    "category": "Physics",
+    "tags": [
+      "physics",
+      "structures"
+    ]
+  },
+  {
+    "slug": "the-camera-director",
+    "title": "The Camera Director",
+    "description": "Call a shot at a salt-flat observatory. Follow one survey rover, keep both in frame, or give the antenna camera priority.",
+    "category": "Editors",
+    "tags": [
+      "camera",
+      "editor",
+      "film"
+    ]
+  },
+  {
+    "slug": "the-changing-maze",
+    "title": "The Changing Maze",
+    "description": "Slide either wall on the routing table. Only the tiles it touches rebuild, then the shuttle takes the new route.",
+    "category": "AI and Pathfinding",
+    "tags": [
+      "ai",
+      "pathfinding"
+    ]
+  },
+  {
+    "slug": "the-conveyor-factory",
+    "title": "The Conveyor Factory",
+    "description": "Start three belts, feed parcels, and watch the chutes sort them into collection bins. Every count comes from a live sensor.",
+    "category": "Physics",
+    "tags": [
+      "physics",
+      "factory"
+    ]
+  },
+  {
+    "slug": "the-coral-garden",
+    "title": "The Coral Garden",
+    "description": "Advance a living branching model from its holdfast to a full colony. Turn the current to see how the growth rule leans into the flow.",
+    "category": "Data and Science",
+    "tags": [
+      "procedural",
+      "biology",
+      "simulation"
+    ]
+  },
+  {
+    "slug": "the-crt-arcade",
+    "title": "The CRT Arcade",
+    "description": "Fly the courier through six inspection rings. Match the lit lane before each crossing.",
+    "category": "Games",
+    "tags": [
+      "game",
+      "2d"
+    ]
+  },
+  {
+    "slug": "the-flow-field",
+    "title": "The Flow Field",
+    "description": "Tap open terrain to move the destination. Twelve thousand moving lights find their way around the ridges.",
+    "category": "AI and Pathfinding",
+    "tags": [
+      "ai",
+      "pathfinding",
+      "crowds"
+    ]
+  },
+  {
+    "slug": "the-game-menu",
+    "title": "The Game Menu",
+    "description": "Open a tethered ocean survey menu, move through three stations, and keep one tether back to the surface.",
+    "category": "Editors",
+    "tags": [
+      "ui",
+      "menu",
+      "editor"
+    ]
+  },
+  {
+    "slug": "the-gear-maker",
+    "title": "The Gear Maker",
+    "description": "Cut a fresh set of involute wheels by changing the tooth counts. Turn the input and see both stages mesh at the correct ratio.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "cad",
+      "gears",
+      "manufacturing"
+    ]
+  },
+  {
+    "slug": "the-guard",
+    "title": "The Guard",
+    "description": "Ring a gallery chime. Watch Rita investigate the sound, search the room, and return to her rounds.",
+    "category": "AI and Pathfinding",
+    "tags": [
+      "ai",
+      "character"
+    ]
+  },
+  {
+    "slug": "the-hex-map",
+    "title": "The Hex Map",
+    "description": "Lead a survey team through a coastal range. Ridges block sight, and every new route fills in the chart.",
+    "category": "Games",
+    "tags": [
+      "game",
+      "maps"
+    ]
+  },
+  {
+    "slug": "the-inspector",
+    "title": "The Inspector",
+    "description": "Slide the lens out, edit the scene tree, then capture the passes that draw the bench.",
+    "category": "Editors",
+    "tags": [
+      "editor",
+      "debug",
+      "rendering"
+    ]
+  },
+  {
+    "slug": "the-joint-workshop",
+    "title": "The Joint Workshop",
+    "description": "Drive two cabinet doors into their mechanical stops and set a jointed pendulum swinging. Show the joint frames to inspect each limit.",
+    "category": "Physics",
+    "tags": [
+      "physics",
+      "joints"
+    ]
+  },
+  {
+    "slug": "the-marble-maze",
+    "title": "The Marble Maze",
+    "description": "Roll the marble from the diamond inlay to the brass-rimmed hole.",
+    "category": "Games",
+    "tags": [
+      "game",
+      "physics"
+    ]
+  },
+  {
+    "slug": "the-material-factory",
+    "title": "The Material Factory",
+    "description": "Generate a finish, then move the light to see what each of its four maps contributes.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "materials",
+      "light",
+      "pbr"
+    ]
+  },
+  {
+    "slug": "the-meshlet-statue",
+    "title": "The Meshlet Statue",
+    "description": "Slide the gallery wall across a bronze sculpture and see how many triangles Margo submits for the same scene.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "rendering",
+      "meshlets"
+    ]
+  },
+  {
+    "slug": "the-mocap-theatre",
+    "title": "The Mocap Theatre",
+    "description": "Watch two real walk recordings. Their captured joints move on the left and drive the same performer on the right.",
+    "category": "People and Characters",
+    "tags": [
+      "character",
+      "animation",
+      "mocap"
+    ]
+  },
+  {
+    "slug": "the-noise-lab",
+    "title": "The Noise Lab",
+    "description": "Change a single frequency and watch an island, a cloud chamber, and a seamless tile reorganize.",
+    "category": "Data and Science",
+    "tags": [
+      "procedural",
+      "noise",
+      "terrain"
+    ]
+  },
+  {
+    "slug": "the-pixel-platformer",
+    "title": "The Pixel Platformer",
+    "description": "Cross the headland. Collect three prisms and relight the beacon.",
+    "category": "Games",
+    "tags": [
+      "game",
+      "2d"
+    ]
+  },
+  {
+    "slug": "the-planner",
+    "title": "The Planner",
+    "description": "At the ridge lookout, Nessa needs a hot supper and a rest. Start the rain and watch her plan find dry fuel under cover.",
+    "category": "AI and Pathfinding",
+    "tags": [
+      "ai",
+      "planning",
+      "character"
+    ]
+  },
+  {
+    "slug": "the-rewind-button",
+    "title": "The Rewind Button",
+    "description": "Roll a brass drum into a stack of ceramic crates. Slide back through the pile-up using the physics engine's saved state.",
+    "category": "Physics",
+    "tags": [
+      "physics",
+      "rewind"
+    ]
+  },
+  {
+    "slug": "the-rigid-body-rain",
+    "title": "The Rigid Body Rain",
+    "description": "Eight hundred blocks and spheres fall into a sculpted basin. Tap any piece to push it.",
+    "category": "Physics",
+    "tags": [
+      "physics",
+      "collision"
+    ]
+  },
+  {
+    "slug": "the-sleep-map",
+    "title": "The Sleep Map",
+    "description": "Tap a spring bed to wake it. Watch its ceramic beads return to rest.",
+    "category": "Physics",
+    "tags": [
+      "physics",
+      "sleeping"
+    ]
+  },
+  {
+    "slug": "the-snapshot-hall",
+    "title": "The Snapshot Hall",
+    "description": "Walk through a specimen archive. Compare three ways of submitting the same hall to the renderer.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "rendering",
+      "instancing"
+    ]
+  },
+  {
+    "slug": "the-streaming-city",
+    "title": "The Streaming City",
+    "description": "Fly across a four-sector district and watch building tiles load as they come into view.",
+    "category": "Scenes and Cities",
+    "tags": [
+      "city",
+      "streaming"
+    ]
+  },
+  {
+    "slug": "the-terrain-sculptor",
+    "title": "The Terrain Sculptor",
+    "description": "Shape a volcanic basin. Raise the ground, paint a mineral layer, or open the lava tube beneath it.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "terrain",
+      "sculpting",
+      "editor"
+    ]
+  },
+  {
+    "slug": "the-ui-layout-editor",
+    "title": "The UI Layout Editor",
+    "description": "Drag widgets onto a live Margo screen. Reorder the layers and see the markup update.",
+    "category": "Editors",
+    "tags": [
+      "ui",
+      "editor"
+    ]
+  },
+  {
+    "slug": "the-voxel-editor",
+    "title": "The Voxel Editor",
+    "description": "Shape a working harbor model cell by cell. Paint the signal tower, build a beacon, or select a volume and cut it away.",
+    "category": "CAD and Modeling",
+    "tags": [
+      "voxels",
+      "editor",
+      "cad"
+    ]
+  },
+  {
+    "slug": "utility-choices",
+    "title": "Utility Choices",
+    "description": "Change the weather in a working orchard. Follow the villagers as they weigh hunger, thirst, and fatigue and book a place to meet each need.",
+    "category": "AI and Pathfinding",
+    "tags": [
+      "ai",
+      "utility",
+      "character"
+    ]
+  },
+  {
+    "slug": "voxel-world-light",
+    "title": "Voxel World Light",
+    "description": "Open the shutter to let amber light reach a corner it can't see.",
+    "category": "Rendering and Lighting",
+    "tags": [
+      "light",
+      "voxels"
+    ]
+  }
+]
