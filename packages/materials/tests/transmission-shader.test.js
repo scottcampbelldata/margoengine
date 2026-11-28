@@ -3,7 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { transmission, Transmission } from '../dist/transmission.js';
+import { transmission } from '../dist/transmission.js';
+import { Transmission } from '../../gltf/dist/transmission.js';
 import { dielectricFresnelWGSL } from '../../shared/pbr-fresnel.js';
 import { pbrNeutral } from '../../shared/display.js';
 import { neutralInverseShader, pbrNeutralInverse } from '../../shared/display-inverse.js';

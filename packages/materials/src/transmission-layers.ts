@@ -9,7 +9,7 @@ import {
 } from '@margoengine/core/extension';
 import type { PBRModel, PBRTransparency } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
-import { Transmission, type TransmissionPassOptions } from './transmission.js';
+import { Transmission, type TransmissionPassOptions } from '@margoengine/gltf/transmission';
 import { alphaBlend } from '../../shared/pass.js';
 import { applyView } from '../../shared/view-rect.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';

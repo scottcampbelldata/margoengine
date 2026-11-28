@@ -1,5 +1,5 @@
 // The scene-copy transmission pass lives in gltf as its own lazy entry (KB4000, step 1): `@margoengine/gltf/transmission`
-// holds `Transmission`, materials re-exports the same class instead of shipping a copy, and gltf's default model and
+// holds `Transmission`, materials neither ships a copy nor exports it under a second name, and gltf's default model and
 // loader entries do not import it statically, so a load that never meets KHR_materials_transmission never pays for it.
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -17,11 +17,11 @@ test('gltf/transmission is a package entry with its own build', () => {
   assert.match(readFileSync(new URL('transmission.js', dist), 'utf8'), /transmission:copy/);
 });
 
-test('materials re-exports the gltf Transmission class itself', async () => {
+test('Transmission has one name: gltf/transmission, with nothing re-exported by materials', async () => {
   const gltf = await import('@margoengine/gltf/transmission'),
     materials = await import('@margoengine/materials/transmission');
   assert.equal(typeof gltf.Transmission, 'function');
-  assert.equal(materials.Transmission, gltf.Transmission);
+  assert.equal(materials.Transmission, undefined);
 });
 
 test('materials ships no copy of the scene-copy pass', () => {

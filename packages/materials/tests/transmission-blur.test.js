@@ -2,7 +2,7 @@
 // own WGSL and checks it against the normal-incidence Snell construction worked out here from first principles.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Transmission } from '../dist/transmission.js';
+import { Transmission } from '../../gltf/dist/transmission.js';
 import { dielectricFresnelWGSL } from '../../shared/pbr-fresnel.js';
 import { wgslModule } from './support/wgsl-subset.js';
 import { volumeThicknessStub } from './support/volume-thickness.js';

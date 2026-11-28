@@ -5,8 +5,6 @@
 ```ts
 import { MaterialExtension, MaterialExtensionTexture, TextureTransform } from "@margoengine/gltf/pbr";
 
-export { Transmission } from "@margoengine/gltf";
-
 export interface TransmissionOptions extends TransmissionPassOptions {
     factor?: number;
     ior?: number;

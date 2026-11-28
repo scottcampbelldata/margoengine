@@ -162,7 +162,7 @@ Transmissive primitives draw after the opaque capture (`afterOpaque: true`) and 
 and MASK surfaces keep their coverage and depth writes, BLEND surfaces blend. They do not cast shadows or receive the
 cascaded shadow map in this version. A clearcoat lobe on the same transmissive material follows this shadow limitation.
 
-For a caller-owned screen capture, `transmission(options)` returns an extension without installing a scene pass:
+The scene-copy pass itself is `Transmission` of [`@margoengine/gltf/transmission`](../gltf/README.md), imported from there. For a caller-owned screen capture, `transmission(options)` returns an extension without installing a scene pass:
 
 ```ts
 import {transmission} from 'margoengine/materials';

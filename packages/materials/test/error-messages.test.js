@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { Material, materialShader, nodeMaterial, transmission } from '../dist/index.js';
-import { Transmission } from '../dist/transmission.js';
+import { Transmission } from '../../gltf/dist/transmission.js';
 
 // Every throw names the fix and uses a coded or typed error, never a bare Error.
 test('shader patching failures are coded MargoErrors that name the fix', () => {

@@ -27,7 +27,7 @@ try {
     const { Engine } = await import('/packages/core/dist/index.js');
     const { Material, Texture, createMesh } = await import('/packages/materials/dist/index.js');
     const { layered } = await import('/packages/materials/dist/layered.js');
-    const { Transmission } = await import('/packages/materials/dist/transmission.js');
+    const { Transmission } = await import('/packages/gltf/dist/transmission.js');
     const { waitForPipelines } = await import('/scripts/support/gpu-ready.js');
     const quad = {
       positions: [-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0],

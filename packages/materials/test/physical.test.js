@@ -9,7 +9,7 @@ import { extendedMaterials } from '../../gltf/dist/extended.js';
 import { PostStack, Bloom, FXAA } from '../../post/dist/index.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 import { Material, createMesh } from '../dist/index.js';
-import { Transmission } from '../dist/transmission.js';
+import { Transmission } from '../../gltf/dist/transmission.js';
 import * as ref from './physical-reference.js';
 
 const near = (a, b, e = 1e-6) => assert.ok(Math.abs(a - b) <= e, `${a} vs ${b}`);

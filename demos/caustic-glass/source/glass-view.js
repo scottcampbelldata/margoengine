@@ -1,5 +1,5 @@
 import {CubeTexture,LambertMaterial,PbrMaterial,Texture,UnlitMaterial,createMesh} from '@margoengine/materials';
-import {Transmission} from '@margoengine/materials/transmission';
+import {Transmission} from '@margoengine/gltf/transmission';
 import {PostStack} from '@margoengine/post/stack';
 import {Tonemap} from '@margoengine/tonemap';
 import {chartGeometry,lensGeometry,lightGeometry} from './art.js';

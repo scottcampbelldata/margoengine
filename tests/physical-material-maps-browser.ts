@@ -8,7 +8,7 @@ import type {
   MeshGeometry,
   RawImage,
 } from '../packages/materials/dist/index.js';
-import { Transmission } from '../packages/materials/dist/transmission.js';
+import { Transmission } from '../packages/gltf/dist/transmission.js';
 import { PostStack } from '../packages/post/dist/index.js';
 import { Tonemap } from '../packages/tonemap/dist/index.js';
 

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { mockGPU } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
-import { Transmission } from '../dist/transmission.js';
+import { Transmission } from '../../gltf/dist/transmission.js';
 import { TransmissionLayers } from '../dist/transmission-layers.js';
 
 for (const [label, Class] of [

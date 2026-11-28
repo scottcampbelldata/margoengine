@@ -14,7 +14,7 @@ import { parseGLTF } from '../packages/gltf/dist/pbr.js';
 import type { PBRModel } from '../packages/gltf/dist/pbr.js';
 import { Picking } from '../packages/selection/dist/index.js';
 import { Raycaster } from '../packages/bvh/dist/index.js';
-import { Transmission } from '../packages/materials/dist/transmission.js';
+import { Transmission } from '../packages/gltf/dist/transmission.js';
 import { OIT } from '../packages/oit/dist/index.js';
 import { PostStack } from '../packages/post/dist/index.js';
 import { Tonemap } from '../packages/tonemap/dist/index.js';

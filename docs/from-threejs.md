@@ -432,7 +432,7 @@ oit.add(pane);  // and oit.add(model) for a loaded glTF's BLEND primitives
   `transmission`, `thickness`, `attenuationColor`, `attenuationDistance`) and their maps (`clearcoatMap`,
   `sheenColorMap`, `transmissionMap`, `thicknessMap`, ...). Set one at any time and that material switches to the
   physical shader; materials that never use them keep the plain one. Glass refracts with
-  `Transmission.attach(engine).add(mesh)` from `@margoengine/materials/transmission` (needs an HDR post capture such as
+  `Transmission.attach(engine).add(mesh)` from `@margoengine/gltf/transmission` (needs an HDR post capture such as
   `PostStack` with `Tonemap`); without it the background shows through tinted.
 - `ShaderMaterial` / `onBeforeCompile`: `WgslMaterial` runs your WGSL `fn shade(i: Out, s: Surface) -> Surface`
   (and optionally `fn displace(i: Input) -> vec3f`) inside the PBR shader, with live `uniforms` and `textures`; the
