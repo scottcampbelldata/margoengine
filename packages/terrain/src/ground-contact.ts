@@ -135,6 +135,8 @@ export class TerrainGroundContact implements EnginePlugin, TerrainLighting, Disp
   readonly look: Required<GroundContactLook> = { color: COLOR, soil: 1, occlusion: 1 };
   readonly #held = new Map<string, Held>();
   #terrain?: Terrain;
+  /** The terrain's world corner as it was given. */
+  readonly #corner: readonly [number, number];
   #engine?: Engine;
   #remove?: () => void;
   #buffer?: GPUBuffer;
@@ -160,6 +162,8 @@ export class TerrainGroundContact implements EnginePlugin, TerrainLighting, Disp
     if (!Number.isInteger(binding) || binding < 0 || binding > 997)
       throw new RangeError('TerrainGroundContact binding must be an integer 0 to 997');
     this.#terrain = terrain;
+    const corner = terrain.options?.origin;
+    this.#corner = [corner?.[0] ?? 0, corner?.[1] ?? 0];
     this.texel = texel;
     this.resolution = resolution;
     this.binding = binding;
@@ -309,7 +313,9 @@ export class TerrainGroundContact implements EnginePlugin, TerrainLighting, Disp
     }
     if (this.#looked) {
       const l = this.look;
-      this.#data.set([origin[0], origin[1], 1 / span, l.soil, ...l.color, l.occlusion]); // float division: view only
+      // The shader reads metres from the terrain's corner (`frame.map.xy`), which a floating origin moves with it.
+      const [x0, z0] = this.#corner;
+      this.#data.set([origin[0] - x0, origin[1] - z0, 1 / span, l.soil, ...l.color, l.occlusion]); // float: view only
       device.queue.writeBuffer(this.#buffer, 0, this.#data);
       this.#looked = false;
     }
@@ -347,7 +353,7 @@ fn contactAt${s}(p:vec2f)->vec2f {
     // The soil's edge is broken by noise a few tens of centimetres across and its colour speckled like litter.
     const color = `
 ${fragmentColor}
- let under=terrainColorBare${s}(position,normal);let p=position.xz;
+ let under=terrainColorBare${s}(position,normal);let p=position.xz-frame.map.xy;
  let ragged=vec2f(contactNoise${s}(p*3.1),contactNoise${s}(p*3.1+17.0))-0.5;
  let weight=clamp(contactAt${s}(p+ragged*0.24).x*(0.55+0.9*contactNoise${s}(p*7.3)),0.0,1.0)*contactLook${s}[0].w;
  return mix(under,contactLook${s}[1].rgb*(0.65+0.7*contactNoise${s}(p*23.0)),weight);
@@ -356,7 +362,7 @@ ${fragmentColor}
       own +
       source
         .replace(fragmentColor, `fn terrainColorBare${s}(position:vec3f,normal:vec3f)->vec3f {`)
-        .replace(lit, `let contactSky${s}=1.0-contactAt${s}(i.position.xz).y*contactLook${s}[1].w;let linear=`)
+        .replace(lit, `let contactSky${s}=1.0-contactAt${s}(i.position.xz-frame.map.xy).y*contactLook${s}[1].w;let linear=`)
         .replace(ambient, `${ambient}*contactSky${s}`) +
       color;
     if (this.#shaders.size >= 16) this.#shaders.clear();
