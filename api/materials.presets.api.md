@@ -67,7 +67,7 @@ export const SOURCES: readonly string[];
 
 export const SURFACES: Readonly<Record<SurfaceName, MeasuredSurface>>;
 
-export type SurfaceName = 'concrete' | 'asphalt' | 'brick' | 'limestone' | 'granite' | 'sandstone' | 'marble' | 'slate' | 'basalt' | 'gypsum' | 'roofTile' | 'pineWood' | 'bark' | 'drySoil' | 'darkSoil' | 'sand' | 'redSand' | 'snow' | 'oldSnow' | 'frost' | 'grass' | 'leaves' | 'dryGrass' | 'leafLitter' | 'conifer' | 'rubber' | 'blackPaint' | 'olivePaint' | 'whiteCoating' | 'cinders' | 'graphite' | 'rust' | 'patina' | 'roofShingle' | 'paper' | 'tire' | 'porcelain' | 'eggShell' | 'bone' | 'skinI' | 'skinII' | 'skinIII' | 'skinIV' | 'skinV' | 'skinVI';
+export type SurfaceName = 'concrete' | 'asphalt' | 'brick' | 'limestone' | 'granite' | 'sandstone' | 'marble' | 'slate' | 'basalt' | 'gabbro' | 'gypsum' | 'roofTile' | 'pineWood' | 'bark' | 'drySoil' | 'darkSoil' | 'sand' | 'redSand' | 'snow' | 'oldSnow' | 'frost' | 'grass' | 'leaves' | 'dryGrass' | 'leafLitter' | 'conifer' | 'rubber' | 'blackPaint' | 'olivePaint' | 'whiteCoating' | 'cinders' | 'graphite' | 'rust' | 'patina' | 'roofShingle' | 'paper' | 'tire' | 'porcelain' | 'eggShell' | 'bone' | 'skinI' | 'skinII' | 'skinIII' | 'skinIV' | 'skinV' | 'skinVI';
 
 export const brick: MaterialPreset;
 

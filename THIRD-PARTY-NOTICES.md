@@ -382,7 +382,8 @@ packages/materials/test/fixtures, each with its source and licence in its `_head
 - `surface-spectra.json`: visible reflectance spectra resampled to 10 nm from the ECOSTRESS Spectral Library 1.0
   (S. K. Meerdink, S. J. Hook, D. A. Roberts and E. A. Abbott, Remote Sensing of Environment 230, 111196, 2019,
   https://speclib.jpl.nasa.gov) and its ASTER part (A. M. Baldridge et al., Remote Sensing of Environment 113, 711,
-  2009), NASA JPL data, free to use with these citations. Retrieved 2026-11-28.
+  2009), NASA JPL data, free to use with these citations; the gabbro row (black granite) is the JHU sample Gabbro_H1.
+  Retrieved 2026-11-28.
 - `physicallybased.json`: rows of the physically based materials database (A. Palmqvist, https://physicallybased.info,
   https://github.com/AntonPalmqvist/physically-based-api), CC0 1.0. Retrieved 2026-11-28.
 

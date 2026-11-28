@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { box } from '@margoengine/core';
-import { METALS, castIron } from '@margoengine/materials/presets';
+import { METALS, SURFACES, castIron } from '@margoengine/materials/presets';
 import { CAD_FINISHES, CadBench, cadFinish } from '../dist/bench.js';
 
 // A stand-in engine: meshes record what the bench sets on them; plugins are kept by name.
@@ -89,6 +89,8 @@ test('show finishes a part, registers it for shadows and shares materials', () =
   assert.ok(cad.deck, 'deck made');
   assert.deepEqual(cad.deck.position, [0, 0.01 - 0.02, 0]);
   assert.equal(cad.deckTop, 0.01);
+  // The default plate is the measured gabbro (black granite), not the lighter basalt it once borrowed.
+  assert.deepEqual([...cad.deck.material.data.slice(0, 3)].map((v) => +v.toFixed(4)), [...SURFACES.gabbro.color].map((v) => +v.toFixed(4)));
   // By default the plate rests on the floor at y 0 and parts rest on its top.
   const resting = CadBench.attach(fakeEngine(), { deck: { thickness: 0.05 }, edges: false });
   assert.deepEqual(resting.deck.position, [0, 0.025, 0]);

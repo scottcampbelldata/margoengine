@@ -1969,6 +1969,7 @@ egg shell, bone, the six skin types and the PET, polypropylene and PVC indices a
 | marble | 0.664, 0.630, 0.551 | 0.5 (0.1 to 0.8) | 1.5724 | measured | Meerdink et al. 2019: 3 |
 | slate | 0.172, 0.129, 0.124 | 0.7 (0.4 to 0.9) | 1.5 | measured | Meerdink et al. 2019: 2 |
 | basalt | 0.126, 0.120, 0.103 | 0.85 (0.6 to 0.95) | 1.5 | measured | Meerdink et al. 2019: 3 |
+| gabbro | 0.105, 0.105, 0.095 | 0.6 (0.2 to 0.9) | 1.5 | measured | Meerdink et al. 2019: 1 |
 | gypsum | 0.954, 0.947, 0.930 | 0.9 (0.8 to 1) | 1.5 | measured | Meerdink et al. 2019: 1 |
 | roofTile | 0.146, 0.110, 0.085 | 0.8 (0.6 to 0.9) | 1.5 | measured | Meerdink et al. 2019: 1 |
 | pineWood | 0.712, 0.467, 0.212 | 0.75 (0.5 to 0.9) | 1.5 | measured | Meerdink et al. 2019: 2 |

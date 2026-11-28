@@ -73,7 +73,7 @@ export interface CadDeckOptions {
   top?: number;
   /** Centre of the plate in x and z. Default [0, 0]. */
   center?: readonly [number, number];
-  /** Plate material. Default black granite: basalt albedo (the diabase of metrology plates), lapped to roughness 0.5. */
+  /** Plate material. Default black granite: the measured gabbro of @margoengine/materials (the dark stone of metrology plates), lapped to roughness 0.5. */
   material?: PbrMaterial;
 }
 
@@ -231,7 +231,7 @@ export class CadBench {
   }: CadDeckOptions): Mesh {
     if (!(size[0] > 0 && size[1] > 0 && thickness > 0) || ![top, center[0], center[1]].every(Number.isFinite))
       throw new RangeError('Invalid deck; pass a positive size and thickness and a finite top and center');
-    const granite = surface('basalt', { roughness: 0.5 }),
+    const granite = surface('gabbro', { roughness: 0.5 }),
       plate = material ?? new PbrMaterial({ color: granite.color, roughness: granite.roughness });
     const mesh = this.engine
       .createMesh()

@@ -1373,6 +1373,58 @@
     ]
    }
   ],
+  "gabbro": [
+   {
+    "sample": "rock.igneous.mafic.solid.all.gabbro_h1.jhu.becknic | Gabbro | Gabbro_H1",
+    "library": "ECOSTRESS Spectral Library 1.0 (JPL/NASA; contributor: JHU)",
+    "citation": "Meerdink et al. 2019, Remote Sensing of Environment 230, 111196, doi 10.1016/j.rse.2019.05.015; original data: ASTER spectral library (Baldridge et al. 2009, RSE 113, 711)",
+    "measurement": "Directional (10 degree) hemispherical reflectance; wavelength range tag All; particle size Solid. Data begin at 400 nm; values at 380,390 nm held at the first measured value.",
+    "url": "https://speclib.jpl.nasa.gov/ecospeclibdata/rock.igneous.mafic.solid.all.gabbro_h1.jhu.becknic.spectrum.txt",
+    "reflectance": [
+     0.0866,
+     0.0866,
+     0.0866,
+     0.0896,
+     0.0895,
+     0.0908,
+     0.0942,
+     0.0986,
+     0.0976,
+     0.101,
+     0.0991,
+     0.1013,
+     0.1022,
+     0.1031,
+     0.1027,
+     0.1039,
+     0.1047,
+     0.1049,
+     0.1053,
+     0.1078,
+     0.1058,
+     0.1058,
+     0.1048,
+     0.1043,
+     0.1038,
+     0.1036,
+     0.1057,
+     0.1042,
+     0.1041,
+     0.1035,
+     0.1041,
+     0.1032,
+     0.0996,
+     0.1037,
+     0.1026,
+     0.1032,
+     0.1057,
+     0.1016,
+     0.101,
+     0.1022,
+     0.1025
+    ]
+   }
+  ],
   "gypsum": [
    {
     "sample": "mineral.sulfate.none.fine.vswir.so-2b.jpl.beckman | Gypsum CaSO_4.2H_2O | SO-2B",
