@@ -15698,14 +15698,18 @@ Release exception: RiggedFigure loads off the floor in AR Quick Look (Apple view
   primvars instead of `UsdTransform2d` nodes. `@margoengine/usdz` first has to read a second UV set (below), or Margo's
   own round trip would break.
 
-### `parseUSDZ` samples every map of a mesh with one UV set (2026-11-28, open)
+### Fixed 2026-11-28: `parseUSDZ` sampled every map of a mesh with one UV set (KB-USDZ-UVSETS1)
 
-- **What:** `@margoengine/usdz` takes one UV primvar for a mesh, the one its first mapped input reads
-  (`diffuseColor`, `normal`, `roughness`, `metallic`), and every map samples it. A file whose maps name different
-  primvars (`exportUSDZ` writes `st` and `st1` for `texCoord` 1) loads with the other maps on the wrong coordinates.
+- **What:** `@margoengine/usdz` took one UV primvar for a mesh, the one its first mapped input read, and every map
+  sampled it, in the base reader, `previewSurface()` and `materialX()` alike. A file whose maps name different primvars
+  (`exportUSDZ` writes `st` and `st1` for `texCoord` 1) loaded with the other maps on the wrong coordinates, and a
+  `GeomSubset` read the mesh material's primvar.
 - **Repro:** `parseUSDZ(exportUSDZ(scene))` for a material with `baseColorTexture` on `uvs` and `normalTexture` with
-  `texCoord: 1` on `uvs1`: the document holds no `TEXCOORD_1` and the normal map reads `TEXCOORD_0`.
-- **Cause:** `uvName` in `packages/usdz/src/index.ts` is a single name for the mesh.
+  `texCoord: 1` on `uvs1`: the document held no `TEXCOORD_1` and the normal map read `TEXCOORD_0`.
+- **Cause:** `uvName` in `packages/usdz/src/index.ts` was a single name for the mesh.
+- **Fix:** each material lists the primvar behind each of its texture coordinate sets, each texture info carries its
+  `texCoord`, and each primitive gets `TEXCOORD_n` from its own material's list (`packages/usdz/src/uv-sets.ts`).
+- **Regression:** `packages/usdz/tests/uv-sets.test.js` (6 of its 8 tests fail on the old source).
 
 ### Fixed 2026-11-28: `exportUSDZ` dropped every texture transform but the base colour's (KB-USDZ-TRANSFORM1)
 

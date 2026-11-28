@@ -150,7 +150,7 @@ export interface SurfaceRead {
   image(
     source: USDImage,
     where: USDImagePlacement,
-  ): { index: number; extensions?: Record<string, unknown>; scale?: number };
+  ): { index: number; extensions?: Record<string, unknown>; scale?: number; texCoord?: number };
   soft(message: string): void;
 }
 /** A material the surface hook made. */
@@ -159,8 +159,8 @@ export interface USDSurface {
   /** Arbitrary named linear color and opacity primvar readers. */
   color?: { name: string; fallback: number[] };
   opacity?: { name: string; fallback: number[] };
-  /** The primvar its textures read. */
-  uv?: string;
+  /** The primvar behind each texture coordinate set its textures read: `uvSets[n]` is TEXCOORD_n. */
+  uvSets?: readonly string[];
   /** Kept on the material's `extras.materialX`. */
   network?: unknown;
 }

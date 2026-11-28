@@ -10,6 +10,7 @@ import {
 } from '@margoengine/loaders/common';
 import { readUSDA, type USDPrim, type USDValue } from '@margoengine/loaders/usd';
 import { parseCrate, type Specs, type TimeSamples } from './crate.js';
+import { uvSets } from './uv-sets.js';
 import type {
   ExtensionHooks,
   ForeignLayer,
@@ -600,7 +601,18 @@ function asset(
     }
     return result;
   };
-  const texture = (path: string, name: string): { path: string; channel: number; placement: Placement } | undefined => {
+  /** The primvar a texture reads, through its UsdTransform2d when it has one. */
+  const uvPrimvar = (shader: string): string | undefined => {
+    let node = connection(shader, 'inputs:st')?.split('.outputs:')[0];
+    if (node && attrs(node, 'info:id') === 'UsdTransform2d')
+      node = connection(node, 'inputs:in')?.split('.outputs:')[0];
+    const name = node && input(node, 'inputs:varname');
+    return typeof name === 'string' ? name : undefined;
+  };
+  const texture = (
+    path: string,
+    name: string,
+  ): { path: string; channel: number; placement: Placement; uv: string } | undefined => {
     const target = connection(path, name);
     if (!target) return;
     const shader = target.split('.outputs:')[0];
@@ -629,6 +641,7 @@ function asset(
       path: root === undefined ? file : pathName(file, root),
       channel: Math.max(0, index),
       placement: placement(shader),
+      uv: uvPrimvar(shader) ?? 'st',
     };
   };
   /**
@@ -664,19 +677,12 @@ function asset(
   };
   const surfacers = hooks(options).filter((hook) => hook.surface),
     materialIds = new Map<string, number>(),
-    // Per material: the fallback colour and opacity of the display primvars it reads, and the primvar its maps sample.
+    // Per material: the fallback colour and opacity of the display primvars it reads, and the primvar behind each
+    // texture coordinate set its maps sample.
     displays = new Map<
       number,
-      { color?: number[]; opacity?: number[]; colorName?: string; opacityName?: string; uv?: string }
+      { color?: number[]; opacity?: number[]; colorName?: string; opacityName?: string; uvSets: readonly string[] }
     >();
-  /** The primvar a texture reads, through its UsdTransform2d when it has one. */
-  const uvPrimvar = (shader: string): string | undefined => {
-    let node = connection(shader, 'inputs:st')?.split('.outputs:')[0];
-    if (node && attrs(node, 'info:id') === 'UsdTransform2d')
-      node = connection(node, 'inputs:in')?.split('.outputs:')[0];
-    const name = node && input(node, 'inputs:varname');
-    return typeof name === 'string' ? name : undefined;
-  };
   function material(path: string): number {
     let binding: string | undefined;
     // The nearest binding wins, unless one above it says it is stronger than what is below it.
@@ -708,7 +714,7 @@ function asset(
             ) - 1;
           materialIds.set(binding, id);
           displays.set(id, {
-            uv: made.uv,
+            uvSets: made.uvSets ?? [],
             color: made.color?.fallback,
             opacity: made.opacity?.fallback,
             colorName: made.color?.name,
@@ -763,6 +769,7 @@ function asset(
     definition.alphaMode = 'OPAQUE';
     if (opacity < 1 || vertexOpacity) seeThrough();
     if (color) p.baseColorFactor = [1, 1, 1, opacity];
+    const sets = uvSets(soft);
     if (shader) {
       const diffuse = color ? undefined : texture(shader, 'inputs:diffuseColor'),
         alpha = vertexOpacity ? undefined : texture(shader, 'inputs:opacity'),
@@ -772,17 +779,24 @@ function asset(
       if (diffuse) {
         p.baseColorFactor = [1, 1, 1, opacity];
         p.baseColorTexture = image({ path: diffuse.path }, diffuse.placement);
+        sets.bind(p.baseColorTexture, diffuse.uv);
       }
       // glTF holds opacity in the base colour's alpha, so an opacity map has to be that texture's own.
       if (alpha) {
-        if (alpha.path !== diffuse?.path || alpha.channel !== 3) soft('unsupported opacity texture');
+        if (alpha.path !== diffuse?.path || alpha.uv !== diffuse.uv || alpha.channel !== 3)
+          soft('unsupported opacity texture');
         else seeThrough();
       }
-      if (normal) definition.normalTexture = image({ path: normal.path }, normal.placement);
+      if (normal) {
+        definition.normalTexture = image({ path: normal.path }, normal.placement);
+        sets.bind(definition.normalTexture, normal.uv);
+      }
       if (rough || metal) {
         // One packed glTF texture: both maps must be sampled the same way.
         if (rough && metal && JSON.stringify(rough.placement) !== JSON.stringify(metal.placement))
           soft('unsupported roughness and metallic textures with different transforms or wrap modes');
+        if (rough && metal && rough.uv !== metal.uv)
+          soft('unsupported roughness and metallic textures with different texture coordinates');
         p.metallicRoughnessTexture = image(
           {
             roughness: rough && { path: rough.path, channel: rough.channel },
@@ -792,6 +806,7 @@ function asset(
           },
           (rough ?? metal)!.placement,
         );
+        sets.bind(p.metallicRoughnessTexture, (rough ?? metal)!.uv);
         p.roughnessFactor = 1;
         p.metallicFactor = 1;
       }
@@ -799,12 +814,7 @@ function asset(
     const id = doc.materials.length;
     doc.materials.push(definition);
     materialIds.set(key, id);
-    const mapped =
-      shader &&
-      ['inputs:diffuseColor', 'inputs:normal', 'inputs:roughness', 'inputs:metallic']
-        .map((name) => connection(shader!, name)?.split('.outputs:')[0])
-        .find((node) => node && attrs(node, 'info:id') === 'UsdUVTexture');
-    displays.set(id, { color, opacity: vertexOpacity, uv: mapped ? uvPrimvar(mapped) : undefined });
+    displays.set(id, { color, opacity: vertexOpacity, uvSets: sets.names });
     return id;
   }
   function accessor(data: Float32Array | Uint32Array | Uint16Array | Uint8Array, type: string): number {
@@ -982,23 +992,13 @@ function asset(
         normalIndices = shape ? undefined : authoredNormalIndices,
         materialId = material(path),
         reads = displays.get(materialId)!,
-        uvName = [reads.uv, 'st', 'UVMap', 'uv', 'st0', 'st_0', 'map1'].find(
-          (name) => name && specs[path + '.primvars:' + name],
-        ),
-        uvValue = uvName ? attrs(path, 'primvars:' + uvName) : undefined,
         authoredNormal = normalValue === undefined ? undefined : numeric(normalValue),
         // A subdivided mesh has normals of its own, as the schema says.
         normal =
           shape?.normals ??
           (shape && authoredNormal ? reshaped(authoredNormal, 3, normalName, authoredNormalIndices) : authoredNormal),
-        uvProperty = 'primvars:' + uvName,
-        authoredUV = uvValue === undefined ? undefined : numeric(uvValue),
-        authoredUVIndices = attrs(path, uvProperty + ':indices') as ArrayLike<number> | undefined,
-        uv = shape && authoredUV ? reshaped(authoredUV, 2, uvProperty, authoredUVIndices) : authoredUV,
-        uvIndices = shape ? undefined : authoredUVIndices,
         positions = new Float32Array(triangles * 9),
         normals = new Float32Array(triangles * 9),
-        uvs = uv ? new Float32Array(triangles * 6) : undefined,
         indices = new Uint32Array(triangles * 3),
         vertexOf = scenes.length || geometryReaders ? new Uint32Array(triangles * 3) : undefined,
         firstTriangle = new Uint32Array(faceCount + 1),
@@ -1010,6 +1010,57 @@ function asset(
         tint = reads.color && shaped(displayStream(path, colorName, reads.color, 3), 3, 'primvars:' + colorName),
         fade =
           reads.opacity && shaped(displayStream(path, opacityName, reads.opacity, 1), 1, 'primvars:' + opacityName);
+      // The faces under each GeomSubset with a material of its own. A face belongs to the first subset that lists it.
+      const taken = new Uint8Array(faceCount),
+        drawn = new Uint8Array(faceCount),
+        claimed: { path: string; faces: number[]; material: number }[] = [];
+      for (let f = 0; f < counts.length; f++) if (counts[f] >= 3) drawn[shape ? shape.face[f] : f] = 1;
+      for (const subset of subsetsOf.get(path) ?? []) {
+        if ((attrs(subset, 'elementType') ?? 'face') !== 'face') continue;
+        if (!specs[subset + '.material:binding'] && attrs(subset, 'familyName') !== 'materialBind') continue;
+        const own: number[] = [];
+        for (const face of Array.from(numeric(attrs(subset, 'indices') ?? []))) {
+          if (!Number.isSafeInteger(face) || face < 0 || face >= faceCount) fail('subset face outside mesh');
+          if (taken[face]) continue;
+          taken[face] = 1;
+          own.push(face);
+        }
+        if (own.some((face) => drawn[face])) claimed.push({ path: subset, faces: own, material: material(subset) });
+      }
+      /** The primvar a mesh gives a material's set: the one it names, else what the mesh calls its coordinates. */
+      const coordinates = (name: string | undefined, other?: string) =>
+        [name, other, 'st', 'UVMap', 'uv', 'st0', 'st_0', 'map1'].find(
+          (name) => name && specs[path + '.primvars:' + name],
+        );
+      const streams = new Map<
+        string,
+        { property: string; values: ArrayLike<number>; indices?: ArrayLike<number>; out: Float32Array }
+      >();
+      /** The primvar behind each TEXCOORD set of a material on this mesh. A material with no maps keeps `other`. */
+      const sets = (id: number, other?: string): (string | undefined)[] => {
+        const wanted = displays.get(id)!.uvSets,
+          first = wanted.length ? coordinates(wanted[0]) : (other ?? coordinates(undefined)),
+          names = [first, ...wanted.slice(1).map((name) => coordinates(name, first))];
+        for (const name of names) {
+          if (!name || streams.has(name)) continue;
+          const value = attrs(path, 'primvars:' + name);
+          if (value == null || value === '') continue;
+          const property = 'primvars:' + name,
+            authored = numeric(value),
+            indices = attrs(path, property + ':indices') as ArrayLike<number> | undefined;
+          streams.set(name, {
+            property,
+            values: shape ? reshaped(authored, 2, property, indices) : authored,
+            indices: shape ? undefined : indices,
+            out: new Float32Array(triangles * 6),
+          });
+        }
+        return names;
+      };
+      const meshSets = sets(materialId),
+        subsetSets = claimed.map((subset) => sets(subset.material, meshSets[0])),
+        coordinateStreams = [...streams.values()],
+        uvs = meshSets[0] ? streams.get(meshSets[0])?.out : undefined;
       const sample = (
         stream: ArrayLike<number>,
         width: number,
@@ -1092,13 +1143,13 @@ function asset(
               if (n * 3 + 2 >= normal.length) fail('normal index outside stream');
               for (let d = 0; d < 3; d++) normals[at * 3 + d] = normal[n * 3 + d];
             }
-            if (uv && uvs) {
-              const u = uvIndices
-                ? uvIndices[sample(uvIndices, 1, corner, vertex, f, uvProperty)]
-                : sample(uv, 2, corner, vertex, f, uvProperty);
-              if (!Number.isSafeInteger(u) || u < 0 || u * 2 + 1 >= uv.length) fail('UV index outside stream');
-              uvs[at * 2] = uv[u * 2];
-              uvs[at * 2 + 1] = uv[u * 2 + 1];
+            for (const { property, values, indices: lookup, out } of coordinateStreams) {
+              const u = lookup
+                ? lookup[sample(lookup, 1, corner, vertex, f, property)]
+                : sample(values, 2, corner, vertex, f, property);
+              if (!Number.isSafeInteger(u) || u < 0 || u * 2 + 1 >= values.length) fail('UV index outside stream');
+              out[at * 2] = values[u * 2];
+              out[at * 2 + 1] = values[u * 2 + 1];
             }
             if (colors) {
               const entry = (stream: DisplayStream, width: number, property: string): number => {
@@ -1132,27 +1183,37 @@ function asset(
       };
       if (colors) attributes.COLOR_0 = accessor(colors, 'VEC4');
       // USD st has its origin at the image's bottom left (t up); glTF uvs at its top left (v down): v = 1 - t.
-      if (uvs)
-        attributes.TEXCOORD_0 = accessor(
-          Float32Array.from(uvs, (x, i) => (i % 2 ? 1 - x : x)),
-          'VEC2',
-        );
-      // Each subset with a material is a primitive of its own, over the same vertex streams. A face belongs to the
-      // first subset that lists it; the faces left keep the mesh's material.
-      const taken = new Uint8Array(faceCount),
-        subsets: USDMeshSubset[] = [];
-      for (const subset of subsetsOf.get(path) ?? []) {
-        if ((attrs(subset, 'elementType') ?? 'face') !== 'face') continue;
-        if (!specs[subset + '.material:binding'] && attrs(subset, 'familyName') !== 'materialBind') continue;
+      const flipped = new Map<string, number>(),
+        withCoordinates = (names: (string | undefined)[]) => {
+          const out = { ...attributes };
+          names.forEach((name, set) => {
+            const stream = name === undefined ? undefined : streams.get(name);
+            if (!stream) return;
+            let id = flipped.get(name!);
+            if (id === undefined)
+              flipped.set(
+                name!,
+                (id = accessor(
+                  Float32Array.from(stream.out, (x, i) => (i % 2 ? 1 - x : x)),
+                  'VEC2',
+                )),
+              );
+            out['TEXCOORD_' + set] = id;
+          });
+          return out;
+        },
+        meshAttributes = withCoordinates(meshSets),
+        // Primitives whose sets read the same primvars share one attribute list.
+        attributesFor = (names: (string | undefined)[]) =>
+          names.join() === meshSets.join() ? meshAttributes : withCoordinates(names);
+      // Each subset with a material is a primitive of its own, over the same vertex streams; the faces left keep the
+      // mesh's material.
+      const subsets: USDMeshSubset[] = claimed.map((subset) => {
         const list: number[] = [];
-        for (const face of Array.from(numeric(attrs(subset, 'indices') ?? []))) {
-          if (!Number.isSafeInteger(face) || face < 0 || face >= faceCount) fail('subset face outside mesh');
-          if (taken[face]) continue;
-          taken[face] = 1;
+        for (const face of subset.faces)
           for (let t = firstTriangle[face] * 3; t < firstTriangle[face + 1] * 3; t++) list.push(t);
-        }
-        if (list.length) subsets.push({ path: subset, indices: Uint32Array.from(list), material: material(subset) });
-      }
+        return { path: subset.path, indices: Uint32Array.from(list), material: subset.material };
+      });
       let rest = indices;
       if (subsets.length) {
         const left: number[] = [];
@@ -1160,12 +1221,13 @@ function asset(
           if (!taken[face]) for (let t = firstTriangle[face] * 3; t < firstTriangle[face + 1] * 3; t++) left.push(t);
         rest = Uint32Array.from(left);
       }
-      const primitives = subsets.map((subset) => ({
-        attributes,
+      const primitives = subsets.map((subset, i) => ({
+        attributes: attributesFor(subsetSets[i]),
         indices: accessor(subset.indices, 'SCALAR'),
         material: subset.material,
       }));
-      if (rest.length) primitives.push({ attributes, indices: accessor(rest, 'SCALAR'), material: materialId });
+      if (rest.length)
+        primitives.push({ attributes: meshAttributes, indices: accessor(rest, 'SCALAR'), material: materialId });
       const mesh = doc.meshes.length;
       doc.meshes.push({ primitives });
       node.mesh = mesh;

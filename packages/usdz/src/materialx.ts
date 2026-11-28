@@ -25,6 +25,7 @@ import type {
   USDImagePlacement,
   USDSurface,
 } from './extension.js';
+import { uvSets } from './uv-sets.js';
 import type { USDAsset } from './index.js';
 import { anchored } from './stage.js';
 
@@ -652,11 +653,12 @@ function surface(read: SurfaceRead): USDSurface | undefined {
   const material: GLTFMaterial = { name: read.path, doubleSided: true, alphaMode: 'OPAQUE' },
     p: NonNullable<GLTFMaterial['pbrMetallicRoughness']> = (material.pbrMetallicRoughness = {}),
     extensions: Record<string, Record<string, unknown>> = {},
-    uvs: string[] = [],
-    /** A texture slot's entry. Each image here counts towards the primvar the mesh gives it. */
+    sets = uvSets(read.soft),
+    /** A texture slot's entry, on the texture coordinate set of the primvar its image reads. */
     texture = (image: Sampled, linearColor = false) => {
-      if (image.uv) uvs.push(image.uv);
-      return read.image({ path: image.file, ...(linearColor ? { linearColor } : {}) }, image.where);
+      const info = read.image({ path: image.file, ...(linearColor ? { linearColor } : {}) }, image.where);
+      sets.bind(info, image.uv);
+      return info;
     };
   /** The base colour, from any mix of constants and one image. */
   const base = (color: Reduced, opacity: number) => {
@@ -695,7 +697,7 @@ function surface(read: SurfaceRead): USDSurface | undefined {
     uses(read, 'KHR_materials_unlit');
     extensions.KHR_materials_unlit = {};
     material.extensions = extensions;
-    return { material, uv: uvs[0], network: networkOf(read, shader) };
+    return { material, uvSets: sets.names, network: networkOf(read, shader) };
   }
   const mode = kind === 'gltf_pbr' ? constant('alpha_mode', 0) : undefined,
     opacity = slots.opacity && mode !== 0 ? alpha(...slots.opacity) : 1,
@@ -763,7 +765,9 @@ function surface(read: SurfaceRead): USDSurface | undefined {
       { roughness: part(rough), metallic: part(metal), roughnessValue: number(rough), metallicValue: number(metal) },
       (sampled(rough) ? rough : (metal as Sampled)).where,
     );
-    for (const image of [rough, metal]) if (sampled(image) && image.uv) uvs.push(image.uv);
+    if (sampled(rough) && sampled(metal) && (rough.uv ?? 'st') !== (metal.uv ?? 'st'))
+      read.soft('unsupported roughness and metallic textures with different texture coordinates');
+    sets.bind(p.metallicRoughnessTexture, (sampled(rough) ? rough : (metal as Sampled)).uv);
     p.roughnessFactor = sampled(rough) ? fit(rough.factor[0]) : 1;
     p.metallicFactor = sampled(metal) ? fit(metal.factor[0]) : 1;
   } else {
@@ -895,7 +899,7 @@ function surface(read: SurfaceRead): USDSurface | undefined {
       read.soft(`${kind} input ${name} on ${read.path} has no glTF form`);
   }
   if (Object.keys(extensions).length) material.extensions = extensions;
-  return { material, uv: uvs[0], network: networkOf(read, shader) };
+  return { material, uvSets: sets.names, network: networkOf(read, shader) };
 }
 
 /** The type a node gives, from its id: the last word that names a type, or what the node always gives. */

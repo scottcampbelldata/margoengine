@@ -3,6 +3,7 @@ import type { ExtensionHooks, SurfaceRead, USDExtension, USDImagePlacement, USDS
 import { flat } from './clip.js';
 import { attachPreviewOpacity } from './preview-opacity.js';
 import { primvarStream } from './primvar-stream.js';
+import { uvSets } from './uv-sets.js';
 import type { PreviewOpacity } from './preview-opacity.js';
 
 const bad = (message: string): never => {
@@ -139,25 +140,36 @@ function surface(read: SurfaceRead): USDSurface | undefined {
     };
   }
   if (threshold > 0) material.alphaCutoff = threshold;
-  if (diffuse) p.baseColorTexture = read.image({ path: diffuse.path }, diffuse.where);
-  if (normal) material.normalTexture = read.image({ path: normal.path }, normal.where);
+  // TEXCOORD_2 and 3 hold the primvar readers' coordinates, so with readers the maps have the first two sets.
+  const sets = uvSets(read.soft, readers.length ? 2 : 4),
+    first = [diffuse, normal, rough, metal, alpha].find((map) => map);
+  if (first) sets.names.push(first.uv ?? 'st');
+  // The separate opacity map is sampled from TEXCOORD_1.
+  if (alpha) sets.names.push(alpha.uv ?? 'st');
+  const mapped = (source: Parameters<SurfaceRead['image']>[0], from: NonNullable<ReturnType<typeof texture>>) => {
+    const info = read.image(source, from.where);
+    sets.bind(info, from.uv);
+    return info;
+  };
+  if (diffuse) p.baseColorTexture = mapped({ path: diffuse.path }, diffuse);
+  if (normal) material.normalTexture = mapped({ path: normal.path }, normal);
   if (rough || metal) {
-    if (rough && metal && JSON.stringify(rough.where) !== JSON.stringify(metal.where))
+    if (rough && metal && (JSON.stringify(rough.where) !== JSON.stringify(metal.where) || rough.uv !== metal.uv))
       bad('metal and roughness sampling differs');
-    p.metallicRoughnessTexture = read.image(
+    p.metallicRoughnessTexture = mapped(
       {
         roughness: rough && { path: rough.path, channel: rough.channel },
         metallic: metal && { path: metal.path, channel: metal.channel },
         roughnessValue: p.roughnessFactor,
         metallicValue: p.metallicFactor,
       },
-      (rough ?? metal)!.where,
+      (rough ?? metal)!,
     );
     p.roughnessFactor = p.metallicFactor = 1;
   }
   material.emissiveFactor = values(input(shader, 'inputs:emissiveColor'), 3, [0, 0, 0]);
   if (emit) {
-    material.emissiveTexture = read.image({ path: emit.path }, emit.where);
+    material.emissiveTexture = mapped({ path: emit.path }, emit);
     material.emissiveFactor = [1, 1, 1];
   }
   if (alpha) {
@@ -175,10 +187,10 @@ function surface(read: SurfaceRead): USDSurface | undefined {
     );
     material.extras = {
       ...(material.extras as object),
-      usdPreviewOpacity: { texture: info.index, uv: alpha.uv, where: alpha.where },
+      usdPreviewOpacity: { texture: info.index, uv: alpha.uv, where: alpha.where, texCoord: 1 },
     };
   }
-  return { material, color, opacity, uv: diffuse?.uv ?? normal?.uv ?? rough?.uv ?? metal?.uv ?? alpha?.uv };
+  return { material, color, opacity, uvSets: sets.names };
 }
 
 /** Import independent opacity maps and arbitrary named color, opacity and UV primvar readers in UsdPreviewSurface. */
@@ -253,11 +265,13 @@ export function previewSurface(): USDExtension {
               usdPreviewValues: { accessor: read.accessor(packed, 'VEC4'), inputs: readers.map((r) => r.input) },
             };
           }
-          if (!data) continue;
-          const stream = primvarStream(read, mesh, data.uv ?? 'st', 2, [0, 0]);
+          const name = data && (data.uv ?? 'st');
+          // The mesh walk wrote the set from the primvar; a mesh without it reads the reader's fallback.
+          if (!name || (primitive.attributes!.TEXCOORD_1 !== undefined && read.specs[mesh.path + '.primvars:' + name]))
+            continue;
+          const stream = primvarStream(read, mesh, name, 2, [0, 0]);
           for (let i = 1; i < stream.length; i += 2) stream[i] = 1 - stream[i];
-          primitive.attributes!.TEXCOORD_1 = read.accessor(stream, 'VEC2');
-          data.texCoord = 1;
+          primitive.attributes = { ...primitive.attributes, TEXCOORD_1: read.accessor(stream, 'VEC2') };
         }
     },
   };
