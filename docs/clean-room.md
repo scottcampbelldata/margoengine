@@ -15406,6 +15406,37 @@ compute shaders), and no companion code of any paper was opened.
 - H. Vogel, [A better way to construct the sunflower head](https://doi.org/10.1016/0025-5564(79)90080-4) (Mathematical
   Biosciences 44, 1979): points k = 0.. at radius R sqrt((k + 1/2) / N) and the golden angle apart cover a disc evenly,
   which places an emitter's particles over its nozzle without a lattice.
+- The accurate profile (2026-11-27), compared before it was built. Alexandre Joel Chorin,
+  [Numerical Solution of the Navier-Stokes Equations](https://doi.org/10.1090/S0025-5718-1968-0242392-2) (Math. Comp.
+  22(104), 1968): the projection, an intermediate velocity without the pressure and then the pressure that makes it
+  divergence-free. Fan Zhang, Xiong Zhang, Kam Yim Sze, Yanping Lian and Yan Liu,
+  [Incompressible material point method for free surface flow](https://repository.hku.hk/handle/10722/242215) (J.
+  Comput. Phys. 330, 2017; a summary of the paper, whose host did not resolve here): the same split in MPM, reported better
+  than weakly compressible MPM on a dam break and on drops. Shyamini Kularathna and Kenichi Soga,
+  [Implicit formulation of material point method for analysis of incompressible materials](https://doi.org/10.1016/j.cma.2016.10.013)
+  (CMAME 313, 2017; a summary of the abstract): the non-incremental projection is stable in MPM and removes the explicit scheme's pressure
+  oscillations and small steps. Markus Ihmsen, Jens Cornelis, Barbara Solenthaler, Christopher Horvath and Matthias
+  Teschner, [Implicit Incompressible SPH](https://doi.org/10.1109/TVCG.2013.105) (IEEE TVCG 20(3), 2014; a summary of
+  the paper and its introduction): a stiff equation of state restricts the time step severely, and an implicit pressure
+  solve handles large steps at density deviations down to 0.01 percent, which is why the accurate profile steps at the
+  flow's speed rather than the speed of sound. Yongning Zhu
+  and Robert Bridson, [Animating Sand as a Fluid](https://doi.org/10.1145/1073204.1073298) (ACM TOG 24(3), 2005): particles
+  carrying velocity through a grid whose pressure solve keeps it incompressible, a cell liquid when particles fill it.
+  Christopher Batty, Florence Bertails and Robert Bridson,
+  [A Fast Variational Framework for Accurate Solid-Fluid Coupling](https://doi.org/10.1145/1276377.1276502) (ACM TOG
+  26(3), 2007): the projection as the least-kinetic-energy divergence-free velocity, which here is weighted by the nodes'
+  lumped masses (W = rest density over the node's mass), holds a solid's normal velocity at its nodes and keeps the
+  system symmetric. Robert Bridson, *Fluid Simulation for Computer Graphics* (2nd ed., CRC Press, 2015): the liquid's
+  velocity extrapolated past its surface before the particles read it. Tassilo Kugelstadt, Andreas Longva, Nils Thuerey
+  and Jan Bender, [Implicit Density Projection for Volume Conserving Liquids](https://doi.org/10.1109/TVCG.2019.2947437)
+  (IEEE TVCG, 2021; a summary of the abstract): a divergence-free solve sees density changes only as a rate, so volume
+  errors from steps and solver tolerance accumulate unseen; they track the density on the particles and put its deviation
+  into the pressure solve. Here the deviation is the cells' density over rest (the node weights, walls mirrored) as a
+  target divergence of half the excess a substep in the same solve, two-sided where no neighbour is air. M. R. Hestenes and E. Stiefel (1952, above in this file): the conjugate gradient
+  solve, Jacobi-preconditioned, its sums in a fixed tree so it repeats bit for bit. The trilinear-velocity,
+  constant-pressure pair (the Q1-P0 element of finite elements) has checkerboard pressure modes; the projected velocity,
+  the least-kinetic-energy divergence-free field, is unique whatever the pressure's null modes, and the conjugate
+  gradient solve converges on its consistent right-hand side. No companion code of any of them was read.
 - W. Daniel Hillis and Guy L. Steele, [Data Parallel Algorithms](https://doi.org/10.1145/7902.7903) (CACM 29(12),
   1986), and Guy E. Blelloch, [Prefix Sums and Their Applications](https://www.cs.cmu.edu/~guyb/papers/Ble93.pdf) (CMU
   technical report, 1990): the inclusive scan inside a workgroup and the per-block counts scanned once more, so the drains'

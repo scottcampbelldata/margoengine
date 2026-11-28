@@ -8415,7 +8415,25 @@ ParticleLiquid draws 0 to 4,194,304 particles, all of one radius (0.001 to 100 w
 each) on a grid of at most 4,194,304 nodes (32 B each, and 16 B more with surface tension), 8 to 256 cells along the container's longest side and at least
 4 on every side. What it does not do, and what was measured:
 
-- Weakly compressible, not incompressible: the Tait equation lets the liquid compress by about g d / c^2 at depth d. With
+- Two profiles. `'accurate'` is incompressible to its solve's tolerance: the grid's velocity is projected each substep
+  with a pressure per grid cell (the trilinear-velocity, constant-pressure pair, whose pressure can show a checkerboard
+  that leaves the velocity unaffected) by Jacobi-preconditioned conjugate gradients from zero, at most
+  `pressureIterations` (128) to a residual of `pressureTolerance` (1e-4) of the first; a solve that hits the cap leaves
+  the rest of its divergence (`stats.pressureResidual`). The Jacobi preconditioner converges slowly on the grid's
+  long-wave and checkerboard-like modes: still water converges within the cap, but a column falling round a sphere in a
+  0.8 m tank (32,768 particles, about 26 cells a side) reaches the cap with 4.5e-4 of its divergence left on the GPU and
+  on the twin alike; a multigrid preconditioner would converge in far fewer iterations and is not built. A cell is liquid at half its rest density or more (the free surface lies within a cell of
+  the particles' edge, first order) and solid when all its corners lie inside colliders, so a collider's surface is
+  placed to the grid's nodes. Measured on the CPU twin (`gpu-liquid.test.js`): a 0.2 m layer on a floor collider holds
+  its centroid within a quarter particle spacing over 1.5 s, its cell pressure is rho g d within rho g h, and the floor
+  carries its weight within 1%; 0.6 s into a dam break of 8,192 particles the liquid at the floor reads 1.006 times rest
+  density, where the fast profile reads 1.028. The GPU's projection matches the twin's to 3.2e-7 m and 2.7e-5 m/s over a frame of 32,768
+  particles and their floor's force to 0.002% (`gpu-liquid-check.mjs`). The pressure enters G2P only through the
+  projected grid velocity, so a particle reads it with the B-spline's 27 nodes while the projection holds the
+  divergence of each cell's 8; the cells' density correction (half a cell's excess a substep) keeps the volume across
+  that gap. Each substep costs 7 + 5 * pressureIterations dispatches (the ones past convergence have no workgroups);
+  speed is measured in the speed phase.
+- The fast profile is weakly compressible: the Tait equation lets the liquid compress by about g d / c^2 at depth d. With
   the default speed of sound 2 sqrt(g H) a 0.6 m column in a 1 m tank reads 1.04 to 1.13 times rest density from its
   surface layer to its floor (CPU twin, 6,000 particles, 2.5 s), within 0.02 of the closed form (1 + 6 g d / c^2)^(1/6)
   while the column still rings from its start (rms speed 0.13 to 0.25 m/s after 1.5 to 2.5 s; the APIC transfers damp

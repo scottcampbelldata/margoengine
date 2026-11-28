@@ -497,6 +497,11 @@ test('every bad option is a coded error naming the value, with the help link', (
     { colliders: [{ shape: 'sphere', position: [0, 0, 0], radius: -1 }] },
     { debug: { particles: 'pressure' } },
     { debug: { enabled: 'yes' } },
+    { profile: 'exact' },
+    { pressureIterations: 0 },
+    { pressureIterations: 1.5 },
+    { pressureTolerance: 0 },
+    { pressureTolerance: 0.5 },
   ];
   for (const options of bad)
     assert.throws(
@@ -574,4 +579,95 @@ test('a floating origin: the liquid lives in a world cell, and a shift of the or
   near.dispose();
   far.dispose();
   assert.throws(() => far.shiftOrigin([1, 0, 0]), { code: 'disposed' });
+});
+
+test('accurate profile: still water stays still at rest density with the hydrostatic pressure rho g d, and the floor carries its weight', () => {
+  // A 0.2 m layer on a floor collider. The projection holds the liquid's volume (the centroid stays where it started, to
+  // the particles' start jitter), the pressure in a liquid cell is rho g times its depth below the surface, which the
+  // cells place within one cell h, and the floor's impulse balances gravity's on the column with its momentum change.
+  const box = { min: [0, 0, 0], max: [0.4, 0.4, 0.4] };
+  const p = resolveLiquidParams({
+    count: 8192,
+    box,
+    profile: 'accurate',
+    fill: { min: [0, 0.1, 0], max: [0.4, 0.3, 0.4] },
+    colliders: [{ shape: 'box', position: [0.2, 0.05, 0.2], halfExtents: [0.3, 0.05, 0.3] }],
+  });
+  assert.equal(p.profile, 'accurate');
+  assert.ok(Math.abs(p.maxSubstep - (0.5 * p.cellSize) / Math.sqrt(2 * 9.81 * 0.4)) < 1e-15, 'half a cell over the fall speed');
+  const s = createLiquidState(p);
+  const centroid = () => {
+    let y = 0;
+    for (let i = 0; i < s.live; i++) y += s.particles[i * F + 1];
+    return y / s.live;
+  };
+  const momentum = () => {
+    let m = 0;
+    for (let i = 0; i < s.live; i++) m += s.particles[i * F + 5];
+    return m;
+  };
+  const y0 = centroid();
+  for (let k = 0; k < 60; k++) stepLiquidCPU(s, p, 1 / 60);
+  const p0 = momentum();
+  let impulse = 0;
+  for (let k = 0; k < 30; k++) {
+    stepLiquidCPU(s, p, 1 / 60);
+    impulse += s.impulses[1] / FORCE_FIXED;
+  }
+  let fastest = 0;
+  for (let i = 0; i < s.live; i++) fastest = Math.max(fastest, Math.hypot(s.particles[i * F + 4], s.particles[i * F + 5], s.particles[i * F + 6]));
+  // From rest, its start jitter (a quarter spacing) settles: no particle moves faster than the speed of falling that far.
+  const jitterFall = Math.sqrt(2 * 9.81 * 0.25 * p.lattice[1]);
+  assert.ok(fastest < jitterFall, `fastest particle ${fastest} m/s after 1.5 s, against ${jitterFall}`);
+  assert.ok(Math.abs(centroid() - y0) < 0.25 * p.lattice[1], `centroid ${centroid()} from ${y0}: the volume is kept`);
+  const expected = -(momentum() - p0) - p.count * 9.81 * 0.5;
+  const weight = p.count * 9.81 * 0.5;
+  assert.ok(Math.abs(impulse - expected) <= 0.01 * weight, `floor impulse ${impulse} against ${expected}`);
+  // Hydrostatic pressure down the middle column of cells.
+  const [nx, ny, nz] = p.dims;
+  const cx = nx - 1,
+    cy = ny - 1;
+  const i = Math.floor(cx / 2),
+    l = Math.floor((nz - 1) / 2);
+  let checked = 0;
+  for (let j = 0; j < cy; j++) {
+    const pressure = s.pressure[i + cx * (j + cy * l)];
+    if (!pressure) continue;
+    const y = p.origin[1] + (j + 0.5) * p.cell[1];
+    if (y < 0.15 || y > 0.25) continue;
+    const exact = 1000 * 9.81 * (0.3 - y);
+    assert.ok(Math.abs(pressure - exact) <= 1000 * 9.81 * p.cellSize, `pressure ${pressure} Pa at ${y} m against ${exact}`);
+    checked++;
+  }
+  assert.ok(checked >= 2, 'liquid cells down the column');
+  assert.ok(s.iterations > 0 && s.iterations < p.pressureIterations, `the solve converges: ${s.iterations} iterations`);
+  assert.ok(s.residual <= p.pressureTolerance, `to its tolerance: ${s.residual}`);
+});
+
+test('accurate profile against fast: the same dam break keeps its volume where the Tait liquid compresses', () => {
+  // A column falls in a 0.4 m tank; after 0.6 s the mean density over rest of the particles more than a cell under the
+  // surface stays within the projection's tolerance of 1 in the accurate profile, while the fast one compresses by its
+  // Mach number squared (c = 2 sqrt(g H) here).
+  const run = (profile) => {
+    const p = resolveLiquidParams({
+      count: 8192,
+      box: { min: [0, 0, 0], max: [0.4, 0.4, 0.2] },
+      fill: { min: [0, 0, 0], max: [0.15, 0.3, 0.2] },
+      profile,
+    });
+    const s = createLiquidState(p);
+    for (let k = 0; k < 36; k++) stepLiquidCPU(s, p, 1 / 60);
+    let sum = 0,
+      n = 0;
+    for (let i = 0; i < s.live; i++)
+      if (s.particles[i * F + 1] < 0.03) {
+        sum += s.particles[i * F + 3];
+        n++;
+      }
+    return sum / n;
+  };
+  const accurate = run('accurate');
+  const fast = run('fast');
+  assert.ok(Math.abs(accurate - 1) < 0.05, `accurate: mean density ${accurate} of rest at the floor`);
+  assert.ok(fast - 1 > accurate - 1, `fast compresses more: ${fast} against ${accurate}`);
 });

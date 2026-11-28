@@ -110,6 +110,23 @@ try {
   assert.ok(r.originDebugDiff > 200, `the debug view draws in the far cell: ${r.originDebugDiff} px`);
   assert.ok(r.originJump <= 0.01 * r.originLit, `surface after the shift: ${r.originJump} px moved of ${r.originLit}`);
   assert.ok(r.originDebugJump <= 0.01 * r.originDebugDiff, `debug view after the shift: ${r.originDebugJump} px moved`);
+  // The accurate profile's projection passes against the twin's projection (f32 against f64 conjugate gradients that
+  // stop at the same relative residual, 1e-4): the same bounds as the first frame above, the floor's force to 2%, and the
+  // same bits on a second run.
+  if (r.compat) assert.equal(r.accGap + r.accVelGap, 0);
+  else {
+    assert.ok(r.accGap < 1e-4, `accurate profile: worst position gap ${r.accGap}`);
+    assert.ok(r.accVelGap < 1e-2, `accurate profile: worst velocity gap ${r.accVelGap}`);
+    assert.ok(
+      Math.abs(r.accForceY - r.accTwinForceY) <= 0.02 * Math.abs(r.accTwinForceY) + 1e-3,
+      `accurate floor force GPU ${r.accForceY} N, twin ${r.accTwinForceY} N`,
+    );
+  }
+  assert.equal(r.accHashes[1], r.accHashes[0], 'the accurate profile repeats its bits');
+  // The solve ran and took the divergence down by three orders at least (Jacobi-preconditioned conjugate gradients
+  // converge slowly on this grid's checkerboard-like modes, so a solve may end at its 128 iterations; docs/limits.md).
+  assert.ok(r.accIterations >= 1 && r.accIterations <= 128, `pressure iterations ${r.accIterations}`);
+  assert.ok(r.accResidual < 1e-3, `the pressure solve's residual ${r.accResidual} of its start`);
   console.log(
     `ok gpu liquid (${r.stats.backend}): ${r.count} particles, ${r.stats.nodes} nodes, hash ${r.hashes[0]}, ` +
       `twin gap ${r.worstPos.toExponential(2)} m, force ${r.gpuForceY?.toFixed(3)} N, lifts ${r.lifts.map((x) => x.toFixed(2))} N, ` +

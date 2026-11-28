@@ -27,13 +27,27 @@ import {
   LIQUID_SCATTER_WGSL,
   LIQUID_SETTLE_WGSL,
   LIQUID_P2G_WGSL,
+  LIQUID_PROJECT_ALPHA_WGSL,
+  LIQUID_PROJECT_APPLY_WGSL,
+  LIQUID_PROJECT_BETA_WGSL,
+  LIQUID_PROJECT_CELLS_WGSL,
+  LIQUID_PROJECT_EXTEND_WGSL,
+  LIQUID_PROJECT_FINAL_WGSL,
+  LIQUID_PROJECT_MATVEC_WGSL,
+  LIQUID_PROJECT_NODES_WGSL,
+  LIQUID_PROJECT_START_WGSL,
+  LIQUID_PROJECT_UPDATE_WGSL,
+  LIQUID_PROJECT_VOLUME_WGSL,
   LIQUID_SIM_FLOATS,
   LIQUID_STRESS_WGSL,
 } from './liquid-mpm-shaders.js';
 import {
   createLiquidState,
   LIQUID_ADHESION_REACH,
+  LIQUID_FLUID_SHARE,
   LIQUID_FORCE_FIXED,
+  LIQUID_VOLUME_RATE,
+  liquidCells,
   LIQUID_GAMMA,
   LIQUID_COLOR_OFFSET,
   LIQUID_GRID_STRIDE,
@@ -107,7 +121,7 @@ export type {
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 type Pass = [GPUComputePipeline, GPUBindGroup];
 
-declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; COPY_SRC: number; MAP_READ: number };
+declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; COPY_SRC: number; MAP_READ: number; INDIRECT: number };
 declare const GPUMapMode: { READ: number };
 
 /** Longest frame delta one frame advances the liquid by, in seconds. */
@@ -169,7 +183,9 @@ let nextLiquidId = 0;
  *
  * On WebGPU every substep runs on the GPU (five compute passes, no readback): particles scatter mass and APIC momentum to
  * a grid, take their density back and scatter Tait pressure and viscous stress, the grid adds gravity, the pointer,
- * colliders and walls, and the particles gather their new velocity. Sums are fixed-point integers, so the same options
+ * colliders and walls, and the particles gather their new velocity. With `profile: 'accurate'` the Tait pressure gives
+ * way to a pressure projection on the grid each substep (conjugate gradients on the GPU, no readback), which keeps the
+ * liquid incompressible. Sums are fixed-point integers, so the same options
  * give the same state on the same GPU and driver, also after `snapshot` and `restore`. On the WebGL2 compatibility layer
  * the CPU twin runs the same passes (`stats.backend` is `'webgl2-compat'`); keep counts there to a few thousand.
  * Throws a coded `MargoError` (help link) for any bad option.
@@ -249,6 +265,15 @@ export class GPULiquid implements EnginePlugin {
     scatter: Pass;
     settle: Pass;
   };
+  /** The accurate profile's projection: its buffers (made on its first substep) and passes. */
+  private project?: {
+    nodes: GPUBuffer;
+    cells: GPUBuffer;
+    solve: GPUBuffer;
+    args: GPUBuffer;
+    uniform: GPUBuffer;
+    passes?: Record<'nodes' | 'cells' | 'volume' | 'start' | 'apply' | 'matvec' | 'alpha' | 'update' | 'beta' | 'final' | 'extend0' | 'extend1', Pass>;
+  };
   private debugPipelines = new Map<string, [GPURenderPipeline, GPUBindGroup, GPURenderPipeline]>();
   private lineGroups = new Map<GPURenderPipeline, GPUBindGroup>();
 
@@ -295,6 +320,8 @@ export class GPULiquid implements EnginePlugin {
       debugDraws: 0,
       live: this.count,
       capacity: this.capacity,
+      pressureIterations: 0,
+      pressureResidual: 0,
     };
   }
 
@@ -509,17 +536,25 @@ export class GPULiquid implements EnginePlugin {
       return { count: this.capacity, live: s.live, steps, emission: s.emission.slice(), particles: s.particles.slice() };
     }
     const bytes = this.capacity * LIQUID_PARTICLE_FLOATS * 4;
-    const staging = device.createBuffer({ size: bytes + 16, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+    const staging = device.createBuffer({ size: bytes + 48, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
     try {
       const encoder = device.createCommandEncoder();
       encoder.copyBufferToBuffer(this.particleBuf!, 0, staging, 0, bytes);
       encoder.copyBufferToBuffer(this.tallyBuf!, 0, staging, bytes, 16);
+      // The accurate profile's last solve: rz, alpha, beta, goal, iterations, done.
+      if (this.project) encoder.copyBufferToBuffer(this.project.solve, 0, staging, bytes + 16, 32);
       device.queue.submit([encoder.finish()]);
       await staging.mapAsync(GPUMapMode.READ);
       signal?.throwIfAborted();
       const range = staging.getMappedRange();
       const live = new Uint32Array(range, bytes, 4)[0]!;
       this.stats.live = live;
+      if (this.project) {
+        const [rz, , , goal, iterations] = new Float32Array(range, bytes + 16, 8);
+        const first = goal! / this.params.pressureTolerance ** 2;
+        this.stats.pressureIterations = iterations!;
+        this.stats.pressureResidual = first > 0 ? Math.sqrt(rz! / first) : 0;
+      }
       return { count: this.capacity, live, steps, emission, particles: new Float32Array(range.slice(0, bytes)) };
     } finally {
       staging.destroy();
@@ -857,7 +892,9 @@ export class GPULiquid implements EnginePlugin {
     f.set([...p.origin, h], 12);
     f.set([hx, hy, hz, p.cellSize / h], 16);
     f.set([1 / hx, 1 / hy, 1 / hz, p.restDensity], 20);
-    f.set([4 / (hx * hx), 4 / (hy * hy), 4 / (hz * hz), (h * p.speedOfSound * p.speedOfSound) / LIQUID_GAMMA], 24);
+    // The Tait pressure's factor; the accurate profile's pressure comes from its projection instead.
+    const tait = p.profile === 'fast' ? (h * p.speedOfSound * p.speedOfSound) / LIQUID_GAMMA : 0;
+    f.set([4 / (hx * hx), 4 / (hy * hy), 4 / (hz * hz), tait], 24);
     f.set([...p.boxMin, h * p.viscosity], 28);
     f.set([...p.boxMax, Math.cbrt(hx * hy * hz)], 32);
     f.set([...p.gravity, 0], 36);
@@ -909,7 +946,10 @@ export class GPULiquid implements EnginePlugin {
       this.scratchBuf = this.buffer(device, this.capacity * LIQUID_PARTICLE_FLOATS * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
       this.compute = undefined;
     }
-    if (!this.compute) this.buildPasses(device);
+    if (!this.compute) {
+      this.buildPasses(device);
+      if (this.project) this.project.passes = undefined;
+    }
     const rt = this.compute!;
     this.writeSimUniforms(device, p, h);
     const particleGroups = Math.ceil(this.capacity / 256);
@@ -927,12 +967,38 @@ export class GPULiquid implements EnginePlugin {
       run(rt.commit, 1);
       extra += 2;
     }
+    const proj = p.profile === 'accurate' ? this.projection(device, p, h) : undefined;
+    const cellGroups = Math.ceil(liquidCells(p) / 256);
     for (let s = 0; s < n; s++) {
       run(rt.clear, nodeGroups);
       run(rt.p2g, particleGroups);
       run(rt.stress, particleGroups);
       if (tension) run(rt.normals, nodeGroups);
       run(rt.grid, nodeGroups);
+      if (proj) {
+        // The pressure projection: the nodes' and cells' records, the volume and the start of the solve, then the
+        // conjugate gradient iterations, dispatched indirectly so they cost nothing once the solve has converged.
+        const ps = proj.passes!;
+        run(ps.nodes, nodeGroups);
+        run(ps.cells, cellGroups);
+        run(ps.volume, cellGroups);
+        run(ps.start, 1);
+        const indirect = ([pipeline, group]: Pass, offset: number) => {
+          pass.setPipeline(pipeline);
+          pass.setBindGroup(0, group);
+          pass.dispatchWorkgroupsIndirect(proj.args, offset);
+        };
+        for (let k = 0; k < p.pressureIterations; k++) {
+          indirect(ps.apply, 0);
+          indirect(ps.matvec, 12);
+          indirect(ps.alpha, 24);
+          indirect(ps.update, 12);
+          run(ps.beta, 1);
+        }
+        run(ps.final, nodeGroups);
+        run(ps.extend0, nodeGroups);
+        run(ps.extend1, nodeGroups);
+      }
       run(rt.g2p, particleGroups);
     }
     if (drains) {
@@ -946,8 +1012,80 @@ export class GPULiquid implements EnginePlugin {
     pass.end();
     if (drains) encoder.copyBufferToBuffer(this.scratchBuf!, 0, this.particleBuf!, 0, this.capacity * LIQUID_PARTICLE_FLOATS * 4);
     this.stats.steps += n;
-    this.stats.dispatches = (tension ? 6 : 5) * n + extra;
+    this.stats.dispatches = ((tension ? 6 : 5) + (proj ? 7 + 5 * p.pressureIterations : 0)) * n + extra;
     this.forceTime += n * h;
+  }
+
+  /**
+   * The accurate profile's projection buffers and passes (made on first use, and again when the grid's size or the
+   * mesh fields' buffer changes), with its uniform for substeps of h seconds.
+   */
+  private projection(device: GPUDevice, p: ResolvedLiquidParams, h: number): NonNullable<GPULiquid['project']> {
+    const STORAGE = GPUBufferUsage.STORAGE;
+    const cells = liquidCells(p);
+    let pr = this.project;
+    if (!pr) {
+      pr = this.project = {
+        nodes: this.buffer(device, p.nodes * 32, STORAGE),
+        cells: this.buffer(device, cells * 32, STORAGE),
+        solve: this.buffer(device, (8 + Math.ceil(cells / 256)) * 4, STORAGE | GPUBufferUsage.COPY_SRC),
+        args: this.buffer(device, 48, STORAGE | GPUBufferUsage.INDIRECT),
+        uniform: this.buffer(device, 768, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST),
+      };
+      // Bytes 256 and 512 (uniform offsets keep 256-byte alignment) hold the extension passes' layers 0 and 1.
+      device.queue.writeBuffer(pr.uniform, 256, new Uint32Array([0, 0, 0, 0]));
+      device.queue.writeBuffer(pr.uniform, 512, new Uint32Array([1, 0, 0, 0]));
+    }
+    if (!pr.passes) {
+      const sim = this.simUniform!,
+        grid = this.gridBuf!,
+        sdf = this.sdfBuf!,
+        forces = this.forceBuf!;
+      const { nodes, cells: cellBuf, solve, args, uniform } = pr;
+      const bound = (code: string, entries: [number, GPUBuffer, number?][]): Pass => {
+        const pipeline = device.createComputePipeline({
+          layout: 'auto',
+          compute: { module: device.createShaderModule({ code }), entryPoint: 'main' },
+        });
+        const group = device.createBindGroup({
+          layout: pipeline.getBindGroupLayout(0),
+          entries: entries.map(([binding, buffer, offset]) => ({
+            binding,
+            resource: offset === undefined ? { buffer } : { buffer, offset, size: 16 },
+          })),
+        });
+        return [pipeline, group];
+      };
+      const extend = bound(LIQUID_PROJECT_EXTEND_WGSL, [[0, sim], [1, grid], [2, nodes], [6, uniform, 256]]);
+      pr.passes = {
+        nodes: bound(LIQUID_PROJECT_NODES_WGSL, [[0, sim], [1, grid], [2, nodes], [3, sdf]]),
+        cells: bound(LIQUID_PROJECT_CELLS_WGSL, [[0, sim], [1, grid], [2, nodes], [3, cellBuf], [7, uniform, 0]]),
+        volume: bound(LIQUID_PROJECT_VOLUME_WGSL, [[0, sim], [1, cellBuf], [2, solve], [7, uniform, 0]]),
+        start: bound(LIQUID_PROJECT_START_WGSL, [[0, sim], [1, solve], [2, args], [7, uniform, 0]]),
+        apply: bound(LIQUID_PROJECT_APPLY_WGSL, [[0, sim], [1, nodes], [2, cellBuf], [3, solve]]),
+        matvec: bound(LIQUID_PROJECT_MATVEC_WGSL, [[0, sim], [1, nodes], [2, cellBuf], [3, solve]]),
+        alpha: bound(LIQUID_PROJECT_ALPHA_WGSL, [[0, sim], [1, solve]]),
+        update: bound(LIQUID_PROJECT_UPDATE_WGSL, [[0, sim], [1, cellBuf], [2, solve]]),
+        beta: bound(LIQUID_PROJECT_BETA_WGSL, [[0, sim], [1, solve], [2, args], [7, uniform, 0]]),
+        final: bound(LIQUID_PROJECT_FINAL_WGSL, [[0, sim], [1, grid], [2, nodes], [3, cellBuf], [4, forces]]),
+        extend0: extend,
+        extend1: [extend[0], device.createBindGroup({
+          layout: extend[0].getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: { buffer: sim } },
+            { binding: 1, resource: { buffer: grid } },
+            { binding: 2, resource: { buffer: nodes } },
+            { binding: 6, resource: { buffer: uniform, offset: 512, size: 16 } },
+          ],
+        })],
+      };
+    }
+    device.queue.writeBuffer(
+      pr.uniform,
+      0,
+      new Float32Array([p.pressureTolerance ** 2, LIQUID_VOLUME_RATE / h, p.pressureIterations, LIQUID_FLUID_SHARE]),
+    );
+    return pr;
   }
 
   /**
@@ -982,6 +1120,8 @@ export class GPULiquid implements EnginePlugin {
     this.stats.steps += n;
     this.stats.dispatches = 0;
     this.stats.live = state.live;
+    this.stats.pressureIterations = state.iterations;
+    this.stats.pressureResidual = state.residual;
     this.forces = this.decodeForces((i) => state.impulses[i]!, 6, p.colliders.length, n * h);
     this.deliver((i) => state.impulses[i]!, 6, p.colliders.length, this.links, this.links.map((l) => l.center));
     device.queue.writeBuffer(this.particleBuf!, 0, state.particles as Float32Array<ArrayBuffer>);
@@ -1262,6 +1402,7 @@ export class GPULiquid implements EnginePlugin {
     this.owned = [];
     this.particleBuf = this.simUniform = this.gridBuf = this.forceBuf = this.debugUniform = this.lineBuf = this.sdfBuf = this.surfBuf = undefined;
     this.tallyBuf = this.emitUniform = this.blockBuf = this.spanBuf = this.scratchBuf = undefined;
+    this.project = undefined;
     this.sdfKey = [];
     this.pulling = undefined;
     this.forceTime = 0;

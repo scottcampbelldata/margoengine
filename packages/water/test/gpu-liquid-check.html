@@ -322,6 +322,46 @@ window.check = async () => {
   const originDebugB = await grab(0);
   const farAfter = liquidStateHash((await far.snapshot()).particles);
   far.dispose();
+
+  // The accurate profile (the pressure projection): one frame against the twin, the floor's force against the twin's,
+  // and the same 10 frames twice give the same bits.
+  const accCount = compat ? 1024 : 32768;
+  const accOptions = {
+    count: accCount,
+    seed: 7,
+    profile: 'accurate',
+    box: { min: [-0.4, 0, -0.4], max: [0.4, 0.8, 0.4] },
+    fill: { min: [-0.4, 0.1, -0.4], max: [0, 0.5, 0.4] },
+    colliders: [
+      { shape: 'box', position: [0, 0.05, 0], halfExtents: [0.5, 0.05, 0.5] },
+      { shape: 'sphere', position: [0.2, 0.25, 0], radius: 0.08 },
+    ],
+    surface: false,
+  };
+  const acc = GPULiquid.attach(engine, accOptions);
+  acc.step(1 / 60);
+  const accGpu = (await acc.snapshot()).particles;
+  const accIterations = acc.stats.pressureIterations;
+  const accResidual = acc.stats.pressureResidual;
+  const accForces = await acc.readForces();
+  const accParams = resolveLiquidParams(acc.options, accCount);
+  const accTwin = createLiquidState(accParams);
+  stepLiquidCPU(accTwin, accParams, 1 / 60);
+  let accGap = 0, accVelGap = 0;
+  for (let i = 0; i < accCount; i++)
+    for (let a = 0; a < 3; a++) {
+      accGap = Math.max(accGap, Math.abs(accGpu[i * F + a] - accTwin.particles[i * F + a]));
+      accVelGap = Math.max(accVelGap, Math.abs(accGpu[i * F + 4 + a] - accTwin.particles[i * F + 4 + a]));
+    }
+  const accTwinForceY = (accTwin.impulses[1] / 1024) * acc.particleMass * 60;
+  acc.reset();
+  for (let k = 0; k < 10; k++) acc.step(1 / 60);
+  const accHashA = liquidStateHash((await acc.snapshot()).particles);
+  acc.reset();
+  for (let k = 0; k < 10; k++) acc.step(1 / 60);
+  const accHashB = liquidStateHash((await acc.snapshot()).particles);
+  const accDispatches = acc.stats.dispatches;
+  acc.dispose();
   engine.dispose();
 
   return {
@@ -372,6 +412,14 @@ window.check = async () => {
     originDebugJump: diffCount(originDebugA, originDebugB),
     originDebugDiff: diffCount(originA, originDebugA),
     originHash: [farBefore, farAfter],
+    accGap,
+    accVelGap,
+    accForceY: accForces[0]?.force[1],
+    accTwinForceY,
+    accHashes: [accHashA, accHashB],
+    accDispatches,
+    accIterations,
+    accResidual,
   };
 };
 window.ready = true;

@@ -1,4 +1,5 @@
-// WGSL of GPULiquid (`@margoengine/water/liquid`): the five compute passes of one MLS-MPM substep and the debug view.
+// WGSL of GPULiquid (`@margoengine/water/liquid`): the five compute passes of one MLS-MPM substep, the accurate profile's
+// pressure projection and the debug view.
 // The step is the CPU twin's (liquid-mpm-sim.ts) in f32, pass for pass. Buffers:
 // - particles: per particle five vec4f, (x, y, z, density ratio), (vx, vy, vz, liquid), the APIC matrix C row by row in
 //   the next nine floats and the particle's colour in the last three;
@@ -624,6 +625,463 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
     if (at.w > -0.5 && at.w < 0.5 && all(abs(d) < half)) { p.pos.w = -1.0; }
   }
   particles[id.x] = p;
+}
+`;
+
+// The accurate profile's pressure projection (the twin's `project` in liquid-mpm-sim.ts), on the grid after its update:
+// - nodes: per node two vec4f, (the cell density's share: mirrored weight over rest plus the colliders' cover, unused,
+//   unused, W) from the nodes pass, its xyz then reused for P W P^T D^T of the solve's direction; and (the holding
+//   collider's normal, code): code bits 0-3 the holding collider + 1, bit 4 inside a collider, bits 5-7 the velocity is
+//   set (projected, then each extrapolation layer);
+// - cells: per cell two vec4f, (x, r, d, q) of the conjugate gradient solve and (1 / diagonal, density over rest, type
+//   0 none or solid, 1 liquid, 2 air, unused);
+// - solve: rz, alpha, beta, goal, iterations, done (1 once converged or at the cap), then the partial sums of each
+//   workgroup of 256 cells;
+// - args: the indirect dispatch sizes of the iteration passes (nodes, cells, one), zeroed once the solve converges.
+// Every sum is in a fixed order (a workgroup's tree, then one workgroup over the partials), so the solve repeats exactly.
+
+/** The projection's shared declarations: the cell grid and the node and cell records. */
+const PROJECT = /* wgsl */ `
+// tolerance squared, volume rate over dt, most iterations, the liquid share of a cell
+@group(0) @binding(7) var<uniform> proj: vec4f;
+fn cellDims() -> vec3u { return sim.dims.xyz - vec3u(1u); }
+fn cellCount() -> u32 { let d = cellDims(); return d.x * d.y * d.z; }
+fn cellAt(c: vec3u) -> u32 { let d = cellDims(); return c.x + d.x * (c.y + d.y * c.z); }
+fn cellCoord(c: u32) -> vec3u { let d = cellDims(); return vec3u(c % d.x, (c / d.x) % d.y, c / (d.x * d.y)); }
+fn nodeCoord(n: u32) -> vec3u { return vec3u(n % sim.dims.x, (n / sim.dims.x) % sim.dims.y, n / sim.dims.w); }
+// A node on or past a wall keeps its velocity along that wall's normal.
+fn onWall(i: vec3u, a: u32) -> bool { return i[a] <= PAD || i[a] >= PAD + sim.cells[a]; }
+// 1 / (4 h) per axis: the weight of one corner in a cell's divergence.
+fn quarter() -> vec3f { return 0.25 * sim.invCell.xyz; }
+// P W P^T g at node n with its record b: the walls' and the holding collider's normal parts out, times W, out again.
+fn applyP(i: vec3u, b: vec4f, w: f32, g0: vec3f) -> vec3f {
+  var g = g0;
+  for (var a = 0u; a < 3u; a++) { if (onWall(i, a)) { g[a] = 0.0; } }
+  let held = (u32(b.w) & 15u) != 0u;
+  if (held) { g -= dot(g, b.xyz) * b.xyz; }
+  g *= w;
+  if (held) { g -= dot(g, b.xyz) * b.xyz; }
+  for (var a = 0u; a < 3u; a++) { if (onWall(i, a)) { g[a] = 0.0; } }
+  return g;
+}
+`;
+
+/** One workgroup's sum of 256 values in a fixed tree. */
+const GROUP_SUM = /* wgsl */ `
+var<workgroup> acc: array<f32, 256>;
+fn groupSum(lid: u32, v: f32) -> f32 {
+  acc[lid] = v;
+  workgroupBarrier();
+  for (var s = 128u; s > 0u; s >>= 1u) {
+    if (lid < s) { acc[lid] += acc[lid + s]; }
+    workgroupBarrier();
+  }
+  return acc[0];
+}
+`;
+
+/** Per node: W, the holding collider and its normal, inside a collider or not, and the density share for the cells. */
+export const LIQUID_PROJECT_NODES_WGSL = /* wgsl */ `${HEADER}${collideWGSL(3)}${PROJECT}
+@group(0) @binding(1) var<storage, read> grid: array<vec4i>;
+@group(0) @binding(2) var<storage, read_write> nodes: array<vec4f>;
+${SPLINE_COVER}
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) id: vec3u) {
+  let node = id.x;
+  if (node >= sim.counts.y) { return; }
+  let i = nodeCoord(node);
+  let rest = sim.invCell.w;
+  let m = bitcast<vec4f>(grid[2u * node]).w;
+  let weight = bitcast<f32>(grid[2u * node + 1u].x);
+  var w = 0.0;
+  if (m > 0.0) { w = rest / max(m, 0.25 * rest * (m / max(weight, 1e-30))); }
+  // The node's weight with its mirrors across the walls.
+  let mi = vec3u(mirror(0u, i.x), mirror(1u, i.y), mirror(2u, i.z));
+  var mirrored = 0.0;
+  for (var z = 0u; z < 2u; z++) {
+    if (z == 1u && mi.z == NONE) { continue; }
+    for (var y = 0u; y < 2u; y++) {
+      if (y == 1u && mi.y == NONE) { continue; }
+      for (var x = 0u; x < 2u; x++) {
+        if (x == 1u && mi.x == NONE) { continue; }
+        let at = vec3u(select(i.x, mi.x, x == 1u), select(i.y, mi.y, y == 1u), select(i.z, mi.z, z == 1u));
+        mirrored += bitcast<f32>(grid[2u * index3(at) + 1u].x);
+      }
+    }
+  }
+  let p = sim.origin.xyz + vec3f(i) * sim.cell.xyz;
+  var cover = 0.0;
+  var deepest = 0.0;
+  var normal = vec3f(0.0);
+  var code = 0u;
+  for (var k = 0u; k < sim.counts.z; k++) {
+    let hit = collide(k, p);
+    cover += splineCover(-hit.w / sim.boxMax.w);
+    if (hit.w < 0.0) { code |= 16u; }
+    if (hit.w < deepest) {
+      deepest = hit.w;
+      normal = hit.xyz;
+      code = (code & ~15u) | (k + 1u);
+    }
+  }
+  nodes[2u * node] = vec4f(mirrored / rest + cover, 0.0, 0.0, w);
+  nodes[2u * node + 1u] = vec4f(normal, f32(code));
+}
+`;
+
+/**
+ * Per cell: its type (liquid when inside the container, not solid and at least the liquid share of rest density),
+ * 1 / its diagonal, and minus the divergence of the updated grid velocity as the residual; the solve starts from zero.
+ */
+export const LIQUID_PROJECT_CELLS_WGSL = /* wgsl */ `${HEADER}${PROJECT}
+@group(0) @binding(1) var<storage, read> grid: array<vec4i>;
+@group(0) @binding(2) var<storage, read> nodes: array<vec4f>;
+@group(0) @binding(3) var<storage, read_write> cells: array<vec4f>;
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) id: vec3u) {
+  let c = id.x;
+  if (c >= cellCount()) { return; }
+  let ci = cellCoord(c);
+  var kind = 0.0;
+  var theta = 0.0;
+  var inv = 0.0;
+  var r = 0.0;
+  let lo = vec3u(PAD);
+  let hi = vec3u(PAD) + sim.cells.xyz;
+  if (all(ci >= lo) && all(ci < hi)) {
+    var solid = true;
+    for (var k = 0u; k < 8u; k++) {
+      let n = index3(ci + vec3u(k & 1u, (k >> 1u) & 1u, (k >> 2u) & 1u));
+      theta += nodes[2u * n].x;
+      solid = solid && (u32(nodes[2u * n + 1u].w) & 16u) != 0u;
+    }
+    theta /= 8.0;
+    kind = 2.0;
+    if (theta >= proj.w) {
+      kind = 0.0;
+      if (!solid) {
+        let q = quarter();
+        var diag = 0.0;
+        var div = 0.0;
+        for (var k = 0u; k < 8u; k++) {
+          let o = vec3u(k & 1u, (k >> 1u) & 1u, (k >> 2u) & 1u);
+          let at = ci + o;
+          let n = index3(at);
+          let v = bitcast<vec4f>(grid[2u * n]).xyz;
+          let w = nodes[2u * n].w;
+          let b = nodes[2u * n + 1u];
+          let held = (u32(b.w) & 15u) != 0u;
+          for (var a = 0u; a < 3u; a++) {
+            div += select(-1.0, 1.0, o[a] == 1u) * q[a] * v[a];
+            if (onWall(at, a) || w == 0.0) { continue; }
+            var along = 0.0;
+            if (held) { along = b[a]; }
+            diag += q[a] * q[a] * w * (1.0 - along * along);
+          }
+        }
+        if (diag > 0.0) {
+          kind = 1.0;
+          inv = 1.0 / diag;
+          r = -div;
+        }
+      }
+    }
+  }
+  cells[2u * c] = vec4f(0.0, r, 0.0, 0.0);
+  cells[2u * c + 1u] = vec4f(inv, theta, kind, 0.0);
+}
+`;
+
+/**
+ * The volume: a liquid cell above rest density is pushed apart, and one below drawn together where none of its six
+ * neighbours is air, at the volume rate; then each workgroup's sum of r z (z = r / diagonal).
+ */
+export const LIQUID_PROJECT_VOLUME_WGSL = /* wgsl */ `${HEADER}${PROJECT}${GROUP_SUM}
+@group(0) @binding(1) var<storage, read_write> cells: array<vec4f>;
+@group(0) @binding(2) var<storage, read_write> solve: array<f32>;
+fn isAir(c: vec3i) -> bool {
+  let d = vec3i(cellDims());
+  if (any(c < vec3i(0)) || any(c >= d)) { return false; }
+  return cells[2u * cellAt(vec3u(c)) + 1u].z == 2.0;
+}
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) id: vec3u, @builtin(local_invocation_index) lid: u32, @builtin(workgroup_id) wg: vec3u) {
+  let c = id.x;
+  var rz = 0.0;
+  if (c < cellCount()) {
+    let info = cells[2u * c + 1u];
+    if (info.z == 1.0) {
+      let ci = vec3i(cellCoord(c));
+      var enclosed = true;
+      for (var a = 0u; a < 3u; a++) {
+        var e = vec3i(0);
+        e[a] = 1;
+        if (isAir(ci - e) || isAir(ci + e)) { enclosed = false; }
+      }
+      var excess = info.y - 1.0;
+      if (!enclosed) { excess = max(excess, 0.0); }
+      let r = cells[2u * c].y + proj.y * excess;
+      cells[2u * c].y = r;
+      rz = r * r * info.x;
+    }
+  }
+  let sum = groupSum(lid, rz);
+  if (lid == 0u) { solve[8u + wg.x] = sum; }
+}
+`;
+
+/** Shared by the single-workgroup passes: the sum of every workgroup's partial, in a fixed order. */
+const PARTIALS = /* wgsl */ `
+@group(0) @binding(1) var<storage, read_write> solve: array<f32>;
+@group(0) @binding(2) var<storage, read_write> args: array<u32>;
+fn partials(lid: u32) -> f32 {
+  let parts = (cellCount() + 255u) / 256u;
+  var s = 0.0;
+  for (var k = lid; k < parts; k += 256u) { s += solve[8u + k]; }
+  return groupSum(lid, s);
+}
+// The iteration passes' sizes: every node and cell, or nothing once the solve has converged.
+fn setArgs(run: bool) {
+  args[0] = select(0u, (sim.counts.y + 255u) / 256u, run);
+  args[1] = 1u;
+  args[2] = 1u;
+  args[3] = select(0u, (cellCount() + 255u) / 256u, run);
+  args[4] = 1u;
+  args[5] = 1u;
+  args[6] = select(0u, 1u, run);
+  args[7] = 1u;
+  args[8] = 1u;
+}
+`;
+
+/** The start of the solve: rz of the residual, the goal tolerance^2 rz, no direction yet. */
+export const LIQUID_PROJECT_START_WGSL = /* wgsl */ `${HEADER}${PROJECT}${GROUP_SUM}${PARTIALS}
+@compute @workgroup_size(256)
+fn main(@builtin(local_invocation_index) lid: u32) {
+  let rz = partials(lid);
+  if (lid == 0u) {
+    solve[0] = rz;
+    solve[1] = 0.0;
+    solve[2] = 0.0;
+    solve[3] = proj.x * rz;
+    solve[4] = 0.0;
+    let run = rz > solve[3] && proj.z > 0.0;
+    solve[5] = select(1.0, 0.0, run);
+    setArgs(run);
+  }
+}
+`;
+
+/**
+ * u = P W P^T D^T d at every node from the liquid cells round it, with the direction d = z + beta d taken on the fly
+ * (the cells pass stores it); zero at a node next to no liquid cell.
+ */
+export const LIQUID_PROJECT_APPLY_WGSL = /* wgsl */ `${HEADER}${PROJECT}
+@group(0) @binding(1) var<storage, read_write> nodes: array<vec4f>;
+@group(0) @binding(2) var<storage, read> cells: array<vec4f>;
+@group(0) @binding(3) var<storage, read> solve: array<f32>;
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) id: vec3u) {
+  let node = id.x;
+  if (node >= sim.counts.y) { return; }
+  let i = nodeCoord(node);
+  let b = nodes[2u * node + 1u];
+  let w = nodes[2u * node].w;
+  var u = vec3f(0.0);
+  if (w != 0.0 || (u32(b.w) & 15u) != 0u) {
+    let q = quarter();
+    let d = cellDims();
+    let beta = solve[2];
+    var g = vec3f(0.0);
+    var touched = false;
+    for (var k = 0u; k < 8u; k++) {
+      let o = vec3u(k & 1u, (k >> 1u) & 1u, (k >> 2u) & 1u);
+      // The cell with the node as corner 1 - o: below it on axis a when o[a] is 0.
+      if (any(i + o < vec3u(1u)) || any(i + o > d)) { continue; }
+      let c = cellAt(i + o - vec3u(1u));
+      let info = cells[2u * c + 1u];
+      if (info.z != 1.0) { continue; }
+      let s = cells[2u * c];
+      let dir = s.y * info.x + beta * s.z;
+      touched = true;
+      for (var a = 0u; a < 3u; a++) { g[a] += select(-1.0, 1.0, o[a] == 0u) * q[a] * dir; }
+    }
+    if (touched) { u = applyP(i, b, w, g); }
+  }
+  nodes[2u * node] = vec4f(u, w);
+}
+`;
+
+/** q = D u on every liquid cell; stores the direction d; each workgroup's sum of d q. */
+export const LIQUID_PROJECT_MATVEC_WGSL = /* wgsl */ `${HEADER}${PROJECT}${GROUP_SUM}
+@group(0) @binding(1) var<storage, read> nodes: array<vec4f>;
+@group(0) @binding(2) var<storage, read_write> cells: array<vec4f>;
+@group(0) @binding(3) var<storage, read_write> solve: array<f32>;
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) id: vec3u, @builtin(local_invocation_index) lid: u32, @builtin(workgroup_id) wg: vec3u) {
+  let c = id.x;
+  var dq = 0.0;
+  if (c < cellCount()) {
+    let info = cells[2u * c + 1u];
+    if (info.z == 1.0) {
+      let ci = cellCoord(c);
+      let q4 = quarter();
+      var q = 0.0;
+      for (var k = 0u; k < 8u; k++) {
+        let o = vec3u(k & 1u, (k >> 1u) & 1u, (k >> 2u) & 1u);
+        let u = nodes[2u * index3(ci + o)].xyz;
+        for (var a = 0u; a < 3u; a++) { q += select(-1.0, 1.0, o[a] == 1u) * q4[a] * u[a]; }
+      }
+      let s = cells[2u * c];
+      let dir = s.y * info.x + solve[2] * s.z;
+      cells[2u * c] = vec4f(s.x, s.y, dir, q);
+      dq = dir * q;
+    }
+  }
+  let sum = groupSum(lid, dq);
+  workgroupBarrier();
+  if (lid == 0u) { solve[8u + wg.x] = sum; }
+}
+`;
+
+/** alpha = rz / (d q), or 0 when d q is not positive. */
+export const LIQUID_PROJECT_ALPHA_WGSL = /* wgsl */ `${HEADER}${PROJECT}${GROUP_SUM}${PARTIALS}
+@compute @workgroup_size(256)
+fn main(@builtin(local_invocation_index) lid: u32) {
+  let dq = partials(lid);
+  if (lid == 0u) { solve[1] = select(0.0, solve[0] / dq, dq > 0.0); }
+}
+`;
+
+/** x += alpha d, r -= alpha q on every liquid cell; each workgroup's sum of the new r z. */
+export const LIQUID_PROJECT_UPDATE_WGSL = /* wgsl */ `${HEADER}${PROJECT}${GROUP_SUM}
+@group(0) @binding(1) var<storage, read_write> cells: array<vec4f>;
+@group(0) @binding(2) var<storage, read_write> solve: array<f32>;
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) id: vec3u, @builtin(local_invocation_index) lid: u32, @builtin(workgroup_id) wg: vec3u) {
+  let c = id.x;
+  var rz = 0.0;
+  let alpha = solve[1];
+  if (c < cellCount()) {
+    let info = cells[2u * c + 1u];
+    if (info.z == 1.0) {
+      let s = cells[2u * c];
+      let x = s.x + alpha * s.z;
+      let r = s.y - alpha * s.w;
+      cells[2u * c] = vec4f(x, r, s.z, s.w);
+      rz = r * r * info.x;
+    }
+  }
+  let sum = groupSum(lid, rz);
+  workgroupBarrier();
+  if (lid == 0u) { solve[8u + wg.x] = sum; }
+}
+`;
+
+/**
+ * beta = the new rz over the old; one more iteration; the iteration passes stop once rz is at the goal or the cap. It
+ * writes the indirect sizes, so it runs directly every iteration and does nothing once the solve is done (solve[5]).
+ */
+export const LIQUID_PROJECT_BETA_WGSL = /* wgsl */ `${HEADER}${PROJECT}${GROUP_SUM}${PARTIALS}
+@compute @workgroup_size(256)
+fn main(@builtin(local_invocation_index) lid: u32) {
+  let next = partials(lid);
+  if (lid == 0u && solve[5] == 0.0) {
+    let rz = solve[0];
+    solve[2] = select(0.0, next / rz, rz > 0.0);
+    solve[0] = next;
+    solve[4] += 1.0;
+    let run = next > solve[3] && solve[4] < proj.z;
+    solve[5] = select(1.0, 0.0, run);
+    setArgs(run);
+  }
+}
+`;
+
+/**
+ * The new velocity v* + P W P^T D^T x at every node next to a liquid cell (marked set), the pressure a collider holds
+ * back as its impulse: rest density times the normal part of D^T x, in particle masses.
+ */
+export const LIQUID_PROJECT_FINAL_WGSL = /* wgsl */ `${HEADER}${PROJECT}
+@group(0) @binding(1) var<storage, read_write> grid: array<vec4i>;
+@group(0) @binding(2) var<storage, read_write> nodes: array<vec4f>;
+@group(0) @binding(3) var<storage, read> cells: array<vec4f>;
+@group(0) @binding(4) var<storage, read_write> forces: array<atomic<i32>>;
+${ADD_IMPULSE}
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) id: vec3u) {
+  let node = id.x;
+  if (node >= sim.counts.y) { return; }
+  let i = nodeCoord(node);
+  let b = nodes[2u * node + 1u];
+  let w = nodes[2u * node].w;
+  let code = u32(b.w);
+  if (w == 0.0 && (code & 15u) == 0u) { return; }
+  let q = quarter();
+  let d = cellDims();
+  var g = vec3f(0.0);
+  var touched = false;
+  for (var k = 0u; k < 8u; k++) {
+    let o = vec3u(k & 1u, (k >> 1u) & 1u, (k >> 2u) & 1u);
+    if (any(i + o < vec3u(1u)) || any(i + o > d)) { continue; }
+    let c = cellAt(i + o - vec3u(1u));
+    if (cells[2u * c + 1u].z != 1.0) { continue; }
+    touched = true;
+    let x = cells[2u * c].x;
+    for (var a = 0u; a < 3u; a++) { g[a] += select(-1.0, 1.0, o[a] == 0u) * q[a] * x; }
+  }
+  if (!touched) { return; }
+  nodes[2u * node + 1u].w = f32(code | 32u);
+  if ((code & 15u) != 0u) {
+    var gw = g;
+    for (var a = 0u; a < 3u; a++) { if (onWall(i, a)) { gw[a] = 0.0; } }
+    let k = (code & 15u) - 1u;
+    let held = dot(gw, b.xyz) * b.xyz * sim.invCell.w;
+    if (any(held != vec3f(0.0))) {
+      addImpulse(k, sim.origin.xyz + vec3f(i) * sim.cell.xyz - sim.colliders[k].center.xyz, held);
+    }
+  }
+  if (w == 0.0) { return; }
+  let raw = bitcast<vec4f>(grid[2u * node]);
+  grid[2u * node] = bitcast<vec4i>(vec4f(raw.xyz + applyP(i, b, w, g), raw.w));
+}
+`;
+
+/**
+ * One layer of the velocity carried out past the liquid: a node with mass not set yet takes the mean velocity of its
+ * set face neighbours (`layer` 0 reads those the projection set, 1 those and the first layer), its wall normals zeroed.
+ */
+export const LIQUID_PROJECT_EXTEND_WGSL = /* wgsl */ `${HEADER}${PROJECT}
+@group(0) @binding(1) var<storage, read_write> grid: array<vec4i>;
+@group(0) @binding(2) var<storage, read_write> nodes: array<vec4f>;
+@group(0) @binding(6) var<uniform> layer: vec4u;
+@compute @workgroup_size(256)
+fn main(@builtin(global_invocation_id) id: vec3u) {
+  let node = id.x;
+  if (node >= sim.counts.y) { return; }
+  let read = select(32u, 96u, layer.x == 1u);
+  let code = u32(nodes[2u * node + 1u].w);
+  if ((code & read) != 0u) { return; }
+  let raw = bitcast<vec4f>(grid[2u * node]);
+  if (!(raw.w > 0.0)) { return; }
+  let i = nodeCoord(node);
+  var sum = vec3f(0.0);
+  var k = 0.0;
+  for (var a = 0u; a < 3u; a++) {
+    for (var s = 0u; s < 2u; s++) {
+      if ((s == 0u && i[a] == 0u) || (s == 1u && i[a] + 1u >= sim.dims[a])) { continue; }
+      let at = step3(i, a, s == 1u);
+      let n = index3(at);
+      if ((u32(nodes[2u * n + 1u].w) & read) == 0u) { continue; }
+      sum += bitcast<vec4f>(grid[2u * n]).xyz;
+      k += 1.0;
+    }
+  }
+  if (k == 0.0) { return; }
+  var v = sum / k;
+  for (var a = 0u; a < 3u; a++) { if (onWall(i, a)) { v[a] = 0.0; } }
+  grid[2u * node] = bitcast<vec4i>(vec4f(v, raw.w));
+  nodes[2u * node + 1u].w = f32(code | select(64u, 128u, layer.x == 1u));
 }
 `;
 

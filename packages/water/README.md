@@ -935,8 +935,10 @@ grid fits the band's atlas. Default `narrowBand` false. The code loads on first 
 `GPULiquid` in `@margoengine/water/liquid` is a real-time particle liquid that moves its own particles: tens of thousands
 to a million of them on WebGPU, held by a container's walls, stirred by the pointer, pushed by rigid bodies (which it
 pushes back), and drawn as a liquid surface by the `ParticleLiquid` above straight from its particle buffer. It steps
-by MLS-MPM, the moving least squares material point method (Hu et al. 2018) with APIC transfers (Jiang et al. 2015)
-and a Tait equation of state, in five compute passes a substep with no readback.
+by MLS-MPM, the moving least squares material point method (Hu et al. 2018) with APIC transfers (Jiang et al. 2015),
+in two profiles behind one option: `'fast'` (the default) with a Tait equation of state, five compute passes a substep,
+and `'accurate'`, incompressible, with a pressure projection on the grid each substep solved by conjugate gradients on the
+GPU. Neither reads anything back.
 
 ```ts
 import { Engine } from '@margoengine/core';
@@ -946,11 +948,24 @@ const liquid = GPULiquid.attach(engine); // 65,536 particles: a dam break in a 1
 engine.render({ delta: 1 / 60 });
 ```
 
-Which liquid to use: `GPULiquid` is the one for interactive scenes, games and demos (WebGPU, real time, weakly
-compressible). The CPU solvers in `@margoengine/physics` are for accuracy and for coupling into a physics `World`:
+Which liquid to use: `GPULiquid` is the one for interactive scenes, games and demos (WebGPU, real time), with
+`profile: 'accurate'` where the liquid must keep its volume (still water stays still at rest density, a column's pressure
+is rho g d). The CPU solvers in `@margoengine/physics` are for coupling into a physics `World`:
 `physics/pbf` (position based fluids), `physics/dfsph` (divergence-free SPH) and `physics/flip` (FLIP and APIC on a
 pressure-projected grid, held to the sea). Any of them, and any particle system of your own, draws as liquid with
 `ParticleLiquid`.
+
+The same tank, incompressible:
+
+```ts
+import { Engine } from '@margoengine/core';
+import { GPULiquid } from '@margoengine/water/liquid';
+const engine = await Engine.create(document.querySelector('canvas')!, { camera: { position: [0, 0.8, 2.2], target: [0, 0.3, 0] } });
+const liquid = GPULiquid.attach(engine, { profile: 'accurate' }); // a pressure projection on the GPU grid each substep
+engine.render({ delta: 1 / 60 });
+await liquid.snapshot(); // reads the particles back, and with them the last solve's work count
+console.log(liquid.stats.pressureIterations); // conjugate gradient iterations of the last substep
+```
 
 Stir it, drop things in and read what the liquid does to them:
 
@@ -975,7 +990,7 @@ engine.render({ delta: 1 / 60 });
 console.log(liquid.forces[0]); // { force: [x, y, z] N, torque: [x, y, z] N m } on the box, one frame behind
 ```
 
-Options (all but `count`, `box`, `fill`, `resolution`, `seed` and `surface` can change live, the pointer, colliders and
+Options (all but `count`, `box`, `fill`, `resolution`, `seed` and `surface` can change live, `profile` included; the pointer, colliders and
 debug view through `setPointer`, `setColliders` and `setDebug`):
 
 - `count` 65,536 particles (1 to 1,048,576). `box` the container, default 1 m wide, deep and tall from
@@ -993,9 +1008,20 @@ debug view through `setPointer`, `setColliders` and `setDebug`):
   one compute pass a substep. `adhesion` 0 m/s²: the pull of the walls and colliders on liquid within one cell of them
   (fading to nothing at two); above gravity a film hangs from the ceiling and the liquid wets the walls, and a collider
   takes the opposite pull.
-- `speedOfSound` default 2 * sqrt(|g| * box height) m/s: higher is stiffer (less compression) and takes more substeps,
-  each 0.4 * cell / speedOfSound long. `maxSubsteps` 32 a frame; a frame that needs more runs in slow motion
-  (`stats.realTime` false). A frame advances at most 1/30 s.
+- `profile` `'fast'`: the liquid is weakly compressible (the Tait equation, about g d / c² of compression at depth d),
+  explicit, with substeps 0.4 * cell / speedOfSound long. `'accurate'`: incompressible. Each substep the grid's velocity
+  is projected to zero divergence (Chorin's projection, the cell's pressure against the nodes' velocities) by
+  Jacobi-preconditioned conjugate gradients on the GPU, `pressureIterations` at most (default 128) until the residual
+  falls to `pressureTolerance` of its start (default 1e-4); a cell packed above rest density is pushed apart and the
+  liquid's velocity is carried two nodes past its surface. Its substeps are 0.5 * cell / sqrt(2 |g| H) long (H the
+  container's height along gravity), so it takes fewer substeps than the fast profile and more work in each:
+  `stats.pressureIterations` counts the last solve's iterations (a work count, 13 to 128 a substep in the dam breaks
+  of the tests) and `stats.pressureResidual` the residual it left over its first. It reads its pressure
+  from the solve, so `speedOfSound` is the fast profile's only; everything else (colliders and their forces, links,
+  surface tension, adhesion, several liquids, emitters and drains, the debug view) works the same in both.
+- `speedOfSound` default 2 * sqrt(|g| * box height) m/s (fast profile): higher is stiffer (less compression) and takes
+  more substeps. `maxSubsteps` 32 a frame; a frame that needs more runs in slow motion (`stats.realTime` false). A frame
+  advances at most 1/30 s.
 - `pointer` (or `setPointer`): `{ position, velocity?, radius?, strength? }`, a stirring stick. Grid nodes within
   `radius` (default 0.1 times the longest side) take on its `velocity` at `strength` per second (default 40); without a
   velocity it is the pointer's own motion between frames. `null` for none.

@@ -63,6 +63,9 @@ export interface GPULiquidOptions {
     maxSubsteps?: number;
     seed?: number;
     paused?: boolean;
+    profile?: 'fast' | 'accurate';
+    pressureIterations?: number;
+    pressureTolerance?: number;
     pointer?: LiquidPointer | null;
     colliders?: readonly LiquidCollider[];
     debug?: LiquidDebugOptions;
@@ -195,6 +198,9 @@ export interface LiquidState {
     emission: Float64Array;
     impulses: Float64Array;
     grid: Float64Array;
+    pressure: Float64Array;
+    iterations: number;
+    residual: number;
 }
 
 export interface LiquidStats {
@@ -212,6 +218,8 @@ export interface LiquidStats {
     live: number;
     capacity: number;
     debugDraws: number;
+    pressureIterations: number;
+    pressureResidual: number;
 }
 
 export type LiquidVec3 = readonly [number, number, number];
@@ -371,6 +379,9 @@ export interface ResolvedLiquidParams {
     kinds: ResolvedLiquidKind[];
     mixing: number;
     maxSubstep: number;
+    profile: 'fast' | 'accurate';
+    pressureIterations: number;
+    pressureTolerance: number;
     maxSubsteps: number;
     seed: number;
     paused: boolean;

@@ -81,8 +81,11 @@ try {
     container: checked('dbg-box'),
     colliders: checked('dbg-col'),
   });
+  const profileSelect = byId<HTMLSelectElement>('profile');
   const makeOptions = (count: number): GPULiquidAttachOptions => ({
     count,
+    // Fast: weakly compressible; accurate: incompressible, a pressure projection on the grid each substep.
+    profile: profileSelect.value === 'accurate' ? 'accurate' : 'fast',
     box: TANK,
     fill: { min: TANK.min, max: [0.5, 0.3, 0.5] },
     viscosity: slider('sl-visc'),
@@ -154,6 +157,10 @@ try {
     liquid = GPULiquid.attach(engine, makeOptions(Number(countSelect.value)));
     window.liquidDemo = { liquid };
     linkCrate(linked);
+  });
+
+  profileSelect.addEventListener('change', () => {
+    liquid.options.profile = profileSelect.value === 'accurate' ? 'accurate' : 'fast';
   });
 
   const bind = (id: string, apply: (v: number) => void) => {

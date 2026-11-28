@@ -2,7 +2,9 @@
 // the same five passes as the WGSL (liquid-mpm-shaders.ts), in f64 with the GPU's fixed-point sums. The WebGL2 layer steps
 // the liquid with it, and the tests check the method against it. Method: the moving least squares material point method
 // (Hu et al. 2018) with APIC transfers (Jiang et al. 2015), density from the grid and the Tait equation of state (Becker and
-// Teschner 2007), quadratic B-spline weights (Steffen et al. 2008). Sources: docs/clean-room.md, "GPU particle liquid".
+// Teschner 2007), quadratic B-spline weights (Steffen et al. 2008); the accurate profile replaces the Tait pressure with a
+// pressure projection on the grid (Chorin 1968) solved by preconditioned conjugate gradients. Sources: docs/clean-room.md,
+// "GPU particle liquid".
 import { fault } from '../../shared/errors.js';
 
 /** A world-space vector [x, y, z]. */
@@ -98,6 +100,14 @@ export const LIQUID_FORCE_FIXED = 1_024;
 export const LIQUID_PAD = 2;
 /** Courant number of one substep against the speed of sound. */
 export const LIQUID_CFL = 0.4;
+/** Courant number of one substep of the accurate profile against the flow's speed. */
+export const LIQUID_FLOW_CFL = 0.5;
+/** Share of a cell's density above rest the accurate profile's pressure solve removes in a substep. */
+export const LIQUID_VOLUME_RATE = 0.5;
+/** Layers of nodes the accurate profile carries the liquid's velocity out to past its liquid cells. */
+export const LIQUID_EXTRAPOLATION = 2;
+/** A cell is liquid in the accurate profile's pressure solve when its density is at least this share of rest density. */
+export const LIQUID_FLUID_SHARE = 0.5;
 /** Density ratio the pressure is computed at most from, so the fixed-point sums cannot overflow. */
 export const LIQUID_MAX_RATIO = 3;
 /** Collider shapes as the WGSL numbers them. */
@@ -251,6 +261,21 @@ export interface GPULiquidOptions {
   seed?: number;
   /** Stops the frame steps; `step()` still runs. Default false. */
   paused?: boolean;
+  /**
+   * The solver: `'fast'` steps a weakly compressible liquid (MLS-MPM with the Tait equation, explicit, a substep a
+   * fraction of a cell over the speed of sound) and `'accurate'` an incompressible one (the same MLS-MPM transfers with a
+   * pressure projection on the grid each substep: a preconditioned conjugate gradient solve that makes the grid's
+   * velocity divergence-free and pushes apart any cell packed above rest density, with substeps half a cell over the
+   * flow's speed). Default `'fast'`.
+   */
+  profile?: 'fast' | 'accurate';
+  /** Most conjugate gradient iterations of the accurate profile's pressure solve a substep, integer 1..4096. Default 128. */
+  pressureIterations?: number;
+  /**
+   * The accurate profile's pressure solve stops once its preconditioned residual is this share of its first, 1e-8 to
+   * 0.1. Default 1e-4.
+   */
+  pressureTolerance?: number;
   /** The pointer, or null for none. Default null. */
   pointer?: LiquidPointer | null;
   /** Up to 8 rigid bodies. Default none. */
@@ -334,8 +359,11 @@ export interface ResolvedLiquidParams {
   /** The liquids; the first's fill and lattice are also `fillMin`, `fillMax` and `lattice`. */
   kinds: ResolvedLiquidKind[];
   mixing: number;
-  /** Longest substep in seconds: LIQUID_CFL * h / c. */
+  /** Longest substep in seconds: LIQUID_CFL * h / c (fast) or LIQUID_FLOW_CFL * h / sqrt(2 |g| H) (accurate). */
   maxSubstep: number;
+  profile: 'fast' | 'accurate';
+  pressureIterations: number;
+  pressureTolerance: number;
   maxSubsteps: number;
   seed: number;
   paused: boolean;
@@ -374,6 +402,15 @@ export interface LiquidState {
   impulses: Float64Array;
   /** The grid of the last substep, LIQUID_GRID_STRIDE words a node: after the update velocity, mass, weight, colour sums. */
   grid: Float64Array;
+  /**
+   * The accurate profile's pressure of the last substep per grid cell (the cell between node (i, j, k) and node
+   * (i + 1, j + 1, k + 1), x fastest over the nodes' dims less one), in Pa; 0 in cells that are not liquid.
+   */
+  pressure: Float64Array;
+  /** Conjugate gradient iterations of the last substep's pressure solve (accurate profile). */
+  iterations: number;
+  /** Its preconditioned residual at the end over its first, sqrt(r z / r0 z0); 0 when there was nothing to solve. */
+  residual: number;
 }
 
 /** A copy of a liquid's state; `GPULiquid.restore` takes it back. */
@@ -412,7 +449,11 @@ export interface LiquidStats {
   substep: number;
   /** False when the last frame needed more than `maxSubsteps` and ran in slow motion. */
   realTime: boolean;
-  /** Compute dispatches of the last frame (five a substep, six with surface tension, plus the emitters' and drains'). */
+  /**
+   * Compute dispatches of the last frame: five a substep, six with surface tension, plus 7 + 5 * pressureIterations a
+   * substep in the accurate profile (the iterations past the solve's convergence are dispatched indirectly with no
+   * workgroups), plus the emitters' and drains'.
+   */
   dispatches: number;
   /** Live particles: exact on the WebGL2 layer, as of the last read-back (forces or snapshot) on WebGPU. */
   live: number;
@@ -420,6 +461,16 @@ export interface LiquidStats {
   capacity: number;
   /** Draw calls of the debug view in the last frame. */
   debugDraws: number;
+  /**
+   * The accurate profile's conjugate gradient iterations in the last substep's pressure solve (a work count): exact on
+   * the WebGL2 layer, as of the last `snapshot()` on WebGPU; 0 for the fast profile.
+   */
+  pressureIterations: number;
+  /**
+   * Its preconditioned residual at the end over its first (the divergence it leaves, relative), as of the same read:
+   * at most `pressureTolerance` unless the solve reached `pressureIterations`.
+   */
+  pressureResidual: number;
 }
 
 /** The coded error of the GPU liquid; the message names the value and links the help entry. */
@@ -527,7 +578,15 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
   const g = Math.hypot(gravity[0], gravity[1], gravity[2]);
   const autoC = Math.max(0.5, 2 * Math.sqrt(g * size[1]!));
   const speedOfSound = num(options.speedOfSound, autoC, 'speedOfSound', 0.05, 1000);
-  const maxSubstep = (LIQUID_CFL * h) / speedOfSound;
+  const profile = options.profile ?? 'fast';
+  if (profile !== 'fast' && profile !== 'accurate')
+    throw liquidError(`GPULiquid profile must be 'fast' or 'accurate', not ${String(profile)}`);
+  // The accurate profile's substep: half a cell over the speed of a fall through the container's height along gravity.
+  const fall = g > 0 ? (Math.abs(gravity[0]) * size[0]! + Math.abs(gravity[1]) * size[1]! + Math.abs(gravity[2]) * size[2]!) / g : 0;
+  const flowSpeed = Math.max(0.25, Math.sqrt(2 * g * fall));
+  const maxSubstep = profile === 'fast' ? (LIQUID_CFL * h) / speedOfSound : (LIQUID_FLOW_CFL * h) / flowSpeed;
+  const pressureIterations = num(options.pressureIterations, 128, 'pressureIterations', 1, 4096, true);
+  const pressureTolerance = num(options.pressureTolerance, 1e-4, 'pressureTolerance', 1e-8, 0.1);
   const viscosity = num(options.viscosity, Math.min(5e-4, (h * h) / (8 * maxSubstep)), 'viscosity', 0, (h * h) / (8 * maxSubstep));
   const maxSubsteps = num(options.maxSubsteps, 32, 'maxSubsteps', 1, 256, true);
   // Brackbill et al. (1992): an explicit capillary step needs dt < sqrt(rho h^3 / (2 pi sigma)).
@@ -702,6 +761,9 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
     kinds,
     mixing,
     maxSubstep,
+    profile,
+    pressureIterations,
+    pressureTolerance,
     maxSubsteps,
     seed,
     paused: options.paused ?? false,
@@ -760,6 +822,9 @@ export function createLiquidState(params: ResolvedLiquidParams): LiquidState {
     emission: new Float64Array(2 * MAX_LIQUID_EMITTERS),
     impulses: new Float64Array(MAX_LIQUID_COLLIDERS * 6),
     grid: new Float64Array(params.nodes * LIQUID_GRID_STRIDE),
+    pressure: new Float64Array(params.profile === 'accurate' ? liquidCells(params) : 0),
+    iterations: 0,
+    residual: 0,
   };
 }
 
@@ -1361,7 +1426,7 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
     const capped = Math.min(Math.fround(ratio), LIQUID_MAX_RATIO);
     // Each liquid's Tait pressure on the shared number density (Solenthaler and Pajarola 2008) and its own viscosity.
     const kind = p.kinds[particles[b + 7]!]!;
-    const pc = capped > 1 ? (kind.massRatio * kp * (capped ** LIQUID_GAMMA - 1)) / capped : 0;
+    const pc = p.profile === 'fast' && capped > 1 ? (kind.massRatio * kp * (capped ** LIQUID_GAMMA - 1)) / capped : 0;
     const kv = dt * kind.viscosity * kind.massRatio;
     for (let c = 0; c < 3; c++)
       for (let bb = 0; bb < 3; bb++)
@@ -1519,6 +1584,9 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
         grid[node + 4] = count;
       }
 
+  // The accurate profile: the pressure projection makes the grid's velocity divergence-free.
+  if (p.profile === 'accurate') project(state, p, dt);
+
   // G2P: velocity and APIC C = sum w v (D^-1 d)^T, advect, out of the colliders, inside the walls.
   for (let i = 0; i < state.live; i++) {
     const b = i * F;
@@ -1608,4 +1676,301 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
     // A particle that entered a drain is gone: its density ratio below zero marks it until the frame's compaction.
     for (const d of p.drains) if (d.enabled && inDrain(d, x)) particles[b + 3] = -1;
   }
+}
+
+/** Grid cells of the accurate profile's pressure solve: one fewer than the nodes on each axis. */
+export function liquidCells(p: ResolvedLiquidParams): number {
+  return (p.dims[0] - 1) * (p.dims[1] - 1) * (p.dims[2] - 1);
+}
+
+/**
+ * The accurate profile's pressure projection (Chorin 1968) on the MLS-MPM grid: velocities on the nodes, one pressure
+ * per cell (the trilinear velocity, constant pressure pair), the divergence of a cell the mean of its four edge
+ * differences per axis and the gradient its transpose. It finds the kinematic pressure x (dt p / rho0) that makes
+ * D (v* + W G x) equal the target divergence on every liquid cell, by Jacobi-preconditioned conjugate gradients
+ * (Hestenes and Stiefel 1952), from zero. W at a node is rest density over its mass in particles (a node's share of
+ * the liquid's volume over its mass, the variational weighting of Batty, Bertails and Bridson 2007, here with lumped
+ * node masses), with the mass at least a quarter of rest so the edge nodes of the particles' spread are not flung. A
+ * node on or past a wall moves freely along it but keeps its normal velocity, and a node inside a collider keeps its
+ * velocity along the collider's normal: P W P^T with the projections P, so the system stays symmetric. A cell is
+ * liquid when inside the container, not solid (all its corners inside colliders) and its density (the node weights with the
+ * walls mirrored and the colliders read as liquid at rest, as the stress pass reads them) at least LIQUID_FLUID_SHARE of
+ * rest; other cells hold zero pressure,
+ * the free surface. The target divergence pushes a cell packed above rest density apart by LIQUID_VOLUME_RATE of its
+ * excess a substep, which keeps the liquid's volume (the drift Kugelstadt et al. 2019 correct). The pressure the
+ * colliders hold back is their impulse, added to the sums as the grid update's own.
+ */
+function project(state: LiquidState, p: ResolvedLiquidParams, dt: number): void {
+  const { grid, impulses } = state;
+  const [nx, ny, nz] = p.dims;
+  const cx = nx - 1,
+    cy = ny - 1,
+    cz = nz - 1;
+  const cells = cx * cy * cz;
+  const G = LIQUID_GRID_STRIDE,
+    lo = LIQUID_PAD;
+  const k4 = [0.25 / p.cell[0], 0.25 / p.cell[1], 0.25 / p.cell[2]];
+  const rest = p.restDensity;
+  // Per node: W, and the collider it is held by (index + 1, 0 for none) with that collider's normal.
+  const W = new Float64Array(p.nodes);
+  const held = new Float64Array(p.nodes * 4);
+  // Per node: its weight with the wall mirrors over rest density, plus the colliders read as liquid at rest (as the
+  // stress pass reads them), for the cells' density.
+  const color = new Float64Array(p.nodes);
+  const inside = new Uint8Array(p.nodes);
+  const hc = Math.cbrt(p.cell[0] * p.cell[1] * p.cell[2]);
+  const x3: [number, number, number] = [0, 0, 0];
+  const normal = [0, 0, 0];
+  const mx = [0, 0],
+    my = [0, 0],
+    mz = [0, 0];
+  for (let iz = 0, n = 0; iz < nz; iz++)
+    for (let iy = 0; iy < ny; iy++)
+      for (let ix = 0; ix < nx; ix++, n++) {
+        // The node's weight with its mirrors across the walls, for the cells' density.
+        const kx = wallMirrors(p, 0, ix, mx),
+          ky = wallMirrors(p, 1, iy, my),
+          kz = wallMirrors(p, 2, iz, mz);
+        let w = 0;
+        for (let c = 0; c < kz; c++)
+          for (let b = 0; b < ky; b++) for (let a = 0; a < kx; a++) w += grid[(mx[a]! + nx * (my[b]! + ny * mz[c]!)) * G + 4]!;
+        let cover = 0;
+        x3[0] = p.origin[0] + ix * p.cell[0];
+        x3[1] = p.origin[1] + iy * p.cell[1];
+        x3[2] = p.origin[2] + iz * p.cell[2];
+        const m = grid[n * G + 3]!,
+          count = grid[n * G + 4]!;
+        if (m > 0) W[n] = rest / Math.max(m, LIQUID_TENSION_FLOOR * rest * (m / Math.max(count, 1e-30)));
+        let deepest = 0;
+        for (let k = 0; k < p.colliders.length; k++) {
+          const sd = colliderDistance(p.colliders[k]!, x3, normal);
+          cover += splineCover(-sd / hc);
+          if (sd < 0) inside[n] = 1;
+          if (sd < deepest) {
+            deepest = sd;
+            held[n * 4] = normal[0]!;
+            held[n * 4 + 1] = normal[1]!;
+            held[n * 4 + 2] = normal[2]!;
+            held[n * 4 + 3] = k + 1;
+          }
+        }
+        color[n] = w / rest + cover;
+      }
+  const wall = (n: number, a: number): boolean => {
+    const i = a === 0 ? n % nx : a === 1 ? Math.floor(n / nx) % ny : Math.floor(n / (nx * ny));
+    return i <= lo || i >= lo + p.cells[a]!;
+  };
+  // u = P W P^T g at node n, in place; `removed` is the momentum the collider holds back along its normal, in particle
+  // masses times m/s: the node's mass times the push W g, which is rest density times g whatever the mass.
+  const removed = [0, 0, 0];
+  const apply = (n: number, g: number[]): void => {
+    for (let a = 0; a < 3; a++) if (wall(n, a)) g[a] = 0;
+    const o = n * 4;
+    removed[0] = removed[1] = removed[2] = 0;
+    if (held[o + 3]) {
+      const gn = g[0]! * held[o]! + g[1]! * held[o + 1]! + g[2]! * held[o + 2]!;
+      for (let a = 0; a < 3; a++) {
+        removed[a] = gn * held[o + a]! * rest;
+        g[a] = g[a]! - gn * held[o + a]!;
+      }
+    }
+    for (let a = 0; a < 3; a++) g[a] = g[a]! * W[n]!;
+    if (held[o + 3]) {
+      const gn = g[0]! * held[o]! + g[1]! * held[o + 1]! + g[2]! * held[o + 2]!;
+      for (let a = 0; a < 3; a++) g[a] = g[a]! - gn * held[o + a]!;
+    }
+    for (let a = 0; a < 3; a++) if (wall(n, a)) g[a] = 0;
+  };
+  // The cells: liquid or not, the inverse of the diagonal, and the right-hand side.
+  const fluid = new Uint8Array(cells);
+  const inv = new Float64Array(cells);
+  const rhs = new Float64Array(cells);
+  const density = new Float64Array(cells);
+  // Air: a cell inside the container, neither liquid nor solid (a solid cell stays 0 like one outside the walls).
+  const air = new Uint8Array(cells);
+  const corner = (c: number, k: number): number => {
+    const i = c % cx,
+      j = Math.floor(c / cx) % cy,
+      l = Math.floor(c / (cx * cy));
+    return i + (k & 1) + nx * (j + ((k >> 1) & 1) + ny * (l + ((k >> 2) & 1)));
+  };
+  for (let c = 0; c < cells; c++) {
+    const i = c % cx,
+      j = Math.floor(c / cx) % cy,
+      l = Math.floor(c / (cx * cy));
+    if (i < lo || i >= lo + p.cells[0] || j < lo || j >= lo + p.cells[1] || l < lo || l >= lo + p.cells[2]) continue;
+    let theta = 0;
+    for (let k = 0; k < 8; k++) theta += color[corner(c, k)]!;
+    theta /= 8;
+    air[c] = 1;
+    if (theta < LIQUID_FLUID_SHARE) continue;
+    air[c] = 0;
+    // A cell whose corners all lie inside colliders is solid: its corners keep their normal velocity, so the solid's
+    // surface is the held nodes the grid update pushes out.
+    let solid = true;
+    for (let k = 0; k < 8 && solid; k++) solid = inside[corner(c, k)] === 1;
+    if (solid) continue;
+    air[c] = 0;
+    let diag = 0,
+      div = 0;
+    for (let k = 0; k < 8; k++) {
+      const n = corner(c, k);
+      for (let a = 0; a < 3; a++) {
+        const sgn = (k >> a) & 1 ? 1 : -1;
+        div += sgn * k4[a]! * grid[n * G + a]!;
+        if (wall(n, a) || !W[n]) continue;
+        const along = held[n * 4 + 3] ? held[n * 4 + a]! : 0;
+        diag += k4[a]! * k4[a]! * W[n]! * (1 - along * along);
+      }
+    }
+    if (!(diag > 0)) continue;
+    fluid[c] = 1;
+    inv[c] = 1 / diag;
+    rhs[c] = -div;
+    density[c] = theta;
+  }
+  // The volume: a cell packed above rest density is pushed apart, and one below it drawn together where none of its six
+  // neighbours is air (at the free surface a cell below rest is only partly full; walls and solids enclose it).
+  for (let c = 0; c < cells; c++) {
+    if (!fluid[c]) continue;
+    let enclosed = true;
+    for (const step of [1, cx, cx * cy])
+      if (air[c - step] || air[c + step]) enclosed = false;
+    const excess = enclosed ? density[c]! - 1 : Math.max(density[c]! - 1, 0);
+    rhs[c] = rhs[c]! + (LIQUID_VOLUME_RATE * excess) / dt;
+  }
+  // u = P W P^T D^T field at every node, from the cells round it.
+  const u = new Float64Array(p.nodes * 3);
+  const g = [0, 0, 0];
+  // Nodes next to a liquid cell: the projection sets their velocity.
+  const valid = new Uint8Array(p.nodes);
+  const spread = (field: Float64Array, impulse: boolean): void => {
+    u.fill(0);
+    for (let iz = 0, n = 0; iz < nz; iz++)
+      for (let iy = 0; iy < ny; iy++)
+        for (let ix = 0; ix < nx; ix++, n++) {
+          if (!W[n] && !held[n * 4 + 3]) continue;
+          g[0] = g[1] = g[2] = 0;
+          let any = false;
+          for (let k = 0; k < 8; k++) {
+            const i = ix - 1 + (k & 1),
+              j = iy - 1 + ((k >> 1) & 1),
+              l = iz - 1 + ((k >> 2) & 1);
+            if (i < 0 || j < 0 || l < 0 || i >= cx || j >= cy || l >= cz) continue;
+            const c = i + cx * (j + cy * l);
+            if (!fluid[c]) continue;
+            any = true;
+            // The node is the cell's upper corner on axis a when the cell lies below it there.
+            for (let a = 0; a < 3; a++) g[a] = g[a]! + ((k >> a) & 1 ? -1 : 1) * k4[a]! * field[c]!;
+          }
+          if (!any) continue;
+          valid[n] = 1;
+          apply(n, g);
+          u[n * 3] = g[0]!;
+          u[n * 3 + 1] = g[1]!;
+          u[n * 3 + 2] = g[2]!;
+          if (impulse && held[n * 4 + 3] && (removed[0] || removed[1] || removed[2])) {
+            // The collider holds back the pressure's push along its normal: the liquid's momentum m * removed goes to it.
+            const k = held[n * 4 + 3]! - 1;
+            const col = p.colliders[k]!;
+            const rx = p.origin[0] + ix * p.cell[0] - col.position[0],
+              ry = p.origin[1] + iy * p.cell[1] - col.position[1],
+              rz = p.origin[2] + iz * p.cell[2] - col.position[2];
+            const jx = removed[0]!,
+              jy = removed[1]!,
+              jz = removed[2]!;
+            const o = k * 6,
+              FS = LIQUID_FORCE_FIXED;
+            impulses[o] += fixed(jx, FS);
+            impulses[o + 1] += fixed(jy, FS);
+            impulses[o + 2] += fixed(jz, FS);
+            impulses[o + 3] += fixed(ry * jz - rz * jy, FS);
+            impulses[o + 4] += fixed(rz * jx - rx * jz, FS);
+            impulses[o + 5] += fixed(rx * jy - ry * jx, FS);
+          }
+        }
+  };
+  const divergence = (c: number): number => {
+    let sum = 0;
+    for (let k = 0; k < 8; k++) {
+      const n = corner(c, k);
+      for (let a = 0; a < 3; a++) sum += ((k >> a) & 1 ? 1 : -1) * k4[a]! * u[n * 3 + a]!;
+    }
+    return sum;
+  };
+  // Preconditioned conjugate gradients from zero on A x = rhs, A = D P W P^T D^T (D^T x is minus the gradient of x, so
+  // the node's velocity takes + P W P^T D^T x).
+  const x = new Float64Array(cells),
+    r = rhs.slice(),
+    d = new Float64Array(cells),
+    q = new Float64Array(cells);
+  let rz = 0;
+  for (let c = 0; c < cells; c++) if (fluid[c]) rz += r[c]! * r[c]! * inv[c]!;
+  const goal = p.pressureTolerance * p.pressureTolerance * rz;
+  const first = rz;
+  let beta = 0,
+    iterations = 0;
+  while (iterations < p.pressureIterations && rz > goal) {
+    for (let c = 0; c < cells; c++) d[c] = fluid[c] ? r[c]! * inv[c]! + beta * d[c]! : 0;
+    spread(d, false);
+    let dq = 0;
+    for (let c = 0; c < cells; c++)
+      if (fluid[c]) {
+        q[c] = divergence(c);
+        dq += d[c]! * q[c]!;
+      }
+    const alpha = dq > 0 ? rz / dq : 0;
+    let next = 0;
+    for (let c = 0; c < cells; c++)
+      if (fluid[c]) {
+        x[c] = x[c]! + alpha * d[c]!;
+        r[c] = r[c]! - alpha * q[c]!;
+        next += r[c]! * r[c]! * inv[c]!;
+      }
+    beta = rz > 0 ? next / rz : 0;
+    rz = next;
+    iterations++;
+  }
+  // The new velocity: v* + P W P^T D^T x, the colliders' share as their impulse.
+  spread(x, true);
+  for (let n = 0; n < p.nodes; n++) {
+    if (!W[n]) continue;
+    for (let a = 0; a < 3; a++) grid[n * G + a] = Math.fround(grid[n * G + a]! + u[n * 3 + a]!);
+  }
+  // The liquid's velocity carried out to the nodes with mass a particle at the surface still reads (the B-spline reaches
+  // a cell and a half), LIQUID_EXTRAPOLATION layers: each takes the mean of its projected face neighbours (Bridson
+  // 2015, "Fluid Simulation for Computer Graphics", on extrapolating velocity). Spray further out keeps its own velocity.
+  for (let layer = 0; layer < LIQUID_EXTRAPOLATION; layer++) {
+    const before = valid.slice();
+    for (let iz = 0, n = 0; iz < nz; iz++)
+      for (let iy = 0; iy < ny; iy++)
+        for (let ix = 0; ix < nx; ix++, n++) {
+          if (before[n] || !(grid[n * G + 3]! > 0)) continue;
+          let k = 0;
+          g[0] = g[1] = g[2] = 0;
+          for (const [o, ok] of [
+            [-1, ix > 0],
+            [1, ix < nx - 1],
+            [-nx, iy > 0],
+            [nx, iy < ny - 1],
+            [-nx * ny, iz > 0],
+            [nx * ny, iz < nz - 1],
+          ] as const) {
+            if (!ok || !before[n + o]) continue;
+            for (let a = 0; a < 3; a++) g[a] = g[a]! + grid[(n + o) * G + a]!;
+            k++;
+          }
+          if (!k) continue;
+          for (let a = 0; a < 3; a++) u[n * 3 + a] = wall(n, a) ? 0 : g[a]! / k;
+          valid[n] = 2;
+        }
+    for (let n = 0; n < p.nodes; n++)
+      if (valid[n] === 2) {
+        valid[n] = 1;
+        for (let a = 0; a < 3; a++) grid[n * G + a] = Math.fround(u[n * 3 + a]!);
+      }
+  }
+  for (let c = 0; c < cells; c++) state.pressure[c] = fluid[c] ? (x[c]! * p.density) / dt : 0;
+  state.iterations = iterations;
+  state.residual = first > 0 ? Math.sqrt(rz / first) : 0;
 }
