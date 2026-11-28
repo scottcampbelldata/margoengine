@@ -16,7 +16,7 @@ export async function show({bench,physics,canvas,notice,status,signal,fail,onRes
   const run=qs('run'),replay=qs('replay'),steps=qs('samples');
   const state=canvas.dataset;
   const engine=bench.engine,compat=bench.renderer==='compatibility';
-  const stage=buildStation(engine,mesh=>bench.add(mesh));
+  const stage=buildStation(engine,(mesh,options)=>bench.add(mesh,options));
   qs('route').textContent=compat?'Margo WebGL2':'Margo WebGPU';
   const draw=async()=>{
     await bench.render(0);
@@ -25,8 +25,8 @@ export async function show({bench,physics,canvas,notice,status,signal,fail,onRes
   let trace={discrete:opening,continuous:opening},busy=false,first=true;
   let timer,requestId=0,runCount=0;
 
-  // The bench frames the rig along the opening view direction at any aspect; the box leaves out the 140 m floor.
-  const fit=()=>bench.fit({fill:.9,bounds:{min:[-3.6,-.45,-1.85],max:[3.6,.85,1.85]}});
+  // The bench frames the rig along the opening view direction at any aspect; the 140 m floor is added with fit:false.
+  const fit=()=>bench.fit({fill:.9});
   function stopReplay(){
     clearTimeout(timer);
     const playing=replay.getAttribute('aria-pressed')==='true';

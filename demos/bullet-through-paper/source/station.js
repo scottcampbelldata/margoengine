@@ -22,15 +22,16 @@ const flag=box(divider[0]*2,divider[1]*2,divider[2]*2);
 
 // Every part goes to the bench, which casts its shadow from the sun.
 export function buildStation(engine,add){
-  const put=(shape,finish,at,scale=[1,1,1],parent)=>{
+  const put=(shape,finish,at,scale=[1,1,1],parent,options)=>{
     const part=engine.createMesh(parent).setGeometry(shape).setMaterial(finish).setPosition(at).setScale(scale);
-    add(part);
+    add(part,options);
     return part;
   };
   const bar=(finish,at,scale,parent)=>put(block,finish,at,scale,parent);
   const rod=(finish,at,scale,parent)=>put(dowel,finish,at,scale,parent);
 
-  bar(M.ground,[0,-.493,0],[140,.12,140]);
+  // The 140 m ground casts and receives but stays out of the bench's auto-fit.
+  put(block,M.ground,[0,-.493,0],[140,.12,140],undefined,{fit:false});
   for(const x of [-2.86,2.86])for(const z of [-1.28,1.28]){
     put(rim,M.shadow,[x,-.386,z],[.101,1,.153]);
     rod(M.tungsten,[x,-.323,z],[.154,.132,.154]);
