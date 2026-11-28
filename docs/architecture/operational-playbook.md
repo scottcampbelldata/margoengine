@@ -12434,3 +12434,11 @@ and PCM banks are accepted only after every participant succeeds. Borrowed rows 
 owning memory and PCM and contact ports carry signed origins. A fixed-camera civil rig compares live
 contact audio and exact renderer replay. Independent plate readings give a limit for the analytic
 model supplying diagnostic frequencies.
+
+### BIO-02 accepted developmental growth and native crown shadows
+
+The growth solver checks borrowed f64 soil storage in its owning memory and maps signed root-zone inputs
+to local seed points. A candidate branch graph and seasonal soil history are staged until the complete
+season succeeds. The native penumbra computes disjoint output rows with fixed source order and contiguous
+SIMD x-cell writes. The camera witness reads live HYDRO-02 and turns the accepted graph into Procedural
+geometry. Held-out red maple shade-tent measurements quantify the generic default's height error.

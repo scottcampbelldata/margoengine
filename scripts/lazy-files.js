@@ -1596,6 +1596,14 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/biomes',
+    file: 'packages/biomes/dist/workers/growth-shadow.js',
+    label: 'growth-shadow.js',
+    kind: 'Plant growth native shadow helper',
+    measure: 'file',
+    when: 'PlantGrowth.load() with threads: 2 or 4 from the optional /growth entry',
+  },
+  {
+    package: '@margoengine/biomes',
     file: 'packages/biomes/dist/growth-kernel-shared.wasm',
     label: 'growth-kernel-shared.wasm',
     kind: 'Rust SIMD growth penumbra, shared world memory',

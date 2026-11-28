@@ -440,8 +440,8 @@
         "gzip": 2402
       },
       "./growth": {
-        "raw": 12804,
-        "gzip": 5728
+        "raw": 21056,
+        "gzip": 8686
       },
       "./forest": {
         "raw": 16719,
@@ -20170,14 +20170,14 @@
       "brotli": 11152
     },
     "packages/biomes/dist/growth-kernel.wasm": {
-      "raw": 601,
-      "gzip": 449,
-      "brotli": 408
+      "raw": 2016,
+      "gzip": 1215,
+      "brotli": 1119
     },
     "packages/biomes/dist/growth-kernel-shared.wasm": {
-      "raw": 601,
-      "gzip": 449,
-      "brotli": 415
+      "raw": 2016,
+      "gzip": 1215,
+      "brotli": 1119
     },
     "packages/biomes/dist/forest-kernel.wasm": {
       "raw": 1276,
@@ -20368,6 +20368,11 @@
       "raw": 1300,
       "gzip": 803,
       "brotli": 743
+    },
+    "packages/biomes/dist/workers/growth-shadow.js": {
+      "raw": 1118,
+      "gzip": 585,
+      "brotli": 491
     }
   },
   "splits": {

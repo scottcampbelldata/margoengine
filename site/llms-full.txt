@@ -15410,7 +15410,37 @@ within 5,396 B. Each local native image is 1,444 B raw and 918 B gzip. Core and 
 
 ### Developmental wood growth (BIO-02)
 
-The parametric solver places shoots on 60 Hz season boundaries and stores permanent branch structure. The initialization footprint follows the supplied productive seasons and the minimum extension per new branch. The light grid uses cubic voxels with a vertical, distance-attenuated penumbra and horizontal light-seeking gradient. Sites outside the supplied grid receive open light. Roots use a measured water threshold and the mean storage in their own supplied HYDRO-02 cell. The model has no water extraction, leaf anatomy, root branching or moving obstructors. Renderer-adapted coordinates are f32 within an origin cell. The optional growth entry measures 12,386 B minified and 5,474 B gzip. The selected lazy SIMD kernel is 601 B raw in either memory mode. Core and Stage gain zero bytes.
+The parametric solver places shoots on developmental season boundaries on the 60 Hz world clock. Branches
+persist. The allocated topology follows the supplied productive lifetime and the minimum eligible extension.
+The light grid uses cubic voxels with a vertical, distance-attenuated penumbra and a local light gradient.
+Sites outside the grid receive open light. Roots transform the signed soil-grid origin when `cellSize` is
+supplied and sample a configurable storage response for the corresponding HYDRO-02 row. Branches and soil
+history update together after a successful season. The renderer adapter rounds local geometry to f32.
+The model leaves root extraction, root branching, leaf physiology, permanent branch re-bending, shedding
+and moving obstructions open. The topological and resource passes run in parent order on the caller.
+
+The world scratch and accepted banks store 104 bytes per reserved internode each, 32 additional bytes
+per reserved internode for resources, and 16 bytes per plant for accepted and candidate soil history.
+Each bank has a 16-byte header. Both branch registry mirrors are additional. Shadow scratch takes
+8 bytes per voxel. The fixed occupancy takes 8 bytes per voxel outside the arena. Native helpers
+use the same scratch grid and retain obstacle-then-internode addition order. Source records reserve
+24 bytes each, with a 40-byte batch and 32 bytes of counters per participant. Each participant has
+a 64 KiB stack plus alignment. Shared jobs have an additional control block. The optional entry measures
+8,686 B gzip. Each lazy Wasm build is 2,016 B raw and 1,215 B gzip, and the optional worker is 585 B gzip.
+
+### BIO-02 red maple growth under field shade
+
+Gottschalk's field shade-tent experiment reported two seasonal height means at eight treatments for red
+maple germinated after the experiment started. The production diagnostic drives the generic README species
+with the reported light fractions and no fitted growth data. After two years, 8% and 57% light produce
+38.4 cm and 80.0 cm. Their held-out measurements are 9.3 cm and 33.7 cm. The model overestimates all
+16 means, by up to 57.3 cm. The modeled two-year heights from 20% to 94% light coincide at the internode
+length cap. The measured means across those treatments range from 22.7 cm to 33.7 cm. Halving voxel side
+from 7.62 cm to 3.81 cm leaves predicted heights unchanged. Reducing the assumed relative water supply
+from 1 to 0.75 moves predicted heights up to 10 cm and still overestimates all means. The one-decimal
+published heights carry a 0.05 cm reading half-width. The source gives no per-treatment dispersion.
+[Gottschalk (1985), Tables 2 and 4](https://research.fs.usda.gov/treesearch/47682).
+[Diagnostic](../packages/biomes/scripts/bio02-growth-measured.mjs).
 
 ### Enclosed and urban acoustics (SOUND-02)
 
@@ -41791,6 +41821,14 @@ excitation and pressure radiation remain open, as do the solid fracture, ice, fl
 thunder sources in the coupling map. The simply supported plate comparison reproduces supplied
 frequencies in PCM and records discrepancies against independent measurements.
 [SOUND-04 measured limits](limits.md#sound-04-simply-supported-aluminum-plates).
+
+### Open: BIO-02 species-specific shade response
+
+The generic defaults overpredict all 16 measured red maple heights in the independent shade-tent
+comparison. Above 20% full light the two-year axial extension is identical across treatments once an
+internode reaches its configured maximum. Sustained multi-internode production, branch shedding, plastic
+deformation of existing wood and explicit root and leaf physiology remain open.
+[Shade comparison and sensitivity](limits.md#bio-02-red-maple-growth-under-field-shade).
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

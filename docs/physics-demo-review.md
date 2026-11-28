@@ -646,3 +646,14 @@ the other striker off the steel and the matched track stays identically silent. 
 PCM. Each renderer repeats full accepted state, PCM bytes and RGBA before contact, during ringing,
 after restore and re-advance, and on rewind. This is a technical witness with an ideal beam mode and
 authored gain and decay. [Browser test](../packages/physics/tests/modal-sound-film.browser.mjs).
+
+### BIO-02 live nursery irrigation witness
+
+Two matched plants start at 4.08 mm of root-zone water. A metered 8 mm surface application on one
+tray infiltrates into live HYDRO-02 storage. After eight authored seasons the wet tray has 12.00 mm of
+root water, 59 internodes and a 1.035 m crown. The matched control has 4.08 mm, 24 internodes and a
+0.403 m crown. Surface, root storage and outflow close the water budget. The 768 × 432 fixed camera
+uses Procedural tubes from accepted branches and display foliage attached to their live endpoints.
+Both renderers independently match complete accepted snapshots and RGBA at held frames, two restores,
+re-advance and rewind. Each modeled season is one edit second. This is a generic technical planting.
+[Browser test](../packages/biomes/tests/growth-film.browser.mjs).

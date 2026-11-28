@@ -148,20 +148,131 @@ test('live HYDRO-02 root-zone storage differentiates neighboring plants in a sin
       full: 0.15,
     },
   });
+  const cell = [-9, 6, 8];
   const world = new PhysicsWorld({ rate, memory: worldMemory(false) })
-    .add(runoff, {
-      nx: 2,
-      nz: 1,
-      dx: 1,
-      downstream: [-1, -1],
-      soilCapacity: 0.15,
-      initialSaturation: [0, 1],
-      drainage: 0,
-    })
-    .add(growth, { plants: [plant, { ...plant, position: [1.25, 0.25, 0.25] }], voxels, ticksPerSeason: 60 });
+    .add(
+      runoff,
+      {
+        nx: 2,
+        nz: 1,
+        dx: 1,
+        downstream: [-1, -1],
+        soilCapacity: 0.15,
+        initialSaturation: [0, 1],
+        drainage: 0,
+      },
+      cell,
+    )
+    .add(growth, { plants: [plant, { ...plant, position: [1.25, 0.25, 0.25] }], voxels, ticksPerSeason: 60 }, cell);
+  world.advance(60);
+  const checkpoint = world.takeSnapshot();
+  assert.deepEqual(world.fields.port(growth.branchesField.name).cell, cell);
+  world.shiftOrigin([2, -3, 1]);
   world.advance(120);
+  assert.deepEqual(world.fields.port(growth.branchesField.name).cell, [-11, 9, 7]);
   assert.equal(growth.internodes().length, 3);
   assert.ok(growth.internodes().every((segment) => segment.plant === 1));
+  const final = world.takeSnapshot();
+  world.restoreSnapshot(checkpoint.bytes);
+  assert.deepEqual(world.fields.port(growth.branchesField.name).cell, cell);
+  world.shiftOrigin([2, -3, 1]);
+  world.advance(120);
+  assert.deepEqual(world.takeSnapshot().bytes, final.bytes);
+});
+
+function soilLease(memory, cell, count, offset = 32) {
+  return {
+    field: soilField.name,
+    tick: 0,
+    cell,
+    region: { name: 'borrowed-soil', memory, type: 'f64', layout: 1, byteOffset: offset, byteLength: count * 8 },
+  };
+}
+
+function stepFromSoil(growth, cell, port) {
+  growth.step({ tick: 0, seed: 0, cell, level: 0, inputs: new Map([[port.field, port]]) });
+}
+
+const soilField = {
+  name: 'test-soil',
+  kind: 'uniformGrid',
+  centring: 'cell',
+  quantity: 'soilWater',
+  unit: 'm',
+};
+
+test('growth validates borrowed soil in its owning memory before accepting water at any root', async () => {
+  const growth = await PlantGrowth.load({
+    soil: { field: soilField, origin: [0, 0], dimensions: [3, 1], size: [1, 1], full: 0.15, cellSize: 1 },
+  });
+  const cell = [-7, 3, -2];
+  const world = new PhysicsWorld({ rate, memory: worldMemory(false) }).add(
+    growth,
+    { plants: [plant, { ...plant, position: [1.25, 0.25, 0.25] }], voxels, ticksPerSeason: 1 },
+    cell,
+  );
+  const memory = new WebAssembly.Memory({ initial: 1 });
+  const values = new Float64Array(memory.buffer, 32, 3);
+  values.set([0, 0.15, Number.NaN]);
+  const port = soilLease(memory, [-8, 3, -2], values.length);
+  const initial = world.takeSnapshot();
+  assert.throws(() => stepFromSoil(growth, cell, port), {
+    code: 'state',
+    message: /finite nonnegative soil water depths.*errors#plant-growth/,
+  });
+  assert.throws(() => stepFromSoil(growth, cell, { ...port, region: { ...port.region, byteOffset: 33 } }), {
+    code: 'state',
+    message: /owning memory.*errors#plant-growth/,
+  });
+  assert.deepEqual(world.takeSnapshot().bytes, initial.bytes);
+  assert.equal(growth.readNativeWork(), undefined);
+  values[2] = 0;
+  stepFromSoil(growth, cell, port);
+  assert.equal(growth.season, 1);
+  assert.deepEqual(
+    growth.internodes().map((node) => node.plant),
+    [0],
+  );
+  const accepted = world.takeSnapshot();
+  world.restoreSnapshot(initial.bytes);
+  stepFromSoil(growth, cell, port);
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+});
+
+test('an unrepresentable late shoot leaves earlier candidate buds and the soil history untouched', async () => {
+  const growth = await PlantGrowth.load({
+    soil: { field: soilField, origin: [0, 0], dimensions: [2, 1], size: [1e16, 1e16], full: 0.15 },
+  });
+  const cell = [-5, 1, 2];
+  const world = new PhysicsWorld({ rate, memory: worldMemory(false) }).add(
+    growth,
+    {
+      plants: [plant, { ...plant, position: [1e16, 0.25, 0.25], direction: [1, 0, 0] }],
+      voxels: { origin: [0, 0, 0], dimensions: [2, 2, 1], size: 1e16 },
+      ticksPerSeason: 1,
+    },
+    cell,
+  );
+  const memory = new WebAssembly.Memory({ initial: 1 });
+  const values = new Float64Array(memory.buffer, 32, 2);
+  values.set([0.15, 0.15]);
+  const port = soilLease(memory, cell, 2);
+  const initial = world.takeSnapshot();
+  assert.throws(() => stepFromSoil(growth, cell, port), {
+    code: 'state',
+    message: /closer origin cell.*errors#plant-growth/,
+  });
+  assert.equal(growth.season, 0);
+  assert.deepEqual(growth.internodes(), []);
+  assert.equal(growth.readNativeWork(), undefined);
+  assert.deepEqual(world.takeSnapshot().bytes, initial.bytes);
+  values[1] = 0;
+  stepFromSoil(growth, cell, port);
+  assert.equal(growth.season, 1);
+  assert.deepEqual(
+    growth.internodes().map((node) => node.plant),
+    [0],
+  );
 });
 
 test('growth is invariant across arena memory modes, display rates, memory growth, and a capped seek', async () => {

@@ -1,4 +1,3 @@
-import { MargoError } from '@margoengine/math/errors';
 import { cos, hypot, sin } from '@margoengine/math/pinned';
 import type {
   Cell,
@@ -11,9 +10,18 @@ import type {
   SolverHost,
   StepContext,
 } from '@margoengine/physics/world';
-import { loadPhysicsWorld, world } from './physics-world.js';
 import type { Branches } from '@margoengine/procedural/lsystem';
 import { umod } from './fixed.js';
+import { growthError } from './growth-errors.js';
+import {
+  bindGrowthShadows,
+  loadGrowthKernel,
+  type GrowthKernelBuilds,
+  type GrowthShadowSource,
+  type GrowthShadowWorkCounts,
+} from './growth-kernel.js';
+
+export type { GrowthShadowWorkCounts, GrowthShadowWorkerWork } from './growth-kernel.js';
 
 const F64 = Float64Array.BYTES_PER_ELEMENT;
 const LAYOUT = 1;
@@ -31,7 +39,6 @@ const ORDER = 11;
 const BIRTH = 12;
 const EMPTY = -1;
 const NO_LATERAL = -2;
-const ORIGIN: Cell = [0, 0, 0];
 const UP: GrowthVector = [0, 1, 0];
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
@@ -121,6 +128,8 @@ export interface PlantGrowthOptions {
   /** ID and field prefix. Default 'plant-growth'. */
   readonly id?: string;
   readonly soil?: GrowthSoil;
+  /** Native shadow participants, including the caller. Default 1. More participants require shared memory. */
+  readonly threads?: 1 | 2 | 4;
   readonly signal?: AbortSignal;
 }
 
@@ -142,23 +151,6 @@ export interface GrowthInternode {
   readonly radius: number;
 }
 
-interface GrowthKernel extends WebAssembly.Exports {
-  readonly __data_end: WebAssembly.Global;
-  readonly __stack_pointer: WebAssembly.Global;
-  deposit_shadow(
-    grid: number,
-    nx: number,
-    ny: number,
-    nz: number,
-    x: number,
-    y: number,
-    z: number,
-    depth: number,
-    strength: number,
-    transmission: number,
-  ): void;
-}
-
 interface Plant {
   readonly species: Required<GrowthSpecies>;
   readonly azimuth: number;
@@ -168,20 +160,20 @@ interface Plant {
 
 interface State {
   readonly host: SolverHost;
-  readonly kernel: GrowthKernel;
+  readonly shadows: ReturnType<typeof bindGrowthShadows>;
   readonly plants: readonly Plant[];
   readonly nodes: Region;
   readonly soil: Region;
+  readonly trialNodes: Region;
+  readonly trialSoil: Region;
   readonly shadow: Region;
   readonly resources: Region;
   readonly occupancy: Float64Array;
-  readonly obstacleCells: readonly { x: number; y: number; z: number; amount: number }[];
+  readonly obstacleCells: readonly GrowthShadowSource[];
   readonly solidCount: number;
   readonly dimensions: GrowthVoxels['dimensions'];
   readonly origin: GrowthVector;
   readonly size: number;
-  readonly depth: number;
-  readonly transmission: number;
   readonly light: GrowthVector;
   readonly sky: number;
   readonly fallback: number;
@@ -191,29 +183,33 @@ interface State {
 
 const finite = (value: number, name: string, low = -Infinity, high = Infinity): number => {
   if (!Number.isFinite(value) || value < low || value > high)
-    throw new MargoError('state', `Choose plant growth ${name} as a finite number in [${low}, ${high}].`);
+    throw growthError(`Choose plant growth ${name} as a finite number in [${low}, ${high}].`);
   return value;
 };
 
 function integer(value: number, name: string, min = 1): number {
   if (!Number.isSafeInteger(value) || value < min)
-    throw new MargoError('state', `Choose plant growth ${name} as a safe integer at least ${min}.`);
+    throw growthError(`Choose plant growth ${name} as a safe integer at least ${min}.`);
   return value;
 }
 
 function position(value: GrowthVector, name: string): GrowthVector {
+  if (value?.length !== 3) throw growthError(`Supply three finite components for plant growth ${name}.`);
   return [finite(value[0], name), finite(value[1], name), finite(value[2], name)];
 }
 
 function direction(value: GrowthVector): GrowthVector {
-  const magnitude = hypot(value[0], value[1], value[2]);
+  const [x, y, z] = position(value, 'direction');
+  const magnitude = hypot(x, y, z);
   if (!(magnitude > 0 && Number.isFinite(magnitude)))
-    throw new MargoError('state', 'Choose a plant growth direction with finite nonzero length.');
-  return [value[0] / magnitude, value[1] / magnitude, value[2] / magnitude]; // float division: unit vector
+    throw growthError('Choose a plant growth direction with finite nonzero length.');
+  return [x / magnitude, y / magnitude, z / magnitude]; // float division: unit vector
 }
 
 function plantOf(plant: PlantAxiom): Plant {
-  const { species: source } = plant;
+  const source = plant?.species;
+  if (!source || typeof source !== 'object')
+    throw growthError('Supply developmental species parameters for each plant axiom.');
   const minimumExtension = finite(source.minimumExtension, 'minimum extension', Number.MIN_VALUE);
   const branchingAngle = finite(source.branchingAngle ?? Math.PI / 4, 'branching angle', 0, Math.PI);
   const species: Required<GrowthSpecies> = {
@@ -229,41 +225,33 @@ function plantOf(plant: PlantAxiom): Plant {
     gravitropism: finite(source.gravitropism ?? 0.125, 'gravitropism', -1, 1),
     leafShadow: finite(source.leafShadow ?? 0.25, 'leaf shadow', 0, 1),
   };
+  const tipArea = species.tipRadius * species.tipRadius;
+  if (!(tipArea > 0 && Number.isFinite(tipArea)))
+    throw growthError('The terminal vascular area is outside the numeric range. Choose a representable tip radius.');
+  const azimuth = finite(plant.azimuth ?? 0, 'azimuth');
+  if (!Number.isFinite(azimuth + species.productiveSeasons * species.divergence))
+    throw growthError('The seasonal azimuth overflows. Choose a practical divergence and productive lifetime.');
   return {
     species,
-    azimuth: finite(plant.azimuth ?? 0, 'azimuth'),
+    azimuth,
     sine: sin(branchingAngle),
     cosine: cos(branchingAngle),
   };
 }
 
-async function loadKernel(file: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {
-  signal?.throwIfAborted();
-  if (file.protocol === 'file:') {
-    const module = 'node:fs/promises';
-    const { readFile } = await import(/* @vite-ignore */ /* webpackIgnore: true */ module);
-    file.search = '';
-    return WebAssembly.compile(await readFile(file, { signal }));
-  }
-  const response = await fetch(file, { signal });
-  if (!response.ok)
-    throw new MargoError('failed', `Plant growth kernel HTTP ${response.status}; serve its Wasm assets with Biomes.`);
-  return WebAssembly.compile(await response.arrayBuffer());
-}
-
-function words(state: State, region: Region): Float64Array {
-  return world().regionWords(state.host.memory, region) as Float64Array;
+function words(state: Pick<State, 'host'>, region: Region): Float64Array {
+  return new Float64Array(state.host.memory.buffer, region.byteOffset, region.byteLength / F64);
 }
 
 const row = (id: number): number => HEADER + STRIDE * id;
 const triple = (values: Float64Array, at: number): GrowthVector => [values[at]!, values[at + 1]!, values[at + 2]!];
-const voxel = (state: State, p: GrowthVector): GrowthVector => [
+const voxel = (state: Pick<State, 'origin' | 'size'>, p: GrowthVector): GrowthVector => [
   Math.floor((p[0] - state.origin[0]) / state.size), // float division: voxel coordinate
   Math.floor((p[1] - state.origin[1]) / state.size), // float division: voxel coordinate
   Math.floor((p[2] - state.origin[2]) / state.size), // float division: voxel coordinate
 ];
 
-function indexOf(state: State, x: number, y: number, z: number): number {
+function indexOf(state: Pick<State, 'dimensions'>, x: number, y: number, z: number): number {
   const [nx, ny, nz] = state.dimensions;
   return x < 0 || y < 0 || z < 0 || x >= nx || y >= ny || z >= nz ? -1 : (z * ny + y) * nx + x;
 }
@@ -285,20 +273,15 @@ function lateralHeading(plant: Plant, heading: GrowthVector, age: number): Growt
 }
 
 function castShadows(state: State, nodes: Float64Array, count: number): Float64Array {
-  const shadow = words(state, state.shadow);
-  shadow.fill(0);
-  const [nx, ny, nz] = state.dimensions;
-  const deposit = (x: number, y: number, z: number, amount: number) => {
-    state.kernel.deposit_shadow(state.shadow.byteOffset, nx, ny, nz, x, y, z, state.depth, amount, state.transmission);
-  };
-  for (const { x, y, z, amount } of state.obstacleCells) deposit(x, y, z, amount);
+  const sources = state.obstacleCells.slice();
   for (let id = state.plants.length; id < count; id++) {
     const at = row(id);
     const leaf = state.plants[nodes[at + PLANT]!]!.species.leafShadow;
     const [x, y, z] = voxel(state, triple(nodes, at + X));
-    if (leaf > 0 && indexOf(state, x, y, z) >= 0) deposit(x, y, z, leaf);
+    if (leaf > 0 && indexOf(state, x, y, z) >= 0) sources.push({ x, y, z, amount: leaf });
   }
-  return shadow;
+  state.shadows.run(state.shadow, sources);
+  return words(state, state.shadow);
 }
 
 function shade(state: State, shadow: Float64Array, x: number, y: number, z: number): number {
@@ -355,11 +338,13 @@ function crossesSolid(state: State, start: GrowthVector, end: GrowthVector): boo
 
 function soilOf(value: GrowthSoil): GrowthSoil {
   const { field } = value;
-  if (field.kind !== 'uniformGrid' || field.centring !== 'cell' || field.unit !== 'm')
-    throw new MargoError('state', 'Use a cell-centred soil water grid in liquid-water metres.');
+  if (!field || field.kind !== 'uniformGrid' || field.centring !== 'cell' || field.unit !== 'm')
+    throw growthError('Use a cell-centred soil water grid in liquid-water metres.');
+  if (value.origin?.length !== 2 || value.dimensions?.length !== 2 || value.size?.length !== 2)
+    throw growthError('Supply two coordinates, dimensions and spacings for the root-zone grid.');
   const wilting = finite(value.wilting ?? 0, 'wilting storage', 0);
   const full = finite(value.full, 'full soil storage', wilting);
-  if (!(full > wilting)) throw new MargoError('state', 'Set full soil storage above the wilting threshold.');
+  if (!(full > wilting)) throw growthError('Set full soil storage above the wilting threshold.');
   return {
     field: { ...field },
     origin: [finite(value.origin[0], 'soil origin'), finite(value.origin[1], 'soil origin')],
@@ -371,29 +356,51 @@ function soilOf(value: GrowthSoil): GrowthSoil {
   };
 }
 
-function sampleWater(state: State, nodes: Float64Array, soil: GrowthSoil, port: Port, receiver: Cell): void {
+function sampleWater(
+  state: State,
+  nodes: Float64Array,
+  history: Float64Array,
+  soil: GrowthSoil,
+  port: Port,
+  receiver: Cell,
+): void {
   const [nx, nz] = soil.dimensions;
-  const { region } = port;
-  if (region.layout !== LAYOUT || region.type !== 'f64' || region.byteLength !== nx * nz * F64)
-    throw new MargoError(
-      'state',
-      'Match the plant soil grid dimensions and use the layout-1 f64 HYDRO-02 storage port.',
+  const { layout, type, byteLength, byteOffset, memory = state.host.memory } = port.region;
+  if (
+    port.field !== soil.field.name ||
+    layout !== LAYOUT ||
+    type !== 'f64' ||
+    byteLength !== nx * nz * F64 ||
+    !Number.isSafeInteger(byteOffset) ||
+    byteOffset < 0 ||
+    byteOffset % F64 !== 0 ||
+    byteOffset + byteLength > memory.buffer.byteLength
+  )
+    throw growthError(
+      'Match the plant soil grid and publish an aligned layout-1 f64 HYDRO-02 bank in its owning memory.',
     );
   if (!soil.cellSize && (port.cell[0] !== receiver[0] || port.cell[2] !== receiver[2]))
-    throw new MargoError('state', 'Set the world cell size when the soil and plant roots are in different cells.');
+    throw growthError('Set the world cell size when the soil and plant roots are in different cells.');
   const offsetX = (receiver[0] - port.cell[0]) * (soil.cellSize ?? 0);
   const offsetZ = (receiver[2] - port.cell[2]) * (soil.cellSize ?? 0);
-  const sampled = words(state, region);
-  const history = words(state, state.soil);
+  if (!Number.isFinite(offsetX) || !Number.isFinite(offsetZ))
+    throw growthError(
+      'The soil offset exceeds the numeric range. Bring the plants and root-zone grid into nearby cells.',
+    );
+  const sampled = new Float64Array(memory.buffer, byteOffset, byteLength / F64);
   const low = soil.wilting!;
   const extent = soil.full - low;
   for (let i = 0; i < state.plants.length; i++) {
     const at = row(i);
-    const x = Math.floor((nodes[at + X]! + offsetX - soil.origin[0]) / soil.size[0]); // float division: soil column
-    const z = Math.floor((nodes[at + Z]! + offsetZ - soil.origin[1]) / soil.size[1]); // float division: soil row
+    const dx = nodes[at + X]! + offsetX - soil.origin[0];
+    const dz = nodes[at + Z]! + offsetZ - soil.origin[1];
+    if (!Number.isFinite(dx) || !Number.isFinite(dz))
+      throw growthError('A root-to-soil offset overflows. Move the root-zone grid closer to the planting.');
+    const x = Math.floor(dx / soil.size[0]); // float division: soil column
+    const z = Math.floor(dz / soil.size[1]); // float division: soil row
     const value = x < 0 || x >= nx || z < 0 || z >= nz ? undefined : sampled[z * nx + x];
-    if (value !== undefined && !Number.isFinite(value))
-      throw new MargoError('state', 'Provide finite soil water depths at all plant roots.');
+    if (value !== undefined && (!Number.isFinite(value) || value < 0))
+      throw growthError('Provide finite nonnegative soil water depths at all plant roots.');
     const supply = value === undefined ? state.fallback : Math.max(0, Math.min(1, (value - low) / extent)); // float division: water response
     history[i] = history[i]! + supply;
   }
@@ -434,13 +441,13 @@ function newInternode(
   const heading = hypot(...growthDirection) > 0 ? direction(growthDirection) : defaultDirection;
   const end = shift(start, heading, Math.min(length, species.internodeLength));
   if (!end.every(Number.isFinite) || end.every((value, index) => value === start[index]))
-    throw new MargoError('state', 'Use a closer origin cell so its shoots remain representable.');
+    throw growthError('Use a closer origin cell so its shoots remain representable.');
   if (crossesSolid(state, start, end)) return id;
   const at = row(id);
   if (at + STRIDE > nodes.length)
-    throw new MargoError(
+    throw growthError(
+      'Plant growth exceeded its derived carbon budget. Check the growth species parameters.',
       'failed',
-      'Plant growth exceeded its derived carbon budget; check the growth species parameters.',
     );
   nodes.set(
     [
@@ -460,12 +467,11 @@ function newInternode(
   return id + 1;
 }
 
-function develop(state: State, nodes: Float64Array, season: number): void {
+function develop(state: State, nodes: Float64Array, water: Float64Array, season: number): void {
   const count = nodes[0]!;
   const seedCount = state.plants.length;
   const shadow = castShadows(state, nodes, count);
   const work = words(state, state.resources);
-  const water = words(state, state.soil);
   work.fill(0, 0, count * WORK);
   for (let id = count - 1; id >= 0; id--) {
     const at = row(id);
@@ -501,7 +507,8 @@ function develop(state: State, nodes: Float64Array, season: number): void {
     const denominator = a + b;
     if (!(denominator > 0)) continue;
     // The normalized main and lateral shares sum to the available parent budget.
-    const apical = Math.min(vigor, (vigor * a) / denominator); // float division: normalized apical share
+    const product = vigor * a;
+    const apical = Math.min(vigor, Number.isFinite(product) ? product / denominator : vigor * (a / denominator)); // float division: normalized apical share
     const lateral = vigor - apical;
     if (main >= 0) work[main * WORK + VIGOUR] = apical;
     else next = newInternode(state, nodes, next, at, APICAL, apical, season, shadow);
@@ -516,7 +523,10 @@ function develop(state: State, nodes: Float64Array, season: number): void {
     const area = distalArea > 0 ? distalArea : tip * tip;
     nodes[at + RADIUS] = Math.max(nodes[at + RADIUS]!, Math.sqrt(area));
     const parent = nodes[at + PARENT]!;
-    work[parent * WORK + AREA] = work[parent * WORK + AREA]! + area;
+    const accumulated = work[parent * WORK + AREA]! + area;
+    if (!Number.isFinite(accumulated))
+      throw growthError('The combined pipe area overflows. Decrease the tip radius or productive shoot count.');
+    work[parent * WORK + AREA] = accumulated;
   }
   nodes[0] = next;
   water.fill(0);
@@ -528,14 +538,15 @@ export class PlantGrowth implements Solver<PlantGrowthParams> {
   readonly branchesField: FieldDescriptor;
   private readonly soil: GrowthSoil | undefined;
   private state: State | undefined;
+  private disposed = false;
 
   private constructor(
-    private readonly plain: WebAssembly.Module,
-    private readonly shared: WebAssembly.Module | undefined,
-    options: PlantGrowthOptions,
+    private readonly builds: GrowthKernelBuilds,
+    id: string,
+    soil: GrowthSoil | undefined,
   ) {
-    this.id = options.id ?? 'plant-growth';
-    this.soil = options.soil && soilOf(options.soil);
+    this.id = id;
+    this.soil = soil;
     this.branchesField = {
       name: `${this.id}:branches`,
       kind: 'particleSet',
@@ -547,16 +558,23 @@ export class PlantGrowth implements Solver<PlantGrowthParams> {
 
   /** Compiles the optional crown-shadow kernel. Add the resulting solver to a PhysicsWorld. */
   static async load(options: PlantGrowthOptions = {}): Promise<PlantGrowth> {
-    const { signal } = options;
-    const { canShareMemory } = await loadPhysicsWorld();
-    const [plain, shared] = await Promise.all([
-      loadKernel(new URL(/* @vite-ignore */ './growth-kernel.wasm?no-inline', import.meta.url), signal),
-      canShareMemory()
-        ? loadKernel(new URL(/* @vite-ignore */ './growth-kernel-shared.wasm?no-inline', import.meta.url), signal)
-        : undefined,
-    ]);
-    signal?.throwIfAborted();
-    return new PlantGrowth(plain, shared, options);
+    const { id = 'plant-growth', signal, threads = 1 } = options ?? {};
+    if (typeof id !== 'string' || !id.trim() || id !== id.trim())
+      throw growthError('Choose a nonempty plant growth ID without outer whitespace.');
+    const soil = options?.soil && soilOf(options.soil);
+    return new PlantGrowth(await loadGrowthKernel(signal, threads), id, soil);
+  }
+
+  /** Releases optional native helpers after the last use of this solver. */
+  [Symbol.dispose](): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.builds[Symbol.dispose]();
+  }
+
+  /** Crown-shadow work for the last accepted season. */
+  readNativeWork(): GrowthShadowWorkCounts | undefined {
+    return this.requireState().shadows.workCounts();
   }
 
   describe(): SolverDescription {
@@ -566,11 +584,15 @@ export class PlantGrowth implements Solver<PlantGrowthParams> {
   }
 
   init(host: SolverHost, params: PlantGrowthParams): void {
+    if (this.disposed) throw growthError('Load a new PlantGrowth solver after disposal.', 'disposed');
+    if (this.state)
+      throw growthError('PlantGrowth is already attached. Load a fresh solver for the next world.', 'attached');
     if (!params?.voxels || !Array.isArray(params.plants))
-      throw new MargoError('state', 'Provide the growth voxel domain and plant axioms.');
+      throw growthError('Provide the growth voxel domain and plant axioms.');
     const { plants: axioms, voxels } = params;
     integer(axioms.length, 'number of plant axioms');
-    const plants = axioms.map(plantOf);
+    const plants = Array.from(axioms, plantOf);
+    if (voxels.dimensions?.length !== 3) throw growthError('Choose three positive voxel dimensions.');
     const dimensions: GrowthVoxels['dimensions'] = [
       integer(voxels.dimensions[0], 'voxel columns'),
       integer(voxels.dimensions[1], 'voxel layers'),
@@ -582,7 +604,7 @@ export class PlantGrowth implements Solver<PlantGrowthParams> {
     for (const axis of [0, 1, 2] as const) {
       const high = origin[axis] + dimensions[axis] * size;
       if (!(high > origin[axis] && Number.isFinite(high)))
-        throw new MargoError('state', 'Choose representable bounds for the growth domain in the current origin cell.');
+        throw growthError('Choose representable bounds for the growth domain in the current origin cell.');
     }
     const interval = integer(params.ticksPerSeason ?? 60, 'ticks per season');
     const lastSeason = plants.reduce((max, p) => Math.max(max, p.species.productiveSeasons), 0);
@@ -598,16 +620,13 @@ export class PlantGrowth implements Solver<PlantGrowthParams> {
       }
       return needed + buds + (iterations - season) * lengthBound;
     }, 0);
-    const memoryWords = cells + (HEADER + capacity * STRIDE) * 3 + capacity * WORK + plants.length;
+    const memoryWords = cells + (HEADER + capacity * STRIDE) * 4 + capacity * WORK + 2 * plants.length;
     if (!Number.isSafeInteger(memoryWords) || memoryWords * F64 >= 0x1_0000_0000)
-      throw new MargoError(
-        'state',
-        'Choose a smaller voxel domain or a shorter developmental period so growth fits Wasm memory.',
-      );
+      throw growthError('Choose a smaller voxel domain or a shorter developmental period so growth fits Wasm memory.');
     if (voxels.obstacles && voxels.obstacles.length !== cells)
-      throw new MargoError('state', 'Provide one obstacle occupancy per growth voxel with X fastest.');
+      throw growthError('Provide one obstacle occupancy per growth voxel with X fastest.');
     const occupancy = new Float64Array(cells);
-    const obstacleCells: State['obstacleCells'][number][] = [];
+    const obstacleCells: GrowthShadowSource[] = [];
     let solidCount = 0;
     if (voxels.obstacles) {
       const obstacles = voxels.obstacles;
@@ -622,21 +641,11 @@ export class PlantGrowth implements Solver<PlantGrowthParams> {
             if (amount) obstacleCells.push({ x, y, z, amount });
           }
     }
-    const shared =
-      world().isShared(host.memory) ||
-      Object.prototype.toString.call(host.memory.buffer) === '[object SharedArrayBuffer]';
-    const module = shared ? this.shared : this.plain;
-    if (!module)
-      throw new MargoError('unsupported', 'Shared plant growth Wasm is unavailable; choose plain world memory.');
-    const stack = host.allocate('plant-growth-stack', world().STACK_BYTES + 8, 'u8', LAYOUT);
-    const kernel = new WebAssembly.Instance(module, { env: { memory: host.memory } }).exports as GrowthKernel;
-    if (kernel.__data_end?.value !== 0 || !(kernel.__stack_pointer instanceof WebAssembly.Global))
-      throw new MargoError('failed', 'Invalid plant growth Wasm placement; rebuild its slot-free kernel assets.');
-    kernel.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16; // exact division: stack alignment
+    const depth = Math.min(dimensions[1] - 1, integer(voxels.shadowDepth ?? 4, 'shadow depth', 0));
+    const transmission = finite(voxels.shadowTransmission ?? 0.5, 'shadow transmission', 0, 1);
     const allocate = (name: string, n: number): Region => host.allocate(`plant-growth-${name}`, n * F64, 'f64', LAYOUT);
-    const state: State = {
+    const state: Omit<State, 'shadows'> = {
       host,
-      kernel,
       plants,
       dimensions,
       origin,
@@ -646,13 +655,13 @@ export class PlantGrowth implements Solver<PlantGrowthParams> {
       occupancy,
       obstacleCells,
       solidCount,
-      depth: Math.min(dimensions[1] - 1, integer(voxels.shadowDepth ?? 4, 'shadow depth', 0)),
-      transmission: finite(voxels.shadowTransmission ?? 0.5, 'shadow transmission', 0, 1),
       light: direction(params.lightDirection ?? UP),
       sky: finite(params.skyExposure ?? 1, 'sky exposure', 0, 1),
       fallback: finite(params.fallbackWater ?? 1, 'fallback water', 0, 1),
       nodes: allocate('internodes', HEADER + capacity * STRIDE),
       soil: allocate('soil-history', plants.length),
+      trialNodes: allocate('trial-internodes', HEADER + capacity * STRIDE),
+      trialSoil: allocate('trial-soil-history', plants.length),
       shadow: allocate('shadow-grid', cells),
       resources: allocate('resource-scratch', capacity * WORK),
     };
@@ -663,14 +672,19 @@ export class PlantGrowth implements Solver<PlantGrowthParams> {
       const heading = direction(seed.direction ?? UP);
       const where = indexOf(state, ...voxel(state, point));
       if (where < 0 || occupancy[where] === 1)
-        throw new MargoError(
-          'state',
-          'Choose plant seeds inside the growth grid and outside its solid obstacle voxels.',
-        );
+        throw growthError('Choose plant seeds inside the growth grid and outside its solid obstacle voxels.');
       nodes.set([...point, ...heading, 0, EMPTY, EMPTY, NO_LATERAL, i, 0, 0], row(i));
     }
     nodes[0] = plants.length;
-    this.state = state;
+    const shadows = bindGrowthShadows(
+      host,
+      this.builds,
+      obstacleCells.length + capacity,
+      dimensions,
+      depth,
+      transmission,
+    );
+    this.state = { ...state, shadows };
   }
 
   step(context: StepContext): void {
@@ -678,21 +692,28 @@ export class PlantGrowth implements Solver<PlantGrowthParams> {
     const nodes = words(state, state.nodes);
     if (nodes[1]! >= state.lastSeason) return;
     const port = this.soil && context.inputs.get(this.soil.field.name);
-    if (this.soil && port) sampleWater(state, nodes, this.soil, port, context.cell);
-    else {
-      const water = words(state, state.soil);
-      for (let i = 0; i < water.length; i++) water[i] = water[i]! + state.fallback;
-    }
+    const acceptedWater = words(state, state.soil);
+    const trialWater = words(state, state.trialSoil);
+    trialWater.set(acceptedWater);
+    if (this.soil && port) sampleWater(state, nodes, trialWater, this.soil, port, context.cell);
+    else for (let i = 0; i < trialWater.length; i++) trialWater[i] = trialWater[i]! + state.fallback;
     if (umod(context.tick + 1, state.interval) === 0) {
-      develop(state, nodes, nodes[1]! + 1);
-      nodes[1] = nodes[1]! + 1;
+      const trial = words(state, state.trialNodes);
+      trial.set(nodes.subarray(0, row(nodes[0]!)));
+      const season = nodes[1]! + 1;
+      develop(state, trial, trialWater, season);
+      trial[1] = season;
+      nodes.set(trial.subarray(0, row(trial[0]!)));
+      state.shadows.accept();
     }
+    acceptedWater.set(trialWater);
   }
 
   importPorts(_tick: number): void {}
 
   exportPorts(tick: number): readonly Port[] {
-    return [{ field: this.branchesField.name, region: this.requireState().nodes, tick, cell: ORIGIN }];
+    const { nodes, host } = this.requireState();
+    return [{ field: this.branchesField.name, region: nodes, tick, cell: host.cell }];
   }
 
   stateRegions(): readonly Region[] {
@@ -757,8 +778,8 @@ export class PlantGrowth implements Solver<PlantGrowthParams> {
   }
 
   private requireState(): State {
-    if (!this.state)
-      throw new MargoError('state', 'Add PlantGrowth to a PhysicsWorld before calling its state methods.');
+    if (this.disposed) throw growthError('Load a new PlantGrowth solver after disposal.', 'disposed');
+    if (!this.state) throw growthError('Add PlantGrowth to a PhysicsWorld before calling its state methods.');
     return this.state;
   }
 }

@@ -18,6 +18,19 @@ export interface GrowthInternode {
     readonly radius: number;
 }
 
+export interface GrowthShadowWorkCounts extends GrowthShadowWorkerWork {
+    readonly threads: number;
+    readonly sources: number;
+    readonly workers: readonly GrowthShadowWorkerWork[];
+}
+
+export interface GrowthShadowWorkerWork {
+    readonly sources: number;
+    readonly rows: number;
+    readonly additions: number;
+    readonly pairedAdditions: number;
+}
+
 export interface GrowthSoil {
     readonly field: FieldDescriptor;
     readonly origin: readonly [x: number, z: number];
@@ -69,6 +82,8 @@ export class PlantGrowth implements Solver<PlantGrowthParams> {
     readonly branchesField: FieldDescriptor;
     private constructor();
     static load(options?: PlantGrowthOptions): Promise<PlantGrowth>;
+    [Symbol.dispose](): void;
+    readNativeWork(): GrowthShadowWorkCounts | undefined;
     describe(): SolverDescription;
     init(host: SolverHost, params: PlantGrowthParams): void;
     step(context: StepContext): void;
@@ -84,6 +99,7 @@ export class PlantGrowth implements Solver<PlantGrowthParams> {
 export interface PlantGrowthOptions {
     readonly id?: string;
     readonly soil?: GrowthSoil;
+    readonly threads?: 1 | 2 | 4;
     readonly signal?: AbortSignal;
 }
 

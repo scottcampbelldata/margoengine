@@ -5474,3 +5474,12 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
   for the fixed-camera contact scene on both renderers.
 - Run `node packages/physics/scripts/sound04-modes-measured.mjs` to compare production PCM
   frequency readout with the independent plate measurements and rounding sensitivity.
+
+### BIO-02 developmental growth, shadow workers and red maple limits
+
+- Build Biomes with `npm run build -w @margoengine/biomes` and run
+  `node --test packages/biomes/tests/coupling/growth.test.js packages/biomes/tests/coupling/growth-workers.test.js`.
+- Run `npm run test:gpu:growth-workers -w @margoengine/biomes` for native helper coverage and
+  `npm run test:gpu:growth-film -w @margoengine/biomes` for the paired planting on both renderers.
+- Run `node packages/biomes/scripts/bio02-growth-measured.mjs` for the field means and light, voxel
+  and water-response sensitivity.

@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'plant-growth',
+    title: '@margoengine/biomes/growth crown, soil and branch fields',
+    kind: 'family',
+    messages: [],
+    cause: 'A root-zone port, local dimension, developmental setting or shadow trial lies outside its usable range.',
+    fix: 'Use finite local SI dimensions and species parameters. Publish aligned root-zone storage in its owning memory and set the origin cell size for distant inputs. Use shared world memory for multiple native participants.',
+  },
+  {
     id: 'modal-sound',
     title: '@margoengine/physics/modal-sound contact tracks and PCM blocks',
     kind: 'family',

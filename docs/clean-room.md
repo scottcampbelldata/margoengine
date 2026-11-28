@@ -20775,3 +20775,22 @@ The technical striker fixture uses the first elastic free–free Euler–Bernoul
 its displayed bar geometry. The nodal locations illustrate the shape of this mode. Damping and PCM gain are
 authored. [F. A. Khasawneh and D. Segalman, *Exact and numerically stable expressions for Euler-Bernoulli
 and Timoshenko beam modes* (2019)](https://arxiv.org/abs/1811.03222).
+
+### BIO-02 staged developmental seasons and parallel light rows
+
+Pałubicki et al., [*Self-organizing tree models for image synthesis* (2009), §4.1](https://algorithmicbotany.org/papers/selforg.sig2009.small.pdf)
+describe a voxel penumbra whose contribution weakens with depth below the shade source.
+The original integer-layer deposit is retained. Each native participant owns distinct output
+rows, visits the same canonically ordered sources and accumulates adjacent x cells with SIMD.
+The trial graph and root history update accepted banks together, with the same signed-cell transform.
+Prusinkiewicz and Lindenmayer's [*The Algorithmic Beauty of Plants* (1990), chapter 2](https://algorithmicbotany.org/papers/#abop)
+provides the concurrent axiom and bud production model. Pirk et al., [*Plastic Trees* (2012)](https://doi.org/10.1145/2185520.2185546)
+motivates local obstacles and light avoidance. Re-bending existing wood and shedding remain outside this method.
+
+K. W. Gottschalk, [*Effects of shading on growth and development of northern red oak, black oak,
+black cherry, and red maple seedlings. I. Height, diameter, and root/shoot ratio* (1985)](https://research.fs.usda.gov/treesearch/47682),
+Tables 2 and 4, supplies the red maple shade-tent observations. The production diagnostic maps
+the measured fraction of full light to the solver's sky exposure, uses the generic settings published
+before the claim and compares retained height as a separate output. It repeats at a second voxel
+size and a prescribed lower water supply. Seasonal species-specific photosynthesis and realized root
+water remain outside the diagnostic's input data.

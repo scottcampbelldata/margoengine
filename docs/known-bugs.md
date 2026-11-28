@@ -24866,3 +24866,11 @@ excitation and pressure radiation remain open, as do the solid fracture, ice, fl
 thunder sources in the coupling map. The simply supported plate comparison reproduces supplied
 frequencies in PCM and records discrepancies against independent measurements.
 [SOUND-04 measured limits](limits.md#sound-04-simply-supported-aluminum-plates).
+
+### Open: BIO-02 species-specific shade response
+
+The generic defaults overpredict all 16 measured red maple heights in the independent shade-tent
+comparison. Above 20% full light the two-year axial extension is identical across treatments once an
+internode reaches its configured maximum. Sustained multi-internode production, branch shedding, plastic
+deformation of existing wood and explicit root and leaf physiology remain open.
+[Shade comparison and sensitivity](limits.md#bio-02-red-maple-growth-under-field-shade).

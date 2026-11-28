@@ -225,6 +225,7 @@
     "prepack": "npm run build",
     "test:gpu": "cd ../.. && node packages/biomes/tests/browser-check.mjs && node packages/biomes/tests/water-check.mjs",
     "test:gpu:ground": "cd ../.. && node packages/biomes/tests/ground-check.mjs && node packages/biomes/tests/ground-check.mjs --compat",
+    "test:gpu:growth-film": "cd ../.. && node packages/biomes/tests/growth-film.browser.mjs && node packages/biomes/tests/growth-film.browser.mjs --compat",
     "test:gpu:objects": "cd ../.. && node packages/biomes/tests/objects-check.mjs",
     "test:gpu:conifers": "cd ../.. && node packages/biomes/tests/conifers-check.mjs",
     "test:gpu:disturbance": "cd ../.. && node packages/biomes/tests/disturbance-check.mjs",
@@ -241,6 +242,7 @@
     "build:forest": "node scripts/build-forest.mjs",
     "build:growth": "node scripts/build-growth.mjs",
     "build:erosion": "node scripts/build-erosion.mjs",
+    "test:gpu:growth-workers": "cd ../.. && node packages/biomes/tests/growth-workers.browser.mjs",
     "test:browser:growth": "cd ../.. && node packages/biomes/tests/growth-browser.mjs",
     "test:browser:erosion": "cd ../.. && node packages/biomes/tests/erosion-browser.mjs"
   }

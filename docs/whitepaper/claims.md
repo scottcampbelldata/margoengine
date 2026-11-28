@@ -7204,3 +7204,11 @@ block. A separate fixed-camera technical scene drives its struck bar and PCM sco
 contact and checks exact PCM, simulation state and pixels within each renderer. Measured plate observations
 bound the independent thin-plate model used to supply diagnostic frequencies.
 [SOUND-04 measured limits](../limits.md#sound-04-simply-supported-aluminum-plates).
+
+### BIO-02 accepted woody growth replay
+
+The growth solver stages each season's branch graph and soil history and publishes accepted local
+coordinates in its signed cell. Crown shadows sum in the same source order with one, two or four native
+participants. A fixed-camera planting witness tests live HYDRO-02 and Procedural branch geometry together.
+The shade-tent field observations quantify the limits of the generic growth parameters.
+[Measured limits](../limits.md#bio-02-red-maple-growth-under-field-shade).

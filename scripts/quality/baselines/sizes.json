@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22141273,
+  "total": 22145331,
   "history": [
     {
       "date": "2026-10-24",
@@ -16037,6 +16037,13 @@
       "commit": "sound-04-native-modal-batches",
       "reason": "SOUND-04 @margoengine/physics/modal-sound 9212 to 11973 B gzip, ceiling 9489 to 12333 B. The modal sound entry stages PCM and routes disjoint track batches through optional SIMD helpers. Splitting would duplicate the audio clock and accepted track state. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "bio-02-accepted-crown-growth",
+      "reason": "BIO-02 @margoengine/biomes/growth 5728 to 8686 B gzip, ceiling 5730 to 8947 B. The growth entry stages signed developmental state and native SIMD shadow rows. A standalone worker keeps the helper out of the root entry, while splitting growth would duplicate the branch and root-zone contract. The lazy worker measures 585 B gzip, with a 841 B ceiling. Core and stage receive zero bytes.",
+      "grew": 1,
+      "added": 1
     }
   ],
   "items": {
@@ -16119,6 +16126,7 @@
     "@margoengine/biomes dist/workers/biomes-valley.js": 4192,
     "@margoengine/biomes dist/workers/biomes-zones.js": 2056,
     "@margoengine/biomes dist/workers/biomes.js": 41860,
+    "@margoengine/biomes dist/workers/growth-shadow.js": 841,
     "@margoengine/biomes/cover": 3795,
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/disturbance": 6548,
@@ -16132,7 +16140,7 @@
     "@margoengine/biomes/fuel": 3860,
     "@margoengine/biomes/gpu": 21566,
     "@margoengine/biomes/graph": 4246,
-    "@margoengine/biomes/growth": 5730,
+    "@margoengine/biomes/growth": 8947,
     "@margoengine/biomes/hydrology": 5748,
     "@margoengine/biomes/io": 4543,
     "@margoengine/biomes/koppen": 1231,

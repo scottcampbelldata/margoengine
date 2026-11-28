@@ -754,3 +754,11 @@ Patrick Dumond, Dominic Monette, Fadi Alladkani, James Akl and Inès Chikhaoui (
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The diagnostic transcribes only the
 dimensions and mode readings for plates 1 and 4 and nominal material inputs from Tables 3–5,
 converting quantities to SI.
+
+### BIO-02 red maple shade-tent observations
+
+Kurt W. Gottschalk (1985), [*Effects of shading on growth and development of northern red oak, black oak,
+black cherry, and red maple seedlings. I. Height, diameter, and root/shoot ratio*](https://research.fs.usda.gov/treesearch/47682),
+USDA Forest Service research presented at the Fifth Central Hardwood Forest Conference.
+The diagnostic includes only the reported treatment light fractions and sparse red maple height means from
+Tables 2 and 4.
