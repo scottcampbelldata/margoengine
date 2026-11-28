@@ -16343,7 +16343,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   WebGPU and the WebGL2 layer) and `packages/shader/test/deform-check.mjs` (`resized`, also with `MARGO_COMPAT=1`);
   both raise the destroyed-texture error without the fix.
 
-### Open 2026-11-27: the shot's look masks are drawn with TAA's jitter, a fifth of a pixel off the resolved frame (KB-POST-MRTJITTER1, post SceneTargets, terrain and scatter captures, taa)
+### Fixed 2026-11-27: the shot's look masks were drawn with TAA's jitter, a fifth of a pixel off the resolved frame (KB-POST-MRTJITTER1, post SceneTargets, gltf, terrain and scatter captures)
 
 - **Repro:** the timber-valley blowup shot rendered with TAA (35cc7b3429) and without it (1604e1a464), then
   `.lane/sky/tint.mjs` and `.lane/sky/maskshift.mjs` in lane B's worktree on the early probe: shadowTint 0.188 b* without
@@ -16359,11 +16359,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   jittered matrix into their own frame uniforms), and `SceneTargets` (order -4.5) draws its outputs with those same
   shaders and uniforms. The resolved frame, averaged over all 8 phases, is centred on the unjittered camera, so the masks
   sit off it by most of one phase's offset.
-- **Next (needs a decision on the default):** SceneTargets outputs that in-frame effects read with the jittered colour
-  want the jitter; masks and AOVs compared with or composited over the resolved frame do not. A fix draws SceneTargets
-  (an option, or always for the shot page's masks) with `unjitteredCamera` (`packages/shared/temporal-camera.js`): core's
-  shader without the `taaCamera` swap, and terrain and scatter captures with an unjittered frame uniform of their own.
-  With registered masks the TAA frame reads 0.198 b* and passes. The bar stays.
+  The gltf/pbr view block had the same fault: one block per view and frame, so the main pass's jittered write
+  replaced the values the earlier capture had bound (every write is seen by the whole submit).
+- **Fix (always on, no option; the manager's ruling):** SceneTargets draws with `unjitteredCamera` (`c.camera` for every
+  added model's capture) and core's shader with its clip patch undone (`unjitteredClip`,
+  `packages/shared/temporal-camera.js`); a terrain capture from a camera other than the one its rings were prepared
+  with writes uniforms of its own per view (`packages/terrain/src/index.ts`); Scatter's and ScatterInstances' capture
+  stages keep their own frame's camera instead of TAA's `taaCamera`; gltf/pbr capture draws keep a view block of their
+  own per view, apart from the main pass's (`packages/gltf/src/model.ts`). The bars are unchanged. Passes
+  that read the targets (outline, pixelate, curvature, mesh blend) take only near, far and the projection type from
+  the camera, which jitter does not change; MaterialDecals reconstructs from the frame's own depth with the frame's
+  camera, as before.
+- **Regression:** `packages/post/test/scene-targets-taa-browser.mjs` (WebGPU and `--compat`): core, terrain, Scatter,
+  ScatterInstances and gltf/pbr each alone in the targets, read without TAA and at three jitter phases with it. Without
+  the fix each moves (core 22 to 81 coverage pixels, terrain 96 to 210, Scatter 13 to 47, ScatterInstances 7 to 46,
+  gltf 20 to 65; heights by up to 1.4 m and distances by up to 13 m at those edges); with it every value is 0.
 
 ### Fixed 2026-11-27: SSR drew stair-stepped streaks and smeared stripe copies on a street (KB-POST-SSRSTREET1, post)
 
@@ -17975,7 +17985,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   1965), which sums to 0.525 on a sphere. Regression: `packages/physics/tests/soft-volume.test.js` ("a closed volume
   feels the air on its windward side").
 
-### Open 2026-11-27: on WebKit's Windows build the voxel traversal on the WebGL2 layer now and then loses its device (KB-COMPAT-LOSTWHY1, webgl2-compat)
+### Open (below Margo) 2026-11-27: on WebKit's Windows build the voxel traversal on the WebGL2 layer now and then loses its device (KB-COMPAT-LOSTWHY1, browser; webgl2-compat)
 
 - **Repro:** Playwright WebKit 27.2 on Windows 11, RTX A6000:
   `node scripts/run-with-timeout.mjs -- node packages/webgl2-compat/scripts/browser-matrix.mjs --browser=webkit --cases=voxel-pathtracer`.
@@ -17994,9 +18004,22 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   context loss, not a destroy or a lazy part that failed to load. With page logging on (run 12) WebKit printed
   "WebGL: context lost." 82 s into the page, near the end of a run that takes 80 to 100 s; no `webglcontextlost` event
   reached the device canvas's listener; the layer found it when `isContextLost()` turned true during a framebuffer
-  status check (`makeFramebuffer`). The probe context's own release is the only event seen. Still not found: why
-  WebKit's Windows build loses it. Next: time the traversal's dispatches on that build (the same per-dispatch loop class
-  as KB-SHOT-COMPATLOST1 is a candidate, not shown).
+  status check (`makeFramebuffer`). The probe context's own release is the only event seen.
+- **Cause (2026-11-27, proven):** below Margo. WebKit's Windows build loses a WebGL context when one call that waits on
+  its GPU process waits 15 s: `docs/upstream-reports/KB-COMPAT-LOSTWHY1/sync-timeout.html` reads a long program's
+  `LINK_STATUS`, which returns after 15,000 to 15,001 ms every time (2,500 to 8,000 statements) with the context lost;
+  Edge 158 on the same PC and the same ANGLE Direct3D 11 waits 30,151 ms and keeps it. The traversal reaches that
+  wait because over Direct3D 11 a program with more than one color output (each compute dispatch the layer draws)
+  compiles again at its first draw, even after `KHR_parallel_shader_compile` reported it linked, and that compile
+  runs inside the next waiting call, the layer's framebuffer status check. Timed in the matrix page (WebKit, a quiet
+  machine): the traversal's first render made five such waits of 1.4, 5.6, 4.8, 6.5 and 8.5 s (12.7 s at most with
+  40 busy CPU threads), after one draw each; the second view, same programs, renders in 87 ms. On a loaded machine one
+  passes 15 s. The page waits do not depend on the draw's own work: the second draw of the same program waits 0 ms.
+- **Margo:** not worked around. The layer cannot wait the compile out without blocking: a fence's status query waits
+  on the same GPU process (first poll 1,068 ms), binding the program's framebuffer layout before the link does not
+  stop the draw-time compile, and the page cannot tell WebKit's Windows build from Safari (both report macOS). The lever
+  Margo has is the voxel programs' own Direct3D 11 compile time (`packages/voxel-pathtracer/tests/compat-d3d11-case-seconds.json`).
+  Report draft: `docs/upstream-reports/KB-COMPAT-LOSTWHY1/report.md`.
 
 ### Open (below Margo) 2026-11-27: on WebKit's Windows build the WebGL2 layer copies unpremultiplied ImageBitmaps wrong (KB-WEBKIT-BITMAPALPHA1, browser; webgl2-compat)
 
@@ -30002,6 +30025,17 @@ Release exception: Safari recordCanvas MP4 duration claim.
   about 93 minutes after the start, consistent with a page suspended while the Mac was locked. Not proven: Safari could
   not run on 2026-11-14 (screen locked), and Playwright WebKit cannot hide its page. The Safari run on Scott's list
   decides it.
+- **2026-11-27, the boxes read in Playwright WebKit 27.2 on the Apple M6 (screen locked, so Safari still not run):** the
+  MP4 is fragmented, `mvhd` and `mdhd` state 0, and the length is the sum of the `trun` sample durations (ISO/IEC
+  14496-12). The last sample lasts until `stop()`: frames at 0 and 1.33 s stopped at 3 s are 800 + 1000 units of
+  timescale 600, and with every WebKit process held by SIGSTOP for 15 s mid-recording they are 800 + 9191 (16.65 s, the
+  wall time). A file of 2 frames claiming 5,576.2 s is that shape with `stop()` handled 5,576 s after the start. A 2D
+  and a WebGPU canvas behaved alike, as did a first draw 2 s late and a main thread blocked for 2.5 s (the file was
+  shorter then, 0.5 s). With an audio track the same SIGSTOP left a file of about 1 s for 16 s of wall time.
+- **Guard (2026-11-27):** `packages/video/test/record-check.mjs` sums the MP4's header and fragment durations and fails
+  if they pass the wall time between `recordCanvas` and the finished file by over 0.1 s (Edge: 0 to 16 ms over;
+  Playwright WebKit on the M6: 44 ms over, the AAC priming). A copy of a WebKit file with 5,574.9 s added to its last
+  sample reads 5,577.9 s through the same parser.
 
 ### Fixed 2026-11-14: WebKit headless MP4 drawn contrast-reduced (found by the WebKit run of the headless browser check)
 
