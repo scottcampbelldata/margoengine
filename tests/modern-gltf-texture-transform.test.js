@@ -164,7 +164,19 @@ test('texture transform texCoord overrides the texture-info UV set and validates
   }
   const missing = textureQuad('base', { texCoord: 1 }, { texCoord: 0 });
   delete missing.doc.meshes[0].primitives[0].attributes.TEXCOORD_1;
-  await assert.rejects(() => scene(missing), /UV|TEXCOORD|coordinate/i);
+  // glTF 2.0 5.24 (KB-GLTFA A2): a selected set the primitive lacks loads with the map left out and one coded warning.
+  const lacking = await scene(missing);
+  try {
+    assert.deepEqual(
+      lacking.model.warnings.map(({ code, map, texCoord }) => ({ code, map, texCoord })),
+      [{ code: 'missing-texcoord', map: 'baseColorTexture', texCoord: 1 }],
+    );
+  } finally {
+    lacking.engine.dispose();
+  }
+  // A set past TEXCOORD_3 is still refused.
+  const past = textureQuad('base', { texCoord: 4 }, { texCoord: 0 });
+  await assert.rejects(() => scene(past), /UV|TEXCOORD|coordinate/i);
 });
 
 test('texture transforms compose with caller factors and preserve their uniform indices and ownership', async () => {
@@ -223,7 +235,7 @@ test('malformed texture transforms reject before leaving GPU resources or model 
     { rotation: NaN },
     { rotation: '1' },
     { rotation: null },
-    { texCoord: 2 },
+    { texCoord: 4 },
     { texCoord: -1 },
     { texCoord: null },
   ]) {
