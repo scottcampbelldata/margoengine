@@ -153,6 +153,8 @@
 <tr><th scope="row"><code>accretion-kernel-shared.wasm</code></th><td>Rust SIMD thin disk mass and heating, shared world memory</td><td class="num">1,657</td><td class="num">919</td><td class="num">851</td><td>AccretionDiskSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>wing-lattice-kernel.wasm</code></th><td>Rust SIMD wing lattice influence, circulation and induced velocity</td><td class="num">6,542</td><td class="num">2,860</td><td class="num">2,576</td><td>WingForce.load() from the optional /flight entry</td></tr>
 <tr><th scope="row"><code>wing-lattice-kernel-shared.wasm</code></th><td>Rust SIMD wing lattice with shared native worker scratch</td><td class="num">6,542</td><td class="num">2,860</td><td class="num">2,576</td><td>WingForce.load() with more than one participant</td></tr>
+<tr><th scope="row"><code>outdoor-sound-kernel.wasm</code></th><td>Rust SIMD octave loss and time-of-flight integration</td><td class="num">4,374</td><td class="num">2,078</td><td class="num">1,914</td><td>OutdoorSound.load() from the optional /outdoor-sound entry</td></tr>
+<tr><th scope="row"><code>outdoor-sound-kernel-shared.wasm</code></th><td>Rust SIMD octave paths with private shared worker scratch</td><td class="num">4,374</td><td class="num">2,078</td><td class="num">1,914</td><td>OutdoorSound.load() with more than one participant</td></tr>
 <tr><th scope="row"><code>room-sound-kernel.wasm</code></th><td>Rust SIMD room acoustic pressure waves</td><td class="num">2,717</td><td class="num">1,393</td><td class="num">1,242</td><td>RoomSoundSolver.load() from the optional /room-sound entry</td></tr>
 <tr><th scope="row"><code>room-sound-kernel-shared.wasm</code></th><td>Rust SIMD room acoustic pressure waves, shared world memory</td><td class="num">2,717</td><td class="num">1,393</td><td class="num">1,242</td><td>RoomSoundSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>modal-sound-kernel.wasm</code></th><td>Rust SIMD modal audio synthesis</td><td class="num">1,567</td><td class="num">919</td><td class="num">816</td><td>ModalSoundSolver.load() from the optional /modal-sound entry</td></tr>
@@ -4915,7 +4917,7 @@
 <tr><th scope="rowgroup" rowspan="18"><a href="./catalog/#audio">@margoengine/audio</a></th><td><code>root</code></td><td class="num">26,473</td><td class="num">8,081</td><td rowspan="18"><code>@margoengine/core</code>, <code>@margoengine/bvh</code> (optional), <code>@margoengine/mixer</code> (optional), <code>@margoengine/compute</code> (optional)</td></tr>
 <tr><td><code>./occlusion</code></td><td class="num">3,468</td><td class="num">1,517</td></tr>
 <tr><td><code>./doppler</code></td><td class="num">3,270</td><td class="num">1,323</td></tr>
-<tr><td><code>./outdoor</code></td><td class="num">2,663</td><td class="num">1,191</td></tr>
+<tr><td><code>./outdoor</code></td><td class="num">3,394</td><td class="num">1,389</td></tr>
 <tr><td><code>./events</code></td><td class="num">18,904</td><td class="num">5,627</td></tr>
 <tr><td><code>./music</code></td><td class="num">4,737</td><td class="num">1,901</td></tr>
 <tr><td><code>./zones</code></td><td class="num">2,332</td><td class="num">1,139</td></tr>
@@ -4981,7 +4983,7 @@
 <tr><td><code>./accretion</code></td><td class="num">12,282</td><td class="num">5,110</td></tr>
 <tr><td><code>./room-sound</code></td><td class="num">23,677</td><td class="num">9,137</td></tr>
 <tr><td><code>./modal-sound</code></td><td class="num">23,950</td><td class="num">9,212</td></tr>
-<tr><td><code>./outdoor-sound</code></td><td class="num">8,158</td><td class="num">3,490</td></tr>
+<tr><td><code>./outdoor-sound</code></td><td class="num">22,064</td><td class="num">8,600</td></tr>
 <tr><td><code>./falling</code></td><td class="num">13,550</td><td class="num">5,907</td></tr>
 <tr><td><code>./flight</code></td><td class="num">33,768</td><td class="num">12,799</td></tr>
 <tr><td><code>./waves</code></td><td class="num">17,096</td><td class="num">7,548</td></tr>
