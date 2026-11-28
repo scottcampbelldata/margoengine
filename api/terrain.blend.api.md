@@ -152,6 +152,7 @@ interface TerrainRock {
     readonly relief?: number;
     readonly gullies?: number;
     readonly tone?: number;
+    readonly undulation?: number;
     readonly debris?: number;
 }
 

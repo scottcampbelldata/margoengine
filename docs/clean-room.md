@@ -20581,3 +20581,21 @@ Sources read (papers only, no code):
 Margo's own: `GroundLayer.exposure` reads the existing layer; `GroundLayer.shelter` is derived per cell in integers
 from slope, aspect, exposure and curvature as the mean of three terms each 0.5 on flat open ground (away from the
 sun, lee, hollow), on the tiles and the overview alike (biomes tests/view.test.js).
+
+## Undulation of gentle ground in the terrain's rock structure (2026-11-28, Above the Treeline round 11)
+
+Problem: plateau tops on an 8 m heightmap drew smooth, with the 4 m layer texture foreshortened into horizontal streaks
+at grazing angles; real alpine plateaus carry felsenmeer, turf banks and solifluction lobes of 5 to 50 m.
+
+Sources read (papers and books only, no code):
+- D. M. Mark and P. B. Aronson, "Scale-dependent fractal dimensions of topographic surfaces: an empirical
+  investigation, with applications in geomorphology and computer mapping", Mathematical Geology 16(7), 1984,
+  https://doi.org/10.1007/BF01033030 (relief amplitude growing about with wavelength over these scales).
+- C. K. Ballantyne, "Periglacial Geomorphology", Wiley, 2018 (sizes of block fields, sorted stripes, solifluction lobes
+  and turf-banked terraces).
+- A. Norton, A. P. Rockwood and P. T. Skolmoski, "Clamping: a method of antialiasing textured surfaces by bandwidth
+  limiting in object space", SIGGRAPH 1982, https://doi.org/10.1145/965145.801274 (fade each octave by footprint).
+
+Margo's own: three value-noise octaves (48, 20, 8 m; heights 1, 0.45, 0.2 of `undulation`) with their analytic
+gradient tilting the shading normal on ground below the rock slope range, crests lighter and hollows darker by up to
+12 percent (terrain test/rock-structure.browser.mjs).

@@ -11,6 +11,9 @@
 //    edge, full relief and dark joints while a block still spans only 10 to 60 pixels). Seen with blocks a few dozen
 //    pixels across, neighbouring pixels rarely jump in tone (edges blend across the cell boundary, relief and joint
 //    contrast fade with the pixel footprint), while a close view keeps its spread of tones.
+// 6. look round 11: gentle plateau tops drew smooth and streaky at low angles (an 8 m heightmap has no 5 to 50 m
+//    forms). With `undulation` a 10 degree slope seen from 160 m spreads its tones where without it the ground is one
+//    even tone, and from 2,500 m it is even again and keeps its mean; `undulation` 0 draws what it drew.
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -150,6 +153,10 @@ await runSuite(
         await picture({ degrees: 10, rock: { ...rock, slope: [20, 40], debris: 1 }, structure: map(255) }),
       ).green;
       out.noDebris = stats(await picture({ degrees: 10, rock: { ...rock, slope: [20, 40] }, structure: map(255) })).green;
+      out.undulating = stats(await picture({ degrees: 10, rock: { ...rock, undulation: 5 } }));
+      out.gentlePlain = stats(await picture({ degrees: 10 }));
+      out.farUndulating = stats(await picture({ degrees: 10, rock: { ...rock, undulation: 5 }, distance: 2500 }));
+      out.farGentle = stats(await picture({ degrees: 10, distance: 2500 }));
       out.errors = errors;
       return out;
     });
@@ -169,6 +176,18 @@ await runSuite(
     assert.ok(result.closeRock.sd > 3 * Math.max(result.plain.sd, 2), `a close view keeps its facets (sd ${result.closeRock.sd})`);
     assert.ok(result.gully > 0.5, `a drainage line carves a gully (mean difference ${result.gully})`);
     assert.ok(result.debris > 0.9 && result.noDebris < 0.01, 'debris gives its weight to the debris layer');
+    assert.ok(
+      result.undulating.sd > 3 * Math.max(result.gentlePlain.sd, 1),
+      `undulation spreads the tones of gentle ground (sd ${result.undulating.sd} against ${result.gentlePlain.sd})`,
+    );
+    assert.ok(
+      result.farUndulating.sd < result.farGentle.sd + 3,
+      `far undulating ground is even again (sd ${result.farUndulating.sd})`,
+    );
+    assert.ok(
+      Math.abs(result.farUndulating.mean - result.farGentle.mean) < 0.05 * result.farGentle.mean,
+      'far undulating ground keeps its mean',
+    );
   },
   () => context.close(),
 );

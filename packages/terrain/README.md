@@ -383,7 +383,14 @@ not change):
 - gullies, with `TerrainTextures.structure` (one `rgba8unorm` texture over the bounds): its R, drainage 0 to 1, is
   carved `gullies` metres deep (default 6) and darkened as wet, shaded rock, and its G is loose debris such as talus
   fans. `@margoengine/biomes/hydrology` `drainageStructure` makes both from a height grid;
-- `debris`, with `weights`: the layer index that benches, gully floors below the faces and the debris fans take.
+- `debris`, with `weights`: the layer index that benches, gully floors below the faces and the debris fans take;
+- `undulation`, metres (0 to 10, default 0): the 5 to 50 m forms of gentle ground (felsenmeer, turf banks, solifluction
+  lobes) that a heightmap of several metres a texel smooths away, so plateau tops do not read as smooth, streaked
+  ground at low angles. Three octaves of 48, 20 and 8 m tilt the shading and shade crests and hollows on ground below
+  `slope`'s start; a 10 degree slope seen from 160 m goes from a tone spread of 0.3 to 5.9 with `undulation: 5`, and
+  from 2.5 km it draws as without. Sources: Mark and Aronson 1984, "Scale-dependent fractal dimensions of topographic
+  surfaces" (Mathematical Geology 16(7)); Ballantyne 2018, "Periglacial Geomorphology" (Wiley); Norton, Rockwood and
+  Skolmoski 1982, clamping (SIGGRAPH).
 
 All of it fades in between `slope` degrees (default [28, 44]) and fades out where a pixel covers a good share of a
 feature, so far ground keeps its mean. Seen at 50 degrees from 160 m, a plane of one grey layer goes from a tone spread
@@ -403,7 +410,7 @@ const engine = await Engine.create(document.querySelector('canvas')!);
 Terrain.attach(engine, {
   size: [512, 512],
   layers: [0, 1, 2, 3].map(() => ({ height: [-1e6, 1e6], slope: [0, 1], scale: 0.25 })),
-  rock: { strata: 8, facets: 20, debris: 1 },
+  rock: { strata: 8, facets: 20, debris: 1, undulation: 2 },
   textures(device) {
     const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
     // A 45 degree face rising along z.

@@ -771,6 +771,10 @@ vertex stays on the lattice: the ridge's silhouette rows are 344 to 344 over the
 412 with the spread patched back (`packages/terrain/test/teeth.browser.mjs`, WebGPU and the WebGL2 layer; seams,
 clipmap-anchor, origin, far, edge, displace, holes, query and crest browser checks pass). Still by design: a feature
 narrower than two cells of a coarse ring is undersampled there (that ring's vertices point-sample the heightmap).
+`TerrainRock.undulation` (same round) shades 5 to 50 m forms into gentle ground below the rock slope range (three
+value-noise octaves with their analytic gradient, each faded by footprint): a 10 degree slope from 160 m spreads its
+tone from 0.3 to 5.9 and from 2.5 km draws as without (`packages/terrain/test/rock-structure.browser.mjs`, WebGPU and
+the WebGL2 layer). Off by default; the shader text is unchanged without it.
 
 ### Section 5 evidence: suspended sediment in the flood (water/flood FG-13, 2026-11-24)
 

@@ -67,6 +67,7 @@ function validRock(rock: TerrainRock, layers: number): boolean {
     range(rock.relief, 0, 1) &&
     range(rock.tone, 0, 1) &&
     range(rock.gullies, 0, 100) &&
+    range(rock.undulation, 0, 10) &&
     (rock.debris === undefined || (Number.isInteger(rock.debris) && rock.debris >= 0 && rock.debris < layers))
   );
 }
@@ -287,6 +288,14 @@ export interface TerrainRock {
   /** Tone variation between beds and blocks and in gullies, 0 to 1. Default 0.35. */
   readonly tone?: number;
   /**
+   * Relief in metres of the 5 to 50 m ground forms (felsenmeer, turf banks, solifluction lobes, frost hummocks) shaded
+   * into gentle ground below `slope`'s start, where a heightmap of several metres a texel is smooth and a repeating
+   * layer texture reads as streaks at grazing angles; 0 to 10. Three octaves of 48, 20 and 8 m tilt the shading
+   * normal and shade their crests and hollows, each fading out as the pixel's footprint nears its wavelength. Default 0
+   * (none).
+   */
+  readonly undulation?: number;
+  /**
    * The layer (index) that benches, gully floors below the faces and `structure` debris fans take, with
    * `TerrainTextures.weights`. Default: none.
    */
@@ -459,7 +468,7 @@ export class Terrain implements EnginePlugin {
       o.layers.length > 16
     )
       throw new RangeError(
-        'Invalid terrain options; check textures, resolution (multiple of 4, 8..256), levels (1..12), roughness (0..1), patches (size 0.5..10000 m, contrast above 0 to 1, warp 0..1, terraces 0 or 0.5..1000 m), rock (slope 0 <= start < full <= 90, strata and facets 0 or 0.5..500 m, ledges, relief and tone 0..1, dip -4..4, gullies 0..100 m, debris a layer index), cellSize above 0, finite heightScale and heightOffset, and 4 to 16 layers.',
+        'Invalid terrain options; check textures, resolution (multiple of 4, 8..256), levels (1..12), roughness (0..1), patches (size 0.5..10000 m, contrast above 0 to 1, warp 0..1, terraces 0 or 0.5..1000 m), rock (slope 0 <= start < full <= 90, strata and facets 0 or 0.5..500 m, ledges, relief and tone 0..1, dip -4..4, gullies 0..100 m, undulation 0..10 m, debris a layer index), cellSize above 0, finite heightScale and heightOffset, and 4 to 16 layers.',
       );
     finiteVector(o.origin ?? [0, 0], 2, 'Terrain origin');
     if (o.clipmapAnchor !== undefined && o.clipmapAnchor !== 'camera')
@@ -950,6 +959,7 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
       facets: r.facets ?? 18,
       relief: r.relief ?? 0.45,
       gullies: r.gullies ?? 6,
+      undulation: r.undulation ?? 0,
       tone: r.tone ?? 0.35,
       debris: this.textures?.weights && r.debris !== undefined ? r.debris : -1,
       map: this.textures?.structure ? this.sourceBinding() - 1 : -1,

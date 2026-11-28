@@ -254,6 +254,7 @@ export interface RockShaderOptions {
   readonly relief: number;
   readonly gullies: number;
   readonly tone: number;
+  readonly undulation: number;
   readonly debris: number;
   readonly map: number;
 }
@@ -287,6 +288,13 @@ const f32 = (v: number): string => {
  *   shading normal by its central differences, darkened as wet, shaded rock, and on gentler ground below the faces its
  *   floors and its G (debris fans) carry `debris`. `@margoengine/biomes/hydrology` `drainageStructure` makes one from
  *   multiple-flow routing (Freeman 1991) and rockfall travel (Statham 1976).
+ * - Undulation: on gentle ground (1 - the slope fade) three octaves of value noise, 48, 20 and 8 m, with heights
+ *   `undulation` times 1, 0.45 and 0.2 (a fractal relief, amplitude about proportional to wavelength, as measured
+ *   for natural terrain: Mark and Aronson 1984, "Scale-dependent fractal dimensions of topographic surfaces",
+ *   Mathematical Geology 16(7); periglacial forms of 5 to 50 m: Ballantyne 2018, "Periglacial Geomorphology", Wiley),
+ *   tilt the shading normal by their analytic gradient and shade hollows darker and crests lighter (up to 12 percent
+ *   for the largest), each faded out between footprints of 0.05 and 0.25 of its wavelength (Norton, Rockwood and
+ *   Skolmoski 1982, clamping), so far ground keeps its mean.
  * The pcg3d hash is Jarzynski and Olano 2020, "Hash Functions for GPU Rendering", JCGT 9(3). With `floatingOrigin`
  * every feature reads terrain-relative positions. Without the option the shader is unchanged.
  */
@@ -350,6 +358,22 @@ ${
   m.x*=factor;m.z*=factor;
   terrainRockLoose=max(terrainRockLoose,bench*k*0.7);
   terrainRockShade*=1.0+${f32(o.tone)}*0.6*(terrainRockHash(vec3i(i32(bed),3,5)).x-0.5)*steep*(1.0-smoothstep(0.3,1.0,ws));
+`
+    : ''
+}${
+  o.undulation > 0
+    ? `  let flat=1.0-steep;var lift=0.0;
+  for(var oc=0;oc<3;oc++){
+    let l=select(select(8.0,20.0,oc==1),48.0,oc==0);let a=${f32(o.undulation)}*select(select(0.2,0.45,oc==1),1.0,oc==0);
+    let k=flat*(1.0-smoothstep(0.05,0.25,fp/l));let q=p.xz/l;let i=floor(q);let f=q-i;let c=vec2i(i);
+    let u=f*f*f*(f*(f*6.0-15.0)+10.0);let du=30.0*f*f*(f*(f-2.0)+1.0);
+    let h00=terrainRockHash(vec3i(c,61+oc)).x;let h10=terrainRockHash(vec3i(c+vec2i(1,0),61+oc)).x;
+    let h01=terrainRockHash(vec3i(c+vec2i(0,1),61+oc)).x;let h11=terrainRockHash(vec3i(c+vec2i(1,1),61+oc)).x;
+    let h=mix(mix(h00,h10,u.x),mix(h01,h11,u.x),u.y);
+    let g=vec2f(du.x*mix(h10-h00,h11-h01,u.y),du.y*mix(h01-h00,h11-h10,u.x))*a/l;
+    m.x-=k*g.x;m.z-=k*g.y;lift+=k*(h-0.5)*a/${f32(o.undulation)};
+  }
+  terrainRockShade*=1.0+0.12*lift;
 `
     : ''
 }  var n=normalize(m);
