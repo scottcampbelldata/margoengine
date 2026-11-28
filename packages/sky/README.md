@@ -818,6 +818,37 @@ so the copy is the same cloud) and needs nothing from the clouds' GPU objects; i
 bindings. The light is the shadows' sun (`engine.lighting.direction`), so drive it from the sky (`lighting`) to keep the
 two together.
 
+### Clouds and weather without WebGPU (`margoengine/sky/compat-clouds`)
+
+`margoengine/sky/compat-clouds` exports `VolumetricClouds`, `Weather` and `WeatherFX` (with `lightningFlash`,
+`thunderDelay`, `speedOfSound` and their types) for browsers that run the engine on the full WebGL2 compatibility
+layer. They are the same classes as `margoengine/sky/volumetric-clouds`, `/weather` and `/weather-fx`, with the same options, defaults,
+depth handling and resource lifetime, so a scene written for WebGPU runs unchanged; only the import differs. Install
+the layer before `Engine.create`; importing this entry installs nothing and changes no browser globals.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { Sky } from 'margoengine/sky';
+import { VolumetricClouds, Weather } from 'margoengine/sky/compat-clouds';
+
+const canvas = document.createElement('canvas');
+const webgpu = 'gpu' in navigator && (await navigator.gpu.requestAdapter()) !== null;
+if (!webgpu) await (await import('margoengine/webgl2-compat')).install(); // the whole layer, only where needed
+const engine = await Engine.create(canvas);
+const sky = Sky.attach(engine);
+const clouds = VolumetricClouds.attach(engine, { sky, coverage: 0.6 });
+Weather.attach(engine);
+engine.render();
+console.log(engine.gpu !== null); // true: native WebGPU or the layer's device
+engine.dispose();
+```
+
+- On the small WebGL2 preview backend (`backend: 'webgl2'` without the layer) these plugins refuse to attach with a
+  `MargoError` code `'unsupported'`, as they do from their own entries: they need a GPU device, which only WebGPU or
+  the layer gives.
+- The layer runs the same shaders through its WGSL front end, so frames match WebGPU within the layer's documented
+  precision (see `@margoengine/webgl2-compat`), at the layer's speed.
+
 ## Aerial perspective
 
 `AerialPerspective` from `@margoengine/sky/aerial` gives scene surfaces the air in front of them: each pixel is
@@ -933,6 +964,75 @@ clear day, 0 to 10) over the gas's scale height, scattering 0.975 of the red lig
 0.90 of the blue (Wolff et al. 2009, the blue Margo's reading of their curve), forward with asymmetry 0.67 (Chen-Chen
 et al. 2019). Any atmosphere may now give `mie` and `mieAbsorption` per channel. On a Radeon 680M, 90 degrees from a
 sun 40 degrees up, the clear Martian sky reads red over blue 1.17 (Earth's reads blue over red 4.7) and a storm 1.82.
+
+### Your own shaders in the planet's air (`margoengine/sky/planet`)
+
+`PlanetAtmosphere` gives your own WGSL the Hillaire transport the sky uses, in a planet frame you choose: light a
+planet seen from orbit, put haze on a globe or terrain tile, or draw the sky into your own pass. It owns the
+transmittance and multiple-scattering tables and one uniform buffer; you bind its `group` at group 2 and call the
+functions in `planetWGSL`.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { PlanetAtmosphere, planetWGSL } from 'margoengine/sky/planet';
+
+const engine = await EngineKernel.create(document.createElement('canvas'));
+const device = engine.gpu!;
+const planet = new PlanetAtmosphere(device);
+
+// World units are kilometres here; the planet frame puts the planet's centre at the origin.
+const worldToPlanet = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 6360, 0, 1]); // column-major: world y 0 is the ground
+const eye = [0, 6360.002, 0]; // the camera in the planet frame, 2 m up
+const sun = [0, 0.3, 1]; // toward the sun, any length
+const encoder = device.createCommandEncoder();
+planet.prepare(encoder, worldToPlanet, eye, sun, { illuminance: 20, exposure: 0 });
+device.queue.submit([encoder.finish()]);
+
+device.pushErrorScope('validation');
+const module = device.createShaderModule({
+  code: `${planetWGSL}
+@vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
+  return vec4f(vec2f(f32(i & 1u), f32(i >> 1u)) * 4.0 - 1.0, 0.0, 1.0);
+}
+@fragment fn fs(@builtin(position) p: vec4f) -> @location(0) vec4f {
+  let up = normalize(vec3f(p.x / 512.0 - 1.0, 1.0 - p.y / 512.0, 1.0));
+  return vec4f(planetSky(up), 1.0); // the sky's radiance along a world direction
+}`,
+});
+const empty = device.createBindGroupLayout({ entries: [] });
+const pipeline = device.createRenderPipeline({
+  layout: device.createPipelineLayout({ bindGroupLayouts: [empty, empty, planet.layout] }),
+  vertex: { module, entryPoint: 'vs' },
+  fragment: { module, entryPoint: 'fs', targets: [{ format: 'rgba16float' }] },
+});
+const error = await device.popErrorScope();
+if (error) throw new Error(error.message); // none: the module and layout fit; bind planet.group at group 2 when drawing
+
+try {
+  planet.prepare(device.createCommandEncoder(), worldToPlanet, [0, 6000, 0], sun);
+} catch (e) {
+  console.log((e as Error).message.split(';')[0]); // 'Planet camera lies below ground'
+}
+planet.dispose(); // frees the tables and uniforms; repeat calls do nothing
+engine.dispose();
+```
+
+| WGSL function | Gives |
+| --- | --- |
+| `planetSky(worldDirection)` | the sky's radiance along a world direction from the eye: air, the sunlit ground where the ray meets it, black space beyond |
+| `planetSurface(world, albedo)` | a ground point's colour as the eye sees it: Lambert sunlight through the air plus multiple-scattered skylight, then the air between; points hidden behind the planet are discarded |
+| `planetAerial(world, light)` | any light leaving a world point, with the air between it and the eye (extinction and in-scattering); hidden points discarded |
+| `planetPoint(world)` | a world point in the planet frame |
+
+- `prepare(encoder, worldToPlanet, eye, sun, options)` takes a 4 x 4 column-major world-to-planet matrix, the eye
+  in the planet frame and a direction toward the sun, all in kilometres, finite in 32-bit floats; the sun must not be
+  zero. Options: `atmosphere` (default Earth, `EARTH_ATMOSPHERE`; any `AtmosphereParameters`, as the presets give),
+  `illuminance` (20, as `HillaireSky`'s `sunIlluminance`, 0 to 1,000,000) and `exposure` (0 stops, -20 to 20). Call it
+  each frame the camera or sun moves; the tables are rebuilt only when `atmosphere` changes.
+- It throws a `RangeError` for an eye below the ground, a planet larger than 100,000 km, air thicker than a vertical
+  scattering depth of 6, or values out of range, and after `dispose()`. The frame is your choice, so nothing ties the
+  planet to the camera's orientation; a world in metres scales its matrix by 0.001.
+- It needs a GPU device: native WebGPU, or the WebGL2 compatibility layer's.
 
 ## Light shafts
 
