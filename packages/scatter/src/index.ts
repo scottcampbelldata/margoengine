@@ -163,6 +163,11 @@ export interface ScatterClearing {
   readonly radius: number;
   /** Width of the thinning ring past `radius`, 0 or more (default 0: a hard edge). */
   readonly falloff?: number;
+  /**
+   * Keep instances inside instead (default false): all of them within `radius`, thinning to none over `falloff`, such
+   * as moss gathered at a boulder's base. Each clearing's chance multiplies, so give a scatter one inside circle.
+   */
+  readonly inside?: boolean;
 }
 export interface ScatterOptions {
   /** Candidate instances on a stratified grid, an integer 1-1,000,000 (GPU memory: three buffers of this many). Default 10,000. */
@@ -215,8 +220,8 @@ export interface ScatterOptions {
    */
   clumps?: ScatterClumps;
   /**
-   * The least reach of an instance from its root per unit scale, in mesh units, for culling and exclusions (default 0:
-   * the meshes' own bounds). Scatters that draw the parts of one plant with one seed (leaves, stem, flowers) take the
+   * The reach of an instance from its root per unit scale, in mesh units, for culling and exclusions (default: from the
+   * meshes' bounding spheres); it must hold the meshes' farthest vertex from the root. Scatters that draw the parts of one plant with one seed (leaves, stem, flowers) take the
    * same reach (and the same `sway.height`) so the same instances survive and bend alike in each.
    */
   reach?: number;
@@ -555,7 +560,7 @@ export function scatterCullShader(o: ScatterOptions): string {
 
 const wgslNumber = (v: number) => (Number.isInteger(v) ? `${v}.0` : `${v}`);
 /**
- * Clearings (plants round 1): one vec4 each (centre x and z, radius, falloff) after the exclusions and the path segments
+ * Clearings (plants round 1): one vec4 each (centre x and z, radius, falloff, negative for an inside circle) after the exclusions and the path segments
  * in the exclusions buffer. The chance of keeping an instance is the product of each clearing's smoothstep of the root's
  * distance past the radius over the falloff, compared with a hash of its own.
  */
@@ -564,7 +569,7 @@ function clearingCode(o: ScatterOptions): string {
   if (!n) return '';
   const start = (o.exclusions?.length ?? 0) + 2 * pathSegments(o.paths ?? []).length,
     key = o.follow ? 'key' : 'i';
-  return ` var clear=1.0;for(var j=0u;j<${n}u;j++){let c=exclusions[${start}u+j];let r=distance(p.xz,c.xy);let e=clamp((r-c.z)/max(c.w,1e-6),0.0,1.0);clear*=select(e*e*(3.0-2.0*e),0.0,r<=c.z);}
+  return ` var clear=1.0;for(var j=0u;j<${n}u;j++){let c=exclusions[${start}u+j];let r=distance(p.xz,c.xy);let e=clamp((r-c.z)/max(abs(c.w),1e-6),0.0,1.0);let s=e*e*(3.0-2.0*e);clear*=select(select(s,0.0,r<=c.z),select(1.0-s,1.0,r<=c.z),c.w<0.0);}
  if(hash((${key}*7u+6u)^0x2d1b6d2bu)>=clear){return;}
 `;
 }
@@ -614,7 +619,8 @@ function clearingRows(o: ScatterOptions): number[][] {
       throw new RangeError(
         'Scatter clearings need { center: [x, z], radius, falloff } with a finite radius and falloff of 0 or more',
       );
-    return [c.center[0], c.center[1], c.radius, falloff];
+    // An inside circle stores its falloff negative (at least -1e-6, so a hard edge still reads as inside).
+    return [c.center[0], c.center[1], c.radius, c.inside ? -Math.max(falloff, 1e-6) : falloff];
   });
 }
 
@@ -903,8 +909,17 @@ export class Scatter implements EnginePlugin {
       sink > 100000
     )
       throw new RangeError('Scatter alignToGround must be 0-1 and sink a distance from 0 to 100000');
-    if (options.reach !== undefined && !(Number.isFinite(options.reach) && options.reach >= 0 && options.reach <= 1e5))
-      throw new RangeError('Scatter reach must be a distance from 0 to 100000 in mesh units');
+    if (options.reach !== undefined) {
+      // The reach replaces the bounding spheres' estimate, so it must hold every vertex: the farthest from the root.
+      let far = 0;
+      for (const g of this.geometries)
+        for (let i = 0; i < g.vertices.length; i += 6)
+          far = Math.max(far, Math.hypot(g.vertices[i], g.vertices[i + 1], g.vertices[i + 2]));
+      if (!(Number.isFinite(options.reach) && options.reach >= Math.fround(far) * (1 - 1e-6) && options.reach <= 1e5))
+        throw new RangeError(
+          `Scatter reach must be a distance up to 100000 that holds every vertex (at least ${far} mesh units here)`,
+        );
+    }
     if (!Number.isFinite(edgeShrink) || edgeShrink < 0 || edgeShrink > 100000)
       throw new RangeError('Scatter edgeShrink must be a distance from 0 to 100000');
     if (!Number.isFinite(inner) || inner < 0 || inner >= lod[2] || !Number.isFinite(innerFade) || innerFade < 0)
@@ -951,10 +966,8 @@ export class Scatter implements EnginePlugin {
         center[1],
         0,
         ...lod,
-        Math.max(
-          options.reach ?? 0,
-          ...this.geometries.map((g) => g.bounds[3] + Math.hypot(g.bounds[0], g.bounds[1], g.bounds[2])),
-        ),
+        options.reach ??
+          Math.max(...this.geometries.map((g) => g.bounds[3] + Math.hypot(g.bounds[0], g.bounds[1], g.bounds[2]))),
       ],
       20,
     );

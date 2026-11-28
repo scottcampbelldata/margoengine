@@ -1,0 +1,36 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Procedural forbs check</title><style>body{margin:0}canvas{display:block;width:640px;height:360px}</style></head><body><canvas width="640" height="360"></canvas>
+<script type="module">
+// Real-GPU proof for @margoengine/procedural/forbs (forbs-browser.mjs drives it): each forb drawn as one Scatter per part
+// (foliage, petals, centres) with one seed, placement, reach and sway height, on a turf-coloured ground, in the sun.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine,Geometry,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {Scatter} from '/packages/scatter/dist/index.js';
+import {forb} from '/packages/procedural/dist/forbs.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{fov:40,position:[0,0.7,1.6],target:[0,0.12,0],near:0.02,far:50}}),device=engine.gpu;
+engine.scene.background='#9fb6cf';
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.createMesh().setGeometry(box(8,0.02,8)).setPosition([0,-0.01,0]).setMaterial(new PbrMaterial({color:[0.09,0.1,0.05],roughness:0.95}));
+let current=[];
+const read=async(buffer)=>{
+ const out=device.createBuffer({size:buffer.size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),e=device.createCommandEncoder();
+ e.copyBufferToBuffer(buffer,0,out,0,buffer.size);device.queue.submit([e.finish()]);await out.mapAsync(GPUMapMode.READ);
+ const data=Array.from(new Uint32Array(out.getMappedRange().slice(0)));out.destroy();return data;
+};
+const geometry=(g)=>new Geometry(g.positions,g.normals,g.indices);
+window.check={
+ // One species as its parts; returns each part's ring instance counts.
+ async make(species,options){
+  for(const s of current)s.dispose();current=[];
+  const plant=forb(species,{seed:3});
+  const shared={count:400,area:[2.4,2.4],seed:17,lod:[1.5,3,8],lodFade:0,scale:[0.8,1.2],reach:plant.reach,sway:{height:plant.top},...(options??{})};
+  for(const part of plant.parts)current.push(Scatter.attach(engine,part.rings.map(geometry),{...shared,material:new PbrMaterial({color:[...part.color],roughness:part.roughness,doubleSided:true})}));
+  device.pushErrorScope('validation');
+  await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+  const e=await device.popErrorScope();if(e)errors.push(e.message);
+  const counts=[];for(const s of current){const c=await read(s.commands);counts.push([c[1],c[6],c[11]]);}
+  return {parts:plant.parts.map(p=>p.name),counts,errors:errors.splice(0)};
+ },
+};
+window.ready=true;
+</script></body></html>

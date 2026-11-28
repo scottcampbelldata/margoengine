@@ -460,8 +460,9 @@ life:
   everything) with a soft rim `edge` wide (default 0.2), and each instance is kept with the chance its place lies in a
   patch, so patches have ragged, thinning edges. The noise follows `seed`.
 - `clearings: [{ center: [x, z], radius, falloff }]` (up to 100,000): no instance roots within `radius`, and over the
-  next `falloff` the chance of keeping one rises smoothly (a smoothstep) to 1.
-- `reach` (mesh units, default the meshes' bounds) is the least cull reach of an instance. Draw a plant of several
+  next `falloff` the chance of keeping one rises smoothly (a smoothstep) to 1; `inside: true` keeps them inside instead,
+  thinning to none over the falloff (moss gathered at a boulder's base).
+- `reach` (mesh units, default the meshes' bounds) is the cull reach of an instance; it must hold the meshes' farthest vertex from the root. Draw a plant of several
   materials (leaves, stem, flowers) as one `Scatter` per part with the same `seed`, placement options, `reach` and
   `sway.height`, and every part keeps the same instances and bends alike.
 

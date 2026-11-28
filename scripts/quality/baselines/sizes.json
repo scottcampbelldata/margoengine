@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22001852,
+  "total": 22005238,
   "history": [
     {
       "date": "2026-10-24",
@@ -15815,6 +15815,12 @@
       "commit": "sea-01-native-wave-transport",
       "reason": "SEA-01 @margoengine/physics/waves 7548 to 12962 B gzip, ceiling 7804 to 13351 B. The existing optional wave solver owns publication, finite checks and transport. A separate solver would duplicate spectrum and boundary state. Native modules and helpers load only when used. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "6c36d467c7",
+      "reason": "procedural/forbs: alpine wildflowers (new entry); scatter: exact reach and inside clearings",
+      "grew": 1
     }
   ],
   "items": {
@@ -16846,6 +16852,7 @@
     "@margoengine/procedural/expression": 4718,
     "@margoengine/procedural/fir-sprays": 1724,
     "@margoengine/procedural/flyer": 5015,
+    "@margoengine/procedural/forbs": 3386,
     "@margoengine/procedural/gears": 2188,
     "@margoengine/procedural/harbour": 8604,
     "@margoengine/procedural/lsystem": 2454,

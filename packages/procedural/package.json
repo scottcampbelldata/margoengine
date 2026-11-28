@@ -130,6 +130,10 @@
       "types": "./dist/coral.d.ts",
       "import": "./dist/coral.js"
     },
+    "./forbs": {
+      "types": "./dist/forbs.d.ts",
+      "import": "./dist/forbs.js"
+    },
     "./conifer-species": {
       "types": "./dist/conifer-species.d.ts",
       "import": "./dist/conifer-species.js"
@@ -167,7 +171,7 @@
     "test": "npm run build && node --test test/*.test.js",
     "build:poisson": "node scripts/build-poisson.mjs",
     "test:poisson-kernel": "node scripts/build-poisson.mjs --test",
-    "test:gpu": "node test/poisson-browser.mjs && node test/textures-browser.mjs && node test/caves-browser.mjs && node test/tree-mesh-browser.mjs && node test/textures-pbr-browser.mjs && node test/buildings-browser.mjs && node test/building-plans-browser.mjs && node test/vehicles-browser.mjs",
+    "test:gpu": "node test/poisson-browser.mjs && node test/textures-browser.mjs && node test/caves-browser.mjs && node test/tree-mesh-browser.mjs && node test/textures-pbr-browser.mjs && node test/buildings-browser.mjs && node test/building-plans-browser.mjs && node test/vehicles-browser.mjs && node test/forbs-browser.mjs",
     "prepack": "npm run build",
     "build:dungeon": "node scripts/build-dungeon.mjs",
     "test:dungeon-kernel": "node scripts/build-dungeon.mjs --test",

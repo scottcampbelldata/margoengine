@@ -1464,6 +1464,48 @@ const block = generateBuilding(buildingOptionsFromSettings({style: 'western-1910
 console.log(block.floors.length); // 2
 ```
 
+## Alpine wildflowers (`@margoengine/procedural/forbs`)
+
+`forb(species, options)` builds one flowering plant of an alpine meadow as separate parts (foliage, petals and, for
+daisies, the disc centres), each in three detail rings for a Scatter's LOD. Species: `arnica` (heartleaf arnica, a
+yellow daisy on a leafy stem), `gentian` (Parry's gentian, blue bells in a cluster), `aster` (alpine aster, violet rays
+around a yellow disc), `bistort` (American bistort, a white spike on a bare stalk) and `campion` (moss campion, a tight
+cushion dotted with pink stars). Part colours are the measured FReD flower and leaf spectra integrated under a
+6504 K black body (`FORB_COLORS`). Draw each part as its own Scatter with the same seed, placement, `reach` and
+`sway.height`, so the parts land on the same instances:
+
+```js
+import { Geometry, PbrMaterial } from '@margoengine/core';
+import { Scatter } from '@margoengine/scatter';
+import { forb } from '@margoengine/procedural/forbs';
+
+export function plantArnica(engine, heightmap) {
+  const plant = forb('arnica', { seed: 3 });
+  return plant.parts.map((part) =>
+    Scatter.attach(engine, part.rings.map((g) => new Geometry(g.positions, g.normals, g.indices)), {
+      area: [40, 40],
+      count: 4000,
+      seed: 12,
+      heightmap,
+      clumps: { size: 4, cover: 0.4 },
+      reach: plant.reach,
+      sway: { height: plant.top },
+      material: new PbrMaterial({ color: [...part.color], roughness: part.roughness, doubleSided: true }),
+    }),
+  );
+}
+```
+
+| Option | Default | Range | Meaning |
+| --- | --- | --- | --- |
+| `seed` | `1` | integer | Decides leaf count, lean, stem curve and head placement. |
+| `scale` | `1` | 0.2 to 5 | Multiplies the flora's flowering height (arnica 0.3 m, gentian 0.18 m, aster 0.15 m, bistort 0.4 m, campion cushion 0.06 m). |
+| `heads` | per species | 0 to 12 (campion 0 to 400) | Flower heads; 0 gives a plant not in flower, foliage only. |
+
+The returned `Forb` holds `species`, `top` (highest point in metres), `reach` (farthest vertex from the root, the
+value Scatter's `reach` needs) and `parts` ({ name, color, roughness, rings }). Each ring is a few hundred triangles
+at most, so a meadow of 200,000 plants stays instanced and cheap.
+
 ## Northern Rockies conifers (`@margoengine/procedural/conifers`)
 
 Western white pine, western larch, western red cedar, Douglas-fir and grand fir, the timber of the 1910 Big Burn country,

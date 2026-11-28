@@ -173,6 +173,7 @@ interface ScatterClearing {
     readonly center: readonly [x: number, z: number];
     readonly radius: number;
     readonly falloff?: number;
+    readonly inside?: boolean;
 }
 
 interface ScatterClumps {

@@ -99,13 +99,16 @@ await runSuite(
         count = async (extra) => rings((await make({}, lit, extra)).commands).reduce((a, b) => a + b),
         cleared = await count({ clearings: [{ center: [0, 0], radius: 2, falloff: 2 }] }),
         bare = await count({ clearings: [{ center: [0, 0], radius: 20 }] }),
+        inside = await count({ clearings: [{ center: [0, 0], radius: 2, falloff: 2, inside: true }] }),
         none = await count({ clumps: { size: 3, cover: 0 } }),
         half = await count({ clumps: { size: 3, cover: 0.5 } }),
         all = await count({ clumps: { size: 3, cover: 1, edge: 0.01 } });
-      results[lit ? 'pbrCounts' : 'counts'] = { total, cleared, bare, none, half, all };
+      results[lit ? 'pbrCounts' : 'counts'] = { total, cleared, inside, bare, none, half, all };
       // A 2 m bare circle and a 2 m ring at half density out of a 14 m square hold about 0.064 + 0.096 of it.
       assert.ok(cleared < total && cleared > 0.7 * total, `clearing thins: ${cleared} of ${total}`);
       assert.equal(bare, 0, 'a clearing over the whole meadow keeps nothing');
+      // Inside, the same circle keeps what the clearing took (the counts are complementary, up to hash ties).
+      assert.ok(Math.abs(inside + cleared - total) <= 0.02 * total, `inside ${inside} + cleared ${cleared} = ${total}`);
       assert.equal(none, 0, 'cover 0 keeps nothing');
       assert.equal(all, total, 'cover 1 keeps everything');
       assert.ok(half > 0.2 * total && half < 0.8 * total, `cover 0.5 keeps ${half} of ${total}`);

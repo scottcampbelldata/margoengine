@@ -20174,3 +20174,28 @@ Dematteis, Grafke, Onorato and Vanden-Eijnden (2019), [Experimental Evidence of 
 The flux and limiter follow B. P. Leonard (1991), [The ULTIMATE conservative difference scheme applied to unsteady one-dimensional advection](https://doi.org/10.1016/0045-7825(91)90232-U), and the [NOAA WAVEWATCH III 5.16 manual](https://polar.ncep.noaa.gov/waves/wavewatch/manual.v5.16.pdf), §3.3.3, equations 3.12–3.23. Native participants evaluate independent spatial lines and leave the original axis, substep, refraction and source order intact. They do not change the physical law or limiter.
 
 The diagnostic uses the Lake George campaign of I. R. Young and L. A. Verhagen (1996), [The growth of fetch limited waves in water of finite depth, Part 1](https://doi.org/10.1016/S0378-3839(96)00006-3), as tabulated by V. S. Gruijthuijsen (1996), [Validation of the wave prediction model SWAN using field data from Lake George, Australia](https://resolver.tudelft.nl/uuid:a8a1face-a0ef-4307-85cf-7931c92bb6eb), §4.3, figure 4.2 and Appendix I. The ST4 source paper cites a separate later campaign at this lake in its discussion of cumulative breaking. The B/C fetch-growth observations in this comparison were not used to fit coefficients. [Method and controls](whitepaper/reproduce.md#sea-01-accepted-wave-transport-and-lake-george)
+
+## Alpine wildflowers: procedural/forbs (2026-11-28)
+
+Plants round 1 for the Above the Treeline film: the meadow had no forbs. Written clean room from these papers and
+floras; no plant generator's code was read.
+
+- Phyllotaxis of the cushion and of the daisy discs: H. Vogel, "A better way to construct the sunflower head",
+  Mathematical Biosciences 44, 1979, https://doi.org/10.1016/0025-5564(79)90080-4.
+- Rosette, stem and inflorescence structure (racemes, spikes, capitula): P. Prusinkiewicz and A. Lindenmayer, The
+  Algorithmic Beauty of Plants, Springer 1990, http://algorithmicbotany.org/papers/#abop.
+- Flower shapes from petal profiles and floral diagrams: T. Ijiri, S. Owada, M. Okabe and T. Igarashi, "Floral
+  diagrams and inflorescences: interactive flower modeling using botanical structural constraints", ACM SIGGRAPH 2005,
+  https://doi.org/10.1145/1073204.1073253.
+- Inflorescence architecture and variation: P. Prusinkiewicz, Y. Erasmus, B. Lane, L. D. Harder and E. Coen,
+  "Evolution and development of inflorescence architectures", Science 316, 2007, https://doi.org/10.1126/science.1140429.
+- Heights, leaf shapes and head counts: Flora of North America (Arnica cordifolia, Gentiana parryi, Erigeron /
+  Oreostemma alpigenum, Bistorta bistortoides, Silene acaulis), http://floranorthamerica.org.
+- Petal and leaf colour: FReD, the Floral Reflectance Database, S. E. J. Arnold, S. Faruq, V. Savolainen, P. W.
+  McOwan and L. Chittka, PLoS ONE 5(12) e14287, 2010, https://doi.org/10.1371/journal.pone.0014287 (data only,
+  credited in THIRD-PARTY-NOTICES.md), integrated with @margoengine/optics/spectrum.
+
+Combined: Vogel's golden-angle spiral places cushion stars and disc florets; leaves and rays are strips bent along a
+profile (ovate, lanceolate, spatulate, strap) as in Ijiri et al.; stems and heads follow the raceme, spike and
+capitulum forms of Prusinkiewicz and Lindenmayer. Each part is its own geometry so the instancer can colour it with its
+measured spectrum. Scatter gained `reach` as an exact override and inside clearings for this (moss skirts at rock bases).

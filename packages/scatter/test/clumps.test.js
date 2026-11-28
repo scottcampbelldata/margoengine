@@ -44,6 +44,9 @@ test('Scatter: clearings fill the exclusions buffer after the paths, and reach w
     clearings: [{ center: [3, 4], radius: 1, falloff: 2 }],
   });
   assert.deepEqual([...s.exclusionValues.subarray(4, 8)], [3, 4, 1, 2]);
+  // An inside circle stores its falloff negative, a hard inside edge as -1e-6.
+  const inside = new Scatter(mesh, { clearings: [{ center: [1, 2], radius: 3, falloff: 4, inside: true }, { center: [0, 0], radius: 1, inside: true }] });
+  assert.deepEqual([...inside.exclusionValues.subarray(0, 8)], [1, 2, 3, -4, 0, 0, 1, Math.fround(-1e-6)]);
 });
 
 test('Scatter: clumps, clearings and reach are checked with messages that say how to fix them', () => {
@@ -57,4 +60,7 @@ test('Scatter: clumps, clearings and reach are checked with messages that say ho
   ])
     assert.throws(() => new Scatter(mesh, { clearings }), /Scatter clearings need/, JSON.stringify(clearings));
   assert.throws(() => new Scatter(mesh, { reach: -1 }), /Scatter reach must be/);
+  // The reach replaces the bounding spheres' estimate, so it must still hold every vertex (a box corner here).
+  assert.throws(() => new Scatter(mesh, { reach: 0.2 }), /holds every vertex/);
+  assert.ok(new Scatter(mesh, { reach: Math.hypot(0.1, 0.2, 0.1) }).values[35] > 0);
 });
