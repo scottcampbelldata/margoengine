@@ -123,6 +123,50 @@ try {
     wide[0] > narrow[0] + 20 && narrow[2] > narrow[0] + 20,
     `The callback reflection lobe must sample the red sky above its blue horizon: ${narrow} to ${wide}`,
   );
+  // KB-WATER-HORIZONBAND1: a map whose rows below the horizon are red (what a sky environment holds there, its ground or
+  // a horizon of another colour) and above it grey. The sea's grazing rows reflect the horizon, and a horizon tap must
+  // read the rows above it alone: the bilinear filter at v 0.5 (or 0.49 for the 0.02 lift) took half (or 0.29) of
+  // the first row below, a red band along the sea's far edge.
+  await page.evaluate(async () => {
+    const { engine, sky, sea } = window.skyTest;
+    const { Environment } = await import('/packages/environment/dist/index.js');
+    const width = 64;
+    const height = 32;
+    const data = new Float32Array(width * height * 4);
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) data.set(y < 16 ? [0.2, 0.2, 0.2, 1] : [1, 0.01, 0.01, 1], (y * width + x) * 4);
+    const band = await Environment.attach(
+      engine,
+      { width, height, data },
+      { name: 'reflection-horizon', size: 16, specularSize: 16, float32: false },
+    );
+    sea.options.reflection = () => band.equirectTexture;
+    sea.setGlitterRoughness(0.12);
+    Object.assign(window.skyTest, { band, oldSky: sky });
+  });
+  const farRows = async (model) => {
+    await page.evaluate((model) => {
+      const { sea, band } = window.skyTest;
+      sea.options.reflectionEnvironment = model ? band : undefined;
+    }, model);
+    await frame(false, 0);
+    const png = await decodePNG(await page.locator('canvas').screenshot()),
+      centre = Math.floor(png.height / 2),
+      rows = [];
+    for (let y = centre + 2; y < centre + 14; y++) {
+      const i = (y * png.width + png.width / 2) * 4;
+      rows.push([png.data[i], png.data[i + 1], png.data[i + 2]]);
+    }
+    return rows;
+  };
+  for (const model of [false, true]) {
+    const rows = await farRows(model);
+    for (const [r, g] of rows)
+      assert.ok(
+        r - g < 12,
+        `${model ? 'the HDR' : 'the callback'} sea's far rows reflect the grey above the horizon, not the red below it: ${JSON.stringify(rows)}`,
+      );
+  }
   const validation = await page.evaluate(async () => (await window.skyTest.engine.gpu.popErrorScope())?.message);
   assert.equal(validation, undefined);
   console.log(JSON.stringify({ legacy, initial, turned, dimBody, brightBody, narrow, wide }));

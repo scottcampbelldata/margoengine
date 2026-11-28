@@ -772,9 +772,13 @@ fn directionalGlint(light:Light,n:vec3f,v:vec3f,rough:f32)->vec3f {
 // Resolve the reflected lobe over a solid angle for a detailed photographic sky. Raw Sky textures keep their
 // established azimuthal sampling. Below-horizon rays see the horizon instead of the HDRI's photographed ground.
 ${skyCoordinates}
+// A tap at or just above the horizon reads the map's rows above it alone: the bilinear filter at v 0.5 took half of the
+// first row below, which holds what the environment has under its horizon (its ground, or a clear horizon without the
+// cloud deck above it), and drew it as a band along the sea's far edge (KB-WATER-HORIZONBAND1).
+fn aboveHorizon(uv:vec2f)->vec2f {return vec2f(uv.x,min(uv.y,0.5-0.5/f32(textureDimensions(environment).y)));}
 fn skyTap(direction:vec3f,horizon:f32,turn:f32)->vec3f {
  let d=normalize(vec3f(direction.x,max(horizon,direction.y),direction.z));
- return textureSampleLevel(environment,skySampler,seaSkyUv(d,turn),0.0).rgb;
+ return textureSampleLevel(environment,skySampler,aboveHorizon(seaSkyUv(d,turn)),0.0).rgb;
 }
 fn skyLobe(direction:vec3f,rough:f32,horizon:f32,turn:f32)->vec3f {
  let r=normalize(vec3f(direction.x,max(max(1e-6,horizon),direction.y),direction.z));
@@ -790,7 +794,7 @@ fn reflectionRay(r:vec3f)->vec3f {return normalize(vec3f(r.x,max(0.02,r.y),r.z))
 fn incidentSky(direction:vec3f,rough:f32)->vec3f {
  if(frame.color.w>0.5&&hdrSkyScale()>0.0){return skyLobe(direction,rough,0.0,hdrSkyTurn())*hdrSkyScale();}
  let r=reflectionRay(direction);
- if(frame.color.w>0.5){let uv=seaSkyUv(r,0.0);let spread=vec2f(rough*0.035,0);return textureSampleLevel(environment,skySampler,uv,0).rgb*0.5+(textureSampleLevel(environment,skySampler,uv-spread,0).rgb+textureSampleLevel(environment,skySampler,uv+spread,0).rgb)*0.25;}
+ if(frame.color.w>0.5){let uv=aboveHorizon(seaSkyUv(r,0.0));let spread=vec2f(rough*0.035,0);return textureSampleLevel(environment,skySampler,uv,0).rgb*0.5+(textureSampleLevel(environment,skySampler,uv-spread,0).rgb+textureSampleLevel(environment,skySampler,uv+spread,0).rgb)*0.25;}
  return mix(vec3f(0.18,0.27,0.32),vec3f(0.035,0.10,0.20),sqrt(max(0.0,r.y)))*frame.radiance.rgb*(0.015+min(1.0,frame.sun.w*0.15));
 }
 // How much of a clear day's sky light the sky above the sea gives, 0 to 1: the luminance of the sky in two directions
