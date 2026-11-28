@@ -16590,14 +16590,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   weather README examples, 57 of 57).
 - **Regression:** that test.
 
-### Open 2026-11-28: the human anatomy table does not read Unreal mannequin or KayKit bone names (KB-RIG-UENAMING1, rigging)
+### Fixed 2026-11-28: the human anatomy table did not read Unreal mannequin or KayKit bone names (KB-RIG-UENAMING1, rigging)
 
 - **Repro:** `fitAnatomy` with `species: human` on `examples/assets/quaternius/UAL1_Standard_RM.glb` (pelvis,
-  upperarm_l, thigh_l) or on a KayKit character throws "This rig needs a left and a right joint to read its facing".
-- **Cause:** `nameHuman` (packages/rigging/src/anatomy-human.ts) knows the HAnim, segment-named, joint-named and
+  upperarm_l, thigh_l) or on a KayKit character threw "This rig needs a left and a right joint to read its facing".
+- **Cause:** `nameHuman` (packages/rigging/src/anatomy-human.ts) knew the HAnim, segment-named, joint-named and
   retarget preset namings only.
-- **Fix needed:** the two namings in the table's aliases (or as retarget presets), with a fit test on both bundled
-  models. Until then pass `map`, as the animator README does.
+- **Fix:** three namings in the table's aliases: `unreal` (three spine bones), `unreal5` (five) and `kaykit`; the best
+  match still wins, and `HUMAN_NAMINGS` lists them.
+- **Regression:** `packages/rigging/tests/anatomy-human-bundled.test.js` (both bundled rigs fit; the five-bone spine).
 
 ### Open 2026-11-28: every `procedural:rock` of a biome is the same stone (KB-BIOMES-ROCKSEED1, biomes)
 
@@ -16635,18 +16636,28 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   (`inner`, `innerFade`). 98.6 percent covered; the whole-scene frames read as a meadow.
 - **Regression:** `packages/biomes/tests/meadow-grass-check.mjs` (real GPU).
 
-### Open 2026-11-28: Puddles and Snow leave `@margoengine/materials` surfaces dry (KB-WEATHER-MATERIALSWET1, weather, materials)
+### Fixed 2026-11-28: Puddles and Snow left `@margoengine/materials` surfaces dry (KB-WEATHER-MATERIALSWET1, weather, materials)
 
 - **Repro:** Last Tram (`examples/showcase-films/last-tram.js`) with `Puddles.attach(engine, {wetness: 0.98, rain:
-  0.72, coverage: 0.39})`: the core `PbrMaterial` ground darkens, holds puddles and rain rings, while the asphalt
-  strips, platform and ballast drawn with `Material` from `@margoengine/materials` keep their dry colour and roughness,
-  so the film has to set a wet-looking roughness on them by hand.
-- **Cause:** `SurfaceHook` (`packages/weather/src/scene-patch.ts`) patches only core's mesh shader, at the top of its
-  `fragment` function; the materials package builds its own WGSL (`built-material.ts`), which has no surface hook for
-  the weather entries to patch, so `weather_puddle_surface` and the snow cover never run there.
-- **Fix needed:** a surface hook in the materials package's built shader (colour, roughness, metalness and normal
-  before lighting, with the world position) that `SurfaceHook` patches as it does core's, on WebGPU and the WebGL2
-  layer, with a GPU test that a wet `Material` matches a wet `PbrMaterial` of the same inputs.
+  0.72, coverage: 0.39})`: the core `PbrMaterial` ground darkened, held puddles and rain rings, while the asphalt
+  strips, platform and ballast drawn with `Material` from `@margoengine/materials` kept their dry colour and roughness,
+  so the film had to set a wet-looking roughness on them by hand.
+- **Cause:** `SurfaceHook` (`packages/weather/src/scene-patch.ts`) patched only core's mesh shader, at the top of its
+  `fragment` function. A Material mesh draws with gltf/pbr's shader, which the materials package rewrites
+  (`built-material.ts`); it had no surface hook for the weather entries to reach, so `weather_puddle_surface` and the
+  snow cover never ran there.
+- **Fix:** each Material mesh joins its scene's surface hooks by itself (`packages/materials/src/scene-surfaces.ts`):
+  before each draw the material queue gives the mesh, through gltf/pbr `addLighting`, the `materialSurface` lighting
+  effect of the scene's `weather-puddles`, `weather-snow` and `weather-cover` plugins in their order, and takes it away
+  when they go. `Puddles`, `Snow` and `PrecipitationCover` offer that effect: it wraps gltf/pbr's whole `surface()`
+  (after every map, triplanar and parallax read) with the same WGSL as on core meshes, bound in group 2 at slots
+  166 to 169, the snow's vertex lift included. Only meshes with a lit material join; `mesh.sceneSurfaces = false`
+  keeps one dry.
+- **Regression:** `packages/weather/tests/material-wet-browser.mjs` draws the same ground as a core mesh and
+  as a Material mesh, dry, wet with standing water and rain rings, and snowed on, on WebGPU and the WebGL2 layer: the
+  wet and snowy Material match the core surface (mean relative difference under 1e-7, no pixel off by 2 percent),
+  where before the fix every one of the 38,072 ground pixels differed by 34 percent on average. Unit tests:
+  `packages/weather/tests/material-surface.test.js` and `packages/materials/tests/scene-surfaces.test.js`.
 
 ### Fixed 2026-11-28: no showcase film soundtrack could be built (KB-FILM-MIXIMPORT1, examples)
 
