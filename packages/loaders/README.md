@@ -1016,7 +1016,7 @@ for (const { positions, indices, groups, matrices } of model.instances) {
 
 ## 3MF volumes and displacement
 
-`parse3MFVolumetric` returns the meshes as `parse3MF` does, with `images` (PNG sheets), `functions` (image samplers and node graphs), `volumes` and the built `objects` that have volume data or a level set, each with its placements and a level set's bounding mesh. References, graph order and types are checked. A built level set is evaluated and meshed, and its surface joins the result's triangles in the object's frame: inside is where the function is below zero within the domain mesh (or its box with `meshbboxonly`), and an undefined value takes `fallbackvalue`. Functions are image stacks (filters and tile styles of the extension) and graphs of native nodes, called functions, gradients, normalized distances and mesh distances included. The surface comes from the Marching Cubes of `@margoengine/procedural` on a grid of `levelSetResolution` cells along the domain's longest side (default 64, at most 512, spacing rounded down to a power of two); a file's `minfeaturesize` asks for two cells to a feature, and `levelSet.unresolved` says the grid could not give them. Edges where the domain cuts the surface are rounded within one cell. `meshLevelSets: false` reads the resources only. Meshing needs the optional `@margoengine/procedural`, `@margoengine/bvh` and `@margoengine/decoders` peers, loaded only for a package with a level set. The `beamlattice` node gives the signed distance to a mesh object's beams and balls, clipped by the lattice's clipping mesh (see `threeMFBeamDistance` below). The colour of a shape's volume data is sampled onto its surface: triangles are split until no side is longer than the spacing (`colorResolution` samples along the longest side, default 32, at most 512; a colour's `minfeaturesize` asks for two samples to a feature, and `colorUnresolved` says they could not be given), the function is read at each corner, its linear channels are clipped to 0..1 and written as sRGB vertex colours, and a triangle with a surface property of its own keeps it. `sampleColors: false` leaves the triangles as the file has them. Composites and properties of volume data are returned as data only. The Marching Cubes method and its citations are in the procedural package.
+`parse3MFVolumetric` returns the meshes as `parse3MF` does, with `images` (PNG sheets), `functions` (image samplers and node graphs), `volumes` and the built `objects` that have volume data or a level set, each with its placements and a level set's bounding mesh. References, graph order and types are checked. A built level set is evaluated and meshed, and its surface joins the result's triangles in the object's frame: inside is where the function is below zero within the domain mesh (or its box with `meshbboxonly`), and an undefined value takes `fallbackvalue`. Functions are image stacks (filters and tile styles of the extension) and graphs of native nodes, called functions, gradients, normalized distances and mesh distances included. The surface comes from the Marching Cubes of `@margoengine/procedural` on a grid of `levelSetResolution` cells along the domain's longest side (default 64, at most 512, spacing rounded down to a power of two); a file's `minfeaturesize` asks for two cells to a feature, and `levelSet.unresolved` says the grid could not give them. Edges where the domain cuts the surface are rounded within one cell. `meshLevelSets: false` reads the resources only. Meshing needs the optional `@margoengine/procedural`, `@margoengine/bvh` and `@margoengine/decoders` peers, loaded only for a package with a level set. The `beamlattice` node gives the signed distance to a mesh object's beams and balls, clipped by the lattice's clipping mesh (see `threeMFBeamDistance` below). The colour of a shape's volume data is sampled onto its surface: triangles are split until no side is longer than the spacing (`colorResolution` samples along the longest side, default 32, at most 512; a colour's `minfeaturesize` asks for two samples to a feature, and `colorUnresolved` says they could not be given), the function is read at each corner, its linear channels are clipped to 0..1 and written as sRGB vertex colours, and a triangle with a surface property of its own keeps it. `sampleColors: false` leaves the triangles as the file has them. A built object with volume data also has `sample(positions)`, which reads it at any points of the object, inside it or on its surface, in the object's own coordinates: `colors` (sRGB), `composite` (the mixing ratios of the base materials, each contribution clipped to 0..1 and divided by their sum, zeros where the sum is under 1e-5) and `properties` (each with its name, namespace, `required`, `size` and `values`). A composite needs one mapping for each base material, and volume data on a displacement mesh is refused, as the extension allows it on mesh and level set shapes only. The Marching Cubes method and its citations are in the procedural package.
 
 `parse3MFDisplacement` returns the displaced surface as its triangles, with `maps`, `displacementGroups` (coordinates, factors and unit vectors) and `meshes` (base triangles, each corner's coordinate and the placements) beside it. Each base edge is split until a segment spans at most one texel of its map (`samplesPerTexel`, default 1) and its interpolated vectors turn at most 15 degrees, never into more than `maxSegments` pieces (default 256, rounded down to a power of two). Points move by `(texture * height + offset) * f` along the normalized mix of the corner vectors, with the extension's filters and tile styles. Both sides of an edge split alike, so no crack opens; sides that move apart are joined directly when they use the same vectors and through the base edge when not. Colours follow the base triangles. `tessellate: false` gives the base triangles, as `parse3MF` does. Reading the map needs the optional `@margoengine/decoders` peer. Self-intersections of a displaced surface are not resolved. The subdivision follows the per-edge factors of Fisher, Fatahalian, Boulos, Akeley, Mark and Hanrahan, [DiagSplit: parallel, crack-free, adaptive tessellation for micropolygon rendering](https://graphics.stanford.edu/~mdfisher/Data/DiagSplit.pdf) (2009), as the edge-split patterns of Boubekeur and Schlick, [Generic adaptive mesh refinement](https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch05.html) (GPU Gems 3, 2007).
 
@@ -1041,6 +1041,43 @@ console.log(functions.length, objects[0].levelSet?.channel, objects[0].levelSet?
 // A finer surface.
 const fine = await parse3MFVolumetric(file, { levelSetResolution: 128 });
 console.log(fine.indices.length / 3);
+```
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+import { parse3MFVolumetric } from 'margoengine/loaders/threemf-volumetric';
+
+const geometry = {
+  positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1]),
+  indices: [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2],
+};
+// Two materials that trade places along x.
+const mix = {
+  nodes: [
+    { id: 'axes', op: 'decomposevector', in: { A: 'inputs.pos' } },
+    { id: 'one', op: 'constant', value: 1 },
+    { id: 'rest', op: 'subtraction', in: { A: 'one.value', B: 'axes.x' } },
+  ],
+  outputs: { x: 'axes.x', rest: 'rest.result' },
+};
+const file = await export3MF(
+  { nodes: [{ name: 'Block', geometry }] },
+  {
+    unit: 'millimeter',
+    upAxis: 'z',
+    objectInfo: () => ({
+      volume: {
+        composite: [
+          { name: 'PLA', color: '#ff0000', function: mix, channel: 'x' },
+          { name: 'TPU', color: '#0000ff', function: mix, channel: 'rest' },
+        ],
+      },
+    }),
+  },
+);
+const { objects } = await parse3MFVolumetric(file, { units: 'file' });
+const samples = await objects[0].sample!([0.25, 0.1, 0.1, 0.75, 0.1, 0.1]);
+console.log(samples.composite?.ratios, samples.properties.length);
 ```
 
 ```ts

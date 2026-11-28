@@ -74,6 +74,22 @@ export interface ThreeMFVolumeData extends ThreeMFResource {
     })[];
 }
 
+export interface ThreeMFVolumeSamples {
+    colors?: Float32Array;
+    composite?: {
+        baseMaterialId: string;
+        materials: number;
+        ratios: Float32Array;
+    };
+    properties: {
+        name: string;
+        namespace: string;
+        required: boolean;
+        size: number;
+        values: Float32Array;
+    }[];
+}
+
 export interface ThreeMFVolumetricObject {
     objectId: string;
     modelPath?: string;
@@ -88,6 +104,7 @@ export interface ThreeMFVolumetricObject {
         cellSize?: number;
         unresolved?: boolean;
     };
+    sample?(positions: ArrayLike<number>): Promise<ThreeMFVolumeSamples>;
     colorSpacing?: number;
     colorUnresolved?: boolean;
     instances: Float64Array[];

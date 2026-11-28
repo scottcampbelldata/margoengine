@@ -372,6 +372,9 @@ export function volumetricStage(
         const object = model.objects.get(p.object)!;
         p.lattices.set(p.object, beams.begin(p, a, object.pid, object.pindex));
       } else if (['beam', 'ball', 'beamset', 'ref', 'ballref'].includes(name)) beams.element(p, name, a);
+      else if (name === 'displacementmesh' && prefixed(a, 'volumeid') !== undefined)
+        // Volumetric extension 5.2: only a mesh or a level set, unless a shape's own extension allows more.
+        bad(`object ${p.object?.slice(0, 32)} is a displacement mesh, which takes no volume data`);
       else if (name === 'mesh' && p.object !== undefined) {
         const volumeId = prefixed(a, 'volumeid');
         if (volumeId !== undefined) {
@@ -406,7 +409,11 @@ export function volumetricStage(
           modelPath = partPath(model);
         if (!p) continue;
         const where = modelPath === undefined ? {} : { modelPath },
-          own = new Map<string, ThreeMFVolumetricObject>();
+          own = new Map<string, ThreeMFVolumetricObject>(),
+          surfaces = new Map<string, ThreeMFMesh>();
+        let scope: Promise<FieldScope> | undefined;
+        /** Built once, on the first level set, color or sample that needs it. */
+        const evaluator = (): Promise<FieldScope> => (scope ??= fieldScope(model, p, surfaces));
         listed.set(model, own);
         for (const [objectId, lattice] of p.lattices) {
           const mesh = model.objects.get(objectId)!.mesh;
@@ -442,6 +449,9 @@ export function volumetricStage(
             if (!p.bases.has(volume.composite.baseMaterialId) || !volume.composite.mappings.length)
               bad(`volumedata ${volume.id} composite needs a basematerials group and a materialmapping`);
             for (const mapping of volume.composite.mappings) check(mapping, 'scalar');
+            const bases = model.properties.get(volume.composite.baseMaterialId)?.length;
+            if (volume.composite.mappings.length !== bases)
+              bad(`volumedata ${volume.id} composite needs one materialmapping for each of ${bases} base materials`);
           }
           for (const property of volume.properties) check(property);
           result.volumes.push({ ...volume, ...where });
@@ -467,14 +477,18 @@ export function volumetricStage(
             ...(shape ? { levelSet: shape } : {}),
             instances: [],
           };
+          if (volumeId !== undefined) {
+            const volume = p.volumes.get(volumeId)!;
+            object.sample = async (positions) => {
+              const { sampleVolume } = await import('./threemf-volume-sample.js');
+              return sampleVolume(await evaluator(), volume, positions);
+            };
+          }
           own.set(objectId, object);
           result.objects.push(object);
         }
         // Distances and level set domains read each mesh as the file wrote it, before lattices and colour samples.
-        const surfaces = new Map<string, ThreeMFMesh>();
         for (const [objectId, object] of model.objects) if (object.mesh) surfaces.set(objectId, object.mesh);
-        let scope: FieldScope | undefined;
-        const evaluator = async (): Promise<FieldScope> => (scope ??= await fieldScope(model, p, surfaces));
         if (options.meshLevelSets !== false)
           for (const object of own.values()) {
             const { levelSet, objectId } = object;

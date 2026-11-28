@@ -189,6 +189,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fixed:** the interpolated colour is clipped to 0..1. Regression:
   `packages/loaders/tests/threemf-evaluate.test.js`.
 
+### Fixed 2026-11-27: volume data on a displacement mesh and a short composite were accepted (KB-3MF-VOLDATA1, loaders)
+
+- **Repro:** `parse3MFVolumetric` on `<d:displacementmesh v:volumeid="5">`, or on a `<composite>` with one
+  `<materialmapping>` for a `basematerials` group of two.
+- **Cause:** the reader looked for `volumeid` on `mesh` and `levelset` only, so the first was dropped without a
+  word, and it asked only that a composite have some mapping.
+- **Fixed:** both are a `syntax` error, as the volumetric extension (5.2 and 5.2.2) rules them out. Regression:
+  `packages/loaders/tests/threemf-volume-sample.test.js`.
+
 ### Fixed 2026-11-27: isolated darker pixels on the flat sides of a cut displacement mesh (KB-3MF-DOTS1, mesh-edit, loaders)
 
 - **Repro:** `parse3MFEvaluated` on a cube of side 10 with a 32 x 32 sine height map on its top (height 2.5) minus

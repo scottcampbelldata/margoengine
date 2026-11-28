@@ -81,6 +81,19 @@ export interface ThreeMFVolumeData extends ThreeMFResource {
   properties: (ThreeMFSampledField & { name: string; namespace: string; required: boolean })[];
 }
 
+/** What a volume holds at a list of points. */
+export interface ThreeMFVolumeSamples {
+  /** sRGB red, green and blue for each point, when the volume data has a color. */
+  colors?: Float32Array;
+  /**
+   * The mixture at each point, when it has a composite: `materials` ratios a point, in the order of the bases of the
+   * `basematerials` group, adding to 1. A point whose contributions add to under 1e-5 holds zeros.
+   */
+  composite?: { baseMaterialId: string; materials: number; ratios: Float32Array };
+  /** Each property of the volume data: `size` numbers a point (1 a scalar, 3 a vector, 16 a matrix). */
+  properties: { name: string; namespace: string; required: boolean; size: number; values: Float32Array }[];
+}
+
 /** An object with volume data or a level set shape. */
 export interface ThreeMFVolumetricObject {
   objectId: string;
@@ -98,6 +111,11 @@ export interface ThreeMFVolumetricObject {
     /** The grid is too coarse for `minFeatureSize`: smaller features may be missing. */
     unresolved?: boolean;
   };
+  /**
+   * Reads its volume data at points, surface or interior: x, y and z for each, in the object's own coordinates (an
+   * `instances` transform takes those to the result's). Present when the object has volume data.
+   */
+  sample?(positions: ArrayLike<number>): Promise<ThreeMFVolumeSamples>;
   /** The longest triangle side its volume colour was sampled at, in the object's units. */
   colorSpacing?: number;
   /** The spacing is too coarse for the colour's `minfeaturesize`: smaller features may be missing. */
@@ -141,12 +159,13 @@ export interface ThreeMFVolumetricResult extends ThreeMFResult {
  * mesh (or that mesh's box) and its surface joins the result's triangles, in object coordinates placed by the build.
  * A built shape whose volume data has a colour takes it on its surface: its triangles are split to the sample spacing
  * and the colour function is read at their corners, except where the file gives a surface property of its own. The
- * volumetric resources and the built objects that use them are returned beside them. Composites and properties of
- * volume data are returned as data only.
+ * volumetric resources and the built objects that use them are returned beside them. A built object's `sample` reads
+ * its color, composite mixture and properties at any points.
  *
  * @throws LoaderError for a reference to a resource the package does not define, a graph that reads a later node, an
  * output of another type or itself, a sheet part that is missing, a level set or colour sampling over `maxTriangles`,
- * a level set with a node that is not evaluated, and what `parse3MF` throws.
+ * a level set with a node that is not evaluated, a composite without one mapping for each base material, volume data
+ * on a displacement mesh, and what `parse3MF` throws.
  */
 export async function parse3MFVolumetric(
   input: BinaryInput,
