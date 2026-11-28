@@ -3,13 +3,13 @@ import { BiomeView } from '@margoengine/biomes/view';
 import { alpineTreelineGraph } from '@margoengine/biomes/treeline';
 import { PbrMaterial } from '@margoengine/core';
 import { DOF } from '@margoengine/dof';
-import { computeVertexNormals, icosahedronGeometry } from '@margoengine/geometry';
-import { Material } from '@margoengine/materials';
 import { GrassScatter } from '@margoengine/scatter/grass';
 import { Sky } from '@margoengine/sky';
 import { VolumetricClouds } from '@margoengine/sky/volumetric-clouds';
 import { TerrainHeightmap } from '@margoengine/terrain';
-import { finishTexture, mix, ramp, rng } from './film.js';
+import { buildBoulder } from '@margoengine/terrain/rocks';
+import { RockSurface } from '@margoengine/terrain/rock-surface';
+import { mix, ramp, rng } from './film.js';
 import { ridgeTrees } from './subalpine-fir.js';
 import { asset as libraryAsset } from './assets.js';
 
@@ -120,19 +120,6 @@ function boundaryBiomes() {
       rocks: [stone],
     }),
   ];
-}
-
-function ledge(seed, radius) {
-  const rock = icosahedronGeometry(radius, 2, true);
-  const p = rock.positions;
-  for (let i = 0; i < p.length; i += 3) {
-    const [x, y, z] = p.subarray(i, i + 3);
-    const wave = 0.89 + 0.17 * Math.sin(6 * x + 5 * z + seed) * Math.cos(7 * y - 3 * x);
-    p[i] = x * wave * 1.18 + 0.13 * y;
-    p[i + 1] = y * wave * 0.57 + 0.13 * x + 0.027 * Math.cos(x * 14 + z * 10 + seed);
-    p[i + 2] = z * wave * 0.77 - 0.09 * y;
-  }
-  return computeVertexNormals(rock);
 }
 
 export async function buildRidge(engine, shop, _cluster, shadows) {
@@ -252,9 +239,8 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
     });
   }
 
-  const rough = finishTexture(4213, { r: 218, grain: 39, mottling: 25 });
-  const grey = new Material({ color: '#76726a', roughness: 0.88, roughnessMap: rough });
-  const ochre = new Material({ color: '#827562', roughness: 0.91, roughnessMap: rough });
+  // Fallen granite blocks: closed fracture-cell meshes shaded per pixel as weathered granite with lichen on top.
+  const stoneSurface = RockSurface.attach(engine, { moss: 0.45, mossColor: [0.27, 0.26, 0.19], cracks: 0.45, scale: 0.9 });
   const random = rng(9112);
   const rocks = [
     [-507, -495, 1.42],
@@ -264,12 +250,16 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
   ];
   for (let i = 0; i < 85; i++) rocks.push([-526 + random() * 41, -517 + random() * 43, 0.091 + random() ** 3 * 0.65]);
   for (const [i, [x, z, r]] of rocks.entries()) {
-    shop.part(
-      ledge(random() * 7, r),
-      i % 4 === 0 ? ochre : grey,
-      [x, world.heightAt(x, z) - r * 0.12, z],
-      [0.13, random() * 6, 0.09],
+    const block = buildBoulder(
+      { kind: 'boulder', position: [x, world.heightAt(x, z), z], radius: r, cliff: 0 },
+      { seed: 9112 + i, cell: Math.max(0.02, r / 18), embed: 0.35 },
     );
+    const mesh = engine
+      .createMesh()
+      .setGeometry(block.geometry)
+      .setPosition(block.position)
+      .setMaterial(new PbrMaterial({ color: '#808080', roughness: 0.9 }));
+    stoneSurface.add(mesh, { type: 'granite', seed: i });
   }
   const lens = new DOF({ focalLength: 0.044, focalDistance: 2.1, aperture: 7.1, maxRadius: 8 });
   const cues = [
@@ -296,7 +286,7 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
     cues,
     dispose() {
       world.dispose();
-      rough.dispose();
+      stoneSurface.dispose();
     },
   };
 }
