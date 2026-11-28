@@ -18,6 +18,7 @@ import {
   refract,
   skyMatrix,
   starColor,
+  subsolarPoint,
   sunPosition,
 } from '@margoengine/sky/astro';
 import { degrees } from '@margoengine/sky/sun';
@@ -291,5 +292,39 @@ test('AstroSky drives the sky and draws every star and planet at night', () => {
   );
   for (const bad of [{ timeScale: 2e6 }, { pointSize: 0.1 }, { latitude: 52 }, { catalog: {} }])
     assert.throws(() => new AstroSky({ ...observer, ...bad }), /AstroSky|observer|catalog/, JSON.stringify(bad));
+  astro.dispose();
+});
+
+test('the subsolar point: the Sun overhead there, the equation of time at noon, the solstice declination', () => {
+  for (const iso of ['2027-03-20T10:20:00Z', '2026-06-21T12:00:00Z', '2026-12-21T23:30:00Z', '1992-10-13T00:00:00Z']) {
+    const date = new Date(iso),
+      point = subsolarPoint(date);
+    assert.ok(point.longitude.degrees >= -180 && point.longitude.degrees < 180, iso);
+    // Seen from that place the Sun is at the zenith (within its parallax, about 0.0024 degree).
+    const sun = sunPosition(date, point, { refraction: false });
+    assert.ok(sun.elevation.degrees > 89.99, `${iso}: ${sun.elevation.degrees}`);
+  }
+  // 2026 June 21 12:00 UT: the equation of time is -1.7 min, so the Sun is still 0.43 degree east of Greenwich, at the
+  // solstice declination of 23.44 degrees (Astronomical Almanac).
+  const june = subsolarPoint(new Date('2026-06-21T12:00:00Z'));
+  near(june.longitude.degrees, 0.43, 0.08, 'June longitude');
+  near(june.latitude.degrees, 23.44, 0.01, 'June latitude');
+  // 2026 November 3 12:00 UT: the equation of time is +16.4 min, so the Sun is 4.1 degrees west.
+  near(subsolarPoint(new Date('2026-11-03T12:00:00Z')).longitude.degrees, -4.1, 0.08, 'November longitude');
+});
+
+test('AstroSky horizon false draws the whole sphere at full night, as from space', () => {
+  const catalog = parseBrightStarCatalog(catalogText, { maxMagnitude: 5 }),
+    day = new Date('2026-06-21T12:00:00Z'),
+    astro = new AstroSky({ latitude: degrees(90), longitude: degrees(-90), date: day, timeScale: 0, catalog, horizon: false }),
+    h = tracedGPU();
+  h.engine.use(astro);
+  astro.onPreUpdate(0);
+  h.context.bindings = [];
+  h.engine.frameGraph.execute(h.context);
+  // By day at the pole the stars still show, and the uniform tells the shader to keep the ones below the horizon.
+  assert.deepEqual(h.commands().filter((c) => c.startsWith('draw 6 ')), [`draw 6 ${catalog.count + 7}`]);
+  assert.equal(astro.values[41], 1);
+  assert.throws(() => new AstroSky({ latitude: degrees(0), longitude: degrees(0), horizon: 'no' }), /horizon/);
   astro.dispose();
 });

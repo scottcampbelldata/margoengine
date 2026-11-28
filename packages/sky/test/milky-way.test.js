@@ -105,3 +105,18 @@ test('the band follows its AstroSky and fades in with the night', () => {
   band.dispose();
   assert.equal(h.engine.plugins?.has?.('sky:milky-way') ?? false, false);
 });
+
+test('MilkyWay horizon false shows the band by day and below the horizon, as from space', () => {
+  const day = new Date('2026-06-20T10:00:00Z'),
+    band = new MilkyWay({ ...observer, date: day, horizon: false });
+  assert.equal(band.night(), 1);
+  assert.equal(new MilkyWay({ ...observer, date: day }).night(), 0);
+  const h = tracedGPU();
+  h.engine.use(band);
+  h.context.bindings = [];
+  h.engine.frameGraph.execute(h.context);
+  assert.deepEqual(h.commands().filter((c) => c.startsWith('draw 6 ')), ['draw 6 1']);
+  assert.equal(band.values[36], 1);
+  assert.throws(() => new MilkyWay({ ...observer, horizon: 1 }), /horizon/);
+  band.dispose();
+});

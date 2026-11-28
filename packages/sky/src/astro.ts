@@ -419,6 +419,19 @@ export function sunPosition(date: Date, observer: Observer, options: AstroOption
   return strip(place(f, fromEcliptic(s.longitude, 0, meanObliquity(f.t) + 0.00256 * cos(s.omega)), s.distance * au));
 }
 
+/**
+ * The place on the Earth with the Sun straight overhead at a moment: the latitude is the Sun's apparent declination and
+ * the longitude its apparent right ascension less the apparent Greenwich sidereal time, east positive, -180 to 180
+ * degrees. Geocentric (the Sun's parallax, under 9 arcseconds, is left out). Use it for a globe's terminator or a
+ * subsolar readout.
+ * @throws TypeError for an invalid Date; RangeError for a non-finite `deltaT`.
+ */
+export function subsolarPoint(date: Date, options: Pick<AstroOptions, 'deltaT'> = {}): Observer {
+  const sun = sunPosition(date, { latitude: degrees(0), longitude: degrees(0) }, { ...options, refraction: false }),
+    hour = sun.rightAscension.degrees - greenwichSiderealTime(date, { ...options, apparent: true }).degrees;
+  return { latitude: sun.declination, longitude: degrees((((hour % 360) + 540) % 360) - 180) };
+}
+
 // Meeus Table 47.A: multiples of D, M, M', F, then the sine coefficient of longitude (1e-6 degree) and the cosine
 // coefficient of distance (1e-3 km). Table 47.B: the same multiples and the sine coefficient of latitude.
 const lunar = (t: number) => meeusLunarPosition(t, sin, cos);
@@ -803,6 +816,12 @@ export interface AstroSkyOptions extends Observer, AstroOptions {
   extinction?: number;
   /** Spread of each point (its Gaussian sigma) in pixels, 0.5 to 16. Default 1; the size does not change its brightness. */
   pointSize?: number;
+  /**
+   * Keep the observer's horizon: stars and planets below it are hidden, refracted and dimmed by the air. Default true.
+   * `false` is the view from orbit or space: the whole sphere, with no refraction or extinction, at full night unless a
+   * `sky` gives its `nightFactor`.
+   */
+  horizon?: boolean;
 }
 
 const number = (value: unknown, name: string, low: number, high: number) => {
@@ -819,6 +838,8 @@ const validate = (o: AstroSkyOptions) => {
   number(o.limitingMagnitude, 'limitingMagnitude', -30, 30);
   number(o.extinction, 'extinction', 0, 2);
   number(o.pointSize, 'pointSize', 0.5, 16);
+  if (o.horizon !== undefined && typeof o.horizon !== 'boolean')
+    throw new TypeError('AstroSky horizon must be true or false; false shows the whole sphere, as from space.');
   const c = o.catalog;
   if (c !== undefined && !(c && c.positions instanceof Float32Array && c.positions.length === c.count * 3))
     throw new TypeError('AstroSky catalog must come from parseBrightStarCatalog or fetchBrightStarCatalog.');
@@ -833,13 +854,13 @@ struct O {@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) c
  // Three vec4s a point: the J2000 vector at 2000.0 and the magnitude, the colour, the motion per Julian year.
  let s=stars[3u*i];let p=normalize(s.xyz+stars[3u*i+2u].xyz*u.eye.w);
  var d=normalize(vec3f(dot(u.sky0.xyz,p),dot(u.sky1.xyz,p),dot(u.sky2.xyz,p)));
- var h=degrees(asin(clamp(d.y,-1.0,1.0)));
+ var h=degrees(asin(clamp(d.y,-1.0,1.0)));let space=u.blend.y>0.5;
  // Refraction (Saemundsson 1986) down to the apparent horizon, as refract: the star rises along its vertical.
- if(u.params.z>0.5&&h>=-0.5739141574){h=min(90.0,h+(1.02/tan(radians(h+10.3/(h+5.11)))+0.0019279)/60.0);let level=length(d.xz);
+ if(!space&&u.params.z>0.5&&h>=-0.5739141574){h=min(90.0,h+(1.02/tan(radians(h+10.3/(h+5.11)))+0.0019279)/60.0);let level=length(d.xz);
   if(level>1e-6){d=vec3f(d.x/level*cos(radians(h)),sin(radians(h)),d.z/level*cos(radians(h)));}}
- if(h<=0.0){return o;}
- // Air mass of Kasten and Young (1989) and the extinction it brings, in magnitudes.
- let m=s.w+u.params.y/(sin(radians(h))+0.50572*pow(h+6.07995,-1.6364));
+ if(h<=0.0&&!space){return o;}
+ // Air mass of Kasten and Young (1989) and the extinction it brings, in magnitudes; none in space.
+ var m=s.w;if(!space){m+=u.params.y/(sin(radians(h))+0.50572*pow(h+6.07995,-1.6364));}
  if(m>u.params.w){return o;}
  let c=u.view*vec4f(u.eye.xyz+d,1.0);
  if(c.w<=0.0){return o;}
@@ -972,7 +993,7 @@ export class AstroSky implements EnginePlugin {
     }
     // Without a sky's own blend, stars fade in as the sun sinks from the horizon to 12 degrees below (nautical twilight).
     const s = Math.max(0, Math.min(1, -this.sun.elevation.degrees / 12));
-    this.night = s * s * (3 - 2 * s);
+    this.night = o.horizon === false ? 1 : s * s * (3 - 2 * s);
   }
 
   setup(engine: Engine): void {
@@ -1054,6 +1075,7 @@ export class AstroSky implements EnginePlugin {
     v[38] = o.refraction === false ? 0 : 1;
     v[39] = o.limitingMagnitude ?? 6.5;
     v[40] = c.format.includes('float') ? 1 / 64 : 1;
+    v[41] = o.horizon === false ? 1 : 0;
     this.overlay.draw(c, shader, this.uniform!, v as Float32Array<ArrayBuffer>, count, this.entries);
   }
 

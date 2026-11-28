@@ -26,6 +26,7 @@ export interface MilkyWayOptions extends Partial<Observer>, AstroOptions {
     extinction?: number;
     clouds?: number;
     seed?: number;
+    horizon?: boolean;
 }
 
 export function galacticCoordinates(direction: readonly [number, number, number], date: Date, observer: Observer, options?: AstroOptions): {
@@ -80,6 +81,7 @@ interface AstroSkyOptions extends Observer, AstroOptions {
     limitingMagnitude?: number;
     extinction?: number;
     pointSize?: number;
+    horizon?: boolean;
 }
 
 interface AstroSkyTarget {

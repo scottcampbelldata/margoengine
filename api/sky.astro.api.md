@@ -41,6 +41,7 @@ export interface AstroSkyOptions extends Observer, AstroOptions {
     limitingMagnitude?: number;
     extinction?: number;
     pointSize?: number;
+    horizon?: boolean;
 }
 
 export interface AstroSkyTarget {
@@ -129,6 +130,8 @@ export function refract(altitude: number): number;
 export function skyMatrix(date: Date, observer: Observer, options?: AstroOptions): Float64Array;
 
 export function starColor(bv: number): Vec3;
+
+export function subsolarPoint(date: Date, options?: Pick<AstroOptions, 'deltaT'>): Observer;
 
 export function sunPosition(date: Date, observer: Observer, options?: AstroOptions): CelestialPosition;
 

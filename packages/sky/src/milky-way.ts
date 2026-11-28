@@ -95,6 +95,11 @@ export interface MilkyWayOptions extends Partial<Observer>, AstroOptions {
   clouds?: number;
   /** Seed of the star clouds, a whole number from 0 to 65535. Default 1. */
   seed?: number;
+  /**
+   * Keep the observer's horizon: no band below it, and the air dims it toward it. Default true. `false` is the view
+   * from orbit or space: the whole sphere with no extinction, at full night unless a `sky` gives its `nightFactor`.
+   */
+  horizon?: boolean;
 }
 
 const number = (value: unknown, name: string, low: number, high: number) => {
@@ -115,6 +120,8 @@ const validate = (o: MilkyWayOptions) => {
   number(o.clouds, 'clouds', 0, 1);
   if (o.seed !== undefined && !(Number.isInteger(o.seed) && o.seed >= 0 && o.seed <= 65535))
     throw new RangeError(`Invalid MilkyWay seed ${String(o.seed)}; use a whole number from 0 to 65535.`);
+  if (o.horizon !== undefined && typeof o.horizon !== 'boolean')
+    throw new TypeError('MilkyWay horizon must be true or false; false shows the whole sphere, as from space.');
 };
 
 const shader = `struct U {inverse:mat4x4f,sky0:vec4f,sky1:vec4f,sky2:vec4f,eye:vec4f,params:vec4f,extra:vec4f}
@@ -140,7 +147,8 @@ fn band(lr:f32,b:f32)->f32 {
 }
 ${backdropRay}@fragment fn fragment(i:O)->@location(0) vec4f {
  let d=ray(i.ndc);
- if(d.y<=0.0){discard;}
+ let space=u.extra.x>0.5;
+ if(d.y<=0.0&&!space){discard;}
  // The pixel's solid angle, so the band is a radiance: the same at any resolution and field of view.
  let omega=pixelSolidAngle(i.ndc);
  // World to J2000 (the sky matrix transposed), then galactic.
@@ -150,7 +158,7 @@ ${backdropRay}@fragment fn fragment(i:O)->@location(0) vec4f {
  let s=u32(u.extra.y);
  let clouds=1.0+u.params.w*(1.2*(noise(g*9.0,s)-0.5)+0.6*(noise(g*31.0,s+7u)-0.5));
  // Air mass of Kasten and Young (1989) and the extinction it brings.
- let h=degrees(asin(d.y));let air=1.0/(d.y+0.50572*pow(h+6.07995,-1.6364));
+ var air=0.0;if(!space){let h=degrees(asin(d.y));air=1.0/(d.y+0.50572*pow(h+6.07995,-1.6364));}
  let k=u.params.x*u.params.y*omega*band(l,b)*max(clouds,0.0)*pow(10.0,-0.4*u.params.z*air);
  // Old stars of the bulge are warmer than the disc's.
  let warm=exp(-(l*l+b*b)/450.0);
@@ -196,6 +204,7 @@ export class MilkyWay extends SkyLayer {
       a = o.astro?.options,
       sky = o.sky ?? a?.sky;
     if (typeof sky?.nightFactor === 'number') return sky.nightFactor;
+    if (o.horizon === false) return 1;
     const e = sunPosition(this.date, this.observer(), this.observer()).elevation.degrees,
       s = Math.max(0, Math.min(1, -e / 12));
     return s * s * (3 - 2 * s);
@@ -232,6 +241,7 @@ export class MilkyWay extends SkyLayer {
     v[34] = o.extinction ?? a?.extinction ?? 0.2;
     v[35] = o.clouds ?? 1;
     v[37] = o.seed ?? 1;
+    v[36] = o.horizon === false ? 1 : 0;
     return true;
   }
 }

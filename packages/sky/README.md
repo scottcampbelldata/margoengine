@@ -1465,6 +1465,7 @@ Options are read every frame from `astro.options`:
 | `pointSize` | 1 | each point's spread in pixels; it does not change the brightness |
 | `refraction` | true | lift each body by the refraction of standard air (Saemundsson down to the apparent horizon; below it the lift fades to none at -6 degrees) |
 | `deltaT` | `deltaT(date)` | terrestrial minus universal time, seconds (Espenak and Meeus, years -500 to 2150) |
+| `horizon` | true | keep the observer's horizon; `false` is the view from orbit or space: the whole sphere with no refraction or extinction, at full night unless `sky` gives its `nightFactor` |
 
 The maths is there on its own, for any engine or none: `sunPosition`, `moonPosition` and `planetPositions` take a
 `Date` and an observer and give the apparent right ascension and declination, the distance, and the `azimuth`,
@@ -1472,7 +1473,18 @@ The maths is there on its own, for any engine or none: `sunPosition`, `moonPosit
 the moon adds `illumination`, `phaseAngle`, `waxing` and `angularRadius`, a planet its `magnitude`. `skyMatrix` turns
 J2000 vectors into world directions for the moment and place, `julianDay`, `deltaT`, `greenwichSiderealTime`,
 `nutation`, `precessionMatrix` and `refract` are the steps underneath, and `starColor` gives a star's colour from its
-B-V index.
+B-V index. `subsolarPoint(date)` gives the place with the Sun straight overhead (latitude the apparent declination, longitude
+the right ascension less the apparent Greenwich sidereal time, east positive), for a globe's terminator:
+
+```ts
+import {subsolarPoint, sunPosition} from 'margoengine/sky/astro';
+import {degrees} from 'margoengine/sky/sun';
+const date = new Date('2026-06-21T12:00:00Z');
+const {latitude, longitude} = subsolarPoint(date); // 23.44 N, 0.43 E: the equation of time puts the Sun east of Greenwich
+// A globe with north on +Y and Greenwich on +X has the horizon frame of an observer on the pole at 90 W: light it with
+const toSun = sunPosition(date, {latitude: degrees(90), longitude: degrees(-90)}, {refraction: false}).direction;
+console.log(latitude.degrees.toFixed(2), longitude.degrees.toFixed(2), toSun);
+```
 
 The sun follows Meeus' low-accuracy method (about 0.01 degree), the moon his full series of chapter 47 (about 10
 arcseconds) with its parallax from the observer, the planets Standish's Keplerian elements from JPL (valid 1800 to 2050,
@@ -2296,7 +2308,9 @@ brightness is `surfaceBrightness` V magnitudes per square arcsecond at the galac
 20.5; larger is fainter), scaled by the same magnitude-0 `brightness` as AstroSky's stars and by each pixel's solid
 angle, so band and stars keep their ratio at any field of view. It fades in with the sky's `nightFactor` (or, without a
 sky, as the sun sinks to 12 degrees below the horizon), is dimmed by `extinction` toward the horizon and is not drawn
-below it. `clouds` (0 to 1) sets the contrast of seamless star clouds and dark lanes, `seed` their pattern. Without
+below it. `clouds` (0 to 1) sets the contrast of seamless star clouds and dark lanes, `seed` their pattern. `horizon: false` draws the
+band over the whole sphere with no extinction, at full night unless a `sky` gives its `nightFactor`: the view from
+orbit, with an `AstroSky` that has `horizon: false` too. Without
 `astro`, pass `latitude`, `longitude` and `date`: the band then stays at that moment. `milkyWayBrightness(l, b)` and
 `galacticCoordinates(direction, date, observer)` give the model and the frame on the CPU. Invalid options throw
 `TypeError` or `RangeError`; WebGPU only.
