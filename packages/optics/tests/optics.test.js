@@ -16,6 +16,11 @@ import {
   minimumDeviationIncidence,
   hexagonalHaloProfile,
   traceGradedRay,
+  ciddorRefractivity,
+  heatedAirLayer,
+  layeredElevation,
+  refractVector,
+  tracePolygon,
 } from '../dist/refraction.js';
 import { malus, JonesVector, JonesMatrix, photoelasticTransmission, photoelasticColors } from '../dist/polarization.js';
 import {
@@ -46,7 +51,7 @@ import {
   cornerCubeReflect,
   knifeEdgeTransmission,
 } from '../dist/imaging.js';
-import { cieXYZ, spectralColor, SpectralIntegrator, wavelengthToLinearSRGB } from '../dist/spectrum.js';
+import { cieXYZ, planckRelative, spectralColor, SpectralIntegrator, wavelengthToLinearSRGB } from '../dist/spectrum.js';
 import * as root from '../dist/index.js';
 
 const deg = Math.PI / 180;
@@ -119,6 +124,79 @@ test('Graded index: n cos(theta) is conserved and a hot layer turns a falling ra
   close(medium.index(ray.turn.height), ray.invariant, 2e-8, 'n at the turning point equals the invariant');
   const steep = traceGradedRay(medium, { height: 0.5, elevation: -3 * deg, distance: 400 });
   assert.equal(steep.kind, 'ground');
+});
+
+test('heated air layer: Ciddor refractivity, exact gradient and inverse, exact mirage turning point', () => {
+  // Ciddor 1996 equation (1) at 550 nm: n - 1 = 2.77838e-4 for standard air; the refractivity falls with wavelength.
+  close(ciddorRefractivity(550), 2.77838e-4, 1e-9, 'Ciddor 550 nm');
+  assert.ok(ciddorRefractivity(450) > ciddorRefractivity(550) && ciddorRefractivity(550) > ciddorRefractivity(700));
+  const air = heatedAirLayer({ ambient: 26, surface: 58, depth: 0.02 });
+  close(air.farIndex, 1 + (ciddorRefractivity(550) * 288.15) / 299.15, 1e-16, 'far index');
+  assert.ok(air.index(0) < air.index(0.01) && air.index(0.01) < air.farIndex, 'hot air is optically thinner');
+  for (const y of [0.001, 0.01, 0.03, 0.1]) {
+    const h = 1e-7;
+    close(air.gradient(y), (air.index(y + h) - air.index(y - h)) / (2 * h), 1e-9, `gradient at ${y}`);
+    close(air.heightAt(air.index(y)), y, 1e-9, `inverse at ${y}`);
+  }
+  assert.ok(Number.isNaN(heatedAirLayer({ ambient: 20, surface: 20, depth: 0.02 }).heightAt(1.0003)), 'no layer, no inverse');
+  // With the inverse the turning point lies exactly where n equals the invariant (Born and Wolf 3.2.1), not between steps.
+  const deg = Math.PI / 180;
+  const ray = traceGradedRay(air, { height: 0.5, elevation: -0.3 * deg, distance: 640, ceiling: 0.5 });
+  assert.equal(ray.kind, 'ceiling');
+  assert.ok(ray.turn, 'turned');
+  close(air.index(ray.turn.height), ray.invariant, 1e-15, 'n at the turn is the invariant');
+  // The layer's own step controller is used by default: fine at the surface, coarse far above it.
+  close(air.step(0, -0.05), 0.065, 1e-15, 'fine at the surface');
+  close(air.step(5, 0.01), 8, 1e-12, 'coarse far above');
+  const fixed = traceGradedRay(air, { height: 0.5, elevation: -0.3 * deg, distance: 640, ceiling: 0.5, step: () => 1.25 });
+  assert.notEqual(fixed.distance, ray.distance, 'an explicit step overrides the medium');
+  // It leaves into still air at the elevation the invariant gives: symmetric with the start for a ray that started there.
+  close(layeredElevation(ray.invariant, air.index(0.5)), 0.3 * deg, 1e-12, 'leaves at the start elevation');
+  close(layeredElevation(1, 1), 0, 0, 'horizontal');
+  assert.throws(() => heatedAirLayer({ ambient: 26, surface: 58, depth: 0 }), RangeError);
+});
+
+test('SpectralIntegrator luminance: white is 1, a cut keeps the Y-weighted share', () => {
+  const integrator = new SpectralIntegrator({ min: 380, max: 740, step: 4 });
+  close(integrator.luminance(() => 1), 1, 1e-14, 'white');
+  close(integrator.luminance(() => 0.25), 0.25, 1e-14, 'grey');
+  // A long-pass edge at 555 nm (the Y peak) keeps about half the luminance; Y = sum ybar w R / sum ybar w by hand.
+  let num = 0, den = 0;
+  for (let i = 0; i < integrator.wavelengths.length; i++) {
+    const nm = integrator.wavelengths[i], w = planckRelative(nm, 6504) * (i === 0 || i === 90 ? 0.5 : 1), y = cieXYZ(nm)[1] * w;
+    num += (nm >= 555 ? 1 : 0) * y;
+    den += y;
+  }
+  close(integrator.luminance((nm) => (nm >= 555 ? 1 : 0)), num / den, 1e-14, 'long-pass');
+});
+
+test('refractVector obeys Snell in 2D and 3D; tracePolygon through an equilateral prism matches prismDeviation', () => {
+  const deg = Math.PI / 180;
+  for (const a of [0, 20, 45, 70]) {
+    const d = [Math.sin(a * deg), -Math.cos(a * deg)];
+    const t = refractVector(d, [0, 1], 1 / 1.5);
+    close(Math.asin(t[0]), snell(1, 1.5, a * deg), 1e-14, `2D ${a}`);
+    close(Math.hypot(...t), 1, 1e-15, 'unit');
+    // The normal may face either way.
+    assert.deepEqual(refractVector(d, [0, -1], 1 / 1.5), t);
+    const t3 = refractVector([d[0], d[1], 0], [0, 1, 0], 1 / 1.5);
+    close(t3[0], t[0], 1e-15, '3D x');
+  }
+  assert.equal(refractVector([Math.sin(60 * deg), -Math.cos(60 * deg)], [0, 1], 1.5), null, 'total internal reflection');
+  // Equilateral prism (apex up), ray from the left at 50 deg incidence on the left face.
+  const prism = [[-0.5, 0], [0.5, 0], [0, Math.sqrt(3) / 2]];
+  const n = 1.6, incidence = 50 * deg;
+  // The left face's inward normal points 30 deg below horizontal; turning it 50 deg up gives a 20 deg ray toward the apex.
+  const dir = [Math.cos(20 * deg), Math.sin(20 * deg)];
+  const hit = [-0.25, Math.sqrt(3) / 4];
+  const ray = tracePolygon(prism, [hit[0] - dir[0], hit[1] - dir[1]], dir, n);
+  assert.ok(ray, 'traced');
+  close(ray.entry[0], hit[0], 1e-12, 'entry x');
+  assert.equal(ray.entryEdge, 2);
+  assert.equal(ray.exitEdge, 1);
+  const turned = Math.acos(dir[0] * ray.direction[0] + dir[1] * ray.direction[1]);
+  close(turned, prismDeviation(60 * deg, incidence, n).deviation, 1e-12, 'deviation');
+  assert.equal(tracePolygon(prism, [5, 5], [1, 0], n), null, 'miss');
 });
 
 test('Malus cos^2 and Jones calculus', () => {

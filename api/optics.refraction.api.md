@@ -33,6 +33,8 @@ export interface FresnelReflectance {
 export interface GradedIndex {
     index(y: number): number;
     gradient(y: number): number;
+    heightAt?(n: number): number;
+    step?(y: number, slope: number): number;
 }
 
 export interface GradedRay {
@@ -67,7 +69,29 @@ export interface HaloProfileOptions {
     readonly blur?: number;
 }
 
+export interface HeatedAir extends GradedIndex {
+    readonly farIndex: number;
+    heightAt(n: number): number;
+    step(y: number, slope: number): number;
+}
+
+export interface HeatedAirOptions {
+    readonly ambient: number;
+    readonly surface: number;
+    readonly depth: number;
+    readonly wavelength?: number;
+}
+
 export const N_BK7: SellmeierCoefficients;
+
+export interface PolygonRay {
+    readonly entry: [number, number];
+    readonly entryEdge: number;
+    readonly inside: [number, number];
+    readonly exit: [number, number];
+    readonly exitEdge: number;
+    readonly direction: [number, number];
+}
 
 export interface PrismRay {
     readonly incidence: number;
@@ -88,13 +112,19 @@ export function cauchyFromAbbe(nd: number, abbe: number): CauchyCoefficients;
 
 export function cauchyIndex(nm: number, coefficients: CauchyCoefficients): number;
 
+export function ciddorRefractivity(nm: number): number;
+
 export function criticalAngle(n1: number, n2: number): number | null;
 
 export function fresnelAmplitudes(n1: number, n2: number, incidence: number): FresnelAmplitudes | null;
 
 export function fresnelReflectance(n1: number, n2: number, incidence: number): FresnelReflectance;
 
+export function heatedAirLayer(options: HeatedAirOptions): HeatedAir;
+
 export function hexagonalHaloProfile(options: HaloProfileOptions): Float64Array;
+
+export function layeredElevation(invariant: number, n: number): number;
 
 export function minimumDeviation(apex: number, n: number): number;
 
@@ -102,9 +132,13 @@ export function minimumDeviationIncidence(apex: number, n: number): number;
 
 export function prismDeviation(apex: number, incidence: number, n: number): PrismRay | null;
 
+export function refractVector(direction: ArrayLike<number>, normal: ArrayLike<number>, ratio: number): number[] | null;
+
 export function sellmeierIndex(nm: number, coefficients: SellmeierCoefficients): number;
 
 export function snell(n1: number, n2: number, incidence: number): number | null;
 
 export function traceGradedRay(medium: GradedIndex, options: GradedRayOptions): GradedRay;
+
+export function tracePolygon(vertices: readonly (readonly [number, number])[], origin: readonly [number, number], direction: readonly [number, number], index: number, ambient?: number): PolygonRay | null;
 ```

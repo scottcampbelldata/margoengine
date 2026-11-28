@@ -9,12 +9,12 @@ nanometres unless a parameter says metres, and argument errors throw `RangeError
 
 | Entry | What it holds |
 | --- | --- |
-| `@margoengine/optics/refraction` | `snell`, `criticalAngle`, `brewsterAngle`, `fresnelAmplitudes`, `fresnelReflectance`, `sellmeierIndex` with `FUSED_SILICA` and `N_BK7`, `cauchyFromAbbe`, `cauchyIndex`, `prismDeviation`, `minimumDeviation`, `minimumDeviationIncidence`, `hexagonalHaloProfile`, `traceGradedRay` |
+| `@margoengine/optics/refraction` | `snell`, `criticalAngle`, `brewsterAngle`, `fresnelAmplitudes`, `fresnelReflectance`, `sellmeierIndex` with `FUSED_SILICA` and `N_BK7`, `cauchyFromAbbe`, `cauchyIndex`, `prismDeviation`, `minimumDeviation`, `minimumDeviationIncidence`, `hexagonalHaloProfile`, `traceGradedRay`, `layeredElevation`, `ciddorRefractivity`, `heatedAirLayer`, `refractVector`, `tracePolygon` |
 | `@margoengine/optics/polarization` | `malus`, `JonesVector`, `JonesMatrix` (polariser, retarder, `after`, `apply`), `photoelasticTransmission`, `photoelasticColors`, `photoelasticRetardation`, `diametralDiscStress` |
 | `@margoengine/optics/interference` | `thinFilmReflectance`, `multilayerReflectance`, `quarterWaveStack`, `thinFilmColor`, `michelsonFringes`, `michelsonIntensity`, `michelsonTilt`, `moireSpacing` |
 | `@margoengine/optics/diffraction` | `gratingAngle`, `gratingOrders`, `besselJ`, `airyIntensity`, `airyFirstZero`, `fresnelNumber`, `circularPointSpread` |
 | `@margoengine/optics/imaging` | `thinLens`, `pinholeImage`, `relativeIllumination`, `astigmaticFoci`, `astigmaticImage`, `designFresnelLens`, `cornerCubeReflect`, `airIndexTemperatureSlope`, `knifeEdgeTransmission` |
-| `@margoengine/optics/spectrum` | `cieXYZ`, `xyzToLinearSRGB`, `wavelengthToLinearSRGB`, `spectralColor`, `planckRelative`, `SpectralIntegrator` |
+| `@margoengine/optics/spectrum` | `cieXYZ`, `xyzToLinearSRGB`, `wavelengthToLinearSRGB`, `spectralColor`, `planckRelative`, `SpectralIntegrator` (`color`, `luminance`) |
 
 The root entry re-exports all six; import an entry to load only that topic.
 
@@ -34,7 +34,21 @@ console.log(inside, tir, glare.p, n, halo);
 `hexagonalHaloProfile({ indices })` bins the light through randomly oriented hexagonal ice columns by scattering
 angle, one channel per index, for a halo texture. `traceGradedRay(medium, options)` follows a ray through a medium whose
 index changes with height (mirages, looming) by fourth-order Runge-Kutta on the ray equation; `n cos(elevation)` is
-kept to integration accuracy and the turning point is reported.
+kept to integration accuracy and the turning point is reported. `heatedAirLayer` is the medium for a road or desert
+mirage (Ciddor's dry-air refractivity, a temperature excess that falls off with height); its exact inverse puts the
+turning point where n equals the ray invariant, and `layeredElevation` gives the angle a ray leaves the layer at.
+`refractVector` is Snell's law for 2D or 3D direction vectors, and `tracePolygon` follows a 2D ray in and out of a
+convex prism.
+
+```ts
+import { heatedAirLayer, layeredElevation, traceGradedRay, tracePolygon } from '@margoengine/optics/refraction';
+const deg = Math.PI / 180;
+const air = heatedAirLayer({ ambient: 26, surface: 62, depth: 0.02 }); // 36 C hotter at the asphalt
+const ray = traceGradedRay(air, { height: 0.5, elevation: -0.32 * deg, distance: 640, ceiling: 0.5 });
+console.log(ray.kind, ray.turn?.height, layeredElevation(ray.invariant, air.farIndex) / deg); // 'ceiling', ~0.013 m, 0.32
+const prism = tracePolygon([[-0.5, 0], [0.5, 0], [0, 0.866]], [-0.9, 0.1], [Math.cos(20 * deg), Math.sin(20 * deg)], 1.6);
+console.log(prism?.exitEdge, prism?.direction); // leaves through the right face, bent toward the base
+```
 
 ## Polarisation
 
@@ -99,7 +113,8 @@ const laserGreen = spectralColor(532); // display colour of a spectral line, bri
 const integrator = new SpectralIntegrator({ step: 4, illuminant: 6504 });
 const white = integrator.color(() => 1); // [1, 1, 1]
 const blueFilter = integrator.color((nm) => (nm < 500 ? 1 : 0));
-console.log(xyz, laserGreen, white, blueFilter);
+const kept = integrator.luminance((nm) => (nm < 500 ? 1 : 0)); // share of the brightness the filter passes
+console.log(xyz, laserGreen, white, blueFilter, kept);
 ```
 
 ## Sources
@@ -128,6 +143,9 @@ Written clean room from these publications; no other engine's or paper's code wa
   2014. https://doi.org/10.1137/130932132 (Bessel integrals).
 - I. Amidror, *The Theory of the Moire Phenomenon*, vol. 1, 2nd ed., Springer, 2009.
   https://doi.org/10.1007/978-1-84882-181-1
+- P. E. Ciddor, "Refractive index of air: new equations for the visible and near infrared", Applied Optics 35(9),
+  1566-1573, 1996. https://doi.org/10.1364/AO.35.001566
+- A. S. Glassner (ed.), *An Introduction to Ray Tracing*, Academic Press, 1989, chapter 6 (vector refraction).
 - G. S. Settles, *Schlieren and Shadowgraph Techniques*, Springer, 2001. https://doi.org/10.1007/978-3-642-56640-0
 - C. Wyman, P.-P. Sloan and P. Shirley, "Simple Analytic Approximations to the CIE XYZ Color Matching Functions",
   JCGT 2(2), 1-11, 2013. https://jcgt.org/published/0002/02/01/

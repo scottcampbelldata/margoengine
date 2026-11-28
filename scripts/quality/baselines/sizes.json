@@ -15272,6 +15272,12 @@
     },
     {
       "date": "2026-11-27",
+      "commit": "optics-demos-2",
+      "reason": "Optics/refraction moves from about 2140 to 3071 B gzip and its ceiling from 2394 to 3268 B; the optics root from about 6996 to 7952 B and its ceiling from 7252 to 8148 B. New: heatedAirLayer with Ciddor air refractivity and an exact turning point, layeredElevation, refractVector and tracePolygon, so the mirage and glasshouse demos carry no optics model. A separate entry would split one topic (refraction) across two imports for under 900 B. Core and Stage are unchanged.",
+      "grew": 2
+    },
+    {
+      "date": "2026-11-27",
       "commit": "lane-e-instanced-flow",
       "reason": "materials gains the instanced-curve-flow entry (many instances along curves, 18,332 B); shader editor-pass grows 114 B of NodeMaterial caster renewal after a texture or buffer is rebuilt (KB-SHADOW-STALEMOVE1).",
       "grew": 2
@@ -16152,12 +16158,12 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/optics": 7252,
+    "@margoengine/optics": 8148,
     "@margoengine/optics/diffraction": 1475,
     "@margoengine/optics/imaging": 1875,
     "@margoengine/optics/interference": 2668,
     "@margoengine/optics/polarization": 2210,
-    "@margoengine/optics/refraction": 2394,
+    "@margoengine/optics/refraction": 3268,
     "@margoengine/optics/spectrum": 1478,
     "@margoengine/physics": 945858,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 104696,

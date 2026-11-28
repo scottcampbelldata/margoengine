@@ -126,6 +126,8 @@ export class SpectralIntegrator {
   readonly wavelengths: Float64Array;
   /** Per-sample linear sRGB weights (three per wavelength), already divided by the white of the illuminant. */
   readonly weights: Float64Array;
+  /** Per-sample luminance (CIE Y) weights, already divided by the Y of the illuminant. */
+  readonly luminanceWeights: Float64Array;
 
   constructor(options: SpectralIntegratorOptions = {}) {
     const min = options.min ?? 380,
@@ -144,11 +146,16 @@ export class SpectralIntegrator {
           : lamp;
     this.wavelengths = new Float64Array(count);
     this.weights = new Float64Array(count * 3);
+    this.luminanceWeights = new Float64Array(count);
     const white = [0, 0, 0],
       rgb = [0, 0, 0];
+    let whiteY = 0;
     for (let i = 0; i < count; i++) {
       const nm = min + i * step;
       const w = power(nm) * (i === 0 || i === count - 1 ? 0.5 : 1);
+      const y = lobes(nm, Y) * w;
+      this.luminanceWeights[i] = y;
+      whiteY += y;
       wavelengthToLinearSRGB(nm, rgb);
       this.wavelengths[i] = nm;
       for (let c = 0; c < 3; c++) {
@@ -157,6 +164,15 @@ export class SpectralIntegrator {
       }
     }
     for (let i = 0; i < count * 3; i++) this.weights[i] /= white[i % 3];
+    for (let i = 0; i < count; i++) this.luminanceWeights[i] /= whiteY;
+  }
+
+  /** Luminance (CIE Y) of `spectrum(nm)` relative to the illuminant's: the fraction of the light's brightness kept. */
+  luminance(spectrum: (nm: number) => number): number {
+    let y = 0;
+    const { wavelengths, luminanceWeights } = this;
+    for (let i = 0; i < wavelengths.length; i++) y += spectrum(wavelengths[i]) * luminanceWeights[i];
+    return y;
   }
 
   /** Linear sRGB of `spectrum(nm)` (values 0..1 for a reflectance), relative to the illuminant's white. */

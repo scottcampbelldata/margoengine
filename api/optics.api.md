@@ -88,6 +88,8 @@ export interface FresnelReflectance {
 export interface GradedIndex {
     index(y: number): number;
     gradient(y: number): number;
+    heightAt?(n: number): number;
+    step?(y: number, slope: number): number;
 }
 
 export interface GradedRay {
@@ -125,6 +127,19 @@ export interface HaloProfileOptions {
     readonly bins?: number;
     readonly rays?: number;
     readonly blur?: number;
+}
+
+export interface HeatedAir extends GradedIndex {
+    readonly farIndex: number;
+    heightAt(n: number): number;
+    step(y: number, slope: number): number;
+}
+
+export interface HeatedAirOptions {
+    readonly ambient: number;
+    readonly surface: number;
+    readonly depth: number;
+    readonly wavelength?: number;
 }
 
 export class JonesMatrix {
@@ -194,6 +209,15 @@ export interface PointSpreadOptions {
 
 export type Polarization = 's' | 'p' | 'unpolarized';
 
+export interface PolygonRay {
+    readonly entry: [number, number];
+    readonly entryEdge: number;
+    readonly inside: [number, number];
+    readonly exit: [number, number];
+    readonly exitEdge: number;
+    readonly direction: [number, number];
+}
+
 export interface PrismRay {
     readonly incidence: number;
     readonly inside: number;
@@ -212,7 +236,9 @@ export interface SellmeierCoefficients {
 export class SpectralIntegrator {
     readonly wavelengths: Float64Array;
     readonly weights: Float64Array;
+    readonly luminanceWeights: Float64Array;
     constructor(options?: SpectralIntegratorOptions);
+    luminance(spectrum: (nm: number) => number): number;
     color<T extends NumberArray = number[]>(spectrum: (nm: number) => number, out?: T, offset?: number): T;
 }
 
@@ -255,6 +281,8 @@ export function cauchyFromAbbe(nd: number, abbe: number): CauchyCoefficients;
 
 export function cauchyIndex(nm: number, coefficients: CauchyCoefficients): number;
 
+export function ciddorRefractivity(nm: number): number;
+
 export function cieXYZ<T extends NumberArray = number[]>(nm: number, out?: T, offset?: number): T;
 
 export function circularPointSpread(options: PointSpreadOptions): PointSpread;
@@ -279,9 +307,13 @@ export function gratingAngle(order: number, nm: number, linesPerMm: number, inci
 
 export function gratingOrders(nm: number, linesPerMm: number, incidence?: number, maxAngle?: number): GratingOrder[];
 
+export function heatedAirLayer(options: HeatedAirOptions): HeatedAir;
+
 export function hexagonalHaloProfile(options: HaloProfileOptions): Float64Array;
 
 export function knifeEdgeTransmission(deflection: number, options: KnifeEdgeOptions): number;
+
+export function layeredElevation(invariant: number, n: number): number;
 
 export function malus(angle: number, intensity?: number): number;
 
@@ -315,6 +347,8 @@ export function prismDeviation(apex: number, incidence: number, n: number): Pris
 
 export function quarterWaveStack(high: number, low: number, pairs: number, designNm: number): Layer[];
 
+export function refractVector(direction: ArrayLike<number>, normal: ArrayLike<number>, ratio: number): number[] | null;
+
 export function relativeIllumination(slope: number): number;
 
 export function sellmeierIndex(nm: number, coefficients: SellmeierCoefficients): number;
@@ -330,6 +364,8 @@ export function thinFilmReflectance(film: ThinFilm, nm: number, angle?: number, 
 export function thinLens(focalLength: number, objectDistance: number): ThinLensImage;
 
 export function traceGradedRay(medium: GradedIndex, options: GradedRayOptions): GradedRay;
+
+export function tracePolygon(vertices: readonly (readonly [number, number])[], origin: readonly [number, number], direction: readonly [number, number], index: number, ambient?: number): PolygonRay | null;
 
 export function wavelengthToLinearSRGB<T extends NumberArray = number[]>(nm: number, out?: T, offset?: number): T;
 

@@ -9,6 +9,11 @@
 //   AGU 1994.
 // - Rays in a medium whose index varies with height (y'' = (1 + y'^2) n'(y) / n(y), with n cos(theta) conserved):
 //   Born and Wolf 1999, section 3.2.1 (the ray equation).
+// - Vector refraction t = r d + (r c - sqrt(1 - r^2 (1 - c^2))) n with c = -d . n: A. S. Glassner (ed.), An Introduction
+//   to Ray Tracing, Academic Press 1989, chapter 6 (Heckbert's derivation); Bec, "Faster refraction formula", 1997.
+// - Refractivity of standard dry air (15 C, 101 325 Pa, 450 ppm CO2): P. E. Ciddor, "Refractive index of air: new
+//   equations for the visible and near infrared", Applied Optics 35(9), 1566-1573, 1996, equation (1). At constant
+//   pressure n - 1 scales with density, so with 1 / T (Gladstone-Dale; Ciddor 1996 section 3).
 import { checkFinite, checkPositive } from './validate.js';
 
 /** Refraction angle (radians) from `n1` into `n2` at `incidence` radians, or null past the critical angle. */
@@ -258,6 +263,13 @@ export interface GradedIndex {
   index(y: number): number;
   /** dn/dy at height `y`. */
   gradient(y: number): number;
+  /**
+   * Optional exact inverse: the height where the index equals `n`. When given, {@link traceGradedRay} places the
+   * turning point there (n at the turn equals the ray invariant) instead of interpolating between two steps.
+   */
+  heightAt?(n: number): number;
+  /** Optional step controller (horizontal step for a height and slope), used when the trace options give none. */
+  step?(y: number, slope: number): number;
 }
 
 /** Options of {@link traceGradedRay}. */
@@ -272,7 +284,7 @@ export interface GradedRayOptions {
   readonly ceiling?: number;
   /** Ground height: the ray stops when it reaches it. Default 0. */
   readonly ground?: number;
-  /** Horizontal step for a given height and slope. Default a constant distance / 512. */
+  /** Horizontal step for a given height and slope. Default the medium's `step`, else a constant distance / 512. */
   readonly step?: (y: number, slope: number) => number;
   /** Keep the path as [x, y] pairs. Default false. */
   readonly path?: boolean;
@@ -307,7 +319,7 @@ export function traceGradedRay(medium: GradedIndex, options: GradedRayOptions): 
   const limit = options.distance,
     ground = options.ground ?? 0,
     ceiling = options.ceiling ?? Infinity;
-  const stepOf = options.step ?? (() => limit / 512);
+  const stepOf = options.step ?? (medium.step ? (y: number, s: number) => medium.step!(y, s) : () => limit / 512);
   let x = 0,
     y = options.height,
     slope = Math.tan(options.elevation);
@@ -343,7 +355,8 @@ export function traceGradedRay(medium: GradedIndex, options: GradedRayOptions): 
     }
     if (slope < 0 && nextSlope >= 0) {
       const f = -slope / (nextSlope - slope);
-      turn = { distance: x + f * step, height: y + f * (nextY - y) };
+      const exact = medium.heightAt?.(invariant);
+      turn = { distance: x + f * step, height: Number.isFinite(exact) ? (exact as number) : y + f * (nextY - y) };
     }
     x += step;
     y = nextY;
@@ -351,4 +364,171 @@ export function traceGradedRay(medium: GradedIndex, options: GradedRayOptions): 
     points?.push([x, y]);
   }
   return done('far', x, y, slope);
+}
+
+/**
+ * Elevation (radians, 0 to pi / 2) of a layered-medium ray with Snell invariant `invariant` (n cos(elevation)) where the
+ * index is `n`: where a mirage ray leaves the hot layer into still air, or 0 where it is horizontal.
+ */
+export function layeredElevation(invariant: number, n: number): number {
+  checkPositive('layeredElevation', 'invariant', invariant);
+  checkPositive('layeredElevation', 'n', n);
+  return Math.acos(Math.min(1, invariant / n));
+}
+
+/**
+ * Phase refractivity n - 1 of standard dry air (15 C, 101 325 Pa, 450 ppm CO2) at `nm` nanometres, Ciddor (1996)
+ * equation (1), valid 230 to 1690 nm: 2.7784e-4 at 550 nm.
+ */
+export function ciddorRefractivity(nm: number): number {
+  checkPositive('ciddorRefractivity', 'nm', nm);
+  const s2 = 1 / (nm / 1000) ** 2;
+  return (5792105 / (238.0185 - s2) + 167917 / (57.362 - s2)) * 1e-8;
+}
+
+/** Options of {@link heatedAirLayer}. */
+export interface HeatedAirOptions {
+  /** Air temperature well above the surface, degrees Celsius. */
+  readonly ambient: number;
+  /** Air temperature at the surface, degrees Celsius (hotter for an inferior mirage, colder for looming). */
+  readonly surface: number;
+  /** Height over which the temperature excess falls by 1 / e, metres. */
+  readonly depth: number;
+  /** Wavelength, nanometres. Default 550. */
+  readonly wavelength?: number;
+}
+
+/** A heated (or cooled) air layer over a surface: a {@link GradedIndex} with its exact inverse. */
+export interface HeatedAir extends GradedIndex {
+  /** Index of the still air far above the layer. */
+  readonly farIndex: number;
+  heightAt(n: number): number;
+  /**
+   * Step controller that resolves the layer: about 3 layer depths at the surface for steep rays, shrinking with the slope
+   * for grazing rays (whose bending happens over a long run), and up to 400 depths well above the layer.
+   */
+  step(y: number, slope: number): number;
+}
+
+/**
+ * Air over a hot road or desert floor: T(y) = T_ambient + (T_surface - T_ambient) exp(-max(0, y) / depth) at constant
+ * pressure, n(y) = 1 + N_0 T_0 / T(y) with N_0 the Ciddor refractivity at T_0 = 288.15 K. Hand it to
+ * {@link traceGradedRay} to trace an inferior mirage; `heightAt` makes the turning point exact.
+ */
+export function heatedAirLayer(options: HeatedAirOptions): HeatedAir {
+  checkFinite('heatedAirLayer', 'ambient', options.ambient);
+  checkFinite('heatedAirLayer', 'surface', options.surface);
+  checkPositive('heatedAirLayer', 'depth', options.depth);
+  const ambient = options.ambient + 273.15,
+    heat = options.surface - options.ambient,
+    depth = options.depth;
+  if (!(ambient > 0) || !(ambient + heat > 0)) throw new RangeError('heatedAirLayer: temperatures must be above absolute zero');
+  const density = ciddorRefractivity(options.wavelength ?? 550) * 288.15;
+  const excess = (y: number) => heat * Math.exp(-Math.max(0, y) / depth);
+  return {
+    farIndex: 1 + density / ambient,
+    index: (y) => 1 + density / (ambient + excess(y)),
+    gradient: (y) => {
+      const e = excess(y),
+        kelvin = ambient + e;
+      return (density * e) / (depth * kelvin * kelvin);
+    },
+    step: (y, slope) =>
+      Math.max(3.25 * depth, Math.min(400 * depth, 9.5 * depth + 67 * y, (0.05 * depth + 0.105 * y) / Math.max(Math.abs(slope), 0.002))),
+    heightAt: (n) => {
+      if (!heat || !(n > 1)) return NaN;
+      const ratio = (density / (n - 1) - ambient) / heat;
+      return ratio > 0 && ratio <= 1 ? -depth * Math.log(ratio) : NaN;
+    },
+  };
+}
+
+/**
+ * Refracted unit direction of the unit `direction` at a surface with unit `normal` (either side; it is flipped to face
+ * the ray), for `ratio` = n_from / n_to. Works for 2D and 3D arrays. Null on total internal reflection.
+ */
+export function refractVector(direction: ArrayLike<number>, normal: ArrayLike<number>, ratio: number): number[] | null {
+  checkPositive('refractVector', 'ratio', ratio);
+  const m = direction.length;
+  let c = 0;
+  for (let i = 0; i < m; i++) c -= direction[i] * normal[i];
+  const sign = c < 0 ? -1 : 1;
+  c *= sign;
+  const k = 1 - ratio * ratio * (1 - c * c);
+  if (k < 0) return null;
+  const along = ratio * c - Math.sqrt(k);
+  const out = new Array<number>(m);
+  let length = 0;
+  for (let i = 0; i < m; i++) {
+    out[i] = ratio * direction[i] + along * sign * normal[i];
+    length += out[i] * out[i];
+  }
+  length = Math.sqrt(length);
+  for (let i = 0; i < m; i++) out[i] /= length;
+  return out;
+}
+
+/** A ray through a polygonal prism, from {@link tracePolygon}. */
+export interface PolygonRay {
+  /** Point where the ray enters, and the index of that edge (edge i runs from vertex i to i + 1). */
+  readonly entry: [number, number];
+  readonly entryEdge: number;
+  /** Unit direction inside the glass. */
+  readonly inside: [number, number];
+  /** Point where the ray leaves, and that edge. */
+  readonly exit: [number, number];
+  readonly exitEdge: number;
+  /** Unit direction after leaving. */
+  readonly direction: [number, number];
+}
+
+/**
+ * Traces a 2D ray from `origin` along the unit `direction` through a convex polygon of index `index` in a medium of
+ * `ambient` (default 1): refraction in at the first edge it meets, straight through, refraction out at the far edge. Null
+ * when it misses the polygon or is totally internally reflected at the exit.
+ */
+export function tracePolygon(
+  vertices: readonly (readonly [number, number])[],
+  origin: readonly [number, number],
+  direction: readonly [number, number],
+  index: number,
+  ambient = 1,
+): PolygonRay | null {
+  checkPositive('tracePolygon', 'index', index);
+  checkPositive('tracePolygon', 'ambient', ambient);
+  const count = vertices.length;
+  const perp = (a: readonly number[], b: readonly number[]) => a[0] * b[1] - a[1] * b[0];
+  const first = (from: readonly number[], d: readonly number[], skip: number) => {
+    let best: { distance: number; edge: number } | null = null;
+    for (let e = 0; e < count; e++) {
+      if (e === skip) continue;
+      const a = vertices[e],
+        b = vertices[(e + 1) % count];
+      const edge = [b[0] - a[0], b[1] - a[1]],
+        offset = [a[0] - from[0], a[1] - from[1]];
+      const denominator = perp(d, edge);
+      if (!denominator) continue;
+      const distance = perp(offset, edge) / denominator,
+        across = perp(offset, d) / denominator;
+      if (distance > 1e-9 && across >= 0 && across <= 1 && (!best || distance < best.distance)) best = { distance, edge: e };
+    }
+    return best;
+  };
+  const normalOf = (e: number): [number, number] => {
+    const a = vertices[e],
+      b = vertices[(e + 1) % count];
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    return [(b[1] - a[1]) / l, -(b[0] - a[0]) / l];
+  };
+  const hitIn = first(origin, direction, -1);
+  if (!hitIn) return null;
+  const entry: [number, number] = [origin[0] + direction[0] * hitIn.distance, origin[1] + direction[1] * hitIn.distance];
+  const inside = refractVector(direction, normalOf(hitIn.edge), ambient / index) as [number, number] | null;
+  if (!inside) return null;
+  const hitOut = first(entry, inside, hitIn.edge);
+  if (!hitOut) return null;
+  const exit: [number, number] = [entry[0] + inside[0] * hitOut.distance, entry[1] + inside[1] * hitOut.distance];
+  const out = refractVector(inside, normalOf(hitOut.edge), index / ambient) as [number, number] | null;
+  if (!out) return null;
+  return { entry, entryEdge: hitIn.edge, inside, exit, exitEdge: hitOut.edge, direction: out };
 }

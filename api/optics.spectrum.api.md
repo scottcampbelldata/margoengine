@@ -10,7 +10,9 @@ export const SECOND_RADIATION_CONSTANT = 14387768.77;
 export class SpectralIntegrator {
     readonly wavelengths: Float64Array;
     readonly weights: Float64Array;
+    readonly luminanceWeights: Float64Array;
     constructor(options?: SpectralIntegratorOptions);
+    luminance(spectrum: (nm: number) => number): number;
     color<T extends NumberArray = number[]>(spectrum: (nm: number) => number, out?: T, offset?: number): T;
 }
 
