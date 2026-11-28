@@ -15,10 +15,7 @@ export const shaftRadius = .061;
 /** The water stands 2.8 mm below the spill line, so it never sheets over the blade's inner edge. */
 const screw = archimedesScrew({pitch, outerRadius: shellRadius, innerRadius: shaftRadius, incline, length: run, freeboard: .0028});
 export const phaseRate = (rpm) => rpm*tau/60;
-export const lift = screw.lift;
-export const risePerTurn = screw.risePerTurn;
 export const lead = screw.lead;
-export const fillLevel = screw.fillLevel;
 export const wetSection = screw.wetSection;
 export const litersPerTurn = 1000*screw.volumePerTurn;
 export const read = (speed) => {
