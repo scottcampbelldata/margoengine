@@ -62,6 +62,11 @@ export interface BiomeObjectsOptions {
     readonly seasons?: BiomeSeasons;
     readonly meshes?: Readonly<Record<string, readonly BiomeMeshPart[]>>;
     readonly states?: (key: string, kind: 'bark' | 'foliage' | 'stone') => ScatterStateSource | undefined;
+    readonly contact?: boolean;
+    readonly ground?: {
+        set(key: string, footprints: ArrayLike<number>): void;
+        remove(key: string): void;
+    };
 }
 
 export const DETAIL_BUDGET = 134217728;
@@ -536,6 +541,9 @@ interface PlacedSpecies {
     readonly tags: readonly string[];
     readonly density: number;
     readonly clustered: boolean;
+    readonly sink?: number;
+    readonly alignToGround?: number;
+    readonly cover?: number;
 }
 
 interface PlacedTile {

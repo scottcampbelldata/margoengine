@@ -6,6 +6,44 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-28: Above the Treeline's scanned rocks are 1.3 to 1.5 times too bright and blotchy (KB-TREELINE-ROCKGRADE1, film asset)
+
+- **Repro:** measure `showcase-films/treeline-rocks/textures/rock_moss_set_0{1,2}_granite.jpg` in the film's asset
+  library. 33.3 and 22.2 percent of the atlas texels are empty (black). Linear luma over the covered texels is 0.2596
+  and 0.2233, where the script's target (0.75 x measured granite) is 0.173, ratios 1.50 and 1.29. Luma of 16 px blocks
+  varies by a coefficient of 0.46 and 0.50 (95th over 5th percentile 4.7 and 5.0); the normal maps tilt 13.1 and 28.0
+  degrees on average (95th percentile 31.6 and 87.3).
+- **Cause:** `grade()` in the film's `build_treeline_rocks.py` scales the albedo by `target / lin.mean(axis=0)` over
+  every texel, the empty ones included, so covered texels come out brighter than the target by the empty share. The
+  blotches are the scan's own half-desaturated moss over a strong normal map on meshes cut to 3,000 triangles. The fix
+  belongs to the film's asset owner: average covered texels only and soften the albedo toward its local mean.
+
+### Open 2026-11-28: a biome species' `lod` and `color.hue`/`color.value` change nothing (KB-BIOMES-DEADFIELDS1, biomes)
+
+- **Repro:** give a `SpeciesRule` `lod: [10, 20, 30]` or `color: { value: 1 }` and draw it with `BiomeView`: the
+  objects change level and tint exactly as without them.
+- **Cause:** `BiomeObjects` takes its rings from `radius` (`[r * 0.15, r * 0.4, r]`) and its tint from the mesh part's
+  kind; nothing reads `rule.lod`, and `rule.color` is read for `seasonal` only. (`sink` and `alignToGround` were the
+  same until KB-BIOMES-SINK1.)
+
+### Fixed 2026-11-28: a biome species' `sink` and `alignToGround` did nothing, so stones stood on the surface (KB-BIOMES-SINK1, biomes)
+
+- **Repro:** a `SpeciesRule` with `sink: 0.2, alignToGround: 0.65` drawn by `BiomeView`: upright objects on the
+  surface, their downhill side clear of the ground on a slope.
+- **Cause:** both fields were declared in `packages/biomes/src/define.ts` and never carried into the placed species or
+  the scatters.
+- **Fix:** `PlacedSpecies` carries them and `BiomeObjects` passes them to each species' `ScatterTiles`. Test:
+  `packages/biomes/tests/contact.test.js` ("a species sink and alignToGround reach its scatters").
+
+### Fixed 2026-11-28: a textured scatter's occlusion map did nothing under a Sky (KB-SCATTER-SKYAO1, scatter)
+
+- **Repro:** a `Scatter` with `textures.occlusionRoughnessMetal` occlusion 128 in a scene with
+  `Sky.attach(engine, { lighting: { ambient } })`: exactly as bright as with occlusion 255.
+- **Cause:** the Sky replaces core's `frame.ambient` term with its own `margoAmbient`; Scatter multiplied only the
+  former.
+- **Fix:** one helper (`packages/shared/occlude-ambient.js`) multiplies every ambient term. Test:
+  `packages/scatter/test/contact.browser.mjs` (1.000 against 0.502 before and after).
+
 ### Fixed 2026-11-28: a shot drawn in sub-frames showed what moves fast as stepped copies, not a smear (KB-LOOK-TV-SUBSTEP1, shot tool, scenes)
 
 - **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-blowup.json --once --seconds 1.1` (RTX A6000,

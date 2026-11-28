@@ -11,6 +11,8 @@
 import type { EngineKernel, EnginePlugin } from '@margoengine/core';
 import type { Terrain, TerrainColorOptions, TerrainOptions } from '@margoengine/terrain';
 import type { WetGround, WetGroundLook } from '@margoengine/terrain/wet-ground';
+import type { TerrainGroundContact } from '@margoengine/terrain/ground-contact';
+import type { TerrainReliefLighting, TerrainReliefLightingOptions } from '@margoengine/terrain/relief-lighting';
 import type { Water, WaterLight, WaterOptions } from '@margoengine/water';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { captureScene } from '../../shared/scene-scope.js';
@@ -179,6 +181,20 @@ export interface BiomeViewOptions {
   readonly meshes?: import('./objects.js').BiomeObjectsOptions['meshes'];
   /** Burnt and flooded plant states of each part (`BiomeObjectsOptions.states`). Default none. */
   readonly states?: import('./objects.js').BiomeObjectsOptions['states'];
+  /**
+   * Stored objects meet the ground: darker and (on damp ground) mossy stone feet, soil on trunk feet, less sky light low
+   * in tree crowns (`BiomeObjectsOptions.contact`), and on the terrain a soil and litter apron with contact shade around
+   * every trunk and stone (`TerrainGroundContact` of `@margoengine/terrain/ground-contact`, `view.groundContact`).
+   * Default true.
+   */
+  readonly contact?: boolean;
+  /**
+   * The ground's own relief shades it at every distance (`TerrainReliefLighting` of
+   * `@margoengine/terrain/relief-lighting`, `view.relief`): ridges cast on the ground behind them and gullies keep less
+   * of the sky, past the reach of `shadows` too. Rebaked when the engine's sun turns or the world's heights change.
+   * `false` leaves it out; settings pass through. Default true.
+   */
+  readonly relief?: boolean | TerrainReliefLightingOptions;
   /**
    * A fire and flood history (`disturbanceOf(world, ...)` of `@margoengine/biomes/disturbance`), or `{ history, ...settings }`
    * with the `disturbanceStates` settings: the view makes a `PlantStates` map over the world (`@margoengine/scatter/states`,
@@ -1001,6 +1017,10 @@ export class BiomeView implements Disposable {
   #plantStates?: PlantStates;
   /** The wet ground made for the `wetness` option. */
   #wetGround?: WetGround;
+  #groundContact?: TerrainGroundContact;
+  #relief?: TerrainReliefLighting;
+  /** The world's heights changed and the relief has not been rebaked over all of the new ones yet. */
+  #reliefStale = false;
   #statesOf?: import('./objects.js').BiomeObjectsOptions['states'];
   #water?: Water;
   #river?: { dispose(): void; readonly options: { fill(x: number, z: number): number | undefined } };
@@ -1213,6 +1233,7 @@ export class BiomeView implements Disposable {
     // A world change repaints the tint over its rectangle too (the world's region fields are rebuilt before it tells
     // listeners, and reading them there is allowed); each `seasons.set` repaints all of it.
     this.#off = world.onChange((rect) => {
+      this.#reliefStale = true;
       this.#dirty(rect, 'v');
       this.#retint?.(rect);
     });
@@ -1409,6 +1430,19 @@ export class BiomeView implements Disposable {
         let detail = view.textureResolution;
         while (!detailFits(bounds, detail, placement.details.length, limit, options.detailBudget)) detail *= 2;
         view.#detailStep = Math.round(detail / world.resolution); // float division: exact multiple
+        if (options.contact !== false) {
+          const { TerrainGroundContact } = await import('@margoengine/terrain/ground-contact');
+          // The soil is the world's own needle litter where it has that ground, else the entry's soil.
+          const litter = view.materials.includes('needles') ? look('needles', options.materials).color : undefined;
+          if (!view.#disposed)
+            view.#groundContact = held.run(() =>
+              TerrainGroundContact.attach(
+                engine,
+                view.terrain,
+                litter ? { color: litter.map((c) => srgbToLinear(c) * 0.8) as [number, number, number] } : {},
+              ),
+            );
+        }
         view.#objects = await held.run(() =>
           BiomeObjects.attach(engine, placement, {
             heightmap: () => view.#textures?.height,
@@ -1421,6 +1455,8 @@ export class BiomeView implements Disposable {
             detailBudget: options.detailBudget,
             ...(seasons ? { seasons } : {}),
             ...(options.meshes ? { meshes: options.meshes } : {}),
+            ...(options.contact !== undefined ? { contact: options.contact } : {}),
+            ...(view.#groundContact ? { ground: view.#groundContact } : {}),
             ...(view.#statesOf ? { states: view.#statesOf } : options.states ? { states: options.states } : {}),
             ...(view.#farEnabled && options.far !== false
               ? {
@@ -1440,6 +1476,14 @@ export class BiomeView implements Disposable {
       await overview;
       // The far ground takes the overview's edge weights, and registers in the scene the view was attached from.
       if (view.#makeHorizon && !view.#disposed) view.#horizon = held.run(() => view.#makeHorizon!());
+      const relief = options.relief ?? true;
+      if (relief !== false && !view.#disposed) {
+        const { TerrainReliefLighting } = await import('@margoengine/terrain/relief-lighting');
+        if (!view.#disposed)
+          view.#relief = held.run(() =>
+            TerrainReliefLighting.attach(engine, view.terrain, { follow: true, ...(relief === true ? {} : relief) }),
+          );
+      }
       if (wetness && !view.#disposed) {
         const { WetGround } = await import('@margoengine/terrain/wet-ground');
         // The look and the dry time are the ones the plants were given; the record stays borrowed.
@@ -2226,6 +2270,11 @@ export class BiomeView implements Disposable {
 
   /** Uploads a texel rectangle of the CPU copies (kept for device restoration). */
   #upload(u: number, v: number, w: number, d: number): void {
+    // The next frame rebakes from the heights written by then; further changed tiles mark it again until none wait.
+    if (this.#reliefStale) {
+      this.#relief?.refresh();
+      this.#reliefStale = this.#pending.size > 0;
+    }
     const t = this.#textures;
     if (!t || w <= 0 || d <= 0) return;
     const rows = new Float32Array(w * d),
@@ -2266,9 +2315,22 @@ export class BiomeView implements Disposable {
     return this.#plantStates;
   }
 
+  /** The ground's relief shading (`relief`), undefined without it. */
+  get relief(): TerrainReliefLighting | undefined {
+    return this.#relief;
+  }
+
   /** The wet ground effect made for the `wetness` option (its `setLook` changes the look live), or undefined without one. */
   get wetGround(): WetGround | undefined {
     return this.#wetGround;
+  }
+
+  /**
+   * The soil and contact shade around the stored trunks and stones (`contact`, with `objects`); undefined without
+   * them. Add your own meshes' feet with `view.groundContact?.set('mine', [x, z, radius, 1])`.
+   */
+  get groundContact(): TerrainGroundContact | undefined {
+    return this.#groundContact;
   }
 
   /**
@@ -2364,6 +2426,8 @@ export class BiomeView implements Disposable {
     // The engine's removePlugin acts on the active scene, which may have changed since attach.
     if (this.#plugin) this.#engine.sceneOf(this.#plugin)?.removePlugin(this.#plugin.name);
     this.#wetGround?.dispose();
+    this.#groundContact?.dispose();
+    this.#relief?.dispose();
     this.terrain.dispose();
     this.#horizon?.dispose();
     this.#objects?.dispose();

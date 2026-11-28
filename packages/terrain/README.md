@@ -1604,6 +1604,37 @@ engine.start();
   1.19 times the dry ground's); at `dryTime` it is the layer times 1 - 0.45 / e, and at 20 x `dryTime` the plain terrain.
   Limits: one wetness a flood cell, the same darkening for every layer, no evaporation model (docs/limits.md).
 
+## Soil and contact shade at the feet: `@margoengine/terrain/ground-contact`
+
+`TerrainGroundContact.attach(engine, terrain)` draws the ground around the feet of the objects standing on it: a ring
+of soil and litter, and the sky light the object keeps from the ground. Give it footprints by key, flat
+`[x, z, radius, kind, ...]` in world metres, kind 0 a trunk and 1 a stone; `BiomeView` feeds it every stored trunk and
+stone by itself (`view.groundContact`).
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Terrain } from '@margoengine/terrain';
+import { TerrainGroundContact } from '@margoengine/terrain/ground-contact';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const terrain = Terrain.attach(engine, { size: [256, 256] });
+const contact = TerrainGroundContact.attach(engine, terrain);
+contact.set('camp', [4, -2, 0.6, 1, 9, 3, 0.25, 0]); // a boulder and a tree trunk
+contact.setLook({ soil: 0.8 });
+engine.start();
+```
+
+- Sky lost at distance d from a footprint of radius r: `(1 + (d / r)^2)^-1.5`, the form factor of a sphere resting
+  there (Quilez, https://iquilezles.org/articles/sphereao/; Evans, "Fast Approximations for Global Illumination on
+  Dynamic Scenes", SIGGRAPH 2006), faded out from 3.5 to 4 radii; a trunk takes 0.6 of it (chosen).
+- Soil: a trunk's thins as `exp(-s / (1.1 r))` past the bark and ends 3 radii out (duff is deepest at the stem: Ryan
+  and Frandsen 1991, International Journal of Wildland Fire 1(2):107-118,
+  https://www.fs.usda.gov/rm/pubs/rmrs_gtr292/1991_ryan.pdf; the numbers are a chosen fit). A stone's is a narrow ring
+  whose width and 0.75 strength are chosen, with no measurement behind them.
+- Options (defaults): `color` ([0.1, 0.08, 0.055] linear), `soil` (1), `occlusion` (1), live through `setLook`;
+  `texel` (0.2 m), `resolution` (1024: the mask covers 205 m around the camera, 2 MB), `binding` (124, three bindings).
+- The mask is baked on the CPU and re-centred as the camera moves; footprints past it draw nothing until it reaches
+  them. A footprint is a circle, and meshes you place yourself get one only from your own `set`.
+
 ## Mesh to terrain blending: `@margoengine/terrain/blend`
 
 `TerrainBlend.attach(engine, terrain, virtualTexture, options)` blends rocks, cliffs and buildings into the ground they

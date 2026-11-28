@@ -101,6 +101,11 @@ export interface PlacedSpecies {
   /** Plants per hectare at full suitability, and whether a cluster rule gathers them. */
   readonly density: number;
   readonly clustered: boolean;
+  /** The rule's `sink` and `alignToGround`, how the objects stand on the ground; undefined when the rule gives none. */
+  readonly sink?: number;
+  readonly alignToGround?: number;
+  /** The share of a stand the species' `stands` rule closes, 0-1; undefined without one. */
+  readonly cover?: number;
 }
 
 /** A detail species' density over a tile: `value / 255 * density` instances per square metre. */
@@ -439,6 +444,9 @@ function planOf(biomes: readonly BiomeDefinition[], options: PlacementOptions): 
           tags: Object.freeze([...(rule.tags ?? [])]),
           density: rule.density,
           clustered: !!rule.cluster,
+          sink: rule.sink,
+          alignToGround: rule.alignToGround,
+          cover: rule.stands?.cover,
           index,
           code,
           biomeIndex,
@@ -1467,6 +1475,9 @@ export class BiomePlacement implements Disposable {
           tags: s.tags,
           density: s.density,
           clustered: s.clustered,
+          sink: s.sink,
+          alignToGround: s.alignToGround,
+          cover: s.cover,
         }),
       ),
     );

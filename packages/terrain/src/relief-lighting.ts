@@ -18,6 +18,11 @@ export interface TerrainReliefLightingOptions {
   softness?: number;
   /** World units per input texel value, finite. Default 1 or the Terrain's height scale. */
   heightScale?: number;
+  /**
+   * The terrain plugin rebakes by itself in the first frame after the engine light has turned more than half a degree
+   * from the baked sun (without a `direction` option) or after `refresh()`. Default false: call `rebake()`.
+   */
+  follow?: boolean;
 }
 
 const TEXTURE_BINDING = 0x04;
@@ -234,6 +239,9 @@ export class TerrainReliefLighting implements EnginePlugin, TerrainLighting, Dis
   #remove?: () => void;
   #entries: GPUBindGroupEntry[] = [];
   readonly #shaders = new Map<string, string>();
+  /** The unit sun of the last bake, and whether the heights changed since. */
+  #sun: readonly number[] = [0, 1, 0];
+  #stale = false;
 
   constructor(
     private readonly terrain: Terrain,
@@ -283,11 +291,29 @@ export class TerrainReliefLighting implements EnginePlugin, TerrainLighting, Dis
     if (!this.terrain.heightmap)
       throw new MargoError('state', 'Attach the clipmap Terrain before its relief lighting.');
     const { direction } = engine.lighting;
-    return bakeTerrainReliefLighting(engine.gpu!, this.terrain.heightmap, this.terrain.options.size, {
-      ...options,
-      direction: options.direction ?? [direction[0], direction[1], direction[2]],
-      heightScale: options.heightScale ?? this.terrain.options.heightScale ?? 100,
-    });
+    const sun = options.direction ?? ([direction[0], direction[1], direction[2]] as const),
+      baked = bakeTerrainReliefLighting(engine.gpu!, this.terrain.heightmap, this.terrain.options.size, {
+        ...options,
+        direction: sun,
+        heightScale: options.heightScale ?? this.terrain.options.heightScale ?? 100,
+      }),
+      length = Math.hypot(...sun);
+    this.#sun = sun.map((v) => v / length); // float division: view only
+    this.#stale = false;
+    return baked;
+  }
+
+  /** With `follow`, marks the heights as changed: the next frame rebakes once, however many edits there were. */
+  refresh(): void {
+    this.#stale = true;
+  }
+
+  /** Whether the light has turned more than half a degree from the baked sun. */
+  #turned(): boolean {
+    const d = this.owner!.lighting.direction,
+      length = Math.hypot(d[0], d[1], d[2]);
+    if (this.#options.direction || !(length > 0)) return false;
+    return (d[0] * this.#sun[0] + d[1] * this.#sun[1] + d[2] * this.#sun[2]) / length < Math.cos(Math.PI / 360);
   }
 
   #apply(texture: GPUTexture): void {
@@ -351,6 +377,8 @@ fn terrainReliefApplied(uv:vec2f)->vec2f{
   }
 
   bindings(): GPUBindGroupEntry[] {
+    if (this.#options.follow && this.owner && this.#texture && (this.#stale || this.#turned()))
+      this.#apply(this.#bake(this.owner, this.#options));
     return this.#entries;
   }
 

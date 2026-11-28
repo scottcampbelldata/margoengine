@@ -11891,4 +11891,14 @@ accepted differences:
 
 Entry sizes are in scripts/quality/baselines/sizes.json.
 
+## Ground contact and relief in BiomeView (2026-11-28)
+
+- `TerrainGroundContact` footprints are circles baked on the CPU into a 1024 x 1024 mask of 0.2 m texels (205 m around
+  the camera, 2 MB), re-baked whole when footprints inside it change. Only stored stones and tree trunks are fed by
+  `BiomeView`; meshes placed by hand need `view.groundContact.set`. Grass drawn over the ground can hide the soil ring.
+- The stone ring's width and strength, a trunk's 0.6 of the sphere form factor, the foot bands' heights and the
+  canopy's optical depth (0.7 x stand cover over the lower half) are chosen on rendered frames, with no measurement behind them.
+- `relief` shades the terrain only (not the objects on it), from the height texture at `textureResolution`, and
+  multiplies with `shadows` where both reach: the same in umbra and light, darker only in soft edges.
+
 Grass leaf colour, clumps and clearings (2026-11-28, plants round 1). GrassShape gains hue (0 to 0.5, default 0.02), yellow (0 to 1, default 0.15), yellowColor (linear RGB 0 to 1, default ANGERS 2003 yellowing leaves [0.1432, 0.1794, 0.0382]), tipBrown (0 to 1, default 0.25) and transmittance (three numbers 0 to 4, default [1.0909, 1.1726, 0]); the colour terms apply in the lit (PBR) stage only, and transmittance only tints `blades.translucency` above 0. Scatter gains clumps ({ size above 0 up to 100000, cover 0 to 1, edge 0.001 to 1, default 0.2 }), clearings (up to 100,000 circles, each one exclusions-buffer row after the rectangles and path segments) and reach (0 to 100000 mesh units). Clumps and clearings are compiled into the distribute shader, so they are fixed for the scatter's life; `cover` is a threshold of the patch noise, not an exact share (0.5 kept 553 of 936 instances in grass.browser.mjs). Sizes: scatter 29,682 to 30,432 B gzip, scatter/grass 3,047 to 3,432 B (scripts/quality/baselines/sizes.json).

@@ -7,9 +7,9 @@
 import type { EngineKernel, Geometry, PbrMaterial } from '@margoengine/core';
 import type { Scatter } from '@margoengine/scatter';
 import type { ScatterTiles } from '@margoengine/scatter/tiles';
-import type { ScatterStateSource, ScatterTextures } from '@margoengine/scatter';
+import type { ScatterBase, ScatterSkyOcclusion, ScatterStateSource, ScatterTextures } from '@margoengine/scatter';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
-import type { BiomePlacement, PlacedTile } from './placement.js';
+import type { BiomePlacement, PlacedSpecies, PlacedTile } from './placement.js';
 import { captureScene } from '../../shared/scene-scope.js';
 import { drawCapture, shareCapture } from '../../shared/capture.js';
 import type { ScatterCapture } from '@margoengine/scatter';
@@ -75,6 +75,19 @@ export interface BiomeObjectsOptions {
    * @example states: (key, kind) => (kind === 'stone' ? undefined : kind === 'bark' ? trunks : crowns)
    */
   readonly states?: (key: string, kind: 'bark' | 'foliage' | 'stone') => ScatterStateSource | undefined;
+  /**
+   * Objects meet the ground they stand on: stones darken and, on damp ground, mossen at the foot, trunks take soil on
+   * theirs (`ScatterOptions.base`), and trees keep exp(-0.7 x stand cover) of the sky's light at the ground line, all
+   * of it from half their height up (`ScatterOptions.skyOcclusion`). Default true. A species' `sink` and `alignToGround` apply either
+   * way.
+   */
+  readonly contact?: boolean;
+  /**
+   * Takes the footprints of each held tile's stones and trunks as tiles come and go: `set(key, [x, z, radius, kind,
+   * ...])`, world metres, kind 0 a trunk and 1 a stone, and `remove(key)`. A `TerrainGroundContact` of
+   * `@margoengine/terrain/ground-contact` takes them and draws the soil and contact shade there. Default none.
+   */
+  readonly ground?: { set(key: string, footprints: ArrayLike<number>): void; remove(key: string): void };
 }
 
 /** Vertex data of a registry mesh: positions and normals (xyz per vertex, metres, y up, the base at y = 0) and triangles. */
@@ -214,6 +227,69 @@ const OBJECT_LOOKS = {
   stone: { variation: { hue: 0.02, value: 0.1 } },
 } as const;
 
+// How objects meet the ground (`contact`). Sky light falls off with the leaves above, exponentially (Monsi and Saeki
+// 1953; English translation 2005, Annals of Botany 95:549, https://doi.org/10.1093/aob/mci052). A crown's outer
+// needles also see the sky from the side, so only a tree's lower half is shaded, to an optical depth of 0.7 at the
+// ground, scaled by the share of its stand the species closes. Both numbers are chosen on rendered stands: the depth
+// of 2 of a closed canopy seen from straight above, over whole trees, turned the crowns black and merged them.
+const CANOPY_DEPTH = 0.7,
+  // A species without a `stands` rule counts as half closed (chosen).
+  OPEN_COVER = 0.5,
+  // Linear albedo: forest soil and litter splashed on a trunk's foot (inside CLM5's dry soil range 0.08 to 0.36 in the
+  // near infrared; the value is chosen), and the damp moss of RockSurface (@margoengine/terrain/rock-surface).
+  SOIL = [0.1, 0.08, 0.055] as const,
+  MOSS = [0.07, 0.1, 0.03] as const,
+  // Ground materials under which stones grow moss at their foot; stones of a desert or a bare field only darken.
+  DAMP_GROUND: readonly string[] = ['grass', 'meadow', 'moss', 'needles', 'leaf-litter', 'tundra', 'mud'];
+
+/** The foot and sky options of one part of a species whose mesh stands `height` metres at scale 1. */
+function standingLooks(
+  kind: Kind,
+  tree: boolean,
+  height: number,
+  cover: number | undefined,
+  damp: boolean,
+): { base?: ScatterBase; skyOcclusion?: ScatterSkyOcclusion } {
+  if (!(height > 0)) return {};
+  if (kind === 'stone')
+    return {
+      base: { height: Math.min(0.25, height / 3), shade: 0.5, ...(damp ? { tint: MOSS, amount: 0.65 } : {}) },
+    };
+  return {
+    ...(kind === 'bark' ? { base: { height: Math.min(0.35, height / 4), shade: 0.4, tint: SOIL, amount: 0.6 } } : {}),
+    ...(tree ? { skyOcclusion: { depth: CANOPY_DEPTH * (cover ?? OPEN_COVER), height: height / 2 } } : {}),
+  };
+}
+
+/**
+ * A form's footprint at scale 1: a stone's from its widest reach across the ground, a tree's from its bark's widest
+ * reach below 0.3 m. Plants of other layers leave none.
+ */
+function footOf(form: readonly Part[], tree: boolean): Foot | undefined {
+  for (const part of form) {
+    const stone = part.kind === 'stone';
+    if (!stone && !(tree && part.kind === 'bark')) continue;
+    const near = (Array.isArray(part.geometry) ? part.geometry[0] : part.geometry) as {
+        readonly vertices?: ArrayLike<number>;
+      },
+      v = near.vertices ?? [];
+    let reach = 0;
+    for (let i = 0; i < v.length; i += 6)
+      if (stone || v[i + 1] < 0.3) reach = Math.max(reach, Math.hypot(v[i], v[i + 2]));
+    // A stone's widest corner reaches past its mean outline.
+    if (reach > 0) return { radius: stone ? reach * 0.8 : reach, kind: stone ? 1 : 0 };
+  }
+  return undefined;
+}
+
+/** The top of a part's mesh above its origin at scale 1 (its near ring), 0 for one without vertices. */
+function meshTop(geometry: Part['geometry']): number {
+  const near = (Array.isArray(geometry) ? geometry[0] : geometry) as { readonly vertices?: ArrayLike<number> };
+  let top = 0;
+  for (let i = 1; i < (near.vertices?.length ?? 0); i += 6) top = Math.max(top, near.vertices![i]);
+  return top;
+}
+
 /** The mesh detail level of each LOD ring (near, middle, far) of stored objects: `@margoengine/procedural`'s `detail`. */
 const OBJECT_LOD_DETAIL = [2, 1, 0] as const;
 
@@ -221,6 +297,10 @@ type Procedural = typeof import('@margoengine/procedural');
 type Conifers = typeof import('@margoengine/procedural/conifers');
 type Data = { positions: ArrayLike<number>; normals: ArrayLike<number>; indices: ArrayLike<number> };
 type Kind = keyof typeof OBJECT_LOOKS;
+/** The options with no default value. */
+type Optional = 'heightmap' | 'bounds' | 'far' | 'seasons' | 'meshes' | 'states' | 'contact' | 'ground';
+/** What one form of a species presses into the ground: its radius at scale 1, and 0 a trunk or 1 a stone. */
+type Foot = { readonly radius: number; readonly kind: 0 | 1 };
 /** A mesh part: one geometry, or one per LOD ring (near, middle, far) for meshes with detail levels. */
 type Part = {
   geometry: Geometry | readonly [Geometry, Geometry, Geometry];
@@ -433,7 +513,7 @@ function splitForms(records: Uint8Array, forms: number): Uint8Array[] {
 }
 
 /** A species' scatters: every part of every form (`tiles`) and the first part of each form, which holds its records. */
-type SpeciesEntry = { tiles: ScatterTiles[]; heads: ScatterTiles[]; radius: number };
+type SpeciesEntry = { tiles: ScatterTiles[]; heads: ScatterTiles[]; radius: number; feet: (Foot | undefined)[] };
 
 type ObjectsPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 /**
@@ -465,10 +545,7 @@ const NEAR_GRASS = { radius: 40, perDensity: 3, thin: 0.8, field: 0.45 } as cons
 export class BiomeObjects implements Disposable {
   readonly #engine: EngineKernel;
   readonly #placement: BiomePlacement;
-  readonly #options: Required<
-    Omit<BiomeObjectsOptions, 'heightmap' | 'bounds' | 'far' | 'seasons' | 'meshes' | 'states'>
-  > &
-    Pick<BiomeObjectsOptions, 'heightmap' | 'bounds' | 'far' | 'seasons' | 'meshes' | 'states'>;
+  readonly #options: Required<Omit<BiomeObjectsOptions, Optional>> & Pick<BiomeObjectsOptions, Optional>;
   /** Foliage materials that follow the seasons, with their base colours, and the seasons listener's remover. */
   readonly #seasonal: { material: PbrMaterial; base: readonly [number, number, number] }[] = [];
   #offSeasons?: () => void;
@@ -638,10 +715,11 @@ export class BiomeObjects implements Disposable {
 
   #build(): void {
     const { radius, nearRadius, detailRadius, detailResolution, bounds, heightmap } = this.#options,
+      contact = this.#options.contact ?? true,
       side = this.#placement.tileSize,
       // Canopy trees are drawn within the full radius, smaller plants, rocks and props within `nearRadius`.
       seasons = this.#options.seasons,
-      tiles = (key: string, near: boolean, seasonal = false): SpeciesEntry => {
+      tiles = (key: string, near: boolean, seasonal = false, species?: PlacedSpecies): SpeciesEntry => {
         const r = near ? Math.min(radius, nearRadius) : radius,
           // Room for every tile within the draw distance plus a tile: a view keeps a tile's objects until it is a whole
           // tile beyond (sized for the distance alone, a view with tiles queued ran out of slots in a frame).
@@ -649,7 +727,8 @@ export class BiomeObjects implements Disposable {
           // Memory follows the held records, so a tile may hold up to scatter's per-tile limit (no stand is dropped).
           slotSize = Math.min(65536, Math.floor(16777216 / slots)), // float division: view only
           all: ScatterTiles[] = [],
-          heads: ScatterTiles[] = [];
+          heads: ScatterTiles[] = [],
+          feet: (Foot | undefined)[] = [];
         for (const form of formsOf(
           key,
           this.#modules.procedural,
@@ -657,7 +736,14 @@ export class BiomeObjects implements Disposable {
           this.#options.meshes,
           this.#modules.conifers,
         )) {
-          const list: ScatterTiles[] = [];
+          const list: ScatterTiles[] = [],
+            // The form's height at scale 1, over all its parts, so a trunk and its crown shade as one tree.
+            height = Math.max(0, ...form.map((part) => meshTop(part.geometry))),
+            // Canopy and understory trees (layers 1 and 2) stand under their stand's crowns.
+            tree = species?.layer === 1 || species?.layer === 2,
+            damp = !!this.#placement.world?.biomes
+              .find((b) => b.id === species?.biome)
+              ?.ground?.some((g) => DAMP_GROUND.includes(g.material));
           for (const part of form)
             list.push(
               this.#modules.tiles.ScatterTiles.attach(this.#engine, part.geometry, {
@@ -672,6 +758,11 @@ export class BiomeObjects implements Disposable {
                 // Each object its own tint; leaves shade as clusters (a few vertex operations, shadows unchanged).
                 ...OBJECT_LOOKS[part.kind],
                 maxSlope: 90,
+                // The species' own bedding: sunk into the hill and tilted with it.
+                ...(species?.sink !== undefined ? { sink: species.sink } : {}),
+                ...(species?.alignToGround !== undefined ? { alignToGround: species.alignToGround } : {}),
+                // A contact foot (soil or moss, less sky) and the sky light a crown loses lower down.
+                ...(contact ? standingLooks(part.kind, tree, height, species?.cover, damp) : {}),
                 // Plants sway with a light breeze; stone does not.
                 ...(part.kind === 'stone' ? {} : { wind: [1, 0, 0.25] as const }),
                 // A scanned part draws its own maps (base colour with a cut-out, normal, occlusion-roughness-metal).
@@ -682,12 +773,13 @@ export class BiomeObjects implements Disposable {
               }),
             );
           heads.push(list[0]);
+          feet.push(footOf(form, tree));
           all.push(...list);
         }
-        return { radius: r, tiles: all, heads };
+        return { radius: r, tiles: all, heads, feet };
       };
     for (const s of this.#placement.species)
-      this.#species.set(s.key, tiles(s.mesh, s.layer !== 1, !!seasons?.isSeasonal(s.biome, s.id)));
+      this.#species.set(s.key, tiles(s.mesh, s.layer !== 1, !!seasons?.isSeasonal(s.biome, s.id), s));
     this.#snags = tiles('procedural:snag', false);
     const [x0, z0, x1, z1] = bounds,
       width = Math.ceil((x1 - x0) / detailResolution), // float division: view only
@@ -943,16 +1035,32 @@ export class BiomeObjects implements Disposable {
       return out;
     };
     this.remove(key);
+    const feet: number[] = [];
     const put = (entry: SpeciesEntry | undefined, list: number[]) => {
       if (!entry || distance > entry.radius) return;
       // The first part of each form holds its records; the others share them.
-      for (const [f, records] of splitForms(gather(list), entry.heads.length).entries())
-        entry.heads[f].setTile(key, tile.origin, tile.size, this.#cap(records, entry.heads[f].slotSize));
+      for (const [f, records] of splitForms(gather(list), entry.heads.length).entries()) {
+        const held = this.#cap(records, entry.heads[f].slotSize);
+        entry.heads[f].setTile(key, tile.origin, tile.size, held);
+        this.#press(feet, tile, held, entry.feet[f]);
+      }
     };
     for (const [s, list] of bySpecies) put(this.#species.get(tile.species[s]), list);
     put(this.#snags, dead);
+    this.#options.ground?.set(key, feet);
     this.#held.set(key, tile.count);
     if (distance <= this.#detailReach) for (const d of tile.density) this.#density(tile, d);
+  }
+
+  /** Adds the footprints of one form's records to `out`: each record's place, and its scale times the form's radius. */
+  #press(out: number[], tile: PlacedTile, records: Uint8Array, foot: Foot | undefined): void {
+    if (!foot || !this.#options.ground) return;
+    const side = tile.size / 65536; // float division: metres per record unit
+    for (let at = 0; at < records.length; at += 8) {
+      const x = tile.origin[0] + (records[at] | (records[at + 1] << 8)) * side,
+        z = tile.origin[1] + (records[at + 2] | (records[at + 3] << 8)) * side;
+      out.push(x, z, Math.min(100, foot.radius * 2 ** ((records[at + 5] - 128) / 32)), foot.kind); // float: view only
+    }
   }
 
   /** A tile denser than its slot keeps the first records (recorded in `dropped`). */
@@ -978,12 +1086,16 @@ export class BiomeObjects implements Disposable {
     if (!tile.groups) return [() => this.add(tile, distance)];
     const key = `${tile.x},${tile.z}`,
       records = new Map<ScatterTiles, Uint8Array>(),
+      pressed: [Uint8Array, Foot | undefined][] = [],
       out: (() => void)[] = [];
     for (const g of tile.groups) {
       const entry = g.dead ? this.#snags : this.#species.get(tile.species[g.species]);
       if (!entry || distance > entry.radius) continue;
-      for (const [f, list] of splitForms(g.records, entry.heads.length).entries())
-        records.set(entry.heads[f], this.#cap(list, entry.heads[f].slotSize));
+      for (const [f, list] of splitForms(g.records, entry.heads.length).entries()) {
+        const held = this.#cap(list, entry.heads[f].slotSize);
+        records.set(entry.heads[f], held);
+        pressed.push([held, entry.feet[f]]);
+      }
     }
     const held = this.#held.has(key);
     for (const entry of [...this.#species.values(), ...(this.#snags ? [this.#snags] : [])])
@@ -992,6 +1104,12 @@ export class BiomeObjects implements Disposable {
         if (r) out.push(() => t.setTile(key, tile.origin, tile.size, r));
         else if (held) out.push(() => t.removeTile(key));
       }
+    if (this.#options.ground)
+      out.push(() => {
+        const feet: number[] = [];
+        for (const [list, foot] of pressed) this.#press(feet, tile, list, foot);
+        this.#options.ground!.set(key, feet);
+      });
     out.push(() => this.#held.set(key, tile.count));
     if (distance <= this.#detailReach) for (const d of tile.density) out.push(() => this.#density(tile, d));
     return out;
@@ -1067,6 +1185,7 @@ export class BiomeObjects implements Disposable {
   /** Takes one tile's objects off the GPU, also those of a tile whose `steps` only ran in part. */
   remove(key: string): void {
     this.#held.delete(key);
+    this.#options.ground?.remove(key);
     for (const entry of [...this.#species.values(), ...(this.#snags ? [this.#snags] : [])])
       for (const t of entry.heads) t.removeTile(key);
   }

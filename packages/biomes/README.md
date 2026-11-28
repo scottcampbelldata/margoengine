@@ -275,6 +275,37 @@ const meadow = defineBiome({
 console.log(meadow.details[0].mesh, meadow.rocks[0].mesh);
 ```
 
+## Objects meet the ground, and the relief shades itself
+
+On by default in `BiomeView`:
+
+- A species' `sink` (metres at scale 1, more on slopes) and `alignToGround` (0-1) bed its objects into the hill.
+- `contact` (default true): stones darken at the foot and, on grass, meadow, moss, needle, leaf, tundra and mud
+  grounds, turn mossy there; tree and shrub bark takes soil at the foot; canopy and understory trees keep
+  `exp(-0.7 x stand cover)` of the sky's light at the ground line (cover 0.5 without a `stands` rule) and all of it
+  from half their height up. The terrain draws soil and contact shade around every stored trunk and stone (`view.groundContact`, a
+  `TerrainGroundContact` of `@margoengine/terrain/ground-contact`). Your own meshes get an apron only when you add
+  their footprints: `view.groundContact?.set('hut', [x, z, radius, 1])`.
+- `relief` (default true, or `TerrainReliefLighting` settings): ridges cast on the ground behind them and gullies keep
+  less sky at every distance (`view.relief`), rebaked when the engine's sun turns or the world's heights change.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { BiomeWorld, defineBiome } from '@margoengine/biomes';
+import { BiomeView } from '@margoengine/biomes/view';
+const fell = defineBiome({
+  id: 'fell',
+  climate: {},
+  ground: [{ material: 'grass' }],
+  rocks: [{ id: 'talus', mesh: 'procedural:rock', density: 80, radius: 0.4, sink: 0.12, alignToGround: 0.65 }],
+});
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const world = await BiomeWorld.create({ size: [512, 512], biomes: [fell] });
+const view = await BiomeView.attach(engine, world, { contact: true, relief: { softness: 1 } });
+view.groundContact?.set('cairn', [12, -4, 0.7, 1]);
+engine.start();
+```
+
 ## Look families for the ground: `@margoengine/biomes/view`
 
 `BIOME_LOOKS` holds the ground-material look families: `natural` keeps every material, `animatedFeature` draws the ground as broad

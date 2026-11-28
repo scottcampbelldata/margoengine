@@ -91,6 +91,9 @@ export interface PlacedSpecies {
     readonly tags: readonly string[];
     readonly density: number;
     readonly clustered: boolean;
+    readonly sink?: number;
+    readonly alignToGround?: number;
+    readonly cover?: number;
 }
 
 export interface PlacedTile {

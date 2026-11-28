@@ -138,7 +138,15 @@ export interface SpeciesRule {
   readonly suitability?: Partial<
     Record<'temperature' | 'rainfall' | 'moisture' | 'slope' | 'height' | 'waterDistance', Range>
   >;
+  /**
+   * How far each object's up axis tilts from upright toward the ground normal, 0-1 (default 0). 1 lays stones and
+   * debris along the slope; trees usually stay upright. Drawn by `BiomeObjects` (`ScatterOptions.alignToGround`).
+   */
   readonly alignToGround?: number;
+  /**
+   * Metres at scale 1 each object stands below the ground (default 0), more on slopes (`ScatterOptions.sink`:
+   * `sink * scale * (1 + tan(slope))`), so stones bed into the hill and trunks stay rooted on its downhill side.
+   */
   readonly sink?: number;
   readonly lod?: readonly [near: number, mid: number, far: number];
   readonly color?: ColorVariation;

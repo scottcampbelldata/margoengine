@@ -7,6 +7,8 @@ import { EngineKernel } from "@margoengine/core";
 import { PassContext } from "@margoengine/core/extension";
 import { PlantStates } from "@margoengine/scatter/states";
 import { Terrain, TerrainColorOptions, TerrainOptions } from "@margoengine/terrain";
+import { TerrainGroundContact } from "@margoengine/terrain/ground-contact";
+import { TerrainReliefLighting, TerrainReliefLightingOptions } from "@margoengine/terrain/relief-lighting";
 import { WetGround, WetGroundLook } from "@margoengine/terrain/wet-ground";
 import { Water, WaterLight, WaterOptions } from "@margoengine/water";
 
@@ -64,7 +66,9 @@ export class BiomeView implements Disposable {
     }): Promise<void>;
     get water(): Water | undefined;
     get plantStates(): PlantStates | undefined;
+    get relief(): TerrainReliefLighting | undefined;
     get wetGround(): WetGround | undefined;
+    get groundContact(): TerrainGroundContact | undefined;
     setCapture(hook: ViewCapture): () => void;
     onDispose(callback: () => void): () => void;
     draw(c: ViewPassContext, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;
@@ -114,6 +118,8 @@ export interface BiomeViewOptions {
     readonly graph?: PlacementGraph;
     readonly meshes?: import('./objects.js').BiomeObjectsOptions['meshes'];
     readonly states?: import('./objects.js').BiomeObjectsOptions['states'];
+    readonly contact?: boolean;
+    readonly relief?: boolean | TerrainReliefLightingOptions;
     readonly disturbance?: import('./disturbance.js').Disturbance | BiomeDisturbanceSettings;
     readonly wetness?: BiomeWetness;
 }

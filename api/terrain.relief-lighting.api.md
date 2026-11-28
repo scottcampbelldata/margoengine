@@ -13,6 +13,7 @@ export class TerrainReliefLighting implements EnginePlugin, TerrainLighting, Dis
     constructor(terrain: Terrain, options?: TerrainReliefLightingOptions);
     static attach(engine: EngineKernel, terrain: Terrain, options?: TerrainReliefLightingOptions): TerrainReliefLighting;
     setup(engine: Engine): void;
+    refresh(): void;
     rebake(options?: TerrainReliefLightingOptions): void;
     shader(source: string, group: number): string;
     bindings(): GPUBindGroupEntry[];
@@ -28,6 +29,7 @@ export interface TerrainReliefLightingOptions {
     steps?: number;
     softness?: number;
     heightScale?: number;
+    follow?: boolean;
 }
 
 export function bakeTerrainReliefLighting(device: GPUDevice, heightmap: GPUTexture, size: readonly [number, number], options?: TerrainReliefLightingOptions): GPUTexture;
