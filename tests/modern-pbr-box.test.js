@@ -67,10 +67,12 @@ function bodyFramePositions(world, body) {
   // Body poses contain translation and unit rotation, never mesh scale.
   // Rotate each actual world vertex by the inverse rigid quaternion rather than
   // reusing the physics package's fitting code or its hierarchy traversal.
-  const position = body.raw.translation(),
-    rotation = body.raw.rotation();
-  const q = [-rotation.x, -rotation.y, -rotation.z],
-    w = rotation.w;
+  // The public pose (body.position and body.rotation [x, y, z, w]); the Rapier handle body.raw left with Margo's own
+  // kernel.
+  const [px, py, pz] = body.position,
+    [rx, ry, rz, w] = body.rotation;
+  const position = { x: px, y: py, z: pz },
+    q = [-rx, -ry, -rz];
   const out = new Float32Array(world.length);
   for (let at = 0; at < world.length; at += 3) {
     const x = world[at] - position.x,
