@@ -201,10 +201,10 @@ function boundaryBiomes() {
         { material: 'rock', weight: 1.2 },
         { material: 'gravel', slope: [9, 37], weight: 0.85 },
         { material: 'grass', slope: [null, 21], height: [null, line + 38], weight: 1.2 },
-        // July snowfields: firn lies on in patches over the gentler ground of the highest benches and summits (the
-        // view's patches break it up), so the far peaks past the world carry it at their height too. It takes the
-        // place of the cured grass, whose brown flecks mottled the alpine slopes.
-        { material: 'firn', height: [3760, null], slope: [null, 30], weight: 1.1 },
+        // July snowfields: firn lies on where summer snow survives, the north-facing, lee and hollow ground of the
+        // highest benches and summits (the `shelter` rule), never on the sunny, wind-scoured tops; the far peaks past
+        // the world carry it at their height too. It takes the place of the cured grass.
+        { material: 'firn', height: [3700, null], slope: [null, 38], shelter: [0.55, null], weight: 1.3 },
       ],
       rocks: [...stones(145), ...blocks(4.5)],
     }),
@@ -273,7 +273,7 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
     patches: { size: 23, contrast: 0.6, warp: 0.65 },
     // Front Range granite and gneiss: no sedimentary beds, but sheeting joints that step the faces into ragged
     // ledges, jointed blocks and buttresses, couloirs down the drainage and talus fans of the same granite below.
-    rock: { debris: 'gravel', slope: [30, 46], strata: 11, dip: [0.12, -0.07], ledges: 0.55, facets: 16, relief: 0.5, gullies: 14, tone: 0.34 },
+    rock: { debris: 'gravel', slope: [30, 46], strata: 11, dip: [0.12, -0.07], ledges: 0.55, facets: 16, relief: 0.5, gullies: 14, tone: 0.34, undulation: 2.5 },
     canopy: 0.35,
     maxSteps: Infinity,
     lookahead: 0,
@@ -291,6 +291,9 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
       needles: { color: [0.274, 0.252, 0.179], detail: 0.57, bump: 0.34 },
       grass: { color: [0.335, 0.382, 0.22], detail: 0.62, bump: 0.25, macro: 0.4 },
       'dry-grass': { color: [0.45, 0.414, 0.234], detail: 0.69, bump: 0.27, macro: 0.31 },
+      // Late-July Front Range firn, dust-laden: visible reflectance about 0.5 (Painter et al. 2007), so it sits a
+      // step under white at the film's exposure instead of clipping.
+      firn: { color: [0.75, 0.742, 0.725], detail: 0.2, bump: 0.2, macro: 0.35 },
     },
     exclusions: [
       {
@@ -461,7 +464,7 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
     ['bistort', 160000, 31, { size: 11, cover: 0.55 }],
     ['arnica', 110000, 32, { size: 7, cover: 0.45 }],
     ['aster', 230000, 33, { size: 8, cover: 0.55 }],
-    ['gentian', 70000, 34, { size: 10, cover: 0.4 }],
+    ['gentian', 36000, 34, { size: 10, cover: 0.32 }],
     ['campion', 40000, 35, { size: 5, cover: 0.38 }],
   ];
   for (const [species, count, seed, clumps] of flowers) {
