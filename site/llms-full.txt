@@ -16539,27 +16539,41 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   The Watt governor rig of `@margoengine/machinery/rigs` uses point-mass balls (I = 1e-5 m L^2) and 32 substeps, which
   settle within 0.001 degrees.
   Physics lane.
-### Checked 2026-11-28, no engine defect: the Arms-wide walk's side view shows the capture's own low, locked arms (KB-RIG-ARMS2, rigging, animation, demo take)
+### Open 2026-11-28: the Arms-wide walk's elbows sit past straight on every frame, so the take is held off the stage (KB-RIG-ARMS2, demo take, rigging)
 
-- **Repro:** demos/the-mocap-theatre, "Arms-wide walk", Elias, Side view at 1.05 s: the near sleeve runs down the
-  torso and the hand juts back at waist height. Scott: "human arms do not bend like that", "his arms are on backwards".
-- **Checked and ruled out:** the loader matches an independent BVH reader to 9e-16 m; Elias's upper arms and forearms
-  point within 0.5 degrees of the capture's on every frame of both takes; his rest alignment gives palms down, thumbs
-  forward and elbow creases forward, the Xsens T-pose (MVN whitepaper: every segment frame equals the global frame in
-  the T-pose, arms horizontal, thumbs forward), and no arm bone is twisted, mirrored or swapped (humeral twist about 13
-  degrees, forearm roll under 10, hand turn under 14); his skinned forearm and hand vertices stay within 2 mm of their
-  bones and the upper arm within 1 cm (armpit blend).
-- **Cause:** the capture. The 100STYLE Aeroplane excerpt holds the arms 23 to 35 degrees below horizontal with the
-  elbows locked 3 to 6.5 degrees past straight and a 8 to 14 degree carrying angle, wrists about 13 degrees up and 13
-  toward the little finger. From a pure side view the near arm points almost at the camera, so it foreshortens into a
-  column down the torso and the locked elbow and wrist turn the hand back. The source stick figure drawn from the same
-  view does the same. A pose driven through the same retarget with the arms 5 degrees below horizontal and the elbows
-  softly bent reads as arms out wide from every side.
-- **Open:** the shipped datasets hold no better arms-out take (CMU 35 and the CMU subject 2 and 16 fixtures are walks,
-  runs and jumps). A new 100STYLE segment or style needs Scott's go to download.
-- **Guard:** `tests/mocap-theatre-arms.test.js` checks every frame of both takes for arm direction against the capture,
-  elbow flexion -10 to 150 degrees, carrying angle up to 20, forearm roll, pronation and wrist ranges, and the skin
-  following its bones; an upper arm twisted 180 degrees in the rest alignment fails it (walk elbows read -21.7).
+- **Repro:** demos/the-mocap-theatre, "Arms-wide walk" (100STYLE Aeroplane_FW.bvh, frames 5598 to 5724), the source
+  stick figure and Elias. Scott, three reports: "human arms do not bend like that", "his arms are on backwards", "the
+  arms are bending backwards, the elbows are closest to the body, not farthest away from the body". This entry was
+  closed on 2026-11-28 as "no engine defect" on the strength of Margo's own forward kinematics, while the broken arms
+  stayed on the page. That was wrong: the stick figure Scott circled came from the same reading, and a plainly wrong
+  human is a defect whatever its cause.
+- **Referee (not Margo):** Blender 5.3 beta's BVH importer (`bpy.ops.import_anim.bvh`, native rotation order, background
+  mode) reads the shipped excerpt to the same joint positions as `parseBVH` + `Skeleton`: worst joint 0.062 mm over
+  64 frames and 23 joints. Five frames of its numbers are `tests/fixtures/mocap-theatre/aeroplane-referee.json`.
+- **Misreadings tested against the referee and the legs** (worst joint error; stance toe travel per frame, 1.44 mm as
+  published): reversed (extrinsic) product 0.27 m, 3.17 mm; X negated 0.75 m, knees bend 53 degrees forward; Y negated
+  0.27 m, 6.14 mm; Z negated 0.71 m, 10.07 mm; Y and Z negated (the other handedness) 0.70 m, 9.42 mm, and 2.47 mm
+  with a 24.5 cm step width (18.4 as published) when the root's sideways travel is negated with it; offsets in the
+  child frame 0.52 m, 11.77 mm; angles as radians 2.1 m. A left and right mirror keeps every joint angle. Elias's
+  upper arms and forearms follow the capture's within 0.5 degrees and his elbow creases face the way the capture's
+  do, so rest alignment and the hinge side are not it either.
+- **Cause:** the recording. In the referee's own positions the upper arms run 37 (right) and 29 (left) degrees below
+  horizontal on average and each forearm leaves the upper arm's line by 10 to 14 degrees, up and toward the back of
+  the body (6.5 to 12.6 degrees backward), on all 64 frames; in the hinge plane read from Elias's bind that is 3 to 6.5
+  degrees past straight plus an 8 to 14 degree carrying angle. The dataset's own list describes the style as "Both
+  arms raised as wings" (100STYLE Dataset_List.csv). Whether the performer's elbows hyperextend or the inertial suit's
+  standing calibration put a bend into "straight" cannot be told from the file.
+- **Now:** the take is held off the stage. `recordings.brisk.held` in the demo's captures.js names this entry, the page
+  neither lists nor loads the take, and the file stays in source/ for the fix.
+- **Closes when** either holds, both need Scott's go: (a) a 100STYLE arms-out excerpt whose elbows stay within 2
+  degrees of straight replaces it (a dataset download); (b) `@margoengine/rigging/retarget` gains target joint limits,
+  so a target's elbow or knee stops at straight when a capture passes it (a new option; joint limits in retargeting:
+  Gleicher 1998, *Retargetting Motion to New Characters*, SIGGRAPH; Choi and Ko 2000, *Online Motion Retargetting*,
+  Journal of Visualization and Computer Animation 11(5)).
+- **Guard:** `tests/mocap-theatre-arms.test.js`: no listed take may pass straight by more than 2 degrees (it was 10,
+  which let this take through); a take that does must be held and absent from the page, and a held take must still
+  pass straight; the loader and the stage's skeleton match the referee fixture within 0.2 mm. The hold rule fails on
+  the page as it was.
 
 ### Fixed 2026-11-28: retargeted mocap hands kept the character's fanned bind fingers, a few degrees off the capture (KB-RIG-FLATHAND1, rigging, animation)
 
