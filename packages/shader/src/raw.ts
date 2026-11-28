@@ -164,6 +164,16 @@ export interface RawShaderMaterialOptions {
    */
   gbufferEntry?: string;
   /**
+   * A `@fragment fn` of the fragment code that returns `margoCapture(MargoMaterial(worldPosition, worldNormal, toEye,
+   * baseColor, metallic, roughness, ambient))` as a `MargoCapture`, drawn when the RawShaders is added to screen-space
+   * reflections or screen-space global illumination (`ssr.add(raw)`, `ssgi.add(raw)`). SSR reads its normal, base colour,
+   * metallic and roughness, so the mesh reflects the screen; SSGI reads its normal and diffuse albedo, so bounced light
+   * reaches it. `ambient` is the ambient light the colour fragment added (SSGI replaces it with the bounce); `vec3f(0)`
+   * when it added none. Without it the mesh's depth still hides what is behind it, and it neither reflects nor takes
+   * bounced light. Default none.
+   */
+  captureEntry?: string;
+  /**
    * A `@vertex fn` of the vertex code that returns `margoVelocity(position, positionBefore)`: where the vertex is now and
    * where it was last frame, both before `mesh.world`. Drawn when the RawShaders is added to TAA (`taa.add(raw)`), it gives
    * TAA the motion of a shape the shader moves, so the shape leaves no ghost trail. It reads `margoBefore.time` (last
@@ -227,9 +237,9 @@ function identifier(name: string, what: string): string {
     );
   return name;
 }
-const entry = (code: string, stage: string, skip?: string): string | undefined => {
+const entry = (code: string, stage: string, skip: readonly (string | undefined)[] = []): string | undefined => {
   for (const found of code.matchAll(new RegExp(`@${stage}\\s+fn\\s+([A-Za-z_]\\w*)`, 'g')))
-    if (found[1] !== skip) return found[1];
+    if (!skip.includes(found[1])) return found[1];
   return undefined;
 };
 const uniformType = (t: string): boolean => kinds.test(t) || t === 'mat3x3f' || t === 'mat4x4f';
@@ -247,6 +257,31 @@ struct MargoMesh { world:mat4x4f, normal:mat3x3f, pickId:u32 }
 @group(0) @binding(1) var<uniform> mesh:MargoMesh;
 struct MargoGBuffer { @location(0) normal:vec4f, @location(1) ambient:vec4f }
 fn margoGBuffer(normal:vec3f,position:vec3f,ambient:vec3f)->MargoGBuffer {return MargoGBuffer(vec4f(normalize((camera.view*vec4f(normal,0)).xyz),-(camera.view*vec4f(position,1)).z),vec4f(ambient,1));}`;
+// A capture module's addition: what a material capture of `@margoengine/post` (SSR, SSGI) reads from a surface. The
+// effect's declarations add `struct MargoCapture` and `fn margoCapture(m:MargoMaterial)->MargoCapture`.
+const materialPrelude = `struct MargoMaterial { position:vec3f, normal:vec3f, view:vec3f, base:vec3f, metal:f32, rough:f32, ambient:vec3f }`,
+  materialStub = `
+struct MargoCapture { @location(0) unused:vec4f }
+fn margoCapture(m:MargoMaterial)->MargoCapture {return MargoCapture(vec4f(0));}`;
+/** What `RawShaders.setCapture` takes: the material capture hook of `@margoengine/post` SSR and SSGI (their `SSRCapture`). */
+export interface RawCapture {
+  /** Module-scope WGSL for the capture code: `struct MargoCapture` and `fn margoCapture(m:MargoMaterial)->MargoCapture`. */
+  declarations(code: string): string;
+  /** Colour targets of the capture pass, in `MargoCapture` location order. */
+  readonly targets: readonly GPUColorTargetState[];
+  /** This frame's capture pass, begun on the first draw and ended by its owner. */
+  begin(): GPURenderPassEncoder;
+}
+const captureIds = new Map<string, number>();
+let captureCount = 0;
+const captureId = (code: string): number => {
+  let id = captureIds.get(code);
+  if (id === undefined) {
+    if (captureIds.size >= 64) captureIds.clear();
+    captureIds.set(code, (id = ++captureCount));
+  }
+  return id;
+};
 // A velocity module's additions: last frame's view-projection, world matrix and time, the vertex helper, and the fragment
 // that writes TAA's motion (current minus previous position in uv, and the previous depth) as its own pass does.
 const velocityPrelude = `struct MargoBefore { viewProjection:mat4x4f, world:mat4x4f, time:f32, valid:f32 }
@@ -337,7 +372,7 @@ function layoutStruct(
   return { fields, size: roundUp(at, 16) };
 }
 /** Which pipeline of a material: the colour pass, a shadow cascade, SSAO's G-buffer or a pick. */
-type RawPass = 'color' | 'shadow' | 'gbuffer' | 'pick' | 'velocity';
+type RawPass = 'color' | 'shadow' | 'gbuffer' | 'pick' | 'velocity' | 'capture' | 'captureDepth';
 interface PipelineEntry {
   state: 'pending' | 'ready' | 'failed';
   pipeline?: GPURenderPipeline;
@@ -581,6 +616,7 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
   private uniformSeen?: Uint8Array;
   private readonly groups: readonly RawBindGroup[];
   private readonly gbufferName?: string;
+  /** @internal The `captureEntry`, when the material writes SSR's and SSGI's material targets. */ readonly captureName?: string;
   /** @internal The `velocityEntry`, when the material draws its own motion for TAA. */ readonly velocityName?: string;
   private vertexCode = '';
   private fragmentCode?: string;
@@ -605,6 +641,7 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
     this.colorWrite = options.colorWrite ?? true;
     this.wireframe = options.wireframe ?? false;
     this.gbufferName = options.gbufferEntry;
+    this.captureName = options.captureEntry;
     this.velocityName = options.velocityEntry;
     this.groups = options.groups ?? [];
     if (this.groups.length > 2 || this.groups.some((g) => typeof g !== 'function'))
@@ -728,7 +765,7 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
     if (fragment !== undefined && typeof fragment !== 'string')
       throw new TypeError('RawShaderMaterial fragmentShader must be WGSL source or undefined');
     const v = this.entries.vertex ?? entry(vertex, 'vertex'),
-      f = this.entries.fragment ?? entry(fragment ?? vertex, 'fragment', this.gbufferName);
+      f = this.entries.fragment ?? entry(fragment ?? vertex, 'fragment', [this.gbufferName, this.captureName]);
     if (!v) throw new TypeError(`RawShaderMaterial ${this.name} has no @vertex fn; add one or pass vertexEntry`);
     if (!f)
       throw new TypeError(
@@ -737,6 +774,10 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
     if (this.gbufferName && !new RegExp(`@fragment\\s+fn\\s+${this.gbufferName}\\b`).test(fragment ?? vertex))
       throw new TypeError(
         `RawShaderMaterial ${this.name} has no @fragment fn ${this.gbufferName}; add it beside the colour fragment or drop gbufferEntry`,
+      );
+    if (this.captureName && !new RegExp(`@fragment\\s+fn\\s+${this.captureName}\\b`).test(fragment ?? vertex))
+      throw new TypeError(
+        `RawShaderMaterial ${this.name} has no @fragment fn ${this.captureName}; add it beside the colour fragment or drop captureEntry`,
       );
     if (this.velocityName && !new RegExp(`@vertex\\s+fn\\s+${this.velocityName}\\b`).test(vertex))
       throw new TypeError(
@@ -754,7 +795,7 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
     }
   }
   /** The declarations added in front of each stage for `mesh` (its `Attributes` struct) or for no attributes. */
-  prelude(mesh?: RawMesh): string {
+  prelude(mesh?: RawMesh, capture = false): string {
     const out = [helpers],
       attributes = mesh?.layout ?? [];
     if (attributes.length)
@@ -767,6 +808,9 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
       );
     // Every stage of a material with a velocity entry declares what that entry reads; unused, it binds nothing.
     if (this.velocityName) out.push(velocityPrelude);
+    // Code that holds a capture entry compiles in every module: outside the capture pass `margoCapture` is a stub.
+    if (this.captureName || /\bmargoCapture\s*\(/.test(this.fragmentCode ?? this.vertexCode))
+      out.push(capture ? materialPrelude : materialPrelude + materialStub);
     if (this.members.length)
       out.push(
         `struct Uniforms {\n${this.members.map((m) => `  ${m.name}:${m.count === undefined ? m.type : `array<${m.type},${m.count}>`},`).join('\n')}\n}\n@group(1) @binding(0) var<uniform> uniforms:Uniforms;`,
@@ -973,12 +1017,24 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
   get writesGBuffer(): boolean {
     return !!this.gbufferName;
   }
+  /** @internal The capture module's fragment code: the prelude, the capture hook's declarations, then your code. */
+  captureCode(mesh: RawMesh, hook: RawCapture): string {
+    const code = this.prelude(mesh, true) + (this.fragmentCode ?? this.vertexCode),
+      declarations = hook.declarations(code);
+    if (!/fn\s+margoCapture\s*\(\s*\w+\s*:\s*MargoMaterial\s*\)/.test(declarations))
+      throw new MargoError(
+        'unsupported',
+        `RawShaderMaterial ${this.name}: this effect's capture takes no MargoMaterial; add raw meshes with captureEntry to SSR or SSGI`,
+      );
+    return this.prelude(mesh, true) + declarations + '\n' + (this.fragmentCode ?? this.vertexCode);
+  }
   /** @internal What differs between the pipelines of one material: the fragment, its targets and the depth state. */
   private target(
     kind: RawPass,
     c: RawPassContext | undefined,
     compare: GPUCompareFunction,
     velocity: GPUTextureFormat = 'rg16float',
+    capture?: RawCapture,
   ): { entry?: string; targets: GPUColorTargetState[]; depthStencil?: GPUDepthStencilState } {
     const format = c?.descriptor.depthStencil?.format as GPUTextureFormat;
     if (kind === 'shadow')
@@ -1005,6 +1061,21 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
         entry: 'margoVelocityFragment',
         targets: [{ format: velocity }, { format: 'r32float' }],
         depthStencil: { format, depthWriteEnabled: false, depthCompare: 'equal' },
+      };
+    if (kind === 'captureDepth')
+      return {
+        // A mesh without a capture entry still hides what is behind it in the capture's depth: its colour fragment
+        // (its discards) with nothing written to the targets.
+        entry: this.fragmentName,
+        targets: (capture?.targets ?? []).map((t) => ({ format: t.format, writeMask: 0 })),
+        depthStencil: { format, depthWriteEnabled: true, depthCompare: 'greater-equal' },
+      };
+    if (kind === 'capture')
+      return {
+        // Depth tested (greater-equal) and written, as gltf/pbr's capture: SSR's own 1x depth at a 4x scene, else the scene's.
+        entry: this.captureName,
+        targets: [...(capture?.targets ?? [])],
+        depthStencil: { format, depthWriteEnabled: true, depthCompare: 'greater-equal' },
       };
     if (kind === 'gbuffer')
       return {
@@ -1041,18 +1112,23 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
     c?: RawPassContext,
     compare: GPUCompareFunction = 'equal',
     motionFormat: GPUTextureFormat = 'rg16float',
+    capture?: RawCapture,
   ): GPURenderPipeline | undefined {
-    const topology = mesh.drawTopology,
+    const captured = kind === 'capture' && capture ? this.captureCode(mesh, capture) : undefined,
+      captureKey =
+        (captured === undefined ? '' : captureId(captured)) +
+        (capture ? '|' + capture.targets.map((t) => t.format).join(',') : ''),
+      topology = mesh.drawTopology,
       strip = topology.endsWith('strip') && mesh.indexFormat,
       samples = c?.descriptor.multisample?.count ?? 1,
       depth = c?.descriptor.depthStencil?.format,
-      key = `${kind}|${mesh.layoutKey}|${topology}|${strip || ''}|${c?.format}|${samples}|${depth}|${compare}|${motionFormat}|${this.state()}`;
+      key = `${kind}|${mesh.layoutKey}|${topology}|${strip || ''}|${c?.format}|${samples}|${depth}|${compare}|${motionFormat}|${captureKey}|${this.state()}`;
     let e = gpu.pipelines.get(key);
     if (e) return e.pipeline;
     e = { state: 'pending' };
     gpu.pipelines.set(key, e);
-    const module = (stage: 'vertex' | 'fragment' | 'pick' | 'velocity') => {
-      const k = stage + '|' + mesh.layoutKey;
+    const module = (stage: 'vertex' | 'fragment' | 'pick' | 'velocity' | 'capture') => {
+      const k = stage + '|' + mesh.layoutKey + (stage === 'capture' ? '|' + captureId(captured!) : '');
       let m = gpu.modules.get(k);
       if (!m) {
         const code =
@@ -1060,7 +1136,9 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
             ? this.prelude(mesh) + pickFragment
             : stage === 'velocity'
               ? this.code('vertex', mesh) + velocityFragment
-              : this.code(stage, mesh);
+              : stage === 'capture'
+                ? captured!
+                : this.code(stage, mesh);
         m = device.createShaderModule({ label: `shader:raw:${this.name}:${stage}`, code });
         gpu.modules.set(k, m);
         // Asked now, for the error report: a request made later, on an idle device, can stay pending (Chromium).
@@ -1069,11 +1147,17 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
       return m;
     };
     device.pushErrorScope?.('validation');
-    const { entry: fragmentEntry, targets, depthStencil } = this.target(kind, c, compare, motionFormat),
+    const { entry: fragmentEntry, targets, depthStencil } = this.target(kind, c, compare, motionFormat, capture),
       velocity = kind === 'velocity',
       vertex = module(velocity ? 'velocity' : 'vertex'),
       fragment =
-        kind === 'pick' ? module('pick') : velocity || this.fragmentCode === undefined ? vertex : module('fragment'),
+        kind === 'pick'
+          ? module('pick')
+          : kind === 'capture'
+            ? module('capture')
+            : velocity || this.fragmentCode === undefined
+              ? vertex
+              : module('fragment'),
       scope = device.popErrorScope?.(),
       descriptor: GPURenderPipelineDescriptor = {
         label: 'shader:raw:' + this.name,
@@ -1112,7 +1196,11 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
       this.compiled++;
       return entry.pipeline;
     }
-    const lines = this.prelude(mesh).split('\n').length - 1,
+    const lines =
+        (captured === undefined
+          ? this.prelude(mesh)
+          : captured.slice(0, captured.length - (this.fragmentCode ?? this.vertexCode).length)
+        ).split('\n').length - 1,
       revision = this.revision,
       fail = async (cause: unknown) => {
         entry.state = 'failed';
@@ -1907,7 +1995,8 @@ export interface RawShadersOptions {
  * Engine plugin that draws {@link RawMesh}es in the scene's main colour and depth targets (WebGPU), with the pass's
  * colour format, MSAA sample count and reversed-Z depth; inside a PostStack they land in its scene capture. Opaque
  * meshes draw in one pass, transparent ones (`material.transparent`) in a later pass sorted back to front.
- * `ssao.add(raw)` draws the meshes whose material has `gbufferEntry` into SSAO's G-buffer.
+ * `ssao.add(raw)` draws the meshes whose material has `gbufferEntry` into SSAO's G-buffer; `ssr.add(raw)` and
+ * `ssgi.add(raw)` draw those whose material has `captureEntry` into SSR's and SSGI's material targets.
  */
 export class RawShaders implements EnginePlugin {
   readonly name: string;
@@ -1937,6 +2026,8 @@ export class RawShaders implements EnginePlugin {
   /** TAA velocity state per TAA view: its camera block, last frame's time and each mesh's last world matrix. */
   private readonly velocityStates = new Map<object, VelocityState>();
   private readonly beforeData = new Float32Array(36);
+  private capture?: RawCapture;
+  private readonly disposers = new Set<() => void>();
   /** @internal The latest pass token (see `nextPass`). */
   get pass(): number {
     return this.passes;
@@ -2018,9 +2109,31 @@ export class RawShaders implements EnginePlugin {
     this.release();
     this.device = engine.gpu ?? undefined;
   }
+  /**
+   * Lets a material capture hook (`@margoengine/post` SSR or SSGI: `ssr.add(raw)`) draw the meshes whose material has
+   * `captureEntry` with `draw(c, 'capture', ...)`. Returns a remover. Without a hook nothing else changes.
+   */
+  setCapture(hook: RawCapture): () => void {
+    if (!hook || typeof hook.declarations !== 'function' || typeof hook.begin !== 'function' || !Array.isArray(hook.targets))
+      throw new TypeError(
+        'Invalid RawShaders capture hook; pass an object with declarations() and begin() functions and a targets array',
+      );
+    this.capture = hook;
+    return () => {
+      if (this.capture === hook) this.capture = undefined;
+    };
+  }
+  /** Calls `callback` once when the plugin is disposed (an effect that captures it lets it go); returns a remover. */
+  onDispose(callback: () => void): () => void {
+    if (typeof callback !== 'function') throw new TypeError('RawShaders onDispose needs a function');
+    this.disposers.add(callback);
+    return () => this.disposers.delete(callback);
+  }
   /** Releases every GPU object; meshes stay registered, so the plugin can be attached again. */
   dispose(): void {
     const engine = this.engine;
+    for (const callback of [...this.disposers]) callback();
+    this.disposers.clear();
     this.release();
     this.engine = this.device = undefined;
     ShaderClock.release(engine, this);
@@ -2167,11 +2280,12 @@ export class RawShaders implements EnginePlugin {
   }
   /**
    * The `SSAOSource` contract of `@margoengine/post`: meshes whose material has `gbufferEntry` write their own normals and
-   * ambient light into SSAO's open G-buffer pass, over the depth the colour pass left.
+   * ambient light into SSAO's open G-buffer pass, over the depth the colour pass left. `mode` 'capture' (SSR's and SSGI's
+   * `SSRModel` contract): meshes whose material has `captureEntry` draw into the capture hook's pass (`setCapture`).
    */
   draw(
     context: PassContext,
-    mode: 'gbuffer' | 'ambient' | 'occlusion',
+    mode: 'gbuffer' | 'ambient' | 'occlusion' | 'capture',
     _color: GPUTextureView,
     _depth: GPUTextureView,
     _phase?: 'all' | 'opaque' | 'blend',
@@ -2180,6 +2294,7 @@ export class RawShaders implements EnginePlugin {
     const c = context,
       device = this.device,
       engine = this.engine as unknown as EngineKernel;
+    if (mode === 'capture') return this.drawCapture(c, device, engine);
     if (mode !== 'occlusion' || !external || c.backend !== 'webgpu' || !device || !engine || c.device !== device)
       return;
     const token = this.nextPass(),
@@ -2198,6 +2313,27 @@ export class RawShaders implements EnginePlugin {
       if (pipeline) draws.push({ mesh, pipeline, gpu, call, distance: 0 });
     }
     drawList(external.pass, draws);
+  }
+  private drawCapture(c: PassContext, device: GPUDevice | undefined, engine: EngineKernel | undefined): void {
+    const hook = this.capture;
+    if (!hook || c.backend !== 'webgpu' || !device || !engine || c.device !== device) return;
+    const token = this.nextPass(),
+      draws: Draw[] = [];
+    let camera: GPUBuffer | undefined;
+    for (const mesh of this.meshes) {
+      const material = mesh.material;
+      if (!mesh.visible || material.transparent || !material.depthWrite) continue;
+      const world = mesh.worldMatrix(engine);
+      if (!world || mesh.culled(world, c.camera.matrix)) continue;
+      camera ??= this.writeCamera(c);
+      const call = mesh.upload(device, camera, world);
+      if (!call) continue;
+      const kind = material.captureName ? 'capture' : 'captureDepth',
+        gpu = material.prepare(device, token, this),
+        pipeline = material.pipeline(this, gpu, device, mesh, kind, c, 'greater-equal', undefined, hook);
+      if (pipeline) draws.push({ mesh, pipeline, gpu, call, distance: 0 });
+    }
+    if (draws.length) drawList(hook.begin(), draws);
   }
   /**
    * The `TAAVelocityPass` contract of `@margoengine/taa` (`taa.add(raw)`): opaque meshes whose material has

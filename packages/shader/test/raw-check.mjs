@@ -170,6 +170,48 @@ try {
   assert.ok(inside <= far - 6, `the shader's normal reaches SSAO: ${inside} against ${far}`);
   console.log('ok ssao');
 
+  // GTAO shares SSAO's G-buffer source: the shader's ambient is darkened at the crease.
+  const gOwn = await scene('gtaoOwn'),
+    gOwnImage = await image();
+  await clear();
+  const gDepth = await scene('gtaoDepth'),
+    gDepthImage = await image();
+  await clear();
+  const gNear = at(gOwnImage, ...gOwn.crease)[0],
+    gPlain = at(gDepthImage, ...gDepth.crease)[0];
+  console.log('gtao crease', gNear, 'against', gPlain);
+  assert.ok(gNear <= gPlain - 6, `GTAO darkens the G-buffer's ambient at the crease: ${gNear} against ${gPlain}`);
+  console.log('ok gtao');
+
+  // SSR: the raw mirror floor reflects the red wall only with its capture entry.
+  const rOwn = await scene('ssrOwn'),
+    rOwnImage = await image();
+  await clear();
+  const rDepth = await scene('ssrDepth'),
+    rDepthImage = await image();
+  await clear();
+  const mirrored = at(rOwnImage, ...rOwn.floor),
+    dull = at(rDepthImage, ...rDepth.floor);
+  console.log('ssr floor', mirrored, 'against', dull);
+  assert.ok(mirrored[0] >= dull[0] + 40 && mirrored[0] - mirrored[1] >= 100, `the raw floor reflects the red wall: ${mirrored} against ${dull}`);
+  console.log('ok ssr');
+
+  // SSGI: the raw white floor takes the red wall's bounced light only with its capture entry.
+  const bOwn = await scene('ssgiOwn'),
+    bOwnImage = await image();
+  await clear();
+  const bDepth = await scene('ssgiDepth'),
+    bDepthImage = await image();
+  await clear();
+  const bounced = at(bOwnImage, ...bOwn.floor),
+    unlit = at(bDepthImage, ...bDepth.floor);
+  console.log('ssgi floor', bounced, 'against', unlit);
+  assert.ok(bounced[0] >= unlit[0] + 6 && bounced[0] - bounced[1] >= unlit[0] - unlit[1] + 6, `the raw floor takes the red bounce: ${bounced} against ${unlit}`);
+  console.log('ok ssgi');
+  assert.deepEqual((await scene('captureWrong')).threw, true, 'captureWrong');
+  await clear();
+  console.log('ok captureWrong');
+
   await picks('pick', { left: true, right: true, miss: null });
   await picks('pickBlocked', { core: true });
   await picks('pickInFront', { raw: true });

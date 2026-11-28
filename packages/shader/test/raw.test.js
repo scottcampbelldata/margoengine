@@ -1094,6 +1094,66 @@ test('SSAO draws only opaque meshes with gbufferEntry, through that entry into t
   assert.equal(named(m, 'renderPipeline').at(-1)[2].fragment.entryPoint, 'fragment');
 });
 
+test('SSR and SSGI capture draws captureEntry meshes into the hook pass, and the rest as depth only (ssr.add(raw))', () => {
+  const code = `${shader}
+@fragment fn surface(i:Out)->MargoCapture {return margoCapture(MargoMaterial(vec3f(0),vec3f(0,1,0),vec3f(0,0,1),i.tint,1.0,0.1,vec3f(0)));}`,
+    h = harness(),
+    raw = RawShaders.attach(h.engine),
+    targets = [{ format: 'rgba16float' }, { format: 'rgba8unorm' }, { format: 'rgba16float' }],
+    declarations = `struct MargoCapture {@location(0) a:vec4f,@location(1) b:vec4f,@location(2) c:vec4f}
+fn margoCapture(m:MargoMaterial)->MargoCapture {return MargoCapture(vec4f(m.base,1),vec4f(1),vec4f(m.normal,1));}`;
+  let begun = 0;
+  const hook = {
+    targets,
+    declarations: (c) => (assert.match(c, /struct MargoMaterial \{/), declarations),
+    begin: () => (begun++, h.gpu.encoder.beginRenderPass({ colorAttachments: [] })),
+  };
+  raw.add(new RawMesh({ material: material({ vertexShader: code, captureEntry: 'surface' }), attributes: quad() }));
+  raw.add(new RawMesh({ material: material(), attributes: quad() }));
+  raw.add(new RawMesh({ material: material({ vertexShader: code, captureEntry: 'surface', transparent: true }), attributes: quad() }));
+  h.frame();
+  assert.equal(h.gpu.record(() => raw.draw(h.view.c, 'capture', null, null)).length, 0, 'nothing without a hook');
+  const release = raw.setCapture(hook),
+    log = h.gpu.record(() => {
+      h.view.begin(h.index++);
+      raw.draw(h.view.c, 'capture', null, null);
+    }),
+    pipelines = named(log, 'renderPipeline').map((p) => p[2]);
+  assert.equal(begun, 1, 'one capture pass');
+  assert.equal(pipelines.length, 2, 'the transparent mesh is not captured');
+  const [own, depth] = pipelines;
+  assert.equal(own.fragment.entryPoint, 'surface');
+  assert.deepEqual(own.fragment.targets, targets);
+  assert.deepEqual([own.depthStencil.depthCompare, own.depthStencil.depthWriteEnabled], ['greater-equal', true]);
+  assert.ok(named(log, 'module').some((m) => m[2].code.includes(declarations)), 'the hook declarations reach the module');
+  assert.equal(depth.fragment.entryPoint, 'fragment', 'a mesh without captureEntry keeps its own discards');
+  assert.deepEqual(depth.fragment.targets, targets.map((t) => ({ format: t.format, writeMask: 0 })), 'and writes no target');
+  assert.deepEqual([depth.depthStencil.depthCompare, depth.depthStencil.depthWriteEnabled], ['greater-equal', true]);
+  assert.equal(named(log, 'pass.draw').length + named(log, 'pass.drawIndexed').length, 2);
+  release();
+  assert.equal(h.gpu.record(() => raw.draw(h.view.c, 'capture', null, null)).length, 0, 'released');
+  // An effect whose capture takes no MargoMaterial (gltf/pbr's Surface contract) is refused with a coded error.
+  raw.setCapture({ ...hook, declarations: () => 'fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {}' });
+  assert.throws(
+    () => {
+      h.view.begin(h.index++);
+      raw.draw(h.view.c, 'capture', null, null);
+    },
+    (e) => e.code === 'unsupported' && /captureEntry to SSR or SSGI/.test(e.message),
+  );
+  assert.throws(() => material({ captureEntry: 'missing' }), /has no @fragment fn missing/);
+  const first = new RawShaderMaterial({
+    vertexShader: `@fragment fn surface()->MargoCapture {return margoCapture(MargoMaterial(vec3f(0),vec3f(0),vec3f(0),vec3f(0),0,0,vec3f(0)));}\n${shader}`,
+    captureEntry: 'surface',
+  });
+  assert.match(first.code('fragment'), /fn margoCapture\(m:MargoMaterial\)->MargoCapture \{return MargoCapture\(vec4f\(0\)\);\}/, 'a stub outside the capture');
+  assert.throws(() => raw.setCapture({}), TypeError);
+  let disposed = 0;
+  raw.onDispose(() => disposed++);
+  raw.dispose();
+  assert.equal(disposed, 1, 'an effect holding the plugin lets it go');
+});
+
 test('RawPicking draws meshes into the tile with IDs from firstId and answers with a mesh', () => {
   const h = harness(),
     meshes = [],

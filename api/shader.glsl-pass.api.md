@@ -315,6 +315,12 @@ interface RawBounds {
     radius: number;
 }
 
+interface RawCapture {
+    declarations(code: string): string;
+    readonly targets: readonly GPUColorTargetState[];
+    begin(): GPURenderPassEncoder;
+}
+
 interface RawLocalShadowDraw {
     context: RawPassContext;
     pass: GPURenderPassEncoder;
@@ -384,7 +390,7 @@ interface RawMeshOptions<M extends AnyRawShaderMaterial = AnyRawShaderMaterial> 
     bounds?: RawBounds | null;
 }
 
-type RawPass = 'color' | 'shadow' | 'gbuffer' | 'pick' | 'velocity';
+type RawPass = 'color' | 'shadow' | 'gbuffer' | 'pick' | 'velocity' | 'capture' | 'captureDepth';
 
 type RawPassContext = Extract<PassContext, {
     backend: 'webgpu';
@@ -450,13 +456,14 @@ class RawShaderMaterial<U extends {
     readonly gpu: Map<GPUDevice, MaterialGpu>;
     revision: number;
     compiled: number;
+    readonly captureName?: string;
     readonly velocityName?: string;
     constructor(options: RawShaderMaterialOptions);
     get vertexShader(): string;
     set vertexShader(code: string);
     get fragmentShader(): string | undefined;
     set fragmentShader(code: string | undefined);
-    prelude(mesh?: RawMesh): string;
+    prelude(mesh?: RawMesh, capture?: boolean): string;
     code(stage: 'vertex' | 'fragment', mesh?: RawMesh): string;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -466,7 +473,8 @@ class RawShaderMaterial<U extends {
     prepare(device: GPUDevice, pass: number, owner?: RawShaders): MaterialGpu;
     uniformVersion(): number;
     get writesGBuffer(): boolean;
-    pipeline(plugin: RawShaders, gpu: MaterialGpu, device: GPUDevice, mesh: RawMesh, kind: RawPass, c?: RawPassContext, compare?: GPUCompareFunction, motionFormat?: GPUTextureFormat): GPURenderPipeline | undefined;
+    captureCode(mesh: RawMesh, hook: RawCapture): string;
+    pipeline(plugin: RawShaders, gpu: MaterialGpu, device: GPUDevice, mesh: RawMesh, kind: RawPass, c?: RawPassContext, compare?: GPUCompareFunction, motionFormat?: GPUTextureFormat, capture?: RawCapture): GPURenderPipeline | undefined;
 }
 
 interface RawShaderMaterialOptions {
@@ -479,6 +487,7 @@ interface RawShaderMaterialOptions {
     storage?: Record<string, RawStorage>;
     groups?: readonly RawBindGroup[];
     gbufferEntry?: string;
+    captureEntry?: string;
     velocityEntry?: string;
     transparent?: boolean;
     blending?: RawBlending;
@@ -516,13 +525,15 @@ class RawShaders implements EnginePlugin {
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
+    setCapture(hook: RawCapture): () => void;
+    onDispose(callback: () => void): () => void;
     dispose(): void;
     [Symbol.dispose]: () => void;
     cameraBlock(camera: PassContext['camera'], m: ArrayLike<number>, width: number, height: number, delta: number, encoding: number, view?: ArrayLike<number>): Float32Array<ArrayBuffer>;
     nextPass(): number;
     shadow(mesh: RawMesh, { context: c, pass, matrix, cascade }: RawShadowContext): void;
     localShadow(mesh: RawMesh, { context: c, pass, matrix, depthCompare }: RawLocalShadowDraw): void;
-    draw(context: PassContext, mode: 'gbuffer' | 'ambient' | 'occlusion', _color: GPUTextureView, _depth: GPUTextureView, _phase?: 'all' | 'opaque' | 'blend', external?: {
+    draw(context: PassContext, mode: 'gbuffer' | 'ambient' | 'occlusion' | 'capture', _color: GPUTextureView, _depth: GPUTextureView, _phase?: 'all' | 'opaque' | 'blend', external?: {
         pass: GPURenderPassEncoder;
         view: ArrayLike<number>;
         depthCompare: GPUCompareFunction;

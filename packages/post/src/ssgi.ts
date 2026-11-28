@@ -84,12 +84,20 @@ function coreReplay(shader: string): string {
 // gltf/pbr capture (SSR's hook contract): the model's own ambient (`ambient(s)`, occlusion included; clearcoat and sheen
 // scale it by k), albedo and normal.
 const pbrSurface = /struct Surface\s*\{\s*base:vec4f/;
+// `@margoengine/shader/raw` meshes with a `captureEntry` (`ssgi.add(raw)`) declare the surface they return, its ambient
+// the light their colour fragment added.
+const rawMaterial = /struct MargoMaterial\s*\{/;
 const modelTail = (code: string) => {
+  if (rawMaterial.test(code))
+    return `
+struct MargoCapture {@location(0) ambient:vec4f,@location(1) albedo:vec4f,@location(2) normal:vec4f}
+fn margoCapture(m:MargoMaterial)->MargoCapture {return MargoCapture(vec4f(m.ambient,1),vec4f(m.base*(1.0-m.metal),1),vec4f(normalize(m.normal)*0.5+0.5,1));}
+`;
   // Terrain and water reach SSR's hook contract too, but have no albedo or ambient replay here.
   if (!pbrSurface.test(code))
     throw margoError(
       'unsupported',
-      'SSGI captures gltf/pbr models and materials meshes only; add terrain and water to SSR',
+      'SSGI captures gltf/pbr models, materials meshes and raw meshes with captureEntry only; add terrain and water to SSR',
     );
   return `
 struct MargoCapture {@location(0) ambient:vec4f,@location(1) albedo:vec4f,@location(2) normal:vec4f}

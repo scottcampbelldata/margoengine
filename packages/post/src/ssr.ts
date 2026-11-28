@@ -117,7 +117,14 @@ const modelTail = (code: string) =>
 struct MargoCapture {@location(0) specular:vec4f,@location(1) weight:vec4f,@location(2) normal:vec4f}
 fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {let m=margoSSRFresnel(s.n,v,s.base.rgb,s.metal,s.roughness,${code.includes(' f0:vec3f') ? 's.f0' : 'vec3f(0.04)'},${code.includes(' sw:f32') ? 's.sw' : '1.0'});let o=k*s.occlusion;return MargoCapture(vec4f(m.specular.rgb*o,m.specular.a),vec4f(m.weight.rgb*o,1),m.normal);}
 `
-    : '');
+    : rawMaterial.test(code)
+      ? `
+alias MargoCapture=MargoSSR;
+fn margoCapture(m:MargoMaterial)->MargoSSR {${code.includes('fn probeSpecular(') ? 'margoPosition=m.position;' : ''}return margoSSR(normalize(m.normal),normalize(m.view),m.base,m.metal,m.rough);}
+`
+      : '');
+// `@margoengine/shader/raw` meshes with a `captureEntry` (`ssr.add(raw)`) declare the surface they return.
+const rawMaterial = /struct MargoMaterial\s*\{/;
 const lit = (code: string) => code.includes('let margoAmbient=') && code.includes('fn iblBrdfTerms(');
 // One ray per pixel along the mirror direction, marched over the Hi-Z pyramid in screen space (pixel x, y and NDC depth
 // are linear along a projected segment for perspective and orthographic cameras alike). Roughness widens the cone:

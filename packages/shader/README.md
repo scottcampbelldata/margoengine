@@ -1034,6 +1034,47 @@ taa.add(raw); // the waving quad writes its own motion
 - **SSAO.** Opaque raw meshes occlude from their depth with nothing to set, like every mesh, and their pixels are not
   darkened. `ssao.add(raw)` with `gbufferEntry` on a material goes further: that `@fragment fn` returns
   `margoGBuffer(worldNormal, worldPosition, ambient)`, SSAO uses your normals, and `ambient` is the light it may take away.
+  `GTAO` takes the same source (`gtao.add(raw)`), as it shares SSAO's G-buffer.
+- **SSR and SSGI.** Opaque raw meshes hide what is behind them in SSR's and SSGI's depth with nothing to set, and neither
+  reflect nor take bounced light. `ssr.add(raw)` and `ssgi.add(raw)` with `captureEntry` on a material go further: that
+  `@fragment fn` returns `margoCapture(MargoMaterial(worldPosition, worldNormal, toEye, baseColor, metallic, roughness,
+  ambient))`, SSR reflects the screen in the surface by its normal, metallic and roughness, and SSGI adds the light bounced
+  onto it by its normal and diffuse albedo (`ambient` is the ambient light your colour fragment added, which SSGI's bounce
+  stands in for; `vec3f(0)` when it added none). In the capture pass meshes without the entry still write their depth, with
+  their own `discard`s. `packages/shader/test/raw-check.mjs` (`ssrOwn`, `ssgiOwn`, `gtaoOwn`) checks each against the same
+  mesh without the entry, on WebGPU and the WebGL2 layer.
+
+```ts
+import {createStage} from 'margoengine';
+import {SSR} from 'margoengine/post/ssr';
+import {RawMesh, RawShaderMaterial, RawShaders} from 'margoengine/shader/raw';
+const stage = await createStage('#app');
+const raw = RawShaders.attach(stage.engine);
+const floor = new RawShaderMaterial({
+  vertexShader: `
+    struct Out {@builtin(position) clip:vec4f, @location(0) world:vec3f, @location(1) normal:vec3f}
+    @vertex fn vertex(a:Attributes)->Out {
+      let w = mesh.world * vec4f(a.position, 1);
+      return Out(camera.viewProjection * w, w.xyz, normalize(mesh.normal * a.normal));
+    }
+    @fragment fn capture(i:Out)->MargoCapture {
+      return margoCapture(MargoMaterial(i.world, i.normal, camera.position - i.world, vec3f(0.9), 1.0, 0.05, vec3f(0)));
+    }
+    @fragment fn fragment(i:Out)->@location(0) vec4f {return vec4f(0.05, 0.05, 0.05, 1);}`,
+  fragmentEntry: 'fragment',
+  captureEntry: 'capture',
+});
+raw.add(new RawMesh({
+  material: floor,
+  attributes: {
+    position: {data: [-3, 0, 3, 3, 0, 3, 3, 0, -3, -3, 0, -3], type: 'vec3f'},
+    normal: {data: [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0], type: 'vec3f'},
+  },
+  index: [0, 1, 2, 0, 2, 3],
+}));
+SSR.attach(stage.engine).add(raw); // the raw floor is a mirror of what the screen holds
+```
+
 - **Culling.** A mesh out of view is skipped in the colour, shadow, SSAO and pick passes, and counted in `raw.stats.culled`.
   The sphere comes from a per-vertex vec3f `position`. A mesh with no such attribute, or an instanced one, is never culled
   unless you give `bounds: {center, radius}`. A vertex shader that moves points outside that sphere needs `bounds` or
@@ -1777,7 +1818,7 @@ round stars, the jet side on, disk detail over time) and `node packages/shader/t
 - Nodes are fixed when a NodeMaterial, NodePass or ComputePass is constructed; build a new one to change the graph. Only uniform values, textures' pixels and storage contents change live.
 - NodeMaterial patches gltf/pbr's shader (standard and KHR physical variants); [Node output in every pass](#node-output-in-every-pass) lists what the other passes see. At most 8 varyings. Its bindings start at group 2, binding 48, and node textures count against WebGPU's 16 sampled textures per stage: a `NodeMaterial` on a materials mesh fits 6 texture nodes alone, 5 with directional shadows and 3 with shadows, IBL and LocalShadows; past that, gltf/pbr throws a `RangeError` naming the combination.
 - `uv()` is the raw first UV set (no texture transform). `select` evaluates both branches; `If` runs one. A NodePass's discarded pixels stay the cleared transparent black. Fn bodies cannot read stage inputs such as `uv()`; pass them as arguments. No automatic derivative-safe sampling: `texture(map, uv)`, `dpdx`, `dpdy` and `fwidth` inside an `If`, `Switch` or `While` on a per-pixel value, or a loop with a non-uniform bound or a `Break` on one, are a WGSL uniformity error, reported when the pipeline compiles; pass `texture` an explicit level there or sample before the branch.
-- Raw meshes cast into `Shadows` only: `VirtualShadows` and `LocalShadows` take no custom caster. SSR, GTAO, SSGI and scene passes do not see them, beyond the depth they write; TAA velocity sees a mesh's own motion only through `velocityEntry`. A raw pick names the mesh, not the instance, and ignores `discard`. Uniform arrays hold 16-byte elements, struct fields are not arrays or structs, and a material has one colour target, 32-bit attribute formats only and at most two extra bind groups.
+- SSR, GTAO and SSGI see a raw mesh's own surface only through `captureEntry` (SSR, SSGI) or `gbufferEntry` (SSAO, GTAO); scene passes (`ScenePass`, MRT) and the clustered bounce see only the depth it writes. A raw mesh with `captureEntry` added to an effect whose capture takes no `MargoMaterial` throws an `unsupported` MargoError. TAA velocity sees a mesh's own motion only through `velocityEntry`. A raw pick names the mesh, not the instance, and ignores `discard`. Uniform arrays hold 16-byte elements, struct fields are not arrays or structs, and a material has one colour target, 32-bit attribute formats only and at most two extra bind groups.
 - NodePass and ShaderPass run only inside a PostStack: a stack of one is fine, and `NodePass.attach` and `ShaderPass.attach` make one. Neither attach joins a PostStack the scene already has (a PostStack's effects are fixed when it is made); add the pass to that stack's array instead. An `hdr` pass that ends the chain tonemaps with ACES.
 - Subgroup operations and half floats run in ComputePass nodes only: `enable` has to open a module, and a material's shader is assembled from others. There are no `quad*` operations, and no f16 uniforms, storage or textures.
 - Storage textures are 2D, one mip level, one sample; `@margoengine/shader/compute-texture` has no 3D or array form.

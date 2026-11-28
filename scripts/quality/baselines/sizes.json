@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21603082,
+  "total": 21606943,
   "history": [
     {
       "date": "2026-10-24",
@@ -15223,6 +15223,12 @@
       "commit": "sea12-ripple-volume",
       "reason": "@margoengine/water/ripples 9,951 to 10,515 B gzip (both measured on this tree), ceiling 9,951 to 10,831 B: bodies make ripples by the water they displace (trackBody volume, displace, RippleField.volume), the displaced-volume ring in the WGSL step and its CPU twin. Every tracked floating body needs it beside the splash and wake it replaces, so a split entry would add a second import to each floating scene for about 0.5 KB. Core and Stage are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "HEAD",
+      "reason": "lane A 2026-11-28, three.js parity row 15: raw shaders in SSR and SSGI (captureEntry, MargoMaterial, RawShaders.setCapture, depth-only capture draws). The raw chunk these three entries bundle grew 17,878 to 18,676 B gzip (+798, dist chunk). Budgets: shader/raw 17068 to 17929, shader/black-hole 26870 to 28104, shader/serialization 22025 to 22911 (measured 17406, 27285 and 22243 plus the gate headroom). The bytes are the capture pipelines, prelude and validation, inside the RawShaders plugin SSR and SSGI call each frame; a split would load the same code by import() the first captured frame and draw that frame without the raw surfaces. Only these three rows change; the other entries over budget belong to other lanes.",
+      "grew": 3
     }
   ],
   "items": {
@@ -16490,7 +16496,7 @@
     "@margoengine/selection/spatial": 2313,
     "@margoengine/selection/xray": 13398,
     "@margoengine/shader": 21398,
-    "@margoengine/shader/black-hole": 26870,
+    "@margoengine/shader/black-hole": 28104,
     "@margoengine/shader/compute-texture": 4761,
     "@margoengine/shader/compute-volume": 4961,
     "@margoengine/shader/deform": 6042,
@@ -16504,9 +16510,9 @@
     "@margoengine/shader/lighting": 10704,
     "@margoengine/shader/noise": 5538,
     "@margoengine/shader/pass": 13203,
-    "@margoengine/shader/raw": 17068,
+    "@margoengine/shader/raw": 17929,
     "@margoengine/shader/readback": 9692,
-    "@margoengine/shader/serialization": 22025,
+    "@margoengine/shader/serialization": 22911,
     "@margoengine/shader/shadertoy": 53319,
     "@margoengine/shader/subgroups": 3517,
     "@margoengine/shader/texture-array": 3442,

@@ -279,7 +279,9 @@ ssr.enabled = false; // pass-through, no recompiles
   materials and depth, so MSAA silhouettes never average two materials, and no multisampled targets). The Hi-Z is
   built from that depth. Memory: 16 B/pixel of targets (+4 B depth at 4x, or at 1x once models are added), a half-resolution `r32float` Hi-Z and a
   half-resolution `rgba16float` blur chain, about 45 MB at 1080p.
-- **Model capture.** Models added with `ssr.add(model)` (a gltf/pbr `PBRModel` or a materials mesh; returns a remover,
+- **Model capture.** Models added with `ssr.add(model)` (a gltf/pbr `PBRModel`, a materials mesh, a `Terrain`, a
+  `Water` or a `@margoengine/shader/raw` `RawShaders`, whose meshes with `captureEntry` return their own normal, base
+  colour, metallic and roughness and whose other opaque meshes write only their depth; returns a remover,
   disposal of the model or of SSR detaches it) then draw into the same three targets in one more pass, through
   gltf/pbr's declared capture hook (gltf/pbr README "Capture hook"; no text search of its shader): their own base
   colour, metal/roughness, normal and occlusion maps, materials' maps, alpha mask, instances and skinned/morphed
@@ -518,7 +520,8 @@ ssgi.add(model); ssr.add(model);  // gltf/pbr model or materials mesh: both may 
   `margoAmbient` when a plugin such as `EnvironmentLighting` names it, else core's ambient term), the diffuse albedo
   `base·(1−metal)` (`rgba8unorm`) and the normal (`rgb10a2unorm`). At 4x MSAA the replay writes its own 1x depth, as
   SSR's does. Models added with `ssgi.add(model)` draw into the same targets through gltf/pbr's capture hook (their
-  own `ambient(s)`, occlusion included, albedo and normal maps). A model takes one capture hook, so SSR and SSGI share
+  own `ambient(s)`, occlusion included, albedo and normal maps); a `RawShaders` added with `ssgi.add(raw)` draws its
+  meshes with `captureEntry` from the normal, albedo and ambient they return (shader README "SSR and SSGI"). A model takes one capture hook, so SSR and SSGI share
   one per model (`packages/post/src/capture.ts`); with only SSR, SSR's calls are what they were
   (`proofs/post-ssr-models.proof.js`).
 - **Rays.** `rays` cosine-weighted directions per pixel around its normal, from a set of `16 · rays` (Malley's method on

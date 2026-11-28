@@ -6,7 +6,7 @@ import {createStage} from '/packages/stage/dist/index.js';
 import {planeGeometry} from '/packages/geometry/dist/index.js';
 import {Material,createMesh} from '/packages/materials/dist/index.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
-import {SSAO} from '/packages/post/dist/index.js';
+import {GTAO,SSAO,SSGI,SSR} from '/packages/post/dist/index.js';
 import {Picking} from '/packages/selection/dist/index.js';
 import {ComputePass,storage,vec4} from '/packages/shader/dist/index.js';
 import {RawMesh,RawPicking,RawShaderMaterial,RawShaders} from '/packages/shader/dist/raw.js';
@@ -87,6 +87,14 @@ const scenarios={
   ssaoOwn:s=>room(s,true),
   ssaoDepth:s=>room(s,false),
   ssaoFlipped:s=>room(s,true,'-i.normal'),
+  gtaoOwn:s=>room(s,true,'i.normal',GTAO),
+  gtaoDepth:s=>room(s,false,'i.normal',GTAO),
+  ssrOwn:s=>mirror(s,true),
+  ssrDepth:s=>mirror(s,false),
+  ssgiOwn:s=>bounce(s,true),
+  ssgiDepth:s=>bounce(s,false),
+  // A raw mesh with captureEntry added to an effect whose capture takes no MargoMaterial reports it (SSAO has no capture).
+  captureWrong:s=>{const material=new RawShaderMaterial({vertexShader:surfaceCode('vec3f(1)','vec3f(1)',0,1,'vec3f(0)'),fragmentEntry:'fragment',captureEntry:'capture'});return {threw:(()=>{try{material.captureCode(new RawMesh({material,attributes:quad(),index}),{declarations:()=>'',targets:[],begin(){}});return false;}catch(e){return e.code==='unsupported';}})()};},
   pick:async s=>{const {picking,left,right}=await pickScene(s),at=async(x,y)=>picking.rawOf(await s.engine.pick(...s.pixel([x,y,0]))),miss=await s.engine.pick(...s.pixel([0,1.2,0]));return {left:await at(-0.6,0)===left,right:await at(0.6,0)===right,miss};},
   pickBlocked:async s=>{const {picking}=await pickScene(s),near=createMesh(s.engine,planeGeometry(1,1),new Material({shading:'basic',color:[1,1,1]}));near.root.setPosition([-0.6,0,1]);await s.draw();const mesh=await s.engine.pick(...s.pixel([-0.6,0,1]));return {core:mesh!==null&&picking.rawOf(mesh)===null};},
   pickInFront:async s=>{const {picking,left}=await pickScene(s,1),far=createMesh(s.engine,planeGeometry(1,1),new Material({shading:'basic',color:[1,1,1]}));far.root.setPosition([-0.6,0,-1]);await s.draw();return {raw:picking.rawOf(await s.engine.pick(...s.pixel([-0.6,0,1])))===left};},
@@ -119,7 +127,7 @@ function glslShadowScene(s,options){
 }
 // A wall at z = 0 and a floor at y = -1 running towards the camera, in white, with SSAO. `own` writes the G-buffer with the
 // shader's normals and full ambient light; without it the mesh only gives SSAO its depth.
-function room(s,own,normal='i.normal'){
+function room(s,own,normal='i.normal',Effect=SSAO){
   const code=`struct Out {@builtin(position) clip:vec4f,@location(0) world:vec3f,@location(1) normal:vec3f}
 @vertex fn vertex(a:Attributes)->Out {let w=mesh.world*vec4f(a.position,1);return Out(camera.viewProjection*w,w.xyz,normalize(mesh.normal*a.normal));}
 @fragment fn gbuffer(i:Out)->MargoGBuffer {return margoGBuffer(${normal},i.world,vec3f(1));}
@@ -128,9 +136,38 @@ function room(s,own,normal='i.normal'){
     wall={position:{data:[-3,-1,0,3,-1,0,3,3,0,-3,3,0],type:'vec3f'},normal:{data:[0,0,1,0,0,1,0,0,1,0,0,1],type:'vec3f'}},
     floor={position:{data:[-3,-1,4,3,-1,4,3,-1,0,-3,-1,0],type:'vec3f'},normal:{data:[0,1,0,0,1,0,0,1,0,0,1,0],type:'vec3f'}};
   s.raw.add(new RawMesh({material,attributes:wall,index}));s.raw.add(new RawMesh({material,attributes:floor,index}));
-  const ssao=SSAO.attach(s.engine);ssao.add(s.raw);
+  const ssao=Effect.attach(s.engine);ssao.add(s.raw);
   s.engine.camera.position=[0,0.5,3];s.engine.camera.target=[0,-0.5,0];
   s.after=async()=>({crease:s.pixel([0,-0.9,0]),open:s.pixel([0,1.2,0])});
+}
+// A raw surface lit by its own colour fragment (`shade` linear, HDR scene), whose capture entry returns its material.
+function surfaceCode(shade,base,metal,rough,ambient){
+  return `struct Out {@builtin(position) clip:vec4f,@location(0) world:vec3f,@location(1) normal:vec3f}
+@vertex fn vertex(a:Attributes)->Out {let w=mesh.world*vec4f(a.position,1);return Out(camera.viewProjection*w,w.xyz,normalize(mesh.normal*a.normal));}
+@fragment fn capture(i:Out)->MargoCapture {return margoCapture(MargoMaterial(i.world,i.normal,camera.position-i.world,${base},${metal.toFixed(2)},${rough.toFixed(2)},${ambient}));}
+@fragment fn fragment(i:Out)->@location(0) vec4f {return vec4f(${shade},1);}`;
+}
+const flat=(y,z0,z1,h=3)=>({position:{data:[-h,y,z1,h,y,z1,h,y,z0,-h,y,z0],type:'vec3f'},normal:{data:[0,1,0,0,1,0,0,1,0,0,1,0],type:'vec3f'}});
+const upright=(z,y0,y1,h=3)=>({position:{data:[-h,y0,z,h,y0,z,h,y1,z,-h,y1,z],type:'vec3f'},normal:{data:[0,0,1,0,0,1,0,0,1,0,0,1],type:'vec3f'}});
+// A dark mirror floor at y = -1 before a red wall at z = -2. With its capture the floor reflects the wall (SSR reads its
+// normal, metal and roughness); without it the floor only gives SSR its depth and stays dark.
+function mirror(s,own){
+  const floor=new RawShaderMaterial({vertexShader:surfaceCode('vec3f(0.05)','vec3f(1)',1,0.02,'vec3f(0)'),fragmentEntry:'fragment',...(own?{captureEntry:'capture'}:{})}),
+    wall=new RawShaderMaterial({vertexShader:surfaceCode('vec3f(1,0,0)','vec3f(1,0,0)',0,1,'vec3f(0)'),fragmentEntry:'fragment'});
+  s.raw.add(new RawMesh({material:floor,attributes:flat(-1,-2,3),index}));s.raw.add(new RawMesh({material:wall,attributes:upright(-2,-1,3),index}));
+  const ssr=SSR.attach(s.engine);ssr.add(s.raw);
+  s.engine.camera.position=[0,0.5,3];s.engine.camera.target=[0,-0.8,0];
+  s.after=async()=>({floor:s.pixel([0,-1,0.2])});
+}
+// A white floor at y = -1 before a bright red wall at z = -1.5. With its capture SSGI bounces the wall's light onto the
+// floor (its normal and albedo); without it the floor gets no bounce.
+function bounce(s,own){
+  const floor=new RawShaderMaterial({vertexShader:surfaceCode('vec3f(0.2)','vec3f(1)',0,1,'vec3f(0)'),fragmentEntry:'fragment',...(own?{captureEntry:'capture'}:{})}),
+    wall=new RawShaderMaterial({vertexShader:surfaceCode('vec3f(4,0,0)','vec3f(1,0,0)',0,1,'vec3f(0)'),fragmentEntry:'fragment'});
+  s.raw.add(new RawMesh({material:floor,attributes:flat(-1,-1.5,3),index}));s.raw.add(new RawMesh({material:wall,attributes:upright(-1.5,-1,3),index}));
+  const ssgi=SSGI.attach(s.engine);ssgi.add(s.raw);
+  s.engine.camera.position=[0,0.5,3];s.engine.camera.target=[0,-0.8,0];
+  s.after=async()=>({floor:s.pixel([0,-1,-1.2])});
 }
 async function pickScene(s,z=0){
   const picking=RawPicking.attach(Picking.attach(s.engine),s.raw),m=x=>solid(s,{vertexShader:paint('vec3f(1)')},{attributes:quad(0.5,z),matrix:translate(x,0,0)}),left=m(-0.6),right=m(0.6);

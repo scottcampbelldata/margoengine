@@ -11326,3 +11326,17 @@ Transparent canvas through TAA, DOF and SceneFade (2026-11-27): by method, on a 
 is `rg32float` (8 bytes a pixel per history instead of 4) and its resolve reads alpha for the 3x3 neighbourhood and
 history taps; DOF adds an `r32float` plane at a quarter of the gather's pixels and, with `temporal`, one at the gather's
 size. `TAAUpscale` adds no memory. An opaque canvas keeps its shaders and memory. No speed figure.
+
+Raw shaders in SSR, SSGI and GTAO (2026-11-28): by method, `ssr.add(raw)` and `ssgi.add(raw)` add one capture draw per
+opaque raw mesh a frame (the meshes with `captureEntry` through it, the rest depth only, their colour fragment with every
+target's write mask 0), and one pipeline per material and effect; GTAO takes `gbufferEntry` as SSAO does. Checked on an
+RTX A6000, WebGPU and the WebGL2 layer (`packages/shader/test/raw-check.mjs`: a raw mirror floor reflects a red wall,
+241 against 33 of 255 red without the entry; a raw white floor takes the wall's red bounce, 248 against 111; GTAO darkens
+the crease 216 against 240). three.js's screen-space passes draw a custom `ShaderMaterial` through an override material,
+so they see its geometry's normals, not the ones the shader computes; a raw mesh here gives its own. Scene passes
+(`ScenePass`, MRT) and Clustered's bounce still see only a raw mesh's depth. No speed figure.
+
+WebGL2 layer, colour targets without a fragment output (2026-11-28): a WebGPU pipeline whose target has write mask 0
+and no shader output draws with that draw buffer off (`packages/webgl2-compat/test/silent-targets-browser.mjs`, before:
+GL_INVALID_OPERATION "Active draw buffers with missing fragment shader outputs" on ANGLE, KB-COMPAT-SILENTTARGET1); such
+a pipeline sets its draw buffers before and after each draw, two `drawBuffers` calls. No speed figure.
