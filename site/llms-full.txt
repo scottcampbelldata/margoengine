@@ -15538,8 +15538,8 @@ Core plus stage remains 24,820 B gzip.
 `Vehicle.car` lays out exactly four wheels on a chassis whose up axis is its own +y; a six-wheeled truck or a chassis
 modelled on another up axis takes `new Vehicle` with its own wheels. Its size comes from the chassis's box colliders
 (spheres, capsules, cylinders and cones count by their bounding spheres); a chassis of hulls or meshes needs
-`halfExtents`. The springs rest where the dampers' reading of a still chassis puts them, 4.6% short of the designed
-sag at the defaults (KB-PHYS-VEHICLEREST1), so the body rides a few millimetres higher than `0.8 r`. The tyre models
+`halfExtents`. The springs rest at the designed sag, so the body rides at `0.8 r` (the dampers read the step's mean speed,
+KB-PHYS-VEHICLEREST1, fixed 2026-11-28). The tyre models
 and grip keep the `Vehicle` defaults: the full MF 6.x tyre is beyond parity (docs/physics-parity-bar.md, P5).
 `debugRender()` allocates its two arrays on every call, reads the last step (the chassis pose and each wheel's cast),
 and colours a tyre-model wheel as sliding at a combined slip of 0.1, about where the default Magic Formula peaks,
@@ -16840,16 +16840,33 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   weather README examples, 57 of 57).
 - **Regression:** that test.
 
-### Open 2026-11-28: a Character Creator walk's skin travels forward while its hips bone stays put (KB-HUM-SKINDRIFT1, humans)
+### Fixed 2026-11-28: a Character Creator walk's skin travels forward while its hips bone stays put (KB-HUM-SKINDRIFT1, animator)
 
 - **Repro:** `packages/humans/test/pose-sheet.browser.mjs --model=<the Character Creator old man>`: sample the walk at 0,
-  6 and 12 seconds with `person.play('walk', {fade: 0, at})`. The hips bone's world position reads the same each time
-  (CC_Base_Hip local z 0.924, the model root has no travel), yet the drawn skin is further forward at each time, out of
-  the frame by 6 seconds.
-- **Cause:** not yet found. The skin follows something the bone pose read through `person.body` does not show: a second
-  root or a skin root the clip moves, or a joint matrix offset that grows with clip time. To trace in `@margoengine/humans`
-  (the clip's root motion handling) before the walk can be judged past its first second.
-- **Until fixed:** the pose sheet samples the walk inside its first second.
+  6 and 12 seconds with `person.play('walk', {fade: 0, at})`. The hips bone's local translation reads the same each
+  time, yet the drawn skin is further forward at each time, out of the frame by 6 seconds.
+- **Cause:** the skin was right. The walk keys its travel (13.5 m over 12 s) on `CC_Base_BoneRoot`, the skin's top
+  joint above the hips, and leaves `CC_Base_Hip`'s own translation in place, so the hips' world position travels with
+  the root (6.74 m at 6 s). The sheet, like `addRootMotion` and warping, took the travel from the hips, which on this
+  rig carry none: root motion took nothing and warping measured a 0 m/s clip.
+- **Fix:** `rootMotionJoint(animation)` (`packages/animator/src/travel-joint.ts`) finds the bone the clips move
+  farthest, nearest the root; `addRootMotion`'s `joint` and warping's `speedJoint` default to it. The pose sheet draws
+  the whole walk in place with `addRootMotion(animator, {apply: false})`.
+- **Regression:** `tests/modern-animator-travel-joint.test.js`.
+
+### Open 2026-11-28: a stooped body's up leans with its trunk, so ground heights read along a slope (KB-RIG-FRAMEUP1, rigging)
+
+- **Repro:** `addPerson` on the Fauld cast's Character Creator old man: `person.body.frame.up` is
+  [0, 0.992, 0.127], 7.3 degrees forward of the model's vertical. `checkPose(body, pose, {ground})` on the walk drawn in
+  place at 5.98 s reports `r_metatarsophalangeal_1` 2.1 percent of stature below the ground while the joint stands
+  0.041 m up in the world, 0.016 m above the ground; with the walk's travel left in (6.7 m forward) the same toe reads
+  0.11 m higher than it is, so `checkClip` misses ground and foot-slide faults on a walk that travels.
+- **Cause:** `fitAnatomy` reads `up` from the hips to the spine above them (`packages/rigging/src/anatomy.ts`,
+  `species.frame.top`), so a body that stands stooped in its rest pose gets its trunk's lean as up; the ground checks
+  of `packages/rigging/src/validate.ts` measure height along that up.
+- **Fix needed:** a vertical for the ground checks that does not lean with the trunk: the normal of the rest feet's
+  sole plane (heels and toes of a standing rest), or the rig space's up when the species gives one. `body.frame` feeds
+  the anatomical zeros too, so the change reruns the anatomy, IK and pose sheet tests.
 
 ### Fixed 2026-11-28: the human anatomy table did not read Unreal mannequin or KayKit bone names (KB-RIG-UENAMING1, rigging)
 
@@ -20086,20 +20103,28 @@ checks the retained stations of a sheer hull and exact agreement of the native a
 - **Regression:** `packages/physics/tests/sail.test.js` "a sail lashed to its hull and pressing on it keeps the momentum
   its contacts trade with the hull (KB-SOFT-LASHCONTACT1)" (1.3 percent before, against a bound of 0.1 percent).
 
-### Open 2026-11-27: a resting vehicle's dampers read the end-of-step velocity of a substepped body (KB-PHYS-VEHICLEREST1, physics)
+### Fixed 2026-11-28: a resting vehicle's dampers read the end-of-step velocity of a substepped body (KB-PHYS-VEHICLEREST1, physics)
 
 - **Repro:** `Vehicle.car(physics, chassis)` on a floor (the quick start of `packages/physics/README.md`), 300 steps:
-  the chassis does not move, yet `chassis.linearVelocity[1]` reads -0.0715 m/s every step, and each spring rests at
+  the chassis does not move, yet `chassis.linearVelocity[1]` reads -0.0715 m/s every step, and each spring rested at
   0.1826 m where `rest - sag` is 0.1785 m (compressed 4.6% less than its static sag). A body held still by any per-step impulse
   (`applyImpulse` from `beforestep`) shows the same -0.0715 m/s.
-- **Cause:** the kernel takes 8 substeps a step and spreads gravity over them, while an impulse from `beforestep` acts
-  once at the start; a body whose position does not change ends the step at `-g dt (n - 1) / (2 n)` = -7/16 of
-  `g dt`. `Vehicle`'s damper (`vehicle.ts`, the suspension loop) reads that velocity as a compression speed and
-  carries part of the weight with it. The fix is a per-substep suspension force (or a damper on the step's mean
-  velocity) in `Vehicle`, which changes every vehicle's ride against the Rapier oracle tests in
-  `tests/next-vehicle.test.js`, so it waits for its own change.
-- **Kept honest by:** `packages/physics/tests/vehicle-car.test.js` asserts the balance the dampers hold,
-  `k (rest - length) - c v = g / 4`, to 1e-5 m, and the length within 5% of the static sag.
+- **Cause:** the kernel takes n substeps a step and adds gravity in each (v += g h, x += v h, h = dt / n), while an impulse from
+  `beforestep` acts once at the start. A body ends the step `g dt (n - 1) / (2 n)` further along gravity than its mean speed
+  over the step, -7/16 of `g dt` at 8 substeps for one held still. `Vehicle`'s damper (`vehicle.ts`, the suspension loop)
+  read that end-of-step velocity as a compression speed and carried part of the weight with it. Rapier, one step with gravity
+  added once, reads 0 there.
+- **Fix:** the damper reads the step's mean speed: the contact point's velocity less `g dt (n - 1) / (2 n)` times each dynamic
+  body's gravity scale (the chassis's, less the ground body's under `groundReaction`), from `physics.substeps` and
+  `physics.gravity`. A still car's dampers read 0 and each spring rests at the static sag to 1e-5 m. Drive, grip and anti-roll
+  keep the velocity they read. Two steps after full throttle a front wheel now carries 2,803 N where it carried 2,850 N, as
+  an unloading wheel takes the extension damper (0.5 of critical) where the phantom compression kept the compression one
+  (0.3).
+- **Regression:** `packages/physics/tests/vehicle-car.test.js` "a car rests on four springs that carry a quarter of its weight
+  each" (each spring at `rest - sag` to 1e-5 m; read 0.18259 before), and "the debug lines show each suspension ray" reads each
+  tyre's push line against its own load (push times load is the 1,200 N drive to 0.5 N; it compared with the static quarter
+  load to 0.02 before). The Rapier oracle files `next-vehicle.test.js` and `next-vehicle-wheels.test.js` and the other vehicle
+  files pass (48 of 48), and `packages/road` driving (14 of 14).
 
 ### Fixed 2026-11-27: a bounce took friction from its compression only, so balls slid through bounces that grip (KB-PHYS-BOUNCEFRICTION1, physics)
 
@@ -34630,6 +34655,25 @@ Regression: packages/gltf/test/node-images.test.js, six PNG/JPEG source cases fa
   (17, 17, 19), half or a quarter of `stepTrigger` (16, 23), and the four together (18). Seed-san falls the same in every
   variant, so its cause is elsewhere: next look at its stance foot's sole (contact points and the `room` ankle torque bound,
   `carryWeight` around line 630) and at what the upper body does in the first 12 frames of a sideways push.
+- **Seed-san's sole and step, measured (lane P, 2026-11-28, second pass):** the sole is not the fault. Seed-san's fitted sole reaches
+  0.198 m ahead of the ankle, 0.030 m behind and 0.045 m to each side; its mesh reaches 0.044 m behind the ankle, and the extra
+  1.4 cm sits above the 2 cm band `soleOf` takes. `minWeight` 0.05 to 0.5 fits the same sole. The stance ankle's own motor is not
+  it either: its rod gains scaled by 0, 0.25 or 4 leave Seed-san at 6 of 8. What fells Seed-san is the step. A 0.2 m/s push
+  backward fells it: the capture point lies 0.035 m behind the ankles, just past the 0.030 m heel, and `stepTrigger` (0.2 of
+  the reach, 0.146 m) holds the step back for 52 frames while the capture point drifts out. Then `room` is 0 (it stands at
+  97.6 percent of its leg, past the 0.9 factor, finding a above), so the step lands under the hips, forward of where the foot
+  stood. The trailing foot steps first on a sideways push (`lifted` wins over the landing check), a crossing step. Each lever,
+  measured over the seven figures and four directions, seed 1 (seeds 1 and 2 read the same), falls at 0.5 / 1 / 1.5 m/s
+  against a baseline of 5 / 9 / 11: a trigger on the capture point leaving the hull of both soles (Pratt 2006; Koolen et al.,
+  "Capturability-based analysis and control of legged locomotion, Part 1", IJRR 2012) 21 of 56 at 1 m/s against 18; that
+  trigger with the true hip height and 0.998 extension 26 of 56; the true hip height and 0.998 extension alone 5 / 8 / 21; the
+  0.998 extension alone 4 / 9 / 12; the trailing-foot rule off 18 of 56; the shortest step at 0.8 or 1.2 of 1/omega (the
+  doc says half a natural period, the code 0.4) 17 and 18 of 56; the ankle bound kept through single support 4 / 11 / 13. With
+  the hull trigger and the true reach, Seed-san's 0.2 m/s backward step lands 4 cm back and the capture point comes back
+  between the feet by frame 30, but both feet stand toe-up on their heels at 0.2 to 0.4 rad and the trailing foot slides
+  0.36 m forward on its heel, so the figure falls backward anyway. Next: why a stance foot that the bound holds stays toe-up
+  after a step (the foot load `foot` against the real contact force), and step execution for a straight-legged figure; the
+  levers above all trade one figure's falls for another's, so none landed.
 
 ### Fixed 2026-11-11: npm run verify hung once in its unit test step
 
@@ -46904,7 +46948,7 @@ const custom = Ragdoll.attach(physics, {
 
 Import `margoengine/navmesh` from the `margoengine` package, or `@margoengine/navmesh` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, `@margoengine/navmesh/links` finds the jumps a level allows, `@margoengine/navmesh/hierarchy` keeps long routes cheap, `@margoengine/navmesh/any-angle` finds the exact shortest path, `@margoengine/navmesh/weighted-any-angle` finds any-angle paths over weighted ground with a proven bound, `@margoengine/navmesh/debug` draws it all, `@margoengine/navmesh/voxel` builds straight from voxel chunks, and `@margoengine/navmesh/volume` routes flying agents in 3D.
+Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, `@margoengine/navmesh/links` finds the jumps a level allows, `@margoengine/navmesh/hierarchy` keeps long routes cheap, `@margoengine/navmesh/any-angle` finds the exact shortest path, `@margoengine/navmesh/weighted-any-angle` finds any-angle paths over weighted ground with a proven bound, `@margoengine/navmesh/debug` draws it all, `@margoengine/navmesh/voxel` builds straight from voxel chunks, `@margoengine/navmesh/volume` routes flying agents in 3D, `@margoengine/navmesh/queries` casts rays, finds walls, samples points and plans partial routes, `@margoengine/navmesh/wasm` builds in a worker with a SIMD kernel, and `@margoengine/navmesh/obstacles` carves round and turned obstacles.
 
 ```ts
 import {NavMesh} from 'margoengine/navmesh';
