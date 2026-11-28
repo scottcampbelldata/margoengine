@@ -16,6 +16,8 @@ const PATTERNS = [
   /(?<![A-Za-z0-9])(?!(?:RUNNER|PROGRA|DEVELO|DOCUME|ABCDEF)~)[A-Z0-9]{6}~[0-9](?![A-Za-z0-9])/,
 ];
 
+const NEEDED = /~|Users|Development/i;
+
 /**
  * Files that may hold a machine path, each with its reason. A folder entry ends with `/`. A new entry needs a reason
  * a reviewer accepts: third-party bytes we must not edit, a test whose input is such a path on purpose, or a frozen
@@ -48,12 +50,12 @@ export function hasMachinePath(line) {
 /** The 1-based line numbers of a text that name a machine path; empty for a binary buffer. */
 export function machinePathLines(buffer) {
   if (buffer.subarray(0, 8192).includes(0)) return [];
+  const text = buffer.toString('utf8');
+  // Every pattern needs one of these, so a text with none of them is not split and matched line by line.
+  if (!NEEDED.test(text)) return [];
   const lines = [];
-  buffer
-    .toString('utf8')
-    .split('\n')
-    .forEach((line, i) => {
-      if (hasMachinePath(line)) lines.push(i + 1);
-    });
+  text.split('\n').forEach((line, i) => {
+    if (hasMachinePath(line)) lines.push(i + 1);
+  });
   return lines;
 }

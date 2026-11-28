@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import { deflateRawSync, deflateSync } from 'node:zlib';
-import { hitsInLine, hitsInPath, main, scan, scanRepo, selectFiles } from '../scripts/check-banned-terms.mjs';
+import { hitsInLine, hitsInPath, main, scan, scanRepo, selectFiles, work } from '../scripts/check-banned-terms.mjs';
 import { pdfText } from '../scripts/pdf-text.mjs';
 
 const word = (...codes) => String.fromCharCode(...codes);
@@ -200,6 +200,36 @@ test('every failure of the check names its reason on stdout and stderr; an unrea
     ['README.md', 'LICENSE', 'AGENTS.md'],
   );
   assert.deepEqual(found, ['README.md: could not be read (EBUSY); rerun once the process writing it has finished']);
+});
+
+// The full run took 211 s because every occurrence of every word was hashed again; minified demo bundles repeat the
+// same words millions of times. The count is deterministic: a word or a path pair costs its hashes once.
+test('a word and a path pair are hashed once however often they repeat, and every occurrence is still reported', () => {
+  // Made at run time: the full scan above reads this file, so a word written out here is already known.
+  const tag = `zz${process.pid}n${Date.now().toString(36)}`;
+  const line = `${tag}a ${tag}b-${tag}c ${banned[1]} ${tag}d/${tag}e/${tag}f ${banned[0]}`;
+  const before = work.hashes;
+  const first = hitsInLine(line);
+  const once = work.hashes - before;
+  assert.ok(once > 0 && first.length >= 2, `${once} hashes, ${first.length} hits`);
+  for (let i = 0; i < 1000; i++) assert.deepEqual(hitsInLine(line), first);
+  assert.equal(work.hashes - before, once);
+  assert.equal(hitsInLine(line.toUpperCase()).length, first.length);
+  assert.equal(work.hashes - before, once);
+});
+
+test('a path pair is found after a long run, after another path and next to punctuation', () => {
+  const alone = hitsInLine(banned[0]);
+  assert.notDeepEqual(alone, []);
+  const long = 'x'.repeat(200_000);
+  for (const text of [
+    `${long} ${banned[0]}`,
+    `a/b ${banned[0]}`,
+    `"${banned[0]}":`,
+    `_${banned[0]}`,
+    `x//${banned[0]}`,
+  ])
+    assert.deepEqual(hitsInLine(text), alone, text.slice(-60));
 });
 
 test('--files and --changed select the files to scan; a named file with a banned name is reported', () => {

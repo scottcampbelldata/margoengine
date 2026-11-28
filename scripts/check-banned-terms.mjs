@@ -13,7 +13,12 @@ import { pdfText } from './pdf-text.mjs';
 
 const root = resolve(fileURLToPath(import.meta.url), '../..');
 const LIST = JSON.parse(readFileSync(resolve(root, 'scripts/banned-terms.json'), 'utf8'));
-const hash = (word) => createHash('sha256').update(`margo-banned:${word}`).digest('hex').slice(0, 24);
+/** Deterministic work counts of this process, for the regression test: hashes computed. */
+export const work = { hashes: 0 };
+const hash = (word) => {
+  work.hashes++;
+  return createHash('sha256').update(`margo-banned:${word}`).digest('hex').slice(0, 24);
+};
 const TOKENS = new Set(LIST.tokens),
   PAIRS = new Set(LIST.pairs),
   PATH_TOKENS = new Set([...LIST.tokens, ...LIST.pathTokens]);
@@ -29,22 +34,52 @@ export function hitsInPath(path) {
   return [...found, ...hitsInLine(path)];
 }
 
-/** The banned-term ids found in one line of text (the hash of each hit). */
+// A tree repeats the same words millions of times (minified demo bundles above all), and hashing each occurrence took
+// most of a 210 s run, so the answer for a word and for a path pair is kept. Memory is bounded: only short keys are
+// kept, a full table is emptied, and a key is copied so it does not keep the file it was cut from alive.
+const KEPT_LENGTH = 64,
+  KEPT_COUNT = 1 << 20;
+const WORDS = new Map(),
+  PAIR_HITS = new Map();
+function kept(table, key, compute) {
+  let ids = table.get(key);
+  if (ids === undefined) {
+    ids = compute(key);
+    if (key.length <= KEPT_LENGTH) {
+      if (table.size >= KEPT_COUNT) table.clear();
+      table.set(Buffer.from(key, 'latin1').toString('latin1'), ids);
+    }
+  }
+  return ids;
+}
+
+// As written, hyphens removed, and each piece of a hyphenated compound (`word-like`, `word-style`).
+function wordIds(word) {
+  const ids = [];
+  for (const form of new Set([word, word.replaceAll('-', ''), ...word.split('-')])) {
+    const id = hash(form);
+    if (TOKENS.has(id)) ids.push(id);
+  }
+  return ids;
+}
+
+function pairIds(pair) {
+  const id = hash(pair);
+  return PAIRS.has(id) ? [id] : [];
+}
+
+/** The banned-term ids found in one line of text (the hash of each hit). Every match is ASCII. */
 export function hitsInLine(line) {
   const found = [];
-  for (const [word] of line.matchAll(/[a-z0-9]+(?:-[a-z0-9]+)*/gi)) {
-    const w = word.toLowerCase();
-    // As written, hyphens removed, and each piece of a hyphenated compound (`word-like`, `word-style`).
-    for (const form of new Set([w, w.replaceAll('-', ''), ...w.split('-')]))
-      if (TOKENS.has(hash(form))) found.push(hash(form));
-  }
-  // Every adjacent pair of a path, so `a/b/c` checks both `a/b` and `b/c`.
-  for (const [path] of line.matchAll(/[a-z0-9-]+(?:\/[a-z0-9-]+)+/gi)) {
+  for (const word of line.match(/[a-z0-9]+(?:-[a-z0-9]+)*/gi) ?? [])
+    for (const id of kept(WORDS, word.toLowerCase(), wordIds)) found.push(id);
+  // Every adjacent pair of a path, so `a/b/c` checks both `a/b` and `b/c`. A match starts only at the start of a run:
+  // the same paths, without trying every position inside a long run that no `/` follows.
+  if (!line.includes('/')) return found;
+  for (const path of line.match(/(?<![a-z0-9-])[a-z0-9-]+(?:\/[a-z0-9-]+)+/gi) ?? []) {
     const parts = path.toLowerCase().split('/');
-    for (let i = 0; i + 1 < parts.length; i++) {
-      const id = hash(`${parts[i]}/${parts[i + 1]}`);
-      if (PAIRS.has(id)) found.push(id);
-    }
+    for (let i = 0; i + 1 < parts.length; i++)
+      for (const id of kept(PAIR_HITS, `${parts[i]}/${parts[i + 1]}`, pairIds)) found.push(id);
   }
   return found;
 }
