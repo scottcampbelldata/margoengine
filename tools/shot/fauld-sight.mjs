@@ -11,6 +11,7 @@ import {
   layFauldGround,
 } from '../../packages/scenes/dist/fauld-countryside.js';
 import { libraryMesh } from '../../packages/scenes/dist/library.js';
+import { nearestRank } from '../../scripts/lib/percentile.mjs';
 
 /** Plants are read this far from the lens at most, metres: farther ones are too small to cover a frame. */
 const REACH = 600;
@@ -18,8 +19,8 @@ const REACH = 600;
 const OPACITY = { oak: 0.35, ash: 0.3, birch: 0.3, holly: 0.85, hazel: 0.7, hawthorn: 0.7, blackthorn: 0.6 };
 const SHRUBS = ['holly', 'hazel', 'hawthorn', 'blackthorn'];
 
-const quantile = (values, q) =>
-  values.sort((a, b) => a - b)[Math.min(values.length - 1, Math.floor(q * values.length))];
+/** The nearest-rank quantile (0 < q <= 1) of a radius set; an empty or non-finite set throws instead of giving undefined. */
+const quantile = (values, q) => nearestRank(values, q * 100);
 
 /**
  * A model's cylinders at scale 1, from its vertices: a tree's trunk (their spread 0.3 to 1.5 m up) and its crown (from
