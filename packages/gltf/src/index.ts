@@ -1,7 +1,7 @@
 import { engineRuntime } from '@margoengine/core/extension';
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import { Geometry, PbrMaterial, type Engine, type Mesh } from '@margoengine/core/extension';
-import { margoError } from '@margoengine/core/extension';
+import { fault, margoError, rangeError, typeError } from '@margoengine/core/extension';
 import { splitNodeMatrix } from './node-matrix.js';
 import { readResponse } from '../../shared/loading.js';
 import { checkCount, countLimit } from '../../shared/limits.js';
@@ -29,18 +29,14 @@ function text(data: Uint8Array): string {
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(data);
   } catch {
-    throw new TypeError(
-      'Invalid glTF JSON: not UTF-8; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
-    );
+    throw typeError('Invalid glTF JSON: not UTF-8', 'gltf-invalid');
   }
 }
 function json(source: string): Document {
   try {
     return parseJSON<Document>(source);
   } catch (error) {
-    throw new TypeError(
-      `Invalid glTF JSON: ${(error as Error).message}; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`,
-    );
+    throw typeError(`Invalid glTF JSON: ${(error as Error).message}`, 'gltf-invalid');
   }
 }
 function bytes(input: ArrayBuffer | ArrayBufferView): Uint8Array {
@@ -100,19 +96,14 @@ function validate(doc: Document, maxNodes: number | undefined, extensions: reado
   for (const field of ['buffers', 'bufferViews', 'accessors', 'meshes', 'nodes', 'scenes', 'materials']) {
     const list: unknown = doc[field];
     if (Array.isArray(list) && !list.every(isObject))
-      throw new TypeError(
-        `Invalid glTF ${field} entry; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`,
-      );
+      throw typeError(`Invalid glTF ${field} entry`, 'gltf-invalid');
   }
   if (
     doc.extensionsRequired?.some((name) => !extensions.some((extension) => extension.handles.includes(name))) ||
     doc.skins?.length ||
     doc.animations?.length
   )
-    throw margoError(
-      'unsupported',
-      'Minimal glTF supports static uncompressed models; required extensions, skins and animations are unsupported; use @margoengine/gltf/pbr',
-    );
+    throw fault('unsupported', 'Skins, animations and required extensions need @margoengine/gltf/pbr', 'gltf-light');
   checkCount('Too many glTF nodes', doc.nodes?.length ?? 0, nodeLimit, 'maxNodes');
 }
 /** KB-GLTFA A5: a bad translation, rotation or scale names its node instead of surfacing core's transform error. */
@@ -129,9 +120,7 @@ function checkTRS(node: GLTFNode, index: number): void {
         v.length !== size ||
         v.some((x) => typeof x !== 'number' || !Number.isFinite(Math.fround(x))))
     )
-      throw new TypeError(
-        `Invalid glTF ${key} on node ${index}: ${size} finite numbers; re-export the file and check it with the glTF Validator`,
-      );
+      throw typeError(`Invalid glTF ${key} on node ${index}: ${size} finite numbers`, 'gltf-transform');
   }
 }
 function transform(mesh: Mesh, node: GLTFNode, index: number): void {
@@ -144,18 +133,14 @@ function transform(mesh: Mesh, node: GLTFNode, index: number): void {
       node.matrix.length !== 16 ||
       node.matrix.some((v: unknown) => typeof v !== 'number' || !Number.isFinite(Math.fround(v)))
     )
-      throw new TypeError(
-        'Invalid glTF matrix; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
-      );
+      throw typeError('Invalid glTF matrix', 'gltf-invalid');
     const m = node.matrix;
     if (m[3] !== 0 || m[7] !== 0 || m[11] !== 0 || m[15] !== 1) throw new TypeError('glTF matrix must be affine');
     const trs = splitNodeMatrix(m);
     if (!trs.ok)
       throw trs.reason === 'singular'
         ? new RangeError('Singular glTF matrix')
-        : new TypeError(
-            `Sheared glTF matrix on node ${index}; a node matrix must split into translation, rotation and scale (glTF 2.0 section 3.5.3), so bake the shear into the mesh and re-export`,
-          );
+        : typeError(`Sheared glTF matrix on node ${index}`, 'gltf-transform');
     mesh.setPosition(trs.position).setScale(trs.scale).setQuaternion(trs.rotation);
   } else {
     checkTRS(node, index);
@@ -317,10 +302,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
         Boolean,
       )
     )
-      throw margoError(
-        'unsupported',
-        'Minimal PBR supports opaque constant colors; add @margoengine/gltf/textured for a base colour map or MASK; other maps, emission and transparency require @margoengine/gltf/pbr',
-      );
+      throw fault('unsupported', 'Maps, emission and transparency need @margoengine/gltf/textured or gltf/pbr', 'gltf-light');
     return new PbrMaterial({
       color: color.slice(0, 3),
       roughness: p.roughnessFactor ?? 1,
@@ -330,9 +312,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
   };
   const definitions = (doc.meshes ?? []).map((mesh) => {
     if (!Array.isArray(mesh.primitives) || !mesh.primitives.length || !mesh.primitives.every(isObject))
-      throw new TypeError(
-        'Missing glTF primitives; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
-      );
+      throw typeError('Missing glTF primitives', 'gltf-invalid');
     // Section 3.7.2.1: a primitive without POSITION is not rendered; the rest of the mesh loads.
     return mesh.primitives.flatMap((p) => {
       if (p.attributes?.POSITION === undefined) return [];
@@ -342,10 +322,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
         p.extensions ||
         Object.keys(p.attributes ?? {}).some((key) => /^(COLOR|JOINTS|WEIGHTS)_/.test(key))
       )
-        throw margoError(
-          'unsupported',
-          'Minimal glTF requires rigid triangles without vertex colors; use @margoengine/gltf/pbr',
-        );
+        throw fault('unsupported', 'Points, lines, morphs, skins and vertex colours need @margoengine/gltf/pbr', 'gltf-light');
       let positions = attribute('POSITION', p.attributes?.POSITION),
         normals = p.attributes?.NORMAL === undefined ? null : attribute('NORMAL', p.attributes.NORMAL);
       let indices =
@@ -362,10 +339,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
       const expanded = normals ? undefined : indices;
       vertices += normals ? positions.length / 3 : indices.length;
       if (vertices > 1_000_000)
-        throw margoError(
-          'unsupported',
-          'glTF exceeds one million vertices, the limit of the light loader; use @margoengine/gltf/pbr, or split it',
-        );
+        throw fault('unsupported', 'glTF exceeds one million vertices, the light loader limit', 'gltf-light');
       if (!normals) {
         const expanded = new Float32Array(indices.length * 3);
         normals = new Float32Array(expanded.length);
@@ -402,7 +376,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
           ? new PbrMaterial({ color: [1, 1, 1], roughness: 1, metalness: 1, doubleSided: false })
           : doc.materials?.[integer(p.material, 'material reference')] &&
             (materials[p.material] ??= make(doc.materials[p.material]));
-      if (!material) throw new TypeError('Missing material; point the primitive at an existing material index');
+      if (!material) throw typeError('Missing glTF material', 'gltf-invalid');
       return [{ geometry: new Geometry(positions, normals, indices), material, source: p, expanded }];
     });
   });
@@ -410,18 +384,13 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
     parents = new Int32Array(nodes.length).fill(-1);
   nodes.forEach((node: GLTFNode, id: number) => {
     if (!node || node.skin !== undefined || node.camera !== undefined || node.extensions)
-      throw margoError(
-        'unsupported',
-        'Unsupported glTF node; add @margoengine/gltf/instancing for EXT_mesh_gpu_instancing or @margoengine/gltf/scene-data for cameras and lights, or use @margoengine/gltf/pbr',
-      );
+      throw fault('unsupported', 'Unsupported glTF node for the light loader', 'gltf-light');
     if (node.children !== undefined && !Array.isArray(node.children))
-      throw new TypeError(
-        'Invalid glTF children; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
-      );
+      throw typeError('Invalid glTF children', 'gltf-invalid');
     for (const child of node.children ?? []) {
       const index = integer(child, 'child reference');
       if (index >= nodes.length || parents[index] !== -1 || index === id)
-        throw new TypeError('Invalid glTF hierarchy; give each node one parent and valid child indices');
+        throw typeError('Invalid glTF hierarchy', 'gltf-transform');
       parents[index] = id;
     }
   });
@@ -429,19 +398,15 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
     let depth = 0;
     for (let current = id; current !== -1; current = parents[current])
       if (++depth > nodes.length)
-        throw new TypeError(`glTF hierarchy cycle through node ${id}; give the nodes a tree with no loops`);
+        throw typeError(`glTF hierarchy cycle through node ${id}`, 'gltf-transform');
     if (depth > 62)
-      throw new RangeError(
-        `glTF node ${id} is ${depth} levels deep; the engine holds 62 levels at most, so flatten the hierarchy`,
-      );
+      throw rangeError(`glTF node ${id} is ${depth} levels deep, past 62`, 'gltf-transform');
   }
   const roots = doc.scenes
     ? (entry(doc.scenes, doc.scene ?? 0, 'scene').nodes ?? [])
     : nodes.map((_: unknown, i: number) => i).filter((i: number) => parents[i] === -1);
   if (!Array.isArray(roots) || new Set(roots).size !== roots.length)
-    throw new TypeError(
-      'Invalid glTF scene roots; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
-    );
+    throw typeError('Invalid glTF scene roots', 'gltf-invalid');
   const created: Mesh[] = [],
     renderable: Mesh[] = [],
     imported: Mesh[] = [],
@@ -457,7 +422,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
       const { id, parent } = stack.pop()!,
         node = entry(nodes, id, 'node');
       if (parent === root && parents[id] !== -1)
-        throw new TypeError('Scene root has a parent; list only top-level nodes in the scene');
+        throw typeError('glTF scene root has a parent', 'gltf-transform');
       const mesh = engine.createMesh(parent);
       created.push(mesh);
       imported.push(mesh);
@@ -466,7 +431,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
       transform(mesh, node, id);
       if (node.mesh !== undefined) {
         const primitives = definitions[integer(node.mesh, 'mesh reference')];
-        if (!primitives) throw new TypeError('Missing glTF mesh; point the node at an existing mesh index');
+        if (!primitives) throw typeError('Missing glTF mesh', 'gltf-invalid');
         for (const p of primitives) {
           const child = engine.createMesh(mesh);
           created.push(child);
@@ -478,7 +443,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
       for (let i = children.length - 1; i >= 0; i--) stack.push({ id: children[i], parent: mesh });
     }
     if (!renderable.length && !extensions.some((extension) => extension.allowEmptyScene))
-      throw margoError('failed', 'glTF contains no renderable meshes; add a mesh with triangle primitives');
+      throw fault('failed', 'glTF contains no renderable meshes', 'gltf-light');
     const release = () => {
       for (let i = created.length - 1; i >= 0; i--) created[i].dispose();
     };
@@ -568,9 +533,7 @@ export async function loadGLTF(
     total = 0;
   async function fetchBytes(target: URL, root = false) {
     if (!['http:', 'https:'].includes(target.protocol))
-      throw new TypeError(
-        'glTF URL must use HTTP(S); for a blob: or file: source, read its bytes (await file.arrayBuffer()) and pass them to parseGLTFAsync',
-      );
+      throw typeError('glTF URL must use HTTP(S)', 'gltf-url');
     const response = await get(target, { signal });
     if (root && response.url) base = new URL(response.url);
     else if (!root) checkRedirect(response, base, allowedURLs, 'glTF buffer');

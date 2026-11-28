@@ -786,6 +786,65 @@ export const entries = [
     fix: 'Run `npm install <package>` with the name from the error, for example `npm install @margoengine/gltf`. Restart the app; rebuild and redeploy a bundled app so the installed package is included.',
   },
   {
+    id: 'gltf-invalid',
+    title: '@margoengine/gltf: the file is not valid glTF 2.0',
+    kind: 'family',
+    messages: [
+      'Invalid glTF JSON: not UTF-8',
+      'Invalid glTF accessor bounds/stride',
+      'Invalid glTF matrix',
+      'Missing glTF primitives',
+      'Invalid glTF children',
+      'Invalid glTF scene roots',
+      'Missing glTF mesh',
+      'Missing glTF material',
+    ],
+    cause:
+      'The file breaks a rule of the glTF 2.0 specification: its JSON is not UTF-8 or does not parse, a top-level list holds something other than objects, an index (a buffer, view, accessor, mesh, material, texture or node reference) is not a whole number or points past its list, an accessor reads outside its buffer view or with a bad stride, a node matrix is not 16 numbers, a mesh has no primitives, a node lists children that are not an array, or the scene roots are not a list of distinct nodes. The message names the field (for example "Invalid glTF mesh reference" or "Missing glTF texture"). Both loaders, @margoengine/gltf and @margoengine/gltf/pbr, refuse such a file.',
+    fix: 'Re-export the file from your 3D tool and check it with the Khronos glTF Validator (https://github.khronos.org/glTF-Validator/), which names the broken field; fix it there or in the tool that wrote the file, then load it again.',
+  },
+  {
+    id: 'gltf-light',
+    title: '@margoengine/gltf: a file the light loader does not read',
+    kind: 'family',
+    messages: [
+      'Unsupported glTF accessor for the light loader',
+      'glTF accessor holds over one million values, the light loader limit',
+      'Skins, animations and required extensions need @margoengine/gltf/pbr',
+      'Maps, emission and transparency need @margoengine/gltf/textured or gltf/pbr',
+      'Points, lines, morphs, skins and vertex colours need @margoengine/gltf/pbr',
+      'glTF exceeds one million vertices, the light loader limit',
+      'Unsupported glTF node for the light loader',
+      'glTF contains no renderable meshes',
+    ],
+    cause:
+      'The root of @margoengine/gltf is a small static loader: float positions and unsigned integer indices, rigid triangle meshes without vertex colours, morph targets or skins, opaque constant-colour materials, no required extensions, skins or animations, at most one million vertices in all and one million values in an accessor. A node with a skin, a camera or an extension needs an entry, and a file with nothing to draw (code failed) loads only with an entry that allows an empty scene, such as gltf/scene-data. These throw a MargoError with code unsupported, which loadAuto takes as the sign to move to gltf/pbr.',
+    fix: 'Use `loadAuto` from `@margoengine/gltf/auto`, which adds the light entries a file calls for and moves to `@margoengine/gltf/pbr` by itself. Or add the entry yourself: `@margoengine/gltf/quantized` for quantized accessors, `@margoengine/gltf/textured` for a base colour map or MASK cut-outs, `@margoengine/gltf/instancing` for EXT_mesh_gpu_instancing, `@margoengine/gltf/scene-data` for cameras, lights and files without a mesh. Load everything else (other maps, emission, transparency, points, lines, morphs, skins, animations, vertex colours, required extensions, larger files) with `loadGLTF` from `@margoengine/gltf/pbr`, or split the file. A file with no mesh needs a mesh with triangle primitives, or gltf/scene-data.',
+  },
+  {
+    id: 'gltf-transform',
+    title: '@margoengine/gltf: a node transform or hierarchy the engine cannot hold',
+    kind: 'family',
+    messages: [
+      'Invalid glTF hierarchy',
+      'glTF scene root has a parent',
+    ],
+    cause:
+      'A node named in the message has a translation, rotation or scale that is not 3, 4 and 3 finite float32 numbers; a matrix that does not split into translation, rotation and scale because it shears (glTF 2.0 section 3.5.3 requires the split); a node that is its own ancestor (the message names a node on the loop); a node deeper than 62 levels (the engine holds 62, the message names the node and its depth); a node with two parents or a child index out of range; or a scene root that is the child of another node. Both loaders check the same rules.',
+    fix: 'Re-export with valid transforms; bake a sheared matrix into the mesh vertices and give the node a plain translation, rotation and scale; give the nodes a tree with no loops and one parent each; flatten a hierarchy deeper than 62 levels (apply the parent transforms in the 3D tool); list only top-level nodes in a scene.',
+  },
+  {
+    id: 'gltf-url',
+    title: '@margoengine/gltf: a URL loadGLTF cannot fetch',
+    kind: 'family',
+    messages: [
+      'glTF URL must use HTTP(S)',
+    ],
+    cause:
+      'loadGLTF and loadAuto fetch over HTTP(S) only. A blob: URL (from URL.createObjectURL) or a file: URL has no server behind it, and its bytes are already in memory.',
+    fix: 'Read the bytes and parse them instead: `const bytes = new Uint8Array(await file.arrayBuffer()); const model = await parseGLTFAsync(engine, bytes);` (pass `baseURL` with gltf/pbr, or the buffers yourself, when the file names external buffers). Serve files from an http(s) URL for loadGLTF.',
+  },
+  {
     id: 'gltf-decoders',
     title: 'A compressed glTF reached without the decoders',
     kind: 'message',
@@ -1185,6 +1244,7 @@ export const entries = [
     title: '@margoengine/compute: GPU arrays, kernels and primitives',
     kind: 'family',
     messages: [
+      'ONNX RegexFullMatch pattern expands past 100000 instructions; lower its repetitions',
       'backward needs a tensor that depends on a parameter; none of its inputs requires a gradient',
       'Tensor operands are Tensors, GpuArrays or numbers',
       'tensor takes a GpuArray; use gpu.array(data) first',
@@ -1339,6 +1399,7 @@ export const entries = [
     title: '@margoengine/sciviz: figures, layers and colour maps',
     kind: 'family',
     messages: [
+      'Volume transform must be 16 finite numbers, column-major, affine (last row 0 0 0 1) and invertible',
       'exportSceneSVG needs a finite width and height above 0',
       'ambient must be from 0 to 1',
       'exportSceneSVG needs a camera: pass `camera`, or an engine that has one',
@@ -2526,6 +2587,7 @@ export const entries = [
     title: '@margoengine/biomes: biome worlds, climate fields and editing',
     kind: 'family',
     messages: [
+      'horizonEdgeMean needs width x depth x channels values on a 2 x 2 or larger grid',
       'Set a valid treeline elevation, width 12..400 m, patchSize 20..2000 m and int32 seed',
       'Invalid biome objects capture hook; pass an object with declarations() and begin() functions and a targets array to live BiomeObjects.',
       'BiomeObjects onDispose needs a function',

@@ -102,7 +102,7 @@ test('the light loader draws an OPAQUE colour whatever its alpha, and never chec
     });
     assert.throws(() => parseGLTF(engine, used.doc, [used.bytes]), /gltf\/pbr/);
     const missing = triangle({ meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 3 }] }] });
-    assert.throws(() => parseGLTF(engine, missing.doc, [missing.bytes]), /Missing material/);
+    assert.throws(() => parseGLTF(engine, missing.doc, [missing.bytes]), /Missing glTF material/);
     assert.equal(engine.meshes.size, 0);
   } finally {
     engine.dispose();
@@ -363,7 +363,7 @@ test('KB-GLTFA A6: a sheared node matrix is a TypeError that names the node and 
     assert.throws(
       () => parse(engine, doc, [bytes]),
       (e) =>
-        e instanceof TypeError && /Sheared glTF matrix on node 1/.test(e.message) && /bake the shear/.test(e.message),
+        e instanceof TypeError && /Sheared glTF matrix on node 1/.test(e.message) && /errors#gltf-transform/.test(e.message),
       label,
     );
   });
@@ -377,7 +377,7 @@ test('KB-GLTFA A4: a cycle and the 62-level limit have their own messages, in bo
     assert.throws(
       () => parse(engine, chain.doc, [chain.bytes]),
       (e) =>
-        e instanceof RangeError && /node 62 is 63 levels deep/.test(e.message) && /62 levels at most/.test(e.message),
+        e instanceof RangeError && /node 62 is 63 levels deep/.test(e.message) && /errors#gltf-transform/.test(e.message),
       `${label} depth`,
     );
     // A 62-node chain, 62 levels deep, still loads.
@@ -405,7 +405,7 @@ test('KB-GLTFA A1: a blob: URL is refused with the way to load its bytes, in bot
       ['pbr', () => loadPBR(engine, 'blob:https://example.com/0f1e')],
       ['auto', () => loadAuto(engine, 'blob:https://example.com/0f1e')],
     ])
-      await assert.rejects(load, (e) => e instanceof TypeError && /parseGLTFAsync/.test(e.message), label);
+      await assert.rejects(load, (e) => e instanceof TypeError && /parseGLTFAsync|errors#gltf-url/.test(e.message), label);
   } finally {
     engine.dispose();
   }

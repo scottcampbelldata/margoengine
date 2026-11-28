@@ -65,7 +65,7 @@ import {
 import { Cleanup } from '../../shared/cleanup.js';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { setMeshSource, clearMeshSource, type MeshSource } from '../../shared/mesh-source.js';
-import { margoError, typeError } from '../../shared/errors.js';
+import { margoError, rangeError, typeError } from '../../shared/errors.js';
 import { shadowPrimitivesInto } from '../../shared/shadow-source.js';
 import { primitiveAfterOpaque } from '../../shared/material-routing.js';
 import { hiddenInTree } from '../../shared/visibility.js';
@@ -2285,9 +2285,8 @@ function checkTRS(node: GLTFNode, index: number): void {
         v.length !== size ||
         v.some((x) => typeof x !== 'number' || !Number.isFinite(Math.fround(x))))
     )
-      throw new TypeError(
-        `Invalid glTF ${key} on node ${index}: ${size} finite numbers; re-export the file and check it with the glTF Validator`,
-      );
+      // The same short message and help link as the light loader (KB-GLTFA A5).
+      throw typeError(`Invalid glTF ${key} on node ${index}: ${size} finite numbers`, 'gltf-transform');
   }
 }
 function transform(node: Mesh, def: GLTFNode, index: number): void {
@@ -2301,9 +2300,7 @@ function transform(node: Mesh, def: GLTFNode, index: number): void {
     if (!trs.ok)
       throw trs.reason === 'singular'
         ? new RangeError('Singular glTF matrix')
-        : new TypeError(
-            `Sheared glTF matrix on node ${index}; a node matrix must split into translation, rotation and scale (glTF 2.0 section 3.5.3), so bake the shear into the mesh and re-export`,
-          );
+        : typeError(`Sheared glTF matrix on node ${index}`, 'gltf-transform');
     node.setPosition(trs.position).setScale(trs.scale).setQuaternion(trs.rotation);
   } else {
     checkTRS(def, index);
@@ -2553,11 +2550,9 @@ export class PBRModel implements EnginePlugin {
       let depth = 0;
       for (let p = i; p !== -1; p = parents[p])
         if (++depth > defs.length)
-          throw new TypeError(`glTF hierarchy cycle through node ${i}; give the nodes a tree with no loops`);
+          throw typeError(`glTF hierarchy cycle through node ${i}`, 'gltf-transform');
       if (depth > 62)
-        throw new RangeError(
-          `glTF node ${i} is ${depth} levels deep; the engine holds 62 levels at most, so flatten the hierarchy`,
-        );
+        throw rangeError(`glTF node ${i} is ${depth} levels deep, past 62`, 'gltf-transform');
     }
     const roots = doc.scenes
       ? (entry(doc.scenes, doc.scene ?? 0, 'scene').nodes ?? [])

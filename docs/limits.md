@@ -8831,6 +8831,12 @@ with `margoError` instead of bundling math's `MargoError` class: 8,323 to 8,191 
 their names, codes and messages, and `instanceof MargoError` still matches. `tests/modern-core-budget.test.js` now checks
 the pair, which only a full build checked before.
 
+2026-11-28: node-named errors and their how-to text (KB-GLTFA A1, A4 to A6, 343e5d9ece) took the root to 8,459 B and
+the pair to 30,984 B. The root's throws now carry a short message ending in a link to margoengine.com/errors
+(`#gltf-invalid`, `#gltf-light`, `#gltf-transform`, `#gltf-url`), where the how-to text moved; node names, error codes
+and error types are unchanged, and gltf/pbr gives the same short transform messages. Root 8,459 to 8,114 B, the pair
+30,639 B. `scripts/errors/check.mjs` checks these two files (`ERROR_FILES`) like the listed packages.
+
 ## IFC and BIM data (2026-11-16)
 
 - Class inheritance (`@margoengine/ifc/query` `isSubtypeOf`, `subtypesOf`, `supertypesOf` and `findElements` class

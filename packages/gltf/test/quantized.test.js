@@ -112,9 +112,9 @@ test('without quantized the file stays refused, with a way forward', async () =>
   const { engine } = await headlessEngine();
   try {
     const packed = file({ data: new Uint8Array(12), type: UNSIGNED_BYTE, stride: 4 });
-    assert.throws(() => load(engine, packed, []), /gltf\/pbr/);
+    assert.throws(() => load(engine, packed, []), /gltf\/pbr|errors#gltf-light/);
     delete packed.doc.extensionsRequired;
-    assert.throws(() => load(engine, packed, []), /gltf\/quantized/);
+    assert.throws(() => load(engine, packed, []), /errors#gltf-light/);
     assert.equal(engine.meshes.size, 0);
   } finally {
     engine.dispose();
@@ -176,7 +176,7 @@ test('loadGLTF takes extensions, for its early check and for the parse', async (
     doc.buffers[0].uri = 'model.bin';
     const get = async (url) =>
       new Response(String(url).endsWith('.bin') ? bytes : JSON.stringify(doc), { status: 200 });
-    await assert.rejects(loadGLTF(engine, 'https://example.test/model.gltf', { fetch: get }), /gltf\/pbr/);
+    await assert.rejects(loadGLTF(engine, 'https://example.test/model.gltf', { fetch: get }), /gltf\/pbr|errors#gltf-light/);
     const model = await loadGLTF(engine, 'https://example.test/model.gltf', { fetch: get, extensions: [quantized] });
     assert.deepEqual(vertexData(model.meshes[0].geometry).positions, [0, 0, 0, 1, 0, 0, 0, 1, 0]);
     model.dispose();

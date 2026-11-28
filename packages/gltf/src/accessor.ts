@@ -1,21 +1,17 @@
 // Accessor reading shared by the loader and its optional entries (glTF 2.0 specification, section 3.6.2).
-import { margoError } from '@margoengine/core/extension';
+import { fault, rangeError, typeError } from '@margoengine/core/extension';
 import { COMPONENT_BYTES, readComponent } from '../../shared/accessor.js';
 import type { GLTFAccessor, GLTFDocument } from '../../shared/gltf.js';
 
 export const integer = (value: unknown, label: string, min = 0): number => {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min)
-    throw new TypeError(
-      `Invalid glTF ${label}; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`,
-    );
+    throw typeError(`Invalid glTF ${label}`, 'gltf-invalid');
   return value;
 };
 export const entry = <T>(array: readonly T[] | undefined, id: unknown, label: string): T => {
   const value = array?.[integer(id, label)];
   if (!value || typeof value !== 'object' || Array.isArray(value))
-    throw new TypeError(
-      `Missing glTF ${label}; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`,
-    );
+    throw typeError(`Missing glTF ${label}`, 'gltf-invalid');
   return value;
 };
 // The divisor of a normalized integer, by componentType (specification section 3.11). A Map: componentType is untrusted.
@@ -43,25 +39,16 @@ export function readAccessor(
   // could override them).
   if (a.bufferView === undefined && !a.sparse) {
     if (!accepts(a))
-      throw margoError(
-        'unsupported',
-        'Unsupported glTF accessor; use float positions and unsigned integer indices, add @margoengine/gltf/quantized for quantized meshes, or use @margoengine/gltf/pbr',
-      );
+      throw fault('unsupported', 'Unsupported glTF accessor for the light loader', 'gltf-light');
     const count = integer(a.count, 'accessor count', 1);
     if (count > 1_000_000)
-      throw margoError(
-        'unsupported',
-        'glTF accessor holds over one million values, the limit of the light loader; use @margoengine/gltf/pbr',
-      );
+      throw fault('unsupported', 'glTF accessor holds over one million values, the light loader limit', 'gltf-light');
     return index ? new Uint32Array(count) : new Float32Array(count * components);
   }
   const v = entry(doc.bufferViews, a.bufferView, 'bufferView'),
     buffer = buffers[integer(v.buffer, 'buffer reference')];
   if (!buffer || a.sparse || !accepts(a))
-    throw margoError(
-      'unsupported',
-      'Unsupported glTF accessor; use float positions and unsigned integer indices, add @margoengine/gltf/quantized for quantized meshes, or use @margoengine/gltf/pbr',
-    );
+    throw fault('unsupported', 'Unsupported glTF accessor for the light loader', 'gltf-light');
   const size: number = COMPONENT_BYTES[a.componentType],
     count = integer(a.count, 'accessor count', 1),
     offset = integer(a.byteOffset ?? 0, 'accessor offset'),
@@ -69,10 +56,7 @@ export function readAccessor(
     length = integer(v.byteLength, 'view length', 1),
     stride = integer(v.byteStride ?? size * components, 'stride', size * components);
   if (count > 1_000_000)
-    throw margoError(
-      'unsupported',
-      'glTF accessor holds over one million values, the limit of the light loader; use @margoengine/gltf/pbr',
-    );
+    throw fault('unsupported', 'glTF accessor holds over one million values, the light loader limit', 'gltf-light');
   if (
     start + length > buffer.length ||
     offset + (count - 1) * stride + components * size > length ||
@@ -82,9 +66,7 @@ export function readAccessor(
     stride > 252 ||
     (index && v.byteStride !== undefined)
   )
-    throw new RangeError(
-      'Invalid glTF accessor bounds/stride; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator',
-    );
+    throw rangeError('Invalid glTF accessor bounds/stride', 'gltf-invalid');
   const view = new DataView(buffer.buffer, buffer.byteOffset + start, length),
     out = index ? new Uint32Array(count) : new Float32Array(count * components),
     range = a.normalized ? ranges.get(a.componentType) : undefined;

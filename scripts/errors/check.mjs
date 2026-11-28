@@ -25,6 +25,10 @@ export const ERROR_SOURCES = [
   'packages/controls/src',
 ];
 
+/** Single files whose throws link to the page, in packages where only these use the linked helpers: the light glTF
+ * loader's root, whose guidance lives on the page so the root stays below build-modern's Core + glTF gate. */
+export const ERROR_FILES = ['packages/gltf/src/index.ts', 'packages/gltf/src/accessor.ts'];
+
 // fault('code', message[, 'anchor']), typeError(message, 'anchor'), rangeError(message, 'anchor').
 const CALL =
   /\b(?:(fault)\(\s*'(\w+)',\s*|(typeError|rangeError)\(\s*)('[^']*'|"[^"]*"|`[^`]*`|\w+(?:\.\w+)*)(?:,\s*'([\w-]+)')?,?\s*\)/g;
@@ -42,11 +46,17 @@ export function errorPageFindings(root, { entries = allEntries, page = errorsPag
   if (ids.size !== entries.length) findings.push('scripts/errors/entries.js: entry ids must be unique');
   for (const e of entries) if (!/^[a-z][a-z-]*$/.test(e.id)) findings.push(`${e.id}: anchor id needs [a-z-]`);
   let calls = 0;
-  for (const dir of ERROR_SOURCES) {
-    if (!existsSync(join(root, dir))) continue;
-    for (const name of readdirSync(join(root, dir)).filter((f) => /\.tsx?$/.test(f))) {
-      const file = `${dir}/${name}`,
-        text = readFileSync(join(root, file), 'utf8');
+  const files = ERROR_SOURCES.flatMap((dir) =>
+    existsSync(join(root, dir))
+      ? readdirSync(join(root, dir))
+          .filter((f) => /\.tsx?$/.test(f))
+          .map((name) => `${dir}/${name}`)
+      : [],
+  );
+  for (const file of ERROR_FILES) if (existsSync(join(root, file))) files.push(file);
+  {
+    for (const file of files) {
+      const text = readFileSync(join(root, file), 'utf8');
       for (const m of text.matchAll(CALL)) {
         calls++;
         const [, faultCall, code, other, message, anchor] = m,

@@ -187,7 +187,7 @@ test('an unsupported file moves to gltf/pbr from the bytes already downloaded', 
       result = await loadAuto(engine, url, { fetch, maxNodes: 7, allowedURLs });
     assert.equal(result.loader, 'gltf/pbr');
     assert.equal(result.model, model);
-    assert.match(result.reason, /skins and animations/);
+    assert.match(result.reason, /Skins, animations/);
     assert.deepEqual(asked, ['/m.glb']);
     assert.equal(calls.length, 1);
     assert.equal(calls[0].engine, engine);
