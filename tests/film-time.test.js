@@ -107,6 +107,7 @@ test('the seekable clocks of GAP-FILM-TIME stay seekable', () => {
       'packages/shadows/src/virtual.ts',
       'packages/shadows/src/light-function.ts',
       'packages/dof/src/autofocus.ts',
+      'packages/vfx/src/flocking.ts', // KB-FILM-FLOCK1
       // The sweep, GAP-FILM-TIME commit 7.
       'packages/cinematic/src/index.ts',
       'packages/cinematic/src/noise.ts',

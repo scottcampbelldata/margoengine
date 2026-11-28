@@ -158,8 +158,8 @@ export class GPUFlock implements EnginePlugin {
   private cpuState?: FlockSimulationState;
   private cpuDirty = false;
   private clocked = false;
-  private ticked = false;
-  private pendingDelta = 0;
+  /** Frame deltas `advanceTime` took since the last simulate pass, each run in order by the next one. */
+  private owed: number[] = [];
 
   private owned: { destroy(): void }[] = [];
   private states: GPUBuffer[] = [];
@@ -300,6 +300,7 @@ export class GPUFlock implements EnginePlugin {
     if (seed !== undefined) this.options.seed = seed;
     this.pending = undefined;
     this.needsInit = true;
+    this.owed.length = 0;
     this.stats.steps = 0;
   }
 
@@ -322,7 +323,7 @@ export class GPUFlock implements EnginePlugin {
       return;
     }
     const encoder = device.createCommandEncoder();
-    this.encodeSteps(encoder, device, params, dt, n);
+    this.encodeSteps(encoder, device, params, dt / n, n);
     device.queue.submit([encoder.finish()]);
   }
 
@@ -397,12 +398,21 @@ export class GPUFlock implements EnginePlugin {
     graph.add({ name: this.name + ':debug', order: 8, execute: (c) => c.backend === 'webgpu' && this.drawDebug(c) });
   }
 
-  /** Takes the frame delta once a tick, so a frame drawn into several views steps once. */
-  onPreUpdate(delta: number): void {
+  /**
+   * The CPU part of a frame update, for `@margoengine/cutscene/seek`: owes the flock one frame step of `delta` seconds
+   * (at most 0.25; none while `paused`), run by the next simulate pass in the order owed. A seek's replayed steps and a
+   * live run's frames therefore step the flock alike, and a frame drawn into several views steps it once.
+   */
+  advanceTime(delta: number): void {
     if (this.disposed) return;
-    this.pendingDelta = delta;
     this.clocked = true;
-    this.ticked = true;
+    if (!(delta > 0) || !Number.isFinite(delta) || resolveFlockParams(this.options, this.count).paused) return;
+    this.owed.push(Math.min(delta, FRAME_DELTA_CAP));
+  }
+
+  /** Takes the frame delta once a tick, through {@link GPUFlock.advanceTime}. */
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
   }
 
   private buffer(device: GPUDevice, size: number, usage: number): GPUBuffer {
@@ -533,11 +543,11 @@ export class GPUFlock implements EnginePlugin {
     encoder: GPUCommandEncoder,
     device: GPUDevice,
     p: ResolvedFlockParams,
-    dt: number,
+    h: number,
     n: number,
   ): void {
     const rt = this.compute!;
-    this.writeSimUniforms(device, p, dt / n);
+    this.writeSimUniforms(device, p, h);
     const boidGroups = Math.ceil(this.count / 256);
     const gridGroups = this.gridCells >> 8;
     const pass = encoder.beginComputePass();
@@ -567,19 +577,18 @@ export class GPUFlock implements EnginePlugin {
     const params = resolveFlockParams(this.options, this.count);
     this.stats.debugEnabled = params.debug.enabled;
     this.ensureResources(c.device, params);
-    let dt = 0;
-    if (!params.paused) {
-      if (!this.clocked) dt = c.delta;
-      else if (this.ticked) dt = this.pendingDelta;
-    }
-    this.ticked = false;
-    dt = Math.min(Math.max(dt, 0), FRAME_DELTA_CAP);
-    const n = Number.isFinite(dt) ? flockSubsteps(dt) : 0;
+    // The owed frame steps in order; with no frame update yet, this pass's own delta.
+    let steps = this.owed;
+    if (!this.clocked) {
+      const dt = Math.min(Math.max(c.delta, 0), FRAME_DELTA_CAP);
+      steps = !params.paused && dt > 0 && Number.isFinite(dt) ? [dt] : [];
+    } else this.owed = [];
     if (this.compat) {
-      if (n) {
-        this.stats.steps += stepFlockCPU(this.cpuState!, this.options, dt);
-        this.cpuDirty = true;
-      }
+      for (const dt of steps)
+        if (flockSubsteps(dt)) {
+          this.stats.steps += stepFlockCPU(this.cpuState!, this.options, dt);
+          this.cpuDirty = true;
+        }
       if (this.cpuDirty) {
         c.device.queue.writeBuffer(this.states[0], 0, this.cpuState!.boids as Float32Array<ArrayBuffer>);
         c.device.queue.writeBuffer(this.debugBuf!, 0, this.cpuState!.debugData as Float32Array<ArrayBuffer>);
@@ -587,7 +596,25 @@ export class GPUFlock implements EnginePlugin {
       }
       return;
     }
-    if (n) this.encodeSteps(c.encoder, c.device, params, dt, n);
+    // Runs of equal steps share one substep length h, so each run is one uniform write and one compute pass. The sim
+    // uniform is written by queue.writeBuffer, which lands before the frame's encoder runs, so a frame owing runs of two
+    // lengths (a seek over a changing frame rate) submits each run in its own encoder, in order, before the frame.
+    const runs: [number, number][] = [];
+    for (const dt of steps) {
+      const n = flockSubsteps(dt);
+      if (!n) continue;
+      const h = dt / n,
+        last = runs[runs.length - 1];
+      if (last && last[0] === h) last[1] += n;
+      else runs.push([h, n]);
+    }
+    if (runs.length === 1) this.encodeSteps(c.encoder, c.device, params, runs[0]![0], runs[0]![1]);
+    else
+      for (const [h, n] of runs) {
+        const encoder = c.device.createCommandEncoder();
+        this.encodeSteps(encoder, c.device, params, h, n);
+        c.device.queue.submit([encoder.finish()]);
+      }
   }
 
   private draw(c: Context): void {

@@ -18,6 +18,29 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `tests/demo-source-data.test.js`); the rest need the same restore where the built page ships the file under a
   content hash, and the original data where Vite inlined it.
 
+### Open 2026-11-28: a film seek cannot move GPU cloth, so it restarts at every cut (KB-FILM-CLOTH1, physics gpu-cloth)
+
+- **Repro:** a cloth from `@margoengine/physics/gpu-cloth` in a film rendered scene by scene: `seek` from
+  `@margoengine/cutscene/seek` replays every clock's `advanceTime` to the scene's film time, but the cloth has none, so
+  it starts each scene hanging from its pins at rest. `node scripts/check-film-time.mjs` lists
+  `packages/physics/src/gpu-cloth.ts:598`.
+- **Cause:** `GPUCloth.onPreUpdate(delta)` adds the frame delta to `pending` and plans the frame's substeps from the
+  physics world's pin and collider poses after its step; with no `advanceTime` the seek leaves it alone, and the world
+  it reads is not replayed either.
+- **Fix wanted (owner of SOFT-01, docs/physics-work-queue.md):** `advanceTime(delta)` owing the frame's steps as
+  `GPUFlock` does (KB-FILM-FLOCK1), fed the replayed world poses, with a seek check on WebGPU and the WebGL2 layer.
+  Until then `scripts/film-time-reviewed.json` names this entry for the hit.
+
+### Fixed 2026-11-28: a film seek could not move a GPU flock, so it restarted at every cut (KB-FILM-FLOCK1, vfx)
+
+- **Repro:** `GPUFlock.attach(engine, options)` in a film rendered scene by scene: `seek` from
+  `@margoengine/cutscene/seek` found no `advanceTime`, so the flock started each scene at its seed state.
+- **Cause:** `onPreUpdate` kept only the last frame delta for the simulate pass, so steps without a draw were lost.
+- **Fix:** `advanceTime(delta)` owes each frame step and the next simulate pass runs them in order (runs of equal
+  steps in one pass; runs of two lengths each in its own submit, since the sim uniform is written by the queue).
+  Regression: `packages/vfx/test/flocking-check.mjs` (seekEven, seekMixed; WebGPU and the WebGL2 layer) and
+  `tests/film-time.test.js`.
+
 ### Open 2026-11-28: a 3MF with `production: {separateParts: true}` copies every resource group whole into each part (KB-3MF-PARTCOPY1, exporters)
 
 - **Repro:** `export3MF(NodePerformanceTest.glb, {assembly: 'components', production: {separateParts: true}})`

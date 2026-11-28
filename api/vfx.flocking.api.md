@@ -139,6 +139,7 @@ export class GPUFlock implements EnginePlugin {
     restore(snapshot: FlockSnapshot): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;

@@ -33,6 +33,12 @@
   "packages/compute/src/autotune.ts": {
     "wall": "profiling: autotune measures candidate kernels; the chosen kernel gives the same output"
   },
+  "packages/controls/src/behaviors.ts": {
+    "delta": "interactive control idle timer (auto-rotate starts after the user stops touching the controls); films drive cameras through cinematic or cutscene"
+  },
+  "packages/controls/src/geospatial.ts": {
+    "wall": "input timing: the pointer event timeStamp (wall clock only when an event has none) times real user drags for inertia; films drive cameras through cinematic or cutscene"
+  },
   "packages/controls/src/presentation.ts": {
     "delta": "interactive control smoothing (PathControls progress eases toward the page scroll offset); films drive cameras through cinematic or cutscene"
   },
@@ -84,6 +90,9 @@
   "packages/input/src/interactions.ts": {
     "wall": "input timing: gesture, interaction, motion and replay clocks time real user input (injectable `now`)"
   },
+  "packages/input/src/landmarks.ts": {
+    "delta": "live input smoothing: the one-euro filter (Casiez, Roussel and Vogel 2012) of tracked hand or face landmarks runs on real camera samples; no drawn clock a film replays"
+  },
   "packages/input/src/motion.ts": {
     "wall": "input timing: gesture, interaction, motion and replay clocks time real user input (injectable `now`)"
   },
@@ -107,6 +116,9 @@
   },
   "packages/loaders/src/types.ts": {
     "wall": "a default argument of httpRefusal: the HTTP-date of a Retry-After header becomes whole seconds from now for a LoaderError; a load error field, nothing drawn"
+  },
+  "packages/machinery/src/rigs.ts": {
+    "delta": "app-stepped rigs: StroboscopeRig.advance(seconds) and WattGovernorRig.spin(rpm, seconds) move only when the app calls them, with the seconds it passes; no plugin frame update, so a film replays them by repeating its own calls"
   },
   "packages/machinery/src/telemetry.ts": {
     "wall": "telemetry receive and sample time of a live machine feed (network timestamps)",
@@ -148,17 +160,50 @@
   "packages/netcode/src/smoothing.ts": {
     "wall": "network timestamps, leases and rate limits (netcode runs on real time, injectable `now`)"
   },
+  "packages/physics/src/clock.ts": {
+    "wall": "profiling: the kernel reads it at a step's phase boundaries into KernelWorld.timing, which no step reads back (tests/step-path.test.js); it changes no step, snapshot or hash"
+  },
   "packages/physics/src/decomposition.ts": {
     "wall": "physics on hold (Scott 2026-11-10)"
   },
-  "packages/physics/src/next/physics.ts": {
-    "delta": "physics on hold (Scott 2026-11-10)"
+  "packages/physics/src/drivetrain.ts": {
+    "delta": "solver state stepped by the vehicle's step(dt) inside the app's world step (shift countdown and engine spin integrate the step's dt); no plugin frame update and nothing drawn from a frame delta"
+  },
+  "packages/physics/src/dynamic-character.ts": {
+    "delta": "controller state stepped by the app's world step (the airborne countdown runs on the step's dt); no plugin frame update and nothing drawn from a frame delta"
+  },
+  "packages/physics/src/gpu-cloth.ts": {
+    "delta": "open defect KB-FILM-CLOTH1 (docs/known-bugs.md): GPU cloth has no advanceTime yet, so a seek restarts it; owner SOFT-01"
+  },
+  "packages/physics/src/kernel-thread.ts": {
+    "wall": "profiling: the kernel thread's clock import fills KernelWorld.timing, which no step reads back; it changes no step, snapshot or hash"
+  },
+  "packages/physics/src/native-phase-pool.ts": {
+    "wall": "a hard deadline for a worker phase wait (fails loudly when a worker hangs); timing only, the step's result does not depend on it"
   },
   "packages/physics/src/physics.ts": {
     "delta": "physics on hold (Scott 2026-11-10)"
   },
+  "packages/physics/src/rod/wrapped.ts": {
+    "delta": "not a clock: tensions are the step's impulses divided by its dt (impulse to force), recomputed each step"
+  },
+  "packages/physics/src/sail.ts": {
+    "delta": "not a clock: the sail's force is the step's impulses divided by its dt (impulse to force), summed over one step"
+  },
+  "packages/physics/src/ship/mmg.ts": {
+    "delta": "solver state: the MMG manoeuvring model's time integrates the dt the app passes to step(dt); no plugin frame update, so a film replays it by repeating its own steps"
+  },
+  "packages/physics2d/src/clock.ts": {
+    "wall": "profiling: the 2D kernel reads it into its step timing record, which no step reads back; it changes no step, snapshot or hash"
+  },
+  "packages/physics2d/src/kernel.ts": {
+    "wall": "profiling: the 2D kernel's clock import fills its step timing record, which no step reads back"
+  },
   "packages/physics2d/src/physics.ts": {
     "delta": "physics on hold (Scott 2026-11-10)"
+  },
+  "packages/physics2d/src/pid.ts": {
+    "delta": "controller state: the PID integral sums error * dt over the steps the app runs it; no plugin frame update and nothing drawn from a frame delta"
   },
   "packages/points/src/laz.ts": {
     "wall": "LAZ decode timing stats; the decoded points do not depend on it"
@@ -168,6 +213,9 @@
   },
   "packages/post/src/scene-fade.ts": {
     "wall": "scene fade is a page-load fade timed by the wall clock (film never list)"
+  },
+  "packages/procedural/src/city-mesh.ts": {
+    "wall": "time slice of an async city mesh build so the page stays responsive; the built mesh does not depend on it"
   },
   "packages/quality/src/events.ts": {
     "wall": "quality events and adaptive resolution follow measured frame time on a live page; films fix the resolution"
@@ -220,6 +268,9 @@
   "packages/sciviz/src/timeline.ts": {
     "wall": "live timeline playback paces itself on the wall clock; a film sets the timeline position itself"
   },
+  "packages/selection/src/actions.ts": {
+    "delta": "interaction timing: ActionManager.update(dt) times real long presses and pointer chains of the user; no drawn clock a film replays"
+  },
   "packages/sky/src/weather-fx.ts": {
     "delta": "class C, history of the view: the wet lens and splash timer settle over the scene's warm-up frames after a cut, as TAA does (GAP-FILM-TIME plan)"
   },
@@ -247,6 +298,9 @@
   "packages/terrain/src/planet.ts": {
     "wall": "planet tile build budget per frame; loading only, the built tiles are the same"
   },
+  "packages/terrain/src/stream-window.ts": {
+    "wall": "retry jitter of a failed tile load (exponential backoff, loading only); what is drawn converges on the loaded set"
+  },
   "packages/tiles/src/fade.ts": {
     "wall": "tile fade takes an injectable `clock` option; a film passes its frame clock (film never list without it)"
   },
@@ -273,6 +327,9 @@
   },
   "packages/vfx/src/debris.ts": {
     "delta": "the film clock: seek(t) sets the film time and the debris is a function of it alone, update(delta) only moves it on (seek test: packages/vfx/test/debris.test.js)"
+  },
+  "packages/vfx/src/node-system.ts": {
+    "delta": "app-stepped: NodeParticleSystem.update(dt) is no engine plugin and runs only when the app calls it, with the dt it passes; a film drives it from its own frame call, steps included"
   },
   "packages/voxel-edit/src/voxelize.ts": {
     "wall": "voxelize yields to the page every 16 ms; the voxels do not depend on it"

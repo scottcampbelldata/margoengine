@@ -36,6 +36,8 @@ try {
     assert.ok(r.offPos <= r.count / 100, `${r.offPos} of ${r.count} boids differ by more than 1e-4 m`);
   }
   assert.equal(r.frameSteps, 10, 'each of the 10 frames steps once');
+  assert.equal(r.seekEven[1], r.seekEven[0], 'advanceTime then a frame steps the flock as live frames do');
+  assert.equal(r.seekMixed[1], r.seekMixed[0], 'a seek over changing frame lengths steps it as live frames do');
   assert.ok(r.litFrame1 > 200, `boids drawn on frame 1: ${r.litFrame1} px`);
   assert.ok(r.movedPixels > 100, `boids move across frames: ${r.movedPixels} px`);
   assert.equal(r.pausedDiff, 0, 'a paused flock draws the same frame');

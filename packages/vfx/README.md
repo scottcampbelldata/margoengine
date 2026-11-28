@@ -1780,6 +1780,12 @@ twin `stepFlockCPU` runs the same steps in the same order (one 16,384-boid step 
 On the WebGL2 compatibility layer the flock steps that CPU twin (`flock.stats.backend` is `'webgl2-compat'`) and the
 same draw shows it; keep counts there to a few thousand.
 
+**Film time.** `flock.advanceTime(delta)` is the CPU part of the flock's frame update (its `onPreUpdate` runs it): it
+owes one frame step of `delta` seconds (at most 0.25; none while `paused`), and the next simulate pass runs every owed
+step in order, once however many views draw. So `seek` from `margoengine/cutscene/seek` moves a flock to a cut: its
+replayed `advanceTime` calls and the next frame give the state a continuous run holds there, bit for bit on one GPU
+and driver, also when the frame length changes on the way (`test/flocking-check.mjs`, WebGPU and the WebGL2 layer).
+
 **The pointer as the predator.** Unproject the pointer onto the depth of the flock's centre:
 
 ```ts

@@ -96,6 +96,21 @@ window.check = async () => {
   const pausedB = await grab(1 / 60);
   flock.options.paused = false;
 
+  // A seek (@margoengine/cutscene/seek): advanceTime calls and then one drawn frame step the flock as the same live
+  // frames do, also over frame lengths that change (each run of equal steps is its own submit).
+  const seekPair = async (deltas) => {
+    flock.reset();
+    for (const delta of deltas) engine.render({ delta });
+    const live = await hash();
+    flock.reset();
+    for (const delta of deltas.slice(0, -1)) flock.advanceTime(delta);
+    engine.render({ delta: deltas[deltas.length - 1] });
+    return [live, await hash()];
+  };
+  const seekEven = await seekPair(Array(12).fill(1 / 60));
+  const seekMixed = await seekPair(Array.from({ length: 12 }, (_, k) => (k % 3 ? 1 / 60 : 1 / 24)));
+  flock.reset();
+
   flock.setDebug({ enabled: true, velocities: false, selectedIndex: 0 });
   const frameInspect = await grab(0);
   flock.setDebug({ velocities: true, grid: false, perception: false, vectors: false });
@@ -122,6 +137,8 @@ window.check = async () => {
     worstVel,
     offPos,
     frameSteps,
+    seekEven,
+    seekMixed,
     drawCalls,
     litFrame1: nonBg(frame1),
     movedPixels: diffCount(frame1, frame2),
