@@ -351,6 +351,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   48.4. The speckles are the distant canopy's gaps against the fire glow, seen behind and between near leaves
   (blowup early, x 1600 to 1760, y 1040 to 1077). Next: the far canopy's coverage against a bright background (the
   imposter's cut-out at distance, and the middle mesh's gaps), not its ring.
+- **Rail-line, traced (2026-11-28, open):** the rail-line early probe's 167 speckles (150 bright) are nearly all single
+  pixels of the smoke sky inside dark crowns 25 to 275 m off, on the full-detail mesh (the film's tree rings are 300,
+  800 and 2,000 m): per pixel of the depth AOV, 4 ppm under 25 m, 150 ppm at 25 to 50 m, 311 at 50 to 90, 949 at 90 to
+  120, 2,148 at 180 to 240. Each pixel is about 32 samples (2 x 2 supersample, 8 jittered sub-frames), so the values
+  are the box-filtered coverage, not sampling noise. A reconstruction filter does not remove them: a Gaussian of
+  sigma 0.5 output pixel on the probe takes early 81 to 11 ppm and mid 38 to 4.8, so the shot tool's area filter
+  (`tools/shot/pixels.js`) is not the cause. Marked on the frame they sit on the trunk lines, and an orthographic
+  side view of each species' detail-2 mesh (`generateConiferMesh`, 9 yaws, pixels of 6, 12 and 20 cm) puts every
+  crown speckle in the inner tenth of the crown's width: grand fir 5,652 ppm of crown at 12 cm, Douglas-fir 2,824 at
+  20 cm, red cedar 4,905 at 12 cm, all at the stem. Cause 1's fix closed the whorl round the stem seen from above;
+  seen from the side the stem column between whorls holds only the spray bases and the stem, since sprays are flat
+  bands at the whorl's height and only sprays pointing at the camera project onto the stem. Fix to decide: Douglas-fir
+  bears internodal branches between whorls (D. A. Maguire, M. Moeur and W. S. Bennett, "Models for describing basal
+  diameter and vertical distribution of primary branches in young Douglas-fir", Forest Ecology and Management 63(1),
+  23-55, 1994), which the generator does not build; grand fir has few internodal shoots and flat, layered branches
+  (H. Ishii, E. D. Ford and D. G. Sprugel, comparative crown study of P. menziesii, A. amabilis and A. grandis,
+  Eurasian Journal of Forest Research, 2003), so some light between its tiers is real. Counts per growth unit are
+  still needed from the full texts before the generator gains internodal branches.
 
 ### Open 2026-11-28: shimmerMoving reads a defocused swaying leaf's soft edge as shimmer (KB-LOOK-TV-SHIMMER2, rest, headless look, scatter)
 
