@@ -480,6 +480,54 @@ console.log(model.primitives[0].material.tint); // [0.25, 0.5, 1]
 engine.start();
 ```
 
+#### Edit a volume's absorption live
+
+A parsed volume material carries `attenuation`, the transmittance through `thicknessFactor` per channel
+(`attenuationColor` to the power thickness / `attenuationDistance`), and `opticalDepth`, the same absorption as
+`-ln(transmittance)`. The draw reads `opticalDepth`, so a thick, dark slab keeps its colour even where its
+transmittance underflows to 0 in float64. Change either while the model draws:
+
+- Set one channel, `material.attenuation[1] = 0.125`: that channel's optical depth becomes `-ln(0.125)` on the next
+  read or draw; the channels you did not touch keep their exact parsed depth.
+- Replace the array, `material.attenuation = [0.5, 0.25, 1]`: every channel is derived again from the new values,
+  a 0 included (an opaque channel, drawn black).
+- Set `material.opticalDepth` to your own depths, or to `undefined` to derive them from `attenuation` from then on.
+- A transmittance of 1 is depth 0 (that channel absorbs nothing).
+- `loadGLTFProgressive` swaps in the textured material when the maps arrive and carries these edits across, so an
+  edit made on the factor-only material during streaming stays.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {parseGLTF, type GLTFDocument} from 'margoengine/gltf/pbr';
+import {extendedMaterials} from 'margoengine/gltf/extended-materials';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 0, 3], target: [0, 0, 0]},
+});
+const data = new Float32Array([-1, -1, 0, 1, -1, 0, 0, 1, 0]);
+const doc: GLTFDocument = {
+  asset: {version: '2.0'},
+  extensionsUsed: ['KHR_materials_transmission', 'KHR_materials_volume'],
+  buffers: [{byteLength: data.byteLength}],
+  bufferViews: [{buffer: 0, byteLength: 36}],
+  accessors: [{bufferView: 0, componentType: 5126, count: 3, type: 'VEC3'}],
+  materials: [{pbrMetallicRoughness: {metallicFactor: 0}, extensions: {
+    KHR_materials_transmission: {transmissionFactor: 1},
+    KHR_materials_volume: {thicknessFactor: 1200, attenuationColor: [0.25, 0.5, 1], attenuationDistance: 1},
+  }}],
+  meshes: [{primitives: [{attributes: {POSITION: 0}, material: 0}]}],
+  nodes: [{mesh: 0}], scenes: [{nodes: [0]}], scene: 0,
+};
+const model = parseGLTF(engine, doc, [data], [], {materials: extendedMaterials});
+const glass = model.primitives[0].material;
+console.log(glass.attenuation, glass.opticalDepth); // [0, 0, 1] [1663.5..., 831.7..., 0]: 0.25^1200 underflows, its depth does not
+glass.attenuation![1] = 0.125;
+console.log(glass.opticalDepth); // [1663.5..., 2.079..., 0]: red untouched, green from the edit
+glass.attenuation = [0.5, 0.25, 1];
+console.log(glass.opticalDepth); // [0.693..., 1.386..., 0]
+engine.start();
+```
+
 `KHR_node_visibility` sets each node's `visible` flag, also when the extension is required. A hidden ancestor hides the meshes and lights below it; transforms, animation, sockets and cameras keep working. Toggle `model.nodes[index].visible` to change it. `model.clusteredLights()` leaves out lights under hidden nodes. After changing visibility, call `applyGLTFLights(model)` again to refresh the imported sun; if the model no longer has a visible sun, the lighting from before goes back, unless the caller changed it since. `@margoengine/animation/pointer` plays animated visibility (`KHR_animation_pointer`).
 
 Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R), emissive, vertex colors, UV sets 0 to 3, tangents or derivative tangent frames, alpha masking/blending, double-sided materials, GLB/external buffers/images, normalized and sparse accessors. GGX, Smith, and Schlick implement analytical direct lighting with hemispherical ambient fill. Canvas output uses Khronos PBR Neutral tone mapping and sRGB encoding; HDR captures remain linear. Color/emissive textures decode sRGB; other maps remain linear. Images have generated mip chains (an area filter at odd sizes, so no texel is skipped; colour weighted by alpha for `BLEND` base colour maps, so transparent texels give no dark fringes) and honor glTF filtering and wrapping.
