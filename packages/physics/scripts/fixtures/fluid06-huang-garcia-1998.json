@@ -1,0 +1,57 @@
+{
+  "source": {
+    "authors": "Xin Huang and Marcelo H. García",
+    "paper": "A Herschel–Bulkley model for mud flow down a slope",
+    "year": 1998,
+    "doi": "https://doi.org/10.1017/S0022112098002845",
+    "inputsLocation": "§4.5 and Table 2, 13.05% kaolinite by volume",
+    "observationsLocation": "Figure 16 experimental front positions as reproduced by Parvin et al. (2024), Figure 3 left, black stars only",
+    "reproductionDoi": "https://doi.org/10.1016/j.apor.2024.104296",
+    "reproductionImage": "https://ars.els-cdn.com/content/image/1-s2.0-S0141118724004176-gr3_lrg.jpg",
+    "reproductionImageSha256": "51590294eb316a37daa35f52eca771428d13a2df2447b86dc3da8338dfb46fc3",
+    "calibrationPixels": {
+      "xMetresZeroToOne": [211, 1397],
+      "timeSecondsZeroToTwo": [966, 23],
+      "markerCenterRadiusPixels": 2
+    }
+  },
+  "inputs": {
+    "tankLengthM": 1,
+    "tankWidthM": 0.3,
+    "upstreamWallHeightM": 0.06,
+    "downstreamWallHeightM": 0.22,
+    "reservoirLengthM": 0.1,
+    "slopeDegrees": 11,
+    "initialCrossSectionM2": 0.00247,
+    "densityKgM3": 1215,
+    "yieldStressPa": 2.21,
+    "consistencyPaSN": 0.22,
+    "exponent": 0.75
+  },
+  "observations": {
+    "frameRateHz": 30,
+    "bottomGridM": 0.01,
+    "timeSecondsAndFrontMetres": [
+      [0.089, 0.164],
+      [0.168, 0.2],
+      [0.235, 0.245],
+      [0.303, 0.28],
+      [0.371, 0.324],
+      [0.422, 0.36],
+      [0.498, 0.393],
+      [0.56, 0.427],
+      [0.636, 0.467],
+      [0.696, 0.5],
+      [0.759, 0.535],
+      [0.84, 0.565],
+      [0.961, 0.628],
+      [1.035, 0.65],
+      [1.094, 0.663],
+      [1.171, 0.694],
+      [1.232, 0.706],
+      [1.302, 0.718],
+      [1.374, 0.728],
+      [1.436, 0.739]
+    ]
+  }
+}

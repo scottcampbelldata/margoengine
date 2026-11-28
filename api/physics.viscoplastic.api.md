@@ -51,6 +51,14 @@ export interface ViscoplasticOptions extends ViscoplasticMaterial {
     readonly friction?: number;
 }
 
+export interface ViscoplasticParticleSource {
+    readonly positions: Float32Array;
+    readonly velocities: Float32Array;
+    readonly count: number;
+    readonly stride: 6;
+    readonly velocityOffset: 3;
+}
+
 export interface ViscoplasticPoint {
     readonly position: Vector;
     readonly velocity?: Vector;
@@ -85,6 +93,7 @@ export class ViscoplasticSolver implements Solver<ViscoplasticOptions> {
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
     get capacity(): number;
+    particleSource(out?: Float32Array, renderCell?: Cell): ViscoplasticParticleSource;
     sample(index: number): ViscoplasticSample;
     get budget(): ViscoplasticBudget;
 }

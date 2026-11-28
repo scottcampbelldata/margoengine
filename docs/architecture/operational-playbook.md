@@ -11297,6 +11297,12 @@ local plastic return and optional occupied-node PCG step run in arena memory. Th
 fixture joins a registered inlet to a real TerrainBed and checks the exact mass ledger and
 matching restore. It compares both memory modes at actual shared and plain instantiation.
 
+The viscoplastic solver rejects nonrepresentable pressure, volume and solvent reductions before
+publishing. It stages the accepted inlet and outlet budget with the candidate and caps explicit
+work at 4,096 microsteps per tick. Its particle adapter compacts active records into the existing
+screen-space liquid passes. A timed flume regression checks the accepted motion and HDR replay
+on both WebGPU and WebGL2.
+
 ### Isothermal gas in the existing soft kernel (SOFT-06)
 
 The optional soft kernel adds an isothermal pressure constraint to its closed-surface pass. The rest of the soft step

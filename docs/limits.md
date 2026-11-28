@@ -10323,7 +10323,17 @@ Bulk elastic stress is weakly compressible, with no incompressible pressure proj
 entry emits positions and stresses for a separate renderer and leaves grain segregation and
 bed entrainment to their own solvers.
 
-The optional viscoplastic entry is 4,931 B gzip with a 5,187 B ceiling. Both Wasm assets are 16,986 B raw and each is 6,744 B gzip. Core plus stage remains 24,820 B gzip.
+A tick must keep the incremental deformation determinant strictly positive throughout each
+microstep. Near singular, numerically indeterminate paths are rejected.
+The explicit tick has a 4,096-microstep limit. The solver stages its grid return, point records
+and cumulative inlet and outlet ledgers before acceptance. The 0.25 terrain and wall friction
+default is a starting parameter. Use the material and substrate's measured friction when available.
+A timed field can feed the solver and replay exactly. The original PA-60 scene inlet and two-way
+sediment entrainment still need their own work. The screen-space surface reads accepted particles,
+using their chosen render radius and float32 positions. Use a nearby render cell and the particle
+limit in the Water package.
+
+The optional viscoplastic entry is 5,925 B gzip with a 6,181 B ceiling. Both Wasm assets are 27,705 B raw and 9,924 B gzip. Core and Stage gain zero bytes.
 
 ### Skeletal tissue attachments (SOFT-05)
 

@@ -102,8 +102,8 @@
 <tr><th scope="row"><code>thin-film-kernel-shared.wasm</code></th><td>Rust SIMD conservative thin-film flow and capillarity, shared world memory</td><td class="num">30,756</td><td class="num">11,743</td><td class="num">10,152</td><td>ThinFilmSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>crush-shell-kernel.wasm</code></th><td>Rust thin-sheet plane-stress plasticity and hinge bending</td><td class="num">19,230</td><td class="num">8,975</td><td class="num">7,824</td><td>CrushShellSolver.load() from the optional /crush entry</td></tr>
 <tr><th scope="row"><code>crush-shell-kernel-shared.wasm</code></th><td>Rust thin-sheet plane-stress plasticity and hinge bending, shared world memory</td><td class="num">19,230</td><td class="num">8,975</td><td class="num">7,824</td><td>the shell loader on a host supporting shared world memory</td></tr>
-<tr><th scope="row"><code>viscoplastic-kernel.wasm</code></th><td>Rust SIMD three-dimensional elastoviscoplastic material points</td><td class="num">16,986</td><td class="num">6,744</td><td class="num">6,051</td><td>ViscoplasticSolver.load() from the optional /viscoplastic entry</td></tr>
-<tr><th scope="row"><code>viscoplastic-kernel-shared.wasm</code></th><td>Rust SIMD three-dimensional elastoviscoplastic material points, shared world memory</td><td class="num">16,986</td><td class="num">6,744</td><td class="num">6,052</td><td>ViscoplasticSolver.load() with shared world memory support</td></tr>
+<tr><th scope="row"><code>viscoplastic-kernel.wasm</code></th><td>Rust SIMD three-dimensional elastoviscoplastic material points</td><td class="num">27,705</td><td class="num">9,924</td><td class="num">8,593</td><td>ViscoplasticSolver.load() from the optional /viscoplastic entry</td></tr>
+<tr><th scope="row"><code>viscoplastic-kernel-shared.wasm</code></th><td>Rust SIMD three-dimensional elastoviscoplastic material points, shared world memory</td><td class="num">27,705</td><td class="num">9,924</td><td class="num">8,570</td><td>ViscoplasticSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>tsunami-kernel.wasm</code></th><td>Rust SIMD natural long-wave propagation and inundation</td><td class="num">23,068</td><td class="num">9,530</td><td class="num">8,475</td><td>TsunamiSolver.load() from the optional /tsunami entry</td></tr>
 <tr><th scope="row"><code>tsunami-kernel-shared.wasm</code></th><td>Rust SIMD natural long-wave propagation and inundation, shared world memory</td><td class="num">23,068</td><td class="num">9,530</td><td class="num">8,489</td><td>TsunamiSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>solver-phase-thread.js</code></th><td>Worker for shared-memory SIMD coastal flux sweeps and lightning relaxation</td><td class="num">1,592</td><td class="num">767</td><td class="num">675</td><td>TsunamiSolver.load({ threads }) or LightningSolver.load({ threads }) with more than one thread</td></tr>
@@ -4951,7 +4951,7 @@
 <tr><td><code>./glacier</code></td><td class="num">7,631</td><td class="num">3,484</td></tr>
 <tr><td><code>./iceberg</code></td><td class="num">9,936</td><td class="num">4,339</td></tr>
 <tr><td><code>./thin-film</code></td><td class="num">39,042</td><td class="num">15,190</td></tr>
-<tr><td><code>./viscoplastic</code></td><td class="num">11,645</td><td class="num">4,898</td></tr>
+<tr><td><code>./viscoplastic</code></td><td class="num">14,726</td><td class="num">5,925</td></tr>
 <tr><td><code>./tsunami</code></td><td class="num">23,277</td><td class="num">8,899</td></tr>
 <tr><td><code>./pack-ice</code></td><td class="num">11,423</td><td class="num">4,715</td></tr>
 <tr><td><code>./runoff</code></td><td class="num">9,524</td><td class="num">3,869</td></tr>

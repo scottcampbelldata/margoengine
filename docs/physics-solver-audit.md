@@ -126,6 +126,28 @@ them; the rest is a record of what a stronger solver would need.
   `node packages/physics/scripts/earth10-lava-measured.mjs C terminal`.
   Analytic and conservation cases cover the equations implemented here. [Dietterich et al. (2017), workbook and experiment](https://doi.org/10.1186/s13617-017-0061-x)
 
+### FLUID-06 four-point pass
+
+- Point 5. `viscoplastic-extremes.test.js` checks coded grid, point, rendering and material corrections, the explicit work cap,
+  and both Wasm memory modes keeping their accepted bytes after a cumulative inlet overflows with real outlet motion.
+  `viscoplastic-native.test.js` checks finite scalar and solver reductions, the acoustic speed overflow case and a strictly
+  positive deformation gradient over the full step. A tangency and a nearby crossing fail without publishing. A nearby positive
+  path matches its closed-form volume change.
+- Point 7. `viscoplastic-surface.browser.mjs` draws accepted material particles from a timed, finite flume inlet, through
+  live TerrainBed contact, with the existing screen-space particle surface. The fixed camera sees 770, 2,323 and 2,985
+  changed HDR pixels through the supplied pulse. Both renderers match the accepted state, exact rewind and replay, and
+  detachment. `viscoplastic-extremes.test.js` checks compact packing and a live world-cell shift.
+- Point 8. `docs/limits.md` and the runnable Physics README example document the weakly compressible single material,
+  grid resolution, Coulomb friction, finite work cap, typed renderer handoff, and the remaining PA-60 sediment and scene gaps.
+- Point 2 remains open. Huang and Garcia's independently specified release geometry, volume and rheology drive the kaolinite
+  experiment. Twenty digitised measured front positions from the attributed replot remain held out. The 25, 20 and 10 mm
+  grids meet the sampling bounds at 0, 8 and 5 observations. The final measured front is 0.739 m and the 10 mm grid reaches
+  0.959 m. The released reference volume closes in all three grids. The recorded film depth is below the finest grid's
+  resolution, and the solver uses Coulomb wall contact. Reproduce the 25/20 mm comparison with
+  `node packages/physics/scripts/fluid06-viscoplastic-measured.mjs` and the 20/10 mm comparison with `0.02 0.01`.
+  [Huang and Garcia (1998), experiment and rheology](https://doi.org/10.1017/S0022112098002845) and
+  [Parvin et al. (2024), Figure 3 measured markers](https://doi.org/10.1016/j.apor.2024.104296)
+
 ## Film set first: the underwater and boat films
 
 The solvers behind the Edmund Fitzgerald, First Wake, Below the Swell and Below the Blue Line films (problem rows EF,

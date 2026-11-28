@@ -6228,6 +6228,12 @@ Finite-strain APIC preserves translation and mass in the free-fall case. Compute
 and Herschel–Bulkley shear agree with independent closed forms for exponents 1 and 1/2, and
 the implicit solvent case agrees with a discrete occupied-node shear solution. A varying
 inlet on a live terrain bed has the same state across frame rates, restore and memory modes.
+A 0.0096 m³ authored flume pulse draws its accepted front through the same fixed camera on WebGPU
+and WebGL2. The rendered pixels and accepted solver state replay exactly after restore. A late
+cumulative inlet overflow leaves all accepted bytes intact.
+[Renderer regression](../../packages/physics/tests/viscoplastic-surface.browser.mjs) ·
+[Rejection tests](../../packages/physics/tests/coupling/viscoplastic-extremes.test.js)
+
 [Direct tests](../../packages/physics/tests/viscoplastic.test.js) ·
 [Coupling tests](../../packages/physics/tests/coupling/viscoplastic.test.js)
 

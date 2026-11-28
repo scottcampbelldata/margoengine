@@ -15598,8 +15598,8 @@
         "gzip": 15190
       },
       "./viscoplastic": {
-        "raw": 11645,
-        "gzip": 4898
+        "raw": 14726,
+        "gzip": 5925
       },
       "./tsunami": {
         "raw": 23277,
@@ -19147,14 +19147,14 @@
       "brotli": 7824
     },
     "packages/physics/dist/viscoplastic-kernel.wasm": {
-      "raw": 16986,
-      "gzip": 6744,
-      "brotli": 6051
+      "raw": 27705,
+      "gzip": 9924,
+      "brotli": 8593
     },
     "packages/physics/dist/viscoplastic-kernel-shared.wasm": {
-      "raw": 16986,
-      "gzip": 6744,
-      "brotli": 6052
+      "raw": 27705,
+      "gzip": 9924,
+      "brotli": 8570
     },
     "packages/physics/dist/tsunami-kernel.wasm": {
       "raw": 23068,

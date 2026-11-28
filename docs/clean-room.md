@@ -17135,6 +17135,11 @@ preserves uniform translation and dissipates differences. The inlets carry refer
 volume in SI units on the same clock. All of the implementation was written in this
 repository from the papers.
 
+- Edward Anderson, [Algorithm 978: Safe Scaling in the Level 1 BLAS](https://doi.org/10.1145/3061665), 2017. The norm scales by its largest component before squaring when the direct norm would overflow or underflow. Ordinary finite states preserve their original operation order. Acoustic and solvent reductions must stay finite before accepting a native step.
+- Yunxin Sun, Tamar Shinar and Craig Schroeder, [Effective time step restrictions for explicit MPM simulation](https://doi.org/10.1111/cgf.14101), 2020, sections 4.2-4.4. Strong affine motion can invalidate a step with a low centre velocity. The candidate requires positive deformation throughout the incremental path.
+- Rida T. Farouki, [The Bernstein polynomial basis: a centennial retrospective](https://doi.org/10.1016/j.cagd.2012.03.001), 2012. A row norm below one certifies invertibility for the whole step. For larger increments, the native solver encloses the cubic determinant's Bernstein coefficients by outward rounding and subdivides only uncertain intervals. An interval that cannot certify a positive determinant rejects the candidate.
+- Steve Cochard and Christophe Ancey, [Experimental investigation of the spreading of viscoplastic fluids on inclined planes](https://doi.org/10.1016/j.jnnfm.2008.08.007), 2009. The renderer regression uses the flume arrangement for an authored pulse, with a volume ledger from its authored input. It reads the accepted MPM particles and hands them to the existing screen-space surface. The test exercises film controls and coupling.
+
 ## Sealed soft-body gas pressure (SOFT-06)
 
 - Matthias Müller, Bruno Heidelberger, Marcus Hennix and John Ratcliff, [*Position Based Dynamics*](https://doi.org/10.1016/j.jvcir.2007.01.005), 2007, §4.4 equations (13–14). A closed shell has a signed-volume constraint with a gradient that distributes its pressure over the mesh. Use one-sixth of the tetrahedral triple product to obtain cubic metres. On a watertight mesh, the cross-product terms that share each vertex telescope to one-third of the oriented area of each incident triangle.

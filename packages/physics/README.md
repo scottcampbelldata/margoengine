@@ -8201,7 +8201,8 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(mud, {
   ],
 });
 world.advance(6);
-console.log(mud.budget.storedReferenceVolume, mud.sample(0).position);
+const draw = mud.particleSource();
+console.log(mud.budget.storedReferenceVolume, mud.sample(0).position, draw.count);
 ```
 
 Pass the geometry of a registered `TerrainBed` to `load({ terrain })` to collide with the live bed.
@@ -8213,6 +8214,17 @@ divided by rest density. The current volume also includes elastic compression.
 `pointField` publishes `VISCOPLASTIC_WORDS` layout-1 f64 values per allocated point, including
 position, velocity, current volume, pressure, shear stress, plastic shear and presence. Draw only
 the present points. `solventViscosity` adds implicit Newtonian diffusion to the material's plastic flow.
+
+Pass `mud.particleSource()` as `particles` to `ParticleLiquid.attach` from
+`@margoengine/water/liquid`. After advancing or restoring the world, call the effect's
+`update(mud.particleSource())` to draw that accepted tick. The source compacts active points as
+XYZ and velocity in interleaved f32 storage with six floats per point. Pass an optional reusable
+array and a renderer world cell as the first and second arguments. The default uses the solver's
+current cell. Use a nearby renderer cell so float32 still resolves individual grid cells.
+
+The explicit solver declines ticks that require more than 4,096 microsteps. Increase spacing or
+reduce stiffness or speed in that case. A rejected update leaves the accepted points and ledgers
+available for a corrected replay.
 
 ### Measured wheel contact materials
 

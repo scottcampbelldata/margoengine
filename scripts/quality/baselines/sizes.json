@@ -15321,6 +15321,12 @@
       "commit": "earth-10-native-workers",
       "reason": "EARTH-10 physics/lava goes from 7046 to 9567 B gzip and its ceiling from 7302 to 9824 B. That adds shared worker scheduling, exact ordered gathers and work counts. Both lazy SIMD assets go from 6049 to 8497 B. Existing sea and lightning callers reuse the transport, growing 16 B each within their caps. Splitting the optional lava entry would duplicate the state and worker ABI binding. Core and Stage gain zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "fluid-06-robustness-and-surface",
+      "reason": "FLUID-06 physics/viscoplastic grows from 4898 to 5925 B gzip (cap 5154 to 6181) for transactional input limits and the accepted-particle bridge to the existing liquid renderer. Both optional Wasm assets grow from 6744 to 9924 B gzip for finite reduction checks and certification of the full deformation path. A separate entry would duplicate arena validation and accepted-record access. Core and Stage gain zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16246,7 +16252,7 @@
     "@margoengine/physics/tsunami": 9006,
     "@margoengine/physics/underwater": 4221,
     "@margoengine/physics/vegetation": 9958,
-    "@margoengine/physics/viscoplastic": 5154,
+    "@margoengine/physics/viscoplastic": 6181,
     "@margoengine/physics/vortices": 5453,
     "@margoengine/physics/waves": 7804,
     "@margoengine/physics/world": 18156,
