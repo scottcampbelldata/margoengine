@@ -16959,16 +16959,6 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   the outer sprays of mid-distance crowns. Next: check which conifer level those trees draw at (`coniferLevels` rings in
   the timber-valley biome) and whether a sub-pixel spray should already be the middle or imposter level.
 
-### Open 2026-11-28: motionBlur calls a correctly smeared mover narrower than its smear sharp (KB-LOOK-TV-MBNARROW1, headless look)
-
-- **Repro:** a bar 12 px wide moving 64 px a frame, exposed over a 180 degree shutter as a continuous smear (256
-  sub-frames), read by `motionBlur(frame, motion)` reads 100 percent sharp (24 of 24 edges); a 24 px bar at 96 px reads 0.
-- **Cause:** the check expects each edge's 10 to 90 percent ramp to be at least a quarter of the travel (half the 180
-  degree smear). A box blur of length L over a bar of width w < L ramps over w, not L, with a plateau of L - w, so a
-  narrow mover's ramp is its own width however well it is blurred.
-- **Next:** judge the ramp against min(smear, the bar's width along the motion), read from the profile (ramp plus
-  plateau spans the smear); needs a ruling on the check, since it changes what passes.
-
 ### Open 2026-11-28: shimmerMoving reads a defocused swaying leaf's soft edge as shimmer (KB-LOOK-TV-SHIMMER2, rest, headless look, scatter)
 
 - **Repro:** `DIR=<blowup render> node` with `shimmerMoving` on the timber-valley blowup mid probe (8 sub-frames,
@@ -17531,6 +17521,28 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `ScatterVelocityOptions.coverage` (default 0.5), far rings first. 37,608 pixels move now (37,584 on the WebGL2 layer
   against 35,849). Regression: `packages/scatter/test/velocity.browser.mjs` (the `coverage: false` run against the
   default, WebGPU and `MARGO_COMPAT=1`).
+
+### Fixed 2026-11-28: motionBlur called a correctly smeared mover narrower than its smear sharp, and passed a half-length one (KB-LOOK-TV-MBNARROW1, headless look)
+
+- **Repro:** a bar 12 px wide moving 64 px a frame, exposed over a 180 degree shutter as a continuous smear (256
+  sub-frames), read by `motionBlur(frame, motion)`: 100 percent sharp (24 of 24 edges). The same bar smeared over half
+  that length passed, and so did its 8 sharp copies.
+- **Cause:** the check calls an edge sharp when its 10 to 90 percent ramp is under a quarter of the travel (half the
+  180 degree smear). A box blur of length L over a bar of width w < L ramps over w, not L, with a plateau of L - w, so
+  a narrow mover's ramp is its own width however well it is blurred. The ramp was also every sample in the band across
+  the whole profile, so a short mover's rise and fall added up and a half smear passed; and `stepped` measured its ramp
+  without its end sample and read its jumps one pixel apart from the ramp's start, so a jump split across two reads
+  was two half jumps and a narrow staircase was missed.
+- **Fix:** `edgeSpan` takes the contiguous ramp round the edge's crossing and, for a profile that holds a plateau past
+  90 percent and comes back inside the window, the ramp plus that plateau, which is the mover's smear over the
+  sub-frames' travel (0.8 w + L - w + 0.2 w = L). An edge is sharp when its ramp is under half the smear and its span
+  under 0.625 of it, the same share (a wide edge's ramp is 0.8 of its smear). A ramp under 1.6 px gets no span: a
+  sharp bar, or a streak under 2 px wide that cannot be told from one. `stepped` counts the ramp's end samples and
+  slides its one-pixel read a sample at a time. No bound changed (ruling, 2026-11-28: a check that flags a correctly
+  rendered blur is a check defect).
+- **Regression:** `packages/headless/tests/look-clean.test.js`, "(KB-LOOK-TV-MBNARROW1)": the smeared 12 px bar at
+  64 px passes (100 to 0 percent sharp); drawn sharp, half smeared or as 8 sharp copies it fails (the half smear read
+  0 percent before).
 
 ### Fixed 2026-11-28: a swaying near leaf's soft fringe read as shimmer, its trail holding the sky's velocity (KB-SCATTER-FRINGEVEL1, headless look)
 
