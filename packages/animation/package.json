@@ -26,6 +26,7 @@
   "scripts": {
     "test": "node --test tests/*.test.js test/*.test.js ../../tests/modern-extensions.test.js ../../tests/deep-interaction-animation-resources.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "test:gpu": "cd ../.. && node scripts/animation-batched-deformation-tests.js",
+    "test:browser": "cd ../.. && node packages/animation/test/vat-clustered-browser.mjs && node packages/animation/test/vat-ssao-browser.mjs",
     "test:gpu:morph": "cd ../.. && node scripts/animation-morph-gpu-tests.js",
     "test:gpu:dqs": "cd ../.. && node scripts/animation-dqs-tests.js",
     "test:gpu:instanced-skin": "cd ../.. && node scripts/animation-instanced-skin-tests.js",
