@@ -1512,6 +1512,15 @@ None is checked against a measurement. The Lake Superior test bounds the tilt on
    - no `water.sample` call per cell;
    - a directable target, for example a surge height at a place and time.
 
+#### SEA-07 four-point pass
+
+- Point 5 (7e2a01c13d). `packages/physics/tests/coupling/surge.test.js` checks coded pressure and celestial input errors that name a fix, byte preservation of the last accepted forcing and water after a late invalid value, and exact coupled replay after correcting it. `packages/physics/tests/coupling/surge-potential-workers.test.js` additionally checks rollback after a finite-input wet pressure sum overflows. The hydro error audit remains open.
+- Point 6 and the grid-loop item 7 (7e2a01c13d). `packages/physics/tests/coupling/surge-potential-workers.test.js` compares scalar, 1-, 2- and 4-participant native results for pressure-only, dry and live celestial cases, with signed origins and exact restores. `packages/physics/tests/surge-potential-workers.browser.mjs` uses three live Chromium helpers. It records 153 cells in each native phase and 152 SIMD lanes per phase. The wet mask and staging arrays are reused. Directable surge targets remain open.
+- Point 7 (7e2a01c13d). `packages/water/test/tide-film.browser.mjs` renders accepted astronomical forcing from the Earth-fixed Sun and Moon. The west sill wets at 7 h and the east sill at 14 h. Both remain dry in the tide-off control. The rendered level follows accepted water within 1 mm. Both renderers independently repeat full RGBA frames and accepted snapshots through hold, restore, re-advance and rewind.
+- Point 8 and the first measurement comparison in item 3 (7e2a01c13d). `packages/physics/scripts/sea07-superior-measured.mjs` compares with 209 independent 1975 Lake Superior gauge readings. ERA5 supplies wind and pressure, and the datum is taken only from a pre-event record at a separate station. The fine-grid peak at Point Iroquois is 0.671 m against 0.971 m observed. It arrives one hour early and the 0.300 m miss exceeds the 0.047 m numerical spread. The historic instrument uncertainty is unavailable. [Evidence and limits](limits.md#native-tide-and-pressure-forcing-sea-07)
+
+Measured accuracy, marine gauges and the independent equilibrium M2 amplitude, full model breadth and two-way sea coupling, direct atmospheric field wiring, the remaining HYDRO error audit, surge targeting and original production shots remain open. The row stays REOPENED at four points.
+
 ## Pass 3, 2026-11-26 (`main` from 71e757b1f)
 
 Codex reported its solvers upgraded while the queue still showed them REOPENED or BUILDING, so this pass judges the code on `main`, not the status. Each film row's audit list (its film-table line, its detail row and its known-bugs bullets) was numbered and each item checked against the code and an opened test; the row's CPU tests were run under `scripts/run-with-timeout.mjs`. A row still marked BUILDING keeps that status, with its findings here.
