@@ -3,13 +3,15 @@
 // terrain.proof.js's story (format, sample-count and depth-format switches, lighting added, changed and removed, shadows,
 // device restoration, disposal) for three terrains.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/terrain-ssr.proof.js [ref] [pin] [--current]
-// Pinned: 6c20076d (before the hook) against 49f3e971, the commit that made this claim. --current: cd69a365b6 (terrain's frame
-// carries lighting.ambient, KB-TERRAIN-SKYAMBIENT1) against the working tree; e2177dc6e5 (terrain's vertex entry
+// Pinned: 6c20076d (before the hook) against 49f3e971, the commit that made this claim. --current: da655b6670 (the clipmap
+// rings keep their vertices on the heightmap lattice, KB-TERRAIN-RINGSAG1, after ba2399ec11 made each cell a fan round a
+// centre vertex, KB-TERRAIN-CRESTTEETH1) against the working tree; cd69a365b6 (terrain's frame carries lighting.ambient,
+// KB-TERRAIN-SKYAMBIENT1), e2177dc6e5 (terrain's vertex entry
 // declares its position @invariant), ba7a0fc89 and 675ee2476e before it (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, current, golden, coreAt } from './compare.js';
 
-const { ref, pin } = refs('6c20076d', '49f3e971', 'cd69a365b6');
+const { ref, pin } = refs('6c20076d', '49f3e971', 'da655b6670');
 await coreAt(pin); // terrain imports core's extension entry: in a pinned run, core as it was at the pin
 const { baseline, candidate } = await versions('terrain', ref, undefined, pin);
 globalThis.GPUBufferUsage ??= { COPY_DST: 8, INDEX: 16, VERTEX: 32, UNIFORM: 64, STORAGE: 128 };

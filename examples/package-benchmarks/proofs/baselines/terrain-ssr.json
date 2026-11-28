@@ -1,18 +1,18 @@
 {
  "proof": "terrain-ssr",
- "ref": "cd69a365b6",
- "revision": "cd69a365b6e51a2011213a3e8926d8e8bd4765df",
- "capturedAt": "4515ae8698f98cdacea8ff7b642ee4688fb340d7",
+ "ref": "da655b6670",
+ "revision": "da655b6670008465696364cb18c7cfe3dd6f7c93",
+ "capturedAt": "ebebf3d562ff9327d1ae92ccf8c844488e149bb0",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
-  "clipmapGrid 8": "f58ee7201906f152f51afc93c21e7fbf22c77c42bef0fbf6595983a3eaf3fdae",
-  "clipmapGrid 12": "360fd5d6eb5c1b10a1bea282a6928ce3234260947c99528308b530e20dc01f33",
-  "clipmapGrid 64": "c48812e0208b49132b2fb944d63fdc96fd76cd532cf782389875e21b6078a415",
-  "clipmapGrid 128": "71fac6941aeedbf69839aa59b264d01b8c6e3b7d2fcf9f483aa96781a291227a",
-  "clipmapGrid 256": "02e385168df28404482337aea803bb22a1d2a5570c9eeac28231ebd5bda79efc",
-  "script {}": "5feabd6fb0d2db0d4ce206a890e0faecf5e3c47ee4e4895d8ee5a955a67479aa",
-  "script {\"normalmap\":true,\"terrain\":{\"origin\":[-2048,512.5],\"resolution\":32,\"levels\":3,\"cellSize\":0.5,\"heightScale\":250,\"heightOffset\":-20}}": "7a867d87c5668045b1ed4ac483166921a9326bcee21a1da2f3d1b95e83ae2ccc",
-  "script {\"terrain\":{\"levels\":12,\"resolution\":8}}": "c8e811d8c90ca992d81d251c1e6b3b837fa52a0ac577365fd8dcaa8102e32d7e"
+  "clipmapGrid 8": "6af803d1f4a9fdd3141cb1fe8f7b647fd70161f024fb84f471aaeb92d7cc124f",
+  "clipmapGrid 12": "f72ad4241a4f23aa91d795e46826e9c035c7278ed9341ff530f24ccca77877d6",
+  "clipmapGrid 64": "31c4d16677473df587cfab2adb18d36086582d7060b834d0a57460596d26478f",
+  "clipmapGrid 128": "dd3c47f322aefeda65cdfe1294235328f357309563643d3a5bb14ae9259dd1a1",
+  "clipmapGrid 256": "dc0a7b56c49876a9c8726da7d704125b9dc79995ea12dfd92f0f2994a48f8800",
+  "script {}": "c24f2c3dd9165b6aee29b5b677cb93c276e8ff07a91adbadc4b167dd9af1a854",
+  "script {\"normalmap\":true,\"terrain\":{\"origin\":[-2048,512.5],\"resolution\":32,\"levels\":3,\"cellSize\":0.5,\"heightScale\":250,\"heightOffset\":-20}}": "e1fa58e5fc0b81a9f7831837150a8c8f328cae5eca8716f779f0d6f3e9e7cad7",
+  "script {\"terrain\":{\"levels\":12,\"resolution\":8}}": "7135f73d7529daf8c9f0a793f17e3e38921b61e2633d1f85aa82154fbd0705d2"
  }
 }
