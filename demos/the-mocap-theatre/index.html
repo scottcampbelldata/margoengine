@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#251f28">
+<link rel="icon" href="data:,">
+
+<link rel="preload" as="fetch" href="./assets/performer-DgcZmau8.skin" crossorigin>
+<link rel="preload" as="fetch" href="./assets/walk-DJx_wyuT.motion" crossorigin>
+<link rel="preload" as="fetch" href="./assets/brisk-CFZ5Ngjw.motion" crossorigin>
+<title>The Mocap Theatre · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-B17hGaIg.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DZcqASKA.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>The Mocap Theatre</h1>
+    <p>Two real walk recordings. Watch their captured joints move on the left and drive the same performer on the right.</p>
+  </header>
+  <section aria-label="Motion capture playback">
+    <div class="choices" role="group" aria-label="Recorded take">
+      <button id="walk" type="button" aria-pressed="true" disabled>Natural walk</button>
+      <button id="brisk" type="button" aria-pressed="false" disabled>Arms-wide walk</button>
+      <button id="angle" type="button" aria-pressed="false" disabled>Side view</button>
+    </div>
+    <figure>
+      <div class="capture-stage">
+        <canvas id="view" aria-label="An optical or inertial capture skeleton next to a live retargeted human on a theatre stage"></canvas>
+        <div id="notice"><p id="status" role="status">Opening the theatre…</p><p id="error" role="alert"></p></div>
+      </div>
+      <figcaption><span>Source skeleton</span><span>Elias · retargeted</span></figcaption>
+    </figure>
+    <div class="transport">
+      <button id="play" type="button" disabled>Play</button>
+      <label class="timeline"><span>Take position</span><input id="seek" type="range" min="0" max="2.5" value="0.420" step="0.001" disabled></label>
+      <output for="seek" id="time">0.42 s</output>
+    </div>
+    <div class="details">
+      <p id="take" aria-live="polite">Natural walk</p>
+      <p id="rig-count"></p>
+    </div>
+    <p class="sources"><span id="renderer">Margo Engine</span> · Captured motion plays in place. <a href="https://mocap.cs.cmu.edu/">CMU Graphics Lab</a> · <a href="https://www.ianxmason.com/100style/">100STYLE · Ian Mason</a></p>
+  </section>
+</main>
+
+</body>
+</html>

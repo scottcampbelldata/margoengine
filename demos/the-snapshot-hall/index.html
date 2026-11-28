@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-DTAvD-9Z.js"><script src="./assets/webgl2-preload-b758e366.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#121c20">
+<link rel="icon" href="data:,">
+<title>The Snapshot Hall · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-SZ-wAkk-.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DBWlPRAn.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>The Snapshot Hall</h1>
+    <p>Walk through a specimen archive. Compare three ways of submitting the same hall to the renderer.</p>
+  </header>
+  <section aria-label="Archive renderer">
+    <fieldset aria-label="Draw submission">
+      <label><input type="radio" name="mode" value="snapshot" checked disabled><span>Snapshot</span></label>
+      <label><input type="radio" name="mode" value="direct" disabled><span>Separate draws</span></label>
+      <label><input type="radio" name="mode" value="batch" disabled><span>Instanced</span></label>
+    </fieldset>
+    <figure>
+      <div class="stage">
+        <canvas id="view" aria-label="Vaulted specimen archive with oak drawers, brass lights, and a teal rosette at the end"></canvas>
+        <div id="notice"><p id="status" role="status">Opening the archive…</p><p id="error" role="alert"></p></div>
+      </div>
+      <figcaption><p id="description">Replay one recorded GPU bundle. The hall’s parts keep their original draw commands.</p><span id="route">Margo Engine</span></figcaption>
+    </figure>
+    <div class="controls">
+      <label>Distance into the hall <output id="movement" for="position">0.0 m</output>
+        <input type="range" id="position" min="0" max="100" step="1" value="0" disabled>
+      </label>
+      <dl aria-label="Draw statistics">
+        <div><dt>Parts</dt><dd id="parts">—</dd></div>
+        <div><dt>App commands</dt><dd id="commands">—</dd></div>
+        <div><dt>CPU encode</dt><dd id="encoding">—</dd></div>
+      </dl>
+    </div>
+    <p class="foot"><span id="runtime">The GPU pass executes the recorded list.</span> The CPU timer covers app command encoding. GPU and driver work have separate costs.</p>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,1 @@
+if(!navigator.gpu||new URLSearchParams(location.search).get("backend")==="webgl2"){for(const href of ["./assets/compatibility-WZ6tR0Al.js","./assets/errors-DkwPZuAq.js"]){const link=document.createElement("link");link.rel="modulepreload";link.crossOrigin="anonymous";link.href=href;document.head.append(link);}}

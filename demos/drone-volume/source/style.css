@@ -1,0 +1,42 @@
+:root{color-scheme:dark;--base:#273630;--surface:#354941;--deep:#2e4038;--edge:#586d60;--gold:#e9c492;--bright:#f5d4a5;--ink:#f2f1e7;--dim:#d0dbcc}
+*{box-sizing:border-box}
+body{margin:0;background:var(--base);color:var(--ink);font:15px/1.45 "Segoe UI",sans-serif}
+main{width:min(1150px,calc(100% - 52px));margin:auto;padding:22px 0 22px}
+nav{display:flex;gap:.7em;align-items:center;color:#c4d7c8;font-size:.84rem;letter-spacing:.062em}
+a{color:inherit;text-underline-offset:.24em}a:hover{color:var(--bright)}
+header{margin:20px 0 16px}h1{font:600 clamp(2.72rem,6vw,5.25rem)/.98 Georgia,serif;letter-spacing:-.067em;margin:0 0 .12em}
+header p{max-width:57ch;color:#d4decf;font-size:clamp(.99rem,2vw,1.13rem);margin:0}
+.instrument{overflow:hidden;border:1px solid var(--edge);border-radius:12px 12px 4px 4px;background:var(--deep)}
+.tools{display:flex;align-items:end;gap:8px;padding:9px 12px;background:var(--surface);border-bottom:1px solid var(--edge)}
+label{display:flex;flex-direction:column;gap:3px;font-size:.78rem;color:#d9e6d6;flex:0 1 17%}
+select,button{min-height:43px;border:1px solid #789080;border-radius:6px;background:#4b6357;color:var(--ink);font:600 .89rem/1 "Segoe UI",sans-serif}
+select{width:100%;min-width:0;padding:0 .58em}button{padding:0 1.0em;white-space:nowrap;cursor:pointer}
+select:focus-visible,button:focus-visible{outline:2px solid #f9d79f;outline-offset:2px}
+button:disabled,select:disabled{opacity:.53;cursor:default}
+button:not(:disabled):hover,button[aria-pressed=true]{background:#70614b;border-color:#ac926b}
+#dispatch{background:#e4bd87;color:#2d3326;border-color:#efd19c}
+#dispatch:not(:disabled):hover{background:#f6d197}#reset{margin-left:auto}
+figure{height:clamp(382px,49vw,614px);margin:0;position:relative;overflow:hidden;background:#a0ada0}
+canvas{display:block;width:100%;height:100%}
+#loading,#error{position:absolute;z-index:2;left:50%;top:48%;translate:-50% -50%;background:#34463d;color:#f5e7d0;padding:.85em 1.13em;border-radius:6px;text-align:center;width:max-content;max-width:85%}
+#stage-name,#flight-state{position:absolute;bottom:12px;background:#334941e9;border:1px solid #b1c4ad7a;padding:.49em .72em;border-radius:4px;pointer-events:none}
+#stage-name{left:13px;font-size:.70rem;color:#ede9d8;letter-spacing:.13em;text-transform:uppercase}
+#flight-state{right:13px;color:var(--bright);font-size:.8rem;font-weight:650}
+.readout{padding:0 12px;display:flex;align-items:center;gap:1.45em;border-top:1px solid var(--edge)}
+dl{margin:0;display:grid;grid-template-columns:1fr 1fr 1.25fr;flex:1}
+dl>div{border-right:1px solid var(--edge);padding:9px 12px}dl>div:first-child{padding-left:0}
+dt{font-size:.67rem;letter-spacing:.09em;text-transform:uppercase;color:#c5d7c5}dd{font-weight:650;color:var(--gold);font-variant-numeric:tabular-nums;margin:2px 0 0}
+.tints{display:flex;gap:1.1em;color:#d6e1d4;font-size:.84rem}.tints span{display:flex;align-items:center;gap:.31em}
+.tints i{width:8px;height:8px;background:#dfaa74;border-radius:50%}.tints span:nth-child(2) i{background:#76b4aa}.tints span:nth-child(3) i{background:#a0a4c7}
+#note{margin:0;padding:7px 12px;border-top:1px solid var(--edge);color:#c9dace;font-size:.79rem;min-height:31px}
+footer{margin:10px 0 0;color:#c5d5c7;font-size:.77rem}
+@media(max-width:720px){
+  main{width:calc(100% - 28px);padding-top:14px}header{margin:15px 0 13px}
+  .tools{display:grid;grid-template-columns:1.2fr .88fr .97fr .72fr;gap:5px;padding:6px 7px 8px}
+  label{grid-column:1/3}#dispatch{grid-column:3/5}#reset{margin-left:0}button,select{padding:0 .48em;font-size:.83rem}
+  .tools button:nth-of-type(n+2){min-height:36px}
+  figure{height:clamp(346px,97vw,480px)}#stage-name,#flight-state{font-size:.70rem;bottom:9px}#stage-name{left:9px}#flight-state{right:9px}
+  .readout{display:block;padding:0 8px}.readout dl>div{padding:8px 6px}.readout dl>div:first-child{padding-left:0}.readout dl>div:last-child{border-right:0}
+  dt{font-size:.60rem}.tints{padding:5px 0;border-top:1px solid var(--edge);font-size:.74rem}
+}
+[hidden]{display:none!important}

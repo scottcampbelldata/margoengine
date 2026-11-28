@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><link rel="modulepreload" crossorigin href="./assets/scene-BxeR6BAA.js"><script src="./assets/webgl2-preload-cb7401e5.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#153235">
+<link rel="icon" href="data:,">
+<title>The Coral Garden · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-B3UY0fIZ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CvLMmgEZ.css">
+</head><body><main>
+<nav><a href="../">Margo Engine / Web demos</a></nav>
+<header><h1>The Coral Garden</h1><p>Advance a living branching model from its holdfast to a full colony. Turn the current to see how the growth rule leans into the flow.</p></header>
+<section class="exhibit" aria-label="Interactive underwater reef and coral growth">
+<figure><div class="view"><canvas id="reef" aria-label="Branching coral on a volcanic reef with sea grass, fish and moving light" tabindex="0"></canvas>
+<p id="loading" role="status">Opening the reef…</p><p id="error" role="alert" hidden></p></div>
+<figcaption><span>Branching, table and brain coral</span><a href="./source/README.md">Growth rules</a></figcaption>
+</figure>
+<aside><fieldset id="controls" disabled>
+<legend>Branching colony</legend>
+<button type="button" id="advance">Advance growth</button>
+<dl><div><dt>Stage</dt><dd id="progress">Young</dd></div><div><dt>Growing segments</dt><dd id="stems">–</dd></div></dl>
+<label for="flow"><span>Current direction</span><output id="flow-value" for="flow">Calm</output></label>
+<input type="range" id="flow" min="-100" max="100" value="0" step="1">
+<label for="orbit"><span>View angle</span><output id="orbit-value" for="orbit">12°</output></label>
+<input type="range" id="orbit" min="-48" max="51" value="12" step="1">
+<label class="motion"><input type="checkbox" id="animate" checked> Animate the reef</label>
+<p id="status" role="status">Each stage grows new tips from attached branches.</p>
+</fieldset></aside>
+</section>
+</main></body></html>

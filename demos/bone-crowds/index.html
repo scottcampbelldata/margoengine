@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><head><link rel="modulepreload" crossorigin href="./assets/scene-BvIlTd1w.js"><script src="./assets/webgl2-preload-78994098.js"></script><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#171e20"><link rel="icon" href="data:,"><title>Bone Crowds · Margo Engine</title>  <script type="module" crossorigin src="./assets/index-CKIYiQTZ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-D5KGhQmB.css">
+</head>
+<body><main>
+<nav><a href="../">Margo Engine / Web demos</a><a href="./source/README.md">Animation notes</a></nav>
+<header><h1>Bone Crowds</h1><p>Follow a caribou migration across a braided river. Every set of hooves moves on its own clock.</p></header>
+<div class="exhibit">
+<figure><div class="screen"><canvas id="view" aria-label="Animated caribou crossing an Arctic river valley"></canvas><p id="loading" role="status">Finding the herd…</p></div>
+<figcaption><span>Blackwater Crossing</span><span id="shot">Ridge overlook</span></figcaption></figure>
+<aside><fieldset id="controls"><legend>Field camera</legend>
+<button id="follow" class="primary" type="button" disabled>Follow the herd <span aria-hidden="true">→</span></button>
+<div class="pair"><button id="pause" type="button" disabled aria-pressed="false">Pause herd</button><button id="lod" type="button" disabled aria-pressed="true">Adaptive detail</button></div>
+<label for="herd">Herd size <output id="population">2,048</output></label>
+<input id="herd" type="range" disabled min="0" max="3" value="3" step="1" aria-label="Herd size">
+<dl><div><dt>Near detail</dt><dd id="near">0</dd></div><div><dt>Far detail</dt><dd id="far">0</dd></div><div><dt>Herd draws</dt><dd id="draws">0</dd></div></dl>
+<p id="mode">Near animals use a finer mesh and more sampled poses.</p>
+</fieldset></aside>
+</div></main></body></html>

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-BckS7Gpl.js"><script src="./assets/webgl2-preload-f3704552.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Move a goal across a canal and watch real navigation, reciprocal crowd avoidance and jump links.">
+  <meta name="theme-color" content="#172b31">
+  <link rel="icon" href="data:,">
+  <title>Pathfinder · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-BXMXV5Zn.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BiNab-5B.css">
+</head>
+<body>
+<main>
+  <nav aria-label="Gallery"><a href="../">← Margo Web Demos</a><span>The East Quay</span></nav>
+  <header>
+    <h1>Pathfinder</h1>
+    <p>Drag the gold pin. The lead cart finds a route while the other carts make room for each other.</p>
+  </header>
+  <section id="exhibit" aria-label="Navigate the canal terraces">
+    <div class="view">
+      <canvas id="canvas" tabindex="0" aria-label="Canal terraces with navigation carts" aria-describedby="input-help"></canvas>
+      <p id="status" role="status">Preparing the quay…</p>
+      <span class="state" id="readout">Planning route</span>
+    </div>
+    <p id="input-help" class="visually-hidden">Drag or tap the floor to move the lead cart’s goal. You can also move the goal with the arrow keys.</p>
+    <div class="toolbar">
+      <div class="buttons">
+        <button id="links" type="button" aria-pressed="true" title="Restart carts using jump links or the bridge" disabled>Jump links on</button>
+        <button id="mesh" type="button" aria-pressed="false" disabled>Show mesh</button>
+        <button id="pause" type="button" disabled>Pause</button>
+        <button id="reset" type="button" disabled>Reset</button>
+      </div>
+      <div class="metrics">
+        <span class="caption"><i></i><span>Planned route</span></span>
+        <span class="caption arc"><i></i><span>Jump</span></span>
+        <output id="distance">—</output>
+      </div>
+    </div>
+  </section>
+</main>
+</body>
+</html>

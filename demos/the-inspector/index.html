@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-BT2YezfJ.js"><script src="./assets/webgl2-preload-966aff32.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eee8dc">
+  <meta name="description" content="Open a live scene tree, edit a precision optical bench, and inspect the geometry and rendering passes.">
+  <link rel="icon" href="data:,">
+  <title>The Inspector · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-C-55wzCm.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-kDz21e0H.css">
+</head>
+<body>
+<main>
+  <nav aria-label="Gallery"><a href="../">← Margo Web Demos</a><span>The Aperture Bench</span></nav>
+  <header>
+    <h1>The Inspector</h1>
+    <p>Slide the lens out, edit the scene tree, then capture the passes that draw the bench.</p>
+  </header>
+  <section id="exhibit" aria-label="Inspect the optical bench">
+    <div class="workbench">
+      <div class="image">
+        <canvas id="canvas" aria-label="Rendered brass and teal optical bench. Tap a component to select it."></canvas>
+        <p id="status" role="status">Opening the bench…</p>
+        <output id="offset">Lens seated</output>
+      </div>
+      <div class="toolbar" role="group" aria-label="Bench controls">
+        <button type="button" id="slide" class="primary" aria-pressed="false" disabled>Slide lens out</button>
+        <button type="button" id="wire" aria-pressed="false" disabled>Wireframe</button>
+        <button type="button" id="normals" aria-pressed="false" disabled>Normals</button>
+        <button type="button" id="capture" disabled>Capture frame</button>
+      </div>
+      <section id="frame" aria-label="Frame debugger" hidden>
+        <div class="frame-heading"><h2>Frame debugger</h2><output id="frame-totals"></output></div>
+        <div id="pass-list" aria-label="Recorded frame passes"></div>
+        <section id="pass-detail" aria-label="Selected pass details"></section>
+      </section>
+    </div>
+    <aside class="panels" aria-label="Scene inspection">
+      <div id="tree-host"></div>
+      <div id="stats-host"></div>
+    </aside>
+  </section>
+</main>
+</body>
+</html>

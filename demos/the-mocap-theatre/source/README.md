@@ -1,0 +1,31 @@
+# The Mocap Theatre
+
+Exhibit 162 in the Margo Web Demos brief. The left alcove shows the recorded source skeleton. Elias on the right is a newly authored 3D character. Select **Natural walk** or **Arms-wide walk** to apply a different capture to both. Use **Play**, **Pause** and the timeline to inspect the take. **Side view** rotates both figures in place to make stride and ankle articulation easier to see.
+
+## Captures
+
+- **Natural walk** comes from Carnegie Mellon University Graphics Lab trial 35_01, captured with an optical Vicon system. The published excerpt keeps original zero-based frames 20 through 336 at four-frame steps, or 80 samples at 30 Hz from the 120 Hz recording. The app loads the subject's ASF calibration and AMC joint motion with Margo. The data used in this project was obtained from mocap.cs.cmu.edu. The database was created with funding from NSF EIA-0196217. CMU permits inclusion in products and prohibits direct resale of the data, including converted files. [CMU data and terms](https://mocap.cs.cmu.edu/) · [Format and scaling](https://mocap.cs.cmu.edu/faqs.php)
+- **Arms-wide walk** comes from the 100STYLE dataset by Ian Mason. Original file Aeroplane_FW.bvh, captured at 60 Hz using XSens inertial motion capture. The excerpt keeps zero-based frames 5598 through 5724 at two-frame steps, or 64 samples at approximately 30 Hz. The app loads the excerpt with Margo's BVH parser. The excerpt is trimmed, subsampled and gzip-compressed under CC BY 4.0. [Author and license](https://www.ianxmason.com/100style/) · [Dataset record](https://zenodo.org/records/8127870) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+
+Capture channels are rounded to three decimal places in their source units for transfer. This changes sampled angles by at most 0.0005°, CMU position values by at most 0.029 mm and BVH position values by at most 0.005 mm. These are different people, actions and capture systems. The exhibit compares the applied motions. It makes no claim about relative sensor accuracy. Both excerpts play in place, retain the recorded vertical hip variation, and align the average walking direction to the theatre. The display offsets the lowest currently posed shoe to the floor for presentation. Source limbs keep their recorded skeleton proportions. Elias's proportions and bind weights are fixed. The small rendered shoe contact shades follow the posed feet. There is no simulated shoe collision, physical force, or captured finger detail.
+
+## Runtime and reproduction
+
+The public Margo engine pin is 0efd9cff8230507a32deb49907ecd499d46925f5. The app uses stock @margoengine/loaders/mocap for all three capture formats, @margoengine/rigging/retarget for the CMU and humanoid-to-Mixamo name presets and rest alignment, @margoengine/animation/skeleton-utils for Retarget, and the public animation Skeleton, Skin.pose and keyframe APIs. The asset keeps all 52 character joints and four influences per vertex. All rendering uses Margo's WebGPU-first core PBR route, and the same skinning, geometry, materials and controls run on the stock WebGL2 route. Use ?backend=webgl2 to select that route explicitly.
+
+The fictional theatre, wardrobe finish, brass hardware and Elias's fitted proportions were authored for this exhibit. The model is derived from MakeHuman CC0 body, hair, eyes, clothes, shoes and Mixamo-compatible rig. Author the asset with Blender, MPFB 2.0.18 and the MakeHuman standard asset root. Run author-performer.py with the output file and extracted asset root as arguments after Blender's -- separator. Use prepare-captures.py with the raw input folder and target source folder to regenerate the shipped gzip extracts. The input names are 35.asf, 35_01.amc and Aeroplane_FW.bvh. [MakeHuman asset licensing](https://static.makehumancommunity.org/about/license.html)
+
+- 35.asf SHA-256 2a8e2eda3c0d7d828566b2a9a8ab36b2b8b3864110574e8b73c8f069fded416c
+- 35_01.amc SHA-256 0743f4ea48e7e199cd56b2810b5ce81f8ede08d32ff79aa4e363c44cc4fe33aa
+- Aeroplane_FW.bvh SHA-256 6d0210a3417e0f6d590d371e7b194c1ba892a62b7ee9de8285cdbe384d2df8e1
+
+## References
+
+- Michael Gleicher (1998), *Retargeting Motion to New Characters*. Rest spaces and preserving the relationship between motion and proportion. [SIGGRAPH paper](https://doi.org/10.1145/280814.280820)
+- Ian Mason, Sebastian Starke and Taku Komura (2022), *Real-Time Style Modelling of Human Locomotion via Feature-Wise Transformations and Local Motion Phases*. [ACM paper](https://doi.org/10.1145/3522618)
+- Lucas Kovar, John Schreiner and Michael Gleicher (2002), *Footskate Cleanup for Motion Capture Editing*. The source for contact interpretation. The exhibit's in-place playback and lowest-shoe offset are simpler than the paper's correction solver. [Authors' publication](https://graphics.cs.wisc.edu/Papers/2002/KSG02/)
+- Royal Ballet and Opera (2024), *Visiting the Royal Opera House Visual Guide*. Curtain, proscenium and warm stage-trim reference. [Theatre reference](https://static.roh.org.uk/digital/Access/Visiting-the-Royal-Opera-House-visual-guide-2024.pdf)
+
+## Verification
+
+The local Playwright harness uses the public engine pin and a production-form Vite build. The mobile benchmark measures the first visible pose after a real take-switch touch in a fresh 390 × 844 CSS px Chromium context at 2× device pixel ratio, fourfold CPU slowdown, 150 ms round-trip latency, and 1.6 Mbps downstream. Tests also exercise playback, pausing, seeking, and switching the view. The front and side motion strips are rendered from the real Margo scene. Browser runs emulate a phone on this workstation.

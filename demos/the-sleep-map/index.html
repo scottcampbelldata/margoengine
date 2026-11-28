@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-a958432c.js"></script><link rel="modulepreload" crossorigin href="./assets/physics-BKPLohFf.js">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#202b2b">
+  <title>The Sleep Map · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-Ej8ML73o.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/errors-D0VAEAiW-D5Z9Tv8Y.js">
+  <link rel="stylesheet" crossorigin href="./assets/index-7lD0Jdms.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Showcase"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><span>Web Demos</span></nav>
+    <header>
+      <h1>The Sleep Map</h1>
+      <p>Tap a spring bed to wake it. Watch its ceramic beads return to rest.</p>
+    </header>
+    <div class="layout">
+      <figure id="viewport" aria-label="Live 3D instrument with four spring-linked beds">
+        <canvas id="scene" aria-label="Four circular brass-rimmed beds contain 224 ceramic beads"></canvas>
+        <figcaption><span class="key awake"></span> Awake <span class="key asleep"></span> Asleep</figcaption>
+        <span id="loading" role="status">Preparing the spring beds…</span>
+        <span id="error" role="alert" hidden></span>
+      </figure>
+      <section class="instrument" aria-label="Spring bed controls">
+        <h2>Tap a bed</h2>
+        <div class="beds" aria-label="Impulse buttons">
+          <button id="bed-a" type="button" aria-label="Tap bed A" disabled>A</button>
+          <button id="bed-b" type="button" aria-label="Tap bed B" disabled>B</button>
+          <button id="bed-c" type="button" aria-label="Tap bed C" disabled>C</button>
+          <button id="bed-d" type="button" aria-label="Tap bed D" disabled>D</button>
+        </div>
+        <dl>
+          <div><dt>Awake beads</dt><dd><output id="awake">—</output></dd></div>
+          <div><dt>Active solver islands</dt><dd><output id="islands">—</output></dd></div>
+          <div><dt>Sleeping beads</dt><dd><output id="asleep">—</output></dd></div>
+        </dl>
+        <button id="debug" type="button" aria-pressed="false" disabled>Show springs and contacts</button>
+        <p class="note">Springs link the beads within each bed. The solver rests an island once its movement stays below its sleep threshold.</p>
+      </section>
+    </div>
+    <footer><a href="https://box2d.org/posts/2023/10/simulation-islands/">How simulation islands work</a></footer>
+  </main>
+</body>
+</html>

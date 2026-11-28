@@ -1,0 +1,73 @@
+:root {
+  color-scheme: dark;
+  --bg: #1a2e34; --panel: #223a40; --rule: #52666a; --ink: #ebf0e8;
+  --muted: #bed1cf; --accent: #e2ca92; --signal: #bfcb98;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: var(--bg); color: var(--ink);
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { width: min(100% - 50px, 1190px); margin: auto; padding-bottom: 39px; }
+nav {
+  display: flex; min-height: 56px; align-items: center; justify-content: space-between;
+  font-size: .82rem; border-bottom: 1px solid var(--rule); color: var(--muted);
+}
+nav a { display: inline-flex; align-items: center; min-height: 44px; gap: .53em; color: inherit; text-decoration: none; font-weight: 650; }
+nav a:hover { text-decoration: underline; text-underline-offset: 3px; }
+header { padding: clamp(24px, 3.9vw, 50px) 0 clamp(17px, 2.15vw, 25px); }
+h1 { margin: 0; font: 400 clamp(3.3rem, 7.25vw, 6.45rem)/.93 Georgia, serif; letter-spacing: -.070em; }
+header p { margin: 13px 0 0; font-size: clamp(.95rem,1.35vw,1.09rem); line-height: 1.39; color: var(--muted); }
+#exhibit { border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
+.flightbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 7px;
+  padding: 7px 12px; background: var(--panel); border-bottom: 1px solid var(--rule);
+}
+.destination { display: flex; gap: 8px; align-items: center; font-size: .88rem; font-weight: 640; }
+.signal { background: var(--signal); border-radius: 50%; width: 8px; height: 8px; flex: 0 0 auto; }
+[data-flying=true] .signal { background: #efbe83; }
+button {
+  border: 1px solid #688184; border-radius: 3px; background: #2d464b; color: var(--ink);
+  min-height: 44px; padding: 0 9px; font: 650 .84rem "Segoe UI", system-ui, sans-serif;
+  cursor: pointer; white-space: nowrap;
+}
+button:disabled { opacity: .62; cursor: default; }
+button:hover:not(:disabled) { background: #506267; }
+#flight { background: var(--accent); color: #30271b; border-color: var(--accent); min-width: 158px; text-align: left; }
+#flight span { margin-left: .5em; }
+#flight:hover:not(:disabled) { background: #fae3aa; }
+.view { position: relative; background: #233e45; aspect-ratio: 1.94; }
+canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+canvas:active { cursor: grabbing; }
+#status {
+  color: #fcf2d9; background: #224047; border: 1px solid #728789; border-radius: 3px;
+  position: absolute; left: 12px; top: 12px; margin: 0; padding: 7px 8px;
+  max-width: min(68%,440px); font-size: .79rem; pointer-events: none;
+}
+#status:empty { display: none; }
+.telemetry { display: flex; background: var(--panel); border-top: 1px solid var(--rule); padding: 10px 12px; gap: 13px; }
+.sectors { display: grid; grid-template-columns: repeat(4, minmax(44px,1fr)) minmax(80px,1.65fr); gap: 6px; flex-shrink: 0; }
+.sectors button { min-width: 44px; }
+.sectors button[data-loaded=true] { border-color: #b4b791; }
+.sectors button[aria-pressed=true] { background: #d8c692; color: #29271e; border-color: #d8c692; }
+dl { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); margin: 0; flex: 1; }
+dl div { padding: 2px 10px 1px; border-left: 1px solid var(--rule); }
+dt { font-size: .74rem; color: var(--muted); font-weight: 650; }
+dd { margin: 4px 0 0; font: .94rem ui-monospace, Consolas, monospace; }
+details { margin-top: 15px; max-width: 750px; border-bottom: 1px solid var(--rule); }
+summary { cursor: pointer; min-height: 44px; padding-top: 12px; font-size: .89rem; font-weight: 650; }
+details p { font-size: .91rem; margin: 4px 0 13px; color: var(--muted); line-height: 1.55; }
+details a { color: #f0dcab; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 720px) {
+  main { width: calc(100% - 28px); }
+  nav { min-height: 48px; }
+  header { padding: 20px 0 15px; }
+  h1 { font-size: clamp(2.7rem, 10.92vw, 5.2rem); }
+  header p { margin-top: 10px; }
+  .flightbar { padding: 6px 8px; }
+  .destination { font-size: .81rem; }
+  #flight { min-width: auto; }
+  .view { aspect-ratio: 1.08; }
+  .telemetry { display: grid; padding: 8px; gap: 8px; }
+  dl div:first-child { border-left: 0; padding-left: 1px; }
+}

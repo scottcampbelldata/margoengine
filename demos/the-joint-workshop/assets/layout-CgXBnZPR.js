@@ -1,0 +1,1 @@
+var e=1/120,t=1.12,n=.29,r=[1.19,2.04,.28],i=[{pin:-2.06,sign:-1,width:.69,y:1.16,z:.32,height:1.26},{pin:-.53,sign:1,width:.69,y:1.16,z:.32,height:1.26}];export{t as a,r as i,i as n,n as r,e as t};

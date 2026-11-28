@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#eae2ce">
+<link rel="icon" href="data:,">
+<title>Utility Choices · Margo Engine</title>
+
+  <script type="module" crossorigin src="./assets/index-CzMa8DDJ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-D3jvfrDh.css">
+</head>
+<body><main>
+<nav aria-label="Exhibit links"><a href="../">Margo Engine / Web demos</a><a href="./source/README.md">Exhibit notes</a></nav>
+<header><h1>Utility Choices</h1><p>Change the weather in a working orchard. Follow the villagers as they weigh hunger, thirst and fatigue and book a place to meet each need.</p></header>
+<section class="exhibit" aria-label="Orchard simulation">
+  <figure>
+    <div class="controls">
+      <button id="heat" class="primary" aria-pressed="false" disabled>Start a hot afternoon</button>
+      <button id="pause" aria-pressed="false" disabled>Pause</button><button id="reset" disabled>Reset</button>
+    </div>
+    <div class="view"><canvas id="village" aria-label="Live scale model of the orchard commons"></canvas><span id="place-label" aria-hidden="true" hidden></span><p id="notice" role="status">Opening the orchard…</p></div>
+    <figcaption><strong>Orchard Commons</strong><span id="weather">Mild afternoon</span></figcaption>
+  </figure>
+  <aside aria-label="Villager decision">
+    <div class="residents" role="group" aria-label="Select a villager">
+      <button data-resident="0" aria-pressed="true" disabled><i></i>Mara</button>
+      <button data-resident="1" aria-pressed="false" disabled><i></i>Ellis</button>
+      <button data-resident="2" aria-pressed="false" disabled><i></i>Inez</button>
+    </div>
+    <section class="scores">
+      <h2>Next decision</h2>
+      <p id="destination">Waiting for the orchard</p>
+      <div class="score" data-score="water"><span>Draw water</span><output>—</output><meter min="0" max="1" value="0" aria-label="Draw water"></meter></div>
+      <div class="score" data-score="food"><span>Eat</span><output>—</output><meter min="0" max="1" value="0" aria-label="Eat"></meter></div>
+      <div class="score" data-score="rest"><span>Rest</span><output>—</output><meter min="0" max="1" value="0" aria-label="Rest"></meter></div>
+      <div class="score" data-score="orchard"><span>Work the orchard</span><output>—</output><meter min="0" max="1" value="0" aria-label="Work the orchard"></meter></div>
+    </section>
+    <fieldset>
+      <legend>Adjust needs</legend>
+      <label>Thirst <output id="thirst-value">—</output><input id="thirst" type="range" min="0" max="100" disabled></label>
+      <label>Hunger <output id="hunger-value">—</output><input id="hunger" type="range" min="0" max="100" disabled></label>
+      <label>Fatigue <output id="fatigue-value">—</output><input id="fatigue" type="range" min="0" max="100" disabled></label>
+    </fieldset>
+    <p id="occupancy"></p>
+  </aside>
+</section>
+</main></body></html>

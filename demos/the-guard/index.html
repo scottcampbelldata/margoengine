@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#243437">
+  <title>The Guard · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" as="fetch" href="./assets/rita-Bc3Hy5b7.rig" crossorigin>
+  <script type="module" crossorigin src="./assets/index-Dnm_FNXp.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DWbzJ4l8.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Showcase"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><span>Web Demos</span></nav>
+    <header>
+      <h1>The Guard</h1>
+      <p>Ring a gallery chime. Watch Rita investigate the sound, search the room, and return to her rounds.</p>
+    </header>
+    <div id="exhibit">
+      <div id="toolbar">
+        <label>Chime location
+          <select id="station" disabled><option value="west">West arch</option><option value="archive">North wall</option><option value="east">East bench</option></select>
+        </label>
+        <label>Hearing range
+          <select id="range" disabled><option value="2.2">Quiet · 2.2 m</option><option value="5.7" selected>Clear · 5.7 m</option><option value="9.4">Strong · 9.4 m</option></select>
+        </label>
+        <button id="ring" type="button" disabled>Ring chime</button>
+        <div class="secondary">
+          <button id="follow" type="button" aria-pressed="false" disabled>Closer view</button>
+          <button id="mute" type="button" aria-pressed="false" disabled>Mute</button>
+          <button id="reset" type="button" disabled>Reset</button>
+        </div>
+      </div>
+      <div class="content">
+        <figure id="viewport" aria-label="A cutaway of the Resonance Gallery">
+          <canvas id="scene"></canvas>
+          <span id="loading" role="status">Opening the gallery…</span>
+          <span id="error" role="alert" hidden></span>
+          <span id="gallery-name">Resonance Gallery</span>
+          <output id="responding" aria-live="polite">On patrol</output>
+        </figure>
+        <section class="audit" aria-label="Agent inspection">
+          <h2>Behavior tree</h2>
+          <ul id="tree" aria-label="Active guard decisions"></ul>
+          <section class="memory">
+            <h2>Blackboard</h2>
+            <dl>
+              <div><dt>Awareness</dt><dd id="awareness">Calm</dd></div>
+              <div><dt>Last known sound</dt><dd id="memory">—</dd></div>
+              <div><dt>Search passes</dt><dd id="cleared">0</dd></div>
+            </dl>
+          </section>
+        </section>
+      </div>
+      <p id="heard" aria-live="polite">Select a chime location to test Rita’s hearing.</p>
+    </div>
+    <footer><a href="https://arxiv.org/abs/1709.00084">Behavior trees in robotics and AI</a><a href="https://mocap.cs.cmu.edu/">Motion capture source</a></footer>
+  </main>
+</body>
+</html>

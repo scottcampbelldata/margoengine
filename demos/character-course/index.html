@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-a8521c3f.js"></script><link rel="modulepreload" crossorigin href="./assets/physics-D_XNNkCd.js">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#2a2724">
+  <title>Character Course · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <link rel="preload" as="fetch" href="./assets/inspector-D2f-SJad.rig" crossorigin>
+  <script type="module" crossorigin src="./assets/index-Dbvz54qg.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CifSUWxm.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Showcase"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><span>Web Demos</span></nav>
+    <header>
+      <h1>Character Course</h1>
+      <p>Cross the gauge station on foot. Climb the steps, ride the ferry, then take the ramp to the lower deck.</p>
+    </header>
+    <div class="layout">
+      <figure id="viewport" aria-label="Interactive 3D course in a sandstone gorge">
+        <canvas id="scene" tabindex="0" aria-label="Third-person view of the intake inspector and the gorge walkway"></canvas>
+        <figcaption><b>Gauge Station</b><output id="cue">Arrival deck</output></figcaption>
+        <span id="loading" role="status">Opening the station…</span>
+        <span id="error" role="alert" hidden></span>
+      </figure>
+      <section class="instrument" aria-label="Course controls">
+        <div class="primary">
+          <button id="guide" type="button" aria-pressed="false" disabled>Start guided walk</button>
+          <button id="reset" type="button" disabled>Reset</button>
+        </div>
+        <div class="motion">
+          <div class="pad" role="group" aria-label="Hold to walk">
+            <button id="forward" type="button" aria-label="Walk forward" disabled>↑</button>
+            <button id="left" type="button" aria-label="Walk left" disabled>←</button>
+            <button id="back" type="button" aria-label="Walk backward" disabled>↓</button>
+            <button id="right" type="button" aria-label="Walk right" disabled>→</button>
+          </div>
+          <button id="jump" type="button" disabled>Jump</button>
+        </div>
+        <p class="instruction">Hold the arrows or use WASD. Press Space to jump. Drag the view to look around.</p>
+        <dl>
+          <div><dt>Steps climbed</dt><dd><output id="steps">0 / 6</output></dd></div>
+          <div><dt>Contact</dt><dd><output id="support">—</output></dd></div>
+          <div><dt>Ground slope</dt><dd><output id="grade">—</output></dd></div>
+        </dl>
+        <p class="note">Stand on the ferry’s brass ring to set it moving.</p>
+      </section>
+    </div>
+    <footer><a href="https://gdcvault.com/play/1021116/Physics-for-Game-Programmers-Understanding">Swept character movement</a></footer>
+  </main>
+</body>
+</html>

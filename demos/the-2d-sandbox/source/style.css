@@ -1,0 +1,38 @@
+*{box-sizing:border-box}
+:root{color-scheme:dark;background:#211d2b;color:#f1e9de;font-family:system-ui,sans-serif;--line:#55475a;--muted:#c1b1be;--light:#f2d4aa}
+body{margin:0}
+main{width:min(960px,calc(100% - 64px));margin:auto;padding:25px 0 35px}
+header a{color:#ddc0bf;text-decoration:none;display:inline-flex;align-items:center;min-height:34px;font-size:.82rem}
+header a:hover{text-decoration:underline}
+h1{font:500 clamp(3.1rem,7.8vw,5.9rem)/.96 Georgia,serif;letter-spacing:-.065em;margin:8px 0;color:#f0e3cc}
+header p{color:var(--muted);font-size:clamp(1rem,1.85vw,1.13rem);line-height:1.44;max-width:54ch;margin:12px 0 20px}
+.actions{display:flex;gap:7px;margin:0 0 9px}
+button{min-height:44px;padding:0 13px;border:1px solid var(--line);border-radius:3px;background:#362d3a;color:#f2e4d9;font:600 .85rem system-ui;cursor:pointer}
+button:disabled{color:#a99baa;cursor:default}
+#crate{background:var(--light);border-color:var(--light);color:#372b29}
+#crate:disabled{color:#59473b;background:#c7b092;border-color:#c7b092}
+#reset{margin-left:auto}
+:where(a,button,canvas):focus-visible{outline:2px solid #ffc392;outline-offset:3px}
+figure{margin:0}
+.stage{position:relative;overflow:hidden;background:#39354d;border:1px solid #695366;border-radius:4px}
+canvas{display:block;width:100%;aspect-ratio:840/510;touch-action:pan-y;cursor:crosshair}
+#notice{position:absolute;inset:0;display:grid;place-content:center;padding:14px;text-align:center;background:#241f31ed}
+#notice[hidden]{display:none}#notice p{margin:4px}#error{color:#ffc69f}
+figcaption{display:flex;justify-content:space-between;gap:14px;align-items:start;padding:9px 0 12px;color:var(--muted);font-size:.82rem;line-height:1.45}
+figcaption p{margin:0}
+#route{font-size:.72rem;color:#baa6b5;white-space:nowrap}
+dl{display:flex;gap:29px;margin:0;border-top:1px solid var(--line);padding-top:9px}
+dl div{min-width:80px;display:flex;align-items:baseline;gap:7px}
+dt{color:#c4b0bb;font-size:.80rem}
+dd{margin:0;color:var(--light);font:1rem ui-monospace,monospace}
+@media(max-width:630px){
+  main{width:calc(100% - 32px);padding:12px 0 26px}
+  h1{font-size:clamp(2.91rem,11.5vw,4.40rem);margin-top:7px}
+  header p{margin:10px 0 16px;font-size:.91rem}
+  .actions{gap:5px}
+  button{padding:0 8px;font-size:.77rem}
+  .actions button:not(#reset){flex:1}
+  #reset{margin-left:0}
+  figcaption{font-size:.76rem;gap:10px}
+  #route{font-size:.66rem}
+}

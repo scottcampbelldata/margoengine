@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-muyD6grz.js"><script src="./assets/webgl2-preload-6fdeded6.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#292d30">
+  <title>The Material Factory · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-BVrQl5PW.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CTpUb3bS.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Showcase"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><span>Web Demos</span></nav>
+    <header>
+      <h1>The Material Factory</h1>
+      <p>Generate a finish, then move the light to see what each of its four maps contributes.</p>
+    </header>
+    <div class="factory">
+      <section class="fixture" aria-label="3D material test fixture">
+        <figure id="viewport">
+          <canvas id="scene" aria-label="A finish applied to a sculpted test ring and flat sample"></canvas>
+          <figcaption id="caption">Unfinished specimen</figcaption>
+          <span id="loading" role="status">Preparing the texture baker…</span>
+          <span id="error" role="alert" hidden></span>
+        </figure>
+        <div class="control-strip">
+          <button id="rebake" type="button" disabled>Bake finish</button>
+          <div class="exposure">
+            <label for="light">Light angle <output id="light-value" for="light">−39°</output></label>
+            <input type="range" id="light" min="-74" max="65" value="-39" disabled>
+          </div>
+          <span id="bake-status" role="status"></span>
+        </div>
+      </section>
+      <section class="maps" aria-labelledby="maps-title">
+        <h2 id="maps-title">Finish maps</h2>
+        <div class="finish-select" aria-label="Finish">
+          <button id="rust" type="button" aria-pressed="true" disabled>Oxide</button>
+          <button id="wood" type="button" aria-pressed="false" disabled>Walnut</button>
+          <button id="stone" type="button" aria-pressed="false" disabled>Stone</button>
+        </div>
+        <div class="texture-sheet">
+          <div><canvas id="map-albedo" aria-label="Generated albedo map"></canvas><span>Albedo</span></div>
+          <div><canvas id="map-normal" aria-label="Generated tangent-space normal map"></canvas><span>Normal</span></div>
+          <div><canvas id="map-roughness" aria-label="Generated roughness map"></canvas><span>Roughness</span></div>
+          <div><canvas id="map-height" aria-label="Generated height map with normalized preview contrast"></canvas><span>Height</span></div>
+        </div>
+        <div class="detail">
+          <label for="detail">Pattern detail <output id="detail-value" for="detail">62%</output></label>
+          <input type="range" id="detail" min="0" max="100" value="62" disabled>
+        </div>
+        <dl>
+          <div><dt>Seed</dt><dd><output id="seed">—</output></dd></div>
+          <div><dt>Maps</dt><dd><output id="resolution">—</output></dd></div>
+        </dl>
+      </section>
+    </div>
+    <footer><span>All four maps are generated on your GPU.</span>
+      <a href="https://doi.org/10.1145/325334.325247">Procedural textures</a>
+      <a href="https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html">PBR maps</a>
+    </footer>
+  </main>
+</body>
+</html>

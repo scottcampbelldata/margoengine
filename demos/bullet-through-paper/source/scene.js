@@ -1,0 +1,132 @@
+import {buildStation} from './station.js';
+import {divider,openingPose,sampleLimit} from './experiment.js';
+
+const afterFrame=()=>new Promise(resolve=>requestAnimationFrame(resolve));
+const pace=330;
+const opening=[openingPose()];
+const describe=(side,index)=>{
+  if(index===0)return 'Start pose';
+  if(side.position[0]>divider[0])return 'Crossed divider';
+  if(index===sampleLimit)return 'Kept on approach side';
+  return side.contacts>0?'At divider':'Approaching';
+};
+
+export async function show({engine,physics,canvas,notice,status,signal,size,fail}){
+  const qs=id=>document.querySelector('#'+id);
+  const run=qs('run'),replay=qs('replay'),steps=qs('samples');
+  const state=canvas.dataset;
+  const compat=engine.backend==='webgl2';
+  const stage=buildStation(engine);
+  engine.scene.background='#25333b';
+  engine.lighting.direction.set([-2.6,7.6,4.1,3.2]);
+  engine.lighting.radiance.set([1.0,.93,.81,.46]);
+  engine.lighting.ambient.set([.78,.91,1.0]);
+  qs('route').textContent=compat?'Margo WebGL2':'Margo WebGPU';
+  state.renderer=compat?'compatibility':'webgpu';
+  let trace={discrete:opening,continuous:opening},busy=false,first=true;
+  let timer,requestId=0,runCount=0;
+
+  function fit(){
+    const aspect=canvas.width/canvas.height,zoom=Math.max(1,1.564/aspect);
+    engine.camera.fov=2*Math.atan(Math.tan(16*Math.PI/180)*zoom)*180/Math.PI;
+  }
+  function stopReplay(){
+    clearTimeout(timer);
+    const playing=replay.getAttribute('aria-pressed')==='true';
+    replay.setAttribute('aria-pressed','false');
+    replay.textContent='Replay samples';
+    return playing;
+  }
+  function record(i){
+    const a=trace.discrete[i],b=trace.continuous[i];
+    steps.value=String(i);
+    qs('sample-number').value=i+' / '+sampleLimit;
+    qs('outcome-a').textContent=describe(a,i);
+    qs('outcome-b').textContent=describe(b,i);
+    qs('detail').textContent=!runCount?'Run both blocks from the same initial pose.':
+      i===sampleLimit&&a.position[0]>divider[0]&&b.position[0]<=0?
+      'The unswept block crossed while the swept block stayed on the approach side.':
+      i===0?'The two lanes share the same starting pose.':
+      'The dots show the previous sampled poses.';
+    state.index=String(i);
+    state.discreteX=a.position[0].toFixed(7);
+    state.continuousX=b.position[0].toFixed(7);
+    state.swept=String(b.sweep);
+    state.discreteContact=String(a.contacts);
+    state.continuousContact=String(b.contacts);
+    state.runs=String(runCount);
+  }
+  async function present(i,mark){
+    const id=++requestId;
+    stage.set(trace,i);
+    engine.render(0);
+    if(engine.gpu)await engine.gpu.queue.onSubmittedWorkDone();
+    await afterFrame();
+    if(id!==requestId||signal.aborted)return;
+    record(i);
+    if(mark){
+      performance.mark('divider-input-rendered');
+      if(first){first=false;performance.mark('divider-first-input');}
+    }
+  }
+
+  fit();
+  engine.render(0);
+  if(engine.gpu)await engine.gpu.queue.onSubmittedWorkDone();
+  signal.throwIfAborted();
+  record(0);
+  status.ready(engine);
+  notice.hidden=true;
+  run.disabled=false;
+  state.ready='true';
+  performance.mark('divider-ready');
+
+
+  run.addEventListener('click',async event=>{
+    if(busy)return;
+    stopReplay();
+    busy=true;run.disabled=true;replay.disabled=true;steps.disabled=true;
+    run.textContent='Comparing…';
+    const trusted=event.isTrusted;
+    if(trusted)performance.mark('divider-requested');
+    try{
+      const result=await physics.run();
+      signal.throwIfAborted();
+      trace=result;
+      runCount++;
+      await present(sampleLimit,trusted);
+
+      if(signal.aborted)return;
+      run.textContent='Run comparison';
+      run.disabled=false;replay.disabled=false;steps.disabled=false;
+    }catch(error){if(!signal.aborted)fail(error);}
+    finally{busy=false;}
+  },{signal});
+
+  replay.addEventListener('click',event=>{
+    if(stopReplay())return;
+    replay.setAttribute('aria-pressed','true');
+    replay.textContent='Pause';
+    const trusted=event.isTrusted;
+    async function play(i){
+      if(signal.aborted||replay.getAttribute('aria-pressed')!=='true')return;
+      try{
+        await present(i,i===0&&trusted);
+        if(signal.aborted||replay.getAttribute('aria-pressed')!=='true')return;
+        if(i===sampleLimit)stopReplay();
+        else timer=setTimeout(()=>play(i+1),pace);
+      }catch(error){if(!signal.aborted)fail(error);}
+    }
+    play(0);
+  },{signal});
+  steps.addEventListener('input',event=>{
+    stopReplay();
+    present(Number(steps.value),event.isTrusted).catch(fail);
+  },{signal});
+  const observer=new ResizeObserver(()=>{
+    if(signal.aborted||!size())return;
+    fit();engine.render(0);
+  });
+  observer.observe(canvas);
+  signal.addEventListener('abort',()=>{observer.disconnect();clearTimeout(timer);},{once:true});
+}

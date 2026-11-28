@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#e9e5da">
+  <link rel="icon" href="data:,">
+  <title>The Camera Director · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-CrXZaq0Q.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CSdeT_zj.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>The Camera Director</h1>
+    <p>Call a shot at a salt-flat observatory. Follow one survey rover, keep both in frame, or give the antenna camera priority.</p>
+  </header>
+  <figure>
+    <div class="screen">
+      <canvas id="view" aria-label="A moving three-dimensional scene with two tracked survey rovers and a slewing dish at a high-desert observatory"></canvas>
+      <div id="notice"><p id="status" role="status">Opening the observatory…</p><p id="error" role="alert"></p></div>
+    </div>
+    <figcaption>
+      <div class="live"><span aria-hidden="true"></span><strong id="live">Station camera</strong></div>
+      <span id="transition">Priority 30</span>
+      <span id="renderer">Margo Engine</span>
+    </figcaption>
+  </figure>
+  <section class="program" aria-label="Camera direction">
+    <div class="actions">
+      <div class="cameras" role="group" aria-label="Requested camera">
+        <button id="camera-wide" data-camera="wide" type="button" aria-pressed="true" disabled>Station</button>
+        <button id="camera-dolly" data-camera="dolly" type="button" aria-pressed="false" disabled>Dolly</button>
+        <button id="camera-group" data-camera="group" type="button" aria-pressed="false" disabled>Group</button>
+      </div>
+      <button id="override" type="button" aria-pressed="false" disabled>Dish cue</button>
+    </div>
+    <div class="readout">
+      <p id="shot-detail">The station camera establishes the antenna and both rovers.</p>
+      <div class="utility">
+        <button id="cut" type="button" aria-pressed="false" disabled>Hard cuts</button>
+        <button id="pause" type="button" aria-pressed="false" disabled>Pause motion</button>
+      </div>
+    </div>
+    <p id="announcement" class="sr" aria-live="polite"></p>
+  </section>
+</main>
+</body>
+</html>

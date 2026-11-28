@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-a958432c.js"></script><link rel="modulepreload" crossorigin href="./assets/solver-CElGYXyS.js"><link rel="modulepreload" crossorigin href="./assets/scene-D_tvAjLA.js">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#171e24">
+<link rel="icon" href="data:,">
+<link rel="modulepreload" href="./assets/solver-CEHsbf3x.js">
+<title>Bullet Through Paper · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-BBtvf7ks.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BqcOzKey.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>Bullet Through Paper</h1>
+    <p>Send two virtual ceramic blocks toward thin rigid dividers. Swept collision changes what happens between samples.</p>
+  </header>
+  <section aria-label="Collision test">
+    <div class="tools">
+      <button type="button" id="run" disabled>Run comparison</button>
+      <button type="button" id="replay" aria-pressed="false" disabled>Replay samples</button>
+    </div>
+    <figure>
+      <div class="stage">
+        <canvas id="view" aria-label="Two virtual blocks and two thin dividers on a slate simulation bench" aria-describedby="detail"></canvas>
+        <div id="notice"><p id="status" role="status">Preparing both lanes…</p><p id="error" role="alert"></p></div>
+      </div>
+      <figcaption>
+        <dl>
+          <div><dt><i class="amber"></i>CCD off</dt><dd id="outcome-a">Start pose</dd></div>
+          <div><dt><i class="ice"></i>CCD on</dt><dd id="outcome-b">Start pose</dd></div>
+        </dl>
+        <span id="route">Margo Engine</span>
+      </figcaption>
+    </figure>
+    <label class="sample-control">Solver sample <output id="sample-number" for="samples">0 / 3</output>
+      <input type="range" id="samples" min="0" max="3" step="1" value="0" disabled>
+    </label>
+    <p id="detail" aria-live="polite">Run both blocks from the same initial pose.</p>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,11 @@
+# The Voxel Editor
+
+Harbor Signal is an original 32 × 32 × 32 voxel sculpture with 15 editable materials. Stamp a smaller dock beacon into the model, repaint or remove cells, or use Add to place cells beside the visible face. The brush radius can be one, three, or five cells across. Drag in Orbit mode to rotate the view and scroll or pinch to change distance.
+
+Select sets the corners of a volume. Tap two corners or drag between them, then fill or cut that volume. The keyboard moves the edit cursor with the arrow keys and Page Up or Page Down. Enter applies the active brush or captures a selection corner. Escape clears the selection. Undo, Redo and Reset work on the actual voxel grid. Export saves the current model and palette to a `.vox` file.
+
+The exhibit uses Margo's voxel-edit grid and ray queries, brush footprints, stamps, selection boxes, palette-aware union, history and export. Margo VoxelRenderer renders the current grid with real meshing and occupancy shading. The initial grid, lighting and mesh are prepared while the display device opens. The beacon control accepts a real grid edit while the first display pipelines finish. The same directional shadow pass is added after the first rendered edit or a short idle on both WebGPU and WebGL2, including the model, tray and hardware. Rendered quality and model data are identical on phone and desktop. The downloaded file excludes the stage, which only supports the exhibit in the browser.
+
+The source brief labels this entry “YouTube only.” This is the public browser edit bench requested for the new exhibits. All artwork was built for Harbor Signal. The engine is [the verified public Margo main revision](https://github.com/scottcampbelldata/margoengine/tree/0efd9cff8230507a32deb49907ecd499d46925f5). Ray-traversal context is from [Amanatides and Woo, A Fast Voxel Traversal Algorithm for Ray Tracing, 1987](https://www.cs.yorku.ca/~amana/research/grid.pdf).
+
+The browser check stamps the beacon through a trusted click, inspects the fenced edit and rendered cells, exercises undo and redo, paints through an actual face pick, selects and removes a volume, then parses the downloaded file and checks its voxel indices against the live edited model. It also verifies that Reset restores the initial export hash.

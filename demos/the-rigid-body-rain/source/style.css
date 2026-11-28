@@ -1,0 +1,41 @@
+*{box-sizing:border-box}
+:root{color-scheme:light;background:#e6e7df;color:#25302d;font-family:Arial,sans-serif;--line:#a5ada0}
+body{margin:0}
+main{width:min(1170px,100% - 64px);margin:auto;padding:15px 0 30px}
+nav{display:flex;justify-content:space-between;align-items:center;min-height:34px;border-bottom:1px solid var(--line);padding-bottom:9px;font-size:.77rem;color:#4d5a52}
+nav a{color:#424f46;text-decoration:none}nav a span{margin-right:5px;color:#8c613d}
+header{padding:16px 0 19px}
+h1{font:normal clamp(2.45rem,6.15vw,6.55rem)/.99 Georgia,serif;letter-spacing:-.066em;margin:0 0 11px}
+header p{margin:0;font-size:.99rem;line-height:1.37;color:#46564b}
+#exhibit{border:1px solid #969f8f;background:#edede2}
+.controls{display:flex;justify-content:space-between;align-items:center;gap:9px;padding:9px 16px;border-bottom:1px solid #a0aa9c}
+.controls>div{display:flex;gap:7px}
+#activity{font-size:.84rem;color:#485b51}
+button{color:#37453c;background:#e7e9df;border:1px solid #a3ad9e;border-radius:2px;min-height:44px;padding:0 12px;font:600 .84rem Arial,sans-serif;cursor:pointer}
+#push{color:#fff6e7;background:#335749;border-color:#335749}
+#push span{margin-left:4px}
+#push:hover{background:#457262}
+button:hover{background:#dbe1d5}
+button:disabled{opacity:.56;cursor:default}
+button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #a77148;outline-offset:3px}
+.scene{position:relative;background:#33413e}
+canvas{display:block;width:100%;height:clamp(405px,57vh,660px);cursor:crosshair;touch-action:manipulation}
+#status{position:absolute;bottom:13px;left:12px;right:12px;width:max-content;max-width:calc(100% - 24px);margin:auto;background:#263c35;color:#f7f1e1;border:1px solid #6a7970;padding:7px 11px;font-size:.8rem}
+#status:empty{display:none}
+.readouts{display:flex;gap:clamp(26px,6vw,84px);justify-content:space-between;margin:0;padding:11px 16px;border-top:1px solid #a0aa9c}
+.readouts div{display:grid;gap:4px}
+.readouts dt{color:#4a5a50;font-size:.71rem}
+.readouts dd{margin:0;font:600 .89rem Consolas,monospace}
+details{margin:14px 0 0;color:#45564d;font-size:.82rem}
+details p{max-width:58ch;line-height:1.47}
+summary{cursor:pointer}
+@media(max-width:720px){
+  main{width:calc(100% - 28px);padding-top:10px}
+  header{padding:17px 0 15px}
+  h1{font-size:clamp(2.1rem,9.8vw,5.3rem);margin-bottom:8px}
+  header p{font-size:.92rem}
+  .controls,.readouts{padding:8px 9px}
+  button{padding-inline:8px;font-size:.77rem}#activity{font-size:.77rem}
+  .readouts{gap:8px}.readouts dd{font-size:.83rem}
+  canvas{height:clamp(338px,96vw,500px)}
+}

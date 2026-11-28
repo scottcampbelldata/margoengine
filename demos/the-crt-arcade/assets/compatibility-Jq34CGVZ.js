@@ -1,0 +1,2 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["./dist-BFtmVFDU.js","./index-C4irGWpb.js","./index-D-2g4tAN.css"])))=>i.map(i=>d[i]);
+import{t as e}from"./index-C4irGWpb.js";async function t(){let{install:t}=await e(async()=>{let{install:e}=await import(`./dist-BFtmVFDU.js`);return{install:e}},__vite__mapDeps([0,1,2]),import.meta.url);await t({force:!0})}export{t as prepareCompatibility};

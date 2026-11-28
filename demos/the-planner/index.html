@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-DFR2PeTS.js"><script src="./assets/webgl2-preload-f92767f0.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1d292f">
+<link rel="icon" href="data:,">
+<link rel="preload" as="fetch" href="./assets/worker-uBw_q6So.skin" crossorigin>
+<title>The Planner · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-t7_JAHPg.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-vgb9aTZS.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>The Planner</h1>
+    <p>At the ridge lookout, Nessa needs a hot supper and a rest. Start the rain and watch her plan find dry fuel under cover.</p>
+  </header>
+  <div class="tools">
+    <button id="weather" type="button" aria-pressed="false" disabled>Start rain</button>
+    <button id="run" type="button" disabled>Run plan</button>
+    <button id="reset" type="button" disabled>Reset</button>
+    <label for="method">Planner
+      <select id="method" disabled><option value="cheap">Lowest effort</option><option value="routine">Camp routine</option></select>
+    </label>
+  </div>
+  <figure>
+    <div class="stage">
+      <canvas id="view" aria-label="Three-dimensional cutaway of a fire lookout showing a worker, woodpile, stove and cot"></canvas>
+      <div id="notice"><p id="status" role="status">Opening the lookout…</p><p id="error" role="alert"></p></div>
+    </div>
+    <figcaption><strong id="activity">Clear evening</strong><span id="renderer">Margo Engine</span></figcaption>
+  </figure>
+  <section class="log" aria-labelledby="plan-label">
+    <div class="plan-head"><h2 id="plan-label">Nessa’s plan</h2><p id="strategy">GOAP · lowest effort</p></div>
+    <ol id="plan" aria-label="Ordered actions"></ol>
+    <dl aria-label="Cabin state">
+      <div><dt>Fuel</dt><dd id="fuel">None</dd></div>
+      <div><dt>Stove</dt><dd id="stove">Cold</dd></div>
+      <div><dt>Supper</dt><dd id="meal">Pending</dd></div>
+      <div><dt>Rest</dt><dd id="rest">Pending</dd></div>
+    </dl>
+  </section>
+  <p id="announce" class="sr" role="status"></p>
+</main>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-CQ-uf-T0.js"><script src="./assets/webgl2-preload-f974e4a0.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#141916">
+<link rel="icon" href="data:,">
+<title>The Noise Lab · Margo Web Demos</title>
+  <script type="module" crossorigin src="./assets/index-DSKh6had.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DEaLh4En.css">
+</head>
+<body>
+<main>
+  <header>
+    <a href="../">← Margo Web Demos</a>
+    <h1>The Noise Lab</h1>
+    <p>Change a single frequency and watch an island, a cloud chamber, and a seamless tile reorganize.</p>
+  </header>
+  <section aria-label="Noise instrument">
+    <fieldset aria-label="Specimen">
+      <label><input type="radio" name="mode" value="terrain" checked disabled><span>Terrain <small>2D</small></span></label>
+      <label><input type="radio" name="mode" value="cloud" disabled><span>Cloud <small>3D</small></span></label>
+      <label><input type="radio" name="mode" value="tile" disabled><span>Tile <small>4D</small></span></label>
+    </fieldset>
+    <figure>
+      <div class="stage">
+        <canvas id="view" aria-label="Procedural island on a bronze display plinth" aria-describedby="description"></canvas>
+        <div id="notice"><p id="status" role="status">Opening the specimens…</p><p id="error" role="alert"></p></div>
+        <div class="overlay" aria-hidden="true"><span id="specimen">Height field</span><span id="coordinates">N(x, y)</span></div>
+      </div>
+      <figcaption><p id="description">Height from two coordinates. The bright contour lines follow equal elevation.</p><span id="route">Margo Engine</span></figcaption>
+    </figure>
+    <div class="controls">
+      <label>Frequency <output id="frequency-value" for="frequency">2.4×</output>
+        <input type="range" id="frequency" min="0.8" max="5.6" step="0.1" value="2.4" disabled>
+      </label>
+      <label><span id="detail-label">Relief</span> <output id="detail-value" for="detail">65%</output>
+        <input type="range" id="detail" min="15" max="95" step="1" value="65" disabled>
+      </label>
+    </div>
+  </section>
+</main>
+</body>
+</html>

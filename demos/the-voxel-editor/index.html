@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><link rel="modulepreload" crossorigin href="./assets/scene-DcCrM1L8.js"><script src="./assets/webgl2-preload-6745386e.js"></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#151e21"><link rel="icon" href="data:,">
+<title>The Voxel Editor · Margo Engine</title>
+
+
+  <script type="module" crossorigin src="./assets/index-BcXa6t-x.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BBdtgzcH.css">
+</head><body><main>
+<nav><a href="../">Margo Engine / Web demos</a><a href="./source/README.md">Model &amp; controls</a></nav>
+<header><h1>The Voxel Editor</h1><p>Shape a working harbor model cell by cell. Paint the signal tower, build a beacon, or select a volume and cut it away.</p></header>
+<section aria-label="Voxel editing studio" class="studio">
+<figure><div class="stage">
+<canvas id="view" tabindex="0" aria-label="Editable three-dimensional voxel harbor. Select a brush, then tap a visible cell, or use Orbit to move the view."></canvas>
+<p class="overlay" id="loading" role="status">Opening the harbor model…</p><p class="overlay" id="error" role="alert" hidden></p>
+</div><figcaption><span>Harbor Signal</span><span><output id="count">–</output> solid cells</span></figcaption></figure>
+<aside><fieldset id="controls"><legend>Tool bench</legend>
+<button id="stamp" class="accent" type="button" disabled>Stamp dock beacon <span aria-hidden="true">+</span></button>
+<div id="editor-tools" inert><div class="tools" aria-label="Canvas tool">
+<button data-tool="orbit" type="button" aria-pressed="true">Orbit</button>
+<button data-tool="paint" type="button" aria-pressed="false">Paint</button>
+<button data-tool="fill" type="button" aria-pressed="false">Add</button>
+<button data-tool="erase" type="button" aria-pressed="false">Erase</button>
+<button data-tool="select" type="button" aria-pressed="false">Select</button>
+</div>
+<div class="palette-label"><span>Clay</span><output id="swatch-name"></output></div>
+<div id="palette" aria-label="Palette"></div>
+<label class="radius" for="radius">Brush size <select id="radius"><option value="0">1 cell</option><option value="1">3 cells</option><option value="2">5 cells</option></select></label>
+<div id="selection" class="tools selection" hidden>
+<button id="fill-selection" type="button">Fill volume</button><button id="erase-selection" type="button">Cut volume</button><button id="clear-selection" type="button">Clear</button>
+</div>
+<div class="tools actions">
+<button id="undo" type="button">Undo</button><button id="redo" type="button">Redo</button><button id="reset" type="button">Reset</button>
+</div>
+<button id="export" class="export" type="button">Export .vox <span aria-hidden="true">↓</span></button>
+<p id="status" role="status">Drag to orbit. Choose a brush to edit.</p></div>
+</fieldset></aside></section>
+</main></body></html>

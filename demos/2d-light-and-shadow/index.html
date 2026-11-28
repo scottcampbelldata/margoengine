@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-Du7DDViW.js"><script src="./assets/webgl2-preload-f3858365.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#11191a">
+<link rel="icon" href="data:,">
+<title>2D Light and Shadow · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-BKoCqQ3S.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Cf3z3yaq.css">
+</head>
+<body><main>
+<nav><a href="../">Margo Engine / Web demos</a><a href="./source/README.md">Lighting notes</a></nav>
+<header><h1>2D Light and Shadow</h1><p>Carry a survey lamp into an underground river chamber. Move the light to see which rock faces it reaches.</p></header>
+<div class="exhibit">
+<figure><div class="screen"><canvas id="view" aria-label="Underground river chamber with a movable survey lamp"></canvas><p id="loading" role="status">Lighting the chamber…</p></div><figcaption><span>Karst chamber</span><span id="station">Entry landing</span></figcaption></figure>
+<aside><fieldset id="controls" disabled><legend>Survey lamp</legend>
+<button id="next" class="primary" type="button">Move to next station <span aria-hidden="true">→</span></button>
+<div class="modes" aria-label="Lighting method">
+<button id="hard" type="button" aria-pressed="false">Hard</button><button id="soft" type="button" aria-pressed="true">Soft</button>
+<button id="cookie" type="button" aria-pressed="false">Grille</button><button id="bounce" type="button" aria-pressed="false">Bounce</button>
+</div>
+<p id="description" role="status">A wide flame softens shadow edges behind the limestone ribs.</p>
+<button id="reset" type="button" class="reset">Return to entry</button>
+<p class="help">Tap or drag inside the chamber to place the lamp.</p>
+</fieldset></aside></div>
+</main></body></html>

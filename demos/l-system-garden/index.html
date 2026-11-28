@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-CswV1ASa.js"><script src="./assets/webgl2-preload-75ffe954.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#2b282e">
+  <title>L-System Garden · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-D_jvqSRT.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Biy8EMdz.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Showcase"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><span>Web Demos</span></nav>
+    <header>
+      <h1>L-System Garden</h1>
+      <p>Rewrite a plant’s growth rules and see each generation take shape.</p>
+    </header>
+    <div class="workshop">
+      <section class="specimen" aria-label="Specimen">
+        <figure id="viewport" aria-label="Live 3D botanical specimen on a glazed planter">
+          <canvas id="scene" aria-label="A branching plant with veined leaves and hanging flowers"></canvas>
+          <figcaption id="specimen-name">Lantern bells</figcaption>
+          <span id="loading" role="status">Opening the glasshouse…</span>
+          <span id="error" role="alert" hidden></span>
+        </figure>
+        <div class="grow-strip">
+          <button id="grow" type="button" disabled>Grow next</button>
+          <div class="generation">
+            <label for="generation">Generation <output id="generation-value" for="generation">4</output></label>
+            <input type="range" id="generation" min="0" max="6" value="4" disabled>
+          </div>
+          <span class="orbit-help">Drag to orbit</span>
+        </div>
+        <dl class="survey" aria-label="Generation counts">
+          <div><dt>Stems</dt><dd><output id="stem-count">—</output></dd></div>
+          <div><dt>Organs</dt><dd><output id="organ-count">—</output></dd></div>
+          <div><dt>Symbols</dt><dd><output id="symbol-count">—</output></dd></div>
+        </dl>
+      </section>
+      <section class="editor" aria-labelledby="editor-title">
+        <div class="editor-title">
+          <h2 id="editor-title">Growth rules</h2>
+          <button id="reset" type="button" disabled>Reset rules</button>
+        </div>
+        <label for="preset">Specimen</label>
+        <select id="preset" disabled>
+          <option value="lantern">Lantern bells</option>
+          <option value="fern">Silver fern</option>
+          <option value="ember">Ember stems</option>
+        </select>
+        <label for="axiom">Axiom <span>Starting text</span></label>
+        <input type="text" id="axiom" autocomplete="off" spellcheck="false" maxlength="640" aria-describedby="axiom-help" disabled>
+        <span id="axiom-help" class="sr-only">The symbols at generation zero.</span>
+        <label for="rules">Productions <span>One rule per line</span></label>
+        <textarea id="rules" rows="5" spellcheck="false" autocapitalize="off" maxlength="6500" aria-describedby="rule-status" disabled></textarea>
+        <p id="rule-status" aria-live="polite"></p>
+        <label for="angle">Branch turn <output id="angle-value" for="angle">53°</output></label>
+        <input type="range" id="angle" min="10" max="78" value="53" disabled>
+        <details>
+          <summary>Read the symbols</summary>
+          <p><code>F</code> and <code>G</code> draw a stem. <code>L</code> adds a leaf and <code>B</code> a bloom. Brackets save and restore the branch point.</p>
+          <p><code>+</code> and <code>-</code> turn left or right. <code>&amp;</code> and <code>^</code> pitch, <code>\</code> and <code>/</code> roll, and <code>!</code> narrows the stem. Numbers in parentheses give meters for a step or radius and degrees for a turn.</p>
+        </details>
+      </section>
+    </div>
+    <footer><a href="https://algorithmicbotany.org/papers/developmental.sig1988.pdf">Development models of herbaceous plants</a><a href="https://link.springer.com/book/10.1007/978-1-4613-8476-2">The Algorithmic Beauty of Plants</a></footer>
+  </main>
+</body>
+</html>

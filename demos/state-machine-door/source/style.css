@@ -1,0 +1,64 @@
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#171f25;color:#eee8d9;--quiet:#b9c1c1;--brass:#e9c28c;--line:#65727a66}
+*{box-sizing:border-box}
+body{margin:0}
+main{width:min(1390px,100%);margin:auto;padding:34px clamp(18px,4.3vw,64px) 28px}
+header{margin-bottom:22px}
+header a{font-size:.815rem;color:#c3cac8;text-decoration:none}
+header a:hover{text-decoration:underline}
+h1{font:500 clamp(2.65rem,6.1vw,5rem)/.99 Georgia,serif;margin:.18em 0 .11em;letter-spacing:-.055em}
+header p{margin:.6em 0 0;line-height:1.5;color:#c6cac7;font-size:clamp(.92rem,1.6vw,1.07rem)}
+.exhibit{display:grid;grid-template-columns:minmax(0,1fr) minmax(290px,327px);align-items:start;gap:20px}
+figure{border:1px solid #5a6770;margin:0;overflow:hidden;background:#263139;box-shadow:0 22px 65px #0b111654}
+.stage{aspect-ratio:1.63;position:relative;background:#24303a}
+canvas{display:block;width:100%;height:100%}
+#notice{position:absolute;inset:0;display:grid;place-content:center;background:#222e37;color:#edf0e8;text-align:center;padding:20px}
+#notice[hidden]{display:none}
+#notice p{margin:.31em}
+figcaption{min-height:39px;display:flex;align-items:center;gap:clamp(9px,3vw,30px);padding:7px 13px;color:#bac6c5;font-size:.76rem;background:#222c32}
+figcaption b{color:#f0dec1;font-weight:650;font-variant-numeric:tabular-nums}
+#renderer{margin-left:auto}
+.console{display:grid;gap:12px}
+.controls{display:grid;grid-template-columns:1fr 1fr .76fr;gap:6px}
+button{font:650 .805rem/1 system-ui,sans-serif;min-height:44px;background:#28353d;border:1px solid #657781;border-radius:4px;padding:6px;color:#f0e6d4;cursor:pointer}
+button:first-child{background:#e4bf8a;border-color:#e4bf8a;color:#1d241f}
+button[aria-pressed=true]{background:#7e603e;color:#fff4e0;border-color:#c79963}
+button:disabled{opacity:.54;cursor:default}
+:where(button,a,summary):focus-visible{outline:2px solid #ffdfaa;outline-offset:3px}
+.chart{padding:14px;border:1px solid #74838980;background:#212c32}
+.root{display:flex;align-items:center;justify-content:space-between;gap:12px}
+h2{font-size:.97rem;font-weight:650;margin:0}
+.root strong{border-radius:3px;color:#c6eadb;background:#304741;padding:5px 8px;font-size:.735rem}
+.chart[data-hold=true] .root strong{color:#ffdab2;background:#604736}
+.ancestors{margin:12px 0 8px;color:#c3c9c4;font-size:.76rem;white-space:normal}
+.ancestors span{color:#a0adad;padding:0 .28em}
+.regions{position:relative;border:1px solid var(--line);background:#1c252a;padding:8px}
+.lanes{display:grid;grid-template-columns:1.08fr 1fr;gap:8px}
+.lane{display:grid;align-content:center;min-width:0;border-left:2px solid #81aa9e;background:#293833;padding:6px 8px;line-height:1.16;min-height:49px}
+.lane + .lane{border-left-color:#c8a36c;background:#39332a}
+.lane span{color:#c3cbc4;font-size:.71rem}
+output{display:block;margin-top:.26rem;font-size:.95rem;color:#fbefda;font-weight:650}
+.chart[data-hold=true] .lane{border-left-style:dashed;background:#393431;border-left-color:#c99465}
+.history{color:#c3c9c3;margin:7px 0 0;font-size:.72rem;line-height:1.35}
+.sequence{padding:0;margin:10px 0 0;display:grid;grid-template-columns:repeat(3,1fr);gap:5px;list-style:none}
+.sequence li{border:1px solid var(--line);padding:4px 3px;text-align:center;position:relative;font-size:.685rem;color:#bdc5c3;line-height:1.23}
+.sequence li[data-active]{background:#35564d;border-color:#77a594;color:#fff0dc}
+.sequence li[data-remembered]{background:#544132;border-color:#ba8b61;border-style:dashed;color:#fff0dc}
+.journal{border:1px solid var(--line);background:#202a30;color:#cbd0ca;font-size:.78rem;padding:9px 10px}
+summary{cursor:pointer;min-height:24px;align-content:center}
+.journal ol{padding-left:17px;margin:9px 0 4px}
+.journal li{padding:.19em 0}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@media(max-width:780px){
+  main{width:min(570px,100%);padding:17px clamp(12px,4vw,25px) 21px}
+  header{margin-bottom:13px}
+  h1{font-size:clamp(2.48rem,7.5vw,3.45rem)}
+  header p{margin-top:.52em;line-height:1.37}
+  .exhibit{display:block}
+  .console{margin-top:10px;gap:9px}
+  .stage{aspect-ratio:1.24}
+  figcaption{min-height:31px;padding:5px 8px;font-size:.68rem}
+  .chart{padding:9px}
+  .ancestors{margin:8px 0 6px}
+  .sequence{margin-top:8px}
+}
+@media(max-width:360px){h1{font-size:2.28rem}.controls{grid-template-columns:1.08fr 1.15fr .75fr}button{font-size:.73rem}}

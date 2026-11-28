@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f4efe4">
+  <title>The UI Layout Editor · Margo Engine</title>
+  <link rel="icon" href="data:,">
+  <script type="module" crossorigin src="./assets/index-CFuw7zBN.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Dst4tu7l.css">
+</head>
+<body>
+  <main id="workspace">
+    <nav aria-label="Showcase"><a href="../">Margo Engine</a><span aria-hidden="true">/</span><span>Web Demos</span></nav>
+    <header class="intro">
+      <h1>The UI Layout Editor</h1>
+      <p>Drag widgets onto a live Margo screen. Reorder the layers and see the markup update.</p>
+    </header>
+    <section class="studio" aria-label="Layout workspace">
+      <section class="palette" aria-labelledby="components-heading">
+        <h2 id="components-heading">Widgets</h2>
+        <div class="palette-list">
+          <button type="button" data-add="label" disabled><span class="icon" aria-hidden="true">T</span>Label</button>
+          <button type="button" data-add="button" disabled><span class="icon icon-button" aria-hidden="true"></span>Button</button>
+          <button type="button" data-add="toggle" disabled><span class="icon icon-switch" aria-hidden="true"></span>Toggle</button>
+          <button type="button" data-add="slider" disabled><span class="icon icon-slider" aria-hidden="true"></span>Slider</button>
+          <button type="button" data-add="column" disabled><span class="icon icon-stack" aria-hidden="true"></span>Stack</button>
+        </div>
+      </section>
+      <section class="preview" aria-labelledby="preview-heading">
+        <div class="panel-head">
+          <h2 id="preview-heading">Live preview</h2>
+          <span class="dimensions" aria-label="420 by 368 layout units">420 × 368</span>
+        </div>
+        <div class="stage">
+          <div id="artboard">
+            <canvas id="canvas" aria-label="Margo UI display for the Coastal Relay"></canvas>
+            <div id="selection-frame" aria-hidden="true" hidden></div>
+            <div id="preview-input" aria-hidden="true"></div>
+            <span id="loading" role="status">Opening the artboard…</span>
+            <span id="failure" role="alert" hidden></span>
+          </div>
+        </div>
+        <div class="stage-foot">
+          <p id="notice" role="status">Select an element to edit its properties.</p>
+          <div class="history" aria-label="Edit history">
+            <button id="undo" type="button" disabled>Undo</button>
+            <button id="redo" type="button" disabled>Redo</button>
+          </div>
+        </div>
+      </section>
+      <section class="layers" aria-labelledby="layers-heading">
+        <div class="panel-head"><h2 id="layers-heading">Layers</h2><span id="node-count"></span></div>
+        <ol id="hierarchy" aria-label="Layout elements"></ol>
+      </section>
+      <section class="inspector" aria-labelledby="inspector-heading">
+        <div class="panel-head"><h2 id="inspector-heading">Inspector</h2><code id="current-type"></code></div>
+        <div class="inspect-body">
+          <p id="inspector-empty">Select a layer in the preview or tree.</p>
+          <div id="properties" hidden>
+            <div class="field"><label for="node-id">Element ID</label><code id="node-id"></code></div>
+            <div class="field" id="text-field"><label for="property-text">Text</label><input id="property-text" type="text" maxlength="160" autocomplete="off"></div>
+            <div class="field" id="spacing-field"><label for="property-gap">Gap</label><input id="property-gap" type="number" min="0" max="80" step="1" inputmode="numeric"></div>
+            <div class="field" id="value-field"><label for="property-value">Value</label><input id="property-value" type="number" step="any" inputmode="decimal"></div>
+            <div class="field"><label for="property-parent">Parent</label><select id="property-parent"></select></div>
+            <div class="order-controls">
+              <button id="move-up" type="button">Move up</button><button id="move-down" type="button">Move down</button>
+              <button id="delete" type="button">Delete</button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="source" aria-labelledby="source-heading">
+        <div class="panel-head"><h2 id="source-heading">Source</h2><span class="dimensions">Margo UI</span></div>
+        <div class="source-body">
+          <div class="source-switch" aria-label="Source view">
+            <button type="button" data-source="markup" aria-pressed="true">Markup</button><button type="button" data-source="styles" aria-pressed="false">Styles</button>
+          </div>
+          <label id="source-label" class="sr-only" for="source-code">Margo UI markup</label>
+          <textarea id="source-code" aria-describedby="source-note" autocapitalize="off" autocomplete="off" spellcheck="false" disabled></textarea>
+          <p id="source-note"></p>
+          <div class="project-controls">
+            <button id="apply" type="button" disabled>Apply edit</button>
+            <button id="export" type="button" disabled>Download project</button>
+            <button id="open" type="button" disabled>Open project</button>
+            <input id="project-file" type="file" accept=".json,application/json" hidden>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

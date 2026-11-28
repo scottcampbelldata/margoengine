@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-a958432c.js"></script><link rel="modulepreload" crossorigin href="./assets/physics-m0NgPBSW.js"><link rel="modulepreload" crossorigin href="./assets/scene-arphC5QB.js">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#e8e4d8">
+  <meta name="description" content="Pull blocks from a twisting tower in a live rigid-body simulation by Margo Engine.">
+  <link rel="icon" href="data:,">
+  <title>The Block Tower · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-CFE7y1fj.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DDtte7Yp.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>Rigid body study</span></nav>
+    <header>
+      <h1>The Block Tower</h1>
+      <p>Pull a beam from the stack and see which supports can still carry the load.</p>
+    </header>
+    <section id="exhibit" aria-label="Interactive tower">
+      <div class="toolbar">
+        <span id="selection">Course 3 · Center</span>
+        <div class="buttons">
+          <button id="pull" type="button" disabled>Pull marked beam <span aria-hidden="true">↗</span></button>
+          <button id="reset" type="button" disabled>Rebuild</button>
+        </div>
+      </div>
+      <div class="stage">
+        <canvas id="canvas" role="img" aria-label="A tall twisting structure with ocher timber beams and dark square decks. The selected beam is gold."></canvas>
+        <p id="status" role="status">Preparing the tower…</p>
+        <p id="stand" aria-live="polite"></p>
+      </div>
+      <div class="readouts">
+        <div class="selector">
+          <label for="course">Course <select id="course" disabled></select></label>
+          <label for="beam">Beam <select id="beam" disabled></select></label>
+        </div>
+        <dl aria-label="Tower state">
+          <div><dt>Extracted</dt><dd id="removed">0 / 24</dd></div>
+          <div><dt>Bodies at rest</dt><dd id="sleeping">32 / 32</dd></div>
+        </dl>
+      </div>
+    </section>
+    <details>
+      <summary>How to play</summary>
+      <p>Choose a course, counted from the bottom, and a beam. Use Pull marked beam, or grab a visible beam end and drag it outward. Rebuild restores all 24 beams and eight decks.</p>
+    </details>
+  </main>
+</body>
+</html>

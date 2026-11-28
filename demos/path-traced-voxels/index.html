@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#1a1d29">
+  <meta name="description" content="Switch emissive lamps in a glass study rendered with Margo Engine's real voxel path tracer.">
+  <link rel="icon" href="data:,">
+  <link rel="preload" as="image" href="./assets/blue-glass-DrdHLRl7.webp">
+  <title>Path-Traced Voxels · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-DfC3fFct.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DSVGC18Q.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>MagicaVoxel study</span></nav>
+    <header>
+      <h1>Path-Traced Voxels</h1>
+      <p>Switch lamps and watch the light reflect off stone and pass through glass.</p>
+    </header>
+    <section id="exhibit" aria-label="Afterglass light study">
+      <div class="controls">
+        <span id="lamp">Amber lamp</span>
+        <div>
+          <button type="button" id="light" disabled>Switch to blue <span aria-hidden="true">↗</span></button>
+          <button type="button" id="material" disabled>Make opaque</button>
+        </div>
+      </div>
+      <div class="view">
+        <img id="reference" src="./assets/amber-glass-C3stOidm.webp" alt="A stone pavilion with a stepped glass column and slotted amber and blue lamps" width="960" height="840">
+        <canvas id="canvas" role="img" aria-hidden="true" aria-label="Live path-traced view of Afterglass"></canvas>
+        <p id="status" role="status">Loading Afterglass…</p>
+      </div>
+      <div class="measure">
+        <div class="render"><strong>Afterglass</strong><span id="render-mode">Path-traced reference</span></div>
+        <dl aria-label="Render measurements">
+          <div><dt>Surface</dt><dd id="surface">Glass</dd></div>
+          <div><dt>Samples / pixel</dt><dd id="samples">—</dd></div>
+        </dl>
+        <button type="button" id="live" disabled>Start live trace</button>
+      </div>
+    </section>
+    <details>
+      <summary>What changes in the trace</summary>
+      <p>Switching lamps changes the colored light emitted by the slotted fixtures. Making the column opaque keeps its shape and removes transmission so you can compare how the light reaches the stone around it. The reference views are full Margo path-traced renders. Start live trace to run the same scene in this browser.</p>
+    </details>
+  </main>
+</body>
+</html>

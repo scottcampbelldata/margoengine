@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><head><link rel="modulepreload" crossorigin href="./assets/scene-B2ygQMYI.js"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#211d29"><link rel="icon" href="data:,">
+<title>The 2D Buggy · Margo Engine</title>  <script type="module" crossorigin src="./assets/index-Dz02klR6.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DMjDinDk.css">
+</head><body><main>
+<nav><a href="../">Margo Engine / Web demos</a><a href="./source/README.md">Suspension model</a></nav>
+<header><h1>The 2D Buggy</h1><p>Take a dune crawler across Salt Ridge. Watch its two independent springs follow the trail as the buggy climbs, crests, and brakes.</p></header>
+<section class="trail" aria-label="Interactive side-view hill climb">
+<figure><div class="screen"><canvas id="view" aria-label="Orange buggy on a layered desert trail at sunset"></canvas>
+<p id="loading" class="overlay" role="status">Setting the buggy on its springs…</p><p id="error" class="overlay" role="alert" hidden></p></div>
+<figcaption><span>Salt Ridge</span><span id="checkpoint">0 / 5 checkpoints</span></figcaption></figure>
+<aside><fieldset id="controls"><legend>Driver controls</legend>
+<button id="drive" class="drive" type="button" disabled>Drive forward <span aria-hidden="true">→</span></button>
+<div id="extra" inert>
+<div class="pair"><button id="brake" type="button" aria-pressed="false">Brake</button><button id="reverse" type="button" aria-pressed="false">Reverse</button></div>
+<dl class="metrics"><div><dt>Ground speed</dt><dd><output id="speed">0.0 km/h</output></dd></div><div><dt>Trail distance</dt><dd><output id="distance">0.0 m</output></dd></div></dl>
+<div class="readouts"><div><span>Rear spring</span><meter id="wheel-rear" min="0" max=".72" value=".39"></meter></div>
+<div><span>Front spring</span><meter id="wheel-front" min="0" max=".72" value=".39"></meter></div></div>
+<button id="reset" type="button" class="reset">Restart run</button>
+<p id="status" role="status">Drive toward the next trail flag. Arrow keys and Space also operate the vehicle.</p>
+</div></fieldset></aside></section></main></body></html>

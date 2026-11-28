@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-CrOktubg.js"><script src="./assets/webgl2-preload-b422fa5c.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#171e22">
+  <meta name="description" content="Open a shutter in a miniature stone vault and see colored voxel light travel around a corner.">
+  <link rel="icon" href="data:,">
+  <title>Voxel World Light · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-BSfQ3dMm.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Dgp0K_hD.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery"><a href="../"><span aria-hidden="true">↖</span> Margo Web Demos</a><span>Lighting study</span></nav>
+    <header>
+      <h1>Voxel World Light</h1>
+      <p>Open the shutter to let amber light reach a corner it can’t see.</p>
+    </header>
+    <section id="exhibit" aria-label="Interactive voxel lighting study">
+      <div class="controls">
+        <span class="position"><i aria-hidden="true"></i><span id="position">Shutter closed</span></span>
+        <button type="button" id="shutter" aria-controls="canvas" aria-pressed="false" disabled>Open shutter <span aria-hidden="true">↗</span></button>
+      </div>
+      <div class="stage">
+        <canvas id="canvas" role="img" aria-label="Stone vault in cutaway. An amber lamp sits behind a raised shutter. A cyan lamp shines across the foreground courtyard."></canvas>
+        <p id="status" role="status">Lighting the vault…</p>
+      </div>
+      <div class="legend">
+        <div class="measure"><span class="target" aria-hidden="true">⊕</span><div><strong>Corner probe</strong><span>Block light · 0–15</span></div></div>
+        <dl aria-label="Corner probe red, green and blue">
+          <div class="red"><dt>R</dt><dd id="red">—</dd></div>
+          <div class="green"><dt>G</dt><dd id="green">—</dd></div>
+          <div class="blue"><dt>B</dt><dd id="blue">—</dd></div>
+        </dl>
+      </div>
+    </section>
+    <details>
+      <summary>How the light travels</summary>
+      <p>Each color channel spreads through open neighboring blocks and loses one level per step. The wall blocks the direct line from the amber lamp to the marked tile, even with the shutter open. The probe samples the air immediately above the tile.</p>
+    </details>
+  </main>
+</body>
+</html>

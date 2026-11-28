@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><head><script src="./assets/inline-a958432c.js"></script><link rel="modulepreload" crossorigin href="./assets/physics-BiE6Ph_M.js"><link rel="modulepreload" crossorigin href="./assets/scene--NO2VMZN.js">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#15191b"><link rel="icon" href="data:,">
+<title>The Conveyor Factory · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-DbV2l8yY.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-B9qJOqLP.css">
+</head><body><main>
+<nav><a href="../">Margo Engine / Web demos</a><a href="./source/README.md">Machine &amp; sensors</a></nav>
+<header><h1>The Conveyor Factory</h1><p>Start three belts, feed parcels, and watch the chutes sort them into collection bins. Every count comes from a live sensor.</p></header>
+<section class="plant" aria-label="Interactive three-lane parcel conveyor and collection bins">
+<figure><div class="floor"><canvas id="stage" aria-label="Three powered belt runs above sloping steel chutes and color-coded collection bins"></canvas>
+<p id="loading" class="overlay" role="status">Starting the factory simulator…</p><p id="error" class="overlay" role="alert" hidden></p></div>
+<figcaption><span>Outbound sorting</span><span id="floor-state">Idle</span></figcaption></figure>
+<aside><fieldset id="controls"><legend>Operator panel</legend>
+<button id="motor" class="on" type="button" disabled aria-pressed="false">Start belts <span aria-hidden="true">▶</span></button>
+<div id="secondary" inert><div class="velocity"><label for="speed">Belt speed</label>
+<select id="speed"><option value="0">0.86 m/s</option><option value="1" selected>1.35 m/s</option><option value="2">1.92 m/s</option></select></div>
+<button id="feed" class="feed" type="button">Feed a parcel <span aria-hidden="true">+</span></button>
+<div class="bins" aria-label="Packages received">
+<div><span class="badge teal"></span>Bay A <output id="count-0">0</output></div>
+<div><span class="badge ochre"></span>Bay B <output id="count-1">0</output></div>
+<div><span class="badge coral"></span>Bay C <output id="count-2">0</output></div>
+</div>
+<p id="status" role="status">Nine parcels are on the belts.</p>
+<button id="reset" class="reset" type="button">Reset factory</button></div>
+</fieldset></aside></section></main></body></html>

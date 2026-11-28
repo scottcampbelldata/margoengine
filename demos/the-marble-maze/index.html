@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head><script src="./assets/inline-a958432c.js"></script><link rel="modulepreload" crossorigin href="./assets/physics-BdcSHzcR.js"><link rel="modulepreload" crossorigin href="./assets/scene-8rEG0fFt.js">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Tilt a lacquered wooden maze and roll a glass marble into the brass-rimmed hole.">
+  <meta name="theme-color" content="#efebe0">
+  <title>The Marble Maze · Margo Engine</title>
+  <link rel='icon' href='data:,'>
+  <script type="module" crossorigin src="./assets/index-CWxWDalX.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-C-pNrQ6d.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Exhibit navigation"><a href="../">← Margo Web Demos</a><span>Tabletop physics</span></nav>
+    <header>
+      <h1>The Marble Maze</h1>
+      <p>Roll the marble from the diamond inlay to the brass-rimmed hole.</p>
+    </header>
+    <section id="exhibit" aria-label="Playable marble maze">
+      <div class="stage">
+        <canvas id="canvas" aria-label="A tilting wooden maze with a teal marble and a square hole"></canvas>
+
+        <p id="status" role="status">Opening the maze…</p>
+      </div>
+      <div class="controls">
+        <div class="instruction">
+          <strong id="progress" role="status">Ready to roll</strong>
+          <span>Drag the board or hold an arrow.</span>
+        </div>
+        <div class="pad" role="group" aria-label="Tilt the board">
+          <button id="aim-left" data-direction="left" aria-label="Tilt left" disabled>←</button>
+          <button id="aim-up" data-direction="up" aria-label="Tilt away" disabled>↑</button>
+          <button id="aim-down" data-direction="down" aria-label="Tilt toward you" disabled>↓</button>
+          <button id="aim-right" data-direction="right" aria-label="Tilt right" disabled>→</button>
+        </div>
+        <div class="actions">
+          <button id="phone" aria-pressed="false" disabled>Tilt with phone</button>
+          <button id="reset" disabled>Reset</button>
+        </div>
+      </div>
+      <p id="motion" role="status"></p>
+    </section>
+    <details><summary>How the board moves</summary>
+      <p>The whole board tilts up to 11°. A rigid glass sphere rolls and collides with the deck and rails under gravity. The brass frame surrounds a through-hole above the catch tray.</p>
+      <p>Use the arrow keys as an alternative to dragging. To use motion controls, tap <b>Tilt with phone</b> and hold your phone steady in a comfortable face-up position. Reset returns the marble to the diamond and sets a new neutral position.</p>
+    </details>
+  </main>
+</body>
+</html>

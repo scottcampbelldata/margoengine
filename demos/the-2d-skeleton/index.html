@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head><link rel="modulepreload" crossorigin href="./assets/scene-y3XwQud6.js"><script src="./assets/webgl2-preload-2c9b056f.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="See a DragonBones character raise a lantern in a moonlit glasshouse. Play the gesture, scrub the motion and reveal the rig.">
+  <meta name="theme-color" content="#eee9de">
+  <link rel="icon" href="data:,">
+  <title>The 2D Skeleton · Margo Engine</title>
+  <script type="module" crossorigin src="./assets/index-DwmCobri.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Bzbxb_vE.css">
+</head>
+<body>
+  <main>
+    <nav aria-label="Gallery navigation"><a href="../">← Margo Web Demos</a><span>Glasshouse Signal</span></nav>
+    <header>
+      <h1>The 2D Skeleton</h1>
+      <p>Raise the keeper’s lantern. Reveal the rig to see each joint carry the motion.</p>
+    </header>
+    <section id="exhibit" aria-label="Interactive DragonBones character">
+      <div class="stage">
+        <canvas id="canvas" aria-label="An illustrated lantern keeper among the plants and moonlit windows of a conservatory"></canvas>
+        <p id="status" role="status">Opening the glasshouse…</p>
+      </div>
+      <div class="toolbar">
+        <button id="play" disabled>Play signal</button>
+        <div class="timeline">
+          <label for="time">Gesture <output id="elapsed">0.00 / 4.50 s</output></label>
+          <input id="time" type="range" min="0" max="4.5" step="0.01" value="0" disabled>
+        </div>
+        <button id="bones" aria-pressed="false" disabled>Show bones</button>
+      </div>
+    </section>
+    <p class="caption">An original 17-bone DragonBones rig. The silk bends across three joints.</p>
+  </main>
+</body>
+</html>
