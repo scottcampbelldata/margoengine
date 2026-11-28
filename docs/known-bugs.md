@@ -1737,7 +1737,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   1965), which sums to 0.525 on a sphere. Regression: `packages/physics/tests/soft-volume.test.js` ("a closed volume
   feels the air on its windward side").
 
-### Open 2026-11-27: on WebKit's Windows build the voxel traversal on the WebGL2 layer now and then loses its device (KB-COMPAT-LOSTWHY1, webgl2-compat)
+### Open (below Margo) 2026-11-27: on WebKit's Windows build the voxel traversal on the WebGL2 layer now and then loses its device (KB-COMPAT-LOSTWHY1, browser; webgl2-compat)
 
 - **Repro:** Playwright WebKit 27.2 on Windows 11, RTX A6000:
   `node scripts/run-with-timeout.mjs -- node packages/webgl2-compat/scripts/browser-matrix.mjs --browser=webkit --cases=voxel-pathtracer`.
@@ -1756,9 +1756,22 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   context loss, not a destroy or a lazy part that failed to load. With page logging on (run 12) WebKit printed
   "WebGL: context lost." 82 s into the page, near the end of a run that takes 80 to 100 s; no `webglcontextlost` event
   reached the device canvas's listener; the layer found it when `isContextLost()` turned true during a framebuffer
-  status check (`makeFramebuffer`). The probe context's own release is the only event seen. Still not found: why
-  WebKit's Windows build loses it. Next: time the traversal's dispatches on that build (the same per-dispatch loop class
-  as KB-SHOT-COMPATLOST1 is a candidate, not shown).
+  status check (`makeFramebuffer`). The probe context's own release is the only event seen.
+- **Cause (2026-11-27, proven):** below Margo. WebKit's Windows build loses a WebGL context when one call that waits on
+  its GPU process waits 15 s: `docs/upstream-reports/KB-COMPAT-LOSTWHY1/sync-timeout.html` reads a long program's
+  `LINK_STATUS`, which returns after 15,000 to 15,001 ms every time (2,500 to 8,000 statements) with the context lost;
+  Edge 158 on the same PC and the same ANGLE Direct3D 11 waits 30,151 ms and keeps it. The traversal reaches that
+  wait because over Direct3D 11 a program with more than one color output (each compute dispatch the layer draws)
+  compiles again at its first draw, even after `KHR_parallel_shader_compile` reported it linked, and that compile
+  runs inside the next waiting call, the layer's framebuffer status check. Timed in the matrix page (WebKit, a quiet
+  machine): the traversal's first render made five such waits of 1.4, 5.6, 4.8, 6.5 and 8.5 s (12.7 s at most with
+  40 busy CPU threads), after one draw each; the second view, same programs, renders in 87 ms. On a loaded machine one
+  passes 15 s. The page waits do not depend on the draw's own work: the second draw of the same program waits 0 ms.
+- **Margo:** not worked around. The layer cannot wait the compile out without blocking: a fence's status query waits
+  on the same GPU process (first poll 1,068 ms), binding the program's framebuffer layout before the link does not
+  stop the draw-time compile, and the page cannot tell WebKit's Windows build from Safari (both report macOS). The lever
+  Margo has is the voxel programs' own Direct3D 11 compile time (`packages/voxel-pathtracer/tests/compat-d3d11-case-seconds.json`).
+  Report draft: `docs/upstream-reports/KB-COMPAT-LOSTWHY1/report.md`.
 
 ### Open (below Margo) 2026-11-27: on WebKit's Windows build the WebGL2 layer copies unpremultiplied ImageBitmaps wrong (KB-WEBKIT-BITMAPALPHA1, browser; webgl2-compat)
 

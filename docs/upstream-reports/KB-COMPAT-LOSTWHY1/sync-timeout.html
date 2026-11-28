@@ -1,0 +1,89 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>A WebGL2 call that waits on a long shader compile loses the context</title>
+<pre id="out">running</pre>
+<script type="module">
+// Links one WebGL2 program whose fragment shader holds `n` dependent statements (?n=, default 3000), then asks for its
+// LINK_STATUS, a call that waits until the compile is done, and times it. A second program with four color outputs
+// (?draw=, default 800 statements) is linked with KHR_parallel_shader_compile, waited for without blocking, then drawn
+// into four layers once and twice; a framebuffer status query after each draw times the draw's own work.
+// No library is used.
+const query = new URLSearchParams(location.search),
+  n = Number(query.get('n') ?? 3000),
+  drawN = Number(query.get('draw') ?? 800),
+  now = () => performance.now();
+const body = (count) => {
+  let s = 'vec4 v=vec4(gl_FragCoord.xy,1.0,2.0);\n';
+  for (let i = 0; i < count; i++)
+    s += `v=sin(v*${(1 + (i % 97) / 101).toFixed(4)}+v.yzwx)*cos(v.wxyz-${((i % 89) / 7).toFixed(3)});\n`;
+  return s;
+};
+const vertex =
+  '#version 300 es\nvoid main(){gl_Position=vec4(float(gl_VertexID==1)*4.0-1.0,float(gl_VertexID==2)*4.0-1.0,0,1);}';
+function program(gl, fragment) {
+  const p = gl.createProgram();
+  for (const [type, source] of [
+    [gl.VERTEX_SHADER, vertex],
+    [gl.FRAGMENT_SHADER, fragment],
+  ]) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, source);
+    gl.compileShader(s);
+    gl.attachShader(p, s);
+  }
+  gl.linkProgram(p);
+  return p;
+}
+
+async function drawCompile() {
+  const gl = document.createElement('canvas').getContext('webgl2'),
+    ext = gl.getExtension('KHR_parallel_shader_compile'),
+    out = { parallelCompile: !!ext };
+  let decl = '',
+    write = '';
+  for (let k = 0; k < 4; k++) {
+    decl += `layout(location=${k}) out uvec4 o${k};`;
+    write += `o${k}=uvec4(floatBitsToUint(v))+uvec4(${k}u);`;
+  }
+  let t = now();
+  const p = program(gl, `#version 300 es\nprecision highp float;${decl}void main(){${body(drawN)}${write}}`);
+  if (ext) while (!gl.getProgramParameter(p, ext.COMPLETION_STATUS_KHR)) await new Promise((r) => setTimeout(r, 50));
+  out.linked = gl.getProgramParameter(p, gl.LINK_STATUS);
+  out.linkMs = Math.round(now() - t);
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture);
+  gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.R32UI, 16, 16, 4);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, gl.createFramebuffer());
+  for (let k = 0; k < 4; k++) gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + k, texture, 0, k);
+  gl.drawBuffers([0, 1, 2, 3].map((k) => gl.COLOR_ATTACHMENT0 + k));
+  gl.useProgram(p);
+  gl.viewport(0, 0, 16, 16);
+  for (const name of ['firstDrawMs', 'secondDrawMs']) {
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    t = now();
+    gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    out[name] = Math.round(now() - t);
+  }
+  out.lost = gl.isContextLost();
+  return out;
+}
+
+async function longCall() {
+  const gl = document.createElement('canvas').getContext('webgl2'),
+    t0 = now(),
+    out = { statements: n, lostEventMs: null };
+  gl.canvas.addEventListener('webglcontextlost', () => (out.lostEventMs = Math.round(now() - t0)));
+  const p = program(gl, `#version 300 es\nprecision highp float;out vec4 o;void main(){${body(n)}o=v;}`),
+    t = now();
+  out.linked = gl.getProgramParameter(p, gl.LINK_STATUS);
+  out.callMs = Math.round(now() - t);
+  await new Promise((r) => setTimeout(r, 1000));
+  out.lost = gl.isContextLost();
+  return out;
+}
+
+const result = { userAgent: navigator.userAgent, drawCompile: await drawCompile(), longCall: await longCall() };
+result.reproduces = result.longCall.lost;
+document.getElementById('out').textContent = JSON.stringify(result, null, 2);
+window.result = result;
+</script>
