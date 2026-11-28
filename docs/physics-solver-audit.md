@@ -50,6 +50,33 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### SOUND-01 four-point pass
+
+- Point 5 (3a2e5a1029). `packages/physics/tests/coupling/outdoor-sound.test.js` rejects a late invalid
+  link and unrepresentable geometry without replacing any path. It verifies independent
+  visibility on both legs of a ground reflection, the original finite atmospheric profiles and
+  recovery. `packages/audio/tests/outdoor.test.js` verifies coded errors and preserves all audio
+  parameters after a malformed octave or an unrepresentable gain.
+- Point 6 (3a2e5a1029). `packages/physics/tests/coupling/outdoor-sound-workers.test.js` matches
+  scalar and native 1/2/4 outputs byte for byte for 35 and 63 mixed paths through signed cells
+  and snapshots. The two-leg summation and rollback after a rejected sample are checked separately.
+  `packages/physics/tests/outdoor-sound-workers.browser.mjs` launches three real nested helpers
+  from packaged assets. Sixty-three links visit 1,768 samples and 7,072 f64x2 octave pairs, with
+  accepted snapshot hash a9a77933d033b037.
+- Point 7 (3a2e5a1029). `packages/audio/tests/outdoor-film.browser.mjs` drives a bell and two
+  equal-range links from actual TerrainBed and the native path solver. The ridge adds 570 audio
+  samples at 48 kHz and reduces treble relative to bass by 12.83 dB. Both renderers repeat full
+  camera pixels, accepted world snapshots and stereo Float32 PCM exactly after restore and replay.
+- Point 8 (3a2e5a1029). `docs/limits.md` records one weakly refracted path or dominant edge,
+  the specular plane, omitted ground impedance and shadow-zone modelling, and the playback shelves.
+  `packages/physics/tests/coupling/outdoor-sound.test.js` covers analytic travel, the ISO table point,
+  the local gradient and rigid-plane interference. The scoped audio filter and 3 km tests pass.
+- Point 2 stays open. `packages/physics/scripts/sound01-outdoor-measured.mjs` compares 16 held-out
+  measurements from four receiver heights. Five are within the figure-reading intervals. After the
+  blocked reflection fix, the 250 Hz prediction at 15 m improves from −41.57 dB to −3.60 dB against
+  −1.9 dB measured. Maximum remaining error is 6.97 dB. The publication does not give a complete
+  uncertainty band or the lab air conditions. [Rasmussen (1994)](https://doi.org/10.1121/1.411404).
+
 ### AERO-03 four-point pass
 
 - Point 5 (0fbedc538b). `packages/physics/tests/flight.test.js` covers coded wind, geometry

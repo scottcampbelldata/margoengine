@@ -35,7 +35,7 @@ notes one change's size or behaviour and its evidence. Every number has a row in
   The 1/2/4-participant path uses native f64 SIMD for each octave pair. Multiple participants require Node or a
   cross-origin-isolated browser worker. Terrain and field sampling remain on the caller. A finer bed can increase
   sampling work. The optional plain and shared Wasm assets are each 4,374 B raw and 2,078 B gzip.
-  The optional Physics and Audio entries are 8,600 B and 1,389 B gzip.
+  The optional Physics and Audio entries are 8,601 B and 1,389 B gzip.
 
 - Webcam face to morph targets (`@margoengine/input/face`, 2026-11-26): no detector shipped; the app supplies one.
   Landmarks alone give 15 of the 52 ARKit shapes (blinks, wide eyes, jaw, smiles, frowns, pucker, brows); the others
