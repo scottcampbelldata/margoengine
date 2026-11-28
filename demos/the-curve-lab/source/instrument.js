@@ -1,101 +1,44 @@
-import {Geometry, PbrMaterial, box} from '@margoengine/core';
+import {PbrMaterial, box} from '@margoengine/core';
+import {GeometryBuilder, placeGeometry} from '@margoengine/geometry/builder';
+import {ringSectorGeometry, scaleMarksGeometry, strokeGeometry, turnedGeometry} from '@margoengine/geometry/parts';
+import {loftGeometry} from '@margoengine/geometry/sweep';
+import {toGeometry} from '@margoengine/geometry/utils';
 import {TubePainter} from '@margoengine/lines/tube-painter';
 import {add, diff, knots, mult, scale, space, tangents} from './study.mjs';
 
-const tau=2*Math.PI;
-
-function prism(rings) {
-  const vertices=[], normals=[], indices=[];
-  const unit=([x,y,z])=>{const l=Math.hypot(x,y,z);return [x/l,y/l,z/l];};
-  function tri(a,b,c) {
-    const u=diff(b,a), v=diff(c,a);
-    const n=unit([u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]]);
-    const i=vertices.length/3;
-    vertices.push(...a,...b,...c);normals.push(...n,...n,...n);indices.push(i,i+1,i+2);
-  }
-  const n=rings[0].length;
-  for(let j=1;j<rings.length;j++)for(let i=0;i<n;i++){
-    const k=(i+1)%n, a=rings[j-1], b=rings[j];
-    tri(a[i],b[i],a[k]);tri(a[k],b[i],b[k]);
-  }
-  const low=rings[0], top=rings.at(-1);
-  for(let i=1;i<n-1;i++){tri(low[0],low[i],low[i+1]);tri(top[0],top[i+1],top[i]);}
-  return new Geometry(vertices,normals,indices);
-}
+// The chassis: chamfered octagon rings stacked and skinned with flat caps.
+const prism=rings=>toGeometry(loftGeometry(rings,{smooth:false,creaseAngle:30}));
 
 const octagon=(w,y,d,c)=>[
   [-w+c,-d],[w-c,-d],[w,-d+c],[w,d-c],[w-c,d],[-w+c,d],[-w,d-c],[-w,-d+c],
 ].map(([x,z])=>space([x,y,z]));
 
-function lathe(profile, sides=24){
-  const p=[],n=[],ids=[];
-  for(let row=1;row<profile.length;row++){
-    const [r0,y0]=profile[row-1], [r1,y1]=profile[row];
-    const dr=r1-r0, dy=y1-y0, distance=Math.hypot(dr,dy), first=p.length/3;
-    for(let i=0;i<sides;i++){
-      const a=i*tau/sides, x=Math.cos(a), z=Math.sin(a);
-      p.push(x*r0,y0,z*r0,x*r1,y1,z*r1);n.push(x*dy/distance,-dr/distance,z*dy/distance,x*dy/distance,-dr/distance,z*dy/distance);
-    }
-    for(let i=0;i<sides;i++){
-      const j=first+2*i, k=first+2*((i+1)%sides);
-      if(r0>0)ids.push(j,j+1,k);
-      if(r1>0)ids.push(k,j+1,k+1);
-    }
-  }
-  return new Geometry(p,n,ids);
-}
+// Turned brass and steel parts from [radius, height] profiles.
+const lathe=(profile,sides=24)=>toGeometry(turnedGeometry(profile,{segments:sides}));
 
-function contactShape(inner,outer) {
-  const base=.1766, p=[],n=[],ix=[], sides=48;
-  const point=(angle,radius)=>{
-    const soften=value=>Math.sign(value)*Math.pow(Math.abs(value),.66);
-    return space([.16+3.12*radius*soften(Math.cos(angle)), -base, .21+1.87*radius*soften(Math.sin(angle))]);
-  };
-  for(let i=0;i<sides;i++){
-    const angle=i*tau/sides;
-    p.push(...point(angle,inner),...point(angle,outer));
-    n.push(0,1,0,0,1,0);
-    const a=i*2,b=((i+1)%sides)*2;
-    if(inner>0)ix.push(a,b,a+1);
-    ix.push(a+1,b,b+1);
-  }
-  return new Geometry(p,n,ix);
-}
+// One band of the baked contact shadow under the bench: a soft-cornered ring (superellipse, exponent 3).
+const contactShape=(inner,outer)=>toGeometry(placeGeometry(ringSectorGeometry(inner,outer,{segments:48,exponent:3.03}),
+  {scale:[3.12*scale,1,1.87*scale],position:space([.16,-.1766,.21])}));
 
+// Etched marks: the front ruler, or the bed's minor or major grid.
 function engravedGrid(key){
-  const p=[],n=[],indices=[];
-  const quad=(x,z,w,d,y)=>{
-    const j=p.length/3;
-    p.push(...space([x-w,y,z-d]),...space([x-w,y,z+d]),...space([x+w,y,z+d]),...space([x+w,y,z-d]));
-    n.push(0,1,0,0,1,0,0,1,0,0,1,0);indices.push(j,j+1,j+2,j,j+2,j+3);
-  };
+  const builder=new GeometryBuilder();
+  const etch=(data,position,yaw=0)=>builder.append(data,{position:space(position),yaw,scale});
   if(key==='ruler'){
-    for(let i=-24;i<=24;i++){
-      const major=i%4===0, d=major?.045:.016;
-      quad(i*.1,1.41-d,major?.006:.0025,d,.245);
-    }
-    for(let i=-6;i<=6;i++){
-      const x=i*.4;
-      quad(x,1.297,.012,.012,.2445);
-    }
+    etch(scaleMarksGeometry({count:49,start:-2.4,spacing:.1,major:4,width:.005,majorWidth:.012,length:.032,majorLength:.09}),[0,.245,1.41]);
+    etch(scaleMarksGeometry({count:13,start:-2.4,spacing:.4,major:0,width:.024,length:.024,align:'center'}),[0,.2445,1.297]);
   } else {
-    const major=key==='major';
-    const size=major?.009:.0034;
-    for(let i=-24;i<=24;i++){
-      if((i%4===0)!==major)continue;
-      quad(i*.10,-.076,size,1.16,.2244+(major?.0003:0));
-    }
-    for(let i=-12;i<=10;i++){
-      if((i%4===0)!==major)continue;
-      quad(0,i*.10,2.40,size,.2243+(major?.0003:0));
-    }
+    const major=key==='major', size=major?.018:.0068, lift=major?.0003:0;
+    const lines=(count,start,length)=>scaleMarksGeometry({count,start,spacing:.1,major:4,marks:key,
+      width:size,majorWidth:size,length,majorLength:length,align:'center'});
+    etch(lines(49,-2.4,2.32),[0,.2244+lift,-.076]);
+    etch(lines(23,-1.2,4.8),[0,.2243+lift,0],-Math.PI/2);
     if(major){
-      quad(0,-1.235,2.447,.014,.225);
-      quad(0,1.087,2.447,.014,.225);
-      for(const x of [-2.435,2.435])quad(x,-.073,.013,1.168,.225);
+      etch(strokeGeometry([[[-2.447,-1.235],[2.447,-1.235]],[[-2.447,1.087],[2.447,1.087]]],.028),[0,.225,0]);
+      etch(strokeGeometry([[[-2.435,-1.241],[-2.435,1.095]],[[2.435,-1.241],[2.435,1.095]]],.026),[0,.225,0]);
     }
   }
-  return new Geometry(p,n,indices);
+  return builder.geometry();
 }
 
 function splineTube(curve) {

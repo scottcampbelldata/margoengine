@@ -1,10 +1,11 @@
-import { Geometry, PbrMaterial, box } from '@margoengine/core';
+import { PbrMaterial, box } from '@margoengine/core';
+import { GeometryBuilder, placeGeometry } from '@margoengine/geometry/builder';
 import { extrudeGeometry } from '@margoengine/geometry/extrude';
+import { ringSectorGeometry, strokeGeometry } from '@margoengine/geometry/parts';
 import { polygonOffset, polygonShapes } from '@margoengine/geometry/polygon';
+import { toGeometry } from '@margoengine/geometry/utils';
 
-export function geometry(source){
-  return new Geometry(source.positions,source.normals,source.indices);
-}
+export const geometry=toGeometry;
 
 const graphic=(color,emissive)=>new PbrMaterial({color,emissive,roughness:.85});
 export const materials={
@@ -24,29 +25,14 @@ export const segments=(points,closed=false)=>points.slice(0,closed?points.length
   .map((point,index)=>[point,points[(index+1)%points.length]]);
 export const edges=polygons=>polygons.flatMap(poly=>[poly.contour,...poly.holes]).flatMap(ring=>segments(ring,true));
 
-export function stroke(list,width){
-  const positions=[],normals=[],indices=[];
-  for(const [[ax,ay],[bx,by]] of list){
-    const length=Math.hypot(bx-ax,by-ay);
-    if(length<1e-7)continue;
-    const dx=(by-ay)/length*width/2,dy=(ax-bx)/length*width/2;
-    const index=positions.length/3;
-    positions.push(ax+dx,ay+dy,0,bx+dx,by+dy,0,bx-dx,by-dy,0,ax-dx,ay-dy,0);
-    normals.push(0,0,1,0,0,1,0,0,1,0,0,1);
-    indices.push(index,index+1,index+2,index,index+2,index+3);
-  }
-  return geometry({positions:Float32Array.from(positions),normals:Float32Array.from(normals),indices:Uint32Array.from(indices)});
-}
+// Drafting strokes and handle diamonds lie in the XY plane, facing the camera on +z.
+export const stroke=(list,width)=>geometry(strokeGeometry(list,width,{axis:'z'}));
 
 export function pins(points,r=.0016){
-  const positions=[],normals=[],indices=[];
-  for(const [x,y] of points){
-    const start=positions.length/3;
-    positions.push(x-r,y,0,x,y-r,0,x+r,y,0,x,y+r,0);
-    normals.push(0,0,1,0,0,1,0,0,1,0,0,1);
-    indices.push(start,start+1,start+2,start,start+2,start+3);
-  }
-  return geometry({positions:Float32Array.from(positions),normals:Float32Array.from(normals),indices:Uint32Array.from(indices)});
+  const diamond=placeGeometry(ringSectorGeometry(0,r,{segments:4}),{pitch:Math.PI/2});
+  const builder=new GeometryBuilder();
+  for(const [x,y] of points)builder.append(diamond,{position:[x,y,0]});
+  return builder.geometry();
 }
 
 function viewLine(scene,list,width,material,z){

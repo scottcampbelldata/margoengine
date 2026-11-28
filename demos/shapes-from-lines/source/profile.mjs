@@ -1,6 +1,7 @@
 import { shapeGeometry, extrudeGeometry } from '@margoengine/geometry/extrude';
 import { triangulateConstrained } from '@margoengine/geometry/delaunay';
 import { polygonUnion, polygonOffset, polygonArea, polygonShapes } from '@margoengine/geometry/polygon';
+import { extractGroups } from '@margoengine/geometry/utils';
 import { Spline } from '@margoengine/splines';
 
 const DEFAULT_OUTLINE=[
@@ -89,15 +90,5 @@ export function buildSolid(profile,{thickness,bevel}){
 
 export const fillGeometry=polygons=>shapeGeometry(polygonShapes(polygons));
 
-export function interiors(geo,kind){
-  const groups=geo?.groups.filter(group=>group.materialIndex===kind)??[];
-  const length=groups.reduce((total,group)=>total+group.count,0);
-  const positions=new Float32Array(length*3),normals=new Float32Array(length*3);
-  let cursor=0;
-  for(const {start,count} of groups){
-    positions.set(geo.positions.subarray(start*3,(start+count)*3),cursor);
-    normals.set(geo.normals.subarray(start*3,(start+count)*3),cursor);
-    cursor+=count*3;
-  }
-  return {positions,normals,indices:Uint32Array.from({length},(_,i)=>i)};
-}
+// The caps (material 0) or walls (material 1) of an extruded solid.
+export const interiors=(geo,kind)=>extractGroups(geo,kind);

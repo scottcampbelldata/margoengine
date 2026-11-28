@@ -1,73 +1,22 @@
-import { Geometry,PbrMaterial,box } from '@margoengine/core';
+import { PbrMaterial,box } from '@margoengine/core';
+import { prismGeometry,scaleMarksGeometry,turnedGeometry } from '@margoengine/geometry/parts';
+import { toGeometry } from '@margoengine/geometry/utils';
 import { contacts,links,weights } from './fixture.mjs';
 
-function spindle(profile,segments=40) {
-  const p=[],n=[],ix=[];
-  for (let k=0; k<profile.length-1; k++) {
-    const [r0,z0]=profile[k], [r1,z1]=profile[k+1];
-    const dr=r1-r0,dz=z1-z0,length=Math.hypot(dr,dz);
-    const base=p.length/3;
-    for(let j=0;j<=segments;j++){
-      const angle=j*Math.PI*2/segments,x=Math.cos(angle),y=Math.sin(angle);
-      p.push(r0*x,r0*y,z0,r1*x,r1*y,z1);
-      n.push(dz*x/length,dz*y/length,-dr/length,dz*x/length,dz*y/length,-dr/length);
-      if(j<segments) {
-        const a=base+j*2;
-        ix.push(a,a+2,a+1,a+2,a+3,a+1);
-      }
-    }
-  }
-  return new Geometry(p,n,ix);
-}
-
-function beveledPrism(outline,depth,bevel) {
-  const rings=[[-depth*.5,1-bevel],[-depth*.5+.015,1],[depth*.5-.015,1],[depth*.5,1-bevel]];
-  const cx=outline.reduce((v,p)=>v+p[0],0)/outline.length;
-  const cy=outline.reduce((v,p)=>v+p[1],0)/outline.length;
-  const points=rings.map(([z,s])=>outline.map(([x,y])=>[cx+(x-cx)*s,cy+(y-cy)*s,z]));
-  const pos=[],normal=[],indices=[];
-  function triangle(a,b,c) {
-    const u=b.map((v,i)=>v-a[i]),v=c.map((x,i)=>x-a[i]);
-    const q=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
-    const length=Math.hypot(...q), n=q.map(value=>value/length), index=pos.length/3;
-    pos.push(...a,...b,...c);
-    normal.push(...n,...n,...n);
-    indices.push(index,index+1,index+2);
-  }
-  for(let k=0;k<points.length-1;k++) {
-    for(let j=0;j<outline.length;j++){
-      const next=(j+1)%outline.length;
-      const current=points[k], upper=points[k+1];
-      triangle(current[j],current[next],upper[j]);
-      triangle(upper[j],current[next],upper[next]);
-    }
-  }
-  const back=points[0], front=points.at(-1);
-  for(let j=1;j<outline.length-1;j++){
-    triangle(back[0],back[j+1],back[j]);
-    triangle(front[0],front[j],front[j+1]);
-  }
-  return new Geometry(pos,normal,indices);
-}
-
-const cylinder=(radius,depth,sides)=>{
+// Outlines in the XY plane, extruded along Z with a 15 mm chamfer at both faces.
+const beveledPrism=(outline,depth,bevel)=>
+  toGeometry(prismGeometry(outline,depth,{axis:'z',bevel,bevelHeight:.015}));
+// Turned parts along Z: a cylinder with chamfered edges, and a flat ring.
+const cylinder=(radius,depth,sides=40)=>{
   const edge=Math.min(depth*.25,radius*.15);
-  return spindle([[0,-depth/2],[radius-edge,-depth/2],[radius,-depth/2+edge],
-    [radius,depth/2-edge],[radius-edge,depth/2],[0,depth/2]],sides);
+  return toGeometry(turnedGeometry([[0,-depth/2],[radius-edge,-depth/2],[radius,-depth/2+edge],
+    [radius,depth/2-edge],[radius-edge,depth/2],[0,depth/2]],{segments:sides,axis:'z'}));
 };
-const ring=(inside,outside,depth)=>spindle([[inside,-depth/2],[outside,-depth/2],
-  [outside,depth/2],[inside,depth/2],[inside,-depth/2]],48);
-
-function ticks() {
-  const p=[],n=[],ix=[];
-  for(let i=0;i<69;i++){
-    const x=-1.69+i*.051,w=i%5===0?.0033:.0016,length=i%5===0?.061:.024,id=p.length/3;
-    p.push(x,.324,.61,x+w,.324,.61,x+w,.324,.61-length,x,.324,.61-length);
-    n.push(0,1,0,0,1,0,0,1,0,0,1,0);
-    ix.push(id,id+1,id+2,id,id+2,id+3);
-  }
-  return new Geometry(p,n,ix);
-}
+const ring=(inside,outside,depth)=>toGeometry(turnedGeometry([[inside,-depth/2],[outside,-depth/2],
+  [outside,depth/2],[inside,depth/2],[inside,-depth/2]],{segments:48,axis:'z'}));
+// The bench scale: 69 marks, every fifth one major.
+const ticks=()=>toGeometry(scaleMarksGeometry({count:69,start:-1.69,spacing:.051,major:5,
+  width:.0016,majorWidth:.0033,length:.024,majorLength:.061}));
 
 export function makeCell(engine) {
   engine.scene.background='#3b3039';
@@ -92,13 +41,13 @@ export function makeCell(engine) {
   };
   const block=(size,mat,position,name,parent)=>put(box(...size),mat,position,name,parent);
   const panelWidth=3.7;
-  const plinth=beveledPrism([[-1.85,.09],[1.85,.09],[1.85,.30],[-1.85,.30]],1.31,.045);
+  const plinth=beveledPrism([[-1.85,.09],[1.85,.09],[1.85,.30],[-1.85,.30]],1.31,.008);
   put(plinth,deck,[.02,0,.02],'Metrology bench');
   block([3.65,.028,1.28],rail,[.02,.306,.02],'Bench datum');
   block([3.65,1.97,.16],backing,[.02,1.26,-.70],'Inspection shield');
   block([3.66,.037,.045],rail,[.02,2.21,-.592],'Upper rail');
   block([3.66,.025,.050],rail,[.02,.56,-.602],'Lower rail');
-  put(ticks(),marks,[0,0,0],'Table scale');
+  put(ticks(),marks,[0,.324,.61],'Table scale');
   for(let i=0;i<16;i++){
     const x=-1.76+i*(panelWidth-.16)/15;
     block([.008,1.64,.009],i%5===0?rail:backing,[x,1.36,-.611],'Backplate scribe '+i);
@@ -106,7 +55,7 @@ export function makeCell(engine) {
 
   const mountain=cylinder(.27,.13);
   put(mountain,dark,[-1.40,.352,0],'Robot mounting flange').setRotation([Math.PI/2,0,0]);
-  const riser=beveledPrism([[-.22,0],[.22,0],[.16,.16],[-.16,.16]],.29,.14);
+  const riser=beveledPrism([[-.22,0],[.22,0],[.16,.16],[-.16,.16]],.29,.012);
   put(riser,burgundy,[-1.40,.373,0],'Shoulder mount');
   const jointSize=[.141,.117,.093,.080];
   const joints=links.map((span,i)=>{
@@ -114,10 +63,10 @@ export function makeCell(engine) {
     node.name='Hinge '+(i+1);
     const width=jointSize[i]*.73;
     const beam=beveledPrism([[.027,-width],[span*.73,-width*.73],[span-.03,-width*.36],[span-.03,width*.39],
-      [span*.71,width*.71],[.02,width]],i<2?.155:.132,.078);
+      [span*.71,width*.71],[.02,width]],i<2?.155:.132,.006);
     put(beam,dark,[0,0,0],'Link spar '+(i+1),node);
     const skin=beveledPrism([[.11,-width*.71],[span*.67,-width*.49],[span-.105,-width*.23],
-      [span-.076,width*.18],[span*.61,width*.59],[.083,width*.63]],.06,.075);
+      [span-.076,width*.18],[span*.61,width*.59],[.083,width*.63]],.06,.004);
     put(skin,enamel,[0,0,.066],'Ivory cover '+(i+1),node);
     const bearing=cylinder(jointSize[i],.17);
     put(bearing,burgundy,[0,0,0],'Bearing case '+(i+1),node);
