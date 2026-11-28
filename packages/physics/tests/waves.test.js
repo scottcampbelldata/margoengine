@@ -261,3 +261,26 @@ test('settings out of range are refused with what to pass', () => {
   assert.throws(() => world().add(new WaveSolver(), { periodic: ['y'] }), /'x' or 'z'/);
   assert.throws(() => world().add(new WaveSolver(), { physics: 'st6' }), /'st4' or 'wam3'/);
 });
+
+test('a rejected spectrum normalization preserves an existing JONSWAP output', () => {
+  const grid = {
+    frequencies: Float64Array.of(0.09, 0.14, 0.22),
+    directions: Float64Array.of(0, 0.5, 2, 4.5),
+    energy: new Float64Array(12),
+    depth: 12,
+    density: 1025,
+  };
+  jonswap({ height: 0.8, period: 7, direction: 0.2 }, grid);
+  assert.ok(significantHeight(grid) > 0.7);
+  const saved = grid.energy.slice(),
+    coded = (e) => e.code === 'unsupported' && e.message.includes('errors#wave-spectrum');
+  assert.throws(() => jonswap({ height: 0.8, period: Number.MIN_VALUE, direction: 0.2 }, grid), coded);
+  assert.deepEqual(grid.energy, saved);
+  const { waves } = sea({ cells: [1, 1], start: { height: 1, period: 7, direction: 0 } });
+  const out = waves.sample(0, 0),
+    before = out.energy.slice();
+  assert.throws(() => waves.sample(NaN, 0, out), coded);
+  assert.deepEqual(out.energy, before);
+  assert.throws(() => waves.sample(0, 0, grid), coded);
+  assert.deepEqual(grid.energy, saved);
+});

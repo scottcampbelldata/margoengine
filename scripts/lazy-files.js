@@ -178,6 +178,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/wave-transport-kernel.wasm',
+    label: 'wave-transport-kernel.wasm',
+    kind: 'Rust SIMD QUICKEST wave transport',
+    measure: 'file',
+    when: 'WaveSolver.load() from the optional /waves entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/wave-transport-kernel-shared.wasm',
+    label: 'wave-transport-kernel-shared.wasm',
+    kind: 'Rust SIMD QUICKEST wave transport with helper workers',
+    measure: 'file',
+    when: 'WaveSolver.load() with threads: 2 or 4 from the optional /waves entry',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/loads-kernel.wasm',
     label: 'loads-kernel.wasm',
     kind: 'Rust SIMD batch for hydrodynamic wrenches',

@@ -12156,3 +12156,7 @@ The optional crush entry partitions shell membrane and pressure faces across nat
 ### SEA-03 native wave pairs and surface-to-hull evidence
 
 The nonlinear sea evaluates second-order pair terms in SIMD and reduces them in the original scalar sequence. Optional helpers own disjoint pair ranges, publish intermediate terms, and leave physical sums to the caller. The signed-cell, finite-depth crest matches the scalar normal exactly, including the spatial taper derivative. The accepted surface drives the same live launch that the dual-renderer fixed-camera cutaway shows. The proof leaves two-way feedback and phase-resolved focusing open. [Evidence and commands](../whitepaper/reproduce.md#sea-03-second-order-waves-and-independent-flume-counts)
+
+### SEA-01 accepted spectral transport and wave-field rendering
+
+Spatial fluxes are independent across transverse lines and spectral bins. Optional native participants use the same scalar limiter and preserve the split sequence, returning finite candidates before the wave solver publishes its clock, friction and field. The WebGPU and WebGL2 cutaway draws the propagating spectrum after an upwind gust ends and checks the resulting buoy motion and exact replay. The physical source terms and angular refraction stay on the caller. [Evidence and commands](../whitepaper/reproduce.md#sea-01-accepted-wave-transport-and-lake-george)

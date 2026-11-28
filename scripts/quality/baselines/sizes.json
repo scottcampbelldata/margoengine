@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21996305,
+  "total": 22001852,
   "history": [
     {
       "date": "2026-10-24",
@@ -15809,6 +15809,12 @@
       "commit": "804d8f554c",
       "grew": 1,
       "reason": "@margoengine/biomes/view about 17,080 -> 17,292 B gzip: +212 B (measured 16,809 -> 17,021 B on the first base) for the contact and relief options and the import() of ground contact and relief lighting, on top of main's BiomeView rock option; the two attaches belong in the view that owns the terrain."
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "sea-01-native-wave-transport",
+      "reason": "SEA-01 @margoengine/physics/waves 7548 to 12962 B gzip, ceiling 7804 to 13351 B. The existing optional wave solver owns publication, finite checks and transport. A separate solver would duplicate spectrum and boundary state. Native modules and helpers load only when used. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16747,7 +16753,7 @@
     "@margoengine/physics/vegetation": 12889,
     "@margoengine/physics/viscoplastic": 8812,
     "@margoengine/physics/vortices": 5453,
-    "@margoengine/physics/waves": 7804,
+    "@margoengine/physics/waves": 13351,
     "@margoengine/physics/world": 18156,
     "@margoengine/physics/wrapped-rope": 5162,
     "@margoengine/physics2d": 24024,

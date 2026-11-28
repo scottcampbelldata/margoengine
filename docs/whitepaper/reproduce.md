@@ -5280,3 +5280,14 @@ node scripts/run-with-timeout.mjs --max=3 -- node packages/physics/scripts/sea03
 ```
 
 The experiment uses a 270 m flume with a measurement at 45 m in 10 m water depth. The wavemaker's target spectrum comes from Equation 3 and Table I of [Dematteis et al. 2019](https://doi.org/10.1103/PhysRevX.9.041057). The check runs both specified normalizations as printed and counts interior local maxima over the same number and duration of records, five 1,500 s records at 40 Hz in each regime. Those synthetic counts are compared to the separate gauge totals in §III. The model does not use measured crest heights, counts or phases as inputs. It preserves the separate effects of rounding of the tabulated significant wave heights and sampling refinement. The paper does not publish per-record counts or all local maxima at the gauge, which limits estimates of repeatability and the uncertainty of the event-window selection.
+
+### SEA-01 accepted wave transport and Lake George
+
+```sh
+node scripts/run-with-timeout.mjs --max=4 -- node --test packages/physics/tests/waves.test.js packages/physics/tests/coupling/waves.test.js packages/physics/tests/coupling/wave-transport-workers.test.js
+node scripts/run-with-timeout.mjs --max=2 -- npm run test:gpu:wave-transport-workers -w @margoengine/physics
+node scripts/run-with-timeout.mjs --max=3 -- npm run test:gpu:swell-film -w @margoengine/water
+node scripts/run-with-timeout.mjs --max=4 -- node packages/physics/scripts/sea01-lake-george-measured.mjs
+```
+
+The Lake George comparison uses a simple along-fetch strip with periodic cross-fetch boundaries. The winds come from the station-6 anemometer and the published Taylor–Lee reconstruction. The bathymetry uses the reported station depths. In one boundary setup only the upstream station contributes its measured significant height and peak frequency. The other setup starts at the calm coast. Stations 2, 4, 6 and 8 supply the separate scored wave measurements. Their confidence bounds come from the original published plot with readout allowance. Peak frequency has a reported value but no per-station interval. Two joint spatial/time resolutions and 6–9 h persistence quantify model sensitivity. The comparison does not infer frequency confidence bounds from grid sensitivity.

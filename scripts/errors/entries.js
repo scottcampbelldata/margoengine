@@ -141,6 +141,15 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'wave-spectrum',
+    title: '@margoengine/physics/waves directional spectrum, forcing and transport',
+    kind: 'family',
+    messages: [],
+    cause:
+      'A grid, spectrum, depth, signed input coordinate, wind sample, clock interval, or transport sweep could not produce a finite wave update.',
+    fix: 'Use an energetic resolved spectrum, finite local wind and bed data, and the scene cell size. Reduce extreme inputs or shorten the step when fluxes cannot be represented. Add a fresh solver to each world and use one native participant on the browser main thread.',
+  },
+  {
     id: 'nonlinear-sea',
     title: '@margoengine/physics/rogue nonlinear seas and wave groups',
     kind: 'family',

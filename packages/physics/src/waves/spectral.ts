@@ -40,6 +40,13 @@ import { cos, exp, hypot, ln, pow, sin } from '@margoengine/math/pinned';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { angleOf } from '../flight.js';
 import { ST4, st4Rates, type SpectralCell } from './st4.js';
+import { waveError } from './errors.js';
+import {
+  loadWaveTransport,
+  type WaveTransportBuild,
+  type WaveTransportKernel,
+  type WaveTransportWorkCounts,
+} from './transport-kernel.js';
 import { regionWords } from '../world/memory.js';
 import type {
   Cell,
@@ -159,14 +166,46 @@ export function jonswap(
   out: WaveSpectrumSample,
   g = gravityMagnitude(DEFAULT_GRAVITY),
 ): WaveSpectrumSample {
-  const { height, period, direction, peakedness = 3.3 } = state,
-    { frequencies: fs, directions: ds, energy } = out,
-    nf = fs.length,
+  const { height, period, direction, peakedness = 3.3 } = state ?? {};
+  if (
+    !(
+      height >= 0 &&
+      period > 0 &&
+      peakedness > 0 &&
+      [height, period, direction, peakedness, g].every(Number.isFinite) &&
+      g > 0
+    )
+  )
+    throw waveError(
+      'unsupported',
+      'JONSWAP needs nonnegative height, positive period, peak enhancement and gravity, and finite direction; pass a resolved sea state in SI units.',
+    );
+  const { frequencies: fs, directions: ds, energy } = out ?? {};
+  if (!(fs?.length && ds?.length && energy?.length === fs.length * ds.length && typeof energy.set === 'function'))
+    throw waveError(
+      'unsupported',
+      'JONSWAP needs a nonempty frequency and direction grid and an energy word per bin; pass a matching spectrum buffer.',
+    );
+  let previous = 0;
+  for (const frequency of fs) {
+    if (!(frequency > previous && Number.isFinite(frequency)))
+      throw waveError(
+        'unsupported',
+        'The JONSWAP frequencies must increase from positive finite hertz; fix the frequency grid.',
+      );
+    previous = frequency;
+  }
+  if (!ds.every(Number.isFinite))
+    throw waveError('unsupported', 'JONSWAP directions must be finite radians; fix the direction grid.');
+  const nf = fs.length,
     nd = ds.length,
     fp = 1 / period,
     dtheta = TWO_PI / nd;
-  energy.fill(0);
-  if (!(height > 0)) return out;
+  if (height === 0) {
+    energy.fill(0);
+    return out;
+  }
+  const candidate = new Float64Array(energy.length);
   let total = 0;
   for (let i = 0; i < nf; i++) {
     const f = fs[i]!,
@@ -179,12 +218,25 @@ export function jonswap(
       const c = cos(ds[j]! - direction),
         spread = c > 0 ? (2 / PI) * c * c : 0,
         e = ef * spread;
-      energy[i * nd + j] = e;
+      candidate[i * nd + j] = e;
       total += e * df * dtheta;
     }
   }
   const scale = (height * height) / 16 / total;
-  for (let k = 0; k < energy.length; k++) energy[k]! *= scale;
+  if (!(scale > 0 && Number.isFinite(scale)))
+    throw waveError(
+      'unsupported',
+      'The JONSWAP peak or energy is unresolved; use a representable height and a frequency grid around the peak.',
+    );
+  for (let k = 0; k < candidate.length; k++) {
+    candidate[k]! *= scale;
+    if (!Number.isFinite(candidate[k]))
+      throw waveError(
+        'unsupported',
+        'JONSWAP normalization exceeds the spectrum range; reduce the height or use a resolved grid.',
+      );
+  }
+  energy.set(candidate);
   return out;
 }
 
@@ -241,6 +293,8 @@ export interface WaveParams {
   bed?: Bed;
   /** The water's surface height, y m (default 0). */
   waterLevel?: number;
+  /** Metres per origin cell for shared wind and bed coordinates (default 4096). */
+  originCellSize?: number;
   /** Density of the water, kg/m^3 (default 1025, the sea; 1000 for a lake). */
   density?: number;
   /** The wind over the water, sampled 10 m above it (default none: swell only). */
@@ -268,7 +322,38 @@ export interface WaveParams {
   physics?: 'st4' | 'wam3';
 }
 
-const ORIGIN: Cell = [0, 0, 0];
+function flowOffset(from: Cell, to: Cell, size: number): [number, number, number] {
+  if (!(to?.length === 3 && to.every(Number.isSafeInteger)))
+    throw waveError('unsupported', 'A wave input field needs three integer cell indices; give it a valid origin.');
+  const offset: [number, number, number] = [
+    (from[0] - to[0]) * size,
+    (from[1] - to[1]) * size,
+    (from[2] - to[2]) * size,
+  ];
+  if (!offset.every(Number.isFinite))
+    throw waveError(
+      'unsupported',
+      'Wave input coordinates exceed numeric range; bring the input field into the wave grid cell.',
+    );
+  return offset;
+}
+
+function finiteWave(value: number): number {
+  if (!Number.isFinite(value))
+    throw waveError(
+      'failed',
+      'The wave step cannot represent its energy or flux; reduce the wind, wave height or interval, or refine the grid.',
+    );
+  return value;
+}
+
+/** Optional native transport configuration for a wave solver. */
+export interface WaveSolverNativeOptions {
+  /** Native participants including the caller. Default one. Use Node or an isolated browser worker for two or four. */
+  readonly threads?: 1 | 2 | 4;
+  /** Cancels loading and releases active helpers on abort. */
+  readonly signal?: AbortSignal;
+}
 
 /**
  * The sea's waves: a spectral wave model on a grid of the water, a framework solver (`Solver`). Add it to a `PhysicsWorld`
@@ -277,7 +362,12 @@ const ORIGIN: Cell = [0, 0, 0];
 export class WaveSolver implements Solver<WaveParams> {
   private readonly id: string;
   private host!: SolverHost;
-  private cell: Cell = ORIGIN;
+  private initialized = false;
+  private stepping = false;
+  private disposed = false;
+  private nativeBuild: WaveTransportBuild | undefined;
+  private transport: WaveTransportKernel | undefined;
+  private nativeWork: WaveTransportWorkCounts | undefined;
   private nx = 0;
   private nz = 0;
   private h = 0;
@@ -299,6 +389,9 @@ export class WaveSolver implements Solver<WaveParams> {
   private wrapZ = false;
   private physics: 'st4' | 'wam3' = 'st4';
   private energy!: Region;
+  private candidateEnergy!: Float64Array;
+  private candidateFriction!: Float64Array;
+  private originCellSize = 4096;
   private clock!: Region;
   /** Each cell's friction velocity u* in its last source step, m/s (derived each step; kept so a restore reports it too). */
   private friction!: Region;
@@ -307,6 +400,24 @@ export class WaveSolver implements Solver<WaveParams> {
   /** @param id The solver's id (default `'waves'`). */
   constructor(id = 'waves') {
     this.id = id;
+  }
+
+  /** Load native spatial transport before adding the solver to a world. Dispose it when the world finishes. */
+  static async load(id = 'waves', native: WaveSolverNativeOptions = {}): Promise<WaveSolver> {
+    const solver = new WaveSolver(id);
+    solver.nativeBuild = await loadWaveTransport(native);
+    return solver;
+  }
+
+  /** Native work of the last accepted advancing tick, or of warm-up until the first advancing tick. */
+  readNativeWork(): WaveTransportWorkCounts | undefined {
+    const work = this.nativeWork;
+    return work && { ...work, workers: work.workers.map((worker) => ({ ...worker })) };
+  }
+
+  [Symbol.dispose](): void {
+    this.nativeBuild?.[Symbol.dispose]();
+    this.disposed = true;
   }
 
   describe(): SolverDescription {
@@ -319,6 +430,11 @@ export class WaveSolver implements Solver<WaveParams> {
   }
 
   init(host: SolverHost, params: WaveParams = {}): void {
+    if (this.disposed) throw waveError('disposed', 'This wave solver was disposed; construct or load another solver.');
+    if (this.initialized)
+      throw waveError('attached', 'This wave solver already belongs to a world; construct or load another solver.');
+    if (!params || typeof params !== 'object')
+      throw waveError('unsupported', 'Pass wave solver settings as an object or omit them.');
     const {
       cells = [32, 32],
       cellSize = 1000,
@@ -326,6 +442,7 @@ export class WaveSolver implements Solver<WaveParams> {
       depth = Infinity,
       bed,
       waterLevel = 0,
+      originCellSize = 4096,
       density = SEA_WATER_DENSITY,
       wind,
       frequencies = { min: 0.04, max: 1, count: 34 },
@@ -339,41 +456,57 @@ export class WaveSolver implements Solver<WaveParams> {
       physics = 'st4',
     } = params;
     if (physics !== 'st4' && physics !== 'wam3')
-      throw new RangeError(`A wave model's physics is 'st4' or 'wam3' (got ${physics}); pass one of them.`);
+      throw waveError('unsupported', `A wave model's physics is 'st4' or 'wam3' (got ${physics}); pass one of them.`);
     this.physics = physics;
-    if (!(cells.length === 2 && cells.every((n) => Number.isInteger(n) && n >= 1 && n <= 1024)))
-      throw new RangeError(`A wave grid has 1 to 1024 whole cells along x and z (got ${cells}); pass two.`);
+    if (!(cells?.length === 2 && cells.every((n) => Number.isInteger(n) && n >= 1 && n <= 1024)))
+      throw waveError('unsupported', `A wave grid has 1 to 1024 whole cells along x and z (got ${cells}); pass two.`);
     for (const [name, value] of [
       ['cell size', cellSize],
+      ['origin cell size', originCellSize],
       ['water density', density],
       ['time scale', timeScale],
       ['interval', interval],
     ] as const)
       if (!(value > 0 && Number.isFinite(value)))
-        throw new RangeError(`A wave solver's ${name} is a finite number above 0 (got ${value}); pass one.`);
+        throw waveError('unsupported', `A wave solver's ${name} is a finite number above 0 (got ${value}); pass one.`);
     if (!(warmUp >= 0 && Number.isFinite(warmUp)))
-      throw new RangeError(`A warm-up is 0 or more seconds (got ${warmUp}); pass one.`);
-    const { min, max, count } = frequencies;
+      throw waveError('unsupported', `A warm-up is 0 or more seconds (got ${warmUp}); pass one.`);
+    const { min, max, count } = frequencies ?? {};
     if (!(min > 0 && max > min && Number.isFinite(max) && Number.isInteger(count) && count >= 2 && count <= 128))
-      throw new RangeError(
+      throw waveError(
+        'unsupported',
         `Wave frequencies need 0 < min < max and a whole count from 2 to 128 (got ${min}, ${max}, ${count}); pass them.`,
       );
     if (!(Number.isInteger(directions) && directions >= 4 && directions <= 180))
-      throw new RangeError(`A wave spectrum has 4 to 180 whole directions (got ${directions}); pass one.`);
-    if (!(centre.length === 2 && centre.every(Number.isFinite) && Number.isFinite(waterLevel)))
-      throw new RangeError('A wave grid needs a finite centre [x, z] and water level; pass them.');
+      throw waveError('unsupported', `A wave spectrum has 4 to 180 whole directions (got ${directions}); pass one.`);
+    if (!(centre?.length === 2 && centre.every(Number.isFinite) && Number.isFinite(waterLevel)))
+      throw waveError('unsupported', 'A wave grid needs a finite centre [x, z] and water level; pass them.');
+    if (!Array.isArray(periodic))
+      throw waveError('unsupported', 'Periodic edges are a list of x and z axes; pass a list.');
     for (const edge of periodic)
-      if (edge !== 'x' && edge !== 'z') throw new RangeError(`A periodic edge is 'x' or 'z' (got ${edge}); pass them.`);
+      if (edge !== 'x' && edge !== 'z')
+        throw waveError('unsupported', `A periodic edge is 'x' or 'z' (got ${edge}); pass them.`);
+    if (wind !== undefined && (wind?.medium !== 'air' || typeof wind?.sample !== 'function'))
+      throw waveError('unsupported', 'Wave forcing needs a sampled air wind; pass a Wind field or omit it.');
+    if (bed !== undefined && typeof bed?.sample !== 'function')
+      throw waveError('unsupported', 'Wave bathymetry needs a bed sampler; pass a TerrainBed view or use depth.');
+    this.host = host;
+    this.originCellSize = originCellSize;
     this.wrapX = periodic.includes('x');
     this.wrapZ = periodic.includes('z');
-    this.host = host;
     [this.nx, this.nz] = cells;
     this.h = cellSize;
     this.x0 = centre[0] - (this.nx * cellSize) / 2;
     this.z0 = centre[1] - (this.nz * cellSize) / 2;
+    if (![this.x0, this.z0, this.x0 + this.nx * cellSize, this.z0 + this.nz * cellSize].every(Number.isFinite))
+      throw waveError(
+        'unsupported',
+        'The wave grid extent is too large to represent; use finite local dimensions and centre.',
+      );
     const [gx, gy, gz] = host.gravity;
     this.g = hypot(gx, gy, gz);
-    if (!(this.g > 0)) throw new RangeError('Waves need gravity; give the world a gravity above 0.');
+    if (!(this.g > 0 && Number.isFinite(this.g)))
+      throw waveError('unsupported', 'Waves need finite positive gravity; set the world gravity.');
     this.nf = count;
     this.nd = directions;
     this.freqs = new Float64Array(count);
@@ -381,31 +514,67 @@ export class WaveSolver implements Solver<WaveParams> {
     this.dirs = new Float64Array(directions);
     for (let j = 0; j < directions; j++) this.dirs[j] = (TWO_PI * j) / directions;
     this.widths = new Float64Array(count);
-    for (let i = 0; i < count; i++) this.widths[i] = bandWidth(this.freqs, i);
+    for (let i = 0; i < count; i++) {
+      const width = bandWidth(this.freqs, i);
+      if (!(width > 0 && Number.isFinite(width)))
+        throw waveError(
+          'unsupported',
+          'Wave frequency bins cannot be resolved; use a wider or smaller frequency range.',
+        );
+      this.widths[i] = width;
+    }
     this.wind = wind;
     this.settings = { density, timeScale, interval, waterLevel };
     const n = this.nx * this.nz;
     this.depth = new Float64Array(n);
     this.k = new Float64Array(n * count);
     this.cg = new Float64Array(n * count);
+    const [bedX, bedY, bedZ] = bed ? flowOffset(host.cell, bed.cell, originCellSize) : [0, 0, 0];
     for (let c = 0; c < this.nz; c++)
       for (let r = 0; r < this.nx; r++) {
         const at = r + this.nx * c,
           x = this.x0 + (r + 0.5) * cellSize,
           z = this.z0 + (c + 0.5) * cellSize,
-          d = bed ? waterLevel - bed.sample(x, z).elevation : typeof depth === 'function' ? depth(x, z) : depth;
-        if (Number.isNaN(d))
-          throw new RangeError(`The water's depth at (${x}, ${z}) is not a number; pass finite metres.`);
+          bedHeight = bed ? bed.sample(x + bedX, z + bedZ)?.elevation : undefined,
+          d = bed ? waterLevel + bedY - (bedHeight ?? NaN) : typeof depth === 'function' ? depth(x, z) : depth;
+        if (bed && !Number.isFinite(bedHeight))
+          throw waveError(
+            'unsupported',
+            'The terrain bed returned an invalid height; return a finite elevation in metres.',
+          );
+        if (!(Number.isFinite(d) || d === Infinity))
+          throw waveError('unsupported', `The water's depth at (${x}, ${z}) is not a number; pass finite metres.`);
         this.depth[at] = d;
         for (let i = 0; i < count; i++) {
           this.k[at * count + i] = d > 0 ? wavenumber(this.freqs[i]!, d, this.g) : 0;
           this.cg[at * count + i] = d > 0 ? groupVelocity(this.freqs[i]!, d, this.g) : 0;
+          if (
+            d > 0 &&
+            !(
+              this.k[at * count + i]! > 0 &&
+              this.cg[at * count + i]! > 0 &&
+              Number.isFinite(this.k[at * count + i]) &&
+              Number.isFinite(this.cg[at * count + i])
+            )
+          )
+            throw waveError(
+              'unsupported',
+              'The wave dispersion is outside numeric range; pass resolved frequency, depth and gravity.',
+            );
         }
       }
     const per = count * directions;
+    if (n * per * Float64Array.BYTES_PER_ELEMENT >= 0x100000000) {
+      throw waveError(
+        'unsupported',
+        'The spectrum exceeds the addressable world memory; reduce the grid or the spectral bins.',
+      );
+    }
     this.energy = host.allocate('spectrum', n * per * 8, 'f64', WAVE_LAYOUT);
     this.clock = host.allocate('clock', 16, 'f64', WAVE_LAYOUT);
     this.friction = host.allocate('friction', n * 8, 'f64', WAVE_LAYOUT);
+    this.candidateEnergy = new Float64Array(n * per);
+    this.candidateFriction = new Float64Array(n);
     const blank = (): WaveSpectrumSample => ({
       frequencies: this.freqs,
       directions: this.dirs,
@@ -413,16 +582,58 @@ export class WaveSolver implements Solver<WaveParams> {
       depth: Infinity,
       density,
     });
-    if (swell) this.swell = jonswap(swell, blank(), this.g).energy;
-    if (start) {
+    this.swell = swell === undefined ? undefined : jonswap(swell, blank(), this.g).energy;
+    if (start !== undefined) {
       const e = jonswap(start, blank(), this.g).energy,
         words = this.words();
       for (let c = 0; c < n; c++) if (this.depth[c]! > 0) words.set(e, c * per);
     }
+    this.transport = this.nativeBuild?.bind({
+      nx: this.nx,
+      nz: this.nz,
+      nf: count,
+      nd: directions,
+      spacing: cellSize,
+      depth: this.depth,
+      groupVelocity: this.cg,
+      swell: this.swell,
+      directionX: Float64Array.from(this.dirs, cos),
+      directionZ: Float64Array.from(this.dirs, sin),
+      wrapX: this.wrapX,
+      wrapZ: this.wrapZ,
+    });
     if (warmUp > 0) {
       const steps = Math.ceil(warmUp / interval);
-      for (let s = 0; s < steps; s++) this.advance(warmUp / steps, 0);
+      if (!Number.isSafeInteger(steps))
+        throw waveError(
+          'unsupported',
+          'The warm-up has too many intervals to represent; shorten it or increase the interval.',
+        );
+      this.candidateEnergy.set(this.words());
+      for (let s = 0; s < steps; s++) this.advance(warmUp / steps, 0, host.cell);
+      this.acceptSpectrum();
     }
+    this.initialized = true;
+  }
+
+  private checkInitialized(): void {
+    if (this.disposed) throw waveError('disposed', 'This wave solver was disposed; construct or load another solver.');
+    if (!this.initialized)
+      throw waveError('state', 'The wave grid is not initialized; add the solver to a PhysicsWorld first.');
+  }
+
+  private clockWords(): Float64Array {
+    return regionWords(this.host.memory, this.clock) as Float64Array;
+  }
+
+  private frictionWords(): Float64Array {
+    return regionWords(this.host.memory, this.friction) as Float64Array;
+  }
+
+  private acceptSpectrum(): void {
+    this.words().set(this.candidateEnergy);
+    this.frictionWords().set(this.candidateFriction);
+    if (this.transport) this.nativeWork = this.transport.workCounts();
   }
 
   private words(): Float64Array {
@@ -430,19 +641,47 @@ export class WaveSolver implements Solver<WaveParams> {
   }
 
   step(context: StepContext, dt: number): void {
-    this.cell = context.cell;
-    const clock = regionWords(this.host.memory, this.clock) as Float64Array,
-      { interval, timeScale } = this.settings;
-    clock[0]! += dt * timeScale;
-    while (clock[0]! >= interval) {
-      this.advance(interval, clock[1]! / timeScale);
-      clock[0]! -= interval;
-      clock[1]! += interval;
+    this.checkInitialized();
+    if (this.stepping)
+      throw waveError(
+        'state',
+        'The wave step is already running; sample the accepted spectrum without advancing again.',
+      );
+    if (!(dt >= 0 && Number.isFinite(dt)))
+      throw waveError('unsupported', 'A wave step needs finite nonnegative seconds; advance with the world time step.');
+    this.stepping = true;
+    try {
+      const { interval, timeScale } = this.settings;
+      let remaining = this.clockWords()[0]! + dt * timeScale,
+        elapsed = this.clockWords()[1]!;
+      if (!Number.isFinite(remaining))
+        throw waveError('unsupported', 'The wave time exceeds numeric range; reduce the time scale or frame duration.');
+      if (remaining >= interval) {
+        this.candidateEnergy.set(this.words());
+        this.candidateFriction.set(this.frictionWords());
+        this.transport?.resetWork();
+        while (remaining >= interval) {
+          const next = remaining - interval,
+            nextElapsed = elapsed + interval;
+          if (!(next < remaining && nextElapsed > elapsed && Number.isFinite(nextElapsed)))
+            throw waveError(
+              'failed',
+              'The wave clock cannot resolve another interval; reduce the time scale or start a new sea.',
+            );
+          this.advance(interval, elapsed / timeScale, context.cell);
+          remaining = next;
+          elapsed = nextElapsed;
+        }
+        this.acceptSpectrum();
+      }
+      this.clockWords().set([remaining, elapsed]);
+    } finally {
+      this.stepping = false;
     }
   }
 
   exportPorts(tick: number): readonly Port[] {
-    return [{ field: WAVE_SPECTRUM_FIELD.name, region: this.energy, tick, cell: this.cell }];
+    return [{ field: WAVE_SPECTRUM_FIELD.name, region: this.energy, tick, cell: this.host.cell }];
   }
 
   importPorts(): void {}
@@ -457,7 +696,8 @@ export class WaveSolver implements Solver<WaveParams> {
 
   /** Seconds of sea time simulated since the start (after any warm-up). */
   get time(): number {
-    return (regionWords(this.host.memory, this.clock) as Float64Array)[1]!;
+    this.checkInitialized();
+    return this.clockWords()[1]!;
   }
 
   /** The grid: cells along x and z, the cell edge and the corner it starts at, [x, z]. */
@@ -468,24 +708,35 @@ export class WaveSolver implements Solver<WaveParams> {
   /** The waves as the framework's `WaveSpectrumField`: the spectrum of the cell under (x, z). */
   get field(): WaveSpectrumField {
     return {
-      cell: this.cell,
+      cell: this.host?.cell ?? [0, 0, 0],
       sample: (x: number, z: number, out?: WaveSpectrumSample) => this.sample(x, z, out),
     };
   }
 
   /** The spectrum of the cell under (x, z), m^2/(Hz rad); outside the grid, the nearest edge cell's. */
   sample(x: number, z: number, out?: WaveSpectrumSample): WaveSpectrumSample {
-    const per = this.nf * this.nd,
-      s = out ?? {
-        frequencies: this.freqs,
-        directions: this.dirs,
-        energy: new Float64Array(per),
-        depth: 0,
-        density: this.settings.density,
-      },
-      r = Math.min(this.nx - 1, Math.max(0, Math.floor((x - this.x0) / this.h))),
-      c = Math.min(this.nz - 1, Math.max(0, Math.floor((z - this.z0) / this.h))),
-      at = r + this.nx * c;
+    const at = this.indexAt(x, z),
+      per = this.nf * this.nd;
+    if (
+      out &&
+      !(
+        out.energy instanceof Float64Array &&
+        out.energy.length === per &&
+        out.frequencies?.length === this.nf &&
+        out.directions?.length === this.nd
+      )
+    )
+      throw waveError(
+        'unsupported',
+        'The output spectrum does not match the wave grid; supply a matching buffer or omit it.',
+      );
+    const s = out ?? {
+      frequencies: this.freqs,
+      directions: this.dirs,
+      energy: new Float64Array(per),
+      depth: 0,
+      density: this.settings.density,
+    };
     s.energy.set(this.words().subarray(at * per, (at + 1) * per));
     s.depth = this.depth[at]!;
     s.density = this.settings.density;
@@ -498,9 +749,17 @@ export class WaveSolver implements Solver<WaveParams> {
    * (young, steep seas drag harder), with WAM Cycle 3 the drag fit of U10. The stress on the sea is rho_a u*^2; 0 without wind.
    */
   frictionVelocity(x: number, z: number): number {
+    const index = this.indexAt(x, z);
+    return this.frictionWords()[index]!;
+  }
+
+  private indexAt(x: number, z: number): number {
+    this.checkInitialized();
+    if (!(Number.isFinite(x) && Number.isFinite(z)))
+      throw waveError('unsupported', 'A wave sample needs finite local metres; pass finite x and z in the wave cell.');
     const r = Math.min(this.nx - 1, Math.max(0, Math.floor((x - this.x0) / this.h))),
       c = Math.min(this.nz - 1, Math.max(0, Math.floor((z - this.z0) / this.h)));
-    return (regionWords(this.host.memory, this.friction) as Float64Array)[r + this.nx * c]!;
+    return r + this.nx * c;
   }
 
   significantHeight(x: number, z: number): number {
@@ -513,9 +772,9 @@ export class WaveSolver implements Solver<WaveParams> {
   }
 
   /** One step of `dt` seconds of sea time, at world time `time` (for the wind). */
-  private advance(dt: number, time: number): void {
+  private advance(dt: number, time: number, cell: Cell): void {
     this.propagate(dt);
-    this.sources(dt, time);
+    this.sources(dt, time, cell);
   }
 
   /**
@@ -525,11 +784,16 @@ export class WaveSolver implements Solver<WaveParams> {
   private propagate(dt: number): void {
     const { nx, nz, nf, nd, h } = this,
       per = nf * nd,
-      words = this.words();
+      words = this.candidateEnergy;
     let fastest = 0;
     for (let k = 0; k < this.cg.length; k++) if (this.cg[k]! > fastest) fastest = this.cg[k]!;
-    const steps = Math.max(1, Math.ceil((2 * fastest * dt) / h)),
-      sub = dt / steps,
+    const steps = Math.max(1, Math.ceil((2 * fastest * dt) / h));
+    if (!Number.isSafeInteger(steps))
+      throw waveError(
+        'failed',
+        'Wave transport needs too many Courant substeps to represent; shorten its interval or resolve the grid at a larger spacing.',
+      );
+    const sub = dt / steps,
       next = new Float64Array(words.length);
     for (let s = 0; s < steps; s++) {
       // Space: ULTIMATE QUICKEST along x and along z in turn, alternating which goes first.
@@ -569,7 +833,10 @@ export class WaveSolver implements Solver<WaveParams> {
             }
           }
         }
-      for (let k = 0; k < next.length; k++) words[k] = next[k]! > 0 ? next[k]! : 0;
+      for (let k = 0; k < next.length; k++) {
+        const value = finiteWave(next[k]!);
+        words[k] = value > 0 ? value : 0;
+      }
     }
   }
 
@@ -580,6 +847,10 @@ export class WaveSolver implements Solver<WaveParams> {
    * stencil cell beyond either. Waves entering over an open edge carry the open sea's swell.
    */
   private advect(words: Float64Array, axis: 'x' | 'z', dt: number): void {
+    if (this.transport) {
+      this.transport.advect(words, axis, dt);
+      return;
+    }
     const { nx, nz, nf, nd, h } = this,
       per = nf * nd,
       along = axis === 'x' ? nx : nz,
@@ -623,7 +894,7 @@ export class WaveSolver implements Solver<WaveParams> {
               nc = value(upstream, bin);
             // First order beside land or an open edge, or where the stencil reaches past one.
             if (!lw || !rw || !wet(far)) {
-              flux[p] = speed * nc;
+              flux[p] = finiteWave(speed * nc);
               continue;
             }
             const nu = value(far, bin),
@@ -643,12 +914,12 @@ export class WaveSolver implements Solver<WaveParams> {
                 face = nu + tb * span;
               } else face = nc;
             } else face = nc;
-            flux[p] = speed * face;
+            flux[p] = finiteWave(speed * face);
           }
           for (let p = 0; p < along; p++) {
             const cell = cellAt(p, q);
             if (!wet(cell)) continue;
-            const updated = before[cell * per + bin]! + (dt / h) * (flux[p]! - flux[p + 1]!);
+            const updated = finiteWave(before[cell * per + bin]! + (dt / h) * (flux[p]! - flux[p + 1]!));
             words[cell * per + bin] = updated > 0 ? updated : 0;
           }
         }
@@ -663,10 +934,10 @@ export class WaveSolver implements Solver<WaveParams> {
   }
 
   /** The source terms in every wet cell, integrated over `dt`. */
-  private sources(dt: number, time: number): void {
+  private sources(dt: number, time: number, cell: Cell): void {
     const { nx, nz, nf, nd, g } = this,
       per = nf * nd,
-      words = this.words(),
+      words = this.candidateEnergy,
       eSigma = new Float64Array(per),
       grow = new Float64Array(per),
       decay = new Float64Array(per),
@@ -675,7 +946,8 @@ export class WaveSolver implements Solver<WaveParams> {
       inputRate = new Float64Array(per),
       sinkRate = new Float64Array(per),
       dtheta = TWO_PI / nd,
-      rhoRatio = AIR_DENSITY / this.settings.density;
+      rhoRatio = AIR_DENSITY / this.settings.density,
+      windOffset = this.wind ? flowOffset(cell, this.wind.cell, this.originCellSize) : undefined;
     for (let c = 0; c < nz; c++)
       for (let r = 0; r < nx; r++) {
         const at = r + nx * c,
@@ -703,11 +975,22 @@ export class WaveSolver implements Solver<WaveParams> {
         // The wind 10 m above the water.
         let u10 = 0,
           windDirection = 0;
-        if (this.wind) {
-          const x = this.x0 + (r + 0.5) * this.h,
-            z = this.z0 + (c + 0.5) * this.h,
-            v = this.wind.sample(x, this.settings.waterLevel + 10, z, time, this.flow).velocity;
-          u10 = hypot(v[0], v[2]);
+        if (this.wind && windOffset) {
+          const x = this.x0 + (r + 0.5) * this.h + windOffset[0],
+            z = this.z0 + (c + 0.5) * this.h + windOffset[2],
+            y = this.settings.waterLevel + 10 + windOffset[1];
+          if (![x, y, z, time].every(Number.isFinite))
+            throw waveError(
+              'unsupported',
+              'The wind sample coordinates exceed numeric range; place the field closer to the wave grid.',
+            );
+          const v = this.wind.sample(x, y, z, time, this.flow)?.velocity;
+          if (!(v?.length === 3 && v.every(Number.isFinite)))
+            throw waveError(
+              'unsupported',
+              'The wind returned invalid velocity; supply three finite components in m/s.',
+            );
+          u10 = finiteWave(hypot(v[0], v[2]));
           windDirection = u10 > 0 ? angleTo(v[2], v[0]) : 0;
         }
         const st4 = this.physics === 'st4';
@@ -728,7 +1011,7 @@ export class WaveSolver implements Solver<WaveParams> {
             drag = (0.55 + 2.97 * ut - 1.49 * ut * ut) * 1e-3;
           ustar = u10 * pow(drag > 0 ? drag : 0, 0.5);
         }
-        (regionWords(this.host.memory, this.friction) as Float64Array)[at] = ustar;
+        this.candidateFriction[at] = finiteWave(ustar);
         const sigmaPM = (TWO_PI * 0.13 * g) / (28 * (ustar > 0 ? ustar : 1e-9));
         let gamma = 0,
           meanS = 0,
@@ -790,19 +1073,22 @@ export class WaveSolver implements Solver<WaveParams> {
           for (let j = 0; j < nd; j++) {
             const b = i * nd + j,
               e = eSigma[b]!,
-              updated = (e + dt * (grow[b]! + transfer[b]!)) / (1 - dt * decay[b]!);
+              numerator = finiteWave(e + dt * (grow[b]! + transfer[b]!)),
+              denominator = finiteWave(1 - dt * decay[b]!),
+              updated = finiteWave(numerator / denominator);
             let change = updated - e;
             if (change > limit) change = limit;
             else if (change < -limit) change = -limit;
             const value = e + change;
-            words[at * per + b] = (value > 0 ? value : 0) * TWO_PI;
+            words[at * per + b] = finiteWave((value > 0 ? value : 0) * TWO_PI);
           }
         }
         // ST4 integrates up to 2.5 times the mean frequency; above it the spectrum is the f^-5 tail (WAVEWATCH III eq. 2.17).
         if (st4)
           for (let i = cutoff + 1; i < nf; i++) {
             const decline = pow(this.freqs[i]! / this.freqs[cutoff]!, -5);
-            for (let j = 0; j < nd; j++) words[at * per + i * nd + j] = words[at * per + cutoff * nd + j]! * decline;
+            for (let j = 0; j < nd; j++)
+              words[at * per + i * nd + j] = finiteWave(words[at * per + cutoff * nd + j]! * decline);
           }
       }
   }

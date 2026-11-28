@@ -14,4 +14,6 @@ export {
   wavenumber,
   type SeaState,
   type WaveParams,
+  type WaveSolverNativeOptions,
 } from './spectral.js';
+export type { WaveTransportWorkerWork, WaveTransportWorkCounts } from './transport-kernel.js';

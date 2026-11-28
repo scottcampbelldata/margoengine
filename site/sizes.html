@@ -108,6 +108,8 @@
 <tr><th scope="row"><code>tracer-random-kernel-shared.wasm</code></th><td>Rust SIMD parcel Brownian draws, with helper workers</td><td class="num">6,901</td><td class="num">2,651</td><td class="num">2,403</td><td>loadTracerRandomKernel() with threads: 2 or 4 from the optional /tracers entry</td></tr>
 <tr><th scope="row"><code>rogue-pair-kernel.wasm</code></th><td>Rust SIMD second-order wave pairs and ordered summation</td><td class="num">4,672</td><td class="num">2,019</td><td class="num">1,711</td><td>NonlinearSea.load() from the optional /rogue entry</td></tr>
 <tr><th scope="row"><code>rogue-pair-kernel-shared.wasm</code></th><td>Rust SIMD second-order wave pairs with helper workers</td><td class="num">4,672</td><td class="num">2,019</td><td class="num">1,712</td><td>NonlinearSea.load() with threads: 2 or 4 from the optional /rogue entry</td></tr>
+<tr><th scope="row"><code>wave-transport-kernel.wasm</code></th><td>Rust SIMD QUICKEST wave transport</td><td class="num">4,150</td><td class="num">1,971</td><td class="num">1,821</td><td>WaveSolver.load() from the optional /waves entry</td></tr>
+<tr><th scope="row"><code>wave-transport-kernel-shared.wasm</code></th><td>Rust SIMD QUICKEST wave transport with helper workers</td><td class="num">4,150</td><td class="num">1,971</td><td class="num">1,821</td><td>WaveSolver.load() with threads: 2 or 4 from the optional /waves entry</td></tr>
 <tr><th scope="row"><code>loads-kernel.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches</td><td class="num">7,761</td><td class="num">2,926</td><td class="num">2,525</td><td>LoadSolver.load() from the optional /loads entry</td></tr>
 <tr><th scope="row"><code>loads-kernel-shared.wasm</code></th><td>Rust SIMD batch for hydrodynamic wrenches, shared world memory</td><td class="num">7,761</td><td class="num">2,926</td><td class="num">2,524</td><td>LoadSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>thin-film-kernel-shared.wasm</code></th><td>Rust SIMD conservative thin-film flow and capillarity, shared world memory</td><td class="num">32,746</td><td class="num">12,619</td><td class="num">10,892</td><td>ThinFilmSolver.load() with shared world memory support</td></tr>
@@ -5003,7 +5005,7 @@
 <tr><td><code>./outdoor-sound</code></td><td class="num">22,064</td><td class="num">8,601</td></tr>
 <tr><td><code>./falling</code></td><td class="num">13,550</td><td class="num">5,907</td></tr>
 <tr><td><code>./flight</code></td><td class="num">33,768</td><td class="num">12,799</td></tr>
-<tr><td><code>./waves</code></td><td class="num">17,096</td><td class="num">7,548</td></tr>
+<tr><td><code>./waves</code></td><td class="num">32,458</td><td class="num">12,962</td></tr>
 <tr><td><code>./bubbles</code></td><td class="num">6,520</td><td class="num">3,033</td></tr>
 <tr><td><code>./entry</code></td><td class="num">36,117</td><td class="num">14,182</td></tr>
 <tr><td><code>./flip</code></td><td class="num">38,669</td><td class="num">13,878</td></tr>

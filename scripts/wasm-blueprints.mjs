@@ -368,6 +368,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'wave-transport-kernel',
+    crate: 'packages/physics/wave-transport-kernel',
+    blueprint: 'packages/physics/src/waves/wave-transport-kernel.wasm',
+    script: 'packages/physics/scripts/build-wave-transport-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'wave-transport-kernel-shared',
+    crate: 'packages/physics/wave-transport-kernel',
+    blueprint: 'packages/physics/src/waves/wave-transport-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-wave-transport-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'viscoplastic-kernel',
     crate: 'packages/physics/viscoplastic-kernel',
     blueprint: 'packages/physics/src/viscoplastic/viscoplastic-kernel.wasm',

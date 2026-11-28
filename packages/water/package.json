@@ -144,6 +144,7 @@
     "test:gpu:flooding-film": "cd ../.. && node packages/water/test/flooding-film.browser.mjs && node packages/water/test/flooding-film.browser.mjs --compat",
     "test:gpu:wave-impact-film": "cd ../.. && node packages/water/test/wave-impact-film.browser.mjs && node packages/water/test/wave-impact-film.browser.mjs --compat",
     "test:gpu:rogue-film": "cd ../.. && node packages/water/test/rogue-film.browser.mjs && node packages/water/test/rogue-film.browser.mjs --compat",
+    "test:gpu:swell-film": "cd ../.. && node packages/water/test/swell-film.browser.mjs && node packages/water/test/swell-film.browser.mjs --compat",
     "test:gpu:seakeeping-film": "cd ../.. && node packages/water/test/seakeeping-film.browser.mjs && node packages/water/test/seakeeping-film.browser.mjs --compat",
     "test:gpu:entry-film": "cd ../.. && node packages/water/test/entry-film.browser.mjs && node packages/water/test/entry-film.browser.mjs --compat",
     "test:gpu:sea-foam-surface": "cd ../.. && node packages/water/test/sea-foam-surface.browser.mjs && node packages/water/test/sea-foam-surface.browser.mjs --compat",

@@ -90,6 +90,11 @@ type NativePhaseSolver =
       readonly subject: 'Wave pairs';
       readonly phaseExport: 'rogue_pair_thread_phase';
       readonly phase: 'second-order interactions';
+    }
+  | {
+      readonly subject: 'Wave transport';
+      readonly phaseExport: 'wave_transport_thread_phase';
+      readonly phase: 'spectral flux sweeps';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };

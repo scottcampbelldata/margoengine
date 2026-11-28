@@ -5952,8 +5952,7 @@ regression test.
   retraction term, which previously hard-coded 1025 kg/m³. The threshold regression in
   `packages/physics/tests/coupling/entry.test.js` passes the same impact through 1000 and 1200 kg/m³ water and
   observes a crown only in the denser case.
-- **SEA-01, a calibration case is used as the validation case.** **Cause:** the ST4 sheltering was calibrated at 10
-  and 20 m/s and `waves.test.js` validates at 20 m/s; the held-out 30 m/s result is only in `docs/limits.md`.
+- **SEA-01, calibration and independent checks separated.** The 10, 20 and 30 m/s runs against the stable fetch curve exercise the same calibration relation. The independent Lake George gauges are held out of the forcing and provide separate measured results in `packages/physics/scripts/sea01-lake-george-measured.mjs`. Depth-limited significant-height and peak-period accuracy remain open.
 - **SEA-10, the flooding solve can stop unconverged without a word.** **Cause:**
   `packages/physics/src/seakeeping/flooding.ts` ends its 200-sweep loop silently. Also, the iron-ore cargo default
   grain is 1e-4 m while the code's own comment gives about 0.012 m for taconite pellets.
@@ -23963,3 +23962,7 @@ A zero-gravity frame using a vessel's carried floodwater failed before the conta
 ### Fixed: SEA-03 returned carrier-only normals and pressure below the bed
 
 A placed wave changes the component amplitudes with position. The previous normal used the derivative of carrier phase alone, which disagreed with the derivative of the rendered surface inside the event. The normal now includes both amplitude derivatives in the linear and bound terms. A separate pressure query omitted the wet depth test and evaluated Wheeler stretching below the bed. It now gives zero under the bed consistently with the velocity query. Malformed currents are rejected before writing caller samples. `packages/physics/tests/rogue.test.js` checks both slope axes by converging differences, finite pressure at the bed, zero pressure below it and exact output preservation on rejection.
+
+### Fixed: SEA-01 could accept a partially advanced spectrum after invalid wind
+
+The step wrote its clock, outgoing spectrum and prior cells' friction before reading every wind sample. It also used forcing coordinates as if wind and wave fields always shared an origin. It now advances private candidates through every owed interval, reads wind in its own signed cell, and publishes only after the candidate is finite. The spectrum field reports the current solver cell immediately after origin shifts and restore. A failed JONSWAP normalization also leaves the caller's output untouched. Regressions run in `packages/physics/tests/coupling/waves.test.js` and `packages/physics/tests/waves.test.js`.

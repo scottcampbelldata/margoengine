@@ -27,6 +27,7 @@ export interface WaveParams {
     depth?: number | ((x: number, z: number) => number);
     bed?: Bed;
     waterLevel?: number;
+    originCellSize?: number;
     density?: number;
     wind?: Wind;
     frequencies?: {
@@ -46,6 +47,9 @@ export interface WaveParams {
 
 export class WaveSolver implements Solver<WaveParams> {
     constructor(id?: string);
+    static load(id?: string, native?: WaveSolverNativeOptions): Promise<WaveSolver>;
+    readNativeWork(): WaveTransportWorkCounts | undefined;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, params?: WaveParams): void;
     step(context: StepContext, dt: number): void;
@@ -64,6 +68,25 @@ export class WaveSolver implements Solver<WaveParams> {
     frictionVelocity(x: number, z: number): number;
     significantHeight(x: number, z: number): number;
     peakPeriod(x: number, z: number): number;
+}
+
+export interface WaveSolverNativeOptions {
+    readonly threads?: 1 | 2 | 4;
+    readonly signal?: AbortSignal;
+}
+
+export interface WaveTransportWorkCounts extends WaveTransportWorkerWork {
+    readonly threads: number;
+    readonly axisSweeps: number;
+    readonly workers: readonly WaveTransportWorkerWork[];
+}
+
+export interface WaveTransportWorkerWork {
+    readonly fluxes: number;
+    readonly pairedFluxes: number;
+    readonly quickestFluxes: number;
+    readonly updates: number;
+    readonly pairedUpdates: number;
 }
 
 export function bandWidth(fs: Float64Array, i: number): number;

@@ -7078,3 +7078,7 @@ A malformed rigid input preserves the previous accepted damage and impulse outpu
 ### SEA-03 exact native second-order waves
 
 One, two and four native participants reproduce the scalar height and full normal at the same signed coordinates and time, including placed-wave envelopes. In the fixed-camera cutaway the launch rolls 19.73° as the prescribed crest crosses it, against 0.045° with the placement disabled. WebGPU and WebGL2 each replay their own full images and accepted state exactly. The independent flume comparison leaves extreme crest counts unvalidated for the second-order model. [Evidence and bounds](../limits.md#placed-second-order-waves-and-flume-crest-counts-sea-03)
+
+### SEA-01 accepted native sweeps and wind cutoff
+
+The directional spectrum, wave clock and friction remain unchanged when a later wind input or native flux fails. Real native helpers preserve scalar output and signed-origin replay. In the fixed-camera cutaway, a wave packet continues downstream after wind cutoff and raises a floating buoy. Both renderers repeat accepted state and full images. Independent Lake George measurements show persistent overprediction at the farther gauges. [Evidence and limits](../limits.md#accepted-wave-transport-and-independent-lake-george-gauges-sea-01)

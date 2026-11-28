@@ -15654,8 +15654,8 @@
         "gzip": 12799
       },
       "./waves": {
-        "raw": 17096,
-        "gzip": 7548
+        "raw": 32458,
+        "gzip": 12962
       },
       "./bubbles": {
         "raw": 6520,
@@ -20294,6 +20294,16 @@
       "raw": 4672,
       "gzip": 2019,
       "brotli": 1712
+    },
+    "packages/physics/dist/wave-transport-kernel.wasm": {
+      "raw": 4150,
+      "gzip": 1971,
+      "brotli": 1821
+    },
+    "packages/physics/dist/wave-transport-kernel-shared.wasm": {
+      "raw": 4150,
+      "gzip": 1971,
+      "brotli": 1821
     }
   },
   "splits": {
