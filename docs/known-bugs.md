@@ -16148,6 +16148,23 @@ voxel path tracer is excluded on this hardware (hardware check).
 
 ## Open defects
 
+### Open 2026-11-28: the WGSL corpus cannot name optics, and water's new shaders inline past the Direct3D limit (KB-CORPUS-OPTICS1)
+
+- **Repro:** `node --test packages/webgl2-compat/test/corpus.test.js` fails "not covered: optics" on main. Recording
+  optics and water alone (`node scripts/record-wgsl-corpus.mjs --no-build "--suites=check:gpu-packages -- --no-build
+  --only=optics"`, then `--merge-only --add`) still leaves optics uncovered, and `corpus-inline.test.js` (KB-COMPAT-FXCTIME1)
+  then fails on 11 water fragment modules from `water test:gpu:optics`: 251,507 to 263,801 characters inlined, over
+  250,000.
+- **Cause, optics:** `optics/screens` draws through `RawShaderMaterial` (`@margoengine/shader/raw`), which creates its
+  modules at the first draw inside core's frame; the recorder names a module's packages from the call stack at
+  `createShaderModule` (`scripts/support/wgsl-corpus.mjs`, `origin`), so the three modules are attributed to `shader`
+  and `core` (label `shader:raw:optics screens:*`). Any package that draws only through `RawShaderMaterial` is
+  uncovered the same way. Fix belongs in the recorder (an attribution that survives the lazy compile), with a test.
+- **Cause, water:** not traced. The corpus on disk (recorded 2026-11-27) holds water modules under the bound; the
+  modules water creates today are new sources over it, so a water shader change since then grew the fragment's inlined
+  call tree past the bound.
+- **Left:** both fixes, then `npm run record:wgsl-corpus` in full. Found by lane A, 2026-11-28; not fixed.
+
 ### Open 2026-11-28: nine browser GPU checks fail on main (KB-GPUMAIN1)
 
 Found by running the voxel and root GPU suites on the Ubuntu server, then each failing check on the workstation (Windows
