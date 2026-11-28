@@ -16387,6 +16387,8 @@ a pipeline sets its draw buffers before and after each draw, two `drawBuffers` c
 
 KB-USDZ-FACTORS1 measured gzip/ceiling changes (2026-11-28): usdz 13,740 to 14,738 B (ceiling 15,156), usdz/worker 14,792 to 15,783 B (16,231), usdz/compose 24,714 to 25,725 B (26,473), usdz/preview-surface 5,479 to 6,278 B (6,509), usdz/clips 28,402 to 29,384 B (30,240), dist/workers/usdz.js 162,958 to 163,956 B (168,844). The bytes read texture scale and bias, emission, occlusion and normal scale in both importers; a split entry would leave the plain import with wrong materials. Core + stage is unchanged.
 
+KB-SHRUB-TUNDRA1 measured gzip/ceiling change (2026-11-28): procedural/tree to 6,418 B (ceiling 6,674, was 6,363), for the leaf blade and stem builders both shrubs use. Core + stage is unchanged.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -16425,6 +16427,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   spectra", Remote Sensing of Environment 34, 1990, https://doi.org/10.1016/0034-4257(90)90100-Z; Hosgood et al.,
   "Leaf Optical Properties EXperiment 93", JRC EUR 16095 EN, 1995).
 - **Regression:** `packages/procedural/test/shrub-leaves.test.js`.
+
+### Fixed 2026-11-28: the tundra shrub drew as smooth domes, and no shrub had wood (KB-SHRUB-TUNDRA1; procedural, biomes)
+
+- **What:** in a close still of the tundra world every dwarf birch was a smooth brown or ochre mound; the shrub fixed in
+  KB-SHRUB-BLOBS1 showed close up as large diamond tiles with nothing holding them.
+- **Cause:** `generateTundraShrubMesh` was six closed hemispheres; `generateShrubMesh` had 20 cm diamond leaves and no
+  stems.
+- **Fix:** both are separate rounded leaves (13 cm on the shrub, 7 cm on the tundra shrub, larger than the 6 to 12 cm
+  of hazel and the 0.6 to 2 cm of dwarf birch at the top end and above, to hold cover within the triangle count) on
+  woody stems from the new `generateShrubStemsMesh` and `generateTundraShrubStemsMesh`; biomes draws stems and leaves
+  as two parts, with copper-red twigs and green leaves on the dwarf birch.
+- **Regression:** `packages/procedural/test/shrub-leaves.test.js`, `packages/biomes/tests/objects.test.js`.
 
 ### Fixed 2026-11-28: the USD importers dropped texture factors, and the default one emission and occlusion (KB-USDZ-FACTORS1, usdz)
 
