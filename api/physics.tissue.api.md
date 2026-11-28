@@ -1989,6 +1989,7 @@ interface SoftAerodynamics {
 }
 
 class SoftBodies implements PhysicsAttachment {
+    clock: number;
     bendsDirty: boolean;
     tethersDirty: boolean;
     steps: number;
@@ -2026,6 +2027,8 @@ class SoftBodies implements PhysicsAttachment {
     get alpha(): number;
     list(): readonly SoftBody[];
     onTear(listener: (event: SoftTearEvent) => void): () => void;
+    get time(): number;
+    get fixedTimestep(): number;
     onBurst(listener: (event: SoftBurstEvent) => void): () => void;
     hash(): number;
     columns(): Columns;
@@ -2179,6 +2182,10 @@ class SoftBody {
     membraneRest: Float32Array;
     burstStretch: number | null;
     vents: SoftVent[];
+    cues: SoftCue[];
+    target: Float64Array | null;
+    targetOmega: number;
+    targetRotation: number[];
     displaced: number;
     surfaceRest: number;
     canSleepFlag: boolean;
@@ -2225,6 +2232,13 @@ class SoftBody {
     setGasPressure(options: SoftGasPressure): this;
     gasState(): SoftGasState | null;
     openVent(options: SoftVentOptions): number;
+    resolveVent(options: SoftVentOptions): SoftVent;
+    cue(cue: SoftCue): this;
+    pendingCues(): readonly SoftCue[];
+    clearCues(): this;
+    setTargetShape(shape: ArrayLike<number> | null, { frequency }?: {
+        frequency?: number;
+    }): this;
     closeVents(): this;
     openVents(): readonly SoftVent[];
     isBurst(): boolean;
@@ -2456,6 +2470,43 @@ interface SoftContact {
     friction: number;
     enabled: boolean;
 }
+
+type SoftCue =
+{
+    readonly at: number;
+    readonly impulse: Vec3;
+}
+ | {
+    readonly at: number;
+    readonly poke: {
+        readonly impulse: Vec3;
+        readonly point: Vec3;
+        readonly radius: number;
+    };
+}
+ | {
+    readonly at: number;
+    readonly blast: {
+        readonly center: Vec3;
+        readonly magnitude: number;
+        readonly radius: number;
+    };
+}
+ | {
+    readonly at: number;
+    readonly vent: SoftVentOptions;
+}
+ | {
+    readonly at: number;
+    readonly closeVents: true;
+}
+ | {
+    readonly at: number;
+    readonly target: {
+        readonly shape: ArrayLike<number> | null;
+        readonly frequency?: number;
+    };
+};
 
 interface SoftDebugOptions {
     readonly edges?: boolean;

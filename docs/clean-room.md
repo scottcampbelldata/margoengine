@@ -51,6 +51,17 @@ curvature is dropped, which is negative because J is the norm of a function affi
 until the potential falls. The tests hold a sphere to the closed form at three fills, its stiffness dp / dlambda and a
 held-out sheet near the peak (`packages/physics/tests/soft-membrane.test.js`). No code was read.
 
+### Directing soft volumes: cues and target shapes (P8, point 7, 2026-11-28)
+
+`SoftBody.cue` and `setTargetShape` (`packages/physics/src/soft-direct.ts`) are Margo's own scheduling over the existing
+impulse, vent and target calls. The target pull is shape matching's goal from Matthias Müller, Bruno Heidelberger, Matthias
+Teschner and Markus Gross, "Meshless Deformations Based on Shape Matching" (ACM TOG 24(3), SIGGRAPH 2005): the target's
+offsets from its mass-weighted centre, turned by the rotational part R of A = sum m p q^T and placed at the particles' centre
+of mass, which makes the springs m omega^2 (g - x) add to no force and, since A R^T is symmetric, to no torque. R comes from
+Matthias Müller, Jan Bender, Nuttapong Chentanez and Miles Macklin, "A Robust Method to Extract the Rotational Part of
+Deformations" (MIG 2016), warm-started from the last step's. The pull is a kick at the step's start, so the sums are exact
+at the instant they are found. No code was read.
+
 ### Venting and bursting soft shells (P8, SOFT-06, 2026-11-28)
 
 `SoftBody.openVent` (`packages/physics/src/soft-vent.ts`) lets a shell's gas out by the isentropic orifice flow of an ideal

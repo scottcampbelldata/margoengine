@@ -2021,6 +2021,31 @@ console.log(ball.centerOfMass(), ball.surfaceVolume());
   for (let i = 0; i < 120; i++) physics.step();
   console.log(balloon.gasState()?.pressure, balloon.centerOfMass());
   ```
+- **Directing it for film.** `body.cue({at, ...})` places an event on the soft world's clock (`soft.time`, seconds): an
+  `impulse` on the whole body, a `poke` (an impulse falling off from a point), a `blast` from a centre, a `vent`, a
+  `closeVents` or a `target` shape. It runs at the start of the first step that begins then or later, in the order placed,
+  and replays the same after a snapshot. `body.setTargetShape(shape, {frequency})` (default 2 Hz) draws the body toward a
+  shape (one point a particle) fitted to where it is, its centre of mass and best-fit turn (shape matching's goal), so the
+  pulls add to no force and no torque: it squashes, stretches or poses as directed while it falls, bounces and spins as the
+  physics says. `null` lets it go; `pendingCues()` and `clearCues()` read and drop the cues.
+
+  <!-- example:node -->
+  ```js
+  import { Physics } from '@margoengine/physics';
+  import { SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+  import { sphereGeometry } from '@margoengine/geometry/primitives';
+
+  await Physics.load();
+  const physics = new Physics(null);
+  physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [5, 0.5, 5] } });
+  const soft = await SoftBodies.attach(physics);
+  const jelly = soft.create(SoftBodyDesc.volume(sphereGeometry(0.3, 16, 12), { stiffness: 4 }).setTranslation([0, 0.4, 0]));
+  const tall = jelly.particlePositions().map((v, i) => (i % 3 === 1 ? v * 1.5 : v / Math.sqrt(1.5)));
+  jelly.cue({ at: 0.5, poke: { impulse: [0, 0, 2], point: [0, 0.4, -0.3], radius: 0.2 } });
+  jelly.cue({ at: 1, target: { shape: tall, frequency: 6 } });
+  for (let i = 0; i < 120; i++) physics.step();
+  console.log(soft.time, jelly.centerOfMass());
+  ```
 - **Anchoring.** Every `SoftBodyDesc` setting applies to the description it returns: `setPinnedParticles([i])` pins a
   particle, `setParticleKinematicTarget(i, position)` on the body drags one, `attachParticle(i, rigidBody)` ties
   one to a rigid body; `setMass`, `setVolumeFactor` (inflate or deflate), `setGravityScale`, `setAirDrag` (default on:

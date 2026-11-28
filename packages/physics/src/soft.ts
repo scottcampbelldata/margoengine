@@ -14,6 +14,7 @@ import { checkVec, type Quat, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
 import { planPlaneCut, type SlicePlan, TETRA_EDGES } from './soft-plane-cut.js';
 import { makeCutPieces } from './soft-plane-pieces.js';
+import { type SoftCue, targetPull } from './soft-direct.js';
 import { type SoftVent, type SoftVentOptions, ventStep, ventThrust } from './soft-vent.js';
 import {
   bindSkin,
@@ -2786,6 +2787,11 @@ export class SoftBody {
   /** @internal */ membraneRest: Float32Array = new Float32Array(0);
   /** @internal */ burstStretch: number | null = null;
   /** @internal Its open vents (openVent). */ vents: SoftVent[] = [];
+  /** @internal Its cues still to come, by time (cue). */ cues: SoftCue[] = [];
+  /** @internal The target shape (flat positions) it is drawn toward, its pull in rad/s and the last rotation found. */
+  target: Float64Array | null = null;
+  /** @internal */ targetOmega = 0;
+  /** @internal */ targetRotation: number[] = [0, 0, 0, 1];
   /** @internal The water a closed body displaced at its last step in `SoftBodies.water`, m^3. */ displaced = 0;
   /** @internal */ surfaceRest = 0;
   /** @internal */ canSleepFlag = true;
@@ -3098,6 +3104,12 @@ export class SoftBody {
    * @throws MargoError (`unsupported`) for a body that holds no gas or an option out of range.
    */
   openVent(options: SoftVentOptions): number {
+    this.vents.push(this.resolveVent(options));
+    return this.vents.length - 1;
+  }
+
+  /** @internal A vent's settings checked and resolved, as openVent would add them. */
+  resolveVent(options: SoftVentOptions): SoftVent {
     this.check();
     if (this.owner.gasState(this) === null)
       throw volumeError(
@@ -3134,8 +3146,87 @@ export class SoftBody {
       throw volumeError(
         'The vents of one body let out one gas: give each the same gasConstant, temperature and heatCapacityRatio.',
       );
-    this.vents.push(vent);
-    return this.vents.length - 1;
+    return vent;
+  }
+
+  /**
+   * Places a cue: at `at` seconds of the soft world's clock ({@link SoftBodies.time}) the body takes an impulse, a poke, a
+   * blast, a vent, its vents' closing or a target shape, at the start of the first step that begins then or later, so a
+   * film's events land on the frame the director put them on and replay the same after a snapshot. Cues at one time run in
+   * the order they were placed. Each is checked when placed (a vent's gas when it opens).
+   * @throws MargoError (`unsupported`) for a cue with no time, a time in the past, or an action out of range.
+   */
+  cue(cue: SoftCue): this {
+    this.check();
+    const at = (cue as { at?: unknown })?.at;
+    if (typeof at !== 'number' || !Number.isFinite(at) || at < this.owner.time)
+      throw volumeError(`A cue's at is a time in seconds, now (${this.owner.time}) or later (got ${String(at)}).`);
+    const keys = ['impulse', 'poke', 'blast', 'vent', 'closeVents', 'target'].filter((key) => key in cue);
+    if (keys.length !== 1)
+      throw volumeError('A cue holds one action: impulse, poke, blast, vent, closeVents or target.');
+    const finite = (v: unknown, name: string): void => {
+      if (!Array.isArray(v) || v.length !== 3 || !v.every(Number.isFinite))
+        throw volumeError(`${name} is three finite numbers.`);
+    };
+    const number = (v: unknown, name: string): void => {
+      if (typeof v !== 'number' || !Number.isFinite(v)) throw volumeError(`${name} is a finite number.`);
+    };
+    if ('impulse' in cue) finite(cue.impulse, 'A cue impulse');
+    if ('poke' in cue) {
+      finite(cue.poke?.impulse, 'A poke impulse');
+      finite(cue.poke?.point, 'A poke point');
+      number(cue.poke?.radius, 'A poke radius (metres)');
+    }
+    if ('blast' in cue) {
+      finite(cue.blast?.center, 'A blast centre');
+      number(cue.blast?.magnitude, 'A blast magnitude (N s)');
+      number(cue.blast?.radius, 'A blast radius (metres)');
+    }
+    if ('vent' in cue) this.resolveVent(cue.vent);
+    if ('target' in cue) this.checkedTarget(cue.target?.shape ?? null, cue.target?.frequency);
+    let k = this.cues.length;
+    while (k > 0 && this.cues[k - 1]!.at > at) k--;
+    this.cues.splice(k, 0, cue);
+    return this;
+  }
+
+  /** The cues still to come, in the order they will run. */
+  pendingCues(): readonly SoftCue[] {
+    return [...this.cues];
+  }
+
+  /** Drops every cue still to come. */
+  clearCues(): this {
+    this.cues = [];
+    return this;
+  }
+
+  /**
+   * Draws the body toward a target shape (flat x, y, z, one point a particle) at `frequency` Hz (default 2): each particle is
+   * pulled by a spring of its mass times (2 pi frequency)^2 toward the target fitted to where the body is (its centre of
+   * mass and the rotation that best fits it, shape matching's goal, Mueller et al. 2005), so the pulls add to no force and
+   * no torque: the body changes shape as directed while its momentum, angular momentum and fall are the physics' own.
+   * `null` lets it go. The pull is held over each fixed step, so 2 pi frequency times the step is at most 1.
+   * @throws MargoError (`unsupported`) for a shape of the wrong length or not finite, or a frequency out of range.
+   */
+  setTargetShape(shape: ArrayLike<number> | null, { frequency = 2 }: { frequency?: number } = {}): this {
+    this.check();
+    this.target = this.checkedTarget(shape, frequency);
+    this.targetOmega = this.target ? 2 * Math.PI * frequency : 0;
+    this.targetRotation = [0, 0, 0, 1];
+    return this;
+  }
+
+  private checkedTarget(shape: ArrayLike<number> | null, frequency = 2): Float64Array | null {
+    if (shape === null) return null;
+    if (!shape || shape.length !== this.particles * 3 || !Array.from(shape).every(Number.isFinite))
+      throw volumeError(`A target shape is ${this.particles * 3} finite numbers, x, y, z for each particle.`);
+    const most = 1 / (2 * Math.PI * this.owner.fixedTimestep);
+    if (!(frequency > 0) || !(frequency <= most))
+      throw volumeError(
+        `A target's frequency is above 0 and at most ${most.toFixed(3)} Hz at this step (got ${frequency}).`,
+      );
+    return Float64Array.from(shape);
   }
 
   /** Closes every vent of the body. */
@@ -3663,6 +3754,8 @@ export class SoftBodies implements PhysicsAttachment {
   private readonly bodies: SoftBody[] = [];
   private readonly listeners = new Set<(event: SoftTearEvent) => void>();
   private readonly burstListeners = new Set<(event: SoftBurstEvent) => void>();
+  /** @internal The soft world's clock, seconds: the fixed steps it has taken times their length. */
+  clock = 0;
   private view: Columns | null = null;
   private viewBuffer: ArrayBuffer | null = null;
   private capacity = [0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -3842,6 +3935,14 @@ export class SoftBodies implements PhysicsAttachment {
   onTear(listener: (event: SoftTearEvent) => void): () => void {
     this.listeners.add(listener);
     return () => void this.listeners.delete(listener);
+  }
+  /** The soft world's clock in seconds: where the next step starts, what {@link SoftBody.cue} times are on. */
+  get time(): number {
+    return this.clock;
+  }
+  /** @internal The physics world's fixed step, seconds. */
+  get fixedTimestep(): number {
+    return this.physics.fixedTimestep;
   }
   /** Calls `listener` after a step that burst a membrane ({@link SoftMembrane.burstStretch}); returns a function that stops it. */
   onBurst(listener: (event: SoftBurstEvent) => void): () => void {
@@ -5421,6 +5522,8 @@ export class SoftBodies implements PhysicsAttachment {
       if (this.waterAccel.length < 3 * this.particleCount) this.waterAccel = new Float64Array(3 * this.particleCount);
       this.waterAccel.fill(0);
     }
+    this.runCues();
+    this.clock += dt;
     this.applyForces(this.columns(), dt);
     this.vent(dt);
     const h = dt / this.substeps,
@@ -6202,6 +6305,22 @@ export class SoftBodies implements PhysicsAttachment {
     c.jx[row] = c.jy[row] = c.jz[row] = c.kx[row] = c.ky[row] = c.kz[row] = 0;
   }
 
+  /** Runs every cue that is due by the start of this step, by time and then in the order placed. */
+  private runCues(): void {
+    for (const body of [...this.bodies]) {
+      while (body.cues.length && body.cues[0]!.at <= this.clock + 1e-9) {
+        const cue = body.cues.shift()!;
+        if ('impulse' in cue) body.applyImpulse(cue.impulse);
+        else if ('poke' in cue) body.applyImpulseAtPoint(cue.poke.impulse, cue.poke.point, cue.poke.radius);
+        else if ('blast' in cue) body.applyRadialImpulse(cue.blast.center, cue.blast.magnitude, cue.blast.radius);
+        else if ('vent' in cue) {
+          if (this.gasState(body)) body.openVent(cue.vent);
+        } else if ('closeVents' in cue) body.closeVents();
+        else body.setTargetShape(cue.target.shape, { frequency: cue.target.frequency ?? 2 });
+      }
+    }
+  }
+
   /**
    * The gas that leaves through each body's vents this step (src/soft-vent.ts), at the volume the shell has now, and the
    * push of its jets: each vent's mean thrust over the step against the surface's outward normal at its particle, on the
@@ -6282,6 +6401,33 @@ export class SoftBodies implements PhysicsAttachment {
         c.ax[row] = fx;
         c.ay[row] = fy;
         c.az[row] = fz;
+      }
+      if (body.target) {
+        const positions = new Float64Array(3 * body.particles);
+        for (let i = 0; i < body.particles; i++) {
+          const row = body.firstParticle + i;
+          positions[3 * i] = c.x[row]!;
+          positions[3 * i + 1] = c.y[row]!;
+          positions[3 * i + 2] = c.z[row]!;
+        }
+        const { accel, rotation } = targetPull(
+          positions,
+          body.masses,
+          (i) => c.w[body.firstParticle + i]! > 0,
+          body.target,
+          body.targetOmega,
+          body.targetRotation,
+        );
+        body.targetRotation = rotation;
+        // The step's pull as one kick at its start: at one instant the kicks add to no momentum and, about the centre of
+        // mass where they were found, to no angular momentum; a force held through the step would turn the body as it moved.
+        for (let i = 0; i < body.particles; i++) {
+          const row = body.firstParticle + i;
+          if (c.w[row] === 0) continue;
+          c.vx[row] = c.vx[row]! + accel[3 * i]! * dt;
+          c.vy[row] = c.vy[row]! + accel[3 * i + 1]! * dt;
+          c.vz[row] = c.vz[row]! + accel[3 * i + 2]! * dt;
+        }
       }
       if (body.airDrag && body.airLoads === 0 && body.triangleList.length > 0) this.airDrag(body, c, dt);
       if (this.water) this.waterLoads(body, c, dt);
@@ -7394,6 +7540,7 @@ export { SailForce, type SailOptions } from './sail.js';
 // Skinned cloth: the skinned mesh a cloth is held to, from a skeleton's joint matrices.
 export { type SkinBinding, type SkinnedVertices, skinVertices } from './soft-skinning.js';
 export { type SoftVent, type SoftVentOptions, ventFlow, ventStep, ventThrust } from './soft-vent.js';
+export { extractRotation, type SoftCue, targetPull } from './soft-direct.js';
 
 /**
  * How the faces of a cloth meet the air ({@link SoftBodyDesc.setAerodynamics}). Each face is a thin plate: attached flow

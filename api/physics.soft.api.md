@@ -237,6 +237,7 @@ export interface SoftAerodynamics {
 }
 
 export class SoftBodies implements PhysicsAttachment {
+    clock: number;
     bendsDirty: boolean;
     tethersDirty: boolean;
     steps: number;
@@ -274,6 +275,8 @@ export class SoftBodies implements PhysicsAttachment {
     get alpha(): number;
     list(): readonly SoftBody[];
     onTear(listener: (event: SoftTearEvent) => void): () => void;
+    get time(): number;
+    get fixedTimestep(): number;
     onBurst(listener: (event: SoftBurstEvent) => void): () => void;
     hash(): number;
     columns(): Columns;
@@ -427,6 +430,10 @@ export class SoftBody {
     membraneRest: Float32Array;
     burstStretch: number | null;
     vents: SoftVent[];
+    cues: SoftCue[];
+    target: Float64Array | null;
+    targetOmega: number;
+    targetRotation: number[];
     displaced: number;
     surfaceRest: number;
     canSleepFlag: boolean;
@@ -473,6 +480,13 @@ export class SoftBody {
     setGasPressure(options: SoftGasPressure): this;
     gasState(): SoftGasState | null;
     openVent(options: SoftVentOptions): number;
+    resolveVent(options: SoftVentOptions): SoftVent;
+    cue(cue: SoftCue): this;
+    pendingCues(): readonly SoftCue[];
+    clearCues(): this;
+    setTargetShape(shape: ArrayLike<number> | null, { frequency }?: {
+        frequency?: number;
+    }): this;
     closeVents(): this;
     openVents(): readonly SoftVent[];
     isBurst(): boolean;
@@ -705,6 +719,43 @@ export interface SoftContact {
     enabled: boolean;
 }
 
+export type SoftCue =
+{
+    readonly at: number;
+    readonly impulse: Vec3;
+}
+ | {
+    readonly at: number;
+    readonly poke: {
+        readonly impulse: Vec3;
+        readonly point: Vec3;
+        readonly radius: number;
+    };
+}
+ | {
+    readonly at: number;
+    readonly blast: {
+        readonly center: Vec3;
+        readonly magnitude: number;
+        readonly radius: number;
+    };
+}
+ | {
+    readonly at: number;
+    readonly vent: SoftVentOptions;
+}
+ | {
+    readonly at: number;
+    readonly closeVents: true;
+}
+ | {
+    readonly at: number;
+    readonly target: {
+        readonly shape: ArrayLike<number> | null;
+        readonly frequency?: number;
+    };
+};
+
 export interface SoftDebugOptions {
     readonly edges?: boolean;
     readonly stress?: boolean;
@@ -862,6 +913,8 @@ export interface SoftVolumeOptions {
     readonly membrane?: SoftMembrane;
 }
 
+export function extractRotation(a: M3, guess?: readonly number[], passes?: number): number[];
+
 export function fabricBendingRigidity(b: number): number;
 
 export function fabricShearDamping(shear: FabricShear): number;
@@ -876,6 +929,11 @@ export function skinVertices(binding: SkinBinding, matrices: ArrayLike<number>, 
     positions: Float32Array;
     normals?: Float32Array | null;
 }): SkinnedVertices;
+
+export function targetPull(positions: ArrayLike<number>, masses: ArrayLike<number>, free: (i: number) => boolean, target: ArrayLike<number>, omega: number, guess: readonly number[]): {
+    accel: Float64Array;
+    rotation: number[];
+};
 
 export function ventFlow(vent: SoftVent, inside: number, outside: number): number;
 
@@ -1887,6 +1945,8 @@ class KernelWorld {
 interface KernelWorldOptions {
     arena?: Arena;
 }
+
+type M3 = [number, number, number, number, number, number, number, number, number];
 
 type MaterialName = keyof typeof densities;
 
