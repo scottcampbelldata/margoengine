@@ -1,4 +1,3 @@
-import {ContactShadows} from '@margoengine/studio';
 import {cameraFor,plantArt} from './art.js';
 import {generate,maxGeneration,specimens} from './grammar.js';
 
@@ -9,11 +8,11 @@ const samePoint=(a,b)=>a.every((v,i)=>v===b[i]);
 const sameOrgan=(a,b)=>a.index===b.index&&a.symbol===b.symbol&&samePoint(a.at,b.at)&&
   samePoint(a.direction,b.direction)&&samePoint(a.up,b.up);
 
-export function mount({opening,canvas,viewport,loading,status,controls,signal,fail,size,first,room,initial}){
+export function mount({opening,canvas,viewport,loading,status,controls,signal,fail,onResize,first,room,initial}){
   const preset=by('preset'),axiom=by('axiom'),rules=by('rules'),angle=by('angle'),generation=by('generation'),grow=by('grow');
   const title=by('specimen-name'),inputStatus=by('rule-status'),angleValue=by('angle-value'),genValue=by('generation-value');
   const stems=by('stem-count'),organs=by('organ-count'),symbols=by('symbol-count');
-  let engine,observer,plant,live=first,pieces=[],pending,raf=0,timer=0,tracking,working=false,layoutDirty=false;
+  let bench,engine,plant,live=first,pieces=[],pending,raf=0,timer=0,tracking,working=false,layoutDirty=false;
   let ready=false,version=0,orbit=0,firstChange=false;
   function camera(){
     const pose=cameraFor(canvas.width,canvas.height,plant?.bounds,orbit);
@@ -98,8 +97,7 @@ export function mount({opening,canvas,viewport,loading,status,controls,signal,fa
       if(next||layoutDirty){
         layoutDirty=false;
         camera();
-        engine.render({delta:0});
-        await engine.gpu.queue.onSubmittedWorkDone();
+        await bench.render(0);
         await frame();
         signal.throwIfAborted();
         published();
@@ -130,27 +128,16 @@ export function mount({opening,canvas,viewport,loading,status,controls,signal,fa
 
   async function run(){
     choose('lantern');
-    engine=await opening;
+    bench=await opening;
     signal.throwIfAborted();
-    engine.scene.background='#554754';
-    engine.lighting.direction.set([-.49,.68,.67,3.7]);
-    engine.lighting.radiance.set([1,.909,.752,.58]);
-    engine.lighting.ambient.set([.84,.96,1.08]);
-    const bed=[];
+    engine=bench.engine;
     for(const piece of room){
       const mesh=add(piece);
-      if(['plinth','edge','glaze','glazeA','glazeB','bare'].includes(piece.name))bed.push(mesh);
+      if(['plinth','edge','glaze','glazeA','glazeB','bare'].includes(piece.name))bench.add(mesh);
     }
-    const shadows=ContactShadows.attach(engine,{
-      position:[0,.004,0],size:[1.34,1.25],height:.36,opacity:.78,blur:.022,resolution:256,static:true,
-      color:[.014,.009,.012],toneMapped:true,
-    });
-    for(const mesh of bed)shadows.add(mesh);
     replace(initial,first);
     camera();
-    engine.render({delta:0});
-    await engine.gpu.queue.onSubmittedWorkDone();
-    await frame();
+    if(!await bench.ready())return;
     signal.throwIfAborted();
     performance.mark('glasshouse-frame');
     published();markValid();
@@ -189,10 +176,7 @@ export function mount({opening,canvas,viewport,loading,status,controls,signal,fa
     for(const event of ['pointerup','pointercancel','lostpointercapture']){
       canvas.addEventListener(event,()=>{tracking=undefined;},{signal});
     }
-    observer=new ResizeObserver(()=>{
-      if(size()){layoutDirty=true;schedule();}
-    });
-    observer.observe(canvas);
+    onResize(()=>{layoutDirty=true;schedule();});
     if(status.ready()){
       ready=true;
       for(const control of controls)by(control).disabled=false;
@@ -201,7 +185,6 @@ export function mount({opening,canvas,viewport,loading,status,controls,signal,fa
   }
   run().catch(fail);
   return ()=>{
-    observer?.disconnect();
     clearTimeout(timer);
     if(raf)cancelAnimationFrame(raf);
   };

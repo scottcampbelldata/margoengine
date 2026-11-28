@@ -1,4 +1,4 @@
-import {Engine} from '@margoengine/core';
+import {openBench} from '@margoengine/studio/bench';
 import {demoStatus} from 'margo-demo-status';
 import {cameraFor,glasshouse} from './art.js';
 import {generate,specimens} from './grammar.js';
@@ -7,59 +7,37 @@ const by=id=>document.getElementById(id);
 const canvas=by('scene'),viewport=by('viewport'),loading=by('loading'),error=by('error');
 const status=demoStatus(viewport,loading,error);
 const controller=new AbortController(),{signal}=controller;
-const forced=new URLSearchParams(location.search).get('backend')==='webgl2';
 const controls=['grow','generation','preset','axiom','rules','angle','reset'];
-let engine,close;
+let close,resized=()=>{};
 function fail(reason){
   if(signal.aborted||status.failed)return;
   for(const id of controls)by(id).disabled=true;
   loading.hidden=true;error.hidden=false;
   status.error(reason);
 }
-function size(){
-  const {width,height}=canvas.getBoundingClientRect(),ratio=Math.min(devicePixelRatio||1,1.8,1330/width);
-  const w=Math.round(width*ratio),h=Math.round(height*ratio);
-  if(!w||!h||canvas.width===w&&canvas.height===h)return false;
-  canvas.width=w;canvas.height=h;
-  return true;
-}
-async function open(){
-  const options={backend:'webgpu',exactSize:true,antialias:true,signal,startupWarning:3000,startupTimeout:8500,
-    camera:cameraFor(canvas.width,canvas.height)};
-  if(!forced&&navigator.gpu){
-    try{
-      const value=await Engine.create(canvas,options);
-      viewport.dataset.renderer='webgpu';
-      return value;
-    }catch(reason){
-      signal.throwIfAborted();
-      if(reason?.code&&!['unsupported','adapter','device','timeout','startup'].includes(reason.code))throw reason;
-    }
-  }
-  const {install}=await import('@margoengine/webgl2-compat');
-  await install({force:true,minimumTier:'half-float',signal});
-  const value=await Engine.create(canvas,options);
-  viewport.dataset.renderer='webgl2';
-  return value;
-}
-
-size();
-const opening=open().then(value=>{
-  engine=value;
-  if(signal.aborted){value.dispose();signal.throwIfAborted();}
-  engine.onError=fail;
+// The bench sizes the backbuffer the same way (device pixels up to 1.8, at most 1330 wide), so the first camera fits it.
+const {width,height}=canvas.getBoundingClientRect(),ratio=Math.min(devicePixelRatio||1,1.8,1330/Math.max(1,width));
+const opening=openBench(canvas,{
+  exhibit:viewport,signal,pixelRatio:1.8,maxWidth:1330,startupTimeout:8500,compat:{minimumTier:'half-float'},
+  camera:cameraFor(Math.round(width*ratio)||1,Math.round(height*ratio)||1),
+  background:'#554754',backdrop:false,environment:false,shadows:false,
+  light:{direction:[-.49,.68,.67],intensity:3.7,color:[1,.909,.752],ambient:.58,ambientColor:[.84,.96,1.08]},
+  // The glasshouse bed's soft contact shadow, baked once: the plinth and glazing never move.
+  contact:{position:[0,.004,0],size:[1.34,1.25],height:.36,opacity:.78,blur:.022,resolution:256,static:true,
+    color:[.014,.009,.012],toneMapped:true},
+  onError:fail,onResize:()=>resized(),
+}).then(bench=>{
   performance.mark('engine-ready');
-  return value;
+  return bench;
 });
 opening.catch(fail);
 const first={...specimens.lantern,generation:4};
 const prepared=Promise.resolve().then(()=>({room:glasshouse(),initial:generate(first)}));
 Promise.all([import('./scene.js'),prepared]).then(([{mount},{room,initial}])=>{
-  close=mount({opening,canvas,viewport,loading,status,controls,signal,fail,size,first,room,initial});
+  close=mount({opening,canvas,viewport,loading,status,controls,signal,fail,onResize:hook=>{resized=hook;},first,room,initial});
 }).catch(fail);
 addEventListener('pagehide',event=>{
   if(event.persisted)return;
   controller.abort();
   close?.();
-  engine?.dispose();
 });

@@ -17,7 +17,7 @@ The screen counts modules, drawable stems, and the actual modeled leaf and bloom
 
 Lantern bells borrow the pendent tubular calyx, four spreading sepals and contrasting corolla of fuchsia as visual cues. The other two plants are fictional silhouette studies. Their controllable grammar describes shape and branching. It abstracts real plant development. The flattened, serrated leaf edges, curved surfaces and raised venation are mesh geometry. The rose and violet flowers have separate cup, sepal and filament meshes. The glasshouse, tiled floor, raku-style glazed bowl and small soil aggregate are made for this scene.
 
-The contact shadow uses Margo’s studio package. The exhibit runs from [the verified public engine revision](https://github.com/scottcampbelldata/margoengine/tree/0efd9cff8230507a32deb49907ecd499d46925f5). WebGPU opens first. The full Margo WebGL2 compatibility layer draws the same branch, leaf, flower, pot and glasshouse meshes. Append `?backend=webgl2` to test that path directly.
+The exhibit opens with `openBench` from Margo’s studio package, which also gives it the contact shadow. The exhibit runs from [the verified public engine revision](https://github.com/scottcampbelldata/margoengine/tree/0efd9cff8230507a32deb49907ecd499d46925f5). WebGPU opens first. The full Margo WebGL2 compatibility layer draws the same branch, leaf, flower, pot and glasshouse meshes. Append `?backend=webgl2` to test that path directly.
 
 ## References
 
