@@ -704,6 +704,14 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   coverage 6.24 against 3.87 and luminance 5.65 against 5.05, seed 3 luminance 6.57 against 5.16 (its middle wood
   takes up to 2,900 of the 4,000 triangles, leaving it 255 to 360 cards). `test/broadleaf-lod.test.js` holds oak
   seeds 1 to 3. The imposter part stays open.
+- **Progress (black alder middle ring, fixed 2026-11-28):** two limits, not the method. The middle ring kept at most a
+  quarter of the near cards, and the alder has only about 1,540 (the oak 3,624, where 800 binds), so 363 to 385 cards;
+  seed 2's first-order wood took 2,918 triangles, leaving 266. Now the middle ring keeps at most half the near cards and
+  its wood at most 1,500 triangles (`MIDDLE_WOOD`; the thinnest first-order limb ends go first, found by bisection on
+  their radii, a parent kept before its child). Worst of 24 views against the tree's own change: alder seeds 1 to 5
+  coverage 2.4 to 2.9 percent (own 3.3 to 7.3), luminance 1.5 to 4.0 (own 3.4 to 6.1); old and sapling alder, beech
+  seeds 1 to 3, old and sapling beech, oak seeds 1 to 5, old and sapling oak all pass. The mature oak's middle ring is
+  unchanged. `test/broadleaf-lod.test.js` now holds alder seeds 1 to 3 and the wood budget.
 
 ### Open 2026-11-28: a broadleaf tree (oak, beech, alder) reads as a few smooth lime blobs (KB-PROCEDURAL-OAKBLOB1, procedural, biomes)
 

@@ -3,7 +3,7 @@
 // it is turned 45 degrees about its trunk. Aggregate geometry is simplified by stratified pruning on visibility: each
 // foliage mass keeps cards in proportion to what it shows, one card a cell of equal visibility, its size solved so the
 // mass shows as much as before (Cook, Halstead, Planck and Ryu 2007, "Stochastic simplification of aggregate detail";
-// Neubert, Pirk, Deussen and Dachsbacher 2011). Every fourth card grown at one width failed it on the open-grown oak:
+// Neubert, Pirk, Deussen and Dachsbacher 2011). It keeps at most half the near cards and a wood budget. Every fourth card grown at one width failed it on the open-grown oak:
 // at 2.25 times the side the coverage was 9.0 percent off, at 1.9 the coverage passed and the luminance was 7.5. The
 // far ring is an
 // imposter of three baked views (Behrendt, Colditz, Franzke, Kopf and Deussen 2005; Bruneton and Neyret 2012).
@@ -40,8 +40,8 @@ function measure(image, outline) {
   return { coverage: covered / inside, luminance: sum / inside };
 }
 
-function measures(seed) {
-  const l = broadleafLevels('english-oak', { seed }),
+function measures(species, seed) {
+  const l = broadleafLevels(species, { seed }),
     f = l.form,
     radius = (f.crownWidth / 2) * 1.1,
     extent = Math.max(f.height / 2, radius) * 1.05,
@@ -69,8 +69,18 @@ function measures(seed) {
 test('the middle ring keeps the near coverage and colour from every side, within a 45 degree turn of the near tree', () => {
   // Measured 2026-11-28 (worst of 24 views, then the near tree's own 45 degree change): seed 1 coverage 2.19 of 5.28
   // percent, luminance 2.54 of 4.71; seed 2 2.41 of 4.48 and 1.76 of 4.81; seed 3 1.88 of 4.50 and 2.98 of 7.70.
-  for (const seed of [1, 2, 3]) {
-    const results = measures(seed);
+  // Black alder (its middle ring at most half its 1,540 near cards, its middle wood at most 1,500 triangles): seed 1
+  // 2.94 of 5.00 and 2.27 of 5.42; seed 2 2.81 of 3.87 and 3.03 of 5.05; seed 3 2.50 of 7.31 and 4.01 of 5.16. With a
+  // quarter of the near cards and all its first-order wood the alder failed on all three seeds (KB-PROCEDURAL-OAKIMPOSTER1).
+  for (const [species, seed] of [
+    ['english-oak', 1],
+    ['english-oak', 2],
+    ['english-oak', 3],
+    ['black-alder', 1],
+    ['black-alder', 2],
+    ['black-alder', 3],
+  ]) {
+    const results = measures(species, seed);
     for (const key of ['coverage', 'luminance']) {
       // The tolerance is the near tree's own change when turned 45 degrees about its trunk, its largest over the eight
       // turns and three elevations.
@@ -82,7 +92,7 @@ test('the middle ring keeps the near coverage and colour from every side, within
         for (const each of views) worst = Math.max(worst, Math.abs(each[1][key] / each[0][key] - 1));
       assert.ok(
         worst <= own,
-        `seed ${seed}: middle ${key} differs by ${(worst * 100).toFixed(2)}%, a 45 degree turn by ${(own * 100).toFixed(2)}%`,
+        `${species} seed ${seed}: middle ${key} differs by ${(worst * 100).toFixed(2)}%, a 45 degree turn by ${(own * 100).toFixed(2)}%`,
       );
     }
   }
@@ -94,13 +104,26 @@ test('the middle ring is the same for the same seed and stays under 4,000 triang
   assert.deepEqual(a.canopy[1].positions, b.canopy[1].positions);
   assert.deepEqual(a.canopy[1].uvs, b.canopy[1].uvs);
   assert.ok((a.canopy[1].indices.length + a.trunk[1].indices.length) / 3 <= 4000);
-  // About one card in five of the near ring's (four triangles a card, both faces).
+  // About one card in five of the near ring's for a mature oak, where 800 cards bind (four triangles a card, both faces).
   const ratio = a.canopy[0].indices.length / a.canopy[1].indices.length;
   assert.ok(ratio > 4 && ratio < 6, `near over middle cards ${ratio}`);
 });
 
+test('a tree of many limbs keeps its middle wood to 1,500 triangles, thinnest first-order ends first, still joined', () => {
+  // Black alder seed 2 grew 2,918 triangles of first-order wood, which left its middle ring 266 cards.
+  const l = broadleafLevels('black-alder', { seed: 2 }),
+    wood = l.trunk[1].indices.length / 3,
+    cards = l.canopy[1].indices.length / 12;
+  assert.ok(wood <= 1500 && wood > 1000, `middle wood ${wood} triangles`);
+  assert.ok(cards >= 450, `middle cards ${cards}`);
+  assert.ok((l.canopy[1].indices.length + l.trunk[1].indices.length) / 3 <= 4000);
+  // An oak under the budget keeps all its first-order wood.
+  const oak = broadleafLevels('english-oak', { seed: 1 });
+  assert.equal(oak.trunk[1].indices.length / 3, 722);
+});
+
 test('the imposter keeps the near tree within its measured error from every side', () => {
-  const results = measures(1);
+  const results = measures('english-oak', 1);
   // Measured 2026-11-28: coverage -14 to +9 percent, luminance -22 to +9 percent against the near tree over the 24
   // views (a 45 degree turn of the near tree changes it by 9.3 and 9.9 percent). Three vertical cards, each with its
   // own baked view, show the union of oblique cards from between them and lose the dome from above.

@@ -100,9 +100,11 @@ const BREAST = 1.37,
   NODE_CAP = 9000,
   // The middle level: at most MIDDLE_CARDS cards (four triangles each, both faces) and MIDDLE_TRIANGLES with its wood,
   // judged from MIDDLE_VIEWS directions (0 to 37 degrees up) at MIDDLE_CELLS pixels to a card's side, its sizes solved
-  // in at most MIDDLE_PASSES passes.
+  // in at most MIDDLE_PASSES passes. Its cards are at most half the near ones, and its wood at most MIDDLE_WOOD
+  // triangles (the thinnest first-order limb ends go first), so a tree of many limbs keeps cards to cover its crown.
   MIDDLE_CARDS = 800,
   MIDDLE_TRIANGLES = 4000,
+  MIDDLE_WOOD = 1500,
   MIDDLE_VIEWS = 12,
   MIDDLE_CELLS = 5,
   MIDDLE_PASSES = 6,
@@ -895,27 +897,53 @@ function wood(
   seed: number,
 ): { trunk: GeometryData; skeleton: Required<TreeMeshSkeleton> } {
   const tree = p.tree,
-    keep =
-      detail === 2
-        ? (i: number) => tree.level[i] <= 2 || (tree.level[i] === 3 && tree.kids[i] > 0)
-        : detail === 1 || !p.live
-          ? (i: number) => tree.level[i] <= 1
-          : (i: number) => tree.level[i] === 0,
-    skeleton = skeletonOf(tree, keep),
     segments =
       detail === 2
         ? { 0: 10, 1: 7, 2: 4, 3: 3, 4: 3 }
         : detail === 1
           ? { 0: 8, 1: 5, 2: 3, 3: 3, 4: 3 }
           : { 0: 5, 1: 3, 2: 3, 3: 3, 4: 3 },
-    mesh = meshTree(skeleton, {
-      seed,
-      bark: { type: 'oak' },
-      leaves: { count: 0 },
-      branch: { segments },
-      detail: { sectionStride: detail === 2 ? 1 : detail === 1 ? 2 : 3 },
-    });
-  return { trunk: mesh.bark, skeleton };
+    build = (keep: (i: number) => boolean) => {
+      const skeleton = skeletonOf(tree, keep),
+        mesh = meshTree(skeleton, {
+          seed,
+          bark: { type: 'oak' },
+          leaves: { count: 0 },
+          branch: { segments },
+          detail: { sectionStride: detail === 2 ? 1 : detail === 1 ? 2 : 3 },
+        });
+      return { trunk: mesh.bark, skeleton };
+    };
+  if (detail === 2) return build((i) => tree.level[i] <= 2 || (tree.level[i] === 3 && tree.kids[i] > 0));
+  if (detail === 0 && p.live) return build((i) => tree.level[i] === 0);
+  const out = build((i) => tree.level[i] <= 1);
+  if (detail === 0 || out.trunk.indices.length / 3 <= MIDDLE_WOOD) return out;
+  // Over the middle wood budget: keep first-order wood at least `cut` thick (a parent before its child, so what is
+  // kept stays joined), the cut found by bisection on the sorted first-order radii.
+  const n = tree.parent.length,
+    radii = [
+      ...new Set(
+        Array.from({ length: n }, (_, i) => i)
+          .filter((i) => tree.level[i] === 1)
+          .map((i) => tree.radii[i]),
+      ),
+    ].sort((a, b) => a - b),
+    keepAt = (cut: number) => {
+      const keep = new Uint8Array(n);
+      for (let i = 0; i < n; i++)
+        keep[i] = tree.level[i] === 0 ? 1 : tree.level[i] === 1 && tree.radii[i] >= cut && keep[tree.parent[i]] ? 1 : 0;
+      return (i: number) => keep[i] === 1;
+    };
+  let lo = 0,
+    hi = radii.length,
+    best = build(keepAt(Infinity));
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1,
+      got = build(keepAt(radii[mid]));
+    if (got.trunk.indices.length / 3 <= MIDDLE_WOOD) (best = got), (hi = mid);
+    else lo = mid + 1;
+  }
+  return best;
 }
 
 const norm = (v: [number, number, number]): [number, number, number] => {
@@ -1206,7 +1234,7 @@ function middleCards(p: Prepared, nearWood: GeometryData, middleWood: GeometryDa
     budget = Math.min(
       MIDDLE_CARDS,
       Math.floor((MIDDLE_TRIANGLES - middleWood.indices.length / 3) / 4) - 4,
-      Math.ceil(near.length / 4),
+      Math.ceil(near.length / 2),
     ),
     rand = random(tree.seed * 131 + 5),
     kept: Drawn[] = [];

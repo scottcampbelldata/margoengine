@@ -1623,13 +1623,16 @@ band; of seeds 1 to 10, 7 are, and seeds 5, 6 and 9 show 0.206 to 0.217 of sky i
   (default 0, Hemery's line).
 - `generateBroadleafMesh(species, {age, height, open, detail, condition, seed, atlasSize})`: `{trunk, canopy, form,
   limbs, masses, leafArea, distanceTests, skeleton, atlas}`, standing on y = 0. `detail` 2 (near: all the wood to the
-  twigs that carry leaves and every card, about 22,000 triangles for a mature oak), 1 (middle: trunk and limbs and about
-  one card in five, at most 800 and 4,000 triangles with the wood: 3,922 for a mature oak) or 0 (the stem). The middle
+  twigs that carry leaves and every card, about 22,000 triangles for a mature oak), 1 (middle: trunk and limbs and at
+  most half the near cards, at most 800 and 4,000 triangles with the wood: 3,922 for a mature oak; a tree of many limbs
+  keeps its middle wood to 1,500 triangles by dropping the thinnest first-order limb ends, so the black alder keeps
+  480 to 690 cards) or 0 (the stem). The middle
   cards are chosen by visibility: 12 low views of the near tree count the pixels each card wins, each foliage mass keeps
   cards in proportion to what it shows, its cards are split into cells of equal visibility and each cell keeps one card
   drawn with odds equal to its visibility; a kept card takes its cell's area, and each mass is then scaled until it shows
   as much inside the near outline as the near tree does. From 24 views the middle oak stays well inside the near
-  tree's own change when turned 45 degrees (seed 1: coverage 2.2 percent against 5.3, luminance 2.5 against 4.7). `condition` `'live'` or `'bare'`. The canopy's uvs point
+  tree's own change when turned 45 degrees (seed 1: coverage 2.2 percent against 5.3, luminance 2.5 against 4.7; black
+  alder seed 2: 2.8 against 3.9 and 3.0 against 5.1). `condition` `'live'` or `'bare'`. The canopy's uvs point
   into `atlas` (draw it with an alpha cut-off of 0.5 and both faces); `skeleton` is the grown wood as nodes, parents,
   pipe-model radii and branch orders; `distanceTests` is the growth's work count. Growing takes a few hundred
   milliseconds for a mature tree.

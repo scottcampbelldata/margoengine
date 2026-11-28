@@ -12722,7 +12722,9 @@ companion code. The leaf atlas is drawn in code; no photograph or outside image 
   M. Chover and C. Rebollo, "Viewpoint-driven simplification of plant and tree foliage", Entropy 20(4), 213, 2018,
   https://doi.org/10.3390/e20040213 (abstracts read). Used: a kept card takes the area of the cards it replaces, and
   the survivors' size makes up what the views lose; the per-mass size solve against the near coverage inside the near
-  outline (a secant step in log space, at most 6 passes) is ours.
+  outline (a secant step in log space, at most 6 passes) is ours. So are the middle level's limits (at most half the
+  near cards; its wood at most 1,500 triangles, the thinnest first-order limb ends dropped first by a bisection on their
+  pipe-model radii), set from the black alder's measured failures.
 - F. Richards, "A flexible growth function for empirical use", Journal of Experimental Botany 10(2), 1959. Used: the
   Chapman-Richards height-age form; its rates, the diameter curve, albedos and leaf sizes are ours.
 
