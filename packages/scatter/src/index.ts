@@ -1491,9 +1491,13 @@ export class Scatter implements EnginePlugin {
           .replace('@location(2) color:vec3f', `@location(2) ${blades || clusters ? centroid + ' ' : ''}color:vec3f`)
           .replace(
             /@vertex fn vertex\([\s\S]*?(?=@fragment)/,
-            c.shader.includes('var<uniform> taaCamera:')
-              ? vertex.replace('o.clip=frame.camera*', 'o.clip=taaCamera*')
-              : vertex,
+            !c.shader.includes('var<uniform> taaCamera:')
+              ? vertex
+              : declarations === undefined
+                ? vertex.replace('o.clip=frame.camera*', 'o.clip=taaCamera*')
+                : // A capture draws from its own frame's camera (SceneTargets' unjittered one, KB-POST-MRTJITTER1);
+                  // TAA's uniform stays statically used, so its binding stays in the bind group.
+                  vertex.replace('o.clip=frame.camera*', '_=taaCamera;o.clip=frame.camera*'),
           );
         if (this.fade)
           code =

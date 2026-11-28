@@ -14,6 +14,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { overlayDepthPass } from '../../shared/pass.js';
 import { unitLight } from '../../shared/unit-light.js';
 import { captureStage, type ScatterCapture } from './capture.js';
+import { unjitteredClip } from '../../shared/temporal-camera.js';
 
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; INDIRECT: number; UNIFORM: number; COPY_DST: number };
 type ScatterPassContext = Extract<PassContext, { backend: 'webgpu' }>;
@@ -348,7 +349,8 @@ export class ScatterInstances implements EnginePlugin {
         c.shader;
     let pipeline = this.capturePipelines.get(key);
     if (!pipeline) {
-      const code = captureStage(positiveColor(this.colourCode(c.shader)), declarations);
+      // The capture draws from its own frame's camera, not TAA's jittered one (KB-POST-MRTJITTER1).
+      const code = captureStage(positiveColor(this.colourCode(unjitteredClip(c.shader))), declarations);
       if (code === undefined)
         throw new MargoError(
           'unsupported',

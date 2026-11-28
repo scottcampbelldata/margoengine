@@ -222,6 +222,9 @@ interface Ring {
   /** Per local shadow layer (clustered `LocalShadows`), created on first use. */
   localUniforms: GPUBuffer[];
   localGroups: GPUBindGroup[];
+  /** Per view, a capture drawn from a camera other than the one prepared (SceneTargets' unjittered camera under TAA). */
+  captureUniforms: GPUBuffer[];
+  captureGroups: GPUBindGroup[];
 }
 interface LightingGroup {
   device: GPUDevice;
@@ -528,6 +531,8 @@ export class Terrain implements EnginePlugin {
         shadowValues: new Float32Array(floats),
         localUniforms: [],
         localGroups: [],
+        captureUniforms: [],
+        captureGroups: [],
       };
       this.rings.push(r);
       r.group = group(uniform);
@@ -913,11 +918,42 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
     pass.setPipeline(pipeline);
     if (entries.length) pass.setBindGroup(1, this.lightingGroup(c.device, pipeline, entries));
     pass.setVertexBuffer(0, this.vertex!);
+    // The rings were prepared with the frame's camera; a capture drawn from another camera (SceneTargets draws with
+    // TAA's unjittered camera, KB-POST-MRTJITTER1) gets uniforms of its own with that camera's matrix and eye.
+    const own = this.otherCamera(c.camera),
+      view = c.view?.index ?? 0;
     for (let i = 0; i < this.rings.length; i++) {
-      pass.setBindGroup(0, this.rings[i].group);
+      const r = this.rings[i];
+      let group = r.group;
+      if (own) {
+        let buffer = r.captureUniforms[view];
+        if (!buffer) {
+          buffer = r.captureUniforms[view] = c.device.createBuffer({
+            size: r.values.length * 4,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          });
+          // Set with the rings in `setup`, and this draw returned without rings.
+          r.captureGroups[view] = this.ringGroup!(buffer);
+        }
+        r.shadowValues.set(r.values);
+        r.shadowValues.set(c.camera.matrix);
+        r.shadowValues.set(c.camera.position, 16);
+        this.upload(c.device.queue, buffer, r.shadowValues);
+        group = r.captureGroups[view];
+      }
+      pass.setBindGroup(0, group);
       pass.setIndexBuffer(i ? this.ring! : this.center!, 'uint32');
       pass.drawIndexed(i ? this.ringCount : this.centerCount);
     }
+  }
+  /** Whether `camera`'s matrix or eye differs, as float32, from the one the rings were prepared with. */
+  private otherCamera(camera: TerrainPassContext['camera']): boolean {
+    const values = this.rings[0].values,
+      m = camera.matrix,
+      p = camera.position;
+    for (let k = 0; k < 16; k++) if (values[k] !== Math.fround(m[k])) return true;
+    for (let k = 0; k < 3; k++) if (values[16 + k] !== Math.fround(p[k])) return true;
+    return false;
   }
   private lightingGroup(device: GPUDevice, pipeline: GPURenderPipeline, entries: GPUBindGroupEntry[]): GPUBindGroup {
     const cached = this.lightingGroups.get(pipeline);
@@ -1101,7 +1137,7 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
       texture?.destroy();
     for (const buffer of [this.vertex, this.center, this.ring, this.rules]) buffer?.destroy();
     for (const r of this.rings)
-      for (const buffer of [r.uniform, ...r.shadowUniforms, ...r.localUniforms]) buffer?.destroy();
+      for (const buffer of [r.uniform, ...r.shadowUniforms, ...r.localUniforms, ...r.captureUniforms]) buffer?.destroy();
     this.textures = undefined;
     this.vertex = this.center = this.ring = this.rules = undefined;
     this.rings = [];

@@ -1314,6 +1314,13 @@ default), so materials can read this frame's targets; a material that reads a ta
 is `targets.depth`. Textures follow the drawing size and are replaced on resize (`onResize`). WebGPU only (and the
 WebGL2 layer that runs it).
 
+Under TAA (`@margoengine/taa`, its upscaler too) the targets are drawn with the unjittered camera, always: TAA moves
+each frame by a sub-pixel Halton offset and averages the phases back onto the unjittered camera, so masks and AOVs
+read after the frame register with the resolved frame (KB-POST-MRTJITTER1). Every capture path follows it: core
+meshes, gltf/pbr models, a `Terrain`, a lit `Scatter` and `ScatterInstances` see the unjittered camera as
+`c.camera`. Checked on a real GPU, WebGPU and the WebGL2 layer, by `test/scene-targets-taa-browser.mjs`: each capture
+path alone, read without TAA and then at three jitter phases with it, moves no coverage pixel, height or distance.
+
 Sun light and the look masks. `t.shadow` is the sun's visibility on the surface (1 lit, 0 hidden): the share of the sun
 a shadow plugin lets through (`@margoengine/shadows`, its light functions and coloured shadows counted by Rec. 709
 luminance), 1 with no shadow plugin; `t.light` is the unit direction toward the sun and `t.subject` is 1 on models

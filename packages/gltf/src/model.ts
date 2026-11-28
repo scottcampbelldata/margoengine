@@ -533,6 +533,8 @@ function tintableCode(code: string): boolean {
 }
 /** Whether a finished shader reads the model rows only in the instanced vertex stage (see `derive`), by shader. */
 const modelFreeCode = new Map<string, boolean>();
+/** The view-block owner of capture draws (`viewBinding`): one per view, apart from the main pass's. */
+const captureView = {};
 // Global, not per model: draws nest (a callback may draw), and one stack serves every model.
 const scratchStack: DrawScratch[] = [];
 let scratchDepth = 0;
@@ -4425,7 +4427,10 @@ export class PBRModel implements EnginePlugin {
           r.sectionBuffer = section;
         }
         if (!viewAt) {
-          viewAt = viewBinding(c.device, viewData, c.view ?? c, external && this);
+          // A capture keeps a view block of its own: it may draw from another camera than the view's main pass in the
+          // same frame (SceneTargets' unjittered camera under TAA, KB-POST-MRTJITTER1), and a block's last write is
+          // the one every draw of the submit reads.
+          viewAt = viewBinding(c.device, viewData, c.view ?? c, external ? this : capture ? captureView : undefined);
           if (runView) {
             runView.at = viewAt;
             runView.format = c.format;

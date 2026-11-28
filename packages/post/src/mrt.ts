@@ -9,6 +9,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { margoError } from '../../shared/errors.js';
 import { captureModel, drawCapture } from '../../shared/capture.js';
+import { unjitteredCamera, unjitteredClip } from '../../shared/temporal-camera.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';
 import type { SSRCapture, SSRModel } from './ssr.js';
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number };
@@ -424,7 +425,9 @@ export class SceneTargets implements EnginePlugin {
           wrapped !== 'direct' && /\bdirect\b/.test(wrapped)
             ? `dot(${wrapped.replace(/\bdirect\b/g, 'vec3f(1)')},${luminance})`
             : '1.0',
-        code = c.shader
+        // TAA's (and the upscaler's) jittered clip transform gives way to core's frame camera, the unjittered one the
+        // resolved frame is centred on (KB-POST-MRTJITTER1).
+        code = unjitteredClip(c.shader)
           .replace(/(@fragment[^{]*)->@location\(0\) vec4f/, '$1->MargoCapture')
           .replace(
             /(let direct=[\s\S]*)return (vec4f\([^\n]+\));/,
@@ -463,7 +466,10 @@ export class SceneTargets implements EnginePlugin {
           },
         })
         .end();
-    const { color, depth, descriptor } = c;
+    const { color, depth, descriptor, camera } = c;
+    // The targets are drawn with the unjittered camera (KB-POST-MRTJITTER1): TAA averages its jittered subframes back
+    // onto it, so masks and AOVs register with the resolved frame, and the added models' captures see it as c.camera.
+    c.camera = unjitteredCamera(camera);
     c.color = this.views[0];
     c.depth = this.depthView!;
     c.descriptor = this.single!;
@@ -482,7 +488,7 @@ export class SceneTargets implements EnginePlugin {
     } finally {
       this.pass?.end();
       this.pass = this.context = undefined;
-      Object.assign(c, { color, depth, descriptor });
+      Object.assign(c, { color, depth, descriptor, camera });
     }
   }
   private resize(c: TargetsPassContext): void {

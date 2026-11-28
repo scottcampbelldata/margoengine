@@ -95,7 +95,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   WebGPU and the WebGL2 layer) and `packages/shader/test/deform-check.mjs` (`resized`, also with `MARGO_COMPAT=1`);
   both raise the destroyed-texture error without the fix.
 
-### Open 2026-11-27: the shot's look masks are drawn with TAA's jitter, a fifth of a pixel off the resolved frame (KB-POST-MRTJITTER1, post SceneTargets, terrain and scatter captures, taa)
+### Fixed 2026-11-27: the shot's look masks were drawn with TAA's jitter, a fifth of a pixel off the resolved frame (KB-POST-MRTJITTER1, post SceneTargets, gltf, terrain and scatter captures)
 
 - **Repro:** the timber-valley blowup shot rendered with TAA (35cc7b3429) and without it (1604e1a464), then
   `.lane/sky/tint.mjs` and `.lane/sky/maskshift.mjs` in lane B's worktree on the early probe: shadowTint 0.188 b* without
@@ -111,11 +111,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   jittered matrix into their own frame uniforms), and `SceneTargets` (order -4.5) draws its outputs with those same
   shaders and uniforms. The resolved frame, averaged over all 8 phases, is centred on the unjittered camera, so the masks
   sit off it by most of one phase's offset.
-- **Next (needs a decision on the default):** SceneTargets outputs that in-frame effects read with the jittered colour
-  want the jitter; masks and AOVs compared with or composited over the resolved frame do not. A fix draws SceneTargets
-  (an option, or always for the shot page's masks) with `unjitteredCamera` (`packages/shared/temporal-camera.js`): core's
-  shader without the `taaCamera` swap, and terrain and scatter captures with an unjittered frame uniform of their own.
-  With registered masks the TAA frame reads 0.198 b* and passes. The bar stays.
+  The gltf/pbr view block had the same fault: one block per view and frame, so the main pass's jittered write
+  replaced the values the earlier capture had bound (every write is seen by the whole submit).
+- **Fix (always on, no option; the manager's ruling):** SceneTargets draws with `unjitteredCamera` (`c.camera` for every
+  added model's capture) and core's shader with its clip patch undone (`unjitteredClip`,
+  `packages/shared/temporal-camera.js`); a terrain capture from a camera other than the one its rings were prepared
+  with writes uniforms of its own per view (`packages/terrain/src/index.ts`); Scatter's and ScatterInstances' capture
+  stages keep their own frame's camera instead of TAA's `taaCamera`; gltf/pbr capture draws keep a view block of their
+  own per view, apart from the main pass's (`packages/gltf/src/model.ts`). The bars are unchanged. Passes
+  that read the targets (outline, pixelate, curvature, mesh blend) take only near, far and the projection type from
+  the camera, which jitter does not change; MaterialDecals reconstructs from the frame's own depth with the frame's
+  camera, as before.
+- **Regression:** `packages/post/test/scene-targets-taa-browser.mjs` (WebGPU and `--compat`): core, terrain, Scatter,
+  ScatterInstances and gltf/pbr each alone in the targets, read without TAA and at three jitter phases with it. Without
+  the fix each moves (core 22 to 81 coverage pixels, terrain 96 to 210, Scatter 13 to 47, ScatterInstances 7 to 46,
+  gltf 20 to 65; heights by up to 1.4 m and distances by up to 13 m at those edges); with it every value is 0.
 
 ### Fixed 2026-11-27: SSR drew stair-stepped streaks and smeared stripe copies on a street (KB-POST-SSRSTREET1, post)
 
