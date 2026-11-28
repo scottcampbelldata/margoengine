@@ -1,0 +1,211 @@
+import{c as e,d as t,f as n,l as r,t as i}from"./index-qOAxkL6O.js";var a=(e,t)=>Object.assign(Error(t),{name:`MargoError`,code:e}),o=(e,t)=>`${e}; see https://margoengine.com/errors#${t}`,s=(e,t,n=e)=>a(e,o(t,n)),c=`
+fn bad(c:vec3f)->vec3<bool>{return (bitcast<vec3u>(c)&vec3u(0x7f800000u))==vec3u(0x7f800000u);}
+fn clean(c:vec3f)->vec3f{return select(min(c,vec3f(65504)),select(vec3f(0),vec3f(65504),bitcast<vec3u>(c)==vec3u(0x7f800000u)),bad(c));}
+`,l=(e,t=`1.0.0`,n=import.meta.url)=>r(e,t,n);function u(e){return e?.view?.viewport}function d(e,t){let n=u(t);if(!n)return;e.setViewport(n[0],n[1],n[2],n[3],0,1);let r=t.view.scissor??n;e.setScissorRect(r[0],r[1],r[2],r[3])}function f(e,t=`clear`){return e?.view?.index?`load`:t}var p=(globalThis[Symbol.for(`margoengine.frame-resources`)]??={devices:new WeakMap}).devices;function m(e){let t=p.get(e);return t||(p.set(e,t={frame:0,open:!1,lost:!1,views:new Set,drawing:0,retired:[],written:new WeakMap}),e.lost?.then?.(()=>{t.lost=!0;let e=t.retired;t.retired=[];for(let t of e)t.destroy()})),t}function h(e,t){if(!t)return;let n=m(e),r=[t,...n.written.get(t)?.extras??[]];if(n.written.delete(t),!n.lost&&n.open&&(n.views.size>1||n.drawing>0))n.retired.push(...r);else for(let e of r)e.destroy()}function g(e){return e?.adapterInfo?.vendor===`margo-webgl2`?`webgl2`:`native`}function _(e){return g(e)===`native`&&e?.features?.has(`core-features-and-limits`)===!1}var v=`@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}`,y=(e,t,n)=>e.createBindGroup({layout:t.getBindGroupLayout(0),entries:[{binding:0,resource:n}]}),b=Symbol.for(`margoengine.optional.msaa`),x=v+`
+@group(0) @binding(0) var source:texture_depth_multisampled_2d;
+@fragment fn fragment(@builtin(position) p:vec4f)->@builtin(frag_depth) f32 {
+ let q=vec2i(p.xy);
+ return max(max(textureLoad(source,q,0),textureLoad(source,q,1)),max(textureLoad(source,q,2),textureLoad(source,q,3)));
+}`;function ee(e,t,n,r,i,a=!1){let o=e=>x.replace(/return max[^;]+;/,`return textureLoad(source,q,${e});`),s=(n,r)=>{let a=e.createShaderModule({code:n}),o=e.createRenderPipeline({layout:`auto`,vertex:{module:a,entryPoint:`vertex`},fragment:{module:a,entryPoint:`fragment`,targets:[]},depthStencil:{format:i,depthWriteEnabled:!0,depthCompare:`always`},multisample:r});return{pipeline:o,group:y(e,o,t)}};return{draws:a?[s(o(0).replace(`_multisampled`,``),{count:r})]:r===4?_(e)?[0,1,2,3].map(e=>s(o(e),{count:r,mask:1<<e})):[s(o(`i32(sample)`).replace(`p:vec4f)`,`p:vec4f,@builtin(sample_index) sample:u32)`),{count:r})]:[s(x,{count:r})],descriptor:{colorAttachments:[],depthStencilAttachment:{view:n,depthLoadOp:`clear`,depthClearValue:0,depthStoreOp:`store`,stencilReadOnly:!0}}}}function te(e,t,n,r,i,a){let o=e.pipelines.get(r);o||e.pipelines.set(r,o=new Map);let s=o.get(i);if(!s){let t=e.samples===1;o.set(i,s=ee(e.device,e.depthSource,n,r,i,t))}s.descriptor.depthStencilAttachment.view=n,s.descriptor.depthStencilAttachment.depthLoadOp=a?.view?`load`:`clear`;let c=t.beginRenderPass(s.descriptor);a&&d(c,a);let l=s.draws;for(let e=0;e<l.length;e++)c.setPipeline(l[e].pipeline),c.setBindGroup(0,l[e].group),c.draw(3);c.end()}var ne=class{constructor(e,t,n,r=4){if(r!==1&&r!==4)throw RangeError(`Scene samples must be 1 or 4`);this.samples=r,this.device=e,this.resolvedColor=t,this.resolvedDepth=n,this.textures=[],this.pipelines=new Map;try{if(r===1){this.color=t.createView(),this.depth=n.createView();return}for(let r of[t,n])this.textures.push(e.createTexture({size:[r.width,r.height],format:r.format,sampleCount:4,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING}));this.color=this.textures[0].createView(),this.depth=this.textures[1].createView(),this.resolution={colorAttachments:[{view:this.color,resolveTarget:t.createView(),loadOp:`load`,storeOp:`store`}]},this.finalResolution={colorAttachments:[{...this.resolution.colorAttachments[0],storeOp:`discard`}],depthStencilAttachment:{view:this.depth,depthLoadOp:`load`,depthStoreOp:`discard`,stencilReadOnly:!0}},this.depthSource=this.textures[1].createView({aspect:`depth-only`}),this.resolvedDepthView=n.createView()}catch(e){throw this.dispose(),e}}begin(e){(this.viewContext??={}).view=e.view,Object.assign(this.original??={},{color:e.color,depth:e.depth,format:e.format,descriptor:e.descriptor,owner:re(e)}),e.color=this.color,e.depth=this.depth,e.format=this.resolvedColor.format,this.baseDescriptor!==e.descriptor&&(this.baseDescriptor=e.descriptor,this.descriptor={...e.descriptor,depthStencil:{...e.descriptor.depthStencil,format:this.resolvedDepth.format},multisample:{count:this.samples}}),e.descriptor=this.descriptor,e[b]=this,this.retired=!1,this.resized=e.width!==void 0&&(e.width!==this.resolvedDepth.width||e.height!==this.resolvedDepth.height)}copyDepth(e,t,n,r=this.resolvedDepth.format){this.depthSource??=this.resolvedDepth.createView({aspect:`depth-only`}),te(this,e,t,n,r,this.viewContext)}resolve(e,t=!1,n=!0){if(this.samples===1)t&&this.give(e);else{if(n&&this.copyDepth(e,this.resolvedDepthView,1),t){let t=this.viewContext?.view?`store`:`discard`;this.finalResolution.colorAttachments[0].storeOp=t,this.finalResolution.depthStencilAttachment.depthStoreOp=t,this.give(e)}e.beginRenderPass(t?this.finalResolution:this.resolution).end()}}give(e){let t=this.original;this.retired||!t||this.resized||(this.copyDepth(e,t.depth,t.descriptor.multisample?.count??1,t.descriptor.depthStencil.format),this.retired=!0)}restore(e){let t=this.original;this.give(e.encoder),Object.assign(e,{color:t.color,depth:t.depth,format:t.format,descriptor:t.descriptor}),e[b]=t.owner}present(e){this.resolve(e.encoder,!0),this.restore(e);let t=e.descriptor.multisample?.count??1;if(!this.presentation||this.presentationFormat!==e.format||this.presentationSamples!==t){let n=this.device.createShaderModule({code:v+`@group(0) @binding(0) var source:texture_2d<f32>;@fragment fn fragment(@builtin(position) p:vec4f)->@location(0) vec4f{return textureLoad(source,vec2i(p.xy),0);}`});this.presentation=this.device.createRenderPipeline({layout:`auto`,vertex:{module:n,entryPoint:`vertex`},fragment:{module:n,entryPoint:`fragment`,targets:[{format:e.format}]},multisample:e.descriptor.multisample}),this.presentationGroup=y(this.device,this.presentation,this.resolvedColor.createView()),this.presentationFormat=e.format,this.presentationSamples=t}let n=this.presentationPass??={colorAttachments:[{view:e.color,loadOp:`clear`,storeOp:`store`}]};n.colorAttachments[0].view=e.color,n.colorAttachments[0].loadOp=f(e,`clear`);let r=e.encoder.beginRenderPass(n);r.setPipeline(this.presentation),r.setBindGroup(0,this.presentationGroup),d(r,e),r.draw(3),r.end()}dispose(){for(let e of this.textures)h(this.device,e);this.textures=[],this.pipelines.clear()}};function re(e){let t=e[b];return t?.color===e.color&&t.depth===e.depth?t:void 0}function S(e,t,n){return e.value=t,e.device=typeof t==`function`?void 0:n,e.made=void 0,e.told=!1,e}function ie(e,t){typeof e.value!=`function`&&(e.device??=t)}var ae=(e,t,n,r)=>S({name:t,setter:n},e,r);function oe(e,t,n){let{value:r}=e;if(typeof r==`function`)return e.device!==t&&(e.made=r(e.device=t)),e.made;if(r!=null){if(e.device??=t,e.device===t)return r;e.told||(e.told=!0,n?.onError(s(`state`,`${e.name} lost with the device; pass a function or call ${e.setter}`,`borrowed-lost`)))}}var se=class{constructor(e,t,n){this.value=e,this.slot=ae(typeof e==`function`?void 0:e,t,n)}set(e,t){this.value=e,S(this.slot,typeof e==`function`?void 0:e,t)}fix(e){e&&ie(this.slot,e)}get(e,t){let n=this.value;return typeof n==`function`?n():oe(this.slot,e,t)}};function ce(e){if(typeof e!=`string`)throw TypeError(`.cube text must be a string; supply the file contents`);if(e.length>33554432)throw RangeError(`.cube text exceeds 32 Mi characters; supply a smaller LUT file`);let t=new Float32Array(3),n=new Float32Array([1,1,1]),r,i=0,a=!1,o=!1,s=!1,c=0;for(let l=0;l<e.length;){let u=e.indexOf(`
+`,l),d=u<0?e.length:u,f=e.slice(l,d);if(l=d+1,/^TITLE\s/.test(f.trim())){if(a||c||!/^TITLE\s+"[^"]*"\s*(?:#.*)?$/.test(f.trim()))throw TypeError(`.cube TITLE is invalid; supply one quoted title before the sample rows`);a=!0;continue}let p=f.indexOf(`#`),m=(p<0?f:f.slice(0,p)).trim();if(!m)continue;let h=m.split(/\s+/),g=h[0];if(g===`LUT_3D_SIZE`){if(i||c||h.length!==2||!/^[+-]?\d+$/.test(h[1]))throw TypeError(`.cube size header is invalid; supply one LUT_3D_SIZE integer before the sample rows`);i=w(Number(h[1])),r=new Float32Array(i**3*4)}else if(g===`DOMAIN_MIN`||g===`DOMAIN_MAX`){if(c||h.length!==4||g===`DOMAIN_MIN`&&o||g===`DOMAIN_MAX`&&s)throw TypeError(`.cube domain header is invalid; supply each three-value domain once before sample rows`);let e=g===`DOMAIN_MIN`?t:n;for(let t=0;t<3;t++)e[t]=C(h[t+1],`.cube domain`);g===`DOMAIN_MIN`?o=!0:s=!0}else{if(!r||h.length!==3||c>=i**3)throw TypeError(`.cube sample row is invalid; supply exactly size³ RGB rows after the size header`);for(let e=0;e<3;e++)r[c*4+e]=C(h[e],`.cube sample`);r[c*4+3]=1,c++}}if(!r||c!==i**3)throw TypeError(`.cube sample count is invalid; supply exactly size³ RGB rows after a LUT_3D_SIZE header`);let l={size:i,data:r,domainMin:t,domainMax:n};return T(l),l}function C(e,t){if(!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.test(e))throw/^[+-]?(?:NaN|Infinity)$/.test(e)?RangeError(`${t} is not finite; supply a finite Float32 value`):TypeError(`${t} syntax is invalid; supply a decimal or scientific-notation number`);let n=Number(e);if(!Number.isFinite(Math.fround(n)))throw RangeError(`${t} is outside Float32 range; supply a finite Float32 value`);return n}function w(e){if(typeof e!=`number`)throw TypeError(`LUT size must be a number; supply an integer from 2 through 65`);if(!Number.isInteger(e)||e<2||e>65)throw RangeError(`LUT size is outside 2-65; supply an integer from 2 through 65`);return e}function le(e){if(!e||typeof e!=`object`)throw TypeError(`LUT must be an object; supply Float32 data and domains`);let t=w(e.size===void 0?33:e.size);if(!(e.data instanceof Float32Array)||e.data.length!==t**3*4||!(e.domainMin instanceof Float32Array)||e.domainMin.length!==3||!(e.domainMax instanceof Float32Array)||e.domainMax.length!==3)throw TypeError(`LUT arrays are invalid; supply size³ RGBA samples and two three-value Float32 domains`);T(e);for(let t=0;t<e.data.length;t++)if(!Number.isFinite(e.data[t]))throw RangeError(`LUT sample is not finite; supply finite RGB and alpha values`)}function T(e){for(let t=0;t<3;t++)if(!Number.isFinite(e.domainMin[t])||!Number.isFinite(e.domainMax[t])||!Number.isFinite(Math.fround(e.domainMax[t]-e.domainMin[t]))||e.domainMax[t]<=e.domainMin[t])throw RangeError(`LUT domain is invalid; supply finite minima below maxima with finite Float32 ranges`)}var E=.18,D=10,O=2.4,k=1.5,A=2.4,j=1e-10,ue=.6,de=[.6274039,.32928304,.043313066,.069097289,.9195404,.011362316,.016391439,.088013308,.89559525],fe=[.85662716,.095121245,.048251598,.13731897,.76124199,.10143904,.11189821,.076799415,.81130238],M=[1.1271006,-.11060664,-.016493931,-.14132975,1.1578237,-.016493931,-.14132975,-.11060664,1.2519364],N=[1.660491,-.58764114,-.072849863,-.12455047,1.1328999,-.0083494226,-.018150763,-.1005789,1.1187297],pe=[.26270021,.67799807,.059301716],me=[.21263901,.71516868,.072192315],he=N.map((e,t)=>{let n=t-t%3,r=t%3;return N[n]*M[r]+N[n+1]*M[r+3]+N[n+2]*M[r+6]}),P=16.5,ge=1/P,_e=(D-Math.log2(E))/P,F=D/P,I=E**(1/A),L=(e,t)=>e*((e/t)**k-1)**(-1/k),ve=L(O*.3939393939393939,1-I),ye=L(O*F,I),R=e=>Number.isInteger(e)?e+`.0`:String(e),z=e=>`mat3x3f(${[0,1,2].map(t=>`vec3f(${R(e[t])},${R(e[t+3])},${R(e[t+6])})`).join(`,`)})`,B=e=>`vec3f(${e.map(R).join(`,`)})`,be=`fn agxRail(c:vec3f,w:vec3f)->vec3f{let o=c+max(-min(c.x,min(c.y,c.z)),0.0);let y=max(dot(c,w),0.0);
+let s=dot(o,w);return select(o,o*(y/s),s>y);}
+fn agxHsv(c:vec3f)->vec3f{let m=max(c.x,max(c.y,c.z));let d=m-min(c.x,min(c.y,c.z));var h=0.0;
+if(d>0.0){if(m==c.x){h=(c.y-c.z)/d;}else if(m==c.y){h=(c.z-c.x)/d+2.0;}else{h=(c.x-c.y)/d+4.0;}}
+return vec3f(fract(h/6.0),select(0.0,d/m,m>0.0),m);}
+fn agxRgb(c:vec3f)->vec3f{let k=(vec3f(5.0,3.0,1.0)+c.x*6.0)%6.0;return c.z-c.z*c.y*clamp(min(k,4.0-k),vec3f(0.0),vec3f(1.0));}
+fn agxSide(t:vec3f,k:vec3f)->vec3f{let u=${R(O)}*t/k;return k*u/pow(1.0+pow(u,vec3f(${R(k)})),vec3f(${R(1/k)}));}
+fn agx(c:vec3f)->vec3f{
+let i=${z(fe)}*agxRail(${z(de)}*c,${B(pe)});
+let x=clamp(log2(select(vec3f(${R(j)}),i,i>vec3f(${R(j)})))*${R(ge)}+${R(_e)},vec3f(0.0),vec3f(1.0));
+let d=x-${R(F)};let y=${R(I)}+sign(d)*agxSide(abs(d),select(vec3f(${R(ye)}),vec3f(${R(ve)}),d>=vec3f(0.0)));
+var f=agxHsv(pow(max(y,vec3f(0.0)),vec3f(${R(A)})));let p=agxHsv(i);
+if(f.y>0.0&&p.y>0.0){let h=p.x-f.x;f.x=fract(f.x+${R(ue)}*(h-floor(h+0.5)));}
+return clamp(agxRail(${z(he)}*agxRgb(f),${B(me)}),vec3f(0.0),vec3f(1.0));}
+`,xe=`fn aces(v:vec3f)->vec3f{let x=max(mat3x3f(vec3f(0.593472,0.076823,0.028601),vec3f(0.358198,0.90752,0.139254),vec3f(0.04833,0.015657,0.832145))*v,vec3f(0.0));let w=pow(x,vec3f(1.332491));let y=1.002*pow(w/(w+0.445751),vec3f(1.325334));return clamp(mat3x3f(vec3f(1.624002,-0.102265,-0.001975),vec3f(-0.547579,1.110313,-0.089177),vec3f(-0.076423,-0.008048,1.091152))*y,vec3f(0.0),vec3f(1.0));}
+`,V=`fn pbrNeutral(input:vec3f)->vec3f {let x=min(input.r,min(input.g,input.b));let offset=select(0.04,x-6.25*x*x,x<0.08);var v=input-offset;let peak=max(v.r,max(v.g,v.b));if(peak<0.76){return v;}let newPeak=1.0-0.24*0.24/(peak+0.24-0.76);v*=newPeak/peak;return mix(v,vec3f(newPeak),1.0-1.0/(0.15*(peak-newPeak)+1.0));}
+`;`${V}`;var Se=/let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/,Ce=e=>e.replace(Se,`return vec4f(linear,1);`),we=e=>`${e} requires the standard core lighting shader; remove the plugin that replaced core's shader`,H=`
+struct Params {grade:vec4f,domainMin:vec4f,domainMax:vec4f,settings:vec4f}
+@group(0) @binding(0) var<uniform> p:Params;
+fn margoContrast(c:vec3f,k:f32)->vec3f {if(k==1.0){return c;}if(k==0.0){return vec3f(0.18);}return 0.18*pow(max(c,vec3f(0))/0.18,vec3f(k));}
+@group(0) @binding(1) var scene:texture_2d<f32>;
+@group(0) @binding(2) var lut:texture_3d<f32>;
+fn acescgToSRGB(v:vec3f)->vec3f {
+  return mat3x3f(vec3f(1.705051,-0.130257,-0.024003),vec3f(-0.621792,1.140805,-0.128969),vec3f(-0.083259,-0.010548,1.152972))*v;
+}
+${xe}
+${be}
+${V}${c}fn sampleLUT(color:vec3f)->vec3f {
+  let uv=clamp((color-p.domainMin.xyz)/(p.domainMax.xyz-p.domainMin.xyz),vec3f(0),vec3f(1))*32.0;
+  let lo=vec3i(floor(uv));let hi=min(lo+1,vec3i(32));let t=fract(uv);
+  let z0=mix(mix(textureLoad(lut,lo,0).rgb,textureLoad(lut,vec3i(hi.x,lo.y,lo.z),0).rgb,t.x),
+    mix(textureLoad(lut,vec3i(lo.x,hi.y,lo.z),0).rgb,textureLoad(lut,vec3i(hi.x,hi.y,lo.z),0).rgb,t.x),t.y);
+  let z1=mix(mix(textureLoad(lut,vec3i(lo.x,lo.y,hi.z),0).rgb,textureLoad(lut,vec3i(hi.x,lo.y,hi.z),0).rgb,t.x),
+    mix(textureLoad(lut,vec3i(lo.x,hi.y,hi.z),0).rgb,textureLoad(lut,hi,0).rgb,t.x),t.y);
+  return mix(z0,z1,t.z);
+}
+@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {
+  let xy=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));return vec4f(xy[i],0,1);
+}
+`,Te=H+`@fragment fn fragment(@builtin(position) pos:vec4f)->@location(0) vec4f {
+  let source=textureLoad(scene,vec2i(pos.xy),0);var hdr=clean(source.rgb);
+  if(p.settings.x==1.0){hdr=acescgToSRGB(hdr);}
+  hdr=max(hdr,vec3f(0))*exp2(p.grade.x);
+  var color:vec3f;if(p.grade.z==1.0){color=aces(hdr);}else if(p.grade.z==2.0){color=pbrNeutral(hdr);}else{color=agx(hdr);}
+  color=clamp(margoContrast(color,p.grade.y),vec3f(0),vec3f(1));
+  if(p.grade.w==1.0){color=sampleLUT(color);}
+  color=clamp(color,vec3f(0),vec3f(1));
+  return vec4f(select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308)),source.a);
+}`,Ee=H+`
+fn rolloff(x:f32,white:f32)->f32 {if(x<0.76){return x;}return white-(white-0.76)*(white-0.76)/(x+white-1.52);}
+fn linearOutput(pos:vec4f)->vec4f {
+  let source=textureLoad(scene,vec2i(pos.xy),0);var hdr=clean(source.rgb);
+  if(p.settings.x==1.0){hdr=acescgToSRGB(hdr);}
+  hdr*=exp2(p.grade.x);
+
+  if(p.settings.z==1.0){hdr=mat3x3f(1.224940,-0.042057,-0.019638,-0.224940,1.042057,-0.078636,0.0,0.0,1.098274)*
+    max(mat3x3f(0.822462,0.033194,0.017083,0.177538,0.966806,0.072397,0.0,0.0,0.910520)*hdr,vec3f(0));}
+  let positive=max(hdr,vec3f(0));let white=p.settings.y;let m=max(positive.r,max(positive.g,positive.b));
+  var color:vec3f;
+  if(p.grade.z==2.0){
+    let x=min(positive.r,min(positive.g,positive.b));let offset=select(0.04,x-6.25*x*x,x<0.08);color=positive-offset;
+    let peak=max(color.r,max(color.g,color.b));
+    if(peak>=0.76){let newPeak=rolloff(peak,white);color*=newPeak/peak;color=mix(color,vec3f(newPeak),1.0-1.0/(0.15*(peak-newPeak)+1.0));}
+  }else{
+    if(p.grade.z==1.0){color=aces(positive);}else{color=agx(positive);}
+    if(m>=0.76){color*=rolloff(m,white)/rolloff(m,1.0);}
+  }
+  color=clamp(margoContrast(color,p.grade.y),vec3f(0),vec3f(white));
+  if(p.grade.w==1.0){color=sampleLUT(min(color,vec3f(1)))+max(color-1.0,vec3f(0));}
+  color=clamp(color,vec3f(0),vec3f(white));
+  if(m>0.0){color+=min(hdr,vec3f(0))*(max(color.r,max(color.g,color.b))/m);}
+  return vec4f(color,source.a);
+}
+@fragment fn fragment(@builtin(position) pos:vec4f)->@location(0) vec4f {
+  let o=linearOutput(pos);let color=clamp(o.rgb,vec3f(0),vec3f(1));
+  return vec4f(select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308)),o.a);
+}
+@fragment fn excess(@builtin(position) pos:vec4f)->@location(0) vec4f {let o=linearOutput(pos);return vec4f(o.rgb-clamp(o.rgb,vec3f(0),vec3f(1)),0);}
+`;function De(e){return e.replace(`fn sampleLUT(color:vec3f)->vec3f {`,`fn sampleLUT(color:vec3f)->vec3f {
+  let edge=i32(textureDimensions(lut).x)-1;`).replace(`vec3f(1))*32.0;`,`vec3f(1))*f32(edge);`).replace(`min(lo+1,vec3i(32))`,`min(lo+1,vec3i(edge))`)}function Oe(e){let t=e=>`}else if(p.grade.z==3.0){color=${e}/(1.0+${e});}else if(p.grade.z==4.0){let f=max(${e}-0.004,vec3f(0));color=pow(f*(6.2*f+0.5)/(f*(6.2*f+1.7)+0.06),vec3f(2.2));}else if(p.grade.z==5.0){color=min(${e},vec3f(1));}else{color=agx(${e});}`;return e.replace(`}else{color=agx(hdr);}`,t(`hdr`)).replace(`}else{color=agx(positive);}`,t(`positive`))}function ke(e){let t=`color=clamp(margoContrast(color,p.grade.y),`;if(!e.includes(t)||!e.includes(`fn margoContrast`))throw RangeError(`Tonemap shader has no contrast step to shape before; pass tonemapShader or outputShader.`);return e.replace(`fn margoContrast`,Ae+`fn margoContrast`).split(t).join(`color=margoShape(color);
+  `+t)}var Ae=`fn margoCurveAt(x:vec3f)->vec3f {
+  if(p.grade.z==1.0){return aces(x);}
+  if(p.grade.z==2.0){return pbrNeutral(x);}
+  if(p.grade.z==3.0){return x/(1.0+x);}
+  if(p.grade.z==4.0){let f=max(x-0.004,vec3f(0));return pow(f*(6.2*f+0.5)/(f*(6.2*f+1.7)+0.06),vec3f(2.2));}
+  if(p.grade.z==5.0){return min(x,vec3f(1));}
+  return agx(x);
+}
+fn margoShape(c:vec3f)->vec3f {
+  var x=c;
+  let white=p.domainMin.w;
+  if(white>0.0){
+    if(p.grade.z==3.0){let w=max(white,0.01);x=x*(1.0+x/(max(vec3f(1)-x,vec3f(0.000001))*w*w));}
+    else{x=x/max(margoCurveAt(vec3f(max(white,0.01))),vec3f(0.000001));}
+  }
+  x=clamp(x,vec3f(0),vec3f(1));
+  let a=1.0+p.domainMax.w;let b=1.0+p.settings.w;
+  if(a!=1.0||b!=1.0){let x2=x*x;let x3=x2*x;x=(x3-2.0*x2+x)*a+(3.0*x2-2.0*x3)+(x3-x2)*b;}
+  return x;
+}
+`;function je(e){let t=`var hdr=clean(source.rgb);`,n=0,r=e.split(t).join(`var hdr=clean(margoStraight(source));`).replace(/return vec4f\((.*pow\(color,.*),(source|o)\.a\);/g,(e,t,r)=>(n++,`return margoOutput((${t}),textureLoad(scene,vec2i(pos.xy),0),${r}.a);`));if(!e.includes(t)||!n)throw RangeError(`Tonemap shader has no input or display output to premultiply; pass tonemapShader or outputShader.`);return`${r}
+fn margoStraight(s:vec4f)->vec3f {if(s.a>0.0&&s.a<1.0){return s.rgb/s.a;}return s.rgb;}
+fn margoOutput(color:vec3f,s:vec4f,alpha:f32)->vec4f {
+  if(s.a>0.0&&s.a<1.0){return vec4f(color*s.a,alpha);}
+  if(s.a>0.0){return vec4f(color,alpha);}
+  if(all(s.rgb<=vec3f(0))){return vec4f(0,0,0,alpha);}
+  return vec4f(color,max(color.r,max(color.g,color.b)));
+}
+`}var Me=[`mean`,`histogram`],U=[`average`,`center`,`spot`,`mask`],W=(e,t,n)=>e===void 0||Number.isFinite(e)&&e>=t&&e<=n;function Ne(e){let t=e.percentiles,n=e.spot;return(e.method===void 0||Me.includes(e.method))&&(e.metering===void 0||U.includes(e.metering))&&(t===void 0||Array.isArray(t)&&t.length===2&&W(t[0],0,1)&&W(t[1],0,1)&&t[0]<t[1])&&(n===void 0||typeof n==`object`&&W(n.x,0,1)&&W(n.y,0,1)&&W(n.radius,.001,1))&&(e.metering!==`mask`||typeof e.mask==`function`||typeof e.mask?.createView==`function`)}function Pe(e,t,n,r){if(e.set(t,0),e[4]=n.min??-4,e[5]=n.max??4,e[6]=r,e[7]=n.compensation??0,e[8]=+(n.method===`histogram`),e[9]=U.indexOf(n.metering??`average`),e[10]=n.percentiles?.[0]??.1,e[11]=n.percentiles?.[1]??.9,n.metering===`spot`){let r=(n.spot?.radius??.05)*Math.min(t[2],t[3]);e[12]=t[0]+(n.spot?.x??.5)*t[2]-r,e[13]=t[1]+(n.spot?.y??.5)*t[3]-r,e[14]=e[15]=2*r}else e.set(t,12);return e}var G=6500;function K(e){let[t,n]=i(e),r=t/n,a=(1-t-n)/n;return[3.2404542*r-1.5371385-.4985314*a,-.969266*r+1.8760108+.041556*a,.0556434*r-.2040259+1.0572252*a]}var q=[[.42272531,.49134529,.027357931],[.055699661,.96153401,.023183824],[.021382653,.087641898,.9805081]],Fe=[[2.538044,-1.2932767,-.040236827],[-.14600373,1.1166482,-.02232905],[-.04229855,-.07160724,1.0227527]],J=(e,t)=>e.map(e=>e[0]*t[0]+e[1]*t[1]+e[2]*t[2]),Y=e=>.2126*e[0]+.7152*e[1]+.0722*e[2],Ie=J(q,K(G));function Le(e=G,t=0){if(!Number.isFinite(e)||e<1667||e>25e3||!Number.isFinite(t)||t<-1||t>1)throw RangeError(`Tonemap white balance needs a temperature of 1667-25000 K and a tint of -1 to 1`);if(e===6500&&t===0)return[1,0,0,0,1,0,0,0,1];let n=K(e),r=J(q,n),i=Fe.map((e,n)=>[0,1,2].map(i=>(n===1?1-.25*t:1)*e.reduce((e,t,n)=>e+t*Ie[n]*q[n][i]/r[n],0))),a=Y(n)/Y(J(i,n));return[0,1,2].flatMap(e=>[i[0][e]*a,i[1][e]*a,i[2][e]*a])}function Re(e){return!!(e.temperature!==void 0&&e.temperature!==6500||e.tint||e.vignette||e.grain||e.dither||e.chromaticAberration||e.autoExposure)}var ze=`
+struct Fx {wb0:vec4f,wb1:vec4f,wb2:vec4f,vig:vec4f,rect:vec4f,time:vec4f,vc:vec4f,vp:vec4f}
+@group(0) @binding(3) var<uniform> fx:Fx;
+fn fxPcg(v:u32)->u32 {let s=v*747796405u+2891336375u;let w=((s>>((s>>28u)+4u))^s)*277803737u;return (w>>22u)^w;}
+fn fxBalance(c:vec3f)->vec3f {return mat3x3f(fx.wb0.xyz,fx.wb1.xyz,fx.wb2.xyz)*c;}
+fn fxNoise(pos:vec2f)->f32 {
+  let h=fxPcg(u32(pos.x)+fxPcg(u32(pos.y)+fxPcg(u32(fx.time.x))));return f32(h)/4294967295.0-0.5;
+}
+fn fxFetch(pos:vec4f)->vec4f {
+  let size=vec2i(textureDimensions(scene))-1;
+  if(fx.vig.w==0.0){return textureLoad(scene,vec2i(pos.xy),0);}
+  let d=(pos.xy-fx.rect.xy)/fx.rect.zw-0.5;let o=d*fx.vig.w*fx.rect.zw;
+  let g=textureLoad(scene,vec2i(pos.xy),0);
+  let r=textureLoad(scene,clamp(vec2i(pos.xy+o),vec2i(0),size),0).r;
+  let b=textureLoad(scene,clamp(vec2i(pos.xy-o),vec2i(0),size),0).b;
+  return vec4f(r,g.g,b,g.a);
+}
+fn fxDither(c:vec3f,pos:vec4f)->vec3f {
+  if(fx.vp.w==0.0){return c;}
+  let s=vec3u(u32(pos.x),u32(pos.y),fxPcg(u32(fx.time.x)+0x9e3779b9u));
+  let a=vec3u(fxPcg(s.x+fxPcg(s.y+s.z)),fxPcg(s.x+fxPcg(s.y+s.z+1u)),fxPcg(s.x+fxPcg(s.y+s.z+2u)));
+  let b=vec3u(fxPcg(a.x),fxPcg(a.y),fxPcg(a.z));
+  let n=(vec3f(a)+vec3f(b))/4294967295.0-1.0;
+  return c+n*min(vec3f(fx.vp.w),min(c,1.0-c));
+}
+fn fxFinish(c:vec3f,pos:vec4f,white:f32)->vec3f {
+  var color=c;
+  if(fx.wb0.w>0.0){
+    let d=((pos.xy-fx.rect.xy)/fx.rect.zw-fx.vp.xy)*2.0*mix(vec2f(1),fx.rect.zw*1.41421356/length(fx.rect.zw),fx.vp.z);
+    let v=fx.wb0.w*smoothstep(fx.vig.x,fx.vig.x+fx.vig.y,length(d)*0.70710678);
+    color=select(color*mix(vec3f(1),fx.vc.rgb,v),mix(color,fx.vc.rgb,v),fx.vc.w==1.0);
+  }
+  if(fx.vig.z>0.0){
+    let l=clamp(dot(color,vec3f(0.2126,0.7152,0.0722))/white,0.0,1.0);
+    color+=fxNoise(pos.xy)*fx.vig.z*0.2*white*(1.0-0.6*abs(2.0*l-1.0));
+  }
+  return color;
+}
+`;function X(t,n,r){if(!t.includes(n))throw new e(`failed`,`Tonemap effects patch target missing; update effects.ts to match the shader`);return t.replace(n,r)}function Be(t,n){let r=X(t,`struct Params`,ze+`struct Params`);n&&(r=X(r,`@group(0) @binding(3) var<uniform> fx:Fx;`,`@group(0) @binding(3) var<uniform> fx:Fx;
+@group(0) @binding(4) var<storage,read> ae:array<f32,2>;`));let i=n?`p.grade.x+ae[0]`:`p.grade.x`;if(r=r.split(`let source=textureLoad(scene,vec2i(pos.xy),0);`).join(`let source=fxFetch(pos);`),r.includes(`hdr=max(hdr,vec3f(0))*exp2(p.grade.x);`)&&(r=X(r,`hdr=max(hdr,vec3f(0))*exp2(p.grade.x);`,`hdr=max(fxBalance(max(hdr,vec3f(0))),vec3f(0))*exp2(${i});`)),r.includes(`hdr*=exp2(p.grade.x);`)&&(r=X(r,`hdr*=exp2(p.grade.x);`,`hdr=fxBalance(hdr)*exp2(${i});`)),r.includes(`  color=clamp(color,vec3f(0),vec3f(1));
+  return vec4f(select`)&&(r=X(r,`  color=clamp(color,vec3f(0),vec3f(1));
+  return vec4f(select`,`  color=clamp(fxFinish(color,pos,1.0),vec3f(0),vec3f(1));
+  return vec4f(select`)),r.includes(`  color=clamp(color,vec3f(0),vec3f(white));
+  if(m>0.0)`)&&(r=X(r,`  color=clamp(color,vec3f(0),vec3f(white));
+  if(m>0.0)`,`  color=clamp(fxFinish(color,pos,white),vec3f(0),vec3f(white));
+  if(m>0.0)`)),r=X(r,`return vec4f(select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308)),`,`return vec4f(fxDither(select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308)),pos),`),!r.includes(`fxFinish(color`))throw new e(`failed`,`Tonemap effects patch found no output stage; update effects.ts to match the shader`);return r}var Ve=`
+struct Meter {rect:vec4f,params:vec4f,mode:vec4f,domain:vec4f}
+@group(0) @binding(0) var<uniform> m:Meter;
+@group(0) @binding(1) var scene:texture_2d<f32>;
+@group(0) @binding(2) var<storage,read_write> st:array<f32,2>;
+@group(0) @binding(3) var mask:texture_2d<f32>;
+var<workgroup> sums:array<vec2f,256>;
+var<workgroup> bins:array<atomic<u32>,64>;
+@compute @workgroup_size(256) fn main(@builtin(local_invocation_index) i:u32) {
+  if(i<64u){atomicStore(&bins[i],0u);}
+  workgroupBarrier();
+  let tx=i%16u;let ty=i/16u;var acc=vec2f(0);
+  for(var k=0u;k<16u;k++){
+    let uv=vec2f((f32(tx*4u+(k%4u))+0.5)/64.0,(f32(ty*4u+(k/4u))+0.5)/64.0);
+    let pix=clamp(m.domain.xy+uv*m.domain.zw,m.rect.xy,m.rect.xy+m.rect.zw-1.0);
+    let c=textureLoad(scene,vec2i(pix),0).rgb;
+    var l=dot(max(c,vec3f(0)),vec3f(0.2126,0.7152,0.0722));
+    l=select(65000.0,l,l<65000.0);
+    let v=clamp(log2(max(l,0.0001)),-12.0,12.0);
+    var w=1.0;
+    if(m.mode.y==1.0){let d=(pix-m.rect.xy-0.5*m.rect.zw)/m.rect.w;w=exp(-8.0*dot(d,d));}
+    else if(m.mode.y==2.0){w=select(0.0,1.0,length(uv-0.5)<=0.5);}
+    else if(m.mode.y==3.0){
+      let size=vec2f(textureDimensions(mask));
+      w=clamp(textureLoad(mask,vec2i(min((pix-m.rect.xy)/m.rect.zw*size,size-1.0)),0).r,0.0,1.0);
+    }
+    acc+=vec2f(w*v,w);
+    if(m.mode.x==1.0){atomicAdd(&bins[min(u32((v+12.0)/24.0*64.0),63u)],u32(w*256.0+0.5));}
+  }
+  sums[i]=acc;workgroupBarrier();
+  for(var s=128u;s>0u;s>>=1u){if(i<s){sums[i]+=sums[i+s];}workgroupBarrier();}
+  if(i==0u){
+    var total=sums[0].y;var level=sums[0].x/max(total,1e-12);
+    if(m.mode.x==1.0){
+      var count=0u;for(var b=0u;b<64u;b++){count+=atomicLoad(&bins[b]);}
+      let lo=f32(count)*m.mode.z;let hi=f32(count)*m.mode.w;var below=0.0;var kept=0.0;var sum=0.0;
+      for(var b=0u;b<64u;b++){
+        let n=f32(atomicLoad(&bins[b]));let part=min(hi,below+n)-max(lo,below);
+        if(part>0.0){kept+=part;sum+=part*(-12.0+(f32(b)+0.5)*0.375);}
+        below+=n;
+      }
+      total=kept;level=sum/max(kept,1e-12);
+    }
+    if(total>0.0){
+      let want=clamp(log2(0.18)-level+m.params.w,m.params.x,m.params.y);
+      if(st[1]==0.0){st[0]=want;st[1]=1.0;}else{st[0]+=(want-st[0])*m.params.z;}
+    }
+  }
+}`,He=Symbol.for(`margoengine.premultiplied-canvas`),Ue=Symbol.for(`margoengine.color-output`),Z=[`agx`,`acescg`,`neutral`,`reinhard`,`cineon`,`linear`],Q=[],We=[],Ge=[0,0,0],Ke=[.5,.5],qe=e=>e.includes(`8unorm`)?1/255:e===`rgb10a2unorm`?1/1023:0,$=(e,t,n)=>e===void 0||Number.isFinite(e)&&e>=t&&e<=n,Je=(e,t)=>e===void 0||Array.isArray(e)&&e.length===t&&e.every(e=>$(e,0,1));function Ye(e){if(e===void 0||typeof e==`boolean`)return!0;let{min:t=-4,max:n=4,speed:r=1.5,compensation:i=0}=e;return $(t,-16,16)&&$(n,-16,16)&&t<=n&&$(r,.01,100)&&$(i,-8,8)&&Ne(e)}var Xe=class r{coreRequirement=n(`1.0.0`,import.meta.url);constructor(e={}){this.options=e,this.name=`tonemap`,this.values=new Float32Array(16),this.shaders=new Map,this.attachment={view:void 0,loadOp:`clear`,storeOp:`store`},this.presentation={colorAttachments:[this.attachment]},this.disposed=!1,this.stacked=!1,this.frameCount=0,this.grainFrame=0,this.clocked=!1,this.pending=!1,this.seconds=0,this.extBuffers=[],this.extResources=[],this.fxValues=new Float32Array(32),this.balanceKelvin=NaN,this.balanceTint=NaN,this.meterValues=new Float32Array(16),this.excessPass={view:void 0,loadOp:`clear`,storeOp:`store`},this.excessDescriptor={colorAttachments:[this.excessPass]},this.keyFlags=-1,this.source=e.source,this.validate()}static attach(e,i={}){t(e,n(`1.0.0`,import.meta.url));let a=new r(i);return l(e).use(a),a}get time(){return this.seconds}resetTime(){this.frameCount=this.grainFrame=this.seconds=0,this.clocked=this.pending=!1,this.resetExposure()}advanceTime(e){this.disposed||(this.clocked=!0,e>0?(this.seconds+=e,this.grainFrame=this.frameCount++&16777215,this.pending=!1):this.pending=!0)}onPreUpdate(e){this.advanceTime(e)}joinStack(t){if(this.engine||this.stacked||this.disposed||this.source)throw new e(`attached`,`Tonemap is already attached or has its own source; stack a new Tonemap without options.source`);return this.stacked=!0,{kind:`display`,render:(e,t,n)=>{this.validate(),this.paint(e,t,n.format,n.multisample,n.view)}}}validate(){let t=this.options,n=t.exposure??0,r=t.contrast??1;if(!$(t.vignette,0,1)||!$(t.vignetteRadius,0,1)||!$(t.vignetteSoftness,0,1)||!$(t.grain,0,1)||!$(t.vignetteRoundness,0,1)||t.vignetteBlend!==void 0&&t.vignetteBlend!==`multiply`&&t.vignetteBlend!==`opaque`||!Je(t.vignetteColor,3)||!Je(t.vignetteCenter,2)||!(typeof t.dither==`boolean`||$(t.dither,0,1))||!$(t.chromaticAberration,0,1)||!$(t.whitePoint,0,64)||!$(t.toe,0,3)||!$(t.shoulder,0,3)||!$(t.tint,-1,1)||!$(t.temperature,1667,25e3)||!Ye(t.autoExposure)||t.extensions!==void 0&&!(Array.isArray(t.extensions)&&t.extensions.every(e=>typeof e?.patch==`function`&&typeof e.key==`string`))||t.curve!==void 0&&!Z.includes(t.curve)||t.inputColorSpace!==void 0&&t.inputColorSpace!==`linear-srgb`&&t.inputColorSpace!==`acescg`||!Number.isFinite(n)||n<-16||n>16||!Number.isFinite(r)||r<0||r>4||t.source!==this.source||t.source!==void 0&&typeof t.source!=`function`)throw RangeError(`Invalid Tonemap options; use curve agx, acescg, neutral, reinhard, cineon or linear, exposure within -16..16, contrast within 0..4, whitePoint within 0..64, toe and shoulder within 0..3, and keep source unchanged after attach.`);if(!this.source&&t.inputColorSpace===`acescg`)throw new e(`state`,`ACEScg input requires an external ACEScg source; pass options.source`)}setup(t){if(this.disposed||!t.gpu)throw new e(this.disposed?`disposed`:`unsupported`,`Tonemap requires WebGPU and a live effect; attach a new Tonemap to a WebGPU engine; see https://margoengine.com/errors#webgpu`);if(!this.source&&!this.stacked&&(t.hasPlugin(`dof`)||t.hasPlugin(`ssao`)||t.hasPlugin(`post-processing`)||t.hasPlugin(`bloom`)))throw new e(`state`,`Tonemap needs an explicit HDR source when another effect owns scene capture; pass options.source`);this.checkLUTSize(t.gpu,this.lut);let n=this.engine;this.engine=t;try{this.uniform=t.gpu.createBuffer({size:64,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),this.uploadLUT(this.lut)}catch(e){throw this.uniform?.destroy(),this.uniform=void 0,this.engine=n,e}}setLUT(t){if(this.disposed)throw new e(`disposed`,`Tonemap is disposed; create a new Tonemap`);let n=typeof t==`string`?ce(t):t;n!==null&&le(n);let r=n?{size:n.size??33,data:n.data.slice(),domainMin:n.domainMin.slice(),domainMax:n.domainMax.slice()}:void 0;this.engine?this.uploadLUT(r):this.lut=r}checkLUTSize(e,t){let n=t?.size??33,r=e.limits?.maxTextureDimension3D;if(r!==void 0&&n>r)throw RangeError(`Tonemap LUT size exceeds the device 3D texture limit; use a smaller LUT`)}uploadLUT(e){let t=this.engine.gpu,n=this.lutTexture,r=e?.size??33;this.checkLUTSize(t,e);let i=t.createTexture({dimension:`3d`,size:[r,r,r],format:`rgba32float`,usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});try{e&&t.queue.writeTexture({texture:i},e.data,{bytesPerRow:r*16,rowsPerImage:r},[r,r,r])}catch(e){throw i.destroy(),e}this.lut=e,this.lutTexture=i,this.group=void 0,n?.destroy()}registerPasses(e){this.stacked||(e.add({name:`tonemap:capture`,order:-50,execute:e=>{e.backend===`webgpu`&&this.capture(e)}}),e.add({name:`tonemap:grade`,order:31,execute:e=>{e.backend===`webgpu`&&this.grade(e)}}))}capture(t){if(this.validate(),this.source)return;if(this.engine.hasPlugin(`dof`)||this.engine.hasPlugin(`ssao`)||this.engine.hasPlugin(`post-processing`)||this.engine.hasPlugin(`bloom`))throw new e(`state`,`Tonemap cannot share scene capture without an HDR source; pass options.source`);this.original=t.color,(this.scene?.width!==t.width||this.scene.height!==t.height||this.depth?.format!==t.descriptor.depthStencil.format||this.captureTarget?.samples!==(t.descriptor.multisample?.count??4))&&(this.captureTarget?.dispose(),this.depth?.destroy(),this.scene?.destroy(),this.scene=t.device.createTexture({size:[t.width,t.height],format:`rgba16float`,usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.RENDER_ATTACHMENT}),this.sceneView=this.scene.createView(),this.depth=t.device.createTexture({size:[t.width,t.height],format:t.descriptor.depthStencil.format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING}),this.captureTarget=new ne(t.device,this.scene,this.depth,t.descriptor.multisample?.count??4));let n=this.shaders.get(t.shader);if(n===void 0){if(n=Ce(t.shader),n===t.shader)throw new e(`unsupported`,we(`Tonemap`));this.shaders.set(t.shader,n)}t.shader=n,this.format=t.format,this.captureTarget.begin(t)}grade(t){this.source||this.captureTarget.resolve(t.encoder,!0,!1);let n=this.source?this.source():this.scene;if(!n||n.width!==t.width||n.height!==t.height||n.dimension!==`2d`||n.sampleCount!==1||n.format!==`rgba16float`&&n.format!==`rgba32float`||!(n.usage&GPUTextureUsage.TEXTURE_BINDING))throw new e(`state`,`Tonemap requires a viewport-sized, sampleable linear HDR texture; return one from options.source`);this.paint(t,n,this.source?t.format:this.format,t.descriptor.multisample,this.source?t.color:this.original),this.source||this.captureTarget.restore(t)}paint(e,t,n,r,i){let a=e[Ue],o=a?.excess,s=(this.lut?.size??33)!==33,c=this.options,l=!!c.autoExposure,u=Re(c),p=c.extensions??Q,m=Z.indexOf(c.curve)>2,h=(c.whitePoint??0)>0||(c.toe??1)!==1||(c.shoulder??1)!==1,g=!!this.engine.canvas?.[He],_=p.length?-1:!!o|(s?2:0)|(u?l?12:4:0)|(m?16:0)|(h?32:0)|(g?64:0),v=this.pipeline&&_>=0&&_===this.keyFlags&&n===this.keyFormat&&r?.count===this.keySamples?this.pipelineFormat:n+`:`+r?.count+(o?`:output`:``)+(s?`:lut-size`:``)+(u?l?`:fx-auto`:`:fx`:``)+(m?`:classic`:``)+(h?`:shape`:``)+(g?`:premultiplied`:``)+(p.length?`:`+p.map(e=>e.key).join(`,`):``);if(this.keyFlags=_,this.keyFormat=n,this.keySamples=r?.count,!this.pipeline||this.pipelineFormat!==v){let t=o?Ee:Te;s&&(t=De(t)),u&&(t=Be(t,l)),m&&(t=Oe(t)),h&&(t=ke(t));for(let[e,n]of p.entries())t=n.patch(t,5+e,16+4*e);g&&(t=je(t));for(let e of this.extBuffers)e?.destroy();this.extBuffers=p.map(t=>t.values&&e.device.createBuffer({size:t.values().byteLength,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}));let i=e.device.createShaderModule({code:t});this.pipeline=e.device.createRenderPipeline({layout:`auto`,vertex:{module:i,entryPoint:`vertex`},fragment:{module:i,entryPoint:`fragment`,targets:[{format:n}]},multisample:r}),this.excessPipeline=o&&e.device.createRenderPipeline({layout:`auto`,vertex:{module:i,entryPoint:`vertex`},fragment:{module:i,entryPoint:`excess`,targets:[{format:`rgba16float`}]}}),this.pipelineFormat=v,this.group=void 0}for(let n=0;n<p.length;n++)p[n].encode?.({device:e.device,encoder:e.encoder,source:t,width:e.width,height:e.height});let y=p.length?p.flatMap((e,t)=>(e.resources?.()??[]).slice(0,4).map((e,n)=>({binding:16+4*t+n,resource:e}))):We;if(!this.group||this.sourceTexture!==t||y.length!==this.extResources.length||y.length>0&&y.some((e,t)=>e.resource!==this.extResources[t])){this.extResources=y.map(e=>e.resource);let n={layout:this.pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.uniform}},{binding:1,resource:`createView`in t?t.createView():t},{binding:2,resource:this.lutTexture.createView()},...u?[{binding:3,resource:{buffer:this.effectsBuffer(e.device)}}]:[],...l?[{binding:4,resource:{buffer:this.stateBuffer(e.device)}}]:[],...this.extBuffers.flatMap((e,t)=>e?[{binding:5+t,resource:{buffer:e}}]:[]),...y]};this.meterGroup=void 0,this.group=e.device.createBindGroup(n),this.sourceTexture=t,this.excessGroup=this.excessPipeline&&e.device.createBindGroup({...n,layout:this.excessPipeline.getBindGroupLayout(0)})}let b=this.values;b[0]=c.exposure??0,b[1]=c.contrast??1,b[2]=c.curve===`acescg`?1:c.curve===`agx`?0:c.curve===void 0?2:Z.indexOf(c.curve),b[3]=+!!this.lut,b[7]=c.whitePoint??0,b[11]=(c.toe??1)-1,b[15]=(c.shoulder??1)-1;for(let e=0;e<3;e++)b[4+e]=this.lut?.domainMin[e]??0,b[8+e]=this.lut?.domainMax[e]??1;b[12]=+(c.inputColorSpace===`acescg`),b[13]=o?a.peak:0,b[14]=+!!(o&&a.p3),e.device.queue.writeBuffer(this.uniform,0,b);for(let t=0;t<p.length;t++){let n=this.extBuffers[t],r=p[t];n&&r.values&&e.device.queue.writeBuffer(n,0,r.values())}u&&this.applyEffects(e,t,l,n),this.attachment.view=i,this.attachment.loadOp=f(e,`clear`);let x=e.encoder.beginRenderPass(this.presentation);if(x.setPipeline(this.pipeline),x.setBindGroup(0,this.group),d(x,e),x.draw(3),x.end(),o){this.excessPass.view=o(e.width,e.height),this.excessPass.loadOp=f(e,`clear`);let t=e.encoder.beginRenderPass(this.excessDescriptor);t.setPipeline(this.excessPipeline),t.setBindGroup(0,this.excessGroup),d(t,e),t.draw(3),t.end()}}effectsBuffer(e){return this.fxBuffer??=e.createBuffer({size:128,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST})}resetExposure(){this.aeBuffer&&this.engine?.gpu&&this.engine.gpu.queue.writeBuffer(this.aeBuffer,0,new Float32Array(2))}stateBuffer(e){return this.aeBuffer??=e.createBuffer({size:8,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST|GPUBufferUsage.COPY_SRC})}applyEffects(e,t,n,r){let i=this.options,a=this.fxValues,o=u(e)??[0,0,e.width,e.height],s=i.temperature??6500,c=i.tint??0;if(s!==this.balanceKelvin||c!==this.balanceTint){let e=Le(s,c);for(let t=0;t<9;t++)a[4*Math.floor(t/3)+t%3]=e[t];this.balanceKelvin=s,this.balanceTint=c}a[3]=i.vignette??0,a[12]=i.vignetteRadius??.5,a[13]=Math.max(i.vignetteSoftness??.5,1e-4),a[14]=i.grain??0,a[15]=(i.chromaticAberration??0)*.02,a.set(o,16),(!this.clocked||this.pending)&&(this.grainFrame=this.frameCount++&16777215),this.pending=!1,a[20]=this.grainFrame;let l=i.vignetteColor??Ge,d=i.vignetteCenter??Ke;if(a.set(l,24),a[27]=+(i.vignetteBlend===`opaque`),a.set(d,28),a[30]=i.vignetteRoundness??0,a[31]=+(i.dither??0)*qe(r),e.device.queue.writeBuffer(this.effectsBuffer(e.device),0,a),!n)return;let f=typeof i.autoExposure==`object`?i.autoExposure:{},p=this.meterValues;this.meterPipeline||(this.meterPipeline=e.device.createComputePipeline({layout:`auto`,compute:{module:e.device.createShaderModule({code:Ve}),entryPoint:`main`}}),this.meterBuffer=e.device.createBuffer({size:64,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),this.blankMask=e.device.createTexture({size:[1,1],format:`r8unorm`,usage:GPUTextureUsage.TEXTURE_BINDING}));let m=this.blankMask;f.metering===`mask`&&f.mask!==void 0&&(this.maskOption?this.maskOption.value!==f.mask&&this.maskOption.set(f.mask,e.device):this.holdMask(f.mask,e.device),m=this.maskOption?.get(e.device,this.engine)??m),(!this.meterGroup||this.meterMask!==m)&&(this.meterMask=m,this.meterGroup=e.device.createBindGroup({layout:this.meterPipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:this.meterBuffer}},{binding:1,resource:`createView`in t?t.createView():t},{binding:2,resource:{buffer:this.stateBuffer(e.device)}},{binding:3,resource:m.createView()}]})),Pe(p,o,f,1-Math.exp(-(f.speed??1.5)*Math.max(0,Math.min(e.delta,.25)))),e.device.queue.writeBuffer(this.meterBuffer,0,p);let h=e.encoder.beginComputePass();h.setPipeline(this.meterPipeline),h.setBindGroup(0,this.meterGroup),h.dispatchWorkgroups(1),h.end()}release(){this.captureTarget?.dispose(),this.captureTarget=void 0,this.depth?.destroy(),this.depth=void 0,this.uniform?.destroy(),this.scene?.destroy(),this.lutTexture?.destroy(),this.uniform=void 0,this.scene=void 0,this.sceneView=void 0,this.lutTexture=void 0,this.sourceTexture=void 0,this.pipeline=void 0,this.group=void 0,this.excessPipeline=void 0,this.excessGroup=void 0,this.fxBuffer?.destroy(),this.aeBuffer?.destroy(),this.meterBuffer?.destroy(),this.blankMask?.destroy(),this.fxBuffer=this.aeBuffer=this.meterBuffer=this.blankMask=this.meterMask=void 0;for(let e of this.extBuffers)e?.destroy();this.extBuffers=[],this.extResources=[];for(let e of this.options.extensions??Q)e.dispose?.();this.meterPipeline=this.meterGroup=void 0,this.original=void 0,this.shaders.clear()}holdMask(e,t){this.maskOption=new se(e,`Tonemap autoExposure mask`,`setAutoExposureMask`),this.maskOption.fix(t)}setAutoExposureMask(e){if(typeof e!=`function`&&typeof e?.createView!=`function`)throw TypeError(`autoExposure mask must be a GPUTexture or a function giving one`);let t=this.options,n=typeof t.autoExposure==`object`?t.autoExposure:t.autoExposure={};return n.mask=e,this.maskOption?this.maskOption.set(e,this.engine?.gpu):this.holdMask(e,this.engine?.gpu),this}onDeviceRestored(e){this.release(),this.setup(e)}dispose(){this.disposed||(this.disposed=!0,this.engine?.sceneOf(this)?.removePlugin(this.name),this.release(),this.lut=void 0,this.engine=void 0)}[Symbol.dispose??Symbol()](){this.dispose()}destroy(){this.dispose()}};export{Xe as Tonemap};

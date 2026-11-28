@@ -8,3 +8,5 @@ Regenerate with `MARGO_ENGINE_CHECKOUT` pointing to the gallery's pinned, built 
 
 - [Aristides A. G. Requicha, Representations for Rigid Solids, 1980](https://doi.org/10.1145/356827.356833).
 - [ISO 10303-42:2021, Geometric and topological representation](https://www.iso.org/standard/78579.html).
+
+generate.mjs writes the solids as one GLB (glTF 2.0 with EXT_meshopt_compression and KHR_mesh_quantization) through `@margoengine/exporters`; the page loads it with `@margoengine/gltf`, opens the studio with `@margoengine/studio/bench` and shows each step on a granite surface plate with `@margoengine/machinery/bench` (measured metal finishes and feature edges).

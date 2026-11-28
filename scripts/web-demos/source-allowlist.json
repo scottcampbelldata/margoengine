@@ -336,10 +336,6 @@
    "R4": 2,
    "R5": 600
   },
-  "the-boolean-bench": {
-   "R1": 3,
-   "R3": 2
-  },
   "the-brain-scan": {
    "R1": 9,
    "R3": 3,
@@ -919,10 +915,6 @@
    "R3": 4,
    "R4": 1,
    "R5": 475
-  },
-  "the-solid-modeller": {
-   "R1": 3,
-   "R3": 1
   },
   "the-sort-race": {
    "R5": 382
