@@ -420,6 +420,7 @@ export class DragJoint implements PhysicsAttachment {
     beforeStep(dt: number): void;
     bodyRemoved(body: PhysicsBody): void;
     remove(): void;
+    [Symbol.dispose](): void;
     dispose(): void;
 }
 
@@ -514,7 +515,7 @@ export interface DynamicCharacterOptions {
 export interface ExplosionOptions {
     impulse: number;
     radius: number;
-    falloff?: "linear" | "inverse-square" | "none";
+    falloff?: 'linear' | 'inverse-square' | 'none';
     lift?: number;
     filter?: QueryFilter;
 }
@@ -522,7 +523,7 @@ export interface ExplosionOptions {
 export interface FieldOptions {
     center: Vec3;
     radius: number;
-    falloff?: "linear" | "inverse-square" | "none";
+    falloff?: 'linear' | 'inverse-square' | 'none';
     filter?: QueryFilter;
 }
 
@@ -2167,7 +2168,7 @@ export class Updraft extends ForceField {
 export interface UpdraftOptions extends FieldOptions {
     height: number;
     strength: number;
-    mode?: "perpendicular" | "center";
+    mode?: 'perpendicular' | 'center';
 }
 
 export type Vec3 = readonly [number, number, number];
@@ -2540,7 +2541,7 @@ interface DofCouplingOptions extends MechanismOptions {
 
 type ElementType = 'f32' | 'f64' | 'i32' | 'u32' | 'u8';
 
-type Falloff = "linear" | "inverse-square" | "none";
+type Falloff = 'linear' | 'inverse-square' | 'none';
 
 type FeatureType = 'vertex' | 'edge' | 'face' | 'unknown';
 
@@ -2654,6 +2655,7 @@ abstract class Mechanism implements PhysicsAttachment {
     };
     bodyRemoved(body: PhysicsBody): void;
     remove(): void;
+    [Symbol.dispose](): void;
     dispose(): void;
 }
 

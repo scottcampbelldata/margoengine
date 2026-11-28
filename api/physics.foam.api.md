@@ -89,6 +89,7 @@ export class FoamSolver implements Solver<FoamParams> {
         readonly signal?: AbortSignal;
     }): Promise<FoamSolver>;
     workCounts(): FoamTransportWorkCounts | undefined;
+    [Symbol.dispose](): void;
     dispose(): void;
     constructor(id?: string, wakeBreaking?: FieldDescriptor);
     describe(): SolverDescription;

@@ -19,6 +19,7 @@ export class OutdoorSound implements Solver<OutdoorSoundParams> {
         readonly signal?: AbortSignal;
     }): Promise<OutdoorSound>;
     workCounts(): OutdoorSoundWorkCounts | undefined;
+    [Symbol.dispose](): void;
     dispose(): void;
     constructor(id?: string);
     describe(): SolverDescription;

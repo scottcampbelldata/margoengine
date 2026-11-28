@@ -205,6 +205,7 @@ export class SailForce implements PhysicsAttachment {
     constructor(physics: Physics, sail: SoftBody, options: SailOptions);
     beforeStep(dt: number): void;
     remove(): void;
+    [Symbol.dispose](): void;
     dispose(): void;
 }
 

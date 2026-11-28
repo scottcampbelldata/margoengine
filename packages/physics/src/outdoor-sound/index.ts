@@ -182,6 +182,11 @@ export class OutdoorSound implements Solver<OutdoorSoundParams> {
     return this.acceptedWork;
   }
 
+  /** Releases it, as `dispose()` does, for `using`. */
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
+
   /** Releases this instance's native helper workers. */
   dispose(): void {
     this.kernel?.close();

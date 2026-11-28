@@ -175,6 +175,11 @@ export class DragJoint implements PhysicsAttachment {
     this.physics.detach(this);
   }
 
+  /** Removes it, as `remove()` does, so `using` releases it at the end of its scope. */
+  [Symbol.dispose](): void {
+    this.remove();
+  }
+
   /** @internal */
   dispose(): void {
     this.released = true;

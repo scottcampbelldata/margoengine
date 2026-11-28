@@ -295,6 +295,11 @@ export class FoamSolver implements Solver<FoamParams> {
     return this.acceptedWork;
   }
 
+  /** Releases it, as `dispose()` does, for `using`. */
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
+
   /** Releases this solver's transport workers. */
   dispose(): void {
     if (this.stepping) throw foamError('state', 'Wait for the foam step to finish before disposing its workers.');

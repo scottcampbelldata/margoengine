@@ -14,6 +14,7 @@ import { pathToFileURL } from 'node:url';
 const NOT_FEATURES = new Map([
   ['PBRModel', 'created by gltf/pbr loadGLTF'],
   ['SoftBodyMesh', 'created by gltf/soft-mesh drawSoftBody(engine, body)'],
+  ['GPUClothMesh', 'created by gltf/soft-mesh drawGPUCloth(engine, cloth), the GPU twin of SoftBodyMesh'],
   ['OverlayEffect', 'abstract base; Ramp, Grid, DepthView and TextureOverlay each have static attach'],
   ['AssetContainer', 'a holder of meshes, models and plugins; it adds no plugin of its own to the engine'],
   [

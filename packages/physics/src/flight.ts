@@ -537,6 +537,11 @@ export class WingForce implements PhysicsAttachment, AirLoad {
     this.physics.detach(this);
   }
 
+  /** Removes it, as `remove()` does, so `using` releases it at the end of its scope. */
+  [Symbol.dispose](): void {
+    this.remove();
+  }
+
   /** @internal */
   dispose(): void {
     this.released = true;
@@ -760,6 +765,11 @@ export class RotorForce implements PhysicsAttachment, AirLoad {
     this.physics.detach(this);
   }
 
+  /** Removes it, as `remove()` does, so `using` releases it at the end of its scope. */
+  [Symbol.dispose](): void {
+    this.remove();
+  }
+
   /** @internal */
   dispose(): void {
     this.released = true;
@@ -880,6 +890,11 @@ export class LiftingGas implements PhysicsAttachment, AirLoad {
     this.released = true;
     this.hold.loads.delete(this);
     this.physics.detach(this);
+  }
+
+  /** Removes it, as `remove()` does, so `using` releases it at the end of its scope. */
+  [Symbol.dispose](): void {
+    this.remove();
   }
 
   /** @internal */

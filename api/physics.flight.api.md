@@ -34,6 +34,7 @@ export class LiftingGas implements PhysicsAttachment, AirLoad {
     load(_dt: number): void;
     bodyRemoved(body: PhysicsBody): void;
     remove(): void;
+    [Symbol.dispose](): void;
     dispose(): void;
 }
 
@@ -60,6 +61,7 @@ export class RotorForce implements PhysicsAttachment, AirLoad {
     load(dt: number): void;
     bodyRemoved(body: PhysicsBody): void;
     remove(): void;
+    [Symbol.dispose](): void;
     dispose(): void;
 }
 
@@ -95,6 +97,7 @@ export class WingForce implements PhysicsAttachment, AirLoad {
     load(dt: number): void;
     bodyRemoved(body: PhysicsBody): void;
     remove(): void;
+    [Symbol.dispose](): void;
     dispose(): void;
 }
 

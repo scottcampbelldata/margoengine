@@ -81,6 +81,11 @@ abstract class Mechanism implements PhysicsAttachment {
     this.physics.detach(this);
   }
 
+  /** Removes it, as `remove()` does, so `using` releases it at the end of its scope. */
+  [Symbol.dispose](): void {
+    this.remove();
+  }
+
   /** @internal */
   dispose(): void {
     if (!this.released) this.physics.kernel.removeCoupling(this.slot);
