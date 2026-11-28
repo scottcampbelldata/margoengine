@@ -1111,3 +1111,23 @@ test('T4 shimmerMoving leaves out what moves other than the camera moves it, by 
   assert.equal(both.value, 0);
   assert.equal(both.detail.animated, 4 * size);
 });
+
+test('T4 shimmerMoving counts a pixel off only outside its four reprojection taps, so a sharp edge warped between pixels is not shimmer and one-pixel shimmer still fails (KB-LOOK-TV-SHIMMER2)', () => {
+  // A hard vertical edge (sky 230 against branch 40) moved 2.5 pixels: each pixel lands between two pixels of the next
+  // frame, where a bilinear read blends the edge into a value the frame never had.
+  const width = 48,
+    height = 32,
+    edge = (x) => (x < 20 ? 40 : 230),
+    frame = image(width, height, (x) => edge(x)),
+    next = image(width, height, (x) => edge(x - 2)),
+    motion = { width, height, data: new Float32Array(width * height * 2) };
+  for (let i = 0; i < width * height; i++) motion.data[i * 2] = 2.5;
+  const warped = shimmerMoving(frame, { next, motion });
+  assert.equal(warped.value, 0, `a warped edge reads as shimmer: ${warped.value}`);
+  // Real one-pixel shimmer: single pixels on and beside the edge flash to a value none of their taps hold in the next
+  // frame (a one-pixel line on a silhouette that is there one frame and gone the next).
+  const lines = image(width, height, (x, y) => (x === 19 && y % 2 === 0 ? 255 : y % 3 === 0 && x === 30 ? 0 : edge(x)));
+  const shimmering = shimmerMoving(lines, { next, motion });
+  assert.ok(shimmering.detail.off >= height / 2, `one-pixel shimmer found: ${shimmering.detail.off}`);
+  assert.ok(shimmering.value > 0.5 && !shimmering.pass, `one-pixel shimmer fails: ${shimmering.value}`);
+});

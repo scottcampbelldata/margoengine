@@ -141,7 +141,7 @@ export const LOOK_CHECKS: Readonly<Record<LookCheckName, { bound: [number, numbe
     shimmerMoving: {
       bound: [0, 0.5],
       unit: '%',
-      about: 'pixels off by over 6 codes after the camera motion is undone',
+      about: 'pixels over 6 codes outside the four pixels their camera motion lands between',
     },
     motionBlur: { bound: [0, 5], unit: '%', about: 'fast edges narrower than half their travel in a frame' },
     silhouette: { bound: [80, 100], unit: '%', about: 'subject outline with at least 15 L* against what is behind' },
@@ -2416,9 +2416,40 @@ function sampleLuma(y: Float32Array, width: number, height: number, x: number, v
 }
 
 /**
+ * Whether `value` lies more than `threshold` outside [min, max] of the four pixels of `y` around (x, v), the taps a
+ * bilinear read there blends (those it gives weight). A sharp edge that the warp lands between two pixels can read as any blend of them, so a
+ * value inside their range is resampling, not a temporal change; the range test is the neighbourhood clamp of temporal
+ * anti-aliasing (B. Karis, "High Quality Temporal Supersampling", SIGGRAPH Advances in Real-Time Rendering, 2014;
+ * M. Salvi, "An Excursion in Temporal Supersampling", GDC 2016), applied to the reprojection's own four taps.
+ */
+function outsideTaps(
+  y: Float32Array,
+  width: number,
+  height: number,
+  x: number,
+  v: number,
+  value: number,
+  threshold: number,
+): boolean {
+  const px = Math.min(width - 1, Math.max(0, x)),
+    py = Math.min(height - 1, Math.max(0, v)),
+    x0 = Math.floor(px),
+    y0 = Math.floor(py),
+    // A tap the read gives no weight (the point on a pixel's row or column) is not a neighbour of the reprojection.
+    x1 = px > x0 ? Math.min(width - 1, x0 + 1) : x0,
+    y1 = py > y0 ? Math.min(height - 1, y0 + 1) : y0,
+    t00 = y[y0 * width + x0],
+    t10 = y[y0 * width + x1],
+    t01 = y[y1 * width + x0],
+    t11 = y[y1 * width + x1];
+  return value < Math.min(t00, t10, t01, t11) - threshold || value > Math.max(t00, t10, t01, t11) + threshold;
+}
+
+/**
  * T4 while moving: frame n is warped onto n + 1 by its motion (`reprojectionMotion` makes it from the depth and the two
- * view-projections), and the percent of pixels whose warped luma differs from the next frame by more than `threshold`
- * (6 codes) is the shimmer. Pixels whose target leaves the frame are not counted.
+ * view-projections), and the percent of pixels whose luma falls more than `threshold` (6 codes) outside [min, max] of
+ * the four pixels of the next frame around where it lands is the shimmer (see `outsideTaps`: a blend of those four is
+ * the warp resampling an edge, not a change). Pixels whose target leaves the frame are not counted.
  */
 export function shimmerMoving(
   frame: LookImage,
@@ -2470,7 +2501,7 @@ export function shimmerMoving(
         continue;
       }
       count++;
-      if (Math.abs(a[i] - sampleLuma(b, width, height, tx, ty)) > threshold) off++;
+      if (outsideTaps(b, width, height, tx, ty, a[i], threshold)) off++;
     }
   return result(
     'shimmerMoving',

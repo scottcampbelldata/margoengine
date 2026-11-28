@@ -4187,6 +4187,14 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   the sky, a leaf over a leaf), early and mid: sky side 0.43 and 1.44, depth edges 1.02 and 1.55, other edges 0.24 and
   0.75, over 0.07 and 0.11. Of it, 1.26 early and 1.78 mid sits inside the range of the four pixels the warp samples
   (what bilinear resampling of a sharp edge gives, not a change); 0.50 and 2.07 lies outside every one of them.
+- **Check changed 2026-11-28 (lane B, manager's ruling):** `shimmerMoving` counts a pixel off only when its luma
+  falls more than the 6-code threshold outside [min, max] of the four pixels of the next frame its reprojection reads
+  (taps the bilinear read gives no weight left out), the neighbourhood clamp of TAA (Karis 2014; Salvi 2016) applied to
+  the warp's own taps: a sharp edge landing between two pixels is resampling, not a change. The 0.5 bound stays. Blowup
+  `--once --seconds 1.1`: early 0.50 (8,453 of 1,681,847 px), mid 2.07 (34,770 of 1,676,851 px). Regression in
+  `packages/headless/tests/look-clean.test.js` (a hard edge warped 2.5 px read as shimmer before; one-pixel lines on and
+  beside the edge still fail). The rest, one-pixel lines on tree edges against the sky, is a render defect and stays
+  open here until traced to its owner.
 
 ### Fixed 2026-11-26: tonemap's settings check on the WebGL2 layer on ANGLE Direct3D 11 differed by one pixel in group `local` about half the time (KB-TONEMAP-LOCALD3D1, tonemap)
 
