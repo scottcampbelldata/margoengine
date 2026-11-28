@@ -27,6 +27,20 @@ interface Bough {
   leaf: FirSprayRegion;
 }
 
+/**
+ * [width, length] factors of the sprays each ring keeps, so its foliage area stays near the near ring's (area-preserving
+ * foliage simplification: Remolar, Chover, Belmonte, Ribelles and Rebollo 2002, "Geometric simplification of foliage",
+ * Eurographics short papers; Zhang, Blaise and Jaeger 2006, "Multiresolution plant models with complex organs", ACM
+ * GRAPHITE). Near ring: main spray 0.62 r^2 and two side arms of 0.245 r^2, 1.11 r^2 a bough. Middle ring: one arm,
+ * 0.865 r^2; 1.17 x 1.1 brings it to 1.11. Far ring: every other row under the tip and an arm on every other bough,
+ * 0.74 r^2 a kept row for two rows of the near ring, 2.22 r^2; 2.3 x 1.3 brings it to 2.21. Alpha mips keep their
+ * coverage at the cut (scatter maps, Castano 2010), so the area is what the crown covers from afar.
+ */
+const SPRAY_GROWTH: readonly (readonly [number, number])[] = [
+  [1, 1],
+  [1.17, 1.1],
+  [2.3, 1.3],
+];
 const defaultRegions: readonly FirSprayRegion[] = /* @__PURE__ */ Object.freeze([[0, 0, 1, 1]] as const);
 const mix = (a: number, b: number, t: number): number => a + (b - a) * t;
 
@@ -68,7 +82,9 @@ function canopy(layers: readonly Bough[][], ring: number, atlas: readonly FirSpr
   const normals: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
-  // Higher rings keep the same main boughs and use fewer planes per spray.
+  // Higher rings keep the same main boughs and use fewer planes per spray. The sprays they keep grow (SPRAY_GROWTH) so a
+  // ring covers about the foliage area of the near one: dropped sprays left far crowns see-through, a bare grey stem
+  // with a few cards on it from 700 m up (Above the Treeline look round 4).
   const divisions = ring === 0 ? 3 : 1;
   function spray(
     x: number,
@@ -112,11 +128,24 @@ function canopy(layers: readonly Bough[][], ring: number, atlas: readonly FirSpr
   }
   for (const [row, whorl] of layers.entries()) {
     if (ring === 2 && row < 27 && row % 2) continue;
+    // Width and length of every spray in this row: the far ring's thinned rows grow the most, the crown tip it keeps
+    // whole grows like the middle ring.
+    const [wide, long] = SPRAY_GROWTH[ring === 2 && row >= 27 ? 1 : ring];
     for (const [i, b] of whorl.entries()) {
       const fx = Math.cos(b.yaw);
       const fz = Math.sin(b.yaw);
       const stem = b.radial * 0.12;
-      spray(stem * fx, b.y, stem * fz, b.yaw, b.radial, b.radial * 0.62, b.tipY - b.y, b.roll, b.leaf);
+      spray(
+        stem * fx,
+        b.y,
+        stem * fz,
+        b.yaw,
+        b.radial * long,
+        b.radial * 0.62 * wide,
+        (b.tipY - b.y) * long,
+        b.roll,
+        b.leaf,
+      );
       if (ring === 2 && i % 2) continue;
       for (const side of [-1, 1]) {
         if (ring > 0 && side !== ((row + i) % 2 ? 1 : -1)) continue;
@@ -126,8 +155,8 @@ function canopy(layers: readonly Bough[][], ring: number, atlas: readonly FirSpr
           b.y + (b.tipY - b.y) * 0.46 + 0.014,
           arm * fz,
           b.yaw + side * 0.56,
-          b.radial * 0.57,
-          b.radial * 0.43,
+          b.radial * 0.57 * long,
+          b.radial * 0.43 * wide,
           -0.09 + (b.tipY - b.y) * 0.32,
           side * 0.7 - 0.31 * b.roll,
           atlas[(row + i + (side < 0 ? 1 : 2)) % atlas.length],
@@ -141,7 +170,9 @@ function canopy(layers: readonly Bough[][], ring: number, atlas: readonly FirSpr
 /**
  * Near, middle and far foliage meshes from one seeded set of fir whorls. Pair them with a stem mesh and an alpha-cutout
  * spray atlas. The rings use the same heights and main branch directions. The first two draw all whorls, and the far
- * ring keeps alternating lower whorls and the full crown tip. Both faces of every spray have winding and UVs.
+ * ring keeps alternating lower whorls and the full crown tip. The sprays the middle and far rings keep are wider and
+ * longer, so each ring covers about the foliage area of the near one and a far crown stays dense rather than thinning
+ * to a bare stem. Both faces of every spray have winding and UVs.
  *
  * @example
  * ```ts
