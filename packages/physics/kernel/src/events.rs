@@ -239,18 +239,34 @@ impl World {
                 self.push_event(row, false, removed);
             }
             self.set_u(PAIR_FLAGS, row, flags & !(PAIR_TOUCHING | PAIR_OVERLAP));
-            let (a, b) = self.pair_bodies(pair);
-            self.drop_contacts(row, a, b);
+            // A pair whose other collider was retired keeps its contacts for the step that drops it, and names no body there.
+            if !self.pair_retired(pair) {
+                let (a, b) = self.pair_bodies(pair);
+                self.drop_contacts(row, a, b);
+            }
             self.wake_pair(pair);
             pair = self.next_pair(pair, collider);
         }
     }
 
+    /// True for a pair one of whose colliders has left its body: `retire_collider` takes the body's name at once and the next
+    /// step drops the pair, so until then the pair names no body on that side.
+    #[inline(always)]
+    fn pair_retired(&self, pair: u32) -> bool {
+        let (a, b) = self.pair_bodies(pair);
+        a == NONE as usize || b == NONE as usize
+    }
+
+    /// Wakes a pair's bodies. A retired collider has none: waking row NONE read and wrote past the body rows, an access
+    /// violation natively and the word before the column in Wasm, where the address wraps (KB-PHYS-RETIREDPAIR1).
     #[inline(always)]
     fn wake_pair(&mut self, pair: u32) {
         let (a, b) = self.pair_bodies(pair);
-        self.wake(a as u32);
-        self.wake(b as u32);
+        for body in [a, b] {
+            if body != NONE as usize {
+                self.wake(body as u32);
+            }
+        }
     }
 
     /// A collider is leaving: each pair that touched says so with a stop marked as a removal, and wakes its bodies, as
@@ -355,6 +371,11 @@ impl World {
         while collider != NONE {
             let mut pair = self.uu(COLLIDER_PAIRS, collider as usize);
             while pair != NONE {
+                // A retired collider's pair is the next step's to drop: it joins no list.
+                if self.pair_retired(pair) {
+                    pair = self.next_pair(pair, collider);
+                    continue;
+                }
                 let (a, b) = self.pair_bodies(pair);
                 if self.is_awake(a) || self.is_awake(b) {
                     self.activate_pair(pair);

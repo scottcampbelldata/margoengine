@@ -6,6 +6,25 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: touching a collider after its neighbour's body was removed read and wrote past the body rows (KB-PHYS-RETIREDPAIR1, physics kernel)
+
+- **Repro:** three boxes in a pile, stepped until they touch. Remove the bottom body, then, before the next step, do any
+  of these to the middle box: `touch_collider` (what a change of collision groups calls), `wake_touching_pairs`,
+  `set_collider_state` (sensor and back) or `set_body_enabled` (off and on). The native build stops with
+  STATUS_ACCESS_VIOLATION. Found while the replay scene ran on with a world that had stopped: 220 iterations of removals
+  and edits with no step between them, then a change of groups on a collider whose neighbour was gone.
+- **Cause:** `retire_collider` sets the removed collider's `COLLIDER_BODY` to NONE at once and leaves its pairs for the
+  next step's broad phase to drop. Until that step the other collider's pair list still holds the pair, and
+  `pair_bodies` gives NONE for the removed side. `wake_pair` woke row NONE, `end_touches_as` zeroed its `SLEEP_TIME` and
+  `set_body_enabled` read `is_awake(NONE)`: row 4,294,967,295 of the body columns. Natively that is 16 GiB past the column;
+  in Wasm the address wraps, so it read and wrote the word before the column. Nothing numeric is involved: no NaN or
+  large speed is needed.
+- **Fix:** a pair with a retired collider names no body on that side, and the walks pass it by (`pair_retired` and
+  `wake_pair` in `kernel/src/events.rs`): the live body still wakes, the pair keeps its contacts for the step that drops
+  it, and it joins no list. Regression: `packages/physics/kernel/tests/retired_pair.rs` (both tests end in an access
+  violation without the fix; with it the pile falls onto the floor, the middle box at y 0.5 and the top one at 1.5 within
+  0.02 m).
+
 ### Fixed 2026-11-28: a Water added to SceneTargets drew nothing, and its SSR capture drew with TAA's jittered camera (KB-WATER-CAPTURECAM1; water)
 
 - **Repro (before):** `SceneTargets.add(water, {ground: false})` (`@margoengine/post/mrt`): the targets hold no water
@@ -91,15 +110,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   loops, so the program grows many times over before it links. Not yet traced to the WGSL loop that costs most.
 - **For:** the water lane (`packages/water`, GLSL emitted by `packages/webgl2-compat`).
 
-### Open 2026-11-28: a reuleaux drive rig sits 0.6 to 0.7 mm off its exact centre (KB-PHYS-REULEAUXWALLS1, physics solver)
+### Open 2026-11-28: a reuleaux drive rig sits up to 0.1 mm off its exact centre, 0.3 mm between samples (KB-PHYS-REULEAUXWALLS1, physics solver)
 
 - **Repro:** `reuleauxRig` of `@margoengine/machinery/rigs` (landed in 267729b7bd): a convex-hull Reuleaux triangle of 64
   points per arc between four fixed walls at zero clearance, its turn locked to the input, sits 0.6 to 0.7 mm off the
   exact centre over a 456 mm travel. More substeps, more iterations, the high-fidelity tier and zero friction gave at best
   0.52 mm; a 24-point hull measured 0.16 mm.
-- **Cause:** not found yet. The leads are the four walls at zero clearance, a contact set that holds more rows than the
-  triangle has freedoms, and how a hull's face count moves where its contact points sit (a finer hull reads worse).
-  Physics lane.
+- **Measured again 2026-11-28 on `main` (the 0.6 to 0.7 mm above is stale):** over two turns in 2 degree 60 Hz steps the
+  64-point hull's worst gap is 9.8e-5 m read every 3 degrees and 3.0e-4 m at any step; the 24-point hull reads 1.5e-4 m
+  and 1.8e-4 m. Driven to 45 degrees and left for 300 steps it settles to 7.8e-6 m, so the offset is made while the
+  triangle moves and is not a resting state.
+- **Cause:** not found yet. Ruled out: the allowed penetration (0 to 2e-4 m reads the same) and the hull build (all 192
+  and 72 outline points are kept, no faces merged). It is not KB-PHYS-SARRUSLOOP1's cut: the rig has one joint and no
+  path. The lead: the box-against-hull contact may take the normal of a hull facet (0.94 degrees a facet at 64 points)
+  where the wall's own normal is exact, so four contacts push a little sideways as the facets pass. Physics lane.
 
 ### Open 2026-11-28: a Sarrus linkage's loop error grows as it moves and stays when it stops (KB-PHYS-SARRUSLOOP1, physics solver)
 
@@ -108,16 +132,37 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `sarrusPose` reads 2.2e-5 m at 49 degrees, 3.4e-4 at 56, 2.1e-3 after 73 and back to 30, 3.4e-3 back at 48, and holds
   each figure unchanged for 300 steps at rest. The error is four of the five hinges pulled apart along their links by the
   same amount (2.6 mm each at the end), with every turning row within 2e-7 rad.
-- **Cause (found 2026-11-28, not fixed):** the loop runs from the fixed base to the kinematic crank, so it is one path
-  of five joints, 25 lock rows on 24 freedoms, solved exactly (share 1). Higham's stop drops one row, always the same one:
-  axis 4 of the base hinge, the last joint of the path, as pivoting only chooses among a joint's own columns. What is left
-  is still close to singular in the loop's direction, so the pushing pass asks for turns far past what it closes: the
-  push asked up to 4.2 (the sum of the largest rows) and `push_share` (Buss and Kim 2005's clamp, TURN) cut it to as
-  little as 7e-7 of itself. Cutting the whole push also cuts the part of it that would close the links, so the stretch made by
-  each move (second order in the step, as the rows turn) is never taken back. The fix is the one Buss and Kim name for
-  this: damp each singular direction apart (selectively damped least squares, or damped least squares on the path's
-  factors, Wampler 1986, Nakamura and Hanafusa 1986), so a near dependent direction asks little and the rest closes whole.
-  Physics lane.
+- **Cause (corrected 2026-11-28, fix built, not landed):** not the near singular push the first note named. `push_share`
+  (`kernel/src/joints.rs`) adds what the joint before gave a shared body (`carried`) to what this joint gives it. Where a
+  joint's body A goes on along the path and its body B came before, it wrote this joint's gain on A into `carried` and
+  then read that as the joint before's gain on B. The Sarrus path runs J0 J1 J4 J3 J2 and J4 and J3 are that way round,
+  so the deck and a knee each read 2,800 rad/s (two hinge gains that cancel, added to each other) and the push was cut to
+  1e-4 to 1e-6 of itself every substep. The pivot at 4.5e-5 of its row is real and harmless: it scales with I / (m L^2).
+- **Measured with the fix (five lines, reading `carried` before it is replaced), on a held-back build:** the gap at rest
+  1.2e-7 to 1.6e-7 m (was 3.4e-3 and growing), the worst while driven 2 degrees a step 1.44e-5 m (was 2.4e-3). A kernel
+  test of the loop is written (`sarrus_loop.rs`, worst 2.2e-5 m at 49 degrees without the fix).
+- **Why it is not landed:** the wrong sum was also hiding a second defect, which the replay scene shows
+  (`kernel/tests/replay.rs`: 48 to 96 random bodies, 24 random joints with anchors up to metres apart, bodies moved by
+  hand, 10,000 steps). Fastest spin, and body-steps past 1,000 rad/s, over the whole run:
+
+  | Build | Block solver, levels on | Sweeps, levels on | Block solver, levels off | Sweeps, levels off |
+  | --- | --- | --- | --- | --- |
+  | `main` | 273 rad/s, 0 | 4,431 rad/s, 593 | 284 rad/s, 0 | 586 rad/s, 0 |
+  | fix alone | 5,965 rad/s, 1,239 | 4.4e8 rad/s at step 1948, then NaN and the world stops | 289 rad/s, 0 | 858 rad/s, 0 |
+  | fix and a damped push | 2,401 rad/s, 609 | 1,703 rad/s, 725 | 777 rad/s, 0 | 261 rad/s, 0 |
+
+  "Levels" are the islands' own substep levels (`adaptive_substeps`). With them off no build passes 1,000 rad/s; with
+  them on `main` already does in the sweeps run. The median gap of the scene's sliding locks, levels on, block solver:
+  5.3e-2 m on `main`, 3.5e-3 m with the fix, 2.7e-2 m with the fix and the damped push; mean kinetic energy 1.4e4, 3.3e4
+  and 4.0e4 J. So the fix holds the joints closer and the scene carries more energy: not yet a state that can be called
+  more correct. The path that starts the run-away is a chain from a fixed body through three bodies (a ball joint with its
+  anchors 4.5 m apart, a ball joint 1.7 m apart, a weld 0.5 m apart): errors no push can close, asked for again every
+  substep. The lead, not proven: the turn bound (TURN, 0.2 rad) is per substep, an island that spins is given up to 128
+  substeps a step, so what the relaxing pass leaves of a cut push grows with the level it raises. The damped push
+  (Levenberg 1944, Marquardt 1963, Wampler 1986, Nakamura and Hanafusa 1986: (K + mu^2 D) x = b on the path's factors,
+  taken only where the exact push breaks the bound) is built and stops the NaN, and does not remove the spin.
+  Next: bound what a cut push leaves in the speeds across substep levels, then land the fix with the replay figures.
+  The access violation that followed the NaN was a separate bug, fixed (KB-PHYS-RETIREDPAIR1). Physics lane.
 
 ### Open 2026-11-28: a ball on a spinning hinge settles off its balance in proportion to its inertia (KB-PHYS-SPINBIAS1, physics solver)
 
@@ -266,7 +311,9 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
 - **Repro:** the same class as KB-PHYS-COUPLINGDRIFT1, on `coupleDofs` (kind COORDS): its error is `error + speed * h`
   each substep in `track_couplings`, so over long runs its two joint coordinates part from the ratio by the f32 rounding
-  of the poses. Not measured yet.
+  of the poses. Measured 2026-11-28 on `main`: an arm three hinges deep with `coupleDofs(..., { ratio: 2 })` on its second
+  and third, spun by two torque impulses with no gravity, reads |q2 + 2 q3| of 4.3e-7 rad at 1.5 s, 4.5e-4 at 10 s,
+  7.5e-3 at 60 s and 0.11 rad at 600 s; the worst over the ten minutes is 0.88 rad.
 - **Cause:** the row's two coordinates are a hinge angle or a slide of each child in its parent's frame, which the row
   does not read from the poses. The fix is to read them as the joint's own measure does (`joint_measure`). Physics lane.
 
