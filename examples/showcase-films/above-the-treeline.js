@@ -61,6 +61,44 @@ function flight(t) {
   return { position: [x, y, z], target: [gazeX, gazeY, gazeZ], fov: mix(37, 44, ramp(t, 10, 68)) };
 }
 
+// The aerial half: poses at these seconds (position, gaze), joined by Hermite curves with Catmull-Rom tangents, the
+// first three on the opening retreat so the hand-over at 40 s keeps its speed. From 48 s the camera arcs at a steady
+// 35 m/s around the summit dome (centre about -900, 300), climbing: along the tree line, across the east face, level
+// with the plateau, then over the valley looking west to the far range.
+const AERIAL = [
+  [32, flight(32)],
+  [40, flight(40)],
+  [48, flight(48)],
+  [58, { position: [42, 3560, -360], target: [-1000, 3490, 150] }],
+  [68, { position: [127, 3640, -34], target: [-950, 3560, 320] }],
+  [78, { position: [100, 3760, 300], target: [-1250, 3650, 450] }],
+  [88, { position: [29, 3880, 498], target: [-2300, 3660, 950] }],
+  [98, { position: [-78, 3960, 666], target: [-2700, 3650, 1150] }],
+  [108, { position: [-204, 4020, 805], target: [-2900, 3650, 1300] }],
+];
+function hermite(key, t) {
+  let i = 1;
+  while (i < AERIAL.length - 2 && t > AERIAL[i + 1][0]) i++;
+  const [t0, a] = AERIAL[i - 1],
+    [t1, b] = AERIAL[i],
+    [t2, c] = AERIAL[i + 1],
+    [t3, d] = AERIAL[i + 2],
+    h = t2 - t1,
+    s = Math.min(1, Math.max(0, (t - t1) / h)),
+    s2 = s * s,
+    s3 = s2 * s;
+  return b[key].map((v, k) => {
+    const m1 = ((c[key][k] - a[key][k]) / (t2 - t0)) * h,
+      m2 = ((d[key][k] - b[key][k]) / (t3 - t1)) * h;
+    return (2 * s3 - 3 * s2 + 1) * v + (s3 - 2 * s2 + s) * m1 + (-2 * s3 + 3 * s2) * c[key][k] + (s3 - s2) * m2;
+  });
+}
+/** The camera at `t` seconds: position, gaze target and vertical field of view in degrees. */
+export function camera(t) {
+  if (t <= 40) return flight(t);
+  return { position: hermite('position', t), target: hermite('target', t), fov: mix(37, 44, ramp(t, 10, 68)) };
+}
+
 export const ridgeCamera = { ...flight(0), near: 0.11, far: 6100 };
 export const ridgeLook = {
   direction: [...sun, 3.18],
@@ -223,7 +261,11 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
     textureResolution: 4,
     radius: 1250,
     nearRadius: 700,
-    patches: { size: 23, contrast: 0.6 },
+    patches: { size: 23, contrast: 0.6, warp: 0.65 },
+    // Front Range granite and gneiss: no sedimentary beds, but sheeting joints that step the faces into ragged
+    // ledges, jointed blocks and buttresses, couloirs down the drainage and talus fans of the same granite below.
+    rock: { debris: 'gravel', slope: [30, 46], strata: 11, dip: [0.12, -0.07], ledges: 0.55, facets: 16, relief: 0.5, gullies: 14, tone: 0.34 },
+    canopy: 0.35,
     maxSteps: Infinity,
     lookahead: 0,
     sky,
@@ -346,7 +388,7 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
   ];
   return {
     apply(time) {
-      const view = flight(time);
+      const view = camera(time);
       const opening = ramp(time, 64, 80);
       cloudDeck.options.coverage = mix(0.47, 0.38, opening);
       engine.lighting.direction[3] = mix(3.18, 4.45, opening);

@@ -72,6 +72,8 @@ export async function ridgeTrees(firKey, youngFirKey, timberlineFirKey) {
   return {
     [firKey]: fir,
     [youngFirKey]: firForm(fir, { height: 0.76, spread: 0.85, lean: -0.49, tint: [0.94, 1, 0.9] }),
-    [timberlineFirKey]: firForm(fir, { height: 0.41, spread: 0.72, lean: 1.74, tint: [1, 0.93, 0.83] }),
+    // Krummholz: wind-pruned mats about 2.5 m high and twice as wide, leaning to the lee (Holtmeier 2009, "Mountain
+    // Timberlines", ch. 5: subalpine fir krummholz of the Front Range as low cushions and mats above the tree line).
+    [timberlineFirKey]: firForm(fir, { height: 0.14, spread: 1.05, lean: 1.2, tint: [0.92, 0.95, 0.82] }),
   };
 }
