@@ -849,6 +849,27 @@ page with a copy: use `engine.canvas` afterwards, as above. The third argument t
 layer and a page that leaves it out never bundles it. Only refusals during `setup` escalate, and any other error rejects with the engine disposed. A browser whose WebGL2 is
 below what the layer needs rejects with the layer's `unsupported` error, which names what is missing.
 
+A page whose packages all need the full renderer (shadows, post, physics-driven scenes) can skip the preview: `startEngine`
+from the same entry opens the browser's WebGPU and, when WebGPU is missing (code `unsupported`) or does not answer within
+`startupTimeout` (code `timeout`), installs the layer with `force` and opens the engine on it. It keeps the canvas element and needs
+no `setup` callback, and the layer is fetched only on that path.
+
+```ts
+import {startEngine} from 'margoengine/webgl2-compat/auto';
+
+const {engine, renderer} = await startEngine(document.querySelector('canvas')!, {
+  loadCompat: () => import('margoengine/webgl2-compat'),
+  forceCompat: location.search.includes('backend=webgl2'), // test the WebGL2 path on a WebGPU browser
+  startupTimeout: 5000,
+});
+console.log(renderer); // 'webgpu' or 'compatibility'
+engine.start();
+```
+
+It takes every `Engine.create` option except `backend` and `fallback`, plus `loadCompat` (required) and `forceCompat`
+(default false). Any other error of `Engine.create` rejects without loading the layer, and an aborted `signal` stops before
+the layer installs.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/webgl2-compat

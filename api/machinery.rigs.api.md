@@ -25,6 +25,13 @@ export interface GenevaRigPose {
     driver: number;
     wheel: number;
     indexing: boolean;
+    turnWheel: number;
+}
+
+export interface KeyedRig<Key, Pose> extends Disposable {
+    drive(angle: number, key: Key, shortest?: boolean): Pose;
+    readonly check: RigCheck | null;
+    dispose(): void;
 }
 
 export interface MechanismRig<Pose> extends Disposable {
@@ -43,6 +50,8 @@ export interface OldhamRigPose {
     center: [number, number];
     inputSlide: number;
     outputSlide: number;
+    orbitCenter: [number, number];
+    orbitRadius: number;
 }
 
 export interface RigCheck {
@@ -56,6 +65,7 @@ export interface RigCheck {
 export interface RigOptions {
     angle?: number;
     maxStep?: number;
+    signal?: AbortSignal;
 }
 
 export interface ScotchYokeRigPose {
@@ -70,11 +80,19 @@ export function epicyclicRig(teeth: EpicyclicTeeth, options?: EpicyclicRigOption
 
 export function genevaRig(options?: GenevaRigOptions): MechanismRig<GenevaRigPose>;
 
+export function keyedRig<Key, Pose>(make: (key: Key, angle: number) => MechanismRig<Pose>, options?: {
+    signal?: AbortSignal;
+}): KeyedRig<Key, Pose>;
+
 export function loadRigs(): Promise<void>;
 
 export function oldhamRig(offset: number, options?: RigOptions): MechanismRig<OldhamRigPose>;
 
+export function openRig<Args extends unknown[], R>(make: (...args: Args) => R, ...args: Args): Promise<R>;
+
 export function scotchYokeRig(radius: number, options?: RigOptions): MechanismRig<ScotchYokeRigPose>;
+
+export function signedReading(value: number, unit: string, digits?: number): string;
 
 // Not exported from this entry, but used by the exports above:
 

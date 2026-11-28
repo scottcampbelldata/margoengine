@@ -39,6 +39,8 @@ export interface RigOptions {
   angle?: number;
   /** The most the input turns in one fixed step, in radians (default 2 degrees): a long move is split into steps this size. */
   maxStep?: number;
+  /** Disposes the rig when it aborts, so a page's one AbortController tears it down with the rest (default none). */
+  signal?: AbortSignal;
 }
 
 /** A mechanism on a stepped physics world: turn its input, read the bodies the solver moved and how far they are from exact. */
@@ -83,14 +85,17 @@ abstract class Rig<Pose> implements MechanismRig<Pose> {
 
   protected constructor(unit: 'm' | 'rad', options: RigOptions) {
     this.input = finite(options.angle ?? 0, 'Rig angle');
+    this.requested = this.input;
     this.maxStep = finite(options.maxStep ?? Math.PI / 90, 'Rig maxStep');
     if (!(this.maxStep > 0)) throw new RangeError(`Rig maxStep must be above 0; got ${this.maxStep}.`);
     this.check = { worst: 0, last: 0, ever: 0, unit, steps: 0 };
+    options.signal?.throwIfAborted();
     const physics = new (physicsModule().Physics)(null);
     physics.gravity = [0, 0, 0];
     this.physics = physics;
     this.ground = physics.addBody(null, { type: 'fixed', position: [0, 0, 0], colliders: [] });
     this.crank = this.disc([0, 0, 0], this.input, 'kinematicPosition');
+    options.signal?.addEventListener('abort', () => this.dispose(), { once: true });
   }
 
   protected disc(position: [number, number, number], angle = 0, type: 'dynamic' | 'kinematicPosition' = 'dynamic'): PhysicsBody {
@@ -112,7 +117,11 @@ abstract class Rig<Pose> implements MechanismRig<Pose> {
   protected abstract gap(): number;
   abstract pose(): Pose;
 
+  /** The angle last asked of {@link drive}, as given. */
+  protected requested = 0;
+
   drive(angle: number, shortest = true): Pose {
+    this.requested = angle;
     const target = shortest ? unwrap(finite(angle, 'Rig angle'), this.input) : finite(angle, 'Rig angle');
     this.check.worst = 0;
     while (this.input !== target) {
@@ -201,6 +210,11 @@ export interface GenevaRigPose {
   wheel: number;
   /** True while the pin is in a slot. */
   indexing: boolean;
+  /**
+   * The wheel's angle moved by whole slot pitches to the crank turn of the angle last asked of `drive` (the angle as given, not
+   * unwrapped): the same picture as `wheel`, since a slot pitch turns the wheel onto itself, read within one crank turn.
+   */
+  turnWheel: number;
 }
 
 class Geneva extends Rig<GenevaRigPose> {
@@ -262,7 +276,9 @@ class Geneva extends Rig<GenevaRigPose> {
     return unwrap(zAngle(this.wheel.rotation), this.exact());
   }
   pose(): GenevaRigPose {
-    return { driver: this.input, wheel: this.wheelAngle(), indexing: this.indexing(this.input) };
+    const wheel = this.wheelAngle(),
+      turns = Math.round((this.input - this.requested) / (2 * Math.PI));
+    return { driver: this.input, wheel, indexing: this.indexing(this.input), turnWheel: wheel + (turns * 2 * Math.PI) / this.slots };
   }
 }
 
@@ -291,6 +307,9 @@ export interface OldhamRigPose {
   /** The disc's slide along the input hub's slot and along the output hub's slot, from the solver. */
   inputSlide: number;
   outputSlide: number;
+  /** The circle the disc centre runs on: centre and radius (half the offset). */
+  orbitCenter: [number, number];
+  orbitRadius: number;
 }
 
 /** The radius the output's angle error is measured at, in metres: a hub's size. */
@@ -342,6 +361,8 @@ class Oldham extends Rig<OldhamRigPose> {
       center: [p[0], p[1]],
       inputSlide: p[0] * Math.cos(input) + p[1] * Math.sin(input),
       outputSlide: -(p[0] - this.offset) * Math.sin(o) + p[1] * Math.cos(o),
+      orbitCenter: [this.offset / 2, 0],
+      orbitRadius: this.offset / 2,
     };
   }
 }
@@ -426,4 +447,65 @@ export function epicyclicRig(teeth: EpicyclicTeeth, options: EpicyclicRigOptions
  */
 export function describeCheck(check: RigCheck): string {
   return check.unit === 'm' ? `${(check.ever * 1e6).toFixed(1)} µm` : `${((check.ever * 180) / Math.PI).toFixed(3)}°`;
+}
+
+/** Loads the solver and makes a rig: `await openRig(scotchYokeRig, 0.142, { angle })`. */
+export async function openRig<Args extends unknown[], R>(make: (...args: Args) => R, ...args: Args): Promise<R> {
+  await loadRigs();
+  return make(...args);
+}
+
+/** A rig remade at the current input whenever its key (a held member, a shaft offset) changes, from {@link keyedRig}. */
+export interface KeyedRig<Key, Pose> extends Disposable {
+  /** Remakes the rig at `angle` when `key` differs from the last one, then drives it there like {@link MechanismRig.drive}. */
+  drive(angle: number, key: Key, shortest?: boolean): Pose;
+  /** The current rig's check, or null before the first drive. */
+  readonly check: RigCheck | null;
+  dispose(): void;
+}
+
+/**
+ * A rig whose build parameters change while it runs: `make(key, angle)` builds it, and a drive with a new key disposes the old
+ * world and builds the new one at the angle asked, so the mechanism is never stepped through a jump of its geometry. `signal`
+ * disposes it on abort, after which `drive` throws the signal's reason (default none).
+ */
+export function keyedRig<Key, Pose>(
+  make: (key: Key, angle: number) => MechanismRig<Pose>,
+  options: { signal?: AbortSignal } = {},
+): KeyedRig<Key, Pose> {
+  let rig: MechanismRig<Pose> | null = null,
+    current: Key | undefined;
+  const { signal } = options;
+  const keyed: KeyedRig<Key, Pose> = {
+    drive(angle, key, shortest = true) {
+      signal?.throwIfAborted();
+      if (!rig || !Object.is(key, current)) {
+        rig?.dispose();
+        rig = make(key, angle);
+        current = key;
+      }
+      return rig.drive(angle, shortest);
+    },
+    get check() {
+      return rig?.check ?? null;
+    },
+    dispose() {
+      rig?.dispose();
+      rig = null;
+    },
+    [Symbol.dispose]() {
+      this.dispose();
+    },
+  };
+  signal?.addEventListener('abort', () => keyed.dispose(), { once: true });
+  return keyed;
+}
+
+/**
+ * A signed reading for a readout: `digits` decimals, a typographic minus or a plus, and no sign on zero (`'+53.2 mm'`,
+ * `'−12.0°'`, `'0.0 mm'`). `value` is already in the unit shown.
+ */
+export function signedReading(value: number, unit: string, digits = 1): string {
+  const rounded = Number(value.toFixed(digits)) || 0;
+  return `${rounded < 0 ? '−' : rounded > 0 ? '+' : ''}${Math.abs(rounded).toFixed(digits)}${unit}`;
 }

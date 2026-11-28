@@ -58,3 +58,52 @@ export const autoEngine = async (
   canvas.replaceWith(fresh);
   return run(await Engine.create(fresh, { ...options, backend: 'webgpu' }), setup);
 };
+
+/** Everything `Engine.create` takes except `backend` and `fallback`, plus where the compatibility layer comes from. */
+export interface StartEngineOptions extends Omit<EngineOptions, 'backend' | 'fallback'> {
+  /**
+   * Loads the WebGL2 compatibility layer: pass the dynamic import of the layer's root entry, so a bundler splits it into
+   * a chunk only the fallback fetches. Required.
+   */
+  loadCompat: () => Promise<{ install(options?: { force?: boolean }): Promise<unknown> }>;
+  /** Draws through the layer even where WebGPU works, for testing the WebGL2 path (for example from `?backend=webgl2`). Default false. */
+  forceCompat?: boolean;
+}
+
+/** What `startEngine` opened: the engine, and which path draws it. */
+export interface StartedEngine {
+  engine: EngineKernel;
+  /** `'webgpu'` for the browser's own WebGPU, `'compatibility'` for the WebGL2 layer. */
+  renderer: 'webgpu' | 'compatibility';
+}
+
+const fallsBack = (error: unknown) => {
+  const { code } = (error ?? {}) as { code?: string };
+  return code === 'unsupported' || code === 'timeout';
+};
+
+/**
+ * Opens an engine that runs every package: the browser's WebGPU, or, when WebGPU is missing (`unsupported`) or does not
+ * answer within `startupTimeout` (`timeout`), the full WebGL2 compatibility layer from `loadCompat`. Unlike `autoEngine`
+ * it never stops at the small preview, so a page whose packages need the full renderer needs no `setup` callback and
+ * keeps its canvas element. The layer is downloaded only when it is used.
+ * @throws Any other error of `Engine.create`; MargoError `'unsupported'` from the layer's `install` when the browser's
+ * WebGL2 is below what the layer needs; the signal's reason once `signal` aborts.
+ */
+export const startEngine = async (
+  canvas: HTMLCanvasElement,
+  { loadCompat, forceCompat = false, ...options }: StartEngineOptions,
+): Promise<StartedEngine> => {
+  const open = () => Engine.create(canvas, { ...options, backend: 'webgpu' });
+  if (!forceCompat) {
+    try {
+      return { engine: await open(), renderer: 'webgpu' };
+    } catch (error) {
+      if (!fallsBack(error)) throw error;
+    }
+  }
+  options.signal?.throwIfAborted();
+  await (await loadCompat()).install({ force: true });
+  options.signal?.throwIfAborted();
+  return { engine: await open(), renderer: 'compatibility' };
+};

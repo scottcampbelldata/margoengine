@@ -11,5 +11,21 @@ export interface AutoEngineOptions extends Omit<EngineOptions, 'fallback'> {
     }>;
 }
 
+export interface StartEngineOptions extends Omit<EngineOptions, 'backend' | 'fallback'> {
+    loadCompat: () => Promise<{
+        install(options?: {
+            force?: boolean;
+        }): Promise<unknown>;
+    }>;
+    forceCompat?: boolean;
+}
+
+export interface StartedEngine {
+    engine: EngineKernel;
+    renderer: 'webgpu' | 'compatibility';
+}
+
 export const autoEngine: (canvas: HTMLCanvasElement, setup: (engine: EngineKernel) => void | Promise<void>, { loadCompat, ...options }?: AutoEngineOptions) => Promise<EngineKernel>;
+
+export const startEngine: (canvas: HTMLCanvasElement, { loadCompat, forceCompat, ...options }: StartEngineOptions) => Promise<StartedEngine>;
 ```

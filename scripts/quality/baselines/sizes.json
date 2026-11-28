@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21687835,
+  "total": 21690757,
   "history": [
     {
       "date": "2026-10-24",
@@ -15363,6 +15363,11 @@
       "commit": "hydro-02-native-workers",
       "reason": "HYDRO-02 physics/runoff grows from 4601 to 6936 B gzip (cap 4857 to 7192) for optional shared soil phases, ordered ledgers and deterministic work counts. Lazy plain/shared Wasm grows from 5135/5194 to 6427/6489 B gzip for cell partitioning. A separate entry would duplicate accepted fields and the arena binding. Existing shared-pool users remain inside their caps. Core and Stage gain zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "rigs-page-helpers",
+      "reason": "Demo engine code moved into packages (check:demo-sources R5 on the four mechanism demos). @margoengine/machinery/rigs gains openRig, keyedRig, signedReading, a signal option, Geneva turnWheel and the Oldham orbit: 2980 to 3303 B gzip (ceiling 3236 to 3559 B). @margoengine/webgl2-compat/auto gains startEngine, the WebGPU then full WebGL2 layer start every full-renderer demo repeated, the layer still a caller-passed import(): 3984 B gzip now (ceiling 3976 to 4240 B). A split would add an entry and a request for under 300 B each."
     }
   ],
   "items": {
@@ -16043,7 +16048,7 @@
     "@margoengine/machinery/metrology": 2911,
     "@margoengine/machinery/overlays": 2296,
     "@margoengine/machinery/react": 4713,
-    "@margoengine/machinery/rigs": 3236,
+    "@margoengine/machinery/rigs": 3559,
     "@margoengine/machinery/section": 4575,
     "@margoengine/machinery/spatial": 16699,
     "@margoengine/machinery/surface": 14297,
@@ -17094,7 +17099,7 @@
     "@margoengine/webgl2-compat base (without compute runtime and read-back)": 97864,
     "@margoengine/webgl2-compat lazy compute runtime and read-back": 34020,
     "@margoengine/webgl2-compat/adapter": 1214,
-    "@margoengine/webgl2-compat/auto": 3976,
+    "@margoengine/webgl2-compat/auto": 4240,
     "@margoengine/webgl2-compat/compute": 49684,
     "@margoengine/webgl2-compat/device": 131063,
     "@margoengine/webgl2-compat/glsl": 46373,

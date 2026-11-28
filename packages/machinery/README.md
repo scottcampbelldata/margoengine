@@ -237,6 +237,21 @@ console.log(train.drive(1).ring, train.check.ever);
 
 The joints are rows of the solver's sequential-impulse solve (Catto 2005; Baraff 1996); the closed forms are Reuleaux (1876) and Willis (1841). Without gravity, friction or load the rigs are kinematic chains solved by the dynamics: they show the solver holds each mechanism to its exact pose.
 
+Page helpers: `openRig(make, ...args)` loads the solver and makes a rig in one call; `keyedRig(make)` remakes a rig whenever a build parameter (its key, such as the held member or a shaft offset) changes, at the angle asked, so the solver never steps through a jump of the geometry; every rig and `keyedRig` take `signal` (default none), which disposes them on abort; `signedReading(value, unit, digits = 1)` writes a readout with a typographic minus or a plus and no sign on zero. The Geneva pose adds `turnWheel` (the wheel angle read within the crank turn last asked of `drive`), and the Oldham pose adds `orbitCenter` and `orbitRadius`, the circle the disc centre runs on.
+
+```ts
+import { epicyclicRig, keyedRig, openRig, scotchYokeRig, signedReading } from 'margoengine/machinery/rigs';
+
+const stop = new AbortController();
+const yoke = await openRig(scotchYokeRig, 0.142, { angle: 0, signal: stop.signal });
+console.log(signedReading(yoke.drive(1).slide * 1000, ' mm')); // '+76.7 mm'
+
+const train = keyedRig((held, angle) => epicyclicRig({ sun: 21, planet: 18, ring: 57 }, { held, angle }), { signal: stop.signal });
+train.drive(1, 'carrier'); // built at 1 radian with the carrier held
+console.log(train.drive(1.2, 'ring').carrier); // rebuilt with the ring held, then driven
+stop.abort(); // disposes the yoke and the train
+```
+
 ### Attaching from a second scene
 
 `SurfacePhysics.attach` and `TelemetryChannel.attach` remember the scene that is active when you call them, before their first await, and join that scene when they finish. Start it inside a second scene's plugin `setup` and the plugin belongs to that scene; start it anywhere else and it belongs to the default scene. An abort or a failure leaves nothing in either scene.
