@@ -395,3 +395,28 @@ export function closedSurface(triangles: ArrayLike<number>): boolean {
   }
   return true;
 }
+
+/**
+ * Each triangle's rest shape for a membrane (soft-kernel/src/membrane.rs), five floats a triangle: the inverse of its rest
+ * edges in its own plane, row major (with e1 = b - a along the plane's first axis, F = [e1 e2] times it), then its rest area.
+ */
+export function membraneRest(positions: ArrayLike<number>, triangles: ArrayLike<number>): Float32Array {
+  const out = new Float32Array((triangles.length / 3) * 5),
+    at = (i: number): V => [positions[i * 3]!, positions[i * 3 + 1]!, positions[i * 3 + 2]!];
+  for (let t = 0; t < triangles.length / 3; t++) {
+    const a = at(triangles[t * 3]!),
+      e1 = sub(at(triangles[t * 3 + 1]!), a),
+      e2 = sub(at(triangles[t * 3 + 2]!), a),
+      length = Math.hypot(...e1),
+      n = cross(e1, e2),
+      twice = Math.hypot(...n);
+    // The plane's axes: u along e1, v in the plane at right angles to it; the rest edges there are (length, 0) and (e2.u, e2.v).
+    const u: V = [e1[0] / length, e1[1] / length, e1[2] / length],
+      v = cross([n[0] / twice, n[1] / twice, n[2] / twice], u),
+      eu = dot(e2, u),
+      ev = dot(e2, v);
+    // [[length, eu], [0, ev]]^-1 = [[1 / length, -eu / (length ev)], [0, 1 / ev]].
+    out.set([1 / length, -eu / (length * ev), 0, 1 / ev, twice / 2], t * 5);
+  }
+  return out;
+}

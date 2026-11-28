@@ -18,7 +18,8 @@ static mut WORLD: World = World {
     kpx: Col::new(), kpy: Col::new(), kpz: Col::new(), kvx: Col::new(), kvy: Col::new(), kvz: Col::new(), kf: Col::new(), kr: Col::new(),
     at_p: Col::new(), at_row: Col::new(), at_rx: Col::new(), at_ry: Col::new(), at_rz: Col::new(), attachments: 0,
     vtri: Col::new(), vb_on: Col::new(), vb_first: Col::new(), vb_count: Col::new(), vb_target: Col::new(), vb_ambient: Col::new(), vb_omega: Col::new(),
-    vb_zeta: Col::new(), vb_lambda: Col::new(), vgx: Col::new(), vgy: Col::new(), vgz: Col::new(), rg: crate::rigid::Rigid::new(), gs: Col::new(), dom: Col::new(), bmesh: Col::new(), bsleep: Col::new(),
+    vb_zeta: Col::new(), vb_lambda: Col::new(), vgx: Col::new(), vgy: Col::new(), vgz: Col::new(),
+    vb_mu: Col::new(), mt_a: Col::new(), mt_b: Col::new(), mt_c: Col::new(), mt_d: Col::new(), mt_area: Col::new(), mh_head: Col::new(), mh_next: Col::new(), rg: crate::rigid::Rigid::new(), gs: Col::new(), dom: Col::new(), bmesh: Col::new(), bsleep: Col::new(),
     m0x: Col::new(), m0y: Col::new(), m0z: Col::new(), l0x: Col::new(), l0y: Col::new(), l0z: Col::new(),
     dmx: Col::new(), dmy: Col::new(), dmz: Col::new(), a0x: Col::new(), a0y: Col::new(), a0z: Col::new(), kj: Col::new(), tau_end: 0.0, pieces: 0, tqx: Col::new(), tqy: Col::new(), tqz: Col::new(), tqw: Col::new(), rox: Col::new(), roy: Col::new(), roz: Col::new(), rqx: Col::new(), rqy: Col::new(), rqz: Col::new(), rqw: Col::new(), sqx: Col::new(), sqy: Col::new(), sqz: Col::new(), sqw: Col::new(),
     fc_a: Col::new(), fc_b: Col::new(), fc_c: Col::new(), fc_wa: Col::new(), fc_wb: Col::new(), fc_wc: Col::new(), fc_row: Col::new(),
@@ -66,6 +67,7 @@ columns! {
     cbx, cby, cbz,
     ax, ay, az,
     vbx, vby, vbz,
+    vb_mu, mt_a, mt_b, mt_c, mt_d, mt_area,
 }
 
 /// Makes room for rows and says how many are in use. Views over the memory are stale after it.
@@ -147,7 +149,11 @@ pub extern "C" fn soft_face_reserve(faces: u32) {
 /// Makes room for the triangles of closed surfaces that keep their volume (three particle indices each in `vtri`).
 #[unsafe(no_mangle)]
 pub extern "C" fn soft_volume_reserve(triangles: u32) {
-    world().vtri.resize(3 * triangles as usize);
+    let w = world();
+    w.vtri.resize(3 * triangles as usize);
+    for col in [&mut w.mt_a, &mut w.mt_b, &mut w.mt_c, &mut w.mt_d, &mut w.mt_area] {
+        col.resize(triangles as usize);
+    }
 }
 
 /// The current volume of the closed surface of body `b`, in cubic metres.

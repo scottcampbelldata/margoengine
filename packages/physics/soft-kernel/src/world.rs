@@ -172,6 +172,17 @@ pub struct World {
     pub vgx: Col<f32>,
     pub vgy: Col<f32>,
     pub vgz: Col<f32>,
+    /// A membrane on the closed surface (src/membrane.rs): per body, mu H in N/m (0 for none); per triangle of `vtri`, the
+    /// inverse of its rest shape in its own plane (row major: mt_a, mt_b; mt_c, mt_d) and its rest area.
+    pub vb_mu: Col<f32>,
+    pub mt_a: Col<f32>,
+    pub mt_b: Col<f32>,
+    pub mt_c: Col<f32>,
+    pub mt_d: Col<f32>,
+    pub mt_area: Col<f32>,
+    /// Per particle, the first of its membrane triangle corners (3 t + k) and, per corner, the next one.
+    pub mh_head: Col<u32>,
+    pub mh_next: Col<u32>,
     /// The exact solve of the rigid edges and attachments (src/rigid.rs).
     pub rg: crate::rigid::Rigid,
     /// Per body row: how much gravity pulls the body, so it falls through the step with the particles that hang from it.
@@ -364,7 +375,7 @@ impl World {
         for v in [&mut self.vgx, &mut self.vgy, &mut self.vgz] {
             grow(v, particles);
         }
-        for v in [&mut self.vb_target, &mut self.vb_ambient, &mut self.vb_omega, &mut self.vb_zeta, &mut self.vb_lambda] {
+        for v in [&mut self.vb_target, &mut self.vb_ambient, &mut self.vb_omega, &mut self.vb_zeta, &mut self.vb_lambda, &mut self.vb_mu] {
             grow(v, bodies);
         }
         grow(&mut self.vb_on, bodies);
@@ -506,6 +517,7 @@ impl World {
         if cloth_block {
             self.prepare_bend_blocks();
         }
+        let membrane = self.prepare_membranes();
         self.shape_begin();
         self.fem_begin();
         self.volume_begin();
@@ -516,6 +528,9 @@ impl World {
             }
             if cloth_block {
                 self.solve_cloth_blocks(h);
+            }
+            if membrane {
+                self.solve_membranes(h);
             }
             self.solve_tethers();
             self.solve_skin();

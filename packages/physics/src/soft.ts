@@ -19,6 +19,7 @@ import {
   boundaryTriangles,
   boundsOf,
   closedSurface,
+  membraneRest,
   meshVolume,
   MIN_TET_DETERMINANT,
   reaches,
@@ -1176,6 +1177,26 @@ export interface SoftVolumeOptions {
   readonly cellSize?: number;
   /** `'cells'` tier: what the cells are made of (default `new CellMaterial()`, 100 kPa rubber); its density is `density`. */
   readonly material?: CellMaterial;
+  /**
+   * `'surface'` tier with a gas fill (`pressure`): the shell is a hyperelastic sheet of rubber in place of springs, an
+   * incompressible neo-Hookean membrane of `shearModulus` and `thickness` ({@link SoftMembrane}), so a balloon or a ball
+   * inflates, stiffens and squashes as the sheet and the gas balance (default none: the springs of `stiffness`).
+   */
+  readonly membrane?: SoftMembrane;
+}
+
+/**
+ * A hyperelastic membrane for a soft volume's shell ({@link SoftVolumeOptions.membrane}): the incompressible neo-Hookean
+ * sheet of Treloar and of Adkins and Rivlin (1952), with energy (`shearModulus` `thickness` / 2) (tr C + 1 / J^2 - 3) per
+ * rest area, C the stretch of the sheet in its own plane and J its area stretch. A sphere of rest radius R stretched by
+ * lambda then holds the overpressure 2 mu H / R (1 / lambda - 1 / lambda^7), which peaks at lambda = 7^(1/6), about 1.38, as a
+ * balloon's does. It has no bending stiffness, so it needs the gas's overpressure to keep its shape.
+ */
+export interface SoftMembrane {
+  /** The sheet's shear modulus in Pa (its small-strain Young's modulus is three times it). */
+  readonly shearModulus: number;
+  /** The sheet's rest thickness in metres. */
+  readonly thickness: number;
 }
 
 /** What `debugRender` draws of soft bodies (see {@link SoftBodies.debugRender} and {@link SoftBody.debugRender}). */
@@ -1247,6 +1268,7 @@ export class SoftBodyDesc {
   /** @internal */ shapeMatching = false;
   /** @internal */ volumeFactor: number | null = null;
   /** @internal */ gas: SoftGasPressure | null = null;
+  /** @internal The membrane's shear modulus times its thickness, N/m (SoftVolumeOptions.membrane); 0 for none. */ membrane = 0;
   /** @internal */ groups: number | undefined = undefined;
   /** @internal */ selfContacts = false;
   /** @internal */ selfFriction = 0;
@@ -1690,6 +1712,7 @@ export class SoftBodyDesc {
       tier = 'surface',
       cellSize,
       material,
+      membrane,
     } = options;
     const flat = mesh && 'positions' in mesh,
       vertices = flat ? mesh.positions : mesh?.vertices,
@@ -1772,12 +1795,32 @@ export class SoftBodyDesc {
       desc.sourceMesh = { particles, indices: Uint32Array.from(indices), uvs };
       return desc;
     }
+    if (membrane !== undefined) {
+      if (tier !== 'surface' || pressure === undefined)
+        throw volumeError(
+          "A membrane is the shell of a gas fill: use the 'surface' tier and give pressure (the fill's absolute pressure in Pa).",
+        );
+      if (membrane === null || typeof membrane !== 'object')
+        throw volumeError('membrane is {shearModulus, thickness}, in Pa and metres.');
+      positive(membrane.shearModulus, 'membrane.shearModulus (Pa)');
+      positive(membrane.thickness, 'membrane.thickness (metres)');
+    }
     const desc = SoftBodyDesc.trimesh(welded.positions, welded.triangles)
       .setShapeMatching(false)
       .setSoftness(stiffness, damping)
       .setParticleRadius(radius)
       .setDensity(density)
       .setMass(density * volume);
+    if (membrane !== undefined) {
+      // The sheet holds the shape; its edges are not springs as well.
+      desc.edgePairs = [];
+      desc.bendPairs = [];
+      desc.edgeKinds = [];
+      desc.edgeShear = [];
+      desc.membrane = Math.fround(membrane.shearModulus * membrane.thickness);
+      if (!(desc.membrane > 0 && Number.isFinite(desc.membrane)))
+        throw volumeError('membrane.shearModulus times membrane.thickness must be a finite positive float32 (N/m).');
+    }
     desc.sourceMesh = { particles: welded.particleOf, indices: Uint32Array.from(indices), uvs };
     return pressure === undefined
       ? desc.setVolumeFactor(1)
@@ -2720,6 +2763,8 @@ export class SoftBody {
     null;
   /** @internal How many `SailForce`s supply its air loads: while any does, the default drag leaves it alone. */ airLoads = 0;
   /** @internal Whether its surface holds a volume, and the volume at rest. */ volumeOn = false;
+  /** @internal A membrane's mu H (N/m, 0 for none) and per triangle its rest shape's inverse (4) and rest area. */ membrane = 0;
+  /** @internal */ membraneRest: Float32Array = new Float32Array(0);
   /** @internal The water a closed body displaced at its last step in `SoftBodies.water`, m^3. */ displaced = 0;
   /** @internal */ surfaceRest = 0;
   /** @internal */ canSleepFlag = true;
@@ -4056,6 +4101,10 @@ export class SoftBodies implements PhysicsAttachment {
       body.volumeOn = true;
     }
     body.selfFriction = desc.selfFriction;
+    if (desc.membrane > 0) {
+      body.membrane = desc.membrane;
+      body.membraneRest = membraneRest(desc.positions, desc.triangles);
+    }
     body.selfThickness = Math.min(radius, half);
     body.dominance = desc.dominance;
     body.canSleepFlag = desc.canSleep;
@@ -4223,6 +4272,19 @@ export class SoftBodies implements PhysicsAttachment {
     for (const b of on) {
       c.vb_first[b.handle] = at / 3;
       c.vb_count[b.handle] = b.triangleList.length / 3;
+      if (b.membrane > 0 && b.membraneRest.length !== (b.triangleList.length / 3) * 5)
+        throw new MargoError(
+          'state',
+          "A membrane body's triangles changed; a membrane shell cannot be cut or retriangulated. Make a new body.",
+        );
+      c.vb_mu[b.handle] = b.membrane;
+      for (let t = 0, first = at / 3; t < b.triangleList.length / 3 && b.membrane > 0; t++) {
+        c.mt_a[first + t] = b.membraneRest[t * 5]!;
+        c.mt_b[first + t] = b.membraneRest[t * 5 + 1]!;
+        c.mt_c[first + t] = b.membraneRest[t * 5 + 2]!;
+        c.mt_d[first + t] = b.membraneRest[t * 5 + 3]!;
+        c.mt_area[first + t] = b.membraneRest[t * 5 + 4]!;
+      }
       for (const v of b.triangleList) c.vtri[at++] = b.firstParticle + v;
     }
   }
@@ -4951,6 +5013,7 @@ export class SoftBodies implements PhysicsAttachment {
         'vb_zeta',
         'vb_target',
         'vb_ambient',
+        'vb_mu',
       ] as const,
       ecols = ['rest', 'omega', 'zeta', 'lambda', 'tear', 'eflags'] as const,
       saved = keep.map((b) => ({
@@ -7089,6 +7152,7 @@ function rowsOf(
   if (name === 'vtri') return volumeTriangles * 3;
   if (name.startsWith('fc_')) return faces;
   if (/^vb_/.test(name)) return bodies;
+  if (name.startsWith('mt_')) return volumeTriangles;
   if (/^at_(p|row|r[xyz])$/.test(name)) return attachments;
   if (/^tt_(p|a|len)$/.test(name)) return tethers;
   if (name.startsWith('sk_')) return skins;

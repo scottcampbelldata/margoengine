@@ -37,6 +37,7 @@ mod fem_api;
 #[cfg(target_arch = "wasm32")]
 mod heap;
 mod math;
+mod membrane;
 mod shape;
 mod skin;
 mod tether;

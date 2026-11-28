@@ -2489,6 +2489,8 @@ class SoftBody {
     waterRadius: number | null;
     airLoads: number;
     volumeOn: boolean;
+    membrane: number;
+    membraneRest: Float32Array;
     displaced: number;
     surfaceRest: number;
     canSleepFlag: boolean;
@@ -2610,6 +2612,7 @@ class SoftBodyDesc {
     shapeMatching: boolean;
     volumeFactor: number | null;
     gas: SoftGasPressure | null;
+    membrane: number;
     groups: number | undefined;
     selfContacts: boolean;
     selfFriction: number;
@@ -2785,6 +2788,11 @@ interface SoftGasState {
     readonly ambientPressure: number;
 }
 
+interface SoftMembrane {
+    readonly shearModulus: number;
+    readonly thickness: number;
+}
+
 class SoftMeshBinding {
     readonly mode: 'direct' | 'directByPosition' | 'skinned';
     readonly particles: readonly number[];
@@ -2880,6 +2888,7 @@ interface SoftVolumeOptions {
     readonly tier?: 'surface' | 'cells';
     readonly cellSize?: number;
     readonly material?: CellMaterial;
+    readonly membrane?: SoftMembrane;
 }
 
 type Triangle = readonly [Vec3, Vec3, Vec3];

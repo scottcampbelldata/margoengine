@@ -1376,6 +1376,7 @@ class SoftBodyDesc {
     shapeMatching: boolean;
     volumeFactor: number | null;
     gas: SoftGasPressure | null;
+    membrane: number;
     groups: number | undefined;
     selfContacts: boolean;
     selfFriction: number;
@@ -1518,6 +1519,11 @@ interface SoftGasPressure {
     readonly ambientPressure?: number;
 }
 
+interface SoftMembrane {
+    readonly shearModulus: number;
+    readonly thickness: number;
+}
+
 interface SoftOrthotropicFractureEnergy {
     readonly tensile: Vec3;
     readonly shear: Vec3;
@@ -1586,6 +1592,7 @@ interface SoftVolumeOptions {
     readonly tier?: 'surface' | 'cells';
     readonly cellSize?: number;
     readonly material?: CellMaterial;
+    readonly membrane?: SoftMembrane;
 }
 
 type Triangle = readonly [Vec3, Vec3, Vec3];

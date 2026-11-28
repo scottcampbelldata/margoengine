@@ -32,6 +32,25 @@ Part 15 are refused as unsupported, not skipped. The Wasm interface, the `decode
 workers are Margo's own code over the W3C WebAssembly JavaScript Interface
 (<https://www.w3.org/TR/wasm-js-api-2/>).
 
+### A membrane shell for soft volumes (P8, SOFT-04 and SOFT-06, point 2, 2026-11-28)
+
+`SoftVolumeOptions.membrane` (`packages/physics/soft-kernel/src/membrane.rs`, the rest shapes in `membraneRest` of
+`soft-volume.ts`) makes the surface tier's shell an incompressible neo-Hookean membrane: per triangle the 3 x 2
+deformation gradient F of its rest shape in its own plane, C = F^T F, area stretch J = sqrt(det C), the thickness H / J
+from incompressibility, and the energy (mu H / 2) (tr C + 1 / J^2 - 3) per rest area. The law and its closed form for a
+sphere, p = 2 mu H / R (1 / lambda - 1 / lambda^7) with its maximum at lambda = 7^(1/6), are from J. E. Adkins and R. S.
+Rivlin, "Large elastic deformations of isotropic materials IX. The deformation of thin shells", Phil. Trans. R. Soc. A
+245 (1952) 505-531 (<https://doi.org/10.1098/rsta.1952.0030>), and L. R. G. Treloar, *The Physics of Rubber Elasticity*
+(3rd ed., Oxford 1975); the general thin-shell form p = (H / R) W'(lambda) / lambda^2 and the balloon models it is
+compared with are in Robert Mangan and Michel Destrade, "Gent models for the inflation of spherical balloons",
+International Journal of Non-Linear Mechanics 68 (2015) 52-58 (arXiv:2009.08752), read for its equations only. The
+sheet and its gas are solved together by Anka He Chen, Ziheng Liu, Yin Yang and Cem Yuksel, "Vertex Block Descent", ACM
+TOG 43(4), 2024: the gas enters as its isothermal energy -nRT ln V + p_out V, so the sheet and the gas share one
+stationary point; each particle's Newton step uses a majorizer of the membrane's Hessian (the area-stretch term's
+curvature is dropped, which is negative because J is the norm of a function affine in one particle) and is cut back
+until the potential falls. The tests hold a sphere to the closed form at three fills, its stiffness dp / dlambda and a
+held-out sheet near the peak (`packages/physics/tests/soft-membrane.test.js`). No code was read.
+
 ### Soft volumes from a mesh (P8, SOFT-04 and SOFT-06, 2026-11-27)
 
 `SoftBodyDesc.volume` (`packages/physics/src/soft.ts`, `weldMesh` in `soft-volume.ts`) welds a mesh's split vertices

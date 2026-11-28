@@ -50,7 +50,8 @@ impl World {
 
     pub(crate) fn solve_volume(&mut self, h: f32) {
         for b in 0..self.bodies {
-            if self.vb_count[b] > 0 {
+            // A membrane's gas is part of its own solve (src/membrane.rs).
+            if self.vb_count[b] > 0 && !(self.vb_mu[b] > 0.0) {
                 match self.vb_on[b] {
                     1 => self.hold_volume(b, h),
                     2 => self.solve_gas(b, h),

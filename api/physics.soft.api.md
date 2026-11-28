@@ -422,6 +422,8 @@ export class SoftBody {
     waterRadius: number | null;
     airLoads: number;
     volumeOn: boolean;
+    membrane: number;
+    membraneRest: Float32Array;
     displaced: number;
     surfaceRest: number;
     canSleepFlag: boolean;
@@ -543,6 +545,7 @@ export class SoftBodyDesc {
     shapeMatching: boolean;
     volumeFactor: number | null;
     gas: SoftGasPressure | null;
+    membrane: number;
     groups: number | undefined;
     selfContacts: boolean;
     selfFriction: number;
@@ -718,6 +721,11 @@ export interface SoftGasState {
     readonly ambientPressure: number;
 }
 
+export interface SoftMembrane {
+    readonly shearModulus: number;
+    readonly thickness: number;
+}
+
 export class SoftMeshBinding {
     readonly mode: 'direct' | 'directByPosition' | 'skinned';
     readonly particles: readonly number[];
@@ -818,6 +826,7 @@ export interface SoftVolumeOptions {
     readonly tier?: 'surface' | 'cells';
     readonly cellSize?: number;
     readonly material?: CellMaterial;
+    readonly membrane?: SoftMembrane;
 }
 
 export function fabricBendingRigidity(b: number): number;

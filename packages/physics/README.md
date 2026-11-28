@@ -1975,6 +1975,28 @@ console.log(ball.centerOfMass(), ball.surfaceVolume());
   for (let i = 0; i < 30; i++) physics.step();
   console.log(ball.numCells(), ball.centerOfMass());
   ```
+- **A rubber sheet for the shell.** `membrane: {shearModulus, thickness}` (Pa and metres) with a `pressure` makes the
+  surface tier's shell an incompressible neo-Hookean membrane (Adkins and Rivlin 1952, Treloar 1975) in place of its
+  springs, solved with its gas by vertex block descent: a balloon or a pressurised ball inflates to the stretch its fill
+  and its sheet balance at, and stiffens as the sheet does. A sphere of rest radius R stretched by lambda holds
+  2 mu H / R (1 / lambda - 1 / lambda^7) over the air outside, which peaks at lambda = 7^(1/6); the tests hold the ball to
+  it within 1e-4 of the stretch and 0.1% of the pressure, its stiffness dp / dlambda within 1%, on a held-out sheet too.
+  The sheet has no bending stiffness, so the gas keeps its shape.
+
+  <!-- example:node -->
+  ```js
+  import { Physics } from '@margoengine/physics';
+  import { SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+  import { sphereGeometry } from '@margoengine/geometry/primitives';
+
+  await Physics.load();
+  const physics = new Physics(null, { gravity: [0, 0, 0] });
+  const soft = await SoftBodies.attach(physics);
+  const sheet = { shearModulus: 300e3, thickness: 0.5e-3 };
+  const balloon = soft.create(SoftBodyDesc.volume(sphereGeometry(0.1, 24, 16), { pressure: 150_000, membrane: sheet }));
+  for (let i = 0; i < 120; i++) physics.step();
+  console.log(balloon.gasState());
+  ```
 - **Anchoring.** Every `SoftBodyDesc` setting applies to the description it returns: `setPinnedParticles([i])` pins a
   particle, `setParticleKinematicTarget(i, position)` on the body drags one, `attachParticle(i, rigidBody)` ties
   one to a rigid body; `setMass`, `setVolumeFactor` (inflate or deflate), `setGravityScale`, `setAirDrag` (default on:
