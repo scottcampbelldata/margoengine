@@ -107,6 +107,20 @@ test('every set on an engine shares one RawShaders plugin, and parts carry one v
   solid.dispose();
 });
 
+test('a lens face is a polar mesh of rings x segments with its sag at the centre, and a reticle carries its size', () => {
+  const screens = OpticsScreens.attach(standIn());
+  const lens = screens.lens(parent, 2, {}, { sag: 0.5, rings: 3, segments: 8 });
+  const positions = lens.mesh.getAttribute('position').data;
+  assert.equal(positions.length, (1 + 3 * 8) * 3);
+  assert.deepEqual([...positions.slice(0, 3)], [0, 0, 0.5]);
+  assert.equal(positions[positions.length - 1], 0, 'the rim has no sag');
+  const reticle = screens.reticle(parent, 0.092, 0.088);
+  assert.deepEqual([...reticle.mesh.getAttribute('e').data.slice(0, 3)], [80, Math.fround(0.092), Math.fround(0.088)]);
+  reticle.set({ spotRadius: [0.03, 0.01] });
+  assert.equal(reticle.mesh.getAttribute('a').data[0], Math.fround(0.03));
+  screens.dispose();
+});
+
 test('set rewrites only the flat values that changed, and a plate turns into a disc', () => {
   const screens = OpticsScreens.attach(standIn());
   const detector = screens.fringes(parent, 0.1, { frequency: 2 });
@@ -133,6 +147,8 @@ test('unknown fields, non-finite numbers, bad sizes and bad blends are refused',
   assert.throws(() => screens.spot(parent, 0, 1), /positive/);
   assert.throws(() => screens.plate(parent, 1, 1, { shape: 'hex' }), /rect or disc/);
   assert.throws(() => screens.facet(parent, [[0, 0, 0]], [0, 0, 1]), /three/);
+  assert.throws(() => screens.lens(parent, 1, {}, { segments: 2 }), /segments at least 3/);
+  assert.throws(() => screens.reticle(parent, 1, -1), /positive/);
   assert.throws(() => OpticsScreens.attach(standIn(), { blending: 'multiply' }), /none, normal or additive/);
   screens.dispose();
 });

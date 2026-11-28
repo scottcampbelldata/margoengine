@@ -50,6 +50,30 @@ export interface FringeLook {
     markWeight?: number;
 }
 
+export interface LensLook {
+    inner?: ScreenColor;
+    outer?: ScreenColor;
+    edgeMix?: number;
+    coatingMix?: number;
+    ribbonX?: number;
+    ribbonY?: number;
+    ribbonOffset?: number;
+    ribbonFalloff?: number;
+    base?: number;
+    edgeWeight?: number;
+    coatingWeight?: number;
+    rimStart?: number;
+    rimEnd?: number;
+}
+
+export interface LensShape {
+    sag?: number;
+    sagU?: number;
+    sagV?: number;
+    rings?: number;
+    segments?: number;
+}
+
 export class OpticsScreens {
     readonly material: RawShaderMaterial;
     readonly raw: RawShaders;
@@ -60,6 +84,8 @@ export class OpticsScreens {
     spot(parent: Mesh, halfWidth: number, halfHeight: number, look?: SpotLook): ScreenPart<SpotLook>;
     fringes(parent: Mesh, radius: number, look?: FringeLook): ScreenPart<FringeLook>;
     facet(parent: Mesh, points: readonly (readonly [number, number, number])[], normal: readonly [number, number, number], look?: FacetLook): ScreenPart<FacetLook>;
+    lens(parent: Mesh, radius: number, look?: LensLook, shape?: LensShape): ScreenPart<LensLook>;
+    reticle(parent: Mesh, halfWidth: number, halfHeight: number, look?: ReticleLook): ScreenPart<ReticleLook>;
     ready(): Promise<void>;
     dispose(): void;
     [Symbol.dispose](): void;
@@ -84,6 +110,17 @@ export interface PlateLook {
     bandWeight?: number;
     bandFalloff?: number;
     shape?: 'rect' | 'disc';
+}
+
+export interface ReticleLook {
+    spotRadius?: readonly [number, number];
+    haloA?: ScreenColor;
+    haloB?: ScreenColor;
+    hueMix?: number;
+    spot?: ScreenColor;
+    spotWeight?: number;
+    haloWeight?: number;
+    pitch?: number;
 }
 
 export type ScreenColor = readonly [number, number, number];
@@ -115,11 +152,15 @@ export function packFacet(look: Required<FacetLook>): ScreenSlots;
 
 export function packFringes(look: Required<FringeLook>): ScreenSlots;
 
+export function packLens(look: Required<LensLook>): ScreenSlots;
+
 export function packPlate(look: Required<PlateLook>): ScreenSlots;
+
+export function packReticle(look: Required<ReticleLook>, halfSize: readonly [number, number]): ScreenSlots;
 
 export function packSpot(look: Required<SpotLook>): ScreenSlots;
 
-export const screensFragmentShader = "\nstruct ScreenVarying {\n  @builtin(position) clip:vec4f,\n  @location(0) uv:vec2f,\n  @location(1) @interpolate(flat) kind:f32,\n  @location(2) @interpolate(flat) a:vec4f,\n  @location(3) @interpolate(flat) b:vec4f,\n  @location(4) @interpolate(flat) c:vec4f,\n  @location(5) @interpolate(flat) d:vec4f,\n  @location(6) @interpolate(flat) e:vec4f,\n  @location(7) world:vec3f,\n  @location(8) normal:vec3f,\n}\n@fragment fn fragment(i:ScreenVarying)->@location(0) vec4f {\n  let uv=i.uv;\n  var color=vec3f(0.0);\n  var alpha=1.0;\n  if(i.kind<0.5){\n    let d=uv.x*uv.x;\n    color=mix(i.a.rgb,i.b.rgb,i.a.w*exp(-i.b.w*d));\n    let along=i.d.x+i.d.y*uv.y+i.d.z*abs(2.0*uv.y-1.0);\n    alpha=min(1.0,i.d.w*(i.c.y*exp(-i.c.x*d)+i.c.w*exp(-i.c.z*d))*along);\n  } else if(i.kind<2.5){\n    var m=max(abs(uv.x),abs(uv.y));\n    if(i.kind>1.5){\n      m=dot(uv,uv);\n      if(m>1.0){discard;}\n    }\n    let rim=smoothstep(i.c.w,1.0,m);\n    let band=uv.x*i.c.x+uv.y*i.c.y+i.c.z;\n    color=mix(i.a.rgb,i.b.rgb,i.a.w*exp(-i.b.w*band*band));\n    alpha=i.d.x+i.d.y*rim+i.d.z*exp(-i.d.w*band*band);\n  } else if(i.kind<3.5){\n    let d=dot(uv,uv);\n    var shade=exp(-i.b.w*d);\n    var inner=exp(-i.c.x*d);\n    if(i.e.y>i.e.x){\n      shade=1.0-smoothstep(i.e.x,i.e.y,d);\n      inner=shade;\n    }\n    color=mix(i.a.rgb,i.b.rgb,i.a.w*shade);\n    var cut=1.0;\n    if(i.d.x<1.0){cut=1.0-smoothstep(i.d.x,1.0,d);}\n    alpha=min(1.0,i.d.w*(i.c.y*inner+i.c.w*exp(-i.c.z*d))*cut);\n  } else if(i.kind<4.5){\n    let rr=dot(uv,uv);\n    if(rr>1.0){discard;}\n    let angle=6.28318530718*(uv.x*i.c.x+i.c.y);\n    let field=0.5+0.5*(i.a.w*cos(angle));\n    let beam=field*exp(-i.c.z*rr);\n    let body=i.d.rgb+i.e.rgb*exp(-rr);\n    let core=mix(i.a.rgb,i.b.rgb,pow(beam,i.b.w));\n    let mark=(1.0-smoothstep(.007,.016,abs(uv.x)))*smoothstep(.75,.86,uv.y);\n    color=body+beam*core*i.c.w+mark*i.d.w;\n  } else {\n    let r=reflect(-normalize(camera.position-i.world),normalize(i.normal));\n    let panel=exp(-i.a.w*abs(r.y-i.b.w));\n    let highlight=exp(-i.c.w*abs(r.x+i.d.x*r.y+i.d.y));\n    color=i.a.rgb+i.b.rgb*panel+i.c.rgb*(i.d.z+i.d.w*highlight);\n  }\n  let brightness=clamp(color,vec3f(0.0),vec3f(1.0));\n  return vec4f(margoEncode(vec4f(brightness,1.0)).rgb,alpha);\n}";
+export const screensFragmentShader = "\nstruct ScreenVarying {\n  @builtin(position) clip:vec4f,\n  @location(0) uv:vec2f,\n  @location(1) @interpolate(flat) kind:f32,\n  @location(2) @interpolate(flat) a:vec4f,\n  @location(3) @interpolate(flat) b:vec4f,\n  @location(4) @interpolate(flat) c:vec4f,\n  @location(5) @interpolate(flat) d:vec4f,\n  @location(6) @interpolate(flat) e:vec4f,\n  @location(7) world:vec3f,\n  @location(8) normal:vec3f,\n}\n@fragment fn fragment(i:ScreenVarying)->@location(0) vec4f {\n  let uv=i.uv;\n  // Derivatives first, in uniform control flow (before any branch or discard); only the reticle reads them.\n  let sample=uv*i.e.yz;\n  let radius=length(sample/max(abs(i.a.xy),vec2f(1e-6)));\n  let radiusStep=fwidth(radius);\n  let sampleStep=fwidth(sample);\n  var color=vec3f(0.0);\n  var alpha=1.0;\n  if(i.kind<0.5){\n    let d=uv.x*uv.x;\n    color=mix(i.a.rgb,i.b.rgb,i.a.w*exp(-i.b.w*d));\n    let along=i.d.x+i.d.y*uv.y+i.d.z*abs(2.0*uv.y-1.0);\n    alpha=min(1.0,i.d.w*(i.c.y*exp(-i.c.x*d)+i.c.w*exp(-i.c.z*d))*along);\n  } else if(i.kind<2.5){\n    var m=max(abs(uv.x),abs(uv.y));\n    if(i.kind>1.5){\n      m=dot(uv,uv);\n      if(m>1.0){discard;}\n    }\n    let rim=smoothstep(i.c.w,1.0,m);\n    let band=uv.x*i.c.x+uv.y*i.c.y+i.c.z;\n    color=mix(i.a.rgb,i.b.rgb,i.a.w*exp(-i.b.w*band*band));\n    alpha=i.d.x+i.d.y*rim+i.d.z*exp(-i.d.w*band*band);\n  } else if(i.kind<3.5){\n    let d=dot(uv,uv);\n    var shade=exp(-i.b.w*d);\n    var inner=exp(-i.c.x*d);\n    if(i.e.y>i.e.x){\n      shade=1.0-smoothstep(i.e.x,i.e.y,d);\n      inner=shade;\n    }\n    color=mix(i.a.rgb,i.b.rgb,i.a.w*shade);\n    var cut=1.0;\n    if(i.d.x<1.0){cut=1.0-smoothstep(i.d.x,1.0,d);}\n    alpha=min(1.0,i.d.w*(i.c.y*inner+i.c.w*exp(-i.c.z*d))*cut);\n  } else if(i.kind<4.5){\n    let rr=dot(uv,uv);\n    if(rr>1.0){discard;}\n    let angle=6.28318530718*(uv.x*i.c.x+i.c.y);\n    let field=0.5+0.5*(i.a.w*cos(angle));\n    let beam=field*exp(-i.c.z*rr);\n    let body=i.d.rgb+i.e.rgb*exp(-rr);\n    let core=mix(i.a.rgb,i.b.rgb,pow(beam,i.b.w));\n    let mark=(1.0-smoothstep(.007,.016,abs(uv.x)))*smoothstep(.75,.86,uv.y);\n    color=body+beam*core*i.c.w+mark*i.d.w;\n  } else if(i.kind<5.5){\n    let r=reflect(-normalize(camera.position-i.world),normalize(i.normal));\n    let panel=exp(-i.a.w*abs(r.y-i.b.w));\n    let highlight=exp(-i.c.w*abs(r.x+i.d.x*r.y+i.d.y));\n    color=i.a.rgb+i.b.rgb*panel+i.c.rgb*(i.d.z+i.d.w*highlight);\n  } else if(i.kind<6.5){\n    let edge=dot(uv,uv);\n    let ribbon=uv.x*i.c.x+uv.y*i.c.y+i.c.z;\n    let coating=exp(-i.a.w*ribbon*ribbon);\n    color=mix(i.a.rgb,i.b.rgb,i.b.w*edge+i.c.w*coating);\n    alpha=(i.d.x+i.d.y*edge*edge+i.d.z*coating)*(1.0-smoothstep(i.d.w,i.e.x,edge));\n  } else {\n    let soft=clamp(radiusStep,0.10,0.60);\n    let aa=max(sampleStep*i.e.x,vec2f(0.008,0.008));\n    let spot=1.0-smoothstep(1.0-soft,1.0+soft,radius);\n    let spill=exp(-1.17*radius*radius);\n    let toned=mix(vec3f(0.050,0.037,0.064),vec3f(0.153,0.137,0.169),1.0-dot(uv*0.68,uv*0.68));\n    let nearLine=abs(fract(sample*i.e.x+0.5)-0.5);\n    let lines=1.0-smoothstep(vec2f(0.014,0.014),vec2f(0.014,0.014)+aa,nearLine);\n    let ruled=max(lines.x,lines.y)*(1.0-smoothstep(0.83,1.01,max(abs(uv.x),abs(uv.y))));\n    let axes=1.0-smoothstep(0.0,0.010,min(abs(uv.x),abs(uv.y)));\n    let haze=fract(sin(dot(floor(sample*7500.0),vec2f(127.1,311.7)))*43758.5453)*0.018;\n    let glass=toned+vec3f(0.046,0.038,0.048)*(ruled+axes*0.65)+haze;\n    let halo=mix(i.b.rgb,i.c.rgb,i.b.w);\n    color=glass+halo*i.d.w*spill+i.d.rgb*i.c.w*spot;\n  }\n  let brightness=clamp(color,vec3f(0.0),vec3f(1.0));\n  return vec4f(margoEncode(vec4f(brightness,1.0)).rgb,alpha);\n}";
 
 export const screensVertexShader = "\nstruct ScreenVarying {\n  @builtin(position) clip:vec4f,\n  @location(0) uv:vec2f,\n  @location(1) @interpolate(flat) kind:f32,\n  @location(2) @interpolate(flat) a:vec4f,\n  @location(3) @interpolate(flat) b:vec4f,\n  @location(4) @interpolate(flat) c:vec4f,\n  @location(5) @interpolate(flat) d:vec4f,\n  @location(6) @interpolate(flat) e:vec4f,\n  @location(7) world:vec3f,\n  @location(8) normal:vec3f,\n}\n@vertex fn vertex(v:Attributes)->ScreenVarying {\n  let p=mesh.world*vec4f(v.position,1.0);\n  return ScreenVarying(camera.viewProjection*p,v.uv,v.kind,v.a,v.b,v.c,v.d,v.e,p.xyz,mesh.normal*v.direction);\n}";
 ```

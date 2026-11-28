@@ -122,6 +122,7 @@ console.log(xyz, laserGreen, white, blueFilter, kept);
 
 `@margoengine/optics/screens` draws what an optics bench shows: laser beams as crossed Gaussian tubes (core plus scatter
 halo, Kogelnik and Li), glass plates with a rim and a sheen band, glowing spots (soft or hard-cored), a two-beam
+interference detector, coated lens faces, an image reticle that shows a spot of any size, and an
 interference detector whose field is `(1 + V cos(2 pi (u f + cycles))) / 2` under a Gaussian beam, and mirror facets that
 reflect a soft studio. Every part of one set shares one `RawShaderMaterial` (one pipeline per blend mode), follows a core
 mesh's transform, and takes its look as numbers, so a scene never writes shader text. Each part's `set(look)` changes
@@ -136,6 +137,8 @@ root entry does not re-export it.
 | Spot | `spot(parent, halfWidth, halfHeight, look)` | `edge`, `core`, `coreMix`, `colorFalloff`, `innerFalloff`, `innerWeight`, `outerFalloff`, `outerWeight`, `fade`, `opacity`, `hardCore` |
 | Fringe detector | `fringes(parent, radius, look)` | `frequency`, `cycles`, `visibility`, `waist`, `edge`, `core`, `gamma`, `gain`, `body`, `glow`, `markWeight` |
 | Mirror facet | `facet(parent, [p0, p1, p2], normal, look)` | `dark`, `panelColor`, `panelFalloff`, `panelHeight`, `tint`, `highlightFalloff`, `highlightTilt`, `highlightOffset`, `base`, `highlightWeight` |
+| Lens face | `lens(parent, radius, look, {sag, sagU, sagV, rings, segments})`: a polar mesh bulging along +z | `inner`, `outer`, `edgeMix`, `coatingMix`, `ribbonX`, `ribbonY`, `ribbonOffset`, `ribbonFalloff`, `base`, `edgeWeight`, `coatingWeight`, `rimStart`, `rimEnd` |
+| Image reticle | `reticle(parent, halfWidth, halfHeight, look)`: a spot of radii `spotRadius` over ruled glass | `spotRadius`, `haloA`, `haloB`, `hueMix`, `spot`, `spotWeight`, `haloWeight`, `pitch` |
 
 `OpticsScreens.attach(engine, {blending})` takes `'normal'` (default) or `'additive'` for glowing parts drawn after the
 opaque scene, or `'none'` for opaque parts that write depth (facets); every set on an engine draws through one

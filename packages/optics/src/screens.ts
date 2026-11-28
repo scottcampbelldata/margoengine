@@ -183,6 +183,78 @@ export interface FacetLook {
   highlightWeight?: number;
 }
 
+/**
+ * A lens face (toric or spherical glass seen face on) on a unit disc in uv, r2 = u^2 + v^2 and ribbon = u ribbonX +
+ * v ribbonY + ribbonOffset, coating = exp(-ribbonFalloff ribbon^2): colour = mix(inner, outer, edgeMix r2 + coatingMix
+ * coating), alpha = (base + edgeWeight r2^2 + coatingWeight coating) (1 - smoothstep(rimStart, rimEnd, r2)).
+ */
+export interface LensLook {
+  /** Default [0.12, 0.049, 0.30] (a violet anti-reflection coating). */
+  inner?: ScreenColor;
+  /** Default [0.46, 0.65, 0.72]. */
+  outer?: ScreenColor;
+  /** Default 0.45. */
+  edgeMix?: number;
+  /** Default 0.38. */
+  coatingMix?: number;
+  /** Default 1. */
+  ribbonX?: number;
+  /** Default 0.40. */
+  ribbonY?: number;
+  /** Default 0.22. */
+  ribbonOffset?: number;
+  /** Default 49. */
+  ribbonFalloff?: number;
+  /** Default 0.20. */
+  base?: number;
+  /** Default 0.58. */
+  edgeWeight?: number;
+  /** Default 0.18. */
+  coatingWeight?: number;
+  /** Default 0.974. */
+  rimStart?: number;
+  /** Default 1.01. */
+  rimEnd?: number;
+}
+
+/** The shape of a {@link OpticsScreens.lens} face: z = (1 - r^2)(sag + sagU u^2 + sagV v^2) over a disc of `radius`. */
+export interface LensShape {
+  /** Centre height of the face along +z. Default 0.012. */
+  sag?: number;
+  /** Extra sag along u (x), the toric difference. Default 0. */
+  sagU?: number;
+  /** Extra sag along v (y). Default 0. */
+  sagV?: number;
+  /** Rings from the centre out. Default 10. */
+  rings?: number;
+  /** Segments around. Default 64. */
+  segments?: number;
+}
+
+/**
+ * An image screen behind ruled glass (a reticle): a spot of radii `spotRadius` (in the screen's own units, half sizes
+ * `halfSize`) over a toned glass card with an 80-per-unit ruled grid, crosshair axes and grain; its halo colour runs from
+ * `haloA` to `haloB` with `hueMix`, the halo following exp(-1.17 r^2) and the spot edge softened by its pixel size.
+ */
+export interface ReticleLook {
+  /** Spot radii along u and v in screen units. Default [0.02, 0.02]. */
+  spotRadius?: readonly [number, number];
+  /** Default [0.91, 0.29, 0.34]. */
+  haloA?: ScreenColor;
+  /** Default [0.33, 0.62, 0.92]. */
+  haloB?: ScreenColor;
+  /** 0 shows haloA, 1 haloB. Default 0.5. */
+  hueMix?: number;
+  /** Default [0.93, 0.87, 0.74]. */
+  spot?: ScreenColor;
+  /** Default 0.95. */
+  spotWeight?: number;
+  /** Default 0.52. */
+  haloWeight?: number;
+  /** Ruled lines per screen unit. Default 80. */
+  pitch?: number;
+}
+
 /** One part on the bench: its RawMesh (hide it with `mesh.visible`) and a live `set` taking any fields of its look. */
 export interface ScreenPart<L> {
   readonly mesh: RawMesh;
@@ -204,7 +276,7 @@ export interface OpticsScreensOptions {
 // One RawShaders plugin per engine: every set on an engine draws through it (an engine takes one plugin of a name).
 const plugins = new WeakMap<EngineKernel, RawShaders>();
 
-const KIND = { beam: 0, plate: 1, disc: 2, spot: 3, fringes: 4, facet: 5 } as const;
+const KIND = { beam: 0, plate: 1, disc: 2, spot: 3, fringes: 4, facet: 5, lens: 6, reticle: 7 } as const;
 
 const varying = `
 struct ScreenVarying {
@@ -231,6 +303,11 @@ export const screensVertexShader = `${varying}
 export const screensFragmentShader = `${varying}
 @fragment fn fragment(i:ScreenVarying)->@location(0) vec4f {
   let uv=i.uv;
+  // Derivatives first, in uniform control flow (before any branch or discard); only the reticle reads them.
+  let sample=uv*i.e.yz;
+  let radius=length(sample/max(abs(i.a.xy),vec2f(1e-6)));
+  let radiusStep=fwidth(radius);
+  let sampleStep=fwidth(sample);
   var color=vec3f(0.0);
   var alpha=1.0;
   if(i.kind<0.5){
@@ -270,11 +347,31 @@ export const screensFragmentShader = `${varying}
     let core=mix(i.a.rgb,i.b.rgb,pow(beam,i.b.w));
     let mark=(1.0-smoothstep(.007,.016,abs(uv.x)))*smoothstep(.75,.86,uv.y);
     color=body+beam*core*i.c.w+mark*i.d.w;
-  } else {
+  } else if(i.kind<5.5){
     let r=reflect(-normalize(camera.position-i.world),normalize(i.normal));
     let panel=exp(-i.a.w*abs(r.y-i.b.w));
     let highlight=exp(-i.c.w*abs(r.x+i.d.x*r.y+i.d.y));
     color=i.a.rgb+i.b.rgb*panel+i.c.rgb*(i.d.z+i.d.w*highlight);
+  } else if(i.kind<6.5){
+    let edge=dot(uv,uv);
+    let ribbon=uv.x*i.c.x+uv.y*i.c.y+i.c.z;
+    let coating=exp(-i.a.w*ribbon*ribbon);
+    color=mix(i.a.rgb,i.b.rgb,i.b.w*edge+i.c.w*coating);
+    alpha=(i.d.x+i.d.y*edge*edge+i.d.z*coating)*(1.0-smoothstep(i.d.w,i.e.x,edge));
+  } else {
+    let soft=clamp(radiusStep,0.10,0.60);
+    let aa=max(sampleStep*i.e.x,vec2f(0.008,0.008));
+    let spot=1.0-smoothstep(1.0-soft,1.0+soft,radius);
+    let spill=exp(-1.17*radius*radius);
+    let toned=mix(vec3f(0.050,0.037,0.064),vec3f(0.153,0.137,0.169),1.0-dot(uv*0.68,uv*0.68));
+    let nearLine=abs(fract(sample*i.e.x+0.5)-0.5);
+    let lines=1.0-smoothstep(vec2f(0.014,0.014),vec2f(0.014,0.014)+aa,nearLine);
+    let ruled=max(lines.x,lines.y)*(1.0-smoothstep(0.83,1.01,max(abs(uv.x),abs(uv.y))));
+    let axes=1.0-smoothstep(0.0,0.010,min(abs(uv.x),abs(uv.y)));
+    let haze=fract(sin(dot(floor(sample*7500.0),vec2f(127.1,311.7)))*43758.5453)*0.018;
+    let glass=toned+vec3f(0.046,0.038,0.048)*(ruled+axes*0.65)+haze;
+    let halo=mix(i.b.rgb,i.c.rgb,i.b.w);
+    color=glass+halo*i.d.w*spill+i.d.rgb*i.c.w*spot;
   }
   let brightness=clamp(color,vec3f(0.0),vec3f(1.0));
   return vec4f(margoEncode(vec4f(brightness,1.0)).rgb,alpha);
@@ -348,6 +445,32 @@ const facetDefaults: Required<FacetLook> = {
   highlightWeight: 0.21,
 };
 
+const lensDefaults: Required<LensLook> = {
+  inner: [0.12, 0.049, 0.3],
+  outer: [0.46, 0.65, 0.72],
+  edgeMix: 0.45,
+  coatingMix: 0.38,
+  ribbonX: 1,
+  ribbonY: 0.4,
+  ribbonOffset: 0.22,
+  ribbonFalloff: 49,
+  base: 0.2,
+  edgeWeight: 0.58,
+  coatingWeight: 0.18,
+  rimStart: 0.974,
+  rimEnd: 1.01,
+};
+const reticleDefaults: Required<ReticleLook> = {
+  spotRadius: [0.02, 0.02],
+  haloA: [0.91, 0.29, 0.34],
+  haloB: [0.33, 0.62, 0.92],
+  hueMix: 0.5,
+  spot: [0.93, 0.87, 0.74],
+  spotWeight: 0.95,
+  haloWeight: 0.52,
+  pitch: 80,
+};
+
 /** The five flat vec4 values (a to e) one part's look packs into. */
 export type ScreenSlots = [number[], number[], number[], number[], number[]];
 const zero4 = [0, 0, 0, 0];
@@ -408,6 +531,29 @@ export function packFacet(look: Required<FacetLook>): ScreenSlots {
   ];
 }
 
+/** The flat values of a lens face's look. */
+export function packLens(look: Required<LensLook>): ScreenSlots {
+  const l = look;
+  return [
+    [...l.inner, l.ribbonFalloff],
+    [...l.outer, l.edgeMix],
+    [l.ribbonX, l.ribbonY, l.ribbonOffset, l.coatingMix],
+    [l.base, l.edgeWeight, l.coatingWeight, l.rimStart],
+    [l.rimEnd, 0, 0, 0],
+  ];
+}
+/** The flat values of a reticle's look; `halfSize` is the screen's own half width and height. */
+export function packReticle(look: Required<ReticleLook>, halfSize: readonly [number, number]): ScreenSlots {
+  const l = look;
+  return [
+    [l.spotRadius[0], l.spotRadius[1], 0, 0],
+    [...l.haloA, l.hueMix],
+    [...l.haloB, l.spotWeight],
+    [...l.spot, l.haloWeight],
+    [l.pitch, halfSize[0], halfSize[1], 0],
+  ];
+}
+
 /** Two crossed quads along +z from 0 to 1, u across, v along: the shape a beam's mesh is scaled and turned into. */
 export const BEAM_POSITIONS: readonly number[] = [-1, 0, 0, 1, 0, 0, 1, 0, 1, -1, 0, 1, 0, -1, 0, 0, 1, 0, 0, 1, 1, 0, -1, 1];
 const BEAM_UV = [-1, 0, 1, 0, 1, 1, -1, 1, -1, 0, 1, 0, 1, 1, -1, 1];
@@ -431,7 +577,7 @@ function positive(what: string, ...sizes: number[]): void {
 
 /**
  * The screens of an optics bench. `OpticsScreens.attach(engine)` makes one material; every `beam`, `plate`, `spot`,
- * `fringes` and `facet` call adds a part that follows a core mesh's transform (scale a beam's mesh to its width and
+ * `fringes`, `facet`, `lens` and `reticle` call adds a part that follows a core mesh's transform (scale a beam's mesh to its width and
  * length).
  */
 export class OpticsScreens {
@@ -559,6 +705,41 @@ export class OpticsScreens {
       throw new TypeError('optics/screens facet: points must be three [x, y, z] and normal one');
     const shape = { positions: points.flat(), uv: [0, 0, 1, 0, 0, 1], index: [0, 1, 2], normal };
     return this.#part(parent, shape, KIND.facet, facetDefaults, packFacet, look, 'facet');
+  }
+
+  /**
+   * A lens face of radius `radius` in the parent's xy plane, bulging along +z by `shape` (a polar mesh of
+   * `rings` x `segments`), drawn as coated glass.
+   */
+  lens(parent: Mesh, radius: number, look: LensLook = {}, shape: LensShape = {}): ScreenPart<LensLook> {
+    positive('lens', radius);
+    const { sag = 0.012, sagU = 0, sagV = 0, rings = 10, segments = 64 } = shape;
+    if (![sag, sagU, sagV].every(Number.isFinite) || !(rings >= 1 && segments >= 3))
+      throw new RangeError('optics/screens lens: sags must be finite, rings at least 1 and segments at least 3');
+    const positions = [0, 0, sag],
+      uv = [0, 0],
+      index: number[] = [];
+    for (let ring = 1; ring <= rings; ring++)
+      for (let k = 0; k < segments; k++) {
+        const angle = (2 * Math.PI * k) / segments,
+          u = (ring / rings) * Math.cos(angle),
+          v = (ring / rings) * Math.sin(angle);
+        positions.push(u * radius, v * radius, (1 - u * u - v * v) * (sag + sagU * u * u + sagV * v * v));
+        uv.push(u, v);
+        const last = 1 + (ring - 1) * segments + k,
+          next = 1 + (ring - 1) * segments + ((k + 1) % segments);
+        if (ring === 1) index.push(0, last, next);
+        else index.push(last - segments, last, next, last - segments, next, next - segments);
+      }
+    return this.#part(parent, { positions, uv, index }, KIND.lens, lensDefaults, packLens, look, 'lens');
+  }
+
+  /** An image screen behind ruled glass, half width `halfWidth` and half height `halfHeight` in the parent's xy plane. */
+  reticle(parent: Mesh, halfWidth: number, halfHeight: number, look: ReticleLook = {}): ScreenPart<ReticleLook> {
+    positive('reticle', halfWidth, halfHeight);
+    const shape = { positions: quad(halfWidth, halfHeight), uv: QUAD_UV, index: QUAD_INDEX };
+    const pack = (l: Required<ReticleLook>) => packReticle(l, [halfWidth, halfHeight]);
+    return this.#part(parent, shape, KIND.reticle, reticleDefaults, pack, look, 'reticle');
   }
 
   /** Resolves once the pipeline is compiled; rejects with the material's compile error. */

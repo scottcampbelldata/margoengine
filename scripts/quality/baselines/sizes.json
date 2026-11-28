@@ -15284,6 +15284,12 @@
     },
     {
       "date": "2026-11-27",
+      "commit": "optics-screens-2",
+      "reason": "optics/screens moves from 3141 to 4245 B gzip and its ceiling from 3397 to 4501 B: coated lens faces (a polar mesh with toric sag) and an image reticle (a spot of any radii over ruled glass), so the astigmatism bench carries no WGSL or mesh arrays. A separate entry would split one material (one pipeline per bench) in two for about 1.1 kB.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-27",
       "commit": "lane-e-instanced-flow",
       "reason": "materials gains the instanced-curve-flow entry (many instances along curves, 18,332 B); shader editor-pass grows 114 B of NodeMaterial caster renewal after a texture or buffer is rebuilt (KB-SHADOW-STALEMOVE1).",
       "grew": 2
@@ -16217,7 +16223,7 @@
     "@margoengine/optics/interference": 2668,
     "@margoengine/optics/polarization": 2210,
     "@margoengine/optics/refraction": 3268,
-    "@margoengine/optics/screens": 3397,
+    "@margoengine/optics/screens": 4501,
     "@margoengine/optics/spectrum": 1478,
     "@margoengine/physics": 945858,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 104696,
