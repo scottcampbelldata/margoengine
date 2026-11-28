@@ -671,9 +671,9 @@ motion past the camera's over the open shutter, at most `MotionBlur`'s `maxBlur`
 one-way jumps on a ramp of 8 px or more). Evidence: `packages/headless/tests/look-clean.test.js` (a flash on a still
 edge 7 px from a branch swaying 8 px still fails, the reach follows `shutter` and `maxBlur`; 8-copy trails of a 24 px
 and a 3 px bar fail, their smooth smears pass). Blowup render (8 sub-frames, 180 degrees): shimmerMoving early 0.48 to
-0.44, mid 2.02 to 1.72; motionBlur early 0.00 and mid 0.88 unchanged by the stair test. Missing: the mid residual is
-near leaves' soft fringes, which keep the sky's velocity (KB-SCATTER-FRINGEVEL1; the scene draws no depth of field) and motionBlur misreads a mover
-narrower than its smear (KB-LOOK-TV-MBNARROW1).
+0.44, mid 2.02 to 1.72; motionBlur early 0.00 and mid 0.88 unchanged by the stair test. Missing: the mid residual
+(0.53 percent after lane C's KB-SCATTER-FRINGEVEL1 fix) is one-pixel rims on near conifer sprays against the sky, and
+motionBlur misreads a mover narrower than its smear (KB-LOOK-TV-MBNARROW1).
 
 ### Section 5 evidence: TAA on the timber-valley film shots (scenes, biomes, KB-SCENES-TVTAA1, 2026-11-27)
 
