@@ -3172,3 +3172,14 @@ Measured timing and wave amplitudes, added inertia and radiation damping, two-wa
 - Point 8 (72e4b4d57b). `packages/physics/scripts/ice02-glacier-velocity-measured.mjs` runs with separately observed thickness and surface slope, with fixed Glen softness. Athabasca reports 49.6 m/yr depth-mean speed versus 75.99 m/yr modeled. Greenland reports 4.6 m/yr deformation, [0.4, 10.8] m/yr, versus 19.46 m/yr modeled. The solver also misses the 114.8 m/yr observed total surface speed where basal sliding dominates. [Measured comparisons and limits](limits.md#grounded-glacier-and-ice-sheet-flow-ice-02)
 
 Basal sliding, longitudinal and transverse stress, temperature and floating shelves, subcell calving, and the wider physical validation and couplings remain open. The row stays REOPENED at four points.
+
+### LIFE-02 Limbless, insect and small-animal locomotion
+
+#### LIFE-02 four-point pass
+
+- Point 5 (b20d78c528). `packages/physics/tests/coupling/locomotion.test.js` rejects a late invalid terrain sample, reentrant drive write and overflowing native candidate with coded fixes. The accepted snapshot and work record remain exact. It grows real plain memory in a sampler, reads a separate aligned f32 bed bank and replays both live signed publications after an origin shift.
+- Point 6 (b20d78c528). `packages/physics/tests/coupling/locomotion-workers.test.js` compares 205 and 275 mixed body rows, spanning all five presets, across 1, 2 and 4 native participants and signed seek. A separate comparison matches the previous plain and shared Wasm. `packages/physics/tests/locomotion-workers.browser.mjs` starts three actual Chromium helpers. The 205-body sample records 2,293 contact rows and 2,147 paired SIMD projections.
+- Point 7 (b20d78c528). `packages/environment/tests/slither-film.browser.mjs` connects a real registered cambered TerrainBed to the 32-link tapered snake at an adjacent signed cell. After four identical input waves the directional friction take travels +10.065 cm, against −1.360 cm with equal friction. Both renderers independently reproduce all accepted snapshot bytes and full RGBA through hold, restore, re-advance and rewind.
+- Point 8 (b20d78c528). `packages/physics/scripts/life02-slithering-measured.mjs` uses separate friction and gait inputs and holds out tracked flat and uphill speed. The default model reverses between 0° and 1.9°, versus 5°–9° measured, and at +5° predicts −0.241 body lengths per cycle against +0.13 measured. Doubling link resolution does not resolve the sign. [Measurement and limits](limits.md#ground-animal-locomotion-life-02)
+
+The planar snake still needs independent speed accuracy, contact-load redistribution and additional gaits. Legged force validation, overhang and articulated contact, reciprocal terrain wear and full rig bindings remain open. The row stays REOPENED at four points.
