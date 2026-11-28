@@ -164,10 +164,14 @@ fn a_torque_held_on_a_tree_link_turns_it_at_the_torque_over_its_inertia_and_roto
     // the bob back by h^2 / 2 of the torque's whole turn about its own centre, 500 rad/s^2, and leaves the lock projection to
     // close the pivot that opens; the tree's forward kinematics ran between the two, read the bob's turned rotation as the
     // hinge's angle, put its centre where that angle places it and kept the move as speed. The bob then turned the other way at
-    // about 250 rad/s^2: -88.8 rad/s after a second, and -87.5 with a rotor of 0.5.
+    // about 250 rad/s^2: -88.8 rad/s after a second, and -87.5 with a rotor of 0.5. With that fixed, the projection still
+    // closed the turned-back pivot at the turned rows, and part of the 0.069 rad it took back at 1 substep landed on the free
+    // motion: 0.795 rad/s for 1.992 at 1 substep, 1.4e-4 fast at 8 (KB-PHYS-LOCKTURN1). The locked part of the turn is now taken back
+    // on the rows it was given along, before the poses move (`take_back_locked`).
     const HINGE_X: u32 = JOINT_LOCK * 7 | JOINT_LOCK * (6 << 3);
-    for armature in [0.0f32, 0.5] {
+    for (armature, substeps) in [(0.0f32, 8), (0.5, 8), (0.0, 1), (0.5, 1), (0.0, 2)] {
         let mut w = World::new(16, 16).unwrap();
+        w.header_mut().substeps = substeps;
         w.header_mut().gravity = [0.0, 0.0, 0.0];
         let pivot = w.add_body(FIXED).unwrap();
         let bob = w.add_body(DYNAMIC).unwrap();
@@ -192,11 +196,8 @@ fn a_torque_held_on_a_tree_link_turns_it_at_the_torque_over_its_inertia_and_roto
             w.step(1.0 / 60.0);
         }
         let (spun, expected) = (w.v(ANGULAR_X, row).x, 2.0 / (1.004 + armature));
-        // The rotor's case to the JS suite's bar; without one, the bob's own small inertia leaves the midpoint move's turn
-        // larger against its free motion, and the projection at the turned pose keeps 1.4e-4 of it (docs/known-bugs.md,
-        // KB-PHYS-LOCKTURN1).
-        let bar = if armature > 0.0 { 1e-4 } else { 1e-3 };
-        assert!((spun / expected - 1.0).abs() < bar, "rotor {armature}: {spun} rad/s against {expected}");
+        // The JS suite's bar, with a rotor or without one and at any substeps.
+        assert!((spun / expected - 1.0).abs() < 1e-4, "rotor {armature}, {substeps} substeps: {spun} rad/s against {expected}");
     }
 }
 

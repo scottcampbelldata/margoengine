@@ -410,7 +410,6 @@ impl World {
         self.shed_locks(h);
         self.integrate_poses(h, substep, substeps);
         self.shift_poses(&shifts);
-        self.lock_drift();
         if staged {
             self.window.kin = Some(substep + 1);
         }

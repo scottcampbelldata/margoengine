@@ -2497,6 +2497,10 @@ impl World {
             for body in [a, b] {
                 if self.uu(LOCK_MARK, body) != stamp {
                     self.set_u(LOCK_MARK, body, stamp);
+                    // The projection's shift starts from zero each substep; here it first holds the midpoint move, which
+                    // `take_back_locked` reads and sets to what it takes back.
+                    self.set_v(LOCK_SHIFT_X, body, v3(0.0, 0.0, 0.0));
+                    self.set_v(LOCK_SHIFT_SPIN_X, body, v3(0.0, 0.0, 0.0));
                     if self.lock_moves(body) {
                         // The applied loads' move over the substep as the midpoint rule makes it, h^2 a / 2, not
                         // the h^2 a of symplectic Euler: gravity, the body's force and its torque, as `integrate_velocities`
@@ -2538,9 +2542,101 @@ impl World {
                             let (lv, lw) = self.locked_part(body, dv, dw);
                             (push, turn) = (push.add(dv.sub(lv)), turn.add(dw.sub(lw)));
                         }
-                        self.nudge(body, push.scale(half), turn.scale(half), false);
+                        self.nudge(body, push.scale(half), turn.scale(half), true);
                     }
                 }
+            }
+        }
+        self.take_back_locked(h);
+    }
+
+    /// Takes the locked part of the midpoint move back at once, on the rows the substep began with, before the poses move:
+    /// one exact linear step of each exact path, P d with P = W J^T (J W J^T)^-1 J and d each body's move's turn (LOCK_SHIFT_SPIN),
+    /// so the poses keep only its free part (I - P) d (KB-PHYS-LOCKTURN1). What the locks gave for it, impulse and shift, is solved
+    /// after the poses move on the matrix the projection steps with (`credit_take_back`): counted here, along the start rows,
+    /// it lagged the swing by h w, and a bob's period at 90 degrees came out 0.9 % short and a double pendulum lost 2.3 J. Left to the
+    /// projection, the locked part was closed at the pose it turned to: a bob of 0.004 kg m2 a metre below its pivot under
+    /// 2 N m turned 0.069 rad back about its own centre at 1 substep, where its free move is 2.8e-4 rad, and the closing at
+    /// the turned rows leaked into the free motion: 60 % short after a second. Projecting a move onto the constraint's tangent
+    /// space in the mass metric is Bayo and Ledesma 1996's mass-orthogonal projection; taking it on the rows of the step's
+    /// start, as SHAKE (Ryckaert, Ciccotti and Berendsen 1977) and RATTLE (Andersen 1983) take their multipliers, and before
+    /// the free move rather than after it, is the perturbation half of Hairer 2000's symmetric projection.
+    fn take_back_locked(&mut self, h: f32) {
+        let (from, solving) = self.window.joints;
+        let zero = v3(0.0, 0.0, 0.0);
+        // The target each lock closes to: where the move d would put it to first order, J d past the gap it began at.
+        let mut any = false;
+        for i in from..solving {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+            if m == 0 || self.uu(SOLVE_EXACT, i) == 0 {
+                continue;
+            }
+            let view = self.view(row);
+            let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+            let (mut da, mut db) = (self.moving(a), self.moving(b));
+            // The move's turn alone: a lock's rows turn with its bodies and do not move with their centres, so the
+            // projection closes a shift of the centres on rows the shift left as they were, exactly to first order in what
+            // it closes, and only a turn moves the rows it is closed on. A pendulum's bob, whose loads hold no torque, keeps
+            // its steps: taken back whole, a bob swung 150 degrees came out 0.021 % short, against 0.017 % and a bar of 0.02 %.
+            for (at, d) in [(a, &mut da), (b, &mut db)] {
+                (d.linear, d.angular) = (zero, if self.lock_moves(at) { self.v(LOCK_SHIFT_SPIN_X, at) } else { zero });
+            }
+            for r in 0..m {
+                let k = axes[r];
+                let jd = view.rows[k].speed(&da, &db);
+                any |= jd != 0.0;
+                self.set_s(JOINT_BEGAN_0 + k, row, view.at[k] - jd);
+            }
+        }
+        let stamp = self.lock_stamp();
+        let (list, first_body, last_body) = self.window.bodies;
+        for slot in first_body..last_body {
+            let at = self.uu(list, slot) as usize;
+            if self.uu(LOCK_MARK, at) == stamp {
+                self.set_v(LOCK_SHIFT_X, at, zero);
+                self.set_v(LOCK_SHIFT_SPIN_X, at, zero);
+            }
+        }
+        let mut first = from;
+        while any && first < solving {
+            let last = self.group_last(first, solving);
+            if self.uu(SOLVE_EXACT, first) == 0 {
+                first = last + 1;
+                continue;
+            }
+            // RIGHT = (J W J^T)^-1 (-(gap - target) / h) = -(J W J^T)^-1 J d / h on the rows not yet refreshed, those of the
+            // substep's start; the step of h along them is -P d.
+            self.newton_right(first, last, 1.0 / h, JOINT_BEGAN_0, false);
+            for i in first..=last {
+                let row = self.uu(SOLVE_JOINTS, i) as usize;
+                let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+                let doubles = self.doubles(row);
+                let mut given = [0.0f32; 6];
+                for r in 0..m {
+                    given[axes[r]] = unsafe { *doubles.add(RIGHT + r) } as f32 * h;
+                }
+                let [(la, aa, _), (lb, ab, _)] = self.gains(row);
+                unsafe {
+                    let step = self.lock_step(row);
+                    (*step).moves = [la.scale(h), aa.scale(h), lb.scale(h), ab.scale(h)];
+                    (*step).given = given;
+                }
+            }
+            // LOCK_SHIFT keeps what each body was moved back, u = -P d, for `credit_take_back`.
+            self.move_path(first, last, 1.0, true);
+            first = last + 1;
+        }
+        // Back to the gap each lock began at, which `project_locks` reads.
+        for i in from..solving {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+            if m == 0 || self.uu(SOLVE_EXACT, i) == 0 {
+                continue;
+            }
+            let view = self.view(row);
+            for r in 0..m {
+                self.set_s(JOINT_BEGAN_0 + axes[r], row, view.at[axes[r]]);
             }
         }
     }
@@ -2662,20 +2758,6 @@ impl World {
         flags & KIND == DYNAMIC && flags & SLEEPING == 0
     }
 
-    /// After the poses move: a body a lock holds starts the projection's shift from zero.
-    pub fn lock_drift(&mut self) {
-        let stamp = self.lock_stamp();
-        let (list, from, to) = self.window.bodies;
-        for slot in from..to {
-            let at = self.uu(list, slot) as usize;
-            if self.uu(LOCK_MARK, at) != stamp || !self.lock_moves(at) {
-                continue;
-            }
-            self.set_v(LOCK_SHIFT_X, at, v3(0.0, 0.0, 0.0));
-            self.set_v(LOCK_SHIFT_SPIN_X, at, v3(0.0, 0.0, 0.0));
-        }
-    }
-
     /// The largest gap any lock from list place `first` to `last` stands open by, from the views of the last `refresh_joints`.
     /// A sliding lock's gap is measured in units of what its anchors' f32 coordinates can resolve, where that is coarser than
     /// LOCK_CLOSED, so the widest reads closed at LOCK_CLOSED when the gap is rounding: past 8 m from the origin an f32 is 1e-6 m
@@ -2710,7 +2792,83 @@ impl World {
 
     /// Closes every lock at the new pose: Gauss-Newton toward the closest pose, in the mass metric, where the locks hold, each
     /// path solved exactly on rows read again at each iterate. Leaves the rows read at the pose it ends on.
+    /// What the locks gave for `take_back_locked`'s move u (LOCK_SHIFT), solved as the projection's own step is, at the pose
+    /// the substep reached: N = J W G^T, J the rows there and G the locks' discrete gradient over the substep (`lock_dirs`),
+    /// the impulse p with J W G^T p = J u, counted as the locks' (JOINT_LOCK_P) and its shift W G^T p as speed alone, as the
+    /// poses had their move before they moved. It is what the projection gave, to first order in the closing, when it closed
+    /// the turned-back pose itself.
+    fn credit_take_back(&mut self, h: f32) {
+        let (from, solving) = self.window.joints;
+        let zero = v3(0.0, 0.0, 0.0);
+        let mut any = false;
+        for i in from..solving {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+            if m == 0 || self.uu(SOLVE_EXACT, i) == 0 {
+                continue;
+            }
+            let view = self.view(row);
+            let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+            let (mut ua, mut ub) = (self.moving(a), self.moving(b));
+            for (at, u) in [(a, &mut ua), (b, &mut ub)] {
+                (u.linear, u.angular) = if self.lock_moves(at) { (self.v(LOCK_SHIFT_X, at), self.v(LOCK_SHIFT_SPIN_X, at)) } else { (zero, zero) };
+            }
+            // The target, held where the impulse goes once solved: the step's J W G^T p is J u.
+            for r in 0..m {
+                let k = axes[r];
+                let ju = view.rows[k].speed(&ua, &ub);
+                any |= ju != 0.0;
+                self.set_s(JOINT_LOCK_P_0 + k, row, view.at[k] + ju);
+            }
+        }
+        let stamp = self.lock_stamp();
+        let (list, first_body, last_body) = self.window.bodies;
+        for slot in first_body..last_body {
+            let at = self.uu(list, slot) as usize;
+            if self.uu(LOCK_MARK, at) == stamp {
+                self.set_v(LOCK_SHIFT_X, at, zero);
+                self.set_v(LOCK_SHIFT_SPIN_X, at, zero);
+            }
+        }
+        let mut first = from;
+        while first < solving {
+            let last = self.group_last(first, solving);
+            if self.uu(SOLVE_EXACT, first) == 0 || !any {
+                for i in first..=last {
+                    let row = self.uu(SOLVE_JOINTS, i) as usize;
+                    for k in 0..6 {
+                        self.set_s(JOINT_LOCK_P_0 + k, row, 0.0);
+                    }
+                }
+                first = last + 1;
+                continue;
+            }
+            self.newton_right(first, last, 1.0 / h, JOINT_LOCK_P_0, true);
+            for i in first..=last {
+                let row = self.uu(SOLVE_JOINTS, i) as usize;
+                let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+                let doubles = self.doubles(row);
+                for k in 0..6 {
+                    self.set_s(JOINT_LOCK_P_0 + k, row, 0.0);
+                }
+                for r in 0..m {
+                    self.set_s(JOINT_LOCK_P_0 + axes[r], row, unsafe { *doubles.add(RIGHT + r) } as f32 * h);
+                }
+                let [(la, aa, _), (lb, ab, _)] = self.lock_gains(row);
+                let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+                for (at, linear, angular) in [(a, la, aa), (b, lb, ab)] {
+                    if self.lock_moves(at) {
+                        self.set_v(LOCK_SHIFT_X, at, self.v(LOCK_SHIFT_X, at).add(linear.scale(h)));
+                        self.set_v(LOCK_SHIFT_SPIN_X, at, self.v(LOCK_SHIFT_SPIN_X, at).add(angular.scale(h)));
+                    }
+                }
+            }
+            first = last + 1;
+        }
+    }
+
     pub fn project_locks(&mut self, h: f32) {
+        self.credit_take_back(h);
         // First what this substep opened, the locks' force, then what earlier substeps left, a move of the poses alone: turned
         // into speed, the closing of an old gap is energy no force gave, and near a toggle a great deal of it.
         let (from, solving) = self.window.joints;
