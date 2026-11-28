@@ -19069,3 +19069,10 @@ Design: vertex removal runs on the exact homogeneous points, with float filters 
 one or two input triangles' parts meet at the point, so the point set of the surface does not change. Float32 output
 reuses the Botsch and Kobbelt pass with a length that counts as nothing (2^-20 of the largest coordinate nearby). It
 does not guarantee a result free of self-intersections after rounding.
+
+## Automatic shoulder fit on thick upper arms (2026-11-27)
+
+In a T pose, a large arm cross-section could make the shoulder ray reach the chest at a plausible location and then move the fitted joint too far inward. The fit now limits the final inset along the measured arm axis, reserving one measured arm radius outside the existing central torso band when there is room. The projected limit leaves the nominal inset alone when it fits or the ray is pointed away from that band. An original stand-in with tapered sleeves checks the shoulder placement on both sides at two grid resolutions.
+
+- Ilya Baran and Jovan Popović, *Automatic Rigging and Animation of 3D Characters* (2007), [paper](https://homes.cs.washington.edu/~jovan/papers/baran-2007-ara.pdf). The paper motivates fitting bones within a surface using shape measurements.
+- Carel G. M. Meskers et al., *In vivo estimation of the glenohumeral joint rotation center from scapular bony landmarks by linear regression* (1998), [paper record](https://pubmed.ncbi.nlm.nih.gov/9596544/). This work distinguishes the joint center from the visible shoulder surface. The inset bound here is a geometric heuristic for mesh rigging.

@@ -236,7 +236,7 @@ test('the names are the ones the retarget tools read', async () => {
   assert.ok(Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) < 1e-9);
 });
 
-test("the README's figure of boxes, a stand-in, stands as the example says", async () => {
+function boxMesh() {
   const positions = [],
     indices = [],
     box = (x0, y0, z0, x1, y1, z1) => {
@@ -252,6 +252,11 @@ test("the README's figure of boxes, a stand-in, stands as the example says", asy
       ])
         indices.push(first + a, first + b, first + c, first + a, first + c, first + d);
     };
+  return { positions, indices, box };
+}
+
+test("the README's figure of boxes, a stand-in, stands as the example says", async () => {
+  const { positions, indices, box } = boxMesh();
   box(-0.17, 0.85, -0.1, 0.17, 1.42, 0.1);
   box(-0.06, 1.4, -0.05, 0.06, 1.5, 0.05);
   box(-0.1, 1.48, -0.1, 0.1, 1.74, 0.1);
@@ -265,6 +270,84 @@ test("the README's figure of boxes, a stand-in, stands as the example says", asy
   assert.ok(rig.joints[rig.humanoid.leftHand].position[0] > 0.5, 'the left hand is out on +x');
   assert.ok(rig.forward[2] > 0.99, 'it faces +z');
   assert.ok(checkSkin({ weights: rig.weights.toInfluences(4), joints: rig.joints }).ok);
+});
+
+test('thick upper arms keep both shoulder balls beside the chest', async () => {
+  const { positions, indices, box } = boxMesh();
+  const limb = (near, far, y, z, nearRadius, farRadius) => {
+    const first = positions.length / 3,
+      sides = 14;
+    for (const [x, radius] of [
+      [near, nearRadius],
+      [far, farRadius],
+    ]) {
+      for (let i = 0; i < sides; i++) {
+        const angle = (i / sides) * Math.PI * 2;
+        positions.push(
+          x,
+          y + Math.cos(angle) * radius,
+          z + Math.sin(angle) * radius,
+        );
+      }
+    }
+    for (let i = 0; i < sides; i++) {
+      const a = first + i,
+        b = first + ((i + 1) % sides);
+      indices.push(a, b, a + sides, b, b + sides, a + sides);
+    }
+    for (let i = 1; i + 1 < sides; i++) {
+      indices.push(
+        first,
+        first + i + 1,
+        first + i,
+        first + sides,
+        first + sides + i,
+        first + sides + i + 1,
+      );
+    }
+  };
+  const chestEdge = 0.188;
+  box(-0.171, 0.84, -0.114, 0.171, 1.301, 0.106);
+  box(-chestEdge, 1.21, -0.108, chestEdge, 1.477, 0.104);
+  box(-0.054, 1.44, -0.064, 0.054, 1.56, 0.057);
+  box(-0.085, 1.52, -0.082, 0.085, 1.79, 0.081);
+  for (const side of [-1, 1]) {
+    const leg = side * 0.107;
+    box(leg - 0.058, 0.05, -0.06, leg + 0.058, 0.9, 0.06);
+    box(leg - 0.058, 0, -0.06, leg + 0.058, 0.08, 0.2);
+    if (side < 0) {
+      limb(-0.48, -0.151, 1.395, -0.004, 0.061, 0.085);
+      limb(-0.751, -0.46, 1.389, 0.005, 0.042, 0.061);
+    } else {
+      limb(0.151, 0.48, 1.395, -0.004, 0.085, 0.061);
+      limb(0.46, 0.751, 1.389, 0.005, 0.061, 0.042);
+    }
+    box(
+      side < 0 ? -0.835 : 0.735,
+      1.353,
+      -0.041,
+      side < 0 ? -0.735 : 0.835,
+      1.414,
+      0.048,
+    );
+  }
+  for (const resolution of [64, 96]) {
+    const rig = await autoRig(
+      { positions, indices },
+      { resolution, weights: 'none' },
+    );
+    // Allow one voxel either side of the chest edge, plus one voxel outside to clear the thick sleeve.
+    const voxel = 1.79 / resolution;
+    for (const key of ['leftUpperArm', 'rightUpperArm']) {
+      const [x, y] = rig.joints[rig.humanoid[key]].position;
+      assert.ok(
+        Math.abs(x) >= chestEdge - voxel &&
+          Math.abs(x) <= chestEdge + 2 * voxel &&
+          Math.abs(y - 1.395) < voxel,
+        `${key} at resolution ${resolution} fit to [${x}, ${y}]`,
+      );
+    }
+  }
 });
 
 test('what is not a humanoid is refused with a code, and bad options name the fix', async () => {

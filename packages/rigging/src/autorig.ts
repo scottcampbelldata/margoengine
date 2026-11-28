@@ -546,7 +546,18 @@ function place(solid: Solid, body: Body, forwardHint: Vec3 | null) {
         }
         if (run > root * 0.15 && cut.area > CHEST * typical) break;
       }
-      if (!ended) run += IN_SHOULDER * radius;
+      if (!ended) {
+        // A thick sleeve can make the nominal inset cross from the shoulder into the chest.
+        const inwardRate = -inward * dot(axis, side),
+          space =
+            across(add(from, axis, run)) * inward -
+            (MIN_SHOULDER * height + radius),
+          inset = IN_SHOULDER * radius;
+        run +=
+          inwardRate > 0
+            ? Math.min(inset, Math.max(0, space / inwardRate))
+            : inset;
+      }
       const ball = add(from, axis, run);
       root = root * 0.5 + run;
       const wrist = thinnestArea(limb, area, root * (1 - WRIST - 0.08), root * (1 - WRIST + 0.08));

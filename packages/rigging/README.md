@@ -593,7 +593,7 @@ The result also gives `grid`, `voxels` and `unreached`: vertices no bone reached
 
 ## Automatic rig (`margoengine/rigging/autorig`)
 
-Places a humanoid skeleton inside a mesh nobody rigged, then weights it. Give it a figure standing in a T or A pose, in any units, turned any way about `up`; the mesh may be broken or in many parts. Joints carry VRM humanoid names, so `margoengine/rigging/retarget` reads them as they are, and `joints` and `weights` go straight to `margoengine/exporters/skin`. Here the figure is made of boxes, so the example runs by itself:
+Places a humanoid skeleton inside a mesh nobody rigged, then weights it. Give it a figure standing in a T or A pose, in any units, turned any way about `up`; the mesh may be broken or in many parts. Joints carry VRM humanoid names, so `margoengine/rigging/retarget` reads them as they are, and `joints` and `weights` go straight to `margoengine/exporters/skin`. The shoulder fit uses the upper-arm cross-section to keep each shoulder beside the chest on figures with thick upper arms. Here the figure is made of boxes, so the example runs by itself:
 
 ```ts
 import { autoRig } from 'margoengine/rigging/autorig';
