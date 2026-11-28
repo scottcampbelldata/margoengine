@@ -32,7 +32,7 @@ window.check={async run(){
   for(let x=-2048;x<=2048;x+=128)for(let z=-2048;z<=2048;z+=128)peak=Math.max(peak,scene.height(x,z));
   return {errors,built,peak,cloudBase:scene.parts.clouds.options.bottom,waterColor:Array.from(scene.parts.view.water?.values.slice(24,27)??[],(v)=>Math.round(v*1000)/1000),ground:scene.height(...scene.layout.rail[60]),lots:scene.layout.structures.length,
     fire:f?{time:f.time,embers:f.embers,spots:f.spots}:null,rockTriangles:rock?rock.geometry.indices.length/3:0,firParts:fir?fir.map(p=>p.name+":"+p.kind):[],
-    post:scene.parts.preset.post.effects.map(e=>e.name),parts,taa:!!scene.parts.taa,swaying:scene.parts.view.objects?.swaying.length??0};
+    post:scene.parts.preset.post.effects.map(e=>e.name),parts,taa:!!scene.parts.taa,shutter:scene.parts.motionBlur?.options.shutter??null,swaying:scene.parts.view.objects?.swaying.length??0};
 }};
 window.ready=true;
 </script></body></html>

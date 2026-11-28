@@ -206,6 +206,11 @@ the silhouette history of KB-TAA-EDGE1) on the post stack's depth, and gives it 
 keep their history. The flames, smoke, rain and the creek mark their own pixels reactive, so they show each frame as
 drawn, and the clouds' march moves its start each frame (`temporal: 'auto'`). History needs about 53 frames to settle
 (`ln 255 / ln(1 / 0.9)`): a film render draws that many from the shot's first instant before frame 0.
+After TAA's resolve, `MotionBlur` from `@margoengine/post/motion-blur` (`parts.motionBlur`, the reconstruction filter of
+McGuire et al. 2012) blurs the frame along TAA's velocity with a 180 degree shutter (`options.shutter` 0.5). A shot drawn
+in sub-frames sets that shutter per sub-frame through the shot tool's `page.shutter` hook (`timberShot.shutter`), so each
+sub-frame blurs over its own slice of the shutter and a fast near branch shows one smear, not eight stepped copies
+(KB-LOOK-TV-SUBSTEP1).
 
 | Setting | Default | Range or values |
 | --- | --- | --- |

@@ -76,6 +76,7 @@ try {
   assert.deepEqual(quiet.r.waterColor, [...WATER_LOOKS.animatedFeature.color]);
   // KB-SCENES-TVTAA1: a preview draws no TAA; film (the default, every view below) does, with the swaying scatters' motion.
   assert.equal(quiet.r.taa, false, 'preview draws no TAA');
+  assert.ok(!quiet.r.post.includes('motion-blur'), 'preview draws no motion blur');
   let red = 0,
     blue = 0;
   for (let y = Math.floor(bank.height * 0.75); y < Math.floor(bank.height * 0.95); y++)
@@ -105,6 +106,9 @@ try {
     if (!/quality=preview/.test(extra)) {
       assert.ok(r.taa, `${view}: film quality resolves with TAA`);
       assert.ok(r.swaying > 0, `${view}: the swaying scatters draw their own motion (${r.swaying})`);
+      // KB-LOOK-TV-SUBSTEP1: film blurs motion after TAA on its velocity, in the post stack, at a 180 degree shutter.
+      assert.ok(r.post.includes('motion-blur'), `${view}: film quality blurs motion (${r.post})`);
+      assert.equal(r.shutter, 0.5);
     }
   }
   // The fire shows: the fire-line view with the fire differs from the same view with none.

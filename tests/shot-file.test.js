@@ -18,6 +18,8 @@ import {
   onGround,
   parseShot,
   probeFrames,
+  shutterShare,
+  subframeOffsets,
   shotFrames,
   validateShot,
 } from '../tools/shot/shot-file.mjs';
@@ -822,4 +824,28 @@ test('shot.page.film names a page function, needs whole-degree shutters with sub
     assert.ok(Math.abs(offset.num / offset.den / 24 - ((k + 0.5) / 4) * (180 / 360 / 24)) < 1e-15);
   }
   assert.deepEqual(filmTime(file.shot, 7, 2, true).offset, { num: 0, den: 1 }, 'a frame drawn once sits on its frame');
+});
+
+test('shot.page.shutter names a page function, and shutterShare gives each sub-frame its slice of the shutter so the copies join (KB-LOOK-TV-SUBSTEP1)', () => {
+  const page = { path: 'examples/storm-light/index.html', engine: 'stormLight.engine', shutter: 'margoShot.shutter' };
+  assert.deepEqual(paths(shot({ page })), []);
+  assert.ok(paths(shot({ page: { ...page, shutter: 'not a name' } })).includes('shot.page.shutter'));
+  const s = { fps: 30, subframes: 8, shutter: 180 },
+    offsets = subframeOffsets(s),
+    slice = 180 / 360 / 30 / 8;
+  // Within a kept frame each sub-frame is one slice after the one before: it blurs over all the motion since, so
+  // blurred about its own time it reaches halfway to each neighbour and the eight copies cover the open shutter.
+  for (let k = 1; k < 8; k++) assert.ok(Math.abs(shutterShare(s, offsets[k - 1], offsets[k]) - 1) < 1e-12);
+  // The first sub-frame of the next kept frame comes 1 / 30 - 7 slices after the last: it blurs over one slice of it.
+  const first = 1 / 30 + offsets[0],
+    share = shutterShare(s, offsets[7], first);
+  assert.ok(Math.abs(share * (first - offsets[7]) - slice) < 1e-15, `share ${share}`);
+  assert.ok(Math.abs(share - 1 / 9) < 1e-12);
+  // A frame drawn alone blurs over the shutter's share of the frame interval; no frame before, or the same instant
+  // (the warm-up), blurs nothing; a share never passes 1.
+  assert.ok(Math.abs(shutterShare({ fps: 24, subframes: 1, shutter: 180 }, 0, 1 / 24) - 0.5) < 1e-12);
+  assert.equal(shutterShare(s, null, 0.1), 0);
+  assert.equal(shutterShare(s, 0.1, 0.1), 0);
+  assert.equal(shutterShare(s, 0.1, 0.1 + slice / 4), 1);
+  assert.equal(shutterShare({ fps: 30, subframes: 8, shutter: 0 }, 0, 0.01), 0);
 });

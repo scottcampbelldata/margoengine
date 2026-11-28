@@ -89,3 +89,35 @@ test('the old order, physics then animation, draws the body one frame behind (th
   const lag = drawn.slice(5).map(({ time, x }) => animation(time)[0] - x);
   for (const l of lag) assert.ok(Math.abs(l - SPEED / 60) < 1e-5, `one frame behind: ${l} m`);
 });
+
+test('the shutter hook gets each sub-frame its share before the frame is drawn (KB-LOOK-TV-SUBSTEP1)', async () => {
+  const calls = [];
+  let share = null;
+  globalThis.__margoShot = {
+    queued: 1,
+    get: (name) => (name === 'page.shutter' ? (value, at) => ((share = value), calls.push([value, at.time])) : undefined),
+    frame: () => (calls.push(['frame', share]), true),
+    settle: async () => {},
+  };
+  try {
+    await shotStep({
+      subs: [
+        { time: { ms: 0, seconds: 0 }, shutter: 1 / 9 },
+        { time: { ms: 2, seconds: 0.002 }, shutter: 1 },
+        { time: { ms: 4, seconds: 0.004 }, shutter: null },
+      ],
+      kept: null,
+      shutterHook: 'page.shutter',
+      warmup: false,
+    });
+  } finally {
+    delete globalThis.__margoShot;
+  }
+  assert.deepEqual(calls, [
+    [1 / 9, 0],
+    ['frame', 1 / 9],
+    [1, 0.002],
+    ['frame', 1],
+    ['frame', 1],
+  ]);
+});

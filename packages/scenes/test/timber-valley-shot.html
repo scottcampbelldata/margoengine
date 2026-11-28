@@ -75,6 +75,9 @@ globalThis.timberShot={
     }
   },
   settings(values){scene.applySettings(values);},
+  // The shot tool's shutter hook (shot.page.shutter): each sub-frame's share of the motion since the frame before, so
+  // the motion blur fills that sub-frame's slice of the shutter and the sub-frames join with no steps (KB-LOOK-TV-SUBSTEP1).
+  shutter(share){const blur=scene.parts.motionBlur;if(blur)blur.options.shutter=share;},
 };
 engine.start();
 canvas.dataset.ready='true';

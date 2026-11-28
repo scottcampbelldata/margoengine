@@ -333,6 +333,8 @@ export function validateShot(input) {
         'shot.shutter',
         'must be a whole number of degrees when shot.page.film is set, so sub-frames have exact times',
       );
+    if ('shutter' in page && (typeof page.shutter !== 'string' || !DOTTED.test(page.shutter)))
+      add('shot.page.shutter', 'must name a function from globalThis with dots, for example margoShot.shutter');
     if ('ground' in page && (typeof page.ground !== 'string' || !DOTTED.test(page.ground)))
       add(
         'shot.page.ground',
@@ -407,6 +409,22 @@ export function subframeOffsets({ fps, subframes, shutter }) {
   if (subframes <= 1) return [0];
   const open = shutter / 360 / fps;
   return Array.from({ length: subframes }, (_, k) => ((k + 0.5) / subframes) * open);
+}
+
+/**
+ * The share of the motion since the frame drawn before that a frame drawn at `seconds` blurs over (shot.page.shutter):
+ * its own slice of the open shutter, `shutter / 360 / fps / subframes` seconds, over the time since that frame, at most
+ * 1. Sub-frames of one kept frame are one slice apart, so each blurs over exactly its slice and together they cover the
+ * open shutter with no gaps between the copies (a surface moving more than a pixel a slice left stepped copies; the
+ * velocity blur after McGuire et al. 2012 fills each slice). A kept frame's first sub-frame comes the rest of a frame
+ * interval after the last one before it and gets a smaller share; one frame drawn alone (`subframes` 1) gets the
+ * shutter, `shutter / 360`. No frame before, or none time apart, gives 0.
+ */
+export function shutterShare({ fps, subframes, shutter }, previous, seconds) {
+  const gap = seconds - previous,
+    slice = shutter / 360 / fps / Math.max(1, subframes);
+  if (!(previous !== null && Number.isFinite(previous) && gap > 0)) return 0;
+  return Math.min(1, slice / gap);
 }
 
 /**

@@ -55,6 +55,7 @@
       "aovs": "timberShot.aovs",
       "apply": "timberShot.apply",
       "settings": "timberShot.settings",
+      "shutter": "timberShot.shutter",
       "ready": "#viewport[data-ready=\"true\"]",
       "query": {
         "weather": "smoke",

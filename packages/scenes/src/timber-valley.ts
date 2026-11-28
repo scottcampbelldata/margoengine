@@ -30,6 +30,7 @@ import { applyFireSettings } from '@margoengine/vfx/settings';
 import { Shadows } from '@margoengine/shadows';
 import { GTAO } from '@margoengine/post/gtao';
 import type { TAA } from '@margoengine/taa';
+import type { MotionBlur } from '@margoengine/post/motion-blur';
 import { applyLookFamily, type LookFamilyName } from './look-family.js';
 import type { SceneShot } from './index.js';
 import { timberValleyInfo } from './timber-valley-info.js';
@@ -151,6 +152,14 @@ export interface TimberValleyScene extends Disposable {
      * each frame for it (`temporal: 'auto'`). Undefined at `preview`.
      */
     readonly taa?: TAA;
+    /**
+     * Motion blur of the `film` quality (`@margoengine/post/motion-blur`, the reconstruction filter of McGuire et al.
+     * 2012) on TAA's resolved frame with TAA's velocity, a 180 degree shutter (`shutter` 0.5) by default. A shot drawn
+     * in sub-frames sets `shutter` per sub-frame to its share of the motion since the frame before (the shot tool's
+     * `page.shutter` hook, `shutterShare`), so each sub-frame blurs over its own slice of the shutter and the copies
+     * join with no steps (KB-LOOK-TV-SUBSTEP1). Undefined at `preview`.
+     */
+    readonly motionBlur?: MotionBlur;
   };
   dispose(): void;
 }
@@ -392,15 +401,25 @@ export async function attach(engine: EngineKernel, settings: TimberValleySetting
     disposers.push(() => clouds.dispose());
     // Film frames are anti-aliased over time: TAA resolves the post stack's picture with the stack's
     // depth, and each swaying scatter draws its own motion, so leaves in the wind keep history instead of smearing.
-    let taa: TAA | undefined;
+    let taa: TAA | undefined, motionBlur: MotionBlur | undefined;
     if (film) {
-      const [{ TAA: Taa }, { ScatterVelocity }] = await Promise.all([
+      const [{ TAA: Taa }, { ScatterVelocity }, { MotionBlur: Blur }] = await Promise.all([
         import('@margoengine/taa'),
         import('@margoengine/scatter/velocity'),
+        import('@margoengine/post/motion-blur'),
       ]);
       const t = Taa.attach(engine, { depth: () => preset.post.depthTexture });
       taa = t;
       disposers.push(() => t.dispose());
+      // Motion blur after TAA's resolve, on its velocity: the film's shutter, which a shot drawn in sub-frames narrows
+      // to each sub-frame's slice (parts.motionBlur).
+      const blur = new Blur({ velocity: () => t.velocity, shutter: 0.5 });
+      preset.post.addEffect(blur);
+      motionBlur = blur;
+      disposers.push(() => {
+        preset.post.removeEffect(blur);
+        blur.dispose();
+      });
       for (const scatter of view.objects?.swaying ?? []) {
         const motion = new ScatterVelocity(scatter),
           remove = t.add(motion);
@@ -506,7 +525,7 @@ export async function attach(engine: EngineKernel, settings: TimberValleySetting
         fireFront?.advanceTime(seconds);
       },
       settle: () => view.whenIdle(),
-      parts: { world: w, view, preset, clouds, weather, drive, shadows, occlusion, fuel, fireFront, taa },
+      parts: { world: w, view, preset, clouds, weather, drive, shadows, occlusion, fuel, fireFront, taa, motionBlur },
       dispose() {
         for (const d of disposers.reverse()) d();
         disposers.length = 0;

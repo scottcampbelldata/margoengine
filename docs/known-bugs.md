@@ -6,6 +6,26 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: a shot drawn in sub-frames showed what moves fast as stepped copies, not a smear (KB-LOOK-TV-SUBSTEP1, shot tool, scenes)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-blowup.json --once --seconds 1.1` (RTX A6000,
+  WebGPU, 8 sub-frames over a 180 degree shutter): the near swaying crown at the right of the mid probe (x 1600 to 1920,
+  y 100 to 420) draws as eight hard copies a few pixels apart, a staircase trail on each leaf against the sky.
+- **Cause:** the shot tool's sub-frames are sharp pictures one slice of the shutter apart (1 / 480 s here); a surface
+  moving more than a pixel a slice leaves gaps between its copies. Nothing filled the slice between them.
+- **Fix:** each sub-frame blurs over its own slice. The shot tool gives the page each sub-frame's share of the motion
+  since the frame drawn before (`shutterShare` in `tools/shot/shot-file.mjs`: the slice over the time since, at most 1)
+  through a new `shot.page.shutter` hook; `@margoengine/scenes/timber-valley` at film quality adds
+  `@margoengine/post/motion-blur` after TAA's resolve on TAA's velocity (`parts.motionBlur`, 180 degrees, McGuire,
+  Hennessy, Bukowski and Osman 2012, "A Reconstruction Filter for Plausible Motion Blur", I3D), and the timber-valley
+  shot page sets its shutter from the hook. The same crop now shows one smooth smear.
+- **Regression:** `tests/shot-file.test.js` (shutterShare tiles the open shutter: 1 within a kept frame, 1/9 for its
+  first sub-frame after the gap, the shutter for a frame drawn alone, 0 with no frame before; `page.shutter` must name a
+  function), `tests/shot-film-hook.test.js` (the hook gets each sub-frame's share before its frame is drawn) and
+  `packages/scenes/test/timber-valley-still.mjs` (film adds the motion blur at 0.5, a preview none).
+- **Measured, blowup `--once --seconds 1.1`:** shimmerMoving early 0.50 to 0.48, mid 2.07 to 2.02 (the smear over the sky,
+  the rest of KB-LOOK-TV-SHIMMER2, needs a ruling on the check); motionBlur mid 0.61 to 0.32.
+
 ### Fixed 2026-11-28: the blowup's early motionBlur read 11.7 percent (bound 5) on near leaves that sway against the camera (KB-LOOK-TV-MBVEL1, headless look)
 
 - **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-blowup.json --once --seconds 1.1` (RTX A6000,

@@ -23,6 +23,7 @@ import {
   shotFrames,
   subframeOffsets,
   filmTime,
+  shutterShare,
 } from './shot-file.mjs';
 import { shotBrowser } from './platform.mjs';
 
@@ -134,6 +135,7 @@ export const shotStep = async ({
   apply,
   settingsHook,
   filmHook,
+  shutterHook,
   ground,
   canvas,
   png,
@@ -151,7 +153,7 @@ export const shotStep = async ({
   let result = null,
     drawn = null;
   for (let sub = 0; sub < subs.length; sub++) {
-    const { time, state, settings, film } = subs[sub];
+    const { time, state, settings, film, shutter } = subs[sub];
     let { camera } = subs[sub];
     // Heights above the ground (shot.page.ground): the page's ground added under the camera and the target,
     // as onGround in shot-file.mjs does. The page may give its ground only once it has loaded it.
@@ -202,6 +204,13 @@ export const shotStep = async ({
       const hook = shot.get(filmHook);
       if (typeof hook !== 'function') throw new Error(`${filmHook} is not a function in the page`);
       await hook(film, { time: time.seconds, kept });
+    }
+    // The page's shutter hook: the share of the motion since the frame before that this one blurs over (shutterShare),
+    // so each sub-frame's velocity blur fills its own slice of the shutter.
+    if (shutter !== undefined && shutter !== null && shutterHook) {
+      const hook = shot.get(shutterHook);
+      if (typeof hook !== 'function') throw new Error(`${shutterHook} is not a function in the page`);
+      await hook(shutter, { time: time.seconds, kept });
     }
     // The sky's own coverage record, for skyClip of a shot with no page sky mask: on before the frame is drawn.
     if (recordSky) shot.recordSky(engine);
@@ -303,6 +312,7 @@ export const pageHooks = (shot, recordSky = false) => ({
   apply: shot.page.apply,
   settingsHook: shot.page.settings,
   filmHook: shot.page.film,
+  shutterHook: shot.page.shutter,
   ground: shot.page.ground,
   canvas: shot.page.canvas,
   recordSky,
@@ -416,6 +426,8 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
     if (write) mkdirSync(join(out, 'frames'), { recursive: true });
     // Frames up to the last one a resumed render had captured are drawn again, one sub-frame each, not captured.
     const passed = done.length ? done.at(-1).index : -1;
+    // The shot time of the last sub-frame drawn, for each sub-frame's shutter share (shot.page.shutter).
+    let previous = null;
     for (const frame of frames) {
       const kept = frame.kept,
         skip = kept !== null && kept <= passed,
@@ -437,8 +449,10 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
             settings: shotKeyedValuesAt(shot, tables, seconds),
             // The exact film time for the page's film hook (shot.page.film): its FilmClock, animation and physics.
             film: shot.page.film ? filmTime(shot, frame.render, k, drawnOnce) : null,
+            shutter: shot.page.shutter ? shutterShare(shot, k ? frame.time + offsets[k - 1] : previous, seconds) : null,
           };
         });
+      previous = frame.time + offsets.at(-1);
       const result = await step({
         ...common,
         subs,
