@@ -1,6 +1,6 @@
 # The Differential
 
-An interactive Margo Engine exhibit of a symmetric open automotive differential on a scale bench. Change steering to vary the two axle speeds around a constant 60 rpm carrier. The three readouts show the model rates. The slow presentation speed makes the relative gear motion visible.
+An interactive Margo Engine exhibit of a symmetric open automotive differential on a scale bench. Change steering to vary the two axle speeds around a constant 60 rpm carrier. The three readouts show the model rates. The slow presentation speed makes the relative gear motion visible. The gears are stepped by the physics solver (`differentialRig` in `@margoengine/machinery/rigs`): the carrier turns, a road under the left wheel runs at the steering's speed, and the right wheel and the pinion are what the bevel meshes make of it. "Physics against exact" is the largest gap between those angles and the closed form.
 
 The chassis follows a circular path with a 1.54 m track and no wheel slip. The slider controls signed curvature with a 2.25 m minimum centreline radius. The pinion spins on its cross shaft at the side-gear-to-pinion tooth ratio. All four pitch-cone contacts begin with a half-tooth phase between mating gears, and the two axle angles remain symmetric about the carrier. The display uses educational tooth profiles. The exhibit models kinematics.
 

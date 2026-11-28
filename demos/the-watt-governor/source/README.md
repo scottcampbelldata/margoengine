@@ -4,7 +4,7 @@ The spindle speed dial directly sets RPM between 58 and 112. The two ball center
 
 The pendulum height is h = g/ω², and its arm angle satisfies cos(θ) = h/L. The arm length L is 292 mm and the lower link is 232 mm. The lower link attaches 198 mm down the arm. The sleeve height follows from the lower link's fixed length and horizontal reach. The pinion pitch radius maps the exhibited sleeve stroke to 90° of valve travel. The displayed opening is the fraction of the bore that the projected circular disc leaves clear, neglecting the shaft and running clearance.
 
-The scene models positions at ideal equilibrium. It omits arm inertia, sleeve load, friction, fluid flow and engine feedback. The zero reference for sleeve rise is its 58 rpm position. The geometry and artwork are original.
+The balls are point masses on hinged arms stepped by the physics solver (`wattGovernorRig` in `@margoengine/machinery/rigs`) with a drag on each hinge, so a speed change swings them to the new balance over a second or two while the spindle turns; held, the new balance is reached at once. The readout "Physics against exact" is the arms' gap from the ideal equilibrium above, and shrinks to zero as they settle. The scene omits sleeve load, valve friction, fluid flow and engine feedback. The zero reference for sleeve rise is its 58 rpm position. The geometry and artwork are original.
 
 ## References
 

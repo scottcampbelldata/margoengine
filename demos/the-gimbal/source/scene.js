@@ -1,6 +1,7 @@
-import { EngineKernel } from '@margoengine/core';
+import { startEngine } from '@margoengine/webgl2-compat/auto';
 import { Shadows } from '@margoengine/shadows';
-import { gimbalPose } from './mechanism.js';
+import { describeCheck } from '@margoengine/machinery/rigs';
+import { gimbalPose, openGimbal } from './mechanism.js';
 import { prepareGimbal } from './model.js';
 
 const canvas=document.querySelector('#scene');
@@ -10,6 +11,7 @@ const guide=document.querySelector('#guide');
 const drift=document.querySelector('#drift');
 const outer=document.querySelector('#outer');
 const inner=document.querySelector('#inner');
+const gap=document.querySelector('#check');
 const explanation=document.querySelector('#explanation');
 const loading=document.querySelector('#loading');
 const modes=[...document.querySelectorAll('[data-mode]')];
@@ -19,9 +21,9 @@ const stop=new AbortController();
 const listen={signal:stop.signal};
 const fov=34;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-const degrees=(value,precision)=>value.toFixed(precision).replace('-','−')+'°';
+const degrees=(value,precision)=>(Number(value.toFixed(precision))||0).toFixed(precision).replace('-','−')+'°';
 
-let engine, model, observer, frame;
+let engine, model, gimbal, observer, frame;
 let fitDirty=true, poseDirty=true, guidesDirty=false, locked=false, guides=true;
 let lastSpin=0, spin=.19;
 
@@ -66,6 +68,7 @@ function report(pose,value) {
   document.body.dataset.mode=locked?'locked':'free';
   document.body.dataset.drift=pose.deviation.toFixed(5);
   document.body.dataset.axis=pose.axis.map((component)=>component.toFixed(6)).join(',');
+  document.body.dataset.check=gap.textContent=describeCheck(gimbal.check);
 }
 
 function render(now) {
@@ -79,7 +82,7 @@ function render(now) {
   }
   if(fitDirty) fit();
   const value=Number(angle.value);
-  const pose=poseDirty?gimbalPose(value,locked):null;
+  const pose=poseDirty?gimbalPose(gimbal,value,locked):null;
   if(pose) model.pose(pose);
   if(guidesDirty) model.showGuides(guides);
   if(fitDirty||poseDirty||guidesDirty||spinDirty) engine.render({delta:0});
@@ -143,25 +146,14 @@ function fail(error) {
 }
 
 async function open() {
-  const options={
-    backend:'webgpu',exactSize:true,antialias:true,signal:stop.signal,
-    startupTimeout:5000,camera:{fov,near:.07,far:70},
-  };
-  const force=new URLSearchParams(location.search).get('backend')==='webgl2';
-  async function create() {
-    if(!force) {
-      try { return [await EngineKernel.create(canvas,options),'webgpu']; }
-      catch(error) { if(error?.code!=='unsupported'&&error?.code!=='timeout') throw error; }
-    }
-    const {install}=await import('@margoengine/webgl2-compat');
-    await install({force:true});
-    return [await EngineKernel.create(canvas,options),'compatibility'];
-  }
-
+  const opening=startEngine(canvas,{exactSize:true,antialias:true,signal:stop.signal,
+    startupTimeout:5000,camera:{fov,near:.07,far:70},forceCompat:location.search.includes('backend=webgl2'),
+    loadCompat:()=>import('@margoengine/webgl2-compat')});
   // Start adapter negotiation before constructing the offline geometric batches.
-  const opening=create();
   const assemble=prepareGimbal();
-  const [device,renderer]=await opening;
+  const solving=openGimbal(stop.signal);
+  const {engine:device,renderer}=await opening;
+  gimbal=await solving;
   engine=device;
   engine.onError=fail;
   engine.scene.background='#28353a';

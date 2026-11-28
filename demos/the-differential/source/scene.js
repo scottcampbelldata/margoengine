@@ -1,7 +1,8 @@
-import { Engine } from '@margoengine/core';
+import { startEngine } from '@margoengine/webgl2-compat/auto';
+import { describeCheck } from '@margoengine/machinery/rigs';
 import { EnvironmentLighting } from '@margoengine/environment';
 import { Shadows } from '@margoengine/shadows';
-import { carrierRpm, gearPose, pinionTeeth, speeds } from './mechanism.js';
+import { carrierRpm, gearPose, openGears, speeds, steer } from './mechanism.js';
 import { makeRig } from './rig.js';
 import { frameDelta } from './clock.js';
 
@@ -19,11 +20,11 @@ const controls = [steering, pause, view];
 const tau = Math.PI * 2;
 const timeScale = 1 / 7;
 
-let engine, rig, resizeObserver, frame;
+let engine, rig, gears, resizeObserver, frame;
 let last, distance = 0;
 let isPaused = reduced.matches, closeUp = false, changed = false;
 let rates = speeds(0);
-let carrierAngle = .22, sideOffset = 0;
+let carrierAngle = .22;
 
 function reflectionStudio() {
   const width = 80, height = 40, data = new Float32Array(width * height * 4);
@@ -81,12 +82,11 @@ function draw(now) {
   if (!isPaused) {
     const mul = dt * timeScale * tau / 60;
     carrierAngle = (carrierAngle + carrierRpm * mul) % tau;
-    sideOffset = (sideOffset + (rates.left - carrierRpm) * mul) % (tau * pinionTeeth);
   }
   const target = Number(closeUp);
   distance = Math.abs(target - distance) < .0008 || reduced.matches ? target
     : distance + (target - distance) * (1 - Math.exp(-(dt || .016) * 14));
-  const pose = gearPose(carrierAngle, sideOffset);
+  const pose = gearPose(gears, carrierAngle);
   rig.setAngles(pose);
   camera(distance);
   engine.render({ delta: dt });
@@ -94,6 +94,7 @@ function draw(now) {
   document.body.dataset.right = rates.right.toFixed(1);
   document.body.dataset.spider = rates.spider.toFixed(1);
   document.body.dataset.gearPhase = pose.pinions.toFixed(4);
+  document.body.dataset.check = document.querySelector('#check').textContent = describeCheck(gears.check);
   document.body.dataset.view = distance === 0 ? 'bench' : distance === 1 ? 'gears' : 'moving';
   if (changed) {
     performance.mark('margo-steering-applied');
@@ -109,6 +110,7 @@ function sync() {
   turnValue.textContent = label;
   steering.setAttribute('aria-valuetext', label);
   rates = speeds(v);
+  steer(gears, v);
   left.textContent = rates.left.toFixed(1).replace(/\.0$/, '');
   right.textContent = rates.right.toFixed(1).replace(/\.0$/, '');
   pause.setAttribute('aria-pressed', String(isPaused));
@@ -134,27 +136,21 @@ function fail(error) {
 }
 
 async function start() {
-  const forced = new URLSearchParams(location.search).get('backend') === 'webgl2';
-  const open = () => Engine.create(canvas, {
-    backend: 'webgpu',
+  size();
+  const opening = startEngine(canvas, {
     exactSize: true,
     antialias: true,
     capacity: 192,
     camera: { fov: 32, near: .17, far: 20 },
     signal: lifetime.signal,
     startupTimeout: 9000,
+    forceCompat: location.search.includes('backend=webgl2'),
+    loadCompat: () => import('@margoengine/webgl2-compat'),
   });
-  size();
-  if (!forced) {
-    try { engine = await open(); }
-    catch (error) { if (error?.code !== 'unsupported') throw error; }
-  }
-  const compatible = !engine;
-  if (compatible) {
-    const { install } = await import('@margoengine/webgl2-compat');
-    await install({ force: true, signal: lifetime.signal });
-    engine = await open();
-  }
+  const solving = openGears(Number(steering.value), lifetime.signal);
+  const { engine: device, renderer } = await opening;
+  gears = await solving;
+  engine = device;
   engine.onError = fail;
   engine.scene.background = '#3d4849';
   engine.lighting.direction.set([-.46, .78, .43, 1.85]);
@@ -174,7 +170,7 @@ async function start() {
   await new Promise(requestAnimationFrame);
   if (lifetime.signal.aborted) return;
   performance.mark('margo-first-usable-frame');
-  document.body.dataset.renderer = compatible ? 'compatibility' : 'webgpu';
+  document.body.dataset.renderer = renderer;
   document.body.dataset.state = 'ready';
   loading.hidden = true;
   const options = { signal: lifetime.signal };

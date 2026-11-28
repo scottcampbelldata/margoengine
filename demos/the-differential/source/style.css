@@ -50,3 +50,5 @@ footer { margin-top: .8rem; color: #c8cabc; font-size: .78rem; }
   header p { font-size: .9rem; }
   #view { min-height: 38px; padding: .27rem .58rem; }
 }
+footer p { margin: 0 0 .3rem; }
+footer output { font-variant-numeric: tabular-nums; color: #ecc899; }

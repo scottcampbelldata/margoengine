@@ -569,7 +569,7 @@
   },
   "the-gimbal": {
    "R4": 2,
-   "R5": 413
+   "R5": 407
   },
   "the-glass-stack": {
    "R1": 9,
@@ -991,7 +991,7 @@
   "the-toggle-press": {
    "R3": 4,
    "R4": 2,
-   "R5": 441
+   "R5": 436
   },
   "the-ui-layout-editor": {
    "R5": 604
@@ -1019,7 +1019,7 @@
   "the-watt-governor": {
    "R3": 7,
    "R4": 2,
-   "R5": 479
+   "R5": 473
   },
   "the-weather-radar": {
    "R3": 4,

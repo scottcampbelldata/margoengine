@@ -1,6 +1,7 @@
-import { EngineKernel } from '@margoengine/core';
+import { startEngine } from '@margoengine/webgl2-compat/auto';
 import { Shadows } from '@margoengine/shadows';
-import { pressPose } from './mechanism.js';
+import { describeCheck } from '@margoengine/machinery/rigs';
+import { openPress, pressPose } from './mechanism.js';
 import { preparePress } from './model.js';
 
 const canvas=document.querySelector('#scene');
@@ -10,12 +11,13 @@ const descent=document.querySelector('#descent');
 const advantage=document.querySelector('#advantage');
 const angle=document.querySelector('#angle');
 const play=document.querySelector('#play');
+const gap=document.querySelector('#check');
 const loading=document.querySelector('#loading');
 const stop=new AbortController();
 const listen={signal:stop.signal};
 const fov=34;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-let engine,model,observer,frame,fitDirty=true,previous=-1,playing=null;
+let engine,model,press,observer,frame,fitDirty=true,previous=-1,playing=null;
 
 function fit() {
   const width=Math.max(1,canvas.clientWidth),height=Math.max(1,canvas.clientHeight);
@@ -48,7 +50,7 @@ function update() {
   const value=Number(travel.value);
   if(!fitDirty&&value===previous) return;
   if(fitDirty) fit();
-  const pose=value===previous?null:pressPose(value/1000);
+  const pose=value===previous?null:pressPose(press,value/1000);
   if(pose) model(pose);
   engine.render({delta:0});
   if(pose) {
@@ -60,6 +62,7 @@ function update() {
     document.body.dataset.progress=String(value);
     document.body.dataset.gain=pose.advantage.toFixed(6);
     document.body.dataset.ram=(pose.descent*1000).toFixed(6);
+    document.body.dataset.check=gap.textContent=describeCheck(press.check);
   }
   previous=value;
   fitDirty=false;
@@ -119,23 +122,13 @@ function fail(error) {
 }
 
 async function open() {
-  const options={
-    backend:'webgpu',exactSize:true,antialias:true,signal:stop.signal,
-    startupTimeout:5000,camera:{fov,near:.105,far:62},
-  };
-  const force=new URLSearchParams(location.search).get('backend')==='webgl2';
-  async function create() {
-    if(!force) {
-      try { return [await EngineKernel.create(canvas,options),'webgpu']; }
-      catch(error) { if(error?.code!=='unsupported'&&error?.code!=='timeout') throw error; }
-    }
-    const {install}=await import('@margoengine/webgl2-compat');
-    await install({force:true});
-    return [await EngineKernel.create(canvas,options),'compatibility'];
-  }
-  const opening=create();
+  const opening=startEngine(canvas,{exactSize:true,antialias:true,signal:stop.signal,
+    startupTimeout:5000,camera:{fov,near:.105,far:62},forceCompat:location.search.includes('backend=webgl2'),
+    loadCompat:()=>import('@margoengine/webgl2-compat')});
   const assemble=preparePress();
-  const [device,renderer]=await opening;
+  const solving=openPress(Number(travel.value)/1000,stop.signal);
+  const {engine:device,renderer}=await opening;
+  press=await solving;
   engine=device;
   engine.onError=fail;
   engine.scene.background='#7f7461';

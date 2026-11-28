@@ -1,6 +1,7 @@
-import { EngineKernel } from '@margoengine/core';
+import { startEngine } from '@margoengine/webgl2-compat/auto';
 import { Shadows } from '@margoengine/shadows';
-import { governorPose } from './mechanism.js';
+import { describeCheck } from '@margoengine/machinery/rigs';
+import { governorPose, openGovernor } from './mechanism.js';
 import { prepareGovernor } from './model.js';
 
 const canvas=document.querySelector('#scene');
@@ -10,6 +11,7 @@ const rise=document.querySelector('#rise');
 const opening=document.querySelector('#opening');
 const radius=document.querySelector('#radius');
 const spin=document.querySelector('#spin');
+const gap=document.querySelector('#check');
 const loading=document.querySelector('#loading');
 const reduced=matchMedia('(prefers-reduced-motion: reduce)');
 const stop=new AbortController();
@@ -17,7 +19,7 @@ const listen={signal:stop.signal};
 const fov=34;
 const tau=Math.PI*2;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-let engine,model,observer,frame;
+let engine,model,rig,observer,frame;
 let yaw=.20,last=null,spinning=!reduced.matches,fitDirty=true,poseDirty=true;
 
 function fit() {
@@ -59,6 +61,7 @@ function readout(value,pose) {
   document.body.dataset.rpm=String(value);
   document.body.dataset.travel=(pose.travel*1000).toFixed(5);
   document.body.dataset.valve=pct.toFixed(5);
+  document.body.dataset.check=gap.textContent=describeCheck(rig.check,'last');
 }
 
 function setSpin(value) {
@@ -74,13 +77,16 @@ function update(now) {
   const rotate=spinning&&!document.hidden&&(last===null||dt>=1000/30-.65);
   if(!fitDirty&&!poseDirty&&!rotate) return;
   if(fitDirty) fit();
+  let moved=null;
   if(rotate) {
     last=now;
-    yaw=(yaw+Math.min(dt,72)*value*tau/60000)%tau;
-  }
+    // The solver turns the spindle and swings the arms in real time; a speed change is followed by the balls over a second or two.
+    moved=rig.spin(value,Math.min(dt,72)/1000);
+    yaw=moved.spindle%tau;
+  } else if(poseDirty) moved=spinning?rig.spin(value,0):rig.settle(value);
   // The held view exposes both links at any of the equilibrium positions.
   model.spin(spinning?yaw:.20);
-  const pose=poseDirty?governorPose(value):null;
+  const pose=moved&&governorPose(moved);
   if(pose) model.pose(pose);
   engine.render({delta:0});
   if(pose) readout(value,pose);
@@ -136,23 +142,13 @@ function fail(error) {
 }
 
 async function open() {
-  const options={
-    backend:'webgpu',exactSize:true,antialias:true,signal:stop.signal,
-    startupTimeout:5000,camera:{fov,near:.10,far:72},
-  };
-  const force=new URLSearchParams(location.search).get('backend')==='webgl2';
-  async function create() {
-    if(!force) {
-      try { return [await EngineKernel.create(canvas,options),'webgpu']; }
-      catch(error) { if(error?.code!=='unsupported'&&error?.code!=='timeout') throw error; }
-    }
-    const {install}=await import('@margoengine/webgl2-compat');
-    await install({force:true});
-    return [await EngineKernel.create(canvas,options),'compatibility'];
-  }
-  const opening=create();
+  const opening=startEngine(canvas,{exactSize:true,antialias:true,signal:stop.signal,
+    startupTimeout:5000,camera:{fov,near:.10,far:72},forceCompat:location.search.includes('backend=webgl2'),
+    loadCompat:()=>import('@margoengine/webgl2-compat')});
   const assemble=prepareGovernor();
-  const [device,renderer]=await opening;
+  const solving=openGovernor(Number(rpm.value),stop.signal);
+  const {engine:device,renderer}=await opening;
+  rig=await solving;
   engine=device;
   engine.onError=fail;
   engine.scene.background='#4b3d2f';
