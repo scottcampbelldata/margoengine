@@ -12,12 +12,12 @@ export class OccludedScatter extends Scatter {
   private args?: GPUBuffer;
   private radius?: GPUBuffer;
   private filter?: GPUComputePipeline;
-  constructor(meshes: readonly [Geometry, Geometry, Geometry], options: ScatterOptions = {}) {
+  constructor(meshes: Geometry | readonly [Geometry, Geometry, Geometry], options: ScatterOptions = {}) {
     super(meshes, options);
   }
   static override attach(
     engine: EngineKernel,
-    meshes: readonly [Geometry, Geometry, Geometry],
+    meshes: Geometry | readonly [Geometry, Geometry, Geometry],
     options?: ScatterOptions,
   ): OccludedScatter {
     const scatter = new OccludedScatter(meshes, options);
