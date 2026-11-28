@@ -16446,6 +16446,40 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: on the WebGL2 layer a page linked its synchronous pipelines one at a time (KB-COMPAT-SYNCLINK1, webgl2-compat)
+
+- **Repro (before):** `demos/ten-thousand-trees/?backend=webgl2` on Chrome, ANGLE over Direct3D 11 (RTX A6000, loaded
+  workstation): 31 and 33 s to `data-ready`, against about 38 s for the whole `controls.mjs` run on WebGPU. A Chrome
+  trace of the page (`devtools.timeline`, `gpu`, `gpu.angle`) shows the GPU process's worker threads running one
+  `D3DCompile` at a time for 15 s (11 to 26 s), the GPU main thread in `Program::MainLinkLoadEvent::wait` for the same
+  15 s and the page in `getProgramParameter(LINK_STATUS)` for 14 s of a 19 s animation frame. Page JavaScript was under
+  2 s; the terrain and tree generation took 6 s on four workers before it, with the GPU idle.
+- **Cause:** `createRenderPipeline` (synchronous) read the program's `LINK_STATUS` and binding table in the call, and the
+  compute tiers did the same for a synchronous `createComputePipeline`. That read waits until the program has linked,
+  so a frame that made 50 pipelines handed the driver one link, waited for it, and only then handed it the next:
+  `KHR_parallel_shader_compile` never had two links to run side by side. WebGPU reports a pipeline's errors
+  asynchronously, so nothing required the read there.
+- **Fix:** with `KHR_parallel_shader_compile` a synchronous render pipeline leaves its link to the driver's threads
+  (`CompatDevice.deferLink`) and is checked at its first draw, by the pop of the validation scope open when it was made
+  (the pop waits for the link by polling `COMPLETION_STATUS_KHR`, without blocking, and gets its error), or by itself a
+  few milliseconds after the driver reports it done (an uncaptured error then). A synchronous compute pipeline's
+  programs are checked at its first dispatch. Without the extension, and for a program already checked, nothing
+  changes. The same draws and the same GL calls are made; only when the link status is read moves.
+- **Numbers (before and after builds taking turns, two rounds, loaded workstation, `private/tools/profile.mjs`):**
+  ready 30.9 and 33.3 s before, 21.2 and 22.0 s after; time in `LINK_STATUS` 14.1 and 14.3 s before, 3.2 and 2.6 s
+  after; longest task 19.0 and 19.2 s before, 9.7 and 9.2 s after. The trace after shows six compiles side by side in
+  the first second of the frame.
+- **Same output:** the demo with its clock stopped (`performance.now`, `Date.now` and animation frame times frozen,
+  reduced motion) draws the same frame byte for byte with the old and new builds on the WebGL2 layer and on WebGPU.
+- **Still open:** the rest of the first frame is the water surface program, the largest (66,747 GLSL characters): its
+  link (about 3.8 s on one worker) and, as it writes three colour outputs, its compile again at its first draw on the GPU
+  main thread (3.0 s, KB-COMPAT-LOSTWHY1), one after the other. The pipelines are made at the first frame, after the
+  6 s of generation in which the GPU is idle; making them before (async creation at attach) would hide both.
+- **Regression:** `packages/webgl2-compat/test/sync-link.test.js` (a stand-in WebGL2 whose links finish on command:
+  no `LINK_STATUS` read while the driver links, four reads once it is done, a refused program reported to the scope it
+  was made in or as an uncaptured error, no read when a compute pipeline is made, and the old check without the
+  extension).
+
 ### Fixed 2026-11-28: 17 README examples failed their type check, two of them on real API defects (KB1867b; shader, materials, sky, READMEs)
 
 - **Repro:** `npm run build:packages`, then `node scripts/check-readme-types.mjs`: 17 new errors in the cameras,
@@ -16607,21 +16641,37 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/water/src/index.ts`); the dune coast attaches no physics wake, so the cause is in the water package, not
   water physics, unless the trace finds otherwise.
 
-### Open 2026-11-28: the WaterWake README example runs out its 20 s page limit (KB-WATER-WAKEREADME1, physics solver SEA-04)
+### Fixed 2026-11-28: the WaterWake README example ran out its 20 s page limit (KB-WATER-WAKEREADME1, physics solver SEA-04)
 
 - **Repro:** `npm run check:readme-run -- --packages=water` on the workstation (RTX A6000, Node 26): "water/readme-a-physics-
   wake-drawn-waterwake-m-224548: Example did not finish within 20 s while settling". The example advances a
-  `WakeSolver` on a 256 x 128 grid for ten seconds at 30 Hz (`world.advance(10 * 30)`) before one frame.
-- **Measured (`.lane/wake-time.mjs`, the example's solver alone in Node):** 40.9 ms a step with the TypeScript FFT,
-  12.3 s for the 300 steps; with `await WakeSolver.load()` (the Wasm FFT) 29 ms a step, 8.6 s. Each step makes 10
-  real 2D transforms of the grid (6 forward, 4 inverse), 3.85 ms each, 94 percent of the step (`RealFft2` of
-  `@margoengine/math/fft`, the generic mixed-radix Stockham loop). `updateWaterVelocity`, added with the capillary and
-  current modes (75ee9d9129, 2026-11-27), takes a forward and an inverse transform of the potential every step for the
-  surface rise, although `step` has just held the new potential's spectrum.
-- **Cause:** the page's 300 wake steps alone take 12 s of the 20 s, before the browser, the Water and the frame; the
-  per-step transform count grew past what the example's limit holds. Owner: SEA-04 (Codex, docs/physics-work-queue.md).
-  A fix reuses the step's spectrum for the rise (one forward transform fewer) or makes the shared FFT's radix-2 and
-  radix-4 stages cheaper, bit for bit with its Rust twin; the README limit and the example's ten seconds stay.
+  `WakeSolver` on a 256 x 128 grid for ten seconds (`world.advance(10 * 30)` frames at 30 Hz) before one frame.
+- **Measured (lane C, the example's solver alone in Node, counting calls):** the wake steps at its default 60 Hz
+  (rate level 0), so the ten seconds are 598 steps, each 3 forward and 2 inverse real 2D transforms (the earlier note's
+  "10 a step" counted two steps a frame; this example has no current, tension or viscosity, so `updateWaterVelocity`
+  takes no transform). 31.1 ms a step, 18.6 s, 96 percent in `RealFft2` of `@margoengine/math/fft`.
+- **Cause:** `RealFft2.forward` ran the whole complex 2D transform, every one of the nx columns, and kept nx / 2 + 1 of
+  them; and the Stockham loop ran every radix-2 stage (all of a 256-point transform) through its generic p-loop, with a
+  modulo and a table index for each of the 4 terms of each output pair.
+- **Fix (`packages/math/src/fft.ts`):** `forward` transforms the rows and only the columns it keeps, each column being
+  its own transform; the radix-2 stage is written out with the same operations in the same order (a sum still starts
+  at 0, so a -0 sum stays +0), so every result keeps the Rust twin's bits (kernel-common's `fft.rs` is untouched).
+  Measured the same way: 9.5 ms a step, 5.7 s for the example's solver; the README example passes (55 of 55 water
+  examples). The README's limit and its ten seconds did not change.
+- **Regression:** `packages/math/test/fft.test.js`: a 16 x 8 forward runs 8 rows and 9 columns (24 before; fails on the
+  parent), the written-out stage matches the generic loop bit for bit at lengths 2 to 1,024 with random and signed-zero
+  inputs, and the existing Rust vectors still match.
+
+### Fixed 2026-11-28: a Water with interactive Ripples failed to compile, "redeclaration of 'rippleAt'" (water)
+
+- **Repro:** `npm run check:readme-run -- --packages=water`: "water/readme-interactive-ripples-...: GPU: Error while parsing
+  WGSL: redeclaration of 'rippleAt'". Any Water with `Ripples.attach` drew nothing.
+- **Cause:** bfb7d64cd8 (KB-WATER-GL2LINK1) split a ripple layer around its noise into WGSL `rippleAt` and `rippleSlope`
+  in the surface program; the Ripples chunk that the same program includes already declares `rippleAt` (its field read).
+- **Fix:** the surface's halves are `rippleLayerAt` and `rippleLayerSlope` (`packages/water/src/index.ts`); the same
+  calls with the same arguments, so the pixels do not change.
+- **Regression:** `packages/water/test/water.test.js`, "a Water with Ripples attached declares each WGSL function once"
+  (fails on the parent with `['rippleAt']`).
 
 ### Fixed 2026-11-28: the water surface program took over 5 s to link on the WebGL2 layer (KB-WATER-GL2LINK1, water)
 
@@ -16639,7 +16689,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** each repeated call sits once in a loop over an array of its arguments, every argument written out as before,
   and the loop's bound is `waterLoops(n)` = n + `frame.sea.z`, a frame uniform lane Water always leaves 0, so no compiler
   can count it (the rule of KB-COMPAT-FXCTIME1). The sums around the calls keep their written order. A ripple layer and
-  a capillary octave are split around their noise (`rippleAt`/`rippleSlope`, `shortOctaveAt`/`shortOctaveSlope`), each
+  a capillary octave are split around their noise (`rippleLayerAt`/`rippleLayerSlope`, `shortOctaveAt`/`shortOctaveSlope`), each
   half called with the layer's literal arguments: a first version read the octaves' wavenumbers from a table, so
   `k/3.77` and `9.81/k` were divided at run time where the literal had been folded, and 84 of 307,200 bytes of a sea
   frame came out 1/255 apart on WebGPU; a ripple loop that summed its weighted layers in the loop moved one byte on the
@@ -16655,7 +16705,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Same output:** three scenes (an HDR-sky sea, a plain sea, a refracting beach with surf) rendered with the old and
   new builds on one page are byte for byte the same on WebGPU and on the WebGL2 layer over ANGLE Direct3D 11 (RTX
   A6000); the old build against a copy of itself is also identical on both, so the check is deterministic.
-- **Still open:** Water creates its pipeline with the synchronous `createRenderPipeline`, so the link blocks the page;
+- **Still open:** Water creates its pipeline with the synchronous `createRenderPipeline`, so the link blocks the page
+  (since KB-COMPAT-SYNCLINK1 only at its first draw, and side by side with the other links of the frame);
   the surface writes three colour outputs, so ANGLE's Direct3D 11 back end compiles it again at its first draw
   (KB-COMPAT-LOSTWHY1) and LINK_STATUS shows about half the cost. Async readiness (`createRenderPipelineAsync`, on the
   layer `KHR_parallel_shader_compile`) is not done.
@@ -16836,7 +16887,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   standing calibration put a bend into "straight" cannot be told from the file.
 - **Now:** the take is held off the stage. `recordings.brisk.held` in the demo's captures.js names this entry, the page
   neither lists nor loads the take, and the file stays in source/ for the fix.
-- **Closes when** either holds, both need Scott's go: (a) a 100STYLE arms-out excerpt whose elbows stay within 2
+- **Closes when** either holds, both need a maintainer decision: (a) a 100STYLE arms-out excerpt whose elbows stay within 2
   degrees of straight replaces it (a dataset download); (b) `@margoengine/rigging/retarget` gains target joint limits,
   so a target's elbow or knee stops at straight when a capture passes it (a new option; joint limits in retargeting:
   Gleicher 1998, *Retargetting Motion to New Characters*, SIGGRAPH; Choi and Ko 2000, *Online Motion Retargetting*,
@@ -18761,6 +18812,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   6.94 s) show only the load (operational playbook, section 5, KB-COMPAT-LOSTWHY1). Still open: those two programs'
   own 5 to 7 s compiles, quiet-machine seconds, and a rerun of the WebKit matrix row, so whether every wait now stays
   under 15 s is not shown; the upstream report waits on Scott.
+- **Seen in Chrome too, 2026-11-28:** in `demos/ten-thousand-trees` on the layer the water surface (three outputs)
+  compiles again at its first draw for 3.0 s on Chrome's GPU main thread (`D3DCompile` there, one call), after its 3.8 s
+  link on a worker; the page waits for it in the next framebuffer status check. Chrome keeps the context; it is the
+  largest single wait left on that page's start after KB-COMPAT-SYNCLINK1.
 
 ### Open (below Margo) 2026-11-27: on WebKit's Windows build the WebGL2 layer copies unpremultiplied ImageBitmaps wrong (KB-WEBKIT-BITMAPALPHA1, browser; webgl2-compat)
 
@@ -32178,7 +32233,7 @@ reproduced `EBUSY` and the live server/worker ports; the repaired seven-test fil
   0.99.7.2 win64 build named in `results/batch-99-parity-gamma-20261109.json` is on the workstation, and
   `packages/voxel-pathtracer/tests/magicavoxel/parity-fixtures.cjs` writes the scenes; the renders are made by hand
   in its Render view (docs/whitepaper/reproduce.md, "Batch 99 parity gamma regression"), not by any script here. With that
-  corpus the transport can be compared per setting; a zero-error match still needs Scott to state whether the oracle
+  corpus the transport can be compared per setting; a zero-error match still needs a maintainer decision on whether the oracle
   means equal expected values (a statistical bound against the reference's own noise) or equal pixels, which no
   renderer can give against another's samples. Job 2's bar, a noise-free disocclusion, asks a finite first-frame
   estimate to recover radiance it has not sampled; Schied et al. 2017 (section 6) report the same limit for SVGF. The
