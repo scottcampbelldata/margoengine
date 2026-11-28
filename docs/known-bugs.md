@@ -1397,6 +1397,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   sun masks do not hold. Not yet split: the fire's point lights against its flame and ember sprites over the ground.
   The fix needs the fire's light on the ground as an AOV (strata of like local light, as of like albedo), a new
   SceneTargets output: asked of the manager.
+- **Cause (2026-11-28, lane B, the same 4.5 s with the shutter closed, per-frame b* spread):** not the fire's light
+  but its flame volumes drawn over the ground. Baseline 3.55; the flames' glow off (`glow` 0) 3.55; the embers off 3.55;
+  the fire's light on the haze and pall off (`WeatherDrive` `fireLight` 0) 4.10; the smoke columns off 3.54; the flame
+  bodies off (`opacity` 0) 0.87; everything the fire draws off 0.96. A flame volume is drawn after the scene, so the
+  sun's masks (SceneTargets, the surfaces only) still count the ground behind it as lit or shadowed ground, and the
+  flames move and flicker along the shot. The probe's own frames hold too few shadow interiors to see it in one frame.
+- **Fix:** TAA gains `reactiveMask` (read only: the coverage mask its resolve read, which flames, smoke, weather and
+  water already draw), the timber-valley shot page gives it as the `over` AOV (every timber-valley shot lists it), and
+  T6 (`bounce`, `shadowTint`, `packages/headless/src/look.ts`) leaves out ground any of it covers, records
+  `detail.over` (percent left out) and reports `missing` below `GROUND_MIN_PIXELS` (30) lit or shadowed pixels left.
+  The blowup pools 15 frames 2 apart round each probe (`probePool`, the ruled pooling), since one frame now holds 22
+  to 24 shadowed interior pixels. Bound unchanged, fire kept; no core or stage change. Only T6 reads `over`: the
+  flames' own look is still held by every other check.
+- **After:** the closed-shutter 4.5 s run with `over`: per-frame spread 0.98 b* (3.55 without), mid shadowTint 1.10 b*
+  pooled (bound 0.0416, pass), bounce 93.2 percent (pass).
+- **Regression:** `packages/headless/tests/look-clean.test.js` ("T6 leaves out ground an effect is drawn over"),
+  `packages/taa/test/reactive-mask.test.js` ("taa.reactiveMask is the mask the last resolve read"),
+  `packages/taa/test/reactive-browser.mjs` (WebGPU and `MARGO_COMPAT=1`).
 
 ### Fixed 2026-11-28: T6 compared different surfaces in the sun and in the shade (KB-LOOK-TV-TINTMATCH1, headless look check)
 

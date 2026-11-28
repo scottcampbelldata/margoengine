@@ -8,6 +8,7 @@ import { encodePNG } from '../dist/index.js';
 import { decodePNG } from '../dist/compare.js';
 import {
   GROUND_ALBEDO_LEVELS,
+  GROUND_MIN_PIXELS,
   GROUND_INSET,
   albedoOf,
   LOOK_CHECKS,
@@ -610,6 +611,72 @@ test('T6 bounce and shadowTint compare like surfaces when given the albedo (KB-L
     masks: { lit, shadow, 'albedo-r': plane(0), 'albedo-g': plane(1), 'albedo-b': plane(2) },
   }).find((row) => row.check === 'shadowTint');
   assert.ok(Math.abs(probe.value - tint.value) < 1e-9, `${probe.value} ${tint.value}`);
+});
+
+test('T6 leaves out ground an effect is drawn over, given the over mask (KB-LOOK-TV-TINTRES1)', () => {
+  // The timber-valley blowup's T6 drifted 3.6 b* from frame to frame: its flame volumes, drawn over the ground after
+  // the scene, sat on ground the sun's masks still counted as lit or shadowed, and moved and flickered along the shot.
+  // One surface under one light here, a bright orange flame over part of the shadowed ground: without `over` the
+  // shadow reads far warmer and brighter than the light gives it; with the flame's coverage the value is the light's.
+  const size = 64,
+    encode = (v) => {
+      const c = Math.min(1, Math.max(0, v));
+      return Math.round(255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055));
+    },
+    sun = [0.9, 0.8, 0.6],
+    sky = [0.12, 0.13, 0.16],
+    flame = [1.0, 0.45, 0.08],
+    soil = [0.3, 0.25, 0.2],
+    lit = mask(size, size, (x) => x < 32),
+    shadow = mask(size, size, (x) => x >= 32),
+    // The flame's coverage: a soft-edged patch over the shadowed ground, rows 8 to 40, columns 36 to 60.
+    cover = (x, y) => (x >= 36 && x < 60 && y >= 8 && y < 40 ? (x < 40 || x >= 56 ? 0.2 : 0.9) : 0),
+    over = mask(size, size, () => false),
+    pixel = (x, y) =>
+      soil.map((a, c) => {
+        const ground = a * (sky[c] + (x < 32 ? sun[c] : 0)),
+          k = cover(x, y);
+        return encode(ground * (1 - k) + flame[c] * k);
+      }),
+    frame = image(size, size, pixel),
+    clean = image(size, size, (x) => soil.map((a, c) => encode(a * (sky[c] + (x < 32 ? sun[c] : 0)))));
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) over.data[y * size + x] = Math.round(255 * cover(x, y));
+  const truth = shadowTint(clean, { lit, shadow }).value,
+    trueBounce = bounce(clean, { lit, shadow }).value,
+    drawn = shadowTint(frame, { lit, shadow }).value,
+    left = shadowTint(frame, { lit, shadow, over }),
+    leftBounce = bounce(frame, { lit, shadow, over }).value;
+  // shadowTint is the lit minus the shadowed b*: a warmer shadow reads lower.
+  assert.ok(drawn < truth - 5, `the flame warms the shadow: ${drawn} against ${truth}`);
+  assert.ok(Math.abs(left.value - truth) < 1e-9, `with over: ${left.value} against ${truth}`);
+  assert.ok(Math.abs(leftBounce - trueBounce) < 1e-9, `bounce with over: ${leftBounce} against ${trueBounce}`);
+  assert.ok(left.detail.shadow < shadowTint(clean, { lit, shadow }).detail.shadow, 'the covered pixels are out');
+  // checkProbe takes it from the probe's masks.
+  const rows = checkProbe({ name: 'mid', frame, masks: { lit, shadow, over } }, {});
+  assert.ok(Math.abs(rows.find((r) => r.check === 'shadowTint').value - truth) < 1e-9, 'checkProbe passes over on');
+  // The share of the ground interior left out is reported; none without a mask.
+  assert.ok(left.detail.over > 0 && left.detail.over < 50, `over ${left.detail.over} %`);
+  assert.equal(shadowTint(frame, { lit, shadow }).detail.over, undefined);
+  assert.equal(shadowTint(clean, { lit, shadow, over: mask(size, size, () => false) }).detail.over, 0);
+  // A real tint fault still fails with the mask on: a shadow warmer than the sun (ground the light tints wrong, with
+  // nothing drawn over it) reads below the bound, as it does without the mask.
+  const warm = [0.25, 0.12, 0.02],
+    faulty = image(size, size, (x, y) =>
+      soil.map((a, c) => {
+        const ground = a * (sky[c] + (x < 32 ? sun[c] : warm[c] * 4)),
+          k = cover(x, y);
+        return encode(ground * (1 - k) + flame[c] * k);
+      }),
+    ),
+    fault = shadowTint(faulty, { lit, shadow, over, bound: [3, 100] });
+  assert.equal(fault.pass, false, `the warm shadow fails with over: ${fault.value}`);
+  assert.ok(fault.value < 0 && !fault.missing);
+  // Too little ground left: a mask over nearly all the shadowed ground leaves fewer than GROUND_MIN_PIXELS there.
+  const most = mask(size, size, (x, y) => x >= 32 && !(x === 40 && y < 20)),
+    gone = shadowTint(frame, { lit, shadow, over: most });
+  assert.equal(gone.pass, false);
+  assert.match(gone.missing, new RegExp(`^${GROUND_MIN_PIXELS} lit and shadowed ground pixels nothing is drawn over`));
+  assert.ok(gone.detail.over > 40, `over ${gone.detail.over} %`);
 });
 
 test('T6 limits follow the light: a clear sun keeps 10 to 35 percent and 3 b*, a pall moves them, wrong bounce fails', () => {

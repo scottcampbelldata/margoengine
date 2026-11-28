@@ -127,6 +127,27 @@ test("several masks in one frame are combined by their maximum, the option's inc
   r.taa.dispose();
 });
 
+// KB-LOOK-TV-TINTRES1: the shot tool reads what is drawn over the scene's surfaces (a flame's coverage) as an AOV.
+test('taa.reactiveMask is the mask the last resolve read: none, the one published, or the combined maximum', () => {
+  const r = rig();
+  assert.equal(r.taa.reactiveMask, undefined, 'before any frame');
+  r.frame();
+  assert.equal(r.taa.reactiveMask, undefined, 'a frame with no mask');
+  const flame = r.mask(),
+    river = r.mask([64, 36]);
+  r.frame([flame]);
+  assert.equal(r.taa.reactiveMask, flame, 'one mask: that mask');
+  const log = r.gpu.record(() => r.frame([flame, river]));
+  const combined = log.find((c) => c[0] === 'texture' && c[2].label === 'TAA combined reactive mask');
+  assert.ok(combined && r.taa.reactiveMask, 'several: the combined mask');
+  assert.notEqual(r.taa.reactiveMask, flame);
+  assert.notEqual(r.taa.reactiveMask, river);
+  r.frame();
+  assert.equal(r.taa.reactiveMask, undefined, "a later frame with none: not last frame's mask");
+  r.taa.dispose();
+  assert.equal(r.taa.reactiveMask, undefined, 'after disposal');
+});
+
 // KB-TAA-PARTICLEMASK1: Weather's and VFX's particle masks cost a pass of their own, so they draw only while something
 // reads masks. TAA's read is that signal; the browser proofs are packages/sky/test/features-check.mjs (weather) and
 // packages/vfx/test/reactive-check.mjs, a plain TAA.attach(engine) with nothing wired.

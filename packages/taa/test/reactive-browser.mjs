@@ -43,6 +43,11 @@ try {
     window.t = {
       gpuErrors: () => [...rigs.plain.gpuErrors, ...rigs.reactive.gpuErrors],
       frames: (n, step, show) => Promise.all(Object.values(rigs).map((r) => r.frames(n, step, show))),
+      // taa.reactiveMask is the mask the resolve read: the square's coverage, none for plain TAA (KB-LOOK-TV-TINTRES1).
+      readMasks: () => ({
+        reactive: rigs.reactive.taa.reactiveMask === rigs.reactive.coverage && !!rigs.reactive.coverage,
+        plain: rigs.plain.taa.reactiveMask === undefined,
+      }),
     };
   });
   const shot = async (id) => decodePNG(await page.locator('#' + id).screenshot());
@@ -83,6 +88,11 @@ try {
   assert.ok(report.reactive.square > report.plain.square + 8, 'and the square shows at full strength at once');
   for (const mode of ['plain', 'reactive'])
     assert.ok(Math.abs(report[mode].far) < 2, `away from the square nothing changes (${mode} ${report[mode].far})`);
+  assert.deepEqual(
+    await page.evaluate(() => window.t.readMasks()),
+    { reactive: true, plain: true },
+    'taa.reactiveMask',
+  );
   assert.deepEqual(await page.evaluate(() => window.t.gpuErrors()), []);
   assert.deepEqual(errors, []);
   console.log('reactive mask check passed');

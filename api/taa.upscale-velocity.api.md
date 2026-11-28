@@ -84,6 +84,7 @@ class TAA implements EnginePlugin {
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     get velocity(): TAAVelocity | undefined;
+    get reactiveMask(): GPUTexture | undefined;
     get gpuState(): {
         velocity: GPUTexture;
         history: GPUTexture;

@@ -19,6 +19,7 @@ export interface BounceOptions {
     lit: LookMask;
     shadow: LookMask;
     albedo?: LookImage;
+    over?: LookMask;
     precise?: PreciseFrame;
     pool?: (GroundFrame | GroundSample)[];
     bound?: LookBound;
@@ -117,6 +118,7 @@ export interface GroundFrame {
     lit: LookMask;
     shadow: LookMask;
     albedo?: LookImage;
+    over?: LookMask;
 }
 
 export interface GroundSample {

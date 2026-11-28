@@ -83,6 +83,20 @@ const mask = engine.gpu!.createTexture({
 TAA.attach(engine, {reactive: () => mask});
 ```
 
+`taa.reactiveMask` is the mask the last resolve read: the `reactive` option's, one another package published, or with
+several their maximum in a mask TAA owns, at the size it was drawn, and undefined for a frame with none. Read it after a
+frame and before the next: the shot tool takes it as an AOV of what is drawn over the scene's surfaces, so
+`@margoengine/headless/look` T6 leaves that ground out (KB-LOOK-TV-TINTRES1).
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {TAA} from 'margoengine/taa';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const taa = TAA.attach(engine);
+engine.render();
+console.log(taa.reactiveMask?.format ?? 'nothing reactive this frame');
+```
+
 A still view converges on its supersampled mean. Until 2026-11-16 the resolve fetched history by the whole velocity,
 jitter difference included, so a still view's history moved by up to 0.8 px through a bilinear tap every frame and
 blurred: 8 px sine stripes converged at 113.9 sRGB levels against 103.4 for the mean of the 8 jitter phases and

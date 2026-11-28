@@ -1550,6 +1550,16 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     this.vectors.resolved = only ? undefined : this.histories[this.front];
     return this.vectors;
   }
+  /**
+   * The reactive mask the last resolve read (red 0 to 1): the `reactive` option's, one another package published for
+   * the frame (a flame's or smoke's coverage, Water's waves) or, with several, their maximum in a mask TAA owns; at
+   * the size it was drawn. Undefined while the frame had none. Read it after a frame and before the next, for example
+   * as a shot tool AOV of what is drawn over the scene's surfaces (`@margoengine/headless/look` T6 `over`).
+   */
+  get reactiveMask(): GPUTexture | undefined {
+    if (this.activeView) return this.activeView.reactiveMask;
+    return this.masked ? this.reactiveSource : undefined;
+  }
   get gpuState(): { velocity: GPUTexture; history: GPUTexture; depth: GPUTexture } {
     if (this.activeView) return this.activeView.gpuState;
     if (this.options.velocityOnly)

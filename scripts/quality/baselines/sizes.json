@@ -15598,6 +15598,11 @@
       "date": "2026-11-28",
       "commit": "tintres1-shutter-masks",
       "reason": "KB-SHOT-SHUTTERMASK1: T6 reads only ground its masks cover whole (255), as the shot tool's masks now follow the shutter: headless/look 19,492 to 19,498 B gzip measured (ceiling 19492 to 19498). One threshold argument on the shared mask helper; a second entry would repeat the ground strata.",
+      "grew": 1    },
+    {
+      "date": "2026-11-28",
+      "commit": "tintres1-over-mask",
+      "reason": "KB-LOOK-TV-TINTRES1: T6 leaves out ground an effect is drawn over (the `over` AOV, TAA's reactiveMask): headless/look 19,498 to 19,739 B gzip measured (ceiling 19498 to 19739), with detail.over and the GROUND_MIN_PIXELS floor the manager asked for. The option rides the ground strata every T6 row already builds; a separate entry would repeat them.",
       "grew": 1
     },
     {
@@ -16178,7 +16183,7 @@
     "@margoengine/headless/formats": 5809,
     "@margoengine/headless/frames": 2152,
     "@margoengine/headless/gif": 374,
-    "@margoengine/headless/look": 19498,
+    "@margoengine/headless/look": 19739,
     "@margoengine/headless/null": 3411,
     "@margoengine/headless/stage": 3972,
     "@margoengine/headless/tiles": 2829,

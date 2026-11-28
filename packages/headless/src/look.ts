@@ -1566,9 +1566,16 @@ export function checkProbe(
     pool = probe.pool?.map((one) => {
       if ('strata' in one) return one;
       const { frame: f, precise, masks: m } = one;
-      return { frame: f, precise, lit: m.lit, shadow: m.shadow, albedo: albedo && albedoOf((precise ?? f)!, m) };
+      return {
+        frame: f,
+        precise,
+        lit: m.lit,
+        shadow: m.shadow,
+        albedo: albedo && albedoOf((precise ?? f)!, m),
+        over: m.over,
+      };
     }),
-    ground6 = { lit: masks.lit, shadow: masks.shadow, albedo, precise: probe.precise, pool };
+    ground6 = { lit: masks.lit, shadow: masks.shadow, albedo, over: masks.over, precise: probe.precise, pool };
   run('bounce', ground, () => noted(bounce(frame, { ...ground6, bound: followed('bounce') })));
   run('shadowTint', ground, () => noted(shadowTint(frame, { ...ground6, bound: followed('shadowTint') })));
   // A night shot names these (a daylight frame is not a failed night): no family runs them.
@@ -1947,7 +1954,13 @@ export async function checkShot({
       if (!m.lit || !m.shadow) continue;
       const p = await precise(one.precise);
       pool.push(
-        groundSample({ precise: p, lit: m.lit, shadow: m.shadow, albedo: withAlbedo ? albedoOf(p, m) : undefined }),
+        groundSample({
+          precise: p,
+          lit: m.lit,
+          shadow: m.shadow,
+          albedo: withAlbedo ? albedoOf(p, m) : undefined,
+          over: m.over,
+        }),
       );
     }
     const probe: LookProbe = {
@@ -2731,6 +2744,12 @@ export interface BounceOptions {
    * within strata of like albedo. Unset, all ground is one stratum.
    */
   albedo?: LookImage;
+  /**
+   * What is drawn over the scene's surfaces (an `over` AOV, 0 to 255: a flame's or smoke's coverage, as TAA's
+   * `reactiveMask` holds it): ground any of it covers is left out, since its colour is partly the effect's, not the
+   * ground's light (KB-LOOK-TV-TINTRES1). Unset, nothing is left out.
+   */
+  over?: LookMask;
   /** The frame's colours before its 8 bits, read in its place ({@link PreciseFrame}). */
   precise?: PreciseFrame;
   /**
@@ -2814,8 +2833,15 @@ export function albedoOf(
   return { width: frame.width, height: frame.height, data };
 }
 
+/**
+ * The fewest interior pixels on each side, lit and shadowed, T6 reads once an `over` mask has left out the ground effects
+ * are drawn over: 30, the usual floor for treating a sample mean as normal (R. V. Hogg, E. A. Tanis and D. L.
+ * Zimmerman, "Probability and Statistical Inference", 9th ed., Pearson, 2015, section 5.6), which `detail.se` assumes.
+ */
+export const GROUND_MIN_PIXELS = 30;
+
 /** The masks T6 reads of a pooled frame. */
-const GROUND_AOVS = ['lit', 'shadow', 'albedo-r', 'albedo-g', 'albedo-b'];
+const GROUND_AOVS = ['lit', 'shadow', 'albedo-r', 'albedo-g', 'albedo-b', 'over'];
 
 /** Levels per sRGB channel of the albedo strata {@link bounce} and {@link shadowTint} compare within: 16 (16 codes). */
 export const GROUND_ALBEDO_LEVELS = 16;
@@ -2846,6 +2872,8 @@ export interface PreciseFrame {
  */
 export interface GroundSample {
   readonly strata: ReadonlyMap<number, Readonly<GroundStratum>>;
+  /** Ground interior pixels its `over` mask left out; undefined without one. */
+  readonly covered?: number;
 }
 
 /** One more frame of a shot whose ground {@link bounce} and {@link shadowTint} pool with the probe's. */
@@ -2856,14 +2884,19 @@ export interface GroundFrame {
   lit: LookMask;
   shadow: LookMask;
   albedo?: LookImage;
+  /** What is drawn over the surfaces ({@link BounceOptions.over}). */
+  over?: LookMask;
 }
 
 /** A frame's ground as {@link bounce} and {@link shadowTint} pool it: its strata, so the frame and masks can go. */
 export function groundSample(frame: GroundFrame): GroundSample {
-  return { strata: groundStrata(frame) };
+  return groundStrata(frame);
 }
 
-function groundStrata({ frame, precise, lit, shadow, albedo }: GroundFrame): Map<number, GroundStratum> {
+function groundStrata({ frame, precise, lit, shadow, albedo, over }: GroundFrame): {
+  strata: Map<number, GroundStratum>;
+  covered?: number;
+} {
   const size = precise ?? frame;
   if (!size) throw typeError('A ground frame needs its frame or its precise frame', 'headless');
   if (precise && precise.data?.length !== precise.width * precise.height * 3)
@@ -2875,6 +2908,16 @@ function groundStrata({ frame, precise, lit, shadow, albedo }: GroundFrame): Map
     masks = [lit, shadow].map((mask, i) =>
       inset(size.width, size.height, maskBits(size, mask, i ? 'shadow' : 'lit', 255), r),
     );
+  // Ground an effect is drawn over, by any share, is not the ground's own light (KB-LOOK-TV-TINTRES1).
+  let covered = 0;
+  if (over) {
+    const bits = maskBits(size, over, 'over', 1);
+    for (let i = 0; i < bits.length; i++)
+      if (bits[i] && (masks[0][i] || masks[1][i])) {
+        masks[0][i] = masks[1][i] = 0;
+        covered++;
+      }
+  }
   if (albedo) {
     sameSize(size, albedo, 'albedo');
     if (albedo.data.length !== size.width * size.height * 4)
@@ -2904,7 +2947,7 @@ function groundStrata({ frame, precise, lit, shadow, albedo }: GroundFrame): Map
     at.Y2[side] += Y * Y;
     at.b2[side] += b * b;
   }
-  return strata;
+  return over ? { strata, covered } : { strata };
 }
 
 /** A side of a stratum: its mean Y and b* and the variance of each mean. */
@@ -2975,9 +3018,14 @@ function pooled(options: BounceOptions, frame: LookImage, value: GroundValue, va
   const frames: (GroundFrame | GroundSample)[] = [{ ...options, frame }, ...(options.pool ?? [])],
     all = new Map<number, GroundStratum>(),
     each: number[] = [];
+  let covered = 0,
+    overGiven = false;
   for (const one of frames) {
-    const strata = 'strata' in one ? one.strata : groundStrata(one),
+    const sample = 'strata' in one ? one : groundStrata(one),
+      strata = sample.strata,
       own = poolStrata(strata.values(), value, variance).value;
+    covered += sample.covered ?? 0;
+    overGiven ||= 'strata' in one ? one.covered !== undefined : !!one.over;
     if (Number.isFinite(own)) each.push(own);
     for (const [key, at] of strata) {
       const to = all.get(key);
@@ -2998,7 +3046,12 @@ function pooled(options: BounceOptions, frame: LookImage, value: GroundValue, va
     : { lit: p.lit, shadow: p.shadow };
   if (Number.isFinite(se)) detail.se = Math.round(se * 1e4) / 1e4;
   if (frames.length > 1) detail.frames = frames.length;
-  return { value: p.value, detail };
+  // The share of the ground interior an effect was drawn over and left out (KB-LOOK-TV-TINTRES1), percent.
+  if (overGiven) {
+    const ground = p.lit + p.shadow + covered;
+    detail.over = ground ? Math.round((1e4 * covered) / ground) / 100 : 0;
+  }
+  return { value: p.value, detail, overGiven };
 }
 
 function groundCheck(
@@ -3008,7 +3061,14 @@ function groundCheck(
   value: GroundValue,
   variance: GroundValue,
 ): LookResult {
-  const { value: v, detail } = pooled(options, frame, value, variance);
+  const { value: v, detail, overGiven } = pooled(options, frame, value, variance);
+  // What `over` leaves must still be enough ground on each side to read a mean from.
+  if (overGiven && (detail.lit! < GROUND_MIN_PIXELS || detail.shadow! < GROUND_MIN_PIXELS))
+    return {
+      ...result(name, Number.NaN, options.bound, detail),
+      pass: false,
+      missing: `${GROUND_MIN_PIXELS} lit and shadowed ground pixels nothing is drawn over (${detail.lit} and ${detail.shadow} left, ${detail.over} % covered)`,
+    };
   if (!Number.isFinite(v))
     return {
       ...result(name, Number.NaN, options.bound, detail),

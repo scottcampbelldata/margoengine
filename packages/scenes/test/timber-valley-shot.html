@@ -4,7 +4,7 @@
 <script type="module">
 // @margoengine/scenes/timber-valley as a shot page for tools/shot (shot files from shotFilesFromScene with this page).
 // URL: any catalogue setting but quality (look, weather, fire, fireTime, hour, date, houses, windFrom, seed). The page
-// gives the shot tool `timberShot.engine`, `timberShot.aovs` (geometry, depth as nearness exp(-distance / 2000 m), and
+// gives the shot tool `timberShot.engine`, `timberShot.aovs` (over: TAA's reactive mask, what is drawn over the surfaces; geometry, depth as nearness exp(-distance / 2000 m), and
 // SceneTargets' look masks penumbra, subject, lit and shadow with the terrain added and the scattered plants, trees and
 // snags added as not ground, so they hide the ground behind them; `plants` marks them, KB-LOOK-MASKOCCLUDE1), `timberShot.apply` (the scene's
 // own time follows the shot clock: fire, sky and weather) and `timberShot.settings` (per-shot rows through each
@@ -45,9 +45,18 @@ if(scene.parts.view.objects)surface.add(scene.parts.view.objects,{ground:false})
 const clocks=()=>({weather:scene.parts.weather.time,fire:scene.parts.fireFront?.time});
 const lag={weather:0.1,fire:0.1+(scene.parts.fireFront?.options.step??0.5)};
 let first=null;
+// What is drawn over the surfaces after the scene (the flames' and smoke's coverage): the reactive mask TAA read this
+// frame, or a black mask the frame's size when it read none, so T6 leaves that ground out (KB-LOOK-TV-TINTRES1).
+let blank=null;
+const over=()=>{
+  const mask=scene.parts.taa?.reactiveMask;if(mask)return mask;
+  const size=targets.texture('geometry');
+  if(!blank||blank.width!==size.width||blank.height!==size.height){blank?.destroy();blank=engine.gpu.createTexture({label:'nothing drawn over',size:[size.width,size.height],format:'r8unorm',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_SRC});}
+  return blank;
+};
 globalThis.timberShot={
   engine,scene,
-  aovs:()=>({device:engine.gpu,textures:{...Object.fromEntries(['geometry','depth','penumbra','subject','lit','shadow','plants'].map(n=>[n,targets.texture(n)])),...Object.fromEntries(['r','g','b'].map(c=>['albedo-'+c,surface.texture('albedo'+c.toUpperCase())]))}}),
+  aovs:()=>({device:engine.gpu,textures:{...Object.fromEntries(['geometry','depth','penumbra','subject','lit','shadow','plants'].map(n=>[n,targets.texture(n)])),...Object.fromEntries(['r','g','b'].map(c=>['albedo-'+c,surface.texture('albedo'+c.toUpperCase())])),over:over()}}),
   async apply(state,{time}){
     const now=clocks();
     if(first===null){first={time,...now};return;}

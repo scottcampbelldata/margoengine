@@ -88,6 +88,10 @@
       "early": 0.3,
       "mid": 1
     },
+    "probePool": {
+      "frames": 15,
+      "step": 2
+    },
     "lookFamily": "animatedFeature",
     "moving": {
       "depthScale": 2000
@@ -102,6 +106,7 @@
       "albedo-r",
       "albedo-g",
       "albedo-b",
+      "over",
       "sky"
     ],
     "horizon": {

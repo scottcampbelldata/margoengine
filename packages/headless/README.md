@@ -682,8 +682,8 @@ console.log(lookReport([{ name: 'hearth', frame, results: rows }]).markdown.spli
 | `motionBlur` | T8: % of edge centres of pixels moving over 8 pixels a frame whose edge is narrower than half the shutter's smear (`shutter` degrees, default 180, smear `shutter / 360` of the travel; `checkShot` reads the angle from `manifest.render` when the shot drew sub-frames) | 5 | `moving` |
 | `silhouette` | T5: % of the subject's outline with 15 L* or more against what is behind | [80, 100] | the `subject` mask |
 | `silhouetteShape` | T5: % of the subject (at 320 x 180, three L* values) in one value | [70, 100] | the `subject` mask |
-| `bounce` | T6: shadowed ground luminance as a % of the lit ground's, linear light, each over its mask's interior (pixels the mask covers whole, 255, then `GROUND_INSET`, 1/360 of the shorter side, in from every edge, where the frame mixes both sides) | [10, 35] under a clear sun; a probe's `light` moves it (`lightBounds`) | the `lit` and `shadow` masks; with `albedo-r`, `albedo-g` and `albedo-b`, like surfaces only |
-| `shadowTint` | T6: lit b* minus shadow b*, points: shadows cooler than the sun, over the masks' interiors as `bounce` | [3, 100] under a clear sun; a probe's `light` moves it (`lightBounds`) | the `lit` and `shadow` masks; with `albedo-r`, `albedo-g` and `albedo-b`, like surfaces only |
+| `bounce` | T6: shadowed ground luminance as a % of the lit ground's, linear light, each over its mask's interior (pixels the mask covers whole, 255, then `GROUND_INSET`, 1/360 of the shorter side, in from every edge, where the frame mixes both sides) | [10, 35] under a clear sun; a probe's `light` moves it (`lightBounds`) | the `lit` and `shadow` masks; with `albedo-r`, `albedo-g` and `albedo-b`, like surfaces only; with `over`, ground nothing is drawn over |
+| `shadowTint` | T6: lit b* minus shadow b*, points: shadows cooler than the sun, over the masks' interiors as `bounce` | [3, 100] under a clear sun; a probe's `light` moves it (`lightBounds`) | the `lit` and `shadow` masks; with `albedo-r`, `albedo-g` and `albedo-b`, like surfaces only; with `over`, ground nothing is drawn over |
 | `nightLuma`, `nightPeak` | T7: mean luma, and the luma of the brightest 1%, of a night frame | [24, 255], [180, 255] | the frame; run only when a shot names them |
 
 | Export | What it does |
@@ -774,6 +774,34 @@ const size = 32,
 const pool = [precise(), precise()].map((p) => groundSample({ precise: p, lit, shadow }));
 const row = shadowTint(frame, { lit, shadow, precise: precise(), pool });
 console.log(row.value > 0, row.detail.frames); // true 3
+```
+
+**T6 leaves out ground an effect is drawn over** (KB-LOOK-TV-TINTRES1, 2026-11-28). `bounce` and `shadowTint` take an
+optional `over` mask (0 to 255, also on each pooled `GroundFrame`): what is drawn over the scene's surfaces after them,
+such as a flame's or smoke's coverage. Ground any of it covers is left out, since its colour is partly the effect's and
+not the ground's light; `checkProbe` and `checkShot` take it from a probe's `over` AOV. Each row then records
+`detail.over`, the percent of the ground interior left out, and reports `missing` when fewer than `GROUND_MIN_PIXELS`
+(30) lit or shadowed pixels are left, the usual floor for a normal sample mean (Hogg, Tanis and Zimmerman 2015). A real
+tint fault on ground nothing covers still fails. The shot tool gets it from
+TAA's `reactiveMask` (the coverage flames, smoke, weather and water already draw for TAA; the timber-valley shot page
+gives it). The timber-valley blowup's T6 drifted 3.6 b* from frame to frame because its flame volumes, which move and
+flicker along the shot, sat on ground the sun's masks counted: with the flames' opacity at 0 the spread was 0.9 b*,
+while the flames' glow, the embers, the fire's light on the haze and the smoke columns each left it unchanged.
+
+```ts
+import { shadowTint } from '@margoengine/headless/look';
+const size = 32,
+  half = (left: boolean) => ({ width: size, height: size, data: Uint8Array.from({ length: size * size }, (_, i) => ((i % size < 16) === left ? 255 : 0)) }),
+  frame = { width: size, height: size, data: new Uint8Array(size * size * 4) },
+  over = { width: size, height: size, data: new Uint8Array(size * size) };
+for (let i = 0; i < size * size; i++) {
+  const x = i % size, y = (i / size) | 0, flame = x >= 20 && y < 12;
+  frame.data.set(x < 16 ? [200, 170, 120, 255] : flame ? [255, 150, 40, 255] : [70, 72, 84, 255], i * 4);
+  if (flame) over.data[i] = 255;
+}
+const drawn = shadowTint(frame, { lit: half(true), shadow: half(false) }),
+  ground = shadowTint(frame, { lit: half(true), shadow: half(false), over });
+console.log(drawn.value < ground.value, ground.pass); // true true
 ```
 
 **Clean frames and look families.** The clean-frame checks are the look bar of the animated-feature film (T1 to T8, private roadmap section 3): no grain, banding, stairs or shimmer, shapes that read, bounce light in the shadows, colour that survives YouTube's 4:2:0 H.264 and motion that is blurred. `checkProbe(probe, bounds, { family: 'animatedFeature' })` (or `lookFamily: "animatedFeature"` in a shot file) holds every check the probe can run to the family's bound: grain 0.5 codes, penumbra 0.7, penumbraPlants 1, speckle 5 ppm, banding 0.2%, stairs 1%, still shimmer 0.1% and flicker 0.3, `shimmerMoving` 0.5%, crush 0.1%, the reference FLIP 0.04, plus the ranges above. A check whose input the probe lacks is left out under a family (a shot that names it in `lookBounds` still fails it as missing); a mask that marks no pixel counts as lacking, so a frame with no subject or no shaded ground runs no `silhouette` or `bounce`, and a shot's own `lookBounds` win by name. `natural` keeps every default. `stairs` and `colourEdges` read the frame alone. A step was once judged against the climb along its own row, which misread an antialiased edge near a pixel axis (one pixel of coverage 0.1 per row is a tenth of the climb on one side and nine tenths on the other): a 16 sample per pixel render of the storm-light shot read 15% `stairs`. They now look for a value between the plateaus around the step; on that shot msaa 1 reads 5.70% over the whole frame (5.98% on the crop in `tests/fixtures/look-real`, against 30.6% by the old test), msaa 4 at supersample 1, 1.5 and 2 read 0.10, 0.00 and 0.01%, and the 16 sample reference 0.00%. The flood draft shots (msaa 1, supersample 1) read 2.7 to 22.7%, which is real aliasing: they are not rendered at the film setting.

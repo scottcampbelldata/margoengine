@@ -148,6 +148,8 @@ ${
   return {
     gpuErrors,
     taa: effect,
+    /** The square's coverage mask (undefined without `mask`). */
+    coverage: mask ? coverage : undefined,
     /** Render n frames, moving the square `step` px before each; `show` draws it. */
     async frames(n, step = 0, show = false) {
       shown = show;

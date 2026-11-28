@@ -85,6 +85,7 @@
       "albedo-r",
       "albedo-g",
       "albedo-b",
+      "over",
       "sky",
       "plants"
     ],
