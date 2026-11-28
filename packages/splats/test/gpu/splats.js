@@ -729,6 +729,11 @@ window.check.brush = async (o) => {
     else if (op === 'select') out.push(brush.select(a[0], a[1]) === brush);
     else if (op === 'erase') out.push(brush.erase(a[0]) === brush);
     else if (op === 'paint') out.push(brush.paint(a[0], a[1], a[2]) === brush);
+    else if (op === 'begin') out.push(brush.beginStroke() === brush);
+    else if (op === 'end') out.push(brush.endStroke() === brush);
+    else if (op === 'undo') out.push(brush.undo());
+    else if (op === 'reset') out.push(brush.reset() === brush);
+    else if (op === 'strokes') out.push(brush.strokes);
   }
   await draw();
   return {

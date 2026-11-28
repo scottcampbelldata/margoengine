@@ -392,6 +392,45 @@ engine.start();
 - The selection lives on the GPU (4 bytes per splat); `selection()` reads it back as indices. A restored device
   starts with an empty selection.
 
+### Strokes, undo and reset
+
+Erase and paint keep a stroke history on the GPU. Wrap one drag of a brush tool in `beginStroke()` and `endStroke()`
+so `undo()` takes the whole drag back; an edit outside a stroke is a stroke of its own. `reset()` restores the scan as
+it was before the first edit:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Splats} from 'margoengine/splats';
+import {parsePly} from 'margoengine/splats/data';
+import {SplatBrush} from 'margoengine/splats/edit';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const cloud = Splats.attach(engine, parsePly(await (await fetch('/raccoon-v2.ply')).arrayBuffer()));
+const brush = SplatBrush.attach(engine, cloud, {history: 32}); // strokes undo can take back
+engine.start();
+const at = (event: PointerEvent) => {
+  const box = canvas.getBoundingClientRect(), [width, height] = brush.frame;
+  return {x: ((event.clientX - box.left) / box.width) * width, y: ((event.clientY - box.top) / box.height) * height, radius: 24};
+};
+canvas.addEventListener('pointerdown', (event) => brush.beginStroke().paint(at(event), [0.1, 0.6, 0.9], 0.6));
+canvas.addEventListener('pointermove', (event) => {
+  if (brush.inStroke) brush.paint(at(event), [0.1, 0.6, 0.9], 0.6);
+});
+canvas.addEventListener('pointerup', () => brush.endStroke());
+addEventListener('keydown', (event) => {
+  if (event.key === 'z' && (event.ctrlKey || event.metaKey)) brush.undo(); // false when there is nothing to undo
+  if (event.key === 'Escape') brush.reset(); // the scan as loaded
+});
+console.log(brush.strokes);
+```
+
+- Each kept stroke holds a GPU copy of what it changed: 32 bytes a splat for an erase (positions and colours), 16
+  bytes a splat plus the SH (4 bytes a coefficient) for a paint. Past `history` strokes (default 32) the oldest is
+  dropped; `history: 0` keeps only `reset()`. `reset()` keeps one more copy of positions, colours and SH from before
+  the first edit.
+- The copies are whole buffers, so a `cloud.write` made between strokes is taken back with the stroke after it.
+  Selections are not strokes. A restored device or a re-attached cloud starts a new history.
+
 ## Picking with meshes (`./pick`)
 
 `SplatBrush.pick` sees splats only. `SplatPicking` adds a cloud to `Picking` from `margoengine/selection`, so one

@@ -51,3 +51,17 @@ test('the brush shader orders depth keys and keeps the SH convention', () => {
   assert.match(brushShader, /0\.2820947918/, 'DC term of the 3DGS colour');
   assert.match(brushShader, /positions\[i\]\.w=0;colors\[i\]\.a=0;/, 'erase hides as Splats.clear');
 });
+
+test('SplatBrush stroke history: options, strokes and undo with nothing done', () => {
+  assert.throws(() => new SplatBrush(Splats.reserve(4), { history: -1 }), RangeError);
+  assert.throws(() => new SplatBrush(Splats.reserve(4), { history: 1.5 }), RangeError);
+  const brush = new SplatBrush(Splats.reserve(4), { history: 0 });
+  assert.equal(brush.strokes, 0);
+  assert.equal(brush.beginStroke().inStroke, true, 'a stroke opens');
+  assert.equal(brush.endStroke().inStroke, false, 'and ends');
+  assert.equal(brush.undo(), false, 'nothing to undo');
+  assert.equal(brush.reset(), brush, 'reset before any edit does nothing');
+  brush.dispose();
+  assert.throws(() => brush.undo(), { code: 'disposed' });
+  assert.throws(() => brush.reset(), { code: 'disposed' });
+});

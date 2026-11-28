@@ -84,12 +84,35 @@ fn inside(i:u32)->bool {
 
 const targets = { circle: 0, rect: 1, selection: 2, all: 3 } as const;
 
+/** Options of a {@link SplatBrush}. */
+export interface SplatBrushOptions {
+  /**
+   * How many strokes `undo` can take back, 0 or more; the oldest is dropped past it. Each kept stroke holds a GPU copy
+   * of what it changed: 32 bytes a splat for an erase, 16 bytes plus the SH (4 bytes per coefficient) for a paint.
+   * Default 32.
+   */
+  readonly history?: number;
+}
+
+/** GPU copies of a cloud's input buffers before an edit; `owner` is the live positions buffer they came from. */
+interface Snapshot {
+  owner: GPUBuffer;
+  positions?: GPUBuffer;
+  colors?: GPUBuffer;
+  sh?: GPUBuffer;
+}
+type Part = 'positions' | 'colors' | 'sh';
+const parts: readonly Part[] = ['positions', 'colors', 'sh'];
+
 /**
  * GPU picking and brush editing of a splat cloud: `const brush = SplatBrush.attach(engine, cloud)`, then
  * `await brush.pick(x, y)`, `brush.select(region)`, `brush.erase('selection')` or `brush.paint(region, [1, 0, 0])`
  * in pixels of the last drawn frame. Edits change the cloud's GPU buffers at once (shown from the next frame);
  * `await brush.commit()` copies them into the cloud's data (`Splats.read`), which export and device restoration use.
- * WebGPU only, as `Splats`.
+ * Erase and paint keep a stroke history on the GPU: edits between `beginStroke()` and `endStroke()` are one stroke (an
+ * edit outside a stroke is a stroke of its own), `undo()` takes the last stroke back and `reset()` restores the cloud
+ * as it was before the first edit. Selections are not strokes. The history copies whole buffers, so a `cloud.write`
+ * made between strokes is taken back with the stroke after it. WebGPU, or the WebGL2 compatibility layer, as `Splats`.
  * @throws TypeError when `cloud` is not a Splats; MargoError `'unsupported'` on a WebGL engine, `'disposed'` after
  * `dispose()`, `'state'` before the cloud has drawn a frame.
  */
@@ -109,16 +132,76 @@ export class SplatBrush implements EnginePlugin {
   private pipeline?: GPUComputePipeline;
   private group?: { group: GPUBindGroup; ellipses: GPUBuffer };
   private dead = false;
-  constructor(cloud: Splats) {
+  private readonly limit: number;
+  private steps: Snapshot[] = [];
+  private original?: Snapshot;
+  private stroke?: Snapshot;
+  private stroking = false;
+  /** @throws RangeError for a `history` that is not a whole number of 0 or more. */
+  constructor(cloud: Splats, options: SplatBrushOptions = {}) {
     if (!cloud || typeof cloud !== 'object' || !('gpuState' in cloud))
       throw new TypeError('SplatBrush needs a Splats cloud');
+    const limit = options?.history ?? 32;
+    if (!(Number.isInteger(limit) && limit >= 0))
+      throw new RangeError('SplatBrush history must be a whole number of strokes, 0 or more');
     this.cloud = cloud;
+    this.limit = limit;
   }
-  /** Same as `engine.use(new SplatBrush(cloud))`; returns it. */
-  static attach(engine: EngineKernel, cloud: Splats): SplatBrush {
-    const brush = new SplatBrush(cloud);
+  /** Same as `engine.use(new SplatBrush(cloud, options))`; returns it. */
+  static attach(engine: EngineKernel, cloud: Splats, options?: SplatBrushOptions): SplatBrush {
+    const brush = new SplatBrush(cloud, options);
     engineRuntime(engine).use(brush);
     return brush;
+  }
+  /** Strokes `undo` can take back. */
+  get strokes(): number {
+    return this.steps.length;
+  }
+  /** Whether a stroke is open (`beginStroke` without its `endStroke`). */
+  get inStroke(): boolean {
+    return this.stroking;
+  }
+  /**
+   * Starts a stroke: every erase and paint until `endStroke()` is taken back by one `undo()`, as one drag of a brush
+   * tool. An open stroke ends first.
+   */
+  beginStroke(): this {
+    this.endStroke();
+    this.stroking = true;
+    return this;
+  }
+  /** Ends the open stroke, if any. */
+  endStroke(): this {
+    this.stroking = false;
+    this.stroke = undefined;
+    return this;
+  }
+  /**
+   * Takes back the last stroke (ending an open one first), restoring the positions, opacities, colours and SH it
+   * changed. Returns false when there is nothing to undo.
+   * @throws MargoError `'disposed'` after `dispose()`.
+   */
+  undo(): boolean {
+    this.endStroke();
+    if (this.dead) throw new MargoError('disposed', 'SplatBrush is disposed; attach a new one');
+    const step = this.steps.pop();
+    if (!step) return false;
+    if (this.live(step)) this.restore(step);
+    this.drop(step);
+    return true;
+  }
+  /**
+   * Restores the cloud as it was before the brush's first erase or paint (the scan as loaded, or as last written
+   * before that edit) and clears the stroke history. Does nothing before any edit.
+   * @throws MargoError `'disposed'` after `dispose()`.
+   */
+  reset(): this {
+    this.endStroke();
+    if (this.dead) throw new MargoError('disposed', 'SplatBrush is disposed; attach a new one');
+    for (const step of this.steps) this.drop(step);
+    this.steps = [];
+    if (this.original && this.live(this.original)) this.restore(this.original);
+    return this;
   }
   /** Width and height in pixels of the frame the cloud last drew, the space of every region and pick; 0 before. */
   get frame(): [number, number] {
@@ -285,9 +368,67 @@ export class SplatBrush implements EnginePlugin {
   private submit(op: number, target: BrushTarget): this {
     const d = this.ready(target),
       e = d.createCommandEncoder();
+    if (op === 3 || op === 4) this.remember(e, op === 3 ? ['positions', 'colors'] : ['colors', 'sh']);
     this.run(e, op);
     d.queue.submit([e.finish()]);
     return this;
+  }
+  /** Whether a snapshot was taken of the cloud's current buffers (not before a device restore or re-attach). */
+  private live(step: Snapshot): boolean {
+    return !!this.device && this.cloud.attached && step.owner === this.cloud.gpuState.positions;
+  }
+  /** The live input buffer of a snapshot part. */
+  private source(part: Part): GPUBuffer {
+    const state = this.cloud.gpuState;
+    return part === 'positions' ? state.positions : part === 'colors' ? state.inputColors : state.sh;
+  }
+  /** Copies the `wanted` live buffers into `step` where it holds none yet, in `e`, before the edit. */
+  private keep(e: GPUCommandEncoder, step: Snapshot, wanted: readonly Part[]): void {
+    for (const part of wanted) {
+      if (step[part] || (part === 'sh' && !this.cloud.coefficients)) continue;
+      const from = this.source(part),
+        copy = this.device!.createBuffer({ size: from.size, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST });
+      e.copyBufferToBuffer(from, 0, copy, 0, from.size);
+      step[part] = copy;
+    }
+  }
+  /** Records what an erase or paint is about to change: the cloud before the first edit, and the stroke's step. */
+  private remember(e: GPUCommandEncoder, wanted: readonly Part[]): void {
+    const owner = this.cloud.gpuState.positions;
+    if (this.original?.owner !== owner) {
+      // New buffers (a first edit, a restored device or a re-attached cloud): an older history cannot be restored.
+      this.forget();
+      this.original = { owner };
+      this.keep(e, this.original, parts);
+    }
+    if (!this.limit) return;
+    let step = this.stroking ? this.stroke : undefined;
+    if (!step) {
+      step = { owner };
+      this.steps.push(step);
+      if (this.steps.length > this.limit) this.drop(this.steps.shift()!);
+      if (this.stroking) this.stroke = step;
+    }
+    this.keep(e, step, wanted);
+  }
+  /** Copies a snapshot back into the live buffers. */
+  private restore(step: Snapshot): void {
+    const e = this.device!.createCommandEncoder();
+    for (const part of parts) {
+      const copy = step[part];
+      if (copy) e.copyBufferToBuffer(copy, 0, this.source(part), 0, copy.size);
+    }
+    this.device!.queue.submit([e.finish()]);
+  }
+  private drop(step: Snapshot): void {
+    for (const part of parts) step[part]?.destroy();
+  }
+  /** Drops the whole history and the copy of the cloud before the first edit. */
+  private forget(): void {
+    for (const step of this.steps) this.drop(step);
+    if (this.original) this.drop(this.original);
+    this.steps = [];
+    this.original = this.stroke = undefined;
   }
   private run(e: GPUCommandEncoder, op: number): void {
     this.integers[29] = op;
@@ -299,6 +440,9 @@ export class SplatBrush implements EnginePlugin {
     pass.end();
   }
   onDeviceRestored(engine: Engine): void {
+    // The history's copies belonged to the lost device.
+    this.steps = [];
+    this.original = this.stroke = undefined;
     this.mask?.destroy();
     this.mask = this.pipeline = this.group = undefined;
     this.width = 0;
@@ -309,6 +453,7 @@ export class SplatBrush implements EnginePlugin {
     this.dead = true;
     this.engine?.sceneOf(this)?.removePlugin(this.name);
     for (const b of [this.uniform, this.result, this.mask]) b?.destroy();
+    this.forget();
     this.uniform = this.result = this.mask = this.pipeline = this.group = this.device = this.engine = undefined;
   }
   declare [Symbol.dispose]: () => void;

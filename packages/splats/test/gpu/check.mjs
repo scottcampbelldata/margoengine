@@ -392,6 +392,47 @@ try {
     report['edit sh'] = { worst };
     assert.ok(worst < 1e-5, `SH paint matches the formula, worst ${worst}`);
   }
+  // ./edit stroke history: edits between beginStroke and endStroke are one stroke, undo takes strokes back in order
+  // (colours, opacities and SH as before), and reset restores the cloud from before the first edit.
+  for (const sh of [false, true]) {
+    const r = await page.evaluate((o) => window.check.brush(o), {
+        sh,
+        steps: [
+          ['commit'],
+          ['begin'],
+          ['erase', { half: 'left' }],
+          ['paint', { half: 'right' }, [0, 1, 0], 1],
+          ['end'],
+          ['commit'],
+          ['paint', 'all', [0, 0, 1], 1],
+          ['strokes'],
+          ['undo'],
+          ['commit'],
+          ['undo'],
+          ['commit'],
+          ['undo'],
+          ['erase', 'all'],
+          ['paint', 'all', [1, 1, 1], 0.5],
+          ['strokes'],
+          ['reset'],
+          ['strokes'],
+          ['commit'],
+        ],
+      }),
+      o = r.out,
+      [before, , , , , stroke] = o,
+      [strokes, firstUndo, afterOne, secondUndo, afterTwo, emptyUndo] = o.slice(7, 13),
+      [, , kept, , cleared, afterReset] = o.slice(13);
+    report[`edit history${sh ? ' sh' : ''}`] = { strokes, kept, cleared, emptyUndo };
+    assert.equal(strokes, 2, 'one stroke for the begin..end edits and one for the lone paint');
+    assert.deepEqual([firstUndo, secondUndo, emptyUndo], [true, true, false], 'two undos, then nothing to undo');
+    assert.deepEqual(afterOne, stroke, 'undo takes the lone paint back to the stroke before it');
+    assert.deepEqual(afterTwo, before, 'a second undo takes the whole stroke back to the cloud as loaded');
+    assert.notDeepEqual(stroke.colors, before.colors, 'the stroke changed the cloud');
+    assert.deepEqual([kept, cleared], [2, 0], 'reset clears the history');
+    assert.deepEqual(afterReset, before, 'reset restores the cloud from before the first edit');
+    if (sh) assert.ok(before.sh && afterTwo.sh.length === before.sh.length, 'the SH come back too');
+  }
   // ./edit, real capture: a pick at the centre finds a splat; a brush there erases what it selects, and only that.
   {
     const r = await page.evaluate((o) => window.check.brush(o), {
