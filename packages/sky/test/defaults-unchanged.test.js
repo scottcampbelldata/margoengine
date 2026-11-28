@@ -43,6 +43,10 @@
 // Recorded again with KB-GPUMAIN1 (2026-11-28): the moon glow takes the moon's tint over its brightest channel above 1,
 // so the night WGSL changed text; no command and no buffer write changed, and only a night whose moon colour passes 1
 // (the default among them) draws its glow differently, at the level it had before the 2026-11-20 disc radiance.
+// Recorded again with KB-SKY-ENVBELOW1 (2026-11-28): skyEnvironment hands the clouds the ray held at the horizon and
+// mixes toward the ground after them, so every configuration whose code carries the environment WGSL changed text; no
+// command and no buffer write changed, and only the environment's rows below the horizon draw differently (the deck
+// under clouds, the ground at night).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';

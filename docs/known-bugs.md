@@ -860,7 +860,7 @@ checks the retained stations of a sheer hull and exact agreement of the native a
 - **Left:** the far rows read 199 under the 189 deck, a flat lighter strip six pixels high; not traced (see
   KB-SKY-ENVBELOW1 for the map's rows below the horizon).
 
-### Open 2026-11-28: the sky's environment map holds a cloudless horizon below the horizon under an overcast deck (KB-SKY-ENVBELOW1, sky)
+### Fixed 2026-11-28: the sky's environment map held a cloudless horizon below the horizon under an overcast deck (KB-SKY-ENVBELOW1, sky)
 
 - **Repro:** the dune coast surf view (overcast, `clouds: 1`), `Sky.reflectionTexture` read back by a compute copy (64 x
   32): row 15, just above the horizon, (0.127, 0.128, 0.124), the deck; row 16, just below, (0.209, 0.160, 0.105), warm
@@ -870,8 +870,13 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   hits the ground and returns the clear sky: just under the horizon the map is the clear horizon, not the deck.
   Anything lit or reflected from that band (an object's lower hemisphere, a reflection that filters across the horizon)
   takes a warm light an overcast day does not have.
-- **Where to fix:** give `cloudSky` the held ray and mix toward the ground after the clouds, with a sky test of an
-  overcast map's first row below the horizon against the row above.
+- **Fix:** `skyEnvironment` hands `cloudSky` the ray held at the horizon and mixes toward the ground colour after the
+  clouds. Overcast map (`Sky.attach(engine, {hours: 11, clouds: {coverage: 1, depth: 30}})`, 64 x 32): row 16 went from
+  (0.543, 0.553, 0.567), the clear horizon, to (0.245, 0.259, 0.289), the deck under row 15's (0.346, 0.365, 0.408) and
+  fading toward the ground; the clear map is unchanged. At night the rows below the horizon now fade to the ground as by
+  day, where the night gradient ran under the horizon before.
+- **Regression:** `packages/sky/test/environment-below-check.mjs` (in `test:gpu`; passed on WebGPU and the WebGL2 layer,
+  RTX A6000), which failed before with row 16 1.5 times the deck's luminance.
 
 ### Open 2026-11-28: the dune coast's shore foam is drawn as long thin streaks along the shore (KB-WATER-FOAMSTREAK1, water)
 
