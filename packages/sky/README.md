@@ -1951,7 +1951,8 @@ weather.options.dropSizes = [0.8, 5]; // no fine mist
 
 `precipitation: 'sleet'` draws rain and snow together, `snowShare` (default 0.5) of it as snow and the rest as rain:
 each kind gets that share of its particles at the eased amount, its own colour, opacity and fall, and its own hash
-seed, so the two never stand on the same spots. Surfaces wet and snow settles by the same shares (`wetness` toward the
+seed, so the two never stand on the same spots. Without a `rainRate` the rain's drop sizes follow its own share of
+the intensity, so sleet's rain is the rain drawn alone at that intensity. Surfaces wet and snow settles by the same shares (`wetness` toward the
 rain's, `snowCover` toward the snow's), and `weather.rainShare` says how much of it is rain.
 
 ```ts

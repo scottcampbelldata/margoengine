@@ -4568,6 +4568,24 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   order and no select on the radius; fails before) and the GPU check above, which passes after on AMD, the RTX A6000 and
   `MARGO_COMPAT=1`.
 
+### Fixed 2026-11-28: sleet's rain drew the drops of the whole precipitation's intensity, not of its own share (KB-SKY-SLEETLAW1, sky)
+
+- **Repro:** `node scripts/run-with-timeout.mjs --max=6 -- node packages/sky/test/features-check.mjs sleet` on an RTX
+  A6000 (origin/main 50e4e322ce, after `npm run build:packages`), WebGPU and `MARGO_COMPAT=1` alike: "sleet off by more
+  than one half-float step", 354 of 399 rain-only pixels differ from the rain drawn alone (worst 0.43), against a 1 %
+  budget. It passed on 8d31e3f9d5.
+- **Cause:** 7c9dbd15d2 gave each raindrop a size from Marshall and Palmer's law. Without `rainRate`, `drawKind` in
+  `packages/sky/src/weather.ts` read the law at `80 * intensity^3` of the whole precipitation, while the rain's
+  particles are its share of it: sleet at 0.6 with half snow drew rain at 0.3's particles with rain at 0.6's drops
+  (bigger, faster, other streaks).
+- **Fix:** the law reads `80 * (intensity * share)^3`, the rain's own rate, so sleet's rain is the rain at its share of
+  the intensity; plain rain (share 1) and an explicit `rainRate` or `rainFrom` are unchanged.
+- **Regression:** `packages/sky/test/sleet.test.js` "sleet's rain takes the drop sizes of the rain drawn alone at its
+  share of the intensity" (the law's slots of the rain uniform; fails before) and the GPU check above, which passes after
+  on WebGPU and the WebGL2 layer: 399 and 431 rain pixels at 4x and 1x, 0 off by a step.
+- **Source:** J. S. Marshall and W. McK. Palmer, "The distribution of raindrops with size", J. Meteor. 5, 165 to 166,
+  1948, https://doi.org/10.1175/1520-0469(1948)005%3C0165:TDORWS%3E2.0.CO;2 (the law is of a rain's own rainfall rate).
+
 ### Open 2026-11-27: four package GPU checks fail on main and failed before the clear colour fix too (KB-GPU-PRECHECKS1, split from KB-CLEAR-CHECKS1)
 
 - **Repro:** `npm run build:packages` on c886aef6c, Intel Arc 140V (Windows, Edge 158), each under
@@ -4610,6 +4628,12 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   under `node scripts/run-with-timeout.mjs --max=6 --`: the clustered sphere-light check (no failures), the biomes
   browser check, the SSAO GPU check and `sky/test/features-check.mjs sleet astro hillaire`. The failures are seen on
   the Intel Arc 140V only, so the row waits for a run on that laptop.
+- **Rechecked 2026-11-28 on the RTX A6000 (origin/main 50e4e322ce), WebGPU and `MARGO_COMPAT=1`:** the clustered and
+  SSAO checks pass. Two had gone red on main since 8d31e3f9d5, on both backends: sleet, from 7c9dbd15d2 (fixed,
+  KB-SKY-SLEETLAW1 above), and the biomes check's "rock light and dark under 2.5x BASE's 0.0415" (0.108), bisected to
+  fefe0bad71, whose BiomeView `relief` default (TerrainReliefLighting) shades both the look and the mask and so lifts
+  the ratio's spread (0.070 with `relief: false`). It passes again after ba2399ec11 (rock faces keep their texture):
+  0.095 on WebGPU, 0.094 on the layer. The Arc rows still wait for that laptop.
 
 ### Fixed 2026-11-27: flame-check `graded` failed on main on both backends (KB-FLAME-GRADEDBG1, vfx)
 

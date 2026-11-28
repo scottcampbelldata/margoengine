@@ -65,3 +65,31 @@ test('sleet draws the rain and the snow, each with its share of the particles an
   );
   weather.dispose();
 });
+
+// KB-SKY-SLEETLAW1: the rain's drop-size law (Marshall and Palmer) was read at the whole precipitation's intensity, so
+// sleet at 0.6 with half snow drew the bigger, faster drops of rain at 0.6 where its rain is rain at 0.3.
+test("sleet's rain takes the drop sizes of the rain drawn alone at its share of the intensity", () => {
+  const uniformOf = (options) => {
+    const h = tracedGPU(),
+      weather = new Weather({ fadeSeconds: 0, ...options }),
+      writes = [],
+      queue = h.engine.gpu.queue,
+      write = queue.writeBuffer.bind(queue);
+    queue.writeBuffer = (buffer, offset, data) => {
+      if (data.length === 56) writes.push(Float32Array.from(data));
+      return write(buffer, offset, data);
+    };
+    h.engine.use(weather);
+    weather.onPreUpdate(0);
+    h.context.bindings = [];
+    h.engine.frameGraph.execute(h.context);
+    return writes.find((v) => v[36] === 0);
+  };
+  const sleet = uniformOf({ precipitation: 'sleet', snowShare: 0.5, intensity: 0.6 }),
+    rain = uniformOf({ precipitation: 'rain', intensity: 0.3 }),
+    whole = uniformOf({ precipitation: 'rain', intensity: 0.6 });
+  // The law's slope, span and smallest diameter, the fall's scale and the inverse mean streak light.
+  const law = (v) => [48, 49, 50, 51, 54].map((i) => v[i]);
+  assert.deepEqual(law(sleet), law(rain));
+  assert.notDeepEqual(law(rain), law(whole), 'the law depends on the intensity, so the test can tell them apart');
+});

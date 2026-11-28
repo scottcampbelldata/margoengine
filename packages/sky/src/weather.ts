@@ -1705,9 +1705,11 @@ export class Weather implements EnginePlugin {
     v[42] = wind[1];
     v[43] = snow ? size.span : Math.max(1, (tall / 540) * 1.2);
     // rain: the drops' size law and the scale of their fall; look: sheets, gusts, the inverse mean streak light and
-    // the gust clock (see the shader's notes). Snow keeps a harmless law (slope 1) there.
+    // the gust clock (see the shader's notes). Snow keeps a harmless law (slope 1) there. Without a rainRate the law is
+    // the rain's own rate: its share of the intensity, as its share of the particles, so sleet's rain is the rain drawn
+    // alone at that intensity (KB-SKY-SLEETLAW1).
     const drops = o.dropSizes ?? [0.5, 6],
-      lawRate = rainRate ?? 80 * (o.intensity ?? 0.5) ** 3,
+      lawRate = rainRate ?? 80 * ((o.intensity ?? 0.5) * share) ** 3,
       law = rainDropSizeLaw(lawRate, drops);
     v[48] = snow ? 1 : law.lambda;
     v[49] = snow ? 0 : law.span;
