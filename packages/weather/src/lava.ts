@@ -64,6 +64,7 @@ import {
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { displayShader } from '../../shared/display.js';
+import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { linearHdr } from '../../shared/hdr-format.js';
 import { applyView } from '../../shared/view-rect.js';
 
@@ -2551,11 +2552,9 @@ export class LavaSurface implements EnginePlugin {
 
   setup(engine: Engine): void {
     if (this.disposed) throw new MargoError('disposed', 'This LavaSurface was disposed. Attach a new lava surface.');
-    if (!engine.gpu)
-      throw new MargoError(
-        'unsupported',
-        'Attach LavaSurface to WebGPU or an engine using the WebGL2 compatibility layer.',
-      );
+    // The small WebGL2 preview has no frame-graph draw for the surface: refuse it so /auto escalates to WebGPU (or to
+    // the WebGL2 compatibility layer, which runs the WebGPU pass).
+    requireWebGPU(engine, 'LavaSurface');
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({
       size: this.values.byteLength,

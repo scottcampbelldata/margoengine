@@ -29,6 +29,18 @@ test('accepted lava surface gives coded source, appearance and plugin-name corre
   surface.dispose();
 });
 
+test('LavaSurface refuses the small WebGL2 preview in setup, before it allocates, so /auto escalates', () => {
+  // check:preview-contract: its only draw is a WebGPU frame-graph pass, which the preview never runs.
+  for (const engine of [
+    { backend: 'webgl2', gpu: null },
+    { backend: 'webgpu', gpu: null },
+  ]) {
+    const surface = new LavaSurface({ source: () => undefined });
+    assert.throws(() => surface.setup(engine), { code: 'unsupported', message: /LavaSurface needs WebGPU/ });
+    surface.dispose();
+  }
+});
+
 const G = 9.80665;
 const slope = (grade) => (x, z) => 1000 - grade * z;
 
