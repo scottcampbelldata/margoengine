@@ -3023,6 +3023,14 @@
       "types": "./dist/rigging/joint-limits.d.ts",
       "import": "./dist/rigging/joint-limits.js"
     },
+    "./rigging/anatomy": {
+      "types": "./dist/rigging/anatomy.d.ts",
+      "import": "./dist/rigging/anatomy.js"
+    },
+    "./rigging/anatomy/human": {
+      "types": "./dist/rigging/anatomy/human.d.ts",
+      "import": "./dist/rigging/anatomy/human.js"
+    },
     "./rigging/swim": {
       "types": "./dist/rigging/swim.d.ts",
       "import": "./dist/rigging/swim.js"

@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/rigging",
   "version": "1.0.0",
-  "description": "Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets, spring bones, VRM 1.0 avatars, geodesic voxel weights, corrective shapes, weight transfer, face tracking, automatic rigs from a bare mesh.",
+  "description": "Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets, spring bones, VRM 1.0 avatars, geodesic voxel weights, corrective shapes, weight transfer, face tracking, automatic rigs from a bare mesh, an anatomical body model with sourced human joint limits.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -44,6 +44,14 @@
     "./joint-limits": {
       "types": "./dist/joint-limits.d.ts",
       "import": "./dist/joint-limits.js"
+    },
+    "./anatomy": {
+      "types": "./dist/anatomy.d.ts",
+      "import": "./dist/anatomy.js"
+    },
+    "./anatomy/human": {
+      "types": "./dist/anatomy-human.d.ts",
+      "import": "./dist/anatomy-human.js"
     },
     "./swim": {
       "types": "./dist/swim.d.ts",

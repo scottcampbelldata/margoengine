@@ -11700,3 +11700,42 @@ KB-SHRUB-TUNDRA1 measured gzip/ceiling change (2026-11-28): procedural/tree to 6
 With `TerrainLayer.bump`, where a pixel covers less than 1/128 of a repeat (3 cm at `scale` 0.25) the relief holds no
 detail finer than that, and each showing layer costs 16 texel loads per triplanar axis there (one axis on most ground).
 Core and stage are unchanged.
+
+### Anatomy core and the human table (`@margoengine/rigging/anatomy`, 2026-11-28)
+
+The optional rigging/anatomy entry fits a species table to a rig and rigging/anatomy/human holds the human table.
+Defaults: limits on; `clampPose` and `addAnatomyLimits` hold the `structural` tier; the human table is adults of 20
+to 44 years, the larger mean of the two sexes; naming is the convention that matches the most bones. Limits and
+accepted differences:
+
+- Angles are a swing vector and a twist. A swing of exactly 180 degrees has no defined twist, which then reads 0. Swing
+  ranges are capped at 180 degrees and `poseFromAngles` caps a swing it is given at 180.
+- The stop of a motion is its largest source value rounded up to 5 degrees plus an allowance (15 for ball, saddle and
+  condyloid joints and spine regions, 10 for a hinge's flexion, 0 for the straight side of a hinge, 5 or 10 for a
+  direction a joint's kind does not allow). The allowances are engine policy, not measurements.
+- An elbow and a knee stop 5 degrees past straight (CDC adult means 4.7 and 1.6, rounded up). The table for men of 45
+  to 69 years has no hyperextension at all (mean -0.7).
+- 90 of the table's 324 distinct source numbers are from recall and marked `recalled`; none is checked in print. The
+  recalled ones are spine levels (61), toe joints, the collarbone's split, knee rotation, wrist twist, the thumb's
+  base, the palm's small joints and the weight-bearing ankle (45 degrees, which sets the ankle's stop).
+- AAOS and AMA values are read from pages that reproduce them, named in each row; where pages disagree the
+  best-labelled AAOS table is used (hip extension 20, abduction 40, adduction 20; knee flexion 135).
+- A rig bone that stands for several joints of a region carries their summed range. In a spine region every bone's
+  stop is the whole region's, and the region's far end is held to the region's range by easing every bone by one
+  share (at most 8 passes).
+- A joint whose zero is a direction in the body is left unlimited when the joint at the far end of its segment is not
+  mapped. A hip with no knee, a shoulder with no elbow and a thumb base with no thumb joint are such joints.
+- A rest bend under 5 degrees is read as straight; from 5 to 20 degrees it sets the hinge side only within 60 degrees
+  of the anatomical side. A straight limb with no knuckle bones is taken as unrolled unless `roll` says otherwise;
+  `hingeRolls` reads the roll from motion once a hinge has swung 30 degrees.
+- The weight-bearing, forefoot and toe-row motions of a foot are lumped: inversion and eversion sit on the subtalar
+  joint, a single toe bone is fitted as the great toe joint, and the small joints of the midfoot and palm have 5
+  degrees of give and no measured range.
+- `poseLimits`, `ikLimits`, `ragdollJoints` and `kinematicsLimits` express a reach that differs by direction as one
+  cone (about the middle of the reach for the first two, about the rest direction for a ragdoll, about neutral for
+  kinematics). Hinges are exact.
+- The face joints of the standard (eyelids, eyeballs, eyebrows, jaw) are not in the table.
+- The body must stand upright in its rest pose for the human frame (up is read from the hips to the head); a species
+  table may give a fixed up direction instead.
+
+Entry sizes are in scripts/quality/baselines/sizes.json.

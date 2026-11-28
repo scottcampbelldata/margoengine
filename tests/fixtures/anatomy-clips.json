@@ -1,0 +1,366 @@
+{
+ "tests/fixtures/cmu-mocap/02_01.bvh": {
+  "naming": "segments",
+  "rest": "T",
+  "joints": 27,
+  "frames": 344,
+  "roll": {
+   "l_hip": 2,
+   "l_shoulder": -18.8,
+   "r_hip": -2,
+   "r_shoulder": 18.8
+  },
+  "elbowSideways": [
+   23.1,
+   0
+  ],
+  "changed": {
+   "l_radiocarpal supination": [
+    11.4,
+    181
+   ],
+   "r_radiocarpal pronation": [
+    7.5,
+    25
+   ],
+   "r_radiocarpal supination": [
+    8.3,
+    136
+   ],
+   "r_talocrural abduction": [
+    0.4,
+    4
+   ],
+   "r_talocrural dorsiflexion": [
+    0,
+    1
+   ],
+   "r_talocrural plantar flexion": [
+    0,
+    3
+   ]
+  }
+ },
+ "tests/fixtures/cmu-mocap/16_11.bvh": {
+  "naming": "segments",
+  "rest": "T",
+  "joints": 27,
+  "frames": 535,
+  "roll": {
+   "l_hip": 2.6,
+   "l_shoulder": -15.7,
+   "r_hip": -2.5,
+   "r_shoulder": 15.7
+  },
+  "elbowSideways": [
+   10.9,
+   0
+  ],
+  "changed": {
+   "l_radiocarpal pronation": [
+    8,
+    153
+   ],
+   "l_talocrural abduction": [
+    1.3,
+    4
+   ],
+   "l_talocrural dorsiflexion": [
+    0.2,
+    4
+   ]
+  }
+ },
+ "tests/fixtures/cmu-mocap/16_15.bvh": {
+  "naming": "segments",
+  "rest": "T",
+  "joints": 27,
+  "frames": 472,
+  "roll": {
+   "l_hip": 2.6,
+   "l_shoulder": -15.7,
+   "r_hip": -2.5,
+   "r_shoulder": 15.7
+  },
+  "elbowSideways": [
+   10.1,
+   0
+  ],
+  "changed": {
+   "l_radiocarpal pronation": [
+    9.6,
+    179
+   ],
+   "r_radiocarpal pronation": [
+    1.9,
+    12
+   ]
+  }
+ },
+ "tests/fixtures/cmu-mocap/16_21.bvh": {
+  "naming": "segments",
+  "rest": "T",
+  "joints": 27,
+  "frames": 313,
+  "roll": {
+   "l_hip": 2.6,
+   "l_shoulder": -15.7,
+   "r_hip": -2.5,
+   "r_shoulder": 15.7
+  },
+  "elbowSideways": [
+   12.5,
+   0
+  ],
+  "changed": {
+   "l_radiocarpal pronation": [
+    9.3,
+    105
+   ],
+   "r_radiocarpal pronation": [
+    4.2,
+    23
+   ]
+  }
+ },
+ "tests/fixtures/cmu-mocap/16_32.bvh": {
+  "naming": "segments",
+  "rest": "T",
+  "joints": 27,
+  "frames": 581,
+  "roll": {
+   "l_hip": 2.6,
+   "l_shoulder": -15.7,
+   "r_hip": -2.5,
+   "r_shoulder": 15.7
+  },
+  "elbowSideways": [
+   11.1,
+   0
+  ],
+  "changed": {
+   "l_radiocarpal pronation": [
+    9.5,
+    156
+   ],
+   "r_radiocarpal pronation": [
+    4.3,
+    14
+   ]
+  }
+ },
+ "tests/fixtures/cmu-mocap/16_36.bvh": {
+  "naming": "segments",
+  "rest": "T",
+  "joints": 27,
+  "frames": 190,
+  "roll": {
+   "l_hip": 2.6,
+   "l_shoulder": -15.7,
+   "r_hip": -2.5,
+   "r_shoulder": 15.7
+  },
+  "elbowSideways": [
+   35.3,
+   0
+  ],
+  "changed": {
+   "l_radiocarpal supination": [
+    16.6,
+    189
+   ],
+   "r_radiocarpal supination": [
+    9.2,
+    119
+   ]
+  }
+ },
+ "tests/fixtures/cmu-mocap/16_45.bvh": {
+  "naming": "segments",
+  "rest": "T",
+  "joints": 27,
+  "frames": 136,
+  "roll": {
+   "l_hip": 2.6,
+   "l_shoulder": -15.7,
+   "r_hip": -2.5,
+   "r_shoulder": 15.7
+  },
+  "elbowSideways": [
+   38.3,
+   0
+  ],
+  "changed": {
+   "l_radiocarpal supination": [
+    21.2,
+    135
+   ],
+   "r_radiocarpal extension": [
+    0.1,
+    42
+   ],
+   "r_radiocarpal flexion": [
+    0.1,
+    7
+   ],
+   "r_radiocarpal radial deviation": [
+    7.8,
+    49
+   ],
+   "r_radiocarpal supination": [
+    6.9,
+    66
+   ]
+  }
+ },
+ "tests/fixtures/cmu-mocap/16_47.bvh": {
+  "naming": "segments",
+  "rest": "T",
+  "joints": 27,
+  "frames": 417,
+  "roll": {
+   "l_hip": 2.6,
+   "l_shoulder": -15.7,
+   "r_hip": -2.5,
+   "r_shoulder": 15.7
+  },
+  "elbowSideways": [
+   11.8,
+   0
+  ],
+  "changed": {
+   "l_radiocarpal pronation": [
+    18.3,
+    255
+   ],
+   "r_radiocarpal pronation": [
+    6.4,
+    72
+   ]
+  }
+ },
+ "tests/fixtures/cmu-mocap/16_57.bvh": {
+  "naming": "segments",
+  "rest": "T",
+  "joints": 27,
+  "frames": 269,
+  "roll": {
+   "l_hip": 2.6,
+   "l_shoulder": -15.7,
+   "r_hip": -2.5,
+   "r_shoulder": 15.7
+  },
+  "elbowSideways": [
+   35.7,
+   0
+  ],
+  "changed": {
+   "l_radiocarpal pronation": [
+    3,
+    12
+   ],
+   "l_radiocarpal supination": [
+    26,
+    123
+   ],
+   "r_radiocarpal pronation": [
+    4.3,
+    10
+   ],
+   "r_radiocarpal supination": [
+    1.3,
+    9
+   ]
+  }
+ },
+ "packages/loaders/tests/fixtures/cmu/35_01-every-20th.amc": {
+  "naming": "cmu",
+  "rest": "T",
+  "joints": 24,
+  "frames": 7,
+  "roll": {
+   "l_hip": 2.9,
+   "l_shoulder": -15.7,
+   "r_hip": -2.2,
+   "r_shoulder": 15.7
+  },
+  "elbowSideways": [
+   9.3,
+   0
+  ],
+  "changed": {}
+ },
+ "demos/the-mocap-theatre: walk": {
+  "naming": "cmu",
+  "rest": "T",
+  "joints": 24,
+  "frames": 80,
+  "roll": {
+   "l_hip": 2.9,
+   "l_shoulder": -15.7,
+   "r_hip": -2.2,
+   "r_shoulder": 15.7
+  },
+  "elbowSideways": [
+   9.4,
+   0
+  ],
+  "changed": {}
+ },
+ "demos/the-mocap-theatre: brisk": {
+  "naming": "humanoid",
+  "rest": "T",
+  "joints": 22,
+  "frames": 64,
+  "roll": {
+   "l_hip": -0.8,
+   "r_hip": -4
+  },
+  "elbowSideways": [
+   13.2,
+   13.2
+  ],
+  "changed": {
+   "l_elbow hyperextension": [
+    2.3,
+    54
+   ],
+   "l_elbow valgus": [
+    0.1,
+    54
+   ],
+   "l_knee internal rotation": [
+    0,
+    1
+   ],
+   "l_metatarsophalangeal_1 eversion": [
+    14.3,
+    8
+   ],
+   "r_elbow hyperextension": [
+    2.2,
+    64
+   ],
+   "r_elbow valgus": [
+    0.2,
+    64
+   ],
+   "r_knee external rotation": [
+    0.2,
+    2
+   ],
+   "r_knee internal rotation": [
+    2,
+    2
+   ],
+   "r_metatarsophalangeal_1 eversion": [
+    2.6,
+    2
+   ],
+   "r_radiocarpal pronation": [
+    2,
+    64
+   ]
+  }
+ }
+}

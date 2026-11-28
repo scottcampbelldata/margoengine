@@ -9,6 +9,17 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Anatomical joint model (rigging overhaul group 1, 2026-11-28). `@margoengine/rigging/anatomy` fits a body to any
+  rig from joint positions, and its human table holds the 139 body joints of ISO/IEC 19774 level 4 with a source for
+  every number: 98 from datasets held in the repository (CDC range of motion, ANSUR II, de Leva 1996), 136 read on a
+  named page, 90 from recall and marked so, none checked in print. One body as a T pose, an A pose and arms down,
+  with rolled bone axes, reads the same angles and the same skeleton for one posture to 1e-9 of its units, and every
+  elbow and knee bends the anatomical way. Reproduce: build the packages, then
+  `node --test packages/rigging/tests/anatomy.test.js packages/rigging/tests/anatomy-human.test.js tests/anatomy-clips.test.js`.
+  Played through the stops, the repository's CMU captures keep their elbows (the hand's twist moves into the forearm)
+  and the 100STYLE Aeroplane take has both elbows held at 5 degrees past straight, 2.3 degrees taken off
+  (tests/fixtures/anatomy-clips.json). No frames back this yet, and nothing calls the limits until the later groups.
+  [Method, sources and limits](../../packages/rigging/README.md#anatomy-the-body-every-solver-reads-margoenginerigginganatomy).
 - Wide glTF points and lines (KB-GLTF-STROKEWIDTH1, 2026-11-27). A glTF line
   or point that asks for a width draws that wide on WebGPU and the WebGL2 layer:
   8 px asked, 7.98 px drawn; 0.2 m at 4 m, 6.85 px for 6.86; a 12 px Bentley

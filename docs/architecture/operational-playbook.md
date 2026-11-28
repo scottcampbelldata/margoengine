@@ -11930,3 +11930,36 @@ colour; every other value reaches the colour check and throws a RangeError at th
 background cleared to core's near-black colour with no error. Evidence: `tests/clear-capture.test.js` (attachment and
 drawn clears, first and later views, the preview renderer); `packages/post/test/scene-background-browser.mjs` on WebGPU
 and the WebGL2 layer (RTX A6000). Core + stage 25,149 B gzip before and after. Missing: other GPUs and browsers.
+
+
+## Section 5 evidence: anatomy core and the human table (rigging overhaul group 1, 2026-11-28)
+
+Rigging has a body model. `@margoengine/rigging/anatomy` fits a species table to any rig from landmarks (joint
+positions and the facing), and `@margoengine/rigging/anatomy/human` holds the human table in ISO/IEC 19774 names.
+Limits come from the table and are on by default; solvers, the validator, retargeting, the ragdoll and `addPerson`
+read it in the groups that follow (private/handoffs/human-rigging-plan.md, groups 2 to 7).
+
+Evidence that exists:
+- `packages/rigging/tests/anatomy.test.js`: one body as a T pose, an A pose and arms down, with rolled bone axes,
+  mirrored, and with elbows or knees modelled bent, bends every hinge the anatomical way and reads the same angles
+  and skeleton for one posture (positions to 1e-9); every one of the 137 limited joints of the table round trips
+  angles to pose to angles (1e-6 degrees) and turns about its own table axis; the stops hold (elbow and knee 5
+  degrees past straight, KB-RIG-ARMS2); a bent knee keeps its bend under sideways noise; a straight knee does not
+  twist; a hand's twist moves into the forearm with the hand unmoved (1e-12); a spine region's budget holds; the
+  older projector fed `poseLimits` stops the same elbow at the same angle; the roll of a straight limb is recovered
+  from motion to 1e-6 degrees.
+- `packages/rigging/tests/anatomy-human.test.js`: the table is the 139 body joints of figure 4.13 with the level 1 to
+  3 joints and parents of the standard; the meaning of every motion of every joint (407 checks); a second copy of
+  every source number; the datasets against typed copies; the stop rule; the spine shares; the namings of Mixamo, the
+  CMU BVH and ASF skeletons, 100STYLE, Character Creator, HAnim 1.x and 2.0, VRM humanoid and Roblox R15.
+- `tests/anatomy-clips.test.js` with `tests/fixtures/anatomy-clips.json`: every motion capture in the repository
+  played through the structural limits, with what they change recorded per clip.
+
+Evidence still missing:
+- No frames yet. The pose sheet (front, side and three-quarter views at each joint's range ends, on WebGPU and the
+  WebGL2 layer) is built by group 2 and is where the table is judged against the anatomy references.
+- No number is checked in print: 90 are from recall. The print sources are the AAOS 1965 booklet, the AMA Guides 5th
+  edition, White and Panjabi 1990 and Kapandji.
+- Nothing calls the limits yet: `addPerson`, the IK solvers, the retargeter and the ragdoll still run without them
+  until groups 3, 5 and 7 land. No demo changes on screen from this group.
+- The structural allowances are policy values with no measurement behind them.

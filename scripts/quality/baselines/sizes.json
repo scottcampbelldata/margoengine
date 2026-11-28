@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21807579,
+  "total": 21840225,
   "history": [
     {
       "date": "2026-10-24",
@@ -15605,6 +15605,12 @@
       "commit": "dyn05-threaded-contact-wire",
       "reason": "DYN-05: rail grows from 8496 to 12230 B gzip (ceiling 8752 to 12597) for staged car and wire publication, coded invalid geometry and loads, signed origins, and optional native worker phases with exact work receipts. A separate wire entry would duplicate the coupled car, contact and registry layout. Each lazy wire variant measures 2,914 B raw and 1,062 B gzip. The Physics base and existing users of the worker pool remain within their ceilings. Core and Stage gain zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "4c18e4e3ad",
+      "reason": "rigging overhaul group 1: new optional entries @margoengine/rigging/anatomy (species table format, landmark fit, clinical angles, limits and their conversions) and @margoengine/rigging/anatomy/human (the 139 joint human table with a source row for every number and the CDC, ANSUR II and de Leva tables); the human table is its own entry so the core entry loads no table, and no other entry changes",
+      "grew": 2
     }
   ],
   "items": {
@@ -16711,6 +16717,8 @@
     "@margoengine/react/xr": 4946,
     "@margoengine/react/xr-pointer": 1516,
     "@margoengine/rigging": 8361,
+    "@margoengine/rigging/anatomy": 10388,
+    "@margoengine/rigging/anatomy/human": 22258,
     "@margoengine/rigging/autorig": 11019,
     "@margoengine/rigging/contact": 13563,
     "@margoengine/rigging/correctives": 2242,

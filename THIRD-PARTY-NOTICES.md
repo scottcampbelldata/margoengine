@@ -562,3 +562,24 @@ packages/water/test/gpu-liquid-dambreak.test.js holds measured values copied unc
   of the dam breaks it gathers).
 
 No program code is included.
+
+## Human body measurement tables (`@margoengine/rigging/anatomy/human`)
+
+Three published tables are held as data files, each with its source and licence at its top. They are typed copies of
+published group values read on 2026-11-28; no file of another party is redistributed and no per-person data is held.
+
+- packages/rigging/src/anatomy-data-cdc.ts: the reference values (means and 95% confidence intervals by sex and age
+  group) of the CDC Normal Joint Range of Motion Study, from the Centers for Disease Control and Prevention page
+  https://archive.cdc.gov/www_cdc_gov/ncbddd/jointrom/index.html ; Soucie JM et al., "Range of motion measurements:
+  reference values and a database for comparison studies", Haemophilia 17(3):500-507, 2011. A publication of a United
+  States federal agency; the page prints no licence statement. The study's downloadable per-person dataset has its own
+  data use restrictions and is not used.
+- packages/rigging/src/anatomy-data-ansur2.ts: summary statistics (mean and standard deviation by sex) of 37
+  dimensions of ANSUR II, from Gordon CC et al., "2012 Anthropometric Survey of U.S. Army Personnel: Methods and
+  Summary Statistics", U.S. Army Natick Soldier Research, Development and Engineering Center, NATICK/TR-15/007, read
+  from https://tools.openlab.psu.edu/publicData/ANSURII-TR15-007.pdf . Distribution statement of the report: "Approved
+  for public release; distribution is unlimited". Credit: U.S. Army; no endorsement.
+- packages/rigging/src/anatomy-data-deleva.ts: segment mass shares and centres of mass from table 4 of de Leva P,
+  "Adjustments to Zatsiorsky-Seluyanov's segment inertia parameters", Journal of Biomechanics 29(9):1223-1230, 1996,
+  https://doi.org/10.1016/0021-9290(95)00178-6 . The paper is copyright Elsevier; only the table's measured values are
+  cited, with credit, and none of its text or figures.

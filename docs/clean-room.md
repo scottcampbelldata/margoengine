@@ -19663,3 +19663,58 @@ https://diglib.eg.org/handle/10.1111/v30i6pp1708-1718 (keep the projected covera
 Derived here: the elements as connected pieces, the golden-ratio order along a Morton curve with nested levels, the
 slenderness limit, the stem threshold of 8 median areas and the secant search of one scale against point-sampled
 silhouettes along the three axes.
+
+## Anatomy core and the human table: rigging/anatomy (2026-11-28)
+
+Scope: `@margoengine/rigging/anatomy` (the species table format, the fit of a table to a rig, clinical angles, the
+limits and their conversions) and `@margoengine/rigging/anatomy/human` (the human table and bone namings). Written from
+the standard, papers and published tables below. No other engine's, tool's or paper's code was read, no anatomy image
+is held in the repository, and no rival manual was consulted for this entry.
+
+Names, hierarchy and the neutral pose: ISO/IEC 19774-1:2019, "Humanoid animation (HAnim), Part 1: Architecture",
+clause 4.8.2 and figures 4.10 to 4.13, https://www.web3d.org/documents/specifications/19774/V2.0/Architecture/concepts.html .
+
+Joint frames and the clinical naming of rotations: G. Wu et al., "ISB recommendation on definitions of joint coordinate
+system of various joints for the reporting of human joint motion, part I: ankle, hip, and spine", J Biomech
+35(4):543-548, 2002, https://doi.org/10.1016/S0021-9290(01)00222-6 ; G. Wu et al., "ISB recommendation on definitions
+of joint coordinate systems of various joints for the reporting of human joint motion, part II: shoulder, elbow, wrist
+and hand", J Biomech 38(5):981-992, 2005, https://doi.org/10.1016/j.jbiomech.2004.05.042 ; E. S. Grood and W. J.
+Suntay, "A joint coordinate system for the clinical description of three-dimensional motions: application to the knee",
+J Biomech Eng 105(2):136-144, 1983, https://doi.org/10.1115/1.3138397 .
+
+Swing and twist, and limits: P. Baerlocher, "Inverse kinematics techniques for the interactive posture control of
+articulated figures", EPFL thesis 2392, 2001; P. Dobrowolski, "Swing-twist decomposition in Clifford algebra", 2015,
+https://arxiv.org/abs/1506.05481 ; F. S. Grassia, "Practical parameterization of rotations using the exponential map",
+J Graphics Tools 3(3):29-48, 1998, https://doi.org/10.1080/10867651.1998.10487493 ; J. Wilhelms and A. Van Gelder,
+"Fast and easy reach-cone joint limits", J Graphics Tools 6(2):27-41, 2001,
+https://doi.org/10.1080/10867651.2001.10487539 ; I. Akhter and M. J. Black, "Pose-conditioned joint angle limits for 3D
+human pose reconstruction", CVPR 2015, https://doi.org/10.1109/CVPR.2015.7298751 (the idea of a range that depends on
+the pose; no learned data).
+
+Ranges of motion: J. M. Soucie et al., "Range of motion measurements: reference values and a database for comparison
+studies", Haemophilia 17(3):500-507, 2011, https://doi.org/10.1111/j.1365-2516.2010.02399.x , as the CDC table
+https://archive.cdc.gov/www_cdc_gov/ncbddd/jointrom/index.html ; American Academy of Orthopaedic Surgeons, "Joint
+Motion: Method of Measuring and Recording", 1965, and L. Cocchiarella and G. B. J. Andersson (eds), "Guides to the
+Evaluation of Permanent Impairment", 5th ed., AMA, 2000, each through the page named in the row that uses it;
+G. Paraskevas et al., "Study of the carrying angle of the human elbow joint in full extension: a morphometric
+analysis", Surg Radiol Anat 26:19-23, 2004, https://doi.org/10.1007/s00276-003-0185-z ; V. T. Inman, J. B. Saunders and
+L. C. Abbott, "Observations on the function of the shoulder joint", J Bone Joint Surg 26(1):1-30, 1944; P. M. Ludewig et
+al., "Motion of the shoulder complex during multiplanar humeral elevation", J Bone Joint Surg Am 91(2):378-389, 2009,
+https://doi.org/10.2106/JBJS.G.01483 ; A. A. White and M. M. Panjabi, "Clinical Biomechanics of the Spine", 2nd ed.,
+1990; M. J. Pearcy and S. B. Tibrewal, "Axial rotation and lateral bending in the normal lumbar spine measured by
+three-dimensional radiography", Spine 9(6):582-587, 1984; N. Bogduk and S. Mercer, "Biomechanics of the cervical spine
+I: normal kinematics", Clin Biomech 15(9):633-648, 2000; I. A. Kapandji, "The Physiology of the Joints" (numbers from
+recall, marked so).
+
+Proportions and masses: C. C. Gordon et al., "2012 Anthropometric Survey of U.S. Army Personnel: Methods and Summary
+Statistics", NATICK/TR-15/007, https://tools.openlab.psu.edu/publicData/ANSURII-TR15-007.pdf ; R. Drillis and R.
+Contini, "Body Segment Parameters", report 1166.03, New York University, 1966, as figure 4.1 of D. A. Winter,
+"Biomechanics and Motor Control of Human Movement", 4th ed., 2009; P. de Leva, "Adjustments to Zatsiorsky-Seluyanov's
+segment inertia parameters", J Biomech 29(9):1223-1230, 1996, https://doi.org/10.1016/0021-9290(95)00178-6 .
+
+Derived here: the body frame from the hip line, the spine and the feet; each segment's frame carried from its parent's
+by the shortest turn onto its rest direction; the roll of a segment from a bent hinge below it or from the knuckle
+line; one swing vector with an ellipse per quadrant and its nearest point by bisection of the Lagrange condition; the
+twist that moves from a wrist into its forearm; the shared budget of a spine region eased across its bones; the stop of
+a motion as its largest source value rounded up to 5 degrees plus an allowance; a region's range shared among its
+levels by weight; and the roll of a straight limb read from motion as the line its hinge's swing lies along.

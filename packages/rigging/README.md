@@ -910,6 +910,174 @@ motion rather than an estimate of anatomy from a bone name. See [Akhter and Blac
 Limits for 3D Human Pose Reconstruction (2015)](https://openaccess.thecvf.com/content_cvpr_2015/html/Akhter_Pose-Conditioned_Joint_Angle_2015_CVPR_paper.html)
 and [Crisco et al., The Mechanical Axes of the Wrist Are Oriented Obliquely to the Anatomical Axes (2011)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3016043/).
 
+## Anatomy: the body every solver reads (`margoengine/rigging/anatomy`)
+
+`fitAnatomy(rig, { species })` gives a rig a body: which bone is which joint, which way each joint bends, how far, and
+where each number comes from. Every joint's frame is built from landmarks (the rig's joint positions and the way its
+feet point), never from bone axes or the rest pose. So a T pose, an A pose and an arms-down pose of one body, with any
+bone roll, read the same clinical angles, and a straight elbow or knee still knows which way it bends. Limits are on by
+default; `limits: false` turns them off by name.
+
+The human table is its own entry, `margoengine/rigging/anatomy/human`, so a scene of horses ships no human numbers.
+Any species uses the same table format through `defineSpecies`.
+
+```ts
+import type { RigJoint } from 'margoengine/rigging';
+import { type ClampIssue, clampPose, fitAnatomy, jointAngles, poseFromAngles } from 'margoengine/rigging/anatomy';
+import { human } from 'margoengine/rigging/anatomy/human';
+
+// Any rig, as joint positions or as { names, parents, rest }. Bones are found by name: Mixamo style here.
+const rig: RigJoint[] = [
+  { name: 'Hips', parent: -1, position: [0, 1, 0] },
+  { name: 'Spine', parent: 0, position: [0, 1.1, 0] },
+  { name: 'Head', parent: 1, position: [0, 1.6, 0] },
+  { name: 'LeftUpLeg', parent: 0, position: [0.1, 0.95, 0] },
+  { name: 'RightUpLeg', parent: 0, position: [-0.1, 0.95, 0] },
+  { name: 'LeftArm', parent: 1, position: [0.2, 1.45, 0] },
+  { name: 'LeftForeArm', parent: 5, position: [0.48, 1.45, 0] },
+  { name: 'LeftHand', parent: 6, position: [0.74, 1.45, 0] },
+];
+const body = fitAnatomy(rig, { species: human });
+console.log(body.preset, body.restPose); // segments T
+
+// A pose with the elbow folded 30 degrees the wrong way is brought back to the stop, and says so.
+const pose = poseFromAngles(body, { l_elbow: { flexion: -30 } });
+const issues: ClampIssue[] = [];
+clampPose(body, pose, { issues });
+console.log(issues[0].joint, issues[0].motion, Math.round(issues[0].limit)); // l_elbow hyperextension -5
+console.log(jointAngles(body, pose).l_elbow.flexion.toFixed(1)); // -5.0
+```
+
+What the entry gives:
+
+| Function | What it does |
+| --- | --- |
+| `fitAnatomy(rig, { species, preset?, map?, limits?, forward?, roll? })` | The `AnatomicalRig`: body frame, stature, rest pose (`T`, `A`, `arms-down`), and per joint its bone, kind, anatomical axes in the bone's own frame, neutral rotation, rest angles and ranges. |
+| `jointAngles(body, pose)`, `readJointAngles(body, pose, out)` | Clinical angles in degrees per joint: the two parts of the swing (flexion and abduction for most joints) and the twist. The second form fills a flat array and allocates nothing. |
+| `poseFromAngles(body, angles, base?)` | The pose that has those angles: the inverse. |
+| `regionAngles(body, pose)` | The head against the chest and the chest against the pelvis, whatever number of spine bones the rig has. |
+| `clampPose(body, pose, { tier?, issues? })` | Brings a pose inside the ranges, in place, and reports each motion it changed with its limit and source. |
+| `addAnatomyLimits(animator, body, { tier?, onClamp? })` | The same every frame on an Animator. |
+| `hingeRolls(body, poses)` | Reads from motion how a straight limb is rolled, to fit again with `roll`. |
+| `poseLimits`, `ikLimits`, `ragdollJoints`, `kinematicsLimits` | The limits in the forms `PoseJointLimits`, IK chains, ragdoll profiles and `JointLimitSet` take. |
+| `defineSpecies(table)`, `bound(allowance, ...rows)`, `mirrorJoint(spec, rename)` | Build and check a species table. |
+
+How angles are measured. The body frame is x to the body's left, y up, z forward. Each joint has a long axis (its
+segment at neutral) and three motions: two swings across it and the twist about it. The swing is read as one rotation
+vector whose two parts are the clinical angles, so flexion and abduction are exact for a single-plane motion and stay
+well defined up to 180 degrees; the twist is what is left about the segment. Neutral for a human is the standing pose
+of ISO/IEC 19774 (HAnim): arms down, palms to the thighs. A shoulder and a hip are measured from that pose in the
+trunk's frame, an elbow, knee, wrist or finger joint from its straight position, and a collarbone, spine joint, ankle
+or toe from the rig's own rest pose.
+
+Two tiers. `normal` is the clinical range, where a validator should warn. `structural` is the stop no body passes,
+and what `clampPose` holds by default: an elbow or a knee stops 5 degrees past straight. A swing range that differs by
+direction (a shoulder reaches 180 degrees forward and 75 back) is an ellipse per quadrant, and a pose outside goes to
+the nearest point of it, so a bent knee with sideways noise keeps its bend. A straight knee does not twist: its
+rotation opens with flexion. Twist past a wrist's own small range moves into the forearm, which turns with the hand, so
+the hand stays where it was. A spine region (neck, trunk) is one budget: each bone may use any part of it, and the
+head stays within the neck's range against the chest whatever number of bones the rig spends.
+
+A rig bone stands for every table joint of its region nearest to it: one spine bone for five vertebrae carries their
+summed range, and a head bone with no neck bone carries the whole neck.
+
+### The human table (`margoengine/rigging/anatomy/human`)
+
+`human` holds the 139 joints of the body in ISO/IEC 19774-1:2019 names from `humanoid_root` (level of articulation 4
+without the 7 joints of the face), each with its kind, axes, ranges, and the source of every number.
+
+```ts
+import { human, humanTable } from 'margoengine/rigging/anatomy/human';
+
+const elbow = human.joints.find((joint) => joint.id === 'l_elbow')!;
+const flexion = elbow.dofs![0];
+console.log(flexion.positive, flexion.max.normal, flexion.max.structural); // flexion 150 160
+console.log(flexion.negative, flexion.min.normal, flexion.min.structural); // hyperextension 4.7 5
+const row = flexion.max.rows[0];
+console.log(row.source, row.provenance, row.what); // cdc2011 dataset elbow flexion, women 20-44 years, mean
+// A table for one group: girls of 2 to 8 years bend further past straight.
+const girl = humanTable({ sex: 'female', age: 6 });
+console.log(girl.joints.find((joint) => joint.id === 'l_elbow')!.dofs![0].min.normal); // 6.8
+```
+
+Where the numbers come from. Every number is a row with its source, the page it was read on, and how it was checked:
+`dataset` (read from a measured dataset held in a data file of this repository), `online` (read on the page named),
+`recalled` (from memory, to be confirmed in print) or `print`. Today 98 numbers are `dataset`, 136 `online`, 90
+`recalled` and none `print`; `packages/rigging/tests/anatomy-human.test.js` holds a second copy of each.
+
+- The limb motions the CDC Normal Joint Range of Motion Study measured (hip, knee, ankle, shoulder flexion, elbow,
+  forearm rotation) come from that dataset: adults of 20 to 44 years, the larger mean of the two sexes
+  (`anatomy-data-cdc.ts`). `humanTable({ sex, age })` reads another group.
+- Every other range is the AAOS 1965 value as a readable page reproduces it, with the AMA Guides (5th edition) value
+  beside it. The stop of a motion is its largest source value rounded up to 5 degrees plus a stated allowance: 15 for
+  the swing or twist of a ball, saddle or condyloid joint and for a spine region, 10 for a hinge's flexion, none for
+  the straight side of a hinge.
+- A spine region's clinical range is shared among its levels by per-level weights: lumbar levels from Pearcy and
+  Tibrewal 1984 and White and Panjabi 1990 as open pages give them; thoracic and cervical levels are White and
+  Panjabi's representative values from recall (61 of the 90 recalled numbers), with the thoracic levels scaled to that
+  book's thoracic totals. The other recalled numbers are toe joints, the collarbone's split, knee rotation, the wrist's
+  own twist, the thumb's base and the small joints of the palm.
+- Proportions (`human.proportions`) are shares of stature from the ANSUR II summary statistics, both sexes
+  (`anatomy-data-ansur2.ts`), with the Drillis and Contini figure beside them. Segment masses and centres of mass
+  (`human.segments`) are de Leva 1996 (`anatomy-data-deleva.ts`). `human.couplings` lists the motions joints share
+  (shoulder girdle rhythm, carrying angle, forearm rotation, knee rotation, finger curl, head rotation) with their
+  numbers and sources, for the coupling solver.
+
+Bones are found by name under these conventions, the best match winning: `hanim` (the standard's own names and the
+HAnim 1.x names of renamed joints), `segments` (Mixamo style, and the BVH form of the CMU captures), `joints` (the
+100STYLE captures and other files that name a bone for its joint), and the presets of `margoengine/rigging/retarget`
+(Character Creator, the CMU ASF skeleton, MPFB, Godot, Roblox R15, VRM humanoid names). `map` adds or overrides one
+bone at a time.
+
+```ts
+import type { RigJoint } from 'margoengine/rigging';
+import { fitAnatomy, hingeRolls, poseFromAngles, poseLimits } from 'margoengine/rigging/anatomy';
+import { fitHuman, human } from 'margoengine/rigging/anatomy/human';
+import { PoseJointLimits } from 'margoengine/rigging/joint-limits';
+
+const rig: RigJoint[] = [
+  { name: 'Hips', parent: -1, position: [0, 1, 0] },
+  { name: 'Spine', parent: 0, position: [0, 1.1, 0] },
+  { name: 'Head', parent: 1, position: [0, 1.6, 0] },
+  { name: 'LeftUpLeg', parent: 0, position: [0.1, 0.95, 0] },
+  { name: 'RightUpLeg', parent: 0, position: [-0.1, 0.95, 0] },
+  { name: 'LeftArm', parent: 1, position: [0.2, 1.45, 0] },
+  { name: 'LeftForeArm', parent: 5, position: [0.48, 1.45, 0] },
+  { name: 'LeftHand', parent: 6, position: [0.74, 1.45, 0] },
+];
+const body = fitHuman(rig);
+// The same limits in the form PoseJointLimits holds: exact for hinges.
+const older = new PoseJointLimits(rig.length, poseLimits(body).filter((limit) => limit.limit.type === 'hinge'));
+const pose = poseFromAngles(body, { l_elbow: { flexion: 175 } });
+older.apply(pose);
+// A capture's frames show how its straight limbs are rolled; fit again with what they show.
+const frames = [30, 60, 90].map((flexion) => poseFromAngles(body, { l_elbow: { flexion } }));
+const calibrated = fitAnatomy(rig, { species: human, roll: hingeRolls(body, frames) });
+console.log(Object.keys(hingeRolls(body, frames)), calibrated.joints.length); // [ 'l_shoulder' ] 8
+```
+
+Limits of the fit, stated plainly:
+
+- A straight limb with no bent joint and no knuckle bones shows no roll in its joint positions. The fit then takes the
+  limb as unrolled (in a T pose with the palms down the elbow bends forward). Motion capture skeletons are often
+  rolled: read from the clips in this repository, the CMU skeleton's upper arms are rolled 15.7 to 18.8 degrees, and
+  without that its elbows seem to bend up to 38 degrees sideways. `hingeRolls` reads the roll from the motion.
+- A joint whose zero is a direction in the body (shoulder, hip, thumb base) needs the joint at the far end of its
+  segment mapped. Without it the joint is left unlimited rather than guessed.
+- A modelled bend of under 5 degrees is read as straight; from 5 to 20 degrees it sets the hinge side only when it is
+  within 60 degrees of the anatomical side; from 20 degrees it always does.
+- When the left and right names disagree with the way the feet point, the feet win and `body.mirrored` is true.
+- `poseLimits`, `ikLimits`, `ragdollJoints` and `kinematicsLimits` give a joint that reaches further one way than the
+  other the nearest cone the older forms can hold; `clampPose` holds the exact reach.
+- The species is passed as its table (`species: human`), not by name, so the core entry loads no table.
+
+Sources: ISO/IEC 19774-1:2019 (HAnim); Wu et al. 2002 and 2005 (ISB joint coordinate systems); Grood and Suntay 1983;
+Baerlocher 2001 and Dobrowolski 2015 (swing and twist); Grassia 1998; Wilhelms and Van Gelder 2001 (reach limits);
+Akhter and Black 2015 (pose-conditioned limits, the idea only); Soucie et al. 2011 (CDC); AAOS 1965 and the AMA
+Guides, 5th edition, through the pages each row names; Paraskevas et al. 2004; Inman, Saunders and Abbott 1944;
+Ludewig et al. 2009; White and Panjabi 1990; Pearcy and Tibrewal 1984; Gordon et al., ANSUR II; de Leva 1996; Drillis
+and Contini 1966 through Winter 2009. Full citations are in `human.sources` and [docs/clean-room.md](../../docs/clean-room.md).
+
 ## Swimming (`margoengine/rigging/swim`)
 
 `createSwimRig` creates a head-to-tail chain in metres, with +Y up and +Z forward. A shark or reef fish sweeps laterally.
