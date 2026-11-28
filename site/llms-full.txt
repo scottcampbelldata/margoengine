@@ -32649,6 +32649,13 @@ voxel path tracer is excluded on this hardware (hardware check).
   call tree past the bound.
 - **Left:** both fixes, then `npm run record:wgsl-corpus` in full. Found by lane A, 2026-11-28; not fixed.
 
+### Fixed 2026-11-28: local CI kept CRLF copies of files whose .gitattributes rule became -text or eol=lf (local CI runner, KB-CI-EOL-STALE1)
+
+- **Seen:** local CI's root tests failed `verbatim licensed fixtures keep the SHA-256 their NOTICE.md records` (`packages/ifc/tests/fixtures-verbatim.test.js`, run 2026-11-27T21-00) while every lane checkout passed it.
+- **Cause:** git writes a file again only when its blob changes. The CI worktree is long-lived, so files checked out under the old rules (CRLF on Windows) kept their CRLF after `.gitattributes` marked them `-text` or `eol=lf`, and `git status` stayed clean. `git ls-files --eol` there listed 11: `packages/ifc/tests/fixtures/bcf/Architectural.ifc` and its NOTICE.md, seven sciviz zarr metadata files, and kernel-common's `pinned-vectors.txt` and `random-vectors.txt` (`i/lf w/crlf`).
+- **Fix:** the local CI runner (`.ci/ci.mjs`, untracked, in the CI worktree) writes again, right after its checkout, every tracked file whose rule forbids CRLF but whose working copy has it, and logs them in `00-eol-rewritten.txt`. The run of 2026-11-28T06-50 rewrote those 11. The SHA test passes in the CI tree; the next run found none.
+- **Regression test:** `tests/checkout-eol.test.js` fails in any checkout holding such a file (it named `Architectural.ifc` when made CRLF by hand) and checks the selection rule on fixed `ls-files` rows.
+
 ### Open 2026-11-28: nine browser GPU checks fail on main (KB-GPUMAIN1)
 
 Found by running the voxel and root GPU suites on the Ubuntu server, then each failing check on the workstation (Windows
