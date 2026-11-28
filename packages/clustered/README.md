@@ -760,7 +760,8 @@ local.add(table);
 side its `direction` faces, or `twoSided`) and fluorescent tubes (`'tube'`, a capsule from `start` to `end`) to a
 `Clustered` light loop, up to 64 at once. Highlights take the light's shape and the light falls off with its size, shaded
 with the same Linearly Transformed Cosines as the rectangle lights. `intensity` is the surface radiance;
-`radianceFromPower(light, lumens)` converts a total power. Shaped lights do not cast shadows yet (docs/limits.md).
+`radianceFromPower(light, lumens)` converts a total power. `ShapeLights` cast no shadows; discs and spheres that
+cast are `AreaShapes` (below).
 
 ```ts
 import {EngineKernel, box} from 'margoengine/core';
@@ -790,7 +791,47 @@ engine.start();
   times that area (a Lambertian emitter): lumens give nits, watts give W/(m^2 sr).
 - Attaching sets the `Clustered.shapes` hook, which the light loop of core meshes and every `lights.add()` receiver
   calls beside the point and spot lights. Every fragment evaluates every shaped light: they have no range, so they are
-  not culled per cluster. They cast no shadows.
+  not culled per cluster. They cast no shadows; use `AreaShapes` (below) for shadowed discs and spheres.
+
+### Shadowed discs and spheres (`@margoengine/clustered/area-shapes`)
+
+`AreaShapes` is `ShapeLights` for discs and spheres that may cast shadows: set `castShadow: true` on a light and the
+`LocalShadows` attached to the same `Clustered` lights shadows it, with the same casters, bias and depth map array as
+the rectangle lights of `AreaLights`. Tubes stay on `ShapeLights`.
+
+```ts
+import {EngineKernel, box} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {LocalShadows} from 'margoengine/clustered/shadows';
+import {AreaShapes} from 'margoengine/clustered/area-shapes';
+
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+const floor = engine.createMesh().setGeometry(box()).setScale([10, 0.1, 10]);
+const table = engine.createMesh().setGeometry(box()).setPosition([0, 1, 0]);
+const lights = Clustered.attach(engine), local = LocalShadows.attach(engine, {lights, resolution: 1024});
+const shapes = AreaShapes.attach(engine, {lights}).setLights([
+  {shape: 'sphere', position: [0, 3, 0], radius: 0.1, intensity: 2000, castShadow: true},
+  {shape: 'disc', position: [2, 3, 0], direction: [0, -1, 0], radius: 0.3, intensity: 800, castShadow: true,
+    shadow: {resolution: 512, near: 0.05, far: 20}},
+]);
+local.add(floor);
+local.add(table);
+console.log(shapes.shadowLights().length); // 2
+engine.start();
+```
+
+- `castShadow` (default `false`) must be a boolean. At most 4 shapes cast at once (`MAX_AREA_SHADOWS`), beside up to 4
+  rectangle lights of `AreaLights`; a fifth casting shape throws a `RangeError` from `setLights`, which changes
+  nothing then. Lights without `castShadow` are lit as with `ShapeLights` and cost no map.
+- `shadow` takes the rectangle lights' settings: `resolution` (default `LocalShadows`' `resolution`), `near` (default
+  0.1) and `far` (default 100) metres.
+- A sphere renders six depth faces round its centre; a disc renders five (the side it lights and the four sides), six
+  when `twoSided`. Each face is `resolution² × 4` bytes of the shared array.
+- The penumbra is the rectangle lights' PCSS with the light's `radius` in place of half its width and height, so a
+  bigger bulb gives a softer shadow; it has the same guard band and blocker-search limits (above), and is filtered
+  from the light's centre, so a large light very close to a caster is approximate.
+- Without `LocalShadows` the lights stay unshadowed. Its shader leaves out the tube code, so a scene with discs and
+  spheres only compiles less than with `ShapeLights`.
 
 ## Many shadowed lights
 
