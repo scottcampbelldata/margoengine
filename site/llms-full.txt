@@ -1347,7 +1347,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,442 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,444 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -45508,7 +45508,8 @@ nanometres unless a parameter says metres, and argument errors throw `RangeError
 | `@margoengine/optics/imaging` | `thinLens`, `pinholeImage`, `relativeIllumination`, `astigmaticFoci`, `astigmaticImage`, `designFresnelLens`, `cornerCubeReflect`, `airIndexTemperatureSlope`, `knifeEdgeTransmission` |
 | `@margoengine/optics/spectrum` | `cieXYZ`, `xyzToLinearSRGB`, `wavelengthToLinearSRGB`, `spectralColor`, `planckRelative`, `SpectralIntegrator` (`color`, `luminance`) |
 
-The root entry re-exports all six; import an entry to load only that topic.
+The root entry re-exports all six; import an entry to load only that topic. `@margoengine/optics/screens` (below) is
+the GPU side, drawn with `@margoengine/shader`, and is imported on its own.
 
 ## Refraction and dispersion
 
@@ -45543,19 +45544,6 @@ console.log(prism?.exitEdge, prism?.direction); // leaves through the right face
 ```
 
 ## Polarisation
-
-```ts
-import { malus, JonesVector, JonesMatrix, photoelasticColors } from '@margoengine/optics/polarization';
-const deg = Math.PI / 180;
-const half = malus(45 * deg); // 0.5
-const quarterWave = JonesMatrix.retarder(45 * deg, Math.PI / 2);
-const circular = quarterWave.apply(JonesVector.linear(0));
-const throughX = JonesMatrix.polarizer(0).apply(circular).intensity; // 0.5
-const michelLevy = photoelasticColors(2000, 256); // linear sRGB of white light through 0..2000 nm retardation, crossed
-console.log(half, throughX, michelLevy.length);
-```
-
-## Thin films and coatings
 
 [README continues: https://margoengine.com/llms/packages/optics.md]
 

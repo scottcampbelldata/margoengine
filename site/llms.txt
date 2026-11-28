@@ -163,7 +163,7 @@ Import the stage for a canvas, camera, controls and loading in a few lines (`imp
 
 - [@margoengine/compute](https://margoengine.com/llms/packages/compute.md): GPU compute without the WebGPU boilerplate, NumPy style: N-d arrays with views and broadcasting, fused expressions, reductions and statistics, scan, sort, selection…
 - [@margoengine/sciviz](https://margoengine.com/llms/packages/sciviz.md): Scientific visualisation for Margo Engine: volume rendering with transfer functions, slices and GPU isosurfaces, million-point scatter plots, surface and line plots…
-- [@margoengine/optics](https://margoengine.com/llms/packages/optics.md): Physical optics as plain functions: refraction and dispersion, polarisation, thin films and multilayers, diffraction, image formation and spectral colour.
+- [@margoengine/optics](https://margoengine.com/llms/packages/optics.md): Physical optics as plain functions: refraction and dispersion, polarisation, thin films and multilayers, diffraction, image formation and spectral colour; plus the GPU…
 
 ## Packages: AI tools
 
@@ -283,7 +283,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/scene API](https://margoengine.com/llms/api/scene.md): 11 entry points
 - [@margoengine/compute API](https://margoengine.com/llms/api/compute.md): 20 entry points
 - [@margoengine/sciviz API](https://margoengine.com/llms/api/sciviz.md): 83 entry points
-- [@margoengine/optics API](https://margoengine.com/llms/api/optics.md): 7 entry points
+- [@margoengine/optics API](https://margoengine.com/llms/api/optics.md): 8 entry points
 - [@margoengine/mcp API](https://margoengine.com/llms/api/mcp.md): 10 entry points
 - [@margoengine/react API](https://margoengine.com/llms/api/react.md): 47 entry points
 
