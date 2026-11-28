@@ -18,7 +18,7 @@ export interface MeshBatchBooleanResult {
   faceMap: Record<string, string[]>[];
   nonManifoldEdges: number;
   collapsedFaces: number;
-  /** With `precision: 'float32'` only: as `selfIntersections` of the exact binary result, normally 0. */
+  /** As `selfIntersections` of the exact binary result: with `'float32'` always, normally 0; else only above 0. */
   selfIntersections?: number;
   diagnostics: string[];
   /** Deterministic work counts; no timing or speed claim. */

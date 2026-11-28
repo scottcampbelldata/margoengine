@@ -15,10 +15,6 @@ import type { BooleanLoop } from './boolean.js';
 import { withoutFlatTriangles } from './flat-triangles.js';
 import { crossingTriangles } from './self-intersections.js';
 
-/** The first reach, as a share of the largest coordinate of the two triangles: one to two float32 steps. */
-const FIRST_REACH = 2 ** -23;
-/** Reaches tried, each twice the one before: the last is 2^-16 of the coordinates. */
-const REACHES = 8;
 /** Edits at one reach while the number of crossing pairs falls. */
 const PASSES = 4;
 
@@ -86,6 +82,7 @@ function edit(
   pairs: readonly [number, number][],
   share: number,
   pointOf: (point: MutableVec3) => number,
+  round: (x: number) => number,
 ): BooleanLoop[] {
   const parent = new Map<number, number>(),
     find = (v: number): number => {
@@ -162,7 +159,7 @@ function edit(
           far = c.map((x, k) => x + t * w[k]),
           off = Math.hypot(...minus(near, far));
         if (off <= reach)
-          crossed.push({ edges, off, point: near.map((x, k) => Math.fround((x + far[k]) / 2) + 0) as MutableVec3 });
+          crossed.push({ edges, off, point: near.map((x, k) => round((x + far[k]) / 2) + 0) as MutableVec3 });
       }
   }
   let triangles: BooleanLoop[] = [];
@@ -223,6 +220,150 @@ function edit(
 }
 
 /**
+ * How fine the numbers are: the grain of a flat triangle, the first reach with the factor to each next one, the
+ * rounding of a new point, and the thickness under which a shell that still crosses itself is taken as empty. The
+ * grain, the reaches and the thickness are shares of the largest coordinate.
+ */
+export interface Steps {
+  grain: number;
+  first: number;
+  factor: number;
+  reaches: number;
+  round: (x: number) => number;
+  shell: number;
+}
+
+/**
+ * The corners rounding, repair or an edit has moved. A pair of triangles with none of them is as the exact result has
+ * it, touching included, and is not tested; without a set every pair is.
+ */
+export type Loose = Set<number> | undefined;
+
+/** {@link crossingTriangles} over the pairs with a loose corner, whose own corners all become loose. */
+export function loosePairs(
+  vertices: readonly MutableVec3[],
+  triangles: readonly (readonly number[])[],
+  loose: Loose,
+  tick: () => void,
+): [number, number][] {
+  const pairs = crossingTriangles(vertices, triangles, loose && ((t) => triangles[t].some((v) => loose.has(v))), tick);
+  if (loose) for (const pair of pairs) for (const t of pair) for (const v of triangles[t]) loose.add(v);
+  return pairs;
+}
+
+/** The distance from `p` to the nearest point of triangle a b c (Ericson, Real-Time Collision Detection, 2005, 5.1.5). */
+function distanceToTriangle(p: Point, [a, b, c]: readonly Point[]): number {
+  const ab = minus(b, a),
+    ac = minus(c, a),
+    ap = minus(p, a),
+    at = (from: Point, along: Point, t: number): number =>
+      Math.hypot(p[0] - from[0] - along[0] * t, p[1] - from[1] - along[1] * t, p[2] - from[2] - along[2] * t),
+    d1 = dot(ab, ap),
+    d2 = dot(ac, ap);
+  if (d1 <= 0 && d2 <= 0) return at(a, ab, 0);
+  const bp = minus(p, b),
+    d3 = dot(ab, bp),
+    d4 = dot(ac, bp);
+  if (d3 >= 0 && d4 <= d3) return at(b, ab, 0);
+  const vc = d1 * d4 - d3 * d2;
+  if (vc <= 0 && d1 >= 0 && d3 <= 0) return at(a, ab, d1 / (d1 - d3));
+  const cp = minus(p, c),
+    d5 = dot(ab, cp),
+    d6 = dot(ac, cp);
+  if (d6 >= 0 && d5 <= d6) return at(c, ab, 0);
+  const vb = d5 * d2 - d1 * d6;
+  if (vb <= 0 && d2 >= 0 && d6 <= 0) return at(a, ac, d2 / (d2 - d6));
+  const va = d3 * d6 - d5 * d4;
+  if (va <= 0 && d4 >= d3 && d5 >= d6) return at(b, minus(c, b), (d4 - d3) / (d4 - d3 + d5 - d6));
+  const share = 1 / (va + vb + vc),
+    foot = a.map((x, k) => x + ab[k] * vb * share);
+  return at(foot, ac, vc * share);
+}
+
+/**
+ * Whether a closed set of triangles is a shell no thicker than `limit` of its coordinates: its volume per area is that
+ * small, and so is the distance from the corners, edge middles and centers of its triangles to a triangle facing the
+ * other way. Triangles too narrow to have a direction of their own only count in the volume.
+ */
+function isThinShell(
+  triangles: readonly (readonly number[])[],
+  vertices: readonly MutableVec3[],
+  limit: number,
+  tick: () => void,
+): boolean {
+  let size = 0;
+  for (const t of triangles) for (const v of t) for (const x of vertices[v]) size = Math.max(size, Math.abs(x));
+  const thick = size * limit,
+    origin = vertices[triangles[0][0]],
+    faces: { corners: Point[]; normal: number[] | undefined }[] = [];
+  let volume = 0,
+    area = 0;
+  for (const t of triangles) {
+    const corners = t.map((v) => vertices[v]),
+      [a, b, c] = corners,
+      normal = cross(minus(b, a), minus(c, a)),
+      length = Math.hypot(...normal),
+      longest = Math.max(Math.hypot(...minus(b, a)), Math.hypot(...minus(c, b)), Math.hypot(...minus(a, c)));
+    area += length / 2;
+    volume += dot(minus(a, origin), cross(minus(b, origin), minus(c, origin))) / 6;
+    faces.push({ corners, normal: length > thick * longest ? normal.map((x) => x / length) : undefined });
+  }
+  // A shell of thickness h whose one side has area A holds A h and, with both sides, has area 2 A.
+  if (!(Math.abs(volume) * 2 <= area * thick)) return false;
+  return faces.every(({ corners, normal }) => {
+    if (!normal) return true;
+    tick();
+    const [a, b, c] = corners,
+      middle = (...points: Point[]): number[] =>
+        [0, 1, 2].map((k) => points.reduce((sum, p) => sum + p[k], 0) / points.length);
+    return [a, b, c, middle(a, b), middle(b, c), middle(c, a), middle(a, b, c)].every((p) =>
+      faces.some(
+        (other) => other.normal && dot(normal, other.normal) < -0.5 && distanceToTriangle(p, other.corners) <= thick,
+      ),
+    );
+  });
+}
+
+/**
+ * `loops` without those connected parts that hold a crossing pair and are thinner than the numbers can keep apart (a
+ * shell whose two sides round into one surface with different triangles), the pairs still crossing, and the parts gone.
+ */
+export function withoutThinShells(
+  loops: BooleanLoop[],
+  vertices: readonly MutableVec3[],
+  limit: number,
+  loose: Loose,
+  tick: () => void,
+): { loops: BooleanLoop[]; crossings: number; shells: number } {
+  const triangles: number[][] = [];
+  for (const { vertices: v } of loops) for (let k = 1; k < v.length - 1; k++) triangles.push([v[0], v[k], v[k + 1]]);
+  const pairs = loosePairs(vertices, triangles, loose, tick),
+    parent = new Map<number, number>(),
+    find = (v: number): number => {
+      let root = v;
+      while (parent.has(root)) root = parent.get(root)!;
+      return root;
+    };
+  for (const t of triangles)
+    for (const v of t) {
+      const a = find(t[0]),
+        b = find(v);
+      if (a !== b) parent.set(Math.max(a, b), Math.min(a, b));
+    }
+  const partOf = (t: number): number => find(triangles[t][0]),
+    gone = new Set<number>();
+  for (const part of new Set(pairs.flat().map(partOf))) {
+    const own = triangles.filter((_, t) => partOf(t) === part);
+    if (isThinShell(own, vertices, limit, tick)) gone.add(part);
+  }
+  return {
+    loops: gone.size ? loops.filter((loop) => !gone.has(find(loop.vertices[0]))) : loops,
+    crossings: pairs.filter((pair) => pair.every((t) => !gone.has(partOf(t)))).length,
+    shells: gone.size,
+  };
+}
+
+/**
  * Closed `triangles` with their crossing pairs edited away, and the number of pairs still crossing (0 unless the edits
  * cannot join features within the last reach, as with sheets that rounding put into one plane). `clean` removes what an edit leaves behind, such as fins of no thickness.
  * `vertices` gains the points where two edges were joined.
@@ -230,20 +371,23 @@ function edit(
 export function withoutCrossings(
   start: BooleanLoop[],
   vertices: MutableVec3[],
-  grain: number,
-  clean: (triangles: BooleanLoop[]) => BooleanLoop[],
+  { grain, first, factor, reaches, round }: Steps,
+  fallback: BooleanLoop[],
+  clean: (triangles: BooleanLoop[]) => BooleanLoop[] | null,
+  loose: Loose,
   tick: () => void,
 ): { loops: BooleanLoop[]; crossings: number } {
   const pairsOf = (triangles: readonly BooleanLoop[]): [number, number][] =>
-    crossingTriangles(
+    loosePairs(
       vertices,
       triangles.map((t) => t.vertices),
-      undefined,
+      loose,
       tick,
     );
-  let loops = start,
+  const cleaned = clean(start);
+  let loops = cleaned ?? start,
     pairs = pairsOf(loops);
-  if (!pairs.length) return { loops, crossings: 0 };
+  if (cleaned && !pairs.length) return { loops, crossings: 0 };
   let ids: Map<string, number> | undefined;
   const pointOf = (point: MutableVec3): number => {
     ids ??= new Map(vertices.map((p, i) => [`${p}`, i]));
@@ -252,25 +396,29 @@ export function withoutCrossings(
       v = vertices.length;
       ids.set(`${point}`, v);
       vertices.push(point);
+      loose?.add(v);
     }
     return v;
   };
   // An edit can add pairs where sheets lie in one plane, so the state with the fewest is the one returned.
-  let best = { loops, crossings: pairs.length };
-  for (let level = 0; pairs.length && level < REACHES; level++)
+  let best = cleaned ? { loops, crossings: pairs.length } : { loops: fallback, crossings: pairs.length };
+  for (let level = 0; pairs.length && level < reaches; level++)
     for (let pass = 0; pairs.length && pass < PASSES; pass++) {
       tick();
-      const edited = edit(loops, vertices, pairs, FIRST_REACH * 2 ** level, pointOf),
+      const edited = edit(loops, vertices, pairs, first * factor ** level, pointOf, round),
         faces = edited.map(({ vertices: corners, uv }, i) => ({ id: String(i), vertices: corners, uv })),
         { mesh, origin } = withoutFlatTriangles({ vertices, faces }, grain),
         before = pairs.length;
-      loops = clean(
+      const next = clean(
         mesh.faces.map(({ id, vertices: corners, uv }) => ({
           ...edited[Number(origin?.get(id) ?? id)],
           vertices: corners,
           uv,
         })),
       );
+      // Faces that cannot be made valid end this reach; a wider one edits them differently.
+      if (!next) break;
+      loops = next;
       pairs = pairsOf(loops);
       if (pairs.length < best.crossings) best = { loops, crossings: pairs.length };
       if (pairs.length >= before) break;

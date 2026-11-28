@@ -19179,6 +19179,21 @@ split two nearby edges at one point; then the thin-triangle pass, then test agai
 of the coordinates and the state with the fewest pairs is returned. It is not proven to reach zero.
 
 
+## Float64 crossings and thin shells of an exact boolean (2026-11-27, KB-BOOL-CROSS64, KB-BOOL-F32SHEETS1)
+
+The sources of the section above, read the same way, and:
+
+- M. Attene, "As-exact-as-possible repair of unprintable STL files", Rapid Prototyping Journal 24(5), 2018,
+  https://arxiv.org/abs/1605.07829 (read as a search summary only): self-intersecting and sheet-like parts are removed
+  and the rest kept.
+- C. Ericson, "Real-Time Collision Detection", 2005, section 5.1.5: the closest point of a triangle.
+
+Design: float64 output goes through the same pair edits with reaches from 2^-52 to 2^-28, fourfold, and the validity
+repair after each; only pairs with a corner that rounding, the repair or an edit moved are tested, so exact contact
+stays. A connected part that still crosses is removed when twice its volume over its area, and the distance from seven
+points of each of its triangles to a triangle facing the other way, are both within 2^-26 (float32: 2^-22) of its
+largest coordinate. Derived here; not proven to reach zero.
+
 ## Interior mapping: materials/interior-mapping (2026-11-27)
 
 Written from the papers below, read as text or cited for their published method; no other engine's or project's code was

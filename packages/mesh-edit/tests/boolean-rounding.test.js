@@ -242,3 +242,119 @@ test('regression: a needle triangle is planar', () => {
   };
   assert.equal(compilePolygonMesh(mesh).indices.length, 3);
 });
+
+/** A sphere of radius 1 with `rings` bands and `sides` corners around, as triangles. */
+function sphere(rings, sides) {
+  const vertices = [[0, 1, 0]],
+    at = (i, j) => 1 + (i - 1) * sides + (j % sides),
+    faces = [],
+    add = (corners) => faces.push({ id: `s${faces.length}`, vertices: corners, uv: corners.map(() => [0, 0]) });
+  for (let i = 1; i < rings; i++)
+    for (let j = 0; j < sides; j++) {
+      const a = (Math.PI * i) / rings,
+        b = (2 * Math.PI * j) / sides;
+      vertices.push([Math.sin(a) * Math.cos(b), Math.cos(a), -Math.sin(a) * Math.sin(b)]);
+    }
+  vertices.push([0, -1, 0]);
+  for (let j = 0; j < sides; j++) add([0, at(1, j), at(1, j + 1)]);
+  for (let i = 1; i < rings - 1; i++)
+    for (let j = 0; j < sides; j++) {
+      add([at(i, j), at(i + 1, j), at(i + 1, j + 1)]);
+      add([at(i, j), at(i + 1, j + 1), at(i, j + 1)]);
+    }
+  for (let j = 0; j < sides; j++) add([vertices.length - 1, at(rings - 1, j + 1), at(rings - 1, j)]);
+  return { vertices, faces };
+}
+
+/** Two copies of `solid` turned by `base`, the second first turned by `turn`, both moved to `at`, it by `offset` more. */
+function pair(solid, { base, turn, at = [0, 0, 0], offset = [0, 0, 0] }) {
+  const place = (prefix, map) => ({
+    vertices: solid.vertices.map(map),
+    faces: solid.faces.map((face) => ({ ...face, id: prefix + face.id })),
+  });
+  return [
+    place('a', (p) => turned(p, base).map((x, k) => x + at[k])),
+    place('b', (p) => turned(turned(p, turn), base).map((x, k) => x + at[k] + offset[k])),
+  ];
+}
+
+test('regression: float64 output of nearly coincident solids has no crossing triangles', () => {
+  const cube = createPrimitiveMesh('cube', 'c');
+  for (const [name, places, operations] of [
+    [
+      'cubes 400 units out',
+      {
+        base: [0.5822296941570144, 0.8095666532449269, 0.5919187858663121],
+        turn: [0.000023425105504423893, 0.0007532678040458205, 0.0009901690958021997],
+        at: [194.80996122342066, -328.3617842608885, 48.31194265201315],
+        offset: [0.0004524234679771697, 0.0009332227259563388, -0.0004057953615699873],
+      },
+      ['union', 'difference', 'intersection'],
+    ],
+    [
+      'cubes a millionth apart',
+      {
+        base: [0.167321017089915, 0.7528159472871646, 0.17859149872259772],
+        turn: [5.804696770293962e-7, -1.482201140132826e-7, -7.331235351660864e-7],
+        at: [-227.59735837001233, 47.91412113602931, 62.54135727069405],
+        offset: [-6.061660021572214e-7, -2.3909013124140455e-7, 8.802748461627749e-7],
+      },
+      ['union', 'difference', 'intersection'],
+    ],
+  ]) {
+    const [a, b] = pair(cube, places),
+      volumes = {};
+    for (const operation of operations) {
+      const result = booleanMeshesExact(a, b, operation, { createId: ids() });
+      closed(result.mesh);
+      assert.equal(crossings(result.mesh), 0, `${operation} of ${name}`);
+      assert.equal(result.selfIntersections, undefined);
+      // About the first corner, so the distance from the origin does not cancel the digits.
+      const [o] = a.vertices;
+      volumes[operation] = volume({
+        ...result.mesh,
+        vertices: result.mesh.vertices.map((p) => sub(p, o)),
+      });
+    }
+    // Both inputs have volume 1.
+    assert.ok(Math.abs(volumes.union + volumes.intersection - 2) < 1e-6, name);
+    assert.ok(Math.abs(volumes.difference + volumes.intersection - 1) < 1e-6, name);
+    assert.ok(volumes.union > 0.999999 && volumes.union < 1.01, `${name}: union ${volumes.union}`);
+  }
+});
+
+test('regression: a shell too thin to keep its sides apart comes out without crossing', () => {
+  // Differences of two spheres about 1e-8 apart: both sides of the shell round into one surface.
+  const solid = sphere(8, 12);
+  for (const [precision, places] of [
+    [
+      'float32',
+      {
+        base: [0.7700689336145617, 0.9974945085111514, 0.05742034179038384],
+        turn: [4.746371272367598e-9, -7.912311543669697e-9, 4.8094755200713296e-9],
+      },
+    ],
+    [
+      'float64',
+      {
+        base: [0.6282732335982254, 0.3772590199379525, 0.6701514249062871],
+        turn: [7.588633027667476e-9, -9.095121463339367e-9, 9.391843145430015e-9],
+        offset: [-6.3395269477458325e-9, 4.694705360892557e-9, -1.8775243553693986e-9],
+      },
+    ],
+    [
+      'float64',
+      {
+        base: [0.15372734896546572, 0.5728619119957378, 0.6173539462580131],
+        turn: [-1.2459610766945225e-8, 2.1286687870177778e-9, -2.7028981864931518e-8],
+      },
+    ],
+  ]) {
+    const [a, b] = pair(solid, places),
+      { mesh, selfIntersections } = booleanMeshesExact(a, b, 'difference', { createId: ids(), precision });
+    if (mesh.faces.length) closed(mesh);
+    assert.equal(crossings(mesh), 0, precision);
+    assert.equal(selfIntersections ?? 0, 0);
+    assert.ok(Math.abs(volume(mesh)) < 1e-6, `${precision}: volume ${volume(mesh)}`);
+  }
+});

@@ -18,8 +18,7 @@ import { type Flattened, withoutFlatTriangles } from './flat-triangles.js';
 import { indexOfLeast } from './least.js';
 import { assertPolygonMesh, dominantAxis, faceGeometryError, newellNormal } from './polygon.js';
 import { convexLoopPieces } from './polygon-split.js';
-import { crossingTriangles } from './self-intersections.js';
-import { withoutCrossings } from './boolean-separate.js';
+import { loosePairs, withoutCrossings, withoutThinShells, type Loose } from './boolean-separate.js';
 import { withoutCutPoints } from './boolean-simplify.js';
 import type { PolygonMesh } from './types.js';
 import type { MeshBatchBooleanResult, MeshBatchFaceSource } from './boolean-batch.js';
@@ -43,6 +42,15 @@ export interface ExactBooleanOptions {
 
 /** In float32 output, the length that counts as nothing, as a share of the largest coordinate nearby: 8 to 16 steps. */
 const FLOAT32_GRAIN = 2 ** -20;
+const FLOAT32_STEPS = {
+  grain: FLOAT32_GRAIN,
+  first: 2 ** -23,
+  factor: 2,
+  reaches: 8,
+  round: Math.fround,
+  shell: 2 ** -22,
+};
+const FLOAT64_STEPS = { grain: 0, first: 2 ** -52, factor: 4, reaches: 13, round: (x: number) => x, shell: 2 ** -26 };
 
 function assertPrecision({ precision }: ExactBooleanOptions): void {
   if (precision !== undefined && precision !== 'float32' && precision !== 'float64')
@@ -54,10 +62,11 @@ export interface ExactBooleanResult extends MeshBooleanResult {
   /** Faces of the exact result too thin to exist in the chosen precision, folded away after rounding. */
   collapsedFaces: number;
   /**
-   * With `precision: 'float32'` only: pairs of the result's triangles that still meet anywhere but in the corners they
-   * share. Rounding can push faces closer than a float step through each other; those places are joined or split,
-   * moving the surface by at most 2^-16 of the coordinates there. This is normally 0; it can stay above 0 where a
-   * part thinner than a float step leaves two sheets in one plane.
+   * Pairs of the result's triangles that still meet anywhere but in the corners they share, among those rounding could
+   * have moved. Rounding can push faces closer than a float step through each other; those places are joined or split,
+   * moving the surface by at most 2^-16 (`'float32'`) or 2^-28 (`'float64'`) of the coordinates there, and a connected
+   * part that still crosses and is thinner than 2^-22 or 2^-26 of them is removed. With `'float32'` the count is always
+   * given and is normally 0; with `'float64'` it is given only when above 0.
    */
   selfIntersections?: number;
 }
@@ -896,6 +905,7 @@ function mergeWithoutCrossings(
   loops: readonly BooleanLoop[],
   vertices: MutableVec3[],
   before: number,
+  loose: Loose,
   tick: () => void,
 ): BooleanLoop[] {
   const apart = new Set<string>();
@@ -908,7 +918,7 @@ function mergeWithoutCrossings(
         triangles.push([loop.vertices[0], loop.vertices[i], loop.vertices[i + 1]]);
         owner.push(loop);
       }
-    const pairs = crossingTriangles(vertices, triangles, undefined, tick);
+    const pairs = loosePairs(vertices, triangles, loose, tick);
     if (pairs.length <= before) return merged;
     const size = apart.size;
     for (const pair of pairs)
@@ -947,6 +957,31 @@ function withoutThin(
     })),
     collapsed: removed,
   };
+}
+
+/** Rounds of cutting into triangles and repairing before the loops are given up as not coming apart. */
+const VALID_ROUNDS = 8;
+
+/**
+ * The loops as triangles that each pass the validity test, as cutting a repaired face can leave a thin one again; null
+ * where the two keep making each other's thin face, as on sheets that touch along an edge.
+ */
+function validTriangles(start: BooleanLoop[], vertices: MutableVec3[], tick: () => void): BooleanLoop[] | null {
+  let loops = start;
+  for (let round = 0; round < VALID_ROUNDS; round++) {
+    const { loops: triangles } = withoutThin(loops, vertices, 0, tick);
+    if (triangles.every((t) => !faceGeometryError(vertices, t.vertices))) return triangles;
+    loops = repairLoops(triangles, vertices, tick).loops;
+  }
+  return null;
+}
+
+/** The triangles the loops render as. */
+function fanTriangles(loops: readonly BooleanLoop[]): number[][] {
+  const out: number[][] = [];
+  for (const { vertices } of loops)
+    for (let i = 1; i < vertices.length - 1; i++) out.push([vertices[0], vertices[i], vertices[i + 1]]);
+  return out;
 }
 
 /** Remove pairs of faces with the same corners in opposite order: a fin of no thickness left by folding. */
@@ -1265,6 +1300,9 @@ function materializeExact(
     round = single ? Math.fround : (x: number): number => x;
   const vertices: MutableVec3[] = [],
     rounded = new Map<string, number>(),
+    // In float64 only a corner the numbers cannot hold, or one the repair moves, can come to cross.
+    loose: Loose = single ? undefined : new Set<number>(),
+    held = (P: readonly bigint[]): boolean => P[3] === 1n && [0, 1, 2].every((k) => BigInt(Number(P[k])) === P[k]),
     vertexOf = exact.map((P) => {
       const x = round(ratio(P[0], P[3], exponent)) + 0,
         y = round(ratio(P[1], P[3], exponent)) + 0,
@@ -1276,6 +1314,7 @@ function materializeExact(
         rounded.set(key, v);
         vertices.push([x, y, z]);
       }
+      if (loose && !held(P)) loose.add(v);
       return v;
     }),
     start: BooleanLoop[] = [];
@@ -1292,20 +1331,52 @@ function materializeExact(
     );
   const thinned = single ? forFloat32(start, vertices, tick) : { loops: start, collapsed: 0 },
     { loops: repaired, collapsed: folded } = repairLoops(thinned.loops, vertices, tick),
-    collapsed = thinned.collapsed + folded,
-    // Float32 steps are wide enough for rounded faces to cross; they are taken apart while still triangles.
-    apart = single
-      ? withoutCrossings(triangulated(cancelFins(repaired), vertices), vertices, FLOAT32_GRAIN, cancelFins, tick)
-      : undefined,
-    loops = apart ? apart.loops : cancelFins(repaired),
+    collapsed = thinned.collapsed + folded;
+  if (loose) {
+    const before = new Set(thinned.loops.map((loop) => loop.vertices.join()));
+    for (const loop of repaired) if (!before.has(loop.vertices.join())) for (const v of loop.vertices) loose.add(v);
+  }
+  const // Rounded faces can cross; they are taken apart while still triangles, and in float64 each edit's invalid faces
+    // are repaired before the next test.
+    clean = (triangles: BooleanLoop[]): BooleanLoop[] | null => {
+      const sound = single ? triangles : validTriangles(triangles, vertices, tick);
+      return sound && cancelFins(sound);
+    },
+    kept = cancelFins(repaired),
+    // Most float64 results have nothing to take apart, and their faces are then left as the repair made them.
+    apart =
+      !single && !loosePairs(vertices, fanTriangles(kept), loose, tick).length
+        ? { loops: kept, crossings: 0 }
+        : withoutCrossings(
+            triangulated(kept, vertices),
+            vertices,
+            single ? FLOAT32_STEPS : FLOAT64_STEPS,
+            kept,
+            clean,
+            loose,
+            tick,
+          ),
+    steps = single ? FLOAT32_STEPS : FLOAT64_STEPS,
+    thin = apart.crossings
+      ? withoutThinShells(apart.loops, vertices, steps.shell, loose, tick)
+      : { loops: apart.loops, crossings: 0, shells: 0 },
+    loops = thin.loops,
     nonManifold = closedNonManifoldEdges(loops),
-    merged = apart ? mergeWithoutCrossings(loops, vertices, apart.crossings, tick) : mergeFaces(loops, vertices, tick),
+    merged = mergeWithoutCrossings(loops, vertices, thin.crossings, loose, tick),
     result = finishBoolean(a, b, merged, vertices, nonManifold, options.createId);
-  if (apart?.crossings)
-    result.diagnostics.push(`${apart.crossings} pairs of triangles still cross after rounding to float32.`);
+  if (thin.shells)
+    result.diagnostics.push(
+      `${thin.shells} shells too thin for ${options.precision ?? 'float64'} to keep their sides apart were removed.`,
+    );
+  if (thin.crossings)
+    result.diagnostics.push(
+      `${thin.crossings} pairs of triangles still cross after rounding to ${options.precision ?? 'float64'}.`,
+    );
   if (collapsed)
     result.diagnostics.push(`${collapsed} faces too thin for ${options.precision ?? 'float64'} were folded away.`);
-  return { ...result, collapsedFaces: collapsed, ...(apart && { selfIntersections: apart.crossings }) };
+  // Float32 output always says how many pairs cross; float64 output only when some are left.
+  const reported = single || thin.crossings > 0;
+  return { ...result, collapsedFaces: collapsed, ...(reported && { selfIntersections: thin.crossings }) };
 }
 
 /** @internal N-ary exact evaluation with a single final materialization. */

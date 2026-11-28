@@ -150,23 +150,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   needle comes from a nearly cancelling cross product, and its rounding tilted the plane by about 2e-8.
 - **Fix:** the tolerance adds the normal's rounding, 8 float steps over the cross product's length. Same regression file.
 
-### Open 2026-11-27: the exact boolean's float64 output can hold triangles crossing at rounding size (KB-BOOL-CROSS64, mesh-edit)
+### Fixed 2026-11-27: the exact boolean's float64 output held triangles crossing at rounding size (KB-BOOL-CROSS64, mesh-edit)
 
 - **Repro:** `booleanMeshesExact` (default precision) of two cubes turned apart by 1e-3 radians and moved 400 units
-  from the origin; a test of all triangle pairs finds some meeting outside their shared corners, at depths mostly under
-  1e-14 of the coordinates and rarely up to about 1e-9 (the validity repair's folds).
+  from the origin; 461 of 720 seeded runs of nearly coincident cubes and spheres held crossing pairs.
 - **Cause:** corners round to float64 one by one, and the repair of invalid faces moves the surface by up to the
-  validity tolerance; neither is followed by a crossing test. `'float32'` output is tested.
-- **Next:** run `withoutCrossings` for float64 too, with the validity tolerance as its grain; in a prototype this left
-  3 of 180 runs, so the repair and the separation have to share one loop.
+  validity tolerance; neither was followed by a crossing test.
+- **Fix:** triangles with a rounded or repaired corner are tested and taken apart as float32 output is, with finer
+  reaches, each edit followed by the repair until its triangles are valid; an edit whose repair keeps making the same
+  thin face is dropped for the next reach. Regression: `packages/mesh-edit/tests/boolean-rounding.test.js`.
 
-### Open 2026-11-27: a float32 boolean residue of two coincident sheets can keep crossing pairs (KB-BOOL-F32SHEETS1, mesh-edit)
+### Fixed 2026-11-27: a boolean result with a shell thinner than the numbers kept crossing pairs (KB-BOOL-F32SHEETS1, mesh-edit)
 
-- **Repro:** the float32 difference of two 8 by 12 spheres turned and moved about 1e-8 apart can report
-  `selfIntersections` 3 (1 of 720 seeded runs).
-- **Cause:** the result is a shell thinner than a float32 step: its two sheets round into one plane with different
-  triangles, and joining features one pair at a time adds pairs as fast as it removes them.
-- **Next:** triangulate coplanar overlapping parts together so the two sheets cancel.
+- **Repro:** the float32 difference of two 8 by 12 spheres turned about 1e-8 apart reported `selfIntersections` 3; in
+  float64 three of 720 seeded runs kept 5 to 24 pairs.
+- **Cause:** the result held a shell thinner than the numbers can keep apart: its two sheets rounded into one surface
+  with different triangles, and joining features one pair at a time added pairs as fast as it removed them.
+- **Fix:** a connected part that still crosses and is no thicker than 2^-22 (float32) or 2^-26 (float64) of its
+  coordinates, by volume per area and by the distance between its opposite sides, is removed. Same regression file.
 
 ### Fixed 2026-11-27: scatter motion vectors drew a streamed forest from destroyed buffers (KB-SCATTER-VELTILES1, scatter)
 

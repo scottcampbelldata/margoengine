@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21606943,
+  "total": 21610325,
   "history": [
     {
       "date": "2026-10-24",
@@ -15229,6 +15229,12 @@
       "commit": "HEAD",
       "reason": "lane A 2026-11-28, three.js parity row 15: raw shaders in SSR and SSGI (captureEntry, MargoMaterial, RawShaders.setCapture, depth-only capture draws). The raw chunk these three entries bundle grew 17,878 to 18,676 B gzip (+798, dist chunk). Budgets: shader/raw 17068 to 17929, shader/black-hole 26870 to 28104, shader/serialization 22025 to 22911 (measured 17406, 27285 and 22243 plus the gate headroom). The bytes are the capture pipelines, prelude and validation, inside the RawShaders plugin SSR and SSGI call each frame; a split would load the same code by import() the first captured frame and draw that frame without the raw surfaces. Only these three rows change; the other entries over budget belong to other lanes.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-e-boolean-float64",
+      "reason": "float64 boolean output is tested and taken apart too, and thin crossing shells are removed (KB-BOOL-CROSS64, KB-BOOL-F32SHEETS1): boolean-exact 15780 to 16879 B; a split would load the same code for every float64 boolean",
+      "grew": 3
     }
   ],
   "items": {
@@ -15995,10 +16001,10 @@
     "@margoengine/mcp/resources": 2313,
     "@margoengine/mesh-edit": 31112,
     "@margoengine/mesh-edit/bake": 5070,
-    "@margoengine/mesh-edit/boolean-batch": 16459,
-    "@margoengine/mesh-edit/boolean-exact": 16254,
+    "@margoengine/mesh-edit/boolean-batch": 17591,
+    "@margoengine/mesh-edit/boolean-exact": 17386,
     "@margoengine/mesh-edit/geometry": 15785,
-    "@margoengine/mesh-edit/hull": 18105,
+    "@margoengine/mesh-edit/hull": 19223,
     "@margoengine/mesh-edit/modeling": 37194,
     "@margoengine/mesh-edit/modifiers": 8564,
     "@margoengine/mesh-edit/remesh": 9967,
