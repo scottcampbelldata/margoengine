@@ -259,7 +259,9 @@ view's heightmap (tussocks with cured blades).
 
 `procedural:rock` draws `generateRockMesh` at 2,880, 720 and 180 triangles in the near, middle and far rings, in
 measured granite, linear (0.2709, 0.224, 0.1869) (ECOSTRESS samples Granite_H2, H3 and H5, the `granite` of
-`@margoengine/materials`).
+`@margoengine/materials`). Each rock species draws eight seeded stones (seeds 1 to 8: blocks, slabs, wedges, shards
+and pebbles of their own proportions), every placed stone the one its record's variant picks, so a talus field holds
+no turned copies of one stone; the density is the species' own.
 
 ```js
 import { defineBiome } from '@margoengine/biomes';
@@ -308,6 +310,22 @@ const side = 64,
   data = new Uint8Array(side * side * 4).fill(128); // decode a real scan here (createImageBitmap, getImageData)
 const levels = materialPixels('winter-pasture', { color: [0.31, 0.37, 0.2], image: { width: side, height: side, data }, repeat: 3 }, 1024);
 console.log(levels.length, levels[0][1]); // 11 94
+```
+
+`patches` draws ground materials that share a texel as patches with crisp edges rather than their average (the
+terrain's `patches`; see `@margoengine/terrain`): with a ground of rock, gravel and turf by slope, a mountainside reads
+as outcrops, scree and turf islands from a kilometre off instead of one grey-brown felt. `size` is the patch cell in
+metres (default 14), `contrast` 0 to 1 (default 0.6). Left out, the ground blends as painted.
+
+```js
+import { BiomeWorld } from '@margoengine/biomes';
+import { BiomeView } from '@margoengine/biomes/view';
+import { Engine } from '@margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas'));
+const world = await BiomeWorld.create({ seed: 7, size: [1024, 1024], workers: false });
+const view = await BiomeView.attach(engine, world, { patches: { size: 18, contrast: 0.7 } });
+await view.ready;
 ```
 
 The view's water is the sea of `SEA` where an edge of the world stands at or below sea level: two ocean swell trains,

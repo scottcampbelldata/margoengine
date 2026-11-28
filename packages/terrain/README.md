@@ -319,6 +319,42 @@ Terrain.attach(engine, {
 });
 ```
 
+Optional patches, with `weights` only: `patches: { size, contrast }` draws layers that share a texel as patches with
+crisp edges instead of their average, the way an alpine slope is turf, scree and rock side by side rather than one
+grey-brown felt from a kilometre off. Each layer with a weight above 0 adds `contrast` (0 to 1, default 0.6) times its
+own value-noise fBm (cells of `size` metres, default 14, three octaves) to its weight, and only the layers within
+0.05 x `contrast` of the highest sum keep weight (height-based splatting: Mishkinis 2013, "Advanced Terrain Texture
+Splatting"; noise-masked splats as in Andersson 2007, "Terrain Rendering in Frostbite Using Procedural Shader
+Splatting", SIGGRAPH; noise cells from the pcg3d hash of Jarzynski and Olano 2020, "Hash Functions for GPU Rendering",
+JCGT 9(3); quintic fade of Perlin 2002, "Improving Noise"). Weights of 0 and 1 draw as painted (0 of 255 apart), octaves
+finer than half a pixel fade to their mean, and as a pixel grows from 0.3 to 0.8 of a cell the patched weights hand
+back to the painted ones, so far ground does not alias. On a 50/50 texel seen from 90 m, 84 percent of pixels are one
+layer or the other ([patches.browser.mjs](test/patches.browser.mjs), RTX A6000, the same figures on WebGPU and the
+WebGL2 layer); without the option the shader is unchanged. Cost: one noise of three octaves per shown layer per pixel.
+
+```ts
+import { Terrain } from 'margoengine/terrain';
+import { Engine } from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+Terrain.attach(engine, {
+  size: [512, 512],
+  layers: [0, 1, 2, 3].map(() => ({ height: [-1e6, 1e6], slope: [0, 1], scale: 0.25 })),
+  patches: { size: 18, contrast: 0.7 },
+  textures(device) {
+    const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
+    const heightmap = device.createTexture({ size: [2, 2], format: 'r32float', usage });
+    device.queue.writeTexture({ texture: heightmap }, new Float32Array(4), { bytesPerRow: 8 }, [2, 2]);
+    const layers = device.createTexture({ size: [1, 1, 4], format: 'rgba8unorm-srgb', usage });
+    const colours = [90, 100, 50, 255, 120, 115, 105, 255, 0, 0, 0, 255, 0, 0, 0, 255];
+    device.queue.writeTexture({ texture: layers }, new Uint8Array(colours), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 4]);
+    // Turf and rock half and half everywhere: drawn as turf and rock patches.
+    const weight = device.createTexture({ size: [1, 1], format: 'rgba8unorm', usage });
+    device.queue.writeTexture({ texture: weight }, new Uint8Array([128, 127, 0, 0]), { bytesPerRow: 4 }, [1, 1]);
+    return { heightmap, layers, weights: [weight, weight] };
+  },
+});
+```
+
 ## Sliders for the sand and ground look: `@margoengine/terrain/settings`
 
 `TerrainColors` keeps its look (the colours, the height and slope ranges, the wet darkening and the sand surface's wind,

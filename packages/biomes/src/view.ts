@@ -67,6 +67,13 @@ export interface BiomeViewOptions {
     readonly anchor?: TerrainOptions['clipmapAnchor'];
   };
   /**
+   * Ground materials that share a texel drawn as patches with crisp edges rather than their average (the terrain's
+   * `patches`, over the world; the horizon ring keeps its means): a slope of rock, gravel and turf reads as outcrops,
+   * scree and turf islands from a kilometre off instead of one grey-brown felt. `size` is the patch cell in metres
+   * (default 14), `contrast` 0 to 1 (default 0.6). Default: none (the ground blends as painted).
+   */
+  readonly patches?: TerrainOptions['patches'];
+  /**
    * How far tree crowns darken the ground, 0 to 1: a material `'canopy'` (its look in `MATERIALS`) takes this share of
    * the ground weight times `canopyCover`, on far hills and on the forest floor, and `materials` lists it last. Nothing
    * is added for worlds without trees or with 16 ground materials already. Default 0.6 with `objects`, 0 without.
@@ -1115,6 +1122,7 @@ export class BiomeView implements Disposable {
       levels: clipmapLevels(world.bounds, extent, options.clipmap),
       clipmapAnchor: anchor,
       captureSurfaceHeight: this.#farEnabled,
+      ...(options.patches ? { patches: options.patches } : {}),
       // Weights replace the rules; the rules only set each material's texture repeat (4 m), relief and macro tone.
       layers: layerKeys.map((_, i) => {
         const { bump = 0, macro = 0, repeat = 4 } = looks[Math.min(i, looks.length - 1)];

@@ -88,6 +88,7 @@ export const originShader = (code: string): string =>
     : code
         .replace('ambient:vec4f}', 'ambient:vec4f,anchor:vec4f}')
         .replace(/struct Layer \{([^}]*)\}/, 'struct Layer {$1,wrap:vec4f,tone:vec4f}')
+        .replace('fn terrainPatchXZ(p:vec3f)->vec2f {return p.xz;}', 'fn terrainPatchXZ(p:vec3f)->vec2f {return p.xz+frame.anchor.xy;}')
         .split('let p=position*scale;')
         .join('let p=(position+layerRules[layer].wrap.xyz)*scale;')
         .replace(
@@ -195,6 +196,49 @@ fn terrainLayerSample(position:vec3f,projection:vec3f,dx:vec3f,dy:vec3f,layer:u3
 }`;
 
 /**
+ * `TerrainOptions.patches`: the painted weights resolved into patches with crisp edges, as alpine ground is turf, scree
+ * and rock side by side rather than their average. Each layer whose weight is above 0 gets a height, `contrast` times a
+ * value-noise fBm of its own (cells of `size` metres, three octaves, quintic fade, Perlin 2002 "Improving Noise",
+ * SIGGRAPH; cell values from the pcg3d hash of Jarzynski and Olano 2020, "Hash Functions for GPU Rendering", JCGT 9(3)),
+ * added to its weight; only the layers within 0.05 x contrast of the highest sum keep weight, by how far they reach
+ * past that line (height-based splatting: Mishkinis 2013, "Advanced Terrain Texture Splatting", Gamasutra; noise-masked
+ * splats as in Andersson 2007, "Terrain Rendering in Frostbite Using Procedural Shader Splatting", SIGGRAPH course).
+ * Weights of 1 and 0 stay as painted. Octaves finer than half a pixel's footprint fade to their mean, and the patched
+ * weights hand back to the painted ones as the footprint grows from 0.3 to 0.8 of a cell, so far ground neither
+ * aliases nor turns into the strongest layer alone. With `floatingOrigin` the noise reads terrain-relative positions.
+ */
+const patchFunctions = (size: number, contrast: number): string => /* wgsl */ `
+var<private> terrainPatchWeights:array<f32,16>;
+fn terrainPatchXZ(p:vec3f)->vec2f {return p.xz;}
+fn terrainPatchHash(c:vec2f,layer:u32)->f32 {
+  var v=vec3u(bitcast<u32>(i32(c.x)),bitcast<u32>(i32(c.y)),layer)*1664525u+1013904223u;
+  v.x+=v.y*v.z;v.y+=v.z*v.x;v.z+=v.x*v.y;v^=v>>vec3u(16u);v.x+=v.y*v.z;v.y+=v.z*v.x;v.z+=v.x*v.y;
+  return f32(v.x>>8u)/16777216.0;
+}
+fn terrainPatchNoise(p:vec2f,layer:u32)->f32 {
+  let i=floor(p);let f=p-i;let u=f*f*f*(f*(f*6.0-15.0)+10.0);
+  return mix(mix(terrainPatchHash(i,layer),terrainPatchHash(i+vec2f(1,0),layer),u.x),mix(terrainPatchHash(i+vec2f(0,1),layer),terrainPatchHash(i+vec2f(1,1),layer),u.x),u.y);
+}
+fn terrainPatch(xz:vec2f,layer:u32,footprint:f32)->f32 {
+  var p=xz*${(1 / size).toPrecision(9)};var cell=${size.toPrecision(9)};var amp=0.5;var sum=0.0;var norm=0.0;
+  for(var k=0u;k<3u;k++){let fade=1.0-smoothstep(0.25,0.5,footprint/cell);sum+=amp*mix(0.5,terrainPatchNoise(p,layer*3u+k),fade);norm+=amp;p=p*2.03+vec2f(19.1,7.3);cell/=2.03;amp*=0.5;}
+  return sum/norm;
+}
+fn terrainPatchBlend(packed:ptr<function,array<vec4f,4>>,xz:vec2f,footprint:f32) {
+  var top=-1.0;var plain=0.0;
+  for(var layer=0u;layer<u32(frame.heights.z);layer++){
+    let w=(*packed)[layer/4u][layer%4u];terrainPatchWeights[layer]=-1.0;if(w<=0.0){continue;}
+    let t=w+${contrast.toPrecision(9)}*terrainPatch(xz,layer,footprint);terrainPatchWeights[layer]=t;top=max(top,t);plain+=w;
+  }
+  let line=top-${(0.05 * contrast).toPrecision(9)};var sum=0.0;
+  for(var layer=0u;layer<u32(frame.heights.z);layer++){let b=max(terrainPatchWeights[layer]-line,0.0);terrainPatchWeights[layer]=b;sum+=b;}
+  let near=1.0-smoothstep(0.3,0.8,footprint*${(1 / size).toPrecision(9)});
+  for(var layer=0u;layer<u32(frame.heights.z);layer++){
+    terrainPatchWeights[layer]=mix((*packed)[layer/4u][layer%4u]/max(plain,0.00001),terrainPatchWeights[layer]/max(sum,0.00001),near);
+  }
+}`;
+
+/**
  * The fragment shader with `TerrainTextures.weights` (`count` textures, 2 to 4): layer i's weight is channel i % 4 of
  * weight texture i / 4, sampled bilinearly once per fragment over the heightmap's bounds, in place of the height and
  * slope rules (which still set each layer's texture scale). A layer whose weight is 0 skips its three triplanar
@@ -203,21 +247,26 @@ fn terrainLayerSample(position:vec3f,projection:vec3f,dx:vec3f,dy:vec3f,layer:u3
  * texel's RGB by its A before relief and macro tone. A function, so importing anything else from this package keeps no
  * shader text.
  */
-export const weightedFragment = (count: number, surface = false, tint = false): string => {
+export const weightedFragment = (
+  count: number,
+  surface = false,
+  tint = false,
+  patches?: { readonly size: number; readonly contrast: number },
+): string => {
   const rules = terrainFragment(surface),
     ruleColor = rules.slice(rules.indexOf('fn terrainColor('), rules.indexOf('@fragment fn fragment(')),
     n = Math.min(4, Math.max(1, Math.floor(count))),
     ids = Array.from({ length: n }, (_, i) => i);
   const code = /* wgsl */ `
 ${ids.map((i) => `@group(0) @binding(${6 + i}) var terrainWeights${i}:texture_2d<f32>;`).join('\n')}
-${layerSample}
+${layerSample}${patches ? patchFunctions(patches.size, patches.contrast) : ''}
 fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
   let axes=pow(abs(normal),vec3f(8));let projection=axes/max(axes.x+axes.y+axes.z,0.00001);let dx=dpdx(position);let dy=dpdy(position);
   let d=vec2f(textureDimensions(terrainWeights0));let uv=clamp((position.xz-frame.map.xy)/frame.map.zw,vec2f(0.5)/d,vec2f(1)-vec2f(0.5)/d);
   var packed=array<vec4f,4>(${[0, 1, 2, 3].map((i) => (i < n ? `textureSampleLevel(terrainWeights${i},terrainSampler,uv,0)` : 'vec4f(0)')).join(',')});
-  var color=vec3f(0);var total=0.0;${surface ? 'var relief=0.0;var repeat=0.0;' : ''}
+  ${patches ? 'terrainPatchBlend(&packed,terrainPatchXZ(position),max(length(dx),length(dy)));' : ''}var color=vec3f(0);var total=0.0;${surface ? 'var relief=0.0;var repeat=0.0;' : ''}
   for(var layer=0u;layer<u32(frame.heights.z);layer++){
-    let weight=packed[layer/4u][layer%4u];if(weight<=0.0){continue;}
+    ${patches ? 'let weight=terrainPatchWeights[layer];' : 'let weight=packed[layer/4u][layer%4u];'}if(weight<=0.0){continue;}
     ${surface ? 'let surface=terrainSurface(terrainLayerSample(position,projection,dx,dy,layer),position,projection,dx,dy,layer);color+=surface.rgb*weight;relief+=surface.w*weight;repeat+=layerRules[layer].params.x*weight;total+=weight;' : 'color+=terrainLayerSample(position,projection,dx,dy,layer)*weight;total+=weight;'}
   }
   ${surface ? 'if(total>0.00001){terrainRelief=relief/total;terrainRepeat=repeat/total;return color/total;}' : 'if(total>0.00001){return color/total;}'}

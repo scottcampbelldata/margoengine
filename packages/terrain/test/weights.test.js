@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { Terrain } from '../dist/index.js';
 
-function rig(weights, count = 5, tint, tinted = () => false) {
+function rig(weights, count = 5, tint, tinted = () => false, extra = {}) {
   const gpu = mockGPU(),
     engine = {
       gpu: gpu.device,
@@ -17,6 +17,7 @@ function rig(weights, count = 5, tint, tinted = () => false) {
     };
   let made;
   const terrain = new Terrain({
+    ...extra,
     resolution: 8,
     levels: 2,
     size: [32, 32],
@@ -191,4 +192,24 @@ test('16 rule layers (no weights) are accepted, 17 rejected', () => {
   assert.equal(r.terrain.rings[0].values[42], 16);
   assert.throws(() => rig(undefined, 17), RangeError);
   assert.throws(() => rig(undefined, 3), RangeError);
+});
+
+// Above the Treeline look round 3: weights sharing a texel were always their average, so far alpine ground of rock,
+// gravel and turf read as one felt. `patches` resolves them into noise-edged patches (GPU proof: patches.browser.mjs);
+// without the option the shader holds none of it.
+test('patches compiles the patch blend into the weighted shader only when asked, with its size and contrast', () => {
+  const two = (texture) => [texture('rgba8unorm'), texture('rgba8unorm')],
+    plain = modules(rig(two).frame()).find((c) => c.includes('@fragment')),
+    r = rig(two, 5, undefined, undefined, { patches: { size: 20, contrast: 0.5 } }),
+    code = modules(r.frame()).find((c) => c.includes('@fragment'));
+  assert.doesNotMatch(plain, /terrainPatch/);
+  assert.match(code, /terrainPatchBlend\(&packed,terrainPatchXZ\(position\),max\(length\(dx\),length\(dy\)\)\);/);
+  assert.match(code, /let weight=terrainPatchWeights\[layer\];/);
+  assert.match(code, /var p=xz\*0\.0500000000;var cell=20\.0000000;/);
+  assert.match(code, /let t=w\+0\.500000000\*terrainPatch\(/);
+  const defaults = modules(rig(two, 5, undefined, undefined, { patches: {} }).frame()).find((c) => c.includes('@fragment'));
+  assert.match(defaults, /var cell=14\.0000000;/);
+  assert.match(defaults, /let t=w\+0\.600000000\*/);
+  for (const patches of [null, { size: 0.1 }, { size: Number.NaN }, { contrast: 0 }, { contrast: 1.5 }])
+    assert.throws(() => rig(two, 5, undefined, undefined, { patches }), RangeError, JSON.stringify(patches));
 });

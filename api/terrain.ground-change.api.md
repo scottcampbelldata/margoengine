@@ -376,6 +376,10 @@ interface TerrainOptions {
     readonly captureSurfaceHeight?: boolean;
     roughness?: number;
     floatingOrigin?: TerrainOrigin;
+    patches?: {
+        readonly size?: number;
+        readonly contrast?: number;
+    };
 }
 
 interface TerrainOrigin {

@@ -186,6 +186,16 @@ export interface TerrainOptions {
    * overlays, sculpt) stay in world coordinates. Default: none (the shaders, uniforms and rules stay as they were).
    */
   floatingOrigin?: TerrainOrigin;
+  /**
+   * With `TerrainTextures.weights` only: resolves layers that share a texel into patches with crisp edges instead of
+   * their average, the way an alpine slope is turf, scree and rock side by side. Each layer gets its own value noise
+   * of `size`-metre cells (default 14) times `contrast` (0 to 1, default 0.6) added to its weight, and only the layers
+   * near the highest sum show (height-based splatting); weights of 0 and 1 stay as painted, and far ground, where a
+   * pixel covers a cell, hands back to the painted weights. Default: none (the shader is unchanged).
+   * @example
+   * Terrain.attach(engine, { ...options, patches: { size: 18, contrast: 0.7 } });
+   */
+  patches?: { readonly size?: number; readonly contrast?: number };
 }
 /** What `setCapture` takes: `@margoengine/post` SSR's material capture hook (its `SSRCapture`), declared here so terrain
  * does not import post. */
@@ -330,6 +340,11 @@ export class Terrain implements EnginePlugin {
       (o.levels ?? 6) < 1 ||
       (o.levels ?? 6) > 12 ||
       (o.roughness !== undefined && !(o.roughness >= 0 && o.roughness <= 1)) ||
+      (o.patches !== undefined &&
+        (typeof o.patches !== 'object' ||
+          o.patches === null ||
+          !((o.patches.size ?? 14) >= 0.5 && (o.patches.size ?? 14) <= 10000) ||
+          !((o.patches.contrast ?? 0.6) > 0 && (o.patches.contrast ?? 0.6) <= 1))) ||
       !Number.isFinite(Math.fround(o.cellSize ?? 1)) ||
       (o.cellSize ?? 1) <= 0 ||
       !Number.isFinite(Math.fround(o.heightScale ?? 100)) ||
@@ -339,7 +354,7 @@ export class Terrain implements EnginePlugin {
       o.layers.length > 16
     )
       throw new RangeError(
-        'Invalid terrain options; check textures, resolution (multiple of 4, 8..256), levels (1..12), roughness (0..1), cellSize above 0, finite heightScale and heightOffset, and 4 to 16 layers.',
+        'Invalid terrain options; check textures, resolution (multiple of 4, 8..256), levels (1..12), roughness (0..1), patches (size 0.5..10000 m, contrast above 0 to 1), cellSize above 0, finite heightScale and heightOffset, and 4 to 16 layers.',
       );
     finiteVector(o.origin ?? [0, 0], 2, 'Terrain origin');
     if (o.clipmapAnchor !== undefined && o.clipmapAnchor !== 'camera')
@@ -745,7 +760,14 @@ export class Terrain implements EnginePlugin {
     const code =
       (surface ? surfaceStruct(vertex) : vertex) +
       (this.textures?.weights
-        ? weightedFragment(this.textures.weights.length, surface, !!this.textures.tint)
+        ? weightedFragment(
+            this.textures.weights.length,
+            surface,
+            !!this.textures.tint,
+            this.options.patches
+              ? { size: this.options.patches.size ?? 14, contrast: this.options.patches.contrast ?? 0.6 }
+              : undefined,
+          )
         : terrainFragment(surface));
     return this.clip(this.options.floatingOrigin ? originShader(code) : code);
   }

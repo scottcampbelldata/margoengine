@@ -89,6 +89,7 @@ export interface BiomeViewOptions {
         readonly levels?: number;
         readonly anchor?: TerrainOptions['clipmapAnchor'];
     };
+    readonly patches?: TerrainOptions['patches'];
     readonly canopy?: number;
     readonly far?: false | {
         readonly radius?: number;
