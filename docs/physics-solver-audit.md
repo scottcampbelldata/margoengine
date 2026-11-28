@@ -104,14 +104,14 @@ them; the rest is a record of what a stronger solver would need.
   TerrainBed in the live world cell. `lava-terminal.test.js` checks yielded and Newtonian discharge, nonnegative wet/dry
   columns, enthalpy and volume conservation and exact replay. `lava.test.js` checks radiation and convection with
   conductivity set to zero.
-- Point 6. `lava-threads.test.js` compares plain Wasm and shared Wasm on one, two and four threads for
+- Point 6. `99d66dbc47` and `lava-threads.test.js` compare plain Wasm and shared Wasm on one, two and four threads for
   both physical tiers, with real TerrainBed and SEA-06, a far origin shift and exact replay. Four threads update
   12,513 cells and 25,252 faces at 129 x 97, and 49,601 cells and 99,652 faces at 257 x 193 in one inertial
   microstep. `lava-threads.browser.mjs` exercises three nested helpers and exact replay in Chromium.
 - Point 7. `bd89d5b702`. Weather's `lava-surface.browser.mjs` draws the accepted dry grid, timed vent, moving front and cooled crust at
   one camera on WebGPU and WebGL2. It verifies exact seek, no emission from cooled crust, detachment, and the same accepted
   solver bytes on both paths. The source supports an explicit render cell.
-- Point 8. `bd89d5b702`. The package READMEs and `docs/limits.md` record the inertial and terminal tiers, timestep bound, fixed
+- Point 8. `bd89d5b702` and `99d66dbc47`. The package READMEs, `check:readme-run` and `docs/limits.md` record the inertial and terminal tiers, timestep bound, fixed
   substrate, lumped column enthalpy, static sea level and the remaining crust, tube, crystal and water feedback gaps.
 - Point 2 remains open. The Dietterich et al. benchmark gives viscosity and source flux separately from the held-out
   front length and width. In BMA the terminal tier lowers the downslope normalised RMS error from 380.34% to 20.93%
