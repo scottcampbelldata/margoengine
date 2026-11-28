@@ -118,7 +118,7 @@ Closed since (2026-11-27, Claude, laptop):
   bodies' boxes, marking those that moved; the main thread lists them in the single pass's order (PK62). Both broad phases,
   sweep and tree, hash as one thread at 1, 2, 4 and 8 threads with equal fitted counts (`kernel/tests/threads.rs`).
 - Point 6, the narrow phase on threads (2026-11-28): `stepAsync` splits the active pairs in fixed runs over the threads,
-  each found on a view of its own; mesh, compound and filtered pairs stay on the main thread (PK61). Hashes equal one
+  each found on a view of its own; mesh, compound and filtered pairs stay on the main thread (PK64). Hashes equal one
   thread's at 1, 2, 4 and 8 threads over 300 steps and the threads' pair counts are equal at every count (native
   `kernel/tests/threads.rs`; Node `tests/kernel-threads.test.js`). It found that a pair with no points kept the normal of the
   pair found before it.
