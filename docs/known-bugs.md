@@ -6,6 +6,36 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: a subtree reference could not be a child of selector, sequence or any builder (KB-BEHAVIOR-SUBTREEBUILD1, behavior)
+
+- **Repro:** the behavior README's "Reusable subtrees" example under `npm run check:readmes`: `selector(subtree('guard'))`
+  failed with TS2345, `SubtreeNode` not assignable to `NodeSpec`, so a typed program could not build a tree that uses
+  references without casts.
+- **Cause:** the root entry's composite and decorator builders take `NodeSpec` children, and `/subtrees` exported only
+  `subtree`, `resolveTree`, `validateTree` and `SubtreeTree`.
+- **Fix:** ac1c5838e0: `/subtrees` exports the same twelve builder functions typed with `SubtreeSpec` children.
+- **Regression:** `packages/behavior/tests/subtrees.test.js` (the entry's builders are the root's and build reference
+  trees that validate and resolve; undefined before the fix).
+
+### Fixed 2026-11-28: BiomeWorld.create({ workers: n }) in Node failed each job with a bare ReferenceError (KB-BIOMES-NODEWORKERS1, biomes)
+
+- **Repro:** `BiomeWorld.create({ workers: 3 })` in Node, then `world.tile(4, 4)`: `ReferenceError: Worker is not
+  defined` (the docs/workers.md example under `check:readme-run` in Node).
+- **Cause:** an explicit worker count started `BiomeWorkers` with the default `new Worker` spawner where no Web Worker
+  exists; only the automatic count checked for one.
+- **Fix:** 7e7f27f8f0: `BiomeWorkers` (the page-side `/workers` entry, so the worker file keeps its size) throws
+  MargoError `'unsupported'` naming `createWorker` when the world is made.
+- **Regression:** `packages/biomes/tests/workers.test.js` ("workers asked for where Web Workers do not exist").
+
+### Fixed 2026-11-28: build:packages stopped on missing umbrella files for /procedural/forbs and /terrain/ground-contact (umbrella)
+
+- **Repro:** `node scripts/build-modern.js --precompiled --only=margoengine` on main ad2ee43b94: "build:packages finished
+  without these declared export targets", `dist/procedural/forbs` and `dist/terrain/ground-contact`.
+- **Cause:** the forbs and ground-contact commits regenerated the margoengine, game and kit-viz exports but did not commit
+  the five `src` files `node scripts/umbrella.mjs` writes; `umbrella.mjs --check` (tests/umbrella.test.js) reports it.
+- **Fix:** ac8c52c4a6: the generated files.
+- **Regression:** `tests/umbrella.test.js` (already catches it; local CI runs it).
+
 ### Fixed 2026-11-28: a scene warmed with warmUp drew aerial perspective from empty atmosphere tables, so far hills had no haze (KB-SKY-TABLESKEY1, sky)
 
 - **Repro:** `scripts/web-demos/still-frame.mjs ten-thousand-trees` on main 4469d88656 (it calls `warmUp` of
