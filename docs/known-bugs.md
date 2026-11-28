@@ -6,6 +6,21 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: the blowup's early motionBlur read 11.7 percent (bound 5) on near leaves that sway against the camera (KB-LOOK-TV-MBVEL1, headless look)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-blowup.json --once --seconds 1.1` (RTX A6000,
+  WebGPU, 1920 x 1080, supersample 2, 8 sub-frames, 180 degrees): `look.md` early motionBlur 11.8 percent, 391 sharp of
+  3,324 edges, before and after KB-LOOK-TV-SHIMMER2 part (b).
+- **Cause:** the check, not the frames. `motionBlur` took each pixel's travel from the camera's motion alone (depth
+  reprojection). The sharp edges sit on the near swaying crown at the right of the frame (x 1280 to 1660), travel 9.9 px
+  by the camera but 7.2 px by the engine's own velocity: the leaves sway against the camera's sweep, so they move less
+  than the camera moves the place they cover, and are smeared by what they really move.
+- **Fix:** `motionBlur(frame, motion, { velocity })` judges each pixel by its surface's own travel when the probe has the
+  engine velocity (`MovingFrames.velocity`, `shot.moving.velocity`); `checkProbe` passes it. Blowup early 11.8 to 0.00
+  percent (1,003 edges over 8 px), mid 0.61 to 0.88 (10,220 edges), bound 5 unchanged.
+- **Regression:** `packages/headless/tests/look-clean.test.js` (a bar moving 2 px under a 12 px camera sweep, drawn sharp,
+  fails by the camera's motion and passes by its velocity; the same bar really moving 12 px still fails).
+
 ### Open 2026-11-28: warmUp makes ten-thousand-trees take 33 s instead of 18 s to start on the WebGL2 layer (KB-QUALITY-WARMSERIAL1, quality, webgl2-compat)
 
 - **Repro:** a paired A/B of `scripts/web-demos/startup-profile.mjs ten-thousand-trees --backend=webgl2`, the build of

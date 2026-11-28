@@ -1131,3 +1131,28 @@ test('T4 shimmerMoving counts a pixel off only outside its four reprojection tap
   assert.ok(shimmering.detail.off >= height / 2, `one-pixel shimmer found: ${shimmering.detail.off}`);
   assert.ok(shimmering.value > 0.5 && !shimmering.pass, `one-pixel shimmer fails: ${shimmering.value}`);
 });
+
+test('T8 motionBlur judges each edge by its surface`s own travel when given the engine velocity (KB-LOOK-TV-MBVEL1)', () => {
+  // The camera sweeps 12 px a frame, but a leaf (the bar) sways back against it and moves 2 px: drawn as it moved, its
+  // edges are near sharp. Judged by the camera's motion it read as strobing; by its own velocity it is under the 8 px
+  // floor and not judged. The same edge with the leaf really moving 12 px still fails.
+  const width = 96,
+    height = 24,
+    motion = { width, height, data: new Float32Array(width * height * 2) },
+    velocity = { width, height, data: new Float32Array(width * height * 2) },
+    leaf = (x) => x >= 30 && x < 54;
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      motion.data[(y * width + x) * 2] = 12;
+      velocity.data[(y * width + x) * 2] = leaf(x) || leaf(x - 1) || leaf(x + 1) ? 2 : 12;
+    }
+  const frame = image(width, height, (x) => (leaf(x) ? 220 : 30)),
+    camera = motionBlur(frame, motion),
+    own = motionBlur(frame, motion, { velocity });
+  assert.ok(camera.value === 100 && !camera.pass, `by the camera's motion: ${camera.value}`);
+  assert.equal(own.detail.edges, 0, 'the swaying leaf moves 2 px: not a fast edge');
+  assert.ok(own.pass);
+  const fast = motionBlur(frame, motion, { velocity: motion });
+  assert.ok(fast.value === 100 && !fast.pass, `a leaf really moving 12 px drawn sharp: ${fast.value}`);
+  assert.throws(() => motionBlur(frame, motion, { velocity: { ...velocity, data: new Float32Array(2) } }), RangeError);
+});

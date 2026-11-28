@@ -1547,7 +1547,11 @@ export function checkProbe(
     shimmerMoving(frame, probe.moving!, { bound: b('shimmerMoving') }),
   );
   run('motionBlur', probe.moving ? null : 'the next frame and its motion', () =>
-    motionBlur(frame, probe.moving!.motion, { bound: b('motionBlur'), shutter: probe.moving!.shutter }),
+    motionBlur(frame, probe.moving!.motion, {
+      bound: b('motionBlur'),
+      shutter: probe.moving!.shutter,
+      velocity: probe.moving!.velocity,
+    }),
   );
   run('silhouette', marked('subject'), () => silhouette(frame, { subject: masks.subject, bound: b('silhouette') }));
   run('silhouetteShape', marked('subject'), () =>
@@ -2388,7 +2392,7 @@ export interface MovingFrames {
    * The engine's own motion of each pixel of this frame from the frame before, the same way as `motion` (pixels over
    * one frame, TAA's velocity with its jitter removed): with it `shimmerMoving` leaves out a pixel whose surface moves
    * other than the camera moves it, by more than half a pixel (a swaying branch, a flame, a wave), which changes on
-   * purpose, including what such a surface leaves behind.
+   * purpose, including what such a surface leaves behind, and `motionBlur` judges each edge by its surface's own travel.
    */
   velocity?: LookMotion;
   /** The same for each pixel of `next`: `shimmerMoving` also leaves out a pixel that lands where such a surface moved. */
@@ -2695,17 +2699,32 @@ export function depthFromDistance(
  * An edge centre is a pixel whose luma profile along its motion (one travel wide, centred on it, spanning over 24 codes)
  * crosses the middle value within one pixel of the pixel itself; the edge's width is the part of the profile between 10
  * and 90 percent of its range. A hard edge is under a pixel wide, a blurred one as wide as its smear.
+ * With `velocity` (the engine's own motion of each pixel, as `MovingFrames.velocity`) each pixel's travel is its
+ * surface's real motion, not the camera's alone: a leaf swaying against the camera's sweep moves less than the camera
+ * moves the place it covers, and is smeared by what it moves (KB-LOOK-TV-MBVEL1).
  * @throws RangeError for a shutter that is not more than 0 and up to 360 degrees.
  */
 export function motionBlur(
   frame: LookImage,
   motion: LookMotion,
-  { mask, bound, minimum = 8, shutter = 180 }: FlickerOptions & { minimum?: number; shutter?: number } = {},
+  {
+    mask,
+    bound,
+    minimum = 8,
+    shutter = 180,
+    velocity,
+  }: FlickerOptions & { minimum?: number; shutter?: number; velocity?: LookMotion } = {},
 ): LookResult {
   const { width, height } = frame;
   sameSize(frame, motion, 'motion');
   if (motion.data.length !== width * height * 2)
     throw rangeError('The motion holds two floats (x, y) per pixel', 'headless');
+  if (velocity) {
+    sameSize(frame, velocity, 'velocity');
+    if (velocity.data.length !== width * height * 2)
+      throw rangeError('The velocity holds two floats (x, y) per pixel', 'headless');
+  }
+  const travelled = velocity ?? motion;
   if (!(shutter > 0 && shutter <= 360))
     throw rangeError('The shutter is more than 0 and up to 360 degrees', 'headless');
   const smear = shutter / 360;
@@ -2717,8 +2736,8 @@ export function motionBlur(
     for (let x = 0; x < width; x++) {
       const i = row * width + x;
       if (!inside[i]) continue;
-      const mx = motion.data[i * 2],
-        my = motion.data[i * 2 + 1],
+      const mx = travelled.data[i * 2],
+        my = travelled.data[i * 2 + 1],
         travel = Math.hypot(mx, my);
       if (!(travel > minimum)) continue;
       const steps = Math.ceil(travel) * 2,
