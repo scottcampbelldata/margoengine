@@ -42,6 +42,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   again; the meadow check keeps running as `test:gpu:meadow-grass`.
 - **Regression:** `packages/biomes/tests/no-raw-division.test.js` and `packages/biomes/tests/gpu-chain-bound.test.js`.
 
+### Open 2026-11-28: every app that imports physics emits the wind-traction kernel's two Wasm files (KB-PHYS-TRACTIONWASM1, physics aero)
+
+- **Repro:** `node --test packages/game/tests/physics-entry.test.js`, "neither the game kit root nor its physics entry
+  emits a Wasm file": an app build of `export { Physics } from '@margoengine/game/physics'` emits
+  `assets/wind-traction-kernel-*.wasm` and `assets/wind-traction-kernel-shared-*.wasm`. Red in local CI at 06d91dbf50.
+- **Cause:** `packages/physics/src/aero/traction-phase.ts` (AERO-01 native wind traction, d4370faed2) loads its kernel with
+  `new URL('./wind-traction-kernel.wasm?no-inline', import.meta.url)`, and the module is reachable from the physics root,
+  so a bundler emits both files for any app that steps a world. Every other physics kernel ships as a blueprint inside the
+  package's JavaScript, or behind its own optional entry.
+- **Owner:** AERO-01 (Codex, in flight). Found by lane P; not changed, as the row's work is in progress. The fix is the
+  blueprint form the other kernels use, or the `import()` of the phase behind the entry that opts into native traction.
+
 ### Open 2026-11-28: Above the Treeline's scanned rocks are 1.3 to 1.5 times too bright and blotchy (KB-TREELINE-ROCKGRADE1, film asset)
 
 - **Repro:** measure `showcase-films/treeline-rocks/textures/rock_moss_set_0{1,2}_granite.jpg` in the film's asset
