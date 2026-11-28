@@ -62,6 +62,7 @@ export class DensityVolume implements VolumetricMediumSource {
     voxel(x: number, y: number, z: number): number;
     clear(): void;
     splat(positions: ArrayLike<number>, options?: DensitySplatOptions): void;
+    protected replaceSplats(positions: ArrayLike<number>, options: DensitySplatOptions): void;
     sample(p: Vec3): number;
     pack(): {
         info: Float32Array;
@@ -82,6 +83,30 @@ export interface DensityVolumeOptions {
     color?: Vec3;
     maxBricks?: number;
     maxPages?: number;
+}
+
+export class SeaSprayDensityVolume extends DensityVolume {
+    constructor(source: SeaSpraySource, options?: SeaSprayDensityVolumeOptions);
+    update(renderCell?: Vec3): void;
+    dispose(): void;
+}
+
+export interface SeaSprayDensityVolumeOptions {
+    voxelSize?: number;
+    cellSize?: number;
+}
+
+export interface SeaSprayParcel {
+    readonly kind: string;
+    readonly position: Vec3;
+    readonly mass: number;
+    readonly diameter: number;
+    readonly materialDensity?: number;
+}
+
+export interface SeaSpraySource {
+    readonly cell: Vec3;
+    readParticles(): readonly SeaSprayParcel[];
 }
 
 // Not exported from this entry, but used by the exports above:

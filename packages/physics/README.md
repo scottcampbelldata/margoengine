@@ -8204,13 +8204,15 @@ views on both renderer paths and check frame replay.
 ## Windborne dust, mist and sea spray
 
 `@margoengine/physics/airborne` moves individual environmental parcels using local wind, diameter-dependent
-drag, gravity and evaporation. Read the poses for scene particles and the ledger for mass accounting.
+drag, gravity and evaporation. `readParticles()` returns positions in `particles.cell`, diameters in metres,
+represented mass in kilograms and current `materialDensity` in kg/m³. Sea-spray density follows the parcel's
+water loss and retained salt. The mass ledger, poses and published work describe the last accepted state.
 
 ```ts
 import { AirborneParticles } from '@margoengine/physics/airborne';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const particles = await AirborneParticles.load();
+using particles = await AirborneParticles.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(particles, {
   capacity: 128,
   initial: [{ kind: 'freshwater-mist', diameter: 0.00008, mass: 0.00001, position: [0, 1, 0] }],
@@ -8222,15 +8224,20 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(particles, {
   humidity: 0.98,
 });
 world.advance(30);
-console.log(particles.readParticles(), particles.budget);
+console.log(particles.readParticles(), particles.budget, particles.workCounts());
 ```
 
 Enable `terrain` and match the actual `TerrainBed` grid for world-space deposition. Pass
 `dustField: aeolian.dustField` to receive mineral dust emitted by EARTH-07. Enable `whitecaps` with the
-matching SEA-13 grid in `spray` to turn active whitecaps into three measured-source diameter bands.
+matching SEA-13 grid in `spray` to turn active whitecaps into three representative diameter bands.
 Supply `sources` for existing waterfall mist or mineral footstep dust. If `emissions` is enabled, an
 optional source owns one layout-1 f64 kg/s value for each row. Closed mass accounting includes the
 discrete parcels, waiting source mass, vapour, settled mass and open outflow.
+
+Use `AirborneParticles.load({ threads: 4 })` with `worldMemory(true)` to integrate four partitions.
+For browser threading, start the world in an isolated Worker. The default is one partition on either memory
+type. `workCounts()` gives the last accepted tick's native parcel, SIMD axis-pair and evaporation work. Wind
+sampling, ordered emissions and mass accounting run on the caller. Dispose the solver when finished.
 
 ## Acoustic pressure in rooms and tunnels
 

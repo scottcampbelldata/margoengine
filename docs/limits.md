@@ -9211,7 +9211,7 @@ The lensed disk uses circular Kerr angular velocity and a prescribed radial drif
 for zero spin and a two-point quadrature for spinning disks. The model covers slow radial drift of the emitter
 texture. Full relativistic gas dynamics, disk thickness and angular momentum transport are separate work.
 
-The orbit entry is 6,743 B gzip under a 6,947 B ceiling. The optional plain and shared Rust Wasm
+The orbit entry is 6,757 B gzip under a 6,947 B ceiling. The optional plain and shared Rust Wasm
 assets are 14,124/14,212 B raw and 6,091/6,146 B gzip. Core and Stage gain zero bytes. The black-hole entry grows from 25,293 B to 25,814 B within its 26,010 B
 budget. Core and stage together measure 24,820 B.
 
@@ -9239,7 +9239,7 @@ folds into the column with one beam drift and integer powers of the reflection f
 count must remain exactly representable as a float64 integer. The solver refuses an unresolved layer-crossing
 time or a tick that would leave the path or beam outside representable range. The previous accepted ray and
 ports remain available. The world holds 384 bytes per ray for state, outputs and scratch, plus the field
-registry's output copies, and 24 bytes per profile knot. The optional entry is 8,087 B gzip under an 8,284 B
+registry's output copies, and 24 bytes per profile knot. The optional entry is 8,105 B gzip under an 8,284 B
 ceiling. Each optional Wasm variant is 10,911 B raw and 4,846 B gzip. Core and Stage gain zero bytes.
 
 The loaded native path operates on the same ray and output regions as the synchronous constructor.
@@ -9705,7 +9705,7 @@ f64 words per cell and a dedicated stack per helper. A single-threaded world can
 browser window. Shared threads use Node or a cross-origin-isolated browser worker. Work counts
 describe the executed grid visits. Wall-clock throughput is unmeasured.
 
-The optional runoff entry is 7,024 B min+gzip under a 7,192 B ceiling. Lazy SIMD Wasm images are
+The optional runoff entry is 7,041 B min+gzip under a 7,192 B ceiling. Lazy SIMD Wasm images are
 23,699 B plain and 23,787 B shared raw, or 6,427 and 6,489 B gzip. Water's inland surface is
 1,716 B gzip under its 1,962 B ceiling. Core and Stage gain zero bytes.
 
@@ -9757,8 +9757,8 @@ workspace. Re-record snapshots created before the accepted mean wind and project
 
 The scalar constructor and optional native projection share the same Boussinesq cloud model. Only the Neumann
 stencil is partitioned. The advection, warm-rain closure, sedimentation and ordered PCG reductions run on the caller.
-The optional Physics entry measures 11,455 B gzip within 11,799 B. Environment density-volume
-measures 4,386 B gzip within 4,642 B. The plain and shared Wasm files load separately at 1,814 B raw and
+The optional Physics entry measures 11,469 B gzip within 11,799 B. Environment density-volume
+measures 5,140 B gzip within 5,396 B. The plain and shared Wasm files load separately at 1,814 B raw and
 943 B gzip each. Neither Physics nor Environment adds bytes to Core or Stage.
 
 `CloudDensityVolume` converts the accepted liquid-water mixing ratio into extinction using constant dry-air density
@@ -9791,7 +9791,7 @@ the values are 0.262, 0.382 and 0.405 m/s. Per-record uncertainty in the supplie
 remains unavailable. The use of a flat surface layer leaves terrain effects and flow feedback open.
 [Measured MOSAiC archive](https://doi.org/10.18739/A2PV6B83F)
 
-The optional Physics entry is 5,533 B gzip within a 5,769 B ceiling. The Weather entry is 3,408 B gzip
+The optional Physics entry is 5,549 B gzip within a 5,769 B ceiling. The Weather entry is 3,408 B gzip
 within a 3,664 B ceiling. Each Wasm variant is 11,852 B raw and 4,483 B gzip. Neither entry adds bytes
 to Physics World, Core or Stage.
 
@@ -9822,7 +9822,7 @@ per-capacity measurement uncertainty. The comparison does not simulate the exper
 subsequent aggradation. [Eslami and Radice (2025)](https://doi.org/10.5194/esurf-13-437-2025) ·
 [Measured capacities](https://doi.org/10.5281/zenodo.14883164)
 
-The optional sediment entry is 7,884 B gzip under an 8,101 B ceiling.
+The optional sediment entry is 7,897 B gzip under an 8,101 B ceiling.
 The plain and shared SIMD Wasm are 19,505/19,596 B raw and 7,606/7,667 B gzip.
 Water's optional shallow-surface mirror is 3,003 B gzip under a 3,259 B ceiling.
 Core and Stage gain zero bytes.
@@ -9867,7 +9867,7 @@ sums keep their cell order. The graph's downstream order and its incision, trans
 exchange retain their serial ordering. Worker scratch needs one job, a receipt and a stack
 per helper. The receipts describe work and stay outside snapshots. Throughput is unmeasured.
 
-The optional physics entry is 7,586 B gzip under a 7,764 B ceiling. The Biomes adapter is 739 B gzip under 870 B. Optional plain/shared Wasm is
+The optional physics entry is 7,597 B gzip under a 7,764 B ceiling. The Biomes adapter is 739 B gzip under 870 B. Optional plain/shared Wasm is
 42,179/42,267 B raw and 11,467/11,530 B gzip. Core and Stage gain zero bytes.
 
 ### Utility passes (`@margoengine/post`: `kawase-blur`, `lut1d`, `color-average`, `depth-downsample`, 2026-11-25)
@@ -10413,23 +10413,34 @@ same wet-face flux. The held-out pendant-drop thinning check covers the attached
 five minutes. The graph cannot represent an overhang or the topology change at pinch-off.
 [Reproduce](whitepaper/reproduce.md#fluid-07-suspended-film)
 
-The optional thin-film entry is 15,190 B gzip with a 15,631 B ceiling. Both Wasm assets are 30,756 B raw and each is 11,743 B gzip.
+The optional thin-film entry is 15,193 B gzip with a 15,631 B ceiling. Both Wasm assets are 30,756 B raw and each is 11,743 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 
 The optional `@margoengine/physics/airborne` advances mineral dust, freshwater mist and sea spray at 240 Hz.
-Source parcels represent many physical particles. Each parcel holds 16 f64 words in the arena. Sources retain
-pending mass and get round-robin emission turns when the parcel allocation is full. Both native builds are
-610 B raw. The optional entry is 8,260 B gzip. Core plus stage remains 24,820 B gzip. The portable and shared variants use the same SIMD arithmetic and import the world memory without
-an initial static region.
+A representative parcel carries its combined mass and 16 f64 state words. A separate candidate region keeps
+accepted parcels, pending releases and the ledger intact if the next interval fails. At capacity, source mass
+waits for a deterministic emission turn. Origin cells are signed integers and parcel coordinates stay in local
+metres. Wind points translate to the Wind's origin cell. The caller samples inputs and folds mass and terrain
+contact in stable order. Browser threading needs an isolated world Worker and shared memory. Work receipts
+are outside snapshots.
 
-The drag law is for rounded particles in environmental air. The Stokes option checks Re ≤ 0.1; the default
-uses a transitional correlation and a constant-drag large-particle approximation. Wind and drag are held during
-one 1/240 s interval, so gradients are resolved at the local query rate. Homogeneous turbulence approaches the
-specified variance from a zero initial fluctuation. The wet-droplet evaporation model is diffusion-limited with
-prescribed humidity and a salt-dependent equilibrium diameter. It conserves the dry sea salt remaining after water loss. Mixed atmospheric chemistry,
-collisions between droplets and two-way air heating need separate fields. Deposition tests use heightfield
-subdivision at half the smallest horizontal cell width; the aggregate ledger retains the mass.
+The drag law assumes rounded particles. The Stokes option is restricted to Re ≤ 0.1. The default has the
+Schiller–Naumann transition and a constant-drag high-Re approximation. Prescribed Wind and drag are frozen
+over each 1/240 s interval. Turbulence is homogeneous and Gaussian, with zero initial gust. Diffusion-limited
+evaporation uses prescribed humidity and a salt-dependent equilibrium diameter. Dry salt is conserved. The
+terrain sweep subdivides the path every half horizontal grid interval up to 4,096 samples per tick. Contact
+moves mass into the deposition ledger. Rebound and resuspension remain open.
+
+The natural spray volume draws accepted mass, droplet diameter and material density. The render resolution
+sets the Gaussian footprint for a representative parcel. Its normalized kernel conserves optical area in
+the continuous limit. The original film installations and the separate Water spray pool remain open. Independent Gunn–Kinzer and
+Beard–Pruppacher settling comparisons cover 0.1–0.5 mm. Several Gunn–Kinzer results exceed the reported
+measurement resolution and uncertainty. Ventilation, wet-bulb cooling, inhomogeneous stochastic drift, other
+materials, droplet collisions and feedback to the air remain open.
+
+The Physics entry measures 10,989 B gzip within 11,319 B. Environment density-volume measures 5,140 B gzip
+within 5,396 B. Each local native image is 1,444 B raw and 918 B gzip. Core and Stage gain no bytes.
 
 ### Developmental wood growth (BIO-02)
 
@@ -10480,7 +10491,7 @@ renderer's optional destination uses a separate ArrayBuffer to protect the physi
 arena, even after shared memory grows. Counts describe work assignments. Wall-clock
 throughput is unmeasured.
 
-The optional viscoplastic entry is 8,666 B gzip with an 8,826 B ceiling. Both Wasm assets are 36,124 B raw and 13,261 B gzip. Core and Stage gain zero bytes.
+The optional viscoplastic entry is 8,675 B gzip with an 8,826 B ceiling. Both Wasm assets are 36,124 B raw and 13,261 B gzip. Core and Stage gain zero bytes.
 
 ### Skeletal tissue attachments (SOFT-05)
 
@@ -10698,7 +10709,7 @@ It displays the moving wet/dry boundary and depth-averaged surface, without an o
 A world tick accepts only finite depth, discharge, volume and inundation records. If the explicit solver
 would need more than 4,096 CFL substeps, use a coarser grid or smaller forcing. No partial step is published.
 
-The optional tsunami entry is 9,007 B gzip with a 9,278 B ceiling. The plain and shared Wasm assets are
+The optional tsunami entry is 9,020 B gzip with a 9,278 B ceiling. The plain and shared Wasm assets are
 each 23,068 B raw and 9,530 B gzip. Its optional worker asset is 767 B gzip and is shared with ATMO-07. Extreme finite Coriolis rates retain the midpoint rotation's bounded
 half-turn limit. Resolve the rotation in time when phase accuracy matters.
 
@@ -10763,7 +10774,7 @@ for visualization and relative acoustic delays. Predicting strike locations, cur
 absolute sound pressure requires storm observations and additional plasma and atmospheric models.
 The live Sky field borrows accepted geometry and a relative radiance envelope at the requested world time.
 Points between accepted physics ticks use the last accepted geometry. Weather retains its own light schedule. Grid capacity follows available wasm32 arena space, including each
-published field's two mirrors. The optional entry measures 8,939 B gzip within a 9,072 B ceiling. Both native
+published field's two mirrors. The optional entry measures 8,950 B gzip within a 9,072 B ceiling. Both native
 modules measure 3,272 B raw and 1,648 B gzip and load with that entry. Sky's bolt measures 6,103 B gzip
 within a 6,300 B ceiling. The optional worker asset is 767 B gzip and is shared with SEA-06. Core and Stage
 gain zero bytes.
@@ -10779,7 +10790,7 @@ Receipts describe recent execution, while snapshots retain the physical state.
 
 Lava uses a regular depth-averaged heightfield patch with closed edges. It resolves laminar Bingham resistance, advected crystallisation enthalpy, diffusion, radiative and convective skin transfer and basal cooling. The optional terminal transport removes inertia for creeping flow, using Bingham discharge at each face and conservative enthalpy transport. It requires a thin, slowly varying sheet and has no imposed initial discharge. A point vent omits the real basalt experiment's chute momentum. Terrain, cooled crust and the pressure gradient drive channel confinement and arrest. The shallow-layer aspect-ratio approximation applies to patch-scale flow. Individual crust fractures, elastic lava tubes, three-dimensional overturning and a separate bubble phase need higher-dimensional models. The coastal source is the signed change in displaced volume under a fixed reference sea level. This estimate covers gravity-wave forcing from submerged occupancy. Rapid interface chemistry and water-side multiphase overturning are outside the model.
 
-The native microstep respects transport and thermal diffusion bounds. It refuses a tick above 4,096 explicit microsteps and publishes only finite, accepted volume and heat ledgers. With zero conductivity the well-mixed bulk is exposed, so radiation, convection and the water film act without a conductive skin or basal term. The default positive conductivity resolves a resistive skin. The ICE-05 contact is a 60 Hz staggered heat exchange. Match the terrain and render frames to the lava grid. Weather draws accepted skin emission and basalt coverage from the depth and crust with no guessed exposed crack area. Physics lava is 9,686 B gzip under 9,824 B. Weather lava is 15,291 B under 15,750 B. Both Wasm assets are 19,038 B raw and 8,497 B gzip. Core and Stage gain zero bytes.
+The native microstep respects transport and thermal diffusion bounds. It refuses a tick above 4,096 explicit microsteps and publishes only finite, accepted volume and heat ledgers. With zero conductivity the well-mixed bulk is exposed, so radiation, convection and the water film act without a conductive skin or basal term. The default positive conductivity resolves a resistive skin. The ICE-05 contact is a 60 Hz staggered heat exchange. Match the terrain and render frames to the lava grid. Weather draws accepted skin emission and basalt coverage from the depth and crust with no guessed exposed crack area. Physics lava is 9,700 B gzip under 9,824 B. Weather lava is 15,291 B under 15,750 B. Both Wasm assets are 19,038 B raw and 8,497 B gzip. Core and Stage gain zero bytes.
 
 The optional native worker path needs shared memory and a blocking host (Node or a
 cross-origin-isolated browser worker). On each microstep it partitions stability and local

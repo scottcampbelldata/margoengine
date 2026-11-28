@@ -18,12 +18,13 @@ export interface AirborneMass {
 }
 
 export interface AirborneOptions {
+    readonly threads?: number;
+    readonly signal?: AbortSignal;
     readonly id?: string;
     readonly terrain?: boolean;
     readonly dustField?: FieldDescriptor;
     readonly whitecaps?: boolean;
     readonly emissions?: boolean;
-    readonly signal?: AbortSignal;
 }
 
 export interface AirborneParams {
@@ -61,9 +62,12 @@ export class AirborneParticles implements Solver<AirborneParams> {
     readonly massField: FieldDescriptor;
     private constructor();
     static load(options?: AirborneOptions): Promise<AirborneParticles>;
+    [Symbol.dispose](): void;
+    workCounts(): AirborneWorkCounts;
     describe(): SolverDescription;
     init(host: SolverHost, params: AirborneParams): void;
     step(context: StepContext, dt: number): void;
+    get cell(): Cell;
     readParticles(): readonly AirborneSample[];
     get budget(): AirborneMass;
     exportPorts(tick: number): readonly Port[];
@@ -76,6 +80,7 @@ export interface AirborneSample extends AirborneParcel {
     readonly id: number;
     readonly age: number;
     readonly velocity: AirborneVector;
+    readonly materialDensity?: number;
 }
 
 export interface AirborneSource extends Omit<AirborneParcel, 'mass'> {
@@ -83,6 +88,17 @@ export interface AirborneSource extends Omit<AirborneParcel, 'mass'> {
 }
 
 export type AirborneVector = readonly [number, number, number];
+
+export interface AirborneWorkCounts extends AirborneWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly AirborneWorkerWork[];
+}
+
+export interface AirborneWorkerWork {
+    readonly parcels: number;
+    readonly simdAxisPairs: number;
+    readonly evaporationUpdates: number;
+}
 
 export interface SpraySourceGrid {
     readonly columns: number;

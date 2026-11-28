@@ -17177,6 +17177,26 @@ integral of that integral. The Rust kernel computes X and Y together and uses th
 order for Z. Field reads precede the native batch. The transported materials are environmental
 mineral dust and water droplets.
 
+ATMO-06 applies the frozen parcel integration to disjoint rows. X and Y position and velocity remain paired
+in Rust SIMD. Z uses the same arithmetic order. Each thread counts its actual updates. Philox keys, source
+emission, bed queries, stable compaction and mass sums stay in fixed caller order. For very slow homogeneous
+turbulence, evaluate Thomson's Ornstein–Uhlenbeck variance with its Taylor expansion to avoid cancellation.
+
+R. Gunn and G. D. Kinzer (1949) studied freely falling drops. K. V. Beard and H. R. Pruppacher (1969)
+measured drop drag independently in a wind tunnel. The atmospheric settling diagnostic uses these references
+without fitting the drag or gas slip coefficients. The separate Kinzer–Gunn (1951) free-fall evaporation
+comparison uses the tabulated factors from Smithsonian Table 117 and retains the measured differences.
+[Smithsonian tables](https://repository.si.edu/items/5b259e9c-a900-48e0-ad68-07bb46302156) ·
+[Beard and Pruppacher](https://doi.org/10.1175/1520-0469%281969%29026%3C1066%3AADOTTV%3E2.0.CO%3B2) ·
+[Kinzer and Gunn](https://doi.org/10.1175/1520-0469%281951%29008%3C0071%3ATETATR%3E2.0.CO%3B2)
+
+The spray display uses the large-drop extinction limit described by J. E. Hansen and L. D. Travis (1974),
+with visible optical area equal to the drop count times twice its geometric cross-section. Depositing that
+area into a spatial volume divides by the integral over the three-standard-deviation spherical Gaussian.
+This integral follows by substituting radial distance into the normal density. The renderer compares
+the discretized volume to the separate radial integral in `environment/tests/density-volume.test.js`.
+[Hansen and Travis](https://pubs.giss.nasa.gov/abs/ha09500o.html)
+
 ### Developmental plant growth (BIO-02)
 
 - Przemyslaw Prusinkiewicz and Aristid Lindenmayer, [The Algorithmic Beauty of Plants](https://algorithmicbotany.org/papers/#abop) (1990), chapters 2 and 4. The tree example in Fig. 2.6 uses a parent apex that creates an internode, a continuing apex and a lateral apex on the same production. The module instantiates that production synchronously at season boundaries. Lateral azimuth follows a configurable fixed divergence angle with the golden-angle default.

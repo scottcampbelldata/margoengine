@@ -6911,3 +6911,13 @@ recovery from invalid wind in the second cloud interval of one tick. `cloud-proj
 shifts and exact seek. The largest Node case applies 171 stencils covering 3,276,189 cell visits, including 3,075,606
 SIMD-paired visits. `cloud-surface.browser.mjs` renders the live condensate and its wind advection on WebGPU and
 WebGL2. The closed cube is analytical numerical evidence. Independent field validation remains open.
+
+### Native environmental parcels and field-driven sea-spray optics (ATMO-06)
+
+`packages/physics/tests/airborne-acceptance.test.js` checks that a bad Wind sample leaves accepted state and
+mass untouched. `airborne-threads.test.js` and `airborne-threads.browser.mjs` prove exact accepted native
+replay across memory and partition counts. The 4,099-parcel case reports 8,198 SIMD axis pairs. The separate
+`airborne-surface.browser.mjs` draws the live wave, whitecap and accepted particle path on WebGPU and WebGL2.
+The 219 retained trajectories move 24.74 m. The volume changes 5,258 and 5,262 pixels on the two backends.
+`packages/physics/scripts/atmo06-droplet-settling.mjs` retains the measured discrepancies for settling
+and evaporation. Field validation across regimes remains open.

@@ -293,6 +293,59 @@ engine.render({ delta: 0 });
 
 The grid uses renderer-local metres and fixed geometry. Recreate its volume when the source grid changes. The optical approximation uses a uniform density and radius, with trilinear filtering and the existing froxel lighting and resolution. It models warm liquid clouds in visible light. [Hansen and Travis (1974)](https://www.giss.nasa.gov/pubs/abs/ha09500o.html), [Slingo (1989)](https://doi.org/10.1175/1520-0469(1989)046%3C1419:AGPFTS%3E2.0.CO;2)
 
+**Render wind-driven sea spray.** `SeaSprayDensityVolume` uses the accepted sea-spray parcels from `AirborneParticles`. Their mass, diameter and current material density determine the optical cross-section. Call `update()` after advancing or restoring the physics world.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { AirborneParticles } from 'margoengine/physics/airborne';
+import { FoamSolver } from 'margoengine/physics/foam';
+import { SpectralSea } from 'margoengine/physics/sea';
+import { WaveSolver } from 'margoengine/physics/waves';
+import { PhysicsWorld } from 'margoengine/physics/world';
+import { BoundaryLayerWind } from 'margoengine/weather/boundary-layer';
+import { SeaSprayDensityVolume } from 'margoengine/environment/density-volume';
+import { VolumetricFog } from 'margoengine/environment/volumetric';
+import { Tonemap } from 'margoengine/tonemap';
+import { Sky } from 'margoengine/sky';
+import { Water } from 'margoengine/water';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu',
+  camera: { position: [35, 3.3, 10], target: [7, 1.25, -1], near: 0.35, far: 360 },
+});
+Tonemap.attach(engine, { exposure: -0.4 });
+Sky.attach(engine, { sunDirection: [-0.94, 0.075, -0.37], timeScale: 0, lighting: { intensity: 3 } });
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, seed: 42 });
+const wind = new BoundaryLayerWind({ speed: 22, turbulence: false });
+const sea = new WaveSolver();
+const swell = { height: 4, period: 6, direction: 0 };
+world.add(sea, {
+  cells: [4, 4], cellSize: 24, depth: 80,
+  frequencies: { count: 24, min: 0.06, max: 0.06 * 1.12 ** 23 },
+  directions: 16, start: swell, swell, wind,
+});
+world.add(new FoamSolver(), { waves: sea.field, cells: [12, 12], cellSize: 3, statistics: 18, wind });
+const airborne = await AirborneParticles.load({ whitecaps: true });
+world.add(airborne, {
+  wind,
+  spray: { columns: 12, rows: 12, spacing: 3, centre: [0, 0], releaseHeight: 1.1 },
+});
+const spray = new SeaSprayDensityVolume(airborne, { cellSize: world.cellSize });
+const surface = new SpectralSea({ waves: sea.field, seed: 42 });
+const water = Water.attach(engine, { sea: surface, size: [110, 110], horizon: true, whitecaps: 0 });
+const fog = VolumetricFog.attach(engine, {
+  volumes: spray, density: 0, range: 62, anisotropy: 0.86, temporal: 0,
+});
+world.advance(120);
+surface.refresh();
+water.setTime(world.time);
+spray.update();
+engine.render({ delta: 0 });
+// When unloading, release fog before spray, then remove the airborne solver from the world.
+```
+
+`voxelSize` defaults to 0.1 m. A parcel contributes extinction area `3m/(ρd)` in the visible large-droplet approximation. Its spherical Gaussian is normalized inside three standard deviations, with a standard deviation of two voxels. Sampling at voxel centres approximates that continuous integral, so volume resolution affects very narrow plumes. Small dried aerosol near visible wavelengths needs wavelength-dependent scattering. `update(renderCell)` accepts a signed cell when the renderer uses another origin. Omit it to use the source's live cell. Match `cellSize` to the world's cell width. [Hansen and Travis (1974)](https://www.giss.nasa.gov/pubs/abs/ha09500o.html), [Gong (2003)](https://doi.org/10.1029/2003GB002079)
+
 How it works. The grid is the leaf layout of OpenVDB (Museth 2013): bricks of 8 x 8 x 8 voxels, z fastest, and constant tiles for whole bricks of one value. On the GPU a page table over the box of occupied bricks holds one entry a brick (empty, a tile's value, or its slot in the voxel store); each froxel maps its sample point to index space through the inverse of the index-to-world matrix and filters the eight voxel centres around it trilinearly, so `sample(p)` on the CPU gives the same value. A voxel value of 1 is `density` extinction per metre with albedo `color`. `splat` adds Gaussians of a given peak and world radius, cut at three radii. The page table and voxels upload only when the grid changed; the matrix, box and look every frame.
 
 Options and defaults: `voxelSize` 0.5 m and `origin` [0, 0, 0] (voxel (0, 0, 0)'s centre), or `matrix` (affine, column-major index to world); `density` 1 per m; `color` [1, 1, 1]; `maxBricks` 32,768 (64 MiB of voxels); `maxPages` 16,777,216 (the page table spans the box round every brick, 4 B a brick of the box). Limits: detail finer than a froxel (about 8 x 8 pixels and a slice deep with the default grid) is averaged into it, so a close-up of fine smoke needs a finer `grid`; one `volumes` source per fog (this or `FogVolumes`); voxel indices within +-524,288; values below 0 read as 0. Real-GPU check: `npm run test:density-volume:browser` (WebGPU and the WebGL2 layer: Gaussian splats, a VDB leaf and a tile give an integrated froxel volume equal to a CPU mirror built on `sample`, every froxel; the albedo colours the fog; a rewritten grid shows on the next frame; an empty grid is clear).

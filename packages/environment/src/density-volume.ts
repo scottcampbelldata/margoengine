@@ -63,6 +63,7 @@ const VOXELS = 512,
   SPAN = 1 << 16,
   MAX_DENSITY = 1e4,
   DEFAULT_MAX_BRICKS = 32768,
+  DEFAULT_MAX_PAGES = 1 << 24,
   identity = (size: number, o: Vec3) => [size, 0, 0, 0, 0, size, 0, 0, 0, 0, size, 0, o[0], o[1], o[2], 1];
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const within = (v: unknown, fallback: number, lo: number, hi: number, name: string): number => {
@@ -123,8 +124,8 @@ export class DensityVolume implements VolumetricMediumSource {
   /** Column-major index-to-world matrix (copied). */
   readonly matrix: Float64Array;
   private readonly inverse: Float64Array;
-  private readonly bricks = new Map<number, Float32Array>();
-  private readonly tiles = new Map<number, number>();
+  private bricks = new Map<number, Float32Array>();
+  private tiles = new Map<number, number>();
   private readonly maxBricks: number;
   private readonly maxPages: number;
   private dirty = true;
@@ -143,7 +144,7 @@ export class DensityVolume implements VolumetricMediumSource {
       throw new RangeError('DensityVolume color must be three numbers from 0 to 1');
     this.color = [color[0], color[1], color[2]];
     this.maxBricks = within(o.maxBricks, DEFAULT_MAX_BRICKS, 1, 1 << 20, 'maxBricks');
-    this.maxPages = within(o.maxPages, 1 << 24, 1, 1 << 26, 'maxPages');
+    this.maxPages = within(o.maxPages, DEFAULT_MAX_PAGES, 1, 1 << 26, 'maxPages');
     if (!Number.isInteger(this.maxBricks) || !Number.isInteger(this.maxPages))
       throw new RangeError('DensityVolume maxBricks and maxPages must be whole numbers');
     let m: ArrayLike<number>;
@@ -316,6 +317,22 @@ export class DensityVolume implements VolumetricMediumSource {
               d2 = dx * dx + dy * dy + dz * dz;
             if (d2 <= cut) this.addAt(x, y, z, w * Math.exp(k * d2));
           }
+    }
+  }
+
+  /** Replace the CPU medium on a complete successful rasterization, retaining its GPU buffers. */
+  protected replaceSplats(positions: ArrayLike<number>, options: DensitySplatOptions): void {
+    const { bricks, tiles, dirty } = this;
+    this.bricks = new Map();
+    this.tiles = new Map();
+    try {
+      this.splat(positions, options);
+      this.dirty = true;
+    } catch (error) {
+      this.bricks = bricks;
+      this.tiles = tiles;
+      this.dirty = dirty;
+      throw error;
     }
   }
 
@@ -548,6 +565,141 @@ export class CloudDensityVolume extends DensityVolume {
           if (value > 0) this.set(x, y, z, value);
         }
       }
+    }
+  }
+
+  override dispose(): void {
+    this.closed = true;
+    super.dispose();
+  }
+}
+
+/** The accepted sea-spray properties of an airborne parcel in its source cell. */
+export interface SeaSprayParcel {
+  readonly kind: string;
+  readonly position: Vec3;
+  /** Combined parcel mass in kilograms. */
+  readonly mass: number;
+  /** Current droplet diameter in metres. */
+  readonly diameter: number;
+  /** Current droplet material density in kg/m³, including residual sea salt. Required for sea spray. */
+  readonly materialDensity?: number;
+}
+
+/** The subset of `AirborneParticles` needed to render its sea spray. */
+export interface SeaSpraySource {
+  readonly cell: Vec3;
+  readParticles(): readonly SeaSprayParcel[];
+}
+
+export interface SeaSprayDensityVolumeOptions {
+  /** Voxel spacing in metres, default 0.1. Each parcel is spread with a standard deviation of two voxels. */
+  voxelSize?: number;
+  /** Width of a large-world origin cell in metres, default 4096. Use the PhysicsWorld's cell size. */
+  cellSize?: number;
+}
+
+// The integral of a unit-centred isotropic Gaussian inside radius three σ
+// is (2π)^(3/2) σ³ [erf(3/√2) - 3√(2/π) exp(-9/2)].
+const TRUNCATED_GAUSSIAN_VOLUME = Math.pow(2 * Math.PI, 1.5) * 0.9707091134651118;
+
+/**
+ * Turns accepted marine droplets into a depth-tested volumetric medium for `VolumetricFog`.
+ * Each parcel's visible-light extinction area is 3m/(ρd) in the large-drop limit Q_ext = 2,
+ * spread with a normalized three-sigma Gaussian and sampled at the voxel centres.
+ */
+export class SeaSprayDensityVolume extends DensityVolume {
+  private readonly spacing: number;
+  private readonly worldCellSize: number;
+  private closed = false;
+
+  constructor(
+    private readonly source: SeaSpraySource,
+    options: SeaSprayDensityVolumeOptions = {},
+  ) {
+    const { voxelSize = 0.1, cellSize = 4096 } = options ?? {};
+    if (
+      typeof source?.readParticles !== 'function' ||
+      !finite(voxelSize) ||
+      !(voxelSize >= 1e-4 && voxelSize <= 1e4) ||
+      !finite(cellSize) ||
+      !(cellSize > 0)
+    )
+      throw new MargoError(
+        'state',
+        'Invalid sea spray source or grid. Pass airborne particles and positive metre sizes.',
+      );
+    super({ voxelSize });
+    this.spacing = voxelSize;
+    this.worldCellSize = cellSize;
+    this.update();
+  }
+
+  /** Upload the current sea-spray parcels in the supplied renderer cell, defaulting to the source's live cell. */
+  update(renderCell?: Vec3): void {
+    if (this.closed) throw new MargoError('disposed', 'Sea spray volume is disposed. Create a new spray volume.');
+    const sourceCell = this.source.cell;
+    const targetCell = renderCell ?? sourceCell;
+    const offset = [0, 0, 0];
+    for (let i = 0; i < 3; i++) {
+      if (!Number.isSafeInteger(targetCell?.[i]) || !Number.isSafeInteger(sourceCell?.[i]))
+        throw new MargoError('state', 'Invalid sea spray origin cell. Pass three signed integer cell coordinates.');
+      offset[i] = (sourceCell[i]! - targetCell[i]!) * this.worldCellSize;
+    }
+    const parcels = this.source.readParticles();
+    if (!Array.isArray(parcels))
+      throw new MargoError('state', 'Invalid sea spray frame. Return the accepted airborne parcels as an array.');
+
+    const positions: number[] = [];
+    const weights: number[] = [];
+    const spread = 2 * this.spacing;
+    const gaussianVolume = TRUNCATED_GAUSSIAN_VOLUME * spread * spread * spread;
+    const extentMin = [Infinity, Infinity, Infinity];
+    const extentMax = [-Infinity, -Infinity, -Infinity];
+    let peakBound = 0;
+    for (const parcel of parcels) {
+      if (parcel?.kind !== 'sea-spray') continue;
+      const { position, diameter, mass, materialDensity } = parcel;
+      if (
+        !finite(diameter) ||
+        !finite(mass) ||
+        !finite(materialDensity) ||
+        !(diameter > 0 && mass >= 0 && materialDensity > 0)
+      )
+        throw new MargoError(
+          'state',
+          'Invalid spray droplet. Use a nonnegative mass and positive diameter and density.',
+        );
+      if (mass === 0) continue;
+      const weight = ((mass / diameter) * (3 / materialDensity)) / gaussianVolume;
+      peakBound += weight;
+      if (!finite(Math.fround(peakBound)) || !finite(Math.fround(peakBound * this.density)))
+        throw new MargoError('state', 'Spray extinction exceeds Float32 range. Check parcel mass, size and density.');
+      for (let i = 0; i < 3; i++) {
+        const world = position?.[i]! + offset[i]!;
+        const grid = world / this.spacing;
+        if (!finite(world) || Math.abs(grid) + 6 > SPAN * DENSITY_BRICK - 1)
+          throw new MargoError(
+            'state',
+            'Spray lies outside the density grid. Use a nearby render cell or larger voxels.',
+          );
+        positions.push(world);
+        extentMin[i] = Math.min(extentMin[i]!, Math.floor((grid - 6) / DENSITY_BRICK));
+        extentMax[i] = Math.max(extentMax[i]!, Math.floor((grid + 6) / DENSITY_BRICK));
+      }
+      weights.push(weight);
+    }
+    if (weights.length && extentMax.reduce((pages, max, i) => pages * (max - extentMin[i]! + 1), 1) > DEFAULT_MAX_PAGES)
+      throw new MargoError('state', 'Spray spans too many density pages. Use larger voxels or a smaller shot region.');
+    try {
+      this.replaceSplats(positions, { radius: spread, weight: weights });
+    } catch (error) {
+      if (error instanceof RangeError)
+        throw new MargoError(
+          'state',
+          'Spray exceeds density volume capacity. Use larger voxels or a smaller shot region.',
+        );
+      throw error;
     }
   }
 

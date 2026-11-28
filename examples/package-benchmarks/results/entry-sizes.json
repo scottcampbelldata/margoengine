@@ -1448,8 +1448,8 @@
         "gzip": 2243
       },
       "./density-volume": {
-        "raw": 11166,
-        "gzip": 4386
+        "raw": 13537,
+        "gzip": 5140
       },
       "./settings": {
         "raw": 9666,
@@ -15446,8 +15446,8 @@
         "gzip": 5010
       },
       "./lightning": {
-        "raw": 24365,
-        "gzip": 8939
+        "raw": 24383,
+        "gzip": 8950
       },
       "./explosive": {
         "raw": 41750,
@@ -15466,8 +15466,8 @@
         "gzip": 6377
       },
       "./clouds": {
-        "raw": 31477,
-        "gzip": 11455
+        "raw": 31495,
+        "gzip": 11469
       },
       "./ageing": {
         "raw": 9179,
@@ -15598,24 +15598,24 @@
         "gzip": 4339
       },
       "./thin-film": {
-        "raw": 39042,
-        "gzip": 15190
+        "raw": 39045,
+        "gzip": 15193
       },
       "./viscoplastic": {
-        "raw": 22838,
-        "gzip": 8666
+        "raw": 22856,
+        "gzip": 8675
       },
       "./tsunami": {
-        "raw": 23456,
-        "gzip": 9007
+        "raw": 23474,
+        "gzip": 9020
       },
       "./pack-ice": {
         "raw": 11423,
         "gzip": 4715
       },
       "./runoff": {
-        "raw": 18197,
-        "gzip": 7024
+        "raw": 18215,
+        "gzip": 7041
       },
       "./drainage-fog": {
         "raw": 10045,
@@ -15630,12 +15630,12 @@
         "gzip": 4916
       },
       "./airborne": {
-        "raw": 16197,
-        "gzip": 7062
+        "raw": 27874,
+        "gzip": 10989
       },
       "./boundary-layer": {
-        "raw": 14042,
-        "gzip": 5533
+        "raw": 14060,
+        "gzip": 5549
       },
       "./aeolian": {
         "raw": 11986,
@@ -15646,28 +15646,28 @@
         "gzip": 3902
       },
       "./landscape": {
-        "raw": 19560,
-        "gzip": 7586
+        "raw": 19578,
+        "gzip": 7597
       },
       "./sediment": {
-        "raw": 21235,
-        "gzip": 7884
+        "raw": 21253,
+        "gzip": 7897
       },
       "./underwater": {
-        "raw": 20391,
-        "gzip": 8087
+        "raw": 20409,
+        "gzip": 8105
       },
       "./orbit": {
-        "raw": 17151,
-        "gzip": 6743
+        "raw": 17169,
+        "gzip": 6757
       },
       "./granular-flow": {
         "raw": 14611,
         "gzip": 5574
       },
       "./lava": {
-        "raw": 25349,
-        "gzip": 9686
+        "raw": 25367,
+        "gzip": 9700
       },
       "./dfsph": {
         "raw": 19974,
@@ -19225,14 +19225,14 @@
       "brotli": 5583
     },
     "packages/physics/dist/airborne-kernel.wasm": {
-      "raw": 610,
-      "gzip": 439,
-      "brotli": 410
+      "raw": 1444,
+      "gzip": 918,
+      "brotli": 851
     },
     "packages/physics/dist/airborne-kernel-shared.wasm": {
-      "raw": 610,
-      "gzip": 439,
-      "brotli": 410
+      "raw": 1444,
+      "gzip": 918,
+      "brotli": 849
     },
     "packages/physics/dist/aeolian-kernel.wasm": {
       "raw": 8172,

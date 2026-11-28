@@ -4,11 +4,9 @@ import { exp, pow } from '@margoengine/math/pinned';
 import { BED_FIELD, type BedShape, bedFromPort, bedVertexAreas, bedVertexCount } from '../earth/index.js';
 import { SEA_FOAM_FIELD, SEA_FOAM_LAYOUT, sprayPerWhitecap } from '../foam/index.js';
 import {
-  canShareMemory,
   type Cell,
   type FieldDescriptor,
   type FieldUse,
-  isShared,
   philox,
   regionWords,
   type Port,
@@ -18,7 +16,6 @@ import {
   type SolverHost,
   type StepContext,
   solverNumber,
-  STACK_BYTES,
   MAX_MEMORY_PAGES,
 } from '../world/index.js';
 import {
@@ -41,6 +38,9 @@ import {
   normalDeviates,
   TWO32,
 } from './environment.js';
+import { AirbornePhase, type AirborneWorkCounts } from './phase.js';
+
+export type { AirborneWorkerWork, AirborneWorkCounts } from './phase.js';
 
 /** Supported environmental suspensions. */
 export type AirborneKind = (typeof KINDS)[number];
@@ -81,6 +81,10 @@ export interface SpraySourceGrid {
 
 /** Fields the solver declares at creation. */
 export interface AirborneOptions {
+  /** Number of native partitions, including the caller. Defaults to one. */
+  readonly threads?: number;
+  /** Cancels loading and compiling the native assets. */
+  readonly signal?: AbortSignal;
   /** Unique registry field prefix. Default 'airborne'. */
   readonly id?: string;
   /** Read the live TerrainBed. Supply matching terrain geometry in the world parameters. Default false. */
@@ -91,8 +95,6 @@ export interface AirborneOptions {
   readonly whitecaps?: boolean;
   /** Read one kg/s layout-1 f64 value per explicit source. Default false. */
   readonly emissions?: boolean;
-  /** Cancels loading and compiling the native assets. */
-  readonly signal?: AbortSignal;
 }
 
 /** Deterministic environmental inputs and storage limits. */
@@ -141,6 +143,8 @@ export interface AirborneSample extends AirborneParcel {
   readonly id: number;
   readonly age: number;
   readonly velocity: AirborneVector;
+  /** Current particle material density, kg/m³, including retained sea salt. */
+  readonly materialDensity?: number;
 }
 
 const LAYOUT = 1;
@@ -155,11 +159,8 @@ const EXIT = 5;
 const WAITING = 6;
 const STRIDE = 4;
 const DUST_DIAMETER = 20e-6;
+const MAX_GROUND_SWEEP_STEPS = 4096;
 
-interface Native extends WebAssembly.Exports {
-  __stack_pointer: WebAssembly.Global;
-  disperse(parcels: number, air: number, count: number, dt: number): void;
-}
 interface Source extends AirborneSource {
   kindIndex: number;
   multiplier: number;
@@ -170,8 +171,11 @@ interface Source extends AirborneSource {
 }
 interface State {
   host: SolverHost;
-  native: Native;
   particles: Region;
+  candidate: Region;
+  candidateLedger: Float64Array;
+  candidateCount: Float64Array;
+  candidatePending: Float64Array;
   samples: Region;
   old: Region;
   ledger: Region;
@@ -198,62 +202,37 @@ function layout(name: string, quantity: string, unit: string, kind: FieldDescrip
   return { name, quantity, unit, kind, centring: kind === 'particleSet' ? 'particle' : 'cell' };
 }
 function vector(input: AirborneVector, label: string): AirborneVector {
-  if (!input || input.length !== 3 || !input.every(Number.isFinite))
-    throw new TypeError(`Provide three finite environmental particle coordinates for ${label}.`);
+  if (!input || input.length !== 3 || ![input[0], input[1], input[2]].every(Number.isFinite))
+    throw new MargoError('state', `Provide three finite environmental particle coordinates for ${label}.`);
   return [input[0], input[1], input[2]];
 }
 function material(value: AirborneKind): number {
   const kind = KINDS.indexOf(value);
-  if (kind < 0) throw new RangeError('Choose mineral-dust, freshwater-mist or sea-spray for environmental particles.');
+  if (kind < 0)
+    throw new MargoError('state', 'Choose mineral-dust, freshwater-mist or sea-spray for environmental particles.');
   return kind;
 }
 function numberOf(value: number, label: string): number {
-  if (!Number.isSafeInteger(value) || value < 1) throw new RangeError(`Use a positive integer for ${label}.`);
+  if (!Number.isSafeInteger(value) || value < 1) throw new MargoError('state', `Use a positive integer for ${label}.`);
   return value;
 }
 function words(s: State, r: Region): Float64Array {
   return regionWords(s.host.memory, r) as Float64Array;
 }
 
-async function load(url: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {
-  signal?.throwIfAborted();
-  if (url.protocol === 'file:') {
-    const name = 'node:fs/promises';
-    const { readFile } = await import(/* @vite-ignore */ /* webpackIgnore: true */ name);
-    url.search = '';
-    return WebAssembly.compile(await readFile(url, { signal }));
-  }
-  const response = await fetch(url, { signal });
-  if (!response.ok)
-    throw new MargoError(
-      'failed',
-      `Airborne kernel HTTP ${response.status}. Use the Wasm assets shipped with the package.`,
-    );
-  return WebAssembly.compile(await response.arrayBuffer());
-}
-
 function writeParcel(out: Float64Array, i: number, id: number, kind: number, a: AirborneParcel, elevation = 0): void {
   const p = vector(a.position, 'position');
   const v = vector(a.velocity ?? ZERO, 'velocity');
   const d = range(a.diameter, 'diameter', MIN_DIAMETER, MAX_DIAMETER[kind]!);
-  const mass = range(a.mass, 'mass', Number.MIN_VALUE, Number.MAX_VALUE);
+  const mass = range(a.mass, 'mass', Number.MIN_VALUE, Number.MAX_VALUE),
+    y = p[1] + elevation;
+  if (!Number.isFinite(y))
+    throw new MargoError(
+      'state',
+      'Airborne release height is outside finite metres. Use a finite bed elevation in the solver cell.',
+    );
   out.set(
-    [
-      p[0],
-      p[1] + elevation,
-      p[2],
-      ...v,
-      0,
-      0,
-      0,
-      mass,
-      d,
-      kind === 2 ? DRY_SALT_SCALE * d : kind === 0 ? d : 0,
-      d,
-      kind,
-      id,
-      0,
-    ],
+    [p[0], y, p[2], ...v, 0, 0, 0, mass, d, kind === 2 ? DRY_SALT_SCALE * d : kind === 0 ? d : 0, d, kind, id, 0],
     i * RECORD,
   );
 }
@@ -283,14 +262,19 @@ function makeDust(shape: BedShape, lift: number, vertical: number): Source[] {
   });
 }
 function makeSpray(grid: SpraySourceGrid): Source[] {
+  if (!grid || typeof grid !== 'object')
+    throw new MargoError(
+      'state',
+      'Airborne spray needs the whitecap grid. Pass its columns, rows, spacing and centre.',
+    );
   const nx = numberOf(grid.columns, 'spray columns');
   const nz = numberOf(grid.rows, 'spray rows');
   if (!Number.isSafeInteger(nx * nz) || 3 * nx * nz * BYTES >= MAX_MEMORY_PAGES * 65536)
-    throw new RangeError('Reduce the spray grid so its three mass bands fit in the world arena.');
+    throw new MargoError('state', 'Reduce the spray grid so its three mass bands fit in the world arena.');
   const dx = range(grid.spacing, 'spray spacing', Number.MIN_VALUE, 1e5);
   const centre = grid.centre;
-  if (!centre || centre.length !== 2 || !centre.every(Number.isFinite))
-    throw new RangeError('Provide the two coordinates of the sea spray grid centre.');
+  if (!Array.isArray(centre) || centre.length !== 2 || ![centre[0], centre[1]].every(Number.isFinite))
+    throw new MargoError('state', 'Provide the two coordinates of the sea spray grid centre.');
   const y =
     range(grid.elevation ?? 0, 'spray elevation', -1e5, 1e5) +
     range(grid.releaseHeight ?? dx, 'spray release height', 0, 1e5);
@@ -341,7 +325,10 @@ function fieldData(
     port.region.byteLength !== count * size ||
     !port.cell.every((v, i) => v === context.cell[i])
   )
-    throw new RangeError(`Invalid ${name} port. Use layout 1 with the matching data type, dimensions and origin cell.`);
+    throw new MargoError(
+      'state',
+      `Invalid ${name} port. Use layout 1 with the matching data type, dimensions and origin cell.`,
+    );
   return regionWords(s.host.memory, port.region) as Float64Array | Float32Array;
 }
 
@@ -362,6 +349,11 @@ function hitsBed(terrain: Bed, sample: BedSample, prev: Float64Array, p: Float64
       Math.max((2 * Math.abs(dx) * terrain.columns) / terrain.width, (2 * Math.abs(dz) * terrain.rows) / terrain.depth),
     ),
   );
+  if (!(steps <= MAX_GROUND_SWEEP_STEPS))
+    throw new MargoError(
+      'state',
+      'Airborne ground sweep crosses too many terrain intervals. Reduce parcel speed or use a coarser terrain grid.',
+    );
   for (let j = 1; j <= steps; j++) {
     const f = j / steps;
     if (isBelow(terrain, sample, x + f * dx, y + f * dy, z + f * dz, radius)) return true;
@@ -380,17 +372,20 @@ export class AirborneParticles implements Solver<AirborneParams> {
   readonly massField: FieldDescriptor;
   readonly #options: AirborneOptions;
   #state?: State;
+  #disposed = false;
+  #lastWork: AirborneWorkCounts;
 
   private constructor(
-    private readonly plain: WebAssembly.Module,
-    private readonly shared: WebAssembly.Module | undefined,
+    private readonly phase: AirbornePhase,
     options: AirborneOptions,
   ) {
+    this.#lastWork = phase.workCounts();
     this.id = options.id ?? 'airborne';
-    if (!this.id) throw new RangeError('Choose a nonempty airborne particle solver id.');
+    if (typeof this.id !== 'string' || !this.id || this.id.trim() !== this.id)
+      throw new MargoError('state', 'Choose a nonempty airborne particle solver id.');
     const dust = options.dustField;
     if (dust && (dust.kind !== 'uniformGrid' || dust.centring !== 'vertex' || dust.unit !== 'kg/(m^2 s)'))
-      throw new RangeError('Provide aeolian dust as a vertex-centred mass flux grid in kg/(m^2 s).');
+      throw new MargoError('state', 'Provide aeolian dust as a vertex-centred mass flux grid in kg/(m^2 s).');
     this.#options = { ...options, dustField: dust ? { ...dust } : undefined, signal: undefined };
     this.emissionField = layout(`${this.id}:emissions`, 'environmentalMassFlux', 'kg/s', 'scalarSeries');
     this.particleField = layout(`${this.id}:particles`, 'environmentalParticleState', 'record', 'particleSet');
@@ -399,15 +394,28 @@ export class AirborneParticles implements Solver<AirborneParams> {
 
   /** Loads the native kernel without importing it into the Physics root. */
   static async load(options: AirborneOptions = {}): Promise<AirborneParticles> {
-    const { signal } = options;
-    const [plain, shared] = await Promise.all([
-      load(new URL(/* @vite-ignore */ './airborne-kernel.wasm?no-inline', import.meta.url), signal),
-      canShareMemory()
-        ? load(new URL(/* @vite-ignore */ './airborne-kernel-shared.wasm?no-inline', import.meta.url), signal)
-        : undefined,
-    ]);
-    signal?.throwIfAborted();
-    return new AirborneParticles(plain, shared, options);
+    if (!options || typeof options !== 'object' || Array.isArray(options))
+      throw new MargoError('state', 'Airborne load options must be an object. Pass options or omit them.');
+    const phase = await AirbornePhase.load(options);
+    try {
+      return new AirborneParticles(phase, options);
+    } catch (error) {
+      phase[Symbol.dispose]();
+      throw error;
+    }
+  }
+
+  [Symbol.dispose](): void {
+    this.#disposed = true;
+    this.phase[Symbol.dispose]();
+  }
+
+  /** Native parcel and SIMD work from the last accepted solver tick. */
+  workCounts(): AirborneWorkCounts {
+    return {
+      ...this.#lastWork,
+      workers: this.#lastWork.workers.map((worker) => ({ ...worker })),
+    };
   }
 
   describe(): SolverDescription {
@@ -423,45 +431,78 @@ export class AirborneParticles implements Solver<AirborneParams> {
   }
 
   init(host: SolverHost, params: AirborneParams): void {
+    if (this.#disposed)
+      throw new MargoError('disposed', 'The airborne solver is disposed. Load a new solver for this world.');
     if (this.#state) throw new MargoError('attached', 'Load a new airborne solver for the next world.');
-    if (!params) throw new TypeError('Provide airborne particle parameters or an empty settings object.');
+    if (!params || typeof params !== 'object' || Array.isArray(params))
+      throw new MargoError('state', 'Provide airborne particle parameters or an empty settings object.');
     if (params.drag !== undefined && params.drag !== 'stokes' && params.drag !== 'sphere')
-      throw new RangeError('Choose either Stokes or sphere drag for environmental particles.');
+      throw new MargoError('state', 'Choose either Stokes or sphere drag for environmental particles.');
     const capacity = numberOf(params.capacity ?? 4096, 'airborne capacity');
     const initial = params.initial ?? [];
-    if (initial.length > capacity || capacity * (RECORD + FORCE + STRIDE) * BYTES >= MAX_MEMORY_PAGES * 65536)
-      throw new RangeError('Choose a capacity that fits the initial airborne parcels and the world memory.');
+    if (!Array.isArray(initial) || !Array.isArray(params.sources ?? []))
+      throw new MargoError(
+        'state',
+        'Airborne parcels and sources must be arrays. Pass lists of parcel and source options.',
+      );
+    if (initial.length > capacity || capacity * (2 * RECORD + FORCE + STRIDE) * BYTES >= MAX_MEMORY_PAGES * 65536)
+      throw new MargoError('state', 'Choose a capacity that fits the initial airborne parcels and the world memory.');
     const wind = params.wind;
-    if (wind && (wind.medium !== 'air' || !wind.cell.every(Number.isSafeInteger)))
-      throw new TypeError('Provide a valid air Wind field for environmental particles.');
+    if (
+      wind !== undefined &&
+      (!wind ||
+        wind.medium !== 'air' ||
+        typeof wind.sample !== 'function' ||
+        !wind.cell ||
+        wind.cell.length !== 3 ||
+        !Array.from(wind.cell).every((cell) => Number.isInteger(cell) && cell >= -2147483648 && cell <= 2147483647))
+    )
+      throw new MargoError('state', 'Provide a valid air Wind field for environmental particles.');
     const terrain = params.terrain;
+    if (terrain !== undefined && (!terrain || typeof terrain !== 'object'))
+      throw new MargoError('state', 'Airborne terrain has an invalid shape. Pass a TerrainBed or its grid geometry.');
     if ((this.#options.terrain || this.#options.dustField) && !terrain)
-      throw new TypeError('Provide the matching terrain shape for the live bed and aeolian dust grids.');
+      throw new MargoError('state', 'Provide the matching terrain shape for the live bed and aeolian dust grids.');
     if (this.#options.whitecaps && !params.spray)
-      throw new TypeError('Provide the SEA-13 whitecap grid shape for its spray source.');
+      throw new MargoError('state', 'Provide the SEA-13 whitecap grid shape for its spray source.');
     const bed = terrain && 'sample' in terrain ? terrain : undefined;
     if (this.#options.dustField && !this.#options.terrain && !bed)
-      throw new TypeError('Provide a live TerrainBed or a static Bed to locate aeolian dust above the surface.');
+      throw new MargoError(
+        'state',
+        'Provide a live TerrainBed or a static Bed to locate aeolian dust above the surface.',
+      );
     const humidity = range(params.humidity ?? 1, 'relative humidity', 0, 1);
     const temperature = range(params.temperature ?? STANDARD_TEMPERATURE, 'temperature in K', 200, 340);
     const cellSize = range(params.cellSize ?? 4096, 'world cell size', Number.MIN_VALUE, 1e12);
     const rms = vector(params.turbulence?.rms ?? ZERO, 'turbulence RMS');
-    if (rms.some((v) => v < 0)) throw new RangeError('Choose nonnegative wind fluctuation RMS on each axis.');
+    if (rms.some((v) => v < 0)) throw new MargoError('state', 'Choose nonnegative wind fluctuation RMS on each axis.');
     const correlation = range(params.turbulence?.time ?? 1, 'turbulence correlation time', Number.MIN_VALUE, 1e7);
+    if (
+      params.bounds !== undefined &&
+      (!Array.isArray(params.bounds) || params.bounds.length !== 2 || !params.bounds[0] || !params.bounds[1])
+    )
+      throw new MargoError('state', 'Airborne open bounds need two corners. Pass minimum and maximum XYZ vectors.');
     const [lo, hi] = params.bounds ?? [undefined, undefined];
     const bounds = lo && hi ? ([vector(lo, 'bounds min'), vector(hi, 'bounds max')] as const) : undefined;
     if (bounds && !bounds[0].every((v, i) => v < bounds[1][i]!))
-      throw new RangeError('Provide airborne bounds with positive extent on each axis.');
-    const sources: Source[] = (params.sources ?? []).map((a, i) => ({
-      ...a,
-      position: vector(a.position, 'source position'),
-      velocity: vector(a.velocity ?? ZERO, 'source velocity'),
-      family: 'custom',
-      kindIndex: material(a.kind),
-      portIndex: i,
-      multiplier: 1,
-      terrainHeight: false,
-    }));
+      throw new MargoError('state', 'Provide airborne bounds with positive extent on each axis.');
+    const sources: Source[] = Array.from(params.sources ?? [], (a, i) => {
+      if (!a || typeof a !== 'object')
+        throw new MargoError(
+          'state',
+          'An airborne source entry is missing. Pass a source with position, kind and diameter.',
+        );
+      return {
+        ...a,
+        position: vector(a.position, 'source position'),
+        velocity: vector(a.velocity ?? ZERO, 'source velocity'),
+        family: 'custom',
+        kindIndex: material(a.kind),
+        portIndex: i,
+        multiplier: 1,
+        terrainHeight: false,
+      };
+    });
     for (const source of sources) {
       range(source.diameter, 'source diameter', MIN_DIAMETER, MAX_DIAMETER[source.kindIndex]!);
       range(source.rate ?? 0, 'source mass rate', 0, Number.MAX_VALUE);
@@ -472,16 +513,14 @@ export class AirborneParticles implements Solver<AirborneParams> {
     if (this.#options.dustField) for (const source of makeDust(terrain!, dustLift, dustVelocity)) sources.push(source);
     const spray = this.#options.whitecaps ? makeSpray(params.spray!) : [];
     for (const source of spray) sources.push(source);
-    const module = isShared(host.memory) ? this.shared : this.plain;
-    if (!module) throw new MargoError('unsupported', 'Use plain world memory when shared Wasm is unavailable.');
-    const native = new WebAssembly.Instance(module, { env: { memory: host.memory } }).exports as Native;
     const reserve = (name: string, count: number) => host.allocate(`airborne-${name}`, BYTES * count, 'f64', LAYOUT);
-    const stack = host.allocate('airborne-stack', STACK_BYTES + 8, 'u8', LAYOUT);
-    native.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
     const state: State = {
       host,
-      native,
       particles: reserve('parcels', capacity * RECORD),
+      candidate: reserve('candidate', capacity * RECORD),
+      candidateLedger: new Float64Array(7),
+      candidateCount: new Float64Array(3),
+      candidatePending: new Float64Array(Math.max(1, sources.length)),
       samples: reserve('air', capacity * FORCE),
       old: reserve('step-begin', capacity * STRIDE),
       ledger: reserve('mass', 7),
@@ -507,33 +546,54 @@ export class AirborneParticles implements Solver<AirborneParams> {
     const count = words(state, state.count);
     const mass = words(state, state.ledger);
     for (const [i, a] of initial.entries()) {
+      if (!a || typeof a !== 'object')
+        throw new MargoError(
+          'state',
+          'An initial airborne parcel is missing. Pass a parcel with position, kind, diameter and mass.',
+        );
       writeParcel(p, i, i, material(a.kind), a);
       mass[FOUNDER]! += a.mass;
     }
+    if (!Number.isFinite(mass[FOUNDER]))
+      throw new MargoError(
+        'state',
+        'The sum of initial airborne masses exceeds finite kilograms. Reduce the total initial mass.',
+      );
     count[0] = initial.length;
     count[1] = initial.length;
     mass[ACTIVE] = mass[FOUNDER]!;
+    this.phase.bind(host);
     this.#state = state;
   }
 
   step(context: StepContext, dt: number): void {
     const s = this.#live();
-    const body = words(s, s.particles);
-    const mass = words(s, s.ledger);
-    const count = words(s, s.count);
-    const pending = words(s, s.pending);
+    const accepted = words(s, s.particles),
+      acceptedMass = words(s, s.ledger),
+      acceptedCount = words(s, s.count),
+      acceptedPending = words(s, s.pending),
+      acceptedRows = acceptedCount[0]! * RECORD;
+    const body = words(s, s.candidate),
+      mass = s.candidateLedger,
+      count = s.candidateCount,
+      pending = s.candidatePending;
+    body.set(accepted.subarray(0, acceptedRows));
+    mass.set(acceptedMass);
+    count.set(acceptedCount);
+    pending.set(acceptedPending);
     const before = words(s, s.old);
     const air = words(s, s.samples);
     const terrainPort = context.inputs.get(BED_FIELD.name);
     const terrain = terrainPort ? bedFromPort(s.host.memory, terrainPort, s.terrain!) : s.bed;
     if (terrain && !terrain.cell.every((coordinate, axis) => coordinate === context.cell[axis]))
-      throw new RangeError('Use the same world origin cell for the airborne terrain grid and solver.');
+      throw new MargoError('state', 'Use the same world origin cell for the airborne terrain grid and solver.');
     const dustField = this.#options.dustField;
     const dust = dustField ? fieldData(s, context, dustField.name, bedVertexCount(s.terrain!), 'f64') : undefined;
     const foam = fieldData(s, context, SEA_FOAM_FIELD.name, s.sprayCells * 2, 'f32');
     const emissions = fieldData(s, context, this.emissionField.name, s.customSources, 'f64');
     const ground: BedSample = { elevation: 0, normal: [0, 1, 0] };
-    if (foam && SEA_FOAM_LAYOUT !== LAYOUT) throw new RangeError('Use the current layout-1 SEA-13 whitecap output.');
+    if (foam && SEA_FOAM_LAYOUT !== LAYOUT)
+      throw new MargoError('state', 'Use the current layout-1 SEA-13 whitecap output.');
     let n = count[0]!;
     for (const [i, source] of s.sources.entries()) {
       const f = source.family;
@@ -546,6 +606,11 @@ export class AirborneParticles implements Solver<AirborneParams> {
       const received = range(rate, 'source flux value', 0, f === 'sea' ? 1 : Number.MAX_VALUE) * source.multiplier * dt;
       pending[i]! += received;
       mass[INCOMING]! += received;
+      if (!Number.isFinite(pending[i]) || !Number.isFinite(mass[INCOMING]))
+        throw new MargoError(
+          'state',
+          'Airborne source accumulation exceeds finite kilograms. Reduce the source flux or area.',
+        );
     }
     const sourceCount = s.sources.length;
     const head = count[2]!;
@@ -557,6 +622,11 @@ export class AirborneParticles implements Solver<AirborneParams> {
       const elevation = source.terrainHeight
         ? terrain!.sample(source.position[0], source.position[2], ground).elevation
         : 0;
+      if (count[1]! >= Number.MAX_SAFE_INTEGER)
+        throw new MargoError(
+          'state',
+          'Airborne parcel identifiers are exhausted. Start a new world or reduce the emission count.',
+        );
       writeParcel(body, n++, count[1]!++, source.kindIndex, { ...source, mass: amount }, elevation);
       count[2] = (i + 1) % sourceCount;
       pending[i] = 0;
@@ -566,8 +636,12 @@ export class AirborneParticles implements Solver<AirborneParams> {
     mass[WAITING] = pendingTotal;
     const wind = s.wind;
     const cellOffset = wind ? context.cell.map((value, i) => (value - wind.cell[i]!) * s.cellSize) : ZERO;
-    const dtWind = exp(-dt / s.correlation);
-    const noiseScale = Math.sqrt(1 - dtWind * dtWind);
+    const decayTime = dt / s.correlation,
+      dtWind = exp(-decayTime);
+    // This is -expm1(-2 dt/T). A short series retains the variance when the step is small relative to T.
+    const noiseScale = Math.sqrt(
+      decayTime < 1e-4 ? 2 * decayTime * (1 - decayTime + (2 / 3) * decayTime * decayTime) : 1 - dtWind * dtWind,
+    );
     const stochastic = s.rms.some((value) => value > 0);
     const draw = new Uint32Array(4);
     const gust = new Float64Array(3);
@@ -579,14 +653,20 @@ export class AirborneParticles implements Solver<AirborneParams> {
         o = i * STRIDE;
       for (let k = 0; k < 3; k++) before[o + k] = body[p + k]!;
       before[o + 3] = body[p + 9]!;
-      const sampled =
-        wind?.sample(
-          body[p]! + cellOffset[0]!,
-          body[p + 1]! + cellOffset[1]!,
-          body[p + 2]! + cellOffset[2]!,
-          context.tick * dt,
-          windSample,
-        ) ?? windSample;
+      const sampled = wind
+        ? wind.sample(
+            body[p]! + cellOffset[0]!,
+            body[p + 1]! + cellOffset[1]!,
+            body[p + 2]! + cellOffset[2]!,
+            context.tick * dt,
+            windSample,
+          )
+        : windSample;
+      if (!sampled || !sampled.velocity)
+        throw new MargoError(
+          'state',
+          'Airborne wind returned no velocity. Return an air FlowSample with finite velocity, temperature and density.',
+        );
       const temperature = range(sampled.temperature, 'sample temperature in K', 200, 340);
       const density = range(sampled.density, 'sample density', 0.05, 3);
       const kind = body[p + 13]!;
@@ -622,13 +702,24 @@ export class AirborneParticles implements Solver<AirborneParams> {
       air[a + 9] = kind && s.humidity < 1 ? waterDrying(temperature, s.humidity, RHO[1]) : 0;
       air[a + 10] = kind === 2 ? s.equilibrium * body[p + 11]! : 0;
     }
-    s.native.disperse(s.particles.byteOffset, s.samples.byteOffset, n, dt);
+    this.phase.apply(s.candidate, s.samples, n, dt);
     let live = 0;
     let airborne = 0;
     for (let i = 0; i < n; i++) {
       const p = i * RECORD;
       const previous = i * STRIDE;
       const remaining = body[p + 9]!;
+      for (let word = 0; word < RECORD; word++)
+        if (!Number.isFinite(body[p + word]))
+          throw new MargoError(
+            'state',
+            'Airborne motion produced a non-finite parcel. Reduce source speed, wind fluctuations or gravity.',
+          );
+      if (!(remaining >= 0 && remaining <= before[previous + 3]!))
+        throw new MargoError(
+          'state',
+          'Airborne parcel mass left its accepted bounds. Reduce source intensity or use finite liquid properties.',
+        );
       mass[VAPOUR]! += before[previous + 3]! - remaining;
       if (!remaining) continue;
       if (terrain && hitsBed(terrain, ground, before, body, previous, p)) {
@@ -646,6 +737,24 @@ export class AirborneParticles implements Solver<AirborneParams> {
     body.fill(0, live * RECORD, n * RECORD);
     count[0] = live;
     mass[ACTIVE] = airborne;
+    if (!mass.every((value) => Number.isFinite(value) && value >= 0))
+      throw new MargoError(
+        'state',
+        'Airborne mass accounting exceeds finite kilograms. Reduce initial mass or source flux.',
+      );
+    const work = this.phase.workCounts();
+    const liveWords = live * RECORD;
+    accepted.set(body.subarray(0, liveWords));
+    accepted.fill(0, liveWords, acceptedRows);
+    acceptedMass.set(mass);
+    acceptedCount.set(count);
+    acceptedPending.set(pending);
+    this.#lastWork = work;
+  }
+
+  /** Origin of the accepted particle coordinates, in signed world cells. */
+  get cell(): Cell {
+    return this.#live().host.cell;
   }
 
   /** Copy the live parcels in their stable emission order. */
@@ -662,6 +771,7 @@ export class AirborneParticles implements Solver<AirborneParams> {
         velocity: [p[at + 3]!, p[at + 4]!, p[at + 5]!],
         diameter: p[at + 10]!,
         mass: p[at + 9]!,
+        materialDensity: parcelDensity(p[at + 13]!, p[at + 10]!, p[at + 11]!),
       };
     });
   }
@@ -684,8 +794,8 @@ export class AirborneParticles implements Solver<AirborneParams> {
   exportPorts(tick: number): readonly Port[] {
     const s = this.#live();
     return [
-      { field: this.particleField.name, region: s.particles, tick, cell: ZERO },
-      { field: this.massField.name, region: s.ledger, tick, cell: ZERO },
+      { field: this.particleField.name, region: s.particles, tick, cell: s.host.cell },
+      { field: this.massField.name, region: s.ledger, tick, cell: s.host.cell },
     ];
   }
 
@@ -701,6 +811,8 @@ export class AirborneParticles implements Solver<AirborneParams> {
   }
 
   #live(): State {
+    if (this.#disposed)
+      throw new MargoError('disposed', 'The airborne solver is disposed. Load a new solver for this world.');
     if (!this.#state) throw new MargoError('state', 'Add the airborne solver to a PhysicsWorld before reading it.');
     return this.#state;
   }

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21756758,
+  "total": 21761513,
   "history": [
     {
       "date": "2026-10-24",
@@ -15497,6 +15497,12 @@
       "commit": "lane-e-usdz-factors",
       "reason": "KB-USDZ-FACTORS1: both USD importers read texture scale and bias, emission, occlusion and normal scale, and write into pixels what glTF factors cannot hold (usdz 13,740 to 14,738 B, preview-surface 5,479 to 6,278 B, workers/usdz.js 162,958 to 163,956 B). Both importers share one module; a split entry would leave the plain import with wrong materials.",
       "grew": 6
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "atmo06-airborne-workers",
+      "reason": "ATMO-06: Physics airborne measures 7,062 to 10,989 B gzip (ceiling 7,318 to 11,319) for checked candidate state and optional SIMD worker phases. Environment density-volume measures 4,386 to 5,140 B (ceiling 4,642 to 5,396) for physical sea-spray extinction using the existing density volume. Keeping each path in its current leaf shares state or renderer buffers. Core and Stage gain no bytes.",
+      "grew": 2
     }
   ],
   "items": {
@@ -15839,7 +15845,7 @@
     "@margoengine/environment dist/workers/exr-codecs.js": 3570,
     "@margoengine/environment/blend": 4861,
     "@margoengine/environment/cube-camera": 6143,
-    "@margoengine/environment/density-volume": 4642,
+    "@margoengine/environment/density-volume": 5396,
     "@margoengine/environment/encoded-hdr": 3409,
     "@margoengine/environment/exr-codecs": 1699,
     "@margoengine/environment/exr-tiled": 9088,
@@ -16355,7 +16361,7 @@
     "@margoengine/physics/accretion": 5366,
     "@margoengine/physics/aeolian": 5256,
     "@margoengine/physics/ageing": 4384,
-    "@margoengine/physics/airborne": 7318,
+    "@margoengine/physics/airborne": 11319,
     "@margoengine/physics/boundary-layer": 5769,
     "@margoengine/physics/breakable": 19351,
     "@margoengine/physics/bubbles": 3289,

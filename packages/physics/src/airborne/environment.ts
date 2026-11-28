@@ -1,3 +1,4 @@
+import { MargoError } from '@margoengine/math/errors';
 import { cos, exp, ln, pow, sin } from '@margoengine/math/pinned';
 
 export const KINDS = ['mineral-dust', 'freshwater-mist', 'sea-spray'] as const;
@@ -24,7 +25,7 @@ export const TWO32 = 4294967296;
 
 export function range(value: number, label: string, min: number, max: number): number {
   if (!(Number.isFinite(value) && value >= min && value <= max))
-    throw new RangeError(`Choose environmental particle ${label} in [${min}, ${max}].`);
+    throw new MargoError('state', `Choose environmental particle ${label} in [${min}, ${max}].`);
   return value;
 }
 
@@ -47,7 +48,7 @@ export function dragRate(
   const slip = 1 + knudsen * (1.257 + 0.4 * exp(-1.1 / knudsen));
   const rate = (18 * viscosity) / (particle * d * d * slip);
   if (stokes) {
-    if (reynolds > 0.1) throw new RangeError('Use sphere drag when the particle Reynolds number exceeds 0.1.');
+    if (reynolds > 0.1) throw new MargoError('state', 'Use sphere drag when the particle Reynolds number exceeds 0.1.');
     return rate;
   }
   return reynolds <= 1000 ? rate * (1 + 0.15 * pow(reynolds, 0.687)) : (3 * air * 0.44 * speed) / (4 * particle * d);

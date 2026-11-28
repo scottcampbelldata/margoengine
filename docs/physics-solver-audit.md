@@ -50,6 +50,31 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### ATMO-06 four-point pass
+
+- Point 5. `airborne-acceptance.test.js` reproduces a bad Wind sample after a previous parcel was sampled and
+  new source mass was staged. The solver returns a coded error and preserves accepted bytes, particles, source
+  counters, work and registry receipt. A resumed step agrees exactly with the uninterrupted route. The signed
+  publication test covers both registry fields through a far-origin shift and rewind.
+- Point 6. `airborne-threads.test.js` and `airborne-threads.browser.mjs` compare one and four partitions across
+  emissions, evaporation, particle IDs, escape and far-origin replay. At 4,099 live parcels, the native step reports
+  8,198 SIMD axis pairs and 2,732 evaporation updates. Isolated Chromium starts three actual helpers and matches
+  the serial accepted snapshot and fields.
+- Point 7. `airborne-surface.browser.mjs` draws the real WaveSolver to SEA-13 to ATMO-06 route on both renderers.
+  The 219 retained tracks move 24.74 m downwind. The accepted 1,368 parcels have 0.0047717 m² of optical
+  cross-section. The volume touches 1,256 HDR columns and changes 5,258 WebGPU and 5,262 WebGL2 pixels. Both
+  replay the held parcel, depth, and canvas state exactly. `environment/tests/density-volume.test.js` tests
+  the optical kernel and far-origin alignment. The original film and legacy Water spray path remain open.
+- Point 8. Physics and Environment READMEs and `docs/limits.md` record the drag and humidity domains, scope of
+  the native worker, deposition and optical approximation and remaining environmental cases.
+- Point 2 remains open. `atmo06-droplet-settling.mjs` runs two 0.10–0.50 mm independent settling series and
+  free-fall evaporation at 50% and 90% relative humidity. Three Gunn–Kinzer settling rows exceed 0.7% stated
+  accuracy plus rounding. The separately acquired Beard–Pruppacher tunnel-derived speeds differ by 0.20–2.98%
+  in absolute terms. Only the 0.40 mm evaporation row at each humidity lies inside the 4% reference uncertainty
+  plus rounding. Neither settling speed nor measured mass loss initializes the predicted trajectory.
+  [Smithsonian measurements](https://repository.si.edu/items/5b259e9c-a900-48e0-ad68-07bb46302156) ·
+  [Wind-tunnel table](https://ntrs.nasa.gov/api/citations/19790017494/downloads/19790017494.pdf)
+
 ### ATMO-03 four-point pass
 
 - Point 5. `9622992eda`. `atmo03-projection.test.js` independently derives all twelve MAC face velocities for a warmed cell at

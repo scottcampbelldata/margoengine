@@ -11807,3 +11807,12 @@ operator residual and corrected face divergence before committing. Origin cells 
 world snapshots. The Environment density-volume path converts accepted cell-centred liquid water to extinction
 and uses the existing two-backend volume pass. The closed-cube check, native worker replay and fixed-frame browser
 regressions cover these three paths. Independent cloud-field measurement and deep moist dynamics are open.
+
+### ATMO-06 natural airborne parcels and spray density volumes
+
+The optional parcel solver samples local Wind and staged sources into a per-tick candidate. Rust SIMD
+integrates disjoint ranges through the existing world-worker helper. Receipts verify work before an ordered
+contact and mass fold commits parcels, work and the registry fields. The accepted phase shares the same
+snapshot layout across worker counts. The Environment layer maps accepted sea spray to local optical depth
+on the existing volume pass. CPU tests verify candidate rejection and cross-section. The fixed-camera
+browser fixture covers both renderers and the restoration of the same draw state.

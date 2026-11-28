@@ -8,7 +8,7 @@ import { mockGPU, passes, context } from '../../../examples/package-benchmarks/p
 import { Camera } from '../../core/dist/extension.js';
 import { SceneTarget } from '../../shared/msaa.js';
 import { VolumetricFog } from '../dist/volumetric.js';
-import { CloudDensityVolume, DensityVolume, DENSITY_BRICK } from '../dist/density-volume.js';
+import { CloudDensityVolume, DensityVolume, DENSITY_BRICK, SeaSprayDensityVolume } from '../dist/density-volume.js';
 
 const usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING;
 function rig(options = {}) {
@@ -102,6 +102,63 @@ test('cloud density rejects invalid optics, shapes and values with a correction'
     code: 'state',
     message: /local render origin/,
   });
+});
+
+test('sea spray extinction integrates parcel cross-section and rebases its signed source cell', () => {
+  const spray = {
+    kind: 'sea-spray',
+    position: [0, 0, 0],
+    mass: 0.000015,
+    diameter: 50e-6,
+    materialDensity: 1490,
+  };
+  let parcels = [spray, { ...spray, kind: 'mineral-dust', mass: 10 }];
+  const source = { cell: [-2700, 0, 1600], readParticles: () => parcels };
+  const h = 0.125;
+  using volume = new SeaSprayDensityVolume(source, { voxelSize: h, cellSize: 16 });
+  const sigma = 2 * h;
+  const dropRadius = spray.diameter / 2;
+  const num = spray.mass / (((4 * Math.PI) / 3) * dropRadius ** 3 * spray.materialDensity);
+  const area = num * 2 * Math.PI * dropRadius * dropRadius;
+  // Independently integrate 4π r² exp(-r²/(2σ²)) by Simpson's rule over the spherical kernel.
+  const radial = (r) => 4 * Math.PI * r * r * Math.exp(-0.5 * (r / sigma) ** 2);
+  const steps = 600;
+  const step = (3 * sigma) / steps;
+  let sum = radial(0) + radial(3 * sigma);
+  for (let i = 1; i < steps; i++) sum += (i % 2 ? 4 : 2) * radial(i * step);
+  const normalized = area / ((sum * step) / 3);
+  assert.equal(volume.sample([0, 0, 0]), Math.fround(normalized));
+  const radiusOfCell = (Math.sqrt(3) * h) / 2;
+  const kernel = (r) => (r > 3 * sigma ? 0 : normalized * Math.exp(-0.5 * (r / sigma) ** 2));
+  let apparent = 0;
+  let low = 0;
+  let high = 0;
+  for (let x = -7; x <= 7; x++) {
+    for (let y = -7; y <= 7; y++) {
+      for (let z = -7; z <= 7; z++) {
+        const r = h * Math.hypot(x, y, z);
+        low += kernel(r + radiusOfCell);
+        high += kernel(Math.max(0, r - radiusOfCell));
+        apparent += volume.voxel(x, y, z);
+      }
+    }
+  }
+  assert(low * h ** 3 < apparent * h ** 3 && apparent * h ** 3 < high * h ** 3);
+  assert(low * h ** 3 < area && area < high * h ** 3);
+  volume.update([-2699, -1, 1602]);
+  assert.equal(volume.sample([-16, 16, -32]), Math.fround(normalized));
+  assert.equal(volume.sample([0, 0, 0]), 0);
+  parcels = [{ ...spray, mass: 3e38 }];
+  assert.throws(() => volume.update(), { code: 'state', message: /Float32 range/ });
+  assert.equal(volume.sample([-16, 16, -32]), Math.fround(normalized), 'an invalid frame keeps previous extinction');
+  parcels = [{ ...spray, materialDensity: undefined }];
+  assert.throws(() => volume.update(), { code: 'state', message: /positive diameter and density/ });
+  assert.equal(volume.sample([-16, 16, -32]), Math.fround(normalized), 'missing density keeps previous extinction');
+  parcels = [];
+  volume.update();
+  assert.equal(volume.brickCount, 0);
+  volume.dispose();
+  assert.throws(() => volume.update(), { code: 'disposed' });
 });
 
 test('validation of options, indices, values and splats', () => {
