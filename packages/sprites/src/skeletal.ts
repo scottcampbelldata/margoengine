@@ -386,8 +386,11 @@ export function gridMesh(
 
 /** Keys of one bone channel: `[time in seconds, value]` pairs, times increasing. Plain `number[][]` literals fit. */
 export type BoneKeys = readonly (readonly number[])[];
-/** Cubic Bezier controls (x1/y1/x2/y2), a held segment, or linear interpolation. */
-export type BoneCurve = readonly [number, number, number, number] | 'linear' | 'stepped';
+/**
+ * Cubic Bezier controls `[x1, y1, x2, y2]` (x1 and x2 in 0 to 1), a held segment, or linear interpolation. Plain
+ * `number[]` literals fit, as for {@link BoneKeys}; the length and ranges are checked when the clip is posed.
+ */
+export type BoneCurve = readonly number[] | 'linear' | 'stepped';
 /** A clip: per bone name, keys for any of `x`, `y`, `rotation`, `scaleX`, `scaleY` (local values, as on {@link Bone}). */
 export interface SkeletonClip {
   duration: number;

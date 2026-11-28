@@ -20,7 +20,7 @@ export class Bone {
     constructor(options: BoneOptions, parent: Bone | null);
 }
 
-export type BoneCurve = readonly [number, number, number, number] | 'linear' | 'stepped';
+export type BoneCurve = readonly number[] | 'linear' | 'stepped';
 
 export type BoneKeys = readonly (readonly number[])[];
 
