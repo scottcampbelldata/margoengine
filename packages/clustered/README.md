@@ -762,6 +762,36 @@ side its `direction` faces, or `twoSided`) and fluorescent tubes (`'tube'`, a ca
 with the same Linearly Transformed Cosines as the rectangle lights. `intensity` is the surface radiance;
 `radianceFromPower(light, lumens)` converts a total power. Shaped lights do not cast shadows yet (docs/limits.md).
 
+```ts
+import {EngineKernel, box} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {MAX_SHAPE_LIGHTS, ShapeLights, radianceFromPower, shapeLightArea, type ShapedLight} from 'margoengine/clustered/shapes';
+
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+engine.createMesh().setGeometry(box(6, 0.1, 6));
+const lights = Clustered.attach(engine);
+const bulb: ShapedLight = {shape: 'sphere', position: [0, 2, 0], radius: 0.04, color: [1, 0.85, 0.7]};
+const tube: ShapedLight = {shape: 'tube', start: [-0.6, 2.4, 1], end: [0.6, 2.4, 1], radius: 0.013};
+const panel: ShapedLight = {shape: 'disc', position: [1.5, 2.5, -1], direction: [0, -1, 0], radius: 0.2};
+// An 800 lm bulb and a 2,500 lm tube; intensity is the surface's radiance (nits).
+bulb.intensity = radianceFromPower(bulb, 800);
+tube.intensity = radianceFromPower(tube, 2500);
+panel.intensity = 2000;
+const shapes = ShapeLights.attach(engine, {lights}).setLights([bulb, tube, panel]);
+console.log(shapes.list.length, MAX_SHAPE_LIGHTS, shapeLightArea(panel).toFixed(4)); // 3 64 0.1257
+console.log(lights.shapes === shapes); // true: attaching sets the Clustered.shapes hook
+engine.start();
+```
+
+- `setLights` takes up to `MAX_SHAPE_LIGHTS` (64) lights and checks every entry before changing anything (a
+  `RangeError` names the bad one); an empty list removes the shader code. `list` is a frozen copy of the last list.
+- `shapeLightArea(light)` is the emitting area in square metres: 4 pi r^2 for a sphere, pi r^2 for a disc (twice that
+  two-sided) and 2 pi r L + 4 pi r^2 for a tube of length L. `radianceFromPower(light, power)` divides the power by pi
+  times that area (a Lambertian emitter): lumens give nits, watts give W/(m^2 sr).
+- Attaching sets the `Clustered.shapes` hook, which the light loop of core meshes and every `lights.add()` receiver
+  calls beside the point and spot lights. Every fragment evaluates every shaped light: they have no range, so they are
+  not culled per cluster. They cast no shadows.
+
 ## Many shadowed lights
 
 `StochasticLights` from `@margoengine/clustered/stochastic` keeps the shadow cost of a pixel at `samples` lookups (default
@@ -771,6 +801,35 @@ lights' sum (a ratio estimator). A pixel reached by `samples` shadowed lights or
 across each 2 x 2 pixel quad (`quad`, default on) and the pattern changes every frame (`temporal`), so
 `@margoengine/taa` averages the remaining noise. It needs `LocalShadows` or `ClusteredOptions.shadows`; without shadows it
 changes nothing. Attach it with `StochasticLights.attach(engine, {lights})`.
+
+```ts
+import {EngineKernel, box} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {LocalShadows} from 'margoengine/clustered/shadows';
+import {MAX_STOCHASTIC_SAMPLES, StochasticLights} from 'margoengine/clustered/stochastic';
+
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+const floor = engine.createMesh().setGeometry(box(8, 0.1, 8));
+const crate = engine.createMesh().setGeometry(box(1, 1, 1)).setPosition([0, 0.55, 0]);
+const lights = Clustered.attach(engine);
+const local = LocalShadows.attach(engine, {lights, maxLights: 8, resolution: 512});
+local.add(floor);
+local.add(crate);
+// Eight shadowed lights in a ring; each pixel looks up the shadows of 2 of them.
+lights.setLights(Array.from({length: 8}, (_, i) => ({
+  position: [3 * Math.cos(i * Math.PI / 4), 2.5, 3 * Math.sin(i * Math.PI / 4)] as [number, number, number],
+  range: 10, intensity: 6, castShadow: true,
+})));
+const sampled = StochasticLights.attach(engine, {lights, samples: 2, temporal: true, quad: true});
+console.log(sampled.samples, MAX_STOCHASTIC_SAMPLES, lights.stochastic === sampled); // 2 8 true
+engine.start();
+```
+
+- `samples` is an integer from 1 to `MAX_STOCHASTIC_SAMPLES` (8); `temporal: false` keeps one pattern for stills and
+  tests; `quad: false` for a shader that calls the light loop outside a fragment stage (the quad sum uses
+  derivatives). Attaching sets the `Clustered.stochastic` hook.
+- Unshadowed point and spot lights, and directional, area and shaped lights, stay exact. Without `LocalShadows` or
+  `ClusteredOptions.shadows` there are no shadow lookups to sample, and it changes nothing. WebGPU only.
 
 ## IES profiles
 
@@ -1067,6 +1126,45 @@ lights.setLights([{position:[0,4,0], range:10, direction:[0,-1,0], outerAngle:0.
 engine.start();
 ```
 
+The same casters go into `LocalShadows`, which calls the hook with `depthCompare: 'greater'` (its maps hold reversed
+depth: near 1, far 0, cleared to 0). The hook gets `{context, pass, matrix, layer, depthCompare}` for each layer it
+draws and is called every frame: it binds its own pipeline and per-layer uniforms (written for `matrix`), so nothing waits on a
+`shadowVersion`. Terrain casts through the same hook:
+
+```ts
+import {EngineKernel, box} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {LocalShadows} from 'margoengine/clustered/shadows';
+import {Terrain} from 'margoengine/terrain';
+
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+const rock = engine.createMesh().setGeometry(box(1, 1, 1)).setPosition([0, 0.5, 0]);
+const terrain = Terrain.attach(engine, {
+  resolution: 64, levels: 4, cellSize: 1, origin: [-32, -32], size: [64, 64], heightScale: 4,
+  layers: [
+    {height: [-10, 50], slope: [0, 0.3], scale: 0.3},
+    {height: [-10, 50], slope: [0.2, 1], scale: 0.2},
+    {height: [-10, 1], slope: [0, 0.4], scale: 0.4},
+    {height: [3, 50], slope: [0, 0.5], scale: 0.2},
+  ],
+  textures: (device) => {
+    const heightmap = device.createTexture({size: [4, 4], format: 'r32float', usage: 6});
+    device.queue.writeTexture({texture: heightmap}, new Float32Array(16), {bytesPerRow: 16}, [4, 4]);
+    const layers = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    const colors = new Uint8Array([90, 110, 70, 255, 110, 110, 100, 255, 120, 90, 60, 255, 240, 245, 255, 255]);
+    device.queue.writeTexture({texture: layers}, colors, {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return {heightmap, layers};
+  },
+});
+const lights = Clustered.attach(engine);
+lights.add(terrain); // lit by the local lights
+const local = LocalShadows.attach(engine, {lights, resolution: 1024});
+local.add(rock);
+local.add(terrain); // terrain's drawLocalShadow draws its clipmap into each shadowed light's layers
+lights.setLights([{position: [2, 4, 1], range: 12, intensity: 40, castShadow: true}]);
+engine.start();
+```
+
 Local depth passes run before clustered culling and main shading, redraw active
 faces each frame, and use a fixed 3×3 comparison filter (`LocalShadows` lights with a `shadow.radius` filter by PCSS,
 and its hard shadows compare each texel with the receiver plane, above). Shadows multiply only
@@ -1099,6 +1197,82 @@ bindings of a shadow-enabled effect; the default second argument is false.
 
 `LocalShadows.shadowMap(kind, index, face)` returns one map as last rendered (its depth texture, layer, reversed perspective or orthographic projection, near and far, and the texels it covers, an atlas tile included) for a debug view: pass it to `ShadowMapViewer` from `@margoengine/shadows/viewer`, as `ShadowMapViewer.attach(engine, { source: () => shadows.shadowMap('point', 0, 3) })` for the first light's -y cube face. `kind` is `'point'` (faces 0 to 5: +x, -x, +y, -y, +z, -z), `'spot'`, `'directional'` (face = cascade) or `'area'`, and `index` the light's place in its own list; it returns null for a light without a map.
 
+## Textured area lights
+
+`AreaLightTextures` (`@margoengine/clustered/area-texture`) puts an image on each `AreaLights` rectangle (a TV screen,
+stained glass, a sign) and colours the light it casts with it. `setTextures(entries)` takes one entry per area light,
+in the order of `AreaLights.setLights`: RGBA8 pixels (an `ImageData` or decoded image, rows top to bottom), an
+`{image, colorSpace}` entry, or null for an untextured light.
+
+```ts
+import {EngineKernel, box} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {AreaLights} from 'margoengine/clustered/area';
+import {AreaLightTextures, MAX_AREA_TEXTURES, areaTextureLevels} from 'margoengine/clustered/area-texture';
+
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+engine.createMesh().setGeometry(box(6, 0.1, 6));
+const lights = Clustered.attach(engine);
+const area = AreaLights.attach(engine, {lights}).setLights([
+  {position: [0, 1.2, -2], direction: [0, 0, 1], width: 1.6, height: 0.9, intensity: 40}, // a TV
+  {position: [2, 1.5, 0], direction: [-1, 0, 0], width: 1, height: 1.5, intensity: 10}, // a plain panel
+]);
+// A 64 x 36 screen image: red on the left half, blue on the right.
+const screen = {width: 64, height: 36, data: new Uint8Array(64 * 36 * 4)};
+for (let i = 0; i < 64 * 36; i++) screen.data.set((i % 64) < 32 ? [255, 40, 40, 255] : [40, 60, 255, 255], i * 4);
+const textures = AreaLightTextures.attach(engine, {area}).setTextures([{image: screen, colorSpace: 'srgb'}, null]);
+console.log(areaTextureLevels(64, 36), MAX_AREA_TEXTURES, area.texture === textures); // 7 16 true
+engine.start();
+```
+
+- Colours are sRGB-encoded by default (as in a PNG or JPEG); `colorSpace: 'linear'` reads the bytes as linear. Alpha
+  premultiplies the colour, so a transparent texel emits nothing.
+- Limits: up to 16 distinct images per call (`MAX_AREA_TEXTURES`; one image object given to several lights in the same
+  colour space counts once), 1,024 texels a side (`MAX_AREA_TEXTURE_SIZE`) and 4,194,304 texels in all, level chains included
+  (`MAX_AREA_TEXTURE_TEXELS`). The images go into a storage buffer as half-float linear RGB with a box-filtered level
+  chain, so no texture binding is added.
+- What it approximates: each lobe (GGX specular and Lambert diffuse, as linearly transformed cosines; Heitz, Dupuy, Hill
+  and Neubelt 2016) reads the image filtered over the part of the rectangle it sees, at the level whose texel spans the
+  clamped cosine's footprint, as 2 x 2 cells weighted by their share of the lobe's integral. A near, sharp lobe reads
+  the texel; a far or rough one the mean colour of what it sees. It is not the exact integral of the image under the
+  lobe.
+
+## Light layers
+
+`LightLayers` (`@margoengine/clustered/layers`) links lights to receivers with 32-bit masks, the light linking of
+offline renderers: a point or spot light shades a receiver only when their masks share a bit.
+
+```ts
+import {EngineKernel, box} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {LightLayers} from 'margoengine/clustered/layers';
+import {boxGeometry} from 'margoengine/geometry';
+import {Material, createMesh} from 'margoengine/materials';
+
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+engine.createMesh().setGeometry(box(6, 0.1, 6)); // a core mesh: layer 0 only
+const hero = createMesh(engine, boxGeometry(0.6, 1.8, 0.4), new Material({color: '#b06040'}));
+const lights = Clustered.attach(engine);
+lights.setLights([
+  {position: [0, 3, 2], range: 10, intensity: 20}, // key light, layer 0
+  {position: [0, 2, -1.5], range: 5, color: [0.5, 0.7, 1], intensity: 30}, // rim light, layer 1 only
+]);
+const layers = LightLayers.attach(engine, {lights});
+layers.setLayers([1, 2]); // light 0: mask 1 (layer 0); light 1: mask 2 (layer 1)
+const remove = layers.add(hero, {layers: 3}); // the hero takes both; the floor never sees the rim light
+engine.start();
+// remove() takes the hero off its layers again.
+console.log(typeof remove);
+```
+
+- `setLayers(masks)` gives light i of `Clustered.setLights` mask i (an integer from 0 to 2^32 - 1, bit n is layer n);
+  a missing or null entry is 1. At most 1,024 masks.
+- `add(receiver, {layers, receiveShadow})` takes a glTF PBR model, a materials mesh or terrain; `layers` defaults to 1
+  and `receiveShadow` (default true) works as in `Clustered.add`. Core meshes have no per-mesh slot for a mask and stay
+  on layer 0 (mask 1).
+- Area, directional and shaped lights are not layered. Without masks or layered receivers it adds nothing to the
+  shaders or the GPU work.
+
 ## Many lights
 
 `ClusteredOptions.maxLights` raises the point and spot light cap from 1,024 to as many as 65,536 for city and
@@ -1107,6 +1281,29 @@ Each cluster still lists at most 1,024 lights, and culling tests every light per
 grows with the count. `AreaLightOptions.maxLights` raises the area light cap from 64 to as many as 1,024; area lights
 are not clustered, so every lit fragment evaluates every one, and only the first 64 may cast shadows. IES, projector
 and contact settings cover the first 1,024 point and spot lights.
+
+```ts
+import {EngineKernel, box} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {AreaLights} from 'margoengine/clustered/area';
+
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+engine.createMesh().setGeometry(box(400, 0.1, 400));
+const lights = Clustered.attach(engine, {maxLights: 20000});
+// A 100 x 100 grid of street lights, 4 m apart: 10,000 lights in 10 pages of 1,024.
+lights.setLights(Array.from({length: 10000}, (_, i) => ({
+  position: [(i % 100) * 4 - 198, 5, Math.floor(i / 100) * 4 - 198] as [number, number, number],
+  range: 8, color: [1, 0.8, 0.55] as [number, number, number], intensity: 10,
+})));
+// 256 shop-window panels; every lit fragment evaluates every area light.
+const panels = AreaLights.attach(engine, {lights, maxLights: 256});
+panels.setLights(Array.from({length: 256}, (_, i) => ({
+  position: [(i % 16) * 24 - 180, 1.5, Math.floor(i / 16) * 24 - 180] as [number, number, number],
+  direction: [0, 0, 1] as [number, number, number], width: 2, height: 1.2, intensity: 4,
+})));
+console.log(panels.list.length); // 256
+engine.start();
+```
 
 ## Contact shadows
 
@@ -1118,6 +1315,31 @@ it; omitted, it shares the scene-depth capture water and HTML panels use, which 
 their stack's `depthTexture` then). A callback is the form to prefer: a plain `depth` texture belongs to the device it was made on, so after a device restore it is dropped, the march stays off, the loss is reported once through `engine.onError` and `contact.setDepth(texture)` brings it back (docs/conventions.md, "Borrowed GPU objects"). It works with or without shadow maps and adds binding 145. It reads one frame late
 (a moving caster's contact trails it by a frame), only what is on screen casts, and receivers added with
 `receiveShadow: false` skip it.
+
+```ts
+import {createStage} from 'margoengine';
+import {box} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {ContactLights, MAX_CONTACT_LIGHTS} from 'margoengine/clustered/contact';
+import {PostStack} from 'margoengine/post/stack';
+import {SSAO} from 'margoengine/post/ssao';
+
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const engine = stage.engine;
+engine.createMesh().setGeometry(box(4, 0.1, 4));
+engine.createMesh().setGeometry(box(0.05, 0.3, 0.05)).setPosition([0, 0.2, 0]); // a small detail to ground
+const lights = Clustered.attach(engine);
+lights.setLights([
+  {position: [1, 1.5, 0.5], range: 6, intensity: 8},
+  {position: [-1, 2, -1], range: 6, intensity: 4},
+]);
+// SSAO refuses the shared scene-depth capture, so the march reads its stack's depth through a callback.
+const stack = PostStack.attach(engine, [new SSAO()]);
+const contact = ContactLights.attach(engine, {lights, depth: () => stack.depthTexture, distance: 0.3, steps: 12});
+contact.setStrengths([0.9, 0]); // the second light casts no contact shadow
+console.log(MAX_CONTACT_LIGHTS); // 1024: strengths cover the first 1,024 point and spot lights
+engine.start();
+```
 
 ## Preview tier contract
 
