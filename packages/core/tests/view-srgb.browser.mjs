@@ -186,9 +186,20 @@ try {
       };
       draw();
       await device.queue.onSubmittedWorkDone();
-      await new Promise((r) => setTimeout(r, 100));
-      draw();
-      await device.queue.onSubmittedWorkDone();
+      if (mode === 'native')
+        // WebGPU: the refusal settles in an error scope after the GPU work and the next frame throws it, so draw until a
+        // frame has (a long bound only a real failure reaches).
+        for (const end = performance.now() + 10_000; !failures.length && performance.now() < end; ) {
+          await new Promise((r) => setTimeout(r));
+          draw();
+          await device.queue.onSubmittedWorkDone();
+        }
+      else {
+        // fixed-wait: a check that nothing happens: the WebGL2 layer draws the target, and no error comes in this time
+        await new Promise((r) => setTimeout(r, 100));
+        draw();
+        await device.queue.onSubmittedWorkDone();
+      }
       const unnamed = failures.map((e) => `${e.name}: ${e.message}`).join(' | ');
       engine.dispose();
       canvas.remove();

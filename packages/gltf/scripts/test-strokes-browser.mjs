@@ -103,7 +103,7 @@ await runSuite(
               await engine.gpu.queue.onSubmittedWorkDone();
             };
             await waitForPipelines(frame);
-            for (let i = 0; i < 3; i++) await frame();
+            await frame();
             out.widened.push(model.pointsAndLines.map((p) => !!p.widened));
             out.pictures.push(canvas.toDataURL('image/png'));
             model.dispose();

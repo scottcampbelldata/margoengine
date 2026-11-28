@@ -87,6 +87,7 @@ try {
           };
           await waitForPipelines(frame);
           const sizes = [];
+          // fixed-wait: the subject, not a wait: three frames after readiness must keep the fixed backbuffer size
           for (let i = 0; i < 3; i++) {
             await frame();
             sizes.push([canvas.width, canvas.height]);
