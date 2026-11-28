@@ -19,6 +19,30 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/scatter/test/velocity-tiles.browser.mjs` (WebGPU and `--compat`; fails with the destroyed-buffer error
   without the fix).
 
+### Open 2026-11-27: an EXR whose colorInteropID names other primaries decodes as Rec.709 (KB-EXR-INTEROPID1, environment)
+
+- **Repro:** `encodeEXR` of one pixel (1, 0, 0) with `colorInteropID: 'lin_ap1_scene'` (linear ACEScg) and no
+  `chromaticities`, then `parseEXR`: the pixel stays (1, 0, 0), `primaries` is null and `primariesConverted` false;
+  linear sRGB is about (1.705, -0.130, -0.024).
+- **Cause:** no reader in `packages/environment` reads the attribute; `encodeEXR` writes it as given. OpenEXR 3.4 added
+  it and says it supersedes `chromaticities` for most purposes ("Technical Introduction",
+  https://openexr.com/en/latest/TechnicalIntroduction.html). The IDs are in the ASWF Color Interop Forum's "Color Space
+  Encodings for Texture Assets and CG Rendering",
+  https://github.com/AcademySoftwareFoundation/ColorInterop/blob/main/Recommendations/01_TextureAssetColorSpaces/TextureAssetColorSpaces.md
+- **Next:** map the linear IDs to their primaries in `exr-primaries.ts` for all three readers, with the precedence over
+  `chromaticities` that the recommendation gives.
+
+### Fixed 2026-11-27: comments and a README still named a one million vertex limit that core and gltf/pbr no longer have (KB-VERTCAP-TEXT1; voxel-edit, loaders, mesh-edit)
+
+- **Repro:** `partitionMesh`'s options and doc comment and the `./mesh` row of the voxel-edit README said a core
+  `Geometry` takes at most 1,000,000 vertices; the `maxPartVertices` comment of `@margoengine/loaders` and the
+  `SculptView.attach` comment of mesh-edit (with its limits row) said gltf/pbr takes 1,000,000.
+- **Cause:** both limits rose (core to 11,184,810, `packages/loaders/src/geometry.ts`; gltf/pbr to 16,777,216 a
+  primitive, `packages/gltf/src/parts.ts`) and only the loaders' core text followed (KB0097).
+- **Fixed:** the texts name the limit that does bind: a materials mesh's 1,000,000 vertices, and for `SculptView` the
+  storage binding its one part must fit. No limit changed. Regression: `tests/vertex-limit-text.test.js` (it named the
+  five lines on the old tree).
+
 ### Fixed 2026-11-28: a soft body held off the ground only after its vertex-block passes sank by twice its load (KB-SOFT-CONTACTSPLIT1, physics soft kernel)
 
 - **Repro:** a 10 cm cube of 1 MPa rubber on `setSolver('vertex-block')`, standing on a fixed floor, pressed by 100 N on
@@ -11570,7 +11594,7 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
   layer's features check named its gradient helpers `dx` and `dy` and now names them `gx` and `gy`, as what it tests is
   the order the layer evaluates `textureSampleGrad`'s arguments in, not the browser's naming.
 - **Next:** report it to Mozilla with the shader above; an app that hits it renames the function.
-- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB0003/report.md` with the repro page `dx.html`; still reproduces in Firefox 157 on 2026-11-11 (Edge 157 compiles all five cases).
+- **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB0003/report.md` with the repro page `dx.html`; still reproduces in Firefox 157 on 2026-11-11 (Edge 157 compiles all five cases) and on 2026-11-27 (`fn dx` fails, the other four compile).
 
 ### Partly fixed 2026-11-11: mesh PBR inlined twelve texture filters into the Direct3D 11 surface program (KB5451)
 
@@ -12031,9 +12055,7 @@ Release exception: Firefox advisory warnings counted as errors by lod/materials 
   (`FIREFOX_DEPTH_COMPARE_LINES` in `scripts/support/browser-advisories.mjs`). Regression: `tests/browser-advisories.test.js`.
 - **Checked 2026-11-15, lod side closed:** `MARGO_BROWSER=firefox node packages/lod/test/browser-check.mjs --compat` (Firefox 157, WebGL2 layer) passes through `watchConsole`, which drops only the exact accepted advisory lines and counts the layer probe's one deliberate context loss; every other error or warning still fails. The other lod checks collect console errors only. Regression: `tests/browser-advisories.test.js` (fake console of each kind: accepted advisory, context loss, other warning, error). The materials side stays open (Mac).
 
-### Voxel path tracer on the WebGL2 layer in Firefox: the `transparent` case does not finish (found 2026-11-11, open)
-
-Release exception: Firefox: voxel path tracer transparent case does not finish on the layer.
+### Fixed 2026-11-27: voxel path tracer on the WebGL2 layer in Firefox, the `transparent` case did not finish (KB0015, voxel-pathtracer; found 2026-11-11)
 
 - **Repro:** `MARGO_BROWSER=firefox node packages/voxel-pathtracer/tests/browser-check.mjs --compat --report=compat
   traversal analytic textures shapes transparent determinism capture viewport materialtables` on the RTX A6000 PC
@@ -12043,6 +12065,13 @@ Release exception: Firefox: voxel path tracer transparent case does not finish o
   tracer's programs (docs/limits.md), and Firefox has no `KHR_parallel_shader_compile`, so each link blocks; the close
   likely waits on a compile in flight, as the 25 to 29 s dispose wait on Edge does. Next: time each program's link in
   Firefox on a quiet machine, and see whether the case finishes given the time.
+- **Closed (2026-11-27, main f204a4135a, RTX A6000 with other lanes' work, Playwright Firefox 157, ANGLE Direct3D 11):**
+  the repro command passes all nine cases; `transparent` takes 16.7 s (longest GPU wait 17 s). Run alone as the page's
+  first case, with each blocking WebGL call timed, it takes 102.1 s (longest block 30.3 s, in `getError`; 19.1 s and
+  18.6 s in `getProgramParameter`) and the browser closes in 0.4 s. The likely cure is 62f038b447 (2026-11-11), which
+  gave the `coverage` kernel's 64-ray loop its bound from the frame uniform after Edge's Direct3D 11 compile of the
+  same case never finished; the failing run's build was not recorded, so that link is not proven. Regression:
+  `packages/voxel-pathtracer/tests/compat-staged.test.js` ("hold no constant-bound loop around a traversal").
 
 ### Accepted 2026-11-11: batch 160 environment native direct budget re-recorded one level higher (KB3574)
 
@@ -12315,7 +12344,8 @@ Release exception: SSGI multiBounce off differs below the GL calls (driver).
 - **Fix:** `packages/environment/src/exr-primaries.ts` reads the attribute from any part's header and converts RGB with
   the RP 177 plus Bradford matrix `parseHDR` uses for Radiance PRIMARIES, in all three readers; images report
   `primaries` and `primariesConverted`, and `encodeEXR` writes `chromaticities`. Regression:
-  `packages/environment/tests/exr-chromaticities.test.js`.
+  `packages/environment/tests/exr-chromaticities.test.js` (5 of 5 on 2026-11-27). Source: OpenEXR, "Standard Attributes",
+  https://openexr.com/en/latest/StandardAttributes.html (`chromaticities`: CIE xy of the RGB primaries and white).
 
 Batch 170 React harness (2026-11-10): when an external engine module fails to evaluate (seen with an R3F build whose React bundle read `process.env`), `bench/scenes/page.js` top-level `await import(...)` rejects without setting `window.result`, so `bench/lib/browser.mjs` waits its full 600 s before the case errors. Repro: an engines.json entry whose module throws on import, then `scripts/parity-smoke-browser.mjs --standard=react --engines=margo,<that engine>`. Cause: the engine import is outside the harness's error reporting. Fix in the fix phase: report the import error as the case result, with a test that loads a throwing module.
 
