@@ -1,1 +1,0 @@
-export{n as meshoptDecodeGltfBuffer}from"./meshopt-dMxKlVxN.js";

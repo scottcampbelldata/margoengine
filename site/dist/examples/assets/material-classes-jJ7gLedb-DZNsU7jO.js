@@ -1,1 +1,0 @@
-import{r as e}from"./built-material-D1frGyvL-DWYTZETd.js";var t=class extends e{constructor(e={}){super({...e,shading:`basic`})}};export{t};

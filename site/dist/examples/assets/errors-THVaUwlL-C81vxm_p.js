@@ -1,1 +1,0 @@
-var e=(e,t)=>Object.assign(Error(t),{name:`MargoError`,code:e}),t=(e,t)=>`${e}; see https://margoengine.com/errors#${t}`,n=(n,r,i=n)=>e(n,t(r,i)),r=(e,n)=>TypeError(t(e,n));export{n,r,e as t};

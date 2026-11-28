@@ -1,1 +1,0 @@
-function e(e,t){let n=globalThis.margoPreset?.[e];if(!n)return t;let r={...t};for(let e in n)r[e]??=n[e];return r}export{e as t};

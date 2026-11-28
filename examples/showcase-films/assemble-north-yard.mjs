@@ -62,17 +62,14 @@ function facade(rows, origin, yaw) {
       const [width, ...parts] = bays[bay];
       x += width;
       for (const name of parts) children.push(piece(name, x, y, 0));
-      if (x < rowWidth)
-        children.push(piece('wall_pier_standard_01', x, y, 0));
+      if (x < rowWidth) children.push(piece('wall_pier_standard_01', x, y, 0));
     }
     if (floor) {
-      for (let end = 3; end <= x; end += 3)
-        children.push(piece('cornice02_standard_standard_01', end, y, 0));
+      for (let end = 3; end <= x; end += 3) children.push(piece('cornice02_standard_standard_01', end, y, 0));
     }
   }
   const width = rows[0].reduce((length, bay) => length + bays[bay][0], 0);
-  for (let end = 3; end <= width; end += 3)
-    children.push(piece('crown_standard_standard_01', end, rows.length * 3, 0));
+  for (let end = 3; end <= width; end += 3) children.push(piece('crown_standard_standard_01', end, rows.length * 3, 0));
   return add('Factory facade', origin, children, undefined, yaw);
 }
 const roofMaterial = kit.materials.length;
@@ -99,7 +96,10 @@ function roof(width, depth, height) {
   const n = accessor(normal, 'VEC3', 4, 5126, 34962);
   const i = accessor(triangles, 'SCALAR', 6, 5123, 34963);
   const mesh = kit.meshes.length;
-  kit.meshes.push({ name: 'Roof deck', primitives: [{ attributes: { POSITION: p, NORMAL: n }, indices: i, material: roofMaterial }] });
+  kit.meshes.push({
+    name: 'Roof deck',
+    primitives: [{ attributes: { POSITION: p, NORMAL: n }, indices: i, material: roofMaterial }],
+  });
   return add('Roof deck', [0, 0, 0], undefined, mesh);
 }
 function building(name, [centerX, centerZ], yaw, depth, ground, upper) {
@@ -130,7 +130,8 @@ function building(name, [centerX, centerZ], yaw, depth, ground, upper) {
 function trackside(name, distance, setback, depth, bays, upper) {
   const arc = Math.min(0, Math.max(-45, distance));
   const yaw = arc / 34;
-  const c = Math.cos(yaw), s = Math.sin(yaw);
+  const c = Math.cos(yaw),
+    s = Math.sin(yaw);
   const extra = distance - arc;
   const x = 34 * (1 - c) + extra * s - setback * c;
   const z = 34 * s + extra * c + setback * s;
@@ -142,11 +143,61 @@ building(
   [8.9, 23],
   -Math.PI / 2,
   9,
-  ['wall', 'narrow', 'door', 'window', 'loading', 'square', 'wall', 'paired', 'loading', 'window', 'door', 'paired', 'wall', 'square', 'loading', 'wall', 'narrow', 'wall', 'door'],
-  ['wall', 'square', 'paired', 'square', 'window', 'window', 'paired', 'square', 'wall', 'window', 'window', 'square', 'square', 'paired', 'wall', 'window', 'window', 'window', 'paired', 'square', 'window', 'wall'],
+  [
+    'wall',
+    'narrow',
+    'door',
+    'window',
+    'loading',
+    'square',
+    'wall',
+    'paired',
+    'loading',
+    'window',
+    'door',
+    'paired',
+    'wall',
+    'square',
+    'loading',
+    'wall',
+    'narrow',
+    'wall',
+    'door',
+  ],
+  [
+    'wall',
+    'square',
+    'paired',
+    'square',
+    'window',
+    'window',
+    'paired',
+    'square',
+    'wall',
+    'window',
+    'window',
+    'square',
+    'square',
+    'paired',
+    'wall',
+    'window',
+    'window',
+    'window',
+    'paired',
+    'square',
+    'window',
+    'wall',
+  ],
 );
 trackside('Track engineering shed', -74, 11.5, 9, ['wall', 'loading', 'door', 'narrow', 'loading', 'wall']);
-trackside('Traction workshop', -48, 13.5, 9, ['wall', 'paired', 'loading', 'door', 'loading', 'wall'], ['wall', 'window', 'square', 'window', 'paired', 'window', 'square', 'wall']);
+trackside(
+  'Traction workshop',
+  -48,
+  13.5,
+  9,
+  ['wall', 'paired', 'loading', 'door', 'loading', 'wall'],
+  ['wall', 'window', 'square', 'window', 'paired', 'window', 'square', 'wall'],
+);
 trackside('Parts store', -20, 12.5, 9, ['wall', 'loading', 'square', 'door', 'window', 'wall']);
 building('Maintenance annex', [-15, 21], Math.PI / 2, 9, ['wall', 'window', 'loading', 'door', 'narrow', 'wall']);
 
@@ -154,7 +205,8 @@ const groups = new Map();
 function collect(index, x, y, z, yaw) {
   const node = nodes[index];
   const [dx, dy, dz] = node.translation;
-  const c = Math.cos(yaw), s = Math.sin(yaw);
+  const c = Math.cos(yaw),
+    s = Math.sin(yaw);
   const pose = [x + c * dx + s * dz, y + dy, z - s * dx + c * dz, yaw];
   if (node.rotation) pose[3] += 2 * Math.atan2(node.rotation[1], node.rotation[3]);
   if (node.mesh === undefined) {
@@ -180,8 +232,7 @@ function instanceAccessor(values, count, type) {
 const meshes = [...groups].map(([mesh, group]) => {
   const rotation = (yaw) => [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)];
   const { name, pose } = group[0];
-  if (group.length === 1)
-    return { name, mesh, translation: pose.slice(0, 3), rotation: rotation(pose[3]) };
+  if (group.length === 1) return { name, mesh, translation: pose.slice(0, 3), rotation: rotation(pose[3]) };
   const translations = group.flatMap(({ pose }) => pose.slice(0, 3));
   const rotations = group.flatMap(({ pose }) => rotation(pose[3]));
   return {

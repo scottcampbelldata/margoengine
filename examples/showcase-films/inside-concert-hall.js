@@ -78,7 +78,6 @@ export async function buildConcertHall(engine, shop, cluster, shadows) {
   const cedar = timber.map((color) => finish(color, 0.48, 0, timberGrain));
   const walnut = finish('#674831', 0.53, 0, timberGrain);
   const shellMat = finish('#5b4231', 0.49, 0, timberGrain);
-  const honey = finish('#ae8161', 0.48, 0, timberGrain);
   const brass = finish('#a98658', 0.36, 0.78, timberGrain);
   const guard = finish('#4d534c', 0.53, 0.59, mineral);
   const shadow = finish('#343a38', 0.75, 0, mineral);

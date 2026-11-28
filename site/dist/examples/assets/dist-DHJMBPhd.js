@@ -1,1 +1,0 @@
-export{a as install}from"./dist-D4MAPS4x.js";

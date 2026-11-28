@@ -108,8 +108,7 @@ export const heavyFiles = [
     sourceCommit,
     bytes: 12258800,
     gitLfs: false,
-    status:
-      'tracked blob on the source branch (not git-lfs). Left out of this branch because it is over 5 MB.',
+    status: 'tracked blob on the source branch (not git-lfs). Left out of this branch because it is over 5 MB.',
   },
   ...firstWake,
   ...swellFiles,

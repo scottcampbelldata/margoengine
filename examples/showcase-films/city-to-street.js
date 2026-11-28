@@ -38,10 +38,10 @@ export async function buildCity(engine, shop) {
   const cache = new AssetCache({ name: 'margo-grant-park', maxBytes: 192 * 1024 ** 2, timeout: 30_000 });
   const response = await cache.fetch(input('tileset.json'), { signal: AbortSignal.timeout(30_000) });
   if (!response.ok) throw Error('Prepare the Grant Park photograph textures before opening this film.');
-  const map = await loadTexture(
-    exampleAsset('city-to-street/grant-park-naip.jpg'),
-    { colorSpace: 'srgb', signal: AbortSignal.timeout(30_000) },
-  );
+  const map = await loadTexture(exampleAsset('city-to-street/grant-park-naip.jpg'), {
+    colorSpace: 'srgb',
+    signal: AbortSignal.timeout(30_000),
+  });
   // Register the orthophoto using Balbo Drive and the north–south road grid.
   // X grows east and Z grows south in the local reconstruction.
   const east = (longitude) => -83 + (longitude + 87.62446) * 82844;

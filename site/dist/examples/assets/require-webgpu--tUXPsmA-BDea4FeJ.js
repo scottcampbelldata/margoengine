@@ -1,1 +1,0 @@
-import{t as e}from"./errors-DkwPZuAq.js";function t(t,n){if(t.backend===`webgl2`||!t.gpu)throw new e(`unsupported`,`${n} needs WebGPU; see https://margoengine.com/errors#webgpu`)}export{t};

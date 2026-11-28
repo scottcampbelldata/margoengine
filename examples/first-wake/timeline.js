@@ -43,7 +43,7 @@ export function shipPose(t) {
   const [x, z] = waterlinePath(t);
   const heading = shipHeading(t);
   const underway = ease(t, 2, 14);
-  const roll = 0.027 * Math.sin((t - 38.3) * (2 * Math.PI / 11.0)) * underway;
+  const roll = 0.027 * Math.sin((t - 38.3) * ((2 * Math.PI) / 11.0)) * underway;
   const pitch = 0.0048 * Math.sin(t * 1.04) * underway;
   return {
     position: [x, underway * (0.07 * Math.sin(t * 0.7) + 0.024 * Math.sin(t * 1.22)), z],

@@ -4,7 +4,7 @@ import { geometryData } from '@margoengine/geometry/utils';
 import { Material } from '@margoengine/materials';
 import { Toon } from '@margoengine/toon';
 import { Hatching } from '@margoengine/toon/hatch';
-import { blend, mix, ramp, rng, shotAt } from './film.js';
+import { blend, ramp, rng, shotAt } from './film.js';
 
 const tau = Math.PI * 2;
 const paperColors = [
@@ -259,7 +259,7 @@ export function buildAviary(engine, shop, _lights, shadows) {
     const x = -7.9 + i * 2.18;
     shop.box([0.045, 4.75, 0.035], warm, [x, 2.55, -6.41], undefined, null);
   }
-  let random = rng(485);
+  const random = rng(485);
   for (let i = 0; i < 31; i++) {
     const z = -7.1 + i * 0.46;
     for (let j = 0; j < 6; j++) {

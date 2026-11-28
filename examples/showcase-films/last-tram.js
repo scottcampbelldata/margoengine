@@ -578,11 +578,18 @@ export async function buildDepot(engine, shop, cluster) {
       const bezelFace = cabFace + 0.035;
       const bezelDepth = 0.083;
       box([0.819, 0.227, bezelDepth], rubber, [0, 2.721, bezelFace - bezelDepth / 2], undefined, end, 0.018);
-      sign([nose ? '03   NORTH YARD' : '03   OUT OF SERVICE'], [0.759, 0.163], [0, 2.721, bezelFace + 0.006], undefined, end, {
-        background: '#1a2425',
-        foreground: '#e6b974',
-        lit: 1.9,
-      });
+      sign(
+        [nose ? '03   NORTH YARD' : '03   OUT OF SERVICE'],
+        [0.759, 0.163],
+        [0, 2.721, bezelFace + 0.006],
+        undefined,
+        end,
+        {
+          background: '#1a2425',
+          foreground: '#e6b974',
+          lit: 1.9,
+        },
+      );
     }
     if (i === 1) {
       box([1.81, 0.141, 1.37], electric, [0, 3.156, 0.57], undefined, car, 0.033);

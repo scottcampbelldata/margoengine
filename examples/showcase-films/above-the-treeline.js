@@ -61,7 +61,10 @@ function boundaryBiomes() {
     color: { hue: 0.035, value: 0.15 },
   });
   const fir = { ...plant('fir', firKey, 345, 3, 1.33, [altitude - 65, line + 130]), canopyKind: 'conifer' };
-  const youngFir = { ...plant('young-fir', youngFirKey, 180, 2.4, 1.16, [altitude - 65, line + 130]), canopyKind: 'conifer' };
+  const youngFir = {
+    ...plant('young-fir', youngFirKey, 180, 2.4, 1.16, [altitude - 65, line + 130]),
+    canopyKind: 'conifer',
+  };
   const scrub = plant('wind-stunted-fir', timberlineFirKey, 135, 1.6, 0.91, [line - 110, line + 135]);
   const stone = {
     id: 'talus',
@@ -177,8 +180,13 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
   const view = await BiomeView.attach(engine, world, {
     clipmap: { resolution: 128, levels: 8 },
     graph: alpineTreelineGraph({
-      elevation: line, width: 148, patchSize: 172, seed: 154726,
-      mature: ['subalpine-fir/fir'], young: ['subalpine-fir/young-fir'], stunted: ['upper-meadow/wind-stunted-fir'],
+      elevation: line,
+      width: 148,
+      patchSize: 172,
+      seed: 154726,
+      mature: ['subalpine-fir/fir'],
+      young: ['subalpine-fir/young-fir'],
+      stunted: ['upper-meadow/wind-stunted-fir'],
     }),
     textureResolution: 4,
     radius: 1250,
@@ -278,7 +286,7 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
       cloudDeck.options.coverage = mix(0.47, 0.38, opening);
       engine.lighting.direction[3] = mix(3.18, 4.45, opening);
       engine.lighting.radiance[1] = mix(0.86, 0.82, opening);
-      engine.lighting.radiance[2] = mix(0.67, 0.60, opening);
+      engine.lighting.radiance[2] = mix(0.67, 0.6, opening);
       lens.options.focalDistance = 2.1 + 480 * ramp(time, 2.8, 16.2);
       lens.options.maxRadius = mix(7.6, 1, ramp(time, 4, 18));
       lens.options.enabled = time < 18;

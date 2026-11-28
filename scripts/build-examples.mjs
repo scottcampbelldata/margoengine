@@ -59,6 +59,5 @@ export async function buildLiveExamples(siteOut = resolve(repo, 'site/dist')) {
   console.log(examplesOut);
 }
 
-const invoked =
-  process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+const invoked = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 if (invoked) await buildLiveExamples();

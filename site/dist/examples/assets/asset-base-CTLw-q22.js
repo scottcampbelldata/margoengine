@@ -1,1 +1,0 @@
-function e(e){return e.endsWith(`/`)?e:`${e}/`}function t(){let t=globalThis.MARGO_EXAMPLES_ASSET_BASE;return e(t||`https://assets.margoengine.com/examples/`)}function n(e){return new URL(String(e).replace(/^\//,``),t()).href}function r(e){return`/examples/packed/${String(e).replace(/^\//,``)}`}export{r as n,n as t};

@@ -23,7 +23,10 @@ test('the catalog lists every film that has source, and leaves the held-back tit
   }
   assert.ok(catalog.films.some((film) => film.id === 'last-tram'));
   assert.ok(catalog.films.some((film) => film.id === 'the-voxel-night-shop'));
-  assert.equal(catalog.films.some((film) => film.id === 'train'), false);
+  assert.equal(
+    catalog.films.some((film) => film.id === 'train'),
+    false,
+  );
 });
 
 test('the asset manifest matches the heavy file list and the bucket constant', () => {
@@ -39,12 +42,23 @@ test('the asset manifest matches the heavy file list and the bucket constant', (
     12258800,
   );
   assert.ok(heavyFiles.every((file) => file.gitLfs === false));
-  assert.equal(statSync(new URL('examples/showcase-films/assets/north-yard/industrial-buildings.glb', root), { throwIfNoEntry: false }), undefined);
+  assert.equal(
+    statSync(new URL('examples/showcase-films/assets/north-yard/industrial-buildings.glb', root), {
+      throwIfNoEntry: false,
+    }),
+    undefined,
+  );
 });
 
 test('every exampleAsset literal is a manifest key, and the dynamic prefixes are covered', () => {
   const keys = new Set(heavyFiles.map((file) => file.key));
-  const dirs = ['examples/showcase-films', 'examples/first-wake', 'examples/underwater-cable', 'examples/glass-bench', 'examples/event-horizon'];
+  const dirs = [
+    'examples/showcase-films',
+    'examples/first-wake',
+    'examples/underwater-cable',
+    'examples/glass-bench',
+    'examples/event-horizon',
+  ];
   const files = [];
   function walk(dir) {
     for (const name of readdirSync(dir)) {

@@ -1,6 +1,0 @@
-function e(e){return e?.view?.viewport}function t(t){let n=e(t);return n?[n[2],n[3]]:[t.width,t.height]}function n(t,n){let r=e(n);if(!r)return;t.setViewport(r[0],r[1],r[2],r[3],0,1);let i=n.view.scissor??r;t.setScissorRect(i[0],i[1],i[2],i[3])}function r(e,t=`clear`){return e?.view?.index?`load`:t}var i=`
-struct Vertex { @builtin(position) position:vec4f,@location(0) uv:vec2f }
-@vertex fn vertex(@builtin(vertex_index) index:u32)->Vertex {
- let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[index];
- return Vertex(vec4f(p,0,1),vec2f(p.x*0.5+0.5,0.5-p.y*0.5));
-}`;function a(e,t,n){return e.createBindGroup({layout:t.getBindGroupLayout(0),entries:n.map((e,t)=>({binding:t,resource:e}))})}function o(e,t,n=`main`){return e.createComputePipeline({layout:`auto`,compute:{module:e.createShaderModule({code:t}),entryPoint:n}})}function s(e,t,n,r,i=1){let a=e.encoder.beginComputePass();a.setPipeline(t),a.setBindGroup(0,n),a.dispatchWorkgroups(r,i),a.end()}var c=()=>({colorAttachments:[{view:void 0,loadOp:`load`,storeOp:`store`}],depthStencilAttachment:{view:void 0,depthReadOnly:!0,stencilReadOnly:!0}}),l=Object.freeze({color:{srcFactor:`src-alpha`,dstFactor:`one-minus-src-alpha`,operation:`add`},alpha:{srcFactor:`zero`,dstFactor:`one`,operation:`add`}});export{s as a,r as c,o as i,t as l,l as n,a as o,i as r,n as s,c as t};

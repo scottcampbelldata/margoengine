@@ -49,7 +49,12 @@ export const films = [
     group: 'City and night',
     description: 'The camera moves from the Chicago park survey down to street level on Balbo Drive.',
     entry: `${film}/city-to-street.html`,
-    sources: [...show('city-to-street'), `${film}/balbo-drive.js`, `${film}/environment-films.js`, 'examples/live/asset-base.js'],
+    sources: [
+      ...show('city-to-street'),
+      `${film}/balbo-drive.js`,
+      `${film}/environment-films.js`,
+      'examples/live/asset-base.js',
+    ],
   },
   {
     id: 'last-tram',
@@ -139,7 +144,12 @@ export const films = [
     group: 'Landscape',
     description: 'Tracker rows tilt through the afternoon over Antelope Valley.',
     entry: `${film}/the-solar-field.html`,
-    sources: [...show('the-solar-field'), `${film}/solar-landscape.js`, `${film}/environment-films.js`, 'examples/live/asset-base.js'],
+    sources: [
+      ...show('the-solar-field'),
+      `${film}/solar-landscape.js`,
+      `${film}/environment-films.js`,
+      'examples/live/asset-base.js',
+    ],
   },
   {
     id: 'the-village-that-builds-itself',
@@ -161,7 +171,12 @@ export const films = [
     group: 'Machines',
     description: 'The camera follows the air through a cutaway engine, then the modules separate.',
     entry: `${film}/inside-turbofan.html`,
-    sources: [...show('inside-turbofan'), `${film}/turbofan-assembly.js`, `${film}/turbofan-flow.js`, 'examples/live/asset-base.js'],
+    sources: [
+      ...show('inside-turbofan'),
+      `${film}/turbofan-assembly.js`,
+      `${film}/turbofan-flow.js`,
+      'examples/live/asset-base.js',
+    ],
   },
   {
     id: 'the-robot-cell',
