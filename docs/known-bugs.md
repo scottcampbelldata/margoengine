@@ -193,10 +193,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   points per arc between four fixed walls at zero clearance, its turn locked to the input, sits 0.6 to 0.7 mm off the
   exact centre over a 456 mm travel. More substeps, more iterations, the high-fidelity tier and zero friction gave at best
   0.52 mm; a 24-point hull measured 0.16 mm.
-- **Measured again 2026-11-28 on `main` (the 0.6 to 0.7 mm above is stale):** over two turns in 2 degree 60 Hz steps the
-  64-point hull's worst gap is 9.8e-5 m read every 3 degrees and 3.0e-4 m at any step; the 24-point hull reads 1.5e-4 m
-  and 1.8e-4 m. Driven to 45 degrees and left for 300 steps it settles to 7.8e-6 m, so the offset is made while the
-  triangle moves and is not a resting state.
+- **Measured again 2026-11-28 on `main` (13124e4f1a), over two turns, one `drive` call a 60 Hz step:** the gap depends
+  on the step. At 3 degrees a step (what `rigs.test.js` drives, bar 2e-4 m) the 64-point hull's worst gap is 9.8e-5 m and
+  the 24-point hull's 1.5e-4 m. At 2 degrees a step they are 7.2e-4 m and 2.9e-3 m, so the 0.6 to 0.7 mm above stands
+  for 2 degree steps (an earlier note here called it stale and gave 3.0e-4 m; that figure did not reproduce). Driven to
+  45 degrees and left for 300 steps it settles to 7.8e-6 m, so the offset is made while the triangle moves and is not a
+  resting state.
 - **Cause:** not found yet. Ruled out: the allowed penetration (0 to 2e-4 m reads the same) and the hull build (all 192
   and 72 outline points are kept, no faces merged). It is not KB-PHYS-SARRUSLOOP1's cut: the rig has one joint and no
   path. The lead: the box-against-hull contact may take the normal of a hull facet (0.94 degrees a facet at 64 points)
@@ -228,18 +230,67 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   | fix alone | 5,965 rad/s, 1,239 | 4.4e8 rad/s at step 1948, then NaN and the world stops | 289 rad/s, 0 | 858 rad/s, 0 |
   | fix and a damped push | 2,401 rad/s, 609 | 1,703 rad/s, 725 | 777 rad/s, 0 | 261 rad/s, 0 |
 
-  "Levels" are the islands' own substep levels (`adaptive_substeps`). With them off no build passes 1,000 rad/s; with
-  them on `main` already does in the sweeps run. The median gap of the scene's sliding locks, levels on, block solver:
-  5.3e-2 m on `main`, 3.5e-3 m with the fix, 2.7e-2 m with the fix and the damped push; mean kinetic energy 1.4e4, 3.3e4
-  and 4.0e4 J. So the fix holds the joints closer and the scene carries more energy: not yet a state that can be called
-  more correct. The path that starts the run-away is a chain from a fixed body through three bodies (a ball joint with its
-  anchors 4.5 m apart, a ball joint 1.7 m apart, a weld 0.5 m apart): errors no push can close, asked for again every
-  substep. The lead, not proven: the turn bound (TURN, 0.2 rad) is per substep, an island that spins is given up to 128
-  substeps a step, so what the relaxing pass leaves of a cut push grows with the level it raises. The damped push
-  (Levenberg 1944, Marquardt 1963, Wampler 1986, Nakamura and Hanafusa 1986: (K + mu^2 D) x = b on the path's factors,
-  taken only where the exact push breaks the bound) is built and stops the NaN, and does not remove the spin.
-  Next: bound what a cut push leaves in the speeds across substep levels, then land the fix with the replay figures.
-  The access violation that followed the NaN was a separate bug, fixed (KB-PHYS-RETIREDPAIR1). Physics lane.
+  "Levels" are the islands' own substep levels (`adaptive_substeps`). That table is the fixture's seed only, and two things
+  read from it were wrong. Over five seeds of the scene (the stream's seed xor n * 0x9E3779B9, n 0 to 4) `main` itself
+  passes 1,000 rad/s in each of the four builds: worst 5,040 rad/s (sweeps) and 4,660 (block) with levels on, 1,280 and
+  17,000 with levels off. So a spin over 1,000 rad/s is this scene's own and no sign of a defect, and "with levels off no
+  build passes 1,000 rad/s" held for one seed. What the fix changes: 2 of 10 runs with levels on leave the numbers (seed 0
+  with the sweeps at step 1948, seed 3 with the block solver at step 509) and 0 of 10 with levels off. That run-away is
+  KB-PHYS-LEVELSPIN1 below, a defect of its own; the wrong sum had been cutting the pushes that feed it.
+- **State:** the fix is not on `main`. Alone it passes `a_web_of_joints_stays_in_the_numbers`; the whole kernel suite has
+  not been run on it. It lands with `sarrus_loop.rs` once KB-PHYS-LEVELSPIN1 is fixed, and the Sarrus rig and its demo
+  wait for it. The damped push (Levenberg 1944, Marquardt 1963, Wampler 1986, Nakamura and Hanafusa 1986) stops both
+  run-aways and is not worth landing: over the same seeds it has the fastest spins of any build (35,200 and 90,000 rad/s
+  with levels on, 15,300 with levels off). The access violation that followed the first run-away was a separate bug,
+  fixed (KB-PHYS-RETIREDPAIR1). Physics lane.
+
+### Open 2026-11-28: an island's substep level and its spin feed each other (KB-PHYS-LEVELSPIN1, physics solver)
+
+- **Repro:** the replay scene (`kernel/tests/replay.rs`) with `adaptive_substeps` on and `push_share` summing a shared
+  body's gains rightly (the fix of KB-PHYS-SARRUSLOOP1 above, not on `main`). Fixture seed, sweeps: the fastest spin is
+  67 rad/s at step 1900 with its island at level 1, 528 at step 1920 (level 4), 2,226 at 1937 (level 6), 33,845 at 1940
+  (level 6), 4.4e8 at 1948 (level 7), then not a number. Seed 3, block solver: 6.6e8 rad/s at step 509. On `main` the
+  same scene reaches 4,431 rad/s (sweeps) and 4,660 (block, seed 1) with levels on.
+- **Cause, as far as it is measured:** `island_level` (`kernel/src/tilt.rs`) gives an island the least level at which no
+  body in contact turns over 0.505 rad a substep at its present spin. In an island whose joints cannot close and whose
+  bodies touch, a finer level makes more spin, so the level the spin asks for is never reached and the island climbs to
+  the finest (7,680 substeps a second). Step size chosen from the state is a feedback loop (Gustafsson 1991; Soderlind
+  2002), and this one's gain is over one. Measured by switching one change on 40 steps before each run-away (step 1900
+  of seed 0 with the sweeps, step 470 of seed 3 with the block solver; the state up to there is the same) and running
+  400 steps on. Fastest spin in rad/s, and the highest level any body's island took:
+
+  | Change | Seed 0, sweeps | Seed 3, block |
+  | --- | --- | --- |
+  | none | 4.4e8, then not a number; level 7 | 6.6e8, then not a number; level 7 |
+  | the level does not answer spin (tilt only) | 326; level 1 | 583; level 0 |
+  | the push's turn bound (TURN, 0.2 rad a substep) taken as 2^-level of itself | 3,149; level 7 | 1,574; level 6 |
+  | a cut push taken back out of the speeds once the poses have moved | 839; level 5 | 10,256; level 7 |
+  | both of those | 650; level 5 | 1,782; level 6 |
+  | the push's speed cap without its turning term (arm times spin) | 611; level 5 | 1,766; level 6 |
+  | the push's speed cap (`joint_max_push`) taken as 2^-level of itself | 2,531; level 7 | 159,730; level 7 |
+  | cap and turn bound 2^-level, no turning term | 415; level 4 | 1,202; level 6 |
+  | the damped push | 2,387; level 7 | 2,617; level 7 |
+  | the level does not answer bodies a joint holds | 840; level 5 | 1,347; level 6 |
+  | the level answers only bodies a joint holds | 978; level 5 | 5,235; level 7 |
+  | the level does not answer an island with a push cut or capped in the step before | 537; level 5 | 1,134; level 5 |
+
+  So no change to the joints' push cuts the loop: each lowers the peak and none holds the level down. Only taking the
+  spin out of the level does, and the spin that raises the level is carried by jointed and free bodies alike. The first
+  lead (TURN is a turn per substep, so a cut push leaves more spin at a finer level) is one term of the loop and not its
+  cause. A ledger of the kinetic energy each stage of a substep adds, over the fixture's run-away: the energy comes in
+  through the contacts' warm start (5.7e10 J in step 1937, 1.9e11 in 1938, 1.9e13 in 1943), the joints' warm start and
+  path solve take most of it out again, and the path's position push adds under a tenth of what the contacts do.
+- **Ruled out as fixes:** the turn bound taken as 2^-level (a push then turns a body at the same rate at every level):
+  `a_web_of_joints_stays_in_the_numbers` (`kernel/tests/stability.rs`) fails with it, seed 59 gaining 1.76e8 J over the
+  1.35e11 J its kinematic bodies did, where the fix alone passes. Dropping the spin rule: it is what keeps a bar through
+  a wall from gaining energy (`kernel/tests/spin_energy.rs`, 19 percent at 0.6 rad a substep). Over the five seeds, whole
+  runs, none of the push changes is told from another by its spins: the scene is chaotic and the spread between seeds
+  (176 to 5,040 rad/s on `main`) is wider than any difference between builds.
+- **Not tried yet:** why the contacts' warm start holds that much (what a contact remembers of stopping a joint's push
+  is no load, and a joint's own push is the one thing the joints do not remember); the spin rule's own cause, the
+  inverse inertia the contacts' relaxing pass reads at the turned pose, taken from the rows' pose so the level need not
+  answer spin at all; a level held where the last raise did not lower the turn a substep.
+- **For:** the physics lane. KB-PHYS-SARRUSLOOP1's fix waits on this.
 
 ### Open 2026-11-28: a ball on a spinning hinge settles off its balance in proportion to its inertia (KB-PHYS-SPINBIAS1, physics solver)
 
