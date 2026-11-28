@@ -3227,3 +3227,14 @@ Dynamic inflow and eyewall structure, reciprocal air–water feedback, remaining
 - Point 8 (cdefe2ee68). `packages/physics/scripts/earth05-plates-measured.mjs` compares independent slender plates and repeated loading. The resolved tier predicts 27.89 and 29.38 mm versus 36.90 and 39.49 mm observed for the 1:5 and 1:7 plates at 48 kPa. The normalized tenth-cycle sinkage remains 1.0 versus 1.719 observed. [Measured limits](limits.md#independent-plate-shape-and-repeated-pressure)
 
 Slender footprint pressure, cumulative same-peak compaction, remaining belt and animal coupling, and the original film takes remain open. The row stays REOPENED at four points.
+
+### EARTH-08 Seismic waves and ground shaking
+
+#### EARTH-08 four-point pass
+
+- Point 5 (27eeda9cac). `packages/physics/tests/coupling/seismic.test.js` checks that a rejected wave pulse and rejected late support load preserve all accepted bytes and the last native work, including independent memory ownership. The matrix build tolerates plain-memory growth during a material callback and both ground outputs replay their signed origins.
+- Point 6 (27eeda9cac). `packages/physics/tests/coupling/seismic-workers.test.js` compares 31 × 27 and 37 × 31 sections byte for byte with one, two and four participants and signed restore. `packages/physics/tests/seismic-workers.browser.mjs` observes real helpers and 837 interior cells, including 810 live paired SIMD cells, in each velocity and stress phase plus 31 caller surface points. The joined phases also match the previous Wasm on three shapes in both memory modes.
+- Point 7 (27eeda9cac). `packages/physics/tests/seismic-film.browser.mjs` couples a natural P–SV section, a single Newmark instrument and a real rigid witness, against a silent control. Station peak acceleration is 1.816 m/s² and the two readouts reach 3.461 and 6.584 mm at frame 68. Each renderer independently reproduces the complete accepted state and RGBA through hold, immediate restore, re-advance and rewind.
+- Point 8 (27eeda9cac). `packages/physics/scripts/earth08-mashiki-measured.mjs` uses the original NIED P/S logging profile and an independent density estimate. The production transit is 0.33187–0.33609 s, versus a measured weak-motion reference of 0.377 s. The separately calculated continuum ratio peaks at 4.025 Hz versus the observed 3.4 Hz feature. [Measured limits](limits.md#earth-08-elastic-site-response-at-mashiki)
+
+Three-dimensional and nonlinear site response, evolving pore pressure, richer rupture geometry and a wider range of measured events remain open. The row stays REOPENED at four points.

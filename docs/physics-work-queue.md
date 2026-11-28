@@ -494,7 +494,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | EARTH-05 | Terramechanics | physics/terramechanics with native soil, live rigid and legged contacts, and mineral dust | Codex | REOPENED (4/8 at cdefe2ee68, points 5–8, [evidence](physics-solver-audit.md#earth-05-four-point-pass)), prior upgrade parts c99bb12d2a and 0fa769d6dc |
 | EARTH-06 | Impact and explosion cratering | stand-in | Claude | LANDED 2026-11-27: `@margoengine/physics/crater`, `craterSize` and `CraterSolver` (FIRE-05's explosions to the terrain bed), validated on craters not fitted, Sedan's blanket and Fauld's throw; limits in docs/limits.md |
 | EARTH-07 | Aeolian transport | physics/aeolian | Codex | REOPENED (4/8 at 5348518fdc, points 5–8, [evidence](physics-solver-audit.md#earth-07-four-point-pass)), prior landing d2fa3cb303 |
-| EARTH-08 | Seismic waves and ground shaking | physics/seismic | Codex | BUILDING (codex/physics-earth-08-four-point; four-point pass; [audit](physics-solver-audit.md)), landed 32c933e9d0 |
+| EARTH-08 | Seismic waves and ground shaking | physics/seismic | Codex | REOPENED (4/8 at 27eeda9cac, points 5–8, [evidence](physics-solver-audit.md#earth-08-four-point-pass)), prior landing 32c933e9d0 |
 | EARTH-09 | Volcanic eruption column | partial | Open | OPEN |
 | EARTH-10 | Lava flow | partial | Codex | REOPENED (4/8 at 99d66dbc47, points 5–8, [evidence](physics-solver-audit.md#earth-10-four-point-pass)), prior landing 3a35fac405 |
 | ICE-01 | Snowpack | physics/snowpack, Weather Snow and live basin runoff | Codex | REOPENED (4/8 at 316b7367c1, points 5–8, [evidence](physics-solver-audit.md#ice-01-four-point-pass)), prior landing 7f5ad4a8d2 |
