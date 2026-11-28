@@ -1,10 +1,10 @@
 {
-  "commit": "c3591f3be3",
+  "commit": "d0ab6b740c",
   "dirty": false,
   "browser": "msedge 158.0.4370.45 headless",
   "buildManifest": {
     "../../../packages/animation/dist/index.js": {
-      "file": "assets/dist-SD7xJ_rH.js",
+      "file": "assets/dist-DI0Y6CXy.js",
       "name": "dist",
       "src": "../../../packages/animation/dist/index.js",
       "isDynamicEntry": true,
@@ -13,7 +13,7 @@
         "_node-matrix-R9BipGnp-ERCK1iAW.js",
         "_errors-DkwPZuAq.js",
         "_mat4-BTlwq2yz.js",
-        "_model-B16_Idts-CN0rSkyN.js",
+        "_model-r5h5WKRU-DM2tjJ4y.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ]
     },
@@ -85,14 +85,14 @@
       "src": "../../../packages/geometry/dist/optimize.js",
       "isDynamicEntry": true
     },
-    "../../../packages/gltf/dist/compression-CyUGU4DR.js": {
-      "file": "assets/compression-CyUGU4DR-DzbsEEnz.js",
-      "name": "compression-CyUGU4DR",
-      "src": "../../../packages/gltf/dist/compression-CyUGU4DR.js",
+    "../../../packages/gltf/dist/compression-BYFLLRc7.js": {
+      "file": "assets/compression-BYFLLRc7-Ds3zP-u7.js",
+      "name": "compression-BYFLLRc7",
+      "src": "../../../packages/gltf/dist/compression-BYFLLRc7.js",
       "isDynamicEntry": true,
       "imports": [
         "_errors-D0VAEAiW-CZKkhVCh.js",
-        "_asset-0FOEpFiE-BWqd8CyT.js"
+        "_asset-BrtvRPmj-NtNbau7l.js"
       ]
     },
     "../../../packages/gltf/dist/dds.js": {
@@ -115,7 +115,7 @@
       ]
     },
     "../../../packages/gltf/dist/index.js": {
-      "file": "assets/dist-B0cjDgRg.js",
+      "file": "assets/dist-Bw6eQIAX.js",
       "name": "dist",
       "src": "../../../packages/gltf/dist/index.js",
       "isDynamicEntry": true,
@@ -129,14 +129,14 @@
       ]
     },
     "../../../packages/gltf/dist/pbr.js": {
-      "file": "assets/pbr-Cm4t7Sof.js",
+      "file": "assets/pbr-BNLW2yCb.js",
       "name": "pbr",
       "src": "../../../packages/gltf/dist/pbr.js",
       "isDynamicEntry": true,
       "imports": [
         "_preload-helper-CRzLMJPS.js",
-        "_model-B16_Idts-CN0rSkyN.js",
-        "_asset-0FOEpFiE-BWqd8CyT.js",
+        "_model-r5h5WKRU-DM2tjJ4y.js",
+        "_asset-BrtvRPmj-NtNbau7l.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ],
       "dynamicImports": [
@@ -171,7 +171,7 @@
       ]
     },
     "../../../packages/gltf/dist/strokes.js": {
-      "file": "assets/strokes-DX6LQi-E.js",
+      "file": "assets/strokes-CVmstMRw.js",
       "name": "strokes",
       "src": "../../../packages/gltf/dist/strokes.js",
       "isDynamicEntry": true,
@@ -179,7 +179,7 @@
         "_errors-D0VAEAiW-CZKkhVCh.js",
         "_preload-helper-CRzLMJPS.js",
         "_scene-scope-CZDEkd24-DwPzBn8G.js",
-        "_asset-0FOEpFiE-BWqd8CyT.js"
+        "_asset-BrtvRPmj-NtNbau7l.js"
       ],
       "dynamicImports": [
         "../../../packages/lines/dist/index.js",
@@ -188,7 +188,7 @@
       ]
     },
     "../../../packages/gltf/dist/transmission.js": {
-      "file": "assets/transmission-CBDHjRlN.js",
+      "file": "assets/transmission-2GDnNcG4.js",
       "name": "transmission",
       "src": "../../../packages/gltf/dist/transmission.js",
       "isDynamicEntry": true,
@@ -196,7 +196,7 @@
         "_errors-D0VAEAiW-CZKkhVCh.js",
         "_version-CrCGs6gQ.js",
         "_extension-DMa9Y_yu.js",
-        "_native-glass-DSXPs6PD-BvVs0fF5.js"
+        "_native-glass-D85twud0-BvVs0fF5.js"
       ]
     },
     "../../../packages/lines/dist/index.js": {
@@ -318,9 +318,9 @@
         "_errors-D0VAEAiW-CZKkhVCh.js"
       ]
     },
-    "_asset-0FOEpFiE-BWqd8CyT.js": {
-      "file": "assets/asset-0FOEpFiE-BWqd8CyT.js",
-      "name": "asset-0FOEpFiE",
+    "_asset-BrtvRPmj-NtNbau7l.js": {
+      "file": "assets/asset-BrtvRPmj-NtNbau7l.js",
+      "name": "asset-BrtvRPmj",
       "imports": [
         "_errors-D0VAEAiW-CZKkhVCh.js",
         "_preload-helper-CRzLMJPS.js",
@@ -333,7 +333,7 @@
         "../../../packages/gltf/dist/spec-gloss.js",
         "../../../packages/gltf/dist/extended.js",
         "../../../packages/decoders/dist/meshopt.js",
-        "../../../packages/gltf/dist/compression-CyUGU4DR.js",
+        "../../../packages/gltf/dist/compression-BYFLLRc7.js",
         "../../../packages/geometry/dist/optimize.js"
       ]
     },
@@ -420,9 +420,9 @@
         "_errors-D4ZctVpl.js"
       ]
     },
-    "_model-B16_Idts-CN0rSkyN.js": {
-      "file": "assets/model-B16_Idts-CN0rSkyN.js",
-      "name": "model-B16_Idts",
+    "_model-r5h5WKRU-DM2tjJ4y.js": {
+      "file": "assets/model-r5h5WKRU-DM2tjJ4y.js",
+      "name": "model-r5h5WKRU",
       "imports": [
         "_errors-D0VAEAiW-CZKkhVCh.js",
         "_version-CrCGs6gQ.js",
@@ -432,20 +432,20 @@
         "_mat4-BTlwq2yz.js",
         "_accessor-DuqjpuxI-lo3KREZ8.js",
         "_scene-scope-CZDEkd24-DwPzBn8G.js",
-        "_native-glass-DSXPs6PD-BvVs0fF5.js",
-        "_asset-0FOEpFiE-BWqd8CyT.js",
+        "_native-glass-D85twud0-BvVs0fF5.js",
+        "_asset-BrtvRPmj-NtNbau7l.js",
         "_shader-C29RtPAw-CzGBoEkS.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js",
         "_texture-BT_nk8cK.js"
       ],
       "dynamicImports": [
         "../../../packages/gltf/dist/transmission.js",
-        "../../../packages/gltf/dist/compression-CyUGU4DR.js"
+        "../../../packages/gltf/dist/compression-BYFLLRc7.js"
       ]
     },
-    "_native-glass-DSXPs6PD-BvVs0fF5.js": {
-      "file": "assets/native-glass-DSXPs6PD-BvVs0fF5.js",
-      "name": "native-glass-DSXPs6PD",
+    "_native-glass-D85twud0-BvVs0fF5.js": {
+      "file": "assets/native-glass-D85twud0-BvVs0fF5.js",
+      "name": "native-glass-D85twud0",
       "imports": [
         "_version-CrCGs6gQ.js",
         "_errors-DkwPZuAq.js"
@@ -500,7 +500,7 @@
       ]
     },
     "index.html": {
-      "file": "assets/index-ee715pUi.js",
+      "file": "assets/index-A9ssufpO.js",
       "name": "index",
       "src": "index.html",
       "isEntry": true,
@@ -530,13 +530,13 @@
       "brotli": 2281
     },
     {
-      "path": "assets/dist-B0cjDgRg.js",
+      "path": "assets/dist-Bw6eQIAX.js",
       "role": "@margoengine/gltf (addGLTF)",
       "encoding": "gzip",
-      "transferred": 5514,
-      "raw": 13574,
-      "gzip": 5142,
-      "brotli": 4650
+      "transferred": 5390,
+      "raw": 12551,
+      "gzip": 5018,
+      "brotli": 4566
     },
     {
       "path": "assets/errors-D0VAEAiW-CZKkhVCh.js",
@@ -566,13 +566,13 @@
       "brotli": 1913
     },
     {
-      "path": "assets/index-ee715pUi.js",
+      "path": "assets/index-A9ssufpO.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 27482,
+      "transferred": 27484,
       "raw": 65859,
-      "gzip": 27100,
-      "brotli": 23945
+      "gzip": 27102,
+      "brotli": 23954
     },
     {
       "path": "assets/node-matrix-R9BipGnp-ERCK1iAW.js",
@@ -616,8 +616,8 @@
       "encoding": "identity",
       "transferred": 1054,
       "raw": 804,
-      "gzip": 432,
-      "brotli": 279
+      "gzip": 433,
+      "brotli": 280
     },
     {
       "path": "model.glb",
@@ -631,15 +631,15 @@
   ],
   "total": {
     "requests": 12,
-    "transferred": 46960,
-    "raw": 97378,
-    "gzip": 40973,
-    "brotli": 36214
+    "transferred": 46838,
+    "raw": 96355,
+    "gzip": 40852,
+    "brotli": 36140
   },
   "notFetched": [
     {
-      "path": "assets/asset-0FOEpFiE-BWqd8CyT.js",
-      "raw": 31545
+      "path": "assets/asset-BrtvRPmj-NtNbau7l.js",
+      "raw": 31698
     },
     {
       "path": "assets/basis_transcoder-DRsa3jdg.js",
@@ -662,7 +662,7 @@
       "raw": 1076
     },
     {
-      "path": "assets/compression-CyUGU4DR-DzbsEEnz.js",
+      "path": "assets/compression-BYFLLRc7-Ds3zP-u7.js",
       "raw": 4395
     },
     {
@@ -698,8 +698,8 @@
       "raw": 27732
     },
     {
-      "path": "assets/dist-SD7xJ_rH.js",
-      "raw": 80949
+      "path": "assets/dist-DI0Y6CXy.js",
+      "raw": 80954
     },
     {
       "path": "assets/draco-here-CI7VOHpu.js",
@@ -754,11 +754,11 @@
       "raw": 7513
     },
     {
-      "path": "assets/model-B16_Idts-CN0rSkyN.js",
-      "raw": 153196
+      "path": "assets/model-r5h5WKRU-DM2tjJ4y.js",
+      "raw": 155169
     },
     {
-      "path": "assets/native-glass-DSXPs6PD-BvVs0fF5.js",
+      "path": "assets/native-glass-D85twud0-BvVs0fF5.js",
       "raw": 10873
     },
     {
@@ -766,7 +766,7 @@
       "raw": 3727
     },
     {
-      "path": "assets/pbr-Cm4t7Sof.js",
+      "path": "assets/pbr-BNLW2yCb.js",
       "raw": 1058
     },
     {
@@ -798,7 +798,7 @@
       "raw": 2094
     },
     {
-      "path": "assets/strokes-DX6LQi-E.js",
+      "path": "assets/strokes-CVmstMRw.js",
       "raw": 4668
     },
     {
@@ -810,7 +810,7 @@
       "raw": 3127
     },
     {
-      "path": "assets/transmission-CBDHjRlN.js",
+      "path": "assets/transmission-2GDnNcG4.js",
       "raw": 10083
     },
     {

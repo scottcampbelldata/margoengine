@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21566278,
+  "total": 21603082,
   "history": [
     {
       "date": "2026-10-24",
@@ -15211,6 +15211,12 @@
       "commit": "lane-e-boolean-rounding",
       "reason": "exact booleans now test float32 output for crossing triangles and remove them (self-intersections.ts, boolean-separate.ts, KB-BOOL-F32CROSS1): boolean-exact 12908 to 15780 B, boolean-batch 13069 to 15979, hull 14655 to 17577, root 30193 to 30205 (needle planarity). Every one holds the exact kernel and booleans are synchronous, so a lazy split would break the API.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "d0ab6b740c",
+      "reason": "Gap row 19 (lane C): procedural/building-rules 27,023 ceiling, 27,742 B measured (curtains kept off stairs, a stair hall for the second stair, the unmet codes, the stair to a flat roof with its house and guard), so procedural/building-plans 37,498 -> 38,072 B and procedural/city 40,705 -> 41,000 B, which bundle it; a separate roof entry would make every flat western block of four storeys, whose code asks for the stair, load it in a second call. New entry materials/interior-mapping 31,075 B, most of it the shared Material and WgslMaterial code, which loads gltf/pbr-model and gltf/extended-materials as materials/portal does and every materials mesh already does",
+      "grew": 6
     }
   ],
   "items": {
@@ -15905,6 +15911,7 @@
     "@margoengine/materials/fur": 4113,
     "@margoengine/materials/hair": 4112,
     "@margoengine/materials/instance-attributes": 3264,
+    "@margoengine/materials/interior-mapping": 32008,
     "@margoengine/materials/layered": 3230,
     "@margoengine/materials/mips": 12353,
     "@margoengine/materials/object-normal": 950,
@@ -16205,12 +16212,12 @@
     "@margoengine/post/trail": 3766,
     "@margoengine/post/upscale": 5366,
     "@margoengine/procedural": 18709,
-    "@margoengine/procedural/building-plans": 37498,
-    "@margoengine/procedural/building-rules": 27023,
+    "@margoengine/procedural/building-plans": 39215,
+    "@margoengine/procedural/building-rules": 28575,
     "@margoengine/procedural/building-settings": 6573,
     "@margoengine/procedural/buildings": 1758,
     "@margoengine/procedural/caves": 1677,
-    "@margoengine/procedural/city": 40705,
+    "@margoengine/procedural/city": 42230,
     "@margoengine/procedural/conifer-settings": 2447,
     "@margoengine/procedural/conifer-species": 2249,
     "@margoengine/procedural/conifers": 6159,
@@ -17066,6 +17073,8 @@
     "leak @margoengine/materials/fake-shadows -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/materials/fur -> @margoengine/gltf/extended-materials": 1,
     "leak @margoengine/materials/fur -> @margoengine/gltf/pbr-model": 1,
+    "leak @margoengine/materials/interior-mapping -> @margoengine/gltf/extended-materials": 1,
+    "leak @margoengine/materials/interior-mapping -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/materials/portal -> @margoengine/gltf/extended-materials": 1,
     "leak @margoengine/materials/portal -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/materials/serialization -> @margoengine/gltf/extended-materials": 1,
