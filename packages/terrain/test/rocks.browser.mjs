@@ -10,6 +10,10 @@
 // 4. with `TerrainBlend` on as well, the cliff's foot takes the ground's colour (the blend is laid over the rock);
 // 5. far off (150 m), a camera move of a quarter pixel changes the rock picture no more than twice the plain one's
 //    (each octave fades as it nears the pixel footprint, so the detail does not shimmer);
+// 6. a hand's breadth (25 cm) from the face, granite shows its millimetre crystals and no blotches: the spread of its
+//    16-pixel block means stays within 1.25 times sandstone's of the same base colour (value-noise quartz and mica
+//    patches 7 to 20 cm across measured 2.2 times until 2026-11-28, read as camouflage on the film's boulders) while
+//    its colour differs from sandstone's by over 2 per pixel;
 // no validation error throughout.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -42,17 +46,26 @@ await runSuite(
         sites = findRockSites(ground, { cliffRelief: 4, cliffWidth: 16, seaRocks: 0, boulders: 0 }),
         site = sites.cliffs.reduce((a, b) => (Math.abs(b.position[0]) < Math.abs(a.position[0]) ? b : a)),
         rock = buildCliff(site, ground, { overhang: 1.5 });
-      async function picture({ surface, blend, style, far = false, shift = 0, empty = false } = {}) {
+      // The face's nearest point to the camera line (x at the site, 2.5 to 3.5 m up; vertices hold position then normal),
+      // for the close-up views.
+      let face = Infinity;
+      for (let k = 0, v = rock.geometry.vertices; k < v.length; k += 6)
+        if (
+          Math.abs(v[k] + rock.position[0] - site.position[0]) < 0.6 &&
+          Math.abs(v[k + 1] + rock.position[1] - 3) < 0.5
+        )
+          face = Math.min(face, v[k + 2] + rock.position[2] - site.position[2]);
+      async function picture({ surface, blend, style, far = false, shift = 0, empty = false, distance } = {}) {
         const canvas = document.createElement('canvas');
         canvas.width = canvas.height = size;
         document.body.append(canvas);
-        const z = far ? -150 : -12,
+        const z = distance ? face - distance : far ? -150 : -12,
           engine = await Engine.create(canvas, {
             backend: 'webgpu',
             camera: {
               position: [site.position[0] + shift, 3, site.position[2] + z],
               target: [site.position[0] + shift, 3, site.position[2]],
-              near: 0.1,
+              near: distance ? 0.02 : 0.1,
               far: 400,
             },
           }),
@@ -123,6 +136,18 @@ await runSuite(
           }
         return sum / count;
       };
+      // Blotches: the spread of 16 x 16 pixel block means over the window, as a share of the window's mean luminance.
+      const blotch = (p) => {
+        const blocks = [];
+        for (let by = y0; by + 16 <= y1; by += 16)
+          for (let bx = x0; bx + 16 <= x1; bx += 16) {
+            let sum = 0;
+            for (let y = by; y < by + 16; y++) for (let x = bx; x < bx + 16; x++) sum += lum(p, x, y);
+            blocks.push(sum / 256);
+          }
+        const m = blocks.reduce((a, b) => a + b, 0) / blocks.length;
+        return Math.sqrt(blocks.reduce((a, b) => a + (b - m) ** 2, 0) / blocks.length) / m;
+      };
       // Mean linear luminance (the canvas holds sRGB codes), so a ratio is a ratio of light.
       const linear = (v) => ((v / 255 + 0.055) / 1.055) ** 2.4;
       const mean = (p, ya = y0, yb = y1) => {
@@ -152,6 +177,17 @@ await runSuite(
         closeSettings = { ...drySettings, scale: 2.5 },
         sandy = await picture({ surface: closeSettings, style: { ...sameBase, type: 'sandstone' } }),
         granite = await picture({ surface: closeSettings, style: { ...sameBase, type: 'granite' } }),
+        // A hand's breadth from the face (pixels of about 1.5 mm): granite's crystals against sandstone's sand grain.
+        sandyNear = await picture({
+          surface: closeSettings,
+          style: { ...sameBase, type: 'sandstone' },
+          distance: 0.25,
+        }),
+        graniteNear = await picture({
+          surface: closeSettings,
+          style: { ...sameBase, type: 'granite' },
+          distance: 0.25,
+        }),
         blended = await picture({ surface: {}, blend: true }),
         bare = await picture({ empty: true }),
         farPlain = [await picture({ far: true }), await picture({ far: true, shift: 0.2 })],
@@ -174,6 +210,12 @@ await runSuite(
         },
         dryTideChange: change(dryShore, dryInland),
         mineralDetail: { sand: detail(sandy), granite: detail(granite), change: change(sandy, granite) },
+        face,
+        nearGrain: {
+          sand: { fine: detail(sandyNear), blotch: blotch(sandyNear) },
+          granite: { fine: detail(graniteNear), blotch: blotch(graniteNear) },
+          change: change(sandyNear, graniteNear),
+        },
         foot: (() => {
           // The pixels the blend changes, and their colour distance from the bare ground the rock hides there.
           let count = 0,
@@ -214,6 +256,11 @@ await runSuite(
       r.mineralDetail.change > 0.4,
       `matching base colors retain distinct mineral detail: ${JSON.stringify(r.mineralDetail)}`,
     );
+    assert.ok(
+      r.nearGrain.granite.blotch < 1.25 * r.nearGrain.sand.blotch,
+      `granite up close has grains, not blotches: ${JSON.stringify(r.nearGrain)}`,
+    );
+    assert.ok(r.nearGrain.change > 2, `granite up close shows its crystals: ${JSON.stringify(r.nearGrain)}`);
     assert.ok(r.foot.count > 200, `the blend changes the cliff's foot: ${JSON.stringify(r.foot)}`);
     assert.ok(
       r.foot.blended < r.foot.rock * 0.6,

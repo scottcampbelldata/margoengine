@@ -1654,8 +1654,12 @@ engine.start();
   moss on faces that look up; a wet, algae-dark band up to `tideHeight` over the rock's `seaLevel`; and rain that
   darkens and smooths it (Lekner and Dorf 1988, Jensen et al. 1999). Rock types: `sandstone` (default), `limestone`,
   `chalk`, `granite`, `basalt`, `shale` (`ROCK_TYPES`; give `color`, `color2`, `strata` or `porosity` to override).
-  At close range, granite has light quartz and dark mica grains, basalt has subtle dark pits, and shale has thin
-  laminations between beds. Grain color and relief fade when the screen footprint can no longer resolve them.
+  At close range, granite is a mosaic of 5 mm crystals whatever `scale` is: feldspar (64 percent, light), quartz
+  (30 percent, grey) and dark biotite flecks (6 percent), after the granite field of Streckeisen (Earth-Science
+  Reviews 12(1), 1976, doi:10.1016/0012-8252(76)90052-0) and the coarse Front Range granites (Barker et al.,
+  Precambrian Research 2(2), 1975, doi:10.1016/0301-9268(75)90001-7); averaged they keep granite's measured tone, so a
+  boulder seen from metres away shows no blotches. Basalt has subtle dark pits, and shale has thin laminations between
+  beds. Grain color and relief fade when the screen footprint can no longer resolve them.
   Granite's two tones are measured: linear (0.2709, 0.224, 0.1869), the mean of ECOSTRESS Spectral Library 1.0 samples
   Granite_H2, H3 and H5, and (0.1678, 0.171, 0.1512), the grey alkalic Granite_H1 (Meerdink et al., Remote Sensing of
   Environment 230, 2019, https://doi.org/10.1016/j.rse.2019.05.015), each spectrum integrated under a 6504 K black body.

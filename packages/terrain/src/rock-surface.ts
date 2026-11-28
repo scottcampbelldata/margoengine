@@ -195,6 +195,22 @@ function styleRow(style: RockStyle | undefined): Float32Array {
 let serial = 0;
 const GLOBAL = 5,
   PER = 3;
+/**
+ * Granite's crystal size, metres. Granite is phaneritic: medium grained (1 to 5 mm) to coarse (over 5 mm), the Front
+ * Range granites coarse (F. Barker, D. R. Wones, W. N. Sharp, G. A. Desborough, "The Pikes Peak batholith, Colorado
+ * Front Range...", Precambrian Research 2(2), 1975, doi:10.1016/0301-9268(75)90001-7). Its share of minerals follows
+ * the granite field of A. Streckeisen, "To each plutonic rock its proper name", Earth-Science Reviews 12(1), 1976,
+ * doi:10.1016/0012-8252(76)90052-0: about 30 percent quartz, 64 percent feldspar and 6 percent dark biotite. Until
+ * 2026-11-28 the grain was value noise 1/13 of the relief scale across (7 to 20 cm), thresholded into quartz and mica
+ * blotches, which read as camouflage paint on a boulder.
+ */
+const GRANITE_GRAIN = 0.005;
+/** Brightness of feldspar, quartz and biotite crystals against granite's mean tone (the shares above average to 1). */
+const GRANITE_MINERALS = { feldspar: 1.15, quartz: 0.75, biotite: 0.3, quartzShare: 0.3, biotiteShare: 0.06 };
+const graniteMean =
+  GRANITE_MINERALS.biotiteShare * GRANITE_MINERALS.biotite +
+  GRANITE_MINERALS.quartzShare * GRANITE_MINERALS.quartz +
+  (1 - GRANITE_MINERALS.quartzShare - GRANITE_MINERALS.biotiteShare) * GRANITE_MINERALS.feldspar;
 
 /**
  * Rock shading for meshes on core's standard material: add each cliff, stack or boulder with its rock type, and every
@@ -308,6 +324,14 @@ fn rockPlanar(p:vec3f,w:vec3f,f:f32,o:f32)->RockPlanar {
  var r:RockPlanar;r.value=w.x*a.x+w.y*b.x+w.z*c.x;
  r.gradient=f*(w.x*vec3f(0,a.y,a.z)+w.y*vec3f(b.y,0,b.z)+w.z*vec3f(c.y,c.z,0));return r;
 }
+// One crystal per cell of a lattice whose edges a low noise bends, so grains are irregular and interlock; the cell's
+// hash picks its mineral, and the result is its brightness over granite's mean.
+fn graniteGrain(q:vec2f,o:f32)->f32 {
+ let s=q*0.6+o*31.0;let bend=vec2f(terrainNoise(s).x,terrainNoise(s+17.3).x)-0.5;
+ let c=bitcast<vec2u>(vec2i(floor(q+0.9*bend)));
+ let h=f32(terrainHash(c.x+terrainHash(c.y+bitcast<u32>(i32(o*977.0))))>>8u)*5.9604645e-8;
+ return select(select(${(GRANITE_MINERALS.feldspar / graniteMean).toFixed(4)},${(GRANITE_MINERALS.quartz / graniteMean).toFixed(4)},h<${(GRANITE_MINERALS.biotiteShare + GRANITE_MINERALS.quartzShare).toFixed(3)}),${(GRANITE_MINERALS.biotite / graniteMean).toFixed(4)},h<${GRANITE_MINERALS.biotiteShare.toFixed(3)});
+}
 struct RockShade {color:vec3f,rough:f32,normal:vec3f}
 fn rockShade(p:vec3f,n0:vec3f,id:f32,footprint:f32)->RockShade {
  let m0=rockRow(id,0u);let m1=rockRow(id,1u);let m2=rockRow(id,2u);
@@ -339,15 +363,16 @@ fn rockShade(p:vec3f,n0:vec3f,id:f32,footprint:f32)->RockShade {
  // Rock types share weathering, but have different grains at the scale of a broken face.
  // Fade grain contrast and relief together when the footprint can no longer resolve it.
  var fabric=0.0;
- let gf=select(21.0,13.0,m2.w==1.0)/g0.y;
+ // Granite's crystals are millimetres whatever the rock's relief scale: ${GRANITE_GRAIN} m cells.
+ let gf=select(21.0/g0.y,${(1 / GRANITE_GRAIN).toFixed(1)},m2.w==1.0);
  let keepGrain=clamp(2.0-4.0*footprint*gf,0.0,1.0);
  if(keepGrain>0.0){
   let grain=rockPlanar(p,w,gf,m2.z+53.79);
   if(m2.w==1.0){
-   let quartz=smoothstep(0.53,0.77,grain.value);
-   let mica=1.0-smoothstep(0.22,0.43,grain.value);
-   fabric=(0.44*quartz-0.57*mica)*keepGrain;
-   grad+=grain.gradient*(0.11/gf)*keepGrain;
+   // A mosaic of whole crystals, each one mineral: feldspar, quartz, or a dark biotite fleck (graniteGrain).
+   let mineral=w.x*graniteGrain(p.yz*gf,m2.z)+w.y*graniteGrain(p.xz*gf,m2.z+0.37)+w.z*graniteGrain(p.xy*gf,m2.z+0.71);
+   fabric=(mineral-1.0)*keepGrain;
+   grad+=grain.gradient*(0.04/gf)*keepGrain;
   }else if(m2.w==2.0){
    let pit=1.0-smoothstep(0.20,0.36,grain.value);
    fabric=-0.29*pit*keepGrain;
