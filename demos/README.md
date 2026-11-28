@@ -28,7 +28,13 @@ Each folder keeps the code it was built from in `source/`. After changing a demo
 node scripts/web-demos/build.mjs newtons-cradle
 ```
 
-That bundles `source/` against this checkout's packages, replaces `index.html` and the hashed files in `assets/`, and refreshes `downloads/newtons-cradle.zip`. Pass several names, or `--all`. Demos use only engine packages: a simulation, model or effect a demo needs belongs in its package, never in `source/`.
+That bundles `source/` against this checkout's packages, replaces `index.html` and the hashed files in `assets/`, and refreshes `downloads/newtons-cradle.zip`. Pass several names, or `--all`. Then refresh the gallery card from the real page:
+
+```sh
+node scripts/web-demos/thumbnail.mjs newtons-cradle
+```
+
+It waits until the exhibit is marked ready, crops the rendered scene to 900 x 579 and writes `thumbs/newtons-cradle.jpg`. Demos use only engine packages: a simulation, model or effect a demo needs belongs in its package, never in `source/`.
 
 ## Exhibits
 
