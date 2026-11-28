@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21995681,
+  "total": 21996305,
   "history": [
     {
       "date": "2026-10-24",
@@ -15803,6 +15803,12 @@
       "commit": "d6c27347a7",
       "grew": 3,
       "reason": "Objects meet the ground (Above the Treeline look notes). @margoengine/scatter 29,682 -> 30,747 B gzip (+1,065 B): the base and skyOcclusion options, their vertex and fragment edits, and the shared ambient helper that fixes KB-SCATTER-SKYAO1; a separate entry would need a hook into the private pipeline builder. @margoengine/biomes/objects 6,419 -> 7,084 B gzip (+665 B): species sink and alignToGround (KB-BIOMES-SINK1), per-part foot and canopy looks and the footprints fed to the ground. @margoengine/terrain/ground-contact is new, 3,308 B gzip, loaded by BiomeView with import()."
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "804d8f554c",
+      "grew": 1,
+      "reason": "@margoengine/biomes/view about 17,080 -> 17,292 B gzip: +212 B (measured 16,809 -> 17,021 B on the first base) for the contact and relief options and the import() of ground contact and relief lighting, on top of main's BiomeView rock option; the two attaches belong in the view that owns the terrain."
     }
   ],
   "items": {
@@ -15917,7 +15923,7 @@
     "@margoengine/biomes/toolkit": 3176,
     "@margoengine/biomes/treeline": 4663,
     "@margoengine/biomes/valley": 5060,
-    "@margoengine/biomes/view": 17187,
+    "@margoengine/biomes/view": 17811,
     "@margoengine/biomes/workers": 2878,
     "@margoengine/biomes/zones": 3875,
     "@margoengine/blender": 4905,

@@ -6,6 +6,13 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-28: two biomes unit checks are red on main (KB-BIOMES-CHECKS-RED1, biomes)
+
+- **Repro:** `node --test packages/biomes/tests/no-raw-division.test.js` names `hydrology.ts:663` and `:664` (from the
+  drainage structure map, bed921d181); the GPU chain check fails with "test:gpu chains 3 checks: browser-check.mjs,
+  water-check.mjs, meadow-grass-check.mjs" (the chain gained meadow-grass-check).
+- **Cause:** both landed on main without these two tests being run; not yet fixed.
+
 ### Open 2026-11-28: Above the Treeline's scanned rocks are 1.3 to 1.5 times too bright and blotchy (KB-TREELINE-ROCKGRADE1, film asset)
 
 - **Repro:** measure `showcase-films/treeline-rocks/textures/rock_moss_set_0{1,2}_granite.jpg` in the film's asset
