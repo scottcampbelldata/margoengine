@@ -31,12 +31,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `packages/rigging/tests/ik-reach-across.test.js`; the pose sheet fails an IK row with a limb through
   the body.
 
-### Open 2026-11-28: two biomes unit checks are red on main (KB-BIOMES-CHECKS-RED1, biomes)
+### Fixed 2026-11-28: two biomes unit checks were red on main (KB-BIOMES-CHECKS-RED1, biomes)
 
-- **Repro:** `node --test packages/biomes/tests/no-raw-division.test.js` names `hydrology.ts:663` and `:664` (from the
-  drainage structure map, bed921d181); the GPU chain check fails with "test:gpu chains 3 checks: browser-check.mjs,
-  water-check.mjs, meadow-grass-check.mjs" (the chain gained meadow-grass-check).
-- **Cause:** both landed on main without these two tests being run; not yet fixed.
+- **Repro:** `node --test packages/biomes/tests/no-raw-division.test.js` named `hydrology.ts:663` and `:664` (from the
+  drainage structure map, bed921d181), and `gpu-chain-bound.test.js` failed with "test:gpu chains 3 checks".
+- **Cause:** both landed without these tests being run. The raster step divided a cell index with raw `%` and `/`; and
+  `meadow-grass-check.mjs` was added to `test:gpu` (5c3686d2b2) beside its own `test:gpu:meadow-grass` (7da58ecd87), so
+  it also ran twice.
+- **Fix:** the step uses `imod` and `idiv` (the same values for a cell index), and `test:gpu` chains its two checks
+  again; the meadow check keeps running as `test:gpu:meadow-grass`.
+- **Regression:** `packages/biomes/tests/no-raw-division.test.js` and `packages/biomes/tests/gpu-chain-bound.test.js`.
 
 ### Open 2026-11-28: Above the Treeline's scanned rocks are 1.3 to 1.5 times too bright and blotchy (KB-TREELINE-ROCKGRADE1, film asset)
 

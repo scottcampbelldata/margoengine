@@ -660,8 +660,9 @@ export function drainageStructure(h: Hydrology, options: DrainageStructureOption
     }
     const d = direction[c];
     if (d < 0) continue;
-    const x = (c % nx) + DX[d],
-      z = Math.floor(c / nx) + DZ[d];
+    const east = imod(c, nx),
+      x = east + DX[d],
+      z = idiv(c - east, nx) + DZ[d];
     if (x >= 0 && x < nx && z >= 0 && z < nz) load[z * nx + x] += carried;
   }
   for (let z = 0; z < nz; z++)
