@@ -779,3 +779,8 @@ Rosa Vera et al. (2022), [*Corrosion Behavior of Copper Exposed in Marine Tropic
 (2024), [*Atmospheric Corrosion of Different Steel Types in Urban and Marine Exposure*](https://doi.org/10.3390/ma17246211),
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The diagnostic converts a few reported deposition,
 ambient climate and penetration values to solver units. It includes no figures or source code.
+
+### LIFE-01 measured treadmill cohort statistics
+
+A. I. Gmel, E. H. Haraldsdóttir, F. M. Serra Bragança, A. M. Cruz and M. A. Weishaupt (2024),
+[*Comparison of speed-dependent time, force and spatial parameters between Franches-Montagnes and European Warmblood horses walking and trotting on a treadmill*](https://doi.org/10.1016/j.jevs.2024.105005), Journal of Equine Veterinary Science 133, 105005. [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The diagnostic transcribes sparse cohort metadata and measured means and deviations from Tables 1, 2 and 4. It converts units and includes no original figure or trial dataset.

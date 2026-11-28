@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22162562,
+  "total": 22163185,
   "history": [
     {
       "date": "2026-10-24",
@@ -16074,6 +16074,12 @@
       "commit": "soft-03-strand-point-prediction",
       "reason": "SOFT-03 @margoengine/physics/strands 5915 to 9181 B gzip, ceiling 6171 to 9457 B. The strand entry stages accepted centreline and contact state and distributes independent point prediction to native SIMD workers. A split would duplicate world-cell, guide and rigid-port handling. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "life-01-accepted-stance-replay",
+      "reason": "LIFE-01 @margoengine/physics/legged 13307 to 13912 B gzip, ceiling 13707 to 14330 B. The controlled ground route stages contact acceptance before publishing gait and rigid deck reactions. A split would duplicate the arena layouts, validation and native phase dispatch. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16971,7 +16977,7 @@
     "@margoengine/physics/iceberg": 7192,
     "@margoengine/physics/landscape": 7724,
     "@margoengine/physics/lava": 9865,
-    "@margoengine/physics/legged": 13707,
+    "@margoengine/physics/legged": 14330,
     "@margoengine/physics/life": 10346,
     "@margoengine/physics/lightning": 9086,
     "@margoengine/physics/loads": 76595,

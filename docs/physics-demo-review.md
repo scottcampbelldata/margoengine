@@ -306,6 +306,13 @@ The registered guide poses match skin matrices, and both renderers replay accept
 through two checkpoints. A separate 240 Hz signed guide verifies the 0.948 mm crossflow response.
 The original HORSE-1 and HORSE-2 shots remain open. [Technical replay](../packages/physics/tests/strand-film.browser.mjs)
 
+The LIFE-01 technical terrain fixture places the weighted horse from accepted pose and hoof contacts.
+The same 3.15 m/s command gives a level diagonal trot and an uphill walk on a 13% grade, travelling
+4.180 m and 2.492 m in the matched interval. The loaded feet stay planted while the body advances
+5.13 cm and 3.09 cm during the observed substep. Both renderers repeat accepted snapshots and raw
+RGBA through two checkpoints. The original HORSE-3, HORSE-4 and COURIER-1 shots remain open.
+[Technical replay](../packages/physics/tests/legged-film.browser.mjs)
+
 ### Horse at the Ridge, making of (horse-at-the-ridge-making-of)
 What it shows: a 12 min 43 s walkthrough of the rig and gait, with code editor screens, Blender views and side-by-side renders of the same horse footage (early rig against rebuilt rig, before and after a restart pass).
 | ID | Time | What is wrong (observed) | What real physics does | Solver | Solver state | Needed for AAA | Status |

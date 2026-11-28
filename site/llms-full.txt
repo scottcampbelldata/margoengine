@@ -15183,7 +15183,7 @@ The field trial included early replacements, ingrowth and disturbance beyond the
 
 ### Grounded biped and quadruped gait (LIFE-01)
 
-The optional `@margoengine/physics/legged` entry and the ground-animal entry share the same slot-13 SIMD module.
+The optional `@margoengine/physics/legged` entry and the ground-animal entry share one slot-free SIMD kernel.
 Each moving body has 16 B of stored target, 40 B of gait state and two or four persistent foot contact points,
 plus the torso. A deck uses its declared planar rectangular support and the rigid body's pose. The projected COM
 sets the approximation for angularly varying contact-surface velocity. A highly articulated surface needs a
@@ -15191,7 +15191,25 @@ contactable support-patch field. Planting and flight follow a reduced spring-mas
 couple. The renderer's baked export clips keep a single pace for each clip, while runtime horse posing uses the
 actual instantaneous stride.
 
-The legged entry measures 36,145 B raw and 13,307 B gzip with a 13,707 B ceiling. It shares the ground kernel bytes listed above.
+The native dispatcher partitions disjoint body rows. Within each row, stance forces retain their deterministic
+order. The legged adapter keeps one backup of its controlled drive profiles and foot clocks. It validates gait
+and signed deck reaction candidates before accepting the ground pose, stance anchors, contacts and native receipt.
+Its deck adds a staged six-word f64 impulse row alongside each published body row.
+
+#### LIFE-01 measured treadmill gait and forelimb loading
+
+An independent instrumented-treadmill study reports 55.13, 51.46, 89.58 and 82.44 strides/min for
+Franches-Montagnes and Warmblood cohorts in walk and trot order. The four representative models at the reported
+speeds give 62.77, 61.02, 97.22 and 95.14 strides/min. The observed vertical impulse share on the forelimbs is
+59.26%, 58.11%, 56.27% and 56.42%. The model gives 44.24%, 45.01%, 40.70% and 40.84%, or 13.10–15.58
+percentage points less. Separately varying speed by the study's reported standard deviation or the default
+leg length by 10% keeps the predicted front share below 47.28%. These central comparisons use the reported
+mean mass and belt speed, equal default engine leg geometry and independent measured response. The published
+sample deviation describes the cohorts. The source lacks matching Warmblood lower limb geometry. A validated
+fore-hind load distribution and articulated horse model remain open. [Gmel et al. 2024](https://doi.org/10.1016/j.jevs.2024.105005)
+
+The legged entry measures 38,252 B raw and 13,912 B gzip with a 14,330 B ceiling. The shared ground entry
+measures 25,543 B raw and 9,785 B gzip against 10,015 B. Both use the existing ground kernel files.
 Horses measures 40,737 B raw and 16,724 B gzip. Its gait utilities measure 2,738 B raw and 1,266 B gzip.
 
 ### Pack ice and floe contact (ICE-04)
@@ -41535,6 +41553,11 @@ footage predates these fixtures. To exercise the scene-level hand-off, connect t
 rig and compare the posed feet to the published stance points after advancing the world. A complete articulated
 handoff and reacquisition strategy, rider leaning and immersed-body displacement require the linked DYN-07,
 LIFE-06 and SEA-12 couplings. The current fields provide the contact pose and wrench for those consumers.
+
+The independent treadmill comparison at observed mean walk and trot speeds overpredicts stride rate and
+puts too little vertical impulse on the forelimbs. The reduced model lacks specimen-specific mass distribution
+and articulated limb geometry. The diagnostic isolates the remaining discrepancy with speed and leg-length
+sensitivity. [Measured treadmill gait](limits.md#life-01-measured-treadmill-gait-and-forelimb-loading)
 
 ### Pack ice grounded and continuous-sheet contacts
 

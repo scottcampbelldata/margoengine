@@ -7240,3 +7240,7 @@ Signed mass supply reads aligned f64 values from the owning memory. An invalid t
 ### SOFT-03 accepted strand and weighted skin replay
 
 Candidates store centreline, frame, swept capsule history and reaction separately from accepted fields. A signed rigid publication can be borrowed from another memory. Native SIMD point prediction preserves the order of serial constraints and contacts. A fixed-camera technical gait renders accepted guides through the existing weighted horse skin, with matched still air and signed crossflow and exact replay on both backends. Independent static single-hair bending establishes a measured limit of the default modulus. Filmed clump dynamics and the original horse shots remain open. [Measured bending](../limits.md#soft-03-measured-single-hair-bending)
+
+### LIFE-01 accepted contact handoff and treadmill limits
+
+The legged wrapper checks signed intent, load and rigid rows before preparing its trial. Coupled deck impulses and gait use the trial contacts before accepting the ground pose. Invalid support leaves drive parameters, gait, anchors, work and reactions unchanged. The existing optional SIMD kernel runs disjoint bodies with up to four participants. A fixed-camera TerrainBed witness binds real accepted legs to the weighted horse in both renderers. Independent treadmill data quantify cadence and fore/hind impulse errors of the nominal reduced body. [Measured gait bounds](../limits.md#life-01-measured-treadmill-gait-and-forelimb-loading)

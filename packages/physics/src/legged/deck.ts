@@ -1,7 +1,8 @@
 import type { Bed, BedSample } from '@margoengine/math/fields';
 import type { GroundAnimalContact } from '../locomotion/index.js';
-import type { Cell, Port, Region, SolverHost } from '../world/solver.js';
-import { BODY_WORDS, IMPULSE_WORDS } from '../world/solvers/rigid.js';
+import type { Cell, Port, SolverHost } from '../world/solver.js';
+import { BODIES_FIELD, BODY_WORDS, IMPULSE_WORDS } from '../world/solvers/rigid.js';
+import { leggedError } from './errors.js';
 
 type V = readonly [number, number, number];
 type MutableV = [number, number, number];
@@ -52,6 +53,7 @@ export class DeckBed implements Bed {
   private angular: MutableV = [0, 0, 0];
   private values: MutableV = [0, 0, 0];
   private armed = false;
+  private capacity?: number;
 
   constructor(
     private readonly geometry: LeggedDeck,
@@ -67,7 +69,7 @@ export class DeckBed implements Bed {
       !(geometry.width > 0 && Number.isFinite(geometry.width)) ||
       !(geometry.depth > 0 && Number.isFinite(geometry.depth))
     )
-      throw new RangeError('Pass a body row, positive finite deck dimensions and a top offset in metres.');
+      throw leggedError('Pass a body row, positive finite deck dimensions and a top offset in metres.');
     this.width = geometry.width;
     this.depth = geometry.depth;
     this.current = cell;
@@ -93,33 +95,55 @@ export class DeckBed implements Bed {
 
   /** Copies the public body row, returning its capacity without retaining a memory view. */
   refresh(host: SolverHost, port: Port | undefined, cell: Cell): number {
-    if (!port || port.region.type !== 'f32' || port.region.layout !== 2 || port.region.byteLength % (4 * BODY_WORDS))
-      throw new RangeError('Register a RigidSolver with its version-2 bodies field before adding a legged deck.');
-    const capacity = port.region.byteLength / (4 * BODY_WORDS);
-    if (this.geometry.body >= capacity) throw new RangeError('Set the deck body to a row in the rigid bodies field.');
-    const source = new Float32Array(
-      (port.region.memory ?? host.memory).buffer,
-      port.region.byteOffset,
-      capacity * BODY_WORDS,
-    );
+    const r = port?.region;
+    if (
+      !port ||
+      port.field !== BODIES_FIELD.name ||
+      !r ||
+      r.type !== 'f32' ||
+      r.layout !== 2 ||
+      !Number.isSafeInteger(r.byteLength) ||
+      r.byteLength <= 0 ||
+      r.byteLength % (4 * BODY_WORDS)
+    )
+      throw leggedError(
+        'Register a RigidSolver with its version-2 bodies field before adding a legged deck.',
+        'version',
+      );
+    const capacity = r.byteLength / (4 * BODY_WORDS);
+    if (this.capacity !== undefined && capacity !== this.capacity)
+      throw leggedError('Keep the rigid body row count used when the legged deck was added.', 'version');
+    if (this.geometry.body >= capacity) throw leggedError('Set the deck body to a row in the rigid bodies field.');
+    const memory = r.memory ?? host.memory;
+    if (
+      !Number.isSafeInteger(r.byteOffset) ||
+      r.byteOffset < 0 ||
+      r.byteOffset % 4 ||
+      r.byteOffset > memory.buffer.byteLength - r.byteLength
+    )
+      throw leggedError('Publish aligned rigid deck rows within the memory that owns the bodies field.');
+    const source = new Float32Array(memory.buffer, r.byteOffset, capacity * BODY_WORDS);
     const at = this.geometry.body * BODY_WORDS;
     const shift = (axis: 0 | 1 | 2) => (port.cell[axis] - cell[axis]) * this.cellSize;
     const q: Q = [source[at + 3]!, source[at + 4]!, source[at + 5]!, source[at + 6]!];
     const size = Math.sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
-    if (!(size > 0) || !Number.isFinite(size))
-      throw new RangeError('Choose a live rigid body row with a unit orientation for the deck.');
+    if (source[at + 23] !== 1 || !(size > 0) || !source.subarray(at, at + 16).every(Number.isFinite))
+      throw leggedError('Choose a live rigid body row with a unit orientation for the deck.');
     const unit: Q = [q[0] / size, q[1] / size, q[2] / size, q[3] / size];
     this.normal = rotate(unit, UP);
     this.axisX = rotate(unit, X);
     this.axisZ = rotate(unit, Z);
     this.current = cell;
     this.armed = this.normal[1] > 0;
+    this.capacity = capacity;
     for (const axis of [0, 1, 2] as const) {
       this.origin[axis] = source[at + axis]! + shift(axis) + this.geometry.top * this.normal[axis];
       this.massCentre[axis] = source[at + 7 + axis]! + shift(axis);
       this.linear[axis] = source[at + 10 + axis]!;
       this.angular[axis] = source[at + 13 + axis]!;
     }
+    if (!this.origin.every(Number.isFinite) || !this.massCentre.every(Number.isFinite))
+      throw leggedError('Bring the deck and its signed origin into finite world coordinates.');
     return capacity;
   }
 
@@ -173,9 +197,5 @@ export class DeckBed implements Bed {
       impulses[at + axis] = impulses[at + axis]! + impulse[axis];
       impulses[at + axis + 3] = impulses[at + axis + 3]! + torque[axis] - dt * contact.couple[axis];
     }
-  }
-
-  port(region: Region, tick: number): Port {
-    return { field: 'bodyImpulses', region, tick, cell: this.cell };
   }
 }

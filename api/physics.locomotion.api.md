@@ -53,6 +53,7 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
     describe(): SolverDescription;
     init(host: SolverHost, params: GroundLocomotionParams): void;
     step(context: StepContext, dt: number): void;
+    stepWithContacts(context: StepContext, dt: number, check: (read: ReadTrialContact) => void): void;
     readNativeWork(): LocomotionWorkCounts | undefined;
     setLeggedDrive(body: number, drive: GroundLeggedDrive): void;
     contactCount(body: number): number;
@@ -175,6 +176,8 @@ interface Port {
 }
 
 type RateLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+type ReadTrialContact = (body: number, element: number, out: GroundAnimalContact) => GroundAnimalContact;
 
 interface Region {
     readonly name: string;

@@ -44,6 +44,8 @@ export type LeggedGait = (typeof LEGGED_GAITS)[number];
 export class LeggedLocomotion implements Solver<LeggedParams> {
     private constructor();
     static load(options?: LeggedOptions): Promise<LeggedLocomotion>;
+    [Symbol.dispose](): void;
+    readNativeWork(): LocomotionWorkCounts | undefined;
     describe(): SolverDescription;
     init(host: SolverHost, params: LeggedParams): void;
     setTarget(row: number, target: LeggedTarget): void;
@@ -57,6 +59,7 @@ export class LeggedLocomotion implements Solver<LeggedParams> {
 }
 
 export interface LeggedOptions extends Pick<GroundLocomotionOptions, 'id' | 'bedShape' | 'cellSize' | 'signal'> {
+    readonly threads?: 1 | 2 | 4;
     readonly readIntent?: boolean;
     readonly readLoad?: boolean;
     readonly deck?: LeggedDeck;
@@ -160,6 +163,21 @@ interface GroundLocomotionParams {
     readonly bed?: Bed;
     readonly originCell?: Cell;
     readonly groundHeight?: number;
+}
+
+interface LocomotionWorkCounts extends LocomotionWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly LocomotionWorkerWork[];
+}
+
+interface LocomotionWorkerWork {
+    readonly bodies: number;
+    readonly contactRows: number;
+    readonly snakeLinks: number;
+    readonly feet: number;
+    readonly torsoRows: number;
+    readonly stanceRows: number;
+    readonly pairedContactDots: number;
 }
 
 interface Port {

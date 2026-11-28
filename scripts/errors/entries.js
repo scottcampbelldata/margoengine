@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'legged',
+    title: '@margoengine/physics/legged locomotion, gait drives and reactive deck support',
+    kind: 'family',
+    messages: [],
+    cause: 'A command, external load, support row or coupled candidate cannot produce finite legged motion and impulses.',
+    fix: 'Use finite SI commands and loads in aligned f64 rows in the memory that owns them. Register a live rigid body with valid signed cells before adding a deck. Reduce the motion or use a smaller substep if reactions overflow.',
+  },
+  {
     id: 'strands',
     title: '@margoengine/physics/strands guide, wind, bed and rigid coupling',
     kind: 'family',

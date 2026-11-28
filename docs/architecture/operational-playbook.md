@@ -12474,3 +12474,8 @@ The implicit disk solve and radial ledger sums retain fixed order. Native f64x2 
 ### SOFT-03 staged strand motion and native point prediction
 
 The optional strand entry treats accepted centreline, frames and swept rigid-contact history as one transaction. Wind and bed sample in their signed frames. Rigid leases validate layout and offsets in their own memory. Optional workers evaluate independent SIMD points before the existing serial solver and reciprocal impulse fold. The weighted horse camera witness drives skin from the accepted guide field, while held-out single-hair static tests quantify deviation from measured deflection.
+
+
+### LIFE-01 accepted controlled stance and deck reactions
+
+The legged wrapper checks alignment and bounds in the owning memory of input rows. GroundLocomotion exposes candidate contacts to the wrapper's accumulator before accepting pose, anchors and contacts. The wrapper retains accepted drive profiles and publishes gait and rigid impulses only through a successful trial. An invalid late bed sample retains the complete world snapshot. Threaded per-body phases reuse the existing optional kernel and preserve signed accepted results. The fixed ridge camera applies accepted feet and body motion to the weighted horse. Independent treadmill observations bound nominal cadence and fore/hind force partition.

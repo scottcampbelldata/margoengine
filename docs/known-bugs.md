@@ -24491,6 +24491,11 @@ rig and compare the posed feet to the published stance points after advancing th
 handoff and reacquisition strategy, rider leaning and immersed-body displacement require the linked DYN-07,
 LIFE-06 and SEA-12 couplings. The current fields provide the contact pose and wrench for those consumers.
 
+The independent treadmill comparison at observed mean walk and trot speeds overpredicts stride rate and
+puts too little vertical impulse on the forelimbs. The reduced model lacks specimen-specific mass distribution
+and articulated limb geometry. The diagnostic isolates the remaining discrepancy with speed and leg-length
+sensitivity. [Measured treadmill gait](limits.md#life-01-measured-treadmill-gait-and-forelimb-loading)
+
 ### Pack ice grounded and continuous-sheet contacts
 
 ICE-04 handles floating pack ice against other floes and waterline capsules. An unbroken sheet

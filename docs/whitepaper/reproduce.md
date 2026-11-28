@@ -5518,3 +5518,9 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
 - Build Physics with `node packages/physics/scripts/build.js`. Run `node --test packages/physics/tests/coupling/strands.test.js packages/physics/tests/coupling/strand-workers.test.js packages/horses/test/strand-horse.test.js packages/rigging/tests/strand-springs.test.js`.
 - Run `npm run test:gpu:strand-workers -w @margoengine/physics` for actual native helpers and `npm run test:gpu:strand-film -w @margoengine/physics` for the weighted horse witness on both renderers.
 - Run `node packages/physics/scripts/soft03-strand-measured.mjs` for the four independent force-deflection specimens and graph, load, spatial and time sensitivity.
+
+### LIFE-01 accepted signed gait, live support and measured treadmill output
+
+- Build Physics with `node packages/physics/scripts/build.js`. Run `node --test packages/physics/tests/legged.test.js packages/physics/tests/coupling/legged.test.js packages/physics/tests/coupling/legged-workers.test.js packages/physics/tests/locomotion.test.js packages/physics/tests/coupling/locomotion.test.js packages/horses/test/legged-drive.test.js`.
+- Run `npm run test:gpu:legged-workers -w @margoengine/physics` and `npm run test:gpu:legged-film -w @margoengine/physics` for the native participant and dual-renderer technical figures.
+- Run `node packages/physics/scripts/life01-legged-measured.mjs` for the independent instrumented-treadmill comparison and geometry and speed sensitivities.

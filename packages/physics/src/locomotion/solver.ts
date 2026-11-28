@@ -85,6 +85,8 @@ export interface GroundAnimalContact {
   stance: boolean;
 }
 
+type ReadTrialContact = (body: number, element: number, out: GroundAnimalContact) => GroundAnimalContact;
+
 interface BodyRange {
   readonly offset: number;
   readonly count: number;
@@ -327,6 +329,15 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
   }
 
   step(context: StepContext, dt: number): void {
+    this.advance(context, dt);
+  }
+
+  /** @internal Check the leg-to-support reactions before publishing a ground step. */
+  stepWithContacts(context: StepContext, dt: number, check: (read: ReadTrialContact) => void): void {
+    this.advance(context, dt, check);
+  }
+
+  private advance(context: StepContext, dt: number, check?: (read: ReadTrialContact) => void): void {
     this.requireIdle();
     const { host, lease, kernel } = this;
     if (!host || !lease || !kernel)
@@ -336,7 +347,7 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
     this.running = true;
     try {
       const bed = this.surface(context.inputs.get(BED_FIELD.name), host);
-      this.integrate(host, lease, kernel, this.ranges, bed, context.cell, dt);
+      this.integrate(host, lease, kernel, this.ranges, bed, context.cell, dt, check);
       this.nativeWork = kernel.workCounts();
     } finally {
       this.running = false;
@@ -357,6 +368,7 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
     bed: Bed | undefined,
     cell: Cell,
     dt: number,
+    check?: (read: ReadTrialContact) => void,
   ): void {
     words(host, lease.next).set(words(host, lease.pose));
     words(host, lease.nextAnchors).set(words(host, lease.anchors));
@@ -394,6 +406,7 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
         'Locomotion exceeded the numeric range. Use local cells and comparable SI scales.',
         'failed',
       );
+    if (check) check((body, element, out) => this.copyContact(lease.nextContacts, body, element, out));
     words(host, lease.pose).set(words(host, lease.next));
     words(host, lease.anchors).set(words(host, lease.nextAnchors));
     words(host, lease.contacts).set(words(host, lease.nextContacts));
@@ -493,10 +506,19 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
       couple: [0, 0, 0],
     },
   ): GroundAnimalContact {
+    return this.copyContact(this.lease?.contacts, body, element, out);
+  }
+
+  private copyContact(
+    region: Region | undefined,
+    body: number,
+    element: number,
+    out: GroundAnimalContact,
+  ): GroundAnimalContact {
     const range = this.bodyRange(body);
     if (!Number.isInteger(element) || element < 0 || element >= range.count)
       throw locomotionError('Use the index of a foot or link on the configured animal.');
-    const contacts = words(this.host!, this.lease!.contacts);
+    const contacts = words(this.host!, region!);
     const start = (range.offset + element) * CONTACT_WORDS;
     copy(out.position, contacts, start);
     copy(out.axis, contacts, start + 3);

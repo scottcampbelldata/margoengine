@@ -1,4 +1,3 @@
-import { MargoError } from '@margoengine/math/errors';
 import { cos, hypot, pow, sin } from '@margoengine/math/pinned';
 import type {
   GroundAnimalContact,
@@ -6,14 +5,15 @@ import type {
   GroundGaitFoot,
   GroundLocomotionOptions,
   GroundLocomotionParams,
+  LocomotionWorkCounts,
   SmallLeggedBody,
 } from '../locomotion/index.js';
 import { GROUND_CONTACT_FIELD, GROUND_POSE_FIELD, GroundLocomotion } from '../locomotion/index.js';
 import { BODIES_FIELD, BODY_IMPULSES_FIELD, IMPULSE_WORDS } from '../world/solvers/rigid.js';
 import { DeckBed, type LeggedDeck } from './deck.js';
+import { leggedError } from './errors.js';
 export type { LeggedDeck } from './deck.js';
 import type {
-  Cell,
   FieldDescriptor,
   FieldUse,
   Port,
@@ -25,7 +25,6 @@ import type {
 } from '../world/solver.js';
 
 type V = readonly [number, number, number];
-const ORIGIN: Cell = [0, 0, 0];
 const ZERO: V = [0, 0, 0];
 const TARGET_WORDS = 2;
 const FORCE_WORDS = 3;
@@ -111,6 +110,8 @@ export interface LeggedParams extends Omit<GroundLocomotionParams, 'bodies'> {
 
 /** Optional kernel loading and explicit port readers. */
 export interface LeggedOptions extends Pick<GroundLocomotionOptions, 'id' | 'bedShape' | 'cellSize' | 'signal'> {
+  /** Native participants for independent bodies. Defaults to one. */
+  readonly threads?: 1 | 2 | 4;
   /** Reads a writer on the LEGGED_INTENT_FIELD where present. Default false. */
   readonly readIntent?: boolean;
   /** Reads a writer on the LEGGED_LOAD_FIELD where present. Default false. */
@@ -157,25 +158,25 @@ const BIPED_RUN: GaitPattern = { phases: [0, 0.5], duty: [0.49, 0.35], transitio
 
 function length(value: number, label: string): number {
   if (!(value > 0) || !Number.isFinite(value))
-    throw new RangeError('Pass a finite positive ' + label + ' for legged locomotion.');
+    throw leggedError('Pass a finite positive ' + label + ' for legged locomotion.');
   return value;
 }
 
 function command(target: LeggedTarget): LeggedTarget {
-  if (!(target.speed >= 0) || !Number.isFinite(target.speed) || !Number.isFinite(target.heading))
-    throw new RangeError('Pass nonnegative speed in metres per second and a finite heading in radians.');
+  if (!(target?.speed >= 0) || !Number.isFinite(target.speed) || !Number.isFinite(target.heading))
+    throw leggedError('Pass nonnegative speed in metres per second and a finite heading in radians.');
   return target;
 }
 
 function model(options: LeggedBody, gravity: number): Character {
   const biped = options.kind === 'biped';
-  if (!biped && options.kind !== 'quadruped') throw new RangeError('Choose a biped or quadruped body.');
+  if (!biped && options.kind !== 'quadruped') throw leggedError('Choose a biped or quadruped body.');
   const leg = length(options.legLength ?? (biped ? 0.9 : 1.08), 'rest leg length');
   const width = length(options.width ?? (biped ? 0.3 : 0.44), 'hip width');
   const base = length(options.length ?? (biped ? 0.4 : 1.42), 'body length');
   const mass = length(options.mass ?? (biped ? 75 : 500), 'body mass');
   const carried = options.loadMass ?? 0;
-  if (!(carried >= 0) || !Number.isFinite(carried)) throw new RangeError('Pass finite nonnegative carried kilograms.');
+  if (!(carried >= 0) || !Number.isFinite(carried)) throw leggedError('Pass finite nonnegative carried kilograms.');
   const target = command(options.target ?? { speed: 0, heading: 0 });
   const feet: GroundGaitFoot[] = [];
   for (const z of biped ? [0] : [base / 2, -base / 2]) {
@@ -226,15 +227,28 @@ function words(host: SolverHost, region: Region): Float64Array {
   return new Float64Array(host.memory.buffer, region.byteOffset, region.byteLength / 8);
 }
 
-function input(host: SolverHost, port: Port | undefined, count: number, width: number): Float64Array | undefined {
+function input(
+  host: SolverHost,
+  port: Port | undefined,
+  field: FieldDescriptor,
+  count: number,
+  width: number,
+): Float64Array | undefined {
   if (!port) return undefined;
+  const region = port.region;
+  const size = count * width * 8;
   if (
-    port.region.type !== 'f64' ||
-    port.region.layout !== LEGGED_LAYOUT ||
-    port.region.byteLength !== count * width * 8
+    port.field !== field.name ||
+    region.type !== 'f64' ||
+    region.layout !== LEGGED_LAYOUT ||
+    region.byteLength !== size
   )
-    throw new RangeError('Provide matching f64 legged rows in the documented layout.');
-  return new Float64Array((port.region.memory ?? host.memory).buffer, port.region.byteOffset, count * width);
+    throw leggedError('Provide matching f64 legged rows in the documented layout.', 'version');
+  const memory = region.memory ?? host.memory;
+  const offset = region.byteOffset;
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset % 8 !== 0 || offset > memory.buffer.byteLength - size)
+    throw leggedError('Publish legged intent and load rows at aligned offsets within their owning memory.');
+  return new Float64Array(memory.buffer, offset, count * width);
 }
 
 /** World-registered quadruped and biped locomotion driven by persistent stance contacts. */
@@ -244,6 +258,10 @@ export class LeggedLocomotion implements Solver<LeggedParams> {
   private gait?: Region;
   private nextGait?: Region;
   private reactions?: Region;
+  private nextReactions?: Float64Array;
+  private driveBackups: readonly { region: Region; previous: Float64Array }[] = [];
+  private stepping = false;
+  private disposed = false;
   private deck?: DeckBed;
   private rows: readonly Character[] = [];
   private gravity = 0;
@@ -276,8 +294,6 @@ export class LeggedLocomotion implements Solver<LeggedParams> {
     this.support = options.deck && { ...options.deck };
     this.cellSize = options.cellSize ?? 1024;
     if (this.support) {
-      if (options.bedShape)
-        throw new RangeError('Pass a fixed Bed fallback instead of live bed geometry with a rigid deck.');
       reads.push({ field: BODIES_FIELD, access: 'read' }, { field: BODY_IMPULSES_FIELD, access: 'accumulate' });
     }
     this.reads = reads;
@@ -285,6 +301,8 @@ export class LeggedLocomotion implements Solver<LeggedParams> {
 
   /** Loads only the optional ground contact kernel. */
   static async load(options: LeggedOptions = {}): Promise<LeggedLocomotion> {
+    if (options.deck && options.bedShape)
+      throw leggedError('Pass a fixed Bed fallback instead of live bed geometry with a rigid deck.');
     const ground = await GroundLocomotion.load({
       ...options,
       id: options.id ?? 'legged-locomotion',
@@ -293,6 +311,19 @@ export class LeggedLocomotion implements Solver<LeggedParams> {
       contactField: LEGGED_CONTACT_FIELD.name,
     });
     return new LeggedLocomotion(ground, options);
+  }
+
+  /** Release the optional locomotion helpers after stopping the world. */
+  [Symbol.dispose](): void {
+    if (this.disposed) return;
+    this.requireIdle();
+    this.disposed = true;
+    this.ground[Symbol.dispose]();
+  }
+
+  /** Native contact work of the most recent accepted step. */
+  readNativeWork(): LocomotionWorkCounts | undefined {
+    return this.ground.readNativeWork();
   }
 
   describe(): SolverDescription {
@@ -304,13 +335,15 @@ export class LeggedLocomotion implements Solver<LeggedParams> {
   }
 
   init(host: SolverHost, params: LeggedParams): void {
-    if (this.host) throw new MargoError('state', 'Load an independent legged solver for each PhysicsWorld.');
+    this.requireIdle();
+    if (this.host) throw leggedError('Load an independent legged solver for each PhysicsWorld.', 'attached');
+    if (!params?.bodies?.length) throw leggedError('Supply at least one biped or quadruped body.');
     const gravity = hypot(...host.gravity);
     const rows = params.bodies.map((body) => model(body, gravity));
     const initial = host.allocate('legged-drives', rows.length * TARGET_WORDS * 8, 'f64', LEGGED_LAYOUT);
     const gait = host.allocate('legged-status', rows.length * GAIT_WORDS * 8, 'f64', LEGGED_LAYOUT);
     const next = host.allocate('legged-next-status', rows.length * GAIT_WORDS * 8, 'f64', LEGGED_LAYOUT);
-    const cell = params.originCell ?? ORIGIN;
+    const cell = params.originCell ?? host.cell;
     const deck = this.support
       ? new DeckBed(this.support, this.cellSize, cell, params.bed, params.groundHeight ?? 0)
       : undefined;
@@ -335,12 +368,18 @@ export class LeggedLocomotion implements Solver<LeggedParams> {
     this.nextGait = next;
     this.deck = deck;
     this.reactions = reactions;
+    this.nextReactions = reactions && new Float64Array(reactions.byteLength / 8);
+    this.driveBackups = this.ground.extraState().map((region) => ({
+      region,
+      previous: new Float64Array(region.byteLength / 8),
+    }));
     this.rows = rows;
     this.gravity = gravity;
   }
 
   /** Stores a target in the world's snapshot state. A live intent port takes priority when present. */
   setTarget(row: number, target: LeggedTarget): void {
+    this.requireIdle();
     this.checkRow(row);
     const { speed, heading } = command(target);
     words(this.host!, this.commands!).set([speed, heading], row * TARGET_WORDS);
@@ -348,7 +387,12 @@ export class LeggedLocomotion implements Solver<LeggedParams> {
 
   private checkRow(row: number): void {
     if (!Number.isInteger(row) || row < 0 || row >= this.rows.length)
-      throw new RangeError('Use the row index of a configured legged body.');
+      throw leggedError('Use the row index of a configured legged body.');
+  }
+
+  private requireIdle(): void {
+    if (this.disposed) throw leggedError('Load a new legged solver after disposing its helpers.', 'disposed');
+    if (this.stepping) throw leggedError('Update, dispose or step legged locomotion after the current step finishes.');
   }
 
   /** Latest pose and physical gait. */
@@ -373,38 +417,51 @@ export class LeggedLocomotion implements Solver<LeggedParams> {
   }
 
   step(context: StepContext, dt: number): void {
-    const { host, commands, gait, nextGait, rows } = this;
+    this.requireIdle();
+    const { host, commands, gait, nextGait, deck, reactions, nextReactions } = this;
     if (!host || !commands || !gait || !nextGait)
-      throw new MargoError('state', 'Add the legged locomotion solver to a PhysicsWorld before stepping.');
-    const deck = this.deck;
-    if (deck) deck.refresh(host, context.inputs.get(BODIES_FIELD.name), context.cell);
-    this.configure(context, host, commands, gait, nextGait);
-    this.ground.step(context, dt);
-    const published = words(host, nextGait);
-    const reactions = this.reactions && words(host, this.reactions);
-    reactions?.fill(0);
-    for (const [i, row] of rows.entries()) {
-      const feet = row.biped ? 2 : 4;
-      const torso = this.ground.readContact(i, feet, this.contact);
-      published[i * GAIT_WORDS + 4] = torso.stance ? 1 : 0;
-      if (deck && reactions) {
-        deck.react(reactions, torso, dt);
-        for (let foot = 0; foot < feet; foot++)
-          deck.react(reactions, this.ground.readContact(i, foot, this.contact), dt);
-      }
+      throw leggedError('Add the legged locomotion solver to a PhysicsWorld before stepping.');
+    if (!Number.isFinite(dt) || dt < 0) throw leggedError('Pass a finite nonnegative legged step in seconds.');
+    for (const { region, previous } of this.driveBackups) previous.set(words(host, region));
+    this.stepping = true;
+    try {
+      if (deck) deck.refresh(host, context.inputs.get(BODIES_FIELD.name), context.cell);
+      this.configure(context, host, commands, gait, nextGait);
+      this.ground.stepWithContacts(context, dt, (read) => {
+        const gaitTrial = words(host, nextGait);
+        nextReactions?.fill(0);
+        for (const [i, row] of this.rows.entries()) {
+          const feet = row.biped ? 2 : 4;
+          const torso = read(i, feet, this.contact);
+          gaitTrial[i * GAIT_WORDS + 4] = torso.stance ? 1 : 0;
+          if (deck && nextReactions) {
+            deck.react(nextReactions, torso, dt);
+            for (let foot = 0; foot < feet; foot++) deck.react(nextReactions, read(i, foot, this.contact), dt);
+          }
+        }
+        if (nextReactions && !nextReactions.every(Number.isFinite))
+          throw leggedError('Reduce the deck offset, contact force or step duration to keep the reaction finite.');
+      });
+      words(host, gait).set(words(host, nextGait));
+      if (reactions && nextReactions) words(host, reactions).set(nextReactions);
+    } catch (cause) {
+      for (const { region, previous } of this.driveBackups) words(host, region).set(previous);
+      throw cause;
+    } finally {
+      this.stepping = false;
     }
-    words(host, gait).set(published);
   }
 
   private configure(context: StepContext, host: SolverHost, commands: Region, gait: Region, nextGait: Region): void {
     const { deck, rows } = this;
     const controls =
-      input(host, context.inputs.get(LEGGED_INTENT_FIELD.name), rows.length, TARGET_WORDS) ?? words(host, commands);
-    const loads = input(host, context.inputs.get(LEGGED_LOAD_FIELD.name), rows.length, FORCE_WORDS);
+      input(host, context.inputs.get(LEGGED_INTENT_FIELD.name), LEGGED_INTENT_FIELD, rows.length, TARGET_WORDS) ??
+      words(host, commands);
+    const loads = input(host, context.inputs.get(LEGGED_LOAD_FIELD.name), LEGGED_LOAD_FIELD, rows.length, FORCE_WORDS);
     for (let i = 0; i < rows.length; i++) {
       command({ speed: controls[i * TARGET_WORDS]!, heading: controls[i * TARGET_WORDS + 1]! });
     }
-    if (loads?.some((force) => !Number.isFinite(force))) throw new RangeError('Pass finite external legged forces.');
+    if (loads?.some((force) => !Number.isFinite(force))) throw leggedError('Pass finite external legged forces.');
     const status = words(host, gait);
     const prospective = words(host, nextGait);
     const gravity = this.gravity;
@@ -457,9 +514,11 @@ export class LeggedLocomotion implements Solver<LeggedParams> {
 
   exportPorts(tick: number): readonly Port[] {
     const base = this.ground.exportPorts(tick);
+    if (!this.host) return base;
+    const cell = this.host.cell;
     const extra: Port[] = [];
-    if (this.gait) extra.push({ field: LEGGED_GAIT_FIELD.name, region: this.gait, tick, cell: ORIGIN });
-    if (this.deck && this.reactions) extra.push(this.deck.port(this.reactions, tick));
+    if (this.gait) extra.push({ field: LEGGED_GAIT_FIELD.name, region: this.gait, tick, cell });
+    if (this.reactions) extra.push({ field: BODY_IMPULSES_FIELD.name, region: this.reactions, tick, cell });
     return [...base, ...extra];
   }
 

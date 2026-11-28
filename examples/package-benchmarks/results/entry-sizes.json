@@ -15702,12 +15702,12 @@
         "gzip": 24368
       },
       "./legged": {
-        "raw": 36145,
-        "gzip": 13307
+        "raw": 38252,
+        "gzip": 13912
       },
       "./locomotion": {
-        "raw": 25353,
-        "gzip": 9726
+        "raw": 25543,
+        "gzip": 9785
       },
       "./pedestrians": {
         "raw": 10894,

@@ -10,7 +10,7 @@ import {
   LEGGED_LOAD_FIELD,
   LeggedLocomotion,
 } from '@margoengine/physics/legged';
-import { PhysicsWorld, RigidSolver, worldMemory } from '@margoengine/physics/world';
+import { BODIES_FIELD, BODY_IMPULSES_FIELD, PhysicsWorld, RigidSolver, worldMemory } from '@margoengine/physics/world';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 const size = { width: 20, depth: 20, rows: 8, columns: 8, centre: [0, 0] };
@@ -97,9 +97,11 @@ test('moving rigid support carries a standing body and receives the opposing con
     linearVelocity: [0.5, 0, 0],
     colliders: { shape: 'box', halfExtents: [4, 0.2, 4], mass },
   });
-  const locomotion = await LeggedLocomotion.load({ deck: { body: plate.row, width: 8, depth: 8, top: 0.2 } });
-  world.add(new RigidSolver(), { physics });
-  world.add(locomotion, { bodies: [{ kind: 'biped', position: [0, 2.95, 0], mass: 75 }], groundHeight: -10 });
+  using locomotion = await LeggedLocomotion.load({ deck: { body: plate.row, width: 8, depth: 8, top: 0.2 } });
+  const cell = [-8, 5, -9];
+  const rigid = new RigidSolver();
+  world.add(rigid, { physics }, cell);
+  world.add(locomotion, { bodies: [{ kind: 'biped', position: [0, 2.95, 0], mass: 75 }], groundHeight: -10 }, cell);
   world.couple(['rigid', 'legged-locomotion'], 'staggered');
   const start = locomotion.readContact(0, 0).position;
   world.advance(15);
@@ -107,6 +109,14 @@ test('moving rigid support carries a standing body and receives the opposing con
   assert.ok(locomotion.read(0).position[1] > 2.95, 'the plate supports the body above the static floor');
   assert.ok(locomotion.readContact(0, 0).position[0] > start[0], 'the stance anchor has deck velocity');
   const saved = world.takeSnapshot();
+  assert.deepEqual(locomotion.exportPorts(0).find((port) => port.field === BODY_IMPULSES_FIELD.name).cell, cell);
+  const bodies = rigid.exportPorts(0).find((port) => port.field === BODIES_FIELD.name);
+  const bad = { ...bodies, region: { ...bodies.region, byteOffset: 2 } };
+  assert.throws(
+    () => locomotion.step({ tick: 0, level: 0, seed: 0, cell, inputs: new Map([[BODIES_FIELD.name, bad]]) }, 1 / 60),
+    { code: 'state', message: /aligned rigid deck rows.*#legged/ },
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, saved.bytes);
   world.advance(90);
   const released = locomotion.read(0);
   close(75 * released.velocity[1] + mass * plate.linearVelocity[1], 0, 2e-4);
@@ -115,4 +125,92 @@ test('moving rigid support carries a standing body and receives the opposing con
   world.advance(90);
   assert.equal(world.hash(), finished);
   physics.dispose();
+});
+
+test('late support rejection retains accepted legged controls, phases, contacts and work', async () => {
+  let reject = false;
+  let reenter;
+  const cell = [-20, 3, -4];
+  const bed = {
+    ...size,
+    cell,
+    elevations: new Float64Array(size.rows * size.columns),
+    sample(x) {
+      if (x > 2) reenter?.();
+      return { elevation: reject && x > 2 ? NaN : 0, normal: [0, 1, 0] };
+    },
+  };
+  using solver = await LeggedLocomotion.load({ readIntent: true, readLoad: true });
+  const world = new PhysicsWorld({ rate })
+    .add(constantPort(LEGGED_INTENT_FIELD, [0.8, 0, 1.5, 0]), {})
+    .add(constantPort(LEGGED_LOAD_FIELD, [0, 0, 0, 0, 0, 0]), {})
+    .add(
+      solver,
+      {
+        bed,
+        bodies: [
+          { kind: 'biped', position: [0, 0.8, 0], target: { speed: 0.8, heading: 0 } },
+          { kind: 'quadruped', position: [4, 0.9, 0], target: { speed: 1.5, heading: 0 } },
+        ],
+      },
+      cell,
+    );
+  world.advance(15);
+  const snapshot = world.takeSnapshot().bytes.slice();
+  const receipt = solver.readNativeWork();
+  const memory = new WebAssembly.Memory({ initial: 1 });
+  const intent = (field, byteOffset, values) => {
+    new Float64Array(memory.buffer, byteOffset, values.length).set(values);
+    return {
+      field: field.name,
+      tick: 0,
+      cell: [-11, -9, 6],
+      region: {
+        name: field.name,
+        byteOffset,
+        byteLength: 8 * values.length,
+        layout: LEGGED_LAYOUT,
+        type: 'f64',
+        memory,
+      },
+    };
+  };
+  const controls = intent(LEGGED_INTENT_FIELD, 8, [1.1, 0, 1.5, 0.15]);
+  const loads = intent(LEGGED_LOAD_FIELD, 56, [9, 0, 0, 0, 0, 0]);
+  const inputs = new Map([
+    [controls.field, controls],
+    [loads.field, loads],
+  ]);
+  const context = { tick: 0, level: 0, seed: 0, cell, inputs };
+  const dt = 1 / 240;
+  reject = true;
+  assert.throws(() => solver.step(context, dt), {
+    code: 'state',
+    message: /finite bed elevations.*#locomotion/,
+  });
+  assert.deepEqual(world.takeSnapshot().bytes, snapshot);
+  assert.deepEqual(solver.readNativeWork(), receipt);
+  reject = false;
+  reenter = () => solver.setTarget(0, { speed: 3, heading: 1 });
+  assert.throws(() => solver.step(context, dt), {
+    code: 'state',
+    message: /after the current step finishes.*#legged/,
+  });
+  assert.deepEqual(world.takeSnapshot().bytes, snapshot);
+  reenter = undefined;
+  controls.region.byteOffset++;
+  assert.throws(() => solver.step(context, dt), {
+    code: 'state',
+    message: /aligned offsets.*#legged/,
+  });
+  assert.deepEqual(world.takeSnapshot().bytes, snapshot);
+  controls.region.byteOffset--;
+  solver.step(context, dt);
+  const advanced = world.takeSnapshot().bytes.slice();
+  assert.notDeepEqual(advanced, snapshot);
+  world.restoreSnapshot(snapshot);
+  solver.step(context, dt);
+  assert.deepEqual(world.takeSnapshot().bytes, advanced);
+  world.shiftOrigin([1, -3, 9]);
+  for (const port of solver.exportPorts(0)) assert.deepEqual(port.cell, [-21, 6, -13]);
 });

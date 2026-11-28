@@ -7586,7 +7586,7 @@ diagonal or asymmetric contacts, and an unloaded foot applies no force.
 import { LeggedLocomotion } from '@margoengine/physics/legged';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const legs = await LeggedLocomotion.load();
+using legs = await LeggedLocomotion.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(legs, {
   bodies: [{ kind: 'biped' }, { kind: 'quadruped' }],
 });
@@ -7610,7 +7610,14 @@ impulse to that same body. A fixed `bed` or `groundHeight` supplies the fallback
 
 Enable `readIntent` to receive f64 pairs of desired speed and heading. Enable `readLoad` to receive f64 triples of
 external force in newtons at the COM. Both use the documented layout and body-row order. The built-in target lives
-in world snapshots. Use the public pose, gait and foot readings to place a rig.
+in world snapshots. Borrowed rows must be aligned within the memory named by their port. The pose, gait, contact
+and deck impulse publications carry the current signed origin. Use the accepted pose, gait and feet to place a rig.
+If a late support or reaction trial fails, the preceding drive, pose, contact, gait and deck impulse stay accepted.
+
+`load({ threads: 1 })` defaults to one participant. Choose two or four with shared world memory in Node or
+an isolated browser worker. The optional native route evaluates independent bodies and their stance work.
+`readNativeWork()` reports the last accepted step and per-participant counts. Stop advancing the world before
+disposing the solver. [Legged error remedies](https://margoengine.com/errors#legged)
 
 ## Pack ice and floes
 
