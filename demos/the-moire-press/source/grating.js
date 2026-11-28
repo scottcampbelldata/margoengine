@@ -1,6 +1,6 @@
+import { moireSpacing } from '@margoengine/optics/interference';
+
 export const pitch = .0105;
 export const radians = Math.PI / 180;
 
-export function bandSpacing(degrees) {
-  return degrees === 0 ? Infinity : pitch / (2 * Math.sin(radians * Math.abs(degrees) / 2));
-}
+export const bandSpacing = (degrees) => moireSpacing(pitch, pitch, radians * Math.abs(degrees));
