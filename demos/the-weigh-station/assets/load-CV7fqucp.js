@@ -1,0 +1,1 @@
+export{loadEnvironmentImage}from"./dist-BjaE35eY.js";
