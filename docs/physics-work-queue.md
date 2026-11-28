@@ -460,7 +460,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | HYDRO-06 | Groundwater and springs | Darcy flow, aquifer recharge and spring discharge | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed b6e01ceb4c |
 | ATMO-05 | Tropical cyclones and large vortices | physics/vortices and Sky | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 80aa218baa |
 | ATMO-06 | Airborne particle transport | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 965fab2df7 |
-| ATMO-07 | Lightning and atmospheric electricity | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 51ccc096bc |
+| ATMO-07 | Lightning and atmospheric electricity | none | Codex | BUILDING (codex/physics-atmo-07-four-point; four-point pass; [audit](physics-solver-audit.md)), prior landing 51ccc096bc |
 | ATMO-08 | Fog and cold-air drainage | physics/drainage-fog and environment/fog-volumes | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 80679b25b4 |
 | ATMO-09 | Surface energy balance | surface temperature, liquid and snow budgets, wetness and fuel | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 93bf3f2435 |
 | EARTH-03 | Particle-laden gravity currents | partial | Claude | CLAIMED (Fauld film) |
