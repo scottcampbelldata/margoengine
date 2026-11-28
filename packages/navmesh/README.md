@@ -2,7 +2,7 @@
 
 Import `margoengine/navmesh` from the `margoengine` package, or `@margoengine/navmesh` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, `@margoengine/navmesh/links` finds the jumps a level allows, `@margoengine/navmesh/hierarchy` keeps long routes cheap, `@margoengine/navmesh/any-angle` finds the exact shortest path, `@margoengine/navmesh/weighted-any-angle` finds any-angle paths over weighted ground with a proven bound, `@margoengine/navmesh/debug` draws it all, `@margoengine/navmesh/voxel` builds straight from voxel chunks, and `@margoengine/navmesh/volume` routes flying agents in 3D.
+Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, `@margoengine/navmesh/links` finds the jumps a level allows, `@margoengine/navmesh/hierarchy` keeps long routes cheap, `@margoengine/navmesh/any-angle` finds the exact shortest path, `@margoengine/navmesh/weighted-any-angle` finds any-angle paths over weighted ground with a proven bound, `@margoengine/navmesh/debug` draws it all, `@margoengine/navmesh/voxel` builds straight from voxel chunks, `@margoengine/navmesh/volume` routes flying agents in 3D, `@margoengine/navmesh/queries` casts rays, finds walls, samples points and plans partial routes, `@margoengine/navmesh/wasm` builds in a worker with a SIMD kernel, and `@margoengine/navmesh/obstacles` carves round and turned obstacles.
 
 ```ts
 import {NavMesh} from 'margoengine/navmesh';
@@ -133,6 +133,100 @@ crowd.addAgent({position: [1, 0, 1]}).setTarget([60, 0, 60]);
 - **What rebuilds.** `addObstacle`, `moveObstacle`, `removeObstacle`, `addGeometry` and `removeGeometry` mark the tiles they reach; `update(maxTiles)` rebuilds the waiting tiles, oldest first, and returns how many. A tile still waiting keeps its old polygons, so routes never see a half-built world.
 - **Same walkable area.** A tile sees past its edge by `walkableRadius + 2` cells before it keeps its own cells, so the area does not depend on the tiling, and any run of changes gives the tiles a fresh build would.
 - **Polygon numbers** change when a tile rebuilds: keep positions, not numbers. Off-mesh links are put back after a rebuild, and sleep while an end has no polygon under it. `tile(x, z)` and `tileList()` show each tile's own `NavMesh`.
+
+## Surface queries: rays, walls, partial routes and random points (`./queries`)
+
+```ts
+import {Crowd} from 'margoengine/navmesh';
+import {buildNavMesh} from 'margoengine/navmesh/build';
+import {NavMeshQuery} from 'margoengine/navmesh/queries';
+
+// A 20 x 20 m floor (Y up); the built mesh stops walkableRadius short of its edges.
+const positions = [0, 0, 0, 20, 0, 0, 20, 0, 20, 0, 0, 20], indices = [0, 2, 1, 0, 3, 2];
+const mesh = buildNavMesh(positions, indices, {cs: 0.25, ch: 0.1, walkableRadius: 0.5});
+const query = new NavMeshQuery(mesh, {seed: 7}); // a TiledNavMesh works too
+
+const ray = query.raycast([10, 0, 10], [30, 0, 10]); // can I walk straight there?
+console.log(ray?.hit, ray?.t, ray?.position, ray?.normal); // true 0.4875 [19.75, 0, 10] [1, 0, 0]
+
+const step = query.moveAlongSurface([19, 0, 10], [21, 0, 11]); // a controller step slides along the wall
+console.log(step?.position); // [19.75, 0, 11]
+
+const wall = query.distanceToWall([10, 0, 15], 10); // the nearest wall within 10 m
+console.log(wall?.distance, wall?.normal); // 4.75 [0, 0, -1]
+
+const route = query.route([10, 0, 10], [40, 0, 10]); // off the mesh: walk as near as it gets
+console.log(route?.partial, route?.points.at(-1)); // true [19.75, 0, 10]
+
+const spawn = query.randomPoint(); // uniform over the walkable area
+const nearby = query.randomPointAroundCircle([10, 0, 10], 2); // strictly within 2 m, on ground reachable from there
+console.log(spawn?.point, nearby?.point);
+
+const crowd = new Crowd(query); // agents walk partial routes and replan when the mesh changes
+const agent = crowd.addAgent({position: [10, 0, 10]});
+agent.setTarget([40, 0, 10]);
+crowd.update(1 / 60);
+console.log(agent.partial); // true
+```
+
+`NavMeshQuery` reads its mesh live (area costs, rebuilt tiles) and copies nothing. Every query takes `{filter, startPolygon}`: `filter` weighs or forbids areas as for `route`, and `startPolygon` picks the floor at a shared edge (default the polygon under the start). Forbidden polygons and closed areas count as walls; off-mesh links are never walked by `raycast`, `moveAlongSurface`, `distanceToWall` or `randomPointAroundCircle`.
+
+- **`raycast(start, end)`** walks the XZ segment across portals (tile seams too) and returns `{hit, t, position, normal, edge, polygon, visited}`: `t` is the fraction reached (1 with no wall), `position` sits on the surface (the end's Y is ignored), `normal` is the outward unit wall normal and `edge` the wall's endpoints (zero and null without a hit), and `visited` the polygons crossed. At a corner, and where the ray leaves a polygon through a vertex, the wall edge opposing the motion most is reported. Null when the start is off the mesh or forbidden.
+- **`moveAlongSurface(start, end)`** moves to the reachable point nearest `end`, sliding along walls, inside a local search whose disc has the segment as diameter, so pass small per-frame steps. Returns `{position, polygon, visited}`, projected onto the polygon's plane.
+- **`route(start, end, filter?)`** and **`path(...)`** plan a complete route, or a partial one ending at the reachable point nearest the goal (XZ distance first, then height) with `partial: true` and the reached `polygon`. Off-mesh links and area costs apply. Null when no allowed polygon is under the start.
+- **`distanceToWall(center, maxRadius = Infinity)`** finds the nearest wall in the connected ground around `center`: `{distance, position, normal, edge, polygon}`, with `distance` equal to `maxRadius` and `position` null when no wall is in range. The normal points from the wall to the center (the inward normal at zero distance). A portal that covers only part of an edge, as at tile seams, leaves the rest of the edge a wall.
+- **`randomPoint({seed?, filter?})`** samples uniformly by area over every allowed polygon, islands included; **`randomPointAroundCircle(center, radius, {seed?, maxSamples?})`** samples strictly inside the XZ radius on ground connected to `center`, by rejection, giving up after `maxSamples` (65536) proposals with a `MargoError` of code `failed`. Both return `{point, polygon}` or null. The query's own stream starts from the constructor's `seed` (0); a `seed` in the options draws one repeatable sample without advancing it.
+- **With a `Crowd`.** A query is a surface for `new Crowd(query)`: an agent whose target cannot be reached walks to the nearest reachable point, `agent.partial` says so, and it replans when `query.version` changes (a tile rebuilt, an area cost changed), so it carries on once a door opens.
+- **Polygon numbers** of a `TiledNavMesh` change when a tile rebuilds, as in `./tiles`; keep positions between frames.
+
+## Building off the main thread (`./wasm`)
+
+```ts
+import {buildNavMeshInWorker, buildTiledNavMeshInWorker} from 'margoengine/navmesh/wasm';
+
+const positions = [0, 0, 0, 64, 0, 0, 64, 0, 64, 0, 0, 64], indices = [0, 2, 1, 0, 3, 2];
+const {mesh, work} = await buildNavMeshInWorker(positions, indices, {cs: 0.25, ch: 0.1, walkableRadius: 0.5});
+console.log(mesh.polygonCount, work.cells, work.rasterCalls);
+
+const controller = new AbortController();
+const tiled = await buildTiledNavMeshInWorker(positions, indices, {cs: 0.25, tileSize: 64}, {signal: controller.signal, timeout: 30_000});
+tiled.mesh.addObstacle({min: [30, 0, 30], max: [33, 3, 31]});
+tiled.mesh.update(); // later rebuilds run on this thread, as in ./tiles
+```
+
+Both builders start one dedicated Web Worker, run the voxel rasteriser in a Rust kernel compiled to Wasm with 128-bit SIMD, then the same region, contour and polygon steps as `./build` and `./tiles`, and return the polygons those give for the same inputs, plus a `work` count of what the kernel did: `cells` and `intersections` (equal to the TypeScript rasteriser's), `vectorPairs`, `rasterCalls` and the largest Wasm `memoryBytes`. These are work counts, not timings. Inputs are copied, never detached, and the worker is ended after success, failure, abort or timeout.
+
+| Control | Default | Meaning |
+| --- | --- | --- |
+| `signal` | none | aborts loading or the build and ends the worker |
+| `timeout` | 60000 | ms, startup and loading included, 1 to 2147483647; past it a `MargoError` of code `timeout` |
+| `workerURL` | the package's `workers/navmesh-build.js` | where you host the worker script |
+| `wasmURL` | the package's `navmesh-raster.wasm` | where you host the kernel |
+
+The worker script and the `.wasm` ship beside the entry and are found with `new URL(..., import.meta.url)`; a bundler that copies assets handles both, otherwise serve them and pass the two URLs. No `Worker` (Node, some embedded hosts) gives a `MargoError` of code `unsupported`; a failed fetch, a broken worker or a host without Wasm SIMD (which cannot compile the kernel) gives `failed`, and an abort rejects with the signal's reason. Use `./build` there, which gives the same mesh on the calling thread. A tiled mesh built in the worker keeps its level, so `addObstacle`, `addGeometry` and `update` rebuild tiles as usual, on the calling thread; call the builder again for a new whole-level build off it.
+
+## Round and turned obstacles (`./obstacles`)
+
+```ts
+import {ObstacleNavMesh} from 'margoengine/navmesh/obstacles';
+
+const positions = [0, 0, 0, 20, 0, 0, 20, 0, 20, 0, 0, 20], indices = [0, 2, 1, 0, 3, 2];
+const world = new ObstacleNavMesh(positions, indices, {cs: 0.25, ch: 0.1, walkableRadius: 0.5, tileSize: 32});
+
+const tree = world.addCylinderObstacle([5, 0, 5], 1, 3); // base centre, radius, height
+const crate = world.addBoxObstacle([12, 0.5, 12], [1, 0.5, 2], Math.PI / 4); // centre, half extents, turn about +Y
+const door = world.addObstacle({min: [15, 0, 2], max: [16, 3, 6]}); // an ordinary box still works
+world.update();
+console.log(world.locate([5, 0, 5]), world.locate([12, 0, 12])); // -1 -1: carved out
+
+world.moveObstacle(tree, {type: 'cylinder', position: [8, 0, 8], radius: 1, height: 3}); // same id
+world.removeObstacle(crate);
+world.removeObstacle(door);
+world.update();
+world.dispose();
+```
+
+`ObstacleNavMesh` is a `TiledNavMesh` that also carves upright cylinders (`{type: 'cylinder', position, radius, height}`, `position` the base centre) and boxes turned about Y (`{type: 'box', center, halfExtents, yRadians = 0}`), all in world units. A cell is carved when its centre lies inside the shape, as for an ordinary box, with the same `walkableRadius` erosion and the same tile rebuild queue: `addObstacle`, `moveObstacle` and `removeObstacle` mark the tiles a shape reaches (both footprints for a move) and `update(maxTiles)` rebuilds them. Each shape is one handle: shaped ids are negative, ordinary box ids are unchanged, `moveObstacle` keeps the id (and may turn a box id into a shape), and both it and `removeObstacle` return false for an unknown id. Invalid dimensions (not finite, not positive, or more than 1,000,000 cell rows) throw a `RangeError` before anything changes. Inside, a shape is stored as horizontal runs of cells, which stay private to it. `dispose()` releases the handles and the mesh and may be called twice.
 
 ## Agent types and filters (`./agents`)
 
