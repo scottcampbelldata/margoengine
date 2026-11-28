@@ -12,7 +12,7 @@ The gate interlock and level dynamics are from this model. The cutaway removes t
 
 ## Implementation
 
-- `lockage.js` implements the analytic water balance and gated phases.
+- `lockage.js` holds the chamber dimensions and the gated phases, and asks `@margoengine/physics/hydraulics` (`equalize`, two basins through an opening in closed form) for the chamber level, transferred volume and valve flow.
 - `geometry.js` and `model.js` build the chamber, water prism, masonry cutaway, cottage, miter gates and narrowboat directly in Margo.
 - `scene.js` connects playback, accessible state and Margo rendering. Add `?backend=webgl2` to request the Margo compatibility backend with the same art.
 - From the showcase root, build with `node build.mjs the-canal-lock` and the public Margo checkout pinned by the showcase.

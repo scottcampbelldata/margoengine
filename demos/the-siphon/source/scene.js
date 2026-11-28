@@ -1,7 +1,7 @@
 import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { createApparatus } from './apparatus.js';
-import { maxDrop, solveSiphon } from './hydraulics.js';
+import { maxDrop, solveSiphon } from './rig.js';
 
 const canvas = document.getElementById('scene');
 const loading = document.getElementById('loading');

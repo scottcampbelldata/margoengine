@@ -1,7 +1,7 @@
 import { latheGeometry, sphereGeometry } from '@margoengine/geometry/primitives';
 import { createMesh, MatcapMaterial, Material } from '@margoengine/materials';
 import { batch, box, cyclorama, facePin, measurePath, move, pathPoint, pipe, quadrant, round, turned } from './geometry.js';
-import { armLength, bore, fixedTube, gravity, maxDrop, pivot, receiver, spoutLength, supply } from './hydraulics.js';
+import { armLength, bore, fixedTube, jetNarrowing, maxDrop, pivot, receiver, spoutLength, supply } from './rig.js';
 
 import { createStudio } from './studio.js';
 
@@ -132,9 +132,7 @@ function markings(add, mat) {
 
 function jetGeometry(height, speed) {
   const which = (end) => {
-    const drop = height * (1 - end);
-    const current = Math.sqrt(speed ** 2 + 2 * gravity * drop);
-    return [radius * Math.sqrt(speed / current), height * end];
+    return [radius * jetNarrowing(speed, height * (1 - end)), height * end];
   };
   return latheGeometry(Array.from({ length: 15 }, (_, i) => which(i / 14)), 22);
 }

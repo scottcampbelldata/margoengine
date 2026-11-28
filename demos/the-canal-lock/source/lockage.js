@@ -1,9 +1,21 @@
+// The lock's dimensions and its lockage choreography. The chamber filling and draining through the sluice comes from
+// @margoengine/physics/hydraulics (`equalize`: two basins through an opening, in closed form).
+import { equalize as equalizeBasins } from '@margoengine/physics/hydraulics';
+
 export const gravity = 9.80665;
 export const chamber = Object.freeze({ length: 18.4, width: 4.5, lower: .92, upper: 2.72, valveArea: 1.75, dischargeCoefficient: .62 });
 export const area = chamber.length * chamber.width;
 export const lift = chamber.upper - chamber.lower;
-export const duration = 2 * area * Math.sqrt(lift) /
-  (chamber.valveArea * chamber.dischargeCoefficient * Math.sqrt(2 * gravity));
+
+/** The chamber from `initial` toward the reach at `target` (a reach that does not move), `time` s after the sluice opens. */
+export function equalize(initial, target, time) {
+  const state = equalizeBasins({
+    area, level: initial, otherLevel: target, openingArea: chamber.valveArea,
+    dischargeCoefficient: chamber.dischargeCoefficient, time, gravity,
+  });
+  return { level: state.level, volume: Math.abs(state.volume), flow: state.flow, duration: state.duration };
+}
+export const duration = equalize(chamber.lower, chamber.upper, 0).duration;
 
 const riverStation = 16.4;
 const hydraulicScale = 12.2;
@@ -16,20 +28,6 @@ export const phases = Object.freeze([
 ]);
 export const finish = phases.reduce((sum, phase) => sum + phase.duration, 0);
 const ease = (value) => value * value * (3 - 2 * value);
-
-export function equalize(initial, target, time) {
-  const difference = Math.abs(target - initial);
-  const remainingRoot = Math.max(0, Math.sqrt(difference) -
-    Math.max(0, time) * chamber.valveArea * chamber.dischargeCoefficient * Math.sqrt(2 * gravity) / (2 * area));
-  const remaining = remainingRoot ** 2;
-  const sign = Math.sign(target - initial);
-  const change = difference - remaining;
-  return {
-    level: target - sign * remaining,
-    volume: change * area,
-    flow: sign * chamber.valveArea * chamber.dischargeCoefficient * Math.sqrt(2 * gravity) * remainingRoot,
-  };
-}
 
 export function lockage(direction, seconds) {
   const ascending = direction === 'up';
