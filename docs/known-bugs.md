@@ -754,9 +754,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   97.8, 88.3 and 103.7 percent: the value follows the binning, not the light. Under a pall that passes 1 percent of
   the light as beam, lit and shadowed ground of one surface differ by about the floor itself, and nothing in these
   frames shows a light that brightens or warms shade (bounce near 100 percent is what the light predicts).
-- **Needs a ruling (manager):** the bound stays 0.0448. Either the check reports that it cannot run when the
-  difference's standard error exceeds the bound it tests (an instrument-resolution rule), or the probe is measured on
-  the float frame or with more shadow interior. Not changed.
+- **Ruled (manager, Rule B):** measure on the float frame and pool frames until the standard error is below the bound;
+  if it then misses, find the light bug. Done in b84c368435 (precise frame, `probePool`, `detail.se`).
+- **Measured after it (2026-11-28, 1080p, float frames):** 15 frames: mid shadowTint 0.65 b*, se 0.184; 33 frames:
+  0.41 b*, se 0.125; the whole 12 s shot (360 frames, 113,318 lit and 43,100 shadowed interior pixels, 6 strata): 1.52
+  b* (passes), se 0.226 by batch means and 0.246 by the cluster-robust error with each frame weighted by its
+  Cochran-Mantel-Haenszel weight (`.lane/t6cluster.mjs`). The error does not fall with frames because the value drifts
+  along the shot: 0.95, 2.86, 2.75, 3.77, -0.86 and -1.10 b* over successive 2 s spans. That is not sampling noise but
+  a change with what ground and light the frame holds, 50 to 80 times the bound, so pooling more frames or 2160p cannot
+  bring the error under 0.0448. Next: find what drives the drift (the light along the shot, `light` per frame; albedo
+  left within the 16-level strata; the fire's light), which is the light bug the ruling asks for. Open.
 
 ### Fixed 2026-11-28: T6 compared different surfaces in the sun and in the shade (KB-LOOK-TV-TINTMATCH1, headless look check)
 
