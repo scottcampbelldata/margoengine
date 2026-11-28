@@ -116,6 +116,9 @@ test('Archimedes screw: buckets match the slice integral, water rises a pitch a 
   assert.ok(screw.volumePerTurn > 0 && screw.volumePerTurn < Math.PI * 0.175 ** 2 * 0.348);
   near(screw.flow(30).volumePerSecond, screw.volumePerTurn / 2, 1e-15);
   near(archimedesScrewPose(4 * Math.PI, 0.348).travel, 0.696, 1e-15);
+  const lower = archimedesScrew({ ...screw.spec, freeboard: 0.01 });
+  near(lower.fillLevel, screw.fillLevel - 0.01, 1e-15, 'freeboard lowers the water line');
+  assert.ok(lower.volumePerTurn < screw.volumePerTurn);
 });
 
 test('Gimbal: the angles point the rotor where asked and lock at 90 degrees', () => {

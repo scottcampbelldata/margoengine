@@ -374,6 +374,8 @@ export interface ArchimedesScrewSpec {
   incline: number;
   /** Axial length of the flighted part, metres (default one pitch). */
   length?: number;
+  /** How far below the spill level (where water would run over the blade's inner edge) the buckets are filled, metres (default 0, full). */
+  freeboard?: number;
 }
 
 /** One wet slice of a bucket between blades, from {@link ArchimedesScrew.wetSection}. */
@@ -413,7 +415,9 @@ export function archimedesScrew(spec: ArchimedesScrewSpec, slices = 1600): Archi
     outer = positive(spec.outerRadius, 'Outer radius'),
     inner = positive(spec.innerRadius, 'Inner radius'),
     incline = positive(spec.incline, 'Incline'),
-    length = positive(spec.length ?? pitch, 'Length');
+    length = positive(spec.length ?? pitch, 'Length'),
+    freeboard = spec.freeboard ?? 0;
+  if (!(freeboard >= 0 && Number.isFinite(freeboard))) throw new RangeError(`Freeboard must be 0 or more; got ${freeboard}.`);
   if (!(inner < outer)) throw new RangeError('The shaft radius must be less than the outer radius.');
   if (!(incline < Math.PI / 2)) throw new RangeError('The incline must be less than 90 degrees.');
   const vertical = Math.sin(incline),
@@ -422,7 +426,7 @@ export function archimedesScrew(spec: ArchimedesScrewSpec, slices = 1600): Archi
   // The blade edge at the shaft, along a turn: its height above the bucket start; the water line is its lowest point in the turn.
   const shaftHeight = (theta: number): number => lead * theta * vertical + inner * across * Math.cos(theta);
   const critical = Math.PI - Math.asin(Math.min(1, (lead * vertical) / (inner * across)));
-  const fillLevel = Math.min(shaftHeight(0), shaftHeight(TAU), shaftHeight(critical));
+  const fillLevel = Math.min(shaftHeight(0), shaftHeight(TAU), shaftHeight(critical)) - freeboard;
   const wetSection = (theta: number): WetSection | null => {
     const radial = Math.cos(theta) * across;
     if (radial >= 0) return null;
@@ -441,7 +445,7 @@ export function archimedesScrew(spec: ArchimedesScrewSpec, slices = 1600): Archi
   }
   const volumePerTurn = sum * delta;
   return {
-    spec: { pitch, outerRadius: outer, innerRadius: inner, incline, length },
+    spec: { pitch, outerRadius: outer, innerRadius: inner, incline, length, freeboard },
     lead,
     risePerTurn: pitch * vertical,
     lift: length * vertical,
