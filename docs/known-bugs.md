@@ -3034,8 +3034,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   the same assertion fails with and without those changes. The node's drawn position and its body's position part after
   the fall, so either the joint holding the spine to the hips drifts (a physics change on main since the test last passed)
   or the pose written into the bones lags the bodies.
-- **Next:** bisect `packages/physics/src` on main for the commit where the test turned red, then fix it in the package that
-  owns it with this test as the regression.
+- **Cause found (lane P, 2026-11-28, main at 601556ae42, 0.0206 against 0.02):** the pose is written right; the joints open.
+  Measured in the hips body's frame, the three joints on the hips (spine and both thighs) stand 2.0 and 1.9 cm off their
+  anchors after 180 frames, while the joints along each limb (head on spine, shin on thigh) hold to 0.1 mm. The hips is a
+  branch: `walk_path` (`kernel/src/joints.rs`) ends every path there, so the three joints meet by block Gauss-Seidel at
+  `jointLooseShare` 0.2, and the hips capsule (r 0.05 m, 1 g) is fifteen times lighter than a thigh. Each path's push moves
+  mostly the light hub, the next path moves it back, and the error closes slowly while loads hold it open. Without friction
+  or limits the gap still stands 3 to 4 cm open at rest (`joint: {type: 'free'}`, floor friction 0); at `jointLooseShare` 1
+  it closes to 0.1 mm, and a stiffer default would break the rings and grids the 0.2 share was chosen for. Native repro, no
+  floor and no gravity: a 1 g hub with three 15 g arms started 2 cm off their anchors is still 3.2 mm open after 1 s and
+  0.26 mm after 2 s, where a path of the same bodies closes in a step. With sleep on (the JS default) the island can sleep
+  with the gap open (1.0 cm, frozen).
+- **Next:** solve a tree of locks exactly, as paths are now: Baraff 1996 ("Linear-time dynamics using Lagrange multipliers")
+  factors any acyclic joint graph in linear time with no fill, ordered leaves first, so a hub between heavy arms is solved
+  with them. A solver design change in `joints.rs` (path factors, `push_share`, the warm start's search): plan it first, then
+  keep `tests/joints.rs` trees, rings, grids and `stability.rs` webs to their bars.
 
 ### Open 2026-11-27: a flexible pipe in strongly sheared flow swings 40 % short of the measurement across it (KB-PHYS-RODVIVSHEAR1, physics loads)
 
