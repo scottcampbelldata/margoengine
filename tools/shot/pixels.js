@@ -77,9 +77,13 @@ export function addSubframe(sum, { width, height, rgba, half, stride }) {
  * The kept frame from the summed sub-frames: the mean of `count` sub-frames, the area filter from `width` x `height`
  * to `outWidth` x `outHeight`, then one encode to 8-bit sRGB with the blue-noise dither `noise` (ranks 0 to n - 1 of a
  * `noiseSize` square, tiled; each channel reads it at its own offset), so the step from float to 8 bits leaves no
- * bands in slow gradients. Returns RGBA bytes, alpha 255, row 0 at the top.
+ * bands in slow gradients. Returns RGBA bytes, alpha 255, row 0 at the top. `precise` (a Float32Array of
+ * `outWidth` x `outHeight` x 3), when given, takes the same frame before the dither and the 8 bits: RGB, sRGB coded 0 to
+ * 1, for the look checks that need more than 8 bits (KB-LOOK-TV-TINTRES1).
  */
-export function resolveFrame({ sum, width, height, count, outWidth, outHeight, noise, noiseSize }) {
+export function resolveFrame({ sum, width, height, count, outWidth, outHeight, noise, noiseSize, precise }) {
+  if (precise && precise.length !== outWidth * outHeight * 3)
+    throw new RangeError(`precise holds ${precise.length} floats, not ${outWidth} x ${outHeight} x 3`);
   const across = areaWeights(width, outWidth),
     down = areaWeights(height, outHeight),
     rows = new Float32Array(outWidth * height * 3);
@@ -128,6 +132,8 @@ export function resolveFrame({ sum, width, height, count, outWidth, outHeight, n
           // A dither from -0.5 to 0.5 of a level, never reaching either, so an exact 8-bit level stays itself.
           level = Math.round(encoded * 255 + (rank + 0.5) / levels - 0.5);
         out[(i * outWidth + x) * 4 + c] = level < 0 ? 0 : level > 255 ? 255 : level;
+        // The dither is for the 8-bit frame only: the precise frame keeps the encoded value as it is.
+        if (precise) precise[(i * outWidth + x) * 3 + c] = encoded;
       }
     for (let x = 0; x < outWidth; x++) out[(i * outWidth + x) * 4 + 3] = 255;
   }

@@ -38,6 +38,7 @@ evaluated state goes to the page's `apply` hook when it has one.
 | `aovs` | `[]` | Masks written beside every frame (see Masks): names the page gives through `page.aovs`, and `sky` and `water`, which the tool works out |
 | `horizon` | `null` | `{y}`: the world height of the water plane that splits `sky` from `water`; needed for either |
 | `moving` | `null` | `{depthScale}`: each probe also writes the frame after it and the camera's motion to it (see Moving evidence); `depthScale` is the metres of the page's `depth` mask, which holds exp(-distance / depthScale) in an `r32float` texture; needs `depth` in `aovs`, a camera track and probes before the last frame |
+| `probePool` | `null` | `{frames, step}`: the ground checks (T6 `bounce`, `shadowTint`) of each probe pool `frames` frames (2 to 400, the probe one of them) `step` kept frames apart and centred on it, for shadow interiors too small in one frame; each pooled frame also gets its precise frame (see Precise frames); frames outside a `--seconds` cut are left out |
 | `subject` | `null` | `{target: [x, y, z], size}` in world metres: the point the shot is about and how big it is across, for a film pipeline's camera checks (framing, focus, the subject at a cut); `cameraFrames` and `--cameras` hand it on |
 | `kit`, `grade`, `endCard` | `null` | Carried in the manifest for the steps that use them: scene kits (P5), the grade (P3) and the end card (P6) |
 | `page.path` | required | The page to render, from the top of the repository (served by the repository's Vite dev server) |
@@ -135,6 +136,16 @@ largest nearness), so a silhouette pixel never mixes its distance with the backg
 carry the distances: at a 2,000 m scale one code is 8 m near the eye, and ground within 4 m rounds to 255, which is no
 distance, so the motion took it for sky (KB-SHOT-DEPTH8BIT1). A page that still draws the mask coarser than 32-bit
 float renders, and the tool warns.
+
+## Precise frames
+
+Every probe also keeps its frame before the dither and the 8 bits, `probes/<name>.rgb32f` (and `frames/frame_NNNN.rgb32f`
+for each frame a `probePool` pools): little-endian float32 RGB rows, sRGB coded 0 to 1, the frame's size, row 0 at the
+top; the manifest names it as the probe's `precise`, and a pooled frame as `pool: [{frame, precise, aovs}]`. T6 reads
+it in place of the PNG: at the dark ground of the timber-valley blowup one blue code is 0.4 b*, nine times its 0.0448
+b* floor (KB-LOOK-TV-TINTRES1). Its detail gives `se`, the standard error of the value (the pixels', or with pooled
+frames the larger of that and the batch-means error over the frames, Schmeiser 1982, doi:10.1287/opre.30.3.556), and
+`frames`. A 1920 x 1080 precise frame is 24.9 MB.
 
 ## Look masks (penumbra, subject, lit, shadow)
 

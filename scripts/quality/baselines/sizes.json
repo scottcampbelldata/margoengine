@@ -14847,6 +14847,12 @@
       "grew": 1
     },
     {
+      "date": "2026-11-28",
+      "commit": "tintres1",
+      "reason": "KB-LOOK-TV-TINTRES1: T6 reads the shot's precise frame (float sRGB before the dither) and pools frames, with a standard error (pixels' and batch means): headless/look 18,518 to about 18,728 B gzip measured (limit 18587 to 19290). The pooling shares groundStrata, the Lab and mask helpers with bounce and shadowTint; a second entry would repeat them and give checkShot an async import.",
+      "grew": 1
+    },
+    {
       "date": "2026-11-27",
       "commit": "exr-zip",
       "reason": "EXRExporter parity: encodeEXR writes ZIPS and ZIP, environment/exr-write 2,084 to 2,648 B gzip measured: the byte split and predictor, chunked zlib through CompressionStream and the compressed offset table in the one writer; a separate entry would repeat the header and sample loops",
@@ -16051,7 +16057,7 @@
     "@margoengine/headless/formats": 5809,
     "@margoengine/headless/frames": 2152,
     "@margoengine/headless/gif": 374,
-    "@margoengine/headless/look": 18587,
+    "@margoengine/headless/look": 19290,
     "@margoengine/headless/null": 3411,
     "@margoengine/headless/stage": 3972,
     "@margoengine/headless/tiles": 2829,

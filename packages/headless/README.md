@@ -748,6 +748,28 @@ const row = shadowTint(frame, { lit: half(true), shadow: half(false), albedo });
 console.log(row.value.toFixed(1), row.pass, row.detail.strata); // 34.1 true 1
 ```
 
+**T6 reads the precise frame and pools frames** (KB-LOOK-TV-TINTRES1, 2026-11-28). `bounce` and `shadowTint` also take
+`precise`, the frame before its 8 bits (RGB float32, sRGB coded 0 to 1: the shot tool's `probes/<name>.rgb32f`), read in
+place of the 8-bit frame, and `pool`, more frames of the shot (each its `precise` or `frame` with `lit`, `shadow` and
+`albedo`, or `groundSample(...)` of one, its strata alone) whose strata add to the probe's. `detail.se` is the value's
+standard error: the pixels' with one frame, and with more the larger of that and the batch-means error over the frames
+(Schmeiser 1982), since neighbouring frames see much the same ground; `detail.frames` counts them. A shot asks for this
+with `probePool: {frames, step}` (docs/shots.md), and `checkShot` reads a probe's `precise` and `pool`.
+
+```js
+import { groundSample, shadowTint } from '@margoengine/headless/look';
+const size = 32,
+  half = (left) => ({ width: size, height: size, data: Uint8Array.from({ length: size * size }, (_, i) => ((i % size < 16) === left ? 255 : 0)) }),
+  frame = { width: size, height: size, data: new Uint8Array(size * size * 4).fill(60) },
+  // One 8-bit colour, but in the floats the shadow's blue is 0.4 of a code higher: a cooler shadow.
+  precise = () => ({ width: size, height: size, data: Float32Array.from({ length: size * size * 3 }, (_, i) => (60 + (i % 3 === 2 ? ((i / 3) % size < 16 ? -0.2 : 0.2) : 0)) / 255) }),
+  lit = half(true),
+  shadow = half(false);
+const pool = [precise(), precise()].map((p) => groundSample({ precise: p, lit, shadow }));
+const row = shadowTint(frame, { lit, shadow, precise: precise(), pool });
+console.log(row.value > 0, row.detail.frames); // true 3
+```
+
 **Clean frames and look families.** The clean-frame checks are the look bar of the animated-feature film (T1 to T8, private roadmap section 3): no grain, banding, stairs or shimmer, shapes that read, bounce light in the shadows, colour that survives YouTube's 4:2:0 H.264 and motion that is blurred. `checkProbe(probe, bounds, { family: 'animatedFeature' })` (or `lookFamily: "animatedFeature"` in a shot file) holds every check the probe can run to the family's bound: grain 0.5 codes, penumbra 0.7, penumbraPlants 1, speckle 5 ppm, banding 0.2%, stairs 1%, still shimmer 0.1% and flicker 0.3, `shimmerMoving` 0.5%, crush 0.1%, the reference FLIP 0.04, plus the ranges above. A check whose input the probe lacks is left out under a family (a shot that names it in `lookBounds` still fails it as missing); a mask that marks no pixel counts as lacking, so a frame with no subject or no shaded ground runs no `silhouette` or `bounce`, and a shot's own `lookBounds` win by name. `natural` keeps every default. `stairs` and `colourEdges` read the frame alone. A step was once judged against the climb along its own row, which misread an antialiased edge near a pixel axis (one pixel of coverage 0.1 per row is a tenth of the climb on one side and nine tenths on the other): a 16 sample per pixel render of the storm-light shot read 15% `stairs`. They now look for a value between the plateaus around the step; on that shot msaa 1 reads 5.70% over the whole frame (5.98% on the crop in `tests/fixtures/look-real`, against 30.6% by the old test), msaa 4 at supersample 1, 1.5 and 2 read 0.10, 0.00 and 0.01%, and the 16 sample reference 0.00%. The flood draft shots (msaa 1, supersample 1) read 2.7 to 22.7%, which is real aliasing: they are not rendered at the film setting.
 
 ```ts

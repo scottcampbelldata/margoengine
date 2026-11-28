@@ -19,6 +19,8 @@ export interface BounceOptions {
     lit: LookMask;
     shadow: LookMask;
     albedo?: LookImage;
+    precise?: PreciseFrame;
+    pool?: (GroundFrame | GroundSample)[];
     bound?: LookBound;
 }
 
@@ -108,6 +110,26 @@ export interface FoamEdgesOptions {
 export const GROUND_ALBEDO_LEVELS = 16;
 
 export const GROUND_INSET: number;
+
+export interface GroundFrame {
+    frame?: LookImage;
+    precise?: PreciseFrame;
+    lit: LookMask;
+    shadow: LookMask;
+    albedo?: LookImage;
+}
+
+export interface GroundSample {
+    readonly strata: ReadonlyMap<number, Readonly<GroundStratum>>;
+}
+
+export interface GroundStratum {
+    n: [number, number];
+    Y: [number, number];
+    b: [number, number];
+    Y2: [number, number];
+    b2: [number, number];
+}
 
 export interface HdrFlipOptions extends FlipOptions {
     toneMapper?: ToneCurve;
@@ -200,6 +222,12 @@ export interface LookProbe {
     still?: LookImage[];
     moving?: MovingFrames;
     light?: LookLight;
+    precise?: PreciseFrame;
+    pool?: ({
+        frame?: LookImage;
+        precise?: PreciseFrame;
+        masks: Record<string, LookMask>;
+    } | GroundSample)[];
 }
 
 export interface LookReport {
@@ -258,6 +286,12 @@ export interface PenumbraPlantsOptions {
     bound?: LookBound;
 }
 
+export interface PreciseFrame {
+    width: number;
+    height: number;
+    data: Float32Array;
+}
+
 export interface RegionOptions {
     mask?: LookMask;
     bound?: LookBound;
@@ -278,6 +312,12 @@ export interface ShotManifestProbe {
     };
     lookBounds?: Record<string, LookBound>;
     light?: LookLight;
+    precise?: string;
+    pool?: {
+        frame: number;
+        precise: string;
+        aovs?: Record<string, string>;
+    }[];
 }
 
 export interface SilhouetteOptions {
@@ -352,6 +392,8 @@ export function flip(test: LookImage, reference: LookImage, { pixelsPerDegree, m
 export function foamEdges(frame: LookImage, options: FoamEdgesOptions): LookResult;
 
 export function grain(frame: LookImage, { mask, bound }?: RegionOptions): LookResult;
+
+export function groundSample(frame: GroundFrame): GroundSample;
 
 export function hdrFlip(test: FloatFrame, reference: FloatFrame, { pixelsPerDegree, map, toneMapper, startExposure, stopExposure, exposureMap }?: HdrFlipOptions): HdrFlipResult;
 

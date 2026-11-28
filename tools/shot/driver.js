@@ -134,7 +134,9 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
   let sheetContext, frameContext, scratchContext;
   // The running sum of a kept frame's sub-frames in linear light (pixels.js addSubframe), and how many it holds.
   let sum = null,
-    summed = 0;
+    summed = 0,
+    // The last kept frame before the dither (pixels.js resolveFrame `precise`): RGB floats, sRGB coded 0 to 1.
+    precise = null;
 
   const get = (path) => path.split('.').reduce((value, key) => (value == null ? undefined : value[key]), globalThis);
 
@@ -477,6 +479,8 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
       // One sub-frame of 8-bit pixels at the frame's own size: the bytes as they are.
       if (subs === 1 && pixels.rgba && width === out[0] && height === out[1]) {
         frameContext.putImageData(new ImageData(pixels.rgba, width, height), 0, 0);
+        // Nothing was resolved: the precise frame is the 8-bit one, made from these bytes when it is asked for.
+        precise = pixels.rgba;
         return result(true);
       }
       const P = globalThis.__margoShotPixels;
@@ -499,6 +503,10 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
         outHeight: out[1],
         noise,
         noiseSize,
+        precise: (precise =
+          precise instanceof Float32Array && precise.length === out[0] * out[1] * 3
+            ? precise
+            : new Float32Array(out[0] * out[1] * 3)),
       });
       frameContext.putImageData(new ImageData(rgba, out[0], out[1]), 0, 0);
       sum = null;
@@ -516,6 +524,20 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
     },
     /** The last capture as PNG bytes, in base64. */
     png: () => encode(frame),
+    /**
+     * The last capture before its dither and 8 bits (KB-LOOK-TV-TINTRES1), in base64: little-endian float32 RGB rows,
+     * sRGB coded 0 to 1, the frame's size, row 0 at the top.
+     */
+    precise() {
+      if (!precise) throw new Error('no frame has been captured, so there is no precise frame');
+      if (!(precise instanceof Float32Array)) {
+        const bytes = precise;
+        precise = new Float32Array((bytes.length / 4) * 3);
+        for (let i = 0; i < bytes.length / 4; i++)
+          for (let c = 0; c < 3; c++) precise[i * 3 + c] = bytes[i * 4 + c] / 255;
+      }
+      return base64(new Uint8Array(precise.buffer, precise.byteOffset, precise.byteLength));
+    },
     /**
      * The shot's masks after a frame: `hook` (a page function) gives {device, textures: {name: GPUTexture}} for the
      * masks the page draws; `derived` names sky and water, worked out from `geometry` and the engine's camera with

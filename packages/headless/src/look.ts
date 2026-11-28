@@ -1443,6 +1443,13 @@ export interface LookProbe {
   moving?: MovingFrames;
   /** The light the frame was shaded with: `bounce` and `shadowTint` take their limits from it ({@link lightBounds}). */
   light?: LookLight;
+  /** The frame before its 8 bits, which `bounce` and `shadowTint` read in its place. */
+  precise?: PreciseFrame;
+  /**
+   * More frames whose ground `bounce` and `shadowTint` pool with this one's: each its precise frame (or frame) and its
+   * masks, or its {@link groundSample} made with this probe's choice of albedo (with one only if the probe has one).
+   */
+  pool?: ({ frame?: LookImage; precise?: PreciseFrame; masks: Record<string, LookMask> } | GroundSample)[];
 }
 
 /** Options of {@link checkProbe}. */
@@ -1549,13 +1556,16 @@ export function checkProbe(
   const noted = (row: LookResult): LookResult =>
     probe.light ? { ...row, detail: { ...row.detail, diffuse: lightBounds(probe.light).diffuse } } : row;
   // The albedo AOV, one grey mask per sRGB channel (`albedo-r`, `albedo-g`, `albedo-b`), makes T6 compare like surfaces.
-  const albedo = albedoOf(frame, masks);
-  run('bounce', ground, () =>
-    noted(bounce(frame, { lit: masks.lit, shadow: masks.shadow, albedo, bound: followed('bounce') })),
-  );
-  run('shadowTint', ground, () =>
-    noted(shadowTint(frame, { lit: masks.lit, shadow: masks.shadow, albedo, bound: followed('shadowTint') })),
-  );
+  const albedo = albedoOf(frame, masks),
+    // The precise frames and the pooled frames (KB-LOOK-TV-TINTRES1); a pooled frame's albedo from its own masks.
+    pool = probe.pool?.map((one) => {
+      if ('strata' in one) return one;
+      const { frame: f, precise, masks: m } = one;
+      return { frame: f, precise, lit: m.lit, shadow: m.shadow, albedo: albedo && albedoOf((precise ?? f)!, m) };
+    }),
+    ground6 = { lit: masks.lit, shadow: masks.shadow, albedo, precise: probe.precise, pool };
+  run('bounce', ground, () => noted(bounce(frame, { ...ground6, bound: followed('bounce') })));
+  run('shadowTint', ground, () => noted(shadowTint(frame, { ...ground6, bound: followed('shadowTint') })));
   // A night shot names these (a daylight frame is not a failed night): no family runs them.
   if ('nightLuma' in bounds) rows.push(nightLuma(frame, { bound: bounds.nightLuma }));
   if ('nightPeak' in bounds) rows.push(nightPeak(frame, { bound: bounds.nightPeak }));
@@ -1833,6 +1843,10 @@ export interface ShotManifestProbe {
   lookBounds?: Record<string, LookBound>;
   /** The light the frame was shaded with (the shot tool records it), for the T6 limits ({@link lightBounds}). */
   light?: LookLight;
+  /** The frame before its 8 bits, raw little-endian RGB float32 rows, sRGB coded 0 to 1 (`.rgb32f`). */
+  precise?: string;
+  /** More frames whose ground T6 pools with this one's (the shot's `probePool`): each its precise frame and masks. */
+  pool?: { frame: number; precise: string; aovs?: Record<string, string> }[];
 }
 
 /** What {@link checkShot} reads. */
@@ -1900,11 +1914,34 @@ export async function checkShot({
       new Uint8Array(floats.buffer).set(bytes);
       hdr = { width: frame.width, height: frame.height, data: floats };
     }
+    const precise = async (path: string): Promise<PreciseFrame> => {
+      const bytes = await read(path),
+        data = new Float32Array(frame.width * frame.height * 3);
+      if (bytes.byteLength !== data.byteLength)
+        throw rangeError(`${path} is not the frame's size in RGB float32`, 'headless');
+      new Uint8Array(data.buffer).set(bytes);
+      return { width: frame.width, height: frame.height, data };
+    };
+    // Each pooled frame is cut to its ground strata as it is read, so a pool of hundreds of frames holds a few numbers
+    // each, not its 25 MB frame and masks; with an albedo only when the probe has one, as checkProbe would.
+    const pool: GroundSample[] = [],
+      withAlbedo = !!albedoOf(frame, masks);
+    for (const one of entry.pool ?? []) {
+      signal?.throwIfAborted();
+      const m: Record<string, LookMask> = {};
+      for (const [aov, path] of Object.entries(one.aovs ?? {}))
+        if (GROUND_AOVS.includes(aov)) m[aov] = await png(path);
+      if (!m.lit || !m.shadow) continue;
+      const p = await precise(one.precise);
+      pool.push(groundSample({ precise: p, lit: m.lit, shadow: m.shadow, albedo: withAlbedo ? albedoOf(p, m) : undefined }));
+    }
     const probe: LookProbe = {
       name,
       frame,
       masks,
       hdr,
+      precise: entry.precise ? await precise(entry.precise) : undefined,
+      pool: pool.length ? pool : undefined,
       reference: entry.reference ? await png(entry.reference) : undefined,
       compat: entry.compat ? await png(entry.compat) : undefined,
       viewProjection: entry.viewProjection,
@@ -2643,6 +2680,13 @@ export interface BounceOptions {
    * within strata of like albedo. Unset, all ground is one stratum.
    */
   albedo?: LookImage;
+  /** The frame's colours before its 8 bits, read in its place ({@link PreciseFrame}). */
+  precise?: PreciseFrame;
+  /**
+   * More frames of the shot whose ground is pooled with this one's, for shadow interiors too small in one frame; the
+   * result's detail then gives `frames`, and `se` follows them ({@link GroundFrame}).
+   */
+  pool?: (GroundFrame | GroundSample)[];
   bound?: LookBound;
 }
 
@@ -2713,21 +2757,66 @@ export function albedoOf(frame: { width: number; height: number }, masks: Record
   return { width: frame.width, height: frame.height, data };
 }
 
+/** The masks T6 reads of a pooled frame. */
+const GROUND_AOVS = ['lit', 'shadow', 'albedo-r', 'albedo-g', 'albedo-b'];
+
 /** Levels per sRGB channel of the albedo strata {@link bounce} and {@link shadowTint} compare within: 16 (16 codes). */
 export const GROUND_ALBEDO_LEVELS = 16;
 
-interface GroundStratum {
+/** The ground pixels of one albedo stratum, lit side first: counts and sums of Y and b* and of their squares. */
+export interface GroundStratum {
   n: [number, number];
   Y: [number, number];
   b: [number, number];
+  /** Sums of squares of Y and b*, for the standard error. */
+  Y2: [number, number];
+  b2: [number, number];
 }
 
-function groundStrata(frame: LookImage, { lit, shadow, albedo }: BounceOptions): Map<number, GroundStratum> {
-  const r = Math.max(1, Math.round(Math.min(frame.width, frame.height) * GROUND_INSET)),
-    masks = [lit, shadow].map((mask, i) => inset(frame.width, frame.height, maskBits(frame, mask, i ? 'shadow' : 'lit'), r));
+/**
+ * The frame's colours before its 8 bits (the shot tool's precise frame, `.rgb32f`): RGB floats, sRGB coded 0 to 1,
+ * row 0 at the top. T6 reads it in place of the 8-bit frame, whose blue codes are 0.4 b* apart at dark ground.
+ */
+export interface PreciseFrame {
+  width: number;
+  height: number;
+  data: Float32Array;
+}
+
+/**
+ * A frame's ground reduced to its albedo strata ({@link groundSample}): what {@link bounce} and {@link shadowTint} read of
+ * a pooled frame, a few numbers in place of its frame and masks.
+ */
+export interface GroundSample {
+  readonly strata: ReadonlyMap<number, Readonly<GroundStratum>>;
+}
+
+/** One more frame of a shot whose ground {@link bounce} and {@link shadowTint} pool with the probe's. */
+export interface GroundFrame {
+  /** The frame, 8-bit; unused where `precise` is given. */
+  frame?: LookImage;
+  precise?: PreciseFrame;
+  lit: LookMask;
+  shadow: LookMask;
+  albedo?: LookImage;
+}
+
+/** A frame's ground as {@link bounce} and {@link shadowTint} pool it: its strata, so the frame and masks can go. */
+export function groundSample(frame: GroundFrame): GroundSample {
+  return { strata: groundStrata(frame) };
+}
+
+function groundStrata({ frame, precise, lit, shadow, albedo }: GroundFrame): Map<number, GroundStratum> {
+  const size = precise ?? frame;
+  if (!size) throw typeError('A ground frame needs its frame or its precise frame', 'headless');
+  if (precise && precise.data?.length !== precise.width * precise.height * 3)
+    throw rangeError('A precise frame holds three floats per pixel (RGB, sRGB coded 0 to 1)', 'headless');
+  if (precise && frame) sameSize(frame, precise, 'precise frame');
+  const r = Math.max(1, Math.round(Math.min(size.width, size.height) * GROUND_INSET)),
+    masks = [lit, shadow].map((mask, i) => inset(size.width, size.height, maskBits(size, mask, i ? 'shadow' : 'lit'), r));
   if (albedo) {
-    sameSize(frame, albedo, 'albedo');
-    if (albedo.data.length !== frame.width * frame.height * 4)
+    sameSize(size, albedo, 'albedo');
+    if (albedo.data.length !== size.width * size.height * 4)
       throw rangeError('The albedo holds four bytes per pixel (RGBA, sRGB coded)', 'headless');
   }
   const strata = new Map<number, GroundStratum>(),
@@ -2741,56 +2830,125 @@ function groundStrata(frame: LookImage, { lit, shadow, albedo }: BounceOptions):
         Math.floor(albedo.data[j + 2] / q)
       : 0;
     let at = strata.get(key);
-    if (!at) strata.set(key, (at = { n: [0, 0], Y: [0, 0], b: [0, 0] }));
+    if (!at) strata.set(key, (at = { n: [0, 0], Y: [0, 0], b: [0, 0], Y2: [0, 0], b2: [0, 0] }));
+    // Codes 0 to 255, fractional from the precise frame.
+    const [R, G, B] = precise
+        ? [precise.data[i * 3] * 255, precise.data[i * 3 + 1] * 255, precise.data[i * 3 + 2] * 255]
+        : [frame!.data[j], frame!.data[j + 1], frame!.data[j + 2]],
+      Y = 0.2126729 * srgbToLinear(R) + 0.7151522 * srgbToLinear(G) + 0.072175 * srgbToLinear(B),
+      b = lab(R, G, B)[2];
     at.n[side]++;
-    at.Y[side] +=
-      0.2126729 * srgbToLinear(frame.data[j]) +
-      0.7151522 * srgbToLinear(frame.data[j + 1]) +
-      0.072175 * srgbToLinear(frame.data[j + 2]);
-    at.b[side] += lab(frame.data[j], frame.data[j + 1], frame.data[j + 2])[2];
+    at.Y[side] += Y;
+    at.b[side] += b;
+    at.Y2[side] += Y * Y;
+    at.b2[side] += b * b;
   }
   return strata;
 }
 
+/** A side of a stratum: its mean Y and b* and the variance of each mean. */
+interface GroundSide {
+  Y: number;
+  b: number;
+  varY: number;
+  varB: number;
+}
+
+type GroundValue = (lit: GroundSide, shadow: GroundSide) => number;
+
 /**
- * The strata's pooled value of `value(lit, shadow)` (each side's mean Y and b*), with the pixels behind it: `lit` and
- * `shadow` count the masks' interiors, `matched` the pixels in strata both sides hold, `strata` those strata.
+ * The strata's pooled `value(lit, shadow)` with the Cochran-Mantel-Haenszel weights, and its standard error from
+ * `variance(lit, shadow)` pooled with the squared weights: `lit` and `shadow` count the masks' interiors, `matched` the
+ * pixels in strata both sides hold, `strata` those strata.
  */
-function pooled(
-  options: BounceOptions,
-  frame: LookImage,
-  value: (lit: { Y: number; b: number }, shadow: { Y: number; b: number }) => number,
-) {
+function poolStrata(strata: Iterable<GroundStratum>, value: GroundValue, variance: GroundValue) {
   let lit = 0,
     shadow = 0,
     matched = 0,
-    strata = 0,
+    count = 0,
     sum = 0,
-    weights = 0;
-  for (const at of groundStrata(frame, options).values()) {
+    weights = 0,
+    spread = 0;
+  for (const at of strata) {
     lit += at.n[0];
     shadow += at.n[1];
     if (!at.n[0] || !at.n[1]) continue;
-    const mean = (side: number) => ({ Y: at.Y[side] / at.n[side], b: at.b[side] / at.n[side] }),
-      v = value(mean(0), mean(1));
+    const side = (k: number): GroundSide => {
+        const n = at.n[k],
+          Y = at.Y[k] / n,
+          b = at.b[k] / n,
+          // The sample variance (over n - 1), over n again for the mean's; one pixel gives none.
+          v = (s2: number, m: number) => (n > 1 ? Math.max(0, s2 - n * m * m) / (n - 1) / n : 0);
+        return { Y, b, varY: v(at.Y2[k], Y), varB: v(at.b2[k], b) };
+      },
+      l = side(0),
+      s = side(1),
+      v = value(l, s);
     if (!Number.isFinite(v)) continue;
     const w = (at.n[0] * at.n[1]) / (at.n[0] + at.n[1]);
     matched += at.n[0] + at.n[1];
-    strata++;
+    count++;
     sum += w * v;
     weights += w;
+    spread += w * w * variance(l, s);
   }
-  const detail: Record<string, number> = options.albedo ? { lit, shadow, matched, strata } : { lit, shadow };
-  return { value: weights ? sum / weights : Number.NaN, detail };
+  return {
+    value: weights ? sum / weights : Number.NaN,
+    se: weights ? Math.sqrt(spread) / weights : Number.NaN,
+    lit,
+    shadow,
+    matched,
+    strata: count,
+  };
+}
+
+/**
+ * The probe's value with the frames of `options.pool` pooled in, every frame's strata summed as one larger frame.
+ * `se` is the value's standard error: with one frame the pixels' (strata pooled with the squared weights), with more
+ * the larger of that and the batch-means error, each frame one batch, the spread of the frames' own values over the
+ * root of their count (B. Schmeiser, "Batch size effects in the analysis of simulation output", Operations Research
+ * 30(3), 556-568, 1982, https://doi.org/10.1287/opre.30.3.556): neighbouring frames see much the same ground, so their
+ * pixels are not independent and the pixels' error alone would claim too much (KB-LOOK-TV-TINTRES1).
+ */
+function pooled(options: BounceOptions, frame: LookImage, value: GroundValue, variance: GroundValue) {
+  const frames: (GroundFrame | GroundSample)[] = [{ ...options, frame }, ...(options.pool ?? [])],
+    all = new Map<number, GroundStratum>(),
+    each: number[] = [];
+  for (const one of frames) {
+    const strata = 'strata' in one ? one.strata : groundStrata(one),
+      own = poolStrata(strata.values(), value, variance).value;
+    if (Number.isFinite(own)) each.push(own);
+    for (const [key, at] of strata) {
+      const to = all.get(key);
+      // A copy: a sample may be pooled again by the next check.
+      if (!to) all.set(key, { n: [...at.n], Y: [...at.Y], b: [...at.b], Y2: [...at.Y2], b2: [...at.b2] });
+      else
+        for (const field of ['n', 'Y', 'b', 'Y2', 'b2'] as const)
+          for (const k of [0, 1]) to[field][k] += at[field][k];
+    }
+  }
+  const p = poolStrata(all.values(), value, variance);
+  let se = p.se;
+  if (each.length > 1) {
+    const mean = each.reduce((a, v) => a + v, 0) / each.length;
+    se = Math.max(se, Math.sqrt(each.reduce((a, v) => a + (v - mean) ** 2, 0) / (each.length - 1) / each.length));
+  }
+  const detail: Record<string, number> = options.albedo
+    ? { lit: p.lit, shadow: p.shadow, matched: p.matched, strata: p.strata }
+    : { lit: p.lit, shadow: p.shadow };
+  if (Number.isFinite(se)) detail.se = Math.round(se * 1e4) / 1e4;
+  if (frames.length > 1) detail.frames = frames.length;
+  return { value: p.value, detail };
 }
 
 function groundCheck(
   name: 'bounce' | 'shadowTint',
   frame: LookImage,
   options: BounceOptions,
-  value: (lit: { Y: number; b: number }, shadow: { Y: number; b: number }) => number,
+  value: GroundValue,
+  variance: GroundValue,
 ): LookResult {
-  const { value: v, detail } = pooled(options, frame, value);
+  const { value: v, detail } = pooled(options, frame, value, variance);
   if (!Number.isFinite(v))
     return {
       ...result(name, Number.NaN, options.bound, detail),
@@ -2808,7 +2966,14 @@ function groundCheck(
  */
 export function bounce(frame: LookImage, { lit, shadow, bound }: BounceOptions): LookResult;
 export function bounce(frame: LookImage, options: BounceOptions): LookResult {
-  return groundCheck('bounce', frame, options, (l, s) => (l.Y ? (100 * s.Y) / l.Y : Number.NaN));
+  return groundCheck(
+    'bounce',
+    frame,
+    options,
+    (l, s) => (l.Y ? (100 * s.Y) / l.Y : Number.NaN),
+    // The ratio's variance by the delta method.
+    (l, s) => (l.Y ? 1e4 * (s.varY / l.Y ** 2 + (s.Y ** 2 * l.varY) / l.Y ** 4) : 0),
+  );
 }
 
 /**
@@ -2817,7 +2982,13 @@ export function bounce(frame: LookImage, options: BounceOptions): LookResult {
  */
 export function shadowTint(frame: LookImage, { lit, shadow, bound }: BounceOptions): LookResult;
 export function shadowTint(frame: LookImage, options: BounceOptions): LookResult {
-  return groundCheck('shadowTint', frame, options, (l, s) => l.b - s.b);
+  return groundCheck(
+    'shadowTint',
+    frame,
+    options,
+    (l, s) => l.b - s.b,
+    (l, s) => l.varB + s.varB,
+  );
 }
 
 /**

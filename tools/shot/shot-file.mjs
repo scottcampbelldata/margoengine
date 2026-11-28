@@ -41,6 +41,7 @@ export const SHOT_DEFAULTS = Object.freeze({
   aovs: Object.freeze([]),
   horizon: null,
   moving: null,
+  probePool: null,
   subject: null,
 });
 
@@ -237,6 +238,26 @@ export function validateShot(input) {
             'is on the last frame, which has no frame after it for shot.moving; move it earlier',
           );
   }
+  // The frames each probe's ground checks (T6) pool with it, for shadow interiors too small in one frame.
+  if ('probePool' in shot && shot.probePool !== null) {
+    const pool = shot.probePool;
+    if (
+      !(
+        isRecord(pool) &&
+        Number.isInteger(pool.frames) &&
+        pool.frames >= 2 &&
+        pool.frames <= 400 &&
+        Number.isInteger(pool.step) &&
+        pool.step >= 1
+      )
+    )
+      add(
+        at('probePool'),
+        'must be {frames, step}: 2 to 400 frames each probe pools, step kept frames apart and centred on it, or null',
+      );
+    else if (!(isRecord(shot.probes) && Object.keys(shot.probes).length))
+      add(at('probePool'), 'needs probes: it names the frames pooled with each one');
+  }
   const derived = aovs.filter((name) => DERIVED_AOVS.includes(name));
   if (derived.length && !(isRecord(shot.horizon) && finite(shot.horizon.y)))
     add(at('horizon'), `must be {y} for the ${derived.join(' and ')} mask: the plane that splits water from sky`);
@@ -392,6 +413,34 @@ export function probeFrames(file) {
     last = Math.round(seconds * fps) - 1;
   return Object.fromEntries(
     Object.entries(probes).map(([name, time]) => [name, Math.max(0, Math.min(last, Math.ceil(time * fps - 1e-9)))]),
+  );
+}
+
+/**
+ * The kept frames each probe pools with (shot.probePool), by probe name: `frames` - 1 frames `step` apart around the
+ * probe, centred on it (one more after it than before when the count is even) and slid inside the shot where the probe
+ * is near its start or end; a shot (or a `--seconds` cut) too short for them all keeps those inside it. The probe
+ * itself is not listed. Without a pool every probe lists none.
+ */
+export function poolFrames(file) {
+  const pool = file.shot.probePool,
+    last = Math.round(file.shot.seconds * file.shot.fps) - 1;
+  return Object.fromEntries(
+    Object.entries(probeFrames(file)).map(([name, at]) => {
+      if (!pool) return [name, []];
+      let first = -Math.floor((pool.frames - 1) / 2);
+      // Slid inside the shot: as far as the frames past either end allow, the probe kept in the window.
+      const end = (k) => at + k * pool.step;
+      if (end(first) < 0) first = Math.min(0, -Math.floor(at / pool.step));
+      else if (end(first + pool.frames - 1) > last)
+        first = Math.max(first - Math.ceil((end(first + pool.frames - 1) - last) / pool.step), -Math.floor(at / pool.step), 1 - pool.frames);
+      const frames = [];
+      for (let k = first; k < first + pool.frames; k++) {
+        const index = at + k * pool.step;
+        if (k && index >= 0 && index <= last) frames.push(index);
+      }
+      return [name, frames];
+    }),
   );
 }
 

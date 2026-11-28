@@ -18,6 +18,7 @@ import {
   compareRenders,
   frameName,
   probeFrames,
+  poolFrames,
   renderSize,
   shotFrames,
   subframeOffsets,
@@ -144,6 +145,7 @@ export const shotStep = async ({
   light,
   recordSky,
   skyCoverage,
+  precise,
 }) => {
   const shot = globalThis.__margoShot;
   let result = null,
@@ -215,6 +217,8 @@ export const shotStep = async ({
         result = { size, via, render, samples: shot.samples, sha256: await shot.hash() };
         if (thumbnail !== undefined) shot.thumbnail(thumbnail);
         if (png || (expectHash && result.sha256 !== expectHash)) result.png = await shot.png();
+        // The frame before its dither, for the look checks that need more than 8 bits (KB-LOOK-TV-TINTRES1).
+        if (precise) result.precise = shot.precise();
         if (masks) result.aovs = await shot.masks({ ...masks, engine, png });
         if (skyCoverage) {
           const covered = await shot.skyCoverage({ engine, png });
@@ -374,6 +378,8 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
     probes = new Set(Object.values(probeFrames(file))),
     // With `shot.moving` the frame after each probe also gets its view-projection, for the probe's motion.
     nextProbes = new Set(shot.moving ? [...probes].map((kept) => kept + 1) : []),
+    // The frames each probe's ground checks pool with it (shot.probePool) also get their precise frame.
+    pooled = new Set(Object.values(poolFrames(file)).flat()),
     sheet = write ? sheetFrames(file) : new Map(),
     shotHash = sha256(JSON.stringify(file));
   let done = [],
@@ -449,6 +455,7 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
         viewProjection: write && !skip && !pass && (probes.has(kept) || nextProbes.has(kept)),
         light: write && !skip && !pass && probes.has(kept),
         skyCoverage: recordSky && !skip && !pass && probes.has(kept),
+        precise: write && !skip && !pass && (probes.has(kept) || pooled.has(kept)),
       });
       if (!result) continue;
       if (result.size[0] !== shot.size[0] || result.size[1] !== shot.size[1])
@@ -480,6 +487,10 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
       if (write) {
         record.file = `frames/${frameName(kept)}`;
         writeFileSync(join(out, record.file), Buffer.from(result.png, 'base64'));
+        if (result.precise) {
+          record.precise = record.file.replace(/png$/, 'rgb32f');
+          writeFileSync(join(out, record.precise), Buffer.from(result.precise, 'base64'));
+        }
       } else if (expect && result.sha256 !== expect[kept]) {
         const written = done.filter((d) => d.mismatch).length;
         if (written < MISMATCH_FILES && result.png) {
@@ -510,6 +521,17 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
   } finally {
     watch.stop();
   }
+}
+
+/**
+ * Copies a frame record's precise frame (frames/<n>.rgb32f) to `copy` in `out` and gives `copy`, or removes an earlier
+ * render's copy and gives null when the record has none.
+ */
+function copyPrecise(out, record, copy) {
+  rmSync(join(out, copy), { force: true });
+  if (!record?.precise) return null;
+  writeFileSync(join(out, copy), readFileSync(join(out, record.precise)));
+  return copy;
 }
 
 /**
@@ -595,6 +617,17 @@ export async function shoot(file, { out, output, source, runs = 2, check = 'ever
           ),
           viewProjection = record?.viewProjection,
           light = record?.light,
+          // The probe before its dither, and the frames its ground checks pool with it (shot.probePool), each with
+          // its own precise frame and masks where they are (KB-LOOK-TV-TINTRES1).
+          precise = copyPrecise(out, record, `probes/${name}.rgb32f`),
+          pool = (poolFrames(file)[name] ?? [])
+            .map((index) => a.frames.find((frame) => frame.index === index))
+            .filter((frame) => frame?.precise)
+            .map((frame) => ({
+              frame: frame.index,
+              precise: frame.precise,
+              aovs: Object.fromEntries(Object.entries(frame.aovs ?? {}).map(([aov, mask]) => [aov, mask.file])),
+            })),
           // The probe's own look bounds (shot.probeLookBounds), which replace the shot's for the checks they name.
           lookBounds = file.shot.probeLookBounds?.[name];
         return [
@@ -606,6 +639,8 @@ export async function shoot(file, { out, output, source, runs = 2, check = 'ever
             ...(viewProjection ? { viewProjection } : {}),
             ...(light ? { light } : {}),
             ...(lookBounds ? { lookBounds } : {}),
+            ...(precise ? { precise } : {}),
+            ...(pool.length ? { pool } : {}),
           },
         ];
       }),

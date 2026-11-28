@@ -33,6 +33,7 @@ import {
   erbsDiffuseFraction,
   lightBounds,
   shadowTint,
+  groundSample,
   shimmerMoving,
   silhouette,
   silhouetteShape,
@@ -818,4 +819,107 @@ test('T7 chroma smear: one pixel colour stripes move visibly at 4:2:0, flat and 
     { mask: mask(64, 64, (x) => x < 32) },
   );
   assert.equal(half.detail.pixels, 64 * 32);
+});
+
+test('T6 reads the precise frame, pools frames and gives its standard error (KB-LOOK-TV-TINTRES1)', () => {
+  // The blowup's shadow interior is a few hundred pixels and one 8-bit blue code is 0.4 b* at its dark ground, both
+  // coarser than the 0.0448 b* floor. Here the lit and shadowed ground share their 8-bit codes but not their floats:
+  // only the precise frame shows the shadow cooler. Pooled frames add their pixels, and the standard error follows.
+  const size = 32,
+    lit = mask(size, size, (x) => x < 16),
+    shadow = mask(size, size, (x) => x >= 16),
+    frame = image(size, size, () => [60, 40, 20]),
+    // Shadow blue 0.3 of a code higher (cooler), lit 0.3 lower; one pixel in four 0.2 higher again, for a spread.
+    precise = (lift = 0) => {
+      const data = new Float32Array(size * size * 3);
+      for (let y = 0; y < size; y++)
+        for (let x = 0; x < size; x++) {
+          const i = (y * size + x) * 3;
+          data[i] = 60 / 255;
+          data[i + 1] = 40 / 255;
+          data[i + 2] = (20 + (x < 16 ? -0.3 : 0.3) + ((x + y) % 4 ? 0 : 0.2) + lift) / 255;
+        }
+      return { width: size, height: size, data };
+    };
+  const eight = shadowTint(frame, { lit, shadow }),
+    one = shadowTint(frame, { lit, shadow, precise: precise() });
+  assert.equal(eight.value, 0, 'the 8-bit codes are one colour');
+  assert.ok(one.value > 0.1, `the precise frame reads the shadow cooler: ${one.value}`);
+  assert.ok(one.detail.se > 0 && one.detail.se < one.value, `a pixel standard error: ${one.detail.se}`);
+  assert.equal(one.detail.frames, undefined);
+  // Three frames pooled, one of them a little bluer all over: three times the pixels, the same difference.
+  const pool = [precise(0.5), precise()].map((p) => ({ precise: p, lit, shadow })),
+    three = shadowTint(frame, { lit, shadow, precise: precise(), pool });
+  assert.equal(three.detail.frames, 3);
+  assert.equal(three.detail.lit, 3 * one.detail.lit);
+  assert.ok(Math.abs(three.value - one.value) < 0.02, `pooled ${three.value} against one ${one.value}`);
+  // Identical frames repeat the same pixels: the batch-means error is 0 and the pixels' error, smaller by root 3, stays.
+  const same = shadowTint(frame, { lit, shadow, precise: precise(), pool: [precise(), precise()].map((p) => ({ precise: p, lit, shadow })) });
+  assert.ok(Math.abs(same.detail.se - one.detail.se / Math.sqrt(3)) < 1e-3, `se ${same.detail.se}`);
+  // Frames that disagree: the batch-means error is the larger and is used.
+  const apart = (lift) => {
+      const p = precise();
+      for (let i = 2; i < p.data.length; i += 3) if ((i / 3) % size >= 16) p.data[i] += lift / 255;
+      return p;
+    },
+    spread = shadowTint(frame, { lit, shadow, precise: apart(-2), pool: [apart(2), apart(0)].map((p) => ({ precise: p, lit, shadow })) });
+  assert.ok(spread.detail.se > 0.3, `the frames' spread sets the error: ${spread.detail.se}`);
+  // A pooled frame cut to its strata gives the same, and pooling it again (the next check) leaves it as it was.
+  const samples = [precise(0.5), precise()].map((p) => groundSample({ precise: p, lit, shadow })),
+    once = shadowTint(frame, { lit, shadow, precise: precise(), pool: samples }),
+    twice = shadowTint(frame, { lit, shadow, precise: precise(), pool: samples });
+  assert.equal(once.value, three.value);
+  assert.deepEqual(twice, once);
+  // bounce reads the precise frame too, and a frame of the wrong length throws.
+  assert.ok(bounce(frame, { lit, shadow, precise: precise() }).detail.se > 0);
+  assert.throws(() => shadowTint(frame, { lit, shadow, precise: { width: size, height: size, data: new Float32Array(3) } }), RangeError);
+});
+
+test('checkShot passes a probe its precise frame and pooled frames for T6 (KB-LOOK-TV-TINTRES1)', async () => {
+  const size = 32,
+    frame = image(size, size, () => [60, 40, 20]),
+    grey = (inside) => {
+      const m = mask(size, size, inside),
+        rgba = new Uint8Array(size * size * 4);
+      for (let i = 0; i < size * size; i++) rgba.fill(m.data[i], i * 4, i * 4 + 3), (rgba[i * 4 + 3] = 255);
+      return { width: size, height: size, data: rgba };
+    },
+    floats = () => {
+      const data = new Float32Array(size * size * 3);
+      for (let i = 0; i < size * size; i++) {
+        data[i * 3] = 60 / 255;
+        data[i * 3 + 1] = 40 / 255;
+        data[i * 3 + 2] = (20 + (i % size < 16 ? -0.4 : 0.4)) / 255;
+      }
+      return new Uint8Array(data.buffer);
+    },
+    files = {
+      'probes/a.png': await encodePNG(frame),
+      'probes/a.lit.png': await encodePNG(grey((x) => x < 16)),
+      'probes/a.shadow.png': await encodePNG(grey((x) => x >= 16)),
+      'probes/a.rgb32f': floats(),
+      'frames/1.rgb32f': floats(),
+      'frames/1.geometry.png': new Uint8Array(1),
+    },
+    read = async (path) => files[path] ?? Promise.reject(new Error(`no file ${path}`)),
+    entry = { frame: 0, file: 'probes/a.png', aovs: { lit: 'probes/a.lit.png', shadow: 'probes/a.shadow.png' } },
+    tintOf = async (probe) =>
+      (await checkShot({ manifest: { probes: { a: probe } }, read, thumbWidth: 32 })).json.probes[0].results.find(
+        (row) => row.check === 'shadowTint',
+      ),
+    eight = await tintOf(entry),
+    pooled = await tintOf({
+      ...entry,
+      precise: 'probes/a.rgb32f',
+      // A pooled frame's other masks are not read (a geometry mask that is no PNG would throw).
+      pool: [{ frame: 1, precise: 'frames/1.rgb32f', aovs: { ...entry.aovs, geometry: 'frames/1.geometry.png' } }],
+    });
+  assert.equal(eight.value, 0);
+  assert.ok(pooled.value > 0.1, `the precise frames read the cooler shadow: ${pooled.value}`);
+  assert.equal(pooled.detail.frames, 2);
+  await assert.rejects(
+    tintOf({ ...entry, precise: 'frames/1.geometry.png' }),
+    RangeError,
+    'a precise frame of the wrong size',
+  );
 });
