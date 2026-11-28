@@ -1,1 +1,0 @@
-var e=new Float64Array(5);function t(t){let n=e,r=0,i=0,a=0,o=!1;for(let e=0;e<t;e++){let t=n[e]=Math.abs(n[e]);t>r?r=t:t!==t&&(o=!0)}if(r===1/0||o||!r)n[4]=r===1/0||!o?r:NaN;else{for(let e=0;e<t;e++){let t=n[e]/r,o=t*t-a,s=i+o;a=s-i-o,i=s}n[4]=i,n[4]=Math.sqrt(n[4])*r}}function n(n,r,i,a=0,o=0){let s=e;return s[0]=r,s[1]=i,s[2]=a,s[3]=o,t(n),s[4]}export{n,t as r,e as t};
