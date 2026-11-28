@@ -7,6 +7,8 @@ export type ChaparralPresetId = 'chaparral' | 'coastal-sage-scrub' | 'oak-woodla
 
 export type ClimatePresetId = 'temperate' | 'desert' | 'tundra' | 'tropical' | 'alpine' | 'wetland' | 'savanna' | 'boreal';
 
+export type ConiferAge = 'sapling' | 'pole' | 'mature' | 'old';
+
 export type PresetId = ClimatePresetId | 'beach';
 
 export interface PresetWorld {
@@ -56,6 +58,8 @@ export const chaparralPresets: Readonly<Record<ChaparralPresetId, BiomeDefinitio
 export const chaparralWorld: PresetWorld & {
     readonly biomes: readonly BiomeDefinition[];
 };
+
+export function coniferAge(biomes: readonly BiomeDefinition[], age: ConiferAge): BiomeDefinition[];
 
 export const presetWorlds: Readonly<Record<ClimatePresetId, PresetWorld> & {
     readonly island: PresetWorld & {

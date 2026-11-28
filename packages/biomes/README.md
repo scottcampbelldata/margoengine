@@ -230,6 +230,25 @@ colour of the lit foliage and shaded crown. The terrain height image uses the fo
 device. Placement on drawn terrain triangles follows Dimitris Papavasiliou,
 [Real-Time Grass (and Other Procedural Objects) on Terrain](https://jcgt.org/published/0004/01/02/) (2015).
 
+## Older or younger rockies forests: `coniferAge`
+
+The northern Rockies presets grow pole stands, about 40 years old, the regrowth after the 1910 fires.
+`coniferAge(biomes, age)` from `@margoengine/biomes/presets` returns the same biomes with every aged conifer key
+(`procedural:<species>/<age>`) drawn at `'sapling'` (15 years), `'pole'` (40), `'mature'` (100) or `'old'` (250), the
+ages of `coniferForm` in `@margoengine/procedural/conifers`. Placement is unchanged, so older trees close their crowns
+into a full canopy. Snag, burnt and unaged keys are kept, and an unknown age throws a `RangeError`.
+
+```js
+import { coniferAge, rockiesValleyWorld } from '@margoengine/biomes/presets';
+
+const { climate, relief } = rockiesValleyWorld;
+const biomes = coniferAge(rockiesValleyWorld.biomes, 'mature'); // a valley that has not burned for a century
+console.log(biomes[0].plants?.[0].mesh, climate.latitude, relief.base); // procedural:western-white-pine/mature 47.3 870
+```
+
+The ages and their sizes follow the Forest Vegetation Simulator's Inland Empire variant (Wykoff height-diameter and
+Crookston crown width equations), as `@margoengine/procedural/conifers` documents.
+
 ## Look families for the ground: `@margoengine/biomes/view`
 
 `BIOME_LOOKS` holds the ground-material look families: `natural` keeps every material, `animatedFeature` draws the ground as broad

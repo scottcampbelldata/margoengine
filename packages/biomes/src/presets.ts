@@ -460,6 +460,29 @@ export const rockiesValleyWorld: PresetWorld & { readonly biomes: readonly Biome
   biomes: rockiesWorld.biomes,
 });
 
+/** A northern Rockies conifer's age, as `procedural:<species>/<age>` mesh keys name it (`@margoengine/procedural/conifers`). */
+export type ConiferAge = 'sapling' | 'pole' | 'mature' | 'old';
+const coniferAges: readonly string[] = ['sapling', 'pole', 'mature', 'old'];
+
+/**
+ * `biomes` with every aged conifer key (`procedural:<species>/<age>`) drawn at `age`: the rockies presets grow pole
+ * stands (about 40 years, the regrowth after the 1910 fires); `'mature'` (100 years) gives the closed old timber of a
+ * valley that has not burned for a century. Placement is unchanged (the same records, spacing and sizes), so the
+ * bigger crowns meet into a closed canopy. Snag, burnt and broadleaf keys are kept. Returns new frozen definitions.
+ *
+ * @example
+ * const biomes = coniferAge(rockiesValleyWorld.biomes, 'mature');
+ * console.log(biomes[0].plants?.[0].mesh); // procedural:western-white-pine/mature
+ */
+export function coniferAge(biomes: readonly BiomeDefinition[], age: ConiferAge): BiomeDefinition[] {
+  if (!coniferAges.includes(age))
+    throw new RangeError(`Unknown conifer age ${String(age)}; pass sapling, pole, mature or old`);
+  const aged = (mesh: string) => mesh.replace(/^(procedural:[a-z-]+)\/(?:sapling|pole|mature|old)$/, `$1/${age}`);
+  return biomes.map((biome) =>
+    freeze({ ...biome, plants: biome.plants?.map((plant) => ({ ...plant, mesh: aged(plant.mesh) })) }),
+  );
+}
+
 /**
  * A Sanriku ria fishing bay on a 4,096 m world (`relief.ria` of `createRelief`): the sea to the east, a drowned valley
  * 2.4 km long running in from it, 900 m across at the mouth and 320 m at the head, 30 m deep at the mouth and 8 m at the
