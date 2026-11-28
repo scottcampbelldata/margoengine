@@ -15,7 +15,7 @@ nav {
 }
 nav a { color: inherit; text-decoration: none; font-weight: 650; min-height: 44px; display: inline-flex; align-items: center; gap: .55em; }
 nav a:hover { text-decoration: underline; text-underline-offset: 3px; }
-header { padding: clamp(27px, 4.35vw, 56px) 0 clamp(17px, 2.65vw, 36px); }
+header { padding: clamp(24px, 2.5vw, 36px) 0 clamp(17px, 2.2vw, 30px); }
 h1 { font: 400 clamp(3rem, 7.5vw, 6.35rem)/.97 Georgia, serif; margin: 0; letter-spacing: -.066em; }
 header p { margin: 13px 0 0; color: var(--muted); font-size: clamp(.93rem, 1.3vw, 1.1rem); line-height: 1.4; }
 #exhibit { border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
@@ -35,7 +35,7 @@ button:disabled, select:disabled { cursor: default; opacity: .57; }
 #generate { margin-left: auto; color: #322719; background: var(--accent); border-color: var(--accent); font-weight: 750; }
 #generate span { margin-left: .55em; }
 #generate:hover:not(:disabled) { background: #fbe4bb; }
-.model { position: relative; background: #bdad90; width: 100%; aspect-ratio: 1.92; }
+.model { position: relative; background: #bdad90; width: 100%; aspect-ratio: 2.3; }
 canvas { width: 100%; height: 100%; display: block; }
 #status {
   position: absolute; left: 12px; top: 12px; max-width: min(420px, 68%); margin: 0; padding: 7px 9px;

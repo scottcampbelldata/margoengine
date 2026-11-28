@@ -135,8 +135,10 @@ export async function openCity(canvas, first, signal) {
     bench = await openBench(canvas, {
       signal, pixelRatio: 2, maxWidth: 1450, startupTimeout: 11000, capacity: 512,
       camera: {near: 2, far: 740}, background: '#bfb19a',
-      backdrop: false, contact: false, environment: false,
-      light: {direction: [-.56,.76,.42], intensity: 2.20, color: [1,.91,.81], ambient: .52, ambientColor: [.62,.68,.73]},
+      // The kit's softbox fill (default strength) under a lower afternoon sun, so roof pitches facing away fall
+      // into shade instead of the flat ambient wash that lit every slope alike.
+      backdrop: false, contact: false,
+      light: {direction: [-.62,.52,.58], intensity: 2.6, color: [1,.91,.81]},
       shadows: {resolution: 1024, filter: 'pcf', bounds: {min: [-136,-13,-136], max: [136,34,136]}, normalBias: .07},
       onError: cause => {error = cause;},
     });
