@@ -12,6 +12,7 @@ export const CAD_FINISHES: Readonly<Record<CadFinish, CadFinishSpec>>;
 export class CadBench {
     readonly engine: EngineKernel;
     readonly deck: Mesh | null;
+    readonly deckTop: number;
     readonly lines: Lines;
     static attach(engine: EngineKernel, options?: CadBenchOptions): CadBench;
     private constructor();

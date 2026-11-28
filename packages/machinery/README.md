@@ -172,7 +172,8 @@ on the WebGL2 layer alike. Pass a glTF model's meshes straight in: the bench kee
 | `'cut'` | aluminium | 0.16 | none: a fresh saw or section face |
 
 Edge defaults: `angle` 30, `width` 1.25 CSS px, `color` '#0c1013', `opacity` 0.82, `depthBias` 0.0012. Deck defaults:
-`size` [0.42, 0.3] m, `thickness` 0.04, `top` 0, `center` [0, 0]. `casters` takes anything with `add(mesh)`, such as
+`size` [0.42, 0.3] m, `thickness` 0.04, `top` the thickness (the plate rests on studio/bench's floor at y 0; parts rest
+on `cad.deckTop`), `center` [0, 0]. `casters` takes anything with `add(mesh)`, such as
 studio/bench's `openBench` result, so shown parts cast its shadows. The bench stages nothing else: open the engine,
 lights, shadows and backdrop with `openBench`.
 
@@ -187,7 +188,7 @@ const bench = await openBench(canvas, {
   contact: false,
 });
 const cad = CadBench.attach(bench.engine, { deck: { size: [0.42, 0.3] }, casters: bench });
-cad.show(box(0.12, 0.06, 0.08), { finish: 'anodised' }).mesh.setPosition([0, 0.03, 0]);
+cad.show(box(0.12, 0.06, 0.08), { finish: 'anodised' }).mesh.setPosition([0, cad.deckTop + 0.03, 0]);
 await bench.ready();
 ```
 

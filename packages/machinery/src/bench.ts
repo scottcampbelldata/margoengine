@@ -68,7 +68,7 @@ export interface CadDeckOptions {
   size?: readonly [number, number];
   /** Plate thickness in metres. Default 0.04. */
   thickness?: number;
-  /** Height of the plate's top face. Default 0. */
+  /** Height of the plate's top face. Default `thickness`: the plate rests on a floor at y 0 (studio/bench's cyclorama). */
   top?: number;
   /** Centre of the plate in x and z. Default [0, 0]. */
   center?: readonly [number, number];
@@ -166,6 +166,8 @@ export class CadBench {
   readonly engine: EngineKernel;
   /** The surface plate, when the bench has one. */
   readonly deck: Mesh | null = null;
+  /** Height of the plate's top face, where parts rest (0 without a deck). Move a model's root up by it. */
+  readonly deckTop: number = 0;
   /** The Lines plugin the edges draw with. */
   readonly lines: Lines;
   private readonly parts = new Set<CadPart>();
@@ -191,12 +193,16 @@ export class CadBench {
     this.engine = engine;
     this.casters = options.casters;
     this.edgeDefaults = options.edges === false ? null : edgeOptions(options.edges === true ? {} : options.edges ?? {});
-    if (options.deck !== false) this.deck = this.makeDeck(options.deck === true ? {} : options.deck ?? {});
+    if (options.deck !== false) {
+      const deck = options.deck === true ? {} : (options.deck ?? {});
+      this.deck = this.makeDeck(deck);
+      this.deckTop = deck.top ?? deck.thickness ?? 0.04;
+    }
     this.ownLines = !options.lines;
     this.lines = options.lines ?? Lines.attach(engine, { name: 'cad-bench:lines' });
   }
 
-  private makeDeck({ size = [0.42, 0.3], thickness = 0.04, top = 0, center = [0, 0], material }: CadDeckOptions): Mesh {
+  private makeDeck({ size = [0.42, 0.3], thickness = 0.04, top = thickness, center = [0, 0], material }: CadDeckOptions): Mesh {
     if (!(size[0] > 0 && size[1] > 0 && thickness > 0) || ![top, center[0], center[1]].every(Number.isFinite))
       throw new RangeError('Invalid deck; pass a positive size and thickness and a finite top and center');
     const granite = surface('basalt', { roughness: 0.5 }),

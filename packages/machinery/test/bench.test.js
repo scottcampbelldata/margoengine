@@ -78,6 +78,12 @@ test('show finishes a part, registers it for shadows and shares materials', () =
     cad = CadBench.attach(engine, { deck: { size: [0.3, 0.2], top: 0.01 }, casters, edges: false });
   assert.ok(cad.deck, 'deck made');
   assert.deepEqual(cad.deck.position, [0, 0.01 - 0.02, 0]);
+  assert.equal(cad.deckTop, 0.01);
+  // By default the plate rests on the floor at y 0 and parts rest on its top.
+  const resting = CadBench.attach(fakeEngine(), { deck: { thickness: 0.05 }, edges: false });
+  assert.deepEqual(resting.deck.position, [0, 0.025, 0]);
+  assert.equal(resting.deckTop, 0.05);
+  assert.equal(CadBench.attach(fakeEngine(), { deck: false }).deckTop, 0);
   assert.ok(engine.plugins.has('cad-bench:lines'));
   const a = cad.show(box(0.1, 0.04, 0.06), { finish: 'anodised' }),
     b = cad.show(box(0.02, 0.02, 0.02), { finish: 'anodised' });
