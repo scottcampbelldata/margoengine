@@ -20616,3 +20616,33 @@ Sources read (papers and books only, no code):
 Margo's own: three value-noise octaves (48, 20, 8 m; heights 1, 0.45, 0.2 of `undulation`) with their analytic
 gradient tilting the shading normal on ground below the rock slope range, crests lighter and hollows darker by up to
 12 percent (terrain test/rock-structure.browser.mjs).
+
+## Skinning about optimized centres of rotation (2026-11-28, rigging group 9)
+
+`@margoengine/animation/cor` and its default in `@margoengine/humans` `addPerson`. Written from the papers' equations;
+no paper's companion code and no other engine's skinning code was read.
+
+- Binh Huy Le and Jessica K. Hodgins, "Real-time skeletal skinning with optimized centers of rotation", ACM TOG
+  35(4):37, 2016, https://doi.org/10.1145/2897824.2925959 (the per-vertex centre as the similarity-weighted mean of the
+  mesh's triangles, the similarity of two weight sets with sigma 0.1, and the skin: blended rotation about the centre
+  plus the linear blend of the centre).
+- Ladislav Kavan, Steven Collins, Jiri Zara and Carol O'Sullivan, "Geometric skinning with approximate dual quaternion
+  blending", ACM TOG 27(4):105, 2008, https://doi.org/10.1145/1409625.1409627 (the sign-aligned quaternion blend, and the
+  bulge on the outside of a bend that the centres remove).
+- Ladislav Kavan and Olga Sorkine, "Elasticity-inspired deformers for character articulation", ACM TOG 31(6):196, 2012,
+  https://doi.org/10.1145/2366145.2366215 (compared: joint-based deformers that also fix the bulge, set aside because
+  they need per-joint fitting, where centres need none).
+- Binh Huy Le and J. P. Lewis, "Direct delta mush skinning and variants", ACM TOG 38(4):113, 2019,
+  https://doi.org/10.1145/3306346.3322982 (compared: removes both artifacts but needs per-vertex 4x4 precomputed
+  matrices per bone, far more memory than one centre; kept for group 10 correctives).
+- Rinat Abdrashitov, Kim Raichstat, Jared Monsen and David Hill, "Robust skin weights transfer via weight inpainting",
+  SIGGRAPH Asia 2023 Technical Communications (link not yet checked; read for the open garment weight
+  fault KB-SKIN-SKIRT1: body-to-garment transfer where the garment is close, inpainting elsewhere; not built yet).
+
+Margo's own: triangles are summed into clusters of like weights (to 1/16 per bone) and indexed by each pair of bones
+they hold, so a vertex reads only clusters that share two of its bones (the similarity is zero otherwise); vertices with
+the same weights (to 1/4096) share one centre; the centres ride as one more vec4 after each vertex's influences, and
+the bones reuse the dual quaternion slots, each rebuilt on the centre for its linear blend. Tests: animation
+tests/cor.test.js (a half-weighed panel keeps its area to 1e-3 where linear shrinks it, and reaches less far than dual
+quaternions; a 160 degree twist keeps its radius; one bone is exact; split parts agree) and
+scripts/animation-cor-tests.js (GPU against the CPU pose on WebGPU and the WebGL2 layer).

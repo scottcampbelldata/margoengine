@@ -3524,7 +3524,7 @@ export interface OutfitReceiver {
 export interface DressOptions extends FitOptions {
   /** The body's material, node or mesh names. Default {@link BODY_MATERIALS}. */
   readonly materials?: readonly string[];
-  /** How the bones blend, as the person's: default `'dual-quaternion'` (addPerson's default). */
+  /** How the bones blend, as the person's: unset, about centres of rotation (addPerson's default), so the clothes bend as the body under them does. */
   readonly skinning?: 'dual-quaternion' | 'linear';
   /** Shadows to cast into and receive from, or false. Default the scene's (`scene.parts.shadows`), or the model scene's `Shadows`. */
   readonly shadows?: OutfitReceiver | false;
@@ -3564,14 +3564,16 @@ export async function dressPerson(
   if (!model || !Array.isArray(model.primitives) || model.root?.engine !== engine)
     throw new TypeError('dressPerson needs a person (addPerson) or a loaded gltf/pbr model of this engine');
   if (options.skinning !== undefined && options.skinning !== 'dual-quaternion' && options.skinning !== 'linear')
-    throw new TypeError("dressPerson skinning must be 'dual-quaternion' or 'linear'");
+    throw new TypeError("dressPerson skinning must be 'dual-quaternion' or 'linear', or unset for centres of rotation");
   // The loader, materials and skinning load with the first dress: fitting alone (fitOutfit) needs none of them.
-  const [{ parseGLTFAsync }, { install }, { Animation }, { dualQuaternionSkinning }] = await Promise.all([
-    import('@margoengine/gltf/pbr'),
-    import('@margoengine/materials'),
-    import('@margoengine/animation'),
-    import('@margoengine/animation/dqs'),
-  ]);
+  const [{ parseGLTFAsync }, { install }, { Animation }, { dualQuaternionSkinning }, { centerOfRotationSkinning }] =
+    await Promise.all([
+      import('@margoengine/gltf/pbr'),
+      import('@margoengine/materials'),
+      import('@margoengine/animation'),
+      import('@margoengine/animation/dqs'),
+      import('@margoengine/animation/cor'),
+    ]);
   const kernel = engine as unknown as EngineKernel,
     materials = options.materials ?? BODY_MATERIALS,
     fit = fitOutfit(riggedBody(model, materials), outfit, options),
@@ -3586,7 +3588,9 @@ export async function dressPerson(
     cleanups.push(() => sheen.dispose());
     const animation = new Animation(dressed, {
       skeleton: model,
-      ...(options.skinning === 'linear' ? {} : { skinning: dualQuaternionSkinning }),
+      ...(options.skinning === 'linear'
+        ? {}
+        : { skinning: options.skinning === 'dual-quaternion' ? dualQuaternionSkinning : centerOfRotationSkinning }),
     });
     kernel.use(animation, into);
     cleanups.push(() => animation.dispose());

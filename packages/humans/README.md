@@ -2,7 +2,7 @@
 
 People in one call. `addPerson(engine, model)` takes a character loaded with `@margoengine/gltf/pbr` and dresses it
 the way a film needs it: skin, eyes and strand hair on the materials named for them, an Animator that plays the clips
-with cross-fades, dual quaternion skinning so a raised arm keeps its shoulder, relaxed hands on clips whose fingers are flat, and the
+with cross-fades, skinning about centres of rotation so a raised arm keeps its shoulder and its coat, relaxed hands on clips whose fingers are flat, and the
 scene's shadows and sky light. Each further default (face, cloth) arrives as it is built, with no change to the call.
 
 ```ts
@@ -191,7 +191,7 @@ garment over 5 mm into the body. What it does not do yet: push cloth aside at ru
 | Cross-fade length for `play` | 0.3 s | `fade` |
 | Hands (`@margoengine/rigging/hands`): the relaxed pose on every clip whose finger tracks stay under 15 degrees mean | on, for Mixamo, VRM, MPFB, Godot and humanoid bone names | `hands: HandsOptions` or `false` |
 | Anatomy (`@margoengine/rigging/anatomy`): the human body fitted bone for bone, every clip and every IK solve held inside its joint ranges | on, for a rig whose bones a naming `fitHuman` knows uses (the humanoid names, Character Creator and the others it lists) | `anatomy: {limits: false}` keeps the body for reading and IK but holds nothing; `anatomy: false` fits none |
-| Skinning | dual quaternion (Kavan et al. 2008) | `skinning: 'linear'` |
+| Skinning: each vertex turns about its own centre of rotation (Le and Hodgins 2016), so a twisted forearm keeps its volume and a coat neither pinches nor balloons at a raised shoulder or bent hips | centres of rotation | `skinning: 'dual-quaternion'` or `'linear'` |
 | Shadows | the `Shadows` attached to the model's scene, if any | `shadows: Shadows` or `false`, or `scene` (a `@margoengine/scenes` handle) |
 | Ambient occlusion | none | `occlusion: scene.parts.occlusion`, or `scene` |
 | Sky light (`Sky` from `@margoengine/sky`, `sky.add(model)`): the sky's diffuse light and its reflections, blurred by each material's roughness, so skin keeps its soft sheen under an overcast sky | the `Sky` attached to the model's scene, if any (every glTF model joins it by itself: gltf/pbr `sceneSky`, so a person's outfit and props are lit alike) | `sky: Sky` or `false` (either sets `model.sceneSky` false until dispose) |

@@ -199,6 +199,14 @@ interface PropertyKeyframeTrack {
 
 type PropertyValueType = 'number' | 'vector' | 'color' | 'quaternion';
 
+interface SkinMeshPart {
+    readonly positions: ArrayLike<number>;
+    readonly triangles: ArrayLike<number> | null;
+    readonly joints: ArrayLike<number>;
+    readonly weights: ArrayLike<number>;
+    readonly influences: number;
+}
+
 class SkinnedCrowd extends VATCrowd {
     readonly bake: BoneBake;
     static attach(engine: EngineKernel, bake: BoneBake, options?: VATCrowdOptions): SkinnedCrowd;
@@ -221,10 +229,11 @@ interface SkinningMode {
     shader(extra: boolean): string;
     encode(palette: Float32Array): void;
     share?(extras: unknown): ArrayLike<number> | undefined;
-    blend?(palette: Float32Array, joints: ArrayLike<number>, weights: ArrayLike<number>, position: ArrayLike<number>, normal: ArrayLike<number>, share: number): {
+    blend?(palette: Float32Array, joints: ArrayLike<number>, weights: ArrayLike<number>, position: ArrayLike<number>, normal: ArrayLike<number>, share: number, data?: ArrayLike<number>): {
         position: ArrayLike<number>;
         normal: ArrayLike<number>;
     };
+    vertexData?(parts: readonly SkinMeshPart[]): Float32Array[];
 }
 
 interface Track {

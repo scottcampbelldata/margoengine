@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // People in one call: addPerson(engine, model) dresses a loaded character the way a film needs it. Skin, eyes and strand
 // hair go on by glTF material name (@margoengine/materials), an Animator plays the clips with cross-fades
-// (@margoengine/animator over @margoengine/animation, dual quaternion skinning), and the model joins the scene's
+// (@margoengine/animator over @margoengine/animation, skinning about optimized centres of rotation), and the model joins the scene's
 // shadows, ambient occlusion and sky light. Each later default (hands, face, cloth) is one lazy import below, so a page pays only
 // for what a person uses.
 import type { Engine } from '@margoengine/core';
@@ -9,6 +9,7 @@ import type { Engine as EngineKernel } from '@margoengine/core/extension';
 import type { PBRModel } from '@margoengine/gltf/pbr-model';
 import { Animation } from '@margoengine/animation';
 import { dualQuaternionSkinning } from '@margoengine/animation/dqs';
+import { centerOfRotationSkinning } from '@margoengine/animation/cor';
 import { Animator } from '@margoengine/animator';
 import { install, Texture, type MaterialInstallation, type ModelFeatures } from '@margoengine/materials';
 import { skin, type SkinOptions } from '@margoengine/materials/skin';
@@ -113,8 +114,10 @@ export interface PersonOptions {
   /** The clip to start on, a name from `model`'s animations. Default the first clip. */
   clip?: string;
   /**
-   * How the bones blend: `'dual-quaternion'` keeps a twisted shoulder or wrist its volume (Kavan et al. 2008),
-   * `'linear'` blends matrices. Default `'dual-quaternion'`.
+   * How the bones blend. Unset, each vertex turns about its own optimized centre of rotation (Le and Hodgins 2016,
+   * `@margoengine/animation/cor`): a twisted forearm keeps its volume and a raised shoulder or a bent hip neither pinches
+   * nor balloons, the skin and the clothes alike. `'dual-quaternion'` keeps the volume but bulges on the outside of a
+   * bend (Kavan et al. 2008); `'linear'` blends matrices and pinches a twisted or sharply bent joint.
    */
   skinning?: 'dual-quaternion' | 'linear';
   /** Cross-fade length in seconds for {@link Person.play}. Default 0.3. */
@@ -446,7 +449,7 @@ export async function addPerson(engine: Engine, model: PBRModel, options: Person
   if (!(fade >= 0 && fade < Infinity))
     throw new RangeError('addPerson fade must be a finite number of seconds, 0 or more');
   if (options.skinning !== undefined && options.skinning !== 'dual-quaternion' && options.skinning !== 'linear')
-    throw new TypeError("addPerson skinning must be 'dual-quaternion' or 'linear'");
+    throw new TypeError("addPerson skinning must be 'dual-quaternion' or 'linear', or unset for centres of rotation");
   const shadows =
     options.shadows === undefined
       ? (options.scene?.parts.shadows ??
@@ -519,7 +522,12 @@ export async function addPerson(engine: Engine, model: PBRModel, options: Person
         ]);
 
   // Everything is built and checked before anything is attached, so bad options leave the model as it was.
-  const animation = new Animation(model, options.skinning === 'linear' ? {} : { skinning: dualQuaternionSkinning }),
+  const animation = new Animation(
+      model,
+      options.skinning === 'linear'
+        ? {}
+        : { skinning: options.skinning === 'dual-quaternion' ? dualQuaternionSkinning : centerOfRotationSkinning },
+    ),
     clips = animation.clips.map((c) => c.name);
   if (options.clip !== undefined && !clips.includes(options.clip))
     throw new RangeError(

@@ -282,10 +282,11 @@ export interface SkinningMode {
     shader(extra: boolean): string;
     encode(palette: Float32Array): void;
     share?(extras: unknown): ArrayLike<number> | undefined;
-    blend?(palette: Float32Array, joints: ArrayLike<number>, weights: ArrayLike<number>, position: ArrayLike<number>, normal: ArrayLike<number>, share: number): {
+    blend?(palette: Float32Array, joints: ArrayLike<number>, weights: ArrayLike<number>, position: ArrayLike<number>, normal: ArrayLike<number>, share: number, data?: ArrayLike<number>): {
         position: ArrayLike<number>;
         normal: ArrayLike<number>;
     };
+    vertexData?(parts: readonly SkinMeshPart[]): Float32Array[];
 }
 
 export function applyKeyframeClip(clip: KeyframeClip, time: number): void;
@@ -363,6 +364,14 @@ interface PosedSnapshot {
     readonly side: 'front' | 'back' | 'double';
     readonly matrix: Float32Array;
     readonly primitiveIndex: number;
+}
+
+interface SkinMeshPart {
+    readonly positions: ArrayLike<number>;
+    readonly triangles: ArrayLike<number> | null;
+    readonly joints: ArrayLike<number>;
+    readonly weights: ArrayLike<number>;
+    readonly influences: number;
 }
 
 interface Track {

@@ -1,6 +1,6 @@
 // Real-GPU check of @margoengine/humans (WebGPU, or the WebGL2 compatibility layer with MARGO_COMPAT=1): addPerson
-// draws the same frame, pixel for pixel, as the hand-wiring it replaces (skin by material name, Animation with dual
-// quaternion skinning, the model in the shadows), and its Animator seeks as a pure function of time and cross-fades
+// draws the same frame, pixel for pixel, as the hand-wiring it replaces (skin by material name, Animation skinning
+// about centres of rotation, the model in the shadows), and its Animator seeks as a pure function of time and cross-fades
 // between clips. Run from the repository root after building packages:
 //   node packages/humans/test/person-still.mjs
 import assert from 'node:assert/strict';

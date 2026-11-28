@@ -2,7 +2,7 @@
 // from another format, a body a tool hands over), with no glTF file. addBody writes the bones and meshes into an
 // in-memory glTF 2.0 document (bone nodes from the bind matrices, one skin with their inverse binds, the clips given or a
 // rest clip), loads it as a gltf/pbr model and hands it to addPerson, so the body gets the same defaults a loaded person
-// does: skin, eyes and hair by material name, dual quaternion skinning, shadows and the human anatomy limits.
+// does: skin, eyes and hair by material name, skinning about centres of rotation, shadows and the human anatomy limits.
 import type { Engine } from '@margoengine/core';
 import type { Engine as EngineKernel } from '@margoengine/core/extension';
 import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';

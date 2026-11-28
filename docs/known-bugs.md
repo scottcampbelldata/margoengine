@@ -6,6 +6,51 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open: person-still's Lantern prop changes 992 to 993 pixels between roughness 0.3 and 0.8, under its 1,000 bar (KB-HUMANS-PROPSKY1, humans test)
+
+- Repro: `node packages/humans/test/person-still.mjs` (and with `MARGO_COMPAT=1`) on the workstation, 2026-11-28, at
+  origin/main 23b89ba321 plus the KB-SKIN-BULGE1 change. Its log prints `prop {"lit":993,"off":0}` (WebGL2: 992), and
+  the assertion "the sky reflection on the prop reads its roughness" wants more than 1,000; the outfit beside it
+  changes 7,556 pixels and passes.
+- Ruled out: the skinning. The same run with the person drawn by dual quaternion skinning (the old default) prints
+  the same 993, and the prop is an unskinned Lantern on the left of the frame.
+- Cause not found yet: the prop does join the sky (`joined` true, `off` 0), so its reflection is there but small at
+  this framing; whether the prop's framing, the sky's overcast fill or the bar moved is still to be measured. The bar
+  is not lowered.
+
+### Open: a Character Creator coat skirt swings out whole at bent hips, its hem a ring around the legs (KB-SKIN-SKIRT1, humans)
+
+- **Repro:** `addPerson` on the Fauld cast's old man (`civ_old_man.glb`), the skin sheet
+  (`node packages/humans/test/skin-sheet.browser.mjs --model=<file>`), rows "seated" and "elbows and knees at full
+  flexion": the coat's hem leaves the legs and hangs as a ring around them, the back panel swung forward with the front.
+  Blender 5.3 with its own importer shows the same with linear and with Preserve Volume skinning (frames
+  `blender-hips90-*` in the rigging lane's `rigging-frames/g9`), so it is the weights, not Margo's skinning.
+- **Cause:** every one of the coat's 2,478 hem vertices, front, back and sides alike, is weighed about 0.28 right thigh,
+  0.27 left thigh, 0.24 waist and 0.21 pelvis (Character Creator's even skirt weighting, which keeps a skirt whole
+  between the legs on a walk). At 90 degrees of hip flexion the whole hem turns about half way with both thighs, so the
+  back of the coat swings forward and up as far as the front.
+- **Fix to build:** garment weights rebuilt from the body and the layers under them where the cloth is close, and
+  inpainted where it hangs free (Abdrashitov et al. 2023), with the even skirt kept only between the legs; the body
+  under this coat is cut away, so the trousers and shirt are the source there. Owner: `@margoengine/humans` (a garment
+  pass in `addPerson`) or `@margoengine/rigging` (the weight solver, rigging group 9 or 10).
+
+### Fixed 2026-11-28: a coat balloons at a raised shoulder and over bent hips under dual quaternion skinning (KB-SKIN-BULGE1, animation)
+
+- **Repro:** the old man's skin sheet as above, row "arms raised: left 90 to the side, right 170 overhead": under
+  `addPerson`'s dual quaternion default the coat's right side panel swells into a sack from armpit to hip; the bent hip
+  rows put a round bulb over each knee. `skinning: 'linear'` shows neither (frames `skin-sheet-civ_old_man-*` and
+  `cmp-*` in `rigging-frames/g9`).
+- **Cause:** the panel's vertices are weighed between the spine, the collarbone and the upper arm twist bones (0.24,
+  0.22 and 0.41 on average near the shoulder). Dual quaternion blending turns each such vertex about the bones' own
+  joint by a blend of their angles, keeping its distance from that joint, so cloth far from the shoulder swings out on
+  an arc as the arm rises (the bulge Kavan et al. 2008 describe on the outside of a bend).
+- **Fix:** `@margoengine/animation/cor`, skinning about optimized centres of rotation (Le and Hodgins 2016), is
+  `addPerson`'s default: each vertex turns about the middle of the surface weighed like it, so the panel turns about
+  itself and its middle moves as a linear blend would. Regression tests: `packages/animation/tests/cor.test.js` and
+  `scripts/animation-cor-tests.js`. Also fixed on the way: influence blocks were shared between models of one asset
+  whatever their skinning mode, so a linear clone could have read a blend skin's share-packed joint indices; the block
+  key now names the mode (the same tests).
+
 ### Fixed 2026-11-28: a Character Creator collarbone read 13 to 15 degrees depressed on a walk, as its A pose rest was taken as its zero (KB-RIG-CLAVICLE1, rigging)
 
 - **Repro:** `addPerson` on the Fauld cast's Character Creator old man (`civ_old_man.glb`), the pose sheet

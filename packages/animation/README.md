@@ -647,6 +647,35 @@ const [hit] = new Raycaster([0, 1, 5], [0, 0, -1]).intersectObjects(stage.engine
 
 Only `Animation` has the option: `Skin` on raw data, `bakeVAT` and the bone-texture crowd stay linear.
 
+## Skinning about centres of rotation (`@margoengine/animation/cor`)
+
+Dual quaternions keep a twisted limb's volume but turn every blended vertex about its bones' joint, so cloth weighed
+between a still bone and a turning one swings out: a coat's side panel balloons when the arm goes up, a coat skirt
+over bent hips turns into a sack. `centerOfRotationSkinning` (Le and Hodgins 2016) turns each vertex by the blended
+rotation about its own centre of rotation, and moves that centre as a linear blend would. The centre is the middle of
+the surface whose weights are like the vertex's, so the panel turns about itself: no linear collapse, no dual
+quaternion bulge, and a twist keeps its volume. `@margoengine/humans` `addPerson` uses it by default.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf/pbr';
+import {Animation} from 'margoengine/animation';
+import {centerOfRotationSkinning} from 'margoengine/animation/cor';
+const stage = await createStage('#viewport', {backend:'webgpu',capacity:2048});
+const model = await loadGLTF(stage.engine, '/RobotExpressive.glb');
+Animation.attach(model, {skinning: centerOfRotationSkinning}).play('Walking');
+```
+
+The centres are computed once per skinned mesh, from all of its primitives in the bind pose, and shared by every copy
+and clone of the model: about 0.3 s for a 75,525 vertex coat and 2.4 s for a 154,923 vertex Character Creator body
+in Node on the workstation. They ride with each vertex's joints and weights (four more numbers per vertex), and the
+bones use the dual quaternion slots, so scaled and mirrored bones work as there. `rotationCentres(parts, options?)`
+returns the centres (four numbers per vertex: the centre then 1, or the vertex itself then 0 on a single bone) and
+`skinCenterOfRotation(slots, joints, weights, position, normal?, centre?)` is the shader's CPU twin; Animation's CPU
+pose uses it, so a synchronous raycast hits the drawn pose (within 5.4e-7 of the GPU on WebGPU and 4.8e-7 on the
+WebGL2 layer, `npm run test:gpu:cor`). A skinning mode of your own gets the same per-vertex channel with
+`vertexData(parts)`.
+
 ## Bone-texture crowds (`@margoengine/animation/instanced-skin`)
 
 A vertex animation texture stores finished vertices, so a crowd member can only play one clip. `bakeBones` stores bone

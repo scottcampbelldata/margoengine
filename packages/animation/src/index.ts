@@ -14,7 +14,7 @@ import { multiplyMatrices } from '@margoengine/math/mat4';
 import type { Interpolation } from './sampling.js';
 import { sampleCursor } from './key-cursor.js';
 import { DeformArena, weightRegion, type DispatchCache, type Slot, type SlotSpec } from './batch.js';
-import type { SkinningMode } from './shader.js';
+import type { SkinMeshPart, SkinningMode } from './shader.js';
 import type { PointerChannels, PointerPlan } from './pointer.js';
 import { applyKeyframeClip, type KeyframeClip } from './keyframes.js';
 export { createMaterialAnimation } from './material-animation.js';
@@ -214,6 +214,75 @@ function identities(count: number): Float32Array {
 }
 /** The inverse binds of a primitive with no skin (shared: nothing reads or writes it). */
 const noBinds = new Float32Array(0);
+/** Each mode's per-vertex data, per asset and glTF mesh: one array per primitive of the mesh, made once. */
+const meshData = new WeakMap<SkinningMode, WeakMap<object, Map<number, Float32Array[]>>>();
+/**
+ * A skinning mode's `vertexData` for the file primitive `definition` of node `nodeIndex`, four numbers per vertex of
+ * the file's primitive. The mode sees every primitive of the node's mesh, so parts of one surface agree at their seams.
+ */
+function modeVertexData(
+  mode: SkinningMode,
+  asset: PBRModel['asset'],
+  doc: ReturnType<typeof animationDocument>,
+  nodeIndex: number,
+  definition: object,
+): Float32Array {
+  const meshIndex = (doc.nodes[nodeIndex] as { mesh?: unknown } | undefined)?.mesh,
+    // The validated animation document carries no meshes: read them from the file's own.
+    meshes = (asset as { doc?: { meshes?: { primitives?: unknown[] }[] } }).doc?.meshes,
+    mesh = typeof meshIndex === 'number' ? meshes?.[meshIndex] : undefined,
+    all = mesh?.primitives ?? [],
+    at = all.indexOf(definition),
+    primitives = at < 0 ? [definition] : all;
+  let byAsset = meshData.get(mode);
+  if (!byAsset) meshData.set(mode, (byAsset = new WeakMap()));
+  let byMesh = byAsset.get(asset);
+  if (!byMesh) byAsset.set(asset, (byMesh = new Map()));
+  // A primitive the mesh does not list (a merged one) is its own surface, keyed apart from the file's meshes.
+  const key = at < 0 ? -1 - nodeIndex : (meshIndex as number);
+  let data = at < 0 ? undefined : byMesh.get(key);
+  if (!data) {
+    const parts: SkinMeshPart[] = primitives.map((value) => {
+      const primitive = value as { attributes?: Record<string, unknown>; indices?: unknown; mode?: unknown },
+        attributes = primitive.attributes ?? {},
+        positions = asset.accessor(attributes.POSITION, 'VEC3'),
+        count = positions.length / 3,
+        extra = attributes.JOINTS_1 !== undefined && attributes.WEIGHTS_1 !== undefined,
+        influences = extra ? 8 : 4,
+        joints = new Float32Array(count * influences),
+        weights = new Float32Array(count * influences);
+      for (let set = 0; set < influences / 4; set++) {
+        const ids = attributes['JOINTS_' + set],
+          amounts = attributes['WEIGHTS_' + set];
+        if (ids === undefined || amounts === undefined) continue;
+        const j = asset.accessor(ids, 'VEC4'),
+          w = asset.accessor(amounts, 'VEC4');
+        for (let i = 0; i < count; i++)
+          for (let c = 0; c < 4; c++) {
+            joints[i * influences + set * 4 + c] = j[i * 4 + c];
+            weights[i * influences + set * 4 + c] = w[i * 4 + c];
+          }
+      }
+      const drawsTriangles = primitive.mode === undefined || primitive.mode === 4;
+      return {
+        positions,
+        triangles: !drawsTriangles
+          ? null
+          : primitive.indices === undefined
+            ? Uint32Array.from({ length: count - (count % 3) }, (_, i) => i)
+            : asset.accessor(primitive.indices, 'SCALAR'),
+        joints,
+        weights,
+        influences,
+      };
+    });
+    data = mode.vertexData!(parts);
+    if (data.length !== parts.length || data.some((d, i) => d.length !== parts[i].positions.length / 3 * 4))
+      throw new RangeError('Invalid skinning vertexData; the mode must return four numbers per vertex of each part');
+    if (at >= 0) byMesh.set(key, data);
+  }
+  return data[Math.max(at, 0)];
+}
 const noInfluences = () => new Uint32Array(0);
 const noDeltas = () => noBinds;
 /** `a` times the 4x4 matrix at `b[at..at + 16]` into `out`: multiplyMatrices' arithmetic, in its order, with an offset. */
@@ -365,7 +434,7 @@ function packInfluences(
   const influenceBytes = new ArrayBuffer(Math.max(32, count * stride * 4)),
     jointIds = new Uint32Array(influenceBytes),
     influenceFloats = new Float32Array(influenceBytes),
-    extra = stride === 16;
+    extra = stride >= 16;
   for (const name of Object.keys(attributes))
     if (/^(JOINTS|WEIGHTS)_/.test(name) && !/^(JOINTS|WEIGHTS)_[01]$/.test(name))
       throw new RangeError(
@@ -684,7 +753,8 @@ export class Animation implements EnginePlugin {
       skinning !== undefined &&
       (typeof skinning?.shader !== 'function' ||
         typeof skinning.encode !== 'function' ||
-        (skinning.blend !== undefined && typeof skinning.blend !== 'function'))
+        (skinning.blend !== undefined && typeof skinning.blend !== 'function') ||
+        (skinning.vertexData !== undefined && typeof skinning.vertexData !== 'function'))
     )
       throw new TypeError('Invalid skinning option; pass dualQuaternionSkinning from @margoengine/animation/dqs');
     if (this.options.pointers !== undefined && typeof this.options.pointers !== 'function')
@@ -864,7 +934,10 @@ export class Animation implements EnginePlugin {
         joints: number[] = [];
       const attributes = definition.attributes,
         extra = skinId !== undefined && (attributes.JOINTS_1 !== undefined || attributes.WEIGHTS_1 !== undefined),
-        stride = extra ? 16 : 8;
+        dataMode = skinId !== undefined && this.options.skinning?.vertexData ? this.options.skinning : undefined,
+        // Joints and weights (twice with eight influences), then the mode's four numbers per vertex.
+        joined = extra ? 16 : 8,
+        stride = joined + (dataMode ? 4 : 0);
       let jointIds: Uint32Array = new Uint32Array(8);
       if (skinId !== undefined) {
         const skin = skinDefinition(skinValue, this.model.nodes.length);
@@ -881,8 +954,27 @@ export class Animation implements EnginePlugin {
         if (inverseBind.length !== joints.length * 16)
           throw new RangeError('Inverse bind matrix count mismatch; the skin needs one 4x4 matrix per joint');
         const jointCount = joints.length;
-        record.influences = () =>
-          packInfluences(asset, doc, attributes, count, sourceCount, stride, jointCount, vertexMap);
+        const nodeIndex = p.nodeIndex,
+          primitiveDefinition = p.definition as object;
+        record.influences = () => {
+          const ids = packInfluences(asset, doc, attributes, count, sourceCount, stride, jointCount, vertexMap);
+          if (dataMode) {
+            const data = vertexValues(
+                modeVertexData(dataMode, asset, doc, nodeIndex, primitiveDefinition),
+                4,
+                vertexMap,
+              ),
+              floats = new Float32Array(ids.buffer, ids.byteOffset, ids.length);
+            for (let i = 0; i < count; i++)
+              for (let c = 0; c < 4; c++) {
+                const value = data[i * 4 + c];
+                if (!Number.isFinite(value))
+                  throw new RangeError('Invalid skinning vertexData; every number must be finite');
+                floats[i * stride + joined + c] = value;
+              }
+          }
+          return ids;
+        };
         jointIds = record.influences();
       }
       const mode = this.options.skinning,
@@ -1233,7 +1325,7 @@ export class Animation implements EnginePlugin {
         posed.deltas,
         posed.weights,
         posed.influences,
-        r.slot.extra ? 16 : 8,
+        (r.slot.extra ? 16 : 8) + (r.slot.mode?.vertexData ? 4 : 0),
         mode ? posed.encoded : posed.palette,
         mode,
       );

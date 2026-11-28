@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22116203,
+  "total": 22124678,
   "history": [
     {
       "date": "2026-10-24",
@@ -16001,18 +16001,25 @@
       "commit": "atmo-05-native-vortex-water",
       "reason": "ATMO-05 @margoengine/physics/vortices 5197 to 10204 B gzip, ceiling 5453 to 10511 B. The optional vortex entry stages weather, body and water fields together on a signed clock. Native helpers sample the pressure slopes and stress on disjoint wet rows. Another package would duplicate the profile coefficients and field ABI. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "skin-center-of-rotation",
+      "reason": "KB-SKIN-BULGE1 skinning about optimized centres of rotation: new entry @margoengine/animation/cor 6062 B gzip; @margoengine/animation root 26123 to 26741 B (ceiling 26616 to 27544) and /interactivity 25436 to 26072 B (25889 to 26855) for the SkinningMode vertexData hook (each mesh's primitives read once per asset, four numbers a vertex packed after the weights, the CPU pose and shader stride); @margoengine/humans/body 7863 to 7906 B (7899 to 8162) for the new default. A lazy split would make the first influence upload async; core and stage receive zero bytes.",
+      "grew": 4
     }
   ],
   "items": {
-    "@margoengine/animation": 26616,
+    "@margoengine/animation": 27544,
     "@margoengine/animation/clip-utils": 4836,
+    "@margoengine/animation/cor": 6318,
     "@margoengine/animation/deformed-points": 3330,
     "@margoengine/animation/discrete-tracks": 2536,
     "@margoengine/animation/dqs": 4772,
     "@margoengine/animation/geometry-cache": 5658,
     "@margoengine/animation/instanced-morph": 11992,
     "@margoengine/animation/instanced-skin": 10607,
-    "@margoengine/animation/interactivity": 25889,
+    "@margoengine/animation/interactivity": 26855,
     "@margoengine/animation/lod": 2768,
     "@margoengine/animation/mixer": 5048,
     "@margoengine/animation/morph-gpu": 4361,
@@ -16521,7 +16528,7 @@
     "@margoengine/html/texture": 5167,
     "@margoengine/html/texture-gl": 6858,
     "@margoengine/humans": 5686,
-    "@margoengine/humans/body": 7899,
+    "@margoengine/humans/body": 8162,
     "@margoengine/humans/cast": 15351,
     "@margoengine/humans/crowd": 1516,
     "@margoengine/humans/fit": 32521,

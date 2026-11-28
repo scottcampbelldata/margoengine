@@ -3333,6 +3333,18 @@ influences with joint 0 and an idle joint must not choose them. Checked on the R
 double-precision twin, worst 8.8e-7 in position and 2.1e-7 in normal; the narrowest ring of a 170 degree twist stays at
 radius 1.000 where the linear path gives 0.087 (`npm run test:gpu:dqs -w @margoengine/animation`). Unmeasured: its frame cost.
 
+A third path, `@margoengine/animation/cor` (2026-11-28, `addPerson`'s default), skins about optimized centres of
+rotation (Le and Hodgins 2016): the rotation is the sign-aligned, normalized quaternion sum of the same dual quaternion
+slots, applied to the vertex less its centre (after the blended stretch), and the centre moves by the linear blend of
+the bones (each bone's slot rebuilt on the centre). The centres are a per-mesh CPU precompute in double precision (the
+paper's weight similarity, sigma 0.1, over triangles summed by weights to 1/16; vertex weights exact), carried as one
+more vec4 after each vertex's influences, so a mode with per-vertex data has its own influence blocks (the block key now
+names the mode: a share-packed or centre-carrying block is never read by another mode's shader). Checked on the RTX
+A6000 on WebGPU and on the WebGL2 layer: 49,920 values against Animation's CPU pose, worst 5.4e-7 and 4.8e-7; a 150
+degree twist keeps radius 1.000 where linear gives 0.259 (`npm run test:gpu:cor -w @margoengine/animation`). Evidence
+on a real asset: the Fauld old man's coat (frames in the rigging lane's `rigging-frames/g9`), whose side panel no
+longer balloons at a raised arm. Unmeasured: frame cost, and the precompute's load time in a browser.
+
 `SkinnedCrowd` (`@margoengine/animation/instanced-skin`) skins in the vertex stage from a baked rgba32float bone texture,
 drawing through `VATCrowd`'s pipeline code. Its proof runs the stage's own `skinned` function from a compute shader, since a
 vertex stage cannot write out. Checked on the RTX A6000 only. Unmeasured: its frame cost.

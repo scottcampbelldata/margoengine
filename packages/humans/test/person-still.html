@@ -10,6 +10,7 @@ import {install} from '/packages/materials/dist/index.js';
 import {skin} from '/packages/materials/dist/skin.js';
 import {Animation} from '/packages/animation/dist/index.js';
 import {dualQuaternionSkinning} from '/packages/animation/dist/dqs.js';
+import {centerOfRotationSkinning} from '/packages/animation/dist/cor.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
 import {addPerson} from '/packages/humans/dist/index.js';
 import {Sky} from '/packages/sky/dist/index.js';
@@ -90,7 +91,7 @@ window.check={
       const material=model.primitives[0].material;material.base.splice(0,4,0.4124,0.1925,0.1284,1);material.factors[0]=0.5;
       if(mode==='plain'){
         lit.add(model);
-        const a=Animation.attach(model,{skinning:dualQuaternionSkinning});a.play(0);a.seek(0.6);a.playing=false;
+        const a=Animation.attach(model,{skinning:centerOfRotationSkinning});a.play(0);a.seek(0.6);a.playing=false;
       }else{
         const p=await addPerson(engine,model,{materials:{skin:[material.name]},hands:false,shadows:false,...(mode==='off'?{sky:false}:{})});
         p.time=0.6;p.playing=false;
@@ -115,7 +116,7 @@ window.check={
     }else{
       install(model,{features:{[material]:[skin()]}});
       shadows.add(model);
-      const a=Animation.attach(model,{skinning:dualQuaternionSkinning});a.play(0);a.seek(0.6);a.playing=false;
+      const a=Animation.attach(model,{skinning:centerOfRotationSkinning});a.play(0);a.seek(0.6);a.playing=false;
     }
     for(let i=0;i<4;i++){engine.render({delta:1/30});await engine.gpu?.queue?.onSubmittedWorkDone?.();}
     const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));

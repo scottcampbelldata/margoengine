@@ -130,8 +130,13 @@ const arenas = new WeakMap<GPUDevice, DeformArena>();
 const roundUp = (value: number, align: number) => Math.ceil(value / align) * align;
 type BlockKind = 's' | 'm' | 'i';
 /** The key of a primitive's shared vertices (`s`), deltas (`m`) or influences (`i`) within its asset and `blockOwner`. */
+// Influences carry what a skinning mode adds (shares in the joint words, per-vertex data after them), so they are
+// shared only between slots of one mode.
 const blockKey = (spec: SlotSpec, kind: BlockKind) =>
-  kind + ':' + spec.count + ':' + (kind === 'i' ? (spec.skin ?? '') : '');
+  kind + ':' + spec.count + ':' + (kind === 'i' ? (spec.skin ?? '') + ':' + (spec.mode?.name ?? '') : '');
+/** Vec4 words of one slot's influences: joints and weights (twice with eight), then a mode's per-vertex data. */
+const influenceSize = (spec: SlotSpec) =>
+  spec.joints ? spec.count * ((spec.extra ? 4 : 2) + (spec.mode?.vertexData ? 1 : 0)) : 0;
 /**
  * What equal blocks have in common: bind-pose vertices are one packed array, the rest come from one definition, or for
  * a part of a split primitive from the vertices its `vertexMap` names (two parts of one definition differ).
@@ -355,7 +360,7 @@ export class DeformArena {
       spec.count,
       spec.count,
       spec.count * spec.targets,
-      spec.joints ? spec.count * (spec.extra ? 4 : 2) : 0,
+      influenceSize(spec),
       weightRegion(spec.targets),
       spec.joints,
     ];
@@ -452,7 +457,7 @@ export class DeformArena {
       weights: allocate(page.weights, weightRegion(spec.targets)),
       bones: bones ? (bones.refs!++, bones) : Object.assign(allocate(page.bones, spec.joints), { refs: 1 }),
       morphs: shared(page.morphs, 'm', spec.count * spec.targets, spec.deltas),
-      influences: shared(page.influences, 'i', spec.joints ? spec.count * (spec.extra ? 4 : 2) : 0, spec.influences),
+      influences: shared(page.influences, 'i', influenceSize(spec), spec.influences),
       index: -1,
     };
     page.slots.add(slot);

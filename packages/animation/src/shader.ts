@@ -89,7 +89,28 @@ export interface SkinningMode {
     position: ArrayLike<number>,
     normal: ArrayLike<number>,
     share: number,
+    data?: ArrayLike<number>,
   ): { position: ArrayLike<number>; normal: ArrayLike<number> };
+  /**
+   * Four numbers per vertex the mode's shader reads as `vertexData` (and `blend` as `data`), made once per skinned mesh
+   * from all of its primitives in the file's bind pose: one array of `4 * vertices` numbers per part, in order.
+   * `Animation` keeps them per mode, asset and mesh, so copies and clones of a model make them once.
+   */
+  vertexData?(parts: readonly SkinMeshPart[]): Float32Array[];
+}
+
+/** One primitive of a skinned mesh as the file has it, for {@link SkinningMode.vertexData}. */
+export interface SkinMeshPart {
+  /** Bind-pose positions, three numbers per vertex. */
+  readonly positions: ArrayLike<number>;
+  /** Triangle corners (three per triangle), or null for a primitive that draws no triangles. */
+  readonly triangles: ArrayLike<number> | null;
+  /** Joint indices into the skin's joints, `influences` per vertex. */
+  readonly joints: ArrayLike<number>;
+  /** Weights parallel to `joints`. */
+  readonly weights: ArrayLike<number>;
+  /** Influences per vertex: 4, or 8 with JOINTS_1. */
+  readonly influences: number;
 }
 
 /** Text a skinning mode puts into the batched shader: module-scope `functions`, and the `blend` that moves `v`. */
@@ -120,11 +141,13 @@ const linearBlend = (extra: boolean) =>
  * named by the work list (`work[0].x` workgroups, then a slot index and first vertex per workgroup); each slot record
  * gives where its vertices, deltas, weights, bones and influences start in the shared buffers. The per-vertex
  * arithmetic is the per-primitive shader's, term for term, so the output is the same bits. `extra`: eight influences.
- * `skin` replaces that arithmetic for a skinning mode.
+ * `skin` replaces that arithmetic for a skinning mode. `data`: each vertex's influences end with one more vec4, the
+ * mode's `vertexData`, which the blend reads as `vertexData`.
  */
 export function batchedDeformationShader(
   extra: boolean,
   skin: SkinningShader = { functions: '', blend: linearBlend(extra) },
+  data = false,
 ): string {
   return /* wgsl */ `
 struct Vertex {position:vec4f,normal:vec4f,tangent:vec4f,uv:vec4f,color:vec4f}
@@ -150,9 +173,9 @@ ${skin.functions}
     v.position+=vec4f(m.position.xyz*w,0);v.normal+=vec4f(m.normal.xyz*w,0);v.tangent+=vec4f(m.tangent.xyz*w,0);
   }
   if(s.joints>0u) {
-    let at=s.influences+i*${extra ? 4 : 2}u;let joints=influences[at];let jointWeights=bitcast<vec4f>(influences[at+1u]);${
+    let at=s.influences+i*${(extra ? 4 : 2) + (data ? 1 : 0)}u;let joints=influences[at];let jointWeights=bitcast<vec4f>(influences[at+1u]);${
       extra ? 'let jointsExtra=influences[at+2u];let weightsExtra=bitcast<vec4f>(influences[at+3u]);' : ''
-    }
+    }${data ? `let vertexData=bitcast<vec4f>(influences[at+${extra ? 4 : 2}u]);` : ''}
     ${skin.blend}
   }
   v.normal=vec4f(normalize(v.normal.xyz),0);output[s.output+i]=v;

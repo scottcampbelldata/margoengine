@@ -9,7 +9,8 @@ import type { SkinningMode } from './shader.js';
  * of `palette` (16 floats per bone) by `influences`: `words` per vertex, four joint indices then four float weights,
  * twice for eight influences. Everything but position and normal is copied from `bind`. With a skinning `mode`, its
  * `blend` moves each vertex instead, with `palette` encoded for it; a mode with `share` reads each vertex's share from
- * the upper 16 bits of its first joint index, as the mode's shader does.
+ * the upper 16 bits of its first joint index, as the mode's shader does; a mode with `vertexData` reads the last four
+ * of each vertex's `words` as its data.
  */
 export function poseVertices(
   bind: Float32Array,
@@ -28,6 +29,8 @@ export function poseVertices(
     count = bind.length / 20,
     targets = count ? deltas.length / (count * 12) : 0,
     shares = new Float32Array(influences.buffer, influences.byteOffset, influences.length),
+    dataWords = mode?.vertexData ? 4 : 0,
+    joined = words - dataWords,
     m = new Float64Array(16);
   out.set(bind);
   for (let i = 0, o = 0; i < count; i++, o += 20) {
@@ -49,7 +52,7 @@ export function poseVertices(
     }
     if (influences.length && blend) {
       ids.length = amounts.length = 0;
-      for (let k = i * words, end = k + words; k < end; k += 8)
+      for (let k = i * words, end = k + joined; k < end; k += 8)
         for (let c = 0; c < 4; c++) {
           ids.push(influences[k + c]);
           amounts.push(shares[k + 4 + c]);
@@ -59,7 +62,8 @@ export function poseVertices(
         share = (ids[0] >>> 16) / 65535;
         ids[0] &= 0xffff;
       }
-      const moved = blend(palette, ids, amounts, [x, y, z], [nx, ny, nz], share);
+      const data = dataWords ? shares.subarray(i * words + joined, i * words + words) : undefined,
+        moved = blend(palette, ids, amounts, [x, y, z], [nx, ny, nz], share, data);
       x = moved.position[0];
       y = moved.position[1];
       z = moved.position[2];
@@ -68,7 +72,7 @@ export function poseVertices(
       nz = moved.normal[2];
     } else if (influences.length) {
       m.fill(0);
-      for (let k = i * words, end = k + words; k < end; k += 8)
+      for (let k = i * words, end = k + joined; k < end; k += 8)
         for (let c = 0; c < 4; c++) {
           const w = shares[k + 4 + c],
             at = influences[k + c] * 16;

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Skin sheet</title><style>body{margin:0;background:#000}canvas{display:block}</style></head>
+<body><canvas></canvas>
+<script type="module">
+  // The skin sheet: how a person's skin and clothes deform, judged by eye. A person through addPerson in the poses that
+  // load the skin hardest (arms raised to the side and overhead, reach forward overhead, seated, elbows and knees at full
+  // flexion, forearms turned), each from the front, the three-quarter and the side, close enough to see the cloth.
+  // window.renderSheet({model, skinning}) returns the sheet as base64 PNG and, per row, every joint's skin matrix (the
+  // joint's world matrix times its inverse bind), so the same pose can be skinned on the CPU.
+  import { Engine } from '/packages/core/dist/index.js';
+  import { loadGLTF } from '/packages/gltf/dist/pbr.js';
+  import { addPerson } from '/packages/humans/dist/index.js';
+  import { clampPose, poseFromAngles } from '/packages/rigging/dist/anatomy.js';
+  import { couplePose } from '/packages/rigging/dist/coupling.js';
+  import { isCompatDevice } from '/packages/webgl2-compat/dist/device.js';
+
+  const CELL_W = 360, CELL_H = 520, FOV = 30;
+  const VIEWS = [['front', 0], ['three-quarter', 45], ['side', 90]];
+  const canvas = document.querySelector('canvas');
+  canvas.width = CELL_W; canvas.height = CELL_H;
+  canvas.style.width = `${CELL_W}px`; canvas.style.height = `${CELL_H}px`;
+
+  window.renderSheet = async ({ model, skinning, rows: only = null }) => {
+    const engine = await Engine.create(canvas, { camera: { position: [0, 1, 4], target: [0, 1, 0], fov: FOV, near: 0.05, far: 200 } });
+    engine.stop();
+    const errors = [];
+    engine.gpu?.addEventListener?.('uncapturederror', (e) => errors.push(e.error.message));
+    engine.scene.background = '#2a2e35';
+    engine.lighting.direction.set([0.4, 0.7, 0.6, 3]);
+    engine.lighting.radiance.set([1, 0.96, 0.9, 0.55]);
+    const person = await addPerson(engine, await loadGLTF(engine, model), { hair: false, cards: false, ...(skinning ? { skinning } : {}) });
+    person.playing = false;
+    const body = person.body, nodes = person.model.nodes, tr = engine.store.transforms,
+      { forward, left } = body.frame, h = body.stature;
+    let held = null;
+    const write = (p) => nodes.forEach((node, i) => {
+      const o = i * 10;
+      tr.x[node.id] = p[o]; tr.y[node.id] = p[o + 1]; tr.z[node.id] = p[o + 2];
+      tr.qx[node.id] = p[o + 3]; tr.qy[node.id] = p[o + 4]; tr.qz[node.id] = p[o + 5]; tr.qw[node.id] = p[o + 6];
+    });
+    engine.use({ name: 'skin-sheet', setup() {}, onPreUpdate() { if (held) write(held); } });
+    const hold = (pose) => { couplePose(body, pose); if (body.limits) clampPose(body, pose); held = pose; write(pose); };
+    const angles = (a) => () => hold(poseFromAngles(body, a, body.neutral));
+    const rows = [
+      ['rest pose as modelled', () => hold(body.rest.slice())],
+      ['anatomical neutral', () => hold(body.neutral.slice())],
+      ['arms raised: left 90 to the side, right 170 overhead', angles({ l_shoulder: { abduction: 90 }, r_shoulder: { abduction: 170 } })],
+      ['arms raised forward overhead (flexion 170, both)', angles({ l_shoulder: { flexion: 170 }, r_shoulder: { flexion: 170 } })],
+      ['seated (hips and knees 90)', angles({ l_hip: { flexion: 90 }, r_hip: { flexion: 90 }, l_knee: { flexion: 90 }, r_knee: { flexion: 90 }, l_elbow: { flexion: 60 }, r_elbow: { flexion: 60 } })],
+      ['elbows and knees at full flexion', () => {
+        const a = { l_hip: { flexion: 90 }, r_hip: { flexion: 90 } };
+        for (const id of ['l_elbow', 'r_elbow', 'l_knee', 'r_knee']) { const j = body.joints.find((x) => x.id === id); if (j) a[id] = { flexion: j.structural[1] }; }
+        hold(poseFromAngles(body, a, body.neutral));
+      }],
+      ['walk stride (hip 30 forward, other 15 back, knee 40)', angles({ l_hip: { flexion: 30 }, r_hip: { flexion: -15 }, r_knee: { flexion: 40 }, l_knee: { flexion: 10 }, l_shoulder: { flexion: -20 }, r_shoulder: { flexion: 25 }, r_elbow: { flexion: 30 } })],
+      ['forearms turned: left pronated 80, right supinated 80, elbows 90', angles({ l_elbow: { flexion: 90 }, r_elbow: { flexion: 90 }, l_radiocarpal: { rotation: 80 }, r_radiocarpal: { rotation: -80 } })],
+    ].filter(([name]) => !only || new RegExp(only, 'i').test(name));
+    const out = new OffscreenCanvas(CELL_W * VIEWS.length, CELL_H * rows.length), sheet = out.getContext('2d');
+    sheet.fillStyle = '#16181c'; sheet.fillRect(0, 0, out.width, out.height);
+    const poses = [];
+    for (const [row, [name, make]] of rows.entries()) {
+      make();
+      engine.store.tick(false);
+      // Every joint's world matrix this row, for CPU skinning of the same pose.
+      poses.push({ row: name, worlds: Object.fromEntries(nodes.map((n) => [n.name, Array.from(n.matrix)])) });
+      let low = Infinity, high = -Infinity, mid = [0, 0, 0];
+      const points = nodes.map((n) => Array.from(n.matrix.subarray(12, 15)));
+      for (const p of points) { low = Math.min(low, p[1]); high = Math.max(high, p[1]); mid = mid.map((v, k) => v + p[k] / points.length); }
+      const span = high - low + h * 0.1, centre = [mid[0], low + span / 2 - h * 0.03, mid[2]],
+        dist = (span * 1.05) / (2 * Math.tan(FOV * Math.PI / 360));
+      for (const [c, [viewName, deg]] of VIEWS.entries()) {
+        const a = deg * Math.PI / 180, dir = [0, 1, 2].map((i) => forward[i] * Math.cos(a) + left[i] * Math.sin(a));
+        engine.camera.position = [0, 1, 2].map((i) => centre[i] + dir[i] * dist);
+        engine.camera.target = centre;
+        engine.render({ delta: 0 });
+        if (isCompatDevice(engine.gpu)) await engine.gpu.queue.onSubmittedWorkDone();
+        sheet.drawImage(canvas, c * CELL_W, row * CELL_H);
+        sheet.fillStyle = '#e8e8e8'; sheet.font = '13px sans-serif';
+        sheet.fillText(`${name}, ${viewName}`, c * CELL_W + 6, row * CELL_H + 16);
+      }
+    }
+    person.dispose(); person.model.dispose(); engine.dispose();
+    const blob = await out.convertToBlob({ type: 'image/png' }), bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return { png: btoa(binary), poses, errors };
+  };
+  window.ready = true;
+</script>
+</body>
+</html>

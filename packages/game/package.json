@@ -71,6 +71,10 @@
       "types": "./dist/animation/dqs.d.ts",
       "import": "./dist/animation/dqs.js"
     },
+    "./animation/cor": {
+      "types": "./dist/animation/cor.d.ts",
+      "import": "./dist/animation/cor.js"
+    },
     "./animation/instanced-skin": {
       "types": "./dist/animation/instanced-skin.d.ts",
       "import": "./dist/animation/instanced-skin.js"
