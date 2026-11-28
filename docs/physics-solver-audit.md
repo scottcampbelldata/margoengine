@@ -2886,7 +2886,7 @@ Independent terminal accuracy, steep contact lines, free pinch-off, impact splas
 6. Return spray moisture and cooling to the air, and add a threaded or large-N scaling work count (one 66-line kernel, no recorded scaling).
 7. Add the spume source (Andreas 1998) for the EF-12 film and a rival comparison note in `docs/limits.md`.
 
-### BREAK-03 Ductile crushing: hulls, car bodies, rail cars (`physics/crush`, commits 25759ed00 9ef07dff9 28668a645 b7472cd5b da07f5d54 f1e1145da dc0dfa8ef a0325f916 116d3054e 408e506ac 64367a884 168006e3c 1b1a25c61 0fc03c638 24e67d6ff e5a8d911a f39137bee 6fbbf8e86 fa058693d dd6d4b7f2 f82be85af 8300fcbe0 3701ff631 ecd6f501f cf8fb2938), owner Codex: not VERIFIED, status left BUILDING
+### BREAK-03 Ductile crushing: hulls, car bodies, rail cars (`physics/crush`, commits 25759ed00 9ef07dff9 28668a645 b7472cd5b da07f5d54 f1e1145da dc0dfa8ef a0325f916 116d3054e 408e506ac 64367a884 168006e3c 1b1a25c61 0fc03c638 24e67d6ff e5a8d911a f39137bee 6fbbf8e86 fa058693d dd6d4b7f2 f82be85af 8300fcbe0 3701ff631 ecd6f501f cf8fb2938), owner Codex: REOPENED
 
 **Checked.** Read `packages/physics/src/crush/{index,shell,material,girder,indentation,ground,envelope}.ts`, the crush tests, the README crush section, the catalog row, the audit row and the KB-PHYS-AUDIT1 bullets. Ran under run-with-timeout: `node --test` on `tests/crush*.test.js` and `tests/coupling/crush*.test.js`: 82 tests, 82 pass on packages built from current main (a first run on an older build failed three shell friction tests for want of `readSphereFriction`, added in 9ef07dff9). `crush-plate.browser.mjs` passes on WebGPU and with `--compat` (WebGL2), 0 shader errors.
 
@@ -2925,6 +2925,15 @@ Independent terminal accuracy, steep contact lines, free pinch-off, impact splas
 4. Add a coupling test to SEA-08 where contact energy deforms the hull (catalog edge), plus fluid pressure on the shell.
 5. Record work counts for the shell kernel scaling, and add film direction inputs for seeded placed breakups.
 6. Update `docs/limits.md`, which has no BREAK-03 limits entry, and the README sensor advice.
+
+#### BREAK-03 four-point pass
+
+- Point 5 and audit items 2 and 6 (dcdd72fd18). `packages/physics/tests/coupling/crush.test.js` holds the previous accepted damage and reaction when a rigid input is rejected. `packages/physics/tests/coupling/crush-shell.test.js` checks failure without partial publication and single-world attachment. `packages/physics/tests/coupling/crush-contact-inertia.test.js` and `packages/physics/tests/flooding.test.js` keep stored water and its contact inertia under zero prescribed gravity. The README shows supported contact with an explicit collision filter for the crush pair.
+- Point 6 and audit item 5 work counts (dcdd72fd18). `packages/physics/tests/coupling/crush-shell-workers.test.js` compares plain and shared one, two and four participants on two odd-sized meshes, including signed-cell rewind and registered pressure. The 211-face case matches the previous scalar Wasm byte for byte and counts 38,430 SIMD face evaluations. `packages/physics/tests/crush-shell-workers.browser.mjs` observes three real Chromium helpers and worker cleanup.
+- Point 7 (dcdd72fd18). `packages/physics/tests/crush-plate.browser.mjs` renders a civilian dock fender under contact from a moving carriage. The fender retains 2.24 mm of deflection and the carriage rebounds at 0.7379 m/s. A parked control stays flat. Each renderer verifies exact accepted snapshots and complete resolved images on hold, replay and rewind. The original EF-11 shot remains open.
+- Point 8 and audit item 8 comparison and item 6 limits (dcdd72fd18). `packages/physics/scripts/break03-steel-tube-measured.mjs` compares six independent ASTM A500 axial compression tests without fitting to their results. Predicted mean force is 13.09–27.01% low and work is 13.87–26.59% low. [Evidence and limits](limits.md#civilian-shell-contact-and-independent-tube-compression-break-03)
+
+The published evidence leaves the full ship grounding, general shell contact, automatic tearing, wider vehicle validation and original production integration open. The row remains REOPENED at four points.
 
 ## Pass 4, 2026-11-26 (`main` at 2d5d7fa8c)
 
