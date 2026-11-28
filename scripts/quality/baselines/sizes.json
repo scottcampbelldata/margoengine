@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21517816,
+  "total": 21520787,
   "history": [
     {
       "date": "2026-10-24",
@@ -15187,6 +15187,12 @@
       "commit": "lane-a-gltfa-api",
       "reason": "lane A 2026-11-27, KB-GLTFA A1 A4 A5 A6 A8: both glTF loaders name the node in a bad translation, rotation, scale or sheared matrix, tell a cycle from the 62-level limit, and say how to load a blob: file; the light Model gets Symbol.dispose. Measured gzip with and without the change: gltf 7,365 to 7,616, gltf/pbr 90,929 to 91,158, gltf/soft-mesh 73,101 to 73,289, gltf/auto 18,423 to 18,675; only soft-mesh passes its ceiling, 73133 to 75488. The bytes are the messages and one TRS check per loader; the messages are the fix, so shorter ones or a lazy split would undo it.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "HEAD",
+      "reason": "Four environment EXR ceilings follow KB-EXR-INTEROPID1: the readers take colorInteropID and the ACES container flag (exr-tiled 8,106 to 8,823 B, load 10,860 to 11,576, loaders 11,130 to 11,843, exr-codecs worker 2,557 to 3,314). A correctness fix on the decode path; a lazy split would add a request to every EXR load.",
+      "grew": 4
     }
   ],
   "items": {
@@ -15525,20 +15531,20 @@
     "@margoengine/ecs/scripts": 3150,
     "@margoengine/ecs/serialize": 4260,
     "@margoengine/environment": 32397,
-    "@margoengine/environment dist/workers/exr-codecs.js": 2813,
+    "@margoengine/environment dist/workers/exr-codecs.js": 3570,
     "@margoengine/environment/blend": 4861,
     "@margoengine/environment/cube-camera": 6143,
     "@margoengine/environment/density-volume": 3819,
     "@margoengine/environment/encoded-hdr": 3409,
     "@margoengine/environment/exr-codecs": 1699,
-    "@margoengine/environment/exr-tiled": 8357,
+    "@margoengine/environment/exr-tiled": 9088,
     "@margoengine/environment/exr-write": 2904,
     "@margoengine/environment/fog-volumes": 2499,
     "@margoengine/environment/gi": 19000,
     "@margoengine/environment/ground": 5064,
     "@margoengine/environment/lightformer": 3402,
-    "@margoengine/environment/load": 11181,
-    "@margoengine/environment/loaders": 11459,
+    "@margoengine/environment/load": 11924,
+    "@margoengine/environment/loaders": 12199,
     "@margoengine/environment/main": 32225,
     "@margoengine/environment/prefiltered": 4219,
     "@margoengine/environment/probes": 18857,

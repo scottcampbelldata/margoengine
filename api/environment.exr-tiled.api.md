@@ -49,6 +49,7 @@ interface EXRImage extends FloatImage {
     dataWindow: [number, number, number, number];
     displayWindow: [number, number, number, number];
     primaries: number[] | null;
+    colorInteropID: string | null;
     primariesConverted: boolean;
 }
 

@@ -16,6 +16,7 @@ export interface CodecEXRImage extends FloatImage {
     };
     channelNames: string[];
     primaries: number[] | null;
+    colorInteropID: string | null;
     primariesConverted: boolean;
 }
 

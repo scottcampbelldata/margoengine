@@ -29,11 +29,15 @@ export interface EXRWriteImage {
   height: number;
   /** 1 to 64 channels, written in name order as OpenEXR requires. */
   channels: readonly EXRWriteChannel[];
-  /** Optional `colorInteropID` header string (1 to 255 printable ASCII characters), stored as given. */
+  /**
+   * Optional `colorInteropID` header string (1 to 255 printable ASCII characters), stored as given. Name the space of
+   * the data, such as `lin_ap1_scene`: the readers convert a known one and prefer it to `chromaticities`.
+   */
   colorInteropID?: string;
   /**
    * Optional `chromaticities` header attribute: red, green, blue and white CIE xy, eight finite numbers, stored as
-   * float32. Leave it out for linear sRGB / Rec.709 data (the OpenEXR default); `parseEXR` converts other primaries.
+   * float32. Leave it out for linear sRGB / Rec.709 data (the OpenEXR default); `parseEXR` converts other primaries
+   * when `colorInteropID` names no known space.
    */
   chromaticities?: readonly number[];
 }

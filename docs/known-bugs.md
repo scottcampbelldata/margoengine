@@ -81,18 +81,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/scatter/test/velocity-tiles.browser.mjs` (WebGPU and `--compat`; fails with the destroyed-buffer error
   without the fix).
 
-### Open 2026-11-27: an EXR whose colorInteropID names other primaries decodes as Rec.709 (KB-EXR-INTEROPID1, environment)
+### Fixed 2026-11-27: an EXR whose colorInteropID names other primaries decoded as Rec.709 (KB-EXR-INTEROPID1, environment)
 
 - **Repro:** `encodeEXR` of one pixel (1, 0, 0) with `colorInteropID: 'lin_ap1_scene'` (linear ACEScg) and no
-  `chromaticities`, then `parseEXR`: the pixel stays (1, 0, 0), `primaries` is null and `primariesConverted` false;
-  linear sRGB is about (1.705, -0.130, -0.024).
-- **Cause:** no reader in `packages/environment` reads the attribute; `encodeEXR` writes it as given. OpenEXR 3.4 added
-  it and says it supersedes `chromaticities` for most purposes ("Technical Introduction",
-  https://openexr.com/en/latest/TechnicalIntroduction.html). The IDs are in the ASWF Color Interop Forum's "Color Space
-  Encodings for Texture Assets and CG Rendering",
+  `chromaticities`, then `parseEXR`: the pixel stayed (1, 0, 0), `primariesConverted` false; linear sRGB is about
+  (1.705, -0.130, -0.024).
+- **Cause:** no reader in `packages/environment` read the attribute. OpenEXR 3.4 added it and says it supersedes
+  `chromaticities` for most purposes ("Technical Introduction", https://openexr.com/en/latest/TechnicalIntroduction.html).
+- **Fix:** all three readers follow the ASWF Color Interop Forum's reading order
+  (https://github.com/AcademySoftwareFoundation/ColorInterop/blob/main/Recommendations/04_OpenEXRFiles/OpenEXRFiles.md):
+  ACES container flag, `data`, a known ID, then `chromaticities` as the fallback, so a known ID wins when both are
+  present. IDs, primaries and transfer functions are those of "Color Space Encodings for Texture Assets and CG
+  Rendering",
   https://github.com/AcademySoftwareFoundation/ColorInterop/blob/main/Recommendations/01_TextureAssetColorSpaces/TextureAssetColorSpaces.md
-- **Next:** map the linear IDs to their primaries in `exr-primaries.ts` for all three readers, with the precedence over
-  `chromaticities` that the recommendation gives.
+  Regression: `packages/environment/tests/exr-interop-id.test.js`.
 
 ### Fixed 2026-11-27: comments and a README still named a one million vertex limit that core and gltf/pbr no longer have (KB-VERTCAP-TEXT1; voxel-edit, loaders, mesh-edit)
 

@@ -990,11 +990,22 @@ const bytes = await (await fetch('/studio.exr')).arrayBuffer();
 const {width, height, data} = parseEXR(bytes); // data: Float32Array RGBA, row 0 at the top
 ```
 
-An EXR whose `chromaticities` attribute names other primaries, such as ACEScg (AP1), decodes to linear sRGB / Rec.709
-(D65) with the RP 177 matrix and a Bradford white adaptation, as `parseHDR` does for Radiance `PRIMARIES`, in all three
-readers (`parseEXR`, `parseTiledEXR` and `decodeEXR`). `image.primaries` reports the attribute (null when absent) and
+An EXR that names another colour space decodes to linear sRGB / Rec.709 (D65) in all three readers (`parseEXR`,
+`parseTiledEXR` and `decodeEXR`). They follow the Color Interop Forum's [reading order](https://github.com/AcademySoftwareFoundation/ColorInterop/blob/main/Recommendations/04_OpenEXRFiles/OpenEXRFiles.md):
+
+1. `acesImageContainerFlag` 1 means ACES2065-1.
+2. `colorInteropID` `data` is never converted.
+3. A [Color Interop ID](https://github.com/AcademySoftwareFoundation/ColorInterop/blob/main/Recommendations/01_TextureAssetColorSpaces/TextureAssetColorSpaces.md)
+   names the space: `lin_ap1_scene` (ACEScg), `lin_ap0_scene`, `lin_rec709_scene`, `lin_p3d65_scene`,
+   `lin_rec2020_scene`, `lin_adobergb_scene`, `lin_ciexyzd65_scene`, and the encoded `srgb_rec709_scene`,
+   `g24_rec709_scene`, `g22_rec709_scene`, `g18_rec709_scene`, `srgb_ap1_scene`, `g22_ap1_scene`, `srgb_p3d65_scene` and
+   `g22_adobergb_scene` (decoded to linear first). One namespace prefix (`studio:lin_ap1_scene`) is dropped if needed.
+4. Otherwise (no ID, `unknown` or one not listed) other `chromaticities` are converted.
+
+Primaries use the RP 177 matrix and a Bradford white adaptation, as `parseHDR` does for Radiance `PRIMARIES`.
+`image.colorInteropID` and `image.primaries` (the `chromaticities`) report the attributes, null when absent, and
 `image.primariesConverted` whether the RGB changed; luminance-only files are left as they are. `encodeEXR` writes the
-attribute when you pass `chromaticities`:
+attributes when you pass them:
 
 ```ts
 import {parseEXR} from 'margoengine/environment';
@@ -1004,6 +1015,9 @@ const ap1 = await encodeEXR({width: 1, height: 1, chromaticities: [0.713, 0.293,
   channels: [{name: 'B', type: 'FLOAT', data: zero}, {name: 'G', type: 'FLOAT', data: zero}, {name: 'R', type: 'FLOAT', data: red}]});
 const image = parseEXR(ap1);
 console.log(image.primariesConverted, Array.from(image.data.subarray(0, 3), (v) => v.toFixed(3))); // true ['1.705', '-0.130', '-0.024']
+const named = parseEXR(await encodeEXR({width: 1, height: 1, colorInteropID: 'lin_ap1_scene',
+  channels: [{name: 'B', type: 'FLOAT', data: zero}, {name: 'G', type: 'FLOAT', data: zero}, {name: 'R', type: 'FLOAT', data: red}]}));
+console.log(named.colorInteropID, named.primariesConverted); // lin_ap1_scene true
 ```
 
 ### Reading tiled and mipmapped EXR
@@ -1195,7 +1209,7 @@ console.log(typeof loadEnvironmentImage); // 'function'; a .hdr file requests th
 
 ## Limits
 
-WebGPU only: `EnvironmentBackground.setup` throws on the WebGL2 backend and `Environment.create` needs a device. EXR tiled images (in the main entry; `/exr-tiled` reads them), multi-part, deep and subsampled (chroma) images and PXR24, B44, B44A, DWAA, DWAB and HTJ2K compression are rejected with an error, as are Radiance `xyze` files and, unless `parseHDR` is given `orientation: 'all'`, mirrored or transposed orientations. Huffman codes longer than 44 bits are rejected (OpenEXR writers do not produce them for normal images). `EXPOSURE`, `GAMMA` and `COLORCORR` headers are reported (`image.exposure`, `image.gamma`, `image.colorCorrection`), not applied. A Radiance `PRIMARIES` line other than sRGB / Rec.709 or the Radiance standard primaries is converted to linear sRGB (D65) with the RP 177 RGB to XYZ matrix and a Bradford white adaptation; `diagnostics.primaries` and `diagnostics.primariesConverted` report it, and colours outside sRGB keep negative components (lighting reads them as 0). OpenEXR `chromaticities` are converted the same way (`image.primaries`, `image.primariesConverted`). Equirects larger than the device's texture limit are box-downsampled on the CPU. The diffuse term is L2 SH (no ringing suppression). `iblShade` adds back the energy single-scattering GGX loses between microfacets (Fdez-Aguera, "A Multiple-Scattering Microfacet Model for Real-Time Image Based Lighting", JCGT 8(1), 2019, https://jcgt.org/published/0008/01/03/); `iblPrefiltered` and `iblBrdfTerms` on their own are single scattering. Source and specular sizes must be powers of two.
+WebGPU only: `EnvironmentBackground.setup` throws on the WebGL2 backend and `Environment.create` needs a device. EXR tiled images (in the main entry; `/exr-tiled` reads them), multi-part, deep and subsampled (chroma) images and PXR24, B44, B44A, DWAA, DWAB and HTJ2K compression are rejected with an error, as are Radiance `xyze` files and, unless `parseHDR` is given `orientation: 'all'`, mirrored or transposed orientations. Huffman codes longer than 44 bits are rejected (OpenEXR writers do not produce them for normal images). `EXPOSURE`, `GAMMA` and `COLORCORR` headers are reported (`image.exposure`, `image.gamma`, `image.colorCorrection`), not applied. A Radiance `PRIMARIES` line other than sRGB / Rec.709 or the Radiance standard primaries is converted to linear sRGB (D65) with the RP 177 RGB to XYZ matrix and a Bradford white adaptation; `diagnostics.primaries` and `diagnostics.primariesConverted` report it, and colours outside sRGB keep negative components (lighting reads them as 0). OpenEXR files are converted the same way from `acesImageContainerFlag`, else a listed Color Interop `colorInteropID` (its transfer function undone first), else `chromaticities` (`image.colorInteropID`, `image.primaries`, `image.primariesConverted`). `data` and luminance-only files are not converted; OpenColorIO config names, `<config>:local:` IDs and the `_display` IDs are not resolved and fall back to `chromaticities`. Equirects larger than the device's texture limit are box-downsampled on the CPU. The diffuse term is L2 SH (no ringing suppression). `iblShade` adds back the energy single-scattering GGX loses between microfacets (Fdez-Aguera, "A Multiple-Scattering Microfacet Model for Real-Time Image Based Lighting", JCGT 8(1), 2019, https://jcgt.org/published/0008/01/03/); `iblPrefiltered` and `iblBrdfTerms` on their own are single scattering. Source and specular sizes must be powers of two.
 
 Two portability measures are deliberate: the specular prefilter samples the cube in a fragment pass (cube sampling with explicit LOD in compute shaders returned wrong seam texels on SwiftShader), and the WGSL avoids `atan2(-0.0, x)` (SwiftShader returns PI).
 
