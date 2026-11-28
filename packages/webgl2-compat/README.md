@@ -323,6 +323,33 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   page's owner. Source bytes are still stored once. The corpus regression test checks
   this across a write/read/add cycle.
 
+### Stencil views, snorm storage, bitmap copies and canvas output
+
+- **Stencil aspects.** A texture view with `aspect: 'stencil-only'`, or a stencil format such as `stencil8`, is sampled
+  as a `texture_2d<u32>` through `WEBGL_stencil_texturing`. Where the browser's WebGL2 lacks that extension, binding one
+  for sampling throws a `MargoError` with code `unsupported` naming it, at the draw, instead of reading zeros. GL keeps
+  the sampled aspect on the texture object, so each draw sets it for what it samples and a later draw reading the same
+  texture's depth gets depth back. A pass may also sample the depth texture it has attached read-only, as WebGPU
+  allows: the draw reads a copy that follows the attachment, since GL would refuse the feedback loop.
+- **Signed normalized storage.** Snorm storage textures (such as `rgba8snorm`) work in compute
+  (`margoengine/webgl2-compat/compute`). WebGL2 cannot render into snorm formats, so a kernel's stores are kept as
+  values and only the runs of texels it wrote are uploaded, as bytes `round(clamp(v, -1, 1) * 127)`, into the view's
+  mip level and array layer: an untouched `-128` byte stays `-128` (re-encoding it would give `-127`).
+  `npm run test:gpu:snorm --workspace @margoengine/webgl2-compat` is its GPU check.
+- **ImageBitmap copies.** `copyExternalImageToTexture` from an `ImageBitmap` honours `origin` (the crop), `flipY` and the
+  requested `premultipliedAlpha`, whether the bitmap holds straight or premultiplied colour (WebGL itself ignores the
+  flip and alpha flags for a bitmap), and an sRGB destination is encoded as on WebGPU. Each copy costs one temporary 2D
+  canvas the size of the copied region, two scratch RGBA8 textures and one draw over the destination region. A
+  destination format the layer cannot draw into throws `unsupported`.
+- **Canvas output across devices.** A canvas configured first by an XR device (a page-backed WebGL context) and later
+  by an ordinary one (an `OffscreenCanvas`), or the other way round, keeps showing frames: the canvas's output context
+  (`bitmaprenderer`, or `2d` where the source cannot transfer a bitmap) is chosen once by the first device and every
+  later source is copied into it. A canvas that already holds another kind of context reports a validation error and
+  shows nothing new.
+- **Firefox.** `test/firefox-matrix.mjs` runs the same correctness drivers through a shipped Firefox's WebDriver BiDi
+  endpoint; the binary comes from `BROWSER_EXECUTABLE` (no path or profile is committed), and the native WebGPU oracle
+  each case is compared with runs in Chromium, which never receives that override.
+
 ### Lower device tiers (`margoengine/webgl2-compat/tiers`)
 
 The optional `installTiers()` permits half-float and LDR devices while retaining the
