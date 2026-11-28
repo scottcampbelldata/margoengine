@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'groundwater',
+    title: '@margoengine/physics/groundwater unconfined aquifer, springs and seepage',
+    kind: 'family',
+    messages: [],
+    cause: 'Aquifer data, a recharge or terrain bank, a time step or an outlet rate exceeds the usable range.',
+    fix: 'Use finite SI quantities and a grid matching its associated fields. Publish aligned arrays in their owning memory, in the aquifer origin cell. Reduce time scaling, forcing or conductivity contrast if the trial exceeds numeric range. Use one native participant or a shared-memory world with two or four.',
+  },
+  {
     id: 'falling',
     title: '@margoengine/physics/falling plates, winged seeds and swept grains',
     kind: 'family',

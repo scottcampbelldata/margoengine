@@ -15806,8 +15806,8 @@
         "gzip": 8989
       },
       "./groundwater": {
-        "raw": 15172,
-        "gzip": 6235
+        "raw": 24073,
+        "gzip": 9253
       },
       "./hydraulics": {
         "raw": 18870,
@@ -19525,14 +19525,14 @@
       "brotli": 5278
     },
     "packages/physics/dist/groundwater-kernel.wasm": {
-      "raw": 11142,
-      "gzip": 3356,
-      "brotli": 3012
+      "raw": 13306,
+      "gzip": 4443,
+      "brotli": 3980
     },
     "packages/physics/dist/groundwater-kernel-shared.wasm": {
-      "raw": 11142,
-      "gzip": 3356,
-      "brotli": 3012
+      "raw": 13306,
+      "gzip": 4443,
+      "brotli": 3987
     },
     "packages/physics/dist/pbf-kernel.wasm": {
       "raw": 18143,

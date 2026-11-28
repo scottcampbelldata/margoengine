@@ -16769,7 +16769,18 @@ both grid edges are zero. Skipping that suffix leaves the low-hill stress unchan
 The aquifer keeps water thickness relative to its bottom, so small inputs survive large coordinate elevations.
 Tests reconstruct the fixed-head solution, a two-cell material contact, a draining spring, and the water-volume
 exchange with the existing runoff and shallow-water solvers. The implementation uses the papers and the repository's
-field contracts.
+field contracts. Native participants assemble only disjoint face weights, initial storage and spring-activity
+rows. The conjugate-gradient order, unilateral drain updates and equal-and-opposite face-volume recovery stay
+fixed in the caller. Adrien Guérin, Olivier Devauchelle and Éric Lajeunesse, [Response of a laboratory aquifer
+to rainfall](https://doi.org/10.1017/jfm.2014.590), 2014, measure conductivity with a Darcy column and packing
+porosity by mass. Their separate rainfall and discharge records let the diagnostic hold out the outlet samples
+of the 1 mm and 4 mm glass-bead tanks. The 1 mm run uses the paper's absolute clock. The 4 mm panels use
+elapsed time from outlet onset, so they test the rise shape and do not establish rain-to-outlet travel time.
+The solver uses imposed recharge directly, with initial drainable storage set to zero. The groundwater
+and surface-water transect in Thomas C. Winter, Judson W. Harvey, O. Lehn Franke and William M. Alley,
+[Ground water and surface water: A single resource](https://doi.org/10.3133/cir1139), 1998, informed the
+authored cutaway. The cutaway uses the Harbaugh drain law for the accepted transfer and has its own
+idealized terrain and time scale.
 
 ### Confined Darcy flow and Hele-Shaw cells (HYDRO-06 groundwater entry, for HYDRO-07)
 

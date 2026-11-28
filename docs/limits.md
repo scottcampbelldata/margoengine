@@ -10116,8 +10116,19 @@ Specify a physical groundwater time scale appropriate to the rate at which the s
 Detailed unsaturated pressure and moisture profiles, multiple aquifer layers and surface-water backflow through
 spring openings are outside this model. HYDRO-02 calculates recharge through the active soil.
 
-The optional JavaScript entry measures 6,235 B min+gzip with the confined solve. Both Wasm variants are 11,142 B
-before HTTP compression.
+In the 1 mm glass-bead experiment, measured outflow reaches 0.5 mL/s near 80 s on the rain clock.
+This model reaches it at 65 s with immediate saturated recharge. At 195 s it predicts 4.69 mL/s versus
+7.50 mL/s measured. For three 4 mm bead rain rates it predicts 1.27, 3.27 and 8.67 mL/s at 30 s
+on the paper's outlet-aligned clock, versus observed 2.22, 5.28 and 15.28 mL/s. Doubling the cell count
+and halving the step changes the largest of these rates by 0.31 mL/s. Independent conductivity and
+rainfall sensitivity plus lower drainable yield cannot close the gap. The outlet-aligned comparison assesses
+amplitude. The absolute recharge delay for the 4 mm runs is unknown. [Guérin et al. (2014)](https://doi.org/10.1017/jfm.2014.590).
+
+The optional JavaScript entry measures 9,253 B min+gzip with a 9,531 B ceiling, including the confined
+exports. Both lazy Wasm variants are 13,306 B raw and 4,443 B gzip. Native helpers split independent cell
+and face setup before the ordered pressure solve and discharge recovery. Trials add 40 B per cell and
+40 B for the staged budget. Each native participant uses an aligned 64 KiB stack. Core and stage receive
+zero bytes.
 
 The confined solve (`solveConfinedFlow`, for a confined aquifer slice or a Hele-Shaw cell) is steady and single
 layer: one potential per cell, five-point faces with harmonic transmissivity, fixed sides half a cell from the

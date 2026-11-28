@@ -24657,3 +24657,13 @@ Native body rows, pending calving, freshwater and signed wakes stage before acce
 - **Fix:** Refuse reentry, validate candidate samples and complete pose and draw buffers, and publish all accepted
   rows together. The pose port reports the live signed origin. Previous accepted work remains readable after rejection.
 - **Regression:** [falling coupling](../packages/physics/tests/coupling/falling.test.js).
+
+### KB-GROUNDWATER-ACCEPTED1 — A late outlet overflow could publish an invalid aquifer (FIXED)
+
+- **Repro:** Supply a recharge step whose underground volume is finite but whose world-second seepage rate exceeds
+  f64. A valid recharge or terrain field in a separate memory also reads the wrong bank.
+- **Cause:** The kernel wrote columns and cumulative balances directly to accepted memory. The readers treated
+  every field's address as local memory. The reported origin was the last saved solver-step cell.
+- **Fix:** Validate the complete trial columns, budgets and storage before accepting them. Use the input bank
+  that owns each field and publish the live world cell. The previous state and work receipt survive rejection.
+- **Regression:** [groundwater coupling](../packages/physics/tests/coupling/groundwater.test.js).

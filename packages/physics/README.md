@@ -7195,7 +7195,7 @@ import { PhysicsWorld } from '@margoengine/physics/world';
 const grid: BedShape = { columns: 3, rows: 1, width: 3, depth: 1, centre: [0, 0] };
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
 const bed = new TerrainBed();
-const aquifer = await GroundwaterSolver.load({ followTerrain: true });
+using aquifer = await GroundwaterSolver.load({ followTerrain: true });
 world.add(bed, { ...grid, elevations: () => 0 });
 world.add(aquifer, {
   grid,
@@ -7218,10 +7218,13 @@ initial surface. `sideHeads` fixes absolute water levels on the specified sides.
 
 Set `rechargeField: runoff.rechargeField` to connect HYDRO-02 soil drainage. Set `followTerrain` (default false)
 to use the current terrain at each cell centre for surface seepage. `load` also accepts `id` (default `groundwater`)
-and an abort `signal`. The linear solve defaults to a relative residual of `1e-12`.
-`secondsPerSecond` defaults to 1. When accelerating underground time, outlet rates still describe volume per
-world second so a receiving stream gets the actual exported volume. The model records total storage, recharge,
-boundary inflow and outflow, spring discharge and seepage in cubic metres.
+and an abort `signal`. Set `threads` to 1 (default), 2 or 4, counting the caller. Multiple participants
+need a shared-memory world and an isolated Worker in browsers. Dispose a threaded aquifer when the world stops
+using it. `readNativeWork()` reports accepted row and SIMD counts. The linear solve defaults to a relative
+residual of `1e-12`.
+`secondsPerSecond` defaults to 1. Outlet rates remain per world second when underground time accelerates.
+The budgets record storage, recharge, boundary inflow and outflow, spring discharge and seepage in cubic metres.
+The four outputs carry the current solver cell. A failed trial leaves accepted columns, budgets and work intact.
 
 ### Confined Darcy and Hele-Shaw cells
 

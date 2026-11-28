@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22104093,
+  "total": 22107133,
   "history": [
     {
       "date": "2026-10-24",
@@ -15983,6 +15983,12 @@
       "commit": "aero-05-accepted-falling-rows",
       "reason": "AERO-05 @margoengine/physics/falling 8015 to 8693 B gzip, ceiling 8271 to 8954 B. The optional falling entry stages accepted poses, sweeps and f32 draw transfer together across all body types. Separating entries would duplicate validation and state ownership. Native assets are unchanged. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "hydro-06-native-aquifer-rows",
+      "reason": "HYDRO-06 @margoengine/physics/groundwater 6235 to 9253 B gzip, ceiling 6491 to 9531 B. The groundwater entry retains shared signed terrain and recharge validation, staged aquifer columns and outlet budgets, and optional independent native face rows. Splitting would duplicate the unconfined solver publication path and worker lifecycle. The existing independent confined exports stay available. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16871,7 +16877,7 @@
     "@margoengine/physics/gpu-cloth": 15626,
     "@margoengine/physics/granular-flow": 5830,
     "@margoengine/physics/granular-mpm": 6045,
-    "@margoengine/physics/groundwater": 6491,
+    "@margoengine/physics/groundwater": 9531,
     "@margoengine/physics/hydraulics": 7937,
     "@margoengine/physics/hydro": 22723,
     "@margoengine/physics/ice": 3483,

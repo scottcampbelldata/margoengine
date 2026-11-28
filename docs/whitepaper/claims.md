@@ -7141,3 +7141,11 @@ A rejected air sample or late contact preserves accepted pose and work. The cali
 the existing seed model develops spin and loses less height than a vacuum drop. Both backends repeat complete
 accepted state and captured pixels. Independent Norway maple measurements show the fixed-axis model
 underestimates descent speed in both cohorts. [Observed spread and limits](../limits.md#falling-plates-winged-seeds-and-hail-aero-05).
+
+### HYDRO-06 accepted aquifer state and spring-to-basin transfer
+
+The signed groundwater solver retains accepted banks through a rejected outlet rate and reads registered
+terrain and recharge in owning memory. Four native participants reproduce the same accepted bank as
+one. The calibrated cutaway transfers 0.308065 m³ into resolved shallow water and replays exact state
+and pixels on both backends. The laboratory diagnostic records early arrival and deficient modeled
+outflow under measured metered rainfall. [Independent results and limits](../limits.md#groundwater-and-springs-hydro-06).

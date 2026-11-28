@@ -75,7 +75,7 @@ test('conductivity across a contact combines both materials by resistance', asyn
   near(aquifer.budget.storage, 1);
 });
 
-test('a spring opens within the implicit step and follows the measured head law', async () => {
+test('a spring opens within the implicit step and follows the head-dependent drain law', async () => {
   const aquifer = await GroundwaterSolver.load();
   const yieldFactor = 0.4;
   const conductance = 0.2;
@@ -212,4 +212,86 @@ test('invalid aquifer parameters identify the repair', async () => {
   assert.throws(() => make(aquifer, { initialHead: 10 }), /initial head.*supply/);
   assert.throws(() => make(aquifer, { conductivity: [1, 2] }), /X conductivity length.*one value/);
   assert.throws(() => aquifer.read(0, 0), /add it to a PhysicsWorld/);
+});
+
+test('GroundwaterSolver rejects a late unrepresentable seepage rate and replays corrected signed recharge', async () => {
+  const rechargeField = {
+    name: 'external-aquifer-recharge',
+    kind: 'uniformGrid',
+    quantity: 'recharge',
+    unit: 'm/s',
+    centring: 'cell',
+  };
+  using aquifer = await GroundwaterSolver.load({ rechargeField });
+  const cell = [-7, 2, 9];
+  const world = new PhysicsWorld({ rate, memory: worldMemory(false) }).add(
+    aquifer,
+    { grid: grid(2), bottom: 0, surface: 2, initialHead: 1, conductivity: 0, secondsPerSecond: 1e200 },
+    cell,
+  );
+  const bank = new WebAssembly.Memory({ initial: 1 });
+  const region = { name: 'foreign recharge', type: 'f64', layout: 1, byteOffset: 64, byteLength: 16, memory: bank };
+  const values = new Float64Array(bank.buffer, region.byteOffset, 2);
+  values.set([0, 1e120]);
+  const context = (r = region) => ({
+    tick: 0,
+    level: 0,
+    seed: 9,
+    cell,
+    inputs: new Map([[rechargeField.name, { field: rechargeField.name, region: r, tick: 0, cell }]]),
+  });
+  const initial = world.takeSnapshot();
+  assert.throws(
+    () => aquifer.step(context(), 1e-310),
+    (error) => error.code === 'failed' && /outlet or storage.*Reduce recharge.*errors#groundwater/.test(error.message),
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, initial.bytes);
+  assert.equal(aquifer.readNativeWork(), undefined);
+  assert.throws(
+    () => aquifer.step(context({ ...region, byteOffset: 65 }), 1 / 60),
+    /aligned groundwater input.*errors#groundwater/,
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, initial.bytes);
+  values.set([3e-201, 1e-201]);
+  aquifer.step(context(), 1 / 60);
+  near(aquifer.budget.recharge, (4e-201 * 1e200) / 60);
+  assert.ok(aquifer.read(0, 0).head > aquifer.read(1, 0).head);
+  const accepted = world.takeSnapshot();
+  const cells = () => aquifer.exportPorts(0).map((port) => port.cell);
+  assert.deepEqual(cells(), Array(4).fill(cell));
+  world.shiftOrigin([4, -3, 2]);
+  assert.deepEqual(cells(), Array(4).fill([-11, 5, 7]));
+  world.restoreSnapshot(initial.bytes);
+  assert.deepEqual(cells(), Array(4).fill(cell));
+  aquifer.step(context(), 1 / 60);
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+});
+
+test('GroundwaterSolver takes terrain elevation from the owning bank and preserves accepted state on an invalid cell', async () => {
+  using aquifer = await GroundwaterSolver.load({ followTerrain: true });
+  const cell = [-2, -1, 3];
+  const world = new PhysicsWorld({ rate, memory: worldMemory(false) }).add(
+    aquifer,
+    { grid: grid(2), bottom: 0, surface: 2, initialHead: 1, specificYield: 0.25, conductivity: 0 },
+    cell,
+  );
+  const bank = new WebAssembly.Memory({ initial: 1 });
+  const region = { name: 'foreign TerrainBed', type: 'f32', layout: 1, byteOffset: 128, byteLength: 24, memory: bank };
+  const values = new Float32Array(bank.buffer, region.byteOffset, 6);
+  values.fill(0.75);
+  const context = {
+    tick: 0,
+    level: 0,
+    seed: 0,
+    cell,
+    inputs: new Map([['bed', { field: 'bed', region, tick: 0, cell }]]),
+  };
+  const before = world.takeSnapshot();
+  values[4] = NaN;
+  assert.throws(() => aquifer.step(context, 1 / 60), /Invalid groundwater terrain elevation.*errors#groundwater/);
+  assert.deepEqual(world.takeSnapshot().bytes, before.bytes);
+  values[4] = 0.75;
+  aquifer.step(context, 1 / 60);
+  near(aquifer.read(1, 0).head, 0.75);
+  near(aquifer.budget.seepage, 2 * (1 - 0.75) * 0.25);
 });

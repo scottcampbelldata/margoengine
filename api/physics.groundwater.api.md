@@ -52,6 +52,7 @@ export interface GroundwaterLoadOptions {
     readonly id?: string;
     readonly rechargeField?: FieldDescriptor;
     readonly followTerrain?: boolean;
+    readonly threads?: 1 | 2 | 4;
     readonly signal?: AbortSignal;
 }
 
@@ -87,16 +88,30 @@ export class GroundwaterSolver implements Solver<GroundwaterParams> {
     readonly seepageField: FieldDescriptor;
     private constructor();
     static load(options?: GroundwaterLoadOptions): Promise<GroundwaterSolver>;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, params: GroundwaterParams): void;
     importPorts(): void;
     step(context: StepContext, dt: number): void;
+    readNativeWork(): GroundwaterWorkCounts | undefined;
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
     shallowInput(): ShallowRunoffInput;
     read(column: number, row: number): GroundwaterSample;
     get budget(): GroundwaterBudget;
+}
+
+export interface GroundwaterWorkCounts extends GroundwaterWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly GroundwaterWorkerWork[];
+}
+
+export interface GroundwaterWorkerWork {
+    readonly cells: number;
+    readonly faceConductances: number;
+    readonly pairedFaceConductances: number;
+    readonly initialActiveSprings: number;
 }
 
 export interface Streamline {

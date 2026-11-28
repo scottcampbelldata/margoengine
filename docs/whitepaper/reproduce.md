@@ -5404,3 +5404,14 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
 - Run `node packages/physics/scripts/aero05-samara-measured.mjs` for two independent free-drop cohorts.
   The script uses measured morphology, a separately published blade model and unchanged pitch.
   It reports held-out speed and spin, spatial and temporal refinement and missing coning.
+
+### HYDRO-06 native aquifer rows and laboratory outflow
+
+- Build Physics with `node packages/physics/scripts/build.js`.
+- Run `node --test packages/physics/tests/groundwater.test.js packages/physics/tests/coupling/groundwater.test.js packages/physics/tests/coupling/groundwater-workers.test.js`
+  for native setup, volume custody, candidate rejection, foreign input memory, and exact signed replay.
+- Run `npm run test:gpu:groundwater-workers -w @margoengine/physics` to verify real browser native helpers
+  and `npm run test:gpu:spring-film -w @margoengine/water` for the two-renderer spring release.
+- Run `node packages/physics/scripts/hydro06-glass-beads-measured.mjs` for separate metered rainfall and
+  held-out measured discharge. Check the stated rainfall-clock alignment and the plotted allowance separately
+  from the conductivity and grid sensitivity. [Guérin et al. (2014)](https://doi.org/10.1017/jfm.2014.590).

@@ -567,3 +567,14 @@ Not in the catalog: staged construction (placement of pieces, stacking, scaffold
 - Both backends reproduce their complete accepted state and full RGBA through hold, restore, re-advance
   and rewind. The axis is fixed. Independent descent and cone checks remain outside the accepted model
   accuracy documented in [limits](limits.md#falling-plates-winged-seeds-and-hail-aero-05).
+
+### HYDRO-06 automated spring opening and surface pool
+
+- `packages/water/test/spring-film.browser.mjs` opens a native groundwater spring over signed TerrainBed.
+  Five surface seconds represent ten aquifer minutes. The accepted head falls 0.4517 m relative to the
+  sealed control. The aquifer loses 0.308065 m³, which matches the registered spring transfer and water
+  volume in the live basin. The sealed spring leaves the basin dry.
+- Water draws the accepted surface and the cutaway draws the native water table. The sampled pool is
+  0.0417 m deep. Both backends independently repeat full accepted state and RGBA through hold, restore,
+  re-advance and rewind. The idealized take uses one-way exchange. Rain transit, saturated backflow
+  and field-scale groundwater response remain open.

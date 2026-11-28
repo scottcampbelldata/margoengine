@@ -12359,3 +12359,7 @@ Ground locomotion copies terrain samples into trial geometry before the body pha
 ### AERO-05 accepted falling bodies and renderer transfer
 
 K23 distributes independent plate, samara and sphere rows before deterministic host sweeps. The falling caller checks every world-space pose in its scratch bank before replacing accepted state. It also checks all f32 draw rows before copying to the caller. The registered pose field carries the live signed origin. The mixed native fixture and separate WebGPU and WebGL2 scene cover accepted outputs. Published natural seed comparisons record the fixed-axis descent deficit and missing coning.
+
+### HYDRO-06 accepted aquifer columns and native face setup
+
+Native participants build disjoint conductance, storage and spring activity rows. The caller keeps PCG and conservative volume recovery in the same order. The aquifer reads its signed terrain and recharge banks from their owning memory. It commits all four published columns, storage, balances and work only after the trial is finite. Browser evidence covers actual native helpers and separate exact surface-water replay. The glass-bead diagnostic records the missing recharge transit delay.

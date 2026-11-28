@@ -1,7 +1,7 @@
-import { MargoError } from '@margoengine/math/errors';
 import { type BedShape, BED_FIELD, BED_LAYOUT, bedVertexCount } from '../earth/bed.js';
 import type { ShallowRunoffInput } from '../hydro/index.js';
-import { canShareMemory, isShared, regionWords, STACK_BYTES } from '../world/memory.js';
+import { regionWords } from '../world/memory.js';
+import { checkCell } from '../world/solver.js';
 import type {
   Cell,
   FieldDescriptor,
@@ -13,6 +13,16 @@ import type {
   SolverHost,
   StepContext,
 } from '../world/solver.js';
+import { groundwaterError } from './errors.js';
+import {
+  bindGroundwaterKernel,
+  type GroundwaterBuilds,
+  type GroundwaterKernel,
+  type GroundwaterWorkCounts,
+  loadGroundwaterBuilds,
+} from './kernel.js';
+
+export type { GroundwaterWorkCounts, GroundwaterWorkerWork } from './kernel.js';
 
 const LAYOUT = 1;
 const F64 = Float64Array.BYTES_PER_ELEMENT;
@@ -32,6 +42,8 @@ export interface GroundwaterLoadOptions {
   readonly rechargeField?: FieldDescriptor;
   /** Follow the canonical TerrainBed field for the current seepage surface. Defaults to false. */
   readonly followTerrain?: boolean;
+  /** Native participants including the caller. Choose 1 (default), 2 or 4. */
+  readonly threads?: 1 | 2 | 4;
   /** Cancels loading with the signal's reason. */
   readonly signal?: AbortSignal;
 }
@@ -92,24 +104,6 @@ export interface GroundwaterBudget {
   readonly seepage: number;
 }
 
-interface GroundwaterKernel extends WebAssembly.Exports {
-  groundwater_step(
-    controls: number,
-    forcing: number,
-    sides: number,
-    state: number,
-    budget: number,
-    scratch: number,
-    nx: number,
-    nz: number,
-    dx: number,
-    dz: number,
-    dt: number,
-    worldDt: number,
-    tolerance: number,
-  ): number;
-}
-
 interface State {
   readonly host: SolverHost;
   readonly kernel: GroundwaterKernel;
@@ -125,14 +119,16 @@ interface State {
   readonly controls: Region;
   readonly sides: Region;
   readonly columns: Region;
+  readonly trialColumns: Region;
   readonly budget: Region;
+  readonly trialBudget: Region;
   readonly scratch: Region;
   readonly cell: Region;
 }
 
 function validate(name: string, value: number, min = -Infinity, max = Infinity): number {
   if (!Number.isFinite(value) || value < min || value > max)
-    throw new RangeError(
+    throw groundwaterError(
       `Invalid groundwater ${name}; supply a finite value from ${min} to ${max} in its stated units.`,
     );
   return value;
@@ -143,8 +139,10 @@ function fill(target: Float64Array, value: Scalars, name: string, min = -Infinit
     target.fill(validate(name, value, min, max));
     return;
   }
-  if (value.length !== target.length)
-    throw new RangeError(`Invalid groundwater ${name} length; pass one value or ${target.length} x-fast cell samples.`);
+  if (value?.length !== target.length)
+    throw groundwaterError(
+      `Invalid groundwater ${name} length; pass one value or ${target.length} x-fast cell samples.`,
+    );
   for (let i = 0; i < target.length; i++) target[i] = validate(name, value[i]!, min, max);
 }
 
@@ -156,25 +154,32 @@ function floats(host: SolverHost, region: Region): Float64Array {
   return regionWords(host.memory, region) as Float64Array;
 }
 
-async function readModule(file: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {
-  signal?.throwIfAborted();
-  if (file.protocol === 'file:') {
-    const moduleName = 'node:fs/promises';
-    const { readFile } = await import(/* @vite-ignore */ /* webpackIgnore: true */ moduleName);
-    file.search = '';
-    return WebAssembly.compile(await readFile(file, { signal }));
-  }
-  const response = await fetch(file, { signal });
-  if (!response.ok)
-    throw new MargoError(
-      'failed',
-      `Groundwater kernel HTTP ${response.status}; serve the matching groundwater Wasm asset.`,
-    );
-  return WebAssembly.compile(await response.arrayBuffer());
+function sameCell(a: Cell, b: Cell): boolean {
+  return a?.length === 3 && a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 }
 
-function sameCell(a: Cell, b: Cell): boolean {
-  return a.every((coordinate, i) => coordinate === b[i]);
+function checkedCell(cell: Cell): void {
+  try {
+    checkCell(cell);
+  } catch (cause) {
+    throw groundwaterError('Use three signed 32-bit integer coordinates for the aquifer origin.', 'state', cause);
+  }
+}
+
+function portWords(host: SolverHost, port: Port): Float32Array | Float64Array {
+  const region = port.region;
+  try {
+    return regionWords(region.memory ?? host.memory, region) as Float32Array | Float64Array;
+  } catch (cause) {
+    throw groundwaterError('Publish aligned groundwater input words in the bank that owns them.', 'state', cause);
+  }
+}
+
+function storageVolume(state: State, depth: Float64Array): number {
+  const properties = floats(state.host, state.controls);
+  let storage = 0;
+  for (let i = 0; i < state.n; i++) storage += depth[i]! * properties[3 * state.n + i]! * state.area;
+  return storage;
 }
 
 /** Conservative unconfined Darcy flow with aquifer storage, springs, and surface seepage. */
@@ -191,16 +196,19 @@ export class GroundwaterSolver implements Solver<GroundwaterParams> {
   private readonly recharge?: FieldDescriptor;
   private readonly followTerrain: boolean;
   private state?: State;
+  private nativeWork?: GroundwaterWorkCounts;
+  private disposed = false;
 
   private constructor(
-    private readonly plain: WebAssembly.Module,
-    private readonly shared: WebAssembly.Module | undefined,
+    private readonly builds: GroundwaterBuilds,
     options: GroundwaterLoadOptions,
   ) {
     this.id = options.id ?? 'groundwater';
+    if (typeof this.id !== 'string' || this.id.length === 0 || this.id.trim() !== this.id)
+      throw groundwaterError('Use a nonempty solver ID without surrounding whitespace.');
     if (options.rechargeField) {
       if (options.rechargeField.unit !== 'm/s' || options.rechargeField.centring !== 'cell')
-        throw new RangeError('Invalid groundwater recharge field; bind a cell-centred field in m/s.');
+        throw groundwaterError('Invalid groundwater recharge field; bind a cell-centred field in m/s.');
       this.recharge = { ...options.rechargeField };
     }
     this.followTerrain = options.followTerrain ?? false;
@@ -212,15 +220,21 @@ export class GroundwaterSolver implements Solver<GroundwaterParams> {
 
   /** Loads the optional native kernel. Add the resulting solver to a PhysicsWorld. */
   static async load(options: GroundwaterLoadOptions = {}): Promise<GroundwaterSolver> {
-    const { signal } = options;
-    const [plain, shared] = await Promise.all([
-      readModule(new URL(/* @vite-ignore */ './groundwater-kernel.wasm?no-inline', import.meta.url), signal),
-      canShareMemory()
-        ? readModule(new URL(/* @vite-ignore */ './groundwater-kernel-shared.wasm?no-inline', import.meta.url), signal)
-        : undefined,
-    ]);
-    signal?.throwIfAborted();
-    return new GroundwaterSolver(plain, shared, options);
+    if (!options) throw groundwaterError('Pass groundwater load options as an object, or omit them.');
+    const builds = await loadGroundwaterBuilds(options.signal, options.threads);
+    try {
+      return new GroundwaterSolver(builds, options);
+    } catch (cause) {
+      builds[Symbol.dispose]();
+      throw cause;
+    }
+  }
+
+  /** Releases optional native helpers after the world stops using this solver. */
+  [Symbol.dispose](): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.builds[Symbol.dispose]();
   }
 
   describe(): SolverDescription {
@@ -236,8 +250,24 @@ export class GroundwaterSolver implements Solver<GroundwaterParams> {
   }
 
   init(host: SolverHost, params: GroundwaterParams): void {
-    if (!params?.grid) throw new RangeError('Groundwater needs a grid; pass a TerrainBed rectangle in metres.');
-    bedVertexCount(params.grid);
+    if (this.disposed) throw groundwaterError('Load a new aquifer after disposing of groundwater.', 'disposed');
+    if (this.state && this.builds.pool)
+      throw groundwaterError('Load a separate threaded aquifer for each world.', 'attached');
+    try {
+      this.initialize(host, params);
+    } catch (cause) {
+      if (this.builds.pool) this[Symbol.dispose]();
+      throw cause;
+    }
+  }
+
+  private initialize(host: SolverHost, params: GroundwaterParams): void {
+    if (!params?.grid) throw groundwaterError('Groundwater needs a grid; pass a TerrainBed rectangle in metres.');
+    try {
+      bedVertexCount(params.grid);
+    } catch (cause) {
+      throw groundwaterError('Use a finite rectangle and positive grid counts matching TerrainBed.', 'state', cause);
+    }
     const grid = { ...params.grid, centre: [params.grid.centre[0], params.grid.centre[1]] as const };
     const n = grid.columns * grid.rows;
     const dx = grid.width / grid.columns;
@@ -245,19 +275,7 @@ export class GroundwaterSolver implements Solver<GroundwaterParams> {
     const area = validate('cell area', dx * dz, Number.MIN_VALUE);
     const timeScale = validate('time scale', params.secondsPerSecond ?? 1, Number.MIN_VALUE);
     const tolerance = validate('relative residual', params.relativeResidual ?? 1e-12, Number.EPSILON, 1);
-    // A non-isolated browser can hand out shared Wasm memory without exposing the JS constructor.
-    const sharedMemory =
-      isShared(host.memory) || Object.prototype.toString.call(host.memory.buffer) === '[object SharedArrayBuffer]';
-    const module = sharedMemory ? this.shared : this.plain;
-    if (!module)
-      throw new MargoError('unsupported', 'Shared groundwater Wasm is unavailable; choose plain world memory.');
-    const stack = host.allocate('groundwater-stack', STACK_BYTES + 8, 'u8', LAYOUT);
-    const kernel = new WebAssembly.Instance(module, { env: { memory: host.memory } }).exports as GroundwaterKernel;
-    const pointer = kernel.__stack_pointer;
-    const end = kernel.__data_end;
-    if (!(pointer instanceof WebAssembly.Global) || !(end instanceof WebAssembly.Global) || end.value !== 0)
-      throw new MargoError('failed', 'Invalid groundwater kernel layout; rebuild the slot-free groundwater assets.');
-    pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
+    const kernel = bindGroundwaterKernel(host, this.builds);
 
     const allocate = (name: string, count: number) => host.allocate('groundwater-' + name, count * F64, 'f64', LAYOUT);
     const state: State = {
@@ -278,6 +296,8 @@ export class GroundwaterSolver implements Solver<GroundwaterParams> {
       budget: allocate('budget', 5),
       scratch: allocate('linear-solve', 12 * n),
       cell: allocate('origin', 3),
+      trialColumns: allocate('trial-columns', 5 * n),
+      trialBudget: allocate('trial-budget', 5),
     };
     const config = floats(host, state.controls);
     const baseline = floats(host, state.defaults);
@@ -311,7 +331,10 @@ export class GroundwaterSolver implements Solver<GroundwaterParams> {
       const fixed = params.sideHeads?.[side];
       if (fixed !== undefined) sides[index] = validate(`${side} fixed head`, fixed);
     }
+    validate('initial drainable storage', storageVolume(state, initial), 0);
+    floats(host, state.cell).set(host.cell);
     this.state = state;
+    this.nativeWork = undefined;
   }
 
   importPorts(): void {
@@ -319,34 +342,60 @@ export class GroundwaterSolver implements Solver<GroundwaterParams> {
   }
 
   step(context: StepContext, dt: number): void {
+    if (this.disposed) throw groundwaterError('Load a new aquifer after disposing of groundwater.', 'disposed');
     const s = this.requireState();
+    checkedCell(context.cell);
+    validate('world timestep', dt, Number.MIN_VALUE);
+    const scaled = validate('scaled timestep', dt * s.timeScale, Number.MIN_VALUE);
     const values = floats(s.host, s.forcing);
     values.set(floats(s.host, s.defaults));
     const rain = this.recharge && context.inputs.get(this.recharge.name);
     if (rain) this.readRecharge(s, rain, context.cell, values.subarray(s.n));
     const bed = this.followTerrain && context.inputs.get(BED_FIELD.name);
     if (bed) this.readBed(s, bed, context.cell, values.subarray(0, s.n));
+    floats(s.host, s.trialColumns).set(floats(s.host, s.columns));
+    floats(s.host, s.trialBudget).set(floats(s.host, s.budget));
     const code = s.kernel.groundwater_step(
       s.controls.byteOffset,
       s.forcing.byteOffset,
       s.sides.byteOffset,
-      s.columns.byteOffset,
-      s.budget.byteOffset,
+      s.trialColumns.byteOffset,
+      s.trialBudget.byteOffset,
       s.scratch.byteOffset,
       s.grid.columns,
       s.grid.rows,
       s.dx,
       s.dz,
-      validate('scaled timestep', dt * s.timeScale, Number.MIN_VALUE),
+      scaled,
       dt,
       s.tolerance,
     );
     if (code !== 0)
-      throw new MargoError(
-        'failed',
+      throw groundwaterError(
         'The groundwater volume solve did not converge; reduce the time scale or conductivity contrast.',
+        'failed',
       );
+    const columns = floats(s.host, s.trialColumns);
+    const budget = floats(s.host, s.trialBudget);
+    if (
+      !columns.every(Number.isFinite) ||
+      !budget.every(Number.isFinite) ||
+      !Number.isFinite(storageVolume(s, columns))
+    )
+      throw groundwaterError(
+        'Groundwater outlet or storage exceeds numeric range. Reduce recharge, time scaling or conductivity contrast.',
+        'failed',
+      );
+    floats(s.host, s.columns).set(columns);
+    floats(s.host, s.budget).set(budget);
     floats(s.host, s.cell).set(context.cell);
+    this.nativeWork = s.kernel.workCounts();
+  }
+
+  /** Copies work counts from the last accepted native step. */
+  readNativeWork(): GroundwaterWorkCounts | undefined {
+    const work = this.nativeWork;
+    return work && { ...work, workers: work.workers.map((worker) => ({ ...worker })) };
   }
 
   private readRecharge(s: State, port: Port, cell: Cell, output: Float64Array): void {
@@ -357,10 +406,10 @@ export class GroundwaterSolver implements Solver<GroundwaterParams> {
       (r.type !== 'f32' && r.type !== 'f64') ||
       r.byteLength !== s.n * (r.type === 'f32' ? 4 : F64)
     )
-      throw new RangeError(
+      throw groundwaterError(
         'Invalid groundwater recharge port; publish one layout-1 scalar per aquifer cell in the same world cell.',
       );
-    const words = regionWords(s.host.memory, r);
+    const words = portWords(s.host, port);
     for (let i = 0; i < s.n; i++) {
       output[i] = validate('total recharge', output[i]! + validate('field recharge', words[i]!, 0), 0);
     }
@@ -376,8 +425,8 @@ export class GroundwaterSolver implements Solver<GroundwaterParams> {
       r.layout !== BED_LAYOUT ||
       r.byteLength !== 4 * (columns + 1) * stride
     )
-      throw new RangeError('Invalid groundwater bed port; place a matching TerrainBed in the same world cell.');
-    const words = regionWords(s.host.memory, r);
+      throw groundwaterError('Invalid groundwater bed port; place a matching TerrainBed in the same world cell.');
+    const words = portWords(s.host, port);
     for (let z = 0; z < rows; z++) {
       for (let x = 0; x < columns; x++) {
         // The terrain's shared triangle edge crosses the centre of the cell.
@@ -392,8 +441,7 @@ export class GroundwaterSolver implements Solver<GroundwaterParams> {
 
   exportPorts(tick: number): readonly Port[] {
     const s = this.requireState();
-    const [x, y, z] = floats(s.host, s.cell);
-    const cell: Cell = [x!, y!, z!];
+    const cell = s.host.cell;
     const byteLength = s.n * F64;
     const fields = [this.headField, this.outletField, this.springField, this.seepageField];
     return fields.map((f, i) => ({
@@ -442,14 +490,16 @@ export class GroundwaterSolver implements Solver<GroundwaterParams> {
       column >= columns ||
       row >= rows
     )
-      throw new RangeError('Invalid groundwater cell; pass an integer column and row inside the grid.');
+      throw groundwaterError('Invalid groundwater cell; pass an integer column and row inside the grid.');
     const i = row * columns + column;
     const values = floats(s.host, s.columns);
     const thickness = values[THICKNESS * s.n + i]!;
+    const yieldFraction = floats(s.host, s.controls)[3 * s.n + i]!;
+    const volume = thickness * s.area;
     return {
       head: values[HEAD * s.n + i]!,
       thickness,
-      storage: thickness * s.area * floats(s.host, s.controls)[3 * s.n + i]!,
+      storage: Number.isFinite(volume) ? volume * yieldFraction : thickness * yieldFraction * s.area,
       spring: values[SPRINGS * s.n + i]!,
       seepage: values[SEEPAGE * s.n + i]!,
     };
@@ -459,9 +509,7 @@ export class GroundwaterSolver implements Solver<GroundwaterParams> {
   get budget(): GroundwaterBudget {
     const s = this.requireState();
     const depth = floats(s.host, s.columns);
-    const properties = floats(s.host, s.controls);
-    let storage = 0;
-    for (let i = 0; i < s.n; i++) storage += depth[i]! * properties[3 * s.n + i]! * s.area;
+    const storage = storageVolume(s, depth);
     const [recharge, boundaryIn, boundaryOut, spring, seepage] = floats(s.host, s.budget);
     return {
       storage,
@@ -475,7 +523,7 @@ export class GroundwaterSolver implements Solver<GroundwaterParams> {
 
   private requireState(): State {
     if (!this.state)
-      throw new MargoError('failed', 'Groundwater is not attached; add it to a PhysicsWorld with an aquifer grid.');
+      throw groundwaterError('Groundwater is not attached; add it to a PhysicsWorld with an aquifer grid.');
     return this.state;
   }
 }

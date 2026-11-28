@@ -135,6 +135,11 @@ type NativePhaseSolver =
       readonly subject: 'Locomotion';
       readonly phaseExport: 'locomotion_thread_phase';
       readonly phase: 'body contact integration';
+    }
+  | {
+      readonly subject: 'Groundwater';
+      readonly phaseExport: 'groundwater_thread_phase';
+      readonly phase: 'aquifer conductance';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };
