@@ -47,6 +47,28 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   violation without the fix; with it the pile falls onto the floor, the middle box at y 0.5 and the top one at 1.5 within
   0.02 m).
 
+### Fixed 2026-11-28: terrain ground with `bump` drew as black and white speckle near the camera (KB-TUNDRA-GROUNDNOISE1; terrain)
+
+- **Repro:** a `BiomeView` of the tundra world, camera 1.1 m over the ground: the snow and tundra ground drew as black and
+  white speckle in diamond-shaped cells; with `bump: 0` on the materials it drew smooth.
+- **Cause:** `TerrainLayer.bump` took its height from the same sampler read as the colour. Near the camera that is the
+  finest mip, so every texel of grain was a height step of up to half a repeat per unit of luma (root mean square slopes
+  1.2 on the tundra material and 5.3 on rock at 256 texels over 4 m, `materialPixels`), a bilinear height has one slope
+  a texel (facets), and the screen derivative of the hardware's rounded filter weights drew dotted lines along texel
+  edges.
+- **Fix:** `packages/terrain/src/shader.ts`: where a pixel covers less than 1/128 of a repeat, the height is the layer's
+  128-texel mip through a cubic B-spline over 16 exact texel loads a projection, handing over to the colour sample's mip
+  by 1/64 (past that the picture is as before); tinted layers and the floating origin shift it as they do the colour.
+  Cubic B-spline basis: Sigg and Hadwiger 2005, GPU Gems 2 chapter 20.
+- **Measured:** on a grey noise texture with texel grain from 2 m, pixel contrast 28.9 before, 8.5 after (RTX A6000, the
+  same on both test paths); the bumped near-view spread stays 4.28 times the flat one (4.29 before).
+- **Left:** the biomes' snow relief (`MATERIALS.snow.bump` 0.35, root mean square height about 33 mm after the filter)
+  is above the 0.5 to 9.2 mm a laser profiler read on snow (Lacroix et al. 2008, Journal of Glaciology 54(187),
+  https://doi.org/10.3189/002214308786570863); the value is a pinned look choice and is not changed here.
+- **Regression:** `packages/terrain/test/bump.browser.mjs` (`smoothBump`, `grainBump`, `grainBumpWeighted` bounds) and
+  `packages/terrain/test/surface.test.js` "the bump height is read from exact texel loads, tinted and under a floating
+  origin as the colour (KB-TUNDRA-GROUNDNOISE1)".
+
 ### Fixed 2026-11-28: a Water added to SceneTargets drew nothing, and its SSR capture drew with TAA's jittered camera (KB-WATER-CAPTURECAM1; water)
 
 - **Repro (before):** `SceneTargets.add(water, {ground: false})` (`@margoengine/post/mrt`): the targets hold no water

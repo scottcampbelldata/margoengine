@@ -363,7 +363,9 @@ readable:
 - `bump` (default 0): the layer's own luma becomes a height of up to half a texture repeat per unit of luma, times
   `bump` (2 m at `scale` 0.25 for luma 0 to 1), and the shading normal follows its slope: derivative bump mapping from
   Mikkelsen's "Bump Mapping Unparametrized Surfaces on the GPU" (2010), screen-space derivatives of the height and the
-  position, no extra texture samples. The mips flatten it with distance, as they flatten the colour, and past a footprint
+  position. Where a pixel covers less than 1/128 of a repeat (3 cm at 0.25) the height is not read through the sampler:
+  it is the layer's 128-texel mip through a cubic B-spline over exact texel loads, so a magnified layer draws no
+  speckle, facets or lines along texel edges. The mips flatten it with distance, as they flatten the colour, and past a footprint
   of 1/64 of a repeat (6 cm at 0.25) its slope falls with the longer of the pixel's two sides on the ground, so distant or
   grazing ground draws no pixel grain.
 - `macro` (default 0): the same layer at 1/24 of its `scale` (a 96 m repeat at 0.25) scales the colour by
@@ -401,7 +403,8 @@ engine.start();
 Leaving both out (or 0 on every layer) keeps the shader text, the 8-float rules and so every GPU call exactly as
 before; when any layer sets one, the rules grow to 12 floats a layer and the shader adds the relief and the macro
 sample for every layer whose value is above 0. This works with painted `weights` and SSR's capture. Cost: `bump`
-adds about 30 ALU operations and four derivatives per pixel; `macro` adds, per showing layer, one top-mip sample and
+adds about 30 ALU operations and four derivatives per pixel, and where a pixel covers less than 1/64 of a repeat, 16
+texel loads for each showing layer and triplanar axis (one axis on most of the ground); `macro` adds, per showing layer, one top-mip sample and
 three texture samples for each triplanar axis that shows (one axis on most of the ground, all three at most). Checked on
 a real GPU by `test/bump.browser.mjs` (in `test:gpu`): on flat ground with one grey noise texture, 0 draws the same pixels
 as leaving them out, `bump: 1` spreads the near ground's luma 4.3 times as wide, `macro: 0.5` spreads the means of 32 px
@@ -409,7 +412,10 @@ blocks of a view from 60 m 9 times as wide, and straight down from 1.5 km the lu
 (RTX A6000).
 Where a crest is seen edge-on, the relief's slope is limited to what the pixel can resolve, so crests draw no dark
 specks: `test/crest.browser.mjs` (in `test:gpu`) draws alpine crests under the noon sun with `bump: 1` and counts
-none more than without it, by rules and by painted weights.
+none more than without it, by rules and by painted weights. Seen from 2 m with a grey value a texel on the noise,
+`bump: 0.35` draws a pixel contrast of 8.5 (28.9 with the height read texel by texel; RTX A6000, `test/bump.browser.mjs`).
+The cubic basis is Sigg and Hadwiger, "Fast Third-Order Texture Filtering", GPU Gems 2, chapter 20, 2005,
+https://developer.nvidia.com/gpugems/gpugems2/part-iii-high-quality-rendering/chapter-20-fast-third-order-texture-filtering
 
 Resolution is a multiple of four from 8-256; levels range from 1-12. The default is 64 cells and six rings, with doubled cell spacing per level. Geometry buffers are allocated once and reused as the camera moves. Layer slope is `1-normal.y` in 0..1; height is world Y. Rules blend smoothly around their thresholds and fall back to layer zero if none match. Terrain uses GGX directional lighting and the scene's reversed depth.
 

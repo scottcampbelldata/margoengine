@@ -59,6 +59,14 @@ export const terrainOutside = /* wgsl */ `if(any(i.position.xz<frame.map.xy)||an
  * A slope estimated across one pixel holds only what that pixel resolves: mips average the height, not its slope, and
  * the relief is up to half a repeat high, so the estimate stayed large at every distance and drew pixel grain on far and
  * grazing ground. Past a footprint of 1/64 of a repeat it falls with the longer side of the pixel on the ground.
+ * Magnified, the height holds nothing finer than 1/128 of a repeat (`terrainReliefLuma`): the layer's mip with 128
+ * texels a repeat through a cubic B-spline over 4 x 4 exact texel loads (the basis of Sigg and Hadwiger 2005, "Fast
+ * Third-Order Texture Filtering", GPU Gems 2 chapter 20, without their bilinear shortcut). A height read texel by texel
+ * through the sampler is texel noise times half a repeat (root mean square slopes of 1.2 on the biomes' tundra and 5.3
+ * on rock at 256 texels over 4 m), one slope a texel, and the hardware's rounded filter weights, which the screen
+ * derivative drew as black and white speckle, facets and dotted lines along texel edges (KB-TUNDRA-GROUNDNOISE1). The
+ * B-spline's slope is continuous and its weights exact. Between footprints of 1/128 and 1/64 of a repeat it hands over
+ * to the colour sample's own mip; past 1/64 the height is the colour sample's, as before.
  */
 export const surfaceStruct = (code: string): string =>
   code.replace(
@@ -95,6 +103,26 @@ fn terrainMacro(p:vec2f,q:vec2f,dx:vec2f,dy:vec2f,m:f32,layer:u32,top:f32,norm:f
   let b=textureSampleGrad(terrainLayers,terrainSampler,p+sin(vec2f(3,7)*(i+1.0)),i32(layer),dx*m,dy*m).rgb;
   return dot(mix(a,b,t),luma)*norm*w;
 }
+fn terrainReliefTap(p:vec2f,layer:u32,level:u32,size:i32)->f32 {
+  let st=p*f32(size)-0.5;let i=floor(st);let f=st-i;let r=vec2f(1.0)-f;
+  let a=r*r*r/6.0;let b=(3.0*f*f*f-6.0*f*f+4.0)/6.0;let d=f*f*f/6.0;let c=vec2f(1.0)-a-b-d;
+  let wx=vec4f(a.x,b.x,c.x,d.x);let wy=vec4f(a.y,b.y,c.y,d.y);let first=vec2i(i)-1;var h=0.0;
+  for(var y=0;y<4;y++){for(var x=0;x<4;x++){
+    let t=((first+vec2i(x,y))%size+size)%size;
+    h+=wx[x]*wy[y]*dot(textureLoad(terrainLayers,t,i32(layer),level).rgb,vec3f(0.2126,0.7152,0.0722));
+  }}
+  return h;
+}
+fn terrainReliefLuma(position:vec3f,projection:vec3f,layer:u32)->f32 {
+  let scale=layerRules[layer].params.x;let p=position*scale;let texels=textureDimensions(terrainLayers).x;
+  let level=u32(clamp(floor(log2(f32(texels)/128.0)),0.0,f32(textureNumLevels(terrainLayers)-1u)));let size=i32(texels>>level);
+  var h=0.0;var total=0.0;
+  if(projection.x>0.01){h+=projection.x*terrainReliefTap(p.zy,layer,level,size);total+=projection.x;}
+  if(projection.y>0.01){h+=projection.y*terrainReliefTap(p.xz,layer,level,size);total+=projection.y;}
+  if(projection.z>0.01){h+=projection.z*terrainReliefTap(p.xy,layer,level,size);total+=projection.z;}
+  return h/max(total,0.00001);
+}
+fn terrainReliefTint(h:f32,layer:u32)->f32 {return h;}
 fn terrainSurface(sample:vec3f,position:vec3f,projection:vec3f,dx:vec3f,dy:vec3f,layer:u32)->vec4f {
   let s=layerRules[layer].surface;let luma=vec3f(0.2126,0.7152,0.0722);var color=sample;
   if(s.y>0.0){
@@ -105,7 +133,12 @@ fn terrainSurface(sample:vec3f,position:vec3f,projection:vec3f,dx:vec3f,dy:vec3f
     if(projection.z>0.01){tone+=projection.z*terrainMacro(p.xy,q.yx,dx.xy,dy.xy,m,layer,top,norm);}
     color*=max(1.0-s.y+s.y*tone,0.0);
   }
-  return vec4f(color,dot(sample,luma)*s.x);
+  var h=dot(sample,luma);
+  if(s.x>0.0){
+    let near=1.0-smoothstep(1.0/128.0,1.0/64.0,layerRules[layer].params.x*max(length(dx),length(dy)));
+    if(near>0.0){h=mix(h,terrainReliefTint(terrainReliefLuma(position,projection,layer),layer),near);}
+  }
+  return vec4f(color,h*s.x);
 }
 fn terrainBump(position:vec3f,normal:vec3f)->vec3f {
   let px=dpdxFine(position);let py=dpdyFine(position);let ax=1.0/max(length(px),1e-20);let ay=1.0/max(length(py),1e-20);
@@ -201,5 +234,9 @@ ${code
     'var packed=',
     'let td=vec2f(textureDimensions(terrainTint));terrainTintTexel=textureSampleLevel(terrainTint,terrainSampler,clamp((position.xz-frame.map.xy)/frame.map.zw,vec2f(0.5)/td,vec2f(1)-vec2f(0.5)/td),0);var packed=',
   )
-  .replace(/terrainLayerSample\(position,projection,dx,dy,(layer|0u)\)/g, 'terrainTinted($&,$1)')}`;
+  .replace(/terrainLayerSample\(position,projection,dx,dy,(layer|0u)\)/g, 'terrainTinted($&,$1)')
+  .replace(
+    'fn terrainReliefTint(h:f32,layer:u32)->f32 {return h;}',
+    'fn terrainReliefTint(h:f32,layer:u32)->f32 {return mix(h,dot(terrainTintTexel.rgb,vec3f(0.2126,0.7152,0.0722)),terrainTintTexel.a*layerRules[layer].params.w);}',
+  )}`;
 };

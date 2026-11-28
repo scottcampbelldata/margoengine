@@ -103,8 +103,10 @@ export interface TerrainLayer {
   /**
    * Relief from the layer's own texture, 0 to 1: its luma becomes a height of up to `bump` halves of one texture repeat
    * (2 m at scale 0.25), and the shading normal follows that height's slope (derivative bump mapping, Mikkelsen 2010).
-   * No extra texture samples; the mips flatten it with distance, and its slope falls once a pixel covers over 1/64 of a
-   * repeat on the ground. Default 0 (no bump).
+   * Where a pixel covers less than 1/128 of a repeat (3 cm at `scale` 0.25) the height is the layer's 128-texel mip
+   * through a cubic filter (16 texel loads a projection), so a magnified texture draws no speckle or facets. The mips
+   * flatten it with distance, and its slope falls once a pixel covers over 1/64 of a repeat on the ground.
+   * Default 0 (no bump).
    */
   bump?: number;
   /**

@@ -8,6 +8,10 @@
 // least 4 times as wide (4.7 on an RTX A6000); macro 0.5 spreads the means of 32 px blocks of the view from 60 m, where
 // the 4 m repeat averages out, at least 4 times as wide and over 2/255 (0.40 to 4.25). On main both options were
 // ignored, so both checks failed there.
+// KB-TUNDRA-GROUNDNOISE1. Seen from 2 m, a texel covers several pixels: bump 0.35 on the noise, and on it with a grey
+// value a texel (the grain of the biomes' ground textures), keeps the pixel contrast (the mean difference from the 3 x 3
+// mean) under bounds the old shader breaks (it read the height texel by texel through the hardware's bilinear filter,
+// which drew speckle, one facet a texel and dotted lines along texel edges), and the relief still spreads the luma.
 // Biome look plan round 3, item A4 and B2. Straight down from 1.52 km, where 96 m is 14 pixels, macro 1 tiled into a
 // grid: the luma correlated 0.999 at that lag; now under 0.2 on both axes (0.12 and -0.03 on an RTX A6000). 20 degrees
 // off a 55 degree face from 30 m, a pixel's long side covers about 1/10 of a repeat and bump 1 kept its full slope there;
@@ -43,6 +47,11 @@ await runSuite(
       ['slopeBumpWeighted', { bump: 1 }, 'slope', true],
       ['high', { macro: 1 }, 'high'],
       ['highWeighted', { macro: 1 }, 'high', true],
+      ['smoothOff', {}, 'close'],
+      ['smoothBump', { bump: 0.35 }, 'close'],
+      ['grainOff', {}, 'close', false, true],
+      ['grainBump', { bump: 0.35 }, 'close', false, true],
+      ['grainBumpWeighted', { bump: 0.35 }, 'close', true, true],
     ];
     for (const [name, ...shot] of shots)
       assert.deepEqual(await page.evaluate((a) => window.check.show(...a), [name, ...shot]), [], name);
@@ -75,6 +84,14 @@ await runSuite(
           ]),
         ),
         stats,
+        fine: await page.evaluate(() =>
+          Object.fromEntries(
+            ['smoothOff', 'smoothBump', 'grainOff', 'grainBump', 'grainBumpWeighted'].map((n) => [
+              n,
+              window.check.fine(n),
+            ]),
+          ),
+        ),
       };
     await mkdir('test-results/terrain-bump', { recursive: true });
     for (const [name] of shots) {
@@ -107,6 +124,20 @@ await runSuite(
       result.fallLine[0] <= 1.3 * Math.max(result.fallLine[1], 0.05),
       `no streaks down the fall line: correlation 8 px along ${result.fallLine[0].toFixed(3)}, across ${result.fallLine[1].toFixed(3)}`,
     );
+    // Bounds between what the shader before the fix drew on an RTX A6000 (6.26 and 28.88) and after (3.75 and 8.49).
+    const bounds = { smoothBump: 5, grainBump: 12, grainBumpWeighted: 12 };
+    for (const [name, bound] of Object.entries(bounds)) {
+      const { grain } = result.fine[name],
+        off = name === 'smoothBump' ? 'smoothOff' : 'grainOff';
+      assert.ok(
+        grain < bound,
+        `${name}: magnified relief draws no speckle: pixel contrast ${grain.toFixed(2)} (under ${bound}; ${result.fine[off].grain.toFixed(2)} without bump)`,
+      );
+      assert.ok(
+        stats[name].deviation > 1.2 * stats[off].deviation,
+        `${name}: the relief still shows: spread ${stats[name].deviation.toFixed(2)} against ${stats[off].deviation.toFixed(2)}`,
+      );
+    }
     console.log(
       `ok terrain bump and macro: bump x${result.bumpRatio.toFixed(2)}, macro block spread x${result.macroRatio.toFixed(2)}, tile ${Math.max(...result.tile).toFixed(3)}, slope x${result.slopeRatio.toFixed(2)}`,
     );

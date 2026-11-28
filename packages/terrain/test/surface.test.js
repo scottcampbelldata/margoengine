@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { Terrain } from '../dist/index.js';
 
-function rig(layer = {}, { weights = false, count = 4 } = {}) {
+function rig(layer = {}, { weights = false, count = 4, tint = false, extra = {} } = {}) {
   const gpu = mockGPU(),
     engine = {
       gpu: gpu.device,
@@ -25,6 +25,7 @@ function rig(layer = {}, { weights = false, count = 4 } = {}) {
       scale: 0.25 * (i + 1),
       ...layer,
     })),
+    ...extra,
     textures: (device) => {
       const texture = (format, layers = 1) =>
         device.createTexture({ size: [4, 4, layers], format, usage: GPUTextureUsage.TEXTURE_BINDING });
@@ -32,6 +33,7 @@ function rig(layer = {}, { weights = false, count = 4 } = {}) {
         heightmap: texture('r32float'),
         layers: texture('rgba8unorm', count),
         ...(weights ? { weights: [texture('rgba8unorm'), texture('rgba8unorm')] } : {}),
+        ...(tint ? { tint: texture('rgba8unorm-srgb') } : {}),
       };
     },
   });
@@ -86,6 +88,30 @@ test('bump and macro add the surface rules and the bumped shading normal', () =>
     assert.equal(r.code.match(/fn terrainColor\(/g).length, 1);
     assert.match(r.code, /terrainRelief=/);
   }
+});
+
+// The pixels are measured by test/bump.browser.mjs; here the shader variants carry the same band-limited height.
+test('the bump height is read from exact texel loads, tinted and under a floating origin as the colour (KB-TUNDRA-GROUNDNOISE1)', () => {
+  const plain = rig({ bump: 0.5 }, { weights: true }).code,
+    tap = plain.slice(plain.indexOf('fn terrainReliefTap('), plain.indexOf('fn terrainReliefLuma('));
+  assert.match(tap, /textureLoad\(terrainLayers,t,i32\(layer\),level\)/);
+  assert.doesNotMatch(tap, /textureSample/, 'no hardware filter weights in the height');
+  assert.match(plain, /log2\(f32\(texels\)\/128\.0\)/);
+  assert.match(plain, /h=mix\(h,terrainReliefTint\(terrainReliefLuma\(position,projection,layer\),layer\),near\);/);
+  assert.match(plain, /fn terrainReliefTint\(h:f32,layer:u32\)->f32 \{return h;\}/);
+  const tinted = rig({ bump: 0.5, tint: true }, { weights: true, tint: true }).code;
+  assert.match(
+    tinted,
+    /fn terrainReliefTint\(h:f32,layer:u32\)->f32 \{return mix\(h,dot\(terrainTintTexel\.rgb,[^;]*terrainTintTexel\.a\*layerRules\[layer\]\.params\.w\);\}/,
+  );
+  const moving = rig(
+    { bump: 0.5 },
+    { extra: { floatingOrigin: { origin: [0, 0, 0], onRebase: () => () => {} } } },
+  ).code;
+  assert.match(
+    moving.slice(moving.indexOf('fn terrainReliefLuma(')),
+    /^[^}]*let p=\(position\+layerRules\[layer\]\.wrap\.xyz\)\*scale;/,
+  );
 });
 
 test('bump and macro outside 0..1 are rejected', () => {

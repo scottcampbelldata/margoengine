@@ -11892,3 +11892,12 @@ longwave closure, native work slots, updated mass ledger and optics. A finite CF
 The workers resolve independent local columns, while donor-face transfers and the ledger follow canonical order.
 A packaged worker test starts three helpers from a production application. The valley cutaway transfers real cold
 condensate over TerrainBed into FogGrid, with identical state and same-frame RGBA after seeking on both backends.
+
+## Terrain bump height near the camera (KB-TUNDRA-GROUNDNOISE1, section 5 evidence, 2026-11-28)
+
+A height that feeds a screen derivative must not come through the hardware sampler where a texel covers several pixels:
+the filter weights are rounded, a bilinear height has one slope a texel, and texel noise becomes slope. Terrain's `bump`
+reads the layer's 128-texel mip with a cubic B-spline over exact texel loads below a footprint of 1/128 of a repeat.
+Evidence: `packages/terrain/test/bump.browser.mjs` on an RTX A6000, WebGPU and the WebGL2 layer; the shader variants
+(tint, floating origin) by `packages/terrain/test/surface.test.js`. Missing: no run on a mobile or integrated GPU, and
+no timing of the extra texel loads (build phase).

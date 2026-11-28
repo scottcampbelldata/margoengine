@@ -11678,3 +11678,9 @@ a pipeline sets its draw buffers before and after each draw, two `drawBuffers` c
 KB-USDZ-FACTORS1 measured gzip/ceiling changes (2026-11-28): usdz 13,740 to 14,738 B (ceiling 15,156), usdz/worker 14,792 to 15,783 B (16,231), usdz/compose 24,714 to 25,725 B (26,473), usdz/preview-surface 5,479 to 6,278 B (6,509), usdz/clips 28,402 to 29,384 B (30,240), dist/workers/usdz.js 162,958 to 163,956 B (168,844). The bytes read texture scale and bias, emission, occlusion and normal scale in both importers; a split entry would leave the plain import with wrong materials. Core + stage is unchanged.
 
 KB-SHRUB-TUNDRA1 measured gzip/ceiling change (2026-11-28): procedural/tree to 6,418 B (ceiling 6,674, was 6,363), for the leaf blade and stem builders both shrubs use. Core + stage is unchanged.
+
+## Terrain bump near the camera (KB-TUNDRA-GROUNDNOISE1, 2026-11-28)
+
+With `TerrainLayer.bump`, where a pixel covers less than 1/128 of a repeat (3 cm at `scale` 0.25) the relief holds no
+detail finer than that, and each showing layer costs 16 texel loads per triplanar axis there (one axis on most ground).
+Core and stage are unchanged.

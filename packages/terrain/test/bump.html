@@ -17,13 +17,17 @@ const noise=(x,y,cells,s)=>{const f=x*cells/256,g=y*cells/256,i=Math.floor(f),j=
 const levels=[new Uint8Array(256*256*4)];
 for(let y=0;y<256;y++)for(let x=0;x<256;x++){const n=(noise(x,y,4,1)*2+noise(x,y,16,2)+noise(x,y,64,3)*0.5)/3.5,k=(y*256+x)*4,v=Math.round(255*(0.25+0.5*n));levels[0].set([v,v,v,255],k);}
 for(let s=128;s>=1;s>>=1){const p=levels[levels.length-1],q=new Uint8Array(s*s*4),w=s*2;for(let y=0;y<s;y++)for(let x=0;x<s;x++)for(let c=0;c<4;c++){const a=(2*y*w+2*x)*4+c;q[(y*s+x)*4+c]=(p[a]+p[a+4]+p[a+w*4]+p[a+w*4+4]+2)>>2;}levels.push(q);}
-// `slope`: 20 degrees off a 55 degree face, its fall line up the screen. `high`: straight down from 1.52 km, where 96 m is 14 pixels.
-const views={near:{position:[0,6,10],target:[0,0,0]},far:{position:[0,60,20],target:[0,0,0]},slope:{position:[24.58,-17.2,0],target:[0,0,0]},high:{position:[0,1520.3,0.01],target:[0,0,0]}};
+// The grain texture: the same noise with a grey value a texel on top (a seventh of the range, as the grain octave of
+// @margoengine/biomes' ground textures), with its own mip chain.
+const grain=[levels[0].map((v,k)=>k%4===3?255:Math.round(v+36*(hash((k>>2)%256,k>>10,7)-0.5)))];
+for(let s=128;s>=1;s>>=1){const p=grain[grain.length-1],q=new Uint8Array(s*s*4),w=s*2;for(let y=0;y<s;y++)for(let x=0;x<s;x++)for(let c=0;c<4;c++){const a=(2*y*w+2*x)*4+c;q[(y*s+x)*4+c]=(p[a]+p[a+4]+p[a+w*4]+p[a+w*4+4]+2)>>2;}grain.push(q);}
+// `close`: 2 m off the ground, a 1.6 cm texel about two pixels. `slope`: 20 degrees off a 55 degree face, its fall line up the screen. `high`: straight down from 1.52 km, where 96 m is 14 pixels.
+const views={close:{position:[0,1.2,1.6],target:[0,0,0]},near:{position:[0,6,10],target:[0,0,0]},far:{position:[0,60,20],target:[0,0,0]},slope:{position:[24.58,-17.2,0],target:[0,0,0]},high:{position:[0,1520.3,0.01],target:[0,0,0]}};
 const SLOPE=Math.tan(55*Math.PI/180),scenes={slope:{size:400,height:(x)=>-x*SLOPE},high:{size:8000,height:()=>0}};
 window.check={
   // Attaches a terrain with `layer` options on every layer, renders it from `view` and keeps its pixels as `name`.
   // `weighted`: through painted weights (two rgba8unorm textures, layer 0 everywhere), as @margoengine/biomes/view draws.
-  async show(name,layer,view,weighted=false){
+  async show(name,layer,view,weighted=false,grainy=false){
     const camera=views[view],scene=scenes[view]??{size:400,height:()=>0},half=scene.size/2;engine.camera.position=[...camera.position];engine.camera.target=[...camera.target];
     device.pushErrorScope('validation');
     const terrain=Terrain.attach(engine,{origin:[-half,-half],size:[scene.size,scene.size],heightScale:1,
@@ -32,7 +36,7 @@ window.check={
         const heightmap=gpu.createTexture({size:[8,8],format:'r32float',usage:6}),layers=gpu.createTexture({size:[256,256,4],format:'rgba8unorm',usage:6,mipLevelCount:9});
         const heights=new Float32Array(64);for(let j=0;j<8;j++)for(let i=0;i<8;i++)heights[j*8+i]=scene.height(-half+i*scene.size/7);
         gpu.queue.writeTexture({texture:heightmap},heights,{bytesPerRow:32},[8,8]);
-        levels.forEach((data,mip)=>{const s=256>>mip;for(let l=0;l<4;l++)gpu.queue.writeTexture({texture:layers,mipLevel:mip,origin:[0,0,l]},data,{bytesPerRow:s*4,rowsPerImage:s},[s,s,1]);});
+        (grainy?grain:levels).forEach((data,mip)=>{const s=256>>mip;for(let l=0;l<4;l++)gpu.queue.writeTexture({texture:layers,mipLevel:mip,origin:[0,0,l]},data,{bytesPerRow:s*4,rowsPerImage:s},[s,s,1]);});
         if(!weighted)return {heightmap,layers};
         const weights=[0,1].map(i=>{const w=gpu.createTexture({size:[1,1],format:'rgba8unorm',usage:6});gpu.queue.writeTexture({texture:w},new Uint8Array([i?0:255,0,0,0]),{bytesPerRow:4},[1,1]);return w;});
         return {heightmap,layers,weights};
@@ -51,6 +55,13 @@ window.check={
     for(let y=64;y<256;y++)for(let x=0;x<256;x++){const v=luma(x,y);sum+=v;sq+=v*v;n++;blocks[((y-64)>>5)*8+(x>>5)]+=v/1024;}
     const mean=sum/n,spread=v=>Math.sqrt(Math.max(0,v.reduce((a,b)=>a+b*b,0)/v.length-(v.reduce((a,b)=>a+b,0)/v.length)**2));
     return {mean,deviation:Math.sqrt(Math.max(0,sq/n-mean*mean)),blocks:spread(blocks)};
+  },
+  // Pixel-scale contrast of the lower 3/4 of a kept image: the mean difference of a pixel's sRGB luma from the mean of
+  // its 3 x 3 neighbourhood.
+  fine(name){
+    const d=kept.get(name),luma=(x,y)=>{const k=(y*256+x)*4;return 0.2126*d[k]+0.7152*d[k+1]+0.0722*d[k+2];};let sum=0,n=0;
+    for(let y=65;y<255;y++)for(let x=1;x<255;x++){let m=0;for(let j=-1;j<2;j++)for(let i=-1;i<2;i++)m+=luma(x+i,y+j);sum+=Math.abs(luma(x,y)-m/9);n++;}
+    return {grain:sum/n};
   },
   // The luma autocorrelation of the middle of a kept image at a lag of (dx, dy) pixels.
   correlation(name,dx,dy){
