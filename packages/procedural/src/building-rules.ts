@@ -45,6 +45,8 @@ import {
   type KeepClear,
 } from './building-interiors.js';
 import { WINDOW_FIT, type WindowFit } from './building-windows.js';
+import { buildBay, placeBays, type BuildingBayFrom, type BuildingBayShape } from './building-bays.js';
+export type { BuildingBayFrom, BuildingBayShape } from './building-bays.js';
 
 /** The style sets. Each is a full set of defaults; any option given overrides it. */
 export type BuildingStyle =
@@ -146,6 +148,24 @@ export interface BuildingRuleOptions {
   readonly balconyFloor?: number;
   /** Balcony width as a share of the front, 0.2 to 1. */
   readonly balconyWidth?: number;
+  /**
+   * Facade bays that hold a bay window, as `doors` counts them (0 the left one seen from outside, -1 the middle), up
+   * to 16 of them. Default none.
+   */
+  readonly bayWindows?: readonly number[];
+  /** Sides those bays are on: 0 front, 1 right, 2 back, 3 left. Default `[0]`. */
+  readonly bayWindowSides?: readonly number[];
+  /** Storeys with them, 0 the ground floor. Default `[]`, every storey. */
+  readonly bayWindowFloors?: readonly number[];
+  /** A box, sides canted at 30 or 45 degrees from the wall, or a bow of five lights. Default `box`. */
+  readonly bayWindowShape?: BuildingBayShape;
+  /** How far a bay window stands out from the wall face, metres, 0.15 to 1.2. Default 0.45. */
+  readonly bayWindowDepth?: number;
+  /**
+   * `sill` (default): a bay hung from its sill, at least 0.3 m over its floor, on brackets. `floor`: the floor runs
+   * out into it; on the ground floor it stands on its own footing, and bays above each other are joined.
+   */
+  readonly bayWindowFrom?: BuildingBayFrom;
   readonly chimney?: boolean;
   /** Chimney position as shares of the half width and half depth, each -0.9 to 0.9. */
   readonly chimneyAt?: readonly [number, number];
@@ -244,6 +264,8 @@ export interface Building {
   /** Highest point of the roof, false front, parapet or chimney above the ground, metres. */
   readonly top: number;
   readonly openings: readonly BuildingOpening[];
+  /** Bay windows built; each also has one `window` in `openings`, its mouth in the wall. */
+  readonly bayWindows: readonly BuildingBay[];
   /** Footprint corners `[x, z]`, world, counter-clockwise from above. */
   readonly footprint: readonly (readonly [number, number])[];
   /** Roof covering height above the ground at local `[x, z]` (NaN off the roof). */
@@ -271,6 +293,29 @@ export interface Building {
   readonly stairs: readonly BuildingStair[];
   /** Doorways through partition walls, local metres. */
   readonly doorways: readonly BuildingDoorway[];
+}
+/** A bay window as built: heights are above the ground, as `floors` is. */
+export interface BuildingBay {
+  readonly side: number;
+  readonly floor: number;
+  readonly shape: BuildingBayShape;
+  readonly from: BuildingBayFrom;
+  /** Its outer faces' plan `[x, z]`, world, from wall to wall. */
+  readonly outline: readonly (readonly [number, number])[];
+  /** How far it stands out (less than asked where a narrow bay keeps its front), metres. */
+  readonly depth: number;
+  /** Underside of its walls, floor inside, window sill, window head and top of its walls, metres. */
+  readonly base: number;
+  readonly ledge: number;
+  readonly sill: number;
+  readonly head: number;
+  readonly top: number;
+  /** Its lights: middle (world `[x, y, z]`), width and height. */
+  readonly lights: readonly {
+    readonly centre: readonly [number, number, number];
+    readonly width: number;
+    readonly height: number;
+  }[];
 }
 /** A room: its storey, its floor rectangle (local `[x, z]`), floor level, clear height to the ceiling and area. */
 export interface BuildingRoom {
@@ -376,6 +421,12 @@ const BASE: StyleSet = {
   balcony: 0.91,
   balconyFloor: 1,
   balconyWidth: 0.6,
+  bayWindows: [],
+  bayWindowSides: [0],
+  bayWindowFloors: [],
+  bayWindowShape: 'box',
+  bayWindowDepth: 0.45,
+  bayWindowFrom: 'sill',
   chimney: false,
   chimneyAt: [0.4, 0],
   gutters: true,
@@ -707,7 +758,13 @@ export function resolveBuildingOptions(options: BuildingRuleOptions = {}): Resol
   const doors = o.doors === undefined ? s.doors : o.doors;
   if (!Array.isArray(doors) || doors.length > 16 || !doors.every((d) => Number.isInteger(d) && d >= -1 && d < 64))
     fail('doors', 'up to 16 bay indices (integers from -1 to 63)');
-  const wall = num(o, 'wall', 0.08, 1, s.wall);
+  const wall = num(o, 'wall', 0.08, 1, s.wall),
+    indices = (name: string, most: number, lo: number, hi: number, fallback: readonly number[]) => {
+      const v = o[name] === undefined ? fallback : o[name];
+      if (!Array.isArray(v) || v.length > most || !v.every((d) => Number.isInteger(d) && d >= lo && d <= hi))
+        fail(name, `up to ${most} integers from ${lo} to ${hi}`);
+      return [...(v as number[])];
+    };
   const r: Resolved = {
     style,
     width: num(o, 'width', 3, 120, s.width),
@@ -739,6 +796,12 @@ export function resolveBuildingOptions(options: BuildingRuleOptions = {}): Resol
     balcony: num(o, 'balcony', 0, 3, s.balcony),
     balconyFloor: num(o, 'balconyFloor', 1, 59, s.balconyFloor, true),
     balconyWidth: num(o, 'balconyWidth', 0.2, 1, s.balconyWidth),
+    bayWindows: indices('bayWindows', 16, -1, 63, s.bayWindows),
+    bayWindowSides: indices('bayWindowSides', 4, 0, 3, s.bayWindowSides),
+    bayWindowFloors: indices('bayWindowFloors', 60, 0, 59, s.bayWindowFloors),
+    bayWindowShape: pick(o, 'bayWindowShape', ['box', 'canted-30', 'canted-45', 'bow'], s.bayWindowShape),
+    bayWindowDepth: num(o, 'bayWindowDepth', 0.15, 1.2, s.bayWindowDepth),
+    bayWindowFrom: pick(o, 'bayWindowFrom', ['sill', 'floor'], s.bayWindowFrom),
     chimney: bool(o, 'chimney', s.chimney),
     chimneyAt: tuple(o, 'chimneyAt', 2, -0.9, 0.9, s.chimneyAt) as [number, number],
     gutters: bool(o, 'gutters', s.gutters),
@@ -923,12 +986,14 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
   }
 
   // In a joined plan an opening another block stands against moves or shrinks, and a window may go
-  // (building-windows.ts).
+  // (building-windows.ts); a bay window is made only where it stands clear.
   const fit = (options as { [WINDOW_FIT]?: WindowFit })[WINDOW_FIT];
+  placeBays(o, sides, holes, floors, fit?.clear);
   if (fit)
     for (let i = holes.length - 1; i >= 0; i--) {
       const h = holes[i],
         s = sides[h.side];
+      if (h.bay) continue;
       const bays = Math.max(1, Math.round(s.length / o.bayWidth)),
         bw = s.length / bays,
         bay = Math.floor((h.a0 + h.a1) / 2 / bw),
@@ -938,9 +1003,12 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
         beside = mine.filter((q) => q.y0 < h.y1 && q.y1 > h.y0),
         // A window keeps to its bay; a door may go as far as the opening next to it.
         door = h.kind === 'door',
-        from = door ? Math.max(0, ...beside.filter((q) => q.a1 <= h.a0).map((q) => q.a1 + 0.1)) : bay * bw + 0.1,
+        // A bay's walls stand past its mouth.
+        start = (q: Hole) => (q.bay ? q.bay.outline[0][0] : q.a0),
+        end = (q: Hole) => (q.bay ? q.bay.outline[q.bay.outline.length - 1][0] : q.a1),
+        from = door ? Math.max(0, ...beside.filter((q) => q.a1 <= h.a0).map((q) => end(q) + 0.1)) : bay * bw + 0.1,
         to = door
-          ? Math.min(s.length, ...beside.filter((q) => q.a0 >= h.a1).map((q) => q.a0 - 0.1))
+          ? Math.min(s.length, ...beside.filter((q) => q.a0 >= h.a1).map((q) => start(q) - 0.1))
           : (bay + 1) * bw - 0.1,
         next = fit(h, s, {
           a0: Math.max(th + 0.05, from),
@@ -956,6 +1024,13 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
     lapCourse = o.cladding === 'clapboard' ? 0.11 : 0.455,
     lapLip = o.cladding === 'clapboard' ? 0.014 : 0.006,
     corrugate = near && o.cladding === 'metal';
+  // A piece of a wall's outer face; a bay may stand below the plinth, where the siding's courses start.
+  function clad(s: Side, a0: number, a1: number, y0: number, y1: number) {
+    if (a1 - a0 < 1e-6 || y1 - y0 < 1e-6) return;
+    if (lap) lapCells(parts.walls, s, at, a0, a1, y0, y1, Math.min(o.plinth, y0), lapCourse, lapLip);
+    else if (corrugate) corrugatedCell(parts.walls, s, at, a0, a1, y0, y1);
+    else parts.walls.poly([at(s, a0, y0), at(s, a1, y0), at(s, a1, y1), at(s, a0, y1)], s.out);
+  }
   for (let si = 0; si < 4; si++) {
     const s = sides[si],
       Ls = s.length,
@@ -970,9 +1045,7 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
           y0 = yBreak[j],
           y1 = yBreak[j + 1];
         if (a1 - a0 < 1e-6 || y1 - y0 < 1e-6 || inside((a0 + a1) / 2, (y0 + y1) / 2)) continue;
-        if (lap) lapCells(parts.walls, s, at, a0, a1, y0, y1, o.plinth, lapCourse, lapLip);
-        else if (corrugate) corrugatedCell(parts.walls, s, at, a0, a1, y0, y1);
-        else parts.walls.poly([at(s, a0, y0), at(s, a1, y0), at(s, a1, y1), at(s, a0, y1)], s.out);
+        clad(s, a0, a1, y0, y1);
         const b0 = Math.max(a0, th),
           b1 = Math.min(a1, Ls - th);
         if (b1 - b0 > 1e-6)
@@ -1000,7 +1073,8 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
     }
   }
   // Openings: glass, frames, sills, casings and doors.
-  const openings: BuildingOpening[] = [];
+  const openings: BuildingOpening[] = [],
+    bayWindows: BuildingBay[] = [];
   for (const h of holes) {
     const s = sides[h.side],
       w = h.a1 - h.a0,
@@ -1015,6 +1089,58 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
       height: hh,
     });
     const plane = (a: number, yy: number, off = -rev) => at(s, a, yy, off);
+    if (h.bay) {
+      const b = h.bay,
+        lights = buildBay(
+          {
+            walls: parts.walls,
+            interior: parts.interior,
+            trim: parts.trim,
+            roof: parts.roof,
+            glass: parts.glass,
+            base: parts.base,
+            detail: !far,
+            clad,
+            // One light to a face: a sliding pair needs a wider one than most faces have.
+            frame: (face, light, inset) =>
+              buildFrame(
+                parts.frames,
+                face,
+                (a, yy, off = 0) => at(face, a, yy, off - inset),
+                light,
+                o.windowKind === 'strip' ? 'strip' : 'double-hung',
+                near,
+                rand,
+                o.style.startsWith('japan'),
+              ),
+          },
+          s,
+          h,
+          b,
+        );
+      bayWindows.push({
+        side: h.side,
+        floor: h.floor,
+        shape: b.shape,
+        from: b.from,
+        outline: b.outline.map(([a, out]) => {
+          const p = at(s, a, 0, out);
+          return [p[0], p[2]] as const;
+        }),
+        depth: b.depth,
+        base: b.base,
+        ledge: b.ledge,
+        sill: b.sill,
+        head: b.head,
+        top: b.top,
+        lights: lights.map((l) => ({
+          centre: at(l.face, (l.a0 + l.a1) / 2, (b.sill + b.head) / 2),
+          width: l.a1 - l.a0,
+          height: b.head - b.sill,
+        })),
+      });
+      continue;
+    }
     if (h.kind === 'door') {
       buildDoor(parts, s, plane, h, near, far, o);
     } else {
@@ -1066,7 +1192,16 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
   foot(-ix, ix, -iz, iz, o.plinth - 0.2);
 
   // Roof.
-  const roof = buildRoof(parts, o, eaves, near, far);
+  const roof = buildRoof(parts, o, eaves, near, far, ([x, y, z]) =>
+    holes.some((h) => {
+      if (!h.bay || h.bay.top + 0.12 <= y) return false;
+      const s = sides[h.side],
+        a = (x - s.start[0]) * s.dir[0] + (z - s.start[2]) * s.dir[2],
+        out = (x - s.start[0]) * s.out[0] + (z - s.start[2]) * s.out[2],
+        line = h.bay.outline;
+      return a > line[0][0] - 0.1 && a < line[line.length - 1][0] + 0.1 && out > -0.1 && out < h.bay.depth + 0.1;
+    }),
+  );
   // False front.
   let top = Math.max(wallTop, roof.top);
   if (o.falseFront > 0) {
@@ -1114,15 +1249,26 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
       if (near) dentils(parts.trim, s, at, 0, s.length, yy - 0.3);
     }
   if (o.bands && !far)
-    for (const s of sides)
-      for (let k = 1; k < floors.length; k++)
-        parts.trim.box(
-          at(s, s.length / 2, floors[k] - 0.05, 0.03),
-          [s.length / 2 + 0.03, 0.12, 0.03],
-          s.dir,
-          UP,
-          s.out,
-        );
+    sides.forEach((s, si) => {
+      for (let k = 1; k < floors.length; k++) {
+        // The band stops either side of a bay the floor runs out into.
+        const gaps = holes
+          .filter((h) => h.side === si && h.floor === k && h.bay?.from === 'floor')
+          .map((h) => [h.bay!.outline[0][0], h.bay!.outline[h.bay!.outline.length - 1][0]])
+          .sort((p, q) => p[0] - q[0]);
+        let from = -0.03;
+        for (const [to, next] of [...gaps, [s.length + 0.03, 0]]) {
+          parts.trim.box(
+            at(s, (from + to) / 2, floors[k] - 0.05, 0.03),
+            [(to - from) / 2, 0.12, 0.03],
+            s.dir,
+            UP,
+            s.out,
+          );
+          from = next;
+        }
+      }
+    });
   if (o.cornerBoards && !far)
     for (const s of sides)
       parts.trim.box(
@@ -1180,6 +1326,14 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
       return { ...p, centre: [x, origin[1] + p.centre[1], z] as const };
     }),
     footprint: [world(-W / 2, D / 2), world(W / 2, D / 2), world(W / 2, -D / 2), world(-W / 2, -D / 2)],
+    bayWindows: bayWindows.map((b) => ({
+      ...b,
+      outline: b.outline.map(([x, z]) => world(x, z)),
+      lights: b.lights.map((l) => {
+        const [x, z] = world(l.centre[0], l.centre[2]);
+        return { ...l, centre: [x, origin[1] + l.centre[1], z] as const };
+      }),
+    })),
     roofHeight: roof.height,
     chimney,
     steps,
@@ -1370,6 +1524,8 @@ function buildRoof(
   eaves: number,
   near: boolean,
   far: boolean,
+  /** Whether a bay window stands where a knee brace would foot. */
+  taken: (p: V3) => boolean,
 ): RoofResult {
   const W = o.width,
     D = o.depth,
@@ -1551,6 +1707,7 @@ function buildRoof(
         const x = -L / 2 + 1 + ((L - 2) * k) / count,
           foot = map([x, eaves - Math.min(1, ov * 0.7), sz * (d / 2 + 0.05)]),
           head = map([x, eaves - ov * 0.75 * t, sz * (d / 2 + ov * 0.75)]);
+        if (taken(foot)) continue;
         parts.trim.beam(foot, head, 0.09, 0.14);
         parts.trim.beam(
           map([x, eaves - 0.12, sz * (d / 2 + 0.05)]),
@@ -1984,8 +2141,14 @@ export function townBuildings(lots: readonly BuildingLot[], options: TownBuildin
     }
     const set = BUILDING_STYLE_SETS[style],
       front = lot.front ?? ([-lot.along[1], lot.along[0]] as const),
-      width = Math.max(3, Math.min(lot.size[0] - 2 * margin, set.width * (1 + (rand() - 0.5) * 0.2))),
-      depth = Math.max(3, Math.min(lot.size[1] - 2 * margin, set.depth * (1 + (rand() - 0.5) * 0.2))),
+      o = options.override,
+      // The margin is kept beyond a bay window on either side of that pair.
+      bay = (pair: number) =>
+        o?.bayWindows?.length && (o.bayWindowSides ?? [0]).some((s) => s % 2 === pair)
+          ? (o.bayWindowDepth ?? set.bayWindowDepth) + 0.03
+          : 0,
+      width = Math.max(3, Math.min(lot.size[0] - 2 * (margin + bay(1)), set.width * (1 + (rand() - 0.5) * 0.2))),
+      depth = Math.max(3, Math.min(lot.size[1] - 2 * (margin + bay(0)), set.depth * (1 + (rand() - 0.5) * 0.2))),
       v = rand(),
       storeys =
         style === 'western-1910-brick'

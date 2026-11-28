@@ -56,6 +56,10 @@ interface BreakwaterOptions {
     readonly seed?: number;
 }
 
+type BuildingBayFrom = 'sill' | 'floor';
+
+type BuildingBayShape = 'box' | 'canted-30' | 'canted-45' | 'bow';
+
 type BuildingCladding = 'clapboard' | 'siding' | 'brick' | 'concrete' | 'plaster' | 'metal';
 
 type BuildingDetail = 'far' | 'mid' | 'near';
@@ -119,6 +123,12 @@ interface BuildingRuleOptions {
     readonly balcony?: number;
     readonly balconyFloor?: number;
     readonly balconyWidth?: number;
+    readonly bayWindows?: readonly number[];
+    readonly bayWindowSides?: readonly number[];
+    readonly bayWindowFloors?: readonly number[];
+    readonly bayWindowShape?: BuildingBayShape;
+    readonly bayWindowDepth?: number;
+    readonly bayWindowFrom?: BuildingBayFrom;
     readonly chimney?: boolean;
     readonly chimneyAt?: readonly [number, number];
     readonly gutters?: boolean;

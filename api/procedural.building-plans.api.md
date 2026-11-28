@@ -68,6 +68,7 @@ export interface PlannedBuilding {
     readonly blocks: readonly BuildingPlanBlock[];
     readonly top: number;
     readonly openings: readonly BuildingOpening[];
+    readonly bayWindows: readonly BuildingBay[];
     readonly dormers: readonly BuildingDormer[];
     readonly rooms: readonly BuildingRoom[];
     readonly furniture: readonly BuildingFurniture[];
@@ -81,6 +82,29 @@ export interface PlannedBuilding {
 export function generateBuildingPlan(options?: BuildingPlanOptions): PlannedBuilding;
 
 // Not exported from this entry, but used by the exports above:
+
+interface BuildingBay {
+    readonly side: number;
+    readonly floor: number;
+    readonly shape: BuildingBayShape;
+    readonly from: BuildingBayFrom;
+    readonly outline: readonly (readonly [number, number])[];
+    readonly depth: number;
+    readonly base: number;
+    readonly ledge: number;
+    readonly sill: number;
+    readonly head: number;
+    readonly top: number;
+    readonly lights: readonly {
+        readonly centre: readonly [number, number, number];
+        readonly width: number;
+        readonly height: number;
+    }[];
+}
+
+type BuildingBayFrom = 'sill' | 'floor';
+
+type BuildingBayShape = 'box' | 'canted-30' | 'canted-45' | 'bow';
 
 type BuildingCladding = 'clapboard' | 'siding' | 'brick' | 'concrete' | 'plaster' | 'metal';
 
@@ -169,6 +193,12 @@ interface BuildingRuleOptions {
     readonly balcony?: number;
     readonly balconyFloor?: number;
     readonly balconyWidth?: number;
+    readonly bayWindows?: readonly number[];
+    readonly bayWindowSides?: readonly number[];
+    readonly bayWindowFloors?: readonly number[];
+    readonly bayWindowShape?: BuildingBayShape;
+    readonly bayWindowDepth?: number;
+    readonly bayWindowFrom?: BuildingBayFrom;
     readonly chimney?: boolean;
     readonly chimneyAt?: readonly [number, number];
     readonly gutters?: boolean;

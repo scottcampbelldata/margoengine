@@ -235,6 +235,28 @@ test('every storey of every random multi-storey building is reached on foot', ()
   assert.ok(kinds.spiral > 0 && kinds.ladder > 0, JSON.stringify(kinds));
 });
 
+test('bay windows on every side leave every storey reached on foot', () => {
+  const wrong = [],
+    kinds = {},
+    shapes = ['box', 'canted-30', 'canted-45', 'bow'];
+  let bays = 0;
+  for (let i = 0; i < 400; i++) {
+    const o = {
+        ...randomOptions(i),
+        bayWindows: [0, 1, 2, -1],
+        bayWindowSides: [0, 1, 2, 3],
+        bayWindowShape: shapes[i % 4],
+        bayWindowDepth: 0.2 + (i % 9) * 0.125,
+        bayWindowFrom: i % 8 < 4 ? 'sill' : 'floor',
+      },
+      b = generateBuilding(o);
+    bays += b.bayWindows.length;
+    check(b, o, `#${i} ${o.style} ${o.width.toFixed(2)} x ${o.depth.toFixed(2)} with bays`, wrong, kinds);
+  }
+  assert.deepEqual(wrong.slice(0, 20), [], `${wrong.length} failures`);
+  assert.ok(bays > 1500, `${bays} bays`);
+});
+
 test('winder stairs reach every storey too, and come first where asked', () => {
   const wrong = [],
     kinds = {};
@@ -448,6 +470,8 @@ function randomPlan(i) {
       tower: pick(['none', 'front-left', 'front-right', 'back-left', 'back-right']),
       towerSize: range(3, 6),
       towerStoreys: Math.floor(next() * 3),
+      // Every other plan has bay windows round it, drawn from the plan's number so the other draws stay as they were.
+      ...(i % 2 ? { bayWindows: [0, 2, -1], bayWindowSides: [0, 1, 2, 3], bayWindowDepth: 0.3 + (i % 5) * 0.2 } : {}),
     };
   let tallest = levels + (o.tower === 'none' ? 0 : o.towerStoreys);
   if (next() < 0.25) {
@@ -728,6 +752,15 @@ function coveredWindows(b, label) {
     else if (faults.every(Boolean))
       wrong.push(`${label}: a ${q.kind} at ${q.centre.map((v) => v.toFixed(2))}: ${faults[0]}`);
   }
+  // A bay window stands clear of every other block: its faces' corners, from its underside to its head.
+  for (const bay of b.bayWindows ?? [])
+    for (const [x, z] of bay.outline.slice(1, -1))
+      for (const y of [bay.base, (bay.base + bay.head) / 2, bay.head])
+        b.blocks.forEach((_, k) => {
+          // Plans here stand at the origin, so a bay's heights are the world's.
+          if (b.insideBlock(k, x, y, z))
+            wrong.push(`${label}: a bay window at ${x.toFixed(2)} ${z.toFixed(2)} in block ${k}`);
+        });
   // Nor do two openings of one wall run into each other.
   for (const list of held.values())
     list.forEach((q, i) => {

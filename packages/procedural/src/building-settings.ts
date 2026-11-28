@@ -100,6 +100,17 @@ export const BUILDING_SETTINGS: readonly BuildingSetting[] = [
   n('balcony', 'frontage', 0.91, 0, 3, 0.01, 'm', 'Front balcony depth (0 none).'),
   n('balconyFloor', 'frontage', 1, 1, 59, 1, '', 'Storey the balcony is on (1 is the second).'),
   n('balconyWidth', 'frontage', 0.6, 0.2, 1, 0.01, '', 'Balcony width as a share of the front.'),
+  c(
+    'bayWindow',
+    'bay windows',
+    ['none', 'middle', 'left', 'right', 'both'],
+    'Bay windows: in the middle facade bay, an end one or both ends.',
+  ),
+  c('bayWindowSides', 'bay windows', ['front', 'front-back', 'all'], 'The sides the bay windows are on.'),
+  c('bayWindowFloors', 'bay windows', ['all', 'ground', 'upper'], 'The storeys with bay windows.'),
+  c('bayWindowShape', 'bay windows', ['box', 'canted-30', 'canted-45', 'bow'], 'Plan of each bay window.'),
+  n('bayWindowDepth', 'bay windows', 0.45, 0.15, 1.2, 0.01, 'm', 'How far a bay window stands out.'),
+  c('bayWindowFrom', 'bay windows', ['sill', 'floor'], 'Hung from the sill on brackets, or the floor run out into it.'),
   c('chimney', 'trim', offOn, 'A chimney (pitched roofs).'),
   c('gutters', 'trim', onOff, 'Gutters and downspouts.'),
   c('cornerBoards', 'trim', offOn, 'Corner boards.'),
@@ -122,6 +133,7 @@ export const BUILDING_SETTINGS: readonly BuildingSetting[] = [
   n('seed', 'detail', 1, 0, 1_000_000, 1, '', 'Seed for small differences.'),
 ];
 const BUILDING_INDEX = settingIndex(BUILDING_SETTINGS);
+const PAIRED = ['storeys', 'storeyHeight', 'windowWidth', 'windowHeight', 'doorWidth', 'doorHeight'];
 const FLAGS = [
   'sideWindows',
   'storefront',
@@ -153,12 +165,13 @@ export function buildingOptionsFromSettings(values: BuildingSettingValues): Buil
   const out: Record<string, unknown> = {},
     v = values as Record<string, BuildingSettingValue>;
   for (const [name, value] of Object.entries(v)) {
-    if (['storeys', 'storeyHeight', 'windowWidth', 'windowHeight', 'doorWidth', 'doorHeight'].includes(name)) continue;
+    if ([...PAIRED, 'bayWindow', 'bayWindowSides', 'bayWindowFloors'].includes(name)) continue;
     out[name] = FLAGS.includes(name) ? value === 'on' : value;
   }
   const set = BUILDING_STYLE_SETS[(v.style as BuildingStyle | undefined) ?? 'japan-2011-house'];
   return {
     ...out,
+    ...bays(v, set),
     ...pair(v, 'storeys', 'storeyHeight', [set.storeys.length, set.storeys[0]], (count, h) => ({
       storeys: Array(count).fill(h),
     })),
@@ -169,6 +182,23 @@ export function buildingOptionsFromSettings(values: BuildingSettingValues): Buil
       door: [w, h],
     })),
   } as BuildingRuleOptions;
+}
+// The bay window rows that name lists of bays, sides and storeys; an end bay of 63 is the right end of any side.
+function bays(v: Record<string, BuildingSettingValue>, set: (typeof BUILDING_STYLE_SETS)[BuildingStyle]) {
+  const out: Record<string, unknown> = {},
+    storeys = (v.storeys as number | undefined) ?? set.storeys.length;
+  if ('bayWindow' in v)
+    out.bayWindows = { none: [], middle: [-1], left: [0], right: [63], both: [0, 63] }[v.bayWindow as 'none'];
+  if ('bayWindowSides' in v)
+    out.bayWindowSides = { front: [0], 'front-back': [0, 2], all: [0, 1, 2, 3] }[v.bayWindowSides as 'front'];
+  if ('bayWindowFloors' in v)
+    // A one storey building has no upper floor: a storey past the roof holds none.
+    out.bayWindowFloors = {
+      all: [],
+      ground: [0],
+      upper: storeys > 1 ? Array.from({ length: storeys - 1 }, (_, i) => i + 1) : [59],
+    }[v.bayWindowFloors as 'all'];
+  return out;
 }
 // Two rows that make one option: the one not given comes from the style set.
 function pair(

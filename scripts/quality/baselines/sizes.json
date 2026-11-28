@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21484902,
+  "total": 21494125,
   "history": [
     {
       "date": "2026-10-24",
@@ -15151,6 +15151,12 @@
       "commit": "lane-e-3mf-corpus",
       "reason": "lane E 2026-11-27 (KB-3MF-DOTS1): the exact boolean removes cut points before rounding (boolean-simplify.ts) and takes precision float32 (Botsch and Kobbelt pass with a grain, shared with the zero-area removal of the other booleans). About 2 KB gzip on the exact entries, worth it: without it a cut of a finely faceted surface holds up to a third slivers; a split entry would cost a second kernel.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "building-bay-windows",
+      "reason": "Bay windows in rules buildings (box, canted 30 and 45 degrees and bow, hung from the sill or carried from the floor; limits row Building rules): measured gzip building-rules 22,131 to 24,940, building-plans 32,076 to 35,115, building-settings 5,898 to 6,317, city 35,536 to 38,235. generateBuilding is synchronous and builds a bay with its wall, so a split entry would leave the option unavailable until a second import.",
+      "grew": 4
     }
   ],
   "items": {
@@ -16145,12 +16151,12 @@
     "@margoengine/post/trail": 3766,
     "@margoengine/post/upscale": 5068,
     "@margoengine/procedural": 18709,
-    "@margoengine/procedural/building-plans": 33039,
-    "@margoengine/procedural/building-rules": 22795,
-    "@margoengine/procedural/building-settings": 6154,
+    "@margoengine/procedural/building-plans": 36169,
+    "@margoengine/procedural/building-rules": 25689,
+    "@margoengine/procedural/building-settings": 6573,
     "@margoengine/procedural/buildings": 1758,
     "@margoengine/procedural/caves": 1677,
-    "@margoengine/procedural/city": 36603,
+    "@margoengine/procedural/city": 39383,
     "@margoengine/procedural/conifer-settings": 2447,
     "@margoengine/procedural/conifer-species": 2249,
     "@margoengine/procedural/conifers": 6159,

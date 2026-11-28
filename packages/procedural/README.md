@@ -992,7 +992,7 @@ pan and roll at `near` detail), shingle or standing seam metal, ridge and hip ca
 braces and a chimney that clears the roof by the building code. `detail` (`far`, `mid`, `near`) sets how much small
 geometry there is, so a whole town can be `mid` and the hero house `near`.
 
-It returns `{parts, palette, options, floors, eaves, top, openings, footprint, roofHeight(x, z), chimney, steps,
+It returns `{parts, palette, options, floors, eaves, top, openings, bayWindows, footprint, roofHeight(x, z), chimney, steps,
 railings, rooms, furniture, doorways, stairs}`: one `GeometryData` per part (`walls`, `interior`, `furniture`,
 `stairs`, `fixtures`, `metalwork`, `fabric`, `mats`, `trim`, `roof`, `glass`, `frames`, `doors`, `base`,
 `porch`, `awning`, `chimney`, `gutters`; a part with nothing in it is left out), all in world space with UVs in metres
@@ -1010,6 +1010,24 @@ Style sets (`style`), each a full set of defaults that any option overrides:
 | `western-1910-false-front` | Two storey store on a 25 ft lot: square or stepped false front with a cornice, storefront and transoms, awning |
 | `western-1910-brick` | Three storey brick commercial block: storefronts, tall double-hung windows with stone lintels, belt courses, parapet and dentil cornice |
 | `western-1910-depot` | One storey rail depot: long hip roof with 1.8 m bracketed eaves, clapboard, two doors |
+
+A bay window takes the place of the window in its facade bay and opens into the room through the wall. Hung from its
+sill (`bayWindowFrom: 'sill'`, on two brackets) its underside is at least 0.3 m over the floor, and at the default depth
+of 0.45 m it stands out less than 0.5 m and is window over more than half its elevation: the three conditions under
+which Japan counts no floor area for a bay (Setagaya City, 4-92-1a, after notice 住指発第115号 of 1986,
+https://www.city.setagaya.lg.jp/documents/3826/4-92-1a.pdf). With `'floor'` the floor runs out into it, a ground floor
+one stands on its own footing and bays above each other join. A narrow facade bay keeps a 0.4 m front and stands out
+less than asked; heads come down under eaves and balcony slabs; none is made on a door, a shop window, a balcony or,
+in a joined plan, where another block stands within its depth of it. `bayWindows` lists what was built, with each
+light's middle and size, and `openings` holds each bay's mouth in the wall.
+
+```ts
+import {generateBuilding} from 'margoengine/procedural/building-rules';
+const front = generateBuilding({width: 10.92, balcony: 0, bayWindows: [0, 3], bayWindowShape: 'canted-45'});
+console.log(front.bayWindows.length, front.bayWindows[0].lights.length, front.bayWindows[0].depth.toFixed(2)); // 4 3 0.45
+const tall = generateBuilding({style: 'western-1910-house', bayWindows: [0], bayWindowFrom: 'floor', bayWindowFloors: [0]});
+console.log(tall.bayWindows[0].ledge === tall.floors[0]); // true
+```
 
 `townBuildings(lots, {styles, margin, detail, seed, override})` turns the lots of a settlement layout (the `houses` of
 `layoutSettlements` from `@margoengine/biomes/settlements`, `pattern: 'grid'`) into one building's options each: a style
@@ -1049,6 +1067,9 @@ console.log(town.length, Object.keys(town[0].parts).length > 5); // 1 true
 | `storefront`, `awning` | false, false | | shop windows over a bulkhead with transoms; a canvas awning |
 | `porch`, `porchWidth` | 0, 1 | 0 to 5 m; 0.2 to 1 | front porch depth and width share |
 | `balcony`, `balconyFloor`, `balconyWidth` | 0.91, 1, 0.6 | 0 to 3 m; 1 to 59; 0.2 to 1 | front balcony |
+| `bayWindows`, `bayWindowSides`, `bayWindowFloors` | [], [0], [] | bay indices as `doors`; sides 0 to 3; storeys, `[]` every one | which facade bays hold a bay window |
+| `bayWindowShape` | `box` | `box`, `canted-30`, `canted-45`, `bow` | square sides, canted sides, or five lights on an arc |
+| `bayWindowDepth`, `bayWindowFrom` | 0.45, `sill` | 0.15 to 1.2 m; `sill`, `floor` | how far it stands out; hung from the sill, or the floor run out into it |
 | `chimney`, `chimneyAt` | false, [0.4, 0] | -0.9 to 0.9 each | a chimney and its place as shares of the half width and depth |
 | `gutters`, `cornerBoards`, `casings`, `bands`, `cornice`, `brackets` | true, false, false, false, false, false | | trim |
 | `detail` | `mid` | `far`, `mid`, `near` | small geometry |

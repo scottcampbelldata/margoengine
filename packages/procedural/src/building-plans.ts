@@ -23,6 +23,7 @@
 import type { GeometryData } from '@margoengine/geometry/utils';
 import {
   type Building,
+  type BuildingBay,
   type BuildingDoorway,
   type BuildingFurniture,
   type BuildingMaterial,
@@ -120,6 +121,8 @@ export interface PlannedBuilding {
   readonly top: number;
   /** Openings left visible (an opening inside another block is dropped), world. */
   readonly openings: readonly BuildingOpening[];
+  /** Bay windows of every block (each stands clear of the others), plan-local heights, world plans. */
+  readonly bayWindows: readonly BuildingBay[];
   readonly dormers: readonly BuildingDormer[];
   /** Rooms, furnishing blocks, doorways and stairs of every block, in plan-local metres (before origin and yaw). */
   readonly rooms: readonly BuildingRoom[];
@@ -1052,6 +1055,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
         doors: [],
         porch: 0,
         balcony: 0,
+        bayWindows: [],
         storefront: false,
         awning: false,
         chimney: false,
@@ -1277,6 +1281,17 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
       openings.push({ ...op, centre: [X, origin[1] + op.centre[1], Z] });
     }
   });
+  const bayWindows: BuildingBay[] = blocks.flatMap((blk) =>
+    (blk.building?.bayWindows ?? []).map((bay) => ({
+      ...bay,
+      // Building plans and lights came out in plan-local terms, as the footprints did.
+      outline: bay.outline.map(([x, z]) => world(x, z)),
+      lights: bay.lights.map((l) => {
+        const [X, Z] = world(l.centre[0], l.centre[2]);
+        return { ...l, centre: [X, origin[1] + l.centre[1], Z] as const };
+      }),
+    })),
+  );
   const dormerOut = dormerList.map((dm) => {
     const [X, Z] = world(dm.window.centre[0], dm.window.centre[2]);
     const window = {
@@ -1355,6 +1370,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
     blocks: infos,
     top: Math.max(...infos.map((b) => b.top)),
     openings,
+    bayWindows,
     dormers: dormerOut,
     rooms,
     furniture,

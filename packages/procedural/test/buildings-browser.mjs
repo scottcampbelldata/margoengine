@@ -284,6 +284,32 @@ try {
         [at[0], 1, at[2] + 7],
       ]);
     }
+    // Bay windows from the front corner: each plan hung from its sill, then two storeys of bays on the ground.
+    for (const [style, shape, from] of [
+      ['japan-2011-house', 'box', 'sill'],
+      ['japan-2011-house', 'bow', 'sill'],
+      ['western-1910-house', 'canted-45', 'floor'],
+      ['western-1910-depot', 'canted-30', 'sill'],
+    ]) {
+      const at = [cuts.length * 40, 0, -600];
+      const b = generateBuilding({
+        style,
+        origin: at,
+        detail: 'near',
+        balcony: 0,
+        bayWindows: [0, 2],
+        bayWindowSides: [0, 1],
+        bayWindowShape: shape,
+        bayWindowFrom: from,
+        ...(from === 'floor' ? { porch: 0, bayWindowDepth: 0.7 } : {}),
+      });
+      for (const [name, g] of Object.entries(b.parts)) add(g, b.palette[name]);
+      const r = Math.max(b.options.width, b.options.depth) > 20 ? 11 : 9;
+      cuts.push([
+        [at[0] + r * 0.85, 4.5, at[2] + r * 1.1],
+        [at[0] + 0.5, 2.4, at[2] + 2],
+      ]);
+    }
     const views = [
       [
         [20, 26, 70],

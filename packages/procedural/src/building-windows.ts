@@ -7,6 +7,7 @@
 //   stands no lower, https://nhbc-standards.co.uk/7-roofs/7-1-flat-roofs-and-balconies/7-1-15-detailing-of-flat-roofs/
 // - Sutherland, I. E., Hodgman, G. W. 1974, "Reentrant polygon clipping", Communications of the ACM 17(1) 32-42,
 //   https://doi.org/10.1145/360767.360802 (the window's rectangle cut by each face of a block's solid).
+import type { BayClear } from './building-bays.js';
 import type { Hole } from './building-interiors.js';
 import type { V3 } from './mesh-builder.js';
 
@@ -24,8 +25,11 @@ export interface WindowSide {
   readonly dir: V3;
   readonly out: V3;
 }
-/** The window to build for a wanted one, or null for none. */
-export type WindowFit = (hole: Hole, side: WindowSide, room: WindowRoom) => Hole | null;
+/** The window to build for a wanted one, or null for none; `clear` tests the room a bay window takes. */
+export interface WindowFit {
+  (hole: Hole, side: WindowSide, room: WindowRoom): Hole | null;
+  readonly clear: BayClear;
+}
 
 /** Half-spaces `[x, y, z, d]`, inside where the dot product is at most `d`. */
 export type Convex = readonly (readonly [number, number, number, number])[];
@@ -84,9 +88,9 @@ function clipped(r: Box, cuts: readonly (readonly [number, number, number])[]): 
  * the plan then has none (building-plans.ts).
  */
 export function windowFit(others: readonly Convex[], place: (p: V3) => V3, thickness: number): WindowFit {
-  return (hole, side, room) => {
-    // Each solid as cuts of the wall's own plane, at depths through the wall.
-    const planes = [0.05, -thickness / 2, -thickness - 0.05].map((off) => {
+  // Each solid as cuts of the plane of a wall, `off` metres out from its face.
+  const cutsAt = (side: WindowSide, offs: readonly number[]) =>
+    offs.map((off) => {
       const at = (a: number, y: number) =>
           place([
             side.start[0] + side.dir[0] * a + side.out[0] * off,
@@ -107,6 +111,23 @@ export function windowFit(others: readonly Convex[], place: (p: V3) => V3, thick
         }),
       );
     });
+  // A bay keeps the flashing's room above and below it, and beside it as far again as it stands out, so no wall
+  // beside it hides it.
+  const clear: BayClear = (side, a0, a1, y0, y1, depth) => {
+    const steps = Math.ceil(depth / 0.25),
+      // Through the wall too: a block whose wall runs on flush with this one covers the mouth from behind the face.
+      offs = [-thickness - 0.05, -thickness / 2].concat(
+        Array.from({ length: steps + 1 }, (_, i) => 0.05 + (depth * i) / steps),
+      ),
+      beside = depth + CLEAR,
+      grown = { a0: a0 - beside, a1: a1 + beside, y0: y0 - CLEAR, y1: y1 + CLEAR };
+    return cutsAt(side, offs)
+      .flat()
+      .every((cuts) => !clipped(grown, cuts));
+  };
+  const fit = (hole: Hole, side: WindowSide, room: WindowRoom): Hole | null => {
+    // At depths through the wall.
+    const planes = cutsAt(side, [0.05, -thickness / 2, -thickness - 0.05]);
     const door = hole.kind === 'door',
       margin = door ? DOOR_CLEAR : CLEAR;
     // The bounds of everything within the clearance of an opening.
@@ -177,4 +198,5 @@ export function windowFit(others: readonly Convex[], place: (p: V3) => V3, thick
     if (!found) return null;
     return { ...hole, a0: found.a0, a1: found.a1, y0: found.y0, y1: found.y1 };
   };
+  return Object.assign(fit, { clear });
 }

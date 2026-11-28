@@ -34,6 +34,7 @@ import type {
   BuildingInterior,
 } from './building-rules.js';
 import { type MeshBuilder, add, scale, type V3 } from './mesh-builder.js';
+import type { BayPlan } from './building-bays.js';
 
 /** One side of the footprint: its start corner, run direction, outward normal and length. */
 export interface Side {
@@ -51,6 +52,8 @@ export interface Hole {
   a1: number;
   y0: number;
   y1: number;
+  /** A bay window standing out from this opening. */
+  bay?: BayPlan;
 }
 interface InteriorOptions {
   readonly style: BuildingStyle;
