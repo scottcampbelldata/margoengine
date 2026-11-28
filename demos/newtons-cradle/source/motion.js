@@ -23,7 +23,7 @@ let loaded;
 export const loadMotion = (signal) => (loaded ??= Physics.load(signal));
 
 export function initialise(lifted) {
-  const physics = new Physics(null, { fixedTimestep: step });
+  const physics = new Physics(null, { fixedTimestep: step, fidelity: 'high' });
   const frame = physics.addBody(null, { type: 'fixed', position: [0, pivotY, 0] });
   const balls = [];
   for (let i = 0; i < count; i++) {
@@ -31,7 +31,7 @@ export function initialise(lifted) {
     const sin = Math.sin(angle), cos = Math.cos(angle);
     const ball = physics.addBody(null, {
       position: [pivotX(i) + length * sin, pivotY - length * cos, 0],
-      colliders: { shape: 'sphere', radius, density: 'steel', restitution, friction: 0.1 },
+      colliders: { shape: 'sphere', radius, density: 'steel', restitution, friction: 0 },
     });
     physics.addJoint(frame, ball, {
       type: 'revolute', axis: [0, 0, 1],

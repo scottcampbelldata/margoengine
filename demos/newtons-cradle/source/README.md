@@ -2,7 +2,7 @@
 
 Set how many balls to lift and release the cradle. Slow motion runs the same simulation at one quarter speed. The energy reading is the balls' kinetic plus gravitational energy as a share of what the lifted balls started with.
 
-The five 26 mm steel spheres are rigid bodies in `@margoengine/physics`, each hung from the frame by a hinge on a 247 mm arm, as the two strings of a real cradle keep a ball swinging in one plane. They touch in a line. When a moving ball strikes the line, the engine resolves the strike one pair at a time before its contact solve (Guendelman, Bridson and Fedkiw 2003), so one lifted ball sends one off the far end and two send two. Each pair bounces with a restitution of 0.995 for hardened, polished steel at under 1 m/s. The simulation steps at 240 Hz. It omits air drag, thread stretch, frame vibration and sound.
+The five 26 mm steel spheres are rigid bodies in `@margoengine/physics`, each hung from the frame by a hinge on a 247 mm arm, as the two strings of a real cradle keep a ball swinging in one plane. They touch in a line. When a moving ball strikes the line, the engine resolves the strike one pair at a time before its contact solve (Guendelman, Bridson and Fedkiw 2003), so one lifted ball sends one off the far end and two send two. Each pair bounces with a restitution of 0.995 for hardened, polished steel at under 1 m/s, and the polished contacts are taken as frictionless, so no spin is traded at a strike. The simulation steps at 240 Hz on the engine's high-fidelity tier, which keeps the turning height within 0.2% over a minute. It omits air drag, thread stretch, frame vibration and sound.
 
 The page runs in Margo Engine. Append `?backend=webgl2` to test compatibility rendering.
 
