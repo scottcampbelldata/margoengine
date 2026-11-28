@@ -53,6 +53,10 @@
       "types": "./dist/anatomy-human.d.ts",
       "import": "./dist/anatomy-human.js"
     },
+    "./validate": {
+      "types": "./dist/validate.d.ts",
+      "import": "./dist/validate.js"
+    },
     "./swim": {
       "types": "./dist/swim.d.ts",
       "import": "./dist/swim.js"

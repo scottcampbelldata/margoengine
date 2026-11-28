@@ -167,6 +167,15 @@ export type KinematicsJointLimit = {
     twist: [number, number];
 };
 
+export interface ProportionMeasure {
+    readonly from: string;
+    readonly to: string;
+    readonly along: 'length' | 'up';
+    readonly offset?: number;
+    readonly band: readonly [number, number];
+    readonly rule: string;
+}
+
 export interface ProportionNorm {
     readonly id: string;
     readonly what: string;
@@ -175,6 +184,7 @@ export interface ProportionNorm {
     readonly male?: number;
     readonly spread?: number;
     readonly rows: readonly SourceRow[];
+    readonly measure?: ProportionMeasure;
 }
 
 export type Provenance = 'dataset' | 'print' | 'online' | 'recalled';
@@ -242,6 +252,9 @@ export interface SpeciesTable {
     readonly proportions: readonly ProportionNorm[];
     readonly segments: readonly SegmentNorm[];
     readonly couplings: readonly CouplingHook[];
+    readonly volumes?: readonly VolumeSpec[];
+    readonly apart?: readonly (readonly [string, string])[];
+    readonly feet?: readonly string[];
     readonly sources: Readonly<Record<string, SourceEntry>>;
     readonly naming?: (names: readonly string[], preset?: string) => JointNaming | null;
     readonly describeRest?: (rest: Readonly<Record<string, JointAngles>>) => string;
@@ -250,6 +263,14 @@ export interface SpeciesTable {
 export type Tier = 'normal' | 'structural';
 
 export type Vec3 = readonly [number, number, number];
+
+export interface VolumeSpec {
+    readonly id: string;
+    readonly from: string;
+    readonly to: readonly string[];
+    readonly radius: readonly [number, number];
+    readonly rows: readonly SourceRow[];
+}
 
 export function addAnatomyLimits(animator: Animator, body: AnatomicalRig, options?: {
     tier?: Tier;

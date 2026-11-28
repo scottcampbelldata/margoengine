@@ -602,8 +602,9 @@ published group values read on 2026-11-28; no file of another party is redistrib
   reference values and a database for comparison studies", Haemophilia 17(3):500-507, 2011. A publication of a United
   States federal agency; the page prints no licence statement. The study's downloadable per-person dataset has its own
   data use restrictions and is not used.
-- packages/rigging/src/anatomy-data-ansur2.ts: summary statistics (mean and standard deviation by sex) of 37
-  dimensions of ANSUR II, from Gordon CC et al., "2012 Anthropometric Survey of U.S. Army Personnel: Methods and
+- packages/rigging/src/anatomy-data-ansur2.ts: summary statistics (mean and standard deviation by sex) of 48
+  dimensions of ANSUR II (lengths and heights, and since 2026-11-28 the limb girths and the chest and waist depths and
+  breadths the pose checker sizes its body volumes from), from Gordon CC et al., "2012 Anthropometric Survey of U.S. Army Personnel: Methods and
   Summary Statistics", U.S. Army Natick Soldier Research, Development and Engineering Center, NATICK/TR-15/007, read
   from https://tools.openlab.psu.edu/publicData/ANSURII-TR15-007.pdf . Distribution statement of the report: "Approved
   for public release; distribution is unlimited". Credit: U.S. Army; no endorsement.

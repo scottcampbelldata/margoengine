@@ -19959,6 +19959,36 @@ the raised arm, named in KB-RIG-CLAVICLE1). Matrix to rotation: K. Shoemake, "An
 curves", SIGGRAPH 1985, https://doi.org/10.1145/325165.325242 , with the largest-component choice of S. W. Shepperd,
 "Quaternion from rotation matrix", J Guidance and Control 1(3):223-224, 1978.
 
+## The pose checker: rigging/validate (2026-11-28)
+
+Scope: `@margoengine/rigging/validate` (`checkPose`, `checkClip`, `checkProportions`, `assertPose`, `assertClip`,
+`formatPoseReport`), the human table's proportion measures, body volumes, volume pairs and feet in
+`@margoengine/rigging/anatomy/human`, and the pose sheet `packages/humans/test/pose-sheet.browser.mjs`. Written from the
+sources below. No other engine's, tool's or paper's code was read.
+
+Ranges and their tiers: the anatomy table's rows and `clampPose`, as in "Anatomy core and the human table" above; a pose
+is checked on a copy, and the checker reports what the clamp would change.
+
+Volumes and proportions: C. C. Gordon et al., "2012 Anthropometric Survey of U.S. Army Personnel: Methods and Summary
+Statistics", NATICK/TR-15/007, 2014, https://tools.openlab.psu.edu/publicData/ANSURII-TR15-007.pdf (the flexed biceps,
+flexed forearm, wrist, thigh, lower thigh, calf and ankle circumferences, the chest and waist depths and breadths, and the
+heights and lengths the proportion bands are built on). A limb segment is a capsule of radius circumference / 2 pi; the
+trunk uses half its depth. C. Ericson, "Real-Time Collision Detection", Morgan Kaufmann, 2005, section 5.1.9 (closest
+points of two segments), from the book's description of the method.
+
+Foot contact: L. Kovar, J. Schreiner and M. Gleicher, "Footskate cleanup for motion capture editing", ACM SIGGRAPH/
+Eurographics Symposium on Computer Animation 2002, https://doi.org/10.1145/545261.545277 (a planted foot should not move;
+contact read from a height and speed threshold). The three-frame plant, the 0.02 stature contact band and the 0.1 stature
+per second slide are chosen here, stated in docs/limits.md.
+
+Joint speeds: G. S. Fleisig et al., "Biomechanical analysis of weighted-ball exercises for baseball pitchers", Sports
+Health 9(3):210-215, 2017, https://pmc.ncbi.nlm.nih.gov/articles/PMC5435148/ (shoulder internal rotation peaks of 6,594 to
+6,756 degrees per second, SD 743 to 893). The default `maxSpeed` of 9,000 is their mean plus three SD.
+
+Derived here: the step and blip tests for a capture pop (a speed four times both neighbours, or one frame far from two
+close neighbours), the "looks locked back" warning for a hinge whose clinical range passes straight by under 10 degrees,
+the asymmetry band of 5 percent, and the shrink of 0.7 that lets soft contact pass.
+
 ## IK that obeys anatomy: animator/ik, rigging/ik, animator/fbik (2026-11-28)
 
 Scope: `@margoengine/animator/ik` (the fitted body as the solvers read it, the swivel-angle limb solver, the joint and

@@ -47,6 +47,17 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   weather README examples, 57 of 57).
 - **Regression:** that test.
 
+### Open 2026-11-28: a Character Creator walk's skin travels forward while its hips bone stays put (KB-HUM-SKINDRIFT1, humans)
+
+- **Repro:** `packages/humans/test/pose-sheet.browser.mjs --model=<the Character Creator old man>`: sample the walk at 0,
+  6 and 12 seconds with `person.play('walk', {fade: 0, at})`. The hips bone's world position reads the same each time
+  (CC_Base_Hip local z 0.924, the model root has no travel), yet the drawn skin is further forward at each time, out of
+  the frame by 6 seconds.
+- **Cause:** not yet found. The skin follows something the bone pose read through `person.body` does not show: a second
+  root or a skin root the clip moves, or a joint matrix offset that grows with clip time. To trace in `@margoengine/humans`
+  (the clip's root motion handling) before the walk can be judged past its first second.
+- **Until fixed:** the pose sheet samples the walk inside its first second.
+
 ### Fixed 2026-11-28: the human anatomy table did not read Unreal mannequin or KayKit bone names (KB-RIG-UENAMING1, rigging)
 
 - **Repro:** `fitAnatomy` with `species: human` on `examples/assets/quaternius/UAL1_Standard_RM.glb` (pelvis,

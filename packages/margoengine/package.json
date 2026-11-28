@@ -4371,6 +4371,10 @@
       "types": "./dist/rigging/anatomy/human.d.ts",
       "import": "./dist/rigging/anatomy/human.js"
     },
+    "./rigging/validate": {
+      "types": "./dist/rigging/validate.d.ts",
+      "import": "./dist/rigging/validate.js"
+    },
     "./rigging/swim": {
       "types": "./dist/rigging/swim.d.ts",
       "import": "./dist/rigging/swim.js"

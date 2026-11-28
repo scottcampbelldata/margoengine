@@ -196,6 +196,46 @@ export interface ProportionNorm {
   readonly spread?: number;
   /** The source values. */
   readonly rows: readonly SourceRow[];
+  /** How a pose checker measures it on a fitted rig, when it can be read from joint centres. */
+  readonly measure?: ProportionMeasure;
+}
+
+/**
+ * How a proportion is read on a fitted rig at neutral: the distance between two joint centres (`length`), or how far the
+ * second lies above the first along the body's up (`up`), plus `offset` shares of stature (a joint's own height above the
+ * ground). A joint centre is not the skin landmark a survey measured, so `band` is wider than the spread between people.
+ */
+export interface ProportionMeasure {
+  /** The first joint. */
+  readonly from: string;
+  /** The second joint. */
+  readonly to: string;
+  /** What is measured between them. */
+  readonly along: 'length' | 'up';
+  /** Shares of stature added to the measure. Default 0. */
+  readonly offset?: number;
+  /** [low, high] shares of stature a rig may measure. */
+  readonly band: readonly [number, number];
+  /** How the band was set. */
+  readonly rule: string;
+}
+
+/**
+ * A volume of the body a pose checker keeps apart from others: a capsule along a segment from one joint centre to the
+ * next, tapered from one radius to the other. It is the body's girth, so two volumes that overlap are limbs through
+ * each other.
+ */
+export interface VolumeSpec {
+  /** Its name. */
+  readonly id: string;
+  /** The joint at its near end. */
+  readonly from: string;
+  /** Joints that can mark its far end, first mapped wins. */
+  readonly to: readonly string[];
+  /** Radius at each end as a share of stature: from the mean girth, circumference over 2 pi. */
+  readonly radius: readonly [number, number];
+  /** The source values. */
+  readonly rows: readonly SourceRow[];
 }
 
 /** A body segment's share of the body's mass and where its centre of mass sits. */
@@ -262,6 +302,12 @@ export interface SpeciesTable {
   readonly segments: readonly SegmentNorm[];
   /** Coupled motions. */
   readonly couplings: readonly CouplingHook[];
+  /** The body's volumes, for a pose checker's limb-through-limb test. */
+  readonly volumes?: readonly VolumeSpec[];
+  /** Pairs of volume ids that must not overlap. */
+  readonly apart?: readonly (readonly [string, string])[];
+  /** Joints that carry the body's weight when it stands (ankles, toes), for a pose checker's foot tests. */
+  readonly feet?: readonly string[];
   /** Every source a row names. */
   readonly sources: Readonly<Record<string, SourceEntry>>;
   /** Finds the joints among bone names, under one named convention or the one that fits best. */
@@ -684,7 +730,29 @@ export function defineSpecies<T extends SpeciesTable>(table: T): T {
     known(measure.to, `${table.id} stature`, 'joint');
     if (!(measure.share > 0)) throw new RangeError(`${table.id} stature: a share must be above 0`);
   }
-  for (const norm of [...table.proportions, ...table.segments, ...table.couplings])
+  for (const norm of table.proportions) {
+    const measure = norm.measure;
+    if (!measure) continue;
+    known(measure.from, `${table.id} ${norm.id}`, 'joint');
+    known(measure.to, `${table.id} ${norm.id}`, 'joint');
+    if (!(measure.band[0] > 0 && measure.band[0] < norm.share && norm.share < measure.band[1]))
+      throw new RangeError(`${table.id} ${norm.id}: the band must be [low, high] around the share, low above 0`);
+  }
+  const volumes = new Set<string>();
+  for (const volume of table.volumes ?? []) {
+    const at = `${table.id} volume ${volume.id}`;
+    if (volumes.has(volume.id)) throw new RangeError(`${at}: the id is used twice`);
+    volumes.add(volume.id);
+    known(volume.from, at, 'joint');
+    for (const id of volume.to) known(id, at, 'joint');
+    if (!volume.to.length || !(volume.radius[0] > 0 && volume.radius[1] > 0))
+      throw new RangeError(`${at}: needs a far joint and two radii above 0`);
+  }
+  for (const pair of table.apart ?? [])
+    for (const id of pair)
+      if (!volumes.has(id)) throw new RangeError(`${table.id} apart: "${id}" is not a volume of the table`);
+  for (const id of table.feet ?? []) known(id, `${table.id} feet`, 'joint');
+  for (const norm of [...table.proportions, ...table.segments, ...table.couplings, ...(table.volumes ?? [])])
     for (const row of norm.rows)
       if (!Object.hasOwn(table.sources, row.source))
         throw new RangeError(`${table.id} ${norm.id}: source "${row.source}" is not listed; add it to the table's sources`);

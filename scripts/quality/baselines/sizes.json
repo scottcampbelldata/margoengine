@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21964194,
+  "total": 21973381,
   "history": [
     {
       "date": "2026-10-24",
@@ -15737,6 +15737,12 @@
       "commit": "07f8f146c1",
       "reason": "Fourteen entries grown by commits that recorded no ceiling, measured on main at 07f8f146c1 after npm run build:packages (before = the old ceiling). 68f7e4f1b5 and dfec4782ef (every person obeys anatomy by default; the Animator's footIK on a fitted body solves through limbTools, KB-ANIM-FOOTIK-ANATOMY1): animator/graph 14,250 B gzip (ceiling 10,799), animator/layers 14,908 (11,478), animator/masks 15,114 (11,690). All three ship the Animator class, whose footIK now carries the anatomical limb solver; it runs inside the synchronous per-frame solve, so a lazy import() would place the first frames' feet without the ranges, the same reason 0970c1b3b5 gave for the animator root. The leak edges of the new humans/body entry to animation, animator, gltf/pbr-model, gltf/extended-materials, materials and materials/skin are the humans root's recorded edges: addBody is addPerson plus the body fit, and loads the root's chunk. 1aff3e60f3 (toolpathBeads draws G-code layers as solid beads): loaders/gcode 3,291 (2,676); the bead mesher sits beside parseGCode in the same entry, a second entry would repeat the move parser. b9f25097cb (backdropGeometry sides wraps the cove round its left, right and back): studio/backdrop 1,852 (1,588), studio/bench 14,467 (14,007); the wrap is the bench's default. b64a8a2918 (halton and jitterProjection get their own entry, so a maths-only import drops every shader): new entry taa/jitter 434. d14c72fba1 (patches draw shared ground weights as crisp turf, scree and rock patches): terrain 19,201 (18,486), terrain/stream 17,195 (16,892); the patch shading is part of the ground shader every terrain draws. d30bcf638e (Puddles and Snow wet Material surfaces, KB-WEATHER-MATERIALSWET1): weather/puddles 4,617 (4,276), weather/snow 5,238 (4,616), weather/gltf 6,600 (6,288); the shared surface code is the fix and on by default. 92761d2bed (thrown messages name their fix) with f5bac35085 (the anatomy table reads Unreal mannequin and KayKit bone names): physics/explosive 15,584 (15,583), rigging/anatomy 10,399 (10,388); no split for a few bytes of message text.",
       "grew": 20
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "60aa71eafd",
+      "reason": "rigging group 2: new optional entry @margoengine/rigging/validate (the pose checker: ranges, hinges, bone stretch, ground, body volumes, foot slide, pops, proportions); @margoengine/rigging/anatomy/human gains its proportion measures, body volumes and ANSUR II girths",
+      "grew": 3
     }
   ],
   "items": {
@@ -16846,8 +16852,8 @@
     "@margoengine/react/xr": 4946,
     "@margoengine/react/xr-pointer": 1516,
     "@margoengine/rigging": 8361,
-    "@margoengine/rigging/anatomy": 10711,
-    "@margoengine/rigging/anatomy/human": 22258,
+    "@margoengine/rigging/anatomy": 10807,
+    "@margoengine/rigging/anatomy/human": 23517,
     "@margoengine/rigging/autorig": 11019,
     "@margoengine/rigging/contact": 13563,
     "@margoengine/rigging/correctives": 2242,
@@ -16863,6 +16869,7 @@
     "@margoengine/rigging/strand-springs": 2247,
     "@margoengine/rigging/swim": 2362,
     "@margoengine/rigging/transfer": 4108,
+    "@margoengine/rigging/validate": 7832,
     "@margoengine/rigging/voxel-weights": 5854,
     "@margoengine/rigging/vrm": 11160,
     "@margoengine/rigging/vrm-constraints": 3250,

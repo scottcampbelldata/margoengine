@@ -43,6 +43,17 @@ export const ANSUR2: {
     readonly 'buttock-popliteal length': readonly [48.51, 2.87, 50.29, 2.74];
     readonly 'functional leg length': readonly [104.43, 5.4, 113.02, 5.61];
     readonly 'weight (kg)': readonly [67.76, 10.98, 85.52, 14.22];
+    readonly 'biceps circumference, flexed': readonly [30.56, 3.08, 35.81, 3.46];
+    readonly 'forearm circumference, flexed': readonly [26.41, 1.85, 31.01, 2.2];
+    readonly 'wrist circumference': readonly [15.48, 0.78, 17.59, 0.9];
+    readonly 'thigh circumference': readonly [61.61, 5.58, 62.51, 5.85];
+    readonly 'lower thigh circumference': readonly [40.07, 3.52, 40.93, 3.19];
+    readonly 'calf circumference': readonly [37.33, 2.85, 39.23, 2.97];
+    readonly 'ankle circumference': readonly [21.57, 1.49, 22.93, 1.46];
+    readonly 'chest depth': readonly [24.74, 2.73, 25.38, 2.62];
+    readonly 'waist depth': readonly [21.3, 3.14, 23.78, 3.47];
+    readonly 'chest breadth': readonly [26.93, 1.86, 28.94, 1.83];
+    readonly 'waist breadth': readonly [29.99, 3.3, 32.64, 3.47];
 };
 
 export type ANSUR2Dimension = keyof typeof ANSUR2;
@@ -298,6 +309,15 @@ interface JointSpec {
     readonly region?: string;
 }
 
+interface ProportionMeasure {
+    readonly from: string;
+    readonly to: string;
+    readonly along: 'length' | 'up';
+    readonly offset?: number;
+    readonly band: readonly [number, number];
+    readonly rule: string;
+}
+
 interface ProportionNorm {
     readonly id: string;
     readonly what: string;
@@ -306,6 +326,7 @@ interface ProportionNorm {
     readonly male?: number;
     readonly spread?: number;
     readonly rows: readonly SourceRow[];
+    readonly measure?: ProportionMeasure;
 }
 
 type Provenance = 'dataset' | 'print' | 'online' | 'recalled';
@@ -371,6 +392,9 @@ interface SpeciesTable {
     readonly proportions: readonly ProportionNorm[];
     readonly segments: readonly SegmentNorm[];
     readonly couplings: readonly CouplingHook[];
+    readonly volumes?: readonly VolumeSpec[];
+    readonly apart?: readonly (readonly [string, string])[];
+    readonly feet?: readonly string[];
     readonly sources: Readonly<Record<string, SourceEntry>>;
     readonly naming?: (names: readonly string[], preset?: string) => JointNaming | null;
     readonly describeRest?: (rest: Readonly<Record<string, JointAngles>>) => string;
@@ -379,4 +403,12 @@ interface SpeciesTable {
 type SpineLevel = readonly [id: string, level: string, flexionExtension: number, sideBend: number, rotation: number];
 
 type Vec3 = readonly [number, number, number];
+
+interface VolumeSpec {
+    readonly id: string;
+    readonly from: string;
+    readonly to: readonly string[];
+    readonly radius: readonly [number, number];
+    readonly rows: readonly SourceRow[];
+}
 ```

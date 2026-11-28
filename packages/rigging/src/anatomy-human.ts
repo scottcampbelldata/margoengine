@@ -33,7 +33,9 @@ import {
   type JointAngles,
   type JointNaming,
   type JointSpec,
+  type ProportionMeasure,
   type ProportionNorm,
+  type VolumeSpec,
   type Provenance,
   type RegionSpec,
   type SegmentNorm,
@@ -1111,6 +1113,76 @@ export function humanTable(group: HumanGroup = {}): SpeciesTable {
     proportion('legLength', 'hip height above the ankle', 'trochanterion height', 'lateral malleolus height'),
   ];
   const shareOf = (id: string) => proportions.find((norm) => norm.id === id)!.share;
+  // What a pose checker reads on a rig, at neutral, from joint centres. A joint centre sits a few centimetres from the
+  // skin landmark the survey measured (the shoulder joint below the acromion, the knee joint by the epicondyle), so a
+  // height may differ by 0.05 of stature and a segment's length by a fifth before it is called wrong. The leg's own
+  // length is not checked: it is what the stature is read from when no stature is given.
+  const HEIGHT_RULE = 'share plus or minus 0.05 of stature: a joint centre is not the skin landmark measured',
+    LENGTH_RULE = 'share times 0.8 to 1.2: a joint centre is not the skin landmark measured',
+    ankle = shareOf('ankleHeight'),
+    measures: Readonly<Record<string, Omit<ProportionMeasure, 'band' | 'rule'>>> = {
+      shoulderHeight: { from: 'l_talocrural', to: 'l_shoulder', along: 'up', offset: ankle },
+      elbowHeight: { from: 'l_talocrural', to: 'l_elbow', along: 'up', offset: ankle },
+      wristHeight: { from: 'l_talocrural', to: 'l_radiocarpal', along: 'up', offset: ankle },
+      kneeHeight: { from: 'l_talocrural', to: 'l_knee', along: 'up', offset: ankle },
+      upperArmLength: { from: 'l_shoulder', to: 'l_elbow', along: 'length' },
+      forearmLength: { from: 'l_elbow', to: 'l_radiocarpal', along: 'length' },
+      thighLength: { from: 'l_hip', to: 'l_knee', along: 'length' },
+      shankLength: { from: 'l_knee', to: 'l_talocrural', along: 'length' },
+      trunkLength: { from: 'l_hip', to: 'l_shoulder', along: 'up' },
+    };
+  proportions.forEach((norm, i) => {
+    const measure = measures[norm.id];
+    if (!measure) return;
+    const band: [number, number] =
+      measure.along === 'up' && measure.offset !== undefined
+        ? [norm.share - 0.05, norm.share + 0.05]
+        : [norm.share * 0.8, norm.share * 1.2];
+    proportions[i] = {
+      ...norm,
+      measure: { ...measure, band, rule: measure.offset !== undefined ? HEIGHT_RULE : LENGTH_RULE },
+    };
+  });
+
+  // Body volumes for the limb-through-limb test: each a capsule with the survey's mean girth at its ends, radius =
+  // circumference / 2 pi (depth / 2 for the trunk, the narrower way through it).
+  const girth = (dimension: ANSUR2Dimension, depth = false) =>
+    sexes.reduce((total, of) => total + mean(of, dimension) / mean(of, 'stature'), 0) /
+    sexes.length /
+    (depth ? 2 : 2 * Math.PI);
+  const volume = (
+    id: string,
+    from: string,
+    to: readonly string[],
+    near: ANSUR2Dimension,
+    far: ANSUR2Dimension,
+    depth = false,
+  ): VolumeSpec => ({
+    id,
+    from,
+    to,
+    radius: [girth(near, depth), girth(far, depth)],
+    rows: [...measured(near), ...(far === near ? [] : measured(far)), ...measured('stature')],
+  });
+  const limbVolumes = (s: 'l' | 'r'): VolumeSpec[] => [
+    volume(`${s}_upperArm`, `${s}_shoulder`, [`${s}_elbow`], 'biceps circumference, flexed', 'forearm circumference, flexed'),
+    volume(`${s}_forearm`, `${s}_elbow`, [`${s}_radiocarpal`], 'forearm circumference, flexed', 'wrist circumference'),
+    volume(`${s}_thigh`, `${s}_hip`, [`${s}_knee`], 'thigh circumference', 'lower thigh circumference'),
+    volume(`${s}_shank`, `${s}_knee`, [`${s}_talocrural`], 'calf circumference', 'ankle circumference'),
+  ];
+  const volumes: VolumeSpec[] = [
+    volume('trunk', 'humanoid_root', ['vc7', 'vc4', 'vc1', 'skullbase'], 'waist depth', 'chest depth', true),
+    ...limbVolumes('l'),
+    ...limbVolumes('r'),
+  ];
+  // An arm hanging at rest lies against its own thigh, so that pair is left out; the other thigh and both shanks are not.
+  const apart: [string, string][] = [];
+  for (const s of ['l', 'r'] as const)
+    for (const part of ['upperArm', 'forearm'])
+      for (const other of ['trunk', `${s === 'l' ? 'r' : 'l'}_thigh`, 'l_shank', 'r_shank'])
+        apart.push([`${s}_${part}`, other]);
+  apart.push(['l_forearm', 'r_forearm'], ['l_forearm', 'r_upperArm'], ['r_forearm', 'l_upperArm']);
+  apart.push(['l_thigh', 'r_thigh'], ['l_shank', 'r_shank'], ['l_thigh', 'r_shank'], ['r_thigh', 'l_shank']);
 
   // Segment masses and centres of mass.
   const pick = (pair: readonly [number, number]) =>
@@ -1262,6 +1334,9 @@ export function humanTable(group: HumanGroup = {}): SpeciesTable {
     proportions,
     segments,
     couplings,
+    volumes,
+    apart,
+    feet: ['l', 'r'].flatMap((s) => [`${s}_talocrural`, ...[1, 2, 3].map((n) => `${s}_metatarsophalangeal_${n}`)]),
     sources: SOURCES,
     naming: nameHuman,
     describeRest,

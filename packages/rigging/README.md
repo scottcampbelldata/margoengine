@@ -1123,6 +1123,90 @@ Guides, 5th edition, through the pages each row names; Paraskevas et al. 2004; I
 Ludewig et al. 2009; White and Panjabi 1990; Pearcy and Tibrewal 1984; Gordon et al., ANSUR II; de Leva 1996; Drillis
 and Contini 1966 through Winter 2009. Full citations are in `human.sources` and [docs/clean-room.md](../../docs/clean-room.md).
 
+## Pose checks (`margoengine/rigging/validate`)
+
+The pose checker tells an artist what is wrong with a pose or a clip before anyone has to see it by eye. It works on
+any body fitted by `fitAnatomy` or `fitHuman`, so it reads Character Creator, Mixamo, CMU, VRM and the other named rigs
+the same way. Every issue names the joint and its bone, the motion, the value against its limit, how far past it is,
+the limit's source row (CDC 2011, AAOS 1965 and so on), the frame time in a clip and a help link.
+
+```ts
+import type { RigJoint } from 'margoengine/rigging';
+import { poseFromAngles } from 'margoengine/rigging/anatomy';
+import { fitHuman } from 'margoengine/rigging/anatomy/human';
+import { checkClip, checkPose, formatPoseReport } from 'margoengine/rigging/validate';
+
+const rig: RigJoint[] = [
+  { name: 'Hips', parent: -1, position: [0, 1, 0] },
+  { name: 'Spine', parent: 0, position: [0, 1.1, 0] },
+  { name: 'Head', parent: 1, position: [0, 1.6, 0] },
+  { name: 'LeftUpLeg', parent: 0, position: [0.1, 0.95, 0] },
+  { name: 'RightUpLeg', parent: 0, position: [-0.1, 0.95, 0] },
+  { name: 'LeftArm', parent: 1, position: [0.2, 1.45, 0] },
+  { name: 'LeftForeArm', parent: 5, position: [0.48, 1.45, 0] },
+  { name: 'LeftHand', parent: 6, position: [0.74, 1.45, 0] },
+];
+const body = fitHuman(rig);
+// An elbow folded 30 degrees back: past its 5 degree stop, so an error.
+const report = checkPose(body, poseFromAngles(body, { l_elbow: { flexion: -30 } }));
+console.log(report.passed, formatPoseReport(report));
+// A whole take, frame by frame: one row per fault with its frames, its worst frame and a total.
+const frames = [0, 40, 80, 120].map((flexion) => poseFromAngles(body, { l_elbow: { flexion } }));
+const clip = checkClip(body, frames, { fps: 30 });
+console.log(clip.passed, clip.summary.length);
+```
+
+`checkPose(body, pose, options)` returns `{ passed, errors, warnings, issues }`; `checkClip(body, frames, options)`
+takes an array (or any iterable) of local poses, or a sampler `(time, out) => void` with `duration`; every issue
+carries its `frame` and `time`, and the report adds a `summary` row per joint, motion and fault (how many frames, the
+first and last time, the worst issue), errors first, and the clip's `frames` and `fps`. `assertPose` and `assertClip` throw a coded `failed` error carrying the report for a
+test or an export step. `checkProportions(body)` checks the fitted rest shape itself. `formatPoseReport` prints any
+report, one line per issue.
+
+| Code | Severity | What it means |
+| --- | --- | --- |
+| `out-of-range` | error past the stop, warning past the clinical range | A swing past the table's range. |
+| `hinge-reversed` | error past the stop, warning past straight | An elbow or knee bent the wrong way. |
+| `hinge-sideways` | as above | A hinge turned off its plane (a knee bent sideways). |
+| `twist-out-of-range` | as above | A bone twisted about its own length past its range. |
+| `bone-stretch` | error | A bone longer or shorter than at rest by more than `stretch` (1 percent), or a scaled bone. |
+| `ground-penetration` | error past `sink` | A joint or a skin point (`points`) under `ground`. |
+| `floating` | warning | A named support (`supports`) more than `float` (6 percent of stature) above `ground`. |
+| `self-penetration` | error | Two body volumes (the trunk and the limb segments, from ANSUR II girths, shrunk by `shrink`) overlap. |
+| `foot-slide` | error | A planted foot moving sideways faster than `slide` (clip only). |
+| `pop` | error | A joint turning faster than `maxSpeed`, a one-frame step or a one-frame blip (clip only). |
+| `proportion` | error | A rest segment outside its ANSUR II band (`checkProportions`). |
+| `asymmetry` | warning | Left and right segments differ by more than 5 percent (`checkProportions`). |
+
+Options, with their defaults:
+
+- `tier`: `'both'` reports errors past the stops and warnings past the clinical range; `'structural'` or `'normal'`
+  reports one tier.
+- `tolerance`: 0.5 degrees a joint may pass a limit before it is reported.
+- `ground`: null, no ground check; a number is the floor height along the body's up axis.
+- `points`: none; skin or mesh points in world units, checked against the ground.
+- `supports`: none; joint ids that should touch the ground (a seated pose names its pelvis or feet).
+- `float`: 0.06 of stature; `sink`: 0.002 of stature.
+- `volumes`: true; `shrink`: 0.7 of each measured radius, so clothes and soft tissue are not read as a collision.
+- `stretch`: 0.01, the share a bone may change length.
+- In a clip: `fps` 30, `start` 0, `duration` (needed for a sampler), `velocity` (the root's speed, for clips played in
+  place), `maxSpeed` 9,000 degrees per second (Fleisig 2017, a pitcher's shoulder, the mean plus three standard
+  deviations), `contact` 0.02 of stature, `slide` 0.1 of stature per second.
+
+Limits of the checks, stated plainly:
+
+- The volume check is capsules, not the mesh: it catches an arm through the chest or one leg through the other, not a
+  finger through a sleeve. Same-side arm against thigh is left out, because a hanging arm rests on it.
+- A foot is read as planted when it stays within `contact` of its lowest height for three frames (Kovar 2002), so a
+  clip whose feet never come near their lowest point is not checked for sliding.
+- An elbow or knee is reported past straight from 0.5 degrees, even though its clinical range allows a little more
+  (CDC 2011 lists 4.7 degrees for the elbow): a mesh elbow past straight looks broken, so the checker warns and the stop decides
+  the error.
+
+Sources: Gordon et al., ANSUR II (girths, depths and breadths); Ericson 2005, section 5.1.9 (segment closest points);
+Kovar, Schreiner and Gleicher 2002 (footskate); Fleisig et al. 2017 (peak joint speeds); and the anatomy table's
+sources above. Full citations are in [docs/clean-room.md](../../docs/clean-room.md).
+
 ## Swimming (`margoengine/rigging/swim`)
 
 `createSwimRig` creates a head-to-tail chain in metres, with +Y up and +Z forward. A shark or reef fish sweeps laterally.

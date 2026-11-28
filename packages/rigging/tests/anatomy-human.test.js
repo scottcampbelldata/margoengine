@@ -647,7 +647,12 @@ test('the datasets are the published tables', () => {
     }
   // ANSUR II: 1,986 women and 4,082 men; centimetres.
   assert.deepEqual([ANSUR2_FEMALES, ANSUR2_MALES], [1986, 4082]);
-  assert.equal(Object.keys(ANSUR2).length, 37);
+  assert.equal(Object.keys(ANSUR2).length, 48);
+  // The girths the pose checker's body volumes read (second read, 2026-11-28).
+  assert.deepEqual(ANSUR2['biceps circumference, flexed'], [30.56, 3.08, 35.81, 3.46]);
+  assert.deepEqual(ANSUR2['wrist circumference'], [15.48, 0.78, 17.59, 0.9]);
+  assert.deepEqual(ANSUR2['chest depth'], [24.74, 2.73, 25.38, 2.62]);
+  assert.deepEqual(ANSUR2['calf circumference'], [37.33, 2.85, 39.23, 2.97]);
   assert.deepEqual(ANSUR2.stature, [162.85, 6.42, 175.62, 6.86]);
   assert.deepEqual(ANSUR2['acromial height'], [133.51, 5.81, 144.07, 6.33]);
   assert.deepEqual(ANSUR2['trochanterion height'], [84.54, 4.47, 90.09, 4.92]);

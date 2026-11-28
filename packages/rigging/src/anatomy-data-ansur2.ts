@@ -17,6 +17,11 @@
 // columns: ball of foot length, bimalleolar breadth, heel breadth, lateral malleolus height, foot breadth, hand
 // length, head length, head breadth, palm length and tragion to top of head. Their standard deviations matched in
 // both units.
+// Girths: on 2026-11-28 a second read, for the pose checker's body volumes, took the circumferences, depths and
+// breadths below from the same report's statistics pages (biceps circumference flexed, forearm circumference flexed,
+// thigh, lower thigh, calf, ankle and wrist circumference, chest and waist depth, chest and waist breadth). Each was
+// checked against its inch column and its coefficient of variation; the wrist page's layout was scrambled and was
+// settled the same way.
 
 /** Women measured for every dimension here. */
 export const ANSUR2_FEMALES = 1986;
@@ -65,6 +70,17 @@ export const ANSUR2 = {
   'buttock-popliteal length': [48.51, 2.87, 50.29, 2.74],
   'functional leg length': [104.43, 5.4, 113.02, 5.61],
   'weight (kg)': [67.76, 10.98, 85.52, 14.22],
+  'biceps circumference, flexed': [30.56, 3.08, 35.81, 3.46],
+  'forearm circumference, flexed': [26.41, 1.85, 31.01, 2.2],
+  'wrist circumference': [15.48, 0.78, 17.59, 0.9],
+  'thigh circumference': [61.61, 5.58, 62.51, 5.85],
+  'lower thigh circumference': [40.07, 3.52, 40.93, 3.19],
+  'calf circumference': [37.33, 2.85, 39.23, 2.97],
+  'ankle circumference': [21.57, 1.49, 22.93, 1.46],
+  'chest depth': [24.74, 2.73, 25.38, 2.62],
+  'waist depth': [21.3, 3.14, 23.78, 3.47],
+  'chest breadth': [26.93, 1.86, 28.94, 1.83],
+  'waist breadth': [29.99, 3.3, 32.64, 3.47],
 } as const satisfies Readonly<Record<string, ANSUR2Row>>;
 
 /** A dimension of {@link ANSUR2}. */

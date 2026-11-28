@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Pose sheet</title><style>body{margin:0;background:#000}canvas{display:block}</style></head>
+<body><canvas></canvas>
+<script type="module">
+  // The pose sheet: a skinned person through addPerson (or addBody) in a row of poses, each drawn from the front, the
+  // three-quarter and the side, so a body is judged by eye; beside each row, what the pose checker
+  // (`@margoengine/rigging/validate`) says about that pose, and a dot on every joint it names (red for an error, amber
+  // for a warning). Rows: the model's rest pose, the anatomical neutral (arms down), four phases of the walk clip, two
+  // IK reaches (across the chest and overhead), a seated pose, and the elbows and knees at their stops. Then every clip
+  // is checked frame by frame, held inside the body (as played) and raw (`anatomy: {limits: false}`), for the report.
+  // window.renderSheet({model}) returns the sheet as base64 PNG, the per-row issues and the clip reports.
+  import { Engine } from '/packages/core/dist/index.js';
+  import { loadGLTF } from '/packages/gltf/dist/pbr.js';
+  import { addPerson } from '/packages/humans/dist/index.js';
+  import { addBody } from '/packages/humans/dist/body.js';
+  import { addIKChain } from '/packages/rigging/dist/ik.js';
+  import { clampPose, jointAngles, poseFromAngles } from '/packages/rigging/dist/anatomy.js';
+  import { checkClip, checkPose, checkProportions, formatPoseReport } from '/packages/rigging/dist/validate.js';
+  import { isCompatDevice } from '/packages/webgl2-compat/dist/device.js';
+  import { riggedTestBody } from '/packages/humans/test/rigged-body.js';
+
+  const CELL_W = 300, CELL_H = 440, TEXT_W = 520, FOV = 30;
+  const VIEWS = [['front', 0], ['three-quarter', 45], ['side', 90]];
+  const canvas = document.querySelector('canvas');
+  canvas.width = CELL_W; canvas.height = CELL_H;
+  canvas.style.width = `${CELL_W}px`; canvas.style.height = `${CELL_H}px`;
+
+  /** The code-built body's walk: arms and legs swinging, elbows and knees bent forward. */
+  function testWalk(bones) {
+    const q = (axis, deg) => { const h = deg * Math.PI / 360, s = Math.sin(h); return [axis[0] * s, axis[1] * s, axis[2] * s, Math.cos(h)]; };
+    const swing = (bone, a, b, axis = [1, 0, 0]) => ({ bone, path: 'rotation', times: [0, 0.5, 1], values: [...q(axis, a), ...q(axis, b), ...q(axis, a)] });
+    const r = Math.SQRT1_2;
+    return [{ name: 'walk', channels: [
+      swing('leftUpperLeg', -25, 20), swing('rightUpperLeg', 20, -25),
+      swing('leftLowerLeg', 10, 40), swing('rightLowerLeg', 40, 10),
+      swing('leftUpperArm', 20, -20), swing('rightUpperArm', -20, 20),
+      swing('leftLowerArm', 20, 35, [-r, -r, 0]), swing('rightLowerArm', 35, 20, [-r, r, 0]),
+    ].filter((ch) => bones.some((b) => b.name === ch.bone)) }];
+  }
+
+  async function makePerson(model, anatomy) {
+    const engine = await Engine.create(canvas, { camera: { position: [0, 1, 4], target: [0, 1, 0], fov: FOV, near: 0.05, far: 200 } });
+    engine.stop();
+    const errors = [];
+    engine.gpu?.addEventListener?.('uncapturederror', (e) => errors.push(e.error.message));
+    engine.scene.background = '#2a2e35';
+    engine.lighting.direction.set([0.4, 0.7, 0.6, 3]);
+    engine.lighting.radiance.set([1, 0.96, 0.9, 0.55]);
+    const options = { anatomy, hair: false, cards: false };
+    let person;
+    if (model) person = await addPerson(engine, await loadGLTF(engine, model), options);
+    else {
+      const b = riggedTestBody('A');
+      person = await addBody(engine, {
+        bones: b.bones,
+        meshes: [{ positions: b.positions, normals: b.normals, indices: b.indices, joints: b.joints, weights: b.weights }],
+        clips: testWalk(b.bones),
+      }, options);
+    }
+    return { engine, errors, person };
+  }
+
+  /** Reads and writes the person's local pose (10 numbers per bone) through the engine's transform store. */
+  function poseIO(engine, person) {
+    const tr = engine.store.transforms, nodes = person.model.nodes, body = person.body;
+    return {
+      read() {
+        const p = body.rest.slice();
+        nodes.forEach((node, i) => p.set([tr.x[node.id], tr.y[node.id], tr.z[node.id], tr.qx[node.id], tr.qy[node.id], tr.qz[node.id], tr.qw[node.id]], i * 10));
+        return p;
+      },
+      write(p) {
+        nodes.forEach((node, i) => {
+          const o = i * 10;
+          tr.x[node.id] = p[o]; tr.y[node.id] = p[o + 1]; tr.z[node.id] = p[o + 2];
+          tr.qx[node.id] = p[o + 3]; tr.qy[node.id] = p[o + 4]; tr.qz[node.id] = p[o + 5]; tr.qw[node.id] = p[o + 6];
+        });
+      },
+      world(i) { engine.store.tick(false); return Array.from(nodes[i].matrix.subarray(12, 15)); },
+    };
+  }
+
+  window.renderSheet = async ({ model = null } = {}) => {
+    const { engine, errors: gpuErrors, person } = await makePerson(model, {}),
+      body = person.body, nodes = person.model.nodes, io = poseIO(engine, person),
+      { forward, left, up } = body.frame, h = body.stature,
+      joint = (id) => body.joints.find((j) => j.id === id);
+    person.playing = false;
+    // The ground: the rest pose stands on it, a little below its lowest joint (a toe joint sits inside the shoe).
+    const restHeights = body.joints.map((j) => io.world(j.bone)).map((p) => p[0] * up[0] + p[1] * up[1] + p[2] * up[2]),
+      ground = Math.min(...restHeights) - 0.01 * h;
+    // Each row: a name and a function that leaves the pose in the transform store, written after the Animator.
+    let held = null, removers = [];
+    engine.use({ name: 'pose-sheet', setup() {}, onPreUpdate() { if (held) io.write(held); } });
+    const animate = (clip, at) => { held = null; person.play(clip, { fade: 0, at }); person.animator.onPreUpdate(0); person.playing = false; };
+    const hold = (pose) => { if (body.limits) clampPose(body, pose); held = pose; io.write(pose); };
+    const walk = person.clips.find((c) => /walk/i.test(c)) ?? person.clips[0],
+      idle = person.clips.find((c) => /idle|rest|stand/i.test(c)) ?? person.clips[0],
+      walkLength = person.animation.clips.find((c) => c.name === walk)?.duration ?? 1;
+    const reach = (targets) => () => {
+      animate(idle, 0.5);
+      for (const remove of removers) remove();
+      removers = [];
+      for (const [side, offset] of targets) {
+        const bones = [`${side}_shoulder`, `${side}_elbow`, `${side}_radiocarpal`].map((id) => joint(id)?.bone);
+        if (bones.some((b) => b === undefined)) continue;
+        const shoulder = io.world(bones[0]), k = h / 1.75,
+          place = (o) => [0, 1, 2].map((i) => shoulder[i] + (left[i] * o[0] + up[i] * o[1] + forward[i] * o[2]) * k);
+        removers.push(addIKChain(person.animator, { joints: bones, target: place(offset) }));
+      }
+      for (let i = 0; i < 4; i++) person.animator.onPreUpdate(0);
+      for (const remove of removers) remove();
+      removers = [];
+    };
+    const stops = (which) => () => {
+      const angles = {};
+      for (const id of ['l_elbow', 'r_elbow', 'l_knee', 'r_knee']) {
+        const j = joint(id); if (!j) continue;
+        angles[id] = { flexion: which === 'bent' ? j.structural[1] : j.structural[0] };
+      }
+      if (which === 'bent') for (const id of ['l_hip', 'r_hip']) if (joint(id)) angles[id] = { flexion: 90 };
+      hold(poseFromAngles(body, angles, body.neutral));
+    };
+    const rows = [
+      ['rest pose as modelled', () => hold(body.rest.slice())],
+      ['anatomical neutral', () => hold(body.neutral.slice())],
+      // Within the clip's first second: a played clip's skin drifts from its bones with clip time (KB-HUM-SKINDRIFT1).
+      ...[0.25, 0.5, 0.75, 1].map((f) => [`${walk} at ${(f * Math.min(1, walkLength)).toFixed(2)} s`, () => animate(walk, f * Math.min(1, walkLength) * 0.999)]),
+      ['reach across the chest (IK, right)', reach([['r', [0.3, -0.05, 0.3]]])],
+      ['reach overhead (IK, left)', reach([['l', [0.05, 0.5, 0.1]]])],
+      ['seated (hips and knees 90)', () => hold(poseFromAngles(body, { l_hip: { flexion: 90 }, r_hip: { flexion: 90 }, l_knee: { flexion: 90 }, r_knee: { flexion: 90 }, l_elbow: { flexion: 60 }, r_elbow: { flexion: 60 } }, body.neutral))],
+      ['elbows and knees at full flexion', stops('bent')],
+      ['elbows and knees at their extension stops', stops('straight')],
+    ];
+    // Rows where the body stands on its feet; the neutral, seated and range-end poses are posed about a fixed hip.
+    const grounded = new Set([0, 2, 3, 4, 5, 6, 7]);
+    const out = new OffscreenCanvas(CELL_W * VIEWS.length + TEXT_W, CELL_H * rows.length),
+      sheet = out.getContext('2d'), report = [];
+    sheet.fillStyle = '#16181c'; sheet.fillRect(0, 0, out.width, out.height);
+    const project = (p) => {
+      const pos = engine.camera.position, tgt = engine.camera.target,
+        f = norm(sub(tgt, pos)), r = norm(cross(f, [0, 1, 0])), u = cross(r, f), d = sub(p, pos),
+        z = dot(d, f), t = Math.tan(FOV * Math.PI / 360);
+      return [(dot(d, r) / z / (t * CELL_W / CELL_H) + 1) / 2 * CELL_W, (1 - dot(d, u) / z / t) / 2 * CELL_H];
+    };
+    for (const [row, [name, make]] of rows.entries()) {
+      make();
+      // What was checked is what is drawn: the pose is held through every render of the row.
+      held = io.read();
+      // A clip that walks moves the hips away from the origin; the sheet draws each pose in place, over the rest hips.
+      const hips = body.joints[0].bone * 10;
+      for (let c = 0; c < 3; c++) held[hips + c] = body.rest[hips + c] + (held[hips + c] - body.rest[hips + c]) * Math.abs(up[c]);
+      io.write(held);
+      const pose = held,
+        result = checkPose(body, pose, { ground: grounded.has(row) ? ground : null }),
+        angles = jointAngles(body, pose),
+        pick = (id) => angles[id] ? `${id} ${angles[id].flexion.toFixed(0)}/${angles[id].abduction.toFixed(0)}/${angles[id].rotation.toFixed(0)}` : '';
+      report.push({ row: name, passed: result.passed, errors: result.errors, warnings: result.warnings, issues: result.issues.map((i) => `${i.severity} ${i.code}: ${i.message}`), arms: ['r_shoulder', 'r_elbow', 'r_radiocarpal', 'l_shoulder', 'l_elbow', 'l_radiocarpal'].map(pick) });
+      // Frame the pose: from its lowest bone to a little above its highest, along the body's forward and left.
+      let low = Infinity, high = -Infinity, mid = [0, 0, 0];
+      const points = nodes.map((_, i) => io.world(i));
+      for (const p of points) { low = Math.min(low, p[1]); high = Math.max(high, p[1]); mid = mid.map((v, k) => v + p[k] / points.length); }
+      const span = high - low + h * 0.12, centre = [mid[0], low + span / 2 - h * 0.03, mid[2]],
+        dist = (span * 1.1) / (2 * Math.tan(FOV * Math.PI / 360));
+      for (const [c, [viewName, deg]] of VIEWS.entries()) {
+        const a = deg * Math.PI / 180, dir = [0, 1, 2].map((i) => forward[i] * Math.cos(a) + left[i] * Math.sin(a));
+        engine.camera.position = [0, 1, 2].map((i) => centre[i] + dir[i] * dist);
+        engine.camera.target = centre;
+        engine.render({ delta: 0 });
+        if (isCompatDevice(engine.gpu)) await engine.gpu.queue.onSubmittedWorkDone();
+        const x = c * CELL_W, y = row * CELL_H;
+        sheet.drawImage(canvas, x, y);
+        for (const issue of [...result.issues].reverse()) {
+          const bone = issue.bone === null ? -1 : body.names.indexOf(issue.bone);
+          if (bone < 0) continue;
+          const [px, py] = project(points[bone]);
+          sheet.fillStyle = issue.severity === 'error' ? '#ff3b30' : '#ffb020';
+          sheet.beginPath(); sheet.arc(x + px, y + py, 5, 0, Math.PI * 2); sheet.fill();
+        }
+        sheet.fillStyle = '#e8e8e8'; sheet.font = '13px sans-serif';
+        sheet.fillText(`${name}, ${viewName}`, x + 6, y + 16);
+      }
+      // The checker's words for this pose.
+      const tx = VIEWS.length * CELL_W + 10, ty = row * CELL_H;
+      sheet.fillStyle = result.passed ? (result.warnings ? '#ffb020' : '#5fd068') : '#ff3b30';
+      sheet.font = 'bold 14px sans-serif';
+      sheet.fillText(`${name}: ${result.passed ? 'passes' : 'FAILS'}, ${result.errors} errors, ${result.warnings} warnings`, tx, ty + 18);
+      sheet.font = '12px sans-serif'; sheet.fillStyle = '#d0d0d0';
+      const lines = [...result.issues.slice(0, 16).map((i) => `${i.severity === 'error' ? 'E' : 'w'} ${i.message}`), ...(result.issues.length > 16 ? [`... and ${result.issues.length - 16} more`] : []), '', ...report.at(-1).arms.filter(Boolean)];
+      lines.forEach((line, k) => sheet.fillText(line.length > 84 ? `${line.slice(0, 83)}...` : line, tx, ty + 38 + k * 16));
+    }
+    // Every clip, frame by frame: as played (held inside the body) and raw.
+    const clips = [];
+    const proportions = checkProportions(body).map((i) => i.message);
+    const clipReport = async (target, label) => {
+      const b = target.body, io2 = poseIO(target.engine ?? engine, target.person ?? target);
+      for (const clip of target.person.animation.clips) {
+        if (!(clip.duration > 0)) continue;
+        const result = checkClip(b, (time, pose) => {
+          target.person.play(clip.name, { fade: 0, at: Math.min(time, clip.duration * 0.999) });
+          target.person.animator.onPreUpdate(0);
+          pose.set(io2.read());
+        }, { duration: clip.duration, fps: 30, ground, contact: 0.02, velocity: [0, 0, 0] });
+        clips.push({ clip: clip.name, variant: label, text: formatPoseReport(result) });
+      }
+    };
+    held = null;
+    await clipReport({ person, body, engine }, 'as played (fitted body)');
+    const raw = await makePerson(model, { limits: false });
+    raw.person.playing = false;
+    await clipReport({ person: raw.person, body: raw.person.body, engine: raw.engine }, 'raw clip (limits: false)');
+    const errors = [...gpuErrors, ...raw.errors];
+    raw.person.dispose(); raw.person.model.dispose(); raw.engine.dispose();
+    person.dispose(); person.model.dispose(); engine.dispose();
+    const blob = await out.convertToBlob({ type: 'image/png' }),
+      bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return { png: btoa(binary), report, clips, proportions, ground, stature: h, restPose: body.restPose, errors };
+  };
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+    dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+    cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+    norm = (a) => { const l = Math.hypot(...a); return a.map((v) => v / l); };
+  window.ready = true;
+</script>
+</body>
+</html>
