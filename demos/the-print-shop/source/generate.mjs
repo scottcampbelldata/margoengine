@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
-import {writeFile} from 'node:fs/promises';
-import {gzipSync} from 'node:zlib';
+import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
@@ -30,7 +29,7 @@ const stock=extrude('kite-stock',{
 const bore=(name,body,x,z,radius)=>boolean(name,'subtract',body,
   cylinder(name+'-cutter',radius,.013,frameOf([x,-.002,z],[0,1,0],[1,0,0])));
 const original=[[-.015,0,.003],[.016,0,-.004]];
-const output=async (name,bytes)=>writeFile(new URL('./assets/'+name,import.meta.url),bytes);
+const output=async (name,bytes)=>{await mkdir(new URL('./assets/',import.meta.url),{recursive:true});await writeFile(new URL('./assets/'+name,import.meta.url),bytes);};
 
 const packed=[];
 for(const diameter of [8,11,14]){
@@ -63,7 +62,13 @@ for(const diameter of [8,11,14]){
   await output('kite-'+diameter+'.3mf',buildFile);
   await output('kite-'+diameter+'.gcode',program.text);
 }
-const summaries=packed.map(({diameter,layers,filament})=>({diameter,layers:layers.length,filament}));
-const opening=gzipSync(JSON.stringify(packed),{level:9});
-await output('paths.bin',opening);
-console.log(JSON.stringify({bundledBytes:opening.length,models:summaries}));
+// The three solids as one glTF binary (meshopt, 16-bit normals), one node each; the page reads the toolpaths from the
+// G-code files themselves with @margoengine/loaders/gcode.
+const [{exportGLB},{compressMeshopt}]=await Promise.all([use('packages/exporters/dist/gltf.js'),use('packages/exporters/dist/meshopt.js')]);
+const nodes=packed.map(({diameter,position,normal,index})=>({name:'kite-'+diameter,geometry:{positions:position,normals:normal,indices:index}}));
+const {glb}=await compressMeshopt(exportGLB({nodes},{generator:'Margo Engine the-print-shop'}),{normalBits:16});
+await mkdir(new URL('./assets/',import.meta.url),{recursive:true});
+await output('kites.glb',glb);
+const facts=packed.map(({diameter,volume,filament,length,layers})=>({diameter,volume,filament,length,layers:layers.length}));
+await writeFile(new URL('./facts.json',import.meta.url),JSON.stringify(facts,null,1)+String.fromCharCode(10));
+console.log(JSON.stringify({glbBytes:glb.byteLength,models:facts}));

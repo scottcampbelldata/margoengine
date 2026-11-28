@@ -84,7 +84,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseBabylon`, `flattenBabylon` (`/babylon`) | See [Babylon scenes](#babylon-scenes) |
 | `parseX` (`/xfile`) | See [DirectX .x files](#directx-x-files) |
 | `parsePMD`, `parsePMX`, `parseMMD`, `parseVMD`, `sampleVMDBone` (`/mmd`) | See [MikuMikuDance](#mikumikudance-models-and-motions) |
-| `parseGCode` (`/gcode`) | See [G-code](#g-code) |
+| `parseGCode`, `toolpathBeads` (`/gcode`) | See [G-code](#g-code) |
 | `parseVDB` (`/vdb`, async) | See [VDB volumes](#vdb-volumes) |
 | `parseMaterialX` (`/materialx`) | See [MaterialX](#materialx) |
 | `parseLottie` (`/lottie`) | See [Lottie](#lottie) |
@@ -923,6 +923,16 @@ console.log(first.positions.length, filament, min, max);
 // G90.1: I and J name the centre itself. arcP 'circles' reads a Marlin file's P as extra full circles.
 const marlin = parseGCode('G1 Z0.2\nG1 X10 E1\nG90.1\nG3 X10 Y0 I0 J0 P1 E5\n', { arcP: 'circles' });
 console.log(marlin.layers[0].extrusion.length, marlin.filament);
+```
+
+`toolpathBeads(segments, {width, height, round})` turns a layer's `extrusion` or `travel` into solid beads, as a slicer preview draws them: each segment becomes a closed prism of the stadium section extruded filament takes (a rectangle with half-round sides, Comminal et al. 2018), `width` across (default 0.45) and `height` tall (default 0.2) with its top on the nozzle path. It returns `{positions, normals, indices}` in the file's frame, Z up, ready for a core `Geometry`.
+
+```ts
+import { parseGCode, toolpathBeads } from '@margoengine/loaders/gcode';
+
+const { layers } = parseGCode('G1 Z0.28\nG1 X20 E1\nG1 Y20 E2\n');
+const bead = toolpathBeads(layers[0].extrusion, { width: 0.45, height: 0.28 });
+console.log(bead.positions.length / 3, bead.indices.length / 3);
 ```
 
 ## NRRD volumes

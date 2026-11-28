@@ -334,3 +334,107 @@ export function parseGCode(input: BinaryInput | string, options: GCodeOptions = 
 function makeLayer(z: number) {
   return { z, extrusion: floats(), travel: floats() };
 }
+
+/** Options of {@link toolpathBeads}. */
+export interface ToolpathBeadOptions {
+  /** Bead width across the path, in the segments' units. Default 0.45 (a 0.4 mm nozzle's usual line). */
+  width?: number;
+  /** Bead height, the layer height; the bead's top is at the segment's Z. Default 0.2. Clamped to `width`. */
+  height?: number;
+  /** Chords on each rounded side of the bead, 1 to 16. Default 3. */
+  round?: number;
+}
+
+/** A triangle mesh in the segments' frame (Z up), ready for `new Geometry(positions, normals, indices)`. */
+export interface ToolpathBeadMesh {
+  positions: Float32Array;
+  normals: Float32Array;
+  indices: Uint32Array;
+}
+
+/**
+ * Solid beads along toolpath segments, as a slicer preview draws them: each segment of a {@link GCodeLayer}'s
+ * `extrusion` (or `travel`) becomes a prism of the stadium section that extruded filament takes, a rectangle with
+ * half-round sides (Comminal, Serdeczny, Pedersen and Spangenberg, "Numerical modeling of the strand deposition flow
+ * in extrusion-based additive manufacturing", Additive Manufacturing 20, 68-76, 2018,
+ * https://doi.org/10.1016/j.addma.2017.12.013; the same rounded-rectangle area Slic3r's flow math uses), `width`
+ * across and `height` tall with its top on the nozzle path, closed at both ends. Segments are two xyz points each, Z
+ * up; vertical and zero-length segments draw nothing.
+ *
+ * @throws RangeError for a segment array whose length is not a multiple of 6, a non-positive width or height, or
+ * `round` outside 1..16.
+ *
+ * @example
+ * ```ts
+ * import { parseGCode, toolpathBeads } from '@margoengine/loaders/gcode';
+ *
+ * const { layers } = parseGCode('G1 Z0.2\nG1 X10 E1\nG1 Y10 E2\n');
+ * const bead = toolpathBeads(layers[0].extrusion, { width: 0.45, height: 0.2 });
+ * console.log(bead.positions.length / 3, bead.indices.length / 3);
+ * ```
+ */
+export function toolpathBeads(segments: ArrayLike<number>, options: ToolpathBeadOptions = {}): ToolpathBeadMesh {
+  const width = options.width ?? 0.45,
+    round = options.round ?? 3;
+  if (!(width > 0) || !Number.isFinite(width) || !(options.height === undefined || (options.height > 0 && Number.isFinite(options.height))))
+    throw new RangeError('Invalid bead size; pass a positive finite width and height');
+  if (!Number.isInteger(round) || round < 1 || round > 16) throw new RangeError('Invalid bead round; pass an integer 1 to 16');
+  if (segments.length % 6) throw new RangeError('Invalid toolpath segments; pass two xyz points per segment');
+  const height = Math.min(options.height ?? 0.2, width),
+    r = height / 2,
+    flat = width / 2 - r;
+  // The section ring in (across, up) with its normals: the right half-round top to bottom, then the left one bottom
+  // to top; the flats between them join points whose normals already agree.
+  const ring: number[][] = [];
+  for (let i = 0; i <= round; i++) {
+    const a = Math.PI / 2 - (i * Math.PI) / round;
+    ring.push([flat + r * Math.cos(a), r * Math.sin(a), Math.cos(a), Math.sin(a)]);
+  }
+  for (let i = 0; i <= round; i++) {
+    const a = -Math.PI / 2 - (i * Math.PI) / round;
+    ring.push([-flat + r * Math.cos(a), r * Math.sin(a), Math.cos(a), Math.sin(a)]);
+  }
+  const n = ring.length,
+    perSegment = 2 * n + 2 * n,
+    count = segments.length / 6;
+  const positions = new Float32Array(count * perSegment * 3),
+    normals = new Float32Array(count * perSegment * 3),
+    indices = new Uint32Array(count * (2 * n * 3 + 2 * (n - 2) * 3));
+  let v = 0,
+    t = 0;
+  const put = (x: number, y: number, z: number, nx: number, ny: number, nz: number) => {
+    positions[v * 3] = x;
+    positions[v * 3 + 1] = y;
+    positions[v * 3 + 2] = z;
+    normals[v * 3] = nx;
+    normals[v * 3 + 1] = ny;
+    normals[v * 3 + 2] = nz;
+    return v++;
+  };
+  for (let s = 0; s < segments.length; s += 6) {
+    const ax = segments[s], ay = segments[s + 1], az = segments[s + 2];
+    const bx = segments[s + 3], by = segments[s + 4], bz = segments[s + 5];
+    const dx = bx - ax, dy = by - ay, length = Math.hypot(dx, dy);
+    if (!(length > 1e-9 * Math.max(1, width))) continue;
+    // Across the path (the direction times -Z, so the right side is on the right of travel), up is +Z.
+    const ux = dx / length, uy = dy / length, sx = uy, sy = -ux;
+    const first = v;
+    for (const [px, py, pz] of [[ax, ay, az], [bx, by, bz]])
+      for (const [across, up, na, nu] of ring) put(px + sx * across, py + sy * across, pz - r + up, sx * na, sy * na, nu);
+    for (let i = 0; i < n; i++) {
+      const a0 = first + i, a1 = first + ((i + 1) % n), b0 = a0 + n, b1 = a1 + n;
+      indices.set([a0, a1, b0, a1, b1, b0], t);
+      t += 6;
+    }
+    // Flat caps facing back along and forward along the path, as fans over the convex section.
+    for (const [end, px, py, pz, sign] of [[0, ax, ay, az, -1], [1, bx, by, bz, 1]] as const) {
+      const cap = v;
+      for (const [across, up] of ring) put(px + sx * across, py + sy * across, pz - r + up, ux * sign, uy * sign, 0);
+      for (let i = 1; i < n - 1; i++) {
+        indices.set(end ? [cap, cap + i, cap + i + 1] : [cap, cap + i + 1, cap + i], t);
+        t += 3;
+      }
+    }
+  }
+  return { positions: positions.slice(0, v * 3), normals: normals.slice(0, v * 3), indices: indices.slice(0, t) };
+}

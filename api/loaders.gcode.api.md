@@ -21,7 +21,21 @@ export interface GCodeOptions extends ParseLimits {
     arcP?: 'turns' | 'circles';
 }
 
+export interface ToolpathBeadMesh {
+    positions: Float32Array;
+    normals: Float32Array;
+    indices: Uint32Array;
+}
+
+export interface ToolpathBeadOptions {
+    width?: number;
+    height?: number;
+    round?: number;
+}
+
 export function parseGCode(input: BinaryInput | string, options?: GCodeOptions): GCode;
+
+export function toolpathBeads(segments: ArrayLike<number>, options?: ToolpathBeadOptions): ToolpathBeadMesh;
 
 // Not exported from this entry, but used by the exports above:
 
