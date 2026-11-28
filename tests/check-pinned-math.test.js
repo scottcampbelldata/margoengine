@@ -19,3 +19,16 @@ test('exact Math, comments, doc comments and strings pass', () => {
     [],
   );
 });
+
+// The audit found the vehicle code feeding the world hash through host maths (KB-PHYS-AUDIT1, DYN-04): Math.atan, Math.sin
+// and Math.exp in the tyres, the suspension and the tracks, and an alias `const atan = Math.atan` that no name check sees.
+test('the vehicle code that feeds a world is held to pinned maths, and passes', async () => {
+  const { ALWAYS } = await import('../scripts/check-pinned-math.mjs'),
+    { readFileSync } = await import('node:fs');
+  for (const name of ['tyres', 'vehicle', 'motorcycle', 'tracked']) {
+    const path = `packages/physics/src/${name}.ts`;
+    assert.ok(ALWAYS.includes(path), `${path} is on the always-checked list`);
+    assert.deepEqual(hostMath(readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')), [], `${path} uses host maths`);
+  }
+  assert.deepEqual(hostMath('const atan = Math.atan,\n  sin = Math.sin;'), ['1: Math.atan', '2: Math.sin']);
+});

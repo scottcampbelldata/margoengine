@@ -6138,10 +6138,13 @@ test.
 - **ATMO-07, a lightning leader can stall with no flash and no error.** **Repro:** a domain where the leader runs out
   of candidate cells before it reaches ground or a target. **Cause:** `packages/physics/src/lightning/index.ts` ends
   growth silently.
-- **DYN-04, host transcendentals in state-feeding vehicle code.** **Repro:** `tyres.ts`, `vehicle.ts`,
-  `motorcycle.ts` and `tracked.ts` call `Math.atan`, `Math.sin` and similar in forces that feed the world hash (an
-  alias `const atan = Math.atan` also hides it). **Cause:** these files predate the pinned-maths rule and
-  `npm run check:pinned-math` does not scan them.
+- **DYN-04, host transcendentals in state-feeding vehicle code, fixed 2026-11-28 (lane P).** `tyres.ts`, `vehicle.ts`,
+  `motorcycle.ts` and `tracked.ts` called `Math.atan`, `Math.sin`, `Math.exp`, `Math.hypot` and `**` in forces that feed
+  the world hash (an alias `const atan = Math.atan` hid two of them), and `npm run check:pinned-math` did not scan them.
+  They now use `@margoengine/math/pinned` (`tan` as pinned `sin / cos`, a cube and a quaternion's length by exact
+  products and `Math.sqrt`), and the four files are on the gate's always-checked list. Regression:
+  `tests/check-pinned-math.test.js` "the vehicle code that feeds a world is held to pinned maths"; the vehicle and road
+  suites pass (53 and 14).
 - **SOFT-06, the pV test cannot fail.** **Repro:** `tests/coupling/gas-pressure.test.js` asserts pV is constant, but
   `soft.ts` computes pressure as nRT/V, so it holds by construction; the public "conserves pV" claim rests on it.
   Also, doc comments in `soft.ts` and `soft-split.ts` say a cloth is never split, while `splitOnTear: 'all'` splits it.

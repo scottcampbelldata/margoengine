@@ -14,6 +14,7 @@
 // positive pushes the car forward, lateral positive along `side`; the vehicle gives the lateral force its sign against the slip.
 
 import { MargoError } from '@margoengine/math/errors';
+import { atan, cos, hypot, sin } from '@margoengine/math/pinned';
 
 /** What a tyre is asked: the slips and the load. */
 export interface TyreSample {
@@ -66,8 +67,6 @@ export interface PacejkaOptions {
 /** A tyre model input that cannot be used: a MargoError of code `unsupported` naming the input and its fix, with the help link. */
 const invalidTyre = (message: string): MargoError =>
   new MargoError('unsupported', `${message} See https://margoengine.com/errors#vehicles`);
-const atan = Math.atan,
-  sin = Math.sin;
 const magic = ({ B, C, D, E }: MagicCurve, x: number): number => {
   const bx = B * x;
   return D * sin(C * atan(bx - E * (bx - atan(bx))));
@@ -109,7 +108,7 @@ export function pacejkaTyre(options: PacejkaOptions = {}): TyreModel {
         // Inside the ellipse of the two peaks: scale both back where together they ask for more than the tyre has.
         const u = fx / dx,
           v = fy / dy,
-          size = Math.hypot(u, v);
+          size = hypot(u, v);
         if (size > 1) {
           fx /= size;
           fy /= size;
@@ -153,15 +152,15 @@ export function brushTyre(options: BrushOptions = {}): TyreModel {
     forces({ slipRatio, slipAngle, load }) {
       if (!(load > 0)) return { longitudinal: 0, lateral: 0 };
       const sx = slipRatio,
-        sy = Math.tan(slipAngle),
-        size = Math.hypot(sx, sy);
+        sy = sin(slipAngle) / cos(slipAngle),
+        size = hypot(sx, sy);
       if (size === 0) return { longitudinal: 0, lateral: 0 };
       // The theoretical slip: the practical slips over the wheel's surface speed in ground speeds, 1 + kappa. A wheel turning no
       // faster than the ground moves backward under it (1 + kappa of 0 or less) slides whole.
       const surface = 1 + sx,
         theta = (2 * c * a * a) / (3 * mu * load),
         t = surface > 0 ? (theta * size) / surface : Infinity,
-        force = t >= 1 ? mu * load : mu * load * (1 - (1 - t) ** 3);
+        force = t >= 1 ? mu * load : mu * load * (1 - (1 - t) * (1 - t) * (1 - t));
       return { longitudinal: (force * sx) / size, lateral: (force * sy) / size };
     },
   };

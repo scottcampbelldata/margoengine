@@ -9,6 +9,7 @@
 // entry); a belt that is stopped keeps adding to it, so a vehicle held by its belts on a slope creeps only until the shear holds it. A track
 // is held harder against sliding sideways than along its belt (the lateral and longitudinal coefficients of Wong's skid steering), so a
 // vehicle turns by driving its tracks at different speeds and the ground resists the turn as it does a real tank's.
+import { exp, hypot } from '@margoengine/math/pinned';
 import type { PhysicsBody } from './body.js';
 import type { PhysicsCollider } from './collider.js';
 import type { Vec3 } from './math.js';
@@ -95,7 +96,7 @@ const clamp = (v: number, low: number, high: number): number => Math.min(high, M
 export function shearShare(displacement: number, modulus: number): number {
   if (!(modulus > 0 && Number.isFinite(modulus)))
     throw invalidVehicle('The shear modulus must be a finite number above 0.');
-  return 1 - Math.exp(-Math.abs(displacement) / modulus);
+  return 1 - exp(-Math.abs(displacement) / modulus);
 }
 
 interface Track {
@@ -163,13 +164,13 @@ export class TrackedVehicle implements PhysicsAttachment {
         throw invalidVehicle(`Tracked vehicle ${name} must be a finite number above 0.`);
     const f = options.forward ?? [0, 0, 1];
     checkVec(f, 'Tracked vehicle forward');
-    const size = Math.hypot(f[0], f[1], f[2]);
+    const size = hypot(f[0], f[1], f[2]);
     if (!size) throw invalidVehicle('Tracked vehicle forward must be nonzero.');
     this.facing = [f[0] / size, f[1] / size, f[2] / size];
     // The chassis's sideways axis, up (+Y) cross forward: a forward along up has none, so no track would have a side and
     // every steer would be ignored.
     const lateral = cross([0, 1, 0], this.facing);
-    if (!(Math.hypot(lateral[0], lateral[1], lateral[2]) > 1e-6))
+    if (!(hypot(lateral[0], lateral[1], lateral[2]) > 1e-6))
       throw invalidVehicle(
         'Tracked vehicle forward must not point along the chassis up axis (+Y); pass a horizontal forward.',
       );
@@ -366,7 +367,7 @@ export class TrackedVehicle implements PhysicsAttachment {
           forwardWorld[1] - normal[1] * dot(forwardWorld, normal),
           forwardWorld[2] - normal[2] * dot(forwardWorld, normal),
         ] as V;
-        const size = Math.hypot(forward[0], forward[1], forward[2]);
+        const size = hypot(forward[0], forward[1], forward[2]);
         if (size < 1e-6) continue;
         forward = [forward[0] / size, forward[1] / size, forward[2] / size];
         const side = cross(forward, normal),
@@ -375,11 +376,11 @@ export class TrackedVehicle implements PhysicsAttachment {
         // The ground's shear displacement under this wheel: the slip speed added up while the belt stays on the same ground, renewed at
         // the rate the belt carries new surface into the patch (twice the belt speed over its length: the mean of Wong's `j = i x`).
         const renewal = (2 * Math.abs(track.speed)) / track.length,
-          keep = Math.exp(-renewal * dt),
+          keep = exp(-renewal * dt),
           gain = renewal > 0 ? (1 - keep) / renewal : dt;
         track.alongShear[k] = track.alongShear[k]! * keep + slideAlong * gain;
         track.acrossShear[k] = track.acrossShear[k]! * keep + slideAcross * gain;
-        const displacement = Math.hypot(track.alongShear[k]!, track.acrossShear[k]!);
+        const displacement = hypot(track.alongShear[k]!, track.acrossShear[k]!);
         if (displacement === 0) continue;
         // Wong's shear: the share of the friction the displacement has mobilised, along the displacement's direction, the friction larger along the belt.
         const share = shearShare(displacement, this.shear),

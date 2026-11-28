@@ -7,6 +7,7 @@
 // balance, `atan(v r-dot / g)`), and to reach a lean the rider first steers the other way, which is counter-steering: it drops out of the
 // control law, not out of a rule.
 import { MargoError } from '@margoengine/math/errors';
+import { atan, atan2, hypot } from '@margoengine/math/pinned';
 import type { PhysicsBody } from './body.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
 import { Vehicle, invalidVehicle, type VehicleOptions, type WheelOptions } from './vehicle.js';
@@ -157,18 +158,18 @@ export class Motorcycle implements PhysicsAttachment {
       },
       forward = rotate([0, 0, 1]),
       up = rotate([0, 1, 0]),
-      flat = Math.hypot(forward[0], forward[2]) || 1,
+      flat = hypot(forward[0], forward[2]) || 1,
       // The bike's forward on the ground, and its +X side there: the world's up crossed with it.
       fh: [number, number, number] = [forward[0] / flat, 0, forward[2] / flat],
       side: [number, number, number] = [fh[2], 0, -fh[0]],
       speed = v[0] * fh[0] + v[2] * fh[2];
     // Positive lean toward the side vector; the side of a bike facing +Z is +X, as the steer input has it.
-    this.lean_ = Math.atan2(up[0] * side[0] + up[2] * side[2], up[1]);
+    this.lean_ = atan2(up[0] * side[0] + up[2] * side[2], up[1]);
     // A turn about the forward axis tilts the up axis toward -X for a positive angle there, so the lean's rate is its negative.
     const rollRate = -(w[0] * fh[0] + w[2] * fh[2]);
     // The turn asked for: a yaw rate over the speed, as a sideways acceleration the lean balances.
     const lateral = this.steerInput * this.maxLateral;
-    this.target_ = Math.atan2(lateral, gravityMagnitude(this.physics.gravity));
+    this.target_ = atan2(lateral, gravityMagnitude(this.physics.gravity));
     if (!this.balance) return;
     // Steering into the fall: more lean toward the side than asked steers toward it; less steers away (the counter-steer that starts a turn).
     // The steering's pull on the roll grows with speed, as the square of it for the steering angle and the speed itself for its rate (the
@@ -177,7 +178,7 @@ export class Motorcycle implements PhysicsAttachment {
     const fall = 8 / Math.max(Math.abs(speed), 8),
       steer = this.gain * fall * fall * (this.lean_ - this.target_) + this.damping * fall * rollRate,
       // Feed-forward: the steering angle that gives the turn's yaw rate at this speed, wheelbase times the yaw rate over the speed.
-      ahead = Math.abs(speed) > 1 ? Math.atan((this.wheelbase * lateral) / (speed * speed)) : 0;
+      ahead = Math.abs(speed) > 1 ? atan((this.wheelbase * lateral) / (speed * speed)) : 0;
     this.vehicle.steering = clamp(steer + ahead, -this.maxSteer, this.maxSteer);
   }
 

@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { MargoError, type MargoErrorCode } from '@margoengine/math/errors';
-import { hypot, pow } from '@margoengine/math/pinned';
+import { atan2, cos, hypot, pow, sin } from '@margoengine/math/pinned';
 import { STANDARD_GRAVITY } from '@margoengine/math/gravity';
 import type { Mesh } from '@margoengine/core';
 import type { PhysicsCollider } from './collider.js';
@@ -351,7 +351,7 @@ const checkVec = (value: unknown, label: string): void => {
 };
 const unit = (value: Vec3, label: string): V => {
   checkVec(value, label);
-  const length = Math.hypot(value[0], value[1], value[2]);
+  const length = hypot(value[0], value[1], value[2]);
   if (!length) throw invalidVehicle(`${label} must be nonzero; pass a direction such as [0, -1, 0].`);
   return [value[0] / length, value[1] / length, value[2] / length];
 };
@@ -374,10 +374,10 @@ const clamp = (value: number | undefined, min: number, max: number, label: strin
 /** A wheel's axle in the world, turned by its steering about the chassis up axis. */
 function steeredAxle(w: { direction: V; axle: V; steering: number }, rotation: readonly number[]): V {
   const s = w.steering / 2,
-    sine = Math.sin(s);
+    sine = sin(s);
   return rotate(
     rotation,
-    rotate([-w.direction[0] * sine, -w.direction[1] * sine, -w.direction[2] * sine, Math.cos(s)], w.axle),
+    rotate([-w.direction[0] * sine, -w.direction[1] * sine, -w.direction[2] * sine, cos(s)], w.axle),
   );
 }
 
@@ -882,10 +882,10 @@ export class Vehicle implements PhysicsAttachment {
     // Steering turns around the chassis up axis (opposite the suspension direction), spin around the axle.
     const s = setup.steering / 2,
       r = -setup.rotation / 2,
-      ss = Math.sin(s),
-      sc = Math.cos(s),
-      rs = Math.sin(r),
-      rc = Math.cos(r),
+      ss = sin(s),
+      sc = cos(s),
+      rs = sin(r),
+      rc = cos(r),
       d = setup.direction,
       a = setup.axle;
     const turn: Q = [-d[0] * ss, -d[1] * ss, -d[2] * ss, sc],
@@ -985,10 +985,10 @@ export class Vehicle implements PhysicsAttachment {
         const steered = wheel.steer
             ? rotate(
                 [
-                  -wheel.direction[0] * Math.sin(wheel.steering / 2),
-                  -wheel.direction[1] * Math.sin(wheel.steering / 2),
-                  -wheel.direction[2] * Math.sin(wheel.steering / 2),
-                  Math.cos(wheel.steering / 2),
+                  -wheel.direction[0] * sin(wheel.steering / 2),
+                  -wheel.direction[1] * sin(wheel.steering / 2),
+                  -wheel.direction[2] * sin(wheel.steering / 2),
+                  cos(wheel.steering / 2),
                 ],
                 wheel.axle,
               )
@@ -996,7 +996,7 @@ export class Vehicle implements PhysicsAttachment {
           a = rotate(rotation, steered),
           // The shortest turn that takes a cylinder's own axis (y) to the axle.
           turn: Q = a[1] < -1 + 1e-6 ? [1, 0, 0, 0] : [a[2], 0, -a[0], 1 + a[1]],
-          size = Math.hypot(turn[0], turn[1], turn[2], turn[3]),
+          size = Math.sqrt(turn[0] * turn[0] + turn[1] * turn[1] + turn[2] * turn[2] + turn[3] * turn[3]),
           cast = own.shapeCast(
             { shape: 'cylinder', halfHeight: wheel.width / 2, radius: wheel.radius },
             origin,
@@ -1134,10 +1134,10 @@ export class Vehicle implements PhysicsAttachment {
       const axle = wheel.steer
           ? rotate(
               [
-                -wheel.direction[0] * Math.sin(wheel.steering / 2),
-                -wheel.direction[1] * Math.sin(wheel.steering / 2),
-                -wheel.direction[2] * Math.sin(wheel.steering / 2),
-                Math.cos(wheel.steering / 2),
+                -wheel.direction[0] * sin(wheel.steering / 2),
+                -wheel.direction[1] * sin(wheel.steering / 2),
+                -wheel.direction[2] * sin(wheel.steering / 2),
+                cos(wheel.steering / 2),
               ],
               wheel.axle,
             )
@@ -1145,7 +1145,7 @@ export class Vehicle implements PhysicsAttachment {
         axleWorld = rotate(rotation, axle);
       wheel.camberSine = Math.max(-1, Math.min(1, -axleWorld[1]));
       let forward = cross(normal, axleWorld);
-      const flat = Math.hypot(forward[0], forward[1], forward[2]);
+      const flat = hypot(forward[0], forward[1], forward[2]);
       if (flat < 1e-6) continue;
       forward = [forward[0] / flat, forward[1] / flat, forward[2] / flat];
       const side = cross(forward, normal);
@@ -1229,7 +1229,7 @@ export class Vehicle implements PhysicsAttachment {
           fy = 0;
         const slips = (f: number, g: number): [number, number] => [
           (rolling * (Math.abs(surface) - f * gainForward)) / reference,
-          sliding * Math.atan2(Math.abs(sideSpeed) - g * gainSide, floorSpeed),
+          sliding * atan2(Math.abs(sideSpeed) - g * gainSide, floorSpeed),
         ];
         for (let sweep = 0; sweep < 3; sweep++) {
           for (const which of [0, 1] as const) {
@@ -1291,7 +1291,7 @@ export class Vehicle implements PhysicsAttachment {
       // The friction circle: drive and grip together stay inside what the load can hold.
       let along = drive,
         across = slide;
-      const total = Math.hypot(along, across);
+      const total = hypot(along, across);
       if (total > grip && total > 0) {
         along *= grip / total;
         across *= grip / total;
@@ -1362,14 +1362,14 @@ export class Vehicle implements PhysicsAttachment {
         // The push the tyre gave, as a share of its load: one metre for a push as large as the load.
         const axleWorld = steeredAxle(w, rotation),
           rolling = cross(w.normal, axleWorld),
-          size = Math.hypot(rolling[0], rolling[1], rolling[2]);
+          size = hypot(rolling[0], rolling[1], rolling[2]);
         if (size > 1e-6) {
           const forward: V = [rolling[0] / size, rolling[1] / size, rolling[2] / size],
             across = cross(forward, w.normal),
             limit = w.tyre ? 0 : Math.min(w.slip, w.groundGrip ?? Infinity) * w.force * dt,
-            push = Math.hypot(w.forwardImpulse, w.sideImpulse),
+            push = hypot(w.forwardImpulse, w.sideImpulse),
             // Friction circle: the share of the grip used. Tyre model: the combined slip against 0.1, about where the Magic Formula peaks.
-            used = Math.min(1, w.tyre ? Math.hypot(w.kappa, w.alpha) / 0.1 : limit > 0 ? push / limit : 1),
+            used = Math.min(1, w.tyre ? hypot(w.kappa, w.alpha) / 0.1 : limit > 0 ? push / limit : 1),
             grip = colour('grip', [0.3, 0.95, 0.35, 1]),
             sliding = colour('sliding', [1, 0.2, 0.15, 1]),
             c = grip.map((g, i) => g + (sliding[i]! - g) * used),
@@ -1396,9 +1396,9 @@ export class Vehicle implements PhysicsAttachment {
         for (let i = 1; i <= n; i++) {
           const t = (2 * Math.PI * i) / n,
             p: V = [
-              hub[0] + (d[0] * Math.cos(t) + f[0] * Math.sin(t)) * w.radius,
-              hub[1] + (d[1] * Math.cos(t) + f[1] * Math.sin(t)) * w.radius,
-              hub[2] + (d[2] * Math.cos(t) + f[2] * Math.sin(t)) * w.radius,
+              hub[0] + (d[0] * cos(t) + f[0] * sin(t)) * w.radius,
+              hub[1] + (d[1] * cos(t) + f[1] * sin(t)) * w.radius,
+              hub[2] + (d[2] * cos(t) + f[2] * sin(t)) * w.radius,
             ];
           segment(previous, p, c);
           previous = p;
