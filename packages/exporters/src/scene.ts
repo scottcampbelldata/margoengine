@@ -171,10 +171,10 @@ export interface MaterialData {
    */
   baseColorTextureTransform?: TextureTransform;
   metallicRoughnessTexture?: TextureData;
-  /** KHR_texture_transform of `metallicRoughnessTexture`, as `baseColorTextureTransform`. glTF writers only. */
+  /** KHR_texture_transform of `metallicRoughnessTexture`, as `baseColorTextureTransform`. glTF and USDZ writers only. */
   metallicRoughnessTextureTransform?: TextureTransform;
   normalTexture?: TextureData;
-  /** KHR_texture_transform of `normalTexture`, as `baseColorTextureTransform`. glTF writers only. */
+  /** KHR_texture_transform of `normalTexture`, as `baseColorTextureTransform`. glTF and USDZ writers only. */
   normalTextureTransform?: TextureTransform;
   /** Shade with base color only, ignoring lights: KHR_materials_unlit in glTF. Default false. */
   unlit?: boolean;
@@ -193,13 +193,13 @@ export interface MaterialData {
   normalScale?: number;
   /** Ambient occlusion in its red channel. glTF writers only. */
   occlusionTexture?: TextureData;
-  /** KHR_texture_transform of `occlusionTexture`, as `baseColorTextureTransform`. glTF writers only. */
+  /** KHR_texture_transform of `occlusionTexture`, as `baseColorTextureTransform`. glTF and USDZ writers only. */
   occlusionTextureTransform?: TextureTransform;
   /** How much `occlusionTexture` darkens, 0 to 1. Default 1. */
   occlusionStrength?: number;
   /** Emitted color in its rgb, multiplied by `emissive` (so set `emissive`, e.g. [1, 1, 1]). glTF writers only. */
   emissiveTexture?: TextureData;
-  /** KHR_texture_transform of `emissiveTexture`, as `baseColorTextureTransform`. glTF writers only. */
+  /** KHR_texture_transform of `emissiveTexture`, as `baseColorTextureTransform`. glTF and USDZ writers only. */
   emissiveTextureTransform?: TextureTransform;
   /** Multiplier on the emitted color, finite and >= 0, for emission brighter than 1: KHR_materials_emissive_strength. Default 1. */
   emissiveStrength?: number;

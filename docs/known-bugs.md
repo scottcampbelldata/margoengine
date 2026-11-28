@@ -15574,6 +15574,15 @@ does not own. Each entry says exactly what is needed to close it.
      `usdchecker` warns `NormalMapTextureValidator.NonCompliantScaleValues` on 04.
   2. The thumbnails were read by eye, not compared with the engine-drawn twins.
   3. Nothing has been opened on an iPhone or iPad, in AR or otherwise.
+- **2026-11-28, Mac mini (Apple M6, macOS 27.2.1, screen locked, over SSH):** the eight kit files and 14 textured Khronos
+  models exported from their GLB bytes all pass `usdchecker --arkit` (04 and SheenChair with the `normalScale` warning) and
+  all 22 draw a 768 px thumbnail through `QLThumbnailGenerator` (`qlmanage -t` itself ran past 60 s on every file tried).
+  Compared by eye with Edge renders of the GLB twins: the kit, Lantern, Fox, Corset, BoomBox, the shoe, SheenChair,
+  AlphaBlendModeTest, NegativeScaleTest, NormalTangentMirrorTest, OrientationTest and MetalRoughSpheres show the same
+  shapes and maps (the lighting differs). Differences: vertex colours with a textureless lit material draw grey
+  (BoxVertexColors, below); transmission draws opaque (IridescenceLamp's globe, ToyCar's glass) and sheen is lost
+  (ToyCar's red cloth draws near black), as UsdPreviewSurface has neither; ToyCar's cloth maps were wrong (the two
+  entries below). Clearcoat and IOR are inputs of UsdPreviewSurface that `exportUSDZ` does not write yet.
 - **Needed to close:** `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` writes the eight files and their twins.
   Open them on an iPhone or iPad on iOS 17 or later, compare each with the same scene drawn by Margo, and record the
   result here and in `docs/threejs-parity.md` (USDZExporter row).
@@ -15634,6 +15643,40 @@ Release exception: RiggedFigure loads off the floor in AR Quick Look (Apple view
   - Anything between leaves the question open, and the entry says so.
 - **Needed to close:** that run, then either a root-cause fix with a regression test or the phone evidence that it is Quick Look's own behaviour. The
   exporter stays as it is until a file-side cause is shown.
+
+### Quick Look draws every map of a material with the base colour map's texture transform (2026-11-28, open)
+
+- **What:** AR Quick Look's renderer (macOS 27.2.1 thumbnails) ignores each texture's own `UsdTransform2d` and samples
+  every map of a material with the base colour map's transform. The Khronos ToyCar's cloth (base and normal maps tiled 3
+  times, occlusion map once) shows the one dark square of its occlusion map repeated over the cloth.
+- **Repro:** a quad with a checker `baseColorTexture`, `baseColorTextureTransform` scale 3, and a one-square
+  `emissiveTexture` or `occlusionTexture` with no transform, scale 1 or scale 2: nine squares in all three. With the base
+  map untransformed and the emissive map at scale 3, one square. `usdchecker --arkit` passes every file; the file is
+  correct USD, and `@margoengine/usdz` reads each map's own transform.
+- **Cause:** Apple's renderer. Measured on the same Mac: it does follow a second UV primvar (a base map on `st1` and
+  another on `st` draw independently, custom primvar names included), and a third set draws with one of the first two.
+- **Way to fix it in Margo (not done):** when the maps of a material differ, write their transformed UVs as their own
+  primvars instead of `UsdTransform2d` nodes. `@margoengine/usdz` first has to read a second UV set (below), or Margo's
+  own round trip would break.
+
+### `parseUSDZ` samples every map of a mesh with one UV set (2026-11-28, open)
+
+- **What:** `@margoengine/usdz` takes one UV primvar for a mesh, the one its first mapped input reads
+  (`diffuseColor`, `normal`, `roughness`, `metallic`), and every map samples it. A file whose maps name different
+  primvars (`exportUSDZ` writes `st` and `st1` for `texCoord` 1) loads with the other maps on the wrong coordinates.
+- **Repro:** `parseUSDZ(exportUSDZ(scene))` for a material with `baseColorTexture` on `uvs` and `normalTexture` with
+  `texCoord: 1` on `uvs1`: the document holds no `TEXCOORD_1` and the normal map reads `TEXCOORD_0`.
+- **Cause:** `uvName` in `packages/usdz/src/index.ts` is a single name for the mesh.
+
+### Fixed 2026-11-28: `exportUSDZ` dropped every texture transform but the base colour's (KB-USDZ-TRANSFORM1)
+
+- **What:** `metallicRoughnessTextureTransform`, `normalTextureTransform`, `occlusionTextureTransform` and
+  `emissiveTextureTransform` (and so those of a GLB's maps) were left out of the file without a word, so a tiled normal
+  map drew once across the surface in any USD reader. Found while comparing the ToyCar in Quick Look.
+- **Cause:** `sample` in `packages/exporters/src/usdz-write.ts` wrote a `UsdTransform2d` for the base colour map alone.
+- **Fix:** each transformed slot gets its own `UsdTransform2d`, in `exportUSDZ` and the animated export alike.
+- **Regression:** `packages/exporters/tests/usdz.test.js`, "every USDZ texture slot reads through its own
+  UsdTransform2d" (fails on the old source).
 
 ### USDZ vertex colours draw grey in Quick Look
 

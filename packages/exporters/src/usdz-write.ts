@@ -335,25 +335,29 @@ export class USDMaterials {
       return `${path}/${set ? 'UV1' : 'UV'}.outputs:result`;
     };
     const sample = (
-      name: string,
+      slot: (typeof TEXTURES)[number],
       texture: TextureData,
       color: boolean,
       scale: readonly number[],
       bias?: readonly number[],
     ): string => {
-      const { wrapS, wrapT } = samplerOf(texture);
+      const { wrapS, wrapT } = samplerOf(texture),
+        name = slot[0].toUpperCase() + slot.slice(1);
       let coordinates = uv(texture.texCoord ?? 0);
-      if (name === 'BaseColorTexture' && material.baseColorTextureTransform) {
+      // Each texture slot has its own KHR_texture_transform, so each transformed map gets its own UsdTransform2d.
+      const transform = material[`${slot}Transform`];
+      if (transform) {
+        const node = `${name.slice(0, -'Texture'.length)}Transform`;
         // KHR_texture_transform in glTF uv space (v down): uv' = O + R S uv, R = [[c, s], [-s, c]] (gltf/pbr's
         // reading: the uvs turn counter-clockwise as seen with v down, the image clockwise). With st = F uv + (0, 1),
         // F = diag(1, -1): st' = (F R F) S st + F O + F R S (0, 1) + (0, 1). F R F = [[c, -s], [s, c]] is
         // UsdTransform2d's counter-clockwise rotation (t up) by the same angle, so the sign is kept; the translation
         // picks up the turned v axis: (ox + s sy, 1 - c sy - oy).
-        const { offset, scale: repeat, rotation = 0 } = material.baseColorTextureTransform;
+        const { offset, scale: repeat, rotation = 0 } = transform;
         const c = Math.cos(rotation),
           s = Math.sin(rotation);
         shaders.push(
-          '    def Shader "BaseColorTransform" {',
+          `    def Shader "${node}" {`,
           '        uniform token info:id = "UsdTransform2d"',
           `        float2 inputs:in.connect = <${coordinates}>`,
           ...(rotation ? [`        float inputs:rotation = ${num((rotation * 180) / Math.PI)}`] : []),
@@ -362,7 +366,7 @@ export class USDMaterials {
           '        float2 outputs:result',
           '    }',
         );
-        coordinates = `${path}/BaseColorTransform.outputs:result`;
+        coordinates = `${path}/${node}.outputs:result`;
       }
       shaders.push(
         `    def Shader "${name}" {`,
@@ -384,10 +388,10 @@ export class USDMaterials {
       return `${path}/${name}.outputs:`;
     };
     const surface = (): string[] => {
-      const baseOut = base && sample('BaseColorTexture', base, true, material.color),
+      const baseOut = base && sample('baseColorTexture', base, true, material.color),
         metalRough =
           material.metallicRoughnessTexture &&
-          sample('MetallicRoughnessTexture', material.metallicRoughnessTexture, false, [
+          sample('metallicRoughnessTexture', material.metallicRoughnessTexture, false, [
             1,
             material.roughness,
             material.metalness,
@@ -396,12 +400,12 @@ export class USDMaterials {
         s = material.normalScale,
         normal =
           material.normalTexture &&
-          sample('NormalTexture', material.normalTexture, false, [2 * s, 2 * s, 2, 1], [-s, -s, -1, 0]),
+          sample('normalTexture', material.normalTexture, false, [2 * s, 2 * s, 2, 1], [-s, -s, -1, 0]),
         k = material.occlusionStrength,
         occlusion =
           material.occlusionTexture &&
           sample(
-            'OcclusionTexture',
+            'occlusionTexture',
             material.occlusionTexture,
             false,
             [k, k, k, 1],
@@ -409,7 +413,7 @@ export class USDMaterials {
           ),
         emissive = material.emissive.map((v) => v * material.emissiveStrength),
         emission =
-          material.emissiveTexture && sample('EmissiveTexture', material.emissiveTexture, true, [...emissive, 1]);
+          material.emissiveTexture && sample('emissiveTexture', material.emissiveTexture, true, [...emissive, 1]);
       return [
         `def Material "Material_${i}" {`,
         `    token outputs:surface.connect = <${path}/Surface.outputs:surface>`,

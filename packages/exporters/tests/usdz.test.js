@@ -345,8 +345,8 @@ test('USDZ samples texCoord 1 from primvars:st1 and textures engine meshes throu
 // KHR_texture_transform rotation (radians) into UsdTransform2d. gltf/pbr's rows are the reference: through the V flip
 // (st = (u, 1 - v)) the USD transform must sample the texel gltf/pbr samples at every uv. UsdTransform2d per the
 // UsdPreviewSurface spec: scale, then a counter-clockwise rotation in degrees (t up), then translation.
-const transformInputs = (source) => {
-  const text = shader(source, 'BaseColorTransform'),
+const transformInputs = (source, node = 'BaseColorTransform') => {
+  const text = shader(source, node),
     pair = (name) => {
       const m = text.match(new RegExp(`float2 inputs:${name} = \\(([^,]+), ([^)]+)\\)`));
       assert.ok(m, `inputs:${name}`);
@@ -421,6 +421,45 @@ test('USDZ writes texture rotation that samples the texels gltf/pbr samples (0, 
       ]);
     assert.equal(Math.sign(Math.round(-upGLTF[1] * 1e9)), lean, `${degrees}: glTF lean`); // u of M^-1 (0, -1)
     assert.equal(Math.sign(Math.round(upUSD[1] * 1e9)), lean, `${degrees}: USD lean`); // s of M^-1 (0, 1)
+  }
+});
+
+test('every USDZ texture slot reads through its own UsdTransform2d, and an untransformed one reads st', async () => {
+  // Quick Look showed the Khronos ToyCar's cloth with its maps misplaced: only baseColorTextureTransform was written
+  // and the other four were dropped. Each slot gets a different transform here, occlusion none.
+  const slots = ['baseColor', 'metallicRoughness', 'normal', 'occlusion', 'emissive'],
+    transforms = {
+      baseColor: { offset: [0.25, 0], scale: [3, 3] },
+      metallicRoughness: { offset: [0, 0.5], scale: [2, 4], rotation: Math.PI / 2 },
+      normal: { offset: [0.125, 0.25], scale: [5, 5], rotation: -Math.PI / 6 },
+      emissive: { offset: [0.5, 0.5], scale: [0.5, 0.25] },
+    },
+    material = { emissive: [1, 1, 1] };
+  for (const [i, slot] of slots.entries()) {
+    material[`${slot}Texture`] = { image: pngBytes(i + 1), mimeType: 'image/png' };
+    if (transforms[slot]) material[`${slot}TextureTransform`] = transforms[slot];
+  }
+  const source = await usda(exportUSDZ({ nodes: [{ geometry: quad, material }] }));
+  for (const slot of slots) {
+    const name = slot[0].toUpperCase() + slot.slice(1),
+      reads = shader(source, `${name}Texture`).match(/inputs:st\.connect = <[^>]*\/(\w+)\.outputs:result>/)[1],
+      transform = transforms[slot];
+    if (!transform) {
+      assert.equal(reads, 'UV', `${slot} reads st`);
+      assert.doesNotMatch(source, new RegExp(`"${name}Transform"`));
+      continue;
+    }
+    assert.equal(reads, `${name}Transform`);
+    const usd = transformInputs(source, reads),
+      rows = textureTransform({ rotation: 0, ...transform });
+    for (let i = 0; i <= 4; i++)
+      for (let j = 0; j <= 4; j++) {
+        const u = i / 4 - 0.3,
+          v = j / 4 + 0.1,
+          [gu, gv] = gltfUV(rows, u, v),
+          [s, t] = usdST(usd, u, 1 - v);
+        assert.ok(Math.abs(s - gu) < 1e-5 && Math.abs(t - (1 - gv)) < 1e-5, `${slot} at (${u}, ${v})`);
+      }
   }
 });
 

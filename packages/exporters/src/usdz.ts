@@ -134,7 +134,8 @@ const OUTSIDE_FLOAT32 =
  * `primvars:st` (from `uvs`, V flipped) or `primvars:st1` (from `uvs1`): base color into `diffuseColor` scaled by the
  * color factor (its alpha into `opacity` for BLEND and MASK, with `opacityThreshold` set to `alphaCutoff` for MASK),
  * metal-rough green and blue into `roughness` and `metallic`, `normal`, `occlusion` red and `emissiveColor`. The images
- * are stored as given (PNG or JPEG) under `texturePrefix`. A `baseColorTextureTransform` becomes a `UsdTransform2d`
+ * are stored as given (PNG or JPEG) under `texturePrefix`. Each slot's transform (`baseColorTextureTransform`,
+ * `normalTextureTransform` and so on) becomes that map's own `UsdTransform2d`
  * that samples the same texels as the glTF transform: its rotation in degrees with the same sign (the V flip turns
  * glTF's counter-clockwise-with-v-down into USD's counter-clockwise-with-t-up), the translation re-expressed in st.
  * @throws TypeError for bytes that are not a GLB, when a textured material's geometry lacks the UV set it samples, or when
