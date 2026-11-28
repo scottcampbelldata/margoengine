@@ -2,7 +2,7 @@
 const row = (at, rate) => Object.freeze({ at: Object.freeze(at), rate: Object.freeze(rate) });
 //                       a            e            I             L               varpi          Omega
 /** Standish's Table 1, valid 1800 to 2050. */
-export const STANDISH_ORBITS = Object.freeze({
+export const STANDISH_ORBITS = /* @__PURE__ */ Object.freeze({
   mercury: row(
     [0.38709927, 0.20563593, 7.00497902, 252.2503235, 77.45779628, 48.33076593],
     [0.00000037, 0.00001906, -0.00594749, 149472.67411175, 0.16047689, -0.12534081],

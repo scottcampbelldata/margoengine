@@ -1,4 +1,4 @@
-const STILL = Object.freeze([0, 0, 0]);
+const STILL = /* @__PURE__ */ Object.freeze([0, 0, 0]);
 
 /** Normalizes and validates point-mass settings before any state is written. */
 export function pointMotion(options) {
