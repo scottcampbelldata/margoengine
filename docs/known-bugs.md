@@ -946,6 +946,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   a change with what ground and light the frame holds, 50 to 80 times the bound, so pooling more frames or 2160p cannot
   bring the error under 0.0448. Next: find what drives the drift (the light along the shot, `light` per frame; albedo
   left within the 16-level strata; the fire's light), which is the light bug the ruling asks for. Open.
+- **What drives the drift (2026-11-28, lane B, `.lane/t6drift.mjs` on every 6th frame of the first 4.5 s, mid probe
+  pool):** each frame's value follows the lit minus shadow L* (correlation 0.99; L* from -6 to +12 within 0.2 s),
+  not the albedo left inside the strata (albedo b* difference -0.3 to 0.9, correlation 0.22) and not position on
+  screen (cutting the strata further into 32-pixel tiles leaves a per-frame spread of 2.9 b*). The same frames with
+  the shutter closed (`subframes` 1, so no motion blur and masks of the drawn instant) read the same (spread 3.6 b*
+  against 3.4), so the blur is not it either (it was a mask defect of its own, KB-SHOT-SHUTTERMASK1). With
+  `fire=none` (no fire, so no pall either: a clear sun) the drift is gone: lit minus shadow 8.4 b* and 33 L* in
+  every frame, spread 0.6 b*. Under the pall the sun's beam is 1 percent of the light, so lit and shaded ground of
+  one surface differ by about 0.3 L* from the sun, while the fire's light, which the trees shade too and which moves
+  and flickers along the shot, changes the same ground by 5 to 12 L*. T6 compares ground the sun's mask splits; what
+  it measures here is the fire's light on that ground, which the probe's `light` record (sun and sky only) and the
+  sun masks do not hold. Not yet split: the fire's point lights against its flame and ember sprites over the ground.
+  The fix needs the fire's light on the ground as an AOV (strata of like local light, as of like albedo), a new
+  SceneTargets output: asked of the manager.
 
 ### Fixed 2026-11-28: T6 compared different surfaces in the sun and in the shade (KB-LOOK-TV-TINTMATCH1, headless look check)
 
