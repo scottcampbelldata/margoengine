@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21520787,
+  "total": 21556404,
   "history": [
     {
       "date": "2026-10-24",
@@ -15199,6 +15199,12 @@
       "commit": "sea12-radiation",
       "reason": "@margoengine/physics/loads 68,905 to 72,069 B gzip (both measured on this tree), ceiling 67,285 to 74,232 B: SEA-12 floating() gives every floating body the damping of the waves it makes by default, panelling each wet part at its own shape (sphere, box, capsule, cylinder, cone, a hull's or mesh's own triangles or the star of a detailed one) and baking it with the SEA-08 panel method into coupled radiation memory. The panel solve itself stays a lazy Wasm import; the bytes are the panel meshes, the draft and band and the turn back into the body's frame. A separate entry would make every floating scene import two entries for the default. Core and Stage are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "7d8bf2f39",
+      "reason": "Measured cloth bending (SOFT-01, 7d8bf2f39) with the soft cells meeting Hertz landed the same hour (727f5df2f): the soft kernel gains the bending elements (bend.rs: each triangle's curvature tensor from the hinge vectors, nine rows of the exact solve, rows of up to six particles) and the entry the fabric bending presets and the elements' builder. Measured gzip: @margoengine/physics/soft 177,421 B, budget 168429 to 182744 (+3%); its base 59,611, budget 56034 to 61400; its lazy soft body kernel 116,989, budget 111510 to 120499. The bending is a pass of the step every cloth of measured fabric runs, so it lives in the soft kernel every cloth loads; a second blueprint would duplicate the step.",
+      "grew": 3
     }
   ],
   "items": {
@@ -16097,9 +16103,9 @@
     "@margoengine/physics/seismic": 5266,
     "@margoengine/physics/ship": 36541,
     "@margoengine/physics/snowpack": 5172,
-    "@margoengine/physics/soft": 168429,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 56034,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 111510,
+    "@margoengine/physics/soft": 182744,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 61400,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 120499,
     "@margoengine/physics/strands": 6171,
     "@margoengine/physics/surf": 7669,
     "@margoengine/physics/surge": 4734,
