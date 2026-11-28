@@ -532,7 +532,7 @@ the `@margoengine/mcp` server ([docs/ai-tools.md](docs/ai-tools.md)).
 
 | Package | What it is |
 | --- | --- |
-| [`@margoengine/machinery`](packages/machinery/README.md) | Kinematics, sections, metrology, clearance, assemblies, exploded views, feature edges, dimensions, spatial queries, surface transport and telemetry for Margo Engine. |
+| [`@margoengine/machinery`](packages/machinery/README.md) | Kinematics, closed-form mechanism poses, sections, metrology, clearance, assemblies, exploded views, feature edges, dimensions, spatial queries, surface transport and telemetry for Margo Engine. |
 | [`@margoengine/bvh`](packages/bvh/README.md) | Triangle BVH, spatial queries and an engine Raycaster for Margo Engine. |
 | [`@margoengine/geometry`](packages/geometry/README.md) | Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities. |
 | [`@margoengine/mesh-edit`](packages/mesh-edit/README.md) | Pure polygon editing with retained corner UVs, explicit topology provenance and conservative cleanup. |
