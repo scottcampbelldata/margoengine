@@ -32,7 +32,8 @@ function fit() {
     engine.camera.position = [0,(2.82/scale+.25)/slope+deckCenterY, -.18];
     return;
   }
-  const yaw=.36,pitch=.69;
+  // From the south-west and a little higher, so the morning shadow (cast north-west) runs across the view, not behind the gnomon.
+  const yaw=-.62,pitch=.8;
   const eye=[Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch)];
   const right=[Math.cos(yaw),0,-Math.sin(yaw)];
   const up=[-Math.sin(yaw)*Math.sin(pitch),Math.cos(pitch),-Math.cos(yaw)*Math.sin(pitch)];
