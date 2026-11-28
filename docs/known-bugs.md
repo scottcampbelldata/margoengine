@@ -199,7 +199,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   few milliseconds after the driver reports it done (an uncaptured error then). A synchronous compute pipeline's
   programs are checked at its first dispatch. Without the extension, and for a program already checked, nothing
   changes. The same draws and the same GL calls are made; only when the link status is read moves.
-- **Numbers (before and after builds taking turns, two rounds, loaded workstation, `private/tools/profile.mjs`):**
+- **Numbers (before and after builds taking turns, two rounds, loaded workstation, a local profiling script):**
   ready 30.9 and 33.3 s before, 21.2 and 22.0 s after; time in `LINK_STATUS` 14.1 and 14.3 s before, 3.2 and 2.6 s
   after; longest task 19.0 and 19.2 s before, 9.7 and 9.2 s after. The trace after shows six compiles side by side in
   the first second of the frame.
@@ -448,7 +448,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   layer (multiply and add no longer fused the same way). `refractionCrossing` has one `refractionBisect` call site.
   After: 7 `noise()`, 5 `skyTap()`, 1 `refractionBisect()` sites; offline fxc of the first, table-driven version
   (same call sites) 3,175 slots, 42 samples, 36 sincos; the final version was not compiled offline.
-- **Numbers:** the surface program's link in the demo (`private/tools/profile.mjs`, before and after builds taking
+- **Numbers:** the surface program's link in the demo (a local profiling script, before and after builds taking
   turns, two rounds, workstation loaded): 6.44 and 6.76 s before, 3.19 and 2.97 s after; all eight programs 12.1 to
   8.9 s. Standalone link of the module (shader disk cache off, minimum of two): 4.5 to 8.8 s before, 3.1 to 3.2 s
   for the first, table-driven version. The fragment's inlined size under the corpus gate's model (`scripts/support/wgsl-inline.mjs`) went from

@@ -11951,7 +11951,7 @@ and the WebGL2 layer (RTX A6000). Core + stage 25,149 B gzip before and after. M
 Rigging has a body model. `@margoengine/rigging/anatomy` fits a species table to any rig from landmarks (joint
 positions and the facing), and `@margoengine/rigging/anatomy/human` holds the human table in ISO/IEC 19774 names.
 Limits come from the table and are on by default; solvers, the validator, retargeting, the ragdoll and `addPerson`
-read it in the groups that follow (private/handoffs/human-rigging-plan.md, groups 2 to 7).
+read it in the groups that follow (the human rigging plan in the untracked private folder, groups 2 to 7).
 
 Evidence that exists:
 - `packages/rigging/tests/anatomy.test.js`: one body as a T pose, an A pose and arms down, with rolled bone axes,
