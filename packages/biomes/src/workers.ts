@@ -92,6 +92,14 @@ export class BiomeWorkers implements Disposable {
   #disposed = false;
 
   constructor(size: number, world: BiomeWorld, state: () => WorldState, create = spawn) {
+    // Asked-for workers where Web Workers do not exist (Node, SSR) need a createWorker; say so when the world is made
+    // instead of failing each job on `new Worker` (KB-BIOMES-NODEWORKERS1).
+    if (create === spawn && typeof Worker !== 'function')
+      throw fault(
+        'unsupported',
+        'Web Workers are unavailable here; pass createWorker (Node worker threads) or workers: 0',
+        'biomes',
+      );
     this.size = size;
     this.#world = world;
     this.#state = state;

@@ -408,3 +408,15 @@ test('a worker asked for a part whose URL the page did not send rejects the job 
   assert.match(reply.error.message, /The page sent no URL for a biome worker part/);
   assert.deepEqual(takeLoaded(), []);
 });
+
+test('workers asked for where Web Workers do not exist reject with a coded error (KB-BIOMES-NODEWORKERS1)', async () => {
+  assert.equal(typeof Worker, 'undefined', 'this test runs where Node has no Web Worker global');
+  await assert.rejects(BiomeWorld.create({ seed: 7, workers: 3 }), (error) => {
+    assert.equal(error.name, 'MargoError');
+    assert.equal(error.code, 'unsupported');
+    assert.match(error.message, /createWorker/);
+    return true;
+  });
+  const world = await BiomeWorld.create({ seed: 7, workers: 0 });
+  world.dispose();
+});

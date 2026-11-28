@@ -6,7 +6,7 @@ Making tiles and objects on Web Workers, and what a placement reads from its nei
 
 A world makes its tiles and stored objects on Web Workers when they exist (browsers): by default hardware threads less
 one, at most 4; `workers: 0` or `false` keeps everything on the page's thread, and in Node there are none unless you
-pass `createWorker`. Each worker holds a replica of the world made from the same options and changed by the same calls
+pass `createWorker` (asking for workers there without it rejects with MargoError `'unsupported'`). Each worker holds a replica of the world made from the same options and changed by the same calls
 in the same order (paint and mask writes, `update`, placements and their updates), so a tile made in a worker is byte
 for byte the page's tile: the package test compares digests of fields, placements and view tiles made both ways,
 after writes and updates too. Height `samples` are copied to each worker; a `field` function cannot be sent, so a world
