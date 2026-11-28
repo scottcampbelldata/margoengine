@@ -20,12 +20,14 @@ function traceDispatches(passes, entryPoints = ['trace', 'preview']) {
       else if (name === 'setBindGroup') group = args[1];
       else if (name === 'dispatchWorkgroups' && entryPoints.includes(pipeline.compute?.entryPoint)) {
         const frame = group.entries.find((e) => e.binding === 0).resource,
-          words = new Uint32Array(frame.buffer.data, frame.offset ?? 0, 40),
+          words = new Uint32Array(frame.buffer.data, frame.offset ?? 0, 204),
           accum = group.entries.find((e) => e.binding === 6).resource;
         out.push({
           entryPoint: pipeline.compute.entryPoint,
           image: [...words.subarray(32, 36)],
           tile: [...words.subarray(36, 40)],
+          // The tile's columns this dispatch covers (Frame.band: first, count).
+          band: [...words.subarray(200, 202)],
           workgroups: args,
           accum: { offset: accum.offset ?? 0, size: accum.size ?? accum.buffer.size },
         });
@@ -52,22 +54,32 @@ function assertCovers(dispatches, width, height, samples) {
   const seen = new Map();
   for (const d of dispatches) {
     const [w, rows, s0, count] = d.tile,
-      [imageWidth, imageHeight, x0, y0] = d.image;
-    assert.equal(w * rows * count <= BUDGET, true, `dispatch of ${w} x ${rows} x ${count} paths over the budget`);
+      [imageWidth, imageHeight, x0, y0] = d.image,
+      [c0, cols] = d.band;
+    assert.equal(w, width, 'the row stride is the whole tile');
+    assert.ok(cols >= 1 && c0 + cols <= w, `columns ${c0} + ${cols} inside ${w}`);
+    assert.equal(cols * rows * count <= BUDGET, true, `dispatch of ${cols} x ${rows} x ${count} paths over the budget`);
     assert.deepEqual([imageWidth, imageHeight, x0], [width, height, 0]);
-    assert.deepEqual(d.workgroups, [Math.ceil(w / 8), Math.ceil(rows / 8)]);
+    assert.deepEqual(d.workgroups, [Math.ceil(cols / 8), Math.ceil(rows / 8)]);
     // The bound image range is the band's rows of the full-size buffers.
     assert.equal(d.accum.offset, y0 * width * 16);
     assert.ok(d.accum.size >= rows * width * 16);
     assert.equal(d.accum.offset % 256, 0, 'storage binding offsets meet the 256-byte alignment');
     for (let y = y0; y < y0 + rows; y++) {
-      const next = seen.get(y) ?? 0;
-      assert.equal(s0 - dispatches[0].tile[2], next, `row ${y} takes its samples in order`);
-      seen.set(y, next + count);
+      const next = seen.get(y) ?? new Int32Array(width);
+      for (let x = c0; x < c0 + cols; x++) {
+        if (next[x] !== s0 - dispatches[0].tile[2]) assert.fail(`pixel ${x}, ${y} takes its samples in order`);
+        next[x] += count;
+      }
+      seen.set(y, next);
     }
   }
   assert.equal(seen.size, height, 'every row traced');
-  for (const [y, n] of seen) assert.equal(n, samples, `row ${y}: every sample of the frame once`);
+  for (const [y, n] of seen)
+    assert.ok(
+      n.every((v) => v === samples),
+      `row ${y}: every pixel takes every sample of the frame once`,
+    );
 }
 
 test('a 4K viewport frame is traced in dispatches of at most 2^20 paths that cover it once', async () => {
@@ -154,24 +166,27 @@ async function framesOf([width, height], options, frames = 1) {
   return { tracer, device, frames: out };
 }
 
-const work = (d, bounces) => d.tile[0] * d.tile[1] * d.tile[3] * loopLimit(bounces);
+const work = (d, bounces) => d.band[1] * d.tile[1] * d.tile[3] * loopLimit(bounces);
 
 test('maxBounces 64: every viewport band is its own submission of at most 2^20 x 192 path-iterations', async () => {
   const { tracer, frames } = await framesOf([1440, 1100], { samplesPerFrame: 4, maxBounces: 64, denoise: false }, 6);
   for (const { dispatches, submits } of frames) {
     assert.ok(dispatches.length > 0);
     for (const d of dispatches)
-      assert.ok(work(d, 64) <= SUBMIT_WORK, `${d.tile.join(' x ')} at 1,312 iterations: ${work(d, 64)} > ${SUBMIT_WORK}`);
+      assert.ok(
+        work(d, 64) <= SUBMIT_WORK,
+        `${d.tile.join(' x ')} at 1,312 iterations: ${work(d, 64)} > ${SUBMIT_WORK}`,
+      );
     assert.equal(submits, dispatches.length, 'one submission a band, none in the frame encoder');
     assertCovers(dispatches, 1440, 1100, 4);
   }
   tracer.dispose();
 });
 
-test("a new tracer's first submissions carry a sixteenth of the budget, then grow with the measured speed", async () => {
+test("a new tracer's first submissions carry a 128th of the budget, then grow with the measured speed", async () => {
   const { tracer, frames } = await framesOf([1440, 1100], { samplesPerFrame: 1, denoise: false }, 8);
   const first = Math.max(...frames[0].dispatches.map((d) => work(d, 8)));
-  assert.ok(first <= SUBMIT_WORK / 16, `first frame's largest submission ${first} > ${SUBMIT_WORK / 16}`);
+  assert.ok(first <= SUBMIT_WORK / 128, `first frame's largest submission ${first} > ${SUBMIT_WORK / 128}`);
   // The fake GPU finishes at once: the budget grows to the full figure within a few frames, never past it.
   const last = Math.max(...frames.at(-1).dispatches.map((d) => work(d, 8)));
   assert.ok(last > first && last <= SUBMIT_WORK, `${first} then ${last}`);
@@ -190,17 +205,26 @@ test('renderImage at maxBounces 64 traces each tile in row bands within the work
   await tracer.renderImage({ width: 1024, height: 512, samples: 2 });
   const dispatches = traceDispatches(device.passes, ['trace']);
   assert.ok(dispatches.length > 1);
-  // The fake applies every frame write at once, so a band's rows are read from its image binding (each band of one
-  // sample at 1,312 iterations: 1024 x 512 x 1,312 is over the budget, so a submission holds one sample).
+  // The fake applies every frame write at once, so a band's rows are read from its image binding and its columns from
+  // its workgroups (each band of one sample at 1,312 iterations: 1024 x 512 x 1,312 is over the budget, so a
+  // submission holds one sample; a new tracer's 128th is under 8 rows x 1024, so the first bands are cut into columns).
   const rows = new Map();
   for (const d of dispatches) {
     const y0 = d.accum.offset / (1024 * 16),
-      n = Math.min(d.accum.size / (1024 * 16), 512 - y0);
-    assert.ok(1024 * n * loopLimit(64) <= SUBMIT_WORK, `${n} rows at 1,312 iterations: ${1024 * n * loopLimit(64)}`);
-    for (let y = y0; y < y0 + n; y++) rows.set(y, (rows.get(y) ?? 0) + 1);
+      n = Math.min(d.accum.size / (1024 * 16), 512 - y0),
+      cols = Math.min(1024, d.workgroups[0] * 8);
+    assert.ok(
+      cols * n * loopLimit(64) <= SUBMIT_WORK,
+      `${cols} x ${n} at 1,312 iterations: ${cols * n * loopLimit(64)}`,
+    );
+    for (let y = y0; y < y0 + n; y++) rows.set(y, (rows.get(y) ?? 0) + d.workgroups[0]);
   }
   assert.equal(rows.size, 512);
-  for (const n of rows.values()) assert.equal(n, 2, 'every row takes both samples once');
+  for (const n of rows.values()) assert.equal(n, 2 * (1024 / 8), "every row's columns take both samples once");
+  assert.ok(
+    dispatches.some((d) => d.workgroups[0] < 1024 / 8),
+    'the first bands are cut into columns',
+  );
   assert.ok(device.submits - submits >= dispatches.length, 'one submission a band');
   tracer.dispose();
 });
@@ -224,4 +248,89 @@ test("the WebGL2 route's submission (a part's paths for one window) fits a new t
     paths = 2 ** Number(/PART_PATHS = 1 << (\d+)/.exec(source)[1]),
     window = Number(/WINDOW = (\d+)/.exec(source)[1]);
   assert.ok(paths * window <= SUBMIT_WORK / 16, `${paths} paths x ${window} iterations > ${SUBMIT_WORK / 16}`);
+});
+
+// KB4037 (2026-11-28): the denoise-materials reference (480 x 300, 16,384 samples, 7 a submission) reset an AMD Ryzen 9
+// 9950X's two-unit RDNA2 graphics on its third submission: 16 rows x 480 x 7 paths took 554, 1,031, then 2,410 ms
+// (Windows' watchdog is 2 s), where the RTX A6000 takes 4 ms. The smallest submission was a band of 8 rows (one
+// workgroup high) of the whole width with all of a run's samples, 26,880 paths, whatever the measured budget, and a
+// new tracer started at a sixteenth (65,536 paths). Bands are now cut into columns when even 8 rows are over the
+// budget, and a new tracer starts at a 128th (8,192 paths).
+test('a budget under 8 rows of the image cuts renderImage bands into column pieces within it (KB4037)', async () => {
+  const device = fakeDevice(),
+    h = fakeEngine(device),
+    tracer = VoxelPathTracer.attach(h.engine, { scene: simpleScene() });
+  await tracer.ready;
+  h.frame();
+  await settle();
+  const paths = 8192;
+  device.voxelTraceWork = paths * loopLimit(8);
+  device.passes.length = 0;
+  await tracer.renderImage({ width: 480, height: 300, samples: 7 });
+  const dispatches = traceDispatches(device.passes, ['trace']),
+    rows = new Map();
+  assert.ok(dispatches.length > 1);
+  for (const d of dispatches) {
+    const y0 = d.accum.offset / (480 * 16),
+      n = Math.min(d.accum.size / (480 * 16), 300 - y0),
+      cols = Math.min(480, d.workgroups[0] * 8);
+    assert.ok(cols * n * 7 <= paths, `${cols} x ${n} x 7 paths over ${paths}`);
+    assert.equal(d.workgroups[1], Math.ceil(n / 8));
+    for (let y = y0; y < y0 + n; y++) rows.set(y, (rows.get(y) ?? 0) + d.workgroups[0]);
+  }
+  assert.equal(rows.size, 300, 'every row traced');
+  for (const [y, n] of rows) assert.equal(n, 480 / 8, `row ${y}: its columns once, all 7 samples in one run`);
+  tracer.dispose();
+});
+
+test('a viewport band too wide for a slow GPU is cut into column pieces that cover it once (KB4037)', async () => {
+  const device = fakeDevice(),
+    h = fakeEngine(device);
+  [h.context.width, h.context.height] = [1440, 1100];
+  device.voxelTraceWork = 4096 * loopLimit(8);
+  const tracer = VoxelPathTracer.attach(h.engine, { scene: simpleScene(), samplesPerFrame: 4, denoise: false });
+  await tracer.ready;
+  h.frame();
+  await settle();
+  const dispatches = traceDispatches(h.frame(), ['trace']);
+  assert.ok(dispatches.every((d) => work(d, 8) <= 4096 * loopLimit(8)));
+  assert.ok(dispatches.some((d) => d.band[1] < 1440));
+  assertCovers(dispatches, 1440, 1100, 4);
+  tracer.dispose();
+});
+
+// KB4037: a 7-sample run of the denoise-materials reference is about 150 pieces on that GPU, and pieces planned at the
+// run's start kept their size after the pacer measured the costly middle of the image (up to 1.3 s each). Each band and
+// piece now reads the budget again, so a drop mid-run sizes the very next piece.
+test('renderImage sizes each piece from the budget measured last, within one run of samples (KB4037)', async () => {
+  const device = fakeDevice(),
+    h = fakeEngine(device),
+    tracer = VoxelPathTracer.attach(h.engine, { scene: simpleScene() });
+  await tracer.ready;
+  h.frame();
+  await settle();
+  const big = 4 * 480 * 8,
+    small = 480;
+  // The budget falls once the render's first piece is submitted (as when the pacer measures a slow one).
+  const start = device.submits;
+  Object.defineProperty(device, 'voxelTraceWork', {
+    configurable: true,
+    get: () => (device.submits - start < 2 ? big : small) * loopLimit(8),
+  });
+  device.passes.length = 0;
+  await tracer.renderImage({ width: 480, height: 64, samples: 1 });
+  const dispatches = traceDispatches(device.passes, ['trace']),
+    rows = new Map(),
+    paths = dispatches.map((d) => Math.min(480, d.workgroups[0] * 8) * Math.min(d.accum.size / (480 * 16), 64));
+  assert.ok(paths[0] > small, `the first piece takes the first budget: ${paths[0]}`);
+  assert.ok(paths.at(-1) <= small, `the last piece takes the later one: ${paths.at(-1)}`);
+  for (const d of dispatches) {
+    const y0 = d.accum.offset / (480 * 16),
+      n = Math.min(d.accum.size / (480 * 16), 64 - y0);
+    for (let y = y0; y < y0 + n; y++) rows.set(y, (rows.get(y) ?? 0) + d.workgroups[0]);
+  }
+  assert.equal(rows.size, 64);
+  for (const [y, n] of rows) assert.equal(n, 480 / 8, `row ${y}: its columns once`);
+  delete device.voxelTraceWork;
+  tracer.dispose();
 });

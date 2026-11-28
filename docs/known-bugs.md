@@ -115,6 +115,51 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/headless/tests/look-clean.test.js` (a static edge flashing 7 px from a swaying branch still fails).
 - **Next:** asked for a ruling to add the moving surface's own circle-of-confusion radius to the reach.
 
+### Fixed 2026-11-28: a voxel path tracer render reset AMD's integrated graphics within seconds (KB4037, voxel-pathtracer; was "Batch 160 AMD voxel denoise watchdog")
+
+- **Repro:** `MARGO_GPU=amd GPU_POWER=low-power node scripts/run-with-timeout.mjs --max 25 -- node
+  packages/voxel-pathtracer/tests/browser-check.mjs --report=denoise-materials denoise-materials` on the workstation
+  (Ryzen 9 9950X's two-unit RDNA2 graphics, driver 32.0.21042.62, Edge 158): about 25 s into the 480 x 300, 16,384
+  sample reference the page lost its device (`DXGI_ERROR_DEVICE_REMOVED`) and Windows logged LiveKernelEvent 141
+  (WATCHDOG-20261128-0854.dmp). The same on origin/main 0f282397e6, so KB-BL1 (2026-11-11) had not fixed it.
+- **Cause, measured:** every submission timed in the page (each `queue.submit` to its `onSubmittedWorkDone`): the
+  reference's first trace bands, 16 rows x 480 pixels x 7 samples (53,760 paths), took 554, 1,031 and 2,410 ms, and
+  the third tripped Windows' 2 s watchdog (AMD preempts compute only between packets). The RTX A6000 traces the same
+  bands in 4 ms, so this GPU is 140 to 600 times slower on this scene, far past the sixteenth of `SUBMIT_WORK` a new
+  tracer started at (65,536 paths at 8 bounces, sized for a GPU 16 times slower than the A6000). The pacer could not
+  have saved it: the smallest piece a band could be was 8 rows (one workgroup high) of the whole width with all of a
+  run's samples (26,880 paths here), and `renderImage` planned a whole 7-sample run (about 150 pieces, 45 s on this
+  GPU) before tracing it, so a budget the pacer cut after the costly middle of the image took effect only at the next
+  run: with column pieces alone, pieces planned at a run's start still took up to 1,341 ms.
+- **Fix (`packages/voxel-pathtracer/src/dispatch.ts`, `src/tracer.ts`, `src/shaders.ts`):** a band of the fewest rows
+  that is still over the budget is cut into pieces of whole columns, multiples of 8 (`planTrace`/`traceChunks`
+  `colStep`; `Frame.band` gives the trace kernel the piece's first column and width, the row stride stays the tile's).
+  `renderImage` makes its pieces one at a time (`traceChunks`), each reading the budget the pacer measured last, and a
+  new tracer starts at a 128th of `SUBMIT_WORK` (8,192 paths). Sample runs still follow `SUBMIT_WORK` alone, and every
+  pixel takes each run once whatever its pieces, so no image depends on the GPU's speed. The WebGL2 route, which
+  windows its own parts, is unchanged. `FRAME_BYTES` 800 to 816.
+- **Evidence:** the same reference on AMD, timed per submission for 600 s on the fixed build: no device loss, the
+  worst submission WORST ms (pieces fall to one 8 x 8 workgroup, about 0.45 s each in the costly middle: one thread
+  runs its 7 samples in turn, so that is this GPU's floor, a speed item for the speed phase). Before: lost at the
+  third costly band. RTX A6000: `determinism` (one smallest piece a submission, now an 8-column piece) gives 18,432
+  of 18,432 values bit for bit, and the four mesh GPU tests and the resampled, guiding, media, spectral, mesh and compose (`--backend=compat`) checks give the same sets of readback hashes on the old and new builds (1,259 distinct, WebGPU and the WebGL2 layer). Not run to the end on AMD: at this speed the two 16,384-sample references
+  take hours.
+- **Regression:** `packages/voxel-pathtracer/tests/dispatch-budget.test.js` "a budget under 8 rows of the image cuts
+  renderImage bands into column pieces within it (KB4037)", "a viewport band too wide for a slow GPU is cut into column
+  pieces that cover it once (KB4037)" and "renderImage sizes each piece from the budget measured last, within one run
+  of samples (KB4037)" (all three fail on the old build); "a new tracer's first submissions carry a 128th of the
+  budget"; `assertCovers` now checks every pixel, not every row.
+- **Still open:** a run's samples are fixed for determinism, so one thread's 7 to 16 samples are the shortest piece;
+  a GPU and scene slow enough to take 2 s for those (more bounces, slower hardware) would still reset. Not seen; the
+  floor measured here is about a quarter of the watchdog.
+- **Sources:** C. D. Polychronopoulos, D. J. Kuck, "Guided Self-Scheduling: A Practical Scheduling Scheme for
+  Parallel Supercomputers", IEEE Transactions on Computers C-36(12), 1987, https://doi.org/10.1109/TC.1987.5009495
+  (chunks sized as the work is handed out, not fixed in advance); S. F. Hummel, E. Schonberg, L. E. Flynn, "Factoring:
+  a method for scheduling parallel loops", CACM 35(8), 1992, https://doi.org/10.1145/135226.135232 (chunk sizes for
+  loop iterations of varying cost); T. Aila, S. Laine, "Understanding the Efficiency of Ray Traversal on GPUs", HPG
+  2009, https://doi.org/10.1145/1572769.1572792 (ray cost varies widely across an image); Microsoft, [Timeout
+  Detection and Recovery (TDR)](https://learn.microsoft.com/en-us/windows-hardware/drivers/display/timeout-detection-and-recovery).
+
 ### Fixed 2026-11-28 (in part 2026-11-11): mesh PBR inlined twelve texture filters into the Direct3D 11 surface program, and the surface program held its material (KB5451)
 
 - **Repro:** a mesh-PBR tracer on the WebGL2 layer over ANGLE Direct3D 11 with Chromium's
@@ -15207,7 +15252,7 @@ Release exception: acos 6.75e-5 off (driver).
   bound was 2^20 paths a dispatch (bug 25), measured on the RTX A6000 at the default 8 bounces: it did not count the
   path loop (1,312 iterations a path at `maxBounces` 64 against 192 at 8, 6.8 times the work), nor the GPU (the 680M
   runs the tracer about ten times slower), and the viewport put all of a frame's bands in the frame's one submission,
-  which a GPU that preempts only between submissions (AMD reports packet boundaries; KB4037 below) runs as one piece
+  which a GPU that preempts only between submissions (AMD reports packet boundaries; KB4037 above) runs as one piece
   against Windows' 2 s watchdog. `renderImage` dispatched a whole tile (up to 1,088 x 1,088 paths) at once.
 - **Cause:** the work bound counted paths, not path-iterations, per dispatch rather than per submission, and was fixed
   to one GPU's speed.
@@ -20303,35 +20348,6 @@ driver defect. AMD Radeon(TM) Graphics / RDNA 2, driver 32.0.21042.62, is the
 proof adapter required by Scott. Fresh three-process proofs follow teardown
 fixes cf699846f/20375ea56; neither an old failed cleanup nor an archived capture
 counts as that fresh proof. Browser teardown remains with its dedicated owner.
-
-### Batch 160 AMD voxel denoise watchdog (open, separate from jobs 4/5)
-
-Repro: select MARGO_GPU=amd, GPU_POWER=low-power and render the unchanged
-voxel-pathtracer denoise-materials reference: 480 x 300, 16,384 spp. Earlier
-bounded diagnostics, including 4 x 480 x 300 x 7 pixel-samples and dispatch
-drain, reset AMD in 4,064/4,068 ms with LiveKernelEvent 141. WER reports
-WATCHDOG-20261109-{0950,0952,0959}.dmp are retained outside the repository.
-The original package failure is test-results/batch-160/job4-material-gpu.log.
-No out-of-bounds access, nontermination or driver fault is established.
-DXGI reports AMD packet-boundary and NVIDIA dispatch-boundary compute preemption.
-The current radiance loop is bounded by 20 * maxBounces + 32, up to 1,312
-steps, each including scene/material work. A bound on pixel-samples alone does
-not bound traversal cost or prove a preemptible OS packet. Reducing the work
-or retrying the driver reset does not repair this. The earlier row-band draft
-passes CPU sample-group/PNG-seam tests but still reset the GPU and is excluded.
-Next isolate packet submission and per-ray termination/access invariants in one
-bounded diagnostic, preserving every pixel/sample and accumulation order.
-This remains an engine bug pending attribution, and is not a speed exemption.
-No new watchdog repro was run by the job 4 continuation.
-
-Lane G current-main repro (2026-11-10): MARGO_GPU=amd and GPU_POWER=low-power,
-browser-check.mjs denoise-materials reaches the unchanged 480x300 reference at
-16384 samples on vendor amd / rdna-2, then loses its device. Dawn reports
-DXGI_ERROR_DEVICE_REMOVED (0x887A0005); four shader modules compiled with zero
-errors. This confirms the current failure, not a driver/kernel attribution.
-The failed run was not retried or treated as a timing exemption. Local log:
-test-results/kb-g/gate-62620-0.log. Per-ray termination/access invariants and
-packet submission still require an isolating repair.
 
 ### Fixed: guiding README blocked module initialization (Batch 99)
 

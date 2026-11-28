@@ -33,15 +33,20 @@ export function pathBudget(maxBounces: number, work = SUBMIT_WORK): number {
 export const TARGET_MS = 50;
 
 /**
- * The work a tracer puts in one submission on the GPU it runs on. It starts at a sixteenth of SUBMIT_WORK (a GPU
- * 16 times slower than the RTX A6000 still meets the target on its first submission), and after each measured group
+ * The work a tracer puts in one submission on the GPU it runs on. It starts at a 128th of SUBMIT_WORK, and after each
+ * measured group
  * of submissions moves to what that GPU does in TARGET_MS, growing at most twofold a step and never past
  * SUBMIT_WORK. Measured times include queue waits and readback latency, so the estimate only errs low. The budget
- * changes only how rows are banded (bands change no pixel's sums); sample runs follow SUBMIT_WORK alone, so images
- * do not depend on timing.
+ * changes only how a tile is cut into bands and columns (they change no pixel's sums); sample runs follow SUBMIT_WORK
+ * alone, so images do not depend on timing.
+ *
+ * The first figure is a 128th because GPUs differ by far more than their compute: an AMD Ryzen 9 9950X's two-unit
+ * RDNA2 graphics took 554 to 2,410 ms for 16 rows of 480 pixels at 7 samples in the denoise-materials scene, which
+ * the RTX A6000 traces in 4 ms (KB4037). A sixteenth (65,536 paths at 8 bounces) passed Windows' 2 s watchdog there
+ * on the third submission; a 128th (8,192 paths) takes about 0.4 s at that cost.
  */
 export class WorkPacer {
-  budget = SUBMIT_WORK / 16;
+  budget = SUBMIT_WORK / 128;
   /** Work and milliseconds of one finished group of submissions (from its first submit to its completion). */
   observe(work: number, ms: number): void {
     if (!(work > 0) || !(ms > 0)) return;
@@ -50,10 +55,15 @@ export class WorkPacer {
   }
 }
 
-/** One trace dispatch: rows `y0`..`y0 + rows - 1` of the image, samples `s0`..`s0 + count - 1`. */
+/**
+ * One trace dispatch: rows `y0`..`y0 + rows - 1` and columns `x0`..`x0 + cols - 1` of the image, samples
+ * `s0`..`s0 + count - 1`.
+ */
 export interface TraceChunk {
   y0: number;
   rows: number;
+  x0: number;
+  cols: number;
   s0: number;
   count: number;
 }
@@ -63,7 +73,10 @@ export interface TraceChunk {
  * `budget` paths a band of the fewest rows (`budget` must not depend on timing: the runs set each pixel's partial
  * sums); bands hold at most `rows` paths (`rows`, at most `budget`, may follow the measured GPU: bands change no sum),
  * and never fewer than `rowStep` rows. Bands start at multiples of `rowStep` rows (a binding's offset into the image
- * buffers must be aligned). Sample runs are outer, so every band takes the samples in order.
+ * buffers must be aligned). With `colStep` (0: whole rows), a band of the fewest rows that still holds more than `rows`
+ * paths is cut into pieces of whole columns, a multiple of `colStep` wide (columns change no pixel's sums either), so
+ * a slow GPU is never given more than its budget by the band's height alone (KB4037). Sample runs are outer, so every
+ * band takes the samples in order.
  */
 export function planTrace(
   width: number,
@@ -73,15 +86,48 @@ export function planTrace(
   rowStep = 1,
   budget = DISPATCH_PATHS,
   rows = budget,
+  colStep = 0,
 ): TraceChunk[] {
+  return [...traceChunks(width, height, s0, count, rowStep, budget, () => rows, colStep)];
+}
+
+/**
+ * planTrace's dispatches, made one at a time: `rows()` is read again before each band and each column piece, so a
+ * budget that falls while a run is traced (WorkPacer, measured every few submissions) sizes the very next piece
+ * instead of the next run's. The samples of each run stay fixed by `budget` alone, and every pixel takes each run once
+ * whatever sizes the pieces get, so no sum depends on timing (KB4037: on an AMD Ryzen 9 9950X's graphics one run of
+ * 7 samples at 480 x 300 is about 150 pieces and 45 s; pieces planned for the run's start took up to 1.2 s in the
+ * image's costly middle).
+ */
+export function* traceChunks(
+  width: number,
+  height: number,
+  s0: number,
+  count: number,
+  rowStep: number,
+  budget: number,
+  rows: () => number,
+  colStep = 0,
+): Generator<TraceChunk> {
   const fewest = Math.min(height, rowStep),
-    perRun = Math.max(1, Math.min(count, Math.floor(budget / (fewest * width)))),
-    band = Math.min(height, Math.max(fewest, Math.floor(Math.min(rows, budget) / (width * perRun) / rowStep) * rowStep)),
-    chunks: TraceChunk[] = [];
-  for (let s = 0; s < count; s += perRun)
-    for (let y0 = 0; y0 < height; y0 += band)
-      chunks.push({ y0, rows: Math.min(band, height - y0), s0: s0 + s, count: Math.min(perRun, count - s) });
-  return chunks;
+    perRun = Math.max(1, Math.min(count, Math.floor(budget / (fewest * width))));
+  for (let s = 0; s < count; s += perRun) {
+    const n = Math.min(perRun, count - s);
+    for (let y0 = 0; y0 < height; ) {
+      const paths = Math.min(rows(), budget),
+        band = Math.min(height - y0, Math.max(fewest, Math.floor(paths / (width * perRun) / rowStep) * rowStep));
+      for (let x0 = 0; x0 < width; ) {
+        const left = Math.min(rows(), budget),
+          cols =
+            colStep > 0 && band * width * perRun > left
+              ? Math.max(colStep, Math.floor(left / (band * perRun) / colStep) * colStep)
+              : width;
+        yield { y0, rows: band, x0, cols: Math.min(cols, width - x0), s0: s0 + s, count: n };
+        x0 += cols;
+      }
+      y0 += band;
+    }
+  }
 }
 
 /** Rows a band's start must be a multiple of, so that its offset (y0 x width x 16 bytes) meets `alignment` (a power of two). */

@@ -15,7 +15,7 @@ import {
 
 export { INSTANCE_WORDS, MODEL_WORDS };
 /** Bytes of the frame uniform. */
-export const FRAME_BYTES = 800;
+export const FRAME_BYTES = 816;
 /** Frame uniform flag bits (config.z). */
 export const FLAG_SUN = 1,
   FLAG_GROUND = 2,

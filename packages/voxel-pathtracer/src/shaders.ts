@@ -122,6 +122,8 @@ struct Frame {
  edges:vec4f,
  grid:vec4f,
  grid2:vec4f,
+ // The columns of the tile one trace dispatch covers: x the first (from the tile's left), y how many (dispatch.ts).
+ band:vec4u,
 }
 `;
 
@@ -1812,10 +1814,11 @@ fn radiance(px:vec2u)->Path {
 }
 
 @compute @workgroup_size(8,8) fn trace(@builtin(global_invocation_id) gid:vec3u) {
- if(gid.x>=f.tile.x||gid.y>=f.tile.y){return;}
- let px=vec2u(gid.x+f.image.z,gid.y+f.image.w);
+ if(gid.x>=f.band.y||gid.y>=f.tile.y){return;}
+ let gx=gid.x+f.band.x;
+ let px=vec2u(gx+f.image.z,gid.y+f.image.w);
  let pixel=px.y*f.image.x+px.x;
- let slot=gid.y*f.tile.x+gid.x;
+ let slot=gid.y*f.tile.x+gx;
  var c=vec4f(0.0);var a=vec4f(0.0);var nn=vec4f(0.0);var cs=vec4f(0.0);var ds=vec4f(0.0);
  let split=(f.config.z&SPLIT)!=0u;
  let two=(f.config.z&DIRECT)!=0u;

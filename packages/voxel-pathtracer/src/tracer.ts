@@ -55,7 +55,7 @@ import {
 } from './options.js';
 import { PngWriter } from './png.js';
 import { traceViewportSize } from './viewport.js';
-import { bandRowStep, loopLimit, pathBudget, planTrace, WorkPacer, type TraceChunk } from './dispatch.js';
+import { bandRowStep, loopLimit, pathBudget, planTrace, traceChunks, WorkPacer, type TraceChunk } from './dispatch.js';
 import {
   buildSnapshot,
   checkNumber,
@@ -1481,6 +1481,7 @@ export class VoxelPathTracer implements EnginePlugin {
     wavelength = 0,
     transparent = false,
     offset = 0,
+    band: readonly [number, number] = [0, tile[0]],
   ): boolean {
     const o = this.#settings,
       f = new Float32Array(this.#frame),
@@ -1574,6 +1575,7 @@ export class VoxelPathTracer implements EnginePlugin {
     f.set(ed ? [ed.color[0], ed.color[1], ed.color[2], ed.width] : [0, 0, 0, 0], 188);
     f.set(gr ? [gr.color[0], gr.color[1], gr.color[2], gr.spacing] : [0, 0, 0, 1], 192);
     f.set(gr ? [gr.width, gr.onVoxels ? 2 : 1, 0, 0] : [0, 0, 0, 0], 196);
+    u.set([band[0], band[1], 0, 0], 200);
     const sl = layout.scene,
       ll = layout.lights;
     u.set([sl.modelBase, sl.instanceBase, sl.nodeBase, s.instances.length ? sl.nodeCount : 0], 44);
@@ -1795,7 +1797,17 @@ export class VoxelPathTracer implements EnginePlugin {
       // Bands of whole workgroups (8 rows) whose offsets meet the storage alignment.
       step = Math.max(8, bandRowStep(width, device.limits.minStorageBufferOffsetAlignment ?? 256)),
       bounces = this.#settings.maxBounces,
-      chunks = planTrace(width, height, s0, count, step, pathBudget(bounces), pathBudget(bounces, bandWork(gpu))),
+      // Native dispatches may also split a band's columns (the WebGL2 route windows its own parts by rows).
+      chunks = planTrace(
+        width,
+        height,
+        s0,
+        count,
+        step,
+        pathBudget(bounces),
+        pathBudget(bounces, bandWork(gpu)),
+        'sums' in pipeline ? 0 : 8,
+      ),
       write = (target: GPUBuffer, offset: number, k: TraceChunk) =>
         this.#writeFrame(
           device,
@@ -1811,6 +1823,7 @@ export class VoxelPathTracer implements EnginePlugin {
           0,
           false,
           offset,
+          [k.x0, k.cols],
         );
     let groups = [view.traceGroup!];
     if (chunks.length === 1) {
@@ -1818,7 +1831,7 @@ export class VoxelPathTracer implements EnginePlugin {
     } else {
       const align = device.limits.minUniformBufferOffsetAlignment ?? 256,
         stride = Math.ceil(FRAME_BYTES / align) * align,
-        key = `${view.traceKey}|${width}x${height}|${chunks.map((k) => `${k.y0}+${k.rows}`).join(',')}`;
+        key = `${view.traceKey}|${width}x${height}|${chunks.map((k) => `${k.y0}+${k.rows}:${k.x0}+${k.cols}`).join(',')}`;
       if (view.bands?.key !== key) {
         this.#destroy(view.bands?.frames);
         const frames = this.#buffer(gpu, stride * chunks.length, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
@@ -1854,10 +1867,10 @@ export class VoxelPathTracer implements EnginePlugin {
         pass = e.beginComputePass();
       pass.setPipeline(pipeline);
       pass.setBindGroup(0, groups[i]);
-      pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(k.rows / 8));
+      pass.dispatchWorkgroups(Math.ceil(k.cols / 8), Math.ceil(k.rows / 8));
       pass.end();
       device.queue.submit([e.finish()]);
-      work += width * k.rows * k.count * limit;
+      work += k.cols * k.rows * k.count * limit;
     }
     if (!gpu.pacing) {
       gpu.pacing = true;
@@ -2356,7 +2369,17 @@ export class VoxelPathTracer implements EnginePlugin {
             }
             // Row bands of the tile, each its own submission of at most the measured GPU's budget (bands change no
             // pixel's sums); the frame uniform is written before each, in queue order.
-            for (const k of planTrace(w, h, s, count, step, pathBudget(bounces), pathBudget(bounces, bandWork(gpu)))) {
+            // Each piece reads the budget the pacer measured last (traceChunks), so a slow region shrinks the next one.
+            for (const k of traceChunks(
+              w,
+              h,
+              s,
+              count,
+              step,
+              pathBudget(bounces),
+              () => pathBudget(bounces, bandWork(gpu)),
+              8,
+            )) {
               const whole = k.rows === h,
                 key = `${k.y0}+${k.rows}`;
               let banded = whole ? group! : bands.get(key);
@@ -2381,15 +2404,17 @@ export class VoxelPathTracer implements EnginePlugin {
                 snapshot,
                 o.wavelength,
                 o.transparent,
+                0,
+                [k.x0, k.cols],
               );
               const e = device.createCommandEncoder(),
                 pass = e.beginComputePass();
               pass.setPipeline(kernels.trace);
               pass.setBindGroup(0, banded);
-              pass.dispatchWorkgroups(Math.ceil(w / 8), Math.ceil(k.rows / 8));
+              pass.dispatchWorkgroups(Math.ceil(k.cols / 8), Math.ceil(k.rows / 8));
               pass.end();
               device.queue.submit([e.finish()]);
-              pending += w * k.rows * count * limit;
+              pending += k.cols * k.rows * count * limit;
               // At most four submissions queued; each group's time (first submit to done) measures this GPU.
               if (++submitted % 4 === 0) {
                 await device.queue.onSubmittedWorkDone();

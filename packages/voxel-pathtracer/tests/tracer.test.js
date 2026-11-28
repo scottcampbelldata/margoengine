@@ -11,7 +11,7 @@ import { setImmediate } from 'node:timers/promises';
 import { VoxelPathTracer } from '../dist/index.js';
 import { fakeDevice, fakeEngine, materials, model, settle, simpleScene, translate } from './support.js';
 
-const FRAME = 800;
+const FRAME = 816;
 // Regression (KB-VPT-BANDS-LOAD1, 2026-11-27): the viewport cuts its trace into row bands sized by the measured GPU
 // (WorkPacer, from wall-clock times). On a loaded machine the fake GPU's submissions "took" longer, the bands shrank,
 // and the new band bind groups (the trace layout's 11 entries, also with a buffer at binding 2) and band uniform buffer
@@ -75,8 +75,11 @@ const kinds = (passes) =>
   );
 
 test('a frame traces samplesPerFrame samples, then draws the image; nothing before the pipelines are ready', async () => {
-  const h = fakeEngine(),
-    tracer = VoxelPathTracer.attach(h.engine, { scene: simpleScene(), samplesPerFrame: 3 });
+  const h = fakeEngine();
+  // The whole 64 x 48 x 3 frame in one band (a new tracer's 128th of the budget would cut it in two; the bands are
+  // dispatch-budget.test.js's).
+  h.device.voxelTraceWork = 2 ** 20 * 192;
+  const tracer = VoxelPathTracer.attach(h.engine, { scene: simpleScene(), samplesPerFrame: 3 });
   assert.equal(tracer.status, 'compiling');
   assert.deepEqual(h.frame(), [], 'compiling: the raster frame shows');
   await tracer.ready;

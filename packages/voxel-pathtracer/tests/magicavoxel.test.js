@@ -486,7 +486,7 @@ test('MagicaVoxel options and environment reach the frame uniform; invalid ones 
   h.frame();
   await settle();
   h.frame();
-  const frame = h.device.buffers.findLast((b) => b.size === 800 && !b.destroyed),
+  const frame = h.device.buffers.findLast((b) => b.size === 816 && !b.destroyed),
     u = new Uint32Array(frame.data),
     f = new Float32Array(frame.data);
   assert.equal(u[42] & (1024 | 2048 | 4096 | 8192 | 16384), 1024 | 2048 | 4096 | 8192 | 16384);

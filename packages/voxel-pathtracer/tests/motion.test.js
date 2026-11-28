@@ -125,7 +125,7 @@ async function uploaded(source) {
   h.frame();
   const group = h.device.groups.findLast((g) => g.entries.some((e) => e.binding === 3 && e.resource.buffer));
   const buffer = group.entries.find((e) => e.binding === 3).resource.buffer;
-  const frame = h.device.buffers.findLast((b) => b.size === 800 && !b.destroyed);
+  const frame = h.device.buffers.findLast((b) => b.size === 816 && !b.destroyed);
   const uniform = new Uint32Array(frame.data),
     floats = new Float32Array(buffer.data),
     words = new Uint32Array(buffer.data);

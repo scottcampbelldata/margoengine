@@ -10255,6 +10255,14 @@ small and size later submissions from its measured speed; keep any timing-driven
 `packages/voxel-pathtracer/tests/dispatch-budget.test.js`; bit-identical bands in the browser check's `determinism`
 case. Still missing: the AMD mini PC validation run under a heat watchdog (recorded in docs/known-bugs.md when done).
 
+KB4037 (2026-11-28) showed the first figure and the smallest piece were still sized for fast GPUs: a Ryzen 9 9950X's
+two-unit RDNA2 graphics ran the denoise-materials bands 140 to 600 times slower than the RTX A6000 and reset on the
+third. The rule gains three parts: a new device starts at a 128th of the per-submission work; a band whose fewest rows
+are still over the budget is cut into column pieces (any split that changes no value may follow timing); and pieces
+are made one at a time from the budget measured last, never planned for a whole run in advance. The shortest piece is
+then one thread's fixed run of samples, which bounds what timing can do; evidence and the remaining limit are in
+docs/known-bugs.md (KB4037).
+
 ## Plugin lifetime in check:owners (integration J1, list 5 batch I1, 2026-11-11)
 
 A plugin package proves its lifetime with a `test(s)/owner-lifetime.fixture.js` run by `npm run check:owners`, not by a
