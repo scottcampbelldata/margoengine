@@ -19,7 +19,7 @@ const DIRECT = {
   'packages/gltf/src/textured.ts': 'glTF images (ImageBitmap)',
   'packages/html/src/texture.ts': 'an HTML element drawn on a canvas',
   'packages/inspector/src/frame.ts': 'the name only, in its list of queue calls it counts',
-  'packages/materials/src/built-material.ts': 'images and canvases; videos go through shared/copy-external.js',
+  'packages/materials/src/texture-core.ts': 'images and canvases; videos go through shared/copy-external.js',
   'packages/materials/src/textures.ts': 'images and canvases',
   'packages/pixel/src/index.ts': 'images',
   'packages/quality/src/knobs.ts': 'a canvas',
@@ -31,7 +31,7 @@ const DIRECT = {
 
 test('the packages that take videos copy through shared/copy-external.js', () => {
   for (const file of [
-    'packages/materials/src/built-material.ts',
+    'packages/materials/src/texture-core.ts',
     'packages/points/src/plugin.ts',
     'packages/shader/src/shadertoy.ts',
     'packages/xr/src/layers.ts',
