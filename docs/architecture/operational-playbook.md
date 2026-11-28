@@ -11694,3 +11694,10 @@ Wasm in a worker with a 10 s watch per case (structure-aware mutation of OpenJPE
 Science, and Engineering of Fuzzing", IEEE TSE 2019, https://arxiv.org/abs/1812.00140; Pham et al., "Smart Greybox
 Fuzzing", IEEE TSE 2019, https://arxiv.org/abs/1811.09447). Missing: the ISO/IEC 15444-4 corpus, coverage-guided
 fuzzing, and streams using code-block style options from an outside encoder.
+
+Lightning glow (`@margoengine/sky/lightning-glow`, 2026-11-27): one fullscreen additive pass at order 6.54 that reads
+the scene depth; each pixel integrates single scattering from up to 4 x 64 straight channel pieces (fragment storage
+buffer, camera-relative, rows rewritten each frame). The shader mirrors `lightningGlowRadiance` line for line:
+12 ray points by `t = t0 + h sinh(q)`, 6 channel angles split at the phase peak. Evidence:
+`packages/sky/test/lightning-glow.test.js` and `features-check.mjs lightning-glow` (GPU against CPU, native WebGPU and
+the WebGL2 layer, 4x and 1x, RTX A6000). Missing: other GPUs, timing, multiple scattering.

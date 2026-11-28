@@ -1,0 +1,101 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky lightning glow check</title><style>body{margin:0}canvas{display:block;width:640px;height:360px}</style></head><body><canvas></canvas>
+<script type="module">
+// LightningGlow on the GPU against its CPU twin: a held flash over a night scene, the glow's light read back from Bloom's
+// HDR scene capture as the difference from the same frame without it, pixel by pixel against lightningGlowRadiance
+// along rays worked out here from the camera, ending on the ground, on a hill or in the sky. Driven by
+// features-check.mjs (`lightning-glow`), on WebGPU and under MARGO_COMPAT=1 on the WebGL2 layer.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {Weather} from '/packages/sky/dist/weather.js';
+import {LightningBolt} from '/packages/sky/dist/lightning-bolt.js';
+import {LightningGlow,lightningGlowPieces,lightningGlowRadiance} from '/packages/sky/dist/lightning-glow.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const eye=[0,3,12],target=[0,400,-1000];
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:eye,target,near:0.5,far:20000}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+const sky=new Sky({hours:23,timeScale:0});engine.use(sky);
+engine.createMesh().setGeometry(box(4000,0.2,4000)).setMaterial(new PbrMaterial({color:'#4a5a3a',roughness:0.9})).setPosition([0,0,0]);
+const hill=engine.createMesh().setGeometry(box(6000,4000,40)).setMaterial(new PbrMaterial({color:'#303030',roughness:0.9})).setPosition([0,-4000,-300]);
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(id.x>=s.x||id.y>=s.y){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return {data,w:texture.width,h:texture.height};
+}
+const shot=async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);};
+const norm=v=>{const l=Math.hypot(...v);return v.map(x=>x/l);};
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const forward=norm(target.map((x,i)=>x-eye[i])),right=norm(cross(forward,[0,1,0])),up=cross(right,forward);
+// The ray through a pixel's centre, and how far it goes: to the hill's near face, the ground's top, or the sky.
+function ray(x,y,w,h,withHill){
+ const t=Math.tan(engine.camera.fov*Math.PI/360),nx=(x+0.5)/w*2-1,ny=1-(y+0.5)/h*2;
+ const d=norm(forward.map((f,i)=>f+right[i]*nx*t*w/h+up[i]*ny*t));
+ let distance=Infinity,on='sky';
+ if(d[1]<0){const s=(0.1-eye[1])/d[1];if(Math.abs(eye[0]+d[0]*s)<2000&&Math.abs(eye[2]+d[2]*s)<2000){distance=s;on='ground';}}
+ if(withHill&&d[2]<0){const s=(-280-eye[2])/d[2];if(s<distance){distance=s;on='hill';}}
+ return {origin:eye,direction:d,distance,on};
+}
+window.check={samples:sceneSamples,
+ async run(){
+  const out={};device.pushErrorScope('validation');
+  const weather=new Weather({intensity:0,lightning:{strength:0,seed:3,hold:1,bolt:{top:900},cloud:{base:1500}}});engine.use(weather);
+  // The bolt is not drawn here: the glow reads its channel, and the difference holds the glow alone.
+  const bolt=new LightningBolt({weather});
+  const strike=weather.strike({distance:900,azimuth:Math.PI,strength:1});
+  const glow=LightningGlow.attach(engine,{bolt,depth:()=>post.depthTexture,visibility:2000});
+  for(let i=0;i<3;i++)await shot();
+  const off=async()=>{glow.options.strength=0;await shot();const image=await shot();glow.options.strength=1;return image;};
+  const measure=async()=>{await shot();return shot();};
+  const base=await off(),lit=await measure();
+  const color=[0.3623,0.4973,1].map(c=>0.4+0.6*c);
+  const channel=bolt.channelOf(strike),pieces=lightningGlowPieces(channel,24),fine=lightningGlowPieces(channel,64);
+  // Compares the drawn light with the CPU's along a grid of pixels.
+  const compare=(a,b,withHill,options={visibility:2000})=>{
+   let count=0,worst=0,sum=0,want=0,got=0,piecesGap=0;const kinds={sky:0,ground:0,hill:0},means={sky:0,ground:0,hill:0},samples=[];
+   for(let j=0;j<9;j++)for(let i=0;i<13;i++){
+    const x=Math.floor((i+0.5)/13*b.w),y=Math.floor((j+0.5)/9*b.h),r=ray(x,y,b.w,b.h,withHill),k=(y*b.w+x)*4;
+    const radiance=lightningGlowRadiance(r,pieces,80*1.5,options,0.75);
+    const many=lightningGlowRadiance(r,fine,80*1.5,options,0.75);
+    const expected=color.map(c=>c*radiance),drawn=[0,1,2].map(c=>b.data[k+c]-a.data[k+c]);
+    // Half floats: each of the two scene values is held to a two-thousandth of itself; that much is not counted.
+    const floor=0.00001+0.0005*(Math.abs(a.data[k+2])+Math.abs(b.data[k+2]));
+    const error=Math.max(...expected.map((e,c)=>Math.max(0,Math.abs(drawn[c]-e)-floor)/Math.max(e,0.002)));
+    worst=Math.max(worst,error);sum+=error;count++;want+=expected[2];got+=drawn[2];piecesGap+=Math.abs(many-radiance);
+    kinds[r.on]++;means[r.on]+=drawn[2];
+    if(error>=worst)samples.push({x,y,on:r.on,expected,drawn});
+   }
+   for(const key in means)means[key]/=kinds[key]||1;
+   return {count,worst,mean:sum/count,total:got/want,kinds,means,piecesGap:piecesGap/(want/color[2]),worstSample:samples.at(-1)};
+  };
+  out.open=compare(base,lit,false);
+  // A hill in front of the whole channel leaves the glow of the air before it.
+  hill.setPosition([0,1000,-300]);
+  const hiddenBase=await off(),hidden=await measure();
+  out.hill=compare(hiddenBase,hidden,true);
+  hill.setPosition([0,-4000,-300]);
+  // Live options: the anisotropy and visibility change the picture as the CPU says.
+  Object.assign(glow.options,{visibility:600,anisotropy:0.2});
+  const mistBase=await off(),mist=await measure();
+  out.mist=compare(mistBase,mist,false,{visibility:600,anisotropy:0.2});
+  Object.assign(glow.options,{visibility:2000,anisotropy:undefined});
+  glow.options.strength=2;const twice=await measure();glow.options.strength=1;
+  let one=0,two=0;for(let k=2;k<lit.data.length;k+=4){one+=lit.data[k]-base.data[k];two+=twice.data[k]-base.data[k];}
+  out.twice=two/one;
+  weather.options.lightning.hold=0;const dark=await measure();
+  let after=0;for(let k=0;k<dark.data.length;k++)after=Math.max(after,Math.abs(dark.data[k]-base.data[k]));
+  out.dark=after;
+  weather.options.lightning.hold=1;
+  // For the picture: the drawn bolt over its glow.
+  engine.use(bolt);weather.options.lightning.bolt.glow=0;await measure();
+  window.check.picture=true;
+  out.validation=(await device.popErrorScope())?.message??null;out.errors=errors.splice(0);
+  return out;
+ }};
+window.ready=true;
+</script></body></html>

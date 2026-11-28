@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21677631,
+  "total": 21683706,
   "history": [
     {
       "date": "2026-10-24",
@@ -15339,6 +15339,12 @@
       "commit": "993b014c8a",
       "reason": "Eight optional entries over their ceilings, each measured when its ceiling was set and now (min+gzip). @margoengine/post/ssr 14,613 to 15,209 B (ceiling 15052 to 15666 B), post/rt-reflections 16,317 to 16,907 B (ceiling 16807 to 17415 B), post/rt-gi 15,649 to 16,245 B (ceiling 16063 to 16733 B), post/ssgi 14,152 to 14,743 B (ceiling 14577 to 15186 B): raw shaders reflect in SSR (captureEntry, d4d9f07fb1, +77 to +83) and the Hi-Z march that stops re-testing cells and hits only facing surfaces (48e76a057a, KB-POST-SSRSTREET1, +437 to +461). All four run that march; a split would give each its own copy or a request more and remove nothing a user loads. @margoengine/vfx/fire-front 10,563 to 12,019 B (ceiling 10880 to 12380 B): the burn-out that skips cells past their flames (4513d9c383, KB-SCENES-BURNTSLOW1: 754,532,995 visits to 435,164, the same burn). It lives in the class's lighting and stepping paths; behind an import() every settle would wait on a request and the class would need a second form of those paths. @margoengine/water/liquid 40,629 to 47,297 B (ceiling 41848 to 48716 B): GPULiquid's origin shift (e5a2c11ad7, +557), the accurate profile's pressure projection (5d27aae880, +5,074) and smooth walls (024e08fb8e, +1,035). The profile is one constructor option of a synchronous GPULiquid, so an entry of its own would be a second import users must make before the option works, a public API change, to save at most its 5,074 B for the fast profile. @margoengine/geometry/extras 16,392 to 18,811 B (ceiling 16884 to 19376 B): trussGeometry (3285409e16, +1,889) and chainLinkGeometry (4a04700271, +530). The figure is the whole entry; each generator is a pure function a bundler drops when unused, so a split saves an app nothing. @margoengine/rigging/ik 3,852 to 4,368 B (ceiling 4108 to 4624 B): IKChain.keepBend, on by default (3001234894, +516), keeps a bent elbow or knee on its side; it is a step of the solve, so a split would leave the default solve folding joints backward. Core and stage unchanged; physics entries are not part of this change.",
       "grew": 8
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-e-lightning-glow",
+      "reason": "sky/lightning-glow: new entry, the lightning channel's light scattered in fog and rain",
+      "grew": 1
     }
   ],
   "items": {
@@ -16669,6 +16675,7 @@
     "@margoengine/sky/hurricane": 2851,
     "@margoengine/sky/lighting": 5135,
     "@margoengine/sky/lightning-bolt": 6300,
+    "@margoengine/sky/lightning-glow": 6075,
     "@margoengine/sky/look": 4026,
     "@margoengine/sky/milky-way": 6589,
     "@margoengine/sky/moon": 3810,

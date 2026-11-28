@@ -1876,6 +1876,51 @@ no change to your code: the package loads a small route there that computes the 
 On its own the weather respects the scene depth, not covered areas: rain falls under roofs, makes no splashes and
 leaves the lens dry. `WeatherFX` (below) adds all three.
 
+### The glow in fog and rain: `LightningGlow`
+
+`LightningGlow` (`@margoengine/sky/lightning-glow`) draws the light a bolt's channel scatters into the air toward the
+camera: bright beside the channel, fading outward, wider and stronger in thicker air, and cut off by hills and walls in
+front of it. At each pixel it integrates single scattering along the view ray, up to the surface there, from the main
+channel of every live strike (Sun et al. 2005; Dobashi et al. 2001). The channel's brightness is the bolt's own
+(`coreRadiance`, `bolt.width`, `bolt.scale` and the stroke flicker), so a held flash holds the glow too. Set
+`lightning.bolt.glow` to 0 to drop the bolt's fixed-width glow.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Bloom } from '@margoengine/post/bloom';
+import { Sky } from '@margoengine/sky';
+import { LightningBolt } from '@margoengine/sky/lightning-bolt';
+import { LightningGlow } from '@margoengine/sky/lightning-glow';
+import { Weather } from '@margoengine/sky/weather';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: { position: [0, 3, 12], target: [0, 400, -1000], far: 20000 },
+});
+const post = Bloom.attach(engine);
+engine.use(new Sky({ hours: 23, timeScale: 0 }));
+const weather = Weather.attach(engine, { intensity: 0, lightning: { strength: 0, bolt: { glow: 0 } } });
+const bolt = LightningBolt.attach(engine, { weather });
+const glow = LightningGlow.attach(engine, { bolt, depth: () => post.depthTexture, visibility: 2000 });
+weather.strike({ distance: 900, azimuth: Math.PI });
+glow.options.anisotropy = 0.5; // read every frame
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `bolt` | required | the `LightningBolt` whose strikes glow |
+| `depth` | required | the scene's reversed-Z depth each frame; nothing is drawn while it is undefined |
+| `visibility` | 3000 | metres of meteorological visibility, 20 to 300,000 (extinction 3.912 / visibility) |
+| `albedo` | 1 | share of the extinguished light that is scattered, 0 to 1 |
+| `anisotropy` | 0.7 | Henyey-Greenstein asymmetry, -0.85 to 0.85; positive scatters forward |
+| `strength` | 1 | scales the scattered light, 0 to 1000 |
+| `pieces` | 24 | straight pieces the main channel is cut into, 1 to 64 |
+
+`lightningGlowRadiance` works out the same light for one view ray on the CPU, and `lightningGlowPieces` the pieces it
+reads. On an RTX A6000 the drawn light matches that CPU function within 3 percent at every one of 117 sampled pixels
+(native WebGPU and the WebGL2 layer, 4x and 1x; `test/features-check.mjs lightning-glow`). Not modelled: light
+scattered more than once, the glow of the forks, uneven air or cloud, dimming of the drawn core by the air in front of
+it, and a bolt driven by a physical `field`.
+
 ### Rain splashes, wet lens and cover
 
 `WeatherFX` from `@margoengine/sky/weather-fx` makes the rain meet the scene: no rain or snow falls under roofs,

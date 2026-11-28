@@ -190,6 +190,29 @@ const checks = {
     );
     return r;
   },
+  // The channel's light scattered in the air, drawn against its CPU twin (lightning-glow-check.html).
+  async 'lightning-glow'(page, samples) {
+    const r = await page.evaluate(() => window.check.run());
+    assert.equal(r.validation, null);
+    assert.deepEqual(r.errors, []);
+    await mkdir('test-results', { recursive: true });
+    await page.locator('canvas').screenshot({ path: `test-results/lightning-glow-${samples}x.png` });
+    for (const name of ['open', 'hill', 'mist']) {
+      const c = r[name],
+        detail = `${name}: ${JSON.stringify(c)}`;
+      assert.ok(c.worst < 0.03 && c.mean < 0.005, `the drawn glow is the CPU's: ${detail}`);
+      assert.ok(Math.abs(c.total - 1) < 0.005, detail);
+      assert.ok(c.piecesGap < 0.1, `24 pieces draw nearly what 64 do: ${detail}`);
+    }
+    assert.ok(r.open.kinds.sky > 20 && r.open.kinds.ground > 5, JSON.stringify(r.open.kinds));
+    assert.ok(r.hill.kinds.hill > 50, JSON.stringify(r.hill.kinds));
+    assert.ok(r.open.means.sky > 0.005, `the sky glows about the channel: ${JSON.stringify(r.open.means)}`);
+    assert.ok(r.hill.means.hill < 0.4 * r.open.means.sky, `a hill cuts the glow: ${JSON.stringify(r.hill.means)}`);
+    assert.ok(Math.abs(r.twice - 2) < 0.01, `strength 2 doubles it: ${r.twice}`);
+    assert.ok(r.dark < 1e-4, `no flash, no glow: ${r.dark}`);
+    console.log(`ok lightning-glow ${samples}x: ${JSON.stringify({ open: r.open, hill: r.hill, mist: r.mist })}`);
+    return r;
+  },
   // The clouds' bounds (elements plan step 6; cloud-bounds-check.html).
   async 'cloud-bounds'(page, samples) {
     const r = await page.evaluate(() => window.check.run());

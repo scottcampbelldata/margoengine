@@ -3447,6 +3447,10 @@
       "types": "./dist/sky/ephemeris.d.ts",
       "import": "./dist/sky/ephemeris.js"
     },
+    "./sky/lightning-glow": {
+      "types": "./dist/sky/lightning-glow.d.ts",
+      "import": "./dist/sky/lightning-glow.js"
+    },
     "./sky/lightning-bolt": {
       "types": "./dist/sky/lightning-bolt.d.ts",
       "import": "./dist/sky/lightning-bolt.js"

@@ -19333,3 +19333,19 @@ read.
 
 The atlas projection (scale k / (k + z) with k = b / (1 - b) for a back wall share b) is one-point perspective, derived
 here.
+
+## Lightning glow: sky/lightning-glow (2026-11-27)
+
+Written from the papers' equations and descriptions only; no other engine's or tool's code was read. Sources: B. Sun,
+R. Ramamoorthi, S. G. Narasimhan and S. K. Nayar, "A practical analytic single scattering model for real-time
+rendering", ACM Trans. Graphics 24(3), 1040-1049, 2005, https://doi.org/10.1145/1073204.1073309 (the airlight
+integral); Y. Dobashi, T. Yamamoto and T. Nishita, "Efficient rendering of lightning taking into account scattering
+effects due to clouds and atmospheric particles", Pacific Graphics 2001, https://doi.org/10.1109/PCCGA.2001.962896
+(lightning seen through scattering particles); C. Kulla and M. Fajardo, "Importance sampling techniques for path
+tracing in participating media", Computer Graphics Forum 31(4), 1519-1528, 2012,
+https://doi.org/10.1111/j.1467-8659.2012.03148.x (equiangular sampling); L. G. Henyey and J. L. Greenstein, "Diffuse
+radiation in the galaxy", Astrophys. J. 93, 70-83, 1941, https://doi.org/10.1086/144246; H. Koschmieder, "Theorie der
+horizontalen Sichtweite", Beitr. Phys. freien Atmos. 12, 33-53 and 171-181, 1924. Read for what is left out: S. G.
+Narasimhan and S. K. Nayar, "Shedding light on the weather", CVPR 2003, https://doi.org/10.1109/CVPR.2003.1211417
+(multiple scattering). The ray substitution t = t0 + h sinh(q), the split of the channel angles at the phase peak and
+the pieces of equal path length are derived and measured here.

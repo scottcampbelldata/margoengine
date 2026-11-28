@@ -6835,3 +6835,11 @@ Proof: `packages/procedural/test/building-reach.test.js` walks 400 random winder
 with ramps, and `packages/procedural/test/building-interiors.test.js` climbs a winder stair's walking line on its mesh
 one riser at a time. Not claimed: compliance with a building code as a whole, or a wheelchair route (door widths,
 turning space and landings at doors are not checked).
+
+## Lightning glow in fog and rain (`@margoengine/sky/lightning-glow`, 2026-11-27)
+
+Claim: the drawn glow is single scattering from the bolt's channel, and equals the engine's CPU integral at the pixel.
+Proof: `packages/sky/test/lightning-glow.test.js` (CPU integral against a fine numerical integral, median error 0.14
+percent over 60 rays, worst 7.0 at anisotropy up to 0.7) and `node packages/sky/test/features-check.mjs lightning-glow`,
+also with `MARGO_COMPAT=1` (RTX A6000, worst of 117 pixels 2.7 percent). Not claimed: multiple scattering, forks, cloud,
+dimming of the core, any speed figure.
