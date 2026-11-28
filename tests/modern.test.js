@@ -338,7 +338,11 @@ test('glTF loader preserves hierarchy and rolls back unsupported materials', asy
     assert.equal(engine.meshes.size, 0);
     assert.equal(resources.size, 0);
     doc.materials[0].alphaMode = 'BLEND';
-    assert.throws(() => parseGLTF(engine, doc), /opaque/);
+    // The BLEND material is refused by name: the coded error the loaders act on, saying what to use instead.
+    assert.throws(() => parseGLTF(engine, doc), {
+      code: 'unsupported',
+      message: /transparency need @margoengine\/gltf\/textured or gltf\/pbr; see https:\/\/\S+#gltf-light$/,
+    });
     assert.equal(engine.meshes.size, 0);
     assert.equal(resources.size, 0);
     doc.buffers[0].byteLength = 1000;
