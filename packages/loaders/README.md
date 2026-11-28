@@ -154,7 +154,8 @@ try {
 | `layout` | `parseXYZ` | `'auto'` (by column count; 6 columns are rgb unless a value is negative) |
 | `maxBytes`, `fetch`, `init` | `load`, `fetchBytes`, `fetchResource` | 256 MiB, `globalThis.fetch`, none |
 | `protocols`, `publicOnly`, `allowHost`, `maxRedirects`, `accept` | `load`, `fetchBytes`, `fetchResource` | any scheme, false, none, 20 once a guard is set (else the fetch follows), any type |
-| `normals` | `toGeometry`, `createMeshes` | `'auto'` (file normals, else smooth); `'smooth'`, `'flat'` |
+| `normals` | `toGeometry`, `createMeshes`, `createPBRMeshes` | `'auto'` (file normals; without them `toGeometry` smooths everything and the mesh creators smooth within `creaseAngle`); `'smooth'`, `'flat'` |
+| `creaseAngle` | `createMeshes`, `createPBRMeshes` | 40 degrees: sharper edges of a mesh without normals stay sharp, each side with its own copy of the vertex; 0 is flat, 180 smooths everything |
 | `group` | `toGeometry` | whole mesh |
 | `merge`, `color`, `roughness`, `metalness`, `doubleSided`, `parent`, `vertexColors` | `createMeshes` | per group, `#b8bcc4`, 0.6, 0, true, none, `'average'` |
 | `size`, `maxPoints` | `pointsToGeometry`, `createMeshes` on clouds | 0.4% of the bounds diagonal, 166,666 |
@@ -285,7 +286,7 @@ model.dispose();
 
 `createPBRMeshes` returns a `PBRModel` (dispose it when done) that renders per-vertex sRGB colors and linear
 `attributes.opacity` through `@margoengine/gltf/pbr`. Group RGBA fills in only a missing channel; `baseColorFactor`
-multiplies the result, and any alpha below one draws blended. `parent`, `normals`, `roughness`, `metalness` and
+multiplies the result, and any alpha below one draws blended. With vertex colors, neighboring groups that differ only in their group color are drawn as one part, so a colored scan with thousands of color groups stays within the 4,096 parts. `parent`, `normals`, `roughness`, `metalness` and
 `doubleSided` work as in `createMeshes`; `unlit` uses the unlit material. It accepts triangle meshes of any size within `maxBytes`
 and at most 4096 parts (a part past 262,144 vertices, gltf/pbr's default `maxPartVertices`, becomes several primitives of one mesh, split as
 `toGeometries` splits, so gltf/pbr draws each as made), and refuses point clouds, malformed attributes, overlapping groups and data over

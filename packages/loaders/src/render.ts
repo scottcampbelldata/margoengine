@@ -2,6 +2,7 @@ import type { EngineKernel, Mesh } from '@margoengine/core';
 import { parsePreparedPBR, type GLTFDocument, type PBRModel, type PreparedGeometry } from '@margoengine/gltf/pbr-model';
 import { SRGBToLinear } from '@margoengine/math/color';
 import type { CreateMeshesOptions } from './engine.js';
+import { creased } from './crease.js';
 import { splitTriangles, toGeometries } from './geometry.js';
 
 /**
@@ -12,11 +13,14 @@ const PRIMITIVE_MAX_VERTICES = 262_144;
 import { LoaderError, type LoadedGeometry, type LoadedGroup } from './types.js';
 
 /**
- * Options for {@link createPBRMeshes}: `parent` (of the model root), `normals`, `roughness` (default 0.6),
- * `metalness` (default 0) and `doubleSided` (default true) as for `createMeshes`. Colors multiply in linear light.
+ * Options for {@link createPBRMeshes}: `parent` (of the model root), `normals`, `creaseAngle` (default 40),
+ * `roughness` (default 0.6), `metalness` (default 0) and `doubleSided` (default true) as for `createMeshes`. Colors
+ * multiply in linear light.
  */
 export interface CreatePBRMeshesOptions
   extends Pick<CreateMeshesOptions, 'parent' | 'normals' | 'roughness' | 'metalness' | 'doubleSided'> {
+  /** As for `createMeshes`: faces within this many degrees are smoothed together. Default 40. */
+  creaseAngle?: number;
   /** Linear RGBA material multiplier in [0,1]. Default white, preserving source colors and opacity. */
   baseColorFactor?: readonly [number, number, number, number];
   /** Use the renderer's existing unlit material. Default false. */
@@ -41,14 +45,35 @@ function attribute(value: Float32Array | undefined, length: number, name: string
       range(`${name} must contain finite${bounded ? ' [0,1]' : ''} values`);
 }
 
+/** What makes two groups different parts when vertex colors carry their color: everything but it and their range. */
+const partKey = ({ start: _start, count: _count, color, ...rest }: LoadedGroup): string =>
+  JSON.stringify([rest, color?.[3] ?? 1]);
+
+/** Joins each run of neighboring groups of one {@link partKey} into the first of them, in place. */
+function joinColorGroups(parts: LoadedGroup[]): void {
+  let kept = 0,
+    last = '';
+  for (const part of parts) {
+    const key = partKey(part);
+    if (kept && key === last) parts[kept - 1] = { ...parts[kept - 1], count: parts[kept - 1].count + part.count };
+    else {
+      parts[kept++] = part;
+      last = key;
+    }
+  }
+  parts.length = kept;
+}
+
 /**
  * Renders triangle loader output with exact per-vertex RGB and opacity through optional `gltf/pbr`.
  * Source RGB is sRGB; opacity is linear. Group RGBA supplies only missing vertex channels, independently.
  * Uncovered index ranges render with white/opaque fallback. The explicit material factor multiplies RGBA.
  * Returns the renderer's owned model: dispose it once finished; its existing lifecycle restores GPU resources.
  * The input is never modified. A part past 262,144 vertices (gltf/pbr's default `maxPartVertices`) becomes several primitives of one
- * glTF mesh, split as toGeometries splits (normals seam-free). Point clouds, overlapping groups, more than 4096
- * parts, or an exceeded packed-data budget are refused before any GPU allocation.
+ * glTF mesh, split as toGeometries splits (normals seam-free). With vertex colors, neighboring groups that differ in
+ * color alone are one part, as their corners already carry it (a scan has a group for almost every color). Point
+ * clouds, overlapping groups, more than 4096 parts, or an exceeded packed-data budget are refused before any GPU
+ * allocation.
  */
 export function createPBRMeshes(
   engine: EngineKernel,
@@ -61,10 +86,10 @@ export function createPBRMeshes(
       'unsupported',
       'createPBRMeshes requires triangles; use createMeshes for point markers',
     );
-  const count = loaded.positions?.length / 3,
+  let count = loaded.positions?.length / 3,
     indices = loaded.indices,
-    opacity = loaded.attributes?.opacity,
-    mode = options.normals ?? 'auto',
+    opacity = loaded.attributes?.opacity;
+  const mode = options.normals ?? 'auto',
     factor = options.baseColorFactor ?? [1, 1, 1, 1],
     roughness = unit(options.roughness ?? 0.6, 'roughness'),
     metalness = unit(options.metalness ?? 0, 'metalness'),
@@ -86,6 +111,12 @@ export function createPBRMeshes(
   if (indices.byteLength > maxBytes)
     throw new LoaderError(format, 'limit', 'indices alone exceed maxBytes; increase maxBytes or split the asset');
   for (const index of indices) if (index >= count) range(`index ${index} exceeds the vertex count`);
+  if (mode === 'auto') {
+    loaded = creased(loaded, options.creaseAngle);
+    count = loaded.positions.length / 3;
+    indices = loaded.indices!;
+    opacity = loaded.attributes?.opacity;
+  }
 
   const parts: LoadedGroup[] = [];
   let end = 0;
@@ -110,6 +141,7 @@ export function createPBRMeshes(
     end = start + size;
   }
   if (end < indices.length) parts.push({ start: end, count: indices.length - end });
+  if (loaded.colors) joinColorGroups(parts);
   if (parts.length > 4096) throw new LoaderError(format, 'limit', 'more than 4096 parts; merge or split the asset');
   // Count before preparing any renderer resources. The same source order is used by toGeometry's compaction.
   let bytes = 0;

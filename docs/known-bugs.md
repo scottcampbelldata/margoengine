@@ -189,6 +189,26 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fixed:** the interpolated colour is clipped to 0..1. Regression:
   `packages/loaders/tests/threemf-evaluate.test.js`.
 
+### Fixed 2026-11-27: createMeshes and createPBRMeshes smoothed the edges of a box without normals (KB-LOAD-CREASE1, loaders)
+
+- **Repro:** `createMeshes` on a cube of 8 shared vertices with no normals: one normal a corner, along the diagonal,
+  so the faces shaded as a blob.
+- **Cause:** both took `toGeometry`'s rule for a file without normals, which smooths across every edge.
+- **Fixed:** they smooth only faces within `creaseAngle` (40 degrees, as `create3MFMesh`) with the geometry
+  package's `creasedNormals`, copying a vertex where its sides differ. Regression:
+  `packages/loaders/tests/crease.test.js`. `creasedNormals` with no tolerance now looks in one cell instead of 27
+  when it welds corners, which took 2.6 s of the 4.6 s on a 2.4 million triangle field (now 1.6 s in all, on the
+  development PC under load).
+
+### Fixed 2026-11-27: createPBRMeshes refused a colored scan as too many parts (KB-LOAD-PBRGROUPS1, loaders)
+
+- **Repro:** `createPBRMeshes(engine, await parse3MF(file))` on a strip of 9,000 triangles with a color of its own
+  at every corner: "more than 4096 parts".
+- **Cause:** `parse3MF` groups triangles by their first corner's color, for `createMeshes`, which draws one color a
+  group; `createPBRMeshes` made a part of every group although the vertex colors already carry the color.
+- **Fixed:** with vertex colors, neighboring groups that differ in color alone are one part. Regression:
+  `packages/loaders/tests/crease.test.js`.
+
 ### Fixed 2026-11-27: volume data on a displacement mesh and a short composite were accepted (KB-3MF-VOLDATA1, loaders)
 
 - **Repro:** `parse3MFVolumetric` on `<d:displacementmesh v:volumeid="5">`, or on a `<composite>` with one

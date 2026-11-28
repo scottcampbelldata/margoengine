@@ -3,11 +3,17 @@ import type { EngineKernel, Mesh } from '@margoengine/core';
 import { LoaderError, type LoadedGeometry, type LoadedGroup } from './types.js';
 import { pointsToGeometry, toGeometries, type PointsToGeometryOptions, type ToGeometryOptions } from './geometry.js';
 import { SRGBToLinear as toLinear } from '@margoengine/math/color';
+import { creased } from './crease.js';
 
 /** Options of createMeshes: parent, material values, one mesh or one per group, and the geometry options. */
 export interface CreateMeshesOptions
   extends Pick<ToGeometryOptions, 'normals' | 'maxPartVertices'>,
     PointsToGeometryOptions {
+  /**
+   * For a file without normals, with `normals: 'auto'`: faces within this many degrees of each other are smoothed
+   * together, so sharper edges stay sharp. 0 is flat, 180 smooths everything. Default 40.
+   */
+  creaseAngle?: number;
   /** Parent for every created mesh. */
   parent?: Mesh | null;
   /** Color for meshes without a file color: `#rrggbb` (sRGB) or linear RGB. Default `#b8bcc4`. */
@@ -68,6 +74,7 @@ export function createMeshes(
   const vertexColors = options.vertexColors ?? 'average';
   if (vertexColors !== 'average' && vertexColors !== 'ignore')
     throw new LoaderError('Engine', 'range', `unknown vertexColors mode "${String(vertexColors)}"`);
+  if ((options.normals ?? 'auto') === 'auto') loaded = creased(loaded, options.creaseAngle);
   const materials = new Map<string, PbrMaterial>();
   const material = (color: string | readonly number[]): PbrMaterial => {
     const key = typeof color === 'string' ? color.toLowerCase() : color.map((v) => v.toFixed(5)).join(',');

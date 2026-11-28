@@ -144,6 +144,7 @@ export type BinaryInput = ArrayBuffer | ArrayBufferView;
 export const CORE_MAX_VERTICES = 11184810;
 
 export interface CreateMeshesOptions extends Pick<ToGeometryOptions, 'normals' | 'maxPartVertices'>, PointsToGeometryOptions {
+    creaseAngle?: number;
     parent?: Mesh | null;
     color?: string | readonly number[];
     roughness?: number;

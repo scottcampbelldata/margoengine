@@ -7,6 +7,7 @@ import { EngineKernel, Mesh } from "@margoengine/core";
 import { PBRModel } from "@margoengine/gltf/pbr";
 
 export interface CreatePBRMeshesOptions extends Pick<CreateMeshesOptions, 'parent' | 'normals' | 'roughness' | 'metalness' | 'doubleSided'> {
+    creaseAngle?: number;
     baseColorFactor?: readonly [number, number, number, number];
     unlit?: boolean;
     maxBytes?: number;
@@ -17,6 +18,7 @@ export function createPBRMeshes(engine: EngineKernel, loaded: LoadedGeometry, op
 // Not exported from this entry, but used by the exports above:
 
 interface CreateMeshesOptions extends Pick<ToGeometryOptions, 'normals' | 'maxPartVertices'>, PointsToGeometryOptions {
+    creaseAngle?: number;
     parent?: Mesh | null;
     color?: string | readonly number[];
     roughness?: number;

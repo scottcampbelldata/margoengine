@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21494125,
+  "total": 21494899,
   "history": [
     {
       "date": "2026-10-24",
@@ -15157,6 +15157,12 @@
       "commit": "building-bay-windows",
       "reason": "Bay windows in rules buildings (box, canted 30 and 45 degrees and bow, hung from the sill or carried from the floor; limits row Building rules): measured gzip building-rules 22,131 to 24,940, building-plans 32,076 to 35,115, building-settings 5,898 to 6,317, city 35,536 to 38,235. generateBuilding is synchronous and builds a bay with its wall, so a split entry would leave the option unavailable until a second import.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-e-3mf-corpus",
+      "reason": "lane E 2026-11-27 (KB-LOAD-CREASE1, KB-LOAD-PBRGROUPS1): createMeshes and createPBRMeshes smooth within a crease angle through geometry/utils creasedNormals, so a file without normals keeps its sharp edges; a separate entry would leave the default wrong.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15796,7 +15802,7 @@
     "@margoengine/loaders/pdb": 2464,
     "@margoengine/loaders/ply": 4486,
     "@margoengine/loaders/prwm": 1990,
-    "@margoengine/loaders/render": 3575,
+    "@margoengine/loaders/render": 4349,
     "@margoengine/loaders/svg": 15333,
     "@margoengine/loaders/tds": 3642,
     "@margoengine/loaders/textures": 702,

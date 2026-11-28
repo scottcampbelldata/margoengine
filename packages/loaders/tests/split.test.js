@@ -180,7 +180,8 @@ test('createPBRMeshes renders a mesh past the gltf/pbr primitive limit as one no
     gpu.cleanup();
   });
   const colored = { ...big, colors: new Float32Array(big.positions.length).fill(0.5) };
-  const model = createPBRMeshes(engine, colored);
+  // Smoothed everywhere, so the vertex count stays that of the field: creasing would copy its sharpest vertices.
+  const model = createPBRMeshes(engine, colored, { creaseAngle: 180 });
   // 1,212,201 vertices in parts of gltf/pbr's default 262,144: each drawn as made, none split again by gltf/pbr.
   assert.equal(model.primitives.length, 5);
   assert.equal(
