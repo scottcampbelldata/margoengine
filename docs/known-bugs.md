@@ -1462,6 +1462,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression test:** `packages/materials/test/interior-mapping.test.js` ("the entry loads no glTF or material code
   until the caller imports it").
 
+### Fixed 2026-11-27: the process.exit check never finished (KB-EXIT-SCAN1)
+
+- **Repro.** `node --test tests/process-exit-check.test.js` after a6fb1ec09e: no result after 590 s.
+- **Cause.** The check rewrote every line with a regex that is quadratic on unmatched quotes; the web demos' minified
+  bundles have lines of 3 MB.
+- **Fix.** `scripts/support/process-exit.mjs` answers a line without the text of a call before rewriting it.
+- **Regression test:** `tests/process-exit-check.test.js` ("a line without the text of a call is answered without being
+  rewritten").
+
 ### Fixed 2026-11-27: the stated size of margoengine/game is stale (KB-KITS-GAMESIZE1)
 
 - **Repro.** `node --test tests/umbrella.test.js` after `npm run build:packages`: `margoengine/game: 399110 B,
@@ -15616,6 +15625,17 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   responding to a moving predator. BB-4, BB-6 and AVIARY-3 still have open shot checks in the demo review.
 
 ## Open defects
+
+### Open 2026-11-27: the create-margo web starter passes its 85,600 B bound (KB-SIZE-STARTER1)
+
+- **Repro:** `npm run build:packages`, then `node --test --test-name-pattern="the web template" tests/create-margo.test.js`:
+  86,252 B gzip against a bound of 85,600 B. It measured 85,171 B at 1a2eb0a5e8.
+- **Cause:** measured at 48e76a057a by building one package's sources of 1a2eb0a5e8 at a time into the starter:
+  environment 710 B (the EXR readers' colour spaces, a1bb0f5275, KB-EXR-INTEROPID1), core 238 B (snapshot rendering
+  and multi-draw, 4ea24d04d1 and c04ed9040d, approved for core, with the smaller core fixes since), shadows 57 B
+  (`Shadows.ready`, dd7fea3b5a). Quality and controls add nothing; the other 76 B were not traced.
+- **Left:** each earlier raise of this bound was Scott's (docs/limits.md, "Web template bundle"), so a raise needs that
+  yes. Without it, 652 B must come out: the environment growth alone is a correctness fix's colour tables and parsing.
 
 ### Open 2026-11-27: five Fauld shot cameras still cannot see their subject (shot generator, KB-SHOT-FAULDSIGHT1)
 
