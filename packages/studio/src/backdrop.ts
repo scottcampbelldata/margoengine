@@ -22,6 +22,12 @@ export interface BackdropShape {
   radius?: number;
   /** Quarter-circle subdivisions, integer 2..256. Default 32. */
   segments?: number;
+  /**
+   * Wrap the cove round its sides: the floor bends up into a wall at the left and right too, and the two back corners
+   * turn through a spherical octant and a vertical quarter cylinder of the same radius, so the open front is the only
+   * way out. Needs radius below width / 2. Default false (the flat-sided sweep drei's Backdrop draws).
+   */
+  sides?: boolean;
 }
 /** A backdrop mesh's initial shape and surface. */
 export interface BackdropOptions extends BackdropShape {
@@ -37,7 +43,8 @@ export function backdropGeometry(options: BackdropShape = {}): Geometry {
     depth = options.depth ?? 5,
     height = options.height ?? 4,
     radius = options.radius ?? 1,
-    segments = options.segments ?? 32;
+    segments = options.segments ?? 32,
+    sides = options.sides ?? false;
   if (
     ![width, depth, height].every((v) => Number.isFinite(v) && v >= 0.001 && v <= 1e4) ||
     !Number.isFinite(radius) ||
@@ -45,12 +52,15 @@ export function backdropGeometry(options: BackdropShape = {}): Geometry {
     radius >= Math.min(depth, height) ||
     !Number.isInteger(segments) ||
     segments < 2 ||
-    segments > 256
+    segments > 256 ||
+    typeof sides !== 'boolean' ||
+    (sides && radius >= width / 2)
   )
     throw rangeError(
       'Invalid backdrop dimensions; use finite width/depth/height .001..1e4, positive radius below depth/height and 2..256 integer segments',
       'arguments',
     );
+  if (sides) return wrappedCove(width, depth, height, radius, segments);
   const positions: number[] = [],
     normals: number[] = [],
     indices: number[] = [];
@@ -81,6 +91,58 @@ export function backdropGeometry(options: BackdropShape = {}): Geometry {
     const a = i * 2;
     indices.push(a, a + 1, a + 3, a, a + 3, a + 2);
   }
+  return new Geometry(positions, normals, indices);
+}
+
+/**
+ * The cove wrapped round three sides. Plan view: a flat floor rectangle inset by the radius from the left, right and back
+ * walls; every edge of that rectangle is swept through a quarter circle up into the wall, and each back corner is the same
+ * quarter circle swept about the corner point (a spherical octant), continuing as a vertical quarter cylinder up the
+ * wall. Normals are exact: they point at the centre of curvature below the bend and horizontally into the room above it.
+ */
+function wrappedCove(width: number, depth: number, height: number, radius: number, segments: number): Geometry {
+  const positions: number[] = [],
+    normals: number[] = [],
+    indices: number[] = [],
+    hx = width / 2 - radius,
+    hz = depth / 2,
+    bz = -depth / 2 + radius;
+  // Stations along the inset path: a point q on the floor and the horizontal direction n from it toward the wall.
+  const stations: { q: [number, number]; n: [number, number] }[] = [{ q: [-hx, hz], n: [-1, 0] }];
+  for (const [corner, from] of [
+    [[-hx, bz], Math.PI],
+    [[hx, bz], (3 * Math.PI) / 2],
+  ] as const)
+    for (let i = 0; i <= segments; i++) {
+      const angle = from + ((i / segments) * Math.PI) / 2;
+      stations.push({ q: [corner[0], corner[1]], n: [Math.cos(angle), Math.sin(angle)] });
+    }
+  stations.push({ q: [hx, hz], n: [1, 0] });
+  const rows: [number, number, number][] = []; // [distance along n, y, normal angle] per profile row
+  for (let i = 0; i <= segments; i++) {
+    const a = ((i / segments) * Math.PI) / 2;
+    rows.push([radius * Math.sin(a), radius * (1 - Math.cos(a)), a]);
+  }
+  rows.push([radius, height, Math.PI / 2]);
+  const per = rows.length;
+  for (const { q, n } of stations)
+    for (const [d, y, a] of rows) {
+      positions.push(q[0] + n[0] * d, y, q[1] + n[1] * d);
+      normals.push(-n[0] * Math.sin(a), Math.cos(a), -n[1] * Math.sin(a));
+    }
+  for (let s = 0; s + 1 < stations.length; s++)
+    for (let r = 0; r + 1 < per; r++) {
+      const a = s * per + r,
+        b = a + per;
+      indices.push(a, b, b + 1, a, b + 1, a + 1);
+    }
+  // The flat floor between the first and last stations, its rim being row 0 of the strip.
+  const base = positions.length / 3;
+  for (const [x, z] of [[-hx, hz], [hx, hz], [hx, bz], [-hx, bz]]) {
+    positions.push(x, 0, z);
+    normals.push(0, 1, 0);
+  }
+  indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
   return new Geometry(positions, normals, indices);
 }
 

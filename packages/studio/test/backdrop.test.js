@@ -43,6 +43,50 @@ test('cyclorama has a tangent circular bend, unit analytic normals and front-fac
   ])
     assert.throws(() => backdropGeometry(options));
 });
+test('a wrapped cove closes both sides and both back corners with unit normals, facing triangles and no hole', () => {
+  const options = { width: 6, depth: 5, height: 4, radius: 1, segments: 16, sides: true },
+    g = backdropGeometry(options),
+    v = g.vertices,
+    count = v.length / 6;
+  assert(count > 100);
+  let low = [Infinity, Infinity, Infinity],
+    high = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < v.length; i += 6) {
+    assert(Math.abs(Math.hypot(v[i + 3], v[i + 4], v[i + 5]) - 1) < 1e-6);
+    for (let k = 0; k < 3; k++) {
+      low[k] = Math.min(low[k], v[i + k]);
+      high[k] = Math.max(high[k], v[i + k]);
+    }
+  }
+  // The wall surfaces reach the full width, the back wall and the full height; the front stays open at z = depth / 2.
+  assert.deepEqual([low[0], high[0], low[2], high[2], high[1]], [-3, 3, -2.5, 2.5, 4]);
+  for (let i = 0; i < g.indices.length; i += 3) {
+    const [a, b, c] = [0, 1, 2].map((k) => g.indices[i + k] * 6),
+      u = [0, 1, 2].map((k) => v[b + k] - v[a + k]),
+      w = [0, 1, 2].map((k) => v[c + k] - v[a + k]),
+      cross = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]],
+      area = Math.hypot(...cross);
+    if (area < 1e-12) continue;
+    assert(cross.reduce((s, x, k) => s + x * v[a + 3 + k], 0) > 0, 'every triangle faces into the room');
+  }
+  // Every point of the cove lies on a surface at the radius from its centre line: a point left of -2 (the inset floor)
+  // is on the side bend or wall, so the left, right and back walls all exist at full height.
+  const wallAt = (test) => {
+    for (let i = 0; i < v.length; i += 6) if (v[i + 1] === 4 && test(v[i], v[i + 2])) return true;
+    return false;
+  };
+  assert(wallAt((x) => x === -3), 'left wall top');
+  assert(wallAt((x) => x === 3), 'right wall top');
+  assert(wallAt((x, z) => z === -2.5), 'back wall top');
+  // The back corner is a vertical quarter cylinder of the bend radius about the inset corner (-2, -1.5).
+  const corner = [];
+  for (let i = 0; i < v.length; i += 6) if (v[i + 1] === 4 && v[i] < -2 + 1e-9 && v[i + 2] < -1.5 + 1e-9) corner.push([v[i], v[i + 2]]);
+  assert(corner.length >= 16);
+  for (const [x, z] of corner) assert(Math.abs(Math.hypot(x + 2, z + 1.5) - 1) < 1e-6);
+  assert.throws(() => backdropGeometry({ width: 2, radius: 1, sides: true }), RangeError);
+  assert.throws(() => backdropGeometry({ sides: 1 }), RangeError);
+  assert.equal(backdropGeometry({ sides: false }).vertices.length, backdropGeometry().vertices.length);
+});
 test('each named rig owns fresh lights and has distinct key/fill/softness; cancelled lighting never attaches', async () => {
   const names = ['portrait', 'rembrandt', 'upfront', 'soft'],
     keys = new Set();

@@ -43,7 +43,7 @@ export interface BenchOrbitOptions {
   damping?: boolean;
   /**
    * Azimuth range in radians about +Y (0 looks from +Z, the backdrop's open front). Default with a backdrop:
-   * {@link coveOrbitLimits} for the start view, so the view never turns past the cove's open sides and front; without
+   * {@link coveOrbitLimits} for the start view, so the view never turns past the cove's open front; without
    * one, unlimited. false for unlimited.
    */
   azimuth?: readonly [number, number] | false;
@@ -472,6 +472,7 @@ export async function openBench(canvas: HTMLCanvasElement, options: BenchOptions
         depth: 24,
         height: 14,
         radius: 4,
+        sides: true,
         ...options.backdrop,
         material: { color: '#a9a49c', roughness: 0.92, metalness: 0, ...options.backdrop?.material },
       });

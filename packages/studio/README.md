@@ -357,6 +357,17 @@ WebGPU and WebGL2 compatibility pass the existing studio value oracle and the st
 test (`ground-browser.mjs --studio`, optionally `--compat`), including actual device replacement,
 caster removal and disposal. Native WebGL2 remains unsupported. Geometry is a generated stand-in.
 
+The cyclorama alone, `backdropGeometry({width, depth, height, radius, segments, sides})`, is a floor that bends up into a
+back wall. `sides: true` wraps it: the floor also bends up into the left and right walls, and each back corner is a
+spherical octant of the same radius under a vertical quarter cylinder, so the cove is closed on three sides and open
+at the front only (needs radius below width / 2; the bench turns it on).
+
+```ts
+import {backdropGeometry} from 'margoengine/studio/backdrop';
+const cove = backdropGeometry({width: 6, depth: 5, height: 4, radius: 1, sides: true});
+console.log(cove.indices.length / 3, 'triangles');
+```
+
 ## A whole bench in one call
 
 `openBench` from `@margoengine/studio/bench` opens the stage a demo or product page needs, from the packages
@@ -405,11 +416,11 @@ const spin = bench.frame((delta) => product.setRotation([0, (turn += delta * 0.5
 | `environment` | `'soft'` at intensity 0.25, width 256 | softbox fill and rim (replaces core's flat ambient); a preset name, options or `false` |
 | `shadows` | `{lightSize: 0.0047}`, the sun's angular radius | `ShadowOptions`, or `false` |
 | `contact` | 6 x 6 plane at y 0, height 0.6, opacity 0.55, blur 0.06 | `ContactShadowOptions`, or `false` |
-| `backdrop` | 80 x 24 x 14, radius 4, `#a9a49c` matte (no view across the floor sees past its sides) | `BackdropOptions`, or `false` |
+| `backdrop` | 80 x 24 x 14, radius 4, `sides: true`, `#a9a49c` matte (the floor bends up into the left, right and back walls, the back corners are curved too, so only the front is open) | `BackdropOptions`, or `false` |
 | `tonemap` | none (core's Khronos PBR Neutral at 0 EV) | `TonemapOptions` attaches `Tonemap` |
 | `ao` | false | `true` or `GTAOOptions` |
 | `fit` | true without `camera`, false with it | frame the subject on `ready()`; `true` or `{fill, bounds}` (fill default 0.8) |
-| `orbit` | false | `true` or `{target, minDistance, maxDistance, damping, azimuth}`; with a backdrop the azimuth defaults to `coveOrbitLimits(fov, aspect)` so the view never turns past the cove's open sides (`azimuth: false` for none) |
+| `orbit` | false | `true` or `{target, minDistance, maxDistance, damping, azimuth}`; with a backdrop the azimuth defaults to `coveOrbitLimits(fov, aspect)` so the view never turns past the cove's open front (`azimuth: false` for none) |
 | `exhibit`, `signal`, `onResize`, `onError` | canvas, none | where the signals go, cancellation, callbacks |
 
 Staging rigs (`@margoengine/studio/backdrop` `stagingLights`, `stagingRoom`, `stagingLighting`): `'portrait'`,

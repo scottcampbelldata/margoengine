@@ -25,6 +25,7 @@ export interface BackdropShape {
     height?: number;
     radius?: number;
     segments?: number;
+    sides?: boolean;
 }
 
 export interface StagingLightingOptions extends EnvironmentLoadOptions {

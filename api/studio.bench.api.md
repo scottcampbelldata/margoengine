@@ -163,6 +163,7 @@ interface BackdropShape {
     height?: number;
     radius?: number;
     segments?: number;
+    sides?: boolean;
 }
 
 interface CasterCutout {
