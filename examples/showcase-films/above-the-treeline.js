@@ -201,7 +201,10 @@ function boundaryBiomes() {
         { material: 'rock', weight: 1.2 },
         { material: 'gravel', slope: [9, 37], weight: 0.85 },
         { material: 'grass', slope: [null, 21], height: [null, line + 38], weight: 1.2 },
-        { material: 'dry-grass', slope: [null, 26], weight: 0.45 },
+        // July snowfields: firn lies on in patches over the gentler ground of the highest benches and summits (the
+        // view's patches break it up), so the far peaks past the world carry it at their height too. It takes the
+        // place of the cured grass, whose brown flecks mottled the alpine slopes.
+        { material: 'firn', height: [3760, null], slope: [null, 30], weight: 1.1 },
       ],
       rocks: [...stones(145), ...blocks(4.5)],
     }),
@@ -215,9 +218,10 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
     timeScale: 0,
     turbidity: 2.8,
     exposure: -0.64,
-    // Clean Front Range air: about 100 km visual range (extinction 3.912 / 100 km), in the sky's own colour, so far
-    // ranges fade blue toward the horizon behind them (the sky fog's Rayleigh share) instead of to a fixed tint.
-    fog: { density: 0.00004, start: 145, falloff: 'exp' },
+    // A July afternoon's haze over the Front Range: about 65 km visual range (extinction 3.912 / 65 km, Malm 1999), in
+    // the sky's own colour, so each range back fades a step bluer toward the horizon (the sky fog's Rayleigh share)
+    // instead of to a fixed tint.
+    fog: { density: 0.00006, start: 145, falloff: 'exp' },
   });
   const cloudDeck = VolumetricClouds.attach(engine, {
     sky,
@@ -456,8 +460,8 @@ export async function buildRidge(engine, shop, _cluster, shadows) {
   const flowers = [
     ['bistort', 160000, 31, { size: 11, cover: 0.55 }],
     ['arnica', 110000, 32, { size: 7, cover: 0.45 }],
-    ['aster', 150000, 33, { size: 8, cover: 0.5 }],
-    ['gentian', 110000, 34, { size: 10, cover: 0.48 }],
+    ['aster', 230000, 33, { size: 8, cover: 0.55 }],
+    ['gentian', 70000, 34, { size: 10, cover: 0.4 }],
     ['campion', 40000, 35, { size: 5, cover: 0.38 }],
   ];
   for (const [species, count, seed, clumps] of flowers) {
