@@ -10,6 +10,8 @@ import {gzipSync} from 'node:zlib';
 const [checkout,model,folder,destination]=process.argv.slice(2);
 if(!destination)throw new Error('Pass the Margo checkout, Rita GLB, CMU data folder and packed output.');
 assert.equal(execFileSync('git',['-C',checkout,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),'0efd9cff8230507a32deb49907ecd499d46925f5');
+const {findPython}=await import(pathToFileURL(resolve(checkout,'scripts/support/find-python.mjs')).href),python=findPython();
+if(!python)throw new Error('Python 3 with Pillow is needed to read the albedo.');
 const {registerHooks}=nodeModule;
 if(typeof registerHooks!=='function')throw new Error('This tool needs Node 22.15 or newer (module.registerHooks).');
 registerHooks({resolve(specifier,context,next){
@@ -27,7 +29,7 @@ const {axisAngleToQuaternion,multiplyQuaternions,interpolateQuaternions,rotateBy
 const {multiplyMatrices}=await import('@margoengine/math/mat4');
 const raw=readFileSync(model),length=raw.readUInt32LE(12);
 const doc=JSON.parse(raw.subarray(20,20+length)),asset=new GLTFAsset(doc,[],raw.subarray(28+length));
-const albedo=JSON.parse(execFileSync('python',[fileURLToPath(new URL('./read-albedo.py',import.meta.url)),model],{encoding:'utf8'}))
+const albedo=JSON.parse(execFileSync(python,[fileURLToPath(new URL('./read-albedo.py',import.meta.url)),model],{encoding:'utf8'}))
   .map(([width,height,bytes])=>({width,height,bytes:Buffer.from(bytes,'base64')}));
 const ASF=readFileSync(resolve(folder,'16.asf')),names=doc.nodes.map((node,i)=>node.name??'node'+i);
 const bones=parseASF(ASF,{scale:.0254/.45});
