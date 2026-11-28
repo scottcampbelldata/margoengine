@@ -471,7 +471,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | SOFT-06 | Pressure bodies | physics/soft with sealed gas and rigid contact; `SoftBodyDesc.volume(mesh, {pressure})` | Claude (laptop), on Scott's order, 2026-11-27 | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a82ff99eb9 |
 | BREAK-04 | Exterior ballistics | partial | Open | OPEN |
 | BREAK-05 | Terminal ballistics and impact damage | stand-in | Open | OPEN |
-| LIFE-02 | Limbless, insect and small-animal locomotion | physics/locomotion with TerrainBed and stance wrenches | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 6712e2b2a4 |
+| LIFE-02 | Limbless, insect and small-animal locomotion | physics/locomotion with TerrainBed and stance wrenches | Codex | BUILDING (codex/physics-life-02-four-point; four-point pass; [audit](physics-solver-audit.md)), landed 6712e2b2a4 |
 | LIFE-07 | Machine dynamics with actuators | stand-in | Open | OPEN |
 | AERO-04 | Turbomachines in flow | none | Open | OPEN |
 | AERO-05 | Falling and tumbling light bodies | falling plates, winged seeds and swept hail | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c82d68bf98 |
