@@ -9,13 +9,18 @@
 import type { Physics, PhysicsBody, PhysicsJoint } from '@margoengine/physics';
 import {
   archimedesScrewPose,
+  differentialPose,
   epicyclicSpeeds,
   genevaPose,
+  gimbalPose,
   harmonicDriveRatio,
   oldhamPose,
   scotchYokePose,
+  togglePressPose,
+  wattGovernorEquilibrium,
   type EpicyclicTeeth,
   type HarmonicDriveSpec,
+  type WattGovernorSpec,
 } from './mechanisms.js';
 
 type Quat = [number, number, number, number];
@@ -779,12 +784,470 @@ export function stroboscopeRig(options: StroboscopeRigOptions): StroboscopeRig {
   return new Stroboscope(options);
 }
 
+/** A body of `mass` kg that meets nothing: a link whose only ties are its joints. */
+const point = (physics: Physics, position: [number, number, number], rotation: Quat = [0, 0, 0, 1], mass = 1): PhysicsBody =>
+  physics.addBody(null, {
+    type: 'dynamic',
+    position,
+    rotation,
+    colliders: { shape: 'sphere', radius: 0.02, mass, collisionGroups: 0 },
+  });
+const turnAbout = (axis: readonly number[], angle: number): Quat => {
+  const s = Math.sin(angle / 2);
+  return [axis[0]! * s, axis[1]! * s, axis[2]! * s, Math.cos(angle / 2)];
+};
+const times = (a: readonly number[], b: readonly number[]): Quat => [
+  a[3]! * b[0]! + a[0]! * b[3]! + a[1]! * b[2]! - a[2]! * b[1]!,
+  a[3]! * b[1]! - a[0]! * b[2]! + a[1]! * b[3]! + a[2]! * b[0]!,
+  a[3]! * b[2]! + a[0]! * b[1]! - a[1]! * b[0]! + a[2]! * b[3]!,
+  a[3]! * b[3]! - a[0]! * b[0]! - a[1]! * b[1]! - a[2]! * b[2]!,
+];
+const conjugate = (q: readonly number[]): Quat => [-q[0]!, -q[1]!, -q[2]!, q[3]!];
+const turnVector = (q: readonly number[], v: readonly number[]): [number, number, number] => {
+  const r = times(times(q, [v[0]!, v[1]!, v[2]!, 0]), conjugate(q));
+  return [r[0], r[1], r[2]];
+};
+const X: [number, number, number] = [1, 0, 0],
+  Y: [number, number, number] = [0, 1, 0],
+  Z: [number, number, number] = [0, 0, 1];
+
+/** Pose of {@link togglePressRig}: the knee from the crank, the rest from the solver. */
+export interface TogglePressRigPose {
+  /** The links' angle from the vertical, radians. */
+  angle: number;
+  /** The knee's offset across the line of the pivot and the ram, and its drop below the pivot, metres. */
+  knee: number;
+  drop: number;
+  /** The ram's drop below the fixed pivot, and the lower link's angle from the vertical. */
+  ram: number;
+  lower: number;
+  /** Ram force per unit of the force pushing the knee across, from the solver's geometry. */
+  advantage: number;
+}
+
+class TogglePress extends Rig<TogglePressRigPose> {
+  private readonly lower: PhysicsBody;
+  private readonly ram: PhysicsBody;
+  constructor(
+    private readonly link: number,
+    options: RigOptions,
+  ) {
+    super('m', options);
+    const t = this.input,
+      knee: [number, number, number] = [link * Math.sin(t), -link * Math.cos(t), 0],
+      ram: [number, number, number] = [0, 2 * knee[1], 0],
+      physics = this.physics;
+    // The crank is the upper link, hanging from the fixed pivot; the lower link joins its knee to the ram on its slide.
+    this.lower = point(physics, knee);
+    this.ram = point(physics, ram);
+    physics.addJoint(this.crank, this.lower, { type: 'revolute', axis: Z, anchorA: [0, -link, 0] });
+    physics.addJoint(this.lower, this.ram, { type: 'revolute', axis: Z, anchorA: [-knee[0], ram[1] - knee[1], 0] });
+    physics.addJoint(this.ground, this.ram, { type: 'prismatic', axis: Y, anchorA: ram });
+  }
+  protected gap(): number {
+    return Math.abs(-this.ram.position[1] - togglePressPose(this.link * Math.sin(this.input), this.link).ram);
+  }
+  pose(): TogglePressRigPose {
+    const t = zAngle(this.crank.rotation),
+      knee = this.link * Math.sin(t),
+      drop = this.link * Math.cos(t),
+      ram = -this.ram.position[1],
+      k = this.lower.position;
+    return {
+      angle: this.input,
+      knee,
+      drop,
+      ram,
+      lower: Math.atan2(k[0] - this.ram.position[0], k[1] - this.ram.position[1]),
+      advantage: knee === 0 ? Infinity : (ram - drop) / (2 * Math.abs(knee)),
+    };
+  }
+}
+
 /**
- * The largest gap since the rig was made, as short text for a readout: micrometres for a length, thousandths of a degree for an
- * angle (`'1.4 µm'`, `'0.004°'`).
+ * A symmetric toggle press: two links `link` metres long, the upper one the crank swung `angle` radians from the vertical about
+ * the fixed pivot, the lower one pinned to a ram on a vertical slide. The ram's drop is the solver's; the check is against
+ * {@link togglePressPose} for the knee `link sin(angle)` across.
  */
-export function describeCheck(check: RigCheck): string {
-  return check.unit === 'm' ? `${(check.ever * 1e6).toFixed(1)} µm` : `${((check.ever * 180) / Math.PI).toFixed(3)}°`;
+export function togglePressRig(link: number, options: RigOptions = {}): MechanismRig<TogglePressRigPose> {
+  if (!(link > 0 && Number.isFinite(link))) throw new RangeError(`Link length must be above 0; got ${link}.`);
+  return new TogglePress(link, options);
+}
+
+/** Options of {@link gimbalRig}. */
+export interface GimbalRigOptions extends RigOptions {
+  /** The axis the mount tilts about, in the room's frame. */
+  mountAxis: readonly number[];
+  /** The rotor axis the rig starts holding, in the room's frame (default +z). */
+  target?: readonly number[];
+  /** Rings clamped at 0, so the rotor turns with the mount (default false). */
+  locked?: boolean;
+}
+/** Pose of {@link gimbalRig}: the rings' angles and the rotor's axis, from the solver. */
+export interface GimbalRigPose {
+  tilt: number;
+  /** The mount's turn as a quaternion [x, y, z, w]. */
+  mount: Quat;
+  /** The outer ring's angle about the mount's y and the inner ring's about the outer ring's x. */
+  outer: number;
+  inner: number;
+  /** The rotor's axis in the room's frame and its angle from the target, radians. */
+  axis: [number, number, number];
+  deviation: number;
+}
+
+class Gimbal extends Rig<GimbalRigPose> {
+  private readonly mount: PhysicsBody;
+  private readonly outer: PhysicsBody;
+  private readonly inner: PhysicsBody;
+  private readonly rotor: PhysicsBody;
+  private readonly axis: [number, number, number];
+  private readonly target: [number, number, number];
+  constructor(
+    private readonly locked: boolean,
+    options: GimbalRigOptions,
+  ) {
+    super('rad', options);
+    const start = gimbalPose(this.input, { mountAxis: options.mountAxis, target: options.target, locked });
+    const n = Math.hypot(...(options.target ?? Z));
+    this.target = (options.target ?? Z).map((v) => v / n) as [number, number, number];
+    this.axis = options.mountAxis.map((v) => v / Math.hypot(...options.mountAxis)) as [number, number, number];
+    const physics = this.physics,
+      mount = start.mount,
+      outer = times(mount, turnAbout(Y, start.outer)),
+      inner = times(outer, turnAbout(X, start.inner));
+    this.mount = physics.addBody(null, { type: 'kinematicPosition', position: [0, 0, 0], rotation: mount, colliders: [] });
+    // Light rings on frictionless hinges about the mount's y and the outer ring's x, and a heavy rotor free about its own z.
+    this.outer = point(physics, [0, 0, 0], outer, 1e-4);
+    this.inner = point(physics, [0, 0, 0], inner, 1e-4);
+    this.rotor = physics.addBody(null, {
+      type: 'dynamic',
+      position: [0, 0, 0],
+      rotation: inner,
+      colliders: { shape: 'cylinder', radius: 0.05, halfHeight: 0.01, mass: 1, collisionGroups: 0 },
+    });
+    const toY = turnAbout(Z, Math.PI / 2),
+      toZ = turnAbout(Y, -Math.PI / 2),
+      none: Quat = [0, 0, 0, 1];
+    if (locked) {
+      physics.addJoint(this.mount, this.outer, { type: 'fixed' });
+      physics.addJoint(this.outer, this.inner, { type: 'fixed' });
+    } else {
+      physics.addJoint(this.mount, this.outer, { type: 'revolute', frameA: toY, frameB: toY });
+      physics.addJoint(this.outer, this.inner, { type: 'revolute', frameA: none, frameB: none });
+    }
+    physics.addJoint(this.inner, this.rotor, { type: 'revolute', frameA: toZ, frameB: toZ });
+  }
+  protected override beforeStep(angle: number): void {
+    this.mount.setNextRotation(turnAbout(this.axis, angle));
+  }
+  private rotorAxis(): [number, number, number] {
+    return turnVector(this.rotor.rotation, Z);
+  }
+  protected gap(): number {
+    const exact = gimbalPose(this.input, { mountAxis: this.axis, target: this.target, locked: this.locked }).axis,
+      a = this.rotorAxis();
+    return Math.acos(Math.min(1, Math.max(-1, a[0] * exact[0] + a[1] * exact[1] + a[2] * exact[2])));
+  }
+  pose(): GimbalRigPose {
+    const ring = times(conjugate(this.mount.rotation), this.outer.rotation),
+      cross = times(conjugate(this.outer.rotation), this.inner.rotation),
+      axis = this.rotorAxis(),
+      t = this.target;
+    return {
+      tilt: this.input,
+      mount: [...this.mount.rotation] as Quat,
+      outer: 2 * Math.atan2(ring[1], ring[3]),
+      inner: 2 * Math.atan2(cross[0], cross[3]),
+      axis,
+      deviation: Math.acos(Math.min(1, Math.max(-1, axis[0] * t[0] + axis[1] * t[1] + axis[2] * t[2]))),
+    };
+  }
+}
+
+/**
+ * A two-ring gimbal on a mount the input tilts about `mountAxis`: light rings on frictionless hinges (outer about the mount's y,
+ * inner about the outer's x) and a rotor free about its own axis, so the solver leaves the rotor where it points while the mount
+ * turns under it. With `locked` the rings are fixed and the rotor turns with the mount. The check is the rotor's axis against
+ * {@link gimbalPose}.
+ */
+export function gimbalRig(options: GimbalRigOptions): MechanismRig<GimbalRigPose> {
+  const k = options.mountAxis;
+  if (!(k && k.length === 3 && k.every(Number.isFinite) && Math.hypot(k[0]!, k[1]!, k[2]!) > 0))
+    throw new RangeError('The mount axis must be a nonzero finite vector of three numbers.');
+  return new Gimbal(Boolean(options.locked), options);
+}
+
+/** Options of {@link differentialRig}. */
+export interface DifferentialRigOptions extends RigOptions {
+  /** Teeth of the side gears and of the spider pinions. */
+  sideTeeth: number;
+  pinionTeeth: number;
+  /** How far the left wheel runs ahead of the carrier per radian the carrier turns, `half track x curvature` (default 0). */
+  split?: number;
+}
+/** Pose of {@link differentialRig}: the carrier, the two side gears and a spider's turn on its pin, from the solver. */
+export interface DifferentialRigPose {
+  carrier: number;
+  left: number;
+  right: number;
+  /** The spider pinion's angle on its pin, relative to the carrier. */
+  pinion: number;
+  /** The left side's lead over the carrier. */
+  offset: number;
+}
+
+class Differential extends Rig<DifferentialRigPose> {
+  private readonly tree: import('@margoengine/physics').Multibody;
+  private readonly road: PhysicsBody;
+  private roadAngle: number;
+  private offset = 0;
+  private split: number;
+  constructor(
+    private readonly teeth: { side: number; pinion: number },
+    split: number,
+    options: RigOptions,
+  ) {
+    super('rad', options);
+    this.split = split;
+    this.roadAngle = this.input;
+    const physics = this.physics,
+      module = physicsModule();
+    // The side gears turn in the carrier's bearings and a spider on its pin, so their joint coordinates are relative to the carrier,
+    // and the bevel meshes are couplings of those coordinates: left + right = 0 (equal sides) and spider + (zs / zp) left fixed.
+    const left = point(physics, [0, 0, 0.5]),
+      right = point(physics, [0, 0, -0.5]),
+      spider = point(physics, [0.3, 0, 0]);
+    this.tree = physics.addMultibody(this.crank, [
+      { body: left, parent: this.crank, joint: { type: 'revolute', axis: Z, anchorA: [0, 0, 0.5] } },
+      { body: right, parent: this.crank, joint: { type: 'revolute', axis: Z, anchorA: [0, 0, -0.5] } },
+      { body: spider, parent: this.crank, joint: { type: 'revolute', axis: X, anchorA: [0.3, 0, 0] } },
+    ]);
+    module.coupleDofs(physics, this.tree, left, right, { ratio: 1 });
+    module.coupleDofs(physics, this.tree, spider, left, { ratio: -teeth.side / teeth.pinion });
+    // The road under the left wheel: a roller the left side is geared to one for one, turned at (1 + split) times the carrier.
+    this.road = physics.addBody(null, { type: 'kinematicPosition', position: [0, 0, 1], rotation: zTurn(this.input), colliders: [] });
+    new module.GearJoint(physics, left, this.road, { ratio: -1 });
+  }
+  /** Sets how far the left wheel runs ahead per radian of the carrier from now on (a new steering angle). */
+  setSplit(split: number): void {
+    this.split = finite(split, 'Split');
+  }
+  protected override beforeStep(angle: number): void {
+    const turn = angle - this.input;
+    this.offset += this.split * turn;
+    this.roadAngle += (1 + this.split) * turn;
+    this.road.setNextRotation(zTurn(this.roadAngle));
+  }
+  protected gap(): number {
+    const [l = 0, r = 0, p = 0] = this.tree.coordinates(),
+      exact = differentialPose(0, this.offset, this.teeth);
+    return Math.max(Math.abs(l - exact.left), Math.abs(r - exact.right), Math.abs(p - exact.pinion));
+  }
+  pose(): DifferentialRigPose {
+    const [l = 0, r = 0, p = 0] = this.tree.coordinates(),
+      carrier = this.input;
+    return { carrier, left: carrier + l, right: carrier + r, pinion: p, offset: l };
+  }
+}
+
+/** A differential rig, from {@link differentialRig}: its world, and the turn it is driven through. */
+export interface DifferentialRig extends MechanismRig<DifferentialRigPose> {
+  /** Sets how far the left wheel runs ahead of the carrier per radian it turns from now on (half track times curvature). */
+  setSplit(split: number): void;
+}
+
+/**
+ * An open bevel-gear differential: the carrier is the input, the side gears and a spider pinion are a multibody tree on it whose
+ * meshes are couplings of their joint coordinates (Rapier's multibody DOF couplings), and the road turns the left side through a
+ * gear at `1 + split` times the carrier, so the right side and the spider are what the gears make of it. The check is against
+ * {@link differentialPose} for the lead the road has given.
+ */
+export function differentialRig(options: DifferentialRigOptions): DifferentialRig {
+  const side = options.sideTeeth,
+    pinion = options.pinionTeeth;
+  differentialPose(0, 0, { side, pinion });
+  return new Differential({ side, pinion }, finite(options.split ?? 0, 'Split'), options);
+}
+
+/** Options of {@link wattGovernorRig}. */
+export interface WattGovernorRigOptions extends WattGovernorSpec {
+  /** The spindle's speed the rig starts settled at, revolutions a minute (default 0: the arms on their stop). */
+  rpm?: number;
+  /** Drag on each arm's hinge per unit of the arm's inertia, 1/s (default 3.5: a swing dies in about two seconds). */
+  damping?: number;
+  /** The stop the arms rest on at low speed, radians from the spindle (default 0.05). */
+  rest?: number;
+  /** Disposes the rig when it aborts (default none). */
+  signal?: AbortSignal;
+}
+/** Pose of {@link wattGovernorRig}: the arms from the solver, and the linkage from their angle. */
+export interface WattGovernorRigPose {
+  /** The spindle's angle, unwrapped, and its speed in rpm. */
+  spindle: number;
+  rpm: number;
+  /** The two arms' angles from the spindle and their mean, radians. */
+  arms: [number, number];
+  arm: number;
+  /** Each ball's distance out from the spindle and drop below the pivot, from the mean arm. */
+  radius: number;
+  drop: number;
+  /** The link's joint on the arm (out, down) and the sleeve's drop below the pivot, when the linkage is given. */
+  joint?: [number, number];
+  sleeve?: number;
+  /** Maxwell's equilibrium at this speed, held up by the stop. */
+  equilibrium: number;
+}
+/** A Watt governor spinning under gravity, from {@link wattGovernorRig}. */
+export interface WattGovernorRig extends Disposable {
+  readonly physics: Physics;
+  /** The arms against Maxwell's equilibrium for the speed now: `last` shrinks as they settle. */
+  readonly check: RigCheck;
+  /** Spins the spindle at `rpm` for `seconds` of the world's time and returns the pose. */
+  spin(rpm: number, seconds: number): WattGovernorRigPose;
+  /** Spins at `rpm` until the arms are within `tolerance` radians of equilibrium and still (default 1e-4), at most `limit` s (default 60). */
+  settle(rpm: number, tolerance?: number, limit?: number): WattGovernorRigPose;
+  pose(): WattGovernorRigPose;
+  dispose(): void;
+}
+
+class Governor implements WattGovernorRig {
+  readonly physics: Physics;
+  readonly check: RigCheck = { worst: 0, last: 0, ever: 0, unit: 'rad', steps: 0 };
+  private readonly spindle: PhysicsBody;
+  private readonly balls: PhysicsBody[];
+  private readonly dt: number;
+  private readonly rest: number;
+  private time = 0;
+  private angle = 0;
+  private rpm: number;
+  constructor(
+    private readonly spec: WattGovernorSpec,
+    options: WattGovernorRigOptions,
+  ) {
+    options.signal?.throwIfAborted();
+    this.rpm = this.speed(options.rpm ?? 0);
+    this.rest = finite(options.rest ?? 0.05, 'Rest angle');
+    if (!(this.rest >= 0 && this.rest < Math.PI / 2)) throw new RangeError(`The stop is from 0 to pi/2; got ${this.rest}.`);
+    const damping = finite(options.damping ?? 3.5, 'Damping');
+    if (!(damping >= 0)) throw new RangeError(`Damping must be 0 or more; got ${damping}.`);
+    const L = spec.arm,
+      omega = (this.rpm * Math.PI) / 30,
+      start = this.exact(omega),
+      physics = new (physicsModule().Physics)(null, { substeps: 32 });
+    physics.gravity = [0, 0, -(spec.gravity ?? 9.80665)];
+    this.physics = physics;
+    this.dt = physics.fixedTimestep;
+    this.spindle = physics.addBody(null, { type: 'kinematicPosition', position: [0, 0, 0], colliders: [] });
+    // Each ball is a point mass on a light arm (Maxwell's model), hinged to the spindle at the pivot about the spindle's
+    // tangent, so the swing is free and a drag on the hinge alone settles it without moving the balance.
+    this.balls = [1, -1].map((side) => {
+      const out = side * L * Math.sin(start),
+        down = -L * Math.cos(start),
+        ball = point(physics, [out, 0, down]);
+      ball.setMassProperties({ mass: 1, inertia: [1e-5 * L * L, 1e-5 * L * L, 1e-5 * L * L] });
+      ball.setLinearVelocity([0, omega * out, 0]);
+      ball.setAngularVelocity([0, 0, omega]);
+      const hinge = physics.addJoint(this.spindle, ball, { type: 'revolute', axis: [0, -side, 0], anchorB: [-out, 0, -down] });
+      hinge.setLimits(this.rest - start, Math.PI / 2 - start);
+      if (damping > 0) hinge.setDamping(damping * L * L);
+      return ball;
+    });
+    options.signal?.addEventListener('abort', () => this.dispose(), { once: true });
+  }
+  private speed(rpm: number): number {
+    if (!(rpm >= 0 && Number.isFinite(rpm))) throw new RangeError(`Spindle speed must be 0 or more rpm; got ${rpm}.`);
+    return rpm;
+  }
+  private exact(omega: number): number {
+    return Math.max(this.rest, wattGovernorEquilibrium(omega, this.spec).angle);
+  }
+  private arms(): [number, number] {
+    const angle = (ball: PhysicsBody) => {
+      const p = ball.position;
+      return Math.atan2(Math.hypot(p[0], p[1]), -p[2]);
+    };
+    return [angle(this.balls[0]!), angle(this.balls[1]!)];
+  }
+  spin(rpm: number, seconds: number): WattGovernorRigPose {
+    this.rpm = this.speed(rpm);
+    if (!(seconds >= 0 && Number.isFinite(seconds))) throw new RangeError(`Time runs forward; got ${seconds} s.`);
+    const omega = (rpm * Math.PI) / 30,
+      exact = this.exact(omega);
+    this.time += seconds;
+    this.check.worst = 0;
+    while (this.time >= this.dt * (1 - 1e-9)) {
+      this.time -= this.dt;
+      this.angle += omega * this.dt;
+      this.spindle.setNextRotation(zTurn(this.angle));
+      this.physics.step();
+      const [a, b] = this.arms(),
+        gap = Math.max(Math.abs(a - exact), Math.abs(b - exact));
+      this.check.steps++;
+      this.check.last = gap;
+      this.check.worst = Math.max(this.check.worst, gap);
+      this.check.ever = Math.max(this.check.ever, gap);
+    }
+    return this.pose();
+  }
+  settle(rpm: number, tolerance = 1e-4, limit = 60): WattGovernorRigPose {
+    let before = Infinity;
+    for (let run = 0; run < limit; run += 0.25) {
+      this.spin(rpm, 0.25);
+      if (this.check.worst < tolerance && Math.abs(this.check.last - before) < tolerance / 10) break;
+      before = this.check.last;
+    }
+    return this.pose();
+  }
+  pose(): WattGovernorRigPose {
+    const arms = this.arms(),
+      arm = (arms[0] + arms[1]) / 2,
+      L = this.spec.arm,
+      out: WattGovernorRigPose = {
+        spindle: this.angle,
+        rpm: this.rpm,
+        arms,
+        arm,
+        radius: L * Math.sin(arm),
+        drop: L * Math.cos(arm),
+        equilibrium: this.exact((this.rpm * Math.PI) / 30),
+      };
+    const { pickoff, link } = this.spec;
+    if (pickoff !== undefined && link !== undefined) {
+      const joint: [number, number] = [pickoff * Math.sin(arm), pickoff * Math.cos(arm)];
+      out.joint = joint;
+      out.sleeve = joint[1] + Math.sqrt(Math.max(0, link * link - joint[0] * joint[0]));
+    }
+    return out;
+  }
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
+  dispose(): void {
+    this.physics.dispose();
+  }
+}
+
+/**
+ * A Watt flyball governor under gravity: the spindle turns at the speed given, two balls on hinged arms swing out until the
+ * centrifugal pull balances their weight, and the drag on the hinges settles them there. The arms are the solver's; the check is
+ * against Maxwell's equilibrium `w^2 L cos(a) = g` (Maxwell 1868, {@link wattGovernorEquilibrium}).
+ */
+export function wattGovernorRig(options: WattGovernorRigOptions): WattGovernorRig {
+  wattGovernorEquilibrium(0, options);
+  return new Governor(
+    { arm: options.arm, pickoff: options.pickoff, link: options.link, gravity: options.gravity },
+    options,
+  );
+}
+
+/**
+ * A gap of the check as short text for a readout, the largest since the rig was made unless `which` names another (`'last'` for a
+ * rig that settles, as a governor does): micrometres for a length, thousandths of a degree for an angle (`'1.4 µm'`, `'0.004°'`).
+ */
+export function describeCheck(check: RigCheck, which: 'ever' | 'last' | 'worst' = 'ever'): string {
+  const gap = check[which];
+  return check.unit === 'm' ? `${(gap * 1e6).toFixed(1)} µm` : `${((gap * 180) / Math.PI).toFixed(3)}°`;
 }
 
 /** Loads the solver and makes a rig: `await openRig(scotchYokeRig, 0.142, { angle })`. */

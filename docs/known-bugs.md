@@ -6,6 +6,21 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-28: a ball on a spinning hinge settles off its balance in proportion to its inertia (KB-PHYS-SPINBIAS1, physics solver)
+
+- **Repro:** a position-driven spindle turned about z at 68 rpm (`setNextRotation` each 60 Hz step), gravity -9.80665 z, a
+  1 kg ball 0.292 m below the pivot on a `revolute` hinge about the spindle's tangent (anchor at the pivot) with
+  `setDamping(2)`, and an isotropic inertia I from `setMassProperties`. After 10 s the arm settles past Maxwell's balance
+  `w^2 L cos(a) = g` by 0.0006 degrees at I = 1e-6 kg m^2, 0.04 at 1e-4, 0.26 at 1e-3 and 0.81 at 1e-2 (8 substeps); the
+  same with a dynamic spindle or a `Multibody` tree. A drag on the ball's speed (`linearDamping`) in place of the hinge drag
+  moves it too, in proportion (0.17 degrees at 3/s, 0.32 at 6/s). Finer steps shrink it slowly (1/60 s: 0.113 degrees at
+  I = 3.6e-4, 1/480 s: 0.064).
+- **Cause:** not found yet. An isotropic ball's spin cannot move the balance (its angular momentum `I w z` is constant), so
+  the shift is the solver's. It looks first order in the substep, as an impulse along a direction fixed at a substep's
+  start while the arm turns `w h` within it would push steadily outward. The Watt governor rig of
+  `@margoengine/machinery/rigs` uses point-mass balls (I = 1e-5 m L^2) and 32 substeps, which settle within 0.001 degrees.
+  Physics lane.
+
 ### Open 2026-11-28: a path joint on a turning base lags and then diverges (KB-PHYS-PATHMOVINGBASE1, physics mechanisms)
 
 - **Repro:** a position-driven body turned about z 2 degrees a 60 Hz step (`setNextRotation`), a dynamic body on a

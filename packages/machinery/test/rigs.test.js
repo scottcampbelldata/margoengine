@@ -3,10 +3,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   loadRigs, scotchYokeRig, genevaRig, oldhamRig, epicyclicRig, openRig, keyedRig, signedReading, describeCheck,
-  harmonicDriveRig, integratorRig, archimedesScrewRig, stroboscopeRig,
+  harmonicDriveRig, integratorRig, archimedesScrewRig, stroboscopeRig, togglePressRig, gimbalRig, differentialRig, wattGovernorRig,
 } from '../dist/rigs.js';
 import {
   genevaPose, epicyclicSpeeds, genevaCrankRadius, harmonicDriveRatio, ballDiskIntegrator, archimedesScrewPose, stroboscopicPose,
+  togglePressPose, gimbalPose, differentialPose, wattGovernorEquilibrium,
 } from '../dist/mechanisms.js';
 
 await loadRigs();
@@ -184,4 +185,71 @@ test('Stroboscope rig: the coasting rotor and the strobe samples match strobosco
   assert.ok(rig.check.ever < 1e-4, `worst gap ${rig.check.ever} rad`);
   assert.throws(() => rig.advance(-1), RangeError);
   assert.throws(() => rig.setFlashRate(0), RangeError);
+});
+
+test('Toggle press rig: the ram on its slide drops 2 sqrt(L^2 - x^2) through a closing stroke and back', () => {
+  using rig = togglePressRig(0.231, { angle: 52 * deg });
+  for (const angle of [8, 30, 52, 8]) {
+    const pose = rig.drive(angle * deg);
+    const exact = togglePressPose(0.231 * Math.sin(angle * deg), 0.231);
+    assert.ok(Math.abs(pose.ram - exact.ram) < 2e-5, `ram at ${angle} degrees: ${pose.ram} against ${exact.ram}`);
+    assert.ok(Math.abs(pose.lower - angle * deg) < 1e-3, `the lower link leans as the upper does: ${pose.lower}`);
+    assert.ok(Math.abs(pose.advantage - exact.advantage) < 2e-3, `advantage ${pose.advantage} against ${exact.advantage}`);
+  }
+  assert.ok(rig.check.ever < 2e-5, `worst gap ${rig.check.ever} m`);
+});
+
+test('Gimbal rig: free rings hold the rotor on its target while the mount tilts; locked rings turn it with the mount', () => {
+  const mountAxis = [0.83, 0.38, -0.4];
+  for (const locked of [false, true]) {
+    using rig = gimbalRig({ mountAxis, angle: 22 * deg, locked });
+    for (const tilt of [44, -44, 0, 22]) {
+      const pose = rig.drive(tilt * deg);
+      const exact = gimbalPose(tilt * deg, { mountAxis, locked });
+      assert.ok(Math.abs(pose.deviation - exact.deviation) < 1e-3, `${locked ? 'locked' : 'free'} at ${tilt}: ${pose.deviation}`);
+      if (!locked) {
+        assert.ok(Math.abs(pose.outer - exact.outer) < 1e-3, `outer ring ${pose.outer} against ${exact.outer}`);
+        assert.ok(Math.abs(pose.inner - exact.inner) < 1e-3, `inner ring ${pose.inner} against ${exact.inner}`);
+      }
+    }
+    assert.ok(rig.check.ever < 1e-3, `worst gap ${rig.check.ever} rad`);
+  }
+  assert.throws(() => gimbalRig({ mountAxis: [0, 0, 0] }), RangeError);
+});
+
+test('Differential rig: the gears share the road lead, left + right = 2 carrier, the spider at zs / zp times the lead', () => {
+  using rig = differentialRig({ sideTeeth: 20, pinionTeeth: 14 });
+  let lead = 0,
+    from = 0;
+  for (const [turns, split] of [[2, 0], [6, 0.34], [10, -0.34], [14, 0]]) {
+    rig.setSplit(split);
+    const pose = rig.drive(turns * 2 * Math.PI, false);
+    lead += split * (pose.carrier - from);
+    from = pose.carrier;
+    const exact = differentialPose(pose.carrier, lead, { side: 20, pinion: 14 });
+    assert.ok(Math.abs(pose.left - exact.left) < 2e-4, `left after ${turns} turns`);
+    assert.ok(Math.abs(pose.right - exact.right) < 2e-4, `right after ${turns} turns`);
+    assert.ok(Math.abs(pose.pinion - exact.pinion) < 3e-4, `spider after ${turns} turns`);
+    assert.ok(Math.abs(pose.left + pose.right - 2 * pose.carrier) < 3e-4, 'the sides average to the carrier');
+  }
+  assert.ok(rig.check.ever < 3e-4, `worst gap ${rig.check.ever} rad`);
+});
+
+test("Watt governor rig: the arms swing out under gravity and settle on Maxwell's balance at each speed", () => {
+  using rig = wattGovernorRig({ arm: 0.292, pickoff: 0.198, link: 0.232, rpm: 68 });
+  assert.ok(rig.check.last < 1e-6, 'it starts settled');
+  for (const rpm of [112, 58, 90]) {
+    rig.spin(rpm, 0.5);
+    assert.ok(rig.check.last > 1e-3, `a speed change at ${rpm} rpm moves the arms off balance first`);
+    const pose = rig.settle(rpm, 2e-4, 30);
+    const exact = wattGovernorEquilibrium((rpm * Math.PI) / 30, { arm: 0.292, pickoff: 0.198, link: 0.232 });
+    assert.ok(Math.abs(pose.arm - exact.angle) < 2e-4, `arms at ${rpm} rpm: ${pose.arm} against ${exact.angle}`);
+    assert.ok(Math.abs(pose.sleeve - exact.sleeve) < 1e-4, `sleeve at ${rpm} rpm`);
+    assert.ok(Math.abs(pose.arms[0] - pose.arms[1]) < 1e-5, 'the two arms swing alike');
+  }
+  assert.equal(describeCheck(rig.check, 'last').endsWith('°'), true);
+  using still = wattGovernorRig({ arm: 0.292 });
+  still.spin(0, 2);
+  assert.ok(Math.abs(still.pose().arm - 0.05) < 1e-3, 'below lift-off the arms rest on their stop');
+  assert.throws(() => rig.spin(-1, 1), RangeError);
 });

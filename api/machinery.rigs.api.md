@@ -5,6 +5,30 @@
 ```ts
 import { Physics } from "@margoengine/physics";
 
+export interface ArchimedesScrewRigPose {
+    angle: number;
+    travel: number;
+    phase: number;
+}
+
+export interface DifferentialRig extends MechanismRig<DifferentialRigPose> {
+    setSplit(split: number): void;
+}
+
+export interface DifferentialRigOptions extends RigOptions {
+    sideTeeth: number;
+    pinionTeeth: number;
+    split?: number;
+}
+
+export interface DifferentialRigPose {
+    carrier: number;
+    left: number;
+    right: number;
+    pinion: number;
+    offset: number;
+}
+
 export interface EpicyclicRigOptions extends RigOptions {
     held?: 'sun' | 'ring' | 'carrier';
 }
@@ -26,6 +50,43 @@ export interface GenevaRigPose {
     wheel: number;
     indexing: boolean;
     turnWheel: number;
+}
+
+export interface GimbalRigOptions extends RigOptions {
+    mountAxis: readonly number[];
+    target?: readonly number[];
+    locked?: boolean;
+}
+
+export interface GimbalRigPose {
+    tilt: number;
+    mount: Quat;
+    outer: number;
+    inner: number;
+    axis: [number, number, number];
+    deviation: number;
+}
+
+export interface HarmonicDriveRigPose {
+    input: number;
+    output: number;
+}
+
+export interface IntegratorRig extends MechanismRig<IntegratorRigPose> {
+    setRadius(radius: number): void;
+    resetOutput(): void;
+}
+
+export interface IntegratorRigOptions extends RigOptions {
+    wheelRadius: number;
+    diskRadius?: number;
+    radius?: number;
+}
+
+export interface IntegratorRigPose {
+    disk: number;
+    output: number;
+    radius: number;
 }
 
 export interface KeyedRig<Key, Pose> extends Disposable {
@@ -74,11 +135,81 @@ export interface ScotchYokeRigPose {
     slot: number;
 }
 
-export function describeCheck(check: RigCheck): string;
+export interface StroboscopeRig extends Disposable {
+    readonly physics: Physics;
+    readonly check: RigCheck;
+    advance(seconds: number): StroboscopeRigPose;
+    setSpeed(rpm: number): void;
+    setFlashRate(hertz: number): void;
+    nextFlash(): StroboscopeRigPose;
+    pose(): StroboscopeRigPose;
+    dispose(): void;
+}
+
+export interface StroboscopeRigOptions {
+    rpm: number;
+    flashRate: number;
+    signal?: AbortSignal;
+}
+
+export interface StroboscopeRigPose {
+    reference: number;
+    sampled: number;
+    flash: number;
+}
+
+export interface TogglePressRigPose {
+    angle: number;
+    knee: number;
+    drop: number;
+    ram: number;
+    lower: number;
+    advantage: number;
+}
+
+export interface WattGovernorRig extends Disposable {
+    readonly physics: Physics;
+    readonly check: RigCheck;
+    spin(rpm: number, seconds: number): WattGovernorRigPose;
+    settle(rpm: number, tolerance?: number, limit?: number): WattGovernorRigPose;
+    pose(): WattGovernorRigPose;
+    dispose(): void;
+}
+
+export interface WattGovernorRigOptions extends WattGovernorSpec {
+    rpm?: number;
+    damping?: number;
+    rest?: number;
+    signal?: AbortSignal;
+}
+
+export interface WattGovernorRigPose {
+    spindle: number;
+    rpm: number;
+    arms: [number, number];
+    arm: number;
+    radius: number;
+    drop: number;
+    joint?: [number, number];
+    sleeve?: number;
+    equilibrium: number;
+}
+
+export function archimedesScrewRig(pitch: number, options?: RigOptions): MechanismRig<ArchimedesScrewRigPose>;
+
+export function describeCheck(check: RigCheck, which?: 'ever' | 'last' | 'worst'): string;
+
+export function differentialRig(options: DifferentialRigOptions): DifferentialRig;
 
 export function epicyclicRig(teeth: EpicyclicTeeth, options?: EpicyclicRigOptions): MechanismRig<EpicyclicRigPose>;
 
 export function genevaRig(options?: GenevaRigOptions): MechanismRig<GenevaRigPose>;
+
+export function gimbalRig(options: GimbalRigOptions): MechanismRig<GimbalRigPose>;
+
+export function harmonicDriveRig(spec: HarmonicDriveSpec, options?: RigOptions): MechanismRig<HarmonicDriveRigPose>;
+
+export function integratorRig(options: IntegratorRigOptions): IntegratorRig;
 
 export function keyedRig<Key, Pose>(make: (key: Key, angle: number) => MechanismRig<Pose>, options?: {
     signal?: AbortSignal;
@@ -94,11 +225,32 @@ export function scotchYokeRig(radius: number, options?: RigOptions): MechanismRi
 
 export function signedReading(value: number, unit: string, digits?: number): string;
 
+export function stroboscopeRig(options: StroboscopeRigOptions): StroboscopeRig;
+
+export function togglePressRig(link: number, options?: RigOptions): MechanismRig<TogglePressRigPose>;
+
+export function wattGovernorRig(options: WattGovernorRigOptions): WattGovernorRig;
+
 // Not exported from this entry, but used by the exports above:
 
 interface EpicyclicTeeth {
     sun: number;
     planet: number;
     ring: number;
+}
+
+interface HarmonicDriveSpec {
+    flexTeeth: number;
+    circularTeeth: number;
+    fixed?: 'circular' | 'flex';
+}
+
+type Quat = [number, number, number, number];
+
+interface WattGovernorSpec {
+    arm: number;
+    pickoff?: number;
+    link?: number;
+    gravity?: number;
 }
 ```

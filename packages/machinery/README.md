@@ -238,8 +238,12 @@ console.log(train.drive(1).ring, train.check.ever);
 | `integratorRig` | roller hinge, gear joint of ratio r / rho remade from where the roller stands when the ball moves (`setRadius`, `resetOutput`) | 0.0002 degrees over four disk turns |
 | `archimedesScrewRig` | water on a slide, the thread as a rack and pinion of radius pitch / 2 pi; the water moves back a pitch per bucket | 2.3 µm over 4.7 turns, 49 µm over 100 |
 | `stroboscopeRig` | a rotor coasting on a frictionless hinge; the world steps onto each flash (`advance(seconds)`, `setSpeed`, `setFlashRate`) | 0.0004 degrees over 5 s at 120 rpm |
+| `togglePressRig` | the upper link is the crank, the lower link hinged at the knee, the ram on a slide | 4.4 µm over a closing stroke and back |
+| `gimbalRig` | light rings on frictionless hinges (outer about the mount's y, inner about its x) round a rotor free about its own axis; `locked` fixes the rings | 0.0001 degrees over four tilts |
+| `differentialRig` | side gears and a spider pinion as a multibody on the carrier, the bevel meshes as couplings of their joint coordinates (`coupleDofs`), the road a gear on the left side (`setSplit`) | 0.005 degrees over 14 carrier turns |
+| `wattGovernorRig` | two point-mass arms on damped hinges of the spindle under gravity, on a stop at low speed; `spin(rpm, seconds)` runs the world, `settle(rpm)` runs it until still; read `check.last`, the gap to Maxwell's balance now | 0.001 degrees settled, about 4 s after a speed change |
 
-The joints are rows of the solver's sequential-impulse solve (Catto 2005; Baraff 1996); the closed forms are Reuleaux (1876) and Willis (1841). Without gravity, friction or load the rigs are kinematic chains solved by the dynamics: they show the solver holds each mechanism to its exact pose.
+The joints are rows of the solver's sequential-impulse solve (Catto 2005; Baraff 1996); the closed forms are Reuleaux (1876) and Willis (1841). Without gravity, friction or load the rigs are kinematic chains solved by the dynamics: they show the solver holds each mechanism to its exact pose. The Watt governor is the one with real dynamics: gravity pulls the balls, the spin swings them out, and a drag on each hinge (which acts only while an arm swings, so it cannot move the balance) settles them where `w^2 L cos(a) = g` (Maxwell, "On Governors", 1868). The differential's meshes are relative to the carrier: the side gears' and the spider's hinge angles are joint coordinates of a multibody tree rooted on the carrier, and couplings hold `left + right` and `spider + (zs / zp) left` fixed, as Rapier's multibody DOF couplings do; `describeCheck(check, 'last')` reads a settling rig's gap now.
 
 The gear and rack rows hold their error as the integral of their own speed, so they drift from the poses by float rounding, a few micrometres a turn (KB-PHYS-COUPLINGDRIFT1); the screw keeps its water near the origin, where a position's float spacing is finest.
 
@@ -260,6 +264,26 @@ console.log(screw.drive(4 * Math.PI, false).travel); // 0.696 m: two pitches
 
 using strobe = stroboscopeRig({ rpm: 120, flashRate: 14 });
 console.log(strobe.advance(1).sampled); // where the 14th flash caught the rotor
+```
+
+```ts
+import { loadRigs, describeCheck, differentialRig, gimbalRig, togglePressRig, wattGovernorRig } from 'margoengine/machinery/rigs';
+
+await loadRigs();
+using governor = wattGovernorRig({ arm: 0.292, pickoff: 0.198, link: 0.232, rpm: 68 });
+governor.spin(90, 1 / 60); // one frame at the new speed: the arms start to swing out
+console.log(describeCheck(governor.check, 'last')); // the gap to Maxwell's balance, shrinking frame by frame
+console.log(governor.settle(90).arm); // about 1.11 rad: acos(g / (w^2 L))
+
+using press = togglePressRig(0.231, { angle: 0.9 });
+console.log(press.drive(0.14).ram); // about 0.4575 m: 2 sqrt(L^2 - x^2)
+
+using gimbal = gimbalRig({ mountAxis: [0.83, 0.38, -0.4] });
+console.log(gimbal.drive(0.7).deviation); // about 0: the rotor stays on +z
+
+using differential = differentialRig({ sideTeeth: 20, pinionTeeth: 14, split: 0.3 });
+const turn = differential.drive(2 * Math.PI, false);
+console.log(turn.left - turn.carrier, turn.right - turn.carrier); // about +1.885 and -1.885
 ```
 
 Page helpers: `openRig(make, ...args)` loads the solver and makes a rig in one call; `keyedRig(make)` remakes a rig whenever a build parameter (its key, such as the held member or a shaft offset) changes, at the angle asked, so the solver never steps through a jump of the geometry; every rig and `keyedRig` take `signal` (default none), which disposes them on abort; `signedReading(value, unit, digits = 1)` writes a readout with a typographic minus or a plus and no sign on zero. The Geneva pose adds `turnWheel` (the wheel angle read within the crank turn last asked of `drive`), and the Oldham pose adds `orbitCenter` and `orbitRadius`, the circle the disc centre runs on.
