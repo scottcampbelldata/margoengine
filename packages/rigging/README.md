@@ -1068,9 +1068,11 @@ Where the numbers come from. Every number is a row with its source, the page it 
 
 Bones are found by name under these conventions, the best match winning: `hanim` (the standard's own names and the
 HAnim 1.x names of renamed joints), `segments` (Mixamo style, and the BVH form of the CMU captures), `joints` (the
-100STYLE captures and other files that name a bone for its joint), and the presets of `margoengine/rigging/retarget`
-(Character Creator, the CMU ASF skeleton, MPFB, Godot, Roblox R15, VRM humanoid names). `map` adds or overrides one
-bone at a time.
+100STYLE captures and other files that name a bone for its joint), `unreal` and `unreal5` (Unreal mannequin names,
+`pelvis`, `spine_01`, `upperarm_l`, `thigh_l`, with three or five spine bones; the Quaternius animation library uses
+the three-bone form), `kaykit` (KayKit characters, `hips`, `chest`, `upperarm.l`, `wrist.l`, `upperleg.l`), and the
+presets of `margoengine/rigging/retarget` (Character Creator, the CMU ASF skeleton, MPFB, Godot, Roblox R15, VRM
+humanoid names). `map` adds or overrides one bone at a time.
 
 ```ts
 import type { RigJoint } from 'margoengine/rigging';

@@ -1321,6 +1321,13 @@ const tidy = (name: string): string =>
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
 
+/**
+ * Unreal mannequin spines, bottom up: three bones (the UE4 mannequin and the bundled Quaternius library) or five (the
+ * UE5 mannequin). The same name sits at another height in each, so they are two namings.
+ */
+const UNREAL_SPINE = { spine01: 'vl5', spine02: 'vt12', spine03: 'vt6' },
+  UNREAL5_SPINE = { spine01: 'vl5', spine02: 'vl3', spine03: 'vt12', spine04: 'vt8', spine05: 'vt4' };
+
 /** This file's own bone namings: tidy bone name to joint id. */
 const ALIASES: Readonly<Record<string, Readonly<Record<string, string>>>> = (() => {
   // HAnim 1.x names for the joints HAnim 2.0 renamed (from recall; the 2.0 text lists no alias table).
@@ -1345,7 +1352,41 @@ const ALIASES: Readonly<Record<string, Readonly<Record<string, string>>>> = (() 
       chest4: 'vt4',
       neck: 'vc7',
       head: 'vc1',
+    },
+    // KayKit character rigs (Rig_Medium): `root` lies on the ground and is left out; no neck or fingers.
+    kaykit: Record<string, string> = { hips: 'humanoid_root', spine: 'vl5', chest: 'vt12', head: 'vc1' };
+  // Unreal mannequin rigs (pelvis, spine_01, upperarm_l, thigh_l): `root` lies on the ground and is left out.
+  const unreal = (spine: Readonly<Record<string, string>>): Record<string, string> => {
+    const names: Record<string, string> = {
+      pelvis: 'humanoid_root',
+      neck01: 'vc7',
+      neck02: 'vc4',
+      head: 'vc1',
+      ...spine,
     };
+    for (const s of ['l', 'r']) {
+      Object.assign(names, {
+        [`clavicle${s}`]: `${s}_sternoclavicular`,
+        [`upperarm${s}`]: `${s}_shoulder`,
+        [`lowerarm${s}`]: `${s}_elbow`,
+        [`hand${s}`]: `${s}_radiocarpal`,
+        [`thigh${s}`]: `${s}_hip`,
+        [`calf${s}`]: `${s}_knee`,
+        [`foot${s}`]: `${s}_talocrural`,
+        [`ball${s}`]: `${s}_metatarsophalangeal_1`,
+        [`thumb01${s}`]: `${s}_carpometacarpal_1`,
+        [`thumb02${s}`]: `${s}_metacarpophalangeal_1`,
+        [`thumb03${s}`]: `${s}_carpal_interphalangeal_1`,
+      });
+      ['index', 'middle', 'ring', 'pinky'].forEach((finger, i) => {
+        names[`${finger}metacarpal${s}`] = `${s}_carpometacarpal_${i + 2}`;
+        names[`${finger}01${s}`] = `${s}_metacarpophalangeal_${i + 2}`;
+        names[`${finger}02${s}`] = `${s}_carpal_proximal_interphalangeal_${i + 2}`;
+        names[`${finger}03${s}`] = `${s}_carpal_distal_interphalangeal_${i + 2}`;
+      });
+    }
+    return names;
+  };
   for (const [side, s] of [
     ['left', 'l'],
     ['right', 'r'],
@@ -1382,6 +1423,15 @@ const ALIASES: Readonly<Record<string, Readonly<Record<string, string>>>> = (() 
       [`${side}handthumb3`]: `${s}_carpal_interphalangeal_1`,
       [`${s}thumb`]: `${s}_carpometacarpal_1`,
     });
+    Object.assign(kaykit, {
+      [`upperarm${s}`]: `${s}_shoulder`,
+      [`lowerarm${s}`]: `${s}_elbow`,
+      [`wrist${s}`]: `${s}_radiocarpal`,
+      [`upperleg${s}`]: `${s}_hip`,
+      [`lowerleg${s}`]: `${s}_knee`,
+      [`foot${s}`]: `${s}_talocrural`,
+      [`toes${s}`]: `${s}_metatarsophalangeal_1`,
+    });
     Object.assign(jointed, {
       [`${side}collar`]: `${s}_sternoclavicular`,
       [`${side}shoulder`]: `${s}_shoulder`,
@@ -1393,7 +1443,7 @@ const ALIASES: Readonly<Record<string, Readonly<Record<string, string>>>> = (() 
       [`${side}toe`]: `${s}_metatarsophalangeal_1`,
     });
   }
-  return { hanim, segments, joints: jointed };
+  return { hanim, segments, joints: jointed, unreal: unreal(UNREAL_SPINE), unreal5: unreal(UNREAL5_SPINE), kaykit };
 })();
 /** Bones a preset of `@margoengine/rigging/retarget` leaves out that the table has a joint for. */
 const EXTRA: Readonly<Record<string, string>> = { ccbasepelvis: 'sacroiliac', ccbasenecktwist02: 'vc4' };
@@ -1421,9 +1471,19 @@ const RETARGET_PRESETS: readonly SkeletonPreset[] = [
 /**
  * The bone namings the human table knows: `hanim` (ISO/IEC 19774 joint names, with the HAnim 1.x names of renamed
  * joints), `segments` (Mixamo-style names and the BVH form of the CMU captures), `joints` (the 100STYLE captures and
- * other files that name a bone for its joint), then the presets of `@margoengine/rigging/retarget`.
+ * other files that name a bone for its joint), the presets of `@margoengine/rigging/retarget`, `unreal` and `unreal5`
+ * (Unreal mannequin rigs with three or five spine bones, the bundled Quaternius library among the first) and `kaykit`
+ * (KayKit characters).
  */
-export const HUMAN_NAMINGS: readonly string[] = ['hanim', 'segments', 'joints', ...RETARGET_PRESETS];
+export const HUMAN_NAMINGS: readonly string[] = [
+  'hanim',
+  'segments',
+  'joints',
+  ...RETARGET_PRESETS,
+  'unreal',
+  'unreal5',
+  'kaykit',
+];
 
 let canonical: Map<string, string> | null = null;
 /** Finds the human joints among bone names: under `preset`, or under the naming that matches the most bones. */
@@ -1448,6 +1508,10 @@ function nameHuman(names: readonly string[], preset?: string): JointNaming | nul
   offer('hanim', (bone) => canonical!.get(bone) ?? ALIASES.hanim[bone]);
   offer('segments', (bone) => ALIASES.segments[bone]);
   offer('joints', (bone) => ALIASES.joints[bone]);
+  // A rig with a fourth spine bone is the five-bone mannequin; without one it is the three-bone one.
+  const five = tidied.includes('spine04');
+  for (const id of ['unreal', 'unreal5', 'kaykit'])
+    if (preset !== undefined || id !== (five ? 'unreal' : 'unreal5')) offer(id, (bone) => ALIASES[id][bone]);
   const detected = preset === undefined ? detectSkeleton([...names])?.preset : undefined;
   for (const id of RETARGET_PRESETS) {
     if (preset === undefined ? id !== detected : id !== preset) continue;

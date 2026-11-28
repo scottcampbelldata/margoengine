@@ -28,14 +28,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   weather README examples, 57 of 57).
 - **Regression:** that test.
 
-### Open 2026-11-28: the human anatomy table does not read Unreal mannequin or KayKit bone names (KB-RIG-UENAMING1, rigging)
+### Fixed 2026-11-28: the human anatomy table did not read Unreal mannequin or KayKit bone names (KB-RIG-UENAMING1, rigging)
 
 - **Repro:** `fitAnatomy` with `species: human` on `examples/assets/quaternius/UAL1_Standard_RM.glb` (pelvis,
-  upperarm_l, thigh_l) or on a KayKit character throws "This rig needs a left and a right joint to read its facing".
-- **Cause:** `nameHuman` (packages/rigging/src/anatomy-human.ts) knows the HAnim, segment-named, joint-named and
+  upperarm_l, thigh_l) or on a KayKit character threw "This rig needs a left and a right joint to read its facing".
+- **Cause:** `nameHuman` (packages/rigging/src/anatomy-human.ts) knew the HAnim, segment-named, joint-named and
   retarget preset namings only.
-- **Fix needed:** the two namings in the table's aliases (or as retarget presets), with a fit test on both bundled
-  models. Until then pass `map`, as the animator README does.
+- **Fix:** three namings in the table's aliases: `unreal` (three spine bones), `unreal5` (five) and `kaykit`; the best
+  match still wins, and `HUMAN_NAMINGS` lists them.
+- **Regression:** `packages/rigging/tests/anatomy-human-bundled.test.js` (both bundled rigs fit; the five-bone spine).
 
 ### Open 2026-11-28: every `procedural:rock` of a biome is the same stone (KB-BIOMES-ROCKSEED1, biomes)
 
