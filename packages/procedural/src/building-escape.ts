@@ -10,7 +10,11 @@
 //   sprinklers), as quoted in ICC interpretation 86-22, https://www3.iccsafe.org/cs/committeeArea/pdf_file/BU_21_86_22.pdf.
 // - IBC Table 1006.3.4(2), a single exit from a second storey of Group B only up to 29 occupants and 75 ft of travel and
 //   none from a third, and Table 1004.5, 150 square feet gross to an occupant of business areas, both read from a
-//   summary of the 2024 model code, https://datadrivenaec.com/insights/ibc-exit-requirements.
+//   summary of the 2024 model code, https://datadrivenaec.com/insights/ibc-exit-requirements. The 29 and 75 ft, and no
+//   single exit from a third storey, match the 2021 tables as adopted at https://up.codes/s/single-exits and, numbered
+//   1006.3.3(2), by Washington (WAC 51-50-1006). The residential table beside it, 1006.3.4(1), gives apartments one
+//   exit up to the third storey with 4 dwelling units a storey and 125 ft of travel, only in a sprinklered building
+//   with escape openings; the rules build no sprinklers, so their western commercial blocks stay under the business row.
 // - Dijkstra, E. W. 1959, "A note on two problems in connexion with graphs", Numerische Mathematik 1, 269-271,
 //   https://doi.org/10.1007/BF01386390: the shortest ways from a stair through the doorways.
 import type { BuildingRoomUse, BuildingStyle } from './building-rules.js';

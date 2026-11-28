@@ -1035,7 +1035,7 @@ down to make it a stair hall of its own. Japan (Enforcement Order arts. 120 and
 121, https://laws.e-gov.go.jp/api/1/lawdata/325CO0000000338): habitable rooms on the 6th floor or above, over 200 m2
 of them on the second floor or 100 m2 on another (both doubled for the concrete and warehouse styles), or a room more
 than 40 m (50 m) of walking from the stair. The western commercial styles (IBC Table 1006.3.4(2) for business areas, as
-summarised at https://datadrivenaec.com/insights/ibc-exit-requirements): a third storey, over 29 occupants at 150 sq ft
+summarised at https://datadrivenaec.com/insights/ibc-exit-requirements and tabled at https://up.codes/s/single-exits): a third storey, over 29 occupants at 150 sq ft
 each on the second, or more than 75 ft of walking. The one-family `western-1910-house` keeps one stair (IRC). The two
 stand at least half the floor's diagonal apart where the plan allows (IBC 2021 1007.1.1,
 https://www3.iccsafe.org/cs/committeeArea/pdf_file/BU_21_86_22.pdf), else a third or a quarter. `escapes` reports for
