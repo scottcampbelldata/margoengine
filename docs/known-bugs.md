@@ -108,17 +108,29 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   against 35,849). Regression: `packages/scatter/test/velocity.browser.mjs` (the `coverage: false` run against the
   default, WebGPU and `MARGO_COMPAT=1`).
 
-### Open 2026-11-28: a spinning bullet's strike at 300 m/s throws it sideways by a speed that follows the substeps (KB-PHYS-CCDKNOCK1, physics kernel, ccd)
+### Open 2026-11-28: a spinning bullet's strike at 300 m/s throws it sideways by a speed that follows the substeps, as substeps reuse the step's contacts (KB-PHYS-CCDKNOCK1, physics kernel, contacts)
 
 - **Repro:** `packages/physics/tests/next-ccd.test.js`'s dynamic plate scene, seed 9, bullet 64 alone with the plate (a 4 x 4 x
   12 cm steel box at 300 m/s, spinning at about 30 rad/s, ccd on, no gravity): after the strike it leaves at 45.4 m/s along the
   face with 8 substeps (the default), 10.7 m/s with 32 and 17.6 m/s with 64, spinning at 650, 230 and 440 rad/s. The answer does
   not settle as the step shrinks. Energy is lost, not made (3 percent of the kinetic energy is left), the tangential impulse is
   0.15 of the normal, inside the cone, and in the full scene its later hit on bullet 170 conserves momentum exactly.
-- **Cause:** not traced. At the spin the strike leaves, the bullet turns about 1.4 rad a default substep, far past the small turn
-  the contact rows are linearised for, so the strike's split between spin and sliding depends on the pose each substep catches.
-- **Next:** compare the strike with the rigid-body impact law for a corner with Coulomb friction (Stronge, "Impact Mechanics",
-  2000, ch. 5) at fine substeps, and with Rapier 3D as the oracle; the test only needs the bullet stopped, which it is.
+- **Cause (traced 2026-11-28, lane P):** contacts are found once a step and every substep reuses those points with gaps
+  read from the new poses (`kernel/src/solver.rs`, header). After the strike's first corner the bullet turns about 1.4 rad a
+  default substep and some 11 rad over the step, so the corners that meet the plate later in the step are not in the
+  manifold the step began with. More substeps cannot recover them: at a 1/60 s step the knock runs 45.4, 24.7, 10.7, 17.6,
+  16.9, 5.5, 10.0, 4.4, 4.6, 0.87, 0.74 m/s at 8 to 8,192 substeps (the repro scene, bullet 64 alone, two steps), away from the answer. A finer
+  step, which finds contacts again, does settle: 8 substeps at 1/61,440 s and 1/245,760 s give 63.8 and 64.3 m/s (spin 445
+  and 429 rad/s), so the default 45.4 m/s is 30 percent under the kernel's own converged knock. Not chaos: perturbing the
+  spin by 1e-9 to 1e-3 moves the knock by under 0.2 m/s at any fixed substep count. The Rapier 3D oracle (devDependency,
+  tests/oracle.js) shares the method and the behaviour: at 1/60 s its knock runs 2.8, 11.3, 10.4, 10.5, 14.7, 14.7, 25.4,
+  49.7 and 71.9 m/s at 1 to 512 solver iterations, and its fine-step limit is about 91 m/s (91.3 and 91.8 at 1/61,440 and
+  1/245,760 s, rebounding at 16 to 17 m/s where the kernel's inelastic point leaves at 2 m/s).
+- **Fix plan:** refresh the manifold of a pair between substeps once one of its bodies has turned past a bound since its
+  points were found (the arc of its reach, a fraction of its thinnest piece), so a tumbling body meets the corners it turns
+  into. A design change in the narrow phase and the solver's per-step pair plan (warm starts, threaded narrow-phase runs of
+  b770cbb14c, events), so a planner first. Bar: the default step within 10 percent of the converged 64 m/s, and the knock
+  settling as substeps rise; tests/joints, stability webs, golden replays and the narrow phase's bit-for-bit thread test held.
 
 ### Open 2026-11-28: 21 web demos cannot be rebuilt from source/: the data files their code imports are missing (KB-DEMO-SOURCEDATA1, demos)
 

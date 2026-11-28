@@ -385,6 +385,23 @@ older foam out. Wanted from the SEA-13 owner: exact foam at the cut time (a warm
 inside the engine). Bound until then: mean foam within 5 percent after a warm-up of three lifetimes. Not changed by
 lane B.
 
+### SEA-08: a heeled box's roll decays 13 percent slower than measured (KB-SEA-HEELDECAY1, logged by physics lane P, 2026-11-28)
+
+`packages/physics/tests/coupling/seakeeping.test.js` "let go heeled" is red on main: HullSolver's roll decay coefficient K
+is 0.288 against Jung, Chang and Jo's measured 0.333 (bar 12 percent). Cause not traced. Repro and state in
+`docs/known-bugs.md`; not changed outside SEA-08.
+
+### SOFT-05: a tissue's sliding attachment misses its closed form by 1.6 times the rounding bound (KB-SOFT-SLIDEATTACH1, logged by physics lane P, 2026-11-28)
+
+`packages/physics/tests/coupling/tissue.test.js` "sliding attachment" is red on main: the particle ends at 0.5100431
+against the closed form 0.5100446 (1.5e-6 off, bound 16 float32 spacings). Repro and state in `docs/known-bugs.md`.
+
+### SOFT-04: a volumetric rung stops cracking under continued remeshing (KB-SOFT-CRACKRES1, logged by physics lane P, 2026-11-28)
+
+`packages/physics/tests/coupling/volumetric-solids.test.js` "automatic cracks remain finite" is red on main: the tensile
+ladder at strain rate 0.005 makes 8 cracks or fewer in 18 steps where the test asks for more. Repro and state in
+`docs/known-bugs.md`; left to the SOFT-04 owner.
+
 ## Scope: solvers only (Scott, 2026-11-26)
 
 The physics engine is the whole job. It is built in two stages:
