@@ -11816,11 +11816,16 @@ Core and stage are unchanged.
 - Calibration reads the roll of the shoulders and hips only from the clips (`hingeRolls`), and trusts a roll only up to
   30 degrees: a clip that bends an elbow the wrong way would otherwise teach a roll that flips the hinge. Elbow, knee
   and finger rolls come from the fit alone.
+- Calibration also reads how far the collarbones drop from the rest where the clips hang the arms (`rhythmDrops`, the
+  median over the frames within 30 degrees of the side) and takes their zero back by it, never past Ludewig et al.
+  2009's rhythm for the rest arm's lift. A model with no clip that hangs the arms keeps the rest as the collarbone's
+  zero unless its rest bone already reads raised (KB-RIG-CLAVICLE1).
 - A rig with no naming `fitHuman` knows (the UAL mannequins' Unreal names among them) gets no body unless
   `anatomy: {map}` names its joints (KB-HUM-UALNAMES1).
 - Measured on the Fauld cast's Character Creator old man, three clips: hands and forearms no longer change; the ring
   fingers rest 12.8 degrees past their supination stop (KB-RIG-RINGROLL1), the thumbs are held up to 22 degrees off
-  the walk (KB-RIG-THUMB1), the left collarbone up to 11 (KB-RIG-CLAVICLE1), the calf 4.7 and the toes 2.
+  the walk (KB-RIG-THUMB1), the calf 4.7 and the toes 2. The walk's left collarbone reads 4.2 past its depression stop
+  raw: the clip drops it about 34 degrees below its rest while the right rises 3.
 - `person.check('structural')` reads the Animator's 32-bit pose, so a joint held at its stop can read a hair past it;
   the pose frames count only what passes by 0.01 degrees.
 - `addBody` writes each bone's rest as translation, rotation and scale; a bind matrix with shear loses the shear. A

@@ -123,6 +123,10 @@ const SOURCES: Readonly<Record<string, SourceEntry>> = {
     cite: 'Ludewig PM et al. 2009, Motion of the shoulder complex during multiplanar humeral elevation, J Bone Joint Surg Am 91(2):378-389',
     url: 'https://doi.org/10.2106/JBJS.G.01483',
   },
+  sahara2007: {
+    cite: 'Sahara W, Sugamoto K, Murai M, Yoshikawa H 2007, Three-dimensional clavicular and acromioclavicular rotations during arm abduction using vertically open MRI, J Orthop Res 25(9):1243-1249',
+    url: 'https://doi.org/10.1002/jor.20407',
+  },
   white1990: {
     cite: 'White AA, Panjabi MM 1990, Clinical Biomechanics of the Spine, 2nd ed., Lippincott (print): representative rotations at each level',
   },
@@ -723,7 +727,13 @@ export function humanTable(group: HumanGroup = {}): SpeciesTable {
           'protraction',
           'retraction',
           bound(10, recalled('kapandji', 15, 'clavicular protraction')),
-          bound(10, recalled('kapandji', 20, 'clavicular retraction')),
+          // Measured: the clavicle retracts 30.6 degrees against the thorax over arm abduction (Sahara et al. 2007,
+          // vertically open MRI, 14 shoulders), past the 20 Kapandji gives and the 19.8 Ludewig's pins reach at 120.
+          bound(
+            10,
+            row('sahara2007', 30.6, 'clavicle retraction over arm abduction, against the lung', 'online', `${EUROPE_PMC}17474135`),
+            recalled('kapandji', 20, 'clavicular retraction'),
+          ),
         ),
         dof(
           RIGHT,

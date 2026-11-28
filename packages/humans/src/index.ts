@@ -75,7 +75,9 @@ export interface PersonAnatomyOptions extends FitHumanOptions {
   tier?: Tier;
   /**
    * Reads how the upper arms and thighs are rolled from the model's clips (`hingeRolls`), so an elbow or knee whose
-   * rig is rolled still bends about its own axis. Default true; it only runs for a model with clips.
+   * rig is rolled still bends about its own axis, and how far the collarbones drop where the clips hang the arms
+   * (`rhythmDrops`), so an A pose rest's raised collarbone is not read as its zero. Default true; it only runs for a
+   * model with clips.
    */
   calibrate?: boolean;
   /** Called on a frame whose pose needed bringing back into range, with what was brought back. Default none. */
@@ -683,7 +685,8 @@ const ROLL_TRUST = 30;
 
 /**
  * Fits the human table to `model`'s nodes; undefined when no human naming knows its bones and no `map` or `preset` is
- * given. With clips and `calibrate`, the body is fitted again with the roll its clips show (`hingeRolls`) at the
+ * given. With clips and `calibrate`, the body is fitted again with the collarbone drop its clips show where they hang
+ * the arms (`rhythmDrops`) and the roll they show (`hingeRolls`) at the
  * shoulders and hips only: an upper arm or thigh has no knuckles to read its roll from, while a hand's roll is read
  * from its knuckles in the fit itself.
  */
@@ -703,9 +706,13 @@ function personBody(
     throw new TypeError('addPerson anatomy.onClamp must be a function');
   const rig = modelRig(model);
   if (!fit.map && !fit.preset && !humans.human.naming?.(rig.names)) return undefined;
-  const fitted = (roll?: Record<string, number>): AnatomicalRig => {
+  const fitted = (roll?: Record<string, number>, drop?: Record<string, readonly [number, number]>): AnatomicalRig => {
     try {
-      return humans.fitHuman(rig, roll ? { ...fit, roll: { ...roll, ...fit.roll } } : fit);
+      return humans.fitHuman(rig, {
+        ...fit,
+        ...(roll ? { roll: { ...roll, ...fit.roll } } : {}),
+        ...(drop ? { drop: { ...drop, ...fit.drop } } : {}),
+      });
     } catch (error) {
       throw new MargoError(
         'unsupported',
@@ -736,9 +743,11 @@ function personBody(
       }
     }
   }
-  let rolls: Record<string, number>;
+  let rolls: Record<string, number>, drops: Record<string, [number, number]>;
   try {
     rolls = anatomy.hingeRolls(body, poses());
+    // Where the clips hang the arm, how far the collarbone drops from the rest pose (KB-RIG-CLAVICLE1).
+    drops = anatomy.rhythmDrops(body, poses());
   } finally {
     sampler.dispose();
   }
@@ -747,5 +756,5 @@ function personBody(
       ([id, roll]) => body.joints[body.index.get(id) ?? -1]?.kind === 'ball' && Math.abs(roll) <= ROLL_TRUST,
     ),
   );
-  return Object.keys(kept).length ? fitted(kept) : body;
+  return Object.keys(kept).length || Object.keys(drops).length ? fitted(kept, drops) : body;
 }

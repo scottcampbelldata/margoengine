@@ -363,6 +363,7 @@ const CITED = {
     ['acromioclavicular posterior tilt gained over elevation, -4 to 15', 19, o],
     ['glenohumeral elevation to scapular upward rotation, abduction (2.4 flexion)', 2.1, o],
   ],
+  sahara2007: [['clavicle retraction over arm abduction, against the lung', 30.6, o]],
   kim2015: [
     ['tibial external rotation over the last 20 degrees of extension, as the introduction states it', 15, o],
     ['knee flexion over which the screw-home turn happens, degrees', 20, o],
@@ -515,7 +516,7 @@ test('every number is the one its source gives', () => {
   assert.deepEqual(counts, PROVENANCE, 'distinct source numbers by how they were checked');
 });
 /** Distinct source numbers of the table by how they were checked. */
-const PROVENANCE = { dataset: 98, print: 0, online: 145, recalled: 92 };
+const PROVENANCE = { dataset: 98, print: 0, online: 146, recalled: 92 };
 
 test('ranges follow from their rows by the stated rule', () => {
   for (const [row, where, end] of everyRow(human)) {

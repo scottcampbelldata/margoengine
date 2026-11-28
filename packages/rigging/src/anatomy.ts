@@ -469,6 +469,15 @@ export interface FitOptions {
    * unrolled arm does; a reader that knows better (from a capture file's own axes, or from the motion) passes it here.
    */
   readonly roll?: Readonly<Record<string, number>>;
+  /**
+   * For a joint whose zero is the rest pose and that rides on a limb (a collarbone on the arm), the degrees of
+   * elevation and retraction its segment drops from the rest pose when the limb hangs at the side, by joint id, as the
+   * rig's own motion shows it ({@link rhythmDrops}). A rest that holds the limb raised takes its zero back by this
+   * much, never past what the joint's rhythm gives between the rest limb's lift and the side. A rig bone often does not
+   * lie along the bone it stands for (a Character Creator clavicle bone aims at the shoulder joint's centre, below the
+   * collarbone), so its rest direction alone cannot show whether the rest holds it raised.
+   */
+  readonly drop?: Readonly<Record<string, readonly [number, number]>>;
 }
 
 /** One motion that {@link clampPose} brought back into range. */
@@ -1029,6 +1038,11 @@ export function fitAnatomy(rig: RigPose | readonly RigJoint[], options: FitOptio
       throw new RangeError(
         `options.roll: "${id}" must be a joint of the ${species.id} table with a finite number of degrees`,
       );
+  for (const [id, drop] of Object.entries(options.drop ?? {}))
+    if (!specs.get(id)?.rhythm || !Array.isArray(drop) || drop.length !== 2 || !drop.every(Number.isFinite))
+      throw new RangeError(
+        `options.drop: "${id}" must be a joint of the ${species.id} table with a rhythm, with [elevation, retraction] in degrees`,
+      );
   const root = species.joints[0];
   if (!bones.has(root.id))
     throw new RangeError(
@@ -1222,8 +1236,11 @@ export function fitAnatomy(rig: RigPose | readonly RigJoint[], options: FitOptio
           elevation = Math.asin(Math.min(1, Math.max(-1, dot(seen, above)))),
           retraction = Math.atan2(dot(seen, back), dot(seen, lateral)),
           share = (have: number, atSide: number, cap: number) => Math.min(Math.max(have - atSide, 0), Math.max(cap, 0)),
-          lifted = share(elevation / RAD, side[0], raised[0] - side[0]) * RAD,
-          drawn = share(retraction / RAD, side[1], raised[1] - side[1]) * RAD;
+          // The rest direction against the measured one at the side, or the drop the rig's own motion shows, whichever
+          // is larger, never past the rhythm.
+          shown = options.drop?.[spec.id] ?? [0, 0],
+          lifted = Math.max(share(elevation / RAD, side[0], raised[0] - side[0]), share(shown[0], 0, raised[0] - side[0])) * RAD,
+          drawn = Math.max(share(retraction / RAD, side[1], raised[1] - side[1]), share(shown[1], 0, raised[1] - side[1])) * RAD;
         if ((lifted > 0 || drawn > 0) && shape.dofs) {
           // The zero is the rest direction turned back by the swing that reads `lifted` up and `drawn` back in the
           // joint's own axes (which hang on the zero, so a few rounds settle it).
@@ -1576,6 +1593,94 @@ export function hingeRolls(body: AnatomicalRig, poses: Iterable<ArrayLike<number
     const [flex, side] = joint.axes;
     out[above.id] = (dot(cross(joint.long, flex), side) >= 0 ? line : -line) * DEG;
   });
+  return out;
+}
+
+/**
+ * How far each joint with a rhythm (a collarbone on its arm) drops from the rest pose when its limb hangs, read from
+ * motion: over the poses whose limb hangs within the rhythm's first measured step of the side (30 degrees for the
+ * human collarbone), the median elevation and retraction the joint loses from rest, less what the rhythm still gives
+ * for that small lift. Returns [elevation, retraction] in degrees by joint id, for the joints with such poses: pass
+ * them as `drop` and fit again, so a rest that holds the arm raised (an A pose) takes the collarbone's zero back to the
+ * side as far as the motion and the rhythm agree.
+ * @example
+ * const first = fitAnatomy(rig, { species: human });
+ * const body = fitAnatomy(rig, { species: human, drop: rhythmDrops(first, frames) });
+ * @param poses Local poses of the motion, 10 numbers per bone each; one buffer may be reused between steps.
+ * @throws TypeError for a pose of the wrong length.
+ */
+export function rhythmDrops(body: AnatomicalRig, poses: Iterable<ArrayLike<number>>): Record<string, [number, number]> {
+  const work = workOf(body),
+    riders = body.joints.flatMap((joint) => {
+      const rhythm = joint.spec.rhythm,
+        from = rhythm && body.joints[body.index.get(rhythm.from) ?? -1],
+        to = rhythm && body.joints[body.index.get(rhythm.to) ?? -1];
+      return rhythm && joint.limited && from && to && rhythm.curve.length > 1
+        ? [{ joint, rhythm, from: from.bone, to: to.bone, seen: [] as number[][] }]
+        : [];
+    });
+  if (!riders.length) return {};
+  // Bone positions by forward kinematics, with each world rotation from `worldOf`.
+  const parents = body.parents,
+    position = (pose: ArrayLike<number>, b: number): V3 => {
+      const chain: number[] = [];
+      for (let x = b; x >= 0; x = parents[x]) chain.push(x);
+      let p: V3 = [0, 0, 0];
+      for (let i = chain.length - 1; i >= 0; i--) {
+        const c = chain[i],
+          t: V3 = [pose[c * 10], pose[c * 10 + 1], pose[c * 10 + 2]],
+          parent = parents[c];
+        if (parent < 0) p = t;
+        else {
+          const w = worldOf(body, work, pose, parent),
+            q: Q4 = [work.world[w], work.world[w + 1], work.world[w + 2], work.world[w + 3]];
+          p = [p[0] + qrot(q, t)[0], p[1] + qrot(q, t)[1], p[2] + qrot(q, t)[2]];
+        }
+      }
+      return p;
+    },
+    // The limb's direction in the reference segment's rest space, so a trunk that leans or turns does not count.
+    limbAt = (pose: ArrayLike<number>, rider: (typeof riders)[number]): V3 | null => {
+      const d = unit(sub(position(pose, rider.to), position(pose, rider.from)), 1e-12),
+        r = rider.joint.reference;
+      if (!d || r < 0) return d;
+      const w = worldOf(body, work, pose, r);
+      return qrot([-work.world[w], -work.world[w + 1], -work.world[w + 2], work.world[w + 3]], d);
+    },
+    up = body.frame.up,
+    restUp: V3[] = [];
+  work.tick++;
+  for (const rider of riders) {
+    const r = rider.joint.reference,
+      w = r < 0 ? -1 : worldOf(body, work, body.rest, r);
+    restUp.push(w < 0 ? [...up] : qrot([-work.world[w], -work.world[w + 1], -work.world[w + 2], work.world[w + 3]], up));
+  }
+  for (const pose of poses) {
+    checkPose(body, pose, 'rhythmDrops');
+    work.tick++;
+    riders.forEach((rider, k) => {
+      const limb = limbAt(pose, rider);
+      if (!limb) return;
+      const lift = Math.acos(Math.min(1, Math.max(-1, -dot(limb, restUp[k])))) / RAD,
+        curve = rider.rhythm.curve;
+      if (lift > curve[1][0]) return;
+      measure(body, work, pose, rider.joint, work.v);
+      const [e0, r0] = rhythmAt(curve, curve[0][0]),
+        [e, r] = rhythmAt(curve, lift);
+      // Elevation is the first swing; retraction is the second swing's negative (protraction is positive).
+      const rest = rider.joint.rest;
+      rider.seen.push([rest.flexion - work.v[0] + (e - e0), work.v[1] - rest.abduction + (r - r0)]);
+    });
+  }
+  const out: Record<string, [number, number]> = {},
+    median = (values: number[]) => {
+      const sorted = [...values].sort((a, b) => a - b),
+        m = sorted.length >> 1;
+      return sorted.length % 2 ? sorted[m] : (sorted[m - 1] + sorted[m]) / 2;
+    };
+  for (const rider of riders)
+    if (rider.seen.length)
+      out[rider.joint.id] = [median(rider.seen.map((v) => v[0])), median(rider.seen.map((v) => v[1]))];
   return out;
 }
 

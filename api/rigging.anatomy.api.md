@@ -108,6 +108,7 @@ export interface FitOptions {
     readonly vertical?: Vec3;
     readonly forward?: Vec3;
     readonly roll?: Readonly<Record<string, number>>;
+    readonly drop?: Readonly<Record<string, readonly [number, number]>>;
 }
 
 export interface FrameSpec {
@@ -312,6 +313,8 @@ export function ragdollJoints(body: AnatomicalRig, tier?: Tier): RagdollJointLim
 export function readJointAngles(body: AnatomicalRig, pose?: ArrayLike<number>, out?: Float64Array): Float64Array;
 
 export function regionAngles(body: AnatomicalRig, pose?: ArrayLike<number>): Record<string, JointAngles>;
+
+export function rhythmDrops(body: AnatomicalRig, poses: Iterable<ArrayLike<number>>): Record<string, [number, number]>;
 
 // Not exported from this entry, but used by the exports above:
 

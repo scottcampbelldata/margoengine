@@ -998,13 +998,14 @@ What the entry gives:
 
 | Function | What it does |
 | --- | --- |
-| `fitAnatomy(rig, { species, preset?, map?, limits?, forward?, roll?, vertical? })` | The `AnatomicalRig`: body frame, stature, rest pose (`T`, `A`, `arms-down`), and per joint its bone, kind, anatomical axes in the bone's own frame, neutral rotation, rest angles and ranges. |
+| `fitAnatomy(rig, { species, preset?, map?, limits?, forward?, roll?, drop?, vertical? })` | The `AnatomicalRig`: body frame, stature, rest pose (`T`, `A`, `arms-down`), and per joint its bone, kind, anatomical axes in the bone's own frame, neutral rotation, rest angles and ranges. |
 | `jointAngles(body, pose)`, `readJointAngles(body, pose, out)` | Clinical angles in degrees per joint: the two parts of the swing (flexion and abduction for most joints) and the twist. The second form fills a flat array and allocates nothing. |
 | `poseFromAngles(body, angles, base?)` | The pose that has those angles: the inverse. |
 | `regionAngles(body, pose)` | The head against the chest and the chest against the pelvis, whatever number of spine bones the rig has. |
 | `clampPose(body, pose, { tier?, issues? })` | Brings a pose inside the ranges, in place, and reports each motion it changed with its limit and source. |
 | `addAnatomyLimits(animator, body, { tier?, onClamp? })` | The same every frame on an Animator. |
 | `hingeRolls(body, poses)` | Reads from motion how a straight limb is rolled, to fit again with `roll`. |
+| `rhythmDrops(body, poses)` | Reads from motion how far a collarbone drops from the rest pose where the arm hangs, to fit again with `drop`. |
 | `poseLimits`, `ikLimits`, `ragdollJoints`, `kinematicsLimits` | The limits in the forms `PoseJointLimits`, IK chains, ragdoll profiles and `JointLimitSet` take. |
 | `defineSpecies(table)`, `bound(allowance, ...rows)`, `mirrorJoint(spec, rename)` | Build and check a species table. |
 
@@ -1109,6 +1110,50 @@ older.apply(pose);
 const frames = [30, 60, 90].map((flexion) => poseFromAngles(body, { l_elbow: { flexion } }));
 const calibrated = fitAnatomy(rig, { species: human, roll: hingeRolls(body, frames) });
 console.log(Object.keys(hingeRolls(body, frames)), calibrated.joints.length); // [ 'l_shoulder' ] 8
+```
+
+An A pose rest holds the collarbone raised with the arm, so its rest is not the collarbone's zero. A rig bone does
+not always lie along the collarbone (a Character Creator clavicle bone aims at the shoulder joint's centre, below the
+collarbone), so the rest direction alone cannot show it; the motion can. `rhythmDrops` reads, over the frames that
+hang the arm within 30 degrees of the side, how far the collarbone drops from the rest, less what the rhythm still
+gives for that lift (Ludewig et al. 2009), and `drop` takes the zero back by it, never past the rhythm between the
+rest arm's lift and the side. `addPerson` in `@margoengine/humans` does this from a model's clips by default.
+
+```ts
+import type { RigJoint } from 'margoengine/rigging';
+import { fitAnatomy, jointAngles, poseFromAngles, rhythmDrops } from 'margoengine/rigging/anatomy';
+import { fitHuman, human } from 'margoengine/rigging/anatomy/human';
+
+const s = Math.SQRT1_2;
+const rig: RigJoint[] = [
+  { name: 'Hips', parent: -1, position: [0, 0.93, 0] },
+  { name: 'Spine', parent: 0, position: [0, 1.03, 0] },
+  { name: 'Spine1', parent: 1, position: [0, 1.18, 0] },
+  { name: 'Spine2', parent: 2, position: [0, 1.33, 0] },
+  { name: 'Neck', parent: 3, position: [0, 1.5, 0] },
+  { name: 'Head', parent: 4, position: [0, 1.6, 0] },
+  { name: 'LeftUpLeg', parent: 0, position: [0.09, 0.9, 0] },
+  { name: 'LeftLeg', parent: 6, position: [0.09, 0.49, 0] },
+  { name: 'LeftFoot', parent: 7, position: [0.09, 0.07, 0] },
+  { name: 'LeftToeBase', parent: 8, position: [0.09, 0.01, 0.13] },
+  { name: 'RightUpLeg', parent: 0, position: [-0.09, 0.9, 0] },
+  { name: 'RightLeg', parent: 10, position: [-0.09, 0.49, 0] },
+  { name: 'RightFoot', parent: 11, position: [-0.09, 0.07, 0] },
+  { name: 'RightToeBase', parent: 12, position: [-0.09, 0.01, 0.13] },
+  { name: 'LeftShoulder', parent: 3, position: [0.03, 1.44, 0] },
+  { name: 'LeftArm', parent: 14, position: [0.18, 1.44, 0] },
+  { name: 'LeftForeArm', parent: 15, position: [0.18 + 0.28 * s, 1.44 - 0.28 * s, 0] },
+  { name: 'LeftHand', parent: 16, position: [0.18 + 0.54 * s, 1.44 - 0.54 * s, 0] },
+];
+const first = fitHuman(rig);
+// A clip frame that hangs the arm 10 degrees out and drops the collarbone 6 degrees from the A pose rest.
+const hang = poseFromAngles(first, {
+  l_shoulder: { flexion: 0, abduction: 10, rotation: 0 },
+  l_sternoclavicular: { flexion: -6, abduction: 4, rotation: 0 },
+});
+const drop = rhythmDrops(first, [hang]);
+const body = fitAnatomy(rig, { species: human, drop });
+console.log(drop.l_sternoclavicular.map(Math.round), Math.round(jointAngles(body).l_sternoclavicular.flexion)); // [ 8, 5 ] 6
 ```
 
 Limits of the fit, stated plainly:

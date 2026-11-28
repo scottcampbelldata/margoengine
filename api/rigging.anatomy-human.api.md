@@ -262,6 +262,7 @@ interface FitOptions {
     readonly vertical?: Vec3;
     readonly forward?: Vec3;
     readonly roll?: Readonly<Record<string, number>>;
+    readonly drop?: Readonly<Record<string, readonly [number, number]>>;
 }
 
 interface FrameSpec {

@@ -244,7 +244,7 @@ which a held pose never reaches).
 | --- | --- | --- |
 | `limits` | `true` | `false` keeps the body for `check`, `jointAngles` and IK but holds no clip |
 | `tier` | `'structural'` | the range clips are held to: `'normal'` holds them to the clinical range |
-| `calibrate` | `true` | reads the arm and leg rolls from the clips (`hingeRolls`); rolls over 30 degrees are not trusted |
+| `calibrate` | `true` | reads the arm and leg rolls from the clips (`hingeRolls`), rolls over 30 degrees not trusted, and how far the collarbones drop where the clips hang the arms (`rhythmDrops`), so an A pose rest is not the collarbone zero |
 | `onClamp` | none | called with the motions each held frame was brought back from |
 | `coupling` | `{}` (every rule on) | the joints a body moves together (`addCoupling` from `@margoengine/rigging/coupling`): the collarbone and shoulder blade rise with the arm, twist bones share a limb's twist, the last finger joint curls with the middle one, trunk and neck bends are shared, the knee screws home; `{girdle: false}` and the like turn one rule off, `false` turns them all off |
 | `map`, `roll` and the other `fitHuman` options | none | name joints a rig's naming misses, or turn a segment by hand |
