@@ -109,6 +109,18 @@ await runSuite(
       const changed = await capture();
       effect.dispose();
       const unshaded = await capture();
+      // `follow`: without a direction the bake takes the engine's sun, and rebakes by itself once the sun has turned.
+      const sun = (x) => engine.lighting.direction.set([x, 0.45, 0, engine.lighting.direction[3]]);
+      sun(1);
+      const following = TerrainReliefLighting.attach(engine, terrain, { follow: true });
+      const fromRight = await capture();
+      sun(-1);
+      const turned = await capture();
+      following.rebake();
+      const baked = await capture();
+      following.dispose();
+      const plain = await capture();
+      const apart = (a, b) => a.reduce((sum, pixel, i) => sum + Math.abs(pixel - b[i]), 0);
       const medium = (image) => image.reduce((sum, pixel, index) => (index % 4 === 3 ? sum : sum + pixel), 0);
       return {
         east,
@@ -117,6 +129,7 @@ await runSuite(
         delta: Math.abs(medium(shaded) - medium(unshaded)),
         switched: changed.reduce((sum, pixel, i) => sum + Math.abs(pixel - shaded[i]), 0),
         released: engine.sceneOf(effect) === undefined,
+        follow: { shaded: apart(turned, plain), stale: apart(turned, baked), moved: apart(turned, fromRight) },
         validation: (await gpu.popErrorScope())?.message ?? null,
       };
     });
@@ -133,6 +146,8 @@ await runSuite(
     assert.equal(result.east.edgeSun, 1);
     assert.ok(result.delta > 5000 && result.switched > 5000, JSON.stringify(result));
     assert.equal(result.released, true);
+    assert.ok(result.follow.shaded > 5000 && result.follow.moved > 5000, JSON.stringify(result.follow));
+    assert.equal(result.follow.stale, 0, 'the followed bake is the one a rebake from the new sun makes');
     console.log(
       'Terrain ridge casts directional shadows, valley receives less diffuse skylight, rebake and detach verified.',
     );
