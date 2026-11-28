@@ -256,6 +256,83 @@ Limits:
   to 14. Memory: 24 bytes per pixel, plus 96 under 4x MSAA.
 - Transmission, custom blending and depth overrides keep the sorted path: `blending` is an `OIT` option only.
 
+## Depth peeling (`PeelOIT`)
+
+`margoengine/oit/peel` gives the exact per-pixel order of `ExactOIT` without storage buffers, so it runs on the full
+WebGL2 compatibility layer as well as WebGPU. Each layer redraws the added models and keeps the nearest surface behind
+the layer before it; the kept layers then composite far to near over the scene, stopped by opaque depth.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PeelOIT} from 'margoengine/oit/peel';
+import {Material, createMesh} from 'margoengine/materials';
+import {boxGeometry} from 'margoengine/geometry';
+const engine = await Engine.create(document.querySelector('canvas')!);
+
+const oit = PeelOIT.attach(engine, {layers: 10});          // the default
+oit.add(createMesh(engine, boxGeometry(1, 1, 1), new Material({color: '#9cc3e6', opacity: 0.4, transparent: true, doubleSided: true})));
+engine.render();
+console.log(oit.layers);                                   // 10
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `layers` | 10 | Nearest distinct depth layers kept per pixel, a positive integer; set it to the deepest stack the view shows. Farther layers are left out. |
+| `order` | 8 | Frame graph order, as for `OIT`. |
+
+Both are fixed at construction; to change them, `dispose()` the pass and attach a new one. `add`, `addMesh` and
+`dispose` work as for `OIT`.
+
+Measured by `packages/oit/test/gpu/peel-check.mjs` on native WebGPU and on the WebGL2 layer (`--compat`), at 1x and 4x
+MSAA: four analytic layers within 2.5 of 255 of hand-worked sorted blending, adding the models in another order changes
+no pixel, `layers: 2` keeps the nearest two, opaque depth hides the layers behind it, and two crossing sheets swap at
+the line. Time is not measured yet.
+
+Limits:
+
+- Cost: every layer draws every added model again, so `layers: 10` is ten transparent draws of the scene plus one
+  full-screen draw per layer in the composite. Memory: 12 bytes per pixel per layer (an `rgba16float` colour and an
+  `r32float` depth) plus 8 bytes per pixel: 128 bytes a pixel at the default, about 253 MiB at 1920x1080 and 1 GiB at
+  3840x2160. Targets follow the view size.
+- Transparent coverage is single-sample, also in an MSAA scene: opaque edges keep their MSAA, glass edges do not.
+- Coplanar fragments share one layer, so two surfaces at the same depth show only one.
+- Models only: `addEffect` (particles, splats, points) throws a `TypeError`; use `OIT`, `ExactOIT` or `MomentOIT` for
+  effects. Transmission and custom blending keep the sorted path.
+- The small preview device throws `MargoError` `'unsupported'`; the full WebGL2 compatibility layer works.
+
+## Float32 sums (`PreciseOIT`)
+
+`margoengine/oit/precise` is the weighted pass of `OIT` with its sums in four `r32float` targets instead of half
+floats, so bright stacked layers (emissive glass, HDR particles) no longer overflow at 65,504 or lose low bits. Weights
+and coverage are those of `OIT`.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PreciseOIT} from 'margoengine/oit/precise';
+import {Material, createMesh} from 'margoengine/materials';
+import {boxGeometry} from 'margoengine/geometry';
+const engine = await Engine.create(document.querySelector('canvas')!, {features: ['float32-blendable']});
+
+const oit = PreciseOIT.attach(engine);                     // depthScale follows the camera
+oit.add(createMesh(engine, boxGeometry(1, 1, 1), new Material({color: '#9cc3e6', opacity: 0.4, transparent: true, doubleSided: true})));
+engine.render();
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `depthScale` | the camera's distance to its target, each frame | Depth-weight distance in world units, positive and finite. |
+| `order` | 8 | Frame graph order, as for `OIT`. |
+
+- It needs float32 blending and five colour targets: on WebGPU create the engine with
+  `features: ['float32-blendable']`; on the WebGL2 layer the browser needs `EXT_float_blend`. Without them `setup`
+  throws `MargoError` `'unsupported'` before allocating anything; use `OIT` there.
+- Scene MSAA is kept: the composite reads and averages the samples itself, with no hardware resolve, at 1x and 4x.
+- Memory: 20 bytes per pixel and sample (four `r32float` sums and an `rg16float` revealage), 80 under 4x MSAA.
+- It is still the weighted approximation: depth order between layers is estimated, as in `OIT` (see Limits below);
+  use `ExactOIT` or `PeelOIT` for exact order. Radiance must be finite.
+- Measured by `packages/oit/test/gpu/precise-check.mjs`: HDR sums within 0.5 of the analytic value at 1x and 4x, the
+  same result in any draw order, scene depth occluding bright layers, and edge coverage within 1 of `OIT`.
+
 ## Depth and motion for glass (`TransparentDepth`)
 
 Transparent surfaces write no depth, so TAA, depth of field and SSAO look straight through them. `margoengine/oit/depth`
