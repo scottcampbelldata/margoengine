@@ -468,7 +468,7 @@ life:
 
 ```js
 import { PbrMaterial, box } from '@margoengine/core';
-import { Scatter } from '@margoengine/scatter';
+import { Scatter, type ScatterOptions } from '@margoengine/scatter';
 const shared = {
   count: 4000,
   area: [30, 30],
@@ -477,7 +477,7 @@ const shared = {
   sway: { height: 0.3 },
   clumps: { size: 4, cover: 0.35 },
   clearings: [{ center: [2, -1], radius: 0.8, falloff: 1.2 }],
-};
+} satisfies ScatterOptions;
 const leaves = new Scatter(box(0.3, 0.05, 0.3), { ...shared, material: new PbrMaterial({ color: '#4b5a2c' }) });
 const flowers = new Scatter(box(0.05, 0.3, 0.05), { ...shared, material: new PbrMaterial({ color: '#f0a020' }) });
 leaves.dispose();

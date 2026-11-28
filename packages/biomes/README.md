@@ -272,7 +272,7 @@ const meadow = defineBiome({
   rocks: [{ id: 'talus', mesh: 'procedural:rock', density: 80, radius: 0.3 }],
   details: [{ id: 'bunchgrass', mesh: 'procedural:grass', density: 18, blades: true }],
 });
-console.log(meadow.details[0].mesh, meadow.rocks[0].mesh);
+console.log(meadow.details?.[0].mesh, meadow.rocks?.[0].mesh);
 ```
 
 ## Objects meet the ground, and the relief shades itself
@@ -353,7 +353,7 @@ import { BiomeWorld } from '@margoengine/biomes';
 import { BiomeView } from '@margoengine/biomes/view';
 import { Engine } from '@margoengine/core';
 
-const engine = await Engine.create(document.querySelector('canvas'));
+const engine = await Engine.create(document.querySelector('canvas')!);
 const world = await BiomeWorld.create({ seed: 7, size: [1024, 1024], workers: false });
 const view = await BiomeView.attach(engine, world, { patches: { size: 18, contrast: 0.7 } });
 await view.ready;
@@ -373,7 +373,7 @@ import { BiomeWorld } from '@margoengine/biomes';
 import { BiomeView } from '@margoengine/biomes/view';
 import { Engine } from '@margoengine/core';
 
-const engine = await Engine.create(document.querySelector('canvas'));
+const engine = await Engine.create(document.querySelector('canvas')!);
 const world = await BiomeWorld.create({ seed: 7, size: [1024, 1024], workers: false });
 const view = await BiomeView.attach(engine, world, {
   patches: { size: 18, contrast: 0.6, warp: 0.6 },

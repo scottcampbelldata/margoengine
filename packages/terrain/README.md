@@ -1618,7 +1618,22 @@ import { Engine } from '@margoengine/core';
 import { Terrain } from '@margoengine/terrain';
 import { TerrainGroundContact } from '@margoengine/terrain/ground-contact';
 const engine = await Engine.create(document.querySelector('canvas')!);
-const terrain = Terrain.attach(engine, { size: [256, 256] });
+// Small demo maps; pass your own heightmap, layers and weights textures.
+function textures(device: GPUDevice) {
+  const heightmap = device.createTexture({ size: [4, 4], format: 'r32float', usage: 6 });
+  device.queue.writeTexture({ texture: heightmap }, new Float32Array(16), { bytesPerRow: 16 }, [4, 4]);
+  const layers = device.createTexture({ size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6 });
+  const colours = [60, 120, 40, 255, 110, 110, 100, 255, 120, 90, 60, 255, 240, 245, 255, 255];
+  device.queue.writeTexture({ texture: layers }, new Uint8Array(colours), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 4]);
+  const weight = device.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: 6 });
+  device.queue.writeTexture({ texture: weight }, new Uint8Array([255, 0, 0, 0]), { bytesPerRow: 4 }, [1, 1]);
+  return { heightmap, layers, weights: [weight, weight] };
+}
+const terrain = Terrain.attach(engine, {
+  size: [256, 256],
+  textures,
+  layers: [0, 1, 2, 3].map(() => ({ height: [-1e6, 1e6], slope: [0, 1], scale: 0.25 })),
+});
 const contact = TerrainGroundContact.attach(engine, terrain);
 contact.set('camp', [4, -2, 0.6, 1, 9, 3, 0.25, 0]); // a boulder and a tree trunk
 contact.setLook({ soil: 0.8 });

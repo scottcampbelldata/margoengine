@@ -1311,7 +1311,7 @@ LOOKUP_TABLE default
 `;
 const grid = parseVTKLegacy(new TextEncoder().encode(file));
 console.log(grid.type, grid.cellCount, grid.cellTypes); // UNSTRUCTURED_GRID 2 [10, 3]
-console.log(grid.indices.length / 3, grid.triangleCells, grid.lines); // 4 [0, 0, 0, 0] [3, 4]
+console.log(grid.indices!.length / 3, grid.triangleCells, grid.lines); // 4 [0, 0, 0, 0] [3, 4]
 console.log(grid.pointData.temperature.values, grid.cellData.material.values); // [20 ... 24] [7, 9]
 ```
 
@@ -1339,7 +1339,7 @@ const map = parseGeoJSON({
     { type: 'Feature', properties: { name: 'Well' }, geometry: { type: 'Point', coordinates: [5, 12] } },
   ],
 });
-console.log(map.crs, map.features.length, map.mesh.indices.length / 3); // OGC:CRS84 3 8
+console.log(map.crs, map.features.length, map.mesh.indices!.length / 3); // OGC:CRS84 3 8
 console.log(map.polygons[0].rings.length, map.lineFeatures.at(-1), map.pointFeatures); // 2 1 [2]
 
 const ride = parseGPX(`<gpx version="1.1" creator="me" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Ride</name>

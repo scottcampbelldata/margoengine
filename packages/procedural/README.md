@@ -150,7 +150,7 @@ lens shows no facets. Use the three as the near, middle and far meshes of a scat
 ```ts
 import { generateRockMesh } from 'margoengine/procedural';
 const fieldstones = [generateRockMesh(17, 'slab'), generateRockMesh(32, 'wedge'), generateRockMesh(53, 'block')];
-const rings = [2, 1, 0].map((detail) => generateRockMesh(17, 'slab', { detail }));
+const rings = ([2, 1, 0] as const).map((detail) => generateRockMesh(17, 'slab', { detail }));
 ```
 
 The overall form, edge rounding and surface texture are separate shape properties in the [Geological Survey of India
@@ -1479,14 +1479,17 @@ stay coloured at a few pixels a flower. Part colours are the measured FReD flowe
 `sway.height`, so the parts land on the same instances:
 
 ```js
-import { Geometry, PbrMaterial } from '@margoengine/core';
+import { Geometry, PbrMaterial, type Engine } from '@margoengine/core';
+import type { GeometryData } from '@margoengine/geometry';
 import { Scatter } from '@margoengine/scatter';
 import { forb } from '@margoengine/procedural/forbs';
 
-export function plantArnica(engine, heightmap) {
+const mesh = (g: GeometryData) => new Geometry(g.positions, g.normals, g.indices);
+
+export function plantArnica(engine: Engine, heightmap: () => GPUTexture | undefined) {
   const plant = forb('arnica', { seed: 3 });
   return plant.parts.map((part) =>
-    Scatter.attach(engine, part.rings.map((g) => new Geometry(g.positions, g.normals, g.indices)), {
+    Scatter.attach(engine, [mesh(part.rings[0]), mesh(part.rings[1]), mesh(part.rings[2])], {
       area: [40, 40],
       count: 4000,
       seed: 12,
