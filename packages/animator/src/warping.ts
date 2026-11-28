@@ -12,6 +12,7 @@ import { finiteVector } from '@margoengine/math/validate';
 import { treeWeights } from './blend.js';
 import type { Animator } from './index.js';
 import { limbTools, position, poseTools } from './pose-tools.js';
+import { rootMotionJoint } from './travel-joint.js';
 
 /** One leg of {@link Warping}: a direct hip, knee, ankle chain. */
 export interface WarpLeg {
@@ -38,7 +39,10 @@ export interface Warping {
    * state's clips, weighted by its blend tree. Set it for in-place clips, which have no travel to measure.
    */
   clipSpeed?: number;
-  /** glTF node index of the bone whose clip translation is the travel (default `pelvis`). */
+  /**
+   * glTF node index of the bone whose clip translation is the travel. Default `rootMotionJoint`'s bone (the one the
+   * clips move farthest, nearest the root), or `pelvis` when no clip moves a bone.
+   */
   speedJoint?: number;
   /** Node that stands for the character: its +Z is its facing. Default the model's root. */
   character?: Mesh;
@@ -183,7 +187,8 @@ export function addWarping(animator: Animator, warp: Warping): WarpingHandle {
     if (!below(joint, i ? spine[i - 1] : pelvis))
       throw new TypeError(`Warping spine ${i} is not below the joint before it; list joints from the pelvis up`);
   });
-  const speedJoint = warp.speedJoint ?? warp.pelvis;
+  const travelling = warp.speedJoint === undefined ? rootMotionJoint(animator.animation) : -1,
+    speedJoint = warp.speedJoint ?? (travelling === -1 ? warp.pelvis : travelling);
   node(speedJoint, 'speedJoint');
   const read = () => {
     const weight = warp.weight ?? 1,

@@ -348,7 +348,7 @@ export interface RootMotion {
 }
 
 export interface RootMotionOptions {
-    joint: number;
+    joint?: number;
     target?: Mesh;
     axes?: 'xz' | 'xyz';
     rotation?: boolean;
@@ -379,13 +379,15 @@ export function addFootPlacement(animator: Animator, placement: FootPlacement): 
 
 export function addLookAt(animator: Animator, lookAt: LookAt): () => void;
 
-export function addRootMotion(animator: Animator, options: RootMotionOptions): RootMotion;
+export function addRootMotion(animator: Animator, options?: RootMotionOptions): RootMotion;
 
 export function anatomyOf(owner: object): Anatomy | null;
 
 export function blend1D(samples: readonly number[], value: number): Float32Array;
 
 export function blend2D(samples: readonly (readonly [number, number])[], x: number, y: number): Float32Array;
+
+export function rootMotionJoint(animation: Animator['animation']): number;
 
 export function setAnatomy(owner: object, body: Anatomy | null): void;
 

@@ -5,11 +5,16 @@ import type { Mesh, Vec3 } from '@margoengine/core/extension';
 import { sampleTrackInto } from '@margoengine/animation/sampling';
 import { treeWeights } from './blend.js';
 import type { Animator } from './index.js';
+import { rootMotionJoint } from './travel-joint.js';
 
 /** Options for {@link addRootMotion}. */
 export interface RootMotionOptions {
-  /** glTF node index of the bone whose clip translation is the character's travel (the hips or a root bone). */
-  joint: number;
+  /**
+   * glTF node index of the bone whose clip translation is the character's travel (the hips or a root bone). Default
+   * {@link rootMotionJoint}: the bone the clips move farthest, nearest the root (CC_Base_BoneRoot on a Character
+   * Creator rig, whose hips carry no travel).
+   */
+  joint?: number;
   /** Node moved by the travel. Default the model's root node. */
   target?: Mesh;
   /** `xz` (default) takes the ground-plane travel and leaves the bone's height animated; `xyz` takes all of it. */
@@ -57,12 +62,14 @@ const AVERAGE = 16;
  * is taken the same way. A transition starts the new state's travel from its time 0; during a crossfade the travel
  * follows the new state. With `smoothing`, travel is the bone's averaged path and what is left of its path stays in
  * the pose. Returns the handle; dispose it to stop.
- * @throws RangeError for an invalid joint or smoothing.
+ * @throws RangeError for an invalid joint or smoothing, or with no joint given when no clip moves a bone.
  */
-export function addRootMotion(animator: Animator, options: RootMotionOptions): RootMotion {
+export function addRootMotion(animator: Animator, options: RootMotionOptions = {}): RootMotion {
   const model = animator.animation.model,
     nodes = model.nodes,
-    joint = options?.joint;
+    joint = options?.joint ?? rootMotionJoint(animator.animation);
+  if (options?.joint === undefined && joint === -1)
+    throw new RangeError('Root motion found no bone the clips move; pass the joint whose translation is the travel');
   if (!Number.isInteger(joint) || joint < 0 || joint >= nodes.length)
     throw new RangeError(`Root motion joint ${joint} is not one of the model's ${nodes.length} glTF nodes`);
   const axes = options.axes ?? 'xz',

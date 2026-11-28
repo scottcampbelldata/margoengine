@@ -126,6 +126,21 @@ motion.dispose(); // the hips travel with the clip again
 
 `smoothing` matters for motion capture. Real hips surge and lag on every step; at 0 all of that counts as travel, so it leaves the pose, and a game that moves the character steadily sees it as foot slide (44 mm on a CMU walk, where the take's own feet slide 21 mm). About one step of `smoothing` takes only the journey and leaves the surge in the pose (27 mm). A loop keeps its whole lap of travel; a clip that stops carries its path on through its ends.
 
+With no `joint`, root motion takes the travel from `rootMotionJoint(animator.animation)`: the bone the clips move farthest from their start to their end, nearest the root. That is the hips of a Mixamo or KayKit walk and `CC_Base_BoneRoot` of a Character Creator one, whose hips carry no travel; warping's `speedJoint` defaults to the same bone.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf/pbr';
+import { Animation } from 'margoengine/animation';
+import { Animator, addRootMotion, rootMotionJoint } from 'margoengine/animator';
+
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, { backend: 'webgpu' });
+const model = await loadGLTF(engine, '/Rig_Medium_MovementBasic.glb'); // KayKit's mannequin (CC0)
+const animator = Animator.attach(Animation.attach(model), { initial: 'walk', states: { walk: 'Walking_A' } });
+console.log(rootMotionJoint(animator.animation)); // the glTF node the walk travels on, -1 for clips that stay put
+addRootMotion(animator, { apply: false }); // play every clip in place, whichever bone carries its travel
+```
+
 A transition starts the new state's travel at its time 0; during a crossfade the travel follows the new state. Yaw is taken per clip cycle, so a clip should turn less than half a turn per cycle. The target's ancestors need nonzero scales.
 
 ## Look-at and aim constraints

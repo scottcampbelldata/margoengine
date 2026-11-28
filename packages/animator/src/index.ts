@@ -17,6 +17,7 @@ export type { CCDConeLimit, CCDEulerLimit, CCDHingeLimit, CCDHingeTwist, CCDJoin
 export { addCCDChain } from './ccd-chain.js';
 export type { CCDChain } from './ccd-chain.js';
 export { addRootMotion } from './root-motion.js';
+export { rootMotionJoint } from './travel-joint.js';
 export type { RootMotion, RootMotionOptions } from './root-motion.js';
 export { addLookAt, addAimConstraint } from './look-at.js';
 export type { LookAt, AimConstraint } from './look-at.js';

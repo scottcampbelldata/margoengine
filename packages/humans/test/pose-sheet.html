@@ -15,6 +15,7 @@
   import { addPerson } from '/packages/humans/dist/index.js';
   import { addBody } from '/packages/humans/dist/body.js';
   import { addIKChain } from '/packages/rigging/dist/ik.js';
+  import { addRootMotion, rootMotionJoint } from '/packages/animator/dist/index.js';
   import { clampPose, jointAngles, poseFromAngles } from '/packages/rigging/dist/anatomy.js';
   import { checkClip, checkPose, checkProportions, formatPoseReport } from '/packages/rigging/dist/validate.js';
   import { isCompatDevice } from '/packages/webgl2-compat/dist/device.js';
@@ -125,14 +126,18 @@
     const rows = [
       ['rest pose as modelled', () => hold(body.rest.slice())],
       ['anatomical neutral', () => hold(body.neutral.slice())],
-      // Within the clip's first second: a played clip's skin drifts from its bones with clip time (KB-HUM-SKINDRIFT1).
-      ...[0.25, 0.5, 0.75, 1].map((f) => [`${walk} at ${(f * Math.min(1, walkLength)).toFixed(2)} s`, () => animate(walk, f * Math.min(1, walkLength) * 0.999)]),
+      // Four phases across the whole walk, drawn in place by the root motion below.
+      ...[0.25, 0.5, 0.75, 1].map((f) => [`${walk} at ${(f * walkLength).toFixed(2)} s`, () => animate(walk, f * walkLength * 0.999)]),
       ['reach across the chest (IK, right)', reach([['r', [0.3, -0.05, 0.3]]])],
       ['reach overhead (IK, left)', reach([['l', [0.05, 0.5, 0.1]]])],
       ['seated (hips and knees 90)', () => hold(poseFromAngles(body, { l_hip: { flexion: 90 }, r_hip: { flexion: 90 }, l_knee: { flexion: 90 }, r_knee: { flexion: 90 }, l_elbow: { flexion: 60 }, r_elbow: { flexion: 60 } }, body.neutral))],
       ['elbows and knees at full flexion', stops('bent')],
       ['elbows and knees at their extension stops', stops('straight')],
     ];
+    // A walk travels on the bone the clips move farthest: the hips of a Mixamo rig, CC_Base_BoneRoot (above the hips) of a
+    // Character Creator one (KB-HUM-SKINDRIFT1). Root motion that only reports keeps that bone in place, so every row is
+    // drawn over the rest feet; it is taken off again before the clips are checked as played.
+    const travel = rootMotionJoint(person.animator.animation) === -1 ? null : addRootMotion(person.animator, { apply: false });
     // Rows where the body stands on its feet; the neutral, seated and range-end poses are posed about a fixed hip.
     const grounded = new Set([0, 2, 3, 4, 5, 6, 7]);
     const out = new OffscreenCanvas(CELL_W * VIEWS.length + TEXT_W, CELL_H * rows.length),
@@ -148,10 +153,6 @@
       make();
       // What was checked is what is drawn: the pose is held through every render of the row.
       held = io.read();
-      // A clip that walks moves the hips away from the origin; the sheet draws each pose in place, over the rest hips.
-      const hips = body.joints[0].bone * 10;
-      for (let c = 0; c < 3; c++) held[hips + c] = body.rest[hips + c] + (held[hips + c] - body.rest[hips + c]) * Math.abs(up[c]);
-      io.write(held);
       const pose = held,
         result = checkPose(body, pose, { ground: grounded.has(row) ? ground : null }),
         angles = jointAngles(body, pose),
@@ -206,6 +207,7 @@
       }
     };
     held = null;
+    travel?.dispose();
     await clipReport({ person, body, engine }, 'as played (fitted body)');
     const raw = await makePerson(model, { limits: false });
     raw.person.playing = false;

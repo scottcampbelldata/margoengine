@@ -179,16 +179,33 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   weather README examples, 57 of 57).
 - **Regression:** that test.
 
-### Open 2026-11-28: a Character Creator walk's skin travels forward while its hips bone stays put (KB-HUM-SKINDRIFT1, humans)
+### Fixed 2026-11-28: a Character Creator walk's skin travels forward while its hips bone stays put (KB-HUM-SKINDRIFT1, animator)
 
 - **Repro:** `packages/humans/test/pose-sheet.browser.mjs --model=<the Character Creator old man>`: sample the walk at 0,
-  6 and 12 seconds with `person.play('walk', {fade: 0, at})`. The hips bone's world position reads the same each time
-  (CC_Base_Hip local z 0.924, the model root has no travel), yet the drawn skin is further forward at each time, out of
-  the frame by 6 seconds.
-- **Cause:** not yet found. The skin follows something the bone pose read through `person.body` does not show: a second
-  root or a skin root the clip moves, or a joint matrix offset that grows with clip time. To trace in `@margoengine/humans`
-  (the clip's root motion handling) before the walk can be judged past its first second.
-- **Until fixed:** the pose sheet samples the walk inside its first second.
+  6 and 12 seconds with `person.play('walk', {fade: 0, at})`. The hips bone's local translation reads the same each
+  time, yet the drawn skin is further forward at each time, out of the frame by 6 seconds.
+- **Cause:** the skin was right. The walk keys its travel (13.5 m over 12 s) on `CC_Base_BoneRoot`, the skin's top
+  joint above the hips, and leaves `CC_Base_Hip`'s own translation in place, so the hips' world position travels with
+  the root (6.74 m at 6 s). The sheet, like `addRootMotion` and warping, took the travel from the hips, which on this
+  rig carry none: root motion took nothing and warping measured a 0 m/s clip.
+- **Fix:** `rootMotionJoint(animation)` (`packages/animator/src/travel-joint.ts`) finds the bone the clips move
+  farthest, nearest the root; `addRootMotion`'s `joint` and warping's `speedJoint` default to it. The pose sheet draws
+  the whole walk in place with `addRootMotion(animator, {apply: false})`.
+- **Regression:** `tests/modern-animator-travel-joint.test.js`.
+
+### Open 2026-11-28: a stooped body's up leans with its trunk, so ground heights read along a slope (KB-RIG-FRAMEUP1, rigging)
+
+- **Repro:** `addPerson` on the Fauld cast's Character Creator old man: `person.body.frame.up` is
+  [0, 0.992, 0.127], 7.3 degrees forward of the model's vertical. `checkPose(body, pose, {ground})` on the walk drawn in
+  place at 5.98 s reports `r_metatarsophalangeal_1` 2.1 percent of stature below the ground while the joint stands
+  0.041 m up in the world, 0.016 m above the ground; with the walk's travel left in (6.7 m forward) the same toe reads
+  0.11 m higher than it is, so `checkClip` misses ground and foot-slide faults on a walk that travels.
+- **Cause:** `fitAnatomy` reads `up` from the hips to the spine above them (`packages/rigging/src/anatomy.ts`,
+  `species.frame.top`), so a body that stands stooped in its rest pose gets its trunk's lean as up; the ground checks
+  of `packages/rigging/src/validate.ts` measure height along that up.
+- **Fix needed:** a vertical for the ground checks that does not lean with the trunk: the normal of the rest feet's
+  sole plane (heels and toes of a standing rest), or the rig space's up when the species gives one. `body.frame` feeds
+  the anatomical zeros too, so the change reruns the anatomy, IK and pose sheet tests.
 
 ### Fixed 2026-11-28: the human anatomy table did not read Unreal mannequin or KayKit bone names (KB-RIG-UENAMING1, rigging)
 
