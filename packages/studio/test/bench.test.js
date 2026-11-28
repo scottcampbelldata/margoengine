@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { Engine, TransformStore } from '@margoengine/core/extension';
 import { box } from '@margoengine/core';
-import { addSubject, frameView, openBench, subjectBox } from '../dist/bench.js';
+import { addSubject, coveOrbitLimits, frameView, openBench, subjectBox } from '../dist/bench.js';
 
 const canvas = () => ({ getContext() {}, clientWidth: 100, clientHeight: 50, width: 0, height: 0, dataset: {} });
 
@@ -147,4 +147,18 @@ test('a mesh added with fit: false stays out of the auto-fit box, so a big floor
   removeSubject();
   assert.equal(subjects.size, 0, 'a remover takes the mesh out of the set');
   assert.equal(await subjectBox(subjects), null, 'an empty set has no box');
+});
+
+test('coveOrbitLimits keeps the frame inside a cove: no edge ray turns past the open sides', () => {
+  // Regression: orbiting the CAD bench about 90 degrees looked past the cove's open side onto the clear colour.
+  for (const [fov, aspect] of [[36, 16 / 9], [36, 1.36], [50, 1], [20, 0.6]]) {
+    const { azimuth, maxPolar } = coveOrbitLimits(fov, aspect),
+      half = Math.atan(Math.tan((fov * Math.PI) / 360) * aspect);
+    assert.equal(azimuth[0], -azimuth[1]);
+    assert.ok(azimuth[1] + half < Math.PI / 2, `${fov}/${aspect}: edge ray at ${azimuth[1] + half}`);
+    assert.ok(azimuth[1] > 0.9, `${fov}/${aspect}: still turns ${azimuth[1]}`);
+    assert.ok(maxPolar < Math.PI / 2);
+  }
+  assert.throws(() => coveOrbitLimits(0, 1), RangeError);
+  assert.throws(() => coveOrbitLimits(36, 0), RangeError);
 });

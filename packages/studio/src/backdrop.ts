@@ -134,9 +134,13 @@ const rigs: Record<StagingPreset, readonly StudioLight[]> = {
   // A light tent (the diffuse enclosure of product and jewellery photography): six panels 60 degrees apart, each 1.2
   // rad wide, ring the horizon with soft overlapping edges, so a flat metal face at any heading mirrors a panel. The
   // front-left panel is brightest and the back ones dimmest, so faces still read as a gradient of form, not one tone.
+  // A tent is one white cloth lit from outside, so nothing in it is far brighter than the cloth: the brightest
+  // direction (front-left panel over its wall) is radiance 1, and the large overhead diffuser only lifts the ceiling
+  // to about 0.95. A polished aluminium top (F0 0.91) then mirrors at most 0.91 times the environment intensity and
+  // keeps its gradient under a display curve, where the old 3x overhead box (radiance 4) clipped it to white.
   tent: [
-    { direction: [0, 1, 0], width: 1.6, height: 1.6, intensity: 3 },
-    ...[3, 2.2, 1.6, 1.3, 1.6, 2.2].map((intensity, i) => {
+    { direction: [0, 1, 0], width: 2, height: 2, intensity: 0.35, softness: 0.5 },
+    ...[0.36, 0.3, 0.24, 0.2, 0.24, 0.3].map((intensity, i) => {
       const a = Math.PI / 4 + (i * Math.PI) / 3;
       return { direction: [-Math.sin(a), 0.22, Math.cos(a)] as [number, number, number], width: 1.2, height: 0.9, intensity, softness: 0.3 };
     }),
@@ -154,7 +158,7 @@ export interface StagingRoom {
   ceiling: Rgb;
 }
 const rooms: Partial<Record<StagingPreset, StagingRoom>> = {
-  tent: { floor: [0.6, 0.6, 0.6], walls: [0.8, 0.8, 0.8], ceiling: [1, 1, 1] },
+  tent: { floor: [0.35, 0.35, 0.35], walls: [0.45, 0.45, 0.45], ceiling: [0.6, 0.6, 0.6] },
 };
 
 /** A fresh copy of the named rig's room (floor, walls, ceiling), or undefined for studio's default grey room. */

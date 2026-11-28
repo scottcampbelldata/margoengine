@@ -409,21 +409,23 @@ const spin = bench.frame((delta) => product.setRotation([0, (turn += delta * 0.5
 | `tonemap` | none (core's Khronos PBR Neutral at 0 EV) | `TonemapOptions` attaches `Tonemap` |
 | `ao` | false | `true` or `GTAOOptions` |
 | `fit` | true without `camera`, false with it | frame the subject on `ready()`; `true` or `{fill, bounds}` (fill default 0.8) |
-| `orbit` | false | `true` or `{target, minDistance, maxDistance, damping}` |
+| `orbit` | false | `true` or `{target, minDistance, maxDistance, damping, azimuth}`; with a backdrop the azimuth defaults to `coveOrbitLimits(fov, aspect)` so the view never turns past the cove's open sides (`azimuth: false` for none) |
 | `exhibit`, `signal`, `onResize`, `onError` | canvas, none | where the signals go, cancellation, callbacks |
 
 Staging rigs (`@margoengine/studio/backdrop` `stagingLights`, `stagingRoom`, `stagingLighting`): `'portrait'`,
 `'rembrandt'`, `'upfront'` and `'soft'` hang three softboxes in studio's grey room. `'tent'` is a product light tent
 for metal and other mirror-like parts: six panels 60 degrees apart ring the horizon under a large overhead box, in a
-white room (floor 0.6, walls 0.8, ceiling 1), so a flat metal face at any heading, seen from any height, mirrors lit
-cloth instead of a dark wall or floor. Under `'soft'` the same face reads near black.
+white room (floor 0.35, walls 0.45, ceiling 0.6), so a flat metal face at any heading, seen from any height, mirrors
+lit cloth instead of a dark wall or floor. Under `'soft'` the same face reads near black. No direction of the tent is
+brighter than radiance 1 (the cloth), so at intensity 1 a polished aluminium top mirrors at most 0.91 and keeps its
+gradient under the display curve instead of clipping to white.
 
 ```ts
 import {stagingLights, stagingRoom} from 'margoengine/studio/backdrop';
 const lights = stagingLights('tent'); // 7 softboxes: overhead and the six-panel ring
 const room = stagingRoom('tent'); // {floor, walls, ceiling}; undefined for the other rigs
 console.log(lights.length, room?.floor);
-// With a bench: openBench(canvas, {environment: {preset: 'tent', intensity: 0.5}})
+// With a bench: openBench(canvas, {environment: {preset: 'tent', intensity: 1}})
 ```
 
 `bench.frame(callback)` runs `callback(delta, time)` before every frame until its remover runs; `bench.request()`

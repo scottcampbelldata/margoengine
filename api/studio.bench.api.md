@@ -88,14 +88,17 @@ export interface BenchOptions {
     tonemap?: TonemapOptions | false;
     ao?: GTAOOptions | boolean;
     fit?: boolean | BenchFitOptions;
-    orbit?: {
-        target?: Vec3;
-        minDistance?: number;
-        maxDistance?: number;
-        damping?: boolean;
-    } | boolean;
+    orbit?: BenchOrbitOptions | boolean;
     onResize?: (bench: Bench) => void;
     onError?: (reason: unknown) => void;
+}
+
+export interface BenchOrbitOptions {
+    target?: Vec3;
+    minDistance?: number;
+    maxDistance?: number;
+    damping?: boolean;
+    azimuth?: readonly [number, number] | false;
 }
 
 export type BenchStart = (canvas: HTMLCanvasElement, options: BenchStartOptions) => Promise<{
@@ -118,6 +121,11 @@ export interface FrameViewCamera {
 }
 
 export function addSubject(subjects: Set<MeshHandle>, mesh: MeshHandle | ContactSource, framed: boolean): () => void;
+
+export function coveOrbitLimits(fov: number, aspect: number): {
+    azimuth: [number, number];
+    maxPolar: number;
+};
 
 export function frameView(camera: FrameViewCamera, box: {
     min: Vec3;

@@ -71,7 +71,7 @@ test('the tent rig rings the horizon: a vertical mirror at any heading reflects 
   assert.equal(lights.length, 7);
   assert.equal(stagingRoom('soft'), undefined);
   stagingRoom('tent').floor[0] = 9;
-  assert.equal(stagingRoom('tent').floor[0], 0.6);
+  assert.equal(stagingRoom('tent').floor[0], 0.35);
   const at = (azimuth, elevation) => {
     // Equirect: column by azimuth, row 0 at the top (elevation PI / 2).
     const x = Math.min(width - 1, Math.floor((((azimuth / (2 * Math.PI)) % 1) + 1) % 1 * width)),
@@ -86,9 +86,16 @@ test('the tent rig rings the horizon: a vertical mirror at any heading reflects 
       low = Math.min(low, v);
       high = Math.max(high, v);
     }
-  // Below the horizon a vertical face seen from above mirrors the tent's white floor (0.6), not a dark one.
-  assert(low >= 0.6, `darkest heading ${low}`);
+  // Below the horizon a vertical face seen from above mirrors the tent's white floor (0.35), not a dark one.
+  assert(low >= 0.35 - 1e-6, `darkest heading ${low}`);
   assert(high > 2 * low, `the panels keep a gradient (${low} to ${high})`);
+  // Regression: the overhead box at 3 over a ceiling of 1 (radiance 4) and the panels over 0.8 walls clipped a
+  // polished aluminium top to white on the CAD bench. No direction of the tent is brighter than its cloth (1).
+  let peak = 0;
+  for (let i = 0; i < image.data.length; i += 4) peak = Math.max(peak, image.data[i], image.data[i + 1], image.data[i + 2]);
+  assert(peak <= 1 + 1e-6 && peak > 0.9, `brightest tent direction ${peak}`);
+  // Straight up is the overhead diffuser, within the cloth's range, so an upward face is lit from above.
+  assert(at(0, Math.PI / 2 - 0.01) > 0.85, `overhead ${at(0, Math.PI / 2 - 0.01)}`);
   const soft = studio({ width, lights: stagingLights('soft') });
   let softLow = Infinity;
   for (let x = 0; x < width; x += 4) softLow = Math.min(softLow, soft.data[(Math.floor(0.45 * height) * width + x) * 4]);

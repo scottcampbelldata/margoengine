@@ -35,6 +35,35 @@ export interface BenchEnvironment {
   width?: number;
 }
 
+/** Pointer orbit settings for {@link BenchOptions.orbit}. */
+export interface BenchOrbitOptions {
+  target?: Vec3;
+  minDistance?: number;
+  maxDistance?: number;
+  damping?: boolean;
+  /**
+   * Azimuth range in radians about +Y (0 looks from +Z, the backdrop's open front). Default with a backdrop:
+   * {@link coveOrbitLimits} for the start view, so the view never turns past the cove's open sides and front; without
+   * one, unlimited. false for unlimited.
+   */
+  azimuth?: readonly [number, number] | false;
+}
+
+/**
+ * Orbit limits that keep a view inside a cyclorama cove (floor and back wall at -Z, open at its sides and front):
+ * the azimuth stays within PI / 2 less half the horizontal field of view (and a 0.1 rad margin) of the front, so the
+ * edge of the frame never looks along or past the open sides, and the camera stays above the floor's horizon.
+ * `fov` is the vertical field of view in degrees and `aspect` width over height.
+ * @throws RangeError for fov outside (0, 180) or a non-positive aspect.
+ */
+export function coveOrbitLimits(fov: number, aspect: number): { azimuth: [number, number]; maxPolar: number } {
+  if (!(fov > 0 && fov < 180) || !(aspect > 0) || !Number.isFinite(aspect))
+    throw rangeError('Invalid cove limits; pass a fov in (0, 180) degrees and a positive aspect', 'arguments');
+  const half = Math.atan(Math.tan((fov * Math.PI) / 360) * aspect),
+    limit = Math.max(0.35, Math.PI / 2 - half - 0.1);
+  return { azimuth: [-limit, limit], maxPolar: Math.PI / 2 - 0.05 };
+}
+
 /** What {@link BenchOptions.start} is handed: `Engine.create` options, the layer's loader and whether to force it. */
 export interface BenchStartOptions extends Omit<EngineOptions, 'backend' | 'fallback'> {
   /** Loads the WebGL2 compatibility layer, from {@link BenchOptions.loadCompat}; rejects when none was given. */
@@ -106,7 +135,7 @@ export interface BenchOptions {
    */
   fit?: boolean | BenchFitOptions;
   /** Pointer orbit (controls/orbit); false for none. Default false. */
-  orbit?: { target?: Vec3; minDistance?: number; maxDistance?: number; damping?: boolean } | boolean;
+  orbit?: BenchOrbitOptions | boolean;
   /** Called after the backbuffer changed size, before the next frame. */
   onResize?: (bench: Bench) => void;
   /** Called once with the first failure (engine error, frame error, start-up error). */
@@ -489,6 +518,12 @@ export async function openBench(canvas: HTMLCanvasElement, options: BenchOptions
           if (settings.target) controls.target = [settings.target[0], settings.target[1], settings.target[2]];
           if (settings.minDistance !== undefined) controls.minDistance = settings.minDistance;
           if (settings.maxDistance !== undefined) controls.maxDistance = settings.maxDistance;
+          if (settings.azimuth) [controls.minAzimuthAngle, controls.maxAzimuthAngle] = settings.azimuth;
+          else if (settings.azimuth === undefined && backdrop) {
+            const limits = coveOrbitLimits(engine.camera.fov ?? 35, canvas.width / Math.max(1, canvas.height));
+            [controls.minAzimuthAngle, controls.maxAzimuthAngle] = limits.azimuth;
+            controls.maxPolarAngle = limits.maxPolar;
+          }
           controls.enableDamping = damping && !motion?.matches;
           // Damped motion lands in update(), so frames run from 'start' to 'end' and the settling 'change' events after it.
           const keep = () => {};
