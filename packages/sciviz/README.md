@@ -1217,6 +1217,36 @@ LIC is a separate optional entry: 23,461 B minified gzip in the integrated build
 This includes the same full-precision published colormap data as the other colour-bearing entries; the
 normalized pre-restoration measurement was 10,429 B. Core + stage remains under 25,150 B combined gzip (`npm run measure:size` prints the figure).
 
+## Shaded relief with isolines
+
+`reliefImage(grid, options)` from `@margoengine/sciviz/contour2d` bakes a gridded height field into one RGBA8 sRGB
+image: a hypsometric tint (`stops` of `{ at, color }`, blended in OKLab, or `stepped: true` for one flat tint per
+contour band; default a green to sand to snow ramp over the data range), Horn's hillshade (`light` [azimuth,
+altitude] default [315, 45], `exaggeration` 1, `shade` 0.55) and contour lines every `interval` from `base` (default
+none and 0), every `index`-th one (5) drawn 2.2 times wider, `lineWidth` 1.2 px, `lineColor` '#25362f',
+`lineOpacity` 0.6. Lines are anti-aliased by each pixel's distance to its level over the local gradient, so they keep
+an even width on steep and gentle ground. `width` defaults to 1024 and `height` to the grid's aspect. The image is
+CPU work, so WebGPU and the WebGL2 layer show the same picture. `reliefGeometry(grid, { size, scale, offset, skirt,
+stride })` builds the matching terrain mesh (UVs 0 to 1, smooth normals, optional skirt walls down to `skirt` as a
+second material group).
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Texture, UnlitMaterial, Material, createMesh } from '@margoengine/materials';
+import { reliefGeometry, reliefImage } from '@margoengine/sciviz/contour2d';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const axis = Array.from({ length: 64 }, (_, i) => i * 10);
+const values = axis.flatMap((y) => axis.map((x) => 400 * Math.exp(-((x - 320) ** 2 + (y - 300) ** 2) / 40000)));
+const grid = { x: axis, y: axis, values };
+const image = reliefImage(grid, { width: 1024, interval: 25, lineWidth: 2.5 });
+const top = new UnlitMaterial({ map: new Texture(image, { colorSpace: 'srgb', mipmaps: true }) });
+const geometry = reliefGeometry(grid, { size: [4, 4], scale: 0.002, skirt: -0.2 });
+createMesh(engine, geometry, [top, new Material({ color: '#56665b', roughness: 0.9 })]);
+```
+
+[The Contour Map](../../demos/the-contour-map/) draws the USGS 3DEP Mount St. Helens grid this way.
+
 ## Stream tubes and ribbons
 
 The optional `@margoengine/sciviz/tubes` entry turns packed xyz polylines into owned CPU mesh arrays.

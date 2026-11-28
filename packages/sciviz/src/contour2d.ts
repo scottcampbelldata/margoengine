@@ -294,3 +294,6 @@ export function contourSVG(data: Contours2D, options: ContourSVGOptions = {}): s
     : '';
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img"><title>${escape(title)}</title>${bands}${lines}${text}</svg>`;
 }
+
+export { reliefImage, reliefGeometry } from './contour2d-relief.js';
+export type { ReliefStop, ReliefImageOptions, ReliefImage, ReliefGeometryOptions } from './contour2d-relief.js';

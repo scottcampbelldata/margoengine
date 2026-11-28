@@ -20453,3 +20453,25 @@ test/grid.test.js, test/teeth.browser.mjs, test/rock-projection.test.js).
 Margo's own: the Hermite bisection to the face and the spanwise exponent shared by chord, sweep and dihedral. Tests:
 sciviz tests/tubes.test.js (an exact helix to 1e-5, the face crossing to 1e-9, OKLab midpoints) and geometry
 tests/builder-parts.test.js (closed, outward, the exact section area times the span).
+
+## G04 shaded relief with isolines: sciviz/contour2d reliefImage and reliefGeometry (2026-11-28)
+
+Written from the sources below; no other library's code was read.
+
+- B. K. P. Horn, "Hill shading and the reflectance map", Proceedings of the IEEE 69(1):14-47, 1981,
+  https://doi.org/10.1109/PROC.1981.11918 (the weighted 3 x 3 gradient and the Lambertian hillshade).
+- E. Imhof, Cartographic Relief Presentation, de Gruyter 1982 (ESRI Press edition 2007) (north-west light, hypsometric
+  tints from low greens to light summits, index contours wider than intermediate ones).
+- T. Patterson and B. Jenny, "The development and rationale of cross-blended hypsometric tints", Cartographic
+  Perspectives 69, 2011, https://doi.org/10.14714/CP69.20 (tint ramps for relief maps).
+- C. Maple, "Geometric design and space planning using the marching squares and marching cube algorithms", GMAG 2003,
+  https://doi.org/10.1109/GMAG.2003.1219671 (marching squares; contour2D traces the labelled paths, the image draws
+  the same levels per pixel).
+- B. Ottosson, OKLab, 2020, https://bottosson.github.io/posts/oklab/ (tint stops blended in OKLab).
+- U.S. Geological Survey, Topographic map symbols, 2005, https://pubs.usgs.gov/gip/TopographicMapSymbols/ (index
+  contour every fifth line).
+
+Margo's own: the per-pixel line coverage w / 2 + 0.5 - distance / (levels per pixel), the same rule a shader writes
+with fwidth, here on the CPU; the gentle brightening of slopes facing the light. Tests: sciviz
+tests/contour2d-relief.test.js (lines on the exact levels of a plane, wider index contours, the hillshade order of
+north-west, flat and south-east slopes, outward skirts and their material group).
