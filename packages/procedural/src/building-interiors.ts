@@ -35,7 +35,7 @@ import type {
 } from './building-rules.js';
 import { type MeshBuilder, add, scale, type V3 } from './mesh-builder.js';
 import type { BayPlan } from './building-bays.js';
-import { type BuildingEscape, twoStairs, walkLimit, walks } from './building-escape.js';
+import { type BuildingEscape, twoStairs, unmetBy, walkLimit, walks } from './building-escape.js';
 
 /** One side of the footprint: its start corner, run direction, outward normal and length. */
 export interface Side {
@@ -960,17 +960,26 @@ const apartOf = (a: StairPlan, b: StairPlan) =>
       flightEnds(a, k).flatMap(([x, z]) => flightEnds(b, k).map(([u, v]) => Math.hypot(x - u, z - v))),
     ),
   );
-function escapesOf(style: BuildingStyle, layout: Floor[], plans: StairPlan[], all: Rect): BuildingEscape[] {
+function escapesOf(
+  style: BuildingStyle,
+  layout: Floor[],
+  plans: StairPlan[],
+  all: Rect,
+  wanted: boolean,
+): BuildingEscape[] {
   const w = all.x1 - all.x0,
     d = all.z1 - all.z0;
   return layout.slice(1).map((floor, i) => {
     const k = i + 1,
       exits = exitsOn(plans, k),
       one = walks(floor, exits.slice(0, 1)),
-      both = exits.length > 1 ? walks(floor, exits) : undefined;
+      both = exits.length > 1 ? walks(floor, exits) : undefined,
+      required = twoStairs(style, k, floor, w * d, one.walk),
+      unmet = unmetBy(style, required, wanted, both);
     return {
       floor: k,
-      required: twoStairs(style, k, floor, w * d, one.walk),
+      required,
+      ...(unmet && { unmet }),
       stairs: exits.length,
       walk: (both ?? one).walk,
       walkLimit: walkLimit(style),
@@ -982,7 +991,8 @@ function escapesOf(style: BuildingStyle, layout: Floor[], plans: StairPlan[], al
 /**
  * The second stair, up to the highest storey that asks for two: framed or winder (no spiral or ladder serves as one), as
  * far from the first as the rooms hold one, half the floor's diagonal apart where it can (IBC 1007.1.1), else a third,
- * else a quarter.
+ * else a quarter. At each distance it stands in a room, else in a second stair hall made by taking partitions down on
+ * the storeys it serves, the first stair's room left with its way past.
  */
 function escapeStair(
   o: InteriorOptions,
@@ -991,34 +1001,57 @@ function escapeStair(
   layout: Floor[],
   first: StairPlan,
   all: Rect,
-  avoid?: StairAvoid,
-): StairPlan | undefined {
-  const asked = escapesOf(o.style, layout, [first], all).filter((e) => e.required);
+  grid: { columns: number; rows: number; plan: (hall: Hall, reached: number) => Floor[]; avoid?: StairAvoid },
+): { stair: StairPlan; reached: number; hall?: Hall } | undefined {
+  const asked = escapesOf(o.style, layout, [first], all, true).filter((e) => e.required);
   if (!asked.length) return undefined;
   const reached = asked[asked.length - 1].floor + 1,
     served = floors.slice(0, reached),
     below = layout.slice(0, reached),
     whole = planRect(first.place, -first.before, first.length + first.after, 0, first.breadth),
+    body = planRect(first.place, 0, first.length, 0, first.breadth),
     middle = (r: Rect) => Math.hypot((r.x0 + r.x1 - whole.x0 - whole.x1) / 2, (r.z0 + r.z1 - whole.z0 - whole.z1) / 2),
     rooms = roomOrder(below).sort((a, b) => middle(b) - middle(a)),
     diagonal = Math.hypot(all.x1 - all.x0, all.z1 - all.z0),
+    { avoid } = grid,
     // The first stair keeps its own floor and a way round it.
     rects = [
       ...(avoid?.rects ?? []),
       { x0: whole.x0 - 0.9, x1: whole.x1 + 0.9, z0: whole.z0 - 0.9, z1: whole.z1 + 0.9 },
-    ];
+    ],
+    pass = first.kind === 'ladder' ? 0.4 : 0.55;
   const framed = [framedShapes(rule, served), winderShapes(o.style, rule, served)];
   if (o.stairShape === 'winder') framed.reverse();
-  for (const share of [1 / 2, 1 / 3, 1 / 4])
+  // Each hall that leaves the first stair standing, with the room it makes: the farthest from that stair first.
+  const makeHalls = () =>
+    halls(grid.columns, grid.rows)
+      .flatMap((hall) => {
+        const planned = grid.plan(hall, reached).slice(0, reached),
+          room = planned.flatMap((f, k) =>
+            f.rooms.filter((r) => !below[k].rooms.some((q) => within(r, q) && within(q, r))),
+          )[0],
+          stands = planned.every((f) => f.rooms.some((q) => within(whole, q) && !divides(q, body, pass)));
+        return room && stands ? [{ hall, room, floors: planned }] : [];
+      })
+      .sort((a, b) => middle(b.room) - middle(a.room));
+  let made: ReturnType<typeof makeHalls> | undefined;
+  for (const share of [1 / 2, 1 / 3, 1 / 4]) {
+    const keepOut: KeepOut = {
+      rects,
+      from: avoid?.from,
+      hidden: avoid?.hidden,
+      allow: (stair) => apartOf(first, stair) >= diagonal * share,
+    };
     for (const shapes of framed) {
-      const found = planStair(shapes, rooms, below, CLEAR, {
-        rects,
-        from: avoid?.from,
-        hidden: avoid?.hidden,
-        allow: (stair) => apartOf(first, stair) >= diagonal * share,
-      });
-      if (found) return found;
+      const found = planStair(shapes, rooms, below, CLEAR, keepOut);
+      if (found) return { stair: found, reached };
     }
+    for (const shapes of framed)
+      for (const { hall, room, floors: planned } of (made ??= makeHalls())) {
+        const found = planStair(shapes, [room], planned, CLEAR, keepOut);
+        if (found) return { stair: found, reached, hall };
+      }
+  }
   return undefined;
 }
 
@@ -1129,16 +1162,16 @@ export function buildInterior(
     }
     return out;
   };
-  const floorPlan = (fy: number, k: number, walls: Wall[], hall?: Hall): Floor => {
+  const floorPlan = (fy: number, k: number, walls: Wall[], made: readonly Hall[]): Floor => {
     const cy = ceilingOf(k),
       xs = open(k) ? [x0, x1] : columnLines,
       zs = open(k) ? [z0, z1] : rowLines,
-      merge = open(k) ? undefined : hall,
+      merged = open(k) ? [] : made,
       doors: BuildingDoorway[] = [],
       gaps: [number, number][] = [],
       // Whether the partition left of column `j` in row `r`, or behind the front row in column `i`, stands.
-      across = (j: number, r: number) => !(merge && j > merge.i0 && j <= merge.i1 && r >= merge.r0 && r <= merge.r1),
-      along = (i: number) => !(merge && merge.r1 > merge.r0 && i >= merge.i0 && i <= merge.i1);
+      across = (j: number, r: number) => !merged.some((h) => j > h.i0 && j <= h.i1 && r >= h.r0 && r <= h.r1),
+      along = (i: number) => !merged.some((h) => h.r1 > h.r0 && i >= h.i0 && i <= h.i1);
     const openings = holes.filter((h) => h.floor === k).map(span),
       // A partition that would run into an outer door stops 1.2 m short of that wall, leaving an entry.
       intoDoor = (axis: Opening['axis'], plane: number, line: number) =>
@@ -1235,10 +1268,11 @@ export function buildInterior(
       for (let r = 0; r + 1 < zs.length; r++) {
         let i1 = i,
           r1 = r;
-        if (merge && i >= merge.i0 && i <= merge.i1 && r >= merge.r0 && r <= merge.r1) {
-          if (i > merge.i0 || r > merge.r0) continue;
-          i1 = merge.i1;
-          r1 = merge.r1;
+        const hall = merged.find((h) => i >= h.i0 && i <= h.i1 && r >= h.r0 && r <= h.r1);
+        if (hall) {
+          if (i > hall.i0 || r > hall.r0) continue;
+          i1 = hall.i1;
+          r1 = hall.r1;
         }
         floor.rooms.push({
           x0: xs[i] + (i > 0 ? pt / 2 : 0),
@@ -1250,8 +1284,19 @@ export function buildInterior(
       }
     return floor;
   };
-  const planFloors = (walls: Wall[], hall?: Hall) =>
-    o.interior !== 'rooms' ? [] : floors.map((fy, k) => floorPlan(fy, k, walls, hall));
+  /** The floors, with the first stair's hall on all of them and the escape stair's on the storeys it serves. */
+  const planFloors = (walls: Wall[], hall?: Hall, escape?: { hall: Hall; reached: number }) =>
+    o.interior !== 'rooms'
+      ? []
+      : floors.map((fy, k) => {
+          const made = [hall, escape && k < escape.reached ? escape.hall : undefined];
+          return floorPlan(
+            fy,
+            k,
+            walls,
+            made.filter((h): h is Hall => !!h),
+          );
+        });
   const rule = stairRule(o.style, (x1 - x0) * (z1 - z0));
   let chosen: ReturnType<typeof placeStair>;
   if (o.interior === 'rooms' && o.stairs && floors.length > 1) {
@@ -1272,13 +1317,26 @@ export function buildInterior(
       (avoid?.required ? (find({ rects: [], hidden: avoid.hidden }) ?? find({ rects: [] })) : undefined);
   }
   const walls: Wall[] = [],
-    layout = planFloors(walls, chosen?.hall),
     plan = chosen?.stair;
+  let layout = planFloors(walls, chosen?.hall);
   assignUses(o, layout, use, plan ? [plan] : []);
-  const second = plan && o.escapeStair ? escapeStair(o, rule, floors, layout, plan, all, avoid) : undefined,
+  const escape =
+      plan && o.escapeStair
+        ? escapeStair(o, rule, floors, layout, plan, all, {
+            columns,
+            rows: rowLines.length - 1,
+            plan: (hall, reached) => planFloors([], chosen?.hall, { hall, reached }),
+            avoid,
+          })
+        : undefined,
+    second = escape?.stair,
     plans = [plan, second].filter((p): p is StairPlan => !!p);
+  if (escape?.hall) {
+    walls.length = 0;
+    layout = planFloors(walls, chosen?.hall, { hall: escape.hall, reached: escape.reached });
+  }
   if (second) assignUses(o, layout, use, plans);
-  if (plan) out.escapes = escapesOf(o.style, layout, plans, all);
+  if (plan) out.escapes = escapesOf(o.style, layout, plans, all, o.escapeStair);
   /** The openings in floor `k`, over the flights that arrive there. */
   const wells = (k: number) => plans.filter((p) => k > 0 && k <= p.flights.length).map((p) => flightRect(p, k - 1));
   // The floors above the first are open over the stairs.

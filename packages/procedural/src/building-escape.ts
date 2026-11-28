@@ -24,6 +24,13 @@ export interface BuildingEscape {
    * too far to one; null where one will do.
    */
   readonly required: 'area' | 'storey' | 'walk' | null;
+  /**
+   * What the code asks of this storey that the building does not give, absent where it gives all that is checked:
+   * `stair-off`, a second stair is asked and `escapeStair` is false; `no-room`, no framed or winder stair stands clear
+   * of the first, a quarter of the diagonal from it, in a room or a stair hall; `walk` (Japan), a room walks farther
+   * than the limit to the nearer of two stairs; `shared` (Japan), the way its two walks share passes half the limit.
+   */
+  readonly unmet?: 'stair-off' | 'no-room' | 'walk' | 'shared';
   /** Stairs down from this storey: 1, or 2. */
   readonly stairs: number;
   /** The farthest walk from a room's corner to its nearest stair, metres, and the most the code allows. */
@@ -89,6 +96,20 @@ export function twoStairs(
     if (Math.ceil(gross / GROSS) > ONE_EXIT_LOAD) return 'area';
   }
   return walk > walkLimit(style) + 1e-9 ? 'walk' : null;
+}
+
+/** What a storey still lacks, given the walks `both` to its two stairs, undefined where it has one. */
+export function unmetBy(
+  style: BuildingStyle,
+  required: BuildingEscape['required'],
+  wanted: boolean,
+  both?: { walk: number; shared: number },
+): BuildingEscape['unmet'] {
+  if (!both) return required ? (wanted ? 'no-room' : 'stair-off') : undefined;
+  // IBC's 75 ft is the most travel with one exit only; arts. 120 and 121 para. 3 hold with two stairs too.
+  if (!style.startsWith('japan')) return undefined;
+  if (both.walk > walkLimit(style) + 1e-9) return 'walk';
+  return both.shared > walkLimit(style) / 2 + 1e-9 ? 'shared' : undefined;
 }
 
 const within = (r: EscapeRoom, [x, z]: Point) =>

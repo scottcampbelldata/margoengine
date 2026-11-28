@@ -1030,7 +1030,8 @@ console.log(tall.bayWindows[0].ledge === tall.floors[0]); // true
 ```
 
 A storey that the style's code does not allow one stair gets a second (`escapeStair`, on by default), from the ground
-up to the highest such storey, as far from the first as the rooms hold one. Japan (Enforcement Order arts. 120 and
+up to the highest such storey, as far from the first as the rooms hold one; where no room does, partitions come
+down to make it a stair hall of its own. Japan (Enforcement Order arts. 120 and
 121, https://laws.e-gov.go.jp/api/1/lawdata/325CO0000000338): habitable rooms on the 6th floor or above, over 200 m2
 of them on the second floor or 100 m2 on another (both doubled for the concrete and warehouse styles), or a room more
 than 40 m (50 m) of walking from the stair. The western commercial styles (IBC Table 1006.3.4(2) for business areas, as
@@ -1039,7 +1040,9 @@ each on the second, or more than 75 ft of walking. The one-family `western-1910-
 stand at least half the floor's diagonal apart where the plan allows (IBC 2021 1007.1.1,
 https://www3.iccsafe.org/cs/committeeArea/pdf_file/BU_21_86_22.pdf), else a third or a quarter. `escapes` reports for
 each upper storey why it asks for two, the stairs it has, the farthest walk, the walk the two ways share and how far
-apart they are; `stairs` marks the second one's flights with `escape`.
+apart they are; `stairs` marks the second one's flights with `escape`. A storey that lacks something the code asks
+names it in `unmet`: `no-room` (the plan holds no second stair), `stair-off` (`escapeStair: false`), and for Japan
+`walk` or `shared` (the walks to two stairs still pass the limit).
 
 ```ts
 import {generateBuilding} from 'margoengine/procedural/building-rules';
@@ -1047,6 +1050,8 @@ const block = generateBuilding({style: 'japan-2011-house', width: 24, depth: 12}
 const [floor] = block.escapes;
 console.log(floor.required, floor.stairs, block.stairs.filter((s) => s.escape).length); // area 2 1
 console.log(floor.apart! >= floor.diagonal / 2, floor.shared! <= floor.walkLimit / 2); // true true
+const narrow = generateBuilding({style: 'western-1910-brick', width: 4, depth: 5});
+console.log(narrow.escapes[1].stairs, narrow.escapes[1].unmet); // 1 no-room
 ```
 
 `townBuildings(lots, {styles, margin, detail, seed, override})` turns the lots of a settlement layout (the `houses` of

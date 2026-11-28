@@ -82,6 +82,7 @@ export interface BuildingDoorway {
 export interface BuildingEscape {
     readonly floor: number;
     readonly required: 'area' | 'storey' | 'walk' | null;
+    readonly unmet?: 'stair-off' | 'no-room' | 'walk' | 'shared';
     readonly stairs: number;
     readonly walk: number;
     readonly walkLimit: number;

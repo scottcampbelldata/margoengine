@@ -279,6 +279,9 @@ test('large buildings get a second stair where the code asks, walked to from eve
     assert.equal(b.escapes.length, o.storeys.length - 1, label);
     asked += wanted.length;
     for (const e of b.escapes) {
+      // What the code asks and the building lacks is named.
+      if (e.required && e.stairs === 1) assert.equal(e.unmet, 'no-room', label);
+      else if (e.unmet) assert.ok(e.unmet === 'walk' || e.unmet === 'shared', `${label}: ${e.unmet}`);
       assert.ok(Number.isFinite(e.walk) && e.walk > 0, `${label}: the walk on floor ${e.floor}`);
       assert.equal(e.stairs, second.some((s) => s.floor === e.floor - 1) ? 2 : 1, label);
       if (e.required && e.stairs === 2) {
@@ -303,7 +306,8 @@ test('large buildings get a second stair where the code asks, walked to from eve
     wrong.push(...unreached({ ...b, stairs: [...second, ...b.stairs.filter((s) => !s.escape)] }, `${label} by escape`));
   }
   assert.deepEqual(wrong.slice(0, 20), [], `${wrong.length} failures`);
-  assert.ok(asked > 400 && placed > asked * 0.97, `${placed} of ${asked}`);
+  assert.ok(asked > 400);
+  assert.equal(placed, asked);
   assert.ok(half > placed * 0.97, `${half} of ${placed} half the diagonal apart`);
 });
 
@@ -334,6 +338,38 @@ test('no curtain hangs through a stair', () => {
   }
   assert.deepEqual(wrong.slice(0, 20), [], `${wrong.length} failures`);
   assert.ok(beside > 0, 'curtains still hang beside stairs');
+});
+
+test('shallow plans get a second stair hall, and what cannot be given has a code', () => {
+  const styles = ['japan-2011-house', 'japan-2011-concrete', 'western-1910-brick', 'western-1910-false-front'],
+    wrong = [],
+    kinds = {};
+  let asked = 0;
+  seed(4242);
+  for (let i = 0; i < 300; i++) {
+    const style = styles[i % 4],
+      storey = range(2.8, 3.4),
+      o = { style, width: range(20, 58), depth: range(6.5, 8.6), storeys: Array(2 + (i % 5)).fill(storey) },
+      b = generateBuilding(o),
+      label = `#${i} ${style} ${o.width.toFixed(2)} x ${o.depth.toFixed(2)} x ${o.storeys.length}`,
+      second = b.stairs.filter((s) => s.escape);
+    check(b, o, label, wrong, kinds);
+    for (const e of b.escapes.filter((e) => e.required)) {
+      asked++;
+      if (e.stairs !== 2) wrong.push(`${label}: floor ${e.floor} has one stair (${e.required})`);
+    }
+    if (second.length)
+      wrong.push(...unreached({ ...b, stairs: [...second, ...b.stairs.filter((s) => !s.escape)] }, `${label} by escape`));
+  }
+  assert.deepEqual(wrong.slice(0, 20), [], `${wrong.length} failures`);
+  assert.ok(asked > 300, `${asked} storeys asked`);
+  // Too small for two stairs, switched off, and (Japan, art. 120) too large for two.
+  const code = (o) => generateBuilding(o).escapes.at(-1),
+    small = code({ style: 'western-1910-brick', width: 4, depth: 5, storeys: [3, 3, 3] });
+  assert.deepEqual([small.required !== null, small.stairs, small.unmet], [true, 1, 'no-room']);
+  assert.equal(code({ style: 'western-1910-brick', escapeStair: false }).unmet, 'stair-off');
+  assert.equal(code({ style: 'western-1910-brick' }).unmet, undefined);
+  assert.equal(code({ style: 'japan-2011-house', width: 110, depth: 40, storeys: [3, 3] }).unmet, 'walk');
 });
 
 test('a second stair follows the thresholds of the code, and can be left out', () => {
