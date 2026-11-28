@@ -580,6 +580,85 @@ does), not scatter's own compatibility route. Sources: Khronos glTF 2.0 (2021) s
 Without Precomputed Tangents" (ShaderX5, 2006; note 2013); Mikkelsen, "Bump Mapping Unparametrized Surfaces on the GPU"
 (JGT 2010); Castano, "Computing Alpha Mipmaps" (2010); Wyman and McGuire, "Hashed Alpha Testing" (JCGT 6(2), 2017).
 
+## Whole glTF plants: `@margoengine/scatter/textured`
+
+`TexturedScatter.attach(engine, model, placements)` copies a whole loaded glTF plant: every primitive of every node,
+with its textures, normal maps, material extensions and alpha MASK cut-outs, drawn by the glTF PBR renderer itself.
+Use it for a scanned or modelled plant you do not want to rebuild as scatter rings.
+
+```ts
+import {Engine, box, PbrMaterial} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf/pbr';
+import {Shadows} from 'margoengine/shadows';
+import {TexturedScatter} from 'margoengine/scatter/textured';
+const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 3, 7], target: [0, 0.3, 0]}});
+engine.createMesh().setGeometry(box(12, 0.01, 8)).setMaterial(new PbrMaterial({color: '#6b5a40', roughness: 1}));
+const shadows = Shadows.attach(engine);
+const plant = await loadGLTF(engine, '/DiffuseTransmissionPlant.glb');
+
+// 50 plants in rows, each turned and scaled a little: column-major affine matrices relative to plant.root.
+const placements = new Float32Array(50 * 16);
+for (let i = 0; i < 50; i++) {
+  const turn = i * 2.4, size = 0.8 + (i % 5) * 0.1, c = Math.cos(turn) * size, s = Math.sin(turn) * size;
+  placements.set([c, 0, -s, 0, 0, size, 0, 0, s, 0, c, 0, (i % 10) - 4.5, 0, Math.floor(i / 10) - 2, 1], i * 16);
+}
+const scatter = TexturedScatter.attach(engine, plant, placements);
+shadows.add(scatter.model); // cut-out leaves cast their own shapes
+
+scatter.setMatrixAt(0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -5, 0, 3, 1]); // move one plant
+console.log(scatter.count, scatter.getMatrixAt(0)[12]); // 50 -5
+```
+
+- A placement moves the whole plant about its root, so a plant made of several nodes keeps their authored offsets
+  under every placement. A primitive that already holds glTF instances (`EXT_mesh_gpu_instancing`) is drawn once per
+  placement for each of them, keeping each one's own colour and extra rows.
+- The node poses are read once, at `attach`: a node animated or moved later is not followed. Move whole plants with
+  `setMatrixAt(index, matrix)`; `getMatrixAt(index)` returns a copy of one placement.
+- MASK materials use alpha to coverage on multisampled targets; single-sample colour targets and shadow maps use the
+  authored `alphaCutoff`. Textures, normal maps and extensions are the model's own, unchanged. The PBR renderer owns
+  every draw and rebuilds after a device restore.
+- Shadows: pass `scatter.model` to the shadows plugin, as for any glTF model.
+- Limits: at most 1,000,000 placements, and a node's placements times its glTF instances at most 1,000,000. A
+  placement that is not a finite, invertible affine matrix throws a `RangeError` (all are checked before the model
+  changes). A model loaded into another engine throws a `TypeError`; a disposed model or one another
+  `TexturedScatter` holds throws a `MargoError` with code `'failed'`.
+- `dispose()` puts the model's original instances and material render states back and frees the copies; the model,
+  its meshes and textures stay yours. Disposing the engine disposes the attachment. After `dispose()`,
+  `setMatrixAt` throws a `MargoError` with code `'disposed'`.
+
+## Placing on any mesh: `@margoengine/scatter/surface`
+
+`scatterSurface(data, count, options)` places `count` instances on any triangle mesh (`GeometryData`: a cliff, a
+ceiling, a planet) and turns each one's +Y to the surface normal there. It needs no engine: it returns arrays you pass
+to a `ScatterBatch`, a `TexturedScatter` (on a model whose root is at the origin) or your own instancing.
+
+```ts
+import {sphereGeometry} from 'margoengine/geometry';
+import {scatterSurface} from 'margoengine/scatter/surface';
+const planet = sphereGeometry(10, 64, 32);
+// Paint density: none on the southern half, rising to the north pole.
+const weights = Array.from({length: planet.positions.length / 3}, (_, i) => Math.max(0, planet.positions[i * 3 + 1] / 10));
+const rocks = scatterSurface(planet, 2000, {weights, seed: 7, scale: [0.5, 1.5], offset: -0.05});
+console.log(rocks.transforms.length / 16, rocks.positions.every((v, i) => i % 3 !== 1 || v >= -1e-4)); // 2000 true
+const up = rocks.normals.slice(0, 3), at = rocks.positions.slice(0, 3);
+console.log(Math.abs(up[0] * 10 - at[0]) < 0.05, Math.abs(up[1] * 10 - at[1]) < 0.05); // true true: +Y points out of the planet
+```
+
+- Density: even over the surface area, measured after `matrix`, or with `weights` (one value of 0 or more a vertex)
+  proportional to area times the weight interpolated across each triangle, so painted vertices are exact densities.
+  `colors` (3 or 4 values a vertex) are interpolated into the returned colours. `seed` (default 1, a whole number up to
+  4294967295) makes the same mesh give the same placements.
+- Each placement: root on the surface, then moved `offset` (default 0) along the normal; +Y turned toward the normal by
+  `align` of the shortest rotation (default 1, fully; 0 keeps world up); a turn about that axis picked from `yaw`
+  (default 0 to 2 pi radians); a uniform scale picked from `scale` (default [1, 1]).
+- `matrix`: a column-major affine matrix from the mesh to the world (default identity). Normals take its inverse
+  transpose, and a mirroring matrix still gives outward normals.
+- Returned, all yours: `transforms` (16 floats a placement, column-major world matrices), `positions` (the roots before
+  `offset`), `normals` (unit world normals), `uvs` (the mesh's interpolated UVs) and `colors` (RGBA, white without
+  `colors`).
+- Limits: `count` 0 to 1,000,000; a bad count, seed, range, matrix or mesh throws a `RangeError`. `signal` cancels it,
+  before or during the work, with the signal's reason. The mesh is read once: after you change it, call again.
+
 ## Density maps, a grid that follows the camera, and stored tiles
 
 Three options turn a `Scatter` into world-anchored ground cover: `bounds` (the world rectangle `[minX, minZ, maxX,
@@ -690,6 +769,92 @@ again as headroom, and about 58 bytes per record slot on the GPU for the ordered
 and slots); `tiles.gpuBytes` reports it from the first frame (0 for a mesh that shares another's). A ring at its
 capacity keeps the first instances in record order. The GPU's `maxStorageBufferBindingSize` holds 32 bytes per record
 slot: 4,194,304 slots at the WebGPU default of 128 MiB.
+
+## Skipping plants hidden behind hills and buildings: `@margoengine/scatter/occlusion`
+
+`OccludedScatter` is a `Scatter` that also drops, each frame, the instances the camera cannot see because terrain or
+a building is in front of them. It takes every `Scatter` option. `addOccluder(source)` names what hides: an opaque
+terrain, building, glTF model or core mesh in the scene.
+
+```ts
+import {Engine, box, PbrMaterial} from 'margoengine/core';
+import {sphereGeometry, toGeometry} from 'margoengine/geometry';
+import {OccludedScatter} from 'margoengine/scatter/occlusion';
+const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 2, 30], target: [0, 1, 0]}});
+const wall = engine.createMesh().setGeometry(box(40, 12, 1)).setMaterial(new PbrMaterial({color: '#8a8070'}));
+wall.setPosition([0, 6, 10]);
+const bush = toGeometry(sphereGeometry(0.5, 12, 6));
+const bushes = OccludedScatter.attach(engine, bush, {count: 20000, area: [80, 80]});
+bushes.addOccluder(wall); // bushes behind the wall are not drawn; their shadows still are
+// bushes.enabled = false turns the test off at any time; removeOccluder(wall) forgets the wall.
+```
+
+- How: after the usual culling, the occluders' depth is drawn into a depth pyramid for this frame
+  (`@margoengine/culling/depth`) and each instance's bounding sphere (the mesh's radius times its scale, padded a
+  little for rounding) is tested against it. An instance any occluder fully hides is left out of the colour pass. It
+  uses this frame's depth only: there is no history, so nothing pops in a frame late when the camera turns.
+- Shadows are not occlusion-culled: an instance hidden from the camera keeps its shadow-casting rings, so a bush
+  behind the wall still shades the ground beyond it. Only the colour pass gets the smaller list.
+- Occluders must be opaque and drawn: a source that is transparent, cut out or hidden would hide plants that should
+  show. Only what you add hides plants; the scatter's own instances never do.
+- `enabled` (default true) can change on any frame; off, the colour pass gets every instance the usual culling keeps.
+- Memory: a second instance buffer the size of the scatter's own for the colour pass, 76 bytes of command and
+  uniform buffers, and the depth pyramid. All of it is freed by `dispose()` and made again after a device restore.
+
+## Per-instance colours and values: `@margoengine/scatter/attributes`
+
+`AttributedScatter` is a `ScatterInstances` whose instances each carry a linear RGB tint and your own named values,
+which a WGSL function you supply turns into position and colour changes. Use it for a field of flowers that bloom one
+by one, crops that ripen, or plants a game marks.
+
+```ts
+import {AttributedScatter, type AttributeBatch} from 'margoengine/scatter/attributes';
+import {boxGeometry, computeTangents, pbrVertexStream} from 'margoengine/geometry';
+import {Engine, PbrMaterial} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 4, 12], target: [0, 0, 0]}});
+const stem = computeTangents(boxGeometry(0.05, 0.6, 0.05)); // the PBR vertex stream needs tangents
+const count = 400, transforms = new Float32Array(count * 16), bloom = new Float32Array(count);
+for (let i = 0; i < count; i++) {
+  transforms.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, (i % 20) - 9.5, 0.3, Math.floor(i / 20) - 9.5, 1], i * 16);
+  bloom[i] = (i % 7) / 6;
+}
+const batches = (): AttributeBatch[] => [{
+  name: 'flowers',
+  vertices: pbrVertexStream(stem),
+  indices: new Uint32Array(stem.indices),
+  transforms,
+  material: new PbrMaterial({color: [0.3, 0.6, 0.2]}),
+  attributes: {bloom},
+}];
+const flowers = AttributedScatter.attach(engine, batches, {
+  attributes: {bloom: 1},
+  // A blooming flower grows half again as tall and turns from green to yellow.
+  shader: `fn scatterAppearance(position:vec3f,color:vec3f,data:ScatterAttributeData)->ScatterAppearance{
+    let b=data.custom[0].x;
+    return ScatterAppearance(position+vec3f(0,0.3*b,0),mix(color,vec3f(1,0.85,0.2),b));
+  }`,
+});
+flowers.setAttributeAt(0, 'bloom', [1]).setColorAt(1, [1, 0.2, 0.2]);
+console.log(flowers.getAttributeAt(0, 'bloom')[0], flowers.attributeIndex('bloom'), [...flowers.getColorAt(1)]); // 1 0 [1, 0.2, 0.2]
+```
+
+- Batches are `ScatterBatch`es (as for `ScatterInstances`) plus optional `colors` (linear RGB, three floats an
+  instance, default white) and `attributes`, one tightly packed `Float32Array` per declared name. The factory runs at
+  attach and after a device restore.
+- `attributes` (in the options) declares each name and its size, 1 to 4 floats; their order is the index in
+  `data.custom`, which `attributeIndex(name)` returns. The layout is fixed for the life of the scatter.
+- `shader` is WGSL defining `fn scatterAppearance(position:vec3f, color:vec3f, data:ScatterAttributeData) ->
+  ScatterAppearance`. `position` is the vertex's world position before wind, `color` the material colour times the
+  instance tint; `data.color` is the tint (a `vec4f`) and `data.custom` an array of `vec4f`, one per attribute, unused
+  components 0. It returns `ScatterAppearance(position, color)`. The colour pass and the shadow pass both run it, so a
+  flower that grows casts the taller shadow. The default returns its inputs.
+- `setColorAt(index, rgb, batch = 0)` and `setAttributeAt(index, name, value, batch = 0)` write one instance's 16 bytes
+  to the GPU at once, nothing rebuilt; `getColorAt` and `getAttributeAt` return copies. An index or batch outside what
+  was uploaded throws a `RangeError`, as do an undeclared name, the wrong number of components, a value that is not a
+  finite f32, or a negative colour. After `dispose()` they throw a `MargoError` with code `'disposed'`.
+- Memory: 16 bytes an instance, plus 16 for each attribute, on the GPU and again on the CPU. The CPU copy keeps the
+  values you set: a device restore uploads them again rather than the batches' first values. A batch whose values
+  pass the device's buffer limit throws a `RangeError` at attach; split it.
 
 ## Picking instances: `@margoengine/scatter/pick`
 
@@ -1001,6 +1166,21 @@ itself; rings 1 and 2 keep `ratios` of its triangles (default 0.4 and 0.12) by q
 second simplified from the first. It loads `@margoengine/lod/auto` and `@margoengine/mesh-edit` on first use (optional
 peers: install both with this entry) and takes an `AbortSignal`.
 
+```ts
+import {Engine} from 'margoengine/core';
+import {sphereGeometry, toGeometry} from 'margoengine/geometry';
+import {Scatter} from 'margoengine/scatter';
+import {scatterLODs, ringDistance} from 'margoengine/scatter/simplify';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const rock = toGeometry(sphereGeometry(0.5, 32, 16));
+const rings = await scatterLODs(rock, {ratios: [0.4, 0.12]});
+console.log(rings.triangles, rings.meshes[0] === rock); // [960, 383, 115] true
+// Switch each ring where its error is under one pixel of a 1080-pixel-tall view, for rocks up to 1.5 times as big.
+const [near, mid] = [rings.deviation[1], rings.deviation[2]].map((d) => ringDistance(d * 1.5, 1, 1080));
+console.log(+near.toFixed(1), +mid.toFixed(1)); // 27.1 160.9
+const rocks = Scatter.attach(engine, rings.meshes, {count: 5000, area: [200, 200], scale: [0.5, 1.5], lod: [near, mid, 300]});
+```
+
 - Every ring vertex is a source vertex with its own normal, so hard edges and blade shading stay as authored, and the
   rings nest.
 - `deviation` gives each ring's largest distance from a source vertex to its surface in mesh units; `ringDistance(
@@ -1056,6 +1236,17 @@ Computer Graphics Forum 30(6), 2011.
 `GrassScatter` is a `Scatter` that takes no mesh: every instance is a clump of blades the vertex stage builds on the
 GPU, for dense meadows. `GrassScatter.attach(engine, { count, area, lod, grass: { height, blades, width } })` takes
 every `Scatter` option, with `blades` shading on by default.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {GrassScatter} from 'margoengine/scatter/grass';
+const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 1.7, 8], target: [0, 0.5, 0]}});
+// No mesh: each of the 200,000 instances is a clump of 12 blades built on the GPU.
+const meadow = GrassScatter.attach(engine, {
+  count: 200_000, area: [60, 60], lod: [12, 30, 60],
+  grass: {height: 0.5, heightVariance: 0.4, width: 0.03, blades: 12, segments: [6, 3, 1]},
+});
+```
 
 - Each blade is a quadratic Bezier spine (root, a control point above it, a leaning tip) widened into a strip that
   tapers to a point (its tip is a pair of vertices drawn as one point up close). Its root inside the clump disc
