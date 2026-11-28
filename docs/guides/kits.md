@@ -140,9 +140,25 @@ larger), shadows 692 B (moving casters leaving the cached map, ada4ac4803; casca
 soft filter's noise, 5feaab3d71) and core 381 B (its approved changes and bug fixes through multi-draw, c04ed9040d).
 Controls, stage and the other roots together fell by 151 B.
 
+The game row rose from 383,226 B on 2026-11-27, measured again after it passed the 3 percent check: it is 14,256 B
+over a build of the kit's packages as they were on 2026-11-20 (384,854 B with the same bundler). Taking one package at a
+time back to that build gives, with every package root under its size ceiling: gltf 3,808 B (the Transmission pass moved
+in from materials, d6db85fbd9, and made the default for glass without a volume, 809b25a10c; point and line widths,
+a5342703e3; dual-source transmission, 829b78dab4; the rough diffuse lobe, f9d753a542; the missing TEXCOORD warning,
+4a21e0e5ac), sky 3,118 B (fire-lit and night smoke palls, c178289823 and 2e2a10a637; the overcast deck's light,
+0a0240f251; ambient light for ground and shots, cd69a365b6 and bc03de0498), vfx 2,876 B (particle and ribbon reactive
+masks for TAA, 3717a119f6 and f8f8a1a10e; particles veiling ambient light, 775ae7883e; the film clock, f78783c762),
+clustered 2,680 B (soft integrated shadow maps, d603e0c8d1; RawMesh and terrain casters, 0382682375; clipping planes,
+ca83af7847), materials 915 B (borrowed GPU textures surviving a device restore, f6f22a4977 and 4e1f611ed8; sort modes
+and texture caps, 8aaf6a2903, less what moved to gltf), animation 868 B (raycasts against the posed skin, 4c574fef53,
+99d42804c9 and b7277ae421), tonemap 727 B (as in the web row, and the display-target transmission read, 6ef3c82192),
+shadows 593 B (as in the web row), post 386 B (no light rim on a transparent canvas, 0b961a9441), core 359 B (its
+approved changes and bug fixes through multi-draw, c04ed9040d) and bvh 345 B (the posed raycasts above). The other
+packages together fell by 2,657 B, most of it text, environment and controls.
+
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
-| `margoengine/game` | Games | 383,226 B |
+| `margoengine/game` | Games | 399,110 B |
 | `margoengine/viz` | Visualization | 284,907 B |
 | `margoengine/web` | Web scenes | 106,118 B |
 

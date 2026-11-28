@@ -1288,6 +1288,17 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression test:** `tests/check-downloads.test.js`, `tests/download-script-arguments.test.js` and the
   `*-download.test.js` files of decoders, loaders and biomes.
 
+### Fixed 2026-11-27: the stated size of margoengine/game is stale (KB-KITS-GAMESIZE1)
+
+- **Repro.** `node --test tests/umbrella.test.js` after `npm run build:packages`: `margoengine/game: 399110 B,
+  docs/guides/kits.md says 383226 B`, past the 3 percent the test allows.
+- **Cause.** The row was measured on or before 2026-11-20 and the roots the kit bundles grew afterwards through features
+  and bug fixes, each under its size ceiling. Traced by building the kit's packages as they were on 2026-11-20
+  (384,854 B) and taking one package at a time back to that build.
+- **Fix.** [docs/guides/kits.md](guides/kits.md) states 399,110 B and names the growth by package and commit.
+- **Regression test:** `tests/umbrella.test.js` ("a kit costs only what the app uses, and its full size is what
+  docs/guides/kits.md states").
+
 ### Fixed 2026-11-27: the stated size of margoengine/web is stale (KB-KITS-WEBSIZE1)
 
 - **Repro.** `node --test tests/umbrella.test.js` after `npm run build:packages`: `margoengine/web: 106118 B,
