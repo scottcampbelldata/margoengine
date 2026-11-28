@@ -16525,6 +16525,19 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: rebase:main left docs/api-surface.md with a wrong Unexported figure and a short total (KB-REBASE-SURFACE1, scripts)
+
+- **Repro:** `npm run api:check` on main 66546e10a1: `webgl2-compat` read 313 unexported (the reports hold 307) and the
+  totals line 18,715 exported names (the rows sum to 18,722). `tests/api-report-scope.test.js` "committed API totals
+  include every package table row" failed there too.
+- **Cause:** two. `mergeApiSurfaceRows` summed both sides' differences for the Unexported and `any` cells even when both
+  sides had made the same change, so efdf5d9a0e's 304 to 307 was added again at 9ef46f22c1 (310) and 1b3dfe2214 (313).
+  And two commits that each added exports to different rows wrote the same totals line, which git merges without a
+  conflict, so no generator ran (b84c368435, 5 short; 33d8c6be64, 2 more).
+- **Fix:** a cell both sides changed alike is counted once; one they changed differently has its package's report built
+  again; the totals are counted from the rows, in `mergeScopedApiSurface` and as a last step of `rebase:main`.
+- **Regression:** `tests/rebase-main.test.js`, both "(KB-REBASE-SURFACE1)" tests.
+
 ### Open 2026-11-28: 21 web demos cannot be rebuilt from source/: the data files their code imports are missing (KB-DEMO-SOURCEDATA1, demos)
 ### Open 2026-11-28: a floating body's carried water swaps energy with it as its draft changes (KB-LOADS-ADDEDRATE1, physics)
 
