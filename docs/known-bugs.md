@@ -6,6 +6,18 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: nine entries of animator, rigging, scatter and biomes were over their size ceilings (KB-SIZE-SPLINEANATOMY1, sizes)
+
+- **Repro:** `npm run quality -- --gate=sizes` on main 4a49e5bd0e: `animator`, `animator/warping`, `animator/fbik`,
+  `animator/spline-ik`, `rigging/ik`, `scatter/grass`, `scatter/velocity` and `biomes/presets` over their ceilings, and
+  `animator/ik` with none.
+- **Cause:** c17577b174 (anatomical IK ranges), ff7f5b428e (grass tussocks), e11607a717 (blade motion) and 8d0541325a
+  (a coded error) each grew entries without raising them. Spline IK, which moves no limb, also carried the limb solver:
+  `poseTools` held `placeLimb` in its closure.
+- **Fix:** the limb tools are a function of their own (`animator/spline-ik` 6,390 to 2,826 B); the other ceilings are
+  raised to the measured size with the reason in `scripts/quality/baselines/sizes.json`.
+- **Regression:** `tests/animator-size-split.test.js` and the sizes gate.
+
 ### Fixed 2026-11-28: the animator README's fitted-body example loaded no model and failed its asset test (KB-ANIM-IKREADME1, animator)
 
 - **Repro:** `node --test packages/animator/test/readme-assets.test.js` on main after c17577b174: "standalone example
@@ -11417,6 +11429,8 @@ for good), and `process.exit` waits for a worker thread blocked in a system call
   `MARGO_COMPAT=1 MARGO_TRACE_SHUTDOWN=1 node packages/blender/tests/nodes-browser.mjs` on 2026-11-27 all exited (70 to
   102 s), their longest browser teardown step 309 ms.
 - **Cause:** not known. Every close step of `openBrowser` is bounded and throws, which this suite does not catch.
+- **Rerun 2026-11-28:** 3 more traced runs on main (RTX A6000) all exited (101, 88 and 93 s) with no `[linger]` line.
+  Still not reproduced.
 - **Instrumented 2026-11-27:** a process still running 60 s after its last browser suite closed prints one `[linger]`
   line naming its open resources (`reportLinger`, scripts/support/shutdown.mjs; tests/linger-report.test.js). A silent
   stop with no such line means the event loop itself was blocked, for example by an undrained output pipe.

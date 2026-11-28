@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21895224,
+  "total": 21913348,
   "history": [
     {
       "date": "2026-10-24",
@@ -15671,6 +15671,12 @@
       "commit": "sea-13-native-foam",
       "reason": "SEA-13 @margoengine/physics/foam 7870 to 13774 B gzip, @margoengine/physics 993705 to 993424 B gzip, @margoengine/water/foam-surface 0 to 2094 B gzip, @margoengine/water 39897 to 39924 B gzip, @margoengine/game/water/foam-surface 0 to 65 B gzip, @margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table)) 107334 to 107013 B gzip, @margoengine/physics/foam 8126 to 14188 B ceiling, @margoengine/water/foam-surface 0 to 2350 B ceiling. The foam entry keeps rollback-safe body-relative fields, finite spectral statistics, and dispatch to the optional SIMD transport. The Water adapter is an independent subpath sharing the existing material effect hook. Splitting the physics entry further would duplicate the candidate grid, wind and current sampling. Core and stage are unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "0970c1b3b5",
+      "reason": "Nine entries c17577b174, ff7f5b428e, e11607a717 and 8d0541325a grew, measured at each parent and on main. c17577b174 (IK obeys a fitted body's anatomy: elbows and knees folded backwards on the human demos): animator 20,315 to 24,549 B, animator/warping 4,525 to 7,709, animator/fbik 5,222 to 8,934, the new animator/ik 4,497, rigging/ik 4,623 to 5,436. The ranges are on by default in synchronous per-frame solvers, so a lazy import() would solve the first frames without them; a table of solvers that setAnatomy installs would spare only rigs with no body in warping and full-body IK, add an indirect call to every limb solve and leave the root entry, which exports setAnatomy, the same size. spline-ik, which moves no limb, was cut back to 2,826 B instead (KB-SIZE-SPLINEANATOMY1). ff7f5b428e (grass clumps grow as bunchgrass tussocks with cured blades and measured colour): scatter/grass 2,627 to 3,047; a separate tussock entry would copy the blade generator and shader to save about 400 B. e11607a717 (a pixel mostly covered by a blended blade takes the blade's motion, for TAA and motion blur): scatter/velocity 3,768 to 3,961; the second draw is the fix and on by default. 8d0541325a (coniferAge throws a coded error linked to the docs): biomes/presets 3,087 to 3,136; no split for 49 B.",
+      "grew": 8
     }
   ],
   "items": {
@@ -15692,11 +15698,12 @@
     "@margoengine/animation/sampling": 2727,
     "@margoengine/animation/skeleton-utils": 8508,
     "@margoengine/animation/vat": 9260,
-    "@margoengine/animator": 20936,
+    "@margoengine/animator": 25286,
     "@margoengine/animator/blend-trees": 1841,
     "@margoengine/animator/ccd": 6289,
-    "@margoengine/animator/fbik": 5478,
+    "@margoengine/animator/fbik": 9203,
     "@margoengine/animator/graph": 10799,
+    "@margoengine/animator/ik": 4753,
     "@margoengine/animator/inertialize": 2107,
     "@margoengine/animator/layers": 11478,
     "@margoengine/animator/masks": 11690,
@@ -15705,7 +15712,7 @@
     "@margoengine/animator/spline-ik": 3544,
     "@margoengine/animator/stepping": 3718,
     "@margoengine/animator/sync": 2070,
-    "@margoengine/animator/warping": 4781,
+    "@margoengine/animator/warping": 7965,
     "@margoengine/armies": 5553,
     "@margoengine/armies/bake": 1742,
     "@margoengine/armies/lod": 2136,
@@ -15772,7 +15779,7 @@
     "@margoengine/biomes/multinoise": 3748,
     "@margoengine/biomes/objects": 6469,
     "@margoengine/biomes/placement": 13635,
-    "@margoengine/biomes/presets": 3117,
+    "@margoengine/biomes/presets": 3392,
     "@margoengine/biomes/region": 4672,
     "@margoengine/biomes/relief": 5694,
     "@margoengine/biomes/rivers": 4449,
@@ -16785,7 +16792,7 @@
     "@margoengine/rigging/face": 2363,
     "@margoengine/rigging/hands": 5966,
     "@margoengine/rigging/hulls": 2759,
-    "@margoengine/rigging/ik": 4624,
+    "@margoengine/rigging/ik": 5692,
     "@margoengine/rigging/joint-limits": 1770,
     "@margoengine/rigging/mtoon": 11432,
     "@margoengine/rigging/pose-tracking": 5458,
@@ -16831,7 +16838,7 @@
     "@margoengine/scatter": 30263,
     "@margoengine/scatter/attributes": 2319,
     "@margoengine/scatter/foliage": 3502,
-    "@margoengine/scatter/grass": 2855,
+    "@margoengine/scatter/grass": 3303,
     "@margoengine/scatter/imposter": 2968,
     "@margoengine/scatter/interact": 3574,
     "@margoengine/scatter/occlusion": 1433,
@@ -16845,7 +16852,7 @@
     "@margoengine/scatter/surface": 1515,
     "@margoengine/scatter/textured": 1719,
     "@margoengine/scatter/tiles": 3606,
-    "@margoengine/scatter/velocity": 3896,
+    "@margoengine/scatter/velocity": 4217,
     "@margoengine/scene": 1974,
     "@margoengine/scene/asset-pools": 7796,
     "@margoengine/scene/assets": 4274,
