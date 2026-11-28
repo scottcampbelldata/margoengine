@@ -1014,7 +1014,11 @@ vector whose two parts are the clinical angles, so flexion and abduction are exa
 well defined up to 180 degrees; the twist is what is left about the segment. Neutral for a human is the standing pose
 of ISO/IEC 19774 (HAnim): arms down, palms to the thighs. A shoulder and a hip are measured from that pose in the
 trunk's frame, an elbow, knee, wrist or finger joint from its straight position, and a collarbone, spine joint, ankle
-or toe from the rig's own rest pose.
+or toe from the rig's own rest pose. A collarbone rides on its arm (the table's `rhythm`, from bone pins, Ludewig et
+al. 2009: 5.9 degrees up and 19.2 back with the arm at the side, 11 to 17 up and 23 to 39 back from 30 to 120 degrees
+of arm elevation), so a rest that holds the arms out and its collarbones raised past the direction at the side reads
+that rise, never more than the rhythm gives for its arms' lift, as one swing with no twist; a rig whose collarbone
+stays put as its arms rise keeps its rest as zero.
 
 Two tiers. `normal` is the clinical range, where a validator should warn. `structural` is the stop no body passes,
 and what `clampPose` holds by default: an elbow or a knee stops 5 degrees past straight. A swing range that differs by

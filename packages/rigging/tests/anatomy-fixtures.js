@@ -95,7 +95,7 @@ export function addHand(joints, palm = 0) {
  * @param mirror Reflects the body left to right and keeps the names, so "Left" bones sit on the right.
  * @param fingers Whether the hands have finger bones.
  */
-export function bodyRig({ arms = 90, elbow = 0, knee = 0, mirror = false, fingers = true } = {}) {
+export function bodyRig({ arms = 90, elbow = 0, knee = 0, mirror = false, fingers = true, clavicle = [0, 0] } = {}) {
   const joints = [];
   put(joints, 'Hips', null, [0, 0.93, 0]);
   put(joints, 'Spine', 'Hips', [0, 1.03, 0]);
@@ -119,7 +119,9 @@ export function bodyRig({ arms = 90, elbow = 0, knee = 0, mirror = false, finger
     put(joints, `${side}ToeBase`, `${side}Foot`, add(ankle, [0, -0.06, 0.13]));
     const d = [Math.sin(a) * s, -Math.cos(a), 0],
       fore = add(mul(d, Math.cos(e)), mul([0, 0, 1], Math.sin(e))),
-      shoulder = [0.18 * s, 1.44, 0],
+      [up, back] = clavicle.map((deg) => (deg * Math.PI) / 180),
+      // The collarbone from the sternum, `clavicle` degrees up and back from straight out.
+      shoulder = add([0.03 * s, 1.44, 0], mul([Math.cos(up) * Math.cos(back) * s, Math.sin(up), -Math.cos(up) * Math.sin(back)], 0.15)),
       elbowAt = add(shoulder, mul(d, 0.28));
     put(joints, `${side}Shoulder`, 'Spine2', [0.03 * s, 1.44, 0]);
     put(joints, `${side}Arm`, `${side}Shoulder`, shoulder);

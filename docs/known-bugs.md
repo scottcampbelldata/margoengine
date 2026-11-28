@@ -878,6 +878,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   the thorax against Ludewig's resting values), capped by the rhythm, and compose it as one swing so the twist reads 0
   (two turns in a row read -0.8 anterior rotation at 90 degrees).
 
+- **Learned 2026-11-28 (part 3):** the fit now takes a collarbone's zero from the rig's own rest direction against
+  Ludewig's arm-at-side direction, capped by the rhythm for the rest arm's lift, as one swing
+  (`packages/rigging/tests/clavicle-rhythm.test.js`). On the old man it changes nothing: with his arm 60 degrees out,
+  his rest collarbone bone reads 2.3 degrees up and 17.8 back in the thorax frame, below the 5.9 and 19.2 of an arm at
+  the side, where the rhythm puts a real collarbone at 13 up and 28 back. A Character Creator clavicle bone aims at
+  the shoulder joint's centre, which sits below the collarbone's own axis, so the bone reads about 11 degrees lower
+  than the bone it stands for. Next: the angle between the sternoclavicular-to-glenohumeral line and the clavicle's
+  axis from a measured source (or read from the rig's clips where an arm hangs at the side), then the same cap.
+
 - **Repro:** the same old man, walk clip at 0.3 s with `anatomy: {limits: false}`: `l_sternoclavicular` depression
   -25.9 degrees and `r_` -15.3, against stops of 15 and 13.3. On the fitted body the left collarbone is held at -15,
   11 degrees above the clip. Both read 0 in the rest pose.

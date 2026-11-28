@@ -151,6 +151,30 @@ export interface JointSpec {
   readonly dofs?: readonly [DofSpec, DofSpec, DofSpec];
   /** The region it belongs to. */
   readonly region?: string;
+  /**
+   * For a joint whose zero is the rest pose, how its segment rides on a limb below it (a collarbone on the arm): the
+   * segment's measured elevation and retraction in degrees against the limb's lift from the body's down, as rows of
+   * [lift, elevation, retraction], the first at the side. A rest that holds the limb raised takes its zero back toward
+   * the direction at the side (see `fitAnatomy`).
+   */
+  readonly rhythm?: {
+    /** The limb's near and far joints. */
+    readonly from: string;
+    readonly to: string;
+    readonly curve: readonly (readonly [number, number, number])[];
+    readonly rows: readonly SourceRow[];
+  };
+}
+
+/** A rhythm curve's elevation and retraction at a lift: straight between rows, carried on past the last two. */
+function rhythmAt(curve: readonly (readonly [number, number, number])[], lift: number): [number, number] {
+  if (curve.length === 1 || lift <= curve[0][0]) return [curve[0][1], curve[0][2]];
+  let k = 1;
+  while (k < curve.length - 1 && lift > curve[k][0]) k++;
+  const a = curve[k - 1],
+    b = curve[k],
+    t = (lift - a[0]) / (b[0] - a[0]);
+  return [a[1] + t * (b[1] - a[1]), a[2] + t * (b[2] - a[2])];
 }
 
 /**
@@ -621,6 +645,7 @@ export function mirrorJoint(spec: JointSpec, rename: (id: string) => string): Jo
     mirror: spec.id,
     long: flip(spec.long),
     ...(spec.distal ? { distal: spec.distal.map(rename) } : {}),
+    ...(spec.rhythm ? { rhythm: { ...spec.rhythm, from: rename(spec.rhythm.from), to: rename(spec.rhythm.to) } } : {}),
     ...(spec.across
       ? {
           across: {
@@ -1123,6 +1148,42 @@ export function fitAnatomy(rig: RigPose | readonly RigJoint[], options: FitOptio
       // The rest pose is zero. The twist is measured about the segment as the rig has it, when that is close.
       const seen = far && qrot(qconj(parentFrame), far);
       if (seen && dot(seen, long) > 0.5) long = seen;
+      // A rest that holds the limb below raised (an A pose) holds this segment raised with it (a collarbone rises with
+      // the arm): its zero is turned back toward the measured direction at the side, by as much as the rig's own
+      // segment sits past that direction, never more than the rhythm gives for the rest limb's lift. One swing, so
+      // the rest reads no twist; a rig whose segment does not rise with the limb keeps its rest as zero.
+      const rhythm = spec.rhythm,
+        from = rhythm ? at(rhythm.from) : null,
+        to = rhythm ? at(rhythm.to) : null,
+        limb = from && to ? unit(sub(to, from), tiny) : null;
+      if (rhythm && seen && far && limb && long === seen) {
+        const lateral = unit(shape.long)!,
+          above: V3 = [0, 1, 0],
+          back: V3 = [0, 0, -1],
+          lift = Math.acos(Math.min(1, Math.max(-1, -dot(limb, up!)))) / RAD,
+          side = rhythmAt(rhythm.curve, rhythm.curve[0][0]),
+          raised = rhythmAt(rhythm.curve, lift),
+          elevation = Math.asin(Math.min(1, Math.max(-1, dot(seen, above)))),
+          retraction = Math.atan2(dot(seen, back), dot(seen, lateral)),
+          share = (have: number, atSide: number, cap: number) => Math.min(Math.max(have - atSide, 0), Math.max(cap, 0)),
+          lifted = share(elevation / RAD, side[0], raised[0] - side[0]) * RAD,
+          drawn = share(retraction / RAD, side[1], raised[1] - side[1]) * RAD;
+        if ((lifted > 0 || drawn > 0) && shape.dofs) {
+          // The zero is the rest direction turned back by the swing that reads `lifted` up and `drawn` back in the
+          // joint's own axes (which hang on the zero, so a few rounds settle it).
+          let zero: V3 = seen;
+          for (let round = 0; round < 6; round++) {
+            const flex = unit(reject(shape.dofs![0].axis, zero))!,
+              across = cross(zero, flex),
+              along = dot(across, shape.dofs![1].axis) < 0 ? scaled(across, -1) : across,
+              turn = [0, 1, 2].map((c) => -(lifted * flex[c] - drawn * along[c])) as V3,
+              angle = Math.hypot(...turn);
+            zero = angle > 0 ? qrot(qaxis(scaled(turn, 1 / angle), angle), seen) : seen;
+          }
+          frame = qmul(qswing(qrot(parentFrame, zero), far), parentFrame);
+          long = zero;
+        }
+      }
     } else {
       const into = spec.neutral === 'straight' && joint.ref >= 0 ? unit(sub(p, P(fitted[joint.ref].bone)), tiny) : null,
         zero = into ?? qrot(parentFrame, long),

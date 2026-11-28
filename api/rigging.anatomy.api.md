@@ -153,6 +153,12 @@ export interface JointSpec {
     };
     readonly dofs?: readonly [DofSpec, DofSpec, DofSpec];
     readonly region?: string;
+    readonly rhythm?: {
+        readonly from: string;
+        readonly to: string;
+        readonly curve: readonly (readonly [number, number, number])[];
+        readonly rows: readonly SourceRow[];
+    };
 }
 
 export type KinematicsJointLimit = {

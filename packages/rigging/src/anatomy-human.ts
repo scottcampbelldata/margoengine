@@ -687,6 +687,23 @@ export function humanTable(group: HumanGroup = {}): SpeciesTable {
       neutral: 'rest',
       long: RIGHT,
       distal: ['r_shoulder'],
+      // Bone pins (Ludewig et al. 2009): at rest with the arm at the side the clavicle stands 5.9 degrees up and 19.2
+      // back (Table I); from 30 to 120 degrees of humeral elevation it goes from 11 to 17 up and from 23 to 39 back.
+      rhythm: {
+        from: 'r_shoulder',
+        to: 'r_elbow',
+        curve: [
+          [0, 5.9, 19.2],
+          [30, 11, 23],
+          [120, 17, 39],
+        ],
+        rows: [
+          row('ludewig2009', 5.9, 'clavicle elevation at rest, arm at side (Table I)', 'online', `${EUROPE_PMC}19181982`),
+          row('ludewig2009', 19.2, 'clavicle retraction at rest, arm at side (Table I)', 'online', `${EUROPE_PMC}19181982`),
+          row('ludewig2009', 6, 'clavicle elevation gained from 30 to 120 degrees of arm elevation, 11 to 17', 'online', `${EUROPE_PMC}19181982`),
+          row('ludewig2009', 16, 'clavicle retraction gained from 30 to 120 degrees of arm elevation, 23 to 39', 'online', `${EUROPE_PMC}19181982`),
+        ],
+      },
       dofs: [
         dof(
           BACK,
