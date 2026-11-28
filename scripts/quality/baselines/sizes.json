@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21864059,
+  "total": 21886424,
   "history": [
     {
       "date": "2026-10-24",
@@ -15653,6 +15653,12 @@
       "commit": "sound-01-native-paths",
       "reason": "SOUND-01 @margoengine/physics/outdoor-sound 3490 to 8600 B gzip, @margoengine/physics 992317 to 992336 B gzip, @margoengine/audio/outdoor 1191 to 1389 B gzip, @margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table)) 107307 to 107331 B gzip, @margoengine/physics/outdoor-sound 3746 to 8858 B ceiling. Phase workers integrate the same ordered path samples, and the optional entry validates and atomically publishes all bands. Terrain occlusion tests both legs of the specular image. The same inputs and outputs serve scalar and native integration, so an extra public split would duplicate the ray and validation paths. Core and stage are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "soft-p8-budgets",
+      "reason": "@margoengine/physics/soft over its budget on main after four soft commits of 2026-11-28 (2ffad0c922 neo-Hookean membrane shell, fa5c5e8f92 gas shells venting through orifices and bursting membranes, 0f70ac8189 vertex-block cloth that never gains energy (KB-SOFT-VBDBEND1), ba3f8d39e3 placed cues and target shapes for film). Measured gzip at 8d0541325a (entry-sizes.json): entry 177,421 (c6cdfb226a's record) to 188,159, budget 182744 to 193804; base 59,611 to 63,624, budget 61400 to 65533; lazy soft body kernel 116,989 to 123,952, budget 120499 to 127671 (measured + 3%). The kernel bytes are passes of the soft step itself (the membrane's stress, the vent flow, the vertex-block energy guard), already in the lazy chunk SoftBodies.attach loads, so a second blueprint would duplicate the step and add a request; the base bytes are the shell, vent and cue options of the same SoftBodies API every soft volume uses. Not cut: the bytes are the four features' own work, landed within two hours by lanes still building them, and a cut there would race their next commits. Core and stage unchanged.",
+      "grew": 3
     }
   ],
   "items": {
@@ -16570,9 +16576,9 @@
     "@margoengine/physics/seismic": 5266,
     "@margoengine/physics/ship": 36541,
     "@margoengine/physics/snowpack": 5172,
-    "@margoengine/physics/soft": 182744,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 61400,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 120499,
+    "@margoengine/physics/soft": 193804,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 65533,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 127671,
     "@margoengine/physics/strands": 6171,
     "@margoengine/physics/surf": 7669,
     "@margoengine/physics/surge": 4734,
