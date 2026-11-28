@@ -235,6 +235,120 @@ shade.blendMode = 'screen'; // takes effect on the next frame
   is two draws, one after the other; four adjacent screen sprites are one draw, three multiply sprites six.
 - Custom `shader` code is not accepted: the layer owns the fragment code that does premultiplication and the
   multiply correction.
+- Every other `SpriteLayer` option works: pages, `filter: 'linear'`, `mask`, `normals`, `camera` and `target`. With a
+  transparent `target`, multiply over an uncovered pixel gives the sprite's own colour, as the formula says.
+- `addBlend(options)` returns a `BlendSprite`; sprites from the plain `add` are `'normal'`. An unknown mode throws a
+  `RangeError`. `blendBatches(sprites, ySort)` returns the runs the layer will draw, `{ mode, first, count }` in draw
+  order, hidden sprites left out, so you can count draws before you ship a scene:
+
+```ts
+import { Sprite } from 'margoengine/sprites';
+import { BlendSprite, blendBatches } from 'margoengine/sprites/blend';
+
+const runs = blendBatches([
+  new BlendSprite({}),
+  new BlendSprite({ blendMode: 'add' }),
+  new BlendSprite({ blendMode: 'add' }),
+  new Sprite({ visible: false }),
+  new BlendSprite({ blendMode: 'multiply', z: -1 }),
+]);
+console.log(runs.map((r) => `${r.mode} ${r.first} ${r.count}`)); // ['multiply 0 1', 'normal 1 1', 'add 2 2']
+```
+
+### Nine-slice and tiling (`margoengine/sprites/slice`)
+
+A `SliceLayer` is a `SpriteLayer` that also draws resizable images: panels, buttons and frames whose corners stay the
+size they were drawn, and tiled or scrolling fills. Ordinary sprites and sliced ones share its one instanced draw, its
+atlas pages and its draw order.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { SliceLayer, SliceSprite, sliceParts } from 'margoengine/sprites/slice';
+
+const engine = await EngineKernel.create(document.querySelector('canvas')!, { exactSize: [128, 64] });
+// A 12 x 12 frame with 4-texel borders at (0, 0), and a 16 x 16 pattern at (12, 0).
+const data = new Uint8Array(28 * 16 * 4).map((_, i) => (i % 4 === 3 ? 255 : (i * 37) % 256));
+const layer = SliceLayer.attach(engine, { atlas: { width: 28, height: 16, data } });
+const panel = layer.addSlice({ rect: [0, 0, 12, 12], borders: [4, 4, 4, 4], width: 100, height: 40, x: 64, y: 32 });
+const water = layer.addSlice({ rect: [12, 0, 16, 16], width: 128, height: 16, y: 56, pivotY: 0, middle: 'repeat', z: -1 });
+let time = 0;
+engine.onFrame((_, delta) => {
+  time += delta;
+  water.scrollX += delta * 8; // the pattern moves; the image stays put
+  panel.width = 100 + Math.sin(time) * 20; // read each frame: corners keep 4 x 4
+});
+engine.start();
+
+// The layout the layer draws, on the CPU: at most nine parts.
+const parts = sliceParts(new SliceSprite({ rect: [0, 0, 12, 12], borders: [4, 4, 4, 4], width: 100, height: 40 }));
+console.log(parts.length, parts[1].rect, parts[1].scaleX); // 9 [4, 0, 4, 4] 23: the top edge stretched to 92 units
+const small = sliceParts(new SliceSprite({ rect: [0, 0, 12, 12], borders: [4, 4, 4, 4], width: 6, height: 40 }));
+console.log(small.length, small[0].scaleX); // 6 0.75: narrower than both borders, they shrink and the middle goes
+layer.removeSlice(panel);
+```
+
+| `SliceSprite` field | Default | What it does |
+| --- | --- | --- |
+| `rect` | required | `[x, y, width, height]` in whole atlas texels |
+| `width`, `height` | required | Size in world units (0 or more), read each frame; `scaleX` and `scaleY` multiply it |
+| `borders` | `[0, 0, 0, 0]` | Left, top, right and bottom in whole texels, drawn at one unit per texel; left plus right at most the rect's width, top plus bottom at most its height |
+| `middle` | `'stretch'` | `'repeat'` tiles the edges and centre at their own size instead of stretching them |
+| `scrollX`, `scrollY` | 0 | Moves the repeated pattern, in world units |
+| `tileScaleX`, `tileScaleY` | 1 | World units per texel in repeated parts (above 0) |
+
+The rest are a `Sprite`'s: `x`, `y`, `z`, `pivotX`, `pivotY` (of the whole size), `rotation`, `flipX`, `flipY`, `tint`,
+`alpha`, `page` and `visible`, all read each frame. Zero borders with `middle: 'repeat'` is a tiling sprite in one part.
+
+- A size smaller than its borders shrinks the borders in proportion, and a part with no area is hidden; each sliced
+  image keeps nine slots in the layer so a resize never adds or removes sprites. A size, border or scale out of range,
+  or a rect that is not whole texels, throws a `RangeError` from `addSlice`, or from the next frame's layout when set later.
+- Repeats wrap inside the part's own texels, never into a neighbouring atlas cell, including with `filter: 'linear'`,
+  where the sample at a tile seam blends the tile's last and first texels.
+- Options are a `SpriteLayer`'s without `shader` and `normals`, which a sliced image needs for itself; use a second
+  `SpriteLayer` for those. `addSlice` returns the `SliceSprite`, `removeSlice(sprite)` removes it, and
+  `clearSprites()` removes sliced and ordinary sprites alike.
+
+### Picking (`margoengine/sprites/pick`)
+
+`pickSprite(sprites, x, y, options)` finds the sprite drawn on top at a point, on the CPU, with no GPU read-back. It
+places sprites as the layer does (camera, pixel snapping, `z`, `ySort`, pages and the mask), and in `'pixel'` mode
+looks at the atlas texel under the point, so a click on a transparent corner falls through to what is behind.
+
+```ts
+import { Sprite } from 'margoengine/sprites';
+import { pickSprite } from 'margoengine/sprites/pick';
+
+// A 4 x 2 white atlas whose texel (3, 0) is transparent: the same bytes the layer draws.
+const data = new Uint8Array(4 * 2 * 4);
+for (let i = 0; i < 8; i++) data.set([255, 255, 255, i === 3 ? 0 : 255], i * 4);
+const atlas = { width: 4, height: 2, data };
+const back = new Sprite({ scaleX: 8, scaleY: 8, pivotX: 0, pivotY: 0, rect: [0, 0, 2, 2] });
+const front = new Sprite({ x: 8, z: 1, scaleX: 8, scaleY: 8, pivotX: 0, pivotY: 0, rect: [2, 0, 2, 2] });
+const sprites = [back, front]; // or layer.sprites
+
+const hit = pickSprite(sprites, 12, 12, { atlas });
+console.log(hit?.sprite === front, hit?.texelX, hit?.texelY, hit?.localX, hit?.localY); // true 2 1 0.5 1.5
+console.log(pickSprite(sprites, 20, 4, { atlas })); // undefined: the transparent texel, and nothing behind it
+console.log(pickSprite(sprites, 20, 4, { atlas, mode: 'box' })?.texelX); // 3: box mode ignores the texel's alpha
+front.alpha = 0.5;
+console.log(pickSprite(sprites, 12, 12, { atlas, alphaThreshold: 200 })?.sprite === back); // true: too faint, falls through
+console.log(pickSprite(sprites, 24, 24, { atlas, camera: { x: 0, y: 0, zoom: 2 } })?.sprite === front); // true
+console.log(pickSprite(sprites, 4, 4, { atlas, mask: { rect: [8, 0, 16, 16] } })); // undefined: masked out
+```
+
+- `x` and `y` are target pixels, the layer's own pixels, not CSS pixels: scale a pointer's offset by
+  `canvas.width / canvas.clientWidth` (and the same for height) first.
+- A hit gives `sprite`, the atlas texel `texelX` and `texelY` it shows, `localX` and `localY` (the point in the
+  sprite's own texel units from its top-left, before flips) and `alpha`, the texel's alpha times the sprite's, 0 to 1.
+- `alphaThreshold` (default 1, in bytes 0 to 255) is the least combined alpha that counts; alpha 0 never picks, and
+  neither does a hidden sprite or one with `alpha` 0. `mode: 'box'` (default `'pixel'`) tests the sprite's rectangle
+  and its `alpha` only, and needs no atlas bytes.
+- `atlas` takes `{ width, height, data }` or a list of same-size pages (`data`: straight-alpha RGBA8,
+  `width * height * 4` bytes). Pixel mode needs `data`; without it the pick throws a `RangeError` (so does a point that
+  is not finite, a bad threshold or camera, or a sprite whose `page` has no atlas). `camera`, `snap`, `ySort` and
+  `mask` take the layer's values (defaults `{ x: 0, y: 0, zoom: 1 }`, true, false, none).
+- The texel test reads the source atlas alpha as nearest filtering draws it; a custom `shader` that changes alpha,
+  such as a dissolve, is not seen, so pick those in `'box'` mode or give them their own test.
 
 ## Billboards
 
@@ -335,6 +449,137 @@ engine.start();
 - Weights are scaled to sum to 1 per vertex; more than four bones per vertex is not supported.
 - Skinning runs on the CPU: about a thousand vertices a frame is light, tens of thousands is not (time not measured).
 - Texels are read at exact positions with no filtering, and the layer needs a single-sample target. WebGPU only.
+
+### IK, slots, draw order and curves
+
+Bones take a `length` (along their local +x, default 0, never negative), which IK uses to find a chain's tip.
+`solveTwoBoneIK(skeleton, root, tip, target, options)` solves a limb exactly with the law of cosines;
+`solveChainIK(skeleton, names, target, options)` turns a chain of any length (cyclic coordinate descent). Both work in
+skeleton world units, keep the bones' positions and scales, and update the skeleton.
+
+```ts
+import { Skeleton2D, SkinnedMesh, gridMesh, poseSkeleton, solveChainIK, solveTwoBoneIK } from 'margoengine/sprites/skeletal';
+
+const leg = new Skeleton2D([
+  { name: 'thigh', rotation: Math.PI / 2, length: 10 },
+  { name: 'shin', parent: 'thigh', x: 10, length: 10 },
+]);
+const tipOf = (name: string) => {
+  const b = leg.bone(name)!;
+  return [b.world[4] + b.world[0] * b.length, b.world[5] + b.world[1] * b.length].map((v) => +v.toFixed(3));
+};
+const step = solveTwoBoneIK(leg, 'thigh', 'shin', [6, 14]); // bendPositive (default true) picks the knee side
+console.log(step.converged, tipOf('shin')); // true [6, 14]
+const reach = solveTwoBoneIK(leg, 'thigh', 'shin', [0, 40]);
+console.log(reach.converged, +reach.distance.toFixed(3)); // false 20: straight at the target, 20 short
+
+const tail = new Skeleton2D([
+  { name: 'a', length: 4 },
+  { name: 'b', parent: 'a', x: 4, length: 4 },
+  { name: 'c', parent: 'b', x: 4, length: 4 },
+]);
+console.log(solveChainIK(tail, ['a', 'b', 'c'], [6, 6], { iterations: 32, tolerance: 0.01 }).converged); // true
+
+// Slots: images on a bone that swap, with a draw order a clip can change.
+const body = new Skeleton2D([{ name: 'root' }, { name: 'head', parent: 'root', y: -8 }]);
+const image = (x: number) => {
+  const grid = gridMesh([x, 0, 4, 4], 1, 1);
+  const joints = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]; // four vertices on bone 1, the head
+  const weights = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
+  return new SkinnedMesh({ skeleton: body, ...grid, joints, weights });
+};
+const face = body.addSlot({ name: 'face', bone: 'head', attachments: { open: image(0), shut: image(4) }, attachment: 'open' });
+body.addSlot({ name: 'hat', bone: 'head', attachments: { cap: image(8) }, attachment: 'cap' });
+const blink = {
+  duration: 1,
+  bones: { head: { y: [[0, -8], [1, -6]] } },
+  curves: { head: { y: [[0.42, 0, 0.58, 1]] } }, // one cubic Bezier per key interval: ease in and out
+  slots: { face: [{ time: 0.4, attachment: 'shut' }, { time: 0.5, attachment: 'open' }] },
+  drawOrder: [{ time: 0.5, slots: ['hat', 'face'] }], // back to front
+};
+poseSkeleton(body, blink, 0.45);
+console.log(face.attachment, body.drawOrder.map((s) => s.name), body.bone('head')!.y.toFixed(3)); // 'shut' ['face', 'hat'] '-7.171'
+poseSkeleton(body, blink, 0.75);
+console.log(face.attachment, body.drawOrder.map((s) => s.name)); // 'open' ['hat', 'face']
+poseSkeleton(body, blink, 0.25);
+console.log(face.attachment, body.drawOrder.map((s) => s.name)); // 'open' ['face', 'hat']: before the first keys, setup
+```
+
+- IK options: `mix` (0 to 1, default 1) blends from the current rotations to the solution, `iterations` (1 to 1024,
+  default 64) caps chain sweeps, `tolerance` (default 0.001) is the distance that counts as reached, and
+  `bendPositive` (default true) chooses the bend side. The result is `{ distance, iterations, converged }`, measured
+  after the blend, so a target out of reach or a `mix` below 1 gives `converged: false`. A parent scaled to zero
+  throws a `RangeError`. A first bone with uneven scale is solved as a chain.
+- `addSlot({ name, bone, attachments, attachment })` adds a slot whose `attachments` are `SkinnedMesh`es of the same
+  skeleton, one shown at a time (`attachment`, default none). `setAttachment(name)` swaps it (an unknown name throws),
+  `slot(name)` finds one, `slots` lists them in setup order and `drawOrder` in the current order;
+  `setDrawOrder(names)` takes every slot name once.
+- `curves` give each key interval of a channel `'linear'` (the default), `'stepped'` (hold, then jump) or cubic Bezier
+  controls `[x1, y1, x2, y2]` as in CSS `cubic-bezier`. `slots` and `drawOrder` keys are discrete; before a slot's first
+  key it shows its setup attachment, and before the first draw-order key the setup order is used.
+- `layer.addSkeleton(skeleton)` draws every slot's shown attachment in draw order, following the clip each frame; one
+  skeleton goes in one layer once. `layer.removeSkeleton(skeleton)` takes it out with all its slot attachments, while
+  `layer.remove(mesh)` removes only meshes you added one by one with `add`.
+
+## Skeletal JSON (`margoengine/sprites/spine`)
+
+`margoengine/sprites/spine` reads the skeletal animation JSON export format onto the same runtime, so a rig is a
+`Skeleton2D` that `SkeletalLayer.addSkeleton` draws. It covers bones with shear and inheritance, slots with light and
+dark tints and blend modes, skins, region, mesh, linked and weighted attachments, bounding boxes, points, clipping and
+paths, IK, transform and path constraints, events, and bone, slot, deform, sequence and constraint timelines with
+their curves. `docs/skeletal-json.md` has the whole reference: coordinates, atlas ownership, every default and the
+evidence.
+
+```ts
+import { parseSpineJSON, serializeSpineJSON } from 'margoengine/sprites/spine';
+
+const document = {
+  skeleton: { spine: '4.2.0' },
+  bones: [{ name: 'root' }, { name: 'arm', parent: 'root', y: 4, rotation: -90, length: 8 }],
+  slots: [{ name: 'arm', bone: 'arm', attachment: 'arm', color: 'ff8040ff' }],
+  skins: [
+    { name: 'default', attachments: { arm: { arm: { width: 2, height: 8 } } } },
+    { name: 'gold', attachments: { arm: { arm: { width: 3, height: 8 } } } },
+  ],
+  events: { step: { int: 1, string: 'left' } },
+  animations: {
+    wave: {
+      bones: { arm: { rotate: [{ value: 0 }, { time: 0.5, value: 45 }, { time: 1, value: 0 }] } },
+      slots: { arm: { rgba: [{ color: 'ff8040ff' }, { time: 1, color: '4080ffff' }] } },
+      events: [{ time: 0.5, name: 'step' }],
+    },
+  },
+};
+const asset = parseSpineJSON(JSON.stringify(document)); // a string or a plain object
+console.log([...asset.animations.keys()], asset.animations.get('wave')!.duration, [...asset.skins.keys()]); // ['wave'] 1 ['default', 'gold']
+
+const rig = asset.createSkeleton(); // any number of independent rigs from one asset
+rig.pose('wave', 0.5); // seconds; starts from the setup pose each call, so seeking back is exact
+console.log(rig.bone('arm')!.rotation.toFixed(4), rig.slotStates.get('arm')!.color.map((c) => +c.toFixed(3))); // '0.7854' [0.625, 0.502, 0.625, 1]
+console.log(rig.eventsBetween('wave', 0.25, 0.75).map((e) => [e.name, e.int, e.string])); // [['step', 1, 'left']]
+console.log(rig.eventsBetween('wave', 0.75, 2.6).length); // 2: one in each loop crossed
+rig.setSkin('gold'); // falls back to the default skin for what gold lacks; resets slots and pose
+console.log(rig.skin, rig.getAttachment('arm') !== undefined); // 'gold' true
+console.log(serializeSpineJSON(asset) === JSON.stringify(document)); // true: every exported value round-trips
+```
+
+- `createSkeleton(options)`: `regions` (named `{ x, y, width, height, rotation, originalWidth, originalHeight,
+  offsetX, offsetY }` rectangles in the one atlas your `SkeletalLayer` draws; default each image at its own full
+  size), `scale` (rig units per exported unit, 1), `yDown` (true: the export's y-up becomes sprite y-down, which flips
+  rotations) and `skin` (`'default'`, or the first skin).
+- `pose(name, seconds, { loop })` wraps time into the animation unless `loop` is false. Constraints run in the
+  exported order. `slotStates` holds each slot's animated `color`, `dark`, `blend` and `attachment`.
+- `eventsBetween(name, from, to, loop = true)` lists events with `from < time <= to` across the loops crossed (pass
+  `from = -1` to include time 0), with definition defaults filled in; a backward range gives none. An event's `audio`,
+  `volume` and `balance` are for your audio system to play.
+- `loadSpineJSON(url, { signal })` fetches and parses; `signal` covers the request, the body and the parse.
+  `maxValues` and `maxVertices` (1,000,000 each) and a 64-level nesting limit bound what a document may hold. A
+  document that breaks them, or is invalid (an unknown parent, say), throws a `MargoError` with code `'failed'` that
+  names the fault.
+- Physics constraints are read, kept and round-tripped, but posing does not simulate them yet: each one logs and lists
+  a `warnings` entry with code `'spine-physics-deferred'` when the document loads. Binary skeleton files are not read.
+- Spine is a trademark of Esoteric Software LLC; this independent reader of the public JSON format has no affiliation
+  with it.
 
 ## DragonBones
 

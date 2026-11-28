@@ -286,9 +286,10 @@ const blue = new PbrMaterial({ color: [0, 0, 1, 1], map: pixels });
 const library = await captureMaterials({ red, blue });
 const text = JSON.stringify(library); // plain JSON: { version: 1, materials: { red, blue }, objects: [...] }
 
-const restored = await restoreMaterials(JSON.parse(text));
-console.log(restored.red instanceof PbrMaterial, restored.red.roughness); // true 0.4
-console.log(restored.red.map === restored.blue.map); // true: still one texture
+const restored = await restoreMaterials(JSON.parse(text)); // Record<string, object>: one per name
+const [red2, blue2] = [restored.red, restored.blue] as PbrMaterial[];
+console.log(red2 instanceof PbrMaterial, red2.roughness); // true 0.4
+console.log(red2.map === blue2.map); // true: still one texture
 ```
 
 - Texture pixels are embedded by default. `textureURL(texture)` returns a URL (or a list of six for a cube) to save
