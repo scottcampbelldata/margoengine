@@ -92,6 +92,9 @@ impl World {
         if !(0..self.fem.count).any(|t| active_vertex_block(self.fem.flags[t])) {
             return false;
         }
+        for b in 0..self.bodies {
+            self.pressed[b] = 0;
+        }
         let head = &mut self.fem.vertex_block.head;
         for i in 0..self.particles {
             head[i] = NONE;
@@ -137,6 +140,7 @@ impl World {
             }
             if self.has_orthotropy((linked / 4) as usize) {
                 self.solve_orthotropic_vertex(i, linked, h);
+                self.hold_still_contacts(i, h);
                 continue;
             }
             let mass = 1.0 / self.w[i] as f64;
@@ -238,6 +242,7 @@ impl World {
             self.x[i] = (current[0] + direction[0]) as f32;
             self.y[i] = (current[1] + direction[1]) as f32;
             self.z[i] = (current[2] + direction[2]) as f32;
+            self.hold_still_contacts(i, h);
         }
     }
 
@@ -307,7 +312,8 @@ impl World {
                 continue;
             }
             previous = Some(b);
-            if self.bsleep[b] != 0 {
+            // A body the passes held off a still body has an outside reaction, as a pinned one has: its translation is not free.
+            if self.bsleep[b] != 0 || self.pressed[b] != 0 {
                 continue;
             }
             let first = self.b_first[b] as usize;

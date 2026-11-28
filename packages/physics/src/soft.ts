@@ -728,17 +728,14 @@ function criticalBandLengths(material: SoftOrthotropy, strengths: readonly numbe
     Math.fround((2 * stiffness[i]! * work) / (failure[i]! * failure[i]!)),
   );
   if (lengths.some((length) => !(length > 0 && Number.isFinite(length))))
-    throw softError(
-      'Fracture energies give unrepresentable band lengths. Supply positive finite energies in J/m².',
-    );
+    throw softError('Fracture energies give unrepresentable band lengths. Supply positive finite energies in J/m².');
   return Object.freeze(lengths);
 }
 
 function unitDirection(direction: Vec3, label: string): Vec3 {
   checkVec(direction, label);
   const scale = Math.max(Math.abs(direction[0]), Math.abs(direction[1]), Math.abs(direction[2]));
-  if (scale === 0)
-    throw softError(`${label} must be nonzero. Supply a rest-space direction with a nonzero component.`);
+  if (scale === 0) throw softError(`${label} must be nonzero. Supply a rest-space direction with a nonzero component.`);
   const x = direction[0] / scale;
   const y = direction[1] / scale;
   const z = direction[2] / scale;
@@ -750,9 +747,7 @@ function softFiber(direction: Vec3, modulus: number): SoftFiber | null {
   checkVec(direction, 'Soft fiber direction');
   const stored = Math.fround(modulus);
   if (!Number.isFinite(stored) || modulus < 0 || (modulus > 0 && stored === 0))
-    throw softError(
-      'Soft fiber modulus is outside the supported range. Use a finite nonnegative float32 value in Pa.',
-    );
+    throw softError('Soft fiber modulus is outside the supported range. Use a finite nonnegative float32 value in Pa.');
   if (modulus === 0) return null;
   const axis = Object.freeze(unitDirection(direction, 'Soft fiber direction'));
   return Object.freeze({ direction: axis, modulus: stored });
@@ -913,8 +908,7 @@ function checkCellMaterial(m: CellMaterial): void {
     if (!(value >= 0 && Number.isFinite(value))) throw softError(`${label} must be 0 or more.`);
   if (!(m.interiorStrength >= 1 && Number.isFinite(m.interiorStrength)))
     throw softError('interiorStrength must be 1 (no difference) or more.');
-  if (!(m.density > 0 && Number.isFinite(m.density)))
-    throw softError('Density must be a positive number of kg/m3.');
+  if (!(m.density > 0 && Number.isFinite(m.density))) throw softError('Density must be a positive number of kg/m3.');
   for (const [value, label] of [
     [m.yieldStrain, 'yieldStrain'],
     [m.creep, 'creep'],
@@ -971,9 +965,7 @@ function checkMaterial(material: SoftBodyMaterial): void {
         'A fabric shear rigidity is a positive number of gf/(cm deg), as KES-F measures it; pass the measured value.',
       );
     if (!(hysteresis >= 0 && Number.isFinite(hysteresis)))
-      throw softError(
-        'A fabric shear hysteresis is 0 or more gf/cm, as KES-F measures it; pass the measured value.',
-      );
+      throw softError('A fabric shear hysteresis is 0 or more gf/cm, as KES-F measures it; pass the measured value.');
   }
   if (material.tensile)
     for (const t of [material.tensile.warp, material.tensile.weft])
@@ -1110,9 +1102,7 @@ const STANDARD_ATMOSPHERE = 101325;
 
 function checkedGas({ pressure, volume, ambientPressure = STANDARD_ATMOSPHERE }: SoftGasPressure): SoftGasPressure {
   if (!(pressure > 0 && Number.isFinite(pressure)))
-    throw softError(
-      'A gas fill needs a positive finite absolute pressure in Pa. Supply the pressure of the fill.',
-    );
+    throw softError('A gas fill needs a positive finite absolute pressure in Pa. Supply the pressure of the fill.');
   if (volume !== undefined && !(volume > 0 && Number.isFinite(volume)))
     throw softError('A gas fill needs a positive finite reference volume in m³. Supply the volume of the fill.');
   if (!(ambientPressure >= 0 && Number.isFinite(Math.fround(ambientPressure))))
@@ -1514,8 +1504,7 @@ export class SoftBodyDesc {
     // Rapier's `sphere` takes the number of subdivisions third.
     const detail = typeof options === 'number' ? options : (options.detail ?? 2);
     checkVec(center, 'Sphere centre');
-    if (!(radius > 0 && Number.isFinite(radius)))
-      throw softError('Sphere radius must be a positive number of metres.');
+    if (!(radius > 0 && Number.isFinite(radius))) throw softError('Sphere radius must be a positive number of metres.');
     count(detail, 'detail', 0);
     if (detail > 5) throw softError('A sphere is subdivided at most 5 times.');
     const t = (1 + Math.sqrt(5)) / 2;
@@ -1688,8 +1677,7 @@ export class SoftBodyDesc {
     if (typeof edges !== 'boolean') {
       const total = (this.edgePairs.length + this.bendPairs.length) / 2;
       for (const e of edges)
-        if (!Number.isInteger(e) || e < 0 || e >= total)
-          throw softError(`Edge ${e} is not one of the ${total} edges.`);
+        if (!Number.isInteger(e) || e < 0 || e >= total) throw softError(`Edge ${e} is not one of the ${total} edges.`);
     }
     this.tension = typeof edges === 'boolean' ? edges : [...edges];
     return this;
@@ -1888,8 +1876,7 @@ export class SoftBodyDesc {
    * coordinates, and `body.meshVertices()` reads the vertices where the cells have taken them. Draw the skin, not the cells.
    */
   setSkin(vertices: ArrayLike<number>, indices: ArrayLike<number>): this {
-    if (this.cells.length === 0)
-      throw softError('A skin needs cells to ride in: build the body with cells first.');
+    if (this.cells.length === 0) throw softError('A skin needs cells to ride in: build the body with cells first.');
     this.skin = bindSkin(vertices, indices, this.positions, this.cells);
     return this;
   }
@@ -2057,9 +2044,7 @@ export class SoftBodyDesc {
       if (group.length < 4) throw softError(`Cluster ${g} has at least four particles.`);
       return Array.from(group, (index) => {
         if (!Number.isInteger(index) || index < 0 || index >= this.particleCount)
-          throw softError(
-            `Cluster ${g} uses ${index}, which is not a particle; use 0 to ${this.particleCount - 1}.`,
-          );
+          throw softError(`Cluster ${g} uses ${index}, which is not a particle; use 0 to ${this.particleCount - 1}.`);
         return index;
       });
     });
@@ -2114,9 +2099,7 @@ export class SoftBodyDesc {
     }
     for (let i = 0; i < out.length; i += 2)
       if (out[i] === out[i + 1])
-        throw softError(
-          `${label} ${i / 2} joins particle ${out[i]} to itself; an edge needs two different particles.`,
-        );
+        throw softError(`${label} ${i / 2} joins particle ${out[i]} to itself; an edge needs two different particles.`);
     return out;
   }
   /** Merges another description in: its particles follow this one's, and its indices are shifted to match. */
@@ -2208,8 +2191,7 @@ export class SoftBodyDesc {
   }
   /** Mass of every particle in kilograms (default 1). */
   setParticleMass(mass: number): this {
-    if (!(mass > 0 && Number.isFinite(mass)))
-      throw softError('Particle mass must be a positive number of kilograms.');
+    if (!(mass > 0 && Number.isFinite(mass))) throw softError('Particle mass must be a positive number of kilograms.');
     this.masses.fill(mass);
     this.massGiven = true;
     return this;
@@ -2221,8 +2203,7 @@ export class SoftBodyDesc {
   }
   /** One mass per particle. */
   setMasses(masses: ArrayLike<number>): this {
-    if (masses.length !== this.particleCount)
-      throw softError(`Give ${this.particleCount} masses, one per particle.`);
+    if (masses.length !== this.particleCount) throw softError(`Give ${this.particleCount} masses, one per particle.`);
     const next = Array.from(masses);
     if (next.some((m) => !(m > 0 && Number.isFinite(m)))) throw softError('Every particle mass must be positive.');
     this.masses = next;
@@ -2893,9 +2874,7 @@ export class SoftBody {
   setGasPressure(options: SoftGasPressure): this {
     this.check();
     if (!this.volumeOn)
-      throw softError(
-        'This body has no closed volume. Create it with SoftBodyDesc.setGasPressure or setVolumeFactor.',
-      );
+      throw softError('This body has no closed volume. Create it with SoftBodyDesc.setGasPressure or setVolumeFactor.');
     if (this.cellRange.count)
       throw softError('Gas needs a hollow shell. Create a closed triangle mesh without tetrahedral cells.');
     const gas = checkedGas(options);
@@ -3529,10 +3508,7 @@ export class SoftBodies implements PhysicsAttachment {
   }
 
   /** @internal The debug lines of some of its bodies (see {@link SoftBodies.debugRender}). */
-  debugLines(
-    bodies: readonly SoftBody[],
-    options: SoftDebugOptions,
-  ): { vertices: Float32Array; colors: Float32Array } {
+  debugLines(bodies: readonly SoftBody[], options: SoftDebugOptions): { vertices: Float32Array; colors: Float32Array } {
     const { edges = true, stress = false, stressRange = 0.2, particles = false, contacts = false } = options,
       positions: number[] = [],
       colors: number[] = [],
@@ -3541,7 +3517,9 @@ export class SoftBodies implements PhysicsAttachment {
         colors.push(...color, ...color);
       };
     if (!(stressRange > 0) || !Number.isFinite(stressRange))
-      throw volumeError(`The stress range is a positive fraction of the rest length (got ${stressRange}); pass 0.2, say.`);
+      throw volumeError(
+        `The stress range is a positive fraction of the rest length (got ${stressRange}); pass 0.2, say.`,
+      );
     const c = this.columns();
     for (const body of bodies) {
       const at = (row: number): [number, number, number] => [c.x![row]!, c.y![row]!, c.z![row]!];
@@ -3747,9 +3725,7 @@ export class SoftBodies implements PhysicsAttachment {
         'Coplanar fracture toughness needs isotropic elastic cells. Build tetrahedra without fibers or plastic flow.',
       );
     if (seam && (nucleus !== null || toughness))
-      throw softError(
-        'Authored and nucleated cracks use different opening rules. Clear one fracture mode with null.',
-      );
+      throw softError('Authored and nucleated cracks use different opening rules. Clear one fracture mode with null.');
     const fracture = seam ?? nucleus ?? (toughness ? 0 : null);
     if (fracture !== null && new Set(desc.cells).size !== desc.particleCount)
       throw softError('A tensile crack needs every particle in a cell. Build a fully tetrahedralized solid.');
@@ -3771,9 +3747,7 @@ export class SoftBodies implements PhysicsAttachment {
       for (let i = 0; i < desc.cells.length; i += 4) {
         const [a, b, c, d] = [desc.cells[i]!, desc.cells[i + 1]!, desc.cells[i + 2]!, desc.cells[i + 3]!];
         if (Math.abs(tetDeterminant(desc.positions, a, b, c, d)) >= maxDeterminant)
-          throw softError(
-            'A cell is too coarse for the authored fracture energy. Refine the tetrahedra in the solid.',
-          );
+          throw softError('A cell is too coarse for the authored fracture energy. Refine the tetrahedra in the solid.');
       }
     }
     const particles = desc.particleCount;
@@ -5830,8 +5804,12 @@ export class SoftBodies implements PhysicsAttachment {
       const total = body.mass();
       for (let i = 0; i < body.particles; i++) {
         const row = body.firstParticle + i;
+        c.ax[row] = c.ay[row] = c.az[row] = 0;
         if (c.w[row] === 0) continue;
-        // The whole-body force is shared by mass, so every particle accelerates by force / total mass.
+        // The whole-body force is shared by mass, so every particle accelerates by force / total mass. The kernel takes the
+        // acceleration with gravity at the start of every piece of the step (KB-SOFT-FORCEKICK1): a kick of the whole step's
+        // F dt at its start was damped and solved away before it loaded the body, so a damped body under a steady force came
+        // to rest at a fraction of its static deflection.
         let fx = body.force[0] / total,
           fy = body.force[1] / total,
           fz = body.force[2] / total;
@@ -5841,9 +5819,9 @@ export class SoftBodies implements PhysicsAttachment {
           fy += own[1] * c.w[row]!;
           fz += own[2] * c.w[row]!;
         }
-        c.vx[row] = c.vx[row]! + fx * dt;
-        c.vy[row] = c.vy[row]! + fy * dt;
-        c.vz[row] = c.vz[row]! + fz * dt;
+        c.ax[row] = fx;
+        c.ay[row] = fy;
+        c.az[row] = fz;
       }
       if (body.airDrag && body.airLoads === 0 && body.triangleList.length > 0) this.airDrag(body, c, dt);
       if (this.water) this.waterLoads(body, c, dt);
@@ -5983,7 +5961,8 @@ export class SoftBodies implements PhysicsAttachment {
       for (let i = 0; i < n; i++) lift += pressure[3 * i + 1]!;
       const displaced = gmag > 0 ? lift / (rho * gmag) : 0,
         total = body.mass();
-      for (let i = 0; i < n; i++) added[i] = total > 0 ? (0.5 * rho * Math.max(0, displaced) * body.masses[i]!) / total : 0;
+      for (let i = 0; i < n; i++)
+        added[i] = total > 0 ? (0.5 * rho * Math.max(0, displaced) * body.masses[i]!) / total : 0;
       body.displaced = Math.max(0, displaced);
     }
     // Per particle: buoyancy, the water's acceleration on it and its water, and the water's inertia.
@@ -5998,9 +5977,9 @@ export class SoftBodies implements PhysicsAttachment {
       c.w[row] = 1 / mass;
       if (pressure) {
         const accel = this.waterAccel;
-        accel[3 * row] = (pressure[3 * i]! / mass) + ((m * scale) / mass - scale) * g[0];
-        accel[3 * row + 1] = (pressure[3 * i + 1]! / mass) + ((m * scale) / mass - scale) * g[1];
-        accel[3 * row + 2] = (pressure[3 * i + 2]! / mass) + ((m * scale) / mass - scale) * g[2];
+        accel[3 * row] = pressure[3 * i]! / mass + ((m * scale) / mass - scale) * g[0];
+        accel[3 * row + 1] = pressure[3 * i + 1]! / mass + ((m * scale) / mass - scale) * g[1];
+        accel[3 * row + 2] = pressure[3 * i + 2]! / mass + ((m * scale) / mass - scale) * g[2];
         if (!(s > 0)) continue;
         // The water's own acceleration on what the body displaces and carries.
         const x = c.x[row]!,
@@ -6008,7 +5987,7 @@ export class SoftBodies implements PhysicsAttachment {
           z = c.z[row]!,
           before = this.waterVelocity(x, y, z, time - h),
           after = this.waterVelocity(x, y, z, time + h),
-          push = (rho * (body.displaced * m) / Math.max(1e-30, body.mass()) + ma) / mass;
+          push = ((rho * (body.displaced * m)) / Math.max(1e-30, body.mass()) + ma) / mass;
         accel[3 * row] = accel[3 * row]! + (push * (after[0] - before[0])) / dt;
         accel[3 * row + 1] = accel[3 * row + 1]! + (push * (after[1] - before[1])) / dt;
         accel[3 * row + 2] = accel[3 * row + 2]! + (push * (after[2] - before[2])) / dt;

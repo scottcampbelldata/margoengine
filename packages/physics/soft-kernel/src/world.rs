@@ -284,6 +284,13 @@ pub struct World {
     pub cb_next: Col<u32>,
     /// A block-solved particle's velocity at the start of the last piece, before gravity (cloth_block.rs): its acceleration
     /// decides how much of gravity the next piece's first guess takes.
+    /// Each particle's acceleration from the forces put on it for the step (`addForce`, `addParticleForce`), in m/s^2: taken
+    /// with gravity at the start of every piece, so a steady force is steady through the pieces and the solves see its load.
+    pub ax: Col<f32>,
+    pub ay: Col<f32>,
+    pub az: Col<f32>,
+    /// Per body row: whether a pass of this piece held one of its particles off a still body (`hold_still_contacts`).
+    pub pressed: Col<u32>,
     pub cbx: Col<f32>,
     pub cby: Col<f32>,
     pub cbz: Col<f32>,
@@ -309,6 +316,9 @@ impl World {
         for v in [&mut self.rx, &mut self.ry, &mut self.rz, &mut self.slx, &mut self.sly, &mut self.slz, &mut self.sw] {
             grow(v, particles);
         }
+        for v in [&mut self.ax, &mut self.ay, &mut self.az] {
+            grow(v, particles);
+        }
         for v in [&mut self.cbx, &mut self.cby, &mut self.cbz] {
             grow(v, particles);
         }
@@ -317,6 +327,7 @@ impl World {
         }
         grow(&mut self.b_on, bodies);
         grow(&mut self.bsleep, bodies);
+        grow(&mut self.pressed, bodies);
         grow(&mut self.b_first, bodies);
         grow(&mut self.b_count, bodies);
         for v in [
@@ -448,9 +459,9 @@ impl World {
                 self.vz[i] = 0.0;
             } else if self.w[i] > 0.0 {
                 let scale = self.gravity_scale[self.pbody[i] as usize];
-                self.vx[i] += h * gravity[0] * scale;
-                self.vy[i] += h * gravity[1] * scale;
-                self.vz[i] += h * gravity[2] * scale;
+                self.vx[i] += h * (gravity[0] * scale + self.ax[i]);
+                self.vy[i] += h * (gravity[1] * scale + self.ay[i]);
+                self.vz[i] += h * (gravity[2] * scale + self.az[i]);
                 self.x[i] += h * self.vx[i];
                 self.y[i] += h * self.vy[i];
                 self.z[i] += h * self.vz[i];
@@ -642,6 +653,57 @@ impl World {
         self.x[b] -= wb * dl * nx;
         self.y[b] -= wb * dl * ny;
         self.z[b] -= wb * dl * nz;
+    }
+
+    /// Whether body row `c` is still: fixed (no inverse mass or inertia) and not moving, so a contact with it is a plane that
+    /// stays put through the piece.
+    pub(crate) fn still(&self, c: usize) -> bool {
+        self.wm[c] == 0.0
+            && self.iixx[c] == 0.0
+            && self.iiyy[c] == 0.0
+            && self.iizz[c] == 0.0
+            && self.lvx[c] == 0.0
+            && self.lvy[c] == 0.0
+            && self.lvz[c] == 0.0
+            && self.avx[c] == 0.0
+            && self.avy[c] == 0.0
+            && self.avz[c] == 0.0
+    }
+
+    /// Keeps particle `i` off the still bodies it holds contacts with, along each contact's normal, inside the passes of the
+    /// vertex-block solve: the ground is then one of the constraints the passes meet, as a pin is, and a body pressed on it comes
+    /// to the static equilibrium of its load and the ground's reaction (KB-SOFT-CONTACTSPLIT1). Held only after the passes, as a
+    /// projection the elastic solve never saw, the ground took the bottom layer back each piece while the rest of the body went
+    /// on falling into it, and a loaded body sank by twice its static deflection at 20 pieces a step. The push is booked as the
+    /// contact's impulse, so the friction and velocity passes after it treat it as the contact passes' own.
+    pub(crate) fn hold_still_contacts(&mut self, i: usize, h: f32) {
+        if self.w[i] <= 0.0 {
+            return;
+        }
+        for s in 0..SLOTS {
+            let k = i * SLOTS + s;
+            let c = self.kc[k];
+            if c == NONE {
+                continue;
+            }
+            let c = (c - 1) as usize;
+            if !self.still(c) || self.dom[c] > 0.0 || self.bmesh[c] > 0.0 || self.linked_to(i, c) {
+                continue;
+            }
+            let carried = [self.mx[c], self.my[c], self.mz[c]];
+            let spin = [self.sqx[c], self.sqy[c], self.sqz[c], self.sqw[c]];
+            let turn = [self.tqx[c], self.tqy[c], self.tqz[c], self.tqw[c]];
+            let dm = [self.dmx[c], self.dmy[c], self.dmz[c]];
+            let (n, _, gap) = self.meet(k, c, 0.0, carried, spin, dm, turn, [self.x[i], self.y[i], self.z[i]]);
+            let d = gap - self.radius[i];
+            if d < 0.0 {
+                self.x[i] -= n[0] * d;
+                self.y[i] -= n[1] * d;
+                self.z[i] -= n[2] * d;
+                self.kj[k] -= d / (self.w[i] * h);
+                self.pressed[self.pbody[i] as usize] = 1;
+            }
+        }
     }
 
     /// Pushes a particle out of every collider of the table it sits in.

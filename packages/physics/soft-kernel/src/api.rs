@@ -28,6 +28,7 @@ static mut WORLD: World = World {
     sk_p: Col::new(), sk_x: Col::new(), sk_y: Col::new(), sk_z: Col::new(), sk_vx: Col::new(), sk_vy: Col::new(), sk_vz: Col::new(),
     sk_nx: Col::new(), sk_ny: Col::new(), sk_nz: Col::new(), sk_max: Col::new(), sk_back: Col::new(), skins: 0,
     cb_head: Col::new(), cb_next: Col::new(), cbx: Col::new(), cby: Col::new(), cbz: Col::new(),
+    ax: Col::new(), ay: Col::new(), az: Col::new(), pressed: Col::new(),
 };
 
 #[allow(static_mut_refs)]
@@ -61,6 +62,7 @@ columns! {
     tt_p, tt_a, tt_len,
     sk_p, sk_x, sk_y, sk_z, sk_vx, sk_vy, sk_vz, sk_nx, sk_ny, sk_nz, sk_max, sk_back,
     cbx, cby, cbz,
+    ax, ay, az,
 }
 
 /// Makes room for rows and says how many are in use. Views over the memory are stale after it.

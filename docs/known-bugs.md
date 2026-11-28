@@ -6,6 +6,31 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: a soft body held off the ground only after its vertex-block passes sank by twice its load (KB-SOFT-CONTACTSPLIT1, physics soft kernel)
+
+- **Repro:** a 10 cm cube of 1 MPa rubber on `setSolver('vertex-block')`, standing on a fixed floor, pressed by 100 N on
+  its top at 20 pieces of 20 passes: its top sank by a strain of 1.98% where p / E is 1% (4.2% at 10 pieces, 1.35% at
+  40); a hemisphere pressed on the floor sank by three to seven times Hertz's approach.
+- **Cause:** `packages/physics/soft-kernel/src/world.rs` meets the colliders after the passes (`apply_contacts`), so the
+  passes solved each piece as if the base were free: the floor took the base back each piece while the rest of the body
+  went on into it, and the free-translation step of the vertex-block solve (`solve_vertex_block_translation`) moved the
+  whole body back towards where its load would carry a free body.
+- **Fix:** `hold_still_contacts` holds each vertex off the still bodies it touches inside the vertex-block passes, right
+  after its block update, booking the push as the contact's impulse (so friction and the velocity pass see it), and a
+  body so held has no free translation, as a pinned one has none. Regression:
+  `packages/physics/tests/soft-cells.test.js` ("a body pressed on the ground comes to its static deflection"). The XPBD
+  and `'fem'` cell solvers still meet the floor after their passes (see `docs/limits.md`).
+
+### Fixed 2026-11-28: a steady force on a soft body was a kick at the step's start (KB-SOFT-FORCEKICK1, physics soft)
+
+- **Repro:** the cube above with its base pinned, pressed by 100 N through `addParticleForce`: at 20 pieces of 20 passes
+  its top came to rest at a strain of 0.37% (vertex-block) or 0.10% (fem), where the same load as gravity gave 0.9%.
+- **Cause:** `SoftBodies.applyForces` added each force's whole F dt to the particles' velocities before the first piece;
+  the damping and the implicit solves took most of that kick before it loaded the body.
+- **Fix:** it writes each particle's acceleration to new kernel columns (`ax`, `ay`, `az`), which the kernel takes with
+  gravity at the start of every piece. Regression: `packages/physics/tests/soft-cells.test.js` ("a steady force loads a
+  damped body to its static deflection").
+
 ### Fixed 2026-11-27: the clouds' two-stream check read the deck's map in the sky's old units (KB-SKY-LAYERUNIT1, sky)
 
 - **Repro:** `node packages/sky/test/features-check.mjs cloud-bounds` on main after 2e2a10a637: "two-stream down at

@@ -1164,3 +1164,67 @@ test('a skin is drawn between steps by alpha, carried by the interpolated cells 
     'the skin moved',
   );
 });
+
+test('a steady force loads a damped body to its static deflection, as gravity does (KB-SOFT-FORCEKICK1)', async () => {
+  // A 10 cm cube of 1 MPa rubber, its base pinned, its top pressed by 100 N spread by area over the top particles and ramped
+  // in over half a second: 10 kPa, a 1% strain unconfined. The pinned base keeps the base from spreading, so the top sinks
+  // between the oedometric strain p / M (M = E (1 - nu) / ((1 + nu)(1 - 2 nu)), 0.743% at nu 0.3) and the unconfined p / E.
+  // The force was a kick of F dt at the start of each step, which the damping and the solve took most of before it loaded
+  // the body: the top came to rest at 0.37%, a body 2.7 times too stiff.
+  const { physics, soft } = await create([0, 0, 0], 20, 20);
+  const material = rubber({ youngsModulus: 1e6, poissonRatio: 0.3, elasticDampingRatio: 0.3 });
+  const desc = SoftBodyDesc.box([0, 0, 0], [0.1, 0.1, 0.1], [4, 4, 4], material)
+    .setSolver('vertex-block')
+    .setCanSleep(false)
+    .setLinearDamping(30);
+  desc.setPinnedParticles(plane(desc, 1, 0));
+  const top = plane(desc, 1, 0.1),
+    edge = (v) => (Math.abs(v) < 1e-9 || Math.abs(v - 0.1) < 1e-9 ? 1 : 2),
+    share = top.map((i) => edge(desc.positions[i * 3]) * edge(desc.positions[i * 3 + 2])),
+    whole = share.reduce((s, w) => s + w, 0);
+  const body = soft.create(desc);
+  for (let s = 0; s < 90; s++) {
+    body.resetForces();
+    const ramp = Math.min(1, (s + 1) / 30);
+    top.forEach((i, k) => body.addParticleForce(i, [0, (-100 * ramp * share[k]) / whole, 0]));
+    physics.step();
+  }
+  const sunk = top.reduce((s, i, k) => s + (0.1 - body.particlePosition(i)[1]) * share[k], 0) / whole,
+    strain = sunk / 0.1;
+  assert.ok(strain > 0.00743 && strain < 0.01, `the top sank by a strain of ${strain}, between 0.743% and 1%`);
+});
+
+test('a body pressed on the ground comes to its static deflection, not twice it (KB-SOFT-CONTACTSPLIT1)', async () => {
+  // The cube above, standing on a fixed floor instead of pinned: the floor gives the base no grip it needs (the load is
+  // straight down), so the top sinks by the unconfined strain p / E, 1%, give or take the Neo-Hookean curve at 1% (under
+  // 2%), and never below the oedometric 0.743%. The floor was held only after the vertex-block passes, which never saw it:
+  // each piece it took the base back while the rest of the body went on into it, and the top sank by 1.98%.
+  const { physics, soft } = await create([0, 0, 0], 20, 20);
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5 - 1e-4, 0],
+    colliders: { shape: 'box', halfExtents: [1, 0.5, 1] },
+  });
+  const material = rubber({ youngsModulus: 1e6, poissonRatio: 0.3, elasticDampingRatio: 0.3 });
+  const desc = SoftBodyDesc.box([0, 0, 0], [0.1, 0.1, 0.1], [4, 4, 4], material)
+    .setSolver('vertex-block')
+    .setCanSleep(false)
+    .setLinearDamping(30)
+    .setParticleRadius(1e-4);
+  const top = plane(desc, 1, 0.1),
+    edge = (v) => (Math.abs(v) < 1e-9 || Math.abs(v - 0.1) < 1e-9 ? 1 : 2),
+    share = top.map((i) => edge(desc.positions[i * 3]) * edge(desc.positions[i * 3 + 2])),
+    whole = share.reduce((s, w) => s + w, 0);
+  const body = soft.create(desc);
+  for (let s = 0; s < 90; s++) {
+    body.resetForces();
+    const ramp = Math.min(1, (s + 1) / 30);
+    top.forEach((i, k) => body.addParticleForce(i, [0, (-100 * ramp * share[k]) / whole, 0]));
+    physics.step();
+  }
+  const sunk = top.reduce((s, i, k) => s + (0.1 - body.particlePosition(i)[1]) * share[k], 0) / whole,
+    strain = sunk / 0.1,
+    base = Math.min(...plane(desc, 1, 0).map((i) => body.particlePosition(i)[1]));
+  assert.ok(Math.abs(base) < 1e-5, `the base stays on the floor (${base})`);
+  assert.ok(strain > 0.00743 && strain < 0.0102, `the top sank by a strain of ${strain}, between 0.743% and 1.02%`);
+});
