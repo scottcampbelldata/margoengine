@@ -31,6 +31,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   for a textured input and never read the `UsdUVTexture`'s `inputs:scale`; the default `material()` never reads
   `inputs:emissiveColor` or `inputs:occlusion`. The coat inputs do read their scale (`preview-physical.ts`).
 
+### Open 2026-11-28: the water surface program takes over 5 s to link on the WebGL2 layer (KB-WATER-GL2LINK1, water)
+
+- **Repro:** `demos/ten-thousand-trees/?backend=webgl2` (BiomeView with `water: { rivers: 'auto' }`) on Chrome, ANGLE
+  over Direct3D 11: the page is ready after 31 to 43 s, against 16 s with `water: false` (CPU near 57 percent busy). Timing
+  `getProgramParameter(LINK_STATUS)` per program shows the water surface program (37 KB vertex, 63 KB fragment GLSL)
+  at 5.5 s, the next five water and banks programs at 0.6 to 1.4 s each. WebGPU is ready in 8 s.
+  `node scripts/web-demos/controls.mjs ten-thousand-trees --backends=webgl2` reports it as not started (30 s wait).
+- **Cause:** the translated fragment shader holds 18 loops, several nested with constant bounds (8 by 10 and 3 by 6
+  wave and refraction steps, a 24-entry part array built in a loop); the Direct3D shader compiler unrolls constant
+  loops, so the program grows many times over before it links. Not yet traced to the WGSL loop that costs most.
+- **For:** the water lane (`packages/water`, GLSL emitted by `packages/webgl2-compat`).
+
 ### Open 2026-11-28: a ball on a spinning hinge settles off its balance in proportion to its inertia (KB-PHYS-SPINBIAS1, physics solver)
 
 - **Repro:** a position-driven spindle turned about z at 68 rpm (`setNextRotation` each 60 Hz step), gravity -9.80665 z, a

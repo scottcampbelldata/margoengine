@@ -44,12 +44,21 @@ export const MATERIALS: Readonly<Record<string, MaterialLook>> = Object.freeze({
   grass: { color: [0.4, 0.55, 0.2], detail: 0.4, bump: 0.3, macro: 0.35 },
   meadow: { color: [0.56, 0.62, 0.28], detail: 0.4, bump: 0.3, macro: 0.35 },
   'leaf-litter': { color: [0.52, 0.37, 0.2], detail: 0.4, bump: 0.3, macro: 0.2 },
-  needles: { color: [0.46, 0.32, 0.18], detail: 0.35, bump: 0.3, macro: 0.2 },
+  // Conifer needle litter: white fir (Abies concolor) dry needles, ECOSTRESS Spectral Library 1.0 (Meerdink et al.,
+  // "The ECOSTRESS spectral library version 1.0", Remote Sensing of Environment 230, 2019,
+  // https://speclib.jpl.nasa.gov), samples VH325, VH326 and VH327 (UCSB, ASD bidirectional reflectance, Sierra Nevada,
+  // 2014). Each spectrum through @margoengine/optics SpectralIntegrator (CIE 1931 fit of Wyman, Sloan and Shirley, JCGT
+  // 2(2), 2013, under a 6504 K black body, 5 nm steps), then averaged: linear (0.2025, 0.1356, 0.0805), sRGB below.
+  // Until 2026-11-28 it was (0.46, 0.32, 0.18), blue at a sixth of red in linear light against 0.40 measured, so the
+  // forest floor read orange from the air.
+  needles: { color: [0.487, 0.404, 0.314], detail: 0.35, bump: 0.3, macro: 0.2 },
   moss: { color: [0.32, 0.5, 0.2], detail: 0.4, bump: 0.3, macro: 0.2 },
   mud: { color: [0.4, 0.31, 0.21], detail: 0.25, bump: 0.3, macro: 0.2 },
   sand: { color: [0.9, 0.8, 0.58], detail: 0.15, bump: 0.25, macro: 0.3 },
   'red-sand': { color: [0.82, 0.5, 0.3], detail: 0.2, bump: 0.3, macro: 0.2 },
-  'dry-grass': { color: [0.78, 0.67, 0.38], detail: 0.35, bump: 0.3, macro: 0.2 },
+  // Cured grass: wild oat (Avena fatua) litter, ECOSTRESS Spectral Library 1.0 samples VH354 and VH355, the same path as
+  // needles: linear (0.3476, 0.2394, 0.0983). Until 2026-11-28 it was (0.78, 0.67, 0.38), twice the measured brightness.
+  'dry-grass': { color: [0.624, 0.527, 0.346], detail: 0.35, bump: 0.3, macro: 0.2 },
   laterite: { color: [0.68, 0.38, 0.22], detail: 0.25, bump: 0.3, macro: 0.2 },
   rock: { color: [0.54, 0.51, 0.47], detail: 0.45, bump: 1, macro: 0.5 },
   scree: { color: [0.64, 0.61, 0.57], detail: 0.4, bump: 0.8, macro: 0.6 },

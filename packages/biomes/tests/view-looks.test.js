@@ -43,3 +43,19 @@ test('a table of your own and your own multipliers are accepted, bad ones refuse
   assert.throws(() => biomeMaterials({ saturation: -1, detail: 1, bump: 1, macro: 1 }), RangeError);
   assert.throws(() => biomeMaterials({ saturation: 1, detail: NaN, bump: 1, macro: 1 }), RangeError);
 });
+
+test('regression: the needles and dry-grass grounds are measured litter, not orange', () => {
+  // ECOSTRESS Spectral Library 1.0: white fir dry needles VH325 to VH327 and wild oat litter VH354, VH355, through the
+  // @margoengine/optics SpectralIntegrator (6504 K, 5 nm). The old needles (0.46, 0.32, 0.18) had blue at 0.15 of red in
+  // linear light, the measured litter 0.40; the old dry grass (0.78, 0.67, 0.38) was twice the measured brightness.
+  const linear = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  for (const [key, want] of [
+    ['needles', [0.2025, 0.1356, 0.0805]],
+    ['dry-grass', [0.3476, 0.2394, 0.0983]],
+  ]) {
+    const got = MATERIALS[key].color.map(linear);
+    want.forEach((w, i) => assert.ok(Math.abs(got[i] - w) < 0.002, `${key} linear channel ${i}: ${got[i]} against ${w}`));
+  }
+  const [r, , b] = MATERIALS.needles.color.map(linear);
+  assert.ok(b / r > 0.36 && b / r < 0.44, `needles blue over red ${b / r}`);
+});
