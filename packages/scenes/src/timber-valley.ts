@@ -29,6 +29,7 @@ import { FireFront } from '@margoengine/vfx/fire-front';
 import { applyFireSettings } from '@margoengine/vfx/settings';
 import { Shadows } from '@margoengine/shadows';
 import { GTAO } from '@margoengine/post/gtao';
+import type { TAA } from '@margoengine/taa';
 import { applyLookFamily, type LookFamilyName } from './look-family.js';
 import type { SceneShot } from './index.js';
 import { timberValleyInfo } from './timber-valley-info.js';
@@ -142,6 +143,14 @@ export interface TimberValleyScene extends Disposable {
     readonly occlusion: GTAO;
     readonly fuel: FuelMap;
     readonly fireFront?: FireFront;
+    /**
+     * Temporal anti-aliasing of the `film` quality (`@margoengine/taa`, its defaults: history weight 0.9, the
+     * silhouette history of KB-TAA-EDGE1), reading the post stack's depth, with every swaying scatter of the view in its
+     * velocity pass (`BiomeObjects.swaying`, `@margoengine/scatter/velocity`) so swaying leaves keep their history; the
+     * flames, smoke, weather and water mark their pixels reactive themselves, and the clouds' march moves its start
+     * each frame for it (`temporal: 'auto'`). Undefined at `preview`.
+     */
+    readonly taa?: TAA;
   };
   dispose(): void;
 }
@@ -381,6 +390,26 @@ export async function attach(engine: EngineKernel, settings: TimberValleySetting
         top: floor + CLOUD_BASE + CLOUD_DEPTH,
       });
     disposers.push(() => clouds.dispose());
+    // Film frames are anti-aliased over time: TAA resolves the post stack's picture with the stack's
+    // depth, and each swaying scatter draws its own motion, so leaves in the wind keep history instead of smearing.
+    let taa: TAA | undefined;
+    if (film) {
+      const [{ TAA: Taa }, { ScatterVelocity }] = await Promise.all([
+        import('@margoengine/taa'),
+        import('@margoengine/scatter/velocity'),
+      ]);
+      const t = Taa.attach(engine, { depth: () => preset.post.depthTexture });
+      taa = t;
+      disposers.push(() => t.dispose());
+      for (const scatter of view.objects?.swaying ?? []) {
+        const motion = new ScatterVelocity(scatter),
+          remove = t.add(motion);
+        disposers.push(() => {
+          remove();
+          motion.dispose();
+        });
+      }
+    }
     // Fuel: the forest's own fuel models, cleared on the rail, the creek, the streets and the lots (the lots burn as
     // structures).
     const fuel = fuelMap(w, { step: film ? 8 : 16, bare: plan.town.exclusions });
@@ -477,7 +506,7 @@ export async function attach(engine: EngineKernel, settings: TimberValleySetting
         fireFront?.advanceTime(seconds);
       },
       settle: () => view.whenIdle(),
-      parts: { world: w, view, preset, clouds, weather, drive, shadows, occlusion, fuel, fireFront },
+      parts: { world: w, view, preset, clouds, weather, drive, shadows, occlusion, fuel, fireFront, taa },
       dispose() {
         for (const d of disposers.reverse()) d();
         disposers.length = 0;

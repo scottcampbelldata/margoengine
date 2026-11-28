@@ -74,6 +74,8 @@ try {
   // look reaches the creek's water.
   assert.ok(quiet.r.cloudBase > quiet.r.peak + 500, `clouds from ${quiet.r.cloudBase}, ground to ${quiet.r.peak}`);
   assert.deepEqual(quiet.r.waterColor, [...WATER_LOOKS.animatedFeature.color]);
+  // KB-SCENES-TVTAA1: a preview draws no TAA; film (the default, every view below) does, with the swaying scatters' motion.
+  assert.equal(quiet.r.taa, false, 'preview draws no TAA');
   let red = 0,
     blue = 0;
   for (let y = Math.floor(bank.height * 0.75); y < Math.floor(bank.height * 0.95); y++)
@@ -100,6 +102,10 @@ try {
     assert.ok(r.lots > 0, 'the town lots are laid out');
     assert.ok(r.fire && r.fire.time >= 1800, `the fire has burned its fireTime: ${JSON.stringify(r.fire)}`);
     assert.equal(r.post[0], 'gtao', 'the occlusion pass runs first');
+    if (!/quality=preview/.test(extra)) {
+      assert.ok(r.taa, `${view}: film quality resolves with TAA`);
+      assert.ok(r.swaying > 0, `${view}: the swaying scatters draw their own motion (${r.swaying})`);
+    }
   }
   // The fire shows: the fire-line view with the fire differs from the same view with none.
   const burning = (await still('fire-line')).img,

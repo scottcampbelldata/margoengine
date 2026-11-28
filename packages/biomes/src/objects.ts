@@ -706,6 +706,16 @@ export class BiomeObjects implements Disposable {
   }
 
   /**
+   * Every scatter this draws that sways in the wind (species parts but stone, snags, detail and far stand-ins with a
+   * `wind`), for the passes that need their own motion: give each to TAA as `taa.add(new ScatterVelocity(scatter))`
+   * (`@margoengine/scatter/velocity`), so it keeps history on swaying leaves instead of reprojecting them by the camera
+   * alone. Built at attach; empty after `dispose()`.
+   */
+  get swaying(): readonly Scatter[] {
+    return this.#scatters().filter((scatter) => !scatter.disposed && !!scatter.options.wind);
+  }
+
+  /**
    * A detail map's texture on the device drawing now, made from its CPU copy on first use and again on a restored
    * device: WebGPU objects are valid only with the device that made them, and a lost device's are unusable (W3C
    * WebGPU, sections 3.2.1 and 3.5.2), so the scatter must never bind the old one (KB-OWN-BIOMES3).

@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel, PbrMaterial } from "@margoengine/core";
 import { PassContext } from "@margoengine/core/extension";
-import { ScatterCapture, ScatterStateSource, ScatterTextures } from "@margoengine/scatter";
+import { Scatter, ScatterCapture, ScatterStateSource, ScatterTextures } from "@margoengine/scatter";
 import { ScatterTiles } from "@margoengine/scatter/tiles";
 
 export interface BiomeMeshData {
@@ -33,6 +33,7 @@ export class BiomeObjects implements Disposable {
     onDispose(callback: () => void): () => void;
     draw(c: ObjectsPassContext, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;
     get casters(): readonly ScatterTiles[];
+    get swaying(): readonly Scatter[];
     stream(rect: readonly [number, number, number, number], options?: {
         readonly signal?: AbortSignal;
     }): Promise<void>;

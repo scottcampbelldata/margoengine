@@ -326,7 +326,13 @@ test('meshes draws a registry mesh by key in place of the procedural one, snags 
   );
   assert.equal(foliage.options.clusters, 0.6, 'foliage takes the foliage look');
   assert.equal(rock.options.wind, undefined, 'stone does not sway');
+  // swaying: the scatters with a wind, for TAA's velocity passes (KB-SCENES-TVTAA1).
+  const swaying = objects.swaying;
+  assert.ok(swaying.includes(bark) && swaying.includes(foliage), 'the fir sways');
+  assert.ok(!swaying.includes(rock), 'stone does not');
+  assert.ok(swaying.length > 0 && swaying.every((s) => !!s.options.wind), 'each one has a wind');
   objects.dispose();
+  assert.deepEqual(objects.swaying, [], 'none after dispose');
 });
 
 test('meshes is checked before anything is built', async () => {

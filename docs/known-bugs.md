@@ -169,6 +169,50 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** a connected part that still crosses and is no thicker than 2^-22 (float32) or 2^-26 (float64) of its
   coordinates, by volume per area and by the distance between its opposite sides, is removed. Same regression file.
 
+### Fixed 2026-11-27: the timber-valley film shots drew no temporal anti-aliasing, so needles, grass and edges crawled (KB-SCENES-TVTAA1, scenes, biomes)
+
+- **Repro:** any timber-valley shot at `quality: 'film'`, `node tools/shot/cli.mjs tools/shot/shots/timber-valley-<shot>.json
+  --once --seconds 1.1 --out <folder>` (RTX A6000, WebGPU, 1920 x 1080, supersample 2, 8 subframes): speckle 138 ppm
+  early on rail-line, 49 to 98 on blowup and 18 to 36 on fire-line, creek and town-street (bound 5), chromaSmear up to
+  3.75 (bound 2), and shimmerMoving on every shot that moves through the forest.
+- **Cause:** `@margoengine/scenes/timber-valley` built its film post stack (GTAO, bloom, grade) with no temporal
+  resolve, so every frame's sub-pixel needles, grass blades and thin trunks landed on a different set of pixels.
+  `@margoengine/taa` was there, but a swaying scatter reprojects by the camera alone unless TAA gets its own motion,
+  and biomes gave no way to find the scatters that sway.
+- **Fix:** `BiomeObjects.swaying` lists the scatters the view draws in the wind. At film quality timber-valley attaches
+  `TAA` (`parts.taa`, its defaults) on the post stack's depth and adds one `ScatterVelocity` per swaying scatter; a
+  preview draws none. Regressions: `packages/biomes/tests/objects.test.js` (the fir's bark and foliage sway, the stone
+  does not, none after dispose) and `packages/scenes/test/timber-valley-still.mjs` (film resolves with TAA and the
+  swaying scatters' passes on every view; a preview has none).
+- **Measured, every bar of seven shots against main 1604e1a464 (same commit, scenes and biomes src swapped, `--once
+  --seconds 1.1`):** failing bars 39 to 28. shimmerMoving early and mid: rail-line 5.06 and 8.41 to 4.40 and 7.74,
+  valley-aerial 0.43 and 0.38 to 0.26 and 0.24, creek 0.40 and 6.24 to 0.11 and 5.80, fire-line 0.62 and 0.84 to 0.14
+  and 0.38, town-street 5.04 and 6.72 to 4.52 and 6.29, blowup 6.24 and 9.50 to 6.00 and 9.02, ridge-smoke 0.03 to 0.01.
+  speckle (ppm) roughly halves to a fifth: rail-line 138 and 78 to 70 and 36, fire-line 18 and 21 to 1.5 and 3.9 (now
+  passing), town-street 37 to 6.8, creek 26 and 27 to 7.7 and 9.7, blowup 49 and 98 to 21 and 47. chromaSmear passes
+  on every probe but rail-line early (3.75 to 2.64). fire-line goes from 9 failing bars to 2 (its bounce, 22 percent
+  against a lower bound of 29, unchanged).
+- **One bar crossed the other way, at noise level:** blowup early shadowTint 0.19 to -0.16 b* (lower bound 0.04). It
+  is measured over 49 and 46 shadow-interior pixels of 2 million, with bounce at 95 and 98 percent (the pall hides the
+  sun, so lit and shadowed ground are the same brightness), and over the whole masks the gap is 0.81 and 0.82 b*
+  either way: the jittered masks move a few interior pixels, not the colour. The same bar already fails on main at
+  mid (0.04). No bound changed. aftermath was not compared: it does not load on main either (KB-SCENES-BURNTSLOW1).
+
+### Open 2026-11-27: the aftermath shot no longer loads: burning the valley out takes longer than the shot tool waits (KB-SCENES-BURNTSLOW1, scenes, vfx, shot tool)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-aftermath.json --once --seconds 1.1 --out <folder>`
+  on main 1604e1a464 (RTX A6000, WebGPU): "page.waitForFunction: Timeout 180000ms exceeded" in `untilQueued`
+  (`tools/shot/render.mjs`, `PAGE_TIMEOUT_MS` 180 s), every run, with and without KB-SCENES-TVTAA1. The same settings in
+  `packages/scenes/test/timber-valley-still.html` (`fire=burnt&weather=smoke&hour=10&date=1910-08-22`, film quality)
+  attach in 193 s with no GPU error, while another render shared the GPU.
+- **Cause:** since 7d96ac7993 (KB-VFX-DARKTRAILS1) `fire: 'burnt'` runs the fire front until nothing burns
+  (`burnOut`, up to `BURN_OUT_LIMIT`, 30 days of fire time) inside `attach`, where it stopped after one day before; at
+  film quality's 4 m cells that is days of fire time on the CPU before the first frame, past the shot tool's fixed page
+  wait.
+- **Next:** the owner of KB-VFX-DARKTRAILS1 decides between a burn-out that costs less with the same end state (the
+  fire front's settle) and a shot-tool wait that covers a scene's build; the 180 s guard is not raised to hide it.
+  Until then the aftermath shot has no frames, so KB-LOOK-TV-SHIMMER3 has no measure with TAA.
+
 ### Fixed 2026-11-27: scatter motion vectors drew a streamed forest from destroyed buffers (KB-SCATTER-VELTILES1, scatter)
 
 - **Repro:** a `ScatterTiles` scatter with `ScatterVelocity` added to TAA; stream a tile in with `setTile` so a ring
@@ -691,6 +735,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   (KB-SKY-SANDGREY1, KB-SKY-PALLHAZE1). Per class, percent of the frame, main to landing: occluded 0.22 to 0.30, depth
   edges 0.30 to 0.30, sky 0.05 to 0.00, other 0.02 to 0.01. Main's sky behind the crest read luma 158 (washed out, the
   defect those fixes remove) over ground 28; the landing's 77 over 45 shows the tips. Bound unchanged.
+- **With TAA (KB-SCENES-TVTAA1), not measured:** the aftermath shot does not load on main since KB-VFX-DARKTRAILS1
+  (KB-SCENES-BURNTSLOW1), with or without TAA, so its 0.607 has no TAA figure yet. On the seven other shots TAA
+  lowered shimmerMoving by 0.02 to 0.67 points and left the occluded and depth-edge shares, which make up all of this
+  entry's remainder, about as they were (rail-line mid 7.34 to 6.79 percent of the frame).
 
 ### Fixed 2026-11-27: a far ridge the haze hid fully took the haze's fire glow, the sky over it the smoke layer's, two laws for one light, so the ridge stood 6 codes lighter (KB-SKY-HAZEGLOW1, sky)
 
@@ -2546,6 +2594,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   4.88 to 5.06 early and 8.19 to 8.41 mid against the work-in-progress frames (sh2-occ, mid: plant interiors +0.09,
   depth edges +0.06, occluded +0.07, sky -0.01 percent of the frame), and chromaSmear 3.68 to 3.75 and 2.83 to 2.86.
   Against main (5.09 and 8.48; chromaSmear 3.97 and 3.07) every one is lower. No bound changed.
+- **Accepted 2026-11-27 (manager's ruling, lane B, with TAA, KB-SCENES-TVTAA1):** shimmerMoving 4.40 early and 7.74
+  mid (main 5.06 and 8.41). sh2-occ split, percent of the frame, main to TAA: occluded 1.93 to 1.80 and 3.69 to 3.53,
+  depth edges 2.75 to 2.33 and 3.65 to 3.26 (together 4.13 early and 6.79 mid, which a warp by camera motion cannot
+  match); plant interiors 0.28 to 0.17 and 0.55 to 0.46, sky 0.02 and 0.14 both, other 0.07 to 0.06 and 0.34 to 0.32.
+  What render fixes could reach is 0.25 early, inside the 0.5 bound, and 0.92 mid: the flame wall's puffing, the smoke
+  plume and the bounded sway, motion the scene draws on purpose. Accepted as deliberate motion; the bound stays 0.5.
 
 ### Fixed 2026-11-26: tonemap's settings check on the WebGL2 layer on ANGLE Direct3D 11 differed by one pixel in group `local` about half the time (KB-TONEMAP-LOCALD3D1, tonemap)
 

@@ -205,6 +205,25 @@ console.log(view.objects?.casters.length); // trunks, canopies, shrubs, rocks an
 engine.start();
 ```
 
+`view.objects.swaying` lists every scatter the view draws in the wind (each species' parts but stone, the snags, grass
+and ferns, and far stand-ins with a wind). TAA from `@margoengine/taa` reprojects a mesh by the camera alone unless it
+draws its own motion, so give each one to it as a `ScatterVelocity` pass (`@margoengine/scatter/velocity`) and the
+swaying leaves keep their history instead of smearing.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { TAA } from '@margoengine/taa';
+import { ScatterVelocity } from '@margoengine/scatter/velocity';
+import { BiomeWorld } from '@margoengine/biomes';
+import { BiomeView } from '@margoengine/biomes/view';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const view = await BiomeView.attach(engine, await BiomeWorld.create());
+const taa = TAA.attach(engine);
+for (const scatter of view.objects?.swaying ?? []) taa.add(new ScatterVelocity(scatter));
+engine.start();
+```
+
 Each tree, palm, birch, acacia and shrub part draws `@margoengine/procedural`'s `detail` 2, 1 and 0 meshes in its
 three LOD rings (150, 400 and 1,000 m for canopy trees, 15, 40 and 100 percent of `nearRadius` for the rest, 45, 120 and 300 m by default; a broadleaf canopy goes from
 6,240 to 3,180 to 400 triangles), switched hard: a dithered fade between them cost 1.2 to 5.6 ms a frame with shadows.

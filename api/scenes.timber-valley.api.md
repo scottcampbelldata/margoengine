@@ -12,6 +12,7 @@ import { GTAO } from "@margoengine/post";
 import { Shadows } from "@margoengine/shadows";
 import { PresetScene } from "@margoengine/sky/scenes";
 import { VolumetricClouds } from "@margoengine/sky/volumetric-clouds";
+import { TAA } from "@margoengine/taa";
 import { FireFront } from "@margoengine/vfx/fire-front";
 import { WeatherMachine, WeatherState } from "@margoengine/weather";
 import { WeatherDrive } from "@margoengine/weather/drive";
@@ -77,6 +78,7 @@ export interface TimberValleyScene extends Disposable {
         readonly occlusion: GTAO;
         readonly fuel: FuelMap;
         readonly fireFront?: FireFront;
+        readonly taa?: TAA;
     };
     dispose(): void;
 }

@@ -627,6 +627,17 @@ one warning over two frames; exactly the need or no limit: traced, no warning; a
 copy per level runs in order; at the full level no copy). Missing: a run on a real OpenGL ES or Direct3D 11 class
 device.
 
+### Section 5 evidence: TAA on the timber-valley film shots (scenes, biomes, KB-SCENES-TVTAA1, 2026-11-27)
+
+`@margoengine/scenes/timber-valley` at `film` quality attaches `@margoengine/taa` with its defaults on the post stack's
+depth and gives it one `@margoengine/scatter/velocity` pass per scatter in `BiomeObjects.swaying` (19 in the default
+valley); `preview` draws none. No shader or core change. Evidence: seven of the eight timber-valley shots against main
+with the scenes and biomes sources swapped (RTX A6000, WebGPU, `--once --seconds 1.1`): failing look bars 39 to 28,
+speckle and chromaSmear down on every probe, shimmerMoving down 0.02 to 0.67 points; one bar crossed the other way at
+noise level (blowup early shadowTint over 46 pixels; docs/known-bugs.md). `packages/scenes/test/timber-valley-still.mjs`
+checks TAA and the swaying passes on every film view and passes on WebGPU and the WebGL2 layer ().
+Missing: the film shots on the WebGL2 layer, and the aftermath shot, which does not load on main (KB-SCENES-BURNTSLOW1).
+
 ### Section 5 evidence: bounded wind sway of scattered plants (scatter, KB-LOOK-TV-SHIMMER1, 2026-11-26)
 
 GPU maths change in `packages/scatter/src/wind.ts` (`windBend`, `windNormal`, `windDeformation`, `windDetailNormal`), used

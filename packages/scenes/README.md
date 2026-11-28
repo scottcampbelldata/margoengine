@@ -200,6 +200,13 @@ anywhere along the valley keeps the creek's channel. The handle gives `height`, 
 `targets`, `layout`, `applyLook(name)`, `applySettings({weather, sky, fire})` for per-shot rows, `advanceTime(seconds)`
 (fire and sky), `settle()` (the forest tiles around the camera), the `parts` and `dispose()`.
 
+At `film` quality the scene attaches `TAA` from `@margoengine/taa` (`parts.taa`, its defaults: history weight 0.9 and
+the silhouette history of KB-TAA-EDGE1) on the post stack's depth, and gives it every swaying scatter of the forest
+(`BiomeObjects.swaying`) as a `ScatterVelocity` pass from `@margoengine/scatter/velocity`, so swaying needles and grass
+keep their history. The flames, smoke, rain and the creek mark their own pixels reactive, so they show each frame as
+drawn, and the clouds' march moves its start each frame (`temporal: 'auto'`). History needs about 53 frames to settle
+(`ln 255 / ln(1 / 0.9)`): a film render draws that many from the shot's first instant before frame 0.
+
 | Setting | Default | Range or values |
 | --- | --- | --- |
 | `date`, `hour`, `latitude`, `longitude` | `1910-08-20`, 16, 47.47, -115.93 | the sun's place by `sunPath` and the moon's by `moonPosition`; with the sun below the horizon the sky is a moonlit night (`sunScene`) |
@@ -210,7 +217,7 @@ anywhere along the valley keeps the creek's channel. The handle gives `height`, 
 | `fireTime` | 1,800 | 0 to 21,600 s |
 | `houses` | 48 | 0 to 256 lots |
 | `meshes` | none | library models by species key (`BiomeViewOptions.meshes`) |
-| `quality` | `film` | `film` (2 km of objects, 4 m fire cells), `preview` (1 km, 8 m) |
+| `quality` | `film` | `film` (2 km of objects, 4 m fire cells, temporal anti-aliasing), `preview` (1 km, 8 m, none) |
 | `seed` | 1910 | the valley, the forest, the town and the embers |
 
 Presets: `blowup` (the defaults), `calm-august` (no fire, late morning), `red-flag` (ten minutes of fire on a red-flag
