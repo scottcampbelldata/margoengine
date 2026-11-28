@@ -102,9 +102,11 @@ export function assembleWFC(
           Math.abs(r[a * 3] * r[b * 3] + r[a * 3 + 1] * r[b * 3 + 1] + r[a * 3 + 2] * r[b * 3 + 2] - +(a === b)) > 1e-8
         )
           throw new RangeError('WFC orientation must be orthogonal; remove scale and shear');
-    const sign = Math.sign(
-      r[0] * (r[4] * r[8] - r[5] * r[7]) - r[3] * (r[1] * r[8] - r[2] * r[7]) + r[6] * (r[1] * r[5] - r[2] * r[4]),
-    );
+    // Orthogonal, so the determinant is -1 (a mirror) or 1.
+    const sign =
+      r[0] * (r[4] * r[8] - r[5] * r[7]) - r[3] * (r[1] * r[8] - r[2] * r[7]) + r[6] * (r[1] * r[5] - r[2] * r[4]) < 0
+        ? -1
+        : 1;
     for (let i = 0; i < 3; i++) r[i] *= sign;
     const q = new Quaternion().setFromRotationMatrix({ elements: r });
     return { source: variant.source, sign, q: [q.x, q.y, q.z, q.w] };

@@ -5098,9 +5098,10 @@ export class PBRModel implements EnginePlugin {
       section = frame.section,
       bound = run.bindings,
       pass = run.pass!,
-      sign = Math.sign(
+      det =
         a[0] * (a[5] * a[10] - a[6] * a[9]) - a[4] * (a[1] * a[10] - a[2] * a[9]) + a[8] * (a[1] * a[6] - a[2] * a[5]),
-      ),
+      // batchable() admits only an invertible node, so this is -1 or 1 as where the draw joined its batch.
+      sign = det < 0 ? -1 : 1,
       draws = deviceDraws(device);
     const topology = batch.d.topology,
       wireframe = topology ? wireframeIndices(r) : undefined;

@@ -297,7 +297,7 @@ export function transformInto(
     ny = n[1] * a + n[4] * b + n[7] * c,
     nz = n[2] * a + n[5] * b + n[8] * c;
   // Cofactors carry the determinant's sign; the normal transform (inverse transpose) does not.
-  const length = (Math.hypot(nx, ny, nz) || 1) * Math.sign(determinant || 1);
+  const length = (Math.hypot(nx, ny, nz) || 1) * (determinant < 0 ? -1 : 1);
   nx /= length;
   ny /= length;
   nz /= length;
