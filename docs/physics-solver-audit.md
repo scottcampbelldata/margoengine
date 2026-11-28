@@ -52,22 +52,22 @@ them; the rest is a record of what a stronger solver would need.
 
 ### LIFE-03 four-point pass
 
-- Point 5. `life03-acceptance.test.js` verifies the production feedback frequency against the fast-envelope
+- Point 5. `850df734e6`. `life03-acceptance.test.js` verifies the production feedback frequency against the fast-envelope
   equation at three body lengths, preserves an explicit override, and checks that invalid controls and
   unrepresentable propulsion leave accepted values intact. `swim-threads.test.js` also checks native numeric
   errors and preserves the accepted body and wake fields. Exported ports carry the live signed origin.
-- Point 6. `swim-threads.test.js` and `swim-threads.browser.mjs` compare ordinary and reciprocal passive routes
+- Point 6. `850df734e6`. `swim-threads.test.js` and `swim-threads.browser.mjs` compare ordinary and reciprocal passive routes
   across signed origin shifts and exact snapshots. A four-partition run integrates 4,099 bodies, 8,198 SIMD
   axis pairs and 4,099 passive reaction rows. Isolated Chromium uses three actual helpers. The real seven-body
   passive transfer into shallow water closes 5.36112 N·s at less than 3.56e-15 N·s absolute residual.
-- Point 7. `environment/tests/swim-sediment.browser.mjs` draws the accepted body orientation and 10 cm fin
+- Point 7. `850df734e6`. `environment/tests/swim-sediment.browser.mjs` draws the accepted body orientation and 10 cm fin
   motion and reads the pectoral impulse before positive sand release. The live plume travels 17.1 pixels
   and leaves 674.8 µm of settled relief with zero net settled bed-volume change. Both renderers reproduce
   the starting hold, release, downstream pass and settled bed after seek. This is the BB-7 technical cutaway.
   The editable original shot and tail vortex and bubble rendering remain open.
-- Point 8. Physics and Environment READMEs and `docs/limits.md` document the fit and control limits, work
+- Point 8. `850df734e6`. Physics and Environment READMEs and `docs/limits.md` document the fit and control limits, work
   and origin requirements, the cutaway's scope and the reduced body, fin and wake models.
-- Point 2 remains open. `life03-swim-measured.mjs` uses three independent Sparks et al. juvenile rainbow trout
+- Point 2 remains open. `850df734e6`. `life03-swim-measured.mjs` uses three independent Sparks et al. juvenile rainbow trout
   tail records and compares reached calculated speeds against the withheld speeds. The measured 0.22, 0.48
   and 0.74 m/s compare to 0.253, 0.421 and 0.541 m/s. Reached Strouhal values 0.324, 0.316 and 0.310 fall within
   the published 0.2–0.4 range. Body morphology is estimated from separate same-species measurements. The

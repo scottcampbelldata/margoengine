@@ -32533,6 +32533,23 @@ voxel path tracer is excluded on this hardware (hardware check).
 
 ## Open defects
 
+### Closed 2026-11-28: bug 45's native half, trace compile time and CPU/GPU camera rounding (KB5185a, voxel-pathtracer)
+
+- **Was:** the bug sweep row "native Dawn compile about 17 s per pipeline and CPU/GPU camera rounding remain", left
+  after the Direct3D 11 half of bug 45 was fixed (entry "Fixed: test-page 45 context loss", above). It had no heading
+  here and no repro for the rounding half.
+- **Compile time:** a compile speed item, deferred by `scripts/speed-phase.json` (build phase), not a defect: on
+  8d31e3f9d5 eight native trace pipelines started at once were ready in 7.4 to 16.3 s on the RTX A6000. 622b96eba1
+  (KB-COMPAT-LOSTWHY1) cut the inlined call tree every backend compiles (two trig reductions in the camera ray
+  instead of six, one `found()` in `march` instead of ten), output bit-identical. Measured seconds wait for the
+  quiet-machine speed pass.
+- **Camera rounding:** checked 2026-11-28 on 622b96eba1 (Edge, RTX A6000): the browser check's `traversal` case
+  traces 160 x 120 rays on the GPU and casts the same ray on the CPU (`tracer.raycast`) for every pixel. Perspective
+  and orthographic agree on 19,200 of 19,200 pixels on native WebGPU and on the WebGL2 layer over Direct3D 11 (depth
+  within 2.7e-6 relative), and the panorama and fisheye `projections` rows land within 0.13 px of the analytic
+  point. No pixel shows a rounding difference, so there is no defect to fix. Proof:
+  `packages/voxel-pathtracer/tests/browser-check.mjs` (`traversal`, `projections`).
+
 ### Open 2026-11-28: the WGSL corpus cannot name optics, and water's new shaders inline past the Direct3D limit (KB-CORPUS-OPTICS1)
 
 - **Repro:** `node --test packages/webgl2-compat/test/corpus.test.js` fails "not covered: optics" on main. Recording
