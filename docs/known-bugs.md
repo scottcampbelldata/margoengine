@@ -1538,6 +1538,29 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   occlusion strength) and the file's image is kept; anything else is written into the pixels when the model is created.
 - **Regression:** `packages/usdz/tests/texture-factors.test.js`.
 
+### Fixed 2026-11-28: the dune coast's fog hazed the sea by the seabed's distance and painted the far sea out (KB-SCENES-SEAFOGDEPTH1, scenes)
+
+- **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --views=surf --out=<folder>` (camera 3.1 m
+  up, far plane 30 km): rows 511 to 538 of `surf.png` are one flat (188, 188, 186) in every column, a one-pixel
+  (191, 191, 189) line on row 511, and the waves start at row 539, about 130 m out. `visibility=50000` gives the same
+  rows. With only the fog's bare-pixel fill off (KB-SKY-BAREBELOW1) the same rows show the sea's waves, and rows 512 to
+  517 the unhazed (199, 199, 197) strip of KB-WATER-HORIZONBAND1's "left" note.
+- **Cause:** `PresetScene` hands the sky's fog `post.depthTexture`, the scene depth before the water, and the dune coast
+  scene kept it. The water draws its surface into its own depth (`water.depthTexture`, documented for this use), so the
+  fog never saw the sea: it hazed each sea pixel by the distance to the seabed behind it, and where the view's rays pass
+  over the seabed mesh's far edge (x 1300, 8 m deep; row 539 is the last ray that meets it, at 468 m) the pixel read as
+  nothing drawn, which the fog fills with the fog at infinity since KB-SKY-BAREBELOW1 and skipped before it (the
+  unhazed 199 strip).
+- **Fix:** `@margoengine/scenes/dune-coast` points the sky fog's depth at `water.depthTexture` (the post depth until the
+  water has drawn). After: the far sea's waves reach the horizon, hazed by their own distance; rows 513 to 517 read 190
+  to 194, neutral, against the deck's 188 to 189. No other scene pairs a Water with the preset fog (fauld-blast has no
+  fog).
+- **Regression:** `packages/scenes/test/dune-coast-still.mjs`, surf view: the luma spread of the rows between the horizon
+  and the seabed's edge (0.477 to 0.497 of the height) must pass 2; 0.73 before (the flat fill), 8.56 after on WebGPU
+  and 7.01 on the WebGL2 layer.
+- **Left:** those few far rows sit 2 to 6 codes over the deck at ranges where the haze is near full; not traced, and in
+  the water's grazing shading if anywhere (SEA-02, see KB-WATER-FARROWS1).
+
 ### Fixed 2026-11-28: a hard-edged peach band lay under the dune coast's cloud deck at the sea horizon (KB-WATER-HORIZONBAND1, water)
 
 - **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --views=surf --out=<folder>`, `surf.png`
@@ -1555,8 +1578,8 @@ checks the retained stations of a sheer hull and exact agreement of the native a
 - **Regression:** `packages/water/test/sky-radiance.browser.mjs` (in `test:gpu:surface`): a 64 x 32 map grey above the
   horizon and red below; the sea's far rows read red over green by up to 69 codes before the fix (callback route,
   [160, 91, 91]) and under 12 after, on both routes.
-- **Left:** the far rows read 199 under the 189 deck, a flat lighter strip six pixels high; not traced (see
-  KB-SKY-ENVBELOW1 for the map's rows below the horizon).
+- **Left:** the far rows read 199 under the 189 deck, a flat lighter strip six pixels high: the fog never hazed them, as
+  its depth held no sea (KB-SCENES-SEAFOGDEPTH1, fixed).
 
 ### Fixed 2026-11-28: the sky's environment map held a cloudless horizon below the horizon under an overcast deck (KB-SKY-ENVBELOW1, sky)
 
@@ -4841,6 +4864,9 @@ checks the retained stations of a sheer hull and exact agreement of the native a
   cannot be Water's far sea with its coast, foam and spray) are the spectral paths.
 - **Cause:** Water draws its far sea from at most eight swell trains unless a physics sea is passed; a sea of a wind
   needs a continuous spectrum (Tessendorf 2001 cascades, or many components) to lose the rows.
+- **Seen 2026-11-28 (rendering lane):** with the fog hazing the sea by its own depth (KB-SCENES-SEAFOGDEPTH1) the s18-like
+  surf view's far rows show the trains' crests up to the horizon; the far rows just under it read 190 to 194 against
+  the deck's 188 to 189, untraced, left to this row.
 - **Owner:** SEA-02, ocean surface synthesis (Codex, `docs/physics-work-queue.md`; REOPENED). The scene's four hand-set
   trains are the film lane's to change (to `wind` or a `sea`) once the package default holds; not changed by the
   rendering lane.

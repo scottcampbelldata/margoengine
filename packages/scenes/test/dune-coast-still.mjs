@@ -31,6 +31,20 @@ page.on('console', (m) => m.type() === 'error' && pageErrors.push(m.text()));
 await page.setViewportSize({ width: Math.max(w, 1440), height: Math.max(h, 1100) });
 if (out) await mkdir(out, { recursive: true });
 console.log('device', context.hardware?.compat ? 'webgl2-compat layer' : 'webgpu');
+// The standard deviation of sRGB luma (0 to 255) over a region given in fractions of the image.
+const lumaSpread = (img, y0, y1, x0, x1) => {
+  let n = 0,
+    sum = 0,
+    sq = 0;
+  for (let y = Math.floor(img.height * y0); y < Math.floor(img.height * y1); y++)
+    for (let x = Math.floor(img.width * x0); x < Math.floor(img.width * x1); x++, n++) {
+      const k = (y * img.width + x) * 4,
+        l = 0.2126 * img.data[k] + 0.7152 * img.data[k + 1] + 0.0722 * img.data[k + 2];
+      sum += l;
+      sq += l * l;
+    }
+  return Math.sqrt(Math.max(0, sq / n - (sum / n) ** 2));
+};
 const mean = (img, y0, y1, x0, x1) => {
   const m = [0, 0, 0];
   let n = 0;
@@ -80,6 +94,14 @@ try {
           `${view}: the sand reads as sand ${ground.map(Math.round)}`,
         );
       assert.ok(sky[0] + sky[1] + sky[2] > 150, `${view}: a daylight sky ${sky.map(Math.round)}`);
+      // KB-SCENES-SEAFOGDEPTH1: the sea reaches the horizon. Between the horizon (0.474 of the height) and where the
+      // view's rays pass over the seabed's far edge (0.499), the fog read a depth with no sea in it and filled the rows
+      // with one flat colour, the fog at infinity (spread 0); hazed by the water's own depth the far sea's waves show.
+      if (view === 'surf') {
+        const spread = lumaSpread(img, 0.477, 0.497, 0, 1);
+        console.log('surf far sea luma spread', spread.toFixed(2));
+        assert.ok(spread > 2, `surf: the far sea shows waves up to the horizon, not a flat fill (spread ${spread})`);
+      }
     }
   if (!shots) {
     // KB-SCENES-BLOWNSAND-STATIC1: the sand loads on demand and still runs on the scene's clock. Time moved on before it

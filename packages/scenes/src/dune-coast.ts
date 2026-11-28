@@ -611,6 +611,11 @@ export function attach(engine: EngineKernel, settings: DuneCoastSettings = {}): 
       waves,
     });
     disposers.push(() => water?.dispose());
+    // The haze reads the depth the water drew (the scene's with the sea surface in it): the preset's post depth has no
+    // sea, so the fog hazed the sea by the seabed's distance and, past the seabed's edge, as nothing drawn, painting the
+    // far sea out with the fog at infinity (KB-SCENES-SEAFOGDEPTH1).
+    const fog = preset.sky.options.fog;
+    if (fog) preset.sky.options.fog = { ...fog, depth: () => water?.depthTexture ?? preset.post.depthTexture };
   }
   // Dune grass: winter clumps of American beachgrass where `grassCover` puts them, on a grid that follows the camera.
   // The height and cover grids span the whole ground with their texel centres on the ground mesh's vertices (a texel
