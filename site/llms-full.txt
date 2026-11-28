@@ -1347,7 +1347,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,436 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,438 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -14635,7 +14635,44 @@ Specify a physical groundwater time scale appropriate to the rate at which the s
 Detailed unsaturated pressure and moisture profiles, multiple aquifer layers and surface-water backflow through
 spring openings are outside this model. HYDRO-02 calculates recharge through the active soil.
 
-The optional JavaScript entry measures 3,939 B min+gzip. Both Wasm variants are 11,142 B before HTTP compression.
+The optional JavaScript entry measures 6,235 B min+gzip with the confined solve. Both Wasm variants are 11,142 B
+before HTTP compression.
+
+The confined solve (`solveConfinedFlow`, for a confined aquifer slice or a Hele-Shaw cell) is steady and single
+layer: one potential per cell, five-point faces with harmonic transmissivity, fixed sides half a cell from the
+centre, and a Jacobi-preconditioned conjugate-gradient solve to a relative residual of 1e-12. A Hele-Shaw gap takes
+T = b^3 / 12 mu, the gap-averaged Poiseuille flow, so it holds while the gap Reynolds number is small and the cell is
+much wider than its gap. Solid cells are blocky (staircase edges, no cut cells). Streamlines are stream-function contours
+found on each column face, with travel time as the trapezoid of dx / u between faces, so they suit flows that run
+from the minX side to the maxX side without turning back. A free cell with no path to a fixed potential is refused.
+
+### Pipe flow, hydraulic structures and machines (HYDRO-07)
+
+`@margoengine/physics/hydraulics` is a set of steady and lumped models, measured against exact solutions:
+Hagen-Poiseuille laminar friction to rounding, Colebrook against an independent fixed-point solve within 1e-12
+(relative), Haaland within 2 percent of it from Re 4,000 and Churchill within 3 percent from Re 10,000 (its blend
+departs most near 4,000), Torricelli and the closed-form basin equalisation against a fine Runge-Kutta run within
+1e-9 m, Belanger's conjugate depth to rounding with
+momentum balanced, Chow's tabled depth ratio 8.0 at F1 = 6.0, and the three-reservoir network against bisection
+within 1e-9 m. Limits by method:
+
+- Pipe and channel flow are steady (no distributed transients, no method of characteristics, no column separation
+  after cavitation; `siphon` reports `cavitates` but does not model the broken column).
+- Minor losses are single K values; Venturi and orifice coefficients are inputs with handbook defaults (ISO 5167-4
+  machined Venturi 0.995, sharp orifice 0.61).
+- `HydraulicRam` is one lumped drive line (inertance, compliance and resistance) with an air vessel under a
+  polytropic law, integrated by the explicit midpoint rule at 0.75 ms. A fast closure gives the Joukowsky surge within
+  2e-3 of rho a dv; the travelling wave inside the drive pipe is not resolved.
+- `solveNetwork` solves steady flow with a dense Cholesky step; it is meant for tens of nodes, not city networks
+  (no sparse solver, no extended-period simulation, no tanks or pressure-driven demand).
+- `peltonRunner` is the one-dimensional momentum theory: windage, bucket entry losses and jet spread are not
+  modelled beyond the bucket retention factor.
+- `hydraulicJump` is for a rectangular, horizontal, frictionless bed; the roller length is Hager's 1990 fit,
+  stated for 2.5 < F1 < 8.
+- Water properties are valid from 0 to 100 degrees Celsius at atmospheric pressure.
+- These are functions, not a `PhysicsWorld` solver: nothing steps with the world or couples to the shallow water.
+
+The optional entry measures 7,681 B min+gzip and loads no Wasm. Core and stage gain zero bytes.
 
 ### Grounded glacier and ice-sheet flow (ICE-02)
 
