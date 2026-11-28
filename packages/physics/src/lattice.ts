@@ -119,24 +119,16 @@ export function latticeLoads(
   let gamma: Float64Array;
   let inducedByNative: Float64Array | undefined;
   let answer: Float64Array | null = null;
-  if (native && !slopes) {
+  if (native) {
     const trailA = boundA.map((_, m) => at(nc, Math.floor(m / nc)));
     const trailB = boundA.map((_, m) => at(nc, Math.floor(m / nc) + 1));
-    const result = native.solve({
-      boundA,
-      boundB,
-      trailA,
-      trailB,
-      collocation: colloc,
-      normal,
-      points,
-      stalled,
-      relative,
-      speeds,
-      wake,
-    });
+    const result = native.solve(
+      { boundA, boundB, trailA, trailB, collocation: colloc, normal, points, stalled, relative, speeds, wake },
+      slopes,
+    );
     gamma = result.circulation;
     inducedByNative = result.induced;
+    if (slopes) answer = inverseDiagonal(result.influence!, n);
   } else {
     const matrix = new Float64Array(n * n);
     const rhs = new Float64Array(n);
@@ -190,10 +182,9 @@ function abs(x: number): number {
   return x < 0 ? -x : x;
 }
 
-/** The diagonal of the inverse of `matrix` (n by n, row-major), by one elimination with partial pivoting over every column. */
-function inverseDiagonal(matrix: Float64Array, n: number): Float64Array {
-  const a = matrix.slice(),
-    b = new Float64Array(n * n);
+/** The diagonal of the inverse, by in-place partial-pivot elimination of the owned n by n row-major matrix. */
+function inverseDiagonal(a: Float64Array, n: number): Float64Array {
+  const b = new Float64Array(n * n);
   for (let k = 0; k < n; k++) b[k * n + k] = 1;
   for (let col = 0; col < n; col++) {
     let pivot = col,

@@ -705,3 +705,7 @@ and appearance. The test closes the hydraulic ledger and compares charge and oxi
 0.018 A/m² current. One model-age year occupies one edit second. PBR reads the accepted layers with
 an authored palette. Both renderers independently replay full solver snapshots and RGBA through held
 frames, prefill and immersed restores, re-advance and rewind. [Browser test](../packages/physics/tests/ageing-film.browser.mjs).
+
+### AERO-02 live sail and hull coupling
+
+The fixed-camera technical witness shows a code-built lake dinghy carrying a flexible lug sail through a signed gust. The sail is tied to the live mast and boom. Cloth impulses reach the rigid hull, and SailingSolver supplies water resistance and the righting moment. The gust adds 0.681 m of travel and 16.69 cm of billow with a 132.21 N forward load. A separate unhindered test gives 66.468 N·s of applied impulse and a 0.000456 N·s difference from combined hull and cloth momentum. The witness holds, restores and rewinds the accepted cloth and hull on each renderer. [Reproduction](whitepaper/reproduce.md#aero-02-sail-attachment-native-lattice-and-measured-polar)

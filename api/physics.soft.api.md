@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel, EnginePlugin, Geometry, Mesh } from "@margoengine/core";
 import { Mesh } from "@margoengine/core/extension";
-import { FlowField } from "@margoengine/math/fields";
+import { FlowCell, FlowField } from "@margoengine/math/fields";
 
 export interface AeroLaw {
     readonly aspectRatio: number;
@@ -202,7 +202,14 @@ export interface FabricTension {
 export class SailForce implements PhysicsAttachment {
     readonly force: [number, number, number];
     circulation: Float64Array;
+    takeState?: () => Float64Array;
+    restoreState?: (words: Float64Array) => void;
     constructor(physics: Physics, sail: SoftBody, options: SailOptions);
+    static attachNative(physics: Physics, sail: SoftBody, options: SailOptions & {
+        threads?: 1 | 2 | 4;
+        signal?: AbortSignal;
+    }): Promise<SailForce>;
+    readNativeWork(): WingLatticeWorkCounts | undefined;
     beforeStep(dt: number): void;
     remove(): void;
     [Symbol.dispose](): void;
@@ -211,6 +218,7 @@ export class SailForce implements PhysicsAttachment {
 
 export interface SailOptions {
     wind: Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField;
+    frame?: WindForceFrame;
     grid: readonly [number, number];
     chord?: 'u' | 'v';
     density?: number;
@@ -2798,6 +2806,26 @@ interface Skin {
 type Triangle = readonly [Vec3, Vec3, Vec3];
 
 type Vec3 = readonly [number, number, number];
+
+interface WindForceFrame {
+    readonly cell: FlowCell;
+    readonly cellSize: number;
+}
+
+interface WingLatticeWorkCounts extends WingLatticeWorkerWork {
+    readonly threads: number;
+    readonly solves: number;
+    readonly workers: readonly WingLatticeWorkerWork[];
+}
+
+interface WingLatticeWorkerWork {
+    readonly matrixInteractions: number;
+    readonly matrixPairs: number;
+    readonly wakeInteractions: number;
+    readonly wakePairs: number;
+    readonly eliminationUpdates: number;
+    readonly eliminationPairs: number;
+}
 
 const densities: Readonly<{
     air: 1.204;

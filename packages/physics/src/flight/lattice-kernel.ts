@@ -37,19 +37,22 @@ export interface WingLatticeWorkCounts extends WingLatticeWorkerWork {
 }
 
 export interface WingLatticeKernel {
-  solve(panels: {
-    boundA: readonly Vec3[];
-    boundB: readonly Vec3[];
-    trailA: readonly Vec3[];
-    trailB: readonly Vec3[];
-    collocation: readonly Vec3[];
-    normal: readonly Vec3[];
-    points: readonly Vec3[];
-    stalled: readonly boolean[];
-    speeds: readonly number[];
-    relative: readonly Vec3[];
-    wake: Vec3;
-  }): { circulation: Float64Array; induced: Float64Array };
+  solve(
+    panels: {
+      boundA: readonly Vec3[];
+      boundB: readonly Vec3[];
+      trailA: readonly Vec3[];
+      trailB: readonly Vec3[];
+      collocation: readonly Vec3[];
+      normal: readonly Vec3[];
+      points: readonly Vec3[];
+      stalled: readonly boolean[];
+      speeds: readonly number[];
+      relative: readonly Vec3[];
+      wake: Vec3;
+    },
+    keepInfluence?: boolean,
+  ): { circulation: Float64Array; induced: Float64Array; influence?: Float64Array };
   resetWork(): void;
   workCounts(): WingLatticeWorkCounts;
   close(): void;
@@ -162,7 +165,10 @@ export async function loadWingLattice({
   }
 
   return {
-    solve({ boundA, boundB, trailA, trailB, collocation, normal, points, stalled, relative, speeds, wake }) {
+    solve(
+      { boundA, boundB, trailA, trailB, collocation, normal, points, stalled, relative, speeds, wake },
+      keepInfluence,
+    ) {
       if (closed) throw latticeError('state', 'Load a new wing lattice after disposing this one.');
       const n = boundA.length;
       const matrixAt = panelsAt + PANEL_WORDS * n * WORD;
@@ -199,8 +205,11 @@ export async function loadWingLattice({
       }
       if (!geometry.every(Number.isFinite) || !rhs.every(Number.isFinite) || !wake.every(Number.isFinite))
         throw latticeError('state', 'Use finite wing geometry, relative wind and aerodynamic directions.');
-      new Float64Array(buffer, matrixAt, n * n).fill(0);
+      const matrix = new Float64Array(buffer, matrixAt, n * n);
+      matrix.fill(0);
       check(runPhase(0));
+      // Native elimination overwrites its matrix. Only membrane damping needs the original diagonal response.
+      const influence = keepInfluence ? matrix.slice() : undefined;
       check(solve(JOB));
       check(runPhase(1));
       const work = new Float64Array(buffer, workAt, RECEIPT_WORDS * threads);
@@ -214,7 +223,9 @@ export async function loadWingLattice({
         sums[i % RECEIPT_WORDS]! += work[i]!;
       }
       solves++;
-      return { circulation: rhs.slice(), induced: new Float64Array(buffer, inducedAt, 3 * n).slice() };
+      const circulation = rhs.slice();
+      const induced = new Float64Array(buffer, inducedAt, 3 * n).slice();
+      return influence ? { circulation, induced, influence } : { circulation, induced };
     },
     resetWork() {
       solves = 0;

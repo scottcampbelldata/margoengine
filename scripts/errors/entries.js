@@ -170,7 +170,8 @@ export const entries = [
     title: '@margoengine/physics/legged locomotion, gait drives and reactive deck support',
     kind: 'family',
     messages: [],
-    cause: 'A command, external load, support row or coupled candidate cannot produce finite legged motion and impulses.',
+    cause:
+      'A command, external load, support row or coupled candidate cannot produce finite legged motion and impulses.',
     fix: 'Use finite SI commands and loads in aligned f64 rows in the memory that owns them. Register a live rigid body with valid signed cells before adding a deck. Reduce the motion or use a smaller substep if reactions overflow.',
   },
   {
@@ -194,7 +195,8 @@ export const entries = [
     title: '@margoengine/physics/celestial orbit, Earth orientation and astronomical fields',
     kind: 'family',
     messages: [],
-    cause: 'An ephemeris, clock, observer, Earth orientation or published field cannot produce a usable celestial sample.',
+    cause:
+      'An ephemeris, clock, observer, Earth orientation or published field cannot produce a usable celestial sample.',
     fix: 'Select a supported epoch and kernel. Pass finite SI positions, seconds and angles in radians. Publish aligned f64 positions in the memory that owns the port. Stop the world before disposing its celestial solver.',
   },
   {
@@ -242,7 +244,8 @@ export const entries = [
     title: '@margoengine/physics/ice freezing, melting and phase exchange',
     kind: 'family',
     messages: [],
-    cause: 'An ice site, aligned field bank, registered thermodynamic forcing or trial phase result is outside the supported range.',
+    cause:
+      'An ice site, aligned field bank, registered thermodynamic forcing or trial phase result is outside the supported range.',
     fix: 'Supply finite SI site and boundary values, one aligned layout-1 value per site and positive durations. Reduce unsupported forcing or dimensions. Use shared memory with multiple native participants.',
   },
   {
@@ -266,7 +269,8 @@ export const entries = [
     title: '@margoengine/physics/vortices natural storm forcing and wet-grid sampling',
     kind: 'family',
     messages: [],
-    cause: 'Vortex parameters, sampled wind or pressure, a coupled input bank, or a trial force exceeded the usable range.',
+    cause:
+      'Vortex parameters, sampled wind or pressure, a coupled input bank, or a trial force exceeded the usable range.',
     fix: 'Use finite SI vortex and grid parameters and three signed origin coordinates. Provide matching registered depth or rigid body banks in their owning memories. Reduce forcing or use smaller local coordinates if a trial overflows. Use shared memory for native helpers.',
   },
   {
@@ -322,7 +326,8 @@ export const entries = [
     title: '@margoengine/physics/pack-ice floes, flow inputs and vessel contact',
     kind: 'family',
     messages: [],
-    cause: 'A floe or vessel input, origin-cell value, registered flow bank or native step exceeds its supported range.',
+    cause:
+      'A floe or vessel input, origin-cell value, registered flow bank or native step exceeds its supported range.',
     fix: 'Use finite SI quantities with positive floe sizes and densities. Supply adequately sized ports from their owning memories and valid air or water field samples. Start a new instance after disposal. Use 1, 2 or 4 native participants, with a shared world in Node or an isolated browser worker for multiple participants.',
   },
   {
@@ -338,7 +343,8 @@ export const entries = [
     title: '@margoengine/physics/surge surge and tidal potential',
     kind: 'family',
     messages: [],
-    cause: 'A shallow-water grid, pressure sample, celestial input, geodetic site or tidal boundary could not produce a finite potential.',
+    cause:
+      'A shallow-water grid, pressure sample, celestial input, geodetic site or tidal boundary could not produce a finite potential.',
     fix: 'Add the shallow water and a matching celestial source before the surge. Use finite SI pressures, gravity, density and water depth. Set the geodetic site in radians and metres, and choose a finite simulation time. Create a fresh solver after disposal.',
   },
   {
@@ -346,7 +352,8 @@ export const entries = [
     title: '@margoengine/physics/surf nearshore waves and run-up',
     kind: 'family',
     messages: [],
-    cause: 'The incoming spectrum, water sample, cell origin, shoreline record or optional force pass could not be resolved.',
+    cause:
+      'The incoming spectrum, water sample, cell origin, shoreline record or optional force pass could not be resolved.',
     fix: 'Add valid shallow water before surf. Provide a resolved incident sea, finite depths and signed coordinates, and a finite world step. Reduce extreme waves or shorten the step when fluxes exceed numeric range. Load a fresh solver after disposal.',
   },
   {
@@ -380,7 +387,8 @@ export const entries = [
     title: '@margoengine/physics/thin-film wet surfaces, drops and receivers',
     kind: 'family',
     messages: [],
-    cause: 'A wetting law, film grid, wind or rain sample, moving mount, drop outlet, field layout, or implicit film solve supplied unusable data.',
+    cause:
+      'A wetting law, film grid, wind or rain sample, moving mount, drop outlet, field layout, or implicit film solve supplied unusable data.',
     fix: 'Use finite SI material values and compatible local film scales. Match the film receiver, world clock and origin cell. Use a resolved precursor depth and contact angles within the stated wetting range. Read the accepted surface between steps.',
   },
   {
@@ -430,6 +438,14 @@ export const entries = [
     messages: [],
     cause: 'A source, listener, atmosphere, terrain or audio path is invalid or exceeds the numerical range.',
     fix: 'Supply finite local source and listener coordinates, a valid bed and wind, and positive kelvin and density. Use a shorter local path if derived distances overflow. Use all eight finite band gains and keep travel time within the audio delay capacity.',
+  },
+  {
+    id: 'physics-sail',
+    title: '@margoengine/physics/soft sail air loads',
+    kind: 'family',
+    messages: [],
+    cause: 'A cloth grid, wind sample, signed origin, air-load trial or sail snapshot does not match the solver.',
+    fix: 'Attach the load to a live cloth with the same particle grid. Supply a finite air velocity, positive air density and the cloth frame for signed fields. Reduce wind, density or the time step if an impulse exceeds the cloth velocity range. Restore a load saved for the same grid and participants.',
   },
   {
     id: 'physics-flight',

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22169135,
+  "total": 22174031,
   "history": [
     {
       "date": "2026-10-24",
@@ -16092,6 +16092,12 @@
       "commit": "atmo-10-synoptic-atomic-publication",
       "reason": "ATMO-10 @margoengine/physics/synoptic 6377 to 9456 B gzip, ceiling 6633 to 9740 B. The optional atmospheric and water publication validates candidates and runs independent native SIMD cells. A split would duplicate the layer layout and signed water checks. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "aero-02-native-sail-publication",
+      "reason": "AERO-02 physics/soft 188159 to 192320 B gzip within its full-entry ceiling. Soft base 63624 to 68377 B, ceiling 65533 to 70429 B. Added signed staged sail loads, restore words and an optional shared native lattice loader. A separate sail entry would break the existing export or repeat the soft attachment bridge and shared lattice. Soft blueprint and core/stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -17016,7 +17022,7 @@
     "@margoengine/physics/ship": 36541,
     "@margoengine/physics/snowpack": 8474,
     "@margoengine/physics/soft": 193804,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 65533,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 70429,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 127671,
     "@margoengine/physics/strands": 9457,
     "@margoengine/physics/surf": 12869,

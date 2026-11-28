@@ -12489,3 +12489,8 @@ Independent drives and wall integration are partitioned into native SIMD phases.
 ### ATMO-10 atomic coupled weather and optional diagnostic cells
 
 One trial holds prognostics, layered variables, atmospheric budget, diagnostic columns and water forces. Borrowed signed water rows are checked in their owning memory before accepting the weather and forcing together. Optional native workers calculate whole pairs of 12-column output cells with the existing spectral and transport order preserved. A fixed-map witness reads the accepted rain in Weather and the runoff ledger. The independent gauge diagnostic records the simplified model's rain deficit.
+
+
+### AERO-02 signed sail loads and optional native lattice
+
+The sail samples the cloth’s signed frame at each collocation point. Every candidate impulse must fit the destination cloth velocity before any load is applied. Optional native SIMD solves the influence and downwash in independent joined rows while the caller retains the existing pressure damping order. Rigid snapshots include accepted native load and work words, and the soft solver carries its particles. The technical lake witness pairs signed wind, cloth and live hull. The measured S3 polar reports the limits of the quasi-steady closure.

@@ -90,6 +90,8 @@
     "test:gpu:resistive-soil-workers": "cd ../.. && node packages/physics/tests/resistive-soil-workers.browser.mjs",
     "test:gpu:terramechanics": "cd ../.. && node packages/physics/tests/terramechanics.browser.mjs",
     "test:gpu:wing-lattice-workers": "cd ../.. && node packages/physics/tests/wing-lattice-workers.browser.mjs",
+    "test:gpu:sail-workers": "cd ../.. && node scripts/run-with-timeout.mjs --max=2 -- node packages/physics/tests/sail-workers.browser.mjs",
+    "test:gpu:sail-film": "cd ../.. && node scripts/run-with-timeout.mjs --max=3 -- node packages/physics/tests/sail-film.browser.mjs && node scripts/run-with-timeout.mjs --max=3 -- node packages/physics/tests/sail-film.browser.mjs --compat",
     "test:gpu:aero-mobile": "cd ../.. && node packages/physics/tests/aero-mobile.browser.mjs && node packages/physics/tests/aero-mobile.browser.mjs --compat",
     "test:gpu:boundary-layer-surface": "cd ../.. && node packages/physics/tests/boundary-layer-surface.browser.mjs && node packages/physics/tests/boundary-layer-surface.browser.mjs --compat",
     "test:gpu:cloud-surface": "cd ../.. && node packages/physics/tests/cloud-surface.browser.mjs && node packages/physics/tests/cloud-surface.browser.mjs --compat",

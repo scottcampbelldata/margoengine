@@ -5536,3 +5536,9 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
 - Build Physics and Weather with their package build scripts. Run `node --test packages/physics/tests/coupling/synoptic.test.js packages/physics/tests/coupling/synoptic-workers.test.js packages/weather/tests/synoptic-drive.test.js`.
 - Run `npm run test:gpu:synoptic-workers -w @margoengine/physics` for the native publication workers and `npm run test:gpu:synoptic-film -w @margoengine/physics` for the fixed-map atmosphere and runoff witness on both renderers.
 - Run `node packages/physics/scripts/atmo10-synoptic-measured.mjs` for the measured storm comparison, station, terrain resolution and lapse sensitivity. It fetches the public USGS 3DEP GeoTIFF by default and accepts that same TIFF as an optional local path.
+
+### AERO-02 sail attachment, native lattice and measured polar
+
+- Build Physics with `node packages/physics/scripts/build.js`. Run `node --test packages/physics/tests/sail.test.js packages/physics/tests/coupling/sail-state.test.js packages/physics/tests/coupling/sail-workers.test.js packages/physics/tests/coupling/sailing.test.js`.
+- Run `npm run test:gpu:sail-workers -w @margoengine/physics` for 1, 2 and 4 participants and `npm run test:gpu:sail-film -w @margoengine/physics` for the fixed camera, cloth and hull on both renderers.
+- Run `node packages/physics/scripts/aero02-sail-measured.mjs` for the independent rigid cambered sail comparison by trim, grid resolution and incidence sensitivity.

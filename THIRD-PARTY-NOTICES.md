@@ -784,3 +784,7 @@ ambient climate and penetration values to solver units. It includes no figures o
 
 A. I. Gmel, E. H. Haraldsdóttir, F. M. Serra Bragança, A. M. Cruz and M. A. Weishaupt (2024),
 [*Comparison of speed-dependent time, force and spatial parameters between Franches-Montagnes and European Warmblood horses walking and trotting on a treadmill*](https://doi.org/10.1016/j.jevs.2024.105005), Journal of Equine Veterinary Science 133, 105005. [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The diagnostic transcribes sparse cohort metadata and measured means and deviations from Tables 1, 2 and 4. It converts units and includes no original figure or trial dataset.
+
+### AERO-02 flume diagnostic data
+
+`packages/physics/scripts/aero02-sail-measured.mjs` includes camber section samples derived from the zero-twist specimen in Abel Arredondo Galeana and Ignazio Maria Viola’s [PIV dataset for near wake of spinnaker (2020)](https://doi.org/10.7488/ds/2857), University of Edinburgh, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The archived solid was reduced to a sampled midsurface with dimensions rounded to 0.01 mm. The script identifies the archive member and checksum. Held-out force coefficients transcribe five Figure 4(a) readings from Abel Arredondo-Galeana, Holger Babinsky and Ignazio Maria Viola, [Vortex Flow of Downwind Sails (2023)](https://doi.org/10.1017/flo.2023.1), also CC BY 4.0. This repository contains the derived numbers and source references.

@@ -321,6 +321,11 @@
       <p><strong>Cause.</strong> A source, listener, atmosphere, terrain or audio path is invalid or exceeds the numerical range.</p>
       <p><strong>Fix.</strong> Supply finite local source and listener coordinates, a valid bed and wind, and positive kelvin and density. Use a shorter local path if derived distances overflow. Use all eight finite band gains and keep travel time within the audio delay capacity.</p>
     </section>
+    <section id="physics-sail">
+      <h2><a href="#physics-sail">@margoengine/physics/soft sail air loads</a></h2>
+      <p><strong>Cause.</strong> A cloth grid, wind sample, signed origin, air-load trial or sail snapshot does not match the solver.</p>
+      <p><strong>Fix.</strong> Attach the load to a live cloth with the same particle grid. Supply a finite air velocity, positive air density and the cloth frame for signed fields. Reduce wind, density or the time step if an impulse exceeds the cloth velocity range. Restore a load saved for the same grid and participants.</p>
+    </section>
     <section id="physics-flight">
       <h2><a href="#physics-flight">@margoengine/physics/flight wings, rotors and lifting gas</a></h2>
       <p><strong>Cause.</strong> Flight geometry, a sampled wind, a flap or blade setting, a relative cell position, or the resulting force could not be used.</p>

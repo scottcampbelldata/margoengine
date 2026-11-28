@@ -24905,3 +24905,7 @@ The independent Douglas-fir spacing diagnostic misses three of four reported fin
 and is sensitive to the initial crown radius. Explicit layered light extinction, measured growth-dependent
 mortality, crown allometry and full stand succession calibration remain open.
 [Measured limits](limits.md#bio-03-douglas-fir-survival-in-the-wind-river-spacing-trial).
+
+### AERO-02 downwind lift and drag deficit
+
+The [S3 rigid-sail diagnostic](limits.md#aero-02-measured-cambered-sail-polar) shows lift and drag underprediction at typical downwind trim after grid and incidence sensitivity. The solver uses instantaneous horseshoes in attached panels and a flat-plate load for separated panels. It has no shed wake state, leading-edge separation history, inter-sail shielding or porous canopy law. A self-excited flag wake, measured cambered-sail agreement and parachute and tent behaviour remain open.

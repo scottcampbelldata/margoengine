@@ -1695,10 +1695,15 @@ const soft = await SoftBodies.attach(physics);
 const a = (5 * Math.PI) / 180;
 const desc = SoftBodyDesc.cloth([0, 0, 0], [Math.cos(a) / 4, -Math.sin(a) / 4, 0], [0, 0, 0.5], 5, 13);
 const sail = soft.create(desc.setPinnedParticles(Array.from({length: 65}, (_, i) => i)));
-const load = new SailForce(physics, sail, {wind: [10, 0, 0], grid: [5, 13], density: 1.2});
+using load = await SailForce.attachNative(physics, sail, {wind: [10, 0, 0], grid: [5, 13], density: 1.2});
 physics.step();
 console.log(load.force[1] > 0); // true: lift across the wind
+console.log(load.readNativeWork()?.matrixPairs);
 ```
+
+`SailForce.attachNative` loads the optional SIMD lattice with one participant by default. Set `threads` to 2 or 4 in a cross-origin-isolated browser, and pass a `signal` to cancel loading. The wind cell is read each step. When cloth and air are in signed world cells, pass `frame: {cell, cellSize}` for the cloth origin in integer cells and the side length in metres. Use a getter for a moving cell. Invalid air samples and impulses fail before changing accepted sail loads or cloth velocity.
+
+Attach native sails before registering their `RigidSolver`. Complete replay of a flexible sail uses both that rigid solver and `SoftSolver`. The synchronous constructor remains available for scalar loads and existing rigid snapshot layouts.
 
 ### Skeletal soft tissue
 

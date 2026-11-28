@@ -7252,3 +7252,7 @@ The pedestrian solver reads signed force and intent rows from their owning memor
 ### ATMO-10 accepted atmosphere and independent gauge limits
 
 The stepped atmosphere, layered fields, budget and borrowed shallow-water forcing publish only after the whole trial succeeds. The native SIMD phase partitions disjoint publication cells with deterministic accepted bytes at one, two and four participants. The atmospheric recurrences keep their order. A fixed map witness feeds HYDRO-02 and the Weather adapter from accepted rain and cloud. Independent OLYMPEX gauges quantify the mountain precipitation deficit and sensitivity to lapse. The upstream IVT is derived from supplied sounding data, and downstream measured IVT remains open. [Gauge evidence](../limits.md#atmo-10-observed-olympex-warm-sector-rainfall)
+
+### AERO-02 accepted sail loads and independent cambered polar
+
+Sails sample signed air against the cloth’s collocation position and velocity. The entire candidate, including the resulting f32 cloth velocity, is checked before applying its impulses. Native matrix and wake phases preserve fixed order, with genuine simultaneous pairs and joined workers. Rigid snapshots store the native attachment’s accepted loads and work. Cloth and hull state are recorded together when the framework registers both solvers. The measured rigid downwind sail exposes a force deficit of the quasi-steady closure. [Measured limits](../limits.md#aero-02-measured-cambered-sail-polar)
