@@ -38,6 +38,11 @@ export interface IceIcicleOptions extends BoundaryOptions {
     readonly tipHeatTransfer?: number;
 }
 
+export interface IceLoadOptions extends IceSolverOptions {
+    readonly threads?: 1 | 2 | 4;
+    readonly signal?: AbortSignal;
+}
+
 export interface IceSample {
     readonly thickness: number;
     readonly length: number;
@@ -53,6 +58,7 @@ export interface IceSheetOptions extends BoundaryOptions {
     readonly conductivity?: number;
     readonly snowThickness?: number;
     readonly snowConductivity?: number;
+    readonly surfaceHeatTransfer?: number;
     readonly waterHeatFlux?: number;
 }
 
@@ -61,6 +67,9 @@ export type IceSiteOptions = IceSheetOptions | IceFrostOptions | IceIcicleOption
 export class IceSolver implements Solver<IceWorldOptions> {
     constructor(options?: IceSolverOptions);
     describe(): SolverDescription;
+    static load(options?: IceLoadOptions): Promise<IceSolver>;
+    [Symbol.dispose](): void;
+    readNativeWork(): IceWorkCounts | undefined;
     init(host: SolverHost, options: IceWorldOptions): void;
     step(context: StepContext, dt: number): void;
     importPorts(_tick: number): void;
@@ -75,6 +84,16 @@ export interface IceSolverOptions {
     readonly readHeat?: boolean;
     readonly readTemperature?: boolean;
     readonly readVapour?: boolean;
+}
+
+export interface IceWorkCounts extends IceWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly IceWorkerWork[];
+}
+
+export interface IceWorkerWork {
+    readonly sites: number;
+    readonly pairedSites: number;
 }
 
 export interface IceWorldOptions {

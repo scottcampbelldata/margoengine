@@ -15754,8 +15754,8 @@
         "gzip": 9078
       },
       "./ice": {
-        "raw": 6791,
-        "gzip": 3227
+        "raw": 16821,
+        "gzip": 6912
       },
       "./glacier": {
         "raw": 14703,
@@ -20358,6 +20358,16 @@
       "raw": 6443,
       "gzip": 2502,
       "brotli": 2320
+    },
+    "packages/physics/dist/ice-thermal-kernel.wasm": {
+      "raw": 1300,
+      "gzip": 803,
+      "brotli": 741
+    },
+    "packages/physics/dist/ice-thermal-kernel-shared.wasm": {
+      "raw": 1300,
+      "gzip": 803,
+      "brotli": 743
     }
   },
   "splits": {

@@ -1,4 +1,5 @@
 import { exp, ln } from '@margoengine/math/pinned';
+import { iceError } from './errors.js';
 
 const ICE_POINT = 273.15;
 const STEAM_POINT = 373.15;
@@ -28,6 +29,8 @@ export interface IceSheetOptions extends BoundaryOptions {
   readonly snowThickness?: number;
   /** Snow thermal conductivity in W/(m K). Defaults to 0.31. */
   readonly snowConductivity?: number;
+  /** Warm-side sensible heat transfer in W/(m² K). Defaults to 10. */
+  readonly surfaceHeatTransfer?: number;
   /** Ocean or river heat delivered to the base of the ice in W/m². Defaults to 0. */
   readonly waterHeatFlux?: number;
 }
@@ -70,14 +73,17 @@ export type IceSiteOptions = IceSheetOptions | IceFrostOptions | IceIcicleOption
 export const CONFIG_WORDS = 8;
 export const GEOMETRY_WORDS = 2;
 export const CHANGE_WORDS = 5;
+export const ICE_THERMAL_INPUT_WORDS = 9;
+export const ICE_THERMAL_OUTPUT_WORDS = 4;
+export const DEFAULT_SURFACE_TRANSFER = 10;
 const SHEET = 0;
 const FROST = 1;
 const ICICLE = 2;
 
 function number(value: number, name: string, minimum = 0, inclusive = true): number {
   if (!Number.isFinite(value) || (inclusive ? value < minimum : value <= minimum))
-    throw new RangeError(
-      `Invalid ice ${name}; pass a finite value ${inclusive ? 'at least' : 'greater than'} ${minimum}.`,
+    throw iceError(
+      `Invalid ice ${name}. Please pass a finite value ${inclusive ? 'at least' : 'greater than'} ${minimum}.`,
     );
   return value;
 }
@@ -85,7 +91,7 @@ function number(value: number, name: string, minimum = 0, inclusive = true): num
 /** Freezing temperature of freshwater or ordinary seawater at the surface in K (UNESCO 1983). */
 export function iceFreezingTemperature(salinity = 0): number {
   const s = number(salinity, 'practical salinity');
-  if (s > 40) throw new RangeError('Ice salinity exceeds the EOS-80 range; use a practical salinity at most 40.');
+  if (s > 40) throw iceError('Ice salinity exceeds the EOS-80 range. Please use a practical salinity at most 40.');
   return ICE_POINT + s * (-0.0575 + 0.001710523 * Math.sqrt(s) - 0.0002154996 * s);
 }
 
@@ -96,13 +102,17 @@ function vapourPressure(temperature: number): number {
 /** Equilibrium vapour pressure above ice in Pa (Murphy and Koop 2005, Eq. 7, 110 to 273.15 K). */
 export function iceVapourPressure(temperature: number): number {
   if (!(temperature > 110 && temperature <= ICE_POINT))
-    throw new RangeError(
-      'Vapour pressure above ice is outside the fit; pass a temperature above 110 K through 273.15 K.',
+    throw iceError(
+      'Vapour pressure above ice is outside the fit. Please pass a temperature above 110 K through 273.15 K.',
     );
   return vapourPressure(temperature);
 }
 
-export function prepareSite(options: IceSiteOptions): { config: readonly number[]; geometry: readonly number[] } {
+export function prepareSite(options: IceSiteOptions): {
+  config: readonly number[];
+  geometry: readonly number[];
+  surfaceTransfer?: number;
+} {
   const temperature = number(options.temperature ?? 268.15, 'temperature', 0, false);
   if (options.kind === 'sheet') {
     const area = number(options.area ?? 1, 'area', 0, false);
@@ -116,6 +126,10 @@ export function prepareSite(options: IceSiteOptions): { config: readonly number[
     return {
       config: [SHEET, area, temperature, ICE_DENSITY, freezing, conductivity, insulation, waterHeat],
       geometry: [thickness, 0],
+      surfaceTransfer:
+        options.surfaceHeatTransfer === undefined
+          ? undefined
+          : number(options.surfaceHeatTransfer, 'surface heat transfer coefficient'),
     };
   }
   if (options.kind === 'frost') {
@@ -132,7 +146,7 @@ export function prepareSite(options: IceSiteOptions): { config: readonly number[
       geometry: [thickness, 0],
     };
   }
-  if (options.kind !== 'icicle') throw new RangeError('Unknown ice site kind; use sheet, frost or icicle.');
+  if (options.kind !== 'icicle') throw iceError('Unknown ice site kind. Please use sheet, frost or icicle.');
   const radius = number(options.radius ?? 0.005, 'icicle radius', 0, false);
   const length = number(options.length ?? 0, 'icicle length');
   const area = number(options.area ?? Math.PI * radius * radius, 'area', 0, false);
@@ -158,11 +172,8 @@ function stefan(thickness: number, insulation: number, drive: number): number {
   return Math.max(0, thickness + drive / (depth + next));
 }
 
-/**
- * Updates one row. Incoming boundary heat is apportioned to fusion, sensible heating and
- * vaporisation. No energy is absorbed after the meltwater in this tick has drained.
- */
-export function advanceSite(
+/** Stages the site-specific boundary update and quantities needed by the common phase budget. */
+export function stageIceSite(
   config: Float64Array,
   geometry: Float64Array,
   row: number,
@@ -170,6 +181,8 @@ export function advanceSite(
   vapour: number | undefined,
   heatFlux: number,
   dt: number,
+  surfaceTransfer: number,
+  phase: Float64Array,
   next: Float64Array,
 ): void {
   const base = row * CONFIG_WORDS;
@@ -188,9 +201,13 @@ export function advanceSite(
   let drainage = 0;
   if (mode === SHEET) {
     freezing = a;
-    const after = stefan(thickness, c, (2 * b * (freezing - boundary) * dt) / (density * FUSION));
-    meltwater = Math.max(0, thickness - after) * area * density;
-    thickness = after;
+    if (boundary < freezing) {
+      thickness = stefan(thickness, c, (2 * b * (freezing - boundary) * dt) / (density * FUSION));
+    } else if (boundary > freezing) {
+      // Surface is at its freezing point during ablation. Water heat and external heat have separate budgets.
+      meltwater = Math.min(thickness * area * density, (surfaceTransfer * (boundary - freezing) * area * dt) / FUSION);
+      thickness = Math.max(0, thickness - meltwater / (area * density));
+    }
     if (d < 0) thickness -= (d * dt) / (density * FUSION);
   } else if (mode === FROST && boundary <= ICE_POINT) {
     const airDensity = (vapour ?? a) / (WATER_VAPOUR_GAS_CONSTANT * b);
@@ -228,27 +245,66 @@ export function advanceSite(
 
   const section = mode === ICICLE ? rotationArea(thickness) : area;
   const massPerMetre = section * density;
-  const solidMass = massPerMetre * (mode === ICICLE ? length : thickness);
-  const basalMelt = mode === SHEET ? Math.min(solidMass, (Math.max(0, d) * area * dt) / FUSION) : 0;
-  const offered = heatFlux * area * dt;
-  const melted = Math.min(Math.max(0, solidMass - basalMelt), offered / FUSION);
-  const remaining = Math.max(0, offered - melted * FUSION);
-  meltwater += basalMelt + melted;
-  const heatToBoil = meltwater * WATER_HEAT_CAPACITY * (STEAM_POINT - freezing);
-  const steam = Math.min(meltwater, Math.max(0, remaining - heatToBoil) / VAPORIZATION);
-  const used = Math.min(offered, melted * FUSION + Math.min(remaining, heatToBoil) + steam * VAPORIZATION);
-  const removed = melted + basalMelt;
-  const after = removed > 0 ? Math.max(0, solidMass - removed) / massPerMetre : mode === ICICLE ? length : thickness;
-  if (mode === ICICLE) {
-    length = after;
-    if (length === 0) thickness = a;
-  } else {
-    thickness = after;
-  }
+  const extent = mode === ICICLE ? length : thickness;
+  const at = row * ICE_THERMAL_INPUT_WORDS;
+  phase[at] = area;
+  phase[at + 1] = massPerMetre;
+  phase[at + 2] = massPerMetre * extent;
+  phase[at + 3] = extent;
+  phase[at + 4] = mode === SHEET ? Math.max(0, d) : 0;
+  phase[at + 5] = heatFlux;
+  phase[at + 6] = meltwater;
+  phase[at + 7] = freezing;
+  phase[at + 8] = drainage;
   const offset = row * CHANGE_WORDS;
   next[offset] = thickness;
   next[offset + 1] = length;
-  next[offset + 2] = (meltwater - steam + drainage) / dt;
-  next[offset + 3] = steam / dt;
-  next[offset + 4] = used / dt;
+}
+
+/** Applies the common boundary energy partition when there is no native kernel. */
+export function settleIceEnergy(phase: Float64Array, row: number, dt: number, result: Float64Array): void {
+  const base = row * ICE_THERMAL_INPUT_WORDS;
+  const area = phase[base]!;
+  const massPerMetre = phase[base + 1]!;
+  const solidMass = phase[base + 2]!;
+  const extent = phase[base + 3]!;
+  const basalHeat = phase[base + 4]!;
+  const heatFlux = phase[base + 5]!;
+  const meltwater = phase[base + 6]!;
+  const freezing = phase[base + 7]!;
+  const drainage = phase[base + 8]!;
+  const basalMelt = Math.min(solidMass, (basalHeat * area * dt) / FUSION);
+  const offered = heatFlux * area * dt;
+  if (!Number.isFinite(offered))
+    throw iceError('Ice boundary energy exceeds numeric range. Reduce the heat flux or initial dimensions.');
+  const melted = Math.min(Math.max(0, solidMass - basalMelt), offered / FUSION);
+  const remaining = Math.max(0, offered - melted * FUSION);
+  const liquid = meltwater + (basalMelt + melted);
+  const heatToBoil = liquid * WATER_HEAT_CAPACITY * (STEAM_POINT - freezing);
+  const steam = Math.min(liquid, Math.max(0, remaining - heatToBoil) / VAPORIZATION);
+  const used = Math.min(offered, melted * FUSION + Math.min(remaining, heatToBoil) + steam * VAPORIZATION);
+  const removed = melted + basalMelt;
+  const after = removed > 0 ? Math.max(0, solidMass - removed) / massPerMetre : extent;
+  const at = row * ICE_THERMAL_OUTPUT_WORDS;
+  result[at] = after;
+  result[at + 1] = (liquid - steam + drainage) / dt;
+  result[at + 2] = steam / dt;
+  result[at + 3] = used / dt;
+}
+
+/** Combines the accepted phase budget with its staged geometry. */
+export function finishIceSite(config: Float64Array, row: number, result: Float64Array, next: Float64Array): void {
+  const base = row * CONFIG_WORDS;
+  const offset = row * CHANGE_WORDS;
+  const resultOffset = row * ICE_THERMAL_OUTPUT_WORDS;
+  const extent = result[resultOffset]!;
+  if (config[base] === ICICLE) {
+    next[offset + 1] = extent;
+    if (extent === 0) next[offset] = config[base + 4]!;
+  } else {
+    next[offset] = extent;
+  }
+  next[offset + 2] = result[resultOffset + 1]!;
+  next[offset + 3] = result[resultOffset + 2]!;
+  next[offset + 4] = result[resultOffset + 3]!;
 }

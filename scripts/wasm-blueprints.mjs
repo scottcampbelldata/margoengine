@@ -64,6 +64,20 @@ export const BLUEPRINTS = [
     deflated: true,
   },
   {
+    name: 'ice-thermal-kernel',
+    crate: 'packages/physics/ice-thermal-kernel',
+    blueprint: 'packages/physics/src/ice/ice-thermal-kernel.wasm',
+    script: 'packages/physics/scripts/build-ice-thermal-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'ice-thermal-kernel-shared',
+    crate: 'packages/physics/ice-thermal-kernel',
+    blueprint: 'packages/physics/src/ice/ice-thermal-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-ice-thermal-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'iceberg-kernel',
     crate: 'packages/physics/iceberg-kernel',
     blueprint: 'packages/physics/src/iceberg/iceberg-kernel.wasm',

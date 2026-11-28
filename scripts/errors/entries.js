@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'ice-thermal',
+    title: '@margoengine/physics/ice freezing, melting and phase exchange',
+    kind: 'family',
+    messages: [],
+    cause: 'An ice site, aligned field bank, registered thermodynamic forcing or trial phase result is outside the supported range.',
+    fix: 'Supply finite SI site and boundary values, one aligned layout-1 value per site and positive durations. Reduce unsupported forcing or dimensions. Use shared memory with multiple native participants.',
+  },
+  {
     id: 'seismic',
     title: '@margoengine/physics/seismic elastic waves and shaking supports',
     kind: 'family',

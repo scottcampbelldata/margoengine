@@ -5446,3 +5446,12 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
   Newmark response and rigid witness in both renderers.
 - Run `node packages/physics/scripts/earth08-mashiki-measured.mjs` to compare modeled elastic
   motion with the independent weak-motion spectral and travel-time observations.
+
+### ICE-05 surface heat and mixed native phase replay
+
+- Build Physics with `node packages/physics/scripts/build.js`, then run
+  `node --test packages/physics/tests/ice.test.js packages/physics/tests/coupling/ice.test.js packages/physics/tests/coupling/ice-thermal-workers.test.js packages/physics/tests/coupling/lava.test.js`.
+- Run `npm run test:gpu:ice-thermal-workers -w @margoengine/physics` for native helper coverage and
+  `npm run test:gpu:ice-thermodynamics-film -w @margoengine/physics` for independent renderer replay.
+- Run `node packages/physics/scripts/ice05-channel-freezing-measured.mjs` for the independently measured
+  freezing fronts and forcing sensitivity.

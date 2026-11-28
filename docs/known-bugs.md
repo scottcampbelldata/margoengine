@@ -6858,10 +6858,10 @@ test.
   forward and reverse passes at the same curve station lean toward the same outside rail.
 - **DYN-05, a flange can never climb.** **Repro:** any flange contact; L/V never exceeds 1. **Cause:** `car.ts` caps
   the flange force at the vertical load, so no Nadal check can ever trip.
-- **ICE-05, thick ice melts slower than thin ice above freezing.** **Repro:** `ice.test.js` (the melt case) asserts
-  it. **Cause:** `packages/physics/src/ice/model.ts` melts an above-freezing surface by running the quasi-steady Stefan
-  growth law backwards through the ice and snow, so conduction through the slab throttles a surface melt that is set
-  by the surface heat flux.
+- **ICE-05, warm surface ablation fixed.** The backward Stefan update formerly ran the warm boundary energy
+  through the full ice and prescribed snow thickness. Surface energy now consumes ice at the boundary freezing
+  point. `packages/physics/tests/ice.test.js` verifies the same melt depth at equal applied surface heat on thin
+  and thick columns, proportional response to the transfer coefficient and finite complete melt.
 - **BREAK-03, sustained crush support fixed.** A pressed body with a sensor collider used to pass through an
   already contacted patch because the latch suppressed all subsequent normal reactions. A unilateral, damped
   backing step now carries the continuing load without creating a new damage event. The six-second fixed
@@ -7311,6 +7311,10 @@ traces both the ray and its paraxial beam. See the turning-point and multi-refle
 `packages/physics/tests/underwater.test.js` and the registry reader in `packages/physics/tests/coupling/underwater.test.js`.
 
 ### Fixed 2026-11-25: fixed ice geometry could not respond to world-clock heating (ICE-05)
+
+The signed ice ports now follow the live world cell. A malformed late condition or unaligned field
+lease preserves all accepted ice geometry and exchanges. The mixed-site and real lava cases exercise
+the signed state, phase closures and world replay. `packages/physics/tests/coupling/ice.test.js`
 
 The prior ice render shapes had no phase-change state. A pulse delivering fusion, sensible and vaporisation
 energy to a thin sheet could neither melt it nor return the resulting drainage and steam in the world.

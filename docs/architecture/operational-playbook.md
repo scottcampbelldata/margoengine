@@ -12410,3 +12410,7 @@ Soil contact stages accepted deposition, column history, wheel reactions and opt
 ### EARTH-08 accepted elastic waves and ground attachments
 
 The optional section allocates separate elastic, surface and site trial regions. Its traction-free surface remains on the caller. The native velocity and stress row phases join separately before publishing accepted results. The support adapter reads registered fields from their owning banks and stages all rigid forces. Exact Chromium worker replays and dual-renderer station playback cover this path. The Mashiki weak-motion diagnostic quantifies limits of the elastic section.
+
+### ICE-05 warm surface boundary and accepted native phase budget
+
+The ice sheet freezes through a prescribed insulation resistance and uses an independent sensible transfer on the warm face. The optional native kernel partitions fusion, liquid heating and vaporization across disjoint pairs and joins each step before geometry and exchange publication. Adopted forcing is read in its owning memory, and the four ports carry the live signed origin. The natural lava and runoff basin repeat precise accepted state and pixels on both renderers. Independent channel readings quantify the missing flow and ice feedback.

@@ -27,8 +27,6 @@ test('bare and snow-covered ice follow the closed form of the Stefan problem', (
   const { world, ice } = make([
     { kind: 'sheet', temperature },
     { kind: 'sheet', temperature, thickness: start, snowThickness: snow },
-    { kind: 'sheet', temperature: 293.15, thickness: start, snowThickness: snow },
-    { kind: 'sheet', temperature: 293.15, thickness: 1e-8 },
   ]);
   const seconds = 10;
   world.advance(seconds * 60);
@@ -41,11 +39,28 @@ test('bare and snow-covered ice follow the closed form of the Stefan problem', (
     Math.sqrt((start + insulation) * (start + insulation) + drive) - insulation,
     tolerance,
   );
-  close(
-    ice.sample(2).thickness,
-    Math.sqrt((start + insulation) * (start + insulation) - drive) - insulation,
-    tolerance,
-  );
+});
+
+test('surface thaw uses supplied heat rather than ice thickness or snow resistance', () => {
+  const warm = 293.15;
+  const duration = 10;
+  const coefficient = 10;
+  const thickness = [0.02, 0.2, 0.08, 1e-8];
+  const { world, ice } = make([
+    { kind: 'sheet', temperature: warm, thickness: thickness[0], snowThickness: 0.04 },
+    { kind: 'sheet', temperature: warm, thickness: thickness[1] },
+    { kind: 'sheet', temperature: warm, thickness: thickness[2], surfaceHeatTransfer: 2 * coefficient },
+    { kind: 'sheet', temperature: warm, thickness: thickness[3] },
+  ]);
+  world.advance(duration * 60);
+  const depth = (coefficient * (warm - freezing) * duration) / (density * fusion);
+  for (let row = 0; row < 3; row++) {
+    const multiplier = row === 2 ? 2 : 1;
+    const sample = ice.sample(row);
+    // Each step subtracts one rounded depth increment. Bound the accumulated rounding at the original thickness.
+    close(sample.thickness, thickness[row] - multiplier * depth, duration * 60 * Number.EPSILON * thickness[row]);
+    close(sample.meltwater * fusion, multiplier * coefficient * (warm - freezing), 16 * Number.EPSILON * 400);
+  }
   assert.equal(ice.sample(3).thickness, 0);
   assert.equal(ice.sample(3).meltwater, 0, 'meltwater flux clears after the last ice drains');
 });

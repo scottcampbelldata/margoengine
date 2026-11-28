@@ -99,6 +99,75 @@ function make(rate = { num: 24, den: 1 }, invalidLayout = false) {
 
 const fps = { num: 60, den: 1 };
 
+test('IceSolver uses the forcing bank owner and retains all accepted signed ports on a late error', () => {
+  const ice = new IceSolver({ readHeat: true, readTemperature: true });
+  const cell = [-11, 2, 6];
+  const world = new PhysicsWorld({ rate: fps }).add(
+    ice,
+    {
+      sites: [
+        { kind: 'sheet', thickness: 0.02, area: 2, surfaceHeatTransfer: 20 },
+        { kind: 'frost', thickness: 0.001 },
+      ],
+    },
+    cell,
+  );
+  const owner = new WebAssembly.Memory({ initial: 1 });
+  const [heatPort, temperaturePort] = [ICE_HEAT_FIELD, ICE_TEMPERATURE_FIELD].map((field, i) => ({
+    field: field.name,
+    region: {
+      name: field.name,
+      memory: owner,
+      type: 'f64',
+      layout: ICE_FIELD_LAYOUT,
+      byteOffset: 128 + i * 32,
+      byteLength: 16,
+    },
+    tick: 0,
+    cell,
+  }));
+  const external = new Float64Array(owner.buffer, 128, 2);
+  const temperatures = new Float64Array(owner.buffer, 160, 2);
+  external.set([47, 0]);
+  temperatures.set([278.15, 250]);
+  const step = (port = temperaturePort) =>
+    ice.step(
+      {
+        tick: 0,
+        level: 0,
+        seed: 3,
+        cell,
+        inputs: new Map([
+          [heatPort.field, heatPort],
+          [port.field, port],
+        ]),
+      },
+      dt,
+    );
+  const initial = world.takeSnapshot();
+  step();
+  assert.ok(Math.abs(ice.sample(0).meltwater - (2 * (20 * 5 + 47)) / fusion) < 8 * Number.EPSILON);
+  assert.ok(Math.abs(ice.sample(0).heatAbsorbed - 94) < 32 * Number.EPSILON * 94);
+  const accepted = world.takeSnapshot();
+  external[0] = 499;
+  temperatures[1] = 100;
+  assert.throws(step, (error) => error.code === 'state' && /outside the fit.*errors#ice-thermal/.test(error.message));
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  const shiftedPort = { ...temperaturePort, region: { ...temperaturePort.region, byteOffset: 161 } };
+  assert.throws(() => step(shiftedPort), /aligned records.*errors#ice-thermal/);
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  world.shiftOrigin([4, -3, 2]);
+  assert.deepEqual(
+    ice.exportPorts(0).map((port) => port.cell),
+    Array(4).fill([-15, 5, 4]),
+  );
+  world.restoreSnapshot(initial.bytes);
+  external[0] = 47;
+  temperatures[1] = 250;
+  step();
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+});
+
 test('IceSolver: applied heat melts ice and returns mass-conserving water, steam and cooling', () => {
   const world = make(fps);
   world.advance(1);

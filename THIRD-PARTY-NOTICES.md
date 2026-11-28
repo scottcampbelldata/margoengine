@@ -731,3 +731,11 @@ values from [NIED KiK-net KMMH16](https://doi.org/10.17598/NIED.0004) as reprodu
 [NILIM and PWRI (2023), Fig. 4.34](https://www.nilim.go.jp/lab/bcg/siryou/tnn/tnn1247pdf/ks1247.pdf),
 and separate weak-motion readouts from [Esfahani et al. (2024), Fig. 2 and §3.1](https://doi.org/10.1093/gji/ggae222).
 No waveform archives, original plots or implementation code are included.
+
+### ICE-05 channel-freezing observations
+
+Bouke Johannes Kaaks, Danny Lathouwers, Jan-Leen Kloosterman and Martin Rohde (2025),
+[*Transient freezing of water in a square channel: An experimental investigation*](https://doi.org/10.1016/j.expthermflusci.2025.111417),
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The ICE-05 diagnostic converts the reported
+temperature fits to kelvin and transcribes sparse cold-plate observations and uncertainty in SI.
+No plots, full datasets or source code are bundled.

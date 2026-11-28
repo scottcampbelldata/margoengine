@@ -6344,17 +6344,17 @@ const row = trackSolarRow(sun.direction, {groundCoverageRatio: 0.5, stowAt: 15, 
 console.log(sun.horizontal > 0, Number.isFinite(tide.potential), row.mode); // true true track
 ```
 
-### Ice thermodynamics (`margoengine/physics/ice`)
+### Ice thermodynamics
 
 `IceSolver` advances lake, river and sea ice, frost and dripping icicles at 60 Hz on a `PhysicsWorld`. Pass one
 site per column, frost patch or icicle. `sample(index)` returns thickness (or icicle radius), icicle length,
 liquid drainage and steam in kg/s, and externally absorbed heat in watts.
 
 ```ts
-import { IceSolver } from 'margoengine/physics/ice';
-import { PhysicsWorld } from 'margoengine/physics/world';
+import { IceSolver } from '@margoengine/physics/ice';
+import { PhysicsWorld } from '@margoengine/physics/world';
 
-const ice = new IceSolver();
+using ice = await IceSolver.load({ threads: 1 });
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(ice, {
   sites: [
     { kind: 'sheet', temperature: 263.15, salinity: 35, snowThickness: 0.04 },
@@ -6370,11 +6370,20 @@ Site temperatures are kelvin and default to 268.15 K. Sheet ice starts at zero t
 snow or basal heat. Set `thickness` and `snowThickness` in metres, `salinity` on the practical salinity scale,
 `conductivity` (default 2.03) and `snowConductivity` (default 0.31) in W/(m K), and `waterHeatFlux` (default 0)
 in W/m², positive into the ice. The water remains at its salinity-adjusted freezing point through phase change.
+Below freezing, `temperature` sets the outer cold boundary for conduction through ice and the prescribed
+snow resistance. Above freezing it supplies the warm-side temperature next to the melting surface.
+Set `surfaceHeatTransfer` in W/(m² K) to describe that boundary. It defaults to 10. Surface thaw consumes
+that heat directly at the freezing point, independently of how thick the remaining ice is.
 Frost starts at zero thickness with density 100 kg/m³, ambient vapour pressure 400 Pa, air temperature 273.15 K,
 mass transfer coefficient 0.002 m/s and thaw heat transfer coefficient 10 W/(m² K). Icicles have an initial
 attachment radius of 0.005 m, zero length, water supply 0.00001 kg/s, and separate side and tip heat transfer
 coefficients of 10 W/(m² K). `area` is the footprint that absorbs external heat, default 1 m² for sheets and
 frost or π times the squared attachment radius for an icicle. Each default can be overridden per site.
+
+`new IceSolver()` remains synchronous. `IceSolver.load()` selects the optional native fusion, sensible
+heating and vaporization work with one participant by default. Choose two or four with shared world
+memory in Node or a cross-origin-isolated browser worker. `readNativeWork()` returns the latest
+accepted site counts. Dispose the solver when stopping its world.
 
 For world-driven forcing, turn on `readHeat`, `readTemperature` and/or `readVapour` on the solver and provide a
 writer for each enabled field. All ports are layout-1 `f64` in the site's array order.

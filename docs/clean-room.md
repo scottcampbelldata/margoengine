@@ -15629,8 +15629,10 @@ snapshot and frame-rate repeatability.
   (1976), Appendix. Their zero-layer approximation treats the two layers as thermal resistances in series.
   Multiplying the snow thermal resistance by the ice conductivity gives an effective ice thickness
   `s = kIce * snowThickness / kSnow`. The closed update adds
-  `2 * kIce * (Tfreeze - Tboundary) * dt / (density * latentHeat)` to `(thickness + s)^2`, limited by the zero-ice
-  boundary. Underwater and imposed heating subsequently consume latent heat at the amount delivered by the source.
+  `2 * kIce * (Tfreeze - Tboundary) * dt / (density * latentHeat)` to `(thickness + s)^2` while growing.
+  Above the freezing point the separate surface balance uses the boundary sensible flux
+  `h * (Tboundary - Tfreeze)`. Divide by density and latent heat for the ablation depth per second,
+  and end at zero solid. Basal and registered heating consume the energy delivered by each source.
 - N. P. Fofonoff and R. C. Millard Jr., [Algorithms for Computation of Fundamental Properties of Seawater](https://www.jodc.go.jp/info/ioc_doc120810/UNESCO_tech/059832eb.pdf)
   (UNESCO, 1983), freezing point chapter. The tested surface value uses the atmospheric-pressure polynomial with
   PSS-78 salinity. Fresh water uses 273.15 K. In between 0 and the lower measured salinity 4, the expression smoothly
@@ -20695,3 +20697,26 @@ give independent weak-motion observations in Fig. 2 and §3.1. The diagnostic co
 synthetic records from a generic incident packet with these observations. Both surface and
 downhole motions are simulated. The field reference is excluded from the input and calibration.
 [Esfahani et al.](https://doi.org/10.1093/gji/ggae222)
+
+### ICE-05 surface ablation, phase work and measured freezing
+
+J. Ala-Könni, K. M. Kohonen, Matti Leppäranta and Ivan Mammarella compare bulk sensible
+heat transfer with four ice-on seasons in *Validation of turbulent heat transfer models against eddy
+covariance flux measurements over a seasonally ice-covered lake* (2022). Their bulk sensible term
+gives `h = ρAir × cpAir × CH × wind`. The fixed default of 10 W/(m² K) describes only a moderate
+neutral wind. Supply the local transfer coefficient or a measured external heat flux for a specific
+site. The cold-side Stefan growth and snow resistance remain separate from warm face ablation.
+[Ala-Könni et al.](https://doi.org/10.5194/gmd-15-4739-2022)
+
+Cecilia M. Bitz and William H. Lipscomb, *An energy-conserving thermodynamic model of sea ice*
+(1999), distinguish applied boundary energy and latent ablation. The native work phase uses
+independent site pairs for the preset flux's fusion, liquid heating and vaporization. The candidate
+remains private until every site's exchange is finite. Internal enthalpy and salt redistribution
+remain outside the column model. [Bitz and Lipscomb](https://doi.org/10.1029/1999JC900100)
+
+Bouke Johannes Kaaks, Danny Lathouwers, Jan-Leen Kloosterman and Martin Rohde,
+*Transient freezing of water in a square channel: An experimental investigation* (2025), publish
+thermocouple fits in Eq. (21) and Table 2 and separate ice thickness measurements in Fig. 7. The
+cold plate uses the thermocouple fits. Sixteen sparse optical targets at two stations and two
+flow rates are held out. The diagnostic also compares the separately measured bulk water-energy
+budget, without using ice growth to infer the heat input. [Kaaks et al.](https://doi.org/10.1016/j.expthermflusci.2025.111417)

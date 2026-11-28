@@ -152,6 +152,11 @@ type NativePhaseSolver =
       readonly phase: 'granular strip forces';
     }
   | {
+      readonly subject: 'Ice thermodynamics';
+      readonly phaseExport: 'ice_thermal_thread_phase';
+      readonly phase: 'phase energy';
+    }
+  | {
       readonly subject: 'Seismic';
       readonly phaseExport: 'seismic_thread_phase';
       readonly phase: 'velocity and stress stencil';

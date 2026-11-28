@@ -47,6 +47,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/ice-thermal-kernel.wasm',
+    label: 'ice-thermal-kernel.wasm',
+    kind: 'Rust SIMD ice phase-energy balance',
+    measure: 'file',
+    when: 'IceSolver.load() from the optional /ice entry with plain world memory',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/ice-thermal-kernel-shared.wasm',
+    label: 'ice-thermal-kernel-shared.wasm',
+    kind: 'Rust SIMD ice phase-energy balance, shared world memory',
+    measure: 'file',
+    when: 'IceSolver.load() from the optional /ice entry with shared world memory',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/iceberg-kernel.wasm',
     label: 'iceberg-kernel.wasm',
     kind: 'Rust SIMD iceberg hydrostatics and rigid-body dynamics',

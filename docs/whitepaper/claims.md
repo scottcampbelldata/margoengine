@@ -7179,3 +7179,12 @@ separately joins the traction-free, velocity and stress work. The civil station'
 accepted state and raw RGBA replay independently on WebGPU and WebGL2. In Mashiki the
 independent borehole comparison exposes the limits of the fixed elastic logging profile.
 [Measured limits](../limits.md#earth-08-elastic-site-response-at-mashiki).
+
+### ICE-05 flux-driven surface thaw and accepted phase exchange
+
+At the same finite warm-side flux, two different slab thicknesses ablate by the same depth before
+either exhausts. Native phase energy matches scalar ice, frost and icicle state across one, two and
+four participants. A natural lava fixture closes the ice exchanges and draws the accepted residual
+ice and runoff. WebGPU and WebGL2 each repeat full accepted state and captured pixels. A separate
+cold-plate diagnostic shows missing longitudinal variation and excessive freezing in flowing water.
+[Measured limits](../limits.md#ice-05-freshwater-flow-over-a-cold-plate).

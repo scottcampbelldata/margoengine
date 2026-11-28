@@ -9318,13 +9318,35 @@ and snow accumulation or ablation. Specify conductivity and snow depth for the r
 freezing-point formula is measured at practical salinity 4 to 40 and extends to the fresh-water point at 0.
 Frost uses the Murphy–Koop ice curve above 110 K and through 273.15 K. The area and transfer coefficient describe
 the resolved layer. Icicle cells approximate the side and tip areas by a cylinder with a fixed-radius attachment
-when no ice remains. The solver updates heat rates and phase changes at 60 Hz, holds each boundary field for the
-tick and applies basal and prescribed heat after conductive growth or thaw. The steam calculation uses an
+when no ice remains. The solver updates heat rates and phase changes at 60 Hz and holds each boundary field for
+the tick. The surface grow-and-thaw model uses conductive resistance below freezing and the supplied warm-side
+transfer above freezing. The default 10 W/(m² K) is representative of a moderate neutral wind. The snow term is
+prescribed cold-side insulation. It has no independent snow meltwater ledger. Basal and external heat follow the
+boundary update, and no part of the same forcing is used for both stages. The steam calculation uses an
 atmospheric-pressure water pool that contains the current tick's melt, with a constant liquid heat capacity.
 Unfrozen feed and meltwater drain at the end of that step. Returned rates follow the layout-1 site order.
 
-Each site uses 144 bytes of world state and scratch, plus registry copies for the four output fields. The
-optional entry measures 3,843 B gzip against a 4,099 B budget on the workstation.
+Each site uses 144 bytes of world state and geometry scratch plus another 104 bytes for the staged phase
+inputs and results. An explicit warm transfer profile adds eight registered settings bytes per site. Registry
+copies and native stack and helper setup are separate. The native phase budget can evaluate 1, 2 or 4
+participants, with scalar site-specific boundary preparation retained.
+The optional entry is 6,912 B gzip with a 7,168 B ceiling. Each Wasm asset is 1,300 B raw and
+803 B gzip, with Brotli sizes of 741 B plain and 743 B shared. Core and Stage gain zero bytes.
+
+### ICE-05 freshwater flow over a cold plate
+
+At 120 minutes the two modeled cold-plate histories give 27.57 and 27.48 mm of ice for Re 474 and
+1118 at either sampled point. In Kaaks et al.'s independent optical measurements, inlet and center
+thicknesses are 13.47 and 20.69 mm at Re 474 and 9.68 and 19.08 mm at Re 1118. The temperature-forced
+columns miss all 16 thickness observations across four samples in time, both locations and both flows.
+The thermocouple and plate-resistance sensitivity also misses all 16.
+
+Adding a uniform water-side heat estimate from independent inlet/outlet temperatures and flow gives
+14.05 and 8.84 mm at 120 minutes. This still misses 15 of 16 observations. The uniform exchange
+cannot resolve the local inlet heat transfer or changing geometry–flow feedback. The 0.25 mm comparison
+allowance includes the reported 0.2 mm replicate spread and figure reading.
+[Kaaks et al. (2025)](https://doi.org/10.1016/j.expthermflusci.2025.111417) ·
+[Reproducible comparison](../packages/physics/scripts/ice05-channel-freezing-measured.mjs)
 
 ## Celestial ephemeris and rotation (SPACE-02)
 

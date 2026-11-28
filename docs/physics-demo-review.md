@@ -614,3 +614,14 @@ Not in the catalog: staged construction (placement of pieces, stacking, scaffold
   instrument-motion pixel check. It is a technical scene about a prescribed earthquake and a
   single monitoring mode. The measured field comparison is documented in
   [limits](limits.md#earth-08-elastic-site-response-at-mashiki).
+
+### ICE-05 automated natural lava contact and meltwater basin
+
+- `packages/physics/tests/ice-thermodynamics-film.browser.mjs` couples TerrainBed, real lava heat,
+  the optional native ice energy balance and the shallow-water runoff basin. The direct contact take
+  melts six 17 mm sheets and absorbs 1.2485 MJ. The shallow basin retains 3.741224 kg of meltwater
+  and reaches 6.610 cm in depth. The lava ledger receives 0.1358 g of steam. The insulation control
+  retains all six sheets and leaves the basin dry.
+- Both renderers separately repeat complete accepted state and raw RGBA through hold, restore,
+  re-advance and rewind. The fixture shows the active lava, ice and surface water in a fixed
+  technical cutaway. Atmospheric condensation and a production film take are outside this scene.

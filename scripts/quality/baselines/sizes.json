@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22131672,
+  "total": 22135357,
   "history": [
     {
       "date": "2026-10-24",
@@ -16019,6 +16019,12 @@
       "commit": "earth-08-native-stencil-workers",
       "reason": "EARTH-08 @margoengine/physics/seismic 5010 to 8300 B gzip, ceiling 5266 to 8556 B. The optional seismic entry stages accepted wave, surface and site results. Native helpers own disjoint velocity and stress rows with a join between them. Splitting would duplicate native ABI and accepted-world coupling. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "ice-05-native-phase-energy",
+      "reason": "ICE-05 @margoengine/physics/ice 3227 to 6912 B gzip, ceiling 3483 to 7168 B. The optional ice entry stages independent phase energy and signed accepted outputs. Native helpers evaluate disjoint site pairs. Splitting would duplicate phase accounting and the accepted field contract. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16911,7 +16917,7 @@
     "@margoengine/physics/groundwater": 9531,
     "@margoengine/physics/hydraulics": 7937,
     "@margoengine/physics/hydro": 22723,
-    "@margoengine/physics/ice": 3483,
+    "@margoengine/physics/ice": 7168,
     "@margoengine/physics/iceberg": 7192,
     "@margoengine/physics/landscape": 7724,
     "@margoengine/physics/lava": 9865,
