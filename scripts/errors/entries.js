@@ -71,6 +71,15 @@ export const entries = [
     fix: 'Pass the value the message names, in SI units (metres, seconds, radians, newtons, watts, kg/m^3): a model from `KVLCC2_L7`, `scaleModel` or `empiricalModel`, a body row from the rigid solver, a track of two or more waypoints, a finite heading or null, and a ship index from 0 to one less than the ships given.',
   },
   {
+    id: 'craters',
+    title: '@margoengine/physics/crater: craters from buried charges',
+    kind: 'family',
+    messages: [],
+    cause:
+      "The crater entry was given something it cannot use: a ground constant outside its range (density, k1, mu, strength, ejected and compaction shares, bulking, blanket or launch), a charge with no energy above 0 J or a negative depth, no gravity, ejecta shells that are not a whole number from 4 to 256, a size or pace factor outside 0.1 to 10, a CraterSolver added without its terrain bed's grid, an ExplosionSolver and CraterSolver in different origin cells (code state), or a crater row that does not exist (code state).",
+    fix: 'Take the ground from `CRATER_GROUNDS` or fit constants within the ranges the message names, pass a charge energy above 0 J and a depth of 0 m or more, give the world gravity, pass shells from 4 to 256 and size and pace from 0.1 to 10, add the solver with `world.add(solver, {bed: {...}})`, keep the ExplosionSolver and CraterSolver in one origin cell, and read rows from 0 to the capacity minus 1.',
+  },
+  {
     id: 'hydrodynamic-loads',
     title: '@margoengine/physics/loads inputs',
     kind: 'family',
@@ -2770,6 +2779,10 @@ export const entries = [
     title: '@margoengine/biomes: biome worlds, climate fields and editing',
     kind: 'family',
     messages: [
+      'drainageStructure area must be [start, full] square metres with 0 < start < full',
+      'drainageStructure wall and repose must be 0 to 90 degrees and travel above 0 metres',
+      'BiomeView rock must be an object',
+      'Web Workers are unavailable here; pass createWorker (Node worker threads) or workers: 0',
       'horizonEdgeMean needs width x depth x channels values on a 2 x 2 or larger grid',
       'Set a valid treeline elevation, width 12..400 m, patchSize 20..2000 m and int32 seed',
       'Invalid biome objects capture hook; pass an object with declarations() and begin() functions and a targets array to live BiomeObjects.',
