@@ -2,6 +2,7 @@
 // made by union, difference and intersection, and the meshes they name.
 import { read3MF, type ThreeMFOptions, type ThreeMFResult } from './threemf.js';
 import { booleanStage } from './threemf-boolean-read.js';
+import type { ThreeMFVolumeSamples } from './threemf-volumetric.js';
 import type { BinaryInput } from './util.js';
 
 const OPERATIONS = ['union', 'difference', 'intersection'] as const;
@@ -15,6 +16,11 @@ export interface ThreeMFBooleanOperand {
   transform: Float64Array;
   /** Its triangles in its own coordinates and the model's unit; absent for a shape without them. */
   mesh?: { positions: Float32Array; indices: Uint32Array };
+  /**
+   * With `parse3MFEvaluated`, when the object has volume data: reads it at points in the object's own coordinates,
+   * which `transform` takes to the shape's.
+   */
+  sample?(positions: ArrayLike<number>): Promise<ThreeMFVolumeSamples>;
 }
 
 /** A boolean shape: `operands` applied to `base` in order. */

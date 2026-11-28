@@ -89,3 +89,65 @@ test('regression: volume data on a displacement mesh is refused, not dropped', a
   for (const parse of [parse3MFVolumetric, parse3MFEvaluated])
     await assert.rejects(parse(input), { code: 'syntax', message: /takes no volume data/ });
 });
+
+const noColor = (mappings) =>
+  `<v:volumedata id="5"><v:composite basematerialid="2">${mappings}</v:composite></v:volumedata>`;
+/** The linear mix of the red and blue bases by x and 1 - x, as sRGB. */
+const mixed = (x) => [srgb(x), 0, srgb(1 - x)];
+
+test('regression: a composite with no color is painted on the surface in its mixture', async () => {
+  const read = await parse3MFVolumetric(pack(bases + functions + noColor(mapping('x') + mapping('rest')) + solid()), {
+    units: 'file',
+    colorResolution: 4,
+  });
+  assert.equal(read.objects[0].colorSpacing, 0.25);
+  assert.ok(read.positions.length / 3 > 36);
+  for (let v = 0; v < read.positions.length; v += 3) {
+    // The item moved the cube by 100 along x.
+    const x = read.positions[v] - 100;
+    close([...read.colors.subarray(v, v + 3)], mixed(x));
+  }
+  const plain = await parse3MFVolumetric(pack(bases + functions + noColor(mapping('x') + mapping('rest')) + solid()), {
+    sampleColors: false,
+  });
+  assert.equal(plain.colors, undefined);
+});
+
+test('a painted composite is equal parts where its contributions add to nothing, and a color takes its place', async () => {
+  const options = { units: 'file', colorResolution: 2 },
+    twice = await parse3MFVolumetric(pack(bases + functions + noColor(mapping('x') + mapping('x')) + solid()), options),
+    both = await parse3MFVolumetric(
+      pack(bases + functions + volume(mapping('x') + mapping('rest')) + solid()),
+      options,
+    );
+  // Two equal contributions mix in equal parts, and so does the face x = 0, where both are nothing.
+  for (let v = 0; v < twice.positions.length; v += 3) close([...twice.colors.subarray(v, v + 3)], mixed(0.5));
+  for (let v = 0; v < both.positions.length; v += 3) {
+    const [x, y, z] = [both.positions[v] - 100, both.positions[v + 1], both.positions[v + 2]];
+    close([...both.colors.subarray(v, v + 3)], [srgb(x), srgb(y), srgb(z)]);
+  }
+});
+
+test('regression: a boolean keeps its operand composite where it moves it, and reads the operand volume', async () => {
+  // The base turns a quarter about z and moves 2 along x before a cube cuts its part beyond x = 1.5.
+  const shape = `<object id="10" type="model"><bo:booleanshape objectid="9" operation="difference" transform="0 1 0 -1 0 0 0 0 1 2 0 0"><bo:boolean objectid="7"/></bo:booleanshape></object>`,
+    cutter = `<object id="7" type="model">${meshXML(box([1.5, -1, -1], [3, 2, 2]))}</object>`,
+    read = await parse3MFEvaluated(
+      zip({
+        '3D/3dmodel.model': `<model unit="millimeter" ${NS} xmlns:bo="http://schemas.3mf.io/3dmanufacturing/booleanoperations/2023/07" requiredextensions="v i bo"><resources>${
+          bases + functions + noColor(mapping('x') + mapping('rest')) + solid() + cutter + shape
+        }</resources><build><item objectid="10"/></build></model>`,
+      }),
+      { units: 'file', colorResolution: 4 },
+    );
+  for (let v = 0; v < read.positions.length; v += 3) {
+    // x' = 2 - y and y' = x, so the point before the turn has x = y'.
+    const [x, y] = [read.positions[v], read.positions[v + 1]];
+    assert.ok(x >= 1 - 1e-6 && x <= 1.5 + 1e-6);
+    close([...read.colors.subarray(v, v + 3)], mixed(y));
+  }
+  const [{ base, operands }] = read.shapes;
+  assert.equal(read.objects.length, 0);
+  close((await base.sample([0.25, 0.5, 0.5])).composite.ratios, [0.25, 0.75]);
+  assert.equal(operands[0].sample, undefined);
+});

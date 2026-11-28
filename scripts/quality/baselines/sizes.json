@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21610325,
+  "total": 21612135,
   "history": [
     {
       "date": "2026-10-24",
@@ -15235,6 +15235,12 @@
       "commit": "lane-e-boolean-float64",
       "reason": "float64 boolean output is tested and taken apart too, and thin crossing shells are removed (KB-BOOL-CROSS64, KB-BOOL-F32SHEETS1): boolean-exact 15780 to 16879 B; a split would load the same code for every float64 boolean",
       "grew": 3
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-e-3mf-composite-paint",
+      "reason": "3MF volume composites are painted on built surfaces and boolean operands read their volume data",
+      "grew": 2
     }
   ],
   "items": {
@@ -15881,12 +15887,12 @@
     "@margoengine/loaders/threemf-beams": 3052,
     "@margoengine/loaders/threemf-boolean": 15151,
     "@margoengine/loaders/threemf-displacement": 16281,
-    "@margoengine/loaders/threemf-evaluate": 32199,
+    "@margoengine/loaders/threemf-evaluate": 33189,
     "@margoengine/loaders/threemf-lattice": 19951,
     "@margoengine/loaders/threemf-materials": 15403,
     "@margoengine/loaders/threemf-mesh": 4316,
     "@margoengine/loaders/threemf-secure": 8938,
-    "@margoengine/loaders/threemf-volumetric": 24442,
+    "@margoengine/loaders/threemf-volumetric": 25262,
     "@margoengine/loaders/tilt": 5045,
     "@margoengine/loaders/usd": 9148,
     "@margoengine/loaders/vdb": 6406,

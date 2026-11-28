@@ -116,7 +116,7 @@ export interface ThreeMFVolumetricObject {
    * `instances` transform takes those to the result's). Present when the object has volume data.
    */
   sample?(positions: ArrayLike<number>): Promise<ThreeMFVolumeSamples>;
-  /** The longest triangle side its volume colour was sampled at, in the object's units. */
+  /** The longest triangle side its volume colour or composite was sampled at, in the object's units. */
   colorSpacing?: number;
   /** The spacing is too coarse for the colour's `minfeaturesize`: smaller features may be missing. */
   colorUnresolved?: boolean;
@@ -136,7 +136,7 @@ export interface ThreeMFVolumetricOptions extends ThreeMFOptions {
    * asks for more, up to 512. The spacing is rounded down to a power of two.
    */
   levelSetResolution?: number;
-  /** Sample each built shape's volume colour onto its triangles. Default true. */
+  /** Sample each built shape's volume colour, or its composite's mixture, onto its triangles. Default true. */
   sampleColors?: boolean;
   /**
    * Colour samples along the longest side of a shape: 1 to 512, default 32. Triangles are split until no side is
@@ -158,7 +158,8 @@ export interface ThreeMFVolumetricResult extends ThreeMFResult {
  * Parses a 3MF package with the volumetric and implicit extensions. Each built level set is evaluated inside its domain
  * mesh (or that mesh's box) and its surface joins the result's triangles, in object coordinates placed by the build.
  * A built shape whose volume data has a colour takes it on its surface: its triangles are split to the sample spacing
- * and the colour function is read at their corners, except where the file gives a surface property of its own. The
+ * and the colour function is read at their corners, except where the file gives a surface property of its own. A volume
+ * with a composite and no colour is drawn the same way in its mixture of the base materials' display colors. The
  * volumetric resources and the built objects that use them are returned beside them. A built object's `sample` reads
  * its color, composite mixture and properties at any points.
  *

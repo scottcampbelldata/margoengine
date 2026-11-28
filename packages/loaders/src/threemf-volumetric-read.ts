@@ -506,9 +506,15 @@ export function volumetricStage(
         await addLattices?.(model, p.lattices, surfaces, modelPath);
         if (options.sampleColors === false) continue;
         for (const object of own.values()) {
-          const color = object.volumeId === undefined ? undefined : p.volumes.get(object.volumeId)!.color,
+          const { color, composite } =
+              (object.volumeId === undefined ? undefined : p.volumes.get(object.volumeId)) ?? {},
             mesh = model.objects.get(object.objectId)!.mesh;
-          if (color && mesh) mesh.fill = { scope: await evaluator(), field: color };
+          if (!mesh) continue;
+          if (color) mesh.fill = { scope: await evaluator(), fields: [color] };
+          else if (composite) {
+            const bases = model.properties.get(composite.baseMaterialId)!;
+            mesh.fill = { scope: await evaluator(), fields: composite.mappings, bases };
+          }
         }
       }
     },
@@ -550,6 +556,9 @@ export function volumetricStage(
   return {
     hooks,
     paint,
+    /** The `sample` of an object with volume data, built or only read by another shape. */
+    sampleOf: (objectId: string, modelPath: string | undefined): ThreeMFVolumetricObject['sample'] =>
+      result.objects.find((o) => o.objectId === objectId && o.modelPath === modelPath)?.sample,
     /** What the reader adds to the core result, once the build has been walked. */
     result(): Pick<ThreeMFVolumetricResult, 'images' | 'functions' | 'volumes' | 'objects'> {
       // The build walk has filled the instances; an object nothing builds, such as a level set's domain, is left out.

@@ -1,12 +1,15 @@
-// Samples the colour of a 3MF volume data resource (volumetric extension section 5.2.1,
+// Samples the colour of a 3MF volume data resource (volumetric extension sections 5.2.1 to 5.2.3,
 // https://github.com/3MFConsortium/spec_volumetric) onto the triangles of its shape. The function is read at each
-// vertex in object coordinates, its channels clipped to 0..1 as linear sRGB, and a triangle the file gives a surface
-// property keeps that property, which the specification puts above the volume's. Triangles are split at the middle of
+// vertex in object coordinates, its channels clipped to 0..1 as linear sRGB. A volume with a composite and no color is
+// drawn in its mixture: the base materials' display colors in the sampled ratios, mixed in linear light as the
+// materials extension shows a composite material, and in equal parts where the contributions add to under 1e-5, where
+// the extension leaves the mixture to the consumer. A triangle the file gives a surface property keeps that property,
+// which the specification puts above the volume's. Triangles are split at the middle of
 // every side longer than the sample spacing; whether a side splits depends on the side alone, so the triangles on both
 // sides decide alike and no crack opens (Fisher and others, "DiagSplit", ACM Transactions on Graphics 28(5), 2009,
 // https://graphics.stanford.edu/~mdfisher/Data/DiagSplit.pdf; patterns of Boubekeur and Schlick, "Generic adaptive mesh
 // refinement", GPU Gems 3 chapter 5, 2007).
-import { LinearToSRGB } from '@margoengine/math/color';
+import { LinearToSRGB, SRGBToLinear } from '@margoengine/math/color';
 import { cornerProperty, type ThreeMFMesh, type ThreeMFModel, type ThreeMFObject } from './threemf.js';
 import { compileField, type FieldScope } from './threemf-functions.js';
 import type { ThreeMFSampledField } from './threemf-volumetric.js';
@@ -21,10 +24,62 @@ export const MAX_COLOUR_SAMPLES = 512;
 type Color = [number, number, number, number];
 type Weights = [number, number, number];
 
-/** A colour function over a solid: `field.transform` takes the mesh's coordinates to the function's. */
+/** The least sum of mixing contributions the extension lets a file have. */
+const LEAST_MIX = 1e-5;
+
+/** What colours a solid: each field's `transform` takes the mesh's coordinates to its function's. */
 export interface VolumeFill {
   scope: FieldScope;
-  field: ThreeMFSampledField;
+  /** The color function, or with `bases` the mixing contribution of each base material. */
+  fields: ThreeMFSampledField[];
+  /** A composite's base materials: their sRGB display colors, in the order of the fields. */
+  bases?: [number, number, number, number][];
+}
+
+/** One field over the points: its output's numbers at a vertex, with the fallback value where it is undefined. */
+function reader(
+  scope: FieldScope,
+  field: ThreeMFSampledField,
+  points: readonly number[],
+): (v: number) => (i: number) => number {
+  const { functionId, channel, fallback, transform: m = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0] } = field,
+    pos = new Float64Array(3),
+    program = compileField(scope, functionId, new Map([['pos', pos]])),
+    output = program.outputs.get(channel) as Float64Array,
+    value = (i: number): number => (Number.isFinite(output[i]) ? output[i] : fallback);
+  return (v) => {
+    const x = points[v * 3],
+      y = points[v * 3 + 1],
+      z = points[v * 3 + 2];
+    for (let k = 0; k < 3; k++) pos[k] = x * m[k] + y * m[3 + k] + z * m[6 + k] + m[9 + k];
+    program.run();
+    return value;
+  };
+}
+
+const unit = (x: number): number => Math.min(1, Math.max(0, x));
+
+/** The sRGB colour a fill gives each vertex. */
+function shade({ scope, fields, bases }: VolumeFill, points: readonly number[]): (v: number) => Color {
+  const readers = fields.map((field) => reader(scope, field, points));
+  if (!bases)
+    return (v) => {
+      const value = readers[0](v),
+        channel = (i: number): number => LinearToSRGB(unit(value(i)));
+      return [channel(0), channel(1), channel(2), 1];
+    };
+  const linear = bases.map((c) => [SRGBToLinear(c[0]), SRGBToLinear(c[1]), SRGBToLinear(c[2]), c[3]]),
+    weights = new Float64Array(readers.length);
+  return (v) => {
+    let total = 0;
+    for (let i = 0; i < readers.length; i++) total += weights[i] = unit(readers[i](v)(0));
+    if (total < LEAST_MIX) {
+      weights.fill(1);
+      total = weights.length;
+    }
+    const [r, g, b, a] = [0, 1, 2, 3].map((c) => weights.reduce((sum, w, i) => sum + w * linear[i][c], 0) / total);
+    return [LinearToSRGB(r), LinearToSRGB(g), LinearToSRGB(b), a];
+  };
 }
 
 /**
@@ -49,10 +104,9 @@ export function colourMesh(
   }
   const longest = Math.max(0, ...high.map((v, k) => v - low[k])),
     fills = mesh.fills ?? [mesh.fill],
-    minFeatureSize = fills.reduce((least, fill) => {
-      const size = fill?.field.minFeatureSize ?? 0;
-      return size > 0 && (!least || size < least) ? size : least;
-    }, 0),
+    minFeatureSize = fills
+      .flatMap((fill) => fill?.fields ?? [])
+      .reduce((least, { minFeatureSize: size }) => (size > 0 && (!least || size < least) ? size : least), 0),
     spacing = Math.max(
       longest / MAX_COLOUR_SAMPLES,
       Math.min(longest / resolution, minFeatureSize > 0 ? minFeatureSize / 2 : Infinity),
@@ -81,28 +135,12 @@ export function colourMesh(
   const sampler = (fill: VolumeFill) => {
     const found = samplers.get(fill);
     if (found) return found;
-    const { functionId, channel: name, fallback, transform: m = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0] } = fill.field,
-      pos = new Float64Array(3),
-      program = compileField(fill.scope, functionId, new Map([['pos', pos]])),
-      output = program.outputs.get(name) as Float64Array,
+    const colourAt = shade(fill, points),
       colours: Color[] = [],
       made = {
         colours,
         group: -1,
-        at(v: number): Color {
-          let colour = colours[v];
-          if (!colour) {
-            const x = points[v * 3],
-              y = points[v * 3 + 1],
-              z = points[v * 3 + 2];
-            for (let k = 0; k < 3; k++) pos[k] = x * m[k] + y * m[3 + k] + z * m[6 + k] + m[9 + k];
-            program.run();
-            const channel = (i: number): number =>
-              LinearToSRGB(Math.min(1, Math.max(0, Number.isFinite(output[i]) ? output[i] : fallback)));
-            colours[v] = colour = [channel(0), channel(1), channel(2), 1];
-          }
-          return colour;
-        },
+        at: (v: number): Color => (colours[v] ??= colourAt(v)),
       };
     samplers.set(fill, made);
     return made;

@@ -112,6 +112,7 @@ interface ThreeMFBooleanOperand {
         positions: Float32Array;
         indices: Uint32Array;
     };
+    sample?(positions: ArrayLike<number>): Promise<ThreeMFVolumeSamples>;
 }
 
 interface ThreeMFBooleanOptions extends ThreeMFOptions {

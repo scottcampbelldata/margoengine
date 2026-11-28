@@ -88,7 +88,7 @@ function placed({ vertices, faces, colours, fills, fill }: Solid, m: ArrayLike<n
 }
 
 /** The fill of a solid after the 3MF transform `m`: a point goes back through `m` before the colour's own transform. */
-function movedFill({ scope, field }: VolumeFill, m: ArrayLike<number>): VolumeFill {
+function movedFill({ fields, ...fill }: VolumeFill, m: ArrayLike<number>): VolumeFill {
   const [a, b, c, d, e, f, g, h, i, x, y, z] = Array.from(m),
     determinant = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g),
     inverse = [
@@ -104,16 +104,19 @@ function movedFill({ scope, field }: VolumeFill, m: ArrayLike<number>): VolumeFi
     ].map((v) => v / determinant),
     back = [0, 1, 2].map((k) => -(x * inverse[k] + y * inverse[3 + k] + z * inverse[6 + k])),
     rows = [...inverse, ...back],
-    own = field.transform ?? [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
-    // Row vectors: first `rows`, then `own`.
-    transform = Array.from({ length: 12 }, (_, at) => {
-      const r = Math.floor(at / 3),
-        k = at % 3;
-      return (
-        rows[r * 3] * own[k] + rows[r * 3 + 1] * own[3 + k] + rows[r * 3 + 2] * own[6 + k] + (r === 3 ? own[9 + k] : 0)
-      );
-    });
-  return { scope, field: { ...field, transform } };
+    // Row vectors: first `rows`, then the field's own.
+    after = (own = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]): number[] =>
+      Array.from({ length: 12 }, (_, at) => {
+        const r = Math.floor(at / 3),
+          k = at % 3;
+        return (
+          rows[r * 3] * own[k] +
+          rows[r * 3 + 1] * own[3 + k] +
+          rows[r * 3 + 2] * own[6 + k] +
+          (r === 3 ? own[9 + k] : 0)
+        );
+      });
+  return { ...fill, fields: fields.map((field) => ({ ...field, transform: after(field.transform) })) };
 }
 
 const sub = (a: Point, b: Point): Point => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];

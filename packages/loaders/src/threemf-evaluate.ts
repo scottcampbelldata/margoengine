@@ -107,6 +107,12 @@ export async function parse3MFEvaluated(
       options,
       joined([displacement.hooks, beams.hooks, volumetric.hooks, booleans.hooks, colours]),
     );
+  // A boolean's operands are not built themselves, so their volume data is read through the shape.
+  for (const { base, operands } of booleans.shapes)
+    for (const operand of [base, ...operands]) {
+      const sample = volumetric.sampleOf(operand.objectId, operand.modelPath);
+      if (sample) operand.sample = sample;
+    }
   return {
     ...read,
     ...displacement.result(),

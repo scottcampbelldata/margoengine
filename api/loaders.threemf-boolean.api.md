@@ -11,6 +11,7 @@ export interface ThreeMFBooleanOperand {
         positions: Float32Array;
         indices: Uint32Array;
     };
+    sample?(positions: ArrayLike<number>): Promise<ThreeMFVolumeSamples>;
 }
 
 export interface ThreeMFBooleanOptions extends ThreeMFOptions {
@@ -86,6 +87,22 @@ interface ThreeMFResult extends LoadedGeometry {
     unit: string;
     buildUUID?: string;
     metadata: Record<string, string>;
+}
+
+interface ThreeMFVolumeSamples {
+    colors?: Float32Array;
+    composite?: {
+        baseMaterialId: string;
+        materials: number;
+        ratios: Float32Array;
+    };
+    properties: {
+        name: string;
+        namespace: string;
+        required: boolean;
+        size: number;
+        values: Float32Array;
+    }[];
 }
 
 type XMLExternal = ReadonlyMap<string, string>;

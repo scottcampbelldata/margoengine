@@ -279,7 +279,8 @@ interface ThreeMFSampledField {
 
 interface VolumeFill {
     scope: FieldScope;
-    field: ThreeMFSampledField;
+    fields: ThreeMFSampledField[];
+    bases?: [number, number, number, number][];
 }
 
 interface Voxels {
