@@ -122,3 +122,33 @@ test('tiled query crosses partial portals and reads rebuilt polygons live', () =
   mesh.update();
   assert.equal(query.raycast([2, 0, 2], [14, 0, 2]).hit, false);
 });
+
+test('a ray leaving through a vertex between two portals reports the wall beyond it, not a portal (KB-NAV-RAYVERTEX1)', () => {
+  // Polygon 0 is a fan point at (2, 0); both of its edges there lead on, and the wall x = 2 belongs to polygons 1 and 2.
+  const mesh = new NavMesh(
+    [
+      [0, 0, -2],
+      [2, 0, 0],
+      [0, 0, 2],
+      [2, 0, -2],
+      [2, 0, 2],
+    ],
+    [
+      [0, 1, 2],
+      [0, 3, 1],
+      [1, 4, 2],
+    ],
+  );
+  const hit = new NavMeshQuery(mesh).raycast([0.5, 0, 0], [5, 0, 0]);
+  assert.equal(hit.hit, true);
+  assert.ok(Math.abs(hit.t - 1 / 3) < 1e-12);
+  near(hit.position, [2, 0, 0]);
+  near(hit.normal, [1, 0, 0]);
+  assert.ok(
+    hit.edge.every((p) => p[0] === 2),
+    `edge ${JSON.stringify(hit.edge)} is a portal`,
+  );
+  assert.notEqual(hit.polygon, 0);
+  assert.equal(hit.visited[0], 0);
+  assert.equal(hit.visited.at(-1), hit.polygon);
+});

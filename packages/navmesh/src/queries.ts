@@ -488,17 +488,17 @@ export class NavMeshQuery implements NavSurface {
     const queue = [from],
       seen = new Set(queue),
       parent = new Map<number, number>();
-    let last = from,
-      far = -1,
-      hitEdges: number[] = [];
+    let far = -1,
+      // Every polygon whose exit ties the farthest one: a ray leaving through a vertex walks zero-length intervals
+      // into the neighbours there, and the wall it stops at may be theirs (KB-NAV-RAYVERTEX1).
+      exits: { polygon: number; edges: number[] }[] = [];
     for (let at = 0; at < queue.length; at++) {
       const p = queue[at],
         interval = this.clip(p, start, end)!;
-      if (interval.exit > far) {
+      if (interval.exit > far + EPS) {
         far = interval.exit;
-        last = p;
-        hitEdges = interval.edges;
-      }
+        exits = [{ polygon: p, edges: interval.edges }];
+      } else if (interval.exit >= far - EPS) exits.push({ polygon: p, edges: interval.edges });
       if (interval.exit >= 1) {
         return {
           hit: false,
@@ -521,28 +521,54 @@ export class NavMeshQuery implements NavSurface {
         queue.push(link.to);
       }
     }
-    const v = this.vertices(last),
-      sign = Math.sign(cross(v[0], v[1], v[2]));
-    // At a corner pick the tied edge opposing the motion most strongly.
-    let edge = hitEdges[0],
-      opposition = -Infinity;
-    for (const i of hitEdges) {
-      const a = v[i],
-        b = v[(i + 1) % v.length],
-        length = Math.sqrt(squared(a, b)),
-        dot = (sign * ((b[2] - a[2]) * (end[0] - start[0]) - (b[0] - a[0]) * (end[2] - start[2]))) / length;
-      if (dot > opposition) {
-        opposition = dot;
-        edge = i;
+    const crossing = interpolate(start, end, far),
+      portal = (p: number, a: Vec3, b: Vec3) =>
+        this.mesh
+          .polygonLinks(p)
+          .some(
+            (link) =>
+              link.offMesh === undefined &&
+              this.allowed(link.to, options.filter) &&
+              squared(crossing, onSegment(crossing, link.left, link.right)) <= EPS ** 2 &&
+              squared(onSegment(link.left, a, b), link.left) <= EPS ** 2 &&
+              squared(onSegment(link.right, a, b), link.right) <= EPS ** 2,
+          );
+    // A tied exit edge the ray could go on through at the crossing is a portal, not the wall; among the walls at a
+    // corner pick the one opposing the motion most strongly. Without any wall edge (a forbidden or missing neighbour
+    // only), every tied edge is a candidate.
+    let last = exits[0].polygon,
+      edge = exits[0].edges[0],
+      opposition = -Infinity,
+      walls = false;
+    for (const pass of [true, false]) {
+      for (const { polygon, edges } of exits) {
+        const v = this.vertices(polygon),
+          sign = Math.sign(cross(v[0], v[1], v[2]));
+        for (const i of edges) {
+          const a = v[i],
+            b = v[(i + 1) % v.length];
+          if (pass && portal(polygon, a, b)) continue;
+          const length = Math.sqrt(squared(a, b)),
+            dot = (sign * ((b[2] - a[2]) * (end[0] - start[0]) - (b[0] - a[0]) * (end[2] - start[2]))) / length;
+          if (dot > opposition) {
+            opposition = dot;
+            last = polygon;
+            edge = i;
+            walls = true;
+          }
+        }
       }
+      if (walls) break;
     }
-    const a = v[edge],
+    const v = this.vertices(last),
+      sign = Math.sign(cross(v[0], v[1], v[2])),
+      a = v[edge],
       b = v[(edge + 1) % v.length],
       length = Math.sqrt(squared(a, b));
     return {
       hit: true,
       t: far,
-      position: this.project(last, interpolate(start, end, far)),
+      position: this.project(last, crossing),
       normal: [(sign * (b[2] - a[2])) / length, 0, (-sign * (b[0] - a[0])) / length],
       edge: [copy(a), copy(b)],
       polygon: last,
