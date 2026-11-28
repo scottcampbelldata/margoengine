@@ -1754,6 +1754,73 @@ tabulated by arc length and interpolated between samples as in J. Bloomenthal, "
 a Space Curve" (Graphics Gems, 1990). The GPU check `npm run test:gpu:curve-flow --workspace packages/materials`
 compares the GPU bend with `flow.deform()` pixel for pixel on WebGPU and the WebGL2 layer.
 
+### Many instances along curves (`@margoengine/materials/instanced-curve-flow`)
+
+`instancedCurveFlow(flows, capacity)` is the same bend for an instanced mesh: each instance picks one of the curves and
+its own place on it, in one draw call. Traffic on several roads, a shoal on its paths, packets along the wires of a
+diagram. Moving instances uploads only their rows, and each instance's matrix still applies after the bend, so
+instances can also be placed, turned, scaled and tinted.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PbrMaterial, createInstancedMesh } from 'margoengine/materials';
+import { instancedCurveFlow } from 'margoengine/materials/instanced-curve-flow';
+import { boxGeometry, CatmullRomCurve3 } from 'margoengine/geometry';
+import { CurveFlow } from 'margoengine/geometry/flow';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { camera: { position: [0, 16, 20], target: [0, 0, 0] } });
+const ring = (radius: number, height: number) =>
+  new CurveFlow(
+    new CatmullRomCurve3([[radius, height, 0], [0, height + 1, radius], [-radius, height, 0], [0, height, -radius]], true),
+    { closed: true, lockUp: true },
+  );
+const roads = [ring(6, 0), ring(10, -1)];
+const cars = instancedCurveFlow(roads, 40);
+createInstancedMesh(engine, boxGeometry(1.2, 0.5, 0.6, 24, 1, 1), new PbrMaterial({ features: [cars] }), 40);
+for (let i = 0; i < 40; i++) {
+  cars.setCurve(i, i % 2);
+  cars.setProgress(i, Math.floor(i / 2) / 20); // spread evenly, whatever the road's length
+}
+const offsets = cars.instanceAttributes.array('offset'); // distance along each car's road
+engine.onFrame((_, delta) => {
+  for (let i = 0; i < 40; i++) offsets[i] += delta * (2 + (i % 5)); // each car at its own speed
+  cars.instanceAttributes.update('offset');
+});
+engine.start();
+```
+
+| Option | Meaning |
+| --- | --- |
+| `axis`, `fit`, `name` | As in `curveFlow()`; `fit` maps the mesh onto each instance's whole curve |
+| `offset` | Distance added to every instance (default 0). Live: `plugin.uniforms.offset` |
+| `progress` | Fraction of its own curve added to every instance (default 0; 1 is once along it). Live: `plugin.uniforms.progress` |
+| `scale` | Stretch along the curves (default 1, not 0). Live: `plugin.uniforms.scale` |
+| `wrap` | Distances wrap on every curve, open ones too (default false: a curve wraps when its `CurveFlow` is closed; past the ends of an open curve the mesh carries on straight) |
+
+| Member | What it does |
+| --- | --- |
+| `setCurve(i, curve)` | Puts instance `i` on another curve; its offset and progress stay |
+| `setOffset(i, distance)`, `setProgress(i, fraction)` | The instance's place: the two add up |
+| `instanceAttributes` | The `curve`, `offset` and `progress` rows of every instance (`/instance-attributes`): `setBuffer`, or `array()` with `update()` |
+| `curveCount`, `curveLength(curve)` | Curves held and their lengths |
+| `setFlow(curve, flow)` | Replaces one curve from the next frame |
+| `dispose()` | Frees the frame texture and instance rows once no material uses the plugin |
+
+Coming from three.js `InstancedFlow`: its offsets are fractions of a curve, so `moveAlongCurve(d)` is
+`plugin.uniforms.progress += d`, `moveIndividualAlongCurve(i, d)` adds `d` to row `i` of
+`instanceAttributes.array('progress')` (then `update('progress', i, 1)`), `setCurve(i, c)` keeps its name and
+`updateCurve(c, curve)` is `setFlow(c, new CurveFlow(curve))`. It wraps on open curves too, which is `wrap: true`
+here. Differences: edits upload by themselves (no `writeChanges`), and every instance keeps its own matrix.
+
+Limits: 1 to 2,048 curves (four rows of one float texture each, as wide as the longest curve's frames: 64 bytes per
+frame per curve) and the instance count of `instanceAttributes()`. The other limits of `curveFlow()` apply. The frames
+and instance choices are read in the vertex shader from a texture and per-instance rows, the layout of B. Dudash,
+[Animated Crowd
+Rendering](https://developer.nvidia.com/gpugems/gpugems3/part-i-geometry/chapter-2-animated-crowd-rendering) (GPU Gems
+3, 2007), with curve frames in place of bone frames. The GPU check `npm run test:gpu:curve-flow --workspace
+packages/materials` compares every instance with `flow.deform()` on WebGPU and the WebGL2 layer.
+
 ### Soot and presets (`@margoengine/materials/soot`, `/presets`)
 
 `soot()` darkens a surface where a fire's smoke reaches it and returns a `layered()` layer, so firelight, shadows and

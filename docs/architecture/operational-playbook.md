@@ -2366,6 +2366,16 @@ instances through the same caster code (`instancedDepth` after the vertex move, 
 vertex-stage storage buffers (compatibility mode), instance velocity for TAA,
 GPU runs of the shadow atlas and contact shadows.
 
+## Caster records and live bindings (section 3 supplement, 2026-11-27)
+
+A depth pass keeps the bind group of a moved caster while `material.displacement` returns the same record. Rule: a
+material that makes such records returns a new one when what its entries bind changes (`reboundCaster`,
+`packages/shared/displacement.js`), compared only after a pass has bound them so no GPU resource is made before one
+draws. `@margoengine/materials/instanced-curve-flow` keeps every curve's frames in one texture and each instance's
+choice in per-instance rows, so the rules above apply to it. Evidence: `packages/materials/test/curve-flow-browser.mjs`
+and `packages/shader/test/deform-check.mjs` (WebGPU and the WebGL2 layer; KB-SHADOW-STALEMOVE1). Missing: a swapped
+plugin texture under clustered shadows and picking has no GPU run of its own.
+
 ## GPU work runs directly (Scott, 2026-11-16)
 
 GPU work runs at once, as many jobs as are started, and every command keeps a hard timeout. `scripts/run-with-timeout.mjs` starts a command and ends its whole process tree after `--max` minutes (default 10), exiting 124. Nothing queues, nothing is refused and nothing records usage, and a shot does not pause: it renders from its first frame to its last. The one pause that remains is the heat pause of `scripts/gpu-package-tests.mjs`, which waits for the machine to cool. Speed measurement stays deferred by `scripts/speed-phase.json` (`bench/cli.mjs` prints SPEED DEFERRED). Proof: `tests/run-with-timeout.test.js` (2, 5 and 20 runs start together; a hung command ends at its timeout).

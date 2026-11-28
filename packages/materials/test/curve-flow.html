@@ -5,6 +5,9 @@
 import {Engine} from '/packages/core/dist/index.js';
 import {PbrMaterial,NormalMaterial,createMesh} from '/packages/materials/dist/index.js';
 import {curveFlow} from '/packages/materials/dist/curve-flow.js';
+import {instancedCurveFlow} from '/packages/materials/dist/instanced-curve-flow.js';
+import {createInstancedMesh} from '/packages/materials/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
 import {boxGeometry,CatmullRomCurve3} from '/packages/geometry/dist/index.js';
 import {CurveFlow} from '/packages/geometry/dist/flow.js';
 const size=256;
@@ -36,6 +39,45 @@ window.check={
     const gpu=await draw(e=>{const m=mat();m.features=[plugin];createMesh(e,mesh,m);return()=>{plugin.uniforms.offset=12;};});
     const cpu0=await draw(e=>{createMesh(e,flow.deform(mesh,{axis,offset:4}),mat());}),
       cpu1=await draw(e=>{createMesh(e,flow.deform(mesh,{axis,offset:12}),mat());});
+    plugin.dispose();
+    return {errors:[...gpu.errors,...cpu0.errors,...cpu1.errors],first:compare(gpu.shots[0],cpu0.shots[0]),live:compare(gpu.shots[1],cpu1.shots[0]),moved:compare(gpu.shots[0],gpu.shots[1])};
+  },
+  // Instances on two curves (one open, one closed, different frame counts), each at its own distance and fraction and
+  // moved by its own matrix, against one CPU bent mesh each: at creation, after live edits of the rows and uniforms,
+  // and after a swap to a curve with more frames than the texture is wide. With shadows, so the depth pass bends too.
+  async instanced(axis,{fit=false,wrap=false,shadows=false}={}){
+    const loop=new CatmullRomCurve3([[-4,0,2],[0,1,5],[4,0,2],[0,-1,-1]],true),
+      flows=[new CurveFlow(track,{segments:96}),new CurveFlow(loop,{segments:160,closed:true})],
+      long=new CurveFlow(new CatmullRomCurve3([[-6,-1,-2],[-2,2,1],[2,-1,2],[6,1,-2]]),{segments:300}),
+      mesh=axis==='x'?boxGeometry(1.6,0.7,0.9,32,2,2):boxGeometry(0.9,0.7,1.6,2,2,32),
+      mat=()=>new PbrMaterial({color:[0.8,0.6,0.3,1],roughness:0.5});
+    // [curve, distance, fraction, instance height]. When wrapping, instance 2 is past the end of the open curve.
+    const first=[[0,2,0,0],[1,1,0,0],[0,0,wrap?1.5:0.5,-2],[1,0,0.55,-2],[0,1,wrap?2.4:0.4,2]];
+    const later=[[1,4,0.2,0],[0,6,0,0],[0,0,wrap?1.5:0.5,-2],[1,-3,0.55,-2],[1,1,0.4,2]];
+    const plugin=instancedCurveFlow(flows,5,{axis,offset:0.5,wrap,...(fit?{fit:[-0.8,0.8],scale:0.2}:{})});
+    const matrix=h=>new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,h,0,1]);
+    first.forEach(([c,o,p],i)=>{plugin.setCurve(i,c);plugin.setOffset(i,o);plugin.setProgress(i,p);});
+    const scene=(e,add)=>{
+      if(!shadows)return add(()=>{});
+      e.lighting.direction.set([0.2,1,0.15,2]);
+      // A fixed shadowed distance gives both draws the same cascades: the default fits them to still meshes, which instances and bent meshes are not.
+      const s=Shadows.attach(e,{resolution:1024,filter:'hard',distance:40}),floor=createMesh(e,boxGeometry(30,0.2,30),new PbrMaterial({roughness:1}));
+      floor.root.setPosition([0,-4.5,0]);s.add(floor);add(m=>s.add(m));
+    };
+    const gpu=await draw(e=>{const m=mat();m.features=[plugin];scene(e,cast=>{const im=createInstancedMesh(e,mesh,m,5);
+      first.forEach(([,,,h],i)=>im.instances.setMatrixAt(i,matrix(h)));cast(im);});
+      return()=>{
+        later.forEach(([c,o],i)=>{plugin.setCurve(i,c);plugin.setOffset(i,o);});
+        plugin.instanceAttributes.array('progress').set(later.map(l=>l[2]));plugin.instanceAttributes.update('progress');
+        plugin.uniforms.offset=1.25;plugin.uniforms.progress=0.1;plugin.setFlow(0,long);
+      };});
+    // The same places on the CPU. deform() extends an open curve straight, so a wrapping place is folded into it first.
+    const cpu=(rows,curves,offset,progress)=>draw(e=>{scene(e,cast=>{for(const [c,o,p,h] of rows){
+      const flow=curves[c],stretch=fit?0.2*flow.length/1.6:1;
+      let at=(fit?0.8*stretch:0)+offset+o+(progress+p)*flow.length;
+      if(wrap&&!flow.closed)at=((at%flow.length)+flow.length)%flow.length;
+      const m=createMesh(e,flow.deform(mesh,{axis,offset:at,scale:stretch}),mat());m.root.setPosition([0,h,0]);cast(m);}});});
+    const cpu0=await cpu(first,flows,0.5,0),cpu1=await cpu(later,[long,flows[1]],1.25,0.1);
     plugin.dispose();
     return {errors:[...gpu.errors,...cpu0.errors,...cpu1.errors],first:compare(gpu.shots[0],cpu0.shots[0]),live:compare(gpu.shots[1],cpu1.shots[0]),moved:compare(gpu.shots[0],gpu.shots[1])};
   },

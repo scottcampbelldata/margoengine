@@ -14,6 +14,7 @@
 // so the 32-bit table needs no float filtering (WebGPU, "float32-filterable" is not required for loads).
 import { materialPlugin, type MaterialPlugin } from './plugins.js';
 import { Texture } from './texture.js';
+import { bendWgsl, curveFlowHelp, curveFlowLayouts, finite, frameTableOf } from './curve-flow-bend.js';
 
 /** What `curveFlow()` reads of a `CurveFlow` (`@margoengine/geometry/flow`), told by shape so materials does not import geometry. */
 export interface CurveFlowFrames {
@@ -56,33 +57,9 @@ export interface CurveFlowPlugin
   dispose(): void;
 }
 
-const help = '; see https://margoengine.com/errors#curve-flow',
-  // Components of a local point that are along, up and side, and the sign of side (as `CurveFlow.deform`).
-  layouts = { x: ['x', 'y', 'z', 1], y: ['y', 'z', 'x', 1], z: ['z', 'y', 'x', -1] } as const,
-  // WebGPU's guaranteed maxTextureDimension2D: one texel column per frame.
-  MAX_FRAMES = 8192;
-
-function finite(label: string, value: number): number {
-  if (typeof value !== 'number' || !Number.isFinite(value))
-    throw new RangeError(`curveFlow ${label} ${String(value)} is invalid; pass a finite number${help}`);
-  return value;
-}
-
 /** The frame table of `flow` as a 4-row float texture source: positions, tangents, ups, sides. */
 function source(flow: CurveFlowFrames): { data: Float32Array; width: number; height: number; format: 'rgba32float' } {
-  if (
-    typeof flow !== 'object' ||
-    flow === null ||
-    typeof flow.frameTable !== 'function' ||
-    !(flow.length > 0 && flow.length < Infinity)
-  )
-    throw new TypeError(`curveFlow needs a CurveFlow from @margoengine/geometry/flow; pass one${help}`);
-  const count = flow.frameCount,
-    table = flow.frameTable();
-  if (!Number.isInteger(count) || count < 2 || count > MAX_FRAMES || table.length !== count * 16)
-    throw new RangeError(
-      `curveFlow takes 2 to ${MAX_FRAMES} frames (CurveFlow segments 1 to ${MAX_FRAMES - 1}), got ${count}; pass fewer segments${help}`,
-    );
+  const { count, table } = frameTableOf(flow, 'curveFlow');
   const data = new Float32Array(count * 16);
   for (let i = 0; i < count; i++)
     for (let row = 0; row < 4; row++) data.set(table.subarray(i * 16 + row * 4, i * 16 + row * 4 + 4), (row * count + i) * 4);
@@ -100,41 +77,31 @@ function source(flow: CurveFlowFrames): { data: Float32Array; width: number; hei
  */
 export function curveFlow(flow: CurveFlowFrames, options: CurveFlowPluginOptions = {}): CurveFlowPlugin {
   const { name = 'curveflow', axis = 'x', fit } = options,
-    order = layouts[axis];
-  if (!order) throw new TypeError(`curveFlow axis ${String(axis)} is invalid; pass 'x', 'y' or 'z'${help}`);
-  let offset = finite('offset', options.offset ?? 0),
-    scale = finite('scale', options.scale ?? 1);
-  if (scale === 0) throw new RangeError(`curveFlow scale 0 flattens the mesh; pass a finite number other than 0${help}`);
+    order = curveFlowLayouts[axis];
+  if (!order) throw new TypeError(`curveFlow axis ${String(axis)} is invalid; pass 'x', 'y' or 'z'${curveFlowHelp}`);
+  let offset = finite('curveFlow offset', options.offset ?? 0),
+    scale = finite('curveFlow scale', options.scale ?? 1);
+  if (scale === 0)
+    throw new RangeError(`curveFlow scale 0 flattens the mesh; pass a finite number other than 0${curveFlowHelp}`);
   const image = source(flow);
   if (fit) {
-    const [low, high] = [finite('fit low', fit[0]), finite('fit high', fit[1])];
-    if (!(high > low)) throw new RangeError(`curveFlow fit [${low}, ${high}] has no extent; pass [low, high] with high > low${help}`);
+    const [low, high] = [finite('curveFlow fit low', fit[0]), finite('curveFlow fit high', fit[1])];
+    if (!(high > low))
+      throw new RangeError(`curveFlow fit [${low}, ${high}] has no extent; pass [low, high] with high > low${curveFlowHelp}`);
     const stretch = flow.length / (high - low);
     offset += -low * stretch * scale;
     scale *= stretch;
   }
   let frames = new Texture(image, { mipmaps: false, colorSpace: 'linear' });
-  const [a, u, s, sign] = order,
-    n = name,
+  const n = name,
     declarations = `
 fn ${n}Frame(i:i32,row:i32)->vec3f{return textureLoad(${n}_frames,vec2i(i,row),0).xyz;}`,
-    vertex = `
-let fl=${n}.length;let seg=${n}.segments;
-var at=position.${a}*${n}.scale+${n}.offset;var beyond=0.0;
-if(${n}.closed>0.5){at=at-floor(at/fl)*fl;}else if(at<0.0){beyond=at;at=0.0;}else if(at>fl){beyond=at-fl;at=fl;}
-let place=at/fl*seg;let k=min(i32(seg)-1,i32(floor(place)));let fr=place-f32(k);
-let t=normalize(mix(${n}Frame(k,1),${n}Frame(k+1,1),fr));
-let uu=normalize(mix(${n}Frame(k,2),${n}Frame(k+1,2),fr));
-let ss=normalize(mix(${n}Frame(k,3),${n}Frame(k+1,3),fr));
-let rate=select(seg/fl,0.0,beyond!=0.0);
-let du=(${n}Frame(k+1,2)-${n}Frame(k,2))*rate;let ds=(${n}Frame(k+1,3)-${n}Frame(k,3))*rate;
-let up=position.${u};let side=position.${s}*${sign.toFixed(1)};
-let j=(t+up*du+side*ds)*${n}.scale;
-let na=normal.${a};let nu=normal.${u};let ns=normal.${s}*${sign.toFixed(1)};
-let bent=na*cross(uu,ss)+nu*cross(ss,j)+ns*cross(j,uu);
-let len=length(bent);
-if(len>0.0){normal=bent/len*select(1.0,-1.0,${n}.scale<0.0);}
-position=mix(${n}Frame(k,0),${n}Frame(k+1,0),fr)+t*beyond+up*uu+side*ss;`;
+    vertex = bendWgsl(
+      n,
+      order,
+      `let fl=${n}.length;let seg=${n}.segments;let loops=${n}.closed>0.5;let stretch=${n}.scale;
+var at=position.${order[0]}*${n}.scale+${n}.offset;`,
+    );
   const plugin = materialPlugin({
     name,
     uniforms: { offset, scale, length: flow.length, segments: image.width - 1, closed: flow.closed ? 1 : 0 },

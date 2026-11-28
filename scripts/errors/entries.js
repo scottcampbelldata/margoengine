@@ -382,17 +382,19 @@ export const entries = [
   },
   {
     id: 'curve-flow',
-    title: '@margoengine/materials/curve-flow: bending a mesh along a curve on the GPU',
+    title: '@margoengine/materials/curve-flow and /instanced-curve-flow: bending meshes along curves on the GPU',
     kind: 'family',
     messages: [
       'curveFlow needs a CurveFlow from @margoengine/geometry/flow; pass one; see https://margoengine.com/errors#curve-flow',
       "curveFlow axis w is invalid; pass 'x', 'y' or 'z'; see https://margoengine.com/errors#curve-flow",
       'curveFlow scale 0 flattens the mesh; pass a finite number other than 0; see https://margoengine.com/errors#curve-flow',
       'curveFlow takes 2 to 8192 frames (CurveFlow segments 1 to 8191), got 9001; pass fewer segments; see https://margoengine.com/errors#curve-flow',
+      'instancedCurveFlow takes an array of 1 to 2048 curves; pass them; see https://margoengine.com/errors#curve-flow',
+      'instancedCurveFlow curve 4 is invalid; pass 0 to 1; see https://margoengine.com/errors#curve-flow',
     ],
     cause:
-      'curveFlow() checks its options when it is made: the flow must be a CurveFlow (anything with length, closed, frameCount and frameTable()), the axis x, y or z, offset, scale and fit finite, scale not 0, fit an extent with high > low, and the frames must fit one texture row (8,192 texels, the width WebGPU guarantees). setFlow() checks the new flow the same way.',
-    fix: 'Pass a CurveFlow built by @margoengine/geometry/flow with at most 8,191 segments, a valid axis, finite numbers, a non-zero scale and a fit range with high above low.',
+      'curveFlow() checks its options when it is made: the flow must be a CurveFlow (anything with length, closed, frameCount and frameTable()), the axis x, y or z, offset, scale and fit finite, scale not 0, fit an extent with high > low, and the frames must fit one texture row (8,192 texels, the width WebGPU guarantees). instancedCurveFlow() takes 1 to 2,048 curves (four texture rows each) and an instance count in the range of instanceAttributes(). setFlow() checks the new flow the same way, and a curve index must name one of the curves given at creation.',
+    fix: 'Pass a CurveFlow built by @margoengine/geometry/flow with at most 8,191 segments, a valid axis, finite numbers, a non-zero scale, a fit range with high above low and, for instances, at most 2,048 curves with indices below their count.',
   },
   {
     id: 'mesh-debug-view',

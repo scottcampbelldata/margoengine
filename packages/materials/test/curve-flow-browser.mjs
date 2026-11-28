@@ -1,6 +1,7 @@
 // Real-GPU checks of @margoengine/materials/curve-flow (curve-flow.html draws, this judges): a mesh bent in the vertex
 // shader matches the same mesh bent by CurveFlow.deform on the CPU, lit and as normals, along x and z, open and closed,
-// with a live offset, fit and a swapped curve; on WebGPU and then on the WebGL2 compatibility layer. From the root:
+// with a live offset, fit and a swapped curve, and instances on their own curves (instanced-curve-flow: live rows, fit,
+// wrap, shadows); on WebGPU and then on the WebGL2 compatibility layer. From the root:
 //   node packages/materials/test/curve-flow-browser.mjs            (both backends)
 //   MARGO_COMPAT=1 node packages/materials/test/curve-flow-browser.mjs   (the compatibility layer only)
 import assert from 'node:assert/strict';
@@ -41,9 +42,25 @@ for (const compat of compatRun() ? [true] : [false, true]) {
     assert.deepEqual(r.errors, []);
     same(r.fit, `${leg} fit matches CurveFlow.deform fit`);
     same(r.swap, `${leg} setFlow bends along the new curve`);
+    for (const [axis, options] of [
+      ['x', {}],
+      ['z', { fit: true }],
+      ['x', { wrap: true }],
+      ['x', { shadows: true }],
+    ]) {
+      const i = await check('instanced', axis, options),
+        label = `${leg} instanced ${axis} ${JSON.stringify(options)}`;
+      console.log(label, JSON.stringify(i));
+      assert.deepEqual(i.errors, []);
+      same(i.first, `${label} every instance matches its CPU bend`);
+      same(i.live, `${label} live rows, uniforms and a wider setFlow match the CPU bend`);
+      assert.ok(i.moved.differ > 500, `${label}: the edits move the instances (${i.moved.differ} pixels changed)`);
+    }
     assert.deepEqual(pageErrors, []);
   } finally {
     await browser.close();
   }
 }
-console.log('Curve flow: GPU bend matches the CPU bend (x, z, lit, normals, closed, live offset, fit, setFlow).');
+console.log(
+  'Curve flow: GPU bend matches the CPU bend (x, z, lit, normals, closed, live offset, fit, setFlow, instances).',
+);

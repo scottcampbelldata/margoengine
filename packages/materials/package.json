@@ -147,6 +147,10 @@
       "types": "./dist/curve-flow.d.ts",
       "import": "./dist/curve-flow.js"
     },
+    "./instanced-curve-flow": {
+      "types": "./dist/instanced-curve-flow.d.ts",
+      "import": "./dist/instanced-curve-flow.js"
+    },
     "./soot": {
       "types": "./dist/soot.d.ts",
       "import": "./dist/soot.js"

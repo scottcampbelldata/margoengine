@@ -2775,6 +2775,10 @@
       "types": "./dist/materials/curve-flow.d.ts",
       "import": "./dist/materials/curve-flow.js"
     },
+    "./materials/instanced-curve-flow": {
+      "types": "./dist/materials/instanced-curve-flow.d.ts",
+      "import": "./dist/materials/instanced-curve-flow.js"
+    },
     "./materials/soot": {
       "types": "./dist/materials/soot.d.ts",
       "import": "./dist/materials/soot.js"

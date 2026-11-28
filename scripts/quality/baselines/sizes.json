@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21607817,
+  "total": 21627784,
   "history": [
     {
       "date": "2026-10-24",
@@ -15269,6 +15269,12 @@
       "commit": "d828209f91",
       "reason": "new package @margoengine/optics: physical optics as plain functions, seven entries (root re-export, refraction, polarization, interference, diffraction, imaging, spectrum), no GPU code",
       "grew": 7
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-e-instanced-flow",
+      "reason": "materials gains the instanced-curve-flow entry (many instances along curves, 18,332 B); shader editor-pass grows 114 B of NodeMaterial caster renewal after a texture or buffer is rebuilt (KB-SHADOW-STALEMOVE1).",
+      "grew": 2
     }
   ],
   "items": {
@@ -15963,6 +15969,7 @@
     "@margoengine/materials/fur": 4113,
     "@margoengine/materials/hair": 4112,
     "@margoengine/materials/instance-attributes": 3264,
+    "@margoengine/materials/instanced-curve-flow": 18882,
     "@margoengine/materials/interior-mapping": 5093,
     "@margoengine/materials/layered": 3230,
     "@margoengine/materials/mips": 12353,
@@ -16548,7 +16555,7 @@
     "@margoengine/shader/compute-volume": 4961,
     "@margoengine/shader/deform": 6042,
     "@margoengine/shader/editor": 25732,
-    "@margoengine/shader/editor-pass": 34097,
+    "@margoengine/shader/editor-pass": 35182,
     "@margoengine/shader/effects": 9334,
     "@margoengine/shader/glsl": 18767,
     "@margoengine/shader/glsl-material": 40907,
