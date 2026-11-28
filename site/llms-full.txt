@@ -16252,6 +16252,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `packages/physics/tests/rigid-validation.test.js`, the three "hung" cradle tests at both tiers (all six
   fail without the fix).
 
+### Fixed 2026-11-27: IK elbows folded sideways or backward when the pole swung the bend plane (KB-RIG-IKHINGE1, rigging)
+
+- **Repro:** the planner demo's workers at idle, chop or cook: `solveSkeletonIK` on each arm with the pole
+  `[sign*.55,.78,.17]` (out to the side and in front). The forearm's bend plane turned about 99 degrees in the upper
+  arm's frame and the forearm pointed backward; Scott saw elbows bent the wrong way.
+- **Cause:** `chainRotations` in `packages/rigging/src/ik.ts` turned each bone by the shortest arc to its new
+  direction, so the twist about the bone was left to chance and the forearm's local rotation took swing about its
+  other axes. A pole on the far side could also fold a bent elbow through straight.
+- **Fix:** each bone also twists about its new direction so its old bend axis lands on the new one (`keepHinge`,
+  Tolani, Goswami and Badler 2000), and `IKChain.keepBend` (default true, also on `addIKChain`) keeps a bent joint on
+  its side (3001234894). The planner demo's pole moved behind and out, `[sign*.45,.95,-.35]`.
+- **Regression:** `packages/rigging/tests/ik.test.js` ("bends as a hinge about the forearm bone's own axis" and "a
+  bent elbow stays on its own side").
+
 ### Fixed 2026-11-27: a swapped or resized texture under a moved shadow stopped the engine on a destroyed texture (KB-SHADOW-STALEMOVE1, materials, shader)
 
 - **Repro:** add a mesh to `Shadows` whose vertex move reads a texture, draw, then swap or resize that texture: a
