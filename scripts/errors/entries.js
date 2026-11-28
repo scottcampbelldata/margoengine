@@ -2969,6 +2969,7 @@ export const entries = [
       'Climate <option> must be a number in <min>..<max>',
       'Climate lapseSplit must be at most twice lapseRate',
       'Climate poleTemperature must not be above equatorTemperature',
+      'Unknown conifer age <age>; pass sapling, pole, mature or old',
       "Climate rainSeason must be 'auto', 'uniform', 'summer' or 'winter'",
       'Invalid relief options; size 64..65,536 m, origin within 1,000 km, base within 8 km, relief and seaDepth 0..8,000 m, coast none/west/east/north/south/island and 0..8 rivers',
       "Invalid relief islands; use them with coast: 'island', count 1..8 and a radius from 100 m to 0.39 of the shorter side",

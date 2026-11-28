@@ -6,6 +6,7 @@
 // Plain data: the presets are frozen here and checked with defineBiome by the package tests, so this entry carries no
 // validation code (a world validates every definition it is given, presets included). `beach` is not a climate preset:
 // it takes low, gentle ground by the sea in any world (height and slope envelopes; the island world uses it).
+import { rangeError } from '../../shared/errors.js';
 import type { ClimateOptions } from './climate.js';
 import type { BiomeDefinition, SpeciesRule } from './define.js';
 import type { ReliefOptions } from './relief.js';
@@ -476,7 +477,7 @@ const coniferAges: readonly string[] = ['sapling', 'pole', 'mature', 'old'];
  */
 export function coniferAge(biomes: readonly BiomeDefinition[], age: ConiferAge): BiomeDefinition[] {
   if (!coniferAges.includes(age))
-    throw new RangeError(`Unknown conifer age ${String(age)}; pass sapling, pole, mature or old`);
+    throw rangeError(`Unknown conifer age ${String(age)}; pass sapling, pole, mature or old`, 'biomes');
   const aged = (mesh: string) => mesh.replace(/^(procedural:[a-z-]+)\/(?:sapling|pole|mature|old)$/, `$1/${age}`);
   return biomes.map((biome) =>
     freeze({ ...biome, plants: biome.plants?.map((plant) => ({ ...plant, mesh: aged(plant.mesh) })) }),
