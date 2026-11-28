@@ -185,8 +185,12 @@ Past the world's edge, `horizon` draws far ground out to the horizon (`horizonHe
 mean of a stretch of the world's edge round its nearest edge texel, an eighth of its distance wide each way
 (`HORIZON_SPREAD`): a valley leaving the world keeps going near the edge, and further out the edge's heights and
 materials blur together instead of running outward as streaks. Over the same ramp in which the heights give way to
-mountains (`far.blend`), the far ground's materials give way to the whole edge's mean. `horizonEdgeMean` takes that mean of any per-texel
-values, such as a material map of your own:
+mountains (`far.blend`), the far ground's materials give way to what the world's own ground wears at the far corner's
+height (`horizonAltitudeMeans`, the world's mean weights in 64 height bands; a far peak above the world's top takes its
+top band), so far summits are rock where the world's summits are rock and far valleys keep the valley floor's ground.
+The mountains are massifs carrying eroded ridges (a hybrid multifractal of gradient noise whose fine octaves are damped
+by the slope under them), on texels of up to 32 m and a 64th of the world. `horizonEdgeMean` takes the edge's
+mean of any per-texel values, such as a material map of your own:
 
 ```ts
 import { horizonEdgeMean, horizonHeights } from '@margoengine/biomes/view';
@@ -196,6 +200,16 @@ const heights = new Float32Array(width * depth).fill(100);
 const far = horizonHeights({ bounds: [0, 0, 512, 512], heights, width, depth, seed: 1 });
 const tone = horizonEdgeMean({ width, depth }, far, new Float32Array(width * depth).fill(0.5), 1);
 console.log(far.width * far.depth === tone.length); // true
+```
+
+```ts
+import { horizonAltitudeMeans } from '@margoengine/biomes/view';
+
+const heights = Float32Array.from({ length: 100 }, (_, i) => 3000 + 10 * i);
+const rockAbove3500 = Float32Array.from(heights, (h) => (h > 3500 ? 1 : 0));
+const out = new Float32Array(1);
+horizonAltitudeMeans(heights, rockAbove3500, 1).at(4200, out);
+console.log(out[0]); // 1: a far peak higher than the world takes the world's summit ground
 ```
 
 ## Alpine treelines

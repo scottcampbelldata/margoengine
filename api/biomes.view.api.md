@@ -237,6 +237,10 @@ export function groundMaterials(biomes: readonly BiomeDefinition[]): string[];
 
 export function groundWeights(world: BiomeWorld, tile: BiomeTile, materials: readonly string[]): Uint8Array;
 
+export function horizonAltitudeMeans(heights: ArrayLike<number>, data: ArrayLike<number>, channels: number, bins?: number): {
+    readonly at: (height: number, out: Float32Array, offset?: number) => void;
+};
+
 export function horizonEdgeMean(grid: {
     readonly width: number;
     readonly depth: number;

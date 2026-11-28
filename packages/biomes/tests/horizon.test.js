@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { BiomeWorld } from '../dist/index.js';
 import { presets } from '../dist/presets.js';
 import { BiomeView } from '../dist/view.js';
-import { horizonEdgeMean, horizonHeights, HORIZON_SKIRT } from '../dist/view.js';
+import { horizonAltitudeMeans, horizonEdgeMean, horizonHeights, HORIZON_SKIRT } from '../dist/view.js';
 
 test('horizonHeights: the ring meets the world at its edge, skirts under it, and rises into mountains past it', () => {
   // A 1 km world on 8 m texels: a valley floor at 100 m along z = 500 that leaves the west and east edges, walls to 300.
@@ -17,7 +17,7 @@ test('horizonHeights: the ring meets the world at its edge, skirts under it, and
         j = Math.round((z - far.origin[1]) / far.texel); // float division
       return far.heights[j * far.width + i];
     };
-  assert.equal(far.texel, 16, 'a power of two of texels near a 64th of the world');
+  assert.equal(far.texel, 16, 'a power of two of texels, up to 32 m and a 64th of the world');
   assert.equal(far.size[0], 1024 + 2 * 3 * 1024, 'three world sizes each side');
   for (let x = 0; x <= 1024; x += far.texel) {
     assert.equal(at(x, 0), heights[x / 8], `the north edge at x ${x} is the world's own height`);
@@ -42,6 +42,63 @@ test('horizonHeights: the ring meets the world at its edge, skirts under it, and
   assert.equal(far.inside[(first + 10) * cells + first + 10], 1);
   assert.equal(far.inside[(first + 10) * cells + first], 0, 'the skirt row is drawn');
   assert.equal(far.inside[(first + 10) * cells + first - 1], 0, 'outside is drawn');
+});
+
+test('regression KB-BIOMES-HORIZONCONE1: far mountains have relief between 128 m corners, not straight-sided cones', () => {
+  // An 8 km world on 32 m texels, as Above the Treeline's. Main drew its ring on 128 m texels (a 64th of the world) of
+  // ridged value noise: a crest was one corner and the GPU's linear rows between corners drew peaks as smooth cones with
+  // straight flanks at 10 to 25 km (round 8, summit and credit). Now the ring's texel is 32 m and the mountains carry
+  // eroded ridges down to about 20 m, so a 128 m stretch of a ring row is seldom a straight line.
+  const width = 257,
+    heights = new Float32Array(width * width);
+  for (let j = 0; j < width; j++)
+    for (let i = 0; i < width; i++) heights[j * width + i] = 3000 + 600 * Math.sin(i / 40) * Math.cos(j / 55);
+  const far = horizonHeights({ bounds: [0, 0, 8192, 8192], heights, width, depth: width, seed: 294876, reach: 8000 });
+  assert.ok(far.texel <= 32, `ring texel ${far.texel} m`);
+  // Along ring rows in the mountains (blend 1): of the 128 m stretches between corners 128 m apart on main's grid, the
+  // share whose middle stands more than 2 m off the straight line between its ends. Main's rows are exactly straight there.
+  const per = 128 / far.texel, // float division: corners per 128 m
+    at = (i, j) => far.heights[j * far.width + i];
+  let stretches = 0,
+    bent = 0,
+    low = Infinity,
+    high = -Infinity;
+  for (let j = 0; j < far.depth; j += 7)
+    for (let i = 0; i + per < far.width; i += per) {
+      if (far.blend[j * far.width + i] < 1 || far.blend[j * far.width + i + per] < 1) continue;
+      const mid = at(i + per / 2, j), // float division: per is a power of two
+        line = (at(i, j) + at(i + per, j)) / 2; // float division
+      stretches++;
+      if (Math.abs(mid - line) > 2) bent++;
+      low = Math.min(low, at(i, j));
+      high = Math.max(high, at(i, j));
+    }
+  assert.ok(stretches > 2000, `stretches sampled: ${stretches}`);
+  assert.ok(bent / stretches > 0.5, `share of 128 m stretches with relief between their ends: ${bent / stretches}`); // float division
+  // Still mountains as high as the world's relief (1,200 m here) over the mean edge, not noise on a plain.
+  assert.ok(high - low > 600, `the far relief spans ${low} to ${high}`);
+});
+
+test('regression KB-BIOMES-HORIZONALTITUDE1: far ground takes the ground the world has at its own height', () => {
+  // A world of grass below 3,400 m and rock above: the far ring gave way to the whole edge's mean, so a far summit at
+  // 3,900 m wore the edge's grass while the world's own summits were rock (Above the Treeline round 9, summit).
+  const n = 1000,
+    heights = Float32Array.from({ length: n }, (_, i) => 3000 + i),
+    painted = new Uint8Array(n * 4);
+  for (let i = 0; i < n; i++) painted[i * 4 + (heights[i] < 3400 ? 0 : 1)] = 255;
+  const byHeight = horizonAltitudeMeans(heights, painted, 4),
+    out = new Float32Array(4);
+  byHeight.at(3100, out);
+  assert.deepEqual(Array.from(out), [255, 0, 0, 0], 'low ground is grass');
+  byHeight.at(3900, out);
+  assert.deepEqual(Array.from(out), [0, 255, 0, 0], 'a high far peak is rock');
+  byHeight.at(9000, out);
+  assert.deepEqual(Array.from(out), [0, 255, 0, 0], 'above the world: its top band');
+  // A band with no texels takes the nearest that has some.
+  const gap = horizonAltitudeMeans(Float32Array.of(0, 0, 100), Uint8Array.of(10, 10, 20), 1, 4);
+  gap.at(30, out);
+  assert.equal(out[0], 10, 'an empty band takes the nearest band below');
+  assert.throws(() => horizonAltitudeMeans(Float32Array.of(0, 1), Uint8Array.of(1), 1), RangeError);
 });
 
 test('regression KB-BIOMES-WORLDEDGE1: a land-locked view draws far ground to the horizon, a coast keeps its sea', async () => {
