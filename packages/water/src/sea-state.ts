@@ -8,6 +8,7 @@
 // graphics", DigiPro 2015 (directions spread wider away from the peak); Monahan and O'Muircheartaigh, J. Phys. Oceanogr.
 // 10, 1980 (whitecap coverage W = 3.84e-6 U^3.41); Tessendorf 2001 (Gerstner fold bound used by Water).
 import type { Wave } from './index.js';
+import { fault } from '../../shared/errors.js';
 
 const G = 9.81;
 /** Most trains a Water takes. */
@@ -53,16 +54,16 @@ export function whitecapCoverage(windSpeed: number): number {
 export function seaWavelengths(trains = MAX_TRAINS): number[] {
   count(trains);
   if (trains === 1) return [Math.sqrt(2 * 1500)];
-  return Array.from({ length: trains }, (_, i) => 2 * (750 ** (i / (trains - 1))));
+  return Array.from({ length: trains }, (_, i) => 2 * 750 ** (i / (trains - 1)));
 }
 
 function check(name: string, value: number, low: number, high: number): void {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < low || value > high)
-    throw new RangeError(`Invalid sea ${name}; use a number from ${low} to ${high}`);
+    throw fault('unsupported', `Invalid sea ${name}; use a number from ${low} to ${high}`, 'ocean');
 }
 function count(trains: number): void {
   if (!Number.isInteger(trains) || trains < 1 || trains > MAX_TRAINS)
-    throw new RangeError('Invalid sea trains; use an integer from 1 to 8');
+    throw fault('unsupported', 'Invalid sea trains; use an integer from 1 to 8', 'ocean');
 }
 
 /** JONSWAP shape (unnormalised) at frequency f, peak fp, peak enhancement 3.3. */
@@ -80,7 +81,8 @@ export const SEA_DIRECTION: readonly [number, number] = [1, 0.3];
  * spectrum's variance goes into the fixed wavelengths by integrating it over each one's band, so the sea's height is Hs
  * whatever the number of trains. Each train's steepness keeps `steepness x amplitude x wavenumber` under 1 / trains, the
  * fold bound of `Water`, so no wind folds the surface. Wind 0 is a flat sea.
- * @throws RangeError for a wind outside 0 to 100, a fetch outside 1 to 1e7, trains outside 1 to 8 or a zero direction.
+ * @throws MargoError `'unsupported'` (errors#ocean) for a wind outside 0 to 100, a fetch outside 1 to 1e7, trains outside
+ * 1 to 8 or a zero direction.
  */
 export function seaState(windSpeed: number, options: SeaStateOptions = {}): SeaState {
   const { fetch = 100000, direction = SEA_DIRECTION, trains = MAX_TRAINS, seed = 0 } = options;
@@ -90,7 +92,7 @@ export function seaState(windSpeed: number, options: SeaStateOptions = {}): SeaS
   count(trains);
   const length = Math.hypot(direction[0], direction[1]);
   if (direction.length !== 2 || !Number.isFinite(length) || !length)
-    throw new RangeError('Invalid sea direction; use a nonzero [x, z]');
+    throw fault('unsupported', 'Invalid sea direction; use a nonzero [x, z]', 'ocean');
   const lengths = seaWavelengths(trains),
     flat = windSpeed === 0,
     u2 = windSpeed * windSpeed,
@@ -115,7 +117,7 @@ export function seaState(windSpeed: number, options: SeaStateOptions = {}): SeaS
       let sum = 0;
       for (let i = 0; i < n; i++) {
         const a = f0 * (f1 / f0) ** ((i + 0.5) / n);
-        sum += shape(a, fp) * a * Math.log(f1 / f0) / n;
+        sum += (shape(a, fp) * a * Math.log(f1 / f0)) / n;
       }
       return sum;
     }),
@@ -128,7 +130,8 @@ export function seaState(windSpeed: number, options: SeaStateOptions = {}): SeaS
   // they are from the peak in octaves), alternating sides (Horvath 2015).
   const order = lengths.map((_, i) => i).reverse(),
     nearest = lengths.reduce(
-      (best, l, i) => (!flat && Math.abs(Math.log(l / peakLength)) < Math.abs(Math.log(lengths[best] / peakLength)) ? i : best),
+      (best, l, i) =>
+        !flat && Math.abs(Math.log(l / peakLength)) < Math.abs(Math.log(lengths[best] / peakLength)) ? i : best,
       0,
     );
   let side = 1;

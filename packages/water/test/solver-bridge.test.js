@@ -7,6 +7,7 @@ import { readdirSync } from 'node:fs';
 import { Water } from '../dist/index.js';
 import { ShallowWaterSurface } from '../dist/shallow-surface.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+const refused = { name: 'MargoError', code: 'unsupported', message: /errors#ocean/ };
 
 // The bridge is internal (not an export of the package): find the solver map in the built query-state chunk by what
 // Water does with it, so the test does not depend on the bundler's short export names.
@@ -115,7 +116,7 @@ test('sprayCount sizes the droplet pool; a count that is not a multiple of 64 fr
     assert.throws(
       () =>
         new Water({ spray: true, sprayCount, terrain: { heightmap: () => undefined, origin: [0, 0], size: [1, 1] } }),
-      TypeError,
+      refused,
       String(sprayCount),
     );
 });

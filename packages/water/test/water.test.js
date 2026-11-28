@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Water } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { SceneTarget } from '../../shared/msaa.js';
+const refused = { name: 'MargoError', code: 'unsupported', message: /errors#ocean/ };
 test('water validates nonfolding waves, samples shared scene depth, accumulates foam and restores', async () => {
   const h = optionalGPU(),
     effect = new Water({ segments: 4 });
@@ -148,7 +149,7 @@ test('wave height adjusts the existing spectrum atomically and rejects folded su
   assert.equal(values[42], 0);
   assert.throws(() => effect.setWaveHeight(NaN), /Invalid/);
   effect.dispose();
-  assert.throws(() => effect.setWaveHeight(0), /Invalid/);
+  assert.throws(() => effect.setWaveHeight(0), { name: 'MargoError', code: 'disposed' });
 });
 test('steady water frames reuse bind groups, views and their render descriptor', () => {
   const h = optionalGPU(),
@@ -659,9 +660,9 @@ test('whitecaps and chop upload 0-1 from the options and their setters and rejec
   h.frame();
   assert.deepEqual([values[130], values[131]], [1, 0]);
   for (const bad of [-0.01, 1.01, NaN, '0.5']) {
-    assert.throws(() => effect.setWhitecaps(bad), RangeError);
-    assert.throws(() => effect.setChop(bad), RangeError);
-    assert.throws(() => new Water({ whitecaps: bad }), RangeError);
+    assert.throws(() => effect.setWhitecaps(bad), refused);
+    assert.throws(() => effect.setChop(bad), refused);
+    assert.throws(() => new Water({ whitecaps: bad }), refused);
   }
   assert.equal(new Water().options.whitecaps, undefined);
   effect.dispose();

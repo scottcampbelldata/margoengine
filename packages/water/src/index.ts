@@ -90,7 +90,7 @@ export interface WaterSample {
   /** Evaluation time in seconds on the wave clock. */
   time: number;
 }
-/** One swell train: three Gerstner components around this direction and wavelength. Invalid values throw RangeError. */
+/** One swell train: three Gerstner components around this direction and wavelength. Invalid values throw MargoError `'unsupported'` (errors#ocean). */
 export interface Wave {
   /** Travel direction in the XZ plane (any nonzero length). */
   direction: readonly [number, number];
@@ -188,7 +188,7 @@ export interface WaterFarField {
    */
   spread?: number;
 }
-/** Water settings, read at construction unless noted. Invalid values throw RangeError or TypeError. */
+/** Water settings, read at construction unless noted. Invalid values throw MargoError `'unsupported'` (errors#ocean). */
 export interface WaterOptions {
   /** Grid extent in world units (X, Z), each 0-100,000 (exclusive of 0). Default [100, 100]. */
   size?: readonly [number, number];
@@ -1004,7 +1004,7 @@ const depthCopy = `
 let instances = 0;
 function unit(value: number, name: string): number {
   if (typeof value !== 'number' || !(value >= 0 && value <= 1))
-    throw new RangeError(`Invalid water ${name}; use a number from 0 to 1`);
+    throw fault('unsupported', `Invalid water ${name}; use a number from 0 to 1`, 'ocean');
   return value;
 }
 // How far the horizon grid's last row lies from the camera, in metres: atan(10 km / 10,000 km) is 0.06 degrees.
@@ -1029,7 +1029,7 @@ interface WaterView {
  * An opaque, Y-up water surface: up to eight Gerstner swell trains with analytic normals, Fresnel reflection, glints,
  * absorption and shoreline foam, with optional terrain-coupled shallow-water flow and spray. `Water.attach(engine,
  * options)`; WebGPU only.
- * @throws RangeError / TypeError for invalid options; linked MargoError with code failed for folding wave steepness.
+ * @throws MargoError `'unsupported'` (errors#ocean) for invalid options; `'failed'` for a folding wave steepness.
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'state'` during a frame when a
  * borrowed texture (depth, reflection, scene colour, terrain heightmap) does not have the required size or format.
  */
@@ -1200,11 +1200,17 @@ export class Water implements EnginePlugin {
       waves.length > 8 ||
       (options.depth !== undefined && typeof options.depth !== 'function')
     )
-      throw new RangeError(
+      throw fault(
+        'unsupported',
         'Invalid water options; use size and segments above 0, finite color and height, 1 to 8 waves and a depth function',
+        'ocean',
       );
     if (options.sea !== undefined && typeof options.sea?.waveComponents !== 'function')
-      throw new TypeError('Water sea needs waveComponents(t, out); pass a SpectralSea from @margoengine/physics/sea.');
+      throw fault(
+        'unsupported',
+        'Water sea needs waveComponents(t, out); pass a SpectralSea from @margoengine/physics/sea',
+        'ocean',
+      );
     // A sea's own waves replace the swell trains on the surface (their count is 0); the trains keep the wind's direction
     // for the ripples and foam patterns that read it.
     this.values.set([0, height, foamDistance, options.sea ? 0 : waves.length], 20);
@@ -1218,8 +1224,10 @@ export class Water implements EnginePlugin {
       (options.reflection !== undefined && typeof options.reflection !== 'function') ||
       (options.reflectionEnvironment !== undefined && !validWaterSky(options.reflectionEnvironment))
     )
-      throw new TypeError(
+      throw fault(
+        'unsupported',
         'Invalid water optics; pass a Sky texture callback as reflection or an HDR Environment as reflectionEnvironment',
+        'ocean',
       );
     if (
       (options.sceneColor !== undefined && typeof options.sceneColor !== 'function') ||
@@ -1232,20 +1240,28 @@ export class Water implements EnginePlugin {
           options.sprayCount % 64 !== 0)) ||
       (options.horizon !== undefined && typeof options.horizon !== 'boolean')
     )
-      throw new TypeError(
+      throw fault(
+        'unsupported',
         'Invalid water optics or spray options; sceneColor takes a function and horizon takes a boolean, spray needs options.terrain, and sprayCount is a multiple of 64 from 64 to 65536',
+        'ocean',
       );
     if (
       options.shadows !== undefined &&
       (typeof options.shadows?.pbr !== 'function' || typeof options.shadows?.bindings !== 'function')
     )
-      throw new TypeError('Water shadows need pbr() and bindings(); pass a Shadows from @margoengine/shadows');
+      throw fault(
+        'unsupported',
+        'Water shadows need pbr() and bindings(); pass a Shadows from @margoengine/shadows',
+        'ocean',
+      );
     if (
       (options.fill !== undefined && (typeof options.fill !== 'function' || !options.terrain)) ||
       (options.still !== undefined && (typeof options.still !== 'boolean' || !options.terrain || options.spray))
     )
-      throw new TypeError(
+      throw fault(
+        'unsupported',
         'Invalid water fill or still; fill takes a function, still a boolean, both need options.terrain and still does not take spray',
+        'ocean',
       );
     this.validateLights();
     this.horizon = options.horizon ?? false;
@@ -1271,8 +1287,10 @@ export class Water implements EnginePlugin {
             terrain.heights.height > WATER_TERRAIN_MAX ||
             terrain.heights.data?.length !== terrain.heights.width * terrain.heights.height))
       )
-        throw new RangeError(
+        throw fault(
+          'unsupported',
           'Invalid water terrain; pass a heightmap function, a finite origin [x, z], a size [x, z] from 0 to 100000 and heights of width x height values (2 to 8192 a side)',
+          'ocean',
         );
       this.values.set(terrain.origin, 96);
       this.values.set(terrain.size, 98);
@@ -1298,8 +1316,10 @@ export class Water implements EnginePlugin {
         q > 1 ||
         !Number.isFinite(w.phase ?? 0)
       )
-        throw new RangeError(
+        throw fault(
+          'unsupported',
           'Invalid Gerstner wave; use a non-zero [x, z] direction, amplitude 0-100, wavelength above 0 up to 100000, steepness 0-1',
+          'ocean',
         );
       const k = (2 * Math.PI) / w.wavelength;
       if (q * w.amplitude * k > 1 / waves.length)
@@ -1440,7 +1460,8 @@ export class Water implements EnginePlugin {
    * the display tone mapping on the canvas, in linear radiance on an HDR target), so fogged water matches fogged
    * terrain and a fully fogged surface shows the fog colour. `null` (the default) draws exactly as without fog. Setting
    * or clearing it recompiles the surface shader once; changing the fog or its `enabled` flag never does.
-   * @throws TypeError when `fog` is neither an object nor null; RangeError or TypeError for an invalid field.
+   * @throws TypeError when `fog` is neither an object nor null; RangeError or TypeError for an invalid field (the fog
+   * check every fogged entry shares).
    */
   setFog(fog: FogLike | null): this {
     this.fogSource = checkFog(fog);
@@ -1449,7 +1470,7 @@ export class Water implements EnginePlugin {
   /**
    * Sets the breaking whitecaps, 0-1 (see `WaterOptions.whitecaps`); read every frame. `null` hands the foam back to the
    * wind (a Water without `waves`) or turns it off (with `waves`), as a Water made without the option has it.
-   * Throws RangeError outside 0-1.
+   * Throws MargoError `'unsupported'` outside 0-1.
    */
   setWhitecaps(amount: number | null): this {
     if (amount === null) {
@@ -1468,10 +1489,10 @@ export class Water implements EnginePlugin {
     const w = this.windSea;
     return w && { speed: w.speed, fetch: w.fetch, direction: w.direction && [w.direction[0], w.direction[1]] };
   }
-  /** Sets the deep-water colour, linear RGB 0-1 (see `WaterOptions.color`); read every frame. Throws RangeError otherwise. */
+  /** Sets the deep-water colour, linear RGB 0-1 (see `WaterOptions.color`); read every frame. Throws MargoError `'unsupported'` otherwise. */
   setColor(color: readonly [number, number, number]): this {
     if (color.length !== 3 || color.some((v) => !Number.isFinite(v) || v < 0 || v > 1))
-      throw new RangeError('Invalid water color; use three numbers from 0 to 1');
+      throw fault('unsupported', 'Invalid water color; use three numbers from 0 to 1', 'ocean');
     this.values.set(color, 24);
     return this;
   }
@@ -1479,11 +1500,12 @@ export class Water implements EnginePlugin {
    * Moves the mean sea level to world Y `y` (see `WaterOptions.height`), from -100,000 to 100,000; read every frame. With
    * `terrain`, the flow's map edge and its open-sea cells follow it, so a slow rise floods the land below it and a fall
    * drains it again (a storm surge or a tide); the open sea, the surf and the queries ride on it.
-   * @throws RangeError outside that range.
+   * @throws MargoError `'unsupported'` outside that range; `'disposed'` after `dispose()`.
    */
   setSeaLevel(y: number): this {
-    if (this.disposed || typeof y !== 'number' || !Number.isFinite(Math.fround(y)) || Math.abs(y) > 100000)
-      throw new RangeError('Invalid water sea level; use a finite world Y from -100000 to 100000');
+    if (this.disposed) throw new MargoError('disposed', 'Water disposed; create a new Water');
+    if (typeof y !== 'number' || !Number.isFinite(Math.fround(y)) || Math.abs(y) > 100000)
+      throw fault('unsupported', 'Invalid water sea level; use a finite world Y from -100000 to 100000', 'ocean');
     this.values[21] = y;
     return this;
   }
@@ -1492,7 +1514,7 @@ export class Water implements EnginePlugin {
    * outside the grid the surface carries `profile`, the long wave travelling on to it, and near and past a sea side it
    * starts from the flow's own edge level where water stands there, so the open sea and the simulated edge meet with
    * no step. Needs `terrain`. Read every frame; `water/flood` sets it from its tsunamis and surge.
-   * @throws RangeError for a profile of other than 2 to 64 finite samples, or a range or spread outside (0, 1e7].
+   * @throws MargoError `'unsupported'` for a profile of other than 2 to 64 finite samples, or a range or spread outside (0, 1e7].
    */
   setFarField(field: WaterFarField | null): this {
     const v = this.values;
@@ -1503,16 +1525,22 @@ export class Water implements EnginePlugin {
     const profile = field?.profile,
       n = profile?.length ?? 0;
     if (!field || typeof field !== 'object' || n < 2 || n > WATER_FAR_SAMPLES)
-      throw new RangeError(
+      throw fault(
+        'unsupported',
         `Invalid water far field; use { sides, profile, range } with 2 to ${WATER_FAR_SAMPLES} samples`,
+        'ocean',
       );
     for (let i = 0; i < n; i++)
       if (!Number.isFinite(profile[i]) || Math.abs(profile[i]) > 1e5)
-        throw new RangeError('Invalid water far field profile; use finite metres from -100000 to 100000');
+        throw fault(
+          'unsupported',
+          'Invalid water far field profile; use finite metres from -100000 to 100000',
+          'ocean',
+        );
     const span = (x: number | undefined, name: string, fallback: number) => {
       const y = x ?? fallback;
       if (!Number.isFinite(y) || y <= 0 || y > 1e7)
-        throw new RangeError(`Invalid water far field ${name}; use metres above 0 and up to 10000000`);
+        throw fault('unsupported', `Invalid water far field ${name}; use metres above 0 and up to 10000000`, 'ocean');
       return y;
     };
     const t = this.options.terrain,
@@ -1529,17 +1557,17 @@ export class Water implements EnginePlugin {
   }
   /**
    * Sets the lowest roughness of the sun's glitter, 0.02 to 0.6 (0.12, the default, is the sea's own floor); a higher
-   * floor widens and smooths the glints, as an animated feature draws them. Read every frame; RangeError outside.
+   * floor widens and smooths the glints, as an animated feature draws them. Read every frame; MargoError outside.
    */
   setGlitterRoughness(roughness: number): this {
     if (!Number.isFinite(roughness) || roughness < 0.02 || roughness > 0.6)
-      throw new RangeError('Invalid water glitterRoughness; use a number from 0.02 to 0.6');
+      throw fault('unsupported', 'Invalid water glitterRoughness; use a number from 0.02 to 0.6', 'ocean');
     this.values[135] = roughness;
     return this;
   }
   /**
    * Sets how soft the foam's edges are, 0 (the physical foam) to 1: the foam's small-scale pattern fades and its edge
-   * widens into larger, softer shapes. Read every frame; RangeError outside 0-1.
+   * widens into larger, softer shapes. Read every frame; MargoError outside 0-1.
    */
   setFoamSoftness(amount: number): this {
     this.values[134] = unit(amount, 'foamSoftness');
@@ -1548,7 +1576,7 @@ export class Water implements EnginePlugin {
   /**
    * Sets the shallow-water colour band: water over a bed less than `depth` metres below the surface takes `color`
    * (linear RGB 0-1) instead of the deep colour, fading to it at `depth`; a depth of 0 turns the band off. Read every
-   * frame; RangeError for a colour outside 0-1 or a depth outside 0-100.
+   * frame; MargoError for a colour outside 0-1 or a depth outside 0-100.
    */
   setShallow(color: readonly [number, number, number], depth: number): this {
     if (
@@ -1558,8 +1586,10 @@ export class Water implements EnginePlugin {
       depth < 0 ||
       depth > 100
     )
-      throw new RangeError(
+      throw fault(
+        'unsupported',
         'Invalid water shallow band; use a colour of three numbers from 0 to 1 and a depth from 0 to 100',
+        'ocean',
       );
     this.values.set(color, 136);
     this.values[139] = depth;
@@ -1568,11 +1598,11 @@ export class Water implements EnginePlugin {
   /** Sets the shoreline foam width, above 0 to 100 world units (see `WaterOptions.foamDistance`); read every frame. */
   setFoamDistance(distance: number): this {
     if (!Number.isFinite(distance) || distance <= 0 || distance > 100)
-      throw new RangeError('Invalid water foamDistance; use a number above 0 and up to 100');
+      throw fault('unsupported', 'Invalid water foamDistance; use a number above 0 and up to 100', 'ocean');
     this.values[22] = distance;
     return this;
   }
-  /** Sets the wind chop, 0-1 (see `WaterOptions.chop`); read every frame. Throws RangeError outside 0-1. */
+  /** Sets the wind chop, 0-1 (see `WaterOptions.chop`); read every frame. Throws MargoError outside 0-1. */
   setChop(amount: number): this {
     this.values[131] = unit(amount, 'chop');
     return this;
@@ -1601,11 +1631,17 @@ export class Water implements EnginePlugin {
   /**
    * Sets the wind, a speed in m/s at 10 m or `{ speed, fetch, direction }`, and retunes the eight swell trains to its sea
    * (amplitudes, directions and steepness; the wavelengths stay). Read every frame; no fold at any speed.
-   * @throws TypeError with `options.waves` (the trains are then fixed); RangeError outside 0-100 m/s.
+   * @throws MargoError `'unsupported'` with `options.waves` (the trains are then fixed) or outside 0-100 m/s; `'disposed'`
+   * after `dispose()`.
    */
   setWind(wind: number | WaterWind): this {
-    if (this.disposed || !this.windSea)
-      throw new TypeError('setWind needs a Water without options.waves; the trains you passed stay as they are');
+    if (this.disposed) throw new MargoError('disposed', 'Water disposed; create a new Water');
+    if (!this.windSea)
+      throw fault(
+        'unsupported',
+        'setWind needs a Water without options.waves; the trains you passed stay as they are',
+        'ocean',
+      );
     // A fetch or direction left out, or given as undefined, keeps the held one: the sea is built from the merged wind, so
     // it is the sea the Water then reports (a spread of `undefined` over the held values would build it from defaults).
     const next = windOf(wind),
@@ -1655,7 +1691,7 @@ export class Water implements EnginePlugin {
       rate = flowRate(substeps),
       target = clock.ticks(rate);
     if (!Number.isSafeInteger(target) || target < 0)
-      throw new RangeError(`A Water clock gives whole ticks from 0; got ${target}. Pass a FilmClock.`);
+      throw fault('unsupported', `A Water clock gives whole ticks from 0; got ${target}. Pass a FilmClock`, 'ocean');
     if (!coastal.isSetUp) {
       // The set-up (the surf's spin-up reads the wave clock) runs at the time of the flow's first tick, as a continuous
       // run from that time sets it up, whatever frame builds it: the tick's slice goes into the frame uniform before the
@@ -1719,8 +1755,10 @@ export class Water implements EnginePlugin {
   private writeSea(sea: WaterSea): void {
     const count = sea.waveComponents(this.seconds, this.seaRows);
     if (!Number.isInteger(count) || count < 0 || count > WATER_SEA_WAVES)
-      throw new RangeError(
-        `Water draws 0 to ${WATER_SEA_WAVES} sea waves; the sea gave ${count}. Give the wave spectrum fewer frequencies or directions.`,
+      throw fault(
+        'unsupported',
+        `Water draws 0 to ${WATER_SEA_WAVES} sea waves; the sea gave ${count}. Give the wave spectrum fewer frequencies or directions`,
+        'ocean',
       );
     this.values[SEA_AT] = count;
   }
@@ -1762,9 +1800,12 @@ export class Water implements EnginePlugin {
    */
   setWaveHeight(height: number | null): this {
     if (height === null) height = this.maxWaveHeight;
-    if (this.disposed || !Number.isFinite(height) || height < 0 || height > 100 || (!this.maxWaveHeight && height > 0))
-      throw new RangeError(
+    if (this.disposed) throw new MargoError('disposed', 'Water disposed; create a new Water');
+    if (!Number.isFinite(height) || height < 0 || height > 100 || (!this.maxWaveHeight && height > 0))
+      throw fault(
+        'unsupported',
         'Invalid water wave height; use 0 to 100 meters, and a wave train with an amplitude above 0 to scale',
+        'ocean',
       );
     for (let i = 0; i < this.values[23]; i++) {
       const o = 32 + i * 8,
@@ -1827,26 +1868,36 @@ export class Water implements EnginePlugin {
     const lights = this.options.lights;
     if (lights === undefined) return;
     if (!Array.isArray(lights) || lights.length > 2)
-      throw new RangeError('Water accepts up to two directional lights; pass options.lights with at most two entries');
+      throw fault(
+        'unsupported',
+        'Water accepts up to two directional lights; pass options.lights with at most two entries',
+        'ocean',
+      );
     for (const light of lights) {
       if (!light || light.direction?.length !== 4 || light.radiance?.length !== 3)
-        throw new RangeError(
+        throw fault(
+          'unsupported',
           'Invalid water light; use a finite direction [x, y, z, w >= 0] that is not zero and a finite radiance [r, g, b] of 0 or more',
+          'ocean',
         );
       for (let i = 0; i < 4; i++)
         if (
           !Number.isFinite(Math.fround(light.direction[i])) ||
           (i < 3 && (!Number.isFinite(Math.fround(light.radiance[i])) || light.radiance[i] < 0))
         )
-          throw new RangeError(
+          throw fault(
+            'unsupported',
             'Invalid water light; use a finite direction [x, y, z, w >= 0] that is not zero and a finite radiance [r, g, b] of 0 or more',
+            'ocean',
           );
       if (
         light.direction[3] < 0 ||
         !Math.hypot(Math.fround(light.direction[0]), Math.fround(light.direction[1]), Math.fround(light.direction[2]))
       )
-        throw new RangeError(
+        throw fault(
+          'unsupported',
           'Invalid water light; use a finite direction [x, y, z, w >= 0] that is not zero and a finite radiance [r, g, b] of 0 or more',
+          'ocean',
         );
     }
   }
@@ -2064,8 +2115,7 @@ export class Water implements EnginePlugin {
     const river = riverKernels.get(this),
       solver = waterSolvers.get(this),
       showSurf = !!this.options.terrain && !this.options.still && !river && !solver;
-    const format =
-      `${effectKey}:${c.format}:${samples}:${depth.format}:${!!shadows}${fog ? ':fog' : ''}${showSurf ? ':surf' : ''}`;
+    const format = `${effectKey}:${c.format}:${samples}:${depth.format}:${!!shadows}${fog ? ':fog' : ''}${showSurf ? ':surf' : ''}`;
     if (this.format !== format) {
       // Shadow sampling goes after the surface functions, which GPU probes compile on their own.
       let code =
@@ -2304,8 +2354,10 @@ export class Water implements EnginePlugin {
       typeof hook.begin !== 'function' ||
       !Array.isArray(hook.targets)
     )
-      throw new TypeError(
+      throw fault(
+        'unsupported',
         'Invalid water capture hook; pass an object with a targets array and the callbacks it documents',
+        'ocean',
       );
     this.capture = hook;
     return () => {
@@ -2358,7 +2410,7 @@ export class Water implements EnginePlugin {
   /** Calls `callback` once when the water is disposed; returns a remover. */
   onDispose(callback: () => void): () => void {
     if (typeof callback !== 'function')
-      throw new TypeError('Water onDispose needs a function; pass the callback to run on dispose');
+      throw fault('unsupported', 'Water onDispose needs a function; pass the callback to run on dispose', 'ocean');
     this.disposers.add(callback);
     return () => this.disposers.delete(callback);
   }
@@ -2532,11 +2584,11 @@ export class Water implements EnginePlugin {
   }
   /**
    * Sets the wave clock to `seconds` outright (0 to 1e9), as `FFTOcean.setTime` does; the next frame draws the waves
-   * there. Throws RangeError for any other value.
+   * there. Throws MargoError `'unsupported'` for any other value.
    */
   setTime(seconds: number): this {
     if (!Number.isFinite(seconds) || seconds < 0 || seconds > 1e9)
-      throw new RangeError('Invalid water time; pass seconds from 0 to 1e9.');
+      throw fault('unsupported', 'Invalid water time; pass seconds from 0 to 1e9', 'ocean');
     this.seconds = seconds;
     return this;
   }
@@ -2570,7 +2622,8 @@ export class Water implements EnginePlugin {
     const rates = (this.cpuSeaRates ??= new Float32Array(WATER_SEA_WAVES));
     const count = sea.waveComponents(t, waves);
     if (!Number.isInteger(count) || count < 0 || count > WATER_SEA_WAVES)
-      throw fault('unsupported',
+      throw fault(
+        'unsupported',
         `Water draws 0 to ${WATER_SEA_WAVES} sea waves; the sea gave ${count}. Give the wave spectrum fewer frequencies or directions`,
         'ocean',
       );

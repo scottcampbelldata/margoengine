@@ -5,6 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { BREAKER_GAMMA, Water, breakerDepth, contourSegments } from '../dist/index.js';
+const refused = { name: 'MargoError', code: 'unsupported', message: /errors#ocean/ };
 
 const shoal = (k0, d) => {
   const k = k0 / Math.tanh((k0 * d) ** 0.75) ** (2 / 3),
@@ -102,7 +103,7 @@ test('Water.breakerLine follows its own trains and terrain.heights, and is empty
   assert.ok(rough > calm + 5, `the breakers move out from ${calm} to ${rough} m`);
   assert.throws(
     () => new Water({ terrain: { ...terrain, heights: { data, width: w, height: h + 1 } }, waves }),
-    RangeError,
+    refused,
   );
 });
 
@@ -117,5 +118,5 @@ test('terrain.heights wider than 512 cells: accepted up to 8,192 a side, refused
   const wide = new Water({ size: [4000, 400], terrain: terrain(ramp(2048, 4), [4096, 8]), waves });
   assert.ok(wide.breakerLine().length > 0, 'a 2,048-cell coast has a breaker line');
   assert.doesNotThrow(() => new Water({ size: [400, 400], terrain: terrain(ramp(8192, 2), [8192, 2]), waves }));
-  assert.throws(() => new Water({ size: [400, 400], terrain: terrain(ramp(8193, 2), [8193, 2]), waves }), RangeError);
+  assert.throws(() => new Water({ size: [400, 400], terrain: terrain(ramp(8193, 2), [8193, 2]), waves }), refused);
 });

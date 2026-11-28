@@ -12,6 +12,7 @@ import {
   waterSettingDefaults,
 } from '../dist/settings.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+const refused = { name: 'MargoError', code: 'unsupported', message: /errors#ocean/ };
 
 const byName = new Map(WATER_SETTINGS.map((s) => [s.name, s]));
 // The Water's frame uniform: 15,216 B (the values with the sea's rows); a frame writes 880 B of it without a sea.
@@ -127,7 +128,7 @@ test('the sea level is live: setSeaLevel writes the frame, refuses what is not a
   h.frame();
   assert.equal(frameValues(h)[21], 1.25);
   for (const bad of [NaN, Infinity, 1e6, -100001, '1'])
-    assert.throws(() => water.setSeaLevel(bad), RangeError, String(bad));
+    assert.throws(() => water.setSeaLevel(bad), refused, String(bad));
   assert.throws(() => applyWaterSettings(water, { seaLevel: 1001 }), RangeError);
   h.frame();
   assert.equal(frameValues(h)[21], 1.25, 'a refused level writes nothing');

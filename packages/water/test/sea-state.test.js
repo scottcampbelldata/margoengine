@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Water } from '../dist/index.js';
 import { seaState, seaWavelengths, whitecapCoverage } from '../dist/sea-state.js';
+const refused = { name: 'MargoError', code: 'unsupported', message: /errors#ocean/ };
 
 // Plan bounds (private elements-real-plan.md, section 2, Water): Hs = 0.0016 sqrt(g F / U^2) U^2 / g, never above the
 // fully developed 0.22 U^2 / g; the sea's height is Hs; no fold at any wind from 0 to 40; whitecaps W = 3.84e-6 U^3.41.
@@ -67,8 +68,8 @@ test('no wind from 0 to 40 m/s folds the surface, at construction or through set
     assert.doesNotThrow(() => new Water({ wind: { speed: u, fetch: 1e7 } }), `U ${u}`);
     assert.doesNotThrow(() => water.setWind({ speed: u, fetch: 1e7 }), `setWind ${u}`);
   }
-  assert.throws(() => new Water({ wind: 101 }), RangeError);
-  assert.throws(() => new Water({ waves: [{ direction: [1, 0], amplitude: 0.1, wavelength: 5 }] }).setWind(5), TypeError);
+  assert.throws(() => new Water({ wind: 101 }), refused);
+  assert.throws(() => new Water({ waves: [{ direction: [1, 0], amplitude: 0.1, wavelength: 5 }] }).setWind(5), refused);
   assert.doesNotThrow(() => new Water().setWind(5));
 });
 
@@ -103,11 +104,11 @@ test('whitecap coverage is 3.84e-6 U^3.41: 0.1% at 5, 1% at 10, 4% at 15, 10.5% 
 });
 
 test('bad inputs are refused', () => {
-  assert.throws(() => seaState(-1), RangeError);
-  assert.throws(() => seaState(5, { fetch: 0 }), RangeError);
-  assert.throws(() => seaState(5, { trains: 9 }), RangeError);
-  assert.throws(() => seaState(5, { direction: [0, 0] }), RangeError);
-  assert.throws(() => seaState(Number.NaN), RangeError);
+  assert.throws(() => seaState(-1), refused);
+  assert.throws(() => seaState(5, { fetch: 0 }), refused);
+  assert.throws(() => seaState(5, { trains: 9 }), refused);
+  assert.throws(() => seaState(5, { direction: [0, 0] }), refused);
+  assert.throws(() => seaState(Number.NaN), refused);
 });
 
 test('setWind with a fetch or direction left out or undefined keeps the held ones, and builds the sea from them', () => {

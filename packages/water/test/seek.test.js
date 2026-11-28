@@ -10,6 +10,7 @@ import { FFTOcean } from '../dist/fft.js';
 import { WaterFlow } from '../dist/flow.js';
 import { WaterRain } from '../dist/rain.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+const refused = { name: 'MargoError', code: 'unsupported', message: /errors#ocean/ };
 
 const FPS = 60;
 function world() {
@@ -81,6 +82,6 @@ test('Water.setTime sets the wave clock outright and the next draw uploads it; b
   w.h.frame();
   assert.equal(uploaded(w)[20], Math.fround(1.25));
   assert.equal(w.water.setTime(0.5).time, 0.5, 'backwards too, and it chains');
-  for (const bad of [-1, Number.NaN, Infinity, 2e9]) assert.throws(() => w.water.setTime(bad), RangeError);
+  for (const bad of [-1, Number.NaN, Infinity, 2e9]) assert.throws(() => w.water.setTime(bad), refused);
   assert.equal(w.water.time, 0.5);
 });

@@ -80,12 +80,12 @@ export const entries = [
   },
   {
     id: 'ocean',
-    title: '@margoengine/water/fft and Water.sample: the ocean surface and its height query',
+    title: '@margoengine/water: the Water surface, the FFT ocean and the height query',
     kind: 'family',
     messages: [],
     cause:
-      'An `FFTOcean` option or setter (`setWind`, `setChoppiness`, `setFoamThreshold`, `setColor`, `setDebug`) or a height query (`FFTOcean.sample`, `Water.sample`) got a value it cannot use: a resolution that is not a power of two from 16 to 512, more than four cascades or overlapping wavelength bands, a wind speed outside 0.1..100 m/s, a zero or non-finite wind direction, a fetch outside 1..1e7 m, a choppiness outside 0..5, a colour channel outside 0..1, an unknown debug mode, more than 16 debug points, non-finite query coordinates or a time below 0. The message names the value and its range.',
-    fix: "Pass finite SI values inside the range the message gives: for example `ocean.setWind({speed: 12, direction: [1, 0]})`, `ocean.setChoppiness(1)`, `ocean.setDebug({mode: 'jacobian'})` and `ocean.sample(x, z)` with world metres.",
+      'A `Water` or `FFTOcean` option or setter (`setWind`, `setSeaLevel`, `setChoppiness`, `setFoamThreshold`, `setColor`, `setDebug`), `seaState` or a height query (`FFTOcean.sample`, `Water.sample`) got a value it cannot use. For `Water`: a size, segment count, colour, wave, light, terrain, far field, capture hook or sea that is missing or out of range, options that need each other (`spray`, `fill` and `still` need `terrain`), or `setWind` on a Water made with `waves`. For `FFTOcean` and queries: a resolution that is not a power of two from 16 to 512, more than four cascades or overlapping wavelength bands, a wind speed outside 0.1..100 m/s, a zero or non-finite wind direction, a fetch outside 1..1e7 m, a choppiness outside 0..5, a colour channel outside 0..1, an unknown debug mode, more than 16 debug points, non-finite query coordinates or a time below 0. The message names the value and its range.',
+    fix: "Pass finite SI values inside the range the message gives: for example `water.setSeaLevel(0)`, `ocean.setWind({speed: 12, direction: [1, 0]})`, `ocean.setChoppiness(1)`, `ocean.setDebug({mode: 'jacobian'})` and `ocean.sample(x, z)` with world metres.",
   },
   {
     id: 'ripples',

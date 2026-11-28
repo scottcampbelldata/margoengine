@@ -181,8 +181,9 @@ gravity-capillary waves (25 cm to 1.8 cm) carry the slope of Elfouhaily et al.'s
 16 x `chop` m/s, so a camera a few metres off sees the fine ripples a real sea has; they fade where a pixel covers
 them, and the slope they no longer show widens the glint instead.
 `water.setWhitecaps(amount)` and
-`water.setChop(amount)` change either from the next frame (a storm slider), and both reject values outside 0 to 1
-with RangeError. At 0 both draw exactly as before.
+`water.setChop(amount)` change either from the next frame (a storm slider), and both reject values outside 0 to 1.
+At 0 both draw exactly as before. Every value `Water` refuses, at construction or in a setter, throws a MargoError with
+code `unsupported` and a link to [errors#ocean](https://margoengine.com/errors#ocean) (`disposed` after `dispose()`).
 
 All foam (whitecaps, surf, shoreline and contact foam) is a bright layer of bubbles lit from above by the sky and the
 sun, so it reads at night and under an overcast sky as well as in sun. Dense foam returns up to about 0.85 of the light

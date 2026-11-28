@@ -372,7 +372,8 @@ outside SEA-02.
 `new Water({ color: [2, 0, 0] })` and `water.setSeaLevel(NaN)` throw a plain `RangeError`, and
 `new Water({ sea: {} })` a `TypeError`, with no code or help link: about 30 refusals in
 `packages/water/src/index.ts`, a file the SEA-01 and SEA-13 rows list. Recorded as KB-WATER-CODED1 in
-`docs/known-bugs.md`; not changed by lane B.
+`docs/known-bugs.md`; not changed by lane B. Fixed 2026-11-27 by gap lane E (error classes only, no solver or draw code;
+`packages/water/test/coded-errors.test.js`).
 
 ### SEA-13: a seek cannot rebuild the FFT sea's older foam (GAP-FILM-FOAM, logged by gap lane B, 2026-11-27)
 
