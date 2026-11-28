@@ -6034,6 +6034,7 @@ in `packages/cad/test/cad-limits.test.js`).
 | SciFiHelmet with default shadows (accepted difference in work, 2026-11-05) | Measured (`helmet`, RTX A6000, Edge 156, 5 runs, `--no-gate`, other jobs running, diagnostic): 0.33 ms GPU a frame against three's WebGL 0.08 and WebGPU 0.07 (0.78 when first measured). Like for like (`helmet-filterpcf-cascades1`, `'pcf'` and one cascade, the setup closest to three's one map): 0.074 ms against 0.085 and 0.068. CPU 0.12 ms against WebGL 0.09 and WebGPU 0.19. | three's side draws one map with one fixed filter. Margo's default draws four cascades and PCSS, so a penumbra widens with the distance to its blocker. Of the 0.33 ms, about 0.12 is the frame with `'pcf'` and four cascades, 0.10 is the pass that finds each layer's nearest depth (it reads all 64 MiB of the four 2048 maps, so memory bandwidth sets its time), and 0.10 is the blocker reads and comparison taps. | Contact-hardening shadows and sharper texels near the camera by default, for about 0.25 ms on this scene. A cheaper filter would change the image, so the default stays. The nearest-depth pass could read only the part of each layer that casters reach and give the same result, but casters carry no bounds yet. | `filter: 'pcf'` and `cascades` on `Shadows`; `@margoengine/quality` sets them on its light and phone tiers. |
 | Rect area lights (accepted difference in work, 2026-11-05) | Measured (`p-rect-area`, 4 lights on 1,000 boxes, RTX A6000, Edge 156, 5 runs, `--no-gate`, other jobs running, diagnostic): 0.38 ms GPU a frame against three's WebGL 0.15 and WebGPU 0.35 (0.47 before entry 67). Like for like (the published fitted edge term with no clip, patched in as a measurement): 0.26 ms. CPU 0.09 ms against 0.61 and 0.83. | Every fragment runs two integrals per light with an exact arc-tangent edge term, held to 1e-5 relative, and clips a quad to the surface's horizon. The fitted term is 1.5e-4 off, and with no clip a quad crossing the horizon reads 0.069 where the true form factor is 0.006. | Exact area light shading at every roughness, for about 0.08 ms per light here. | Fewer lights: every light costs every fragment, as the lights have no range. |
 | USDZ export (2026-11-05) | Measured (`p-export-usdz`, 1,000 nodes of one box, RTX A6000, Edge 156, 3 runs, `--no-gate`, other jobs running, diagnostic): 4.4 ms against three's WebGL 3.2 and 496,187 B against 444,202 B (16.0 ms and 2.46 MB before entry 69). Every mesh is in its own space under `xformOp:transform`; a geometry two or more nodes draw is written once as a class prim that each node references, and nodes that mirror it share one reflected shape, so no matrix keeps a negative determinant. Against the writer that kept single and mirrored meshes in world space, 25 real Khronos models range from 4.6% smaller (ToyCar) to 2.9% larger (NodePerformanceTest, 10,000 nodes each with a matrix of long decimals), so local space is about what the file holds, not its size; against writing every node as its own copy, ABeautifulGame is 91.4 MB in place of 165.9 MB. Load time in AR is not measured. Only `references = </Path>` within the layer is read back. Enforced (2026-11-15): the package is a ZIP32 archive of at most 65,535 files and under 4 GiB, else `RangeError`; the end record counts files in 16 bits (PKWARE APPNOTE 6.3.10, 4.4.21 and 4.4.22) and the OpenUSD usdz rules name no ZIP64 records. | A loaded textured model keeps its images on the GPU, and a USDZ holds only what the format can carry. | Vertex colours are written for any USD reader; Quick Look draws them only on a mesh with no material, so a paint-only material is left out, and under any other material it draws them grey ([known bug](known-bugs.md#usdz-vertex-colours-draw-grey-in-quick-look)). | `exportUSDZ` of a loaded textured model refuses, as its images are on the GPU; its GLB bytes go in instead, and `measureUSDZ(bytes).skipped` names what a USDZ cannot hold. |
+| USDZ textures in AR Quick Look (`@margoengine/exporters/usdz`, 2026-11-28) | Measured as macOS 27.2.1 thumbnails: Quick Look samples every map of a material with the base colour map's transform, and follows at most two UV sets. | Apple's renderer; the file holds each map's own `UsdTransform2d`, which is correct USD. | Maps with different transforms (the Khronos ToyCar's cloth) draw misplaced in Quick Look. | Give a material's maps one shared transform, or bake the transform into the geometry's UVs before export. |
 | USDZ tap behaviours (`@margoengine/exporters/usdz` `behaviors`, 2026-11-25) | Tested in Node: the written prims, nesting of a group's actions, targets by name and index, refusals. Not run in AR Quick Look or on an iPhone. By method: only what Apple's pages for the schema state is written: `Preliminary_Behavior` with `rel triggers` and `rel actions`; child prims that `inherits` `TapGestureTrigger`, `EmphasizeAction`, `VisibilityAction` (`type = "hide"`), `WaitAction` and `GroupAction` (`loops`, `performCount`), with `rel affectedObjects` and `motionType` (`flip`, from Apple's example; any token is passed through). | Apple's pages list the property names of each class but not every value or type, so these are unconfirmed and follow the examples only: the `uniform double` type of `duration`; `concurrent` for a parallel group (the GroupAction page says `serial` and `concurrent`, the Preliminary_Behavior example writes `parallel`); the `info:id` tokens (the Preliminary_Trigger example shows `TapGesture`, the WWDC20 session `tap`), left out because the `inherits` form carries the class. Scene-start, proximity, collide, notification triggers, show (the Visibility `type` other than `hide`), audio, transform, spin, orbit and look-at actions, `easeType`, `style` and `exclusive` are not written: their values are not in the pages. The `inherits` classes are not defined in the file, so a USD reader without Apple's schema reports an unresolved inherit and ignores the prims; `exportAnimatedUSDZ` writes no behaviours. | Quick Look runs a tap that flips, hides or waits. | Put other actions in Reality Composer Pro. |
 | Engine scene as SVG (`@margoengine/sciviz/scene-svg`, 2026-11-25) | Tested in Node: the far surface painted first in either node order, crossing surfaces split, back-face culling, shading by slant, lines and points, a matrix in place of a camera, refusals. By method: painter's order through a binary space partition (`exportVectorScene`), colour per triangle from the material's base colour with a light at the camera. | A vector picture has no z-buffer: every visible polygon becomes SVG paths, so the file grows with the scene (default 20,000 input triangles and 200,000 fragments, then `unsupported` or the `raster` fallback), and each triangle is painted in a flat colour split into 16 facets at the default `colorDepth`. | No textures, normal maps, PBR lighting, shadows, transparency sorting beyond the painter's order, skinned or morphed poses beyond the pose the scene is in, or per-vertex colours; lit by one light at the camera. Points and lines have a constant CSS width. Not compared with three.js SVGRenderer on the same scene. | For a shaded or textured picture use `capture` (PNG); lower `colorDepth` or `maxTriangles` for smaller files. |
 | USDZ animation (`@margoengine/exporters/usdz-anim`, 2026-11-06) | A joint with a shear in the nodes above it is refused. At most eight influences for each vertex: `elementSize` 4, or 8 with a second glTF set (2026-11-25). A clip past 100,000 frames is refused. GLB input takes PNG and JPEG images. A GLB that requires Draco or meshopt is decoded with `@margoengine/decoders` (an optional peer, imported only for such a file), up to 2 GiB decoded and the native Draco decoder's own limits (384 MiB for one primitive); only Draco triangle lists are read, and meshopt data outside the BIN chunk is refused (2026-11-26). `exportUSDZ` and `measureUSDZ` still take uncompressed files. The mirroring of a node is read at frame 0. | By method: one clip for each file, as USD has one timeline. Scales in a `SkelAnimation` are half floats, by USD's schema: 2^-11 relative for each joint, so 5.9e-3 of the model's size at worst for a chain of 12. | Tracks are sampled at `fps`, default 30: a STEP key turns over one frame, and a clip that ends between two frames holds its last pose on the next one, so it runs up to one frame longer. Measured worst 3.1e-4 of the model's size, inside the 5.9e-3 that half-float scales allow, and 4.6e-7 on clips that keep scale 1. Morph targets of a skinned mesh are written as UsdSkel blend shapes (`BlendShape` prims, one weight each in the `SkelAnimation`; a target that moves some points lists them in `pointIndices`), and the clip bounds leave their displacement out; a morphed mesh with no skin binds rigidly to a skeleton of one still joint so its blend shapes play too (checked with OpenUSD 26.11 `UsdSkel.BakeSkinning`); `KHR_animation_pointer` channels are named in `skipped`. Quick Look shows a file at real size and the default is the model's true size, which glTF says is metres: `height` measures the rest pose, and a clip can reach further, which `bounds` in the result says. The first real iPhone test (Fox-Run, 2026-11-06) failed on size. After the fix Fox-Run and the Robot files looked right on one iPhone, 8 of the 76 files were tried, and the rigged figure still floats off the ground ([known bug](known-bugs.md#animated-usdz-the-fix-for-the-first-iphone-failure-awaits-a-retest)); whether the clipping and the failed move had another cause is not known. No anchoring metadata is written: Quick Look places a file without it, and what it does to moving a model is unmeasured. | Fox.glb is 79 m tall and robot-expressive 4.46 m, so `height` is what makes such a model fit a room, and the result's `size` and `bounds` say so first. |
@@ -6192,7 +6193,7 @@ FXAA a depthless line's one-pixel rim is partly covered, colour and alpha alike,
 | Limit | Starts at | Why | What you see | Escape hatch |
 | --- | --- | --- | --- | --- |
 | Mechanism poses (`@margoengine/machinery/mechanisms`, 2026-11-27) (LIM-679) | Enforced by method: each function is the rigid, frictionless, backlash-free closed form of its mechanism. The Geneva drive is external with tangential pin entry; the harmonic drive ratio assumes a two-lobe wave generator and `flexsplinePoint` is a drawing aid, not an elastic flexspline; the Watt governor is Maxwell's conical-pendulum equilibrium (massless arms, no sleeve load, no hunting dynamics); the Archimedes screw bucket is a 1,600-slice integral (within 1e-7 m^3 of 6,400 slices on the demo screw). Entry 3,864 B gzip. | Closed forms are the exact solution a joint model tracks and a readout shows. | The physics-joint models in `tests/machinery-mechanisms-physics.test.js` (a hinge motor, sliders, a pin in a slot, a gear joint) follow the poses to 2e-4 m and 2e-3 rad at 60 Hz. | For loads, friction, backlash or governor dynamics, build the mechanism from `@margoengine/physics` joints and step it. |
-| Mechanism rigs on physics (`@margoengine/machinery/rigs`, 2026-11-27) (LIM-680) | Enforced by method: four rigs (Scotch yoke, Geneva, Oldham, epicyclic) on `@margoengine/physics` joints with no gravity, friction or load; the input is a position-driven body stepped at most 2 degrees per 60 Hz step. Measured gaps against the closed forms: 1.4 µm (yoke), 0.004 degrees (Geneva), 2 µm (Oldham), 0.0003 degrees (epicyclic), tested to 1e-5 m and 5e-4 rad (`packages/machinery/test/rigs.test.js`). A demo that loads a rig carries the physics solver: the four mechanism demo zips grew from about 0.32 MB to 1.25 MB. | The solver holding the exact pose is the claim; loads are not modelled yet. | `packages/machinery/test/rigs.test.js` | Rigs for the other eleven mechanisms (cam contact for the rose engine and Reuleaux drive, the flexspline, governor dynamics under gravity) are still to build. |
+| Mechanism rigs on physics (`@margoengine/machinery/rigs`, 2026-11-27) (LIM-680) | Enforced by method: eight rigs (Scotch yoke, Geneva, Oldham, epicyclic, harmonic drive, ball-and-disk integrator, Archimedes screw, stroboscope) on `@margoengine/physics` joints with no gravity, friction or load; the input is a position-driven body stepped at most 2 degrees per 60 Hz step. Measured gaps against the closed forms: 1.4 µm (yoke), 0.004 degrees (Geneva), 2 µm (Oldham), 0.0003 degrees (epicyclic), 0.00002 degrees (harmonic), 0.0002 degrees (integrator), 2.3 µm over 4.7 turns and 49 µm over 100 (screw: the gear and rack rows drift by float rounding, KB-PHYS-COUPLINGDRIFT1), 0.0004 degrees (stroboscope), tested to 2e-5 m and 5e-4 rad (`packages/machinery/test/rigs.test.js`). A demo that loads a rig carries the physics solver: the four mechanism demo zips grew from about 0.32 MB to 1.25 MB. | The solver holding the exact pose is the claim; loads are not modelled yet. | `packages/machinery/test/rigs.test.js` | Rigs for the other seven mechanisms (Sarrus, toggle press, gimbal, differential, Watt governor dynamics under gravity, and cam contact for the rose engine and Reuleaux drive, where the path joint on a turning base diverges, KB-PHYS-PATHMOVINGBASE1) are still to build. |
 | NURBS surfaces (`@margoengine/geometry/nurbs`) | Enforced by method: no trimming curves, knot insertion or degree elevation; `NurbsCurve.tessellate` halves a span at most 12 times. | Trimming needs a boundary representation, which this engine does not carry; revolves, control nets and whole patches do not. | A trimmed patch meshes untrimmed. | Cut the mesh with `@margoengine/mesh-edit`. |
 | Mesh surface sampler (`@margoengine/geometry/sample`) | Enforced by method: points are independent random draws, so they can clump; there is no minimum spacing. Vertex weights are linear across each triangle. | Independent draws cost one search each and need no neighbour lookups. | Two points can land close together. | `@margoengine/scatter` for spaced placement on terrain. |
 | Mesh optimisation (`@margoengine/geometry/optimize`) | Enforced by test ([optimize.test.js](../packages/geometry/tests/optimize.test.js)): shuffled grids, spheres and knots end under 0.8 cache misses per triangle on a 16-vertex first-in first-out cache (3 before); nested shells lose over 40 percent of their overdraw while the miss ratio stays within 6 percent. Those are stand-ins for a GPU: frame time on a real one is not measured. | The cache model is a simulation; real GPUs differ in cache size and batching. | Triangle order changes, so a transparent mesh that relied on it can look different. | `overdraw: false` keeps the sort off; leave the mesh out to keep its order. |
@@ -12573,8 +12574,12 @@ The root water entry measures 32,655 B minified and gzipped, up from 32,150 B. I
 
 ## Web template bundle
 
-The `create-margo` web starter's production build (every JS chunk, lazy ones included, gzip level 9) must stay below
-85,600 B (`tests/create-margo.test.js`, "the web template type-checks and builds"). Scott approved the increase from
+The `create-margo` web starter's production build (every JS chunk, lazy ones included, gzip level 9) must not pass
+85,939 B (`tests/create-margo.test.js`, "the web template type-checks and builds"). Scott approved the increase from
+85,600 B on 2026-11-28 ("Raise it", KB-SIZE-STARTER1). The starter measured 86,252 B against 85,171 B at 1a2eb0a5e8:
+environment 710 B (the EXR readers' colour spaces, a1bb0f5275), core 238 B (snapshot rendering, multi-draw and the
+core fixes since), shadows 57 B (`Shadows.ready`, dd7fea3b5a), the other 76 B not traced. 993b014c8a took 313 B out (a
+namespace import of the environment shaders), leaving 85,939 B. The earlier increase, from
 85,000 B on 2026-11-26 for two shadows changes, each measured by rebuilding the starter with the shadows sources from
 before it: the instanced cascade fit (KB-SHADOW-INSTFIT1, b6781020ba) costs 456 B and the turning penumbra jitter
 (KB-LOOK-TV-PENUMBRA1, 5feaab3d71) 122 B. The instanced fit's minified code holds no duplication; its bounds walk was
@@ -16272,6 +16277,29 @@ until it is fixed. Entries are newest first. A heading starts with the state (Op
 an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the regression test that keeps it fixed.
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
+
+### Open 2026-11-28: a path joint on a turning base lags and then diverges (KB-PHYS-PATHMOVINGBASE1, physics mechanisms)
+
+- **Repro:** a position-driven body turned about z 2 degrees a 60 Hz step (`setNextRotation`), a dynamic body on a
+  `prismatic` slide along z, and a `PathJoint` from the turning body holding a point 0.1 m out on the follower to a helix
+  of pitch 0.348 m (Catmull-Rom through 128 points a turn, in the turning body's frame). After a quarter turn the follower
+  is 0.15 mm off the helix, 3.7 mm after a turn; with the helix 1 m out it is 1.1 m off after a quarter turn and the world
+  stops ("went past 1e15"). The same follower on a fixed curve holds.
+- **Cause:** not found yet. The path rows (`kernel/src/couplings.rs`, PATH) read the point on the curve and its frame at the
+  poses before the substep and correct a share of the error only in the biased pass; on a base that turns, the curve
+  point's own motion along the normals seems to be missed or lagged. It blocks a cam follower (the rose engine and the
+  Reuleaux drive in `@margoengine/machinery/rigs`), which wait for it. Physics lane.
+
+### Open 2026-11-28: gear and rack rows drift from the poses by float rounding (KB-PHYS-COUPLINGDRIFT1, physics mechanisms)
+
+- **Repro:** `archimedesScrewRig(0.348)` of `@margoengine/machinery/rigs` with its water body at z 0.5 m instead of near the
+  origin: the water is 0.1 mm behind `pitch * angle / 2 pi` after 4.7 turns and 0.35 mm after ten, growing with the travel,
+  and the sign changes with the step size (2 degrees: -33 µm a turn; half a degree: +120 µm). At the origin it is 2.3 µm
+  after 4.7 turns and 49 µm after 100; a harmonic drive's gear row is 6e-6 rad behind after 100 turns.
+- **Cause:** a gear's and a rack's error is the integral of the row's own speed (`track_couplings`), not read from the
+  poses; the positions are stored in f32 and each substep's small move is rounded, with a bias, so the poses part from the
+  integrated speed and nothing pulls them back. Box2D's gear joint reads its error from the joints' coordinates. The rig
+  keeps its water near the origin, where the float spacing is finest, until the row reads the poses. Physics lane.
 
 ### Open 2026-11-27: the physics preview render check ignores MARGO_COMPAT (KB-PHYS-PREVIEWCOMPAT1, physics scripts)
 
@@ -31828,6 +31856,15 @@ does not own. Each entry says exactly what is needed to close it.
      `usdchecker` warns `NormalMapTextureValidator.NonCompliantScaleValues` on 04.
   2. The thumbnails were read by eye, not compared with the engine-drawn twins.
   3. Nothing has been opened on an iPhone or iPad, in AR or otherwise.
+- **2026-11-28, Mac mini (Apple M6, macOS 27.2.1, screen locked, over SSH):** the eight kit files and 14 textured Khronos
+  models exported from their GLB bytes all pass `usdchecker --arkit` (04 and SheenChair with the `normalScale` warning) and
+  all 22 draw a 768 px thumbnail through `QLThumbnailGenerator` (`qlmanage -t` itself ran past 60 s on every file tried).
+  Compared by eye with Edge renders of the GLB twins: the kit, Lantern, Fox, Corset, BoomBox, the shoe, SheenChair,
+  AlphaBlendModeTest, NegativeScaleTest, NormalTangentMirrorTest, OrientationTest and MetalRoughSpheres show the same
+  shapes and maps (the lighting differs). Differences: vertex colours with a textureless lit material draw grey
+  (BoxVertexColors, below); transmission draws opaque (IridescenceLamp's globe, ToyCar's glass) and sheen is lost
+  (ToyCar's red cloth draws near black), as UsdPreviewSurface has neither; ToyCar's cloth maps were wrong (the two
+  entries below). Clearcoat and IOR are inputs of UsdPreviewSurface that `exportUSDZ` does not write yet.
 - **Needed to close:** `node scripts/make-usdz-quicklook-kit.mjs <folder> --glb` writes the eight files and their twins.
   Open them on an iPhone or iPad on iOS 17 or later, compare each with the same scene drawn by Margo, and record the
   result here and in `docs/threejs-parity.md` (USDZExporter row).
@@ -31888,6 +31925,40 @@ Release exception: RiggedFigure loads off the floor in AR Quick Look (Apple view
   - Anything between leaves the question open, and the entry says so.
 - **Needed to close:** that run, then either a root-cause fix with a regression test or the phone evidence that it is Quick Look's own behaviour. The
   exporter stays as it is until a file-side cause is shown.
+
+### Quick Look draws every map of a material with the base colour map's texture transform (2026-11-28, open)
+
+- **What:** AR Quick Look's renderer (macOS 27.2.1 thumbnails) ignores each texture's own `UsdTransform2d` and samples
+  every map of a material with the base colour map's transform. The Khronos ToyCar's cloth (base and normal maps tiled 3
+  times, occlusion map once) shows the one dark square of its occlusion map repeated over the cloth.
+- **Repro:** a quad with a checker `baseColorTexture`, `baseColorTextureTransform` scale 3, and a one-square
+  `emissiveTexture` or `occlusionTexture` with no transform, scale 1 or scale 2: nine squares in all three. With the base
+  map untransformed and the emissive map at scale 3, one square. `usdchecker --arkit` passes every file; the file is
+  correct USD, and `@margoengine/usdz` reads each map's own transform.
+- **Cause:** Apple's renderer. Measured on the same Mac: it does follow a second UV primvar (a base map on `st1` and
+  another on `st` draw independently, custom primvar names included), and a third set draws with one of the first two.
+- **Way to fix it in Margo (not done):** when the maps of a material differ, write their transformed UVs as their own
+  primvars instead of `UsdTransform2d` nodes. `@margoengine/usdz` first has to read a second UV set (below), or Margo's
+  own round trip would break.
+
+### `parseUSDZ` samples every map of a mesh with one UV set (2026-11-28, open)
+
+- **What:** `@margoengine/usdz` takes one UV primvar for a mesh, the one its first mapped input reads
+  (`diffuseColor`, `normal`, `roughness`, `metallic`), and every map samples it. A file whose maps name different
+  primvars (`exportUSDZ` writes `st` and `st1` for `texCoord` 1) loads with the other maps on the wrong coordinates.
+- **Repro:** `parseUSDZ(exportUSDZ(scene))` for a material with `baseColorTexture` on `uvs` and `normalTexture` with
+  `texCoord: 1` on `uvs1`: the document holds no `TEXCOORD_1` and the normal map reads `TEXCOORD_0`.
+- **Cause:** `uvName` in `packages/usdz/src/index.ts` is a single name for the mesh.
+
+### Fixed 2026-11-28: `exportUSDZ` dropped every texture transform but the base colour's (KB-USDZ-TRANSFORM1)
+
+- **What:** `metallicRoughnessTextureTransform`, `normalTextureTransform`, `occlusionTextureTransform` and
+  `emissiveTextureTransform` (and so those of a GLB's maps) were left out of the file without a word, so a tiled normal
+  map drew once across the surface in any USD reader. Found while comparing the ToyCar in Quick Look.
+- **Cause:** `sample` in `packages/exporters/src/usdz-write.ts` wrote a `UsdTransform2d` for the base colour map alone.
+- **Fix:** each transformed slot gets its own `UsdTransform2d`, in `exportUSDZ` and the animated export alike.
+- **Regression:** `packages/exporters/tests/usdz.test.js`, "every USDZ texture slot reads through its own
+  UsdTransform2d" (fails on the old source).
 
 ### USDZ vertex colours draw grey in Quick Look
 
@@ -32041,9 +32112,7 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   `packages/physics/tests/coupling/schooling.test.js` check force, curvature, relative coasting, and a school
   responding to a moving predator. BB-4, BB-6 and AVIARY-3 still have open shot checks in the demo review.
 
-## Open defects
-
-### Open 2026-11-27: the create-margo web starter passes its 85,600 B bound (KB-SIZE-STARTER1)
+### Fixed 2026-11-28: the create-margo web starter passed its 85,600 B bound (KB-SIZE-STARTER1)
 
 - **Repro:** `npm run build:packages`, then `node --test --test-name-pattern="the web template" tests/create-margo.test.js`:
   86,252 B gzip against a bound of 85,600 B. It measured 85,171 B at 1a2eb0a5e8.
@@ -32059,8 +32128,11 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   code behind another `import()` or into its own file cannot lower the figure while `load(url)` reads EXR files.
 - **Measured and not taken:** the EXR colour spaces as a table in place of the switch is 31 B larger;
   `build.modulePreload: false` in the template saves 107 B and gives up preloading a lazy chunk's imports.
-- **Left:** Scott's decision. Each earlier raise of this bound was Scott's (docs/limits.md, "Web template bundle"). The
-  choices are a bound above 85,939 B, or a change to what the starter ships or what the test counts.
+- **Fix:** Scott, 2026-11-28: "Raise it". The bound is 85,939 B (it was under 85,600 B), the size measured again on
+  main at 765f4e1260. Test: `tests/create-margo.test.js`, "the web template type-checks and builds"; the figures are in
+  docs/limits.md, "Web template bundle".
+
+## Open defects
 
 ### Open 2026-11-27: five Fauld shot cameras still cannot see their subject (shot generator, KB-SHOT-FAULDSIGHT1)
 
@@ -35911,6 +35983,21 @@ Audio follow-up (sweep L6, 2026-11-11, still open): not reproduced; the whole su
 ### Batch 273 Firefox scope and concurrent landing blockers
 
 **Status:** open, deferred (Scott: ignore for now): physical-device certification still open (hardware check).
+
+**Checked 2026-11-28 on main 31585d1f5a.** Only certification is open; the rest of this entry is history.
+
+- Open: full-package and physical-device certification. Real phones, Safari's feature rows after `canvasRead`, the iOS
+  Simulator and a headset are still unmeasured ([limits.md](limits.md), "Browser matrix (batch 273, 2026-11-15)").
+- Not measured again: the shipped Firefox 159.0.1 receipt below, its null native adapter included (the workstation has
+  no installed Firefox). The reruns of 2026-11-27 use Playwright's Firefox 157.0, where 48 native WebGPU rows pass.
+- Closed, the merge markers: `tests/integration-json.test.js` passes.
+- Closed, the Batch 258 forms faults: `packages/ui/tests/forms.test.js` passes, and `forms-browser.mjs` passes on
+  WebGPU and on the WebGL2 compatibility layer.
+- Closed, the duplicate MCP request ids and the GPU planner registrations: `packages/mcp/tests/server.test.js` and
+  `tests/gpu-browser-registration.test.js` pass.
+- Not defects: the colour picker's 64 by 64 cell square is its documented scope ([limits.md](limits.md), "Batch 258
+  forms scope"; a continuous shader is polish), and assistive-technology certification needs a person.
+
 Shipped Firefox159.0.1 now launches through the package-owned BiDi transport and
 passes the scoped46 numeric cases,733 render pipelines and477 legal compute
 pipelines plus the required negative pipeline rejection. The old patched-browser
