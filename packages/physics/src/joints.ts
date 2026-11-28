@@ -412,7 +412,7 @@ export class PhysicsJoint {
       columns = this.owner.kernel.columns,
       h = this.owner.substepLength;
     const sum = (k: number): number =>
-      (columns[`jointImpulse${first + k}`][row] + columns[`jointMotor${first + k}`][row]) / h;
+      (columns[`jointImpulse${first + k}`][row] + columns[`jointLockP${first + k}`][row] + columns[`jointMotor${first + k}`][row]) / h;
     if (columns.jointFlags[row] & JOINT_DISTANCE) {
       // A rope's or a spring's one row acts along the line between the anchors, and nothing turns.
       if (first !== 0) return [0, 0, 0];
@@ -491,6 +491,7 @@ export class PhysicsJoint {
     if (!distance) columns.jointAngle[row] = -columns.jointAngle[row];
     for (let axis = 0; axis < 6; axis++) {
       columns[`jointImpulse${axis}`][row] = 0;
+      columns[`jointLockP${axis}`][row] = 0;
       columns[`jointMotor${axis}`][row] = 0;
     }
     this.wake();

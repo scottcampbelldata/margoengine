@@ -96,6 +96,66 @@ fn measured_period(w: &mut World, bob: u32, steps: u32) -> f64 {
 }
 
 #[test]
+fn a_bob_swung_by_a_force_keeps_the_period_gravity_gives_it() {
+    // KB2161: a locked body's applied loads move its pose by h^2 a / 2 over a substep, as the locks' midpoint step reads
+    // them. Gravity alone had it at first, so a body's own force of m g, the same load, swung it 0.013% off gravity's
+    // period. Both now run the same steps.
+    let swing = |by_force: bool| {
+        let theta = 150.0f64.to_radians();
+        let mut w = world(4);
+        let (length, mass, inertia) = (1.5f64, 2.0f32, 0.01f32);
+        if by_force {
+            w.header_mut().gravity = [0.0, 0.0, 0.0];
+        }
+        let pivot = anchor(&mut w);
+        place(&mut w, pivot, v3(0.0, 2.0, 0.0));
+        let at = v3((length * theta.sin()) as f32, 2.0 - (length * theta.cos()) as f32, 0.0);
+        let bob = point(&mut w, at, mass, inertia);
+        let turned = Q { x: 0.0, y: 0.0, z: (theta / 2.0).sin() as f32, w: (theta / 2.0).cos() as f32 };
+        w.set_pose(bob, at, turned, false);
+        spherical(&mut w, pivot, bob, v3(0.0, 0.0, 0.0), v3(0.0, length as f32, 0.0));
+        if by_force {
+            w.set_v(FORCE_X, bob as usize, v3(0.0, -(G as f32) * mass, 0.0));
+        }
+        let pivot_inertia = inertia as f64 + mass as f64 * length * length;
+        let want = 4.0 * ((pivot_inertia / (mass as f64 * length)) / G).sqrt() * elliptic_k((theta / 2.0).sin());
+        (measured_period(&mut w, bob, (want * 6.0 * 60.0) as u32), want)
+    };
+    let ((force, want), (gravity, _)) = (swing(true), swing(false));
+    println!("swung by a force: {force:.6} s, by gravity {gravity:.6} s, the closed form {want:.6} s");
+    assert!((force - want).abs() < 0.0002 * want, "{force} s against {want} s");
+    assert!((force - gravity).abs() < 1e-5 * gravity, "a force of m g swung it in {force} s, gravity in {gravity} s");
+}
+
+#[test]
+fn a_pivoted_bob_turned_by_a_torque_turns_as_the_closed_form() {
+    // KB2161: a torque on a body a lock holds at a pivot turns it about the pivot at tau / I, I its inertia about the pivot,
+    // so theta = tau t^2 / (2 I). Its h^2 W tau move over a substep is read by the locks' midpoint step as h^2 W tau / 2.
+    let mut w = world(4);
+    w.header_mut().gravity = [0.0, 0.0, 0.0];
+    let pivot = anchor(&mut w);
+    place(&mut w, pivot, v3(0.0, 0.0, 0.0));
+    let (mass, inertia, length) = (2.0f32, 0.01f32, 1.5f32);
+    let bob = point(&mut w, v3(0.0, -length, 0.0), mass, inertia);
+    spherical(&mut w, pivot, bob, v3(0.0, 0.0, 0.0), v3(0.0, length, 0.0));
+    let tau = 0.5f32;
+    w.set_v(TORQUE_X, bob as usize, v3(0.0, 0.0, tau));
+    let pivot_inertia = inertia as f64 + mass as f64 * (length * length) as f64;
+    let steps = 90u32;
+    let mut worst = 0.0f64;
+    for step in 1..=steps {
+        w.step(DT);
+        let t = DT as f64 * step as f64;
+        let want = tau as f64 * t * t / (2.0 * pivot_inertia);
+        let p = w.v(POSITION_X, bob as usize);
+        let got = (p.x as f64).atan2(-(p.y as f64));
+        worst = worst.max((got - want).abs() / want);
+    }
+    println!("turned by a torque: worst {:.4}% of the closed form", worst * 100.0);
+    assert!(worst < 0.0002, "{}% of the closed form", worst * 100.0);
+}
+
+#[test]
 fn atan2_is_the_real_angle_in_every_quadrant() {
     for i in -360..=360 {
         let angle = i as f64 * std::f64::consts::PI / 360.0;
@@ -297,6 +357,19 @@ fn a_chain_laid_out_level_stays_a_chain_as_it_snaps_taut() {
     let (worst, opened) = level_chain(1000.0, 1200);
     assert!(worst < 0.2 * full, "outgrew its length by {worst} m");
     assert!(opened < 0.2 * full, "a joint opened by {opened} m");
+}
+
+#[test]
+fn a_level_chain_holds_a_heavy_end_through_every_snap() {
+    // KB2161: after the first swing each snap taut turned the light links faster than a substep holds, and a joint stood 4 mm
+    // open. The locks now close at the end pose with the midpoint rule, and a taut lock's geometric stiffness damps the free
+    // motion no substep resolves, so the chain holds 1e-4 of its length for 20 s.
+    let full = 4.95f32;
+    for ratio in [1000.0f32, 100.0, 10.0] {
+        let (worst, opened) = level_chain(ratio, 1200);
+        assert!(worst.is_finite() && worst < 1e-4 * full, "{ratio}:1 outgrew its length by {worst} m");
+        assert!(opened.is_finite() && opened < 1e-4 * full, "{ratio}:1: a joint opened by {opened} m");
+    }
 }
 
 #[test]
@@ -581,7 +654,7 @@ fn most_impulse(w: &World, joints: &[u32]) -> f32 {
     let mut most = 0.0f32;
     for &joint in joints {
         for k in 0..6 {
-            most = most.max(w.s(JOINT_IMPULSE_0 + k, joint as usize).abs());
+            most = most.max(w.joint_load(joint as usize, k).abs());
         }
     }
     most

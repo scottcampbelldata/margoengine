@@ -363,10 +363,12 @@ impl World {
         if staged {
             self.window.kin = Some(substep);
         }
+        self.note_mid_start();
         self.integrate_velocities(h);
         tick(self, 10, inner);
         self.hold_multibodies();
         self.refresh_joints(h, true);
+        self.damp_taut(h);
         let shifts = self.collide_pairwise(h, substep as usize);
         self.note_approach();
         self.warm_start();
@@ -399,11 +401,15 @@ impl World {
             // With no relaxing pass the last pushing one is the last word, and friction is always solved in it.
             self.solve_contacts(h, stiffness, true, substep as usize, least, relaxes == 0 && pass == all);
         }
+        self.note_springs(true, h);
         self.spring_multibodies(h);
+        self.note_springs(false, h);
         self.clamp_speeds();
         tick(self, 9, inner);
+        self.shed_locks(h);
         self.integrate_poses(h, substep, substeps);
         self.shift_poses(&shifts);
+        self.lock_drift();
         if staged {
             self.window.kin = Some(substep + 1);
         }
@@ -412,6 +418,8 @@ impl World {
         self.fk_multibodies(h);
         self.tally_drift(h);
         self.refresh_joints(h, false);
+        self.project_locks(h);
+        self.lock_speeds(h);
         tick(self, 10, inner);
         // As many relaxing passes as pushing ones: one pass does not take the anchors' push back out of a deep pile, and
         // what it leaves is speed no force gave (a pyramid of 14 rows or more rocks for good). An island with e extra

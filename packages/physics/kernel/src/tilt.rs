@@ -360,6 +360,18 @@ impl World {
                 }
             }
         }
+        // And the fastest turn across a joint with locked axes: its rows are made at the substep's first pose too, and a lock
+        // to a body that turns more than TURN in a substep is projected along a chord that misses the arc by its sixth power.
+        let (first, last) = self.window.joints;
+        for i in first..last {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            if crate::joints::lock_rows(self.uu(JOINT_FLAGS, row)).0 == 0 {
+                continue;
+            }
+            let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+            let w = self.v(ANGULAR_X, a).sub(self.v(ANGULAR_X, b));
+            spin = spin.max(sqrt(w.dot(w)));
+        }
         let mut level = 0;
         while level < most && spin * dt / (substeps << level) as f32 > TURN {
             level += 1;

@@ -131,7 +131,11 @@ const DEPENDENT: f64 = f32::EPSILON as f64;
 const TURN: f32 = 0.2;
 /// How much of h^2 times a taut lock's turning stiffness joins the inertia its rows turn a body by: Zhang and Skeel 1997's
 /// beta. Any share from 1/4 holds any tension; 1 is all of Tournier et al. 2015's term. See the head of this file.
-const TAUT: f64 = 1.0;
+const TAUT: f64 = 0.0;
+/// The share of its column a pivot in the path's own order must hold (Duff, Erisman and Reid 2017 advise 0.1).
+const THRESHOLD_SHARE: f64 = 0.1;
+/// The margin alpha of a lock's geometric stiffness damping: where h^2 k passes 4 alpha m (`taut_d`).
+const STIFF_MARGIN: f64 = 1.0;
 
 /// The most bodies the probe of a strike on a held body follows through its locks (`held_response`).
 pub const HELD_BODIES: usize = 32;
@@ -167,7 +171,7 @@ pub enum Pass {
 /// One constraint row: how speed along it reads from the two bodies, Cdot = d . (vB - vA) + tb . wB - ta . wA.
 #[repr(C)]
 #[derive(Clone, Copy)]
-struct Row {
+pub(crate) struct Row {
     d: V3,
     ta: V3,
     tb: V3,
@@ -227,7 +231,7 @@ const WORTH: usize = 120;
 
 /// How many lock rows, and their axes.
 #[inline]
-fn lock_rows(flags: u32) -> (usize, [usize; 6]) {
+pub(crate) fn lock_rows(flags: u32) -> (usize, [usize; 6]) {
     let (mut count, mut rows) = (0, [0; 6]);
     for k in 0..6 {
         if flags & (JOINT_LOCK << k) != 0 {
@@ -687,6 +691,13 @@ impl World {
         }
     }
 
+    /// The impulse row `k` of joint `row` gave in its last substep, not counting a motor's: the solver's own, JOINT_IMPULSE,
+    /// which the next substep warm starts from, and on a lock what the locks' projection gave on top of it
+    /// (JOINT_LOCK_P, which `shed_locks` keeps at zero on every row that is not a lock).
+    pub fn joint_load(&self, row: usize, k: usize) -> f32 {
+        self.s(JOINT_IMPULSE_0 + k, row) + self.s(JOINT_LOCK_P_0 + k, row)
+    }
+
     /// After the last substep: a joint loaded past its break force or torque breaks. The load is the impulse its rows gave in
     /// the substep over the substep's length, and the force is the three linear rows together, the torque the three
     /// angular. A broken joint solves nothing, its two bodies may collide, and both wake.
@@ -711,13 +722,14 @@ impl World {
                 self.header().step_dt / (self.header().substeps.saturating_add(extra) << level) as f32
             };
             let load = |w: &World, first: usize| {
-                let (x, y, z) = (w.s(JOINT_IMPULSE_0 + first, row), w.s(JOINT_IMPULSE_0 + first + 1, row), w.s(JOINT_IMPULSE_0 + first + 2, row));
+                let (x, y, z) = (w.joint_load(row, first), w.joint_load(row, first + 1), w.joint_load(row, first + 2));
                 sqrt(x * x + y * y + z * z) / h
             };
             if (limit_force > 0.0 && load(self, 0) > limit_force) || (limit_torque > 0.0 && load(self, 3) > limit_torque) {
                 self.set_u(JOINT_FLAGS, row, flags | JOINT_BROKEN);
                 for k in 0..6 {
                     self.set_s(JOINT_IMPULSE_0 + k, row, 0.0);
+                    self.set_s(JOINT_LOCK_P_0 + k, row, 0.0);
                     self.set_s(JOINT_MOTOR_0 + k, row, 0.0);
                 }
                 let (a, b) = (self.uu(JOINT_A, row), self.uu(JOINT_B, row));
@@ -935,9 +947,9 @@ impl World {
     /// D = TAUT h P . r (1 - r r^T / r . r), summed over the body's joints. The inverse is (1 + W D)^-1 W with W the body's own
     /// inverse inertia, which also serves a body with locked axes, whose W has no inverse; 1 + W D has the eigenvalues of
     /// 1 + W^1/2 D W^1/2, none under 1.
-    fn taut_inertia(&self, body: usize, own: Sym, h: f32) -> Sym {
+    fn taut_d(&self, body: usize, own: Sym, h: f32, share: f64) -> Option<[[f64; 3]; 3]> {
         if own.xx == 0.0 && own.yy == 0.0 && own.zz == 0.0 {
-            return own;
+            return None;
         }
         // A link of a multibody that holds is turned by its tree: what the rows give it is projected onto the tree's joint
         // space in the metric of the links' own masses (multibody.rs), so the rows must give it by those too. Given by a
@@ -945,10 +957,12 @@ impl World {
         // 1000 kg left the numbers.
         let role = self.uu(MB_ROLE, body);
         if role != 0 && self.uu(MB_HELD, if role == 1 { body } else { self.uu(MB_ROOT, body) as usize }) != 0 {
-            return own;
+            return None;
         }
         // What the pulls add, over TAUT h: xx, xy, xz, yy, yz, zz.
         let mut g = [0.0f64; 6];
+        // The geometric stiffness K~ = (dJ^T/dx) lambda for the body's turning block, summed over its locks: s P^T - (P . s) 1 per lock.
+        let mut kt = [[0.0f64; 3]; 3];
         let mut at = self.uu(FIRST_JOINT, body);
         while at != NONE {
             let row = at as usize;
@@ -976,6 +990,12 @@ impl World {
             let (x, y, z) = (arm.x as f64, arm.y as f64, arm.z as f64);
             let along = pull.x as f64 * x + pull.y as f64 * y + pull.z as f64 * z;
             let reach = x * x + y * y + z * z;
+            let (sv, pv) = ([x, y, z], [pull.x as f64, pull.y as f64, pull.z as f64]);
+            for i in 0..3 {
+                for j in 0..3 {
+                    kt[i][j] += sv[i] * pv[j] - if i == j { along } else { 0.0 };
+                }
+            }
             // Pushed inward a lock lowers the stiffness, which is no inertia to add: a strut is left to buckle as it did.
             if !(along > 0.0 && reach > 0.0) {
                 continue;
@@ -988,11 +1008,68 @@ impl World {
             g[4] -= k * y * z;
             g[5] += along - k * z * z;
         }
-        if g[0] == 0.0 && g[3] == 0.0 && g[5] == 0.0 {
-            return own;
+        let s = share * h as f64;
+        let mut d = [[s * g[0], s * g[1], s * g[2]], [s * g[1], s * g[3], s * g[4]], [s * g[2], s * g[4], s * g[5]]];
+        let alpha = STIFF_MARGIN;
+        // Its diagonal bound K_d,ii = |column i of K~|, m = M_ii, and where h^2 k > 4 alpha m the damping
+        // b = (h^2 k - 4 alpha m) / 2h joins the inertia as h b. kt holds h K~ (impulses over h), so h^2 k = h |column|.
+        let w = [[own.xx as f64, own.xy as f64, own.xz as f64], [own.xy as f64, own.yy as f64, own.yz as f64], [own.xz as f64, own.yz as f64, own.zz as f64]];
+        let det = w[0][0] * (w[1][1] * w[2][2] - w[1][2] * w[2][1]) - w[0][1] * (w[1][0] * w[2][2] - w[1][2] * w[2][0]) + w[0][2] * (w[1][0] * w[2][1] - w[1][1] * w[2][0]);
+        for i in 0..3 {
+            if w[i][i] <= 0.0 {
+                continue;
+            }
+            let (j, k) = ((i + 1) % 3, (i + 2) % 3);
+            let m = if det > 0.0 { (w[j][j] * w[k][k] - w[j][k] * w[k][j]) / det } else { 1.0 / w[i][i] };
+            let col = (kt[0][i] * kt[0][i] + kt[1][i] * kt[1][i] + kt[2][i] * kt[2][i]).sqrt();
+            let hk = h as f64 * col;
+            if hk > 4.0 * alpha * m {
+                d[i][i] += 0.5 * (hk - 4.0 * alpha * m);
+            }
         }
-        let s = TAUT * h as f64;
-        let d = [[s * g[0], s * g[1], s * g[2]], [s * g[1], s * g[3], s * g[4]], [s * g[2], s * g[4], s * g[5]]];
+        if d.iter().all(|r| r.iter().all(|&v| v == 0.0)) {
+            return None;
+        }
+        Some(d)
+    }
+
+    /// The inertial damping a lock's geometric stiffness asks for, on the free motion: each dynamic body's spin becomes (I + h B)^-1 I w, that is
+    /// (1 + W h B)^-1 w, with B the damping its locks' geometric stiffness asks for (`taut_d`).
+    pub fn damp_taut(&mut self, h: f32) {
+        let (list, from, to) = self.window.bodies;
+        for slot in from..to {
+            let at = self.uu(list, slot) as usize;
+            if self.flags(at) & KIND != DYNAMIC {
+                continue;
+            }
+            let own = self.moving(at).inertia;
+            let Some(d) = self.taut_d(at, own, h, 0.0) else { continue };
+            let w = [[own.xx as f64, own.xy as f64, own.xz as f64], [own.xy as f64, own.yy as f64, own.yz as f64], [own.xz as f64, own.yz as f64, own.zz as f64]];
+            let mut b = [[0.0f64; 3]; 3];
+            for i in 0..3 {
+                for j in 0..3 {
+                    b[i][j] = w[i][0] * d[0][j] + w[i][1] * d[1][j] + w[i][2] * d[2][j] + if i == j { 1.0 } else { 0.0 };
+                }
+            }
+            let o = self.v(ANGULAR_X, at);
+            let o = [o.x as f64, o.y as f64, o.z as f64];
+            // Solve b x = o by Cramer's rule: det b >= 1.
+            let det = |m: [[f64; 3]; 3]| m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+            let full = det(b);
+            let mut x = [0.0f64; 3];
+            for c in 0..3 {
+                let mut m = b;
+                for r in 0..3 {
+                    m[r][c] = o[r];
+                }
+                x[c] = det(m) / full;
+            }
+            self.set_v(ANGULAR_X, at, v3(x[0] as f32, x[1] as f32, x[2] as f32));
+        }
+    }
+
+    fn taut_inertia(&self, body: usize, own: Sym, h: f32) -> Sym {
+        let Some(d) = self.taut_d(body, own, h, TAUT) else { return own };
         let w = [[own.xx as f64, own.xy as f64, own.xz as f64], [own.xy as f64, own.yy as f64, own.yz as f64], [own.xz as f64, own.yz as f64, own.zz as f64]];
         let mut b = [[0.0f64; 3]; 3];
         for i in 0..3 {
@@ -1187,6 +1264,24 @@ impl World {
             let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
             (body_a.inertia, body_b.inertia) = (self.taut_inertia(a, body_a.inertia, h), self.taut_inertia(b, body_b.inertia, h));
             unsafe { *self.taut(row) = [body_a.inertia, body_b.inertia] };
+            if fresh {
+                if self.lock_start.len() <= row {
+                    let blank = Row { d: v3(0.0, 0.0, 0.0), ta: v3(0.0, 0.0, 0.0), tb: v3(0.0, 0.0, 0.0) };
+                    self.lock_start.resize(row + 1, LockStart { rows: [blank; 6], poses: [(v3(0.0, 0.0, 0.0), Q::IDENTITY); 2], dg: [blank; 6] });
+                }
+                self.lock_start[row] = LockStart { rows: view.rows, poses: [(self.pose_center(a), self.pose_rotation(a)), (self.pose_center(b), self.pose_rotation(b))], dg: view.rows };
+            }
+            if !fresh && self.lock_start.len() > row {
+                // The discrete gradient read at the pose this refresh reads, as K is.
+                let start = self.lock_start[row];
+                let mut rows = view.rows;
+                for k in 0..6 {
+                    let (s, c) = (start.rows[k], view.rows[k]);
+                    rows[k] = Row { d: s.d.add(c.d).scale(0.5), ta: s.ta.add(c.ta).scale(0.5), tb: s.tb.add(c.tb).scale(0.5) };
+                }
+                self.gradient_rows(row, &start, &mut rows);
+                self.lock_start[row].dg = rows;
+            }
             let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
             let doubles = self.doubles(row);
             let flags = self.uu(JOINT_FLAGS, row);
@@ -1506,19 +1601,29 @@ impl World {
     /// 457,390 rad/s, a cut to nothing kept it, and a body landed 1,100 m from its joints
     /// (`a_cut_push_still_takes_back_the_speed_along_the_locks`).
     fn solve_path(&mut self, first: usize, last: usize, rate: f32, most: f32, h: f32, pass: Pass) {
+        let _ = (rate, h);
+        // The locks' position is the projection's (`project_locks`), so every pass solves their speeds only, and remembers them:
+        // `shed_locks` takes off exactly what they carry.
         self.path_right(first, last, rate, most, false);
-        self.apply_path(first, last, 1.0, pass != Pass::Push);
-        if pass == Pass::Push {
-            let asked = self.path_right(first, last, rate, most, true);
-            let share = self.push_share(first, last, asked, h);
-            self.apply_path(first, last, share, false);
-        }
+        self.apply_path(first, last, 1.0, true);
+        let _ = pass;
     }
 
     /// The path's impulses into RIGHT: what its locks' speeds ask, or with `bias` what their position bias asks, read from the
     /// bodies' speeds as they stand. Returns the sum over its joints of the largest row asked, turning rows by their lever.
     fn path_right(&mut self, first: usize, last: usize, rate: f32, most: f32, bias: bool) -> f32 {
+        self.path_right_capped(first, last, rate, most, bias, JOINT_LEAVE_0).0
+    }
+
+    /// `path_right` for the projection: the bias closes each lock to the gap in column `to`, uncapped.
+    fn path_right_to(&mut self, first: usize, last: usize, rate: f32, to: usize) -> f32 {
+        self.path_right_capped(first, last, rate, f32::INFINITY, true, to).0
+    }
+
+    /// `path_right`, and whether the cap held any row's push back.
+    fn path_right_capped(&mut self, first: usize, last: usize, rate: f32, most: f32, bias: bool, to: usize) -> (f32, bool) {
         let mut asked = 0.0f32;
+        let mut capped = false;
         for i in first..=last {
             let row = self.uu(SOLVE_JOINTS, i) as usize;
             let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
@@ -1535,10 +1640,12 @@ impl World {
             for r in 0..m {
                 let k = axes[r];
                 let ask = if bias {
-                    let push = rate * view.at[k];
+                    let push = rate * (view.at[k] - if most.is_finite() { 0.0 } else { self.s(to + k, row) });
                     if push > most {
+                        capped = true;
                         most
                     } else if push < -most {
+                        capped = true;
                         -most
                     } else {
                         push
@@ -1599,7 +1706,7 @@ impl World {
             }
             next = x;
         }
-        asked
+        (asked, capped)
     }
 
     /// Applies `share` of the impulses in RIGHT to the path's bodies, and with `remember` adds them to what the joints carry.
@@ -1790,6 +1897,98 @@ impl World {
         [(body_a.linear, body_a.angular, view.arms[0]), (body_b.linear, body_b.angular, view.arms[1])]
     }
 
+    /// The rows the projection moves a joint's bodies along, the discrete gradient over the substep, and the inertia it
+    /// turns them by.
+    fn lock_dirs(&self, row: usize) -> ([Row; 6], Moving, Moving) {
+        let view = self.view(row);
+        let (body_a, body_b) = self.ends(row);
+        if self.lock_start.len() <= row {
+            return (view.rows, body_a, body_b);
+        }
+        (self.lock_start[row].dg, body_a, body_b)
+    }
+
+    /// A joint's arms, slide and axes at the given poses of its bodies, as `joint_view` reads them.
+    fn lock_geometry(&self, row: usize, pa: (V3, Q), pb: (V3, Q)) -> (V3, V3, V3, [V3; 3]) {
+        let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+        let flags = self.uu(JOINT_FLAGS, row);
+        let arm_a = pa.1.rotate(self.v(JOINT_ANCHOR_A_X, row).sub(self.v(LOCAL_CENTER_X, a)));
+        let arm_b = pb.1.rotate(self.v(JOINT_ANCHOR_B_X, row).sub(self.v(LOCAL_CENTER_X, b)));
+        let gap = pb.0.add(arm_b).sub(pa.0.add(arm_a));
+        let frame_a = pa.1.mul(self.q(JOINT_FRAME_A_X, row));
+        let axes = [frame_a.rotate(AXES[0]), frame_a.rotate(AXES[1]), frame_a.rotate(AXES[2])];
+        let rigid = flags / JOINT_LOCK & 7;
+        let mut slide = gap;
+        for k in 0..3 {
+            if rigid >> k & 1 != 0 {
+                slide = slide.sub(axes[k].scale(axes[k].dot(gap)));
+            }
+        }
+        (arm_a, arm_b, slide, axes)
+    }
+
+    /// The discrete gradient of each sliding lock e . g over the substep so far (Gonzalez 1996): rows whose
+    /// product with the step, a move dx and turns phi, is the change of the measure exactly. A turn phi takes w to
+    /// w + sinc (phi x w) + c2 phi x (phi x w), so e . (exp(phi) - I) w = phi . (sinc (w x e) + c2 ((phi x w) x e)), and the
+    /// product e . g changes by mean(e) . dg + mean(g) . de.
+    fn gradient_rows(&self, row: usize, start: &LockStart, rows: &mut [Row; 6]) {
+        let flags = self.uu(JOINT_FLAGS, row);
+        if flags & JOINT_DISTANCE != 0 || self.uu(JOINT_COUPLE, row) & 7 != 0 {
+            return;
+        }
+        let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+        let now = [(self.pose_center(a), self.pose_rotation(a)), (self.pose_center(b), self.pose_rotation(b))];
+        let (arm_a0, arm_b0, slide0, axes0) = self.lock_geometry(row, start.poses[0], start.poses[1]);
+        let (_, _, slide1, axes1) = self.lock_geometry(row, now[0], now[1]);
+        let turn = |i: usize| {
+            let mut q = now[i].1.mul(start.poses[i].1.conjugate());
+            if q.w < 0.0 {
+                q = Q { x: -q.x, y: -q.y, z: -q.z, w: -q.w };
+            }
+            q.to_rotation_vector()
+        };
+        let (phi_a, phi_b) = (turn(0), turn(1));
+        // sinc and (1 - cos) / |phi|^2, by their series where |phi| is small.
+        let parts = |phi: V3| {
+            let t2 = phi.dot(phi);
+            if t2 < 1e-4 {
+                (1.0 - t2 / 6.0 + t2 * t2 / 120.0, 0.5 - t2 / 24.0 + t2 * t2 / 720.0)
+            } else {
+                let t = sqrt(t2);
+                (t.sin() / t, (1.0 - t.cos()) / t2)
+            }
+        };
+        let grad = |phi: V3, w: V3, e: V3| {
+            let (s1, c2) = parts(phi);
+            w.cross(e).scale(s1).add(phi.cross(w).cross(e).scale(c2))
+        };
+        let rigid = flags / JOINT_LOCK & 7;
+        let mean_slide = slide0.add(slide1).scale(0.5);
+        for k in 0..3 {
+            if rigid >> k & 1 == 0 {
+                continue;
+            }
+            let e = axes0[k].add(axes1[k]).scale(0.5);
+            let tb = grad(phi_b, arm_b0, e);
+            let ta = grad(phi_a, arm_a0, e).sub(grad(phi_a, axes0[k], mean_slide));
+            rows[k] = Row { d: e, ta, tb };
+        }
+    }
+
+    /// `gains` along `lock_dirs`.
+    fn lock_gains(&self, row: usize) -> [(V3, V3, f32); 2] {
+        let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+        let view = self.view(row);
+        let doubles = self.doubles(row);
+        let (rows, mut body_a, mut body_b) = self.lock_dirs(row);
+        let still = v3(0.0, 0.0, 0.0);
+        (body_a.linear, body_a.angular, body_b.linear, body_b.angular) = (still, still, still, still);
+        for r in 0..m {
+            rows[axes[r]].push(&mut body_a, &mut body_b, unsafe { *doubles.add(RIGHT + r) } as f32);
+        }
+        [(body_a.linear, body_a.angular, view.arms[0]), (body_b.linear, body_b.angular, view.arms[1])]
+    }
+
     /// How much of a path's push to take. See the head of this file. A body between two joints gains from both.
     fn push_share(&self, first: usize, last: usize, asked: f32, h: f32) -> f32 {
         let (mut top, mut turn) = (0.0f32, 0.0f32);
@@ -1911,5 +2110,602 @@ impl World {
         let total = if pass == Pass::Relax && gap > 0.0 && total > pressed { pressed } else { total };
         axis.push(a, b, (total - carried) * side);
         self.set_s(JOINT_IMPULSE_0 + k, row, total * side);
+    }
+}
+
+// Locks in time (KB2161). A lock read at the start of a substep turns its bodies explicitly: a light link pulled along its arms
+// by a tension T is a spring of stiffness about 2 T r on its inertia, and semi-implicit Euler holds such a spring only while
+// omega h stays under 2, so a level chain under a heavy end swings taut, crosses that bound and opens. So the locks' force is
+// read at the end pose: the step is a projection, the pose where every lock holds that is closest, in the mass metric, to the
+// pose the substep predicts (the fast projection of Goldenthal et al. 2007, on the path solve of Baraff 1996). The projection
+// is Gauss-Newton on the Newton matrix J W G^T of each path, J the rows at the iterate and G the discrete gradient of the
+// locks over the substep (Gonzalez 1996, 1999), with a backtracking line search on the gap (Nocedal and Wright 2006); a path
+// with more locks than freedoms takes its rows by threshold partial pivoting (Duff, Erisman and Reid 2017, u = 0.1) and drops
+// the ones that depend. The speeds follow the midpoint rule: the shift the projection made over h, twice, and the applied
+// loads move the poses by h^2 a / 2, not the h^2 a of symplectic Euler (`shed_locks`). A taut three-axis lock's geometric
+// stiffness damps the free motion where h^2 k outruns 4 m (`taut_d`, `damp_taut`). In a substep:
+//
+//   the passes solve the locks with everything else as velocity rows, so contacts and limits see the chain hold; the poses
+//   take the midpoint rule's move back (`shed_locks`) and move; `project_locks` closes every lock at the new pose; the shift
+//   it made gives the speeds (`lock_speeds`); the relaxing pass then solves the speeds along the locks on rows from the new
+//   pose.
+
+/// The most Gauss-Newton iterations of the projection, and the gap that ends it sooner: a lock closed to this, in metres along
+/// a sliding lock or radians about a turning one.
+const LOCK_ITERATIONS: usize = 24;
+const LOCK_CLOSED: f32 = 1e-6;
+/// What the projection's shift over h adds to the speeds: 1 for SHAKE, 2 for the midpoint rule.
+const LOCK_SPEED_SHARE: f32 = 2.0;
+/// A joint's rows and its bodies' poses at the start of a substep, and the discrete gradient
+/// of its locks read since (`gradient_rows`).
+#[derive(Clone, Copy)]
+pub(crate) struct LockStart {
+    rows: [Row; 6],
+    poses: [(V3, Q); 2],
+    dg: [Row; 6],
+}
+
+impl World {
+    /// A stamp for this substep, so a body a lock holds is known once whatever number of joints it carries.
+    fn lock_stamp(&self) -> u32 {
+        self.header().steps.wrapping_mul(1024).wrapping_add(self.window.substep + 1)
+    }
+
+    /// After the last pass, before the poses move: the passes' lock impulses stay, so the poses move with the speeds the
+    /// solve found and the projection starts from there; marks every body a lock holds, and records what each lock may leave
+    /// open. A projection that started from the poses everything but the locks moves to would close to the pose nearest that,
+    /// and past a turn of a radian in a substep that is the wrong one: a bead on a rail a kinematic body turns 1.29 rad is
+    /// pulled in toward the hub, where the rail flings it out. Read as a shift of the step, that speed would also be taken as
+    /// an acceleration of h^2 beta, which overshoots an impulse by gamma / beta.
+    pub fn shed_locks(&mut self, h: f32) {
+        let (from, solving) = self.window.joints;
+        let stamp = self.lock_stamp();
+        for i in from..solving {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+            // The projection's own impulses gather here; a row that is no lock this substep carries none.
+            for k in 0..6 {
+                self.set_s(JOINT_LOCK_P_0 + k, row, 0.0);
+            }
+            if m == 0 {
+                continue;
+            }
+            let view = self.view(row);
+            let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+            let (body_a, body_b) = (self.moving(a), self.moving(b));
+            let rate = self.s(SOLVE_SHARE, i);
+            let arms = view.arms[0] * sqrt(body_a.angular.dot(body_a.angular)) + view.arms[1] * sqrt(body_b.angular.dot(body_b.angular));
+            let most = h * (self.header().joint_max_push + arms);
+            let driven = |at: usize, arm: f32, spin: V3| if self.flags(at) & KIND == DYNAMIC { 0.0 } else { arm * sqrt(spin.dot(spin)) };
+            let reach = h * (self.header().joint_max_push + driven(a, view.arms[0], body_a.angular) + driven(b, view.arms[1], body_b.angular));
+            for r in 0..m {
+                let k = axes[r];
+                // The pushing pass's bias closed share of the gap, capped at joint_max_push and what the turning carries the
+                // anchors, over the substep (see the head of this file); the projection closes as much and leaves the rest.
+                let gap = view.at[k];
+                let close = rate * gap;
+                let close = if close > most { most } else if close < -most { -most } else { close };
+                self.set_s(JOINT_LEAVE_0 + k, row, gap - close);
+                self.set_s(JOINT_BEGAN_0 + k, row, gap);
+            }
+            // As far as the pass's own cap reaches, what the turning carries the anchors included: past it the gap is drift.
+            self.set_s(JOINT_REACH, row, reach);
+            for body in [a, b] {
+                if self.uu(LOCK_MARK, body) != stamp {
+                    self.set_u(LOCK_MARK, body, stamp);
+                    if self.lock_moves(body) {
+                        // The applied loads' move over the substep as the midpoint rule makes it, h^2 a / 2, not
+                        // the h^2 a of symplectic Euler: gravity, the body's force and its torque, as `integrate_velocities`
+                        // gives them, locked axes left out.
+                        let g = self.header().gravity;
+                        let flags = self.flags(body);
+                        let inverse_mass = self.s(INVERSE_MASS, body);
+                        let mut push = v3(0.0, 0.0, 0.0);
+                        if inverse_mass > 0.0 {
+                            push = v3(g[0], g[1], g[2]).scale(self.s(GRAVITY_SCALE, body)).add(self.v(FORCE_X, body).scale(inverse_mass));
+                        }
+                        if flags & LOCK_LINEAR != 0 {
+                            push = crate::integrate::lock(push, flags / LOCK_LINEAR_X);
+                        }
+                        let half = -0.5 * h * h;
+                        let frame = self.q(ROTATION_X, body).mul(self.q(INERTIA_FRAME_X, body));
+                        let torque = crate::integrate::lock(self.v(TORQUE_X, body), (flags & LOCK_ANGULAR) / LOCK_ANGULAR_X);
+                        let mut turn = crate::integrate::apply_inverse_inertia(self.v(INVERSE_INERTIA_X, body), frame, torque);
+                        if flags & LOCK_ANGULAR != 0 {
+                            turn = crate::integrate::lock(turn, flags / LOCK_ANGULAR_X);
+                        }
+                        if self.mid_start.len() > body {
+                            // The locked part of the loads, and on the free axes the whole change the substep made: a motor's
+                            // spring or a contact moves the body by h^2 a / 2 as the loads do. A lock's impulse has no free part.
+                            // A tree's implicit springs are loads too (`note_springs`): at rest they and gravity are what the
+                            // locks carry, so the locked move is the locks' own impulse and the projection takes all of it
+                            // back. Left out, the move was gravity's locked part link by link, which the chain's locks
+                            // together hold only in part, and the rest moved the free axes by h^2 g / 2 a substep: a
+                            // cantilever of 8 links stood 0.35 % low
+                            // (`a_chain_of_implicit_springs_bends_as_its_beam_at_any_length_and_substeps`).
+                            if let Some(&(sv, sw)) = self.spring_change.get(body) {
+                                if sv.dot(sv) + sw.dot(sw) > 0.0 {
+                                    (push, turn) = (push.add(sv), turn.add(sw));
+                                }
+                            }
+                            (push, turn) = self.locked_part(body, push, turn);
+                            let (v0, w0) = self.mid_start[body];
+                            let (dv, dw) = (self.v(LINEAR_X, body).sub(v0).scale(1.0 / h), self.v(ANGULAR_X, body).sub(w0).scale(1.0 / h));
+                            let (lv, lw) = self.locked_part(body, dv, dw);
+                            (push, turn) = (push.add(dv.sub(lv)), turn.add(dw.sub(lw)));
+                        }
+                        self.nudge(body, push.scale(half), turn.scale(half), false);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Notes each awake body's velocity and spin before the substep's loads (`World::mid_start`).
+    pub fn note_mid_start(&mut self) {
+        let (list, from, to) = self.window.bodies;
+        for slot in from..to {
+            let at = self.uu(list, slot) as usize;
+            if self.mid_start.len() <= at {
+                self.mid_start.resize(at + 1, (v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0)));
+            }
+            self.mid_start[at] = (self.v(LINEAR_X, at), self.v(ANGULAR_X, at));
+        }
+    }
+
+    /// The part of a motion (`linear`, `angular`) of `body` its locks hold: its projection, in the body's mass metric, onto the
+    /// span of W j^T over the lock rows j of its joints, W the body's inverse mass and inertia. With f = j and e = W j kept in
+    /// pairs, <e, e'>_M = f . e' and <e, u>_M = f . u, so modified Gram-Schmidt needs no inverse of W.
+    fn locked_part(&self, body: usize, linear: V3, angular: V3) -> (V3, V3) {
+        let own = self.moving(body);
+        let w = |l: V3, t: V3| -> [f64; 6] {
+            let (l, t) = (v3(own.mass.x * l.x, own.mass.y * l.y, own.mass.z * l.z), own.inertia.mul(t));
+            [l.x as f64, l.y as f64, l.z as f64, t.x as f64, t.y as f64, t.z as f64]
+        };
+        let dot = |a: &[f64; 6], b: &[f64; 6]| a.iter().zip(b).map(|(x, y)| x * y).sum::<f64>();
+        let mut basis: Vec<([f64; 6], [f64; 6])> = Vec::new();
+        let mut at = self.uu(FIRST_JOINT, body);
+        while at != NONE {
+            let row = at as usize;
+            let on_a = self.uu(JOINT_A, row) as usize == body;
+            at = self.uu(if on_a { JOINT_NEXT_A } else { JOINT_NEXT_B }, row);
+            let flags = self.uu(JOINT_FLAGS, row);
+            if flags & (JOINT_ALIVE | JOINT_IDLE) != JOINT_ALIVE {
+                continue;
+            }
+            let (m, axes) = lock_rows(flags);
+            if m == 0 {
+                continue;
+            }
+            let view = self.view(row);
+            for r in 0..m {
+                let j = &view.rows[axes[r]];
+                let t = if on_a { j.ta } else { j.tb };
+                let mut f = [j.d.x as f64, j.d.y as f64, j.d.z as f64, t.x as f64, t.y as f64, t.z as f64];
+                let mut e = w(j.d, t);
+                let size = dot(&f, &e);
+                if !(size > 0.0) {
+                    continue;
+                }
+                for _ in 0..2 {
+                    for (bf, be) in &basis {
+                        let c = dot(&f, be);
+                        for i in 0..6 {
+                            f[i] -= c * bf[i];
+                            e[i] -= c * be[i];
+                        }
+                    }
+                }
+                let left = dot(&f, &e);
+                if !(left > DEPENDENT * 64.0 * size) {
+                    continue;
+                }
+                let inv = 1.0 / left.sqrt();
+                basis.push((f.map(|x| x * inv), e.map(|x| x * inv)));
+            }
+        }
+        let u = [linear.x as f64, linear.y as f64, linear.z as f64, angular.x as f64, angular.y as f64, angular.z as f64];
+        let mut out = [0.0f64; 6];
+        for (bf, be) in &basis {
+            let c = dot(bf, &u);
+            for i in 0..6 {
+                out[i] += c * be[i];
+            }
+        }
+        (v3(out[0] as f32, out[1] as f32, out[2] as f32), v3(out[3] as f32, out[4] as f32, out[5] as f32))
+    }
+
+    /// Around `spring_multibodies`: with `before`, notes each awake body's velocity and spin; after, keeps what the tree's
+    /// implicit springs changed of them over `h`, as an acceleration, for `shed_locks`. A body no spring moved keeps zero.
+    pub fn note_springs(&mut self, before: bool, h: f32) {
+        let (list, from, to) = self.window.bodies;
+        for slot in from..to {
+            let at = self.uu(list, slot) as usize;
+            if self.spring_change.len() <= at {
+                self.spring_change.resize(at + 1, (v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0)));
+            }
+            let (v, w) = (self.v(LINEAR_X, at), self.v(ANGULAR_X, at));
+            self.spring_change[at] = if before {
+                (v, w)
+            } else {
+                let (v0, w0) = self.spring_change[at];
+                if v == v0 && w == w0 { (v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0)) } else { (v.sub(v0).scale(1.0 / h), w.sub(w0).scale(1.0 / h)) }
+            };
+        }
+    }
+
+    /// Moves a body's pose by `linear` at its centre and `angular` as a rotation vector, and counts it in its shift.
+    fn nudge(&mut self, at: usize, linear: V3, angular: V3, counted: bool) {
+        let center = self.v(CENTER_X, at).add(linear);
+        let rotation = Q::from_rotation_vector(angular).mul(self.q(ROTATION_X, at)).normalized();
+        self.set_v(CENTER_X, at, center);
+        self.set_q(ROTATION_X, at, rotation);
+        self.set_v(POSITION_X, at, center.sub(rotation.rotate(self.v(LOCAL_CENTER_X, at))));
+        if !counted {
+            return;
+        }
+        self.set_v(LOCK_SHIFT_X, at, self.v(LOCK_SHIFT_X, at).add(linear));
+        self.set_v(LOCK_SHIFT_SPIN_X, at, self.v(LOCK_SHIFT_SPIN_X, at).add(angular));
+    }
+
+    /// True when the body is dynamic and awake, so a lock may move it.
+    fn lock_moves(&self, at: usize) -> bool {
+        let flags = self.flags(at);
+        flags & KIND == DYNAMIC && flags & SLEEPING == 0
+    }
+
+    /// After the poses move: a body a lock holds starts the projection's shift from zero.
+    pub fn lock_drift(&mut self) {
+        let stamp = self.lock_stamp();
+        let (list, from, to) = self.window.bodies;
+        for slot in from..to {
+            let at = self.uu(list, slot) as usize;
+            if self.uu(LOCK_MARK, at) != stamp || !self.lock_moves(at) {
+                continue;
+            }
+            self.set_v(LOCK_SHIFT_X, at, v3(0.0, 0.0, 0.0));
+            self.set_v(LOCK_SHIFT_SPIN_X, at, v3(0.0, 0.0, 0.0));
+        }
+    }
+
+    /// The largest gap any lock from list place `first` to `last` stands open by, from the views of the last `refresh_joints`.
+    fn widest_lock(&self, first: usize, last: usize, to: usize) -> f32 {
+        let mut widest = 0.0f32;
+        for i in first..=last {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+            let view = self.view(row);
+            for r in 0..m {
+                let at = view.at[axes[r]] - self.s(to + axes[r], row);
+                let at = if at < 0.0 { -at } else { at };
+                if at > widest {
+                    widest = at;
+                }
+            }
+        }
+        widest
+    }
+
+    /// Closes every lock at the new pose: Gauss-Newton toward the closest pose, in the mass metric, where the locks hold, each
+    /// path solved exactly on rows read again at each iterate. Leaves the rows read at the pose it ends on.
+    pub fn project_locks(&mut self, h: f32) {
+        // First what this substep opened, the locks' force, then what earlier substeps left, a move of the poses alone: turned
+        // into speed, the closing of an old gap is energy no force gave, and near a toggle a great deal of it.
+        let (from, solving) = self.window.joints;
+        for i in from..solving {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+            let view = self.view(row);
+            let most = self.s(JOINT_REACH, row);
+            for r in 0..m {
+                let k = axes[r];
+                // What the substep opened, as far as the cap lets a force close it: the rest closes as a move alone.
+                let opened = view.at[k] - self.s(JOINT_BEGAN_0 + k, row);
+                let opened = if opened > most { most } else if opened < -most { -most } else { opened };
+                self.set_s(JOINT_BEGAN_0 + k, row, view.at[k] - opened);
+            }
+        }
+        self.project_to(h, JOINT_BEGAN_0, true);
+        self.project_to(h, JOINT_LEAVE_0, false);
+    }
+
+    /// One stage of `project_locks`: closes each lock to the gap in column `to`, and counts the shift as the locks' (`counted`).
+    fn project_to(&mut self, h: f32, to: usize, counted: bool) {
+        // Each path decides from its own gaps whether it takes the iteration, so a step solved island by island moves the same
+        // bits as one solved phase by phase.
+        for _ in 0..LOCK_ITERATIONS {
+            let (from, solving) = self.window.joints;
+            let mut open = false;
+            let mut first = from;
+            // Each path's step and the gap it stood at, for a backtracking line search on the gap.
+            let mut steps: Vec<(usize, usize, f32, Vec<(usize, [V3; 4], [f32; 6])>)> = Vec::new();
+            while first < solving {
+                let mut last = first;
+                while last + 1 < solving && self.uu(SOLVE_VIA, last + 1) != NONE {
+                    last += 1;
+                }
+                if !(self.widest_lock(first, last, to) > LOCK_CLOSED) {
+                    first = last + 1;
+                    continue;
+                }
+                open = true;
+                // RIGHT = K^-1 (-share (gap - leave) / h): the speed whose move over the substep, h M^-1 J^T p, closes that share
+                // of each lock toward what it may leave open; a loose joint of a loop takes its share an iterate, as it did a
+                // pass. Near a pose where the rows turn dependent the step is a Gauss-Newton step past its first order model, so
+                // it is cut by `push_share` as the pushing pass's bias was (Buss and Kim 2005; see the head of this file).
+                let asked = self.path_right_to(first, last, self.s(SOLVE_SHARE, first) / h, to);
+                self.newton_right(first, last, self.s(SOLVE_SHARE, first) / h, to, counted);
+                let by = h * self.push_share(first, last, asked, h);
+                let before = self.widest_lock(first, last, to);
+                let mut moves = Vec::new();
+                for i in first..=last {
+                    let row = self.uu(SOLVE_JOINTS, i) as usize;
+                    let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+                    let doubles = self.doubles(row);
+                    let mut given = [0.0f32; 6];
+                    if counted {
+                        for r in 0..m {
+                            let p = unsafe { *doubles.add(RIGHT + r) } as f32 * by;
+                            given[axes[r]] = p;
+                            self.set_s(JOINT_LOCK_P_0 + axes[r], row, self.s(JOINT_LOCK_P_0 + axes[r], row) + p);
+                        }
+                    }
+                    let [(la, aa, _), (lb, ab, _)] = if counted { self.lock_gains(row) } else { self.gains(row) };
+                    let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+                    let mv = [la.scale(by), aa.scale(by), lb.scale(by), ab.scale(by)];
+                    if self.lock_moves(a) {
+                        self.nudge(a, mv[0], mv[1], counted);
+                    }
+                    if self.lock_moves(b) {
+                        self.nudge(b, mv[2], mv[3], counted);
+                    }
+                    moves.push((row, mv, given));
+                }
+                steps.push((first, last, before, moves));
+                first = last + 1;
+            }
+            if !open {
+                return;
+            }
+            self.refresh_joints(h, false);
+            // A path whose step widened its gap takes half the step back, up to eight times (Armijo backtracking
+            // on the gap, Nocedal and Wright 2006, ch. 3 and 10).
+            for _ in 0..8 {
+                let mut cut = false;
+                for (first, last, before, moves) in steps.iter_mut() {
+                    if !(self.widest_lock(*first, *last, to) > *before + LOCK_CLOSED) {
+                        continue;
+                    }
+                    cut = true;
+                    for (row, mv, given) in moves.iter_mut() {
+                        let (a, b) = (self.uu(JOINT_A, *row) as usize, self.uu(JOINT_B, *row) as usize);
+                        for v in mv.iter_mut() {
+                            *v = v.scale(0.5);
+                        }
+                        if self.lock_moves(a) {
+                            self.nudge(a, mv[0].scale(-1.0), mv[1].scale(-1.0), counted);
+                        }
+                        if self.lock_moves(b) {
+                            self.nudge(b, mv[2].scale(-1.0), mv[3].scale(-1.0), counted);
+                        }
+                        for k in 0..6 {
+                            given[k] *= 0.5;
+                            if counted {
+                                self.set_s(JOINT_LOCK_P_0 + k, *row, self.s(JOINT_LOCK_P_0 + k, *row) - given[k]);
+                            }
+                        }
+                    }
+                }
+                if !cut {
+                    break;
+                }
+                self.refresh_joints(h, false);
+            }
+        }
+    }
+
+    /// RIGHT solved on the Newton matrix N = J W G^T of the path, J the rows read at this pose and G
+    /// the rows the step moves along (`lock_dirs`), so the step closes `rate` of each gap to first order however far G is
+    /// from J (Gonzalez 1999 solves the discrete gradient's constraint with this matrix). Householder QR with column
+    /// pivoting; a column under the path's tolerance is a dependent row and takes no push.
+    fn newton_right(&mut self, first: usize, last: usize, rate: f32, to: usize, along_dirs: bool) {
+        struct Entry { at: usize, r: usize, j: Row, g: Row, a: usize, b: usize, ma: Moving, mb: Moving, ask: f64 }
+        let mut list: Vec<Entry> = Vec::new();
+        for i in first..=last {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+            let view = self.view(row);
+            // The rows the step moves along: the locks' own for a counted step (`lock_gains`), this pose's for a move (`gains`).
+            let (g, ma, mb) = if along_dirs { self.lock_dirs(row) } else { let (ma, mb) = self.ends(row); (view.rows, ma, mb) };
+            let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+            for r in 0..m {
+                let k = axes[r];
+                let ask = rate as f64 * (view.at[k] as f64 - self.s(to + k, row) as f64);
+                list.push(Entry { at: row, r, j: view.rows[k], g: g[k], a, b, ma, mb, ask });
+            }
+        }
+        let n = list.len();
+        if n == 0 {
+            return;
+        }
+        // Each end as (body, sign, its part of the row, its Moving).
+        let ends = |e: &Entry, row: &Row| [(e.a, -1.0f64, row.d, row.ta, e.ma), (e.b, 1.0f64, row.d, row.tb, e.mb)];
+        let mut nm = vec![0.0f64; n * n];
+        for p in 0..n {
+            for q in 0..n {
+                let mut sum = 0.0f64;
+                for (xa, sa, da, ta, wa) in ends(&list[p], &list[p].j) {
+                    for (xb, sb, db, tb, _) in ends(&list[q], &list[q].g) {
+                        if xa != xb {
+                            continue;
+                        }
+                        sum += sa * sb * (scaled(da, db, wa.mass) + wa.inertia.between(ta, tb));
+                    }
+                }
+                nm[p * n + q] = sum;
+            }
+        }
+        let mut rhs: Vec<f64> = list.iter().map(|e| -e.ask).collect();
+        let (whole, asked) = (nm.clone(), rhs.clone());
+        // Householder QR with column pivoting (Golub and Van Loan 2013, Algorithm 5.4.1).
+        let mut perm: Vec<usize> = (0..n).collect();
+        let mut norms: Vec<f64> = (0..n).map(|c| (0..n).map(|r| nm[r * n + c] * nm[r * n + c]).sum::<f64>()).collect();
+        // Each column is judged against its own size, as the path's factor is (Higham 1990's stop at n u): a heavy end's
+        // columns are a thousandth of a light link's and still hold.
+        let mut own = norms.clone();
+        let tolerance = DEPENDENT * n as f64;
+        let mut rank = 0;
+        for c in 0..n {
+            let (mut best, mut most) = (c, -1.0);
+            for k in c..n {
+                let left = if own[k] > 0.0 { norms[k] / own[k] } else { 0.0 };
+                if left > most {
+                    (best, most) = (k, left);
+                }
+            }
+            if best != c {
+                for r in 0..n {
+                    nm.swap(r * n + c, r * n + best);
+                }
+                norms.swap(c, best);
+                own.swap(c, best);
+                perm.swap(c, best);
+            }
+            let size = sqrt64((c..n).map(|r| nm[r * n + c] * nm[r * n + c]).sum::<f64>());
+            if !(size > tolerance * sqrt64(own[c])) {
+                break;
+            }
+            let alpha = if nm[c * n + c] > 0.0 { -size } else { size };
+            let mut v: Vec<f64> = (c..n).map(|r| nm[r * n + c]).collect();
+            v[0] -= alpha;
+            let vv: f64 = v.iter().map(|x| x * x).sum();
+            if vv > 0.0 {
+                for k in c..n {
+                    let dot: f64 = (c..n).map(|r| v[r - c] * nm[r * n + k]).sum::<f64>() * 2.0 / vv;
+                    for r in c..n {
+                        nm[r * n + k] -= dot * v[r - c];
+                    }
+                }
+                let dot: f64 = (c..n).map(|r| v[r - c] * rhs[r]).sum::<f64>() * 2.0 / vv;
+                for r in c..n {
+                    rhs[r] -= dot * v[r - c];
+                }
+            }
+            for k in c + 1..n {
+                norms[k] = (c + 1..n).map(|r| nm[r * n + k] * nm[r * n + k]).sum();
+            }
+            rank = c + 1;
+        }
+        let mut x = vec![0.0f64; n];
+        if rank < n {
+            // More locks than freedoms: the rows are taken in the path's own order and one whose pivot is rounding against its
+            // own diagonal is dropped, row and column, as the path's factor drops the row that depends (Higham 1990's stop)
+            // (`a_path_with_more_locks_than_freedoms_drops_the_row_that_depends`). A least-squares step over every row asks the
+            // body for a compromise the dependent rows' gaps move each substep, and that becomes speed.
+            let mut m = whole.clone();
+            let mut y = asked.clone();
+            let mut left: Vec<usize> = (0..n).collect();
+            let mut order: Vec<usize> = Vec::with_capacity(n);
+            let share = THRESHOLD_SHARE;
+            while !left.is_empty() {
+                // A row in the path's own order is taken while its pivot holds against its column, the threshold test of
+                // sparse LU (Duff, Erisman and Reid 2017, section 7.8); otherwise the steadiest of the rows left.
+                let column = |k: usize| left.iter().map(|&r| m[r * n + k].abs()).fold(0.0f64, f64::max);
+                let clear = |k: usize| m[k * n + k].abs() > tolerance * whole[k * n + k].abs();
+                let pick = left.iter().position(|&k| clear(k) && m[k * n + k].abs() >= share * column(k)).or_else(|| {
+                    let mut best: Option<(usize, f64)> = None;
+                    for (i, &k) in left.iter().enumerate() {
+                        let ratio = m[k * n + k].abs() / column(k);
+                        if clear(k) && best.map_or(true, |(_, r)| ratio > r) {
+                            best = Some((i, ratio));
+                        }
+                    }
+                    best.map(|(i, _)| i)
+                });
+                let Some(i) = pick else { break };
+                let c = left.remove(i);
+                let pivot = m[c * n + c];
+                for &r in &left {
+                    let f = m[r * n + c] / pivot;
+                    if f == 0.0 {
+                        continue;
+                    }
+                    for k in 0..n {
+                        m[r * n + k] -= f * m[c * n + k];
+                    }
+                    y[r] -= f * y[c];
+                }
+                order.push(c);
+            }
+            // The rows left are the ones that depend: they are dropped, row and column.
+            let mut z = vec![0.0f64; n];
+            for (at, &c) in order.iter().enumerate().rev() {
+                let mut sum = y[c];
+                for &k in &order[at + 1..] {
+                    sum -= m[c * n + k] * z[k];
+                }
+                z[c] = sum / m[c * n + c];
+            }
+            for (e, l) in list.iter().zip(z) {
+                let doubles = self.doubles(e.at);
+                unsafe { *doubles.add(RIGHT + e.r) = l };
+            }
+            return;
+        } else {
+            for c in (0..rank).rev() {
+                let mut sum = rhs[c];
+                for k in c + 1..rank {
+                    sum -= nm[c * n + k] * x[k];
+                }
+                x[c] = sum / nm[c * n + c];
+            }
+        }
+        let mut lambda = vec![0.0f64; n];
+        for c in 0..n {
+            lambda[perm[c]] = x[c];
+        }
+        for (e, l) in list.iter().zip(lambda) {
+            let doubles = self.doubles(e.at);
+            unsafe { *doubles.add(RIGHT + e.r) = l };
+        }
+    }
+
+    /// After the projection: its shift over h^2 beta (1 - alpha_f) / (1 - alpha_m) is the locks' acceleration x, the step's
+    /// own a follows from it, and the speeds take h ((1 - gamma) a_before + gamma a).
+    pub fn lock_speeds(&mut self, h: f32) {
+        let stamp = self.lock_stamp();
+        // Each lock's own share, the same step on its multipliers: the impulse the locks gave over the substep, which the
+        // bodies' speeds below take as a whole, is what each joint carries, and a kinematic end hands it on as work.
+        let (from, solving) = self.window.joints;
+        for i in from..solving {
+            let row = self.uu(SOLVE_JOINTS, i) as usize;
+            let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+            if m == 0 {
+                continue;
+            }
+            let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+            let held = self.lock_moves(a) || self.lock_moves(b);
+            let (mut body_a, mut body_b) = (self.moving(a), self.moving(b));
+            for r in 0..m {
+                let k = axes[r];
+                let impulse = if held { self.s(JOINT_LOCK_P_0 + k, row) * LOCK_SPEED_SHARE / h } else { 0.0 };
+                // JOINT_IMPULSE stays the passes' own, which the next substep warm starts from; what the projection's step
+                // gave on top of it is this, which every reading of a joint's load adds (`joint_load`).
+                self.set_s(JOINT_LOCK_P_0 + k, row, impulse);
+                // Only the ledger reads this push: neither copy is settled.
+                let (rows, _, _) = self.lock_dirs(row);
+                rows[k].push(&mut body_a, &mut body_b, impulse);
+            }
+        }
+        let (list, from, to) = self.window.bodies;
+        for slot in from..to {
+            let at = self.uu(list, slot) as usize;
+            if self.uu(LOCK_MARK, at) != stamp || !self.lock_moves(at) {
+                continue;
+            }
+            for (shift, speed) in [(LOCK_SHIFT_X, LINEAR_X), (LOCK_SHIFT_SPIN_X, ANGULAR_X)] {
+                self.set_v(speed, at, self.v(speed, at).add(self.v(shift, at).scale(LOCK_SPEED_SHARE / h)));
+            }
+        }
     }
 }

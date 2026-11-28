@@ -102,6 +102,15 @@ columns! {
     LOCAL_CENTER_X f32 Body,
     LOCAL_CENTER_Y f32 Body,
     LOCAL_CENTER_Z f32 Body,
+    // The shift the locks' projection made of the body in this substep (joints.rs, "Locks in time").
+    LOCK_SHIFT_X f32 Body,
+    LOCK_SHIFT_Y f32 Body,
+    LOCK_SHIFT_Z f32 Body,
+    LOCK_SHIFT_SPIN_X f32 Body,
+    LOCK_SHIFT_SPIN_Y f32 Body,
+    LOCK_SHIFT_SPIN_Z f32 Body,
+    // The substep stamp of the last substep a lock held the body.
+    LOCK_MARK u32 Body,
     // Forces stay until the caller clears them and reach every substep; impulses land once, before the first.
     FORCE_X f32 Body,
     FORCE_Y f32 Body,
@@ -568,6 +577,33 @@ columns! {
     JOINT_IMPULSE_3 f32 Joint,
     JOINT_IMPULSE_4 f32 Joint,
     JOINT_IMPULSE_5 f32 Joint,
+    // What of each lock's gap the projection leaves open this substep (joints.rs, "Locks in time"): the gap the substep began
+    // with less the share and cap the pushing pass's bias allowed, so a wide gap closes over several substeps.
+    JOINT_LEAVE_0 f32 Joint,
+    JOINT_LEAVE_1 f32 Joint,
+    JOINT_LEAVE_2 f32 Joint,
+    JOINT_LEAVE_3 f32 Joint,
+    JOINT_LEAVE_4 f32 Joint,
+    JOINT_LEAVE_5 f32 Joint,
+    // The gap each lock began the substep with: the projection's first stage closes to it, what the substep opened, and only
+    // that is the locks' force; the second closes the rest to JOINT_LEAVE and moves no speed.
+    JOINT_BEGAN_0 f32 Joint,
+    JOINT_BEGAN_1 f32 Joint,
+    JOINT_BEGAN_2 f32 Joint,
+    JOINT_BEGAN_3 f32 Joint,
+    JOINT_BEGAN_4 f32 Joint,
+    JOINT_BEGAN_5 f32 Joint,
+    // The most a lock's gap may close in a substep as the locks' force, in metres or radians: joint_max_push and what the
+    // turning carries the anchors, over the substep, the old pushing pass's cap.
+    JOINT_REACH f32 Joint,
+    // What each lock's projection gave this substep, an impulse times h, and then the impulse it gives the speeds
+    // (joints.rs, `lock_speeds`), which every reading of a joint's load adds to JOINT_IMPULSE.
+    JOINT_LOCK_P_0 f32 Joint,
+    JOINT_LOCK_P_1 f32 Joint,
+    JOINT_LOCK_P_2 f32 Joint,
+    JOINT_LOCK_P_3 f32 Joint,
+    JOINT_LOCK_P_4 f32 Joint,
+    JOINT_LOCK_P_5 f32 Joint,
     JOINT_MOTOR_0 f32 Joint,
     JOINT_MOTOR_1 f32 Joint,
     JOINT_MOTOR_2 f32 Joint,
