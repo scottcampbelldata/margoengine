@@ -78,7 +78,10 @@ test('a lazily compiled module is credited to the package whose WGSL it holds (K
   // core only. The module's text is optics' own WGSL, so the recording credits optics.
   const index = wgslLineIndex(root),
     source = readFileSync(join(root, 'packages/optics/src/screens.ts'), 'utf8'),
-    fragment = source.slice(source.indexOf('@fragment fn fragment('), source.indexOf('}`;', source.indexOf('@fragment fn fragment('))),
+    fragment = source.slice(
+      source.indexOf('@fragment fn fragment('),
+      source.indexOf('}`;', source.indexOf('@fragment fn fragment(')),
+    ),
     code = `struct ScreenVarying { @builtin(position) position: vec4f }
 ${fragment}}
 `;

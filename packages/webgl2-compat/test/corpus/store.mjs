@@ -87,7 +87,15 @@ export function wgslLineIndex(root) {
   try {
     files = execFileSync(
       'git',
-      ['grep', '-l', '-E', 'fn [A-Za-z_][A-Za-z0-9_]*[[:space:]]*\\(', '--', 'packages/*/src/**', 'packages/shared/*.js'],
+      [
+        'grep',
+        '-l',
+        '-E',
+        'fn [A-Za-z_][A-Za-z0-9_]*[[:space:]]*\\(',
+        '--',
+        'packages/*/src/**',
+        'packages/shared/*.js',
+      ],
       { cwd: root, encoding: 'utf8', maxBuffer: 64 << 20 },
     );
   } catch (e) {
@@ -127,7 +135,10 @@ export function authorsOf(code, index, min = 3) {
     const [name] = set;
     count.set(name, (count.get(name) ?? 0) + 1);
   }
-  return [...count].filter(([, n]) => n >= min).map(([name]) => name).sort();
+  return [...count]
+    .filter(([, n]) => n >= min)
+    .map(([name]) => name)
+    .sort();
 }
 
 /**
