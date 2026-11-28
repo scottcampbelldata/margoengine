@@ -265,7 +265,7 @@ export function chamferGrid(
 
 /** Options of {@link partitionMesh}. */
 export interface PartitionOptions {
-  /** Most quads per part, 1 to 250,000 (core `Geometry` takes at most 1,000,000 vertices). Default 250,000. */
+  /** Most quads per part, 1 to 250,000 (four vertices a quad, a materials mesh's 1,000,000). Default 250,000. */
   maxQuads?: number;
 }
 
@@ -288,9 +288,10 @@ export interface MeshPart {
 const MAX_PART_QUADS = 250_000;
 
 /**
- * Splits a mesh from {@link meshGrid} into parts a core `Geometry` (at most 1,000,000 vertices) and one material
- * each can take: quads are visited in mesh order and each goes to its palette index's open part, which closes once it
- * holds `maxQuads`. Parts come in the order of their first quad; every attribute is copied, never recomputed.
+ * Splits a mesh from {@link meshGrid} into parts one material mesh each can take (`createMesh` of
+ * `@margoengine/materials`, at most 1,000,000 vertices): quads are visited in mesh order and each goes to its palette
+ * index's open part, which closes once it holds `maxQuads`. Parts come in the order of their first quad; every
+ * attribute is copied, never recomputed.
  */
 export function partitionMesh(mesh: GridMesh, options: PartitionOptions = {}): MeshPart[] {
   if (typeof options !== 'object' || options === null)

@@ -35,7 +35,7 @@ export class SculptView implements EnginePlugin {
   #engine: Engine;
   #disposed = false;
 
-  /** Draws `session` in `engine`. @throws RangeError when the mesh is over gltf\/pbr's 1,000,000 vertices per primitive. */
+  /** Draws `session` in `engine`. @throws RangeError when the drawn vertices (80 bytes each) pass the device's storage binding. */
   static attach(engine: Engine, session: MeshSculptSession, options: SculptViewOptions = {}): SculptView {
     return new this(engine, session, options);
   }

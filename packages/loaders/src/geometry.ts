@@ -24,7 +24,7 @@ export interface ToGeometryOptions {
   group?: number | LoadedGroup;
   /**
    * `toGeometries` only: most vertices in one part, an integer from 3 to {@link CORE_MAX_VERTICES} (the default).
-   * Lower it for a renderer whose per-primitive limit is smaller (gltf/pbr takes 1,000,000).
+   * Lower it for a renderer whose per-mesh limit is smaller (a materials mesh takes 1,000,000).
    */
   maxPartVertices?: number;
 }
