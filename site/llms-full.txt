@@ -1347,7 +1347,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,450 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,452 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -4894,7 +4894,7 @@ notes one change's size or behaviour and its evidence. Every number has a row in
   matrix as TRS, packages/exporters/tests/zero-scale.test.js). Evidence:
   packages/core/tests/zero-scale.browser.mjs (WebGPU and the WebGL2 layer), packages/gltf/test/audit-gltfa.test.js,
   tests/modern-zero-determinant-normals.test.js.
-- River water and the world's edge (KB-BIOMES-RIVERSTEP1, KB-BIOMES-WORLDEDGE1, 2026-11-17): still river water fills a carved channel to three quarters of its depth (at most 1.5 m; 1.5 m over open ground), found 6 m across and 24 m to each bank, never rising downstream and averaged over 9 half cells; it still sits on the 512-cell coupled grid (8 m cells on a 4 km world), so its own waterline is that coarse and the terrain's banks draw the edge. A view's far ground holds the world's 16 m overview heights, too coarse for an 8 m creek: there the creek is the `riverbed` ground material painted under the water (one `heightAt` per texel inside a river's corridor), not water with reflections. `horizon` far ground reaches 3 world sizes past each edge (at most 48 km) at a 64th of the world per texel (64 m on 4 km), with no plants and no shadows. Sizes (quality gate bundle measure): `@margoengine/biomes/view` 11,774 to 13,431 B gzip (horizon on by default for land-locked views, so a lazy split would load it anyway and await before the first frame), `@margoengine/biomes/rivers` 2,264 to 2,817 B. Tests: packages/biomes/tests/view.test.js (RIVERSTEP1), tests/horizon.test.js.
+- River water and the world's edge (KB-BIOMES-RIVERSTEP1, KB-BIOMES-WORLDEDGE1, 2026-11-17): still river water fills a carved channel to three quarters of its depth (at most 1.5 m; 1.5 m over open ground), found 6 m across and 24 m to each bank, never rising downstream and averaged over 9 half cells; it still sits on the 512-cell coupled grid (8 m cells on a 4 km world), so its own waterline is that coarse and the terrain's banks draw the edge. Past the fine clipmap rings the water passes the rings' error (`@margoengine/water/banks`, at most 2 m) and ends where the view's own 2 m heights rise through it, so a creek stays one line of water wherever the view's heightmap holds it; the `riverbed` ground material is still painted under the water (one `heightAt` per texel inside a river's corridor), and past the world's 16 m overview heights (the horizon ring) the creek is that paint only. `horizon` far ground reaches 3 world sizes past each edge (at most 48 km) at a 64th of the world per texel (64 m on 4 km), with no plants and no shadows. Sizes (quality gate bundle measure): `@margoengine/biomes/view` 11,774 to 13,431 B gzip (horizon on by default for land-locked views, so a lazy split would load it anyway and await before the first frame), `@margoengine/biomes/rivers` 2,264 to 2,817 B. Tests: packages/biomes/tests/view.test.js (RIVERSTEP1), tests/horizon.test.js.
 - Frame budgets and film frames (KB-FILM-CLOCK1, 2026-11-17): the live per-frame budgets in milliseconds (terrain `PlanetTerrain` `budget`, biomes `BiomeView` `budget`, gltf `loadGLTFProgressive` `frameBudget`) make a slower machine do less work a frame, so a frame drawn while work is still arriving differs between machines. Each has a work-count twin that replaces it (`maxBuilds`, `maxSteps`, `maxJobs`) and a `clock` option (also `SceneFade`'s third argument); a film uses the counts. The live defaults are unchanged.
 - Film frames on every run (GAP-FILM-READY, KB-FILM-GPUSHARE1, 2026-11-17, LIM-661): a 90-frame rain shot (Bruneton
   sky with clouds, AgX, shadows, Weather rain, 1280x720) read with headless `readPixels` is byte for byte the same in
@@ -17556,14 +17556,26 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   bound 1.3).
 - **Still open:** the far half, below.
 
-### Open 2026-11-27: seen from far off, a narrow creek breaks into separate patches of water (KB-BIOMES-RIVERSTEP1, far half; terrain, water, biomes)
+### Fixed 2026-11-28: seen from far off, a narrow creek broke into separate patches of water (KB-BIOMES-RIVERSTEP1, far half; water, biomes)
 
-- **Repro:** the `aerial-west` view of timber-valley: past a few hundred metres the creek is a row of separate blue
-  patches, then only the riverbed paint.
-- **Cause:** a clipmap ring's cells grow with distance (16 and 32 m from about 500 m) past the channel's 14 m width. The
-  ring takes the ground at its vertices only, so the water, 0.3 m under the banks, shows where a vertex falls in the
-  channel and is covered elsewhere. A fix has to either keep the channel's low ground in the coarse rings or let the
-  water pass the coarse ground's error in the depth test; both are design work.
+- **Repro:** the `aerial-west` view of timber-valley, or ten-thousand-trees with `water: { rivers: 'auto' }`: past a few
+  hundred metres the creek was a row of separate blue patches, then only the riverbed paint. With the view's default
+  fixed clipmap anchor the patches reached the camera once the flight left its start.
+- **Cause:** a clipmap ring's cells grow with distance from its centre (16 and 32 m from about 500 m) past the channel's
+  14 m width. The ring takes the ground at its vertices only, so the water, 0.3 m under the banks, showed where a vertex
+  fell in the channel and was covered by triangles bridging the banks elsewhere.
+- **Fix:** new optional entry `@margoengine/water/banks` (`WaterBanks`), attached by `BiomeView` to its river and lake
+  water (`packages/biomes/src/view.ts`): each water vertex moves toward the eye along its view ray until it stands as
+  high as the rings' geometric error there (slope 0.25 times twice the ring spacing less a texel, at most 2 m), which
+  keeps its pixel and only brings its depth nearer, and fragments over the view's own 2 m heights at or above the surface
+  are dropped, so the waterline follows the heightmap, not the rings. Near the camera, where the rings sample every
+  texel, nothing changes. Sources: Losasso and Hoppe 2004 (geometry clipmaps), Strugar 2009 (CDLOD morph), Ulrich 2002
+  (per-level geometric error), Lengyel 2000 (projected depth offset); see `packages/water/src/banks.ts`.
+- **Regression test:** `node packages/water/test/banks.browser.mjs` and `--compat` (a 6 m channel under rings of 2 m
+  cells from 300 m up: the channel's centre column showed water in 153 of 400 rows before, 400 of 400 with the banks,
+  and no water pixel past its walls; WebGPU and the WebGL2 compatibility layer).
+- **Note for the terrain and biomes owners:** the terrain rings and BiomeView's default anchor are unchanged; the fix
+  lives in the water, which reads the terrain's heightmap and ring layout.
 
 ### Fixed 2026-11-27: past a landlocked world's edge the view showed a flat blue plane (KB-BIOMES-WORLDEDGE1; biomes)
 
