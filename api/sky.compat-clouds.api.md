@@ -242,6 +242,9 @@ export interface WeatherOptions {
     exposure?: number;
     lens?: WeatherLensOptions | false;
     nearFade?: readonly [number, number];
+    dropSizes?: readonly [number, number];
+    rainVariation?: number;
+    gusts?: number;
     lightning?: WeatherLightningOptions;
 }
 

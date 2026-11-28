@@ -311,6 +311,26 @@ export interface WeatherOptions {
    * never taken nearer than the camera's near plane. Default [0.4, 2].
    */
   nearFade?: readonly [number, number];
+  /**
+   * The range of raindrop diameters drawn, `[smallest, largest]` in millimetres, 0.1 to 8, smallest first. Each drop
+   * takes its own diameter from Marshall and Palmer's exponential for the rain rate ({@link rainDropSample}), falls at
+   * Gunn and Kinzer's terminal speed for that size, so it streaks for its own length and slants by its own
+   * atan(wind / fall), and carries the light Garg and Nayar give a streak, its diameter over its speed
+   * ({@link rainStreakWeight}). Drops above about 6 mm break up in the air (Villermaux and Bossa 2009). Default [0.5, 6].
+   */
+  dropSizes?: readonly [number, number];
+  /**
+   * How much the rain gathers into moving sheets, 0 (even rain) to 1: the drops' light is scaled by a smooth field that
+   * travels with the wind, from a quarter in the gaps to twice in the sheets, keeping the mean ({@link rainSheet}).
+   * Default 0.5.
+   */
+  rainVariation?: number;
+  /**
+   * Gust strength, 0 (steady wind) to 1: two gust fronts travel downwind at the wind speed and add up to this share of
+   * the wind to each drop's motion, so the streaks' slant changes across the frame and over time ({@link rainGust}).
+   * Nothing gusts in still air. Default 0.5.
+   */
+  gusts?: number;
   /** Storms; omitted means no lightning. */
   lightning?: WeatherLightningOptions;
 }
@@ -542,9 +562,17 @@ interface Active {
 // disc reaches). It keeps the disc's light (1.596 radii squared) for any sweep and tapers at both ends, so the capsules
 // of a shot's consecutive sub-frames add up to an even streak; a capsule shaded at full strength out to its round
 // ends doubled the light where two met, and the streaks showed as rows of beads.
+// Rain drops (rain, look): each drop's diameter is drawn from Marshall and Palmer's exponential (rain.x slope per mm,
+// rain.y share, rain.z smallest mm; `rainDropSample`) and falls at Gunn and Kinzer's speed for it times rain.w (1 with a
+// rain rate, else the fixed fall over the median drop's speed), quantised to k / 512 m/s and wrapped like the snow's
+// fall phase. Its streak is its own velocity over the streak seconds, its light its diameter over its speed over the
+// mean (look.z; `rainStreakWeight`), its width the drop's own size where that is wider than the base width, with the
+// light spread over it. look.x: the sheet field's strength (`rainSheet`, evaluated in the rain's frame, q less the
+// wind's drift, whose waves fit the box). look.y: the gusts (`rainGust`), look.w the gust clock in seconds (wrapped at
+// RAIN_GUST_PERIOD): the drop moves by the gust velocity's time integral and streaks along wind plus gust.
 const shader = `
 struct Weather {
- camera:mat4x4f, eye:vec4f, volume:vec4f, drift:vec4f, colour:vec4f, screen:vec4f, params:vec4f, extra:vec4f, lens:vec4f,
+ camera:mat4x4f, eye:vec4f, volume:vec4f, drift:vec4f, colour:vec4f, screen:vec4f, params:vec4f, extra:vec4f, lens:vec4f, rain:vec4f, look:vec4f,
 }
 @group(0) @binding(0) var<uniform> w:Weather;
 struct Out {@builtin(position) position:vec4f,@location(0) @interpolate(perspective,centroid) uv:vec2f,@location(1) @interpolate(perspective,centroid) alpha:f32,@location(2) @interpolate(perspective,centroid) sweep:f32}
@@ -555,6 +583,8 @@ fn flakeSize(ii:u32)->f32 {
  let sizeMeters=0.0005*pow(7.172586*melted*melted*melted,0.71428571);
  return sizeMeters;
 }
+fn dropSize(ii:u32)->f32 {return w.rain.z-log(1.0-rnd(ii,3u)*w.rain.y)/w.rain.x;}
+fn dropFall(d:f32)->f32 {return max(0.1,9.65-10.3*exp(-0.6*d))*w.rain.w;}
 const corners=array<vec2f,6>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(-1,1),vec2f(1,-1),vec2f(1,1));
 const culled=Out(vec4f(2,2,2,1),vec2f(0),0.0,0.0);
 @vertex fn vertex(@builtin(vertex_index) vi:u32,@builtin(instance_index) ii:u32)->Out {
@@ -563,12 +593,24 @@ const culled=Out(vec4f(2,2,2,1),vec2f(0),0.0,0.0);
  let start=vec3f(rnd(ii,0u),rnd(ii,1u),rnd(ii,2u))*size;
  // The drift (velocity times time, wrapped on the CPU) keeps the numbers small; the box follows the camera.
  let sizeMeters=flakeSize(ii);
- let k=u32(round(w.extra.y*pow(sizeMeters*2000.0,0.16)*512.0));
  let flakes=w.params.x>0.5;
- let fall=select(w.extra.y,f32(k)*0.001953125,flakes);
- let fallen=select(w.drift.y,-f32((k*u32(w.drift.y))&0xffffffu)*5.9604645e-8*size.y,flakes);
+ let drop=dropSize(ii);
+ let k=u32(round(select(dropFall(drop),w.extra.y*pow(sizeMeters*2000.0,0.16),flakes)*512.0));
+ let fall=f32(k)*0.001953125;
+ let fallen=-f32((k*u32(w.drift.y))&0xffffffu)*5.9604645e-8*size.y;
  let rel=fract((start+vec3f(w.drift.x,fallen,w.drift.z)-w.eye.xyz)/size)-0.5;
  var q=w.eye.xyz+rel*size;
+ let wind=vec2f(w.extra.x,w.extra.z);
+ let speed=length(wind);
+ var gust=0.0;
+ if(!flakes&&speed>0.01){
+  let u=max(speed,0.5);
+  let along=dot(q.xz,wind/speed);
+  let p1=0.52359878*(along/u-w.look.w);
+  let p2=1.5707963*(along/u-w.look.w);
+  gust=w.look.y*(0.6*sin(p1)+0.4*sin(p2));
+  q+=vec3f(wind.x,0.0,wind.y)*w.look.y*(0.6*cos(p1)/0.52359878+0.4*cos(p2)/1.5707963);
+ }
  let snow=w.params.x>0.5;
  let ph=pcg(pcg(ii*4u+3u+bitcast<u32>(w.params.z)));
  let phase=vec2f(f32(ph&0xffffu),f32(ph>>16u))*9.5873799e-5;
@@ -603,7 +645,7 @@ const culled=Out(vec4f(2,2,2,1),vec2f(0),0.0,0.0);
   out.alpha=fade*sharp*sharp/(px*px);
   return out;
  }
- let velocity=vec3f(w.extra.x,-w.extra.y,w.extra.z);
+ let velocity=vec3f(w.extra.x*(1.0+gust),-fall,w.extra.z*(1.0+gust));
  let tail=q-velocity*w.params.y;
  let a=w.camera*vec4f(q,1);
  let b=w.camera*vec4f(tail,1);
@@ -615,13 +657,18 @@ const culled=Out(vec4f(2,2,2,1),vec2f(0),0.0,0.0);
  let dir=select(vec2f(0,1),d/length2,length2>0.0001);
  let normal=vec2f(-dir.y,dir.x);
  let head=corner.y>0.0;
- let halfWidth=max(w.extra.w*0.5,0.5);
+ let baseWidth=max(w.extra.w*0.5,0.5);
+ let halfWidth=clamp(drop*0.0005*w.screen.z/a.w,baseWidth,4.0);
  let base=select(pb,pa,head);
  let ndc=(base+normal*corner.x*halfWidth)*2.0/vp;
  let c=select(b,a,head);
  out.position=vec4f(ndc*c.w,c.z,c.w);
  out.uv=vec2f(corner.x,select(0.0,1.0,head));
- out.alpha=fade*(0.4+0.6*rnd(ii,3u));
+ let rainFrame=(q.xz-vec2f(w.drift.x,w.drift.z))*6.2831853/size.x;
+ let f=0.5+0.25*sin(rainFrame.x+2.0*rainFrame.y+1.3)+0.15*sin(3.0*rainFrame.x-rainFrame.y+4.1)+0.1*sin(-2.0*rainFrame.x+4.0*rainFrame.y+2.2);
+ let sheet=smoothstep(0.25,0.85,f);
+ let weight=clamp(drop/max(0.1,9.65-10.3*exp(-0.6*drop))*w.look.z,0.25,3.0);
+ out.alpha=fade*0.7*weight*mix(1.0,0.25+1.75*sheet,w.look.x)*baseWidth/halfWidth;
  out.sweep=0.0;
  return out;
 }
@@ -708,6 +755,80 @@ export function rainDropCount(rainRate: number): number {
   return (8000 * rate(rainRate) ** 0.21) / 4.1;
 }
 
+/**
+ * The size law the rain draws each drop from ({@link rainDropSample}): Marshall and Palmer's slope `lambda` = 4.1 R^-0.21
+ * per mm for `rainRate` R mm/h, the smallest diameter `low` and the share `span` of the exponential between the two
+ * ends of `sizes`.
+ * @throws RangeError for a negative or non-finite rate.
+ */
+export function rainDropSizeLaw(
+  rainRate: number,
+  sizes: readonly [number, number] = [0.5, 6],
+): { lambda: number; low: number; span: number } {
+  const lambda = 4.1 * rate(rainRate) ** -0.21;
+  return { lambda, low: sizes[0], span: 1 - Math.exp(-lambda * (sizes[1] - sizes[0])) };
+}
+
+/**
+ * The diameter in millimetres of the raindrop drawn by `u` (0 to 1) in rain of `rainRate` mm/h over `sizes` mm: the
+ * inverse of Marshall and Palmer's (1948) exponential N(D) = N0 e^(-lambda D) cut to `sizes`. In 17 mm/h rain over
+ * [0.5, 6] mm the median drop is 0.81 mm and one drop in thirty is over 2 mm. The shader draws each drop from the same law.
+ */
+export function rainDropSample(u: number, rainRate: number, sizes: readonly [number, number] = [0.5, 6]): number {
+  const { lambda, low, span } = rainDropSizeLaw(rainRate, sizes);
+  return low - Math.log(1 - u * span) / lambda;
+}
+
+/**
+ * The light of a drop `diameter` mm across in its streak, relative to others: a drop lights a pixel for the time it
+ * takes to cross it, its diameter over its fall speed (Garg and Nayar 2006, "Photorealistic rendering of rain streaks",
+ * ACM TOG 25(3), 996 to 1002, doi:10.1145/1141911.1141985), so a big drop leaves a bright streak and a fast small one a
+ * faint one. The shader scales this by the inverse of its mean over the size law and clamps it to 0.25 to 3.
+ */
+export function rainStreakWeight(diameter: number): number {
+  return diameter / rainFallSpeed(diameter);
+}
+
+/** Mean of {@link rainStreakWeight} over the drops of `rainRate` mm/h drawn over `sizes` (midpoint rule, 256 steps). */
+export function rainStreakMean(rainRate: number, sizes: readonly [number, number] = [0.5, 6]): number {
+  let sum = 0;
+  for (let i = 0; i < 256; i++) sum += rainStreakWeight(rainDropSample((i + 0.5) / 256, rainRate, sizes));
+  return sum / 256;
+}
+
+/**
+ * The rain-sheet field of {@link WeatherOptions.rainVariation}, 0 to 1, at a point `x`, `z` metres in the rain's own
+ * frame (the world less the wind's drift) inside a box `size` metres across: three plane waves whose whole numbers of
+ * cycles fit the box, so the field is seamless where the box wraps, smoothed into bands. The shader computes the same.
+ */
+export function rainSheet(x: number, z: number, size: number): number {
+  const t = (2 * Math.PI) / size;
+  const f =
+    0.5 +
+    0.25 * Math.sin(t * (x + 2 * z) + 1.3) +
+    0.15 * Math.sin(t * (3 * x - z) + 4.1) +
+    0.1 * Math.sin(t * (-2 * x + 4 * z) + 2.2);
+  const s = Math.min(1, Math.max(0, (f - 0.25) / 0.6));
+  return s * s * (3 - 2 * s);
+}
+
+/** Seconds after which the two gust fronts of {@link rainGust} repeat: they turn every 12 and every 4 seconds. */
+export const RAIN_GUST_PERIOD = 12;
+
+/**
+ * The extra horizontal velocity, as a share of the wind, that the gusts of {@link WeatherOptions.gusts} `amount` give
+ * a drop `along` metres downwind at `seconds`, for a wind of `speed` m/s: two fronts, turning every 12 and 4 s, that
+ * travel downwind at the wind speed. The drops are moved by the time integral of the same sum, so the streaks point
+ * where the drops go. 0 in still air.
+ */
+export function rainGust(along: number, seconds: number, speed: number, amount: number): number {
+  if (speed < 0.01) return 0;
+  const w1 = (2 * Math.PI) / 12,
+    w2 = (2 * Math.PI) / 4,
+    u = Math.max(speed, 0.5);
+  return amount * (0.6 * Math.sin((w1 / u) * along - w1 * seconds) + 0.4 * Math.sin((w2 / u) * along - w2 * seconds));
+}
+
 /** The fall speed in m/s of rain of `rainRate` mm/h (`rainFallSpeed` of `rainDropDiameter`), or {@link RAIN_FALL_DEFAULT} for undefined. */
 export function rainFall(rainRate?: number): number {
   return rainRate === undefined ? RAIN_FALL_DEFAULT : rainFallSpeed(rainDropDiameter(rainRate));
@@ -763,6 +884,16 @@ function validate(o: WeatherOptions): void {
   if (o.brightness !== undefined) number(o.brightness, 'brightness', 0, 1e6);
   if (o.opacity !== undefined) number(o.opacity, 'opacity', 0, 1);
   if (o.exposure !== undefined) number(o.exposure, 'exposure', 0, 1);
+  if (o.rainVariation !== undefined) number(o.rainVariation, 'rainVariation', 0, 1);
+  if (o.gusts !== undefined) number(o.gusts, 'gusts', 0, 1);
+  if (o.dropSizes !== undefined) {
+    if (!Array.isArray(o.dropSizes) || o.dropSizes.length !== 2)
+      throw new TypeError('Weather dropSizes needs [smallest, largest] in millimetres; pass an array of two numbers');
+    number(o.dropSizes[0], 'dropSizes[0]', 0.1, 8);
+    number(o.dropSizes[1], 'dropSizes[1]', 0.1, 8);
+    if (o.dropSizes[0] > o.dropSizes[1])
+      throw new RangeError('Weather dropSizes smallest must not exceed largest; swap them');
+  }
   if (o.reactive !== undefined && typeof o.reactive !== 'boolean')
     throw new TypeError('Weather reactive must be true or false; pass a boolean');
   if (o.lens !== undefined && o.lens !== false) {
@@ -897,7 +1028,7 @@ export class Weather implements EnginePlugin {
   // Sleet draws its snow as a second overlay with its own uniform: one uploaded buffer holds one draw's values.
   private readonly snowOverlay = new ParticleOverlay();
   private snowUniform?: GPUBuffer;
-  private readonly snowValues = new Float32Array(48);
+  private readonly snowValues = new Float32Array(56);
   private engine?: Engine;
   private uniform?: GPUBuffer;
   private flashUniform?: GPUBuffer;
@@ -914,7 +1045,7 @@ export class Weather implements EnginePlugin {
     GPUBuffer,
     { code: string; key: string; pipeline: GPURenderPipeline; bind?: GPUBindGroup; extra?: GPUBindGroupEntry[] }
   >();
-  private readonly values = new Float32Array(48);
+  private readonly values = new Float32Array(56);
   private readonly flashValues = new Float32Array(4);
   private disposed = false;
   private seconds = 0;
@@ -1528,14 +1659,14 @@ export class Weather implements EnginePlugin {
     v[21] = height;
     v[22] = radius * 2;
     v[23] = snow ? size.low : 0;
-    // Position = start + drift, wrapped into the box on the CPU in double precision so it stays exact. Rain falls at
-    // one speed, so its drift is fall * time; the wind's is the running sum kept by onPreUpdate. Each snow flake falls
-    // at its own speed, k / 512 m/s (`snowflakeFallSpeed` of its size): drift.y is then the fall phase, seconds over
+    // Position = start + drift, wrapped into the box on the CPU in double precision so it stays exact. The wind's drift
+    // is the running sum kept by onPreUpdate. Each raindrop and snow flake falls at its own speed, k / 512 m/s
+    // (`rainFallSpeed` or `snowflakeFallSpeed` of its size): drift.y is then the fall phase, seconds over
     // 512 heights as an exact 24-bit count, and the shader takes flake k's fall as k times it, wrapped to 24 bits in
     // u32, which stays exact and continuous for every k when the count wraps (KB-SNOW-FALLSPEED1).
     const wrap = (value: number, size: number) => ((value % size) + size) % size;
     v[24] = wrap(this.drift[0], radius * 2);
-    v[25] = snow ? Math.floor(wrap(this.seconds / (512 * height), 1) * 16777216) : wrap(-fall * this.seconds, height);
+    v[25] = Math.floor(wrap(this.seconds / (512 * height), 1) * 16777216);
     v[26] = wrap(this.drift[1], radius * 2);
     // Snow sways with sin(phase) and cos(0.8 phase): the phase wraps at 10 pi, a whole turn of both.
     v[27] = (this.seconds * 1.3) % (Math.PI * 10);
@@ -1559,6 +1690,19 @@ export class Weather implements EnginePlugin {
     v[41] = fall;
     v[42] = wind[1];
     v[43] = snow ? size.span : Math.max(1, (tall / 540) * 1.2);
+    // rain: the drops' size law and the scale of their fall; look: sheets, gusts, the inverse mean streak light and
+    // the gust clock (see the shader's notes). Snow keeps a harmless law (slope 1) there.
+    const drops = o.dropSizes ?? [0.5, 6],
+      lawRate = o.rainRate ?? 80 * (o.intensity ?? 0.5) ** 3,
+      law = rainDropSizeLaw(lawRate, drops);
+    v[48] = snow ? 1 : law.lambda;
+    v[49] = snow ? 0 : law.span;
+    v[50] = snow ? 0 : law.low;
+    v[51] = o.rainRate === undefined ? fall / rainFallSpeed(rainDropDiameter(lawRate)) : 1;
+    v[52] = o.rainVariation ?? 0.5;
+    v[53] = o.gusts ?? 0.5;
+    v[54] = snow ? 1 : 1 / rainStreakMean(lawRate, drops);
+    v[55] = this.seconds % RAIN_GUST_PERIOD;
     // The mask is drawn while TAA reads masks, so a scene wires nothing (KB-TAA-PARTICLEMASK1).
     const masked = o.reactive ?? reactiveMaskWanted(c, this),
       cover = this.occlusion;

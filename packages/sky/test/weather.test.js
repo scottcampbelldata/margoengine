@@ -26,6 +26,13 @@ import {
   rainIntensity,
   rainDropCount,
   RAIN_FALL_DEFAULT,
+  rainDropSizeLaw,
+  rainDropSample,
+  rainStreakWeight,
+  rainStreakMean,
+  rainSheet,
+  rainGust,
+  RAIN_GUST_PERIOD,
 } from '@margoengine/sky/weather';
 import { snowNight } from '@margoengine/sky/scene-kits';
 import { MargoError } from '@margoengine/math/errors';
@@ -52,7 +59,7 @@ function rig(options) {
   h.engine.use(weather);
   return { h, weather, passes };
 }
-const uniform = (h) => new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 192).data);
+const uniform = (h) => new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 224).data);
 
 test('amount eases to the intensity over fadeSeconds and holds', () => {
   const w = new Weather({ intensity: 1, fadeSeconds: 4 });
@@ -298,7 +305,8 @@ test('the uniform carries the camera, the box, the wrapped drift, the colour and
   assert.deepEqual([...u.subarray(20, 23)], [20, 8, 20]);
   const wrap = (v, size) => ((v % size) + size) % size;
   assert.ok(Math.abs(u[24] - wrap(3 * 1000.3, 20)) < 1e-3, 'Wind drifts the box contents, wrapped in double precision');
-  assert.ok(Math.abs(u[25] - wrap(-9 * 1000.3, 8)) < 1e-3);
+  // Rain falls drop by drop at k / 512 m/s like snow, so drift.y is the 24-bit fall phase (seconds over 512 heights).
+  assert.equal(u[25], Math.floor(wrap(1000.3 / (512 * 8), 1) * 16777216));
   assert.ok(Math.abs(u[26] - wrap(-2 * 1000.3, 20)) < 1e-3);
   assert.deepEqual([...u.subarray(28, 32)], [1, 0.5, 2, Math.fround(0.4)]);
   assert.equal(u[32], 128);
@@ -533,7 +541,7 @@ test('precipitation is brightened by the flash through the uniform', () => {
 test('dispose frees the GPU, is idempotent and blocks later use', () => {
   const { h, weather } = rig({ intensity: 1 });
   h.frame();
-  const buffers = h.resources.filter((r) => r.size === 192 || r.size === 16);
+  const buffers = h.resources.filter((r) => r.size === 224 || r.size === 16);
   assert.ok(buffers.length >= 1);
   weather.dispose();
   weather.dispose();
@@ -552,12 +560,12 @@ test('dispose frees the GPU, is idempotent and blocks later use', () => {
 test('device restoration rebuilds the buffers and pipelines', () => {
   const { h, weather, passes } = rig({ intensity: 1, fadeSeconds: 0, particles: 10 });
   h.frame();
-  const old = h.resources.filter((r) => r.size === 192);
+  const old = h.resources.filter((r) => r.size === 224);
   weather.onDeviceRestored(h.engine);
   assert.ok(old.every((b) => b.destroyed));
   h.frame();
   assert.deepEqual(passes.at(-1).draws, [[6, 10]]);
-  assert.ok(h.resources.some((r) => r.size === 192 && !r.destroyed));
+  assert.ok(h.resources.some((r) => r.size === 224 && !r.destroyed));
 });
 
 test('a strike lights the scene: a point light of a measured first stroke, at the strike, through the flash', () => {
@@ -886,12 +894,12 @@ test('each flake falls at the measured speed of its own size, Locatelli and Hobb
   // The shader: each flake's speed from its own sampled size, the size the disc is drawn at.
   const code = snowShader({ precipitation: 'snow', intensity: 1, fadeSeconds: 0 });
   assert.ok(
-    code.includes(' let k=u32(round(w.extra.y*pow(sizeMeters*2000.0,0.16)*512.0));'),
+    code.includes(' let k=u32(round(select(dropFall(drop),w.extra.y*pow(sizeMeters*2000.0,0.16),flakes)*512.0));'),
     'Speed from the flake size',
   );
-  assert.ok(code.includes(' let fall=select(w.extra.y,f32(k)*0.001953125,flakes);'));
+  assert.ok(code.includes(' let fall=f32(k)*0.001953125;'));
   assert.ok(
-    code.includes(' let fallen=select(w.drift.y,-f32((k*u32(w.drift.y))&0xffffffu)*5.9604645e-8*size.y,flakes);'),
+    code.includes(' let fallen=-f32((k*u32(w.drift.y))&0xffffffu)*5.9604645e-8*size.y;'),
   );
   assert.ok(code.includes(' let rel=fract((start+vec3f(w.drift.x,fallen,w.drift.z)-w.eye.xyz)/size)-0.5;'));
   // Twin over the flakes the shader draws (hash seed 1): every flake's speed is the law at its size, to half a step.
@@ -930,9 +938,10 @@ test('each flake falls at the measured speed of its own size, Locatelli and Hobb
   weather.options.precipitation = 'rain';
   h.frame();
   assert.equal(uniform(h)[41], 9, 'Rain keeps its 9 m/s');
-  assert.ok(
-    Math.abs(uniform(h)[25] - ((((-9 * 2000.6) % 16) + 16) % 16)) < 1e-3,
-    'Rain keeps its float drift, 9 m/s times the time',
+  assert.equal(
+    uniform(h)[25],
+    Math.floor((((2000.6 / (512 * 16)) % 1) + 1) % 1 * 16777216),
+    'Rain falls drop by drop too: the same exact 24-bit fall phase, each drop k / 512 m/s',
   );
   weather.dispose();
 });
@@ -1303,4 +1312,84 @@ test('at a kilometre the light lights the ground to the inverse square of its me
   const expected = (LIGHTNING_PEAK_CANDELA * (LIGHTNING_LIGHT_HEIGHT / d)) / (d * d);
   assert.ok(Math.abs(lux / expected - 1) < 1e-9, `${lux} lux against ${expected}`);
   assert.ok(lux > 1 && lux < 50, `a kilometre from a stroke the ground gets ${lux.toFixed(2)} lux`);
+});
+
+test('each raindrop draws its own size, fall, streak and light, so rain is not a field of identical streaks (Last Tram)', () => {
+  // Regression: every drop fell at one speed with one streak length, slant and width, so night rain read as an even
+  // field of identical straight lines. Drops now draw Marshall and Palmer sizes and Gunn and Kinzer speeds.
+  const R = 17,
+    law = rainDropSizeLaw(R);
+  assert.ok(Math.abs(law.lambda - 4.1 * R ** -0.21) < 1e-12 && law.low === 0.5 && law.span > 0.99);
+  const median = rainDropSample(0.5, R);
+  assert.ok(Math.abs(median - (0.5 + Math.log(2 - law.span) / -law.lambda + Math.log(2) / law.lambda)) < 0.01, `median ${median}`);
+  assert.ok(Math.abs(median - 0.81) < 0.01, `median ${median}`);
+  const small = rainDropSample(0.05, R),
+    big = rainDropSample(0.995, R);
+  assert.ok(small >= 0.5 && big <= 6 && big > 2.5, `${small} to ${big} mm`);
+  assert.ok(rainFallSpeed(big) / rainFallSpeed(small) > 2.5, 'Big drops fall, and so streak, over twice as far');
+  assert.ok(rainStreakWeight(big) > 1.4 * rainStreakWeight(small), 'Big drops leave brighter streaks (Garg and Nayar 2006)');
+  const mean = rainStreakMean(R);
+  assert.ok(mean > rainStreakWeight(small) && mean < rainStreakWeight(big));
+  // The uniform carries the law, the fall scale, sheets, gusts, the mean's inverse and the gust clock.
+  const { h, weather } = rig({ precipitation: 'rain', intensity: 1, fadeSeconds: 0, rainRate: R, wind: [2, 0] });
+  h.frame();
+  let u = uniform(h);
+  assert.deepEqual([u[48], u[49], u[50], u[51], u[52], u[53]], [law.lambda, law.span, 0.5, 1, 0.5, 0.5].map(Math.fround));
+  assert.ok(Math.abs(u[54] - 1 / mean) < 1e-4);
+  weather.options.rainRate = undefined;
+  weather.options.intensity = 0.5;
+  weather.options.dropSizes = [1, 4];
+  weather.options.rainVariation = 0;
+  weather.options.gusts = 1;
+  h.frame();
+  u = uniform(h);
+  const rate = 80 * 0.5 ** 3;
+  assert.ok(
+    Math.abs(u[51] - RAIN_FALL_DEFAULT / rainFallSpeed(rainDropDiameter(rate))) < 1e-5,
+    'With no rate the median drop keeps the fixed 9 m/s',
+  );
+  assert.deepEqual([u[50], u[52], u[53]], [1, 0, 1]);
+  weather.dispose();
+  const code = snowShader({ precipitation: 'rain', intensity: 1, fadeSeconds: 0 });
+  assert.ok(code.includes('fn dropSize(ii:u32)->f32 {return w.rain.z-log(1.0-rnd(ii,3u)*w.rain.y)/w.rain.x;}'));
+  assert.ok(code.includes('max(0.1,9.65-10.3*exp(-0.6*d))*w.rain.w'));
+  for (const bad of [{ dropSizes: [4, 1] }, { dropSizes: [0, 2] }, { dropSizes: [1] }, { rainVariation: 2 }, { gusts: -1 }])
+    assert.throws(() => new Weather(bad), /dropSizes|rainVariation|gusts/);
+});
+
+test('rain gathers into seamless moving sheets, and gusts move the drops the way their streaks point', () => {
+  const size = 48;
+  let sum = 0,
+    n = 0,
+    low = 1,
+    high = 0;
+  for (let i = 0; i < 200; i++)
+    for (let j = 0; j < 200; j++) {
+      const s = rainSheet((i / 200) * size, (j / 200) * size, size);
+      sum += 0.25 + 1.75 * s;
+      n++;
+      low = Math.min(low, s);
+      high = Math.max(high, s);
+    }
+  assert.ok(Math.abs(sum / n - 1) < 0.01, `The sheets keep the rain's mean light (${sum / n})`);
+  assert.ok(low < 0.05 && high > 0.95, 'There are gaps and full sheets');
+  for (const z of [0, 7.3, 31])
+    assert.ok(Math.abs(rainSheet(0, z, size) - rainSheet(size, z, size)) < 1e-9, 'Seamless where the box wraps');
+  assert.equal(rainGust(10, 3, 0, 1), 0, 'Nothing gusts in still air');
+  assert.equal(rainGust(10, 3, 2, 0), 0);
+  // The fronts repeat after RAIN_GUST_PERIOD and travel downwind at the wind speed.
+  assert.ok(Math.abs(rainGust(4, 1, 2, 1) - rainGust(4, 1 + RAIN_GUST_PERIOD, 2, 1)) < 1e-9);
+  assert.ok(Math.abs(rainGust(4, 1, 2, 1) - rainGust(4 + 2 * 1.5, 2.5, 2, 1)) < 1e-9);
+  let spread = 0;
+  for (let x = 0; x < 40; x += 0.25) spread = Math.max(spread, Math.abs(rainGust(x, 0, 2, 0.5)));
+  assert.ok(spread > 0.3 && spread <= 0.5, `Gusts reach about their share of the wind (${spread})`);
+  // The shader moves each drop by the time integral of its gust: the displacement's rate is the gust velocity.
+  const code = snowShader({ precipitation: 'rain', intensity: 1, fadeSeconds: 0 });
+  assert.ok(code.includes('gust=w.look.y*(0.6*sin(p1)+0.4*sin(p2));'));
+  assert.ok(code.includes('q+=vec3f(wind.x,0.0,wind.y)*w.look.y*(0.6*cos(p1)/0.52359878+0.4*cos(p2)/1.5707963);'));
+  const w1 = Math.PI / 6,
+    w2 = Math.PI / 2,
+    shift = (t) => (0.6 * Math.cos(w1 * (4 / 2 - t))) / w1 + (0.4 * Math.cos(w2 * (4 / 2 - t))) / w2;
+  const rateOfShift = (shift(1.0001) - shift(0.9999)) / 0.0002;
+  assert.ok(Math.abs(rateOfShift - rainGust(4, 1, 2, 1)) < 1e-6, 'The drop moves where its streak points');
 });

@@ -31,7 +31,7 @@ test('sleet draws the rain and the snow, each with its share of the particles an
     queue = h.engine.gpu.queue,
     write = queue.writeBuffer.bind(queue);
   queue.writeBuffer = (buffer, offset, data) => {
-    if (data.length === 48) writes.push([buffer, Float32Array.from(data)]);
+    if (data.length === 56) writes.push([buffer, Float32Array.from(data)]);
     return write(buffer, offset, data);
   };
   h.engine.use(weather);

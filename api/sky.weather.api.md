@@ -68,6 +68,8 @@ export interface LiveStrike {
 
 export const RAIN_FALL_DEFAULT = 9;
 
+export const RAIN_GUST_PERIOD = 12;
+
 export const SNOWFLAKE_FALL_COEFFICIENT = 0.8;
 
 export const SNOWFLAKE_FALL_EXPONENT = 0.16;
@@ -192,6 +194,9 @@ export interface WeatherOptions {
     exposure?: number;
     lens?: WeatherLensOptions | false;
     nearFade?: readonly [number, number];
+    dropSizes?: readonly [number, number];
+    rainVariation?: number;
+    gusts?: number;
     lightning?: WeatherLightningOptions;
 }
 
@@ -203,13 +208,29 @@ export function rainDropCount(rainRate: number): number;
 
 export function rainDropDiameter(rainRate: number): number;
 
+export function rainDropSample(u: number, rainRate: number, sizes?: readonly [number, number]): number;
+
+export function rainDropSizeLaw(rainRate: number, sizes?: readonly [number, number]): {
+    lambda: number;
+    low: number;
+    span: number;
+};
+
 export function rainFall(rainRate?: number): number;
 
 export function rainFallSpeed(diameter: number): number;
 
+export function rainGust(along: number, seconds: number, speed: number, amount: number): number;
+
 export function rainIntensity(rainRate: number): number;
 
+export function rainSheet(x: number, z: number, size: number): number;
+
 export function rainSlant(wind: readonly [number, number], fall: number): number;
+
+export function rainStreakMean(rainRate: number, sizes?: readonly [number, number]): number;
+
+export function rainStreakWeight(diameter: number): number;
 
 export function snowflakeBokeh(pixels: number, depth: number, lens: {
     scale: number;

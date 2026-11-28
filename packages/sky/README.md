@@ -1587,6 +1587,9 @@ Options are read every frame from `weather.options`; change them live. `intensit
 | `reactive` | on while TAA runs | draw the particles' coverage into `weather.reactiveMask` (r8unorm), which TAA reads by itself; `true` every frame, `false` never |
 | `lens` | `{focalDistance: 10, aperture: 2.8, filmGauge: 36}` | the lens the snow is seen through, named as `@margoengine/dof` names it: a flake off the focal plane draws as its blur disc, its light spread over it; `false` keeps every flake sharp. Rain keeps its streaks sharp |
 | `nearFade` | `[0.4, 2]` | metres from the camera over which particles fade in; the first is never nearer than the camera's near plane |
+| `dropSizes` | `[0.5, 6]` | raindrop diameters drawn, mm, 0.1 to 8, smallest first: each drop takes its own size, fall speed, streak, slant and light (below) |
+| `rainVariation` | 0.5 | 0 to 1: how much the rain gathers into sheets that travel with the wind, from a quarter of the light in the gaps to twice in the sheets, the mean kept |
+| `gusts` | 0.5 | 0 to 1: two gust fronts travel downwind and add up to this share of the wind, so the streaks' slant changes across the frame; nothing gusts in still air |
 | `lightning` | none | storms, below |
 
 Particle colour is a fixed linear RGB, so scale `brightness` with the light of the scene (above, `1 - sky.nightFactor`).
@@ -1666,6 +1669,28 @@ console.log(rainDropDiameter(17), rainFall(17)); // about 1.6 mm drops falling a
 console.log(rainSlant([8, 0], rainFall(17))); // 8 m/s of wind leans the rain about 54 degrees
 const weather = new Weather({precipitation: 'rain', rainRate: 17, wind: [8, 0]});
 weather.options.rainRate = 0.5; // a drizzle: smaller drops, falling slower, leaning further
+```
+
+No two drops are alike. Each draws its own diameter from Marshall and Palmer's exponential cut to `dropSizes`
+(`rainDropSample(u, rate)`: in 17 mm/h rain the median drop is 0.81 mm and one in thirty is over 2 mm), falls at Gunn and
+Kinzer's speed for that size, so a big drop streaks two to three times as far as a small one and leans less in the wind,
+and lights its streak by the time it spends over a pixel, its diameter over its speed (`rainStreakWeight`; Garg and
+Nayar 2006, "Photorealistic rendering of rain streaks", ACM TOG 25(3), doi:10.1145/1141911.1141985), scaled by the mean
+over the law (`rainStreakMean`). A drop close enough to be wider than the streak's base width is drawn at its own size
+with its light spread over it, up to 8 pixels. With no `rainRate` the size law follows the intensity (`R = 80 I^3`) and the
+median drop keeps the fixed 9 m/s. The rain gathers into moving sheets (`rainSheet`, waves whose cycles fit the box, so
+there is no seam where it wraps) and gusts (`rainGust`): two fronts, turning every 12 and 4 seconds, travel downwind at
+the wind speed, and each drop moves by the time integral of its gust, so its streak points where it goes. The sheets and
+gusts follow the observation that rain falls in bands and curtains driven by the wind field (Garg and Nayar 2007,
+"Vision and rain", IJCV 75(1), doi:10.1007/s11263-006-0028-6); drops over about 6 mm break up in the air (Villermaux and
+Bossa 2009, "Single-drop fragmentation determines size distribution of raindrops", Nature Physics 5,
+doi:10.1038/nphys1340), which sets the default upper size.
+
+```ts
+import {Weather, rainDropSample, rainFallSpeed} from 'margoengine/sky/weather';
+console.log(rainDropSample(0.5, 17), rainFallSpeed(rainDropSample(0.99, 17))); // 0.81 mm; a big drop falls about 7 m/s
+const weather = new Weather({precipitation: 'rain', rainRate: 17, wind: [3, 0], rainVariation: 0.7, gusts: 0.6});
+weather.options.dropSizes = [0.8, 5]; // no fine mist
 ```
 
 `precipitation: 'sleet'` draws rain and snow together, `snowShare` (default 0.5) of it as snow and the rest as rain:
