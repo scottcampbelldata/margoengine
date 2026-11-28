@@ -8883,6 +8883,35 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -9.81, 
   .couple(['blast', 'rigid'], 'staggered');
 world.advance(30);
 console.log(shed.linearVelocity, blast.counts, blast.pressureAt([0, 1.5, 30], 0.15));
+## Craters (`@margoengine/physics/crater`)
+
+The crater a buried charge digs, its rim and its ejecta blanket, on the terrain bed (EARTH-06). `craterSize(energy, depth, ground, gravity)` is the apparent crater of a charge of `energy` J with its centre `depth` m down:
+
+- Its scale is Holsapple and Housen's point-source scaling for explosions. It runs from cube-root scaling for small charges, held by the ground's strength, to gravity scaling for large ones.
+- How burial changes the radius and depth is fitted to the Nevada desert-alluvium HE shots.
+- Too deep, past 1.6 m per cube root of a TNT kilogram, a charge leaves a mound and no crater.
+- `CRATER_GROUNDS` holds Holsapple and Housen's explosion constants for dry sand, dry soil (the default, desert alluvium), wet soil, soft rock, hard rock and ice, with measured bulking.
+
+Checked against craters it was not fitted to, the radius is within 26 percent, the scatter of identical shots:
+
+- the nuclear shots in alluvium, among them Sedan;
+- basalt and tuff, among them Danny Boy and Schooner;
+- Fauld's bomb store in mudstone.
+
+`CraterSolver` digs them in a `TerrainBed`. It reads the `ExplosionSolver`'s explosions (each one's energy and depth, from its `explosions` field), and a charge that goes off in the ground digs:
+
+- a paraboloid bowl over the crater's formation time;
+- a rim lifted from the share of the crater neither thrown nor compacted;
+- an ejecta curtain of equal-mass shells, launched at 45 degrees and landing as a blanket that thins as r^-3. Half of it lands within two crater radii, as at Sedan.
+
+The bed's volume balances to rounding. `ledgerTotals()` gives the volume dug, lifted, compacted, thrown, landed and carried past the bed's edge. `crater(i)` gives each crater's size, how far it has formed and its ejecta curtain's extent. The `crater:craters` field publishes the same for renderers and the base surge. `size` and `pace` scale a crater and its formation time for film.
+
+```ts
+import {CRATER_GROUNDS, craterSize} from 'margoengine/physics/crater';
+
+// Scooter (1960): a million pounds of TNT 38 m down in Nevada alluvium dug a crater 47 m in radius.
+const crater = craterSize(453600 * 4.184e6, 38.1, CRATER_GROUNDS.drySoil, 9.81);
+console.log(Math.round(crater.radius)); // 48
 ```
 
 ## Natural lightning and thunder

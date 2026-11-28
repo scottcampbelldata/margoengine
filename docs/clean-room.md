@@ -20130,3 +20130,23 @@ noise, 1.1 cell reach, a 3.3 cell octave of weight 0.75) and contour terraces (a
 phase wandering by a 7 cycle noise, 2.1 radians per layer); and the fir spray ring growth factors (1.17 x 1.1 and
 2.3 x 1.3) from the near ring's spray area.
 
+### Craters (EARTH-06, `@margoengine/physics/crater`, 2026-11-27)
+
+`packages/physics/src/crater/law.ts` and `solver.ts`, written from:
+- K. A. Holsapple and K. R. Housen, "Craters from impacts and explosions", theory notes for the crater-scaling tool, v2.1,
+  2003-2015, https://web.archive.org/web/2015id_/http://keith.aa.washington.edu/craterdata/scaling/theory.pdf (eq. 3, Table
+  4's explosion constants, eq. 6's formation time, read).
+- K. A. Holsapple, "IMPACTS!", arXiv:2203.07476, 2022 (section 3.7: about 60 percent of the crater's mass thrown, read).
+- Housen and Holsapple 2011's ejecta form v ~ (x / R)^(-1/mu) and its 45 degree launch, as "Ejecta distribution from
+  impact craters on Ryugu" (arXiv:2205.06607, Table B1 and eqs. 1 and 2) reprints it (the 2011 paper was not obtained).
+- M. D. Nordyke, "On cratering", UCRL-6578, 1961 (Appendix A and Table III: the alluvium HE shots fitted, and the basalt
+  shots, read); M. D. Nordyke and M. M. Williamson, "The Sedan event", PNE-242F, 1965 (sections 2.3, 2.4 and 6.1.2:
+  Sedan's crater, its ejecta's spread and spall speed, the nuclear radii's shortfall, read); J. Toman, "Summary of
+  nuclear-excavation applications", 1970 (Table IV: Danny Boy, Cabriolet, Schooner, their bulking, read); H. F. Cooper,
+  RDA-TR-2604-001, 1976 (section 1.2: a factor of 2 in volume between identical shots, read); T. Waltham, Mercian
+  Geologist 15(2), 2001, and G. Fielder and J. E. Guest, Comm. Lunar Planet. Lab. 115, 1968 (Fauld, read).
+- T. R. McGetchin, M. Settle and J. W. Head, EPSL 20, 1973: the blanket's r^-3, as Minton et al. (arXiv:1902.07746) quote
+  it (not obtained).
+No cratering or hydrocode code was read. Fitting the burial curves, the rim's (R / r)^3 profile, the shells' exact volume
+on the bed's vertex areas, and the launch speed's calibration to Sedan are this package's own. A research agent gathered
+the documents; every value used was checked on its page before it was used.

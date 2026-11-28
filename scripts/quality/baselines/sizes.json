@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21974799,
+  "total": 21979661,
   "history": [
     {
       "date": "2026-10-24",
@@ -15773,6 +15773,12 @@
       "commit": "sea-15-native-parcel-diffusion",
       "reason": "SEA-15 @margoengine/physics/tracers 17389 to 22152 B gzip, ceiling 17877 to 22817 B. The tracer entry owns ordered advection and accepted parcel validation across water, bed and oil. A separate solver would duplicate parcel storage and the shared field contract. Both random-walk assets and the native helpers load only when requested. Core and stage are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "pending",
+      "reason": "physics/crater (new entry, EARTH-06) 4,862 B gzip: craterSize and the CraterSolver digging the terrain bed. A new optional entry; core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -17804,6 +17810,7 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/physics/crater": 4862
   }
 }

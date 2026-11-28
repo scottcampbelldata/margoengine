@@ -3451,6 +3451,10 @@
       "types": "./dist/physics/explosive.d.ts",
       "import": "./dist/physics/explosive.js"
     },
+    "./physics/crater": {
+      "types": "./dist/physics/crater.d.ts",
+      "import": "./dist/physics/crater.js"
+    },
     "./physics/granular-mpm": {
       "types": "./dist/physics/granular-mpm.d.ts",
       "import": "./dist/physics/granular-mpm.js"

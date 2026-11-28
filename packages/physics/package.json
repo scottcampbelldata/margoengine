@@ -158,6 +158,10 @@
       "types": "./dist/explosive/index.d.ts",
       "import": "./dist/explosive.js"
     },
+    "./crater": {
+      "types": "./dist/crater/index.d.ts",
+      "import": "./dist/crater.js"
+    },
     "./granular-mpm": {
       "types": "./dist/granular-mpm/index.d.ts",
       "import": "./dist/granular-mpm.js"
