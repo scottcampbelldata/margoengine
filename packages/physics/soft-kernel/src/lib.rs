@@ -20,6 +20,7 @@ mod cloth_block;
 mod col;
 mod crack_band;
 pub mod attach;
+pub mod bend;
 mod rigid;
 pub mod collide;
 pub mod face;

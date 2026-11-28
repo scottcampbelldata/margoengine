@@ -23,6 +23,8 @@ pub const SHEET: u32 = 4;
 pub const STIFFNESS: u32 = 8;
 /// An edge of a sheet on the vertex-block solver (cloth_block.rs): a spring of the block solve, not swept or held exactly.
 pub const BLOCK: u32 = 16;
+/// A bend edge left out: its body bends by quadratic bending stencils (bend.rs) instead.
+pub const OFF: u32 = 32;
 /// No contact: the value of `kc` for a particle that meets nothing (a contact holds its table row plus one).
 pub const NONE: u32 = 0;
 /// Planes held for each particle.
@@ -299,6 +301,19 @@ pub struct World {
     pub cbx: Col<f32>,
     pub cby: Col<f32>,
     pub cbz: Col<f32>,
+    // Bending elements (bend.rs), one a triangle: its six particles (corners, then the far corner across each edge, or
+    // BEND_NONE), the coefficients of its three curvature components over them, each component's compliance, its XPBD
+    // multipliers this piece (three components by three axes), whether the vertex block solver holds it, and the square
+    // root of its area; each particle's first block slot and the next.
+    pub bd_p: Col<u32>,
+    pub bd_r: Col<f32>,
+    pub bd_alpha: Col<f32>,
+    pub bd_l: Col<f32>,
+    pub bd_flag: Col<u32>,
+    pub bd_len: Col<f32>,
+    pub bends: usize,
+    pub bd_head: Col<u32>,
+    pub bd_next: Col<u32>,
 }
 
 fn grow<T: Copy>(v: &mut Col<T>, n: usize) {
@@ -482,11 +497,15 @@ impl World {
         for e in 0..self.edges {
             self.lambda[e] = 0.0;
         }
+        self.bend_begin();
         self.advance_skin(h);
         self.fem_implicit(h, gravity);
         self.solve_projective(h, iterations);
         let vertex_block = self.prepare_vertex_blocks(h, gravity);
         let cloth_block = self.prepare_cloth_blocks(h, gravity);
+        if cloth_block {
+            self.prepare_bend_blocks();
+        }
         self.shape_begin();
         self.fem_begin();
         self.volume_begin();
@@ -609,7 +628,7 @@ impl World {
 
     /// One compliant distance constraint, C = |a - b| - rest (Macklin et al. 2016, with the damping of its section 4).
     fn solve_edge(&mut self, e: usize, h: f32) {
-        if self.eflags[e] & TORN != 0 {
+        if self.eflags[e] & (TORN | OFF) != 0 {
             return;
         }
         let (a, b) = (self.ea[e] as usize, self.eb[e] as usize);

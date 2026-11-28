@@ -23,7 +23,7 @@
 // All the algebra is in f64, from f32 positions, with only + - * / sqrt and compares, so a result is the same on every run.
 use crate::col::Col;
 use crate::math::sqrt;
-use crate::world::{BLOCK, NONE, SHEET, SLOTS, STIFFNESS, TENSION, TORN, World};
+use crate::world::{BLOCK, NONE, OFF, SHEET, SLOTS, STIFFNESS, TENSION, TORN, World};
 
 /// Row kinds.
 /// No particle or no body in a row's slot (the kernel's NONE, 0, is a row number plus one elsewhere).
@@ -33,6 +33,7 @@ const LINK: u32 = 1;
 const CONTACT: u32 = 2;
 const FACE: u32 = 3;
 const FRICTION: u32 = 4;
+const BEND: u32 = 5;
 
 pub struct Rigid {
     // Per row: its kind and what it is (an edge, a link's attachment times three plus the axis, a contact slot, a face), its
@@ -41,9 +42,7 @@ pub struct Rigid {
     // scratch.
     kind: Col<u32>,
     item: Col<u32>,
-    pa: Col<u32>,
-    pb: Col<u32>,
-    pc: Col<u32>,
+    pp: Col<u32>,
     co: Col<f64>,
     body: Col<u32>,
     bj: Col<f64>,
@@ -62,6 +61,8 @@ pub struct Rigid {
     // Per row, its compliance over the piece's length squared (0 for a row held exactly), and per edge its row this Newton step.
     cmp: Col<f64>,
     edge_row: Col<u32>,
+    // Per bending element, its first row (of nine) this Newton step.
+    bend_row: Col<u32>,
     // The solver's scratch vectors, kept from piece to piece: a `Col` keeps the block it grows from, so a fresh one each solve
     // would leave a block behind every time.
     ms: Col<f64>,
@@ -105,9 +106,7 @@ impl Rigid {
         Rigid {
             kind: Col::new(),
             item: Col::new(),
-            pa: Col::new(),
-            pb: Col::new(),
-            pc: Col::new(),
+            pp: Col::new(),
             co: Col::new(),
             body: Col::new(),
             bj: Col::new(),
@@ -123,6 +122,7 @@ impl Rigid {
             g: Col::new(),
             cmp: Col::new(),
             edge_row: Col::new(),
+            bend_row: Col::new(),
             ms: Col::new(),
             my: Col::new(),
             mg: Col::new(),
@@ -198,8 +198,10 @@ const PROPORTION: f64 = 1.0;
 /// methods for interactive simulations of multibodies with dry frictional contacts", PhD thesis, Umea University, 2007,
 /// chapter 5.
 pub const ROW_DAMPING: f64 = 3.452669830012439e-4;
-/// Coefficients a row holds: three particles of three components.
-const CO: usize = 9;
+/// Particles a row holds: a bending element's six.
+const PARTS: usize = crate::bend::BEND_PARTS;
+/// Coefficients a row holds: its particles' three components each.
+const CO: usize = 3 * PARTS;
 /// Body coefficients a row holds: linear then angular.
 const BJ: usize = 6;
 
@@ -251,7 +253,7 @@ impl World {
     /// its compliance): what the exact solve may hold.
     fn candidate(&self, e: usize) -> bool {
         let held = self.omega[e] == 0.0 || self.eflags[e] & (SHEET | STIFFNESS) == SHEET | STIFFNESS;
-        held && self.eflags[e] & (TORN | BLOCK) == 0 && self.w[self.ea[e] as usize] + self.w[self.eb[e] as usize] > 0.0
+        held && self.eflags[e] & (TORN | BLOCK | OFF) == 0 && self.w[self.ea[e] as usize] + self.w[self.eb[e] as usize] > 0.0
     }
 
     /// An edge's compliance over the piece's length squared: 1 / (k h^2) for a sheet's edge of stiffness k (XPBD's
@@ -399,10 +401,10 @@ impl World {
     /// One row: its kind and item, its particles and their coefficients, its body and the body's coefficients, its bound and
     /// its violation (the right-hand side is its negative).
     #[allow(clippy::too_many_arguments)]
-    fn push_row(&mut self, kind: u32, item: usize, parts: [(u32, [f64; 3]); 3], body: u32, bj: [f64; 6], bounded: bool, c: f64) {
+    fn push_row(&mut self, kind: u32, item: usize, parts: &[(u32, [f64; 3])], body: u32, bj: [f64; 6], bounded: bool, c: f64) {
         let r = self.rg.rows;
         let grow = r + 1;
-        for col in [&mut self.rg.kind, &mut self.rg.item, &mut self.rg.pa, &mut self.rg.pb, &mut self.rg.pc, &mut self.rg.body, &mut self.rg.bounded] {
+        for col in [&mut self.rg.kind, &mut self.rg.item, &mut self.rg.body, &mut self.rg.bounded] {
             if col.len() < grow {
                 col.resize(grow);
             }
@@ -412,6 +414,9 @@ impl World {
                 col.resize(grow);
             }
         }
+        if self.rg.pp.len() < grow * PARTS {
+            self.rg.pp.resize(grow * PARTS);
+        }
         if self.rg.co.len() < grow * CO {
             self.rg.co.resize(grow * CO);
         }
@@ -420,12 +425,12 @@ impl World {
         }
         self.rg.kind[r] = kind;
         self.rg.item[r] = item as u32;
-        self.rg.pa[r] = parts[0].0;
-        self.rg.pb[r] = parts[1].0;
-        self.rg.pc[r] = parts[2].0;
-        for k in 0..3 {
+        for k in 0..PARTS {
+            self.rg.pp[r * PARTS + k] = if k < parts.len() { parts[k].0 } else { EMPTY };
+        }
+        for k in 0..PARTS {
             for j in 0..3 {
-                self.rg.co[r * CO + 3 * k + j] = parts[k].1[j];
+                self.rg.co[r * CO + 3 * k + j] = if k < parts.len() { parts[k].1[j] } else { 0.0 };
             }
         }
         self.rg.body[r] = body;
@@ -504,9 +509,65 @@ impl World {
             if build {
                 let n = [dx / len, dy / len, dz / len];
                 self.rg.edge_row[e] = self.rg.rows as u32;
-                self.push_row(EDGE, e, [(a as u32, n), (b as u32, [-n[0], -n[1], -n[2]]), none], EMPTY, [0.0; 6], false, res);
+                self.push_row(EDGE, e, &[(a as u32, n), (b as u32, [-n[0], -n[1], -n[2]]), none, none], EMPTY, [0.0; 6], false, res);
                 let r = self.rg.rows - 1;
                 self.rg.cmp[r] = cmp;
+            }
+        }
+        // Bending elements (bend.rs): each curvature component's R x along each axis, with its compliance over the piece's
+        // length squared and the multiplier it has taken this piece, as a compliant edge's row (XPBD's C + alpha-tilde lambda).
+        if build && self.rg.bend_row.len() < self.bends {
+            self.rg.bend_row.resize(self.bends);
+        }
+        for s in 0..self.bends {
+            if self.bd_flag[s] & crate::bend::BEND_BLOCK != 0 || !(self.bd_alpha[3 * s] > 0.0) {
+                if build {
+                    self.rg.bend_row[s] = EMPTY;
+                }
+                continue;
+            }
+            let moving = (0..PARTS).any(|j| {
+                let p = self.bd_p[PARTS * s + j];
+                p != crate::bend::BEND_NONE && self.w[p as usize] > 0.0
+            });
+            if !moving {
+                if build {
+                    self.rg.bend_row[s] = EMPTY;
+                }
+                continue;
+            }
+            if build {
+                self.rg.bend_row[s] = self.rg.rows as u32;
+            }
+            for c in 0..3 {
+                let (p, r) = self.bend_row(s, c);
+                let value = self.bend_value(p, r);
+                let cmp = self.bd_alpha[3 * s + c] as f64 / (h as f64 * h as f64);
+                for axis in 0..3 {
+                    let mut taken = self.bd_l[9 * s + 3 * c + axis] as f64;
+                    if !build && self.rg.bend_row[s] != EMPTY {
+                        taken += alpha * self.rg.u[self.rg.bend_row[s] as usize + 3 * c + axis];
+                    }
+                    let res = value[axis] + cmp * taken;
+                    merit += res * res;
+                    // R x is a curvature: held to a hundred thousandth of a radian over the element's size.
+                    let m = (if res < 0.0 { -res } else { res }) * self.bd_len[s] as f64 / TOLERANCE;
+                    if m > worst {
+                        worst = m;
+                    }
+                    if build {
+                        let mut parts = [(EMPTY, [0.0f64; 3]); PARTS];
+                        for j in 0..PARTS {
+                            if p[j] != crate::bend::BEND_NONE && self.w[p[j] as usize] > 0.0 {
+                                parts[j].0 = p[j];
+                                parts[j].1[axis] = r[j];
+                            }
+                        }
+                        self.push_row(BEND, 9 * s + 3 * c + axis, &parts, EMPTY, [0.0; 6], false, res);
+                        let row = self.rg.rows - 1;
+                        self.rg.cmp[row] = cmp;
+                    }
+                }
             }
         }
         // Links: the particle at the body's point, along each axis.
@@ -536,7 +597,7 @@ impl World {
                 if build {
                     let axis = [if k == 0 { 1.0 } else { 0.0 }, if k == 1 { 1.0 } else { 0.0 }, if k == 2 { 1.0 } else { 0.0 }];
                     let ang = cross(q, axis);
-                    self.push_row(LINK, 3 * a + k, [(p as u32, axis), none, none], c as u32, [-axis[0], -axis[1], -axis[2], -ang[0], -ang[1], -ang[2]], false, gap);
+                    self.push_row(LINK, 3 * a + k, &[(p as u32, axis), none, none, none], c as u32, [-axis[0], -axis[1], -axis[2], -ang[0], -ang[1], -ang[2]], false, gap);
                 }
             }
         }
@@ -578,7 +639,7 @@ impl World {
                 if build {
                     let n = [n[0] as f64, n[1] as f64, n[2] as f64];
                     let ang = cross([q[0] as f64, q[1] as f64, q[2] as f64], n);
-                    self.push_row(CONTACT, k, [(i as u32, n), none, none], c as u32, [-n[0], -n[1], -n[2], -ang[0], -ang[1], -ang[2]], true, depth);
+                    self.push_row(CONTACT, k, &[(i as u32, n), none, none, none], c as u32, [-n[0], -n[1], -n[2], -ang[0], -ang[1], -ang[2]], true, depth);
                 }
             }
         }
@@ -614,8 +675,8 @@ impl World {
                     let w = weights[k] as f64;
                     (if self.w[corners[k]] > 0.0 { corners[k] as u32 } else { EMPTY }, [w * n[0], w * n[1], w * n[2]])
                 };
-                let parts = [part(0), part(1), part(2)];
-                self.push_row(FACE, f, parts, c as u32, [-n[0], -n[1], -n[2], -ang[0], -ang[1], -ang[2]], true, depth);
+                let parts = [part(0), part(1), part(2), none];
+                self.push_row(FACE, f, &parts, c as u32, [-n[0], -n[1], -n[2], -ang[0], -ang[1], -ang[2]], true, depth);
             }
         }
         (worst, merit)
@@ -636,7 +697,7 @@ impl World {
             if s == 0.0 {
                 continue;
             }
-            for (k, p) in [self.rg.pa[r], self.rg.pb[r], self.rg.pc[r]].into_iter().enumerate() {
+            for (k, p) in (0..PARTS).map(|k| (k, self.rg.pp[r * PARTS + k])) {
                 if p == EMPTY {
                     continue;
                 }
@@ -660,7 +721,7 @@ impl World {
         self.spread(v);
         for r in 0..self.rg.rows {
             let mut sum = 0.0f64;
-            for (k, p) in [self.rg.pa[r], self.rg.pb[r], self.rg.pc[r]].into_iter().enumerate() {
+            for (k, p) in (0..PARTS).map(|k| (k, self.rg.pp[r * PARTS + k])) {
                 if p == EMPTY {
                     continue;
                 }
@@ -691,7 +752,7 @@ impl World {
         let n = self.rg.rows;
         for r in 0..n {
             let mut sum = 0.0f64;
-            for (k, p) in [self.rg.pa[r], self.rg.pb[r], self.rg.pc[r]].into_iter().enumerate() {
+            for (k, p) in (0..PARTS).map(|k| (k, self.rg.pp[r * PARTS + k])) {
                 if p == EMPTY {
                     continue;
                 }
@@ -749,7 +810,7 @@ impl World {
             self.rg.bf[j] = 0.0;
         }
         for r in 0..self.rg.rows {
-            for (k, p) in [self.rg.pa[r], self.rg.pb[r], self.rg.pc[r]].into_iter().enumerate() {
+            for (k, p) in (0..PARTS).map(|k| (k, self.rg.pp[r * PARTS + k])) {
                 if p == EMPTY {
                     continue;
                 }
@@ -767,7 +828,7 @@ impl World {
         }
         for r in 0..self.rg.rows {
             let mut sum = 0.0f64;
-            for (k, p) in [self.rg.pa[r], self.rg.pb[r], self.rg.pc[r]].into_iter().enumerate() {
+            for (k, p) in (0..PARTS).map(|k| (k, self.rg.pp[r * PARTS + k])) {
                 if p == EMPTY {
                     continue;
                 }
@@ -1121,6 +1182,7 @@ impl World {
             let item = self.rg.item[r] as usize;
             match self.rg.kind[r] {
                 EDGE => self.lambda[item] += lam as f32,
+                BEND => self.bd_l[item] += lam as f32,
                 CONTACT => self.kj[item] += (lam * inv) as f32,
                 FACE => self.fc_j[item] += (lam * inv) as f32,
                 _ => {}
@@ -1228,7 +1290,7 @@ impl World {
                 (part.0, [w * t[0], w * t[1], w * t[2]])
             };
             let ang = cross(qf, t);
-            self.push_row(FRICTION, kind_item, [scaled(parts[0]), scaled(parts[1]), scaled(parts[2])], c as u32, [-t[0], -t[1], -t[2], -ang[0], -ang[1], -ang[2]], false, dot(s, t));
+            self.push_row(FRICTION, kind_item, &[scaled(parts[0]), scaled(parts[1]), scaled(parts[2]), (EMPTY, [0.0; 3])], c as u32, [-t[0], -t[1], -t[2], -ang[0], -ang[1], -ang[2]], false, dot(s, t));
             let r = self.rg.rows - 1;
             self.rg.lo[r] = -limit;
             self.rg.hi[r] = limit;

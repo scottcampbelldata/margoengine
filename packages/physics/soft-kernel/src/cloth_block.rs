@@ -135,6 +135,10 @@ impl World {
                 hess[4] += scale * along * n[0] * n[2];
                 hess[5] += scale * along * n[1] * n[2];
             }
+            let bend = self.bend_block_terms(i, x, &mut g);
+            hess[0] += bend;
+            hess[1] += bend;
+            hess[2] += bend;
             let step = crate::vertex_block::solve(hess, g);
             if !(step[0].is_finite() && step[1].is_finite() && step[2].is_finite()) {
                 continue;

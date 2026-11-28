@@ -1033,8 +1033,26 @@ A woven sheet (`cloth`, `clothTube`, `clothAnisotropic`) is a fabric. By default
 - **Stretch.** Each warp and weft thread is a spring of the fabric's tensile stiffness, 2 WT / EMT^2 per width (`fabricTensileStiffness`: the linear spring that stores the energy measured up to the strain at 500 gf/cm), held in the exact solve with its compliance, so the stretch does not depend on the iterations or the load's mass. It holds from 0 to EMT, where the real fabric (whose curve stiffens, LT under 1) is softer at the highest loads and stiffer at the lightest; past EMT a thread is held rigid at that strain (strain limiting, Provot 1995). `material.tensile = null` holds the threads inextensible, solved exactly to 0.1 percent strain (Goldenthal et al. 2007).
 - **Shear.** Each cell's diagonals are springs of the fabric's shear rigidity G, G L^2 / (2 a b) on a diagonal of length L across a cell of sides a and b (G itself on a square cell), so the cloth shears alike at any resolution (`fabricShearStiffness`), damped by the shear hysteresis 2HG at 0.5 degrees through Jacobsen's equivalent viscous damping (`fabricShearDamping`).
 - **Damping.** The threads lose what the fabric's tensile resilience RT says a stretch cycle loses, zeta = (1 - RT) / (4 pi) (`fabricTensileDamping`, Jacobsen 1930).
+- **Bending.** Each fabric carries its KES-FB2 bending rigidity B along the warp and the weft (`fabric.bending`, gf cm^2/cm; `fabricBendingRigidity(b)` in N m). `desc.setFabric(fabric)` and `SoftBodyMaterial.fabric(fabric)` set `material.bending`, and the sheet then bends as a plate of that rigidity with no Poisson coupling, B/2 per area times its curvature squared along the warp, across it and in twist, at any resolution: each triangle's curvature comes from the dihedral angles of its three sides (Bergou et al.'s quadratic hinge vectors, "A quadratic bending model for inextensible surfaces", SGP 2006, gathered per triangle as Cohen-Steiner and Morvan's normal-cycle tensor gathers them, SoCG 2003), so the energy is quadratic in the positions and is solved exactly with the threads (the vertex-block solver takes it in its blocks, met pass by pass rather than exactly). Its bend edges rest. A cantilevered strip settles on the exact heavy elastica to (cell / length)^2, and strips of four woven fabrics hang where FAST's cantilever measured them within the KES-FB2's face and back spread (`tests/soft-bending.test.js`; linen's warp, measured 1.64 times stiffer by FAST, is the exception in `docs/limits.md`). `material.bending = null` (the default for a material that is not set from a fabric) keeps the bend edges and `bendSoftness`. The plate is flat at rest: a curved rest shape bends back toward flat. `soft.bendingEnergy()` reads the energy, J.
 - **Weight.** A woven sheet given no mass weighs its fabric's areal density (`material.arealDensity`, 0.12 kg/m^2 for cotton shirting), each particle a third of the triangles around it.
 - **Air.** The faces of a body of triangles feel the air (`desc.setAirDrag(on)`, default on), against `soft.wind` (a velocity, a function of the point and the time, or a flow field; still air when unset), rho the flow field's or the standard atmosphere's at the face's height. Each face is a thin plate meeting the air at an angle a: across it a normal force q A C_N(a), in attached flow Polhamus's potential and vortex lift, C_N = K_p sin a cos a + K_v sin^2 a, with K_p Helmbold's lift slope at the cloth's aspect ratio and K_v pi; past the stall, where that reaches the square plate's 1.17 (Hoerner 1965), the separated plate's 1.17 sin a / (0.56 + 0.44 sin a) (Lindenburg 2003); along it skin friction, 0.004 q A. So a face square to the air is pushed, one at a small angle is lifted across the air, and a flag or a curtain edge-on to a breeze lifts and flutters. Both loads are taken implicitly over the step, so a light cloth in a gale stays steady. `desc.setAerodynamics({ aspectRatio = 1, drag = 1.17, vortexLift = Math.PI, friction = 0.004 })` sets the law (a flag flown from its short side is `aspectRatio: 0.5`), `body.setAerodynamics(...)` changes it, and `body.stallAngle` and `body.aerodynamics` read it. The slope and stall angle match flat plates measured in a wind tunnel (Torres and Mueller 2004): within 10 percent and 5 degrees for aspect ratios 0.5 to 1. A `SailForce` on a cloth supplies its air loads instead (a vortex lattice over the whole sail), and turns this off for that cloth while it is attached.
+
+```js
+import { Physics } from '@margoengine/physics';
+import { FABRICS, SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+
+await Physics.load();
+const physics = new Physics(null);
+const soft = await SoftBodies.attach(physics);
+// A 30 by 5 cm strip of measured wool gabardine held along one end: it droops as the fabric's KES-FB2 B says.
+const strip = soft.create(
+  SoftBodyDesc.cloth([0, 1, 0], [0.025, 0, 0], [0, 0, 0.025], 13, 3)
+    .setFabric(FABRICS.woolGabardine)
+    .setPinnedParticles([0, 1, 2, 3, 4, 5]),
+);
+for (let i = 0; i < 120; i++) physics.step();
+console.log(strip.particlePositions()[3 * 37 + 1] < 1, soft.bendingEnergy() > 0); // true true
+```
 
 ```js
 import { Physics } from '@margoengine/physics';

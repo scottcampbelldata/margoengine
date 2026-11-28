@@ -69,6 +69,9 @@ interface SoftExports extends WebAssembly.Exports {
   soft_cloth_enable(triangles: number, thickness: number, friction: number): void;
   soft_attach_reserve(attachments: number): void;
   soft_tether_reserve(tethers: number): void;
+  soft_bend_reserve(bends: number): void;
+  soft_bend_set(s: number, ...words: BendWords): void;
+  soft_bend_energy(): number;
   soft_skin_reserve(skins: number): void;
   soft_face_reserve(faces: number): void;
   soft_volume_reserve(triangles: number): void;
@@ -123,6 +126,39 @@ const SHEET = 4;
 const STIFFNESS = 8;
 /** An edge of a sheet on the vertex-block solver (cloth_block.rs). */
 const BLOCK = 16;
+/** A bend edge left out: the body bends by its measured bending elements (bend.rs) instead. */
+const OFF = 32;
+/** A bending element on the vertex-block solver (bend.rs). */
+const BEND_BLOCK = 1;
+/** No far corner across a triangle's side (a free edge), for a bending element (bend.rs). */
+const NO_BEND = 0xffffffff;
+/**
+ * A bending element's words for `soft_bend_set` (bend.rs): its corners, the far corner across each side, the rest lengths
+ * of its sides and of each far corner to its side's ends, the warp side, the rigidity along and across the warp, its flags.
+ */
+type BendWords = [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+];
+/** A bending rigidity of 1 gf cm^2/cm, KES-FB2's unit of B (a moment times a length per width), in N m: 9.80665e-3 N x 1e-4 m^2 / 0.01 m. */
+const GF_CM2_PER_CM = (9.80665e-3 * 1e-4) / 0.01;
 /** A shear rigidity of 1 gf/(cm deg), Kawabata's unit, in N/m per radian: 9.80665e-3 N / 0.01 m x 180 / pi. */
 const GF_PER_CM_DEGREE = ((9.80665e-3 / 0.01) * 180) / Math.PI;
 /** The shear angle KES-F reads the shear hysteresis 2HG at: 0.5 degrees, in degrees. */
@@ -300,11 +336,30 @@ export function fabricTensileDamping(tension: FabricTension): number {
   return (1 - tension.resilience / 100) / (4 * Math.PI);
 }
 
-/** A woven fabric: its measured shear and stretch and its areal density, with where the numbers come from. */
+/**
+ * A woven fabric's bending as KES-F's pure bending tester (KES-FB2) measures it: the slope B of the bending moment per width
+ * against the curvature, gf cm^2/cm, for a strip bent along its warp and one bent along its weft (Kawabata 1980). Warp B is
+ * the rigidity against a curvature along the warp, which a fold line along the weft makes.
+ */
+export interface FabricBending {
+  /** B along the warp, gf cm^2/cm. */
+  readonly warp: number;
+  /** B along the weft, gf cm^2/cm. */
+  readonly weft: number;
+}
+
+/** A fabric's bending rigidity along one direction in N m (moment per width per curvature): KES-FB2's B times 9.80665e-5. */
+export function fabricBendingRigidity(b: number): number {
+  return b * GF_CM2_PER_CM;
+}
+
+/** A woven fabric: its measured shear, stretch and bending and its areal density, with where the numbers come from. */
 export interface Fabric {
   readonly name: string;
   readonly shear: FabricShear;
   readonly tensile: FabricTensile;
+  /** Its measured bending (KES-FB2), for {@link SoftBodyMaterial.bending}. */
+  readonly bending: FabricBending;
   /** Mass per area, kg/m^2. */
   readonly arealDensity: number;
   /** The measurement the numbers come from. */
@@ -344,7 +399,7 @@ const LUIBLE =
  * 0.57; JIS silk habutae 0.11 to 0.51 in Miura et al. 2010 and Nakajima and Miura 2013), with weave, finish and humidity.
  */
 export const FABRICS = Object.freeze({
-  /** Shirt cotton, 100 percent cotton, 120 g/m^2 (sample 2): G 0.367 / 0.321, 2HG 0.258 / 0.196; EMT 5.874 / 5.608 %, WT 9.23 / 9.03, RT 52.03 / 48.48 %. The default cloth. */
+  /** Shirt cotton, 100 percent cotton, 120 g/m^2 (sample 2): G 0.367 / 0.321, 2HG 0.258 / 0.196; EMT 5.874 / 5.608 %, WT 9.23 / 9.03, RT 52.03 / 48.48 %; B 0.057 / 0.033. The default cloth. */
   cottonShirting: Object.freeze({
     name: 'cotton shirting',
     shear: Object.freeze({ rigidity: (0.367 + 0.321) / 2, hysteresis: (0.258 + 0.196) / 2 }),
@@ -352,10 +407,11 @@ export const FABRICS = Object.freeze({
       warp: Object.freeze({ strain: 5.874, energy: 9.23, resilience: 52.03 }),
       weft: Object.freeze({ strain: 5.608, energy: 9.03, resilience: 48.48 }),
     }),
+    bending: Object.freeze({ warp: 0.057, weft: 0.033 }),
     arealDensity: 0.12,
     source: `${LUIBLE}, sample 2`,
   }),
-  /** Wool gabardine, 100 percent wool twill, 175 g/m^2 (sample 5): G 0.588 / 0.545, 2HG 0.197 / 0.129; EMT 4.614 / 5.741 %, WT 8.53 / 10.43, RT 70.68 / 67.16 %. */
+  /** Wool gabardine, 100 percent wool twill, 175 g/m^2 (sample 5): G 0.588 / 0.545, 2HG 0.197 / 0.129; EMT 4.614 / 5.741 %, WT 8.53 / 10.43, RT 70.68 / 67.16 %; B 0.073 / 0.063. */
   woolGabardine: Object.freeze({
     name: 'wool gabardine',
     shear: Object.freeze({ rigidity: (0.588 + 0.545) / 2, hysteresis: (0.197 + 0.129) / 2 }),
@@ -363,11 +419,12 @@ export const FABRICS = Object.freeze({
       warp: Object.freeze({ strain: 4.614, energy: 8.53, resilience: 70.68 }),
       weft: Object.freeze({ strain: 5.741, energy: 10.43, resilience: 67.16 }),
     }),
+    bending: Object.freeze({ warp: 0.073, weft: 0.063 }),
     arealDensity: 0.175,
     source: `${LUIBLE}, sample 5`,
   }),
   /**
-   * Silk, bourette (natural silk) plain weave, 150 g/m^2 (sample 8): G 0.733 / 0.597, 2HG 0.647 / 0.654; EMT 3.372 / 6.913 %, WT 5.78 / 10.38, RT 54.55 / 48.67 %. The thesis's light
+   * Silk, bourette (natural silk) plain weave, 150 g/m^2 (sample 8): G 0.733 / 0.597, 2HG 0.647 / 0.654; EMT 3.372 / 6.913 %, WT 5.78 / 10.38, RT 54.55 / 48.67 %; B 0.040 / 0.040. The thesis's light
    * 15 g/m^2 silk (sample 7) reads a negative hysteresis, under what the instrument resolves, so it is not used.
    */
   silk: Object.freeze({
@@ -377,12 +434,13 @@ export const FABRICS = Object.freeze({
       warp: Object.freeze({ strain: 3.372, energy: 5.78, resilience: 54.55 }),
       weft: Object.freeze({ strain: 6.913, energy: 10.38, resilience: 48.67 }),
     }),
+    bending: Object.freeze({ warp: 0.04, weft: 0.04 }),
     arealDensity: 0.15,
     source: `${LUIBLE}, sample 8`,
   }),
   /**
    * Canvas. No published KES-F measurement of a cotton duck canvas was found; this is the nearest measured fabric, a jute
-   * plain weave of 300 g/m^2 (sample 10): G 2.516 / 2.203, 2HG 2.995 / 2.584; EMT 1.439 / 0.963 %, WT 2.63 / 2.88, RT 61.10 / 60.30 %.
+   * plain weave of 300 g/m^2 (sample 10): G 2.516 / 2.203, 2HG 2.995 / 2.584; EMT 1.439 / 0.963 %, WT 2.63 / 2.88, RT 61.10 / 60.30 %; B 2.725 / 6.479.
    */
   canvas: Object.freeze({
     name: 'canvas (from a measured jute plain weave)',
@@ -391,12 +449,13 @@ export const FABRICS = Object.freeze({
       warp: Object.freeze({ strain: 1.439, energy: 2.63, resilience: 61.1 }),
       weft: Object.freeze({ strain: 0.963, energy: 2.88, resilience: 60.3 }),
     }),
+    bending: Object.freeze({ warp: 2.725, weft: 6.479 }),
     arealDensity: 0.3,
     source: `${LUIBLE}, sample 10 (jute plain weave; no canvas measurement was found)`,
   }),
   /**
    * Sailcloth. No published KES-F measurement of a woven polyester sailcloth was found; this is the nearest measured fabric, a
-   * woven polyester plain weave for outdoor wear of 90 g/m^2 (sample 29): G 2.315 / 2.328, 2HG 1.832 / 1.270; EMT 1.977 / 1.882 %, WT 3.88 / 4.075, RT 59.99 / 63.83 %. A real sail is
+   * woven polyester plain weave for outdoor wear of 90 g/m^2 (sample 29): G 2.315 / 2.328, 2HG 1.832 / 1.270; EMT 1.977 / 1.882 %, WT 3.88 / 4.075, RT 59.99 / 63.83 %; B 0.027 / 0.046. A real sail is
    * heavier and resin-finished, so stiffer in shear; give it its own measured values where you have them.
    */
   sailcloth: Object.freeze({
@@ -406,6 +465,7 @@ export const FABRICS = Object.freeze({
       warp: Object.freeze({ strain: 1.977, energy: 3.88, resilience: 59.99 }),
       weft: Object.freeze({ strain: 1.882, energy: 4.075, resilience: 63.83 }),
     }),
+    bending: Object.freeze({ warp: 0.027, weft: 0.046 }),
     arealDensity: 0.09,
     source: `${LUIBLE}, sample 29 (woven polyester outdoor fabric; no sailcloth measurement was found)`,
   }),
@@ -446,6 +506,17 @@ export class SoftBodyMaterial {
   arealDensity: number | null = FABRICS.cottonShirting.arealDensity;
   /** Bend edges, which join a particle to the one two along (default 10 Hz, critically damped). */
   bendSoftness: SoftSoftness = { naturalFrequency: 10, dampingRatio: 1 };
+  /**
+   * The measured bending of a body of triangles (KES-FB2's B, see {@link FabricBending}; default null: the bend edges and
+   * {@link bendSoftness}). Set, the body bends as a plate of that rigidity with no Poisson coupling, B/2 per area times its
+   * curvature squared along the warp, across it and in twist (the mean of the two), whatever the cloth's resolution; each
+   * triangle's curvature comes from the dihedral angles of its sides (Bergou et al., "A quadratic bending model for
+   * inextensible surfaces", SGP 2006, gathered per triangle as Cohen-Steiner and Morvan gather them), so the bending energy is
+   * quadratic in the positions and solved exactly with the threads. Its bend edges rest. {@link SoftBodyDesc.setFabric} and
+   * {@link SoftBodyMaterial.fabric} set it from the fabric. It is for a sheet flat at rest (a cloth): a curved rest shape
+   * bends back toward flat.
+   */
+  bending: FabricBending | null = null;
   /**
    * Stretch past this fraction of an edge's rest length tears it at the end of the step (0, the default, never tears). Only
    * structural and shear edges tear; a torn edge stays torn.
@@ -505,6 +576,7 @@ export class SoftBodyMaterial {
     material.shear = { ...fabric.shear };
     material.tensile = { warp: { ...fabric.tensile.warp }, weft: { ...fabric.tensile.weft } };
     material.arealDensity = fabric.arealDensity;
+    material.bending = { ...fabric.bending };
     return material;
   }
   /** @internal */
@@ -518,6 +590,7 @@ export class SoftBodyMaterial {
     copy.shear = this.shear && { ...this.shear };
     copy.tensile = this.tensile && { warp: { ...this.tensile.warp }, weft: { ...this.tensile.weft } };
     copy.arealDensity = this.arealDensity;
+    copy.bending = this.bending && { ...this.bending };
     copy.tearStrain = this.tearStrain;
     copy.adaptiveTearing = this.adaptiveTearing;
     copy.shapeMatchingSoftness = { ...this.shapeMatchingSoftness };
@@ -977,6 +1050,18 @@ function checkMaterial(material: SoftBodyMaterial): void {
         throw softError(
           'A fabric tension is a positive strain (EMT, percent) and energy (WT, gf cm/cm^2) and a resilience (RT) of 0 to 100 percent, as KES-F measures them; pass the measured values.',
         );
+  if (
+    material.bending &&
+    !(
+      material.bending.warp > 0 &&
+      Number.isFinite(material.bending.warp) &&
+      material.bending.weft > 0 &&
+      Number.isFinite(material.bending.weft)
+    )
+  )
+    throw softError(
+      'A fabric bending rigidity is a positive B along the warp and the weft in gf cm^2/cm, as KES-FB2 measures it; pass the measured values, or null for bend edges.',
+    );
   if (material.arealDensity !== null && !(material.arealDensity > 0 && Number.isFinite(material.arealDensity)))
     throw softError('A fabric areal density is a positive number of kg/m^2, or null; pass one of those.');
   checkSoftness(material.shapeMatchingSoftness, 'Shape matching softness');
@@ -2216,6 +2301,7 @@ export class SoftBodyDesc {
     material.shear = { ...fabric.shear };
     material.tensile = { warp: { ...fabric.tensile.warp }, weft: { ...fabric.tensile.weft } };
     material.arealDensity = fabric.arealDensity;
+    material.bending = { ...fabric.bending };
     this.setMaterial(material);
     const masses = this.areaMasses(fabric.arealDensity);
     if (masses.some((m) => !(m > 0)))
@@ -3033,6 +3119,7 @@ export class SoftBody {
     // Announced, and split by the world's splitOnTear, at the end of the next step, as a tear the step finds is.
     this.owner.cellTornByHand = true;
     if (this.tetherStretch !== null) this.owner.tethersDirty = true;
+    if (this.material.bending) this.owner.bendsDirty = true;
     return this;
   }
   /** How the body's cells are solved. */
@@ -3446,6 +3533,8 @@ export class SoftBodies implements PhysicsAttachment {
   private view: Columns | null = null;
   private viewBuffer: ArrayBuffer | null = null;
   private capacity = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+  /** @internal Whether the bending elements must be worked out again (a body, a material or a tear changed them). */
+  bendsDirty = false;
   /** @internal Whether the long range attachments must be worked out again (a body, a pin or a tear changed the paths). */
   tethersDirty = false;
   private rowGroups: number[] = [];
@@ -4630,6 +4719,7 @@ export class SoftBodies implements PhysicsAttachment {
 
   /** @internal Writes a body's material into its edge rows. */
   writeMaterial(body: SoftBody): void {
+    this.bendsDirty = true;
     const c = this.columns(),
       fem = this.cellColumns(),
       { edgeSoftness, bendSoftness, tearStrain, shapeMatchingSoftness } = body.material;
@@ -4689,6 +4779,9 @@ export class SoftBodies implements PhysicsAttachment {
       }
       // A body of edges with no cells on the vertex-block solver: its edges are springs of the block solve (cloth_block.rs).
       if (blocks) flags |= BLOCK;
+      // A body of measured bending bends by its bending elements (bend.rs): its bend edges, if it was made with any, rest.
+      flags &= ~OFF;
+      if (bend && body.material.bending && body.triangleList.length > 0) flags = (flags | OFF) & ~BLOCK;
       c.eflags[row] = flags;
       // The cells' module tears and flows the edges (it smooths the load, shields the interior and keeps the pieces), so the
       // solver's own test is off.
@@ -4799,6 +4892,7 @@ export class SoftBodies implements PhysicsAttachment {
   /** Removes a body and its particles; later bodies keep their order, but their numbers shift down by one. */
   remove(body: SoftBody): void {
     if (body.tetherStretch !== null || this.bodies.some((b) => b.tetherStretch !== null)) this.tethersDirty = true;
+    this.bendsDirty = true;
     if (body.removed) return;
     const at = this.bodies.indexOf(body);
     if (at < 0)
@@ -5182,6 +5276,7 @@ export class SoftBodies implements PhysicsAttachment {
     this.findPlanes(dt, rows, bodies);
     this.takeFromProxies();
     if (this.tethersDirty) this.writeTethers();
+    if (this.bendsDirty) this.writeBends();
     this.writeSkins(dt);
     this.exports.soft_fem_step_begin();
     this.exports.soft_begin(dt);
@@ -5363,6 +5458,102 @@ export class SoftBodies implements PhysicsAttachment {
       }
       from.set(to);
     }
+  }
+
+  /**
+   * The bending elements of every body of measured bending (bend.rs): one a triangle whose sides are whole, with the rest
+   * lengths of its sides and of the far corner across each side that another whole triangle shares, the side along the warp
+   * (a woven grid's warp thread), and the rigidity along and across the warp.
+   */
+  private writeBends(): void {
+    this.bendsDirty = false;
+    const c = this.columns(),
+      elements: number[] = [];
+    for (const body of this.bodies) {
+      const bending = body.material.bending;
+      if (!bending || body.triangleList.length === 0) continue;
+      const along = fabricBendingRigidity(bending.warp),
+        across = fabricBendingRigidity(bending.weft),
+        first = body.firstParticle,
+        n = body.particles,
+        edges = new Map<number, number>(),
+        key = (a: number, b: number): number => Math.min(a, b) * n + Math.max(a, b);
+      // The whole structural edges, by their ends.
+      for (let e = 0; e < body.structural; e++) {
+        const row = body.firstEdge + e;
+        if ((c.eflags[row]! & TORN) !== 0) continue;
+        edges.set(key(c.ea[row]! - first, c.eb[row]! - first), e);
+      }
+      const list = body.triangleList,
+        rest = (a: number, b: number): number => {
+          const e = edges.get(key(a, b));
+          return e === undefined ? -1 : c.rest[body.firstEdge + e]!;
+        },
+        // Each edge's triangles' far corners.
+        across_ = new Map<number, number[]>();
+      for (let t = 0; t < list.length; t += 3)
+        for (let k = 0; k < 3; k++) {
+          const a = list[t + k]!,
+            b = list[t + ((k + 1) % 3)]!,
+            far = list[t + ((k + 2) % 3)]!,
+            seen = across_.get(key(a, b));
+          if (seen) seen.push(far);
+          else across_.set(key(a, b), [far]);
+        }
+      const flag = body.solverKind === 'vertex-block' && body.cellRange.count === 0 ? BEND_BLOCK : 0;
+      for (let t = 0; t < list.length; t += 3) {
+        const corner = [list[t]!, list[t + 1]!, list[t + 2]!],
+          sides = [0, 1, 2].map((k) => rest(corner[k]!, corner[(k + 1) % 3]!));
+        // A triangle with a torn side (or a side the body was not made with) bends nothing.
+        if (sides.some((l) => !(l > 0))) continue;
+        const far = [NO_BEND, NO_BEND, NO_BEND],
+          spokes = [0, 0, 0, 0, 0, 0];
+        let warp = 3;
+        for (let k = 0; k < 3; k++) {
+          const a = corner[k]!,
+            b = corner[(k + 1) % 3]!,
+            e = edges.get(key(a, b))!;
+          if (warp === 3 && body.edgeKinds[e] === THREAD_WARP) warp = k;
+          const sharing = across_.get(key(a, b))!;
+          if (sharing.length !== 2) continue;
+          const other = sharing[0] === corner[(k + 2) % 3] ? sharing[1]! : sharing[0]!,
+            ra = rest(a, other),
+            rb = rest(b, other);
+          if (!(ra > 0 && rb > 0)) continue;
+          far[k] = first + other;
+          spokes[2 * k] = ra;
+          spokes[2 * k + 1] = rb;
+        }
+        // A body of triangles that is not a woven grid bends alike every way: the mean of the two rigidities.
+        const isotropic = body.edgeKinds.length === 0;
+        elements.push(
+          first + corner[0]!,
+          first + corner[1]!,
+          first + corner[2]!,
+          ...far,
+          ...sides,
+          ...spokes,
+          warp,
+          isotropic ? (along + across) / 2 : along,
+          isotropic ? (along + across) / 2 : across,
+          flag,
+        );
+      }
+    }
+    const stride = 19,
+      count = elements.length / stride;
+    this.exports.soft_bend_reserve(count);
+    this.view = null;
+    for (let s = 0; s < count; s++) {
+      const o = stride * s;
+      this.exports.soft_bend_set(s, ...(elements.slice(o, o + stride) as BendWords));
+    }
+  }
+
+  /** The bending energy of every body's measured bending now, J (0 with none; see {@link SoftBodyMaterial.bending}). */
+  bendingEnergy(): number {
+    if (this.bendsDirty) this.writeBends();
+    return this.exports.soft_bend_energy();
   }
 
   private writeTethers(): void {
@@ -6471,6 +6662,7 @@ export class SoftBodies implements PhysicsAttachment {
           }
       }
       if (fresh.length && body.tetherStretch !== null) this.tethersDirty = true;
+      if (fresh.length && body.material.bending) this.bendsDirty = true;
       if (fresh.length || freshCells.length) this.announce(body, fresh, freshCells, this.splitAfterTear(body));
     }
   }

@@ -19076,3 +19076,33 @@ In a T pose, a large arm cross-section could make the shoulder ray reach the che
 
 - Ilya Baran and Jovan Popović, *Automatic Rigging and Animation of 3D Characters* (2007), [paper](https://homes.cs.washington.edu/~jovan/papers/baran-2007-ara.pdf). The paper motivates fitting bones within a surface using shape measurements.
 - Carel G. M. Meskers et al., *In vivo estimation of the glenohumeral joint rotation center from scapular bony landmarks by linear regression* (1998), [paper record](https://pubmed.ncbi.nlm.nih.gov/9596544/). This work distinguishes the joint center from the visible shoulder surface. The inset bound here is a geometric heuristic for mesh rigging.
+### Measured cloth bending (`SoftBodyMaterial.bending`, `@margoengine/physics/soft`, SOFT-01, 2026-11-27)
+
+`packages/physics/soft-kernel/src/bend.rs`, the bending rows of `rigid.rs`, `writeBends` in `packages/physics/src/soft.ts`.
+Written from these papers; no engine's or companion code was read.
+
+- M. Bergou, M. Wardetzky, D. Harmon, D. Zorin and E. Grinspun, "A quadratic bending model for inextensible surfaces",
+  Symposium on Geometry Processing 2006, https://doi.org/10.2312/SGP/SGP06/227-230: the hinge's row vector
+  K = (c03 + c04, c01 + c02, -c01 - c03, -c02 - c04) of rest cotangents, whose K x is zero on a flat placement, sums to zero
+  and is |e| times the dihedral angle for an isometric bend. Their local matrix 3 / (2 (A0 + A1)) K^T K converges to the
+  squared mean curvature (checked here: 3/2 kappa^2 per area summed over a cylinder), a plate of Poisson's ratio 1: a free
+  cantilevered strip of it drooped 30 to 45 percent past a beam of the same B at any width (a linear solve of its Q on the
+  strip, and the soft solver). So the hinge vectors are not summed directly.
+- M. Wardetzky, M. Bergou, D. Harmon, D. Zorin and E. Grinspun, "Discrete quadratic curvature energies", Computer Aided
+  Geometric Design, 2007, https://www.cs.columbia.edu/cg/pdfs/1166238667-bendingCAGD.pdf: the family of isometric bending models and their
+  invariances (read for the conditions a discrete quadratic energy must meet).
+- D. Cohen-Steiner and J.-M. Morvan, "Restricted Delaunay triangulations and normal cycle", Symposium on Computational
+  Geometry 2003 (not read; its tensor as the discrete-curvature literature states it): a region's curvature tensor as the sum over edges of the dihedral
+  angle times the edge length in the region times the edge's direction outer product, over the region's area. Here the region
+  is a triangle, each hinge shared half and half, and the in-plane normal of the edge carries the curvature across it, so
+  k_T = 1 / (2 A_T) sum (K_e x) n_e n_e^T, a vector per component, linear in the positions. The energy B/2 (k11^2 + 2 k12^2
+  + k22^2) A_T is the plate with no Poisson coupling that a woven fabric's bending is.
+- F. T. Peirce, "The 'handle' of cloth as a measurable quantity", Journal of the Textile Institute, 1930 (as Luible
+  section 2.2 and ASTM D1388 state its cantilever): a strip whose tip reaches the 41.5 degree slope
+  hangs out twice its bending length c = (B / w)^(1/3); the exact heavy elastica (solved in the test by shooting) agrees to
+  0.02 degrees.
+- E. Luible's thesis (above): Annex C's KES-FB2 B for the presets and the validation, section 4.2.2's FAST bending rigidity
+  and weights for the four woven fabrics both instruments measured, section 4.3's face and back spread of up to 89 percent for
+  the band, section 5.3.6 on why the two instruments differ.
+- Clamp: two pinned columns half a cell either side of the clamp's edge hold the slope level at the edge (a central
+  difference), checked on a finite difference beam, where a column at the edge and one behind it lengthen it by half a cell.

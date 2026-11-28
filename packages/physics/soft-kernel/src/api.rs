@@ -29,6 +29,8 @@ static mut WORLD: World = World {
     sk_nx: Col::new(), sk_ny: Col::new(), sk_nz: Col::new(), sk_max: Col::new(), sk_back: Col::new(), skins: 0,
     cb_head: Col::new(), cb_next: Col::new(), cbx: Col::new(), cby: Col::new(), cbz: Col::new(),
     ax: Col::new(), ay: Col::new(), az: Col::new(), pressed: Col::new(), vbx: Col::new(), vby: Col::new(), vbz: Col::new(),
+    bd_p: Col::new(), bd_r: Col::new(), bd_alpha: Col::new(), bd_l: Col::new(), bd_flag: Col::new(), bd_len: Col::new(), bends: 0,
+    bd_head: Col::new(), bd_next: Col::new(),
 };
 
 #[allow(static_mut_refs)]
@@ -93,6 +95,30 @@ pub extern "C" fn soft_tether_reserve(tethers: u32) {
     w.tt_a.resize(tethers as usize);
     w.tt_len.resize(tethers as usize);
     w.tethers = tethers as usize;
+}
+
+/// Makes room for quadratic bending stencils and says how many are in use. Views over the memory are stale after it.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_bend_reserve(bends: u32) {
+    world().reserve_bends(bends as usize);
+}
+
+/// Sets bending element `s` (bend.rs, `set_bend`): triangle t0 t1 t2, the far corner across each edge (u32::MAX for none),
+/// the rest lengths of its sides (t0t1, t1t2, t2t0) and of each far corner to its edge's ends, the warp side (3: none), the
+/// rigidity along and across the warp (N m) and its flags.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn soft_bend_set(
+    s: u32, t0: u32, t1: u32, t2: u32, f0: u32, f1: u32, f2: u32, s01: f32, s12: f32, s20: f32, a0: f32, b0: f32, a1: f32,
+    b1: f32, a2: f32, b2: f32, warp: u32, along: f32, across: f32, flag: u32,
+) {
+    world().set_bend(s as usize, [t0, t1, t2], [f0, f1, f2], [s01, s12, s20], [a0, b0, a1, b1, a2, b2], warp, along, across, flag);
+}
+
+/// The bending energy of every element, J.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_bend_energy() -> f64 {
+    world().bend_energy()
 }
 
 /// Makes room for skinned particles and says how many are in use. Views over the memory are stale after it.

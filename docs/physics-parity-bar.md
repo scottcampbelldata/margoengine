@@ -221,11 +221,14 @@ default staying 1 kg/m³ and documented as Rapier's.
   `packages/physics/tests/gpu-cloth.test.js`, `gpu-cloth-check.mjs` (WebGPU and the WebGL2 layer). PA-06 is fixed; the
   CPU cloth's PA-05 soft-world snapshots, X-28 face aerodynamics, X-30 tethers and X-31 skinned cloth landed
   2026-11-27, with cloth vertex block descent (X-27, 5fbceae4a) and adaptive tearing; PA-29 is fixed (a sail lashed to
-  a free hull drives it with the whole of its load, 7b0bfd12d). Open against the eight points: (1) one option choosing
-  XPBD or vertex block descent on the GPU cloth (VBD is on the CPU cloth only) and bending from measured KES-FB2
-  rigidity (Bergou et al. 2006 quadratic bending) on both; (2) validation against measured fabrics (ASTM D1388
-  cantilever bending length against the heavy elastica, the Cusick drape coefficient, held-out fabrics: no open
-  tabulated data set with weight, bending rigidity and drape coefficient was found on 2026-11-27); (4) the GPU cloth's
+  a free hull drives it with the whole of its load, 7b0bfd12d). The CPU cloth bends by
+  measured KES-FB2 rigidity (`material.bending`, set by `setFabric`: Bergou et al. 2006 hinge vectors gathered into each
+  triangle's curvature tensor, a plate with no Poisson coupling, solved exactly with the threads), on the exact heavy
+  elastica to (cell / length)^2 and within the KES-FB2 face and back band of FAST's measured cantilever in seven of the eight
+  directions of four woven fabrics (linen's warp outside, `tests/soft-bending.test.js`); KB-SOFT-LASHCONTACT1 is fixed
+  (41edc7d44). Open against the eight points: (1) one option choosing XPBD or vertex block descent on the GPU cloth (VBD
+  is on the CPU cloth only) and the measured bending on the GPU cloth (bend edges there); (2) the Cusick drape
+  coefficient (no published set with weight, KES-FB2 B and drape coefficient together was found on 2026-11-27); (4) the GPU cloth's
   ties to dynamic bodies are one way: two-way ties were built and measured (momentum to 2e-5 at 8 substeps) but a box
   hung on a stiff strip rings and grows, because the body's turn answers a frame late; it needs the body's inertia in the
   cloth's own solve; (6) one thread on the CPU route; and speed against the rival's demo (quiet speed phase).
