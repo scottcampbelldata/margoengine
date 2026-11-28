@@ -9212,10 +9212,21 @@ It omits range-dependent bathymetry, rough-interface scattering, lateral spread 
 modes. Its pressure is relative to each beam's launch amplitude, with no automatic combination of independent
 launches into a calibrated point source. The path, delay and pressure ports can feed a downstream audio graph.
 
-Cost scales with rays and crossed layers. The world holds 384 bytes per ray for state, outputs and scratch,
-plus the field registry's output copies, and 24 bytes per profile knot. The workload is one closed-form
-drift or interface update per active ray interval. The optional entry measures 4,758 B gzip with a 5,014 B budget
-on the workstation.
+Nonuniform columns visit each resolved interface. In a uniform column with many repeats, the straight path
+folds into the column with one beam drift and integer powers of the reflection factors. The total reflection
+count must remain exactly representable as a float64 integer. The solver refuses an unresolved layer-crossing
+time or a tick that would leave the path or beam outside representable range. The previous accepted ray and
+ports remain available. The world holds 384 bytes per ray for state, outputs and scratch, plus the field
+registry's output copies, and 24 bytes per profile knot. The optional entry is 4,622 B gzip under a 4,878 B
+ceiling. Core and Stage gain zero bytes.
+
+Published arrival timing was checked separately with `sound03-arrival-measured.mjs`. One of the four
+ocean echoes matches within the timing resolution and published rounding. Three match when the reported
+variability of individual arrivals is also allowed. Both nominal tank echo predictions differ by more than
+the reported timing resolution. The tank paper does not give independent sound-speed or placement uncertainty.
+The comparisons exercise geometric timing only. Receiver pressure, transmission loss and waveguide modes
+remain open. [Chitre, 2007](https://doi.org/10.1121/1.2782884) ·
+[Viegas, Zabel and Silva, 2023](https://doi.org/10.3390/s23104931)
 
 ## Ice thermodynamics (ICE-05)
 

@@ -6261,6 +6261,8 @@ Pass `{ id }` to the constructor to name a second column. The default ID is `'un
 
 `sample(index)` gives the current ray in launch-array order. Use `acousticBeamPressure(ray, offset)` with a
 perpendicular offset in metres to obtain the real and imaginary pressure in Pa at the current wavefront.
+The solver preserves precise reflection counts in uniform columns with many repeats. If the count or beam
+state exceeds float64 range, it reports a coded error and retains the previous accepted state.
 For another solver, read the layout-1 f64 ports below. The source ID prefixes each suffix.
 
 | Descriptor property | Suffix | Words per ray |
@@ -6268,6 +6270,11 @@ For another solver, read the layout-1 f64 ports below. The source ID prefixes ea
 | `pathField` | `.path` | Range, depth, total path length and beam width in metres |
 | `signalField` | `.signal` | Real and imaginary on-axis pressure in Pa |
 | `delayField` | `.delay` | Travel time in seconds |
+
+The fixed-camera Margo cutaway draws the accepted rays and signed beam-axis pressure. Run
+`npm run test:gpu:underwater-surface -w @margoengine/physics` from the repository. Set
+`MARGO_KEEP_UNDERWATER_FRAMES=1` to keep the reviewed frames under
+`packages/physics/test-results/underwater-waveguide/`.
 
 ### Orbital mechanics (`margoengine/physics/orbit`)
 

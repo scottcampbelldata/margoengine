@@ -1,3 +1,4 @@
+import { MargoError } from '@margoengine/math/errors';
 import { cos, exp, hypot, ln, sin } from '@margoengine/math/pinned';
 import { atan2 } from '../space/angles.js';
 import { layerSpeed, PROFILE_WORDS, soundLayer } from './profile.js';
@@ -56,13 +57,27 @@ export interface AcousticPressure {
 /** Evaluates a ray's beam at a signed perpendicular offset in metres. */
 export function acousticBeamPressure(ray: AcousticRaySample, offset: number): AcousticPressure {
   if (!Number.isFinite(offset))
-    throw new RangeError('Invalid Gaussian beam offset; pass a finite perpendicular distance in metres.');
+    throw new MargoError('state', 'Invalid Gaussian beam offset; pass a finite perpendicular distance in metres.');
+  if (
+    !ray ||
+    !Number.isFinite(ray.width) ||
+    ray.width <= 0 ||
+    !Number.isFinite(ray.soundSpeed) ||
+    ray.soundSpeed <= 0 ||
+    !Number.isFinite(ray.frequency) ||
+    ray.frequency <= 0 ||
+    !Number.isFinite(ray.pressure) ||
+    !Number.isFinite(ray.curvature) ||
+    !Number.isFinite(ray.phase)
+  )
+    throw new MargoError('state', 'Invalid acoustic beam sample. Pass a current sample from the solver.');
   const ratio = offset / ray.width;
   const pressure = ray.pressure * exp(-ratio * ratio);
   if (pressure === 0) return { real: 0, imaginary: 0 };
   const phase = (ray.phase + ((Math.PI * ray.frequency * ray.curvature * offset) / ray.soundSpeed) * offset) % TAU;
   if (!Number.isFinite(phase))
-    throw new RangeError(
+    throw new MargoError(
+      'state',
       'Acoustic beam phase exceeds numeric range; reduce launch frequency or the perpendicular offset.',
     );
   return { real: pressure * cos(phase), imaginary: pressure * sin(phase) };
@@ -94,22 +109,26 @@ export const TRACE_WORDS = Word.LengthWords;
 const DEFAULT_WAIST = 5;
 
 export function initializeRay(profile: Float64Array, ray: AcousticRayOptions): readonly number[] {
+  if (ray === null || typeof ray !== 'object')
+    throw new MargoError('state', 'Invalid acoustic launch. Pass an object with the launch conditions.');
   const depth = ray.depth ?? profile[profile.length - PROFILE_WORDS]! / 2;
   const direction = ray.declination ?? 0;
   const frequency = ray.frequency ?? 1000;
   const waist = ray.waist ?? DEFAULT_WAIST;
   const pressure = ray.pressure ?? 1;
-  if (!(Math.abs(direction) <= Math.PI / 2))
-    throw new RangeError('Invalid acoustic launch angle; use an angle from -π/2 to π/2 radians.');
+  if (!Number.isFinite(direction) || Math.abs(direction) > Math.PI / 2)
+    throw new MargoError('state', 'Invalid acoustic launch angle; use an angle from -π/2 to π/2 radians.');
   if (
     !(frequency > 0 && Number.isFinite(frequency) && waist > 0 && Number.isFinite(waist) && Number.isFinite(pressure))
   )
-    throw new RangeError(
+    throw new MargoError(
+      'state',
       'Invalid Gaussian beam; supply positive finite frequency and width and finite launch pressure.',
     );
   const epsilon = Math.PI * frequency * waist * waist;
   if (!(epsilon > 0 && Number.isFinite(epsilon)))
-    throw new RangeError(
+    throw new MargoError(
+      'state',
       'Gaussian beam scale is outside numeric range; use a smaller frequency or representable beam width.',
     );
   let layer = soundLayer(profile, depth, direction >= 0);
@@ -124,6 +143,11 @@ export function initializeRay(profile: Float64Array, ray: AcousticRayOptions): r
   const speed = layerSpeed(profile, layer * PROFILE_WORDS, depth);
   const vertical = sin(direction);
   const slowness = Math.abs(direction) === Math.PI / 2 ? 0 : cos(direction) / speed;
+  if (!(speed > 0) || !Number.isFinite(speed) || !Number.isFinite(slowness))
+    throw new MargoError(
+      'state',
+      'Acoustic launch speed is outside numeric range. Specify a representable sound speed.',
+    );
   return [layer, 0, depth, vertical, slowness, 0, 0, frequency, speed, epsilon, 0, epsilon, 1, 0, 0, pressure, 0];
 }
 
@@ -183,14 +207,25 @@ function beamDrift(ray: Float64Array, row: number, integral: number): void {
   const nextX = x + dx;
   const nextY = y + dy;
   // Advance the argument along the continuous branch of the complex square root.
-  const cross = x * dy - y * dx;
-  const dot = x * nextX + y * nextY;
+  let cross = x * dy - y * dx;
+  let dot = x * nextX + y * nextY;
+  if (!Number.isFinite(cross) || !Number.isFinite(dot) || (cross === 0 && dot === 0 && (dx !== 0 || dy !== 0))) {
+    const beforeScale = Math.max(Math.abs(x), Math.abs(y));
+    const afterScale = Math.max(Math.abs(nextX), Math.abs(nextY));
+    const a = x / beforeScale;
+    const b = y / beforeScale;
+    const c = nextX / afterScale;
+    const d = nextY / afterScale;
+    cross = a * d - b * c;
+    dot = a * c + b * d;
+  }
   ray[row + Word.Gouy] = (ray[row + Word.Gouy]! - 0.5 * atan2(cross, dot)) % TAU;
   ray[row + Word.QReal] = nextX;
   ray[row + Word.QImag] = nextY;
 }
 
 function advanceInside(ray: Float64Array, row: number, speed: number, slope: number, dt: number): void {
+  if (dt === 0) return;
   const u = ray[row + Word.Vertical]!;
   const slowness = ray[row + Word.Slowness]!;
   let integral = speed * speed * dt;
@@ -229,6 +264,58 @@ function bendBeam(ray: Float64Array, row: number, slopeChange: number, vertical:
   ray[row + Word.PImag] = ray[row + Word.PImag]! + kick * ray[row + Word.QImag]!;
 }
 
+// Integer pressure powers retain the parity of pressure-release reflections.
+function reflectionPower(factor: number, count: number): number {
+  let value = 1;
+  while (count > 0) {
+    if (count % 2 === 1) value *= factor;
+    count = Math.floor(count / 2);
+    factor *= factor;
+  }
+  return value;
+}
+
+// Unfold a uniform channel to a straight path and fold only its final depth back into the column.
+// Keep the event-by-event operation order when there are only a few reflections.
+function foldUniformRay(
+  ray: Float64Array,
+  row: number,
+  speed: number,
+  bottom: number,
+  dt: number,
+  surfaceReflection: number,
+  bottomReflection: number,
+): boolean {
+  const vertical = ray[row + Word.Vertical]!;
+  const depth = ray[row + Word.Depth]!;
+  const travelled = Math.abs(speed * vertical * dt);
+  const firstIsBottom = vertical > 0;
+  const firstDistance = firstIsBottom ? bottom - depth : depth;
+  const pastFirst = travelled - firstDistance;
+  if (!(pastFirst >= 16 * bottom)) return false;
+  const further = Math.floor(pastFirst / bottom);
+  const reflections = further + 1;
+  const total = ray[row + Word.Reflections]! + reflections;
+  if (!Number.isSafeInteger(reflections) || !Number.isSafeInteger(total))
+    throw new MargoError(
+      'state',
+      'Acoustic reflection count exceeds exact numeric range. Increase the water depth or shorten the run.',
+    );
+  const lastIsBottom = firstIsBottom === (further % 2 === 0);
+  const tail = pastFirst % bottom;
+  const pairs = Math.floor(reflections / 2);
+  const unpaired = reflections % 2;
+  advanceInside(ray, row, speed, 0, dt);
+  ray[row + Word.Depth] = lastIsBottom ? bottom - tail : tail;
+  ray[row + Word.Vertical] = lastIsBottom ? -Math.abs(vertical) : Math.abs(vertical);
+  ray[row + Word.Pressure] =
+    ray[row + Word.Pressure]! *
+    reflectionPower(surfaceReflection, pairs + (firstIsBottom ? 0 : unpaired)) *
+    reflectionPower(bottomReflection, pairs + (firstIsBottom ? unpaired : 0));
+  ray[row + Word.Reflections] = total;
+  return true;
+}
+
 export function advanceRay(
   profile: Float64Array,
   ray: Float64Array,
@@ -239,6 +326,13 @@ export function advanceRay(
 ): void {
   const slowness = ray[row + Word.Slowness]!;
   let remaining = dt;
+  let previousZeroTime = false;
+  if (
+    profile.length === 2 * PROFILE_WORDS &&
+    profile[2] === 0 &&
+    foldUniformRay(ray, row, profile[1]!, profile[3]!, dt, surfaceReflection, bottomReflection)
+  )
+    remaining = 0;
   while (remaining > 0) {
     const layer = ray[row + Word.Layer]!;
     const index = layer * PROFILE_WORDS;
@@ -275,13 +369,18 @@ export function advanceRay(
       bendBeam(ray, row, -2 * slope, incidence);
       ray[row + Word.Vertical] = -incidence;
       ray[row + Word.Pressure] = ray[row + Word.Pressure]! * (nextLayer < 0 ? surfaceReflection : bottomReflection);
-      ray[row + Word.Reflections] = ray[row + Word.Reflections]! + 1;
+      const count = ray[row + Word.Reflections]! + 1;
+      if (!Number.isSafeInteger(count))
+        throw new MargoError('state', 'Acoustic reflection count is no longer exact. Start a new acoustic run.');
+      ray[row + Word.Reflections] = count;
     }
     const nextTime = remaining - exit;
-    if (exit > 0 && nextTime === remaining)
-      throw new RangeError(
-        'The acoustic layer transit is below floating-point time resolution; increase the layer depth.',
+    if ((exit > 0 && nextTime === remaining) || (exit === 0 && previousZeroTime))
+      throw new MargoError(
+        'state',
+        'The acoustic layer transit is below floating-point time resolution. Increase the separation between profile knots.',
       );
+    previousZeroTime = exit === 0;
     remaining = nextTime;
   }
   ray[row + Word.Time] = ray[row + Word.Time]! + dt;
@@ -299,7 +398,14 @@ export function sampleRay(
   const frequency = ray[row + Word.Frequency]!;
   const qr = ray[row + Word.QReal]!;
   const qi = ray[row + Word.QImag]!;
-  const norm = hypot(qr, qi);
+  let norm = hypot(qr, qi);
+  let beamScale = 1;
+  if (!(norm > 0 && Number.isFinite(norm))) {
+    beamScale = Math.max(Math.abs(qr), Math.abs(qi));
+    norm = hypot(qr / beamScale, qi / beamScale);
+  }
+  const relativeScale = beamScale === 1 ? norm / epsilon : (beamScale / epsilon) * norm;
+  const inverseScale = beamScale === 1 ? epsilon / norm : epsilon / beamScale / norm;
   const pathLength = ray[row + Word.Length]!;
   const travelTime = ray[row + Word.Time]!;
   const damping = absorption === 0 ? 1 : exp((-absorption * (pathLength / 1000)) / DB_PER_NEPER);
@@ -310,10 +416,11 @@ export function sampleRay(
     travelTime,
     pathLength,
     soundSpeed: speed,
-    width: (norm / epsilon) * Math.sqrt(epsilon / (Math.PI * frequency)),
-    curvature: (-speed / norm) * (ray[row + Word.PReal]! * (qr / norm) + ray[row + Word.PImag]! * (qi / norm)),
-    pressure:
-      ray[row + Word.Pressure]! * damping * Math.sqrt((speed / ray[row + Word.LaunchSpeed]!) * (epsilon / norm)),
+    width: relativeScale * Math.sqrt(epsilon / (Math.PI * frequency)),
+    curvature:
+      (-speed / beamScale / norm) *
+      (ray[row + Word.PReal]! * (qr / beamScale / norm) + ray[row + Word.PImag]! * (qi / beamScale / norm)),
+    pressure: ray[row + Word.Pressure]! * damping * Math.sqrt((speed / ray[row + Word.LaunchSpeed]!) * inverseScale),
     phase: ray[row + Word.Gouy]! - TAU * ((frequency * travelTime) % 1),
     frequency,
     reflections: ray[row + Word.Reflections]!,

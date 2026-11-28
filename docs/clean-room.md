@@ -15231,6 +15231,21 @@ real pixel readback at a fixed camera in addition to the CPU orbit checks.
   path through a linear gradient. The code uses a time form of that same arc so a step crosses interfaces
   without assuming a prescribed range or depth increment.
 
+The uniform column follows the image-ray construction in Jensen et al. (2011). For a fast crossing ray we
+apply a triangular depth fold to the full straight path, reflect the final vertical direction by parity and
+apply the pressure factors over each boundary's count by integer exponentiation. The uniform beam has
+constant `P`, so the total drift is the sum of the identical subinterval integrals (Porter and Bucker,
+1987). For an extreme beam size, factoring out positive scales from `Q` preserves the argument of
+its normalized cross and dot products. Ordinary arithmetic keeps its original order.
+
+The field timing comparison uses independent geometry and measured water speed from Table I and the
+excess arrival times from Table II of Mandar Chitre, [A high-frequency warm shallow water acoustic communications
+channel model and measurements](https://arl.nus.edu.sg/wp-content/publications/Chitre2007b.pdf) (2007).
+It omits the reflection, material and motion parameters fitted by that paper. The tank comparison uses
+the geometry, nominal sound speed and independent measured delays of Ruben Viegas, Friedrich Zabel and
+Antonio Silva, [In-Lab Demonstration of an Underwater Acoustic Spiral Source](https://doi.org/10.3390/s23104931)
+(2023), §3, Figures 6 and 8. The script records misses in both regimes without fitting solver parameters.
+
 Tests compare the uniform beam width, attenuation and phase, the analytic circular arc and turning point,
 the change in wavefront curvature at a knot, and repeated flat-boundary reflections with closed solutions.
 The coupling test verifies the recorded delay and complex pressure against the live registry reader and exact

@@ -178,3 +178,103 @@ test('horizontal sound at a channel minimum stays on its axis and validates outs
   assert.equal(ray.declination, 0);
   assert.equal(ray.reflections, 0);
 });
+
+test('unsupported launch and beam states throw coded corrections', () => {
+  const error = (message) => ({ name: 'MargoError', code: 'state', message });
+  assert.throws(() => make({ profile: [{ depth: 0, speed: 1500 }, null] }), error(/strictly increasing/));
+  assert.throws(() => make({ rays: new Array(1) }), error(/Pass an object with the launch/));
+  assert.throws(() => make({ rays: [null] }), error(/Pass an object with the launch/));
+  assert.throws(() => make({ rays: [{ declination: '0' }] }), error(/angle from -π/));
+  assert.throws(() => make({ bottomReflection: '0.8' }), error(/signed pressure ratio/));
+  assert.throws(
+    () =>
+      make({
+        profile: [
+          { depth: 0, speed: Number.MIN_VALUE },
+          { depth: 1, speed: Number.MIN_VALUE },
+        ],
+      }),
+    error(/representable sound speed/),
+  );
+  const { solver } = make();
+  const sample = solver.sample(0);
+  assert.throws(
+    () => acousticBeamPressure({ ...sample, pressure: Infinity }, 0),
+    error(/current sample from the solver/),
+  );
+  assert.throws(() => acousticBeamPressure(sample, NaN), error(/finite perpendicular distance/));
+  assert.throws(() => solver.sample(Infinity), error(/pass an integer/));
+});
+
+test('a very narrow uniform column folds over 33 million physical reflections in one tick', () => {
+  const bottom = 2 ** -20;
+  const speed = 1920;
+  const { solver, world } = make({
+    profile: [
+      { depth: 0, speed },
+      { depth: bottom, speed },
+    ],
+    rays: [
+      { depth: bottom / 4, declination: Math.PI / 2, pressure: 2 },
+      { depth: bottom / 4, declination: -Math.PI / 2, pressure: 2 },
+    ],
+    surfaceReflection: -1,
+    bottomReflection: 1,
+  });
+  world.advance(1);
+  for (const index of [0, 1]) {
+    const sample = solver.sample(index);
+    assert.equal(sample.reflections, 32 / bottom);
+    assert.equal(sample.range, 0);
+    assert.equal(sample.pathLength, 32);
+    close(sample.depth, bottom / 4, bottom, 8);
+    close(sample.declination, ((index === 0 ? 1 : -1) * Math.PI) / 2);
+    const epsilon = Math.PI * 1000 * 25;
+    close(sample.pressure, 2 * Math.sqrt(epsilon / Math.hypot(speed * 32, epsilon)));
+  }
+  const saved = world.takeSnapshot();
+  world.advance(2);
+  const endpoint = world.hash();
+  world.restoreSnapshot(saved.bytes);
+  world.advance(2);
+  assert.equal(world.hash(), endpoint);
+});
+
+test('overflowing squared beam coordinates retain the finite homogeneous beam', () => {
+  const speed = 1500;
+  const waist = 1e90;
+  const frequency = 960;
+  const { solver, world } = make({ rays: [{ depth: 50, waist, frequency }] });
+  const epsilon = Math.PI * frequency * waist * waist;
+  const initial = solver.sample(0);
+  close(initial.width, waist, waist);
+  assert.ok(initial.curvature === 0);
+  world.advance(1);
+  const travelled = speed / 60;
+  const drift = speed * travelled;
+  const sample = solver.sample(0);
+  close(sample.range, travelled);
+  close(sample.width, waist, waist);
+  close(sample.pressure, 1);
+  // q/epsilon = (drift/epsilon, 1). Its argument changes by atan(drift/epsilon).
+  assert.equal((frequency * sample.travelTime) % 1, 0);
+  const phase = 0.5 * Math.atan(drift / epsilon);
+  close(sample.phase, phase, phase, 16);
+});
+
+test('a reflection count beyond exact f64 integers leaves the previous acoustic tick available', () => {
+  const { solver, world } = make({
+    profile: [
+      { depth: 0, speed: 1920 },
+      { depth: 2 ** -52, speed: 1920 },
+    ],
+    rays: [{ declination: Math.PI / 2 }],
+  });
+  const initial = solver.sample(0);
+  assert.throws(() => world.advance(1), {
+    name: 'MargoError',
+    code: 'state',
+    message: /Increase the water depth or shorten the run/,
+  });
+  assert.deepEqual(solver.sample(0), initial);
+});

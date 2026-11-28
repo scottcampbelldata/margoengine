@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21702293,
+  "total": 21702950,
   "history": [
     {
       "date": "2026-10-24",
@@ -15397,6 +15397,12 @@
       "date": "2026-11-28",
       "commit": "rigs-gear-trains",
       "reason": "Four more mechanism rigs on the solver so their demos show physics against exact: harmonicDriveRig (gear row at the Musser ratio), integratorRig (gear row of ratio r / rho remade as the ball moves), archimedesScrewRig (rack and pinion, the water kept near the origin) and stroboscopeRig (a coasting rotor stepped onto each flash). @margoengine/machinery/rigs 3303 to 4643 B gzip (ceiling 3559 to 4899 B). A split per rig would add an entry and a request for 300 to 400 B each, and each demo loads one solver anyway."
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "sound-03-reflection-fold-and-beam-range",
+      "reason": "SOUND-03 physics/underwater 3965 to 4622 B gzip, ceiling 4221 to 4878, for coded input and accepted-state checks, exact uniform reflection counts, and scaled beam drift. Keeping the fold with the trace shares its physical state and avoids duplicating integrator and validation code. Core and Stage gain zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16321,7 +16327,7 @@
     "@margoengine/physics/tissue": 3218,
     "@margoengine/physics/tracers": 17877,
     "@margoengine/physics/tsunami": 9006,
-    "@margoengine/physics/underwater": 4221,
+    "@margoengine/physics/underwater": 4878,
     "@margoengine/physics/vegetation": 9958,
     "@margoengine/physics/viscoplastic": 8826,
     "@margoengine/physics/vortices": 5453,

@@ -4865,6 +4865,16 @@ fixture also drove wall-clock time while the raw shader reads the engine's shade
 `packages/shader/test/black-hole-check.mjs` uses the actual shader clock and checks moving emission,
 repeatable explicit disk time and inward advection. The live demo uses the same clock for flare timing.
 
+### Fixed 2026-11-28: thin uniform acoustic columns visited each reflection (KB-SOUND-03-FOLD)
+
+A 1/60 s tick in a uniform 2⁻²⁰ m column at 1,920 m/s needed 33,554,432 identical crossings.
+The solver now folds the straight unfolded path, applies each boundary's signed pressure factor by
+integer powers and updates the beam by its full uniform drift. A separate overflow at large launch waists
+came from squaring the complex beam coordinates before finding the norm and phase. Scaling those
+coordinates preserves the phase and width when the unscaled products leave float64 range.
+Regression: `packages/physics/tests/underwater.test.js` covers both failures and ensures that a reflection
+count outside exact integer range leaves the previous accepted ray intact.
+
 ### Fixed 2026-11-25 underwater sound lacked depth refraction and water-column arrivals (SOUND-03)
 
 The air propagation path used a fixed sound speed and had no depth axis for water. In a layered water column

@@ -83,8 +83,11 @@ function field(name: string, quantity: string, unit: string): FieldDescriptor {
 }
 
 function reflection(value: number): number {
-  if (!(value >= -1 && value <= 1))
-    throw new RangeError('Invalid acoustic reflection coefficient; pass a signed pressure ratio from -1 to 1.');
+  if (!Number.isFinite(value) || value < -1 || value > 1)
+    throw new MargoError(
+      'state',
+      'Invalid acoustic reflection coefficient; pass a signed pressure ratio from -1 to 1.',
+    );
   return value;
 }
 
@@ -101,9 +104,11 @@ export class UnderwaterAcousticsSolver implements Solver<UnderwaterAcousticsOpti
   readonly delayField: FieldDescriptor;
 
   constructor(options: UnderwaterAcousticsSolverOptions = {}) {
+    if (options === null || typeof options !== 'object')
+      throw new MargoError('state', 'Invalid underwater acoustics options. Pass an options object or omit it.');
     this.#id = options.id ?? 'underwater-acoustics';
     if (typeof this.#id !== 'string' || this.#id.trim() === '' || this.#id.trim() !== this.#id)
-      throw new RangeError('Invalid underwater acoustics ID; pass a nonempty ID without outer whitespace.');
+      throw new MargoError('state', 'Invalid underwater acoustics ID; pass a nonempty ID without outer whitespace.');
     this.pathField = field(this.#id + '.path', 'length', 'm');
     this.signalField = field(this.#id + '.signal', 'pressure', 'Pa');
     this.delayField = field(this.#id + '.delay', 'time', 's');
@@ -125,16 +130,18 @@ export class UnderwaterAcousticsSolver implements Solver<UnderwaterAcousticsOpti
         'attached',
         'Underwater acoustics is already attached; create a fresh solver for a new world.',
       );
+    if (options === null || typeof options !== 'object')
+      throw new MargoError('state', 'Invalid acoustic column options. Pass a profile and rays in an options object.');
     const packed = prepareProfile(options.profile ?? DEFAULT_PROFILE);
     const launches = options.rays ?? [{}];
     if (!Array.isArray(launches) || launches.length === 0)
-      throw new RangeError('No acoustic rays are configured; pass at least one launch condition.');
-    const rows = launches.map((launch) => initializeRay(packed, launch));
+      throw new MargoError('state', 'No acoustic rays are configured; pass at least one launch condition.');
+    const rows = Array.from(launches, (launch) => initializeRay(packed, launch));
     const surface = reflection(options.surfaceReflection ?? -1);
     const bottom = reflection(options.bottomReflection ?? 0.8);
     const absorption = options.absorption ?? 0;
     if (!(absorption >= 0 && Number.isFinite(absorption)))
-      throw new RangeError('Invalid acoustic absorption; pass a finite nonnegative loss in dB/km.');
+      throw new MargoError('state', 'Invalid acoustic absorption; pass a finite nonnegative loss in dB/km.');
     const n = rows.length;
     const allocate = (name: string, count: number) =>
       host.allocate(name, count * F64_BYTES, 'f64', ACOUSTIC_FIELD_LAYOUT);
@@ -176,7 +183,8 @@ export class UnderwaterAcousticsSolver implements Solver<UnderwaterAcousticsOpti
     next.set(state);
     for (let i = 0; i < n; i++) advanceRay(layers, next, i * TRACE_WORDS, dt, surface!, bottom!);
     if (!next.every(Number.isFinite))
-      throw new RangeError(
+      throw new MargoError(
+        'state',
         'Acoustic trace exceeds numeric range; reduce the profile gradient or use a shorter interval.',
       );
     this.#publish(data, layers, next, absorption!);
@@ -210,7 +218,7 @@ export class UnderwaterAcousticsSolver implements Solver<UnderwaterAcousticsOpti
   sample(ray: number): AcousticRaySample {
     const { memory, rays, profile, settings, n } = this.#state();
     if (!Number.isInteger(ray) || ray < 0 || ray >= n)
-      throw new RangeError(`Acoustic ray index is out of range; pass an integer from 0 to ${n - 1}.`);
+      throw new MargoError('state', `Acoustic ray index is out of range; pass an integer from 0 to ${n - 1}.`);
     return sampleRay(words(memory, profile), words(memory, rays), ray * TRACE_WORDS, words(memory, settings)[2]!);
   }
 
@@ -227,17 +235,18 @@ export class UnderwaterAcousticsSolver implements Solver<UnderwaterAcousticsOpti
     const delaysStart = signalStart + data.n * SIGNAL_WORDS;
     for (let i = 0; i < data.n; i++) {
       const sample = sampleRay(layers, rays, i * TRACE_WORDS, absorption);
-      const pressure = acousticBeamPressure(sample, 0);
-      if (!Number.isFinite(sample.curvature) || !(sample.width > 0))
-        throw new RangeError(
+      if (!Number.isFinite(sample.curvature) || !(sample.width > 0 && Number.isFinite(sample.width)))
+        throw new MargoError(
+          'state',
           'Acoustic beam width or curvature exceeds numeric range; adjust launch frequency or beam waist.',
         );
+      const pressure = acousticBeamPressure(sample, 0);
       output.set([sample.range, sample.depth, sample.pathLength, sample.width], PATH_WORDS * i);
       output.set([pressure.real, pressure.imaginary], signalStart + SIGNAL_WORDS * i);
       output[delaysStart + i] = sample.travelTime;
     }
     if (!output.every(Number.isFinite))
-      throw new RangeError('Acoustic output exceeds numeric range; reduce launch pressure or frequency.');
+      throw new MargoError('state', 'Acoustic output exceeds numeric range; reduce launch pressure or frequency.');
     words(data.memory, data.path).set(output.subarray(0, signalStart));
     words(data.memory, data.signal).set(output.subarray(signalStart, delaysStart));
     words(data.memory, data.delay).set(output.subarray(delaysStart));
