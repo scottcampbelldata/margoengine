@@ -193,7 +193,10 @@ const BARK = [0.22, 0.14, 0.08] as const,
   PALM = [0.1, 0.32, 0.07] as const,
   NEEDLE = [0.04, 0.17, 0.07] as const,
   STONE = [0.4, 0.37, 0.33] as const,
-  DRY = [0.45, 0.33, 0.11] as const;
+  DRY = [0.45, 0.33, 0.11] as const,
+  // A green leaf reflects about a tenth of green light and half that of blue and red (PROSPECT, Jacquemoud and Baret
+  // 1990; LOPEX93 leaf spectra, Hosgood et al. 1995).
+  SHRUB = [0.065, 0.11, 0.035] as const;
 
 /**
  * Per-instance tint and leaf-cluster shading of each kind of part (scatter's `variation` and `clusters`): leaves vary
@@ -339,7 +342,7 @@ function partsOf(
     case 'reeds':
       return [{ geometry: make(p.generateReedMesh()), color: [0.36, 0.34, 0.11], kind: 'foliage', blades: true }];
     default:
-      return [{ geometry: rings(chain((detail) => p.generateShrubMesh({ detail }))), color: LEAF, kind: 'foliage' }];
+      return [{ geometry: rings(chain((detail) => p.generateShrubMesh({ detail }))), color: SHRUB, kind: 'foliage' }];
   }
 }
 

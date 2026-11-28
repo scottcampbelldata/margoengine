@@ -838,9 +838,69 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: TreeMe
   return { trunk: computeTangents(mergeGeometries(wood)), canopy: computeTangents(canopy), center, radius };
 }
 
+/** Leaves per lobe and detail level (0, 1, 2) of a shrub. */
+const SHRUB_LEAVES = [12, 36, 90] as const;
+
 /**
- * Compact asymmetric hemispherical foliage with continuous smooth normals. `options.detail` (default 2, the full mesh)
- * lowers the lobes' segment counts at 1 and 0.
+ * `count` leaves through the outer shell of one upper half ellipsoid: diamonds on a golden-angle spiral, each at its own
+ * depth and turned every way (a spherical leaf angle distribution, from the R2 low-discrepancy pair), both faces lit by
+ * the direction out of the whole shrub so the crown shades as one soft volume. A lower level draws fewer, larger leaves
+ * of the same total area.
+ */
+function shrubLeaves(count: number, [x, z, rx, ry, rz, phase]: readonly number[]): GeometryData {
+  const positions: number[] = [],
+    normals: number[] = [],
+    uvs: number[] = [],
+    indices: number[] = [],
+    long = 0.1 * Math.sqrt(SHRUB_LEAVES[2] / count);
+  for (let k = 0; k < count; k++) {
+    const dy = (k + 0.5) / count,
+      ring = Math.sqrt(1 - dy * dy),
+      angle = k * 2.399963 + phase,
+      dx = Math.cos(angle) * ring,
+      dz = Math.sin(angle) * ring,
+      depth = lump(dx, dy, dz) * (0.66 + 0.4 * ((k * 0.618034 + phase * 0.31) % 1)),
+      px = x + dx * rx * depth,
+      py = dy * ry * depth - 0.04,
+      pz = z + dz * rz * depth,
+      // The leaf's own plane: a direction uniform on the sphere, and two axes across it.
+      up = 2 * ((0.5 + k * 0.754878 + phase) % 1) - 1,
+      turn = 2 * Math.PI * ((0.5 + k * 0.56984) % 1),
+      side = Math.sqrt(1 - up * up),
+      lx = Math.cos(turn) * side,
+      lz = Math.sin(turn) * side,
+      al = Math.hypot(lx, lz),
+      ax = al > 1e-3 ? -lz / al : 1,
+      az = al > 1e-3 ? lx / al : 0,
+      bx = up * az,
+      by = lz * ax - lx * az,
+      bz = -up * ax,
+      wide = long * 0.6,
+      corners = [
+        [px - ax * long, py, pz - az * long],
+        [px + bx * wide, py + by * wide, pz + bz * wide],
+        [px + ax * long, py, pz + az * long],
+        [px - bx * wide, py - by * wide, pz - bz * wide],
+      ],
+      start = positions.length / 3;
+    // Front and back get their own vertices so each side keeps a consistent tangent frame.
+    for (let face = 0; face < 2; face++)
+      corners.forEach(([cx, cy, cz], i) => {
+        const length = Math.hypot(cx, cy + 0.15, cz);
+        positions.push(cx, cy, cz);
+        normals.push(cx / length, (cy + 0.15) / length, cz / length);
+        uvs.push([0.5, 1, 0.5, 0][i], [0, 0.5, 1, 0.5][i]);
+      });
+    indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
+    indices.push(start + 4, start + 6, start + 5, start + 4, start + 7, start + 6);
+  }
+  return geometryData(positions, new Float32Array(normals), uvs, indices);
+}
+
+/**
+ * A compact, asymmetric dome of separate leaves in three lobes, with gaps between them and a ragged outline, normals
+ * pointing out of the shrub. `options.detail` (default 2, 1,080 triangles) draws fewer, larger leaves at 1 (432) and
+ * 0 (144), in the same bounding box.
  * @throws RangeError when `options.detail` is not 0, 1 or 2.
  */
 export function generateShrubMesh(options?: MeshDetailOptions): GeometryData {
@@ -850,19 +910,17 @@ export function generateShrubMesh(options?: MeshDetailOptions): GeometryData {
     const angle = i * 2.399963,
       r = i === 2 ? 0 : 0.23;
     lobes.push(
-      placed(
-        perturb(sphereGeometry(1, [6, 10, 16][detail], [2, 4, 8][detail], 0, Math.PI * 2, 0, Math.PI / 2)),
+      shrubLeaves(SHRUB_LEAVES[detail], [
         Math.cos(angle) * r,
-        -0.04,
         Math.sin(angle) * r,
         0.47 + i * 0.07,
         0.68 + i * 0.09,
         0.45 + (i % 2) * 0.08,
         angle,
-      ),
+      ]),
     );
   }
-  if (detail === 0) fitToHull(lobes, FULL_HULLS.shrub);
+  fitToHull(lobes, FULL_HULLS.shrub);
   return computeTangents(mergeGeometries(lobes));
 }
 

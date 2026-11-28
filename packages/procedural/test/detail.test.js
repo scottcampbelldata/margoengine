@@ -33,7 +33,8 @@ const pair = (mesh) => (mesh.canopy ? mesh : { canopy: mesh, trunk: null });
 
 // Digests of the meshes on main before the detail option existed (sha256 of positions, normals, uvs, tangents, indices).
 // The palm, birch and acacia trunks were re-pinned when their taper was fixed to run from a wide root to a narrow tip
-// (plants.test.js 'trunks and limbs taper'); their canopies are unchanged.
+// (plants.test.js 'trunks and limbs taper'); their canopies are unchanged. The shrub was re-pinned when its three smooth
+// domes were rebuilt from separate leaves (shrub-leaves.test.js, KB-SHRUB-BLOBS1).
 const MAIN = {
   'conifer.trunk': '04ab2a4b2f292c24',
   'conifer.canopy': '3e0725ca5b286b2c',
@@ -45,7 +46,7 @@ const MAIN = {
   'birch.canopy': '2477f80b9dac288e',
   'acacia.trunk': '4a3eb2c3b585caa5',
   'acacia.canopy': '10dc5a0e4cb949db',
-  shrub: '95a71c0db1e1bff0',
+  shrub: '50079dbf4bac2480',
   tundra: '65ccbe3206104cd5',
 };
 

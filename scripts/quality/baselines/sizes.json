@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21737521,
+  "total": 21738286,
   "history": [
     {
       "date": "2026-10-24",
@@ -15479,6 +15479,12 @@
       "commit": "atmo01-boundary-layer",
       "reason": "ATMO-01: the optional Physics boundary-layer entry grows from 0 to 5,513 B measured gzip (5,769 B ceiling) for registry sampling, origin cells and native phase workers. Weather boundary-layer measures 3,408 B (ceiling 2,596 to 3,664 B) for the stability integral and finite vertically tapered gusts. One resolved profile serves scalar and native callers. Splitting the Weather profile would add a fetch for a required part of the wind contract. Core and Stage gain no bytes.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "lane-e-shrub-leaves",
+      "reason": "KB-SHRUB-BLOBS1: generateShrubMesh builds separate leaves in place of three smooth domes, and biomes paints shrubs a leaf's colour; the bytes are the leaf builder, which every shrub needs.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16487,7 +16493,7 @@
     "@margoengine/post/stylize": 7937,
     "@margoengine/post/trail": 3766,
     "@margoengine/post/upscale": 5366,
-    "@margoengine/procedural": 18709,
+    "@margoengine/procedural": 19474,
     "@margoengine/procedural/building-plans": 39215,
     "@margoengine/procedural/building-rules": 28575,
     "@margoengine/procedural/building-settings": 6573,
