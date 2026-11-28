@@ -140,7 +140,7 @@ solveFABRIK(points, [1, 1, 0], { pole: [2, 0, 0], iterations: 32, tolerance: 1e-
 
 Unreachable targets straighten the chain toward them (`reached` false, `distance` the gap). A straight chain starts bending toward the pole (or, with none, a fixed side).
 
-`keepBend` (default `true`) keeps an elbow or knee that is already bent more than 2 degrees on the side it is bent to, so a pole on the far side cannot fold it backward: the joint goes to the nearest place on its own side instead, with both bone lengths kept. Pass `keepBend: false` to let the pole fold a joint either way:
+`keepBend` (default `true`) keeps an elbow or knee that is already bent more than 2 degrees on the side it is bent to, so a pole on the far side cannot fold it backward: the joint goes to the nearest place on its own side instead, with both bone lengths kept. Pass `keepBend: false` to let the pole fold a joint either way. `addIKChain` takes the same option. Every solve also turns each bone about its own length so its bend axis follows the new bend, so an elbow or knee changes only by a rotation about one axis fixed in the upper bone, as a real hinge does, and the skin never shows a forearm swung sideways (Tolani, Goswami and Badler, *Real-time inverse kinematics techniques for anthropomorphic limbs*, 2000):
 
 ```ts
 import { solvePoseIK } from 'margoengine/rigging/ik';

@@ -267,3 +267,54 @@ test('a bent elbow stays on its own side when the pole points the other way (pla
   solveSkeletonIK(same, { ...behind, keepBend: false });
   for (let b = 0; b < 4; b++) assert.ok(distance(at(own, b), at(same, b)) < 1e-12);
 });
+
+test('a two-bone arm bends as a hinge about the forearm bone\'s own axis, whatever the pole (planner arms)', () => {
+  // Forearm bent 40 degrees about its local x at rest. Shortest-arc turns left the upper arm's twist to chance, so when
+  // the bend plane swung the forearm's local rotation picked up swing about y and z: the forearm went sideways or back.
+  const half = (-40 * Math.PI) / 360,
+    rest = [Math.sin(half), 0, 0, Math.cos(half)],
+    bones = () => [
+      { name: 'chest', parent: -1 },
+      { name: 'arm', parent: 0, translation: [0.18, 1.3, 0] },
+      { name: 'forearm', parent: 1, translation: [0, -0.25, 0], rotation: rest },
+      { name: 'hand', parent: 2, translation: [0, -0.24, 0] },
+    ],
+    conj = (q) => [-q[0], -q[1], -q[2], q[3]],
+    mul = (a, b) => [
+      a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+      a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+      a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+      a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
+    ];
+  const targets = [
+      [0.18, 0.95, -0.05],
+      [0.3, 1.0, 0.25],
+      [0.1, 1.15, 0.3],
+      [0.35, 0.9, 0.0],
+      [0.05, 1.05, 0.2],
+    ],
+    poles = [
+      [0.4, 1.0, 0.6], // out and in front, the planner's old pole
+      [0.45, 0.95, -0.35], // out and behind
+      [0.9, 1.2, 0.0], // straight out
+    ];
+  let worst = 0;
+  for (const target of targets)
+    for (const pole of poles) {
+      const skeleton = new Skeleton(bones());
+      solveSkeletonIK(skeleton, { joints: ['arm', 'forearm', 'hand'], target, pole });
+      // The forearm's change from rest, in the upper arm's frame: a rotation about local x only.
+      const q = Array.from(skeleton.getPose(2).rotation),
+        delta = mul(q, conj(rest)),
+        s = Math.hypot(delta[0], delta[1], delta[2]);
+      if (s > Math.sin((2 * Math.PI) / 360)) {
+        const offAxis = Math.acos(Math.min(1, Math.abs(delta[0]) / s)) * (180 / Math.PI);
+        worst = Math.max(worst, offAxis);
+      }
+      // Flexion stays forward of straight: the forearm's local rotation is about -x by a positive angle.
+      const flex = 2 * Math.atan2(-q[0], q[3]);
+      assert.ok(flex > 0 && flex < Math.PI, `elbow folded backward at target ${target}, pole ${pole}: ${flex}`);
+      assert.ok(Math.abs(q[1]) < 1e-6 && Math.abs(q[2]) < 1e-6, `forearm twisted or swung: ${q}`);
+    }
+  assert.ok(worst < 1e-3, `the forearm hinge left its own axis by ${worst} degrees`);
+});

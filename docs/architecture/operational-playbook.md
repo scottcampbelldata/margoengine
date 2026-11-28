@@ -1,3 +1,16 @@
+### Section 5 evidence: IK limbs bend as hinges and keep their side (2026-11-27)
+
+`@margoengine/rigging/ik` (`solvePoseIK`, `solveSkeletonIK`, `addIKChain`) turned each bone by the shortest arc from its
+old direction to its new one, which leaves the twist about the bone to chance: when a pole swung the bend plane, the
+forearm's local rotation picked up swing about its other two axes and folded sideways or backward in the skin (the
+planner demo's workers, KB-RIG-IKHINGE1). Each bone now also twists about its new direction so its old bend axis lands
+on the new one (`keepHinge`), so the joint between two bones changes only by a rotation about one axis fixed in the
+upper bone, and `keepBend` (default true) stops a pole folding an already bent elbow or knee to its far side.
+Evidence: `packages/rigging/tests/ik.test.js`, 5 targets by 3 poles on a bent arm, keeps the forearm's change about
+its own x axis to under 0.001 degrees with zero y and z parts (the old solve left 0.15 and 0.68 in them), and the
+keepBend test folds the forearm backward with `keepBend: false` only. Missing: joint limits in FABRIK itself, which
+stay with `addCCDChain` and `solveContactIK`.
+
 ### Section 5 evidence: friction through a bounce in the rigid kernel, against measured material pairs (2026-11-27)
 
 The rigid kernel's strike (`physics/kernel/src/solver.rs`, `solve_impacts` and `collide_pairwise`) now solves friction in the cone

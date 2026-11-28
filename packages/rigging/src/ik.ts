@@ -6,6 +6,7 @@
 import type { Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 import {
+  axisAngleToQuaternion,
   multiplyQuaternions,
   normalizeQuaternion,
   rotateByQuaternion,
@@ -473,16 +474,64 @@ function chainRotations(
   rotations: readonly number[][],
   weight: number,
 ): number[][] {
-  const out: number[][] = [];
-  for (let i = 0; i < rotations.length - 1; i++) {
-    const from = [0, 1, 2].map((c) => before[i * 3 + 3 + c] - before[i * 3 + c]),
-      to = [0, 1, 2].map((c) => after[i * 3 + 3 + c] - after[i * 3 + c]);
-    let turn = rotationBetween(from, to);
+  const out: number[][] = [],
+    bones = rotations.length - 1,
+    bone = (points: Float64Array, i: number): number[] => [0, 1, 2].map((c) => points[i * 3 + 3 + c] - points[i * 3 + c]);
+  for (let i = 0; i < bones; i++) {
+    const from = bone(before, i),
+      to = bone(after, i);
+    let turn: number[] = rotationBetween(from, to);
+    // The bend this bone hinges in: at its far joint, or for the last bone at its near one.
+    const joint = i + 1 < bones ? i + 1 : i;
+    if (joint >= 1) turn = keepHinge(turn, to, bendAxis(bone(before, joint - 1), bone(before, joint)), bendAxis(bone(after, joint - 1), bone(after, joint)));
     if (weight < 1) turn = partial(turn, weight);
     out.push(normalizeQuaternion(multiplyQuaternions(turn, rotations[i])));
   }
   out.push(rotations[rotations.length - 1]);
   return out;
+}
+
+/**
+ * The unit axis of the bend between two consecutive bones (their cross product), or null when they are within 2
+ * degrees of a straight line and the bend has no axis to keep.
+ */
+function bendAxis(a: readonly number[], b: readonly number[]): number[] | null {
+  const n = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+    length = Math.hypot(n[0], n[1], n[2]);
+  return length > BEND_SIDE_MIN * Math.hypot(a[0], a[1], a[2]) * Math.hypot(b[0], b[1], b[2])
+    ? [n[0] / length, n[1] / length, n[2] / length]
+    : null;
+}
+
+/**
+ * Adds to a bone's shortest-arc `turn` the twist about its new direction `to` that carries its old bend axis onto the
+ * new one, so both bones of an elbow or knee turn their bend axis the same way and the joint between them changes
+ * only by a rotation about that axis, a true hinge in the bone's own frame. A shortest arc alone leaves the twist to
+ * chance: when the bend plane swings, the lower bone's local rotation picks up swing about other axes and the forearm
+ * or shin turns sideways or backward in the skin. A human elbow (humeroulnar) and knee flex about one axis fixed in
+ * the bone (Kapandji, The Physiology of the Joints, vol. 1 and 2, 2007; Wu et al., ISB recommendation on definitions
+ * of joint coordinate systems, Part II, J. Biomechanics 38, 2005), and analytic limb IK places the bend by turning the
+ * upper limb about its own axis (the swivel angle of Tolani, Goswami and Badler, Real-time inverse kinematics
+ * techniques for anthropomorphic limbs, Graphical Models 62, 2000). Either axis missing (a straight limb) leaves the
+ * shortest arc as it was.
+ */
+function keepHinge(
+  turn: readonly number[],
+  to: readonly number[],
+  oldAxis: number[] | null,
+  newAxis: number[] | null,
+): number[] {
+  if (!oldAxis || !newAxis) return turn as number[];
+  const length = Math.hypot(to[0], to[1], to[2]),
+    u = [to[0] / length, to[1] / length, to[2] / length],
+    m = rotateByQuaternion(oldAxis, turn),
+    cos = m[0] * newAxis[0] + m[1] * newAxis[1] + m[2] * newAxis[2],
+    sin =
+      u[0] * (m[1] * newAxis[2] - m[2] * newAxis[1]) +
+      u[1] * (m[2] * newAxis[0] - m[0] * newAxis[2]) +
+      u[2] * (m[0] * newAxis[1] - m[1] * newAxis[0]),
+    angle = Math.atan2(sin, cos);
+  return normalizeQuaternion(multiplyQuaternions(axisAngleToQuaternion(u, angle), turn));
 }
 
 /** The same rotation about the same axis, `fraction` of the angle. */
@@ -603,6 +652,8 @@ export interface AnimatorIKChain extends FABRIKOptions {
   target: Vec3;
   /** Blend from the animated pose (0) to the solved chain (1); default 1. */
   weight?: number;
+  /** Keep each bent elbow or knee on the side the animation bends it to, as {@link IKChain.keepBend}; default true. */
+  keepBend?: boolean;
   /** Called after each frame's solve with its result. */
   onSolve?: (result: FABRIKResult) => void;
 }
@@ -636,8 +687,10 @@ export function addIKChain(animator: Animator, chain: AnimatorIKChain): () => vo
       return worldRotation(m);
     });
     before.set(points);
-    const result = solveFABRIK(points, chain.target, chain),
-      turned = chainRotations(before, points, rotations, weight),
+    const bends = chain.keepBend === false ? null : bendSides(before, joints.length),
+      result = solveFABRIK(points, chain.target, chain);
+    if (bends) keepBendSides(points, bends);
+    const turned = chainRotations(before, points, rotations, weight),
       parent = parents[chainNodes[0].id],
       base = parent === -1 ? [0, 0, 0, 1] : worldRotation(engine.meshes.get(parent)!.matrix);
     for (let i = 0; i < chainNodes.length - 1; i++) {

@@ -11,6 +11,7 @@ export interface AnimatorIKChain extends FABRIKOptions {
     joints: readonly number[];
     target: Vec3;
     weight?: number;
+    keepBend?: boolean;
     onSolve?: (result: FABRIKResult) => void;
 }
 

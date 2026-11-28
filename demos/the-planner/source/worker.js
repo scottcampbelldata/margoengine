@@ -183,7 +183,7 @@ export function worker(engine,workshop,prepared){
           for(let axis=0;axis<3;axis++)grip[axis]=mix(grip[axis],wrist[axis],motion);
         }
         if(activity==='rest')grip[1]+=.184*(1-seated);
-        solveSkeletonIK(skeleton,{joints:handChain(side),target:grip,pole:[sign*.55,.78,.17],iterations:10});
+        solveSkeletonIK(skeleton,{joints:handChain(side),target:grip,pole:[sign*.45,.95,-.35],iterations:10});
       }
       let lowest=Infinity;
       for(const {name,mesh,skin,position,normal,index} of layers){
