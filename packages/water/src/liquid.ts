@@ -10,6 +10,7 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { PostStack } from '@margoengine/post/stack';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { displayShader } from '../../shared/display.js';
+import { displayFor, premultipliedCanvas } from '../../shared/straight-display.js';
 import { borrow, fix, lend } from '../../shared/borrowed.js';
 import { fault, rangeError } from '../../shared/errors.js';
 import { group } from '../../shared/gpu.js';
@@ -313,7 +314,10 @@ export class ParticleLiquid implements EnginePlugin {
     signal?.throwIfAborted();
     await this.bandLoading;
     if (!this.band?.atlas)
-      throw fault('state', 'ParticleLiquid has no narrow band yet; set narrowBand, draw a frame, await ready() and draw another');
+      throw fault(
+        'state',
+        'ParticleLiquid has no narrow band yet; set narrowBand, draw a frame, await ready() and draw another',
+      );
     return this.band.read(signal);
   }
 
@@ -337,7 +341,8 @@ export class ParticleLiquid implements EnginePlugin {
     // Loaded after the last frame: the pool is made now on the engine's current device, so it reads as empty.
     const device = this.engine?.gpu,
       ww = this.options.whitewater;
-    if (!this.foam && this.whitewaterCode && device && ww && ww.enabled !== false) this.foam = new this.whitewaterCode.Whitewater(device);
+    if (!this.foam && this.whitewaterCode && device && ww && ww.enabled !== false)
+      this.foam = new this.whitewaterCode.Whitewater(device);
     if (!this.foam)
       throw fault('state', 'ParticleLiquid has no whitewater yet; set options.whitewater and draw a frame');
     return this.foam.read(signal);
@@ -366,7 +371,10 @@ export class ParticleLiquid implements EnginePlugin {
           throw rangeError(`ParticleLiquid particle ${i} has a non-finite position; pass finite centres`, 'geometry');
       }
       if (s.colorOffset !== undefined && count && s.colorOffset + (count - 1) * stride + 3 > s.positions.length)
-        throw rangeError('ParticleLiquid particles.colorOffset reads past the end of positions; pass an offset inside each record', 'geometry');
+        throw rangeError(
+          'ParticleLiquid particles.colorOffset reads past the end of positions; pass an offset inside each record',
+          'geometry',
+        );
       return count;
     }
     if (s.count === undefined)
@@ -393,7 +401,10 @@ export class ParticleLiquid implements EnginePlugin {
     if (o.resolutionScale !== undefined && o.resolutionScale !== 1 && o.resolutionScale !== 0.5)
       throw rangeError('ParticleLiquid resolutionScale must be 1 or 0.5', 'geometry');
     const at = o.origin;
-    if (at !== undefined && (typeof at !== 'object' || at.length !== 3 || [0, 1, 2].some((i) => !Number.isFinite(at[i]))))
+    if (
+      at !== undefined &&
+      (typeof at !== 'object' || at.length !== 3 || [0, 1, 2].some((i) => !Number.isFinite(at[i])))
+    )
       throw rangeError('ParticleLiquid origin needs three finite numbers [x, y, z]', 'geometry');
     for (const [name, max] of [
       ['absorption', 100],
@@ -586,7 +597,11 @@ export class ParticleLiquid implements EnginePlugin {
   }
 
   /** What a GPU source binds on this device (the buffer of a holder), or undefined when a plain buffer was lost. */
-  private resolve(slot: ReturnType<typeof borrow> | undefined, value: unknown, device: GPUDevice): GPUBuffer | undefined {
+  private resolve(
+    slot: ReturnType<typeof borrow> | undefined,
+    value: unknown,
+    device: GPUDevice,
+  ): GPUBuffer | undefined {
     const held = slot ? lend(slot, device, this.engine) : value;
     if (held === undefined || held === null) return undefined;
     return typeof (held as GPUBuffer).getMappedRange === 'function'
@@ -672,7 +687,15 @@ export class ParticleLiquid implements EnginePlugin {
     v.set([d[0] / dl, d[1] / dl, d[2] / dl, o.shininess ?? 2000], 60);
     // radiance.w: 1 + the colour offset of a coloured source, 0 for white particles.
     const tinted = this.source.colorOffset;
-    v.set([light.radiance[0] * d[3], light.radiance[1] * d[3], light.radiance[2] * d[3], tinted === undefined ? 0 : tinted + 1], 64);
+    v.set(
+      [
+        light.radiance[0] * d[3],
+        light.radiance[1] * d[3],
+        light.radiance[2] * d[3],
+        tinted === undefined ? 0 : tinted + 1,
+      ],
+      64,
+    );
     v.set([light.ambient[0], light.ambient[1], light.ambient[2], this.foamOn ? 1 : 0], 68);
     v.set([...(o.skyHorizon ?? [0.38, 0.53, 0.67]), this.environment ? 1 : 0], 72);
     v.set([...(o.skyZenith ?? [0.045, 0.16, 0.34]), scale], 76);
@@ -891,10 +914,12 @@ export class ParticleLiquid implements EnginePlugin {
       }
     }
     // 4 and 5. Normals and the composite over the scene.
-    const key = `${output.format}:${output.multisample.count ?? 1}:${+output.hdr}`;
+    const premultiplied = +premultipliedCanvas(this.engine),
+      key = `${output.format}:${output.multisample.count ?? 1}:${+output.hdr}:${premultiplied}`;
     let pipeline = this.composites.get(key);
     if (!pipeline) {
-      const module = device.createShaderModule({ code: compositeShader(!output.hdr, displayShader) });
+      const code = displayFor(this.engine, compositeShader(!output.hdr, displayShader));
+      const module = device.createShaderModule({ code });
       pipeline = device.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex' },

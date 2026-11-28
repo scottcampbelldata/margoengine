@@ -13,6 +13,7 @@ import { queryStates, type QueryState } from './query-state.js';
 import { surfacePass } from './surface-pass.js';
 import { SurfaceCapture } from './surface-capture.js';
 import { causticBeams, causticCopy, causticPartials, causticProject, causticRange } from './caustics-shader.js';
+import { displayFor, premultipliedCanvas } from '../../shared/straight-display.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
@@ -369,10 +370,12 @@ export class Caustics implements EnginePlugin {
     this.validate();
     if (this.prepared !== c.encoder)
       throw fault('state', 'Render the live Caustics surface in the same scene before composition');
-    const key = `${output.format}:${output.multisample.count ?? 1}:${+output.hdr}`;
+    const premultiplied = +premultipliedCanvas(this.engine),
+      key = `${output.format}:${output.multisample.count ?? 1}:${+output.hdr}:${premultiplied}`;
     let pipeline = this.copies.get(key);
     if (!pipeline) {
-      pipeline = render(c.device, causticCopy(!output.hdr), output.format, { multisample: output.multisample });
+      const code = displayFor(this.engine, causticCopy(!output.hdr));
+      pipeline = render(c.device, code, output.format, { multisample: output.multisample });
       this.copies.set(key, pipeline);
     }
     const pass = c.encoder.beginRenderPass({

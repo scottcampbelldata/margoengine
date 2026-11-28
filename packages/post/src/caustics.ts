@@ -12,6 +12,7 @@ import { accumulateNormals } from '../../shared/normals.js';
 import { rangeError } from '../../shared/errors.js';
 import { beamPipeline, group, layerPass, render } from '../../shared/gpu.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
+import { displayFor, premultipliedCanvas } from '../../shared/straight-display.js';
 import { PostStack } from './stack.js';
 import {
   type CausticSurfaceShader,
@@ -312,14 +313,12 @@ export class SurfaceCaustics implements EnginePlugin {
       on = o.enabled !== false && o.intensity !== 0,
       shadow = o.shadows?.pbr(2).declarations ?? '',
       receive = o.shadows?.pbr(1).declarations ?? '',
-      key = `${output.format}:${output.multisample?.count ?? 1}:${+encode}:${on ? receive : 'copy'}`;
+      premultiplied = +premultipliedCanvas(this.engine),
+      key = `${output.format}:${output.multisample?.count ?? 1}:${+encode}:${premultiplied}:${on ? receive : 'copy'}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      pipeline = on
-        ? render(device, causticProject(receive, { composite: true, encode }), output.format, {
-            multisample: output.multisample,
-          })
-        : render(device, causticCopy(encode), output.format, { multisample: output.multisample });
+      const code = on ? causticProject(receive, { composite: true, encode }) : causticCopy(encode);
+      pipeline = render(device, displayFor(this.engine, code), output.format, { multisample: output.multisample });
       this.pipelines.set(key, pipeline);
     }
     if (on) this.illuminate(c, shadow);

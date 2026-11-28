@@ -6,6 +6,7 @@ import { MargoError } from '@margoengine/math/errors';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { fullscreen, render, group } from '../../shared/gpu.js';
 import { displayShader } from '../../shared/display.js';
+import { displayFor, premultipliedCanvas } from '../../shared/straight-display.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { lattice, noiseWGSL } from './scene-patch.js';
 let attachments = 0;
@@ -301,10 +302,13 @@ export class LensDrops implements EnginePlugin {
     c.device.queue.writeBuffer(this.uniform!, 0, this.values);
     let byCount = this.pipelines.get(output.format);
     if (!byCount) this.pipelines.set(output.format, (byCount = new Map()));
-    const variant = (output.multisample?.count ?? 1) * 2 + +output.hdr;
+    const premultiplied = !output.hdr && premultipliedCanvas(this.engine),
+      variant = (output.multisample?.count ?? 1) * 4 + +premultiplied * 2 + +output.hdr;
     let pipeline = byCount.get(variant);
     if (!pipeline) {
-      pipeline = render(c.device, shader(output.hdr), output.format, { multisample: output.multisample });
+      // The HDR stage writes linear light: it has no display output to convert.
+      const code = output.hdr ? shader(true) : displayFor(this.engine, shader(false));
+      pipeline = render(c.device, code, output.format, { multisample: output.multisample });
       byCount.set(variant, pipeline);
     }
     const bindings = group(c.device, pipeline, [{ buffer: this.uniform! }, input, this.sampler!]);

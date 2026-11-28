@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21846992,
+  "total": 21848132,
   "history": [
     {
       "date": "2026-10-24",
@@ -15623,6 +15623,12 @@
       "commit": "sound02-native-room-pressure",
       "reason": "SOUND-02: room-sound 5350 to 9125 B gzip (ceiling 5606 to 9399), lava 9794 to 9846 B gzip (ceiling 9824 to 10142), lightning 9037 to 9092 B gzip (ceiling 9072 to 9365). Room sound gains coded input and derived-output handling, accepted-state staging and optional native barrier and work receipt support. A separate room entry would duplicate geometry and world-port bindings. The lava and lightning figures include the extra room pressure label in the existing shared worker pool. Another copy of the worker transport would cost more bytes. Each lazy acoustic variant measures 2,717 B raw and 1,393 B gzip. Core and Stage gain zero bytes.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "lane-e-water-alpharim",
+      "reason": "KB-WATER-ALPHARIM1: the display composites of water caustics and underwater and weather lens build through displayFor on a transparent canvas. Measured gzip: water/caustics 6,395 to 6,703 B, water/underwater 9,071 to 9,366 B, weather/lens 4,075 to 4,398 B. The bytes are the straight-colour shader rewrite that stops the light rim; a split would need a lazy import in front of every pipeline build for about 300 B.",
+      "grew": 3
     }
   ],
   "items": {
@@ -17314,7 +17320,7 @@
     "@margoengine/water/banks": 2725,
     "@margoengine/water/bodies": 4379,
     "@margoengine/water/breaking": 3538,
-    "@margoengine/water/caustics": 6651,
+    "@margoengine/water/caustics": 6959,
     "@margoengine/water/fft": 11826,
     "@margoengine/water/flood": 17569,
     "@margoengine/water/flood-bake": 4359,
@@ -17332,7 +17338,7 @@
     "@margoengine/water/shallow-surface": 3259,
     "@margoengine/water/ships": 11259,
     "@margoengine/water/splash": 5893,
-    "@margoengine/water/underwater": 9344,
+    "@margoengine/water/underwater": 9647,
     "@margoengine/water/wake": 3362,
     "@margoengine/weather": 9423,
     "@margoengine/weather dist/workers/mann-fft.js": 1088,
@@ -17348,7 +17354,7 @@
     "@margoengine/weather/hail-physics": 1312,
     "@margoengine/weather/lava": 15750,
     "@margoengine/weather/lava-settings": 4046,
-    "@margoengine/weather/lens": 4125,
+    "@margoengine/weather/lens": 4654,
     "@margoengine/weather/precipitation": 3923,
     "@margoengine/weather/puddles": 3984,
     "@margoengine/weather/regions": 2864,

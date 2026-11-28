@@ -11969,3 +11969,10 @@ Evidence still missing:
 - Nothing calls the limits yet: `addPerson`, the IK solvers, the retargeter and the ragdoll still run without them
   until groups 3, 5 and 7 land. No demo changes on screen from this group.
 - The structural allowances are policy values with no measurement behind them.
+
+## Composites outside post on a transparent canvas (KB-WATER-ALPHARIM1, section 5 evidence, 2026-11-28)
+
+Water's liquid, underwater and caustics composites, post's SurfaceCaustics and weather's LensDrops encode straight colour
+on a premultiplied canvas. Evidence: `packages/post/test/alpha-rim-browser.mjs` on WebGPU and the WebGL2 layer (RTX
+A6000); `packages/post/test/straight-display.test.js` scans every package for the pattern. Missing: other GPUs, XR on a
+transparent canvas, and liquid drawn over empty pixels.

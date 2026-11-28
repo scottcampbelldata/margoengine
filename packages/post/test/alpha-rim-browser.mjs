@@ -29,6 +29,13 @@ const effects = [
   'TAA reactive',
   'TAA with Sharpen',
   'TAA without settling',
+  // Composites outside post's own effects that write the canvas from a linear capture (KB-WATER-ALPHARIM1). The water
+  // surface lies far under the view and the liquid's one particle too, so each passes the box through.
+  'Underwater',
+  'ParticleLiquid',
+  'Water Caustics',
+  'SurfaceCaustics',
+  'LensDrops',
 ];
 
 await postBrowser(
@@ -47,7 +54,20 @@ await postBrowser(
         { SelectiveBloom } = await import('/packages/post/dist/selective-bloom.js'),
         { DOF } = await import('/packages/dof/dist/index.js'),
         { TAA } = await import('/packages/taa/dist/index.js'),
-        { Sharpen } = await import('/packages/taa/dist/sharpen.js');
+        { Sharpen } = await import('/packages/taa/dist/sharpen.js'),
+        { Water } = await import('/packages/water/dist/index.js'),
+        { Underwater } = await import('/packages/water/dist/underwater.js'),
+        { ParticleLiquid } = await import('/packages/water/dist/liquid.js'),
+        { Caustics } = await import('/packages/water/dist/caustics.js'),
+        { SurfaceCaustics } = await import('/packages/post/dist/caustics.js'),
+        { LensDrops } = await import('/packages/weather/dist/lens.js');
+      const sea = (engine) =>
+        Water.attach(engine, {
+          size: [2, 2],
+          segments: 4,
+          height: -60,
+          waves: [{ direction: [1, 0], amplitude: 0.01, wavelength: 1 }],
+        });
       const taa = (options) => ({ attach: (engine) => TAA.attach(engine, options(engine)) });
       const make = {
         ...post,
@@ -70,6 +90,23 @@ await postBrowser(
         }),
         'TAA with Sharpen': taa(() => ({ present: new Sharpen() })),
         'TAA without settling': taa(() => ({ settle: false })),
+        Underwater: { attach: (engine) => Underwater.attach(engine, { surface: sea(engine) }) },
+        ParticleLiquid: {
+          attach: (engine) =>
+            ParticleLiquid.attach(engine, { particles: { positions: new Float32Array([0, -60, 0]) }, radius: 0.05 }),
+        },
+        'Water Caustics': { attach: (engine) => Caustics.attach(engine, { surface: sea(engine), enabled: false }) },
+        SurfaceCaustics: {
+          attach: (engine) =>
+            SurfaceCaustics.attach(engine, {
+              geometry: {
+                positions: new Float32Array([-1, -60, -1, 1, -60, -1, 0, -60, 1]),
+                indices: new Uint32Array([0, 2, 1]),
+              },
+              enabled: false,
+            }),
+        },
+        LensDrops: { attach: (engine) => LensDrops.attach(engine, { enabled: false }) },
       };
       window.t = {
         // Draws one frame with `name` alone (or no effect) and keeps the engine for the shots.
@@ -85,7 +122,7 @@ await postBrowser(
             .setGeometry(box(1.2, 1.2, 1.2))
             .setMaterial(new PbrMaterial({ color: '#e0a050', roughness: 1 }))
             .setQuaternion([0, 0, Math.sin(Math.PI / 10), Math.cos(Math.PI / 10)]);
-          if (name !== 'none') make[name].attach(engine);
+          if (name !== 'none') await make[name].attach(engine);
           // TAA accumulates and settles over its jitter cycle; the others draw the same picture every frame.
           for (let i = 0; i < (name.startsWith('TAA') ? 24 : 1); i++) engine.render({ delta: 1 / 60 });
           await engine.gpu.queue.onSubmittedWorkDone();

@@ -1,6 +1,7 @@
 // The display transform for a premultiplied canvas (packages/shared/display.js, KB-POST-ALPHARIM1). The GPU proof is
 // packages/post/test/alpha-rim-browser.mjs; this pins the shader rewrite every post effect goes through.
 import assert from 'node:assert/strict';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import { displayFor, displayShader, premultipliedCanvas, straightDisplay } from '../../shared/display.js';
 
@@ -49,4 +50,36 @@ test('a display shader with no output it can convert throws instead of keeping t
 test('the straight transform divides partly covered pixels only', () => {
   const fn = straightDisplay(`${displayShader}return vec4f(toDisplay(c),s.a);`).split('fn toDisplayStraight')[1];
   assert.match(fn, /if\(a>0\.0&&a<1\.0\)\{return toDisplay\(c\/a\)\*a;\}return toDisplay\(c\);/);
+});
+
+// KB-WATER-ALPHARIM1: water's, post caustics' and the lens drops' composites kept the scene's alpha and encoded the
+// premultiplied colour, so each drew the rim. Any source that writes `toDisplay(c)` beside a sampled alpha must build
+// through displayFor, itself or in every module that compiles its shader.
+test('every display shader that keeps a sampled alpha is built through displayFor, in every package', () => {
+  const compiledBy = {
+      'dof/shaders.ts': ['dof/index.ts'],
+      'post/caustics-shader.ts': ['post/caustics.ts', 'water/caustics.ts'],
+      'post/shaders.ts': ['post/ssao.ts'],
+      'water/liquid-shaders.ts': ['water/liquid.ts'],
+    },
+    keepsAlpha = /toDisplay\((?:[^()]|\([^()]*\))*\)(?:' : '[\w.]+')?\}?,\s*\w+\.a\)/,
+    packages = new URL('../../', import.meta.url),
+    source = (name) => {
+      const [owner, ...rest] = name.split('/');
+      return readFileSync(new URL(`${owner}/src/${rest.join('/')}`, packages), 'utf8');
+    },
+    found = [];
+  for (const owner of readdirSync(packages)) {
+    const folder = new URL(`${owner}/src/`, packages);
+    if (!existsSync(folder)) continue;
+    for (const file of readdirSync(folder, { recursive: true })) {
+      const name = `${owner}/${String(file).replaceAll('\\', '/')}`;
+      if (!name.endsWith('.ts') || !keepsAlpha.test(source(name))) continue;
+      found.push(name);
+      for (const compiler of compiledBy[name] ?? [name])
+        assert.match(source(compiler), /displayFor\(/, `${compiler} compiles ${name} without displayFor`);
+    }
+  }
+  for (const name of Object.keys(compiledBy)) assert.ok(found.includes(name), `${name}: the scan no longer sees it`);
+  assert.ok(found.includes('water/underwater.ts') && found.length > 12, found.join(', '));
 });

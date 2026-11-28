@@ -1562,10 +1562,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** each filter handled three channels. TAA's history, DOF's gathers and SceneFade's blend had no coverage to filter, and TAA and DOF decoded or encoded premultiplied colour as if it were straight.
 - **Fixed:** premultiplied linear colour throughout (Porter and Duff 1984), alpha filtered with colour's weights: `packages/taa/src/alpha.ts` (TAAUpscale's opaque alpha, the same fault, included), `packages/dof/src/alpha.ts`, a constant-weight dissolve in `packages/post/src/scene-fade.ts`. TAA's `Sharpen` leaves coverage edges unsharpened (sharpening colour alone moved an edge pixel 1.7 of 255). An opaque canvas keeps its shaders. Regression: `packages/taa/test/alpha-browser.mjs`, `packages/dof/tests/gpu/alpha-check.mjs`, `packages/post/test/scene-fade-alpha-browser.mjs` and `alpha-rim-browser.mjs`, WebGPU and the WebGL2 layer.
 
-### Open 2026-11-27: water's composites draw a light rim on a transparent canvas (KB-WATER-ALPHARIM1, water)
+### Fixed 2026-11-28: water, caustics and lens-drop composites drew a light rim on a transparent canvas (KB-WATER-ALPHARIM1; water, post, weather)
 
-- **Repro:** not yet run. By reading: water's liquid, underwater and caustics composites on a `TransparentCanvas` encode `vec4f(toDisplay(rgb),now.a)`, the pattern KB-POST-ALPHARIM1 measured at 36 of 255 on silhouettes.
-- **Cause:** the display curve is applied to premultiplied colour. The shared helper `displayFor` (`packages/shared/straight-display.js`) is the fix; each composite needs it and a case in a transparent-canvas test.
+- **Repro:** `packages/post/test/alpha-rim-browser.mjs`: a box on a `TransparentCanvas` with `Underwater` alone put
+  silhouette pixels 37.5 of 255 above the face colour at their coverage, `LensDrops` 31.5 (no effect: 0.7). The same
+  code shape is in `ParticleLiquid`, water's `Caustics` and post's `SurfaceCaustics`.
+- **Cause:** the display curve was applied to premultiplied colour (`vec4f(toDisplay(c),a)`); KB-POST-ALPHARIM1 fixed
+  that in post's other effects and left these.
+- **Fix:** each builds its pipeline through `displayFor` (`packages/shared/straight-display.js`) and keys it on the
+  canvas mark; an opaque canvas keeps its shaders byte for byte. All five read 0.7 of 255 on WebGPU and the WebGL2
+  layer (RTX A6000). Entry sizes: water/caustics 6,395 to 6,703 B, water/underwater 9,071 to 9,366 B, weather/lens
+  4,075 to 4,398 B gzip.
+- **Left:** where the liquid covers a pixel with nothing behind it on a transparent canvas, the composite keeps the
+  scene's alpha of 0 (read in the shader, not run).
+- **Regression:** the GPU test above and `packages/post/test/straight-display.test.js` "every display shader that keeps
+  a sampled alpha is built through displayFor, in every package".
 ### Fixed 2026-11-27: the aftermath shot shimmered 0.61 percent at mid, all of it the crest conifers' parallax against the sky (KB-LOOK-TV-SHIMMER3, look check; fixed by TAA, KB-SCENES-TVTAA1)
 
 - **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-aftermath.json --once --seconds 1.1 --out <folder>`
@@ -6112,7 +6123,7 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **Repro:** `packages/post/test/alpha-rim-browser.mjs` (WebGPU, and MARGO_COMPAT=1 for the WebGL2 layer): a box turned about the view axis on a `TransparentCanvas` with SSAO, GTAO, SSGI, SSR, Afterimage or LensFlare alone put silhouette pixels 36 to 37.5 of 255 above the face colour at their coverage, Bloom 37.5; Tonemap had the same fault until GAP-FILM-ALPHA (e323a96e86).
 - **Cause:** every post effect that writes the canvas from a linear capture ran `toDisplay` (PBR Neutral and the sRGB encoding) on the premultiplied colour. A partly covered pixel holds colour times coverage (Porter and Duff 1984), and the curve of that product is brighter than the product of the curve. FXAA, SMAA and Glitch were not affected: they filter core's display output, which core encodes per sample before the resolve.
 - **Fixed:** `straightDisplay` and `displayFor` in `packages/shared/display.js` rewrite each `vec4f(toDisplay(c),a)` as `toDisplay(c/a)*a` for 0 < a < 1, and every display pipeline in post (SSAO and GTAO, SSGI, SSR, Bloom, Afterimage, Accumulate, LensFlare, Lens, Anamorphic, Blur, HeatHaze, ContactShadows, SSS, MaterialDecals, MotionBlur, SelectiveBloom, EffectMask) builds from it and keys its pipeline on the canvas mark. An opaque canvas keeps its shaders byte for byte. Regression: the GPU test above (within 0.7 of 255, Bloom 1.4, on WebGPU and the WebGL2 layer; the core render alone reads 0.7, the bound is one 8-bit step above it) and `packages/post/test/straight-display.test.js`.
-- **Same pattern outside post:** DOF was fixed on 2026-11-27 (KB-ALPHA-TEMPORAL1). Water's composites are open as KB-WATER-ALPHARIM1.
+- **Same pattern outside post:** DOF was fixed on 2026-11-27 (KB-ALPHA-TEMPORAL1). Water's composites, post's SurfaceCaustics and the lens drops followed on 2026-11-28 (KB-WATER-ALPHARIM1).
 
 ### Fixed 2026-11-25: a thin rod rolling on a default cloth is thrown through it (KB-SOFT-TUNNEL1, physics soft, soft-rigid contact)
 

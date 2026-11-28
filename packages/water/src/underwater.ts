@@ -11,6 +11,7 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { PostStack } from '@margoengine/post/stack';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { displayShader } from '../../shared/display.js';
+import { displayFor, premultipliedCanvas } from '../../shared/straight-display.js';
 import { fault, rangeError } from '../../shared/errors.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { fullscreen, group, render } from '../../shared/gpu.js';
@@ -359,10 +360,12 @@ export class Underwater implements EnginePlugin {
     if (this.prepared !== c.encoder)
       throw fault('state', 'Render the live Underwater surface in the same scene before composition');
     const enabled = this.options.enabled !== false && this.targets.length > 0;
-    const key = `${output.format}:${output.multisample.count ?? 1}:${+output.hdr}`;
+    const premultiplied = +premultipliedCanvas(this.engine),
+      key = `${output.format}:${output.multisample.count ?? 1}:${+output.hdr}:${premultiplied}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      pipeline = render(c.device, shader(!output.hdr), output.format, { multisample: output.multisample });
+      const code = displayFor(this.engine, shader(!output.hdr));
+      pipeline = render(c.device, code, output.format, { multisample: output.multisample });
       this.pipelines.set(key, pipeline);
     }
     if (!enabled) {
