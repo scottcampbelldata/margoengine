@@ -5,6 +5,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { Puddles, puddleWGSL, type PuddleOptions } from './puddles.js';
 import { Snow, snowWGSL, type SnowOptions } from './snow.js';
 import { noiseWGSL } from './scene-patch.js';
+import { PBR_PROJECTION, pbrLift, puddleSurfaceCode, snowSurfaceCode } from './surface-code.js';
 import type { PrecipitationCover } from './cover.js';
 
 /** Imported model accepting gltf/pbr's composable lighting/shading effects. */
@@ -133,24 +134,11 @@ export class GLTFWeather implements EnginePlugin {
     if (start < 0 || end < 0)
       throw new MargoError('unsupported', 'GLTFWeather needs the standard gltf/pbr surface shader');
     const wet = this.options.puddles?.wetSurfaces ?? true;
-    const edit = `{
-      let weatherWater=weather_puddle_surface(i.position,s.n,s.base.rgb,s.roughness,s.metal,${wet},weatherPuddles);
-      s.base=vec4f(weatherWater[0].xyz,s.base.a);s.roughness=weatherWater[0].w;s.metal=weatherWater[1].x;s.n=weatherWater[2].xyz;
-      let weatherCover=weather_snow_at(i.position.xz,normalize(i.normal).y,weatherSnow.a.x);
-      if(weatherCover>0.0){s.base=vec4f(mix(s.base.rgb,weatherSnow.b.xyz,weatherCover),s.base.a);
-      s.roughness=mix(s.roughness,weatherSnow.b.w,weatherCover);s.metal*=1.0-weatherCover;
-      s.n=weather_snow_normal(i.position.xz,s.n,weatherCover,weatherSnow);}
-    }`;
+    const edit = `{${puddleSurfaceCode(wet)}${snowSurfaceCode('weatherSnow.a.x')}}`;
     let code = source.slice(0, end) + edit + source.slice(end);
-    // The world-space lift runs after skinning/morphing and before camera projection. It is the depth on flat ground at
-    // the vertex's place, not by its normal, so a hard edge's vertices rise together and its faces stay joined.
-    const projection = 'o.clip=f.camera*p; o.position=p.xyz;';
-    if (code.split(projection).length !== 2)
+    if (code.split(PBR_PROJECTION).length !== 2)
       throw new MargoError('unsupported', 'GLTFWeather snow needs the standard gltf/pbr vertex projection');
-    code = code.replace(
-      projection,
-      'var weatherPosition=p;weatherPosition.y+=weather_snow_depth(p.xz,1.0,weatherSnow);o.clip=f.camera*weatherPosition;o.position=weatherPosition.xyz;',
-    );
+    code = code.replace(PBR_PROJECTION, () => pbrLift('weather_snow_depth(p.xz,1.0,weatherSnow)'));
     const weatherShader = `${source.includes('fn weather_noise(') ? '' : noiseWGSL}
       ${puddleWGSL.slice(noiseWGSL.length)}${snowWGSL.slice(noiseWGSL.length)}
       struct WeatherGLTFUniform { puddles:WeatherPuddles, snow:WeatherSnow }

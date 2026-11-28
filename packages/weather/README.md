@@ -127,7 +127,8 @@ An invalid forcing value, clock or numeric result rejects the entire step before
 
 ## Puddles and wet ground
 
-`Puddles` from `margoengine/weather/puddles` makes the rain show on every core mesh: surfaces darken and turn shinier
+`Puddles` from `margoengine/weather/puddles` makes the rain show on every core mesh and every `Material` mesh of
+`margoengine/materials` ("On Material meshes" below): surfaces darken and turn shinier
 with the wetness, water gathers in the low spots of flat ground as the ground soaks, and falling rain rings it. It
 follows a `WeatherMachine` or the sky's `Weather` (anything with `wetness`, and `state.rain` or `amount`), or numbers you
 set. WebGPU only.
@@ -172,10 +173,46 @@ console.log(dampRoughness(0.5, 0.9, film), puddleWaterRoughness(0.8)); // patchy
 ``` A bad option throws `RangeError` or `TypeError`; a
 replaced core shader throws `MargoError` `'unsupported'`.
 
+### On Material meshes
+
+`Puddles`, `Snow` and `PrecipitationCover` reach the meshes `createMesh` of `margoengine/materials` makes as they reach
+core meshes, with no call per mesh: each such mesh with a lit material (standard, Lambert, Phong or toon shading) joins
+their `materialSurface` on its next draw and leaves it when they are disposed. A `Material` and a core `PbrMaterial` of
+the same colour, roughness and metalness take the same wetness, water, rain rings and snow, lift included
+(`tests/material-wet-browser.mjs` holds the two to the same pixels on WebGPU and the WebGL2 layer). The weather runs on
+the Material's surface after every map, triplanar and parallax read it made, before any lighting. Set a mesh's
+`sceneSurfaces` to `false` to keep it dry (a sign under a canopy, a screen).
+
+```ts
+import { Engine } from 'margoengine/core';
+import { Material, createMesh } from 'margoengine/materials';
+import { Puddles } from 'margoengine/weather/puddles';
+import { Snow } from 'margoengine/weather/snow';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const quad = (size: number, y: number) => ({
+  positions: [-size, y, -size, size, y, -size, size, y, size, -size, y, size],
+  normals: [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0],
+  indices: [0, 3, 1, 1, 3, 2],
+});
+createMesh(engine, quad(20, 0), new Material({ color: '#30363b', roughness: 0.8, metalness: 0.1 })); // asphalt
+const canopy = createMesh(engine, quad(2, 2.4), new Material({ color: '#c8a040', roughness: 0.5 }));
+canopy.sceneSurfaces = false; // this one stays dry
+
+Puddles.attach(engine, { wetness: 0.95, rain: 0.6, coverage: 0.35 }); // the asphalt darkens, pools and rings
+Snow.attach(engine, { cover: 0.3, depth: 0.05 }); // and a thin snow settles on it
+```
+
+The surface entries bind their uniforms in gltf/pbr's group 2 at slots 166 to 169 (`MATERIAL_SLOTS` in the source:
+160 to 166 for the puddles, 161 to 167 for the snow, 164 and 165 to 168 and 169 for a snow field); the cover keeps
+162 and 163. A snow field reads its map at the fragment's position on a Material mesh, where core meshes read it at
+the pixel's centroid. A Material mesh under weather composes its shader each frame, as one under a `Sky` does; meshes
+that share material and geometry still draw as one instanced batch.
+
 ## Snow with depth
 
-`Snow` from `margoengine/weather/snow` lays snow on every core mesh: up-facing surfaces whiten first and steeper ones
-as the cover grows, the snow line is patchy, the surface has a fine grain, and the snow has thickness: covered
+`Snow` from `margoengine/weather/snow` lays snow on every core mesh and every `Material` mesh: up-facing surfaces
+whiten first and steeper ones as the cover grows, the snow line is patchy, the surface has a fine grain, and the snow has thickness: covered
 surfaces are lifted by it, so a plate's edge rises and ground snow buries the foot of a wall that a roof shelters
 (see "Snow and rain kept off under a roof" below). It follows a `WeatherMachine` or the
 sky's `Weather` by their `snowCover`, or the `cover` you set. WebGPU only.
@@ -1512,9 +1549,10 @@ and `humidity` follow the weather while null; `step`, `initialDepth` and `initia
 - Lit hail stones are shaded as balls by the engine's one sun and its ambient light: they cast no shadows and are not
   shaded by the scene's shadows (a stone under a roof is lit as in the open); a splash is four chips per stone, not a
   bounce off the surface it hits. The box around the camera is at most 400 m across; stones outside it do not exist.
-- Puddles stand in the low spots of a procedural relief, not of your geometry, and on every flat core mesh, roofs
-  included: there is no cover (water stands under a roof too) and no flow. They draw on core meshes, not glTF PBR
-  models or other packages' own shaders. Rings tilt the normal only; the water has no depth, refraction or reflection
+- Puddles stand in the low spots of a procedural relief, not of your geometry, and on every flat core and Material
+  mesh, roofs included unless a `PrecipitationCover` shelters them; there is no flow. They draw on core meshes and
+  `margoengine/materials` meshes; glTF PBR models take them through `GLTFWeather`, and other packages' own shaders not
+  at all. Rings tilt the normal only; the water has no depth, refraction or reflection
   of its own beyond the scene's lighting.
 - Snow's shadows draw the unlifted shape, and a vertex stage another package replaced keeps its shape. Without a
   `PrecipitationCover` nothing is sheltered.
@@ -1523,8 +1561,8 @@ and `humidity` follow the weather while null; `step`, `initialDepth` and `initia
   a flow solution, so there are no eddies and no lee vortex; snow in motion is a flux, not drawn particles. The snow does
   not settle or melt after it lands (a layer keeps its density). The slide state marks where a slab would release; the
   avalanche itself is another feature. It runs on the CPU, about 0.15 microseconds per cell per step on the dev PC
-  (a 96 x 8 grid, 1,080 steps in 123 ms, the shelter search every 6 steps included); a seek back replays from 0. The field draws on core meshes
-  (WebGPU and the WebGL2 layer), not glTF PBR models.
+  (a 96 x 8 grid, 1,080 steps in 123 ms, the shelter search every 6 steps included); a seek back replays from 0. The field draws on core meshes and
+  Material meshes (WebGPU and the WebGL2 layer), not glTF PBR models.
 - Region fronts are straight and move at a constant speed, cells are circles at a constant velocity; none bends,
   stalls or forms by itself. They are authoring shapes, not a forecast model.
 - Weather audio is one rain and one wind loop heard everywhere at once (no louder rain on a roof, no wind direction)

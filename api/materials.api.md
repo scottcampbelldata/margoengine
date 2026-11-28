@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
-import { MaterialExtension, MaterialExtensionTexture, PBRMaterial, PBRModel, PBRPrimitive, PreparedGeometry } from "@margoengine/gltf/pbr";
+import { LightingEffect, MaterialExtension, MaterialExtensionTexture, PBRMaterial, PBRModel, PBRPrimitive, PreparedGeometry } from "@margoengine/gltf/pbr";
 import { PBRInstances } from "@margoengine/gltf/pbr-instancing";
 import { TransmissionPassOptions } from "@margoengine/gltf/transmission";
 import { ColorInput } from "@margoengine/math";
@@ -504,6 +504,7 @@ export type MaterialMesh<M extends Material | readonly Material[] = Material> = 
     material: M extends Material ? Material : readonly Material[];
     setGeometry(geometry: MeshGeometry, range?: GeometryRange): MaterialMesh<M>;
     renderOrder: number;
+    sceneSurfaces: boolean;
 };
 
 export interface MaterialMeshData {
@@ -611,6 +612,14 @@ export type MaterialSortMode = 'manual' | 'front-to-back' | 'back-to-front';
 export interface MaterialSortModes {
     opaque?: MaterialSortMode;
     transparent?: MaterialSortMode;
+}
+
+export interface MaterialSurfaceEffect extends LightingEffect {
+    readonly order?: number;
+}
+
+export interface MaterialSurfaceHook extends EnginePlugin {
+    readonly materialSurface?: MaterialSurfaceEffect;
 }
 
 export type MaterialUVTransform = TextureTransform & {
@@ -1045,6 +1054,8 @@ export function materialLobes(options?: MaterialLobeOptions, base?: MaterialExte
 
 export function materialShader(source: string, group: number, shading: Shading): string;
 
+export const materialSurfaceHooks: readonly string[];
+
 export function nodeMaterial(graph: MaterialGraph, options?: NodeMaterialOptions): MaterialExtension;
 
 export function noteEngine(engine: Engine): void;
@@ -1120,6 +1131,7 @@ interface Entry {
     opaque: boolean;
     blend: boolean;
     distance: number;
+    surfaces: boolean;
 }
 
 type EnvKeys = 'envMap' | 'envMapIntensity' | 'envMapRotation' | 'envMapMode' | 'refractionRatio' | 'combine' | 'reflectivity';

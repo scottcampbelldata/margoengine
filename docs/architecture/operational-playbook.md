@@ -4086,6 +4086,23 @@ but counted a surface up to two pixels' worth of metres above the ground as on i
 to 1.2e-6, an empty field changes no pixel, the skyline rises by the lee drift and not on the bare crest, a later time
 re-uploads, the cornice mesh draws). Missing: other GPUs, timing, glTF PBR models (the field draws on core meshes only).
 
+Weather on Material meshes (KB-WEATHER-MATERIALSWET1, 2026-11-28): a mesh of `@margoengine/materials` draws with
+gltf/pbr's shader, not core's, so the surface hooks above never reached it. `Puddles`, `Snow` and `PrecipitationCover`
+now also offer a gltf/pbr lighting effect, `materialSurface` (order -1, -1 and -0.5, as their core passes): its shader
+renames gltf/pbr's `surface()` and wraps it, so the same WGSL as on core meshes edits colour, roughness, metalness and
+normal after every map, triplanar and parallax read and before lighting, a second hook chaining inside the same
+wrapper; the snow also lifts the vertex at gltf/pbr's projection line. Their declarations move from group 0 to the
+model's group 2 at slots 166 (puddles), 167 (snow), 168 and 169 (snow field); the cover keeps 162 and 163. The material
+queue (`packages/materials/src/scene-surfaces.ts`) reads the scene's `weather-puddles`, `weather-snow` and
+`weather-cover` plugins once a frame and joins their effects to each lit mesh through `addLighting` in order before its
+draw (`sceneSurfaces = false` opts one out); such a mesh composes its shader each frame, as under a `Sky`, and equal
+meshes still batch. Uniforms upload only when their bytes change. Evidence: `packages/weather/tests/material-wet-browser.mjs`
+on an RTX A6000, native WebGPU and the WebGL2 layer: a core `PbrMaterial` ground and a `Material` ground of the same
+inputs, dry, wet (water and rain rings) and snowed on, differ by a mean relative 7.6e-8 and 5.3e-8 (WebGPU) and
+6.8e-8 and 3.7e-8 (WebGL2) with no pixel off by 2 percent; disposal restores the dry picture and an opted-out mesh stays
+dry; with the join removed every one of 38,072 ground pixels differed, 34 percent on average. Missing: other GPUs,
+timing, the snow field read at the centroid on Material meshes (they read it at the fragment's position).
+
 Avalanche (`@margoengine/weather/avalanche`, 2026-11-17): CPU JavaScript with no GPU state but the plant maps; a
 depth-averaged Voellmy-fluid solve (Savage and Hutter 1989; Voellmy 1955; Christen et al. 2010) in horizontal grid
 coordinates with first-order Rusanov fluxes, CFL 0.4 substeps, implicit friction, entrainment proportional to speed and

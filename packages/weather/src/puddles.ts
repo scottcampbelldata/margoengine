@@ -4,7 +4,8 @@
 // water. One hook in core's mesh shader (the surface before lighting), one 32-byte uniform a frame. The maths has a
 // JavaScript twin (`puddleMask`, `puddleSurface`) that the real-GPU test holds the WGSL to.
 import type { EngineKernel } from '@margoengine/core';
-import { SurfaceHook, noiseWGSL, patchFragment, valueNoise2 } from './scene-patch.js';
+import { SurfaceHook, noiseWGSL, patchFragment, patchSurface, valueNoise2 } from './scene-patch.js';
+import { puddleSurfaceCode } from './surface-code.js';
 import { wetColor } from './surface.js';
 
 /** Bind group 0 slot of the puddle uniform in core's mesh shader. */
@@ -238,7 +239,8 @@ fn weather_puddle_surface(p:vec3f, n:vec3f, color:vec3f, roughness:f32, metal:f3
 export const puddleWGSL: string = noiseWGSL + puddleCore;
 
 /**
- * Wet ground and puddles on every core mesh. `Puddles.attach(engine, {weather})` follows a `WeatherMachine` or a sky
+ * Wet ground and puddles on every core mesh and every `@margoengine/materials` mesh of the scene (its
+ * `sceneSurfaces`, through {@link SurfaceHook.materialSurface}). `Puddles.attach(engine, {weather})` follows a `WeatherMachine` or a sky
  * `Weather`; or set `options.wetness` and `options.rain` yourself. WebGPU only.
  * @throws TypeError / RangeError on invalid options; MargoError `'unsupported'` on a WebGL engine or when core's mesh
  * shader was replaced, `'disposed'` after `dispose()`.
@@ -285,6 +287,10 @@ export class Puddles extends SurfaceHook {
       source,
       `{let s=weather_puddle_surface(i.position,normalize(i.normal),i.color,i.material.x,i.material.y,${wet},weatherPuddles);if(s[1].y>0.0||${wet}){i.color=s[0].xyz;i.material.x=s[0].w;i.material.y=s[1].x;}if(s[1].y>0.0){i.normal=s[2].xyz;}}`,
     );
+  }
+
+  patchMaterial(source: string): string {
+    return patchSurface(source, puddleSurfaceCode(this.options.wetSurfaces ?? true));
   }
 
   override onPreUpdate(delta: number): void {

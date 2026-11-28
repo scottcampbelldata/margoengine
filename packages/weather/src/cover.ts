@@ -23,8 +23,8 @@ export interface PrecipitationCoverOptions {
 /**
  * A single top-down WeatherFX depth map shared by rain, snow and surface weather.
  * Pass an unattached new WeatherFX({weather, occluders}) as capture. Core Puddles
- * and Snow are covered automatically; pass this effect as GLTFWeather.options.cover
- * for imported surfaces. The capture's splash and lens passes are not installed.
+ * and Snow are covered automatically, on core meshes and on `@margoengine/materials`
+ * meshes alike; pass this effect as GLTFWeather.options.cover for imported surfaces. The capture's splash and lens passes are not installed.
  * @throws MargoError for an attached/disposed capture or missing map pass.
  * @throws RangeError when bias is not finite and nonnegative.
  */
@@ -34,6 +34,12 @@ export class PrecipitationCover implements EnginePlugin {
   private engine?: Engine;
   private disposed = false;
   private readonly cache = new Map<string, string>();
+  private surfaceEffect?: {
+    readonly order: number;
+    readonly owner: Engine | undefined;
+    shader(source: string, group: number): string;
+    bindings(): GPUBindGroupEntry[];
+  };
 
   constructor(
     readonly capture: PrecipitationCapture,
@@ -95,6 +101,29 @@ export class PrecipitationCover implements EnginePlugin {
           c.bindings.push(...this.bindings());
         }
       },
+    });
+  }
+
+  /**
+   * The Material-mesh side of the cover (KB-WEATHER-MATERIALSWET1): the gltf/pbr lighting effect every
+   * `@margoengine/materials` mesh of the scene joins after the scene's Puddles and Snow (order -0.5, as the cover's pass
+   * follows theirs on core meshes), so sheltered Material surfaces stay dry as sheltered core surfaces do. Like the core
+   * pass, it changes a shader only once the map exists.
+   */
+  get materialSurface(): {
+    readonly order: number;
+    readonly owner: Engine | undefined;
+    shader(source: string, group: number): string;
+    bindings(): GPUBindGroupEntry[];
+  } {
+    const cover = this;
+    return (this.surfaceEffect ??= {
+      order: -0.5,
+      get owner() {
+        return cover.engine;
+      },
+      shader: (source, group) => (this.bindings().length ? this.shader(source, group) : source),
+      bindings: () => this.bindings(),
     });
   }
 

@@ -414,6 +414,7 @@ type MaterialMesh<M extends Material | readonly Material[] = Material> = PBRMode
     material: M extends Material ? Material : readonly Material[];
     setGeometry(geometry: MeshGeometry, range?: GeometryRange): MaterialMesh<M>;
     renderOrder: number;
+    sceneSurfaces: boolean;
 };
 
 interface MaterialMeshData {

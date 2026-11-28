@@ -5,7 +5,8 @@
 // 48-byte uniform a frame. The maths has a JavaScript twin (`snowAt`, `snowDepthAt`) that the real-GPU test holds the
 // WGSL to.
 import type { EngineKernel } from '@margoengine/core';
-import { SurfaceHook, noiseWGSL, patchFragment, valueNoise2 } from './scene-patch.js';
+import { SurfaceHook, noiseWGSL, patchFragment, patchSurface, valueNoise2 } from './scene-patch.js';
+import { PBR_PROJECTION, pbrLift, snowSurfaceCode } from './surface-code.js';
 import { SNOW_COLOR, SNOW_ROUGHNESS } from './surface.js';
 import type { SnowFieldSource } from './snow-drift.js';
 import { heldFromWeather } from '../../shared/settings.js';
@@ -294,7 +295,8 @@ function centroidPosition(source: string): { source: string; name: string } | un
 }
 
 /**
- * Snow on every core mesh. `Snow.attach(engine, {weather})` follows a `WeatherMachine` or a sky `Weather`; or set
+ * Snow on every core mesh and every `@margoengine/materials` mesh of the scene (its `sceneSurfaces`, through
+ * {@link SurfaceHook.materialSurface}). `Snow.attach(engine, {weather})` follows a `WeatherMachine` or a sky `Weather`; or set
  * `options.cover` yourself. WebGPU only.
  * @throws TypeError / RangeError on invalid options; MargoError `'unsupported'` on a WebGL engine or when core's mesh
  * shader was replaced, `'disposed'` after `dispose()`.
@@ -401,6 +403,23 @@ export class Snow extends SurfaceHook {
     // A vertex stage another package replaced keeps its shape: the snow is then a layer of colour and grain only.
     if (fragment === (field ? field.source : source)) return source;
     return fragment.replace(VERTEX, () => (this.options.field ? FIELD_LIFT : LIFT));
+  }
+
+  patchMaterial(source: string): string {
+    const field = !!this.options.field,
+      out = patchSurface(
+        source,
+        snowSurfaceCode(field ? 'weather_snow_field_cover(i.position,weatherSnow.a.x)' : 'weatherSnow.a.x'),
+      );
+    // A vertex stage another package replaced (instanced, skinned) keeps its shape: the snow is then colour and grain.
+    if (out === source || out.split(PBR_PROJECTION).length !== 2) return out;
+    return out.replace(PBR_PROJECTION, () =>
+      pbrLift(
+        field
+          ? 'weather_snow_depth(p.xz,1.0,weather_snow_field_uniform(p.xyz,weatherSnow))'
+          : 'weather_snow_depth(p.xz,1.0,weatherSnow)',
+      ),
+    );
   }
 
   protected validate(): void {

@@ -146,6 +146,7 @@
     "test": "npm run build && node --test tests/*.test.js",
     "test:gpu:surface-energy-surface": "cd ../.. && node packages/weather/tests/surface-energy-surface.browser.mjs && node packages/weather/tests/surface-energy-surface.browser.mjs --compat",
     "test:gpu:lava-surface": "cd ../.. && node packages/weather/tests/lava-surface.browser.mjs && node packages/weather/tests/lava-surface.browser.mjs --compat",
+    "test:gpu:material-wet": "cd ../.. && node packages/weather/tests/material-wet-browser.mjs && node packages/weather/tests/material-wet-browser.mjs --compat",
     "test:gpu:mann-fft": "cd ../.. && node packages/weather/tests/mann-fft.browser.mjs",
     "test:gpu:surface-energy-workers": "cd ../.. && node packages/weather/tests/surface-energy-workers.browser.mjs",
     "test:gpu": "cd ../.. && node packages/weather/tests/browser-check.mjs && node packages/weather/tests/seek-check.mjs && node packages/weather/tests/settings-check.mjs && node packages/weather/tests/snowpack-check.mjs && node packages/weather/tests/snowpack-check.mjs --compat",

@@ -467,6 +467,7 @@ export function install(model: PBRModel, options?: InstallOptions): MaterialInst
 
 // Mesh materials and imported glTF extensions share the same PBR renderer.
 export * from './built-material.js';
+export { materialSurfaceHooks, type MaterialSurfaceEffect, type MaterialSurfaceHook } from './scene-surfaces.js';
 export * from './material-classes.js';
 export * from './tile-animation.js';
 export * from './wgsl-material.js';

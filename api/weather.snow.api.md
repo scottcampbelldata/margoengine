@@ -21,6 +21,7 @@ export class Snow extends SurfaceHook {
     protected extraBindings(device: GPUDevice): GPUBindGroupEntry[];
     protected releaseExtra(): void;
     patch(source: string): string;
+    patchMaterial(source: string): string;
     protected validate(): void;
     protected write(): void;
 }
@@ -77,11 +78,18 @@ abstract class SurfaceHook implements EnginePlugin {
     protected abstract validate(): void;
     protected abstract write(): void;
     abstract patch(source: string): string;
+    abstract patchMaterial(source: string): string;
     protected variant(): string;
     protected shaderDeclarations(): string;
     protected extraBindings(_device: GPUDevice): GPUBindGroupEntry[];
     protected releaseExtra(): void;
     onPreUpdate(delta: number): void;
+    get materialSurface(): {
+        readonly order: number;
+        readonly owner: Engine | undefined;
+        shader(source: string, group: number): string;
+        bindings(): GPUBindGroupEntry[];
+    };
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;

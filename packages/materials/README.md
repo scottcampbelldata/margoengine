@@ -539,6 +539,32 @@ for (let i = 0; i < 1000; i++) matrices.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0,
 boxes.instances.setMatrices(0, matrices);
 ```
 
+## Rain, puddles and snow on Material surfaces
+
+A mesh from `createMesh` (and so `createInstancedMesh` and the batched meshes) takes the surface hooks of its scene by
+itself: `Puddles`, `Snow` and `PrecipitationCover` of `margoengine/weather` darken it, pool water on it, ring the water
+with rain and lay snow on it, lift included, as they do core meshes, from its next draw. Each of those plugins offers a
+gltf/pbr lighting effect, `materialSurface`, that edits the surface (colour, roughness, metalness and normal, with the
+world position) after every map and feature the material read and before lighting; the mesh joins the effects of the
+scene's `weather-puddles`, `weather-snow` and `weather-cover` plugins (`materialSurfaceHooks`) in their order and leaves
+them when they go. Only a mesh with a lit material (standard, Lambert, Phong or toon shading) joins; `sceneSurfaces`
+(default `true`, live) set to `false` keeps one dry. Any plugin under those names with a `materialSurface`
+(`MaterialSurfaceHook`) joins the same way.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { Material, createMesh } from 'margoengine/materials';
+import { boxGeometry } from 'margoengine/geometry';
+import { Puddles } from 'margoengine/weather/puddles';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const platform = createMesh(engine, boxGeometry(12, 0.3, 4), new Material({ color: '#5a5650', roughness: 0.78 }));
+const kiosk = createMesh(engine, boxGeometry(1, 2, 1), new Material({ color: '#8a3a2a', roughness: 0.6 }));
+kiosk.sceneSurfaces = false; // under the station roof: stays dry
+Puddles.attach(engine, { wetness: 0.9, rain: 0.5, coverage: 0.3 }); // the platform darkens and holds water
+console.log(platform.sceneSurfaces); // true
+```
+
 ## Animated tiles
 
 A tile animation (Crocotile 3D's per-tileset UV animation) is a looping list of frames, each with a duration in

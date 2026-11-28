@@ -29,6 +29,7 @@ import { attenuationPower } from '../../shared/attenuation.js';
 import { clusterBrdf } from '../../shared/light-terms.js';
 import type { CasterDisplacement } from '../../shared/caster.js';
 import { primitiveAfterOpaque } from '../../shared/material-routing.js';
+import { SceneSurfaces } from './scene-surfaces.js';
 import { MargoError } from '@margoengine/math/errors';
 import { hexColor, parseColor, type ColorInput } from '@margoengine/math/color';
 import type { CubeTarget } from './texture-kinds.js';
@@ -847,7 +848,8 @@ function materialBuffer(
   }
   return state[field];
 }
-const lit: readonly Shading[] = ['standard', 'lambert', 'phong', 'toon'];
+const lit: readonly Shading[] = ['standard', 'lambert', 'phong', 'toon'],
+  litMaterial = (m: Material) => lit.includes(m.shading);
 /** The feature maps `m` draws now; a lightMap means nothing to normal, matcap, depth and distance output. */
 function featureMapsUsed(m: Material): boolean[] {
   const maps = m['featureTextures'];
@@ -2848,6 +2850,8 @@ interface Entry {
   blend: boolean;
   /** Squared camera distance this frame, for the late phase's back-to-front sort. */
   distance: number;
+  /** The mesh's `sceneSurfaces`: it joins its scene's surface hooks (scene-surfaces.ts). */
+  surfaces: boolean;
 }
 interface Phase {
   entry: Entry;
@@ -2923,7 +2927,10 @@ function queue(runtime: Engine): MaterialDraws {
     sortModes = sortSettings(graph),
     name = 'materials:' + serial++,
     // One run, reused every frame: it keeps its batch records (gltf/pbr draw-batch.ts) instead of making new ones.
-    run = new PBRDrawRun();
+    run = new PBRDrawRun(),
+    surfaces = new SceneSurfaces(runtime);
+  /** Joins or leaves the scene's surface hooks (wet ground, snow) before the entry draws: lit meshes only. */
+  const join = (entry: Entry) => surfaces.sync(entry.model, entry.surfaces && entry.materials.some(litMaterial));
   // Each arrange() makes a new list, so a loop that is drawing one keeps it while a draw re-arranges the queue.
   let phases: Phase[] = [],
     opaqueEnd = 0,
@@ -3002,6 +3009,7 @@ function queue(runtime: Engine): MaterialDraws {
         execute: (c) => {
           if (c.backend !== 'webgpu') return;
           if (!arranged) arrange();
+          surfaces.next();
           // The late phase's entries are checked before anything draws, so one that turned opaque draws with the
           // opaque phase this frame.
           const eye = c.camera.position;
@@ -3029,6 +3037,7 @@ function queue(runtime: Engine): MaterialDraws {
               if (drawn?.has(entry)) continue;
               let done = 0;
               if (current(entry)) {
+                join(entry);
                 item.model.draw(c, 'beauty', color, depth, item.phase, undefined, own);
                 if (at === epoch) continue;
                 done = 1;
@@ -3046,6 +3055,7 @@ function queue(runtime: Engine): MaterialDraws {
             end = list.length;
             for (let i = opaqueEnd; i < end; i++) {
               const item = list[i];
+              join(item.entry);
               item.model.draw(c, 'beauty', color, depth, item.phase, undefined, own);
             }
           } finally {
@@ -3642,6 +3652,13 @@ export type MaterialMesh<M extends Material | readonly Material[] = Material> = 
   setGeometry(geometry: MeshGeometry, range?: GeometryRange): MaterialMesh<M>;
   /** Draw order among materials meshes, lower first within the opaque and the transparent phase; live. */
   renderOrder: number;
+  /**
+   * Takes the surface hooks of its scene (`@margoengine/weather`'s `Puddles`, `Snow` and `PrecipitationCover`): wet
+   * ground, standing water and snow change its colour, roughness, metalness and normal before lighting, as they change
+   * core meshes, from the next frame, with no call per mesh. Only a mesh with a lit material (standard, Lambert, Phong
+   * or toon shading) joins them. Set false to keep this mesh out of the weather (a sign under a roof). Live; default true.
+   */
+  sceneSurfaces: boolean;
 };
 /**
  * Creates one gltf/pbr `PBRModel`. A material array draws the geometry's nonempty, nonoverlapping triangle groups;
@@ -3730,6 +3747,7 @@ export function createMesh<M extends Material | readonly Material[]>(
     opaque: false,
     blend: false,
     distance: 0,
+    surfaces: true,
   };
   let snapshot = array ? Object.freeze([...assigned]) : undefined;
   const swap = (next: Material | readonly Material[]) => {
@@ -3827,6 +3845,14 @@ export function createMesh<M extends Material | readonly Material[]>(
         if (!Number.isFinite(v)) throw new RangeError('Material mesh renderOrder must be finite; set a finite number');
         entry.order = v;
         draws.reorder();
+      },
+    },
+    sceneSurfaces: {
+      get: () => entry.surfaces,
+      set: (v: boolean) => {
+        if (typeof v !== 'boolean')
+          throw new TypeError('Material mesh sceneSurfaces must be true or false; set a boolean');
+        entry.surfaces = v;
       },
     },
     setGeometry: { value: setGeometry },

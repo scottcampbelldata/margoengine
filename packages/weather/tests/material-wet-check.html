@@ -1,0 +1,77 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Wet Material check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas></canvas>
+<script type="module">
+// KB-WEATHER-MATERIALSWET1 on a real GPU: Puddles and Snow change a @margoengine/materials Material surface as they
+// change a core PbrMaterial surface of the same inputs. The same ground is drawn once as a core mesh and once as a
+// Material mesh, dry and then wet (and then snowed on). The two renderers light a dry surface alike to within `dry`;
+// the wet and snowy pictures must then match as closely, and the weather must change both.
+import {Engine,PbrMaterial,Geometry} from '/packages/core/dist/index.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Material,createMesh} from '/packages/materials/dist/index.js';
+import {Puddles} from '/packages/weather/dist/puddles.js';
+import {Snow} from '/packages/weather/dist/snow.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,7,7],target:[0,0,-1],near:0.1,far:200}}),device=engine.gpu,errors=[];
+engine.stop();device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+// Sun only: the two renderers share the glTF 2.0 direct BRDF, while their ambient terms differ by design (core: a
+// flat ambient; gltf/pbr: a hemisphere with a specular share), so the ambient is off and a dry surface matches.
+engine.lighting.radiance.set([1,1,1,0]);
+// A 16 m ground of 32 x 32 quads facing up (the snow lifts its vertices), and a wall facing the camera.
+const positions=[],normals=[],indices=[];
+const quad=(origin,u,v,n,cells)=>{const start=positions.length/3;
+ for(let j=0;j<=cells;j++)for(let i=0;i<=cells;i++){for(let k=0;k<3;k++){positions.push(origin[k]+u[k]*i/cells+v[k]*j/cells);normals.push(n[k]);}}
+ for(let j=0;j<cells;j++)for(let i=0;i<cells;i++){const a=start+j*(cells+1)+i,b=a+1,c=a+cells+1,d=c+1;indices.push(a,c,b,b,c,d);}};
+quad([-8,0,-9],[16,0,0],[0,0,16],[0,1,0],32);
+quad([3,0,-4],[-6,0,0],[0,4,0],[0,0,1],4);
+const inputs={color:[0.42,0.4,0.37],roughness:0.72,metalness:0.1};
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+async function shot(){engine.render({delta:0});await device.queue.onSubmittedWorkDone();engine.render({delta:0});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);}
+// One picture of the ground drawn by core, one drawn by materials, under whatever weather is attached.
+async function pair(){
+ const core=engine.createMesh().setGeometry(new Geometry(positions,normals,indices)).setMaterial(new PbrMaterial(inputs));
+ const a=await shot();core.dispose();
+ const mesh=createMesh(engine,{positions,normals,indices},new Material(inputs));
+ const b=await shot();mesh.dispose();return [a,b];
+}
+const luminance=(x,p)=>0.2126*x[p]+0.7152*x[p+1]+0.0722*x[p+2];
+let empty;
+const covers=(a,p)=>Math.abs(a[p]-empty[p])+Math.abs(a[p+1]-empty[p+1])+Math.abs(a[p+2]-empty[p+2])>1e-6;
+// Relative difference of two pictures over the pixels either one covers (differs from the empty frame): the share of
+// pixels off by more than 2% of their luminance, and the mean relative difference.
+function compare(a,b){let n=0,off=0,sum=0;
+ for(let p=0;p<a.length;p+=4){if(!covers(a,p)&&!covers(b,p))continue;const la=luminance(a,p),lb=luminance(b,p),m=Math.max(la,lb,1e-4);
+  if(m<1e-3)continue;n++;const d=(Math.abs(a[p]-b[p])+Math.abs(a[p+1]-b[p+1])+Math.abs(a[p+2]-b[p+2]))/(3*m);sum+=d;if(d>0.02)off++;}
+ return {pixels:n,off,mean:n?sum/n:0};}
+window.run=async()=>{
+ device.pushErrorScope('validation');
+ empty=await shot();
+ const [coreDry,materialDry]=await pair();
+ // Soaked ground with standing water under full rain: the rings tilt the water's normal at the clock's 0.3 s.
+ const puddles=Puddles.attach(engine,{wetness:1,coverage:0.5,size:2,rain:1});puddles.advanceTime(0.3);
+ const [coreWet,materialWet]=await pair();
+ const snow=Snow.attach(engine,{cover:0.7,depth:0.1});
+ const [coreSnow,materialSnow]=await pair();
+ snow.dispose();puddles.dispose();
+ const [coreAfter,materialAfter]=await pair();
+ // A mesh kept out of the weather stays dry.
+ const kept=Puddles.attach(engine,{wetness:1,coverage:0.5,size:2,rain:0});
+ const mesh=createMesh(engine,{positions,normals,indices},new Material(inputs));mesh.sceneSurfaces=false;
+ const keptDry=await shot();mesh.dispose();kept.dispose();
+ const validation=(await device.popErrorScope())?.message??null;
+ return {
+  compat:globalThis.__margoCompat===true,
+  dry:compare(coreDry,materialDry),wet:compare(coreWet,materialWet),snow:compare(coreSnow,materialSnow),
+  coreWetChange:compare(coreDry,coreWet),materialWetChange:compare(materialDry,materialWet),
+  coreSnowChange:compare(coreWet,coreSnow),materialSnowChange:compare(materialWet,materialSnow),
+  restored:compare(materialDry,materialAfter),coreRestored:compare(coreDry,coreAfter),
+  optOut:compare(materialDry,keptDry),validation,errors};
+};
+window.ready=true;
+</script></body></html>

@@ -56,6 +56,12 @@ class PrecipitationCover implements EnginePlugin {
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
     registerPasses(graph: FrameGraph): void;
+    get materialSurface(): {
+        readonly order: number;
+        readonly owner: Engine | undefined;
+        shader(source: string, group: number): string;
+        bindings(): GPUBindGroupEntry[];
+    };
     shader(source: string, group: number): string;
     bindings(): GPUBindGroupEntry[];
     onDeviceRestored(engine: Engine): void;

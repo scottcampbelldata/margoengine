@@ -35,6 +35,35 @@ export function patchFragment(source: string, code: string): string {
   );
 }
 
+const SURFACE = 'fn surface(i:Out,front:bool)->Surface {';
+const DRY = 'var s=weather_dry_surface(i,front);';
+
+/**
+ * gltf/pbr's shader `source` (a `@margoengine/materials` Material mesh) with `code` run on its surface before lighting:
+ * its `surface()` is renamed `weather_dry_surface` and a new `surface()` returns that surface `s` after `code`, which
+ * may change `s.base`, `s.roughness`, `s.metal` and `s.n` and reads the fragment input `i` (`i.position` is the world
+ * position). Wrapping the whole function puts the code after every map, triplanar or parallax read the material made.
+ * A second entry adds its code right after the first call, ahead of the first entry's code, as {@link patchFragment}
+ * chains on core's shader, so the two compose in the same order on both. Returns `source` unchanged when it holds no
+ * single gltf/pbr `surface()`.
+ */
+export function patchSurface(source: string, code: string): string {
+  const at = source.indexOf(DRY);
+  if (at >= 0) return source.slice(0, at + DRY.length) + code + source.slice(at + DRY.length);
+  if (source.split(SURFACE).length !== 2) return source;
+  return `${source.replace(SURFACE, () => 'fn weather_dry_surface(i:Out,front:bool)->Surface {')}
+${SURFACE}${DRY}${code}return s;}
+`;
+}
+
+/**
+ * The group 2 slot on a gltf/pbr shader (Material meshes) of each group 0 slot the surface entries take in core's mesh
+ * shader. gltf/pbr's group 2 holds other effects' bindings at 160 (retroreflection) and 164-165 (light bounce), and
+ * the precipitation cover's at 162-163.
+ */
+export const MATERIAL_SLOTS: Readonly<Record<number, number>> = { 160: 166, 161: 167, 164: 168, 165: 169 };
+const slot = (binding: number): number => MATERIAL_SLOTS[binding] ?? binding;
+
 /** Throws the error every surface entry gives when core's mesh shader was replaced. */
 export function unsupportedShader(name: string): never {
   throw new MargoError(
@@ -96,6 +125,17 @@ export abstract class SurfaceHook implements EnginePlugin {
   private uniform?: GPUBuffer;
   private readonly shaders = new Map<string, string>();
   private disposed = false;
+  /** The values last written to the uniform (NaN: nothing written yet on this device). */
+  private readonly sent: Float32Array;
+  /** True from each frame update until the Material side brings its entries up to date. */
+  private materialStale = true;
+  private materialEntries: GPUBindGroupEntry[] = [];
+  private surfaceEffect?: {
+    readonly order: number;
+    readonly owner: Engine | undefined;
+    shader(source: string, group: number): string;
+    bindings(): GPUBindGroupEntry[];
+  };
 
   /** @param label The class name, for errors. @param binding Group 0 slot. @param declarations WGSL without the noise. @param values The uniform's values. */
   constructor(
@@ -103,7 +143,9 @@ export abstract class SurfaceHook implements EnginePlugin {
     private readonly binding: number,
     private readonly declarations: string,
     protected readonly values: Float32Array,
-  ) {}
+  ) {
+    this.sent = new Float32Array(values.length).fill(NaN);
+  }
 
   protected static use<T extends SurfaceHook>(engine: EngineKernel, effect: T): T {
     engineRuntime(engine).use(effect);
@@ -116,6 +158,11 @@ export abstract class SurfaceHook implements EnginePlugin {
   protected abstract write(): void;
   /** Core's mesh shader `source` with this entry's hooks; `source` itself when it is not core's shader. */
   abstract patch(source: string): string;
+  /**
+   * gltf/pbr's shader `source` of a Material mesh with this entry's hooks (see {@link patchSurface}); `source` itself
+   * when it has no gltf/pbr surface.
+   */
+  abstract patchMaterial(source: string): string;
   /** Anything besides the source that changes the patched shader. */
   protected variant(): string {
     return '';
@@ -137,6 +184,77 @@ export abstract class SurfaceHook implements EnginePlugin {
     this.validate();
     if (typeof delta !== 'number' || !Number.isFinite(delta) || delta < 0)
       throw new RangeError(`Invalid ${this.label} delta; pass a finite delta of 0 or more seconds.`);
+    this.materialStale = true;
+  }
+
+  /**
+   * The Material-mesh side of this entry (KB-WEATHER-MATERIALSWET1): a gltf/pbr lighting effect that every
+   * `@margoengine/materials` mesh in this entry's scene joins by itself (its `sceneSurfaces`), so wet ground and snow
+   * reach Material surfaces as they reach core meshes. The same WGSL and uniform as on core meshes, bound in gltf/pbr's
+   * group 2 at {@link MATERIAL_SLOTS}.
+   */
+  get materialSurface(): {
+    readonly order: number;
+    readonly owner: Engine | undefined;
+    shader(source: string, group: number): string;
+    bindings(): GPUBindGroupEntry[];
+  } {
+    const hook = this;
+    return (this.surfaceEffect ??= {
+      order: -1,
+      get owner() {
+        return hook.engine;
+      },
+      shader: (source, group) => this.materialShader(source, group),
+      bindings: () => this.materialBindings(),
+    });
+  }
+
+  private materialShader(source: string, group: number): string {
+    if (this.disposed) return source;
+    const key = `m${group}:${this.variant()}${source}`;
+    let code = this.shaders.get(key);
+    if (code === undefined) {
+      const patched = this.patchMaterial(source);
+      code =
+        patched === source
+          ? source
+          : `${patched.includes('fn weather_noise(') ? '' : noiseWGSL}${this.shaderDeclarations().replace(
+              /@group\(0\) @binding\((\d+)\)/g,
+              (_, binding: string) => `@group(${group}) @binding(${slot(Number(binding))})`,
+            )}
+${patched}`;
+      if (this.shaders.size >= 32) this.shaders.clear();
+      this.shaders.set(key, code);
+    }
+    return code;
+  }
+
+  private materialBindings(): GPUBindGroupEntry[] {
+    const device = this.device;
+    if (this.disposed || !this.uniform || !device) return [];
+    this.upload(device);
+    // A subclass's own resources (the snow field) are brought up to date once a frame, not once a mesh.
+    if (this.materialStale) {
+      this.materialStale = false;
+      this.materialEntries = [
+        { binding: slot(this.binding), resource: { buffer: this.uniform } },
+        ...this.extraBindings(device).map((entry) => ({ binding: slot(entry.binding), resource: entry.resource })),
+      ];
+    }
+    return this.materialEntries;
+  }
+
+  /** Writes this frame's values to the uniform when they changed since the last write. */
+  private upload(device: GPUDevice): void {
+    this.write();
+    const v = this.values,
+      sent = this.sent;
+    let same = true;
+    for (let k = 0; k < v.length && same; k++) same = Object.is(v[k], sent[k]);
+    if (same) return;
+    device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
+    sent.set(v);
   }
 
   setup(engine: Engine): void {
@@ -165,8 +283,7 @@ export abstract class SurfaceHook implements EnginePlugin {
 
   private hook(c: MeshShaderPass): void {
     if (this.disposed || !this.uniform || c.device !== this.device) return;
-    this.write();
-    c.device.queue.writeBuffer(this.uniform, 0, this.values as Float32Array<ArrayBuffer>);
+    this.upload(c.device);
     const key = this.variant() + c.shader;
     let code = this.shaders.get(key);
     if (code === undefined) {
@@ -186,6 +303,9 @@ ${patched}`;
     this.uniform?.destroy();
     this.uniform = undefined;
     this.shaders.clear();
+    this.sent.fill(NaN);
+    this.materialStale = true;
+    this.materialEntries = [];
   }
 
   onDeviceRestored(engine: Engine): void {
