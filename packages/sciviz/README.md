@@ -465,6 +465,60 @@ WebGL2 preview renderer, was retired (KB1405): it could not draw axes, points, l
 copy of the figure. A `Figure` on an engine without a WebGPU device now rejects with a coded `unsupported` error that
 names `createFallbackFigure`.
 
+## Notebooks and offline pages: the WebGL2 fallback
+
+`render({ model, el })` from `@margoengine/sciviz/notebook` draws a saved figure into a notebook output cell through
+the anywidget front-end contract (AFM): it reads `spec`, `buffers`, `backend`, `camera`, `selection` and `height`
+from the host's model and writes `camera`, `selection` and `error` back. `exportStandalone(figure, { runtime })` from
+`@margoengine/sciviz/share` writes one offline HTML file that starts the same way. Neither entry imports a GPU
+backend. Where a figure may run on WebGL2, the host passes `prepareBackend`, an async callback that installs the
+WebGL2 compatibility layer:
+
+| `backend` (model value or `exportStandalone` option) | What happens |
+|---|---|
+| `'auto'` (default) | `prepareBackend({ force: false, signal })` runs if given; the layer's `install` keeps native WebGPU where it has an adapter (it resolves `{ installed: false, reason: 'webgpu' }` and warns once) and fills in WebGL2 where it has none. Without the callback a browser with no WebGPU fails at figure creation. |
+| `'webgpu'` | `prepareBackend` is never called. |
+| `'webgl2'` | `prepareBackend({ force: true, signal })` runs, so the layer replaces WebGPU even where it exists. Without the callback the call rejects with a `MargoError` code `'unsupported'` ([sciviz](https://margoengine.com/errors#sciviz)) before any device is made. |
+
+The hosts Margo ships pass it for you: the Python widget's bundled front end (`python/frontend/notebook.ts`) and the
+offline runtime built by `packages/sciviz/scripts/bundle-share.mjs` both import `@margoengine/webgl2-compat` lazily,
+when `prepareBackend` is first called, so a `'webgpu'` figure never downloads it. A raw `@margoengine/sciviz/notebook` or `/share` import, or the
+`margoengine/sciviz/notebook` and `margoengine/sciviz/share` aliases, pass nothing: give the callback yourself.
+
+```ts
+import { Figure } from 'margoengine/sciviz/spec';
+import { render } from 'margoengine/sciviz/notebook';
+
+using source = await Figure.create(document.querySelector('canvas')!, { axes: false, controls: false });
+const x = Float32Array.from({ length: 100 }, (_, i) => i / 10);
+await source.line({ x, y: x.map(Math.sin), z: new Float32Array(100) });
+const state = new Map<string, unknown>([['spec', await source.toJSON()], ['backend', 'auto']]);
+const model = {
+  get: (name: string) => state.get(name),
+  set: (name: string, value: unknown) => void state.set(name, value),
+  save_changes() {},
+  on() {},
+  off() {},
+};
+const el = document.createElement('div');
+document.body.append(el);
+const dispose = await render({
+  model,
+  el,
+  // Called for backend 'auto' and 'webgl2', never 'webgpu'; install() reads force and signal.
+  prepareBackend: async (options) => (await import('margoengine/webgl2-compat')).install(options),
+});
+console.log(el.querySelector('canvas') !== null, state.get('error')); // true ''
+dispose();
+```
+
+- An offline page started from your own runtime passes the same callback to `startStandalone({ prepareBackend })`;
+  the bundled runtime already does.
+- `render` resolves once the first figure is drawn and returns `dispose`; a failure in that first draw rejects it and
+  clears `el`. A later failure (a bad spec, a lost backend) shows its message in `el`, writes it to the model's
+  `error` and dispatches `margo-notebook-error`; `margo-notebook-ready` fires with the figure after each draw.
+- `signal` stops the backend setup and the figure load; the callback receives it and should stop too.
+
 ## A first WebGPU figure
 
 ```ts
