@@ -153,6 +153,8 @@
 <tr><th scope="row"><code>accretion-kernel-shared.wasm</code></th><td>Rust SIMD thin disk mass and heating, shared world memory</td><td class="num">1,657</td><td class="num">919</td><td class="num">851</td><td>AccretionDiskSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>foam-transport-kernel.wasm</code></th><td>Rust SIMD conservative foam transport</td><td class="num">2,236</td><td class="num">1,170</td><td class="num">1,078</td><td>FoamSolver.load() from the optional /foam entry</td></tr>
 <tr><th scope="row"><code>foam-transport-kernel-shared.wasm</code></th><td>Rust SIMD foam transport with private shared worker scratch</td><td class="num">2,236</td><td class="num">1,169</td><td class="num">1,093</td><td>FoamSolver.load() with more than one participant</td></tr>
+<tr><th scope="row"><code>entry-profile-kernel.wasm</code></th><td>Rust SIMD indexed-mesh section clipping</td><td class="num">3,365</td><td class="num">1,697</td><td class="num">1,562</td><td>EntrySolver.load() from the optional /entry entry</td></tr>
+<tr><th scope="row"><code>entry-profile-kernel-shared.wasm</code></th><td>Rust SIMD indexed-mesh section clipping with private shared worker scratch</td><td class="num">3,365</td><td class="num">1,697</td><td class="num">1,564</td><td>EntrySolver.load() with more than one participant</td></tr>
 <tr><th scope="row"><code>wing-lattice-kernel.wasm</code></th><td>Rust SIMD wing lattice influence, circulation and induced velocity</td><td class="num">6,542</td><td class="num">2,860</td><td class="num">2,576</td><td>WingForce.load() from the optional /flight entry</td></tr>
 <tr><th scope="row"><code>wing-lattice-kernel-shared.wasm</code></th><td>Rust SIMD wing lattice with shared native worker scratch</td><td class="num">6,542</td><td class="num">2,860</td><td class="num">2,576</td><td>WingForce.load() with more than one participant</td></tr>
 <tr><th scope="row"><code>outdoor-sound-kernel.wasm</code></th><td>Rust SIMD octave loss and time-of-flight integration</td><td class="num">4,374</td><td class="num">2,078</td><td class="num">1,914</td><td>OutdoorSound.load() from the optional /outdoor-sound entry</td></tr>
@@ -373,7 +375,7 @@
 <tr><th scope="row"><code>@margoengine/sky/compat-clouds</code></th><td>Lazy: hurricane storm field</td><td class="num">10,591</td><td class="num">4,395</td><td>the first layer that draws a storm (<code>hurricane</code> option or the type hurricane; import() in volumetric-clouds.ts); its WGSL and maths load once, and every entry above reads the same copy</td></tr>
 <tr><th scope="row"><code>@margoengine/sky/tornado</code></th><td>Base: everything a page reading a Tornado's wind and rain loads, without the lazy part</td><td class="num">19,037</td><td class="num">7,786</td><td></td></tr>
 <tr><th scope="row"><code>@margoengine/sky/tornado</code></th><td>Lazy: tornado shader</td><td class="num">5,763</td><td class="num">2,504</td><td>the first frame of a TornadoCloud (import() in tornado.ts)</td></tr>
-<tr><th scope="row"><code>@margoengine/physics</code></th><td>Base: everything the entry loads before <code>Physics.load()</code>, without the lazy part</td><td class="num">333,396</td><td class="num">107,013</td><td></td></tr>
+<tr><th scope="row"><code>@margoengine/physics</code></th><td>Base: everything the entry loads before <code>Physics.load()</code>, without the lazy part</td><td class="num">333,222</td><td class="num">107,005</td><td></td></tr>
 <tr><th scope="row"><code>@margoengine/physics</code></th><td>Lazy: physics kernel (deflated Wasm blueprint and its column table)</td><td class="num">1,201,318</td><td class="num">885,755</td><td><code>await Physics.load()</code>, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own</td></tr>
 <tr><th scope="row"><code>@margoengine/physics/soft</code></th><td>Base: everything the entry loads before <code>SoftBodies.attach()</code>, without the lazy part</td><td class="num">191,136</td><td class="num">63,624</td><td></td></tr>
 <tr><th scope="row"><code>@margoengine/physics/soft</code></th><td>Lazy: soft body kernel (deflated Wasm blueprint and its column table)</td><td class="num">164,937</td><td class="num">123,952</td><td><code>await SoftBodies.attach(physics)</code>, once per app (import() in soft.ts); the Wasm is inflated and compiled from it, with no file of its own</td></tr>
@@ -4962,7 +4964,7 @@
   <caption class="sr-only">Simulation and games: bytes per package entry</caption>
   <thead><tr><th scope="col">Package</th><th scope="col">Entry</th><th scope="col" class="num">Raw (B)</th><th scope="col" class="num">Min+gzip (B)</th><th scope="col">Peers on</th></tr></thead>
 <tbody data-package="@margoengine/physics">
-<tr><th scope="rowgroup" rowspan="77"><a href="./catalog/#physics">@margoengine/physics</a></th><td><code>root</code></td><td class="num">1,534,715</td><td class="num">993,424</td><td rowspan="77"><code>@margoengine/core</code>, <code>@margoengine/lines</code> (optional)<br>Installs <code>@margoengine/math</code></td></tr>
+<tr><th scope="rowgroup" rowspan="77"><a href="./catalog/#physics">@margoengine/physics</a></th><td><code>root</code></td><td class="num">1,534,541</td><td class="num">993,414</td><td rowspan="77"><code>@margoengine/core</code>, <code>@margoengine/lines</code> (optional)<br>Installs <code>@margoengine/math</code></td></tr>
 <tr><td><code>./decomposition</code></td><td class="num">26,988</td><td class="num">11,152</td></tr>
 <tr><td><code>./soft</code></td><td class="num">356,074</td><td class="num">188,159</td></tr>
 <tr><td><code>./tissue</code></td><td class="num">7,410</td><td class="num">3,154</td></tr>
@@ -4992,7 +4994,7 @@
 <tr><td><code>./flight</code></td><td class="num">33,768</td><td class="num">12,799</td></tr>
 <tr><td><code>./waves</code></td><td class="num">17,096</td><td class="num">7,548</td></tr>
 <tr><td><code>./bubbles</code></td><td class="num">6,520</td><td class="num">3,033</td></tr>
-<tr><td><code>./entry</code></td><td class="num">22,068</td><td class="num">9,429</td></tr>
+<tr><td><code>./entry</code></td><td class="num">36,117</td><td class="num">14,182</td></tr>
 <tr><td><code>./flip</code></td><td class="num">38,669</td><td class="num">13,878</td></tr>
 <tr><td><code>./sea</code></td><td class="num">36,863</td><td class="num">14,183</td></tr>
 <tr><td><code>./seakeeping</code></td><td class="num">113,171</td><td class="num">42,698</td></tr>

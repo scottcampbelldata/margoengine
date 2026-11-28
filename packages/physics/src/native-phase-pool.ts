@@ -56,7 +56,16 @@ type NativePhaseSolver =
       readonly phaseExport: 'outdoor_sound_thread_phase';
       readonly phase: 'path quadrature';
     }
-  | { readonly subject: 'Foam transport'; readonly phaseExport: 'foam_transport_thread_phase'; readonly phase: 'directional flux' };
+  | {
+      readonly subject: 'Foam transport';
+      readonly phaseExport: 'foam_transport_thread_phase';
+      readonly phase: 'directional flux';
+    }
+  | {
+      readonly subject: 'Entry profile';
+      readonly phaseExport: 'entry_profile_thread_phase';
+      readonly phase: 'section clipping';
+    };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };
 

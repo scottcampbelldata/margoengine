@@ -313,17 +313,33 @@ test('bad bodies and settings are refused, each naming its fix', () => {
   const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, bodyRows: 1 }),
     mesh = sphereMesh(1, 8, 4),
     sea = { elevation: () => 0 };
-  assert.throws(() => world.add(new EntrySolver('a'), { bodies: [], sea }), /pass them/);
-  assert.throws(() => world.add(new EntrySolver('b'), { bodies: [{ row: 0, mesh }] }), /pass \{sea\}/);
-  assert.throws(() => world.add(new EntrySolver('c'), { bodies: [{ row: -1, mesh }], sea }), RangeError);
+  const unsupported = (message) => ({ code: 'unsupported', message });
+  assert.throws(() => world.add(new EntrySolver('a'), { bodies: [], sea }), unsupported(/pass them.+#sea-entry/));
+  assert.throws(() => world.add(new EntrySolver('b'), { bodies: [{ row: 0, mesh }] }), unsupported(/pass \{sea\}.+#sea-entry/));
+  assert.throws(
+    () => world.add(new EntrySolver('c'), { bodies: [{ row: -1, mesh }], sea }),
+    unsupported(/Supply one entry per rigid body row.+#sea-entry/),
+  );
   assert.throws(
     () => world.add(new EntrySolver('d'), { bodies: [{ row: 0, mesh, contactAngle: 200 }], sea }),
-    RangeError,
+    unsupported(/pass one.+#sea-entry/),
   );
   const inward = { vertices: mesh.vertices, indices: Uint32Array.from(mesh.indices).reverse() };
   assert.throws(
     () => world.add(new EntrySolver('e'), { bodies: [{ row: 0, mesh: inward }], sea }),
-    /wind its triangles outward/,
+    unsupported(/wind its triangles outward.+#sea-entry/),
   );
-  assert.throws(() => world.add(new EntrySolver('f'), { bodies: [{ row: 0, mesh }], sea, foam: {} }), TypeError);
+  assert.throws(
+    () => world.add(new EntrySolver('f'), { bodies: [{ row: 0, mesh }], sea, foam: {} }),
+    unsupported(/pass a FoamSolver or none.+#sea-entry/),
+  );
+  const valid = { bodies: [{ row: 0, mesh }], sea };
+  assert.throws(() => world.add(new EntrySolver('g'), { ...valid, capacity: 3 }), unsupported(/Omit capacity.+#sea-entry/));
+  assert.throws(() => world.add(new EntrySolver('h'), { ...valid, level: 1.5 }), unsupported(/Use an integer.+#sea-entry/));
+  assert.throws(
+    () => world.add(new EntrySolver('i'), { ...valid, bodies: [valid.bodies[0], valid.bodies[0]] }),
+    unsupported(/invalid or repeated.+#sea-entry/),
+  );
+  mesh.vertices[0] = Infinity;
+  assert.throws(() => world.add(new EntrySolver('j'), valid), unsupported(/Supply finite body-local metres.+#sea-entry/));
 });

@@ -11460,6 +11460,15 @@ the field registry. A production Vite build preserves both lazy Wasm files.
 
 The Biomes entry reads current HYDRO-02 water through the registered soil storage field and publishes versioned branch geometry. The phase, stable parent graph, radii and in-season water sums survive snapshot restore. The SIMD shadow kernel allocates its own arena stack and has no static window. Geometry conversion uses the existing Procedural tube entry. Tests derive the apical and lateral allocation, branch angle, attenuation, and radius from the production law, then exercise drought, solid occlusion, plant competition and wasm/browser replay.
 
+### SEA-14 native water-entry section profiles
+
+The optional Physics entry profiler loads Rust Wasm with one participant by default, or uses the native worker
+pool to process disjoint cut-plane ranges. Within each plane the signed fan sum keeps the original triangle order.
+Only the accepted forces, cavity, splash events and wake sources reach the world. The regular constructor reads
+the same closed mesh with TypeScript. Invalid sampled pressure and non-representable force roll back the candidate.
+The Water tank proof draws the accepted events through ShotSplash on WebGPU and WebGL2 and checks full frame
+and world-snapshot replay. Measured slam timing, resolved curtain, surface seal and original film cuts remain open.
+
 ### SEA-13 accepted surface foam
 
 The foam solver stages coverage, breaker records and the clock before publishing the accepted fields. A Rust

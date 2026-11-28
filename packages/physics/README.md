@@ -4128,13 +4128,21 @@ seal throws a Worthington jet. `splashes()` lists what happened at the water, as
 `skip`. `seaSources()` is the water it moved this step, for a `WakeSolver`'s `sources`, so the entry and the cavity's
 collapse make their waves; pass a `FoamSolver` as `foam` for the foam it leaves.
 
+`new EntrySolver()` uses the TypeScript section profiler. `await EntrySolver.load()` uses the optional Rust Wasm
+profiler. Pass `threads: 2` or `threads: 4` to distribute section planes across the caller and real workers on Node
+or in a cross-origin-isolated browser. The default native path uses one participant. Pass `signal` to cancel loading
+and use `using` to release the pool. `workCounts()` reports the last accepted native step's geometric work.
+Keep the sea in the entry solver's origin cell. Set `originCellSize` to the world's cell side length when the rigid
+solver is in a different cell and the world uses a value other than 4096 m. An unusable sample or unrepresentable
+load rejects that entry step before it publishes forces, cavity changes, events or foam.
+
 ```ts
 import {Physics} from 'margoengine/physics';
 import {EntrySolver} from 'margoengine/physics/entry';
 import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
 
 await Physics.load();
-const physics = new Physics(null, {fixedTimestep: 1 / 960});
+using physics = new Physics(null, {fixedTimestep: 1 / 960});
 // A 25 mm steel ball dropped in at 9 m/s.
 const R = 0.0125;
 const ball = physics.addBody(null, {
@@ -4156,7 +4164,7 @@ for (let j = 0; j < 16; j++)
     if (j > 0) indices.push(a, a + 1, a + 34);
     if (j < 15) indices.push(a, a + 34, a + 33);
   }
-const entry = new EntrySolver();
+using entry = await EntrySolver.load();
 const world = new PhysicsWorld({rate: {num: 960, den: 1}})
   .add(new RigidSolver(), {physics})
   .add(entry, {bodies: [{row: ball.row, mesh: {vertices, indices}}], sea: {elevation: () => 0}, level: 4})

@@ -18,15 +18,38 @@ export interface EntryFoam {
     addFoam(min: readonly [number, number], max: readonly [number, number], whiteness?: number, persistence?: number): void;
 }
 
+export interface EntryNativeOptions {
+    readonly id?: string;
+    readonly cavityPressure?: boolean;
+    readonly threads?: number;
+    readonly signal?: AbortSignal;
+}
+
 export interface EntryParams {
     readonly bodies: readonly EntryBody[];
     readonly sea: SeaSurface | SeaQuery;
     readonly level?: RateLevel;
+    readonly originCellSize?: number;
     readonly capacity?: number;
     readonly surfaceTension?: number;
     readonly viscosity?: number;
     readonly foam?: EntryFoam;
     readonly events?: number;
+}
+
+export interface EntryProfileWorkCounts extends EntryProfileWorkerWork {
+    readonly profiles: number;
+    readonly threads: number;
+    readonly workers: readonly EntryProfileWorkerWork[];
+}
+
+export interface EntryProfileWorkerWork {
+    readonly projectedVertices: number;
+    readonly planes: number;
+    readonly triangleVisits: number;
+    readonly trianglePairs: number;
+    readonly intersectionPairs: number;
+    readonly fanPairs: number;
 }
 
 export class EntrySolver implements Solver<EntryParams> {
@@ -35,6 +58,10 @@ export class EntrySolver implements Solver<EntryParams> {
     constructor(id?: string, options?: {
         readonly cavityPressure?: boolean;
     });
+    static load(options?: EntryNativeOptions): Promise<EntrySolver>;
+    workCounts(): EntryProfileWorkCounts | undefined;
+    dispose(): void;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, params: EntryParams): void;
     step(context: StepContext, dt: number): void;

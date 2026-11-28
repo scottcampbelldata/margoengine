@@ -15542,8 +15542,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 1534715,
-        "gzip": 993424
+        "raw": 1534541,
+        "gzip": 993414
       },
       "./decomposition": {
         "raw": 26988,
@@ -15662,8 +15662,8 @@
         "gzip": 3033
       },
       "./entry": {
-        "raw": 22068,
-        "gzip": 9429
+        "raw": 36117,
+        "gzip": 14182
       },
       "./flip": {
         "raw": 38669,
@@ -20229,6 +20229,16 @@
       "raw": 2236,
       "gzip": 1169,
       "brotli": 1093
+    },
+    "packages/physics/dist/entry-profile-kernel.wasm": {
+      "raw": 3365,
+      "gzip": 1697,
+      "brotli": 1562
+    },
+    "packages/physics/dist/entry-profile-kernel-shared.wasm": {
+      "raw": 3365,
+      "gzip": 1697,
+      "brotli": 1564
     }
   },
   "splits": {
@@ -20327,8 +20337,8 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 333396,
-        "gzip": 107013
+        "raw": 333222,
+        "gzip": 107005
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",

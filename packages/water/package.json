@@ -141,6 +141,7 @@
     "@margoengine/materials": "^1.0.0"
   },
   "scripts": {
+    "test:gpu:entry-film": "cd ../.. && node packages/water/test/entry-film.browser.mjs && node packages/water/test/entry-film.browser.mjs --compat",
     "test:gpu:sea-foam-surface": "cd ../.. && node packages/water/test/sea-foam-surface.browser.mjs && node packages/water/test/sea-foam-surface.browser.mjs --compat",
     "build": "node ../../scripts/build-optional.js water",
     "test": "npm run build && node --test test/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",

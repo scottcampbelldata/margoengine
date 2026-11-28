@@ -141,6 +141,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'sea-entry',
+    title: '@margoengine/physics/entry hydrodynamic load and splash',
+    kind: 'family',
+    messages: [],
+    cause: 'A rigid body, mesh, sea query, material, pose, load, or native section-profile setting could not be used.',
+    fix: 'Use one valid rigid row per closed outward-wound mesh and supply finite local coordinates, SI material values, and finite elevation and pressure queries. Use a colocated sea and the rigid rate level. Reduce scale, density or speed when the load exceeds the rigid columns.',
+  },
+  {
     id: 'sea-foam',
     title: '@margoengine/physics/foam breaking waves and surface transport',
     kind: 'family',

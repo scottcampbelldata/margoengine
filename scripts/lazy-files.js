@@ -535,6 +535,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/entry-profile-kernel.wasm',
+    label: 'entry-profile-kernel.wasm',
+    kind: 'Rust SIMD indexed-mesh section clipping',
+    measure: 'file',
+    when: 'EntrySolver.load() from the optional /entry entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/entry-profile-kernel-shared.wasm',
+    label: 'entry-profile-kernel-shared.wasm',
+    kind: 'Rust SIMD indexed-mesh section clipping with private shared worker scratch',
+    measure: 'file',
+    when: 'EntrySolver.load() with more than one participant',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/wing-lattice-kernel.wasm',
     label: 'wing-lattice-kernel.wasm',
     kind: 'Rust SIMD wing lattice influence, circulation and induced velocity',

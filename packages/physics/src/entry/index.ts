@@ -9,8 +9,10 @@ export {
   WATER_VISCOSITY,
   type EntryBody,
   type EntryFoam,
+  type EntryNativeOptions,
   type EntryParams,
   type EntrySplash,
 } from './solver.js';
 export { CAVITY_ALPHA, cavityThreshold, constantSpeedPinch, sectionRadius2, WETTING_XI } from './cavity.js';
+export type { EntryProfileWorkCounts, EntryProfileWorkerWork } from './kernel.js';
 export { sectionArea, slam, slamProfile, wagnerRadius, type Slam, type SlamProfile } from './slam.js';

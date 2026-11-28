@@ -5547,8 +5547,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 Found by the audit in [physics-solver-audit.md](physics-solver-audit.md); each is fixed by the row's owner with a
 regression test.
 
-- **SEA-14, entry uses sea-water density whatever the water.** **Cause:** `packages/physics/src/entry/solver.ts`
-  hard-codes 1025 kg/m³ in the cavity term instead of reading the water's density.
+- **SEA-14, fixed 2026-11-28.** The crown-onset test uses the density of the sampled liquid in the Taylor–Culick
+  retraction term, which previously hard-coded 1025 kg/m³. The threshold regression in
+  `packages/physics/tests/coupling/entry.test.js` passes the same impact through 1000 and 1200 kg/m³ water and
+  observes a crown only in the denser case.
 - **SEA-01, a calibration case is used as the validation case.** **Cause:** the ST4 sheltering was calibrated at 10
   and 20 m/s and `waves.test.js` validates at 20 m/s; the held-out 30 m/s result is only in `docs/limits.md`.
 - **SEA-10, the flooding solve can stop unconverged without a word.** **Cause:**

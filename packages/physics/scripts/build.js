@@ -27,7 +27,7 @@ const exposeOptionalUrls = {
     return {
       code: code
         .replace(
-          /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|cloud-projection|vegetation|wind-traction|wing-lattice|foam-transport|accretion|room-sound|outdoor-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
+          /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|cloud-projection|vegetation|wind-traction|wing-lattice|foam-transport|entry-profile|accretion|room-sound|outdoor-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
           '',
         )
         .replace(
@@ -212,6 +212,8 @@ for (const name of ['wind-traction-kernel.wasm', 'wind-traction-kernel-shared.wa
 
 for (const name of ['foam-transport-kernel.wasm', 'foam-transport-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/foam', name), resolve(dist, name));
+for (const name of ['entry-profile-kernel.wasm', 'entry-profile-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/entry', name), resolve(dist, name));
 
 for (const name of ['wing-lattice-kernel.wasm', 'wing-lattice-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/flight', name), resolve(dist, name));

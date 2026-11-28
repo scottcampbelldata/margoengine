@@ -15970,6 +15970,33 @@ Published and calibrated constants:
 | Jet speed / entry speed | 9.85 | Gekle and Gordillo 2010, golf ball | Calibrated on that one sphere; their disc threw 12.3 times (20 percent above). No other measurement found to validate it on; uncertainty some 25 percent. |
 | Sheet thickness | 0.2 mm | Aristoff and Bush 2009 | Published, one case |
 
+#### Native section geometry and independent impulse checks (SEA-14, 2026-11-28)
+
+The native profiler implements the projected cut-section area used to recover the axisymmetric shape in
+the Wagner condition. Each plane clips the original triangles, sums signed fan projections in input
+order, and supplies its area to the existing radius calculation. Rust preprojects vertex positions
+and packs two independent planes per f64x2 operation. No horizontal SIMD reduction changes the sum order.
+The penetration and pressure still use eqs. 3.2–3.3 and 2.17–2.19 from
+[Hulin, Tassin and Korobkin, 2022, *Gravity effects in two-dimensional and axisymmetric water impact models*](https://doi.org/10.1017/jfm.2022.448).
+The crown threshold uses the local liquid density in the sheet retraction speed from
+[Aristoff and Bush, 2009, *Water entry of small hydrophobic spheres*](https://thales.mit.edu/bush/wp-content/uploads/2012/09/aristoff-splash.pdf).
+
+`node packages/physics/scripts/sea14-entry-measured.mjs` uses the published geometry, density ratio,
+entry speed and sample rate of the plain 50 mm sphere, Figure 3(c) and §3 in
+[Speirs, Belden, Pan, Holekamp, Badlissi, Jones and Truscott, 2019, *The water entry of a sphere in a jet*](https://doi.org/10.1017/jfm.2018.931).
+No measured outcome tunes the solver. Its impulse from contact to descending half-peak is 0.04520 of
+entry momentum versus 0.067 ± 0.003 measured. The 1 kHz aperture-phase diagnostic gives 0.03750–0.04414.
+A separate coarse read from the authors’ published figure puts descending half-peak at 4.3 ± 1 ms versus
+1.98 ms modelled. Integrating the model to a fixed 4.3 ms gives 0.07260, so the short modelled pulse
+matters to the impulse discrepancy. Mesh and step refinement and an analytic sphere profile did not
+close the gap.
+
+The same script can take the authors’ pinned CSV for the nominal 4 m/s, 22.23 mm hemispherical nose
+from Figure 3(b) of [Antolik, Belden, Speirs and Harris, 2023, *Slamming forces during water entry of a simple harmonic oscillator*](https://doi.org/10.1017/jfm.2023.820).
+It checks the digest before reading the external replicate means and standard deviations. At one nose
+radius divided by nominal speed the model integrates 0.01823 of initial body momentum versus 0.01560
+measured (+16.8%). No data are embedded in the package and the measurements are separate from the model.
+
 ## Rooted plants in wind and water (`@margoengine/physics/vegetation`, BIO-01)
 
 `vegetation/model.ts` and `vegetation-kernel/src/lib.rs` were written from the following sources without companion

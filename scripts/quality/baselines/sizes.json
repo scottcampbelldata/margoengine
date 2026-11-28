@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21913589,
+  "total": 21918485,
   "history": [
     {
       "date": "2026-10-24",
@@ -15598,7 +15598,8 @@
       "date": "2026-11-28",
       "commit": "tintres1-shutter-masks",
       "reason": "KB-SHOT-SHUTTERMASK1: T6 reads only ground its masks cover whole (255), as the shot tool's masks now follow the shutter: headless/look 19,492 to 19,498 B gzip measured (ceiling 19492 to 19498). One threshold argument on the shared mask helper; a second entry would repeat the ground strata.",
-      "grew": 1    },
+      "grew": 1
+    },
     {
       "date": "2026-11-28",
       "commit": "tintres1-over-mask",
@@ -15682,6 +15683,12 @@
       "commit": "0970c1b3b5",
       "reason": "Nine entries c17577b174, ff7f5b428e, e11607a717 and 8d0541325a grew, measured at each parent and on main. c17577b174 (IK obeys a fitted body's anatomy: elbows and knees folded backwards on the human demos): animator 20,315 to 24,549 B, animator/warping 4,525 to 7,709, animator/fbik 5,222 to 8,934, the new animator/ik 4,497, rigging/ik 4,623 to 5,436. The ranges are on by default in synchronous per-frame solvers, so a lazy import() would solve the first frames without them; a table of solvers that setAnatomy installs would spare only rigs with no body in warping and full-body IK, add an indirect call to every limb solve and leave the root entry, which exports setAnatomy, the same size. spline-ik, which moves no limb, was cut back to 2,826 B instead (KB-SIZE-SPLINEANATOMY1). ff7f5b428e (grass clumps grow as bunchgrass tussocks with cured blades and measured colour): scatter/grass 2,627 to 3,047; a separate tussock entry would copy the blade generator and shader to save about 400 B. e11607a717 (a pixel mostly covered by a blended blade takes the blade's motion, for TAA and motion blur): scatter/velocity 3,768 to 3,961; the second draw is the fix and on by default. 8d0541325a (coniferAge throws a coded error linked to the docs): biomes/presets 3,087 to 3,136; no split for 49 B.",
       "grew": 8
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "sea-14-native-entry-profile",
+      "reason": "SEA-14 @margoengine/physics/entry 9429 to 14182 B gzip, @margoengine/physics 993424 to 993414 B gzip, @margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table)) 107013 to 107005 B gzip, @margoengine/physics/entry 9712 to 14608 B ceiling. The entry retains the guarded transaction for forces, cavity and splashes and the optional native section profiler hooks. A second public entry would repeat the same scalar model and accepted-state contract; both Wasm assets remain lazy. Core and stage are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16557,7 +16564,7 @@
     "@margoengine/physics/dfsph": 8136,
     "@margoengine/physics/drainage-fog": 8228,
     "@margoengine/physics/earth": 3456,
-    "@margoengine/physics/entry": 9712,
+    "@margoengine/physics/entry": 14608,
     "@margoengine/physics/explosive": 15583,
     "@margoengine/physics/falling": 6163,
     "@margoengine/physics/flight": 13184,

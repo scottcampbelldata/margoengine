@@ -28,11 +28,11 @@
 //
 // State: per body, its phase, where and how it went in, its cavity's sections and its events; snapshot, restore and hash
 // with the world.
-import { MargoError } from '@margoengine/math/errors';
 import type { SeaSource, SeaSurface, SeaSurfaceSample } from '@margoengine/math/fields';
 import { hypot, ln, pow } from '@margoengine/math/pinned';
 import {
   type FieldDescriptor,
+  isRateLevel,
   type Port,
   type RateLevel,
   type Region,
@@ -43,14 +43,38 @@ import {
   type StepContext,
 } from '../world/solver.js';
 import { regionWords } from '../world/memory.js';
-import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
-import { type HullMesh, type SeaQuery, wettedLoads, type WettedLoads } from '../seakeeping/wetted.js';
+import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, FORCE_WORDS } from '../world/solvers/rigid.js';
+import { SEA_WATER, type HullMesh, type SeaQuery, wettedLoads, type WettedLoads } from '../seakeeping/wetted.js';
 import { entryCavityField, ENTRY_CAVITY_LAYOUT, ENTRY_CAVITY_WORDS } from './cavity-port.js';
 import { CAVITY_ALPHA, cavityThreshold, constantSpeedPinch, SECTION_WORDS, sectionRadius2 } from './cavity.js';
+import { entryError } from './errors.js';
+import { loadEntryProfileKernel, type EntryProfileKernel, type EntryProfileWorkCounts } from './kernel.js';
 import { slam, slamProfile, type Slam } from './slam.js';
 
 type Vec3 = readonly [number, number, number];
 type V3 = [number, number, number];
+type FoamPatch = [min: [number, number], max: [number, number], whiteness: number];
+
+interface EntryStep {
+  readonly forces: Float64Array;
+  readonly cavity?: Float64Array;
+  readonly state: Float64Array;
+  readonly sections: Float64Array;
+  readonly log: Float64Array;
+  readonly foam: FoamPatch[];
+}
+
+/** Native section profiling for {@link EntrySolver.load}. */
+export interface EntryNativeOptions {
+  /** Solver identifier (default 'entry'). */
+  readonly id?: string;
+  /** Adds the observer cavity pressure field (default false). */
+  readonly cavityPressure?: boolean;
+  /** Total participants, including the caller (default 1). Multi-worker browsers need cross-origin isolation. */
+  readonly threads?: number;
+  /** Cancel loading the Wasm module and worker pool. */
+  readonly signal?: AbortSignal;
+}
 
 /** A body that may go into the water: its kernel body row, its closed surface in the body's frame (wound outward). */
 export interface EntryBody {
@@ -83,6 +107,8 @@ export interface EntryParams {
   readonly sea: SeaSurface | SeaQuery;
   /** The solver's rate level, 60 * 2^level steps a second (default 0); step with the rigid solver. */
   readonly level?: RateLevel;
+  /** Side length of an origin cell, m (default 4096). Match PhysicsWorld.cellSize for distinct rigid and entry cells. */
+  readonly originCellSize?: number;
   /**
    * Body rows its `bodyForces` port covers: the world's (`PhysicsWorld.bodyRows`, the rigid world's capacity), which it reads;
    * given, it must be the same.
@@ -175,12 +201,16 @@ export class EntrySolver implements Solver<EntryParams> {
   private bodies: readonly EntryBody[] = [];
   private sea: SeaSurface | SeaQuery | null = null;
   private level: RateLevel = 0;
-  private capacity = 0;
+  private originCellSize = 4096;
   private forces: Region | null = null;
   private cavityPressure: Region | null = null;
   private state: Region | null = null;
   private sections: Region | null = null;
   private log: Region | null = null;
+  private candidate: EntryStep | null = null;
+  private native: EntryProfileKernel | null = null;
+  private acceptedWork: EntryProfileWorkCounts | undefined;
+  private disposed = false;
   private eventCount = 64;
   private gamma = WATER_SURFACE_TENSION;
   private mu = WATER_VISCOSITY;
@@ -204,7 +234,7 @@ export class EntrySolver implements Solver<EntryParams> {
     velocity: [0, 0, 0],
     current: [0, 0, 0],
     depth: Infinity,
-    density: 1025,
+    density: SEA_WATER,
   };
 
   /** Open air cavity directions for observer bodies. Enable this field with the cavityPressure option. */
@@ -215,6 +245,30 @@ export class EntrySolver implements Solver<EntryParams> {
     private readonly options: { readonly cavityPressure?: boolean } = {},
   ) {
     this.cavityPressureField = entryCavityField(id);
+  }
+
+  /** Make a solver with optional native section profiles. The regular constructor uses TypeScript. */
+  static async load(options: EntryNativeOptions = {}): Promise<EntrySolver> {
+    const solver = new EntrySolver(options.id, { cavityPressure: options.cavityPressure });
+    solver.native = await loadEntryProfileKernel({ threads: options.threads, signal: options.signal });
+    return solver;
+  }
+
+  /** Deterministic work of the last accepted native step, or undefined before any native step. */
+  workCounts(): EntryProfileWorkCounts | undefined {
+    return this.acceptedWork;
+  }
+
+  /** Release the optional native participant pool. */
+  dispose(): void {
+    this.native?.close();
+    this.native = null;
+    this.disposed = true;
+  }
+
+  /** Release the optional native participant pool with `using`. */
+  [Symbol.dispose](): void {
+    this.dispose();
   }
 
   describe(): SolverDescription {
@@ -231,64 +285,84 @@ export class EntrySolver implements Solver<EntryParams> {
   }
 
   /**
-   * @throws TypeError without bodies or a sea; RangeError for a body row, mesh, contact angle, capacity, surface tension,
-   * viscosity or event count out of range, each naming the fix.
+   * @throws A coded error for an invalid body, sea, mesh, rate, capacity, material or event count.
    */
   init(host: SolverHost, params: EntryParams): void {
+    if (this.disposed) throw entryError('disposed', 'This entry solver was disposed. Create and add a new EntrySolver.');
     const { bodies, sea, level = 0 } = params ?? ({} as EntryParams);
     if (!Array.isArray(bodies) || bodies.length === 0)
-      throw new TypeError(
+      throw entryError(
+        'unsupported',
         'An EntrySolver takes one or more bodies; pass them: world.add(new EntrySolver(), {bodies: [{row, mesh}], sea}).',
       );
     if (!sea || typeof sea.elevation !== 'function')
-      throw new TypeError('An EntrySolver needs the water, a sea with elevation(x, z, t); pass {sea}.');
+      throw entryError('unsupported', 'An EntrySolver needs the water, a sea with elevation(x, z, t); pass {sea}.');
+    if (!isRateLevel(level))
+      throw entryError('unsupported', 'The entry rate level is invalid. Use an integer from 0 to 7 matching the rigid solver.');
+    const originCellSize = params.originCellSize ?? 4096;
+    if (!(originCellSize > 0 && Number.isFinite(originCellSize)))
+      throw entryError('unsupported', 'The entry origin cell size is invalid. Use the world’s positive cellSize in metres.');
+    if (sea.density !== undefined && !(sea.density > 0 && Number.isFinite(sea.density)))
+      throw entryError('unsupported', 'The sea density is invalid. Supply finite positive kilograms per cubic metre.');
+    if (sea.pressure !== undefined && typeof sea.pressure !== 'function')
+      throw entryError('unsupported', 'The sea pressure query is invalid. Supply a pressure function or omit it.');
+    const seen = new Set<number>();
     for (const body of bodies) {
-      if (!(Number.isInteger(body.row) && body.row >= 0))
-        throw new RangeError(`A body's row is a kernel body row (got ${body.row}); pass a whole number of 0 or more.`);
+      if (!body || !(Number.isSafeInteger(body.row) && body.row >= 0) || seen.has(body.row))
+        throw entryError('unsupported', `Body row ${body?.row} is invalid or repeated. Supply one entry per rigid body row.`);
+      seen.add(body.row);
       const { vertices, indices } = body.mesh ?? {};
       if (!vertices || !indices || vertices.length % 3 !== 0 || indices.length % 3 !== 0 || indices.length === 0)
-        throw new RangeError(
+        throw entryError(
+          'unsupported',
           "A body's mesh is not whole; pass vertices (three numbers each) and triangles (three indices each, wound outward).",
         );
+      for (let k = 0; k < vertices.length; k++)
+        if (!Number.isFinite(vertices[k]))
+          throw entryError('unsupported', `Entry vertex word ${k} is invalid. Supply finite body-local metres.`);
       for (let k = 0; k < indices.length; k++)
         if (!(Number.isInteger(indices[k]) && indices[k]! >= 0 && indices[k]! < vertices.length / 3))
-          throw new RangeError(
+          throw entryError(
+            'unsupported',
             `Body triangle index ${indices[k]} names no vertex of the ${vertices.length / 3}; keep each index under the vertex count.`,
           );
       const angle = body.contactAngle ?? 30;
       if (!(angle >= 0 && angle <= 180))
-        throw new RangeError(`A contact angle is 0 to 180 degrees (got ${angle}); pass one.`);
+        throw entryError('unsupported', `A contact angle is 0 to 180 degrees (got ${angle}); pass one.`);
     }
-    const capacity = bodyRowsOf(
-      host,
-      'An EntrySolver',
-      bodies.map((b) => b.row),
-      params.capacity,
-    );
+    const capacity = host.bodyRows();
+    if (params.capacity !== undefined && params.capacity !== capacity)
+      throw entryError('unsupported', `Entry capacity differs from the world's ${capacity} rows. Omit capacity or match the world.`);
+    for (const row of seen)
+      if (row >= capacity)
+        throw entryError('unsupported', `Entry body row ${row} exceeds the world's ${capacity} rows. Use a rigid body in this world.`);
     const gamma = params.surfaceTension ?? WATER_SURFACE_TENSION,
       mu = params.viscosity ?? WATER_VISCOSITY,
       events = params.events ?? 64;
     if (!(gamma > 0 && Number.isFinite(gamma)))
-      throw new RangeError(`Surface tension is a finite number of N/m above 0 (got ${gamma}); pass one.`);
+      throw entryError('unsupported', `Surface tension is a finite number of N/m above 0 (got ${gamma}); pass one.`);
     if (!(mu > 0 && Number.isFinite(mu)))
-      throw new RangeError(`Viscosity is a finite number of Pa s above 0 (got ${mu}); pass one.`);
+      throw entryError('unsupported', `Viscosity is a finite number of Pa s above 0 (got ${mu}); pass one.`);
+    if (!Number.isFinite(gamma / mu))
+      throw entryError('unsupported', 'Surface tension divided by viscosity overflows. Use the liquid’s SI values.');
     if (!(Number.isInteger(events) && events >= 1 && events <= 4096))
-      throw new RangeError(`An EntrySolver keeps 1 to 4096 events (got ${events}); pass a whole number.`);
+      throw entryError('unsupported', `An EntrySolver keeps 1 to 4096 events (got ${events}); pass a whole number.`);
     if (params.foam !== undefined && typeof params.foam?.addFoam !== 'function')
-      throw new TypeError('Foam goes through addFoam(min, max, whiteness, persistence); pass a FoamSolver or none.');
+      throw entryError('unsupported', 'Foam goes through addFoam(min, max, whiteness, persistence); pass a FoamSolver or none.');
     const [gx, gy, gz] = host.gravity;
     this.g = hypot(gx, gy, gz);
-    if (!(this.g > 0)) throw new RangeError('Water entry needs gravity; give the world a gravity above 0.');
+    if (!(this.g > 0 && Number.isFinite(this.g)))
+      throw entryError('unsupported', 'Water entry needs gravity; give the world a finite gravity magnitude above 0.');
+    this.shapes = bodies.map((b) => shapeOf(b.mesh));
     this.host = host;
     this.bodies = bodies;
     this.sea = sea;
     this.level = level;
-    this.capacity = capacity;
+    this.originCellSize = originCellSize;
     this.gamma = gamma;
     this.mu = mu;
     this.foam = params.foam;
     this.eventCount = events;
-    this.shapes = bodies.map((b) => shapeOf(b.mesh));
     this.forces = host.allocate(`${this.id}:forces`, capacity * FORCE_WORDS * 8, 'f64', ENTRY_LAYOUT);
     if (this.options.cavityPressure)
       this.cavityPressure = host.allocate(
@@ -306,75 +380,133 @@ export class EntrySolver implements Solver<EntryParams> {
     );
     // The event ring: how many were ever written, then the events.
     this.log = host.allocate(`${this.id}:events`, (1 + events * EVENT_WORDS) * 8, 'f64', ENTRY_LAYOUT);
+    this.candidate = {
+      forces: new Float64Array(capacity * FORCE_WORDS),
+      cavity: this.cavityPressure ? new Float64Array(capacity * ENTRY_CAVITY_WORDS) : undefined,
+      state: new Float64Array(bodies.length * STATE_WORDS),
+      sections: new Float64Array(bodies.length * SECTIONS * SECTION_WORDS),
+      log: new Float64Array(1 + events * EVENT_WORDS),
+      foam: [],
+    };
   }
 
   private words(region: Region | null): Float64Array {
     if (!this.host || !region)
-      throw new MargoError('state', 'EntrySolver is not in a world yet; add it with world.add(solver, {bodies, sea}).');
+      throw entryError('state', 'EntrySolver is not in a world yet; add it with world.add(solver, {bodies, sea}).');
     return regionWords(this.host.memory, region) as Float64Array;
   }
 
   private sample(x: number, z: number, t: number): SeaSurfaceSample {
     const sea = this.sea!,
       s = this.surface;
-    if ('sample' in sea && typeof sea.sample === 'function') return sea.sample(x, z, t, s);
+    if ('sample' in sea && typeof sea.sample === 'function') {
+      const value = sea.sample(x, z, t, s);
+      if (
+        !value ||
+        !Number.isFinite(value.height) ||
+        !finite3(value.normal) ||
+        !finite3(value.velocity) ||
+        value.normal[1] <= 0 ||
+        Math.abs(value.normal[0] * value.normal[0] + value.normal[1] * value.normal[1] + value.normal[2] * value.normal[2] - 1) >
+          1e-5 ||
+        !(value.density > 0 && Number.isFinite(value.density))
+      )
+        throw entryError(
+          'failed',
+          'The sea returned an unusable entry sample. Return finite height and velocity, an upward unit normal and positive finite density.',
+        );
+      return value;
+    }
     // A sea of heights alone: the normal from its slope, the water still.
     const e = 0.05,
-      h = sea.elevation(x, z, t),
-      sx = (sea.elevation(x + e, z, t) - sea.elevation(x - e, z, t)) / (2 * e),
-      sz = (sea.elevation(x, z + e, t) - sea.elevation(x, z - e, t)) / (2 * e),
+      h = elevationOf(sea, x, z, t),
+      sx = (elevationOf(sea, x + e, z, t) - elevationOf(sea, x - e, z, t)) / (2 * e),
+      sz = (elevationOf(sea, x, z + e, t) - elevationOf(sea, x, z - e, t)) / (2 * e),
       n = hypot(sx, 1, sz);
+    if (!Number.isFinite(n))
+      throw entryError('failed', 'The elevation gradient overflowed. Return nearby elevations in local metres.');
     s.height = h;
     s.normal[0] = -sx / n;
     s.normal[1] = 1 / n;
     s.normal[2] = -sz / n;
     s.velocity[0] = s.velocity[1] = s.velocity[2] = 0;
-    s.density = sea.density ?? 1025;
+    s.density = sea.density ?? SEA_WATER;
+    if (!(s.density > 0 && Number.isFinite(s.density)))
+      throw entryError('failed', 'The sea returned an invalid density. Supply finite positive kilograms per cubic metre.');
     return s;
   }
 
   step(context: StepContext, dt: number): void {
-    const host = this.host;
-    if (!host || !this.sea || !this.forces)
-      throw new MargoError('state', 'EntrySolver is not in a world yet; add it with world.add(solver, {bodies, sea}).');
+    void dt;
+    const host = this.host,
+      candidate = this.candidate;
+    if (this.disposed) throw entryError('disposed', 'This entry solver was disposed. Create and add a new EntrySolver.');
+    if (!host || !this.sea || !candidate)
+      throw entryError('state', 'EntrySolver is not in a world yet; add it with world.add(solver, {bodies, sea}).');
     const cell = (this.sea as Partial<SeaSurface>).cell;
     if (cell && (cell[0] !== context.cell[0] || cell[1] !== context.cell[1] || cell[2] !== context.cell[2]))
-      throw new MargoError(
+      throw entryError(
         'state',
         `The sea's origin cell is [${cell.join(', ')}] and the EntrySolver's is [${context.cell.join(', ')}]; make the sea in the solver's cell.`,
       );
-    const out = this.words(this.forces);
-    out.fill(0);
-    const cavity = this.cavityPressure ? this.words(this.cavityPressure) : undefined;
-    cavity?.fill(0);
     const port: Port | undefined = context.inputs.get(BODIES_FIELD.name);
-    const state = this.words(this.state);
-    for (let b = 0; b < this.bodies.length; b++) state[b * STATE_WORDS + SOURCE_V] = 0;
-    if (!port) return;
-    const memory = port.region.memory ?? host.memory,
-      rows = new Float32Array(memory.buffer, port.region.byteOffset, port.region.byteLength / 4),
-      t = (context.tick + 0.5) / rateOf(context.level);
-    void dt;
-    for (let b = 0; b < this.bodies.length; b++) {
-      const body = this.bodies[b]!,
-        at = body.row * BODY_WORDS;
-      if (at + BODY_WORDS > rows.length || rows[at + 23] !== 1) continue;
-      this.stepBody(b, body, rows, at, t, 1 / rateOf(context.level), out, cavity);
+    candidate.forces.fill(0);
+    candidate.cavity?.fill(0);
+    candidate.state.set(this.words(this.state));
+    candidate.sections.set(this.words(this.sections));
+    candidate.log.set(this.words(this.log));
+    candidate.foam.length = 0;
+    this.native?.resetWork();
+    for (let b = 0; b < this.bodies.length; b++) candidate.state[b * STATE_WORDS + SOURCE_V] = 0;
+    if (port) {
+      const memory = port.region.memory ?? host.memory,
+        rows = new Float32Array(memory.buffer, port.region.byteOffset, port.region.byteLength / 4),
+        rate = rateOf(context.level),
+        t = (context.tick + 0.5) / rate,
+        rigidOffset: V3 = [
+          (port.cell[0] - context.cell[0]) * this.originCellSize,
+          (port.cell[1] - context.cell[1]) * this.originCellSize,
+          (port.cell[2] - context.cell[2]) * this.originCellSize,
+        ];
+      for (let b = 0; b < this.bodies.length; b++) {
+        const body = this.bodies[b]!,
+          at = body.row * BODY_WORDS;
+        if (at + BODY_WORDS > rows.length || rows[at + 23] !== 1) continue;
+        this.stepBody(candidate, b, body, rows, at, rigidOffset, t, 1 / rate);
+      }
     }
+    if (
+      !candidate.state.every(Number.isFinite) ||
+      !candidate.sections.every(Number.isFinite) ||
+      !candidate.log.every(Number.isFinite) ||
+      (candidate.cavity && !candidate.cavity.every(Number.isFinite))
+    )
+      throw entryError(
+        'failed',
+        'Water entry would publish an unrepresentable load, event or cavity. Check the mesh scale, liquid density and relative speed.',
+      );
+    const work = this.native?.workCounts();
+    this.words(this.forces).set(candidate.forces);
+    if (candidate.cavity) this.words(this.cavityPressure).set(candidate.cavity);
+    this.words(this.state).set(candidate.state);
+    this.words(this.sections).set(candidate.sections);
+    this.words(this.log).set(candidate.log);
+    this.acceptedWork = work;
+    for (const patch of candidate.foam) this.foam!.addFoam(...patch);
   }
 
   private stepBody(
+    candidate: EntryStep,
     b: number,
     body: EntryBody,
     rows: Float32Array,
     at: number,
+    rigidOffset: Vec3,
     t: number,
     dt: number,
-    out: Float64Array,
-    cavity?: Float64Array,
   ) {
+    const { state, forces: out, cavity } = candidate;
     const sea = this.sea!,
-      state = this.words(this.state),
       s = b * STATE_WORDS,
       shape = this.shapes[b]!,
       // The pose at the middle of the step, carried on by the body's velocity and spin (as the hull solver takes it).
@@ -383,7 +515,11 @@ export class EntrySolver implements Solver<EntryParams> {
       half = dt / 2,
       start = [rows[at + 3]!, rows[at + 4]!, rows[at + 5]!, rows[at + 6]!] as const,
       q = turn(start, spin, half),
-      centre: V3 = [rows[at + 7]! + v[0] * half, rows[at + 8]! + v[1] * half, rows[at + 9]! + v[2] * half],
+      centre: V3 = [
+        rows[at + 7]! + rigidOffset[0] + v[0] * half,
+        rows[at + 8]! + rigidOffset[1] + v[1] * half,
+        rows[at + 9]! + rigidOffset[2] + v[2] * half,
+      ],
       offset = rotate(
         q,
         rotate(
@@ -395,21 +531,27 @@ export class EntrySolver implements Solver<EntryParams> {
       { vertices, indices } = body.mesh,
       count = vertices.length / 3,
       world = new Float64Array(vertices.length);
+    if (!centre.every(Number.isFinite) || !q.every(Number.isFinite) || !origin.every(Number.isFinite))
+      throw entryError('failed', 'An active rigid pose is invalid. Supply finite local positions, velocities and rotation.');
     for (let i = 0; i < count; i++) {
       const p = rotate(q, [vertices[3 * i]!, vertices[3 * i + 1]!, vertices[3 * i + 2]!]);
       world[3 * i] = p[0] + origin[0];
       world[3 * i + 1] = p[1] + origin[1];
       world[3 * i + 2] = p[2] + origin[2];
     }
+    if (!world.every(Number.isFinite))
+      throw entryError('failed', 'A transformed entry vertex overflowed. Use finite body-local coordinates and a local cell.');
     // The local surface under the body: its height, normal and the water's velocity.
     const surf = this.sample(centre[0], centre[2], t),
-      rho = surf.density > 0 ? surf.density : (sea.density ?? 1025),
+      rho = surf.density,
       n: V3 = [surf.normal[0], surf.normal[1], surf.normal[2]],
       surfaceHeight = surf.height,
       p0: V3 = [centre[0], surf.height, centre[2]],
       level = n[0] * p0[0] + n[1] * p0[1] + n[2] * p0[2],
       vr: V3 = [v[0] - surf.velocity[0], v[1] - surf.velocity[1], v[2] - surf.velocity[2]],
       speed = hypot(vr[0], vr[1], vr[2]);
+    if (!Number.isFinite(level) || !Number.isFinite(speed))
+      throw entryError('failed', 'The entry plane or relative speed overflowed. Use local metres and finite SI velocities.');
     let lowest = Infinity,
       highest = -Infinity,
       lowestAt = 0;
@@ -427,7 +569,7 @@ export class EntrySolver implements Solver<EntryParams> {
       vn = -(vr[0] * n[0] + vr[1] * n[1] + vr[2] * n[2]);
     // Out of the water: nothing to hold, but an exit or a skip as it leaves.
     if (h <= 0) {
-      if (phase !== 0) this.leave(b, body, state, s, t, centre, vr, speed, vn, n, surf.height);
+      if (phase !== 0) this.leave(candidate, body, s, t, centre, vr, speed, vn, surf.height);
       state[s + PHASE] = 0;
       if (!body.effectsOnly) this.displace(state, s, 0, centre);
       return;
@@ -437,10 +579,10 @@ export class EntrySolver implements Solver<EntryParams> {
       // In from the air, or back in after breaking out, its centre coming down through the surface (a breaching whale
       // falling back on its flank): an entry.
       state[s + EMERGED] = 0;
-      this.enter(b, body, state, s, t, world, indices, n, surfaceHeight, centre, vr, speed, vn);
+      this.enter(candidate, body, s, t, world, indices, n, surfaceHeight, centre, vr, speed, vn, rho);
     } else if (phase === 2 && !under && vn < 0) {
       // Out from under through the surface: the exit, the water riding up on it.
-      this.breach(b, body, state, s, t, world, indices, centre, vr, speed, vn, surfaceHeight);
+      this.breach(candidate, body, s, t, world, indices, centre, vr, speed, vn, surfaceHeight);
     }
     if (state[s + SUBMERGED_ONCE] === 1 && centreUp) state[s + EMERGED] = 1;
     state[s + PHASE] = under ? 2 : 1;
@@ -448,7 +590,7 @@ export class EntrySolver implements Solver<EntryParams> {
     const R0 = state[s + ENTRY_RADIUS]!;
     // The cavity: sections opened as the widest section passes, and the pinch.
     let cavityVolume = 0;
-    if (state[s + CAVITY] === 1) cavityVolume = this.cavity(b, state, s, t, centre, speed, R0, surfaceHeight);
+    if (state[s + CAVITY] === 1) cavityVolume = this.cavity(candidate, b, s, t, centre, speed, R0, surfaceHeight);
     const open = state[s + CAVITY] === 1;
     // The sea's pressure over the wetted surface, the air's inside an open cavity: behind the plane through the centre
     // across the body's motion (its widest section, where the contact line is pinned).
@@ -457,16 +599,13 @@ export class EntrySolver implements Solver<EntryParams> {
       if (open && cavity) cavity.set([1, ...ahead], body.row * ENTRY_CAVITY_WORDS);
       return;
     }
-    const seaQuery: SeaQuery = open
-        ? {
-            elevation: (x, z, tt) => sea.elevation(x, z, tt),
-            pressure: (x, y, z, tt) =>
-              (x - centre[0]) * ahead[0] + (y - centre[1]) * ahead[1] + (z - centre[2]) * ahead[2] < 0
-                ? 0
-                : pressureOf(sea, x, y, z, tt, rho, this.g),
-            density: rho,
-          }
-        : sea,
+    const seaQuery: SeaQuery = {
+        elevation: (x, z, tt) => elevationOf(sea, x, z, tt),
+        pressure: (x, y, z, tt) =>
+          open && (x - centre[0]) * ahead[0] + (y - centre[1]) * ahead[1] + (z - centre[2]) * ahead[2] < 0
+            ? 0
+            : pressureOf(sea, x, y, z, tt, rho, this.g),
+      },
       loads = wettedLoads(body.mesh, { position: origin, rotation: q }, seaQuery, t, centre, this.loads),
       force: V3 = [loads.force[0], loads.force[1], loads.force[2]],
       torque: V3 = [loads.torque[0], loads.torque[1], loads.torque[2]];
@@ -522,8 +661,8 @@ export class EntrySolver implements Solver<EntryParams> {
     // The slam, while the wetted radius is inside the widest section across the normal.
     let slamMass = 0;
     if (vn > 0 && state[s + SUBMERGED_ONCE] === 0) {
-      const profile = slamProfile(world, indices, n, lowest, Math.min(highest - lowest, 3.5 * h), PROFILE_LEVELS),
-        widest = slamProfile(world, indices, n, lowest, highest - lowest, PROFILE_LEVELS).radii[PROFILE_LEVELS]!,
+      const profile = this.profile(world, indices, n, lowest, Math.min(highest - lowest, 3.5 * h)),
+        widest = this.profile(world, indices, n, lowest, highest - lowest).radii[PROFILE_LEVELS]!,
         sl = slam(profile, h, vn, rho, this.slamOut);
       if (sl.c < widest * (1 - 1e-6)) {
         slamMass = sl.addedMass;
@@ -558,6 +697,8 @@ export class EntrySolver implements Solver<EntryParams> {
     }
     const w = body.row * FORCE_WORDS,
       held = mass < Infinity ? carried(mass, A, force, this.host!.gravity) : force;
+    if (![...held, ...torque].every((value) => Number.isFinite(Math.fround(value))))
+      throw entryError('failed', 'The entry force exceeds the rigid columns. Reduce the body scale, density or relative speed.');
     out[w]! += held[0];
     out[w + 1]! += held[1];
     out[w + 2]! += held[2];
@@ -570,9 +711,8 @@ export class EntrySolver implements Solver<EntryParams> {
 
   /** It meets the water: the entry event, its widest radius, its cavity if it is fast enough, and foam. */
   private enter(
-    b: number,
+    candidate: EntryStep,
     body: EntryBody,
-    state: Float64Array,
     s: number,
     t: number,
     world: Float64Array,
@@ -583,10 +723,12 @@ export class EntrySolver implements Solver<EntryParams> {
     vr: V3,
     speed: number,
     vn: number,
+    rho: number,
   ): void {
+    const { state, log } = candidate;
     const ahead: V3 = speed > 0 ? [vr[0] / speed, vr[1] / speed, vr[2] / speed] : [-n[0], -n[1], -n[2]],
       // The widest radius across its path (the section across its motion).
-      span = spanOf(world, indices, ahead),
+      span = this.spanOf(world, indices, ahead),
       sine = speed > 0 ? Math.max(0, vn) / speed : 0,
       threshold = cavityThreshold(((body.contactAngle ?? 30) * Math.PI) / 180, this.gamma, this.mu),
       cavity = vn > threshold && sine > 0.5,
@@ -595,7 +737,7 @@ export class EntrySolver implements Solver<EntryParams> {
       // as the body grazes (Margo's sqrt(sine), as ShotSplash takes it); under the sheet's retraction speed
       // sqrt(2 gamma / (rho delta)), delta = 0.2 mm (J. M. Aristoff and J. W. M. Bush, J. Fluid Mech. 619, 2009), none.
       sheet = Math.sqrt(CAVITY_ALPHA) * speed * Math.sqrt(sine),
-      crown = sheet > Math.sqrt((2 * this.gamma) / (1025 * 2e-4)) ? sheet : 0;
+      crown = sheet > Math.sqrt((2 * this.gamma) / (rho * 2e-4)) ? sheet : 0;
     state[s + ENTRY_TIME] = t;
     state[s + ENTRY_X] = centre[0];
     state[s + ENTRY_X + 1] = contact;
@@ -618,7 +760,7 @@ export class EntrySolver implements Solver<EntryParams> {
     state[s + LAST_X + 2] = centre[2];
     if (!(vn > 0)) return;
     this.event(
-      b,
+      log,
       body.row,
       'entry',
       t,
@@ -628,47 +770,40 @@ export class EntrySolver implements Solver<EntryParams> {
       sine,
       span,
       crown,
-      dropHeight(crown, CROWN_DROP_FALL),
+      dropHeight(crown, CROWN_DROP_FALL, this.g),
       0,
       0,
       cavity,
     );
-    if (crown > 0)
-      this.foam?.addFoam(
-        [centre[0] - 2.5 * span, centre[2] - 2.5 * span],
-        [centre[0] + 2.5 * span, centre[2] + 2.5 * span],
-        1,
-      );
+    if (crown > 0) this.addFoam(candidate, centre, 2.5 * span, 1);
   }
 
   /** It leaves the water: an exit (it was under) or a skip (it glanced off). */
   private leave(
-    b: number,
+    candidate: EntryStep,
     body: EntryBody,
-    state: Float64Array,
     s: number,
     t: number,
     centre: V3,
     vr: V3,
     speed: number,
     vn: number,
-    n: V3,
     height: number,
   ): void {
-    void n;
+    const { state, log } = candidate;
     const R0 = state[s + ENTRY_RADIUS]!,
       sine = speed > 0 ? Math.max(0, -vn) / speed : 0,
       at: V3 = [centre[0], height, centre[2]];
     if (state[s + SUBMERGED_ONCE] === 1) {
       if (state[s + EMERGED] === 0) {
         const up = Math.max(0, -vn);
-        this.event(b, body.row, 'exit', t, at, vr, speed, sine, R0, 0, 0, up, dropHeight(up, COLUMN_DROP_FALL), false);
-        this.foam?.addFoam([at[0] - 1.5 * R0, at[2] - 1.5 * R0], [at[0] + 1.5 * R0, at[2] + 1.5 * R0], 0.8);
+        this.event(log, body.row, 'exit', t, at, vr, speed, sine, R0, 0, 0, up, dropHeight(up, COLUMN_DROP_FALL, this.g), false);
+        this.addFoam(candidate, at, 1.5 * R0, 0.8);
       }
     } else {
       const crown = state[s + CROWN]!;
       this.event(
-        b,
+        log,
         body.row,
         'skip',
         t,
@@ -678,7 +813,7 @@ export class EntrySolver implements Solver<EntryParams> {
         sine,
         R0,
         crown,
-        dropHeight(crown, CROWN_DROP_FALL),
+        dropHeight(crown, CROWN_DROP_FALL, this.g),
         0,
         0,
         false,
@@ -691,9 +826,8 @@ export class EntrySolver implements Solver<EntryParams> {
 
   /** It breaks out from under: the exit splash, the water lifted with it at its speed, and foam. */
   private breach(
-    b: number,
+    candidate: EntryStep,
     body: EntryBody,
-    state: Float64Array,
     s: number,
     t: number,
     world: Float64Array,
@@ -704,13 +838,14 @@ export class EntrySolver implements Solver<EntryParams> {
     vn: number,
     height: number,
   ): void {
+    const { state, log } = candidate;
     const ahead: V3 = speed > 0 ? [vr[0] / speed, vr[1] / speed, vr[2] / speed] : [0, 1, 0],
-      span = spanOf(world, indices, ahead),
+      span = this.spanOf(world, indices, ahead),
       up = -vn,
       at: V3 = [centre[0], height, centre[2]];
     state[s + ENTRY_RADIUS] = span;
     this.event(
-      b,
+      log,
       body.row,
       'exit',
       t,
@@ -722,10 +857,10 @@ export class EntrySolver implements Solver<EntryParams> {
       0,
       0,
       up,
-      dropHeight(up, COLUMN_DROP_FALL),
+      dropHeight(up, COLUMN_DROP_FALL, this.g),
       false,
     );
-    this.foam?.addFoam([at[0] - 1.5 * span, at[2] - 1.5 * span], [at[0] + 1.5 * span, at[2] + 1.5 * span], 0.8);
+    this.addFoam(candidate, at, 1.5 * span, 0.8);
   }
 
   /**
@@ -734,8 +869,8 @@ export class EntrySolver implements Solver<EntryParams> {
    * cavity's volume, m^3.
    */
   private cavity(
+    candidate: EntryStep,
     b: number,
-    state: Float64Array,
     s: number,
     t: number,
     centre: V3,
@@ -743,8 +878,8 @@ export class EntrySolver implements Solver<EntryParams> {
     R0: number,
     surface: number,
   ): number {
-    const sec = this.words(this.sections),
-      base = b * SECTIONS * SECTION_WORDS,
+    const { sections: sec, state, log } = candidate;
+    const base = b * SECTIONS * SECTION_WORDS,
       g = this.g;
     let n = state[s + SECTION_COUNT]!;
     const moved = hypot(
@@ -777,7 +912,7 @@ export class EntrySolver implements Solver<EntryParams> {
         const jet = JET_SPEED_RATIO * state[s + ENTRY_SPEED]! * state[s + ENTRY_SINE]!,
           entry: V3 = [state[s + ENTRY_X]!, state[s + ENTRY_X + 1]!, state[s + ENTRY_X + 2]!];
         this.event(
-          b,
+          log,
           this.bodies[b]!.row,
           'seal',
           t,
@@ -789,10 +924,10 @@ export class EntrySolver implements Solver<EntryParams> {
           0,
           0,
           jet,
-          dropHeight(jet, COLUMN_DROP_FALL),
+          dropHeight(jet, COLUMN_DROP_FALL, this.g),
           true,
         );
-        this.foam?.addFoam([entry[0] - 1.5 * R0, entry[2] - 1.5 * R0], [entry[0] + 1.5 * R0, entry[2] + 1.5 * R0], 1);
+        this.addFoam(candidate, entry, 1.5 * R0, 1);
         state[s + CAVITY] = 0;
         state[s + SECTION_COUNT] = 0;
         return 0;
@@ -800,6 +935,15 @@ export class EntrySolver implements Solver<EntryParams> {
       volume += Math.PI * Math.max(0, r2) * state[s + SPACING]!;
     }
     return volume;
+  }
+
+  private addFoam(candidate: EntryStep, point: Vec3, radius: number, whiteness: number): void {
+    if (!this.foam) return;
+    const min: [number, number] = [point[0] - radius, point[2] - radius];
+    const max: [number, number] = [point[0] + radius, point[2] + radius];
+    if (!min.every(Number.isFinite) || !max.every(Number.isFinite) || !(min[0] < max[0] && min[1] < max[1]))
+      throw entryError('failed', 'An entry foam box is unrepresentable. Use local metres and a nondegenerate hull.');
+    candidate.foam.push([min, max, whiteness]);
   }
 
   /** What it displaces near the surface now; the change is this step's volume for the wake. */
@@ -814,7 +958,7 @@ export class EntrySolver implements Solver<EntryParams> {
   }
 
   private event(
-    b: number,
+    log: Float64Array,
     row: number,
     kind: EntrySplash['kind'],
     t: number,
@@ -829,10 +973,10 @@ export class EntrySolver implements Solver<EntryParams> {
     columnHeight: number,
     cavity: boolean,
   ): void {
-    void b;
-    const log = this.words(this.log),
-      written = log[0]!,
+    const written = log[0]!,
       k = 1 + (written % this.eventCount) * EVENT_WORDS;
+    if (!Number.isSafeInteger(written + 1))
+      throw entryError('failed', 'The entry event counter overflowed. Start a new entry simulation.');
     log.set(
       [
         ['entry', 'seal', 'exit', 'skip'].indexOf(kind),
@@ -910,7 +1054,7 @@ export class EntrySolver implements Solver<EntryParams> {
   /** The body's state, for a view: its phase ('air', 'through', 'under') and whether its cavity is open. */
   bodyState(row: number): { phase: 'air' | 'through' | 'under'; cavity: boolean } {
     const b = this.bodies.findIndex((body) => body.row === row);
-    if (b < 0) throw new RangeError(`No body of this EntrySolver is on row ${row}; pass one of its rows.`);
+    if (b < 0) throw entryError('unsupported', `No body of this EntrySolver is on row ${row}; pass one of its rows.`);
     const state = this.words(this.state),
       s = b * STATE_WORDS;
     return { phase: (['air', 'through', 'under'] as const)[state[s + PHASE]!]!, cavity: state[s + CAVITY] === 1 };
@@ -918,7 +1062,7 @@ export class EntrySolver implements Solver<EntryParams> {
 
   exportPorts(tick: number): readonly Port[] {
     if (!this.forces)
-      throw new MargoError('state', 'EntrySolver is not in a world yet; add it with world.add(solver, {bodies, sea}).');
+      throw entryError('state', 'EntrySolver is not in a world yet; add it with world.add(solver, {bodies, sea}).');
     const ports: Port[] = [{ field: BODY_FORCES_FIELD.name, region: this.forces, tick, cell: [0, 0, 0] }];
     if (this.cavityPressure)
       ports.push({ field: this.cavityPressureField.name, region: this.cavityPressure, tick, cell: [0, 0, 0] });
@@ -934,20 +1078,36 @@ export class EntrySolver implements Solver<EntryParams> {
   extraState(): readonly Region[] {
     return [];
   }
+
+  private profile(world: Float64Array, indices: ArrayLike<number>, normal: Vec3, lowest: number, top: number) {
+    return (
+      this.native?.profile(world, indices, normal, lowest, top, PROFILE_LEVELS) ??
+      slamProfile(world, indices, normal, lowest, top, PROFILE_LEVELS)
+    );
+  }
+
+  /** The equivalent radius of the widest section across the path. */
+  private spanOf(world: Float64Array, indices: ArrayLike<number>, ahead: Vec3): number {
+    let lo = Infinity,
+      hi = -Infinity;
+    for (let i = 0; i < world.length; i += 3) {
+      const d = -(ahead[0] * world[i]! + ahead[1] * world[i + 1]! + ahead[2] * world[i + 2]!);
+      lo = Math.min(lo, d);
+      hi = Math.max(hi, d);
+    }
+    return this.profile(world, indices, [-ahead[0], -ahead[1], -ahead[2]], lo, hi - lo).radii[PROFILE_LEVELS]!;
+  }
 }
 
-/** A body's widest radius across the direction `ahead`: the equivalent radius of its largest section across it. */
-function spanOf(world: Float64Array, indices: ArrayLike<number>, ahead: Vec3): number {
-  let lo = Infinity,
-    hi = -Infinity;
-  for (let i = 0; i < world.length; i += 3) {
-    const d = -(ahead[0] * world[i]! + ahead[1] * world[i + 1]! + ahead[2] * world[i + 2]!);
-    lo = Math.min(lo, d);
-    hi = Math.max(hi, d);
-  }
-  return slamProfile(world, indices, [-ahead[0], -ahead[1], -ahead[2]], lo, hi - lo, PROFILE_LEVELS).radii[
-    PROFILE_LEVELS
-  ]!;
+function finite3(v: readonly number[]): boolean {
+  return v?.length === 3 && Number.isFinite(v[0]) && Number.isFinite(v[1]) && Number.isFinite(v[2]);
+}
+
+function elevationOf(sea: SeaQuery, x: number, z: number, t: number): number {
+  const height = sea.elevation(x, z, t);
+  if (!Number.isFinite(height))
+    throw entryError('failed', 'The sea elevation is invalid. Return a finite height for every wetted-mesh query.');
+  return height;
 }
 
 /** The sea's gauge pressure at a point: its own, or the still water's under its surface. */
@@ -960,14 +1120,18 @@ function pressureOf(
   rho: number,
   g: number,
 ): number {
-  if (typeof sea.pressure === 'function') return sea.pressure(x, y, z, t);
-  const below = sea.elevation(x, z, t) - y;
-  return below > 0 ? rho * g * below : 0;
+  const pressure =
+    typeof sea.pressure === 'function'
+      ? sea.pressure(x, y, z, t)
+      : rho * g * Math.max(0, elevationOf(sea, x, z, t) - y);
+  if (!Number.isFinite(pressure))
+    throw entryError('failed', 'The sea pressure is invalid. Return finite pascals at every wetted-mesh query.');
+  return pressure;
 }
 
 /** The height drops thrown up at `speed` reach against air drag, falling at `terminal`: vt^2 / (2 g) ln(1 + v^2 / vt^2). */
-function dropHeight(speed: number, terminal: number): number {
-  return ((terminal * terminal) / (2 * 9.81)) * ln(1 + (speed * speed) / (terminal * terminal));
+function dropHeight(speed: number, terminal: number, g: number): number {
+  return ((terminal * terminal) / (2 * g)) * ln(1 + (speed * speed) / (terminal * terminal));
 }
 
 /** The share of a triangle below a plane, from its corners' depths below it (positive under). */
@@ -1057,7 +1221,8 @@ function solve3(m: Float64Array, r: Vec3): V3 {
     B = f! * g! - d! * i!,
     C = d! * h! - e! * g!,
     det = a! * A + b! * B + c! * C;
-  if (!(det !== 0 && Number.isFinite(det))) return [0, 0, 0];
+  if (!(det !== 0 && Number.isFinite(det)))
+    throw entryError('failed', 'The effective entry mass is singular or out of range. Use finite body mass and mesh scale.');
   return [
     (A * r[0] + (c! * h! - b! * i!) * r[1] + (b! * f! - c! * e!) * r[2]) / det,
     (B * r[0] + (a! * i! - c! * g!) * r[1] + (c! * d! - a! * f!) * r[2]) / det,
@@ -1092,8 +1257,9 @@ function shapeOf(mesh: HullMesh): EntrySolver['shapes'][number] {
       vz = cz! - az!;
     wetted += 0.5 * hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx);
   }
-  if (!(volume > 0))
-    throw new RangeError(
+  if (!(volume > 0 && Number.isFinite(volume) && Number.isFinite(wetted)))
+    throw entryError(
+      'unsupported',
       `A body's mesh encloses ${volume} m^3; wind its triangles outward (counter-clockwise seen from outside) around a closed volume.`,
     );
   const extent = [0, 1, 2].map((i) => high[i]! - low[i]!),
@@ -1102,6 +1268,8 @@ function shapeOf(mesh: HullMesh): EntrySolver['shapes'][number] {
     others = extent.filter((_, i) => i !== axis),
     breadth = 0.5 * (others[0]! + others[1]!),
     { k1, k2 } = spheroid(length / Math.max(breadth, 1e-9));
+  if (![length, breadth, k1, k2].every(Number.isFinite))
+    throw entryError('unsupported', 'Entry mesh mass coefficients are unrepresentable. Use finite, nondegenerate body dimensions.');
   return { volume, length, breadth, axis, k1, k2, wetted };
 }
 

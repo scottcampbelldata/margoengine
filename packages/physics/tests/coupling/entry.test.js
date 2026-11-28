@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../../dist/index.js';
 import { EntrySolver } from '../../dist/entry.js';
-import { FORCE_WORDS, PhysicsWorld, regionWords, RigidSolver } from '../../dist/world.js';
+import { BODIES_FIELD, FORCE_WORDS, PhysicsWorld, regionWords, RigidSolver } from '../../dist/world.js';
 import { effectBothWays, frameRateIndependent, seekEqualsContinuous } from './harness.js';
 import { makeEntryLaunch } from './entry-launch.js';
 
@@ -58,6 +58,132 @@ test('EntrySolver: a faster ball makes a different entry, and denser water slows
         ? JSON.stringify(world.probe.entry.splashes().map((e) => e.speed.toFixed(6)))
         : world.probe.ball.linearVelocity[1],
   ));
+
+function entryFixture(physics, options) {
+  const rigid = new RigidSolver();
+  const entry = new EntrySolver('entry', { cavityPressure: true });
+  const mesh = sphereMesh(0.05, 16, 8);
+  const bodies = options.positions.map((position) => {
+    const body = physics.addBody(null, {
+      position,
+      linearVelocity: [0, -options.speed, 0],
+      colliders: { shape: 'sphere', radius: 0.05, mass: 2 },
+    });
+    return { row: body.row, mesh, contactAngle: 140 };
+  });
+  const world = new PhysicsWorld({ rate: { num: 240, den: 1 }, gravity: [0, -9.81, 0], cellSize: 1 })
+    .add(rigid, { physics })
+    .add(entry, { bodies, sea: options.sea, foam: options.foam, originCellSize: 1, level: 2 })
+    .couple(['entry', 'rigid'], 'staggered');
+  const stage = (tick) => {
+    const port = { ...rigid.exportPorts(tick)[0], cell: world.cellOf('rigid') };
+    entry.step({ tick, level: 2, seed: 1, inputs: new Map([[BODIES_FIELD.name, port]]), cell: world.cellOf('entry') }, 1 / 240);
+  };
+  const observe = () => ({
+    events: entry.splashes(),
+    sources: entry.seaSources(),
+    state: [...entry.stateRegions(), ...entry.exportPorts(0).map(({ region }) => region)].map((region) =>
+      regionWords(world.arena.memory, region).slice(),
+    ),
+  });
+  return { entry, world, stage, observe };
+}
+
+test('a non-finite pressure query on the second body leaves every entry publication and pending foam unchanged', () => {
+  using physics = new Physics(null, { fixedTimestep: 1 / 240 });
+  const foam = [];
+  let failAtSecond = true;
+  let firstPressureQueries = 0;
+  const sea = {
+    elevation: () => 0,
+    pressure(x, y) {
+      if (x < 0) firstPressureQueries++;
+      return x > 0 && failAtSecond ? NaN : -9.81 * 1025 * y;
+    },
+  };
+  const { entry, world, stage, observe } = entryFixture(physics, {
+    positions: [[-0.5, 0.03125, 0], [0.5, 0.03125, 0]],
+    speed: 10,
+    sea,
+    foam: { addFoam: (...box) => foam.push(box) },
+  });
+  const checkpoint = world.takeSnapshot();
+  const before = observe();
+  assert.throws(() => stage(0), { code: 'failed', message: /Return finite pascals.+#sea-entry/ });
+  assert.ok(firstPressureQueries > 0);
+  assert.deepEqual(observe(), before);
+  assert.deepEqual(world.takeSnapshot().bytes, checkpoint.bytes);
+  assert.deepEqual(foam, []);
+  failAtSecond = false;
+  stage(0);
+  const accepted = observe();
+  assert.equal(accepted.events.length, 2);
+  assert.equal(foam.length, 2);
+  assert.ok(accepted.state.at(-2).some((force) => force > 0));
+  assert.throws(() => entry.bodyState(128), { code: 'unsupported', message: /pass one of its rows.+#sea-entry/ });
+
+  // Even finite pressure can exceed the rigid solver's Float32 load columns.
+  sea.pressure = () => 1e50;
+  assert.throws(() => stage(1), { code: 'failed', message: /Reduce the body scale.+#sea-entry/ });
+  assert.deepEqual(observe(), accepted);
+  assert.equal(foam.length, 2);
+});
+
+test('a signed rebase and distinct rigid cell preserve entry loads and splash replay', () => {
+  const base = [1640000000, -1100000000, 2030000000];
+  const neighbour = [base[0] + 1, base[1], base[2] - 1];
+  const run = (separate) => {
+    using physics = new Physics(null, { fixedTimestep: 1 / 240 });
+    let seaCell = base;
+    const sea = {
+      get cell() { return seaCell; },
+      elevation: (x) => x / 32,
+    };
+    const { world, observe } = entryFixture(physics, {
+      positions: [[separate ? -1 : 0, 0.0859375, separate ? 1 : 0]],
+      speed: 4,
+      sea,
+    });
+    world.setCell('entry', base).setCell('rigid', separate ? neighbour : base);
+    world.advance(1);
+    const start = world.takeSnapshot();
+    world.advance(8);
+    const atEight = world.takeSnapshot();
+    const observation = observe();
+    assert.equal(observation.events[0]?.kind, 'entry');
+    world.restoreSnapshot(start.bytes);
+    world.advance(8);
+    assert.deepEqual(world.takeSnapshot().bytes, atEight.bytes);
+    world.restoreSnapshot(start.bytes);
+    const delta = [-9400000, 14000000, 3000000];
+    world.shiftOrigin(delta);
+    seaCell = base.map((cell, axis) => cell - delta[axis]);
+    world.advance(8);
+    assert.deepEqual(observe(), observation);
+    return observation;
+  };
+  const colocated = run(false);
+  const separate = run(true);
+  assert.equal(colocated.events[0].time, separate.events[0].time);
+  assert.equal(colocated.events[0].crownSpeed, separate.events[0].crownSpeed);
+  // Independent Float32 rigid location rounding is at most one represented unit at the shifted local offset.
+  assert.ok(Math.abs(colocated.events[0].position[0] - separate.events[0].position[0]) < 2 ** -22);
+});
+
+test('liquid density controls the onset of the entry crown at the retraction threshold', () => {
+  const crown = (density) => {
+    using physics = new Physics(null, { fixedTimestep: 1 / 240 });
+    const { stage, entry } = entryFixture(physics, {
+      positions: [[0, 0.03125, 0]],
+      speed: 2.3,
+      sea: { elevation: () => 0, density },
+    });
+    stage(0);
+    return entry.splashes()[0].crownSpeed;
+  };
+  assert.equal(crown(1000), 0);
+  assert.ok(crown(1200) > Math.sqrt((2 * 0.072) / (1200 * 2e-4)));
+});
 
 test('EntrySolver observes a launching HullSolver hull without duplicating loads or wake displacement', async (context) => {
   await Physics.load({ threads: true });

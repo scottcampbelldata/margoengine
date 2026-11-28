@@ -6970,6 +6970,15 @@ shifts and exact seek. The largest Node case applies 171 stencils covering 3,276
 SIMD-paired visits. `cloud-surface.browser.mjs` renders the live condensate and its wind advection on WebGPU and
 WebGL2. The closed cube is analytical numerical evidence. Independent field validation remains open.
 
+### SEA-14 water entry section profiling
+
+The two native Node mesh sizes match the scalar snapshots, rigid loads, cavity, events and wake sources
+byte for byte with 1/2/4 participants. The 322-triangle case clips 80 planes in two profiles, with 12,880
+paired triangle visits and 326 vertex dot products versus 154,560 repeated edge-endpoint dot products
+in the TypeScript formulation. The engine tank proof renders the 64.583 ms entry and 214.583 ms cavity
+seal with complete same-backend image replay. Independent Speirs and Antolik impulse checks miss and
+the original production cuts remain open. Reproduce with the entry-profile worker and Water entry-film tests.
+
 ### Native foam transport and accepted water coverage (SEA-13)
 
 The 71 × 37 native foam run counts 15,762 paired cell updates in three CFL substeps. The

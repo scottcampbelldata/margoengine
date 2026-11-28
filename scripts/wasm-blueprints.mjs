@@ -649,6 +649,20 @@ export const BLUEPRINTS = [
     args: ['plain'],
   },
   {
+    name: 'entry-profile-kernel',
+    crate: 'packages/physics/entry-profile-kernel',
+    blueprint: 'packages/physics/src/entry/entry-profile-kernel.wasm',
+    script: 'packages/physics/scripts/build-entry-profile-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'entry-profile-kernel-shared',
+    crate: 'packages/physics/entry-profile-kernel',
+    blueprint: 'packages/physics/src/entry/entry-profile-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-entry-profile-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'foam-transport-kernel-shared',
     crate: 'packages/physics/foam-transport-kernel',
     blueprint: 'packages/physics/src/foam/foam-transport-kernel-shared.wasm',
