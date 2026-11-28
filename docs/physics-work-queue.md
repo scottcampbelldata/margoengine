@@ -515,7 +515,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | BIO-03 | Forest ecosystem dynamics | sound | Codex | REOPENED (4/8 at 1476595e04, points 5–8, [evidence](physics-solver-audit.md#bio-03-four-point-pass)), prior landing 609d76e5ce |
 | BIO-04 | Material ageing | material exposure, decay and PBR appearance | Codex | REOPENED (4/8 at a9332e0abb, points 5–8, [evidence](physics-solver-audit.md#bio-04-four-point-pass)), prior landing 9632f2731c |
 | SPACE-01 | N-body and orbital dynamics | physics/orbit | Codex | REOPENED (4/8 at 06bda264b7, points 5–8, [evidence](physics-solver-audit.md#space-01-four-point-pass)), prior landing 56f09d5d54 |
-| SPACE-02 | Celestial ephemeris and rotation | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 18dbe0de5e |
+| SPACE-02 | Celestial ephemeris and rotation | partial | Codex | BUILDING (codex/physics-space-02-four-point; four-point pass; [audit](physics-solver-audit.md)), landed 18dbe0de5e |
 | SPACE-03 | Accretion disks and motion near compact objects | physics/accretion with viscous transport and geodesics | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 0c11fd27f7 |
 | DYN-04 | Wheeled vehicles on roads | partial | Claude (laptop), on Scott's order, 2026-11-27 | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 18ded2be7c; P5 parity (arcade car, debug lines, coded errors, migration note, example page) landed 2026-11-27 |
 | DYN-05 | Rail vehicle dynamics | physics/rail | Codex | REOPENED (4/8 at 59abbb0f64, points 5–8, [evidence](physics-solver-audit.md#dyn-05-four-point-pass)), prior landing fa79b04868 |
