@@ -2833,7 +2833,19 @@ impl World {
         let mut first = from;
         while first < solving {
             let last = self.group_last(first, solving);
-            if self.uu(SOLVE_EXACT, first) == 0 || !any {
+            // Decided group by group, as the step is: a group with nothing to take back takes zero, not a solve of zero, whose
+            // -0.0 is other bits in the hash, so a world stepped island by island hashed otherwise than one stepped phase by
+            // phase for the step a group had nothing (`island_by_island_gives_the_state_phase_by_phase_gives`).
+            let mut owed = false;
+            for i in first..=last {
+                let row = self.uu(SOLVE_JOINTS, i) as usize;
+                let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
+                let view = self.view(row);
+                for r in 0..m {
+                    owed |= self.s(JOINT_LOCK_P_0 + axes[r], row) != view.at[axes[r]];
+                }
+            }
+            if self.uu(SOLVE_EXACT, first) == 0 || !any || !owed {
                 for i in first..=last {
                     let row = self.uu(SOLVE_JOINTS, i) as usize;
                     for k in 0..6 {
