@@ -2467,6 +2467,10 @@
       "types": "./dist/terrain/wet-ground.d.ts",
       "import": "./dist/terrain/wet-ground.js"
     },
+    "./terrain/ground-contact": {
+      "types": "./dist/terrain/ground-contact.d.ts",
+      "import": "./dist/terrain/ground-contact.js"
+    },
     "./terrain/rocks": {
       "types": "./dist/terrain/rocks.d.ts",
       "import": "./dist/terrain/rocks.js"

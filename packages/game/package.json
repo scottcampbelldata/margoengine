@@ -2939,6 +2939,10 @@
       "types": "./dist/procedural/coral.d.ts",
       "import": "./dist/procedural/coral.js"
     },
+    "./procedural/forbs": {
+      "types": "./dist/procedural/forbs.d.ts",
+      "import": "./dist/procedural/forbs.js"
+    },
     "./procedural/conifer-species": {
       "types": "./dist/procedural/conifer-species.d.ts",
       "import": "./dist/procedural/conifer-species.js"
@@ -3862,6 +3866,10 @@
     "./terrain/wet-ground": {
       "types": "./dist/terrain/wet-ground.d.ts",
       "import": "./dist/terrain/wet-ground.js"
+    },
+    "./terrain/ground-contact": {
+      "types": "./dist/terrain/ground-contact.d.ts",
+      "import": "./dist/terrain/ground-contact.js"
     },
     "./terrain/rocks": {
       "types": "./dist/terrain/rocks.d.ts",
