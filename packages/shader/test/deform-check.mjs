@@ -1,6 +1,6 @@
 // Real-adapter check (run from the repository root after building packages): node packages/shader/test/deform-check.mjs
 // Skinning and morph nodes against the same mesh deformed on the CPU: position, chained deformation, an effect on top,
-// normals, a new pose, the shadow, and positionLocal on vertices a compute deformer already moved. Then Fox.glb, a real
+// normals, a new pose, the shadow, a resized texture under a shadow, and positionLocal on vertices a compute deformer already moved. Then Fox.glb, a real
 // glTF character: skinningFromModel against Animation's compute deformer, at two frames of its clip.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -59,6 +59,7 @@ try {
   await same('newPose', 'cpuNewPose');
   await same('shadow', 'cpuShadow');
   await same('deformed', 'cpuDeformed');
+  await same('resized', 'cpuResized');
   const { different: posed } = compare(await grab('foxCompute'), await grab('foxBind'));
   assert.ok(posed > 0.005, `the clip moves the Fox: ${posed}`);
   await same('foxNodes', 'foxCompute');

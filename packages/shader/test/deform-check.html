@@ -2,9 +2,9 @@
 <script type="module">
 import {createStage} from '/packages/stage/dist/index.js';
 import {planeGeometry} from '/packages/geometry/dist/index.js';
-import {Material,createMesh} from '/packages/materials/dist/index.js';
+import {Material,Texture,createMesh} from '/packages/materials/dist/index.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
-import {NodeMaterial,positionLocal,storage,uv,vec3} from '/packages/shader/dist/index.js';
+import {NodeMaterial,positionLocal,storage,texture,uv,vec3} from '/packages/shader/dist/index.js';
 import {morphing,skinning,skinningFromModel,worldNormal} from '/packages/shader/dist/deform.js';
 import {loadGLTF} from '/packages/gltf/dist/pbr.js';
 import {Animation} from '/packages/animation/dist/index.js';
@@ -82,6 +82,16 @@ const scenarios={
   newPose:async()=>{const b=skinBuffers(),m=show(base,{positionNode:skinning(b).position()});engine.render();await device.queue.onSubmittedWorkDone();b.bones.data.set(other,16);b.bones.update();return m;},
   cpuShadow:()=>shadowed(cpu(cpuSkin),{}),
   shadow:()=>{const s=skinning(skinBuffers());return shadowed(base,{positionNode:s.position(),normalNode:worldNormal(s.normal())});},
+  // A texture the move reads takes a new size after the shadow has drawn it: the caster binds the new GPU texture
+  // (KB-SHADOW-STALEMOVE1: it kept the destroyed one).
+  cpuResized:()=>shadowed(cpu((p,n)=>[[p[0],p[1],p[2]+102/255],n]),{}),
+  resized:async()=>{
+    const image={data:new Uint8Array(4*4*4).fill(51),width:4,height:4},depth=new Texture(image,{mipmaps:false,colorSpace:'linear'});
+    const mesh=shadowed(base,{positionNode:positionLocal.add(vec3(0,0,texture(depth,uv(),0).x))});
+    for(let i=0;i<2;i++){engine.render();await device.queue.onSubmittedWorkDone();}
+    Object.assign(image,{data:new Uint8Array(8*8*4).fill(102),width:8,height:8});depth.update();
+    return {destroy(){mesh.destroy();depth.dispose();}};
+  },
   // A compute deformer swaps the vertices the pass fetches, so positionLocal is already the posed vertex.
   cpuDeformed:()=>show(shifted(cpu(cpuSkin))),
   deformed:()=>{

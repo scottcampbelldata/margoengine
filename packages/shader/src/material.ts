@@ -1,6 +1,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import { Material, type MaterialMeshData, type MaterialOptions, type MeshGeometry } from '@margoengine/materials';
 import type { CasterDisplacement } from '../../shared/caster.js';
+import { reboundCaster } from '../../shared/displacement.js';
 import type { SurfaceGraph } from './graph.js';
 import type { Engine } from '@margoengine/core/extension';
 import { ShaderClock } from './clock.js';
@@ -373,7 +374,10 @@ export class NodeMaterial extends Material {
   private depthFragment: string;
   private depthFields: string;
   /** One depth record per mesh that has data of its own (else the material's), for the device it was made on. */
-  private readonly depthRecords = new WeakMap<object, { device: GPUDevice; record: CasterDisplacement }>();
+  private readonly depthRecords = new WeakMap<
+    object,
+    { device: GPUDevice; record: CasterDisplacement; readonly bound: unknown[] }
+  >();
   /** The pipeline key of every depth record: their shader and layout are the same. */
   private depthKey?: string;
   private readonly colourBindings: number;
@@ -598,7 +602,12 @@ export class NodeMaterial extends Material {
   ): CasterDisplacement | undefined {
     if (!this.depthVertex) return undefined;
     const kept = this.depthRecords.get(data ?? this);
-    if (kept?.device === device) return kept.record;
+    if (kept?.device === device) {
+      // A texture or buffer a pass has bound may have been rebuilt: the depth passes then need a new record.
+      if (kept.bound.length && reboundCaster(kept.record.entries!(), kept.bound)) kept.record = { ...kept.record };
+      return kept.record;
+    }
+    const bound: unknown[] = [];
     const body = this.depthVertex + this.depthFragment,
       // Auto layouts hold what the shader reaches, which can be less than the beauty pass binds.
       reached = reachedBindings(this.program.declare(0), body);
@@ -611,12 +620,15 @@ export class NodeMaterial extends Material {
       move: this.depthMove,
       program: this.program,
       layout: () => (layout ??= device.createBindGroupLayout({ entries: [...reached.values()] })),
-      entries: () =>
-        this.program
+      entries: () => {
+        const entries = this.program
           .entries(device, { ...frameHost(engine), meshData: data })
-          .filter((entry) => reached.has(entry.binding)),
+          .filter((entry) => reached.has(entry.binding));
+        if (!bound.length) reboundCaster(entries, bound);
+        return entries;
+      },
     };
-    this.depthRecords.set(data ?? this, { device, record });
+    this.depthRecords.set(data ?? this, { device, record, bound });
     return record;
   }
   override bindings(device: GPUDevice, engine?: Engine, data?: MaterialMeshData): GPUBindGroupEntry[] {

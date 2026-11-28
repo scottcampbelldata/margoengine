@@ -6,6 +6,22 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: a swapped or resized texture under a moved shadow stopped the engine on a destroyed texture (KB-SHADOW-STALEMOVE1, materials, shader)
+
+- **Repro:** add a mesh to `Shadows` whose vertex move reads a texture, draw, then swap or resize that texture: a
+  `materialPlugin` vertex plugin given another `textures` entry (`curveFlow().setFlow` with more frames did this), or a
+  `NodeMaterial` whose `positionNode` samples a `Texture` that takes a new size. The next frame raised `MargoError`
+  `Destroyed texture ... used in a submit`. A swap that kept the old texture alive drew the shadow from the old one.
+- **Cause:** depth passes (shadows, virtual, clustered and local shadows, picking, studio contact shadows, TAA velocity)
+  keep a displaced caster's bind group for as long as `material.displacement` returns the same record. `materialPlugin`
+  and `NodeMaterial` kept one record whatever their entries bound.
+- **Fix:** once a pass has bound a record's entries, both compare them on each read and hand out a new record when a
+  buffer, range, view or sampler differs (`reboundCaster`, packages/shared/displacement.js). The built-in
+  `displacementMap` and cut-out masks already did this.
+- **Regression:** `packages/materials/test/curve-flow-browser.mjs` (instances with shadows and a wider `setFlow`,
+  WebGPU and the WebGL2 layer) and `packages/shader/test/deform-check.mjs` (`resized`, also with `MARGO_COMPAT=1`);
+  both raise the destroyed-texture error without the fix.
+
 ### Open 2026-11-27: the shot's look masks are drawn with TAA's jitter, a fifth of a pixel off the resolved frame (KB-POST-MRTJITTER1, post SceneTargets, terrain and scatter captures, taa)
 
 - **Repro:** the timber-valley blowup shot rendered with TAA (35cc7b3429) and without it (1604e1a464), then

@@ -604,5 +604,9 @@ test('importing a colour node and NodeMaterial leaves post, compute and textures
   // record (61 B); attribute() itself, its checked packing and StorageBuffer's ranged update are shaken out unless used.
   // A split into an entry of its own would put `attribute` beside, not among, the other node inputs and save no bytes
   // for anyone who does not call it.
-  assert.ok(minimal.gzip < 9370 && all.gzip < 20800, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
+  // Then 9,480 B and 20,880 B (2026-11-27, minimal 9,363 B to 9,477 B, whole 20,774 B to 20,878 B): a caster record is
+  // renewed when a texture or buffer its depth passes bind is rebuilt (KB-SHADOW-STALEMOVE1: a resized texture under a
+  // shadow stopped the engine on a destroyed texture). NodeMaterial makes the record, so every graph with a moved or
+  // cut shadow needs the check; a split entry would leave NodeMaterial with the crash.
+  assert.ok(minimal.gzip < 9480 && all.gzip < 20880, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
 });

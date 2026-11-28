@@ -29,3 +29,14 @@ export function displacedDepth(code, group, displacement) {
     throw new TypeError('Displaced shadow casters need 80-byte PBR vertices; draw them with a PBR depth shader');
   return displacementCode(group) + out;
 }
+/**
+ * Whether `entries` bind other buffers, ranges or resources than `bound` holds, which it brings up to date. Depth passes
+ * keep a displaced caster's bind group for as long as they see the same record, so a material whose bindings changed (a
+ * swapped or resized texture) must hand them a new record object.
+ */
+export function reboundCaster(entries, bound) {
+  const next = entries.flatMap(({ resource: r }) => [r.buffer ?? r, r.offset, r.size]),
+    changed = next.length !== bound.length || next.some((value, i) => value !== bound[i]);
+  bound.splice(0, bound.length, ...next);
+  return changed;
+}

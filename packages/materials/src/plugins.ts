@@ -11,7 +11,7 @@
 // From them: each plugin is a closed function with a typed interface at its point (no free edits of the host text), its
 // parameters live in a block of their own bound per component, and the composition is ordered and keyed by identity.
 import { whiteTexture } from '../../shared/white-texture.js';
-import { displacementCode } from '../../shared/displacement.js';
+import { displacementCode, reboundCaster } from '../../shared/displacement.js';
 import type { CasterDisplacement } from '../../shared/caster.js';
 import { MargoError } from '@margoengine/math/errors';
 import type { Material, MaterialFeature, Texture } from './built-material.js';
@@ -304,12 +304,17 @@ function composeLit(code: string, list: readonly State[]): string {
   return out;
 }
 
-/** Caster records of a material, kept while the device, its plugin list and its displacement map stay the same. */
+/**
+ * Caster records of a material, kept while the device, its plugin list, its displacement map and what the vertex plugins
+ * bind stay the same: depth passes keep a bind group for as long as they see the same record.
+ */
 interface CasterState {
   device: GPUDevice;
   key: string;
   map: CasterDisplacement | undefined;
   record: CasterDisplacement;
+  /** The buffers, views and samplers the record's bind groups hold. */
+  readonly bound: unknown[];
   layout?: GPUBindGroupLayout;
 }
 const casters = new WeakMap<Material, CasterState>();
@@ -321,9 +326,16 @@ function casterOf(m: Material, device: GPUDevice, map: CasterDisplacement | unde
   // A map with a key is a subclass's own move; plugins build on a plain displacementMap only.
   const own = map && map.key === undefined ? map : undefined,
     key = 'plugins:' + list.map((p) => p.id).join(',') + (own ? ':map' : '');
-  const kept = casters.get(m);
-  if (kept && kept.device === device && kept.key === key && kept.map === own) return kept.record;
   const used = list.flatMap((p, k) => (p.code.vertex ? [[p, k] as const] : []));
+  // Gathering the entries also uploads what the depth passes read: a caster the colour pass skips has no other upload.
+  const gather = () => used.flatMap(([p, k]) => entriesOf(p, k, device)),
+    kept = casters.get(m);
+  if (kept && kept.device === device && kept.key === key && kept.map === own) {
+    // Once a pass has bound them, a swapped or rebuilt texture takes a new record, so every pass binds it afresh.
+    if (kept.bound.length && reboundCaster(gather(), kept.bound)) kept.record = { ...kept.record };
+    return kept.record;
+  }
+  const bound: unknown[] = [];
   const declarations = (group: number) =>
     (own ? displacementCode(group) : '') +
     vertexStruct +
@@ -341,6 +353,7 @@ function casterOf(m: Material, device: GPUDevice, map: CasterDisplacement | unde
     device,
     key,
     map: own,
+    bound,
     record: {
       key,
       cuts: false,
@@ -357,16 +370,20 @@ function casterOf(m: Material, device: GPUDevice, map: CasterDisplacement | unde
           )
         );
       },
-      entries: () => [
-        ...(own
-          ? [
-              { binding: 0, resource: { buffer: own.buffer } },
-              { binding: 1, resource: own.view },
-              { binding: 2, resource: own.sampler },
-            ]
-          : []),
-        ...used.flatMap(([p, k]) => entriesOf(p, k, device)),
-      ],
+      entries: () => {
+        const plugins = gather();
+        if (!bound.length) reboundCaster(plugins, bound);
+        return [
+          ...(own
+            ? [
+                { binding: 0, resource: { buffer: own.buffer } },
+                { binding: 1, resource: own.view },
+                { binding: 2, resource: own.sampler },
+              ]
+            : []),
+          ...plugins,
+        ];
+      },
       layout: () =>
         (state.layout ??= device.createBindGroupLayout({
           entries: [
