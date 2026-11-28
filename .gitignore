@@ -62,3 +62,6 @@ packages/voxel-pathtracer/mesh-kernel/target/
 /private/
 packages/physics/kernel-common/target/
 packages/physics/kernel-common/Cargo.lock
+
+# Reports from scripts/web-demos/controls.mjs (dead-control finder); regenerated, never committed.
+/demos/.reports/

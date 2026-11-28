@@ -50,6 +50,19 @@ node scripts/web-demos/coverage.mjs
 
 It lists every entry in each `packages/*/package.json` `exports` that no demo's `source/` imports, with the unused and total count per package, then the sorted entries.
 
+### Find dead controls
+
+A slider that moves nothing, or a switch whose dial turns while nothing turns on, is a bug. To find them:
+
+```sh
+node scripts/web-demos/controls.mjs newtons-cradle
+node scripts/web-demos/controls.mjs --all --resume
+```
+
+It opens each page in installed Chrome, one page at a time, on WebGPU and again on the WebGL2 layer (`?backend=webgl2`), waits until the exhibit is marked ready and operates every visible control: sliders and number fields go to their max, min and middle, checkboxes and switches turn on and off, each radio, tab, select option and preset button in a row is chosen (the one already chosen only after another, since choosing it again changes nothing by design), buttons are clicked (a reset button after the view and a slider were moved first) and the scene is dragged when the page invites it. Around every input it compares the canvases and charts and the page's text readouts with what changes when nothing is touched (the page's own motion is the noise floor). A control is dead when neither a picture nor any readout outside its own label changes; dead and unsure controls are tried again on a fresh page with normal motion and a longer wait, then once more after pressing the page's start button, before they are reported. It also reports console and page errors on interaction, controls whose own value label changes while nothing else does, controls covered by another element or off-screen at 1440 x 900 and 390 x 844, pages that scroll sideways at 390 px, and pages that fail to start, stop drawing or hang (every step has a hard timeout; a hung page is closed and Chrome restarted).
+
+Results go to `demos/.reports/controls.json` (not committed; each run updates only the demos it ran; WebGL2 results are filed as `<demo>@webgl2`) and a short list to `private/handoffs/dead-controls.md`. The run exits 1 when a page it checked fails to start, logs an error or has a dead or broken control. Options: `--backends=webgpu` runs one backend, `--resume` skips pages already in the report, `--save-frames` writes the before and after picture of every input to `demos/.reports/frames/` to check a verdict by eye (`--save-frames=flagged` only for inputs that changed nothing), `--no-confirm` skips the second try, `--wait=<ms>` (default 600) and `--confirm-wait=<ms>` (default 1500) set the wait after an input, `--md=<path>` moves the list and `--md-only` rewrites it from the JSON. The comparison rules are in `scripts/web-demos/controls-compare.mjs` and tested by `tests/web-demos-controls.test.js`.
+
 ## Exhibits
 
 | Exhibit | What it shows | Live | Zip |
