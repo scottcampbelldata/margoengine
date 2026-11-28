@@ -857,6 +857,7 @@ interface Model {
     meshes: readonly MeshHandle[];
     nodes: readonly MeshHandle[];
     dispose(): void;
+    [Symbol.dispose](): void;
 }
 
 type ModelNode = Mesh & PublicMesh;

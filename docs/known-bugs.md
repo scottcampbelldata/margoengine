@@ -53,6 +53,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   inverted cells. Regression: `packages/physics/tests/soft-volume-cells.test.js` ("meets Hertz contact at the default
   passes").
 
+### Fixed 2026-11-27: glTF loader errors named no node, mixed a cycle with the depth limit, and a light model had no `using` (KB-GLTFA A1, A4, A5, A6, A8, gltf)
+
+- **Repro:** `translation: [1, 2]` on node 3 surfaced core's "Position: 3 values" with no node; a sheared node matrix threw
+  a plain `Error`; a 63-deep chain and a two-node loop gave one message, "cycle or depth limit"; `loadGLTF(engine,
+  'blob:...')` said only "must use HTTP(S)"; `using model = parseGLTF(...)` threw, since the light `Model` had no
+  `Symbol.dispose`. Each in both loaders (the last in the light one only).
+- **Cause:** `transform` in `packages/gltf/src/index.ts` and `model.ts` passed TRS arrays to core unchecked and had no node
+  index; the depth walk stopped at 62 whatever the reason; the URL check named no way forward; the model literal had four
+  members.
+- **Fix:** `checkTRS` names the node and the key; a sheared matrix is a `TypeError` that names the node and says to bake
+  the shear; a loop (a walk longer than the node count) is a `TypeError` naming a node on it, and a node past 62 levels a
+  `RangeError` naming it and its depth; the URL refusal points to `parseGLTFAsync` with the file's bytes; the light model
+  has `Symbol.dispose`. Regression: `packages/gltf/test/audit-gltfa.test.js` ("KB-GLTFA A1" to "A8", all fail without
+  the fix). Still open from the audit's API table: A2 and A3 (rulings), A7, A9 and A10.
+
 ### Fixed 2026-11-27: scatter motion vectors drew a streamed forest from destroyed buffers (KB-SCATTER-VELTILES1, scatter)
 
 - **Repro:** a `ScatterTiles` scatter with `ScatterVelocity` added to TAA; stream a tile in with `setTile` so a ring

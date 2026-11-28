@@ -44,6 +44,7 @@ export interface Model {
     meshes: readonly MeshHandle[];
     nodes: readonly MeshHandle[];
     dispose(): void;
+    [Symbol.dispose](): void;
 }
 
 export function loadGLTF(engine: EngineKernel, url: string | URL, { signal, maxNodes, allowedURLs, extensions, fetch: get }?: GLTFOptions & {

@@ -216,7 +216,11 @@ export interface GLTFDecoderHooks {
 /** What gltf/pbr needs to refract the scene through a model (`screenTransmission` from @margoengine/gltf/transmission implements it). */
 export interface GLTFTransmissionPass {
   /** Draws `model`'s transmissive primitives from a scene copy in the scene whose frame graph is `graph`. Returns a remover. */
-  attach(model: import('./model.js').PBRModel, engine: Engine, graph: import('@margoengine/core/extension').FrameGraph): () => void;
+  attach(
+    model: import('./model.js').PBRModel,
+    engine: Engine,
+    graph: import('@margoengine/core/extension').FrameGraph,
+  ): () => void;
 }
 /** One POINTS or LINES primitive that asks for a width, as gltf/pbr hands it to `GLTFStrokeReader.attach`. */
 export interface GLTFStrokeItem {
@@ -1131,7 +1135,10 @@ export async function loadAsset(
           : undefined,
     total = downloadedBytes;
   const fetchBytes = async (target: URL, root = false) => {
-    if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
+    if (!['http:', 'https:'].includes(target.protocol))
+      throw new TypeError(
+        'glTF URL must use HTTP(S); for a blob: or file: source, read its bytes (await file.arrayBuffer()) and pass them to parseGLTFAsync',
+      );
     const response = await get(target, { signal });
     if (root && response.url) base = new URL(response.url);
     else if (!root) checkRedirect(response, base ?? globalThis.location?.href, allowedURLs, 'glTF resource');

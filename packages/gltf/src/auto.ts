@@ -185,7 +185,10 @@ export async function loadAuto(
 ): Promise<AutoModel> {
   signal?.throwIfAborted();
   const target = new URL(url, globalThis.location?.href);
-  if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
+  if (!['http:', 'https:'].includes(target.protocol))
+    throw new TypeError(
+      'glTF URL must use HTTP(S); for a blob: or file: source, read its bytes (await file.arrayBuffer()) and pass them to parseGLTFAsync',
+    );
   const cached = remembering(get);
   try {
     // Both loaders run after awaits: each is started inside the scene this call came from.

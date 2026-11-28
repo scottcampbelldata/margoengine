@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21515461,
+  "total": 21517816,
   "history": [
     {
       "date": "2026-10-24",
@@ -15181,6 +15181,12 @@
       "commit": "lane-a-sizes",
       "reason": "lane A 2026-11-27, rendering entries over budget on a full build of main (budgets: html 7487 to 7751, materials/portal 29788 to 30759, post/upscale 5068 to 5366, taa 19250 to 20229, taa/upscale 10354 to 11037, taa/upscale-velocity 25079 to 26362, transitions/custom 5461 to 5748, transitions/presets 8856 to 9147, xr 10245 to 11251; each new budget is the measured gzip plus the gate headroom). Measured per commit by rebuilding the package at each one: taa grew 18,689 to 19,639 from bdd8ebe2c5 KB-TAA-ALPHACLIP1 (+105), 3f37931ace KB-TAA-EDGE1 (+272), 7d41715e1c KB-TAA-COMPATEDGE2 (+433) and 4ecc014172 (+49); taa/upscale 10,052 to 10,715 from KB-TAA-EDGE1 (+614) and 4ecc014172 (+47); taa/upscale-velocity 24,348 to 25,594 from KB-TAA-ALPHACLIP1 (+103), KB-TAA-EDGE1 (+217), KB-TAA-COMPATEDGE2 (+875) and 4ecc014172 (+51); xr 9,946 to 10,923 from d52270e08f KB-XR-AR4XCOMPAT1 (+414) and cee7c8b46a KB-XR-ARNODEPTH1 (+563); materials/portal 29,080 to 29,863 from 4ecc014172 (+765, StencilBuffer now gives the scene depth back through DepthCopy) and c8d5c41eeb KB-MAT-TINTMAP1 (+18); html 7,342 to 7,495, post/upscale 5,068 to 5,110, transitions/custom 5,443 to 5,492 and presets 8,836 to 8,880, all from 4ecc014172 KB-XR-AREFFECTS1 in shared/msaa.js and shared/gpu.js. Every one is a bug fix whose bytes are new shader and pass code, already factored (4ecc014172 shares one copyInto between SceneTarget and DepthCopy). A split would cost more than it saves: the depth give-back and the silhouette and AR coverage paths run inside the frame that needs them, so a lazy import() would leave the first frames wrong and add a request.",
       "grew": 9
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-a-gltfa-api",
+      "reason": "lane A 2026-11-27, KB-GLTFA A1 A4 A5 A6 A8: both glTF loaders name the node in a bad translation, rotation, scale or sheared matrix, tell a cycle from the 62-level limit, and say how to load a blob: file; the light Model gets Symbol.dispose. Measured gzip with and without the change: gltf 7,365 to 7,616, gltf/pbr 90,929 to 91,158, gltf/soft-mesh 73,101 to 73,289, gltf/auto 18,423 to 18,675; only soft-mesh passes its ceiling, 73133 to 75488. The bytes are the messages and one TRS check per loader; the messages are the fix, so shorter ones or a lazy split would undo it.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15661,7 +15667,7 @@
     "@margoengine/gltf/report": 11799,
     "@margoengine/gltf/scene": 1695,
     "@margoengine/gltf/scene-data": 1663,
-    "@margoengine/gltf/soft-mesh": 73133,
+    "@margoengine/gltf/soft-mesh": 75488,
     "@margoengine/gltf/spec-gloss": 12038,
     "@margoengine/gltf/splats": 2356,
     "@margoengine/gltf/strokes": 2707,

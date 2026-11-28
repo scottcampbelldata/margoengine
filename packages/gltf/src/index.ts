@@ -113,7 +113,26 @@ function validate(doc: Document, maxNodes: number | undefined, extensions: reado
     );
   checkCount('Too many glTF nodes', doc.nodes?.length ?? 0, nodeLimit, 'maxNodes');
 }
-function transform(mesh: Mesh, node: GLTFNode): void {
+/** KB-GLTFA A5: a bad translation, rotation or scale names its node instead of surfacing core's transform error. */
+function checkTRS(node: GLTFNode, index: number): void {
+  for (const [key, size] of [
+    ['translation', 3],
+    ['rotation', 4],
+    ['scale', 3],
+  ] as const) {
+    const v = (node as Record<string, unknown>)[key];
+    if (
+      v !== undefined &&
+      (!Array.isArray(v) ||
+        v.length !== size ||
+        v.some((x) => typeof x !== 'number' || !Number.isFinite(Math.fround(x))))
+    )
+      throw new TypeError(
+        `Invalid glTF ${key} on node ${index}: ${size} finite numbers; re-export the file and check it with the glTF Validator`,
+      );
+  }
+}
+function transform(mesh: Mesh, node: GLTFNode, index: number): void {
   if (node.matrix !== undefined) {
     if (
       node.translation !== undefined ||
@@ -132,9 +151,12 @@ function transform(mesh: Mesh, node: GLTFNode): void {
     if (!trs.ok)
       throw trs.reason === 'singular'
         ? new RangeError('Singular glTF matrix')
-        : new Error('Sheared glTF matrices are unsupported');
+        : new TypeError(
+            `Sheared glTF matrix on node ${index}; a node matrix must split into translation, rotation and scale (glTF 2.0 section 3.5.3), so bake the shear into the mesh and re-export`,
+          );
     mesh.setPosition(trs.position).setScale(trs.scale).setQuaternion(trs.rotation);
   } else {
+    checkTRS(node, index);
     mesh
       .setPosition((node.translation ?? [0, 0, 0]) as [number, number, number])
       .setScale((node.scale ?? [1, 1, 1]) as [number, number, number])
@@ -148,6 +170,8 @@ export interface Model {
   meshes: readonly MeshHandle[];
   nodes: readonly MeshHandle[];
   dispose(): void;
+  /** The same as `dispose()`, so `using model = parseGLTF(...)` releases it (KB-GLTFA A8). */
+  [Symbol.dispose](): void;
 }
 /** A file on its way through the loader. An extension may replace `doc` and `buffers`, never change what they hold. */
 export interface GLTFFile {
@@ -395,10 +419,12 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
   for (let id = 0; id < nodes.length; id++) {
     let depth = 0;
     for (let current = id; current !== -1; current = parents[current])
-      if (++depth > 62)
-        throw new RangeError(
-          'glTF hierarchy cycle or depth limit; remove the cycle or flatten the nodes to 62 levels or fewer',
-        );
+      if (++depth > nodes.length)
+        throw new TypeError(`glTF hierarchy cycle through node ${id}; give the nodes a tree with no loops`);
+    if (depth > 62)
+      throw new RangeError(
+        `glTF node ${id} is ${depth} levels deep; the engine holds 62 levels at most, so flatten the hierarchy`,
+      );
   }
   const roots = doc.scenes
     ? (entry(doc.scenes, doc.scene ?? 0, 'scene').nodes ?? [])
@@ -426,7 +452,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
       imported.push(mesh);
       handles[id] = mesh;
       mesh.name = typeof node.name === 'string' ? node.name : '';
-      transform(mesh, node);
+      transform(mesh, node, id);
       if (node.mesh !== undefined) {
         const primitives = definitions[integer(node.mesh, 'mesh reference')];
         if (!primitives) throw new TypeError('Missing glTF mesh; point the node at an existing mesh index');
@@ -444,7 +470,14 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
     const release = () => {
       for (let i = created.length - 1; i >= 0; i--) created[i].dispose();
     };
-    model = { root, meshes: renderable, nodes: imported, dispose: release };
+    model = {
+      root,
+      meshes: renderable,
+      nodes: imported,
+      dispose: release,
+      // Where the runtime has no Symbol.dispose a private symbol keeps the member unused, as core does.
+      [(Symbol.dispose ?? Symbol()) as typeof Symbol.dispose]: release,
+    };
     for (const extension of extensions)
       extension.finish?.(model, file, { engine, primitives: definitions.flat(), nodes: handles });
     return model;
@@ -521,7 +554,10 @@ export async function loadGLTF(
   let base = new URL(url, globalThis.location?.href),
     total = 0;
   async function fetchBytes(target: URL, root = false) {
-    if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
+    if (!['http:', 'https:'].includes(target.protocol))
+      throw new TypeError(
+        'glTF URL must use HTTP(S); for a blob: or file: source, read its bytes (await file.arrayBuffer()) and pass them to parseGLTFAsync',
+      );
     const response = await get(target, { signal });
     if (root && response.url) base = new URL(response.url);
     else if (!root) checkRedirect(response, base, allowedURLs, 'glTF buffer');

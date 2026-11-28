@@ -319,3 +319,109 @@ test('KB-GLTFA B1: a node with a zero scale loads in both loaders, as TRS and as
     pbr.engine.dispose();
   }
 });
+
+// Runs `body(parse, engine)` with the light loader and with gltf/pbr.
+async function bothLoaders(t, body) {
+  const { engine } = await headlessEngine();
+  try {
+    await body(parseGLTF, engine, 'light');
+  } finally {
+    engine.dispose();
+  }
+  const pbr = await gpuEngine(t, 128);
+  try {
+    await body(parsePBR, pbr.engine, 'pbr');
+  } finally {
+    pbr.engine.dispose();
+  }
+}
+
+test('KB-GLTFA A5: a bad translation, rotation or scale names its node, in both loaders', async (t) => {
+  await bothLoaders(t, (parse, engine, label) => {
+    for (const [key, value] of [
+      ['translation', [1, 2]],
+      ['rotation', [0, 0, 0]],
+      ['scale', [1, Number.NaN, 1]],
+    ]) {
+      const nodes = [{}, {}, {}, { mesh: 0, [key]: value }];
+      const { doc, bytes } = triangle({ nodes, scenes: [{ nodes: [0, 1, 2, 3] }] });
+      assert.throws(
+        () => parse(engine, doc, [bytes]),
+        (e) => e instanceof TypeError && e.message.includes(`${key} on node 3`),
+        `${label} ${key}`,
+      );
+    }
+  });
+});
+
+test('KB-GLTFA A6: a sheared node matrix is a TypeError that names the node and the fix, in both loaders', async (t) => {
+  await bothLoaders(t, (parse, engine, label) => {
+    const matrix = [1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    const { doc, bytes } = triangle({ nodes: [{}, { mesh: 0, matrix }], scenes: [{ nodes: [0, 1] }] });
+    assert.throws(
+      () => parse(engine, doc, [bytes]),
+      (e) =>
+        e instanceof TypeError && /Sheared glTF matrix on node 1/.test(e.message) && /bake the shear/.test(e.message),
+      label,
+    );
+  });
+});
+
+test('KB-GLTFA A4: a cycle and the 62-level limit have their own messages, in both loaders', async (t) => {
+  await bothLoaders(t, (parse, engine, label) => {
+    // 63 nodes in one chain: the last is 63 levels deep.
+    const deep = Array.from({ length: 63 }, (_, i) => (i < 62 ? { children: [i + 1] } : { mesh: 0 }));
+    const chain = triangle({ nodes: deep, scenes: [{ nodes: [0] }] });
+    assert.throws(
+      () => parse(engine, chain.doc, [chain.bytes]),
+      (e) =>
+        e instanceof RangeError && /node 62 is 63 levels deep/.test(e.message) && /62 levels at most/.test(e.message),
+      `${label} depth`,
+    );
+    // A 62-node chain, 62 levels deep, still loads.
+    const fits = triangle({
+      nodes: deep.slice(0, 62).map((n, i) => (i < 61 ? n : { mesh: 0 })),
+      scenes: [{ nodes: [0] }],
+    });
+    parse(engine, fits.doc, [fits.bytes]).dispose();
+    const loop = triangle({ nodes: [{ mesh: 0, children: [1] }, { children: [0] }], scenes: [{ nodes: [] }] });
+    assert.throws(
+      () => parse(engine, loop.doc, [loop.bytes]),
+      (e) => e instanceof TypeError && /cycle through node/.test(e.message),
+      `${label} cycle`,
+    );
+  });
+});
+
+test('KB-GLTFA A1: a blob: URL is refused with the way to load its bytes, in both loaders and loadAuto', async (t) => {
+  const { loadAuto } = await import('../dist/auto.js');
+  const { loadGLTF: loadPBR } = await import('../dist/pbr.js');
+  const { engine } = await headlessEngine();
+  try {
+    for (const [label, load] of [
+      ['light', () => loadGLTF(engine, 'blob:https://example.com/0f1e')],
+      ['pbr', () => loadPBR(engine, 'blob:https://example.com/0f1e')],
+      ['auto', () => loadAuto(engine, 'blob:https://example.com/0f1e')],
+    ])
+      await assert.rejects(load, (e) => e instanceof TypeError && /parseGLTFAsync/.test(e.message), label);
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('KB-GLTFA A8: `using` disposes a light model, as it does a PBRModel', async () => {
+  const { engine } = await headlessEngine();
+  try {
+    const { doc, bytes } = triangle();
+    let released = 0;
+    {
+      using model = parseGLTF(engine, doc, [bytes]);
+      // The model's release disposes every mesh it made, the root last.
+      const dispose = model.root.dispose.bind(model.root);
+      model.root.dispose = () => (released++, dispose());
+    }
+    assert.equal(released, 1);
+  } finally {
+    engine.dispose();
+  }
+});

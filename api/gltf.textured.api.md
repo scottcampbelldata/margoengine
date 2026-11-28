@@ -331,5 +331,6 @@ interface Model {
     meshes: readonly MeshHandle[];
     nodes: readonly MeshHandle[];
     dispose(): void;
+    [Symbol.dispose](): void;
 }
 ```

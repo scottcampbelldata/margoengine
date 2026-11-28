@@ -2206,7 +2206,26 @@ function fit(asset: GLTFAsset, p: GLTFPrimitive, m: PBRMaterial, pointsOrLines: 
     ? Object.defineProperty({ ...m, ext: [1, ...m.ext!.slice(1)] }, 'side', Object.getOwnPropertyDescriptor(m, 'side')!)
     : m;
 }
-function transform(node: Mesh, def: GLTFNode): void {
+/** KB-GLTFA A5: a bad translation, rotation or scale names its node instead of surfacing core's transform error. */
+function checkTRS(node: GLTFNode, index: number): void {
+  for (const [key, size] of [
+    ['translation', 3],
+    ['rotation', 4],
+    ['scale', 3],
+  ] as const) {
+    const v = (node as Record<string, unknown>)[key];
+    if (
+      v !== undefined &&
+      (!Array.isArray(v) ||
+        v.length !== size ||
+        v.some((x) => typeof x !== 'number' || !Number.isFinite(Math.fround(x))))
+    )
+      throw new TypeError(
+        `Invalid glTF ${key} on node ${index}: ${size} finite numbers; re-export the file and check it with the glTF Validator`,
+      );
+  }
+}
+function transform(node: Mesh, def: GLTFNode, index: number): void {
   if (def.matrix !== undefined) {
     const m = vector(def.matrix, 16, 'matrix');
     if (def.translation || def.rotation || def.scale || m[3] || m[7] || m[11] || m[15] !== 1)
@@ -2217,13 +2236,17 @@ function transform(node: Mesh, def: GLTFNode): void {
     if (!trs.ok)
       throw trs.reason === 'singular'
         ? new RangeError('Singular glTF matrix')
-        : new Error('Sheared matrices are unsupported');
+        : new TypeError(
+            `Sheared glTF matrix on node ${index}; a node matrix must split into translation, rotation and scale (glTF 2.0 section 3.5.3), so bake the shear into the mesh and re-export`,
+          );
     node.setPosition(trs.position).setScale(trs.scale).setQuaternion(trs.rotation);
-  } else
+  } else {
+    checkTRS(def, index);
     node
       .setPosition((def.translation ?? [0, 0, 0]) as [number, number, number])
       .setScale((def.scale ?? [1, 1, 1]) as [number, number, number])
       .setQuaternion(def.rotation ?? [0, 0, 0, 1]);
+  }
 }
 
 function nodeVisible(engine: Engine, node: Mesh): boolean {
@@ -2462,8 +2485,12 @@ export class PBRModel implements EnginePlugin {
     for (let i = 0; i < defs.length; i++) {
       let depth = 0;
       for (let p = i; p !== -1; p = parents[p])
-        if (++depth > 62)
-          throw new RangeError('glTF hierarchy cycle or depth limit; remove the cycle or flatten the nodes');
+        if (++depth > defs.length)
+          throw new TypeError(`glTF hierarchy cycle through node ${i}; give the nodes a tree with no loops`);
+      if (depth > 62)
+        throw new RangeError(
+          `glTF node ${i} is ${depth} levels deep; the engine holds 62 levels at most, so flatten the hierarchy`,
+        );
     }
     const roots = doc.scenes
       ? (entry(doc.scenes, doc.scene ?? 0, 'scene').nodes ?? [])
@@ -2493,7 +2520,7 @@ export class PBRModel implements EnginePlugin {
         this.created.push(node);
         node.name = defs[i].name ?? '';
         node.visible = defs[i].extensions?.KHR_node_visibility?.visible ?? true;
-        transform(node, defs[i]);
+        transform(node, defs[i], i);
       }
       for (let i = 0; i < defs.length; i++)
         this.nodes[i].setParent(parents[i] < 0 ? this.root : this.nodes[parents[i]]);
@@ -3453,8 +3480,7 @@ export class PBRModel implements EnginePlugin {
    */
   private glassActive(): boolean {
     return this.primitives.some(
-      (p) =>
-        linearBlends(p.material) || (!this.takesTransparent(p.material) && transmits(p.material)),
+      (p) => linearBlends(p.material) || (!this.takesTransparent(p.material) && transmits(p.material)),
     );
   }
   /**
@@ -5472,7 +5498,12 @@ export class PBRModel implements EnginePlugin {
       (topology ? ':' + topology : '') +
       (laterUV ? ':uv' : '') +
       (through || capture
-        ? ':o' + objectId((through ? oit! : hook!).targets) + ':' + kind + (linearMark ? 'l' : '') + (written ? 'w' : '')
+        ? ':o' +
+          objectId((through ? oit! : hook!).targets) +
+          ':' +
+          kind +
+          (linearMark ? 'l' : '') +
+          (written ? 'w' : '')
         : '') +
       (tinted && (shading?.texturedTint || surfaceTint(m)) ? ':t' : '');
     let pipeline = draws.pipelines.get(key);

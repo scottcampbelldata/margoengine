@@ -243,7 +243,10 @@ export class GLTFStream {
   }
   /** `root`: the model's own first request, whose final URL becomes the base; every other response must stay in it. */
   private fetch(source: Source, headers?: Record<string, string>, root = false): Promise<Response> {
-    if (!['http:', 'https:'].includes(source.url.protocol)) throw new TypeError('glTF URL must use HTTP(S)');
+    if (!['http:', 'https:'].includes(source.url.protocol))
+      throw new TypeError(
+        'glTF URL must use HTTP(S); for a blob: or file: source, read its bytes (await file.arrayBuffer()) and pass them to parseGLTFAsync',
+      );
     return fetch(source.url, { signal: this.signal, headers }).then((r) => {
       if (!root) checkRedirect(r, this.base, this.allowedURLs, 'glTF');
       if (!r.ok)

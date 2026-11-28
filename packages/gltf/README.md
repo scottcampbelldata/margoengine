@@ -68,6 +68,12 @@ engine.start();
 // On teardown: model.dispose(); engine.dispose();
 ```
 
+A model also has `Symbol.dispose`, so `using model = parseGLTF(engine, doc, buffers)` releases it at the end of the
+block, as a `PBRModel` does. Both loaders fetch HTTP(S) only: for a dropped file or a `blob:` URL, read the bytes
+(`await file.arrayBuffer()`) and pass them to `parseGLTFAsync`. A bad `translation`, `rotation` or `scale` and a sheared
+node matrix are `TypeError`s that name the node; a loop in the node tree is a `TypeError` that says so, and a node more
+than 62 levels deep is a `RangeError` that names it.
+
 Images decode asynchronously, so for bytes already in memory use `parseGLTFAsync(engine, bytes, [], { extensions })` in
 place of `parseGLTF`. It draws on WebGPU and on the WebGL2 compatibility layer (`install()` from
 `@margoengine/webgl2-compat` before `Engine.create`, where the browser has no WebGPU), with the same pixels on the
