@@ -1221,8 +1221,10 @@ feature `sample` 7 to 4 motion rotations (fxc 30.6 to 25.3 s) and `post` 2 to 1 
 `packages/voxel-pathtracer/tests/compat-staged.test.js`. Missing: another vendor's D3D11 driver, and the run time of
 the staged route on Direct3D 11 (a 480 x 300 reference at 16384 samples about 555 s against 14 s on WebGPU, KB-L5a-10;
 449 s since 2026-11-16, when a light kind the frame switches off stopped drawing passes and 480 x 300 became one part:
-1,527 to 443 passes a sample, counted on the CPU by `packages/voxel-pathtracer/tests/route-work.test.js`; what is left
-is mostly the passes' fragment work). Sources for the pass cuts: Samuli Laine, Tero Karras, Timo Aila, "Megakernels
+1,527 to 443 passes a sample, counted on the CPU by `packages/voxel-pathtracer/tests/route-work.test.js`; 363 since
+2026-11-28, when the state's fields were laid out so each program rewrites fewer pages, `packOrder` in
+`packages/voxel-pathtracer/src/compat-staged.ts`, an iteration 47 to 42 passes with every light kind, the same values;
+what is left is mostly the passes' fragment work). Sources for the pass cuts: Samuli Laine, Tero Karras, Timo Aila, "Megakernels
 Considered Harmful: Wavefront Path Tracing on GPUs", HPG 2013, https://doi.org/10.1145/2492045.2492060 ; Dietger van
 Antwerpen, "Improving SIMD Efficiency for Parallel Monte Carlo Light Transport on the GPU", HPG 2011,
 https://doi.org/10.1145/2018323.2018330 ; Khronos, OpenGL ES 3.0.6 and WebGL 2.0 specifications (occlusion queries,

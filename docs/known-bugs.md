@@ -14352,6 +14352,18 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
   (`packages/voxel-pathtracer`), about 35 times native WebGPU a sample here. Which part of a pass costs most on the GPU
   was not measured. Closing the steps takes a staged route several times cheaper a sample, which is speed work under
   the build phase, or a ruling like KB6016e's. `stall` passes since e88457054c; no other step was rerun for this note.
+- **Progress 2026-11-28 (fewer passes an iteration, the same values):** a program draws once for each state page it
+  writes and each draw runs the whole program, and the fields were laid out by their writers' rank, so `hit` wrote 3
+  pages, `vertex` 6, `surface` 7 and `post` 6. `packOrder` (`packages/voxel-pathtracer/src/compat-staged.ts`) now lays
+  the field groups out for the fewest passes an iteration (a local search over group moves from the ranked order and
+  32 seeded shuffles, the same layout every run, never more passes than the ranked order; a linear arrangement of a hypergraph, Diaz, Petit and Serna, "A survey of
+  graph layout problems", ACM Computing Surveys 34(3), 2002, https://doi.org/10.1145/568522.568523): the base tracer's
+  iteration is 42 passes with every kind against 47 (`hit` 2, `vertex` 4, `surface` 6, `post` 5; the light kinds' 2,
+  1 and 2 were already the least), a 480 x 300 sample 363 passes against 443 with no distant light. On ANGLE Vulkan
+  (RTX A6000) `traversal`, `analytic`, `determinism` and `compat` give the same 186 read-backs before and after, and
+  `determinism` replays 1,297 layer passes against 1,497. Regression: `tests/compat-staged.test.js` "the staged state
+  is laid out for the fewest passes an iteration (KB-L5a-10)" and the counts in `tests/route-work.test.js`. Seven pages
+  hold 190 of 196 words, so about 42 is the floor for this layout; the steps were not rerun on Direct3D 11.
 - **Next:** make the staged route cheaper per sample on Direct3D 11 (fewer passes an iteration, or more samples a
   pass) and its programs cheaper to compile (`hit` and `sample`, the largest), or share one reference between the WebGPU and compat legs, then rerun the repro. The tests, their samples and their limits stay as they are. A driver reset (nvlddmkm 153) at 06:03 local
   on 2026-11-15 came during the first of these runs.

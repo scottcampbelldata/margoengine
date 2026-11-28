@@ -105,16 +105,17 @@ test('the route draws no pass for a light kind the frame switches off', async ()
     // Kinds: 0 the sun, 1 emitters, 2 area lights, 3 the environment map, 4 the shadow walk's candidates.
     cases = [
       // simpleScene: no sun, no emitters, no area lights, no environment map: only the walk's kind is drawn.
-      [simpleScene(), [4], 16 * 27 + 11],
-      [simpleScene({ environment: sun }), [0, 4], 16 * 32 + 11],
+      [simpleScene(), [4], 16 * 22 + 11],
+      [simpleScene({ environment: sun }), [0, 4], 16 * 27 + 11],
       // Uniform fog keeps distant lights out of reach.
-      [simpleScene({ environment: { ...sun, fog: { density: 0.01 } } }), [4], 16 * 27 + 11],
-      [simpleScene({ materials: [{ id: 1, color: [1, 1, 1], type: 'emit', emission: 2 }] }), [1, 4], 16 * 32 + 11],
+      [simpleScene({ environment: { ...sun, fog: { density: 0.01 } } }), [4], 16 * 22 + 11],
+      [simpleScene({ materials: [{ id: 1, color: [1, 1, 1], type: 'emit', emission: 2 }] }), [1, 4], 16 * 27 + 11],
     ];
   for (const [scene, kinds, perSample] of cases) {
     const passes = await second((e) => VoxelPathTracer.attach(e, { scene }));
     assert.deepEqual(kindsOf(passes, pages), kinds, JSON.stringify(scene.environment ?? scene.materials));
-    // Passes a sample (16 iterations of one part, its start, finish, marks and two censuses): 1,527 before.
+    // Passes a sample (16 iterations of one part, its start, finish, marks and two censuses): 1,527 before the idle
+    // kinds were dropped, and 5 fewer an iteration since the state is laid out by packOrder (KB-L5a-10).
     assert.equal(passes.length / 7, perSample);
   }
   // The route's test switch draws every kind (browser-check `determinism` compares the two images bit for bit).
@@ -123,7 +124,7 @@ test('the route draws no pass for a light kind the frame switches off', async ()
     return VoxelPathTracer.attach(e, { scene: simpleScene() });
   });
   assert.deepEqual(kindsOf(every, pages), [0, 1, 2, 3, 4]);
-  assert.equal(every.length / 7, 16 * 47 + 11);
+  assert.equal(every.length / 7, 16 * 42 + 11);
 });
 
 test('a light kind past every bound the mesh feature sets draws no pass', async () => {

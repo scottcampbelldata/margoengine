@@ -738,3 +738,54 @@ for (const [name, attach] of cases)
       tracer.dispose();
     }
   });
+
+// KB-L5a-10: a program draws once for each state page it writes, and each draw runs the whole program, so the layout of
+// the state decides the passes a sample makes on the layer. The writers-ranked layout made the base tracer's iteration
+// 47 passes (hit 3, vertex 6, surface 7, post 6, five light kinds of 2 + 1 + 2); packOrder lays the groups out for 42.
+const iterationPasses = (s) =>
+  ['hit', 'vertex', 'shading', 'material', 'surface', 'post'].reduce((n, k) => n + (s.writes[k]?.length ?? 0), 0) +
+  s.steps.reduce(
+    (n, q) =>
+      n + s.writes.sample.length + s.writes.shadow.length + s.writes.gather.length +
+      (s.emits.includes(q) ? s.writes.emit.length : 0),
+    0,
+  );
+
+test('the staged state is laid out for the fewest passes an iteration (KB-L5a-10)', async () => {
+  await moduleHooks([{ source: new URL('../src/', import.meta.url).href }]);
+  const { stagedTrace, packOrder } = await import('../src/compat-staged.ts');
+  const plain = harness(),
+    base = await VoxelPathTracer.attach(plain.engine, { scene: simpleScene() });
+  try {
+    await base.ready;
+    const trace = plain.modules.find((c) => c.includes('fn radiance(') && c.includes('fn trace('));
+    const s = stagedTrace(trace);
+    assert.equal(s.pages, 7, 'no page more than the words need');
+    assert.equal(iterationPasses(s), 42, JSON.stringify(s.writes));
+    assert.deepEqual(stagedTrace(trace).writes, s.writes, 'the same layout every time');
+  } finally {
+    base.dispose();
+  }
+  // Two 28-word pages after 4 control words: a light group run five times an iteration and two groups of one program.
+  // In the order given the light group straddles both pages (5 x 2 + 2 = 12 passes); the packer puts it on page 0.
+  const groups = [
+      { size: 20, writers: ['post'] },
+      { size: 20, writers: ['sample'] },
+      { size: 8, writers: ['post'] },
+    ],
+    runs = { sample: 5, post: 1 },
+    passes = (order) => {
+      const touched = { sample: new Set([0]), post: new Set([0]) };
+      let at = 4;
+      for (const i of order) {
+        for (const w of groups[i].writers)
+          for (let p = Math.floor(at / 28); p <= Math.floor((at + groups[i].size - 1) / 28); p++) touched[w].add(p);
+        at += groups[i].size;
+      }
+      return 5 * touched.sample.size + touched.post.size;
+    };
+  assert.equal(passes([0, 1, 2]), 12);
+  const order = packOrder(4, groups, runs, 0);
+  assert.equal(passes(order), 7, `order ${order}`);
+  assert.deepEqual(packOrder(4, groups, runs), packOrder(4, groups, runs));
+});

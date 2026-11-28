@@ -19,6 +19,87 @@ const stale = (what: string) =>
     `VoxelPathTracer on WebGL2 stages the path loop of the shader it was written for (${what}); update voxel-pathtracer/src/compat-staged.ts`,
   );
 
+/**
+ * The order of the path state's field groups after the control words (`start` words, on page 0, written by every
+ * program) that rewrites the fewest pages an iteration. A program draws once for each page it writes (one page is all
+ * the outputs a draw has), and each draw runs the whole program, so an iteration's passes are, summed over the
+ * programs, the passes a program makes an iteration (`runs`) times the pages its groups' words touch, page 0 included.
+ * The groups are laid out one after another, a page every PAGE_WORDS words, so the pages are as few as the words
+ * allow. A local search moves one group at a time to wherever it lowers that sum (first improvement), from the order
+ * given and from seeded shuffles of it, and keeps the first best: the same order on every run, never more passes than
+ * the order given (the base tracer: 47 to 42 passes an iteration, KB-L5a-10). The problem is a linear arrangement of a
+ * hypergraph (Diaz, Petit and Serna, "A survey of graph layout problems", ACM Computing Surveys 34(3), 2002,
+ * https://doi.org/10.1145/568522.568523).
+ */
+export function packOrder(
+  start: number,
+  groups: readonly { readonly size: number; readonly writers: readonly string[] }[],
+  runs: Readonly<Record<string, number>>,
+  restarts = 32,
+): number[] {
+  const stages = Object.keys(runs),
+    writes = groups.map((g) => stages.map((s) => g.writers.includes(s))),
+    passes = (order: readonly number[]) => {
+      const touched = stages.map(() => 1);
+      let at = start;
+      for (const i of order) {
+        const g = groups[i];
+        if (g.size) {
+          let pages = 0;
+          for (let p = Math.floor(at / PAGE_WORDS); p <= Math.floor((at + g.size - 1) / PAGE_WORDS); p++) pages |= 1 << p;
+          for (let s = 0; s < stages.length; s++) if (writes[i][s]) touched[s] |= pages;
+        }
+        at += g.size;
+      }
+      let n = 0;
+      for (let s = 0; s < stages.length; s++) {
+        let bits = touched[s];
+        while (bits) {
+          n += runs[stages[s]];
+          bits &= bits - 1;
+        }
+      }
+      return n;
+    },
+    descend = (from: number[]): [number, number[]] => {
+      let order = from,
+        n = passes(order),
+        moved = true;
+      while (moved) {
+        moved = false;
+        for (let i = 0; i < order.length; i++)
+          for (let j = 0; j < order.length; j++) {
+            if (i === j) continue;
+            const next = order.slice(),
+              [g] = next.splice(i, 1);
+            next.splice(j, 0, g);
+            const m = passes(next);
+            if (m < n) [order, n, moved] = [next, m, true];
+          }
+      }
+      return [n, order];
+    };
+  let best = descend([...groups.keys()]),
+    seed = 0x9e3779b9;
+  // mulberry32 (Tommy Ettinger, 2017), a fixed seed, so the layout never changes from run to run.
+  const random = () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let r = 0; r < restarts; r++) {
+    const order = [...groups.keys()];
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    const found = descend(order);
+    if (found[0] < best[0]) best = found;
+  }
+  return best[1];
+}
+
 /** The programs of one sample, in the order they run. */
 export type Stage =
   | 'start'
@@ -906,7 +987,38 @@ export function stagedTrace(source: string): StagedTrace {
           }),
     signature = new Map(fields.map((d) => [d, writers(d).join()])),
     rank = (d: Decl) => STAGES.reduce((r, s, i) => r | (writers(d).includes(s) ? 1 << (STAGES.length - i) : 0), 0),
-    order = [...control, ...[...path, ...scratch].sort((a, b) => rank(b) - rank(a))],
+    ranked = [...path, ...scratch].sort((a, b) => rank(b) - rank(a)),
+    // Runs of fields with the same writers (adjacent once ranked), laid out by packOrder.
+    groups: Decl[][] = [];
+  for (const d of ranked)
+    if (groups.length && signature.get(groups.at(-1)![0]) === signature.get(d)) groups.at(-1)!.push(d);
+    else groups.push([d]);
+  const repeat = REPEAT.exec(code),
+    steps = [...Array(kinds).keys()].flatMap((q) =>
+      Array<number>(repeat && Number(repeat[1]) === q ? Number(repeat[2]) : 1).fill(q),
+    ),
+    runs: Record<string, number> = Object.fromEntries(
+      STAGES.map((s) => [
+        s,
+        ['sample', 'shadow', 'gather'].includes(s)
+          ? steps.length
+          : s === 'emit'
+            ? steps.filter((q) => emits.includes(q)).length
+            : 1,
+      ]),
+    ),
+    controlWords = control.reduce((n, d) => n + words(d.type, T), 0),
+    order = [
+      ...control,
+      ...packOrder(
+        controlWords,
+        groups.map((g) => ({
+          size: g.reduce((n, d) => n + words(d.type, T), 0),
+          writers: signature.get(g[0])!.split(','),
+        })),
+        runs,
+      ).flatMap((i) => groups[i]),
+    ],
     at = new Map<Decl, number>();
   let total = 0;
   for (const d of order) {
@@ -1077,9 +1189,5 @@ struct ZCensus {k:u32,p0:u32,p1:u32,p2:u32}
 }
 `;
   if (word('z_fin') >= PAGE_WORDS || word('z_it') >= PAGE_WORDS) throw stale('the control words');
-  const repeat = REPEAT.exec(code),
-    steps = [...Array(kinds).keys()].flatMap((q) =>
-      Array<number>(repeat && Number(repeat[1]) === q ? Number(repeat[2]) : 1).fill(q),
-    );
   return { modules, pages, writes, words: total, census, kinds, steps, idle, emits };
 }
