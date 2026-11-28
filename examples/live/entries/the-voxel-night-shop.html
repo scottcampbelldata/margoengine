@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Voxel Night Shop | Margo Engine</title>
+  <link rel="stylesheet" href="../../showcase-films/player.css">
+</head>
+<body>
+  <div id="viewport"></div>
+  <p id="status" role="status">Preparing the film.</p>
+  <section id="controls" aria-label="Film playback" hidden>
+    <button id="play" type="button">Pause</button>
+    <input id="seek" type="range" aria-label="Film time" min="0" max="90" value="0" step="0.01">
+    <output id="clock" for="seek">0:00 / 1:30</output>
+  </section>
+  <script type="module">
+    import { openFilm } from '../../showcase-films/film.js';
+    import { buildNightShop } from '../../showcase-films/the-voxel-night-shop.js';
+    await openFilm({ title: 'The Voxel Night Shop', build: buildNightShop, night: true, far: 35, look: { exposure: 0.25, bloom: 0.1 } });
+  </script>
+</body>
+</html>

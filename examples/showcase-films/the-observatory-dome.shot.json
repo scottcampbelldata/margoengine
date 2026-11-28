@@ -1,0 +1,48 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 90,
+  "tracks": [],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "the-observatory-dome",
+    "kind": "long",
+    "seed": 58218,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "seconds": 90,
+    "msaa": 1,
+    "tier": "high",
+    "kit": null,
+    "subframes": 1,
+    "shutter": 180,
+    "grade": null,
+    "endCard": null,
+    "warmup": 9,
+    "probes": {
+      "hook": 2.2,
+      "interior": 10,
+      "dome": 30,
+      "scope-start": 34.8,
+      "scope-mid": 40.5,
+      "scope-aligned": 47.5,
+      "slit": 55,
+      "stars": 70,
+      "credit": 87
+    },
+    "page": {
+      "path": "examples/showcase-films/the-observatory-dome.html",
+      "query": {
+        "capture": 1
+      },
+      "css": "#controls,#status{display:none!important}",
+      "engine": "showcase.engine",
+      "apply": "showcase.apply",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

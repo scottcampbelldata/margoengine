@@ -1,0 +1,46 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 60,
+  "tracks": [],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "below-the-swell-full",
+    "kind": "long",
+    "seed": 48874,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "seconds": 60,
+    "msaa": 1,
+    "tier": "high",
+    "kit": null,
+    "subframes": 2,
+    "shutter": 180,
+    "grade": null,
+    "endCard": null,
+    "warmup": 5,
+    "probes": {
+      "vessel": 3,
+      "waterline": 8.1,
+      "submarine": 12,
+      "inspection": 24,
+      "joint": 28,
+      "return": 44,
+      "cable": 59
+    },
+    "page": {
+      "path": "examples/underwater-cable/index.html",
+      "query": {
+        "capture": 1
+      },
+      "css": "#controls,#status{display:none!important}",
+      "engine": "belowTheSwell.engine",
+      "apply": "belowTheSwell.apply",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

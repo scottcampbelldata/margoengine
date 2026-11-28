@@ -1,0 +1,50 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 90,
+  "tracks": [],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "the-kiln-shift",
+    "kind": "long",
+    "seed": 39269,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "seconds": 90,
+    "msaa": 1,
+    "tier": "high",
+    "kit": null,
+    "subframes": 1,
+    "shutter": 180,
+    "grade": null,
+    "endCard": null,
+    "warmup": 8,
+    "probes": {
+      "opening": 2,
+      "establish": 9,
+      "latch": 17,
+      "seam": 24,
+      "swing": 34,
+      "inside": 43,
+      "haze": 53,
+      "embers": 62,
+      "shut": 71,
+      "settle": 79,
+      "credit": 87
+    },
+    "page": {
+      "path": "examples/showcase-films/the-kiln-shift.html",
+      "query": {
+        "capture": 1
+      },
+      "css": "#controls,#status{display:none!important}",
+      "engine": "showcase.engine",
+      "apply": "showcase.apply",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

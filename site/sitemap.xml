@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://margoengine.com/</loc></url>
+  <url><loc>https://margoengine.com/examples/</loc></url>
   <url><loc>https://margoengine.com/catalog/</loc></url>
   <url><loc>https://margoengine.com/demos/orrery/</loc></url>
   <url><loc>https://margoengine.com/demos/storm-light/</loc></url>

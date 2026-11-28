@@ -1,0 +1,568 @@
+{
+  "assetBase": "https://assets.margoengine.com/examples/",
+  "fallback": "/examples/assets/",
+  "note": "Upload each file to assetBase + key. Nothing in this list is uploaded by the build. Known bytes count only files that were in the source commit. The rest are missing from git, so their sizes are not in this repository. Keep the total under 10 GB.",
+  "fileCount": 62,
+  "knownBytes": 12258800,
+  "unknownSizeCount": 61,
+  "files": [
+    {
+      "demo": "last-tram",
+      "key": "last-tram/industrial-buildings.glb",
+      "source": "examples/showcase-films/assets/north-yard/industrial-buildings.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": 12258800,
+      "gitLfs": false,
+      "status": "tracked blob on the source branch (not git-lfs). Left out of this branch because it is over 5 MB."
+    },
+    {
+      "demo": "first-wake",
+      "key": "first-wake/quay-plain.glb",
+      "source": "examples/first-wake/assets/quay-plain.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "first-wake",
+      "key": "first-wake/quay-bollard.glb",
+      "source": "examples/first-wake/assets/quay-bollard.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "first-wake",
+      "key": "first-wake/port-crane.glb",
+      "source": "examples/first-wake/assets/port-crane.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "first-wake",
+      "key": "first-wake/port-office.glb",
+      "source": "examples/first-wake/assets/port-office.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "first-wake",
+      "key": "first-wake/port-warehouse.glb",
+      "source": "examples/first-wake/assets/port-warehouse.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "first-wake",
+      "key": "first-wake/cargo-container.glb",
+      "source": "examples/first-wake/assets/cargo-container.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "first-wake",
+      "key": "first-wake/concrete-color.jpg",
+      "source": "examples/first-wake/assets/concrete-color.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "first-wake",
+      "key": "first-wake/concrete-normal.jpg",
+      "source": "examples/first-wake/assets/concrete-normal.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "first-wake",
+      "key": "first-wake/concrete-orm.jpg",
+      "source": "examples/first-wake/assets/concrete-orm.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "first-wake",
+      "key": "first-wake/dawn.hdr",
+      "source": "examples/first-wake/assets/dawn.hdr",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "first-wake",
+      "key": "first-wake/survey-hull.glb",
+      "source": "examples/first-wake/assets/survey-hull.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "first-wake",
+      "key": "first-wake/survey-screw.glb",
+      "source": "examples/first-wake/assets/survey-screw.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "below-the-swell",
+      "key": "below-the-swell/overcast-sky.hdr",
+      "source": "examples/underwater-cable/assets/overcast-sky.hdr",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "below-the-swell",
+      "key": "below-the-swell/sand.jpg",
+      "source": "examples/underwater-cable/assets/sand.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "below-the-swell",
+      "key": "below-the-swell/sand-normal.jpg",
+      "source": "examples/underwater-cable/assets/sand-normal.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "below-the-swell",
+      "key": "below-the-swell/sand-arm.jpg",
+      "source": "examples/underwater-cable/assets/sand-arm.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "below-the-swell",
+      "key": "below-the-swell/steel.jpg",
+      "source": "examples/underwater-cable/assets/steel.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "below-the-swell",
+      "key": "below-the-swell/steel-normal.jpg",
+      "source": "examples/underwater-cable/assets/steel-normal.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "below-the-swell",
+      "key": "below-the-swell/steel-arm.jpg",
+      "source": "examples/underwater-cable/assets/steel-arm.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "below-the-swell",
+      "key": "below-the-swell/coast_rocks_05_1k.gltf",
+      "source": "examples/underwater-cable/assets/coast_rocks_05_1k.gltf",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs). Keep this glTF and its bin and textures side by side so relative URIs resolve."
+    },
+    {
+      "demo": "below-the-swell",
+      "key": "below-the-swell/coast_rocks_05.bin",
+      "source": "examples/underwater-cable/assets/coast_rocks_05.bin",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "below-the-swell",
+      "key": "below-the-swell/textures/coast_rocks_05_diff_1k.jpg",
+      "source": "examples/underwater-cable/assets/textures/coast_rocks_05_diff_1k.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "below-the-swell",
+      "key": "below-the-swell/textures/coast_rocks_05_nor_gl_1k.jpg",
+      "source": "examples/underwater-cable/assets/textures/coast_rocks_05_nor_gl_1k.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "below-the-swell",
+      "key": "below-the-swell/textures/coast_rocks_05_arm_1k.jpg",
+      "source": "examples/underwater-cable/assets/textures/coast_rocks_05_arm_1k.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "below-the-swell",
+      "key": "below-the-swell/survey-submarine.glb",
+      "source": "examples/underwater-cable/assets/survey-submarine.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "below-the-swell",
+      "key": "below-the-swell/diver-head.glb",
+      "source": "examples/underwater-cable/assets/diver-head.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "below-the-swell",
+      "key": "below-the-swell/tripo-vessel.glb",
+      "source": "examples/underwater-cable/assets/tripo-vessel.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (the assets folder is gitignored, not git-lfs)"
+    },
+    {
+      "demo": "city-to-street",
+      "key": "city-to-street/tiles/blackstone.jpg",
+      "source": "test-results/four-demos-inputs/chicago/tiles/blackstone.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed). prepare-chicago-scan.py writes the Grant Park tiles and facade photos."
+    },
+    {
+      "demo": "city-to-street",
+      "key": "city-to-street/tiles/blackstone-annex.jpg",
+      "source": "test-results/four-demos-inputs/chicago/tiles/blackstone-annex.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed). prepare-chicago-scan.py writes the Grant Park tiles and facade photos."
+    },
+    {
+      "demo": "city-to-street",
+      "key": "city-to-street/tiles/spertus.jpg",
+      "source": "test-results/four-demos-inputs/chicago/tiles/spertus.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed). prepare-chicago-scan.py writes the Grant Park tiles and facade photos."
+    },
+    {
+      "demo": "city-to-street",
+      "key": "city-to-street/tiles/park-oaks.glb",
+      "source": "test-results/four-demos-inputs/chicago/tiles/park-oaks.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed). prepare-chicago-scan.py writes the Grant Park tiles and facade photos."
+    },
+    {
+      "demo": "city-to-street",
+      "key": "city-to-street/tiles/tileset.json",
+      "source": "test-results/four-demos-inputs/chicago/tiles/tileset.json",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed). prepare-chicago-scan.py writes this tileset. grant-park.glb is the relative content URI, so it must sit in the same tiles folder."
+    },
+    {
+      "demo": "city-to-street",
+      "key": "city-to-street/tiles/grant-park.glb",
+      "source": "test-results/four-demos-inputs/chicago/tiles/grant-park.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed). prepare-chicago-scan.py writes the Grant Park tiles and facade photos."
+    },
+    {
+      "demo": "city-to-street",
+      "key": "city-to-street/grant-park-naip.jpg",
+      "source": "test-results/four-demos-inputs/chicago/grant-park-naip.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed). prepare-chicago-scan.py writes the Grant Park tiles and facade photos."
+    },
+    {
+      "demo": "horse-at-the-ridge",
+      "key": "horse-at-the-ridge/ridge-bay-performance.glb",
+      "source": "test-results/showcase-12-15-inputs/ridge-bay-performance.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "horse-at-the-ridge",
+      "key": "horse-at-the-ridge/ridge-bay-performance.json",
+      "source": "test-results/showcase-12-15-inputs/ridge-bay-performance.json",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "inside-a-meteorite",
+      "key": "inside-a-meteorite/sample.obj",
+      "source": "test-results/showcase-12-15-inputs/meteorite/sample.obj",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "inside-a-meteorite",
+      "key": "inside-a-meteorite/volume.u8",
+      "source": "test-results/showcase-12-15-inputs/meteorite/volume.u8",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed). prepare-meteorite-volume.py builds this grid from NASA PNG slices, which are also absent."
+    },
+    {
+      "demo": "inside-a-meteorite",
+      "key": "inside-a-meteorite/texture.jpg",
+      "source": "test-results/showcase-12-15-inputs/meteorite/texture.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "opening-night",
+      "key": "opening-night/business_male_02.glb",
+      "source": "test-results/showcase-12-15-inputs/business_male_02.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "opening-night",
+      "key": "opening-night/business_male_02.png",
+      "source": "test-results/showcase-12-15-inputs/business_male_02.png",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "opening-night",
+      "key": "opening-night/business_female_01.glb",
+      "source": "test-results/showcase-12-15-inputs/business_female_01.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "opening-night",
+      "key": "opening-night/business_female_01.png",
+      "source": "test-results/showcase-12-15-inputs/business_female_01.png",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "opening-night",
+      "key": "opening-night/business_male_07.glb",
+      "source": "test-results/showcase-12-15-inputs/business_male_07.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "opening-night",
+      "key": "opening-night/business_male_07.png",
+      "source": "test-results/showcase-12-15-inputs/business_male_07.png",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "opening-night",
+      "key": "opening-night/business_female_03.glb",
+      "source": "test-results/showcase-12-15-inputs/business_female_03.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "opening-night",
+      "key": "opening-night/business_female_03.png",
+      "source": "test-results/showcase-12-15-inputs/business_female_03.png",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "opening-night",
+      "key": "opening-night/business_male_01.glb",
+      "source": "test-results/showcase-12-15-inputs/business_male_01.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "opening-night",
+      "key": "opening-night/business_male_01.png",
+      "source": "test-results/showcase-12-15-inputs/business_male_01.png",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "opening-night",
+      "key": "opening-night/business_female_02.glb",
+      "source": "test-results/showcase-12-15-inputs/business_female_02.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "opening-night",
+      "key": "opening-night/business_female_02.png",
+      "source": "test-results/showcase-12-15-inputs/business_female_02.png",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "opening-night",
+      "key": "opening-night/business_male_05.glb",
+      "source": "test-results/showcase-12-15-inputs/business_male_05.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "opening-night",
+      "key": "opening-night/business_male_05.png",
+      "source": "test-results/showcase-12-15-inputs/business_male_05.png",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "opening-night",
+      "key": "opening-night/business_female_04.glb",
+      "source": "test-results/showcase-12-15-inputs/business_female_04.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "opening-night",
+      "key": "opening-night/business_female_04.png",
+      "source": "test-results/showcase-12-15-inputs/business_female_04.png",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "the-projectionist",
+      "key": "the-projectionist/projectionist.glb",
+      "source": "test-results/showcase-12-15-inputs/projectionist.glb",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "the-solar-field",
+      "key": "the-solar-field/antelope.f32",
+      "source": "test-results/four-demos-inputs/solar-v2/antelope.f32",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "the-solar-field",
+      "key": "the-solar-field/antelope.jpg",
+      "source": "test-results/four-demos-inputs/solar-v2/antelope.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "the-scanned-workshop",
+      "key": "the-scanned-workshop/cactus.spz",
+      "source": "test-results/four-demos-inputs/studio/cactus.spz",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "the-scanned-workshop",
+      "key": "the-scanned-workshop/plant.splat",
+      "source": "test-results/four-demos-inputs/studio/plant.splat",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    },
+    {
+      "demo": "the-scanned-workshop",
+      "key": "the-scanned-workshop/studio-garden.jpg",
+      "source": "test-results/four-demos-inputs/studio/studio-garden.jpg",
+      "sourceCommit": "05c0eb827dc07c18dc9e2ad99e06ae962c10a896",
+      "bytes": null,
+      "gitLfs": false,
+      "status": "missing from the source commit (not git-lfs; the file was never committed)"
+    }
+  ]
+}

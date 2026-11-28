@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Inside a Turbofan | Margo Engine</title>
+  <link rel="stylesheet" href="./player.css">
+</head>
+<body>
+  <div id="viewport"></div>
+  <p id="status" role="status">Preparing the film…</p>
+  <section id="controls" aria-label="Film playback" hidden>
+    <button id="play" type="button">Pause</button>
+    <input id="seek" type="range" aria-label="Film time" min="0" max="90" value="0" step="0.01">
+    <output id="clock" for="seek">0:00 / 1:30</output>
+  </section>
+  <script type="module">
+    import { openFilm } from './film.js';
+    import { buildTurbofan } from './inside-turbofan.js';
+    await openFilm({ title: 'Inside a Turbofan', build: buildTurbofan, night: false, far: 68, look: { environment: 0.96, exposure: -0.13, bloom: 0.085, direction: [-0.56, 0.74, 0.59, 0.99], radiance: [0.83, 0.91, 1, 0.29], shadows: { distance: 11, resolution: 2048 } } });
+  </script>
+</body>
+</html>

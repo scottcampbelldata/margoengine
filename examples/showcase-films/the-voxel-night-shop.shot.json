@@ -1,0 +1,49 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 90,
+  "tracks": [],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "the-voxel-night-shop",
+    "kind": "long",
+    "seed": 8243,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 24,
+    "seconds": 90,
+    "msaa": 1,
+    "tier": "high",
+    "kit": null,
+    "subframes": 1,
+    "shutter": 180,
+    "grade": null,
+    "endCard": null,
+    "warmup": 12,
+    "probes": {
+      "beat-1": 2,
+      "beat-2": 10,
+      "beat-3": 15,
+      "beat-4": 22,
+      "beat-5": 32,
+      "beat-6": 46,
+      "beat-7": 59,
+      "beat-8": 76,
+      "beat-9": 86
+    },
+    "page": {
+      "path": "examples/showcase-films/showcase-final-four.html",
+      "query": {
+        "capture": 1,
+        "film": "the-voxel-night-shop"
+      },
+      "css": "#controls,#status{display:none!important}",
+      "engine": "showcase.engine",
+      "apply": "showcase.apply",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

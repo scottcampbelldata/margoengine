@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Inside the Concert Hall | Margo Engine</title>
+  <link rel="stylesheet" href="./player.css">
+</head>
+<body>
+  <div id="viewport"></div>
+  <p id="status" role="status">Preparing the film…</p>
+  <section id="controls" aria-label="Film playback" hidden>
+    <button id="play" type="button">Pause</button>
+    <input id="seek" type="range" aria-label="Film time" min="0" max="90" value="0" step="0.01">
+    <output id="clock" for="seek">0:00 / 1:30</output>
+  </section>
+  <script type="module">
+    import { openFilm } from './film.js';
+    import { buildConcertHall } from './inside-concert-hall.js';
+    await openFilm({ title: 'Inside the Concert Hall', build: buildConcertHall, night: true, far: 115, look: { environment: 0.56, exposure: 0.62, bloom: 0.18, direction: [-0.32, 0.85, 0.43, 0.54], radiance: [0.82, 0.89, 1, 0.25], shadows: { distance: 37, resolution: 2048, lightSize: 0.4 } } });
+  </script>
+</body>
+</html>

@@ -88,6 +88,11 @@ export function siteFiles(root) {
     ...demoPages.map((name) => `demos/${name}.html`),
     ...[...demoPackageFolders, ...demoExampleFolders, ...demoOtherFolders].map((name) => `demos/${name}/index.html`),
   ];
+  const catalogPath = join(root, 'site/examples/catalog.json');
+  if (existsSync(catalogPath)) {
+    const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
+    for (const film of catalog.films ?? []) built.push(`examples/${film.id}/index.html`);
+  }
   const galleryDir = join(root, 'examples/gallery');
   if (existsSync(galleryDir))
     for (const name of readdirSync(galleryDir)) if (name.endsWith('.html')) built.push(`gallery/${name}`);

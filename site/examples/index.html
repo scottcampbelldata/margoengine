@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Examples | Margo Engine</title>
+  <meta name="description" content="Live Margo Engine examples: a searchable grid of films. Open one to run it, or read its source. None of them play audio.">
+  <link rel="canonical" href="https://margoengine.com/examples/">
+  <meta name="theme-color" content="#0b1020">
+  <link rel="icon" href="../favicon.ico" sizes="32x32">
+  <link rel="preload" href="../fonts/SourceSans3-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="./examples.css">
+</head>
+<body>
+  <a class="skip" href="#examples">Skip to examples</a>
+  <header class="top">
+    <a class="brand" href="../" translate="no">Margo Engine</a>
+    <nav aria-label="Primary">
+      <a href="../#start">Get started</a>
+      <a href="../#packages">Packages</a>
+      <a href="./" aria-current="page">Examples</a>
+      <a href="../catalog/">Catalog</a>
+      <a href="../whitepaper/engine.html">Whitepaper</a>
+      <a href="../bench/">Benchmark</a>
+      <a href="https://github.com/scottcampbelldata/margoengine">GitHub</a>
+    </nav>
+  </header>
+  <div class="shell">
+    <aside>
+      <form role="search">
+        <label for="find">Search examples</label>
+        <input id="find" type="search" placeholder="Search" autocomplete="off">
+      </form>
+      <nav id="list" aria-label="Examples"></nav>
+    </aside>
+    <main id="examples">
+      <div id="grid-view">
+        <h1>Examples</h1>
+        <p class="lede">Live films in the browser. They need WebGPU, so use a current Chrome or Edge on desktop. None of them play audio. Heavy models load from the examples asset host when you open a film.</p>
+        <p id="empty" hidden>No examples match that search.</p>
+        <div id="grid"></div>
+      </div>
+      <div id="viewer" hidden>
+        <div class="bar">
+          <a id="back" href="#">All examples</a>
+          <h1 id="viewer-title"></h1>
+          <a id="source-link" href="#">View source</a>
+          <a id="open-link" href=".">Open page</a>
+        </div>
+        <iframe id="frame" title="Running example" hidden></iframe>
+        <div id="source" hidden>
+          <div id="files" role="tablist" aria-label="Source files"></div>
+          <pre id="code" tabindex="0"></pre>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="./examples.js"></script>
+</body>
+</html>
