@@ -175,12 +175,21 @@ impl World {
     }
 
     /// The step up to its islands' solves: the broad and narrow phases, the islands, the rows, and each island's level of
-    /// substeps and multibody stamps (`plan_islands`). None when the world was lost and does not step.
+    /// substeps and multibody stamps (`plan_islands`). None when the world was lost and does not step. The same as `step_broad`,
+    /// `narrow_pairs` over every active pair and `step_plan`, which is how threads share the narrow phase: each finds a fixed
+    /// run of the active pairs on a view of its own (`thread_view`), and a pair it may take writes only its own row.
     pub fn step_begin(&mut self, dt: f32) -> Option<StepTimes> {
+        let times = self.step_broad(dt)?;
+        self.narrow_pairs(0, self.header().active_pairs, dt);
+        Some(self.step_plan(dt, times))
+    }
+
+    /// The step up to its narrow phase's pairs: the lists put in order, the broad phase, and the narrow phase's header. None when
+    /// the world was lost and does not step. The active pairs are then `header().active_pairs`.
+    pub fn step_broad(&mut self, dt: f32) -> Option<StepTimes> {
         if self.header().lost != NONE {
             return None;
         }
-        let substeps = self.header().substeps;
         self.header_mut().step_dt = dt;
         let begun = now();
         let mut stamp = begun;
@@ -199,7 +208,21 @@ impl World {
         lap(self, 1);
         self.broad_update(dt);
         lap(self, 2);
-        self.narrow_phase(dt);
+        self.narrow_begin(dt);
+        Some(StepTimes { begun, stamp })
+    }
+
+    /// The step after the narrow phase's threadable pairs (`narrow_pairs`) up to its islands' solves: the other pairs, the
+    /// islands, the rows and the islands' plan.
+    pub fn step_plan(&mut self, dt: f32, times: StepTimes) -> StepTimes {
+        let substeps = self.header().substeps;
+        let StepTimes { begun, mut stamp } = times;
+        let mut lap = |world: &mut World, phase: usize| {
+            let at = now();
+            world.timing[phase] = (at - stamp) as f32;
+            stamp = at;
+        };
+        self.narrow_finish(dt);
         lap(self, 3);
         self.update_islands(dt);
         lap(self, 4);
@@ -211,7 +234,7 @@ impl World {
         if self.island_major {
             self.plan_islands(dt, substeps);
         }
-        Some(StepTimes { begun, stamp })
+        StepTimes { begun, stamp }
     }
 
     /// Each island's level of substeps (`island_level`, from its own state alone) and the first multibody stamp of its walks,

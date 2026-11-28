@@ -985,6 +985,8 @@ pub const PAIR_A_RULES: u32 = 4;
 pub const PAIR_B_RULES: u32 = 8;
 /// A part of a mesh pair: off the broad phase's lists, solved like any pair, silent in events.
 pub const PAIR_IS_PART: u32 = 16;
+/// Within a narrow phase only: a pair found on a thread lost its contacts, and `narrow_finish` wakes its bodies.
+pub const PAIR_WAKES: u32 = 32;
 /// Set through one substep's solve: a point of the pair strikes a body that touches a third, still apart, and the strike pass
 /// (`collide_pairwise`) found it does not close this substep, so the pass and not the contact solve strikes it when it does.
 /// 32 is a mesh part's own bit (mesh.rs).

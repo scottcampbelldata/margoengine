@@ -1,14 +1,15 @@
 // A worker thread of a KernelWorld (`KernelWorld.useThreads`): its own instance of the threaded kernel over the world's
 // shared memory, on a stack region of its own, solving the runs of islands the main thread hands it. The world itself is the
-// main thread's: this instance only reads its handle from the kernel's statics and solves islands on a view of its own
-// (`world_solve_islands`), so it never grows the world, filters a pair or modifies a contact.
+// main thread's: this instance only reads its handle from the kernel's statics and, on a view of its own, finds runs of the
+// narrow phase's pairs (`world_narrow_pairs`) and solves runs of islands (`world_solve_islands`), so it never grows the world,
+// filters a pair or modifies a contact.
 
 import { MargoError } from '@margoengine/math/errors';
 
-/** What the main thread sends: the module and memory to start on, then runs of islands. */
+/** What the main thread sends: the module and memory to start on, then runs of active pairs (`narrow`) and of islands. */
 type Message =
   | { readonly module: WebAssembly.Module; readonly memory: WebAssembly.Memory; readonly stack: number }
-  | { readonly first: number; readonly last: number; readonly dt: number };
+  | { readonly narrow?: true; readonly first: number; readonly last: number; readonly dt: number };
 
 /** The answer to each message: done, or the error that stopped it. */
 type Reply = { readonly ok: true } | { readonly ok: false; readonly message: string };
@@ -20,7 +21,8 @@ const mainOnly = (what: string) => (): never => {
   );
 };
 
-let solve: ((first: number, last: number, dt: number) => void) | null = null;
+let solve: ((first: number, last: number, dt: number) => void) | null = null,
+  narrow: ((first: number, last: number, dt: number) => number) | null = null;
 
 function handle(message: Message): Reply {
   try {
@@ -36,13 +38,15 @@ function handle(message: Message): Reply {
       });
       (exports.__stack_pointer as WebAssembly.Global).value = message.stack;
       solve = exports.world_solve_islands as (first: number, last: number, dt: number) => void;
+      narrow = exports.world_narrow_pairs as (first: number, last: number, dt: number) => number;
     } else {
-      if (!solve)
+      if (!solve || !narrow)
         throw new MargoError(
           'state',
           'A kernel thread was asked to solve before it was started; send the module first.',
         );
-      solve(message.first, message.last, message.dt);
+      if (message.narrow) narrow(message.first, message.last, message.dt);
+      else solve(message.first, message.last, message.dt);
     }
     return { ok: true };
   } catch (error) {

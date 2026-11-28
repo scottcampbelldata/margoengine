@@ -611,97 +611,170 @@ impl World {
         }
     }
 
-    /// Finds the manifold of every pair with an awake body. A pair of two sleepers keeps the one it has.
+    /// Finds the manifold of every pair with an awake body. A pair of two sleepers keeps the one it has. The same as
+    /// `narrow_begin`, `narrow_pairs` over every active pair and `narrow_finish`, which is how threads share it: the pairs a
+    /// thread may take (`threadable`) are found on views of the world in fixed runs, the rest after them on the world.
     pub fn narrow_phase(&mut self, dt: f32) {
-        let mut manifold = Manifold::new();
+        self.narrow_begin(dt);
+        self.narrow_pairs(0, self.header().active_pairs, dt);
+        self.narrow_finish(dt);
+    }
+
+    /// The narrow phase's header before any pair: this step's substep and its ratio to the last one's.
+    pub fn narrow_begin(&mut self, dt: f32) {
         let h = dt / self.header().substeps as f32;
         let before = self.header().contact_substep;
         let ratio = if before > 0.0 { h / before } else { 1.0 };
         self.header_mut().contact_substep = h;
         self.header_mut().substep_ratio = ratio;
+    }
+
+    /// Whether active pair `row` may be found on a thread: it writes only its own row. A mesh or compound pair makes and frees
+    /// parts, and a pair the contact filter asks about calls out to it, so those stay on the world (`narrow_finish`).
+    pub fn threadable(&self, row: usize) -> bool {
+        if self.uu(PAIR_FLAGS, row) & PAIR_IS_PART != 0 || self.uu(PAIR_CHILD, row) != crate::world::NONE {
+            return false;
+        }
+        let (a, b) = (self.uu(PAIR_A, row) as usize, self.uu(PAIR_B, row) as usize);
+        let (shape_a, shape_b) = (self.uu(COLLIDER_SHAPE, a), self.uu(COLLIDER_SHAPE, b));
+        shape_a != SHAPE_TRIMESH && shape_b != SHAPE_TRIMESH && !self.has_compound(a, b) && !(self.header().filtering != 0 && self.asks_filter(a, b))
+    }
+
+    /// The threadable pairs among active pairs `first` to `last - 1`, on this world or a thread's view of it; returns how many.
+    /// A pair that loses its contacts marks itself (`PAIR_WAKES`) for `narrow_finish` to wake its bodies, so no two threads
+    /// write one body.
+    pub fn narrow_pairs(&mut self, first: u32, last: u32, dt: f32) -> u32 {
+        let ratio = self.header().substep_ratio;
+        let mut found = 0;
+        for i in first as usize..last as usize {
+            let row = self.uu(ACTIVE_PAIRS, i) as usize;
+            if self.threadable(row) {
+                self.narrow_pair(row, dt, ratio, true);
+                found += 1;
+            }
+        }
+        found
+    }
+
+    /// The narrow phase after the threadable pairs: their bodies woken, then every other pair in order, then the parts swept.
+    pub fn narrow_finish(&mut self, dt: f32) {
+        let ratio = self.header().substep_ratio;
         for i in 0..self.header().active_pairs as usize {
             let row = self.uu(ACTIVE_PAIRS, i) as usize;
-            let flags = self.uu(PAIR_FLAGS, row) & !PAIR_OVERLAP;
-            // A part is its mesh pair's to fill.
-            if flags & PAIR_IS_PART != 0 {
-                continue;
+            let flags = self.uu(PAIR_FLAGS, row);
+            if flags & PAIR_WAKES != 0 {
+                self.set_u(PAIR_FLAGS, row, flags & !PAIR_WAKES);
+                let (a, b) = (self.uu(PAIR_A, row) as usize, self.uu(PAIR_B, row) as usize);
+                self.set_s(SLEEP_TIME, self.uu(COLLIDER_BODY, a) as usize, 0.0);
+                self.set_s(SLEEP_TIME, self.uu(COLLIDER_BODY, b) as usize, 0.0);
             }
-            let (a, b) = (self.uu(PAIR_A, row) as usize, self.uu(PAIR_B, row) as usize);
-            let (body_a, body_b) = (self.uu(COLLIDER_BODY, a) as usize, self.uu(COLLIDER_BODY, b) as usize);
-            let (shape_a, shape_b) = (self.uu(COLLIDER_SHAPE, a), self.uu(COLLIDER_SHAPE, b));
-            let meshed = shape_a == SHAPE_TRIMESH || shape_b == SHAPE_TRIMESH;
-            // A half space meets every convex shape, and nothing it cannot be laid under: a mesh, or another half space.
-            if (shape_a == SHAPE_HALFSPACE || shape_b == SHAPE_HALFSPACE)
-                && (meshed || (shape_a == SHAPE_HALFSPACE && shape_b == SHAPE_HALFSPACE))
-            {
-                self.set_u(PAIR_FLAGS, row, flags);
-                self.drop_contacts(row, body_a, body_b);
-                continue;
-            }
-            let compound = self.has_compound(a, b);
-            let sensor = (self.uu(COLLIDER_FLAGS, a) | self.uu(COLLIDER_FLAGS, b)) & COLLIDER_SENSOR != 0;
-            // Pairs of the kinds a collider leaves out pass through each other, and by default so do scripted bodies:
-            // nothing can push them. A sensor still sees them.
-            let verdict = if !sensor && !self.types_allow(a, b, body_a, body_b) { crate::events::PAIR_SKIP } else { self.touch_verdict(a, b, body_a, body_b) };
-            if verdict == crate::events::PAIR_SKIP {
-                self.set_u(PAIR_FLAGS, row, flags);
-                self.drop_contacts(row, body_a, body_b);
-                continue;
-            }
-            // A pair nothing solves needs to know only that it overlaps.
-            if sensor || verdict == crate::events::PAIR_EVENTS_ONLY || !self.colliders_meet(a, b, true) {
-                manifold.held_count = 0;
-                manifold.feature = 0;
-                let overlaps = if compound {
-                    self.compound_overlaps(a, b)
-                } else if meshed {
-                    self.mesh_overlaps(a, b)
-                } else {
-                    self.collide(a, b, 0.0, &mut manifold);
-                    manifold.points[..manifold.count].iter().any(|point| point.separation <= 0.0)
-                };
-                self.set_u(PAIR_FLAGS, row, if overlaps { flags | PAIR_OVERLAP } else { flags });
-                self.drop_contacts(row, body_a, body_b);
-                continue;
-            }
-            self.set_u(PAIR_FLAGS, row, flags);
-            if compound {
-                self.compound_pair(row, a, b, dt, ratio);
-                if self.header().cluster > 0.0 {
-                    self.cluster_parts(row);
-                }
-                continue;
-            }
-            let limit = self.contact_limit(a, b, dt);
-            if meshed {
-                self.mesh_pair(row, a, b, limit, ratio);
-                if self.header().cluster > 0.0 {
-                    self.cluster_parts(row);
-                }
-                continue;
-            }
-            if self.header().recycle > 0.0 && self.uu(PAIR_CONTACTS, row) > 0 && self.recycle_pair(row, a, b, body_a, body_b, limit) {
-                self.narrow_recycled.set(self.narrow_recycled.get() + 1);
-                continue;
-            }
-            self.narrow_found.set(self.narrow_found.get() + 1);
-            manifold.held_count = self.uu(PAIR_CONTACTS, row) as usize;
-            for k in 0..manifold.held_count {
-                manifold.held[k] = self.uu(CONTACT_ID, row * MANIFOLD + k);
-            }
-            manifold.feature = self.uu(PAIR_FEATURE, row);
-            self.collide(a, b, limit, &mut manifold);
-            self.set_u(PAIR_FEATURE, row, if manifold.count > 0 { manifold.feature } else { 0 });
-            if manifold.count == 0 {
-                self.drop_contacts(row, body_a, body_b);
-                self.set_s(PAIR_REL_ROT_W, row, 0.0);
-            }
-            self.store_manifold(row, body_a, body_b, &manifold, ratio);
-            if self.header().recycle > 0.0 && manifold.count > 0 {
-                self.remember_poses(row, body_a, body_b);
+        }
+        for i in 0..self.header().active_pairs as usize {
+            let row = self.uu(ACTIVE_PAIRS, i) as usize;
+            if !self.threadable(row) {
+                self.narrow_pair(row, dt, ratio, false);
             }
         }
         self.sweep_parts();
+    }
+
+    /// A pair losing its contacts: on a thread (`threaded`) it marks itself for `narrow_finish` to wake its bodies.
+    fn drop_pair_contacts(&mut self, row: usize, a: usize, b: usize, threaded: bool) {
+        if threaded {
+            if self.uu(PAIR_CONTACTS, row) != 0 {
+                self.set_u(PAIR_CONTACTS, row, 0);
+                self.set_u(PAIR_FLAGS, row, self.uu(PAIR_FLAGS, row) | PAIR_WAKES);
+            }
+        } else {
+            self.drop_contacts(row, a, b);
+        }
+    }
+
+    /// The narrow phase of one active pair.
+    /// A manifold of its own each pair: one carried from pair to pair left the last pair's normal on a pair with no points, so
+    /// what a pair stored depended on the pair found before it, and so on how the pairs were split over threads.
+    fn narrow_pair(&mut self, row: usize, dt: f32, ratio: f32, threaded: bool) {
+        let mut manifold = Manifold::new();
+        let manifold = &mut manifold;
+        let flags = self.uu(PAIR_FLAGS, row) & !PAIR_OVERLAP;
+        // A part is its mesh pair's to fill.
+        if flags & PAIR_IS_PART != 0 {
+            return;
+        }
+        let (a, b) = (self.uu(PAIR_A, row) as usize, self.uu(PAIR_B, row) as usize);
+        let (body_a, body_b) = (self.uu(COLLIDER_BODY, a) as usize, self.uu(COLLIDER_BODY, b) as usize);
+        let (shape_a, shape_b) = (self.uu(COLLIDER_SHAPE, a), self.uu(COLLIDER_SHAPE, b));
+        let meshed = shape_a == SHAPE_TRIMESH || shape_b == SHAPE_TRIMESH;
+        // A half space meets every convex shape, and nothing it cannot be laid under: a mesh, or another half space.
+        if (shape_a == SHAPE_HALFSPACE || shape_b == SHAPE_HALFSPACE)
+            && (meshed || (shape_a == SHAPE_HALFSPACE && shape_b == SHAPE_HALFSPACE))
+        {
+            self.set_u(PAIR_FLAGS, row, flags);
+            self.drop_pair_contacts(row, body_a, body_b, threaded);
+            return;
+        }
+        let compound = self.has_compound(a, b);
+        let sensor = (self.uu(COLLIDER_FLAGS, a) | self.uu(COLLIDER_FLAGS, b)) & COLLIDER_SENSOR != 0;
+        // Pairs of the kinds a collider leaves out pass through each other, and by default so do scripted bodies:
+        // nothing can push them. A sensor still sees them.
+        let verdict = if !sensor && !self.types_allow(a, b, body_a, body_b) { crate::events::PAIR_SKIP } else { self.touch_verdict(a, b, body_a, body_b) };
+        if verdict == crate::events::PAIR_SKIP {
+            self.set_u(PAIR_FLAGS, row, flags);
+            self.drop_pair_contacts(row, body_a, body_b, threaded);
+            return;
+        }
+        // A pair nothing solves needs to know only that it overlaps.
+        if sensor || verdict == crate::events::PAIR_EVENTS_ONLY || !self.colliders_meet(a, b, true) {
+            manifold.held_count = 0;
+            manifold.feature = 0;
+            let overlaps = if compound {
+                self.compound_overlaps(a, b)
+            } else if meshed {
+                self.mesh_overlaps(a, b)
+            } else {
+                self.collide(a, b, 0.0, manifold);
+                manifold.points[..manifold.count].iter().any(|point| point.separation <= 0.0)
+            };
+            self.set_u(PAIR_FLAGS, row, if overlaps { flags | PAIR_OVERLAP } else { flags });
+            self.drop_pair_contacts(row, body_a, body_b, threaded);
+            return;
+        }
+        self.set_u(PAIR_FLAGS, row, flags);
+        if compound {
+            self.compound_pair(row, a, b, dt, ratio);
+            if self.header().cluster > 0.0 {
+                self.cluster_parts(row);
+            }
+            return;
+        }
+        let limit = self.contact_limit(a, b, dt);
+        if meshed {
+            self.mesh_pair(row, a, b, limit, ratio);
+            if self.header().cluster > 0.0 {
+                self.cluster_parts(row);
+            }
+            return;
+        }
+        if self.header().recycle > 0.0 && self.uu(PAIR_CONTACTS, row) > 0 && self.recycle_pair(row, a, b, body_a, body_b, limit) {
+            self.narrow_recycled.set(self.narrow_recycled.get() + 1);
+            return;
+        }
+        self.narrow_found.set(self.narrow_found.get() + 1);
+        manifold.held_count = self.uu(PAIR_CONTACTS, row) as usize;
+        for k in 0..manifold.held_count {
+            manifold.held[k] = self.uu(CONTACT_ID, row * MANIFOLD + k);
+        }
+        manifold.feature = self.uu(PAIR_FEATURE, row);
+        self.collide(a, b, limit, manifold);
+        self.set_u(PAIR_FEATURE, row, if manifold.count > 0 { manifold.feature } else { 0 });
+        if manifold.count == 0 {
+            self.drop_pair_contacts(row, body_a, body_b, threaded);
+            self.set_s(PAIR_REL_ROT_W, row, 0.0);
+        }
+        self.store_manifold(row, body_a, body_b, manifold, ratio);
+        if self.header().recycle > 0.0 && manifold.count > 0 {
+            self.remember_poses(row, body_a, body_b);
+        }
     }
 
     /// The pose of body `b` in body `a`'s frame, and the unit quaternion's dot with another, for contact recycling.

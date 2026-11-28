@@ -91,7 +91,7 @@ impl World {
     /// True when a pair may touch: neither side is off, the groups meet, no joint keeps them apart, and the filter agrees.
     /// Whether the world's pair filter is asked about a pair: one of its two colliders has not turned the question off.
     #[inline]
-    fn asks_filter(&self, a: usize, b: usize) -> bool {
+    pub(crate) fn asks_filter(&self, a: usize, b: usize) -> bool {
         let (fa, fb) = (self.uu(COLLIDER_FLAGS, a), self.uu(COLLIDER_FLAGS, b));
         let off = if (fa | fb) & COLLIDER_SENSOR != 0 { COLLIDER_NO_INTERSECTION_FILTER } else { COLLIDER_NO_CONTACT_FILTER };
         fa & off == 0 || fb & off == 0

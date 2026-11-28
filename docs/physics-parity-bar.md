@@ -105,14 +105,19 @@ Status 2026-11-27 (Claude, laptop). Met: every checklist row above but Rapier pa
 `tests/rigid-validation.test.js` with the restitution chain fix (03202202a). Open, so the row stays CLAIMED:
 - Rapier parity: the three PARTIAL rows of `docs/physics-collision-parity.md` (2D soft builders, dihedral and wire
   elements, soft recovery settings) belong to SOFT-01, SOFT-02 and SOFT-04.
-- Point 6: four-wide solver batches, parallel broad and narrow phases (islands already solve on threads, 684c99009) and
-  B-02 64-bit builds are not built: each is kernel work across the Rust crate, its three Wasm builds and the thread
-  scheduler, to be proven by deterministic work counts with identical output.
+- Point 6: four-wide solver batches, the parallel broad phase and B-02 64-bit builds are not built: each is kernel work
+  across the Rust crate, its three Wasm builds and the thread scheduler, to be proven by deterministic work counts with
+  identical output. Islands (684c99009) and the narrow phase (2026-11-28, below) already run on threads.
 
 Closed since (2026-11-27, Claude, laptop):
 - Point 1: `fidelity: 'standard' | 'high'` (28b7c2b4f), each tier validated: both pass the exact-solution suite, a light box
   under 1000 times its mass sinks within 10 percent of each tier's spring depth (18 mm and 1.3 mm), and the domino wave
   agrees between tiers.
+- Point 6, the narrow phase on threads (2026-11-28): `stepAsync` splits the active pairs in fixed runs over the threads,
+  each found on a view of its own; mesh, compound and filtered pairs stay on the main thread (PK61). Hashes equal one
+  thread's at 1, 2, 4 and 8 threads over 300 steps and the threads' pair counts are equal at every count (native
+  `kernel/tests/threads.rs`; Node `tests/kernel-threads.test.js`). It found that a pair with no points kept the normal of the
+  pair found before it.
 - Point 2: measured material pairs (2026-11-27): a tennis ball on polished timber, Rebound Ace and emery (Cross 2002, AJP 70,
   482), restitution and sliding friction each from its own experiment and nothing fitted, bounced at 20 and 45 degrees: the
   six bounces' speed kept along the surface, time-average friction and 45-degree rebound angles match within the paper's stated

@@ -38,6 +38,51 @@ fn step_on(w: &mut World, threads: usize) {
     w.step_end(DT, times);
 }
 
+/// One step with the narrow phase's pairs split over `threads` threads in fixed runs of the active pairs, then the islands as
+/// `step_on` splits them. Returns how many pairs the threads found, each run's count added in run order, and how many active
+/// pairs were left to the world.
+fn step_narrow_on(w: &mut World, threads: usize) -> (u32, u32) {
+    let Some(times) = w.step_broad(DT) else { return (0, 0) };
+    let pairs = w.header().active_pairs as usize;
+    let kept = (0..pairs).filter(|&i| !w.threadable(w.uu(ACTIVE_PAIRS, i) as usize)).count() as u32;
+    let run = pairs.div_ceil(threads).max(1);
+    let shared = Shared(w as *const World);
+    let found: Vec<u32> = std::thread::scope(|scope| {
+        let runs: Vec<_> = (0..threads)
+            .map(|t| {
+                let shared = &shared;
+                scope.spawn(move || {
+                    // SAFETY: the world does nothing else while the pairs are found, and a threadable pair writes only its own row.
+                    let mut view = unsafe { &*shared.0 }.thread_view();
+                    let (first, last) = ((t * run).min(pairs), ((t + 1) * run).min(pairs));
+                    view.narrow_pairs(first as u32, last as u32, DT)
+                })
+            })
+            .collect();
+        runs.into_iter().map(|run| run.join().unwrap()).collect()
+    });
+    let times = w.step_plan(DT, times);
+    let islands = w.header().islands as usize;
+    if w.island_major && islands > 0 {
+        let run = islands.div_ceil(threads);
+        let shared = Shared(w as *const World);
+        std::thread::scope(|scope| {
+            for t in 0..threads {
+                let shared = &shared;
+                scope.spawn(move || {
+                    // SAFETY: as in `step_on`.
+                    let mut view = unsafe { &*shared.0 }.thread_view();
+                    for group in (t * run)..((t + 1) * run).min(islands) {
+                        view.solve_island(group, DT);
+                    }
+                });
+            }
+        });
+    }
+    w.step_end(DT, times);
+    (found.iter().sum(), kept)
+}
+
 fn floor(w: &mut World) {
     let body = w.add_body(FIXED).unwrap();
     w.add_collider(body, SHAPE_BOX, [60.0, 0.5, 60.0], [0.0; 3], IDENTITY, 0.0).unwrap();
@@ -130,4 +175,46 @@ fn islands_on_one_two_four_and_eight_threads_give_the_bits_of_one() {
     // The proof means something only if the steps had islands to share out.
     assert!(most >= 8, "at most {most} islands in a step");
     println!("up to {most} islands a step");
+}
+
+/// A dumbbell of one compound collider dropped among the balls: its pairs stay on the world (`threadable`), the rest go to threads.
+fn mixed_scene(w: &mut World) {
+    scene(w);
+    let body = w.add_body(DYNAMIC).unwrap();
+    let c = w.add_collider(body, SHAPE_COMPOUND, [0.0; 3], [0.0; 3], IDENTITY, 1.0).unwrap();
+    w.add_compound_part(c, SHAPE_BALL, [0.3, 0.0, 0.0], [-0.6, 0.0, 0.0], IDENTITY).unwrap();
+    w.add_compound_part(c, SHAPE_BALL, [0.3, 0.0, 0.0], [0.6, 0.0, 0.0], IDENTITY).unwrap();
+    w.set_v(POSITION_X, body as usize, v3(-2.5, 6.0, 4.0));
+}
+
+#[test]
+fn narrow_phase_pairs_on_one_two_four_and_eight_threads_give_the_bits_of_one_and_the_same_work() {
+    // The work count is the proof the split is the same work: every threadable pair is found once, on some thread, and the
+    // pairs left to the world (the compound's) are the same in every run. Before each pair took a manifold of its own, 8
+    // threads differed at step 2: a pair with no points kept the normal of the pair found before it in its run.
+    let mut serial = World::new(256, 256).unwrap();
+    mixed_scene(&mut serial);
+    let mut worlds: Vec<(usize, World)> = [1usize, 2, 4, 8]
+        .into_iter()
+        .map(|threads| {
+            let mut w = World::new(256, 256).unwrap();
+            mixed_scene(&mut w);
+            (threads, w)
+        })
+        .collect();
+    let (mut most, mut kept) = (0u32, 0u32);
+    for step in 0..300 {
+        serial.step(DT);
+        let mut counts = vec![];
+        for (threads, w) in worlds.iter_mut() {
+            counts.push(step_narrow_on(w, *threads));
+            assert_eq!(w.hash(), serial.hash(), "{threads} threads: the state differs after step {step}");
+        }
+        assert!(counts.iter().all(|&c| c == counts[0]), "pairs found on threads, and left to the world, at step {step}: {counts:?}");
+        most = most.max(counts[0].0);
+        kept = kept.max(counts[0].1);
+    }
+    assert!(most >= 32, "at most {most} threadable pairs in a step");
+    assert!(kept >= 1, "no pair was left to the world");
+    println!("up to {most} pairs a step on threads, up to {kept} on the world");
 }

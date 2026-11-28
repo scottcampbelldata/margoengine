@@ -31,7 +31,9 @@ interface KernelExports extends WebAssembly.Exports {
   world_iterations(): number;
   world_steps(): number;
   world_step(dt: number): number;
-  world_step_begin(dt: number): number;
+  world_step_broad(dt: number): number;
+  world_narrow_pairs(first: number, last: number, dt: number): number;
+  world_step_plan(dt: number): number;
   world_solve_islands(first: number, last: number, dt: number): void;
   world_step_end(dt: number): number;
   world_detect(): number;
@@ -3260,7 +3262,7 @@ export class KernelWorld {
   }
   /** Seconds of the last step, or one 60th before the first. */
   stepSeconds = 1 / 60;
-  /** Threads the islands of a step solve on: the main thread and the workers {@link KernelWorld.useThreads} started. */
+  /** Threads the narrow phase and the islands of a step run on: the main thread and the workers {@link KernelWorld.useThreads} started. */
   get threadCount(): number {
     return this.threads.length + 1;
   }
@@ -3315,9 +3317,10 @@ export class KernelWorld {
   }
 
   /**
-   * {@link KernelWorld.step} with the step's islands split over the threads (`useThreads`) in fixed runs of island numbers,
-   * the main thread solving the first: islands share no body a solve changes, so the bits are those of `step` on any number of
-   * threads. With no worker thread it is `step`.
+   * {@link KernelWorld.step} with the narrow phase's pairs and then the step's islands split over the threads (`useThreads`)
+   * in fixed runs, of active pairs and of island numbers, the main thread taking the first of each: a pair found on a thread
+   * writes only its own row (mesh, compound and filtered pairs stay on the main thread) and islands share no body a solve
+   * changes, so the bits are those of `step` on any number of threads. With no worker thread it is `step`.
    * @throws as {@link KernelWorld.step} does; MargoError (`failed`) when a thread stopped.
    */
   async stepAsync(dt: number): Promise<this> {
@@ -3325,7 +3328,20 @@ export class KernelWorld {
     this.beforeStep(dt);
     let failed: number;
     try {
-      const islands = this.api.world_step_begin(dt);
+      const pairs = this.api.world_step_broad(dt);
+      if (pairs !== 0xffffffff) {
+        const runs = this.threads.length + 1,
+          // Pairs a run, as islands below: the count over the runs, rounded up.
+          share = (pairs - (pairs % runs)) / runs + (pairs % runs === 0 ? 0 : 1),
+          upTo = (first: number) => (first + share < pairs ? first + share : pairs),
+          found = this.threads.map((thread, i) => {
+            const first = (i + 1) * share;
+            return first < pairs ? thread.send({ narrow: true, first, last: upTo(first), dt }) : Promise.resolve();
+          });
+        this.api.world_narrow_pairs(0, upTo(0), dt);
+        await Promise.all(found);
+      }
+      const islands = pairs === 0xffffffff ? pairs : this.api.world_step_plan(dt);
       if (islands !== 0xffffffff) {
         const runs = this.threads.length + 1,
           // Islands a run: the count over the runs, rounded up, in whole numbers.

@@ -349,6 +349,23 @@ from 380 to 780 nm, taken unchanged from Scott Prahl's "Tabulated Molar Extincti
 N. Kollias), retrieved 2026-11-18. Measured physical data, used with attribution; the page states no licence terms. No
 program code is included.
 
+## Measured tennis-ball bounces (physics rigid validation, 2026-11-27)
+
+packages/physics/tests/rigid-materials.test.js holds, as test data, measured values from R. Cross, "Measurements of the
+horizontal coefficient of restitution for a superball and a tennis ball", American Journal of Physics 70(5), 482-489, 2002,
+https://doi.org/10.1119/1.1450571 (author's copy, https://www.physics.usyd.edu.au/~cross/PUBLICATIONS/20.%20HorizCOR.PDF):
+the ball's mass and radii, its restitution and its sliding friction on timber, Rebound Ace and emery (sections V and VI),
+and from Table II each bounce's incidence angle, incoming speed, vx2 / vx1, rebound angle and time-average friction.
+Measured physical data, used with attribution; the paper's text and figures are not copied. Never shipped (test data). No
+program code is included.
+
+## Measured domino wave speeds (physics rigid validation, 2026-11-27)
+
+packages/physics/tests/rigid-measured.test.js holds, as test data, five wave speeds over sqrt(g H) against the spacing over
+the height from R. Larham, "Validation of a Model of the Domino Effect?", arXiv:0803.2898, 2008, appendix A table 1,
+https://arxiv.org/abs/0803.2898 (arXiv's non-exclusive distribution licence). Measured physical data, used with
+attribution; the paper's text is not copied. Never shipped (test data). No program code is included.
+
 ## Measured material data sets (materials library, 2026-11-28)
 
 Scott, 2026-11-28: measured data sets may be copied with credit, each in its own data file under its own licence. The
