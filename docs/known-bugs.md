@@ -15772,20 +15772,25 @@ Release exception: RiggedFigure loads off the floor in AR Quick Look (Apple view
 - **Needed to close:** that run, then either a root-cause fix with a regression test or the phone evidence that it is Quick Look's own behaviour. The
   exporter stays as it is until a file-side cause is shown.
 
-### Quick Look draws every map of a material with the base colour map's texture transform (2026-11-28, open)
+### Fixed 2026-11-28: Quick Look drew every map with the base colour map's texture transform (KB-USDZ-QLTRANSFORM1)
 
-- **What:** AR Quick Look's renderer (macOS 27.2.1 thumbnails) ignores each texture's own `UsdTransform2d` and samples
-  every map of a material with the base colour map's transform. The Khronos ToyCar's cloth (base and normal maps tiled 3
-  times, occlusion map once) shows the one dark square of its occlusion map repeated over the cloth.
-- **Repro:** a quad with a checker `baseColorTexture`, `baseColorTextureTransform` scale 3, and a one-square
-  `emissiveTexture` or `occlusionTexture` with no transform, scale 1 or scale 2: nine squares in all three. With the base
-  map untransformed and the emissive map at scale 3, one square. `usdchecker --arkit` passes every file; the file is
-  correct USD, and `@margoengine/usdz` reads each map's own transform.
-- **Cause:** Apple's renderer. Measured on the same Mac: it does follow a second UV primvar (a base map on `st1` and
-  another on `st` draw independently, custom primvar names included), and a third set draws with one of the first two.
-- **Way to fix it in Margo (not done):** when the maps of a material differ, write their transformed UVs as their own
-  primvars instead of `UsdTransform2d` nodes. `@margoengine/usdz` first has to read a second UV set (below), or Margo's
-  own round trip would break.
+- **What:** AR Quick Look's renderer (macOS 27.2.1 thumbnails) ignores each texture's own `UsdTransform2d` where a
+  material's maps differ, and samples every map with the base colour map's. The Khronos ToyCar's cloth (base and normal
+  maps tiled 3 times, occlusion map once) showed the dark squares of its occlusion map repeated over the cloth.
+- **Repro:** a quad with a `baseColorTexture` that holds one square, `baseColorTextureTransform` scale 3, and an
+  `emissiveTexture` with no transform: nine squares of each, where the glow should show one.
+- **Cause:** Apple's renderer, which the writer did not allow for. Probes on the same Mac: it follows a map's transform
+  where every map has it (also with no base map), and it follows two UV primvars a material, custom names included,
+  also when two materials on one shared shape read four between them; a third set draws with another set's coordinates.
+- **Fix:** where a material's maps differ in UV set or transform, `exportUSDZ` and `exportAnimatedUSDZ` give each
+  transformed map a primvar of moved coordinates (`primvars:stMap0` and on) and no `UsdTransform2d`. Maps all alike
+  keep their nodes, and so does a material with more than four differing ones, which would else hold more UV sets than
+  the four a glTF reader takes (`packages/exporters/src/usdz-write.ts`).
+- **Measured after:** on that Mac, `usdchecker --arkit` passes 10 files and their thumbnails show each map where its
+  glTF transform puts it, the ToyCar's cloth included. With three differing sets Quick Look still draws one map on
+  another's coordinates (`docs/limits.md`).
+- **Regression:** `packages/exporters/tests/usdz.test.js`, "maps of a material that differ read primvars of moved
+  coordinates" and "materials sharing one geometry each find their moved primvars on it" (both fail on the old source).
 
 ### Fixed 2026-11-28: `parseUSDZ` sampled every map of a mesh with one UV set (KB-USDZ-UVSETS1)
 

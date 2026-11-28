@@ -6,6 +6,7 @@ import { exportUSDZ, measureUSDZ } from '../dist/usdz.js';
 import { exportGLB } from '../dist/index.js';
 import { parseUSDZ, readZipDirectory, readZipEntry } from '@margoengine/loaders';
 import { parseUSDZ as readUSD } from '@margoengine/usdz';
+import { previewSurface } from '@margoengine/usdz/preview-surface';
 import { textureTransform } from '@margoengine/gltf/pbr';
 import { headlessEngine } from './helpers.js';
 
@@ -199,13 +200,15 @@ test('USDZ writes a UsdPreviewSurface texture graph with embedded, 64-byte-align
   assert.match(albedo, /token inputs:sourceColorSpace = "sRGB"/);
   assert.match(albedo, /token inputs:wrapS = "clamp"/);
   assert.match(albedo, /token inputs:wrapT = "mirror"/);
-  assert.match(albedo, new RegExp(`float2 inputs:st.connect = <${m}/BaseColorTransform.outputs:result>`));
-  const transform = shader(source, 'BaseColorTransform');
-  assert.match(transform, /info:id = "UsdTransform2d"/);
-  assert.match(transform, new RegExp(`float2 inputs:in.connect = <${m}/UV.outputs:result>`));
-  assert.match(transform, /float2 inputs:scale = \(2, 3\)/);
-  // glTF offset (0.25, 0.5) with scale 3 in v becomes t' = 3 t + (1 - 3 - 0.5) in st space.
-  assert.match(transform, /float2 inputs:translation = \(0.25, -2.5\)/);
+  // The base map's transform differs from the other maps', so it reads a primvar of moved coordinates and no node.
+  assert.match(albedo, new RegExp(`float2 inputs:st.connect = <${m}/UVMap0.outputs:result>`));
+  assert.match(shader(source, 'UVMap0'), /string inputs:varname = "stMap0"/);
+  assert.doesNotMatch(source, /UsdTransform2d/);
+  // glTF offset (0.25, 0.5) with scale (2, 3): st' = (2 u + 0.25, 1 - (3 v + 0.5)).
+  assert.match(
+    source,
+    /texCoord2f\[\] primvars:stMap0 = \[\(0.25, -2.5\), \(2.25, -2.5\), \(2.25, 0.5\), \(0.75, 0.5\)\]/,
+  );
   const metalRough = shader(source, 'MetallicRoughnessTexture');
   assert.match(metalRough, /asset inputs:file = @textures\/orm.jpg@/);
   assert.match(metalRough, /float4 inputs:scale = \(1, 0.4, 0.6, 1\)/);
@@ -256,14 +259,21 @@ test('USDZ writes a UsdPreviewSurface texture graph with embedded, 64-byte-align
   const packed = images[material.pbrMetallicRoughness.metallicRoughnessTexture.index];
   assert.deepEqual(packed.roughness, { path: 'textures/orm.jpg', channel: 1 });
   assert.deepEqual(packed.metallic, { path: 'textures/orm.jpg', channel: 2 });
-  const [mesh] = asset.meshes;
+  const [mesh] = asset.meshes,
+    doc = asset.document,
+    second = asset.buffers[doc.accessors[doc.meshes[0].primitives[0].attributes.TEXCOORD_1].bufferView];
   assert.equal(mesh.indices.length, 6);
   for (let corner = 0; corner < 6; corner++) {
     const p = Array.from(mesh.positions.subarray(corner * 3, corner * 3 + 3)),
       v = [0, 1, 2, 3].find((i) => p.every((x, k) => x === quad.positions[i * 3 + k]));
-    assert.ok(Math.abs(mesh.uvs[corner * 2] - quad.uvs[v * 2]) < 1e-6);
-    assert.ok(Math.abs(mesh.uvs[corner * 2 + 1] - (1 - quad.uvs[v * 2 + 1])) < 1e-6);
+    // The base map's coordinates come first, moved; the other maps' follow as the second set, as authored.
+    assert.ok(Math.abs(mesh.uvs[corner * 2] - (2 * quad.uvs[v * 2] + 0.25)) < 1e-6);
+    assert.ok(Math.abs(mesh.uvs[corner * 2 + 1] - (1 - (3 * quad.uvs[v * 2 + 1] + 0.5))) < 1e-6);
+    assert.ok(Math.abs(second[corner * 2] - quad.uvs[v * 2]) < 1e-6);
+    assert.ok(Math.abs(second[corner * 2 + 1] - quad.uvs[v * 2 + 1]) < 1e-6);
   }
+  assert.equal(material.normalTexture.texCoord, 1);
+  assert.equal(material.pbrMetallicRoughness.metallicRoughnessTexture.texCoord, 1);
 });
 
 test('USDZ alpha masks set opacityThreshold from alphaCutoff', async () => {
@@ -612,4 +622,116 @@ test('a paint-only material is left out, so Quick Look draws the vertex colours 
     await usda(exportUSDZ({ nodes: [{ geometry: plain, material: { color: [1, 1, 1, 1] } }] })),
     /material:binding/,
   );
+});
+
+/** A primvar of one mesh prim as [s, t] pairs. */
+const primvarOf = (source, name) => {
+  const found = source.match(new RegExp(`texCoord2f\\[\\] primvars:${name} = \\[(.*)\\] \\(interpolation`));
+  assert.ok(found, `primvars:${name}`);
+  return found[1].split('), (').map((pair) => pair.replace(/[()]/g, '').split(', ').map(Number));
+};
+/** The primvar a texture shader's coordinates come from, with no UsdTransform2d between. */
+const primvarRead = (source, texture) => {
+  const node = shader(source, texture).match(/inputs:st\.connect = <[^>]*\/(\w+)\.outputs:result>/)[1];
+  return shader(source, node).match(/string inputs:varname = "(\w+)"/)[1];
+};
+/** What gltf/pbr samples at each of `uvs` under `transform`, as st. */
+const movedST = (uvs, transform) => {
+  const rows = textureTransform({ rotation: 0, ...transform });
+  return [0, 1, 2, 3].map((v) => {
+    const [u, w] = gltfUV(rows, uvs[v * 2], uvs[v * 2 + 1]);
+    return [u, 1 - w];
+  });
+};
+const near = (a, b, label) => {
+  assert.equal(a.length, b.length, label);
+  a.flat().forEach((x, i) => assert.ok(Math.abs(x - b.flat()[i]) < 1e-5, `${label}: ${a} is not ${b}`));
+};
+const png = (seed) => ({ image: pngBytes(seed), mimeType: 'image/png' });
+
+test('maps of a material that differ read primvars of moved coordinates, which Quick Look follows', async () => {
+  // AR Quick Look sampled every map with the base colour map's UsdTransform2d: the Khronos ToyCar's cloth, base and
+  // normal maps tiled three times and an occlusion map once, showed the occlusion map tiled too.
+  const tiled = { offset: [0, 0], scale: [3, 3] },
+    turned = { offset: [0.5, 0.25], scale: [2, 1], rotation: Math.PI / 6 },
+    uvs1 = new Float32Array([0, 0, 0.5, 0, 0.5, 0.5, 0, 0.5]),
+    archive = exportUSDZ({
+      nodes: [
+        {
+          geometry: { ...quad, uvs1 },
+          material: {
+            emissive: [1, 1, 1],
+            baseColorTexture: png(1),
+            baseColorTextureTransform: tiled,
+            normalTexture: png(2),
+            normalTextureTransform: tiled,
+            occlusionTexture: png(3),
+            emissiveTexture: { ...png(4), texCoord: 1 },
+            emissiveTextureTransform: turned,
+          },
+        },
+      ],
+    }),
+    source = await usda(archive);
+  assert.doesNotMatch(source, /UsdTransform2d/);
+  const base = primvarRead(source, 'BaseColorTexture'),
+    emissive = primvarRead(source, 'EmissiveTexture');
+  assert.equal(primvarRead(source, 'NormalTexture'), base, 'maps alike share one primvar');
+  assert.equal(primvarRead(source, 'OcclusionTexture'), 'st');
+  assert.notEqual(emissive, base);
+  near(primvarOf(source, base), movedST(quad.uvs, tiled), 'tiled');
+  near(primvarOf(source, emissive), movedST(uvs1, turned), 'turned, from uvs1');
+  near(primvarOf(source, 'st'), movedST(quad.uvs, { offset: [0, 0], scale: [1, 1] }), 'st');
+  assert.doesNotMatch(source, /primvars:st1 =/, 'no map reads uvs1 as it is');
+  // @margoengine/usdz reads each of them back onto a set of its own.
+  const asset = await readUSD(archive, { extensions: [previewSurface()] }),
+    { document, buffers, meshes } = asset,
+    material = document.materials[0],
+    { attributes } = document.meshes[0].primitives[0],
+    infos = [material.pbrMetallicRoughness.baseColorTexture, material.normalTexture, material.emissiveTexture];
+  assert.equal(infos[1].texCoord ?? 0, infos[0].texCoord ?? 0);
+  assert.notEqual(infos[2].texCoord ?? 0, infos[0].texCoord ?? 0);
+  for (const [info, uvs, transform] of [
+    [infos[0], quad.uvs, tiled],
+    [infos[2], uvs1, turned],
+  ]) {
+    const values = buffers[document.accessors[attributes['TEXCOORD_' + (info.texCoord ?? 0)]].bufferView],
+      expected = movedST(uvs, transform);
+    for (let corner = 0; corner < 6; corner++) {
+      const p = Array.from(meshes[0].positions.subarray(corner * 3, corner * 3 + 3)),
+        v = [0, 1, 2, 3].find((i) => p.every((x, k) => x === quad.positions[i * 3 + k]));
+      near([[values[corner * 2], values[corner * 2 + 1]]], [[expected[v][0], 1 - expected[v][1]]], 'corner ' + corner);
+    }
+  }
+});
+
+test('materials sharing one geometry each find their moved primvars on it, and maps all alike keep UsdTransform2d', async () => {
+  const two = { offset: [0, 0], scale: [2, 2] },
+    four = { offset: [0, 0], scale: [4, 4] },
+    material = (transform) => ({
+      baseColorTexture: png(1),
+      baseColorTextureTransform: transform,
+      normalTexture: png(2),
+    }),
+    source = await usda(
+      exportUSDZ({
+        nodes: [
+          { geometry: quad, material: material(two) },
+          { geometry: quad, material: material(four) },
+          { geometry: quad, material: material(two) },
+        ],
+      }),
+    );
+  const shape = source.slice(source.indexOf('class Mesh'), source.indexOf('def Mesh'));
+  near(primvarOf(shape, 'stMap0'), movedST(quad.uvs, two), 'the first material');
+  near(primvarOf(shape, 'stMap1'), movedST(quad.uvs, four), 'the second');
+  assert.equal(source.match(/primvars:stMap0 =/g).length, 1, 'written once, on the shared shape');
+  assert.doesNotMatch(source, /primvars:stMap2/);
+  const alike = await usda(
+    exportUSDZ({
+      nodes: [{ geometry: quad, material: { ...material(two), normalTextureTransform: two } }],
+    }),
+  );
+  assert.equal(alike.match(/info:id = "UsdTransform2d"/g).length, 2);
+  assert.doesNotMatch(alike, /stMap/);
 });

@@ -266,9 +266,26 @@ function surfaceMaterial(material: Mat): SurfaceMat {
   return out;
 }
 
-/** Whether a material samples UV set `set`. */
-const samples = (material: SurfaceMat, set: number): boolean =>
-  TEXTURES.some((slot) => material[slot] && (material[slot].texCoord ?? 0) === set);
+/** A primvar that holds one of a geometry's UV sets with a texture transform applied to it. */
+export interface MovedUVs {
+  name: string;
+  set: 0 | 1;
+  transform: TextureTransform;
+}
+
+/** glTF uvs under a KHR_texture_transform (v down): offset + R S uv, R = [[c, s], [-s, c]], as gltf/pbr reads it. */
+function transformed(uvs: Float32Array, { offset, scale, rotation = 0 }: TextureTransform): Float32Array {
+  const c = Math.cos(rotation),
+    s = Math.sin(rotation),
+    out = new Float32Array(uvs.length);
+  for (let i = 0; i < uvs.length; i += 2) {
+    const u = uvs[i] * scale[0],
+      v = uvs[i + 1] * scale[1];
+    out[i] = c * u + s * v + offset[0];
+    out[i + 1] = c * v - s * u + offset[1];
+  }
+  return out;
+}
 
 /** One geometry in its own space: the class prim of the nodes that share it, its local bounds and the UV sets they read. */
 export interface Shape {
@@ -277,6 +294,8 @@ export interface Shape {
   indices: Uint32Array;
   users: number;
   sets: [boolean, boolean];
+  /** The transformed UV primvars its materials read. */
+  moved: Set<MovedUVs>;
   path?: string;
   min: number[];
   max: number[];
@@ -290,7 +309,7 @@ export function shapeOf(positions: Float32Array, normals: Float32Array, indices:
     min[v % 3] = Math.min(min[v % 3], positions[v]);
     max[v % 3] = Math.max(max[v % 3], positions[v]);
   }
-  return { positions, normals, indices, users: 0, sets: [false, false], min, max };
+  return { positions, normals, indices, users: 0, sets: [false, false], moved: new Set(), min, max };
 }
 
 /** The geometry reflected in X with its winding reversed. */
@@ -318,6 +337,7 @@ export class USDMaterials {
   private readonly textures: ReturnType<typeof textureFiles>;
   private readonly written = new Map<string, { path: string; sets: boolean[] }>();
   private readonly keys = new Map<Mat, number>();
+  private readonly moved = new Map<string, MovedUVs>();
   private readonly surfaces = new Map<Mat, SurfaceMat>();
   private readonly onWarning: SceneOptions['onWarning'];
   constructor(prefix: string = 'textures/', onWarning?: SceneOptions['onWarning']) {
@@ -345,11 +365,44 @@ export class USDMaterials {
     }
     return read;
   }
-  /** Records the UV sets `material` reads from `shape`, before the shape is written. */
+  /**
+   * The primvar each transformed map of `material` reads in place of a UsdTransform2d, or nothing when the maps keep
+   * their nodes. AR Quick Look samples every map of a material with the base colour map's UsdTransform2d and follows two
+   * UV primvars, so maps that differ in UV set or transform read primvars that hold the coordinates already moved. Maps
+   * all alike need none, and with more than four different ones the file would hold more primvars than the four UV sets
+   * glTF readers, `@margoengine/usdz` among them, take.
+   */
+  private movedMaps(material: SurfaceMat): Map<string, MovedUVs> | undefined {
+    const maps = TEXTURES.flatMap((slot) => {
+      const texture = material[slot];
+      if (!texture) return [];
+      const set: 0 | 1 = texture.texCoord === 1 ? 1 : 0,
+        transform = material[`${slot}Transform`],
+        values = transform && [...transform.offset, ...transform.scale, transform.rotation ?? 0],
+        still = !values || values.join() === '0,0,1,1,0';
+      return [{ slot, set, key: still ? `${set}` : `${set},${values}`, transform: still ? undefined : transform }];
+    });
+    const different = new Set(maps.map((map) => map.key)).size;
+    if (different < 2 || different > 4) return undefined;
+    const out = new Map<string, MovedUVs>();
+    for (const { slot, set, key, transform } of maps) {
+      if (!transform) continue;
+      let primvar = this.moved.get(key);
+      if (!primvar) this.moved.set(key, (primvar = { name: `stMap${this.moved.size}`, set, transform }));
+      out.set(slot, primvar);
+    }
+    return out;
+  }
+  /** Records the UV primvars `material` reads from `shape`, before the shape is written. */
   note(shape: Shape, material: Mat): void {
-    const read = this.surfaceOf(material);
-    shape.sets[0] ||= samples(read, 0);
-    shape.sets[1] ||= samples(read, 1);
+    const read = this.surfaceOf(material),
+      moved = this.movedMaps(read);
+    for (const slot of TEXTURES) {
+      const texture = read[slot],
+        primvar = moved?.get(slot);
+      if (primvar) shape.moved.add(primvar);
+      else if (texture) shape.sets[texture.texCoord === 1 ? 1 : 0] = true;
+    }
   }
   /** Mesh `i`'s material: builds its prim the first time, and the colour lines for this geometry. */
   bind(i: number, geometry: Geo, source: Mat): BoundMaterial {
@@ -416,6 +469,16 @@ export class USDMaterials {
       }
       return `${path}/${set ? 'UV1' : 'UV'}.outputs:result`;
     };
+    const moved = this.movedMaps(material),
+      read = new Set<MovedUVs>();
+    const movedUV = (primvar: MovedUVs): string => {
+      const node = `UV${primvar.name.slice('st'.length)}`;
+      if (!read.has(primvar)) {
+        read.add(primvar);
+        shaders.push(...reader(node, 'float2', primvar.name, '(0, 0)'));
+      }
+      return `${path}/${node}.outputs:result`;
+    };
     const sample = (
       slot: (typeof TEXTURES)[number],
       texture: TextureData,
@@ -425,9 +488,11 @@ export class USDMaterials {
     ): string => {
       const { wrapS, wrapT } = samplerOf(texture),
         name = slot[0].toUpperCase() + slot.slice(1);
-      let coordinates = uv(texture.texCoord ?? 0);
-      // Each texture slot has its own KHR_texture_transform, so each transformed map gets its own UsdTransform2d.
-      const transform = material[`${slot}Transform`];
+      const primvar = moved?.get(slot);
+      let coordinates = primvar ? movedUV(primvar) : uv(texture.texCoord ?? 0);
+      // Each texture slot has its own KHR_texture_transform. Maps all alike each keep it as a UsdTransform2d; maps that
+      // differ read it from their primvar (see `movedMaps`).
+      const transform = moved ? undefined : material[`${slot}Transform`];
       if (transform) {
         const node = `${name.slice(0, -'Texture'.length)}Transform`;
         // KHR_texture_transform in glTF uv space (v down): uv' = O + R S uv, R = [[c, s], [-s, c]] (gltf/pbr's
@@ -589,6 +654,15 @@ export function meshPrim(
       ? [`    texCoord2f[] primvars:st${set ? '1' : ''} = ${tuples(st(uvs), 2)} (interpolation = "vertex")`]
       : [];
   };
+  const movedST = (): string[] =>
+    [...shape.moved].flatMap(({ name, set, transform }) => {
+      const uvs = set ? geometry.uvs1 : geometry.uvs;
+      return uvs
+        ? [
+            `    texCoord2f[] primvars:${name} = ${tuples(st(transformed(uvs, transform)), 2)} (interpolation = "vertex")`,
+          ]
+        : [];
+    });
   const topology = [
     `    float3[] extent = ${tuples([...shape.min, ...shape.max], 3)}`,
     `    point3f[] points = ${tuples(shape.positions, 3)}`,
@@ -606,6 +680,7 @@ export function meshPrim(
       ...appearance,
       ...vertexST(0, shape.sets[0]),
       ...vertexST(1, shape.sets[1]),
+      ...movedST(),
       ...extra,
       ...binding,
       '}',
@@ -621,6 +696,7 @@ export function meshPrim(
       ...topology,
       ...vertexST(0, shape.sets[0]),
       ...vertexST(1, shape.sets[1]),
+      ...movedST(),
       '}',
     );
   }

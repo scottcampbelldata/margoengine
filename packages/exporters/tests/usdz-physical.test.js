@@ -135,7 +135,10 @@ test('USDZ writes coat maps from red and green with their factors, UV sets and t
   assert.match(coat, /asset inputs:file = @textures\/map3\.png@/);
   assert.match(coat, /float4 inputs:scale = \(0\.5, 1, 1, 1\)/);
   assert.match(coat, /token inputs:sourceColorSpace = "raw"/);
-  assert.match(coat, new RegExp(`float2 inputs:st.connect = <${m}/ClearcoatTransform.outputs:result>`));
+  // The two coat maps differ in transform, so the transformed one reads a primvar of moved coordinates.
+  assert.match(coat, new RegExp(`float2 inputs:st.connect = <${m}/UVMap0.outputs:result>`));
+  assert.match(shader(source, 'UVMap0'), /string inputs:varname = "stMap0"/);
+  assert.match(source, /primvars:stMap0 = \[\(0, -1\), \(2, -1\), \(2, 1\), \(0, 1\)\]/);
   assert.match(shader(source, 'ClearcoatRoughnessTexture'), /float4 inputs:scale = \(1, 0\.75, 1, 1\)/);
   assert.match(source, /primvars:st = /);
   assert.deepEqual(
@@ -151,7 +154,17 @@ test('USDZ writes coat maps from red and green with their factors, UV sets and t
       (info) => model.sources[model.document.textures[info.index].source],
     );
     assert.deepEqual(files, [{ path: 'textures/map3.png' }, { path: 'textures/map5.png' }], name);
-    assert.deepEqual(layer.clearcoatTexture.extensions.KHR_texture_transform.scale, [2, 2], name);
+    // The coat's coordinates come back moved, on a set of their own; the roughness map keeps the set as authored.
+    const { accessors, meshes } = model.document,
+      { attributes } = meshes[0].primitives[0],
+      [coatUVs, roughUVs] = [layer.clearcoatTexture, layer.clearcoatRoughnessTexture].map(
+        (info) => model.buffers[accessors[attributes['TEXCOORD_' + (info.texCoord ?? 0)]].bufferView],
+      );
+    assert.deepEqual(
+      Array.from(coatUVs),
+      Array.from(roughUVs, (x) => 2 * x),
+      name,
+    );
   }
 });
 

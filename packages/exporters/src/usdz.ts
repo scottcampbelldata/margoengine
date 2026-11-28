@@ -135,9 +135,11 @@ const OUTSIDE_FLOAT32 =
  * color factor (its alpha into `opacity` for BLEND and MASK, with `opacityThreshold` set to `alphaCutoff` for MASK),
  * metal-rough green and blue into `roughness` and `metallic`, `normal`, `occlusion` red and `emissiveColor`. The images
  * are stored as given (PNG or JPEG) under `texturePrefix`. Each slot's transform (`baseColorTextureTransform`,
- * `normalTextureTransform` and so on) becomes that map's own `UsdTransform2d`
- * that samples the same texels as the glTF transform: its rotation in degrees with the same sign (the V flip turns
- * glTF's counter-clockwise-with-v-down into USD's counter-clockwise-with-t-up), the translation re-expressed in st.
+ * `normalTextureTransform` and so on) samples the same texels as the glTF transform. Maps that share one UV set and
+ * transform each carry it as a `UsdTransform2d`: its rotation in degrees with the same sign (the V flip turns glTF's
+ * counter-clockwise-with-v-down into USD's counter-clockwise-with-t-up), the translation re-expressed in st. When a
+ * material's maps differ, which AR Quick Look does not follow, each transformed map reads a primvar (`primvars:stMap0`
+ * and on) that holds the moved coordinates instead, unless more than four differ.
  * @throws TypeError for bytes that are not a GLB, when a textured material's geometry lacks the UV set it samples, or when
  * vertex colors meet a base color texture (USD Preview Surface cannot multiply them); RangeError for an empty scene, a world position
  * outside Float32 range, a bad `height` or an archive over 4 GiB.

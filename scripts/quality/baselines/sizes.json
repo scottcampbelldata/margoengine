@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21726381,
+  "total": 21727515,
   "history": [
     {
       "date": "2026-10-24",
@@ -15456,6 +15456,12 @@
       "commit": "lane-e-usdz-coat",
       "reason": "USDZ keeps UsdPreviewSurface clearcoat, clearcoatRoughness and ior (before, the file and the importers lost them). Measured gzip, parent to this change: exporters/usdz 23398 to 23976, usdz-anim 28967 to 29507, usdz 13168 to 13740, worker 14169 to 14792, compose 24132 to 24714, preview-surface 5013 to 5479. It is the material writer and reader every USD file passes through; a split would add an entry callers must know to keep their coat.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "usdz-moved-uvs",
+      "reason": "KB-USDZ-QLTRANSFORM1: where a material's maps differ in UV set or transform, the USDZ writers write moved coordinates as primvars, which AR Quick Look follows. With the clearcoat maps of 3e4788880e, @margoengine/exporters/usdz-anim measures 29914 B gzip (ceiling 29678 to 30812); /usdz 24352 B stays under its 24696. The bytes are in the material writer both exports share. Core and Stage gain zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15867,7 +15873,7 @@
     "@margoengine/exporters/unreal-precision": 28787,
     "@margoengine/exporters/unreal-precision-importer": 17145,
     "@margoengine/exporters/usdz": 24696,
-    "@margoengine/exporters/usdz-anim": 29678,
+    "@margoengine/exporters/usdz-anim": 30812,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 24025,
     "@margoengine/fbx dist/workers/fbx.js": 136254,
