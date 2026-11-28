@@ -8,6 +8,7 @@ or triangulate geometry. Metadata and arrays stay separated by piece. Array `rea
 float64 values. `maxBytes` defaults to 256 MiB per decoded array. A `readAppended(offset, length, signal)`
 callback supplies raw binary bytes relative to the appended underscore, enabling range loading from an
 immutable file. Inline/base64 payloads must be in the supplied bytes. `signal` cancels all lazy reads.
+A piece of a `.vtr` RectilinearGrid gives `coordinates`, its three axis arrays in x, y, z order, whether or not the file names them.
 Unknown byte orders and integers beyond exact JavaScript number precision reject instead of silently corrupting data.
 
 ```ts
@@ -62,12 +63,12 @@ Every parser returns the same `LoadedGeometry`:
 
 | Function | Reads |
 | --- | --- |
-| `parsePLY` | ASCII, binary little and big endian; x y z, nx ny nz, red green blue (uchar, ushort or float), s/t, u/v, texture_u/texture_v; polygon faces fan-triangulated; `edge` elements (`vertex1`, `vertex2`) as `lineIndices`; files without faces become point clouds; unknown elements and properties skipped |
+| `parsePLY` (also alone from `/ply`) | ASCII, binary little and big endian; x y z, nx ny nz, red green blue (uchar, ushort or float), s/t, u/v, texture_u/texture_v; polygon faces fan-triangulated; `edge` elements (`vertex1`, `vertex2`) as `lineIndices`; files without faces become point clouds; unknown elements and properties skipped |
 | `parseSTL` | See [STL](#stl) |
 | `parse3MF` (async) | Own ZIP reader (stored and deflate through `DecompressionStream('deflate-raw')`, CRC-32 checked); objects, meshes, components, build items, 3x4 transforms; `basematerials` and materials-extension `colorgroup` colors; production extension (parts named by path, UUIDs, alternative representations); unit conversion to meters |
 | `parseDXF` | ASCII and binary DXF, every version: `$INSUNITS` to meters, LAYER colours and off/frozen layers, ACI and true colours (BYLAYER, BYBLOCK), blocks through INSERT (scale, rotation, rows and columns, nested) and DIMENSION; faces from 3DFACE, SOLID, TRACE, polyface and polygon-mesh POLYLINEs and MESH; line segments from LINE, LWPOLYLINE and 2D/3D POLYLINE (bulge arcs), ARC, CIRCLE, ELLIPSE and SPLINE (NURBS), and MLINE (each element along the vertices' miters, with its breaks; the style's caps, fill and element colours are not read), in each entity's object coordinate system; [LEADER and MULTILEADER](#dxf-leaders) with their arrows, text and block content; POINT, TEXT and MTEXT (formatting and `%%` control codes resolved); [block attributes](#dxf-block-attributes) in `texts`; 3DSOLID, BODY and REGION ACIS data decoded to SAT text. `HATCH` with [`readDXFHatch`](#dxf-hatches). Returns `{mesh, lines, points, texts, layers, solids, unit, version, skipped}`; draw `lines` with `@margoengine/lines` (`mode: 'segments'`) and the mesh double-sided (DXF faces have no winding) |
 | `parsePCD` | `DATA ascii`, `binary`, `binary_compressed` (own LZF decompressor); x y z, normal_x/y/z, packed `rgb`/`rgba`, `intensity`, any other field skipped |
-| `parseOFF` | `OFF` with `ST`, `C`, `N` prefixes (texture coordinates, colors 0..1 or 0..255, normals) |
+| `parseOFF` (also alone from `/off`) | `OFF` with `ST`, `C`, `N` prefixes (texture coordinates, colors 0..1 or 0..255, normals), ASCII or big-endian binary; a face's colour or colormap index is kept in its group |
 | `parseXYZ` | xyz, xyz+rgb, xyz+normal, xyz+normal+rgb, xyz+intensity, PTS (xyz+intensity+rgb), chemistry XYZ |
 | `parseVTK` | `# vtk DataFile Version` 1.0 to 5.1, ASCII or BINARY `DATASET POLYDATA`: POINTS, POLYGONS (convex ones fanned, concave ones ear-clipped), TRIANGLE_STRIPS, 5.x OFFSETS/CONNECTIVITY, point NORMALS, COLOR_SCALARS, TEXTURE_COORDINATES (v = 1 - t, as VTK puts t = 0 at the image's bottom), SCALARS |
 | `parseOBJ` (async), `parseMTL` | See [OBJ and MTL](#obj-and-mtl) |
@@ -93,6 +94,10 @@ Every parser returns the same `LoadedGeometry`:
 | `parse3MFMaterials` (`/threemf-materials`, async) | See [3MF textures and colour groups](#3mf-textures-and-colour-groups) |
 | `create3MFMesh` (`/threemf-mesh`, async) | Draws that result, layer stacks included; see [Drawing it](#drawing-it-create3mfmesh) |
 | `parseVTKXML` (`/vtk-xml`, async) | See [VTK XML](#vtk-xml) |
+| `parseVTKLegacy` (`/vtk-legacy`) | See [Legacy VTK datasets](#legacy-vtk-datasets-vtk-legacy) |
+| `parseGeoJSON`, `parseShapefile`, `parseGPX`, `parseKML`, `parseMVT` (`/geo`) | See [Maps, tracks and vector tiles](#maps-tracks-and-vector-tiles-geo) |
+| `parseMMCIF` (`/mmcif`) | See [mmCIF structures](#mmcif-structures-mmcif) |
+| `parse3MFLattice` (`/threemf-lattice`, async) | See [3MF lattices and slices as data](#3mf-lattices-and-slices-as-data-threemf-lattice) |
 | `parse3DM` (`/3dm`) | See [Rhino 3DM](#rhino-3dm) |
 | `parse3DS` (`/3ds`), `parseTDS` (`/tds`) | See [3DS, LWO, AMF, MD2, PDB and KMZ](#3ds-lwo-amf-md2-pdb-and-kmz) |
 | `parseLWO` (`/lwo`), `parseAMF` (`/amf`, async), `parseMD2` (`/md2`) | See [3DS, LWO, AMF, MD2, PDB and KMZ](#3ds-lwo-amf-md2-pdb-and-kmz) |
@@ -115,6 +120,8 @@ Helpers: `toGeometry` (core `Geometry`, flat or smooth normals when missing, per
 ## Errors
 
 Every failure is a `LoaderError`. Branch on `error.code` and `error.format`, not on the message text, and show `error.message` to the person: it ends with a link to the help entry for the code.
+
+A `signal` that is already aborted makes every `/geo` reader (`parseGeoJSON`, `parseShapefile`, `parseGPX`, `parseKML`, `parseMVT`) throw code `aborted` before any input is converted or decoded.
 
 | `code` | Help entry |
 | --- | --- |
@@ -1273,6 +1280,136 @@ console.log(positions.length, indices);
 - **Cells.** Polygons and strips become triangles over the file's points (a convex polygon fanned, a concave one ear-clipped on its own plane), and polylines become `lines`. Volume cells are reduced to the faces only one cell owns, their outer surface; `surface: 'all'` keeps every face. Higher-order cells (quadratic, biquadratic and triquadratic types 21 to 37, Lagrange 68 to 74 and Bezier 75 to 81) draw from their corner points, which VTK lists first, with a warning. `triangleCells` names the cell each triangle came from, numbered as VTK does (PolyData: verts, lines, polys, then strips, whatever order the file writes them in), so a cell field can colour them.
 - **Data.** Every array is in `pointData` or `cellData` by name. `Normals`, `TCoords` and a 3 or 4 component `UInt8` `Scalars` array also fill `normals`, `uvs` and `colors`.
 - **Not read.** Other dataset types, such as image and structured grids, are `unsupported` errors. The legacy text format is `parseVTK`. LZMA blocks (`vtkLZMADataCompressor`) need `@margoengine/decoders`.
+
+## Legacy VTK datasets (`/vtk-legacy`)
+
+`parseVTKLegacy` from `@margoengine/loaders/vtk-legacy` reads all five legacy dataset types (`STRUCTURED_POINTS`, `STRUCTURED_GRID`, `RECTILINEAR_GRID`, `POLYDATA` and `UNSTRUCTURED_GRID`), ASCII or big-endian `BINARY`, in the pre-5.0 cell layout and the 5.x `OFFSETS`/`CONNECTIVITY` one. `parseVTK` in the main entry stays the small POLYDATA surface reader.
+
+```ts
+import { parseVTKLegacy } from '@margoengine/loaders/vtk-legacy';
+
+const file = `# vtk DataFile Version 3.0
+one tetrahedron and a line
+ASCII
+DATASET UNSTRUCTURED_GRID
+POINTS 5 double
+0 0 0  1 0 0  0 1 0  0 0 1  2 2 2
+CELLS 2 8
+4 0 1 2 3
+2 3 4
+CELL_TYPES 2
+10
+3
+POINT_DATA 5
+SCALARS temperature double 1
+LOOKUP_TABLE default
+20 21 22 23 24
+CELL_DATA 2
+SCALARS material int 1
+LOOKUP_TABLE default
+7 9
+`;
+const grid = parseVTKLegacy(new TextEncoder().encode(file));
+console.log(grid.type, grid.cellCount, grid.cellTypes); // UNSTRUCTURED_GRID 2 [10, 3]
+console.log(grid.indices.length / 3, grid.triangleCells, grid.lines); // 4 [0, 0, 0, 0] [3, 4]
+console.log(grid.pointData.temperature.values, grid.cellData.material.values); // [20 ... 24] [7, 9]
+```
+
+- **Topology stays whole.** `offsets` (with a leading zero), `connectivity` and `cellTypes` hold every source cell, volume cells included, as the file has them; `cellCount` counts them. Structured types also give `dimensions` (x fastest), and `STRUCTURED_POINTS` its `origin` and `spacing`.
+- **What draws.** `indices` holds the surface triangles of polygon, strip and volume cells, `triangleCells` the source cell of each; `lines` holds two point indices per line segment (`LINE`, `POLY_LINE` and cell edges with no face), `lineCells` theirs; `vertices` and `vertexCells` the `VERTEX` and `POLY_VERTEX` points. Higher-order and unknown cells keep their topology and draw their corner shape, each such difference named once in `warnings`.
+- **Surface policy.** `surface: 'outer'` (the default) keeps only volume faces no other cell shares, so a grid draws as its skin; `'all'` keeps internal faces too. Faces wind outward from the cell, in the XML reader too. The wedge (type 13) uses VTK's standard corner order: corners 0 1 2 make one triangle and 3 4 5 the other, so its outward faces are 0 2 1 and 3 4 5.
+- **Data.** `pointData`, `cellData` (in source cell order) and the global `fieldData` hold every numeric array by its file name in a prototype-free object, each `{components, values}` with `values` a `Float64Array` (no rounding to float32). `SCALARS`, `VECTORS`, `NORMALS`, `TENSORS`, `TEXTURE_COORDINATES`, `COLOR_SCALARS` and `FIELD` arrays all arrive there.
+- **Limits.** `maxCells` (default `maxTriangles`, 16,000,000) bounds the source cells beside the usual `maxVertices` and `maxTriangles`; `signal` is checked while reading and while building topology.
+
+## Maps, tracks and vector tiles (`/geo`)
+
+`@margoengine/loaders/geo` reads GIS vector data into one shape: `parseGeoJSON`, `parseShapefile`, `parseGPX`, `parseKML` and `parseMVT`. Points, lines and polygons can be mixed in one file; polygons with holes are triangulated for drawing, and every primitive remembers its feature.
+
+```ts
+import { parseGeoJSON, parseGPX } from '@margoengine/loaders/geo';
+
+const map = parseGeoJSON({
+  type: 'FeatureCollection',
+  features: [
+    { type: 'Feature', id: 'park', properties: { name: 'Park' }, geometry: { type: 'Polygon', coordinates: [
+      [[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]], // outer ring
+      [[4, 4], [6, 4], [6, 6], [4, 6], [4, 4]], // a pond
+    ] } },
+    { type: 'Feature', properties: { name: 'Path' }, geometry: { type: 'LineString', coordinates: [[0, -1, 2], [10, -1, 3]] } },
+    { type: 'Feature', properties: { name: 'Well' }, geometry: { type: 'Point', coordinates: [5, 12] } },
+  ],
+});
+console.log(map.crs, map.features.length, map.mesh.indices.length / 3); // OGC:CRS84 3 8
+console.log(map.polygons[0].rings.length, map.lineFeatures.at(-1), map.pointFeatures); // 2 1 [2]
+
+const ride = parseGPX(`<gpx version="1.1" creator="me" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Ride</name>
+  <trkseg><trkpt lat="1" lon="2"><ele>10</ele></trkpt><trkpt lat="1.1" lon="2.1"><ele>12</ele></trkpt></trkseg></trk></gpx>`);
+console.log(ride.features[0].properties?.name, ride.positions); // Ride [2, 1, 10, 2.1, 1.1, 12]
+```
+
+- **The result.** `features` holds each source feature as GeoJSON (`id`, `properties`, `geometry`, and for MVT its `layer` and `extent`). `positions` keeps the source coordinates as `Float64Array` xyz (x = longitude or easting, z defaults to 0), with no projection applied; `crs` names their system (`OGC:CRS84` for GeoJSON, GPX and KML, the `.prj` text for a Shapefile). `points`/`pointFeatures`, `lines`/`lineFeatures` (polygon boundaries included) and `polygons` (`rings` of indices, outer ring first, holes after, without the repeated closing point) address them. `mesh` is a float32 `LoadedGeometry` of the polygon triangles for `toGeometry` and `createMeshes`, `triangleFeatures` giving each triangle's feature and one group per feature carrying its `id` and `name`. Rings are grouped into polygons by containment, whatever their winding or part order.
+- **Shapefile.** `parseShapefile(shp, {dbf, prj, encoding, includeDeleted})` reads point, multipoint, polyline, polygon and multipatch records with their Z and M values; the optional `.dbf` gives `properties` in record order (`encoding` defaults to `windows-1252`; pass the `.cpg` label), and records dBASE marks deleted are left out unless `includeDeleted`.
+- **GPX and KML.** GPX 1.0 and 1.1 waypoints, routes and tracks (each segment its own line) and KML placemarks keep their names, descriptions and `Data`/`SimpleData` values in `properties`; GPX elevations become z and point times are kept in `properties.times`.
+- **Vector tiles.** `parseMVT(bytes, {tile, layers})` reads Mapbox Vector Tile 1 and 2 protobufs, layers, tags, ids, multipart lines and holes included. Without `tile` the coordinates stay in tile units (y down); with `{x, y, z}` they become WGS84 longitude and latitude.
+- **Limits.** `maxFeatures` (100,000), `maxBytes` (256 MiB) and `maxDepth` (geometry collections nested 64 deep) bound a file, beside `maxVertices` and `maxTriangles`; `signal` is checked between features and primitives.
+
+## mmCIF structures (`/mmcif`)
+
+`parseMMCIF` from `@margoengine/loaders/mmcif` reads PDBx/mmCIF coordinate files, the format the Protein Data Bank now serves, into the same `PDBMolecule` that `parsePDB` returns: a point cloud with element colours, covalent radii, atom labels and bonds.
+
+```ts
+import { parseMMCIF } from '@margoengine/loaders/mmcif';
+
+const cif = `data_demo
+loop_
+_atom_site.group_PDB
+_atom_site.id
+_atom_site.type_symbol
+_atom_site.label_atom_id
+_atom_site.label_alt_id
+_atom_site.label_comp_id
+_atom_site.label_asym_id
+_atom_site.auth_seq_id
+_atom_site.pdbx_PDB_ins_code
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+_atom_site.pdbx_PDB_model_num
+ATOM 1 N N . GLY A 52 A 0.000 0.000 0.000 1
+ATOM 2 C CA A GLY A 52 A 1.450 0.000 0.000 1
+ATOM 3 C CA B GLY A 52 A 1.460 0.100 0.000 1
+ATOM 4 N N . GLY A 1 . 9.000 0.000 0.000 2
+`;
+const molecule = parseMMCIF(cif);
+console.log(molecule.atoms.map((a) => `${a.name} ${a.residueId}${a.insertionCode} ${a.alternateLocation}`)); // ['N 52A ', 'CA 52A A']
+console.log(molecule.bonds, molecule.warnings); // [0, 1] ['only the first MODEL is read']
+```
+
+- **What is read.** The CIF 1.1 syntax (quoted values, semicolon text fields, loops), the first data block or the one `block` names (without `data_`, any case), and `_atom_site` with author and label identifiers: `residueId` is the author residue id (text, so non-numeric ids survive), `id` a non-numeric atom id.
+- **Models and conformers.** Only the first model loads (noted once in `warnings`), and an atom with alternate locations keeps its first (`alternateLocation` names it). `insertionCode` holds the PDB insertion code, so residues 52 and 52A stay apart; `parsePDB` fills the same two fields.
+- **Bonds.** `_struct_conn` covalent and disulfide records become bonds when both partners are in the selected model and conformer; records that need a symmetry operation (crystal expansion) are skipped with a warning. Distance bonds from covalent radii follow, as in `parsePDB`, unless `guessBonds: false`. Building a crystal or biological assembly is a separate step.
+
+## 3MF lattices and slices as data (`/threemf-lattice`)
+
+`parse3MFLattice` from `@margoengine/loaders/threemf-lattice` returns what `parse3MFMaterials` returns (the textured, coloured triangle mesh) plus the beam lattice and slice extensions as they are written, so a slicer or a simulation can use the exact beams and layers instead of the triangles. `mesh3MFBeamLattice` (`/threemf-beams`, above) turns a lattice into triangles.
+
+```ts
+import { parse3MFLattice } from '@margoengine/loaders/threemf-lattice';
+
+const bytes = await (await fetch('/prints/lattice-slices.3mf')).arrayBuffer();
+const result = await parse3MFLattice(bytes, { maxBeams: 2_000_000 });
+for (const { object, transform, unitScale } of result.instances) {
+  const lattice = object.lattice;
+  if (lattice) console.log(object.id, lattice.beams.length, lattice.activeBeams.length, lattice.effectiveBalls.length, unitScale); // 9 2 1 2 0.001
+}
+for (const { stack } of result.sliceInstances) console.log(stack.id, stack.layers.length); // 10 2
+```
+
+- **Native objects and their uses.** `objects` holds each source object once, in source units and source doubles (`vertices`, `triangles`, its `lattice` or `slices` reference); `instances` holds each occurrence in the build with its exact row-vector 4 x 3 `transform` (object, component and build transforms multiplied) and the `unitScale` to metres applied after it. A beam radius stays valid under a non-uniform scale because the transform is kept, not baked. The triangle mesh, by contrast, is the baked preview `parse3MF` makes.
+- **Beam lattices.** Each `lattice` keeps its defaults (`radius`, `minLength`, `cap`), `beams` (vertex pair, both radii, both caps, property), `balls`, named `sets` of beam and ball references, `ballMode` and `ballRadius`, and the clipping and representation mesh references (`clippingMode`, `clippingMesh`, `representationMesh`), which are reported, not applied. `activeBeams` lists the beams at least `minLength` long (the others keep their place, so set indices stay valid); `effectiveBalls` the balls `ballMode` asks for, implicit ones at beam ends in `all` mode included.
+- **Slices.** `sliceStacks` holds each slice stack with its `bottom`, its own `slices` (each a `top`, xy `vertices` and closed `polygons` of segments that may carry properties, void layers included) and its `references` to stacks in other parts, which are resolved: `layers` is the whole stack, rising monotonically. `sliceInstances` gives each build use of a stack; a stack on a component wins over stacks on what it contains.
+- **Properties.** `propertyResources` keeps the material resources as written: colour groups with resolved `colors`, composite materials with their `materialId`, `materialIndices` and `weights`, and multiproperties with `propertyIds`, `rows` and `blendMethods`.
+- **Limits.** `maxBeams` (1,000,000 beams and as many explicit balls) and `maxSlices` (100,000 layers and slice references) beside the 3MF options; `signal` cancels.
 
 ## Rhino 3DM
 
