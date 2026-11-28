@@ -545,3 +545,20 @@ uncertainty. Copyright © 2025 by the authors, under CC BY 4.0. The source figur
 code from other projects are absent from the fixture.
 [Article](https://doi.org/10.3390/lubricants13070287)
 [Licence](https://creativecommons.org/licenses/by/4.0/)
+
+## Dam-break measurements (water, GPULiquid checks, 2026-11-28)
+
+packages/water/test/gpu-liquid-dambreak.test.js holds measured values copied unchanged, used with attribution:
+
+- J. C. Martin and W. J. Moyce, "An experimental study of the collapse of liquid columns on a rigid horizontal plane",
+  Phil. Trans. R. Soc. A 244 (1952), 312-324, https://doi.org/10.1098/rsta.1952.0006 (read from the scan at
+  https://www.math.ntu.edu.tw/~shyue/orch08/benchmarks/lowmach/broken-dam/91519.pdf): the runs' T at each Z of their
+  tables 1 to 3 that the test uses (table 1 to Z = 13, table 2 to Z = 12, table 3 to Z = 7.67) and the normalising T
+  at Z = 1.44. The paper states no licence for its tables.
+- L. Lobovsky, E. Botia-Vera, F. Castellana, J. Mas-Soler and A. Souto-Iglesias, "Experimental investigation of
+  dynamic pressure loads during dam break", J. Fluids Struct. 48 (2014), 407-434,
+  https://doi.org/10.1016/j.jfluidstructs.2014.03.009 (arXiv:1308.0115, arXiv's non-exclusive distribution licence
+  1.0): the front's mean speeds of their Table 1 (1.56 and 1.34 sqrt(g H) at 300 and 600 mm, and the 1.14 to 1.74 range
+  of the dam breaks it gathers).
+
+No program code is included.
