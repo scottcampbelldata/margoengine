@@ -9,6 +9,8 @@ import { PostStack } from '@margoengine/post/stack';
 import { Shadows } from '@margoengine/shadows';
 import { createStage } from '@margoengine/stage';
 import { Tonemap } from '@margoengine/tonemap';
+import { Grade } from '@margoengine/tonemap/grade';
+import { LocalExposure } from '@margoengine/tonemap/local';
 import { Label, Panel, Ui, UiRenderer } from '@margoengine/ui';
 
 export const clamp = (x) => Math.max(0, Math.min(1, x));
@@ -298,6 +300,13 @@ export async function openFilm({ title, build, night = false, far = 75, camera, 
         curve: look.curve ?? 'agx',
         exposure: look.exposure ?? (night ? 0.47 : 0.03),
         contrast: look.contrast ?? (night ? 1.01 : 1.08),
+        // A film's grade: look.local lifts dark regions toward grey without flattening their detail
+        // (LocalExposure), look.grade is the colour grade (Grade wheels, curves, saturation).
+        extensions: [
+          ...(look.local ? [new LocalExposure(look.local)] : []),
+          ...(look.grade ? [new Grade(look.grade)] : []),
+        ],
+        ...(look.vignette ? { vignette: look.vignette } : {}),
       }),
       new SMAA({ quality: 'high' }),
     ]);

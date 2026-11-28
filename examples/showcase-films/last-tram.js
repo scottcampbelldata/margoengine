@@ -118,6 +118,9 @@ export async function buildDepot(engine, shop, cluster) {
   const water = { wetness: 0.96, rain: 0.72, coverage: 0.22, size: 1.7, rippleStrength: 0.3 };
   const puddles = Puddles.attach(engine, { ...water });
   const modelWeather = GLTFWeather.attach(engine, { puddles: { ...water } });
+  // Props, buildings and the tram shed standing water off their small tops and edges: they darken and gloss in the
+  // rain, but only the ground, track and platforms pool.
+  const propWeather = GLTFWeather.attach(engine, { puddles: { ...water, coverage: 0 } });
   const fog = Fog.attach(engine, { color: '#3a3532', density: 0.013, heightFalloff: 0.055, height: 3 });
   // Through the gaps of the deck: a near black night.
   ColorBackground.attach(engine, { color: '#0e0f13', bottom: '#1d1a19' });
@@ -330,7 +333,8 @@ export async function buildDepot(engine, shop, cluster) {
   });
   const tram = [...modules, ...wheelsets, ...bellows, ...leaves];
   // GLTFWeather wets the imported models; the film's own Material meshes join Puddles by themselves.
-  for (const model of [depot, ...approach, ...yard, ...tram]) modelWeather.add(model);
+  for (const model of yard) modelWeather.add(model);
+  for (const model of [depot, ...approach, ...tram]) propWeather.add(model);
 
   const heads = [-0.738, 0.738].map(() => ({
     position: [0, 1.188, 0],
@@ -414,6 +418,7 @@ export async function buildDepot(engine, shop, cluster) {
     weather.options.intensity = 0.73 - 0.17 * ramp(time, 68, 86);
     puddles.options.rain = weather.options.intensity;
     modelWeather.options.puddles.rain = weather.options.intensity;
+    propWeather.options.puddles.rain = weather.options.intensity;
 
     if (time >= 19 && time < 27)
       return follow(
