@@ -9087,7 +9087,14 @@ fetches the SIMD module for that world's memory mode. `setControls(index, {drive
 torque commands in snapshot memory. A consumer can apply `read(index)` to a model using the car's
 position, forward, up, the two bogie deflections, and the four axle angles. `readPantograph` gives the
 head height, normal force, gap and a short visual arc pulse on powered separation. A catenary carries
-mechanical waves and contact impulses. The arc pulse is an animation event.
+mechanical waves and contact impulses. The arc pulse is an animation event. On a curve the bogies
+and carbody load the same outer side in either travel direction at the same speed.
+
+The default `threads: 1` runs in either world memory mode. Pass `{ threads: 2 }` or `{ threads: 4 }`
+to `RailSolver.load` for concurrent catenary work on `worldMemory(true)` in Node or a cross-origin-isolated
+browser worker. The count includes the caller. Use one threaded solver per world and dispose it after
+the last step. `wireWorkCounts()` describes the last accepted wire step this instance computed,
+including its velocity rows, position rows and actual f64x2 visits. The report is outside the snapshot.
 
 | Car setting | Default |
 | --- | --- |
@@ -9116,8 +9123,9 @@ speed, and longitudinal and lateral wheel loads. Words 12–23 hold two bogies w
 yaw and their rates. Words 24–30 hold controls, support flags, coupler loads and roof reactions.
 Words 32–55 hold the four wheelsets with angle, angular speed, heave, heave speed and left/right
 rail loads. `wireField` holds interleaved lateral/vertical displacement and velocity columns,
-followed by seven head words each. World snapshots preserve the commands, spring and axle state,
-wire motion and arc pulse.
+followed by seven head words each. Both ports publish in the solver's current signed world cell.
+World snapshots preserve the commands, spring and axle state, wire motion and arc pulse.
+Coded numeric errors leave the previous car and wire state available.
 
 ## Soil tracks, footprints and airborne fines
 

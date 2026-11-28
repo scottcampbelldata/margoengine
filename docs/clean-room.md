@@ -17564,6 +17564,18 @@ The marine output uses the exact geometric difference of consecutive occupied su
   [Handbook](https://www.iqytechnicalcollege.com/Handbook%20of%20Railway%20Vehicle%20Dynamics.pdf)
   [Manchester benchmark](https://doi.org/10.1080/00423119808969454)
   [Wheel–rail contact](https://doi.org/10.1007/s40534-023-00306-4)
+- ENSCO for the Federal Railroad Administration, *High Speed Rail Tilt Train Technology* (1992),
+  appendix A, equations A.1 and A.4 and figure A.10. The radial acceleration magnitude is speed squared
+  over radius. Project it and gravity onto the canted section's right axis for bogie and carbody
+  sway and roll. The survey curvature signs the radial term, which stays the same in reverse travel.
+  [Federal Railroad Administration report](https://rosap.ntl.bts.gov/view/dot/10547/dot_10547_DS1.pdf)
+- Gokul J. Krishnan, Jan Moraal, Zili Li and Zhen Yang, *An Experimental Study of Wheel–Rail Creep
+  Curves Under Dry Contact Conditions Using V-Track* (2025). The contact comparison uses the prescribed
+  angle, slip, speed and reported normal loads as inputs, and holds out the measured force coefficients
+  in figures 9b and 11a/c. The engine defaults are fixed. A separate sensitivity uses Kalker's
+  `G a b C22` on the reported ellipse, from his 1967 thesis §4.3 Table 3. No contact parameter uses
+  the measured or CONTACT-fitted lateral force curves.
+  [V-Track experiment](https://doi.org/10.3390/lubricants13070287)
 - Colin Cole, Maksym Spiryagin, Qing Wu and Chris Bosomworth, *Practical Modelling and
   Simulation of Polymer Draft Gear Connections* (2017). The reduced connection has a measured
   centre spacing, a free-travel region and independent linear compression and tension branches.
@@ -17577,6 +17589,14 @@ The marine output uses the exact geometric difference of consecutive occupied su
   [Benchmark](https://doi.org/10.1080/00423114.2014.953183)
   [Method](https://re.public.polimi.it/retrieve/e0c31c0e-151d-4599-e053-1705fe0aef77/PCaDA%20statement%20of%20methods_11311-943365_Facchinetti.pdf)
   [String response](https://research.tudelft.nl/en/publications/dynamic-response-of-a-two-level-catenary-to-a-moving-load/)
+- R. Courant, K. Friedrichs and H. Lewy, *On the Partial Difference Equations of Mathematical
+  Physics* (1928), part II §1, and Gilbert Strang's MIT 18.086 lecture notes (2006),
+  §5.3. Decomposing the centered tensioned-string difference into an ordered velocity update and
+  a position update gives two independent passes. Each partition writes disjoint interior nodes.
+  The joins preserve the stencil's old-neighbor values, and pantograph loads are accumulated in
+  their original order before the passes.
+  [Courant–Friedrichs–Lewy](https://web.stanford.edu/class/cme324/classics/courant-friedrichs-lewy.pdf)
+  [Strang lecture notes](https://math.mit.edu/classes/18.086/2006/am53.pdf)
 - Andrea Mariscotti, *Dataset of measured and commented pantograph electric arcs in DC
   railways* (2020), records the experimental association of detachment and powered arcing.
   The documented option emits a brief visual event after mechanically measured contact loss.

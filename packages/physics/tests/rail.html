@@ -8,6 +8,7 @@
   import { generateWagon } from '/packages/procedural/dist/vehicles.js';
   import { RailRoute, RailSolver } from '/packages/physics/dist/rail.js';
   import { PhysicsWorld, worldMemory } from '/packages/physics/dist/world.js';
+  import { curveTake, stockMaterial } from './rail-curve-shot.js';
 
   const errors = [];
   const stage = await createStage(document.querySelector('canvas'), {
@@ -30,14 +31,8 @@
     wire: { track, pantographs: [{ car: 0, restHeight: 4.0, energized: true }] },
   });
 
-  const hex = (c) => '#' + c.map((v) => Math.round(255 * (v <= 0.0031308 ? 12.92 * v :
-    1.055 * v ** (1 / 2.4) - 0.055)).toString(16).padStart(2, '0')).join('');
-  const meshes = Object.entries(stock.parts).map(([name, data]) => {
-    const material = stock.palette[name];
-    return [name, stage.mesh(toGeometry(data), {
-      color: hex(material.color), roughness: material.roughness, metalness: material.metalness,
-    })];
-  });
+  const meshes = Object.entries(stock.parts).map(([name, data]) =>
+    [name, stage.mesh(toGeometry(data), stockMaterial(stock, name))]);
   stage.box({ size: [90, 0.3, 28], position: [40, -0.59, 0], color: '#6a7166', roughness: 0.93 });
   stage.box({ size: [85, 0.2, 3.5], position: [40, -0.29, 0], color: '#747672', roughness: 0.92 });
   for (let x = 9; x <= 43; x += 0.54)
@@ -80,5 +75,14 @@
     return { distance: car.distance, wheelTravel: car.wheelsets[0].angle * radius, uptake: panto.contactForce,
       headHeight: panto.headHeight, errors, shared: world.memory.buffer instanceof SharedArrayBuffer };
   };
-  window.closeRail = () => stage.dispose();
+  let curved;
+  window.beginCurveTake = async () => {
+    stage.dispose();
+    const canvas = document.createElement('canvas');
+    document.body.replaceChildren(canvas);
+    curved = await curveTake(canvas, stock);
+    window.curveFrame = curved.shot;
+    return curved.setup;
+  };
+  window.closeRail = () => curved ? curved.dispose() : stage.dispose();
 </script></body></html>

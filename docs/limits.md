@@ -10941,7 +10941,23 @@ centreline curvature and cant. The field accepts separate rail height irregulari
 is chosen before the world starts. Contact tracks the two tread reactions and a flange restoring
 load. Post-rail motion retains an arclength and independent spring and fall coordinates. The
 catenary uses a tensioned fixed-anchor contact wire with linear waves and a single sprung pickup
-per configured car. The powered separation event is for animation. The optional rail entry measures 23,282 B minified and 9,673 B gzip. The plain and shared wire kernels each measure 571 B raw. Core and Stage gain zero bytes.
+per configured car. The wire's vertical gravity and contact geometry are aligned with world Y.
+The powered separation event is for animation.
+
+The default creep and Hertz stiffnesses are effective constants. Spin creepage and resolved
+wheel and rail profiles are open, as are flange climbing and a Nadal criterion. Leaving the
+authored support enters a fall without an off-track collision model. The wire omits messenger,
+droppers, wire bending and wind response. The contact comparison in
+`packages/physics/scripts/dyn05-vtrack-measured.mjs` misses 14 of 19 dry lateral adhesion bands
+on the scaled V-Track rig. At the largest tested slip the model gives 0.295–0.297 against
+measured values of 0.375–0.394. The fixture leaves full train and catenary validation open.
+
+The stable world rate comes from wheelset, suspension, draft-gear and wire frequencies.
+Nonfinite geometry, forces or native updates report a coded error before changing the
+accepted car or wire. The optional 2- and 4-participant arrangements require shared world memory
+and a blocking agent. Participants parallelize each catenary node pass. The coupler and pantograph
+force sums and independent vehicle dynamics run on the caller.
+The optional rail entry is 12,230 B min+gzip. Each lazy Wasm variant is 2,914 B raw and 1,062 B gzip.
 
 ### Tracks and footprints on a physical bed (EARTH-05)
 

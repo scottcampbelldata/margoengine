@@ -6355,6 +6355,13 @@ a moving pantograph exciting both cable axes, deterministic snapshot restore and
 arena equality. Two Chromium render paths measure four metres of travel over one second from
 the actual procedural wagon and more than 36,000 changed frame pixels.
 
+Reversing travel keeps the same lateral acceleration and roll at a fixed surveyed position and
+speed. `rail.test.js` compares both directions and both curve hands against the resolved centrifugal
+and gravity force. The native catenary reproduces the discrete two-axis standing wave and exact
+1/2/4 participant snapshots through a signed origin shift in `rail-wire-workers.test.js`.
+The V-Track contact holdout misses 14 of 19 measured uncertainty bands, so measured contact
+validation remains open.
+
 ### Pressure-sinkage and persistent relief (EARTH-05)
 
 The soil contact cases verify the independent Bekker and Janosi–Hanamoto laws, the bedrock bound and the

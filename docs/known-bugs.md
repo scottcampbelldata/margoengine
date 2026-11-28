@@ -5072,10 +5072,10 @@ The audit in [physics-solver-audit.md](physics-solver-audit.md) read every solve
 listed there and the rows are REOPENED; these are the defects, each to be fixed by the row's owner with a regression
 test.
 
-- **DYN-05, a reversing train feels the curve the wrong way.** **Repro:** run a rail car backwards through a curve;
-  the lateral load in the car frame flips sign. **Cause:** `packages/physics/src/rail/car.ts` (two places, the bogie
-  and body lateral terms) uses `signedSquare(speed) * curvature`; centripetal acceleration is v²κ whatever the
-  direction.
+- **DYN-05, reversed curve load fixed.** The former signed square of wheel speed reversed lateral acceleration.
+  Bogies and carbody now use speed squared with the surveyed curvature sign for both travel directions.
+  `packages/physics/tests/coupling/rail.test.js` checks both curve hands and `rail.browser.mjs` checks that wet
+  forward and reverse passes at the same curve station lean toward the same outside rail.
 - **DYN-05, a flange can never climb.** **Repro:** any flange contact; L/V never exceeds 1. **Cause:** `car.ts` caps
   the flange force at the vertical load, so no Nadal check can ever trip.
 - **ICE-05, thick ice melts slower than thin ice above freezing.** **Repro:** `ice.test.js` (the melt case) asserts

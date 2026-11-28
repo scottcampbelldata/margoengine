@@ -11539,6 +11539,13 @@ fluid (speed phase) and a run on a second GPU vendor.
 
 The optional rail solver owns layout-1 f64 car and cable regions. It consumes ATMO-09 wetness directly through the field registry. The numeric state includes springs, axle speeds, controls and wire deflections. The Rust SIMD cable kernel works in the same arena and has no active static data in either memory mode. Its two lanes carry lateral and vertical waves. Focused proofs cover static axle loads, rolling distance, cant, a rail joint, wet-braking slip, coupler reactions, wire lift, contact loss, deterministic scrub and rendered asset motion on both backends.
 
+The surveyed curve acceleration is even in travel direction. `rail.test.js` proves the sign and
+magnitude for both curve hands, signed-origin port replay, and atomic rejection of derived overflow.
+The private native catenary job partitions velocity and position passes with a join at each boundary.
+The force assembly remains ordered. `rail-wire-workers.test.js` covers the discrete two-axis mode and
+exact 1/2/4-participant replay. The packaged browser test starts three actual catenary helpers.
+`rail.browser.mjs` checks the outward roll and exact same-frame replay during both wet-curved passes.
+
 ### Terrain-contact footprints (EARTH-05)
 
 An optional slot-free SIMD kernel rasterizes pressure-driven indentation and redistributes loose volume using

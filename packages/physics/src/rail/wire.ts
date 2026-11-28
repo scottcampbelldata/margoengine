@@ -16,7 +16,7 @@ import {
   type Car,
 } from './car.js';
 import { railNumber } from './contact.js';
-import type { WireKernel } from './kernel.js';
+import type { RailWireWorkCounts, WireKernel } from './kernel.js';
 import type { RailRoute } from './track.js';
 
 export interface PantographSpec {
@@ -115,6 +115,12 @@ export function makeWire(host: SolverHost, spec: RailWireSpec, cars: readonly Ca
   if (!Number.isSafeInteger(intervals))
     throw new MargoError('state', 'Choose a whole number of wire subdivisions per span.');
   const nodes = spans * intervals + 1;
+  if (
+    !Number.isSafeInteger(nodes) ||
+    nodes < 3 ||
+    (nodes * 4 + COLLECTOR_WORDS * spec.pantographs.length) * WORD_BYTES >= 0x100000000
+  )
+    throw new MargoError('state', 'Use a longer catenary span or fewer nodes per span so the wire fits world memory.');
   const spacing = length / intervals; // float division: wire spacing
   const tension = pos(spec.tension ?? 12500, 'wire tension');
   const density = pos(spec.density ?? 1.05, 'wire mass per metre');
@@ -124,6 +130,9 @@ export function makeWire(host: SolverHost, spec: RailWireSpec, cars: readonly Ca
     throw new MargoError('state', 'Use one pantograph head per rail car.');
   const inverseMass = 1 / (density * spacing); // float division: mass per wire node
   const c2 = tension / (density * spacing * spacing); // float division: tensioned-string finite difference
+  pos(spacing, 'wire node spacing');
+  pos(inverseMass, 'inverse wire node mass');
+  pos(c2, 'wire squared wave speed per squared spacing');
   const frequency = pantographs.reduce(
     (max, p) => Math.max(max, Math.sqrt((p.stiffness + p.contactStiffness) / p.mass), p.damping / p.mass), // float division: collector natural frequency and damping
     Math.max(2 * Math.sqrt(c2), damping),
@@ -197,8 +206,14 @@ export function readPantograph(wire: Wire, index: number): PantographReading {
   };
 }
 
-export function stepWire(wire: Wire, cars: readonly Car[], carsRegion: Region, dt: number): void {
-  const words = regionWords(wire.host.memory, wire.region) as Float64Array;
+export function stepWire(
+  wire: Wire,
+  cars: readonly Car[],
+  carsRegion: Region,
+  dt: number,
+  wireRegion = wire.region,
+): RailWireWorkCounts {
+  const words = regionWords(wire.host.memory, wireRegion) as Float64Array;
   const loading = regionWords(wire.host.memory, wire.loading) as Float64Array;
   const carsState = regionWords(wire.host.memory, carsRegion) as Float64Array;
   loading.fill(0);
@@ -247,9 +262,9 @@ export function stepWire(wire: Wire, cars: readonly Car[], carsRegion: Region, d
       loading[2 * left + 3] = loading[2 * left + 3]! + fraction * force;
     }
   }
-  wire.kernel.rail_wire_step(
-    wire.region.byteOffset,
-    wire.region.byteOffset + 2 * wire.nodes * WORD_BYTES,
+  return wire.kernel.step(
+    wireRegion.byteOffset,
+    wireRegion.byteOffset + 2 * wire.nodes * WORD_BYTES,
     wire.loading.byteOffset,
     wire.nodes,
     wire.intervals,

@@ -15386,8 +15386,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 1527319,
-        "gzip": 988337
+        "raw": 1527342,
+        "gzip": 988115
       },
       "./decomposition": {
         "raw": 26988,
@@ -15438,8 +15438,8 @@
         "gzip": 16106
       },
       "./rail": {
-        "raw": 20545,
-        "gzip": 8496
+        "raw": 30922,
+        "gzip": 12230
       },
       "./seismic": {
         "raw": 12828,
@@ -19319,9 +19319,9 @@
       "brotli": 1483
     },
     "packages/physics/dist/solver-phase-thread.js": {
-      "raw": 1587,
-      "gzip": 766,
-      "brotli": 665
+      "raw": 1604,
+      "gzip": 778,
+      "brotli": 673
     },
     "packages/physics/dist/cloth-kernel.wasm": {
       "raw": 11606,
@@ -19334,14 +19334,14 @@
       "brotli": 4720
     },
     "packages/physics/dist/rail-kernel.wasm": {
-      "raw": 571,
-      "gzip": 391,
-      "brotli": 356
+      "raw": 2914,
+      "gzip": 1062,
+      "brotli": 924
     },
     "packages/physics/dist/rail-kernel-shared.wasm": {
-      "raw": 571,
-      "gzip": 391,
-      "brotli": 357
+      "raw": 2914,
+      "gzip": 1062,
+      "brotli": 924
     },
     "packages/physics/dist/granular-mpm-kernel.wasm": {
       "raw": 16409,
@@ -20090,13 +20090,13 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 333008,
-        "gzip": 106982
+        "raw": 333031,
+        "gzip": 106996
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",
         "raw": 1194310,
-        "gzip": 880542,
+        "gzip": 880546,
         "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },

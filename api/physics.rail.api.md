@@ -159,11 +159,15 @@ export class RailSolver implements Solver<RailSolverParams> {
     read(index: number): RailCarState;
     readWire(arclength: number): RailWireReading;
     readPantograph(index: number): PantographReading;
+    wireWorkCounts(): RailWireWorkCounts | undefined;
+    dispose(): void;
+    [Symbol.dispose](): void;
 }
 
 export interface RailSolverOptions {
     readonly id?: string;
     readonly wetnessField?: FieldDescriptor;
+    readonly threads?: number;
 }
 
 export interface RailSolverParams {
@@ -203,6 +207,17 @@ export interface RailWireSpec {
     readonly density?: number;
     readonly damping?: number;
     readonly pantographs: readonly PantographSpec[];
+}
+
+export interface RailWireWorkCounts extends RailWireWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly RailWireWorkerWork[];
+}
+
+export interface RailWireWorkerWork {
+    readonly velocityRows: number;
+    readonly positionRows: number;
+    readonly simdNodePairs: number;
 }
 
 export function railCreepForce({ slip, rollingSpeed, normal, creepStiffness, adhesion }: RailCreep): readonly [number, number];

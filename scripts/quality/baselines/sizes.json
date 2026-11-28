@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21803728,
+  "total": 21807579,
   "history": [
     {
       "date": "2026-10-24",
@@ -15599,6 +15599,12 @@
       "commit": "tintres1-shutter-masks",
       "reason": "KB-SHOT-SHUTTERMASK1: T6 reads only ground its masks cover whole (255), as the shot tool's masks now follow the shutter: headless/look 19,492 to 19,498 B gzip measured (ceiling 19492 to 19498). One threshold argument on the shared mask helper; a second entry would repeat the ground strata.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "dyn05-threaded-contact-wire",
+      "reason": "DYN-05: rail grows from 8496 to 12230 B gzip (ceiling 8752 to 12597) for staged car and wire publication, coded invalid geometry and loads, signed origins, and optional native worker phases with exact work receipts. A separate wire entry would duplicate the coupled car, contact and registry layout. Each lazy wire variant measures 2,914 B raw and 1,062 B gzip. The Physics base and existing users of the worker pool remain within their ceilings. Core and Stage gain zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16503,7 +16509,7 @@
     "@margoengine/physics/pack-ice": 4971,
     "@margoengine/physics/pbf": 5833,
     "@margoengine/physics/pedestrians": 4688,
-    "@margoengine/physics/rail": 8752,
+    "@margoengine/physics/rail": 12597,
     "@margoengine/physics/robots": 5083,
     "@margoengine/physics/rod": 4755,
     "@margoengine/physics/rogue": 7642,

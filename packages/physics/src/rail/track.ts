@@ -53,7 +53,8 @@ const vectorBlend = (a: RailPoint, b: RailPoint, t: number): RailPoint => [
 
 function normalise(vector: RailPoint): RailPoint {
   const length = hypot(...vector);
-  if (length < EPS) throw new MargoError('state', 'Supply track stations with a nonzero tangent.');
+  if (!(length >= EPS && Number.isFinite(length)))
+    throw new MargoError('state', 'Supply track stations with a finite nonzero tangent.');
   return [vector[0] / length, vector[1] / length, vector[2] / length]; // float division: unit vector
 }
 
@@ -65,13 +66,25 @@ export class RailRoute {
   private readonly stations: readonly Station[];
 
   constructor(input: readonly RailStation[]) {
-    if (input.length < 2) throw new MargoError('state', 'Provide two or more rail stations.');
-    const samples = input.map(({ centre, cant = 0, leftHeight = 0, rightHeight = 0 }) => ({
-      centre: centre.map((value) => railNumber(value, 'rail coordinate')) as unknown as RailPoint,
-      cant: railNumber(cant, 'rail cant in radians', -0.7, 0.7),
-      leftHeight: railNumber(leftHeight, 'left rail elevation'),
-      rightHeight: railNumber(rightHeight, 'right rail elevation'),
-    }));
+    if (!Array.isArray(input) || input.length < 2)
+      throw new MargoError('state', 'Provide an array of two or more rail stations.');
+    const samples = Array.from(input, (station: RailStation) => {
+      const centre = station?.centre;
+      if (centre?.length !== 3)
+        throw new MargoError('state', 'Give each rail station three centre coordinates [x, y, z] in metres.');
+      const point: RailPoint = [
+        railNumber(centre[0], 'rail X coordinate'),
+        railNumber(centre[1], 'rail Y coordinate'),
+        railNumber(centre[2], 'rail Z coordinate'),
+      ];
+      const { cant = 0, leftHeight = 0, rightHeight = 0 } = station;
+      return {
+        centre: point,
+        cant: railNumber(cant, 'rail cant in radians', -0.7, 0.7),
+        leftHeight: railNumber(leftHeight, 'left rail elevation'),
+        rightHeight: railNumber(rightHeight, 'right rail elevation'),
+      };
+    });
     this.maxHeightOffset = samples.reduce(
       (peak, s) => Math.max(peak, Math.abs(s.leftHeight), Math.abs(s.rightHeight)),
       0,
@@ -79,7 +92,7 @@ export class RailRoute {
     const edges = samples.slice(1).map(({ centre }, i) => diff(centre, samples[i]!.centre));
     const spans = edges.map((edge) => {
       railNumber(hypot(edge[0], edge[2]), 'horizontal station spacing', EPS);
-      return hypot(...edge);
+      return railNumber(hypot(...edge), 'finite station spacing in metres', EPS);
     });
     let distance = 0;
     this.stations = samples.map((sample, i) => {
@@ -87,12 +100,21 @@ export class RailRoute {
       const after = Math.min(edges.length - 1, i);
       const a = normalise(edges[before]!);
       const b = normalise(edges[after]!);
-      const span = 0.5 * (spans[before]! + spans[after]!);
+      const span = railNumber(0.5 * (spans[before]! + spans[after]!), 'station curvature spacing', EPS);
       const bent = diff(b, a);
       const tangent = normalise(vectorBlend(a, b, 0.5));
-      const curvature = dot(bent, [tangent[2], 0, -tangent[0]]) / span; // float division: curvature per arclength
+      const curvature = railNumber(
+        dot(bent, [tangent[2], 0, -tangent[0]]) / span, // float division: curvature per arclength
+        'finite curvature per metre',
+      );
       const station = { ...sample, tangent, curvature, distance };
-      distance += spans[i] ?? 0;
+      const next = spans[i];
+      if (next !== undefined) {
+        const end = distance + next;
+        if (!(end > distance && Number.isFinite(end)))
+          throw new MargoError('state', 'Rail arclength loses a station span; author a shorter route at local scale.');
+        distance = end;
+      }
       return station;
     });
     this.length = distance;
@@ -126,7 +148,9 @@ export class RailRoute {
     const supported = distance >= 0 && distance <= this.length;
     const extension = distance < 0 ? distance : distance > this.length ? distance - this.length : 0;
     const point = vectorBlend(a.centre, b.centre, t);
-    const centre = point.map((value, i) => value + extension * tangent[i]!) as unknown as RailPoint;
+    const centre = point.map((value, i) =>
+      railNumber(value + extension * tangent[i]!, 'finite rail position in metres'),
+    ) as unknown as RailPoint;
     return {
       centre,
       tangent,

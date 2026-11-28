@@ -123,6 +123,34 @@ test('LAST-TRAM-1/2: curvature turns the bogie and a balanced cant cancels most 
   assert.equal(a.lostSupport, 0);
 });
 
+test('forward and reverse wheelsets produce the same outer-rail acceleration at either curve hand', () => {
+  const speed = 10;
+  const arclength = 42;
+  for (const radius of [100, -100]) {
+    const bank = Math.sign(radius) * 0.03;
+    const track = route({ radius, bank });
+    const forward = setup(track, { speed: +speed, distance: arclength });
+    const reverse = setup(track, { speed: -speed, distance: arclength });
+    const dt = 1 / 7680;
+    const context = { tick: 0, level: 7, cell: [0, 0, 0], seed: 0, inputs: new Map() };
+    forward.rail.step(context, dt);
+    reverse.rail.step(context, dt);
+    const a = forward.rail.read(0);
+    const b = reverse.rail.read(0);
+    assert.ok(a.distance > arclength && b.distance < arclength);
+    assert.equal(a.sway, b.sway);
+    assert.equal(a.roll, b.roll);
+    assert.deepEqual(a.bogieSway, b.bogieSway);
+    const { tangent, right, curvature } = track.sample(arclength);
+    const bankProjection = right[0] * tangent[2] - right[2] * tangent[0];
+    const acceleration = GRAVITY[1] * right[1] - speed * speed * curvature * bankProjection;
+    close(a.sway / (dt * dt), acceleration, 128 * Number.EPSILON);
+    const rollMomentPerInertia = (8 * 1.05) / (1.435 * 1.435);
+    close(a.roll / (dt * dt), acceleration * rollMomentPerInertia, 512 * Number.EPSILON);
+    assert.equal(Math.sign(a.sway), -Math.sign(radius));
+  }
+});
+
 test('LAST-TRAM-2/3: the leading sprung bogie rides the joint before the trailing bogie', () => {
   const stock = generateLocomotive({ arrangement: '4-4-0' });
   const { world, rail } = setup(route({ joint: 0.016 }), { centreHeight: stock.size[1] * 0.4 });
@@ -249,6 +277,49 @@ test('plain and shared wire state match through a snapshot and an exact replay',
   b.world.restoreSnapshot(saved.bytes);
   b.world.advance(115);
   assert.equal(b.world.hash(), expected);
+});
+
+test('invalid surveyed geometry and contact inputs report coded actions', () => {
+  const coded = (message) => ({ name: 'MargoError', code: 'state', message });
+  assert.throws(() => new RailRoute([null, { centre: [0, 0, 10] }]), coded(/three centre coordinates/));
+  assert.throws(
+    () => new RailRoute([{ centre: [-Number.MAX_VALUE, 0, 0] }, { centre: [Number.MAX_VALUE, 0, 0] }]),
+    coded(/horizontal station spacing/),
+  );
+  assert.throws(() => railCreepForce({ slip: [1] }), coded(/two rail slip velocities/));
+  assert.throws(() => setup(route(), { mass: Number.MAX_VALUE }), coded(/finite static wheel reaction/));
+});
+
+test('rail publications use the live signed cell across advancement and replay', async () => {
+  const { world, rail } = await wireSetup(route());
+  const cell = [-7, 3, -2];
+  world.shiftOrigin([7, -3, 2]);
+  const saved = world.takeSnapshot();
+  world.advance(20);
+  const expected = world.takeSnapshot();
+  for (const { name } of [rail.carField, rail.wireField]) {
+    assert.deepEqual(world.fields.port(name).cell, cell);
+  }
+  world.restoreSnapshot(saved.bytes);
+  world.advance(20);
+  assert.deepEqual(world.takeSnapshot().bytes, expected.bytes);
+});
+
+test('derived car overflow leaves accepted running gear and native wire data unchanged', async () => {
+  const track = route({ radius: 100 });
+  const world = new PhysicsWorld({ rate: RATE, gravity: GRAVITY, memory: worldMemory(true) });
+  using rail = await RailSolver.load(world.memory, { threads: 2 });
+  const setup = wireParams(track);
+  world.add(rail, { ...setup, cars: [...setup.cars, { track, distance: 65, speed: 1e190 }] });
+  const accepted = world.takeSnapshot();
+  assert.equal(rail.wireWorkCounts(), undefined);
+  assert.throws(() => rail.step({ tick: 0, level: 7, seed: 0, cell: [0, 0, 0], inputs: new Map() }, 1 / 7680), {
+    name: 'MargoError',
+    code: 'state',
+    message: /forces exceed finite range/,
+  });
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  assert.equal(rail.wireWorkCounts(), undefined);
 });
 
 test('rail contact and suspension are independent of display rate and capped scrubbing', () => {

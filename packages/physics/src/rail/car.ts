@@ -1,5 +1,6 @@
+import { MargoError } from '@margoengine/math/errors';
 import { cos, dot, pow, sin } from '@margoengine/math/pinned';
-import { checkedAdhesion, type RailAdhesion, railCreepForce, railNumber, railSlipLimit } from './contact.js';
+import { checkedAdhesion, evaluatedRailCreep, type RailAdhesion, railNumber, railSlipLimit } from './contact.js';
 import type { RailPoint, RailRoute, RailSample } from './track.js';
 
 /**
@@ -113,14 +114,20 @@ const WET: RailAdhesion = { friction: 0.12, highSlipRatio: 0.4, decay: 0.7, adhe
 const positive = (value: number, description: string) => railNumber(value, description, Number.MIN_VALUE);
 const blend = (a: number, b: number, t: number) => a + (b - a) * t;
 const magnitude = (v: number, bound: number) => Math.sign(v) * Math.min(Math.abs(v), bound);
-const signedSquare = (v: number) => Math.abs(v) * v;
 const along = (p: RailPoint, a: RailPoint, x: number, b: RailPoint, y: number): RailPoint => [
   p[0] + a[0] * x + b[0] * y,
   p[1] + a[1] * x + b[1] * y,
   p[2] + a[2] * x + b[2] * y,
 ];
 
+function lateralAcceleration(speed: number, track: RailSample, gravity: RailPoint): number {
+  // Curvature is signed in the surveyed route frame. The radial term is even in travel speed.
+  return dot(gravity, track.right) - speed * speed * track.curvature * cos(track.cant);
+}
+
 export function carOf(spec: RailCarSpec, gravity: RailPoint): Car {
+  if (typeof spec?.track?.sample !== 'function')
+    throw new MargoError('state', 'Give each rail car a surveyed RailRoute.');
   const mass = positive(spec.mass ?? 24000, 'rail carbody mass');
   const bogieMass = positive(spec.bogieMass ?? 2000, 'bogie mass');
   const axleMass = positive(spec.axleMass ?? 650, 'wheelset mass');
@@ -130,16 +137,22 @@ export function carOf(spec: RailCarSpec, gravity: RailPoint): Car {
   const bogieSpacing = railNumber(spec.bogieSpacing ?? 6.6, 'bogie spacing', bogieWheelbase);
   const centreHeight = positive(spec.centreHeight ?? 1.05, 'carbody centre height above the rail plane');
   const contactStiffness = positive(spec.contactStiffness ?? 1e8, 'wheel Hertz stiffness');
-  const totalMass = mass + 2 * bogieMass + 4 * axleMass;
+  const totalMass = positive(mass + 2 * bogieMass + 4 * axleMass, 'finite total rail mass');
   const distance = railNumber(spec.distance, 'carbody initial arclength');
+  const speed = railNumber(spec.speed ?? 0, 'initial rail speed');
+  railNumber(speed / wheelRadius, 'representable initial wheel angular speed'); // float division: pure rolling
   const axles = [-1, 1].flatMap((bogie) => [-1, 1].map((axle) => 0.5 * (bogie * bogieSpacing + axle * bogieWheelbase)));
   const g = Math.max(0, -dot(gravity, spec.track.sample(distance).up));
   const flangeClearance = positive(spec.flangeClearance ?? 0.008, 'wheel flange clearance');
   const treadHalfWidth = railNumber(spec.treadHalfWidth ?? 0.052, 'supported tread half width', flangeClearance);
   const wetnessWord = railNumber(spec.wetnessWord ?? 0, 'relative wetness word', 0);
   if (!Number.isSafeInteger(wetnessWord)) railNumber(NaN, 'integer relative wetness word');
-  const load = totalMass * g * 0.125;
-  const restDepth = load > 0 ? pow(load / contactStiffness, 2 / 3) : 0; // float division: static Hertz preload ratio
+  const load = railNumber(totalMass * g * 0.125, 'finite static wheel reaction', 0);
+  const restDepth = railNumber(
+    load > 0 ? pow(load / contactStiffness, 2 / 3) : 0,
+    'finite static wheel compression',
+    0,
+  ); // float division: static Hertz preload ratio
   return {
     track: spec.track,
     distance,
@@ -151,7 +164,7 @@ export function carOf(spec: RailCarSpec, gravity: RailPoint): Car {
     bogieWheelbase,
     bogieSpacing,
     centreHeight,
-    speed: railNumber(spec.speed ?? 0, 'initial rail speed'),
+    speed,
     conicity: railNumber(spec.conicity ?? 0.045, 'equivalent conicity', 0, 0.5),
     primaryStiffness: positive(spec.primaryStiffness ?? 7.5e5, 'primary spring stiffness'),
     primaryDamping: railNumber(spec.primaryDamping ?? 9000, 'primary damping', 0),
@@ -173,10 +186,10 @@ export function carOf(spec: RailCarSpec, gravity: RailPoint): Car {
     restDepth,
     restSecondary: 0.5 * mass * g,
     restPrimary: 0.5 * (bogieMass + 0.5 * mass) * g,
-    wheelInertia: 0.5 * axleMass * wheelRadius * wheelRadius,
-    pitchInertia: (mass * bogieSpacing * bogieSpacing) / 12, // float division: slender carbody estimate
-    rollInertia: (mass * gauge * gauge) / 8, // float division: distributed carbody estimate
-    bogieInertia: (bogieMass * bogieWheelbase * bogieWheelbase) / 6, // float division: distributed bogie estimate
+    wheelInertia: positive(0.5 * axleMass * wheelRadius * wheelRadius, 'finite wheelset inertia'),
+    pitchInertia: positive((mass * bogieSpacing * bogieSpacing) / 12, 'finite pitch inertia'), // float division: slender carbody estimate
+    rollInertia: positive((mass * gauge * gauge) / 8, 'finite roll inertia'), // float division: distributed carbody estimate
+    bogieInertia: positive((bogieMass * bogieWheelbase * bogieWheelbase) / 6, 'finite bogie inertia'), // float division: distributed bogie estimate
   };
 }
 
@@ -272,7 +285,7 @@ function resolveBogie(
       const longitudinalJacobian = 1 - side * halfGauge * s.curvature;
       const railSpeed = speed * longitudinalJacobian - side * halfGauge * yawSpeed;
       const relative = [railSpeed - radius * omega, linSlip] as const;
-      const force = railCreepForce({
+      const force = evaluatedRailCreep({
         slip: relative,
         rollingSpeed: rolling,
         normal,
@@ -299,8 +312,7 @@ function resolveBogie(
     integrate(w, axle + 2, normals - spring + car.axleMass * dot(gravity, s.up), car.axleMass, dt);
     axleLoad += spring;
   }
-  const cantGravity = dot(gravity, centre.right);
-  const lateralInFrame = cantGravity - signedSquare(speed) * centre.curvature * cos(centre.cant);
+  const lateralInFrame = lateralAcceleration(speed, centre, gravity);
   integrate(w, base, axleLoad - vertical + car.bogieMass * dot(gravity, centre.up), car.bogieMass, dt);
   integrate(w, base + 2, contactSide - lateral + car.bogieMass * lateralInFrame, car.bogieMass, dt);
   const yawSpring = 0.25 * car.primaryStiffness * car.bogieWheelbase * car.bogieWheelbase;
@@ -318,9 +330,8 @@ export function stepCar(w: Float64Array, car: Car, gravity: RailPoint, wetness: 
   w[LATERAL] = a.contactSide + b.contactSide;
   w[LOSS] = a.loss | b.loss;
   w[DERAILED] = w[DERAILED]! || Number(a.unsupported + b.unsupported >= 2);
-  const normalG = dot(gravity, centre.up),
-    rightG = dot(gravity, centre.right);
-  const lateralInFrame = rightG - signedSquare(w[SPEED]!) * centre.curvature * cos(centre.cant);
+  const normalG = dot(gravity, centre.up);
+  const lateralInFrame = lateralAcceleration(w[SPEED]!, centre, gravity);
   integrate(
     w,
     DISTANCE,

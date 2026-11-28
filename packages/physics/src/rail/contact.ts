@@ -72,6 +72,35 @@ export function railCreepForce({
   normal,
   creepStiffness,
   adhesion,
+}: RailCreep): readonly [number, number];
+export function railCreepForce(input: RailCreep): readonly [number, number] {
+  if (input?.slip?.length !== 2 || !input.adhesion)
+    throw new MargoError('state', 'Supply two rail slip velocities and one rail adhesion record.');
+  const slip = [
+    railNumber(input.slip[0], 'longitudinal slip velocity in metres per second'),
+    railNumber(input.slip[1], 'lateral slip velocity in metres per second'),
+  ] as const;
+  const result = evaluatedRailCreep({
+    slip,
+    rollingSpeed: railNumber(input.rollingSpeed, 'positive rail rolling speed', Number.MIN_VALUE),
+    normal: railNumber(input.normal, 'nonnegative rail reaction', 0),
+    creepStiffness: railNumber(input.creepStiffness, 'nonnegative rail creep stiffness', 0),
+    adhesion: checkedAdhesion(input.adhesion),
+  });
+  if (!result.every(Number.isFinite))
+    throw new MargoError(
+      'state',
+      'Rail creep force exceeds numeric range. Reduce slip or use a representable rolling speed.',
+    );
+  return result;
+}
+
+export function evaluatedRailCreep({
+  slip,
+  rollingSpeed,
+  normal,
+  creepStiffness,
+  adhesion,
 }: RailCreep): readonly [number, number] {
   const speed = hypot(slip[0], slip[1]);
   if (!(speed > 0 && normal > 0 && adhesion.friction > 0 && rollingSpeed > 0)) return [0, 0];

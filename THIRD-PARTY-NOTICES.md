@@ -535,3 +535,13 @@ e8114a8ae5eedc1e69d89ed1c5ea8e617bc70657ad95bf0633616d7bd15d04f0 (heights -106.9
 
 ## 3MF Consortium sample and validation files
 packages/loaders/tests/fixtures/3mf-samples/ holds ten unchanged files from https://github.com/3MFConsortium/3mf-samples at commit 665e20dc4d7777fd4c9702bca86a2d4028440337: examples/material/multiprop-opaque.3mf and multiprop-metallic.3mf, and from validation tests/_archive/3mf-Verify six MUSTFAIL_3MF100_Extension_Chapter5b-5e multiproperties files and MUSTPASS_Chapter5.1a and 5.1b. BSD-2-Clause, Copyright (c) 2018, 3MF Consortium; the licence text is LICENSE.txt in that folder and each file SHA-256 is in packages/loaders/tests/fixtures/SOURCES.txt. Test inputs only, never shipped; no implementation code is included.
+
+## V-Track wheel–rail measurements
+
+`packages/physics/scripts/dyn05-vtrack-measured.mjs` digitizes the measured lateral creep samples
+and their plotted spread in figures 9(b) and 11(a,c) by Gokul J. Krishnan, Jan Moraal, Zili Li and
+Zhen Yang (2025). The diagnostic uses the article's reported dimensions, test loads and measurement
+uncertainty. Copyright © 2025 by the authors, under CC BY 4.0. The source figures and implementation
+code from other projects are absent from the fixture.
+[Article](https://doi.org/10.3390/lubricants13070287)
+[Licence](https://creativecommons.org/licenses/by/4.0/)
