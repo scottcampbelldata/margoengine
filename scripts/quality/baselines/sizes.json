@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21702950,
+  "total": 21707183,
   "history": [
     {
       "date": "2026-10-24",
@@ -15409,6 +15409,12 @@
       "commit": "sound-03-threaded-ray-trace",
       "reason": "SOUND-03 physics/underwater grows from 4622 to 8028 B gzip (cap 4878 to 8284) for optional Wasm asset loading, shared-memory workers and exact accepted work receipts. Keeping both trace choices in one entry preserves the synchronous API and shares its snapshots and field publication. Each optional native image is 4846 B gzip. Core and Stage gain zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "cameras-shots-1",
+      "reason": "new entry @margoengine/cameras/shots at 571 B gzip (ceiling 827 B): ShotBlend, two framed views and an eased move between them with a portrait back-off, so the optics demos carry no camera maths. The root and the other entries are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15574,6 +15580,7 @@
     "@margoengine/cameras/panini": 3289,
     "@margoengine/cameras/panorama": 2686,
     "@margoengine/cameras/physical": 1349,
+    "@margoengine/cameras/shots": 827,
     "@margoengine/cameras/stereo": 3400,
     "@margoengine/cameras/wide-cube": 4031,
     "@margoengine/cinematic": 2076,

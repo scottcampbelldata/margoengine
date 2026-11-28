@@ -3,7 +3,7 @@ import { Clustered } from '@margoengine/clustered';
 import { Shadows } from '@margoengine/shadows';
 import { createInstrument } from './model.js';
 import { malus } from '@margoengine/optics/polarization';
-import { lerp as mix } from '@margoengine/math/mathutils';
+import { ShotBlend } from '@margoengine/cameras/shots';
 
 const transmissionAt = (degrees) => malus(degrees * Math.PI / 180);
 
@@ -19,17 +19,17 @@ const view = document.querySelector('#view');
 const presets = Array.from(document.querySelectorAll('[data-angle]'));
 const lifetime = new AbortController();
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-const overview = { target: [0, .150, .039], offset: [.492, .392, .929], fitAspect: 1.10 };
-const detail = { target: [.008, .241, .030], offset: [.448, .300, .585], fitAspect: 1.02 };
+const overview = { target: [0, .150, .039], offset: [.492, .392, .929], fit: 1.10 };
+const detail = { target: [.008, .241, .030], offset: [.448, .300, .585], fit: 1.02 };
 const studio = [
   { position: [-.48, .61, -.57], range: 1.6, color: [.34, .66, 1], intensity: 1.8, radius: .12 },
   { position: [.29, .53, .42], range: 1.0, color: [1, .82, .63], intensity: .41, radius: .09 },
 ];
 const detector = { position: [0, .263, .151], range: .39, color: [.39, .82, 1], intensity: .0015, radius: .041 };
-let engine, instrument, lights, observer, advance, last = 0;
+let engine, shots, instrument, lights, observer, advance, last = 0;
 const angles = { analyzer: Number(range.value), polarizer: 0 };
 const separation = () => Math.abs(angles.analyzer - angles.polarizer);
-let zoom = 0, close = false, pending = false, opticalDirty = true;
+let close = false, pending = false, opticalDirty = true;
 
 function resize() {
   const frame = canvas.getBoundingClientRect();
@@ -39,13 +39,6 @@ function resize() {
   if (canvas.width !== width) canvas.width = width;
   if (canvas.height !== height) canvas.height = height;
   return true;
-}
-
-function frameCamera() {
-  const fit = Math.max(1, mix(overview.fitAspect, detail.fitAspect, zoom) * canvas.height / canvas.width);
-  const target = overview.target.map((value, i) => mix(value, detail.target[i], zoom));
-  engine.camera.target = target;
-  engine.camera.position = target.map((value, i) => value + fit * mix(overview.offset[i], detail.offset[i], zoom));
 }
 
 function status() {
@@ -69,12 +62,11 @@ function paint(now) {
   advance = undefined;
   const delta = last ? Math.min(.06, (now - last) / 1000) : 1 / 60;
   last = now;
-  const target = Number(close);
-  zoom = reducedMotion.matches || Math.abs(zoom - target) < .001 ? target : mix(target, zoom, Math.exp(-delta * 17));
-  frameCamera();
+  shots.goal = Number(close);
+  const moving = shots.update(delta, canvas.width, canvas.height);
   const brightness = transmissionAt(separation());
   if (opticalDirty) {
-    instrument.update(angles, brightness);
+    instrument.update(angles, brightness, filter.value);
     lights.setLights([...studio, { ...detector, intensity: .021 * brightness }]);
     opticalDirty = false;
   }
@@ -85,13 +77,13 @@ function paint(now) {
     polarizer: angles.polarizer,
     separation: separation(),
     transmission: brightness.toFixed(6),
-    view: zoom === 1 ? 'detail' : zoom === 0 ? 'overview' : 'moving',
+    view: moving ? 'moving' : close ? 'detail' : 'overview',
   });
   if (pending) {
     performance.mark('margo-angle-applied');
     pending = false;
   }
-  if (zoom !== target) schedule();
+  if (moving) schedule();
   else last = 0;
 }
 
@@ -145,6 +137,7 @@ async function start() {
     engine = await open();
   }
   engine.onError = fail;
+  shots = new ShotBlend(engine.camera, overview, detail, { rate: 17, still: reducedMotion });
   engine.scene.background = '#4c5b62';
   engine.lighting.direction.set([-.67, 1.05, .53, 3.3]);
   engine.lighting.radiance.set([1, .90, .74, .36]);
@@ -162,7 +155,7 @@ async function start() {
   if (lifetime.signal.aborted) return;
   const options = { signal: lifetime.signal };
   range.addEventListener('input', () => turn(Number(range.value)), options);
-  filter.addEventListener('change', () => { status(); schedule(); }, options);
+  filter.addEventListener('change', () => { opticalDirty = true; status(); schedule(); }, options);
   for (const button of presets) button.addEventListener('click', () => {
     const difference = Number(button.dataset.angle);
     const stationary = angles[filter.value === 'analyzer' ? 'polarizer' : 'analyzer'];

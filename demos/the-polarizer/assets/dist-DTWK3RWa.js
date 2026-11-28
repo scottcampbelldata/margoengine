@@ -1,0 +1,1 @@
+export{a as install}from"./dist-K_Re-Yea.js";

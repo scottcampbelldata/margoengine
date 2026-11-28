@@ -1,1 +1,0 @@
-export{a as install}from"./dist-CpShwwOp.js";

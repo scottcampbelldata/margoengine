@@ -33,6 +33,7 @@ button:focus-visible,input:focus-visible,a:focus-visible { outline:2px solid var
 label,dt { color:var(--muted); font-size:.87rem; font-weight:650; }
 input { width:100%; min-height:43px; margin:0; accent-color:var(--accent); grid-column:1/-1; cursor:grab; }
 input:active { cursor:grabbing; }
+.scale { grid-column:1/-1; margin:2px 0 0; color:var(--muted); font-size:.8rem; }
 output { font:665 1.18rem/1.14 "Segoe UI",system-ui,sans-serif; font-variant-numeric:tabular-nums; }
 .actions { display:flex; gap:6px; }
 .readings { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:0; }

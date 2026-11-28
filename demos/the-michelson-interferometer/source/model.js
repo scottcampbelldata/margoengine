@@ -3,7 +3,7 @@ import { roundedBoxGeometry } from '@margoengine/geometry/extras';
 import { cylinderGeometry, latheGeometry } from '@margoengine/geometry/primitives';
 import { toGeometry } from '@margoengine/geometry/utils';
 import { axisAngleToQuaternion } from '@margoengine/math/quat';
-import { mirrorPeriodNm, mirrorTilt } from './optics.js';
+import { mirrorPeriodNm, mirrorTilt, travelScale } from './optics.js';
 import { installLight } from './light.js';
 
 const h=.264;
@@ -121,8 +121,10 @@ export function createInterferometer(engine,shadows){
   const carriage=engine.createMesh();
   box([.126,.021,.104],.008,violet,[stepCell-.021,.131,0],{parent:carriage});
   mirror(carriage,violet,stepCell,0,Math.PI/2,0,false);
-  disc(.020,.112,steel,[-.516,.154,0],{rotation:alignX});
-  const dial=engine.createMesh().setPosition([-.575,.154,0]);
+  // The micrometer spindle and thimble push the carriage, so they translate with it.
+  const screw=engine.createMesh();
+  disc(.020,.112,steel,[-.516,.154,0],{parent:screw,rotation:alignX});
+  const dial=engine.createMesh(screw).setPosition([-.575,.154,0]);
   disc(.044,.033,warm,[0,0,0],{parent:dial,rotation:alignX});
   disc(.035,.012,steel,[-.018,0,0],{parent:dial,rotation:alignX});
   const knurl=block(.029,.0065,.0065,.002);
@@ -179,10 +181,11 @@ export function createInterferometer(engine,shadows){
     ready:light.ready,
     showGuides(visible){for(const guide of guides)guide.visible=visible;},
     update(distance){
-      const shift=distance*1e-9;
-      carriage.setPosition([-shift,0,0]);
+      const shift=distance*1e-9*travelScale;
+      carriage.setPosition([shift,0,0]);
+      screw.setPosition([shift,0,0]);
       dial.setQuaternion(axisAngleToQuaternion([1,0,0],2*Math.PI*distance/mirrorPeriodNm));
-      beam(movingBeam,pivot,[stepCell+.013-shift,h,0],.013,yaw(-Math.PI/2));
+      beam(movingBeam,pivot,[stepCell+.013+shift,h,0],.013,yaw(-Math.PI/2));
       light.update(distance);
     },
   };

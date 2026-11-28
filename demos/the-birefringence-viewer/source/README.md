@@ -1,6 +1,6 @@
 # The Birefringence Viewer
 
-Increase **Compression force** to load the clear disc from opposite ends of its vertical diameter. **Rotate both filters** turns the crossed pair relative to the load, moving the dark bands tied to principal stress direction. **Use parallel filters** shows the complementary bright-field pattern. At zero load the crossed view is dark and the parallel view is bright.
+Increase **Compression force** to load the clear disc from opposite ends of its vertical diameter. **Rotate both filters** turns the crossed pair relative to the load, moving the dark bands tied to principal stress direction; the index pointer on the front filter shows its axis, since a quarter turn of a crossed pair brings back the same bands. **Use parallel filters** shows the complementary bright-field pattern. At zero load the crossed view is dark and the parallel view is bright.
 
 The ideal specimen is a circular, linearly elastic disc of radius 143 mm and thickness 16 mm under diametric point loads. The model uses the sum of the two Flamant compression fields for the stress tensor difference and shear. The uniform correction for the circular boundary cancels from both quantities. The stress-optic relation gives an optical path difference C t (σ₁ − σ₂), using an illustrative polymer coefficient of 67 × 10⁻¹² Pa⁻¹. For light of wavelength λ, the transmitted fraction for crossed filters is sin²(2(φ − a)) sin²(π C t (σ₁ − σ₂) / λ), where φ is the principal stress direction and a is the first filter's axis. Parallel filters transmit the complement.
 

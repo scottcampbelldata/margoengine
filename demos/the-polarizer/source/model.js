@@ -86,10 +86,14 @@ export function createInstrument(engine, shadows) {
   shadows.add(polarizerShell, { static: true });
   ring(.113, .155, .011, .003, satin, [0, 0, .023], { parent: polarizer });
   ring(.091, .117, .014, .003, baffle, [0, 0, .030], { parent: polarizer });
-  for (const sign of [-1, 1]) {
-    box([.015, .023, .013], .003, ivory, [0, sign * .149, .030], { parent: polarizer });
-    box([.004, .015, .004], .001, baffle, [0, sign * .151, .037], { parent: polarizer });
-  }
+  // One index pointer marks the top of each mount, so a half turn reads differently from no turn. The rim lamp
+  // lights on the filter the angle control turns.
+  box([.015, .023, .013], .003, ivory, [0, .149, .030], { parent: polarizer });
+  box([.016, .030, .016], .004, ivory, [0, .168, .010], { parent: polarizer });
+  box([.004, .015, .004], .001, baffle, [0, .151, .037], { parent: polarizer });
+  box([.011, .012, .010], .003, baffle, [0, -.149, .030], { parent: polarizer });
+  const polarizerLamp = finish([.05, .045, .04], .5);
+  ring(.144, .152, .004, .0012, polarizerLamp, [0, 0, .0305], { parent: polarizer });
   box([.257, .034, .117], .012, slate, [0, .074, .073], staticCaster);
   box([.105, .113, .048], .015, navy, [0, .143, .071], staticCaster);
   ring(.116, .160, .033, .005, slate, [0, aim[1], .067], staticCaster);
@@ -114,10 +118,12 @@ export function createInstrument(engine, shadows) {
     mount(i % 6 === 0 ? mainIndex : minorIndex, i % 6 === 0 ? ivory : ceramic,
       [-radius * Math.sin(theta), radius * Math.cos(theta), .022], { rotation: turn(theta), parent: analyzer });
   }
-  for (const sign of [-1, 1]) {
-    box([.023, .016, .008], .003, bronze, [0, sign * .155, .023], { parent: analyzer });
-    box([.007, .012, .0015], .0006, ivory, [0, sign * .153, .0275], { parent: analyzer });
-  }
+  for (const sign of [-1, 1]) box([.023, .016, .008], .003, bronze, [0, sign * .155, .023], { parent: analyzer });
+  box([.009, .030, .0015], .0006, ivory, [0, .157, .0275], { parent: analyzer });
+  box([.017, .032, .018], .004, ivory, [0, .177, .006], { parent: analyzer });
+  box([.0025, .022, .002], .0008, baffle, [0, .179, .0155], { parent: analyzer });
+  const analyzerLamp = finish([.05, .045, .04], .5);
+  ring(.130, .136, .004, .0012, analyzerLamp, [0, 0, .0255], { parent: analyzer });
 
   // The circular diffuser shows transmission at the detector. Its etched reticle is stationary.
   const center = [0, aim[1], .119];
@@ -161,7 +167,9 @@ export function createInstrument(engine, shadows) {
 
   return {
     count,
-    update(angles, amplitude) {
+    update(angles, amplitude, turning) {
+      analyzerLamp.set({ color: turning === 'analyzer' ? [1, .66, .30] : [.05, .045, .04] });
+      polarizerLamp.set({ color: turning === 'polarizer' ? [1, .66, .30] : [.05, .045, .04] });
       analyzer.setQuaternion(turn(-angles.analyzer * tau / 360));
       polarizer.setQuaternion(turn(-angles.polarizer * tau / 360));
       for (const { material, color, scale } of pixels) {

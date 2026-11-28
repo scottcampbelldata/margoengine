@@ -108,6 +108,9 @@ export function createPolariscope(engine, shadows) {
     box([.023,.014,.006],.0025,bronze,[0,sign*.159,.007],{ parent: frontFilter });
     box([.005,.009,.002],.0007,lightMark,[0,sign*.158,.0104],{ parent: frontFilter });
   }
+  // One index pointer marks the analyzer axis, so a quarter turn of both filters reads in the picture too.
+  box([.016,.030,.014],.004,lightMark,[0,.182,.006],{ parent: frontFilter });
+  box([.0025,.020,.002],.0008,gray,[0,.184,.0135],{ parent: frontFilter });
 
   // Compression shoes obscure the tiny point-contact neighborhoods.
   box([.087,.047,.073],.010,graphite,[0,.125,.103],caster);

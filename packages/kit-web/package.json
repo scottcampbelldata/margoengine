@@ -203,6 +203,10 @@
       "types": "./dist/cameras.d.ts",
       "import": "./dist/cameras.js"
     },
+    "./cameras/shots": {
+      "types": "./dist/cameras/shots.d.ts",
+      "import": "./dist/cameras/shots.js"
+    },
     "./cameras/origin": {
       "types": "./dist/cameras/origin.d.ts",
       "import": "./dist/cameras/origin.js"

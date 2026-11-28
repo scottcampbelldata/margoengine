@@ -1,7 +1,7 @@
 import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { createPolariscope } from './model.js';
-import { lerp as mix } from '@margoengine/math/mathutils';
+import { ShotBlend } from '@margoengine/cameras/shots';
 
 const canvas = document.querySelector('#scene');
 const loading = document.querySelector('#loading');
@@ -14,11 +14,11 @@ const view = document.querySelector('#view');
 const controls = [load, angle, filter, view];
 const lifetime = new AbortController();
 const motion = matchMedia('(prefers-reduced-motion: reduce)');
-const wide = { target: [0,.239,.039], offset: [.49,.505,1.145], fitAspect: 1.10 };
-const close = { target: [.012,.315,.112], offset: [.19,.227,.75], fitAspect: .92 };
+const wide = { target: [0,.239,.039], offset: [.49,.505,1.145], fit: 1.10 };
+const close = { target: [.012,.315,.112], offset: [.19,.227,.75], fit: .92 };
 let force = Number(load.value), degrees = Number(angle.value);
-let engine, polariscope, observer, frame, last = 0;
-let detail = false, zoom = 0, parallel = false, dirty = true, pending = false;
+let engine, shots, polariscope, observer, frame, last = 0;
+let detail = false, parallel = false, dirty = true, pending = false;
 
 function resize() {
   const bounds = canvas.getBoundingClientRect();
@@ -46,24 +46,20 @@ function paint(now) {
   frame = undefined;
   const delta = last ? Math.min(.06, (now-last)/1000) : 1/60;
   last = now;
-  const target = Number(detail);
-  zoom = motion.matches || Math.abs(zoom-target) < .001 ? target : mix(target,zoom,Math.exp(-delta*15));
-  const fit = Math.max(1, mix(wide.fitAspect,close.fitAspect,zoom)*canvas.height/canvas.width);
-  const focus = wide.target.map((value,i) => mix(value,close.target[i],zoom));
-  engine.camera.target = focus;
-  engine.camera.position = focus.map((value,i) => value + fit*mix(wide.offset[i],close.offset[i],zoom));
+  shots.goal = Number(detail);
+  const moving = shots.update(delta, canvas.width, canvas.height);
   if (dirty) {
     polariscope.update(force,degrees,parallel);
     dirty = false;
   }
   engine.render({ delta });
   Object.assign(document.body.dataset, { force,degrees,mode:parallel?'parallel':'crossed',
-    view:zoom===1?'disc':zoom===0?'overview':'moving' });
+    view:moving?'moving':detail?'disc':'overview' });
   if (pending) {
     performance.mark('margo-load-applied');
     pending = false;
   }
-  if (zoom !== target) schedule();
+  if (moving) schedule();
   else last = 0;
 }
 
@@ -112,6 +108,7 @@ async function start() {
     engine = await open();
   }
   engine.onError = fail;
+  shots = new ShotBlend(engine.camera, wide, close, { still: motion });
   engine.scene.background = '#64736b';
   engine.lighting.direction.set([-.55,1.33,.78,3.52]);
   engine.lighting.radiance.set([1,.93,.80,.46]);

@@ -1,6 +1,6 @@
 # The Polarizer
 
-Choose either filter and move the angle slider with touch, a pointer, or arrow keys. **Parallel**, **45°**, and **Crossed** compare full, half, and zero transmission at the angle between the two rings. **Optics close-up** moves the camera in on the brass polarizer, blue analyzer, and the circular detector.
+Choose either filter and move the angle slider with touch, a pointer, or arrow keys. **Parallel**, **45°**, and **Crossed** compare full, half, and zero transmission at the angle between the two rings. **Optics close-up** moves the camera in on the brass polarizer, blue analyzer, and the circular detector. An amber lamp ring lights on the filter the slider turns, and each ring carries one index pointer at its top, so 0° and 180° read as different settings of the mount even though a linear polarizer passes the same light at both.
 
 The first ideal linear polarizer passes one axis of the source's electric field. The analyzer transmits the component of that field along its own axis. Because intensity is proportional to field amplitude squared, the relative detector intensity is I/I₀ = cos² θ. Here I₀ is the detector's value with both filters aligned. The result is 100% at 0° and 180°, 50% at 45° and 135°, and zero at 90°.
 

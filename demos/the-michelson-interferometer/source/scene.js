@@ -2,7 +2,7 @@ import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { createInterferometer, detectorFocus } from './model.js';
 import { fringeCount, mirrorPeriodNm, opticalPathNm, travelNm } from './optics.js';
-import { lerp as mix } from '@margoengine/math/mathutils';
+import { ShotBlend } from '@margoengine/cameras/shots';
 
 const canvas=document.querySelector('#scene');
 const loading=document.querySelector('#loading');
@@ -16,9 +16,9 @@ const view=document.querySelector('#view');
 const controls=[input,zero,half,view];
 const lifetime=new AbortController();
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
-const wide={aim:[.021,.059,.020],offset:[-.85,.97,1.12],fit:1.25,fov:42};
-const detail={aim:[detectorFocus[0],detectorFocus[1]+.016,detectorFocus[2]],offset:[-.437,.182,.095],fit:1.06,fov:38};
-let engine,instrument,observer,frame,last=0,zoom=0;
+const wide={target:[.021,.059,.020],offset:[-.85,.97,1.12],fit:1.25,fov:42};
+const detail={target:[detectorFocus[0],detectorFocus[1]+.016,detectorFocus[2]],offset:[-.437,.182,.095],fit:1.06,fov:38};
+let engine,shots,instrument,observer,frame,last=0;
 let distance=Number(input.value),close=false,dirty=true,applied=false;
 const nanometers=(nm)=>nm.toFixed(1)+' nm';
 
@@ -49,20 +49,16 @@ function paint(now){
   frame=undefined;
   const delta=last?Math.min(.06,(now-last)/1000):1/60;
   last=now;
-  const goal=Number(close);
-  zoom=motion.matches||Math.abs(zoom-goal)<.001?goal:mix(goal,zoom,Math.exp(-delta*16));
-  const fit=Math.max(1,mix(wide.fit,detail.fit,zoom)*canvas.height/canvas.width);
-  engine.camera.target=wide.aim.map((axis,i)=>mix(axis,detail.aim[i],zoom));
-  engine.camera.position=engine.camera.target.map((axis,i)=>axis+fit*mix(wide.offset[i],detail.offset[i],zoom));
-  engine.camera.fov=mix(wide.fov,detail.fov,zoom);
+  shots.goal=Number(close);
+  const moving=shots.update(delta,canvas.width,canvas.height);
   if(dirty){instrument.update(distance);dirty=false;}
   engine.render({delta});
   Object.assign(document.body.dataset,{
     distance:distance.toFixed(1),path:opticalPathNm(distance).toFixed(1),
-    fringe:fringeCount(distance).toFixed(8),view:zoom===0?'bench':zoom===1?'detector':'moving',
+    fringe:fringeCount(distance).toFixed(8),view:moving?'moving':close?'detector':'bench',
   });
   if(applied){performance.mark('margo-mirror-applied');applied=false;}
-  if(zoom!==goal)schedule();
+  if(moving)schedule();
   else last=0;
 }
 
@@ -114,6 +110,7 @@ async function start(){
     engine=await open();
   }
   engine.onError=fail;
+  shots=new ShotBlend(engine.camera,wide,detail,{rate:16,still:motion});
   engine.scene.background='#565568';
   engine.lighting.direction.set([-.74,1.59,.86,3.64]);
   engine.lighting.radiance.set([1,.94,.82,.48]);

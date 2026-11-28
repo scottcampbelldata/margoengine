@@ -1,7 +1,8 @@
 import { michelsonFringes, michelsonIntensity, michelsonTilt } from '@margoengine/optics/interference';
 
-// The bench: a helium-neon laser, four half-wave steps of travel, and tilt fringes 26 mm apart on the screen.
-export const wavelengthNm = 632.8, mirrorPeriodNm = wavelengthNm / 2, travelNm = 4 * mirrorPeriodNm;
+// The bench: a helium-neon laser, one micrometre of travel (3.16 fringes, so no two slider stops show the same
+// bands), and tilt fringes 26 mm apart on the screen. The stage is drawn moving travelScale times its real distance.
+export const wavelengthNm = 632.8, mirrorPeriodNm = wavelengthNm / 2, travelNm = 1000, travelScale = 40000;
 export const carrierMeters = .026, visibility = .96, mirrorTilt = michelsonTilt(wavelengthNm, carrierMeters);
 const fringes = { wavelength: wavelengthNm, fringeSpacing: carrierMeters, visibility };
 export const opticalPathNm = (mirrorNm) => 2 * mirrorNm;

@@ -1,6 +1,6 @@
 # The Michelson Interferometer
 
-Move **Mirror travel** to translate the mirror on the bronze micrometer stage. **Zero** returns to the starting reference. **+½ fringe** advances the mirror by 158.2 nm, exchanging bright and dark bands at the detector. **Inspect fringes** shows the translucent imaging plate close up. The two readouts count the physical changes relative to zero.
+Move **Mirror travel** (0 to 1000 nm) to translate the mirror on the bronze micrometer stage. The fringes sweep across the detector while you drag; the stage, its spindle and the moving beam are drawn travelling 40,000 times their real distance, so one micrometre shows as 4 cm. **Zero** returns to the starting reference. **+½ fringe** advances the mirror by 158.2 nm, exchanging bright and dark bands at the detector. **Inspect fringes** shows the translucent imaging plate close up. The two readouts count the physical changes relative to zero.
 
 ## Optical model
 
@@ -8,7 +8,7 @@ The beam splitter sends the same 632.8 nm monochromatic source toward two perpen
 
 Two coherent plane waves of equal polarization and nominally equal amplitude meet at the detector. The fixed mirror has a small static tilt, so the two wave vectors have a difference along the transverse screen coordinate *u*. With beam angle 2θ and wavelength λ, the carrier period *p* = λ/sin(2θ) is 26 mm. The chosen tilt angle is approximately 12.17 µrad. At the calibrated detector plane, normalized irradiance is `0.5 + 0.5 V cos(2π(u/p + 2Δd/λ))`. A Gaussian envelope models beam overlap. A fixed visibility *V* of 0.96 describes residual contrast loss.
 
-The bright traces are schematic paths through the instrument. Their width is for visibility, and the display uses a warm color scale for irradiance. The physical translation and tilt are micrometric, while the visible micrometer index repeats as the mirror moves. The model omits source noise, diffraction, polarization mismatch, wavelength spread and coating-dependent changes to phase and amplitude. A constant phase offset is absorbed into the zero setting.
+The bright traces are schematic paths through the instrument. Their width is for visibility, and the display uses a warm color scale for irradiance. The physical translation and tilt are micrometric: the carriage motion is magnified 40,000 times so it can be seen, the fringe phase is exact, and the micrometer index turns once per fringe. The model omits source noise, diffraction, polarization mismatch, wavelength spread and coating-dependent changes to phase and amplitude. A constant phase offset is absorbed into the zero setting.
 
 ## References and provenance
 

@@ -622,6 +622,31 @@ const best = clearestShot(choices, (c) => [view(c)], scene);
 console.log(best.choice, best.clearance.clear, best.clearance.subject);
 ```
 
+## Two shots and an eased move: optional /shots
+
+An exhibit with a whole view and a close-up wants one button that glides the camera between them. `ShotBlend` holds two
+`Shot`s (a `target`, an eye `offset` from it, an optional portrait back-off `fit`, default 1, and an optional `fov`)
+and a `goal` of 0 or 1. Each `update(delta, width, height)` eases `blend` toward the goal by exponential smoothing
+(`rate`, default 15 per second, the same path at any frame rate, snapping within 0.001), frames the camera, and returns
+true while the move is still running so a page that draws on demand knows to draw again. Views taller than they are wide
+back the eye away along the offset by `max(1, fit * height / width)`, so a bench framed for a laptop still fits an
+upright phone. `still: matchMedia('(prefers-reduced-motion: reduce)')` jumps straight to the goal. `fov` is set only when
+both shots give one; shot targets are read on every update, so a shot can follow a moving part. CPU only, no plugin.
+
+```js
+import { Camera } from '@margoengine/core';
+import { ShotBlend } from '@margoengine/cameras/shots';
+
+const camera = new Camera({ fov: 42 });
+const bench = { target: [0, 0.06, 0], offset: [-0.85, 0.97, 1.12], fit: 1.25, fov: 42 };
+const detector = { target: [0.43, 0.28, 0], offset: [-0.44, 0.18, 0.1], fit: 1.06, fov: 38 };
+const shots = new ShotBlend(camera, bench, detector, { rate: 16 });
+shots.goal = 1; // the "Inspect" button
+let frames = 0;
+while (shots.update(1 / 60, 1280, 720)) frames++;
+console.log(frames, camera.position, camera.fov); // about half a second of frames, then exactly the close-up
+```
+
 ## Attachment ownership and validation
 
 CameraProjection.attach(engine) registers the projection with the engine, while
