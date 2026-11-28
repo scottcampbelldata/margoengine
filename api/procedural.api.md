@@ -186,7 +186,7 @@ export function generatePalmMesh(options?: MeshDetailOptions): TreeMesh;
 
 export function generateReedMesh(stems?: number): GeometryData;
 
-export function generateRockMesh(seed?: number, form?: RockForm): GeometryData;
+export function generateRockMesh(seed?: number, form?: RockForm, options?: MeshDetailOptions): GeometryData;
 
 export function generateSedgeMesh(): GeometryData;
 

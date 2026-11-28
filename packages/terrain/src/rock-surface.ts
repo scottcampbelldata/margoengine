@@ -85,7 +85,11 @@ export const ROCK_TYPES: Readonly<Record<RockType, Required<Omit<RockStyle, 'typ
   sandstone: { color: [0.36, 0.25, 0.15], color2: [0.45, 0.33, 0.21], strata: 1.2, porosity: 0.9 },
   limestone: { color: [0.42, 0.4, 0.35], color2: [0.5, 0.48, 0.42], strata: 0.8, porosity: 0.6 },
   chalk: { color: [0.66, 0.65, 0.6], color2: [0.58, 0.57, 0.53], strata: 1.5, porosity: 1 },
-  granite: { color: [0.25, 0.219, 0.192], color2: [0.36, 0.316, 0.266], strata: 0, porosity: 0.25 },
+  // Granite from measured spectra, ECOSTRESS Spectral Library 1.0 (Meerdink, Hook, Roberts and Abbott, Remote Sensing of
+  // Environment 230, 2019, https://doi.org/10.1016/j.rse.2019.05.015), JHU hand specimens integrated under a 6504 K
+  // black body: the main tone is the mean of Granite_H2, H3 and H5 (the `granite` of @margoengine/materials), the second
+  // the grey alkalic Granite_H1. Until 2026-11-28 both were chosen, (0.25, 0.219, 0.192) and (0.36, 0.316, 0.266).
+  granite: { color: [0.2709, 0.224, 0.1869], color2: [0.1678, 0.171, 0.1512], strata: 0, porosity: 0.25 },
   basalt: { color: [0.07, 0.07, 0.075], color2: [0.1, 0.095, 0.09], strata: 0, porosity: 0.3 },
   shale: { color: [0.16, 0.15, 0.14], color2: [0.22, 0.2, 0.18], strata: 0.25, porosity: 0.5 },
 };

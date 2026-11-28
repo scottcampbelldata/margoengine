@@ -142,10 +142,15 @@ fracture faces, clipped corners and fine weathering. Choose `block`, `slab`, `we
 the form to let the unsigned 32-bit seed select it. The default seed selects a block. The same seed and form give
 the same positions, averaged normals, UV seams and tangent frames. Rotate and instance a few seeded meshes for
 scatter. For close-up stone shading use `@margoengine/terrain/rock-surface` with the rock type of the site.
+`generateRockMesh(seed, form, { detail })` takes `detail` 0 (default, the 180-triangle mesh), 1 (720 triangles) or 2
+(2,880): the same stone subdivided finer with two finer octaves of grain-scale weathering relief (Turkington and
+Phillips, Earth Surface Processes and Landforms 29(6), 2004, doi:10.1002/esp.1056), so a stone a metre or two from the
+lens shows no facets. Use the three as the near, middle and far meshes of a scatter.
 
 ```ts
 import { generateRockMesh } from 'margoengine/procedural';
 const fieldstones = [generateRockMesh(17, 'slab'), generateRockMesh(32, 'wedge'), generateRockMesh(53, 'block')];
+const rings = [2, 1, 0].map((detail) => generateRockMesh(17, 'slab', { detail }));
 ```
 
 The overall form, edge rounding and surface texture are separate shape properties in the [Geological Survey of India

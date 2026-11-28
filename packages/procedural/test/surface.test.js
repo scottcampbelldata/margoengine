@@ -70,3 +70,31 @@ test('contact and radial occlusion stay bounded and reject invalid sampling data
   assert.throws(() => contactAO(NaN, 0), /height/);
   assert.throws(() => radialAO(0, 0, 0, [0, 0, 0], 0), /volume/);
 });
+
+// Film look 2026-11-28 ("Above the Treeline"): a 180-triangle stone a metre or two from the lens showed facets along its
+// outline. Detail 1 and 2 subdivide the same stone finer and add grain-scale weathering relief.
+test('generateRockMesh detail: 180, 720 and 2,880 triangles of the same stone; detail 0 is the default mesh', () => {
+  const extent = (g) => {
+    const lo = [Infinity, Infinity, Infinity],
+      hi = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < g.positions.length; i += 3)
+      for (const a of [0, 1, 2]) {
+        lo[a] = Math.min(lo[a], g.positions[i + a]);
+        hi[a] = Math.max(hi[a], g.positions[i + a]);
+      }
+    return hi.map((h, a) => h - lo[a]);
+  };
+  const levels = [0, 1, 2].map((detail) => generateRockMesh(7, 'block', { detail }));
+  assert.deepEqual(
+    levels.map((g) => g.indices.length / 3),
+    [180, 720, 2880],
+  );
+  assert.deepEqual(levels[0], generateRockMesh(7, 'block'));
+  const coarse = extent(levels[0]);
+  for (const g of levels.slice(1))
+    extent(g).forEach((size, a) =>
+      assert.ok(Math.abs(size - coarse[a]) < 0.12 * coarse[a], `axis ${a}: ${size} against ${coarse[a]}`),
+    );
+  for (const g of levels) assert.ok(g.positions.every(Number.isFinite) && g.normals.every(Number.isFinite));
+  assert.throws(() => generateRockMesh(1, undefined, { detail: 3 }), /rock detail/);
+});

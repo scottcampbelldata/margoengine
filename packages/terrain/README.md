@@ -1656,6 +1656,9 @@ engine.start();
   `chalk`, `granite`, `basalt`, `shale` (`ROCK_TYPES`; give `color`, `color2`, `strata` or `porosity` to override).
   At close range, granite has light quartz and dark mica grains, basalt has subtle dark pits, and shale has thin
   laminations between beds. Grain color and relief fade when the screen footprint can no longer resolve them.
+  Granite's two tones are measured: linear (0.2709, 0.224, 0.1869), the mean of ECOSTRESS Spectral Library 1.0 samples
+  Granite_H2, H3 and H5, and (0.1678, 0.171, 0.1512), the grey alkalic Granite_H1 (Meerdink et al., Remote Sensing of
+  Environment 230, 2019, https://doi.org/10.1016/j.rse.2019.05.015), each spectrum integrated under a 6504 K black body.
   These materials use visual characteristics from the [British Columbia Geological Survey, *Rock Identification
   Key* (1987)](https://cmscontent.nrs.gov.bc.ca/geoscience/publicationcatalogue/InformationCircular/BCGS_IC1987-05_METC1980.pdf)
   and [Utah Geological Survey, *Igneous, Sedimentary, & Metamorphic Rocks*](https://geology.utah.gov/map-pub/survey-notes/glad-you-asked/igneous-sedimentary-metamorphic-rocks/).

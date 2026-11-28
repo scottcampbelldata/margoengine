@@ -373,3 +373,11 @@ test('rock settings: the shared row shape, live look rows, shape rows for the bu
   assert.throws(() => applyRockSettings(surface, { 'detail.shine': 1 }), TypeError);
   assert.throws(() => applyRockSettings(surface, { 'detail.bump': 9 }), RangeError);
 });
+
+// Film look 2026-11-28 ("Above the Treeline"): granite took chosen tones. It now takes measured ones, the same numbers
+// as @margoengine/materials' ECOSTRESS-measured granite, so a boulder and a granite material agree.
+test('RockSurface granite takes the measured ECOSTRESS granite tones', () => {
+  // packages/materials/src/measured.ts SURFACE_DATA.granite: Granite_H2, H3 and H5.
+  assert.deepEqual(ROCK_TYPES.granite.color, [0.2709, 0.224, 0.1869]);
+  assert.deepEqual(ROCK_TYPES.granite.color2, [0.1678, 0.171, 0.1512]);
+});

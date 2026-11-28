@@ -1012,22 +1012,32 @@ const ROCK_FORMS = {
 } as const satisfies Record<RockForm, readonly number[]>;
 const ROCK_FORM_ORDER: readonly RockForm[] = ['wedge', 'block', 'slab', 'shard', 'pebble'];
 
+/** Icosahedron subdivisions of a rock at `options.detail` 0, 1 and 2: 180, 720 and 2,880 triangles. */
+const ROCK_DETAIL = [2, 5, 11] as const;
+
 /**
  * A fieldstone with fracture faces, softened edges and seeded proportions, centered on the placement origin (+Y up).
- * The mesh retains its UV layout, tangent frame and 180-triangle budget.
+ * `options.detail` 0 (the default, 180 triangles) keeps the mesh as it always was; 1 (720) and 2 (2,880) subdivide it
+ * finer and add the pitting of granular disintegration, two finer octaves of weathering relief (grain-scale roughening
+ * of exposed granite: A. Turkington and J. Phillips, "Cavernous weathering, dynamical instability and self-organization",
+ * Earth Surface Processes and Landforms 29(6), 2004, doi:10.1002/esp.1056), so a stone seen from a metre or two shows
+ * no facets along its outline. Every detail is the same stone: the broad faces, edges and proportions do not move.
  * @param seed - Unsigned 32-bit seed for the proportions, fracture planes and weathering. Default 1.
  * @param form - Dominant shape. If omitted, the seed selects the form (seed 1 selects a block).
- * @throws RangeError for an invalid seed or form.
+ * @throws RangeError for an invalid seed, form or detail.
  */
-export function generateRockMesh(seed = 1, form?: RockForm): GeometryData {
+export function generateRockMesh(seed = 1, form?: RockForm, options?: MeshDetailOptions): GeometryData {
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff)
     throw new RangeError('Invalid rock seed; pass an integer from 0 to 4294967295.');
   const shape = form === undefined ? ROCK_FORM_ORDER[seed % ROCK_FORM_ORDER.length] : form;
   if (typeof shape !== 'string' || !Object.hasOwn(ROCK_FORMS, shape))
     throw new RangeError('Invalid rock form; pass block, slab, wedge, shard or pebble.');
+  const detail = options?.detail ?? 0;
+  if (detail !== 0 && detail !== 1 && detail !== 2)
+    throw new RangeError('Invalid rock detail; pass 0, 1 or 2 (or omit it for 0).');
   const random = createRandom(seed),
     noise = new Noise(seed),
-    data = icosahedronGeometry(1, 2),
+    data = icosahedronGeometry(1, ROCK_DETAIL[detail]),
     [halfX, halfY, halfZ, edgeWear, roofPitch, sideCount] = ROCK_FORMS[shape],
     yaw = random() * 0.7 - 0.35,
     length = halfX * (0.89 + 0.24 * random()),
@@ -1063,7 +1073,10 @@ export function generateRockMesh(seed = 1, form?: RockForm): GeometryData {
     }
     // Smooth only around the closest two planes: rounding the whole shape loses the broad faces.
     const edge = Math.max(0, rounding - (face - neighbour)),
-      wear = 0.045 * noise.simplex(2.1 * x, 3.2 * y, 2.6 * z) + 0.018 * noise.simplex(6 * x, 7 * y, 5 * z),
+      wear =
+        0.045 * noise.simplex(2.1 * x, 3.2 * y, 2.6 * z) +
+        0.018 * noise.simplex(6 * x, 7 * y, 5 * z) +
+        (detail ? 0.008 * noise.simplex(15 * x, 17 * y, 13 * z) + 0.0035 * noise.simplex(37 * x, 41 * y, 31 * z) : 0),
       radius = (1 + wear) / (face + (edge * edge) / (4 * rounding));
     data.positions[i] = x * radius * length;
     data.positions[i + 1] = y * radius * height;
