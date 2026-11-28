@@ -527,7 +527,7 @@ The torso is a damped Gauss-Newton solve (Levenberg 1944, Marquardt 1963); the c
 | `addCCDChain` | A joint with no limit of its own in `limits` takes the body's: an elbow or knee as an exact hinge that stops at straight, any other joint as the nearest cone and then its exact reach. | `body: null`, or `null` in `limits` for one joint |
 | `placeLimb` users (`addWarping`, `addStepping`) | Legs are bent by `solveLimbIK`. | `setAnatomy(animator, null)` |
 
-`solveLimbIK` is the limb solver itself: two-bone IK by swivel angle (Tolani, Goswami and Badler 2000). The hinge turns only about its own axis between straight and its stop; the pole picks the swivel inside the shoulder's or hip's reach and twist; with no pole a bent limb keeps its side and a straight one takes the swivel that leaves the shoulder or hip nearest neutral.
+`solveLimbIK` is the limb solver itself: two-bone IK by swivel angle (Tolani, Goswami and Badler 2000). The hinge turns only about its own axis between straight and its stop; the pole picks the swivel inside the shoulder's or hip's reach and twist; with no pole a bent limb keeps its side and a straight one takes the swivel that leaves the shoulder or hip nearest neutral. With `avoid` (how deep the limb would be inside the body for an elbow or knee and an end position, 0 when clear) the swivel is also the nearest one that keeps the limb out of the body; `margoengine/rigging/ik` passes the body's measured volumes there.
 
 ```ts
 import { EngineKernel } from 'margoengine/core';
@@ -576,7 +576,7 @@ console.log(body.restPose, jointOf(body, node('lowerarm_l'))?.kind); // T hinge
 |---|---|
 | `setAnatomy(owner, body)`, `anatomyOf(owner)` | Names (or forgets, with null) the fitted body of an Animator, a `Skeleton` or a pose; reads it back. |
 | `jointOf(body, bone)` | The limited joint that turns a bone, or null. |
-| `solveLimbIK({ root, mid, end, upperRotation, lowerRotation, target, hinge, ball?, reference?, pole?, tier?, soft?, tolerance? })` | The limb solve above. `tier` defaults to `structural` (the stops), `soft` to 0 (exact; up to 0.5 of the limb's length eases the reach in before full stretch), `tolerance` to 1e-4. Returns the two world rotations, the new joint positions, the flexion in degrees, `reached`, `distance` and `held`. |
+| `solveLimbIK({ root, mid, end, upperRotation, lowerRotation, target, hinge, ball?, reference?, pole?, tier?, soft?, tolerance?, avoid?, twist? })` | The limb solve above. `tier` defaults to `structural` (the stops), `soft` to 0 (exact; up to 0.5 of the limb's length eases the reach in before full stretch), `tolerance` to 1e-4, `avoid` to none, `twist` (the elbow's or knee's twist in degrees) to the pose's. Returns the two world rotations, the new joint positions, the flexion in degrees, `reached`, `distance` and `held`. |
 | `jointTurn(joint, reference, bone, out)`, `turnRotation(joint, angles, out)` | A joint's clinical angles (flexion, abduction, twist; degrees) from two world rotations, and back. The same numbers as `jointAngles` in `margoengine/rigging/anatomy`. |
 | `clampTurn(jointOrRegion, angles, tier?)`, `limitRotation(joint, reference, bone, out, tier?)` | Angles, or a world rotation, brought inside a range: the swing inside the ellipse of its quadrant, then the twist (a gated twist by how far its gate is open). |
 | `limitBones(body, bones, access, tier?)` | Holds listed bones of any posed skeleton inside their ranges, then eases a trunk or neck that is past its range as a whole back across its levels. |

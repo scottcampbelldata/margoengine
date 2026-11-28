@@ -6,6 +6,31 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: an explicit fitAnatomy map threw when the table's naming had read the same bone (KB-RIG-MAPWINS1, rigging)
+
+- **Repro:** the animator README example "Solvers on a fitted body": `fitAnatomy` on the UAL1 mannequin with
+  `map: { vl3: 'spine_01', ... }` threw "Bone spine_01 is mapped to both vl5 and vl3", since the table now reads Unreal
+  names itself (KB-RIG-UENAMING1) and maps spine_01 to vl5.
+- **Cause:** `fitAnatomy` (`packages/rigging/src/anatomy.ts`) added the map's joints on top of the naming's and kept
+  the naming's joint for a bone the map placed elsewhere.
+- **Fix:** a bone the map places is the map's; the naming's guess for that bone gives way.
+- **Regression:** `packages/rigging/tests/anatomy-human-bundled.test.js` ("an explicit map wins").
+
+### Fixed 2026-11-28: an IK arm reaching across the chest passed through the trunk, palm up (KB-RIG-REACHTRUNK1, rigging, animator)
+
+- **Repro:** `packages/humans/test/pose-sheet.browser.mjs --model=<the Character Creator old man>`, row "reach across
+  the chest (IK, right)": `checkPose` failed it with the upper arm and the forearm 4 percent of stature from the
+  trunk's axis, and the hand lay palm up.
+- **Cause:** `solveLimbIK` (`packages/animator/src/ik.ts`) kept the swivel the idle pose bent to, which dropped the
+  elbow into the belly, and knew nothing of the body's volumes; `solveChain` (`packages/rigging/src/ik.ts`) left the
+  forearm twist and the hand as the idle clip held them.
+- **Fix:** `solveLimbIK` takes `avoid` and searches the swivel nearest the wanted one that keeps the limb out of the
+  body as it keeps the shoulder in range; `rigging/ik` passes the table's measured volumes (now shared with the pose
+  checker in `packages/rigging/src/body-volumes.ts`). An arm ends with the forearm at its anatomical zero and the hand
+  at the body's neutral unless the chain says `hand: 'keep'`.
+- **Regression:** `packages/rigging/tests/ik-reach-across.test.js`; the pose sheet fails an IK row with a limb through
+  the body.
+
 ### Open 2026-11-28: two biomes unit checks are red on main (KB-BIOMES-CHECKS-RED1, biomes)
 
 - **Repro:** `node --test packages/biomes/tests/no-raw-division.test.js` names `hydrology.ts:663` and `:664` (from the

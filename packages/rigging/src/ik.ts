@@ -37,6 +37,8 @@ import {
   solveLimbIK,
   turnRotation,
 } from '@margoengine/animator/ik';
+import type { AnatomicalRig } from './anatomy.js';
+import { bodyVolumes, overlapDepth, type BodyVolume } from './body-volumes.js';
 import { parentOrder } from './rig.js';
 
 // A fitted body is named with `setAnatomy` of `@margoengine/animator/ik`, which owns it; it is not exported again here.
@@ -303,6 +305,12 @@ export interface IKChain extends FABRIKOptions {
    * elbow or knee does not snap straight (0-0.5, default 0: the end meets every target in reach exactly).
    */
   soft?: number;
+  /**
+   * On a fitted arm (a shoulder, an elbow and a wrist): `natural` (default) turns the forearm to its anatomical zero
+   * and leaves the hand at the body's neutral, a relaxed hand whatever the pose held; `keep` keeps the pose's forearm
+   * twist and hand.
+   */
+  hand?: 'natural' | 'keep';
 }
 
 /**
@@ -407,7 +415,49 @@ interface ChainRig {
   flush(): void;
 }
 
-type ChainSettings = FABRIKOptions & Pick<IKChain, 'target' | 'weight' | 'keepBend' | 'soft'>;
+type ChainSettings = FABRIKOptions & Pick<IKChain, 'target' | 'weight' | 'keepBend' | 'soft' | 'hand'>;
+
+/** How far into each other two body volumes may reach, as a share of their radii, before an IK limb steers clear. */
+const CLEAR = 0.8;
+
+/**
+ * How deep the limb from `upper` through `mid` to `tip` would be inside the rest of the body, as a function of
+ * where its elbow or knee and its end are: the deepest overlap of its two capsules with the volumes the body keeps
+ * apart from them, at their places in the pose now. Null when the body has no volumes for this limb.
+ */
+function limbAvoid(
+  body: Anatomy,
+  upper: number,
+  mid: number,
+  tip: number,
+  where: (bone: number) => ArrayLike<number>,
+): ((at: ArrayLike<number>, end: ArrayLike<number>) => number) | null {
+  if (!(body as Partial<AnatomicalRig>).species) return null;
+  const { volumes, pairs } = bodyVolumes(body as AnatomicalRig),
+    own: [string, BodyVolume][] = [...volumes].filter(
+      ([, v]) => (v.near === upper && v.far === mid) || (v.near === mid && v.far === tip),
+    ),
+    tests: { first: boolean; self: BodyVolume; other: BodyVolume; a: number[]; b: number[] }[] = [];
+  for (const [id, self] of own)
+    for (const [x, y] of pairs) {
+      const otherId = x === id ? y : y === id ? x : null,
+        other = otherId === null ? undefined : volumes.get(otherId);
+      if (!other) continue;
+      tests.push({ first: self.near === upper, self, other, a: Array.from(where(other.near)), b: Array.from(where(other.far)) });
+    }
+  if (!tests.length) return null;
+  const root = Array.from(where(upper));
+  return (at, end) => {
+    let depth = 0;
+    for (const test of tests) {
+      const d = test.first
+        ? overlapDepth(root, at, test.self, test.a, test.b, test.other, CLEAR)
+        : overlapDepth(at, end, test.self, test.a, test.b, test.other, CLEAR);
+      if (d > depth) depth = d;
+    }
+    return depth;
+  };
+}
 
 /** A hinge straighter than this many degrees is started this far bent, so the solve knows its side. */
 const HINGE_SEED = 3;
@@ -490,20 +540,30 @@ function solveChain(
     limb = (upper: number, mid: number, tip: number, parts: NonNullable<ReturnType<typeof limbOf>>): boolean => {
       const u = rig.world(upper),
         m = rig.world(mid),
-        solved = solveLimbIK({
-          root: u.position,
-          mid: m.position,
-          end: rig.world(tip).position,
-          upperRotation: u.rotation,
-          lowerRotation: m.rotation,
-          target: chain.target,
-          pole: chain.pole ?? null,
-          hinge: parts.hinge,
-          ball: parts.ball,
-          reference: parts.ball ? referenceOf(parts.ball) : undefined,
-          soft: chain.soft,
-          tolerance,
-        });
+        natural = chain.hand !== 'keep' && /elbow$/.test(parts.hinge.id),
+        neutral = (body as Partial<AnatomicalRig>).neutral;
+      // A relaxed hand first, so the reach is solved with the hand it ends with.
+      if (natural && neutral && jointOf(body, tip)) {
+        const o = tip * 10;
+        rig.write(tip, [neutral[o + 3], neutral[o + 4], neutral[o + 5], neutral[o + 6]]);
+        rig.flush();
+      }
+      const solved = solveLimbIK({
+        root: u.position,
+        mid: m.position,
+        end: rig.world(tip).position,
+        upperRotation: u.rotation,
+        lowerRotation: m.rotation,
+        target: chain.target,
+        pole: chain.pole ?? null,
+        hinge: parts.hinge,
+        ball: parts.ball,
+        reference: parts.ball ? referenceOf(parts.ball) : undefined,
+        soft: chain.soft,
+        tolerance,
+        avoid: limbAvoid(body, upper, mid, tip, (bone) => rig.world(bone).position),
+        twist: natural ? 0 : null,
+      });
       setWorld(upper, solved.upper);
       setWorld(mid, solved.lower);
       return solved.held;
@@ -873,6 +933,8 @@ export interface AnimatorIKChain extends FABRIKOptions {
   limits?: boolean;
   /** Eases a fitted limb's reach in before full stretch, as {@link IKChain.soft}. */
   soft?: number;
+  /** A fitted arm's forearm and hand, as {@link IKChain.hand}; default `natural`. */
+  hand?: 'natural' | 'keep';
   /** Called after each frame's solve with its result. */
   onSolve?: (result: FABRIKResult) => void;
 }

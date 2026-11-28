@@ -604,6 +604,14 @@ export interface LimbIK {
   pole?: ArrayLike<number> | null;
   /** Which range holds. Default `structural`. */
   tier?: AnatomyTier;
+  /**
+   * How deep the limb would be inside the body with its elbow or knee at `mid` and its end at `end` (world points), in
+   * world units; 0 when clear. The swivel then keeps the limb out of the body as it keeps the shoulder or hip inside
+   * its range: the nearest swivel to the wanted one that is clear of both. Default: no body volumes.
+   */
+  avoid?: ((mid: ArrayLike<number>, end: ArrayLike<number>) => number) | null;
+  /** The elbow's or knee's twist, degrees, in place of the pose's. Default: the pose's twist. */
+  twist?: number | null;
   /** Share of the limb's length over which the reach eases in before full stretch, 0-0.5 (default 0: exact). */
   soft?: number;
   /** Distance from the target that counts as reached (default 1e-4). */
@@ -667,6 +675,10 @@ export function solveLimbIK(limb: LimbIK): LimbIKResult {
     bend = [0, 0, 0, 1],
     e = [0, 0, 0];
   jointTurn(hinge, up, low, now);
+  if (limb.twist !== undefined && limb.twist !== null) {
+    if (!Number.isFinite(limb.twist)) throw new RangeError('IK twist must be a finite number of degrees');
+    now[2] = limb.twist;
+  }
   /** The length from root to end with the hinge flexed `flexion` degrees; leaves the offset in `e` and the lower bone's turn in `bend`. */
   const span = (flexion: number): number => {
     v[0] = flexion;
@@ -724,8 +736,26 @@ export function solveLimbIK(limb: LimbIK): LimbIKResult {
     spin = [0, 0, 0, 1],
     reference = limb.reference ?? [0, 0, 0, 1],
     w = [0, 0, 0],
-    kept = [0, 0, 0];
-  /** Turns the upper bone `phi` about the line, into `upper`; returns how far outside its range the shoulder or hip then is, degrees. */
+    kept = [0, 0, 0],
+    avoid = limb.avoid ?? null,
+    at = [0, 0, 0],
+    tipAt = [0, 0, 0];
+  /** Degrees of swivel-equivalent cost for the limb inside the body: its depth as an angle seen from the root. */
+  const inside = (): number => {
+    if (!avoid) return 0;
+    turnVector(upper, a, at);
+    turnVector(upper, reach, tipAt);
+    for (let i = 0; i < 3; i++) {
+      at[i] += root[i];
+      tipAt[i] += root[i];
+    }
+    const depth = avoid(at, tipAt);
+    return depth > 0 ? (depth / upperLength) * DEG : 0;
+  };
+  /**
+   * Turns the upper bone `phi` about the line, into `upper`; returns how far outside its range the shoulder or hip
+   * then is, degrees, plus how deep the limb then is inside the body as an angle.
+   */
   const outside = (phi: number): number => {
     const s = Math.sin(phi / 2);
     spin[0] = line[0] * s;
@@ -733,13 +763,14 @@ export function solveLimbIK(limb: LimbIK): LimbIKResult {
     spin[2] = line[2] * s;
     spin[3] = Math.cos(phi / 2);
     mul(spin, base, upper);
-    if (!ball?.limited) return 0;
+    const body = inside();
+    if (!ball?.limited) return body;
     jointTurn(ball, reference, upper, w);
     kept[0] = w[0];
     kept[1] = w[1];
     kept[2] = w[2];
-    if (!clampTurn(ball, w, tier)) return 0;
-    return Math.hypot(w[0] - kept[0], w[1] - kept[1], w[2] - kept[2]);
+    if (!clampTurn(ball, w, tier)) return body;
+    return Math.hypot(w[0] - kept[0], w[1] - kept[1], w[2] - kept[2]) + body;
   };
   // The swivel the pole asks for: the side the elbow or knee is on (for a straight limb, the side it would bend to)
   // turned onto the pole's side of the line.
@@ -866,11 +897,13 @@ export function solveLimbIK(limb: LimbIK): LimbIKResult {
         else from = m1;
       }
       outside((from + until) / 2);
-      jointTurn(ball!, reference, upper, w);
-      clampTurn(ball!, w, tier);
-      turnRotation(ball!, w, spin);
-      mul(reference, spin, upper);
-      stopped = true;
+      // Only a shoulder or hip past its range is stopped; a limb that only touches the body keeps its swivel.
+      if (ball?.limited) {
+        jointTurn(ball, reference, upper, w);
+        stopped = clampTurn(ball, w, tier);
+        turnRotation(ball, w, spin);
+        mul(reference, spin, upper);
+      }
     }
   }
   const lower = mul(upper, hingeTurn, [0, 0, 0, 1]) as [number, number, number, number],

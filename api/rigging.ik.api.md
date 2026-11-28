@@ -17,6 +17,7 @@ export interface AnimatorIKChain extends FABRIKOptions {
     body?: Anatomy | null;
     limits?: boolean;
     soft?: number;
+    hand?: 'natural' | 'keep';
     onSolve?: (result: FABRIKResult) => void;
 }
 
@@ -41,6 +42,7 @@ export interface IKChain extends FABRIKOptions {
     body?: Anatomy | null;
     limits?: boolean;
     soft?: number;
+    hand?: 'natural' | 'keep';
 }
 
 export interface IKPose {

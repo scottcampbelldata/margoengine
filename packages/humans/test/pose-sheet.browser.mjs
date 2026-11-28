@@ -61,11 +61,15 @@ try {
   console.log(text);
   assert.deepEqual(result.errors, []);
   assert.deepEqual(errors, []);
-  for (const row of result.report)
+  for (const row of result.report) {
+    // An IK reach keeps the arm out of the body (KB-RIG-REACHTRUNK1).
+    if (/\(IK/.test(row.row))
+      assert.ok(!row.issues.some((line) => /^error self-penetration/.test(line)), `${row.row}: a limb passes through the body`);
     assert.ok(
       !row.issues.some((line) => /^error (out-of-range|hinge-|twist-)/.test(line)),
       `${row.row}: a pose the fitted body drew is past a stop`,
     );
+  }
 } finally {
   await close();
 }

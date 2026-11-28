@@ -31,6 +31,7 @@ import {
   type Tier,
   type Vec3,
 } from './anatomy.js';
+import { bodyVolumes, closestSegments, type BodyVolume } from './body-volumes.js';
 import { parentOrder, worldFrames } from './rig.js';
 
 /** What an issue is. */
@@ -194,8 +195,8 @@ interface Fit {
   /** Bones whose length is checked, with rest length and rest scale. */
   readonly bones: readonly { bone: number; joint: string; length: number; scale: V3 }[];
   /** Volumes on the rig: near bone, far bone and radii in rig units. */
-  readonly volumes: Map<string, { near: number; far: number; r0: number; r1: number }>;
-  readonly pairs: readonly [string, string][];
+  readonly volumes: Map<string, BodyVolume>;
+  readonly pairs: readonly (readonly [string, string])[];
   /** Weight-bearing joints: id and bone, one per bone. */
   readonly feet: readonly { id: string; bone: number }[];
   readonly up: V3;
@@ -233,19 +234,7 @@ function fitOf(body: AnatomicalRig): Fit {
       };
     })
     .filter((entry) => entry.length > 1e-4 * stature);
-  const volumes = new Map<string, { near: number; far: number; r0: number; r1: number }>();
-  for (const volume of species.volumes ?? []) {
-    const near = boneOf(volume.from),
-      far = volume.to.map(boneOf).find((bone) => bone !== undefined && bone !== near);
-    if (near === undefined || far === undefined) continue;
-    volumes.set(volume.id, { near, far, r0: volume.radius[0] * stature, r1: volume.radius[1] * stature });
-  }
-  const pairs = (species.apart ?? []).filter(([a, b]) => {
-    const va = volumes.get(a),
-      vb = volumes.get(b);
-    // Volumes that share an end bone meet at a joint, which is not a fault.
-    return va && vb && va.near !== vb.near && va.near !== vb.far && va.far !== vb.near && va.far !== vb.far;
-  }) as [string, string][];
+  const { volumes, pairs } = bodyVolumes(body);
   const seen = new Set<number>(),
     feet: { id: string; bone: number }[] = [];
   for (const id of species.feet ?? []) {
@@ -363,33 +352,6 @@ function angleIssues(body: AnatomicalRig, fit: Fit, pose: ArrayLike<number>, opt
   return out;
 }
 
-/** Closest points of segments p0-p1 and q0-q1: [s, t, squared distance] (Ericson 2005, 5.1.9). */
-function closest(p0: V3, p1: V3, q0: V3, q1: V3): [number, number, number] {
-  const d1 = sub(p1, p0),
-    d2 = sub(q1, q0),
-    r = sub(p0, q0),
-    a = dot(d1, d1),
-    e = dot(d2, d2),
-    f = dot(d2, r),
-    clamp = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
-  let s: number, t: number;
-  if (a <= 1e-12 && e <= 1e-12) (s = 0), (t = 0);
-  else if (a <= 1e-12) (s = 0), (t = clamp(f / e));
-  else {
-    const c = dot(d1, r);
-    if (e <= 1e-12) (t = 0), (s = clamp(-c / a));
-    else {
-      const b = dot(d1, d2),
-        denom = a * e - b * b;
-      s = denom > 1e-12 ? clamp((b * f - c * e) / denom) : 0;
-      t = (b * s + f) / e;
-      if (t < 0) (t = 0), (s = clamp(-c / a));
-      else if (t > 1) (t = 1), (s = clamp((b - c) / a));
-    }
-  }
-  const x = sub(add(p0, scale(d1, s)), add(q0, scale(d2, t)));
-  return [s, t, dot(x, x)];
-}
 const dot = (a: readonly number[], b: readonly number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const sub = (a: readonly number[], b: readonly number[]): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const add = (a: readonly number[], b: readonly number[]): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -538,7 +500,7 @@ function placeIssues(
     for (const [a, b] of fit.pairs) {
       const va = fit.volumes.get(a)!,
         vb = fit.volumes.get(b)!,
-        [s, t, d2] = closest(at(position, va.near), at(position, va.far), at(position, vb.near), at(position, vb.far)),
+        [s, t, d2] = closestSegments(at(position, va.near), at(position, va.far), at(position, vb.near), at(position, vb.far)),
         reach = shrink * (va.r0 + (va.r1 - va.r0) * s + vb.r0 + (vb.r1 - vb.r0) * t),
         distance = Math.sqrt(d2);
       if (distance < reach)

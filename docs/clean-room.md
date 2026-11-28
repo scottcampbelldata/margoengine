@@ -20199,3 +20199,24 @@ Combined: Vogel's golden-angle spiral places cushion stars and disc florets; lea
 profile (ovate, lanceolate, spatulate, strap) as in Ijiri et al.; stems and heads follow the raceme, spike and
 capitulum forms of Prusinkiewicz and Lindenmayer. Each part is its own geometry so the instancer can colour it with its
 measured spectrum. Scatter gained `reach` as an exact override and inside clearings for this (moss skirts at rock bases).
+
+## IK limbs kept out of the body, and a relaxed hand: animator/ik, rigging/ik (2026-11-28)
+
+Scope: `solveLimbIK`'s `avoid` and `twist`, and `rigging/ik`'s use of the body's volumes and its `hand` option
+(KB-RIG-REACHTRUNK1). Written from the sources below; no other engine's or tool's code was read.
+
+- The swivel searched for the nearest value that is both inside the joint ranges and free of collision with the body:
+  M. Kallmann, "Analytical inverse kinematics with body posture control", Computer Animation and Virtual Worlds
+  19(2):79-91, 2008, https://doi.org/10.1002/cav.176 ; D. Tolani, A. Goswami and N. I. Badler, Graphical Models
+  62(5):353-388, 2000, https://doi.org/10.1006/gmod.2000.0528 (one swivel angle per limb).
+- The body's volumes: capsules of the ANSUR II mean girths (C. C. Gordon et al., "2012 Anthropometric survey of U.S.
+  Army personnel", NATICK/TR-15/007, 2014), the closest points of two segments as in C. Ericson, "Real-Time Collision
+  Detection", Morgan Kaufmann 2005, section 5.1.9. The IK keeps them apart past 0.8 of their radii, a little stricter
+  than the pose checker's 0.7, so a solved reach passes the checker.
+- The relaxed hand: the forearm's zero is the neutral of ISO/IEC 19774-1:2019 (HAnim), clause 4.8.2, palms toward the
+  thighs with the arm hanging, the mid-position between pronation and supination (A. I. Kapandji, "The Physiology of the
+  Joints", vol. 1, the forearm's position of reference); the hand is left at the fitted body's neutral.
+
+Margo's own: the depth inside the body turned into an angle seen from the shoulder or hip and added to the range
+excess the swivel search already minimised, so one search serves both; the relaxed hand set before the solve so the
+reach is solved with the hand it ends with.

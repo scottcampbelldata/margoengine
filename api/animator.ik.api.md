@@ -84,6 +84,8 @@ export interface LimbIK {
     reference?: ArrayLike<number>;
     pole?: ArrayLike<number> | null;
     tier?: AnatomyTier;
+    avoid?: ((mid: ArrayLike<number>, end: ArrayLike<number>) => number) | null;
+    twist?: number | null;
     soft?: number;
     tolerance?: number;
 }
