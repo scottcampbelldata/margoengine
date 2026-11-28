@@ -11798,3 +11798,12 @@ buffer, camera-relative, rows rewritten each frame). The shader mirrors `lightni
 12 ray points by `t = t0 + h sinh(q)`, 6 channel angles split at the phase peak. Evidence:
 `packages/sky/test/lightning-glow.test.js` and `features-check.mjs lightning-glow` (GPU against CPU, native WebGPU and
 the WebGL2 layer, 4x and 1x, RTX A6000). Missing: other GPUs, timing, multiple scattering.
+
+### ATMO-03 cloud projection and field-driven render path
+
+Cloud convection can load a plain or shared Rust SIMD Neumann stencil outside the Physics root and World entries.
+The cloud step computes a complete candidate state, traverses the pressure stencil in stable order and checks the
+operator residual and corrected face divergence before committing. Origin cells and accepted mean wind follow
+world snapshots. The Environment density-volume path converts accepted cell-centred liquid water to extinction
+and uses the existing two-backend volume pass. The closed-cube check, native worker replay and fixed-frame browser
+regressions cover these three paths. Independent cloud-field measurement and deep moist dynamics are open.

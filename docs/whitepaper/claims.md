@@ -6901,3 +6901,13 @@ cover 35.3, 35.5 and 34.5 m2 seen from the side, where exported edge-collapse de
 (synthetic crown, coverage within 12 percent at 25 times fewer needles; the same needles without growth under a tenth);
 the fir figures are from one run on the asset library's scan with `foliageLODs` and defaults. Not claimed: a match of
 colour or shading up close, or any frame-time figure.
+
+### Closed cloud pressure projection and accepted visible cloud motion (ATMO-03)
+
+`packages/physics/tests/atmo03-projection.test.js` checks all twelve interior face velocities in the analytically
+projected warm-cell MAC cube at 80 and 160 m cell widths. It checks closed-wall normals, per-cell divergence, and
+recovery from invalid wind in the second cloud interval of one tick. `cloud-projection-threads.test.js` and
+`cloud-projection-threads.browser.mjs` compare scalar, plain and shared Rust SIMD state across signed origin
+shifts and exact seek. The largest Node case applies 171 stencils covering 3,276,189 cell visits, including 3,075,606
+SIMD-paired visits. `cloud-surface.browser.mjs` renders the live condensate and its wind advection on WebGPU and
+WebGL2. The closed cube is analytical numerical evidence. Independent field validation remains open.

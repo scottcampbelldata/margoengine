@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21738286,
+  "total": 21745199,
   "history": [
     {
       "date": "2026-10-24",
@@ -15485,6 +15485,12 @@
       "commit": "lane-e-shrub-leaves",
       "reason": "KB-SHRUB-BLOBS1: generateShrubMesh builds separate leaves in place of three smooth domes, and biomes paints shrubs a leaf's colour; the bytes are the leaf builder, which every shrub needs.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "atmo03-cloud-projection",
+      "reason": "ATMO-03: Physics clouds 5,725 to 11,455 B gzip (ceiling 5,981 to 11,799) for checked MAC projection, finite transactional field state and lazy SIMD workers. Environment density-volume 3,563 to 4,386 B (ceiling 3,819 to 4,642) for real cloud extinction with authored droplet radius. Splitting those producer and renderer paths would repeat state or volume transfers. The shared optional native pool moves Physics tsunami from 8,985 to 9,007 B (ceiling 9,006 to 9,278). Core and Stage gain no bytes.",
+      "grew": 3
     }
   ],
   "items": {
@@ -15827,7 +15833,7 @@
     "@margoengine/environment dist/workers/exr-codecs.js": 3570,
     "@margoengine/environment/blend": 4861,
     "@margoengine/environment/cube-camera": 6143,
-    "@margoengine/environment/density-volume": 3819,
+    "@margoengine/environment/density-volume": 4642,
     "@margoengine/environment/encoded-hdr": 3409,
     "@margoengine/environment/exr-codecs": 1699,
     "@margoengine/environment/exr-tiled": 9088,
@@ -16348,7 +16354,7 @@
     "@margoengine/physics/breakable": 19351,
     "@margoengine/physics/bubbles": 3289,
     "@margoengine/physics/celestial": 9756,
-    "@margoengine/physics/clouds": 5981,
+    "@margoengine/physics/clouds": 11799,
     "@margoengine/physics/crush": 21991,
     "@margoengine/physics/debug-view": 1965,
     "@margoengine/physics/decomposition": 11103,
@@ -16410,7 +16416,7 @@
     "@margoengine/physics/thin-film": 15631,
     "@margoengine/physics/tissue": 3218,
     "@margoengine/physics/tracers": 17877,
-    "@margoengine/physics/tsunami": 9006,
+    "@margoengine/physics/tsunami": 9278,
     "@margoengine/physics/underwater": 8284,
     "@margoengine/physics/vegetation": 9958,
     "@margoengine/physics/viscoplastic": 8826,

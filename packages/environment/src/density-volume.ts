@@ -13,6 +13,7 @@
 // trilinearly, each through the page table (a dense page table instead of VDB's two upper tree levels: one lookup a
 // voxel, bounded by `maxPages`). Splats are Gaussians truncated at three standard deviations.
 import type { Vec3 } from '@margoengine/core/extension';
+import { MargoError } from '@margoengine/math/errors';
 import { invertMatrix } from '@margoengine/math/mat4';
 import type { VolumetricMediumSource } from './volumetric.js';
 
@@ -60,6 +61,8 @@ const VOXELS = 512,
   EMPTY = 0xffffffff,
   TILE = 0x80000000,
   SPAN = 1 << 16,
+  MAX_DENSITY = 1e4,
+  DEFAULT_MAX_BRICKS = 32768,
   identity = (size: number, o: Vec3) => [size, 0, 0, 0, 0, size, 0, 0, 0, 0, size, 0, o[0], o[1], o[2], 1];
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const within = (v: unknown, fallback: number, lo: number, hi: number, name: string): number => {
@@ -134,12 +137,12 @@ export class DensityVolume implements VolumetricMediumSource {
 
   constructor(options: DensityVolumeOptions = {}) {
     const o = options ?? {};
-    this.density = within(o.density, 1, 0, 1e4, 'density');
+    this.density = within(o.density, 1, 0, MAX_DENSITY, 'density');
     const color = o.color ?? [1, 1, 1];
     if (!Array.isArray(color) || color.length !== 3 || !color.every((c) => finite(c) && c >= 0 && c <= 1))
       throw new RangeError('DensityVolume color must be three numbers from 0 to 1');
     this.color = [color[0], color[1], color[2]];
-    this.maxBricks = within(o.maxBricks, 32768, 1, 1 << 20, 'maxBricks');
+    this.maxBricks = within(o.maxBricks, DEFAULT_MAX_BRICKS, 1, 1 << 20, 'maxBricks');
     this.maxPages = within(o.maxPages, 1 << 24, 1, 1 << 26, 'maxPages');
     if (!Number.isInteger(this.maxBricks) || !Number.isInteger(this.maxPages))
       throw new RangeError('DensityVolume maxBricks and maxPages must be whole numbers');
@@ -422,5 +425,134 @@ export class DensityVolume implements VolumetricMediumSource {
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
     this.dispose();
+  }
+}
+
+/** A warm-cloud source such as `CloudSolver`, with a fixed grid in renderer-local metres. */
+export interface CloudDensitySource {
+  readonly grid: {
+    readonly cells: readonly [number, number, number];
+    readonly cellSize: number;
+    /** Corner of the first cell, at half a cell from its sample. */
+    readonly origin: Vec3;
+  };
+  /** Accepted liquid-water mixing ratios (kg/kg), X fastest, then Y and Z. */
+  cloudWater(): Float32Array;
+}
+
+export interface CloudDensityVolumeOptions {
+  /** Uniform air density, kg/m³ (default 1.2). */
+  airDensity?: number;
+  /** Effective water-droplet radius in metres (default 10 µm). */
+  effectiveRadius?: number;
+}
+
+/**
+ * Renders accepted warm-cloud water as a trilinear world-space volume. Pass the instance as
+ * `VolumetricFog`'s `volumes` and call `update()` after advancing or restoring the cloud source.
+ * Visible extinction is 3 ρ_air q_c / (2 ρ_water r_e), using the large-drop limit Q_ext = 2
+ * (Hansen and Travis 1974; Slingo 1989). Air density and effective radius are uniform.
+ */
+export class CloudDensityVolume extends DensityVolume {
+  private readonly grid: CloudDensitySource['grid'];
+  private closed = false;
+
+  constructor(
+    private readonly source: CloudDensitySource,
+    options: CloudDensityVolumeOptions = {},
+  ) {
+    const grid = source?.grid;
+    if (
+      !grid ||
+      typeof source.cloudWater !== 'function' ||
+      !Array.isArray(grid.cells) ||
+      grid.cells.length !== 3 ||
+      !Array.from(grid.cells).every((n) => Number.isInteger(n) && n > 0 && n <= SPAN * DENSITY_BRICK) ||
+      !Array.isArray(grid.origin) ||
+      grid.origin.length !== 3 ||
+      !Array.from(grid.origin).every(finite) ||
+      !finite(grid.cellSize) ||
+      !(grid.cellSize >= 1e-4 && grid.cellSize <= 1e4)
+    )
+      throw new MargoError(
+        'state',
+        'Invalid cloud grid. Pass three positive cell counts, a finite corner and a valid cell size.',
+      );
+    const bricks = grid.cells.reduce((total, cells) => total * Math.ceil(cells / DENSITY_BRICK), 1);
+    if (bricks > DEFAULT_MAX_BRICKS)
+      throw new MargoError('state', 'Cloud grid exceeds the density volume capacity. Use a smaller cloud grid.');
+    const { airDensity = 1.2, effectiveRadius = 10e-6 } = options ?? {};
+    const density = (3 * airDensity) / (2000 * effectiveRadius);
+    if (
+      !finite(airDensity) ||
+      !finite(effectiveRadius) ||
+      !(airDensity > 0 && effectiveRadius > 0 && density > 0 && density <= MAX_DENSITY)
+    )
+      throw new MargoError(
+        'state',
+        'Invalid cloud optics. Use positive air density and droplet radius such as 1.2 kg/m³ and 10 μm.',
+      );
+    const { cells, cellSize, origin } = grid;
+    const centre: Vec3 = [origin[0] + cellSize / 2, origin[1] + cellSize / 2, origin[2] + cellSize / 2];
+    if (centre.some((value) => !finite(Math.fround(value)) || !finite(Math.fround(value / cellSize))))
+      throw new MargoError(
+        'state',
+        'Cloud grid origin exceeds shader coordinates. Move the grid to a local render origin.',
+      );
+    super({ voxelSize: cellSize, origin: centre, density });
+    this.grid = {
+      cells: [cells[0], cells[1], cells[2]],
+      cellSize,
+      origin: [origin[0], origin[1], origin[2]],
+    };
+    this.update();
+  }
+
+  /** Replaces every voxel with the current accepted cloud water, including newly clear voxels. */
+  update(): void {
+    if (this.closed) throw new MargoError('disposed', 'Cloud density volume is disposed. Create a new cloud volume.');
+    const {
+      cells: [nx, ny, nz],
+      cellSize,
+      origin,
+    } = this.grid;
+    const current = this.source.grid;
+    if (
+      current?.cellSize !== cellSize ||
+      !Array.isArray(current.cells) ||
+      current.cells.length !== 3 ||
+      current.cells[0] !== nx ||
+      current.cells[1] !== ny ||
+      current.cells[2] !== nz ||
+      !Array.isArray(current.origin) ||
+      current.origin.length !== 3 ||
+      origin.some((value, i) => value !== current.origin[i])
+    )
+      throw new MargoError('state', 'Cloud grid geometry changed. Create a cloud volume for the new grid.');
+    const water = this.source.cloudWater();
+    if (
+      !(water instanceof Float32Array) ||
+      water.length !== nx * ny * nz ||
+      !water.every((value) => value >= 0 && finite(Math.fround(value * this.density)))
+    )
+      throw new MargoError(
+        'state',
+        'Invalid cloud water. Supply one finite nonnegative Float32 ratio per grid cell with representable extinction.',
+      );
+    this.clear();
+    for (let z = 0; z < nz; z++) {
+      for (let y = 0; y < ny; y++) {
+        const row = nx * (y + ny * z);
+        for (let x = 0; x < nx; x++) {
+          const value = water[row + x]!;
+          if (value > 0) this.set(x, y, z, value);
+        }
+      }
+    }
+  }
+
+  override dispose(): void {
+    this.closed = true;
+    super.dispose();
   }
 }

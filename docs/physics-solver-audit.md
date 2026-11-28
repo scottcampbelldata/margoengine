@@ -50,6 +50,34 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### ATMO-03 four-point pass
+
+- Point 5. `atmo03-projection.test.js` independently derives all twelve MAC face velocities for a warmed cell at
+  80 m and 160 m spacing. Removing an extra division by cell width brings the flux balance in every cell within
+  the analytical bound. Further tests check immediate mean-wind rewind, a coded impossible atmosphere and exact
+  retention of the accepted state and registry receipt after a failure in the second attempted internal step.
+- Point 6. `cloud-projection-threads.test.js` and `cloud-projection-threads.browser.mjs` compare the scalar and native
+  accepted fields, projection diagnostics and exact seek through signed far-origin shifts. Four partitions on the
+  49 × 17 × 23 grid perform 171 products covering 3,276,189 cells, with 3,075,606 SIMD-paired visits. Isolated
+  Chromium starts three actual helper workers and repeats the same snapshot hash as the scalar projection.
+- Point 7. `cloud-surface.browser.mjs` reproduces the fixed-camera cloud-motion requirement of OO-4. The real
+  native boundary-layer Wind moves the accepted condensate and the Environment density volume renders that
+  changing field on WebGPU and WebGL2. The accepted cloud moves 807.4 m east and rises 72.7 m. Its visible
+  centroid moves 203.1 pixels, with exact replay after renderer readiness. `environment/tests/density-volume.test.js`
+  checks physical optical scaling
+  and validates field replacements. Original film installation and other shot conditions remain open.
+- Point 8. The Physics and Environment READMEs and `docs/limits.md` record the Boussinesq and warm-rain domain,
+  relative pressure residual and resource bounds, scalar transport limits, constant cloud optics defaults, scope of
+  SIMD work and the older snapshot layout limitation.
+- Point 2 remains open. The closed MAC cube tests numerical accuracy. Bryan and Fritsch (2002) is an idealised
+  simulation benchmark requiring an initial saturated sounding and reversible moist thermodynamics. BOMEX
+  intercomparison cloud statistics are simulated, and RICO forcing uses the campaign radar precipitation to close
+  the budget. A defensible field test can use independent RICO aircraft liquid-water profiles or ARM LASSO liquid
+  water paths once the solver accepts the required observed profiles and large-scale forcing.
+  [Bryan and Fritsch](https://www.atmos.albany.edu/facstaff/rfovell/ATM562/bryan-fritsch-2002.pdf) ·
+  [BOMEX](https://doi.org/10.1175/1520-0469%282003%2960%3C1201%3AALESIS%3E2.0.CO%3B2) ·
+  [RICO](https://doi.org/10.1029/2011MS000056) · [ARM LASSO](https://doi.org/10.1029/2021JD035208)
+
 ### ATMO-01 four-point pass
 
 - Point 5. `9d7dd26bc5`. Weather's `boundary-layer.test.js` compares stable and unstable profiles to independent

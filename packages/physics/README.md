@@ -3486,13 +3486,34 @@ console.log(bedSurface(grid, heights).sample(0, 0).elevation); // -2
 
 ### Clouds: moist convection (`@margoengine/physics/clouds`)
 
-`CloudSolver` is the physics framework's clouds (ATMO-03): a box of air over flat ground in which warm, moist air rises, cools, condenses into cloud, releases its latent heat, rains and drifts with the wind. Add it to a `PhysicsWorld` with its settings: the box (`cells`, default 48 by 24 by 48, of `cellSize` metres, default 200, about `centre` over `ground`), the environment (the standard atmosphere at `altitude` with `seaLevelTemperature`, default 298.15 K, and relative `humidity` from 0.75 at the ground to `humidityTop` 0.3 at the top), the ground's `surfaceHeat` and `surfaceLatent` heat (W/m^2, defaults 250 and 150, varying by `patchiness` from place to place each `thermalPeriod` so thermals rise in some places and not others), warm `bubbles` to start from, the `wind` that carries air through the box, and `timeScale`, the seconds of cloud time per second of world time (60 runs a minute of weather a second, for a timelapse); the cloud steps every `interval` seconds of its own time (default 2). It publishes `cloudWater` (kg/kg per cell) as a registry field, `cloudWater()` copies it as a density volume for the sky to draw (x fastest, then up, then z), `sample(x, y, z)` gives the cloud and rain water, vapour, temperature and velocity anywhere in the box, `rainRate(x, z)` the rain reaching the ground in mm/h, `rainSource()` that rain as a `source` for `PrecipitationField` (`@margoengine/weather/precipitation`), and `windWith(base)` a wind with the clouds' own updrafts and outflow added. Physics after Harris et al. (2003), with Kessler's warm rain; whether rain reaches the ground as snow is the precipitation field's to decide from the air there.
+`CloudSolver` (ATMO-03) evolves moist air and warm rain over flat ground. Configure the box with `cells`
+(default `[48, 24, 48]`), `cellSize` (200 m), `centre` (`[0, 0]` in X and Z) and `ground` (0 m).
+The reference atmosphere uses `altitude` (0 m), `seaLevelTemperature` (298.15 K), `humidity` (0.75 at the ground)
+and `humidityTop` (0.3 at the top). Set `surfaceHeat` (250 W/m²), `surfaceLatent` (150 W/m²), `patchiness` (0.6),
+`thermalPeriod` (600 s), `vorticity` (0.2) and optional initial `bubbles` to author the forcing.
+`interval` defaults to 2 s of atmospheric time. `timeScale` defaults to one atmospheric second per world second.
+Pass a `wind` for horizontal transport. Its velocity is sampled in the Wind's origin cell using `worldCellSize`
+(default 4096 m).
+
+Use `new CloudSolver()` for the scalar pressure stencil, or `await CloudSolver.load()` for the Rust SIMD stencil.
+With `threads: 4` and shared world memory, three helpers apply the stencil in parallel while the caller reduces
+its sums in a fixed order. In a browser run the threaded world inside an isolated Worker. Dispose the solver when
+finished. `projectionDiagnostics` gives the physical divergence before and after projection and the checked
+residual. `workCounts()` reports actual native cells and SIMD-paired rows in the last accepted world tick.
+
+The `cloudWater` registry port and `cloudWater()` use kg/kg, with X fastest, then Y, then Z. Use
+`CloudDensityVolume` from `@margoengine/environment/density-volume` to draw the accepted condensate.
+`sample()` returns air temperature, water phases and velocity in local metres. `rainSource()` feeds the
+Weather precipitation field in mm/h. `windWith(base)` adds convective flow in the base wind's origin frame.
+The upwind boundary uses fresh environment air, so the semi-Lagrangian scalar transport does not conserve total
+water. Ice microphysics, terrain lift and anelastic flow remain open. Snapshots made before the accepted mean
+wind and diagnostics regions were added need to be re-recorded.
 
 ```ts
 import {CloudSolver} from 'margoengine/physics/clouds';
 import {PhysicsWorld} from 'margoengine/physics/world';
 
-const clouds = new CloudSolver();
+using clouds = await CloudSolver.load();
 const world = new PhysicsWorld({rate: {num: 24, den: 1}}).add(clouds, {
   cells: [16, 16, 16],
   cellSize: 100,
@@ -3505,7 +3526,7 @@ const world = new PhysicsWorld({rate: {num: 24, den: 1}}).add(clouds, {
 });
 world.advance(24); // one second of film
 console.log(clouds.time, clouds.cloudWater().some((q) => q > 1e-5)); // 120 true: a cumulus after two minutes
-console.log(clouds.sample(0, 800, 0).velocity[1] > 10); // true: its updraft, over 10 m/s
+console.log(clouds.projectionDiagnostics.divergenceAfter < 1e-9); // true: checked divergence (s^-1)
 ```
 
 ### Sea waves: a spectral wave model (`@margoengine/physics/waves`)

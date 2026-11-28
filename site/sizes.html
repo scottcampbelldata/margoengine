@@ -159,6 +159,8 @@
 <tr><th scope="row"><code>sediment-kernel-shared.wasm</code></th><td>Rust SIMD sediment transport, shared world memory</td><td class="num">19,596</td><td class="num">7,667</td><td class="num">6,712</td><td>SedimentTransport.load() on a host with shared memory support</td></tr>
 <tr><th scope="row"><code>boundary-layer-kernel.wasm</code></th><td>Rust SIMD boundary-layer sampling</td><td class="num">11,852</td><td class="num">4,483</td><td class="num">3,982</td><td>BoundaryLayerSolver.load(), only from the optional /boundary-layer entry</td></tr>
 <tr><th scope="row"><code>boundary-layer-kernel-shared.wasm</code></th><td>Rust SIMD boundary-layer sampling, shared world memory</td><td class="num">11,852</td><td class="num">4,483</td><td class="num">3,982</td><td>BoundaryLayerSolver.load() on a host with shared memory support</td></tr>
+<tr><th scope="row"><code>cloud-projection-kernel.wasm</code></th><td>Rust SIMD cloud pressure projection</td><td class="num">1,814</td><td class="num">943</td><td class="num">866</td><td>CloudSolver.load(), only from the optional /clouds entry</td></tr>
+<tr><th scope="row"><code>cloud-projection-kernel-shared.wasm</code></th><td>Rust SIMD cloud pressure projection, shared world memory</td><td class="num">1,814</td><td class="num">943</td><td class="num">868</td><td>CloudSolver.load() on a host with shared memory support</td></tr>
 <tr><th scope="row"><code>orbit-kernel.wasm</code></th><td>Rust SIMD N-body gravity and orbital drag</td><td class="num">14,124</td><td class="num">6,091</td><td class="num">5,491</td><td>OrbitSolver.load(), only from the optional /orbit entry</td></tr>
 <tr><th scope="row"><code>orbit-kernel-shared.wasm</code></th><td>Rust SIMD N-body gravity, shared world memory</td><td class="num">14,212</td><td class="num">6,146</td><td class="num">5,567</td><td>OrbitSolver.load() on a host with shared memory support</td></tr>
 <tr><th scope="row"><code>runoff-kernel.wasm</code></th><td>Rust SIMD catchment runoff</td><td class="num">23,699</td><td class="num">6,427</td><td class="num">5,537</td><td>RainfallRunoff.load(), only from the optional /runoff entry</td></tr>
@@ -3874,7 +3876,7 @@
 <tr><td><code>./ground</code></td><td class="num">12,858</td><td class="num">4,849</td></tr>
 <tr><td><code>./gi</code></td><td class="num">52,625</td><td class="num">18,446</td></tr>
 <tr><td><code>./fog-volumes</code></td><td class="num">5,283</td><td class="num">2,243</td></tr>
-<tr><td><code>./density-volume</code></td><td class="num">8,980</td><td class="num">3,563</td></tr>
+<tr><td><code>./density-volume</code></td><td class="num">11,166</td><td class="num">4,386</td></tr>
 <tr><td><code>./settings</code></td><td class="num">9,666</td><td class="num">3,825</td></tr>
 <tr><td><code>./studio</code></td><td class="num">2,479</td><td class="num">1,256</td></tr>
 <tr><td><code>./prefiltered</code></td><td class="num">9,321</td><td class="num">3,963</td></tr>
@@ -4917,12 +4919,12 @@
 <tr><td><code>./terramechanics</code></td><td class="num">47,678</td><td class="num">16,106</td></tr>
 <tr><td><code>./rail</code></td><td class="num">20,545</td><td class="num">8,496</td></tr>
 <tr><td><code>./seismic</code></td><td class="num">12,828</td><td class="num">5,010</td></tr>
-<tr><td><code>./lightning</code></td><td class="num">24,337</td><td class="num">8,917</td></tr>
+<tr><td><code>./lightning</code></td><td class="num">24,365</td><td class="num">8,939</td></tr>
 <tr><td><code>./explosive</code></td><td class="num">41,750</td><td class="num">15,583</td></tr>
 <tr><td><code>./granular-mpm</code></td><td class="num">14,644</td><td class="num">5,824</td></tr>
 <tr><td><code>./strands</code></td><td class="num">14,451</td><td class="num">5,915</td></tr>
 <tr><td><code>./synoptic</code></td><td class="num">15,555</td><td class="num">6,377</td></tr>
-<tr><td><code>./clouds</code></td><td class="num">15,116</td><td class="num">5,725</td></tr>
+<tr><td><code>./clouds</code></td><td class="num">31,477</td><td class="num">11,455</td></tr>
 <tr><td><code>./ageing</code></td><td class="num">9,179</td><td class="num">4,128</td></tr>
 <tr><td><code>./accretion</code></td><td class="num">12,282</td><td class="num">5,110</td></tr>
 <tr><td><code>./room-sound</code></td><td class="num">12,852</td><td class="num">5,350</td></tr>
@@ -4956,23 +4958,23 @@
 <tr><td><code>./glacier</code></td><td class="num">7,631</td><td class="num">3,484</td></tr>
 <tr><td><code>./iceberg</code></td><td class="num">9,936</td><td class="num">4,339</td></tr>
 <tr><td><code>./thin-film</code></td><td class="num">39,042</td><td class="num">15,190</td></tr>
-<tr><td><code>./viscoplastic</code></td><td class="num">22,810</td><td class="num">8,643</td></tr>
-<tr><td><code>./tsunami</code></td><td class="num">23,428</td><td class="num">8,985</td></tr>
+<tr><td><code>./viscoplastic</code></td><td class="num">22,838</td><td class="num">8,666</td></tr>
+<tr><td><code>./tsunami</code></td><td class="num">23,456</td><td class="num">9,007</td></tr>
 <tr><td><code>./pack-ice</code></td><td class="num">11,423</td><td class="num">4,715</td></tr>
-<tr><td><code>./runoff</code></td><td class="num">18,169</td><td class="num">7,003</td></tr>
+<tr><td><code>./runoff</code></td><td class="num">18,197</td><td class="num">7,024</td></tr>
 <tr><td><code>./drainage-fog</code></td><td class="num">10,045</td><td class="num">4,267</td></tr>
 <tr><td><code>./vortices</code></td><td class="num">13,162</td><td class="num">5,197</td></tr>
 <tr><td><code>./snowpack</code></td><td class="num">11,964</td><td class="num">4,916</td></tr>
 <tr><td><code>./airborne</code></td><td class="num">16,197</td><td class="num">7,062</td></tr>
-<tr><td><code>./boundary-layer</code></td><td class="num">14,014</td><td class="num">5,513</td></tr>
+<tr><td><code>./boundary-layer</code></td><td class="num">14,042</td><td class="num">5,533</td></tr>
 <tr><td><code>./aeolian</code></td><td class="num">11,986</td><td class="num">5,000</td></tr>
 <tr><td><code>./groundwater</code></td><td class="num">9,310</td><td class="num">3,902</td></tr>
-<tr><td><code>./landscape</code></td><td class="num">19,532</td><td class="num">7,562</td></tr>
-<tr><td><code>./sediment</code></td><td class="num">21,207</td><td class="num">7,863</td></tr>
-<tr><td><code>./underwater</code></td><td class="num">20,363</td><td class="num">8,067</td></tr>
-<tr><td><code>./orbit</code></td><td class="num">17,123</td><td class="num">6,720</td></tr>
+<tr><td><code>./landscape</code></td><td class="num">19,560</td><td class="num">7,586</td></tr>
+<tr><td><code>./sediment</code></td><td class="num">21,235</td><td class="num">7,884</td></tr>
+<tr><td><code>./underwater</code></td><td class="num">20,391</td><td class="num">8,087</td></tr>
+<tr><td><code>./orbit</code></td><td class="num">17,151</td><td class="num">6,743</td></tr>
 <tr><td><code>./granular-flow</code></td><td class="num">14,611</td><td class="num">5,574</td></tr>
-<tr><td><code>./lava</code></td><td class="num">25,321</td><td class="num">9,666</td></tr>
+<tr><td><code>./lava</code></td><td class="num">25,349</td><td class="num">9,686</td></tr>
 <tr><td><code>./dfsph</code></td><td class="num">19,974</td><td class="num">7,880</td></tr>
 <tr><td><code>./pbf</code></td><td class="num">13,032</td><td class="num">5,577</td></tr>
 <tr><td><code>./breakable</code></td><td class="num">58,334</td><td class="num">19,414</td></tr>

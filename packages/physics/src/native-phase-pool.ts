@@ -14,7 +14,8 @@ type NativePhaseSolver =
   | { readonly subject: 'Runoff'; readonly phaseExport: 'runoff_thread_phase' }
   | { readonly subject: 'Landscape'; readonly phaseExport: 'landscape_thread_phase' }
   | { readonly subject: 'Sediment'; readonly phaseExport: 'sediment_thread_phase' }
-  | { readonly subject: 'Boundary-layer wind'; readonly phaseExport: 'boundary_layer_thread_phase' };
+  | { readonly subject: 'Boundary-layer wind'; readonly phaseExport: 'boundary_layer_thread_phase' }
+  | { readonly subject: 'Cloud projection'; readonly phaseExport: 'cloud_projection_thread_phase' };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };
 
@@ -58,6 +59,7 @@ const phaseLabel = {
   Landscape: 'terrain',
   Sediment: 'transport',
   'Boundary-layer wind': 'sampling',
+  'Cloud projection': 'matrix',
 } as const;
 
 function failedThreads(subject: NativePhaseSolver['subject'], reason: string, cause?: unknown): MargoError {

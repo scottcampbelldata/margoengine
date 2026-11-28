@@ -260,6 +260,39 @@ mist.clear(); mist.splat([0, 1.2, -4], {radius: 1});                          //
 
 A VDB grid read by `parseVDB` of `@margoengine/loaders/vdb` loads with `DensityVolume.fromVDB(file.grids[0], {density})`: its active leaves and tiles, placed by the grid's own matrix (inactive voxels read 0; vector grids and level sets are refused). For a flood's spray mist, `floodMist` of `@margoengine/water/flood-bake` gives Gaussian puffs to `splat`.
 
+**Render simulated cloud water.** `CloudDensityVolume` places each accepted `CloudSolver` sample at the centre of its world cell. It converts the liquid-water mixing ratio to visible extinction using the air density and effective droplet radius. The defaults are 1.2 kg/m³ and 10 µm. The water field supplies the changing shape and location. Call `update()` after stepping or restoring the world.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { CloudSolver } from 'margoengine/physics/clouds';
+import { PhysicsWorld } from 'margoengine/physics/world';
+import { BoundaryLayerWind } from 'margoengine/weather/boundary-layer';
+import { CloudDensityVolume } from 'margoengine/environment/density-volume';
+import { VolumetricFog } from 'margoengine/environment/volumetric';
+import { Tonemap } from 'margoengine/tonemap';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu',
+  camera: { position: [0, 180, 1550], target: [0, 350, 0], near: 10, far: 4400 },
+});
+Tonemap.attach(engine);
+const wind = new BoundaryLayerWind({ speed: 7.5, turbulence: false });
+const cloud = new CloudSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(cloud, {
+  cells: [24, 12, 14], cellSize: 84, humidity: 0.96, humidityTop: 0.96, wind,
+  timeScale: 180, interval: 3, surfaceHeat: 0, surfaceLatent: 0,
+  bubbles: [{ centre: [-320, 360, 0], radius: 320, warming: 2.2, humidity: 1.18 }],
+});
+const volume = new CloudDensityVolume(cloud);
+const fog = VolumetricFog.attach(engine, { density: 0, range: 3500, volumes: volume, temporal: 0 });
+world.advance(10);
+volume.update();
+engine.render({ delta: 0 });
+// Release the fog before the density volume when unloading the scene.
+```
+
+The grid uses renderer-local metres and fixed geometry. Recreate its volume when the source grid changes. The optical approximation uses a uniform density and radius, with trilinear filtering and the existing froxel lighting and resolution. It models warm liquid clouds in visible light. [Hansen and Travis (1974)](https://www.giss.nasa.gov/pubs/abs/ha09500o.html), [Slingo (1989)](https://doi.org/10.1175/1520-0469(1989)046%3C1419:AGPFTS%3E2.0.CO;2)
+
 How it works. The grid is the leaf layout of OpenVDB (Museth 2013): bricks of 8 x 8 x 8 voxels, z fastest, and constant tiles for whole bricks of one value. On the GPU a page table over the box of occupied bricks holds one entry a brick (empty, a tile's value, or its slot in the voxel store); each froxel maps its sample point to index space through the inverse of the index-to-world matrix and filters the eight voxel centres around it trilinearly, so `sample(p)` on the CPU gives the same value. A voxel value of 1 is `density` extinction per metre with albedo `color`. `splat` adds Gaussians of a given peak and world radius, cut at three radii. The page table and voxels upload only when the grid changed; the matrix, box and look every frame.
 
 Options and defaults: `voxelSize` 0.5 m and `origin` [0, 0, 0] (voxel (0, 0, 0)'s centre), or `matrix` (affine, column-major index to world); `density` 1 per m; `color` [1, 1, 1]; `maxBricks` 32,768 (64 MiB of voxels); `maxPages` 16,777,216 (the page table spans the box round every brick, 4 B a brick of the box). Limits: detail finer than a froxel (about 8 x 8 pixels and a slice deep with the default grid) is averaged into it, so a close-up of fine smoke needs a finer `grid`; one `volumes` source per fog (this or `FogVolumes`); voxel indices within +-524,288; values below 0 read as 0. Real-GPU check: `npm run test:density-volume:browser` (WebGPU and the WebGL2 layer: Gaussian splats, a VDB leaf and a tile give an integrated froxel volume equal to a CPU mirror built on `sample`, every froxel; the albedo colours the fog; a rewritten grid shows on the next frame; an empty grid is clear).

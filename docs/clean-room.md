@@ -13479,11 +13479,28 @@ Proof: `packages/weather/tests/precipitation.test.js`.
 - S. Arabas et al., "libcloudph++ 0.2", arXiv:1310.1905, read (sections 3.1 to 3.1.4): the single-moment scheme's
   structure, the autoconversion threshold range 1e-4 to 1e-3 kg/kg, and the heat capacities.
 
-The staggered (MAC) grid, the midpoint back-trace, Jacobi-preconditioned conjugate gradients from the last pressure with
+The staggered (MAC) grid, the midpoint back-trace, Jacobi-preconditioned conjugate gradients with
 the wall's constant null space taken out, the two-pass linearised saturation adjustment, column sedimentation in
 substeps of at most a cell, the surface fluxes made patchy by the framework's counter-based random numbers, environment
 air at the upwind side, and the cloud's own clock (`timeScale`, `interval`) are this package's own arrangement. Proof:
 `packages/physics/tests/clouds.test.js` and `tests/coupling/clouds.test.js`.
+
+ATMO-03's resolved cloud upgrade uses:
+
+- F. H. Harlow and J. E. Welch, “Numerical Calculation of Time-Dependent Viscous Incompressible Flow of Fluid with
+  Free Surface” (1965), MAC difference operators. A. J. Chorin, “Numerical solution of the Navier–Stokes
+  equations” (1968), equation 20 gives the compatible pressure Laplacian. The corrected velocity subtracts the
+  discrete gradient with one power of inverse cell width. [Harlow and Welch](https://doi.org/10.1063/1.1761178) ·
+  [Chorin](https://doi.org/10.1090/S0025-5718-1968-0242392-2)
+- M. R. Hestenes and E. Stiefel, “Methods of conjugate gradients for solving linear systems” (1952), section 3. Native
+  Rust SIMD evaluates the structured matrix product in the same order as scalar, with one contiguous block of X
+  rows per worker. An ordered canonical reduction and independently recomputed residual set the convergence rule.
+  [Hestenes and Stiefel](https://doi.org/10.6028/jres.049.044)
+- J. E. Hansen and L. D. Travis, “Light Scattering in Planetary Atmospheres” (1974), and A. Slingo, “A GCM Parameterization
+  for the Shortwave Radiative Properties of Water Clouds” (1989). Visible cloud extinction uses the large-drop
+  limit of extinction efficiency two and the droplet population’s liquid mass to area ratio.
+  [Hansen and Travis](https://pubs.giss.nasa.gov/abs/ha09500o.html) ·
+  [Slingo](https://doi.org/10.1175/1520-0469%281989%29046%3C1419%3AAGPFTS%3E2.0.CO%3B2)
 
 ### Aerodynamic loads from shape (AERO-01, `WindForce` in `@margoengine/physics`, 2026-11-25)
 

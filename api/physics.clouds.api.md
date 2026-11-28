@@ -35,7 +35,21 @@ export interface CloudParams {
     timeScale?: number;
     interval?: number;
     vorticity?: number;
+    worldCellSize?: number;
     bubbles?: readonly CloudBubble[];
+}
+
+export interface CloudProjectionDiagnostics {
+    readonly iterations: number;
+    readonly divergenceBefore: number;
+    readonly divergenceAfter: number;
+    readonly relativeResidual: number;
+}
+
+export interface CloudProjectionWorkCounts extends WorkerWork {
+    readonly threads: number;
+    readonly applications: number;
+    readonly workers: readonly WorkerWork[];
 }
 
 export interface CloudRain {
@@ -53,6 +67,8 @@ export interface CloudSample {
 
 export class CloudSolver implements Solver<CloudParams> {
     constructor(id?: string);
+    static load(options?: CloudSolverLoadOptions): Promise<CloudSolver>;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, params?: CloudParams): void;
     step(context: StepContext, dt: number): void;
@@ -60,6 +76,9 @@ export class CloudSolver implements Solver<CloudParams> {
     importPorts(): void;
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
+    get cell(): Cell;
+    workCounts(): CloudProjectionWorkCounts;
+    get projectionDiagnostics(): CloudProjectionDiagnostics;
     get grid(): {
         cells: [number, number, number];
         cellSize: number;
@@ -71,6 +90,10 @@ export class CloudSolver implements Solver<CloudParams> {
     rainRate(x: number, z: number): number;
     rainSource(): CloudRain;
     windWith(base: Wind): Wind;
+}
+
+export interface CloudSolverLoadOptions extends CloudProjectionLoadOptions {
+    readonly id?: string;
 }
 
 export const LATENT_HEAT = 2501000;
@@ -90,6 +113,11 @@ export function saturation(t: number, p: number): number;
 type Cell = readonly [number, number, number];
 
 type Centring = 'cell' | 'face' | 'vertex' | 'particle';
+
+interface CloudProjectionLoadOptions {
+    readonly threads?: number;
+    readonly signal?: AbortSignal;
+}
 
 type ElementType = 'f32' | 'f64' | 'i32' | 'u32' | 'u8';
 
@@ -166,5 +194,10 @@ interface StepContext {
     readonly seed: number;
     readonly inputs: ReadonlyMap<string, Port>;
     readonly cell: Cell;
+}
+
+interface WorkerWork {
+    readonly cells: number;
+    readonly pairedCells: number;
 }
 ```

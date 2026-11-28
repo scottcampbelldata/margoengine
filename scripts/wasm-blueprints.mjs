@@ -496,6 +496,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'cloud-projection-kernel',
+    crate: 'packages/physics/cloud-projection-kernel',
+    blueprint: 'packages/physics/src/clouds/cloud-projection-kernel.wasm',
+    script: 'packages/physics/scripts/build-cloud-projection-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'cloud-projection-kernel-shared',
+    crate: 'packages/physics/cloud-projection-kernel',
+    blueprint: 'packages/physics/src/clouds/cloud-projection-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-cloud-projection-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'runoff-kernel',
     crate: 'packages/physics/runoff-kernel',
     blueprint: 'packages/physics/src/runoff/runoff-kernel.wasm',

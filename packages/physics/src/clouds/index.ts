@@ -11,6 +11,9 @@ export {
   saturation,
   type CloudBubble,
   type CloudParams,
+  type CloudProjectionDiagnostics,
+  type CloudProjectionWorkCounts,
+  type CloudSolverLoadOptions,
   type CloudRain,
   type CloudSample,
 } from './convection.js';

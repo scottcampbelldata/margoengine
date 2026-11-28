@@ -1448,8 +1448,8 @@
         "gzip": 2243
       },
       "./density-volume": {
-        "raw": 8980,
-        "gzip": 3563
+        "raw": 11166,
+        "gzip": 4386
       },
       "./settings": {
         "raw": 9666,
@@ -15446,8 +15446,8 @@
         "gzip": 5010
       },
       "./lightning": {
-        "raw": 24337,
-        "gzip": 8917
+        "raw": 24365,
+        "gzip": 8939
       },
       "./explosive": {
         "raw": 41750,
@@ -15466,8 +15466,8 @@
         "gzip": 6377
       },
       "./clouds": {
-        "raw": 15116,
-        "gzip": 5725
+        "raw": 31477,
+        "gzip": 11455
       },
       "./ageing": {
         "raw": 9179,
@@ -15602,20 +15602,20 @@
         "gzip": 15190
       },
       "./viscoplastic": {
-        "raw": 22810,
-        "gzip": 8643
+        "raw": 22838,
+        "gzip": 8666
       },
       "./tsunami": {
-        "raw": 23428,
-        "gzip": 8985
+        "raw": 23456,
+        "gzip": 9007
       },
       "./pack-ice": {
         "raw": 11423,
         "gzip": 4715
       },
       "./runoff": {
-        "raw": 18169,
-        "gzip": 7003
+        "raw": 18197,
+        "gzip": 7024
       },
       "./drainage-fog": {
         "raw": 10045,
@@ -15634,8 +15634,8 @@
         "gzip": 7062
       },
       "./boundary-layer": {
-        "raw": 14014,
-        "gzip": 5513
+        "raw": 14042,
+        "gzip": 5533
       },
       "./aeolian": {
         "raw": 11986,
@@ -15646,28 +15646,28 @@
         "gzip": 3902
       },
       "./landscape": {
-        "raw": 19532,
-        "gzip": 7562
+        "raw": 19560,
+        "gzip": 7586
       },
       "./sediment": {
-        "raw": 21207,
-        "gzip": 7863
+        "raw": 21235,
+        "gzip": 7884
       },
       "./underwater": {
-        "raw": 20363,
-        "gzip": 8067
+        "raw": 20391,
+        "gzip": 8087
       },
       "./orbit": {
-        "raw": 17123,
-        "gzip": 6720
+        "raw": 17151,
+        "gzip": 6743
       },
       "./granular-flow": {
         "raw": 14611,
         "gzip": 5574
       },
       "./lava": {
-        "raw": 25321,
-        "gzip": 9666
+        "raw": 25349,
+        "gzip": 9686
       },
       "./dfsph": {
         "raw": 19974,
@@ -19428,6 +19428,16 @@
       "raw": 11852,
       "gzip": 4483,
       "brotli": 3982
+    },
+    "packages/physics/dist/cloud-projection-kernel.wasm": {
+      "raw": 1814,
+      "gzip": 943,
+      "brotli": 866
+    },
+    "packages/physics/dist/cloud-projection-kernel-shared.wasm": {
+      "raw": 1814,
+      "gzip": 943,
+      "brotli": 868
     },
     "packages/physics/dist/orbit-kernel.wasm": {
       "raw": 14124,

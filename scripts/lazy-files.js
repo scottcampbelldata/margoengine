@@ -583,6 +583,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/cloud-projection-kernel.wasm',
+    label: 'cloud-projection-kernel.wasm',
+    kind: 'Rust SIMD cloud pressure projection',
+    measure: 'file',
+    when: 'CloudSolver.load(), only from the optional /clouds entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/cloud-projection-kernel-shared.wasm',
+    label: 'cloud-projection-kernel-shared.wasm',
+    kind: 'Rust SIMD cloud pressure projection, shared world memory',
+    measure: 'file',
+    when: 'CloudSolver.load() on a host with shared memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/orbit-kernel.wasm',
     label: 'orbit-kernel.wasm',
     kind: 'Rust SIMD N-body gravity and orbital drag',

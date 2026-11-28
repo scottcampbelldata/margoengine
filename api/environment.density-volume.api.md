@@ -5,6 +5,26 @@
 ```ts
 import { Vec3 } from "@margoengine/core";
 
+export interface CloudDensitySource {
+    readonly grid: {
+        readonly cells: readonly [number, number, number];
+        readonly cellSize: number;
+        readonly origin: Vec3;
+    };
+    cloudWater(): Float32Array;
+}
+
+export class CloudDensityVolume extends DensityVolume {
+    constructor(source: CloudDensitySource, options?: CloudDensityVolumeOptions);
+    update(): void;
+    dispose(): void;
+}
+
+export interface CloudDensityVolumeOptions {
+    airDensity?: number;
+    effectiveRadius?: number;
+}
+
 export const DENSITY_BRICK = 8;
 
 export interface DensitySplatOptions {

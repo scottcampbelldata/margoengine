@@ -25,8 +25,9 @@
 // water exactly.
 
 import { airDensity, standardAtmosphere } from '@margoengine/math/atmosphere';
+import { MargoError } from '@margoengine/math/errors';
 import type { FlowSample, Wind } from '@margoengine/math/fields';
-import { cos as cosine, exp, pow } from '@margoengine/math/pinned';
+import { cos as cosine, exp, hypot, pow } from '@margoengine/math/pinned';
 import { RandomStream, solverNumber } from '@margoengine/math/random';
 import { regionWords } from '../world/memory.js';
 import type {
@@ -40,6 +41,7 @@ import type {
   SolverHost,
   StepContext,
 } from '../world/solver.js';
+import type { CloudProjection, CloudProjectionLoadOptions, CloudProjectionWorkCounts } from './projection-kernel.js';
 
 /** The registry field of the clouds: cloud water mixing ratio per cell, kg/kg, owned by {@link CloudSolver}. */
 export const CLOUD_WATER_FIELD: FieldDescriptor = {
@@ -58,6 +60,12 @@ export const LATENT_HEAT = 2.501e6;
 export const AIR_HEAT_CAPACITY = 1005;
 const R_OVER_CP = 0.286;
 const REFERENCE_PRESSURE = 100000;
+const PROJECTION_RELATIVE_TOLERANCE = 1e-10;
+const PROJECTION_ITERATIONS = 400;
+const MAX_SUBSTEPS = 4096;
+const MAX_CELLS = 2 ** 21;
+const SATURATION_MINIMUM_K = 273.15 - 243.5;
+const STATE_F32_MAX = 3.4028234663852886e38;
 const WATER_DENSITY = 1000;
 /** Kessler's autoconversion threshold, kg/kg, and rate, 1/s. */
 const AUTOCONVERSION_THRESHOLD = 0.001;
@@ -99,6 +107,8 @@ export interface CloudParams {
   interval?: number;
   /** Vorticity confinement strength, 0 to switch it off (default 0.2). */
   vorticity?: number;
+  /** Metres per origin cell for translating the wind and cloud box (default 4096). */
+  worldCellSize?: number;
   /** Warm bubbles to start from: where thermals or a storm begin (default none). */
   bubbles?: readonly CloudBubble[];
 }
@@ -137,8 +147,45 @@ export interface CloudRain {
   readonly peak: number;
 }
 
-const ORIGIN: Cell = [0, 0, 0];
-const STATE = ['u', 'v', 'w', 'theta', 'vapour', 'cloud', 'rain', 'pressure', 'surfaceRain'] as const;
+const STATE = [
+  'u',
+  'v',
+  'w',
+  'theta',
+  'vapour',
+  'cloud',
+  'rain',
+  'pressure',
+  'surfaceRain',
+  'meanU',
+  'meanW',
+  'projection',
+] as const;
+const PROJECTION_WORDS = 4;
+const NO_NATIVE_WORK: CloudProjectionWorkCounts = Object.freeze({
+  threads: 1,
+  applications: 0,
+  cells: 0,
+  pairedCells: 0,
+  workers: Object.freeze([{ cells: 0, pairedCells: 0 }]),
+});
+
+/** Native pressure projection options. Four partitions include the world worker and three helpers. */
+export interface CloudSolverLoadOptions extends CloudProjectionLoadOptions {
+  readonly id?: string;
+}
+
+/** Projection statistics from the most recently accepted cloud interval. */
+export interface CloudProjectionDiagnostics {
+  readonly iterations: number;
+  /** RMS divergence in inverse seconds, before and after the MAC face update. */
+  readonly divergenceBefore: number;
+  readonly divergenceAfter: number;
+  /** L2 norm of the independently recomputed residual divided by the L2 right-hand side. */
+  readonly relativeResidual: number;
+}
+
+export type { CloudProjectionWorkCounts } from './projection-kernel.js';
 type StateName = (typeof STATE)[number];
 
 /**
@@ -148,7 +195,6 @@ type StateName = (typeof STATE)[number];
 export class CloudSolver implements Solver<CloudParams> {
   private readonly id: string;
   private host!: SolverHost;
-  private cell: Cell = ORIGIN;
   private nx = 0;
   private ny = 0;
   private nz = 0;
@@ -166,8 +212,15 @@ export class CloudSolver implements Solver<CloudParams> {
   private pressure0!: Float64Array;
   private density0!: Float64Array;
   private thetaV0!: Float64Array;
-  private meanU!: Float64Array;
-  private meanW!: Float64Array;
+  private working: Map<StateName, Float64Array<ArrayBuffer>> | undefined;
+  private readonly candidate = new Map<StateName, Float64Array<ArrayBuffer>>();
+  private projectionWorkspace!: Region;
+  private nativeProjection: CloudProjection | undefined;
+  private lastWork: CloudProjectionWorkCounts = NO_NATIVE_WORK;
+  private disposed = false;
+  private projectionInput!: Float64Array<ArrayBuffer>;
+  private projectionResidual!: Float64Array<ArrayBuffer>;
+  private projectionPreconditioned!: Float64Array<ArrayBuffer>;
   private regions = new Map<StateName, Region>();
   private clock!: Region;
   private port!: Region;
@@ -175,7 +228,24 @@ export class CloudSolver implements Solver<CloudParams> {
 
   /** @param id The solver's id (default `'clouds'`). */
   constructor(id = 'clouds') {
+    if (typeof id !== 'string' || !id || id.trim() !== id)
+      throw new MargoError('state', 'Invalid cloud solver id; pass a nonempty string without surrounding spaces.');
     this.id = id;
+  }
+
+  /** Load native SIMD pressure projection. The constructor remains available for scalar projection. */
+  static async load(options: CloudSolverLoadOptions = {}): Promise<CloudSolver> {
+    if (!options || typeof options !== 'object' || Array.isArray(options))
+      throw new MargoError('state', 'Invalid cloud load options; pass an options object or omit it.');
+    const solver = new CloudSolver(options.id),
+      { CloudProjection } = await import('./projection-kernel.js');
+    solver.nativeProjection = await CloudProjection.load(options);
+    return solver;
+  }
+
+  [Symbol.dispose](): void {
+    this.disposed = true;
+    this.nativeProjection?.[Symbol.dispose]();
   }
 
   describe(): SolverDescription {
@@ -188,6 +258,10 @@ export class CloudSolver implements Solver<CloudParams> {
   }
 
   init(host: SolverHost, params: CloudParams = {}): void {
+    if (this.disposed)
+      throw new MargoError('disposed', 'The cloud solver has been disposed; construct or load a new solver.');
+    if (!params || typeof params !== 'object' || Array.isArray(params))
+      throw new MargoError('state', 'Invalid cloud parameters; pass a CloudParams object or omit it.');
     const {
       cells = [48, 24, 48],
       cellSize = 200,
@@ -205,35 +279,94 @@ export class CloudSolver implements Solver<CloudParams> {
       timeScale = 1,
       interval = 2,
       vorticity = 0.2,
+      worldCellSize = 4096,
       bubbles = [],
     } = params;
-    if (!(cells.length === 3 && cells.every((n) => Number.isInteger(n) && n >= 2 && n <= 512)))
-      throw new RangeError(`A cloud box has 2 to 512 whole cells along each axis (got ${cells}); pass three.`);
+    if (
+      !Array.isArray(cells) ||
+      cells.length !== 3 ||
+      ![cells[0], cells[1], cells[2]].every((n) => Number.isInteger(n) && n >= 2 && n <= 512)
+    )
+      throw new MargoError('state', `A cloud box has 2 to 512 whole cells along each axis (got ${cells}); pass three.`);
     for (const [name, value] of [
       ['cell size', cellSize],
       ['sea-level temperature', seaLevelTemperature],
       ['thermal period', thermalPeriod],
       ['time scale', timeScale],
       ['interval', interval],
+      ['world cell size', worldCellSize],
     ] as const)
       if (!(value > 0 && Number.isFinite(value)))
-        throw new RangeError(`A cloud box's ${name} is a finite number above 0 (got ${value}); pass one.`);
+        throw new MargoError('state', `A cloud box's ${name} is a finite number above 0 (got ${value}); pass one.`);
     for (const [name, value] of [
       ['humidity', humidity],
       ['top humidity', humidityTop],
       ['patchiness', patchiness],
     ] as const)
-      if (!(value >= 0 && value <= 1))
-        throw new RangeError(`A cloud box's ${name} lies in [0, 1] (got ${value}); pass one in that range.`);
+      if (!(Number.isFinite(value) && value >= 0 && value <= 1))
+        throw new MargoError('state', `A cloud box's ${name} lies in [0, 1] (got ${value}); pass one in that range.`);
     for (const [name, value] of [
       ['surface heat', surfaceHeat],
       ['surface latent heat', surfaceLatent],
       ['vorticity', vorticity],
     ] as const)
       if (!(value >= 0 && Number.isFinite(value)))
-        throw new RangeError(`A cloud box's ${name} is a finite number, 0 or more (got ${value}); pass one.`);
-    if (!(centre.length === 2 && centre.every(Number.isFinite) && Number.isFinite(ground) && Number.isFinite(altitude)))
-      throw new RangeError('A cloud box needs a finite centre [x, z], ground and altitude in metres; pass them.');
+        throw new MargoError('state', `A cloud box's ${name} is a finite number, 0 or more (got ${value}); pass one.`);
+    if (
+      !Array.isArray(centre) ||
+      centre.length !== 2 ||
+      ![centre[0], centre[1]].every(Number.isFinite) ||
+      !Number.isFinite(ground) ||
+      !Number.isFinite(altitude)
+    )
+      throw new MargoError(
+        'state',
+        'A cloud box needs a finite centre [x, z], ground and altitude in metres; pass them.',
+      );
+    const cellsCount = cells[0] * cells[1] * cells[2];
+    if (cellsCount > MAX_CELLS)
+      throw new MargoError('state', `A cloud box has room for ${MAX_CELLS} cells; reduce one or more grid dimensions.`);
+    if (
+      !Number.isFinite(cells[1] * cellSize + altitude) ||
+      !Number.isFinite(ground + cells[1] * cellSize) ||
+      !Number.isFinite(Math.abs(centre[0]) + (cells[0] * cellSize) / 2) ||
+      !Number.isFinite(Math.abs(centre[1]) + (cells[2] * cellSize) / 2)
+    )
+      throw new MargoError(
+        'state',
+        'Cloud grid bounds must fit in finite metres; bring the centre and ground into their local origin and reduce the cell size.',
+      );
+    if (
+      wind !== undefined &&
+      (!wind || wind.medium !== 'air' || typeof wind.sample !== 'function' || !validOrigin(wind.cell))
+    )
+      throw new MargoError(
+        'state',
+        'Clouds use an air Wind with a signed origin cell; pass a BoundaryLayerWind or another Wind for air.',
+      );
+    if (!Array.isArray(bubbles))
+      throw new MargoError('state', 'Cloud bubbles must be an array; pass an array of CloudBubble options.');
+    const validBubbles = Array.from(bubbles, (bubble: CloudBubble, n) => {
+      if (
+        !bubble ||
+        !Array.isArray(bubble.centre) ||
+        bubble.centre.length !== 3 ||
+        ![bubble.centre[0], bubble.centre[1], bubble.centre[2]].every(Number.isFinite) ||
+        !(bubble.radius > 0) ||
+        !Number.isFinite(bubble.radius) ||
+        !Number.isFinite(bubble.warming)
+      )
+        throw new MargoError(
+          'state',
+          `Bubble ${n} needs a finite centre [x, y, z], a radius above 0 and a finite warming; pass them.`,
+        );
+      if (
+        bubble.humidity !== undefined &&
+        !(Number.isFinite(bubble.humidity) && bubble.humidity >= 0 && bubble.humidity <= 1.2)
+      )
+        throw new MargoError('state', `Bubble ${n}'s humidity lies in [0, 1.2]; pass one in that range.`);
+      return bubble;
+    });
     this.host = host;
     [this.nx, this.ny, this.nz] = cells;
     this.h = cellSize;
@@ -255,6 +388,7 @@ export class CloudSolver implements Solver<CloudParams> {
       timeScale,
       interval,
       vorticity,
+      worldCellSize,
     };
     this.random = new RandomStream(0, solverNumber(this.id));
     const { nx, ny, nz } = this;
@@ -264,62 +398,82 @@ export class CloudSolver implements Solver<CloudParams> {
     this.pressure0 = new Float64Array(ny);
     this.density0 = new Float64Array(ny);
     this.thetaV0 = new Float64Array(ny);
-    this.meanU = new Float64Array(ny);
-    this.meanW = new Float64Array(ny);
     for (let j = 0; j < ny; j++) {
       const y = (j + 0.5) * cellSize,
         [t, p] = standardAtmosphere(altitude + y, seaLevelTemperature),
         pi = pow(p / REFERENCE_PRESSURE, R_OVER_CP),
         rh = humidity + ((humidityTop - humidity) * (j + 0.5)) / ny;
+      const density = airDensity(t, p);
+      if (
+        !(
+          t > SATURATION_MINIMUM_K &&
+          p > 0 &&
+          density > 0 &&
+          Number.isFinite(t) &&
+          Number.isFinite(p) &&
+          Number.isFinite(density)
+        )
+      )
+        throw new MargoError(
+          'state',
+          'The cloud reference atmosphere has invalid temperature or density; use a smaller altitude, grid height or a realistic sea-level temperature.',
+        );
       this.pressure0[j] = p;
-      this.density0[j] = airDensity(t, p);
+      this.density0[j] = density;
       this.exner[j] = pi;
       this.theta0[j] = t / pi;
       this.vapour0[j] = rh * saturation(t, p);
       this.thetaV0[j] = this.theta0[j]! * (1 + 0.61 * this.vapour0[j]!);
     }
-    const cellsCount = nx * ny * nz,
-      sizes: Record<StateName, number> = {
-        u: (nx + 1) * ny * nz,
-        v: nx * (ny + 1) * nz,
-        w: nx * ny * (nz + 1),
-        theta: cellsCount,
-        vapour: cellsCount,
-        cloud: cellsCount,
-        rain: cellsCount,
-        pressure: cellsCount,
-        surfaceRain: nx * nz,
-      };
-    for (const name of STATE) this.regions.set(name, host.allocate(name, sizes[name] * 8, 'f64', CLOUD_LAYOUT));
+    const sizes: Record<StateName, number> = {
+      u: (nx + 1) * ny * nz,
+      v: nx * (ny + 1) * nz,
+      w: nx * ny * (nz + 1),
+      theta: cellsCount,
+      vapour: cellsCount,
+      cloud: cellsCount,
+      rain: cellsCount,
+      pressure: cellsCount,
+      surfaceRain: nx * nz,
+      meanU: ny,
+      meanW: ny,
+      projection: PROJECTION_WORDS,
+    };
+    for (const name of STATE) {
+      this.regions.set(name, host.allocate(name, sizes[name] * 8, 'f64', CLOUD_LAYOUT));
+      this.candidate.set(name, new Float64Array(sizes[name]));
+    }
+    this.projectionWorkspace = host.allocate('projectionScratch', cellsCount * 32, 'f64', CLOUD_LAYOUT);
+    this.nativeProjection?.bind(host, nx, ny, nz);
+    this.lastWork = this.nativeProjection?.workCounts() ?? NO_NATIVE_WORK;
+    const degree = (regionWords(host.memory, this.projectionWorkspace) as Float64Array).subarray(0, cellsCount);
+    for (let k = 0; k < nz; k++)
+      for (let j = 0; j < ny; j++)
+        for (let i = 0; i < nx; i++)
+          degree[i + nx * (j + ny * k)] =
+            Number(i > 0) +
+            Number(i < nx - 1) +
+            Number(j > 0) +
+            Number(j < ny - 1) +
+            Number(k > 0) +
+            Number(k < nz - 1);
+    this.projectionInput = new Float64Array(cellsCount);
+    this.projectionResidual = new Float64Array(cellsCount);
+    this.projectionPreconditioned = new Float64Array(cellsCount);
     this.clock = host.allocate('clock', 16, 'f64', CLOUD_LAYOUT);
     this.port = host.allocate('cloudWater', cellsCount * 4, 'f32', CLOUD_LAYOUT);
     const vapour = this.words('vapour'),
       theta = this.words('theta');
     for (let k = 0; k < nz; k++)
       for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) vapour[i + nx * (j + ny * k)] = this.vapour0[j]!;
-    bubbles.forEach((bubble, n) => {
-      const { centre: at, radius, warming, humidity: wet } = bubble;
-      if (
-        !(
-          at.length === 3 &&
-          at.every(Number.isFinite) &&
-          radius > 0 &&
-          Number.isFinite(radius) &&
-          Number.isFinite(warming)
-        )
-      )
-        throw new RangeError(
-          `Bubble ${n} needs a finite centre [x, y, z], a radius above 0 and a finite warming; pass them.`,
-        );
-      if (wet !== undefined && !(wet >= 0 && wet <= 1.2))
-        throw new RangeError(`Bubble ${n}'s humidity lies in [0, 1.2] (got ${wet}); pass one in that range.`);
+    for (const { centre: at, radius, warming, humidity: wet } of validBubbles) {
       for (let k = 0; k < nz; k++)
         for (let j = 0; j < ny; j++)
           for (let i = 0; i < nx; i++) {
             const dx = this.x0 + (i + 0.5) * cellSize - at[0],
               dy = (j + 0.5) * cellSize - at[1],
               dz = this.z0 + (k + 0.5) * cellSize - at[2],
-              r = Math.sqrt(dx * dx + dy * dy + dz * dz) / radius;
+              r = hypot(dx / radius, dy / radius, dz / radius);
             if (r >= 1) continue;
             const c = i + nx * (j + ny * k),
               shape = 0.5 + 0.5 * cosine(3.141592653589793 * r);
@@ -330,31 +484,59 @@ export class CloudSolver implements Solver<CloudParams> {
               vapour[c] = vapour[c]! + shape * (wanted - vapour[c]!);
             }
           }
-    });
+    }
+    this.checkCellState();
   }
 
   private words(name: StateName): Float64Array {
-    return regionWords(this.host.memory, this.regions.get(name)!) as Float64Array;
+    return this.working?.get(name) ?? (regionWords(this.host.memory, this.regions.get(name)!) as Float64Array);
   }
 
   step(context: StepContext, dt: number): void {
-    this.cell = context.cell;
+    if (this.disposed)
+      throw new MargoError('state', 'The cloud solver has been disposed; add a fresh solver to a new world.');
     if (this.random.seed !== context.seed) this.random = new RandomStream(context.seed, solverNumber(this.id));
     const clock = regionWords(this.host.memory, this.clock) as Float64Array,
       { interval, timeScale } = this.settings;
-    clock[0]! += dt * timeScale;
-    while (clock[0]! >= interval) {
-      this.advance(interval, clock[1]!);
-      clock[0]! -= interval;
-      clock[1]! += interval;
+    let pending = clock[0]! + dt * timeScale,
+      time = clock[1]!;
+    if (!(pending / interval < MAX_SUBSTEPS + 1) || !Number.isFinite(time + pending))
+      throw new MargoError(
+        'state',
+        'A world tick exceeds the cloud substep or time budget; reduce timeScale or increase interval.',
+      );
+    this.nativeProjection?.resetWork();
+    if (pending < interval) {
+      this.lastWork = this.nativeProjection?.workCounts() ?? NO_NATIVE_WORK;
+      clock[0] = pending;
+      return;
     }
+    for (const name of STATE) this.candidate.get(name)!.set(this.words(name));
+    this.working = this.candidate;
+    try {
+      let substeps = 0;
+      while (pending >= interval) {
+        if (substeps++ >= MAX_SUBSTEPS || !(time + interval > time))
+          throw new MargoError('state', 'Cloud time cannot advance safely; lower timeScale or use a larger interval.');
+        this.advance(interval, time);
+        pending -= interval;
+        time += interval;
+      }
+      this.checkCellState();
+    } finally {
+      this.working = undefined;
+    }
+    for (const name of STATE) this.words(name).set(this.candidate.get(name)!);
+    this.lastWork = this.nativeProjection?.workCounts() ?? NO_NATIVE_WORK;
+    clock[0] = pending;
+    clock[1] = time;
   }
 
   exportPorts(tick: number): readonly Port[] {
     const cloud = this.words('cloud'),
       out = regionWords(this.host.memory, this.port) as Float32Array;
     for (let c = 0; c < cloud.length; c++) out[c] = cloud[c]!;
-    return [{ field: CLOUD_WATER_FIELD.name, region: this.port, tick, cell: this.cell }];
+    return [{ field: CLOUD_WATER_FIELD.name, region: this.port, tick, cell: this.host.cell }];
   }
 
   importPorts(): void {}
@@ -365,6 +547,26 @@ export class CloudSolver implements Solver<CloudParams> {
 
   extraState(): readonly Region[] {
     return [this.clock];
+  }
+
+  /** The cloud box's signed origin cell, as retained by the world and its snapshots. */
+  get cell(): Cell {
+    return this.host.cell;
+  }
+
+  /** Native work from the last accepted world tick. Work receipts are excluded from world snapshots. */
+  workCounts(): CloudProjectionWorkCounts {
+    return this.lastWork;
+  }
+
+  get projectionDiagnostics(): CloudProjectionDiagnostics {
+    const [iterations, divergenceBefore, divergenceAfter, relativeResidual] = this.words('projection');
+    return {
+      iterations: iterations!,
+      divergenceBefore: divergenceBefore!,
+      divergenceAfter: divergenceAfter!,
+      relativeResidual: relativeResidual!,
+    };
   }
 
   /** Cells along x, y and z, and the cell edge in metres. */
@@ -384,6 +586,11 @@ export class CloudSolver implements Solver<CloudParams> {
 
   /** The air at (x, y, z) m from the solver's cell origin: water, temperature and velocity, trilinear between cells. */
   sample(x: number, y: number, z: number, out?: CloudSample): CloudSample {
+    if (![x, y, z].every(Number.isFinite))
+      throw new MargoError(
+        'state',
+        'Cloud sampling needs finite local coordinates; pass finite metres from the cloud origin.',
+      );
     const s = out ?? { cloudWater: 0, rainWater: 0, vapour: 0, temperature: 0, velocity: [0, 0, 0] },
       px = (x - this.x0) / this.h,
       py = (y - this.ground) / this.h,
@@ -395,13 +602,18 @@ export class CloudSolver implements Solver<CloudParams> {
     s.vapour = this.scalarAt(this.words('vapour'), px, py, pz, -1);
     s.temperature = (this.layer(this.theta0, py) + theta) * this.layer(this.exner, py);
     this.velocityAt(px, py, pz, s.velocity);
-    s.velocity[0] += this.meanU[j]!;
-    s.velocity[2] += this.meanW[j]!;
+    s.velocity[0] += this.words('meanU')[j]!;
+    s.velocity[2] += this.words('meanW')[j]!;
     return s;
   }
 
   /** The rain reaching the ground at (x, z), mm/h, bilinear between columns. */
   rainRate(x: number, z: number): number {
+    if (!Number.isFinite(x) || !Number.isFinite(z))
+      throw new MargoError(
+        'state',
+        'Cloud rain sampling needs finite local coordinates; pass finite X and Z in metres.',
+      );
     const rain = this.words('surfaceRain'),
       { nx, nz } = this,
       px = (x - this.x0) / this.h - 0.5,
@@ -439,8 +651,14 @@ export class CloudSolver implements Solver<CloudParams> {
       medium: 'air',
       cell: base.cell,
       sample(x: number, y: number, z: number, t: number, out?: FlowSample): FlowSample {
+        const delta = originDelta(base.cell, self.host.cell, self.settings.worldCellSize);
         const s = base.sample(x, y, z, t, out);
-        self.velocityAt((x - self.x0) / self.h, (y - self.ground) / self.h, (z - self.z0) / self.h, v);
+        self.velocityAt(
+          (x + delta[0] - self.x0) / self.h,
+          (y + delta[1] - self.ground) / self.h,
+          (z + delta[2] - self.z0) / self.h,
+          v,
+        );
         s.velocity[0] += v[0];
         s.velocity[1] += v[1];
         s.velocity[2] += v[2];
@@ -489,25 +707,69 @@ export class CloudSolver implements Solver<CloudParams> {
     this.microphysics(dt);
   }
 
+  private checkCellState(): void {
+    const theta = this.words('theta'),
+      vapour = this.words('vapour'),
+      cloud = this.words('cloud'),
+      rain = this.words('rain');
+    for (let c = 0; c < theta.length; c++) {
+      const j = Math.floor(c / this.nx) % this.ny;
+      const temperature = (this.theta0[j]! + theta[c]!) * this.exner[j]!;
+      if (
+        !(
+          temperature > SATURATION_MINIMUM_K &&
+          Number.isFinite(temperature) &&
+          vapour[c]! >= 0 &&
+          cloud[c]! >= 0 &&
+          cloud[c]! <= STATE_F32_MAX &&
+          rain[c]! >= 0 &&
+          Number.isFinite(vapour[c]!) &&
+          Number.isFinite(rain[c]!)
+        )
+      )
+        throw new MargoError(
+          'state',
+          'Cloud thermodynamics left its finite warm-rain domain; reduce bubble warming or ground forcing and use a smaller interval.',
+        );
+    }
+    for (const rate of this.words('surfaceRain')) {
+      if (!(rate >= 0 && Number.isFinite(rate * 3600)))
+        throw new MargoError(
+          'state',
+          'Cloud surface rain is outside finite millimetres per hour; reduce the moisture forcing or interval.',
+        );
+    }
+  }
+
   /** The mean wind of each layer, from the wind over the box's centre. */
   private meanWind(time: number): void {
-    const cx = this.x0 + (this.nx * this.h) / 2,
-      cz = this.z0 + (this.nz * this.h) / 2;
+    const wind = this.wind,
+      meanU = this.words('meanU'),
+      meanW = this.words('meanW');
+    if (!wind) {
+      meanU.fill(0);
+      meanW.fill(0);
+      return;
+    }
+    const delta = originDelta(this.host.cell, wind.cell, this.settings.worldCellSize),
+      cx = this.x0 + (this.nx * this.h) / 2 + delta[0],
+      cz = this.z0 + (this.nz * this.h) / 2 + delta[2];
     for (let j = 0; j < this.ny; j++) {
-      if (!this.wind) {
-        this.meanU[j] = this.meanW[j] = 0;
-        continue;
-      }
       // The wind runs on world time; cloud time runs `timeScale` times faster.
-      const v = this.wind.sample(
-        cx,
-        this.ground + (j + 0.5) * this.h,
-        cz,
-        time / this.settings.timeScale,
-        this.flow,
-      ).velocity;
-      this.meanU[j] = v[0];
-      this.meanW[j] = v[2];
+      const y = this.ground + (j + 0.5) * this.h + delta[1];
+      if (![cx, y, cz].every(Number.isFinite))
+        throw new MargoError(
+          'state',
+          'Cloud wind coordinates have overflowed; rebase closer to the Wind cell or use a smaller worldCellSize.',
+        );
+      const v = wind.sample(cx, y, cz, time / this.settings.timeScale, this.flow)?.velocity;
+      if (!v || !Number.isFinite(v[0]) || !Number.isFinite(v[2]))
+        throw new MargoError(
+          'state',
+          'Cloud advection needs finite wind; return finite horizontal velocity from Wind.sample().',
+        );
+      meanU[j] = v[0];
+      meanW[j] = v[2];
     }
   }
 
@@ -568,15 +830,15 @@ export class CloudSolver implements Solver<CloudParams> {
   private totalVelocity(px: number, py: number, pz: number, out: [number, number, number]): void {
     this.velocityAt(px, py, pz, out);
     const j = Math.min(this.ny - 1, Math.max(0, Math.floor(py)));
-    out[0] += this.meanU[j]!;
-    out[2] += this.meanW[j]!;
+    out[0] += this.words('meanU')[j]!;
+    out[2] += this.words('meanW')[j]!;
   }
 
   /** Buoyancy, vorticity confinement, and the ground's heat and water. */
   private forces(dt: number, time: number): void {
     const { nx, ny, nz, h } = this,
       [gx, gy, gz] = this.host.gravity,
-      g = Math.sqrt(gx * gx + gy * gy + gz * gz),
+      g = hypot(gx, gy, gz),
       theta = this.words('theta'),
       vapour = this.words('vapour'),
       cloud = this.words('cloud'),
@@ -685,109 +947,177 @@ export class CloudSolver implements Solver<CloudParams> {
           w[i + nx * (j + ny * k)]! += 0.5 * dt * (fz[i + nx * (j + ny * (k - 1))]! + fz[i + nx * (j + ny * k)]!);
   }
 
-  /**
-   * The pressure projection: solve sum over open neighbours of (p_c - p_n) = -(h^2 / dt) div_c by conjugate gradients
-   * (Jacobi preconditioned, from the last step's pressure), then take dt grad p from the interior faces, so the flow has no
-   * divergence and none through the walls.
-   */
+  /** Signed MAC face speed balance across each closed cell, equal to cell width times divergence. */
+  private faceBalance(target: Float64Array): number {
+    const { nx, ny, nz } = this,
+      u = this.words('u'),
+      v = this.words('v'),
+      w = this.words('w');
+    let largest = 0;
+    for (let k = 0; k < nz; k++)
+      for (let j = 0; j < ny; j++)
+        for (let i = 0; i < nx; i++) {
+          const c = i + nx * (j + ny * k),
+            a = i + (nx + 1) * (j + ny * k),
+            b = i + nx * (j + (ny + 1) * k),
+            balance = u[a + 1]! - u[a]! + (v[b + nx]! - v[b]!) + (w[c + nx * ny]! - w[c]!);
+          target[c] = balance;
+          largest = Math.max(largest, Math.abs(balance));
+        }
+    return largest;
+  }
+
+  /** Harlow–Welch MAC and Chorin projection with a Jacobi-preconditioned Neumann solve. */
   private project(dt: number): void {
     const { nx, ny, nz, h } = this,
       n = nx * ny * nz,
       u = this.words('u'),
       v = this.words('v'),
       w = this.words('w'),
-      p = this.words('pressure'),
-      b = new Float64Array(n),
-      degree = new Float64Array(n);
-    let mean = 0;
-    for (let k = 0; k < nz; k++)
-      for (let j = 0; j < ny; j++)
-        for (let i = 0; i < nx; i++) {
-          const c = i + nx * (j + ny * k),
-            div =
-              (u[i + 1 + (nx + 1) * (j + ny * k)]! -
-                u[i + (nx + 1) * (j + ny * k)]! +
-                v[i + nx * (j + 1 + (ny + 1) * k)]! -
-                v[i + nx * (j + (ny + 1) * k)]! +
-                w[i + nx * (j + ny * (k + 1))]! -
-                w[i + nx * (j + ny * k)]!) /
-              h;
-          b[c] = (-h * h * div) / dt;
-          mean += b[c]!;
-          degree[c] =
-            (i > 0 ? 1 : 0) +
-            (i < nx - 1 ? 1 : 0) +
-            (j > 0 ? 1 : 0) +
-            (j < ny - 1 ? 1 : 0) +
-            (k > 0 ? 1 : 0) +
-            (k < nz - 1 ? 1 : 0);
-        }
-    // The walls make the system singular by a constant: take out the right side's mean, which rounding leaves.
-    mean /= n;
-    for (let c = 0; c < n; c++) b[c]! -= mean;
-    const apply = (x: Float64Array, out: Float64Array) => {
-      for (let k = 0; k < nz; k++)
-        for (let j = 0; j < ny; j++)
-          for (let i = 0; i < nx; i++) {
-            const c = i + nx * (j + ny * k);
-            let s = degree[c]! * x[c]!;
-            if (i > 0) s -= x[c - 1]!;
-            if (i < nx - 1) s -= x[c + 1]!;
-            if (j > 0) s -= x[c - nx]!;
-            if (j < ny - 1) s -= x[c + nx]!;
-            if (k > 0) s -= x[c - nx * ny]!;
-            if (k < nz - 1) s -= x[c + nx * ny]!;
-            out[c] = s;
-          }
-    };
-    const r = new Float64Array(n),
-      z = new Float64Array(n),
-      d = new Float64Array(n),
-      q = new Float64Array(n);
-    apply(p, q);
-    let bNorm = 0;
-    for (let c = 0; c < n; c++) {
-      r[c] = b[c]! - q[c]!;
-      z[c] = r[c]! / degree[c]!;
-      d[c] = z[c]!;
-      bNorm += b[c]! * b[c]!;
+      acceptedPressure = this.words('pressure'),
+      evidence = this.words('projection'),
+      rhs = this.projectionInput,
+      r = this.projectionResidual,
+      z = this.projectionPreconditioned,
+      workspace = regionWords(this.host.memory, this.projectionWorkspace) as Float64Array,
+      degree = workspace.subarray(0, n),
+      p = workspace.subarray(n, n * 2),
+      d = workspace.subarray(n * 2, n * 3),
+      q = workspace.subarray(n * 3);
+    const speed = this.faceBalance(rhs);
+    if (!Number.isFinite(speed))
+      throw new MargoError('state', 'Cloud velocity divergence has overflowed; reduce the interval or the forcing.');
+    if (speed === 0) {
+      acceptedPressure.fill(0);
+      evidence.fill(0);
+      return;
     }
-    let rz = 0;
-    for (let c = 0; c < n; c++) rz += r[c]! * z[c]!;
-    const tolerance = 1e-20 * bNorm;
-    for (let iteration = 0; iteration < 400; iteration++) {
-      let rr = 0;
-      for (let c = 0; c < n; c++) rr += r[c]! * r[c]!;
-      if (rr <= tolerance) break;
-      apply(d, q);
-      let dq = 0;
-      for (let c = 0; c < n; c++) dq += d[c]! * q[c]!;
-      if (!(dq > 0)) break;
-      const alpha = rz / dq;
+    // Solve for pressure multiplied by dt / (h * speed). This conditions the RHS without squaring large velocities.
+    let mean = 0,
+      beforeSquared = 0;
+    for (let c = 0; c < n; c++) {
+      rhs[c] = -rhs[c]! / speed;
+      mean += rhs[c]!;
+      beforeSquared += rhs[c]! * rhs[c]!;
+    }
+    mean /= n;
+    p.fill(0);
+    let bSquared = 0,
+      rz = 0;
+    for (let c = 0; c < n; c++) {
+      rhs[c]! -= mean;
+      r[c] = rhs[c]!;
+      z[c] = d[c] = r[c]! / degree[c]!;
+      bSquared += rhs[c]! * rhs[c]!;
+      rz += r[c]! * z[c]!;
+    }
+    const toleranceSquared = PROJECTION_RELATIVE_TOLERANCE ** 2 * bSquared;
+    let residualSquared = bSquared,
+      iterations = 0;
+    while (residualSquared > toleranceSquared && iterations < PROJECTION_ITERATIONS) {
+      this.pressureOperator(d, degree, q);
+      let curvature = 0;
+      for (let c = 0; c < n; c++) curvature += d[c]! * q[c]!;
+      if (!(curvature > 0) || !Number.isFinite(curvature)) break;
+      const alpha = rz / curvature;
+      let next = 0;
+      residualSquared = 0;
       for (let c = 0; c < n; c++) {
         p[c]! += alpha * d[c]!;
         r[c]! -= alpha * q[c]!;
         z[c] = r[c]! / degree[c]!;
+        next += r[c]! * z[c]!;
+        residualSquared += r[c]! * r[c]!;
       }
-      let next = 0;
-      for (let c = 0; c < n; c++) next += r[c]! * z[c]!;
       const beta = next / rz;
       rz = next;
       for (let c = 0; c < n; c++) d[c] = z[c]! + beta * d[c]!;
+      iterations++;
     }
-    const scale = dt / h;
+    // Check the actual operator residual as well as the recurrence. Neither publishes on failed convergence.
+    this.pressureOperator(p, degree, q);
+    let actualSquared = 0;
+    for (let c = 0; c < n; c++) {
+      const error = rhs[c]! - q[c]!;
+      actualSquared += error * error;
+    }
+    if (!(actualSquared <= toleranceSquared) || !Number.isFinite(actualSquared))
+      throw new MargoError(
+        'state',
+        `Cloud pressure projection did not converge in ${iterations} iterations; reduce the grid dimensions.`,
+      );
+    // The solved potential is already scaled by dt / h, so only the speed normalisation remains here.
     for (let k = 0; k < nz; k++)
       for (let j = 0; j < ny; j++)
-        for (let i = 1; i < nx; i++)
-          u[i + (nx + 1) * (j + ny * k)]! -= (scale * (p[i + nx * (j + ny * k)]! - p[i - 1 + nx * (j + ny * k)]!)) / h;
+        for (let i = 1; i < nx; i++) {
+          const c = i + nx * (j + ny * k);
+          u[i + (nx + 1) * (j + ny * k)]! -= speed * (p[c]! - p[c - 1]!);
+        }
     for (let k = 0; k < nz; k++)
       for (let j = 1; j < ny; j++)
-        for (let i = 0; i < nx; i++)
-          v[i + nx * (j + (ny + 1) * k)]! -= (scale * (p[i + nx * (j + ny * k)]! - p[i + nx * (j - 1 + ny * k)]!)) / h;
+        for (let i = 0; i < nx; i++) {
+          const c = i + nx * (j + ny * k);
+          v[i + nx * (j + (ny + 1) * k)]! -= speed * (p[c]! - p[c - nx]!);
+        }
     for (let k = 1; k < nz; k++)
       for (let j = 0; j < ny; j++)
-        for (let i = 0; i < nx; i++)
-          w[i + nx * (j + ny * k)]! -= (scale * (p[i + nx * (j + ny * k)]! - p[i + nx * (j + ny * (k - 1))]!)) / h;
+        for (let i = 0; i < nx; i++) {
+          const c = i + nx * (j + ny * k);
+          w[c]! -= speed * (p[c]! - p[c - nx * ny]!);
+        }
+    this.faceBalance(r);
+    let afterSquared = 0;
+    for (let c = 0; c < n; c++) {
+      const row = r[c]! / speed;
+      afterSquared += row * row;
+      acceptedPressure[c] = ((p[c]! * speed) / dt) * h;
+      if (!Number.isFinite(acceptedPressure[c]))
+        throw new MargoError(
+          'state',
+          'Cloud pressure is outside finite units; reduce the grid scale, wind or forcing.',
+        );
+    }
+    // A mean removed to make the Neumann equation solvable is a roundoff from telescoping closed faces.
+    let faceSpeed = 0;
+    for (const field of [u, v, w]) for (const value of field) faceSpeed = Math.max(faceSpeed, Math.abs(value));
+    const roundoff = ((64 * Number.EPSILON * faceSpeed) / speed) * Math.sqrt(n);
+    if (
+      !Number.isFinite(afterSquared) ||
+      !(Math.sqrt(afterSquared) <= PROJECTION_RELATIVE_TOLERANCE * Math.sqrt(beforeSquared) + roundoff)
+    )
+      throw new MargoError(
+        'state',
+        'Cloud projection left excess divergence in the corrected faces; reduce the grid size or the forcing.',
+      );
+    const after = (Math.sqrt(afterSquared / n) * speed) / h,
+      before = (Math.sqrt(beforeSquared / n) * speed) / h;
+    if (!Number.isFinite(before) || !Number.isFinite(after))
+      throw new MargoError(
+        'state',
+        'Cloud divergence is outside finite inverse seconds; use larger cells or smaller forcing.',
+      );
+    evidence.set([iterations, before, after, bSquared === 0 ? 0 : Math.sqrt(actualSquared / bSquared)]);
+  }
+
+  private pressureOperator(input: Float64Array, degree: Float64Array, output: Float64Array): void {
+    if (this.nativeProjection) {
+      this.nativeProjection.apply(input, degree, output);
+      return;
+    }
+    const { nx, ny, nz } = this;
+    for (let k = 0; k < nz; k++)
+      for (let j = 0; j < ny; j++)
+        for (let i = 0; i < nx; i++) {
+          const c = i + nx * (j + ny * k);
+          let value = degree[c]! * input[c]!;
+          if (i > 0) value -= input[c - 1]!;
+          if (i < nx - 1) value -= input[c + 1]!;
+          if (j > 0) value -= input[c - nx]!;
+          if (j < ny - 1) value -= input[c + nx]!;
+          if (k > 0) value -= input[c - nx * ny]!;
+          if (k < nz - 1) value -= input[c + nx * ny]!;
+          output[c] = value;
+        }
   }
 
   /** Condensation, Kessler's warm rain, rain evaporation and the rain's fall, cell by cell and column by column. */
@@ -851,15 +1181,21 @@ export class CloudSolver implements Solver<CloudParams> {
           fastest = Math.max(fastest, rainSpeed(this.density0[j]! * rain[i + nx * (j + ny * k)]!));
         const steps = Math.max(1, Math.ceil((fastest * dt) / h)),
           sub = dt / steps;
+        if (!(steps <= MAX_SUBSTEPS))
+          throw new MargoError(
+            'state',
+            'Cloud rainfall exceeds the sedimentation substep budget; reduce interval or increase cellSize.',
+          );
         let landed = 0;
         for (let s = 0; s < steps; s++) {
           let above = 0;
           for (let j = ny - 1; j >= 0; j--) {
             const c = i + nx * (j + ny * k),
               rho = this.density0[j]!,
+              mass = rho * h * rain[c]!,
               flux = rho * rain[c]! * rainSpeed(rho * rain[c]!),
-              out = Math.min(flux * sub, rho * h * rain[c]!);
-            rain[c]! += (above - out) / (rho * h);
+              out = Math.min(flux * sub, mass);
+            rain[c] = (mass - out + above) / (rho * h);
             above = out;
           }
           landed += above;
@@ -916,6 +1252,18 @@ function adjust(t: number, p: number, qv: number, qc: number): number {
 /** The mass-weighted fall speed of rain of `density` kg/m^3 of rain water, m/s. */
 export function rainSpeed(density: number): number {
   return density > 0 ? RAIN_SPEED * pow(density, 0.125) : 0;
+}
+
+function validOrigin(cell: Cell): boolean {
+  return (
+    Array.isArray(cell) &&
+    cell.length === 3 &&
+    [cell[0], cell[1], cell[2]].every((axis) => Number.isInteger(axis) && axis >= -2147483648 && axis <= 2147483647)
+  );
+}
+
+function originDelta(from: Cell, to: Cell, size: number): [number, number, number] {
+  return [(from[0] - to[0]) * size, (from[1] - to[1]) * size, (from[2] - to[2]) * size];
 }
 
 /** Trilinear interpolation in a grid of nx by ny by nz values at (fx, fy, fz) in grid units, clamped to the grid. */

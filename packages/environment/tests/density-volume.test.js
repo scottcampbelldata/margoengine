@@ -8,7 +8,7 @@ import { mockGPU, passes, context } from '../../../examples/package-benchmarks/p
 import { Camera } from '../../core/dist/extension.js';
 import { SceneTarget } from '../../shared/msaa.js';
 import { VolumetricFog } from '../dist/volumetric.js';
-import { DensityVolume, DENSITY_BRICK } from '../dist/density-volume.js';
+import { CloudDensityVolume, DensityVolume, DENSITY_BRICK } from '../dist/density-volume.js';
 
 const usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING;
 function rig(options = {}) {
@@ -42,6 +42,67 @@ function rig(options = {}) {
   return { fog, frame, record: (work) => gpu.record(work) };
 }
 const injectCode = (log) => log.find((e) => e[0] === 'module' && /fn inject/.test(e[2].code))[2].code;
+
+test('accepted cloud water places extinction at cell centres and clears the previous frame', () => {
+  const grid = { cells: [3, 2, 3], cellSize: 8, origin: [-12, 10, 32] };
+  const data = new Float32Array(18);
+  const first = 2 + 3 * (1 + 2 * 1);
+  data[first] = 0.0005;
+  const source = { grid, cloudWater: () => data };
+  const effectiveRadius = 12e-6;
+  const airDensity = 1.12;
+  using volume = new CloudDensityVolume(source, { effectiveRadius, airDensity });
+  const dropMass = (4 / 3) * Math.PI * effectiveRadius ** 3 * 1000;
+  const dropCrossSection = 2 * Math.PI * effectiveRadius ** 2;
+  const ext = (data[first] * airDensity * dropCrossSection) / dropMass;
+  assert.equal(volume.voxel(2, 1, 1), data[first]);
+  assert(Math.abs(volume.sample([8, 22, 44]) - ext) < 1e-15);
+  assert(Math.abs(volume.sample([4, 22, 44]) - ext / 2) < 1e-15);
+  assert.equal(volume.sample([8, 14, 44]), 0);
+  data.fill(0);
+  data[0] = 0.0002;
+  volume.update();
+  assert.equal(volume.voxel(2, 1, 1), 0);
+  assert.equal(volume.voxel(0, 0, 0), data[0]);
+  data[first] = -0.0005;
+  assert.throws(() => volume.update(), { code: 'state', message: /one finite nonnegative Float32 ratio/ });
+  assert.equal(volume.voxel(0, 0, 0), data[0], 'an invalid update keeps the last good frame');
+  data[first] = 3e38;
+  assert.throws(() => volume.update(), { code: 'state', message: /representable extinction/ });
+  assert.equal(volume.voxel(0, 0, 0), data[0], 'overflow keeps the last good frame');
+  data.fill(0);
+  volume.update();
+  assert.equal(volume.brickCount, 0);
+  grid.cellSize = 9;
+  assert.throws(() => volume.update(), { code: 'state', message: /new grid/ });
+  volume.dispose();
+  assert.throws(() => volume.update(), { code: 'disposed' });
+});
+
+test('cloud density rejects invalid optics, shapes and values with a correction', () => {
+  const grid = { cells: [1, 1, 1], cellSize: 8, origin: [0, 0, 0] };
+  const source = { grid, cloudWater: () => new Float32Array(1) };
+  assert.throws(() => new CloudDensityVolume(source, { effectiveRadius: 0 }), {
+    code: 'state',
+    message: /positive air density/,
+  });
+  assert.throws(() => new CloudDensityVolume(source, { airDensity: Number.POSITIVE_INFINITY }), {
+    code: 'state',
+    message: /positive air density/,
+  });
+  assert.throws(() => new CloudDensityVolume({ ...source, grid: { ...grid, cells: [1, 0, 1] } }), {
+    code: 'state',
+    message: /positive cell counts/,
+  });
+  assert.throws(() => new CloudDensityVolume({ ...source, cloudWater: () => new Float32Array(2) }), {
+    code: 'state',
+    message: /one finite nonnegative Float32 ratio/,
+  });
+  assert.throws(() => new CloudDensityVolume({ ...source, grid: { ...grid, origin: [1e40, 0, 0] } }), {
+    code: 'state',
+    message: /local render origin/,
+  });
+});
 
 test('validation of options, indices, values and splats', () => {
   assert.equal(DENSITY_BRICK, 8);
