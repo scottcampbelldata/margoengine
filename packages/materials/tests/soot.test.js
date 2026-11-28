@@ -78,8 +78,8 @@ test('sootDecal: a multiply decal over the plume that reads a soot atlas fire en
 test('presets: plain frozen options; metals from measured F0, tarnished copper darker and rougher', () => {
   // Johnson and Christy 1972 and 1974 through the spectral integrator (test/measured-library.test.js); Hoffman's
   // course figures (0.955, 0.638, 0.538) and (0.562, 0.565, 0.578) until 2026-11-28.
-  assert.deepEqual(presets.copper.color, [0.9216, 0.6251, 0.5207, 1]);
-  assert.deepEqual(presets.iron.color, [0.5289, 0.5136, 0.4938, 1]);
+  assert.deepEqual(presets.copper.color, [0.9216, 0.6251, 0.5207]);
+  assert.deepEqual(presets.iron.color, [0.5289, 0.5136, 0.4938]);
   assert.equal(presets.copper.metalness, 1);
   assert.ok(presets.tarnishedCopper.roughness > presets.copper.roughness);
   for (let k = 0; k < 3; k++) assert.ok(presets.tarnishedCopper.color[k] < presets.copper.color[k]);

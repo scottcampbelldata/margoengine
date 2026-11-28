@@ -150,7 +150,7 @@ export function cadFinish(
   const base = spec.metal === 'castIron' ? castIron : metal(spec.metal),
     t = tint === undefined ? spec.tint : rgb(tint, 'tint');
   return Object.freeze({
-    color: Object.freeze([base.color[0] * t[0], base.color[1] * t[1], base.color[2] * t[2], 1] as const),
+    color: Object.freeze([base.color[0] * t[0], base.color[1] * t[1], base.color[2] * t[2]] as const),
     roughness: r,
     metalness: base.metalness,
   });
@@ -206,7 +206,7 @@ export class CadBench {
     if (!(size[0] > 0 && size[1] > 0 && thickness > 0) || ![top, center[0], center[1]].every(Number.isFinite))
       throw new RangeError('Invalid deck; pass a positive size and thickness and a finite top and center');
     const granite = surface('basalt', { roughness: 0.5 }),
-      plate = material ?? new PbrMaterial({ color: granite.color.slice(0, 3), roughness: granite.roughness });
+      plate = material ?? new PbrMaterial({ color: granite.color, roughness: granite.roughness });
     const mesh = this.engine
       .createMesh()
       .setGeometry(box(size[0], thickness, size[1]))
@@ -221,12 +221,11 @@ export class CadBench {
     const preset = cadFinish(finish, options),
       key = `${preset.color.join(',')}|${preset.roughness}`;
     let value = this.materials.get(key);
-    // Core's PbrMaterial takes linear rgb; the preset's fourth value is alpha 1.
     if (!value)
       this.materials.set(
         key,
         (value = new PbrMaterial({
-          color: preset.color.slice(0, 3),
+          color: preset.color,
           roughness: preset.roughness,
           metalness: preset.metalness,
           doubleSided: false,

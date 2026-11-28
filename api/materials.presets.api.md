@@ -19,7 +19,7 @@ export interface MaterialInfo {
 export type MaterialName = MetalName | DielectricName | SurfaceName;
 
 export interface MaterialPreset {
-    readonly color: readonly [number, number, number, number];
+    readonly color: readonly [number, number, number];
     readonly roughness: number;
     readonly metalness: number;
     readonly ior?: number;

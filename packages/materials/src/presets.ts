@@ -12,9 +12,12 @@ import type { MeasuredDielectric, MeasuredMetal, MeasuredSurface, Provenance } f
 export type { MeasuredDielectric, MeasuredMetal, MeasuredSurface, Provenance } from './measured-types.js';
 export { SOURCES };
 
-/** What a preset holds: the PbrMaterial options it sets. */
+/**
+ * What a preset holds: the PbrMaterial options it sets. `color` is linear [r, g, b], which both core's and this
+ * package's `PbrMaterial` take (core's accepts exactly three values).
+ */
 export interface MaterialPreset {
-  readonly color: readonly [number, number, number, number];
+  readonly color: readonly [number, number, number];
   readonly roughness: number;
   readonly metalness: number;
   /** Index of refraction, set by dielectric and surface presets (PbrMaterial's default is 1.5). */
@@ -38,8 +41,8 @@ export const SURFACES: Readonly<Record<SurfaceName, MeasuredSurface>> = SURFACE_
 const preset = (r: number, g: number, b: number, roughness: number, metalness: number, ior?: number): MaterialPreset =>
   Object.freeze(
     ior === undefined
-      ? { color: Object.freeze([r, g, b, 1] as const), roughness, metalness }
-      : { color: Object.freeze([r, g, b, 1] as const), roughness, metalness, ior },
+      ? { color: Object.freeze([r, g, b] as const), roughness, metalness }
+      : { color: Object.freeze([r, g, b] as const), roughness, metalness, ior },
   );
 function row<T>(table: Readonly<Record<string, T>>, kind: string, name: string): T {
   if (!Object.prototype.hasOwnProperty.call(table, name))

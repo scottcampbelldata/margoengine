@@ -55,6 +55,7 @@ test('every finish is a measured metal F0 times its tint, metalness 1', () => {
     for (let i = 0; i < 3; i++) assert.equal(preset.color[i], base[i] * spec.tint[i], `${name} channel ${i}`);
     assert.equal(preset.roughness, spec.roughness);
     assert.equal(preset.metalness, 1);
+    assert.equal(preset.color.length, 3, `${name} is linear rgb, as core's PbrMaterial takes`);
   }
   // A #rrggbb tint is sRGB and goes in linear: #808080 is 0.2158605 linear.
   const grey = cadFinish('machined', { tint: '#808080' });
@@ -88,7 +89,7 @@ test('show finishes a part, registers it for shadows and shares materials', () =
   const a = cad.show(box(0.1, 0.04, 0.06), { finish: 'anodised' }),
     b = cad.show(box(0.02, 0.02, 0.02), { finish: 'anodised' });
   assert.equal(a.material, b.material, 'one material per finish');
-  assert.deepEqual([...a.material.data.slice(0, 3)].map((v) => +v.toFixed(5)), cadFinish('anodised').color.slice(0, 3).map((v) => +v.toFixed(5)));
+  assert.deepEqual([...a.material.data.slice(0, 3)].map((v) => +v.toFixed(5)), [...cadFinish('anodised').color].map((v) => +v.toFixed(5)));
   assert.notEqual(cad.material('machined'), a.material);
   assert.equal(b.edges, null);
   assert.deepEqual(registered, [a.mesh, b.mesh]);

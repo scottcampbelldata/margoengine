@@ -106,7 +106,7 @@ test('API: metal, dielectric, surface and materials give PbrMaterial options; na
   assert.deepEqual(metal('gold', { roughness: 0.1 }).roughness, 0.1);
   assert.equal(metal('silver').metalness, 1);
   const glass = dielectric('windowGlass');
-  assert.deepEqual([...glass.color], [1, 1, 1, 1]);
+  assert.deepEqual([...glass.color], [1, 1, 1]);
   assert.equal(glass.ior, DIELECTRICS.windowGlass.ior);
   assert.equal(surface('snow').metalness, 0);
   assert.ok(Object.isFrozen(materials) && Object.isFrozen(materials.gold));
@@ -117,4 +117,16 @@ test('API: metal, dielectric, surface and materials give PbrMaterial options; na
   assert.deepEqual(copper, metal('copper'));
   assert.deepEqual(iron, metal('iron'));
   assert.deepEqual(brick, surface('brick'));
+});
+
+test('presets: every preset goes straight into core PbrMaterial, which takes linear [r, g, b] only', async () => {
+  // Regression: presets held [r, g, b, 1], so `new PbrMaterial(metal('gold'))` with core's class threw TypeError.
+  const { PbrMaterial } = await import('@margoengine/core');
+  for (const [name, preset] of Object.entries(materials)) {
+    assert.equal(preset.color.length, 3, name);
+    const m = new PbrMaterial(preset);
+    [...preset.color].forEach((v, i) => close(m.data[i], v, 1e-6, `${name} color[${i}]`));
+    close(m.data[5], preset.metalness, 1e-6, `${name} metalness`);
+  }
+  assert.doesNotThrow(() => new PbrMaterial(copper));
 });
