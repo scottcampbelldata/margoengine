@@ -1,28 +1,28 @@
 {
  "proof": "post-ssr-models",
- "ref": "68163189d3",
- "revision": "68163189d3b2d8276a12cb3dfd4f0fed190309af",
- "capturedAt": "68163189d3b2d8276a12cb3dfd4f0fed190309af",
+ "ref": "a53e3a9835",
+ "revision": "a53e3a9835c0078aac9426aac72a3d11eb09b286",
+ "capturedAt": "a53e3a9835c0078aac9426aac72a3d11eb09b286",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {
-  "68163189d3 descends from f5b3575bc0": true
+  "a53e3a9835 descends from f5b3575bc0": true
  },
  "outputs": {
-  "SSR 1x core": "f62d07fb6754b9d3c4928ebe402eeece479ab3c7905ea7f320073e388c8fef8b",
-  "SSR 1x IBL": "ddc11c7e59b218412db6de1575b3d93a6298b2e1ba25ac1e0f02e5341951c169",
-  "SSR 4x core": "38a60b81f9c9c3d5f2b886898757346e66d7e8b7af4e2153885aa514e96c1477",
-  "SSR 4x IBL": "fb6357c526b308ec9ae7074c15274d5dc2c37bfda44d2412485d92892d342c43",
-  "SSAO, SSR, Bloom, FXAA 1x core": "fd5fd383002ff5fe193da4fb14c8564da84c65fc2f9ea86efd35579042c588b5",
-  "SSAO, SSR, Bloom, FXAA 1x IBL": "99714513c3e4398d76f35ad82ce6b81cddc7304fe7d9af6d5a37d7119af185c2",
-  "SSAO, SSR, Bloom, FXAA 4x core": "fc44df6402e76c622b5a34fd48d0128a06067e28c43383c7c36e1227c75d0ed1",
-  "SSAO, SSR, Bloom, FXAA 4x IBL": "048f86d4655a54b3afd5679e42449edd9b7a0cc9c22bf5a58b1d9bae61f3f065",
-  "SSAO, Bloom, FXAA 1x core": "1a682c3b735e489c16997f9586fd49f8af1d3d6af9a15e85802410721a356528",
-  "SSAO, Bloom, FXAA 1x IBL": "a2e49d99f137cb55d6f4faf3dd8a42ae01f7292e04392f94382da3c22c766cf6",
-  "SSAO, Bloom, FXAA 4x core": "dafd6a4aff73659fae3692165386dc8fa0405f1a428cd9510f380fe3ca138500",
-  "SSAO, Bloom, FXAA 4x IBL": "2b534538b5c4bfa72fa425bbaf2dba501a89134fcd14cfa4b89b2e74906d266f",
-  "FXAA 1x core": "bd82cb402018ded54ec058d8dd3697ee3bc2af056e3a87515b2e0b6ff019a01e",
-  "FXAA 1x IBL": "5548424b1538cbad0e837d9903a35e9a25c988b95768ca2e6a643caf5e746783",
-  "FXAA 4x core": "716754776b6446ba3abe9dcae684a7bf4deef5c16cc7479a4baf740ed53da96a",
-  "FXAA 4x IBL": "9c95591cb4f6554ab41ce68a14758ed12ca5b6be7908c29cf7699b8e57981e1e"
+  "SSR 1x core": "7a219295cbe702bf4a47198feb69130beb2d02dc389081ed222fcd1095e6fd9e",
+  "SSR 1x IBL": "6361e45830d8e6387ac94c211e3dc556463e38c4ec5798978c2b82f0940212e8",
+  "SSR 4x core": "70c25ac16b2398820a64c410ad14a0a17c94b5e779f44c69d5dbcfa726136374",
+  "SSR 4x IBL": "91a53ab98b5ccd0eff2f46e48d67181683bfb7949ee32d2b7c6dbe6972848dc9",
+  "SSAO, SSR, Bloom, FXAA 1x core": "b3e4e460737b6ff6f0898b4008f5a6f6ad5f1bb8be9ff128df65a856c8eac719",
+  "SSAO, SSR, Bloom, FXAA 1x IBL": "d555e98db8314a94e7e30e29a1a5240abcc3cfa18a16824ada0a683958abc57e",
+  "SSAO, SSR, Bloom, FXAA 4x core": "7ce83527e51111bcf52fdcc57cde77205132c860f12c61862893db5664f2cda0",
+  "SSAO, SSR, Bloom, FXAA 4x IBL": "fc2f6e20ae3b4e546c8e9304336ff59a0d82974e55373b032e9e3a2fb05a909f",
+  "SSAO, Bloom, FXAA 1x core": "fd7542b7d7898753a272b2fc3eaeddbb3361e423842174235fc954be80ada914",
+  "SSAO, Bloom, FXAA 1x IBL": "8032c3b341b772f7bde3cd695582788eef25dd828e07ed2e5e8b8c3cea0ae9b5",
+  "SSAO, Bloom, FXAA 4x core": "a577c27795a895ed1be55ec55bdc3c8980799ef9be082f9d6ad391e59631a093",
+  "SSAO, Bloom, FXAA 4x IBL": "0debde1d8c3720a94630bf32891ff34d5ca070870bc679c26e8b0823bae29625",
+  "FXAA 1x core": "51d65ccff0a9243220b098b9cec3c4d81125a56ee3935a4fce0d6fb98af9c153",
+  "FXAA 1x IBL": "2acd5d60825d6513bc9eb6e66b9130eb8d3eb5e78eacc6e79146ad7fe2a399b3",
+  "FXAA 4x core": "c1c0656ef6d16ecdf83599cce667d6b3a7f109c61d3431ed41ae72a422ed7705",
+  "FXAA 4x IBL": "0efa506aba0e3ecf6b4408f385b6efb7bfdebafcb7ef28beb9d50deb35fa301e"
  }
 }

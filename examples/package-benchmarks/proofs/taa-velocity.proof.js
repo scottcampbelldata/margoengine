@@ -4,7 +4,8 @@
 // restoration) at 1x and 4x, also when the getter is read every frame. The jitter difference is CPU state only.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/taa-velocity.proof.js [ref] [--current]
 // Pinned: baseline 6c20076d (before the getter) against e1a20e13 (the motion-blur commit that added it). Current:
-// 7d41715e1c against the working tree (velocity shaders write log2 of the expected depth in z, KB-TAA-COMPATEDGE2;
+// a53e3a9835 against the working tree (a redirected 1-sample scene depth is copied back to the attachment it replaced,
+// KB-XR-AREFFECTS1); 7d41715e1c before it (velocity shaders write log2 of the expected depth in z, KB-TAA-COMPATEDGE2;
 // 3f37931ace before: the resolve's closest-depth motion and footprint test, KB-TAA-EDGE1; 90f54f5672
 // before: velocity shaders write a coverage channel, KB-TAA-COMPATEDGE1; 8149bf4e first:
 // one velocity pass and a shared camera block, speed matrix row 13.7;
@@ -14,7 +15,7 @@ import { refs, versions, current, golden } from './compare.js';
 import { mockGPU, passes, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('6c20076d', 'e1a20e13', '7d41715e1c'),
+const { ref, pin } = refs('6c20076d', 'e1a20e13', 'a53e3a9835'),
   { baseline, candidate } = await versions('taa', ref, undefined, pin);
 
 /** One engine with TAA attached: core meshes (stride 24), an optional PBR velocity source (stride 80), and a frame driver. */

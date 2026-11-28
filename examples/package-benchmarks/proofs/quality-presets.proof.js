@@ -11,7 +11,7 @@
 // VolumetricFog's far air and clear-air default; 4e89a51c0e before it: VFX births seeded by step and birth number, GAP-FILM-VFXSEED; 72df70379c before it,
 // directional hard shadows on the receiver plane, KB-SUNSHADOW-OFFSET1; 67e90fef9d before
 // it, 6007055dbf before Shadows' soft filter read its tap counts and focus from the frame uniform).
-// Pinned: 96daac7 against 01e5e35, the commit that recorded results/quality-presets.json. --current: 68163189d3 (SSAO's occlusion kernels read occluder depth bindings and its under-blade extract is made only for covered frames, KB-SCATTER-AOFRINGE1; the AO blur predicts the centre plane's depth, KB-POST-GTAOFAR1); a826259019 (SSAO's extract pass steps at constant depth along an axis where a pixel stands alone, KB-SSAO-LONEPIXEL1); 374aa47b9e (SSR's blur level from the roughness cone at the hit distance, 519453f01e, and SSR taking only the cone level WGSL); a7ab55ea49 (the extract shader's comments move out of its WGSL text); 196bb7feb3 (SSAO's normal reconstruction skips background neighbours, KB-SSAO-SILHOUETTE1); e2177dc6e5
+// Pinned: 96daac7 against 01e5e35, the commit that recorded results/quality-presets.json. --current: a53e3a9835 (a redirected 1-sample scene depth is copied back to the attachment it replaced, KB-XR-AREFFECTS1; the AO blur predicts the plane at negative orthographic depths, KB-SSAO-ORTHOBLUR1); 68163189d3 (SSAO's occlusion kernels read occluder depth bindings and its under-blade extract is made only for covered frames, KB-SCATTER-AOFRINGE1; the AO blur predicts the centre plane's depth, KB-POST-GTAOFAR1); a826259019 (SSAO's extract pass steps at constant depth along an axis where a pixel stands alone, KB-SSAO-LONEPIXEL1); 374aa47b9e (SSR's blur level from the roughness cone at the hit distance, 519453f01e, and SSR taking only the cone level WGSL); a7ab55ea49 (the extract shader's comments move out of its WGSL text); 196bb7feb3 (SSAO's normal reconstruction skips background neighbours, KB-SSAO-SILHOUETTE1); e2177dc6e5
 // (SSAO's ambient replay keeps the lighting in a dead block and binds every pass binding, KB-POST-GTAO-TERRAINLOOK1; f7aa52189c before it; 6007055dbf, LocalShadows' receiver-plane hard filter, KB-LOCALSHADOW-OFFSET1; e2177dc6e5 before it, b97633a025 before that,
 // 74ebb5dab, Tonemap's contrast 0 as flat grey, before that; 149501ed0, its power contrast, before it; 1fdb559080 before
 // it, 33c403984 before that, 667d1a26 before the VFX slot order; 57250a49 before the PCSS search spanned to the nearest
@@ -21,7 +21,7 @@ import assert from 'node:assert/strict';
 import { refs, versions, entryAt, save, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('96daac7', '01e5e35', '68163189d3'),
+const { ref, pin } = refs('96daac7', '01e5e35', 'a53e3a9835'),
   { Engine, TransformStore, wgsl } = await coreAt(pin);
 const [{ Clustered }, { Tonemap }, { QUALITY_PRESETS }] = await Promise.all(
     ['clustered', 'tonemap', 'quality'].map((name) => entryAt(name, 'src/index.ts', pin)),

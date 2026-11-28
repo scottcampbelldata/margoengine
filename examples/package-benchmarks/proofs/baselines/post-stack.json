@@ -1,25 +1,25 @@
 {
  "proof": "post-stack",
- "ref": "68163189d3",
- "revision": "68163189d3b2d8276a12cb3dfd4f0fed190309af",
- "capturedAt": "68163189d3b2d8276a12cb3dfd4f0fed190309af",
+ "ref": "a53e3a9835",
+ "revision": "a53e3a9835c0078aac9426aac72a3d11eb09b286",
+ "capturedAt": "a53e3a9835c0078aac9426aac72a3d11eb09b286",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {
-  "68163189d3 descends from f5b3575bc0": true,
+  "a53e3a9835 descends from f5b3575bc0": true,
   "f044d8ef05 descends from f5b3575bc0": false,
   "creative PostProcessing 1x: f044d8ef05 -> ca366457a3 identical calls": 1813,
   "creative PostProcessing 4x: f044d8ef05 -> ca366457a3 identical calls": 1840
  },
  "outputs": {
-  "post Bloom 1x": "b2c368fd6305b8ae6b8e6d1f707b883da2985ad1933877b5c10ef1bbe92256fa",
-  "post Bloom 4x": "854868061a4a534bd1a15163cd1b030d2ac1b14cae64f32ad26d2b23d45c6c3d",
-  "post SSAO 1x": "fc9a99ff3a678d15c6ca8fe2ce2b38f4220c68679c8e9dd44cff0e56df86dc2c",
-  "post SSAO 4x": "bf261cf503e53896d461e5fb6530550e1556d16e02f21e717f1f45890cc778a7",
-  "dof DOF 1x": "d842b72a23273fdce924f8ed358f6558542d07b8a216d7e5f2b580aed130ce72",
-  "dof DOF 4x": "a128833f9aa81dc2d6ba70515f5829fc526411169286af6bdfb46b8b85e4db70",
-  "tonemap Tonemap 1x": "069b6529ac98ee75bb9505b48aa376bbea2757e544035985b1768f98996cfcf6",
-  "tonemap Tonemap 4x": "2a425d93abbba7832cee63ad335ec67021f3d002c3c5361f805923b4f032ce7b",
-  "DOF -> Tonemap 1x": "554503632724324e23e1abfe4de87c2d3f99d20438de6082caeac8e720a1debb",
-  "DOF -> Tonemap 4x": "c94c67c1021214385c62e4e294759d1b6ac5e4e2b0bd84c22cf27b649112e74c"
+  "post Bloom 1x": "f664e857253809bd05081ba59ef1c43cf321af00c26173ff5205916568f61db9",
+  "post Bloom 4x": "b25620fdaedcf4bbd72ca96cead3c915fc59ade23363a41b62a812218426f6f9",
+  "post SSAO 1x": "9013ffa1d3ed61b8883ff70077757f227b9f44ed2f670eb17d78c74aa710cf8a",
+  "post SSAO 4x": "89d0a5d37437479782744680fe1f9a0be702c04eb8eb01e56685a901dad975ef",
+  "dof DOF 1x": "abe0e48088a250957fa9ca86d0ab4090e19861a40fdb26909241f0a499257d74",
+  "dof DOF 4x": "1d1befdc831ceec394180b8e34fc4d3e62ed82adb40d567074a0e599789a360e",
+  "tonemap Tonemap 1x": "1886ef69809d6edc35f57a6e00215be603a24ae85a95cb26f25b96725a7c6e67",
+  "tonemap Tonemap 4x": "bf19f7b6410f49d94c1a61a3c838a31d2399effe8c4acfefd1b4a3611459f7a0",
+  "DOF -> Tonemap 1x": "a7dce20f5eae6baf153a8619b7e395493b6238c370147397a7afa77655c41723",
+  "DOF -> Tonemap 4x": "a2c0c2bcad0d541d4f7db7e4d67a42776db73e51a7b9978ab58605da0ba6a628"
  }
 }

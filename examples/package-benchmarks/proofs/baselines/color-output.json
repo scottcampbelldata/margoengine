@@ -1,19 +1,19 @@
 {
  "proof": "color-output",
- "ref": "e2177dc6e5",
- "revision": "e2177dc6e50e2fce0f654da781dc7c8d495f6c56",
- "capturedAt": "67f268eb9f31c955b1de04d966c63ca6c5e4a3d8",
+ "ref": "a53e3a9835",
+ "revision": "a53e3a9835c0078aac9426aac72a3d11eb09b286",
+ "capturedAt": "a53e3a9835c0078aac9426aac72a3d11eb09b286",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {
-  "e2177dc6e5 descends from f5b3575bc0": true
+  "a53e3a9835 descends from f5b3575bc0": true
  },
  "outputs": {
-  "Tonemap alone 1x": "7d8d766f656e746cadd687f094ccd6b2e918e94f3cef6bef91958a8c3500221d",
-  "Tonemap alone 4x": "b1183c5950553da25ed17e29c9c45b16de8c6597e25e3946f06aaf2e8720cdfe",
-  "DOF -> Tonemap 1x": "4bb14850912425cdfd42b4665596399d8eb45a1b0cf8824c1df69a417ef6eac6",
-  "DOF -> Tonemap 4x": "9b76f72434116256d413964f2b32f50d76f5165b0ab6ba1846917792dc700f45",
-  "PostStack Bloom + Tonemap + FXAA 1x": "991228e0c3b09680000b2b6b4f7caf4df6bd68b334904e5eee2b61d2a98d0fcb",
-  "PostStack Bloom + Tonemap + FXAA 4x": "76834989de5ef48df6f247fe665a558b981480ad874d899adfb1a5c74379c2c9",
+  "Tonemap alone 1x": "04f4f94e6d2113440fb03ae2a3ecea75323efd3d41888b017f47e31b8160b853",
+  "Tonemap alone 4x": "ce2dfb38a73c715214d5b29c9ec26123e751728975e144a36431abdd5c999ad0",
+  "DOF -> Tonemap 1x": "68f17ec7b0a955c04f1b34778fb074effb71129a23cf41c28a151e873a90fca0",
+  "DOF -> Tonemap 4x": "621228d7af8853a8a6ce330371da02a157b5a349033308c64df1ab30bb2509d9",
+  "PostStack Bloom + Tonemap + FXAA 1x": "1e0cd8e8bfb8838683f30f44c0b6b66f904dd4f0ef3d11544bb8c3f922ed950f",
+  "PostStack Bloom + Tonemap + FXAA 4x": "e40d6274ed0917c83bff831ef566eb6c2e09deb864f2742da82514656d6fbd7f",
   "TransparentCanvas 1x": "efc445b31e4c50c078e6185635667b30e2c2e045af57959ceb59c0715390f288",
   "TransparentCanvas 4x": "94be8d030e0c0afd83becf19f93e0700ba2038844396d8e04c54dd28adee27f4",
   "ColorBackground gradient 1x": "5e5440cec09418430179bda9b060c3857baf0a8f1821505fbd1631a31470bcb6",

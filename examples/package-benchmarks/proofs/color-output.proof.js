@@ -4,14 +4,14 @@
 // do too. ColorOutput itself on an sRGB/SDR display is covered by packages/environment/tests/output.test.js (identical
 // configuration and GPU calls to an engine without it).
 // Run: node examples/package-benchmarks/proofs/color-output.proof.js [ref] [pin] [--current]
-// Pinned: 7dcc958 against 225b1d6, the commit that made this claim. --current: 26451c21fb (Bloom's temporal firefly budget, KB-CABIN-BLOOM1); 40dcf8a22 (the DOF near-field mip chain, its two levels blended in the shader) before it; before that 74ebb5dab (Tonemap's contrast 0 as flat grey; 149501ed0, its power
+// Pinned: 7dcc958 against 225b1d6, the commit that made this claim. --current: a53e3a9835 (a redirected 1-sample scene depth is copied back to the attachment it replaced, KB-XR-AREFFECTS1); 26451c21fb (Bloom's temporal firefly budget, KB-CABIN-BLOOM1); 40dcf8a22 (the DOF near-field mip chain, its two levels blended in the shader) before it; before that 74ebb5dab (Tonemap's contrast 0 as flat grey; 149501ed0, its power
 // contrast, and f3d25c892 before it) against the working tree; 56ee987 intentionally unified PBR Neutral output and made Tonemap's default
 // curve neutral (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, ignoreAgx, entryAt, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('7dcc958', '225b1d6', 'e2177dc6e5'),
+const { ref, pin } = refs('7dcc958', '225b1d6', 'a53e3a9835'),
   { wgsl } = await coreAt(pin),
   { PostStack, FXAA, Bloom } = await entryAt('post', 'src/index.ts', pin); // the stack around the effects
 const tonemap = await versions('tonemap', ref, undefined, pin),
