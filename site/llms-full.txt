@@ -16392,6 +16392,29 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   for a textured input and never read the `UsdUVTexture`'s `inputs:scale`; the default `material()` never reads
   `inputs:emissiveColor` or `inputs:occlusion`. The coat inputs do read their scale (`preview-physical.ts`).
 
+### Open 2026-11-28: gltf/asset, a data entry, imports core/extension (KB-GLTF-DATADEP1, gltf)
+
+- **Repro:** `cd packages/splats && npm test` (or `node --test tests/modern-data-subpaths.test.js`): "native asset
+  and splat data entries require no GPU renderer or shaders" fails with "Unexpected data dependency:
+  @margoengine/core/extension".
+- **Cause:** 26ebdfa169 moved the throws of `packages/gltf/src/accessor.ts` (and the root) to core/extension's
+  `typeError`, `rangeError` and `fault` to fit the 30 KiB core plus glTF gate; `accessor.ts` is shared with the
+  `./asset` chunk, so the data entry now loads core's extension module. The errors need a home a data entry may import
+  (`@margoengine/math/errors` holds only `MargoError`) without growing the glTF root.
+- **For:** the gltf lane. Found by the splats lane, which did not change gltf.
+
+### Open 2026-11-28: the water surface program takes over 5 s to link on the WebGL2 layer (KB-WATER-GL2LINK1, water)
+
+- **Repro:** `demos/ten-thousand-trees/?backend=webgl2` (BiomeView with `water: { rivers: 'auto' }`) on Chrome, ANGLE
+  over Direct3D 11: the page is ready after 31 to 43 s, against 16 s with `water: false` (CPU near 57 percent busy). Timing
+  `getProgramParameter(LINK_STATUS)` per program shows the water surface program (37 KB vertex, 63 KB fragment GLSL)
+  at 5.5 s, the next five water and banks programs at 0.6 to 1.4 s each. WebGPU is ready in 8 s.
+  `node scripts/web-demos/controls.mjs ten-thousand-trees --backends=webgl2` reports it as not started (30 s wait).
+- **Cause:** the translated fragment shader holds 18 loops, several nested with constant bounds (8 by 10 and 3 by 6
+  wave and refraction steps, a 24-entry part array built in a loop); the Direct3D shader compiler unrolls constant
+  loops, so the program grows many times over before it links. Not yet traced to the WGSL loop that costs most.
+- **For:** the water lane (`packages/water`, GLSL emitted by `packages/webgl2-compat`).
+
 ### Open 2026-11-28: a ball on a spinning hinge settles off its balance in proportion to its inertia (KB-PHYS-SPINBIAS1, physics solver)
 
 - **Repro:** a position-driven spindle turned about z at 68 rpm (`setNextRotation` each 60 Hz step), gravity -9.80665 z, a
@@ -16406,6 +16429,28 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   start while the arm turns `w h` within it would push steadily outward. The Watt governor rig of
   `@margoengine/machinery/rigs` uses point-mass balls (I = 1e-5 m L^2) and 32 substeps, which settle within 0.001 degrees.
   Physics lane.
+### Checked 2026-11-28, no engine defect: the Arms-wide walk's side view shows the capture's own low, locked arms (KB-RIG-ARMS2, rigging, animation, demo take)
+
+- **Repro:** demos/the-mocap-theatre, "Arms-wide walk", Elias, Side view at 1.05 s: the near sleeve runs down the
+  torso and the hand juts back at waist height. Scott: "human arms do not bend like that", "his arms are on backwards".
+- **Checked and ruled out:** the loader matches an independent BVH reader to 9e-16 m; Elias's upper arms and forearms
+  point within 0.5 degrees of the capture's on every frame of both takes; his rest alignment gives palms down, thumbs
+  forward and elbow creases forward, the Xsens T-pose (MVN whitepaper: every segment frame equals the global frame in
+  the T-pose, arms horizontal, thumbs forward), and no arm bone is twisted, mirrored or swapped (humeral twist about 13
+  degrees, forearm roll under 10, hand turn under 14); his skinned forearm and hand vertices stay within 2 mm of their
+  bones and the upper arm within 1 cm (armpit blend).
+- **Cause:** the capture. The 100STYLE Aeroplane excerpt holds the arms 23 to 35 degrees below horizontal with the
+  elbows locked 3 to 6.5 degrees past straight and a 8 to 14 degree carrying angle, wrists about 13 degrees up and 13
+  toward the little finger. From a pure side view the near arm points almost at the camera, so it foreshortens into a
+  column down the torso and the locked elbow and wrist turn the hand back. The source stick figure drawn from the same
+  view does the same. A pose driven through the same retarget with the arms 5 degrees below horizontal and the elbows
+  softly bent reads as arms out wide from every side.
+- **Open:** the shipped datasets hold no better arms-out take (CMU 35 and the CMU subject 2 and 16 fixtures are walks,
+  runs and jumps). A new 100STYLE segment or style needs Scott's go to download.
+- **Guard:** `tests/mocap-theatre-arms.test.js` checks every frame of both takes for arm direction against the capture,
+  elbow flexion -10 to 150 degrees, carrying angle up to 20, forearm roll, pronation and wrist ranges, and the skin
+  following its bones; an upper arm twisted 180 degrees in the rest alignment fails it (walk elbows read -21.7).
+
 ### Fixed 2026-11-28: retargeted mocap hands kept the character's fanned bind fingers, a few degrees off the capture (KB-RIG-FLATHAND1, rigging, animation)
 
 - **Repro:** demos/the-mocap-theatre, "Arms-wide walk" (100STYLE Aeroplane BVH, Xsens), Elias at 1.05 s in Front and
@@ -18264,6 +18309,14 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   stop the draw-time compile, and the page cannot tell WebKit's Windows build from Safari (both report macOS). The lever
   Margo has is the voxel programs' own Direct3D 11 compile time (`packages/voxel-pathtracer/tests/compat-d3d11-case-seconds.json`).
   Report draft: `docs/upstream-reports/KB-COMPAT-LOSTWHY1/report.md`.
+- **Margo, 2026-11-28:** that compile cut in part, with the same output bit for bit (30 images of eight cases on
+  WebGPU and on the layer over Direct3D 11): the camera ray takes its sines and cosines from two reductions instead
+  of six (`preciseSinCos`), and the voxel walk records its hit in one `found()` instead of ten. Paired offline fxc
+  compiles on a loaded machine: start 5.40 to 4.16 s and hit 7.11 to 5.84 s, but shadow 5.27 to 5.89 s and the last
+  loop program 6.45 to 6.94 s, about 6 percent off the five measured programs in all (operational playbook, section
+  5, KB-COMPAT-LOSTWHY1). Still open: why fxc takes longer on shadow and the last loop program, quiet-machine
+  seconds, and a rerun of the WebKit matrix row, so whether every wait now stays under 15 s is not shown; the
+  upstream report waits on Scott.
 
 ### Open (below Margo) 2026-11-27: on WebKit's Windows build the WebGL2 layer copies unpremultiplied ImageBitmaps wrong (KB-WEBKIT-BITMAPALPHA1, browser; webgl2-compat)
 
@@ -31656,6 +31709,19 @@ reproduced `EBUSY` and the live server/worker ports; the repaired seven-test fil
   (5.51 and 2.81 without the wide estimate), each part's variance now coming from its own samples; which term of the
   two chains loses the 1 percent is not established. Repro: `npm run test:gpu:denoise -w
   @margoengine/voxel-pathtracer`, the `denoisehistory` line. Job 2 remains open.
+- **What closing each job needs, exactly (2026-11-28, lane A):** nothing in this repository can close either job as
+  the bars are written, and no hardware is missing. Job 1's bar is zero error against an external MagicaVoxel image.
+  MagicaVoxel is closed source with its own random sequence, so a Monte Carlo render of it carries its own noise: the
+  1,024-sample references on disk (`docs/whitepaper/results/batch-99-parity-gamma-20261109.json`) are themselves
+  estimates, and two independent unbiased renderers agree pixel for pixel only in the limit of infinite samples. The
+  rival run that is missing is a reference corpus rendered in MagicaVoxel itself (outside this repository): the `_sss`
+  block at three or more densities, colours and sun angles with a view of its side faces (the model question of KB1673 above), glass over a lit floor at two or more IORs, and the atmosphere at its `_atm`
+  settings, each at the highest sample count it allows, with the file and settings saved beside the image. With that
+  corpus the transport can be compared per setting; a zero-error match still needs Scott to state whether the oracle
+  means equal expected values (a statistical bound against the reference's own noise) or equal pixels, which no
+  renderer can give against another's samples. Job 2's bar, a noise-free disocclusion, asks a finite first-frame
+  estimate to recover radiance it has not sampled; Schied et al. 2017 (section 6) report the same limit for SVGF. The
+  oracle exists (`denoisedisocclusion`); the remaining gap is 6.01 against 4.52 RMS. Closing it as written needs a bar Scott sets (a ratio to the kept pixels, for example); no change to either bar is made here.
 
 ### Batch 99 caustic guide scope
 
@@ -32382,12 +32448,12 @@ suspect from its date and subject and was not tested.
 
 | Check (command) | Failure | Suspect |
 | --- | --- | --- |
-| `node packages/voxel/tests/render-lighting-browser-check.mjs` | `4x lit greedy vs naive view 0`: 360 pixels differ on the workstation (382 on Linux), 92 two by two blocks where 0 are allowed; sampled values differ by about 1 percent | none |
+| `node packages/voxel/tests/render-lighting-browser-check.mjs` | `4x lit greedy vs naive view 0`: 360 pixels differ on the workstation (382 on Linux), 92 two by two blocks where 0 are allowed; sampled values differ by about 1 percent | **Fixed 2026-11-28.** Bisected to 5feaab3d71 (KB-LOOK-TV-PENUMBRA1): the soft filter turns its noise each frame whose clock moves, and the check's one Shadows plugin drew the greedy mesh at turn 1 and the naive mesh at turn 2. The check now calls `shadows.resetTime()` before each mesh's moving frame; edge pixels are back to 141, 266 and 172 of 76,800 at 4x, WebGPU and the WebGL2 layer |
 | `node scripts/modern-browser-tests.js` (also `--pipeline-delay=300` on Linux) | `Moon not visible over the base engine: 0` | none |
 | `node scripts/modern-xr-tests.js` | `AR alpha`: `wrong` 1,337 pixels (1,328 on Linux). `tests/modern-xr-passes.ts` still requires alpha to equal the brightest channel where nothing wrote depth | cee7c8b46a (KB-XR-ARNODEPTH1) gives depthless content its coverage as alpha |
 | `node scripts/lifecycle-browser-tests.mjs`, scenario D, stage loop | the first frame after a 30 s background tab runs physics steps (1 on the workstation, 2 on Linux), 0 required | physics lane; the late physics step (KB-PHYS-FRAMEORDER1) |
 | `node scripts/modern-domain-tests.js` | `mid-encoding device loss`: `recreated` false (9 recovery frames of 21) | none |
-| `node scripts/modern-game-tests.js` | `History did not follow motion-vector reprojection: 0.2496337890625 vs 0.170196533203125` (same values on both) | f2f994fb19 (KB-POST-MRTJITTER1) changed the TAA camera |
+| `node scripts/modern-game-tests.js` | `History did not follow motion-vector reprojection: 0.2496337890625 vs 0.170196533203125` (same values on both) | **Fixed 2026-11-28.** Not f2f994fb19: reverting it, or TAA's resolve to before 3f37931ace, gives the same values. The check's expected point left out the jitter difference the resolve takes out of every vector (`TAAVelocity.jitter`, KB-TAA-CLAMP1); TAA's phase follows frame updates and is not restarted by `reset()`, so this frame pair's jitter moved x by -0.625 px, and the gradient's step made that 0.0036 off where 0.003 is allowed (a quarter pixel stayed under). With the jitter the expected history is 0.16627, the value the GPU reads; the check passes on WebGPU and `MARGO_COMPAT=1` |
 | `node scripts/modern-sky-fog-tests.js` | `bruneton/12` render with 4 samples and legacy fog rejected: buffer binding of 32 B below the pipeline's minimum 320 B | none |
 | `node scripts/frame-alloc-browser.mjs`, `post` | 1,588 B a steady frame, floor 1,528 B | none |
 | `node scripts/docs-browser-test.mjs`, quickstart (Linux only) | no click reaches `Picked the ball` | none |
@@ -34579,7 +34645,7 @@ No open defect found within the documented contract. Explicit vertex topology on
 
 ### Batch 99 spectral transport evidence
 
-**Status:** open (owner: voxel-pathtracer).
+**Status:** closed 2026-11-28 (no open defect; proof: packages/voxel-pathtracer/tests/spectral-browser.mjs).
 
 The root tracer's documented unscaled-index convention and single dispersive wavelength are retained
 there; the optional /spectral entry provides physical index-ratio transport, hero packets and chromatic
@@ -34593,6 +34659,14 @@ The initial optional spectral coverage pass left its wavelength at zero, so chro
 were nonfinite and an opaque emitter returned alpha zero. The pass now chooses a uniform wavelength
 or the capture wavelength before generating each ray. The unchanged full-coverage GPU regression
 fails with alpha [0] before the repair and requires alpha [1] for packet, 450, 587.6 and 650 nm captures.
+
+Rechecked 2026-11-28 (lane A): `npm run test:gpu:spectral -w @margoengine/voxel-pathtracer` passes on native
+WebGPU and on the WebGL2 layer over ANGLE Vulkan (Edge 158, RTX A6000): the one-interface, closed-slab, single-collapse
+and finite-slab edge oracles and the alpha rows for packet, 450, 587.6 and 650 nm. What is left are the scope limits
+in [limits.md](limits.md), LIM-641 (no reconstructed reflectance or emission spectra, no physical lens stack,
+lateral colour or diffraction); three.js, Babylon.js and PlayCanvas ship no spectral renderer, so these are
+recorded limits, not a gap to a rival. Not run: another GPU vendor, and the layer over Direct3D 11. The Batch 99
+parity and disocclusion jobs stay open in their own entry.
 
 ### Batch 68 job 7 verification scope
 
