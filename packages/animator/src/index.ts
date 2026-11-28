@@ -8,7 +8,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { fault } from '../../shared/errors.js';
 import { blend1D, blend2D, quaternionBlend, treeWeights } from './blend.js';
 import { anatomyOf, solveTwoBoneIK, rotationBetween } from './ik.js';
-import { poseTools } from './pose-tools.js';
+import { limbTools, poseTools } from './pose-tools.js';
 export { blend1D, blend2D } from './blend.js';
 export { anatomyOf, setAnatomy, solveTwoBoneIK } from './ik.js';
 export type { Anatomy, AnatomyGate, AnatomyJoint, AnatomyRegion } from './ik.js';
@@ -278,7 +278,7 @@ export class Animator implements EnginePlugin {
   private layers = new Set<AdditiveLayer>();
   private readonly scratch = new Map<number, Float32Array>();
   private feet = new Set<FootIK>();
-  private footTools?: ReturnType<typeof poseTools>;
+  private footTools?: ReturnType<typeof limbTools>;
   private readonly solvers: Array<(step: number) => void> = [];
   private readonly poseSteps: Array<(position: number[][], rotation: number[][]) => void> = [];
   private readonly lateSteps: Array<(pose: Pose, step: number) => void> = [];
@@ -1181,7 +1181,7 @@ export class Animator implements EnginePlugin {
     if (anatomyOf(this)?.limits)
       // A fitted body (setAnatomy): the knee bends about its own axis the anatomical way, inside its range, and the
       // pole only picks the leg's swivel inside the hip's range, as addFootPlacement does (KB-ANIM-FOOTIK-ANATOMY1).
-      (this.footTools ??= poseTools(this, 'Foot IK')).placeLimb(hip, knee, ankle, target, foot.pole);
+      (this.footTools ??= limbTools(this, poseTools(this, 'Foot IK'))).placeLimb(hip, knee, ankle, target, foot.pole);
     else {
       const root = position(hip),
         solved = solveTwoBoneIK(root, position(knee), start, target, foot.pole);

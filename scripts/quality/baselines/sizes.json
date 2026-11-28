@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21918485,
+  "total": 21927592,
   "history": [
     {
       "date": "2026-10-24",
@@ -15689,6 +15689,12 @@
       "commit": "sea-14-native-entry-profile",
       "reason": "SEA-14 @margoengine/physics/entry 9429 to 14182 B gzip, @margoengine/physics 993424 to 993414 B gzip, @margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table)) 107013 to 107005 B gzip, @margoengine/physics/entry 9712 to 14608 B ceiling. The entry retains the guarded transaction for forces, cavity and splashes and the optional native section profiler hooks. A second public entry would repeat the same scalar model and accepted-state contract; both Wasm assets remain lazy. Core and stage are unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "rigging-g5-humans",
+      "reason": "@margoengine/humans root 4,406 to 5,430 B gzip (ceiling 4,478 to 5,686): every person obeys anatomy by default (Scott, 2026-11-28), so addPerson fits the body, calibrates the arm and leg rolls and adds person.check; the anatomy package itself loads lazily, a split would add a second chunk load to every addPerson. New entry @margoengine/humans/body 7,643 B gzip (ceiling 7,899), of which the humans root it hands the body to is 5,430; gltf/pbr loads lazily.",
+      "grew": 2
     }
   ],
   "items": {
@@ -16208,7 +16214,8 @@
     "@margoengine/html/inline": 2744,
     "@margoengine/html/texture": 5167,
     "@margoengine/html/texture-gl": 6858,
-    "@margoengine/humans": 4478,
+    "@margoengine/humans": 5686,
+    "@margoengine/humans/body": 7899,
     "@margoengine/humans/cast": 15351,
     "@margoengine/humans/crowd": 1516,
     "@margoengine/humans/fit": 31398,

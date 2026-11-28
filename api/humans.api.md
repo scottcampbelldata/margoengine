@@ -11,6 +11,8 @@ import { MaterialInstallation } from "@margoengine/materials";
 import { EyeOptions } from "@margoengine/materials/eye";
 import { HairCardOptions, HairOptions } from "@margoengine/materials/hair";
 import { SkinOptions } from "@margoengine/materials/skin";
+import { AnatomicalRig, ClampIssue, Tier } from "@margoengine/rigging/anatomy";
+import { FitHumanOptions } from "@margoengine/rigging/anatomy/human";
 import { Hands, HandsOptions } from "@margoengine/rigging/hands";
 
 export interface EyeBall {
@@ -40,6 +42,8 @@ export interface Person {
     readonly animator: Animator | undefined;
     readonly clips: readonly string[];
     readonly hands: Hands | undefined;
+    readonly body: AnatomicalRig | undefined;
+    check(tier?: Tier): ClampIssue[];
     play(clip: string, options?: {
         fade?: number;
         at?: number;
@@ -48,6 +52,12 @@ export interface Person {
     playing: boolean;
     dispose(): void;
     [Symbol.dispose](): void;
+}
+
+export interface PersonAnatomyOptions extends FitHumanOptions {
+    tier?: Tier;
+    calibrate?: boolean;
+    onClamp?: (issues: readonly ClampIssue[]) => void;
 }
 
 export type PersonLook = 'skin' | 'eyes' | 'hair';
@@ -71,6 +81,7 @@ export interface PersonOptions {
     fade?: number;
     shadows?: PersonReceiver | false;
     hands?: HandsOptions | false;
+    anatomy?: PersonAnatomyOptions | false;
     occlusion?: PersonReceiver | false;
     sky?: PersonReceiver | false;
     scene?: {
