@@ -12,7 +12,7 @@ The tracer positions use the local area. Advancing cumulative pipe volume by Q Î
 
 ## Implementation
 
-- `flow.js` defines the pipe profile and calculates velocity, pressure head and tracer coordinates.
+- `flow.js` defines the pipe profile and asks `@margoengine/physics/hydraulics` (`venturi` with a discharge coefficient of 1, and `plugTracer`) for the velocities, pressure head and tracer coordinates.
 - `craft.js` and `meter.js` build the glass constriction, milled fixtures, calibrated scales, open pressure columns and moving menisci in Margo.
 - `scene.js` connects the controls and provides WebGPU-first rendering. Use `?backend=webgl2` to request Margoâ€™s compatibility backend with the same artwork.
 - Build from the showcase root with `node build.mjs the-venturi-meter` and the verified public Margo checkout pinned by the showcase build.
