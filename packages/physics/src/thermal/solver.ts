@@ -1,4 +1,5 @@
-import { MargoError } from '@margoengine/math/errors';
+import { thermalError } from './errors.js';
+import { thermalInputWords } from './inputs.js';
 import {
   COEFFICIENTS,
   type HeatConductionOptions,
@@ -6,7 +7,13 @@ import {
   RADIATION_WORDS,
   type ThermalAxes,
 } from './grid.js';
-import { instantiateThermalKernel, loadThermalKernel, type ThermalKernelBuilds } from './kernel.js';
+import {
+  bindThermalConduction,
+  loadThermalKernel,
+  type ThermalConductionKernel,
+  type ThermalKernelBuilds,
+  type ThermalWorkCounts,
+} from './kernel.js';
 import {
   type FieldDescriptor,
   type Port,
@@ -26,31 +33,13 @@ export interface HeatConductionLoadOptions {
   readonly id?: string;
   /** Cancels the load with the signal's reason. Defaults to no cancellation. */
   readonly signal?: AbortSignal;
-}
-
-interface ThermalKernel {
-  thermal_decode(energy: number, temperature: number, liquid: number, coefficients: number, count: number): void;
-  thermal_step(
-    energy: number,
-    temperature: number,
-    liquid: number,
-    coefficients: number,
-    scratch: number,
-    source: number,
-    radiation: number,
-    radiators: number,
-    nx: number,
-    ny: number,
-    nz: number,
-    subdivisions: number,
-    dt: number,
-    implicit: number,
-  ): number;
+  /** Total native participants for explicit conduction, including the caller. Defaults to 1. */
+  readonly threads?: 1 | 2 | 4;
 }
 
 interface ThermalState {
   readonly host: SolverHost;
-  readonly kernel: ThermalKernel;
+  readonly kernel: ThermalConductionKernel;
   readonly dimensions: ThermalAxes;
   readonly geometry: Region;
   readonly coefficients: Region;
@@ -58,6 +47,7 @@ interface ThermalState {
   readonly temperature: Region;
   readonly liquid: Region;
   readonly scratch: Region;
+  readonly sourceCopy: Region;
   readonly radiation: Region;
   readonly regions: readonly Region[];
 }
@@ -67,7 +57,6 @@ const FORWARD_EULER_LIMIT = 0.5;
 // Keeps the backward-Euler fixed point at a contraction factor of at most 2/3.
 const BACKWARD_EULER_LIMIT = 2;
 const F64_BYTES = Float64Array.BYTES_PER_ELEMENT;
-const CENTRE = [0, 0, 0] as const;
 
 const words = (memory: WebAssembly.Memory, region: Region) =>
   new Float64Array(memory.buffer, region.byteOffset, region.byteLength / F64_BYTES);
@@ -92,6 +81,8 @@ export class HeatConduction implements Solver<HeatConductionOptions> {
   readonly #builds: ThermalKernelBuilds;
   #data?: ThermalState;
   #heatSource: Region | undefined;
+  #work?: ThermalWorkCounts;
+  #disposed = false;
 
   private constructor(id: string, builds: ThermalKernelBuilds) {
     this.id = id;
@@ -105,8 +96,24 @@ export class HeatConduction implements Solver<HeatConductionOptions> {
   static async load(options: HeatConductionLoadOptions = {}): Promise<HeatConduction> {
     const id = options.id ?? 'heat-conduction';
     if (typeof id !== 'string' || id.trim() === '' || id.trim() !== id)
-      throw new RangeError('Thermal solver ID is invalid; pass a nonempty ID without outer whitespace.');
-    return new HeatConduction(id, await loadThermalKernel(options.signal));
+      throw thermalError('Thermal solver ID is invalid; pass a nonempty ID without outer whitespace.');
+    return new HeatConduction(id, await loadThermalKernel(options.signal, options.threads));
+  }
+
+  /** Releases the optional native helpers. */
+  [Symbol.dispose](): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    this.#builds[Symbol.dispose]();
+  }
+
+  /** Accepted explicit stencil work, or undefined before a step or when using backward Euler. */
+  readNativeWork(): ThermalWorkCounts | undefined {
+    return this.#work && structuredClone(this.#work);
+  }
+
+  #requireActive(): void {
+    if (this.#disposed) throw thermalError('Load a new heat conduction solver after disposal.', 'disposed');
   }
 
   /** Describes the fields and the dyadic rate required by the diffusion bound. */
@@ -133,12 +140,14 @@ export class HeatConduction implements Solver<HeatConductionOptions> {
 
   /** Allocates solver state and validates the grid before joining the world. */
   init(host: SolverHost, options: HeatConductionOptions): void {
+    this.#requireActive();
     if (this.#data)
-      throw new MargoError('attached', 'HeatConduction is already attached; load a fresh solver for another world.');
+      throw thermalError('HeatConduction is already attached. Load a fresh solver for another world.', 'attached');
     const prepared = prepareThermalGrid(options);
     const bytes = prepared.energy.byteLength;
     const cellCount = prepared.energy.length;
-    const kernel = instantiateThermalKernel(host, this.#builds) as unknown as ThermalKernel;
+    const implicit = prepared.integration === 'implicit';
+    const kernel = bindThermalConduction(host, this.#builds, implicit);
     const topology = prepared.dimensions.join('x') + '-' + prepared.integration;
     const geometry = host.allocate('thermal-geometry-' + topology, 5 * F64_BYTES, 'f64', LAYOUT);
     const coefficients = host.allocate('thermal-coefficients', COEFFICIENTS * bytes, 'f64', LAYOUT);
@@ -146,9 +155,9 @@ export class HeatConduction implements Solver<HeatConductionOptions> {
     const temperature = host.allocate('temperature', bytes, 'f64', LAYOUT);
     const liquid = host.allocate('liquid-fraction', bytes, 'f64', LAYOUT);
     const radiation = host.allocate('thermal-radiation', prepared.radiation.byteLength, 'f64', LAYOUT);
-    const implicit = prepared.integration === 'implicit';
     const planes = 3 + Number(implicit) + Number(prepared.radiation.length > 0);
     const scratch = host.allocate('thermal-scratch', planes * bytes, 'f64', LAYOUT);
+    const sourceCopy = host.allocate('thermal-source-copy', bytes, 'f64', LAYOUT);
     words(host.memory, geometry).set([...prepared.cellSize, prepared.stiffness, Number(implicit)]);
     words(host.memory, coefficients).set(prepared.coefficients);
     words(host.memory, energy).set(prepared.energy);
@@ -161,7 +170,7 @@ export class HeatConduction implements Solver<HeatConductionOptions> {
       cellCount,
     );
     if (!words(host.memory, temperature).every(Number.isFinite))
-      throw new RangeError(
+      throw thermalError(
         'Initial thermal temperature overflows; pass finite materials and initial conditions within range.',
       );
     this.#data = {
@@ -174,6 +183,7 @@ export class HeatConduction implements Solver<HeatConductionOptions> {
       temperature,
       liquid,
       scratch,
+      sourceCopy,
       radiation,
       regions: [geometry, coefficients, energy, temperature, liquid, radiation],
     };
@@ -183,29 +193,44 @@ export class HeatConduction implements Solver<HeatConductionOptions> {
   importPorts(_tick: number): void {
     const state = this.#state();
     const source = state.host.port(this.enthalpyField.name)?.region;
+    this.#heatSource = undefined;
     if (source && (source.byteLength !== state.energy.byteLength || source.type !== 'f64' || source.layout !== LAYOUT))
-      throw new RangeError('Thermal heat input layout differs from the grid; publish one f64 joule value per cell.');
+      throw thermalError('Thermal heat input layout differs from the grid; publish one f64 joule value per cell.');
+    if (source) thermalInputWords(state.host.memory, source);
     this.#heatSource = source;
   }
 
   /** Advances one dyadic world step. The kernel subdivides if diffusion needs a finer step. */
   step(_context: StepContext, dt: number): void {
+    this.#requireActive();
     const state = this.#state();
+    const source = this.#heatSource;
+    this.#heatSource = undefined;
     const [nx, ny, nz] = state.dimensions;
     const [, , , stiffness, implicit] = words(state.host.memory, state.geometry);
     const limit = implicit === 1 ? BACKWARD_EULER_LIMIT : FORWARD_EULER_LIMIT;
     const substeps = Math.max(1, Math.ceil((dt * stiffness!) / limit));
     if (!(dt > 0) || !Number.isFinite(dt) || substeps > 0xffffffff)
-      throw new RangeError(
+      throw thermalError(
         'Thermal timestep exceeds its representable stable subdivisions; use a finer tick or coarser cells.',
       );
+    let sourceOffset = 0;
+    if (source) {
+      const values = thermalInputWords(state.host.memory, source);
+      if ((source.memory ?? state.host.memory) === state.host.memory) {
+        sourceOffset = source.byteOffset;
+      } else {
+        words(state.host.memory, state.sourceCopy).set(values);
+        sourceOffset = state.sourceCopy.byteOffset;
+      }
+    }
     const status = state.kernel.thermal_step(
       state.energy.byteOffset,
       state.temperature.byteOffset,
       state.liquid.byteOffset,
       state.coefficients.byteOffset,
       state.scratch.byteOffset,
-      this.#heatSource?.byteOffset ?? 0,
+      sourceOffset,
       state.radiation.byteOffset,
       state.radiation.byteLength / (F64_BYTES * RADIATION_WORDS),
       nx,
@@ -215,22 +240,23 @@ export class HeatConduction implements Solver<HeatConductionOptions> {
       dt / substeps,
       implicit!,
     );
-    this.#heatSource = undefined;
     if (status === 2)
-      throw new RangeError('Implicit heat step did not converge; use a finer tick or reduce the material contrast.');
+      throw thermalError('Implicit heat step did not converge; use a finer tick or reduce the material contrast.');
     if (status !== 0)
-      throw new RangeError(
+      throw thermalError(
         'Thermal step produced invalid energy or temperature; reduce the applied flux or enthalpy impulse.',
       );
+    this.#work = state.kernel.workCounts();
   }
 
   /** Publishes all three grid fields for the supplied world tick. */
   exportPorts(tick: number): readonly Port[] {
     const state = this.#state();
+    const cell = state.host.cell;
     return [
-      { field: this.temperatureField.name, region: state.temperature, tick, cell: CENTRE },
-      { field: this.enthalpyField.name, region: state.energy, tick, cell: CENTRE },
-      { field: this.liquidFractionField.name, region: state.liquid, tick, cell: CENTRE },
+      { field: this.temperatureField.name, region: state.temperature, tick, cell },
+      { field: this.enthalpyField.name, region: state.energy, tick, cell },
+      { field: this.liquidFractionField.name, region: state.liquid, tick, cell },
     ];
   }
 
@@ -258,7 +284,7 @@ export class HeatConduction implements Solver<HeatConductionOptions> {
 
   #state(): ThermalState {
     if (!this.#data)
-      throw new MargoError('state', 'HeatConduction has no grid; add it to a PhysicsWorld before reading or stepping.');
+      throw thermalError('HeatConduction has no grid. Add it to a PhysicsWorld before reading or stepping.');
     return this.#data;
   }
 }

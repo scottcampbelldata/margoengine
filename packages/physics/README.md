@@ -6542,7 +6542,7 @@ Wasm initialization needs `'wasm-unsafe-eval'` in `script-src` on restricted pag
 
 Use [the physics world](#the-solver-contract-margoenginephysicsworld) to advance heat diffusion independently of the frame rate.
 `HeatConduction` loads a SIMD Wasm kernel from the optional `@margoengine/physics/thermal` entry.
-It supports plain and shared world memory. The browser loads the shared build only when the page can use shared memory.
+It supports plain and shared world memory. The browser loads the shared build when the page can use shared memory.
 It simulates a cell-centred grid with one material or a palette of materials.
 Insulated faces are the default. Set a fixed temperature, convection, radiation, or an inward heat flux at each exterior face.
 
@@ -6573,9 +6573,15 @@ and volumetric latent heat in J/m³. Give `liquidHeatCapacity` when the phases h
 Time integration defaults to forward Euler. Set `integration: 'implicit'` for backward Euler, which uses the
 new temperature for conductive and radiative fluxes. Both methods may choose a finer dyadic world rate.
 
+Set `threads` to 1, 2 or 4 in `HeatConduction.load()` for explicit grids. The default is one native participant.
+Choose two or four for a shared world in Node or an isolated browser worker and dispose the heat solver when
+its world is finished. `heat.readNativeWork()` reports decoded and stencil cells, including SIMD pair counts,
+from the most recent accepted explicit step. Implicit integration uses one participant.
+
 The temperature, enthalpy, and liquid-fraction fields are f64 grids in that same order.
 A coupled solver can add J per tick per cell into `heat.enthalpyField`. Sources and readers must use
-the same grid and origin cell. The world snapshots geometry, material coefficients, and state.
+the same grid and signed origin cell. Borrowed inputs are read from their owning memory. A rejected step retains
+the accepted thermal fields. The world snapshots geometry, material coefficients, and state.
 `HeatConduction.load({ signal })` accepts cancellation, and an optional `id` gives each grid independent field names.
 
 ### Thermal stress in a solid
@@ -6617,6 +6623,8 @@ cell-average stress in [xx, yy, zz, xy, yz, zx] order in Pa, and reactions at us
 x-fastest. Set `relativeTolerance` to control the residual (default 1e-9) and `maxIterations` for the solve
 (default twice the number of free nodal degrees of freedom, at least one). Supply `liquidFractionField` to reject cells that begin
 to melt. The elastic model assumes bonded solid cells and uses one-way coupling from heat to deformation.
+The displacement, stress and reaction ports share the heat grid's signed origin. A rejected input or equilibrium
+solve preserves the last accepted mechanical results.
 
 
 ## Collective animal motion

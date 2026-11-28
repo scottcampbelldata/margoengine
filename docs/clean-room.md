@@ -20720,3 +20720,33 @@ thermocouple fits in Eq. (21) and Table 2 and separate ice thickness measurement
 cold plate uses the thermocouple fits. Sixteen sparse optical targets at two stations and two
 flow rates are held out. The diagnostic also compares the separately measured bulk water-energy
 budget, without using ice growth to infer the heat input. [Kaaks et al.](https://doi.org/10.1016/j.expthermflusci.2025.111417)
+
+### FIRE-06 accepted thermal banks, SIMD work phases and measured limits
+
+The existing finite-volume flux and isothermal enthalpy method continue to follow J. Crank,
+*Free and Moving Boundary Problems* (1984), H. S. Carslaw and J. C. Jaeger, *Conduction
+of Heat in Solids* (1959), and V. R. Voller and C. Prakash, [*A fixed grid numerical
+modelling methodology for convection-diffusion mushy region phase-change problems* (1987)](https://doi.org/10.1016/0017-9310(87)90317-6).
+Independent f64 pairs decode enthalpy and evaluate the interior stencil. Native participants read the prior
+scratch phase, then rendezvous before the next one. Radiation follows the same caller-ordered surface balance
+and accepted fields publish after all cells pass. The native shared-memory model uses
+[WebAssembly SIMD](https://webassembly.github.io/spec/core/exec/instructions.html#vector-instructions)
+and [Wasm threads](https://webassembly.github.io/threads/core/).
+
+C. Gau and R. Viskanta, [*Melting and Solidification of a Pure Metal on a Vertical Wall* (1986)](https://doi.org/10.1115/1.3246884),
+supply observed gallium melt fronts. S. Meyer, [*A Fluid Dynamics Approach for Solid-Liquid Phase Change in Binary
+and Elemental Melts* (2016)](https://publikationen.bibliothek.kit.edu/1000058183/3880102), clarifies the cavity
+orientation and reproduces the observations. Material inputs come from M. W. Chase Jr., [*NIST-JANAF
+Thermochemical Tables*, fourth edition (1998)](https://janaf.nist.gov/pdf/JANAF-FourthEd-1998-Gallium.pdf),
+[*The Gallium Melting-Point Standard* (NBS, 1977)](https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nbsspecialpublication481.pdf),
+and M. J. Assael et al., [*Reference correlations for the thermal conductivity of liquid copper, gallium, indium,
+iron, lead, nickel and tin* (2017), Eq. 2 and Table 8](https://pmc.ncbi.nlm.nih.gov/articles/PMC5772911/).
+Distances extracted from the observation traces enter only the comparison. The measured spread demonstrates
+the limit of the conduction-only model.
+
+The technical ceramic fixture uses high-temperature approximations based on B. Hildmann and H. Schneider,
+[*Thermal Conductivity of 2/1-Mullite Single Crystals* (2005)](https://doi.org/10.1111/j.1551-2916.2005.00530.x),
+the [NIST-JANAF heat capacity of mullite (Chase, 1998)](https://webbook.nist.gov/cgi/cbook.cgi?ID=C1302938&Table=on&Type=JANAFS),
+and the [BSEE ceramic material properties report, Table 5.2](https://www.bsee.gov/sites/bsee.gov/files/tap-technical-assessment-program/138aa.pdf).
+Reported bow is the small-strain equilibrium. The display multiplies displacement by 15 and
+renders emission from the simulated surface temperature through the existing spectral glow helper.

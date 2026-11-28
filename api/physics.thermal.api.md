@@ -10,6 +10,8 @@ export class HeatConduction implements Solver<HeatConductionOptions> {
     readonly liquidFractionField: FieldDescriptor;
     private constructor();
     static load(options?: HeatConductionLoadOptions): Promise<HeatConduction>;
+    [Symbol.dispose](): void;
+    readNativeWork(): ThermalWorkCounts | undefined;
     describe(): SolverDescription;
     init(host: SolverHost, options: HeatConductionOptions): void;
     importPorts(_tick: number): void;
@@ -24,6 +26,7 @@ export class HeatConduction implements Solver<HeatConductionOptions> {
 export interface HeatConductionLoadOptions {
     readonly id?: string;
     readonly signal?: AbortSignal;
+    readonly threads?: 1 | 2 | 4;
 }
 
 export interface HeatConductionOptions {
@@ -66,6 +69,19 @@ export interface ThermalMaterial {
         readonly latentHeat: number;
         readonly liquidHeatCapacity?: number;
     };
+}
+
+export interface ThermalWorkCounts extends ThermalWorkerWork {
+    readonly threads: number;
+    readonly substeps: number;
+    readonly workers: readonly ThermalWorkerWork[];
+}
+
+export interface ThermalWorkerWork {
+    readonly decodedCells: number;
+    readonly pairedDecodeCells: number;
+    readonly stencilCells: number;
+    readonly pairedStencilCells: number;
 }
 
 export interface ThermoelasticMaterial {

@@ -34,18 +34,20 @@ unsafe fn load2(base: *const f64, i: usize) -> v128 {
 
 // Invert enthalpy without a division per cell. Using two f64 lanes preserves the
 // arithmetic and evaluation order of the scalar tail.
-unsafe fn decode(
+unsafe fn decode_range(
     energy: *const f64,
     temperature: *mut f64,
     liquid: *mut f64,
     coeff: *const f64,
     n: usize,
+    from: usize,
+    to: usize,
 ) {
-    let mut i = 0;
+    let mut i = from;
     let zero = f64x2_splat(0.0);
     let one = f64x2_splat(1.0);
     unsafe {
-        while i + 1 < n {
+        while i + 1 < to {
             let h = load2(energy, i);
             let hs = load2(coeff, SOLIDUS * n + i);
             let hl = load2(coeff, LIQUIDUS * n + i);
@@ -62,7 +64,7 @@ unsafe fn decode(
             );
             i += 2;
         }
-        if i < n {
+        if i < to {
             let h = *energy.add(i);
             let hs = *coeff.add(SOLIDUS * n + i);
             let hl = *coeff.add(LIQUIDUS * n + i);
@@ -71,6 +73,17 @@ unsafe fn decode(
             *liquid.add(i) = ((h - hs) * *coeff.add(INV_LATENT * n + i)).clamp(0.0, 1.0);
         }
     }
+}
+
+#[inline]
+unsafe fn decode(
+    energy: *const f64,
+    temperature: *mut f64,
+    liquid: *mut f64,
+    coeff: *const f64,
+    n: usize,
+) {
+    unsafe { decode_range(energy, temperature, liquid, coeff, n, 0, n) };
 }
 
 #[unsafe(no_mangle)]
@@ -369,6 +382,267 @@ pub unsafe extern "C" fn thermal_step(
         ptr::copy_nonoverlapping(scratch, energy, n);
         ptr::copy_nonoverlapping(first, temperature, n);
         ptr::copy_nonoverlapping(fraction, liquid, n);
+    }
+    0
+}
+
+#[repr(C)]
+struct ThermalWork {
+    decoded_cells: f64,
+    paired_decode_cells: f64,
+    stencil_cells: f64,
+    paired_stencil_cells: f64,
+}
+
+#[repr(C)]
+struct ThermalJob {
+    energy: *mut f64,
+    temperature: *mut f64,
+    liquid: *mut f64,
+    coefficients: *const f64,
+    scratch: *mut f64,
+    source: *const f64,
+    radiation: *const f64,
+    radiators: usize,
+    nx: usize,
+    ny: usize,
+    nz: usize,
+    work: *mut ThermalWork,
+    dt: f64,
+}
+
+const _: [(); 56] = [(); size_of::<ThermalJob>()];
+
+impl ThermalJob {
+    fn count(&self) -> Option<usize> {
+        let n = self.nx.checked_mul(self.ny)?.checked_mul(self.nz)?;
+        if n == 0
+            || n > isize::MAX as usize / (11 * size_of::<f64>())
+            || self.radiators > isize::MAX as usize / (5 * size_of::<f64>())
+            || !self.dt.is_finite()
+            || self.dt <= 0.0
+        {
+            return None;
+        }
+        Some(n)
+    }
+}
+
+fn participant_range(total: usize, part: usize, parts: usize) -> (usize, usize) {
+    (part * total / parts, (part + 1) * total / parts)
+}
+
+#[inline]
+unsafe fn face2(
+    temp: *const f64,
+    g: *const f64,
+    neighbour: usize,
+    positive: usize,
+    cell: v128,
+) -> v128 {
+    unsafe { f64x2_mul(load2(g, positive), f64x2_sub(load2(temp, neighbour), cell)) }
+}
+
+impl Stencil {
+    // Only pair interior x neighbours. Both lanes then take identical face branches.
+    #[inline]
+    unsafe fn watts2(
+        &self,
+        temperature: *const f64,
+        i: usize,
+        y: usize,
+        z: usize,
+        radiated: v128,
+    ) -> v128 {
+        let plane = self.nx * self.ny;
+        let n = plane * self.nz;
+        let coeff = self.coefficients;
+        unsafe {
+            let t = load2(temperature, i);
+            let boundary = f64x2_mul(load2(coeff, BOUNDARY * n + i), t);
+            let mut watts = f64x2_sub(load2(coeff, POWER * n + i), boundary);
+            watts = f64x2_add(watts, radiated);
+            let gx = coeff.add(FACE_X * n);
+            let gy = coeff.add(FACE_Y * n);
+            let gz = coeff.add(FACE_Z * n);
+            watts = f64x2_add(watts, face2(temperature, gx, i - 1, i - 1, t));
+            watts = f64x2_add(watts, face2(temperature, gx, i + 1, i, t));
+            if y != 0 {
+                watts = f64x2_add(watts, face2(temperature, gy, i - self.nx, i - self.nx, t));
+            }
+            if y + 1 < self.ny {
+                watts = f64x2_add(watts, face2(temperature, gy, i + self.nx, i, t));
+            }
+            if z != 0 {
+                watts = f64x2_add(watts, face2(temperature, gz, i - plane, i - plane, t));
+            }
+            if z + 1 < self.nz {
+                watts = f64x2_add(watts, face2(temperature, gz, i + plane, i, t));
+            }
+            watts
+        }
+    }
+}
+
+unsafe fn explicit_rows(job: &ThermalJob, n: usize, first: usize, end: usize) -> bool {
+    let stencil = Stencil {
+        coefficients: job.coefficients,
+        nx: job.nx,
+        ny: job.ny,
+        nz: job.nz,
+    };
+    let dt = f64x2_splat(job.dt);
+    let zero = f64x2_splat(0.0);
+    let maximum = f64x2_splat(f64::MAX);
+    unsafe {
+        let temp = job.scratch.add(n);
+        let radiation_power = job.scratch.add(3 * n);
+        for row in first..end {
+            let y = row % job.ny;
+            let z = row / job.ny;
+            let start = row * job.nx;
+            let scalar = |x: usize| {
+                let i = start + x;
+                let rad = if job.radiators == 0 {
+                    0.0
+                } else {
+                    *radiation_power.add(i)
+                };
+                let next = *job.scratch.add(i) + job.dt * stencil.watts(temp, i, x, y, z, rad);
+                if !next.is_finite() || next < 0.0 {
+                    return false;
+                }
+                *job.scratch.add(i) = next;
+                true
+            };
+            if !scalar(0) {
+                return false;
+            }
+            let mut x = 1;
+            while x + 2 < job.nx {
+                let i = start + x;
+                let rad = if job.radiators == 0 {
+                    zero
+                } else {
+                    load2(radiation_power, i)
+                };
+                let next = f64x2_add(
+                    load2(job.scratch, i),
+                    f64x2_mul(dt, stencil.watts2(temp, i, y, z, rad)),
+                );
+                let valid = v128_and(f64x2_ge(next, zero), f64x2_le(next, maximum));
+                if i64x2_bitmask(valid) != 3 {
+                    return false;
+                }
+                v128_store(job.scratch.add(i).cast(), next);
+                x += 2;
+            }
+            while x < job.nx {
+                if !scalar(x) {
+                    return false;
+                }
+                x += 1;
+            }
+        }
+    }
+    true
+}
+
+/// Run one explicit heat phase, with a barrier between decode and stencil and before final commit.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn thermal_thread_phase(
+    job: &ThermalJob,
+    stage: u32,
+    part: usize,
+    parts: usize,
+) -> u32 {
+    let Some(n) = job.count() else {
+        return 1;
+    };
+    if !matches!(parts, 1 | 2 | 4) || part >= parts {
+        return 1;
+    }
+    let (from_pair, to_pair) = participant_range(n / 2, part, parts);
+    let from = from_pair * 2;
+    let to = if part + 1 == parts { n } else { to_pair * 2 };
+    unsafe {
+        let work = &mut *job.work.add(part);
+        match stage {
+            0 => {
+                *work = ThermalWork {
+                    decoded_cells: 0.0,
+                    paired_decode_cells: 0.0,
+                    stencil_cells: 0.0,
+                    paired_stencil_cells: 0.0,
+                };
+                for i in from..to {
+                    let input = if job.source.is_null() {
+                        0.0
+                    } else {
+                        *job.source.add(i)
+                    };
+                    let h = *job.energy.add(i) + input;
+                    if !h.is_finite() || h < 0.0 {
+                        return 1;
+                    }
+                    *job.scratch.add(i) = h;
+                }
+            }
+            1 => {
+                let temp = job.scratch.add(n);
+                let liquid = job.scratch.add(2 * n);
+                decode_range(job.scratch, temp, liquid, job.coefficients, n, from, to);
+                for i in from..to {
+                    if !(*temp.add(i)).is_finite() || !(*liquid.add(i)).is_finite() {
+                        return 1;
+                    }
+                }
+                work.decoded_cells += (to - from) as f64;
+                work.paired_decode_cells += (2 * (to_pair - from_pair)) as f64;
+            }
+            2 => {
+                let (first, end) = participant_range(job.ny * job.nz, part, parts);
+                if !explicit_rows(job, n, first, end) {
+                    return 1;
+                }
+                work.stencil_cells += ((end - first) * job.nx) as f64;
+                work.paired_stencil_cells +=
+                    ((end - first) * (job.nx.saturating_sub(2) & !1)) as f64;
+            }
+            _ => return 1,
+        }
+    }
+    0
+}
+
+/// Accumulate radiating faces in author order while every helper is between phases.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn thermal_thread_radiation(job: &ThermalJob) -> u32 {
+    let Some(n) = job.count() else {
+        return 1;
+    };
+    unsafe {
+        update_radiation(
+            job.scratch.add(3 * n),
+            job.scratch.add(n),
+            job.radiation,
+            job.radiators,
+            n,
+        )
+    };
+    0
+}
+
+/// Publish only after the final successful decode and the last helper barrier.
+#[unsafe(no_mangle)]
+unsafe extern "C" fn thermal_thread_finish(job: &ThermalJob) -> u32 {
+    let Some(n) = job.count() else {
+        return 1;
+    };
+    unsafe {
+        ptr::copy_nonoverlapping(job.scratch, job.energy, n);
+        ptr::copy_nonoverlapping(job.scratch.add(n), job.temperature, n);
+        ptr::copy_nonoverlapping(job.scratch.add(2 * n), job.liquid, n);
     }
     0
 }

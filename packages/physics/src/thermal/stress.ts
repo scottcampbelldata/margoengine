@@ -1,4 +1,5 @@
-import { MargoError } from '@margoengine/math/errors';
+import { thermalError } from './errors.js';
+import { thermalInputWords } from './inputs.js';
 import type {
   FieldDescriptor,
   Port,
@@ -98,11 +99,12 @@ interface SolidState {
   readonly stress: Region;
   readonly reaction: Region;
   readonly work: Region;
+  readonly temperatureCopy: Region;
+  readonly phaseCopy?: Region;
   readonly stateRegions: readonly Region[];
 }
 
 const LAYOUT = 1;
-const CENTRE = [0, 0, 0] as const;
 const F64 = Float64Array.BYTES_PER_ELEMENT;
 
 function f64(memory: WebAssembly.Memory, region: Region): Float64Array {
@@ -111,7 +113,7 @@ function f64(memory: WebAssembly.Memory, region: Region): Float64Array {
 
 function elasticMaterial(material: ThermoelasticMaterial): readonly [number, number, number, number] {
   if (!material || typeof material !== 'object')
-    throw new TypeError('Thermoelasticity material is invalid; provide its elastic properties.');
+    throw thermalError('Thermoelasticity material is invalid; provide its elastic properties.');
   const {
     youngModulus: young,
     poissonRatio: poisson,
@@ -119,18 +121,18 @@ function elasticMaterial(material: ThermoelasticMaterial): readonly [number, num
     referenceTemperature = 293.15,
   } = material;
   if (!Number.isFinite(young) || !(young > 0) || !Number.isFinite(poisson) || !(poisson > -1 && poisson < 0.5))
-    throw new RangeError(
+    throw thermalError(
       'Thermoelasticity needs finite positive Young’s modulus and Poisson’s ratio strictly between -1 and 0.5.',
     );
   if (!Number.isFinite(alpha) || !Number.isFinite(referenceTemperature) || referenceTemperature < 0)
-    throw new RangeError(
+    throw thermalError(
       'Thermoelasticity needs a finite expansion coefficient and a finite, nonnegative reference temperature.',
     );
   const mu2 = young / (1 + poisson);
   const bulk = young / (3 * (1 - 2 * poisson));
   const expansionPressure = bulk * alpha * 3;
   if (!Number.isFinite(mu2) || !Number.isFinite(bulk) || !Number.isFinite(expansionPressure) || !(bulk > 0))
-    throw new RangeError(
+    throw thermalError(
       'Thermoelasticity elastic coefficients are outside the numeric range; use smaller contrasts and finite moduli.',
     );
   return [mu2, bulk, expansionPressure, referenceTemperature];
@@ -160,24 +162,28 @@ function prepareConstraints(dimensions: ThermalAxes, dofs: number, restraints: r
   const basis: number[][] = [];
   const index = (i: number, j: number, k: number, axis: number) => 3 * (i + (nx + 1) * (j + (ny + 1) * k)) + axis;
   let constrained = 0;
-  for (const { node, displacement: values } of restraints) {
+  for (const restraint of restraints) {
+    const node = restraint?.node;
+    const values = restraint?.displacement;
     if (
-      node.length !== 3 ||
-      !node.every(
+      node?.length !== 3 ||
+      ![node[0], node[1], node[2]].every(
         (coordinate, axis) => Number.isSafeInteger(coordinate) && coordinate >= 0 && coordinate <= dimensions[axis]!,
       ) ||
-      values.length !== 3
+      values?.length !== 3
     )
-      throw new RangeError(
+      throw thermalError(
         'Thermoelasticity restraint is outside the grid; provide a vertex and three displacement components.',
       );
-    const [x, y, z] = node;
+    const x = node[0],
+      y = node[1],
+      z = node[2];
     for (let axis = 0; axis < 3; axis++) {
       const value = values[axis];
       if (value === null) continue;
       const row = index(x, y, z, axis);
       if (value === undefined || !Number.isFinite(value) || flags[row] !== 0)
-        throw new RangeError(
+        throw thermalError(
           'Thermoelasticity restraint is invalid or repeated; give each fixed component one finite displacement.',
         );
       flags[row] = 2;
@@ -206,49 +212,60 @@ function prepareConstraints(dimensions: ThermalAxes, dofs: number, restraints: r
     }
   }
   if (basis.length < 6)
-    throw new RangeError('Thermoelasticity could not fix the rigid modes; use restraints at distinct grid vertices.');
+    throw thermalError('Thermoelasticity could not fix the rigid modes; use restraints at distinct grid vertices.');
   return { flags, displacement, free: dofs - constrained };
 }
 
-function prepare(options: ThermoelasticityOptions) {
-  const dimensions = options.dimensions;
-  const size = options.cellSize ?? [1, 1, 1];
-  if (dimensions.length !== 3 || !dimensions.every((count) => Number.isSafeInteger(count) && count > 0))
-    throw new RangeError('Thermoelasticity needs three positive cell counts; match the temperature grid.');
-  if (size.length !== 3 || !size.every((width) => Number.isFinite(width) && width > 0))
-    throw new RangeError('Thermoelasticity needs three finite, positive cell sizes; match the temperature grid.');
-  const [nx, ny, nz] = dimensions;
-  const [hx, hy, hz] = size;
+function prepare(options: ThermoelasticityOptions, readsPhase: boolean) {
+  const dimensions = options?.dimensions;
+  const size = options?.cellSize ?? [1, 1, 1];
+  if (
+    dimensions?.length !== 3 ||
+    ![dimensions[0], dimensions[1], dimensions[2]].every((count) => Number.isSafeInteger(count) && count > 0)
+  )
+    throw thermalError('Thermoelasticity needs three positive cell counts. Match the temperature grid.');
+  if (size.length !== 3 || ![size[0], size[1], size[2]].every((width) => Number.isFinite(width) && width > 0))
+    throw thermalError('Thermoelasticity needs three finite, positive cell sizes. Match the temperature grid.');
+  const nx = dimensions[0],
+    ny = dimensions[1],
+    nz = dimensions[2];
+  const hx = size[0],
+    hy = size[1],
+    hz = size[2];
   const volume = (hx * hy * hz) / 6;
   const inverseSize = [1 / hx, 1 / hy, 1 / hz];
   if (!(volume > 0) || !Number.isFinite(volume) || inverseSize.some((value) => !Number.isFinite(value)))
-    throw new RangeError('Thermoelasticity cell geometry is outside the numeric range; use representable cell sizes.');
+    throw thermalError('Thermoelasticity cell geometry is outside the numeric range; use representable cell sizes.');
   const cells = nx * ny * nz;
   const dofs = 3 * ((nx + 1) * (ny + 1) * (nz + 1));
-  // Includes the working arrays, outputs and their two registry mirrors.
-  const requiredBytes = F64 * (12 * dofs + 29 * cells + 48) + dofs;
+  // Includes the working arrays, input copies, outputs and their two registry mirrors.
+  const cellWords = readsPhase ? 31 : 30;
+  const requiredBytes = F64 * (12 * dofs + cellWords * cells + 48) + dofs;
   if (!Number.isSafeInteger(requiredBytes) || requiredBytes > 0xffffffff)
-    throw new RangeError('Thermoelasticity grid cannot fit in the Wasm address space; use fewer cells.');
+    throw thermalError('Thermoelasticity grid cannot fit in the Wasm address space; use fewer cells.');
   const tolerance = options.relativeTolerance ?? 1e-9;
   if (!Number.isFinite(tolerance) || !(tolerance > 0 && tolerance < 1))
-    throw new RangeError('Thermoelasticity relative tolerance must be between zero and one.');
-  const restrained = prepareConstraints(dimensions, dofs, options.restraints ?? []);
+    throw thermalError('Thermoelasticity relative tolerance is invalid. Choose a value between zero and one.');
+  const restraints = options.restraints ?? [];
+  if (!Array.isArray(restraints))
+    throw thermalError('Thermoelasticity restraints are invalid. Supply an array of nodal restraints.');
+  const restrained = prepareConstraints(dimensions, dofs, restraints);
   // Floating-point CG can need more than the exact-arithmetic dimension.
   const maxIterations = options.maxIterations ?? Math.max(2 * restrained.free, 1);
   if (!Number.isSafeInteger(maxIterations) || maxIterations < 1 || maxIterations > 0xffffffff)
-    throw new RangeError('Thermoelasticity iterations must be a positive u32 count.');
+    throw thermalError('Thermoelasticity iterations are invalid. Choose a positive u32 count.');
   const materials = options.materials;
-  if (!materials || typeof materials !== 'object')
-    throw new TypeError('Thermoelasticity requires a material or material palette.');
+  if (!materials || typeof materials !== 'object' || (!Array.isArray(materials) && !('youngModulus' in materials)))
+    throw thermalError('Thermoelasticity needs elastic properties. Supply a material or material palette.');
   const palette = ('youngModulus' in materials ? [materials] : materials).map(elasticMaterial);
   const indices = options.materialIndices;
-  if (palette.length === 0 || (indices !== undefined && indices.length !== cells))
-    throw new RangeError('Thermoelasticity materials do not match the grid; supply one palette index per cell.');
+  if (palette.length === 0 || (indices !== undefined && indices?.length !== cells))
+    throw thermalError('Thermoelasticity materials do not match the grid; supply one palette index per cell.');
   const coefficients = new Float64Array(cells * 4);
   for (let cell = 0; cell < cells; cell++) {
     const i = indices === undefined ? 0 : indices[cell];
     if (i === undefined || !Number.isInteger(i) || i < 0 || i >= palette.length)
-      throw new RangeError('Thermoelasticity material index is outside the palette; use a valid index.');
+      throw thermalError('Thermoelasticity material index is outside the palette; use a valid index.');
     coefficients.set(palette[i]!, cell * 4);
   }
   return {
@@ -268,8 +285,8 @@ function source(field: FieldDescriptor, quantity: string, unit: string): FieldDe
     field.quantity !== quantity ||
     field.unit !== unit
   )
-    throw new TypeError(
-      'Thermoelasticity source must be a cell-centred uniform grid of ' + quantity + ' in ' + unit + '.',
+    throw thermalError(
+      `Thermoelasticity source is incompatible. Publish a cell-centred uniform grid of ${quantity} in ${unit}.`,
     );
   return Object.freeze({ ...field });
 }
@@ -315,9 +332,11 @@ export class Thermoelasticity implements Solver<ThermoelasticityOptions> {
 
   /** Loads the optional shared thermal Wasm. A solver instance belongs to one PhysicsWorld. */
   static async load(options: ThermoelasticityLoadOptions): Promise<Thermoelasticity> {
+    if (!options?.temperatureField)
+      throw thermalError('Thermoelasticity needs temperature. Supply the heat grid field.');
     const id = options.id ?? 'thermoelasticity';
     if (typeof id !== 'string' || id.trim() === '' || id.trim() !== id)
-      throw new RangeError('Thermoelasticity solver ID is invalid; use a nonempty ID without outer whitespace.');
+      throw thermalError('Thermoelasticity solver ID is invalid; use a nonempty ID without outer whitespace.');
     const temperature = source(options.temperatureField, 'temperature', 'K');
     const phase = options.liquidFractionField && source(options.liquidFractionField, 'volumeFraction', '1');
     return new Thermoelasticity(id, await loadThermalKernel(options.signal), temperature, phase);
@@ -342,8 +361,8 @@ export class Thermoelasticity implements Solver<ThermoelasticityOptions> {
   /** Validates the grid and allocates state in the world arena. */
   init(host: SolverHost, options: ThermoelasticityOptions): void {
     if (this.#data)
-      throw new MargoError('attached', 'Thermoelasticity is already attached; load a fresh solver for another world.');
-    const prepared = prepare(options);
+      throw thermalError('Thermoelasticity is already attached. Load a fresh solver for another world.', 'attached');
+    const prepared = prepare(options, this.#phase !== undefined);
     const { cells, dofs } = prepared;
     const kernel = instantiateThermalKernel(host, this.#builds) as unknown as ElasticKernel;
     const allocate = (name: string, words: number) => host.allocate(name, words * F64, 'f64', LAYOUT);
@@ -355,6 +374,8 @@ export class Thermoelasticity implements Solver<ThermoelasticityOptions> {
     const stress = allocate('stress', cells * 6);
     const reaction = allocate('reaction', dofs);
     const work = allocate('thermoelastic-work', 5 * dofs + 7 * cells);
+    const temperatureCopy = allocate('thermoelastic-temperature-copy', cells);
+    const phaseCopy = this.#phase ? allocate('thermoelastic-phase-copy', cells) : undefined;
     f64(host.memory, grid).set(prepared.geometry);
     f64(host.memory, coefficients).set(prepared.coefficients);
     new Uint8Array(host.memory.buffer, constraints.byteOffset, dofs).set(prepared.flags);
@@ -368,7 +389,7 @@ export class Thermoelasticity implements Solver<ThermoelasticityOptions> {
         dofs,
       ) !== 0
     )
-      throw new RangeError(
+      throw thermalError(
         'Thermoelasticity stiffness is outside the numeric range; use representable cell sizes and moduli.',
       );
     this.#data = {
@@ -384,6 +405,8 @@ export class Thermoelasticity implements Solver<ThermoelasticityOptions> {
       stress,
       reaction,
       work,
+      temperatureCopy,
+      phaseCopy,
       stateRegions: [grid, coefficients, constraints, inverseDiagonal, displacement, stress, reaction],
     };
   }
@@ -394,8 +417,8 @@ export class Thermoelasticity implements Solver<ThermoelasticityOptions> {
   /** Solves the current solid equilibrium from the last published thermal fields. */
   step(context: StepContext, _dt: number): void {
     const data = this.#state();
-    const temperature = this.#input(context, this.#temperature, data);
-    const phase = this.#phase ? this.#input(context, this.#phase, data) : 0;
+    const temperature = this.#input(context, this.#temperature, data, data.temperatureCopy);
+    const phase = this.#phase ? this.#input(context, this.#phase, data, data.phaseCopy!) : 0;
     const status = data.kernel.thermoelastic_solve(
       data.grid.byteOffset,
       data.coefficients.byteOffset,
@@ -411,29 +434,30 @@ export class Thermoelasticity implements Solver<ThermoelasticityOptions> {
       data.dofs,
     );
     if (status === 2)
-      throw new MargoError(
+      throw thermalError(
+        'Thermoelasticity received a non-solid cell. Couple it to an entirely solid region.',
         'unsupported',
-        'Thermoelasticity received a non-solid cell; couple it to an entirely solid region.',
       );
     if (status === 3)
-      throw new MargoError(
+      throw thermalError(
+        'Thermoelasticity did not converge. Increase the iteration budget or improve grid and material conditioning.',
         'failed',
-        'Thermoelasticity did not converge; increase the iteration budget or improve grid and material conditioning.',
       );
     if (status !== 0)
-      throw new MargoError(
+      throw thermalError(
+        'Thermoelasticity inputs or results left the numeric range. Check the temperature port and scale the solid model.',
         'failed',
-        'Thermoelasticity inputs or results left the numeric range; check the temperature port and scale the solid model.',
       );
   }
 
   /** Publishes displacement, stress and support reaction for the supplied tick. */
   exportPorts(tick: number): readonly Port[] {
     const data = this.#state();
+    const cell = data.host.cell;
     return [
-      { field: this.displacementField.name, region: data.displacement, tick, cell: CENTRE },
-      { field: this.stressField.name, region: data.stress, tick, cell: CENTRE },
-      { field: this.reactionField.name, region: data.reaction, tick, cell: CENTRE },
+      { field: this.displacementField.name, region: data.displacement, tick, cell },
+      { field: this.stressField.name, region: data.stress, tick, cell },
+      { field: this.reactionField.name, region: data.reaction, tick, cell },
     ];
   }
 
@@ -467,33 +491,28 @@ export class Thermoelasticity implements Solver<ThermoelasticityOptions> {
 
   #state(): SolidState {
     if (!this.#data)
-      throw new MargoError(
-        'state',
-        'Thermoelasticity has no solid grid; add it to a PhysicsWorld before reading or stepping.',
-      );
+      throw thermalError('Thermoelasticity has no solid grid. Add it to a PhysicsWorld before reading or stepping.');
     return this.#data;
   }
 
-  #input(context: StepContext, field: FieldDescriptor, data: SolidState): number {
+  #input(context: StepContext, field: FieldDescriptor, data: SolidState, copy: Region): number {
     const port = context.inputs.get(field.name);
-    if (!port)
-      throw new MargoError(
-        'state',
-        'Thermoelasticity input ' + field.name + ' is missing; add the field owner to the world.',
-      );
+    if (!port) throw thermalError(`Thermoelasticity input ${field.name} is missing. Add the field owner to the world.`);
     const region = port.region;
     if (
+      port.field !== field.name ||
       region.type !== 'f64' ||
       region.layout !== LAYOUT ||
       region.byteLength !== data.cells * F64 ||
-      (region.memory !== undefined && region.memory !== data.host.memory) ||
+      port.cell.length !== 3 ||
       port.cell.some((value, axis) => value !== context.cell[axis])
     )
-      throw new RangeError(
-        'Thermoelasticity input ' +
-          field.name +
-          ' does not match the solid grid; use one f64 per cell in the same origin.',
+      throw thermalError(
+        `Thermoelasticity input ${field.name} does not match the solid grid. Use one f64 per cell in the same origin.`,
       );
-    return region.byteOffset;
+    const values = thermalInputWords(data.host.memory, region);
+    if ((region.memory ?? data.host.memory) === data.host.memory) return region.byteOffset;
+    f64(data.host.memory, copy).set(values);
+    return copy.byteOffset;
   }
 }

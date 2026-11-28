@@ -386,6 +386,10 @@ test('invalid options and an aborted kernel load fail before running a solve', a
   await assert.rejects(HeatConduction.load({ signal: AbortSignal.abort(reason) }), (error) => error === reason);
   const thermal = await HeatConduction.load();
   const world = new PhysicsWorld();
+  assert.throws(() => world.add(thermal, { dimensions: [1, 1, 1] }), {
+    code: 'state',
+    message: /Supply conductivity.*errors#thermal/,
+  });
   assert.throws(
     () => world.add(thermal, { dimensions: [1, 1, 1], materials: { conductivity: -1, heatCapacity: 2 } }),
     /conductivity/,

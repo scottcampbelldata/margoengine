@@ -625,3 +625,13 @@ Not in the catalog: staged construction (placement of pieces, stacking, scaffold
 - Both renderers separately repeat complete accepted state and raw RGBA through hold, restore,
   re-advance and rewind. The fixture shows the active lava, ice and surface water in a fixed
   technical cutaway. Atmospheric condensation and a production film take are outside this scene.
+
+### FIRE-06 civil kiln coupon witness
+
+A locked 768 × 432 camera observes two 36 cm clamped mullite strips starting at 1350 K. Exposing the top
+and tip of one strip to greybody radiation takes out 66,113 J in 24 s and cools the exposed tip skin to 988.70 K.
+The thermal field drives emission and 0.587 mm of computed bow with stress above 40 MPa. The insulated
+control remains exactly 1350 K and flat. The cutaway labels its 15× display-only magnification. Optical and
+deformation controls verify independently visible changes. WebGPU and WebGL2 each repeat all RGBA pixels
+and complete accepted state at held frames, restore, re-advance and rewind. Original film shots remain open.
+[Browser test](../packages/physics/tests/thermal-film.browser.mjs).

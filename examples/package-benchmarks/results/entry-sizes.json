@@ -15578,8 +15578,8 @@
         "gzip": 4827
       },
       "./thermal": {
-        "raw": 18547,
-        "gzip": 6649
+        "raw": 27449,
+        "gzip": 9686
       },
       "./world": {
         "raw": 52491,
@@ -19745,14 +19745,14 @@
       "brotli": 5604
     },
     "packages/physics/dist/thermal-kernel.wasm": {
-      "raw": 12160,
-      "gzip": 5120,
-      "brotli": 4460
+      "raw": 16560,
+      "gzip": 6945,
+      "brotli": 6009
     },
     "packages/physics/dist/thermal-kernel-shared.wasm": {
-      "raw": 12160,
-      "gzip": 5120,
-      "brotli": 4458
+      "raw": 16560,
+      "gzip": 6945,
+      "brotli": 6008
     },
     "packages/physics/dist/vegetation-kernel.wasm": {
       "raw": 7951,

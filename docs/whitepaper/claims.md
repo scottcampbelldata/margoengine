@@ -7188,3 +7188,10 @@ four participants. A natural lava fixture closes the ice exchanges and draws the
 ice and runoff. WebGPU and WebGL2 each repeat full accepted state and captured pixels. A separate
 cold-plate diagnostic shows missing longitudinal variation and excessive freezing in flowing water.
 [Measured limits](../limits.md#ice-05-freshwater-flow-over-a-cold-plate).
+
+### FIRE-06 native thermal replay and kiln witness
+
+Explicit native participant counts 1, 2 and 4 reproduce complete accepted heat fields and snapshots.
+The renderer witness drives live emission and thermoelastic bow from the same heat grid with a matched
+insulated control. Each renderer repeats complete accepted state and RGBA. Independently measured gallium
+fronts quantify the missing melt convection in the thermal entry. [Measured limits](../limits.md#fire-06-gallium-melting-across-a-heated-vertical-plate).

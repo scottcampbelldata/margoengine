@@ -171,6 +171,20 @@ test('thermal stress follows the heat port at the same time across frame rates a
   seekEqualsContinuous(factory);
 });
 
+test('malformed solid materials and restraints report how to fix the grid', async () => {
+  const { solid } = await loaded();
+  const options = { dimensions: [1, 1, 1], materials: material };
+  const world = new PhysicsWorld({ rate });
+  assert.throws(() => world.add(solid, { ...options, materials: {} }), {
+    code: 'state',
+    message: /Supply a material or material palette.*errors#thermal/,
+  });
+  assert.throws(() => world.add(solid, { ...options, restraints: [null] }), {
+    code: 'state',
+    message: /provide a vertex.*errors#thermal/,
+  });
+});
+
 test('missing or differently placed temperatures cannot produce misleading stress', async () => {
   const pair = await loaded();
   const options = { dimensions: [1, 1, 1], materials: material };
@@ -191,6 +205,91 @@ test('missing or differently placed temperatures cannot produce misleading stres
   const mismatched = await loaded();
   const wrongShape = coupled(mismatched, options, referenceTemperature, rate, { dimensions: [2, 1, 1] });
   assert.throws(() => wrongShape.advance(1), /does not match the solid grid/);
+});
+
+test('thermal and solid fields keep the same registered signed cell through seek', async () => {
+  const { heat, solid } = await loaded();
+  const dimensions = [3, 1, 1];
+  const cell = [-12, 5, 4];
+  const world = new PhysicsWorld({ rate })
+    .add(
+      heat,
+      {
+        dimensions,
+        materials: { conductivity: 1, heatCapacity: 40 },
+        initialTemperature: 320,
+        boundaries: { xMin: { kind: 'temperature', kelvin: 270 } },
+      },
+      cell,
+    )
+    .add(solid, { dimensions, materials: material, restraints: ends(...dimensions) }, cell);
+  world.advance(2);
+  const mark = world.takeSnapshot();
+  const cells = () => [...heat.exportPorts(2), ...solid.exportPorts(2)].map((port) => port.cell);
+  assert.deepEqual(cells(), Array(6).fill(cell));
+  world.shiftOrigin([2, -4, 1]);
+  assert.deepEqual(cells(), Array(6).fill([-14, 9, 3]));
+  world.advance(5);
+  const accepted = world.takeSnapshot();
+  assert.ok(solid.readStress()[0] < 0);
+  world.restoreSnapshot(mark.bytes);
+  assert.deepEqual(cells(), Array(6).fill(cell));
+  world.shiftOrigin([2, -4, 1]);
+  world.advance(5);
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+});
+
+test('the solid uses independently allocated temperatures and rejects a late liquid row atomically', async () => {
+  const { heat, solid } = await loaded();
+  const dimensions = [2, 1, 1];
+  const cell = [-2, -9, 7];
+  const world = new PhysicsWorld({ rate }).add(
+    solid,
+    { dimensions, materials: material, restraints: ends(...dimensions) },
+    cell,
+  );
+  const temperatureMemory = new WebAssembly.Memory({ initial: 1 });
+  const phaseMemory = new WebAssembly.Memory({ initial: 1 });
+  const port = (field, memory) => ({
+    field: field.name,
+    cell,
+    tick: 0,
+    region: { name: field.name, memory, type: 'f64', layout: 1, byteOffset: 128, byteLength: 16 },
+  });
+  const tempPort = port(heat.temperatureField, temperatureMemory);
+  const phasePort = port(heat.liquidFractionField, phaseMemory);
+  const temperatures = new Float64Array(temperatureMemory.buffer, 128, 2);
+  const liquid = new Float64Array(phaseMemory.buffer, 128, 2);
+  temperatures.set([310, 340]);
+  const step = (phase = phasePort) =>
+    solid.step(
+      {
+        tick: 0,
+        level: 0,
+        seed: 3,
+        cell,
+        inputs: new Map([
+          [tempPort.field, tempPort],
+          [phase.field, phase],
+        ]),
+      },
+      1 / 60,
+    );
+  step();
+  assert.ok(solid.readStress()[0] < 0);
+  const accepted = world.takeSnapshot();
+  temperatures[0] = 600;
+  liquid[1] = 0.01;
+  assert.throws(
+    () => step(),
+    (error) => error.code === 'unsupported' && /non-solid cell.*errors#thermal/.test(error.message),
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  assert.throws(
+    () => step({ ...phasePort, region: { ...phasePort.region, byteOffset: 129 } }),
+    /owning memory.*errors#thermal/,
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
 });
 
 test('the solid solver retains its last equilibrium when the heat port shows melt', async () => {

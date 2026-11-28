@@ -196,8 +196,8 @@
 <tr><th scope="row"><code>orbit-kernel-shared.wasm</code></th><td>Rust SIMD N-body gravity, shared world memory</td><td class="num">14,212</td><td class="num">6,146</td><td class="num">5,567</td><td>OrbitSolver.load() on a host with shared memory support</td></tr>
 <tr><th scope="row"><code>runoff-kernel.wasm</code></th><td>Rust SIMD catchment runoff</td><td class="num">23,699</td><td class="num">6,427</td><td class="num">5,537</td><td>RainfallRunoff.load(), only from the optional /runoff entry</td></tr>
 <tr><th scope="row"><code>runoff-kernel-shared.wasm</code></th><td>Rust SIMD catchment runoff, shared world memory</td><td class="num">23,787</td><td class="num">6,489</td><td class="num">5,604</td><td>RainfallRunoff.load() on a host with shared memory support</td></tr>
-<tr><th scope="row"><code>thermal-kernel.wasm</code></th><td>Rust SIMD heat conduction</td><td class="num">12,160</td><td class="num">5,120</td><td class="num">4,460</td><td>HeatConduction.load() or Thermoelasticity.load() from the optional /thermal entry</td></tr>
-<tr><th scope="row"><code>thermal-kernel-shared.wasm</code></th><td>Rust SIMD heat conduction, shared world memory</td><td class="num">12,160</td><td class="num">5,120</td><td class="num">4,458</td><td>The optional /thermal entry loads a kernel on a host with shared memory support</td></tr>
+<tr><th scope="row"><code>thermal-kernel.wasm</code></th><td>Rust SIMD heat conduction</td><td class="num">16,560</td><td class="num">6,945</td><td class="num">6,009</td><td>HeatConduction.load() or Thermoelasticity.load() from the optional /thermal entry</td></tr>
+<tr><th scope="row"><code>thermal-kernel-shared.wasm</code></th><td>Rust SIMD heat conduction, shared world memory</td><td class="num">16,560</td><td class="num">6,945</td><td class="num">6,008</td><td>The optional /thermal entry loads a kernel on a host with shared memory support</td></tr>
 <tr><th scope="row"><code>vegetation-kernel.wasm</code></th><td>Rust SIMD structural plant response</td><td class="num">7,951</td><td class="num">2,974</td><td class="num">2,613</td><td>PlantSway.load(), only from the optional /vegetation entry</td></tr>
 <tr><th scope="row"><code>vegetation-kernel-shared.wasm</code></th><td>Rust SIMD structural plant response, shared world memory</td><td class="num">7,951</td><td class="num">2,974</td><td class="num">2,613</td><td>PlantSway.load() on a host with shared memory support</td></tr>
 <tr><th scope="row"><code>school-kernel.wasm</code></th><td>Collective animal motion neighbour kernel (Rust, SIMD)</td><td class="num">8,622</td><td class="num">4,464</td><td class="num">4,040</td><td><code>await SchoolSolver.load()</code> (<code>@margoengine/physics/schooling</code>), on demand</td></tr>
@@ -4997,7 +4997,7 @@
 <tr><td><code>./tissue</code></td><td class="num">7,410</td><td class="num">3,154</td></tr>
 <tr><td><code>./meshfiles</code></td><td class="num">6,547</td><td class="num">2,684</td></tr>
 <tr><td><code>./robots</code></td><td class="num">12,225</td><td class="num">4,827</td></tr>
-<tr><td><code>./thermal</code></td><td class="num">18,547</td><td class="num">6,649</td></tr>
+<tr><td><code>./thermal</code></td><td class="num">27,449</td><td class="num">9,686</td></tr>
 <tr><td><code>./world</code></td><td class="num">52,491</td><td class="num">17,627</td></tr>
 <tr><td><code>./rod</code></td><td class="num">11,286</td><td class="num">4,499</td></tr>
 <tr><td><code>./wrapped-rope</code></td><td class="num">12,459</td><td class="num">4,906</td></tr>

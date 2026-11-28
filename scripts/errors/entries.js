@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'thermal',
+    title: '@margoengine/physics/thermal heat, phase change and solid equilibrium',
+    kind: 'family',
+    messages: [],
+    cause: 'A thermal grid, material coefficient, imposed energy or solid solve is outside the supported range.',
+    fix: 'Supply finite SI data and aligned registered fields on the same signed grid cell. Use an entirely solid region for the stress solve. Reduce the heat impulse, relax the grid conditioning or use a finer accepted time step.',
+  },
+  {
     id: 'ice-thermal',
     title: '@margoengine/physics/ice freezing, melting and phase exchange',
     kind: 'family',

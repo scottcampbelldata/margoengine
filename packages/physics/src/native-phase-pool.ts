@@ -157,6 +157,11 @@ type NativePhaseSolver =
       readonly phase: 'phase energy';
     }
   | {
+      readonly subject: 'Heat conduction';
+      readonly phaseExport: 'thermal_thread_phase';
+      readonly phase: 'enthalpy decode and conduction stencil';
+    }
+  | {
       readonly subject: 'Seismic';
       readonly phaseExport: 'seismic_thread_phase';
       readonly phase: 'velocity and stress stencil';

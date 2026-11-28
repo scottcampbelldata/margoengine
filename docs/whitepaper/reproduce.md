@@ -5455,3 +5455,12 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
   `npm run test:gpu:ice-thermodynamics-film -w @margoengine/physics` for independent renderer replay.
 - Run `node packages/physics/scripts/ice05-channel-freezing-measured.mjs` for the independently measured
   freezing fronts and forcing sensitivity.
+
+### FIRE-06 native thermal replay and kiln witness
+
+- Build Physics with `node packages/physics/scripts/build.js`. Run
+  `node --test packages/physics/tests/coupling/thermal.test.js packages/physics/tests/coupling/thermal-stress.test.js packages/physics/tests/coupling/thermal-demo.test.js packages/physics/tests/coupling/thermal-workers.test.js`.
+- Run `npm run test:gpu:thermal-workers -w @margoengine/physics` for three joined native helpers and
+  `npm run test:gpu:thermal-film -w @margoengine/physics` for per-renderer kiln replay.
+- Run `node packages/physics/scripts/fire06-gallium-measured.mjs` for the independent front comparisons,
+  cold-wall sensitivity and grid refinement.

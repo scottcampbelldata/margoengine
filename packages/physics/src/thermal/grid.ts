@@ -1,3 +1,4 @@
+import { thermalError } from './errors.js';
 /** A uniform grid shape or a vector of cell widths, ordered x, y, z. */
 export type ThermalAxes = readonly [number, number, number];
 
@@ -82,18 +83,18 @@ const CONDUCTANCE = 10;
 
 function nonnegative(value: number, name: string): number {
   if (!Number.isFinite(value) || value < 0)
-    throw new RangeError(name + ' must be finite and nonnegative; pass a value in range.');
+    throw thermalError(name + ' must be finite and nonnegative; pass a value in range.');
   return value;
 }
 
 function positive(value: number, name: string): number {
   if (!Number.isFinite(value) || value <= 0)
-    throw new RangeError(name + ' must be finite and positive; pass a value in range.');
+    throw thermalError(name + ' must be finite and positive; pass a value in range.');
   return value;
 }
 
 function vector(value: ThermalAxes, name: string): ThermalAxes {
-  if (value.length !== 3) throw new RangeError(name + ' requires three axes; pass [x, y, z].');
+  if (value?.length !== 3) throw thermalError(name + ' requires three axes. Pass [x, y, z].');
   return [positive(value[0], name), positive(value[1], name), positive(value[2], name)];
 }
 
@@ -102,6 +103,8 @@ function cellValue(value: number | ArrayLike<number>, i: number): number {
 }
 
 function materialData(material: ThermalMaterial, volume: number) {
+  if (!material || typeof material !== 'object')
+    throw thermalError('A thermal material is missing. Supply conductivity and heat capacity for each material.');
   const conductivity = nonnegative(material.conductivity, 'Thermal conductivity');
   const solid = positive(material.heatCapacity * volume, 'Solid cell heat capacity');
   const phase = material.phaseChange;
@@ -111,9 +114,7 @@ function materialData(material: ThermalMaterial, volume: number) {
   const solidus = phase ? positive(solid * melting, 'Solidus enthalpy') : 0;
   const liquidus = nonnegative(solidus + latent, 'Liquidus enthalpy');
   if (phase && liquidus === solidus)
-    throw new RangeError(
-      'Latent heat rounds away at the solidus; pass material data with a representable latent heat.',
-    );
+    throw thermalError('Latent heat rounds away at the solidus; pass material data with a representable latent heat.');
   return {
     conductivity,
     solid,
@@ -134,14 +135,15 @@ function boundaryData(
   halfWidth: number,
 ): (conductivity: number) => FaceBalance {
   if (boundary === undefined) return () => [0, 0] as const;
+  if (!boundary || typeof boundary !== 'object')
+    throw thermalError('A thermal boundary is invalid. Pass a temperature, convection, radiation or flux condition.');
   if (boundary.kind === 'flux') {
     const watts = boundary.wattsPerSquareMetre * area;
-    if (!Number.isFinite(watts))
-      throw new RangeError('Boundary heat flux overflows; pass a finite flux and face area.');
+    if (!Number.isFinite(watts)) throw thermalError('Boundary heat flux overflows; pass a finite flux and face area.');
     return () => [0, watts] as const;
   }
   if (boundary.kind !== 'temperature' && boundary.kind !== 'convection' && boundary.kind !== 'radiation')
-    throw new TypeError('Unknown thermal boundary; pass a temperature, convection, radiation or flux condition.');
+    throw thermalError('Unknown thermal boundary; pass a temperature, convection, radiation or flux condition.');
   const kelvin = nonnegative(boundary.kelvin, 'Boundary temperature');
   const film =
     boundary.kind === 'temperature'
@@ -152,7 +154,7 @@ function boundaryData(
         );
   if (boundary.kind === 'radiation') {
     const emissivity = nonnegative(boundary.emissivity, 'Emissivity');
-    if (emissivity > 1) throw new RangeError('Emissivity is greater than one; pass a value from 0 to 1.');
+    if (emissivity > 1) throw thermalError('Emissivity is greater than one; pass a value from 0 to 1.');
     if (emissivity > 0) {
       const factor = STEFAN_BOLTZMANN * emissivity * area;
       const convective = nonnegative(film * area, 'Face convection conductance');
@@ -174,15 +176,18 @@ function faceConductance(k1: number, k2: number, scale: number): number {
 }
 
 export function prepareThermalGrid(options: HeatConductionOptions) {
+  const materials = options?.materials;
+  if (!materials || typeof materials !== 'object' || (!Array.isArray(materials) && !('conductivity' in materials)))
+    throw thermalError('A thermal grid needs a material. Supply conductivity and heat capacity or a palette.');
   const integration = options.integration ?? 'explicit';
   if (integration !== 'explicit' && integration !== 'implicit')
-    throw new TypeError('Unknown thermal integration; pass explicit or implicit.');
+    throw thermalError('Unknown thermal integration; pass explicit or implicit.');
   const dimensions = vector(options.dimensions, 'Thermal grid dimensions');
   const cellSize = vector(options.cellSize ?? [1, 1, 1], 'Thermal cell size');
   const [nx, ny, nz] = dimensions;
   const count = nx * ny * nz;
   if (!dimensions.every(Number.isSafeInteger) || count * COEFFICIENTS * 8 >= 0x100000000)
-    throw new RangeError('Thermal grid does not fit its Wasm address space; pass smaller positive integer dimensions.');
+    throw thermalError('Thermal grid does not fit its Wasm address space; pass smaller positive integer dimensions.');
   const [width, height, depth] = cellSize;
   const areas = [height * depth, width * depth, width * height];
   const volume = positive(width * areas[0]!, 'Cell volume');
@@ -191,15 +196,15 @@ export function prepareThermalGrid(options: HeatConductionOptions) {
     pair.map((face) => boundaryData(options.boundaries?.[face], areas[axis]!, cellSize[axis]! * 0.5)),
   );
 
-  const palette = 'conductivity' in options.materials ? [options.materials] : options.materials;
-  if (palette.length === 0) throw new RangeError('Thermal materials are empty; pass at least one material.');
+  const palette = 'conductivity' in materials ? [materials] : materials;
+  if (palette.length === 0) throw thermalError('Thermal materials are empty; pass at least one material.');
   const data = palette.map((material) => materialData(material, volume));
   const indices = options.materialIndices;
   const initial = options.initialTemperature ?? 293.15;
   const fractions = options.initialLiquidFraction ?? 0;
   for (const values of [indices, initial, fractions]) {
-    if (values !== undefined && typeof values !== 'number' && values.length !== count)
-      throw new RangeError('Thermal cell data has the wrong length; pass one value per cell in x-fastest order.');
+    if (values !== undefined && typeof values !== 'number' && values?.length !== count)
+      throw thermalError('Thermal cell data has the wrong length; pass one value per cell in x-fastest order.');
   }
 
   const energy = new Float64Array(count);
@@ -207,12 +212,12 @@ export function prepareThermalGrid(options: HeatConductionOptions) {
   for (let i = 0; i < count; i++) {
     const index = indices === undefined ? 0 : indices[i]!;
     if (!Number.isInteger(index) || index < 0 || index >= data.length)
-      throw new RangeError('Thermal material index is outside the palette; pass a valid index for every cell.');
+      throw thermalError('Thermal material index is outside the palette; pass a valid index for every cell.');
     const material = data[index]!;
     const kelvin = nonnegative(cellValue(initial, i), 'Initial temperature');
     const fraction = nonnegative(cellValue(fractions, i), 'Initial liquid fraction');
     if (fraction > 1 || (fraction > 0 && (material.latent === 0 || kelvin !== material.melting)))
-      throw new RangeError('Initial liquid fraction is invalid; pass 0 to 1 at the melting temperature or omit it.');
+      throw thermalError('Initial liquid fraction is invalid; pass 0 to 1 at the melting temperature or omit it.');
     const stored =
       kelvin <= material.melting
         ? material.solid * kelvin + material.latent * fraction
@@ -264,7 +269,7 @@ export function prepareThermalGrid(options: HeatConductionOptions) {
       }
     }
     if (!Number.isFinite(watts))
-      throw new RangeError('Total boundary heat flux overflows; reduce the flux or use a smaller cell.');
+      throw thermalError('Total boundary heat flux overflows; reduce the flux or use a smaller cell.');
     coefficients[BOUNDARY * count + i] = boundaryConductance;
     coefficients[POWER * count + i] = watts;
     const diagonal = conductanceSum + boundaryConductance;
@@ -273,6 +278,6 @@ export function prepareThermalGrid(options: HeatConductionOptions) {
     stiffness = Math.max(stiffness, diagonal * invCapacity);
   }
   if (!Number.isFinite(stiffness))
-    throw new RangeError('Thermal diffusion rate overflows; reduce conductivity or increase cell size.');
+    throw thermalError('Thermal diffusion rate overflows; reduce conductivity or increase cell size.');
   return { dimensions, cellSize, integration, stiffness, coefficients, energy, radiation: new Float64Array(radiators) };
 }

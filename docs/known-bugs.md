@@ -7867,7 +7867,7 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 
 ### Open: the original kiln and turbofan shots await FIRE-06 scene integrations
 
-- The physics coupling tests evolve the heat grid and read its temperature for ceramic emission and gas expansion. The heat-haze renderer accepts the temperature volume. A thermoelastic solver reads the same thermal field to compute solid stresses.
+- Thermal and mechanical output ports use their live signed cell and validate borrowed inputs in the owner's memory. The thermal stress coupling tests cover registered replay and rejection of a late liquid cell or unaligned lease before mechanical publication. A separate civil kiln witness displays radiative cooling and its small-strain thermal deformation on both renderers. The heat-haze renderer accepts the temperature volume.
 - THE-KILN-SHIFT-3, THE-KILN-SHIFT-5 and INSIDE-A-TURBOFAN-4 remain open in the demo review. Their source scenes are absent from the engine checkout. The turbofan also needs the reaction and advecting gas fields from FIRE-02 and FLUID-04. [Physics demo review](physics-demo-review.md)
 
 ### Fixed 2026-11-25: a port big enough to grow the world's memory at its first publish crashed the field registry (KB-PHYS-REGISTRYGROW1, physics world)

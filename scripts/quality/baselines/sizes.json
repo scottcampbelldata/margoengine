@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22135357,
+  "total": 22138429,
   "history": [
     {
       "date": "2026-10-24",
@@ -16025,6 +16025,12 @@
       "commit": "ice-05-native-phase-energy",
       "reason": "ICE-05 @margoengine/physics/ice 3227 to 6912 B gzip, ceiling 3483 to 7168 B. The optional ice entry stages independent phase energy and signed accepted outputs. Native helpers evaluate disjoint site pairs. Splitting would duplicate phase accounting and the accepted field contract. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "fire-06-native-thermal-phases",
+      "reason": "FIRE-06 @margoengine/physics/thermal 6649 to 9686 B gzip, ceiling 6905 to 9977 B. The thermal entry validates borrowed fields and runs ordered SIMD heat phases with native helpers. Splitting would duplicate the thermal field and scratch contract. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16955,7 +16961,7 @@
     "@margoengine/physics/surge": 9351,
     "@margoengine/physics/synoptic": 6633,
     "@margoengine/physics/terramechanics": 20294,
-    "@margoengine/physics/thermal": 6905,
+    "@margoengine/physics/thermal": 9977,
     "@margoengine/physics/thin-film": 18799,
     "@margoengine/physics/tissue": 3218,
     "@margoengine/physics/tracers": 22816,

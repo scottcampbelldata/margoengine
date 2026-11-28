@@ -12414,3 +12414,13 @@ The optional section allocates separate elastic, surface and site trial regions.
 ### ICE-05 warm surface boundary and accepted native phase budget
 
 The ice sheet freezes through a prescribed insulation resistance and uses an independent sensible transfer on the warm face. The optional native kernel partitions fusion, liquid heating and vaporization across disjoint pairs and joins each step before geometry and exchange publication. Adopted forcing is read in its owning memory, and the four ports carry the live signed origin. The natural lava and runoff basin repeat precise accepted state and pixels on both renderers. Independent channel readings quantify the missing flow and ice feedback.
+
+### FIRE-06 native heat phases and accepted field replay
+
+The optional thermal entry partitions explicit heat decode and the interior conduction stencil across
+native SIMD pairs and joins participants before radiation, the next stencil or publication. The caller
+keeps the native result and work counts only after acceptance. Borrowed f64 inputs are checked in their
+own memory and heat and mechanical outputs carry the live signed cell. The civil kiln cutaway repeats
+all accepted solver bytes and RGBA independently on WebGPU and WebGL2. Independent gallium melt fronts
+show the effect of omitted convection. Backward Euler remains single-participant and original films
+await installation.

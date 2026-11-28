@@ -9703,7 +9703,7 @@ UV transform centre (`uvTransform.center`, `@margoengine/materials`, 2026-11-25)
 
 The heat grid is Cartesian and cell-centred, with isotropic conductivity and piecewise constant sensible heat capacity. Phase change is isothermal and of fixed volume. Exterior faces support insulation, fixed temperature, convection using half-cell and film resistances in series, diffuse-grey radiation to fixed-temperature surroundings, and prescribed heat flux.
 
-The solver and scratch regions occupy 136 bytes per cell and a 40-byte geometry record in world memory. Backward Euler adds 8 bytes of scratch per cell. A grid with radiating faces adds another 8 bytes per cell and 40 bytes per radiating face. The field registry adds its mirrors and any accumulated sources. The solver supports plain and shared Wasm memory with SIMD. Each solver instance uses a 64 KiB stack region in world memory. The solver chooses the world rate from the finite-volume diffusion bound and subdivides a tick when needed. The numerical limits follow the world's Wasm address space and the kernel's u32 subdivision count. Forward Euler uses a step diffusion number at most 1/2. Backward Euler subdivides above 2 to bound the stationary iteration's convergence rate. Very stiff large grids still need a scalable sparse solve. The optional entry measures 6,684 B gzip. Each of its two lazy Wasm builds measures 12,160 B raw and 5,120 B gzip. A browser without shared memory support loads the plain build.
+The solver and scratch regions occupy 144 bytes per cell, including the copy region for borrowed heat sources, and a 40-byte geometry record in world memory. Backward Euler adds 8 bytes of scratch per cell. A grid with radiating faces adds another 8 bytes per cell and 40 bytes per radiating face. The field registry adds its mirrors and any accumulated sources. The solver supports plain and shared Wasm memory with SIMD. Each native participant uses a 64 KiB stack plus alignment in world memory. Explicit grids also use a 56-byte job record and 32 bytes of work counters per participant, plus worker control words for shared execution. The decode and interior stencil are split across participant ranges. Radiation and accepted-state publication run in caller order. The solver chooses the world rate from the finite-volume diffusion bound and subdivides a tick when needed. The numerical limits follow the world's Wasm address space and the kernel's u32 subdivision count. Forward Euler uses a step diffusion number at most 1/2. Backward Euler subdivides above 2 to bound the stationary iteration's convergence rate. Very stiff large grids still need a scalable sparse solve. The optional entry measures 9,686 B gzip. Each of its two lazy Wasm builds measures 16,560 B raw and 6,945 B gzip. A browser without shared memory support loads the plain build.
 
 Thermoelasticity solves quasistatic small-strain equilibrium in a bonded solid on the same Cartesian grid. Each
 cell is decomposed into six tetrahedra, with a common per-cell temperature and isotropic elastic properties. The
@@ -9711,7 +9711,7 @@ solid takes prescribed nodal displacements and has zero traction on free surface
 heat grid. A supplied liquid-fraction field rejects any positive melt fraction. Plastic flow, fracture and stresses
 within a fluid are outside this elastic model.
 
-Before alignment and the registry's mirrors, the elastic solver uses 136 bytes per cell, 65 bytes per nodal degree
+Before alignment and the registry's mirrors, the elastic solver uses 144 bytes per cell, or 152 when a melt field is registered, and 65 bytes per nodal degree
 of freedom, and a 72-byte geometry record. The grid count is limited by the Wasm address space. A solve fails before
 publishing new mechanical results when the residual remains above the requested tolerance after its iteration budget.
 
@@ -9721,7 +9721,11 @@ wavelength, fixed local pressure, small-angle deflection along the camera ray, a
 and opaque depth. The effect samples the displaced colour inside the frame. Off-screen background
 and light paths that require large-angle or multiple refraction are outside this screen-space model. The heat-haze entry grows from 11,008 B to 13,299 B gzip for volume upload, ray integration and lifetime management.
 
-The shared sparse solver for stiff heat grids and the original kiln and turbofan scene integrations remain open.
+The shared sparse solver for stiff heat grids, temperature-dependent material properties, mushy melting, melt convection and the original kiln and turbofan scene integrations remain open.
+
+#### FIRE-06 gallium melting across a heated vertical plate
+
+The 1986 gallium test measured the front after 3, 10 and 17 min at three heights in an 88.9 mm wide cavity. Conductivity and sensible and latent heat come from separate material references. Boundary and initial temperatures come from the experiment's apparatus. The production model predicts a height-invariant 30.67 mm front after 17 min. The measured bottom, middle and top sample distances are 23.7, 59.7 and 70.3 mm. Doubling the grid in the simulation plane shifts the front by at most 0.0112 mm across all times. Varying the reported initial undercooling from 1 to 2 K gives 30.35–30.99 mm at 17 min. One of nine sparse measured samples overlaps the grid and undercooling range plus the estimated 0.7 mm plot-reading allowance. The experiment shows buoyancy-driven flow that the thermal entry does not solve. The figure allowance represents extraction precision and the source gives no instrument uncertainty for these samples. [Gau and Viskanta (1986), Fig. 2(a)](https://doi.org/10.1115/1.3246884). [Meyer (2016), Figs. 5.7–5.8](https://publikationen.bibliothek.kit.edu/1000058183/3880102). [Diagnostic](../packages/physics/scripts/fire06-gallium-measured.mjs).
 
 
 ## Collective animal motion

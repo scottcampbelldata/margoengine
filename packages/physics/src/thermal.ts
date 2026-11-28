@@ -13,3 +13,4 @@ export {
   type ThermoelasticMaterial,
   type ThermoelasticRestraint,
 } from './thermal/stress.js';
+export type { ThermalWorkCounts, ThermalWorkerWork } from './thermal/kernel.js';
