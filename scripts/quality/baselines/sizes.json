@@ -15611,6 +15611,12 @@
       "commit": "4c18e4e3ad",
       "reason": "rigging overhaul group 1: new optional entries @margoengine/rigging/anatomy (species table format, landmark fit, clinical angles, limits and their conversions) and @margoengine/rigging/anatomy/human (the 139 joint human table with a source row for every number and the CDC, ANSUR II and de Leva tables); the human table is its own entry so the core entry loads no table, and no other entry changes",
       "grew": 2
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "sea12-film",
+      "reason": "@margoengine/physics/loads 72,082 to 74,364 B gzip (both measured on this tree), ceiling 74,232 to 76,595 B: SEA-12 film direction, waveHit (NewWave and constrained NewWave crests placed at a time and place, drawn by Water), ballast (mass and centre of mass for a target draft, heel and trim) and the LoadSolver's placed impulses. Both tools work on the LoadSolver's own sea and buoyancy; a separate entry would make a directed floating scene import two entries. Core and Stage are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16505,7 +16511,7 @@
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 10482,
     "@margoengine/physics/lightning": 9072,
-    "@margoengine/physics/loads": 74232,
+    "@margoengine/physics/loads": 76595,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 9489,

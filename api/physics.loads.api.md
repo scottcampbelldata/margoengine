@@ -6,6 +6,20 @@
 import { Geometry, Mesh } from "@margoengine/core";
 import { Bed, FlowField, FlowSample, SeaSource, SeaSurface, Wind } from "@margoengine/math/fields";
 
+export interface Ballast {
+    readonly mass: number;
+    readonly centerOfMass: [number, number, number];
+    readonly stability: number;
+}
+
+export interface BallastOptions {
+    readonly draft: number;
+    readonly heel?: number;
+    readonly trim?: number;
+    readonly height?: number;
+    readonly density?: number;
+}
+
 export interface BodyLoad {
     readonly active: boolean;
     readonly submerged: number;
@@ -343,6 +357,13 @@ export interface LoadDebugOptions {
     readonly forceScale?: number;
 }
 
+export interface LoadImpulse {
+    readonly row: number;
+    readonly time: number;
+    readonly impulse: readonly [number, number, number];
+    readonly point?: readonly [number, number, number];
+}
+
 export interface LoadLines {
     vertices: Float32Array;
     colors: Float32Array;
@@ -373,6 +394,7 @@ export interface LoadParams {
     readonly cellSize?: number;
     readonly capacity?: number;
     readonly level?: RateLevel;
+    readonly impulses?: readonly LoadImpulse[];
 }
 
 export interface LoadRadiationFrequencyResponse {
@@ -731,6 +753,29 @@ export class TautMooringSolver implements Solver<TautMooringParams> {
     extraState(): readonly Region[];
 }
 
+export interface WaveHit extends LoadWater {
+    readonly cell: readonly [number, number, number];
+    pressure(x: number, y: number, z: number, t: number): number;
+    waveComponents(t: number, out: Float32Array): number;
+    readonly componentCount: number;
+}
+
+export interface WaveHitOptions {
+    readonly at: readonly [number, number];
+    readonly time: number;
+    readonly crest: number;
+    readonly period?: number;
+    readonly direction?: readonly [number, number];
+    readonly peakedness?: number;
+    readonly background?: number;
+    readonly seed?: number;
+    readonly components?: number;
+    readonly sea?: LoadWater & {
+        pressure?(x: number, y: number, z: number, t: number): number;
+    };
+    readonly density?: number;
+}
+
 export interface WoodyDebrisContact extends Omit<WoodyDebrisImpactInput, 'closingSpeed' | 'inverseEffectiveMass'> {
     readonly debrisRow: number;
     readonly supportRow: number;
@@ -755,6 +800,11 @@ export interface WoodyDebrisImpactInput {
 }
 
 export function accumulateFilteredWoodyContact(bodies: Float32Array, impulses: Float64Array, contact: WoodyDebrisContact): WoodyDebrisImpact | undefined;
+
+export function ballast(mesh: {
+    readonly vertices: ArrayLike<number>;
+    readonly indices: ArrayLike<number>;
+}, options: BallastOptions): Ballast;
 
 export function coupledRadiationProfile(mesh: HullMesh, options: LoadCoupledRadiationProfileOptions): Promise<LoadCoupledRadiationProfile & {
     readonly fit: LoadCoupledRadiationFit;
@@ -858,6 +908,8 @@ export function washOnBed(efflux: number, diameter: number, distance: number, he
 export function waterAcceleration(sea: LoadWater, flows: readonly FlowField[], x: number, y: number, z: number, t: number, sample: FlowSample, out: Vec3): Vec3;
 
 export function waterVelocity(sea: LoadWater, flows: readonly FlowField[], x: number, y: number, z: number, t: number, sample: FlowSample, out: Vec3): Vec3;
+
+export function waveHit(options: WaveHitOptions): WaveHit;
 
 export function woodyDebrisImpact(input: WoodyDebrisImpactInput): WoodyDebrisImpact | undefined;
 

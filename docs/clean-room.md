@@ -19718,3 +19718,21 @@ line; one swing vector with an ellipse per quadrant and its nearest point by bis
 twist that moves from a wrist into its forearm; the shared budget of a spine region eased across its bones; the stop of
 a motion as its largest source value rounded up to 5 degrees plus an allowance; a region's range shared among its
 levels by weight; and the roll of a straight limb read from motion as the line its hinge's swing lies along.
+
+## SEA-12 directing floating bodies (`waveHit`, `ballast`, `impulses`, 2026-11-27)
+
+Margo's own design from these public sources; no engine's or library's source was read.
+
+- P. S. Tromans, A. R. Anaturk and P. Hagemeijer, *A new model for the kinematics of large ocean waves: application as a
+  design wave*, Proc. 1st ISOPE (1991) 64-71: NewWave, the expected shape of a linear sea's crest of a given height,
+  the spectrum's autocorrelation scaled to the crest.
+- P. H. Taylor, P. Jonathan and L. A. Harland, *Time domain simulation of jack-up dynamics with the extremes of a Gaussian
+  process*, J. Vibration and Acoustics 119 (1997) 624-628: constrained NewWave, a random sea conditioned on a crest of a
+  given height and zero slope at a given time.
+- K. Hasselmann et al., *Measurements of wind-wave growth and swell decay during the Joint North Sea Wave Project
+  (JONSWAP)*, Dtsch. Hydrogr. Z. A8(12) (1973): the spectrum's shape and peak enhancement.
+- G. B. Airy, *Tides and waves*, Encyclopaedia Metropolitana (1845), as in J. N. Newman, *Marine Hydrodynamics* (MIT
+  Press, 1977), §6.1-6.3: linear deep-water orbits and dynamic pressure.
+- Static equilibrium of a floating body (weight equals displacement; centre of gravity on the vertical through the centre
+  of buoyancy) and GM from the centre of buoyancy's shift under a small heel: K. J. Rawson and E. C. Tupper, *Basic Ship
+  Theory*, 5th ed. (2001), vol. 1, ch. 4.

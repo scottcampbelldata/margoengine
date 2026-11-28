@@ -5426,6 +5426,39 @@ new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics
 console.log(loads.bodyLoad(0).wet, loads.debugRender().vertices.length > 0); physics[Symbol.dispose](); // 0.5 true
 ```
 
+#### Direct a floating scene (`waveHit`, `ballast`, `impulses`)
+
+Three tools steer floating bodies for a shot through the physics, not around it:
+
+- **`waveHit({at, time, crest, period?, direction?, peakedness?, background?, seed?, components?, sea?, density?})`**
+  places a crest `crest` m high at `at` [x, z] at `time` s: a NewWave focused group (Tromans, Anaturk and Hagemeijer 1991)
+  of a JONSWAP spectrum with peak `period` (default 8 s, `peakedness` 3.3), travelling along `direction` (default
+  [1, 0]), from 64 `components`. With `background` (a significant height, default 0) it is a random sea of that
+  spectrum, `seed` (default 1), constrained to make the same crest there and then (Taylor, Jonathan and Harland 1997).
+  It is a linear deep-water sea (Airy orbits and pressure) on top of `sea` (default still water), so it is a
+  `LoadSolver` `sea`, and `waveComponents` gives `Water` the same waves to draw (`new Water({sea: hit})`).
+- **`ballast(mesh, {draft, heel?, trim?, height?, density?})`** gives the `mass` and `centerOfMass` that float a closed
+  mesh (the body's hull in its frame) at that draft (its lowest point below the water, m), heel (about X) and trim
+  (about Z), with its centre of mass at `height` (default the centroid's), and the pose's `stability` (GM in heel, m).
+  The weight is the water displaced there and the centre of mass sits over the centre of buoyancy, so the pose is an
+  equilibrium of the same buoyancy; a pose that would capsize is a MargoError naming the fix.
+- **`impulses: [{row, time, impulse, point?}]`** in the `LoadSolver`'s params pushes a body by `impulse` N s in the step
+  that holds `time`, at `point` (default its centre of mass), held with the water it carries; placed by the tick, so a
+  replay or a restored snapshot pushes at the same step.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { ballast, floating, LoadSolver, waveHit } from '@margoengine/physics/loads';
+import { PhysicsWorld, RigidSolver } from '@margoengine/physics/world';
+await Physics.load(); const physics = new Physics(null, { fixedTimestep: 1 / 60 });
+const hull = { vertices: [-1, -0.4, -0.5, 1, -0.4, -0.5, 1, 0.4, -0.5, -1, 0.4, -0.5, -1, -0.4, 0.5, 1, -0.4, 0.5, 1, 0.4, 0.5, -1, 0.4, 0.5], indices: [0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6, 5, 0, 1, 5, 0, 5, 4, 3, 7, 6, 3, 6, 2] };
+const boat = physics.addBody(null, { position: [0, 0.1, 0], colliders: { shape: 'box', halfExtents: [1, 0.4, 0.5] } });
+boat.setMassProperties(ballast(hull, { draft: 0.3, height: -0.2 }));
+const sea = waveHit({ at: [0, 0], time: 5, crest: 0.8, period: 6 });
+new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics }).add(new LoadSolver(), { sea, bodies: await floating(physics, boat, { sea, radiation: 'none' }), impulses: [{ row: boat.row, time: 2, impulse: [400, 0, 0] }] }).advance(300);
+console.log(boat.position[0] > 0, Math.abs(sea.elevation(0, 0, 5) - 0.8) < 1e-9); physics[Symbol.dispose](); // true true
+```
+
 A live page floats boxes, a capsule, a hull and a glTF model on the ocean and in pointer ripples, with this debug view:
 [examples/floating.html](../../examples/floating.html).
 

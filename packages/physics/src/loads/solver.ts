@@ -158,6 +158,21 @@ export interface LoadMember {
   readonly vortexCoupling?: 'body-acceleration';
 }
 
+/**
+ * A push placed at a time (film direction): `impulse` N s on the body of `row` in the step whose interval holds `time`,
+ * at `point` (world metres from the solver's cell, default the centre of mass), held with the water the body carries
+ * like its other loads, so a floating body takes it with its added mass. Placed by the tick, so a replay or a restored
+ * snapshot pushes at the same step.
+ */
+export interface LoadImpulse {
+  readonly row: number;
+  /** Seconds on the world clock. */
+  readonly time: number;
+  /** N s, world axes. */
+  readonly impulse: readonly [number, number, number];
+  readonly point?: readonly [number, number, number];
+}
+
 /** What a {@link LoadSolver} is made from. */
 export interface LoadParams {
   /**
@@ -178,6 +193,8 @@ export interface LoadParams {
   /** Body rows its `bodyForces` port covers. Omit to use the world's rigid body capacity. */
   readonly capacity?: number;
   readonly level?: RateLevel;
+  /** Pushes placed at times (default none). */
+  readonly impulses?: readonly LoadImpulse[];
 }
 
 interface BodyRuntime {
@@ -307,6 +324,7 @@ export class LoadSolver implements Solver<LoadParams> {
   private flows: readonly FlowField[] = [];
   private wind: Wind | undefined;
   private bodies: BodyRuntime[] = [];
+  private impulses: readonly LoadImpulse[] = [];
   private members: readonly LoadMember[] = [];
   private memberLoads: MemberLoad[] = [];
   private forces!: Region;
@@ -384,6 +402,30 @@ export class LoadSolver implements Solver<LoadParams> {
     this.wind = wind && localFlow(wind, offsetOf);
     this.nu = viscosity;
     this.level = level as RateLevel;
+    const impulses = params.impulses ?? [];
+    if (
+      !Array.isArray(impulses) ||
+      !impulses.every(
+        (p) =>
+          Number.isInteger(p?.row) &&
+          p.row >= 0 &&
+          Number.isFinite(p.time) &&
+          p.time >= 0 &&
+          Array.isArray(p.impulse) &&
+          p.impulse.length === 3 &&
+          p.impulse.every(Number.isFinite) &&
+          (p.point === undefined || (Array.isArray(p.point) && p.point.length === 3 && p.point.every(Number.isFinite))),
+      )
+    )
+      throw invalidLoad(
+        'Invalid placed impulse; give {row, time, impulse: [x, y, z], point?} with a body row, seconds from 0 and N s.',
+      );
+    this.impulses = impulses.map((p) => ({
+      row: p.row,
+      time: p.time,
+      impulse: [p.impulse[0], p.impulse[1], p.impulse[2]] as const,
+      ...(p.point && { point: [p.point[0], p.point[1], p.point[2]] as const }),
+    }));
     const rows: number[] = [];
     let radiationWords = 1;
     const dt = 1 / rateOf(this.level);
@@ -708,12 +750,52 @@ export class LoadSolver implements Solver<LoadParams> {
       this.loadBody(b, bodies, at, t, dt, rho, history);
     }
     this.members.forEach((m, index) => this.loadMember(m, index, bodies, t, dt, rho, wakes, wakeMotion));
+    const late: LoadImpulse[] = [];
+    if (bodies && this.impulses.length) this.push(context.tick * dt, dt, bodies, late);
     this.heldBodies = this.rows.size;
     this.batchCalls = 0;
     if (this.native && bodies && this.heldBodies > 0 && (!mobility || mobility.buffer === this.host.memory.buffer))
       this.holdNative(bodies, this.native, mobility);
     else this.hold(out, bodies, mobility);
+    // A push on a body out of the water (no loads to hold it with) goes straight on its dry mass.
+    for (const p of late) {
+      const at = p.row * FORCE_WORDS,
+        base = p.row * BODY_WORDS,
+        force = p.impulse.map((j) => j / dt) as Vec3,
+        arm: Vec3 = p.point
+          ? sub([...p.point] as Vec3, [bodies![base + 7]!, bodies![base + 8]!, bodies![base + 9]!])
+          : [0, 0, 0],
+        torque = cross(arm, force);
+      for (let k = 0; k < 3; k++) {
+        out[at + k]! += force[k]!;
+        out[at + 3 + k]! += torque[k]!;
+      }
+    }
     if (history) history[0] = 1;
+  }
+
+  /** Adds the pushes placed in [start, start + dt) to their rows' loads, or to `late` for a body with none. */
+  private push(start: number, dt: number, bodies: Float32Array, late: LoadImpulse[]): void {
+    for (const p of this.impulses) {
+      if (!(p.time >= start && p.time < start + dt)) continue;
+      const base = p.row * BODY_WORDS;
+      if (base + BODY_WORDS > bodies.length || bodies[base + 23] !== 1)
+        throw invalidLoad(`A placed impulse names row ${p.row}, which is not a live rigid body; push a body's row.`);
+      const r = this.rows.get(p.row);
+      if (!r) {
+        late.push(p);
+        continue;
+      }
+      const force = p.impulse.map((j) => j / dt) as Vec3,
+        arm: Vec3 = p.point
+          ? sub([...p.point] as Vec3, [bodies[base + 7]!, bodies[base + 8]!, bodies[base + 9]!])
+          : [0, 0, 0],
+        torque = cross(arm, force);
+      for (let k = 0; k < 3; k++) {
+        r.force[k]! += force[k]!;
+        r.torque[k]! += torque[k]!;
+      }
+    }
   }
 
   /** A compact body's load, held with its added mass. */
