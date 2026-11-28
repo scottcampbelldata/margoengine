@@ -3194,3 +3194,14 @@ The planar snake still needs independent speed accuracy, contact-load redistribu
 - Point 8 (c33e207d1b). `packages/physics/scripts/aero05-samara-measured.mjs` retains published morphology and existing polar parameters for two independent natural maple still-air cohorts. The two predicted descent speeds, 0.776 and 0.723 m/s, lie below observed 1.00 ± 0.10 and 1.10 ± 0.24 m/s. Blade and time refinement change the results negligibly. One observed 12 ± 5° cone exceeds the fixed-axis model. [Comparisons and limits](limits.md#falling-plates-winged-seeds-and-hail-aero-05)
 
 Free-axis coning, full 3D plate tumble, natural shape presets, extended Reynolds drag and multi-regime validation remain open. The row stays REOPENED at four points.
+
+### HYDRO-06 Groundwater and springs
+
+#### HYDRO-06 four-point pass
+
+- Point 5 (507df10bf7). `packages/physics/tests/coupling/groundwater.test.js` rejects a late unrepresentable world-second seepage rate and misaligned recharge while keeping all accepted bytes and work. It reads an f64 recharge bank and f32 terrain bank in separate memories, refuses a late invalid terrain vertex and replays all four signed publications through an origin shift and restore.
+- Point 6 (507df10bf7). `packages/physics/tests/coupling/groundwater-workers.test.js` compares 221 and 391 signed anisotropic cells with 1, 2 and 4 native participants. A separate raw Wasm comparison matches the previous public physical bank. `packages/physics/tests/groundwater-workers.browser.mjs` starts three actual Chromium helpers and records 412 conductances, 384 paired SIMD lanes and 97 initial active springs. Ordered pressure iteration and volume closure are retained.
+- Point 7 (507df10bf7). `packages/water/test/spring-film.browser.mjs` draws the native groundwater table and real shallow-water basin. The open spring releases 0.308065 m³, equal to accepted pond volume, and draws the front head down 0.4517 m relative to a sealed dry control. Both renderers independently reproduce complete accepted state and full RGBA.
+- Point 8 (507df10bf7). `packages/physics/scripts/hydro06-glass-beads-measured.mjs` scores independent reported discharge with measured tank geometry, conductivity and metered rainfall. At 195 s the solver gives 4.69 mL/s, against 7.50 mL/s observed, and its 0.5 mL/s crossing is about 15 s early. The separate outlet-aligned 4 mm measurements also exceed the modeled rise under input and grid sensitivity. [Measured limits](limits.md#groundwater-and-springs-hydro-06)
+
+Unsaturated recharge transit, multilayer and confined transient response, wells and reciprocal spring exchange remain open for the unconfined world solver. The row stays REOPENED at four points.

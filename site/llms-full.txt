@@ -17500,6 +17500,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   photographed open-grown oaks (0.10 to 0.19, inner up to 0.09; bars 0.10 to 0.20 and 0.10): seeds 1 to 3 pass, and of
   seeds 1 to 10, 7 pass; seeds 5, 6 and 9 read 0.206 to 0.217 (holes inside the crown). (2) to (4) and step C open.
 
+### Fixed 2026-11-28: biome oaks grew to 45 m and their crowns ran together (KB-BIOMES-BROADLEAFSIZE1, procedural, biomes)
+
+- **Repro (before):** `node packages/biomes/tests/objects-check.mjs` (real GPU): `objects-look.html` (temperate oak, 80
+  a hectare, sizes up to 1.6) measured 7 green trees on main (3 after the open-grown oak form) where it needs 40.
+- **Cause:** scatter scales a species mesh by its plant's reverse-J size (about a third to `size.max` times), so the
+  mesh is the reference size. Since 57eddd5407 `procedural:broadleaf` drew the grown oak at its mature age (18.8 m
+  tall, 19.8 m across), where the old generic mesh was 7.5 m by 7 m: a forest preset's largest oaks reached 45 m and
+  the crowns merged into a few regions. The rockies conifers already name `/pole` for this reason.
+- **Fix:** `parseBroadleafKey('procedural:broadleaf')` is the pole oak (40 years, 9.9 m by 9.0 m). objects-check now
+  measures 90 green trees, luma texture 0.0751, hue spread 0.0382 (WebGPU, this workstation).
+- **Regression:** `packages/biomes/tests/tree-reference-size.test.js` (every preset that scales a species mesh names
+  it at pole age or younger; fails with the mature generic key), `packages/biomes/tests/objects-check.mjs`.
+
 ### Fixed 2026-11-28: a meadow seen from a few metres up showed the edge of the dense near grass as a band (KB-BIOMES-GRASSRING1, biomes, scatter)
 
 - **Repro (before):** the FG-16 wide shot (camera 6 m up): the ground within 20 m was a dense sward and beyond it the
