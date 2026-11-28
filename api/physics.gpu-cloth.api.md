@@ -338,8 +338,14 @@ interface Fabric {
     readonly name: string;
     readonly shear: FabricShear;
     readonly tensile: FabricTensile;
+    readonly bending: FabricBending;
     readonly arealDensity: number;
     readonly source: string;
+}
+
+interface FabricBending {
+    readonly warp: number;
+    readonly weft: number;
 }
 
 interface FabricShear {
@@ -1479,6 +1485,7 @@ class SoftBodyMaterial {
     tensile: FabricTensile | null;
     arealDensity: number | null;
     bendSoftness: SoftSoftness;
+    bending: FabricBending | null;
     tearStrain: number;
     adaptiveTearing: boolean;
     shapeMatchingSoftness: SoftSoftness;

@@ -541,8 +541,14 @@ interface Fabric {
     readonly name: string;
     readonly shear: FabricShear;
     readonly tensile: FabricTensile;
+    readonly bending: FabricBending;
     readonly arealDensity: number;
     readonly source: string;
+}
+
+interface FabricBending {
+    readonly warp: number;
+    readonly weft: number;
 }
 
 interface FabricShear {
@@ -1983,6 +1989,7 @@ interface SoftAerodynamics {
 }
 
 class SoftBodies implements PhysicsAttachment {
+    bendsDirty: boolean;
     tethersDirty: boolean;
     steps: number;
     cellTornByHand: boolean;
@@ -2065,6 +2072,7 @@ class SoftBodies implements PhysicsAttachment {
         readonly impulses: Float64Array;
         readonly forces: Float64Array;
     }): void;
+    bendingEnergy(): number;
     createSurfaceCollider(body: SoftBody, settings?: Omit<ColliderSettings, 'offset' | 'rotation'>): PhysicsCollider;
     createDeformableCollider(soft: SoftBody, mesh: {
         vertices: ArrayLike<number>;
@@ -2400,6 +2408,7 @@ class SoftBodyMaterial {
     tensile: FabricTensile | null;
     arealDensity: number | null;
     bendSoftness: SoftSoftness;
+    bending: FabricBending | null;
     tearStrain: number;
     adaptiveTearing: boolean;
     shapeMatchingSoftness: SoftSoftness;

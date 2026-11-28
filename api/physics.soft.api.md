@@ -60,6 +60,10 @@ export const FABRICS: Readonly<{
                 resilience: 48.48;
             }>;
         }>;
+        bending: Readonly<{
+            warp: 0.057;
+            weft: 0.033;
+        }>;
         arealDensity: 0.12;
         source: "Luible, \"Study of mechanical properties in the simulation of 3D garments\", doctoral thesis, Universite de Geneve, 2008 (doi:10.13097/archive-ouverte/unige:688), Annex B and Annex C, sample 2";
     }>;
@@ -80,6 +84,10 @@ export const FABRICS: Readonly<{
                 energy: 10.43;
                 resilience: 67.16;
             }>;
+        }>;
+        bending: Readonly<{
+            warp: 0.073;
+            weft: 0.063;
         }>;
         arealDensity: 0.175;
         source: "Luible, \"Study of mechanical properties in the simulation of 3D garments\", doctoral thesis, Universite de Geneve, 2008 (doi:10.13097/archive-ouverte/unige:688), Annex B and Annex C, sample 5";
@@ -102,6 +110,10 @@ export const FABRICS: Readonly<{
                 resilience: 48.67;
             }>;
         }>;
+        bending: Readonly<{
+            warp: 0.04;
+            weft: 0.04;
+        }>;
         arealDensity: 0.15;
         source: "Luible, \"Study of mechanical properties in the simulation of 3D garments\", doctoral thesis, Universite de Geneve, 2008 (doi:10.13097/archive-ouverte/unige:688), Annex B and Annex C, sample 8";
     }>;
@@ -122,6 +134,10 @@ export const FABRICS: Readonly<{
                 energy: 2.88;
                 resilience: 60.3;
             }>;
+        }>;
+        bending: Readonly<{
+            warp: 2.725;
+            weft: 6.479;
         }>;
         arealDensity: 0.3;
         source: "Luible, \"Study of mechanical properties in the simulation of 3D garments\", doctoral thesis, Universite de Geneve, 2008 (doi:10.13097/archive-ouverte/unige:688), Annex B and Annex C, sample 10 (jute plain weave; no canvas measurement was found)";
@@ -144,6 +160,10 @@ export const FABRICS: Readonly<{
                 resilience: 63.83;
             }>;
         }>;
+        bending: Readonly<{
+            warp: 0.027;
+            weft: 0.046;
+        }>;
         arealDensity: 0.09;
         source: "Luible, \"Study of mechanical properties in the simulation of 3D garments\", doctoral thesis, Universite de Geneve, 2008 (doi:10.13097/archive-ouverte/unige:688), Annex B and Annex C, sample 29 (woven polyester outdoor fabric; no sailcloth measurement was found)";
     }>;
@@ -153,8 +173,14 @@ export interface Fabric {
     readonly name: string;
     readonly shear: FabricShear;
     readonly tensile: FabricTensile;
+    readonly bending: FabricBending;
     readonly arealDensity: number;
     readonly source: string;
+}
+
+export interface FabricBending {
+    readonly warp: number;
+    readonly weft: number;
 }
 
 export interface FabricShear {
@@ -211,6 +237,7 @@ export interface SoftAerodynamics {
 }
 
 export class SoftBodies implements PhysicsAttachment {
+    bendsDirty: boolean;
     tethersDirty: boolean;
     steps: number;
     cellTornByHand: boolean;
@@ -293,6 +320,7 @@ export class SoftBodies implements PhysicsAttachment {
         readonly impulses: Float64Array;
         readonly forces: Float64Array;
     }): void;
+    bendingEnergy(): number;
     createSurfaceCollider(body: SoftBody, settings?: Omit<ColliderSettings, 'offset' | 'rotation'>): PhysicsCollider;
     createDeformableCollider(soft: SoftBody, mesh: {
         vertices: ArrayLike<number>;
@@ -628,6 +656,7 @@ export class SoftBodyMaterial {
     tensile: FabricTensile | null;
     arealDensity: number | null;
     bendSoftness: SoftSoftness;
+    bending: FabricBending | null;
     tearStrain: number;
     adaptiveTearing: boolean;
     shapeMatchingSoftness: SoftSoftness;
@@ -790,6 +819,8 @@ export interface SoftVolumeOptions {
     readonly cellSize?: number;
     readonly material?: CellMaterial;
 }
+
+export function fabricBendingRigidity(b: number): number;
 
 export function fabricShearDamping(shear: FabricShear): number;
 
