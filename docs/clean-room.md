@@ -20039,3 +20039,26 @@ with the limb's line; the rule that a bent pose keeps its side and a straight on
 swivel search outward in 5 degree steps with a bisection back to the edge of the range; hinges stopped at straight
 inside a solve while a played pose keeps the structural allowance past it; the gate of a twist read after the swing
 is settled; and a shared region eased across only the bones a solver owns.
+
+## Grass leaf colour, clumps and clearings: scatter/grass, scatter (2026-11-28)
+
+Written from the papers' descriptions and measured data only; no other engine's or tool's code was read. Sources: S.
+Jacquemoud and F. Baret, "PROSPECT: A model of leaf optical properties spectra", Remote Sensing of Environment 34,
+75-91, 1990, https://doi.org/10.1016/0034-4257(90)90100-Z, and J.-B. Feret, C. Francois, G. P. Asner et al.,
+"PROSPECT-4 and 5: Advances in the leaf optical properties model separating photosynthetic pigments", Remote Sensing of
+Environment 112, 3030-3043, 2008, https://doi.org/10.1016/j.rse.2008.02.012 (leaf reflectance and transmittance are
+of one size in the visible and both fall to almost nothing in the blue as chlorophyll rises; chlorophyll loss lifts
+red and green: the ANGERS 2003 measurements that paper describes are the data used here); L. Wang, W. Wang, J. Dorsey,
+X. Yang, B. Guo and H.-Y. Shum, "Real-time rendering of plant leaves", SIGGRAPH 2005,
+https://doi.org/10.1145/1073204.1073251 (leaves as a glossy reflective surface plus a transmitted term of their own
+colour); G. V. G. Baranoski and J. G. Rokne, "Light Interaction with Plants: A Computer Graphics Perspective",
+Horwood, 2004 (senescence and dieback from the tip); C. Barre-Brisebois and M. Bouchard, "Approximating Translucency
+for a Fast, Cheap and Convincing Subsurface Scattering Look", GDC 2011 (the translucency term the ratio tints); B. Lane
+and P. Prusinkiewicz, "Generating Spatial Distributions for Multilevel Models of Plant Communities", Graphics
+Interface 2002, https://doi.org/10.20380/GI2002.08, and O. Deussen, P. Hanrahan, B. Lintermann, R. Mech, M. Pharr and
+P. Prusinkiewicz, "Realistic Modeling and Rendering of Plant Ecosystems", SIGGRAPH 1998,
+https://doi.org/10.1145/280814.280898 (plants of one species aggregate in patches, and plants thin where a dominant
+object competes for ground: density as a field, thinned by a probability). Derived here: the hue turn, yellowing share
+and tip dieback per blade by hashes of the blade, the transmittance over reflectance ratio as a per channel tint,
+the two-octave value-noise patch mask with a soft rim against a per instance hash, and the smoothstep clearing
+product.

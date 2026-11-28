@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21973381,
+  "total": 21974848,
   "history": [
     {
       "date": "2026-10-24",
@@ -15743,6 +15743,12 @@
       "commit": "60aa71eafd",
       "reason": "rigging group 2: new optional entry @margoengine/rigging/validate (the pose checker: ranges, hinges, bone stretch, ground, body volumes, foot slide, pops, proportions); @margoengine/rigging/anatomy/human gains its proportion measures, body volumes and ANSUR II girths",
       "grew": 3
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "39b027001b",
+      "reason": "scatter 29,682 to 30,432 B gzip (ceiling 30,263 to 31,345) and scatter/grass 3,047 to 3,432 B (ceiling 3,303 to 3,688), measured at 39b027001b and with the change: Scatter clumps (patches of one kind of plant), clearings (grass thinning around a boulder) and reach (the parts of one plant keeping the same instances), and grass blades turning in hue, yellowing, dying back from the tip and tinting the light through them by measured leaf transmittance (plants round 1, Above the Treeline). The options compile into the distribute and vertex shaders only when set; a separate entry would copy the distribute shader builder and the blade generator to save under 800 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -16904,10 +16910,10 @@
     "@margoengine/save/scene-state": 1267,
     "@margoengine/save/signed": 2837,
     "@margoengine/save/slots": 6151,
-    "@margoengine/scatter": 30263,
+    "@margoengine/scatter": 31345,
     "@margoengine/scatter/attributes": 2319,
     "@margoengine/scatter/foliage": 3502,
-    "@margoengine/scatter/grass": 3303,
+    "@margoengine/scatter/grass": 3688,
     "@margoengine/scatter/imposter": 2968,
     "@margoengine/scatter/interact": 3574,
     "@margoengine/scatter/occlusion": 1433,

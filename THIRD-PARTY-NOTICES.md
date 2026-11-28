@@ -366,6 +366,24 @@ the height from R. Larham, "Validation of a Model of the Domino Effect?", arXiv:
 https://arxiv.org/abs/0803.2898 (arXiv's non-exclusive distribution licence). Measured physical data, used with
 attribution; the paper's text is not copied. Never shipped (test data). No program code is included.
 
+## Measured leaf and flower spectra (scatter grass and procedural forbs, 2026-11-28)
+
+Measured data copied with credit (Scott, 2026-11-28). No program code is included; only values derived from these files
+ship (the default colours of `@margoengine/scatter/grass` and `@margoengine/procedural/forbs`), and the tests integrate
+the files again.
+
+- `packages/scatter/test/fixtures/leaf-spectra.json`: leaf reflectance and transmittance, 380 to 780 nm every 10 nm,
+  means of sycamore maple leaves grouped by chlorophyll, from the ANGERS Leaf Optical Properties Database (2003), S.
+  Jacquemoud, L. Bidel, C. Francois and G. Pavan, INRA Angers, distributed by EcoSIS (https://ecosis.org, package
+  2231d4f6-981e-4408-bf23-1b2b303f475e) under its "Other (Open)" licence with this citation; described in Feret et
+  al., Remote Sensing of Environment 112, 3030 (2008). Retrieved 2026-11-28.
+- `packages/procedural/test/fixtures/forb-spectra.json`: petal and leaf reflectance of alpine forbs (Arnica montana,
+  Gentiana acaulis and grandiflora, Aster alpinus, Bistorta vivipara, Silene acaulis and the leaves of eight alpine
+  species), from FReD, the Floral Reflectance Database (S. E. J. Arnold, S. Faruq, V. Savolainen, P. W. McOwan and L.
+  Chittka, PLoS ONE 5(12), e14287, 2010, http://www.reflectance.co.uk), open access with this citation; the records
+  are from Chittka et al., Vision Research 34, 1489 (1994) and Chittka, J. Theor. Biol. 181, 179 (1996). Retrieved
+  2026-11-28.
+
 ## Measured material data sets (materials library, 2026-11-28)
 
 Scott, 2026-11-28: measured data sets may be copied with credit, each in its own data file under its own licence. The

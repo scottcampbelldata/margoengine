@@ -144,6 +144,18 @@ export interface ScatterCapture {
     begin(): GPURenderPassEncoder;
 }
 
+export interface ScatterClearing {
+    readonly center: readonly [x: number, z: number];
+    readonly radius: number;
+    readonly falloff?: number;
+}
+
+export interface ScatterClumps {
+    readonly size: number;
+    readonly cover: number;
+    readonly edge?: number;
+}
+
 export type ScatterImage = {
     readonly width: number;
     readonly height: number;
@@ -202,6 +214,9 @@ export interface ScatterOptions {
     material?: PbrMaterial;
     textures?: ScatterTextures;
     exclusions?: readonly GroundBounds[];
+    clearings?: readonly ScatterClearing[];
+    clumps?: ScatterClumps;
+    reach?: number;
     paths?: readonly GroundPath[];
     heightmap?: () => GPUTexture | undefined;
     wind?: ScatterWind;

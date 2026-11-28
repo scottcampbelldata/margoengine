@@ -136,6 +136,32 @@ export interface ScatterVariation {
   value?: number;
 }
 /** GPU scatter rules, fixed at construction (out of range throws RangeError). Distances are world units. */
+/**
+ * Patches of instances (`ScatterOptions.clumps`): plants of one kind grow in drifts, not evenly. A smoothed value noise
+ * of the world position (two octaves) is cut at `cover`, and each instance is kept with the chance its place is inside
+ * a patch, over a soft rim `edge` wide, so patches have ragged edges and thin out instead of stopping at a line.
+ */
+export interface ScatterClumps {
+  /** Patch size in world units: the wavelength of the noise, above 0. */
+  readonly size: number;
+  /** Threshold of the patch noise, 0 to 1: 0 keeps nothing and 1 everything; 0.5 covers about half the ground. */
+  readonly cover: number;
+  /** Width of the soft rim in noise units, 0.001 to 1 (default 0.2). */
+  readonly edge?: number;
+}
+/**
+ * Ground around a placed object where instances thin out (`ScatterOptions.clearings`): none root within `radius` of
+ * `center`, and over the next `falloff` the chance of keeping one rises smoothly to 1. Grass thins around a boulder this
+ * way, where the stone sheds water past its base and shades it.
+ */
+export interface ScatterClearing {
+  /** World XZ centre. */
+  readonly center: readonly [x: number, z: number];
+  /** Bare radius, 0 or more. */
+  readonly radius: number;
+  /** Width of the thinning ring past `radius`, 0 or more (default 0: a hard edge). */
+  readonly falloff?: number;
+}
 export interface ScatterOptions {
   /** Candidate instances on a stratified grid, an integer 1-1,000,000 (GPU memory: three buffers of this many). Default 10,000. */
   count?: number;
@@ -176,6 +202,22 @@ export interface ScatterOptions {
   textures?: ScatterTextures;
   /** World XZ rectangles `[minX, minZ, maxX, maxZ]` kept free of instances (up to 1,000,000). */
   exclusions?: readonly GroundBounds[];
+  /**
+   * Circles around placed objects (boulders, trunks, posts) where instances thin out to none (see
+   * {@link ScatterClearing}); up to 100,000. Fixed for the scatter's life. Default none.
+   */
+  clearings?: readonly ScatterClearing[];
+  /**
+   * Gathers the instances into patches with soft, ragged edges (see {@link ScatterClumps}). Fixed for the scatter's
+   * life; the patches follow `seed`, so scatters that share a seed share their patches. Default none: even cover.
+   */
+  clumps?: ScatterClumps;
+  /**
+   * The least reach of an instance from its root per unit scale, in mesh units, for culling and exclusions (default 0:
+   * the meshes' own bounds). Scatters that draw the parts of one plant with one seed (leaves, stem, flowers) take the
+   * same reach (and the same `sway.height`) so the same instances survive and bend alike in each.
+   */
+  reach?: number;
   /**
    * Ground paths kept free of instances (a road, track or river bed): each instance's footprint stays more than
    * `width / 2` from the path's centreline. `roadPath` from `@margoengine/road` gives a road's. Up to 1,000,000
@@ -483,8 +525,74 @@ function validateWorld(o: ScatterOptions): void {
  * text, byte for byte; each option rewrites only its own part.
  */
 export function scatterCullShader(o: ScatterOptions): string {
-  const code = optionShader(o);
-  return o.paths?.length ? code.replace(PLANES, PATHS + PLANES) : code;
+  const code = optionShader(o),
+    extra = (o.paths?.length ? PATHS : '') + clearingCode(o) + clumpCode(o);
+  return extra ? code.replace(PLANES, extra + PLANES) : code;
+}
+
+const wgslNumber = (v: number) => (Number.isInteger(v) ? `${v}.0` : `${v}`);
+/**
+ * Clearings (plants round 1): one vec4 each (centre x and z, radius, falloff) after the exclusions and the path segments
+ * in the exclusions buffer. The chance of keeping an instance is the product of each clearing's smoothstep of the root's
+ * distance past the radius over the falloff, compared with a hash of its own.
+ */
+function clearingCode(o: ScatterOptions): string {
+  const n = o.clearings?.length ?? 0;
+  if (!n) return '';
+  const start = (o.exclusions?.length ?? 0) + 2 * pathSegments(o.paths ?? []).length,
+    key = o.follow ? 'key' : 'i';
+  return ` var clear=1.0;for(var j=0u;j<${n}u;j++){let c=exclusions[${start}u+j];let r=distance(p.xz,c.xy);let e=clamp((r-c.z)/max(c.w,1e-6),0.0,1.0);clear*=select(e*e*(3.0-2.0*e),0.0,r<=c.z);}
+ if(hash((${key}*7u+6u)^0x2d1b6d2bu)>=clear){return;}
+`;
+}
+/**
+ * Clumps: two octaves of smoothed value noise of the world position (corners hashed with the scatter's seed), cut at
+ * the cover with a soft rim, against a hash of the instance's own (see {@link ScatterClumps}).
+ */
+function clumpCode(o: ScatterOptions): string {
+  const c = o.clumps;
+  if (!c) return '';
+  const key = o.follow ? 'key' : 'i';
+  return ` var clump=0.0;for(var octave=0u;octave<2u;octave++){
+  let second=octave==1u;let q=p.xz/${wgslNumber(c.size)}*select(1.0,2.17,second)+select(vec2f(0.0),vec2f(19.3,7.1),second);
+  let cell=vec2i(floor(q));let f=q-floor(q);let u=f*f*(3.0-2.0*f);let x0=bitcast<u32>(cell.x)*0x8da6b343u;let x1=bitcast<u32>(cell.x+1)*0x8da6b343u;
+  let y0=bitcast<u32>(cell.y)*0xd8163841u;let y1=bitcast<u32>(cell.y+1)*0xd8163841u;
+  clump+=select(0.65,0.35,second)*mix(mix(hash(x0^y0),hash(x1^y0),u.x),mix(hash(x0^y1),hash(x1^y1),u.x),u.y);
+ }
+ if(hash((${key}*7u+6u)^0x5f356495u)>=clamp((${wgslNumber(c.cover)}-clump)/${wgslNumber(c.edge ?? 0.2)}+0.5,0.0,1.0)){return;}
+`;
+}
+/** Checks `clumps` and `clearings`; returns the clearings as vec4 rows (centre x and z, radius, falloff). */
+function clearingRows(o: ScatterOptions): number[][] {
+  const c = o.clumps;
+  if (
+    c !== undefined &&
+    (typeof c !== 'object' ||
+      c === null ||
+      !(Number.isFinite(c.size) && c.size > 0 && c.size <= 1e5) ||
+      !(Number.isFinite(c.cover) && c.cover >= 0 && c.cover <= 1) ||
+      !(c.edge === undefined || (Number.isFinite(c.edge) && c.edge >= 0.001 && c.edge <= 1)))
+  )
+    throw new RangeError(
+      'Scatter clumps need size above 0 up to 100000, cover 0-1 and edge 0.001-1, such as { size: 6, cover: 0.4 }',
+    );
+  const clearings = o.clearings ?? [];
+  if (!Array.isArray(clearings) || clearings.length > 100000)
+    throw new RangeError('Scatter clearings must be an array of at most 100000 { center: [x, z], radius, falloff }');
+  return clearings.map((c: ScatterClearing) => {
+    const falloff = c?.falloff ?? 0;
+    if (
+      !Array.isArray(c?.center) ||
+      c.center.length !== 2 ||
+      !c.center.every((v) => Number.isFinite(Math.fround(v))) ||
+      !(Number.isFinite(c.radius) && c.radius >= 0) ||
+      !(Number.isFinite(falloff) && falloff >= 0)
+    )
+      throw new RangeError(
+        'Scatter clearings need { center: [x, z], radius, falloff } with a finite radius and falloff of 0 or more',
+      );
+    return [c.center[0], c.center[1], c.radius, falloff];
+  });
 }
 
 // Ground paths (GAP-FILM-LOOK): segments (a, b) and their half width follow the rectangles in the exclusions buffer,
@@ -760,6 +868,8 @@ export class Scatter implements EnginePlugin {
       sink > 100000
     )
       throw new RangeError('Scatter alignToGround must be 0-1 and sink a distance from 0 to 100000');
+    if (options.reach !== undefined && !(Number.isFinite(options.reach) && options.reach >= 0 && options.reach <= 1e5))
+      throw new RangeError('Scatter reach must be a distance from 0 to 100000 in mesh units');
     if (!Number.isFinite(edgeShrink) || edgeShrink < 0 || edgeShrink > 100000)
       throw new RangeError('Scatter edgeShrink must be a distance from 0 to 100000');
     if (!Number.isFinite(inner) || inner < 0 || inner >= lod[2] || !Number.isFinite(innerFade) || innerFade < 0)
@@ -774,7 +884,12 @@ export class Scatter implements EnginePlugin {
     const exclusions = options.exclusions ?? [],
       segments = pathSegments(options.paths ?? []);
     validateExclusions(exclusions);
-    this.exclusionValues = new Float32Array(Math.max(1, exclusions.length + 2 * segments.length) * 4);
+    const clearings = clearingRows(options);
+    this.exclusionValues = new Float32Array(
+      Math.max(1, exclusions.length + 2 * segments.length + clearings.length) * 4,
+    );
+    for (let i = 0; i < clearings.length; i++)
+      this.exclusionValues.set(clearings[i], (exclusions.length + 2 * segments.length + i) * 4);
     for (let i = 0; i < exclusions.length; i++) this.exclusionValues.set(exclusions[i], i * 4);
     for (let i = 0; i < segments.length; i++) {
       const at = (exclusions.length + 2 * i) * 4;
@@ -798,7 +913,10 @@ export class Scatter implements EnginePlugin {
         center[1],
         0,
         ...lod,
-        Math.max(...this.geometries.map((g) => g.bounds[3] + Math.hypot(g.bounds[0], g.bounds[1], g.bounds[2]))),
+        Math.max(
+          options.reach ?? 0,
+          ...this.geometries.map((g) => g.bounds[3] + Math.hypot(g.bounds[0], g.bounds[1], g.bounds[2])),
+        ),
       ],
       20,
     );

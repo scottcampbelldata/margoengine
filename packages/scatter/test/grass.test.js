@@ -60,6 +60,11 @@ test('grassShape: defaults and refusals that say how to fix it', () => {
     dry: 0.2,
     dryColor: [0.3476, 0.2394, 0.0983],
     tone: 0.25,
+    hue: 0.02,
+    yellow: 0.15,
+    yellowColor: [0.1432, 0.1794, 0.0382],
+    tipBrown: 0.25,
+    transmittance: [1.0909, 1.1726, 0],
   });
   for (const bad of [
     { height: 0 },
@@ -307,18 +312,67 @@ test('grassPoseCode: cured blades take the dry colour at their own brightness, a
   const code = grassPoseCode(litStage, { dry: 0.3, tone: 0.4, dryColor: [0.5, 0.25, 0.125] });
   assert.match(
     code,
-    /grassTone=vec2f\(1\.0\+\(grassHash\(seed\^0x5bd1e995u\)\*2\.0-1\.0\)\*0\.4,select\(0\.0,1\.0,grassHash\(seed\^0x27d4eb2fu\)<0\.3\)\);/,
+    /grassTone=vec4f\(1\.0\+\(grassHash\(seed\^0x5bd1e995u\)\*2\.0-1\.0\)\*0\.4,select\(0\.0,1\.0,grassHash\(seed\^0x27d4eb2fu\)<0\.3\),/,
   );
   assert.match(code, /pose\.shade\*=grassTone\.x;return pose;/);
   // The lit stage mixes toward the dry colour, scaled by the drawn colour's luminance over the material's.
   assert.match(
     code,
-    /o\.color=material\[0\]\.rgb\*pose\.shade;o\.color=mix\(o\.color,vec3f\(0\.5,0\.25,0\.125\)\*\(dot\(o\.color,vec3f\(0\.2126,0\.7152,0\.0722\)\)\/max\(dot\(material\[0\]\.rgb,/,
+    /o\.color=material\[0\]\.rgb\*pose\.shade;\{let lum=dot\(o\.color,vec3f\(0\.2126,0\.7152,0\.0722\)\)\/max\(dot\(material\[0\]\.rgb,/,
   );
-  assert.match(code, /,grassTone\.y\);return o;/);
+  assert.match(code, /o\.color=mix\(o\.color,vec3f\(0\.5,0\.25,0\.125\)\*lum,max\(grassTone\.y,grassTip\)\);\}return o;/);
   // A stage with no colour (shadow, depth) is left as it was apart from the pose.
   const depth = grassPoseCode(litStage.replace(/var o:Output;.*return o;/, ''));
   assert.doesNotMatch(depth, /grassTone\.y/);
+});
+
+// Plants round 1 (2026-11-28): blades read flat and cartoon coloured, one green and one straw. Leaves of a sward differ
+// in hue, some lose their chlorophyll, tips die back, and sunlight through a leaf is yellow green with no blue
+// (ANGERS 2003 transmittance over reflectance, packages/scatter/test/fixtures/leaf-spectra.json).
+test('grassPoseCode: blades turn in hue, yellow, brown from the tip and tint the light through them', () => {
+  const translucent = litStage.replace(
+    'return o;}',
+    'return o;}\n@fragment fn fragment()->@location(0) vec4f {let linear=a+foliageTranslucency(n,v,l,1.0,i.transl)*i.color*frame.radiance.xyz*frame.light.w;}',
+  );
+  const code = grassPoseCode(translucent, {
+    hue: 0.05,
+    yellow: 0.4,
+    yellowColor: [0.25, 0.5, 0.125],
+    tipBrown: 0.5,
+    transmittance: [1.5, 1.25, 0],
+  });
+  // Hue turn of up to 0.05 turn each way, a yellowing share of 0.4 and a dead tip of up to half the blade.
+  assert.match(code, /\(grassHash\(seed\^0x1656671bu\)\*2\.0-1\.0\)\*0\.05,/);
+  assert.match(code, /grassHash\(seed\^0x41c64e6du\)<0\.4\)\);/);
+  assert.match(code, /let dieback=0\.5\*grassHash\(seed\^0x0bf03d2bu\);grassTip=clamp\(\(along-1\.0\+dieback\)\/max\(dieback,1e-4\),0\.0,1\.0\);/);
+  assert.match(code, /o\.color=mix\(o\.color,vec3f\(0\.25,0\.5,0\.125\)\*lum,grassTone\.w\);/);
+  assert.match(code, /let turn=grassTone\.z\*6\.2831853;/);
+  assert.match(code, /\*i\.color\*vec3f\(1\.5,1\.25,0\.0\)\*frame\.radiance\.xyz\*frame\.light\.w;/);
+  for (const bad of [{ hue: 0.6 }, { yellow: -1 }, { tipBrown: 2 }, { yellowColor: [1, 2, 0] }, { transmittance: [5, 1, 1] }])
+    assert.throws(
+      () => grassShape(bad),
+      (e) => e instanceof RangeError && /hue 0-0\.5, yellow and tipBrown 0-1/.test(e.message),
+      JSON.stringify(bad),
+    );
+});
+
+test('grassShape: the yellowing colour and the light through a blade are the ANGERS 2003 leaves', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { SpectralIntegrator } = await import('@margoengine/optics/spectrum');
+  const { groups } = JSON.parse(await readFile(new URL('./fixtures/leaf-spectra.json', import.meta.url), 'utf8'));
+  const integrator = new SpectralIntegrator();
+  const colour = (spectrum) =>
+    integrator.color((nm) => {
+      const x = (Math.min(780, Math.max(380, nm)) - 380) / 10,
+        i = Math.min(39, Math.floor(x));
+      return spectrum[i] + (spectrum[i + 1] - spectrum[i]) * (x - i);
+    });
+  const near = (a, b, tolerance) => a.every((v, i) => Math.abs(v - b[i]) <= tolerance);
+  const shape = grassShape();
+  assert.ok(near(colour(groups.yellowing.reflectance), shape.yellowColor, 1e-4), String(colour(groups.yellowing.reflectance)));
+  const r = colour(groups.green.reflectance),
+    t = colour(groups.green.transmittance).map((v) => Math.max(v, 0));
+  assert.ok(near(t.map((v, i) => v / r[i]), shape.transmittance, 1e-3), String(t.map((v, i) => v / r[i])));
 });
 
 test('grassShape: tussock, dry, tone and dryColor are checked', () => {

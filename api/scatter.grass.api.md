@@ -31,6 +31,11 @@ export interface GrassShape {
     dry?: number;
     dryColor?: readonly [number, number, number];
     tone?: number;
+    hue?: number;
+    yellow?: number;
+    yellowColor?: readonly [number, number, number];
+    tipBrown?: number;
+    transmittance?: readonly [number, number, number];
 }
 
 export function grassPoseCode(code: string, shape?: GrassShape): string;
@@ -54,6 +59,11 @@ const DEFAULTS: {
     dry: number;
     dryColor: readonly [0.3476, 0.2394, 0.0983];
     tone: number;
+    hue: number;
+    yellow: number;
+    yellowColor: readonly [0.1432, 0.1794, 0.0382];
+    tipBrown: number;
+    transmittance: readonly [1.0909, 1.1726, 0];
 };
 
 type GroundBounds = readonly [minX: number, minZ: number, maxX: number, maxZ: number];
@@ -72,6 +82,8 @@ class OrderedCull {
     get bytes(): number;
     destroy(): void;
 }
+
+type RGB = readonly [number, number, number];
 
 class Scatter implements EnginePlugin {
     readonly name: string;
@@ -177,6 +189,18 @@ interface ScatterCapture {
     begin(): GPURenderPassEncoder;
 }
 
+interface ScatterClearing {
+    readonly center: readonly [x: number, z: number];
+    readonly radius: number;
+    readonly falloff?: number;
+}
+
+interface ScatterClumps {
+    readonly size: number;
+    readonly cover: number;
+    readonly edge?: number;
+}
+
 type ScatterImage = {
     readonly width: number;
     readonly height: number;
@@ -199,6 +223,9 @@ interface ScatterOptions {
     material?: PbrMaterial;
     textures?: ScatterTextures;
     exclusions?: readonly GroundBounds[];
+    clearings?: readonly ScatterClearing[];
+    clumps?: ScatterClumps;
+    reach?: number;
     paths?: readonly GroundPath[];
     heightmap?: () => GPUTexture | undefined;
     wind?: ScatterWind;
@@ -282,6 +309,8 @@ type ScatterWind = readonly [number, number, number] | readonly [number, number,
 
 type Shape = typeof DEFAULTS & {
     segments: readonly [number, number, number];
-    dryColor: readonly [number, number, number];
+    dryColor: RGB;
+    yellowColor: RGB;
+    transmittance: RGB;
 };
 ```

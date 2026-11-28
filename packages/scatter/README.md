@@ -391,6 +391,39 @@ geometry or transforms. It defaults to 1 and accepts a nonnegative finite number
 or a callback sampled each render, such as `() => sky.nightFactor` for night lights.
 The value must fit a GPU float; the callback remains installed after restoration.
 
+## Clumps, clearings and plants of several parts
+
+Plants of one kind grow in drifts, and grass thins around a boulder. Three `Scatter` options, fixed for the scatter's
+life:
+
+- `clumps: { size, cover, edge }` gathers the instances into patches: two octaves of smoothed value noise of the world
+  position (`size` its wavelength in world units) are cut at `cover` (0 keeps nothing, 0.5 about half the ground, 1
+  everything) with a soft rim `edge` wide (default 0.2), and each instance is kept with the chance its place lies in a
+  patch, so patches have ragged, thinning edges. The noise follows `seed`.
+- `clearings: [{ center: [x, z], radius, falloff }]` (up to 100,000): no instance roots within `radius`, and over the
+  next `falloff` the chance of keeping one rises smoothly (a smoothstep) to 1.
+- `reach` (mesh units, default the meshes' bounds) is the least cull reach of an instance. Draw a plant of several
+  materials (leaves, stem, flowers) as one `Scatter` per part with the same `seed`, placement options, `reach` and
+  `sway.height`, and every part keeps the same instances and bends alike.
+
+```js
+import { PbrMaterial, box } from '@margoengine/core';
+import { Scatter } from '@margoengine/scatter';
+const shared = {
+  count: 4000,
+  area: [30, 30],
+  seed: 7,
+  reach: 0.5,
+  sway: { height: 0.3 },
+  clumps: { size: 4, cover: 0.35 },
+  clearings: [{ center: [2, -1], radius: 0.8, falloff: 1.2 }],
+};
+const leaves = new Scatter(box(0.3, 0.05, 0.3), { ...shared, material: new PbrMaterial({ color: '#4b5a2c' }) });
+const flowers = new Scatter(box(0.05, 0.3, 0.05), { ...shared, material: new PbrMaterial({ color: '#f0a020' }) });
+leaves.dispose();
+flowers.dispose();
+```
+
 ## Texture maps: scanned plants, bark and rocks
 
 `textures` draws a mesh with its glTF 2.0 metallic-roughness maps instead of one material colour: `uvs` (two per
@@ -945,6 +978,30 @@ every `Scatter` option, with `blades` shading on by default.
   https://doi.org/10.1016/j.rse.2019.05.015) at the brightness the green blade would have had. `tone` (0 to 1, default
   0.25) spreads brightness blade by blade. The default green, used without a `material`, is green grass leaves
   measured the same way (samples VH350 and VH352, ripgut brome and wild oat): linear [0.1617, 0.2024, 0.0917].
+- Leaf to leaf colour from measured leaves. `hue` (0 to 0.5, default 0.02) turns each blade's hue about the grey axis
+  by up to that share of a turn either way. `yellow` (0 to 1, default 0.15) is the share of blades losing their
+  chlorophyll: each turns part of the way to `yellowColor` (default linear [0.1432, 0.1794, 0.0382], the mean
+  reflectance of the 39 ANGERS 2003 leaves of 8 to 20 ug/cm2 chlorophyll). `tipBrown` (0 to 1, default 0.25) is the
+  longest dead tip as a share of the blade: each blade takes `dryColor` over its last 0 to `tipBrown`, blended in over
+  that span, as grass leaves die back from the tip. `transmittance` (three numbers 0 to 4, default [1.0909, 1.1726, 0])
+  is the light through a living leaf over the light it reflects, per channel: ANGERS 2003 green leaves (40 ug/cm2
+  chlorophyll and more) integrate to transmittance [0.0528, 0.0856, 0] and reflectance [0.0484, 0.073, 0.0364], so the
+  sun seen through a blade (`blades.translucency`) glows yellow green with no blue. ANGERS: S. Jacquemoud, L. Bidel,
+  C. Francois and G. Pavan, INRA Angers 2003, from EcoSIS (https://ecosis.org); the spectra are in
+  `test/fixtures/leaf-spectra.json` and `test/grass.test.js` integrates them again.
+
+  ```js
+  import { PbrMaterial } from '@margoengine/core';
+  import { GrassScatter } from '@margoengine/scatter/grass';
+  const sward = new GrassScatter({
+    count: 20000,
+    area: [40, 40],
+    material: new PbrMaterial({ color: '#5f6a3a', roughness: 0.55 }),
+    blades: { translucency: 0.6 },
+    grass: { hue: 0.03, yellow: 0.2, tipBrown: 0.35 },
+  });
+  sward.dispose();
+  ```
 
   ```js
   import { GrassScatter } from '@margoengine/scatter/grass';

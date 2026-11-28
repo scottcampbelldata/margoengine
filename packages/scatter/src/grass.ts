@@ -45,6 +45,34 @@ export interface GrassShape {
   dryColor?: readonly [number, number, number];
   /** Brightness spread from blade to blade within a clump, 0 to 1 (default 0.25): leaves differ in age and angle. */
   tone?: number;
+  /**
+   * Hue spread from blade to blade, a turn about the grey axis of up to this fraction of a full turn either way, 0 to
+   * 0.5 (default 0.02): leaves of one sward run from yellow green to blue green with age, water and species.
+   */
+  hue?: number;
+  /**
+   * Share of the blades that are losing their chlorophyll, 0 to 1 (default 0.15): each such blade turns part of the
+   * way, by a hash of the blade, to `yellowColor`, at the brightness its green would have had.
+   */
+  yellow?: number;
+  /**
+   * Linear RGB albedo of a yellowing leaf (default [0.1432, 0.1794, 0.0382]: the mean reflectance of the 39 sycamore
+   * maple leaves of 8 to 20 ug/cm2 chlorophyll in the ANGERS 2003 leaf optical properties database).
+   */
+  yellowColor?: readonly [number, number, number];
+  /**
+   * Longest dead tip, as a fraction of the blade's length, 0 to 1 (default 0.25): grass leaves die back from the tip,
+   * so each blade takes `dryColor` over its last 0 to `tipBrown` of its length (a hash of the blade picks how much),
+   * blending in over that span.
+   */
+  tipBrown?: number;
+  /**
+   * Light through a living blade over the light it reflects, per linear RGB channel, each 0 to 4 (default
+   * [1.0909, 1.1726, 0], the ANGERS 2003 green leaves of 40 ug/cm2 chlorophyll and more: transmittance integrates to
+   * [0.0528, 0.0856, 0] and reflectance to [0.0484, 0.073, 0.0364]). It tints `blades.translucency`, so sunlight seen
+   * through a blade glows yellow green with no blue, as a leaf held to the sun does.
+   */
+  transmittance?: readonly [number, number, number];
 }
 /** Options of `new GrassScatter(options)`: a Scatter's, with `blades` shading on by default, plus the blade shape. */
 export interface GrassScatterOptions extends ScatterOptions {
@@ -64,10 +92,18 @@ const DEFAULTS = {
   dry: 0.2,
   dryColor: [0.3476, 0.2394, 0.0983] as const,
   tone: 0.25,
+  hue: 0.02,
+  yellow: 0.15,
+  yellowColor: [0.1432, 0.1794, 0.0382] as const,
+  tipBrown: 0.25,
+  transmittance: [1.0909, 1.1726, 0] as const,
 };
+type RGB = readonly [number, number, number];
 type Shape = typeof DEFAULTS & {
   segments: readonly [number, number, number];
-  dryColor: readonly [number, number, number];
+  dryColor: RGB;
+  yellowColor: RGB;
+  transmittance: RGB;
 };
 
 /** Checks a shape and fills in its defaults. */
@@ -80,6 +116,19 @@ export function grassShape(shape: GrassShape = {}): Shape {
   const s = { ...DEFAULTS, ...shape } as Shape;
   const { height, heightVariance, width, blades, radius, lean, round, segments, tussock, dry, dryColor, tone } = s;
   const within = (v: number, lo: number, hi: number) => Number.isFinite(v) && v >= lo && v <= hi;
+  const rgb = (c: unknown, hi: number) =>
+    Array.isArray(c) && c.length === 3 && c.every((v) => typeof v === 'number' && within(v, 0, hi));
+  if (
+    !within(s.hue, 0, 0.5) ||
+    !within(s.yellow, 0, 1) ||
+    !within(s.tipBrown, 0, 1) ||
+    !rgb(s.yellowColor, 1) ||
+    !rgb(s.transmittance, 4)
+  )
+    throw rangeError(
+      'GrassScatter grass needs hue 0-0.5, yellow and tipBrown 0-1, yellowColor three linear RGB numbers 0-1 and transmittance three numbers 0-4',
+      'scatter',
+    );
   if (
     !(within(height, 1e-4, 1e4) && within(width, 1e-5, 1e3) && within(radius, 0, 1e4)) ||
     !within(heightVariance, 0, 0.95) ||
@@ -178,7 +227,8 @@ export function grassPoseCode(code: string, shape: GrassShape = {}): string {
     code.replace(head, 'fn scatterPoseBase(p:vec3f,n:vec3f,position:vec4f,') +
     `
 struct GrassVertex {p:vec3f,n:vec3f}
-var<private> grassTone:vec2f=vec2f(1.0,0.0);
+var<private> grassTone:vec4f=vec4f(1.0,0.0,0.0,0.0);
+var<private> grassTip:f32=0.0;
 fn grassHash(value:u32)->f32 {var x=value;x=(x^(x>>16u))*0x7feb352du;x=(x^(x>>15u))*0x846ca68bu;x=x^(x>>16u);return f32(x)/4294967296.0;}
 fn grassVertex(p:vec3f,position:vec4f,wide:f32,pix:f32,view:vec3f)->GrassVertex {
  let side=p.x/${f(r)};let along=p.y/${f(s.height)};let k=u32(round((p.z/${f(r)}+1.0)*0.5*${f(s.blades - 1)}));
@@ -191,7 +241,8 @@ fn grassVertex(p:vec3f,position:vec4f,wide:f32,pix:f32,view:vec3f)->GrassVertex 
      : `let d=${f(s.radius)}*sqrt(grassHash(seed^0x68e31da4u));
  let heading=grassHash(seed^0xb5297a4du)*6.2831853;`
  }let dir=vec3f(cos(heading),0.0,sin(heading));let right=vec3f(-dir.z,0.0,dir.x);
- grassTone=vec2f(1.0+(grassHash(seed^0x5bd1e995u)*2.0-1.0)*${f(s.tone)},select(0.0,1.0,grassHash(seed^0x27d4eb2fu)<${f(s.dry)}));
+ grassTone=vec4f(1.0+(grassHash(seed^0x5bd1e995u)*2.0-1.0)*${f(s.tone)},select(0.0,1.0,grassHash(seed^0x27d4eb2fu)<${f(s.dry)}),(grassHash(seed^0x1656671bu)*2.0-1.0)*${f(s.hue)},select(0.0,grassHash(seed^0x6c078965u),grassHash(seed^0x41c64e6du)<${f(s.yellow)}));
+ let dieback=${f(s.tipBrown)}*grassHash(seed^0x0bf03d2bu);grassTip=clamp((along-1.0+dieback)/max(dieback,1e-4),0.0,1.0);grassTip*=grassTip;
  let foot=1.5*pix;let w=${f(s.width)};let face=sqrt(max(1.0-dot(view,right)*dot(view,right),0.0));let seen=max(face,0.25);let wp=w*face;
 ${
   cover || split
@@ -249,13 +300,24 @@ fn scatterPose(p:vec3f,n:vec3f,position:vec4f,rotation:vec4f,ground:vec4f,blade:
  var pose=scatterPoseBase(g.p,g.n,position,rotation,ground,blade,eye,wind,pixel,sway);pose.shade*=grassTone.x;return pose;
 }
 `
-  ).replace(
-    // A lit stage: a cured blade takes the dry colour at the brightness its green would have had (root shade, tone and
-    // variation kept), by the ratio of the drawn colour's luminance to the material's.
-    /(o\.color=[^;]+;)/,
-    (line) =>
-      `${line}o.color=mix(o.color,vec3f(${s.dryColor.map(f).join(',')})*(dot(o.color,vec3f(0.2126,0.7152,0.0722))/max(dot(material[0].rgb,vec3f(0.2126,0.7152,0.0722)),1e-4)),grassTone.y);`,
-  );
+  )
+    .replace(
+      // A lit stage: the blade's hue turns by its own share (Rodrigues about the grey axis), a yellowing blade moves
+      // toward the yellow colour and a cured blade, or the dead part of a tip, toward the dry colour, each at the
+      // brightness its green would have had (root shade, tone and variation kept): the ratio of the drawn colour's
+      // luminance to the material's.
+      /(o\.color=[^;]+;)/,
+      (line) =>
+        `${line}{let lum=dot(o.color,vec3f(0.2126,0.7152,0.0722))/max(dot(material[0].rgb,vec3f(0.2126,0.7152,0.0722)),1e-4);` +
+        `let k=vec3f(0.57735027);let turn=grassTone.z*6.2831853;o.color=max(o.color*cos(turn)+cross(k,o.color)*sin(turn)+k*dot(k,o.color)*(1.0-cos(turn)),vec3f(0.0));` +
+        `o.color=mix(o.color,vec3f(${s.yellowColor.map(f).join(',')})*lum,grassTone.w);` +
+        `o.color=mix(o.color,vec3f(${s.dryColor.map(f).join(',')})*lum,max(grassTone.y,grassTip));}`,
+    )
+    .replace(
+      // Light through the blade: the measured transmittance over reflectance tints the translucency term.
+      '*i.color*frame.radiance.xyz*frame.light.w',
+      `*i.color*vec3f(${s.transmittance.map(f).join(',')})*frame.radiance.xyz*frame.light.w`,
+    );
 }
 
 /**
@@ -277,6 +339,8 @@ export class GrassScatter extends Scatter {
       ...shape,
       segments: Object.freeze([...shape.segments]) as Shape['segments'],
       dryColor: Object.freeze([...shape.dryColor]) as Shape['dryColor'],
+      yellowColor: Object.freeze([...shape.yellowColor]) as Shape['yellowColor'],
+      transmittance: Object.freeze([...shape.transmittance]) as Shape['transmittance'],
     });
   }
   /**

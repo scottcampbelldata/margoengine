@@ -17,9 +17,9 @@ const read=async(buffer)=>{
 };
 window.check={
  // grass null: no scatter. lit: the PBR material. One frame, after every pipeline is ready.
- async make(grass,lit){
+ async make(grass,lit,extra){
   current?.dispose();current=undefined;
-  if(grass)current=GrassScatter.attach(engine,{count:1000,area:[14,14],lod:[3,6,30],lodFade:0,seed:5,grass,...(lit?{material}:{})});
+  if(grass)current=GrassScatter.attach(engine,{count:1000,area:[14,14],lod:[3,6,30],lodFade:0,seed:5,grass,...(lit?{material}:{}),...(extra??{})});
   device.pushErrorScope('validation');
   await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
   const e=await device.popErrorScope();if(e)errors.push(e.message);
