@@ -67,13 +67,13 @@ test('each tree, shrub and rock part gets its LOD mesh chain, per-instance tint 
       bounds: [-2048, -2048, 2048, 2048],
     }),
     triangles = (scatter) => scatter.geometries.map((g) => g.indices.length / 3),
-    // Parts in attach order: each species' trunk then canopy (one part for shrubs and rocks), then the snags.
+    // Parts in attach order: each species' trunk (a shrub's stems) then canopy (one part for rocks), then the snags.
     parts = objects.casters;
   assert.equal(parts.length, attached.length);
   const byMesh = new Map();
   let k = 0;
   for (const s of species) {
-    const n = ['shrub', 'tundra-shrub', 'rock'].includes(s.key) ? 1 : 2;
+    const n = s.key === 'rock' ? 1 : 2;
     byMesh.set(s.key, parts.slice(k, k + n));
     k += n;
   }
@@ -99,14 +99,16 @@ test('each tree, shrub and rock part gets its LOD mesh chain, per-instance tint 
   tree('palm', (detail) => procedural.generatePalmMesh({ detail }));
   tree('acacia', (detail) => procedural.generateAcaciaMesh({ detail }));
   assert.deepEqual(triangles(broadleaf.canopy), [6240, 3180, 400]);
-  assert.deepEqual(
-    triangles(byMesh.get('shrub')[0]),
-    levels((detail) => procedural.generateShrubMesh({ detail }).indices.length / 3),
-  );
-  assert.deepEqual(
-    triangles(byMesh.get('tundra-shrub')[0]),
-    levels((detail) => procedural.generateTundraShrubMesh({ detail }).indices.length / 3),
-  );
+  for (const [key, wood, leaves] of [
+    ['shrub', 'generateShrubStemsMesh', 'generateShrubMesh'],
+    ['tundra-shrub', 'generateTundraShrubStemsMesh', 'generateTundraShrubMesh'],
+  ])
+    for (const [part, make] of [wood, leaves].entries())
+      assert.deepEqual(
+        triangles(byMesh.get(key)[part]),
+        levels((detail) => procedural[make]({ detail }).indices.length / 3),
+        `${key} part ${part}`,
+      );
   // The rock mesh has no detail levels (180 triangles): one mesh in every ring.
   const rock = byMesh.get('rock')[0];
   assert.equal(new Set(rock.geometries).size, 1);
@@ -116,7 +118,7 @@ test('each tree, shrub and rock part gets its LOD mesh chain, per-instance tint 
   assert.deepEqual(rock.options.lod, [45, 120, 300]);
   for (const part of parts) assert.equal(part.options.lodFade, 0);
   // Foliage tints and shades as leaf clusters; bark and stone vary a little and stay smooth.
-  for (const part of [broadleaf.canopy, birch.canopy, conifer.canopy, byMesh.get('shrub')[0]]) {
+  for (const part of [broadleaf.canopy, birch.canopy, conifer.canopy, byMesh.get('shrub')[1]]) {
     assert.deepEqual(part.options.variation, { hue: 0.06, value: 0.15 });
     assert.equal(part.options.clusters, 0.6);
   }

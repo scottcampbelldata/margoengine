@@ -3,7 +3,12 @@
 // simplification of aggregate detail).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateShrubMesh } from '../dist/index.js';
+import {
+  generateShrubMesh,
+  generateShrubStemsMesh,
+  generateTundraShrubMesh,
+  generateTundraShrubStemsMesh,
+} from '../dist/index.js';
 
 const SIZE = 160;
 /** The side view of a mesh on a grid: which cells a triangle covers. */
@@ -42,4 +47,36 @@ test('a shrub draws separate leaves with a ragged outline, the same cover at eve
     assert.ok(Math.abs(level.area / levels[0].area - 1) < 0.25, `cover ${level.area} against ${levels[0].area}`);
   // Dense enough to read as one shrub: over a quarter of its box.
   assert.ok(levels[0].area > 0.25 * (SIZE / 1.6) ** 2 * 1.36 * 0.89, `cover ${levels[0].area}`);
+});
+
+// KB-SHRUB-TUNDRA1: the tundra shrub was six closed smooth domes, and neither shrub had any wood.
+test('a tundra shrub is a low mat of separate leaves with a ragged outline', () => {
+  for (const detail of [2, 1, 0]) {
+    const mesh = generateTundraShrubMesh({ detail }),
+      { ragged } = measure(silhouette(mesh));
+    // The domes measured about 1.5.
+    assert.ok(ragged > 3, `detail ${detail} raggedness ${ragged}`);
+    // Separate leaves of 12 corners (two faces of six), not a welded surface.
+    assert.equal((mesh.positions.length / 3) % 12, 0, `detail ${detail}`);
+    assert.equal(mesh.indices.length / 3, ((mesh.positions.length / 3 / 12) * 8) | 0, `detail ${detail}`);
+  }
+});
+
+test('each shrub has stems from its foot into its leaves, within the leaves box', () => {
+  for (const [stems, leaves] of [
+    [generateShrubStemsMesh, generateShrubMesh],
+    [generateTundraShrubStemsMesh, generateTundraShrubMesh],
+  ])
+    for (const detail of [2, 1, 0]) {
+      const wood = stems({ detail }).positions,
+        crown = leaves({ detail }).positions;
+      for (let axis = 0; axis < 3; axis++) {
+        const of = (data) => Array.from(data).filter((_, i) => i % 3 === axis);
+        assert.ok(Math.min(...of(wood)) >= Math.min(...of(crown)) - 0.04, `${stems.name} ${detail} low ${axis}`);
+        assert.ok(Math.max(...of(wood)) <= Math.max(...of(crown)), `${stems.name} ${detail} high ${axis}`);
+      }
+      // Every stem starts in the ground: two lengths of six corners each, the first ring at the foot.
+      assert.equal((wood.length / 3) % 12, 0);
+      for (let at = 0; at < wood.length; at += 36) assert.ok(wood[at + 1] < 0.02, `${stems.name} foot ${wood[at + 1]}`);
+    }
 });

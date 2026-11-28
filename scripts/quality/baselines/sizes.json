@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21738709,
+  "total": 21739020,
   "history": [
     {
       "date": "2026-10-24",
@@ -15521,6 +15521,12 @@
       "commit": "0357c2ed03 audit",
       "reason": "Audit of the 14 items other than studio/bench that the fbabe71501 (on main as 0357c2ed03) update raised: each was measured on a full build of 632d700155 and each grew from committed source changes on main that had not updated this record, so all are kept. cutscene, cutscene/editor, cutscene/nested-editor and cutscene/render: dee8388f41 (GAP-FILM-RESET resetClocks) and 96c3d44779 (FG-17 samples and shutter). physics, its lazy kernel, physics/breakable and physics/decomposition: the ATMO-01, ATMO-03 and ATMO-06 native worker phases (9d7dd26bc5, 9622992eda, a65111cd3a) and 632d700155. rigging/retarget: 9a0a5f9188, 4131095aab and 3001234894 (IK hinge and hand fixes). sky/milky-way: 848d9f409b (survey catalogues). splats/edit: 96d7978d3d (SplatBrush history, undo and reset). terrain: bb8bf442aa (complex craters) and 0382682375 (drawLocalShadow casters). animator/stepping: a new entry on main since caf466b4cc, fixed in a20b94c768. leak optics/screens to shader/raw: e2272ca739 and 5bf270d0a1 import RawMesh statically. No item came from an uncommitted demo build.",
       "grew": 0
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "lane-e-shrub-stems",
+      "reason": "KB-SHRUB-TUNDRA1: shrub leaf blades and woody stems shared by the shrub and the tundra shrub (procedural/tree, which holds the shared foliage module, to 6,418 B).",
+      "grew": 1
     }
   ],
   "items": {
@@ -16556,7 +16562,7 @@
     "@margoengine/procedural/standin": 673,
     "@margoengine/procedural/textures": 5296,
     "@margoengine/procedural/textures-pbr": 5704,
-    "@margoengine/procedural/tree": 6363,
+    "@margoengine/procedural/tree": 6674,
     "@margoengine/procedural/tree-mesh": 4676,
     "@margoengine/procedural/trees": 1796,
     "@margoengine/procedural/vehicles": 11964,

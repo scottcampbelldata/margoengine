@@ -35,6 +35,18 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   "Leaf Optical Properties EXperiment 93", JRC EUR 16095 EN, 1995).
 - **Regression:** `packages/procedural/test/shrub-leaves.test.js`.
 
+### Fixed 2026-11-28: the tundra shrub drew as smooth domes, and no shrub had wood (KB-SHRUB-TUNDRA1; procedural, biomes)
+
+- **What:** in a close still of the tundra world every dwarf birch was a smooth brown or ochre mound; the shrub fixed in
+  KB-SHRUB-BLOBS1 showed close up as large diamond tiles with nothing holding them.
+- **Cause:** `generateTundraShrubMesh` was six closed hemispheres; `generateShrubMesh` had 20 cm diamond leaves and no
+  stems.
+- **Fix:** both are separate rounded leaves (13 cm on the shrub, 7 cm on the tundra shrub, larger than the 6 to 12 cm
+  of hazel and the 0.6 to 2 cm of dwarf birch at the top end and above, to hold cover within the triangle count) on
+  woody stems from the new `generateShrubStemsMesh` and `generateTundraShrubStemsMesh`; biomes draws stems and leaves
+  as two parts, with copper-red twigs and green leaves on the dwarf birch.
+- **Regression:** `packages/procedural/test/shrub-leaves.test.js`, `packages/biomes/tests/objects.test.js`.
+
 ### Fixed 2026-11-28: the USD importers dropped texture factors, and the default one emission and occlusion (KB-USDZ-FACTORS1, usdz)
 
 - **What:** a textured file written by `exportUSDZ` read back through `@margoengine/usdz` with a white base colour

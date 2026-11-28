@@ -375,7 +375,7 @@ clumps per lobe (diamond cards rooted inside the lobe and reaching up to about
 0.5 m past it) that break the smooth outline; all their normals radiate from the
 collective centroid. The clumps add 1,440 triangles to the 4,800 of the lobes
 and need no alpha test, so they keep early depth rejection on phone GPUs.
-Shrubs are separate leaves through three compact, asymmetric dome lobes, with gaps and a ragged outline; their normals point out of the shrub so the crown shades as one soft volume (1,080 triangles, 432 and 144 at the lower detail levels, each keeping the same cover).
+Shrubs are separate leaves through three compact, asymmetric dome lobes, with gaps and a ragged outline; their normals point out of the shrub so the crown shades as one soft volume (3,120 triangles, 1,152 and 384 at the lower detail levels, each keeping the same cover). `generateShrubStemsMesh` gives the woody stems inside them, for a bark material. The tundra shrub is a low mat of small leaves (`generateTundraShrubMesh`, 6,240, 2,112 and 576 triangles) with its twigs from `generateTundraShrubStemsMesh`.
 All meshes have contiguous Float32 positions, normals, UVs and tangents, and
 Uint32 indices. Tangents are xyzw, with `cross(normal, tangent.xyz) * w` pointing toward increasing v; `meshTree`
 writes w = -1 on the base cap of each bark tube, whose UV disc is mirrored as seen from below. Trunks of the palm,

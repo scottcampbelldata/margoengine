@@ -18,6 +18,8 @@ import {
   perturb,
   placed,
   resolveDetail,
+  shrubLeaves,
+  shrubStems,
   type LobeSpec,
   type MeshDetailOptions,
 } from './foliage.js';
@@ -221,29 +223,37 @@ export function generateReedMesh(stems = 9): GeometryData {
   return computeTangents(computeVertexNormals(toNonIndexed(mergeGeometries(parts))));
 }
 
+/** Leaves and twigs per lobe and detail level (0, 1, 2) of a tundra shrub. */
+const TUNDRA_LEAVES = [12, 44, 130] as const,
+  TUNDRA_TWIGS = [3, 5, 8] as const;
+/** A tundra shrub's six low lobes as [x, z, x radius, height, z radius, phase]. */
+const TUNDRA_LOBES: readonly (readonly number[])[] = [0, 1, 2, 3, 4, 5].map((i) => {
+  const a = i * 2.399963,
+    r = 0.12 + 0.18 * (i % 3);
+  return [Math.cos(a) * r, Math.sin(a) * r, 0.42, 0.24 + 0.05 * (i % 2), 0.36, a];
+});
+
 /**
- * A low, wind-pressed tundra shrub: a flat mat of lumpy lobes. `options.detail` (default 2, the full mesh) lowers
- * the lobes' segment counts at 1 and 0.
+ * A low, wind-pressed tundra shrub, as a dwarf birch grows: a flat, ragged mat of small rounded leaves; draw
+ * `generateTundraShrubStemsMesh` with it for its twigs. `options.detail` (default 2, 6,240 triangles) draws fewer,
+ * larger leaves at 1 (2,112) and 0 (576), in the same bounding box.
  * @throws RangeError when `options.detail` is not 0, 1 or 2.
  */
 export function generateTundraShrubMesh(options?: MeshDetailOptions): GeometryData {
-  const detail = resolveDetail(options),
-    lobes: GeometryData[] = [];
-  for (let i = 0; i < 6; i++) {
-    const a = i * 2.399963,
-      r = 0.12 + 0.18 * (i % 3);
-    lobes.push(
-      placed(
-        perturb(sphereGeometry(1, [6, 8, 12][detail], [2, 3, 6][detail], 0, Math.PI * 2, 0, Math.PI / 2)),
-        Math.cos(a) * r,
-        -0.02,
-        Math.sin(a) * r,
-        0.42,
-        0.22,
-        0.36,
-        a,
-      ),
-    );
-  }
+  const count = TUNDRA_LEAVES[resolveDetail(options)],
+    long = 0.035 * Math.sqrt(TUNDRA_LEAVES[2] / count),
+    // Lit from well under the ground, so a flat mat shades as mostly facing the sky.
+    lobes = TUNDRA_LOBES.map((lobe) => shrubLeaves(count, lobe, long, 0.6));
+  fitToHull(lobes, FULL_HULLS.tundra);
   return computeTangents(mergeGeometries(lobes));
+}
+
+/**
+ * The twigs inside `generateTundraShrubMesh`'s leaves, in its coordinates, for a bark material. `options.detail`
+ * (default 2, 576 triangles) draws fewer, thicker twigs at 1 (360) and 0 (216).
+ * @throws RangeError when `options.detail` is not 0, 1 or 2.
+ */
+export function generateTundraShrubStemsMesh(options?: MeshDetailOptions): GeometryData {
+  const detail = resolveDetail(options);
+  return computeTangents(shrubStems(TUNDRA_LOBES, TUNDRA_TWIGS[detail], [0.018, 0.014, 0.01][detail]));
 }

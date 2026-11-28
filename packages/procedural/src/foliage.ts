@@ -199,6 +199,7 @@ export const FULL_HULLS = {
   birch: [-1.32, 4.22, -1.21, 1.17, 10.38, 1.25],
   acacia: [-3.56, 4.1, -3.52, 3.24, 4.65, 3.57],
   shrub: [-0.66, -0.04, -0.61, 0.7, 0.85, 0.83],
+  tundra: [-0.85, -0.04, -0.82, 0.86, 0.3, 0.84],
 } as const satisfies Record<string, HullBox>;
 
 /**
@@ -839,20 +840,33 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: TreeMe
 }
 
 /** Leaves per lobe and detail level (0, 1, 2) of a shrub. */
-const SHRUB_LEAVES = [12, 36, 90] as const;
+const SHRUB_LEAVES = [16, 48, 130] as const;
+/** Stems per lobe and detail level of a shrub. */
+const SHRUB_STEMS = [2, 4, 7] as const;
+/** A shrub's three lobes as [x, z, x radius, height, z radius, phase]. */
+const SHRUB_LOBES: readonly (readonly number[])[] = [0, 1, 2].map((i) => {
+  const angle = i * 2.399963,
+    r = i === 2 ? 0 : 0.23;
+  return [Math.cos(angle) * r, Math.sin(angle) * r, 0.47 + i * 0.07, 0.68 + i * 0.09, 0.45 + (i % 2) * 0.08, angle];
+});
 
 /**
- * `count` leaves through the outer shell of one upper half ellipsoid: diamonds on a golden-angle spiral, each at its own
- * depth and turned every way (a spherical leaf angle distribution, from the R2 low-discrepancy pair), both faces lit by
- * the direction out of the whole shrub so the crown shades as one soft volume. A lower level draws fewer, larger leaves
- * of the same total area.
+ * `count` leaves through the outer shell of one upper half ellipsoid: six-cornered blades of half length `long` on a
+ * golden-angle spiral, each at its own depth and turned every way (a spherical leaf angle distribution, from the R2
+ * low-discrepancy pair), both faces lit by the direction out of a point `lift` under the origin, so the crown shades as
+ * one soft volume.
+ * @internal
  */
-function shrubLeaves(count: number, [x, z, rx, ry, rz, phase]: readonly number[]): GeometryData {
+export function shrubLeaves(
+  count: number,
+  [x, z, rx, ry, rz, phase]: readonly number[],
+  long: number,
+  lift: number,
+): GeometryData {
   const positions: number[] = [],
     normals: number[] = [],
     uvs: number[] = [],
-    indices: number[] = [],
-    long = 0.1 * Math.sqrt(SHRUB_LEAVES[2] / count);
+    indices: number[] = [];
   for (let k = 0; k < count; k++) {
     const dy = (k + 0.5) / count,
       ring = Math.sqrt(1 - dy * dy),
@@ -875,53 +889,114 @@ function shrubLeaves(count: number, [x, z, rx, ry, rz, phase]: readonly number[]
       bx = up * az,
       by = lz * ax - lx * az,
       bz = -up * ax,
-      wide = long * 0.6,
-      corners = [
-        [px - ax * long, py, pz - az * long],
-        [px + bx * wide, py + by * wide, pz + bz * wide],
-        [px + ax * long, py, pz + az * long],
-        [px - bx * wide, py - by * wide, pz - bz * wide],
+      // A rounded blade, wider toward the stalk: [along, across] in half lengths.
+      outline = [
+        [-1, 0],
+        [-0.55, 0.72],
+        [0.35, 0.62],
+        [1, 0],
+        [0.35, -0.62],
+        [-0.55, -0.72],
       ],
       start = positions.length / 3;
     // Front and back get their own vertices so each side keeps a consistent tangent frame.
     for (let face = 0; face < 2; face++)
-      corners.forEach(([cx, cy, cz], i) => {
-        const length = Math.hypot(cx, cy + 0.15, cz);
+      for (const [along, across] of outline) {
+        const cx = px + (ax * along + bx * across) * long,
+          cy = py + by * across * long,
+          cz = pz + (az * along + bz * across) * long,
+          length = Math.hypot(cx, cy + lift, cz);
         positions.push(cx, cy, cz);
-        normals.push(cx / length, (cy + 0.15) / length, cz / length);
-        uvs.push([0.5, 1, 0.5, 0][i], [0, 0.5, 1, 0.5][i]);
-      });
-    indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
-    indices.push(start + 4, start + 6, start + 5, start + 4, start + 7, start + 6);
+        normals.push(cx / length, (cy + lift) / length, cz / length);
+        uvs.push(0.5 + across * 0.5, 0.5 + along * 0.5);
+      }
+    for (let i = 1; i < 5; i++) {
+      indices.push(start, start + i, start + i + 1);
+      indices.push(start + 6, start + 6 + i + 1, start + 6 + i);
+    }
   }
   return geometryData(positions, new Float32Array(normals), uvs, indices);
 }
 
 /**
+ * `count` woody stems per lobe, from the shrub's foot into the leaves: two tapered three-sided lengths that rise and
+ * then spread, `radius` metres thick at the foot.
+ * @internal
+ */
+export function shrubStems(lobes: readonly (readonly number[])[], count: number, radius: number): GeometryData {
+  const positions: number[] = [],
+    normals: number[] = [],
+    uvs: number[] = [],
+    indices: number[] = [];
+  lobes.forEach(([x, z, rx, ry, rz, phase], lobe) => {
+    for (let s = 0; s < count; s++) {
+      const dy = 0.15 + (0.8 * (s + 0.5)) / count,
+        ring = Math.sqrt(1 - dy * dy),
+        angle = s * 2.399963 + phase + lobe,
+        tip = [x + Math.cos(angle) * ring * rx * 0.72, dy * ry * 0.72 - 0.04, z + Math.sin(angle) * ring * rz * 0.72],
+        foot = [0.07 * Math.cos(angle), -0.04, 0.07 * Math.sin(angle)],
+        elbow = [
+          foot[0] + (tip[0] - foot[0]) * 0.42,
+          foot[1] + (tip[1] - foot[1]) * 0.66,
+          foot[2] + (tip[2] - foot[2]) * 0.42,
+        ],
+        path = [foot, elbow, tip];
+      for (let k = 0; k < 2; k++) {
+        const p = path[k],
+          q = path[k + 1],
+          d = [q[0] - p[0], q[1] - p[1], q[2] - p[2]],
+          length = Math.hypot(d[0], d[1], d[2]),
+          // Two axes across the length; a stem is never along x, since it rises from the foot.
+          across = Math.hypot(d[2], d[1]),
+          u = [0, d[2] / across, -d[1] / across],
+          v = [
+            (d[1] * u[2] - d[2] * u[1]) / length,
+            (d[2] * u[0] - d[0] * u[2]) / length,
+            (d[0] * u[1] - d[1] * u[0]) / length,
+          ],
+          start = positions.length / 3;
+        for (let end = 0; end < 2; end++)
+          for (let side = 0; side < 3; side++) {
+            const turn = (side * 2 * Math.PI) / 3,
+              n = [0, 1, 2].map((i) => u[i] * Math.cos(turn) + v[i] * Math.sin(turn)),
+              thick = radius * (1 - 0.35 * (k + end));
+            positions.push(...[0, 1, 2].map((i) => path[k + end][i] + n[i] * thick));
+            normals.push(...n);
+            uvs.push(side / 3, k + end);
+          }
+        for (let side = 0; side < 3; side++) {
+          const a = start + side,
+            b = start + ((side + 1) % 3);
+          indices.push(a, b, b + 3, a, b + 3, a + 3);
+        }
+      }
+    }
+  });
+  return geometryData(positions, new Float32Array(normals), uvs, indices);
+}
+
+/**
  * A compact, asymmetric dome of separate leaves in three lobes, with gaps between them and a ragged outline, normals
- * pointing out of the shrub. `options.detail` (default 2, 1,080 triangles) draws fewer, larger leaves at 1 (432) and
- * 0 (144), in the same bounding box.
+ * pointing out of the shrub; draw `generateShrubStemsMesh` with it for its wood. `options.detail` (default 2, 3,120
+ * triangles) draws fewer, larger leaves at 1 (1,152) and 0 (384), in the same bounding box.
  * @throws RangeError when `options.detail` is not 0, 1 or 2.
  */
 export function generateShrubMesh(options?: MeshDetailOptions): GeometryData {
-  const detail = resolveDetail(options),
-    lobes: GeometryData[] = [];
-  for (let i = 0; i < 3; i++) {
-    const angle = i * 2.399963,
-      r = i === 2 ? 0 : 0.23;
-    lobes.push(
-      shrubLeaves(SHRUB_LEAVES[detail], [
-        Math.cos(angle) * r,
-        Math.sin(angle) * r,
-        0.47 + i * 0.07,
-        0.68 + i * 0.09,
-        0.45 + (i % 2) * 0.08,
-        angle,
-      ]),
-    );
-  }
+  const count = SHRUB_LEAVES[resolveDetail(options)],
+    long = 0.065 * Math.sqrt(SHRUB_LEAVES[2] / count),
+    lobes = SHRUB_LOBES.map((lobe) => shrubLeaves(count, lobe, long, 0.15));
   fitToHull(lobes, FULL_HULLS.shrub);
   return computeTangents(mergeGeometries(lobes));
+}
+
+/**
+ * The woody stems inside `generateShrubMesh`'s leaves, in its coordinates, for a bark material. `options.detail`
+ * (default 2, 252 triangles) draws fewer, thicker stems at 1 (144) and 0 (72).
+ * @throws RangeError when `options.detail` is not 0, 1 or 2.
+ */
+export function generateShrubStemsMesh(options?: MeshDetailOptions): GeometryData {
+  const detail = resolveDetail(options);
+  return computeTangents(shrubStems(SHRUB_LOBES, SHRUB_STEMS[detail], [0.03, 0.024, 0.018][detail]));
 }
 
 /** Dominant shape of a fieldstone. Pebbles are the more rounded, water-worn form. */

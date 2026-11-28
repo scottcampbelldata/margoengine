@@ -3,6 +3,7 @@ export * from './noise.js';
 export {
   generateTreeMesh,
   generateShrubMesh,
+  generateShrubStemsMesh,
   generateRockMesh,
   generateFernMesh,
   generateGrassMesh,
@@ -21,6 +22,7 @@ export {
   generateReedMesh,
   generateSnagMesh,
   generateTundraShrubMesh,
+  generateTundraShrubStemsMesh,
   type TreeMesh,
 } from './plants.js';
 export { generateJettyMesh, generateBoatMesh, type JettyOptions, type BoatOptions } from './waterfront.js';

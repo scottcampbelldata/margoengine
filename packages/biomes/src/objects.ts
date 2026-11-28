@@ -196,7 +196,10 @@ const BARK = [0.22, 0.14, 0.08] as const,
   DRY = [0.45, 0.33, 0.11] as const,
   // A green leaf reflects about a tenth of green light and half that of blue and red (PROSPECT, Jacquemoud and Baret
   // 1990; LOPEX93 leaf spectra, Hosgood et al. 1995).
-  SHRUB = [0.065, 0.11, 0.035] as const;
+  SHRUB = [0.065, 0.11, 0.035] as const,
+  // Dwarf birch: copper-red twigs and small leaves, darker green above (Betula nana L.).
+  TWIG = [0.11, 0.045, 0.028] as const,
+  DWARF_BIRCH = [0.07, 0.105, 0.025] as const;
 
 /**
  * Per-instance tint and leaf-cluster shading of each kind of part (scatter's `variation` and `clusters`): leaves vary
@@ -274,6 +277,16 @@ function partsOf(
           : []),
       ];
     };
+  /** A shrub's wood and leaves. */
+  const shrubParts = (
+    stems: readonly [Data, Data, Data],
+    leaves: readonly [Data, Data, Data],
+    wood: readonly [number, number, number],
+    leaf: readonly [number, number, number],
+  ): Part[] => [
+    { geometry: rings(stems), color: wood, kind: 'bark' },
+    { geometry: rings(leaves), color: leaf, kind: 'foliage' },
+  ];
   const conifer = conifers?.parseConiferKey(name);
   if (conifers && conifer) {
     // A northern Rockies conifer: near and middle meshes and, for a live tree, the imposter in the far ring. The canopy
@@ -328,13 +341,12 @@ function partsOf(
     case 'cactus':
       return [{ geometry: make(p.generateCactusMesh()), color: [0.13, 0.3, 0.1], kind: 'bark' }];
     case 'tundra-shrub':
-      return [
-        {
-          geometry: rings(chain((detail) => p.generateTundraShrubMesh({ detail }))),
-          color: [0.3, 0.17, 0.07],
-          kind: 'foliage',
-        },
-      ];
+      return shrubParts(
+        chain((detail) => p.generateTundraShrubStemsMesh({ detail })),
+        chain((detail) => p.generateTundraShrubMesh({ detail })),
+        TWIG,
+        DWARF_BIRCH,
+      );
     case 'grass':
       return [{ geometry: make(p.generateGrassMesh(3)), color: [0.2, 0.4, 0.06], kind: 'foliage', blades: true }];
     case 'fern':
@@ -342,7 +354,12 @@ function partsOf(
     case 'reeds':
       return [{ geometry: make(p.generateReedMesh()), color: [0.36, 0.34, 0.11], kind: 'foliage', blades: true }];
     default:
-      return [{ geometry: rings(chain((detail) => p.generateShrubMesh({ detail }))), color: SHRUB, kind: 'foliage' }];
+      return shrubParts(
+        chain((detail) => p.generateShrubStemsMesh({ detail })),
+        chain((detail) => p.generateShrubMesh({ detail })),
+        BARK,
+        SHRUB,
+      );
   }
 }
 

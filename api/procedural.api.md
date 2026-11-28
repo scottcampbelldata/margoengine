@@ -188,6 +188,8 @@ export function generateRockMesh(seed?: number, form?: RockForm): GeometryData;
 
 export function generateShrubMesh(options?: MeshDetailOptions): GeometryData;
 
+export function generateShrubStemsMesh(options?: MeshDetailOptions): GeometryData;
+
 export function generateSnagMesh(): TreeMesh;
 
 export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: TreeMeshShapeOptions): {
@@ -198,6 +200,8 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: TreeMe
 };
 
 export function generateTundraShrubMesh(options?: MeshDetailOptions): GeometryData;
+
+export function generateTundraShrubStemsMesh(options?: MeshDetailOptions): GeometryData;
 
 export function generateWindowPane(options: WindowPaneOptions): WindowPane;
 

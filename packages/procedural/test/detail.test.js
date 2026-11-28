@@ -46,8 +46,8 @@ const MAIN = {
   'birch.canopy': '2477f80b9dac288e',
   'acacia.trunk': '4a3eb2c3b585caa5',
   'acacia.canopy': '10dc5a0e4cb949db',
-  shrub: '50079dbf4bac2480',
-  tundra: '65ccbe3206104cd5',
+  shrub: '9014d7657768f0ba',
+  tundra: '84f26fd8eb8bd9ed',
 };
 
 const makers = {
