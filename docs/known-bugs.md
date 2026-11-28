@@ -6,6 +6,18 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-28: 21 web demos cannot be rebuilt from source/: the data files their code imports are missing (KB-DEMO-SOURCEDATA1, demos)
+
+- **Repro:** `node scripts/web-demos/build.mjs the-brain-scan` (or caustic-glass, character-course, cutscene-studio,
+  depth-video, directional-lightmaps, ground-projection, hdr-window, parallel-coordinates, the-ar-card,
+  the-climate-globe, the-contour-map, the-cut-house, the-laser-scan, the-lighting-store, the-simplifier, the-sky-clock,
+  the-sky-survey, the-weather-radar, wind-and-flow-painting, wind-over-america): Vite fails to resolve a relative
+  `?url` or JSON import such as `./assets/mri.bin`.
+- **Cause:** 3eb5f2dd23 added the demos with their built `assets/` but without the source copies of their data files.
+  height-streaming is fixed (its tiles restored from the shipped assets, byte for byte, guarded by
+  `tests/demo-source-data.test.js`); the rest need the same restore where the built page ships the file under a
+  content hash, and the original data where Vite inlined it.
+
 ### Open 2026-11-28: a 3MF with `production: {separateParts: true}` copies every resource group whole into each part (KB-3MF-PARTCOPY1, exporters)
 
 - **Repro:** `export3MF(NodePerformanceTest.glb, {assembly: 'components', production: {separateParts: true}})`
