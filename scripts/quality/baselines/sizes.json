@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21715649,
+  "total": 21720390,
   "history": [
     {
       "date": "2026-10-24",
@@ -15432,6 +15432,12 @@
       "commit": "usdz-uv-sets",
       "reason": "KB-USDZ-UVSETS1: every map reads its own UV primvar on its own glTF set, per mesh and GeomSubset. @margoengine/usdz 12753 to 13168 B gzip (ceiling 12918 to 13564), /worker 13753 to 14169 (13900 to 14595), /compose 23754 to 24132 (23890 to 24856), /preview-surface 4787 to 5013 (5006 to 5269). The bytes are the reader's own mesh walk, so no split can hold them without dropping maps' coordinates. Core and Stage gain zero bytes.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "hydro-03-local-banks-and-worker-proposals",
+      "reason": "HYDRO-03 physics/sediment grows from 4402 to 7845 B gzip (cap 4657 to 8101). The same optional entry validates candidate inventory and float32 outputs, joins workers and keeps the existing bed and water ports. The native plain and shared images are 7606/7667 B gzip and partition cell and face proposals before ordered sediment transfer. Water/shallow-surface grows from 1716 to 3003 B gzip (cap 1962 to 3259) for reuse of the sediment tint shader and accepted concentration upload. Keeping this with the Water surface mirror shares its renderer and device lifecycle. Core and Stage gain zero bytes.",
+      "grew": 2
     }
   ],
   "items": {
@@ -16340,7 +16346,7 @@
     "@margoengine/physics/schooling": 5102,
     "@margoengine/physics/sea": 14609,
     "@margoengine/physics/seakeeping": 43883,
-    "@margoengine/physics/sediment": 4657,
+    "@margoengine/physics/sediment": 8101,
     "@margoengine/physics/seismic": 5266,
     "@margoengine/physics/ship": 36541,
     "@margoengine/physics/snowpack": 5172,
@@ -17133,7 +17139,7 @@
     "@margoengine/water/scatter": 2320,
     "@margoengine/water/sea-state": 1694,
     "@margoengine/water/settings": 6689,
-    "@margoengine/water/shallow-surface": 1962,
+    "@margoengine/water/shallow-surface": 3259,
     "@margoengine/water/ships": 11259,
     "@margoengine/water/splash": 5893,
     "@margoengine/water/underwater": 9344,

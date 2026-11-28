@@ -15442,8 +15442,8 @@
         "gzip": 5010
       },
       "./lightning": {
-        "raw": 24283,
-        "gzip": 8890
+        "raw": 24304,
+        "gzip": 8900
       },
       "./explosive": {
         "raw": 41750,
@@ -15598,20 +15598,20 @@
         "gzip": 15190
       },
       "./viscoplastic": {
-        "raw": 22756,
-        "gzip": 8616
+        "raw": 22777,
+        "gzip": 8628
       },
       "./tsunami": {
-        "raw": 23374,
-        "gzip": 8959
+        "raw": 23395,
+        "gzip": 8969
       },
       "./pack-ice": {
         "raw": 11423,
         "gzip": 4715
       },
       "./runoff": {
-        "raw": 18115,
-        "gzip": 6973
+        "raw": 18136,
+        "gzip": 6982
       },
       "./drainage-fog": {
         "raw": 10045,
@@ -15638,28 +15638,28 @@
         "gzip": 3902
       },
       "./landscape": {
-        "raw": 19478,
-        "gzip": 7533
+        "raw": 19499,
+        "gzip": 7542
       },
       "./sediment": {
-        "raw": 11090,
-        "gzip": 4402
+        "raw": 21174,
+        "gzip": 7845
       },
       "./underwater": {
-        "raw": 20309,
-        "gzip": 8041
+        "raw": 20330,
+        "gzip": 8051
       },
       "./orbit": {
-        "raw": 17069,
-        "gzip": 6691
+        "raw": 17090,
+        "gzip": 6703
       },
       "./granular-flow": {
         "raw": 14611,
         "gzip": 5574
       },
       "./lava": {
-        "raw": 25267,
-        "gzip": 9637
+        "raw": 25288,
+        "gzip": 9647
       },
       "./dfsph": {
         "raw": 19974,
@@ -18752,8 +18752,8 @@
         "gzip": 17117
       },
       "./shallow-surface": {
-        "raw": 3516,
-        "gzip": 1716
+        "raw": 6756,
+        "gzip": 3003
       },
       "./flood-bake": {
         "raw": 10165,
@@ -19288,8 +19288,8 @@
     },
     "packages/physics/dist/solver-phase-thread.js": {
       "raw": 1592,
-      "gzip": 767,
-      "brotli": 674
+      "gzip": 765,
+      "brotli": 667
     },
     "packages/physics/dist/cloth-kernel.wasm": {
       "raw": 11606,
@@ -19402,14 +19402,14 @@
       "brotli": 3824
     },
     "packages/physics/dist/sediment-kernel.wasm": {
-      "raw": 12483,
-      "gzip": 5224,
-      "brotli": 4691
+      "raw": 19505,
+      "gzip": 7606,
+      "brotli": 6633
     },
     "packages/physics/dist/sediment-kernel-shared.wasm": {
-      "raw": 12571,
-      "gzip": 5279,
-      "brotli": 4747
+      "raw": 19596,
+      "gzip": 7667,
+      "brotli": 6712
     },
     "packages/physics/dist/orbit-kernel.wasm": {
       "raw": 14124,

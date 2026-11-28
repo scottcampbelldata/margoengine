@@ -15937,9 +15937,18 @@ frame-rate and snapshot equality, and physical hail GPU replay are exercised by 
   bed inventories closes the solid mass balance.
 - S. Ikeda, G. Parker and K. Sawai, [Bend Theory of River Meanders. Part 1. Linear Development](https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/abs/bend-theory-of-river-meanders-part-1-linear-development/EAE7F1CD6803CC4F4F61148CB4FE96B3),
   1981, §§2–3, Eqs. 11–13, relates bank erosion and deposition to the tangential velocity perturbation at a bank.
-  The implementation uses the resolved velocity in the bordering wet cell and the reach mean, and routes
-  material across that bank face. Optional root pressure reduces the mobilised area and raises the Shields
-  threshold. This is a local bank exchange on the hydraulic mesh with user-supplied erodibility.
+  The bordered cell supplies the near-bank velocity. The connected wet band transverse to the interface
+  supplies the depth-weighted tangential mean. Its sign defines downstream. The two-sided transfer changes
+  storage by equal and opposite amounts; optional root pressure reduces the mobilised area and raises
+  the Shields threshold. Gary Parker's [Universal Bank Erosion Coefficient for Meandering Rivers](https://doi.org/10.1061/(ASCE)0733-9429(1989)115:6(744))
+  (1989) examines the local relation and how bank materials set the erodibility. The engine resolves
+  finite Cartesian sections and uses the caller's bank coefficient.
+- Hasan Eslami et al., [Investigating the celerity of propagation for small perturbations and dispersive sediment aggradation under a supercritical flow](https://esurf.copernicus.org/articles/13/437/2025/)
+  (2025), §4.1 and the [CC BY 4.0 measurement workbook](https://doi.org/10.5281/zenodo.14883164). The separate
+  diagnostic prescribes rectangular normal flow from measured water discharge, imposed slope, flume width and
+  Manning roughness from preliminary tests. The eleven independently measured solid capacities stay outside
+  the solver inputs. The diagnostic uses the separately measured grain properties and untuned Wong–Parker
+  coefficient, and reports the discrepancies and the limits of the comparison.
 
 The SIMD module reads the framework's water field and the solver contributes to TerrainBed's existing vertex
 accumulator. Water follows that bed. The same concentration enters the renderer's existing absorption and

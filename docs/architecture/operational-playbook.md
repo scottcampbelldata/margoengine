@@ -11036,6 +11036,14 @@ loads for unequal masses, rotational clearance, wall loads, queue release, input
 replay across frame rates and memory variants. The NavMesh regressions check weight in the
 existing ORCA planner and preserve covered-target and wall guidance behavior.
 
+### Live sediment and channel-bank evidence (HYDRO-03)
+
+Sediment updates one accepted TerrainBed with shared vertex mass accounting. Its native SIMD workers prepare
+individual cells and face proposals, with ordered bed transfer after joining. `sediment-threads.test.js` and
+`sediment-threads.browser.mjs` verify exact parallel state, far-cell replay and work counts. The Water shallow
+surface uploads accepted suspended concentration through its existing sediment tint. `sediment-surface.browser.mjs`
+checks moving bed, water and same-state tint on WebGPU and WebGL2. The held-out capacity comparisons still miss.
+
 ### Native orbital evidence (SPACE-01)
 
 The optional orbit entry compacts positive-mass sources in row order. Native workers partition target

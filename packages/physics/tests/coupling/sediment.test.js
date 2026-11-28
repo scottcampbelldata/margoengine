@@ -17,7 +17,7 @@ function near(actual, expected, tolerance) {
   assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} against ${expected} ± ${tolerance}`);
 }
 
-function publisher(field, type, words) {
+function publisher(field, type, words, valuesForTick) {
   let host;
   let region;
   return {
@@ -27,7 +27,9 @@ function publisher(field, type, words) {
       region = host.allocate(field.name, words.length * (type === 'f32' ? 4 : 8), type, 1);
       regionWords(host.memory, region).set(words);
     },
-    step() {},
+    step(context) {
+      if (valuesForTick) regionWords(host.memory, region).set(valuesForTick(context.tick));
+    },
     importPorts() {},
     exportPorts: (tick) => [{ field: field.name, region, tick, cell: [0, 0, 0] }],
     stateRegions: () => [region],
@@ -40,7 +42,7 @@ function setup(sediment, grid, flow, params = {}, options = {}) {
   const terrain = new TerrainBed();
   world.add(terrain, { ...grid, elevations: () => 0, bedrock: options.bedrock });
   world.add(sediment, { grid, ...params });
-  world.add(publisher(SURFACE_WATER_FIELD, 'f32', flow), {});
+  world.add(publisher(SURFACE_WATER_FIELD, 'f32', flow, options.waterForTick), {});
   return { world, terrain, sediment };
 }
 
@@ -228,4 +230,79 @@ test('real flow, bank and bed fields replay across frame rates, snapshots and bo
   plain.advance(90);
   shared.advance(90);
   assert.equal(plain.hash(), shared.hash());
+});
+
+test('banks use only their connected wet section and ignore a remote pool in either grid axis', async (t) => {
+  const params = { bankErodibility: 0.02, criticalShields: 1e9, settlingVelocity: 0, mobileDepth: 0.1 };
+  const expected = 6 * params.bankErodibility * (1 - porosity) * density;
+  for (const alongX of [false, true]) {
+    const grid = alongX ? shape(3, 9) : shape(9, 3);
+    async function run(remoteSpeed, alongNormal = false) {
+      const solver = await SedimentTransport.load();
+      t.after(() => solver[Symbol.dispose]());
+      const flow = Array.from({ length: grid.columns * grid.rows }, (_, i) => {
+        const across = alongX ? Math.floor(i / grid.columns) : i % grid.columns;
+        let speed;
+        if (across >= 1 && across <= 3) speed = 4 - across;
+        else if (across === 6 || across === 7) speed = remoteSpeed;
+        if (speed === undefined) return [0, 0, 0];
+        return alongX !== alongNormal ? [1, speed, 0] : [1, 0, speed];
+      }).flat();
+      const model = setup(solver, grid, flow, params);
+      model.world.advance(60);
+      return { bed: Array.from(model.terrain.elevations()), transfer: solver.budget.bankTransfer };
+    }
+    const isolated = await run(undefined);
+    const remote = await run(140);
+    assert.deepEqual(remote, isolated);
+    near(isolated.transfer, expected, 60 * 16 * Number.EPSILON * expected);
+    const normal = await run(undefined, true);
+    assert.equal(normal.transfer, 0);
+    assert.ok(normal.bed.every((value) => value === 0));
+  }
+});
+
+test('an unrepresentable concentration leaves the prior accepted sediment state and work intact', async (t) => {
+  for (const threads of [1, 4]) {
+    const solver = await SedimentTransport.load({ threads });
+    t.after(() => solver[Symbol.dispose]());
+    const grid = shape(1, 1);
+    const flow = [1e10, 0, 0];
+    const model = setup(
+      solver,
+      grid,
+      flow,
+      {
+        grainDensity: 1e70,
+        suspendedMass: 1e45,
+        settlingVelocity: 0,
+        mobileDepth: 0,
+      },
+      { memory: worldMemory(threads > 1), waterForTick: (tick) => (tick === 0 ? flow : [1, 0, 0]) },
+    );
+    model.world.advance(1);
+    const cell = solver.read(0, 0);
+    const budget = solver.budget;
+    const work = solver.workCounts();
+    const bed = model.terrain.elevations().slice();
+    assert.ok(cell.concentration > 0);
+    assert.throws(() => model.world.advance(2), {
+      name: 'MargoError',
+      code: 'state',
+      message: /Reduce the solid load or grain density/,
+    });
+    assert.deepEqual(solver.read(0, 0), cell);
+    assert.deepEqual(solver.budget, budget);
+    assert.deepEqual(solver.workCounts(), work);
+    assert.deepEqual(model.terrain.elevations(), bed);
+  }
+});
+
+test('van Rijn settling stays finite when an intermediate drag or grain product exceeds float64', () => {
+  const submerged = (density / waterDensity - 1) * g;
+  const diameter = 0.0002;
+  const transition = Math.sqrt(submerged * diameter);
+  near(sedimentSettlingSpeed(diameter, density, waterDensity, 1e-180), transition, 12 * Number.EPSILON * transition);
+  const large = 1.1 * Math.sqrt(submerged) * 1e154;
+  near(sedimentSettlingSpeed(1e308), large, 12 * Number.EPSILON * large);
 });

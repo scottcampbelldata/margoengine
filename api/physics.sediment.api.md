@@ -17,6 +17,7 @@ export interface SedimentLoadOptions {
     readonly id?: string;
     readonly waterField?: FieldDescriptor;
     readonly rootCohesion?: FieldDescriptor;
+    readonly threads?: number;
     readonly signal?: AbortSignal;
 }
 
@@ -51,10 +52,12 @@ export class SedimentTransport implements Solver<SedimentParams> {
     readonly shearField: FieldDescriptor;
     private constructor();
     static load(options?: SedimentLoadOptions): Promise<SedimentTransport>;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, params: SedimentParams): void;
     importPorts(): void;
     step(context: StepContext, dt: number): void;
+    workCounts(): SedimentWorkCounts;
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
@@ -63,6 +66,16 @@ export class SedimentTransport implements Solver<SedimentParams> {
     get concentrationSize(): readonly [number, number];
     copyConcentrations(out: Float32Array): void;
     get budget(): SedimentBudget;
+}
+
+export interface SedimentWorkCounts extends SedimentWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly SedimentWorkerWork[];
+}
+
+export interface SedimentWorkerWork {
+    readonly cellProposals: number;
+    readonly faceProposals: number;
 }
 
 export function sedimentSettlingSpeed(diameter: number, grainDensity?: number, waterDensity?: number, viscosity?: number, gravity?: number): number;

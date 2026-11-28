@@ -6199,6 +6199,13 @@ buoyancy enabled. The Water bridge uses that world state to write the rendered i
 [Physical tests](../../packages/physics/tests/pack-ice.test.js) · [Coupling tests](../../packages/physics/tests/coupling/pack-ice.test.js) ·
 [Display test](../../packages/physics/tests/coupling/pack-ice-render.test.js)
 
+### Conservative local bank and sediment work (HYDRO-03)
+
+The HYDRO-03 flume accounts for both water and solid mass as the bed scours and deposits. The fixed-camera
+`sediment-surface.browser.mjs` renders the accepted geometry and sediment tint on WebGPU and WebGL2. Serial and
+four-thread native state agree exactly on the 49,601-cell fixture in `sediment-threads.test.js`, and Chromium
+checks three real helpers through an origin shift. [HYDRO-03 audit](../physics-solver-audit.md#hydro-03-four-point-pass)
+
 ### Deterministic orbital force partitions (SPACE-01)
 
 The orbital solver publishes the same accepted positions, velocities and time in plain Wasm and

@@ -20,6 +20,7 @@ export class ShallowWaterSurface implements EnginePlugin {
 export interface ShallowWaterSurfaceOptions {
     readonly surface: Water;
     readonly source: ShallowWaterSurfaceSource;
+    readonly sediment?: NonNullable<FloodSediment['source']>;
 }
 
 export interface ShallowWaterSurfaceSample {
@@ -40,6 +41,18 @@ export interface ShallowWaterSurfaceSource {
 }
 
 // Not exported from this entry, but used by the exports above:
+
+interface FloodSediment {
+    erosion?: number;
+    criticalShear?: number;
+    settling?: number;
+    soil?: (x: number, z: number) => number | undefined;
+    tint?: boolean;
+    source?: {
+        readonly concentrationSize: readonly [number, number];
+        copyConcentrations(out: Float32Array): void;
+    };
+}
 
 interface FogLike {
   readonly color?: ColorInput;

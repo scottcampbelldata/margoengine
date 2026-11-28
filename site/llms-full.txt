@@ -13958,7 +13958,7 @@ The lensed disk uses circular Kerr angular velocity and a prescribed radial drif
 for zero spin and a two-point quadrature for spinning disks. The model covers slow radial drift of the emitter
 texture. Full relativistic gas dynamics, disk thickness and angular momentum transport are separate work.
 
-The orbit entry is 6,691 B gzip under a 6,947 B ceiling. The optional plain and shared Rust Wasm
+The orbit entry is 6,703 B gzip under a 6,947 B ceiling. The optional plain and shared Rust Wasm
 assets are 14,124/14,212 B raw and 6,091/6,146 B gzip. Core and Stage gain zero bytes. The black-hole entry grows from 25,293 B to 25,814 B within its 26,010 B
 budget. Core and stage together measure 24,820 B.
 
@@ -13986,7 +13986,7 @@ folds into the column with one beam drift and integer powers of the reflection f
 count must remain exactly representable as a float64 integer. The solver refuses an unresolved layer-crossing
 time or a tick that would leave the path or beam outside representable range. The previous accepted ray and
 ports remain available. The world holds 384 bytes per ray for state, outputs and scratch, plus the field
-registry's output copies, and 24 bytes per profile knot. The optional entry is 8,041 B gzip under an 8,284 B
+registry's output copies, and 24 bytes per profile knot. The optional entry is 8,051 B gzip under an 8,284 B
 ceiling. Each optional Wasm variant is 10,911 B raw and 4,846 B gzip. Core and Stage gain zero bytes.
 
 The loaded native path operates on the same ray and output regions as the synchronous constructor.
@@ -14452,7 +14452,7 @@ f64 words per cell and a dedicated stack per helper. A single-threaded world can
 browser window. Shared threads use Node or a cross-origin-isolated browser worker. Work counts
 describe the executed grid visits. Wall-clock throughput is unmeasured.
 
-The optional runoff entry is 6,973 B min+gzip under a 7,192 B ceiling. Lazy SIMD Wasm images are
+The optional runoff entry is 6,982 B min+gzip under a 7,192 B ceiling. Lazy SIMD Wasm images are
 23,699 B plain and 23,787 B shared raw, or 6,427 and 6,489 B gzip. Water's inland surface is
 1,716 B gzip under its 1,962 B ceiling. Core and Stage gain zero bytes.
 
@@ -14497,13 +14497,33 @@ Core and stage remain at 24,820 B min+gzip combined.
 
 `@margoengine/physics/sediment` works on one co-located rectangular TerrainBed and shallow-water grid. It uses a
 representative bed diameter and a representative suspended diameter for dilute transport. The bank model uses
-local near-bank velocity relative to the wet reach mean with user-supplied erodibility and optional root stress.
+bank-parallel velocity relative to the depth-weighted, connected wet band perpendicular to each wet/dry face.
+The signed mean establishes the downstream direction. A single wet cell across the channel or a band with no
+net tangent discharge gives no resolved bank perturbation. Rotated banks follow their Cartesian faces. Optional
+root pressure reduces exchange. Mixed grains, secondary circulation and natural meander rates remain open.
 The vertex reserve covers the mobile layer the caller declares. Set it to the bedrock clearance when TerrainBed
 has a floor. Fluid momentum and bed evolution exchange one field update per world tick. An open boundary exports
-sediment; external inflow at that edge carries clear water. Use the source grid's same rectangle for Flood tint.
+sediment. External inflow at that edge carries clear water. Flood and ShallowWaterSurface tint require their
+source's own rectangle and cell order. ShallowWaterSurface uploads the accepted concentration once per draw
+through Water's existing tint effect. The renderer expects a finite float32 concentration in kg/m³ and uses
+its existing optical concentration range. The floor and the live bed control available physical geometry.
 
-The optional sediment entry measures 5,256 B min+gzip. The plain and shared SIMD Wasm files are 12,483 B and
-12,571 B before HTTP compression. The Flood entry measures 14,457 B min+gzip with the concentration upload.
+Native shared workers split cell preparations and proposed face fluxes. Sediment movement through shared
+vertices, donor accounting and budgets retain their canonical order. Scratch changes are accepted only after
+native arithmetic, mass inventory and float32 publication checks. Counts report actual cell and face visits
+from the previous accepted tick and are independent of snapshots. Threaded browser worlds require shared
+memory and execution outside the Window thread.
+
+Eleven independently measured sediment capacities at two slopes were 3.48 to 4.40 times the native prediction
+with the independently prescribed rectangular-channel flow and grain properties. The source provides no
+per-capacity measurement uncertainty. The comparison does not simulate the experiment's sediment feed or
+subsequent aggradation. [Eslami and Radice (2025)](https://doi.org/10.5194/esurf-13-437-2025) ·
+[Measured capacities](https://doi.org/10.5281/zenodo.14883164)
+
+The optional sediment entry is 7,845 B gzip under a 8,101 B ceiling.
+The plain and shared SIMD Wasm are 19,505/19,596 B raw and 7,606/7,667 B gzip.
+Water's optional shallow-surface mirror is 3,003 B gzip under a 3,259 B ceiling.
+Core and Stage gain zero bytes.
 
 ### Pedestrian contact and crowd motion (LIFE-05)
 
@@ -15158,7 +15178,7 @@ renderer's optional destination uses a separate ArrayBuffer to protect the physi
 arena, even after shared memory grows. Counts describe work assignments. Wall-clock
 throughput is unmeasured.
 
-The optional viscoplastic entry is 8,616 B gzip with an 8,826 B ceiling. Both Wasm assets are 36,124 B raw and 13,261 B gzip. Core and Stage gain zero bytes.
+The optional viscoplastic entry is 8,628 B gzip with an 8,826 B ceiling. Both Wasm assets are 36,124 B raw and 13,261 B gzip. Core and Stage gain zero bytes.
 
 ### Skeletal tissue attachments (SOFT-05)
 
@@ -15457,7 +15477,7 @@ Receipts describe recent execution, while snapshots retain the physical state.
 
 Lava uses a regular depth-averaged heightfield patch with closed edges. It resolves laminar Bingham resistance, advected crystallisation enthalpy, diffusion, radiative and convective skin transfer and basal cooling. The optional terminal transport removes inertia for creeping flow, using Bingham discharge at each face and conservative enthalpy transport. It requires a thin, slowly varying sheet and has no imposed initial discharge. A point vent omits the real basalt experiment's chute momentum. Terrain, cooled crust and the pressure gradient drive channel confinement and arrest. The shallow-layer aspect-ratio approximation applies to patch-scale flow. Individual crust fractures, elastic lava tubes, three-dimensional overturning and a separate bubble phase need higher-dimensional models. The coastal source is the signed change in displaced volume under a fixed reference sea level. This estimate covers gravity-wave forcing from submerged occupancy. Rapid interface chemistry and water-side multiphase overturning are outside the model.
 
-The native microstep respects transport and thermal diffusion bounds. It refuses a tick above 4,096 explicit microsteps and publishes only finite, accepted volume and heat ledgers. With zero conductivity the well-mixed bulk is exposed, so radiation, convection and the water film act without a conductive skin or basal term. The default positive conductivity resolves a resistive skin. The ICE-05 contact is a 60 Hz staggered heat exchange. Match the terrain and render frames to the lava grid. Weather draws accepted skin emission and basalt coverage from the depth and crust with no guessed exposed crack area. Physics lava is 9,637 B gzip under 9,824 B. Weather lava is 15,291 B under 15,750 B. Both Wasm assets are 19,038 B raw and 8,497 B gzip. Core and Stage gain zero bytes.
+The native microstep respects transport and thermal diffusion bounds. It refuses a tick above 4,096 explicit microsteps and publishes only finite, accepted volume and heat ledgers. With zero conductivity the well-mixed bulk is exposed, so radiation, convection and the water film act without a conductive skin or basal term. The default positive conductivity resolves a resistive skin. The ICE-05 contact is a 60 Hz staggered heat exchange. Match the terrain and render frames to the lava grid. Weather draws accepted skin emission and basalt coverage from the depth and crust with no guessed exposed crack area. Physics lava is 9,647 B gzip under 9,824 B. Weather lava is 15,291 B under 15,750 B. Both Wasm assets are 19,038 B raw and 8,497 B gzip. Core and Stage gain zero bytes.
 
 The optional native worker path needs shared memory and a blocking host (Node or a
 cross-origin-isolated browser worker). On each microstep it partitions stability and local
@@ -21173,6 +21193,15 @@ fixture also drove wall-clock time while the raw shader reads the engine's shade
 `packages/physics/tests/orbit.test.js` checks the new conservative and atmospheric dynamics.
 `packages/shader/test/black-hole-check.mjs` uses the actual shader clock and checks moving emission,
 repeatable explicit disk time and inward advection. The live demo uses the same clock for flare timing.
+
+### Fixed 2026-11-28: remote water changed local bank erosion (KB-SEDIMENT-LOCALBANK1)
+
+The bank closure subtracted the mean speed of every wet cell from the wet edge's speed magnitude. A remote
+pool could change the erosion of a separate reach and channel-normal flow could move a bank. The closure now
+uses the signed bank-parallel velocity and the weighted mean of the connected local wet section. Both sides
+move the same accounted volume. Regression: `packages/physics/tests/coupling/sediment.test.js` verifies remote
+pool isolation and the signed mass balance on both axes. Its float32 overflow test also verifies preservation
+of each accepted buffer and the previous work receipt after a rejected candidate.
 
 ### Fixed 2026-11-28: finite extreme orbital forces and periapsis motion (KB-ORBIT-RANGE1)
 

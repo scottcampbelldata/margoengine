@@ -50,6 +50,28 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### HYDRO-03 four-point pass
+
+- Point 5. `coupling/sediment.test.js` verifies that remote pools cannot alter a bank's exchange, channel-normal
+  flow gives zero perturbation, and both raster axes follow the same directional mass balance. It checks extreme
+  settling arithmetic and rejection of a candidate concentration outside float32 without changing the prior
+  accepted load, bed or work. `sediment.test.js` covers coded input validation.
+- Point 6. `sediment-threads.test.js` and `sediment-threads.browser.mjs` verify exact native snapshots with
+  plain and shared memory and one, two and four workers, including mixed wet/dry roots, transport, a signed
+  far-origin shift and replay. Chromium starts three helpers and the four partitions visit all 172 faces. On a 257 × 193
+  grid four native partitions visit 49,601 cells and 99,652 faces, producing the same accepted state as serial.
+- Point 7. `sediment-surface.browser.mjs` drives an authored live Hydro inlet through the shared TerrainBed.
+  Scour and deposition in the flume reach 31.14 mm and 1.09 mm. Both renderers draw actual accepted topography
+  and live sediment tint. Changing only the tint alters 22,441 and 22,443 pixels on WebGPU and WebGL2 with unchanged
+  accepted motion. Bed and water readbacks, solid and water ledgers and fixed-camera replay pass.
+- Point 8. Physics and Water READMEs and `docs/limits.md` describe the local bank approximation, erodible reserves,
+  single-class transport, clear-inflow boundary, ordered transfer and the same-grid optical source.
+- Point 2 remains open. `hydro03-bedload-measured.mjs` compares eleven independent measured initial bedload
+  capacities at 1.37% and 2.20% slope, using source discharge, roughness from separate preliminary tests and
+  measured grain properties. Default Wong–Parker gives 22.75–28.75% of measured solid capacity. The sediment-fed
+  aggradation case requires a solid input port. [Eslami and Radice (2025)](https://doi.org/10.5194/esurf-13-437-2025) ·
+  [Measured capacities](https://doi.org/10.5281/zenodo.14883164)
+
 ### SPACE-01 four-point pass
 
 - Point 5. `06bda264b7`. `orbit.test.js` checks Kepler position and velocity near eccentricity one, extreme circular

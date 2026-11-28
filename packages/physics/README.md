@@ -221,7 +221,7 @@ import { PhysicsWorld } from '@margoengine/physics/world';
 
 const grid = { columns: 4, rows: 2, width: 16, depth: 8, centre: [8, 4] as const };
 const terrain = new TerrainBed();
-const sediment = await SedimentTransport.load();
+using sediment = await SedimentTransport.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
 world.add(terrain, { ...grid, elevations: () => 0 });
 world.add(new ShallowWaterSolver(), {
@@ -242,8 +242,15 @@ console.log(sediment.read(1, 0), sediment.budget, terrain.volume());
 
 Use the erodible thickness above the bedrock for `mobileDepth`. The registry exports layout-1 f64 cell grids
 with concentration in kg/m³, bedload capacity in m²/s and shear in Pa. The `rootCohesion` input can add a
-per-cell pressure from vegetation. `bankErodibility` activates lateral exchange in reaches with different
-near-bank and mean water speeds. `budget` reports bed and suspended masses and boundary exports in kg.
+per-cell pressure from vegetation. `bankErodibility` scales signed bank-parallel velocity relative to the
+mean of the connected local cross-section. Both sides of the bank exchange use the same transported mass.
+`budget` reports bed and suspended masses and boundary exports in kg.
+
+`SedimentTransport.load({ threads, signal })` optionally starts native workers or aborts the load.
+The default is one native thread. Use `worldMemory(true)` for multiple threads, and host the world in a
+Worker on a cross-origin-isolated browser page. `workCounts()` reports accepted cell and face proposals for
+each partition. Dispose the solver after removing it from the world. `ShallowWaterSurface` accepts this
+solver as its `sediment` source to tint the same live water that moves the bed.
 
 ## Rainfall runoff and channel inflow
 

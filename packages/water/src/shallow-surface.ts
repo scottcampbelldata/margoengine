@@ -1,11 +1,14 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
 import { fault, rangeError } from '../../shared/errors.js';
+import type { FloodSediment } from './flood.js';
+import { siltShader } from './flood-silt.js';
 import type { Water } from './index.js';
 import { waterSolvers, type WaterSolver, type WaterSolverInput } from './query-state.js';
+import { addSurfaceEffect } from './surface-effects.js';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; COPY_SRC: number };
-declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number };
+declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number; COPY_DST: number; UNIFORM: number };
 
 /** Depth and free-surface height in metres, and depth-averaged X/Z velocity in m/s. */
 export interface ShallowWaterSurfaceSample {
@@ -31,6 +34,8 @@ export interface ShallowWaterSurfaceOptions {
   /** Flowing Water with a terrain heightmap in the source grid's dimensions and coordinate frame. */
   readonly surface: Water;
   readonly source: ShallowWaterSurfaceSource;
+  /** Accepted suspended concentration in kg/m³ on the same cells and extent. Defaults to clear water. */
+  readonly sediment?: NonNullable<FloodSediment['source']>;
 }
 
 /**
@@ -41,6 +46,7 @@ export class ShallowWaterSurface implements EnginePlugin {
   readonly name: string;
   private engine?: Engine;
   private unwatch?: () => void;
+  private releaseTint?: () => void;
   private disposed = false;
 
   constructor(readonly options: ShallowWaterSurfaceOptions) {
@@ -61,14 +67,91 @@ export class ShallowWaterSurface implements EnginePlugin {
 
   setup(engine: Engine): void {
     if (this.disposed) throw fault('disposed', 'ShallowWaterSurface is disposed; create another mirror');
-    const { surface } = this.options;
+    const { surface, sediment } = this.options;
     if (this.engine || waterSolvers.has(surface))
       throw fault('attached', 'This Water already has a flood solver or mirror; dispose it before attaching a mirror');
     if (!engine.gpu || !engine.hasPlugin(surface.name))
       throw fault('state', 'Attach flowing Water to the same WebGPU or WebGL2 compatibility engine before its mirror');
+    if (sediment !== undefined) this.releaseTint = this.attachTint(sediment, engine.gpu);
     this.engine = engine;
     this.unwatch = surface.onDispose(() => this.dispose());
     waterSolvers.set(surface, this.makeMirror);
+  }
+
+  private attachTint(sediment: NonNullable<FloodSediment['source']>, gpu: GPUDevice): () => void {
+    const { surface, source } = this.options;
+    const shape = source.shape;
+    const dims = sediment?.concentrationSize;
+    if (
+      typeof sediment?.copyConcentrations !== 'function' ||
+      !shape ||
+      !Array.isArray(dims) ||
+      dims.length !== 2 ||
+      dims[0] !== shape.columns ||
+      dims[1] !== shape.rows ||
+      !dims.every((size) => Number.isInteger(size) && size > 0 && size <= gpu.limits.maxTextureDimension2D)
+    )
+      throw fault(
+        'state',
+        'Invalid shallow-water sediment grid; give copyConcentrations and matching positive cell dimensions within the device limit',
+        'geometry',
+      );
+
+    const { origin, size } = surface.options.terrain!;
+    const extent = Float32Array.of(...origin, ...size);
+    const sizeCells: [number, number] = [shape.columns, shape.rows];
+    const concentration = new Float32Array(shape.columns * shape.rows);
+    const layout = { bytesPerRow: shape.columns * Float32Array.BYTES_PER_ELEMENT };
+    let binding:
+      | { device: GPUDevice; uniform: GPUBuffer; texture: GPUTexture; resources: GPUBindingResource[] }
+      | undefined;
+    const release = () => {
+      binding?.uniform.destroy();
+      binding?.texture.destroy();
+      binding = undefined;
+    };
+    const unregister = addSurfaceEffect(surface, {
+      key: 'shallow-sediment',
+      vertex: false,
+      count: 2,
+      shader: (code, index) => siltShader(code, index, 'x'),
+      prepare({ device }) {
+        sediment.copyConcentrations(concentration);
+        if (!concentration.every((value) => Number.isFinite(value) && value >= 0))
+          throw fault(
+            'state',
+            'Invalid shallow-water sediment concentration; supply finite nonnegative kg/m³ values',
+            'geometry',
+          );
+        if (binding?.device !== device) {
+          release();
+          const uniform = device.createBuffer({
+            size: extent.byteLength,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+          });
+          let texture: GPUTexture | undefined;
+          try {
+            texture = device.createTexture({
+              size: sizeCells,
+              format: 'r32float',
+              usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING,
+            });
+            device.queue.writeBuffer(uniform, 0, extent);
+            binding = { device, uniform, texture, resources: [{ buffer: uniform }, texture.createView()] };
+          } catch (error) {
+            uniform.destroy();
+            texture?.destroy();
+            throw error;
+          }
+        }
+        device.queue.writeTexture({ texture: binding.texture }, concentration, layout, sizeCells);
+        return binding.resources;
+      },
+    });
+    return () => {
+      unregister();
+      release();
+    };
   }
 
   private readonly makeMirror = ({ device, terrain }: WaterSolverInput): WaterSolver => {
@@ -181,6 +264,8 @@ export class ShallowWaterSurface implements EnginePlugin {
     this.disposed = true;
     const { surface } = this.options;
     if (waterSolvers.get(surface) === this.makeMirror) waterSolvers.delete(surface);
+    this.releaseTint?.();
+    this.releaseTint = undefined;
     this.unwatch?.();
     this.unwatch = undefined;
     this.engine?.sceneOf(this)?.removePlugin(this.name);

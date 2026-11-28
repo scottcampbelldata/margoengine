@@ -12,7 +12,8 @@ type NativePhaseSolver =
   | { readonly subject: 'Underwater'; readonly phaseExport: 'underwater_thread_phase' }
   | { readonly subject: 'Orbit'; readonly phaseExport: 'orbit_thread_phase' }
   | { readonly subject: 'Runoff'; readonly phaseExport: 'runoff_thread_phase' }
-  | { readonly subject: 'Landscape'; readonly phaseExport: 'landscape_thread_phase' };
+  | { readonly subject: 'Landscape'; readonly phaseExport: 'landscape_thread_phase' }
+  | { readonly subject: 'Sediment'; readonly phaseExport: 'sediment_thread_phase' };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };
 
@@ -54,6 +55,7 @@ const phaseLabel = {
   Orbit: 'gravity',
   Runoff: 'soil',
   Landscape: 'terrain',
+  Sediment: 'transport',
 } as const;
 
 function failedThreads(subject: NativePhaseSolver['subject'], reason: string, cause?: unknown): MargoError {

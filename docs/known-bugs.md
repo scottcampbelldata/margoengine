@@ -4884,6 +4884,15 @@ fixture also drove wall-clock time while the raw shader reads the engine's shade
 `packages/shader/test/black-hole-check.mjs` uses the actual shader clock and checks moving emission,
 repeatable explicit disk time and inward advection. The live demo uses the same clock for flare timing.
 
+### Fixed 2026-11-28: remote water changed local bank erosion (KB-SEDIMENT-LOCALBANK1)
+
+The bank closure subtracted the mean speed of every wet cell from the wet edge's speed magnitude. A remote
+pool could change the erosion of a separate reach and channel-normal flow could move a bank. The closure now
+uses the signed bank-parallel velocity and the weighted mean of the connected local wet section. Both sides
+move the same accounted volume. Regression: `packages/physics/tests/coupling/sediment.test.js` verifies remote
+pool isolation and the signed mass balance on both axes. Its float32 overflow test also verifies preservation
+of each accepted buffer and the previous work receipt after a rejected candidate.
+
 ### Fixed 2026-11-28: finite extreme orbital forces and periapsis motion (KB-ORBIT-RANGE1)
 
 A finite inverse-square force could disappear or reject when its squared separation or intermediate
