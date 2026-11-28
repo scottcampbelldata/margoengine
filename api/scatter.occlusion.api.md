@@ -9,8 +9,8 @@ import { OccluderInput } from "@margoengine/culling";
 
 export class OccludedScatter extends Scatter {
     enabled: boolean;
-    constructor(meshes: readonly [Geometry, Geometry, Geometry], options?: ScatterOptions);
-    static attach(engine: EngineKernel, meshes: readonly [Geometry, Geometry, Geometry], options?: ScatterOptions): OccludedScatter;
+    constructor(meshes: Geometry | readonly [Geometry, Geometry, Geometry], options?: ScatterOptions);
+    static attach(engine: EngineKernel, meshes: Geometry | readonly [Geometry, Geometry, Geometry], options?: ScatterOptions): OccludedScatter;
     addOccluder(source: OccluderInput): this;
     removeOccluder(source: OccluderInput): this;
     protected colourInstances(): GPUBuffer[];
