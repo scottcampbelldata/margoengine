@@ -766,6 +766,93 @@ const FRONT_HAZE = 0.003;
 /** Buildings have negative flame keys: -(index + 1), or below this for a structure fuel no building listed. */
 const BUILDING_NONE = -1e9;
 
+/** A cell past its flames waiting in `FireFront.settle` (KB-SCENES-BURNTSLOW1). */
+interface LazyCell {
+  /** The step it left `burning` after; its travel holds the sums as they were after that step's visit. */
+  readonly entry: number;
+  /** Bit k: neighbour k still to be reached. */
+  open: number;
+  /** The last step it is in `burning` (the step its last way closes). */
+  death: number;
+}
+
+// Float32 travel added up step by step (`acc[k] = acc[k] + step` in a Float32Array), jumped ahead. Within one binade
+// [p, 2p) of float32, fround(a + s) - a is the same for every float32 a while a + s stays below 2p: the sum's rounding
+// to the float32 grid then depends on s alone, but for a tie, which goes to even and so differs between a and a + ulp;
+// a tie is stepped one at a time. So a run of steps inside a binade is one multiply, bit for bit the step-by-step sum.
+// `float32Steps` gives how many steps reach 1 from `a` (Infinity if the sum never grows); with `limit`, it stops there
+// and `runValue` holds the value (`float32Value`).
+let runValue = 0;
+function float32Steps(a: number, s: number, limit: number): number {
+  let n = 0;
+  while (n < limit && a < 1) {
+    if (a >= 1.1754943508222875e-38) {
+      let p = 2 ** Math.floor(Math.log2(a));
+      if (p > a) p /= 2;
+      else if (p * 2 <= a) p *= 2;
+      const top = p * 2,
+        u = p / 8388608,
+        d = Math.fround(a + s) - a;
+      if (d === 0) {
+        runValue = a;
+        return limit;
+      }
+      const a2 = a + u;
+      if (a2 + s < top && Math.fround(a2 + s) - a2 === d) {
+        // Steps 0..m-1 start below top - s, so each stays in the binade.
+        let m = Math.max(0, Math.floor((top - s - a) / d) + 1);
+        while (m > 0 && !(a + (m - 1) * d + s < top)) m--;
+        while (a + m * d + s < top) m++;
+        m = Math.min(m, limit - n);
+        if (m >= 1) {
+          a += m * d;
+          n += m;
+          continue;
+        }
+      }
+    }
+    const b = Math.fround(a + s);
+    if (b === a) {
+      runValue = a;
+      return limit;
+    }
+    a = b;
+    n++;
+  }
+  runValue = a;
+  return n;
+}
+const float32Run = float32Steps;
+function float32Value(a: number, s: number, steps: number): number {
+  float32Steps(a, s, steps);
+  return runValue;
+}
+function heapPush(h: number[], v: number): void {
+  let i = h.length;
+  h.push(v);
+  while (i > 0) {
+    const up = (i - 1) >> 1;
+    if (h[up]! <= v) break;
+    h[i] = h[up]!;
+    i = up;
+  }
+  h[i] = v;
+}
+function heapPop(h: number[]): void {
+  const last = h.pop()!;
+  if (!h.length) return;
+  let i = 0;
+  for (;;) {
+    let c = 2 * i + 1;
+    if (c >= h.length) break;
+    if (c + 1 < h.length && h[c + 1]! < h[c]!) c++;
+    if (h[c]! >= last) break;
+    h[i] = h[c]!;
+    i = c;
+  }
+  h[i] = last;
+}
+
 let nextId = 0;
 /** Mulberry32 random numbers in [0, 1). */
 function rng(seed: number): () => number {
@@ -843,6 +930,24 @@ export class FireFront implements EnginePlugin {
   // wind, the fuel moistures and the step, so it holds while `carryKey` does (KB-VFX-BURNOUTWORK1).
   private readonly carry = new Map<number, Float64Array>();
   private carryKey = '';
+  // `settle`'s lazy carry (KB-SCENES-BURNTSLOW1): a cell past its flames leaves `burning` and waits as a record until
+  // the step its kept travel reaches a neighbour, worked out ahead in float32 exactly as the steps would add it up.
+  /** Light order of each cell (1, 2, ...): the order `burning` holds them in, so the lazy cells interleave exactly. */
+  private readonly seqOf: Float64Array;
+  /** The cell lit `seq`-th. */
+  private readonly cellOfSeq: Int32Array;
+  private seqN = 0;
+  /** Steps taken since the front was made or reset; the step in progress inside `advance`. */
+  private stepN = 0;
+  /** Light order of the cell the step is visiting (-1 before the first: ignitions). */
+  private visitSeq = -1;
+  private lazyOn = false;
+  private readonly lazy = new Map<number, LazyCell>();
+  /** Step -> neighbours reached in it, each `seq * 16 + k`; `dueSteps` is a min-heap of the steps. */
+  private readonly due = new Map<number, number[]>();
+  private readonly dueSteps: number[] = [];
+  /** Step -> lazy cells whose last open neighbour closes in it (they leave at the end of that step). */
+  private readonly dying = new Map<number, number[]>();
   private beds: FuelBed[] = [];
   private bedKey = '';
   private dirty = true;
@@ -893,6 +998,8 @@ export class FireFront implements EnginePlugin {
     this.slopeZ = new Float32Array(n);
     this.crownOf = new Float32Array(n);
     this.fed = new Uint8Array(n);
+    this.seqOf = new Float64Array(n);
+    this.cellOfSeq = new Int32Array(n + 1);
     if (options.canopy) this.stands = new Float32Array(n * 3);
     this.rows = new Float32Array(this.width * 4);
     this.fill();
@@ -1147,7 +1254,7 @@ export class FireFront implements EnginePlugin {
   private airBackValue?: readonly [number, number, number];
   /** True while a cell burns or an ignition waits. */
   get active(): boolean {
-    return this.burning.length > 0 || this.pending.length > 0;
+    return this.burning.length > 0 || this.pending.length > 0 || this.lazy.size > 0;
   }
 
   private queue(ig: FireIgnition): void {
@@ -1189,7 +1296,123 @@ export class FireFront implements EnginePlugin {
     this.burnout[i] = t + (model.structure ? (this.options.structureBurnTime ?? 1800) : bed.residence);
     this.born.push(i);
     this.dirty = true;
+    this.seqOf[i] = ++this.seqN;
+    this.cellOfSeq[this.seqN] = i;
+    if (this.lazy.size) this.closeToward(i);
     return true;
+  }
+
+  // A lazy cell's way into `j`, just lit, closes: in this step if the visits reach the cell after the one that lit `j`
+  // (it then finds `j` alight), else in the next (as a visited cell finds it on its next visit).
+  private closeToward(j: number): void {
+    const { width, height } = this,
+      jx = j % width,
+      jz = (j - jx) / width,
+      s = this.stepN;
+    for (let k = 0; k < NEIGHBOURS.length; k++) {
+      const [dx, dz] = NEIGHBOURS[k]!,
+        ix = jx - dx,
+        iz = jz - dz;
+      if (ix < 0 || iz < 0 || ix >= width || iz >= height) continue;
+      const i = iz * width + ix,
+        rec = this.lazy.get(i);
+      if (rec && rec.open & (1 << k)) {
+        rec.open &= ~(1 << k);
+        this.closed(i, rec, this.seqOf[i]! > this.visitSeq ? s : s + 1);
+      }
+    }
+  }
+  private closed(i: number, rec: LazyCell, step: number): void {
+    if (step > rec.death) rec.death = step;
+    if (rec.open === 0) {
+      const list = this.dying.get(rec.death);
+      if (list) list.push(i);
+      else this.dying.set(rec.death, [i]);
+    }
+  }
+  /** Takes a cell past its flames, after its visit in step `s`, out of `burning` into a lazy record. */
+  private lazify(i: number, s: number, memo: Float64Array): boolean {
+    const acc = this.travel.get(i)!,
+      { width } = this,
+      x = i % width,
+      z = (i - x) / width,
+      seq = this.seqOf[i]!;
+    let open = 0;
+    const ahead: number[] = [];
+    for (let k = 0; k < NEIGHBOURS.length; k++) {
+      const step = memo[k]!;
+      if (acc[k]! >= 1 || step === CARRY_DONE) continue;
+      const j = (z + NEIGHBOURS[k]![1]) * width + x + NEIGHBOURS[k]![0];
+      if (this.stateOf[j] !== UNBURNT) continue; // lit after this visit: found on the next one, step s + 1
+      if (!(step > 0)) return false; // never worked out: the step does it (not expected)
+      open |= 1 << k;
+      ahead.push(k, float32Run(acc[k]!, step, Infinity));
+    }
+    const rec: LazyCell = { entry: s, open, death: s + 1 };
+    this.lazy.set(i, rec);
+    for (let q = 0; q < ahead.length; q += 2) {
+      const n = ahead[q + 1]!;
+      if (n === Infinity) continue; // too small a step to ever add up: open until a neighbour lights it
+      const at = s + n,
+        list = this.due.get(at),
+        key = seq * 16 + ahead[q]!;
+      if (list) list.push(key);
+      else {
+        this.due.set(at, [key]);
+        heapPush(this.dueSteps, at);
+      }
+    }
+    if (open === 0) this.closed(i, rec, s + 1);
+    return true;
+  }
+  /** A lazy cell's kept travel reaches neighbour `k` in step `s`: what its visit would have done. */
+  private reach(key: number, t: number, s: number): void {
+    const seq = Math.floor(key / 16),
+      k = key - seq * 16,
+      i = this.cellOfSeq[seq]!,
+      rec = this.lazy.get(i);
+    if (!rec || !(rec.open & (1 << k))) return;
+    rec.open &= ~(1 << k);
+    this.visitSeq = seq;
+    const j = i + NEIGHBOURS[k]![1] * this.width + NEIGHBOURS[k]![0];
+    if (this.light(j, t) && this.carry.get(i)![NEIGHBOURS.length + k] === 1) {
+      this.fed[j] = 1;
+      this.closed(i, rec, s);
+    } else this.closed(i, rec, s + 1);
+  }
+  /** Puts every lazy cell back into `burning`, in light order, with the travel the steps since would have added. */
+  private flush(): void {
+    if (!this.lazy.size) return;
+    const S = this.stepN,
+      back: number[] = [];
+    for (const [i, rec] of this.lazy) {
+      const acc = this.travel.get(i)!,
+        memo = this.carry.get(i)!;
+      for (let k = 0; k < NEIGHBOURS.length; k++) {
+        if (rec.open & (1 << k)) acc[k] = float32Value(acc[k]!, memo[k]!, S - rec.entry);
+        else if (acc[k]! < 1 && memo[k] !== CARRY_DONE) acc[k] = 2;
+      }
+      back.push(i);
+    }
+    back.sort((a, b) => this.seqOf[a]! - this.seqOf[b]!);
+    const list = this.burning,
+      merged: number[] = [];
+    let p = 0,
+      q = 0;
+    while (p < list.length || q < back.length)
+      if (q >= back.length || (p < list.length && this.seqOf[list[p]!]! < this.seqOf[back[q]!]!)) merged.push(list[p++]!);
+      else merged.push(back[q++]!);
+    this.burning = merged;
+    this.lazy.clear();
+    this.due.clear();
+    this.dueSteps.length = 0;
+    this.dying.clear();
+  }
+  /** The next step a lazy cell does anything in (reaches a neighbour or leaves), or Infinity. */
+  private nextLazyStep(): number {
+    let at = this.dueSteps.length ? this.dueSteps[0]! : Infinity;
+    for (const d of this.dying.keys()) if (d < at) at = d;
+    return at;
   }
 
   private lightArea(ig: FireIgnition, t: number): void {
@@ -1264,6 +1487,14 @@ export class FireFront implements EnginePlugin {
     this.travel.clear();
     this.carry.clear();
     this.carryKey = '';
+    this.lazy.clear();
+    this.due.clear();
+    this.dueSteps.length = 0;
+    this.dying.clear();
+    this.seqN = this.stepN = 0;
+    this.visitSeq = -1;
+    this.seqOf.fill(0);
+    this.cellOfSeq.fill(0);
     this.segs.clear();
     this.flameAcc.clear();
     // The fuel beds are a cache of the options; a fresh fire builds them on its first step.
@@ -1286,17 +1517,44 @@ export class FireFront implements EnginePlugin {
 
   /**
    * Steps the fire until nothing burns and no ignition waits, then resolves with the fire time. Yields to the event
-   * loop every 4,096 steps; `signal` aborts it.
+   * loop every 4,096 steps; `signal` aborts it. The burn is the one `advanceTime` steps, cell for cell, but a cell past
+   * its flames is not visited each step: it waits for the step its kept travel reaches a neighbour, worked out ahead
+   * (KB-SCENES-BURNTSLOW1), and steps in which nothing but such cells wait are only counted.
    * @param maxSeconds The most fire time to simulate. Default 86,400.
    */
   async settle(maxSeconds = 86400, signal?: AbortSignal): Promise<number> {
     finiteIn(maxSeconds, 'maxSeconds', 0, 1e9);
     const end = this.time + maxSeconds;
     let n = 0;
-    while (this.active && this.time < end) {
-      signal?.throwIfAborted();
-      this.advance(this.step);
-      if (++n % 4096 === 0) await Promise.resolve();
+    this.lazyOn = true;
+    try {
+      while (this.active && this.time < end) {
+        signal?.throwIfAborted();
+        if (this.burning.length === 0 && this.pending.length === 0) {
+          // Only lazy cells wait: the steps before the next one that does something change nothing but the time.
+          const next = this.nextLazyStep();
+          let skipped = false;
+          while (this.stepN + 1 < next && this.time < end) {
+            this.time = this.time + this.step;
+            this.stepN++;
+            skipped = true;
+          }
+          if (skipped) {
+            this.segs.clear();
+            this.flameAcc.clear();
+          }
+          if (this.time >= end) break;
+        }
+        this.advance(this.step);
+        if (++n % 4096 === 0) {
+          // Every cell back in `burning` while other code may run.
+          this.flush();
+          await Promise.resolve();
+        }
+      }
+    } finally {
+      this.flush();
+      this.lazyOn = false;
     }
     if (this.dirty) this.publish();
     return this.time;
@@ -1306,7 +1564,15 @@ export class FireFront implements EnginePlugin {
     const t = this.time + dt,
       o = this.options,
       { width, height, cell } = this,
-      beds = this.bedsFor();
+      beds = this.bedsFor(),
+      w0 = o.wind ?? [0, 0],
+      key0 = Array.isArray(w0)
+        ? [w0[0], w0[1], o.windReduction ?? 0.4, o.foliarMoisture ?? 1, o.crown, this.bedKey, dt].join()
+        : '';
+    // Kept rates that no longer hold: the lazy cells go back to being stepped, their rates worked out again.
+    if (this.lazy.size && (key0 === '' || key0 !== this.carryKey)) this.flush();
+    const s = ++this.stepN;
+    this.visitSeq = -1;
     while (this.pending.length && (this.pending[0]!.time ?? 0) <= t) this.lightArea(this.pending.shift()!, t);
     for (const i of this.born) this.burning.push(i);
     this.born.length = 0;
@@ -1316,9 +1582,8 @@ export class FireFront implements EnginePlugin {
       fm10 = this.fm10!,
       foliar = o.foliarMoisture ?? 1,
       standOut = { baseHeight: 0, bulkDensity: 0, height: 0 },
-      w = o.wind ?? [0, 0],
       // A wind field varies over the ground and in time, so nothing is kept under one.
-      key = Array.isArray(w) ? [w[0], w[1], reduction, foliar, o.crown, this.bedKey, dt].join() : '';
+      key = key0;
     if (key === '' || key !== this.carryKey) {
       this.carry.clear();
       this.carryKey = key;
@@ -1329,7 +1594,20 @@ export class FireFront implements EnginePlugin {
     // `burning` holds every cell that is flaming or still carrying the front out to its neighbours: a flame lasts its
     // residence time (Anderson 1969) but the front goes on at Rothermel's rate until it has reached each neighbour, so
     // a slow backing fire is not cut short by a short-lived flame.
-    for (const i of this.burning) {
+    // The lazy cells' neighbours reached this step, in the order their visits would come (light order, then direction).
+    let events: number[] | undefined;
+    if (this.dueSteps.length && this.dueSteps[0] === s) {
+      heapPop(this.dueSteps);
+      events = this.due.get(s)!.sort((a, b) => a - b);
+      this.due.delete(s);
+    }
+    let e = 0;
+    const list = this.burning;
+    for (let p = 0; p < list.length; p++) {
+      const i = list[p]!,
+        seq = this.seqOf[i]!;
+      if (events) while (e < events.length && events[e]! < seq * 16) this.reach(events[e++]!, t, s);
+      this.visitSeq = seq;
       const x = i % width,
         z = (i - x) / width,
         wx = this.origin[0] + (x + 0.5) * cell,
@@ -1345,8 +1623,9 @@ export class FireFront implements EnginePlugin {
       // again each step (KB-VFX-BURNOUTWORK1: 99 percent of the cells a burn-out steps).
       const kept = this.stateOf[i] === BURNING ? undefined : this.carry.get(i);
       if (kept) {
-        if (this.carryOn(i, x, z, t, kept)) next.push(i);
-        else {
+        if (this.carryOn(i, x, z, t, kept)) {
+          if (!this.lazyOn || !this.lazify(i, s, kept)) next.push(i);
+        } else {
           this.travel.delete(i);
           this.carry.delete(i);
         }
@@ -1515,6 +1794,16 @@ export class FireFront implements EnginePlugin {
         this.travel.delete(i);
         this.carry.delete(i);
       }
+    }
+    if (events) while (e < events.length) this.reach(events[e++]!, t, s);
+    const gone = this.dying.get(s);
+    if (gone) {
+      for (const i of gone) {
+        this.lazy.delete(i);
+        this.travel.delete(i);
+        this.carry.delete(i);
+      }
+      this.dying.delete(s);
     }
     for (const i of this.born) next.push(i);
     this.born.length = 0;

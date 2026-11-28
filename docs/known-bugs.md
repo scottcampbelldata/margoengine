@@ -6,6 +6,28 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: the shot's look masks are drawn with TAA's jitter, a fifth of a pixel off the resolved frame (KB-POST-MRTJITTER1, post SceneTargets, terrain and scatter captures, taa)
+
+- **Repro:** the timber-valley blowup shot rendered with TAA (35cc7b3429) and without it (1604e1a464), then
+  `.lane/sky/tint.mjs` and `.lane/sky/maskshift.mjs` in lane B's worktree on the early probe: shadowTint 0.188 b* without
+  TAA, -0.164 with it (bound 0.04 up), the same value on a second render.
+- **Measured:** under the same masks TAA moves shadowTint by 0.01 b* (main's masks: 0.188 without TAA, 0.198 with; TAA's
+  masks: -0.157 and -0.164); every bit of the flip is the masks. The geometry, lit and shadow masks of the TAA render are
+  main's shifted by (-0.21, -0.03) px (least squares on the grey masks, the whole frame; the mid probe gives the same),
+  so 3 of 49 shadow-interior and 37 lit-interior pixels change, over a patch where lit and shadowed ground differ by 2
+  percent in brightness (bounce 95 to 98). TAA's sample 3 offset is (-0.375, -0.056) render px, (-0.19, -0.03) at the
+  shot's 2x supersample. Every kept frame is 8 subframes, the whole Halton cycle, so the masks (read after the frame)
+  always come from the same phase: deterministic, not noise.
+- **Cause:** TAA swaps in its jittered camera at order -70 (core's shader reads `taaCamera`, terrain and scatter write the
+  jittered matrix into their own frame uniforms), and `SceneTargets` (order -4.5) draws its outputs with those same
+  shaders and uniforms. The resolved frame, averaged over all 8 phases, is centred on the unjittered camera, so the masks
+  sit off it by most of one phase's offset.
+- **Next (needs a decision on the default):** SceneTargets outputs that in-frame effects read with the jittered colour
+  want the jitter; masks and AOVs compared with or composited over the resolved frame do not. A fix draws SceneTargets
+  (an option, or always for the shot page's masks) with `unjitteredCamera` (`packages/shared/temporal-camera.js`): core's
+  shader without the `taaCamera` swap, and terrain and scatter captures with an unjittered frame uniform of their own.
+  With registered masks the TAA frame reads 0.198 b* and passes. The bar stays.
+
 ### Fixed 2026-11-27: a figure under reduced motion kept a picture without its axes and ignored input (KB-VC-SCIVIZ-VOL, -SURF, -WIND, -HEAD, sciviz)
 
 - **Repro:** `node scripts/visual-compat.mjs --only=sciviz-volume,sciviz-surface,sciviz-wind,sciviz-head` several times on
@@ -212,22 +234,43 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   is measured over 49 and 46 shadow-interior pixels of 2 million, with bounce at 95 and 98 percent (the pall hides the
   sun, so lit and shadowed ground are the same brightness), and over the whole masks the gap is 0.81 and 0.82 b*
   either way: the jittered masks move a few interior pixels, not the colour. The same bar already fails on main at
-  mid (0.04). No bound changed. aftermath was not compared: it does not load on main either (KB-SCENES-BURNTSLOW1).
+  mid (0.04). No bound changed. aftermath was not compared: it did not load on main either (KB-SCENES-BURNTSLOW1); with
+  that fixed, every aftermath bar passes with TAA (shimmerMoving 0.253 and 0.607 to 0.092 and 0.300, KB-LOOK-TV-SHIMMER3).
+- **Sent back, then found (2026-11-27):** the blowup early shadowTint flip is deterministic and not TAA's colour: see
+  KB-POST-MRTJITTER1.
 
-### Open 2026-11-27: the aftermath shot no longer loads: burning the valley out takes longer than the shot tool waits (KB-SCENES-BURNTSLOW1, scenes, vfx, shot tool)
+### Fixed 2026-11-27: the aftermath shot no longer loaded: burning the valley out took longer than the shot tool waits (KB-SCENES-BURNTSLOW1, vfx)
 
-- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-aftermath.json --once --seconds 1.1 --out <folder>`
+- **Repro (before):** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-aftermath.json --once --seconds 1.1 --out <folder>`
   on main 1604e1a464 (RTX A6000, WebGPU): "page.waitForFunction: Timeout 180000ms exceeded" in `untilQueued`
-  (`tools/shot/render.mjs`, `PAGE_TIMEOUT_MS` 180 s), every run, with and without KB-SCENES-TVTAA1. The same settings in
-  `packages/scenes/test/timber-valley-still.html` (`fire=burnt&weather=smoke&hour=10&date=1910-08-22`, film quality)
-  attach in 193 s with no GPU error, while another render shared the GPU.
-- **Cause:** since 7d96ac7993 (KB-VFX-DARKTRAILS1) `fire: 'burnt'` runs the fire front until nothing burns
-  (`burnOut`, up to `BURN_OUT_LIMIT`, 30 days of fire time) inside `attach`, where it stopped after one day before; at
-  film quality's 4 m cells that is days of fire time on the CPU before the first frame, past the shot tool's fixed page
-  wait.
-- **Next:** the owner of KB-VFX-DARKTRAILS1 decides between a burn-out that costs less with the same end state (the
-  fire front's settle) and a shot-tool wait that covers a scene's build; the 180 s guard is not raised to hide it.
-  Until then the aftermath shot has no frames, so KB-LOOK-TV-SHIMMER3 has no measure with TAA.
+  (`tools/shot/render.mjs`, `PAGE_TIMEOUT_MS` 180 s), every run, with and without KB-SCENES-TVTAA1; the shot page with
+  the shot's query (`fire=burnt&weather=smoke&hour=10&date=1910-08-22`) took 193 s to be ready.
+- **Cause:** since 7d96ac7993 (KB-VFX-DARKTRAILS1) `fire: 'burnt'` settles the fire until nothing burns (`burnOut`,
+  `FireFront.settle`), 2.8 days of fire time in 0.5 s steps. KB-VFX-BURNOUTWORK1 kept each spent cell's spread rates,
+  but `settle` still visited every cell in `burning` every step, and 99.9 percent of those visits were cells past their
+  flames adding their kept travel toward neighbours a slow backing or flanking fire takes hours or days to reach:
+  on the 8 m grid 754,532,995 such visits in 471,341 steps.
+- **Fix:** inside `settle` a cell past its flames leaves the step loop as a record (`packages/vfx/src/fire-front.ts`,
+  `lazify`, `reach`, `flush`). For each way still open it works out the step its float32 travel reaches 1, the sum the
+  steps would make: inside one float32 binade fround(a + s) - a is the same for every a (but for a rounding tie, which
+  is stepped one at a time), so a run of steps is one multiply, bit for bit the step-by-step sum. That step's visit
+  happens in light order with the flaming cells, so the same cell lights a neighbour first and the embers draw the same
+  random numbers; a neighbour lit by another cell closes the way in the step the visit would have found it. Steps where
+  only such records wait are counted, not run. Every record goes back into `burning` with its travel brought up to date
+  before `settle` yields, stops or is aborted, and when the kept rates no longer hold, so `advanceTime` and every getter
+  see the state the steps would have left. The 180 s page wait is unchanged.
+- **After (work counted, timber-valley's fire, smoke weather, seed 1910, `.lane/burn/lazycount.mjs` in lane B's
+  worktree):** 8 m grid: the same burn as stepping it (sha256 of the burn texture, fire time, embers, spots and crowning
+  cells equal: 237,470.5 s, 255,310 cells burnt, 105,120 embers, 8,171 spot fires), carrying visits 754,532,995 to
+  435,164 (1,734 times fewer), steps run 471,341 to 398,724, full spread evaluations 6,246,622 either way. 4 m grid
+  (the film's): 245,753.5 s, 1,025,344 cells burnt, 1,454,522 carrying visits, 25,095,798 full evaluations;
+  stepped instead, the same burn (equal hash) with 1,769,337,899 carrying visits in 487,907 steps (1,216 times
+  more). The shot page is ready in 34.4 s (was 193 s), and the aftermath shot renders.
+- **Regression test:** `packages/vfx/test/fire-front-lazy.test.js`: a fire with crowns, slope, a building, spotting and
+  three ignitions (two of them later) settles to the same burn, cell for cell, as the same fire stepped with
+  `advanceTime`, with under a twentieth of the carrying visits (10,033 against 17,392,485; fails without the fix: the
+  same count both ways); settles stopped after 1, 777, 3,600 and 5,000.5 s, stepping on, and a change of wind and
+  moisture mid-burn match the stepped fire at every stop; an aborted settle and a reset fire do too.
 
 ### Fixed 2026-11-27: scatter motion vectors drew a streamed forest from destroyed buffers (KB-SCATTER-VELTILES1, scatter)
 
@@ -731,7 +774,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
 - **Repro:** not yet run. By reading: water's liquid, underwater and caustics composites on a `TransparentCanvas` encode `vec4f(toDisplay(rgb),now.a)`, the pattern KB-POST-ALPHARIM1 measured at 36 of 255 on silhouettes.
 - **Cause:** the display curve is applied to premultiplied colour. The shared helper `displayFor` (`packages/shared/straight-display.js`) is the fix; each composite needs it and a case in a transparent-canvas test.
-### Open 2026-11-27: the aftermath shot shimmers 0.61 percent at mid, all of it the crest conifers' parallax against the sky (KB-LOOK-TV-SHIMMER3, look check)
+### Fixed 2026-11-27: the aftermath shot shimmered 0.61 percent at mid, all of it the crest conifers' parallax against the sky (KB-LOOK-TV-SHIMMER3, look check; fixed by TAA, KB-SCENES-TVTAA1)
 
 - **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-aftermath.json --once --seconds 1.1 --out <folder>`
   (RTX A6000, WebGPU; supersample 2, 8 subframes): mid shimmerMoving 0.607 percent (bound 0.5), the shot's one failing
@@ -751,10 +794,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   (KB-SKY-SANDGREY1, KB-SKY-PALLHAZE1). Per class, percent of the frame, main to landing: occluded 0.22 to 0.30, depth
   edges 0.30 to 0.30, sky 0.05 to 0.00, other 0.02 to 0.01. Main's sky behind the crest read luma 158 (washed out, the
   defect those fixes remove) over ground 28; the landing's 77 over 45 shows the tips. Bound unchanged.
-- **With TAA (KB-SCENES-TVTAA1), not measured:** the aftermath shot does not load on main since KB-VFX-DARKTRAILS1
-  (KB-SCENES-BURNTSLOW1), with or without TAA, so its 0.607 has no TAA figure yet. On the seven other shots TAA
-  lowered shimmerMoving by 0.02 to 0.67 points and left the occluded and depth-edge shares, which make up all of this
-  entry's remainder, about as they were (rail-line mid 7.34 to 6.79 percent of the frame).
+- **With TAA (KB-SCENES-TVTAA1), measured 2026-11-27:** once the shot loaded again (KB-SCENES-BURNTSLOW1), the same
+  command gives shimmerMoving 0.092 early and 0.300 mid (were 0.253 and 0.607), inside the 0.5 bound, and every other
+  aftermath bar passes (chromaSmear 0.115 and 0.098 to 0.033 and 0.014, speckle mid 0.48 to 0 ppm, shadowTint 6.15 and
+  6.27 b* unchanged). The shot has no failing bar left; the bound stays 0.5.
 
 ### Fixed 2026-11-27: a far ridge the haze hid fully took the haze's fire glow, the sky over it the smoke layer's, two laws for one light, so the ridge stood 6 codes lighter (KB-SKY-HAZEGLOW1, sky)
 
