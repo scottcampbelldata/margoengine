@@ -6,6 +6,29 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-28: a path joint on a turning base lags and then diverges (KB-PHYS-PATHMOVINGBASE1, physics mechanisms)
+
+- **Repro:** a position-driven body turned about z 2 degrees a 60 Hz step (`setNextRotation`), a dynamic body on a
+  `prismatic` slide along z, and a `PathJoint` from the turning body holding a point 0.1 m out on the follower to a helix
+  of pitch 0.348 m (Catmull-Rom through 128 points a turn, in the turning body's frame). After a quarter turn the follower
+  is 0.15 mm off the helix, 3.7 mm after a turn; with the helix 1 m out it is 1.1 m off after a quarter turn and the world
+  stops ("went past 1e15"). The same follower on a fixed curve holds.
+- **Cause:** not found yet. The path rows (`kernel/src/couplings.rs`, PATH) read the point on the curve and its frame at the
+  poses before the substep and correct a share of the error only in the biased pass; on a base that turns, the curve
+  point's own motion along the normals seems to be missed or lagged. It blocks a cam follower (the rose engine and the
+  Reuleaux drive in `@margoengine/machinery/rigs`), which wait for it. Physics lane.
+
+### Open 2026-11-28: gear and rack rows drift from the poses by float rounding (KB-PHYS-COUPLINGDRIFT1, physics mechanisms)
+
+- **Repro:** `archimedesScrewRig(0.348)` of `@margoengine/machinery/rigs` with its water body at z 0.5 m instead of near the
+  origin: the water is 0.1 mm behind `pitch * angle / 2 pi` after 4.7 turns and 0.35 mm after ten, growing with the travel,
+  and the sign changes with the step size (2 degrees: -33 µm a turn; half a degree: +120 µm). At the origin it is 2.3 µm
+  after 4.7 turns and 49 µm after 100; a harmonic drive's gear row is 6e-6 rad behind after 100 turns.
+- **Cause:** a gear's and a rack's error is the integral of the row's own speed (`track_couplings`), not read from the
+  poses; the positions are stored in f32 and each substep's small move is rounded, with a bias, so the poses part from the
+  integrated speed and nothing pulls them back. Box2D's gear joint reads its error from the joints' coordinates. The rig
+  keeps its water near the origin, where the float spacing is finest, until the row reads the poses. Physics lane.
+
 ### Open 2026-11-27: the physics preview render check ignores MARGO_COMPAT (KB-PHYS-PREVIEWCOMPAT1, physics scripts)
 
 - **Repro:** `node --test tests/gpu-compat-honoured.test.js` fails, naming `packages/physics/scripts/test-preview.js`.

@@ -1,8 +1,13 @@
 // The mechanism rigs step a physics world and match the closed forms of ./mechanisms: the solver's followers against the exact pose.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadRigs, scotchYokeRig, genevaRig, oldhamRig, epicyclicRig, openRig, keyedRig, signedReading, describeCheck } from '../dist/rigs.js';
-import { genevaPose, epicyclicSpeeds, genevaCrankRadius } from '../dist/mechanisms.js';
+import {
+  loadRigs, scotchYokeRig, genevaRig, oldhamRig, epicyclicRig, openRig, keyedRig, signedReading, describeCheck,
+  harmonicDriveRig, integratorRig, archimedesScrewRig, stroboscopeRig,
+} from '../dist/rigs.js';
+import {
+  genevaPose, epicyclicSpeeds, genevaCrankRadius, harmonicDriveRatio, ballDiskIntegrator, archimedesScrewPose, stroboscopicPose,
+} from '../dist/mechanisms.js';
 
 await loadRigs();
 const deg = Math.PI / 180;
@@ -112,4 +117,71 @@ test('a signal disposes a rig and a keyed rig when it aborts', async () => {
   assert.equal(train.check, null, 'the keyed rig dropped its rig');
   assert.throws(() => train.drive(1, 'ring'), /left the page/);
   assert.throws(() => scotchYokeRig(0.1, { signal: stop.signal }), /left the page/, 'an aborted signal builds nothing');
+});
+
+test('Harmonic drive rig: the output spline turns at the Musser ratio with either spline held', () => {
+  for (const fixed of ['circular', 'flex']) {
+    const spec = { flexTeeth: 60, circularTeeth: 62, fixed };
+    using rig = harmonicDriveRig(spec, { angle: 0.3 });
+    const pose = rig.drive(0.3 + 6 * Math.PI, false);
+    assert.ok(Math.abs(pose.output - harmonicDriveRatio(spec) * pose.input) < 1e-5, `${fixed} held: ${pose.output}`);
+    rig.drive(-1);
+    assert.ok(rig.check.ever < 1e-5, `${fixed} held: worst gap ${rig.check.ever} rad`);
+  }
+  assert.throws(() => harmonicDriveRig({ flexTeeth: 60, circularTeeth: 60 }), RangeError);
+});
+
+test('Integrator rig: the roller turns the integral of r / rho over the disk, as the ball moves and after a reset', () => {
+  using rig = integratorRig({ wheelRadius: 0.046, diskRadius: 0.24, radius: 0.1 });
+  const exact = ballDiskIntegrator({ wheelRadius: 0.046, diskRadius: 0.24 });
+  rig.drive(2 * Math.PI, false);
+  exact.advance(1, 0.1);
+  rig.setRadius(-0.05);
+  rig.drive(5 * Math.PI, false);
+  exact.advance(1.5, -0.05);
+  rig.setRadius(0);
+  rig.drive(6 * Math.PI, false);
+  exact.advance(0.5, 0);
+  rig.setRadius(0.195);
+  let pose = rig.drive(8 * Math.PI, false);
+  exact.advance(1, 0.195);
+  assert.ok(Math.abs(pose.output - exact.outputTurns * 2 * Math.PI) < 1e-4, `output ${pose.output}`);
+  assert.equal(pose.radius, 0.195);
+  rig.resetOutput();
+  pose = rig.drive(9 * Math.PI, false);
+  assert.ok(Math.abs(pose.output - (0.195 / 0.046) * Math.PI) < 1e-4, `after a reset ${pose.output}`);
+  assert.ok(rig.check.ever < 1e-4, `worst gap ${rig.check.ever} rad`);
+  assert.throws(() => rig.setRadius(0.3), RangeError);
+  assert.throws(() => integratorRig({ wheelRadius: 0 }), RangeError);
+});
+
+test('Archimedes screw rig: the water climbs a pitch a turn, over many buckets and back', () => {
+  using rig = archimedesScrewRig(0.348, { angle: 0.2 });
+  for (const target of [9.3 * Math.PI, 40 * Math.PI, 3 * Math.PI, -4 * Math.PI]) {
+    const pose = rig.drive(target, false);
+    const exact = archimedesScrewPose(target, 0.348);
+    assert.ok(Math.abs(pose.travel - exact.travel) < 2e-5, `travel at ${target}: ${pose.travel} against ${exact.travel}`);
+    const phase = Math.abs(pose.phase - exact.phase);
+    assert.ok(Math.min(phase, 2 * Math.PI - phase) < 1e-3, `phase at ${target}`);
+  }
+  assert.ok(rig.check.ever < 2e-5, `worst gap ${rig.check.ever} m`);
+  assert.equal(rig.check.unit, 'm');
+  assert.throws(() => archimedesScrewRig(0), RangeError);
+});
+
+test('Stroboscope rig: the coasting rotor and the strobe samples match stroboscopicPose', () => {
+  using rig = stroboscopeRig({ rpm: 120, flashRate: 14 });
+  let pose;
+  for (let i = 0; i < 300; i++) pose = rig.advance(1 / 60);
+  const exact = stroboscopicPose(5, 120, 14);
+  const near = (a, b) => Math.min(Math.abs(a - b), 2 * Math.PI - Math.abs(a - b));
+  assert.equal(pose.flash, exact.flash);
+  assert.ok(near(pose.reference, exact.reference) < 1e-4 && near(pose.sampled, exact.sampled) < 1e-4, 'reference and sample');
+  rig.setFlashRate(20);
+  rig.setSpeed(60);
+  pose = rig.advance(0.25);
+  assert.equal(pose.flash, 5);
+  assert.ok(rig.check.ever < 1e-4, `worst gap ${rig.check.ever} rad`);
+  assert.throws(() => rig.advance(-1), RangeError);
+  assert.throws(() => rig.setFlashRate(0), RangeError);
 });

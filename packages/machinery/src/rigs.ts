@@ -7,7 +7,16 @@
 // "Principles of Mechanism", 1841. A Geneva wheel is held by its locking disc between strokes, modelled as the wheel made fixed
 // while the pin is out of every slot, the way the convex arc of the disc holds it in the real drive.
 import type { Physics, PhysicsBody, PhysicsJoint } from '@margoengine/physics';
-import { epicyclicSpeeds, genevaPose, oldhamPose, scotchYokePose, type EpicyclicTeeth } from './mechanisms.js';
+import {
+  archimedesScrewPose,
+  epicyclicSpeeds,
+  genevaPose,
+  harmonicDriveRatio,
+  oldhamPose,
+  scotchYokePose,
+  type EpicyclicTeeth,
+  type HarmonicDriveSpec,
+} from './mechanisms.js';
 
 type Quat = [number, number, number, number];
 const zTurn = (angle: number): Quat => [0, 0, Math.sin(angle / 2), Math.cos(angle / 2)];
@@ -439,6 +448,335 @@ export function epicyclicRig(teeth: EpicyclicTeeth, options: EpicyclicRigOptions
   if (!['sun', 'ring', 'carrier'].includes(held)) throw new RangeError(`Held member is sun, ring or carrier; got ${String(held)}.`);
   epicyclicSpeeds(teeth, { sun: 0, ring: 0 });
   return new Epicyclic(teeth, held, options);
+}
+
+/** Pose of {@link harmonicDriveRig}: the wave generator's angle and the output spline's, from the solver. */
+export interface HarmonicDriveRigPose {
+  input: number;
+  output: number;
+}
+
+class Harmonic extends Rig<HarmonicDriveRigPose> {
+  private readonly output: PhysicsBody;
+  private readonly ratio: number;
+  constructor(spec: HarmonicDriveSpec, options: RigOptions) {
+    super('rad', options);
+    this.ratio = harmonicDriveRatio(spec);
+    this.output = this.disc([0, 0, 0.5], this.ratio * this.input);
+    this.physics.addJoint(this.ground, this.output, { type: 'revolute', axis: [0, 0, 1], anchorA: [0, 0, 0.5] });
+    // The teeth in mesh at the two ends of the major axis carry the output on at the tooth-count ratio: a gear row.
+    new (physicsModule().GearJoint)(this.physics, this.crank, this.output, { ratio: -1 / this.ratio });
+  }
+  private outputAngle(): number {
+    return unwrap(zAngle(this.output.rotation), this.ratio * this.input);
+  }
+  protected gap(): number {
+    return Math.abs(this.outputAngle() - this.ratio * this.input);
+  }
+  pose(): HarmonicDriveRigPose {
+    return { input: this.input, output: this.outputAngle() };
+  }
+}
+
+/**
+ * A harmonic drive: the wave generator is the input, and the output spline (the flexspline with the circular spline held, or the
+ * circular spline with the flexspline held) is turned by a gear row at Musser's tooth-count ratio. The check is against
+ * {@link harmonicDriveRatio} times the input.
+ */
+export function harmonicDriveRig(spec: HarmonicDriveSpec, options: RigOptions = {}): MechanismRig<HarmonicDriveRigPose> {
+  harmonicDriveRatio(spec);
+  return new Harmonic(spec, options);
+}
+
+/** Options of {@link integratorRig}. */
+export interface IntegratorRigOptions extends RigOptions {
+  /** The output roller's radius in metres. */
+  wheelRadius: number;
+  /** The disk's radius in metres: the ball stays within it (default no bound). */
+  diskRadius?: number;
+  /** The ball's distance from the disk centre at the start, metres (default 0). */
+  radius?: number;
+}
+/** Pose of {@link integratorRig}: the disk's angle, the output roller's from the solver since the last reset, and the ball radius. */
+export interface IntegratorRigPose {
+  disk: number;
+  output: number;
+  radius: number;
+}
+/** A ball-and-disk integrator on the solver, from {@link integratorRig}. */
+export interface IntegratorRig extends MechanismRig<IntegratorRigPose> {
+  /** Moves the ball to `radius` metres from the disk centre; the next drive integrates at it. */
+  setRadius(radius: number): void;
+  /** Sets the output reading back to 0 (the roller keeps its angle; the count starts again). */
+  resetOutput(): void;
+}
+
+class Integrator extends Rig<IntegratorRigPose> implements IntegratorRig {
+  private readonly roller: PhysicsBody;
+  private readonly rho: number;
+  private readonly limit: number;
+  private radius = 0;
+  private built = false;
+  private mesh: { remove(): void } | null = null;
+  /** The output's exact angle since the last reset (Thomson's integral, summed a step at a time) and the roller's angle then. */
+  private exact = 0;
+  private zero = 0;
+  constructor(options: IntegratorRigOptions) {
+    super('rad', options);
+    this.rho = options.wheelRadius;
+    this.limit = options.diskRadius ?? Infinity;
+    this.roller = this.disc([0, 0, 0.5]);
+    this.physics.addJoint(this.ground, this.roller, { type: 'revolute', axis: [0, 0, 1], anchorA: [0, 0, 0.5] });
+    this.setRadius(options.radius ?? 0);
+  }
+  setRadius(radius: number): void {
+    if (!(Math.abs(finite(radius, 'Ball radius')) <= this.limit))
+      throw new RangeError(`The ball must stay on the disk (|r| <= ${this.limit}); got ${radius}.`);
+    if (this.built && radius === this.radius) return;
+    this.built = true;
+    this.radius = radius;
+    // The ball's friction drive is a gear row of ratio r / rho; a new radius makes a new row from where the roller stands.
+    this.mesh?.remove();
+    this.mesh = null;
+    if (radius === 0) {
+      // At the centre the ball does not turn, and the roller stands.
+      this.roller.setType('fixed');
+      return;
+    }
+    this.roller.setType('dynamic');
+    this.roller.setAngularVelocity([0, 0, (radius / this.rho) * this.crank.angularVelocity[2]]);
+    this.mesh = new (physicsModule().GearJoint)(this.physics, this.roller, this.crank, { ratio: -radius / this.rho });
+  }
+  resetOutput(): void {
+    this.zero += this.exact;
+    this.exact = 0;
+  }
+  protected override beforeStep(angle: number): void {
+    this.exact += ((angle - this.input) * this.radius) / this.rho;
+  }
+  private rollerAngle(): number {
+    return unwrap(zAngle(this.roller.rotation), this.zero + this.exact) - this.zero;
+  }
+  protected gap(): number {
+    return Math.abs(this.rollerAngle() - this.exact);
+  }
+  pose(): IntegratorRigPose {
+    return { disk: this.input, output: this.rollerAngle(), radius: this.radius };
+  }
+}
+
+/**
+ * A ball-and-disk (Kelvin) integrator: the disk is the input and the ball's friction drive is a gear row of ratio r / rho to the
+ * output roller, remade from where the roller stands whenever the ball moves. The roller's angle is the integral of r / rho over the
+ * disk's angle; the check is against that integral summed over the steps, the sum `ballDiskIntegrator` makes.
+ */
+export function integratorRig(options: IntegratorRigOptions): IntegratorRig {
+  if (!(options.wheelRadius > 0 && Number.isFinite(options.wheelRadius)))
+    throw new RangeError(`Wheel radius must be above 0; got ${options.wheelRadius}.`);
+  if (options.diskRadius !== undefined && !(options.diskRadius > 0 && Number.isFinite(options.diskRadius)))
+    throw new RangeError(`Disk radius must be above 0; got ${options.diskRadius}.`);
+  return new Integrator(options);
+}
+
+/** Pose of {@link archimedesScrewRig}: the shaft angle and the water's travel up the axis, from the solver. */
+export interface ArchimedesScrewRigPose {
+  angle: number;
+  /** The water's travel up the axis, metres. */
+  travel: number;
+  /** The blades' phase within the turn, radians in [0, 2 pi), read from the travel. */
+  phase: number;
+}
+
+class Screw extends Rig<ArchimedesScrewRigPose> {
+  private readonly water: PhysicsBody;
+  private thread: { remove(): void } | null = null;
+  /** Whole pitches the water was moved back by, so its body stays within half a pitch of the origin. */
+  private band: number;
+  constructor(
+    private readonly pitch: number,
+    options: RigOptions,
+  ) {
+    super('m', options);
+    const travel = archimedesScrewPose(this.input, pitch).travel;
+    this.band = Math.round(travel / pitch);
+    // The water touches nothing, so it has no collider: its mass is given, and it sits on the axis near the origin, where a
+    // position's float spacing is finest.
+    this.water = this.physics.addBody(null, { type: 'dynamic', position: [0, 0, travel - this.band * pitch], colliders: [] });
+    this.water.setMassProperties({ mass: 1, inertia: [1e-3, 1e-3, 1e-3] });
+    this.physics.addJoint(this.ground, this.water, { type: 'prismatic', axis: [0, 0, 1] });
+    this.wind();
+  }
+  /** The thread: the water climbs a pitch a turn, a rack on the shaft's pinion of radius pitch / 2 pi. */
+  private wind(): void {
+    this.thread?.remove();
+    this.thread = new (physicsModule().RackAndPinionJoint)(this.physics, this.crank, this.water, {
+      rackAxis: [0, 0, -1],
+      radius: this.pitch / (2 * Math.PI),
+    });
+  }
+  private travel(): number {
+    return this.water.position[2] + this.band * this.pitch;
+  }
+  protected override beforeStep(): void {
+    // A bucket that has climbed a whole pitch is the next one up: the body moves back a pitch so it stays near the origin.
+    const shift = Math.round(this.water.position[2] / this.pitch);
+    if (shift !== 0) {
+      this.band += shift;
+      const p = this.water.position;
+      this.water.setPosition([p[0], p[1], p[2] - shift * this.pitch]);
+      this.wind();
+    }
+  }
+  protected gap(): number {
+    return Math.abs(this.travel() - archimedesScrewPose(this.input, this.pitch).travel);
+  }
+  pose(): ArchimedesScrewRigPose {
+    const travel = this.travel(),
+      turns = travel / this.pitch;
+    return { angle: this.input, travel, phase: (turns - Math.floor(turns)) * 2 * Math.PI };
+  }
+}
+
+/**
+ * An Archimedes screw: the shaft is the input, and the water in a bucket climbs the axis on a slide, held to the shaft by the
+ * thread as a rack and pinion of radius pitch / 2 pi. The check is against {@link archimedesScrewPose}'s travel.
+ */
+export function archimedesScrewRig(pitch: number, options: RigOptions = {}): MechanismRig<ArchimedesScrewRigPose> {
+  if (!(pitch > 0 && Number.isFinite(pitch))) throw new RangeError(`Pitch must be above 0; got ${pitch}.`);
+  return new Screw(pitch, options);
+}
+
+/** Options of {@link stroboscopeRig}. */
+export interface StroboscopeRigOptions {
+  /** The rotor's speed in revolutions a minute. */
+  rpm: number;
+  /** Flashes a second. */
+  flashRate: number;
+  /** Disposes the rig when it aborts (default none). */
+  signal?: AbortSignal;
+}
+/** Pose of {@link stroboscopeRig}: the rotor's angle now and at the last flash, both from the solver, and the flash count. */
+export interface StroboscopeRigPose {
+  /** The rotor's angle now, radians in [0, 2 pi). */
+  reference: number;
+  /** The rotor's angle at the last flash, what the eye sees under the strobe, radians in [0, 2 pi). */
+  sampled: number;
+  /** Flashes since the flash rate was set. */
+  flash: number;
+}
+/** A rotor coasting on a frictionless bearing under a strobe, from {@link stroboscopeRig}. */
+export interface StroboscopeRig extends Disposable {
+  readonly physics: Physics;
+  /** The rotor's angle against its speed times the time run. */
+  readonly check: RigCheck;
+  /** Runs the world on by `seconds`, stepping onto each flash, and returns the pose. */
+  advance(seconds: number): StroboscopeRigPose;
+  /** Spins the rotor at `rpm` from now on (a belt brought to speed). */
+  setSpeed(rpm: number): void;
+  /** Flashes `hertz` times a second from now on, the count starting again with a flash now. */
+  setFlashRate(hertz: number): void;
+  /** Runs the world on to the next flash and returns the pose. */
+  nextFlash(): StroboscopeRigPose;
+  pose(): StroboscopeRigPose;
+  dispose(): void;
+}
+
+const wrapTurn = (angle: number): number => ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+
+class Stroboscope implements StroboscopeRig {
+  readonly physics: Physics;
+  readonly check: RigCheck = { worst: 0, last: 0, ever: 0, unit: 'rad', steps: 0 };
+  private readonly rotor: PhysicsBody;
+  private readonly step: number;
+  private omega = 0;
+  private period = 1;
+  /** Time to the next flash, the flash count and the angle the last flash caught. */
+  private toFlash = 0;
+  private flash = 0;
+  private caught = 0;
+  /** The rotor's exact angle: its speed integrated over the time run. */
+  private exact = 0;
+  constructor(options: StroboscopeRigOptions) {
+    options.signal?.throwIfAborted();
+    const physics = new (physicsModule().Physics)(null);
+    physics.gravity = [0, 0, 0];
+    this.physics = physics;
+    this.step = physics.fixedTimestep;
+    const ground = physics.addBody(null, { type: 'fixed', position: [0, 0, 0], colliders: [] });
+    this.rotor = physics.addBody(null, {
+      type: 'dynamic',
+      position: [0, 0, 0],
+      colliders: { shape: 'cylinder', radius: 0.05, halfHeight: 0.01, mass: 1 },
+    });
+    physics.addJoint(ground, this.rotor, { type: 'revolute', axis: [0, 0, 1], anchorA: [0, 0, 0] });
+    this.setSpeed(options.rpm);
+    this.setFlashRate(options.flashRate);
+    options.signal?.addEventListener('abort', () => this.dispose(), { once: true });
+  }
+  setSpeed(rpm: number): void {
+    this.omega = (finite(rpm, 'Speed') * 2 * Math.PI) / 60;
+    this.rotor.setAngularVelocity([0, 0, this.omega]);
+  }
+  setFlashRate(hertz: number): void {
+    if (!(hertz > 0 && Number.isFinite(hertz))) throw new RangeError(`Flash rate must be above 0; got ${hertz}.`);
+    this.period = 1 / hertz;
+    this.flash = 0;
+    this.toFlash = this.period;
+    this.caught = this.angle();
+  }
+  private angle(): number {
+    return unwrap(zAngle(this.rotor.rotation), this.exact);
+  }
+  advance(seconds: number): StroboscopeRigPose {
+    let left = finite(seconds, 'Time');
+    if (left < 0) throw new RangeError(`Time runs forward; got ${seconds} s.`);
+    this.check.worst = 0;
+    try {
+      while (left > 1e-12) {
+        // Step onto the next flash when it comes first, so the strobe catches the rotor where the solver has it at that instant.
+        const dt = Math.min(this.step, left, this.toFlash);
+        this.physics.fixedTimestep = dt;
+        this.physics.step();
+        this.exact += this.omega * dt;
+        left -= dt;
+        this.toFlash -= dt;
+        if (this.toFlash <= 1e-12) {
+          this.flash++;
+          this.caught = this.angle();
+          this.toFlash = this.period;
+        }
+        const gap = Math.abs(this.angle() - this.exact);
+        this.check.steps++;
+        this.check.last = gap;
+        this.check.worst = Math.max(this.check.worst, gap);
+        this.check.ever = Math.max(this.check.ever, gap);
+      }
+    } finally {
+      this.physics.fixedTimestep = this.step;
+    }
+    return this.pose();
+  }
+  nextFlash(): StroboscopeRigPose {
+    return this.advance(this.toFlash);
+  }
+  pose(): StroboscopeRigPose {
+    return { reference: wrapTurn(this.angle()), sampled: wrapTurn(this.caught), flash: this.flash };
+  }
+  [Symbol.dispose](): void {
+    this.dispose();
+  }
+  dispose(): void {
+    this.physics.dispose();
+  }
+}
+
+/**
+ * A stroboscope: a rotor coasting at `rpm` on a frictionless hinge (the solver integrates its turn) and a strobe flashing
+ * `flashRate` times a second. The world steps onto every flash, so `sampled` is the solver's angle at the flash; the check is the
+ * rotor against its speed times the time run, `stroboscopicPose` for a steady speed.
+ */
+export function stroboscopeRig(options: StroboscopeRigOptions): StroboscopeRig {
+  return new Stroboscope(options);
 }
 
 /**

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21700953,
+  "total": 21702293,
   "history": [
     {
       "date": "2026-10-24",
@@ -15392,6 +15392,11 @@
       "commit": "hydro-04-shared-native-preparation",
       "reason": "HYDRO-04 physics/landscape grows from 5066 to 7508 B gzip (ceiling 5322 to 7764) to negotiate shared memory, dispatch worker partitions and publish work receipts only after the complete landscape tick is accepted. Keeping both paths in one optional entry avoids duplicating the native ABI and accepted arena state. The optional plain and shared Wasm assets shrink from 11788/11848 to 11467/11530 B gzip. Core and Stage gain zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "rigs-gear-trains",
+      "reason": "Four more mechanism rigs on the solver so their demos show physics against exact: harmonicDriveRig (gear row at the Musser ratio), integratorRig (gear row of ratio r / rho remade as the ball moves), archimedesScrewRig (rack and pinion, the water kept near the origin) and stroboscopeRig (a coasting rotor stepped onto each flash). @margoengine/machinery/rigs 3303 to 4643 B gzip (ceiling 3559 to 4899 B). A split per rig would add an entry and a request for 300 to 400 B each, and each demo loads one solver anyway."
     }
   ],
   "items": {
@@ -16072,7 +16077,7 @@
     "@margoengine/machinery/metrology": 2911,
     "@margoengine/machinery/overlays": 2296,
     "@margoengine/machinery/react": 4713,
-    "@margoengine/machinery/rigs": 3559,
+    "@margoengine/machinery/rigs": 4899,
     "@margoengine/machinery/section": 4575,
     "@margoengine/machinery/spatial": 16699,
     "@margoengine/machinery/surface": 14297,

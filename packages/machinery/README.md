@@ -234,8 +234,33 @@ console.log(train.drive(1).ring, train.check.ever);
 | `genevaRig` | wheel hinge, pin in the slot (generic, made and removed at the slot mouth); the wheel is fixed while the locking disc holds it | 0.004 degrees over three turns |
 | `oldhamRig` | output hinge, two crossed slides (generic) | 2 µm over two turns |
 | `epicyclicRig` | driven member hinge, gear joint at Willis's ratio; `held` picks the still member | 0.0003 degrees over two turns |
+| `harmonicDriveRig` | output spline hinge, gear joint at Musser's tooth-count ratio (circular or flex spline held) | 0.00002 degrees over three turns |
+| `integratorRig` | roller hinge, gear joint of ratio r / rho remade from where the roller stands when the ball moves (`setRadius`, `resetOutput`) | 0.0002 degrees over four disk turns |
+| `archimedesScrewRig` | water on a slide, the thread as a rack and pinion of radius pitch / 2 pi; the water moves back a pitch per bucket | 2.3 µm over 4.7 turns, 49 µm over 100 |
+| `stroboscopeRig` | a rotor coasting on a frictionless hinge; the world steps onto each flash (`advance(seconds)`, `setSpeed`, `setFlashRate`) | 0.0004 degrees over 5 s at 120 rpm |
 
 The joints are rows of the solver's sequential-impulse solve (Catto 2005; Baraff 1996); the closed forms are Reuleaux (1876) and Willis (1841). Without gravity, friction or load the rigs are kinematic chains solved by the dynamics: they show the solver holds each mechanism to its exact pose.
+
+The gear and rack rows hold their error as the integral of their own speed, so they drift from the poses by float rounding, a few micrometres a turn (KB-PHYS-COUPLINGDRIFT1); the screw keeps its water near the origin, where a position's float spacing is finest.
+
+```ts
+import { loadRigs, harmonicDriveRig, integratorRig, archimedesScrewRig, stroboscopeRig } from 'margoengine/machinery/rigs';
+
+await loadRigs();
+using harmonic = harmonicDriveRig({ flexTeeth: 60, circularTeeth: 62 });
+console.log(harmonic.drive(2 * Math.PI, false).output); // about -0.209: a thirtieth of a turn back
+
+using integrator = integratorRig({ wheelRadius: 0.046, diskRadius: 0.24, radius: 0.1 });
+integrator.drive(2 * Math.PI, false);
+integrator.setRadius(0.15); // the ball moves out; the next turn integrates at it
+console.log(integrator.drive(4 * Math.PI, false).output); // 2 pi (0.1 + 0.15) / 0.046
+
+using screw = archimedesScrewRig(0.348);
+console.log(screw.drive(4 * Math.PI, false).travel); // 0.696 m: two pitches
+
+using strobe = stroboscopeRig({ rpm: 120, flashRate: 14 });
+console.log(strobe.advance(1).sampled); // where the 14th flash caught the rotor
+```
 
 Page helpers: `openRig(make, ...args)` loads the solver and makes a rig in one call; `keyedRig(make)` remakes a rig whenever a build parameter (its key, such as the held member or a shaft offset) changes, at the angle asked, so the solver never steps through a jump of the geometry; every rig and `keyedRig` take `signal` (default none), which disposes them on abort; `signedReading(value, unit, digits = 1)` writes a readout with a typographic minus or a plus and no sign on zero. The Geneva pose adds `turnWheel` (the wheel angle read within the crank turn last asked of `drive`), and the Oldham pose adds `orbitCenter` and `orbitRadius`, the circle the disc centre runs on.
 
