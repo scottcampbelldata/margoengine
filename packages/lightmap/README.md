@@ -124,6 +124,27 @@ reaches the texel. The direction is the luminance-weighted mean of the light dir
 direction); ambient light and AO stay non-directional. The flat `lightmap` is the one `bakeMeshLightmap` bakes, with
 no extra rays. `applyLightmap` draws the bake with this formula per pixel on a glTF PBR model (see below).
 
+```ts
+import { bakeDirectionalLightmap, directionalIrradiance } from 'margoengine/lightmap/directional';
+
+const floor = {
+  positions: new Float32Array([0, 0, 0, 4, 0, 0, 4, 0, -4, 0, 0, -4]),
+  normals: new Float32Array([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]),
+  uv1: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+  indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+};
+const baked = await bakeDirectionalLightmap(floor, {
+  width: 32,
+  radiometry: 'physical',
+  lights: [{ type: 'directional', direction: [1, 1, 0], intensity: 2 }],
+});
+const texel = 16 * baked.width + 16; // a texel near the middle
+// A bump that tilts the normal toward the light gets more light than the flat floor.
+const flat = directionalIrradiance(baked, texel, [0, 1, 0], [0, 1, 0]);
+const tilted = directionalIrradiance(baked, texel, [0.4, 1, 0], [0, 1, 0]);
+console.log(flat[0], tilted[0], baked.directionMap.length); // tilted[0] > flat[0]
+```
+
 ## Progressive GPU baking: `@margoengine/lightmap/gpu`
 
 `GPULightmapBaker` bakes the same meshes as `./mesh` in WebGPU compute. Each `step()` adds passes and `texture` (an
@@ -175,6 +196,29 @@ order-3 spherical harmonics (27 floats, `SH3` layout) of the shadowed direct lig
 room's baked lightmap where they hit it (`albedo * irradiance / pi`) and the ambient lights where they escape.
 `probeIrradiance(grid, position, normal)` reads the irradiance trilinearly, in the same units as a physical lightmap.
 
+```ts
+import { bakeMeshLightmap } from 'margoengine/lightmap/mesh';
+import { bakeLightProbes, probeIrradiance } from 'margoengine/lightmap/probes';
+
+const lights = [{ type: 'directional' as const, direction: [0.3, 1, 0.2] as [number, number, number], intensity: 2 }];
+const room = {
+  positions: new Float32Array([0, 0, 0, 4, 0, 0, 4, 0, -4, 0, 0, -4]),
+  uv1: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+  indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+};
+const lightmap = await bakeMeshLightmap(room, { width: 32, radiometry: 'physical', lights });
+const grid = await bakeLightProbes({
+  volume: { min: [0, 0.1, -4], max: [4, 2, 0], counts: [4, 2, 4] },
+  room: { mesh: room, lightmap, albedo: [0.8, 0.8, 0.8] },
+  lights,
+  rays: 128,
+});
+// A character at (2, 1, -2): light on its top and the floor's bounce light on its underside.
+const up = probeIrradiance(grid, [2, 1, -2], [0, 1, 0]);
+const down = probeIrradiance(grid, [2, 1, -2], [0, -1, 0]);
+console.log(grid.count, up[0], down[0]); // 32, then up[0] > down[0] > 0
+```
+
 ## Drawing a bake: `@margoengine/lightmap/apply`
 
 `applyLightmap(target, baked, options)` draws a bake at draw time on a materials `Material` or `createMesh` mesh, a loaded glTF PBR model or a
@@ -204,6 +248,47 @@ or a live `GPULightmapBaker`, whose texture is drawn as it improves.
   vertex normal), and `directional: true` on them throws. `app.directional` says which was drawn.
 - **Textures.** `lightmapTexture(baked)` returns the linear `Texture` (RGBA8 for a CPU bake, the live `rgba16float`
   texture of a GPU baker) and the `lightMapIntensity` that decodes it, without mipmaps, for your own materials.
+
+A materials mesh with a UV1 set, a live GPU baker and your own material, in one scene:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { Material, createMesh } from 'margoengine/materials';
+import { applyLightmap, lightmapTexture } from 'margoengine/lightmap/apply';
+import { GPULightmapBaker } from 'margoengine/lightmap/gpu';
+import { bakeMeshLightmap } from 'margoengine/lightmap/mesh';
+
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+const floor = {
+  positions: new Float32Array([0, 0, 0, 4, 0, 0, 4, 0, -4, 0, 0, -4]),
+  uv1: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+  indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+};
+const lights = [{ type: 'point' as const, position: [2, 2, -2] as [number, number, number], intensity: 8 }];
+const geometry = {
+  positions: Array.from(floor.positions),
+  normals: [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0],
+  uvs1: Array.from(floor.uv1),
+  indices: Array.from(floor.indices),
+};
+
+// A CPU bake on a createMesh mesh: dispose() puts back the material's own lightMap.
+const mesh = createMesh(engine, geometry, new Material({ color: '#c8b89a', roughness: 0.9 }));
+const baked = await bakeMeshLightmap(floor, { width: 64, radiometry: 'physical', lights });
+const app = applyLightmap(mesh, baked);
+console.log(app.scale, app.directional); // the decode scale over pi, false
+
+// A live GPU bake, drawn while it improves.
+const baker = await GPULightmapBaker.create(engine, floor, { width: 64, radiometry: 'physical', lights });
+const live = applyLightmap(createMesh(engine, geometry, new Material()), baker);
+await baker.step(16);
+
+// Your own material: the texture and the lightMapIntensity that decodes it.
+const { texture, intensity } = lightmapTexture(baked);
+createMesh(engine, geometry, new Material({ lightMap: texture, lightMapIntensity: intensity }));
+engine.start();
+// On teardown: live.dispose(); baker[Symbol.dispose](); app.dispose(); engine.dispose();
+```
 
 ```ts
 import { Engine } from 'margoengine/core';
@@ -244,6 +329,37 @@ engine.start();
 - `transmission`: quads with albedo alpha below 1 cast no shadows.
 - `glassVolumes`: closed convex volumes made of bake quads cast coloured shadows (Fresnel at each boundary, Beer
   absorption inside). Light goes straight through: no refraction or caustics.
+
+A closed furnace, a cube of six walls facing in, each emitting 1 and reflecting half: every texel reads the exact
+series `pi * (1 + 0.5 + ... + 0.5^7)` with eight path bounces.
+
+```ts
+import { bakeGlobalLightmap } from 'margoengine/lightmap/global';
+
+// One wall of the cube from -1 to 1 on `axis` at `side`, its corners counterclockwise seen from inside.
+const wall = (axis: number, side: number) => {
+  const corner = (s: number, t: number) => {
+    const p = [0, 0, 0];
+    p[axis] = side;
+    p[(axis + 1) % 3] = s;
+    p[(axis + 2) % 3] = t * -side;
+    return p;
+  };
+  return [...corner(-1, -1), ...corner(1, -1), ...corner(1, 1), ...corner(-1, 1)];
+};
+const positions = new Float32Array([0, 1, 2].flatMap((axis) => [-1, 1].flatMap((side) => wall(axis, side))));
+const furnace = await bakeGlobalLightmap(
+  {
+    positions,
+    albedo: new Float32Array(24).map((_, i) => (i % 4 === 3 ? 1 : 0.5)),
+    emission: new Float32Array(18).fill(1),
+  },
+  { texelsPerUnit: 2, aoRays: 1, radiometry: 'physical', bounceMode: 'path', bounces: 8, bounceRays: 4 },
+);
+const c = furnace.charts[0];
+const texel = (c.y * furnace.width + c.x) * 4;
+console.log((furnace.textures.lightmap[texel] / 255) * furnace.lightmapScale, Math.PI * ((1 - 0.5 ** 8) / 0.5));
+```
 
 ## Caustics: `@margoengine/lightmap/refracted`
 
@@ -296,6 +412,31 @@ console.log(result.diagnostics.masked); // [0, 0, 0]
 `denoiseLightmap(atlas, quads)` (for `bakeLightmap` and `bakeGlobalLightmap`), `denoiseMeshLightmap(baked, mesh)` (for
 `bakeMeshLightmap`) and `denoiseTexels({ width, height, color, chart, normals, positions, variance })` (any Float32 RGB
 texels) filter Monte Carlo noise out of a bake, so fewer AO and bounce rays give clean light. Each returns new arrays.
+
+```ts
+import { bakeMeshLightmap } from 'margoengine/lightmap/mesh';
+import { denoiseMeshLightmap, denoiseTexels } from 'margoengine/lightmap/denoise';
+
+const floor = {
+  positions: new Float32Array([0, 0, 0, 4, 0, 0, 4, 0, -4, 0, 0, -4]),
+  uv1: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+  indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+};
+// A noisy bake: four AO rays per texel.
+const noisy = await bakeMeshLightmap(floor, {
+  width: 32,
+  aoRays: 4,
+  lights: [{ type: 'ambient', intensity: 1 }],
+  occluders: [{ positions: new Float32Array([1, 0.5, -1, 3, 0.5, -1, 2, 0.5, -3]) }],
+});
+const clean = await denoiseMeshLightmap(noisy, floor, { iterations: 5, sigmaLuminance: 4 });
+console.log(clean.lightmap.length === noisy.lightmap.length); // true: same size, new arrays
+
+// Any RGB texels: a 16 x 16 grey with noise, one chart.
+const color = new Float32Array(16 * 16 * 3).map(() => 0.5 + (Math.random() - 0.5) * 0.2);
+const { color: smooth, variance } = await denoiseTexels({ width: 16, height: 16, color });
+console.log(smooth[0], variance[0]);
+```
 
 - **Filter.** The edge-avoiding a-trous wavelet transform (Dammertz et al. 2010): `iterations` (default 5) passes of a
   5 x 5 B3 spline kernel whose taps spread 2^i texels apart. Each tap is weighted by luminance difference against the
