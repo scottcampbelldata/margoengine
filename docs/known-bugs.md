@@ -115,6 +115,117 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/headless/tests/look-clean.test.js` (a static edge flashing 7 px from a swaying branch still fails).
 - **Next:** asked for a ruling to add the moving surface's own circle-of-confusion radius to the reach.
 
+### Fixed 2026-11-28 (in part 2026-11-11): mesh PBR inlined twelve texture filters into the Direct3D 11 surface program, and the surface program held its material (KB5451)
+
+- **Repro:** a mesh-PBR tracer on the WebGL2 layer over ANGLE Direct3D 11 with Chromium's
+  `--disable-gpu-shader-disk-cache`, timing each GL link and first draw: the staged `surface` program took 177 s to link and 356 s more at its first
+  draw (58% of a 362 s ready, 550 s image; dev PC, RTX A6000, busy, diagnostic).
+- **Cause:** `pbrMaterial` called the bilinear `pbrTexture` filter once per texture slot (eleven direct calls plus the
+  clearcoat normal map through `pbrMappedNormal`). HLSL functions are inline by default, so fxc built one copy of the
+  filter per call: 21 copies in the `trace` entry and 17 in `preview`.
+- **Fix:** `pbrMaterial` reads every slot but the normal map through ONE `pbrTexture` call in a loop whose bound is
+  the record's slot count (word 3, written by `mesh-pbr-build.ts`), a value the compiler cannot see, so it keeps one
+  rolled body (the technique the coverage kernel already uses, docs/limits.md). The same calls with the same
+  arguments: same values. `pbrMapNormal` takes the texel the loop read.
+- **Evidence:** inlined filter copies (a call-graph walk of each WGSL module the tracer makes under the test's fake engine) went
+  from 21 to 10 in `trace`, 17 to 6 in `preview`, 42 to 20 in total; the Direct3D 11 image hash is the same
+  (1711753600) before and after; the surface program's cold link plus first draw went from 533 s to 305 s on the
+  busy machine (diagnostic only: the unchanged `hit` program moved from 157 s to 257 s in the same pair).
+- **Still open:** the other staged programs (`hit`, `shadow`, an unlabeled one) still take minutes cold on Direct3D
+  11, so the 120 s `renderImage` signal with the disk cache off is not yet met. Next: the same loop-bound treatment
+  for `pbrVisible`'s alpha reads and the traversal loops in `hit` and `shadow`, proven by the same counts.
+- **Measured 2026-11-28 (lane A):** `MARGO_COMPAT=1 node packages/voxel-pathtracer/tests/mesh-pbr-lobes-browser.mjs`
+  (Edge, ANGLE Direct3D 11, a fresh profile each run, so cold) passes, but its first image arrives 314 s after
+  `ready`; later images and the ANGLE Vulkan leg take under a second. The draw-time compiles of four 7-output programs
+  hold it: 74 to 173 s each by the first-draw wait. Binding the framebuffer before `linkProgram`, or declaring the
+  outputs as one array, leaves the link at about 1 s and the first draw as long (ANGLE links against one output either
+  way), so the cost cannot be moved to the parallel link. Inlined statements of the surface program: 21,211, of which
+  the layer's storage-word loads are 15,596 (1,114 copies). Fixed in part: `triangleNormal` calls `meshWorldNormal`
+  once (it was in both branches), the dielectric side test takes the triangle normal once (`triangleWrongSide`), and
+  the tangent frame reads `meshWorld` once per branch. Surface program 21,211 to 18,425 statements, paired offline fxc
+  144.2 to 106.5 s; emitter program 79.6 to 75.2 s. Same output: 122 GPU readbacks of `test:gpu:mesh-pbr`,
+  `mesh-deform`, `mesh-attributes` and `mesh-pbr-lobes` hash the same before and after (native WebGPU, repeatable run
+  to run). Regression: `packages/voxel-pathtracer/tests/mesh-pbr.test.js` "the mesh helpers compute each hit value
+  once per call site (KB5451)". Still open: the cold first image is far above 120 s; next are the 941 storage loads
+  (meshX 19 copies of 12 loads, pbrVertex 21, rowAt 27, meshCorner 27) and the two pbrMapNormal copies.
+- **Measured 2026-11-28, second round (lane A, paired offline fxc, `ps_5_0`, per-pair minimum of 2 rounds, loaded
+  machine):** a branch-free storage-word select (`v & mask` of `equal(ivec4(o & 3), ivec4(0,1,2,3))`, OR of the four
+  lanes) in place of the layer's nested `c < 2 ? ...` select made the surface program slower, 141.2 to 228.5 s, and
+  the emitter program 90.3 to 119.1 s, though it removes three branches from each of the 907 inlined `_ld0f` copies:
+  dropped. Filling only the first n of the surface program's 7 outputs: 1 output 40.2 s, 2 39.4 s, 4 108.4 s, 6
+  141.0 s, so outputs 3 and 4 hold most of the compile. ANGLE's Direct3D 11 back end links against the first output
+  only and compiles again at the first draw for the bound 7-target layout, on the GPU thread, so the four 7-output
+  programs compile one after another; statement cuts inside them gave 5 to 30 percent each and two of them were
+  slower. Reaching 120 s from 314 s needs a structural change to what each staged program writes (fewer outputs per
+  program, or the heavy material terms behind outputs 3 and 4 moved out of the 7-output programs), not more cuts.
+- **Fixed in part 2026-11-28, third round (lane A):** mesh PBR's shading normal (`triangleShading`) and material
+  (`pbrMaterial`) were 10,800 of the surface program's 17,900 inlined statements; with both stubbed the program
+  compiled in 12.5 s against 123.9 s (paired offline fxc). Each now runs in a staged program of its own, `shading`
+  and `material`, between `vertex` and `surface` (`packages/voxel-pathtracer/src/compat-staged.ts`, SURFACE_CALLS):
+  both read the path state only, so each is computed under a guard that holds wherever its call runs (the conjunction
+  of the branches around it), kept in three new state fields, and the call site reads them. `pbrMaterial` changes
+  nothing private but `pbrLayer`, which its program saves and restores and the call site sets from the kept copy. Only
+  tracers whose shader calls `pbrMaterial` get the two programs; WebGPU's shader is not touched. The purity check
+  read `h.mesh!=0u&&motion<1.0` as taking the address of `motion` (`&motion`); `assigns` now skips `&&`. The same
+  misreading (`&&h.inst`, `&&done`) had marked programs as writers of `h`, `done` and `medium`, so every tracer's
+  state pages are now laid out with fewer pages rewritten per program; the resampled, guiding, media, spectral, mesh
+  and compose (`--backend=compat`) GPU checks give the same 1,332 readback hashes before and after (821 on the
+  layer). Paired
+  offline fxc (2 rounds, per-pair minimum): the old surface program 94.2 s, the new surface 14.1 s, shading 3.7 s,
+  material 9.6 s. Cold first image of `MARGO_COMPAT=1 node packages/voxel-pathtracer/tests/mesh-pbr-lobes-browser.mjs`
+  (Edge, ANGLE Direct3D 11 leg, fresh profile, busy workstation, old and new builds run back to back): 272 s before,
+  200 and 193 s after. Same output: the four mesh GPU tests (`mesh-pbr`, `mesh-deform`, `mesh-attributes`,
+  `mesh-pbr-lobes`) give the same set of readback hashes before and after on native WebGPU and on the layer (244 in
+  all, the layer's `getBufferSubData` reads hashed too); only the order the layer's reads finish in differs. Entry
+  sizes stay under their ceilings (the staged route is in the lazy compat chunk). Regression:
+  `packages/voxel-pathtracer/tests/compat-staged.test.js` "mesh PBR evaluates its shading normal and material in
+  programs of their own before surface (KB5451)". The cold first-draw waits left were `sample` (mesh emitter
+  radiance, 83 s), `post` (labelled `hit` before; 45 s) and `shadow` (28 s).
+- **Fix (2026-11-28, emit and the texel loop):** the staged route evaluates a mesh emitter's radiance in a program
+  of its own, `emit`, drawn between `sample` and `shadow` for the light kind that samples mesh emitters only (kind 5;
+  `StagedTrace.emits`). sampleMeshEmitter draws its three random numbers first and everything after them depends on
+  those draws, the shading point and private words alone, so on this route it returns the face's record offset (bit
+  30 set, so the word stays a normal f32) and its two draws through the light kind's own `radiance` words, and `emit`
+  runs the same code after the draws (`z_meshEmitted`) for the radiance. The stager refuses a shader where `sample`
+  reads that radiance again, changes a private word the emitter code reads, or reaches the call by more than the
+  light kind. A first version kept the record in 4 new state words: mesh PBR's state went from 280 words (10 pages)
+  to 11 pages and every program's state load and store grew with it, slower cold; a whole Hit (35 words) took 12
+  pages, 17 texture units with finish's 5 sums, and the layer refused it. `pbrTexture` on this route also fetches
+  its nearest tap and its four bilinear taps in one loop bounded by the texture's filter word, the same taps in the
+  same order, decoded and mixed in the same expressions: Direct3D's compiler had inlined five `pbrPixel` copies
+  (ten `pbrAddress`) into every texture fetch. WebGPU's shader is not touched. Paired offline fxc over all ten
+  (now eleven) staged programs, 2 rounds, per-program minimum: 89.6 s to 68.0 s (sample 29.7 s to 4.1 s plus emit
+  8.1 s, shadow 17.7 to 15.9 s, post 20.1 to 17.9 s). Cold first image of
+  `MARGO_COMPAT=1 node packages/voxel-pathtracer/tests/mesh-pbr-lobes-browser.mjs` (Edge, ANGLE Direct3D 11, fresh
+  profile, old and new alternating, the workstation quiet): old 94 and 91 s, new 80 and 77 s, under the 120 s bar.
+  Same output: the four mesh GPU tests and the resampled, guiding, media, spectral, mesh and compose
+  (`--backend=compat`) checks give the same sets of readback hashes before and after on WebGPU and the layer (1,576).
+  The lazy compat chunk grows from 13,503 to 14,856 B gzip; the root entry by 1 B (the chunk's name). Regressions:
+  `packages/voxel-pathtracer/tests/compat-staged.test.js` "mesh emitters evaluate their radiance in a program of
+  its own between sample and shadow (KB5451)" and `packages/voxel-pathtracer/tests/mesh-pbr.test.js` "the WebGL2
+  route's texel loop gives pbrTexture's values bit for bit (KB5451)" (CPU WGSL interpreter, nearest and bilinear,
+  sRGB and not). The 120 s bar is met on a quiet machine (80 and 77 s); the loaded runs (167 to 205 s while other
+  lanes ran) are time only and wait in the busy-machine retest list for the quiet rerun before release (manager
+  ruling, 2026-11-28); the bar is unchanged. The largest cold programs left are `post` and `shadow` (about 16 to
+  18 s each offline).
+- **Sources (the split):** S. Laine, T. Karras, T. Aila, "Megakernels Considered Harmful: Wavefront Path Tracing on
+  GPUs", HPG 2013, https://research.nvidia.com/publication/2013-07_megakernels-considered-harmful-wavefront-path-tracing-gpus
+  (a path's work cut into small kernels that pass the path state through memory, which keeps each kernel small for
+  the compiler and the register file); D. van Antwerpen, "Improving SIMD Efficiency for Parallel Monte Carlo Light
+  Transport on the GPU", HPG 2011, https://doi.org/10.1145/2018323.2018330 (stream compaction between path stages);
+  P. S. Heckbert, "Fundamentals of Texture Mapping and Image Warping", MS thesis, UC Berkeley, 1989,
+  https://www2.eecs.berkeley.edu/Pubs/TechRpts/1989/CSD-89-516.pdf (bilinear reconstruction as two linear
+  interpolations of four taps, the order the loop keeps); R. W. Scheifler, "An Analysis of Inline Substitution for a
+  Structured Programming Language", CACM 20(9), 1977, https://doi.org/10.1145/359810.359830 (code growth from
+  inlining every call site, which the single tap avoids).
+- **Sources:** Microsoft, "Function Declaration Syntax" (HLSL `inline` is the default; one copy of the body per call),
+  https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-function-syntax ; Microsoft,
+  "for Statement" (`loop` keeps flow control, `unroll` copies the body; without an attribute the compiler unrolls
+  when it can), https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-for .
+- **Regression:** `packages/voxel-pathtracer/tests/mesh-pbr.test.js` "pbrMaterial reads every texture slot through
+  one filter call in a loop bounded by the record (KB5451)" (fails on the old build: 11 calls) and "pbrMaterial gives
+  the same values as one filter call per slot (KB5451)" (24 values bit-identical on the CPU WGSL interpreter).
+
 ### Fixed 2026-11-28: a shot drawn in sub-frames showed what moves fast as stepped copies, not a smear (KB-LOOK-TV-SUBSTEP1, shot tool, scenes)
 
 - **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-blowup.json --once --seconds 1.1` (RTX A6000,
@@ -13857,115 +13968,6 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
   the order the layer evaluates `textureSampleGrad`'s arguments in, not the browser's naming.
 - **Next:** report it to Mozilla with the shader above; an app that hits it renames the function.
 - **Upstream report (draft, nothing filed):** `docs/upstream-reports/KB0003/report.md` with the repro page `dx.html`; still reproduces in Firefox 157 on 2026-11-11 (Edge 157 compiles all five cases) and on 2026-11-27 (`fn dx` fails, the other four compile).
-
-### Partly fixed 2026-11-11 and 2026-11-28: mesh PBR inlined twelve texture filters into the Direct3D 11 surface program, and the surface program held its material (KB5451)
-
-- **Repro:** a mesh-PBR tracer on the WebGL2 layer over ANGLE Direct3D 11 with Chromium's
-  `--disable-gpu-shader-disk-cache`, timing each GL link and first draw: the staged `surface` program took 177 s to link and 356 s more at its first
-  draw (58% of a 362 s ready, 550 s image; dev PC, RTX A6000, busy, diagnostic).
-- **Cause:** `pbrMaterial` called the bilinear `pbrTexture` filter once per texture slot (eleven direct calls plus the
-  clearcoat normal map through `pbrMappedNormal`). HLSL functions are inline by default, so fxc built one copy of the
-  filter per call: 21 copies in the `trace` entry and 17 in `preview`.
-- **Fix:** `pbrMaterial` reads every slot but the normal map through ONE `pbrTexture` call in a loop whose bound is
-  the record's slot count (word 3, written by `mesh-pbr-build.ts`), a value the compiler cannot see, so it keeps one
-  rolled body (the technique the coverage kernel already uses, docs/limits.md). The same calls with the same
-  arguments: same values. `pbrMapNormal` takes the texel the loop read.
-- **Evidence:** inlined filter copies (a call-graph walk of each WGSL module the tracer makes under the test's fake engine) went
-  from 21 to 10 in `trace`, 17 to 6 in `preview`, 42 to 20 in total; the Direct3D 11 image hash is the same
-  (1711753600) before and after; the surface program's cold link plus first draw went from 533 s to 305 s on the
-  busy machine (diagnostic only: the unchanged `hit` program moved from 157 s to 257 s in the same pair).
-- **Still open:** the other staged programs (`hit`, `shadow`, an unlabeled one) still take minutes cold on Direct3D
-  11, so the 120 s `renderImage` signal with the disk cache off is not yet met. Next: the same loop-bound treatment
-  for `pbrVisible`'s alpha reads and the traversal loops in `hit` and `shadow`, proven by the same counts.
-- **Measured 2026-11-28 (lane A):** `MARGO_COMPAT=1 node packages/voxel-pathtracer/tests/mesh-pbr-lobes-browser.mjs`
-  (Edge, ANGLE Direct3D 11, a fresh profile each run, so cold) passes, but its first image arrives 314 s after
-  `ready`; later images and the ANGLE Vulkan leg take under a second. The draw-time compiles of four 7-output programs
-  hold it: 74 to 173 s each by the first-draw wait. Binding the framebuffer before `linkProgram`, or declaring the
-  outputs as one array, leaves the link at about 1 s and the first draw as long (ANGLE links against one output either
-  way), so the cost cannot be moved to the parallel link. Inlined statements of the surface program: 21,211, of which
-  the layer's storage-word loads are 15,596 (1,114 copies). Fixed in part: `triangleNormal` calls `meshWorldNormal`
-  once (it was in both branches), the dielectric side test takes the triangle normal once (`triangleWrongSide`), and
-  the tangent frame reads `meshWorld` once per branch. Surface program 21,211 to 18,425 statements, paired offline fxc
-  144.2 to 106.5 s; emitter program 79.6 to 75.2 s. Same output: 122 GPU readbacks of `test:gpu:mesh-pbr`,
-  `mesh-deform`, `mesh-attributes` and `mesh-pbr-lobes` hash the same before and after (native WebGPU, repeatable run
-  to run). Regression: `packages/voxel-pathtracer/tests/mesh-pbr.test.js` "the mesh helpers compute each hit value
-  once per call site (KB5451)". Still open: the cold first image is far above 120 s; next are the 941 storage loads
-  (meshX 19 copies of 12 loads, pbrVertex 21, rowAt 27, meshCorner 27) and the two pbrMapNormal copies.
-- **Measured 2026-11-28, second round (lane A, paired offline fxc, `ps_5_0`, per-pair minimum of 2 rounds, loaded
-  machine):** a branch-free storage-word select (`v & mask` of `equal(ivec4(o & 3), ivec4(0,1,2,3))`, OR of the four
-  lanes) in place of the layer's nested `c < 2 ? ...` select made the surface program slower, 141.2 to 228.5 s, and
-  the emitter program 90.3 to 119.1 s, though it removes three branches from each of the 907 inlined `_ld0f` copies:
-  dropped. Filling only the first n of the surface program's 7 outputs: 1 output 40.2 s, 2 39.4 s, 4 108.4 s, 6
-  141.0 s, so outputs 3 and 4 hold most of the compile. ANGLE's Direct3D 11 back end links against the first output
-  only and compiles again at the first draw for the bound 7-target layout, on the GPU thread, so the four 7-output
-  programs compile one after another; statement cuts inside them gave 5 to 30 percent each and two of them were
-  slower. Reaching 120 s from 314 s needs a structural change to what each staged program writes (fewer outputs per
-  program, or the heavy material terms behind outputs 3 and 4 moved out of the 7-output programs), not more cuts.
-- **Fixed in part 2026-11-28, third round (lane A):** mesh PBR's shading normal (`triangleShading`) and material
-  (`pbrMaterial`) were 10,800 of the surface program's 17,900 inlined statements; with both stubbed the program
-  compiled in 12.5 s against 123.9 s (paired offline fxc). Each now runs in a staged program of its own, `shading`
-  and `material`, between `vertex` and `surface` (`packages/voxel-pathtracer/src/compat-staged.ts`, SURFACE_CALLS):
-  both read the path state only, so each is computed under a guard that holds wherever its call runs (the conjunction
-  of the branches around it), kept in three new state fields, and the call site reads them. `pbrMaterial` changes
-  nothing private but `pbrLayer`, which its program saves and restores and the call site sets from the kept copy. Only
-  tracers whose shader calls `pbrMaterial` get the two programs; WebGPU's shader is not touched. The purity check
-  read `h.mesh!=0u&&motion<1.0` as taking the address of `motion` (`&motion`); `assigns` now skips `&&`. The same
-  misreading (`&&h.inst`, `&&done`) had marked programs as writers of `h`, `done` and `medium`, so every tracer's
-  state pages are now laid out with fewer pages rewritten per program; the resampled, guiding, media, spectral, mesh
-  and compose (`--backend=compat`) GPU checks give the same 1,332 readback hashes before and after (821 on the
-  layer). Paired
-  offline fxc (2 rounds, per-pair minimum): the old surface program 94.2 s, the new surface 14.1 s, shading 3.7 s,
-  material 9.6 s. Cold first image of `MARGO_COMPAT=1 node packages/voxel-pathtracer/tests/mesh-pbr-lobes-browser.mjs`
-  (Edge, ANGLE Direct3D 11 leg, fresh profile, busy workstation, old and new builds run back to back): 272 s before,
-  200 and 193 s after. Same output: the four mesh GPU tests (`mesh-pbr`, `mesh-deform`, `mesh-attributes`,
-  `mesh-pbr-lobes`) give the same set of readback hashes before and after on native WebGPU and on the layer (244 in
-  all, the layer's `getBufferSubData` reads hashed too); only the order the layer's reads finish in differs. Entry
-  sizes stay under their ceilings (the staged route is in the lazy compat chunk). Regression:
-  `packages/voxel-pathtracer/tests/compat-staged.test.js` "mesh PBR evaluates its shading normal and material in
-  programs of their own before surface (KB5451)". The cold first-draw waits left were `sample` (mesh emitter
-  radiance, 83 s), `post` (labelled `hit` before; 45 s) and `shadow` (28 s).
-- **Fix (2026-11-28, emit and the texel loop):** the staged route evaluates a mesh emitter's radiance in a program
-  of its own, `emit`, drawn between `sample` and `shadow` for the light kind that samples mesh emitters only (kind 5;
-  `StagedTrace.emits`). sampleMeshEmitter draws its three random numbers first and everything after them depends on
-  those draws, the shading point and private words alone, so on this route it returns the face's record offset (bit
-  30 set, so the word stays a normal f32) and its two draws through the light kind's own `radiance` words, and `emit`
-  runs the same code after the draws (`z_meshEmitted`) for the radiance. The stager refuses a shader where `sample`
-  reads that radiance again, changes a private word the emitter code reads, or reaches the call by more than the
-  light kind. A first version kept the record in 4 new state words: mesh PBR's state went from 280 words (10 pages)
-  to 11 pages and every program's state load and store grew with it, slower cold; a whole Hit (35 words) took 12
-  pages, 17 texture units with finish's 5 sums, and the layer refused it. `pbrTexture` on this route also fetches
-  its nearest tap and its four bilinear taps in one loop bounded by the texture's filter word, the same taps in the
-  same order, decoded and mixed in the same expressions: Direct3D's compiler had inlined five `pbrPixel` copies
-  (ten `pbrAddress`) into every texture fetch. WebGPU's shader is not touched. Paired offline fxc over all ten
-  (now eleven) staged programs, 2 rounds, per-program minimum: 89.6 s to 68.0 s (sample 29.7 s to 4.1 s plus emit
-  8.1 s, shadow 17.7 to 15.9 s, post 20.1 to 17.9 s). Cold first image of
-  `MARGO_COMPAT=1 node packages/voxel-pathtracer/tests/mesh-pbr-lobes-browser.mjs` (Edge, ANGLE Direct3D 11, fresh
-  profile, old and new alternating, the workstation quiet): old 94 and 91 s, new 80 and 77 s, under the 120 s bar.
-  Same output: the four mesh GPU tests and the resampled, guiding, media, spectral, mesh and compose
-  (`--backend=compat`) checks give the same sets of readback hashes before and after on WebGPU and the layer (1,576).
-  The lazy compat chunk grows from 13,503 to 14,856 B gzip; the root entry by 1 B (the chunk's name). Regressions:
-  `packages/voxel-pathtracer/tests/compat-staged.test.js` "mesh emitters evaluate their radiance in a program of
-  its own between sample and shadow (KB5451)" and `packages/voxel-pathtracer/tests/mesh-pbr.test.js` "the WebGL2
-  route's texel loop gives pbrTexture's values bit for bit (KB5451)" (CPU WGSL interpreter, nearest and bilinear,
-  sRGB and not). Still open: the busy-machine first image (167 to 205 s while other lanes ran); the largest cold
-  programs left are `post` and `shadow` (about 16 to 18 s each offline).
-- **Sources (the split):** S. Laine, T. Karras, T. Aila, "Megakernels Considered Harmful: Wavefront Path Tracing on
-  GPUs", HPG 2013, https://research.nvidia.com/publication/2013-07_megakernels-considered-harmful-wavefront-path-tracing-gpus
-  (a path's work cut into small kernels that pass the path state through memory, which keeps each kernel small for
-  the compiler and the register file); D. van Antwerpen, "Improving SIMD Efficiency for Parallel Monte Carlo Light
-  Transport on the GPU", HPG 2011, https://doi.org/10.1145/2018323.2018330 (stream compaction between path stages);
-  P. S. Heckbert, "Fundamentals of Texture Mapping and Image Warping", MS thesis, UC Berkeley, 1989,
-  https://www2.eecs.berkeley.edu/Pubs/TechRpts/1989/CSD-89-516.pdf (bilinear reconstruction as two linear
-  interpolations of four taps, the order the loop keeps); R. W. Scheifler, "An Analysis of Inline Substitution for a
-  Structured Programming Language", CACM 20(9), 1977, https://doi.org/10.1145/359810.359830 (code growth from
-  inlining every call site, which the single tap avoids).
-- **Sources:** Microsoft, "Function Declaration Syntax" (HLSL `inline` is the default; one copy of the body per call),
-  https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-function-syntax ; Microsoft,
-  "for Statement" (`loop` keeps flow control, `unroll` copies the body; without an attribute the compiler unrolls
-  when it can), https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-for .
-- **Regression:** `packages/voxel-pathtracer/tests/mesh-pbr.test.js` "pbrMaterial reads every texture slot through
-  one filter call in a loop bounded by the record (KB5451)" (fails on the old build: 11 calls) and "pbrMaterial gives
-  the same values as one filter call per slot (KB5451)" (24 values bit-identical on the CPU WGSL interpreter).
 
 ### Open: `MARGO_COMPAT=1` voxel-pathtracer steps cannot finish on ANGLE Direct3D 11, on main too; the serial compile is ANGLE's, proven 2026-11-25 (KB-L5a-10)
 
