@@ -52,23 +52,23 @@ them; the rest is a record of what a stronger solver would need.
 
 ### ATMO-01 four-point pass
 
-- Point 5. Weather's `boundary-layer.test.js` compares stable and unstable profiles to independent
+- Point 5. `9d7dd26bc5`. Weather's `boundary-layer.test.js` compares stable and unstable profiles to independent
   closed and quadrature references, checks coded options, applies local Taylor speed, and verifies
   the finite-height box or ground does not repeat an earlier vertical gust. Physics' `coupling/boundary-layer.test.js`
   verifies height-dependent rigid panel loads and exact replay through AirSolver.
-- Point 6. `boundary-layer-threads.test.js` and `boundary-layer-threads.browser.mjs` compare
+- Point 6. `9d7dd26bc5`. `boundary-layer-threads.test.js` and `boundary-layer-threads.browser.mjs` compare
   accepted Weather and Rust/Wasm states through far-origin shifts and exact seek with plain
   and shared memory. Chromium starts three actual helpers. The largest Node grid samples 71,703 rows
   with 71,702 SIMD-paired rows and 55,769 Mann interpolations.
-- Point 7. `boundary-layer-surface.browser.mjs` reproduces RITS-5 with a fixed camera using
+- Point 7. `9d7dd26bc5`. `boundary-layer-surface.browser.mjs` reproduces RITS-5 with a fixed camera using
   continuous accepted native wind and the production Weather precipitation field. The shaft
   drifts 30 m in six seconds and its lower section moves 105.93 m downwind of the cloud base.
   Both renderers draw the actual slant and reproduce exact replay. The precipitation fixture
   has a separate published droplet terminal-speed comparison.
-- Point 8. Physics and Weather READMEs and `docs/limits.md` describe the stability law and
+- Point 8. `9d7dd26bc5`. Physics and Weather READMEs and `docs/limits.md` describe the stability law and
   supported heights, tapered synthetic gusts, registry grid, scope of the rain reproduction
   and remaining terrain and coupling work.
-- Point 2 remains open. `atmo01-mosaic-measured.mjs` compares 98 higher-level MOSAiC wind
+- Point 2 remains open. `9d7dd26bc5`. `atmo01-mosaic-measured.mjs` compares 98 higher-level MOSAiC wind
   observations at 49 times. Low-level speed and turbulence stability data and external SHEBA
   roughness initialise the model. The corrected top-sensor RMS is 0.382 m/s stable, 0.500 m/s
   unstable and 0.615 m/s near neutral. Independently measured friction velocity lowers those
