@@ -141,6 +141,11 @@ test('identicalStops finds two stops of one control that give the same picture (
   const moving = { ...stop('max', '10', fringesB), noise: [noiseFloor(fringesA, fringesB)] };
   assert.deepEqual(identicalStops([stop('start', '0', fringesB), moving]), [], 'a stop whose picture moves on its own is not judged');
   assert.deepEqual(identicalStops([stop('start', '0', fringesA), stop('max', '10', fringesB)]), []);
+  // A turn slider: -180 and 180 degrees are the same angle and draw the same picture by design.
+  const turn = [stop('max', '180', fringesA), stop('min', '-180', fringesA), stop('middle', '0', fringesB)];
+  assert.deepEqual(identicalStops(turn), [['max', 'min']], 'without a period the two ends look partly dead');
+  assert.deepEqual(identicalStops(turn, { period: 360 }), [], 'whole turns apart are the same angle, not a dead stop');
+  assert.deepEqual(identicalStops([stop('a', '0', fringesA), stop('b', '180', fringesA)], { period: 360 }), [['a', 'b']], 'half a turn apart still counts');
 });
 
 test('stalled: drawing at the start and nothing at the end; an on-demand page is not stalled', () => {

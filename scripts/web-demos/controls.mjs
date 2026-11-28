@@ -20,7 +20,7 @@
 // both), --timeout=<ms> to load a page (default 60000), --budget=<ms> per page (default: 90 s plus 30 s per control,
 // at most 15 min), --wait=<ms> after an input (default 600), --confirm-wait=<ms> (default 1500), --no-confirm,
 // --save-frames (writes the before and after pictures of every input to demos/.reports/frames/; --save-frames=flagged
-// only for inputs that changed nothing), --resume (skips demos already in the report), --md=<path>, --md-only.
+// only for inputs that changed nothing), --resume (skips demos already in the report), --md=<path>, --md-only, --report=<path> (default demos/.reports/controls.json).
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -34,7 +34,6 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../..');
 const demos = path.join(root, 'demos');
 const reportDir = path.join(demos, '.reports');
-const reportFile = path.join(reportDir, 'controls.json');
 
 const args = process.argv.slice(2);
 const option = (name, fallback) => {
@@ -42,6 +41,7 @@ const option = (name, fallback) => {
   return hit ? hit.slice(name.length + 3) : fallback;
 };
 const flag = (name) => args.includes(`--${name}`);
+const reportFile = path.resolve(option('report', path.join(reportDir, 'controls.json')));
 const loadTimeout = Number(option('timeout', 60000));
 const fixedBudget = option('budget', null);
 const WAIT = Number(option('wait', 600));
@@ -828,7 +828,7 @@ async function testControl(s, c, group, plan = {}) {
   }
   try {
     const out = await operate(s, c, group, plan, records, rec, run, () => pre, (v) => (pre = v));
-    const same = stops.length > 2 ? identicalStops(stops) : [];
+    const same = stops.length > 2 ? identicalStops(stops, { period: periodOf(c) }) : [];
     const r = records.find((x) => x.path === c.path);
     if (same.length && r) r.sameStops = same;
     return out;
@@ -842,10 +842,25 @@ async function testControl(s, c, group, plan = {}) {
  * dead only when the picture was moving during one of its tries and still did not change.
  */
 function refine(c, d) {
+  const period = c.sameStops?.length ? periodOf(c) : 0;
+  if (period) {
+    // Records made before whole turns were recognised: drop pairs such as -180 and 180 degrees.
+    const valueOf = (name) => Number(/\(([-+\d.e]+)\)\s*$/.exec(name)?.[1]);
+    const turns = (a, b) => Math.abs(valueOf(a) - valueOf(b)) / period;
+    c.sameStops = c.sameStops.filter(([a, b]) => { const t = turns(a, b); return !(t > 0.5 && Math.abs(t - Math.round(t)) < 1e-6); });
+    if (!c.sameStops.length) delete c.sameStops;
+  }
   if (c.verdict !== 'dead') return c;
-  if (c.kind === 'canvas-drag' && /\b(draw|paint|sketch|brush|lasso|box|select|place|cut|carve|sculpt)/i.test(d?.dragHint ?? ''))
-    return Object.assign(c, { verdict: 'unsure', note: `the page asks for a particular gesture: "${d.dragHint}"` });
+  const hint = d?.dragHint ?? pageText(d?.slug ?? d?.demo).match(/[^.]*\b(drag|swipe)\b[^.]*/i)?.[0]?.trim() ?? '';
+  if (c.kind === 'canvas-drag' && /\b(draw|paint|sketch|brush|lasso|box|select|place|cut|carve|sculpt|stroke)/i.test(hint))
+    return Object.assign(c, { verdict: 'unsure', note: `the page asks for a particular gesture: "${hint.slice(0, 100)}"` });
   if (TOOL.test(c.label)) return Object.assign(c, { verdict: 'unsure', note: 'a tool or mode for the next click or drag on the scene; nothing to see until then' });
+  if (c.kind !== 'canvas-drag' && HANDLE.test(c.label)) return Object.assign(c, { verdict: 'unsure', note: 'a drag handle: it acts when dragged, and a click does nothing by design' });
+  const held = alreadyHeld(c, d);
+  if (held) return Object.assign(c, { verdict: 'unsure', note: `already holds ${held}, what a click puts there; its neighbours holding other values changed the picture` });
+  // On a page you draw on (a brush, a sculpting tool, planting points), the tools and brushes act on the next stroke.
+  const gesture = pageText(d?.slug ?? d?.demo).match(GESTURE);
+  if (gesture && c.kind !== 'canvas-drag') return Object.assign(c, { verdict: 'unsure', note: `a tool or brush for the next stroke on a page that says "${gesture[0].trim().slice(0, 80)}"` });
   const steps = [...(c.steps ?? []), ...(c.confirm?.steps ?? [])];
   if (SOUND.test(c.label)) Object.assign(c, { verdict: 'unsure', note: 'a sound control: nothing to see, and no sound setting changed' });
   else if (PLAYBACK.test(c.label) && steps.every((st) => (st.pictures ?? []).every((p) => p.noiseCount === 0)))
@@ -853,7 +868,42 @@ function refine(c, d) {
   return c;
 }
 const START = /\b(play|run|start|spin|release|drop|launch|fire|go|animate|tip|swing|pump|drive|wind|roll|pour|flow|turn on|switch on)\b/i;
-const TOOL = /\b(brush|eraser|pen|pencil|paint|pick|tool|draw|stamp|marker|lasso)\b/i;
+const GESTURE = /[^.]*\b(drag|tap|click)\b[^.]{0,60}\b(strokes?|draw(?!\s+order)|paint|recolou?r|brush|plant|place|erase|sculpt|carve|tap the map)\b[^.]*|[^.]*\bchoose a \w+, then (tap|click|drag)[^.]*/i;
+const pageTexts = new Map();
+/** The static text of a demo page, for instructions such as "Drag over the clay to make a stroke". */
+function pageText(slug) {
+  if (!slug) return '';
+  if (!pageTexts.has(slug)) {
+    const file = path.join(demos, slug, 'index.html');
+    pageTexts.set(slug, fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, ' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ') : '');
+  }
+  return pageTexts.get(slug);
+}
+const HANDLE = /^(drag|grab|move|reorder|resize)\b/i;
+/** A slider that turns something through whole turns: -180 and 180 degrees draw the same picture by design. */
+function periodOf(c) {
+  const span = Number(c.max) - Number(c.min);
+  if (Math.abs(span - 2 * Math.PI) < 1e-3) return 2 * Math.PI;
+  return span >= 360 && /°|\b(deg|degrees|turn|rotat\w*|angle|heading|yaw|bearing|azimuth|spin|hue|longitude)\b/i.test(c.label ?? '') ? 360 : 0;
+}
+/**
+ * A grid of cells named "Row 2, column 4, Saffron": a click paints the cell with the current colour, so a cell that
+ * already holds it changes nothing. When every dead cell holds one value and live cells of the same grid hold others,
+ * the dead ones are already in the state a click gives. Returns that value, or ''.
+ */
+function alreadyHeld(c, d) {
+  const split = (label) => /^(.*\S),\s*([^,]+)$/.exec(label ?? '');
+  const own = split(c.label);
+  if (!own || !d?.controls) return '';
+  const shape = (s) => s.replace(/\d+/g, '#');
+  const same = d.controls.filter((o) => o.kind === c.kind && split(o.label) && shape(split(o.label)[1]) === shape(own[1]));
+  const dead = same.filter((o) => o.verdict === 'dead' || (o.verdict === 'unsure' && o.note?.startsWith('already holds')));
+  const live = same.filter((o) => o.verdict === 'live');
+  if (live.length < 3 || dead.some((o) => split(o.label)[2] !== own[2]) || live.some((o) => split(o.label)[2] === own[2])) return '';
+  return own[2];
+}
+// "Draw" alone is a tool; "Reverse draw order" is a setting that should change the picture.
+const TOOL = /\b(brush|eraser|pen|pencil|paint|pick|tool|stamp|marker|lasso)\b|^draw$/i;
 const PLAYBACK = /\b(speed|rate|tempo|time ?scale|playback|slow(er)?|fast(er)?)\b/i;
 /** A sound control that changed nothing to see may still change what is heard: unsure, never dead. */
 const soundAware = (verdict, label) => (verdict === 'dead' && SOUND.test(label) ? 'unsure' : verdict);
@@ -1102,7 +1152,7 @@ async function confirm(slug, backend, c, { running = false } = {}) {
 }
 
 function save() {
-  fs.mkdirSync(reportDir, { recursive: true });
+  fs.mkdirSync(path.dirname(reportFile), { recursive: true });
   report.generated = new Date().toISOString();
   report.options = { wait: WAIT, confirmWait: CONFIRM_WAIT, viewport: DESKTOP, mobile: MOBILE };
   fs.writeFileSync(reportFile, `${JSON.stringify(report, null, 1)}\n`);
@@ -1157,52 +1207,82 @@ function severity(d, rows) {
 function writeMarkdown() {
   const ds = Object.values(report.demos).sort((a, b) => a.demo.localeCompare(b.demo));
   const all = (d) => d.controls ?? [];
+  const slugOf = (d) => d.slug ?? d.demo;
+  const backendOf = (d) => d.backend ?? 'webgpu';
   let controls = 0,
     dead = 0,
     unsure = 0;
-  const body = [],
-    ranked = [],
-    whileRunning = [],
+  const whileRunning = [],
     unclear = [];
+  // One row per demo and control; a row the same on both backends is written once with "both".
+  const bySlug = new Map();
   for (const d of ds) {
     controls += all(d).filter((c) => !['disabled', 'skipped', 'not tested'].includes(c.verdict)).length;
     dead += all(d).filter((c) => c.verdict === 'dead').length;
     unsure += all(d).filter((c) => c.verdict === 'unsure').length;
     for (const c of all(d)) {
-      if (c.verdict === 'live' && /acts only while/.test(c.note ?? '')) whileRunning.push(`- ${d.demo}: ${c.label} (${c.note})`);
-      if (c.verdict === 'unsure') unclear.push(`- ${d.demo}: ${c.label} (${c.note ?? 'the picture moves too much on its own to tell'})`);
+      if (c.verdict === 'live' && /acts only while/.test(c.note ?? '')) whileRunning.push(`- ${slugOf(d)} (${backendOf(d)}): ${c.label} (${c.note})`);
+      if (c.verdict === 'unsure') unclear.push({ where: `${slugOf(d)} (${backendOf(d)})`, label: c.label, note: c.note ?? 'the picture moves too much on its own to tell' });
     }
     const rows = problemsOf(d);
     if (!rows.length) continue;
-    ranked.push({ d, rows, score: severity(d, rows) });
-    body.push(`## ${d.demo}`, '', '| Control | Expected | What happened |', '| --- | --- | --- |');
-    for (const r of rows) body.push(`| ${r.label.replace(/\|/g, '/')} | ${r.expected} | ${r.happened.replace(/\|/g, '/')} |`);
-    body.push('');
+    const entry = bySlug.get(slugOf(d)) ?? { slug: slugOf(d), rows: new Map(), score: 0 };
+    entry.score = Math.max(entry.score, severity(d, rows));
+    for (const r of rows) {
+      const key = `${r.label}|${r.happened}`;
+      const had = entry.rows.get(key);
+      if (had) had.backends.add(backendOf(d));
+      else entry.rows.set(key, { ...r, backends: new Set([backendOf(d)]) });
+    }
+    bySlug.set(slugOf(d), entry);
   }
-  ranked.sort((a, b) => b.score - a.score || a.d.demo.localeCompare(b.d.demo));
+  const ranked = [...bySlug.values()].sort((a, b) => b.score - a.score || a.slug.localeCompare(b.slug));
+  const cell = (t) => String(t).replace(/\|/g, '/');
+  const table = ['| Demo | Backend | Control | Expected | What happened |', '| --- | --- | --- | --- | --- |'];
+  for (const e of [...ranked].sort((a, b) => a.slug.localeCompare(b.slug)))
+    for (const r of e.rows.values()) table.push(`| ${e.slug} | ${r.backends.size > 1 ? 'both' : [...r.backends][0]} | ${cell(r.label)} | ${r.expected} | ${cell(r.happened)} |`);
   const lines = [
     '# Dead and broken demo controls',
     '',
-    `Made by \`node scripts/web-demos/controls.mjs --all\` on ${report.generated?.slice(0, 10) ?? 'unknown'}; the full record is \`demos/.reports/controls.json\`. ${ds.length} demos, ${controls} controls operated, ${dead} dead, ${unsure} unsure, ${ranked.length} demos with at least one problem.`,
+    `Made by \`node scripts/web-demos/controls.mjs --all\` (WebGPU and \`?backend=webgl2\`) on ${report.generated?.slice(0, 10) ?? 'unknown'}; the full record is \`demos/.reports/controls.json\`. ${ds.length} demo runs, ${controls} controls operated, ${dead} dead, ${unsure} unsure, ${ranked.length} demos with at least one problem.`,
     '',
-    'A control is dead when neither the canvas (beyond its own motion) nor any readout outside its own label changed: on the first pass with reduced motion, again on a fresh page with normal motion and a longer wait, and a third time after pressing the page\'s start button when it has one.',
+    'A control is dead when neither the canvas (beyond its own motion) nor any readout outside its own label changed: on the first pass with reduced motion, again on a fresh page with normal motion and a longer wait, and a third time after pressing the page\'s start button when it has one. Partly dead: two stops of the same slider or select draw the same picture.',
     '',
     '## Worst first',
     '',
-    ...ranked.slice(0, 30).map(({ d, rows }) => `- ${d.demo}: ${rows.map((r) => `${r.label} (${r.happened.split(';')[0]})`).join('; ').slice(0, 300)}`),
+    ...ranked.slice(0, 30).map((e) => `- ${e.slug}: ${[...e.rows.values()].map((r) => `${r.label} (${r.happened.split(';')[0]})`).join('; ').slice(0, 300)}`),
     '',
-    ...body,
+    '## Every problem',
+    '',
+    ...table,
+    '',
   ];
   if (whileRunning.length) lines.push('## Controls that act only while something runs', '', 'At rest, moving these changes only their own label. Worth a hint or a visible effect at rest.', '', ...whileRunning, '');
-  if (unclear.length) lines.push('## Could not tell', '', ...unclear, '');
+  if (unclear.length) {
+    // A grid of 144 cells with the same reason reads as one line.
+    const groups = new Map();
+    for (const u of unclear) {
+      const key = `${u.where}|${u.note}`;
+      if (!groups.has(key)) groups.set(key, { ...u, labels: [] });
+      groups.get(key).labels.push(u.label);
+    }
+    const said = [...groups.values()].flatMap((g) =>
+      g.labels.length > 3 ? [`- ${g.where}: ${g.labels.length} controls such as ${g.labels.slice(0, 2).join('; ')} (${g.note})`] : g.labels.map((l) => `- ${g.where}: ${l} (${g.note})`),
+    );
+    lines.push('## Could not tell', '', ...said, '');
+  }
   fs.mkdirSync(path.dirname(mdFile), { recursive: true });
   fs.writeFileSync(mdFile, `${lines.join('\n')}\n`);
   console.log(`wrote ${mdFile}`);
-  return ranked;
+  return ranked.map((e) => ({ d: { slug: e.slug } }));
 }
 
 // ---------------------------------------------------------------------------------------------------------------
 if (mdOnly) {
+  // Judge again with the current rules: a dead control that an older rule called unsure goes back to dead first.
+  const REFINED = /^(a tool or|the page asks for|a sound control|a speed or playback|a drag handle|already holds)/;
+  for (const d of Object.values(report.demos))
+    for (const c of d.controls ?? []) if (c.verdict === 'unsure' && REFINED.test(c.note ?? '')) Object.assign(c, { verdict: 'dead', note: undefined });
   for (const d of Object.values(report.demos)) for (const c of d.controls ?? []) refine(c, d);
   save();
   writeMarkdown();
@@ -1232,6 +1312,7 @@ for (const slug of names) for (const backend of backends) {
       refine(c, d);
     }
     for (const c of flagged.slice(12)) c.confirm = { verdict: 'not confirmed', note: 'more than 12 flagged controls on the page' };
+    for (const c of d.controls) refine(c, d);
   }
   report.demos[d.demo] = d;
   save();

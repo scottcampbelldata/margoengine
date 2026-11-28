@@ -174,14 +174,19 @@ export function stalled(start, end) {
  * frames: [frame per picture], noise: [noiseFloor per picture] } with frames taken once the picture settled. Only
  * steady stops (no motion of their own) with different values are compared. Returns the pairs of stop names.
  */
-export function identicalStops(stops) {
+export function identicalStops(stops, { period = 0 } = {}) {
+  const wraps = (a, b) => {
+    if (!period) return false;
+    const turns = Math.abs(Number(a) - Number(b)) / period;
+    return Number.isFinite(turns) && turns > 0.5 && Math.abs(turns - Math.round(turns)) < 1e-6;
+  };
   const steady = stops.filter((s) => s.frames.length && s.noise.every((n) => n.count < MIN_PIXELS));
   const pairs = [];
   for (let i = 0; i < steady.length; i++)
     for (let j = i + 1; j < steady.length; j++) {
       const a = steady[i],
         b = steady[j];
-      if (a.value === b.value || a.frames.length !== b.frames.length) continue;
+      if (a.value === b.value || wraps(a.value, b.value) || a.frames.length !== b.frames.length) continue;
       if (a.frames.some((f, k) => f.width !== b.frames[k].width || f.height !== b.frames[k].height)) continue;
       if (a.frames.every((f, k) => !compareRegion(f, b.frames[k], b.noise[k]).changed)) pairs.push([a.name, b.name]);
     }
