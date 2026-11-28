@@ -6,6 +6,21 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-28: a 3MF with `production: {separateParts: true}` copies every resource group whole into each part (KB-3MF-PARTCOPY1, exporters)
+
+- **Repro:** `export3MF(NodePerformanceTest.glb, {assembly: 'components', production: {separateParts: true}})`
+  (`examples/assets/khronos`, 10,001 mesh nodes): RangeError "ZIP would exceed 268435456 bytes". The same scene with
+  `assembly: 'components'` alone is 10,402,277 B, and with `production: true` in one part 10,056,754 B.
+- **Cause:** a part may refer only to resources in itself (production extension 3.2), so the writer copies into each
+  part the resource groups its object names (`resourcesOf`, `packages/exporters/src/threemf.ts`, where `apart` is
+  built). It copies a group whole: this scene's one `basematerials` holds about 10,000 entries with their
+  `pbmetallicdisplayproperties`, and every one of the 10,001 parts carries both, past `encodeZIP`'s 256 MiB, which it
+  counts uncompressed. Smaller scenes pay the same way: OrientationTest is 15,644 B in 14 parts against 5,916 B as
+  components.
+- **Fix wanted:** each part gets copies of its groups pruned to the indices its object uses, with `pindex`, `p1` to
+  `p3`, `multiproperties` layers and the display properties' entries renumbered to match, and a regression test that
+  reads such a file back through `parse3MF` and `parse3MFMaterials` with the same colours and checks the part sizes.
+
 ### Fixed 2026-11-28: on the WebGL2 layer a page linked its synchronous pipelines one at a time (KB-COMPAT-SYNCLINK1, webgl2-compat)
 
 - **Repro (before):** `demos/ten-thousand-trees/?backend=webgl2` on Chrome, ANGLE over Direct3D 11 (RTX A6000, loaded
