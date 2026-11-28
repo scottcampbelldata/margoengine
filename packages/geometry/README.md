@@ -72,7 +72,7 @@ Every function returns a plain `GeometryData` (`positions`, `normals`, `uvs`, `i
 | `computeVertexNormals`, `toNonIndexed`, `applyMatrix4`, `center`, `computeBoundingBox`, `computeBoundingSphere`: pure functions returning new data |
 | `edgesGeometry`, `wireframe` (line index pairs) |
 | `loopSubdivide` |
-| `roundedBoxGeometry`, `convexGeometry`, `parametricGeometry`, `decalGeometry`, `trussGeometry` from `@margoengine/geometry/extras` |
+| `roundedBoxGeometry`, `convexGeometry`, `parametricGeometry`, `decalGeometry`, `trussGeometry`, `chainLinkGeometry` from `@margoengine/geometry/extras` |
 | `NurbsCurve`, `NurbsSurface`, `nurbsSurfaceGeometry`, `nurbsCircle`, `nurbsRevolve` from `@margoengine/geometry/nurbs` |
 | `MeshSurfaceSampler` from `@margoengine/geometry/sample` |
 | `CurveFlow`, `flowGeometry` from `@margoengine/geometry/flow` |
@@ -119,7 +119,7 @@ one mesh:
 
 ```ts
 import {Engine, PbrMaterial} from 'margoengine/core';
-import {trussGeometry} from 'margoengine/geometry/extras';
+import {chainLinkGeometry, trussGeometry} from 'margoengine/geometry/extras';
 import {toGeometry} from 'margoengine/geometry/utils';
 const engine = await Engine.create(document.querySelector('canvas')!);
 // A 2 m mast of 8 Warren panels, then a jib that tapers to 40 percent, laid along +X.
@@ -128,6 +128,9 @@ const jib = trussGeometry({length: 1.6, width: 0.16, depth: 0.2, bays: 10, taper
 const red = new PbrMaterial({color: '#b5432b', roughness: 0.45});
 engine.createMesh().setGeometry(toGeometry(mast)).setMaterial(red);
 engine.createMesh().setGeometry(toGeometry(jib)).setMaterial(red).setPosition([0, 2, 0]).setQuaternion([0, 0, -Math.SQRT1_2, Math.SQRT1_2]);
+// A 6 cm chain link, 2.4 cm wide, of 3 mm wire; turn every other one a quarter turn about Y.
+const link = chainLinkGeometry({length: 0.06, width: 0.024, wire: 0.003});
+engine.createMesh().setGeometry(toGeometry(link)).setPosition([1.6, 1.9, 0]);
 engine.start();
 ```
 
@@ -143,6 +146,10 @@ engine.start();
   `taper` (1) scales the section at the top end for jibs; `radialSegments` (8) sides per member. Every member is a capped
   `cylinderGeometry` merged into one `GeometryData`; members meet at the panel points without joint geometry. Chords that
   would overlap, a non-positive size or a bad count throw `RangeError`.
+- `chainLinkGeometry(options)`: one chain link, a round wire of radius `wire` (9 percent of the width) bent into a
+  stadium of outside `length` (0.06) along Y and `width` (40 percent of the length) along X, in the XY plane about the
+  origin; `segments` (48) rings along it and `radialSegments` (10) sides. The centre line is exact and spaced by arc
+  length. A width over the length, a non-positive size or a wire of a quarter of the width or more throws `RangeError`.
 - `convexGeometry(points)`: quickhull (Barber, Dobkin and Huhdanpaa 1996) with a tolerance scaled to the coordinates.
   Duplicates and points inside or on a face or edge are dropped; coplanar triangles merge into one flat face with one
   normal. UVs project each face onto the bounding-box side it faces. Fewer than four points, or points that do not

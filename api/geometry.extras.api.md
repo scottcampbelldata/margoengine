@@ -5,6 +5,14 @@
 ```ts
 import { MutableVec3 } from "@margoengine/math";
 
+export interface ChainLinkOptions {
+    length?: number;
+    width?: number;
+    wire?: number;
+    segments?: number;
+    radialSegments?: number;
+}
+
 export interface DecalGeometryOptions {
     offset?: number;
     backfaces?: boolean;
@@ -89,6 +97,8 @@ export interface TrussOptions {
 }
 
 export type TrussPattern = 'warren' | 'pratt' | 'x';
+
+export function chainLinkGeometry(options?: ChainLinkOptions): GeometryData;
 
 export function convexGeometry(points: ArrayLike<number> | readonly ArrayLike<number>[]): GeometryData;
 

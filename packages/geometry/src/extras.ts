@@ -32,3 +32,4 @@ export {
   type TiledBoxOptions,
 } from './tiled.js';
 export { trussGeometry, type TrussOptions, type TrussPattern } from './truss.js';
+export { chainLinkGeometry, type ChainLinkOptions } from './chain-link.js';

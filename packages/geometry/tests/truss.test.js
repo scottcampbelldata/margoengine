@@ -43,3 +43,14 @@ test('invalid options throw RangeError', () => {
   for (const options of [{ length: 0 }, { width: -1 }, { bays: 0 }, { bays: 1.5 }, { chordRadius: 0.2 }, { radialSegments: 2 }, { pattern: 'k' }, { taper: 0 }])
     assert.throws(() => trussGeometry(options), RangeError, JSON.stringify(options));
 });
+
+test('a chain link is a round wire on a stadium of its outside length and width', async () => {
+  const { chainLinkGeometry } = await import('../dist/extras.js');
+  const data = chainLinkGeometry({ length: 0.06, width: 0.024, wire: 0.003 });
+  assertValid(data);
+  const [x0, x1] = extent(data, 0), [y0, y1] = extent(data, 1), [z0, z1] = extent(data, 2);
+  assert.ok(Math.abs(x1 - 0.012) < 2e-4 && Math.abs(x0 + 0.012) < 2e-4, `x ${x0}..${x1}`);
+  assert.ok(Math.abs(y1 - 0.03) < 2e-4 && Math.abs(y0 + 0.03) < 2e-4, `y ${y0}..${y1}`);
+  assert.ok(Math.abs(z1 - 0.003) < 1e-4 && Math.abs(z0 + 0.003) < 1e-4, `z ${z0}..${z1}`);
+  for (const options of [{ length: 0 }, { width: 0.1 }, { wire: 0.01 }]) assert.throws(() => chainLinkGeometry(options), RangeError);
+});
