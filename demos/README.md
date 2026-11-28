@@ -36,6 +36,20 @@ node scripts/web-demos/thumbnail.mjs newtons-cradle
 
 It waits until the exhibit is marked ready, crops the rendered scene to 900 x 579 and writes `thumbs/newtons-cradle.jpg`. Demos use only engine packages: a simulation, model or effect a demo needs belongs in its package, never in `source/`.
 
+### Keep engine code out of `source/`
+
+`npm run check:demo-sources` (part of `check:merge`) scans every `demos/*/source` and fails on engine code that lives in a demo: shader text or raw GPU use (R1), solvers, time-step updates and physical constants (R2), hand-built mesh arrays (R3), local helpers such as `cross`, `normalize`, `mix`, a seeded random or noise (R4), more than 300 lines of JS (R5), and any import that is not `@margoengine/*`, `margo-demo-status` or a relative path (IMP). When it fails, use the package that owns the code; if no package does, build the gap in the package first. Wiring, UI, layout and content data stay in the demo.
+
+`scripts/web-demos/source-allowlist.json` records today's counts per demo and rule. It is a ratchet: a count never rises, a demo that is not listed starts at zero, and after you move code out of a demo you lower its numbers with `node scripts/check-demo-sources.mjs --lower` (the check also fails when a count fell and the file was not lowered). Never raise a number by hand.
+
+To see which package entry points no demo shows yet:
+
+```sh
+node scripts/web-demos/coverage.mjs
+```
+
+It lists every entry in each `packages/*/package.json` `exports` that no demo's `source/` imports, with the unused and total count per package, then the sorted entries.
+
 ## Exhibits
 
 | Exhibit | What it shows | Live | Zip |

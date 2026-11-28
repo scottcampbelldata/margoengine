@@ -1,0 +1,1095 @@
+{
+ "_comment": "Ratchet for scripts/check-demo-sources.mjs: engine code still living in each demo source/ (Scott, 2026-11-27: nothing in a demo directly). Counts only fall; never raise one. After moving code into a package run: node scripts/check-demo-sources.mjs --lower. R5 is listed only above r5Floor.",
+ "r5Floor": 300,
+ "demos": {
+  "2d-light-and-shadow": {
+   "R5": 442
+  },
+  "a-thousand-lights": {
+   "R1": 9,
+   "R2": 1,
+   "R3": 5,
+   "R5": 517
+  },
+  "ambient-occlusion": {
+   "R3": 4,
+   "R4": 1
+  },
+  "area-lights": {
+   "R3": 4,
+   "R5": 412
+  },
+  "bend-it": {
+   "R3": 4,
+   "R5": 364
+  },
+  "big-data-points": {
+   "R3": 1
+  },
+  "bone-crowds": {
+   "R2": 1,
+   "R3": 15,
+   "R4": 3,
+   "R5": 628
+  },
+  "bounce-light": {
+   "R1": 13,
+   "R3": 3,
+   "R4": 1,
+   "R5": 489
+  },
+  "bullet-through-paper": {
+   "R3": 3,
+   "R4": 1,
+   "R5": 416
+  },
+  "candlelight": {
+   "R1": 7,
+   "R3": 19,
+   "R5": 461
+  },
+  "cathedral-light": {
+   "R1": 12,
+   "R3": 8,
+   "R4": 2,
+   "R5": 691
+  },
+  "caustic-glass": {
+   "R1": 18,
+   "R3": 7,
+   "R4": 3,
+   "R5": 791
+  },
+  "character-course": {
+   "R2": 2,
+   "R3": 7,
+   "R4": 3,
+   "R5": 1054
+  },
+  "cloudscape": {
+   "R1": 7,
+   "R3": 2,
+   "R4": 3,
+   "R5": 425
+  },
+  "compound-shapes": {
+   "R3": 7,
+   "R5": 476
+  },
+  "compute-textures": {
+   "R1": 20,
+   "R5": 301
+  },
+  "cutscene-studio": {
+   "R3": 12,
+   "R5": 726
+  },
+  "depth-video": {
+   "R5": 378
+  },
+  "directional-lightmaps": {
+   "R3": 13,
+   "R5": 420
+  },
+  "drone-volume": {
+   "R2": 1,
+   "R3": 3,
+   "R4": 3,
+   "R5": 705
+  },
+  "edit-and-save-bim": {
+   "R3": 4,
+   "R5": 603,
+   "IMP": 2
+  },
+  "globe-flight": {
+   "R1": 13,
+   "R3": 5,
+   "R5": 608
+  },
+  "glsl-welcome": {
+   "R1": 6,
+   "R5": 322
+  },
+  "golden-hour": {
+   "R3": 4,
+   "R4": 2,
+   "R5": 463
+  },
+  "gpu-numpy": {
+   "R1": 1,
+   "R5": 457
+  },
+  "ground-projection": {
+   "R1": 14,
+   "R3": 4,
+   "R5": 616
+  },
+  "hdr-window": {
+   "R3": 8,
+   "R4": 1,
+   "R5": 479
+  },
+  "height-streaming": {
+   "R1": 1,
+   "R5": 421
+  },
+  "inside-a-heat-pump": {
+   "R2": 1,
+   "R3": 8,
+   "R5": 518
+  },
+  "l-system-garden": {
+   "R3": 1,
+   "R4": 1,
+   "R5": 625
+  },
+  "light-probes": {
+   "R1": 1,
+   "R3": 13,
+   "R5": 441
+  },
+  "long-shadows": {
+   "R1": 2,
+   "R3": 10,
+   "R4": 1,
+   "R5": 373
+  },
+  "many-goals": {
+   "R3": 6,
+   "R5": 356
+  },
+  "marching-cubes": {
+   "R1": 14,
+   "R3": 8,
+   "R4": 1,
+   "R5": 611
+  },
+  "mesh-booleans": {
+   "R1": 14,
+   "R3": 3,
+   "R4": 3,
+   "R5": 562
+  },
+  "model-to-step": {
+   "R3": 20,
+   "R5": 638
+  },
+  "molten-words": {
+   "R1": 5,
+   "R3": 5
+  },
+  "mountain-day": {
+   "R1": 32,
+   "R3": 6,
+   "R4": 3,
+   "R5": 1113
+  },
+  "newtons-cradle": {
+   "R5": 362
+  },
+  "night-storm-sky": {
+   "R1": 8,
+   "R3": 4,
+   "R4": 1,
+   "R5": 471
+  },
+  "paint-the-model": {
+   "R1": 14,
+   "R3": 3,
+   "R4": 5,
+   "R5": 630
+  },
+  "parallax-walls": {
+   "R3": 6,
+   "R4": 2,
+   "R5": 344
+  },
+  "parallel-coordinates": {
+   "R3": 3,
+   "R5": 391
+  },
+  "path-traced-voxels": {
+   "R5": 455
+  },
+  "pathfinder": {
+   "R3": 7,
+   "R4": 2,
+   "R5": 617
+  },
+  "pattern-copier": {
+   "R1": 9,
+   "R2": 2,
+   "R5": 448
+  },
+  "pinball": {
+   "R5": 531
+  },
+  "portals": {
+   "R3": 8,
+   "R4": 1,
+   "R5": 479
+  },
+  "ray-traced-shadows": {
+   "R1": 3,
+   "R3": 8,
+   "R4": 1,
+   "R5": 391
+  },
+  "scene-transitions": {
+   "R1": 16,
+   "R3": 2,
+   "R4": 1,
+   "R5": 550
+  },
+  "shape-casts": {
+   "R5": 313
+  },
+  "shapes-from-lines": {
+   "R3": 7,
+   "R5": 480
+  },
+  "sharp-sdf-models": {
+   "R1": 8,
+   "R3": 1,
+   "R4": 1,
+   "R5": 439
+  },
+  "shortest-paths": {
+   "R1": 6,
+   "R5": 656
+  },
+  "skin-and-wax": {
+   "R3": 10,
+   "R5": 497
+  },
+  "speed": {
+   "R3": 8
+  },
+  "sprite-colliders": {
+   "R1": 2,
+   "R5": 804
+  },
+  "state-machine-door": {
+   "R3": 8,
+   "R5": 543
+  },
+  "sweep-and-loft": {
+   "R1": 3,
+   "R3": 1
+  },
+  "temporal-upscaling": {
+   "R1": 1,
+   "R3": 4,
+   "R4": 2,
+   "R5": 563
+  },
+  "the-2d-buggy": {
+   "R3": 9,
+   "R5": 459
+  },
+  "the-2d-sandbox": {
+   "R3": 4,
+   "R4": 1,
+   "R5": 522
+  },
+  "the-2d-skeleton": {
+   "R3": 3,
+   "R4": 1,
+   "R5": 598
+  },
+  "the-analog-integrator": {
+   "R3": 4,
+   "R4": 2,
+   "R5": 417
+  },
+  "the-ar-card": {
+   "R3": 11,
+   "R5": 375
+  },
+  "the-archimedes-screw": {
+   "R3": 3,
+   "R4": 1,
+   "R5": 593
+  },
+  "the-astigmatism-bench": {
+   "R1": 3,
+   "R3": 3,
+   "R4": 1,
+   "R5": 423
+  },
+  "the-baked-room": {
+   "R1": 31,
+   "R3": 6,
+   "R4": 1,
+   "R5": 731
+  },
+  "the-bellows": {
+   "R3": 5,
+   "R5": 622
+  },
+  "the-bim-house": {
+   "R3": 4,
+   "R5": 488
+  },
+  "the-bimetal-switch": {
+   "R3": 4,
+   "R5": 367
+  },
+  "the-biome-map": {
+   "R1": 6,
+   "R3": 1,
+   "R4": 3,
+   "R5": 392
+  },
+  "the-birefringence-viewer": {
+   "R1": 4,
+   "R3": 1,
+   "R4": 1,
+   "R5": 387
+  },
+  "the-block-tower": {
+   "R2": 1,
+   "R3": 11,
+   "R4": 2,
+   "R5": 600
+  },
+  "the-boolean-bench": {
+   "R1": 3,
+   "R3": 2
+  },
+  "the-brain-scan": {
+   "R1": 9,
+   "R3": 3,
+   "R5": 589
+  },
+  "the-building-checker": {
+   "R2": 1,
+   "R3": 4,
+   "R5": 753,
+   "IMP": 2
+  },
+  "the-cable-span": {
+   "R2": 1,
+   "R3": 7,
+   "R4": 3,
+   "R5": 764
+  },
+  "the-cad-format-shelf": {
+   "R3": 6,
+   "R5": 548
+  },
+  "the-camera-director": {
+   "R3": 2,
+   "R5": 795
+  },
+  "the-camera-obscura": {
+   "R4": 1,
+   "R5": 369
+  },
+  "the-canal-lock": {
+   "R2": 1,
+   "R3": 6,
+   "R4": 2,
+   "R5": 746
+  },
+  "the-capillary-garden": {
+   "R2": 2,
+   "R3": 9,
+   "R4": 2,
+   "R5": 493
+  },
+  "the-capstan": {
+   "R3": 4,
+   "R4": 1,
+   "R5": 339
+  },
+  "the-cell-microscope": {
+   "R4": 1
+  },
+  "the-chain-fountain": {
+   "R2": 1,
+   "R3": 4,
+   "R5": 366
+  },
+  "the-changing-maze": {
+   "R3": 10,
+   "R4": 1,
+   "R5": 571
+  },
+  "the-chart-wall": {
+   "R5": 552
+  },
+  "the-cine-lens": {
+   "R3": 3,
+   "R5": 557
+  },
+  "the-city-generator": {
+   "R3": 3,
+   "R5": 367
+  },
+  "the-climate-globe": {
+   "R1": 12,
+   "R3": 1,
+   "R5": 493
+  },
+  "the-climbing-robot": {
+   "R1": 13,
+   "R3": 6,
+   "R5": 857,
+   "IMP": 4
+  },
+  "the-colour-grader": {
+   "R3": 10,
+   "R5": 374
+  },
+  "the-contour-map": {
+   "R1": 9,
+   "R3": 2,
+   "R5": 416
+  },
+  "the-conveyor-factory": {
+   "R3": 1,
+   "R5": 413
+  },
+  "the-coral-garden": {
+   "R1": 5,
+   "R3": 2,
+   "R4": 3,
+   "R5": 413
+  },
+  "the-crt-arcade": {
+   "R2": 4,
+   "R3": 17,
+   "R4": 1,
+   "R5": 581
+  },
+  "the-curve-lab": {
+   "R3": 6,
+   "R4": 2,
+   "R5": 419
+  },
+  "the-cut-house": {
+   "R3": 16,
+   "R5": 661
+  },
+  "the-desert-mirage": {
+   "R1": 14,
+   "R5": 406
+  },
+  "the-dichroic-splitter": {
+   "R1": 3,
+   "R4": 1,
+   "R5": 384
+  },
+  "the-differential": {
+   "R2": 1,
+   "R3": 4,
+   "R5": 450
+  },
+  "the-diffraction-ruler": {
+   "R1": 3,
+   "R3": 1,
+   "R4": 1,
+   "R5": 362
+  },
+  "the-domino-cascade": {
+   "R2": 1,
+   "R3": 3,
+   "R4": 2,
+   "R5": 673
+  },
+  "the-dungeon-maker": {
+   "R3": 9,
+   "R5": 457
+  },
+  "the-echo-canyon": {
+   "R3": 9,
+   "R4": 1,
+   "R5": 420
+  },
+  "the-eclipse": {
+   "R1": 12,
+   "R3": 10,
+   "R4": 3,
+   "R5": 534
+  },
+  "the-eddy-brake": {
+   "R2": 1,
+   "R5": 465
+  },
+  "the-engine-block": {
+   "R3": 17,
+   "R4": 1,
+   "R5": 595
+  },
+  "the-engineering-mesh": {
+   "R1": 6,
+   "R3": 13,
+   "R5": 722
+  },
+  "the-epicyclic-drive": {
+   "R3": 4,
+   "R4": 2,
+   "R5": 484
+  },
+  "the-exploded-assembly": {
+   "R3": 3,
+   "R5": 365
+  },
+  "the-fillet-bench": {
+   "R1": 3,
+   "R3": 1
+  },
+  "the-flood-table": {
+   "R1": 2,
+   "R3": 14,
+   "R4": 3,
+   "R5": 643
+  },
+  "the-flow-field": {
+   "R2": 1,
+   "R3": 5,
+   "R4": 4,
+   "R5": 638
+  },
+  "the-foucault-pendulum": {
+   "R2": 1,
+   "R3": 13,
+   "R5": 355
+  },
+  "the-fourier-organ": {
+   "R5": 304
+  },
+  "the-fresnel-lens": {
+   "R1": 3,
+   "R3": 11,
+   "R4": 1,
+   "R5": 453
+  },
+  "the-game-menu": {
+   "R5": 678
+  },
+  "the-gear-maker": {
+   "R3": 1,
+   "R5": 313
+  },
+  "the-geneva-drive": {
+   "R4": 1,
+   "R5": 386
+  },
+  "the-gimbal": {
+   "R4": 3,
+   "R5": 430
+  },
+  "the-glass-stack": {
+   "R1": 9,
+   "R3": 6,
+   "R5": 438
+  },
+  "the-graph-network": {
+   "R1": 13,
+   "R3": 1,
+   "R5": 700
+  },
+  "the-guard": {
+   "R2": 4,
+   "R3": 5,
+   "R4": 2,
+   "R5": 1037
+  },
+  "the-halo-prism": {
+   "R1": 4,
+   "R3": 10,
+   "R4": 1,
+   "R5": 524
+  },
+  "the-harmonic-drive": {
+   "R3": 3,
+   "R4": 3,
+   "R5": 442
+  },
+  "the-heat-haze": {
+   "R3": 4,
+   "R4": 1,
+   "R5": 448
+  },
+  "the-heat-sink": {
+   "R2": 5,
+   "R5": 437
+  },
+  "the-hele-shaw-cell": {
+   "R2": 3,
+   "R3": 9,
+   "R4": 1,
+   "R5": 591
+  },
+  "the-hex-map": {
+   "R3": 4,
+   "R4": 1,
+   "R5": 500
+  },
+  "the-hollow-cup": {
+   "R1": 3,
+   "R3": 1
+  },
+  "the-hydraulic-jump": {
+   "R2": 2,
+   "R3": 7,
+   "R5": 517
+  },
+  "the-hydraulic-ram": {
+   "R2": 3,
+   "R3": 4,
+   "R5": 587
+  },
+  "the-inspector": {
+   "R5": 412
+  },
+  "the-iridescence-bench": {
+   "R4": 2,
+   "R5": 359
+  },
+  "the-jewelry-counter": {
+   "R1": 3,
+   "R3": 14,
+   "R4": 2,
+   "R5": 614
+  },
+  "the-joint-workshop": {
+   "R3": 4,
+   "R5": 483
+  },
+  "the-laser-scan": {
+   "R3": 2,
+   "R5": 351
+  },
+  "the-lens-kit": {
+   "R3": 5,
+   "R5": 410
+  },
+  "the-light-bench": {
+   "R4": 1,
+   "R5": 397
+  },
+  "the-lighting-store": {
+   "R3": 10,
+   "R5": 341
+  },
+  "the-living-museum": {
+   "R3": 8,
+   "R4": 1,
+   "R5": 913
+  },
+  "the-magnetic-field-mapper": {
+   "R3": 5,
+   "R5": 310
+  },
+  "the-marble-maze": {
+   "R3": 15,
+   "R5": 649
+  },
+  "the-marble-sorter": {
+   "R2": 1,
+   "R4": 3,
+   "R5": 553
+  },
+  "the-material-factory": {
+   "R1": 12,
+   "R3": 2,
+   "R4": 1,
+   "R5": 588
+  },
+  "the-meadow": {
+   "R1": 3,
+   "R3": 4,
+   "R4": 4,
+   "R5": 589
+  },
+  "the-measuring-room": {
+   "R3": 4,
+   "R5": 358
+  },
+  "the-mesh-workshop": {
+   "R3": 10,
+   "R4": 1,
+   "R5": 378
+  },
+  "the-meshlet-statue": {
+   "R3": 10,
+   "R4": 2,
+   "R5": 400
+  },
+  "the-michelson-interferometer": {
+   "R1": 3,
+   "R4": 1,
+   "R5": 368
+  },
+  "the-mirror-hall": {
+   "R1": 28,
+   "R3": 3,
+   "R5": 600
+  },
+  "the-mocap-theatre": {
+   "R3": 13,
+   "R5": 509
+  },
+  "the-moire-press": {
+   "R4": 1
+  },
+  "the-molecule": {
+   "R3": 7,
+   "R5": 425
+  },
+  "the-murmuration": {
+   "R1": 9,
+   "R3": 8,
+   "R5": 536
+  },
+  "the-neural-playground": {
+   "R1": 14,
+   "R2": 1,
+   "R3": 3,
+   "R4": 1,
+   "R5": 458
+  },
+  "the-night-city": {
+   "R1": 8,
+   "R3": 16,
+   "R4": 1,
+   "R5": 691
+  },
+  "the-noise-lab": {
+   "R1": 20,
+   "R3": 1,
+   "R4": 2,
+   "R5": 510
+  },
+  "the-oldham-coupling": {
+   "R3": 1,
+   "R4": 2,
+   "R5": 418
+  },
+  "the-orrery": {
+   "R3": 11,
+   "R4": 2,
+   "R5": 476
+  },
+  "the-painting": {
+   "R1": 17,
+   "R3": 1,
+   "R4": 2,
+   "R5": 456
+  },
+  "the-paper-bridge": {
+   "R2": 1,
+   "R3": 5,
+   "R5": 598
+  },
+  "the-path-traced-glasshouse": {
+   "R3": 5,
+   "R4": 3,
+   "R5": 710
+  },
+  "the-pelton-wheel": {
+   "R2": 2,
+   "R3": 8,
+   "R4": 1,
+   "R5": 561
+  },
+  "the-pinhole-array": {
+   "R1": 5,
+   "R4": 1,
+   "R5": 421
+  },
+  "the-pixel-platformer": {
+   "R4": 3,
+   "R5": 766
+  },
+  "the-planner": {
+   "R2": 1,
+   "R3": 12,
+   "R4": 3,
+   "R5": 945
+  },
+  "the-polarizer": {
+   "R4": 1,
+   "R5": 336
+  },
+  "the-print-shop": {
+   "R3": 2,
+   "R5": 305
+  },
+  "the-product-studio": {
+   "R3": 3,
+   "R4": 2,
+   "R5": 550
+  },
+  "the-projector": {
+   "R3": 1,
+   "R4": 2,
+   "R5": 557
+  },
+  "the-reach-test": {
+   "R2": 1,
+   "R3": 4,
+   "R4": 3,
+   "R5": 356
+  },
+  "the-resonance-room": {
+   "R3": 6,
+   "R4": 1,
+   "R5": 625
+  },
+  "the-retroreflector": {
+   "R1": 4,
+   "R4": 2,
+   "R5": 462
+  },
+  "the-reuleaux-drive": {
+   "R3": 4,
+   "R4": 3,
+   "R5": 436
+  },
+  "the-rewind-button": {
+   "R5": 430
+  },
+  "the-rigid-body-rain": {
+   "R3": 8,
+   "R4": 3,
+   "R5": 486
+  },
+  "the-road-builder": {
+   "R3": 3,
+   "R5": 488
+  },
+  "the-rolling-race": {
+   "R2": 1,
+   "R5": 344
+  },
+  "the-rose-engine": {
+   "R3": 8,
+   "R4": 2,
+   "R5": 492
+  },
+  "the-salt-wedge": {
+   "R2": 2,
+   "R3": 18,
+   "R4": 1,
+   "R5": 661
+  },
+  "the-sand-pendulum": {
+   "R2": 1,
+   "R3": 3,
+   "R4": 1,
+   "R5": 435
+  },
+  "the-sarrus-linkage": {
+   "R3": 4,
+   "R4": 2,
+   "R5": 439
+  },
+  "the-schlieren-bench": {
+   "R1": 5,
+   "R3": 5,
+   "R4": 1,
+   "R5": 415
+  },
+  "the-scotch-yoke": {
+   "R4": 2,
+   "R5": 395
+  },
+  "the-sculpting-clay": {
+   "R1": 17,
+   "R3": 11,
+   "R4": 2,
+   "R5": 774
+  },
+  "the-section-saw": {
+   "R3": 4
+  },
+  "the-seismograph": {
+   "R2": 2,
+   "R3": 9,
+   "R4": 2,
+   "R5": 521
+  },
+  "the-shader-node-editor": {
+   "R1": 1,
+   "R3": 9,
+   "R4": 1,
+   "R5": 480
+  },
+  "the-shadow-calendar": {
+   "R3": 4,
+   "R4": 1,
+   "R5": 395
+  },
+  "the-shadow-lab": {
+   "R3": 7,
+   "R4": 2,
+   "R5": 444
+  },
+  "the-simplifier": {
+   "R3": 16,
+   "R5": 524
+  },
+  "the-siphon": {
+   "R2": 2,
+   "R3": 14,
+   "R5": 680
+  },
+  "the-sky-clock": {
+   "R3": 5,
+   "R4": 2,
+   "R5": 323
+  },
+  "the-sky-survey": {
+   "R3": 4,
+   "R4": 3,
+   "R5": 467
+  },
+  "the-sleep-map": {
+   "R3": 10,
+   "R4": 1,
+   "R5": 507
+  },
+  "the-snapshot-hall": {
+   "R1": 6,
+   "R3": 4,
+   "R4": 1,
+   "R5": 475
+  },
+  "the-solid-modeller": {
+   "R1": 3,
+   "R3": 1
+  },
+  "the-sort-race": {
+   "R5": 382
+  },
+  "the-sound-landscape": {
+   "R3": 8,
+   "R5": 481
+  },
+  "the-stepping-stones": {
+   "R1": 3,
+   "R2": 1,
+   "R3": 21,
+   "R4": 3,
+   "R5": 871
+  },
+  "the-streaming-city": {
+   "R3": 9,
+   "R4": 1,
+   "R5": 448
+  },
+  "the-streamtubes": {
+   "R1": 9,
+   "R2": 2,
+   "R3": 10,
+   "R5": 327
+  },
+  "the-stress-glyphs": {
+   "R3": 3,
+   "R5": 388
+  },
+  "the-stroboscope": {
+   "R3": 4
+  },
+  "the-technical-drawing": {
+   "R3": 9,
+   "R4": 3,
+   "R5": 426
+  },
+  "the-terrain-sculptor": {
+   "R1": 15,
+   "R3": 1,
+   "R4": 4,
+   "R5": 765
+  },
+  "the-tidal-clock": {
+   "R3": 18,
+   "R4": 1,
+   "R5": 735
+  },
+  "the-toggle-press": {
+   "R3": 4,
+   "R4": 2,
+   "R5": 443
+  },
+  "the-ui-layout-editor": {
+   "R5": 604
+  },
+  "the-uv-unwrapper": {
+   "R1": 9,
+   "R3": 5,
+   "R4": 3,
+   "R5": 443
+  },
+  "the-venturi-meter": {
+   "R2": 1,
+   "R3": 2,
+   "R5": 519
+  },
+  "the-vortex-ring": {
+   "R2": 1,
+   "R3": 8,
+   "R5": 519
+  },
+  "the-voxel-editor": {
+   "R3": 1,
+   "R5": 612
+  },
+  "the-watt-governor": {
+   "R2": 1,
+   "R3": 7,
+   "R4": 2,
+   "R5": 486
+  },
+  "the-weather-radar": {
+   "R3": 4,
+   "R5": 481
+  },
+  "the-weigh-station": {
+   "R1": 3,
+   "R3": 1
+  },
+  "toon-town": {
+   "R3": 11,
+   "R5": 380
+  },
+  "trees-from-space": {
+   "R1": 5,
+   "R2": 2,
+   "R3": 7,
+   "R4": 3,
+   "R5": 627
+  },
+  "utility-choices": {
+   "R2": 1,
+   "R3": 13,
+   "R4": 1,
+   "R5": 630
+  },
+  "volumetric-fog": {
+   "R3": 7,
+   "R4": 1,
+   "R5": 503
+  },
+  "voronoi-shatter-art": {
+   "R1": 6,
+   "R3": 4,
+   "R4": 2,
+   "R5": 334
+  },
+  "wind-and-flow-painting": {
+   "R1": 12,
+   "R5": 483
+  },
+  "wind-over-america": {
+   "R1": 12,
+   "R3": 4,
+   "R5": 550
+  }
+ }
+}

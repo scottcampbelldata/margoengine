@@ -99,6 +99,7 @@ export const GPU_STEPS = [
 /** Steps known to need no GPU narrowing; a step in neither list fails the unit test so someone decides. */
 export const PLAIN_STEPS = [
   'check:mass-deletion',
+  'check:demo-sources',
   'check:core-stress',
   'check:road-invariants',
   'check:testpage-contracts',
@@ -126,6 +127,7 @@ export const NO_GPU_STEPS = [
   'check:core-stress',
   'check:road-invariants',
   'check:testpage-contracts',
+  'check:demo-sources',
   'verify',
   'check:fresh-clone',
   'check:rust-kernels',
@@ -674,6 +676,8 @@ export const STEP_AFTER = {
   'check:rust-kernels': [],
   // Reads only git history; it needs no build.
   'check:mass-deletion': [],
+  // Reads only demos/*/source and the allowlist.
+  'check:demo-sources': [],
   'modern:test:packages': ['verify'],
   'modern:test:bundlers': ['modern:test:packages'],
   ...Object.fromEntries(GPU_STEPS.map((step) => [step, ['build:site']])),
