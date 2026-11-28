@@ -394,7 +394,8 @@ is 0.288 against Jung, Chang and Jo's measured 0.333 (bar 12 percent). Cause not
 ### SOFT-05: a tissue's sliding attachment misses its closed form by 1.6 times the rounding bound (KB-SOFT-SLIDEATTACH1, logged by physics lane P, 2026-11-28)
 
 `packages/physics/tests/coupling/tissue.test.js` "sliding attachment" is red on main: the particle ends at 0.5100431
-against the closed form 0.5100446 (1.5e-6 off, bound 16 float32 spacings). Repro and state in `docs/known-bugs.md`.
+against the closed form 0.5100446 (1.5e-6 off, bound 16 float32 spacings). Cause traced: the soft world's face air drag acts on the tissue's cell surface;
+the one-line fix is in `packages/physics/src/soft.ts` (SOFT-01, SOFT-04 and SOFT-06's file), set out in `docs/known-bugs.md`.
 
 ### SOFT-04: a volumetric rung stops cracking under continued remeshing (KB-SOFT-CRACKRES1, logged by physics lane P, 2026-11-28)
 

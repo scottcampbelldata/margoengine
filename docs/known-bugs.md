@@ -390,8 +390,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Repro:** `node --test --test-name-pattern="sliding attachment" packages/physics/tests/coupling/tissue.test.js`: the
   particle ends at 0.5100431 against the closed form 0.5100446, 1.5e-6 off, where the bound is 16 float32 spacings of the
   0.5 m length (9.5e-7). Red on main at bfb7d64cd8.
-- **Cause:** not traced yet. Whether the solve falls short of its closed form (a missing term) or only rounds past the
-  bound is to be found first; the bound is not to be widened.
+- **Cause (traced 2026-11-28, lane P):** a missing term in the closed form's world, not rounding: the soft world's face air
+  drag acts on the tissue. `SoftBodies` steps `airDrag` for any body with triangles (`packages/physics/src/soft.ts`, the
+  `body.airDrag && body.airLoads === 0 && body.triangleList.length > 0` line), and `setSurface()` gives a body of cells its
+  boundary faces, which its doc names as what a surface collider is made of; `setAirDrag` documents the air for "a body of
+  triangles (a cloth, a trimesh)". So every box, solid and volumetric body takes a flat plate's drag on each surface face.
+  Measured with the test's scene: the particle's step falls short by 1.49e-4, 7.8e-5 and 3.1e-5 of its displacement at
+  bone offsets of 1/32, 1/64 and 1/128 m (the shortfall follows the speed, as quadratic drag does), by the same 1.49e-4 with
+  the elastic modulus set to 0.001 Pa, and by under 7e-6 (float32 rounding) with `setAirDrag(false)`, for 2 to 64 passes.
+- **Fix:** skip the face air for a body with cells (`body.cellRange.count === 0` beside the triangle check, as adaptive
+  tearing and the cloth-only flags already test), so the code keeps its documented contract and the tissue test passes
+  unchanged. `soft.ts` belongs to SOFT-01, SOFT-04 and SOFT-06 (claimed in docs/physics-work-queue.md and edited within
+  the hour), so it is left to that owner; a closed shell's faces (`SoftBodyDesc.volume` without cells) each take a whole
+  plate's drag too, front and back, which that owner should weigh at the same time.
 
 ### Open 2026-11-28: a volumetric rung stops cracking under continued remeshing (KB-SOFT-CRACKRES1, physics soft volumetric)
 
