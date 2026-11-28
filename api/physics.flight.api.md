@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel, EnginePlugin, Geometry, Mesh } from "@margoengine/core";
 import { Mesh } from "@margoengine/core/extension";
-import { FlowField } from "@margoengine/math/fields";
+import { FlowCell, FlowField } from "@margoengine/math/fields";
 
 export type Air = Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField;
 
@@ -78,18 +78,39 @@ export interface RotorOptions {
     stations?: number;
     wind?: Air;
     density?: number;
+    frame?: WindForceFrame;
 }
 
 export class WingForce implements PhysicsAttachment, AirLoad {
     readonly force: [number, number, number];
     readonly torque: [number, number, number];
     circulation: Float64Array;
+    static load(physics: Physics, body: PhysicsBody, options: WingOptions, native?: {
+        readonly threads?: number;
+        readonly signal?: AbortSignal;
+    }): Promise<WingForce>;
+    workCounts(): WingLatticeWorkCounts | null;
     constructor(physics: Physics, body: PhysicsBody, options: WingOptions);
     beforeStep(dt: number): void;
     load(dt: number): void;
     bodyRemoved(body: PhysicsBody): void;
     remove(): void;
     dispose(): void;
+}
+
+export interface WingLatticeWorkCounts extends WingLatticeWorkerWork {
+    readonly threads: number;
+    readonly solves: number;
+    readonly workers: readonly WingLatticeWorkerWork[];
+}
+
+export interface WingLatticeWorkerWork {
+    readonly matrixInteractions: number;
+    readonly matrixPairs: number;
+    readonly wakeInteractions: number;
+    readonly wakePairs: number;
+    readonly eliminationUpdates: number;
+    readonly eliminationPairs: number;
 }
 
 export interface WingOptions {
@@ -100,6 +121,7 @@ export interface WingOptions {
     panels?: readonly [number, number];
     wind?: Air;
     density?: number;
+    frame?: WindForceFrame;
     stall?: number;
     flap?: (time: number) => WingStroke;
     separation?: 'plate' | 'flapping';
@@ -2013,6 +2035,11 @@ interface StepContext {
 }
 
 type Vec3 = readonly [number, number, number];
+
+interface WindForceFrame {
+    readonly cell: FlowCell;
+    readonly cellSize: number;
+}
 
 const densities: Readonly<{
     air: 1.204;

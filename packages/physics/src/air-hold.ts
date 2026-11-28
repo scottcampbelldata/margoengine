@@ -4,6 +4,7 @@
 // after it (the difference of two f32 values is exact), so a body keeps its own forces to the bit. In a world, an `AirSolver`
 // steps the loads instead and the same sums go into the `bodyForces` port, which the `RigidSolver` adds and takes off the
 // same way: a world and Physics stepped alone are the same bits.
+import { MargoError } from '@margoengine/math/errors';
 import type { PhysicsBody } from './body.js';
 import type { Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
@@ -17,6 +18,14 @@ export interface AirLoad {
 /** Words of a body's entry: what its columns were before (6), the summed load (6) and what the columns took (6). */
 const ENTRY = 18;
 const holds = new WeakMap<Physics, AirHold>();
+
+function requireRigidLoad(value: number): void {
+  if (!Number.isFinite(Math.fround(value)))
+    throw new MargoError(
+      'failed',
+      'Combined air loads exceed the rigid force range. Reduce the loads or their moment arms. See https://margoengine.com/errors#physics-flight',
+    );
+}
 
 /** The hold of `physics`'s air loads, made and attached the first time it is asked for. */
 export function airHoldOf(physics: Physics): AirHold {
@@ -46,33 +55,33 @@ export class AirHold implements PhysicsAttachment {
     if (body.type !== 'dynamic' || !body.valid) return;
     if (force[0] === 0 && force[1] === 0 && force[2] === 0 && torque[0] === 0 && torque[1] === 0 && torque[2] === 0)
       return;
+    const wrench = [...force, ...torque];
     const port = this.port;
     if (port) {
       const at = body.row * 6;
       if (at + 6 > port.length)
-        throw new RangeError(
-          `An air load is on body row ${body.row}, past the AirSolver's ${port.length / 6} rows; make it with a capacity of ${body.row + 1} or more.`,
+        throw new MargoError(
+          'unsupported',
+          'The air load lies beyond its AirSolver body rows. Increase its capacity to at least ' +
+            (body.row + 1) +
+            '. See https://margoengine.com/errors#physics-flight',
         );
-      for (let k = 0; k < 3; k++) {
-        port[at + k]! += force[k]!;
-        port[at + 3 + k]! += torque[k]!;
-      }
+      const next = wrench.map((value, k) => port[at + k]! + value);
+      next.forEach(requireRigidLoad);
+      port.set(next, at);
       return;
     }
     const kernel = this.physics.kernel,
       c = kernel.columns,
       row = body.row,
       columns = [c.forceX, c.forceY, c.forceZ, c.torqueX, c.torqueY, c.torqueZ];
-    let entry = this.entries.get(body);
-    if (!entry) {
-      entry = new Float64Array(ENTRY);
-      for (let k = 0; k < 6; k++) entry[k] = columns[k]![row]!;
-      this.entries.set(body, entry);
-    }
-    for (let k = 0; k < 3; k++) {
-      entry[6 + k]! += force[k]!;
-      entry[9 + k]! += torque[k]!;
-    }
+    const previous = this.entries.get(body);
+    const entry = previous ?? new Float64Array(ENTRY);
+    if (!previous) for (let k = 0; k < 6; k++) entry[k] = columns[k]![row]!;
+    const next = wrench.map((value, k) => entry[6 + k]! + value);
+    for (let k = 0; k < 6; k++) requireRigidLoad(entry[k]! + next[k]!);
+    entry.set(next, 6);
+    if (!previous) this.entries.set(body, entry);
     kernel.wake(row);
     // The column holds its own force plus the sum, rounded once, as a world's RigidSolver adds the summed port.
     for (let k = 0; k < 6; k++) {
@@ -102,6 +111,11 @@ export class AirHold implements PhysicsAttachment {
     }
   }
 
+  /** @internal Clears a staged load if an attachment aborted the preceding attempt before the kernel ran. */
+  beforeStep(): void {
+    this.afterStep();
+  }
+
   /** @internal Takes off what each body's columns took for the step. */
   afterStep(): void {
     if (this.entries.size === 0) return;
@@ -109,7 +123,13 @@ export class AirHold implements PhysicsAttachment {
       columns = [c.forceX, c.forceY, c.forceZ, c.torqueX, c.torqueY, c.torqueZ];
     for (const [body, entry] of this.entries) {
       if (!body.valid) continue;
-      for (let k = 0; k < 6; k++) columns[k]![body.row] -= entry[12 + k]!;
+      for (let k = 0; k < 6; k++) {
+        const column = columns[k]!;
+        const row = body.row;
+        const staged = Math.fround(entry[k]! + entry[6 + k]!);
+        // Recover the exact original f32 even when a very large load rounded it out of the recorded difference.
+        column[row] = column[row] === staged ? entry[k]! : column[row]! - entry[12 + k]!;
+      }
     }
     this.entries.clear();
   }

@@ -965,8 +965,8 @@ Three loads of `@margoengine/physics/flight` make a rigid body fly from its shap
 `WingForce.profileDrag` applies to each attached panel. A stalled panel takes the full load from its separated-flow
 law and leaves the attached circulation solve. One wing can carry both regimes at the same time in a varying wind.
 
-- **`new WingForce(physics, body, {sections, forward = [0, 0, 1], up = [0, 1, 0], mirror = true, panels = [2, 4], wind, density, stall = 0.26, profileDrag = 0.008, separation, flap})`**: a wing as a vortex lattice (the method of `SailForce`). `sections` run from root to tip in the body's frame, each a `leadingEdge`, a `chord` and a nose-up `twist` (radians). With `mirror` the wing is a pair, mirrored across the plane of `forward` and `up`. So lift, induced drag, the moment about the centre of mass and the downwash between panels come from the planform and the attitude: a rectangular wing of aspect ratio 6 has the lift slope of a finite wing within 4 percent. Panels the air meets beyond `stall` separate: by default a fixed wing takes the flat plate's law and loses lift, and a flapping wing (`separation: 'flapping'`) takes the quasi-steady coefficients of Su et al. (`flatWingCoefficients`), whose leading-edge vortex keeps its lift. `flap(time)` returns `{stroke, pitch}` in radians: a rotation about the forward axis at the root, tip up, and a pitch of every section. The wing's own motion is part of the air each panel meets, so a downstroke pitched nose down pushes the body forward. `wing.force` and `wing.torque` are the last step's load, and `wing.circulation` each panel's circulation.
-- **`new RotorForce(physics, body, {radius, chord, pitch, speed, hub, axis = [0, 1, 0], blades = 2, hubRadius, liftSlope = 2 pi, profileDrag = 0.008, stall, stations = 16, wind, density})`**: a rotor or propeller by blade-element momentum theory. Each annulus's induced velocity balances its blades' thrust against the momentum it gives the air. Thrust acts along `axis` for a positive `speed` (rad/s, or a function of time), and the rotor's torque turns the body the other way. `chord` and `pitch` are numbers or functions of radius. `rotor.evaluate(omega, inflow, density)` gives thrust, torque and power without stepping, and `rotor.thrust`, `rotor.torque` and `rotor.power` hold the last step's.
+- **`new WingForce(physics, body, {sections, forward = [0, 0, 1], up = [0, 1, 0], mirror = true, panels = [2, 4], wind, density, frame, stall = 0.26, profileDrag = 0.008, separation, flap})`**: a wing as a vortex lattice (the method of `SailForce`). `sections` run from root to tip in the body's frame, each a `leadingEdge`, a `chord` and a nose-up `twist` (radians). With `mirror` the wing is a pair, mirrored across the plane of `forward` and `up`. So lift, induced drag, the moment about the centre of mass and the downwash between panels come from the planform and the attitude: a rectangular wing of aspect ratio 6 has the lift slope of a finite wing within 4 percent. Panels the air meets beyond `stall` separate: by default a fixed wing takes the flat plate's law and loses lift, and a flapping wing (`separation: 'flapping'`) takes the quasi-steady coefficients of Su et al. (`flatWingCoefficients`), whose leading-edge vortex keeps its lift. `flap(time)` returns `{stroke, pitch}` in radians: a rotation about the forward axis at the root, tip up, and a pitch of every section. The wing's own motion is part of the air each panel meets, so a downstroke pitched nose down pushes the body forward. `wing.force` and `wing.torque` are the last step's load, and `wing.circulation` each panel's circulation.
+- **`new RotorForce(physics, body, {radius, chord, pitch, speed, hub, axis = [0, 1, 0], blades = 2, hubRadius, liftSlope = 2 pi, profileDrag = 0.008, stall = 0.26, stations = 16, wind, density, frame})`**: a rotor or propeller by blade-element momentum theory. Each annulus's induced velocity balances its blades' thrust against the momentum it gives the air. Thrust acts along `axis` for a positive `speed` (rad/s, or a function of time), and the rotor's torque turns the body the other way. `chord` and `pitch` are numbers or functions of radius. `rotor.evaluate(omega, inflow, density)` gives thrust, torque and power without stepping, and `rotor.thrust`, `rotor.torque` and `rotor.power` hold the last step's.
 - **`new LiftingGas(physics, body, {volume, gas = 'helium', temperature = 373.15, centre, altitude, seaLevelTemperature})`**: buoyancy (rho_air - rho_gas) V g at the body's height in the standard atmosphere. `gas` is `'helium'`, `'hydrogen'` or `'hotAir'` (at `temperature`), so a balloon rises to the height where it floats. `gas.liftAt(height, g)` is the net lift there.
 
 ```ts
@@ -991,6 +991,32 @@ for (let i = 0; i < 600; i++) physics.step(); // ten seconds
 const [, vy, vz] = glider.linearVelocity;
 console.log((vz / -vy).toFixed(1)); // 40.1: the glide ratio, metres forward for each metre down
 console.log(rotor.thrust.toFixed(1), gas.lift.toFixed(1)); // 19.6 39.3: the drone climbs at its weight's thrust; the balloon rises
+```
+
+The `WingForce` constructor runs the TypeScript lattice. `WingForce.load` lazily loads the same lattice with native SIMD and the same force and moment ordering.
+The `threads` option accepts one (default), two or four participants including the caller.
+Multiple participants require Node or a cross-origin-isolated browser worker. Pass `signal` to cancel loading and call `wing.remove()` to close its native resources.
+`wing.workCounts()` reports accepted matrix, wake and elimination work after a step. It returns null before the first accepted native load.
+
+Wing and rotor wind default to still air. Density defaults to the field density when supplied or the standard atmosphere at the local sample height.
+For a cell-based `FlowField`, set `frame` with the rigid coordinate origin and cell size, such as `{cellSize: world.cellSize, get cell() { return world.cellOf('rigid'); }}`.
+Use the wind field’s live cell when shifting the world. A vector or callback continues to use local positions.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { WingForce } from '@margoengine/physics/flight';
+
+await Physics.load();
+const physics = new Physics(null);
+const body = physics.addBody(null, { type: "kinematicVelocity" });
+const wing = await WingForce.load(physics, body, {
+  sections: [{ leadingEdge: [0, 0, 0], chord: 1, twist: 0.08 }, { leadingEdge: [2, 0, 0], chord: 0.7, twist: 0.05 }],
+  wind: [0, 0, -12],
+});
+physics.step();
+console.log(wing.force[1], wing.workCounts()?.matrixPairs); // N of lift and actual paired matrix evaluations
+wing.remove();
+physics.dispose();
 ```
 
 ## Soft bodies

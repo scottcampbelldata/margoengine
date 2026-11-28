@@ -15518,8 +15518,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 1527378,
-        "gzip": 988134
+        "raw": 1533440,
+        "gzip": 992317
       },
       "./decomposition": {
         "raw": 26988,
@@ -15626,8 +15626,8 @@
         "gzip": 5907
       },
       "./flight": {
-        "raw": 19153,
-        "gzip": 7423
+        "raw": 33768,
+        "gzip": 12800
       },
       "./waves": {
         "raw": 17096,
@@ -20159,6 +20159,16 @@
       "raw": 1321,
       "gzip": 654,
       "brotli": 561
+    },
+    "packages/physics/dist/wing-lattice-kernel.wasm": {
+      "raw": 6542,
+      "gzip": 2860,
+      "brotli": 2576
+    },
+    "packages/physics/dist/wing-lattice-kernel-shared.wasm": {
+      "raw": 6542,
+      "gzip": 2860,
+      "brotli": 2576
     }
   },
   "splits": {
@@ -20257,13 +20267,13 @@
     "@margoengine/physics": {
       "entry": ".",
       "base": {
-        "raw": 333067,
-        "gzip": 107016
+        "raw": 333857,
+        "gzip": 107307
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",
-        "raw": 1194310,
-        "gzip": 880546,
+        "raw": 1199582,
+        "gzip": 884404,
         "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },

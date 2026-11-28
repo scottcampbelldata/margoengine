@@ -151,6 +151,8 @@
 <tr><th scope="row"><code>landscape-kernel-shared.wasm</code></th><td>Rust SIMD landscape evolution, shared world memory</td><td class="num">42,267</td><td class="num">11,530</td><td class="num">9,828</td><td>LandscapeEvolution.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>accretion-kernel.wasm</code></th><td>Rust SIMD thin disk mass and heating</td><td class="num">1,657</td><td class="num">919</td><td class="num">857</td><td>AccretionDiskSolver.load() from the optional /accretion entry</td></tr>
 <tr><th scope="row"><code>accretion-kernel-shared.wasm</code></th><td>Rust SIMD thin disk mass and heating, shared world memory</td><td class="num">1,657</td><td class="num">919</td><td class="num">851</td><td>AccretionDiskSolver.load() with shared world memory support</td></tr>
+<tr><th scope="row"><code>wing-lattice-kernel.wasm</code></th><td>Rust SIMD wing lattice influence, circulation and induced velocity</td><td class="num">6,542</td><td class="num">2,860</td><td class="num">2,576</td><td>WingForce.load() from the optional /flight entry</td></tr>
+<tr><th scope="row"><code>wing-lattice-kernel-shared.wasm</code></th><td>Rust SIMD wing lattice with shared native worker scratch</td><td class="num">6,542</td><td class="num">2,860</td><td class="num">2,576</td><td>WingForce.load() with more than one participant</td></tr>
 <tr><th scope="row"><code>room-sound-kernel.wasm</code></th><td>Rust SIMD room acoustic pressure waves</td><td class="num">2,717</td><td class="num">1,393</td><td class="num">1,242</td><td>RoomSoundSolver.load() from the optional /room-sound entry</td></tr>
 <tr><th scope="row"><code>room-sound-kernel-shared.wasm</code></th><td>Rust SIMD room acoustic pressure waves, shared world memory</td><td class="num">2,717</td><td class="num">1,393</td><td class="num">1,242</td><td>RoomSoundSolver.load() with shared world memory support</td></tr>
 <tr><th scope="row"><code>modal-sound-kernel.wasm</code></th><td>Rust SIMD modal audio synthesis</td><td class="num">1,567</td><td class="num">919</td><td class="num">816</td><td>ModalSoundSolver.load() from the optional /modal-sound entry</td></tr>
@@ -367,8 +369,8 @@
 <tr><th scope="row"><code>@margoengine/sky/compat-clouds</code></th><td>Lazy: hurricane storm field</td><td class="num">10,591</td><td class="num">4,395</td><td>the first layer that draws a storm (<code>hurricane</code> option or the type hurricane; import() in volumetric-clouds.ts); its WGSL and maths load once, and every entry above reads the same copy</td></tr>
 <tr><th scope="row"><code>@margoengine/sky/tornado</code></th><td>Base: everything a page reading a Tornado's wind and rain loads, without the lazy part</td><td class="num">19,037</td><td class="num">7,786</td><td></td></tr>
 <tr><th scope="row"><code>@margoengine/sky/tornado</code></th><td>Lazy: tornado shader</td><td class="num">5,763</td><td class="num">2,504</td><td>the first frame of a TornadoCloud (import() in tornado.ts)</td></tr>
-<tr><th scope="row"><code>@margoengine/physics</code></th><td>Base: everything the entry loads before <code>Physics.load()</code>, without the lazy part</td><td class="num">333,067</td><td class="num">107,016</td><td></td></tr>
-<tr><th scope="row"><code>@margoengine/physics</code></th><td>Lazy: physics kernel (deflated Wasm blueprint and its column table)</td><td class="num">1,194,310</td><td class="num">880,546</td><td><code>await Physics.load()</code>, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own</td></tr>
+<tr><th scope="row"><code>@margoengine/physics</code></th><td>Base: everything the entry loads before <code>Physics.load()</code>, without the lazy part</td><td class="num">333,857</td><td class="num">107,307</td><td></td></tr>
+<tr><th scope="row"><code>@margoengine/physics</code></th><td>Lazy: physics kernel (deflated Wasm blueprint and its column table)</td><td class="num">1,199,582</td><td class="num">884,404</td><td><code>await Physics.load()</code>, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own</td></tr>
 <tr><th scope="row"><code>@margoengine/physics/soft</code></th><td>Base: everything the entry loads before <code>SoftBodies.attach()</code>, without the lazy part</td><td class="num">181,776</td><td class="num">60,132</td><td></td></tr>
 <tr><th scope="row"><code>@margoengine/physics/soft</code></th><td>Lazy: soft body kernel (deflated Wasm blueprint and its column table)</td><td class="num">160,537</td><td class="num">120,618</td><td><code>await SoftBodies.attach(physics)</code>, once per app (import() in soft.ts); the Wasm is inflated and compiled from it, with no file of its own</td></tr>
 <tr><th scope="row"><code>@margoengine/physics2d</code></th><td>Base: everything the entry loads before <code>Physics2D.load()</code>, without the lazy part</td><td class="num">66,511</td><td class="num">21,631</td><td></td></tr>
@@ -4947,7 +4949,7 @@
   <caption class="sr-only">Simulation and games: bytes per package entry</caption>
   <thead><tr><th scope="col">Package</th><th scope="col">Entry</th><th scope="col" class="num">Raw (B)</th><th scope="col" class="num">Min+gzip (B)</th><th scope="col">Peers on</th></tr></thead>
 <tbody data-package="@margoengine/physics">
-<tr><th scope="rowgroup" rowspan="77"><a href="./catalog/#physics">@margoengine/physics</a></th><td><code>root</code></td><td class="num">1,527,378</td><td class="num">988,134</td><td rowspan="77"><code>@margoengine/core</code>, <code>@margoengine/lines</code> (optional)<br>Installs <code>@margoengine/math</code></td></tr>
+<tr><th scope="rowgroup" rowspan="77"><a href="./catalog/#physics">@margoengine/physics</a></th><td><code>root</code></td><td class="num">1,533,440</td><td class="num">992,317</td><td rowspan="77"><code>@margoengine/core</code>, <code>@margoengine/lines</code> (optional)<br>Installs <code>@margoengine/math</code></td></tr>
 <tr><td><code>./decomposition</code></td><td class="num">26,988</td><td class="num">11,152</td></tr>
 <tr><td><code>./soft</code></td><td class="num">342,314</td><td class="num">181,566</td></tr>
 <tr><td><code>./tissue</code></td><td class="num">7,410</td><td class="num">3,154</td></tr>
@@ -4974,7 +4976,7 @@
 <tr><td><code>./modal-sound</code></td><td class="num">23,950</td><td class="num">9,212</td></tr>
 <tr><td><code>./outdoor-sound</code></td><td class="num">8,158</td><td class="num">3,490</td></tr>
 <tr><td><code>./falling</code></td><td class="num">13,550</td><td class="num">5,907</td></tr>
-<tr><td><code>./flight</code></td><td class="num">19,153</td><td class="num">7,423</td></tr>
+<tr><td><code>./flight</code></td><td class="num">33,768</td><td class="num">12,800</td></tr>
 <tr><td><code>./waves</code></td><td class="num">17,096</td><td class="num">7,548</td></tr>
 <tr><td><code>./bubbles</code></td><td class="num">6,520</td><td class="num">3,033</td></tr>
 <tr><td><code>./entry</code></td><td class="num">22,068</td><td class="num">9,429</td></tr>

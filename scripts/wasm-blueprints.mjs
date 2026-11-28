@@ -635,6 +635,20 @@ export const BLUEPRINTS = [
     args: ['plain'],
   },
   {
+    name: 'wing-lattice-kernel',
+    crate: 'packages/physics/wing-lattice-kernel',
+    blueprint: 'packages/physics/src/flight/wing-lattice-kernel.wasm',
+    script: 'packages/physics/scripts/build-wing-lattice-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'wing-lattice-kernel-shared',
+    crate: 'packages/physics/wing-lattice-kernel',
+    blueprint: 'packages/physics/src/flight/wing-lattice-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-wing-lattice-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'room-sound-kernel-shared',
     crate: 'packages/physics/room-sound-kernel',
     blueprint: 'packages/physics/src/room-sound/room-sound-kernel-shared.wasm',

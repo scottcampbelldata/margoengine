@@ -141,6 +141,15 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'physics-flight',
+    title: '@margoengine/physics/flight wings, rotors and lifting gas',
+    kind: 'family',
+    messages: [],
+    cause:
+      'Flight geometry, a sampled wind, a flap or blade setting, a relative cell position, or the resulting force could not be used.',
+    fix: 'Use finite SI geometry with distinct wing sections and positive density, radius and chord. Return finite flap angles and wind samples. Use the rigid world cell and cell size for relocated fields. If a computed load cannot fit the rigid force columns, reduce speed, density, area or the load arm.',
+  },
+  {
     id: 'physics-meshes',
     title: '@margoengine/physics mesh colliders, hulls, mesh mass and convex decomposition',
     kind: 'family',

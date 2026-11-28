@@ -326,3 +326,118 @@ test('settings out of range are refused with what to pass', () => {
   assert.throws(() => new RotorForce(physics, body, { radius: 0, chord: 0.1, pitch: 0.1, speed: 1 }), /radius/);
   assert.throws(() => new LiftingGas(physics, body, { volume: 1, gas: 'neon' }), /helium/);
 });
+
+const flightError = (code, pattern) => (error) =>
+  error?.name === 'MargoError' &&
+  error.code === code &&
+  pattern.test(error.message) &&
+  error.message.endsWith('https://margoengine.com/errors#physics-flight');
+
+test('wing load rejects late malformed wind and a derived overflow before replacing the accepted wrench', () => {
+  const physics = new Physics(null);
+  const body = physics.addBody(null, { colliders: { shape: 'box', halfExtents: [0.1, 0.1, 0.2], mass: 12 } });
+  let mode = 'normal';
+  const wing = new WingForce(physics, body, {
+    sections: [
+      { leadingEdge: [0, 0, 0], chord: 1, twist: 0.08 },
+      { leadingEdge: [2, 0, 0], chord: 1, twist: 0.08 },
+    ],
+    panels: [2, 4],
+    density: 1.2,
+    wind: ([x]) =>
+      x > 1 ? [0, 0, mode === 'malformed' ? Number.NaN : mode === 'excessive' ? -1e100 : -12] : [0, 0, -12],
+  });
+  physics.step();
+  const accepted = () => [
+    [...wing.force],
+    [...wing.torque],
+    [...wing.circulation],
+    physics.kernel.hash,
+    physics.stepCount,
+  ];
+  const before = accepted();
+  assert.ok(wing.force[1] > 1);
+  mode = 'malformed';
+  assert.throws(() => physics.step(), flightError('unsupported', /wind sample.*finite/));
+  assert.deepEqual(accepted(), before);
+  mode = 'excessive';
+  assert.throws(() => physics.step(), flightError('failed', /rigid force range/));
+  assert.deepEqual(accepted(), before);
+  mode = 'normal';
+  physics.step();
+  assert.equal(physics.stepCount, before[4] + 1);
+  assert.ok(wing.force[1] > 1);
+  physics.dispose();
+});
+
+test('body-centered wing loads retain small panel geometry far from the origin', () => {
+  function load(x) {
+    const physics = new Physics(null);
+    const body = physics.addBody(null, { type: 'kinematicVelocity', position: [x, 3, 0] });
+    const wing = new WingForce(physics, body, {
+      sections: [
+        { leadingEdge: [0, 0, 0], chord: 0.25, twist: 0.08 },
+        { leadingEdge: [0.5, 0, 0], chord: 0.2, twist: 0.05 },
+      ],
+      wind: [0, 0, -12],
+      density: 1.2,
+      panels: [2, 3],
+    });
+    physics.step();
+    const load = [[...wing.force], [...wing.torque], [...wing.circulation]];
+    assert.ok(wing.force[1] > 1 && wing.circulation.some((value) => value !== 0));
+    physics.dispose();
+    return load;
+  }
+  assert.deepEqual(load(2 ** 49), load(0));
+});
+
+test('rotor and envelope reject invalid settings and callback results with coded fixes', () => {
+  const physics = new Physics(null);
+  const body = physics.addBody(null, { type: 'kinematicVelocity' });
+  const settings = { radius: 0.4, chord: 0.04, pitch: 0.2, speed: 45, density: 1.2 };
+  assert.throws(
+    () => new RotorForce(physics, body, { ...settings, stall: NaN }),
+    flightError('unsupported', /stall threshold/),
+  );
+  const rotor = new RotorForce(physics, body, {
+    ...settings,
+    axis: [0, Number.MIN_VALUE, 0],
+    chord: (radius) => (radius > 0.35 ? NaN : settings.chord),
+  });
+  assert.throws(() => rotor.evaluate(45, 0, 1.2), flightError('unsupported', /blade station/));
+  assert.throws(() => rotor.evaluate(45, 0, 0), flightError('unsupported', /positive finite density/));
+  rotor.remove();
+  const extreme = new RotorForce(physics, body, { ...settings, axis: [0, Number.MAX_VALUE, 0] });
+  physics.step();
+  assert.ok(extreme.thrust > 0 && Number.isFinite(extreme.power));
+  assert.throws(() => extreme.evaluate(1e151, 0, 1e20), flightError('failed', /unrepresentable/));
+  assert.throws(
+    () => new LiftingGas(physics, body, { volume: 1, altitude: Infinity }),
+    flightError('unsupported', /altitude/),
+  );
+  const gas = new LiftingGas(physics, body, { volume: 5, seaLevelTemperature: 50 });
+  assert.throws(() => gas.liftAt(11_000, 9.81), flightError('failed', /atmosphere/));
+  assert.throws(() => gas.liftAt(0, -9.81), flightError('unsupported', /gravity/));
+  physics.dispose();
+});
+
+test('an overflow in combined air loads can be corrected without retaining the abandoned force', () => {
+  const physics = new Physics(null);
+  const body = physics.addBody(null, { colliders: { shape: 'sphere', radius: 0.5, mass: 100 } });
+  const control = physics.addBody(null, {
+    position: [5, 0, 0],
+    colliders: { shape: 'sphere', radius: 0.5, mass: 100 },
+  });
+  const own = [0, 0.75, 0];
+  body.addForce(own, undefined, false);
+  control.addForce(own, undefined, false);
+  const held = [new LiftingGas(physics, body, { volume: 2e37 }), new LiftingGas(physics, body, { volume: 2e37 })];
+  assert.throws(() => physics.step(), flightError('failed', /Combined air loads/));
+  assert.equal(physics.stepCount, 0);
+  held.forEach((load) => load.remove());
+  physics.step();
+  assert.deepEqual(body.linearVelocity, control.linearVelocity);
+  assert.equal(physics.kernel.columns.forceY[body.row], 0.75);
+  physics.dispose();
+});

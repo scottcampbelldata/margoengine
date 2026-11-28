@@ -24,16 +24,21 @@
 // ground effect, and one envelope temperature for hot air.
 
 import { DRY_AIR_GAS_CONSTANT, standardAtmosphere } from '@margoengine/math/atmosphere';
+import { MargoError } from '@margoengine/math/errors';
 import type { FlowField, FlowSample } from '@margoengine/math/fields';
 import { cos, exp, hypot, pow, sin } from '@margoengine/math/pinned';
 import type { PhysicsBody } from './body.js';
 import { type AirHold, type AirLoad, airHoldOf } from './air-hold.js';
+import type { WindForceFrame } from './fields.js';
+import type { WingLatticeKernel, WingLatticeWorkCounts } from './flight/lattice-kernel.js';
+
+export type { WingLatticeWorkCounts, WingLatticeWorkerWork } from './flight/lattice-kernel.js';
 import { implicitWrench, type Wrench } from './held.js';
 
 /** The air's loads in a `PhysicsWorld`: `world.add(new AirSolver(), {physics})`, coupled air before rigid. */
 export { AirSolver, type AirSolverParams } from './world/solvers/air.js';
 import { add, crossOf, dot, flatPlate, latticeLoads, scale, sub } from './lattice.js';
-import { checkVec, rotateVec, type Vec3 } from './math.js';
+import { rotateVec, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
 
 const DEGREE = 0.017453292519943295;
@@ -41,6 +46,41 @@ const DEGREE = 0.017453292519943295;
 const PLATE = flatPlate(1.17);
 const TWO_PI = 6.283185307179586;
 const FOUR_PI = 12.566370614359172;
+
+function flightInput(message: string): MargoError {
+  return new MargoError('unsupported', message + ' See https://margoengine.com/errors#physics-flight');
+}
+
+function flightRange(message: string): MargoError {
+  return new MargoError('failed', message + ' See https://margoengine.com/errors#physics-flight');
+}
+
+function flightVector(value: unknown, label: string): asserts value is Vec3 {
+  const v = value as ArrayLike<number> | null | undefined;
+  if (v?.length !== 3 || !Number.isFinite(v[0]) || !Number.isFinite(v[1]) || !Number.isFinite(v[2]))
+    throw flightInput(label + ' must be three finite components. Pass a finite [x, y, z] vector.');
+}
+
+function flightCell(value: unknown): asserts value is Vec3 {
+  const cell = value as ArrayLike<number> | null | undefined;
+  if (
+    cell?.length !== 3 ||
+    !Number.isSafeInteger(cell[0]) ||
+    !Number.isSafeInteger(cell[1]) ||
+    !Number.isSafeInteger(cell[2])
+  )
+    throw flightInput(
+      'The flight wind and body frames need three signed integer coordinates. Pass their solver cells.',
+    );
+}
+
+function checkWrench(force: Vec3, torque: Vec3): void {
+  for (let axis = 0; axis < 3; axis++)
+    if (!Number.isFinite(Math.fround(force[axis]!)) || !Number.isFinite(Math.fround(torque[axis]!)))
+      throw flightRange(
+        'The flight force or torque exceeds the rigid force range. Reduce speed, area or the load arm.',
+      );
+}
 
 /** The air: a velocity in m/s, a function of the point and the time, or a flow field (whose density it takes too). */
 export type Air = Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField;
@@ -77,8 +117,10 @@ export interface WingOptions {
   panels?: readonly [number, number];
   /** The wind the wing flies through (default still air). */
   wind?: Air;
-  /** Air density, kg/m^3 (default the flow field's, or the standard atmosphere's at the body's height). */
+  /** Air density, kg/m^3 (default the flow field's, or the standard atmosphere's at the body's local height). */
   density?: number;
+  /** Body frame for a cell-based wind field. Default cell [0, 0, 0]. Use a getter for a moving world origin. */
+  frame?: WindForceFrame;
   /** The angle of attack, radians, past which a panel's flow has separated (default 0.26, 15 degrees). */
   stall?: number;
   /** The flapping, as a function of time in seconds (default none: a fixed wing). */
@@ -152,10 +194,20 @@ function rotateAbout(v: Vec3, axis: Vec3, angle: number): Vec3 {
 }
 
 function unit(v: Vec3, label: string): Vec3 {
-  checkVec(v, label);
-  const l = hypot(v[0], v[1], v[2]);
-  if (!(l > 0)) throw new RangeError(`${label} must be a direction, not zero; pass a vector of any length.`);
-  return [v[0] / l, v[1] / l, v[2] / l];
+  flightVector(v, label);
+  const length = hypot(v[0], v[1], v[2]);
+  if (length > 0 && Number.isFinite(length)) return [v[0] / length, v[1] / length, v[2] / length];
+  const magnitude = Math.max(Math.abs(v[0]), Math.abs(v[1]), Math.abs(v[2]));
+  if (magnitude === 0) throw flightInput(label + ' must be nonzero. Pass a direction of any finite length.');
+  const x = v[0] / magnitude,
+    y = v[1] / magnitude,
+    z = v[2] / magnitude;
+  const scaledLength = hypot(x, y, z);
+  return [x / scaledLength, y / scaledLength, z / scaledLength];
+}
+
+function isFlowField(air: Air): air is FlowField {
+  return typeof air === 'object' && air !== null && 'sample' in air && typeof air.sample === 'function';
 }
 
 /** Shared by the forces: the air at a point and its density. */
@@ -164,23 +216,53 @@ class AirSampler {
   constructor(
     private readonly air: Air,
     private readonly density: number | undefined,
+    private readonly frame: WindForceFrame | undefined,
   ) {
+    if (frame !== undefined && (!frame || !(frame.cellSize > 0 && Number.isFinite(frame.cellSize))))
+      throw flightInput('The flight frame requires a finite positive cell size. Use your rigid world cellSize.');
     if (density !== undefined && !(density > 0 && Number.isFinite(density)))
-      throw new RangeError(
+      throw flightInput(
         `Air density is a finite number of kg/m^3 above 0 (got ${density}); pass one, or leave it unset.`,
       );
-    if (!(typeof air === 'function' || (typeof air === 'object' && air !== null && 'sample' in air)))
-      checkVec(air, 'Wind');
+    if (!(typeof air === 'function' || isFlowField(air))) flightVector(air, 'Wind');
   }
 
   at(point: Vec3, time: number): [Vec3, number] {
+    flightVector(point, 'The flight sample position');
     const air = this.air;
-    if (typeof air === 'function') return [air(point, time), this.density ?? standardAirDensity(point[1])];
-    if ('sample' in (air as object)) {
-      const s = (air as FlowField).sample(point[0], point[1], point[2], time, this.sample);
-      return [[s.velocity[0], s.velocity[1], s.velocity[2]], this.density ?? s.density];
+    let velocity: unknown;
+    let density = this.density;
+    if (typeof air === 'function') {
+      velocity = air(point, time);
+    } else if (isFlowField(air)) {
+      const cell = air.cell ?? [0, 0, 0];
+      const local = this.frame ? this.frame.cell : [0, 0, 0];
+      flightCell(cell);
+      flightCell(local);
+      if (!this.frame && (cell[0] || cell[1] || cell[2]))
+        throw flightInput(
+          'The wind is in a nonzero cell. Provide the rigid world cell and cellSize in the flight frame.',
+        );
+      const shifted = this.frame ? add(point, scale(sub(local, cell), this.frame.cellSize)) : point;
+      if (!shifted.every(Number.isFinite))
+        throw flightRange('The wind sample position overflows. Use cell sizes and offsets that fit the local scene.');
+      const sample = air.sample(shifted[0], shifted[1], shifted[2], time, this.sample);
+      velocity = sample?.velocity;
+      density ??= sample?.density;
+      if (!(density !== undefined && density > 0 && Number.isFinite(density)))
+        throw flightInput(
+          'The flight field returned an invalid air density. Return a finite positive density or set density explicitly.',
+        );
+    } else {
+      velocity = air;
     }
-    return [air as Vec3, this.density ?? standardAirDensity(point[1])];
+    density ??= standardAirDensity(point[1]);
+    flightVector(velocity, 'The flight wind sample');
+    if (!(density > 0 && Number.isFinite(density)))
+      throw flightRange(
+        'The ISA density is outside the representable range. Use a lower absolute altitude or supply an air density.',
+      );
+    return [[velocity[0], velocity[1], velocity[2]], density];
   }
 }
 
@@ -208,49 +290,85 @@ export class WingForce implements PhysicsAttachment, AirLoad {
   private readonly air: AirSampler;
   private readonly nc: number;
   private readonly perInterval: number;
+  private kernel: WingLatticeKernel | null = null;
+  private acceptedWork: WingLatticeWorkCounts | null = null;
 
-  /** @throws RangeError for fewer than two sections, a chord or panel count out of range, or bad settings. */
+  /**
+   * Creates a wing and lazily loads the native SIMD lattice. Threads include the caller (default one).
+   * More than one thread requires Node or an isolated browser worker. Abort before attachment with signal.
+   */
+  static async load(
+    physics: Physics,
+    body: PhysicsBody,
+    options: WingOptions,
+    native: { readonly threads?: number; readonly signal?: AbortSignal } = {},
+  ): Promise<WingForce> {
+    const { loadWingLattice } = await import('./flight/lattice-kernel.js');
+    const kernel = await loadWingLattice(native);
+    try {
+      const wing = new WingForce(physics, body, options);
+      wing.kernel = kernel;
+      return wing;
+    } catch (error) {
+      kernel.close();
+      throw error;
+    }
+  }
+
+  /** Work performed during the last accepted native load, or null before stepping or when using the scalar constructor. */
+  workCounts(): WingLatticeWorkCounts | null {
+    return this.acceptedWork;
+  }
+
+  /** @throws MargoError for fewer than two sections, a chord or panel count out of range, or bad settings. */
   constructor(
     private readonly physics: Physics,
     private readonly body: PhysicsBody,
     private readonly options: WingOptions,
   ) {
+    if (!options) throw flightInput('Wing settings are missing. Pass at least two wing sections.');
     const { sections, panels = [2, 4], stall = 0.26, wind = [0, 0, 0], density, profileDrag = PROFILE_DRAG } = options;
     if (!(profileDrag >= 0 && Number.isFinite(profileDrag)))
-      throw new RangeError(
+      throw flightInput(
         `A profile drag coefficient is 0 or more (got ${profileDrag}); pass a finite number, or leave it unset.`,
       );
     if (!(Array.isArray(sections) && sections.length >= 2))
-      throw new RangeError(`A wing has two or more sections from root to tip (got ${sections?.length}); pass them.`);
-    sections.forEach((s, i) => {
-      checkVec(s.leadingEdge, `Section ${i}'s leading edge`);
+      throw flightInput(`A wing has two or more sections from root to tip (got ${sections?.length}); pass them.`);
+    for (const [i, s] of sections.entries()) {
+      flightVector(s?.leadingEdge, `Section ${i}'s leading edge`);
       if (!(s.chord > 0 && Number.isFinite(s.chord)))
-        throw new RangeError(`Section ${i}'s chord is a finite number of metres above 0 (got ${s.chord}); pass one.`);
+        throw flightInput(`Section ${i}'s chord is a finite number of metres above 0 (got ${s.chord}); pass one.`);
       if (s.twist !== undefined && !Number.isFinite(s.twist))
-        throw new RangeError(
+        throw flightInput(
           `Section ${i}'s twist is a finite number of radians (got ${s.twist}); pass one or leave it unset.`,
         );
-    });
-    if (!(panels.length === 2 && panels.every((p) => Number.isInteger(p) && p >= 1 && p <= 32)))
-      throw new RangeError(
+    }
+    if (
+      !(Array.isArray(panels) && panels.length === 2 && panels.every((p) => Number.isInteger(p) && p >= 1 && p <= 32))
+    )
+      throw flightInput(
         `A wing's panels are two whole numbers from 1 to 32, [chordwise, spanwise] (got ${panels}); pass them.`,
       );
     if (!(stall > 0 && stall <= 1.5707963267948966))
-      throw new RangeError(
+      throw flightInput(
         `A stall angle lies in (0, pi/2] radians (got ${stall}); pass one in that range, or leave it unset.`,
       );
     if (options.separation !== undefined && options.separation !== 'plate' && options.separation !== 'flapping')
-      throw new RangeError(
-        `A wing's separation is 'plate' or 'flapping' (got ${options.separation}); pass one of them.`,
+      throw flightInput(`A wing's separation is 'plate' or 'flapping' (got ${options.separation}); pass one of them.`);
+    if (options.flap !== undefined && typeof options.flap !== 'function')
+      throw flightInput(
+        'A wing flap must return its stroke and pitch at the requested time. Pass a function or omit flap.',
       );
+    if (options.mirror !== undefined && typeof options.mirror !== 'boolean')
+      throw flightInput('The wing mirror setting must be a boolean. Pass true for a pair or false for a single wing.');
     this.forward = unit(options.forward ?? [0, 0, 1], 'The forward direction');
     this.up = unit(options.up ?? [0, 1, 0], 'The up direction');
     const side = crossOf(this.up, this.forward),
       length = hypot(side[0], side[1], side[2]);
     if (!(length > 1e-9))
-      throw new RangeError('The forward and up directions must not be parallel; pass two directions at right angles.');
+      throw flightInput('The forward and up directions must not be parallel; pass two directions at right angles.');
     this.side = scale(side, 1 / length);
-    this.air = new AirSampler(wind, density);
+    this.air = new AirSampler(wind, density, options.frame);
     [this.nc, this.perInterval] = panels;
     this.hold = airHoldOf(physics);
     this.hold.loads.add(this);
@@ -259,10 +377,15 @@ export class WingForce implements PhysicsAttachment, AirLoad {
 
   /** The wing's corners in the body's frame at `time`: chord index fastest, then span from the left tip. */
   private geometry(time: number): { corners: Vec3[]; stations: number } {
-    const { sections, mirror = true, flap } = this.options,
-      { stroke = 0, pitch = 0 } = flap ? flap(time) : {},
-      root = sections[0]!.leadingEdge,
-      half: Vec3[][] = [];
+    const { sections, mirror = true, flap } = this.options;
+    const motion = flap ? flap(time) : {};
+    if (!motion || typeof motion !== 'object')
+      throw flightInput('Wing flap did not return a pose. Return an object with optional stroke and pitch angles.');
+    const { stroke = 0, pitch = 0 } = motion;
+    if (!(Number.isFinite(stroke) && Number.isFinite(pitch)))
+      throw flightInput('The wing flap angles are not finite. Return finite stroke and pitch in radians.');
+    const root = sections[0]!.leadingEdge;
+    const half: Vec3[][] = [];
     for (let i = 0; i + 1 < sections.length; i++)
       for (let k = i === 0 ? 0 : 1; k <= this.perInterval; k++) {
         const t = k / this.perInterval,
@@ -314,10 +437,12 @@ export class WingForce implements PhysicsAttachment, AirLoad {
       ns = stations - 1,
       q = body.rotation,
       pos = body.position,
-      com = body.worldCenterOfMass,
+      com = body.centerOfMass,
       v0 = body.linearVelocity,
       w0 = body.angularVelocity,
-      world = corners.map((p): Vec3 => add(pos, rotateVec(q, p))),
+      // Circulation and moment arms need relative geometry even when the body is far from the local origin.
+      centred = corners.map((p) => rotateVec(q, sub(p, com))),
+      comPosition = add(pos, rotateVec(q, com)),
       // The flapping's own velocity, by a central difference of the wing's shape over a tenth of a millisecond.
       h = 1e-4,
       moving = this.options.flap
@@ -327,7 +452,7 @@ export class WingForce implements PhysicsAttachment, AirLoad {
             return ahead.map((p, i) => rotateVec(q, scale(sub(p, behind[i]!), 1 / (2 * h))));
           })()
         : undefined,
-      corner = (c: number, s: number) => world[c + (nc + 1) * s]!,
+      corner = (c: number, s: number) => centred[c + (nc + 1) * s]!,
       air: Vec3[] = [],
       rho: number[] = [];
     for (let s = 0; s < ns; s++)
@@ -336,8 +461,14 @@ export class WingForce implements PhysicsAttachment, AirLoad {
           p10 = corner(c + 1, s),
           p01 = corner(c, s + 1),
           p11 = corner(c + 1, s + 1),
-          mid = (k: number) => (p00[k]! + 0.75 * (p10[k]! - p00[k]!) + p01[k]! + 0.75 * (p11[k]! - p01[k]!)) / 2,
-          [wind, density] = this.air.at([mid(0), mid(1), mid(2)], time);
+          normal = crossOf(sub(p11, p00), sub(p01, p10)),
+          area = hypot(normal[0], normal[1], normal[2]);
+        if (!(area > 0 && Number.isFinite(area)))
+          throw flightRange(
+            'A wing panel has zero or unrepresentable area. Separate its sections and use a finite planform.',
+          );
+        const mid = (k: number) => (p00[k]! + 0.75 * (p10[k]! - p00[k]!) + p01[k]! + 0.75 * (p11[k]! - p01[k]!)) / 2,
+          [wind, density] = this.air.at(add(comPosition, [mid(0), mid(1), mid(2)]), time);
         air.push(wind);
         rho.push(density);
       }
@@ -346,11 +477,13 @@ export class WingForce implements PhysicsAttachment, AirLoad {
       stall = this.options.stall ?? 0.26;
     const profileDrag = this.options.profileDrag ?? PROFILE_DRAG;
     let circulation: Float64Array = new Float64Array(0);
+    const kernel = this.kernel;
+    kernel?.resetWork();
     const wrench: Wrench = (dv, dw) => {
       const v = add(v0, dv),
         w = add(w0, dw),
-        velocity = world.map((p, i): Vec3 => {
-          const spin = crossOf(w, sub(p, com)),
+        velocity = centred.map((p, i): Vec3 => {
+          const spin = crossOf(w, p),
             own = moving ? moving[i]! : ([0, 0, 0] as Vec3);
           return [v[0] + spin[0] + own[0], v[1] + spin[1] + own[1], v[2] + spin[2] + own[2]];
         }),
@@ -359,9 +492,18 @@ export class WingForce implements PhysicsAttachment, AirLoad {
       for (let s = 0; s < ns; s++)
         for (let c = 0; c < nc; c++) {
           const mean = scale(add(add(vel(c, s), vel(c + 1, s)), add(vel(c, s + 1), vel(c + 1, s + 1))), 0.25);
-          relative.push(sub(air[c + nc * s]!, mean));
+          const flow = sub(air[c + nc * s]!, mean);
+          if (!Number.isFinite(dot(flow, flow)))
+            throw flightRange('The wing relative speed is too large to square. Reduce the wind or flap speed.');
+          relative.push(flow);
         }
-      const loads = latticeLoads({ nc, ns, corner, relative, density: rho, profileDrag }, stall, law);
+      const loads = latticeLoads(
+        { nc, ns, corner, relative, density: rho, profileDrag },
+        stall,
+        law,
+        false,
+        kernel ?? undefined,
+      );
       if (dv[0] === 0 && dv[1] === 0 && dv[2] === 0 && dw[0] === 0 && dw[1] === 0 && dw[2] === 0)
         circulation = loads.circulation;
       let force: Vec3 = [0, 0, 0],
@@ -369,15 +511,18 @@ export class WingForce implements PhysicsAttachment, AirLoad {
       for (let m = 0; m < loads.forces.length; m++) {
         const f = loads.forces[m]!;
         force = add(force, f);
-        torque = add(torque, crossOf(sub(loads.points[m]!, com), f));
+        torque = add(torque, crossOf(loads.points[m]!, f));
       }
+      checkWrench(force, torque);
       return [force, torque];
     };
     const [force, torque] = implicitWrench(body, wrench, dt, this.physics.gravity);
+    checkWrench(force, torque);
+    this.hold.hold(body, force, torque);
+    this.acceptedWork = kernel?.workCounts() ?? null;
     this.circulation = circulation;
     [this.force[0], this.force[1], this.force[2]] = force;
     [this.torque[0], this.torque[1], this.torque[2]] = torque;
-    this.hold.hold(body, force, torque);
   }
 
   /** @internal */
@@ -385,11 +530,10 @@ export class WingForce implements PhysicsAttachment, AirLoad {
     if (body === this.body) this.remove();
   }
 
-  /** Stops the load. */
+  /** Stops the load and closes native worker resources. */
   remove(): void {
     if (this.released) return;
-    this.released = true;
-    this.hold.loads.delete(this);
+    this.dispose();
     this.physics.detach(this);
   }
 
@@ -397,6 +541,8 @@ export class WingForce implements PhysicsAttachment, AirLoad {
   dispose(): void {
     this.released = true;
     this.hold.loads.delete(this);
+    this.kernel?.close();
+    this.kernel = null;
   }
 }
 
@@ -428,8 +574,10 @@ export interface RotorOptions {
   stations?: number;
   /** The wind (default still air). */
   wind?: Air;
-  /** Air density, kg/m^3 (default the flow field's, or the standard atmosphere's at the hub). */
+  /** Air density, kg/m^3 (default the flow field's, or the standard atmosphere's at the hub's local height). */
   density?: number;
+  /** Body frame for a cell-based wind field. Default cell [0, 0, 0]. Use a getter for a moving world origin. */
+  frame?: WindForceFrame;
 }
 
 /** A rotor or propeller on a rigid body: blade-element momentum theory every step; thrust along its axis, torque against it. */
@@ -445,12 +593,13 @@ export class RotorForce implements PhysicsAttachment, AirLoad {
   private readonly axis: Vec3;
   private readonly air: AirSampler;
 
-  /** @throws RangeError for a radius, blade count, chord, pitch or speed out of range. */
+  /** @throws MargoError for a radius, blade count, chord, pitch or speed out of range. */
   constructor(
     private readonly physics: Physics,
     private readonly body: PhysicsBody,
     private readonly options: RotorOptions,
   ) {
+    if (!options) throw flightInput('Rotor settings are missing. Pass radius, chord, pitch and speed.');
     const {
       radius,
       hubRadius = 0.1 * radius,
@@ -458,22 +607,31 @@ export class RotorForce implements PhysicsAttachment, AirLoad {
       stations = 16,
       liftSlope = TWO_PI,
       profileDrag = PROFILE_DRAG,
+      stall = 0.26,
     } = options;
     if (!(radius > 0 && Number.isFinite(radius)))
-      throw new RangeError(`A rotor's radius is a finite number of metres above 0 (got ${radius}); pass one.`);
+      throw flightInput(`A rotor's radius is a finite number of metres above 0 (got ${radius}); pass one.`);
     if (!(hubRadius >= 0 && hubRadius < radius))
-      throw new RangeError(
+      throw flightInput(
         `A rotor's hub radius lies in [0, radius) (got ${hubRadius} for radius ${radius}); pass a smaller one.`,
       );
     if (!(Number.isInteger(blades) && blades >= 1 && blades <= 64))
-      throw new RangeError(`A rotor has 1 to 64 whole blades (got ${blades}); pass a whole number.`);
+      throw flightInput(`A rotor has 1 to 64 whole blades (got ${blades}); pass a whole number.`);
     if (!(Number.isInteger(stations) && stations >= 2 && stations <= 256))
-      throw new RangeError(`A rotor's stations are a whole number from 2 to 256 (got ${stations}); pass one.`);
+      throw flightInput(`A rotor's stations are a whole number from 2 to 256 (got ${stations}); pass one.`);
     if (!(liftSlope > 0 && Number.isFinite(liftSlope) && profileDrag >= 0 && Number.isFinite(profileDrag)))
-      throw new RangeError('A rotor needs a finite lift slope above 0 and a profile drag of 0 or more; pass them.');
+      throw flightInput('A rotor needs a finite lift slope above 0 and a profile drag of 0 or more; pass them.');
+    if (!(stall > 0 && stall <= 1.5707963267948966))
+      throw flightInput('The rotor stall threshold is outside (0, pi/2]. Pass an angle within that range in radians.');
+    if (!(typeof options.chord === 'function' || (Number.isFinite(options.chord) && options.chord > 0)))
+      throw flightInput('The rotor chord must be positive. Pass a chord in metres or a radial function.');
+    if (!(typeof options.pitch === 'function' || Number.isFinite(options.pitch)))
+      throw flightInput('The rotor pitch must be finite. Pass an angle in radians or a radial function.');
+    if (!(typeof options.speed === 'function' || Number.isFinite(options.speed)))
+      throw flightInput('The rotor speed must be finite. Pass a speed in rad/s or a time function.');
     this.axis = unit(options.axis ?? [0, 1, 0], "The rotor's axis");
-    if (options.hub !== undefined) checkVec(options.hub, "The rotor's hub");
-    this.air = new AirSampler(options.wind ?? [0, 0, 0], options.density);
+    if (options.hub !== undefined) flightVector(options.hub, "The rotor's hub");
+    this.air = new AirSampler(options.wind ?? [0, 0, 0], options.density, options.frame);
     this.hold = airHoldOf(physics);
     this.hold.loads.add(this);
     physics.attach(this);
@@ -481,6 +639,10 @@ export class RotorForce implements PhysicsAttachment, AirLoad {
 
   /** Thrust, torque and power at speed `omega` rad/s with the air meeting the disk at `inflow` m/s along the axis, density `rho`. */
   evaluate(omega: number, inflow: number, rho: number): { thrust: number; torque: number; power: number } {
+    if (!(Number.isFinite(omega) && Number.isFinite(inflow) && rho > 0 && Number.isFinite(rho)))
+      throw flightInput(
+        'The rotor needs finite speed and inflow and positive finite density. Pass rad/s, m/s and kg/m³.',
+      );
     const {
         radius,
         hubRadius = 0.1 * radius,
@@ -493,32 +655,43 @@ export class RotorForce implements PhysicsAttachment, AirLoad {
       chordAt = (r: number) => (typeof this.options.chord === 'function' ? this.options.chord(r) : this.options.chord),
       pitchAt = (r: number) => (typeof this.options.pitch === 'function' ? this.options.pitch(r) : this.options.pitch),
       spin = omega < 0 ? -omega : omega,
-      dr = (radius - hubRadius) / stations;
+      dr = (radius - hubRadius) / stations,
+      reach = spin * radius + Math.abs(inflow) + 1;
+    if (!(dr > 0 && Number.isFinite(reach)))
+      throw flightRange('The annulus spacing or tip speed is unrepresentable. Rescale the rotor or reduce its speed.');
     let thrust = 0,
       torque = 0;
     for (let k = 0; k < stations; k++) {
       const r = hubRadius + (k + 0.5) * dr,
         c = chordAt(r),
-        theta = pitchAt(r),
-        // Blade-element thrust minus the momentum the annulus gives the air, for an induced velocity v_i.
-        element = (vi: number): [number, number, number] => {
-          const axial = inflow + vi,
-            tangential = spin * r,
-            w2 = axial * axial + tangential * tangential,
-            phi = axial < 0 ? -angleOf(-axial, tangential) : angleOf(axial, tangential),
-            alpha = theta - phi,
-            stalled = (alpha < 0 ? -alpha : alpha) > stall,
-            [cls, cds] = stalled ? flatWingCoefficients((alpha < 0 ? -alpha : alpha) / DEGREE) : [0, 0],
-            cl = stalled ? (alpha < 0 ? -cls : cls) : liftSlope * alpha,
-            cd = stalled ? cds : profileDrag,
-            q = 0.5 * rho * w2 * blades * c * dr,
-            dT = q * (cl * cos(phi) - cd * sin(phi)),
-            dQ = q * (cl * sin(phi) + cd * cos(phi)) * r;
-          // The annulus's mass flow is rho dA |V + v_i| whichever way it goes, and the air leaves with 2 v_i.
-          return [dT - FOUR_PI * rho * r * dr * (axial < 0 ? -axial : axial) * vi, dT, dQ];
-        };
+        theta = pitchAt(r);
+      if (!(c > 0 && Number.isFinite(c) && Number.isFinite(theta)))
+        throw flightInput(
+          'A blade station returned invalid chord or pitch. Return a positive finite chord and a finite pitch.',
+        );
+      // Blade-element thrust minus the momentum the annulus gives the air, for an induced velocity v_i.
+      const element = (vi: number): [number, number, number] => {
+        const axial = inflow + vi,
+          tangential = spin * r,
+          w2 = axial * axial + tangential * tangential,
+          phi = axial < 0 ? -angleOf(-axial, tangential) : angleOf(axial, tangential),
+          alpha = theta - phi,
+          stalled = (alpha < 0 ? -alpha : alpha) > stall,
+          [cls, cds] = stalled ? flatWingCoefficients((alpha < 0 ? -alpha : alpha) / DEGREE) : [0, 0],
+          cl = stalled ? (alpha < 0 ? -cls : cls) : liftSlope * alpha,
+          cd = stalled ? cds : profileDrag,
+          q = 0.5 * rho * w2 * blades * c * dr,
+          dT = q * (cl * cos(phi) - cd * sin(phi)),
+          dQ = q * (cl * sin(phi) + cd * cos(phi)) * r;
+        // The annulus's mass flow is rho dA |V + v_i| whichever way it goes, and the air leaves with 2 v_i.
+        const residual = dT - FOUR_PI * rho * r * dr * (axial < 0 ? -axial : axial) * vi;
+        if (!(Number.isFinite(residual) && Number.isFinite(dT) && Number.isFinite(dQ)))
+          throw flightRange(
+            'The blade load or momentum is unrepresentable. Reduce tip speed, inflow, density or blade size.',
+          );
+        return [residual, dT, dQ];
+      };
       // The induced velocity solves element(v_i)[0] = 0, which falls as v_i rises: bisect it within the tip speed and the inflow.
-      const reach = spin * radius + (inflow < 0 ? -inflow : inflow) + 1;
       let lo = -reach,
         hi = reach;
       for (let i = 0; i < 80; i++) {
@@ -530,7 +703,10 @@ export class RotorForce implements PhysicsAttachment, AirLoad {
       thrust += dT;
       torque += dQ;
     }
-    return { thrust, torque: omega < 0 ? -torque : torque, power: torque * spin };
+    const power = torque * spin;
+    if (!(Number.isFinite(thrust) && Number.isFinite(torque) && Number.isFinite(power)))
+      throw flightRange('The integrated rotor load exceeds numerical range. Reduce tip speed, density or blade area.');
+    return { thrust, torque: omega < 0 ? -torque : torque, power };
   }
 
   /** @internal Stepped alone, the Physics's step computes the load; in a world, an `AirSolver` does. */
@@ -545,13 +721,13 @@ export class RotorForce implements PhysicsAttachment, AirLoad {
       time = this.hold.now(),
       q = body.rotation,
       axis = rotateVec(q, this.axis),
-      hub = add(body.position, rotateVec(q, this.options.hub ?? [0, 0, 0])),
-      com = body.worldCenterOfMass,
+      hubLocal = this.options.hub ?? [0, 0, 0],
+      hub = add(body.position, rotateVec(q, hubLocal)),
+      lever = rotateVec(q, sub(hubLocal, body.centerOfMass)),
       omega = typeof this.options.speed === 'function' ? this.options.speed(time) : this.options.speed;
     if (!Number.isFinite(omega))
-      throw new RangeError(`A rotor's speed is a finite number of rad/s (got ${omega}); pass one.`);
+      throw flightInput(`A rotor's speed is a finite number of rad/s (got ${omega}); pass one.`);
     const [air, rho] = this.air.at(hub, time),
-      lever = sub(hub, com),
       wrench: Wrench = (dv, dw) => {
         const hubVelocity = add(add(body.linearVelocity, dv), crossOf(add(body.angularVelocity, dw), lever)),
           // The air through the disk along the thrust's opposite: climbing into still air, it meets the disk from above.
@@ -563,10 +739,12 @@ export class RotorForce implements PhysicsAttachment, AirLoad {
       [force, pushMoment] = implicitWrench(body, wrench, dt, this.physics.gravity),
       hubVelocity = add(body.linearVelocity, crossOf(body.angularVelocity, lever)),
       { thrust, torque, power } = this.evaluate(omega, -dot(sub(air, hubVelocity), axis), rho);
+    const moment = add(pushMoment, scale(axis, -torque));
+    checkWrench(force, moment);
+    this.hold.hold(body, force, moment);
     this.thrust = thrust;
     this.torque = torque;
     this.power = power;
-    this.hold.hold(body, force, add(pushMoment, scale(axis, -torque)));
   }
 
   /** @internal */
@@ -616,22 +794,27 @@ export class LiftingGas implements PhysicsAttachment, AirLoad {
   private released = false;
   private readonly hold: AirHold;
 
-  /** @throws RangeError for a volume or temperature that is not finite and above 0, or an unknown gas. */
+  /** @throws MargoError for a volume or temperature that is not finite and above 0, or an unknown gas. */
   constructor(
     private readonly physics: Physics,
     private readonly body: PhysicsBody,
     private readonly options: LiftingGasOptions,
   ) {
-    const { volume, gas = 'helium', temperature = 373.15 } = options;
-    if (!(volume > 0 && Number.isFinite(volume)))
-      throw new RangeError(`An envelope's volume is a finite number of m^3 above 0 (got ${volume}); pass one.`);
-    if (gas !== 'helium' && gas !== 'hydrogen' && gas !== 'hotAir')
-      throw new RangeError(`A lifting gas is 'helium', 'hydrogen' or 'hotAir' (got ${gas}); pass one of them.`);
-    if (!(temperature > 0 && Number.isFinite(temperature)))
-      throw new RangeError(
-        `Hot air's temperature is a finite number of kelvin above 0 (got ${temperature}); pass one.`,
+    if (!options) throw flightInput('Lifting gas settings are missing. Pass an envelope volume.');
+    const { volume, gas = 'helium', temperature = 373.15, altitude = 0, seaLevelTemperature } = options;
+    if (!Number.isFinite(altitude))
+      throw flightInput('The envelope reference altitude is not finite. Pass metres above sea level.');
+    if (seaLevelTemperature !== undefined && !(seaLevelTemperature > 0 && Number.isFinite(seaLevelTemperature)))
+      throw flightInput(
+        'The sea-level temperature is invalid. Pass positive finite kelvin or omit seaLevelTemperature.',
       );
-    if (options.centre !== undefined) checkVec(options.centre, "The envelope's centre");
+    if (!(volume > 0 && Number.isFinite(volume)))
+      throw flightInput(`An envelope's volume is a finite number of m^3 above 0 (got ${volume}); pass one.`);
+    if (gas !== 'helium' && gas !== 'hydrogen' && gas !== 'hotAir')
+      throw flightInput(`A lifting gas is 'helium', 'hydrogen' or 'hotAir' (got ${gas}); pass one of them.`);
+    if (!(temperature > 0 && Number.isFinite(temperature)))
+      throw flightInput(`Hot air's temperature is a finite number of kelvin above 0 (got ${temperature}); pass one.`);
+    if (options.centre !== undefined) flightVector(options.centre, "The envelope's centre");
     this.hold = airHoldOf(physics);
     this.hold.loads.add(this);
     physics.attach(this);
@@ -639,12 +822,25 @@ export class LiftingGas implements PhysicsAttachment, AirLoad {
 
   /** The net lift, N, of the envelope at `height` m (y) under gravity `g` m/s^2. */
   liftAt(height: number, g: number): number {
-    const { volume, gas = 'helium', temperature = 373.15, altitude = 0, seaLevelTemperature } = this.options,
-      [t, p] = standardAtmosphere(altitude + height, seaLevelTemperature),
-      air = p / (DRY_AIR_GAS_CONSTANT * t),
+    if (!(Number.isFinite(height) && Number.isFinite(g) && g >= 0))
+      throw flightInput('Envelope height and gravity must be finite and gravity nonnegative. Pass metres and m/s².');
+    if (g === 0) return 0;
+    const { volume, gas = 'helium', temperature = 373.15, altitude = 0, seaLevelTemperature } = this.options;
+    const elevation = altitude + height;
+    if (!Number.isFinite(elevation))
+      throw flightRange('Envelope altitude is unrepresentable. Reduce the reference altitude or height.');
+    const [t, p] = standardAtmosphere(elevation, seaLevelTemperature);
+    if (!(t > 0 && Number.isFinite(t) && p >= 0 && Number.isFinite(p)))
+      throw flightRange(
+        'The atmosphere cannot be evaluated at this altitude and temperature. Use an Earth-like profile.',
+      );
+    const air = p / (DRY_AIR_GAS_CONSTANT * t),
       inside =
         gas === 'hotAir' ? p / (DRY_AIR_GAS_CONSTANT * temperature) : (p * GASES[gas]) / (UNIVERSAL_GAS_CONSTANT * t);
-    return (air - inside) * volume * g;
+    const lift = (air - inside) * volume * g;
+    if (!Number.isFinite(lift))
+      throw flightRange('Envelope lift is unrepresentable. Reduce volume or gravity or use a warmer atmosphere.');
+    return lift;
   }
 
   /** @internal Stepped alone, the Physics's step computes the load; in a world, an `AirSolver` does. */
@@ -662,12 +858,15 @@ export class LiftingGas implements PhysicsAttachment, AirLoad {
       this.lift = 0;
       return;
     }
-    const centre = add(body.position, rotateVec(body.rotation, this.options.centre ?? [0, 0, 0])),
-      lift = this.liftAt(centre[1], g),
-      up = scale(gravity, -lift / g),
-      moment = crossOf(sub(centre, body.worldCenterOfMass), up);
-    this.lift = lift;
+    const q = body.rotation,
+      centre = this.options.centre ?? [0, 0, 0],
+      height = body.position[1] + rotateVec(q, centre)[1],
+      lift = this.liftAt(height, g),
+      up = scale([gravity[0] / g, gravity[1] / g, gravity[2] / g], -lift),
+      moment = crossOf(rotateVec(q, sub(centre, body.centerOfMass)), up);
+    checkWrench(up, moment);
     this.hold.hold(body, up, moment);
+    this.lift = lift;
   }
 
   /** @internal */

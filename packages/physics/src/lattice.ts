@@ -2,15 +2,15 @@
 // panels, each carrying a horseshoe vortex, solved so the air passes no panel, with each panel's load from Kutta-Joukowski,
 // or from a separated-flow law where the air meets it more steeply than the stall angle.
 //
-// The vortex-lattice method (J. Katz and A. Plotkin, "Low-Speed Aerodynamics", 2001, chapter 12, not read here; the
-// formulation as restated by the article "Vortex lattice method" in Wikipedia, read 2026-11-25, and by M. Klein and others,
-// "Direct Wing Design and Inverse Airfoil Identification with the Nonlinear Weissinger Method", arXiv:1501.04983, 2015, read
-// in full, eqs. 1-4): each panel's bound segment lies on its quarter-chord line, its legs run along the chord to the trailing
+// The vortex-lattice method follows M. Ranneberg, "Direct Wing Design and Inverse Airfoil Identification with the
+// Nonlinear Weissinger Method", arXiv:1501.04983v2 (2015), §2: each panel's bound segment lies on its
+// quarter-chord line, its legs run along the chord to the trailing
 // edge and from there downstream along the mean apparent wind to infinity; the circulations make the velocity normal to the
 // surface vanish at every panel's three-quarter-chord point (a dense linear system, solved by Gaussian elimination with
 // partial pivoting in a fixed order); each bound segment takes rho Gamma (V x l) from the local air V. A straight segment's
-// induced velocity is Biot-Savart's closed form (Klein et al., eq. 2) and a leg to infinity its limit (eq. 3).
+// induced velocity is Biot-Savart's closed form (Ranneberg, eq. 2) and a leg to infinity its limit (eq. 3).
 import { hypot, sin } from '@margoengine/math/pinned';
+import type { WingLatticeKernel } from './flight/lattice-kernel.js';
 import type { Vec3 } from './math.js';
 
 /** A lattice surface: its corners and, per panel (c + nc s), the air relative to it and the air's density. */
@@ -65,6 +65,7 @@ export function latticeLoads(
   stall: number,
   separated: SeparatedLaw,
   slopes = false,
+  native?: WingLatticeKernel,
 ): LatticeLoads {
   const { nc, ns, relative, density, profileDrag = 0 } = surface,
     n = nc * ns,
@@ -112,24 +113,47 @@ export function latticeLoads(
       return add(u, semiInfinite(tB, wake, point, 1));
     };
   // a_km Gamma_m = -V_k . n_k
-  const matrix = new Float64Array(n * n),
-    rhs = new Float64Array(n),
-    sinStall = sin(stall),
+  const sinStall = sin(stall),
     speeds = relative.map((v) => hypot(v[0], v[1], v[2])),
     stalled = relative.map((v, m) => speeds[m]! > 1e-9 && abs(dot(v, normal[m]!)) / speeds[m]! > sinStall);
-  for (let k = 0; k < n; k++) {
-    if (stalled[k]) {
-      // The separated law owns this panel's load. It contributes no attached horseshoe circulation.
-      matrix[k * n + k] = 1;
-      continue;
+  let gamma: Float64Array;
+  let inducedByNative: Float64Array | undefined;
+  let answer: Float64Array | null = null;
+  if (native && !slopes) {
+    const trailA = boundA.map((_, m) => at(nc, Math.floor(m / nc)));
+    const trailB = boundA.map((_, m) => at(nc, Math.floor(m / nc) + 1));
+    const result = native.solve({
+      boundA,
+      boundB,
+      trailA,
+      trailB,
+      collocation: colloc,
+      normal,
+      points,
+      stalled,
+      relative,
+      speeds,
+      wake,
+    });
+    gamma = result.circulation;
+    inducedByNative = result.induced;
+  } else {
+    const matrix = new Float64Array(n * n);
+    const rhs = new Float64Array(n);
+    for (let k = 0; k < n; k++) {
+      if (stalled[k]) {
+        // The separated law owns this panel's load. It contributes no attached horseshoe circulation.
+        matrix[k * n + k] = 1;
+        continue;
+      }
+      for (let m = 0; m < n; m++) if (!stalled[m]) matrix[k * n + m] = dot(horseshoe(m, colloc[k]!), normal[k]!);
+      rhs[k] = -dot(relative[k]!, normal[k]!);
     }
-    for (let m = 0; m < n; m++) if (!stalled[m]) matrix[k * n + m] = dot(horseshoe(m, colloc[k]!), normal[k]!);
-    rhs[k] = -dot(relative[k]!, normal[k]!);
+    gamma = solve(matrix, rhs, n);
+    // A panel's circulation answers the air's speed through it by row m of the inverse at column m.
+    if (slopes) answer = inverseDiagonal(matrix, n);
   }
-  const gamma = solve(matrix, rhs, n),
-    // A panel's circulation answers the air's speed through it by row m of the inverse at column m (rhs_m is minus it).
-    answer = slopes ? inverseDiagonal(matrix, n) : null,
-    slope = slopes ? new Float64Array(n) : null;
+  const slope = slopes ? new Float64Array(n) : null;
   for (let m = 0; m < n; m++) {
     const v = relative[m]!,
       speed = speeds[m]!;
@@ -148,7 +172,9 @@ export function latticeLoads(
     }
     // Attached: Kutta-Joukowski on the bound segment, with the air there and every vortex's induced velocity.
     let induced: Vec3 = [0, 0, 0];
-    for (let j = 0; j < n; j++) if (!stalled[j]) induced = add(induced, scale(horseshoe(j, points[m]!), gamma[j]!));
+    if (inducedByNative) induced = [inducedByNative[3 * m]!, inducedByNative[3 * m + 1]!, inducedByNative[3 * m + 2]!];
+    else
+      for (let j = 0; j < n; j++) if (!stalled[j]) induced = add(induced, scale(horseshoe(j, points[m]!), gamma[j]!));
     const lift = crossOf(add(v, induced), sub(boundB[m]!, boundA[m]!));
     forces[m] = scale(lift, density[m]! * gamma[m]!);
     if (profileDrag > 0) {
@@ -232,7 +258,7 @@ const CORE = 1e-6;
 
 /**
  * The velocity a straight vortex segment from r0 to r1 of unit circulation induces at m (Biot-Savart's closed form;
- * Klein et al. 2015, eq. 2): (r1 - r0) . ((r1 - m)/|r1 - m| - (r0 - m)/|r0 - m|) (r0 - m) x (r1 - r0) / (4 pi |(r0 - m) x (r1 - r0)|^2).
+ * Ranneberg 2015, eq. 2): (r1 - r0) . ((r1 - m)/|r1 - m| - (r0 - m)/|r0 - m|) (r0 - m) x (r1 - r0) / (4 pi |(r0 - m) x (r1 - r0)|^2).
  */
 function segment(r0: Vec3, r1: Vec3, m: Vec3): Vec3 {
   const d = sub(r1, r0),
@@ -250,7 +276,7 @@ function segment(r0: Vec3, r1: Vec3, m: Vec3): Vec3 {
 
 /**
  * The velocity of a straight vortex leg of unit circulation from `start` to infinity along the unit `direction` at m (the
- * limit of the closed form, Klein et al. 2015, eq. 3), `sense` -1 for the leg that comes in from infinity.
+ * limit of the closed form, Ranneberg 2015, eq. 3), `sense` -1 for the leg that comes in from infinity.
  */
 function semiInfinite(start: Vec3, direction: Vec3, m: Vec3, sense: number): Vec3 {
   const a = sub(start, m),

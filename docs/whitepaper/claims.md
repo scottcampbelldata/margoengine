@@ -145,6 +145,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   opposite momentum. The sliding impulse saturates the circular friction bound, while a higher coefficient
   brings the relative slip to zero. Both dissipate kinetic energy. A fixed shoe also slows sliding under a
   sustained 30 N load. Run `node --test packages/physics/tests/coupling/crush.test.js`.
+- Native quasi-steady wing lattice (AERO-03). One, two and four participants reproduce the scalar loads,
+  circulation and signed-cell rigid replay exactly on 51- and 95-panel fixtures. The Aviary cutaway converts
+  −0.325 m/s descent into +0.631 m/s climb with 0.00688 N·s of accepted incremental lift impulse. Both
+  backends repeat their own rendered frames and snapshots byte for byte. Tests are
+  `packages/physics/tests/coupling/wing-lattice-workers.test.js` and `packages/physics/tests/aviary-flight.browser.mjs`.
+  Axial rotor predictions exceed all 12 unambiguous measured Caradonna–Tung thrust coefficients by 36–52%.
 - Wing stall drag (AERO-03, 2026-11-26). A 25° fixed wing matches the analytic plate drag, and a flapping wing's
   separated force and torque are independent of the attached profile coefficient. A mixed-flow fixture checks the
   attached share of area and zero attached circulation on separated panels. The original light flapping-wing case

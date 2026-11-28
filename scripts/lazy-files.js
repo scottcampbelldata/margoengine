@@ -519,6 +519,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/wing-lattice-kernel.wasm',
+    label: 'wing-lattice-kernel.wasm',
+    kind: 'Rust SIMD wing lattice influence, circulation and induced velocity',
+    measure: 'file',
+    when: 'WingForce.load() from the optional /flight entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/wing-lattice-kernel-shared.wasm',
+    label: 'wing-lattice-kernel-shared.wasm',
+    kind: 'Rust SIMD wing lattice with shared native worker scratch',
+    measure: 'file',
+    when: 'WingForce.load() with more than one participant',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/room-sound-kernel.wasm',
     label: 'room-sound-kernel.wasm',
     kind: 'Rust SIMD room acoustic pressure waves',

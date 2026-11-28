@@ -14663,8 +14663,7 @@ both physics.
 `packages/physics/src/flight.ts`, on the vortex-lattice core `packages/physics/src/lattice.ts` that `SailForce` (AERO-02)
 now shares. Written from:
 
-- The vortex-lattice method as restated by the Wikipedia article "Vortex lattice method" and by Klein et al., arXiv:1501.04983
-  (both read for AERO-02; see that record).
+- Maximilian Ranneberg, *Direct Wing Design and Inverse Airfoil Identification with the Nonlinear Weissinger Method* (2015), §2.1 gives the finite segment in equation 2 and the semi-infinite limit in the following derivation used by the lattice. [Paper](https://arxiv.org/abs/1501.04983).
 - Y. Su, Fan, Onoue, Vejdani and Breuer, "An improved aerodynamic model for quasi-steady simulations of animal flight at
   moderate Reynolds numbers", arXiv:2302.09602, read in full: the flat wing's lift and drag coefficients (eqs. 10 and 11)
   and the blade-element forces at the quarter chord (eqs. 3 and 4). Dickinson, Lehmann and Sane (1999) are known through it.
@@ -14690,6 +14689,30 @@ and empirical separated section loads follows Thomas Ozoroski's discussion of vi
 lattice (2015). The existing abrupt stall remains a reduced model. The analytic 25° plate and mixed-flow tests
 check the two force paths. The original light flapping-wing regression checks stable integration.
 [Su et al.](https://doi.org/10.1111/nyas.70142) [Ozoroski, NASA/CR–2015–218969](https://ntrs.nasa.gov/citations/20160000765)
+
+#### Body-centered loads and native wing lattice (AERO-03 four-point pass)
+
+Ludwig Prandtl, *Applications of Modern Hydrodynamics to Aeronautics*, NACA TR-116, §§11–14, sets out
+the bound and trailing vortex account. Ranneberg’s finite segment and semi-infinite leg formulas are
+evaluated two target rows at a time. Each target still sums sources in the original order. The caller
+runs partial-pivot elimination in the original index order. SIMD updates disjoint columns of a row.
+Rust runs on private optional Wasm scratch. Workers join before accepted wing diagnostics and rigid forces
+are published. Torque arms and lattice geometry are formed about the local centre of mass, then only the
+wind query is relocated between signed cells. [Prandtl, NACA TR-116](https://ntrs.nasa.gov/citations/19930091180).
+
+F. X. Caradonna and C. Tung, *Experimental and Analytical Studies of a Model Helicopter Rotor in Hover* (1981),
+§2 and figures 1 and 3–6 supply geometry, operating inputs and independent integrated thrust coefficients.
+The runtime diagnostic holds out the thrust results and reports the overprediction and the anomalous literal
+figure value separately. The existing axial annulus balance is the combined momentum and blade-element form
+described in the rotor theory literature. It omits tip-vortex and compressible effects. [Caradonna and Tung, NASA TM-81232](https://ntrs.nasa.gov/citations/19820004169), [NASA combined momentum and blade-element analysis](https://ntrs.nasa.gov/api/citations/19900004033/downloads/19900004033.pdf).
+
+Jia-chi Wu and Zoran Popović, *Realistic Modeling of Bird Flight Animations* (2003), uses forces and joint
+motion to produce flight from authored wingbeats. Michael H. Dickinson, Fritz-Olaf Lehmann and Sanjay P. Sane,
+*Wing Rotation and the Aerodynamic Basis of Insect Flight* (1999), separates translational and rotational effects.
+Colin J. Pennycuick, *Modelling the Flying Bird* (2008), separates gliding performance from powered flight.
+The Aviary cutaway compares a held wing with one downstroke using the existing quasi-steady law. It does not
+claim unsteady motion or measured insect-force agreement. [Wu and Popović](https://doi.org/10.1145/1201775.882360),
+[Dickinson, Lehmann and Sane](https://authors.library.caltech.edu/records/k0ywt-79d59), [Pennycuick](https://shop.elsevier.com/books/modelling-the-flying-bird/pennycuick/978-0-12-374299-5).
 
 #### The air's loads in a world (`AirSolver` of `@margoengine/physics/flight`, `air-hold.ts`, 2026-11-25)
 

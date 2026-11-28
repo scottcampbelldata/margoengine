@@ -11986,3 +11986,14 @@ A6000); `packages/post/test/straight-display.test.js` scans every package for th
 `Underwater` also write the coverage their medium makes, so empty pixels they fill are not see-through
 (KB-WATER-LIQUIDALPHA1): the same test's liquid and underwater cases. Missing: other GPUs and XR on a transparent
 canvas.
+
+
+### AERO-03 native wing lattice
+
+The optional flight entry loads one native lattice at a time per wing. Private Wasm memory holds panel geometry,
+matrix rows and post-solve induced velocities. Each participant owns disjoint target rows during matrix and wake
+phases. The caller pivots and eliminates in the scalar order. Both paths compute local moment arms before shifting
+the wind sample to its signed field cell. Accepted work reports actual matrix, wake and elimination SIMD operations.
+The 51- and 95-panel coupling cases reproduce scalar forces, circulation and rigid replay at 1, 2 and 4 participants.
+A fixed-camera Aviary regression checks full-frame replay on both renderers. Dense wing storage is quadratic.
+Rotor annuli, full aircraft wake feedback and the original flight timeline remain outside this proof.

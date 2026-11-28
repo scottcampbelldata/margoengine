@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21853414,
+  "total": 21858947,
   "history": [
     {
       "date": "2026-10-24",
@@ -15641,6 +15641,12 @@
       "commit": "37f1306d51",
       "reason": "@margoengine/math/fft 1,604 to 1,819 B gzip (37f1306d51, KB-WATER-WAKEREADME1): RealFft2 transforms only the kept nx/2+1 columns and the radix-2 Stockham stage is written out with the same operations (181 B of the 215). The written-out stage makes a 256 x 128 wake step (3 forward, 2 inverse transforms) 4.26 ms against 13.5 ms without it (1,638 B), which keeps the water README WakeSolver example inside its 20 s page limit; computing its repeated first term once saved 0 B, and its bits must match the Rust twin fft.rs, so the bytes stay.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "aero-03-native-flight",
+      "reason": "AERO-03 @margoengine/physics/flight 7423 to 12800 B gzip, @margoengine/physics 988134 to 992317 B gzip, @margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table)) 107016 to 107307 B gzip, @margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table) 880546 to 884404 B gzip, @margoengine/physics/flight 7651 to 13184 B ceiling. Flight adds validated body-relative panel and rotor sampling, coded range errors and the shared native phase loader. The native matrix and wake code stays in on-demand Wasm files. Splitting the flight options would duplicate the existing wing geometry and wrench path. The air accumulator guard is shared with WindForce. Core and stage are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16518,7 +16524,7 @@
     "@margoengine/physics/entry": 9712,
     "@margoengine/physics/explosive": 15583,
     "@margoengine/physics/falling": 6163,
-    "@margoengine/physics/flight": 7651,
+    "@margoengine/physics/flight": 13184,
     "@margoengine/physics/flip": 14295,
     "@margoengine/physics/foam": 8126,
     "@margoengine/physics/glacier": 3740,
