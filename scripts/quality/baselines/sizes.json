@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22080492,
+  "total": 22086994,
   "history": [
     {
       "date": "2026-10-24",
@@ -15899,6 +15899,18 @@
       "commit": "rigging-clavicle-drop",
       "reason": "KB-RIG-CLAVICLE1, measured with the change after npm run build:packages on c4bfd7b73d: @margoengine/rigging/anatomy 10,567 to 11,203 B gzip (ceiling 10,807 to 11,540) as the fit reads the collarbone's zero from motion (rhythmDrops and the drop option: the median drop of the collarbone where the clips hang the arm, capped by the rhythm). It sits beside hingeRolls, which addPerson already loads from this entry for the same calibration pass and with the same pose and joint helpers; an entry of its own would copy the forward kinematics, the joint measure and the work buffers for about 600 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "life-02-native-ground-contacts-locomotion",
+      "reason": "LIFE-02 @margoengine/physics/locomotion 6552 to 9726 B gzip, ceiling 6808 to 10018 B. The ground and legged entries share the same accepted foot, anchor and body storage. The size preserves shared terrain-bank validation and ordered native staging. Separate copies would duplicate the contact solver. Core and stage receive zero bytes.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "life-02-native-ground-contacts-legged",
+      "reason": "LIFE-02 @margoengine/physics/legged 10111 to 13307 B gzip, ceiling 10415 to 13707 B. The ground and legged entries share the same accepted foot, anchor and body storage. The size preserves shared terrain-bank validation and ordered native staging. Separate copies would duplicate the contact solver. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16794,11 +16806,11 @@
     "@margoengine/physics/iceberg": 7193,
     "@margoengine/physics/landscape": 7724,
     "@margoengine/physics/lava": 9865,
-    "@margoengine/physics/legged": 10415,
+    "@margoengine/physics/legged": 13707,
     "@margoengine/physics/life": 10347,
     "@margoengine/physics/lightning": 9086,
     "@margoengine/physics/loads": 76595,
-    "@margoengine/physics/locomotion": 6808,
+    "@margoengine/physics/locomotion": 10018,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 9489,
     "@margoengine/physics/mooring": 3744,

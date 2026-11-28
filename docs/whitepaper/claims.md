@@ -7126,3 +7126,10 @@ computed wake raises a gauge by 16.44 cm at three seconds. Both backends indepen
 full accepted state and pixels. The unchanged no-slip flow model
 overpredicts measured depth-mean Athabasca flow and underpredicts Greenland total GPS motion.
 Local geometry spreads and deformation-only comparisons appear in [limits](../limits.md#grounded-glacier-and-ice-sheet-flow-ice-02).
+
+### LIFE-02 accepted ground contacts and measured slope response
+
+Ground locomotion retains accepted row state if a later terrain sample fails and reads a registered bed in
+its owning memory. Independent native participants preserve complete accepted bytes with the same mixed body
+group. The reduced snake model predicts a direction reversal at shallower slopes than measured under
+independent cloth friction and prescribed shape inputs. [Scope and measured error](../limits.md#ground-animal-locomotion-life-02).

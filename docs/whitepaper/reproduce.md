@@ -5382,3 +5382,14 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
   worker counts and actual browser-worker startup.
 - Run `npm run test:gpu:glacier-calving-film -w @margoengine/water` for the coupled fixed-camera replay
   on WebGPU and WebGL2.
+
+### LIFE-02 native animal contacts and a held-out cloth runway
+
+- Build Physics with `node packages/physics/scripts/build.js`.
+- Run `node --test packages/physics/tests/locomotion.test.js packages/physics/tests/coupling/locomotion.test.js packages/physics/tests/coupling/locomotion-workers.test.js`
+  for contact reactions, candidate rejection, signed terrain, and native row dispatch.
+- Run `npm run test:gpu:locomotion-workers -w @margoengine/physics` to start actual browser helpers, and
+  `npm run test:gpu:slither-film -w @margoengine/environment` for fixed-camera WebGPU and WebGL2 replay.
+- Run `node packages/physics/scripts/life02-slithering-measured.mjs` for independent flat and incline comparisons.
+  This diagnostic uses published cloth friction and shape inputs, scores complete strides, and identifies samples
+  that exceed the measured runway dimensions. [Hu et al. (2009)](https://doi.org/10.1073/pnas.0812533106).

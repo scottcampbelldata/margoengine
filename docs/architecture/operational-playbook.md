@@ -12340,3 +12340,7 @@ bake's work count is in docs/limits.md). A default changed here changes every Bi
 ### ICE-02 native face conductance and fracture
 
 The glacier kernel joins disjoint paired face-conductance rows before the ordered implicit solve. It joins the separate per-column fracture phase before cumulative ice release and drainage. Native snapshots agree across one, two and four participants and the previous executable assets. All six accepted ports carry the current signed origin. A failed numeric trial preserves published values and work receipts. Local field comparisons record the missing lateral stress, basal sliding and temperature effects.
+
+### LIFE-02 accepted contacts and independent animal rows
+
+Ground locomotion copies terrain samples into trial geometry before the body phase. Acquiring the post-callback view preserves valid plain-memory growth. The two pose and contact publications and their native work receipt update after the entire candidate succeeds. Shared native participants advance disjoint bodies and preserve each ordered contact sum. The fixed-camera snake test reads accepted TerrainBed contacts at a signed cell. The independent Hu incline diagnostic retains the observed direction-change mismatch.

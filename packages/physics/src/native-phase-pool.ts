@@ -130,6 +130,11 @@ type NativePhaseSolver =
       readonly subject: 'Glacier';
       readonly phaseExport: 'glacier_thread_phase';
       readonly phase: 'flow weights and crevasses';
+    }
+  | {
+      readonly subject: 'Locomotion';
+      readonly phaseExport: 'locomotion_thread_phase';
+      readonly phase: 'body contact integration';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };

@@ -7362,7 +7362,7 @@ its own hip locations, foot locations and phases to replace the preset gait.
 import { GroundLocomotion } from '@margoengine/physics/locomotion';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const gait = await GroundLocomotion.load();
+using gait = await GroundLocomotion.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(gait, {
   bodies: [{ kind: 'snake' }, { kind: 'insect' }, { kind: 'crab' }],
 });
@@ -7375,10 +7375,10 @@ if (snake.position[2] <= 0 || !Number.isFinite(frontFoot.position[1])) {
 ```
 
 The plane starts at Y=0. To follow production terrain, pass the `TerrainBed` geometry as `bedShape` to
-`GroundLocomotion.load`, and register the bed before the animals. Use the same `cellSize` as the world and set
-`originCell` to the cell passed to `world.add` for an animal group that starts outside the origin cell. The `bed`
-parameter accepts a fixed `Bed` and supplies a surface until a declared live port is available. The remaining static
-fallback is `groundHeight`. The bed's border behavior follows `Bed`.
+`GroundLocomotion.load`, and register the bed before the animals. Use the same `cellSize` as the world.
+The initial origin defaults to the cell passed to `world.add`. If provided, `originCell` must match it.
+A fixed `Bed` supplies a surface until a declared live port is available. The remaining fallback is
+`groundHeight`. Terrain callbacks return finite elevations and upward normals. Apply drive changes between steps.
 
 A snake has 32 links over 1 m by default. Its 0.48 rad bend and two waves advance at 1 Hz, with a 0.025 m belly
 radius and forward, backward and sideways friction coefficients of 0.11, 0.14 and 0.19. The body receives no
@@ -7403,8 +7403,11 @@ reaction force, stance couple, and link midpoint or foot position. For legged an
 row after the configured feet. For a snake, each row's axis points from tail toward head. Its link endpoints are
 the midpoint plus and minus half a link length along that axis. Consumers can read the versioned
 `GROUND_POSE_FIELD` and `GROUND_CONTACT_FIELD` directly through the world registry. Contact rows are grouped by
-body order and report the samples that produced the last substep. The entry fetches Wasm on `load`, and accepts
-an abort signal.
+body order and report the samples that produced the last substep. Both ports carry the current solver cell.
+The loader accepts an abort signal and `threads: 1 | 2 | 4` (default 1, including the caller). Use shared
+world memory for helpers and run an isolated Worker as the world owner in browsers. Dispose after the world
+stops using the group. `readNativeWork()` copies accepted body, contact and paired SIMD counts and returns
+undefined before the first accepted step.
 
 ## Material ageing
 

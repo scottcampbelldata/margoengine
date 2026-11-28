@@ -49,9 +49,11 @@ export interface GroundLeggedDrive {
 export class GroundLocomotion implements Solver<GroundLocomotionParams> {
     private constructor();
     static load(options?: GroundLocomotionOptions): Promise<GroundLocomotion>;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, params: GroundLocomotionParams): void;
     step(context: StepContext, dt: number): void;
+    readNativeWork(): LocomotionWorkCounts | undefined;
     setLeggedDrive(body: number, drive: GroundLeggedDrive): void;
     contactCount(body: number): number;
     read(body: number, out?: GroundAnimalPose): GroundAnimalPose;
@@ -69,6 +71,7 @@ export interface GroundLocomotionOptions {
     readonly controlled?: boolean;
     readonly poseField?: string;
     readonly contactField?: string;
+    readonly threads?: 1 | 2 | 4;
     readonly signal?: AbortSignal;
 }
 
@@ -77,6 +80,21 @@ export interface GroundLocomotionParams {
     readonly bed?: Bed;
     readonly originCell?: Cell;
     readonly groundHeight?: number;
+}
+
+export interface LocomotionWorkCounts extends LocomotionWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly LocomotionWorkerWork[];
+}
+
+export interface LocomotionWorkerWork {
+    readonly bodies: number;
+    readonly contactRows: number;
+    readonly snakeLinks: number;
+    readonly feet: number;
+    readonly torsoRows: number;
+    readonly stanceRows: number;
+    readonly pairedContactDots: number;
 }
 
 export interface SlitheringBody extends BodyOptions {

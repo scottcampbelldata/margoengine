@@ -7,7 +7,7 @@ import {
   GROUND_POSE_FIELD,
   GroundLocomotion,
 } from '@margoengine/physics/locomotion';
-import { PhysicsWorld } from '@margoengine/physics/world';
+import { PhysicsWorld, worldMemory } from '@margoengine/physics/world';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 const bedShape = { width: 4, depth: 4, columns: 8, rows: 8, centre: [0, 0] };
@@ -98,4 +98,104 @@ test('coupled feet, body phase and contacts agree after restore and across displ
       .add(groups[next++], { bodies: [{ kind: 'snake' }, { kind: 'crab' }] });
   frameRateIndependent(make);
   seekEqualsContinuous(make);
+});
+
+test('GroundLocomotion refreshes plain memory after terrain sampling and refuses late or reentrant writes atomically', async () => {
+  using gait = await GroundLocomotion.load({ controlled: true });
+  const memory = worldMemory(false);
+  let action;
+  const bed = {
+    cell: [0, 0, 0],
+    sample(x, _z, out) {
+      if (action === 'grow') {
+        action = undefined;
+        memory.grow(1);
+      }
+      if (action === 'drive' && x > 1) {
+        gait.setLeggedDrive(1, { speed: 0, heading: 0, frequency: 2, duty: 0.58, phases: [0, 0.5, 0.5, 0] });
+      }
+      out.elevation = action === 'invalid' && x > 1 ? NaN : 0.01 * x;
+      out.normal = [0, 1, 0];
+      return out;
+    },
+  };
+  const world = new PhysicsWorld({ rate: fps60, memory }).add(gait, {
+    bed,
+    bodies: [
+      { kind: 'snake', links: 8 },
+      { kind: 'lizard', position: [2, 0.06, 0] },
+    ],
+  });
+  const context = { tick: 0, level: 2, seed: 9, cell: [0, 0, 0], inputs: new Map() };
+  const dt = 1 / 240;
+  const initial = world.takeSnapshot();
+  action = 'invalid';
+  assert.throws(
+    () => gait.step(context, dt),
+    (error) => error.code === 'state' && /finite bed elevations.*errors#locomotion/.test(error.message),
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, initial.bytes);
+  action = 'drive';
+  assert.throws(() => gait.step(context, dt), /between steps.*read-only sampler.*errors#locomotion/);
+  assert.deepEqual(world.takeSnapshot().bytes, initial.bytes);
+  assert.equal(gait.readNativeWork(), undefined);
+  action = 'grow';
+  const priorBuffer = memory.buffer;
+  gait.step(context, dt);
+  assert.notEqual(memory.buffer, priorBuffer);
+  assert.ok(gait.readNativeWork().contactRows > 8);
+  const advanced = world.takeSnapshot();
+  assert.notDeepEqual(advanced.bytes, initial.bytes);
+  world.restoreSnapshot(initial.bytes);
+  gait.step(context, dt);
+  assert.deepEqual(world.takeSnapshot().bytes, advanced.bytes);
+  const work = gait.readNativeWork();
+  assert.throws(
+    () => gait.step(context, Number.MAX_VALUE),
+    (error) => error.code === 'failed' && /numeric range.*local cells.*errors#locomotion/.test(error.message),
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, advanced.bytes);
+  assert.deepEqual(gait.readNativeWork(), work);
+});
+
+test('GroundLocomotion reads the owning bed bank and publishes its signed cell through a shift and restore', async () => {
+  const cell = [-6, 2, 7];
+  const shape = { columns: 1, rows: 1, width: 1, depth: 1, centre: [0, 0] };
+  using gait = await GroundLocomotion.load({ bedShape: shape });
+  const world = new PhysicsWorld({ rate: fps60, gravity: [0, 0, 0], memory: worldMemory(false) }).add(
+    gait,
+    {
+      bodies: [
+        { kind: 'snake', position: [0, 0.2, 0], links: 1, radius: 0.1, stiffness: 25, damping: 0, frequency: 0 },
+      ],
+    },
+    cell,
+  );
+  const bank = new WebAssembly.Memory({ initial: 1 });
+  const bed = { name: 'separate bed', type: 'f32', layout: 1, byteOffset: 64, byteLength: 16, memory: bank };
+  new Float32Array(bank.buffer, bed.byteOffset, 4).fill(0.125);
+  const context = (region) => ({
+    tick: 0,
+    level: 0,
+    seed: 9,
+    cell,
+    inputs: new Map([['bed', { field: 'bed', region, tick: 0, cell }]]),
+  });
+  const initial = world.takeSnapshot();
+  assert.throws(() => gait.step(context({ ...bed, byteOffset: 65 }), 1 / 60), /aligned f32 bed.*errors#locomotion/);
+  assert.deepEqual(world.takeSnapshot().bytes, initial.bytes);
+  gait.step(context(bed), 1 / 60);
+  close(gait.readContact(0, 0).force[1], 0.625);
+  const ports = () => gait.exportPorts(0).map((port) => port.cell);
+  assert.deepEqual(ports(), [cell, cell]);
+  const accepted = world.takeSnapshot();
+  world.shiftOrigin([5, -4, 2]);
+  assert.deepEqual(ports(), [
+    [-11, 6, 5],
+    [-11, 6, 5],
+  ]);
+  world.restoreSnapshot(initial.bytes);
+  assert.deepEqual(ports(), [cell, cell]);
+  gait.step(context(bed), 1 / 60);
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
 });

@@ -1,9 +1,9 @@
-import { MargoError } from '@margoengine/math/errors';
 import type { Bed, BedSample } from '@margoengine/math/fields';
 import { cos, hypot, sin } from '@margoengine/math/pinned';
 import { BED_FIELD, bedFromPort, type BedShape, bedVertexCount } from '../earth/bed.js';
 import {
   type Cell,
+  checkCell,
   type FieldDescriptor,
   type Port,
   type RateLevel,
@@ -22,9 +22,15 @@ import {
   makeModel,
   sampleBed,
 } from './config.js';
-import { bindLocomotionKernel, loadLocomotionBuilds, type LocomotionBuilds, type LocomotionKernel } from './kernel.js';
+import { locomotionError } from './errors.js';
+import {
+  bindLocomotionKernel,
+  type LocomotionBuilds,
+  type LocomotionKernel,
+  type LocomotionWorkCounts,
+  loadLocomotionBuilds,
+} from './kernel.js';
 
-const ORIGIN: Cell = [0, 0, 0];
 const BODY_WORDS = 14;
 const PROFILE_WORDS = 34;
 const DRIVE_FREQUENCY = 6;
@@ -100,7 +106,7 @@ function allocate(host: SolverHost, bodyCount: number, actuatorCount: number): L
   const region = (name: string, count: number, stride: number) => {
     const bytes = count * stride * Float64Array.BYTES_PER_ELEMENT;
     if (!Number.isSafeInteger(bytes) || bytes >= 0x100000000)
-      throw new RangeError('Reduce the number of configured contacts to fit the world memory.');
+      throw locomotionError('Reduce the number of configured contacts to fit the world memory.');
     return host.allocate(name, bytes, 'f64', GROUND_LOCOMOTION_LAYOUT);
   };
   return {
@@ -132,12 +138,15 @@ function stableLevel(minimum: number): RateLevel {
   for (let level = 0; level < 8; level++) {
     if (rateOf(level as RateLevel) >= minimum) return level as RateLevel;
   }
-  throw new RangeError('Reduce gait frequency, stiffness or damping to fit the fastest physics world rate.');
+  throw locomotionError('Reduce gait frequency, stiffness or damping to fit the fastest physics world rate.');
 }
 
 /** Contact-driven lateral undulation and small legged gait in a PhysicsWorld. */
 export class GroundLocomotion implements Solver<GroundLocomotionParams> {
   private host?: SolverHost;
+  private disposed = false;
+  private running = false;
+  private nativeWork?: LocomotionWorkCounts;
   private lease?: Lease;
   private kernel?: LocomotionKernel;
   private ranges: readonly BodyRange[] = [];
@@ -157,21 +166,48 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
     options: GroundLocomotionOptions,
   ) {
     this.id = options.id ?? 'ground-locomotion';
+    if (typeof this.id !== 'string' || this.id.length === 0 || this.id.trim() !== this.id)
+      throw locomotionError('Use a ground locomotion solver ID without empty or surrounding whitespace.');
     this.controlled = options.controlled ?? false;
     this.poseField = { ...GROUND_POSE_FIELD, name: options.poseField ?? GROUND_POSE_FIELD.name };
     this.contactField = { ...GROUND_CONTACT_FIELD, name: options.contactField ?? GROUND_CONTACT_FIELD.name };
     this.cellSize = finite(options.cellSize ?? 1024, 'origin cell size');
-    if (this.cellSize <= 0) throw new RangeError('Pass the world cell size as a positive length in metres.');
+    if (this.cellSize <= 0) throw locomotionError('Pass the world cell size as a positive length in metres.');
     if (options.bedShape) {
       const { centre, ...shape } = options.bedShape;
       this.bedShape = { ...shape, centre: centre && [...centre] };
-      bedVertexCount(this.bedShape);
+      try {
+        bedVertexCount(this.bedShape);
+      } catch (cause) {
+        throw locomotionError('Give locomotion the same finite extent and grid counts as TerrainBed.', 'state', cause);
+      }
     }
   }
 
   /** Loads the SIMD kernel on demand. */
   static async load(options: GroundLocomotionOptions = {}): Promise<GroundLocomotion> {
-    return new GroundLocomotion(await loadLocomotionBuilds(options.signal), options);
+    if (!options) throw locomotionError('Pass locomotion load options as an object, or omit them.');
+    const builds = await loadLocomotionBuilds(options.signal, options.threads);
+    try {
+      return new GroundLocomotion(builds, options);
+    } catch (cause) {
+      builds[Symbol.dispose]();
+      throw cause;
+    }
+  }
+
+  /** Releases optional native helpers after the world stops using this group. */
+  [Symbol.dispose](): void {
+    if (this.disposed) return;
+    this.requireIdle();
+    this.disposed = true;
+    this.builds[Symbol.dispose]();
+  }
+
+  private requireIdle(): void {
+    if (this.disposed) throw locomotionError('Load a new group after disposing of ground locomotion.', 'disposed');
+    if (this.running)
+      throw locomotionError('Call the solver only between steps. Give the terrain a read-only sampler.');
   }
 
   describe(): SolverDescription {
@@ -188,20 +224,34 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
   }
 
   init(host: SolverHost, params: GroundLocomotionParams): void {
-    if (this.host) throw new MargoError('state', 'Load a separate ground locomotion solver for each world.');
-    if (!params.bodies.length) throw new RangeError('Configure at least one ground animal body.');
+    this.requireIdle();
+    if (this.host) throw locomotionError('Load a separate ground locomotion solver for each world.', 'attached');
+    this.running = true;
+    try {
+      this.initialize(host, params);
+    } catch (cause) {
+      if (this.builds.pool) {
+        this.disposed = true;
+        this.builds[Symbol.dispose]();
+      }
+      throw cause;
+    } finally {
+      this.running = false;
+    }
+  }
+
+  private initialize(host: SolverHost, params: GroundLocomotionParams): void {
+    if (!Array.isArray(params?.bodies) || !params.bodies.length)
+      throw locomotionError('Configure at least one ground animal body.');
     if (params.bed && typeof params.bed.sample !== 'function')
-      throw new RangeError('Pass a Bed with a sample method for the ground locomotion surface.');
+      throw locomotionError('Pass a Bed with a sample method for the ground locomotion surface.');
+    if (params.bed) this.validateCell(params.bed.cell);
     this.bed = params.bed;
     this.floor = finite(params.groundHeight ?? 0, 'flat ground elevation');
-    const cell = params.originCell ?? ORIGIN;
-    if (
-      cell.length !== 3 ||
-      !Number.isSafeInteger(cell[0]) ||
-      !Number.isSafeInteger(cell[1]) ||
-      !Number.isSafeInteger(cell[2])
-    )
-      throw new RangeError('Pass an origin cell with three integer coordinates.');
+    const cell = params.originCell ?? host.cell;
+    this.validateCell(cell);
+    if (cell.some((coordinate, axis) => coordinate !== host.cell[axis]))
+      throw locomotionError('Use the same initial origin in the ground animal options and PhysicsWorld.add.');
     const gravity = hypot(...host.gravity);
     const models = params.bodies.map((body) => makeModel(body, gravity));
     this.rate = stableLevel(models.reduce((minimum, model) => Math.max(minimum, model.minimumHz), 0));
@@ -212,19 +262,17 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
       return range;
     });
     const lease = allocate(host, models.length, total);
-    const kernel = bindLocomotionKernel(host, this.builds);
+    const kernel = bindLocomotionKernel(host, this.builds, ranges);
     const bed = this.surface(host.port(BED_FIELD.name), host);
-    const pose = words(host, lease.pose);
-    const profiles = words(host, lease.profile);
-    const actuators = words(host, lease.actuators);
     for (let row = 0; row < models.length; row++) {
       const model = models[row]!;
       const start = row * BODY_WORDS;
+      const elevation = model.autoHeight ? this.elevation(bed, cell, model.body[0]!, model.body[2]!) : 0;
+      const pose = words(host, lease.pose);
       pose.set(model.body, start);
-      if (model.autoHeight)
-        pose[start + 1] = pose[start + 1]! + this.elevation(bed, cell, pose[start]!, pose[start + 2]!);
-      profiles.set(model.profile, row * PROFILE_WORDS);
-      actuators.set(model.actuators, ranges[row]!.offset * FOOT_WORDS);
+      if (model.autoHeight) pose[start + 1] = finite(model.body[1]! + elevation, 'initial elevation');
+      words(host, lease.profile).set(model.profile, row * PROFILE_WORDS);
+      words(host, lease.actuators).set(model.actuators, ranges[row]!.offset * FOOT_WORDS);
     }
     this.integrate(host, lease, kernel, ranges, bed, cell, 0);
     this.ranges = ranges;
@@ -233,8 +281,31 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
     this.lease = lease;
   }
 
+  private validateCell(cell: Cell): void {
+    try {
+      checkCell(cell);
+    } catch (cause) {
+      throw locomotionError('Use three signed 32-bit integer coordinates for each origin cell.', 'state', cause);
+    }
+  }
+
   private surface(port: Port | undefined, host: SolverHost): Bed | undefined {
-    return port && this.bedShape ? bedFromPort(host.memory, port, this.bedShape) : this.bed;
+    if (!port || !this.bedShape) return this.bed;
+    this.validateCell(port.cell);
+    const region = port.region;
+    const memory = region.memory ?? host.memory;
+    if (
+      !Number.isSafeInteger(region.byteOffset) ||
+      region.byteOffset < 0 ||
+      region.byteOffset % 4 !== 0 ||
+      region.byteOffset + region.byteLength > memory.buffer.byteLength
+    )
+      throw locomotionError('Publish an aligned f32 bed region that fits the memory it belongs to.');
+    try {
+      return bedFromPort(memory, port, this.bedShape);
+    } catch (cause) {
+      throw locomotionError('Publish a layout-1 f32 bed with the same shape as the locomotion bed.', 'state', cause);
+    }
   }
 
   private elevation(bed: Bed | undefined, cell: Cell, x: number, z: number): number {
@@ -248,19 +319,34 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
     const size = this.cellSize;
     const point = sampleBed(
       bed,
-      x + (cell[0] - bed.cell[0]) * size,
-      z + (cell[2] - bed.cell[2]) * size,
+      finite(x + (cell[0] - bed.cell[0]) * size, 'terrain X sample coordinate'),
+      finite(z + (cell[2] - bed.cell[2]) * size, 'terrain Z sample coordinate'),
       this.groundPoint,
     );
-    return point.elevation + (bed.cell[1] - cell[1]) * size;
+    return finite(point.elevation + (bed.cell[1] - cell[1]) * size, 'terrain elevation in the local origin');
   }
 
   step(context: StepContext, dt: number): void {
+    this.requireIdle();
     const { host, lease, kernel } = this;
     if (!host || !lease || !kernel)
-      throw new MargoError('state', 'Register the ground locomotion solver in a PhysicsWorld before stepping.');
-    const bed = this.surface(context.inputs.get(BED_FIELD.name), host);
-    this.integrate(host, lease, kernel, this.ranges, bed, context.cell, dt);
+      throw locomotionError('Register the ground locomotion solver in a PhysicsWorld before stepping.');
+    if (!Number.isFinite(dt) || dt < 0) throw locomotionError('Pass a finite nonnegative step in seconds.');
+    this.validateCell(context.cell);
+    this.running = true;
+    try {
+      const bed = this.surface(context.inputs.get(BED_FIELD.name), host);
+      this.integrate(host, lease, kernel, this.ranges, bed, context.cell, dt);
+      this.nativeWork = kernel.workCounts();
+    } finally {
+      this.running = false;
+    }
+  }
+
+  /** Copies deterministic work counts from the last accepted native step. */
+  readNativeWork(): LocomotionWorkCounts | undefined {
+    const work = this.nativeWork;
+    return work && { ...work, workers: work.workers.map((worker) => ({ ...worker })) };
   }
 
   private integrate(
@@ -284,38 +370,54 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
         offset(lease.geometry, first, GEOMETRY_WORDS),
       ] as const;
       kernel.prepare(...args, count);
-      const geometry = words(host, lease.geometry);
       for (let contact = first; contact < first + count; contact++) {
         const word = contact * GEOMETRY_WORDS;
-        geometry[word + 12] = this.elevation(bed, cell, geometry[word]!, geometry[word + 2]!);
-        geometry.set(this.groundPoint.normal, word + 9);
+        const geometry = words(host, lease.geometry);
+        const elevation = this.elevation(bed, cell, geometry[word]!, geometry[word + 2]!);
+        const trial = words(host, lease.geometry);
+        trial[word + 12] = elevation;
+        trial.set(this.groundPoint.normal, word + 9);
       }
-      const status = kernel.step(...args, offset(lease.nextContacts, first, CONTACT_WORDS), count, dt, ...host.gravity);
-      if (status)
-        throw new RangeError('Locomotion exceeded the numeric range. Use local cells and comparable SI scales.');
     }
+    const status = kernel.stepBatch(
+      lease.next.byteOffset,
+      lease.profile.byteOffset,
+      lease.actuators.byteOffset,
+      lease.nextAnchors.byteOffset,
+      lease.geometry.byteOffset,
+      lease.nextContacts.byteOffset,
+      dt,
+      ...host.gravity,
+    );
+    if (status)
+      throw locomotionError(
+        'Locomotion exceeded the numeric range. Use local cells and comparable SI scales.',
+        'failed',
+      );
     words(host, lease.pose).set(words(host, lease.next));
     words(host, lease.anchors).set(words(host, lease.nextAnchors));
     words(host, lease.contacts).set(words(host, lease.nextContacts));
   }
 
   private bodyRange(body: number): BodyRange {
+    if (this.disposed) throw locomotionError('Load a new group after disposing of ground locomotion.', 'disposed');
     const range = Number.isInteger(body) ? this.ranges[body] : undefined;
-    if (!Number.isInteger(body) || !range) throw new RangeError('Use the row index of a configured ground animal.');
+    if (!Number.isInteger(body) || !range) throw locomotionError('Use the row index of a configured ground animal.');
     return range;
   }
 
   /** Updates the drive and foot clock of a legged body in a group loaded with controlled commands. */
   setLeggedDrive(body: number, drive: GroundLeggedDrive): void {
+    this.requireIdle();
     const range = this.bodyRange(body);
     const { host, lease } = this;
     if (!this.controlled || !host || !lease)
-      throw new MargoError('state', 'Load ground locomotion with controlled enabled before setting live drives.');
+      throw locomotionError('Load ground locomotion with controlled enabled before setting live drives.');
     const profile = words(host, lease.profile);
     const row = body * PROFILE_WORDS;
     const count = range.count - 1;
-    if (profile[row] !== 0 || drive.phases.length !== count)
-      throw new RangeError('Supply each foot phase for a legged body instead of a snake.');
+    if (profile[row] !== 0 || drive?.phases?.length !== count)
+      throw locomotionError('Supply each foot phase for a legged body instead of a snake.');
     const { speed, heading, frequency, duty, phases } = drive;
     const force = drive.force ?? [0, 0, 0];
     const support = drive.supportVelocity ?? [0, 0, 0];
@@ -327,18 +429,18 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
       frequency < 0 ||
       !(duty > 0 && duty < 1)
     )
-      throw new RangeError('Pass finite speed, heading, frequency and a duty between zero and one.');
+      throw locomotionError('Pass finite speed, heading, frequency and a duty between zero and one.');
     if (4 * frequency > rateOf(this.rate) * Math.min(duty, 1 - duty))
-      throw new RangeError(
+      throw locomotionError(
         'Set a faster configured gait in the group to raise the configured rate for live drive changes.',
       );
     if (force.length !== 3 || !force.every(Number.isFinite))
-      throw new RangeError('Pass finite force components in world newtons.');
+      throw locomotionError('Pass finite force components in world newtons.');
     if (support.length !== 3 || !support.every(Number.isFinite))
-      throw new RangeError('Pass finite support velocity components in world metres per second.');
+      throw locomotionError('Pass finite support velocity components in world metres per second.');
     for (let foot = 0; foot < count; foot++) {
       const phase = phases[foot]!;
-      if (!(phase >= 0 && phase < 1)) throw new RangeError('Pass foot phases in [0, 1) cycles.');
+      if (!(phase >= 0 && phase < 1)) throw locomotionError('Pass foot phases in [0, 1) cycles.');
     }
     const actuators = words(host, lease.actuators);
     profile[row + DRIVE_FREQUENCY] = frequency;
@@ -393,7 +495,7 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
   ): GroundAnimalContact {
     const range = this.bodyRange(body);
     if (!Number.isInteger(element) || element < 0 || element >= range.count)
-      throw new RangeError('Use the index of a foot or link on the configured animal.');
+      throw locomotionError('Use the index of a foot or link on the configured animal.');
     const contacts = words(this.host!, this.lease!.contacts);
     const start = (range.offset + element) * CONTACT_WORDS;
     copy(out.position, contacts, start);
@@ -405,13 +507,13 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
   }
 
   exportPorts(tick: number): readonly Port[] {
-    const { lease } = this;
-    return lease
-      ? [
-          { field: this.poseField.name, region: lease.pose, tick, cell: ORIGIN },
-          { field: this.contactField.name, region: lease.contacts, tick, cell: ORIGIN },
-        ]
-      : [];
+    const { host, lease } = this;
+    if (!host || !lease) return [];
+    const cell = host.cell;
+    return [
+      { field: this.poseField.name, region: lease.pose, tick, cell },
+      { field: this.contactField.name, region: lease.contacts, tick, cell },
+    ];
   }
 
   importPorts(_tick: number): void {}

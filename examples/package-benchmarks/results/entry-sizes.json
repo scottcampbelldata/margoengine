@@ -15702,12 +15702,12 @@
         "gzip": 24368
       },
       "./legged": {
-        "raw": 26980,
-        "gzip": 10111
+        "raw": 36145,
+        "gzip": 13307
       },
       "./locomotion": {
-        "raw": 16224,
-        "gzip": 6552
+        "raw": 25353,
+        "gzip": 9726
       },
       "./pedestrians": {
         "raw": 10894,
@@ -19785,14 +19785,14 @@
       "brotli": 3917
     },
     "packages/physics/dist/locomotion-kernel.wasm": {
-      "raw": 10782,
-      "gzip": 4873,
-      "brotli": 4415
+      "raw": 11448,
+      "gzip": 5236,
+      "brotli": 4737
     },
     "packages/physics/dist/locomotion-kernel-shared.wasm": {
-      "raw": 10870,
-      "gzip": 4937,
-      "brotli": 4474
+      "raw": 11536,
+      "gzip": 5298,
+      "brotli": 4793
     },
     "packages/physics/dist/pedestrian-kernel.wasm": {
       "raw": 12041,

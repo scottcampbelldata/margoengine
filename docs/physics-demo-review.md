@@ -547,3 +547,14 @@ Not in the catalog: staged construction (placement of pieces, stacking, scaffold
   accepted ice isolates the water pixels. WebGPU and WebGL2 each reproduce complete accepted snapshots and RGBA buffers
   through hold, restore, re-advance and rewind. The scene represents idealized whole-cell calving and a linear outgoing wake.
   Measured terminus evolution and the original production shots remain open.
+
+### LIFE-02 automated snake traction on signed terrain
+
+- `packages/environment/tests/slither-film.browser.mjs` connects a real cambered TerrainBed to the
+  ground locomotion solver in neighboring signed cells. The fixed camera frames a 36 cm milksnake.
+  Its tapered mesh reads all 32 accepted link samples. The same authored shape wave travels 10.065 cm
+  forward over four cycles with directional cloth friction, and slips backward 1.360 cm with equal friction.
+- The two takes start with the same accepted shape and pixels. Both renderers independently replay the
+  full state and RGBA through hold, restore, re-advance and rewind. The scene demonstrates contact and
+  gait direction. It uses a prescribed planar wave and a cloth runway. Independent animal speed comparisons
+  and the existing model limits are recorded separately in [limits](limits.md#ground-animal-locomotion-life-02).

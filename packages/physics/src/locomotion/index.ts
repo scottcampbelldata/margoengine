@@ -7,6 +7,7 @@ export type {
   SlitheringBody,
   SmallLeggedBody,
 } from './config.js';
+export type { LocomotionWorkCounts, LocomotionWorkerWork } from './kernel.js';
 export {
   GROUND_CONTACT_FIELD,
   GROUND_LOCOMOTION_LAYOUT,

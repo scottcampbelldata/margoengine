@@ -30,6 +30,7 @@
     "test:gpu:drainage-fog": "cd ../.. && node packages/environment/tests/drainage-fog.browser.mjs && node packages/environment/tests/drainage-fog.browser.mjs --compat",
     "test:gpu:breach-ore": "cd ../.. && node packages/environment/tests/breach-ore.browser.mjs && node packages/environment/tests/breach-ore.browser.mjs --compat",
     "test:gpu:swim-sediment": "cd ../.. && node packages/environment/tests/swim-sediment.browser.mjs && node packages/environment/tests/swim-sediment.browser.mjs --compat",
+    "test:gpu:slither-film": "cd ../.. && node packages/environment/tests/slither-film.browser.mjs && node packages/environment/tests/slither-film.browser.mjs --compat",
     "build": "node scripts/build.js",
     "test": "npm run build && node --test tests/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "test:browser": "npm run build && node scripts/test-browser.js",

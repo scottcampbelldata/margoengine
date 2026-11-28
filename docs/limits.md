@@ -10184,9 +10184,11 @@ receive zero bytes.
 and fixed world-space stance contacts for lizards, insects, spiders and crabs. Each legged animal has an additional
 torso contact. Body state uses 112 B per row, published contact uses 104 B per element, and three f64 foothold
 values per element are part of replay. Both optional modules import the same world memory and use one static
-slot and a 64 KiB arena stack per solver instance. The world rate ranges from 60 to 7,680 Hz; extreme stiffness,
-damping or gait frequencies that require faster stepping are reported when configuring the group. Storage scales
-with the configured body and contact counts.
+slot. Each native participant uses an aligned 64 KiB stack. The world rate ranges from 60 to 7,680 Hz.
+Configuration rejects stiffness, damping or gait frequencies that require a faster step. Storage scales with
+body and contact counts. The caller prepares all contacts and samples the bed in order. Native helpers advance
+disjoint bodies before the accepted state and both publications change. Numeric or terrain failure preserves the
+previous accepted pose, anchors, contacts and work receipt.
 
 The snake's motion uses a planar travelling wave across a heightfield and yaw about world up. The compiled leg
 templates use a single rigid torso and massless compressive legs, with stick-phase anchors and contact forces
@@ -10195,7 +10197,17 @@ caves or overhanging holds needs a collider-based foot placement system. The pos
 kinematics and reaction wrenches for downstream animation or an erosion consumer. Inter-animal collision and
 feedback into the live terrain require downstream coupling.
 
-The optional entry measures 17,194 B raw and 6,926 B gzip. The plain Wasm is 10,782 B raw and 4,873 B gzip. The shared Wasm is 10,870 B raw and 4,937 B gzip.
+With independently measured cloth friction and published shape inputs, the held-out flat snake speed
+is 0.144 modeled versus 0.22 ± 0.08 body lengths per cycle. At +5° the model moves downslope at
+−0.241 body lengths per cycle while the tracked animals move uphill at +0.13. The first observed reversal
+lies in 5°–9°, while the model reverses between 0° and 1.9°. Doubling the links leaves that reversal gap.
+Two steep runs leave the reported plank dimensions before a complete comparison. The solver lacks the
+contact-load redistribution and nonplanar movement observed in living snakes. [Hu et al. (2009)](https://doi.org/10.1073/pnas.0812533106).
+
+The optional entry measures 25,353 B raw and 9,726 B gzip with a 10,018 B ceiling. The plain and
+shared Wasm assets measure 11,448 and 11,536 B raw, or 5,236 and 5,298 B gzip. Native jobs store
+72 B of fixed call data, an 8 B range per body and a seven-word work receipt per participant.
+Core and stage receive zero bytes.
 
 ## Material ageing (BIO-04)
 
@@ -10266,7 +10278,7 @@ contactable support-patch field. Planting and flight follow a reduced spring-mas
 couple. The renderer's baked export clips keep a single pace for each clip, while runtime horse posing uses the
 actual instantaneous stride.
 
-The legged entry measures 29,240 B raw and 11,101 B gzip and shares the ground kernel bytes listed above.
+The legged entry measures 36,145 B raw and 13,307 B gzip with a 13,707 B ceiling. It shares the ground kernel bytes listed above.
 Horses measures 40,737 B raw and 16,724 B gzip. Its gait utilities measure 2,738 B raw and 1,266 B gzip.
 
 ### Pack ice and floe contact (ICE-04)

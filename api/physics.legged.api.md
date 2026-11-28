@@ -151,6 +151,7 @@ interface GroundLocomotionOptions {
     readonly controlled?: boolean;
     readonly poseField?: string;
     readonly contactField?: string;
+    readonly threads?: 1 | 2 | 4;
     readonly signal?: AbortSignal;
 }
 

@@ -24522,3 +24522,14 @@ Native body rows, pending calving, freshwater and signed wakes stage before acce
   read the live host cell through a shift or restore. The coupling test preserves the exact
   accepted state through a rejected tick and replays the next valid ticks.
 - **Regression:** [glacier coupling](../packages/physics/tests/coupling/glacier.test.js).
+
+### KB-LOCOMOTION-ACCEPTED1 — Terrain sampling could invalidate a staged ground animal (FIXED)
+
+- **Repro:** Grow plain Wasm memory in a terrain sampler while a group prepares its contacts. A sampler can also
+  try to change live leg commands during a step. Direct dispatch to a reported bed in a separate bank could read
+  an unrelated host address, and the two direct publications reported the zero origin.
+- **Cause:** The caller held trial memory views across the terrain callback and assumed every bed used host
+  memory. It allowed mutation from the sampler and tagged both publications with a constant cell.
+- **Fix:** Obtain current views after callbacks, refuse reentrant writes, validate the owning bed bank and publish
+  the host's live cell. A failed trial leaves the accepted pose, anchors, contacts and work receipt intact.
+- **Regression:** [locomotion coupling](../packages/physics/tests/coupling/locomotion.test.js).

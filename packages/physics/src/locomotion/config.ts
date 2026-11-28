@@ -2,6 +2,7 @@ import type { Bed, BedSample } from '@margoengine/math/fields';
 import { cos, hypot, sin } from '@margoengine/math/pinned';
 import type { BedShape } from '../earth/bed.js';
 import type { Cell } from '../world/solver.js';
+import { locomotionError } from './errors.js';
 
 type V = readonly [number, number, number];
 
@@ -119,7 +120,7 @@ export interface GroundLocomotionParams {
   readonly bodies: readonly GroundAnimal[];
   /** Fixed terrain implementing the shared Bed contract. Used when no live bed port is requested. */
   readonly bed?: Bed;
-  /** Initial solver cell, matching PhysicsWorld.add when supplied. Default [0, 0, 0]. */
+  /** Initial solver cell. Defaults to the cell passed to PhysicsWorld.add and must match it if supplied. */
   readonly originCell?: Cell;
   /** Flat ground height over the solver's datum, m, when neither bed option is used. Default zero. */
   readonly groundHeight?: number;
@@ -139,6 +140,8 @@ export interface GroundLocomotionOptions {
   readonly poseField?: string;
   /** Override the contact field's registry name for an independent group. */
   readonly contactField?: string;
+  /** Native participants including the caller. Use 1 (default), 2 or 4. */
+  readonly threads?: 1 | 2 | 4;
   /** Cancels kernel loading. */
   readonly signal?: AbortSignal;
 }
@@ -169,28 +172,28 @@ export interface Model {
 }
 
 export function finite(value: number, name: string): number {
-  if (!Number.isFinite(value)) throw new RangeError('Pass a finite ground locomotion ' + name + '.');
+  if (!Number.isFinite(value)) throw locomotionError('Pass a finite ground locomotion ' + name + '.');
   return value;
 }
 
 function nonnegative(value: number, name: string): number {
-  if (finite(value, name) < 0) throw new RangeError('Pass a nonnegative ground locomotion ' + name + '.');
+  if (finite(value, name) < 0) throw locomotionError('Pass a nonnegative ground locomotion ' + name + '.');
   return value;
 }
 
 export function positive(value: number, name: string): number {
-  if (finite(value, name) <= 0) throw new RangeError('Pass a positive ground locomotion ' + name + '.');
+  if (finite(value, name) <= 0) throw locomotionError('Pass a positive ground locomotion ' + name + '.');
   return value;
 }
 
 function cycle(value: number, name: string): number {
-  if (nonnegative(value, name) >= 1) throw new RangeError('Pass ' + name + ' as a phase in [0, 1) cycles.');
+  if (nonnegative(value, name) >= 1) throw locomotionError('Pass ' + name + ' as a phase in [0, 1) cycles.');
   return value;
 }
 
 function vector(value: V, name: string): V {
-  if (value.length !== 3 || !Number.isFinite(value[0]) || !Number.isFinite(value[1]) || !Number.isFinite(value[2]))
-    throw new RangeError('Pass three finite Cartesian components for ' + name + '.');
+  if (value?.length !== 3 || !Number.isFinite(value[0]) || !Number.isFinite(value[1]) || !Number.isFinite(value[2]))
+    throw locomotionError('Pass three finite Cartesian components for ' + name + '.');
   return value;
 }
 
@@ -210,18 +213,24 @@ function legSettings(animal: SmallLeggedBody, preset: Preset, length: number) {
   const size = positive(animal.legLength ?? preset.leg, 'rest leg length');
   const width = positive(animal.width ?? preset.width, 'body width');
   const feet = animal.feet ?? defaultFeet(preset.pairs, length, width, size);
-  if (!feet.length) throw new RangeError('Give a legged body at least one foot.');
+  if (typeof feet.flatMap !== 'function' || !feet.length)
+    throw locomotionError('Give a legged body at least one foot.');
   const duty = positive(animal.duty ?? 0.58, 'stance duty');
-  if (duty >= 1) throw new RangeError('Pass a stance duty strictly between zero and one.');
+  if (duty >= 1) throw locomotionError('Pass a stance duty strictly between zero and one.');
   const direction = animal.direction ?? (animal.kind === 'crab' ? [1, 0] : [0, 1]);
+  if (direction.length !== 2 || !direction.every(Number.isFinite))
+    throw locomotionError('Pass a gait direction with two finite X and Z components.');
   const axis = positive(hypot(direction[0], direction[1]), 'gait direction length');
-  const actuators = feet.flatMap((foot) => [
-    ...vector(foot.hip, 'hip position'),
-    finite(foot.rest[0], 'foot X'),
-    0,
-    finite(foot.rest[1], 'foot Z'),
-    cycle(foot.phase, 'foot phase'),
-  ]);
+  const actuators = feet.flatMap((foot) => {
+    if (foot?.rest?.length !== 2) throw locomotionError('Pass a foot rest with X and Z offsets.');
+    return [
+      ...vector(foot.hip, 'hip position'),
+      finite(foot.rest[0], 'foot X'),
+      0,
+      finite(foot.rest[1], 'foot Z'),
+      cycle(foot.phase, 'foot phase'),
+    ];
+  });
   return {
     size,
     width,
@@ -241,9 +250,10 @@ function legSettings(animal: SmallLeggedBody, preset: Preset, length: number) {
 }
 
 export function makeModel(animal: GroundAnimal, gravity: number): Model {
+  if (!animal) throw locomotionError('Supply an animal configuration with its gait kind.');
   const snake = animal.kind === 'snake' ? animal : undefined;
   const preset = animal.kind !== 'snake' && Object.hasOwn(PRESETS, animal.kind) ? PRESETS[animal.kind] : undefined;
-  if (!snake && !preset) throw new RangeError('Choose a snake, lizard, insect, spider or crab gait.');
+  if (!snake && !preset) throw locomotionError('Choose a snake, lizard, insect, spider or crab gait.');
   const length = positive(animal.length ?? preset?.length ?? 1, 'body length');
   const mass = positive(animal.mass ?? preset?.mass ?? 0.4, 'mass');
   const frequency = nonnegative(animal.frequency ?? preset?.frequency ?? 1, 'gait frequency');
@@ -253,7 +263,7 @@ export function makeModel(animal: GroundAnimal, gravity: number): Model {
   const legs = animal.kind !== 'snake' && preset ? legSettings(animal, preset, length) : undefined;
   const count = legs ? legs.count + 1 : (snake?.links ?? 32);
   if (!Number.isSafeInteger(count) || count < 1)
-    throw new RangeError('Pass a positive safe integer number of links or feet.');
+    throw locomotionError('Pass a positive safe integer number of links or feet.');
   const radius = snake ? positive(snake.radius ?? 0.025, 'link radius') : 0;
   const size = legs?.size ?? length;
   const inertia = positive(
@@ -345,12 +355,15 @@ export function makeModel(animal: GroundAnimal, gravity: number): Model {
 
 export function sampleBed(bed: Bed, x: number, z: number, out: BedSample): BedSample {
   const point = bed.sample(x, z, out);
-  const length = hypot(...point.normal);
-  if (!Number.isFinite(point.elevation) || !Number.isFinite(length) || length <= 0 || point.normal[1] <= 0)
-    throw new RangeError('Provide finite bed elevations and finite upward normals for ground locomotion.');
+  const normal = point?.normal;
+  if (normal?.length !== 3 || !Number.isFinite(point.elevation) || !(normal[1] > 0))
+    throw locomotionError('Provide finite bed elevations and finite upward normals for ground locomotion.');
+  const length = hypot(...normal);
+  if (!Number.isFinite(length) || length <= 0)
+    throw locomotionError('Provide finite upward normals with a nonzero length for ground locomotion.');
   out.elevation = point.elevation;
-  out.normal[0] = point.normal[0] / length;
-  out.normal[1] = point.normal[1] / length;
-  out.normal[2] = point.normal[2] / length;
+  out.normal[0] = normal[0] / length;
+  out.normal[1] = normal[1] / length;
+  out.normal[2] = normal[2] / length;
   return out;
 }

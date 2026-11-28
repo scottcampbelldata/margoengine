@@ -354,7 +354,14 @@ fn snake_inertia(body: &Body, profile: &Profile, shape: &[Geometry]) -> (f64, V)
     (inertia, [0.0, shape_spin, 0.0])
 }
 
-fn snake_contact(body: &Body, profile: &Profile, g: &Geometry, velocity: V, parts: f64) -> V {
+fn snake_contact(
+    body: &Body,
+    profile: &Profile,
+    g: &Geometry,
+    velocity: V,
+    parts: f64,
+    paired_dots: &mut f64,
+) -> V {
     let normal = g.normal;
     let penetration = profile.stride - (g.point[1] - g.elevation) * normal[1];
     if penetration <= 0.0 {
@@ -381,6 +388,7 @@ fn snake_contact(body: &Body, profile: &Profile, g: &Geometry, velocity: V, part
         profile.reverse_friction
     };
     // Hu et al. Eq. (2): both anisotropic terms use the same ground-tangent slip direction.
+    *paired_dots += 2.0;
     let friction = add(
         scale(forward, coefficient * along),
         scale(side, profile.sideways_friction * dot(movement, side)),
@@ -388,12 +396,19 @@ fn snake_contact(body: &Body, profile: &Profile, g: &Geometry, velocity: V, part
     scale(sub(normal, friction), normal_load)
 }
 
-fn torso_contact(body: &Body, profile: &Profile, torso: &Geometry, count: f64) -> V {
+fn torso_contact(
+    body: &Body,
+    profile: &Profile,
+    torso: &Geometry,
+    count: f64,
+    paired_dots: &mut f64,
+) -> V {
     let normal = torso.normal;
     let compression = profile.body_radius - (body.position[1] - torso.elevation) * normal[1];
     if compression <= 0.0 {
         return ZERO;
     }
+    *paired_dots += 1.0;
     let load = (profile.stiffness * compression - profile.damping * dot(body.velocity, normal))
         .max(0.0)
         * count;
@@ -409,11 +424,13 @@ fn leg_contact(
     foot: &Geometry,
     omega: V,
     stiffness: f64,
+    paired_dots: &mut f64,
 ) -> V {
     let arm = rotate(leg.hip, body.rotation);
     if foot.stance == 0.0 {
         return ZERO;
     }
+    *paired_dots += 1.0;
     let ground = [foot.point[0], foot.elevation, foot.point[2]];
     let leg_vector = sub(add(body.position, arm), ground);
     let length = norm(leg_vector);
@@ -560,10 +577,21 @@ fn drive(
     }
 }
 
-/// Advances one body against the sampled ground. The host stages all bodies and
-/// their changed contacts in separate leases and publishes only on complete success.
-#[unsafe(no_mangle)]
-pub(crate) unsafe extern "C" fn locomotion_step(
+#[repr(C)]
+#[derive(Default)]
+struct Work {
+    bodies: f64,
+    contact_rows: f64,
+    snake_links: f64,
+    feet: f64,
+    torso_rows: f64,
+    stance_rows: f64,
+    paired_contact_dots: f64,
+}
+
+/// Advances one body against the sampled ground without changing link or foot order.
+#[inline(never)]
+unsafe fn step_body(
     body: *mut Body,
     profile: *const Profile,
     actuator: *const Actuator,
@@ -572,9 +600,8 @@ pub(crate) unsafe extern "C" fn locomotion_step(
     contacts: *mut Contact,
     count: usize,
     dt: f64,
-    gravity_x: f64,
-    gravity_y: f64,
-    gravity_z: f64,
+    gravity: V,
+    work: &mut Work,
 ) -> u32 {
     let (body, profile) = unsafe { (&mut *body, &*profile) };
     let geometry = unsafe { slice::from_raw_parts(geometry, count) };
@@ -596,14 +623,29 @@ pub(crate) unsafe extern "C" fn locomotion_step(
         .enumerate()
     {
         let (force, point, stance) = if snake {
-            let force = snake_contact(body, profile, g, omega, count as f64);
+            work.snake_links += 1.0;
+            let force = snake_contact(
+                body,
+                profile,
+                g,
+                omega,
+                count as f64,
+                &mut work.paired_contact_dots,
+            );
             (
                 force,
                 g.point,
                 if dot(force, g.normal) > 0.0 { 1.0 } else { 0.0 },
             )
         } else if index == count - 1 {
-            let force = torso_contact(body, profile, g, (count - 1) as f64);
+            work.torso_rows += 1.0;
+            let force = torso_contact(
+                body,
+                profile,
+                g,
+                (count - 1) as f64,
+                &mut work.paired_contact_dots,
+            );
             let arm = scale(g.normal, -profile.body_radius);
             (
                 force,
@@ -611,7 +653,16 @@ pub(crate) unsafe extern "C" fn locomotion_step(
                 if dot(force, g.normal) > 0.0 { 1.0 } else { 0.0 },
             )
         } else {
-            let force = leg_contact(body, profile, leg, g, omega, profile.stiffness);
+            work.feet += 1.0;
+            let force = leg_contact(
+                body,
+                profile,
+                leg,
+                g,
+                omega,
+                profile.stiffness,
+                &mut work.paired_contact_dots,
+            );
             if g.stance != 0.0 || anchor.planted == 0.0 {
                 let carried_time = if g.stance != 0.0 { dt } else { 0.0 };
                 anchor.x = g.point[0] + profile.support_velocity[0] * carried_time;
@@ -626,6 +677,9 @@ pub(crate) unsafe extern "C" fn locomotion_step(
         };
         if point.iter().chain(&force).any(|value| !value.is_finite()) {
             return 1;
+        }
+        if stance != 0.0 {
+            work.stance_rows += 1.0;
         }
         let couple = if !snake && index == count - 1 && stance > 0.0 && dt > 0.0 {
             let available = profile.friction * dot(force, g.normal) * profile.body_radius;
@@ -644,7 +698,6 @@ pub(crate) unsafe extern "C" fn locomotion_step(
             couple,
         };
     }
-    let gravity = [gravity_x, gravity_y, gravity_z];
     if !snake {
         drive(body, profile, geometry, contacts, omega, gravity);
     }
@@ -666,5 +719,100 @@ pub(crate) unsafe extern "C" fn locomotion_step(
         dt,
     );
     body.phase = wrap(body.phase + profile.frequency * dt);
+    work.bodies += 1.0;
+    work.contact_rows += count as f64;
     u32::from(!body.finite() || !body.phase.is_finite())
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn locomotion_step(
+    body: *mut Body,
+    profile: *const Profile,
+    actuator: *const Actuator,
+    anchors: *mut Anchor,
+    geometry: *const Geometry,
+    contacts: *mut Contact,
+    count: usize,
+    dt: f64,
+    gravity_x: f64,
+    gravity_y: f64,
+    gravity_z: f64,
+) -> u32 {
+    unsafe {
+        step_body(
+            body,
+            profile,
+            actuator,
+            anchors,
+            geometry,
+            contacts,
+            count,
+            dt,
+            [gravity_x, gravity_y, gravity_z],
+            &mut Work::default(),
+        )
+    }
+}
+
+#[repr(C)]
+struct BodyRange {
+    offset: usize,
+    count: usize,
+}
+
+#[repr(C)]
+struct Job {
+    bodies: *mut Body,
+    profiles: *const Profile,
+    actuators: *const Actuator,
+    anchors: *mut Anchor,
+    geometry: *const Geometry,
+    contacts: *mut Contact,
+    ranges: *const BodyRange,
+    work: *mut Work,
+    count: usize,
+    _padding: u32,
+    dt: f64,
+    gravity: V,
+}
+
+const _: [(); 72] = [(); core::mem::size_of::<Job>()];
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn locomotion_thread_phase(job: &Job, stage: u32, part: u32, parts: u32) -> u32 {
+    let Some(parts) = core::num::NonZeroU64::new(u64::from(parts)) else {
+        return 1;
+    };
+    if stage != 0 || u64::from(part) >= parts.get() {
+        return 1;
+    }
+    let count = job.count as u64;
+    let first = (count * u64::from(part) / parts.get()) as usize;
+    let last = (count * u64::from(part + 1) / parts.get()) as usize;
+    let mut work = Work::default();
+    for row in first..last {
+        // The prepared geometry and model are immutable. Only this body's candidate state,
+        // anchors and contacts are borrowed mutably in this partition.
+        let range = unsafe { &*job.ranges.add(row) };
+        let offset = range.offset;
+        let status = unsafe {
+            step_body(
+                job.bodies.add(row),
+                job.profiles.add(row),
+                job.actuators.add(offset),
+                job.anchors.add(offset),
+                job.geometry.add(offset),
+                job.contacts.add(offset),
+                range.count,
+                job.dt,
+                job.gravity,
+                &mut work,
+            )
+        };
+        if status != 0 {
+            return status;
+        }
+    }
+    unsafe { job.work.add(part as usize).write(work) };
+    0
 }

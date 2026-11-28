@@ -16842,7 +16842,11 @@ flood inlet volume. A registry-only observer uses the source layout SEA-06 will 
 
 The Wasm regions use double-precision state, pinned sine and cosine and explicit semi-implicit Euler stepping on the
 world's dyadic clock. The fixed-rate bound considers contact-mode stiffness and damping, friction regularization,
-stance/swing sampling and controller response. The engine tests verify Eq. (2), spring reaction, the friction-wrench
+stance/swing sampling and controller response. Worker partitions own disjoint animal rows and disjoint contact ranges.
+They retain the ordered force and moment accumulation within each animal. The measured-snake diagnostic uses
+the paper's separately measured friction and its prescribed shape normalization. Flat speed and incline markers,
+including the change of direction on an uphill cloth runway, are held out. No photograph, code or dataset is bundled.
+The engine tests verify Eq. (2), spring reaction, the friction-wrench
 bound, link closure, frictionless motion, swing loads, alternating footholds, lateral crab motion, and plain/shared
 and snapshot replay. The coupling tests compare the published reaction to the actual flat and sloped TerrainBed
 fields. The animal templates reproduce the documented coordination patterns and physical loads. The default masses,

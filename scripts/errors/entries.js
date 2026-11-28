@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'locomotion',
+    title: '@margoengine/physics/locomotion ground animal state, terrain and gait',
+    kind: 'family',
+    messages: [],
+    cause: 'A gait, terrain sample, origin, time step or native worker exceeds the range the ground animal can use.',
+    fix: 'Give the animal finite SI dimensions, mass, gait rates and friction. Use matching terrain geometry and a valid origin cell. Return finite elevations and upward normals, keep control commands between steps, and lower forcing or use smaller local scales if a trial overflows.',
+  },
+  {
     id: 'glacier',
     title: '@margoengine/physics/glacier grounded ice, fracture and drainage',
     kind: 'family',
