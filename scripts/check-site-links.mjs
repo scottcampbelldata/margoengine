@@ -5,6 +5,7 @@
 // The rule: a link in code or docs names a route the site serves (site/, the /catalog/ copy of docs/, the /llms/ pages
 // of scripts/build-llms.mjs, and the demos, gallery, voxel and bench pages listed in scripts/support/site-routes.mjs).
 // Package help lives at /llms/packages/<package>.md and /llms/docs/<doc>.md; error help at /errors#<id>.
+// A site/_redirects rule keeps its old address live, so its destination page and anchor are checked as well.
 // A page under site/ also has its relative links (`href` and `src` that name no scheme) resolved against its own route with
 // the same route list, so a renamed page or asset leaves no dead link on the pages that point at it.
 // Skipped: tests, the generated site/llms-full.txt, templates (`${...}`, `<id>`), XML namespace names and the private notes folder.
@@ -16,7 +17,7 @@ import { pathToFileURL } from 'node:url';
 import { sitePages } from './build-llms.mjs';
 import { slug } from './docs-links.mjs';
 import { collectCorpus } from './support/llms-corpus.mjs';
-import { redirectSources, resolveRoute, siteFiles } from './support/site-routes.mjs';
+import { redirectRules, resolveRoute, siteFiles } from './support/site-routes.mjs';
 
 const TEXT = /\.(?:[cm]?[jt]sx?|md|html|json|rs|txt|css|toml|yml|yaml)$/;
 const SKIP_FILE =
@@ -76,7 +77,8 @@ function trackedFiles(root) {
 export function siteLinkFindings(root, { files = trackedFiles(root), pages = sitePages(collectCorpus(root)) } = {}) {
   const { served, source } = siteFiles(root);
   for (const path of pages.keys()) served.add(path);
-  for (const path of redirectSources(root)) served.add(path.replace(/^\//, ''));
+  const redirects = redirectRules(root);
+  for (const { from } of redirects) served.add(from.replace(/^\//, ''));
   const idCache = new Map();
   const idsOf = (route) => {
     if (!idCache.has(route)) {
@@ -97,6 +99,15 @@ export function siteLinkFindings(root, { files = trackedFiles(root), pages = sit
     return idCache.get(route);
   };
   const findings = [];
+  // A redirect makes its old address count as live, so the address it sends the reader to has to be live too.
+  for (const { line, to = '' } of redirects) {
+    if (!to.startsWith('/') || /[:*]/.test(to)) continue;
+    const [path, fragment] = to.split('#'),
+      found = resolveRoute(served, path.split('?')[0]),
+      ids = found && fragment ? idsOf(found) : null,
+      why = !found ? `no page at ${path}` : ids && !ids.has(fragment) ? `${found} has no #${fragment}` : null;
+    if (why) findings.push({ file: 'site/_redirects', line, url: to, why });
+  }
   for (const file of files) {
     let text;
     try {

@@ -95,15 +95,16 @@ export function siteFiles(root) {
   return { served, source };
 }
 
-/** Source paths of redirects in site/_redirects (Cloudflare Pages: "<from> <to> <status>" per line). */
-export function redirectSources(root) {
+/** The rules of site/_redirects (Cloudflare Pages: "<from> <to> <status>" per line), with their line numbers. */
+export function redirectRules(root) {
   const file = join(root, 'site/_redirects');
   if (!existsSync(file)) return [];
   return readFileSync(file, 'utf8')
     .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith('#'))
-    .map((line) => line.split(/\s+/)[0]);
+    .flatMap((text, index) => {
+      const [from, to] = text.trim().split(/\s+/);
+      return from && !from.startsWith('#') ? [{ line: index + 1, from, to }] : [];
+    });
 }
 
 /** True when `path` is a file in `served` (a Cloudflare Pages lookup: /x is x, x.html or x/index.html). */

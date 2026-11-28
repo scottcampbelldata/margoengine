@@ -83,6 +83,35 @@ test('the links that were dead are found, and the replacements pass', () => {
   }
 });
 
+test('a redirect whose destination page or anchor is missing is found', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'site-links-'));
+  try {
+    mkdirSync(join(dir, 'site'), { recursive: true });
+    writeFileSync(join(dir, 'site/errors.html'), '<!doctype html><h2 id="live">Live</h2>');
+    writeFileSync(
+      join(dir, 'site/_redirects'),
+      [
+        '# old addresses',
+        '/docs/a /errors#live 301',
+        '/docs/b /errors#gone 301',
+        '/docs/c /docs/nowhere 301',
+        '/docs/d https://example.com/x 301',
+      ].join('\n'),
+    );
+    writeFileSync(join(dir, 'a.md'), 'https://margoengine.com/docs/b and https://margoengine.com/docs/c');
+    const found = siteLinkFindings(dir, { files: ['a.md'], pages: new Map() });
+    assert.deepEqual(
+      found.map((f) => [f.file, f.line, f.url]),
+      [
+        ['site/_redirects', 3, '/errors#gone'],
+        ['site/_redirects', 4, '/docs/nowhere'],
+      ],
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('the route list names every demo page the build makes, and resolves like Cloudflare Pages', () => {
   const { served } = siteFiles(root);
   for (const name of demoPages) assert.ok(served.has(`demos/${name}.html`), name);
