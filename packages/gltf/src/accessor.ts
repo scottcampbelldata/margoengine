@@ -38,8 +38,7 @@ export function readAccessor(
   // Section 3.6.2.1: an accessor without a bufferView holds zeros (sparse values, which this loader does not read,
   // could override them).
   if (a.bufferView === undefined && !a.sparse) {
-    if (!accepts(a))
-      throw fault('unsupported', 'Unsupported glTF accessor for the light loader', 'gltf-light');
+    if (!accepts(a)) throw fault('unsupported', 'Unsupported glTF accessor for the light loader', 'gltf-light');
     const count = integer(a.count, 'accessor count', 1);
     if (count > 1_000_000)
       throw fault('unsupported', 'glTF accessor holds over one million values, the light loader limit', 'gltf-light');

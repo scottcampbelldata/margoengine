@@ -559,7 +559,8 @@ export class CompatRenderPipeline {
     // a draw whose active draw buffers miss an output whatever the colour mask ("Active draw buffers with missing
     // fragment shader outputs", WebGL 2.0 5.x draw validation in ANGLE): its draw buffer is off for the pipeline's draws.
     const silent = this.targets.some((t) => t?.writeMask === 0);
-    if (silent && device.ext.indexed) this.splits = [this.targets.flatMap((t, i) => (t && t.writeMask !== 0 ? [i] : []))];
+    if (silent && device.ext.indexed)
+      this.splits = [this.targets.flatMap((t, i) => (t && t.writeMask !== 0 ? [i] : []))];
     else if (!device.ext.indexed) {
       const groups = new Map<string, number[]>();
       this.targets.forEach((t, i) => {

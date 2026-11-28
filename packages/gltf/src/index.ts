@@ -95,8 +95,7 @@ function validate(doc: Document, maxNodes: number | undefined, extensions: reado
   // Every definition is an object, so later reads of its members never meet null or a number.
   for (const field of ['buffers', 'bufferViews', 'accessors', 'meshes', 'nodes', 'scenes', 'materials']) {
     const list: unknown = doc[field];
-    if (Array.isArray(list) && !list.every(isObject))
-      throw typeError(`Invalid glTF ${field} entry`, 'gltf-invalid');
+    if (Array.isArray(list) && !list.every(isObject)) throw typeError(`Invalid glTF ${field} entry`, 'gltf-invalid');
   }
   if (
     doc.extensionsRequired?.some((name) => !extensions.some((extension) => extension.handles.includes(name))) ||
@@ -302,7 +301,11 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
         Boolean,
       )
     )
-      throw fault('unsupported', 'Maps, emission and transparency need @margoengine/gltf/textured or gltf/pbr', 'gltf-light');
+      throw fault(
+        'unsupported',
+        'Maps, emission and transparency need @margoengine/gltf/textured or gltf/pbr',
+        'gltf-light',
+      );
     return new PbrMaterial({
       color: color.slice(0, 3),
       roughness: p.roughnessFactor ?? 1,
@@ -322,7 +325,11 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
         p.extensions ||
         Object.keys(p.attributes ?? {}).some((key) => /^(COLOR|JOINTS|WEIGHTS)_/.test(key))
       )
-        throw fault('unsupported', 'Points, lines, morphs, skins and vertex colours need @margoengine/gltf/pbr', 'gltf-light');
+        throw fault(
+          'unsupported',
+          'Points, lines, morphs, skins and vertex colours need @margoengine/gltf/pbr',
+          'gltf-light',
+        );
       let positions = attribute('POSITION', p.attributes?.POSITION),
         normals = p.attributes?.NORMAL === undefined ? null : attribute('NORMAL', p.attributes.NORMAL);
       let indices =
@@ -397,10 +404,8 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
   for (let id = 0; id < nodes.length; id++) {
     let depth = 0;
     for (let current = id; current !== -1; current = parents[current])
-      if (++depth > nodes.length)
-        throw typeError(`glTF hierarchy cycle through node ${id}`, 'gltf-transform');
-    if (depth > 62)
-      throw rangeError(`glTF node ${id} is ${depth} levels deep, past 62`, 'gltf-transform');
+      if (++depth > nodes.length) throw typeError(`glTF hierarchy cycle through node ${id}`, 'gltf-transform');
+    if (depth > 62) throw rangeError(`glTF node ${id} is ${depth} levels deep, past 62`, 'gltf-transform');
   }
   const roots = doc.scenes
     ? (entry(doc.scenes, doc.scene ?? 0, 'scene').nodes ?? [])
@@ -421,8 +426,7 @@ function build(instance: EngineKernel, file: GLTFFile, { maxNodes, extensions = 
     while (stack.length) {
       const { id, parent } = stack.pop()!,
         node = entry(nodes, id, 'node');
-      if (parent === root && parents[id] !== -1)
-        throw typeError('glTF scene root has a parent', 'gltf-transform');
+      if (parent === root && parents[id] !== -1) throw typeError('glTF scene root has a parent', 'gltf-transform');
       const mesh = engine.createMesh(parent);
       created.push(mesh);
       imported.push(mesh);
@@ -532,8 +536,7 @@ export async function loadGLTF(
   let base = new URL(url, globalThis.location?.href),
     total = 0;
   async function fetchBytes(target: URL, root = false) {
-    if (!['http:', 'https:'].includes(target.protocol))
-      throw typeError('glTF URL must use HTTP(S)', 'gltf-url');
+    if (!['http:', 'https:'].includes(target.protocol)) throw typeError('glTF URL must use HTTP(S)', 'gltf-url');
     const response = await get(target, { signal });
     if (root && response.url) base = new URL(response.url);
     else if (!root) checkRedirect(response, base, allowedURLs, 'glTF buffer');

@@ -25,7 +25,13 @@ test('pbrNeutralInverse undoes pbrNeutral below display white', () => {
   }
   assert.ok(worst < 1e-3, `worst relative error ${worst}`);
   // Through every branch: blacks (offset below 0.08), mid tones and the roll-off.
-  for (const c of [[0, 0, 0], [0.01, 0.02, 0.05], [0.3, 0.5, 0.2], [0.9, 0.4, 0.1], [3, 2, 1]]) {
+  for (const c of [
+    [0, 0, 0],
+    [0.01, 0.02, 0.05],
+    [0.3, 0.5, 0.2],
+    [0.9, 0.4, 0.1],
+    [3, 2, 1],
+  ]) {
     const r = pbrNeutralInverse(pbrNeutral(c));
     for (let i = 0; i < 3; i++) assert.ok(Math.abs(r[i] - c[i]) < 1e-6, `${c} -> ${r}`);
   }
@@ -55,7 +61,9 @@ test('a bundle that uses the forward display curve carries nothing of the invers
   const dir = mkdtempSync(resolve(import.meta.dirname, '.display-bundle-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const entry = join(dir, 'entry.js'),
-    target = relative(dir, resolve(import.meta.dirname, '../packages/shared/display.js')).split(sep).join('/');
+    target = relative(dir, resolve(import.meta.dirname, '../packages/shared/display.js'))
+      .split(sep)
+      .join('/');
   writeFileSync(entry, `export { displayShader } from '${target}';`);
   const code = String(await bundleBytes(entry, () => false));
   assert.match(code, /fn toDisplay/);

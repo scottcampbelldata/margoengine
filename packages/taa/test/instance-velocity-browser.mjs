@@ -71,7 +71,10 @@ try {
       jitter = v.jitter[0],
       { width, height } = v.texture,
       bytesPerRow = Math.ceil((width * 4) / 256) * 256,
-      read = device.createBuffer({ size: bytesPerRow * height, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }),
+      read = device.createBuffer({
+        size: bytesPerRow * height,
+        usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+      }),
       depth = device.createBuffer({
         size: bytesPerRow * height,
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,

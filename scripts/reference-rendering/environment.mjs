@@ -60,11 +60,9 @@ if (process.argv.includes('--capture-decomposition')) {
   const candidate = join(out, `decomposition-${Date.now()}-${process.pid}`);
   mkdirSync(candidate, { recursive: true });
   for (const file of ['scene.glb', 'settings.json']) copyFileSync(join(out, file), join(candidate, file));
-  await capturePathReference(
-    fileURLToPath(new URL('./mitsuba-environment-decompose.py', import.meta.url)),
-    candidate,
-    { minutes: 120 },
-  );
+  await capturePathReference(fileURLToPath(new URL('./mitsuba-environment-decompose.py', import.meta.url)), candidate, {
+    minutes: 120,
+  });
   for (const name of decompositionNames)
     readPathReference(candidate, 'mitsuba-' + name, settings.width, settings.height, decomposition?.references[name]);
   for (const name of decompositionNames)

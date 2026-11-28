@@ -209,7 +209,7 @@ test('rollFire burns the past in the weather: far more ground under the gale tha
 // KB-VFX-DARKTRAILS1: `fire: 'burnt'` stopped the fire after one day of fire time, and the valley's litter fire runs on
 // for about two (8 m grid: 188,822 of 257,138 fuelled cells burnt and 20 still burning after 86,400 s), so the
 // "burned" valley still burned under 12 smoke columns. burnOut runs it until it goes out.
-test("burnOut runs a fire until it goes out, past a day, and refuses one that never does", async () => {
+test('burnOut runs a fire until it goes out, past a day, and refuses one that never does', async () => {
   const { burnOut, BURN_OUT_LIMIT } = await import('@margoengine/scenes/timber-valley');
   // A fire that goes out after two days of fire time, settled as FireFront.settle is: up to maxSeconds while active.
   const slow = (out) => ({

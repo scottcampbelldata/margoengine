@@ -75,14 +75,20 @@ test('screenTransmission shares one depth-writing pass per frame graph and dispo
 
 test('the loaders import gltf/transmission lazily, and the parsing workers never bundle it', () => {
   const chunks = readdirSync(dist).filter((name) => name.endsWith('.js'));
-  const lazy = chunks.filter((name) => /import\(`\.\/transmission\.js`\)/.test(readFileSync(new URL(name, dist), 'utf8')));
+  const lazy = chunks.filter((name) =>
+    /import\(`\.\/transmission\.js`\)/.test(readFileSync(new URL(name, dist), 'utf8')),
+  );
   assert.equal(lazy.length, 1, `one chunk imports the pass lazily (${lazy})`);
   assert.match(readFileSync(new URL(lazy[0], dist), 'utf8'), /KHR_materials_transmission/);
   for (const entry of ['pbr.js', 'model-entry.js', 'asset-entry.js'])
     assert.doesNotMatch(readFileSync(new URL(entry, dist), 'utf8'), /^import[^;]*transmission/m, entry);
   // A worker draws nothing: inlining the pass there cost dist/workers/gltf.js 3.5 kB gzip (45,046 B).
   for (const worker of ['gltf.js', 'progressive.js'])
-    assert.doesNotMatch(readFileSync(new URL(`workers/${worker}`, dist), 'utf8'), /transmission:copy|screenTransmission/, worker);
+    assert.doesNotMatch(
+      readFileSync(new URL(`workers/${worker}`, dist), 'utf8'),
+      /transmission:copy|screenTransmission/,
+      worker,
+    );
 });
 
 test('withTransmission adds the pass only for a physical file that declares the extension and leaves a choice alone', async () => {

@@ -193,7 +193,10 @@ try {
   const mirrored = at(rOwnImage, ...rOwn.floor),
     dull = at(rDepthImage, ...rDepth.floor);
   console.log('ssr floor', mirrored, 'against', dull);
-  assert.ok(mirrored[0] >= dull[0] + 40 && mirrored[0] - mirrored[1] >= 100, `the raw floor reflects the red wall: ${mirrored} against ${dull}`);
+  assert.ok(
+    mirrored[0] >= dull[0] + 40 && mirrored[0] - mirrored[1] >= 100,
+    `the raw floor reflects the red wall: ${mirrored} against ${dull}`,
+  );
   console.log('ok ssr');
 
   // SSGI: the raw white floor takes the red wall's bounced light only with its capture entry.
@@ -206,7 +209,10 @@ try {
   const bounced = at(bOwnImage, ...bOwn.floor),
     unlit = at(bDepthImage, ...bDepth.floor);
   console.log('ssgi floor', bounced, 'against', unlit);
-  assert.ok(bounced[0] >= unlit[0] + 6 && bounced[0] - bounced[1] >= unlit[0] - unlit[1] + 6, `the raw floor takes the red bounce: ${bounced} against ${unlit}`);
+  assert.ok(
+    bounced[0] >= unlit[0] + 6 && bounced[0] - bounced[1] >= unlit[0] - unlit[1] + 6,
+    `the raw floor takes the red bounce: ${bounced} against ${unlit}`,
+  );
   console.log('ok ssgi');
   // SceneTargets: the raw floor writes its own albedo and normal only with its capture entry.
   const tOwn = await scene('mrtOwn');

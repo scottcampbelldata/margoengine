@@ -40,7 +40,10 @@ const build = (head, parts = [tilePart(0, [0])]) =>
 /** Headers that ask for far more work or memory than their bytes can carry. */
 function* hostile() {
   const huge = 0xffffffff;
-  yield ['4G x 4G in 1 x 1 tiles', build([siz({ width: huge, height: huge, tileWidth: 1, tileHeight: 1 }), cod(), qcd()])];
+  yield [
+    '4G x 4G in 1 x 1 tiles',
+    build([siz({ width: huge, height: huge, tileWidth: 1, tileHeight: 1 }), cod(), qcd()]),
+  ];
   yield ['4G x 4G in one tile', build([siz({ width: huge, height: huge }), cod(), qcd()])];
   yield ['4G x 1', build([siz({ width: huge, height: 1 }), cod(), qcd()])];
   const many = Array.from({ length: 16384 }, () => [7, 255, 255]);
@@ -57,10 +60,7 @@ function* hostile() {
   // The same precincts ordered again by thousands of progression changes.
   for (const order of [0, 2]) {
     const change = [0, 0, ...be(65535, 2), 1, 1, order];
-    const changes = segment(
-      0xff5f,
-      Array.from({ length: 9000 }, () => change).flat(),
-    );
+    const changes = segment(0xff5f, Array.from({ length: 9000 }, () => change).flat());
     yield [
       `9,000 progression changes of order ${order}`,
       build([square, cod({ layers: 65535, precincts: [0x22] }), qcd(), changes]),
@@ -104,19 +104,23 @@ function* hostile() {
   const grey = codestream(8, 8);
   const xl = [...be(1, 4), ...[...'free'].map((c) => c.charCodeAt(0)), 255, 255, 255, 255, 255, 255, 255, 255];
   yield ['a box of 2^64 - 1 bytes', Uint8Array.from([...jp2Opening(), ...xl, 0, 0])];
-  yield [
-    'a header box of 2^64 - 1 bytes',
-    jp2(grey, 8, 8, [...xl, 0, 0]),
-  ];
+  yield ['a header box of 2^64 - 1 bytes', jp2(grey, 8, 8, [...xl, 0, 0])];
   const palette = box('pclr', [0, 1, 1, 7, 9]);
   const mapping = box('cmap', new Array(16000).fill([0, 0, 0, 0]).flat());
   yield ['16,000 mapped channels', jp2(codestream(1024, 1024), 1024, 1024, [...palette, ...mapping])];
   const wide = Array.from({ length: 4096 }, (_, i) => (i ? [7, 255, 255] : [7, 1, 1]));
-  yield ['4,096 planes resampled to the largest', build([siz({ width: 1000, height: 1000, components: wide }), cod(), qcd()])];
+  yield [
+    '4,096 planes resampled to the largest',
+    build([siz({ width: 1000, height: 1000, components: wide }), cod(), qcd()]),
+  ];
   const empty = new Array(2).fill([7, 255, 255]);
   yield [
     'components that hold no samples',
-    build([segment(0xff51, [0, 0, ...[3, 3, 2, 2, 1, 1, 2, 2].flatMap((v) => be(v, 4)), 0, 2, ...empty.flat()]), cod(), qcd()]),
+    build([
+      segment(0xff51, [0, 0, ...[3, 3, 2, 2, 1, 1, 2, 2].flatMap((v) => be(v, 4)), 0, 2, ...empty.flat()]),
+      cod(),
+      qcd(),
+    ]),
   ];
 }
 
@@ -211,8 +215,8 @@ export function* fuzzCases({ mutations, skip = 0, seed = 1 }) {
   const wanted = () => index++ >= skip;
   for (const [name, bytes] of hostile()) if (wanted()) yield { name, bytes, options: {} };
   const seeds = vectors();
+  // Every cut through the headers, then cuts through the packet data.
   for (const { file, bytes } of seeds)
-    // Every cut through the headers, then cuts through the packet data.
     for (let length = 1; length < bytes.length; length += length < 200 ? 1 : 97)
       if (wanted()) yield { name: `${file} cut to ${length} bytes`, bytes: bytes.subarray(0, length), options: {} };
   for (let i = 0; i < mutations; i++) {

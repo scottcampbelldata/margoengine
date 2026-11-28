@@ -5,7 +5,11 @@
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 
-const context = await openBrowser({ startPath: '/packages/webgl2-compat/test/silent-targets.html', port: 'free', compat: false });
+const context = await openBrowser({
+  startPath: '/packages/webgl2-compat/test/silent-targets.html',
+  port: 'free',
+  compat: false,
+});
 const { page } = context,
   pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));

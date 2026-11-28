@@ -62,7 +62,8 @@ function source(flow: CurveFlowFrames): { data: Float32Array; width: number; hei
   const { count, table } = frameTableOf(flow, 'curveFlow');
   const data = new Float32Array(count * 16);
   for (let i = 0; i < count; i++)
-    for (let row = 0; row < 4; row++) data.set(table.subarray(i * 16 + row * 4, i * 16 + row * 4 + 4), (row * count + i) * 4);
+    for (let row = 0; row < 4; row++)
+      data.set(table.subarray(i * 16 + row * 4, i * 16 + row * 4 + 4), (row * count + i) * 4);
   return { data, width: count, height: 4, format: 'rgba32float' };
 }
 
@@ -87,7 +88,9 @@ export function curveFlow(flow: CurveFlowFrames, options: CurveFlowPluginOptions
   if (fit) {
     const [low, high] = [finite('curveFlow fit low', fit[0]), finite('curveFlow fit high', fit[1])];
     if (!(high > low))
-      throw new RangeError(`curveFlow fit [${low}, ${high}] has no extent; pass [low, high] with high > low${curveFlowHelp}`);
+      throw new RangeError(
+        `curveFlow fit [${low}, ${high}] has no extent; pass [low, high] with high > low${curveFlowHelp}`,
+      );
     const stretch = flow.length / (high - low);
     offset += -low * stretch * scale;
     scale *= stretch;

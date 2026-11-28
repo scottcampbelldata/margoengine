@@ -42,7 +42,13 @@ test('lit writes the sun, its colour, the ambient, the wrap and the eye each fra
   h.frame();
   const values = () => [...new Float32Array(uniform(h).data)].map((v) => +v.toFixed(5));
   // Sun towards [0, 0.6, 0.8] at intensity 2 times radiance; ambient = radiance.w x ambient; eye = the camera.
-  assert.deepEqual(values(), [0, 0.6, 0.8, 0, 2, 1, 0.5, 0.5, 0.2, 0.4, 0.6, 0.2, 0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.337, 0.306, 0.268, 0]);
+  assert.deepEqual(
+    values(),
+    [
+      0, 0.6, 0.8, 0, 2, 1, 0.5, 0.5, 0.2, 0.4, 0.6, 0.2, 0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.337, 0.306,
+      0.268, 0,
+    ],
+  );
   effect.options.lit.wrap = 1;
   effect.options.lit.ambient = [0.1, 0, 0];
   h.engine.lighting.direction.set([1, 0, 0, 0]);
@@ -202,7 +208,11 @@ test("the air's light is air * noon / pi beside the ambient, in any scene units"
 // reflectance of it from above, each with its mean over every normal kept. This reruns the shader's split on the CPU
 // from the uniform the effect writes and the WGSL it compiles.
 test('the ambient comes from above and the air from below, each with its mean kept', () => {
-  const { h, effect } = attach({ capacity: 8, initialCount: 8, lit: { ambient: [0.1, 0.1, 0.1], air: [0.5, 0.5, 0.5] } });
+  const { h, effect } = attach({
+    capacity: 8,
+    initialCount: 8,
+    lit: { ambient: [0.1, 0.1, 0.1], air: [0.5, 0.5, 0.5] },
+  });
   h.frame();
   const code = billboards(h)[0];
   assert.ok(
@@ -240,7 +250,11 @@ test('the ambient comes from above and the air from below, each with its mean ke
     assert.throws(() => h.frame(), /lit ground/);
   }
   effect.options.lit.ground = 0.2;
-  for (const bad of [[0, 0], [0, 2, 0], [NaN, 0, 0]]) {
+  for (const bad of [
+    [0, 0],
+    [0, 2, 0],
+    [NaN, 0, 0],
+  ]) {
     effect.options.lit.airReflectance = bad;
     assert.throws(() => h.frame(), /lit airReflectance/);
   }

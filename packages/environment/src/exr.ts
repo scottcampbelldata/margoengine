@@ -338,7 +338,19 @@ export function copyEXRLines(
 export function parseEXR(source: ArrayBuffer | ArrayBufferView): EXRImage {
   const bytes = toBytes(source);
   const header = readEXRHeader(bytes, false);
-  const { view, channels, compression, dataWindow, displayWindow, width, height, indices, layout, primaries, colorInteropID } = header;
+  const {
+    view,
+    channels,
+    compression,
+    dataWindow,
+    displayWindow,
+    width,
+    height,
+    indices,
+    layout,
+    primaries,
+    colorInteropID,
+  } = header;
   let position = header.position;
   const yMin = dataWindow[1];
 

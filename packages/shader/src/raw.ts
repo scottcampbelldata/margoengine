@@ -71,11 +71,7 @@ export interface RawUniformField {
  * construction.
  */
 export interface RawUniform {
-  value:
-    | RawUniformValue
-    | readonly RawUniformValue[]
-    | RawUniformStructValue
-    | readonly RawUniformStructValue[];
+  value: RawUniformValue | readonly RawUniformValue[] | RawUniformStructValue | readonly RawUniformStructValue[];
   readonly type?: RawUniformType;
   /**
    * Elements of an `array<type, count>`, read as `uniforms.<name>[i]`. A uniform array's stride is a multiple of 16 bytes, so
@@ -616,7 +612,8 @@ export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
   private uniformSeen?: Uint8Array;
   private readonly groups: readonly RawBindGroup[];
   private readonly gbufferName?: string;
-  /** @internal The `captureEntry`, when the material writes SSR's and SSGI's material targets. */ readonly captureName?: string;
+  /** @internal The `captureEntry`, when the material writes SSR's and SSGI's material targets. */
+  readonly captureName?: string;
   /** @internal The `velocityEntry`, when the material draws its own motion for TAA. */ readonly velocityName?: string;
   private vertexCode = '';
   private fragmentCode?: string;
@@ -2124,7 +2121,12 @@ export class RawShaders implements EnginePlugin {
    * `captureEntry` with `draw(c, 'capture', ...)`. Returns a remover. Without a hook nothing else changes.
    */
   setCapture(hook: RawCapture): () => void {
-    if (!hook || typeof hook.declarations !== 'function' || typeof hook.begin !== 'function' || !Array.isArray(hook.targets))
+    if (
+      !hook ||
+      typeof hook.declarations !== 'function' ||
+      typeof hook.begin !== 'function' ||
+      !Array.isArray(hook.targets)
+    )
       throw new TypeError(
         'Invalid RawShaders capture hook; pass an object with declarations() and begin() functions and a targets array',
       );

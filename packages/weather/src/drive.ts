@@ -820,13 +820,7 @@ export class WeatherDrive {
       // The sky fog's own density sets how far a low ray sees the lit layer (KB-WEATHER-FIRESIGHT1): an 'exp2' fog
       // takes extinction / sqrt(3), so 2 / extinction stopped the layer short of the haze's own track.
       const skyFog = sky.fog?.density;
-      this.dimSun(
-        skyTarget,
-        state,
-        fireLight,
-        spots,
-        typeof skyFog === 'number' && skyFog > 0 ? skyFog : s.extinction,
-      );
+      this.dimSun(skyTarget, state, fireLight, spots, typeof skyFog === 'number' && skyFog > 0 ? skyFog : s.extinction);
     }
     const grounds =
       o.grounds !== undefined
@@ -1091,7 +1085,10 @@ export class WeatherDrive {
   // The haze's light below the eye (`lightDecay`, KB-SKY-HAZEBELOW1), written while the load colours the fog and given
   // back as the colour is: what the fog had comes back when the load leaves; one a person set meanwhile, or one held by a
   // setting, is left alone.
-  private decayFog(fog: { lightDecay?: readonly [number, number, number] }, decay: [number, number, number] | undefined): void {
+  private decayFog(
+    fog: { lightDecay?: readonly [number, number, number] },
+    decay: [number, number, number] | undefined,
+  ): void {
     if (heldFromWeather(fog, 'lightDecay')) return;
     const record = this.fogDecays.get(fog);
     if (decay) {
@@ -1390,7 +1387,10 @@ function hazeUnits(sky: SkyTarget): number {
   const zenith = sky.zenithSun;
   if (typeof zenith !== 'number' || !(zenith > 0)) return 1;
   return (
-    (zenith * (sky.options.atmosphere?.sunIntensity ?? 1) * 2 ** (sky.options.exposure ?? 0) * (sky.pictureScale ?? 1)) /
+    (zenith *
+      (sky.options.atmosphere?.sunIntensity ?? 1) *
+      2 ** (sky.options.exposure ?? 0) *
+      (sky.pictureScale ?? 1)) /
     Math.PI
   );
 }

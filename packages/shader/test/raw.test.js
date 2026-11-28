@@ -790,10 +790,14 @@ test('struct uniforms nest structs, arrays and arrays of structs at the WGSL uni
         },
       },
       after: { value: 0.25 },
-      list: { count: 2, struct: { deep: { struct: { v: 'vec2f' } }, w: 'f32' }, value: [
-        { deep: { v: [1, 2] }, w: 3 },
-        { deep: { v: [4, 5] }, w: 6 },
-      ] },
+      list: {
+        count: 2,
+        struct: { deep: { struct: { v: 'vec2f' } }, w: 'f32' },
+        value: [
+          { deep: { v: [1, 2] }, w: 3 },
+          { deep: { v: [4, 5] }, w: 6 },
+        ],
+      },
     },
   });
   assert.deepEqual(
@@ -827,12 +831,17 @@ test('struct uniforms nest structs, arrays and arrays of structs at the WGSL uni
   assert.deepEqual(f.slice(16, 20), [0, 0.25, 0, 0], 'numbers in a row fill an array field');
   assert.deepEqual(f.slice(24, 27), [0, 0, 0.5], 'an array of structs field steps by the struct size');
   assert.equal(f[28], 0.25, 'the next member follows the struct');
-  assert.deepEqual([...f.slice(32, 34), f[36], ...f.slice(40, 42), f[44]], [1, 2, 3, 4, 5, 6], 'nested in an array of structs');
+  assert.deepEqual(
+    [...f.slice(32, 34), f[36], ...f.slice(40, 42), f[44]],
+    [1, 2, 3, 4, 5, 6],
+    'nested in an array of structs',
+  );
   m.uniforms.s.value = { ...m.uniforms.s.value, inner: { lift: 1, tint: [1, 2] } };
   assert.throws(() => h.frame(), /uniform s\.inner\.tint needs 3 finite numbers/);
   m.uniforms.s.value = { ...m.uniforms.s.value, inner: { lift: 1, tint: [1, 2, 3] }, parts: [{ c: [1, 2, 3] }] };
   assert.throws(() => h.frame(), /uniform s\.parts needs 2 elements/);
-  const make = (struct) => () => new RawShaderMaterial({ vertexShader: shader, uniforms: { a: { struct, value: {} } } });
+  const make = (struct) => () =>
+    new RawShaderMaterial({ vertexShader: shader, uniforms: { a: { struct, value: {} } } });
   assert.throws(make({ b: { type: 'vec2f', count: 2 } }), /field b: elements of a uniform array sit 16 bytes apart/);
   assert.throws(make({ b: { type: 'vec4f', count: 0 } }), /field b count must be a positive integer/);
   assert.throws(make({ b: {} }), /field b needs \{struct\} for a nested struct/);
@@ -1110,7 +1119,12 @@ fn margoCapture(m:MargoMaterial)->MargoCapture {return MargoCapture(vec4f(m.base
   };
   raw.add(new RawMesh({ material: material({ vertexShader: code, captureEntry: 'surface' }), attributes: quad() }));
   raw.add(new RawMesh({ material: material(), attributes: quad() }));
-  raw.add(new RawMesh({ material: material({ vertexShader: code, captureEntry: 'surface', transparent: true }), attributes: quad() }));
+  raw.add(
+    new RawMesh({
+      material: material({ vertexShader: code, captureEntry: 'surface', transparent: true }),
+      attributes: quad(),
+    }),
+  );
   h.frame();
   assert.equal(h.gpu.record(() => raw.draw(h.view.c, 'capture', null, null)).length, 0, 'nothing without a hook');
   const release = raw.setCapture(hook),
@@ -1125,9 +1139,16 @@ fn margoCapture(m:MargoMaterial)->MargoCapture {return MargoCapture(vec4f(m.base
   assert.equal(own.fragment.entryPoint, 'surface');
   assert.deepEqual(own.fragment.targets, targets);
   assert.deepEqual([own.depthStencil.depthCompare, own.depthStencil.depthWriteEnabled], ['greater-equal', true]);
-  assert.ok(named(log, 'module').some((m) => m[2].code.includes(declarations)), 'the hook declarations reach the module');
+  assert.ok(
+    named(log, 'module').some((m) => m[2].code.includes(declarations)),
+    'the hook declarations reach the module',
+  );
   assert.equal(depth.fragment.entryPoint, 'fragment', 'a mesh without captureEntry keeps its own discards');
-  assert.deepEqual(depth.fragment.targets, targets.map((t) => ({ format: t.format, writeMask: 0 })), 'and writes no target');
+  assert.deepEqual(
+    depth.fragment.targets,
+    targets.map((t) => ({ format: t.format, writeMask: 0 })),
+    'and writes no target',
+  );
   assert.deepEqual([depth.depthStencil.depthCompare, depth.depthStencil.depthWriteEnabled], ['greater-equal', true]);
   assert.equal(named(log, 'pass.draw').length + named(log, 'pass.drawIndexed').length, 2);
   release();
@@ -1146,7 +1167,11 @@ fn margoCapture(m:MargoMaterial)->MargoCapture {return MargoCapture(vec4f(m.base
     vertexShader: `@fragment fn surface()->MargoCapture {return margoCapture(MargoMaterial(vec3f(0),vec3f(0),vec3f(0),vec3f(0),0,0,vec3f(0)));}\n${shader}`,
     captureEntry: 'surface',
   });
-  assert.match(first.code('fragment'), /fn margoCapture\(m:MargoMaterial\)->MargoCapture \{return MargoCapture\(vec4f\(0\)\);\}/, 'a stub outside the capture');
+  assert.match(
+    first.code('fragment'),
+    /fn margoCapture\(m:MargoMaterial\)->MargoCapture \{return MargoCapture\(vec4f\(0\)\);\}/,
+    'a stub outside the capture',
+  );
   assert.throws(() => raw.setCapture({}), TypeError);
   let disposed = 0;
   raw.onDispose(() => disposed++);

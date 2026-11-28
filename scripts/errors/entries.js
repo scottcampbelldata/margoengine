@@ -844,10 +844,7 @@ export const entries = [
     id: 'gltf-transform',
     title: '@margoengine/gltf: a node transform or hierarchy the engine cannot hold',
     kind: 'family',
-    messages: [
-      'Invalid glTF hierarchy',
-      'glTF scene root has a parent',
-    ],
+    messages: ['Invalid glTF hierarchy', 'glTF scene root has a parent'],
     cause:
       'A node named in the message has a translation, rotation or scale that is not 3, 4 and 3 finite float32 numbers; a matrix that does not split into translation, rotation and scale because it shears (glTF 2.0 section 3.5.3 requires the split); a node that is its own ancestor (the message names a node on the loop); a node deeper than 62 levels (the engine holds 62, the message names the node and its depth); a node with two parents or a child index out of range; or a scene root that is the child of another node. Both loaders check the same rules.',
     fix: 'Re-export with valid transforms; bake a sheared matrix into the mesh vertices and give the node a plain translation, rotation and scale; give the nodes a tree with no loops and one parent each; flatten a hierarchy deeper than 62 levels (apply the parent transforms in the 3D tool); list only top-level nodes in a scene.',
@@ -856,9 +853,7 @@ export const entries = [
     id: 'gltf-url',
     title: '@margoengine/gltf: a URL loadGLTF cannot fetch',
     kind: 'family',
-    messages: [
-      'glTF URL must use HTTP(S)',
-    ],
+    messages: ['glTF URL must use HTTP(S)'],
     cause:
       'loadGLTF and loadAuto fetch over HTTP(S) only. A blob: URL (from URL.createObjectURL) or a file: URL has no server behind it, and its bytes are already in memory.',
     fix: 'Read the bytes and parse them instead: `const bytes = new Uint8Array(await file.arrayBuffer()); const model = await parseGLTFAsync(engine, bytes);` (pass `baseURL` with gltf/pbr, or the buffers yourself, when the file names external buffers). Serve files from an http(s) URL for loadGLTF.',

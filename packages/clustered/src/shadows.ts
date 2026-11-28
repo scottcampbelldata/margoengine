@@ -1510,7 +1510,9 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         buffers: casterBuffers(pbr ? 80 : 24, displaced, flags.includes('i')),
       },
       // Opaque casters need no fragment stage, which keeps early depth testing.
-      ...(flags.includes('m') || flags.includes('c') ? { fragment: { module, entryPoint: 'fragment', targets: [] } } : {}),
+      ...(flags.includes('m') || flags.includes('c')
+        ? { fragment: { module, entryPoint: 'fragment', targets: [] } }
+        : {}),
       ...(flags.includes('l') ? { primitive: { topology: 'line-list' as const } } : {}),
       depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
     });

@@ -327,7 +327,19 @@ const ROLLOUT = new Set([
   ...['cameras', 'compute', 'lod', 'robot-planning', 'taa', 'tonemap'],
   ...['animation', 'biomes', 'blender', 'bvh', 'creative', 'culling', 'decoders', 'fbx', 'geometry', 'lighting2d'],
   ...['lightmap', 'lines', 'oit', 'pixel', 'points', 'procedural', 'shader', 'sky', 'splats', 'studio'],
-  ...['terrain', 'text', 'tilemap', 'transitions', 'usdz', 'vfx', 'voxel', 'voxel-pathtracer', 'water', 'weather', 'xr'],
+  ...[
+    'terrain',
+    'text',
+    'tilemap',
+    'transitions',
+    'usdz',
+    'vfx',
+    'voxel',
+    'voxel-pathtracer',
+    'water',
+    'weather',
+    'xr',
+  ],
 ]);
 
 /**

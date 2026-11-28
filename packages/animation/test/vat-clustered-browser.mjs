@@ -105,7 +105,10 @@ try {
   // PBR Neutral tone mapping desaturates a channel near 1 toward white, so green and blue rise a little too.
   assert.ok(r1 - r0 > 2 * (g1 - g0) && r1 - r0 > 2 * (b1 - b0), `the light is red: ${report.red.centre}`);
   assert.deepEqual(report.red.corner, report.none.corner, 'the background is untouched');
-  assert.ok(report.both.centre[0] - r0 > 40, `with Shadows too, the point light still lights it: ${report.both.centre}`);
+  assert.ok(
+    report.both.centre[0] - r0 > 40,
+    `with Shadows too, the point light still lights it: ${report.both.centre}`,
+  );
   assert.deepEqual(report.far.centre, report.none.centre, 'a light out of range adds nothing');
   console.log(`vat-clustered: PASS on ${compat ? 'WebGL2 layer' : 'WebGPU'}`);
 } finally {

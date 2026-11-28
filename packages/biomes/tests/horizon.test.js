@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { BiomeWorld } from '../dist/index.js';
 import { presets } from '../dist/presets.js';
 import { BiomeView } from '../dist/view.js';
-import { horizonEdgeMean, horizonHeights, HORIZON_SKIRT, HORIZON_SPREAD } from '../dist/view.js';
+import { horizonEdgeMean, horizonHeights, HORIZON_SKIRT } from '../dist/view.js';
 
 test('horizonHeights: the ring meets the world at its edge, skirts under it, and rises into mountains past it', () => {
   // A 1 km world on 8 m texels: a valley floor at 100 m along z = 500 that leaves the west and east edges, walls to 300.
@@ -229,7 +229,10 @@ test('regression KB-BIOMES-HORIZONSTREAK1: one odd edge texel does not run out t
     spike = 64 * width;
   heights[spike] = 300;
   const far = horizonHeights({ bounds: [0, 0, 1024, 1024], heights, width, depth: width, seed: 3 }),
-    at = (x, z) => far.heights[Math.round((z - far.origin[1]) / far.texel) * far.width + Math.round((x - far.origin[0]) / far.texel)]; // float division
+    at = (x, z) =>
+      far.heights[
+        Math.round((z - far.origin[1]) / far.texel) * far.width + Math.round((x - far.origin[0]) / far.texel)
+      ]; // float division
   assert.equal(at(0, 512), 300, 'the edge itself is the world');
   // Straight out from the spike and 160 m beside it, at the same distance. Copying the nearest texel, the spike ran
   // out as a ridge the mountains only slowly took over (about 170 m at 128 m out, 100 m at 256 m); now it is one texel
@@ -249,7 +252,10 @@ test('regression KB-BIOMES-HORIZONSTREAK1: one odd edge texel does not run out t
   assert.ok(Math.abs(mean[c * 4] + mean[c * 4 + 1] - 255) < 1e-3, 'the weights still sum to 255');
   // The mountains' share: 0 at the edge, all of it past the ramp (512 m for a 1 km world), where a material map gives
   // way to the whole edge's mean, so even the edge's large patches stop fanning out.
-  assert.equal(far.blend[Math.round((512 - far.origin[1]) / far.texel) * far.width + Math.round(-far.origin[0] / far.texel)], 0); // float division
+  assert.equal(
+    far.blend[Math.round((512 - far.origin[1]) / far.texel) * far.width + Math.round(-far.origin[0] / far.texel)],
+    0,
+  ); // float division
   assert.equal(far.blend[c], Math.min(1, far.blend[c]));
   assert.ok(far.blend[c] > 0.85, `400 m out the mountains have ${far.blend[c]}`);
   assert.equal(far.blend[0], 1, 'the ring corner, kilometres out');

@@ -363,7 +363,9 @@ test('KB-GLTFA A6: a sheared node matrix is a TypeError that names the node and 
     assert.throws(
       () => parse(engine, doc, [bytes]),
       (e) =>
-        e instanceof TypeError && /Sheared glTF matrix on node 1/.test(e.message) && /errors#gltf-transform/.test(e.message),
+        e instanceof TypeError &&
+        /Sheared glTF matrix on node 1/.test(e.message) &&
+        /errors#gltf-transform/.test(e.message),
       label,
     );
   });
@@ -377,7 +379,9 @@ test('KB-GLTFA A4: a cycle and the 62-level limit have their own messages, in bo
     assert.throws(
       () => parse(engine, chain.doc, [chain.bytes]),
       (e) =>
-        e instanceof RangeError && /node 62 is 63 levels deep/.test(e.message) && /errors#gltf-transform/.test(e.message),
+        e instanceof RangeError &&
+        /node 62 is 63 levels deep/.test(e.message) &&
+        /errors#gltf-transform/.test(e.message),
       `${label} depth`,
     );
     // A 62-node chain, 62 levels deep, still loads.
@@ -405,7 +409,11 @@ test('KB-GLTFA A1: a blob: URL is refused with the way to load its bytes, in bot
       ['pbr', () => loadPBR(engine, 'blob:https://example.com/0f1e')],
       ['auto', () => loadAuto(engine, 'blob:https://example.com/0f1e')],
     ])
-      await assert.rejects(load, (e) => e instanceof TypeError && /parseGLTFAsync|errors#gltf-url/.test(e.message), label);
+      await assert.rejects(
+        load,
+        (e) => e instanceof TypeError && /parseGLTFAsync|errors#gltf-url/.test(e.message),
+        label,
+      );
   } finally {
     engine.dispose();
   }
@@ -471,7 +479,10 @@ test('KB-GLTFA A9: a gltf/pbr parse that throws closes the images it was given, 
     // container: not glTF at all
     ['parseGLTF, bad JSON', (images) => pbrModule.parseGLTF(pbr.engine, '{not json', [], images)],
     // GLTFAsset: a major version the loader does not read
-    ['parseGLTF, glTF 3.0', (images) => pbrModule.parseGLTF(pbr.engine, { ...doc, asset: { version: '3.0' } }, [bytes], images)],
+    [
+      'parseGLTF, glTF 3.0',
+      (images) => pbrModule.parseGLTF(pbr.engine, { ...doc, asset: { version: '3.0' } }, [bytes], images),
+    ],
     // the model constructor: an image that is neither a bitmap nor valid RGBA pixels
     [
       'parseGLTF, bad pixels',
@@ -522,9 +533,13 @@ test('KB-GLTFA A2: a map whose TEXCOORD set the primitive lacks is left out with
   const bitmaps = withBitmaps(t),
     { engine } = await gpuEngine(t),
     expected = { code: 'missing-texcoord', material: 0, map: 'baseColorTexture', texCoord: 0 };
-  const fields = (model) => model.warnings.map(({ code, material, map, texCoord }) => ({ code, material, map, texCoord }));
+  const fields = (model) =>
+    model.warnings.map(({ code, material, map, texCoord }) => ({ code, material, map, texCoord }));
   // Two primitives lack the set: still one warning.
-  const file = texturedFile({ materials: [{ name: 'Body', pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }], attributes: { POSITION: 0 } });
+  const file = texturedFile({
+    materials: [{ name: 'Body', pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
+    attributes: { POSITION: 0 },
+  });
   file.doc.meshes[0].primitives.push({ attributes: { POSITION: 0 }, material: 0 });
   const light = await loadTextured(engine, file);
   try {

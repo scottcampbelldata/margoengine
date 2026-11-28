@@ -37,7 +37,9 @@ test('regression KB-LOOK-TV-SHIMMER2: an engine-run drive also stepped every fra
       frame();
       frame();
     },
-    (error) => error.code === 'state' && /stepped with advanceTime between engine frames runs its weather too fast; .*advance: false/.test(error.message),
+    (error) =>
+      error.code === 'state' &&
+      /stepped with advanceTime between engine frames runs its weather too fast; .*advance: false/.test(error.message),
   );
 });
 

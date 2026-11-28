@@ -21,7 +21,8 @@ export interface GLTFWarning {
 
 /** The warning for material `material` whose `map` reads `TEXCOORD_<texCoord>`, which a primitive lacks. */
 export function missingTexCoord(material: number, name: unknown, map: string, texCoord: number): GLTFWarning {
-  const label = typeof name === 'string' && name ? `glTF material ${material} ("${name}")` : `glTF material ${material}`;
+  const label =
+    typeof name === 'string' && name ? `glTF material ${material} ("${name}")` : `glTF material ${material}`;
   return {
     code: 'missing-texcoord',
     message: `${label} reads its ${map} from TEXCOORD_${texCoord}, which a primitive using it lacks; that primitive draws without the map (glTF 2.0 section 5.24 textureInfo.texCoord). Add TEXCOORD_${texCoord} to the mesh or point texCoord at a set it has`,

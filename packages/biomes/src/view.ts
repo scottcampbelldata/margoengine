@@ -2077,7 +2077,8 @@ export class BiomeView implements Disposable {
               mostAt = a * 4 + k;
             }
           }
-        if (most > 0) weights[mostAt >> 2][c * 4 + (mostAt & 3)] = Math.min(255, Math.max(0, most + Math.round(exact) - total));
+        if (most > 0)
+          weights[mostAt >> 2][c * 4 + (mostAt & 3)] = Math.min(255, Math.max(0, most + Math.round(exact) - total));
         if (rock < 0) continue;
         const left = far.heights[j * far.width + Math.max(0, i - 1)],
           right = far.heights[j * far.width + Math.min(far.width - 1, i + 1)],

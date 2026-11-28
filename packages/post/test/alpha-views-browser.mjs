@@ -166,12 +166,12 @@ await postBrowser(
       if (Math.abs(old.white.data[i + 2] - next.white.data[i + 2]) > 40) moved++;
       for (let c = 0; c < 3; c++)
         for (const key of ['black', 'white'])
-          worst = Math.max(
-            worst,
-            Math.abs(half[key].data[i + c] - (old[key].data[i + c] + next[key].data[i + c]) / 2),
-          );
+          worst = Math.max(worst, Math.abs(half[key].data[i + c] - (old[key].data[i + c] + next[key].data[i + c]) / 2));
     }
-    check(moved > 3000 && worst <= 1.5, `SceneFade over two views: ${moved} changing pixels, ${worst} of 255 from the mean`);
+    check(
+      moved > 3000 && worst <= 1.5,
+      `SceneFade over two views: ${moved} changing pixels, ${worst} of 255 from the mean`,
+    );
     assert.deepEqual(wrong, []);
   },
   { seconds: 240 },

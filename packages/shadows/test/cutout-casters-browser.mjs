@@ -137,7 +137,8 @@ if (!(measuringCost && deferSpeed('shadows cutout caster paired cost'))) {
             row = { pass, caster: 'raw', edit: name };
           for (const half of ['solid', 'cut']) {
             const ratio = (row[half] = +((await patch(image, points[half])) / lit[half]).toFixed(3));
-            if (shaded ? ratio > SHADED : ratio < LIT) failures.push(`${pass} raw ${name} ${half}: ${ratio} of its open light`);
+            if (shaded ? ratio > SHADED : ratio < LIT)
+              failures.push(`${pass} raw ${name} ${half}: ${ratio} of its open light`);
           }
           rows.push(row);
           console.log(JSON.stringify(row));
@@ -202,7 +203,8 @@ if (!(measuringCost && deferSpeed('shadows cutout caster paired cost'))) {
       await page.goto(page.url().split('?')[0] + '?hardware');
       await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
       const hardware = await page.evaluate(() => window.check.hardware);
-      if (!hardware.has) console.log('cut-out casters: no adapter here offers clip-distances; the hardware clip path is not checked');
+      if (!hardware.has)
+        console.log('cut-out casters: no adapter here offers clip-distances; the hardware clip path is not checked');
       else {
         mode = 'hardware';
         const before = await page.evaluate(() => window.check.clipModules());
@@ -224,7 +226,9 @@ if (!(measuringCost && deferSpeed('shadows cutout caster paired cost'))) {
               differ++;
               const x = (i / 4) % image.width,
                 y = Math.floor(i / 4 / image.width);
-              box = box ? [Math.min(box[0], x), Math.min(box[1], y), Math.max(box[2], x), Math.max(box[3], y)] : [x, y, x, y];
+              box = box
+                ? [Math.min(box[0], x), Math.min(box[1], y), Math.max(box[2], x), Math.max(box[3], y)]
+                : [x, y, x, y];
             }
           const share = differ / (image.width * image.height);
           console.log(JSON.stringify({ frame: key, differ, share: +share.toFixed(5), box }));

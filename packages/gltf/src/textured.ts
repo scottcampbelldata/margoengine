@@ -593,10 +593,16 @@ export const textured: GLTFExtension = {
       if (lacks)
         addWarning(
           model.warnings as GLTFWarning[],
-          missingTexCoord(source.material!, file.doc.materials?.[source.material!]?.name, 'baseColorTexture', surface.texCoord),
+          missingTexCoord(
+            source.material!,
+            file.doc.materials?.[source.material!]?.name,
+            'baseColorTexture',
+            surface.texCoord,
+          ),
         );
       const read = () => {
-        if (surface.image === undefined || id === undefined) return new Float32Array((geometry.vertices.length / 6) * 2);
+        if (surface.image === undefined || id === undefined)
+          return new Float32Array((geometry.vertices.length / 6) * 2);
         return readAccessor(
           file,
           id,

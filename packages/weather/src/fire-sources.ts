@@ -44,7 +44,8 @@ export function clusterFires(points: readonly FirePoint[]): FireCluster[] {
     if (next < 0) break;
     const { x, z } = points[next]!;
     seeds.push([x, z]);
-    for (let i = 0; i < points.length; i++) away[i] = Math.min(away[i]!, (points[i]!.x - x) ** 2 + (points[i]!.z - z) ** 2);
+    for (let i = 0; i < points.length; i++)
+      away[i] = Math.min(away[i]!, (points[i]!.x - x) ** 2 + (points[i]!.z - z) ** 2);
   }
   const owner = new Int8Array(points.length).fill(-1),
     // Per source: power, and power times x, y, z.

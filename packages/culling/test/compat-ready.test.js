@@ -23,8 +23,7 @@ const harness = (vendor) => {
 const at = (x) => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0, 0, 1]);
 const plugins = {
   CulledMeshes: () => new CulledMeshes(),
-  CulledInstances: () =>
-    new CulledInstances([{ geometry: box(), material: new PbrMaterial(), transforms: at(0) }]),
+  CulledInstances: () => new CulledInstances([{ geometry: box(), material: new PbrMaterial(), transforms: at(0) }]),
   DynamicInstances: () => new DynamicInstances({ geometry: box(), material: new PbrMaterial(), capacity: 16 }),
 };
 

@@ -52,7 +52,13 @@ test('the axis picks the components along, up and side', () => {
 
 test('setFlow rewrites the same texture when the frame count matches, else swaps it', () => {
   const a = new CurveFlow(track, { segments: 16 }),
-    b = new CurveFlow(new CatmullRomCurve3([[0, 0, 0], [0, 6, 0]]), { segments: 16, closed: false }),
+    b = new CurveFlow(
+      new CatmullRomCurve3([
+        [0, 0, 0],
+        [0, 6, 0],
+      ]),
+      { segments: 16, closed: false },
+    ),
     c = new CurveFlow(track, { segments: 40, closed: true }),
     plugin = curveFlow(a),
     first = plugin.textures.frames;
@@ -68,11 +74,26 @@ test('setFlow rewrites the same texture when the frame count matches, else swaps
 
 test('invalid input is refused with the fix and the help link', () => {
   const flow = new CurveFlow(track);
-  assert.throws(() => curveFlow({}), (e) => e instanceof TypeError && link.test(e.message));
-  assert.throws(() => curveFlow(flow, { axis: 'w' }), (e) => e instanceof TypeError && link.test(e.message));
-  assert.throws(() => curveFlow(flow, { scale: 0 }), (e) => e instanceof RangeError && link.test(e.message));
-  assert.throws(() => curveFlow(flow, { offset: NaN }), (e) => e instanceof RangeError && link.test(e.message));
-  assert.throws(() => curveFlow(flow, { fit: [2, 2] }), (e) => e instanceof RangeError && link.test(e.message));
+  assert.throws(
+    () => curveFlow({}),
+    (e) => e instanceof TypeError && link.test(e.message),
+  );
+  assert.throws(
+    () => curveFlow(flow, { axis: 'w' }),
+    (e) => e instanceof TypeError && link.test(e.message),
+  );
+  assert.throws(
+    () => curveFlow(flow, { scale: 0 }),
+    (e) => e instanceof RangeError && link.test(e.message),
+  );
+  assert.throws(
+    () => curveFlow(flow, { offset: NaN }),
+    (e) => e instanceof RangeError && link.test(e.message),
+  );
+  assert.throws(
+    () => curveFlow(flow, { fit: [2, 2] }),
+    (e) => e instanceof RangeError && link.test(e.message),
+  );
   assert.throws(
     () => curveFlow(new CurveFlow(track, { segments: 9000 })),
     (e) => e instanceof RangeError && /8192 frames/.test(e.message),

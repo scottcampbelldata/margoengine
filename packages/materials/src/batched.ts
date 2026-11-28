@@ -777,7 +777,8 @@ export class BatchedMesh implements EnginePlugin {
     }
     if (k0 < k1) {
       queue.writeBuffer(gpu.items, k0 * ITEM * 4, this.items.subarray(k0 * ITEM, k1 * ITEM));
-      if (this.sorter) queue.writeBuffer(this.sorter.info, k0 * INFO * 4, this.info, k0 * INFO * 4, (k1 - k0) * INFO * 4);
+      if (this.sorter)
+        queue.writeBuffer(this.sorter.info, k0 * INFO * 4, this.info, k0 * INFO * 4, (k1 - k0) * INFO * 4);
       changed = true;
     }
     this.dirtyVertices = [Infinity, -Infinity];
@@ -813,7 +814,11 @@ export class BatchedMesh implements EnginePlugin {
       if (this.sorter) {
         this.releaseSorter();
         // Item order again: the CPU indices are the unsorted ones.
-        device.queue.writeBuffer(index, 0, this.mesh.primitives[0].indices.subarray(0, this.nextIndex) as Uint32Array<ArrayBuffer>);
+        device.queue.writeBuffer(
+          index,
+          0,
+          this.mesh.primitives[0].indices.subarray(0, this.nextIndex) as Uint32Array<ArrayBuffer>,
+        );
       }
       return;
     }
@@ -969,8 +974,7 @@ export class BatchedMesh implements EnginePlugin {
   private shape(geometryId: number): Shape {
     this.live_();
     const shape = Number.isInteger(geometryId) ? this.shapes[geometryId] : undefined;
-    if (!shape)
-      throw new RangeError(`BatchedMesh has no geometry ${geometryId}; use an id that addGeometry returned`);
+    if (!shape) throw new RangeError(`BatchedMesh has no geometry ${geometryId}; use an id that addGeometry returned`);
     return shape;
   }
   private range(id: number): Range {

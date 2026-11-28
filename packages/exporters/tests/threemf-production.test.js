@@ -81,12 +81,7 @@ test('UUIDs from the caller write the same bytes twice', async () => {
     first = await export3MF(scene, options),
     second = await export3MF(scene, options);
   assert.deepEqual(first, second);
-  assert.deepEqual(seen.slice(0, seen.length / 2), [
-    'object 0 a',
-    'item 0 a',
-    'item 1 b',
-    'build 0 undefined',
-  ]);
+  assert.deepEqual(seen.slice(0, seen.length / 2), ['object 0 a', 'item 0 a', 'item 1 b', 'build 0 undefined']);
 });
 
 test('separate parts hold one object and its resources each, named by path from the root', async () => {
@@ -289,7 +284,10 @@ test('the reader follows the namespace, whatever prefix a file gives it', async 
 test('the reader refuses a path outside the root part and alternatives of an alternative', async () => {
   const nested = await packed({
     [ROOT]: model('', '<item objectid="2" p:path="/3D/a.model"/>'),
-    '3D/a.model': model('<object id="2"><components><component objectid="1" p:path="/3D/b.model"/></components></object>', ''),
+    '3D/a.model': model(
+      '<object id="2"><components><component objectid="1" p:path="/3D/b.model"/></components></object>',
+      '',
+    ),
     '3D/b.model': model(`<object id="1">${tetra}</object>`, ''),
   });
   await assert.rejects(parse3MF(nested), /only the root model part/);

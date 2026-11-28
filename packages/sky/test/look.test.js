@@ -332,11 +332,20 @@ test("the haze's fire glow is in front of the layer's, by the fog's law", () => 
   look.write(block, { fog: { density: 0.001, fireSpots: [spot] } }, air, 5, 4);
   const f = (x) => Math.fround(x);
   assert.deepEqual([...block.subarray(144, 152)], [f(0.1), f(0.05), f(0.025), 640000, 50, 1000, -1500, 2000]);
-  assert.ok(block.subarray(152).every((v) => v === 0), 'the spots left over end the list');
-  assert.ok(block.subarray(80, 144).every((v) => v === 0), 'no layer spots written by the fog');
+  assert.ok(
+    block.subarray(152).every((v) => v === 0),
+    'the spots left over end the list',
+  );
+  assert.ok(
+    block.subarray(80, 144).every((v) => v === 0),
+    'no layer spots written by the fog',
+  );
   for (const fog of [{ density: 0, fireSpots: [spot] }, { fireSpots: [] }, undefined]) {
     look.write(block, { fog }, air, 5, 4);
-    assert.ok(block.subarray(144).every((v) => v === 0), `no haze glow: ${JSON.stringify(fog)}`);
+    assert.ok(
+      block.subarray(144).every((v) => v === 0),
+      `no haze glow: ${JSON.stringify(fog)}`,
+    );
   }
   // The fog's default density, 0.01: the path end 200 m.
   look.write(block, { fog: { fireSpots: [spot] } }, air, 5);
@@ -347,9 +356,14 @@ test("the haze's fire glow is in front of the layer's, by the fog's law", () => 
   h.frame();
   const main = h.codes.find((c) => c.includes('fn lowLayer(') && c.includes('fn lookSky('));
   assert.ok(main.includes('+frame.air3.rgb*frame.sun.w+fireSky(w,t);'), 'the low layer takes the fire term with t');
-  assert.ok(main.includes('if(frame.hazeFires[0].w<=0.0){return layer;}'), "without haze spots, the layer's glow alone");
   assert.ok(
-    main.includes('return layer*t+(vec3f(1.0)-t)*fireHazeTrack(frame.eye.xz,frame.eye.xz+ray.xz*frame.hazeFires[1].w);'),
+    main.includes('if(frame.hazeFires[0].w<=0.0){return layer;}'),
+    "without haze spots, the layer's glow alone",
+  );
+  assert.ok(
+    main.includes(
+      'return layer*t+(vec3f(1.0)-t)*fireHazeTrack(frame.eye.xz,frame.eye.xz+ray.xz*frame.hazeFires[1].w);',
+    ),
     "the layer's glow through the haze, the haze's in front along the fog's path",
   );
   sky.dispose();
@@ -368,7 +382,11 @@ test("the sky fog's colour goes through the look's low layer, and only with a lo
     h.engine.gpu.createShaderModule = (d) => (codes.push(d.code), make(d));
     h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array([1, 1, 1, 0.15]) };
     const depth = Object.assign(
-        h.engine.gpu.createTexture({ size: [128, 96], format: 'depth32float', usage: globalThis.GPUTextureUsage.TEXTURE_BINDING }),
+        h.engine.gpu.createTexture({
+          size: [128, 96],
+          format: 'depth32float',
+          usage: globalThis.GPUTextureUsage.TEXTURE_BINDING,
+        }),
         { depthOrArrayLayers: 1 },
       ),
       sky = new Sky({ ...options, fog: { depth: () => depth, density: 0.001 }, timeScale: 0 });
@@ -389,5 +407,8 @@ test("the sky fog's colour goes through the look's low layer, and only with a lo
     'the layer and its glow, without the fires',
   );
   const plain = fogCode({});
-  assert.ok(!plain.includes('hazeLayer') && plain.includes(' color=color*exp2(frame.settings.y);}'), 'no look, as before');
+  assert.ok(
+    !plain.includes('hazeLayer') && plain.includes(' color=color*exp2(frame.settings.y);}'),
+    'no look, as before',
+  );
 });

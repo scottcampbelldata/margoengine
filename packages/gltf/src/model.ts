@@ -2267,9 +2267,7 @@ function fit(
     }
     m = copy;
   }
-  return pointsOrLines && a.NORMAL === undefined
-    ? copyOf(m, { ext: [1, ...m.ext!.slice(1)] })
-    : m;
+  return pointsOrLines && a.NORMAL === undefined ? copyOf(m, { ext: [1, ...m.ext!.slice(1)] }) : m;
 }
 /** KB-GLTFA A5: a bad translation, rotation or scale names its node instead of surfacing core's transform error. */
 function checkTRS(node: GLTFNode, index: number): void {
@@ -2549,10 +2547,8 @@ export class PBRModel implements EnginePlugin {
     for (let i = 0; i < defs.length; i++) {
       let depth = 0;
       for (let p = i; p !== -1; p = parents[p])
-        if (++depth > defs.length)
-          throw typeError(`glTF hierarchy cycle through node ${i}`, 'gltf-transform');
-      if (depth > 62)
-        throw rangeError(`glTF node ${i} is ${depth} levels deep, past 62`, 'gltf-transform');
+        if (++depth > defs.length) throw typeError(`glTF hierarchy cycle through node ${i}`, 'gltf-transform');
+      if (depth > 62) throw rangeError(`glTF node ${i} is ${depth} levels deep, past 62`, 'gltf-transform');
     }
     const roots = doc.scenes
       ? (entry(doc.scenes, doc.scene ?? 0, 'scene').nodes ?? [])
@@ -2719,7 +2715,10 @@ export class PBRModel implements EnginePlugin {
         !this.lights.length &&
         !audioOnly
       )
-        throw margoError('failed', 'glTF contains no renderable meshes, cameras or lights; add a mesh with triangle primitives');
+        throw margoError(
+          'failed',
+          'glTF contains no renderable meshes, cameras or lights; add a mesh with triangle primitives',
+        );
       const source: PBRSource = this;
       for (const node of this.created) Object.defineProperty(node, cpuSource, { value: source, configurable: true });
       // The primitives of each node, in one pass: nodes in first-primitive order, primitives in model order.

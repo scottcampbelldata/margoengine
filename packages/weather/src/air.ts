@@ -720,7 +720,8 @@ export function fireLayerLight(radiantPower: number, spread = 0, distance = 0): 
       throw new RangeError(name + ' must be a finite number, 0 or more; got ' + String(v));
   if (radiantPower === 0) return [0, 0, 0];
   const h = SMOKE_LAYER_DEPTH / 2,
-    share = (radiantPower * h) / (4 * Math.PI * (h * h + spread * spread + distance * distance) ** 1.5) / NOON_IRRADIANCE;
+    share =
+      (radiantPower * h) / (4 * Math.PI * (h * h + spread * spread + distance * distance) ** 1.5) / NOON_IRRADIANCE;
   return [FIRE_LIGHT_COLOR[0] * share, FIRE_LIGHT_COLOR[1] * share, FIRE_LIGHT_COLOR[2] * share];
 }
 

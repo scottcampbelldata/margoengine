@@ -87,7 +87,19 @@ export function parseTiledEXR(
     return { ...image, levels: [{ levelX: 0, levelY: 0, width: image.width, height: image.height, data: image.data }] };
   }
   const header = readEXRHeader(bytes, true, rejectCompression);
-  const { view, channels, compression, dataWindow, displayWindow, width, height, indices, layout, primaries, colorInteropID } = header;
+  const {
+    view,
+    channels,
+    compression,
+    dataWindow,
+    displayWindow,
+    width,
+    height,
+    indices,
+    layout,
+    primaries,
+    colorInteropID,
+  } = header;
   const { xSize, ySize, mode } = header.tiles!;
   const levelMode = mode & 15,
     roundingMode = mode >> 4;

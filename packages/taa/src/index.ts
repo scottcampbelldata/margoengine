@@ -21,7 +21,6 @@ import {
   cameraVelocity,
   multisampledCameraVelocity,
   skySample,
-  mixedGap,
   mixedSurface,
   nearestCopy as nearestCopyShader,
   nearestDepth as nearestDepthShader,

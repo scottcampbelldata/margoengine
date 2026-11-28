@@ -19,11 +19,7 @@ export async function withTransmission<T extends Pick<GLTFDecoderHooks, 'materia
   doc: GLTFDocument,
   decoders: T,
 ): Promise<T> {
-  if (
-    decoders.transmission !== undefined ||
-    !decoders.materials ||
-    !declares(doc, 'KHR_materials_transmission')
-  )
+  if (decoders.transmission !== undefined || !decoders.materials || !declares(doc, 'KHR_materials_transmission'))
     return decoders;
   return { ...decoders, transmission: (await import('./transmission.js')).screenTransmission };
 }

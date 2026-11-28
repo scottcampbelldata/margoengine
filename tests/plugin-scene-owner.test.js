@@ -75,7 +75,10 @@ test('open sites pass only by file and exact call; a listed site that is gone fa
   const tree = mkdtempSync(join(tmpdir(), 'scene-owner-'));
   try {
     mkdirSync(join(tree, 'packages/demo/src'), { recursive: true });
-    writeFileSync(join(tree, 'packages/demo/src/a.ts'), ['export function f(engine) {', '  engine.removePlugin(name);', '}', ''].join(String.fromCharCode(10)));
+    writeFileSync(
+      join(tree, 'packages/demo/src/a.ts'),
+      ['export function f(engine) {', '  engine.removePlugin(name);', '}', ''].join(String.fromCharCode(10)),
+    );
     const git = (...args) => execFileSync('git', args, { cwd: tree, timeout: 30_000 });
     git('init', '-q');
     git('add', '.');

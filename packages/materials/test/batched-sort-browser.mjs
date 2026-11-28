@@ -17,7 +17,10 @@ const call = async (name, ...args) => {
   return r;
 };
 const near = (a, b, label, tolerance = 2) =>
-  assert.ok(a.every((v, i) => Math.abs(v - b[i]) <= tolerance), `${label}: ${a} vs ${b}`);
+  assert.ok(
+    a.every((v, i) => Math.abs(v - b[i]) <= tolerance),
+    `${label}: ${a} vs ${b}`,
+  );
 try {
   await browser.page.waitForFunction(() => window.ready, null, { timeout: 30000 });
   for (const z of [6, -6]) {
@@ -44,7 +47,9 @@ try {
   assert.equal(removed.count, 0, 'removing the geometry removes its items');
   near(removed.rgb, [0, 0, 0], 'and they draw nothing');
   assert.deepEqual(pageErrors, []);
-  console.log(`batched-sort (${compat ? 'webgl2-layer' : 'webgpu'}): back-to-front from both sides, manual, front-to-back, shared geometry passed`);
+  console.log(
+    `batched-sort (${compat ? 'webgl2-layer' : 'webgpu'}): back-to-front from both sides, manual, front-to-back, shared geometry passed`,
+  );
 } finally {
   await browser.close();
 }

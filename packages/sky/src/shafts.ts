@@ -261,7 +261,10 @@ export class LightShafts implements EnginePlugin {
     const illuminance =
         o.sunIlluminance ?? sky?.sunIlluminance ?? (sky && (sky.options.model ?? 'preetham') === 'preetham' ? 10 : 20),
       scale =
-        illuminance * 2 ** (sky?.options.exposure ?? 0) * (sky?.pictureScale ?? 1) * (o.intensity ?? defaults.intensity);
+        illuminance *
+        2 ** (sky?.options.exposure ?? 0) *
+        (sky?.pictureScale ?? 1) *
+        (o.intensity ?? defaults.intensity);
     if (!(fade > 0 && scale > 0 && Math.max(this.color[0], this.color[1], this.color[2]) > 0)) return false;
     v.set(c.camera.position, 16);
     v.set(s, 20);

@@ -53,7 +53,9 @@ function run(skip, report) {
   });
 }
 
-test('malformed JPEG 2000 input gives a picture or a coded error, never a trap or a hang', { timeout: 600_000 }, async (t) => {
+test('malformed JPEG 2000 input gives a picture or a coded error, never a trap or a hang', {
+  timeout: 600_000,
+}, async (t) => {
   const report = { cases: 0, outcomes: {}, failures: [] };
   let skip = 0;
   while (skip !== undefined && report.failures.length < 40) skip = await run(skip, report);

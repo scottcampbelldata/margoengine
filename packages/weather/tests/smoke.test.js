@@ -263,7 +263,11 @@ test('the fog colour under a load is in the units the sky draws its haze in (KB-
 // wedge cut hard against a brown sky of (98, 66, 24). A long enough path ends at the horizon sky (Koschmieder 1924).
 test('a sky that draws the load leaves the fog on its own radiance, gives back the colour after, and dust still tints', async () => {
   const { holdFromWeather } = await import('../../shared/settings.js');
-  for (const extra of [{ options: { atmosphere: {} } }, { options: { look: {} } }, { airControls: true, options: {} }]) {
+  for (const extra of [
+    { options: { atmosphere: {} } },
+    { options: { look: {} } },
+    { airControls: true, options: {} },
+  ]) {
     const sky = {
         name: 'sky',
         zenithSun: 4 * Math.PI * 0.55,
@@ -291,7 +295,11 @@ test('a sky that draws the load leaves the fog on its own radiance, gives back t
     assert.deepEqual(sky.options.fog.color, [0.3, 0.4, 0.5]);
   }
   // A sky with no atmosphere, look or air controls, or one whose glow or sun colour is held, does not draw the load.
-  for (const [options, key] of [[{}, undefined], [{ atmosphere: {} }, 'scatteredLight'], [{ atmosphere: {} }, 'sunColor']]) {
+  for (const [options, key] of [
+    [{}, undefined],
+    [{ atmosphere: {} }, 'scatteredLight'],
+    [{ atmosphere: {} }, 'sunColor'],
+  ]) {
     if (key) holdFromWeather(options.atmosphere, key);
     const sky = { name: 'sky', options: { fog: { density: 0.01, falloff: 'exp' }, ...options } },
       machine = new WeatherMachine('clear', { seed: 8 }),

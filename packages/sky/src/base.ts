@@ -1301,7 +1301,13 @@ export class Sky implements EnginePlugin {
     let air = false;
     if (this.extended) {
       const look = this.features.look!;
-      look.write(this.extra, this.options, this.air, this.zenithSun, 2 ** (this.options.exposure ?? 0) * this.pictureScale);
+      look.write(
+        this.extra,
+        this.options,
+        this.air,
+        this.zenithSun,
+        2 ** (this.options.exposure ?? 0) * this.pictureScale,
+      );
       c.device.queue.writeBuffer(this.uniform!, 256, this.extra as Float32Array<ArrayBuffer>);
       for (let i = 0; i < 9; i++) air ||= this.air[i] !== this.computedAir[i];
       this.computedAir.set(this.air);

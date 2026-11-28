@@ -25,10 +25,18 @@ await postBrowser(
       engine.stop();
       engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
       const grey = new PbrMaterial({ color: '#c0c0c0', roughness: 1 });
-      engine.createMesh().setGeometry(box(400, 0.2, 2000)).setPosition([0, -0.1, -600]).setMaterial(grey);
+      engine
+        .createMesh()
+        .setGeometry(box(400, 0.2, 2000))
+        .setPosition([0, -0.1, -600])
+        .setMaterial(grey);
       // Ridges 1 m wide and 0.5 m high every 4 m, along the view.
       for (let x = -60; x <= 60; x += 4)
-        engine.createMesh().setGeometry(box(1, 0.5, 1600)).setPosition([x, 0.25, -800]).setMaterial(grey);
+        engine
+          .createMesh()
+          .setGeometry(box(1, 0.5, 1600))
+          .setPosition([x, 0.25, -800])
+          .setMaterial(grey);
       const gtao = GTAO.attach(engine, { radius: 1.5, slices: 2, steps: 6 });
       for (let i = 0; i < 3; i++) engine.render({ delta: 1 / 60 });
       await engine.gpu.queue.onSubmittedWorkDone();

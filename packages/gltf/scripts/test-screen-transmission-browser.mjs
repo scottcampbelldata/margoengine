@@ -60,7 +60,10 @@ await runSuite(
       // The checker shows through clear glass and blurs behind rough IOR 1.5 glass; a rough IOR 1 slab bends no ray, so
       // it stays see-through (the blur derivation in src/transmission.ts).
       assert.ok(sharp.row.spread > 60, `clear glass shows the checker (spread ${sharp.row.spread}, ${antialias})`);
-      assert.ok(bent.row.spread > 60, `clear IOR 1.5 glass shows the checker (spread ${bent.row.spread}, ${antialias})`);
+      assert.ok(
+        bent.row.spread > 60,
+        `clear IOR 1.5 glass shows the checker (spread ${bent.row.spread}, ${antialias})`,
+      );
       assert.ok(
         rough.row.spread < bent.row.spread / 2,
         `roughness 0.6 at IOR 1.5 blurs the checker (${rough.row.spread} vs ${bent.row.spread}, ${antialias})`,
@@ -77,9 +80,15 @@ await runSuite(
       // depthWrite: the white glass in front hides the red glass behind it in either draw order (green survives); without
       // it the later red draw lands over the white one (green gone). The white-only frame's green mean is the target.
       const white = sharp.row.greenMean;
-      assert.ok(at('stack-blend-near-first').row.greenMean < white / 4, `blended: the later red glass covers (${antialias})`);
+      assert.ok(
+        at('stack-blend-near-first').row.greenMean < white / 4,
+        `blended: the later red glass covers (${antialias})`,
+      );
       for (const name of ['stack-write-near-first', 'stack-write-far-first'])
-        assert.ok(Math.abs(at(name).row.greenMean - white) < 1, `${name}: the front glass hides the red (${antialias})`);
+        assert.ok(
+          Math.abs(at(name).row.greenMean - white) < 1,
+          `${name}: the front glass hides the red (${antialias})`,
+        );
       // KB4000 step 4: parseGLTFAsync wires the pass for a file that declares KHR_materials_transmission (and the
       // synchronous parse when passed `screenTransmission`): the same pixels as the attached pass, with depth writes.
       for (const name of ['default-ior15-rough06', 'sync-ior15-rough06']) {
@@ -132,7 +141,11 @@ await runSuite(
             const want = pbrNeutral(light.map((v, c) => v * T[c] ** d)).map(encode);
             for (let c = 0; c < 3; c++) {
               const e = Math.abs(got[o + c] - want[c]);
-              if (e > worst) [worst, at] = [e, { x, y, c, got: [...got.subarray(o, o + 3)], want, behind: [...behind.subarray(o, o + 3)] }];
+              if (e > worst)
+                [worst, at] = [
+                  e,
+                  { x, y, c, got: [...got.subarray(o, o + 3)], want, behind: [...behind.subarray(o, o + 3)] },
+                ];
             }
           }
         report[`${name}:${antialias}`] = { worst, at };

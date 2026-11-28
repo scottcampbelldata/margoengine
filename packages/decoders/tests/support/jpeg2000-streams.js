@@ -46,10 +46,6 @@ export function greyProfile(gamma) {
  * specification box.
  */
 export function jp2(stream, width, height, boxes = [], colour = greyColour()) {
-  const header = [
-    ...box('ihdr', [...be(height, 4), ...be(width, 4), 0, 1, 7, 7, 0, 0]),
-    ...colour,
-    ...boxes,
-  ];
+  const header = [...box('ihdr', [...be(height, 4), ...be(width, 4), 0, 1, 7, 7, 0, 0]), ...colour, ...boxes];
   return Uint8Array.from([...jp2Opening(), ...box('jp2h', header), ...box('jp2c', [...stream])]);
 }

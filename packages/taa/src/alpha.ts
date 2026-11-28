@@ -33,7 +33,8 @@ export function premultipliedResolve(code: string): string {
   // pixel's straight colour with them.
   const colourClip = 'clipHistory(ycocg(old/total),lo,hi,m1,m2)',
     variance = code.includes('fn clipHistory('),
-    joint = 'clipPremultiplied(vec4f(ycocg(old/total),oldAlpha/total),vec4f(lo,loA),vec4f(hi,hiA),vec4f(m1,m1A),vec4f(m2,m2A))';
+    joint =
+      'clipPremultiplied(vec4f(ycocg(old/total),oldAlpha/total),vec4f(lo,loA),vec4f(hi,hiA),vec4f(m1,m1A),vec4f(m2,m2A))';
   const clamped = variance ? joint + '.w' : 'clamp(oldAlpha/total,loA,hiA)',
     history = locked ? `select(${clamped},oldAlpha/total,lock>0.0)` : clamped,
     weight = reactive ? 'temporal.settings.x*(1.0-max(react,oldReact/total))' : 'temporal.settings.x';

@@ -176,7 +176,10 @@ test('loadGLTF takes extensions, for its early check and for the parse', async (
     doc.buffers[0].uri = 'model.bin';
     const get = async (url) =>
       new Response(String(url).endsWith('.bin') ? bytes : JSON.stringify(doc), { status: 200 });
-    await assert.rejects(loadGLTF(engine, 'https://example.test/model.gltf', { fetch: get }), /gltf\/pbr|errors#gltf-light/);
+    await assert.rejects(
+      loadGLTF(engine, 'https://example.test/model.gltf', { fetch: get }),
+      /gltf\/pbr|errors#gltf-light/,
+    );
     const model = await loadGLTF(engine, 'https://example.test/model.gltf', { fetch: get, extensions: [quantized] });
     assert.deepEqual(vertexData(model.meshes[0].geometry).positions, [0, 0, 0, 1, 0, 0, 0, 1, 0]);
     model.dispose();

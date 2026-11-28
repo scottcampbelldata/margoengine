@@ -46,9 +46,7 @@ try {
           const gpuErrors = [];
           device.addEventListener('uncapturederror', (e) => gpuErrors.push(e.error.message));
           const load = async (name) =>
-            new Uint8Array(
-              await (await fetch(`/packages/decoders/tests/fixtures/jpeg2000/${name}`)).arrayBuffer(),
-            );
+            new Uint8Array(await (await fetch(`/packages/decoders/tests/fixtures/jpeg2000/${name}`)).arrayBuffer());
           const same = (a, b, what) => {
             if (a.length !== b.length) throw new Error(`${what}: ${a.length} samples against ${b.length}`);
             for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) throw new Error(`${what}: sample ${i} differs`);
@@ -112,7 +110,10 @@ try {
                 outcomes.decoded = (outcomes.decoded ?? 0) + 1;
               } catch (error) {
                 const kind = error instanceof RangeError ? 'range' : error.code;
-                if (!['range', 'failed', 'unsupported'].includes(kind) || /stopped|timed? ?out|time limit/i.test(error.message))
+                if (
+                  !['range', 'failed', 'unsupported'].includes(kind) ||
+                  /stopped|timed? ?out|time limit/i.test(error.message)
+                )
                   throw new Error(`${name}: ${error.name}: ${error.message}`);
                 outcomes[kind] = (outcomes[kind] ?? 0) + 1;
               }
@@ -121,7 +122,10 @@ try {
             }
             // An abort ends the slowest of them in its worker at once, and the pool decodes the next file.
             const controller = new AbortController();
-            const pending = decoder.decode(Uint8Array.from(slow.bytes), { maxPixels: 2 ** 20, signal: controller.signal });
+            const pending = decoder.decode(Uint8Array.from(slow.bytes), {
+              maxPixels: 2 ** 20,
+              signal: controller.signal,
+            });
             setTimeout(() => controller.abort(), 20);
             const aborted = await pending.then(
               () => 'resolved',
@@ -149,7 +153,10 @@ try {
       assert.equal(result.after, 61);
       assert.deepEqual(result.gpuErrors, []);
       assert.deepEqual(errors, []);
-      assert.equal(Object.values(result.outcomes).reduce((a, b) => a + b, 0), hostile.length);
+      assert.equal(
+        Object.values(result.outcomes).reduce((a, b) => a + b, 0),
+        hostile.length,
+      );
       console.log(
         `${backend}: ${all.length} vectors in workers, ${result.uploaded} texture bytes, ${hostile.length} hostile ` +
           `headers ${JSON.stringify(result.outcomes)}, slowest ${result.slowest}, abort ok`,

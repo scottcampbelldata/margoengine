@@ -217,7 +217,10 @@ test('a low haze layer in the sky dims and veils the clouds seen through it', ()
   assert.match(code(h), /var color=cloudVeiled\(m\.light,m\.opacity,d\)\*clouds\.sunColor\.w;/);
   assert.match(code(h), /cloudVeiled\(light,opacity,dir\)\*k/);
   assert.match(code(h), /cloudVeiled\(scene,opacity,dir\)\*k/);
-  assert.match(code(h), /let t=pow\(max\(clouds\.veil\.rgb,vec3f\(1e-30\)\),vec3f\(1\.0\/max\(d\.y\/max\(length\(d\),1e-6\),0\.052336\)\)\);/);
+  assert.match(
+    code(h),
+    /let t=pow\(max\(clouds\.veil\.rgb,vec3f\(1e-30\)\),vec3f\(1\.0\/max\(d\.y\/max\(length\(d\),1e-6\),0\.052336\)\)\);/,
+  );
   assert.match(code(h), /return light\*t\*clouds\.veil\.w\+opacity\*\(clouds\.glow\.rgb\+fireSky\(d,t\)\);/);
   clouds.dispose();
   // Without a layer the clouds are as they were: no dimming, no glow, no fires.
@@ -242,7 +245,10 @@ test("the fires' light on the layer is in front of the clouds, as of the dome", 
   });
   const unit = (2 * 5) / Math.PI,
     f = (x) => Math.fround(x);
-  assert.deepEqual([...v.subarray(104, 112)], [f(0.2 * unit), f(0.1 * unit), f(0.05 * unit), 1440000, 300, 1500, -40, 2600]);
+  assert.deepEqual(
+    [...v.subarray(104, 112)],
+    [f(0.2 * unit), f(0.1 * unit), f(0.05 * unit), 1440000, 300, 1500, -40, 2600],
+  );
   assert.ok(
     v.subarray(112).every((x) => x === 0),
     'the spots left over end the list',
@@ -275,12 +281,18 @@ test("the haze's fire glow is in front of the clouds, as of the dome", () => {
   const f = (x) => Math.fround(x);
   // 2^1 x 0.5 = 1: the fog's units are the sky's here; the path end 2 / 0.002 = 1000 m.
   assert.deepEqual([...v.subarray(168, 176)], [f(0.4), f(0.2), f(0.1), 640000, 50, 1000, -1500, 1000]);
-  assert.ok(v.subarray(176).every((x) => x === 0), 'the spots left over end the list');
+  assert.ok(
+    v.subarray(176).every((x) => x === 0),
+    'the spots left over end the list',
+  );
   writeVeil(v, { sun: [0, 1, 0], options: { exposure: 2, fog: { density: 0.002, fireSpots: [spot] } }, zenithSun: 5 });
   assert.equal(v[168], f(0.1), 'the fog adds after the exposure, the sky before it');
   for (const fog of [{ density: 0, fireSpots: [spot] }, { density: 0.002 }, undefined]) {
     writeVeil(v, { sun: [0, 1, 0], options: { fog }, zenithSun: 5 });
-    assert.ok(v.subarray(168).every((x) => x === 0), `no haze glow: ${JSON.stringify(fog)}`);
+    assert.ok(
+      v.subarray(168).every((x) => x === 0),
+      `no haze glow: ${JSON.stringify(fog)}`,
+    );
   }
   const h = tracedGPU(),
     sky = new Sky({ hours: 10, timeScale: 0, atmosphere: { fireSpots: [spot] } }),
@@ -291,7 +303,9 @@ test("the haze's fire glow is in front of the clouds, as of the dome", () => {
   const c = code(h);
   assert.ok(c.includes('fn fireHazeTrack(start:vec2f,end:vec2f)->vec3f'), "the haze's law");
   assert.ok(
-    c.includes('return layer*t+(vec3f(1.0)-t)*fireHazeTrack(clouds.eye.xz,clouds.eye.xz+ray.xz*clouds.hazeFires[1].w);'),
+    c.includes(
+      'return layer*t+(vec3f(1.0)-t)*fireHazeTrack(clouds.eye.xz,clouds.eye.xz+ray.xz*clouds.hazeFires[1].w);',
+    ),
     "the layer's glow through the haze, the haze's in front",
   );
   clouds.dispose();

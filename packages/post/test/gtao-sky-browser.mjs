@@ -7,21 +7,20 @@
 // - with skyRadius 0 the visibility is the plain GTAO's, bit for bit, before and after a frame with the sky on;
 // - the plain GTAO term reads 1 on the open floor (seen 53 degrees off its normal) and slope, and about 0.5 in the 90
 //   degree crease where the floor meets a wall (KB-GTAO-OPENFLOOR1: samples rounded off the slice read 0.980 there).
-import assert from "node:assert/strict";
-import { launchBrowser } from "../../../scripts/lib/browser.mjs";
-import { postBrowser } from "./post-browser.mjs";
-import { compatRun } from "../../../scripts/support/compat-shim.js";
+import assert from 'node:assert/strict';
+import { launchBrowser } from '../../../scripts/lib/browser.mjs';
+import { postBrowser } from './post-browser.mjs';
+import { compatRun } from '../../../scripts/support/compat-shim.js';
 
 await postBrowser(
-  "post-gtao-sky",
+  'post-gtao-sky',
   5373,
   () => launchBrowser({ headless: true }),
   async (page) => {
     await page.evaluate(async () => {
-      const { Engine, PbrMaterial, box } =
-          await import("/packages/core/dist/index.js"),
-        { GTAO } = await import("/packages/post/dist/gtao.js");
-      const canvas = document.querySelector("canvas"),
+      const { Engine, PbrMaterial, box } = await import('/packages/core/dist/index.js'),
+        { GTAO } = await import('/packages/post/dist/gtao.js');
+      const canvas = document.querySelector('canvas'),
         device = { current: null },
         errors = [];
       const scenes = {
@@ -87,9 +86,9 @@ await postBrowser(
               {
                 binding: 0,
                 visibility: 4,
-                texture: { sampleType: "unfilterable-float" },
+                texture: { sampleType: 'unfilterable-float' },
               },
-              { binding: 1, visibility: 4, buffer: { type: "storage" } },
+              { binding: 1, visibility: 4, buffer: { type: 'storage' } },
             ],
           }),
           pipeline = gpu.createComputePipeline({
@@ -99,7 +98,7 @@ await postBrowser(
                 code: `@group(0) @binding(0) var ao:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> out:array<f32,81>;
 @compute @workgroup_size(9,9) fn main(@builtin(local_invocation_id) id:vec3u){let c=vec2i(textureDimensions(ao)/2u);out[id.y*9u+id.x]=textureLoad(ao,c+vec2i(id.xy)-4,0).r;}`,
               }),
-              entryPoint: "main",
+              entryPoint: 'main',
             },
           }),
           storage = gpu.createBuffer({ size: 324, usage: 128 | 4 }),
@@ -122,9 +121,7 @@ await postBrowser(
         encoder.copyBufferToBuffer(storage, 0, readback, 0, 324);
         gpu.queue.submit([encoder.finish()]);
         await readback.mapAsync(1);
-        const values = Array.from(
-          new Float32Array(readback.getMappedRange().slice(0)),
-        );
+        const values = Array.from(new Float32Array(readback.getMappedRange().slice(0)));
         readback.unmap();
         return values;
       };
@@ -138,9 +135,9 @@ await postBrowser(
               {
                 binding: 0,
                 visibility: 4,
-                texture: { sampleType: "unfilterable-float" },
+                texture: { sampleType: 'unfilterable-float' },
               },
-              { binding: 1, visibility: 4, buffer: { type: "storage" } },
+              { binding: 1, visibility: 4, buffer: { type: 'storage' } },
             ],
           }),
           pipeline = gpu.createComputePipeline({
@@ -150,7 +147,7 @@ await postBrowser(
                 code: `@group(0) @binding(0) var t:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> out:array<f32>;
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){if(any(id.xy>=vec2u(${n}u))){return;}let c=vec2i(textureDimensions(t)/2u);let v=textureLoad(t,c+vec2i(id.xy)-${half},0);let o=(id.y*${n}u+id.x)*${channels}u;for(var k=0u;k<${channels}u;k++){out[o+k]=v[k];}}`,
               }),
-              entryPoint: "main",
+              entryPoint: 'main',
             },
           }),
           storage = gpu.createBuffer({ size: bytes, usage: 128 | 4 }),
@@ -173,9 +170,7 @@ await postBrowser(
         encoder.copyBufferToBuffer(storage, 0, readback, 0, bytes);
         gpu.queue.submit([encoder.finish()]);
         await readback.mapAsync(1);
-        const values = Array.from(
-          new Float32Array(readback.getMappedRange().slice(0)),
-        );
+        const values = Array.from(new Float32Array(readback.getMappedRange().slice(0)));
         readback.unmap();
         return values;
       };
@@ -183,15 +178,13 @@ await postBrowser(
       window.measure = async (name, skyRadius) => {
         const scene = scenes[name],
           engine = await Engine.create(canvas, {
-            backend: "webgpu",
+            backend: 'webgpu',
             camera: scene.camera,
           });
         engine.stop();
         device.current = engine.gpu;
-        engine.gpu.addEventListener("uncapturederror", (event) =>
-          errors.push(event.error.message),
-        );
-        const grey = new PbrMaterial({ color: "#c0c0c0", roughness: 1 });
+        engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+        const grey = new PbrMaterial({ color: '#c0c0c0', roughness: 1 });
         for (const [size, position, rotation] of scene.boxes) {
           const mesh = engine
             .createMesh()
@@ -220,7 +213,7 @@ await postBrowser(
         result.back = await read(gtao);
         // The blur's inputs (the raw AO it smooths, view depth, G-buffer normals) and output around the middle, and its
         // two pass settings (axis, radius, orthographic flag), for the CPU replica.
-        if (name === "crease")
+        if (name === 'crease')
           result.blur = {
             raw: await readBlock(gtao.raw, 16, 1),
             depth: await readBlock(gtao.viewDepth, 16, 1),
@@ -229,17 +222,16 @@ await postBrowser(
             passes: gtao.directionValues.map((v) => Array.from(v)),
           };
         engine.dispose();
-        if (errors.length) throw new Error(errors.join("\n"));
+        if (errors.length) throw new Error(errors.join('\n'));
         return result;
       };
     });
     const mean = (values) => values.reduce((a, b) => a + b, 0) / values.length;
-    const centre = (values) =>
-      mean([30, 31, 32, 39, 40, 41, 48, 49, 50].map((i) => values[i]));
-    const floor = await page.evaluate(() => window.measure("floor", 8)),
-      slope = await page.evaluate(() => window.measure("slope", 8)),
-      slot = await page.evaluate(() => window.measure("slot", 12)),
-      crease = await page.evaluate(() => window.measure("crease", 0));
+    const centre = (values) => mean([30, 31, 32, 39, 40, 41, 48, 49, 50].map((i) => values[i]));
+    const floor = await page.evaluate(() => window.measure('floor', 8)),
+      slope = await page.evaluate(() => window.measure('slope', 8)),
+      slot = await page.evaluate(() => window.measure('slot', 12)),
+      crease = await page.evaluate(() => window.measure('crease', 0));
     // The sky term alone: the visibility with the sky search over the plain GTAO's at the same pixel.
     const share = (r) => r.on.map((on, i) => on / r.off[i]);
     const analytic = Math.sin(Math.atan(1 / 2)),
@@ -275,9 +267,7 @@ await postBrowser(
       { raw, depth, normal, ao, passes } = crease.blur,
       at = (x, y) => y * B + x,
       dot3 = (a, b) =>
-        normal[a * 4] * normal[b * 4] +
-        normal[a * 4 + 1] * normal[b * 4 + 1] +
-        normal[a * 4 + 2] * normal[b * 4 + 2],
+        normal[a * 4] * normal[b * 4] + normal[a * 4 + 1] * normal[b * 4 + 1] + normal[a * 4 + 2] * normal[b * 4 + 2],
       pass = (input, [ax, ay, radius, ortho], x0, x1, y0, y1) => {
         const out = new Float64Array(B * B);
         for (let y = y0; y <= y1; y++)
@@ -290,32 +280,16 @@ await postBrowser(
               near = forward ? ahead : behind,
               inv = (d) => (ortho > 0.5 ? d : 1 / Math.max(d, 1e-30)),
               key = inv(centre),
-              slope =
-                centre > 0 && near > 0
-                  ? (forward ? 1 : -1) * (inv(near) - key)
-                  : 0;
+              slope = centre > 0 && near > 0 ? (forward ? 1 : -1) * (inv(near) - key) : 0;
             let sum = 0,
               total = 0;
             for (let i = -4; i <= 4; i++) {
               const q = at(x + ax * i, y + ay * i),
                 along = key + slope * i,
-                expected =
-                  slope !== 0 && i !== 0
-                    ? ortho > 0.5
-                      ? along
-                      : along > 0
-                        ? 1 / along
-                        : centre
-                    : centre,
-                depthWeight = Math.exp(
-                  -Math.abs(expected - depth[q]) /
-                    Math.max(radius * 0.1, 0.0001),
-                ),
+                expected = slope !== 0 && i !== 0 ? (ortho > 0.5 ? along : along > 0 ? 1 / along : centre) : centre,
+                depthWeight = Math.exp(-Math.abs(expected - depth[q]) / Math.max(radius * 0.1, 0.0001)),
                 normalWeight = Math.max(dot3(p, q), 0) ** 8,
-                w =
-                  Math.exp(-(i * i) / 8) *
-                  depthWeight *
-                  (centre === 0 ? 1 : normalWeight);
+                w = Math.exp(-(i * i) / 8) * depthWeight * (centre === 0 ? 1 : normalWeight);
               sum += input[q] * w;
               total += w;
             }
@@ -323,27 +297,15 @@ await postBrowser(
           }
         return out;
       };
-    const blurred = pass(
-      pass(raw, passes[0], 4, 28, 0, 32),
-      passes[1],
-      4,
-      28,
-      4,
-      28,
-    );
+    const blurred = pass(pass(raw, passes[0], 4, 28, 0, 32), passes[1], 4, 28, 4, 28);
     // Floor or wall: a pixel's normal against the block's bottom (floor) and top (wall) middle pixels.
-    const floorAt = (x, y) =>
-      dot3(at(x, y), at(16, 32)) > dot3(at(x, y), at(16, 0));
+    const floorAt = (x, y) => dot3(at(x, y), at(16, 32)) > dot3(at(x, y), at(16, 0));
     let creaseRow = 0;
     while (!floorAt(16, creaseRow)) creaseRow++;
     // Floor rows 0 to 4 px from the crease, over the 17 middle columns.
     let replicaError = 0;
     for (let y = creaseRow; y <= creaseRow + 4; y++)
-      for (let x = 8; x <= 24; x++)
-        replicaError = Math.max(
-          replicaError,
-          Math.abs(blurred[at(x, y)] - ao[at(x, y)]),
-        );
+      for (let x = 8; x <= 24; x++) replicaError = Math.max(replicaError, Math.abs(blurred[at(x, y)] - ao[at(x, y)]));
     // The total darkness (sum of 1 - AO) of the crease profile, blurred against raw, and the 17 x 17 read's outer rows.
     let darkRaw = 0,
       darkAo = 0;
@@ -352,11 +314,9 @@ await postBrowser(
         darkRaw += 1 - raw[at(x, y)];
         darkAo += 1 - ao[at(x, y)];
       }
-    const rows = (values) =>
-      Array.from({ length: 17 }, (_, j) => +values[at(16, 8 + j)].toFixed(3));
+    const rows = (values) => Array.from({ length: 17 }, (_, j) => +values[at(16, 8 + j)].toFixed(3));
     let ringMin = 1;
-    for (const y of [8, 24])
-      for (let x = 8; x <= 24; x++) ringMin = Math.min(ringMin, ao[at(x, y)]);
+    for (const y of [8, 24]) for (let x = 8; x <= 24; x++) ringMin = Math.min(ringMin, ao[at(x, y)]);
     result.blur = {
       ringMin,
       creaseRow: creaseRow - 16,
@@ -369,24 +329,17 @@ await postBrowser(
     };
     console.log(JSON.stringify(result));
     for (const [name, r] of [
-      ["floor", floor],
-      ["slope", slope],
-      ["slot", slot],
-      ["crease", crease],
+      ['floor', floor],
+      ['slope', slope],
+      ['slot', slot],
+      ['crease', crease],
     ])
-      assert.deepEqual(
-        r.back,
-        r.off,
-        `${name}: skyRadius 0 gives the plain GTAO back bit for bit`,
-      );
+      assert.deepEqual(r.back, r.off, `${name}: skyRadius 0 gives the plain GTAO back bit for bit`);
     // The plain GTAO term (KB-GTAO-OPENFLOOR1). An open plane reads exactly 1 in the shader's maths (the CPU replica in
     // float64 gives 1.00000); the bound leaves only float32 rounding of the rebuilt positions. Before the fix the floor
     // read 0.980: samples 1 to 3 pixels out, rounded off the slice, rose above the floor's tangent in the slice.
-    for (const name of ["floor", "slope"])
-      assert.ok(
-        result.plain[name][0] >= 0.999,
-        `the plain GTAO reads 1 on an open ${name} (${result.plain[name]})`,
-      );
+    for (const name of ['floor', 'slope'])
+      assert.ok(result.plain[name][0] >= 0.999, `the plain GTAO reads 1 on an open ${name} (${result.plain[name]})`);
     // The 90 degree crease keeps its occlusion: 0.5 at the crease itself (half the cosine-weighted hemisphere is the wall),
     // the unblurred pixels nearest it 0.51 to 0.62 in the CPU replica, the open floor and wall around it near 1. The view
     // read here is after the bilateral blur: measured on an RTX A6000, 0.692 (WebGPU) and 0.654 (WebGL2) at its darkest.
@@ -399,28 +352,19 @@ await postBrowser(
     // because the blur then hardly blurred across floor rows: floor rows from the crease read 0.711 .790 .892 .964 .992
     // before and 0.705 .862 .900 .935 .965 after (9 x 9 maximum 0.992 to 0.965 on WebGPU, 0.948 on WebGL2). Measured
     // 0.995 (WebGPU) and 0.997 (WebGL2).
-    assert.ok(
-      result.blur.ringMin >= 0.98,
-      `the surfaces past the blur's reach read 1 (${result.blur.ringMin})`,
-    );
+    assert.ok(result.blur.ringMin >= 0.98, `the surfaces past the blur's reach read 1 (${result.blur.ringMin})`);
     // The blur is the shader's maths: a CPU 9-tap Gaussian (exp(-i^2/8)) of the raw AO with the same plane-predicted
     // depth and normal weights, both passes, on the floor rows 0 to 4 px from the crease. Measured 1.2e-6 and 1.1e-6.
-    assert.ok(
-      result.blur.replicaError <= 1e-3,
-      `the blur matches its CPU replica (${result.blur.replicaError})`,
-    );
+    assert.ok(result.blur.replicaError <= 1e-3, `the blur matches its CPU replica (${result.blur.replicaError})`);
     // Total darkness (sum of 1 - AO over 17 columns and the 25 rows the replica covers), blurred against raw: an
     // accepted difference (docs/limits.md). An edge-stopped normalised blur loses darkness where the darkest pixels lie
     // against the edge and average only with the brighter side; the old blur lost 1.3 percent only because it hardly
     // blurred there. Measured -4.69 percent (WebGPU) and -5.35 (WebGL2); the bound pins that, so it may not get worse.
     const darkness = result.blur.darkAo / result.blur.darkRaw - 1;
-    assert.ok(
-      darkness >= (compatRun() ? -0.055 : -0.048),
-      `the blur keeps the crease's darkness (${darkness})`,
-    );
+    assert.ok(darkness >= (compatRun() ? -0.055 : -0.048), `the blur keeps the crease's darkness (${darkness})`);
     // Measured on an RTX A6000 (before KB-GTAO-OPENFLOOR1, with the sky search starting 4 pixels out): 0.9983 to 0.9987
     // on the floor, 0.9997 on the slope.
-    for (const name of ["floor", "slope"])
+    for (const name of ['floor', 'slope'])
       assert.ok(
         result[name].min >= 0.995 && result[name].max <= 1,
         `an open ${name} reads 1 (${result[name].min} to ${result[name].max})`,

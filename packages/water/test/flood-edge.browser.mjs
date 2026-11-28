@@ -30,17 +30,24 @@ try {
       return createShaderModule(descriptor);
     };
     device.pushErrorScope('validation');
-    const columns = 40, rows = 32, width = 20, length = 16;
+    const columns = 40,
+      rows = 32,
+      width = 20,
+      length = 16;
     const terrain = device.createTexture({
-      size: [columns, rows], format: 'r32float',
+      size: [columns, rows],
+      format: 'r32float',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
-    device.queue.writeTexture(
-      { texture: terrain }, new Float32Array(columns * rows), { bytesPerRow: columns * 4 }, [columns, rows],
-    );
+    device.queue.writeTexture({ texture: terrain }, new Float32Array(columns * rows), { bytesPerRow: columns * 4 }, [
+      columns,
+      rows,
+    ]);
     const sample = async (boundary, checkDetach = false) => {
       const water = Water.attach(engine, {
-        height: -6, size: [width, length], segments: 16,
+        height: -6,
+        size: [width, length],
+        segments: 16,
         waves: [{ direction: [1, 0], amplitude: 0, wavelength: 1.6 }],
         terrain: { heightmap: () => terrain, origin: [-10, -8], size: [width, length] },
         fill: () => 2,
@@ -50,7 +57,12 @@ try {
       const reading = await flood.read();
       const mesh = await WaveQuery.capture(water);
       const at = [
-        [0, 16], [columns - 1, 16], [20, 0], [20, rows - 1], [1, 1], [20, 16],
+        [0, 16],
+        [columns - 1, 16],
+        [20, 0],
+        [20, rows - 1],
+        [1, 1],
+        [20, 16],
       ].map(([i, j]) => {
         const k = j * columns + i;
         return {
@@ -70,7 +82,9 @@ try {
     engine.dispose();
     terrain.destroy();
     return {
-      inland, coastal, validation,
+      inland,
+      coastal,
+      validation,
       surf: waterShaders.map((source) => /const COAST_SURF=(true|false);/.exec(source)?.[1]),
     };
   });

@@ -95,7 +95,10 @@ export function writeHazeFires(
  * path from the closest approach to the spot and a^2 = R^2 + d^2, the integral is R^3 u / (a^2 sqrt(a^2 + u^2)). The
  * fog draws it over the scene and the sky toward its own rays (`fireSky`), one law for one light (KB-SKY-HAZEGLOW1).
  */
-export const fireTrackWgsl = (name: string, spot: (part: 0 | 1) => string): string => `fn ${name}(start:vec2f,end:vec2f)->vec3f {
+export const fireTrackWgsl = (
+  name: string,
+  spot: (part: 0 | 1) => string,
+): string => `fn ${name}(start:vec2f,end:vec2f)->vec3f {
  let path=end-start;let span=length(path);var light=vec3f(0.0);
  for(var i=0u;i<8u;i++){
   let spot=${spot(0)};let R2=spot.w;if(R2<=0.0){break;}let toFire=${spot(1)}.xz-start;
@@ -118,7 +121,9 @@ export const fireTrackWgsl = (name: string, spot: (part: 0 | 1) => string): stri
  * Scattering Model for Real Time Rendering", SIGGRAPH 2005, https://doi.org/10.1145/1186822.1073309). Without haze
  * spots the layer's glow is drawn as it is (KB-SKY-HAZEGLOW1).
  */
-export const fireSkyWgsl = (u: string): string => `${fireLayerWgsl(u)}${fireTrackWgsl('fireHazeTrack', (part) => `${u}.hazeFires[2u*i${part ? '+1u' : ''}]`)}fn fireSky(w:vec3f,t:vec3f)->vec3f {
+export const fireSkyWgsl = (
+  u: string,
+): string => `${fireLayerWgsl(u)}${fireTrackWgsl('fireHazeTrack', (part) => `${u}.hazeFires[2u*i${part ? '+1u' : ''}]`)}fn fireSky(w:vec3f,t:vec3f)->vec3f {
  let layer=fireLayer(w);if(${u}.hazeFires[0].w<=0.0){return layer;}
  let ray=normalize(w);
  return layer*t+(vec3f(1.0)-t)*fireHazeTrack(${u}.eye.xz,${u}.eye.xz+ray.xz*${u}.hazeFires[1].w);

@@ -238,7 +238,8 @@ export function horizonEdgeMean(
   for (let p = 0; p < loop; p++) {
     const a = width - 1,
       b = depth - 1,
-      [u, v] = p < a ? [p, 0] : p < a + b ? [a, p - a] : p < 2 * a + b ? [a - (p - a - b), b] : [0, b - (p - 2 * a - b)],
+      [u, v] =
+        p < a ? [p, 0] : p < a + b ? [a, p - a] : p < 2 * a + b ? [a - (p - a - b), b] : [0, b - (p - 2 * a - b)],
       t = (v * width + u) * channels;
     for (let k = 0; k < channels; k++) sums[(p + 1) * channels + k] = sums[p * channels + k] + data[t + k];
   }
