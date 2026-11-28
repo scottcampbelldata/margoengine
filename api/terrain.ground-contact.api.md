@@ -14,6 +14,11 @@ export interface GroundContactLook {
     occlusion?: number;
 }
 
+export interface GroundContactMask {
+    readonly texture: GPUTexture;
+    readonly bounds: readonly [number, number, number, number];
+}
+
 export interface GroundContactOptions extends GroundContactLook {
     texel?: number;
     resolution?: number;
@@ -36,6 +41,7 @@ export class TerrainGroundContact implements EnginePlugin, TerrainLighting, Disp
     get owner(): Engine | undefined;
     setup(engine: Engine): void;
     onDeviceRestored(engine: Engine): void;
+    mask(): GroundContactMask | undefined;
     bindings(): GPUBindGroupEntry[];
     shader(source: string, group: number): string;
     dispose(): void;

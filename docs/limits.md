@@ -11919,9 +11919,21 @@ Entry sizes are in scripts/quality/baselines/sizes.json.
 
 - `TerrainGroundContact` footprints are circles baked on the CPU into a 1024 x 1024 mask of 0.2 m texels (205 m around
   the camera, 2 MB), re-baked whole when footprints inside it change. Only stored stones and tree trunks are fed by
-  `BiomeView`; meshes placed by hand need `view.groundContact.set`. Grass drawn over the ground can hide the soil ring.
+  `BiomeView`; meshes placed by hand need `view.groundContact.set`.
+- `BiomeObjects` opens its own grass and ferns in the soil rings (`groundCover`, `scatter/clearing-map`: `thin` 1.4,
+  `shorten` 0.6, `reach` 0.25 m, five texel reads a candidate). Grass scattered by a scene itself is not thinned unless
+  it takes `thinning` too, and still hides the ring. Chosen on rendered frames, with no measurement: those three values,
+  a trunk footprint of 0.3 of its crown's reach and the crown depth 1.2.
+- The crown shade (`skyOcclusion.crown`) is a cone about the up axis, not the mesh's outline, and dims sky light only.
+  On the treeline stills it deepens crowns a little (crown luma down 3 to 9 percent); it does not separate near and far
+  stands, which needs haze (the scene's fog).
+- The relief shadows' toothed edges on the treeline summit cliff are the cast outline of a serrated crest: raising the
+  bake's march from 48 to 256 steps moved 0.3 percent of those pixels by more than 20 of 255.
+- Relief bake work: one compute pass over the height texture, each texel marching `rays + 1` rays of up to `steps`
+  samples of 4 reads (defaults 12 and 48): 2,496 texture reads a texel, 10.5 billion for a 2049 x 2049 texture, once
+  per rebake. Wall-clock time is not measured (speed is deferred).
 - The stone ring's width and strength, a trunk's 0.6 of the sphere form factor, the foot bands' heights and the
-  canopy's optical depth (0.7 x stand cover over the lower half) are chosen on rendered frames, with no measurement behind them.
+  canopy's optical depth (0.5 x stand cover over the lower half) are chosen on rendered frames, with no measurement behind them.
 - `relief` shades the terrain only (not the objects on it), from the height texture at `textureResolution`, and
   multiplies with `shadows` where both reach: the same in umbra and light, darker only in soft edges.
 

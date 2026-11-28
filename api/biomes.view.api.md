@@ -119,6 +119,7 @@ export interface BiomeViewOptions {
     readonly meshes?: import('./objects.js').BiomeObjectsOptions['meshes'];
     readonly states?: import('./objects.js').BiomeObjectsOptions['states'];
     readonly contact?: boolean;
+    readonly groundCover?: import('./objects.js').BiomeObjectsOptions['groundCover'];
     readonly relief?: boolean | TerrainReliefLightingOptions;
     readonly disturbance?: import('./disturbance.js').Disturbance | BiomeDisturbanceSettings;
     readonly wetness?: BiomeWetness;

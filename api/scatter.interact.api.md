@@ -185,6 +185,12 @@ interface ScatterClumps {
     readonly edge?: number;
 }
 
+interface ScatterCrown {
+    depth: number;
+    radius: number;
+    top: number;
+}
+
 type ScatterImage = {
     readonly width: number;
     readonly height: number;
@@ -208,6 +214,7 @@ interface ScatterOptions {
     textures?: ScatterTextures;
     exclusions?: readonly GroundBounds[];
     clearings?: readonly ScatterClearing[];
+    thinning?: ScatterThinningSource;
     clumps?: ScatterClumps;
     reach?: number;
     paths?: readonly GroundPath[];
@@ -238,6 +245,7 @@ type ScatterPassContext = Extract<PassContext, {
 interface ScatterSkyOcclusion {
     depth: number;
     height: number;
+    crown?: ScatterCrown;
 }
 
 interface ScatterStateSource {
@@ -262,6 +270,11 @@ interface ScatterTextures {
     readonly normal?: ScatterImage;
     readonly occlusionRoughnessMetal?: ScatterImage;
     readonly alphaCutoff?: number;
+}
+
+interface ScatterThinningSource {
+    cullCode(code: string, key: 'i' | 'key'): string;
+    entries(device: GPUDevice): GPUBindGroupEntry[];
 }
 
 interface ScatterVariation {

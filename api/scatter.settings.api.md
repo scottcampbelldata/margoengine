@@ -33,7 +33,7 @@ export interface ScatterSetting extends SettingRow {
 
 export type ScatterSettingColor = readonly [number, number, number];
 
-export type ScatterSettingGroup = 'scatter' | 'wind' | 'blades' | 'variation';
+export type ScatterSettingGroup = 'scatter' | 'wind' | 'blades' | 'variation' | 'clearing';
 
 export interface ScatterSettingTarget {
     density: number;
@@ -52,6 +52,7 @@ export interface ScatterSettingTarget {
     readonly options: {
         readonly blades?: object;
         readonly material?: object;
+        readonly thinning?: object;
     };
 }
 

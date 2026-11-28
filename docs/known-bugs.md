@@ -6,6 +6,20 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: a biome species' `color` hue and value did nothing (KB-BIOMES-SPECIESCOLOR1, biomes)
+
+- **Repro:** a `SpeciesRule` with `color: { hue: 0.2, value: 0.3 }`: its objects jitter like every other species'.
+- **Cause:** the field was declared in `packages/biomes/src/define.ts` and never carried into the placed species.
+- **Fix:** `PlacedSpecies.color`, and `BiomeObjects` passes the jitter to the species' leaf and stone scatters (a hue
+  past half a turn is half a turn). Test: `packages/biomes/tests/contact.test.js`.
+
+### Fixed 2026-11-28: the alpine rock look check read cast shadows as grain (KB-BIOMES-ROCKSHADOW1, biomes test)
+
+- **Repro:** `node packages/biomes/tests/browser-check.mjs` from fefe0bad71: rock light and dark 0.108 over its 0.104.
+- **Cause:** the check divides the light out against a flat-colour frame, which holds for one light colour. With
+  BiomeView's relief lighting on by default, shadowed rock keeps only the sky's blue light and luma over red rises.
+- **Fix:** the check's material shots set `relief: false` (0.086, limits unchanged); relief has its own GPU checks.
+
 ### Fixed 2026-11-28: a subtree reference could not be a child of selector, sequence or any builder (KB-BEHAVIOR-SUBTREEBUILD1, behavior)
 
 - **Repro:** the behavior README's "Reusable subtrees" example under `npm run check:readmes`: `selector(subtree('guard'))`

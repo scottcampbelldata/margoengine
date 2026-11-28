@@ -1617,6 +1617,7 @@ stone by itself (`view.groundContact`).
 import { Engine } from '@margoengine/core';
 import { Terrain } from '@margoengine/terrain';
 import { TerrainGroundContact } from '@margoengine/terrain/ground-contact';
+import { applyGroundContactSettings } from '@margoengine/terrain/ground-contact-settings';
 const engine = await Engine.create(document.querySelector('canvas')!);
 // Small demo maps; pass your own heightmap, layers and weights textures.
 function textures(device: GPUDevice) {
@@ -1637,6 +1638,7 @@ const terrain = Terrain.attach(engine, {
 const contact = TerrainGroundContact.attach(engine, terrain);
 contact.set('camp', [4, -2, 0.6, 1, 9, 3, 0.25, 0]); // a boulder and a tree trunk
 contact.setLook({ soil: 0.8 });
+applyGroundContactSettings(contact, { 'contact.occlusion': 0.8 }); // the same look as slider rows
 engine.start();
 ```
 
@@ -1651,6 +1653,11 @@ engine.start();
   `texel` (0.2 m), `resolution` (1024: the mask covers 205 m around the camera, 2 MB), `binding` (124, three bindings).
 - The mask is baked on the CPU and re-centred as the camera moves; footprints past it draw nothing until it reaches
   them. A footprint is a circle, and meshes you place yourself get one only from your own `set`.
+- `contact.mask()` gives the baked `{ texture, bounds }` (red soil, green sky lost), for ground cover that opens around
+  the same feet: `clearingMap` of `@margoengine/scatter/clearing-map`.
+
+Sliders: `@margoengine/terrain/ground-contact-settings` holds `contact.color`, `contact.soil` and `contact.occlusion`,
+all live: `applyGroundContactSettings(contact, { 'contact.soil': 0.6 })`, as at the end of the example above.
 
 ## Mesh to terrain blending: `@margoengine/terrain/blend`
 

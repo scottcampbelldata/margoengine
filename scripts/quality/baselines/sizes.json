@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22070396,
+  "total": 22075367,
   "history": [
     {
       "date": "2026-10-24",
@@ -15881,6 +15881,12 @@
       "commit": "storm-sky-step-3",
       "reason": "VolumetricClouds rain shafts under a deck (`rain` option: cells, steps, streaks; Marshall and Palmer 1948 drop sizes, Atlas, Srivastava and Sekhon 1973 fall speed) and Weather `rainFrom`: gzip measured on the same workstation build (build-modern --only=sky,weather) from the step-2 record to now: sky/volumetric-clouds 18,769 to 20,644 B, compat-clouds 32,779 to 34,753. The rain march itself (rain-shafts.ts) joins the lazy part, which grows 4,763 to 5,670 B and loads only for a layer with a `rain` option, so the lazy rows are renamed: volumetric-clouds base 14,586 to 15,634 B, compat-clouds base 28,344 to 29,452 B. The base bytes are the rain uniform block and its writer, option checks, the CPU twin (rainRateAt, rainSource) that weather and gameplay read without the GPU, and the shared call site in the cloud shader; a further split would load a second chunk for every rain layer and still keep the uniform layout in the base. cloud-shadows, shafts, sky/weather and weather stay under their ceilings. Core and stage unchanged.",
       "grew": 6
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "7b394c5aec",
+      "grew": 4,
+      "reason": "@margoengine/scatter measures 32053 B gzip (ceiling 31670 -> 33015); @margoengine/scatter/clearing-map measures 1455 B gzip (ceiling none -> 1711); @margoengine/biomes/objects measures 7561 B gzip (ceiling 7340 -> 7817); @margoengine/terrain/ground-contact-settings measures 1182 B gzip (ceiling none -> 1438). Grass opens around trunk and stone feet (a distribute-pass thinning hook in scatter and the lazy clearing-map entry), a crown shades itself (skyOcclusion.crown), live clearing and ground contact slider rows. The hook must sit in scatter's own cull; the rest is already behind separate or lazy entries."
     }
   ],
   "items": {
@@ -15981,7 +15987,7 @@
     "@margoengine/biomes/koppen": 1231,
     "@margoengine/biomes/landscape": 870,
     "@margoengine/biomes/multinoise": 3748,
-    "@margoengine/biomes/objects": 7340,
+    "@margoengine/biomes/objects": 7817,
     "@margoengine/biomes/placement": 13635,
     "@margoengine/biomes/presets": 3392,
     "@margoengine/biomes/region": 4672,
@@ -17048,8 +17054,9 @@
     "@margoengine/save/scene-state": 1267,
     "@margoengine/save/signed": 2837,
     "@margoengine/save/slots": 6151,
-    "@margoengine/scatter": 31670,
+    "@margoengine/scatter": 33015,
     "@margoengine/scatter/attributes": 2319,
+    "@margoengine/scatter/clearing-map": 1711,
     "@margoengine/scatter/foliage": 3502,
     "@margoengine/scatter/grass": 3688,
     "@margoengine/scatter/imposter": 2968,
@@ -17337,6 +17344,7 @@
     "@margoengine/terrain/ground-change": 16379,
     "@margoengine/terrain/ground-change-settings": 2159,
     "@margoengine/terrain/ground-contact": 3564,
+    "@margoengine/terrain/ground-contact-settings": 1438,
     "@margoengine/terrain/height-grid": 1641,
     "@margoengine/terrain/holes": 1539,
     "@margoengine/terrain/imagery": 6506,

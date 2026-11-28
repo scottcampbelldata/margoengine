@@ -226,6 +226,10 @@ at construction; metres are at instance scale 1.
 - `skyOcclusion: { depth, height }`: `exp(-depth * (1 - h / height))` of the sky's light is kept `h` metres above the
   ground, as under a canopy (Beer-Lambert light in a canopy: Monsi and Saeki 1953; English translation 2005, Annals of
   Botany 95:549, https://doi.org/10.1093/aob/mci052). The sun's beam is untouched.
+- `skyOcclusion.crown: { depth, radius, top }`: the sky light a crown keeps from its own leaves. The crown is a cone
+  about the up axis, `radius` wide at the ground and a tenth of that from 0.9 of `top` up; a point `d` of the way from
+  the axis to it keeps `exp(-depth * (1 - d))`, so inner needles are darker than outer tips (ambient light falls with
+  depth inside a tree: Reeves and Blau, SIGGRAPH 1985, https://doi.org/10.1145/325165.325250).
 
 The ground line follows `sink` and the ground's slope, so a sunk stone's band starts where it leaves the soil. Both
 reach every ambient term: core's flat one, a hemisphere light's and a Sky's.
@@ -240,12 +244,43 @@ Scatter.attach(engine, box(1, 3, 1), {
   material: new PbrMaterial({ color: '#7a7268', roughness: 0.9 }),
   sink: 0.4,
   base: { height: 0.25, shade: 0.5, tint: [0.07, 0.1, 0.03] }, // moss and contact shade at the foot
-  skyOcclusion: { depth: 0.9, height: 1.5 },
+  skyOcclusion: { depth: 0.9, height: 1.5, crown: { depth: 1.2, radius: 0.6, top: 3 } },
 });
 engine.start();
 ```
 
 Checked on WebGPU and the WebGL2 layer by `test/contact.browser.mjs`.
+
+### Ground cover that opens around objects: `@margoengine/scatter/clearing-map`
+
+`clearings` are circles fixed at construction. `thinning: clearingMap(map)` reads a world map every frame instead, such
+as the ground contact around trunks and stones that stream in: where its red channel is high, instances drop out and the
+survivors stand shorter. The map is read at the instance's root and four places `reach` metres away.
+
+```ts
+import { Engine, PbrMaterial } from '@margoengine/core';
+import { clearingMap } from '@margoengine/scatter/clearing-map';
+import { GrassScatter } from '@margoengine/scatter/grass';
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const texture = engine.gpu!.createTexture({
+  size: [64, 64],
+  format: 'r8unorm',
+  usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+});
+const thinning = clearingMap(() => ({ texture, bounds: [-32, -32, 32, 32] }), { thin: 1.4 });
+GrassScatter.attach(engine, { area: [40, 40], material: new PbrMaterial({ color: '#6a7a3a' }), thinning });
+thinning.set({ shorten: 0.5 }); // live
+engine.start();
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `thin` | 1.4 | Chance of dropping an instance per unit of map value (stops at 1), 0 to 8 |
+| `shorten` | 0.6 | Share of its height an instance loses per unit of map value, 0 to 1 |
+| `reach` | 0.25 | Metres around the root also read, 0 to 10 |
+
+With a `TerrainGroundContact`: `clearingMap(() => contact.mask())`. `ScatterTiles` does not take `thinning`. Checked on
+WebGPU and the WebGL2 layer by `test/clearing-map.browser.mjs`.
 
 Thin triangles whose shading changes across them (blade root shade, vertex
 colour, occlusion, the blade ground weight, the `clusters` colour) interpolate those values at a

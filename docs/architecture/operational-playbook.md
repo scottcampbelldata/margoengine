@@ -12305,3 +12305,13 @@ Snowpack reads forcing from its owning memory and copies it before callbacks, us
 ### ICE-03 accepted body rows and water sources
 
 Iceberg Wasm distributes independent body rows and preserves adaptive substeps. The caller stages signed waves, freshwater and calving receipts, validates each candidate, then copies accepted outputs and the live origin together. Browser tests check replay of the underwater body, signed patches and rendered gauges. The laboratory record keeps the timing and roll overshoot residuals explicit.
+### Section 5 evidence for objects meeting the ground in BiomeView (2026-11-28)
+
+BiomeView turns three things on by default: ground contact under stored trunks and stones, ground cover that opens in
+those soil rings (`scatter/clearing-map`, a test in the distribute pass on both backends), and relief shadows on the
+terrain. `packages/biomes/tests/ground-check.mjs` (WebGPU and the WebGL2 layer) checks the wiring: footprints are
+pressed, the grass changes with the live clearing look and returns exactly at its defaults, a ridge's shadow reaches the
+ground in view, and `contact: false`, `relief: false` and `groundCover: false` each leave their part out.
+`packages/scatter/test/clearing-map.browser.mjs` and `contact.browser.mjs` hold the heights, drop rule, reach and crown
+shade to their formulas. Missing evidence: no timing of the five map reads or of the relief bake (speed is deferred; the
+bake's work count is in docs/limits.md). A default changed here changes every BiomeView film, whose stills need review.

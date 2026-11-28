@@ -86,7 +86,8 @@ test('TerrainGroundContact checks its options and footprints and patches the ter
   assert.throws(() => contact.set('a', [0, 0, 1, 0]), { code: 'disposed' });
 });
 
-test('the settings table writes the live look and refuses unknown names and values', () => {
+test('the settings table writes the live look and refuses unknown names and values', async () => {
+  const { TerrainGroundContact } = await import('../dist/ground-contact.js');
   assert.deepEqual(
     GROUND_CONTACT_SETTINGS.map((row) => [row.name, row.live]),
     [

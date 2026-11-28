@@ -6,6 +6,7 @@
 import { EngineKernel, PbrMaterial } from "@margoengine/core";
 import { PassContext } from "@margoengine/core/extension";
 import { Scatter, ScatterCapture, ScatterStateSource, ScatterTextures } from "@margoengine/scatter";
+import { ClearingMap, ClearingMapLook, ScatterClearingMap } from "@margoengine/scatter/clearing-map";
 import { ScatterTiles } from "@margoengine/scatter/tiles";
 
 export interface BiomeMeshData {
@@ -28,6 +29,7 @@ export class BiomeObjects implements Disposable {
     get gpuBytes(): number;
     get farCount(): number;
     get count(): number;
+    get groundCover(): ScatterClearingMap | undefined;
     get seasonalMaterials(): readonly PbrMaterial[];
     setCapture(hook: ScatterCapture): () => void;
     onDispose(callback: () => void): () => void;
@@ -66,7 +68,9 @@ export interface BiomeObjectsOptions {
     readonly ground?: {
         set(key: string, footprints: ArrayLike<number>): void;
         remove(key: string): void;
+        mask?(): ClearingMap | undefined;
     };
+    readonly groundCover?: false | ClearingMapLook;
 }
 
 export const DETAIL_BUDGET = 134217728;
@@ -544,6 +548,10 @@ interface PlacedSpecies {
     readonly sink?: number;
     readonly alignToGround?: number;
     readonly cover?: number;
+    readonly color?: {
+        readonly hue?: number;
+        readonly value?: number;
+    };
 }
 
 interface PlacedTile {

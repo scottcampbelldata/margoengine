@@ -77,9 +77,9 @@ test("a species' colour jitter reaches its leaves and stone, never its bark (KB-
   const { species, parts, done } = await attach(),
     [trunk, crown] = parts['fell/fir'],
     [stone] = parts['fell/stone'];
-  assert.deepEqual(species['fell/fir'].variation, { hue: 0.5, value: 0.3 }, 'a hue past half a turn is half a turn');
-  assert.equal(species['fell/stone'].variation, undefined);
-  assert.deepEqual(crown.variation, { hue: 0.5, value: 0.3 });
+  assert.deepEqual(species['fell/fir'].color, { hue: 0.7, value: 0.3 });
+  assert.equal(species['fell/stone'].color, undefined);
+  assert.deepEqual(crown.variation, { hue: 0.5, value: 0.3 }, 'a hue past half a turn is half a turn');
   assert.deepEqual(trunk.variation, { hue: 0.02, value: 0.1 });
   assert.deepEqual(stone.variation, { hue: 0.02, value: 0.1 }, "a rule without a colour keeps the kind's");
   done();

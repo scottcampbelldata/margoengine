@@ -303,6 +303,15 @@ function reachOf(geometry: Part['geometry'], under = Infinity): number {
 // The share is chosen on rendered stands.
 const LITTER_REACH = 0.3;
 
+/**
+ * A part's colour jitter under its species' `color`: the hue and value the rule gives, else the part kind's own. A hue
+ * past half a turn either way covers the circle already.
+ */
+const jitterOf = (
+  own: { readonly hue: number; readonly value: number },
+  color: { readonly hue?: number; readonly value?: number },
+): { hue: number; value: number } => ({ hue: Math.min(0.5, color.hue ?? own.hue), value: color.value ?? own.value });
+
 /** The widest reach across the ground of a form's foliage, 0 for a form without any. */
 const crownOf = (form: readonly Part[]): number =>
   Math.max(0, ...form.map((part) => (part.kind === 'foliage' ? reachOf(part.geometry) : 0)));
@@ -864,8 +873,8 @@ export class BiomeObjects implements Disposable {
                 // A contact foot (soil or moss, less sky) and the sky light a crown loses lower down.
                 ...(contact ? standingLooks(part.kind, tree, height, species?.cover, damp, crown) : {}),
                 // The species' own colour jitter where its rule gives one: leaves and stone, never bark.
-                ...(part.kind !== 'bark' && species?.variation
-                  ? { variation: { ...OBJECT_LOOKS[part.kind].variation, ...species.variation } }
+                ...(part.kind !== 'bark' && species?.color
+                  ? { variation: jitterOf(OBJECT_LOOKS[part.kind].variation, species.color) }
                   : {}),
                 // Plants sway with a light breeze; stone does not.
                 ...(part.kind === 'stone' ? {} : { wind: [1, 0, 0.25] as const }),

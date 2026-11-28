@@ -493,6 +493,10 @@ interface PlacedSpecies {
     readonly sink?: number;
     readonly alignToGround?: number;
     readonly cover?: number;
+    readonly color?: {
+        readonly hue?: number;
+        readonly value?: number;
+    };
 }
 
 interface PlacedTile {

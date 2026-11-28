@@ -296,10 +296,16 @@ On by default in `BiomeView`:
 - A species' `sink` (metres at scale 1, more on slopes) and `alignToGround` (0-1) bed its objects into the hill.
 - `contact` (default true): stones darken at the foot and, on grass, meadow, moss, needle, leaf, tundra and mud
   grounds, turn mossy there; tree and shrub bark takes soil at the foot; canopy and understory trees keep
-  `exp(-0.7 x stand cover)` of the sky's light at the ground line (cover 0.5 without a `stands` rule) and all of it
-  from half their height up. The terrain draws soil and contact shade around every stored trunk and stone (`view.groundContact`, a
+  `exp(-0.5 x stand cover)` of the sky's light at the ground line (cover 0.5 without a `stands` rule) and all of it
+  from half their height up, and their foliage keeps `exp(-1.2)` of it at the crown's axis and all of it at the outer
+  tips. A tree's soil apron spreads with its crown. The terrain draws soil and contact shade around every stored trunk and stone (`view.groundContact`, a
   `TerrainGroundContact` of `@margoengine/terrain/ground-contact`). Your own meshes get an apron only when you add
   their footprints: `view.groundContact?.set('hut', [x, z, radius, 1])`.
+- `groundCover` (default on with `contact`, or `{ thin, shorten, reach }`, or false): grass and ferns thin out and
+  stand shorter in those soil rings, so the rings show. Live: `view.objects?.groundCover?.set({ thin: 2 })`. Grass you
+  scatter yourself joins with `thinning: clearingMap(() => view.groundContact?.mask())`
+  (`@margoengine/scatter/clearing-map`).
+- A species' `color: { hue, value }` sets the jitter of its leaf and stone parts.
 - `relief` (default true, or `TerrainReliefLighting` settings): ridges cast on the ground behind them and gullies keep
   less sky at every distance (`view.relief`), rebaked when the engine's sun turns or the world's heights change.
 

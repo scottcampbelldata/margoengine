@@ -3,7 +3,8 @@
 //   - The defaults written draw exactly what a Scatter built with no settings draws (every channel of every pixel).
 //   - Sixty frames of every row (all live) make no pipeline, buffer or texture, and the last frame equals the frame of a
 //     fresh field given the same values once.
-//   - Each of density, colour, the wind, the root shade and the widen changes the frame.
+//   - Each of density, colour, the wind, the root shade, the widen and the three clearing rows changes the frame (the
+//     field has a clearing map over half its area at half weight).
 //   - A lit field (material): translucency, variation hue and value and clusters each change the frame, the defaults
 //     written draw it exact, and 60 frames of those rows between nonzero values make no GPU object. Turning translucency
 //     on from 0 makes a pipeline (why those four rows are `live: false`).
@@ -21,6 +22,7 @@ await postBrowser(
       const { Engine } = await import('/packages/core/dist/index.js'),
         { Scatter } = await import('/packages/scatter/dist/index.js'),
         { box, PbrMaterial } = await import('/packages/core/dist/index.js'),
+        { clearingMap } = await import('/packages/scatter/dist/clearing-map.js'),
         settings = await import('/packages/scatter/dist/settings.js');
       const engine = await Engine.create(document.querySelector('canvas'), {
         backend: 'webgpu',
@@ -64,7 +66,17 @@ await postBrowser(
         values['wind.directionX'] = 1 - 0.5 * u;
         return values;
       };
-      window.t = { engine, device, settings, Scatter, box, PbrMaterial, made, at, rows, field: undefined };
+      // Half weight over the western half of the field's 24 m, none east of it.
+      const map = device.createTexture({ size: [24, 24], format: 'r8unorm', usage: 4 | 2 });
+      device.queue.writeTexture(
+        { texture: map },
+        new Uint8Array(576).map((_, k) => (k % 24 < 12 ? 128 : 0)),
+        { bytesPerRow: 24 },
+        [24, 24],
+      );
+      // A source of its own for each field: the rows write its look.
+      const thinning = () => clearingMap(() => ({ texture: map, bounds: [-12, -12, 12, 12] }));
+      window.t = { engine, device, settings, Scatter, box, PbrMaterial, made, at, rows, thinning, field: undefined };
     });
     const t = (fn, ...args) => page.evaluate(fn, ...args);
     const diff = (a, b) => {
@@ -95,6 +107,7 @@ await postBrowser(
           blades: {},
           lod: [30, 60, 120],
           seed: 3,
+          thinning: w.thinning(),
         });
         if (values) w.settings.applyScatterSettings(w.field, values);
         await w.field.ready;
@@ -242,7 +255,16 @@ await postBrowser(
     assert.equal(result.defaultsDiffer, 0, 'the defaults written leave the frame exact');
     assert.equal(result.onceDiffers, 0, "the sweep's last frame is what writing its values once draws");
     assert.ok(result.changed > 500, `the swept rows change the frame (${result.changed})`);
-    for (const name of ['scatter.density', 'scatter.color', 'wind.strength', 'blades.rootShade', 'blades.widen'])
+    for (const name of [
+      'scatter.density',
+      'scatter.color',
+      'wind.strength',
+      'blades.rootShade',
+      'blades.widen',
+      'clearing.thin',
+      'clearing.shorten',
+      'clearing.reach',
+    ])
       assert.ok(result.rows[name] > 20, `${name} changes the frame (${result.rows[name]})`);
   },
   { seconds: 300 },

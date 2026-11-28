@@ -388,8 +388,11 @@ test('the worker and its part files hold one copy of each module, without the di
   // 41,108 B and 109,131 B raw on 2026-11-25 with each paint layer's own blend width (ec34c7f3be, +173 B gzip and
   // +423 B raw: the classification's paint feather reads the layer's width and the world keeps the widest for its dirty
   // reach). Without it a 2 m hedge is spread across the world's 24 m ecotone.
+  // 41,181 B and 109,314 B raw on 2026-11-28 with a placed species carrying its rule's `color`, so its jitter reaches
+  // the scatters (KB-BIOMES-SPECIESCOLOR1): +13 B gzip and +28 B raw over 41,168 B and 109,286 B. The list of placed
+  // species is built where placement is, so it cannot move to a part.
   assert.ok(gzip <= 41_200, `worker ${gzip} B gzip`);
-  assert.ok(core.length <= 109_300, `worker ${core.length} B raw`);
+  assert.ok(core.length <= 109_400, `worker ${core.length} B raw`);
 });
 
 test('a worker asked for a part whose URL the page did not send rejects the job clearly', async () => {

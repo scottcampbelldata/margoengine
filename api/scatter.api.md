@@ -164,6 +164,12 @@ export interface ScatterClumps {
     readonly edge?: number;
 }
 
+export interface ScatterCrown {
+    depth: number;
+    radius: number;
+    top: number;
+}
+
 export type ScatterImage = {
     readonly width: number;
     readonly height: number;
@@ -223,6 +229,7 @@ export interface ScatterOptions {
     textures?: ScatterTextures;
     exclusions?: readonly GroundBounds[];
     clearings?: readonly ScatterClearing[];
+    thinning?: ScatterThinningSource;
     clumps?: ScatterClumps;
     reach?: number;
     paths?: readonly GroundPath[];
@@ -249,6 +256,7 @@ export interface ScatterOptions {
 export interface ScatterSkyOcclusion {
     depth: number;
     height: number;
+    crown?: ScatterCrown;
 }
 
 export interface ScatterStateSource {
@@ -273,6 +281,11 @@ export interface ScatterTextures {
     readonly normal?: ScatterImage;
     readonly occlusionRoughnessMetal?: ScatterImage;
     readonly alphaCutoff?: number;
+}
+
+export interface ScatterThinningSource {
+    cullCode(code: string, key: 'i' | 'key'): string;
+    entries(device: GPUDevice): GPUBindGroupEntry[];
 }
 
 export interface ScatterVariation {
