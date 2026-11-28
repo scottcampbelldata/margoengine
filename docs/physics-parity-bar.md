@@ -109,10 +109,6 @@ Status 2026-11-27 (Claude, laptop). Met: every checklist row above but Rapier pa
   B-02 64-bit builds are not built: each is kernel work across the Rust crate, its three Wasm builds and the thread
   scheduler, to be proven by deterministic work counts with identical output.
 - Point 2: restitution and friction are inputs, checked by exact solutions, not against measured material pairs.
-- Point 3: a touching Newton's cradle shares the strike out (docs/limits.md), as Rapier, Havok, Jolt, PhysX and Box2D do.
-  The textbook cradle needs a pairwise collision pass before the contact solve (Guendelman, Bridson and Fedkiw,
-  "Nonconvex rigid bodies with stacking", SIGGRAPH 2003, section 6, collisions resolved one pair at a time); folded into
-  soft step it would also run on resting stacks, so it is held for its own kernel change with stacking re-proved.
 
 Closed since (2026-11-27, Claude, laptop):
 - Point 1: `fidelity: 'standard' | 'high'` (28b7c2b4f), each tier validated: both pass the exact-solution suite, a light box
@@ -120,6 +116,10 @@ Closed since (2026-11-27, Claude, laptop):
   agrees between tiers.
 - Point 2: the measured domino wave of Larham (2008), one friction fitted and four spacings held out within 0.1 sqrt(gH)
   (`tests/rigid-measured.test.js`, 28b7c2b4f).
+- Point 3: the textbook Newton's cradle (2026-11-27): strikes into touching balls are resolved one pair at a time
+  before the contact solve (Guendelman, Bridson and Fedkiw 2003), so one or two struck balls send as many off, spaced or
+  touching, at both tiers; towers of ten boxes at restitution 0, 0.5 and 1 still stand and sleep
+  (`tests/rigid-validation.test.js`).
 - Point 2: KB-PHYS-DOMINOSCALE1 fixed (2026-11-27): the separating axis test's face bias was 1 mm at every size and now
   follows shapes below a reach of 0.2 m, so rows the same in every dimensionless number topple at one speed, and real 48 mm
   dominoes with `lengthUnit: 0.05` and a 1/240 s step match all five measurements within 0.1 (`tests/rigid-measured.test.js`).

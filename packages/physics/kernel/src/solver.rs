@@ -483,6 +483,110 @@ impl World {
         }
     }
 
+    /// The gaps of pair `row`'s points from where its bodies are now, as `normal_rows` reads them at substep `turn`.
+    fn point_gaps(&self, row: usize, a: usize, b: usize, h: f32, turn: usize) -> [f32; MANIFOLD] {
+        let (center_a, center_b) = (self.pose_center(a), self.pose_center(b));
+        let (rotation_a, rotation_b) = (self.pose_rotation(a), self.pose_rotation(b));
+        let normal = self.v(PAIR_NORMAL_X, row);
+        let surface_normal = self.v(PAIR_SURFACE_X, row).dot(normal);
+        let (round_a, round_b) = (self.round_core(self.uu(PAIR_A, row) as usize), self.round_core(self.uu(PAIR_B, row) as usize));
+        let mut gaps = [f32::MAX; MANIFOLD];
+        for (k, gap) in gaps.iter_mut().enumerate().take(self.uu(PAIR_CONTACTS, row) as usize) {
+            let at = row * MANIFOLD + k;
+            let (anchor_a, anchor_b) = (self.v(CONTACT_ANCHOR_A_X, at), self.v(CONTACT_ANCHOR_B_X, at));
+            let on_a = match round_a {
+                Some(core) => center_a.add(rotation_a.rotate(core.nearest(anchor_a))).add(normal.scale(core.radius)),
+                None => center_a.add(rotation_a.rotate(anchor_a)),
+            };
+            let on_b = match round_b {
+                Some(core) => center_b.add(rotation_b.rotate(core.nearest(anchor_b))).sub(normal.scale(core.radius)),
+                None => center_b.add(rotation_b.rotate(anchor_b)),
+            };
+            *gap = on_b.sub(on_a).dot(normal) - surface_normal * h * (turn as f32);
+        }
+        gaps
+    }
+
+    /// Each substep, before the contact solve: strikes into bodies that already touch another are resolved one pair at a
+    /// time, Newton's law of restitution at each point, until no struck point still approaches (Guendelman, Bridson and
+    /// Fedkiw, "Nonconvex rigid bodies with stacking", SIGGRAPH 2003, section 6: collisions before contact, pair by pair,
+    /// on the positions the substep will reach). Solved together with the contacts, such a strike was shared along a line
+    /// of touching balls in place of passing down it, so a touching Newton's cradle sent every ball off at a fifth of the
+    /// speed. A point takes part when its pair has restitution, it approaches faster than the bounce speed (two substeps of
+    /// gravity), it carried no load into the substep (so a resting pile is never struck), and it touches or will within
+    /// this substep; a point still apart joins only when one of its bodies touches a third (within the slop) through
+    /// another bouncy pair or was moved by a strike of the pass, as a lone strike is met exactly by the speculative row and
+    /// the bounce after it. Each impulse is -(1 + e) times the approach times the point's normal mass, which takes energy
+    /// out for e up to 1, so no sweep can add energy.
+    pub fn collide_pairwise(&mut self, h: f32, turn: usize) {
+        let (start, end) = self.window.pairs;
+        if !(start..end).any(|i| self.s(PAIR_RESTITUTION, self.uu(SOLVE_PAIRS, i) as usize) > 0.0) {
+            return;
+        }
+        let threshold = self.bounce_speed(h);
+        // Touching is within the slop, where the solver holds resting points.
+        let slop = self.header().contact_slop;
+        // Whether `body` touches a third body through a bouncy pair other than `row`.
+        let pressed = |world: &World, body: usize, row: usize| {
+            (start..end).any(|j| {
+                let other = world.uu(SOLVE_PAIRS, j) as usize;
+                if other == row || world.s(PAIR_RESTITUTION, other) <= 0.0 {
+                    return false;
+                }
+                let (c, d) = world.pair_bodies(other as u32);
+                (c == body || d == body)
+                    && world.point_gaps(other, c, d, h, turn).iter().take(world.uu(PAIR_CONTACTS, other) as usize).any(|&gap| gap <= slop)
+            })
+        };
+        // ponytail: one sweep a pair at most, and the pressed test scans the window, O(pairs^2) on a substep with a strike;
+        // a line of n touching bodies needs n - 1 sweeps when its pairs are listed against the strike.
+        // Bodies a strike of this pass moved: struck in a line, they are not lone. ponytail: the first 32 a substep; past
+        // them a strike is left to the contact solve, which shares it.
+        let (mut hit, mut hits) = ([usize::MAX; 32], 0usize);
+        for _ in start..end {
+            let mut struck = false;
+            for i in start..end {
+                let row = self.uu(SOLVE_PAIRS, i) as usize;
+                let bounce = self.s(PAIR_RESTITUTION, row);
+                if bounce <= 0.0 {
+                    continue;
+                }
+                let (a, b) = self.pair_bodies(row as u32);
+                let gaps = self.point_gaps(row, a, b, h, turn);
+                let normal = self.v(PAIR_NORMAL_X, row);
+                let surface_normal = self.v(PAIR_SURFACE_X, row).dot(normal);
+                for (k, &gap) in gaps.iter().enumerate().take(self.uu(PAIR_CONTACTS, row) as usize) {
+                    let at = row * MANIFOLD + k;
+                    let (mut body_a, mut body_b) = self.pair_moving(row, a, b);
+                    let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
+                    let speed = body_b.at(arm_b).sub(body_a.at(arm_a)).dot(normal) - surface_normal;
+                    // A point that carried a load into this substep rests: a strike is a point that held nothing (as `normal_rows`
+                    // marks one), so a rocking pile is left to the contact solve.
+                    if self.s(CONTACT_NORMAL_IMPULSE, at) > 0.0 || speed >= -threshold || gap + speed * h > 0.0 || (gap > 0.0 && !hit[..hits].contains(&a) && !hit[..hits].contains(&b) && !pressed(self, a, row) && !pressed(self, b, row)) {
+                        continue;
+                    }
+                    let impulse = -(1.0 + bounce) * speed * self.s(CONTACT_NORMAL_MASS, at);
+                    let applied = normal.scale(impulse);
+                    body_a.push(applied.scale(-1.0), arm_a);
+                    body_b.push(applied, arm_b);
+                    self.settle(a, &body_a);
+                    self.settle(b, &body_b);
+                    self.set_s(PAIR_FORCE, row, self.s(PAIR_FORCE, row) + impulse);
+                    for body in [a, b] {
+                        if hits < hit.len() && !hit[..hits].contains(&body) {
+                            hit[hits] = body;
+                            hits += 1;
+                        }
+                    }
+                    struck = true;
+                }
+            }
+            if !struck {
+                break;
+            }
+        }
+    }
+
     /// Each substep, before the warm start: every point of a pair with restitution notes its normal speed as it stands, the
     /// pre-solve approach (Muller et al. 2020) a strike is bounced from. Pairs with no restitution are skipped, so a scene
     /// with no bounce does no more work.
