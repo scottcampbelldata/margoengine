@@ -15572,8 +15572,8 @@
         "gzip": 4898
       },
       "./tsunami": {
-        "raw": 13346,
-        "gzip": 5524
+        "raw": 15369,
+        "gzip": 6193
       },
       "./pack-ice": {
         "raw": 11423,
@@ -19127,14 +19127,14 @@
       "brotli": 6052
     },
     "packages/physics/dist/tsunami-kernel.wasm": {
-      "raw": 13850,
-      "gzip": 6294,
-      "brotli": 5677
+      "raw": 15307,
+      "gzip": 6807,
+      "brotli": 6077
     },
     "packages/physics/dist/tsunami-kernel-shared.wasm": {
-      "raw": 13850,
-      "gzip": 6294,
-      "brotli": 5677
+      "raw": 15307,
+      "gzip": 6807,
+      "brotli": 6077
     },
     "packages/physics/dist/terramechanics-kernel.wasm": {
       "raw": 40423,

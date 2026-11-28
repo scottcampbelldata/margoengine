@@ -4209,9 +4209,6 @@ test.
   `motorcycle.ts` and `tracked.ts` call `Math.atan`, `Math.sin` and similar in forces that feed the world hash (an
   alias `const atan = Math.atan` also hides it). **Cause:** these files predate the pinned-maths rule and
   `npm run check:pinned-math` does not scan them.
-- **SEA-06, the clean-room record names a fault source the code does not have.** **Repro:** `git grep -i okada --
-  packages` finds nothing. **Cause:** `docs/clean-room.md` (SEA-06) says the solver consumes Okada deformation
-  computed from the natural source model; no such model exists.
 - **SOFT-06, the pV test cannot fail.** **Repro:** `tests/coupling/gas-pressure.test.js` asserts pV is constant, but
   `soft.ts` computes pressure as nRT/V, so it holds by construction; the public "conserves pV" claim rests on it.
   Also, doc comments in `soft.ts` and `soft-split.ts` say a cloth is never split, while `splitOnTear: 'all'` splits it.

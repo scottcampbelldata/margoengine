@@ -8144,7 +8144,15 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(pulse, {
 });
 world.advance(60);
 console.log(pulse.sample(36, 0).depth, pulse.budget.runup);
+const sea = pulse.surfaceSource();
+console.log(sea.sample(9.125, 0.125, { depth: 0, surface: 0, velocity: [0, 0] }));
 ```
+
+For a coastal scene, pass `pulse.surfaceSource()` as `source` to Water's `ShallowWaterSurface.attach`.
+Give Water terrain with the same cell dimensions, extent, placement and elevation datum as the solver.
+Advance the physics world before drawing. The mirror reads the accepted depth and discharge and hides
+dry cells until the wave inundates them. Its reusable sample gives distance in local metres and surface
+altitude above the same datum as the terrain. Floating-origin placement stays with the scene that owns both.
 
 Pass a live `TerrainBed` geometry or an aligned layout-1 `bottomField` to supply natural seabed
 motion. An optional `bottomFilterDepth` redistributes the rapid bottom response over nearby wet

@@ -45,7 +45,7 @@ export interface TsunamiKernel {
     depth: number,
     scratch: number,
   ): number;
-  tsunami_travel(bed: number, out: number, model: number, nx: number, nz: number, cell: number): void;
+  tsunami_travel(bed: number, out: number, model: number, nx: number, nz: number, cell: number): number;
 }
 
 export async function loadTsunamiBuilds(signal?: AbortSignal): Promise<TsunamiBuilds> {

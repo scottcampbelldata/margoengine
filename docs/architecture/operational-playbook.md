@@ -2922,6 +2922,13 @@ Known kernel gaps:
 
 ### 1.7 Physics kernel
 
+The plain and shared SEA-06 kernels step candidate depth and discharge in solver-owned buffers.
+The native corrector checks the state and volume products before publishing. A step that would take
+more than 4,096 explicit CFL substeps returns an error before changing the world. The extreme-state
+fixtures exercise both memory modes, the Coriolis half-turn limit, overflow rejection and exact replay
+through repeated wetting and drying. Water's coastal renderer reads the accepted cells, with the same
+dry-to-wet transition tested on WebGPU and WebGL2.
+
 Rigid axis locks project the angular impulse and held torque before applying the rotated inverse inertia and
 then project the resulting velocity. This uses the same available degrees of freedom as the contact solve.
 The `bodyMobility` port publishes the corresponding response at frame zero and at coupling ticks. The

@@ -17104,8 +17104,8 @@ The collider uses the same visible road and bank geometry. A dynamic deck contri
 ## Natural displacement and shoreline long waves (SEA-06)
 
 - Yoshimitsu Okada, “Surface deformation due to shear and tensile faults in a half-space”
-  (1985). This optional wave solver consumes vertical bottom deformation computed from
-  the natural source model. A registered bed keeps that calculation independent of the wave state.
+  (1985). This is a reference for generating externally supplied vertical deformation.
+  The wave solver consumes registered bottom elevations. It does not compute Okada fault displacements.
   [NIED author paper](https://www.bosai.go.jp/sp/information/pdf/copy_of_Okada_1985_BSSA.pdf)
 - Randall LeVeque, David George and Marsha Berger, “Tsunami modelling with adaptively
   refined finite volume methods” (2011). The depth-averaged Saint-Venant equations propagate
@@ -17121,6 +17121,10 @@ The collider uses the same visible road and bank geometry. A dynamic deck contri
   no-friction limit independently.
   [Audusse et al.](https://perso.math.u-pem.fr/bouchut.francois/publications/hydroproj_published.pdf) ·
   [Castro-Orgaz and Chanson (2017), Ritter benchmark](https://staff.civil.uq.edu.au/h.chanson/reprints/Castro-Orgaz_Chanson_efmc_2017.pdf)
+  The extreme-scale regressions verify that the explicit CFL bound is retained when a requested
+  tick is too expensive. The Coriolis implicit-midpoint rotation evaluates the same Cayley map in
+  reciprocal coordinates when its squared half-angle overflows. The eikonal diagonal retains Zhao's
+  two-neighbour quadratic by factoring its local transit time before squaring at extreme scales.
 - Kinjiro Kajiura, “The Leading Wave of a Tsunami” (1963). The rapid bottom-to-surface
   transfer at depth h is `sech(kh)`. The implementation uses its long-wave Padé approximation
   `1/(1 + (kh)²/2)`. The equivalent wet-cell Helmholtz system is symmetric and solved by

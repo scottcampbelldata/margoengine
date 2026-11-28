@@ -10472,8 +10472,15 @@ Padé approximation of Kajiura's response is intended for rapid bottom movement 
 representative depth. The dynamic model is depth averaged. Short-wave dispersion,
 three-dimensional impact generation and nested grid corrections require separate models.
 Inland arrival can differ from the linear still-water travel time.
+Supply fault displacement as moving bed elevations. The solver leaves fault displacement to its source. The coastal renderer
+uses the accepted shallow-water depth and velocity and requires a shared grid, coordinate frame and datum.
+It displays the moving wet/dry boundary and depth-averaged surface, without an overturning wave crest.
+A world tick accepts only finite depth, discharge, volume and inundation records. If the explicit solver
+would need more than 4,096 CFL substeps, use a coarser grid or smaller forcing. No partial step is published.
 
-The optional tsunami entry is 6,538 B gzip with a 6,794 B ceiling. Both Wasm assets are 13,850 B raw and each is 6,294 B gzip. Core plus stage remains 24,820 B gzip.
+The optional tsunami entry is 6,193 B gzip with a 6,449 B ceiling. The plain and shared Wasm assets are
+each 15,307 B raw and 6,807 B gzip. Extreme finite Coriolis rates retain the midpoint rotation's bounded
+half-turn limit. Resolve the rotation in time when phase accuracy matters.
 
 ### Accretion and compact-object trajectories (SPACE-03)
 

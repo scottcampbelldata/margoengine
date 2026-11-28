@@ -84,8 +84,26 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
     sample(x: number, z: number): TsunamiSample;
+    surfaceSource(): TsunamiSurfaceSource;
     travelTimes(source: Pair, out?: Float64Array<ArrayBuffer>): Float64Array;
     get budget(): TsunamiBudget;
+}
+
+export interface TsunamiSurfaceSample {
+    depth: number;
+    surface: number;
+    velocity: [number, number];
+}
+
+export interface TsunamiSurfaceSource {
+    readonly shape: {
+        readonly columns: number;
+        readonly rows: number;
+        readonly width: number;
+        readonly depth: number;
+        readonly centre: Pair;
+    };
+    sample(x: number, z: number, out: TsunamiSurfaceSample): TsunamiSurfaceSample;
 }
 
 export function landslideImpulse(options: LandslideImpulseOptions): {

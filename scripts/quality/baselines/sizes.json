@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21612135,
+  "total": 21612804,
   "history": [
     {
       "date": "2026-10-24",
@@ -15241,6 +15241,11 @@
       "commit": "lane-e-3mf-composite-paint",
       "reason": "3MF volume composites are painted on built surfaces and boolean operands read their volume data",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "sea-06-coastal-render-source",
+      "reason": "Physics/tsunami grows from 5524 to 6193 B gzip and its ceiling from 5780 to 6449 B. The public coast reader exposes the same accepted shoreline and discharge, and validation reports coded fixes. A split requires another import and connection to every solver's cell geometry and state. The two optional kernel variants each move from 6294 to 6807 B gzip for finite-state checks, bounded CFL work and scale-safe travel times. Core and Stage are unchanged."
     }
   ],
   "items": {
@@ -16152,7 +16157,7 @@
     "@margoengine/physics/thin-film": 15631,
     "@margoengine/physics/tissue": 3218,
     "@margoengine/physics/tracers": 17877,
-    "@margoengine/physics/tsunami": 5780,
+    "@margoengine/physics/tsunami": 6449,
     "@margoengine/physics/underwater": 4221,
     "@margoengine/physics/vegetation": 9958,
     "@margoengine/physics/viscoplastic": 5154,

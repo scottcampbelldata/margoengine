@@ -40,6 +40,102 @@ test('TsunamiSolver: lake at rest is well-balanced over rough terrain with wet a
   balance(tsunami, 120);
 });
 
+test('TsunamiSolver refuses malformed or unrepresentable grids with coded corrections', async () => {
+  const tsunami = await TsunamiSolver.load();
+  const base = { cells: [4, 3], spacing: 0.25, bathymetry: -2 };
+  const cases = [
+    [{ cells: null }, /two positive whole cell counts/],
+    [{ origin: { length: 2, 0: Infinity, 1: 0 } }, /two finite coordinates/],
+    [{ origin: [2 ** 53, 0] }, /nearby origin cell/],
+    [{ spacing: Number.MIN_VALUE }, /positive finite value/],
+    [{ spacing: 1e200 }, /positive finite value/],
+    [{ bathymetry: null }, /one value per cell/],
+    [{ open: { length: 4 } }, /four booleans/],
+    [{ bathymetry: -0.25, dischargeX: Number.MAX_VALUE }, /Reduce discharge or increase the wet depth/],
+    [{ cells: [2, 1], spacing: 1e154, bathymetry: 0, surface: 1e-3 }, /initial wet land area/],
+    [{ cells: [1, 1], spacing: 1, bathymetry: 1e308, seaLevel: -1e308, surface: 1e308 + 2e292 }, /initial run-up/],
+  ];
+  for (const [override, correction] of cases) {
+    assert.throws(() => new PhysicsWorld({ rate }).add(tsunami, { ...base, ...override }), {
+      name: 'MargoError',
+      code: 'state',
+      message: correction,
+    });
+  }
+  const world = new PhysicsWorld({ rate }).add(tsunami, base, [400_000, 0, -700_000]);
+  for (const out of [null, [], new Float64Array(2)]) {
+    assert.throws(() => tsunami.travelTimes([0, 0], out), {
+      code: 'state',
+      message: /Float64Array with one value per cell/,
+    });
+  }
+  world.shiftOrigin([400_000, 0, -700_000]);
+  world.advance(120);
+  assert.deepEqual(tsunami.exportPorts(120)[0].cell, [0, 0, 0]);
+  assert.deepEqual(tsunami.sample(0, 0), {
+    bed: -2,
+    height: 0,
+    depth: 2,
+    discharge: [0, 0],
+    peakDepth: 2,
+    firstWet: 0,
+  });
+  balance(tsunami, 120);
+});
+
+test('landslideImpulse rejects a nonrepresentable derived impulse', () => {
+  assert.throws(() => landslideImpulse({ depth: 1e-200, speed: 2, thickness: 1, width: 1, mass: 1, angle: 0 }), {
+    code: 'state',
+    message: /slide impulse product.*Use a finite value/,
+  });
+});
+
+test('TsunamiSolver supplies live dry and inundated coastal cells and replays the same surface', async () => {
+  const nx = 80;
+  const spacing = 0.125;
+  const bathymetry = Array.from({ length: nx }, (_, i) => Math.max(-1, ((i + 0.5) * spacing) / 3 - 2));
+  const surface = bathymetry.map((_, i) => {
+    const distance = ((i + 0.5) * spacing - 3) / 2;
+    return 0.3 * Math.max(0, 1 - distance * distance) ** 2;
+  });
+  const { world, tsunami } = await make({
+    cells: [nx, 1],
+    spacing,
+    origin: [-4, -2],
+    bathymetry,
+    surface,
+    dischargeX: surface.map((height) => Math.sqrt(9.80665) * height),
+  });
+  const source = tsunami.surfaceSource();
+  assert.deepEqual(source.shape, { columns: nx, rows: 1, width: 10, depth: spacing, centre: [1, -1.9375] });
+  const row = { surface: 0, depth: 0, velocity: [0, 0] };
+  const shore = 48;
+  const x = -4 + (shore + 0.5) * spacing;
+  const z = -2 + spacing / 2;
+  assert.strictEqual(source.sample(x, z, row), row);
+  assert.equal(row.surface, bathymetry[shore]);
+  assert.deepEqual(row.velocity, [0, 0]);
+  assert.equal(row.depth, 0);
+  const start = world.takeSnapshot();
+  world.advance(100);
+  source.sample(x, z, row);
+  const wet = tsunami.sample(shore, 0);
+  assert.ok(wet.depth > 0);
+  assert.deepEqual(row, {
+    surface: wet.height,
+    depth: wet.depth,
+    velocity: [wet.discharge[0] / wet.depth, wet.discharge[1] / wet.depth],
+  });
+  const expected = structuredClone(row);
+  const hash = world.hash();
+  world.restoreSnapshot(start.bytes);
+  assert.equal(source.sample(x, z, row).depth, 0);
+  world.advance(100);
+  assert.equal(world.hash(), hash);
+  assert.deepEqual(source.sample(x, z, row), expected);
+  balance(tsunami, 100);
+});
+
 test('TsunamiSolver: wetting fan tracks Ritter’s shallow-water benchmark within its cell-slope bound', async () => {
   const nx = 200;
   const dx = 0.025;

@@ -6,6 +6,16 @@ use core::arch::wasm32::{
 };
 use margoengine_physics_kernel_common::pinned::pow;
 
+// This is an explicit solver. Refuse a requested tick that needs more work
+// than this budget rather than stepping over the CFL bound or dropping time.
+const MAX_CFL_SUBSTEPS: u32 = 4096;
+
+#[repr(u32)]
+enum StepFailure {
+    Numeric = 1,
+    Work = 2,
+}
+
 struct ArenaOnly;
 unsafe impl core::alloc::GlobalAlloc for ArenaOnly {
     unsafe fn alloc(&self, _: core::alloc::Layout) -> *mut u8 {
@@ -74,6 +84,10 @@ impl Water {
             x: self.z,
             z: self.x,
         }
+    }
+
+    fn is_finite(self) -> bool {
+        self.h.is_finite() && self.x.is_finite() && self.z.is_finite()
     }
 
     fn velocity(self, dry: f64) -> (f64, f64) {
@@ -358,16 +372,20 @@ impl Basin<'_> {
         outgoing * self.model.spacing * dt
     }
 
-    unsafe fn bound(&self, field: *const Water) -> f64 {
+    unsafe fn bound(&self, field: *const Water) -> Option<f64> {
         let mut speed: f64 = 0.0;
         for i in 0..self.grid.size {
             let q = *field.add(i);
             let (u, v) = q.velocity(self.model.dry);
             let c = sqrt(self.model.gravity * q.h);
             // Both horizontal directions can drain a cell during one update.
-            speed = speed.max(u.abs() + v.abs() + 4.0 * c);
+            let local = u.abs() + v.abs() + 4.0 * c;
+            if !local.is_finite() {
+                return None;
+            }
+            speed = speed.max(local);
         }
-        speed
+        Some(speed)
     }
 
     fn dissipate(&self, q: &mut Water, dt: f64) {
@@ -385,9 +403,18 @@ impl Basin<'_> {
         }
         if m.coriolis != 0.0 {
             let rotation = 0.5 * dt * m.coriolis;
-            let inverse = 1.0 / (1.0 + rotation * rotation);
-            let sine = 2.0 * rotation * inverse;
-            let cosine = (1.0 - rotation * rotation) * inverse;
+            let square = rotation * rotation;
+            let (sine, cosine) = if square.is_finite() {
+                let inverse = 1.0 / (1.0 + square);
+                (2.0 * rotation * inverse, (1.0 - square) * inverse)
+            } else {
+                // The same Cayley rotation in reciprocal coordinates, with
+                // its finite half-turn limit as the half-angle tends to infinity.
+                let reciprocal = 1.0 / rotation;
+                let square = reciprocal * reciprocal;
+                let inverse = 1.0 / (1.0 + square);
+                (2.0 * reciprocal * inverse, (square - 1.0) * inverse)
+            };
             let x = cosine * q.x - sine * q.z;
             q.z = sine * q.x + cosine * q.z;
             q.x = x;
@@ -397,7 +424,7 @@ impl Basin<'_> {
     unsafe fn sanitize(&self, state: *mut Water, old: *const Water) -> bool {
         for i in 0..self.grid.size {
             let q = &mut *state.add(i);
-            if !(q.h.is_finite() && q.x.is_finite() && q.z.is_finite()) {
+            if !q.is_finite() {
                 return false;
             }
             if q.h < 0.0 {
@@ -420,28 +447,32 @@ impl Basin<'_> {
         rk: *mut Water,
         trial: *mut Water,
         dt: f64,
-    ) -> Option<(f64, u32)> {
+    ) -> Result<(f64, u32), StepFailure> {
         let mut remaining = dt;
         let mut out = 0.0;
         let mut substeps = 0_u32;
+        let minimum_initial_step = dt / f64::from(MAX_CFL_SUBSTEPS);
         while remaining > 0.0 {
-            let speed = self.bound(state);
+            if substeps == MAX_CFL_SUBSTEPS {
+                return Err(StepFailure::Work);
+            }
+            let speed = self.bound(state).ok_or(StepFailure::Numeric)?;
             let step = remaining.min(if speed == 0.0 {
                 remaining
             } else {
                 0.42 * self.model.spacing / speed
             });
             let next = remaining - step;
-            if !(step.is_finite() && next < remaining) {
-                return None;
+            if !(next < remaining) || (substeps == 0 && step < minimum_initial_step) {
+                return Err(StepFailure::Work);
             }
             let first = self.flux_update(state, rk, step);
             if !self.sanitize(rk, state) {
-                return None;
+                return Err(StepFailure::Numeric);
             }
             let second = self.flux_update(rk, trial, step);
             if !self.sanitize(trial, rk) {
-                return None;
+                return Err(StepFailure::Numeric);
             }
             for i in 0..self.grid.size {
                 let mut q = (*state.add(i)).add(*trial.add(i)).scale(0.5);
@@ -452,7 +483,7 @@ impl Basin<'_> {
             remaining = next;
             substeps += 1;
         }
-        Some((out, substeps))
+        Ok((out, substeps))
     }
 }
 
@@ -605,8 +636,12 @@ unsafe extern "C" fn tsunami_step(
         bed,
         pressure,
     };
-    let Some((out, iterations)) = basin.integrate(state, rk, trial, dt) else {
-        return 1;
+    if !(dt.is_finite() && dt > 0.0 && time.is_finite() && time >= 0.0) {
+        return StepFailure::Numeric as u32;
+    }
+    let (out, iterations) = match basin.integrate(state, rk, trial, dt) {
+        Ok(receipt) => receipt,
+        Err(reason) => return reason as u32,
     };
     let mut volume = 0.0;
     let mut area = 0.0;
@@ -615,6 +650,11 @@ unsafe extern "C" fn tsunami_step(
     for i in 0..grid.size {
         let q = &*state.add(i);
         let elevation = *bed.add(i);
+        let surface = elevation + q.h;
+        let (u, v) = q.velocity(model.dry);
+        if !(q.is_finite() && surface.is_finite() && u.is_finite() && v.is_finite()) {
+            return StepFailure::Numeric as u32;
+        }
         if q.h > model.dry {
             let wet = log.add(2 * i);
             *wet = (*wet).max(q.h);
@@ -622,7 +662,7 @@ unsafe extern "C" fn tsunami_step(
                 *wet.add(1) = time;
             }
             if elevation >= model.sea {
-                runup = runup.max(elevation + q.h);
+                runup = runup.max(surface);
                 area += 1.0;
             }
         }
@@ -630,13 +670,91 @@ unsafe extern "C" fn tsunami_step(
         volume += q.h;
     }
     let cell_area = model.spacing * model.spacing;
-    metrics.write(volume * cell_area);
-    metrics.add(1).write(out);
-    metrics.add(2).write(area * cell_area);
-    metrics.add(3).write(runup);
-    metrics.add(4).write(peak);
-    metrics.add(5).write(f64::from(iterations));
+    let receipt = [
+        volume * cell_area,
+        out,
+        area * cell_area,
+        runup,
+        peak,
+        f64::from(iterations),
+    ];
+    if !(receipt.iter().all(|value| value.is_finite()) && (runup - model.sea).is_finite()) {
+        return StepFailure::Numeric as u32;
+    }
+    metrics.copy_from_nonoverlapping(receipt.as_ptr(), receipt.len());
     0
+}
+
+// The eikonal update uses the smaller neighbour along each horizontal axis.
+unsafe fn travel_neighbours(grid: Grid, out: *const f64, x: usize, z: usize) -> (f64, f64) {
+    let i = grid.index(x, z);
+    let left = if x == 0 {
+        f64::INFINITY
+    } else {
+        *out.add(i - 1)
+    };
+    let right = if x + 1 == grid.width {
+        f64::INFINITY
+    } else {
+        *out.add(i + 1)
+    };
+    let low = if z == 0 {
+        f64::INFINITY
+    } else {
+        *out.add(i - grid.width)
+    };
+    let high = if z + 1 == grid.rows {
+        f64::INFINITY
+    } else {
+        *out.add(i + grid.width)
+    };
+    let x_time = left.min(right);
+    let z_time = low.min(high);
+    (x_time.min(z_time), x_time.max(z_time))
+}
+
+fn travel_arrival(model: &Model, bed: f64, depth: f64, near: f64, far: f64) -> f64 {
+    // For an overflowing depth difference, halve the depth and scale the
+    // numerator by the same square-root factor to retain the physical speed.
+    let (distance, depth) = if depth.is_finite() {
+        (model.spacing, depth)
+    } else {
+        (
+            model.spacing * core::f64::consts::FRAC_1_SQRT_2,
+            0.5 * model.sea - 0.5 * bed,
+        )
+    };
+    let c2 = model.gravity * depth;
+    let speed = if c2.is_normal() {
+        sqrt(c2)
+    } else {
+        sqrt(model.gravity) * sqrt(depth)
+    };
+    let cost = distance / speed;
+    let diff = far - near;
+    if cost == 0.0 {
+        return if near == 0.0 { f64::NAN } else { near };
+    }
+    if !cost.is_finite() {
+        // The two-neighbour diagonal can still fit when the axis cost does not.
+        let half_cost = (0.5 * distance) / speed;
+        return if half_cost.is_finite() && far.is_finite() {
+            let ratio = (0.5 * diff) / half_cost;
+            near + half_cost * (ratio + sqrt(2.0 - ratio * ratio))
+        } else {
+            f64::INFINITY
+        };
+    }
+    if diff >= cost {
+        return near + cost;
+    }
+    let discriminant = 2.0 * cost * cost - diff * diff;
+    if discriminant.is_normal() {
+        near + 0.5 * (diff + sqrt(discriminant))
+    } else {
+        let ratio = diff / cost;
+        near + cost * (0.5 * (ratio + sqrt(2.0 - ratio * ratio)))
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -647,7 +765,7 @@ unsafe extern "C" fn tsunami_travel(
     nx: u32,
     nz: u32,
     source: u32,
-) {
+) -> u32 {
     let grid = Grid {
         width: nx as usize,
         rows: nz as usize,
@@ -658,7 +776,7 @@ unsafe extern "C" fn tsunami_travel(
         out.add(i).write(f64::INFINITY);
     }
     if source as usize >= grid.size || m.sea - *bed.add(source as usize) <= m.dry {
-        return;
+        return 0;
     }
     out.add(source as usize).write(0.0);
     // Monotone alternating sweeps of the first-order upwind eikonal equation.
@@ -679,43 +797,19 @@ unsafe extern "C" fn tsunami_travel(
                         grid.width - 1 - column
                     };
                     let i = grid.index(x, z);
-                    let h = m.sea - *bed.add(i);
+                    let elevation = *bed.add(i);
+                    let h = m.sea - elevation;
                     if i == source as usize || h <= m.dry {
                         continue;
                     }
-                    let l = if x == 0 {
-                        f64::INFINITY
-                    } else {
-                        *out.add(i - 1)
-                    };
-                    let r = if x + 1 == grid.width {
-                        f64::INFINITY
-                    } else {
-                        *out.add(i + 1)
-                    };
-                    let b = if z == 0 {
-                        f64::INFINITY
-                    } else {
-                        *out.add(i - grid.width)
-                    };
-                    let t = if z + 1 == grid.rows {
-                        f64::INFINITY
-                    } else {
-                        *out.add(i + grid.width)
-                    };
-                    let a = l.min(r);
-                    let b = b.min(t);
-                    let near = a.min(b);
+                    let (near, far) = travel_neighbours(grid, out, x, z);
                     if !near.is_finite() {
                         continue;
                     }
-                    let cost = m.spacing / sqrt(m.gravity * h);
-                    let diff = a.max(b) - near;
-                    let t = if diff >= cost {
-                        near + cost
-                    } else {
-                        near + 0.5 * (diff + sqrt(2.0 * cost * cost - diff * diff))
-                    };
+                    let t = travel_arrival(m, elevation, h, near, far);
+                    if t.is_nan() {
+                        return StepFailure::Numeric as u32;
+                    }
                     if t < *out.add(i) {
                         *out.add(i) = t;
                         revised = true;
@@ -727,6 +821,20 @@ unsafe extern "C" fn tsunami_travel(
             break;
         }
     }
+    // Keep infinity as the dry/disconnected sentinel. A wet cell adjoining
+    // a reached cell is connected by definition, so reject an unresolved time.
+    for z in 0..grid.rows {
+        for x in 0..grid.width {
+            let i = grid.index(x, z);
+            if !(*out.add(i)).is_finite()
+                && m.sea - *bed.add(i) > m.dry
+                && travel_neighbours(grid, out, x, z).0.is_finite()
+            {
+                return StepFailure::Numeric as u32;
+            }
+        }
+    }
+    0
 }
 
 unsafe fn bottom_row(
