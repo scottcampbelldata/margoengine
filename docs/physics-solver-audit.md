@@ -50,6 +50,33 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### SEA-08 four-point pass
+
+- Point 5 (5b8388a0c0). `packages/physics/tests/coupling/seakeeping-accepted.test.js` rejects invalid
+  pressure and Float32 load overflow on the second hull and checks every accepted region and port.
+  Corrected input matches a clean run, including the first hull’s diffraction and motion histories.
+  The signed separate-rigid-cell check preserves loads and wake words across snapshot restore. Invalid
+  mesh/solver settings and the parallel bake’s extreme outputs fail with coded fixes.
+- Point 6 (5b8388a0c0). `packages/physics/tests/coupling/hull-panel-workers.test.js` compares native
+  1/2/4 tables and live signed snapshot replay. `packages/physics/tests/hull-panel-workers.browser.mjs`
+  joins three real Chromium helpers, checks abort cleanup, and visits nine independent matrix systems
+  with 73,032 paired f64x2 complex updates and 6,528 scalar tails. Raw prior and current Wasm coefficients
+  matched for 10,752 bytes. Workers run in the optional bake. The live hull reads the resulting table.
+- Point 7 (5b8388a0c0). `packages/water/test/seakeeping-film.browser.mjs` draws the procedural 16.8 m
+  hull in an oblique sea. It samples 0.744 m heave peak-to-peak across two phases and 6.70° roll at 3 s
+  against 0.022° in the calm control. Disabling the live hull wake changes 2,790 pixels. Both renderers
+  replay the complete accepted world and full frames byte for byte within backend (state b60e50491a6f66c0).
+- Point 8 (5b8388a0c0). `docs/limits.md#ship-seakeeping-evidence-and-limits-sea-08` distinguishes the
+  default deep-water strip solution from the optional reference-geometry finite-depth panel response.
+  `packages/physics/tests/coupling/hull-panels.test.js` checks the sphere and finite-depth references.
+  The reference draft, Lewis edge, roll-pivot bounds and original lake film cuts remain open for broader proof.
+- The corrected measured fixture in `packages/physics/tests/coupling/seakeeping.test.js` now uses
+  Jung’s roll-only hinge, 0.90 m tank span, 0.30 m beam, 0.05 m draft and 0.236 kg m² whole-box dry inertia.
+  The measured decay slope 0.33271 and period 0.930 s compare with 0.35051 and 0.89340 s at 60 Hz, inside
+  the unchanged 12% and 5% regression bars. The independent KVLCC2 tests pass at λ/L 0.5, 1.1 and 2.
+  Point 2 stays open. The 25 mm Wigley grid gives 31.49 and 33.05 mm versus 63.80 and 77.89 mm
+  measured at 2x/L = −0.95. Refinement does not close that bow-wave gap. See `docs/limits.md`.
+
 ### SEA-14 four-point pass
 
 - Point 5 (f5005a1986). `packages/physics/tests/entry.test.js` checks coded mesh, configuration and input
