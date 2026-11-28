@@ -6,7 +6,7 @@
 // overpressure anywhere at any time for sound and camera shake (SOUND-01, PA-66).
 import type { Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
-import { hypot } from '@margoengine/math/pinned';
+import { hypot, pow } from '@margoengine/math/pinned';
 import type { Physics } from '../physics.js';
 import type {
   FieldDescriptor,
@@ -137,7 +137,7 @@ export class BlastSolver implements Solver<BlastParams> {
       else hi = mid;
     }
     // Z in m kg^-1/3; back to metres in the reference air (Sachs's factor is close to 1 near the ground).
-    return hi * Math.cbrt(energy / 4.184e6) * 1.05;
+    return hi * pow(energy / 4.184e6, 1 / 3) * 1.05;
   }
 
   step(context: StepContext, _dt: number): void {

@@ -70,7 +70,7 @@ export interface SurgeWakeOptions {
 }
 
 // Rigid publication is f32. Allow rounding of its unit quaternion and of the position of the reference plane.
-const POSE_ROUNDOFF = 8 * 2 ** -24;
+const POSE_ROUNDOFF = 8 * 5.960464477539063e-8;
 
 function fftLength(n: number): boolean {
   if (!Number.isInteger(n) || n < 4 || n > 4096) return false;
@@ -233,7 +233,7 @@ export class SurgeWakeCoupling implements Solver<undefined> {
 
   init(host: SolverHost): void {
     const [gx, gy, gz] = host.gravity;
-    const cellWork = -gy * this.density * this.grid.dx ** 2;
+    const cellWork = -gy * this.density * this.grid.dx * this.grid.dx;
     if (gx !== 0 || gz !== 0 || !(gy < 0 && cellWork > 0 && Number.isFinite(cellWork)))
       throw invalidLoad('Use gravity straight down along Y for the guided hull and wake.');
     const capacity = host.bodyRows();

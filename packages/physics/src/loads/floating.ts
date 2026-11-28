@@ -9,6 +9,7 @@
 //   its parts', as its mass is (parts that overlap count twice in both).
 // Sensors and disabled colliders displace nothing. Half spaces, height fields and voxel grids, and rounded colliders
 // (border radius above 0), are refused with a coded error naming the fix.
+import { cos, sin } from '@margoengine/math/pinned';
 import { invalidLoad } from './errors.js';
 import {
   bodyRadiation,
@@ -323,12 +324,12 @@ export function roundMesh(
 ): { vertices: Float64Array; indices: Uint32Array } {
   const n = FLOATING_SIDES,
     step = (2 * Math.PI) / n,
-    r = radius * Math.sqrt(step / Math.sin(step)),
+    r = radius * Math.sqrt(step / sin(step)),
     vertices: number[] = [0, -halfHeight, 0, 0, halfHeight, 0],
     indices: number[] = [];
   for (let k = 0; k < n; k++) {
-    const x = r * Math.cos(k * step),
-      z = r * Math.sin(k * step);
+    const x = r * cos(k * step),
+      z = r * sin(k * step);
     vertices.push(x, -halfHeight, z);
     if (!cone) vertices.push(x, halfHeight, z);
   }
@@ -347,7 +348,7 @@ export function roundMesh(
 }
 
 function unit(q: Quat): Quat {
-  const l = Math.hypot(q[0], q[1], q[2], q[3]);
+  const l = Math.sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
   return [q[0] / l, q[1] / l, q[2] / l, q[3] / l];
 }
 

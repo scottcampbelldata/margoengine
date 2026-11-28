@@ -4,6 +4,7 @@ import { Physics } from '@margoengine/physics';
 import { TerrainBed } from '@margoengine/physics/earth';
 import { ResistiveSoil } from '@margoengine/physics/terramechanics';
 import { PhysicsWorld, RigidSolver, worldMemory } from '@margoengine/physics/world';
+import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 const dt = 1 / 60;
 const terrain = { columns: 8, rows: 8, width: 0.24, depth: 0.22, centre: [0, 0] };
@@ -133,4 +134,23 @@ test('a live soil strip transfers its integrated force and moment to a dynamic r
     hashes.push(hash);
   }
   assert.equal(hashes[0], hashes[1]);
+});
+
+test('a live soil strip replays across presentation clocks and snapshots', async () => {
+  await Physics.load({ threads: true });
+  const soils = await Promise.all(Array.from({ length: 5 }, () => ResistiveSoil.load()));
+  const model = (rate = { num: 24, den: 1 }) => {
+    const world = new PhysicsWorld({ rate, memory: worldMemory(false) });
+    const physics = new Physics(null, { arena: world.arena, fixedTimestep: dt, gravity: [0, 0, 0] });
+    const body = physics.addBody(null, {
+      type: 'dynamic',
+      colliders: { shape: 'sphere', radius: 0.05, mass: 2 },
+      linearVelocity: [0, -0.06, 0],
+    });
+    const strip = { start: [0.01, -0.1, 0], end: [0.11, -0.1, 0], width: 0.1, samples: 3 };
+    setup(world, soils.shift(), physics, body, [1000, 0, 0, 0, 0, 0, 0, 0, 0], [strip]);
+    return world;
+  };
+  frameRateIndependent(model);
+  seekEqualsContinuous(() => model(), { at: 2, frames: 12 });
 });

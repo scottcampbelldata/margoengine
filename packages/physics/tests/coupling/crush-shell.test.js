@@ -3,6 +3,7 @@ import test from 'node:test';
 import { CrushShellSolver } from '../../dist/crush.js';
 import { Physics } from '../../dist/index.js';
 import { PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
+import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 const material = {
   thickness: 0.015,
@@ -745,4 +746,15 @@ test('rolled shell rejects unusable coupon values and directions normal to a she
   ]) {
     await assert.rejects(model({ material: { ...material, anisotropy } }), { code: 'state', message });
   }
+});
+
+test('a falling sheet replays across presentation clocks and snapshots', async () => {
+  const solvers = await Promise.all(Array.from({ length: 5 }, () => CrushShellSolver.load()));
+  const fall = (rate = { num: 24, den: 1 }) => {
+    const world = new PhysicsWorld({ rate, gravity: [0, -9.81, 0], memory: worldMemory(false) });
+    world.add(solvers.shift(), { positions, triangles, material, velocities: positions.map(() => [0.45, -1.5, 0.2]) });
+    return world;
+  };
+  frameRateIndependent(fall);
+  seekEqualsContinuous(() => fall(), { at: 2, frames: 12 });
 });

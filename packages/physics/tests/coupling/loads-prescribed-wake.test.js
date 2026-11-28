@@ -7,6 +7,8 @@ import { SpectralSea, WakeSolver } from '@margoengine/physics/sea';
 import { HullSolver } from '@margoengine/physics/seakeeping';
 import { PhysicsWorld, regionWords, RigidSolver, worldMemory } from '@margoengine/physics/world';
 
+import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
+
 const gravity = 9.81;
 const dt = 1 / 60;
 const density = 1024;
@@ -249,6 +251,60 @@ for (const [mirrored, surfaceMotion] of [
     },
   );
 }
+
+test('prescribed wake work replays across presentation clocks and snapshots', async () => {
+  await loadKernel({ threads: false });
+  const physicsList = [];
+  const model = (rate = { num: 24, den: 1 }) => {
+    const world = new PhysicsWorld({ rate, memory: worldMemory(false), gravity: [0, -gravity, 0] });
+    const physics = new Physics(null, { arena: world.arena, fixedTimestep: dt, gravity: [0, -gravity, 0] });
+    physicsList.push(physics);
+    const body = physics.addBody(null, {
+      position: [-2, 0, 0],
+      linearVelocity: [1.25, 0, 0],
+      enabledTranslations: [true, false, false],
+      enabledRotations: [false, false, false],
+      colliders: { shape: 'box', halfExtents: [1, 0.5, 0.5], mass },
+    });
+    const hull = new HullSolver('hull', { minimumRadius: 0.35, submergedAdvance: [0, 0.25, 0.5] });
+    const meter = new PrescribedWakeWork({
+      grid: { cells, cellSize, depth, density, centre },
+      source: hull.submergedWakeSource,
+    });
+    const wake = new WakeSolver('wake', undefined, hull.submergedWakeSource);
+    const sea = new SpectralSea({
+      waves: {
+        frequencies: Float64Array.of(0.5),
+        directions: Float64Array.of(0),
+        energy: Float64Array.of(0),
+        depth,
+        density,
+      },
+    });
+    world.add(new RigidSolver(), { physics }).add(hull, {
+      sea,
+      hulls: [{ row: body.row, mesh }],
+      addedMass: false,
+      drag: false,
+      radiation: false,
+      rollDamping: false,
+      diffraction: false,
+      drift: false,
+      greenWater: false,
+      slamming: false,
+    });
+    world.add(meter, undefined);
+    world.add(wake, meter.wakeParams({ sponge: 0 }));
+    world.couple(['hull', 'prescribedWakeWork', 'wake', 'rigid'], 'staggered');
+    return world;
+  };
+  try {
+    frameRateIndependent(model);
+    seekEqualsContinuous(() => model(), { at: 2, frames: 12 });
+  } finally {
+    for (const physics of physicsList) physics[Symbol.dispose]();
+  }
+});
 
 test('prescribed wake work rejects a grid without supported transform dimensions', () => {
   const hull = new HullSolver('hull', { minimumRadius: 0.35, submergedAdvance: [0, 0.5] });

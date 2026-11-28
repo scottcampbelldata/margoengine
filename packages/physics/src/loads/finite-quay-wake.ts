@@ -238,7 +238,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
         const x = i % cells[0],
           z = Math.floor(i / cells[0]);
         const distance = Math.min(x, cells[0] - x - 1, z, cells[1] - z - 1);
-        return sponge.rate * Math.max(0, 1 - distance / sponge.cells) ** 2;
+        return sponge.rate * Math.max(0, 1 - distance / sponge.cells) * Math.max(0, 1 - distance / sponge.cells);
       });
     let initialFlux: Float64Array | undefined;
     if (this.hull) {
@@ -301,7 +301,7 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     const height = this.words(0),
       trace = this.words(1),
       ledger = this.words(4);
-    const area = this.shape.cellSize ** 2;
+    const area = this.shape.cellSize * this.shape.cellSize;
     kick.fill(0);
     pressure.fill(0);
     const surface = this.sourceField && context.inputs.get(this.sourceField.name);
@@ -860,8 +860,8 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       trace = this.words(1),
       rate = this.words(3);
     let energy = 0;
-    for (let i = 0; i < height.length; i++) energy += this.g * height[i]! ** 2 + rate[i]! * trace[i]!;
-    const surfaceEnergy = 0.5 * this.rho * this.shape.cellSize ** 2 * energy;
+    for (let i = 0; i < height.length; i++) energy += this.g * height[i]! * height[i]! + rate[i]! * trace[i]!;
+    const surfaceEnergy = 0.5 * this.rho * this.shape.cellSize * this.shape.cellSize * energy;
     const hullState = this.hullWords();
     // Green's identity includes the moving hull's flux in addition to the free-surface contribution.
     return this.hull && hullState

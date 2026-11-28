@@ -4,6 +4,7 @@ import { GirderJointSolver } from '../../dist/crush.js';
 import { Physics } from '../../dist/index.js';
 import { ATMOSPHERE, HULL_BREACHES_FIELD, HULL_BREACH_WORDS, HullSolver } from '../../dist/seakeeping.js';
 import { PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
+import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 const zero = [0, 0, 0];
 const step = 1 / 60;
@@ -26,9 +27,9 @@ const fibers = [-depth, depth].map((offset) => ({ offset, area, curve }));
 const near = (value, expected, tolerance = 1e-7) =>
   assert.ok(Math.abs(value - expected) <= tolerance, `${value} differs from ${expected} by more than ${tolerance}`);
 
-async function assemble({ separated = false, ...overrides } = {}) {
+async function assemble({ separated = false, rate = { num: 60, den: 1 }, ...overrides } = {}) {
   await Physics.load({ threads: false });
-  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: zero, memory: worldMemory(false) });
+  const world = new PhysicsWorld({ rate, gravity: zero, memory: worldMemory(false) });
   const physics = new Physics(null, { arena: world.arena, gravity: zero, fixedTimestep: step });
   const parts = masses.map((mass, index) =>
     physics.addBody(null, {
@@ -324,6 +325,24 @@ test('an actual girder break latches a native flooding aperture and carries wate
     }
   } finally {
     physics.dispose();
+  }
+});
+
+test('a bending section replays across presentation clocks and snapshots', async () => {
+  const rates = [24, 30, 60, 24, 24];
+  const pool = await Promise.all(
+    rates.map(async (fps) => {
+      const built = await assemble({ rate: { num: fps, den: 1 } });
+      built.b.setRotation([0, 0, Math.sin(0.07), Math.cos(0.07)]);
+      return built;
+    }),
+  );
+  try {
+    const model = () => pool.shift().world;
+    frameRateIndependent(model);
+    seekEqualsContinuous(model, { at: 2, frames: 12 });
+  } finally {
+    for (const { physics } of pool) physics.dispose();
   }
 });
 

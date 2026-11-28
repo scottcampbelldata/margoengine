@@ -5,6 +5,7 @@ import { QuayWakeBoundary } from '../../dist/loads.js';
 import { WakeSolver } from '../../dist/sea.js';
 import { HullSolver } from '../../dist/seakeeping.js';
 import { PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
+import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 const wallZ = -10.55;
 const centreX = 90;
@@ -15,8 +16,8 @@ const rate = 60;
 const g = 9.81;
 const rho = 1025;
 
-function makeWorld() {
-  return new PhysicsWorld({ rate: { num: rate, den: 1 }, gravity: [0, -g, 0], memory: worldMemory(false) });
+function makeWorld(presentation = { num: rate, den: 1 }) {
+  return new PhysicsWorld({ rate: presentation, gravity: [0, -g, 0], memory: worldMemory(false) });
 }
 
 test('a rigid quay reflects the oblique finite-depth mode in phase with equal energy and zero normal flow', (t) => {
@@ -187,8 +188,8 @@ const mesh = {
   ),
 };
 
-function drivenHull(reflected) {
-  const world = makeWorld();
+function drivenHull(reflected, presentation) {
+  const world = makeWorld(presentation);
   const physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / rate });
   const body = physics.addBody(null, {
     position: [centreX, 0, wallZ + 2],
@@ -263,6 +264,22 @@ test('the live hull routes both pressure/volume fields through the quay without 
   assert.equal(reflected.world.hash(), hash);
   assert.deepEqual(reflected.boundary.sampleWall(reflected.wake, centreX), face);
   t.diagnostic(`Maximum wall excursion ${maxWallHeight} m, open-control normal speed ${maxIncidentNormal} m/s.`);
+});
+
+test('a hull beside the quay replays across presentation clocks and snapshots', async () => {
+  await Physics.load();
+  const sims = [];
+  const model = (presentation = { num: 24, den: 1 }) => {
+    const sim = drivenHull(true, presentation);
+    sims.push(sim);
+    return sim.world;
+  };
+  try {
+    frameRateIndependent(model);
+    seekEqualsContinuous(() => model(), { at: 2, frames: 12 });
+  } finally {
+    for (const { physics } of sims) physics.dispose();
+  }
 });
 
 test('an image setup rejects an odd Z grid and a source inside the quay', () => {

@@ -85,6 +85,12 @@ there, add a line below with the solver ID and what is needed, and build against
 - **SEA-12 — RESOLVED in `13b6c14dd0`.** The registry reserves accumulator sums at first publication.
   `world-frame-zero-accumulator.test.js` covers `bodyForces` and `bodyImpulses`. The Flood browser test
   replays frame zero with live buoyancy on WebGPU and WebGL2.
+- **SEA-12 gate fix (2026-11-27, by another lane on Scott's go):** `check:pinned-math` and `check:coupling` failed on main.
+  The loads, crush and blast sources now use `@margoengine/math/pinned` or plain products in place of `**`, `Math.sin`,
+  `Math.cos`, `Math.hypot` and `Math.cbrt` (43 places in 11 files, among them `loads/surge-wake.ts`). Seven solvers
+  (`SurgeWakeCoupling`, `FreeHullWakeCoupling`, `PrescribedWakeWork`, `QuayWakeBoundary`, `ResistiveSoil`,
+  `CrushShellSolver`, `GirderJointSolver`) each gained a `frameRateIndependent` and `seekEqualsContinuous` test through the
+  coupling harness in their own `tests/coupling` file.
 
 - **FLUID-01:** Connect SEA-04 and general HYDRO-01 cells to the optional DFSPH layout-1 parcel requests and
   receipts. The real HYDRO-01 wet-cell test settles signed depth and both horizontal momentum components in

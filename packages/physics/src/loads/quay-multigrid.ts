@@ -258,7 +258,7 @@ export class QuayCoarseCorrection {
     } else {
       for (let i = 0; i < n; i++) {
         const before = upper[i]!;
-        const pivot = diagonal[i]! + top * graph.anchors(i) - (before < 0 ? 0 : line[i]! ** 2 * inverse[before]!);
+        const pivot = diagonal[i]! + top * graph.anchors(i) - (before < 0 ? 0 : line[i]! * line[i]! * inverse[before]!);
         requirePivot(pivot);
         inverse[i] = 1 / pivot;
       }

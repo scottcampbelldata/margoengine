@@ -17,6 +17,8 @@ import {
   worldMemory,
 } from '../../dist/world.js';
 
+import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
+
 await Physics.load({ threads: true });
 const gravity = 9.81,
   density = 1024,
@@ -114,8 +116,8 @@ function waveEnergy(world, wake) {
   return 0.5 * density * cellSize ** 2 * (potential + kinetic / (nx * nz));
 }
 
-function setup({ reaction = true, axis = 'x', initial, speed = 1.25, shared = false } = {}) {
-  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -gravity, 0], memory: worldMemory(shared) });
+function setup({ reaction = true, axis = 'x', initial, speed = 1.25, shared = false, rate = { num: 60, den: 1 } } = {}) {
+  const world = new PhysicsWorld({ rate, gravity: [0, -gravity, 0], memory: worldMemory(shared) });
   const physics = new Physics(null, { arena: world.arena, fixedTimestep: dt, substeps: 1, gravity: [0, -gravity, 0] });
   const along = axis === 'x' ? 0 : 2;
   const turn = Math.SQRT1_2;
@@ -355,6 +357,21 @@ test('a pre-existing wave starts a stationary hull on its negative-facing Z guid
   assert.ok(deltaWave < 0 && deltaBody > 0);
   assert.ok(Math.abs(deltaBody + deltaWave) < 4 * 2 ** -24 * deltaBody + 64 * Number.EPSILON * before);
   t.diagnostic(JSON.stringify({ deltaWave, deltaBody, impulse: impulses[at + 2] }));
+});
+
+test('guided surge replays across presentation clocks and snapshots', () => {
+  const sims = [];
+  const model = (rate = { num: 24, den: 1 }) => {
+    const sim = setup({ rate });
+    sims.push(sim);
+    return sim.world;
+  };
+  try {
+    frameRateIndependent(model);
+    seekEqualsContinuous(() => model(), { at: 2, frames: 12 });
+  } finally {
+    for (const { physics } of sims) physics.dispose();
+  }
 });
 
 test('bad prior-tick ports and an off-guide pose leave both current outputs intact', () => {

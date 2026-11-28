@@ -14,6 +14,7 @@
 // pure sample in time.
 //
 // State: the wake oscillators. Couple it before the rigid solver: `world.couple(['loads', 'rigid'], 'staggered')`.
+import { pow } from '@margoengine/math/pinned';
 import { invalidLoad } from './errors.js';
 import type { FlowCell, FlowField, FlowSample, SeaSurface, Wind } from '@margoengine/math/fields';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
@@ -560,7 +561,7 @@ export class LoadSolver implements Solver<LoadParams> {
     } else throw invalidLoad('Missing hydrodynamic shape; pass {ellipsoid}, {sphere}, {box}, {capsule} or {mesh}.');
     if (spec.rotation !== undefined) {
       const turn = spec.rotation,
-        length = Array.isArray(turn) && turn.length === 4 ? Math.hypot(turn[0], turn[1], turn[2], turn[3]) : NaN;
+        length = Array.isArray(turn) && turn.length === 4 ? Math.sqrt(turn[0] * turn[0] + turn[1] * turn[1] + turn[2] * turn[2] + turn[3] * turn[3]) : NaN;
       if (!(Math.abs(length - 1) < 1e-5))
         throw invalidLoad(
           'Invalid hydrodynamic shape rotation; pass a unit quaternion [x, y, z, w] in the body frame.',
@@ -1318,7 +1319,7 @@ export class LoadSolver implements Solver<LoadParams> {
       }
       if (!(l.submerged > 0)) return;
       const load = this.bodyLoad(index),
-        size = 2 * Math.cbrt(b.volume),
+        size = 2 * pow(b.volume, 1 / 3),
         perNewton = forceScale ?? size / (this.sea.density * this.g * b.volume);
       if (centreOfBuoyancy) out.cross(load.centreOfBuoyancy, 0.08 * size, BUOYANCY_CENTRE);
       if (forces) {

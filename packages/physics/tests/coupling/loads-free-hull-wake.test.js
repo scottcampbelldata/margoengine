@@ -17,6 +17,8 @@ import {
   worldMemory,
 } from '../../dist/world.js';
 
+import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
+
 await Physics.load({ threads: true });
 const dt = 1 / 60,
   g = 9.81,
@@ -134,8 +136,8 @@ function kinetic(body) {
   );
 }
 
-function setup(shared, paired, unit, finite = false, temporalOrder) {
-  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -g, 0], memory: worldMemory(shared) });
+function setup(shared, paired, unit, finite = false, temporalOrder, rate = { num: 60, den: 1 }) {
+  const world = new PhysicsWorld({ rate, gravity: [0, -g, 0], memory: worldMemory(shared) });
   const physics = new Physics(null, { arena: world.arena, fixedTimestep: dt, substeps: 1, gravity: [0, -g, 0] });
   const body = physics.addBody(null, {
     position: [-1.65, 0, 0.23],
@@ -328,6 +330,21 @@ test('finite curtain exchanges free hull heave, roll, pitch and surge work acros
 
 test('fourth-order finite curtain preserves free hull work and exact replay on both memory layouts', (t) =>
   checkWaveWork(t, true, 4));
+
+test('a free hull and its wake replay across presentation clocks and snapshots', () => {
+  const sims = [];
+  const model = (rate = { num: 24, den: 1 }) => {
+    const sim = setup(false, true, undefined, false, undefined, rate);
+    sims.push(sim);
+    return sim.world;
+  };
+  try {
+    frameRateIndependent(model);
+    seekEqualsContinuous(() => model(), { at: 2, frames: 12 });
+  } finally {
+    for (const { physics } of sims) physics.dispose();
+  }
+});
 
 test('locked or disabled gyroscopic rotation is rejected before any active publication changes', () => {
   const { world, physics, body, exchange } = setup(false, true);

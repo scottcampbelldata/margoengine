@@ -321,7 +321,7 @@ export class FreeHullWakeCoupling implements Solver<undefined> {
 
   init(host: SolverHost): void {
     const [x, y, z] = host.gravity,
-      scale = -y * this.settings.density * this.grid.dx ** 2;
+      scale = -y * this.settings.density * this.grid.dx * this.grid.dx;
     this.capacity = host.bodyRows();
     if (x !== 0 || z !== 0 || !(scale > 0 && Number.isFinite(scale)) || this.body.row >= this.capacity)
       throw invalidLoad('Add the live rigid body before its coupling and use downward Y gravity.');

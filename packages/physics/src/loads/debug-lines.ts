@@ -1,6 +1,7 @@
 // The debug view of floating bodies (SEA-12): each compact body's edges below the water, its waterline, its centre of
 // buoyancy and its load arrows, as line segments for `@margoengine/physics/debug-view` (`view.add(loads)`). Drawing only:
 // an analytic shape (sphere, ellipsoid, capsule) is drawn as a fine closed surface; its loads stay analytic.
+import { cos, hypot, sin } from '@margoengine/math/pinned';
 import type { HullMesh, Quat, Vec3 } from '../seakeeping/wetted.js';
 
 /** Line segments: x, y, z of two vertices a segment; r, g, b, a a vertex. */
@@ -34,13 +35,13 @@ export function analyticOutline(
     point = (ring: number, side: number): Vec3 => {
       const theta = (Math.PI * ring) / rings,
         phi = (2 * Math.PI * side) / sides,
-        s = Math.sin(theta),
-        c = Math.cos(theta);
+        s = sin(theta),
+        c = cos(theta);
       if (capsule) {
         const lift = ring <= rings / 2 ? capsule.halfHeight : -capsule.halfHeight;
-        return [capsule.radius * s * Math.cos(phi), lift + capsule.radius * c, capsule.radius * s * Math.sin(phi)];
+        return [capsule.radius * s * cos(phi), lift + capsule.radius * c, capsule.radius * s * sin(phi)];
       }
-      return [axes[0] * s * Math.cos(phi), axes[1] * c, axes[2] * s * Math.sin(phi)];
+      return [axes[0] * s * cos(phi), axes[1] * c, axes[2] * s * sin(phi)];
     };
   at([0, top, 0]);
   at([0, -top, 0]);
@@ -85,7 +86,7 @@ export class LineSink {
   }
   /** An arrow from `from` along `vector`, its head a fifth of its length (at most 0.15 m). */
   arrow(from: Vec3, vector: Vec3, colour: Colour): void {
-    const length = Math.hypot(vector[0], vector[1], vector[2]);
+    const length = hypot(vector[0], vector[1], vector[2]);
     if (!(length > 1e-6)) return;
     const tip: Vec3 = [from[0] + vector[0], from[1] + vector[1], from[2] + vector[2]],
       d: Vec3 = [vector[0] / length, vector[1] / length, vector[2] / length],
@@ -120,7 +121,7 @@ export class LineSink {
 }
 
 function normal(v: Vec3): Vec3 {
-  const l = Math.hypot(v[0], v[1], v[2]);
+  const l = hypot(v[0], v[1], v[2]);
   return [v[0] / l, v[1] / l, v[2] / l];
 }
 

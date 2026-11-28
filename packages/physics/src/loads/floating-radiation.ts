@@ -6,6 +6,7 @@
 // passive fit (Cummins 1962; Perez and Fossen 2008) turns them into the causal radiation memory the LoadSolver steps.
 // Parts are baked one by one at the whole body's waterline: their waves do not interact (a compound of separate floats
 // is slightly off where its parts are close; one collider, the usual case, is exact to the panel method).
+import { cos, hypot, pow, sin } from '@margoengine/math/pinned';
 import { stillWaterline } from '../seakeeping/memory.js';
 import { type HullMesh, wettedLoads } from '../seakeeping/wetted.js';
 import { invalidLoad } from './errors.js';
@@ -82,7 +83,7 @@ export async function bodyRadiation(
   for (const mesh of meshes) wetEdge = Math.max(wetEdge, longestWetEdge(mesh, level));
   // The panel method needs each edge within an eighth of the shortest wave; the band runs 40 times down from there.
   const top = Math.PI / 4 / wetEdge / (1 + 1e-9),
-    frequencies = Array.from({ length: count }, (_, i) => Math.sqrt(gravity * top * 40 ** (i / (count - 1) - 1)));
+    frequencies = Array.from({ length: count }, (_, i) => Math.sqrt(gravity * top * pow(40, i / (count - 1) - 1)));
   const centre = rotate(rotation, com[0], com[1], com[2]);
   const out: (LoadCoupledRadiationProfile | undefined)[] = [];
   for (const mesh of meshes) {
@@ -171,7 +172,7 @@ function longestWetEdge(mesh: HullMesh, level: number): number {
       const a = 3 * ix[t + k]!,
         b = 3 * ix[t + ((k + 1) % 3)]!;
       if (Math.min(v[a + 1]!, v[b + 1]!) >= level) continue;
-      longest = Math.max(longest, Math.hypot(v[a]! - v[b]!, v[a + 1]! - v[b + 1]!, v[a + 2]! - v[b + 2]!));
+      longest = Math.max(longest, hypot(v[a]! - v[b]!, v[a + 1]! - v[b + 1]!, v[a + 2]! - v[b + 2]!));
     }
   return longest;
 }
@@ -218,7 +219,7 @@ function revolve(
     else
       for (let j = 0; j < around; j++) {
         const phi = (2 * Math.PI * j) / around;
-        vertices.push(r * Math.cos(phi), y, r * Math.sin(phi));
+        vertices.push(r * cos(phi), y, r * sin(phi));
       }
   }
   const at = (i: number, j: number) => (profile[i]![0] === 0 ? first[i]! : first[i]! + (j % around));
@@ -244,12 +245,12 @@ const steps = (length: number, edge: number, least: number) => Math.max(least, M
 export function sphereMesh(radius: number, edge: number) {
   const rings = steps(Math.PI * radius, edge, 6);
   return scaled(
-    (4 / 3) * Math.PI * radius ** 3,
+    (4 / 3) * Math.PI * radius * radius * radius,
     1,
     revolve(
       Array.from(
         { length: rings + 1 },
-        (_, i) => [radius * Math.sin((Math.PI * i) / rings), -radius * Math.cos((Math.PI * i) / rings)] as const,
+        (_, i) => [radius * sin((Math.PI * i) / rings), -radius * cos((Math.PI * i) / rings)] as const,
       ),
       2 * rings,
     ),
@@ -263,12 +264,12 @@ export function capsuleMesh(radius: number, halfHeight: number, edge: number) {
     profile: [number, number][] = [];
   for (let i = 0; i <= cap; i++) {
     const a = (Math.PI / 2) * (i / cap);
-    profile.push([radius * Math.sin(a), -halfHeight - radius * Math.cos(a)]);
+    profile.push([radius * sin(a), -halfHeight - radius * cos(a)]);
   }
   for (let i = 1; i < side; i++) profile.push([radius, -halfHeight + (2 * halfHeight * i) / side]);
   for (let i = 0; i <= cap; i++) {
     const a = (Math.PI / 2) * (i / cap);
-    profile.push([radius * Math.cos(a), halfHeight + radius * Math.sin(a)]);
+    profile.push([radius * cos(a), halfHeight + radius * sin(a)]);
   }
   return scaled(
     Math.PI * radius * radius * ((4 / 3) * radius + 2 * halfHeight),
@@ -284,7 +285,7 @@ export function roundPanelMesh(radius: number, halfHeight: number, cone: boolean
     profile: [number, number][] = [];
   for (let i = 0; i <= radial; i++) profile.push([(radius * i) / radial, -halfHeight]);
   if (cone) {
-    const slant = steps(Math.hypot(radius, 2 * halfHeight), edge, 2);
+    const slant = steps(hypot(radius, 2 * halfHeight), edge, 2);
     for (let i = 1; i <= slant; i++)
       profile.push([radius * (1 - i / slant), -halfHeight + (2 * halfHeight * i) / slant]);
   } else {
@@ -301,7 +302,7 @@ export function roundPanelMesh(radius: number, halfHeight: number, cone: boolean
  * axis's origin to the shape's own volume, uniformly (`vertical` 1) or across Y only (`vertical` 0).
  */
 function scaled(exact: number, vertical: 0 | 1, mesh: { vertices: Float64Array; indices: Uint32Array }) {
-  const across = (exact / volume(mesh)) ** (vertical ? 1 / 3 : 1 / 2),
+  const across = pow(exact / volume(mesh), vertical ? 1 / 3 : 1 / 2),
     v = mesh.vertices;
   for (let i = 0; i < v.length; i += 3) {
     v[i]! *= across;
@@ -370,7 +371,7 @@ export function ownPanelMesh(mesh: { vertices: ArrayLike<number>; indices: Array
       wx = v[c]! - v[a]!,
       wy = v[c + 1]! - v[a + 1]!,
       wz = v[c + 2]! - v[a + 2]!;
-    area += Math.hypot(uy * wz - uz * wy, uz * wx - ux * wz, ux * wy - uy * wx) / 2;
+    area += hypot(uy * wz - uz * wy, uz * wx - ux * wz, ux * wy - uy * wx) / 2;
   }
   const allowed = 1.25 * (area / ((Math.sqrt(3) / 4) * edge * edge)) + 32;
   return ix.length / 3 > allowed ? starMesh(mesh, edge) : refinedMesh(mesh, edge, allowed);
@@ -388,7 +389,7 @@ function refinedMesh(mesh: { vertices: ArrayLike<number>; indices: ArrayLike<num
           b = 3 * indices[t + ((k + 1) % 3)]!;
         longest = Math.max(
           longest,
-          Math.hypot(
+          hypot(
             vertices[a]! - vertices[b]!,
             vertices[a + 1]! - vertices[b + 1]!,
             vertices[a + 2]! - vertices[b + 2]!,
@@ -457,7 +458,7 @@ function starMesh(mesh: { vertices: ArrayLike<number>; indices: ArrayLike<number
       vertices: Float64Array.from(v),
       indices: Uint32Array.from(ix),
     }),
-    scale = Math.cbrt(own / volume(grid));
+    scale = pow(own / volume(grid), 1 / 3);
   for (let i = 0; i < out.length; i += 3)
     for (let k = 0; k < 3; k++) out[i + k] = centre[k]! + (out[i + k]! - centre[k]!) * scale;
   return grid;
@@ -468,7 +469,7 @@ function sphereGrid(rings: number) {
   return revolve(
     Array.from(
       { length: rings + 1 },
-      (_, i) => [Math.sin((Math.PI * i) / rings), -Math.cos((Math.PI * i) / rings)] as const,
+      (_, i) => [sin((Math.PI * i) / rings), -cos((Math.PI * i) / rings)] as const,
     ),
     2 * rings,
   );

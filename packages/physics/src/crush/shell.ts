@@ -305,7 +305,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       ? prepareSeams(seams, positions, topology.boundaryEdges, topology.nodeMass, material.thickness)
       : undefined;
     const maxStep = cohesive
-      ? 0.5 / Math.sqrt((0.5 / topology.maxStep) ** 2 + cohesive.frequencySquared)
+      ? 0.5 / Math.sqrt((0.5 / topology.maxStep) * (0.5 / topology.maxStep) + cohesive.frequencySquared)
       : topology.maxStep;
     if (!(maxStep > 0) || substeps(1 / rateOf(this.rate), maxStep, resolution) > MAX_SUBSTEPS)
       throw new MargoError('state', 'Give the shell larger minimum elements or reduce its requested resolution.');
