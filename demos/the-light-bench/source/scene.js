@@ -13,7 +13,8 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 const lifetime = new AbortController();
 const initialAngle = Number(angle.defaultValue);
 const controls = [angle, beam, view, reset];
-const wideShot = { target: [-.07, .44, -.035], offset: [.51, .80, 1.99], framedAspect: 1.99 };
+// The wide shot stands back far enough that the gauge blocks at the front right stay inside the frame.
+const wideShot = { target: [-.03, .40, -.01], offset: [.57, .89, 2.22], framedAspect: 1.99 };
 const closeShot = { target: [.34, .43, -.205], offset: [.26, .35, 1.27], framedAspect: 1.26 };
 
 let bench, engine, set, frame;
@@ -87,11 +88,11 @@ async function start() {
   bench = await openBench(canvas, {
     exhibit: document.body, signal: lifetime.signal, pixelRatio: 1.5, capacity: 160, startupTimeout: 10000,
     camera: { fov: 33, near: .2, far: 18 }, background: '#1b2528', backdrop: false, contact: false, shadows: false,
-    environment: false, light: { direction: [.23, .79, .55], intensity: 1.18, color: [.78, .88, 1], ambient: .19, ambientColor: [.75, .87, 1] },
+    environment: { intensity: .3 }, light: { direction: [.23, .79, .55], intensity: 1.18, color: [.78, .88, 1], ambient: .19, ambientColor: [.75, .87, 1] },
     onError: fail, onResize: () => schedule(),
   });
   engine = bench.engine;
-  // Cool, broad studio fill from the bench sun. Only the warm optical beam casts a dynamic shadow.
+  // Cool key from the bench sun with the kit softbox fill at 0.3. Only the warm optical beam casts a dynamic shadow.
   const light = Clustered.attach(engine, { grid: [8, 6, 12], maxLights: 3, shadows: { maxLights: 1, resolution: 1024 } });
   light.setLights([
     {
