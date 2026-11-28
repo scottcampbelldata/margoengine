@@ -91,6 +91,16 @@ const boundBuffers = (parts: ScatterVelocityParts): GPUBuffer[] => [
 const same = (a: readonly GPUBuffer[], b: readonly GPUBuffer[]) =>
   a.length === b.length && a.every((x, i) => x === b[i]);
 
+/** Options of `ScatterVelocity`. */
+export interface ScatterVelocityOptions {
+  /**
+   * The share of a pixel, 0 to 1, a covered blade must cover for the pixel to take its motion where the blade writes
+   * no depth (it blends over what is behind). Default 0.5: a pixel whose colour is mostly blade moves with the blade.
+   * `false` gives only the pixels the blades write depth to their motion, as before 2026-11-28.
+   */
+  coverage?: number | false;
+}
+
 /**
  * A `TAAVelocityPass` for one Scatter (a `GrassScatter`, a forest, any scatter with wind): `taa.add(new
  * ScatterVelocity(grass))`. TAA then calls `drawVelocity` inside its object velocity pass each frame, so the scatter's
@@ -109,16 +119,6 @@ const same = (a: readonly GPUBuffer[], b: readonly GPUBuffer[]) =>
  * MotionBlur.attach(engine, { velocity: () => taa.velocity });
  * ```
  */
-/** Options of `ScatterVelocity`. */
-export interface ScatterVelocityOptions {
-  /**
-   * The share of a pixel, 0 to 1, a covered blade must cover for the pixel to take its motion where the blade writes
-   * no depth (it blends over what is behind). Default 0.5: a pixel whose colour is mostly blade moves with the blade.
-   * `false` gives only the pixels the blades write depth to their motion, as before 2026-11-28.
-   */
-  coverage?: number | false;
-}
-
 export class ScatterVelocity {
   private readonly views = new Map<object, View>();
   private readonly pipelines = new Map<string, GPURenderPipeline>();

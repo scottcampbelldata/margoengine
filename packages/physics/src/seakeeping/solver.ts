@@ -60,32 +60,14 @@ import {
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { DECK_CLAIMS_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS } from '../world/deck.js';
-import {
-  addBilgeKeelInertia,
-  type HullBilgeKeel,
-  bilgeKeelDamping,
-  type RollKeel,
-  rollKeelsOf,
-  validateBilgeKeels,
-} from './bilge-keel.js';
-import { courseLoad, courseSpeedLimit, courseWords, lateralCourseLoad, type HullCourse } from './course.js';
+import { addBilgeKeelInertia, bilgeKeelDamping, type RollKeel, rollKeelsOf, validateBilgeKeels } from './bilge-keel.js';
+import { courseLoad, courseSpeedLimit, courseWords, lateralCourseLoad } from './course.js';
 import { CLAIM_ADDED_MASS, CLAIM_DAMPING, MANOEUVRING_CLAIMS_FIELD } from '../world/manoeuvring.js';
 import { type Deck, deckOf, stepDeck } from './deck.js';
 import { courseWaveCorrection } from './excitation.js';
 import { hullError } from './errors.js';
 import { type SlamStation, slamSlope, slamStations } from './slamming.js';
-import { type HullSlammingTable, slamMeshHash } from './slamming-table.js';
-import {
-  AIR_DENSITY,
-  ATMOSPHERE,
-  type Compartment,
-  COMPARTMENT_WORDS,
-  FLOOD_OPENING_GRID,
-  Flooding,
-  type Opening,
-  volumeBelow,
-} from './flooding.js';
-import type { FloodVolumeKernel } from './flood-volume-kernel.js';
+import { AIR_DENSITY, ATMOSPHERE, COMPARTMENT_WORDS, FLOOD_OPENING_GRID, Flooding, volumeBelow } from './flooding.js';
 import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from '../world/flooding.js';
 import { buildHullMemory, type HullMemory, type HullWaveMemory, type RadiationPair, stillWaterline } from './memory.js';
 import { panelDampingKernels, panelDiffraction } from './panel-runtime.js';
@@ -99,7 +81,6 @@ import { HullStepJournal } from './step-journal.js';
 import { submergedWakeNodes, type SubmergedWakeNode } from './submerged-wake.js';
 import { type ForwardRoll, forwardRollOf } from './viscous.js';
 import type { WakeAdvancePoints } from './wake-advance-points.js';
-import type { WakeWaterplane } from './wake-waterplane.js';
 import {
   interceptedBreadth,
   type ReflectingWaterline,
@@ -118,152 +99,26 @@ import {
   wettedLoads,
 } from './wetted.js';
 
-/** A hull: the kernel body row it is the hull of, and its surface in the body's frame. */
-export interface Hull {
-  readonly row: number;
-  readonly mesh: HullMesh;
-  /** Enable forward-speed strip loads in heave and pitch and the bare-hull roll corrections. */
-  readonly course?: HullCourse;
-  /** Thin bilateral or single-side plates that add normal viscous roll damping when wet. */
-  readonly bilgeKeels?: readonly HullBilgeKeel[];
-  /** Carry the 3D high-frequency water inertia along the hull's x axis. Default false. */
-  readonly surgeAddedMass?: boolean;
-  /** Optional three-dimensional radiation, infinite inertia and directional diffraction at the reference draft. */
-  readonly panels?: HullPanelResponse;
-  /** Optional native Wagner tables made for this exact body-local mesh, liquid density and station count. */
-  readonly slammingTable?: HullSlammingTable;
-  /** Add mean axial wave-reflection loads on the hull's waterline. Default false. */
-  readonly shortWaveResistance?: boolean;
-  /** Baked reference waterplane for heave, roll and pitch sources. A wake-enabled HullSolver copies its nodes. */
-  readonly wakeWaterplane?: {
-    /** Bake the hull mesh at its equilibrium waterline for the configured mass and density. */
-    readonly plane: WakeWaterplane;
-    /** Positive projection radius in metres, independent of the panel spacing. */
-    readonly radius: number;
-  };
-  /** Reference advancing panel points for a finite point-depth wake. */
-  readonly wakeAdvancePoints?: {
-    readonly geometry: WakeAdvancePoints;
-    /** Positive receiver projection radius in metres, separate from the bake bins. */
-    readonly radius: number;
-  };
-  /**
-   * Its spaces that can flood (flooding.ts): closed meshes in the body's frame inside the hull, each with its permeability,
-   * its water at the start and its cargo. The body's mass includes the cargo, not the floodwater.
-   */
-  readonly compartments?: readonly Compartment[];
-  /** Its openings between the compartments and to the outside: breaches, doors, hatches, vents. */
-  readonly openings?: readonly Opening[];
-}
+import {
+  add,
+  checkedHullSea,
+  copySlammingTable,
+  divide,
+  finiteHullVector,
+  hullHistoryBytes,
+  hullWaterVelocity,
+  interpolate,
+  invertSymmetric,
+  rotate,
+  solve6,
+  sub,
+  times,
+  turn,
+  writeWetMobility,
+} from './hull-math.js';
 
-/** Publish the hull's linearized waterplane displacement for a WakeSolver. */
-export interface HullWake {
-  /** Minimum radius of the surface patches in metres. Default 0, using their geometric size. */
-  readonly minimumRadius?: number;
-  /** Displace water at the advancing end and draw it in behind the hull. Default false. */
-  readonly advance?: boolean;
-  /** Project advancing flux from its actual depth and breadth. Pass one to eight bands covering every reference draft. */
-  readonly submergedAdvance?: readonly number[];
-  /** Publish the baked advancing points to a finiteQuayPointSource descriptor. Use one advancing source mode. */
-  readonly pointAdvance?: FieldDescriptor;
-}
-
-/** A hull's most recently accepted green-water surface in the body frame, x fastest. */
-export interface HullDeckSurface extends Deck {
-  /** The water column above each cell's deck height in metres. */
-  readonly depth: Float64Array;
-}
-
-/** Accepted contents of a configured flood compartment. */
-export interface HullFloodedCompartment {
-  /** Floodwater volume, in m³. */
-  readonly waterVolume: number;
-  /** Trapped air mass, in kg. */
-  readonly airMass: number;
-  /** Remaining cargo mass, in kg. */
-  readonly cargoMass: number;
-}
-
-/** What a {@link HullSolver} is made from. */
-export interface HullParams {
-  /** The hulls, each on its own body row. */
-  readonly hulls: readonly Hull[];
-  /** The sea they float on. */
-  /**
-   * The sea they float on: a `SeaSurface` (the framework's, such as `SpectralSea` from `@margoengine/physics/sea`) in the
-   * solver's own origin cell, or anything with `elevation` (and `pressure`, `density`).
-   */
-  readonly sea: SeaSurface | SeaQuery;
-  /** Optional caller-owned Wasm volume kernel. Keep it open until the world has finished using it. */
-  readonly floodVolumeKernel?: FloodVolumeKernel;
-  /** The solver's rate level, 60 * 2^level steps a second (default 0); step with the rigid solver. */
-  readonly level?: RateLevel;
-  /** Side length of an origin cell, m (default 4096). Match PhysicsWorld.cellSize for a separate rigid origin. */
-  readonly originCellSize?: number;
-  /**
-   * Body rows its `bodyForces` port covers: the world's (`PhysicsWorld.bodyRows`, the rigid world's capacity), which it reads;
-   * given, it must be the same.
-   */
-  readonly capacity?: number;
-  /** The rigid world's gravity, m/s^2 (default [0, -9.81, 0]): the weight the added-mass solve takes with the load. */
-  readonly gravity?: Vec3;
-  /** Carry the water the hull and any wet bilge keel plates move (default true). */
-  readonly addedMass?: boolean;
-  /** Stations along the hull for its sections (default 24). */
-  readonly stations?: number;
-  /**
-   * Take the waves a hull makes as it moves (default true): its heave and pitch damping with memory, Cummins' convolution of
-   * its strip-theory damping over the last `memory` seconds of its motion (memory.ts).
-   */
-  readonly radiation?: boolean;
-  /** Seconds of a hull's motion its radiation remembers (default 20). */
-  readonly memory?: number;
-  /**
-   * Take the waves' diffraction (default true, when the sea gives the water's motion, as a `SeaSurface`'s `water` does): the
-   * relative motion principle of strip theory (Journee and Massie eqs. 8.19 and 8.45-8.47), each section loaded by its added
-   * mass times the water's acceleration and its radiation memory convolved with the water's velocity, at the depths that
-   * stand for the section's motion. The Froude-Krylov part comes from the pressure over the wetted surface.
-   */
-  readonly diffraction?: boolean;
-  /**
-   * Take the waves' mean and slow drift (default true, when the sea gives its waves, as `SpectralSea`'s `waveComponents`
-   * do): each section's far-field drift in beam waves, 1/2 rho g R^2 per metre and square metre of wave amplitude, R the
-   * wave it sends back held by the hull's motions (Maruo; the momentum the waves carry), less the part the Froude-Krylov
-   * pressure over the moving wetted surface already gives, over the waves by Newman's approximation.
-   */
-  readonly drift?: boolean;
-  /**
-   * Take the sea coming over the deck (default true): shallow water on each hull's deck in its moving frame, coming in where
-   * the sea stands above a deck edge and running off where it does not, its weight (rho G h) on the deck (deck.ts). The
-   * deck's own faces then take no Froude-Krylov pressure, so the water over them is counted once. Where a liquid solver
-   * owns a hull's on-deck load (`deckClaims`), the hull solver leaves its own out.
-   */
-  readonly greenWater?: boolean;
-  /**
-   * Take the hull's slamming (default true): each section that comes down into the water takes the momentum of the water
-   * it sets moving, (dm/dh) V^2 a metre, m its added mass at its depth of entry with Wagner's wetted width and V its speed
-   * into the water (slamming.ts).
-   */
-  readonly slamming?: boolean;
-  /**
-   * Take the form drag of the hull moving through the water (default true): on each wet piece facing the way it moves,
-   * the stagnation pressure 1/2 rho C (v . n)^2, v its velocity relative to the water at the centre of mass (the sea's
-   * `water` there, when it gives it), the roll's part left to the roll damping where that is on. It sets the speed a
-   * hull that has lost its buoyancy sinks at, and how it turns as it goes down.
-   */
-  readonly drag?: boolean;
-  /** The drag coefficient C (default 1.05, Hoerner's cube face-on; a flat disk is 1.17). */
-  readonly dragCoefficient?: number;
-  /** The deck's grid, cells along the hull and across it (default [32, 12]). */
-  readonly deckCells?: readonly [number, number];
-  /**
-   * Damp a hull's roll by its bilge eddies and its skin friction (default true): Ikeda's component method (viscous.ts), the
-   * viscous part of roll damping that potential flow leaves out and that damps a real hull's roll most near its resonance.
-   */
-  readonly rollDamping?: boolean;
-  /** The water's kinematic viscosity, m^2/s (default 1.19e-6, sea water at 15 degrees C; fresh water 1.14e-6). */
-  readonly viscosity?: number;
-}
+import type { Hull, HullWake, HullDeckSurface, HullFloodedCompartment, HullParams } from './hull-params.js';
+export type { Hull, HullWake, HullDeckSurface, HullFloodedCompartment, HullParams } from './hull-params.js';
 
 /** Sea water's kinematic viscosity at 15 degrees C, m^2/s (ITTC 7.5-02-01-03, 2011). */
 export const SEA_VISCOSITY = 1.19e-6;
@@ -2776,224 +2631,4 @@ export class HullSolver implements Solver<HullParams> {
   extraState(): readonly Region[] {
     return [];
   }
-}
-
-function finiteHullVector(value: readonly number[] | undefined): value is Vec3 {
-  return value?.length === 3 && Number.isFinite(value[0]) && Number.isFinite(value[1]) && Number.isFinite(value[2]);
-}
-
-function copySlammingTable(table: HullSlammingTable, mesh: HullMesh, density: number, stations: number): SlamStation[] {
-  if (table.stations !== stations || table.density !== density || table.meshHash !== slamMeshHash(mesh))
-    throw hullError(
-      'unsupported',
-      'The slam table does not match this hull. Bake it with the same body-local mesh, sea density and station count.',
-    );
-  const { profiles, levels } = table;
-  if (
-    !Number.isSafeInteger(levels) ||
-    levels < 1 ||
-    !Array.isArray(profiles) ||
-    profiles.length === 0 ||
-    profiles.length > stations
-  )
-    throw hullError('unsupported', 'The slam table has invalid profile counts. Supply a table from bakeHullSlamming.');
-  return profiles.map((profile, i) => {
-    if (!profile)
-      throw hullError('unsupported', 'A slam profile is missing. Supply every profile returned by bakeHullSlamming.');
-    const { x, width, keel, heights, wetted, slope } = profile;
-    if (
-      ![x, width, keel].every(Number.isFinite) ||
-      !(width > 0) ||
-      (i > 0 && !(x > profiles[i - 1]!.x)) ||
-      !(heights instanceof Float64Array && wetted instanceof Float64Array && slope instanceof Float64Array) ||
-      heights.length < 2 ||
-      heights.length > levels + 1 ||
-      heights[0] !== 0 ||
-      wetted.length !== heights.length ||
-      slope.length !== heights.length ||
-      !heights.every((h, k) => Number.isFinite(h) && (k === 0 || h > heights[k - 1]!)) ||
-      !wetted.every((w, k) => Number.isFinite(w) && w >= (k > 0 ? wetted[k - 1]! : 0)) ||
-      !slope.every((s) => Number.isFinite(s) && s >= 0)
-    )
-      throw hullError(
-        'unsupported',
-        'A slam profile is invalid. Supply the ordered finite profiles from bakeHullSlamming.',
-      );
-    return { x, width, keel, heights: heights.slice(), wetted: wetted.slice(), slope: slope.slice() };
-  });
-}
-
-function hullHistoryBytes(words: number): number {
-  const bytes = words * Float64Array.BYTES_PER_ELEMENT;
-  if (!Number.isSafeInteger(bytes) || bytes > 0x1_0000_0000)
-    throw hullError('unsupported', 'Hull wave history exceeds Wasm memory. Reduce the history span or station count.');
-  return bytes;
-}
-
-function checkedHullSea(sea: SeaQuery): SeaQuery {
-  return {
-    get density() {
-      const density = sea.density;
-      if (density !== undefined && !(density > 0 && Number.isFinite(density)))
-        throw hullError('failed', 'The sea density is invalid. Return positive finite kilograms per cubic metre.');
-      return density;
-    },
-    elevation: (x, z, time) => {
-      const height = sea.elevation(x, z, time);
-      if (!Number.isFinite(height))
-        throw hullError('failed', 'The sea elevation is invalid. Return finite local metres for each hull query.');
-      return height;
-    },
-    pressure:
-      sea.pressure &&
-      ((x, y, z, time) => {
-        const pressure = sea.pressure!(x, y, z, time);
-        if (!Number.isFinite(pressure))
-          throw hullError('failed', 'The sea pressure is invalid. Return finite gauge pascals for each hull query.');
-        return pressure;
-      }),
-  };
-}
-
-function hullWaterVelocity(water: SeaWater, x: number, y: number, z: number, t: number, out: FlowSample): Vec3 {
-  const velocity = water.sample(x, y, z, t, out)?.velocity;
-  if (!finiteHullVector(velocity))
-    throw hullError(
-      'failed',
-      'Water velocity at the hull is invalid. Return three finite metres-per-second components.',
-    );
-  return velocity;
-}
-
-function rotate(q: readonly [number, number, number, number], v: Vec3): [number, number, number] {
-  const [x, y, z, w] = q,
-    tx = 2 * (y * v[2] - z * v[1]),
-    ty = 2 * (z * v[0] - x * v[2]),
-    tz = 2 * (x * v[1] - y * v[0]);
-  return [v[0] + w * tx + (y * tz - z * ty), v[1] + w * ty + (z * tx - x * tz), v[2] + w * tz + (x * ty - y * tx)];
-}
-
-/** The inverse of a symmetric 3 by 3 matrix given as xx, xy, xz, yy, yz, zz, row-major 3 by 3 (zeros where it is singular). */
-function invertSymmetric(e: readonly number[]): Float64Array {
-  const [a, b, c, d, f, g] = e as [number, number, number, number, number, number],
-    // [[a b c] [b d f] [c f g]]
-    A = d * g - f * f,
-    B = c * f - b * g,
-    C = b * f - c * d,
-    det = a * A + b * B + c * C,
-    out = new Float64Array(9);
-  if (!(det !== 0 && Number.isFinite(det))) return out;
-  const k = 1 / det;
-  out.set([
-    A * k,
-    B * k,
-    C * k,
-    B * k,
-    (a * g - c * c) * k,
-    (b * c - a * f) * k,
-    C * k,
-    (b * c - a * f) * k,
-    (a * d - b * b) * k,
-  ]);
-  return out;
-}
-
-/** Solves the 6 by 6 system (row-major) by Gaussian elimination with partial pivoting, in a fixed order. */
-function solve6(matrix: Float64Array, rhs: Float64Array): Float64Array {
-  const a = matrix.slice(),
-    b = rhs.slice(),
-    n = 6;
-  for (let col = 0; col < n; col++) {
-    let pivot = col;
-    for (let row = col + 1; row < n; row++)
-      if (Math.abs(a[row * n + col]!) > Math.abs(a[pivot * n + col]!)) pivot = row;
-    if (a[pivot * n + col] === 0) continue;
-    if (pivot !== col) {
-      for (let k = 0; k < n; k++) [a[col * n + k], a[pivot * n + k]] = [a[pivot * n + k]!, a[col * n + k]!];
-      [b[col], b[pivot]] = [b[pivot]!, b[col]!];
-    }
-    for (let row = col + 1; row < n; row++) {
-      const f = a[row * n + col]! / a[col * n + col]!;
-      if (f === 0) continue;
-      for (let k = col; k < n; k++) a[row * n + k]! -= f * a[col * n + k]!;
-      b[row]! -= f * b[col]!;
-    }
-  }
-  const x = new Float64Array(n);
-  for (let row = n - 1; row >= 0; row--) {
-    let sum = b[row]!;
-    for (let k = row + 1; k < n; k++) sum -= a[row * n + k]! * x[k]!;
-    x[row] = a[row * n + row]! !== 0 ? sum / a[row * n + row]! : 0;
-  }
-  return x;
-}
-
-/** Publishes world twist mobility and its mapping to the dry kernel's impulse. */
-function writeWetMobility(out: Float64Array, row: number, dry: Float64Array, system: Float64Array): void {
-  const at = row * WET_INERTIA_WORDS;
-  const basis = new Float64Array(6);
-  for (let column = 0; column < 6; column++) {
-    basis[column] = 1;
-    const columnMobility = solve6(system, basis);
-    basis[column] = 0;
-    if (!(columnMobility[column]! > 0 && columnMobility.every(Number.isFinite)))
-      throw hullError('failed', 'Use a hull with finite positive effective rigid and water inertia.');
-    for (let i = 0; i < 6; i++) {
-      let mapped = 0;
-      for (let j = 0; j < 6; j++) mapped += dry[i * 6 + j]! * columnMobility[j]!;
-      out[at + 1 + i * 6 + column] = columnMobility[i]!;
-      out[at + 37 + i * 6 + column] = mapped;
-    }
-  }
-  out[at] = 1;
-}
-
-/** The rotation `q` turned by the angular velocity `w` (world axes) for `h` seconds: q + (h / 2) [w, 0] q, made a unit. */
-function turn(
-  q: readonly [number, number, number, number],
-  w: readonly number[],
-  h: number,
-): [number, number, number, number] {
-  const [x, y, z, s] = q,
-    a = (w[0]! * h) / 2,
-    b = (w[1]! * h) / 2,
-    c = (w[2]! * h) / 2,
-    nx = x + (s * a + b * z - c * y),
-    ny = y + (s * b + c * x - a * z),
-    nz = z + (s * c + a * y - b * x),
-    ns = s - (a * x + b * y + c * z),
-    length = Math.sqrt(nx * nx + ny * ny + nz * nz + ns * ns);
-  return [nx / length, ny / length, nz / length, ns / length];
-}
-
-/** Complex numbers as [re, im]. */
-function add(a: readonly [number, number], b: readonly [number, number]): [number, number] {
-  return [a[0] + b[0], a[1] + b[1]];
-}
-function sub(a: readonly [number, number], b: readonly [number, number]): [number, number] {
-  return [a[0] - b[0], a[1] - b[1]];
-}
-function times(a: readonly [number, number], b: readonly [number, number]): [number, number] {
-  return [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]];
-}
-function divide(a: readonly [number, number], b: readonly [number, number]): [number, number] {
-  const m = b[0] * b[0] + b[1] * b[1];
-  return m > 0 ? [(a[0] * b[0] + a[1] * b[1]) / m, (a[1] * b[0] - a[0] * b[1]) / m] : [0, 0];
-}
-
-/** `values` at `x`, linear between `at`'s samples (rising), held at the ends. */
-function interpolate(at: Float64Array, values: Float64Array, x: number): number {
-  const n = at.length;
-  if (n === 0) return 0;
-  if (x <= at[0]!) return values[0]!;
-  if (x >= at[n - 1]!) return values[n - 1]!;
-  let lo = 0,
-    hi = n - 1;
-  while (hi - lo > 1) {
-    const mid = (lo + hi) >> 1;
-    if (at[mid]! <= x) lo = mid;
-    else hi = mid;
-  }
-  const t = (x - at[lo]!) / (at[hi]! - at[lo]!);
-  return values[lo]! + t * (values[hi]! - values[lo]!);
 }
