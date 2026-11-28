@@ -1,6 +1,7 @@
-import { EngineKernel } from '@margoengine/core';
+import { startEngine } from '@margoengine/webgl2-compat/auto';
 import { Shadows } from '@margoengine/shadows';
-import { rosettes, spindlePose } from './mechanism.js';
+import { describeCheck } from '@margoengine/machinery/rigs';
+import { openEngine, rosettes, spindlePose } from './mechanism.js';
 import { prepareRoseEngine } from './model.js';
 
 const canvas=document.querySelector('#scene');
@@ -11,13 +12,14 @@ const run=document.querySelector('#run');
 const shift=document.querySelector('#shift');
 const repeat=document.querySelector('#repeat');
 const pass=document.querySelector('#pass');
+const gap=document.querySelector('#check');
 const loading=document.querySelector('#loading');
 const choices=[...document.querySelectorAll('[data-rosette]')];
 const stop=new AbortController();
 const listen={signal:stop.signal};
 const fov=33;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-let engine,model,observer,frame,viewDirty=true,close=false,index=0,playing=null;
+let engine,model,rig,observer,frame,viewDirty=true,close=false,index=0,playing=null;
 let previous=-1,previousIndex=-1;
 
 function fit() {
@@ -58,7 +60,7 @@ function update() {
   const changed=degrees!==previous||index!==previousIndex;
   if(!viewDirty&&!changed) return;
   if(viewDirty) fit();
-  const pose=changed?spindlePose(degrees,rosettes[index]):null;
+  const pose=changed?spindlePose(rig,degrees,rosettes[index]):null;
   if(pose) model(pose,index,degrees);
   engine.render({delta:0});
   if(pose) {
@@ -71,6 +73,7 @@ function update() {
     document.body.dataset.rosette=String(rosettes[index].lobes);
     document.body.dataset.period=String(pose.period);
     document.body.dataset.shift=pose.shift.toFixed(8);
+    document.body.dataset.check=gap.textContent=describeCheck(rig.check);
   }
   if(viewDirty) document.body.dataset.view=close?'detail':'exhibit';
   previous=degrees;
@@ -146,23 +149,13 @@ function fail(error) {
 }
 
 async function open() {
-  const options={
-    backend:'webgpu',exactSize:true,antialias:true,signal:stop.signal,
-    startupTimeout:5000,camera:{fov,near:.099,far:67},
-  };
-  const force=new URLSearchParams(location.search).get('backend')==='webgl2';
-  async function create() {
-    if(!force) {
-      try { return [await EngineKernel.create(canvas,options),'webgpu']; }
-      catch(error) { if(error?.code!=='unsupported'&&error?.code!=='timeout') throw error; }
-    }
-    const {install}=await import('@margoengine/webgl2-compat');
-    await install({force:true});
-    return [await EngineKernel.create(canvas,options),'compatibility'];
-  }
-  const opening=create();
+  const opening=startEngine(canvas,{exactSize:true,antialias:true,signal:stop.signal,
+    startupTimeout:5000,camera:{fov,near:.099,far:67},forceCompat:location.search.includes('backend=webgl2'),
+    loadCompat:()=>import('@margoengine/webgl2-compat')});
   const assemble=prepareRoseEngine();
-  const [device,renderer]=await opening;
+  const solving=openEngine(stop.signal);
+  const {engine:device,renderer}=await opening;
+  rig=await solving;
   engine=device;
   engine.onError=fail;
   engine.scene.background='#68585c';

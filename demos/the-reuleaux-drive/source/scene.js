@@ -1,6 +1,7 @@
-import { EngineKernel } from '@margoengine/core';
+import { startEngine } from '@margoengine/webgl2-compat/auto';
 import { Shadows } from '@margoengine/shadows';
-import { drivePose } from './mechanism.js';
+import { describeCheck } from '@margoengine/machinery/rigs';
+import { openDrive, solvedPose } from './mechanism.js';
 import { prepareDrive } from './model.js';
 
 const canvas=document.querySelector('#scene');
@@ -10,13 +11,14 @@ const face=document.querySelector('#face');
 const play=document.querySelector('#play');
 const guides=document.querySelector('#guides');
 const contacts=document.querySelector('#contacts');
+const gap=document.querySelector('#check');
 const offsets=[document.querySelector('#offset-x'),document.querySelector('#offset-y')];
 const loading=document.querySelector('#loading');
 const stop=new AbortController();
 const listen={signal:stop.signal};
 const fov=33;
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
-let engine,model,observer,frame,previous=-1,viewDirty=true,guidesDirty=true;
+let engine,model,drive,observer,frame,previous=-1,viewDirty=true,guidesDirty=true;
 let faceOn=false,showGuides=true,playing=null;
 
 function fit() {
@@ -54,7 +56,7 @@ function update() {
   const value=Number(angle.value);
   if(!viewDirty&&!guidesDirty&&value===previous) return;
   if(viewDirty) fit();
-  const pose=value===previous?null:drivePose(value);
+  const pose=value===previous?null:solvedPose(drive,value);
   if(pose) model.pose(pose);
   if(guidesDirty) model.show(showGuides);
   engine.render({delta:0});
@@ -66,6 +68,7 @@ function update() {
     document.body.dataset.angle=String(value);
     document.body.dataset.center=pose.center.map((value)=>value.toFixed(7)).join(',');
     document.body.dataset.contacts=String(pose.contacts.length);
+    document.body.dataset.check=gap.textContent=describeCheck(drive.check);
   }
   if(viewDirty) document.body.dataset.view=faceOn?'face':'exhibit';
   if(guidesDirty) document.body.dataset.guides=String(showGuides);
@@ -139,23 +142,13 @@ function fail(error) {
 }
 
 async function open() {
-  const options={
-    backend:'webgpu',exactSize:true,antialias:true,signal:stop.signal,
-    startupTimeout:5000,camera:{fov,near:.10,far:66},
-  };
-  const force=new URLSearchParams(location.search).get('backend')==='webgl2';
-  async function create() {
-    if(!force) {
-      try { return [await EngineKernel.create(canvas,options),'webgpu']; }
-      catch(error) { if(error?.code!=='unsupported'&&error?.code!=='timeout') throw error; }
-    }
-    const {install}=await import('@margoengine/webgl2-compat');
-    await install({force:true});
-    return [await EngineKernel.create(canvas,options),'compatibility'];
-  }
-  const opening=create();
+  const opening=startEngine(canvas,{exactSize:true,antialias:true,signal:stop.signal,
+    startupTimeout:5000,camera:{fov,near:.10,far:66},forceCompat:location.search.includes('backend=webgl2'),
+    loadCompat:()=>import('@margoengine/webgl2-compat')});
   const assemble=prepareDrive();
-  const [device,renderer]=await opening;
+  const solving=openDrive(Number(angle.value),stop.signal);
+  const {engine:device,renderer}=await opening;
+  drive=await solving;
   engine=device;
   engine.onError=fail;
   engine.scene.background='#615766';
