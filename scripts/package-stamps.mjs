@@ -20,7 +20,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
-import { packageDependencies, packageOrder } from './package-order.js';
+import { packageClosure, packageDependencies, packageOrder } from './package-order.js';
 
 /** Stamp folder, relative to the repository root (test-results/ is ignored by git). */
 export const STAMP_DIR = 'test-results/package-stamps';
@@ -144,8 +144,12 @@ export function buildTools(root) {
   return ['package-lock.json', ...moduleClosure(root, [BUILD_ENTRY])];
 }
 
-/** Map of package directory name -> the stamp its dist must carry to match the checked-out sources. */
-export function packageStamps(root, manifests = workspaceManifests(root)) {
+/**
+ * Map of package directory name -> the stamp its dist must carry to match the checked-out sources. With `only` (a set of
+ * directories) it stamps just those and the packages they build after, whose stamps theirs include: the same values
+ * the full map holds, without hashing the other packages' sources (KB-TOOL-APISCOPE1).
+ */
+export function packageStamps(root, manifests = workspaceManifests(root), only) {
   const workspaces = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).workspaces;
   const tools = buildTools(root);
   const common = createHash('sha256')
@@ -155,7 +159,9 @@ export function packageStamps(root, manifests = workspaceManifests(root)) {
     .digest('hex');
   const dependencies = packageDependencies(manifests),
     stamps = new Map();
+  const needed = only && new Set([...only].flatMap((dir) => [dir, ...packageClosure(dir, dependencies)]));
   for (const dir of packageOrder(manifests)) {
+    if (needed && !needed.has(dir)) continue;
     const hash = createHash('sha256')
       .update(common)
       .update(hashFiles(root, packageInputs(root, dir, manifests.get(dir))));
@@ -188,8 +194,13 @@ export function clearStamp(root, dir) {
   rmSync(stampFile(root, dir), { force: true });
 }
 
-/** Package directories, in build order, whose dist does not match the checked-out sources (or has no stamp). */
-export function stalePackages(root, manifests = workspaceManifests(root)) {
-  const stamps = packageStamps(root, manifests);
-  return [...stamps].filter(([dir, stamp]) => readStamp(root, dir) !== stamp).map(([dir]) => dir);
+/**
+ * Package directories, in build order, whose dist does not match the checked-out sources (or has no stamp); with `only`
+ * (a set of directories), just those of them.
+ */
+export function stalePackages(root, manifests = workspaceManifests(root), only) {
+  const stamps = packageStamps(root, manifests, only);
+  return [...stamps]
+    .filter(([dir, stamp]) => (!only || only.has(dir)) && readStamp(root, dir) !== stamp)
+    .map(([dir]) => dir);
 }

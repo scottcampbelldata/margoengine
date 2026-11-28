@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -88,7 +89,11 @@ export function mergeApiSurfaceRows(base, ours, theirs) {
     if (b.get(name) === t.get(name)) continue;
     if (!t.has(name)) throw new Error(`${API_SURFACE}: the branch removed the ${name} row; run npm run api:update`);
     const row = o.has(name) ? mergeRow(b.get(name), o.get(name), t.get(name)) : t.get(name);
-    merged = mergeScopedApiSurface(merged, { packageName: name, row, ...rowCounts(row) });
+    merged = mergeScopedApiSurface(merged, {
+      packageName: name,
+      row,
+      ...rowCounts(row),
+    });
   }
   return merged;
 }
@@ -163,7 +168,10 @@ function rowCounts(row) {
   const exportsCell = row.split('|')[2] ?? '';
   const counts = [...exportsCell.matchAll(/`[^`]+`\s+(\d+)/g)].map((match) => Number(match[1]));
   if (!counts.length) throw new Error(`Unrecognized API surface package row: ${row}`);
-  return { entries: counts.length, exports: counts.reduce((sum, count) => sum + count, 0) };
+  return {
+    entries: counts.length,
+    exports: counts.reduce((sum, count) => sum + count, 0),
+  };
 }
 
 function packageName(row) {
@@ -191,4 +199,75 @@ export function foreignWorkspaceLinks(root, packages) {
     if (real(link) !== real(join(root, 'packages', dir))) foreign.push({ name, dir, target });
   }
   return foreign;
+}
+
+// The package a module specifier names: `@scope/name` or `name`, without its subpath.
+const packageOf = (specifier) =>
+  specifier
+    .split('/')
+    .slice(0, specifier.startsWith('@') ? 2 : 1)
+    .join('/');
+
+/**
+ * Map of package directory -> the package names its sources augment with `declare module '@margoengine/...'` (scene
+ * augments core). Read with `git grep` over packages/<dir>/src, untracked files included: reading every source file
+ * from Node took over a minute on a loaded laptop, the index lookup about ten seconds.
+ */
+export function moduleAugmentations(root) {
+  let out;
+  try {
+    out = execFileSync(
+      'git',
+      // POSIX classes, not \s: Git for Windows drops a backslash from its arguments.
+      [
+        'grep',
+        '-I',
+        '--untracked',
+        '-E',
+        `^[[:space:]]*declare[[:space:]]+module[[:space:]]+['"]@margoengine/`,
+        '--',
+        'packages/*/src/**',
+      ],
+      { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26 },
+    );
+  } catch (error) {
+    if (error.status === 1) return new Map(); // git grep exits 1 when nothing matches
+    throw error;
+  }
+  const augments = new Map();
+  for (const line of out.split('\n')) {
+    const match = line.match(/^packages\/([^/]+)\/[^:]*:\s*declare\s+module\s+['"]([^'"]+)['"]/);
+    if (!match) continue;
+    if (!augments.has(match[1])) augments.set(match[1], new Set());
+    augments.get(match[1]).add(packageOf(match[2]));
+  }
+  return augments;
+}
+
+/**
+ * The package directories a scoped API report loads and keeps current (KB-TOOL-APISCOPE1): the selected one, the
+ * workspace packages it imports (dependencies and peerDependencies, followed transitively; a published declaration can
+ * import nothing else, and api-report.js refuses one that does), and every package whose sources augment one of those
+ * with `declare module`, with what that package imports in turn. No other package's declarations can reach the
+ * selected one's symbols, so a program over these reports it as the full program does. `manifests`: Map of directory
+ * -> parsed package.json; `augments`: what moduleAugmentations returns.
+ */
+export function apiReportScope(selected, manifests, augments = new Map()) {
+  const byName = new Map([...manifests].map(([dir, manifest]) => [manifest.name, dir]));
+  const scope = new Set(),
+    wanted = [selected];
+  while (wanted.length) {
+    const dir = wanted.pop();
+    if (!scope.has(dir)) {
+      scope.add(dir);
+      const { dependencies, peerDependencies } = manifests.get(dir);
+      for (const name of Object.keys({ ...dependencies, ...peerDependencies }))
+        if (byName.has(name)) wanted.push(byName.get(name));
+    }
+    if (!wanted.length)
+      for (const [other, targets] of augments)
+        if (!scope.has(other) && manifests.has(other) && [...targets].some((name) => scope.has(byName.get(name))))
+          wanted.push(other);
+  }
+  return scope;
 }

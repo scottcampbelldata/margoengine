@@ -3,8 +3,9 @@
 // types those declarations reference but the entry does not export. One report per entry in api/, like API Extractor's
 // .api.md. `npm run api:check` (default) fails with a diff when a report changed; `npm run api:update` rewrites them and
 // docs/api-surface.md. `--package=<name>` and optional `--entry=<subpath>` limit checking and updates to one package
-// or entry; the program still loads every package's declarations, because another package's `declare module` changes
-// this package's symbols, so a scoped report is the same text the full run writes. Needs `npm run build:packages` (packages whose dist no longer matches their sources are rebuilt first). Uses TypeScript 7's checker through its
+// or entry; a scoped program loads that package, the packages it imports and the packages that `declare module` one of
+// those (another package's augmentation changes this package's symbols), so a scoped report is the same text the full
+// run writes, and only those packages are rebuilt (KB-TOOL-APISCOPE1). Needs `npm run build:packages` (packages whose dist no longer matches their sources are rebuilt first). Uses TypeScript 7's checker through its
 // `typescript/unstable/async` API (no extra dependency); that API is marked unstable, so a TypeScript bump may need edits.
 // Not the sync API: on Windows its client gives a new tsgo a fixed ~5 s to open a named pipe and throws "SyncRpcChannel:
 // timed out connecting to named pipe" on a loaded machine; the async client talks over stdio and waits for the process
@@ -27,9 +28,11 @@ import { isUmbrellaAlias } from './umbrella.mjs';
 import { OUTPUT as ALL_ENTRIES, entriesSource } from './generate-all-entries.mjs';
 import {
   ENTRY_SIZES,
+  apiReportScope,
   foreignWorkspaceLinks,
   gzipCell,
   mergeScopedApiSurface,
+  moduleAugmentations,
   packageMatchesApiReportScope,
   parseApiReportArguments,
   refreshSurfaceGzip,
@@ -48,38 +51,61 @@ const slash = (p) => p.replaceAll('\\', '/');
 const key = (p) => slash(p).toLowerCase(); // the checker reports lower-cased paths on Windows
 const byText = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
-// Every package's declarations load below, scoped or not. After a rebase the dist of a package changed upstream still
-// holds its old build: a new entry had no .d.ts and a changed one its old declarations, so the report failed on packages
-// nobody touched until build:packages ran again. Rebuild just the packages whose dist does not match their sources
-// (scripts/package-stamps.mjs); a current build is left alone.
-// Stale packages are found and rebuilt under the build lock (scripts/support/build-lock.mjs): two reports at once (two
-// root tests in one CI run) both rebuilt the same packages side by side and deleted each other's dist (KB-RM4).
-rebuildStalePackages(root, { label: 'API report' });
-
-// Packages and their entries, in directory order.
-const packages = [];
+// Package manifests, in directory order.
+const manifests = new Map();
 for (const dir of readdirSync(join(root, 'packages')).sort(byText)) {
   const file = join(root, 'packages', dir, 'package.json');
-  if (!existsSync(file)) continue;
-  const manifest = JSON.parse(readFileSync(file, 'utf8'));
-  // margoengine/<x> aliases re-export @margoengine/<x>, which has its own report (scripts/umbrella.mjs).
-  const entries = Object.entries(manifest.exports ?? {})
-    .filter(([subpath]) => !isUmbrellaAlias(manifest.name, subpath))
-    .map(([subpath, target]) => {
-      const types = typeof target === 'string' ? target.replace(/\.js$/, '.d.ts') : target.types;
-      const dts = join(root, 'packages', dir, types);
-      if (!existsSync(dts))
-        throw new Error(`${manifest.name} "${subpath}": ${types} missing; run npm run build:packages`);
-      const suffix = subpath === '.' ? '' : '.' + subpath.slice(2).replaceAll('/', '-');
-      return {
-        subpath,
-        specifier: manifest.name + subpath.slice(1),
-        dts: slash(dts),
-        report: `${dir}${suffix}.api.md`,
-      };
-    });
+  if (existsSync(file)) manifests.set(dir, JSON.parse(readFileSync(file, 'utf8')));
+}
+// margoengine/<x> aliases re-export @margoengine/<x>, which has its own report (scripts/umbrella.mjs).
+const entriesOf = (manifest) =>
+  Object.entries(manifest.exports ?? {}).filter(([subpath]) => !isUmbrellaAlias(manifest.name, subpath));
+// Every reported package, loaded or not: the API lock's watch list keeps the ones that still exist.
+const reportedNames = [...manifests.values()].filter((manifest) => entriesOf(manifest).length).map((m) => m.name);
+const selectedDir = packageSelector
+  ? [...manifests].find(([dir, manifest]) => packageMatchesApiReportScope(packageSelector, dir, manifest.name))?.[0]
+  : undefined;
+if (packageSelector && !selectedDir)
+  throw new RangeError(
+    `Unknown API report package ${packageSelector}; use a packages/<dir> name or its full package name`,
+  );
+// The packages whose declarations load: all of them for the full run; for a scoped one the selected package, what it
+// imports and what augments those (apiReportScope). A scoped run once rebuilt and loaded all 108 packages after a rebase,
+// to write one report (KB-TOOL-APISCOPE1).
+const scope = selectedDir ? apiReportScope(selectedDir, manifests, moduleAugmentations(root)) : undefined;
+
+// After a rebase the dist of a package changed upstream still holds its old build: a new entry had no .d.ts and a
+// changed one its old declarations, so the report failed on packages nobody touched until build:packages ran again.
+// Rebuild just the loaded packages whose dist does not match their sources (scripts/package-stamps.mjs); a current
+// build is left alone.
+// Stale packages are found and rebuilt under the build lock (scripts/support/build-lock.mjs): two reports at once (two
+// root tests in one CI run) both rebuilt the same packages side by side and deleted each other's dist (KB-RM4).
+rebuildStalePackages(root, { label: 'API report', only: scope });
+
+// Loaded packages and their entries, in directory order.
+const packages = [];
+for (const [dir, manifest] of manifests) {
+  if (scope && !scope.has(dir)) continue;
+  const entries = entriesOf(manifest).map(([subpath, target]) => {
+    const types = typeof target === 'string' ? target.replace(/\.js$/, '.d.ts') : target.types;
+    const dts = join(root, 'packages', dir, types);
+    if (!existsSync(dts))
+      throw new Error(`${manifest.name} "${subpath}": ${types} missing; run npm run build:packages`);
+    const suffix = subpath === '.' ? '' : '.' + subpath.slice(2).replaceAll('/', '-');
+    return {
+      subpath,
+      specifier: manifest.name + subpath.slice(1),
+      dts: slash(dts),
+      report: `${dir}${suffix}.api.md`,
+    };
+  });
   if (entries.length)
-    packages.push({ dir, name: manifest.name, home: key(join(root, 'packages', dir)) + '/', entries });
+    packages.push({
+      dir,
+      name: manifest.name,
+      home: key(join(root, 'packages', dir)) + '/',
+      entries,
+    });
 }
 // A checkout that borrows another checkout's node_modules reads that checkout's packages for every cross-package
 // import, so its reports lose their import lines and say `from "undefined"` (KB-API-FOREIGN1): stop before writing any.
@@ -107,9 +133,19 @@ if (entrySelector && !scopedPackage.entries.some((entry) => entry.subpath === en
 const reportPackages = scopedPackage ? [scopedPackage] : packages;
 const shared = key(join(root, 'packages', 'shared')) + '/'; // copied into each bundle, so it counts as package-local
 // The package a declaration file belongs to; undefined for TypeScript's own lib files.
+const packagesHome = key(join(root, 'packages')) + '/';
+const unloaded = new Set([...manifests.keys()].filter((dir) => !scope?.has(dir)).map((dir) => dir.toLowerCase()));
 const ownerOf = (path) => {
   const p = key(path);
   for (const pkg of packages) if (p.startsWith(pkg.home)) return pkg.name;
+  // A workspace package a scoped run did not load: its symbols would come out without their entry. Only an import its
+  // package.json does not declare gets here, which no published package may have.
+  const dir = p.startsWith(packagesHome) ? p.slice(packagesHome.length).split('/')[0] : undefined;
+  if (scope && dir && unloaded.has(dir))
+    throw new Error(
+      `API report: ${path} is read by a declaration of the selected packages but its package is not among their ` +
+        `dependencies or peerDependencies; declare it in package.json`,
+    );
   const nm = p.lastIndexOf('/node_modules/');
   if (nm < 0) return undefined;
   const [a, b] = p.slice(nm + 14).split('/');
@@ -168,7 +204,12 @@ try {
   for (const pkg of reportPackages) {
     const rows = [];
     const globals = await globalReport(pkg.home);
-    for (const entry of pkg.entries) rows.push({ pkg, entry, ...(await report(project, pkg, entry, globals)) });
+    for (const entry of pkg.entries)
+      rows.push({
+        pkg,
+        entry,
+        ...(await report(project, pkg, entry, globals)),
+      });
     reports.push(rows);
   }
 } finally {
@@ -454,7 +495,7 @@ function writeOrCompare() {
         enrollWatch(
           lock,
           selectedReports.map((item) => item.pkg.name),
-          packages.map((pkg) => pkg.name),
+          reportedNames,
         ),
         null,
         2,

@@ -18,14 +18,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Next:** the volumetric-fracture owner drives the test past nucleation with a load the rung's own measured strain
   exceeds, keeping its assertions.
 
-### Open 2026-11-28: the scoped API report rebuilds every stale package (KB-TOOL-APISCOPE1, scripts)
+### Fixed 2026-11-28: the scoped API report rebuilds every stale package (KB-TOOL-APISCOPE1, scripts)
 
 - **Repro:** after a rebase onto a main 300 commits on, `node scripts/api-report.js --package=@margoengine/physics` began
   rebuilding 108 packages, core to kit-react, before it wrote the one report asked for.
 - **Cause:** `scripts/api-report.js` calls `rebuildStalePackages` (`scripts/support/fresh-dist.mjs`) for the whole tree
   before it reads the selector, because it loads every package's declarations, scoped or not, to resolve cross-package
   imports; the script has no flag that limits the rebuild.
-- **Next:** rebuild only the selected package and the packages its declarations import, and load only those.
+- **Fix:** a scoped run loads, stamps and rebuilds only `apiReportScope` (`scripts/api-report-scope.mjs`): the selected
+  package, its dependencies and peerDependencies followed transitively, and every package whose sources `declare module`
+  one of those (found by `git grep`, so scene comes in with core), with what it imports. `stalePackages` and
+  `rebuildStalePackages` take that set as `only` and hash just it and the packages it builds after, so the stamps are the
+  full run's. A declaration that reads a workspace package outside the set stops the report with an error naming it,
+  so a scoped report cannot silently differ from the full one (`tests/api-report-scope-full.test.js` holds core and
+  scene to the committed reports). `--package=physics` now loads 18 of 108 packages. Regression:
+  `tests/api-report-scope-closure.test.js`.
 
 ### Open 2026-11-28: cells on the constraint solver are not converged under a static load at their passes (KB-SOFT-XPBDSTATIC1, physics soft)
 

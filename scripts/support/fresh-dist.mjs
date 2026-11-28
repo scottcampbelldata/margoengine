@@ -10,14 +10,17 @@ import { stalePackages } from '../package-stamps.mjs';
 import { BUILD_LOCK_ENV, acquireBuildLock } from './build-lock.mjs';
 
 /**
- * Rebuilds the packages whose dist does not match their sources and returns their directory names.
- * `stale` and `build` are the parts a test replaces: the stale finder and the build command (given the stale names).
+ * Rebuilds the packages whose dist does not match their sources and returns their directory names. `only` (a set of
+ * directories) limits the check and the rebuild to those packages, so a scoped tool leaves the rest of the tree alone
+ * (KB-TOOL-APISCOPE1). `stale` and `build` are the parts a test replaces: the stale finder (given the root and `only`)
+ * and the build command (given the stale names).
  */
 export function rebuildStalePackages(
   root,
   {
     label = 'Build',
-    stale = stalePackages,
+    only,
+    stale = (root, only) => stalePackages(root, undefined, only),
     build = (names) =>
       execFileSync(process.execPath, ['scripts/build-modern.js', '--precompiled', `--only=${names.join(',')}`], {
         cwd: root,
@@ -31,7 +34,7 @@ export function rebuildStalePackages(
   // and deleted each other's dist (KB-RM4).
   const release = acquireBuildLock(root);
   try {
-    const names = stale(root);
+    const names = stale(root, only).filter((name) => !only || only.has(name));
     if (names.length) {
       log(
         `${label}: rebuilding ${names.length} package(s) whose dist does not match their sources: ${names.join(', ')}`,
