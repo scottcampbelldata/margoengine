@@ -263,7 +263,7 @@ test("the fires' light on the layer is in front of the clouds, as of the dome", 
   const c = code(h);
   assert.match(
     c,
-    /fires:array<vec4f,16>,hazeFires:array<vec4f,16>,ground:array<vec4f,16>,mist:vec4f,lift:vec4f,link:vec4f,linkGlow:vec4f\}/,
+    /fires:array<vec4f,16>,hazeFires:array<vec4f,16>,ground:array<vec4f,16>,mist:vec4f,lift:vec4f,link:vec4f,linkGlow:vec4f,rain:array<vec4f,3>,rainCells:array<vec4f,16>\}/,
     'the uniform holds the spots',
   );
   assert.ok(c.includes('fn fireLayer(w:vec3f)->vec3f'), "the dome's fire term");

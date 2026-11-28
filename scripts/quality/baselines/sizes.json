@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22062399,
+  "total": 22070396,
   "history": [
     {
       "date": "2026-10-24",
@@ -15875,6 +15875,12 @@
       "commit": "ice-03-native-iceberg-poses",
       "reason": "ICE-03 @margoengine/physics/iceberg 4339 to 6937 B gzip, ceiling 4595 to 7193 B. The entry owns accepted iceberg rows, calving volume, meltwater and signed wake sources. Splitting would duplicate their staging and lifetime. Optional helpers integrate only disjoint body rows before ordered source publication. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "storm-sky-step-3",
+      "reason": "VolumetricClouds rain shafts under a deck (`rain` option: cells, steps, streaks; Marshall and Palmer 1948 drop sizes, Atlas, Srivastava and Sekhon 1973 fall speed) and Weather `rainFrom`: gzip measured on the same workstation build (build-modern --only=sky,weather) from the step-2 record to now: sky/volumetric-clouds 18,769 to 20,644 B, compat-clouds 32,779 to 34,753. The rain march itself (rain-shafts.ts) joins the lazy part, which grows 4,763 to 5,670 B and loads only for a layer with a `rain` option, so the lazy rows are renamed: volumetric-clouds base 14,586 to 15,634 B, compat-clouds base 28,344 to 29,452 B. The base bytes are the rain uniform block and its writer, option checks, the CPU twin (rainRateAt, rainSource) that weather and gameplay read without the GPU, and the shared call site in the cloud shader; a further split would load a second chunk for every rain layer and still keep the uniform layout in the base. cloud-shadows, shafts, sky/weather and weather stay under their ceilings. Core and stage unchanged.",
+      "grew": 6
     }
   ],
   "items": {
@@ -17215,9 +17221,9 @@
     "@margoengine/sky/cloud-shadows base (without storm field and scud shape)": 5425,
     "@margoengine/sky/cloud-shadows lazy storm field and scud shape": 5019,
     "@margoengine/sky/clouds": 2606,
-    "@margoengine/sky/compat-clouds": 33763,
-    "@margoengine/sky/compat-clouds base (without storm field and scud shape)": 29195,
-    "@margoengine/sky/compat-clouds lazy storm field and scud shape": 5019,
+    "@margoengine/sky/compat-clouds": 35796,
+    "@margoengine/sky/compat-clouds base (without storm field, scud shape and rain shafts)": 30336,
+    "@margoengine/sky/compat-clouds lazy storm field, scud shape and rain shafts": 5926,
     "@margoengine/sky/day-presets": 1757,
     "@margoengine/sky/ephemeris": 2235,
     "@margoengine/sky/fog": 4746,
@@ -17246,9 +17252,9 @@
     "@margoengine/sky/tornado": 10327,
     "@margoengine/sky/tornado base (without tornado shader)": 7934,
     "@margoengine/sky/tornado lazy tornado shader": 2741,
-    "@margoengine/sky/volumetric-clouds": 19333,
-    "@margoengine/sky/volumetric-clouds base (without storm field and scud shape)": 15024,
-    "@margoengine/sky/volumetric-clouds lazy storm field and scud shape": 5019,
+    "@margoengine/sky/volumetric-clouds": 21263,
+    "@margoengine/sky/volumetric-clouds base (without storm field, scud shape and rain shafts)": 16103,
+    "@margoengine/sky/volumetric-clouds lazy storm field, scud shape and rain shafts": 5926,
     "@margoengine/sky/weather": 12684,
     "@margoengine/sky/weather-fx": 5533,
     "@margoengine/splats": 32003,

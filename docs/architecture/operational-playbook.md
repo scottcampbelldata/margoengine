@@ -10689,6 +10689,27 @@ and overlap; `cloud-shadows` and `shafts` checks still pass. Cost: no second lay
 is one more march of 24 steps and 2 light steps. Missing: no mist inside the scud slab, the link is the decks' means
 (no gap of the deck lights a shred more), and no photograph comparison is automated.
 
+## Rain shafts under a deck (section 5 evidence, 2026-11-28)
+
+GPU maths change in `packages/sky/src/volumetric-clouds.ts` and the lazy `packages/sky/src/rain-shafts.ts`, both
+backends from one WGSL source. The `Clouds` uniform grows from 312 to 388 floats (`rain`: count, steps, band, fall,
+wind, streaks; `rainCells`: up to 8 cells of centre, radius, rate, velocity and reach). Rain is a medium in the air
+under the base, marched in the layer's air band to the scene depth (`sceneFar`): its rate at a point is each cell's
+exponential mound at the base, read (base - h) / v seconds ago and (wind - cell velocity) times that upwind, with v the
+fall speed of the strongest cell's median drop (Marshall and Palmer 1948 sizes, the Atlas, Srivastava and Sekhon 1973
+fit), so the same law as `@margoengine/weather` `PrecipitationField.sample`. Extinction 3.647e-4 R^0.63 per metre; the
+drops scatter the ground, deck, sun, moon and ground lights isotropically; a streak noise along the fall line breaks
+the shaft into curtains. A lower layer with `above` draws the upper deck's rain from the ground through its own tops,
+the upper from those tops to its base. The CPU twin (`cloudRainRate`, `rainRateAt`, `rainSource`) feeds `Weather`
+`rainFrom` and `PrecipitationField`, so the rain round the camera is the rain the shafts draw there. Evidence:
+`features-check.mjs rain-shaft` (RTX A6000, WebGPU and `MARGO_COMPAT=1`, 4x and 1x): optical depth against the CPU
+integral within 0.2 percent still, 0.3 wind, 0.5 moving cell, 0.2 split over two layers; a ray that misses the rain
+keeps transmittance 0.998; clouds without rain bit-identical; a city light lights the shaft (0.019 against 0); streak
+contrast 0.107 (bar 0.08). `rain-shafts.test.js` and `packages/weather/tests/rain-shaft-agree.test.js` hold the CPU
+twin to the field. Cost: nothing for clouds without rain (the code loads by `import()`); with rain, 16 steps per pixel
+in the air band. Missing: one fall speed per layer, isotropic phase, `WeatherDrive` does not pass its cells, and no
+photograph comparison is automated.
+
 ## Cloud base lit from below: ground lights and mist (section 5 evidence, 2026-11-28)
 
 GPU maths change in `packages/sky/src/volumetric-clouds.ts`, both backends from one WGSL source. `groundLights` (at

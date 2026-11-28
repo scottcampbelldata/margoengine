@@ -448,6 +448,7 @@ over the empty sky.
 | `type` | none | `'cumulus'`, `'stratus'` or `'storm'` forces that type's base, tops and density whatever the `weather` says (with no weather its `cloud` is 0.5); `'hurricane'` is the hurricane deck, 500 to 15,000 m, drawing the default storm at the origin; `'scud'` is ragged low cloud under a rain deck (below); `cloudLayerFor(weather, out, type)` gives the same layer |
 | `above` | none | the layer over this one (scud under a rain deck): linked light, one sky deck and environment map, air bands and draw order (below); this layer's tops must be at or below its base (`RangeError`) |
 | `shear` | 0 (1.5 x thickness for scud) | metres the tops lead the base along the wind, so the shapes lean downwind as wind shear tilts real cloud (-20,000 to 20,000); live |
+| `rain` | none | rain shafts hanging from the base, `{cells, steps?, streaks?}`: at most 8 cells `{x, z, radius, rate, velocity?, reach?}` (rate in mm/h at the base, 0 to 300), `steps` 4 to 128 (16), `streaks` 0 to 1 (0.6); loads by `import()` on first use (below); live |
 | `hurricane` | none | a `Hurricane` (or its options) shaping the layer: eye, eyewall, moat, bands, shield and canopy, turning and moving with the storm (below); `coverage` then scales its cover, and the weather drive leaves the layer's coverage, density and drift to it |
 | `coverage` | 0.5 | share of the sky covered, 0 to 1; 0 draws nothing |
 | `bottom`, `top` | 1500, 4000 | the layer's base and tops in metres above the ground (100 to 20,000) |
@@ -603,6 +604,46 @@ Sources: WMO International Cloud Atlas, "Pannus", https://cloudatlas.wmo.int/en/
 Meteorological Society, Glossary of Meteorology, "scud", https://glossary.ametsoc.org/wiki/Scud; A. Schneider and N.
 Vos, "The Real-Time Volumetric Cloudscapes of Horizon Zero Dawn", SIGGRAPH Advances in Real-Time Rendering 2015,
 https://www.advances.realtimerendering.com/s2015/index.html (the noise shape and erosion the scud reshapes).
+
+### Rain shafts hanging from the deck
+
+`rain` hangs rain shafts from the layer's base: up to 8 cells, each an exponential mound of rain rate at the base
+(`rate` mm/h at its centre, falling by e over `radius` metres) that moves with its `velocity`. The water read at a
+height left the base (base - height) / v seconds ago and has drifted with the wind since, so the shafts lean and trail
+downwind as real fall streaks do, the same law as `PrecipitationField` of `@margoengine/weather`; v is the fall speed of
+the strongest cell's median drop (Marshall and Palmer sizes, the Atlas, Srivastava and Sekhon fall speed). `reach` stops
+a cell above the ground (virga). The rain dims what is behind it by Marshall and Palmer's extinction, 3.647e-4 R^0.63
+per metre, over the sky and scene surfaces alike, and takes the light round it: the sky, the deck, the sun and moon
+through the deck and the ground lights at its own place, so a city lights the curtains orange from below. `streaks`
+breaks a shaft into darker hanging curtains along the fall line. A layer under the deck (`above`) draws the deck's rain
+in its own air band. `rainRateAt(position)` is the CPU twin, and `Weather`'s `rainFrom` reads it at the camera every
+frame, so the rain falling round the camera starts and stops as the camera passes under a shaft; `rainSource()` hands
+the same cells to a `PrecipitationField`. Only clouds with `rain` load its code (`ready`).
+
+How strongly a shaft shows is physical: at 20 mm/h the extinction is about 2.4e-3 per metre, so 1 km of rain hides
+about nine tenths of what is behind it, while at 2 mm/h the same kilometre hides about two fifths. Curtains then read as
+about a tenth of the shaft's own opacity (`features-check.mjs rain-shaft`).
+
+```ts
+import {Engine} from 'margoengine/core';
+import {VolumetricClouds} from 'margoengine/sky/volumetric-clouds';
+import {Weather} from 'margoengine/sky/weather';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+// A deck at 800 to 1,500 m with two rain cells drifting east on a 9 m/s wind.
+const deck = VolumetricClouds.attach(engine, {
+  coverage: 0.9, bottom: 800, top: 1500, density: 0.06, wind: [9, 2],
+  rain: {cells: [{x: 0, z: -3000, radius: 900, rate: 25, velocity: [8, 0]}, {x: 2500, z: -5000, radius: 600, rate: 10}]},
+});
+await deck.ready;
+// The rain round the camera follows the shafts.
+const weather = Weather.attach(engine, {precipitation: 'rain', rainFrom: deck});
+console.log(deck.rainRateAt([0, 0, -3000]) > 0, weather.options.rainFrom === deck); // true true
+```
+
+Sources: J. S. Marshall and W. McK. Palmer, "The distribution of raindrops with size", J. Meteor. 5, 165 to 166, 1948,
+https://doi.org/10.1175/1520-0469(1948)005%3C0165:TDORWS%3E2.0.CO;2 (drop sizes and the extinction they give); D.
+Atlas, R. C. Srivastava and R. S. Sekhon, "Doppler radar characteristics of precipitation at vertical incidence", Rev.
+Geophys. Space Phys. 11(1), 1 to 35, 1973, https://doi.org/10.1029/RG011i001p00001 (fall speed of a drop).
 
 ### Hurricanes: the eye, the eyewall and the rain bands
 
@@ -1794,6 +1835,7 @@ Options are read every frame from `weather.options`; change them live. `intensit
 | `radius`, `height` | 25, 20 | half-width and height in metres of the box that follows the camera |
 | `particles` | 24,000 rain, 500,000 snow | count at intensity 1, up to 2,000,000; the amount scales it. Flakes are drawn at their real size, most under a pixel, so snow takes many |
 | `rainRate` | unset | mm of water per hour, 0 to 300: the rain's drops fall at the speed of their own size (below); unset keeps a fixed 9 m/s. `WeatherDrive` of `@margoengine/weather` sets it from the state |
+| `rainFrom` | none | anything with `rainRateAt(position)` (mm/h at a world position), read at the camera every frame in place of `rainRate`, such as a `VolumetricClouds` layer with `rain`: the rain round the camera is the rain the shafts draw there |
 | `snowfallRate` | 1 | mm of melted water per hour, 0.01 to 30: sets the flakes' size distribution (below); harder snow has larger flakes |
 | `flakeSizes` | `[2, 10]` | the flake sizes drawn, largest dimension in mm, 0.5 to 30, smallest first |
 | `color`, `brightness`, `opacity` | pale grey-blue (rain) or white (snow), 1, 0.35 (rain) or 0.8 (snow) | linear RGB, its scale, one particle's alpha |

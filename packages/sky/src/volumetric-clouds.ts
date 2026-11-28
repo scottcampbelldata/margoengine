@@ -32,6 +32,7 @@ import {
 import type { Hurricane, HurricaneOptions } from './hurricane.js';
 import type { StormField } from './storm-field.js';
 import type { ScudField } from './scud-field.js';
+import type { RainShafts } from './rain-shafts.js';
 export {
   CLOUD_LAYER_NAME,
   isCloudLayerName,
@@ -274,6 +275,39 @@ export interface VolumetricCloudOptions {
    * cloud), -20,000 to 20,000. Live. Default 0, or 1.5 times the layer's thickness for `type: 'scud'`.
    */
   shear?: number;
+  /**
+   * Rain shafts hanging from the base (`{cells, steps?, streaks?}`, at most 8 cells): each cell an exponential mound of
+   * rain rate at the base, moving with its `velocity`, its water trailing downwind as it falls (the trail of
+   * `PrecipitationField` in `@margoengine/weather`), drawn as a medium in the air under the base that dims what is behind
+   * it by Marshall and Palmer's extinction (3.647e-4 R^0.63 per metre) and takes the light round it, the ground lights'
+   * at its own place included. Over the sky and over scene surfaces alike. A layer under this one (`above`) draws the
+   * rain in its own air band. Its code loads by `import()` on first use (`ready`). Read every frame; default none.
+   */
+  rain?: CloudRain;
+}
+/** {@link VolumetricCloudOptions.rain}: rain shafts under the base. */
+export interface CloudRain {
+  /** The rain cells, at most 8. */
+  cells: readonly CloudRainCell[];
+  /** Samples along each view ray through the air band, an integer 4 to 128. Default 16. */
+  steps?: number;
+  /** How much a streak noise carried down the fall line breaks the shafts into curtains, 0 (even) to 1. Default 0.6. */
+  streaks?: number;
+}
+/** {@link CloudRain.cells}: one rain cell, as `RainCell` of `@margoengine/weather` with its centre split in two. */
+export interface CloudRainCell {
+  /** World x of the centre at the layer's time 0, metres. */
+  x: number;
+  /** World z of the centre at the layer's time 0, metres (north is -z). */
+  z: number;
+  /** Metres over which the rate at the base falls by a factor e, 1 to 1,000,000. */
+  radius: number;
+  /** Rate at the centre, mm/h of liquid water, 0 to 300. */
+  rate: number;
+  /** How the centre moves over the ground, [x, z] m/s. Default still. */
+  velocity?: readonly [number, number];
+  /** The lowest height the rain reaches, metres (virga stops above the ground), 0 to 20,000. Default 0. */
+  reach?: number;
 }
 /** {@link VolumetricCloudOptions.groundLights}: one disc of lit ground that lights the cloud base from below. */
 export interface CloudGroundLight {
@@ -396,7 +430,7 @@ fn perlinFbm(p:vec3f,period:i32)->f32 {
 // three quarters of the layer's slant depth, of the base shape only.
 /** WGSL of the cloud uniform and its density field, shared with `@margoengine/sky/cloud-shadows`. */
 export const cloudField = /* wgsl */ `
-struct Clouds {inverse:mat4x4f,eye:vec4f,sun:vec4f,sunColor:vec4f,layer:vec4f,shape:vec4f,wind:vec4f,flags:vec4f,moon:vec4f,moonColor:vec4f,flash:vec4f,flashColor:vec4f,look:vec4f,storm:array<vec4f,8>,veil:vec4f,glow:vec4f,fires:array<vec4f,16>,hazeFires:array<vec4f,16>,ground:array<vec4f,16>,mist:vec4f,lift:vec4f,link:vec4f,linkGlow:vec4f}
+struct Clouds {inverse:mat4x4f,eye:vec4f,sun:vec4f,sunColor:vec4f,layer:vec4f,shape:vec4f,wind:vec4f,flags:vec4f,moon:vec4f,moonColor:vec4f,flash:vec4f,flashColor:vec4f,look:vec4f,storm:array<vec4f,8>,veil:vec4f,glow:vec4f,fires:array<vec4f,16>,hazeFires:array<vec4f,16>,ground:array<vec4f,16>,mist:vec4f,lift:vec4f,link:vec4f,linkGlow:vec4f,rain:array<vec4f,3>,rainCells:array<vec4f,16>}
 fn cloudRemap(x:f32,a:f32,b:f32)->f32 {return (x-a)/max(b-a,0.00001);}
 fn cloudAltitude(c:Clouds,p:vec3f)->f32 {let R=c.eye.w;return (dot(p,p)+2.0*R*p.y)/(length(vec3f(p.x,p.y+R,p.z))+R);}
 fn cloudBase(s:vec4f)->f32 {let low=s.g*0.625+s.b*0.25+s.a*0.125;return clamp((clamp(cloudRemap(s.r,low-1.0,1.0),0.0,1.0)-0.67)/0.21,0.0,1.0);}
@@ -638,16 +672,18 @@ fn cloudMist(d:vec3f)->vec4f {
 // transmittance mist.z of the light above it), times 1 - t. Behind it the cloud's light and the backdrop both take t.
 const shader = (depthBinding: string) => /* wgsl */ `${fullscreen}${march}${displayShader}
 ${depthBinding}
+//[rain-fns]
 @fragment fn fragment(i:Vertex)->@location(0) vec4f {
  let ndc=vec2f(i.uv.x*2.0-1.0,1.0-i.uv.y*2.0);let far=clouds.inverse*vec4f(ndc,0.000001,1);
  let d=normalize(far.xyz/far.w-clouds.eye.xyz)*select(-1.0,1.0,far.w>=0.0);
- let span=cloudSpan(d);var end=span.y;var open=true;
- ${depthBinding ? `let z=sceneDepthAt(vec2i(i.position.xy));if(z>0.0){open=false;let w=clouds.inverse*vec4f(ndc,z,1);end=min(end,length(w.xyz/w.w-clouds.eye.xyz));}` : ''}
+ let span=cloudSpan(d);var end=span.y;var open=true;var sceneFar=clouds.shape.z*4.0;
+ ${depthBinding ? `let z=sceneDepthAt(vec2i(i.position.xy));if(z>0.0){open=false;let w=clouds.inverse*vec4f(ndc,z,1);sceneFar=length(w.xyz/w.w-clouds.eye.xyz);end=min(end,sceneFar);}` : ''}
  var light=vec3f(0);var opacity=0.0;
  if(end>span.x){
   let m=cloudMarch(d,span.x,end,u32(clouds.shape.w),fract(cloudHash3(vec3u(vec2u(i.position.xy),7u)).x+clouds.flags.y),0.95);
   if(m.opacity>0.0){light=cloudVeiled(m.light,m.opacity,d);opacity=m.opacity;}
  }
+//[rain-call]
  if(open&&clouds.mist.x>0.0){let air=cloudMist(d);light=air.rgb+air.a*light;opacity=1.0-air.a*(1.0-opacity);}
  if(opacity<=0.0){discard;}
  var color=light*clouds.sunColor.w;
@@ -772,6 +808,7 @@ const typeWeather: CloudWeather = { cloud: 0.5 },
   weatherLayer: MutableCloudLayer = { coverage: 0, bottom: 0, top: 0, density: 0 },
   writeScratch: MutableCloudLayer = { coverage: 0, bottom: 0, top: 0, density: 0 },
   aboveLayer: MutableCloudLayer = { coverage: 0, bottom: 0, top: 0, density: 0 },
+  rainLayer: MutableCloudLayer = { coverage: 0, bottom: 0, top: 0, density: 0 },
   linkLayer: MutableCloudLayer = { coverage: 0, bottom: 0, top: 0, density: 0 };
 /**
  * The layer the options give: each of `coverage`, `bottom`, `top` and `density` as set, else the `weather`'s type
@@ -890,7 +927,7 @@ export function cloudGroundLight(
   return out;
 }
 /** Floats in the `Clouds` uniform ({@link cloudField}): the buffers of the clouds, their shadows and shafts hold this many. */
-export const CLOUD_FLOATS = 312;
+export const CLOUD_FLOATS = 388;
 
 let loadedStorm: StormField | undefined, loading: Promise<StormField> | undefined, loadError: unknown;
 /** Whether the options draw a storm: a `hurricane`, or `type: 'hurricane'`. */
@@ -931,10 +968,108 @@ export function scudFieldFor(options: VolumetricCloudOptions): ScudField | undef
  * The cloud field's WGSL (or any shader holding it) with the storm's functions when `field` is given, and the scud
  * shape's when `scud` is.
  */
-export const withStorm = (code: string, field?: StormField, scud?: ScudField): string => {
-  const stormed = field ? code.replace('//[storm-fns]', field.fns).replace('//[storm-branch]', field.branch) : code;
-  return scud ? stormed.replace('//[scud-fns]', scud.fns).replace('//[scud-branch]', scud.branch) : stormed;
+export const withStorm = (code: string, field?: StormField, scud?: ScudField, rain?: RainShafts): string => {
+  const stormed = field ? code.replace('//[storm-fns]', field.fns).replace('//[storm-branch]', field.branch) : code,
+    scudded = scud ? stormed.replace('//[scud-fns]', scud.fns).replace('//[scud-branch]', scud.branch) : stormed;
+  return rain ? scudded.replace('//[rain-fns]', rain.fns).replace('//[rain-call]', rain.call) : scudded;
 };
+let loadedRain: RainShafts | undefined, rainLoading: Promise<RainShafts> | undefined, rainError: unknown;
+/** Whether the options draw rain shafts: rain cells of their own or of the layer `above` them. */
+export const wantsRain = (options: VolumetricCloudOptions): boolean =>
+  (options.rain?.cells.length ?? 0) > 0 || (options.above?.options.rain?.cells.length ?? 0) > 0;
+/** Loads the rain shafts' WGSL (`rain`; kept out of clouds without rain). `ready` resolves once it is in. */
+export function loadRainShafts(): Promise<RainShafts> {
+  return (rainLoading ??= import('./rain-shafts.js').then((m) => (loadedRain = m.rainShafts())));
+}
+/** The rain shafts once loaded, else undefined (starting the load when the options draw rain). */
+export function rainShaftsFor(options: VolumetricCloudOptions): RainShafts | undefined {
+  if (rainError !== undefined) throw rainError;
+  if (!loadedRain && wantsRain(options))
+    loadRainShafts().catch((e: unknown) => (rainError = e ?? new Error('rain shafts failed to load')));
+  return loadedRain;
+}
+/** Extinction of rain of `rate` mm/h, per metre: Marshall and Palmer's drops at extinction efficiency 2, 3.647e-4 R^0.63. */
+export const rainExtinction = (rate: number): number => 3.647e-4 * Math.max(rate, 0) ** 0.63;
+/**
+ * The fall speed, m/s, that carries the rain of `options.rain` down from the base: that of the median drop of its
+ * strongest cell (Marshall and Palmer 1948, D0 = (3.67 / 4.1) R^0.21 mm; Atlas, Srivastava and Sekhon 1973, v = 9.65 -
+ * 10.3 e^(-0.6 D); as `rainFall` of `@margoengine/sky/weather`). 9 m/s without cells.
+ */
+export function cloudRainFall(options: VolumetricCloudOptions): number {
+  let peak = 0;
+  for (const c of options.rain?.cells ?? []) peak = Math.max(peak, c.rate);
+  return peak > 0 ? Math.max(0.1, 9.65 - 10.3 * Math.exp(-0.6 * (3.67 / 4.1) * Math.max(peak, 0.01) ** 0.21)) : 9;
+}
+/**
+ * The CPU twin of the rain shafts: the rain rate, mm/h, at world (x, y, z) (y the height over the ground) at `seconds`
+ * on the layer's clock under the layer `options` with `rain`: each cell's mound at the base, read where the water now
+ * at height y left it, (base - y) / fall seconds ago and (wind - cell velocity) times that upwind, nothing under the
+ * cell's `reach` or at and over the base. The shader draws the same rate.
+ * @example cloudRainRate({ bottom: 650, top: 1300, wind: [0, 0], rain: { cells: [{ x: 0, z: 0, radius: 800, rate: 20 }] } }, 0, 0, 0); // 20
+ */
+export function cloudRainRate(options: VolumetricCloudOptions, x: number, y: number, z: number, seconds = 0): number {
+  const cells = options.rain?.cells;
+  if (!cells?.length) return 0;
+  const base = layerOf(options, rainLayer).bottom;
+  if (y >= base) return 0;
+  const tau = (base - Math.max(y, 0)) / cloudRainFall(options),
+    wind = options.wind ?? [10, 3];
+  let rate = 0;
+  for (const c of cells) {
+    if (y < (c.reach ?? 0)) continue;
+    const v = c.velocity ?? [0, 0],
+      dx = x - (c.x + v[0] * seconds) - (wind[0] - v[0]) * tau,
+      dz = z - (c.z + v[1] * seconds) - (wind[1] - v[1]) * tau;
+    rate += c.rate * Math.exp(-Math.hypot(dx, dz) / c.radius);
+  }
+  return rate;
+}
+/** The rate, mm/h, of the rain cells of `options` at the base over world (x, z) at `seconds`: no trail, no reach. */
+export function cloudRainBase(options: VolumetricCloudOptions, x: number, z: number, seconds = 0): number {
+  let rate = 0;
+  for (const c of options.rain?.cells ?? []) {
+    const v = c.velocity ?? [0, 0];
+    rate += c.rate * Math.exp(-Math.hypot(x - (c.x + v[0] * seconds), z - (c.z + v[1] * seconds)) / c.radius);
+  }
+  return rate;
+}
+/** Writes the rain of `options` (the layer that holds the cells) into `v` from 312: the band `low` to `high`. */
+function writeRain(
+  v: Float32Array,
+  options: VolumetricCloudOptions,
+  seconds: number,
+  low: number,
+  high: number,
+  own: boolean,
+): void {
+  const rain = options.rain!,
+    deck = layerOf(options, rainLayer),
+    wind = options.wind ?? [10, 3];
+  v[312] = rain.cells.length;
+  v[313] = rain.steps ?? 16;
+  v[314] = deck.bottom;
+  v[315] = cloudRainFall(options);
+  v[316] = wind[0];
+  v[317] = wind[1];
+  v[318] = low;
+  v[319] = high;
+  v[320] = rain.streaks ?? 0.6;
+  v[321] = deckReflectance(deck);
+  // The sun and moon through the deck onto the drops; a layer under the deck has them in its link already.
+  v[322] = own ? cloudDeckTransmittance(deck, Math.max(v[21], 0.1)) : 1;
+  v[323] = own ? cloudDeckTransmittance(deck, Math.max(v[45], 0.1)) : 1;
+  rain.cells.forEach((c, i) => {
+    const o = 324 + 8 * i,
+      vel = c.velocity ?? [0, 0];
+    v[o] = c.x + vel[0] * seconds;
+    v[o + 1] = c.z + vel[1] * seconds;
+    v[o + 2] = c.radius;
+    v[o + 3] = c.rate;
+    v[o + 4] = vel[0];
+    v[o + 5] = vel[1];
+    v[o + 6] = c.reach ?? 0;
+  });
+}
 /** Height of a world point over the planet's surface, metres (the field's `cloudAltitude`, in double precision). */
 const cameraAltitude = (p: ArrayLike<number>): number =>
   (p[0] * p[0] + p[1] * p[1] + p[2] * p[2] + 2 * PLANET_RADIUS * p[1]) /
@@ -1021,6 +1156,7 @@ export class VolumetricClouds implements EnginePlugin {
   // The storm field the pipelines were built with (undefined: without one), and the scud shape likewise.
   private built: StormField | undefined;
   private builtScud: ScudField | undefined;
+  private builtRain: RainShafts | undefined;
   // Whether the environment map was marched this frame (the layer under this one lays its map over it).
   private mapped = false;
   // The upper deck's maps the linked deck pipeline's bind group reads (rebuilt when they change).
@@ -1117,6 +1253,34 @@ export class VolumetricClouds implements EnginePlugin {
     }
     if (o.mist !== undefined && (typeof o.mist !== 'object' || o.mist === null || !inRange(o.mist.visibility, 10, 1e6)))
       throw new RangeError('Invalid VolumetricClouds mist; give {visibility: 10 to 1000000 metres}');
+    if (o.rain !== undefined) {
+      const r = o.rain,
+        cells = typeof r === 'object' && r !== null ? r.cells : undefined,
+        bad =
+          !Array.isArray(cells) ||
+          cells.length > 8 ||
+          !Number.isInteger(r.steps ?? 16) ||
+          !inRange(r.steps ?? 16, 4, 128) ||
+          !inRange(r.streaks ?? 0.6, 0, 1) ||
+          cells.some(
+            (c: CloudRainCell) =>
+              typeof c !== 'object' ||
+              c === null ||
+              !inRange(c.x, -1e7, 1e7) ||
+              !inRange(c.z, -1e7, 1e7) ||
+              !inRange(c.radius, 1, 1e6) ||
+              !inRange(c.rate, 0, 300) ||
+              !inRange(c.reach ?? 0, 0, 20000) ||
+              (c.velocity !== undefined &&
+                (!Array.isArray(c.velocity) ||
+                  c.velocity.length !== 2 ||
+                  !c.velocity.every((x: number) => inRange(x, -200, 200)))),
+          );
+      if (bad)
+        throw new RangeError(
+          'Invalid VolumetricClouds rain; give {cells: at most 8 of {x, z within 1e7, radius 1 to 1e6, rate 0 to 300 mm/h, velocity [x, z] within 200 m/s, reach 0 to 20000}, integer steps 4 to 128, streaks 0 to 1}',
+        );
+    }
     const { coverage, bottom, top, density } = layerOf(o, this.layer);
     if (o.above !== undefined) {
       if (!(o.above instanceof VolumetricClouds) || o.above === this)
@@ -1196,8 +1360,9 @@ export class VolumetricClouds implements EnginePlugin {
   get ready(): Promise<void> {
     // The storm's options are checked once its code is in; a bad one rejects here and throws in the next draw.
     const storm = wantsStorm(this.options) ? loadStormField().then((f) => void f.of(this.options)) : undefined,
-      scud = this.options.type === 'scud' ? loadScudField().then(() => undefined) : undefined;
-    return Promise.all([storm, scud]).then(() => undefined);
+      scud = this.options.type === 'scud' ? loadScudField().then(() => undefined) : undefined,
+      rain = wantsRain(this.options) ? loadRainShafts().then(() => undefined) : undefined;
+    return Promise.all([storm, scud, rain]).then(() => undefined);
   }
   // The layer over this one when both draw on one engine, else undefined.
   private upper(): VolumetricClouds | undefined {
@@ -1231,6 +1396,32 @@ export class VolumetricClouds implements EnginePlugin {
   /** Seconds on this layer's clock: the sum of the deltas given to `advanceTime` (each frame update runs it). */
   get time(): number {
     return this.seconds;
+  }
+  /**
+   * The rain rate, mm/h, the shafts draw at a world `position` now (`cloudRainRate` at this layer's time): what
+   * `@margoengine/sky/weather` `rainFrom` reads, so the rain on the ground falls where the shafts are. 0 without `rain`.
+   */
+  rainRateAt(position: readonly [number, number, number]): number {
+    return cloudRainRate(this.options, position[0], position[1], position[2], this.seconds);
+  }
+  /**
+   * The rain of this layer at its base as a `RainSource` of `@margoengine/weather` (`new PrecipitationField({ source:
+   * clouds.rainSource(), base })`): `rate(x, z, t)` the cells' rate at the base at `t` seconds on this layer's clock,
+   * `peak` the strongest cell's rate, `fall` the shafts' fall speed. The field then carries the rain down itself.
+   */
+  rainSource(): { rate(x: number, z: number, t: number): number; readonly peak: number; readonly fall: number } {
+    const options = this.options;
+    return {
+      rate: (x, z, t) => cloudRainBase(options, x, z, t),
+      get peak() {
+        let peak = 0;
+        for (const c of options.rain?.cells ?? []) peak = Math.max(peak, c.rate);
+        return peak;
+      },
+      get fall() {
+        return cloudRainFall(options);
+      },
+    };
   }
   onPreUpdate(delta: number): void {
     this.advanceTime(delta);
@@ -1361,8 +1552,12 @@ export class VolumetricClouds implements EnginePlugin {
       v[303] = scud.top;
       for (let i = 0; i < 8; i++) for (let k = 0; k < 3; k++) v[232 + 8 * i + k] *= through;
     }
+    // The rain shafts: this layer's cells in its air band, or the upper deck's from the ground through this layer's tops.
+    v.fill(0, 312, CLOUD_FLOATS);
+    if (o.rain?.cells.length) writeRain(v, o, this.seconds, v[303], layer.bottom, true);
+    else if (upper?.options.rain?.cells.length) writeRain(v, upper.options, upper.seconds, 0, layer.top, false);
     c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
-    return v[30] > 0 || v[296] > 0;
+    return v[30] > 0 || v[296] > 0 || v[312] > 0;
   }
   // The sky light: from the sky's reflection map on the GPU when it has one, else the `ambient` option.
   private skyLight(c: Context): void {
@@ -1484,8 +1679,18 @@ export class VolumetricClouds implements EnginePlugin {
     if (!this.uniform) return false;
     // A storm's or scud's code loads on first use; until it has the layer draws nothing (`ready`).
     const field = stormFieldFor(this.options),
-      scud = scudFieldFor(this.options);
-    if ((wantsStorm(this.options) && !field) || (this.options.type === 'scud' && !scud)) return false;
+      scud = scudFieldFor(this.options),
+      rain = wantsRain(this.options) ? rainShaftsFor(this.options) : undefined;
+    if (
+      (wantsStorm(this.options) && !field) ||
+      (this.options.type === 'scud' && !scud) ||
+      (wantsRain(this.options) && !rain)
+    )
+      return false;
+    if (rain !== this.builtRain) {
+      this.builtRain = rain;
+      this.key = '';
+    }
     if (field !== this.built || scud !== this.builtScud) {
       // The field arrived (or changed): the shaders are made again with it.
       this.lightPipeline = this.lightGroup = this.deckPipeline = this.deckGroup = this.lightSource = undefined;
@@ -1509,7 +1714,7 @@ export class VolumetricClouds implements EnginePlugin {
       key = `${c.format}:${samples}:${depth?.samples ?? 0}:${c.descriptor.depthStencil?.format}`;
     if (this.key !== key) {
       const module = c.device.createShaderModule({
-        code: withStorm(shader(depth ? depthWGSL(5, depth.samples) : ''), this.built, this.builtScud),
+        code: withStorm(shader(depth ? depthWGSL(5, depth.samples) : ''), this.built, this.builtScud, this.builtRain),
       });
       this.pipeline = c.device.createRenderPipeline({
         layout: 'auto',

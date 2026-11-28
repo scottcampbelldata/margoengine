@@ -12,6 +12,29 @@ const TABLE_TOLERANCE = 0.005;
 const SHEET_STEPS_MAX = 0.0015;
 const SHEET_SPREAD_MIN = 0.48;
 const checks = {
+  // Rain shafts under a deck (rain; rain-shaft-check.html): optical depth against the CPU twin's integral.
+  async 'rain-shaft'(page, samples) {
+    const r = await page.evaluate(() => window.check.run());
+    assert.equal(r.validation, null);
+    assert.deepEqual(r.errors, []);
+    const s = JSON.stringify(r);
+    // Each ray's optical depth is the CPU integral of Marshall and Palmer's extinction of the twin's rate: within 5% on
+    // average and summed, in still air, in wind (the trail), for a moving cell after 60 s and drawn by two linked layers.
+    for (const k of ['still', 'wind', 'moved', 'split']) {
+      const c = r[k];
+      assert.ok(c.pixels > 100 && c.peak > 0.5, `${k}: the shaft is in view (${s})`);
+      assert.ok(c.meanError < 0.05 && Math.abs(c.ratio - 1) < 0.05, `${k}: depth is the CPU integral (${s})`);
+      assert.ok(c.thin < 0.01, `${k}: thin rain is the CPU transmittance within 0.01 (${s})`);
+    }
+    assert.ok(r.wind.mid < 0.5 * r.still.mid, `the wind carries the shaft out of the still-air line of sight (${s})`);
+    assert.ok(r.miss.pixels === 0 && r.miss.thin < 0.01 && r.miss.mean > 0.99, `a ray beside the cell is clear (${s})`);
+    assert.ok(r.empty.mean > 0.01 && r.empty.differing === 0, `no cells: the frame bit for bit (${s})`);
+    assert.ok(r.lamps.dark === 0 && r.lamps.lit > 1e-4, `a city under the shaft lights it by night (${s})`);
+    assert.ok(r.day > 1e-3, `by day the shaft is lit (${s})`);
+    assert.ok(r.streaks.opacity > 0.2 && r.streaks.contrast > 0.08, `streaks break the shaft into curtains (${s})`);
+    console.log(`ok rain-shaft ${samples}x: ${s}`);
+    return r;
+  },
   // Low scud under a rain deck (type 'scud' with above; scud-check.html).
   async scud(page, samples) {
     const r = await page.evaluate(() => window.check.run());

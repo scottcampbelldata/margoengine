@@ -64,6 +64,21 @@ interface CloudMist {
     visibility: number;
 }
 
+interface CloudRain {
+    cells: readonly CloudRainCell[];
+    steps?: number;
+    streaks?: number;
+}
+
+interface CloudRainCell {
+    x: number;
+    z: number;
+    radius: number;
+    rate: number;
+    velocity?: readonly [number, number];
+    reach?: number;
+}
+
 type CloudType = 'cumulus' | 'stratus' | 'storm' | 'hurricane' | 'scud';
 
 interface CloudWeather {
@@ -233,6 +248,7 @@ interface VolumetricCloudOptions {
     mist?: CloudMist;
     above?: VolumetricClouds;
     shear?: number;
+    rain?: CloudRain;
 }
 
 interface VolumetricCloudSky {
@@ -278,6 +294,12 @@ class VolumetricClouds implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     get ready(): Promise<void>;
     get time(): number;
+    rainRateAt(position: readonly [number, number, number]): number;
+    rainSource(): {
+        rate(x: number, z: number, t: number): number;
+        readonly peak: number;
+        readonly fall: number;
+    };
     onPreUpdate(delta: number): void;
     resetTime(): void;
     advanceTime(delta: number): void;

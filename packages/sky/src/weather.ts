@@ -251,6 +251,12 @@ export interface WeatherOptions {
    * m/s, a downpour at 7. Unset keeps a fixed fall of 9 m/s. `WeatherDrive` (`@margoengine/weather`) sets it from the state.
    */
   rainRate?: number;
+  /**
+   * Where the rain rate comes from instead of `rainRate`: anything with `rainRateAt(position)` giving mm/h at a world
+   * position, read at the camera every frame, such as the clouds' rain shafts (`VolumetricClouds` `rain`), so the rain
+   * round the camera is the rain the shafts draw there and stops when the camera walks out from under them. Default none.
+   */
+  rainFrom?: { rainRateAt(position: readonly [number, number, number]): number };
   /** Seconds the amount takes to move across its whole range, 0 or more (0 jumps). Default 4. */
   fadeSeconds?: number;
   /** Horizontal wind in metres per second, world X and Z. Rain slants and snow drifts with it. Default [0, 0]. */
@@ -868,6 +874,8 @@ function validate(o: WeatherOptions): void {
   if (o.snowShare !== undefined) number(o.snowShare, 'snowShare', 0, 1);
   if (o.intensity !== undefined) number(o.intensity, 'intensity', 0, 1);
   if (o.rainRate !== undefined) number(o.rainRate, 'rainRate', 0, 300);
+  if (o.rainFrom !== undefined && (typeof o.rainFrom !== 'object' || typeof o.rainFrom?.rainRateAt !== 'function'))
+    throw new TypeError('Weather rainFrom must be an object with rainRateAt(position); pass VolumetricClouds or similar');
   if (o.fadeSeconds !== undefined) number(o.fadeSeconds, 'fadeSeconds', 0, 3600);
   if (o.radius !== undefined) number(o.radius, 'radius', 2, 200);
   if (o.height !== undefined) number(o.height, 'height', 2, 200);
@@ -1056,6 +1064,8 @@ export class Weather implements EnginePlugin {
   // to wind * time.
   private readonly drift = [0, 0];
   private level = 0;
+  // The rain rate this frame: `rainFrom` at the camera, else `rainRate` (step sets it).
+  private rateNow: number | undefined;
   private flashLevel = 0;
   private lightLevel = 0;
   private last?: LightningStrike;
@@ -1326,8 +1336,10 @@ export class Weather implements EnginePlugin {
       throw new RangeError('Invalid weather delta; pass a finite delta of 0 or more seconds.');
     const o = this.options,
       precipitation = o.precipitation ?? 'rain',
-      target =
-        precipitation === 'none' ? 0 : (o.intensity ?? (o.rainRate === undefined ? 0.5 : rainIntensity(o.rainRate))),
+      rainRate = (this.rateNow = o.rainFrom
+        ? Math.min(300, Math.max(0, o.rainFrom.rainRateAt(this.engine?.camera.position ?? [0, 0, 0]) || 0))
+        : o.rainRate),
+      target = precipitation === 'none' ? 0 : (o.intensity ?? (rainRate === undefined ? 0.5 : rainIntensity(rainRate))),
       fade = o.fadeSeconds ?? 4;
     this.seconds += delta;
     if (this.engine) this.listener.set(this.engine.camera.position);
@@ -1639,7 +1651,8 @@ export class Weather implements EnginePlugin {
       height = o.height ?? 20,
       wind = o.wind ?? [0, 0],
       snow = kind === 'snow',
-      fall = snow ? SNOWFLAKE_FALL_COEFFICIENT : rainFall(o.rainRate),
+      rainRate = o.rainFrom ? this.rateNow : o.rainRate,
+      fall = snow ? SNOWFLAKE_FALL_COEFFICIENT : rainFall(rainRate),
       color = o.color ?? d.color,
       brightness = o.brightness ?? 1,
       [width, tall] = viewSize(c) as [number, number],
@@ -1694,12 +1707,12 @@ export class Weather implements EnginePlugin {
     // rain: the drops' size law and the scale of their fall; look: sheets, gusts, the inverse mean streak light and
     // the gust clock (see the shader's notes). Snow keeps a harmless law (slope 1) there.
     const drops = o.dropSizes ?? [0.5, 6],
-      lawRate = o.rainRate ?? 80 * (o.intensity ?? 0.5) ** 3,
+      lawRate = rainRate ?? 80 * (o.intensity ?? 0.5) ** 3,
       law = rainDropSizeLaw(lawRate, drops);
     v[48] = snow ? 1 : law.lambda;
     v[49] = snow ? 0 : law.span;
     v[50] = snow ? 0 : law.low;
-    v[51] = o.rainRate === undefined ? fall / rainFallSpeed(rainDropDiameter(lawRate)) : 1;
+    v[51] = rainRate === undefined ? fall / rainFallSpeed(rainDropDiameter(lawRate)) : 1;
     v[52] = o.rainVariation ?? 0.5;
     v[53] = o.gusts ?? 0.5;
     v[54] = snow ? 1 : 1 / rainStreakMean(lawRate, drops);

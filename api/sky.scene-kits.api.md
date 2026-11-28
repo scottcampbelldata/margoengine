@@ -406,6 +406,9 @@ interface WeatherOptions {
     snowShare?: number;
     intensity?: number;
     rainRate?: number;
+    rainFrom?: {
+        rainRateAt(position: readonly [number, number, number]): number;
+    };
     fadeSeconds?: number;
     wind?: readonly [number, number];
     radius?: number;

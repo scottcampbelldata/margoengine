@@ -1,0 +1,114 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky rain shaft check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body><canvas width="320" height="240"></canvas>
+<script type="module">
+// Rain shafts under a deck (VolumetricClouds `rain`) on a real GPU, read back from a PostStack's linear HDR scene
+// target. At night with no sky light and a white backdrop each pixel is the rain's transmittance, so its optical depth
+// is checked against the CPU twin (`cloudRainRate`) integrated finely along the same ray with Marshall and Palmer's
+// extinction (`rainExtinction`). The deck has no cover, so only the rain draws. Driven by features-check.mjs (rain-shaft).
+import {Engine} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {VolumetricClouds,PLANET_RADIUS,cloudRainRate,rainExtinction} from '/packages/sky/dist/volumetric-clouds.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const FOV=50,engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,1.6,0],target:[0,1.6,-1],fov:FOV,near:0.1,far:1000}}),device=engine.gpu,errors=[];
+engine.stop();engine.scene.background='#ffffff';
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(id.x<s.x&&id.y<s.y){result[id.y*s.x+id.x]=textureLoad(image,id.xy,0);}}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function scene(){
+ const w=post.sceneTexture.width,h=post.sceneTexture.height,size=w*h*16;
+ const output=device.createBuffer({size,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:post.sceneTexture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(w/8),Math.ceil(h/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,size);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const v=new Float32Array(staging.getMappedRange().slice(0));staging.unmap();output.destroy();staging.destroy();return {w,h,v};
+}
+const lum=(v,i)=>0.2126*v[i]+0.7152*v[i+1]+0.0722*v[i+2];
+const night={sunDirection:[0,-1,0],ambient:[[0,0,0],[0,0,0]]};
+const MAX=8000;
+const shaft=(o={})=>({cells:[{x:0,z:-3000,radius:800,rate:2}],steps:128,streaks:0,...o});
+const deckOf=(o={})=>({...night,coverage:0,bottom:650,top:1300,density:0.03,wind:[0,0],evolution:0,temporal:false,maxDistance:MAX,rain:shaft(),...o});
+// One frame from `position` looking along yaw (from north, -z, toward east, +x) at pitch 0 with the layers `make`
+// attaches (each disposed after); `before` runs on the layers before the frame (a clock step).
+async function frame(make,position,yaw=0,pitch=0,before){
+ const y=yaw*Math.PI/180,p=pitch*Math.PI/180;
+ engine.camera.position=position;
+ engine.camera.target=[position[0]+Math.sin(y)*Math.cos(p),position[1]+Math.sin(p),position[2]-Math.cos(y)*Math.cos(p)];
+ const layers=make();await Promise.all(layers.map(l=>l.ready));before?.(layers);
+ engine.render({delta:0});engine.render({delta:0});const out=await scene();for(const l of layers.slice().reverse())l.dispose();
+ return out;
+}
+const alone=(o={})=>()=>[VolumetricClouds.attach(engine,deckOf(o))];
+const differing=(a,b)=>{let n=0;for(let i=0;i<a.v.length;i++)if(a.v[i]!==b.v[i])n++;return n;};
+// The CPU optical depth of the rain of `options` along the pixel (x, y) ray from `eye` looking north at pitch 0, at
+// `seconds`: the rate of the twin at each point's height over the planet, to the ground or MAX, 4000 midpoint steps.
+function depth(options,eye,x,y,w,h,seconds=0,band=[0,1e9]){
+ const t=Math.tan(FOV*Math.PI/360),cx=((x+0.5)/w*2-1)*t*(w/h),cy=(1-(y+0.5)/h*2)*t,l=Math.hypot(cx,cy,1),d=[cx/l,cy/l,-1/l];
+ const n=4000,dt=MAX/n,R=PLANET_RADIUS;let tau=0;
+ for(let k=0;k<n;k++){
+  const s=(k+0.5)*dt,p=[eye[0]+d[0]*s,eye[1]+d[1]*s,eye[2]+d[2]*s],alt=Math.hypot(p[0],p[1]+R,p[2])-R;
+  if(alt<0)break;if(alt<band[0]||alt>=band[1])continue;tau+=rainExtinction(cloudRainRate(options,p[0],alt,p[2],seconds))*dt;
+ }
+ return tau;
+}
+// GPU against CPU over every 8th pixel: the mean relative error of the optical depth where the CPU depth is over
+// 0.05, the ratio of the summed depths, the worst transmittance difference where the depth is under 0.05, the CPU
+// peak and the GPU depth 8 rows over the middle of the frame (the horizon, just over the ground).
+function compare(f,options,eye,seconds=0,band){
+ let n=0,err=0,worst=0,gpu=0,cpu=0,thin=0,peak=0;
+ for(let y=4;y<f.h;y+=8)for(let x=4;x<f.w;x+=8){
+  const T=Math.max(lum(f.v,4*(y*f.w+x)),1e-6),want=depth(options,eye,x,y,f.w,f.h,seconds,band),got=-Math.log(T);
+  peak=Math.max(peak,want);
+  if(want>0.05){const e=Math.abs(got/want-1);err+=e;worst=Math.max(worst,e);n++;gpu+=got;cpu+=want;}
+  else thin=Math.max(thin,Math.abs(T-Math.exp(-want)));
+ }
+ const mid=-Math.log(Math.max(lum(f.v,4*((f.h/2-8)*f.w+f.w/2)),1e-6));
+ return {pixels:n,meanError:err/Math.max(n,1),worst,ratio:gpu/Math.max(cpu,1e-9),thin,peak,mid};
+}
+const mean=({v},pick)=>{let s=0,n=0;for(let i=0;i<v.length/4;i++)if(!pick||pick(i)){s+=lum(v,4*i);n++;}return n?s/n:0;};
+// The column means of the rows just over the horizon (transmittance, by night over white).
+function columns({w,h,v}){
+ const c=[];for(let x=0;x<w;x++){let s=0;for(let y=h/2-40;y<h/2-2;y++)s+=lum(v,4*(y*w+x));c.push(s/38);}return c;
+}
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');
+  const ground=[0,1.6,0],r={};
+  // Still air: the shaft hangs straight down; the optical depth along each ray is the CPU integral.
+  const still=deckOf();
+  r.still=compare(await frame(alone(),ground),still,ground);
+  // Wind 15 m/s east: the water trails east of its cell by 15 (base - h) / fall, as the twin has it.
+  const windy=deckOf({wind:[15,0]});
+  r.wind=compare(await frame(alone({wind:[15,0]}),ground),windy,ground);
+  // A cell moving east at 40 m/s, after 60 s on the layer's clock: from 2400 m east the view of the time-0 cell.
+  const moving=deckOf({rain:shaft({cells:[{x:0,z:-3000,radius:800,rate:2,velocity:[40,0]}]})}),east=[2400,1.6,0];
+  const moved=await frame(()=>[VolumetricClouds.attach(engine,moving)],east,0,0,(l)=>l[0].advanceTime(60));
+  r.moved=compare(moved,moving,east,60);
+  // A ray that passes 8 km to the side of the cell: clear.
+  const aside=[8000,1.6,0],missed=await frame(alone(),aside);
+  r.miss={...compare(missed,still,aside),mean:mean(missed)};
+  // The rain of an upper deck drawn by two layers: the lower (no cover) from the ground through its tops and the upper
+  // from there to its base, the same optical depth as the deck alone.
+  const split=await frame(()=>{const upper=VolumetricClouds.attach(engine,still);return [upper,VolumetricClouds.attach(engine,{...night,name:'sky:volumetric-clouds:low',type:'cumulus',coverage:0,bottom:300,top:500,wind:[0,0],evolution:0,temporal:false,maxDistance:MAX,above:upper})];},ground);
+  r.split=compare(split,still,ground);
+  // No cells draws nothing: the frame of a sunlit deck bit for bit with and without an empty rain.
+  const day={sunDirection:[0.3,0.8,0.2],coverage:0.6,bottom:650,top:1300,density:0.03,wind:[0,0],evolution:0,temporal:false};
+  engine.scene.background='#000000';
+  const plain=await frame(()=>[VolumetricClouds.attach(engine,day)],ground,0,30),empty=await frame(()=>[VolumetricClouds.attach(engine,{...day,rain:{cells:[]}})],ground,0,30);
+  r.empty={differing:differing(plain,empty),mean:mean(plain)};
+  // By night a city under the shaft lights its drops: the shaft glows over black, and nothing without the city.
+  const city={color:[1,0.55,0.25],x:0,z:-3000,radius:1500};
+  r.lamps={lit:mean(await frame(alone({groundLights:[city]}),ground)),dark:mean(await frame(alone(),ground))};
+  // By day the shaft takes the sun through the deck and the sky light: it shows over black.
+  r.day=mean(await frame(alone({sunDirection:[0.3,0.8,0.2],ambient:undefined}),ground));
+    engine.scene.background='#ffffff';
+  const dense=(streaks)=>alone({rain:shaft({cells:[{x:0,z:-3000,radius:800,rate:2}],streaks})});
+  // The curtains' contrast: the mean change of the column means from the even shaft's over the even shaft's mean
+  // opacity there.
+  const even=columns(await frame(dense(0),ground)),streaked=columns(await frame(dense(1),ground));
+  let change=0,opaque=0;for(let x=0;x<even.length;x++){change+=Math.abs(streaked[x]-even[x]);opaque+=1-even[x];}
+  r.streaks={contrast:change/opaque,opacity:opaque/even.length};
+  return {validation:(await device.popErrorScope())?.message??null,errors,...r};
+ }};
+window.ready=true;
+</script></body></html>

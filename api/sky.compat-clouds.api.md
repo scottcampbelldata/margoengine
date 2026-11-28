@@ -88,6 +88,7 @@ export interface VolumetricCloudOptions {
     mist?: CloudMist;
     above?: VolumetricClouds;
     shear?: number;
+    rain?: CloudRain;
 }
 
 export interface VolumetricCloudSky {
@@ -133,6 +134,12 @@ export class VolumetricClouds implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     get ready(): Promise<void>;
     get time(): number;
+    rainRateAt(position: readonly [number, number, number]): number;
+    rainSource(): {
+        rate(x: number, z: number, t: number): number;
+        readonly peak: number;
+        readonly fall: number;
+    };
     onPreUpdate(delta: number): void;
     resetTime(): void;
     advanceTime(delta: number): void;
@@ -244,6 +251,9 @@ export interface WeatherOptions {
     snowShare?: number;
     intensity?: number;
     rainRate?: number;
+    rainFrom?: {
+        rainRateAt(position: readonly [number, number, number]): number;
+    };
     fadeSeconds?: number;
     wind?: readonly [number, number];
     radius?: number;
@@ -271,6 +281,21 @@ export const speedOfSound = 343;
 export function thunderDelay(distance: number, speed?: number): number;
 
 // Not exported from this entry, but used by the exports above:
+
+interface CloudRain {
+    cells: readonly CloudRainCell[];
+    steps?: number;
+    streaks?: number;
+}
+
+interface CloudRainCell {
+    x: number;
+    z: number;
+    radius: number;
+    rate: number;
+    velocity?: readonly [number, number];
+    reach?: number;
+}
 
 type CloudType = 'cumulus' | 'stratus' | 'storm' | 'hurricane' | 'scud';
 
