@@ -52,22 +52,22 @@ them; the rest is a record of what a stronger solver would need.
 
 ### ATMO-02 four-point pass
 
-- Point 5. `weather/tests/turbulence.test.js` covers the continuous transverse-mode shear, far signed-periodic
+- Point 5 (df2e11c99e). `weather/tests/turbulence.test.js` covers the continuous transverse-mode shear, far signed-periodic
   queries and invalid or overflowing settings. `weather/tests/travelling-gust.test.js` covers the FAA envelope's
   analytic position and rise, the height taper, a signed origin cell rebase, out-of-order queries and rejection
   before writing the caller's output. Calm boundary-layer wind leaves default turbulence off and accepts a gust.
-- Point 6. `weather/tests/turbulence-native.test.js` checks raw Stockham FFT parity and the scalar, one-thread,
+- Point 6 (df2e11c99e). `weather/tests/turbulence-native.test.js` checks raw Stockham FFT parity and the scalar, one-thread,
   two-thread and three-thread seeded output byte for byte. At 512 × 32 × 32 cells, three participants count six
   transforms of 3,145,728 complex values and 179,306,496 f64x2 twiddle products. The signed-cell gust queries
   survive rebasing. The optional native plan handles the FFT while noise and spectral factors use pinned TypeScript.
   `weather/tests/mann-fft.browser.mjs` proves two helpers and both assets in a production app, and keeps the Wasm
   external in a library build.
-- Point 7. `scatter/test/plant-gust.browser.mjs` carries the gust over a real ATMO-01 air field into BIO-01
+- Point 7 (df2e11c99e). `scatter/test/plant-gust.browser.mjs` carries the gust over a real ATMO-01 air field into BIO-01
   PlantSway and Scatter. At 4 m/s, roots spaced 2 m apart first move on world frames 46, 76 and 106, exactly
   30 frames apart. Equal-age near and far plant tips each move 12.23 cm. Both renderers show the same spatial
   delay and match full RGBA frames and accepted physics snapshot bytes after rewind. The technical TREE-1
   reproduction leaves original shot integration open.
-- Point 8. `docs/limits.md` records the CPU and worker split, periodic dimensions, finite-band and near-ground
+- Point 8 (df2e11c99e). `docs/limits.md` records the CPU and worker split, periodic dimensions, finite-band and near-ground
   limitations, and which authoring assumptions apply to a one-cosine event.
 - Point 2 stays open. `weather/scripts/atmo02-vindeby-measured.mjs` compares fixed-settings Mann boxes with
   the independent Putri et al. (2022) Fig. 11 measurements. The refined vertical co-coherence RMSE is 0.409,
