@@ -2691,6 +2691,10 @@
       "types": "./dist/machinery/materials.d.ts",
       "import": "./dist/machinery/materials.js"
     },
+    "./machinery/bench": {
+      "types": "./dist/machinery/bench.d.ts",
+      "import": "./dist/machinery/bench.js"
+    },
     "./machinery/overlays": {
       "types": "./dist/machinery/overlays.d.ts",
       "import": "./dist/machinery/overlays.js"

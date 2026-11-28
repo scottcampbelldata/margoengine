@@ -47,6 +47,7 @@ Import individual systems from these subpaths to keep unrelated code out of dire
 | `/spatial` | `AssemblyBVH` picking |
 | `/clearance` | `measureClearance` |
 | `/materials` | `industrialMaterials`, `industrialMaterial` |
+| `/bench` | `CadBench`, `cadFinish`, `CAD_FINISHES`: measured metal finishes, feature edges and a surface-plate deck |
 | `/overlays` | `EngineeringAnnotations`, `worldAnchor`, `projectAnnotation` |
 | `/exploded` | `ExplodedView` |
 
@@ -151,9 +152,53 @@ Three more entries draw on top of the scene:
 - `margoengine/machinery/dimensions`: `Dimensions`, linear, angle and radius dimension callouts whose lines and labels keep their size on screen.
 - `margoengine/machinery/react`: `<SectionPlanes>`, the section plugin as a React component for `@margoengine/react`.
 
-`packages/machinery/test/*-check.mjs` (`npm run test:gpu` in this package) check edges, dimensions and caps on open shells on a real adapter.
+`packages/machinery/test/*-check.mjs` (`npm run test:gpu` in this package) check edges, dimensions, caps on open shells and the CAD bench (both backends) on a real adapter.
 
 This ESM package includes TypeScript declarations and requires `@margoengine/core` 1.0.0. See the API and supported geometry guide.
+
+### CAD bench
+
+`margoengine/machinery/bench` puts solids from a CAD kernel on an inspection bench. `CadBench.attach(engine, { deck })`
+lays a black granite surface plate (`deck: false` for none); `cad.show(meshOrGeometry, { finish, tint, roughness, edges })`
+gives the part a finish on a measured metal from `@margoengine/materials/presets` and draws its feature edges (faces
+meeting above `angle` degrees, plus open boundaries) as `@margoengine/lines` segments that follow the mesh, on WebGPU and
+on the WebGL2 layer alike. Pass a glTF model's meshes straight in: the bench keeps their geometry.
+
+| Finish | Metal | Roughness | Tint (linear, on F0) |
+| --- | --- | --- | --- |
+| `'machined'` (default) | aluminium | 0.32 | none |
+| `'cast'` | cast iron (`castIron`) | 0.75 | none |
+| `'anodised'` | aluminium | 0.4 | [0.22, 0.34, 0.5], a Type II steel blue; `tint` sets the dye |
+| `'cut'` | aluminium | 0.16 | none: a fresh saw or section face |
+
+Edge defaults: `angle` 30, `width` 1.25 CSS px, `color` '#0c1013', `opacity` 0.82, `depthBias` 0.0012. Deck defaults:
+`size` [0.42, 0.3] m, `thickness` 0.04, `top` 0, `center` [0, 0]. `casters` takes anything with `add(mesh)`, such as
+studio/bench's `openBench` result, so shown parts cast its shadows. The bench stages nothing else: open the engine,
+lights, shadows and backdrop with `openBench`.
+
+```ts
+import { box } from 'margoengine/core';
+import { openBench } from 'margoengine/studio/bench';
+import { CadBench } from 'margoengine/machinery/bench';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const bench = await openBench(canvas, {
+  camera: { position: [0.3, 0.2, 0.38], target: [0, 0.03, 0], fov: 35, near: 0.01, far: 20 },
+  contact: false,
+});
+const cad = CadBench.attach(bench.engine, { deck: { size: [0.42, 0.3] }, casters: bench });
+cad.show(box(0.12, 0.06, 0.08), { finish: 'anodised' }).mesh.setPosition([0, 0.03, 0]);
+await bench.ready();
+```
+
+The demo solids travel as GLB: a build script meshes the B-rep body, writes it with `exportGLB` and
+`compressMeshopt` (EXT_meshopt_compression with KHR_mesh_quantization), and the page loads it with
+`loadGLTF(engine, url, { extensions: [meshopt, quantized] })` and hands `model.meshes` to `show`.
+
+Sources: glTF 2.0 (ISO/IEC 12113:2022) for the metallic-roughness F0; EXT_meshopt_compression; ISO 10303-21:2016 for the
+B-rep faces whose shared boundaries are drawn; Saito and Takahashi 1990 ("Comprehensible rendering of 3-D shapes") and
+Gooch, Gooch, Shirley and Cohen 1998 (technical illustration) for dark crease lines over shading; Isenberg et al. 2003
+(silhouette algorithms guide) for dihedral crease detection; Bærentzen et al. 2008 for depth-biased antialiased lines.
 
 ### Mechanism poses
 

@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>CAD bench check</title><style>body{margin:0}canvas{display:block;width:400px;height:400px}</style></head><body><canvas id="view"></canvas>
+<script type="module">
+import {Engine,box} from '/packages/core/dist/index.js';
+import {CadBench} from '/packages/machinery/dist/bench.js';
+const canvas=document.getElementById('view'),errors=[];
+if(new URLSearchParams(location.search).get('backend')==='webgl2'){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+const engine=await Engine.create(canvas,{camera:{position:[3,2.5,4],target:[0,0,0],fov:40}});
+engine.onError=e=>errors.push(String(e?.message??e));
+engine.scene.background='#203040';
+const project=p=>{const m=engine.camera.matrix,x=m[0]*p[0]+m[4]*p[1]+m[8]*p[2]+m[12],y=m[1]*p[0]+m[5]*p[1]+m[9]*p[2]+m[13],w=m[3]*p[0]+m[7]*p[1]+m[11]*p[2]+m[15];return [Math.round((x/w*0.5+0.5)*canvas.clientWidth),Math.round((0.5-y/w*0.5)*canvas.clientHeight)];};
+const cad=CadBench.attach(engine,{deck:{size:[3,3],thickness:0.1,top:-0.5},edges:{color:'#ff00ff',width:3,opacity:1}});
+const part=cad.show(box(),{finish:'anodised'});
+engine.render();await engine.gpu.queue.onSubmittedWorkDone();await new Promise(r=>requestAnimationFrame(r));engine.render();await engine.gpu.queue.onSubmittedWorkDone();
+// Visible box edges from (3,2.5,4): top-front, top-right, front-right; two face centres and a deck point.
+window.result={errors,compat:engine.gpu.adapterInfo?.vendor==='margo-webgl2',
+  edges:[[0,0.5,0.5],[0.5,0.5,0.1],[0.5,0.1,0.5]].map(project),faces:[[0.15,0.5,0.15],[0.2,-0.1,0.5]].map(project),deck:project([1.2,-0.5,1.2]),
+  material:[...part.material.data.slice(0,6)]};
+window.ready=true;
+</script></body></html>

@@ -30,7 +30,7 @@
     "build": "node ../../scripts/build-optional.js machinery",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/machinery/test/dimensions-check.mjs && node packages/machinery/test/edges-check.mjs && node packages/machinery/test/section-open-check.mjs"
+    "test:gpu": "cd ../.. && node packages/machinery/test/dimensions-check.mjs && node packages/machinery/test/edges-check.mjs && node packages/machinery/test/section-open-check.mjs && node packages/machinery/test/bench-check.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -82,6 +82,10 @@
       "types": "./dist/materials.d.ts",
       "import": "./dist/materials.js"
     },
+    "./bench": {
+      "types": "./dist/bench.d.ts",
+      "import": "./dist/bench.js"
+    },
     "./overlays": {
       "types": "./dist/overlays.d.ts",
       "import": "./dist/overlays.js"
@@ -124,6 +128,7 @@
     "@margoengine/cad": "^1.0.0",
     "@margoengine/geometry": "^1.0.0",
     "@margoengine/lines": "^1.0.0",
+    "@margoengine/materials": "^1.0.0",
     "@margoengine/math": "^1.0.0",
     "@margoengine/physics": "^1.0.0",
     "@margoengine/text": "^1.0.0"
