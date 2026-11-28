@@ -307,7 +307,7 @@ try {
           p.simulation,
           p.computeGroup,
           p.alive,
-          fx.uniform,
+          fx.slot?.buffer,
           fx.target.color,
           fx.target.depth,
           fx.output,
@@ -315,7 +315,7 @@ try {
           fx.colorView,
           fx.depthView,
           fx.presentGroup,
-          fx.resolveGroup,
+          fx.slot?.group,
           fx.presentPass,
         ],
       };
@@ -364,7 +364,7 @@ try {
           p.simulation,
           p.computeGroup,
           p.alive,
-          fx.uniform,
+          fx.slot?.buffer,
           fx.target.color,
           fx.target.depth,
           fx.output,
@@ -372,7 +372,7 @@ try {
           fx.colorView,
           fx.depthView,
           fx.presentGroup,
-          fx.resolveGroup,
+          fx.slot?.group,
           fx.presentPass,
         ];
       return {
@@ -380,10 +380,17 @@ try {
         recoveryFrames: window.race.recoveryFrames,
         errors: window.race.errors,
         state: e.store === window.race.store && e.store.matrices.buffer === window.race.memory,
+        // Each listed resource must exist on both sides, or a field a package renamed reads undefined twice and
+        // passes as unchanged (5ffd9e6da6 moved PostProcessing's uniform and resolve group into per-view slots).
+        missing: [
+          ...window.race.resources.flatMap((r, i) => (r ? [] : [`before ${i}`])),
+          ...resources.flatMap((r, i) => (r ? [] : [`after ${i}`])),
+        ],
         recreated: resources.every((r, i) => r !== window.race.resources[i]),
       };
     });
     assert.deepEqual(race.errors, []);
+    assert.deepEqual(race.missing, [], `${scenario}: resources the check names are missing`);
     assert.ok(
       race.state && race.recreated && race.recoveryFrames >= 2,
       `${scenario} device loss: ${JSON.stringify({ state: race.state, recreated: race.recreated, recoveryFrames: race.recoveryFrames, frames: race.frames })}`,
