@@ -845,8 +845,8 @@ export class Ripples implements EnginePlugin {
 struct RippleSurface { grid:vec4f, debug:vec4f, obstacles:array<vec4f,64> }
 @group(0) @binding(${binding}) var<uniform> rippleSurface:RippleSurface;
 @group(0) @binding(${binding + 1}) var<storage,read> rippleField:array<vec2f>;
-fn rippleAt(p:vec2i)->vec2f {let n=i32(rippleSurface.grid.w);if(any(p<vec2i(0))||any(p>=vec2i(n))){return vec2f(0);}return rippleField[u32(p.y*n+p.x)];}
-fn rippleSample(xz:vec2f)->vec2f {let p=(xz-rippleSurface.grid.xy)/rippleSurface.grid.z-0.5;let a=vec2i(floor(p));let t=fract(p);return mix(mix(rippleAt(a),rippleAt(a+vec2i(1,0)),t.x),mix(rippleAt(a+vec2i(0,1)),rippleAt(a+vec2i(1,1)),t.x),t.y);}
+fn rippleCell(p:vec2i)->vec2f {let n=i32(rippleSurface.grid.w);if(any(p<vec2i(0))||any(p>=vec2i(n))){return vec2f(0);}return rippleField[u32(p.y*n+p.x)];}
+fn rippleSample(xz:vec2f)->vec2f {let p=(xz-rippleSurface.grid.xy)/rippleSurface.grid.z-0.5;let a=vec2i(floor(p));let t=fract(p);return mix(mix(rippleCell(a),rippleCell(a+vec2i(1,0)),t.x),mix(rippleCell(a+vec2i(0,1)),rippleCell(a+vec2i(1,1)),t.x),t.y);}
 // The same obstacle test as the step, on the surface's copy of the packed obstacles, for the debug hatching.
 fn rippleSurfaceObstacle(world:vec2f)->bool {
  let count=u32(round(rippleSurface.debug.w));
