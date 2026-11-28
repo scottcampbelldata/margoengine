@@ -22,17 +22,18 @@ const exposeOptionalUrls = {
       !code.includes('-kernel-shared.wasm') &&
       !code.includes('wake-fft.wasm') &&
       !code.includes('solver-phase-thread.js') &&
-      !code.includes('hull-panel-thread.js')
+      !code.includes('hull-panel-thread.js') &&
+      !code.includes('hull-slamming-thread.js')
     )
       return null;
     return {
       code: code
         .replace(
-          /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|cloud-projection|vegetation|wind-traction|wing-lattice|foam-transport|entry-profile|accretion|room-sound|outdoor-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
+          /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:wake-fft|(?:school|swim|airborne|falling|pedestrian|landscape|boundary-layer|cloud-projection|vegetation|wind-traction|wing-lattice|foam-transport|entry-profile|accretion|room-sound|outdoor-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|crush-shell|viscoplastic|underwater|seismic|tsunami|lightning|lava|granular-flow|rail|terramechanics|synoptic|strand|pbf|dfsph|hull-panel|hull-slamming|cloth)-kernel(?:-shared)?)\.wasm\?no-inline["'])/g,
           '',
         )
         .replace(
-          /(new Worker\s*\(\s*new URL\(\s*)\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:solver-phase|hull-panel)-thread\.js["'])/g,
+          /(new Worker\s*\(\s*new URL\(\s*)\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:solver-phase|hull-panel|hull-slamming)-thread\.js["'])/g,
           '$1',
         ),
       map: null,
@@ -60,6 +61,7 @@ await build({
         'cloth-thread': resolve(root, 'src/cloth/thread.ts'),
         'solver-phase-thread': resolve(root, 'src/native-phase-worker.ts'),
         'hull-panel-thread': resolve(root, 'src/seakeeping/panel-bake-worker.ts'),
+        'hull-slamming-thread': resolve(root, 'src/seakeeping/slamming-worker.ts'),
         decomposition: resolve(root, 'src/decomposition.ts'),
         soft: resolve(root, 'src/soft.ts'),
         tissue: resolve(root, 'src/tissue.ts'),
@@ -244,6 +246,7 @@ for (const name of ['pack-ice-kernel.wasm', 'pack-ice-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/pack-ice', name), resolve(dist, name));
 
 await copyFile(resolve(root, 'src/seakeeping/hull-panel-kernel.wasm'), resolve(dist, 'hull-panel-kernel.wasm'));
+await copyFile(resolve(root, 'src/seakeeping/hull-slamming-kernel.wasm'), resolve(dist, 'hull-slamming-kernel.wasm'));
 await copyFile(resolve(root, 'src/sea/wake-fft.wasm'), resolve(dist, 'wake-fft.wasm'));
 for (const name of ['loads-kernel.wasm', 'loads-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/loads', name), resolve(dist, name));

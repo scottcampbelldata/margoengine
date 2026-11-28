@@ -11361,6 +11361,35 @@ a non-self-intersecting mesh. Enclosed cavities follow even–odd fill.
 The optional sea entry grows from 12,263 to 14,183 B gzip with a 14,609 B ceiling.
 Freely advancing geometry and the held-out Wigley stem elevation remain open. The optional loads entry is 65,111 B gzip with a 67,065 B ceiling.
 
+### Wave impact and green-water evidence and limits (SEA-11)
+
+The strip slam uses one symmetric equivalent section per station, vertical penetration, and the existing
+Wagner wetting relation and added-mass growth. Its pressure is a net force and pitch moment. It does not
+resolve plating pressure, oblique flare entry, spray breakup or structural whipping. The code now retains
+valid stations beneath locally lower decks. The optional native profile bake uses the same numerical
+scheme and stores the tables in mesh order. Mesh, density and longitudinal resolution must match the
+live hull. The workers act only while preparing the tables. Runtime reads the accepted baked tables.
+The seakeeping entry is 48,146 B gzip. The optional strip Wasm is 20,492 B raw and 8,775 B gzip. The
+lazy worker and its binding are 727 B gzip.
+
+The green-water grid is shallow water in body coordinates. Its hydrostatic weight loads the deck and live
+inlet records carry the receiving cell’s height even at interior mask edges. Its accepted depth and deck
+height can be copied by the renderer after each tick. No reliable load on local vertical deck structures,
+air entrainment or scupper flow is inferred from the grid.
+
+The held-out Tveitnes comparison (`packages/physics/scripts/sea11-wedge-measured.mjs`) matches one of twelve
+measured forces inside its repeatability and figure bounds. At z/d near 0.45, the 15°, 30° and 45°
+predictions are 1,106, 542 and 519 N versus 648, 341 and 166 N observed. Near 0.85 they are 116, 162
+and 248 N versus 638, 243 and 354 N. The 240–960 Hz sensitivity is at most 0.040 N. The recorded motor
+speed is used and the wetted face impact speed was not measured. The test does not establish accuracy on
+any measured deck structure. The digital case uses only primary inputs and no fitted coefficients.
+
+The technical workboat in `packages/water/test/wave-impact-film.browser.mjs` couples the dynamic hull to
+a 0.72 m wave. At the sampled impact the upward load differs by 69.7 kN and vertical speed by 0.929 m/s
+from the matched slam-off control. The copied deck water spreads 1.04 m inboard, grows from 5.6 to
+101.3 L, and drains when inflow stops. WebGPU and WebGL2 each reproduce full camera frames and accepted
+world bytes through restore and replay. The original EF-6, CY-2 and CY-6 cuts remain open.
+
 ### Ship seakeeping evidence and limits (SEA-08)
 
 The optional three-dimensional panel bake evaluates independently sampled reference-frequency systems,

@@ -630,3 +630,12 @@ https://doi.org/10.6084/m9.figshare.25460128.v1. Licensed CC BY 4.0
 (https://creativecommons.org/licenses/by/4.0/). The diagnostic packages/physics/scripts/sea13-whitecaps-measured.mjs
 contains nine selected observational coverage, neutral wind and wave-age tuples with their original units.
 The selection uses input wind and wave age. No archive, photograph or model code is bundled.
+
+## Wedge water-entry force measurements (SEA-11)
+
+T. Tveitnes, A. C. Fairlie-Clarke and K. Varyani, *An experimental investigation into the constant velocity
+water entry of wedge-shaped sections*, Ocean Engineering 35 (2008), pp. 1463–1478,
+https://doi.org/10.1016/j.oceaneng.2008.06.012. The measured diagnostic
+`packages/physics/scripts/sea11-wedge-measured.mjs` transcribes twelve factual force and penetration
+coordinates from the data markers in Fig. 4(g), (j) and (l), with credit. The article is copyright Elsevier.
+Its figures, PDF, fitted curves and software are absent from the package.

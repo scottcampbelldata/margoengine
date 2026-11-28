@@ -3814,6 +3814,14 @@ leaves the accepted loads, wake sources and histories intact.
 - **The hull** is a closed triangle mesh in the body's frame, wound outward. Each triangle is cut where the sea's surface crosses it (the linear cut, then two secant steps on the surface). The wet pieces are integrated by Dunavant's six-point rule, which is exact for the hydrostatic force and moment.
 - **The sea** is the framework's sea surface, `SpectralSea` from `@margoengine/physics/sea` (the wave solver's spectrum as a sum of waves; measured: in its long swell a box rides up and down within 0.04 percent of the frequency-domain answer), made in the hull solver's origin cell (another cell is refused, naming the fix); or anything with `elevation(x, z, t)`, and optionally `pressure(x, y, z, t)`: the hydrostatic pressure plus the waves' dynamic pressure, stretched to 0 at the surface (Wheeler). Without it, the water is still to its local surface, rho g (eta - y). The pressure over the instantaneous wetted surface is the nonlinear Froude-Krylov load. `density` is the sea's, default sea water.
 - **`wettedLoads(mesh, pose, sea, t, about)`** gives the same force, moment and wetted area for one hull at one instant.
+
+Use `bakeHullSlamming(mesh, {density, stations, levels, threads, signal})` to prepare the same Wagner section tables in
+Rust Wasm. Defaults are 1025 kg/m³, 24 stations, 48 height levels and one participant. With `threads: 2` or `4`,
+independent stations run across actual native workers and the caller. Keep the body-frame mesh, density and station
+count the same when assigning the result to `Hull.slammingTable`. Use its `work` receipt to see how the quadrature was split.
+For green water, `hull.deckSurface(row)` copies the accepted X-fast deck height and water depth in body coordinates.
+Height is NaN off the deck. It returns undefined before a live deck update or when green water is disabled.
+
 - **Measured:**
   - a box at its draft is held up by the weight of the water it displaces, to f64 rounding;
   - heeled, a box rights itself by the wall-sided righting arm;
@@ -3844,11 +3852,11 @@ leaves the accepted loads, wake sources and histories intact.
 
 ```ts
 import {Physics} from 'margoengine/physics';
-import {HullSolver} from 'margoengine/physics/seakeeping';
+import {bakeHullSlamming, HullSolver} from 'margoengine/physics/seakeeping';
 import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
 
 await Physics.load();
-const physics = new Physics(null, {fixedTimestep: 1 / 60});
+using physics = new Physics(null, {fixedTimestep: 1 / 60});
 // A 4 m by 2 m box, 1.5 m deep, as heavy as 0.5 m of sea water under it: it floats at a 0.5 m draft.
 const [L, D, B, T] = [4, 1.5, 2, 0.5];
 const box = physics.addBody(null, {
@@ -3862,12 +3870,15 @@ const mesh = {
   vertices: v,
   indices: [0, 1, 3, 0, 3, 2, 4, 6, 7, 4, 7, 5, 0, 4, 5, 0, 5, 1, 2, 3, 7, 2, 7, 6, 0, 2, 6, 0, 6, 4, 1, 5, 7, 1, 7, 3],
 };
+const slammingTable = await bakeHullSlamming(mesh, {threads: 2});
+const hull = new HullSolver();
 const world = new PhysicsWorld({rate: {num: 60, den: 1}})
   .add(new RigidSolver(), {physics})
-  .add(new HullSolver(), {hulls: [{row: box.row, mesh}], sea: {elevation: () => 0}})
+  .add(hull, {hulls: [{row: box.row, mesh, slammingTable}], sea: {elevation: () => 0}})
   .couple(['hull', 'rigid'], 'staggered');
 world.advance(60);
 console.log(Math.abs(box.position[1] - (D / 2 - T)) < 1e-3); // true: it floats at its draft
+console.log(hull.deckSurface(box.row)?.depth.every((h) => h === 0)); // true: the deck stays dry
 ```
 
 A barge strikes a fixed quay. Its wing tank opens when the crush patch loses its seal, floods while

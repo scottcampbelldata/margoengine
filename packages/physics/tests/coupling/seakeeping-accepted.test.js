@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../../dist/index.js';
-import { HullSolver } from '../../dist/seakeeping.js';
-import { BODIES_FIELD, PhysicsWorld, regionWords, RigidSolver } from '../../dist/world.js';
+import { bakeHullSlamming, HullSolver, slamStations } from '../../dist/seakeeping.js';
+import { BODIES_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS, PhysicsWorld, regionWords, RigidSolver } from '../../dist/world.js';
 
 await Physics.load();
 
@@ -13,7 +13,7 @@ const mesh = {
     3, 7, 6, 3, 6, 2, 0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6, 5),
 };
 
-function hullFixture(physics, positions, sea, options = {}) {
+function hullFixture(physics, positions, sea, options = {}, hullMesh = mesh) {
   const rigid = new RigidSolver();
   const hull = new HullSolver('hull', { minimumRadius: 0.25 });
   const hulls = positions.map((position) => {
@@ -22,7 +22,7 @@ function hullFixture(physics, positions, sea, options = {}) {
       linearVelocity: [0, -0.125, 0],
       colliders: { shape: 'box', halfExtents: [1, 0.5, 0.5], mass: 1000 },
     });
-    return { row: body.row, mesh };
+    return { row: body.row, mesh: hullMesh };
   });
   const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, cellSize: 1, gravity: [0, -9.81, 0] })
     .add(rigid, { physics })
@@ -34,7 +34,7 @@ function hullFixture(physics, positions, sea, options = {}) {
   };
   const accepted = () => [...hull.stateRegions(), ...hull.exportPorts(0).map(({ region }) => region)].map((region) =>
     regionWords(world.arena.memory, region).slice());
-  return { world, step, accepted };
+  return { world, hull, step, accepted, row: hulls[0].row };
 }
 
 test('a late failed hull query preserves earlier hull histories and every published field', () => {
@@ -126,4 +126,89 @@ test('invalid hull inputs use coded errors before force allocation', () => {
       { code: 'unsupported', message: explanation },
     );
   }
+});
+
+test('green-water inflow on a rasterized tapered deck uses the receiving wet cell height', () => {
+  using physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, -9.81, 0] });
+  const tapered = { ...mesh, vertices: mesh.vertices.slice() };
+  for (let i = 0; i < tapered.vertices.length; i += 3)
+    if (tapered.vertices[i] > 0) tapered.vertices[i + 2] *= 0.375;
+  const { world, hull, row, step } = hullFixture(physics, [[0, -0.25, 0]], {
+    elevation: () => 0.5,
+    density: 1000,
+  }, { addedMass: false, slamming: false, radiation: false, rollDamping: false, deckCells: [12, 12] }, tapered);
+  assert.equal(hull.deckSurface(row), undefined);
+  const start = world.takeSnapshot();
+  step(0);
+  const accepted = hull.deckSurface(row);
+  assert.ok(accepted);
+  assert.ok(accepted.depth.some((value) => value > 0));
+  const { region } = hull.exportPorts(0).find((port) => port.field === DECK_INFLOW_FIELD.name);
+  const records = regionWords(world.arena.memory, region);
+  assert.ok(records[0] > 0);
+  let interiorEdges = 0;
+  for (let n = 0; n < records[0]; n++) {
+    const o = 1 + n * DECK_INFLOW_WORDS;
+    const [, ax, ay, az, bx, by, bz, nX, , nZ, depth, , , , flux] = records.subarray(o, o + DECK_INFLOW_WORDS);
+    assert.ok(depth > 0 && flux > 0);
+    const ux = ((ax + bx) / 2 - accepted.x0) / accepted.dx;
+    const uz = ((az + bz) / 2 - accepted.z0) / accepted.dz;
+    const i = Math.floor(ux + nX / 2);
+    const j = Math.floor(uz + nZ / 2);
+    assert.equal(ay, 0.5);
+    assert.equal(by, accepted.height[j * accepted.nx + i]);
+    const outsideI = Math.floor(ux - nX / 2);
+    const outsideJ = Math.floor(uz - nZ / 2);
+    if (outsideI >= 0 && outsideI < accepted.nx && outsideJ >= 0 && outsideJ < accepted.nz &&
+      Number.isNaN(accepted.height[outsideJ * accepted.nx + outsideI])) interiorEdges++;
+  }
+  assert.ok(interiorEdges > 0, 'some edges border a dry hole within the raster, away from the outer bounds');
+  const expected = hull.deckSurface(row);
+  accepted.depth.fill(0);
+  accepted.height.fill(-100);
+  assert.deepEqual(hull.deckSurface(row), expected);
+  world.restoreSnapshot(start.bytes);
+  assert.equal(hull.deckSurface(row), undefined);
+  step(0);
+  assert.deepEqual(hull.deckSurface(row), expected);
+});
+
+test('slamming rejects open hulls, invalid density and unsupported table dimensions with coded fixes', () => {
+  const open = { ...mesh, indices: mesh.indices.slice(0, -3) };
+  assert.throws(() => slamStations(open, 1025), { code: 'unsupported', message: /Close every edge.+#ship-seakeeping/ });
+  assert.throws(() => slamStations(mesh, Infinity), { code: 'unsupported', message: /finite positive kilograms.+#ship-seakeeping/ });
+  assert.throws(() => slamStations(mesh, 1025, Number.MAX_SAFE_INTEGER),
+    { code: 'unsupported', message: /within Wasm memory.+#ship-seakeeping/ });
+  assert.ok(slamStations(mesh, 1025).length > 0);
+});
+
+test('a native slam table is admitted only for the matching hull and is copied into the live solver', async () => {
+  const table = await bakeHullSlamming(mesh, { density: 1000, stations: 8, threads: 1 });
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, bodyRows: 1 });
+  const sea = { elevation: () => 0, density: 1000 };
+  const hulls = [{ row: 0, mesh, slammingTable: table }];
+  for (const options of [{ sea: { ...sea, density: 1025 } }, { stations: 7 }]) {
+    assert.throws(() => world.add(new HullSolver(), { hulls, sea, stations: 8, ...options }),
+      { code: 'unsupported', message: /same body-local mesh, sea density and station count.+#ship-seakeeping/ });
+  }
+  const offset = mesh.vertices.map((coordinate, i) => i % 3 === 0 ? coordinate + 1 : coordinate);
+  assert.throws(() => world.add(new HullSolver(), {
+    sea, stations: 8, hulls: [{ ...hulls[0], mesh: { ...mesh, vertices: offset } }],
+  }), { code: 'unsupported', message: /same body-local mesh.+#ship-seakeeping/ });
+  const invalid = { ...table, profiles: table.profiles.map((profile) => ({ ...profile, slope: profile.slope.slice() })) };
+  invalid.profiles[0].slope[0] = NaN;
+  assert.throws(() => world.add(new HullSolver(), {
+    sea, stations: 8, hulls: [{ ...hulls[0], slammingTable: invalid }],
+  }), { code: 'unsupported', message: /ordered finite profiles.+#ship-seakeeping/ });
+
+  function run(scalar) {
+    using physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, -9.81, 0] });
+    const input = scalar ? { row: 0, mesh } : hulls[0];
+    const { world: fixture, accepted, step } = hullFixture(physics, [[0, 0.25, 0]], sea, { hulls: [input] });
+    step(0);
+    if (!scalar) table.profiles[0].slope.fill(NaN);
+    fixture.advance(4);
+    return accepted();
+  }
+  assert.deepEqual(run(false), run(true));
 });

@@ -6791,6 +6791,16 @@ At `λ/L = 0.5` and `Fn = 0.142`, the independently measured KVLCC2 normalized m
 
 `MorphedCrowd` draws any number of skinned characters in one instanced call with live morph weights per member, on native WebGPU and on the WebGL2 compatibility layer. Proof: `packages/animation/tests/instanced-morph-browser.mjs` runs the vertex stage's own `morphed` and `skinned` functions from a compute shader over all 66 vertices of 48 members with their own weights (zero, one, between, negative and above one), two clips and a blend: 9,504 coordinates match the CPU twin `poseMorphedBones` within 9.6e-7 on both backends. A member drawn at three sets of weights differs from the model itself at those weights on 0 of 829, 967 and 1,376 covered pixels, and two members at different weights in the one draw cover 1,708 pixels against 898 for one. The CPU test checks the twin against the analytic strip, the baked offsets, the 64-target limit and every bound. No speed claim.
 
+### SEA-11 native strip slamming and live green water
+
+Actual packaged Chromium helpers compute independent Wagner station tables with exact scalar-table and
+signed live-world replay. The 25-station fixture evaluates 1,200 depth samples and 600,400 f64x2
+quadrature pairs, with 2,093,050 bracket comparisons versus 20,377,650 in the preceding scalar traversal.
+A separate tapered-deck test checks the receiving cell height and copied-surface replay. The real Water
+scene draws the physics-driven difference in bow motion and the accepted 5.6 to 101.3 L deck sheet.
+Both renderers replay their entire frames exactly. Only one of twelve independent wedge force readings
+falls inside the comparison envelope. [Evidence and bounds](../limits.md#wave-impact-and-green-water-evidence-and-limits-sea-11)
+
 ### SEA-08 panel workers and seakeeping replay
 
 Nine independent panel systems in packaged Chromium use three real helpers plus the caller. The native

@@ -11498,6 +11498,15 @@ the field registry. A production Vite build preserves both lazy Wasm files.
 
 The Biomes entry reads current HYDRO-02 water through the registered soil storage field and publishes versioned branch geometry. The phase, stable parent graph, radii and in-season water sums survive snapshot restore. The SIMD shadow kernel allocates its own arena stack and has no static window. Geometry conversion uses the existing Procedural tube entry. Tests derive the apical and lateral allocation, branch angle, attenuation, and radius from the production law, then exercise drought, solid occlusion, plant competition and wasm/browser replay.
 
+### SEA-11 native strip tables and live deck sources
+
+The optional Wagner bake packs independent angle evaluations in Rust Wasm and gives deterministic ranges
+of hull stations to native workers. A live HullSolver admits tables only for its body-frame mesh, density
+and station count. Deck inlet records use the same receiving cell as the shallow-water calculation and
+the full accepted deck surface can be copied between world steps. The Water technical proof draws that
+surface and checks exact accepted-state replay on both renderers. Measured loads beyond the early wedge
+model, load on hatch structures, and the original film cuts remain open.
+
 ### SEA-08 guarded hull publication and native panel workers
 
 HullSolver bounds live sea samples and the force columns. Its transaction restores any force, wake,

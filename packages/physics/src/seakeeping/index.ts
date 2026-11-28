@@ -13,7 +13,14 @@ export {
   type WettedLoads,
   wettedLoads,
 } from './wetted.js';
-export { type Hull, type HullParams, type HullWake, HullSolver, SEA_VISCOSITY } from './solver.js';
+export {
+  type Hull,
+  type HullDeckSurface,
+  type HullParams,
+  type HullWake,
+  HullSolver,
+  SEA_VISCOSITY,
+} from './solver.js';
 export {
   bakeHullPanels,
   type HullPanelOptions,
@@ -26,6 +33,13 @@ export type { HullBilgeKeel } from './bilge-keel.js';
 export type { HullCourse } from './course.js';
 export { type Deck, deckOf, stepDeck } from './deck.js';
 export { type SlamStation, slamSlope, slamStations } from './slamming.js';
+export {
+  bakeHullSlamming,
+  type HullSlammingOptions,
+  type HullSlammingTable,
+  type HullSlammingWorkCounts,
+  type HullSlammingWorkerWork,
+} from './slamming-table.js';
 export {
   AIR_DENSITY,
   ATMOSPHERE,

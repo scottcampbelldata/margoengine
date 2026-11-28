@@ -15,8 +15,11 @@
 // knuckle) the wetted width stops growing: the flow leaves the hull, and the impact ends.
 
 import { sin } from '@margoengine/math/pinned';
+import { validateSlamInputs } from './slamming-validation.js';
 import { hullSections } from './strips.js';
 import type { HullMesh } from './wetted.js';
+
+export { validateSlamInputs } from './slamming-validation.js';
 
 /**
  * A station's slamming table: at heights `heights` above its keel (m), Wagner's wetted half-breadth and the added mass's
@@ -33,12 +36,31 @@ export interface SlamStation {
   readonly slope: Float64Array;
 }
 
+export interface SlamGeometry {
+  readonly x: number;
+  readonly width: number;
+  readonly keel: number;
+  readonly heights: Float64Array;
+  readonly half: Float64Array;
+}
+
+// Evaluate pinned sine at the same 32 midpoint angles in both the scalar and native quadrature.
+export function slamQuadratureNodes(): Float64Array {
+  return Float64Array.from({ length: 32 }, (_, i) => sin((Math.PI / 2) * ((i + 0.5) / 32)));
+}
+
 /**
  * The slamming tables of a closed hull mesh (body frame, y up), one a station of `stations` along x: each section's
  * half-breadth at `levels` heights from its keel to its top, Wagner's wetted half-breadth from them, and the added mass's
  * slope.
  */
 export function slamStations(mesh: HullMesh, density: number, stations = 24, levels = 48): SlamStation[] {
+  validateSlamInputs(mesh, density, stations, levels);
+  const nodes = slamQuadratureNodes();
+  return slamGeometry(mesh, stations, levels).map((section) => scalarStation(section, density, nodes));
+}
+
+export function slamGeometry(mesh: HullMesh, stations: number, levels: number): SlamGeometry[] {
   const { vertices: v } = mesh;
   let top = -Infinity,
     bottom = Infinity;
@@ -49,12 +71,12 @@ export function slamStations(mesh: HullMesh, density: number, stations = 24, lev
   // Each station's half-breadth at each height, from the mesh cut at that height (the breadth at the waterline there).
   const span = top - bottom,
     cuts = Array.from({ length: levels }, (_, k) => hullSections(mesh, bottom + (span * (k + 1)) / levels, stations));
-  const out: SlamStation[] = [];
+  const out: SlamGeometry[] = [];
   for (let s = 0; s < stations; s++) {
     // The keel: the lowest height with any breadth (its draft at the top cut).
     const first = cuts[levels - 1]![s]!,
       keel = top - first.draft;
-    if (!(first.breadth > 0 && first.draft > 0)) continue;
+    if (!(first.draft > 0)) continue;
     // Half-breadth b(h) at heights h above the keel, rising (a hull that tucks in above its widest keeps its widest: the
     // flow left it there).
     const hs = [0],
@@ -65,53 +87,58 @@ export function slamStations(mesh: HullMesh, density: number, stations = 24, lev
       hs.push(h);
       bs.push(Math.max(bs.at(-1)!, cuts[k]![s]!.breadth / 2));
     }
-    const heights = Float64Array.from(hs),
-      half = Float64Array.from(bs),
-      // f(x): the height of the section at half-breadth x, the inverse of b(h) (the first height that wide).
-      f = (x: number) => {
-        if (x <= 0) return 0;
-        for (let k = 1; k < half.length; k++)
-          if (half[k]! >= x) {
-            const t = half[k]! > half[k - 1]! ? (x - half[k - 1]!) / (half[k]! - half[k - 1]!) : 1;
-            return heights[k - 1]! + t * (heights[k]! - heights[k - 1]!);
-          }
-        return Infinity;
-      },
-      widest = half[half.length - 1]!,
-      // Wagner's condition at depth h: the mean of f over the wetted width, by a 32-point midpoint rule in theta.
-      mean = (c: number) => {
-        let sum = 0;
-        for (let i = 0; i < 32; i++) sum += f(c * sin((Math.PI / 2) * ((i + 0.5) / 32)));
-        return sum / 32;
-      },
-      wetted = new Float64Array(heights.length);
-    for (let k = 1; k < heights.length; k++) {
-      const h = heights[k]!;
-      // c with mean f(c sin theta) = h, by bisection; past the widest the flow has left the hull.
-      if (mean(widest) <= h) {
-        wetted[k] = widest;
-        continue;
-      }
-      let lo = 0,
-        hi = widest;
-      for (let step = 0; step < 50; step++) {
-        const mid = (lo + hi) / 2;
-        if (mean(mid) < h) lo = mid;
-        else hi = mid;
-      }
-      wetted[k] = (lo + hi) / 2;
-    }
-    // m = rho pi c^2 / 2, its slope by central differences in h (one-sided at the ends).
-    const mass = Float64Array.from(wetted, (c) => (density * Math.PI * c * c) / 2),
-      slope = new Float64Array(heights.length);
-    for (let k = 0; k < heights.length; k++) {
-      const a = Math.max(0, k - 1),
-        b = Math.min(heights.length - 1, k + 1);
-      slope[k] = b > a ? (mass[b]! - mass[a]!) / (heights[b]! - heights[a]!) : 0;
-    }
-    out.push({ x: first.x, width: first.width, keel, heights, wetted, slope });
+    // A sheer deck can sit below the global top. Keep an entering section if any sampled cut wets it.
+    if (bs.at(-1)! > 0)
+      out.push({ x: first.x, width: first.width, keel, heights: Float64Array.from(hs), half: Float64Array.from(bs) });
   }
   return out;
+}
+
+function scalarStation(section: SlamGeometry, density: number, nodes: Float64Array): SlamStation {
+  const { x, width, keel, heights, half } = section;
+  const // f(x): the height of the section at half-breadth x, the inverse of b(h) (the first height that wide).
+    f = (x: number) => {
+      if (x <= 0) return 0;
+      for (let k = 1; k < half.length; k++)
+        if (half[k]! >= x) {
+          const t = half[k]! > half[k - 1]! ? (x - half[k - 1]!) / (half[k]! - half[k - 1]!) : 1;
+          return heights[k - 1]! + t * (heights[k]! - heights[k - 1]!);
+        }
+      return Infinity;
+    },
+    widest = half[half.length - 1]!,
+    // Wagner's condition at depth h: the mean of f over the wetted width, by a 32-point midpoint rule in theta.
+    mean = (c: number) => {
+      let sum = 0;
+      for (const node of nodes) sum += f(c * node);
+      return sum / 32;
+    },
+    wetted = new Float64Array(heights.length);
+  for (let k = 1; k < heights.length; k++) {
+    const h = heights[k]!;
+    // c with mean f(c sin theta) = h, by bisection; past the widest the flow has left the hull.
+    if (mean(widest) <= h) {
+      wetted[k] = widest;
+      continue;
+    }
+    let lo = 0,
+      hi = widest;
+    for (let step = 0; step < 50; step++) {
+      const mid = (lo + hi) / 2;
+      if (mean(mid) < h) lo = mid;
+      else hi = mid;
+    }
+    wetted[k] = (lo + hi) / 2;
+  }
+  // m = rho pi c^2 / 2, its slope by central differences in h (one-sided at the ends).
+  const mass = Float64Array.from(wetted, (c) => (density * Math.PI * c * c) / 2),
+    slope = new Float64Array(heights.length);
+  for (let k = 0; k < heights.length; k++) {
+    const a = Math.max(0, k - 1),
+      b = Math.min(heights.length - 1, k + 1);
+    slope[k] = b > a ? (mass[b]! - mass[a]!) / (heights[b]! - heights[a]!) : 0;
+  }
+  return { x, width, keel, heights, wetted, slope };
 }
 
 /** dm/dh of a station at depth `h` above its keel (kg/m^2), linear between its table's heights, 0 out of the water or past it. */

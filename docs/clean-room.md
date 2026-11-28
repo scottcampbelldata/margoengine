@@ -18182,6 +18182,27 @@ P. Poulain, A. Le Friant, A. Mangeney, S. Viroulet, E. Fernandez-Nieto, M. Castr
 
 For ground shaking, the reference-frame inertial acceleration acts opposite the published horizontal support acceleration. The vertical support acceleration adds to the effective downward gravity, so the material shear threshold changes with the contact load. Nathan M. Newmark (1965), *Effects of Earthquakes on Dams and Embankments*, established the critical-acceleration concept. Jacques Ingles, José Darrozes and Jean-Claude Soula (2006), *Effects of the vertical component of ground shaking on earthquake-induced landslide displacements using generalized Newmark analysis*, show why horizontal and vertical support accelerations need separate components. The optional EARTH-08 edge puts the support force into the same apparent-step projection as slope and pressure. The flat wide-layer test checks both directions and the contact-load threshold against force balance with a derived first-order error in reconstruction. [Newmark 1965](https://doi.org/10.1680/geot.1965.15.2.139), [Ingles et al. 2006](https://doi.org/10.1016/j.enggeo.2006.02.018)
 
+### SEA-11 hull slamming and accepted green water
+
+The section bake uses the zero-gravity two-dimensional Wagner wetting condition, Hulin, Tassin and
+Korobkin (2022) equation (2.3), to integrate the profile height at 32 midpoint angles. It preserves the
+order of the sum and the 50 bisections for each uncapped depth while pairing independent angle samples in native
+f64x2. The live load uses the momentum rate of the wetted added mass, as in the von Kármán water-entry
+balance. Independent station ranges run in private Wasm memories and return in mesh order.
+[Hulin, Tassin and Korobkin (2022)](https://doi.org/10.1017/jfm.2022.448) · [von Kármán, NACA TN-321 (1929)](https://ntrs.nasa.gov/citations/19930081174)
+
+The deck uses the existing Audusse et al. (2004) hydrostatic reconstruction, with the receiving cell
+of each inlet found half a cell inside its inward normal. The exported surface copies accepted x-fast
+height and depth in the hull frame. No particle emission or visible sheet is used as a load input.
+[Audusse, Bouchut, Bristeau, Klein and Perthame (2004)](https://doi.org/10.1137/S1064827503431090)
+
+The held-out force diagnostic records 12 isolated experimental markers from Fig. 4(g), (j) and (l)
+of Tveitnes, Fairlie-Clarke and Varyani (2008). It uses reported width, length, deadrise and motor
+speeds as inputs. Neither the measured force outcomes nor the paper’s fitted wetting and drag coefficients
+set model parameters. The paper’s peak-relative repeatability, digitization and position allowances are
+recorded separately in the script. The instrument did not measure the water-impact velocity of the face.
+[Tveitnes, Fairlie-Clarke and Varyani (2008)](https://doi.org/10.1016/j.oceaneng.2008.06.012)
+
 ### SEA-08 ordered panel workers
 
 The three-dimensional panel response retains the original boundary-integral kernels and linearized reference

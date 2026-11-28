@@ -74,6 +74,7 @@ import { type Deck, deckOf, stepDeck } from './deck.js';
 import { courseWaveCorrection } from './excitation.js';
 import { hullError } from './errors.js';
 import { type SlamStation, slamSlope, slamStations } from './slamming.js';
+import { type HullSlammingTable, slamMeshHash } from './slamming-table.js';
 import {
   AIR_DENSITY,
   ATMOSPHERE,
@@ -127,6 +128,8 @@ export interface Hull {
   readonly surgeAddedMass?: boolean;
   /** Optional three-dimensional radiation, infinite inertia and directional diffraction at the reference draft. */
   readonly panels?: HullPanelResponse;
+  /** Optional native Wagner tables made for this exact body-local mesh, liquid density and station count. */
+  readonly slammingTable?: HullSlammingTable;
   /** Add mean axial wave-reflection loads on the hull's waterline. Default false. */
   readonly shortWaveResistance?: boolean;
   /** Baked reference waterplane for heave, roll and pitch sources. A wake-enabled HullSolver copies its nodes. */
@@ -161,6 +164,12 @@ export interface HullWake {
   readonly submergedAdvance?: readonly number[];
   /** Publish the baked advancing points to a finiteQuayPointSource descriptor. Use one advancing source mode. */
   readonly pointAdvance?: FieldDescriptor;
+}
+
+/** A hull's most recently accepted green-water surface in the body frame, x fastest. */
+export interface HullDeckSurface extends Deck {
+  /** The water column above each cell's deck height in metres. */
+  readonly depth: Float64Array;
 }
 
 /** What a {@link HullSolver} is made from. */
@@ -571,6 +580,11 @@ export class HullSolver implements Solver<HullParams> {
     let lastShellSeam = -1;
     const pressureSeams = new Set<number>();
     const seen = new Set<number>();
+    const slamming = params.slamming ?? true;
+    const stationCount = params.stations ?? 24;
+    if (!(Number.isSafeInteger(stationCount) && stationCount >= 2))
+      throw hullError('unsupported', `A hull's stations are ${stationCount}; pass a whole number of 2 or more.`);
+    const bakedSlams = new Map<Hull, SlamStation[]>();
     for (const hull of hulls) {
       if (!hull || !(Number.isSafeInteger(hull.row) && hull.row >= 0) || seen.has(hull.row))
         throw hullError('unsupported', `Hull body row ${hull?.row} is invalid or repeated. Supply one hull per rigid row.`);
@@ -619,6 +633,8 @@ export class HullSolver implements Solver<HullParams> {
             'unsupported',
             `Hull triangle index ${indices[k]} names no vertex of the ${vertices.length / 3}; keep each index under the vertex count.`,
           );
+      if (slamming && hull.slammingTable)
+        bakedSlams.set(hull, copySlammingTable(hull.slammingTable, hull.mesh, sea.density ?? SEA_WATER, stationCount));
     }
     const capacity = host.bodyRows();
     if (params.capacity !== undefined && params.capacity !== capacity)
@@ -659,9 +675,7 @@ export class HullSolver implements Solver<HullParams> {
     if (this.gravity.length !== 3 || !this.gravity.every(Number.isFinite))
       throw hullError('unsupported', 'Hull gravity is invalid. Supply three finite SI components.');
     this.addedMass = params.addedMass ?? true;
-    this.stations = params.stations ?? 24;
-    if (!(Number.isSafeInteger(this.stations) && this.stations >= 2))
-      throw hullError('unsupported', `A hull's stations are ${this.stations}; pass a whole number of 2 or more.`);
+    this.stations = stationCount;
     this.host = host;
     this.lastCrushPatch = lastCrushPatch;
     this.lastGirderJoint = lastGirderJoint;
@@ -828,7 +842,9 @@ export class HullSolver implements Solver<HullParams> {
     }
     this.drift = (params.drift ?? true) && this.wavesOf() !== null;
     this.greenWater = params.greenWater ?? true;
-    this.slamming = params.slamming ?? true;
+    this.slamming = slamming;
+    this.slams.clear();
+    for (const [hull, profiles] of bakedSlams) this.slams.set(hull, profiles);
     this.drag = params.drag ?? true;
     this.dragCoefficient = params.dragCoefficient ?? FORM_DRAG;
     if (!(this.dragCoefficient >= 0 && Number.isFinite(this.dragCoefficient)))
@@ -1928,10 +1944,13 @@ export class HullSolver implements Solver<HullParams> {
         // The face runs across its normal, half a cell each way.
         hx = nZ !== 0 ? deck.dx / 2 : 0,
         hz = nX !== 0 ? deck.dz / 2 : 0,
-        i = Math.min(nx - 1, Math.max(0, Math.floor((x - nX * 1e-6 - deck.x0) / deck.dx))),
-        j = Math.min(nz - 1, Math.max(0, Math.floor((z - nZ * 1e-6 - deck.z0) / deck.dz))),
-        b = deck.height[j * nx + i] ?? 0,
+        // The published normal points into the wettable cell. Move half a cell off the shared edge to get its bed.
+        i = Math.floor((x - deck.x0) / deck.dx + nX / 2),
+        j = Math.floor((z - deck.z0) / deck.dz + nZ / 2),
+        b = deck.height[j * nx + i]!,
         o = 1 + records[0]! * DECK_INFLOW_WORDS;
+      if (!(i >= 0 && i < nx && j >= 0 && j < nz && Number.isFinite(b)))
+        throw hullError('failed', 'A green-water edge has no receiving deck cell. Use a finite body-local deck grid.');
       records.set([hull.row, x - hx, b, z - hz, x + hx, b, z + hz, nX, 0, nZ, h, u, 0, w, flux, context.tick], o);
       records[0]! += 1;
     }
@@ -1991,9 +2010,12 @@ export class HullSolver implements Solver<HullParams> {
     dt: number,
     loads: WettedLoads,
   ): void {
+    const density = this.checkedSea!.density ?? SEA_WATER;
+    if (hull.slammingTable && density !== hull.slammingTable.density)
+      throw hullError('state', 'The slam table’s density no longer matches the sea. Bake the table for the new liquid.');
     let stations = this.slams.get(hull);
     if (!stations) {
-      stations = slamStations(hull.mesh, this.sea!.density ?? SEA_WATER, this.stations);
+      stations = slamStations(hull.mesh, density, this.stations);
       this.slams.set(hull, stations);
     }
     const index = this.hulls.indexOf(hull),
@@ -2013,6 +2035,8 @@ export class HullSolver implements Solver<HullParams> {
         p: Vec3 = [pose.position[0] + r[0], pose.position[1] + r[1], pose.position[2] + r[2]],
         h = this.checkedSea!.elevation(p[0], p[2], t) - p[1],
         rate = seen ? (h - state[1 + s]!) / dt : 0;
+      if (!Number.isFinite(h) || !Number.isFinite(rate))
+        throw hullError('failed', 'Slam penetration or speed overflowed. Use finite local heights and body pose.');
       state[1 + s] = h;
       if (!(rate > 0)) return;
       const f = slamSlope(station, h) * rate * rate * station.width;
@@ -2617,6 +2641,24 @@ export class HullSolver implements Solver<HullParams> {
 
   importPorts(_tick: number): void {}
 
+  /** Copy a live hull's accepted deck grid. Undefined before a deck update or when green water is disabled. */
+  deckSurface(row: number): HullDeckSurface | undefined {
+    if (this.updating)
+      throw hullError('state', 'The hull is stepping. Read its accepted deck surface between world steps.');
+    if (!this.host || !this.deckWater) return undefined;
+    const index = this.hulls.findIndex((hull) => hull.row === row);
+    if (index < 0)
+      throw hullError('unsupported', `No hull owns body row ${row}. Use a hull row from this solver.`);
+    const geometry = this.decks.get(this.hulls[index]!);
+    if (!geometry) return undefined;
+    const { deck } = geometry;
+    const cells = deck.nx * deck.nz;
+    const start = this.deckWater.byteOffset + index * (3 * cells + 4) * Float64Array.BYTES_PER_ELEMENT;
+    const words = new Float64Array(this.host.memory.buffer, start, 3 * cells + 4);
+    if (words[3 * cells] !== 1) return undefined;
+    return { ...deck, height: deck.height.slice(), depth: words.slice(0, cells) };
+  }
+
   /** The hulls' motion histories, which their radiation remembers. */
   stateRegions(): readonly Region[] {
     return [
@@ -2642,6 +2684,31 @@ export class HullSolver implements Solver<HullParams> {
 
 function finiteHullVector(value: readonly number[] | undefined): value is Vec3 {
   return value?.length === 3 && Number.isFinite(value[0]) && Number.isFinite(value[1]) && Number.isFinite(value[2]);
+}
+
+function copySlammingTable(table: HullSlammingTable, mesh: HullMesh, density: number, stations: number): SlamStation[] {
+  if (table.stations !== stations || table.density !== density || table.meshHash !== slamMeshHash(mesh))
+    throw hullError(
+      'unsupported',
+      'The slam table does not match this hull. Bake it with the same body-local mesh, sea density and station count.',
+    );
+  const { profiles, levels } = table;
+  if (!Number.isSafeInteger(levels) || levels < 1 || !Array.isArray(profiles) ||
+    profiles.length === 0 || profiles.length > stations)
+    throw hullError('unsupported', 'The slam table has invalid profile counts. Supply a table from bakeHullSlamming.');
+  return profiles.map((profile, i) => {
+    if (!profile) throw hullError('unsupported', 'A slam profile is missing. Supply every profile returned by bakeHullSlamming.');
+    const { x, width, keel, heights, wetted, slope } = profile;
+    if (![x, width, keel].every(Number.isFinite) || !(width > 0) || (i > 0 && !(x > profiles[i - 1]!.x)) ||
+      !(heights instanceof Float64Array && wetted instanceof Float64Array && slope instanceof Float64Array) ||
+      heights.length < 2 || heights.length > levels + 1 || heights[0] !== 0 ||
+      wetted.length !== heights.length || slope.length !== heights.length ||
+      !heights.every((h, k) => Number.isFinite(h) && (k === 0 || h > heights[k - 1]!)) ||
+      !wetted.every((w, k) => Number.isFinite(w) && w >= (k > 0 ? wetted[k - 1]! : 0)) ||
+      !slope.every((s) => Number.isFinite(s) && s >= 0))
+      throw hullError('unsupported', 'A slam profile is invalid. Supply the ordered finite profiles from bakeHullSlamming.');
+    return { x, width, keel, heights: heights.slice(), wetted: wetted.slice(), slope: slope.slice() };
+  });
 }
 
 function hullHistoryBytes(words: number): number {

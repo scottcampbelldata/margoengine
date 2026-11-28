@@ -117,6 +117,12 @@ export const BLUEPRINTS = [
     script: 'packages/physics/scripts/build-hull-panel-kernel.mjs',
   },
   {
+    name: 'hull-slamming-kernel',
+    crate: 'packages/physics/hull-slamming-kernel',
+    blueprint: 'packages/physics/src/seakeeping/hull-slamming-kernel.wasm',
+    script: 'packages/physics/scripts/build-hull-slamming-kernel.mjs',
+  },
+  {
     name: 'loads-kernel',
     crate: 'packages/physics/loads-kernel',
     blueprint: 'packages/physics/src/loads/loads-kernel.wasm',

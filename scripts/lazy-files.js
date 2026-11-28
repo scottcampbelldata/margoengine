@@ -113,6 +113,23 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/hull-slamming-kernel.wasm',
+    label: 'hull-slamming-kernel.wasm',
+    kind: 'Rust SIMD Wagner strip slamming quadrature',
+    measure: 'file',
+    when: 'bakeHullSlamming() from the optional /seakeeping entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/hull-slamming-thread.js',
+    label: 'hull-slamming-thread.js',
+    kind: 'Private hull slamming station worker',
+    measure: 'bundle',
+    external: [],
+    when: 'bakeHullSlamming() with threads: 2 or 4 from the optional /seakeeping entry',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/loads-kernel.wasm',
     label: 'loads-kernel.wasm',
     kind: 'Rust SIMD batch for hydrodynamic wrenches',

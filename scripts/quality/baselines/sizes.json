@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21941591,
+  "total": 21944631,
   "history": [
     {
       "date": "2026-10-24",
@@ -15725,6 +15725,12 @@
       "commit": "7c9dbd15d2",
       "reason": "sky/weather 12,314 B gzip (ceiling 11,740 to 12,684): each raindrop draws its own size, fall speed, streak and light, with rain sheets and gusts (7c9dbd15d2), after the centroid-sampled streak varyings (a99625931f). weather/puddles 4,020 B (ceiling 3,984 to 4,276) and weather/gltf 6,032 B (ceiling 5,981 to 6,288): the patchy water film on damp ground and the rain-roughened puddles (ef8c29fafa), in the puddle WGSL both entries draw. All three are what the optional entry is imported for; a split would leave the default rain as one field of identical streaks and a wet floor a mirror.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "sea-11-native-wagner-deck-surface",
+      "reason": "SEA-11 @margoengine/physics/seakeeping 45195 to 48146 B gzip, @margoengine/physics 993422 to 993434 B gzip, @margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table)) 107013 to 107025 B gzip, @margoengine/physics/seakeeping 46551 to 49591 B ceiling. The seakeeping entry keeps checked hull meshes, delegated strip tables and accepted deck copies beside the existing load solver. A separate runtime entry would duplicate the existing solver and port contract. The strip bytecode and worker load only from the optional bake. Core and stage are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16640,7 +16646,7 @@
     "@margoengine/physics/runoff": 7192,
     "@margoengine/physics/schooling": 5102,
     "@margoengine/physics/sea": 14609,
-    "@margoengine/physics/seakeeping": 46551,
+    "@margoengine/physics/seakeeping": 49591,
     "@margoengine/physics/sediment": 8101,
     "@margoengine/physics/seismic": 5266,
     "@margoengine/physics/ship": 36541,

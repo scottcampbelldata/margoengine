@@ -94,6 +94,7 @@ export interface Hull {
     readonly bilgeKeels?: readonly HullBilgeKeel[];
     readonly surgeAddedMass?: boolean;
     readonly panels?: HullPanelResponse;
+    readonly slammingTable?: HullSlammingTable;
     readonly shortWaveResistance?: boolean;
     readonly wakeWaterplane?: {
         readonly plane: WakeWaterplane;
@@ -118,6 +119,10 @@ export interface HullCourse {
     readonly speed?: number;
     readonly trim?: number;
     readonly lateralHeading?: number;
+}
+
+export interface HullDeckSurface extends Deck {
+    readonly depth: Float64Array;
 }
 
 export interface HullMemory {
@@ -210,6 +215,36 @@ export interface HullPose {
     readonly rotation: Quat;
 }
 
+export interface HullSlammingOptions {
+    readonly density?: number;
+    readonly stations?: number;
+    readonly levels?: number;
+    readonly threads?: 1 | 2 | 4;
+    readonly signal?: AbortSignal;
+}
+
+export interface HullSlammingTable {
+    readonly density: number;
+    readonly stations: number;
+    readonly levels: number;
+    readonly meshHash: string;
+    readonly work: HullSlammingWorkCounts;
+    readonly profiles: readonly SlamStation[];
+}
+
+export interface HullSlammingWorkCounts extends HullSlammingWorkerWork {
+    readonly threads: number;
+    readonly workers: readonly HullSlammingWorkerWork[];
+}
+
+export interface HullSlammingWorkerWork {
+    readonly stations: number;
+    readonly samples: number;
+    readonly bisections: number;
+    readonly quadraturePairs: number;
+    readonly profileComparisons: number;
+}
+
 export class HullSolver implements Solver<HullParams> {
     readonly id: string;
     readonly wakeSourceField: FieldDescriptor;
@@ -240,6 +275,7 @@ export class HullSolver implements Solver<HullParams> {
     step(context: StepContext, dt: number): void;
     exportPorts(tick: number): readonly Port[];
     importPorts(_tick: number): void;
+    deckSurface(row: number): HullDeckSurface | undefined;
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
 }
@@ -380,6 +416,8 @@ export interface WettedLoads {
 export function addedMassInfinite(sections: readonly Section[], centre: readonly [number, number, number], density: number): Float64Array;
 
 export function bakeHullPanels(mesh: HullMesh, options: HullPanelOptions): Promise<HullPanelResponse>;
+
+export function bakeHullSlamming(mesh: HullMesh, options?: HullSlammingOptions): Promise<HullSlammingTable>;
 
 export function bakeWakeAdvancePoints(mesh: HullMesh, waterline: number, options: WakeAdvancePointOptions): WakeAdvancePoints;
 

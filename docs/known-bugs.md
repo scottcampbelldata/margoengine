@@ -531,6 +531,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   set down inside the slop and past it: at rest within 1e-7 m of the slop plus g / omega^2), and the case above in
   `next-parameters.test.js`, now run at 9.81, 9.80665 and 9.82 (it fails at 9.80665 without the fix).
 
+### Fixed 2026-11-28: tapered deck inflow took the height of its dry neighbor (KB-SEA-DECKEDGEHEIGHT1)
+
+At a green-water inlet inside the deck raster, the normal points into the receiving cell. A step
+outwards selected the NaN of the excluded cell and rejected the published deck inflow. The inlet
+record now takes its bed half a cell inside the normal in grid units.
+`packages/physics/tests/coupling/seakeeping-accepted.test.js` supplies a flooded tapered deck with
+interior mask edges, checks finite bed heights and verifies copied-surface replay.
+
+### Fixed 2026-11-28: hull slamming dropped sections below the highest deck (KB-SEA-SLAMSHEER1)
+
+The hull-wide upper cut can lie above a lower deck section. Its zero breadth used to remove that
+station even when lower cuts had a wetted profile. The station now uses the keel depth at the top
+cut and looks for breadth across the lower cuts. `packages/physics/tests/coupling/hull-slamming-workers.test.js`
+checks the retained stations of a sheer hull and exact agreement of the native and TypeScript tables.
+
 ### Fixed 2026-11-28: the roll-decay test used a free hull for a hinged box (KB-SEA-HEELDECAY1, physics seakeeping)
 
 - **Repro:** `node --test --test-name-pattern="let go heeled" packages/physics/tests/coupling/seakeeping.test.js`.
