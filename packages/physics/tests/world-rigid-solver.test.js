@@ -309,6 +309,34 @@ test('the kernel state snapshots and restores with the world, and a world of oth
   for (const s of [first, second, third]) s.physics.dispose();
 });
 
+test("a snapshot taken before a joint's first step restores after the step grew the locks' solve memory", () => {
+  // The first step sizes the locks' Newton solve for the joints' paths (NEWTON, grown in the step). That memory is rewritten
+  // before every read inside a step, so it is no state and no carried history: the regions a snapshot names stay the same.
+  const physics = new Physics(null, { fixedTimestep: 1 / 60 });
+  let last = physics.addBody(null, { type: 'fixed' });
+  for (let i = 1; i <= 4; i++) {
+    const link = physics.addBody(null, {
+      position: [0.6 * i, 2, 0],
+      colliders: { shape: 'sphere', radius: 0.2, mass: 1 + i },
+    });
+    physics.addJoint(last, link, { type: 'spherical', anchorA: i === 1 ? [0, 2, 0] : [0.3, 0, 0], anchorB: [-0.3, 0, 0] });
+    last = link;
+  }
+  const solver = new RigidSolver(),
+    world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(solver, { physics });
+  const names = () => [...solver.stateRegions(), ...solver.extraState()].map((region) => region.name);
+  const before = names(),
+    start = world.takeSnapshot();
+  world.advance(30);
+  assert.deepEqual(names(), before);
+  const ran = world.hash();
+  world.restoreSnapshot(start.bytes);
+  assert.equal(world.hash(), start.hash);
+  world.advance(30);
+  assert.equal(world.hash(), ran);
+  physics.dispose();
+});
+
 test('a Physics stepped 240 times a second steps at level 2 in a world, and to the bits it gives alone', () => {
   // A solver's level was read from describe(), which the world asks before init (which learns the Physics's step), so
   // every RigidSolver stepped at level 0 and a Physics at 1/240 s was refused ("the world asked for 1/60 s").

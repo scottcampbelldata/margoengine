@@ -27,8 +27,6 @@ pub struct Header {
     pub steps: u32,
     pub substeps: u32,
     pub gravity: [f32; 3],
-    /// Counts every change of layout, so JS knows to bind its views again.
-    pub layout: u32,
     /// Endpoints in each sorted list.
     pub endpoints: u32,
     /// The head of the chain of colliders the next step must look at.
@@ -93,6 +91,10 @@ pub struct Header {
     pub warm_start: f32,
     /// Visits of the multibody pass, so a tree is taken once a visit.
     pub mb_calls: u32,
+    /// Counts every change of layout, so JS knows to bind its views again. It says where the words lie, as the offsets do, so it
+    /// is no state (`state_ranges`): a snapshot taken before a step grew the world, put back after, leaves it as it is, where
+    /// writing the old count back made the replay's hash differ from the run's with every body to the bit.
+    pub layout: u32,
     /// How many continuous-collision passes a step may make: 0 leaves every body's CCD off for the world, any other number
     /// lets the one pass a step takes run (it resolves a body's whole sweep, so more passes would find nothing more).
     pub ccd_substeps: u32,
@@ -948,14 +950,16 @@ impl World {
     /// The words of the world that are its state, as ranges of 32-bit words from the arena's base, in a fixed order: the header's
     /// scalars, after the words that say what the layout is (the magic number, which counts the columns, the block size, the row
     /// capacities and the column offsets) and before the padding that rounds the header up to a multiple of 16 bytes, without the
-    /// count of multibody walks (`mb_calls`, a stamp the walks leave on the roots they have reached, in a column left out too);
-    /// then every column that is not scratch, over its capacity. `hash` covers exactly these, and the physics framework's state
+    /// count of multibody walks (`mb_calls`, a stamp the walks leave on the roots they have reached, in a column left out too)
+    /// and the count of layouts after it (`layout`, which says where the words lie); then every column that is not scratch, over
+    /// its capacity. `hash` covers exactly these, and the physics framework's state
     /// regions are these (`world_state_range`), so the two can never cover different words.
     pub fn state_ranges(&self, mut visit: impl FnMut(usize, usize)) {
         let layout = 2 + ROW_CLASSES + COLUMNS;
         let stamp = core::mem::offset_of!(Header, mb_calls) / 4;
+        const _: () = assert!(core::mem::offset_of!(Header, layout) == core::mem::offset_of!(Header, mb_calls) + 4);
         visit(layout, stamp - layout);
-        visit(stamp + 1, core::mem::size_of::<Header>() / 4 - stamp - 1);
+        visit(stamp + 2, core::mem::size_of::<Header>() / 4 - stamp - 2);
         for column in 0..COLUMNS {
             if !SCRATCH.contains(&column) {
                 let header = self.header();

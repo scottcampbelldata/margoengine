@@ -1155,3 +1155,22 @@ pub const SCRATCH: [usize; 80] = [
     LOCK_SUM_10, LOCK_SUM_11,
     PAIR_PATCH_NEXT, PAIR_PATCH_TAIL, PATCH_LIST, PATCH_TEMP, PATCH_SIGN, CONTACT_CUT,
 ];
+
+/// The scratch columns no step carries into the next: every word of them is written inside a step before it is read there, so
+/// they are workspace, not history. A snapshot of the world's state and what it carries (the framework's `extraState`) leaves
+/// them out, as their size may grow inside a step (NEWTON, sized for the paths' lock rows by `place_newton`): a snapshot taken
+/// before that growth still names the same regions after it.
+pub const WORKSPACE: [usize; 1] = [NEWTON];
+// Workspace is scratch: the state hash leaves it out as it does all scratch.
+const _: () = {
+    let mut i = 0;
+    while i < WORKSPACE.len() {
+        let (mut j, mut found) = (0, false);
+        while j < SCRATCH.len() {
+            found |= SCRATCH[j] == WORKSPACE[i];
+            j += 1;
+        }
+        assert!(found);
+        i += 1;
+    }
+};

@@ -490,15 +490,19 @@ export class RigidSolver implements Solver<RigidSolverParams> {
    * What the kernel carries from one step into the next beyond its state: its scratch columns (the island lists a step leaves
    * and the next starts from), the multibody walk stamp and the Physics's step count. Left out of the kernel's own hash, they are still history a
    * restored run needs to go on bit for bit (docs/physics-framework.md, section 8), so they are snapshotted as extra state.
+   * Workspace columns (`KernelWorld.workspaceColumns`) are left out: a step writes them before it reads them, and they may grow
+   * inside a step, which would change the regions a snapshot taken before it names.
    */
   extraState(): readonly Region[] {
     const kernel = this.live().kernel,
       memory = this.kernelMemory(),
       ranges = kernel.stateRanges(),
       covered = new Set(ranges.map((range) => range.byteOffset)),
+      workspace = kernel.workspaceColumns(),
       out: Region[] = this.clock ? [this.clock] : [];
     if (this.attached) out.push(this.attached);
-    // The stamp is the one word between the header's two state ranges.
+    // The stamp is the first of the two words between the header's two state ranges; the second, the count of layouts, says
+    // where the words lie and is neither state nor history.
     const [first] = ranges;
     if (first)
       out.push({
@@ -510,7 +514,7 @@ export class RigidSolver implements Solver<RigidSolverParams> {
         ...memory,
       });
     for (const [name, view] of Object.entries(kernel.columns))
-      if (view.byteLength > 0 && !covered.has(view.byteOffset))
+      if (view.byteLength > 0 && !covered.has(view.byteOffset) && !workspace.has(name))
         out.push({
           name: `${name}[${view.length}]`,
           byteOffset: view.byteOffset,

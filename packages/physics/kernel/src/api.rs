@@ -73,6 +73,11 @@ pub extern "C" fn world_capacity(class: u32) -> u32 {
 pub extern "C" fn world_offset(column: u32) -> u32 {
     world().header().offsets[column as usize]
 }
+/// 1 when column `column` is workspace (`WORKSPACE`): scratch a step writes before it reads, carried into no later step.
+#[unsafe(no_mangle)]
+pub extern "C" fn world_workspace(column: u32) -> u32 {
+    WORKSPACE.contains(&(column as usize)) as u32
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn world_columns() -> u32 {
     COLUMNS as u32

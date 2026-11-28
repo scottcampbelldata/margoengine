@@ -113,3 +113,25 @@ fn bodies_woken_in_any_order_and_a_restored_snapshot_step_to_the_same_bits_for_6
         }
     }
 }
+
+#[test]
+fn a_world_grown_before_its_first_step_hashes_and_steps_as_one_its_step_grew() {
+    // The first step sizes the locks' Newton solve (NEWTON) for the chain's paths and so lays the world out again. Where the
+    // words lie is no state: the count of layouts was hashed, so a snapshot taken before that step and put back after it
+    // stepped on to another hash with every body to the bit.
+    let mut in_step = scene();
+    let mut before = scene();
+    let fresh = before.hash();
+    let mut capacity = before.header().capacity;
+    assert_eq!(capacity[Rows::Newton as usize], 0, "no Newton words before the first step");
+    capacity[Rows::Newton as usize] = 1 << 14;
+    assert!(before.grow(capacity));
+    assert_eq!(before.hash(), fresh, "growing moved the words and changed no state");
+    for step in 0..10 {
+        in_step.step(DT);
+        before.step(DT);
+        assert!(bodies(&in_step) == bodies(&before), "the bodies differ after step {step}");
+        assert_eq!(in_step.hash(), before.hash(), "the state differs after step {step}");
+    }
+    assert!(in_step.header().capacity[Rows::Newton as usize] > 0, "the step grew the Newton words");
+}

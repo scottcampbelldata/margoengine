@@ -21,6 +21,7 @@ interface KernelExports extends WebAssembly.Exports {
   world_reserve(bodies: number, colliders: number): number;
   world_hash(): number;
   world_arena_hash(): number;
+  world_workspace(column: number): number;
   world_state_range_count(): number;
   world_state_range(index: number, part: number): number;
   world_set_gravity(x: number, y: number, z: number): void;
@@ -3514,8 +3515,9 @@ export class KernelWorld {
   }
   /**
    * The byte ranges of {@link KernelWorld.memory} that are the world's state, in a fixed order: exactly the words {@link hash}
-   * covers (the header's scalars and every column but scratch), with the layout words, the header's padding, the multibody walk
-   * stamp and the scratch columns left out. Read them afresh after the world grows, as growth moves them.
+   * covers (the header's scalars and every column but scratch), with the layout words, the count of layouts, the header's
+   * padding, the multibody walk stamp and the scratch columns left out. Read them afresh after the world grows, as growth
+   * moves them.
    */
   stateRanges(): { byteOffset: number; byteLength: number }[] {
     const { api } = this,
@@ -3523,6 +3525,14 @@ export class KernelWorld {
     for (let i = 0, count = api.world_state_range_count(); i < count; i++)
       ranges.push({ byteOffset: api.world_state_range(i, 0) >>> 0, byteLength: api.world_state_range(i, 1) >>> 0 });
     return ranges;
+  }
+  /**
+   * The names of the scratch columns no step carries into the next (the locks' Newton solve, `newton`): a step writes every
+   * word of them before it reads it, so they are workspace, neither state nor history, and they may grow inside a step.
+   */
+  workspaceColumns(): ReadonlySet<string> {
+    const { api } = this;
+    return new Set(kernelColumns.filter((_, column) => api.world_workspace(column) !== 0).map(([name]) => name));
   }
   /** The whole world as one copy of its bytes, for {@link KernelWorld.restore}. Only this kernel build can read them. */
   snapshot(): Uint8Array {

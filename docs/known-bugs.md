@@ -60,6 +60,23 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** the check divides the light out against a flat-colour frame, which holds for one light colour. With
   BiomeView's relief lighting on by default, shadowed rock keeps only the sky's blue light and luma over red rises.
 - **Fix:** the check's material shots set `relief: false` (0.086, limits unchanged); relief has its own GPU checks.
+### Fixed 2026-11-28: a snapshot taken before a step that grew the rigid world would not restore, or replayed to another hash (KB-PHYS-LAYOUTHASH1, physics)
+
+- **Repro:** `node --test --test-name-pattern="first step restores" packages/physics/tests/world-rigid-solver.test.js`: a chain of
+  four `spherical` joints in a `PhysicsWorld`, `takeSnapshot()` before the first `advance`, 30 frames, `restoreSnapshot`, 30 frames
+  again. First refused ("The snapshot holds 506 regions and the solvers name 507", as in `modal-sound.test.js`, "sounds a real
+  joint rupture once and replays"); with that fixed, the replay ended at another hash with every body to the bit.
+- **Cause, two of them:** (1) the first step sizes the locks' Newton solve for the joints' paths (`NEWTON`, grown inside the step
+  by `place_newton`), and `RigidSolver.extraState()` named every scratch column with rows, so the region list grew by one. NEWTON
+  is workspace: every word of it is written inside a step before it is read there, and no step carries it into the next. (2) The
+  header's count of layouts (`layout`, which tells JS to bind its views again) lay inside the hashed state range, so a snapshot
+  from before any growth wrote the old count back over a world laid out after it. It says where the words lie, as the offsets
+  do. Any growth inside a step does the same, the pairs' too (`broad.rs`), so (2) was on main as well.
+- **Fix:** the kernel names its workspace columns (`WORKSPACE` in `layout.rs`, `world_workspace`, `KernelWorld.workspaceColumns()`)
+  and `extraState()` leaves them out; the count of layouts moved next to the multibody stamp, outside `state_ranges`, so neither
+  `World::hash` nor a snapshot carries it. Every world's hash changes once with this (the replay goldens are rebuilt).
+- **Regression:** the test above, `modal-sound.test.js`, and `a_world_grown_before_its_first_step_hashes_and_steps_as_one_its_step_grew`
+  in `packages/physics/kernel/tests/canonical.rs` (growing a world changed its hash before the fix).
 
 
 ### Fixed 2026-11-28: a subtree reference could not be a child of selector, sequence or any builder (KB-BEHAVIOR-SUBTREEBUILD1, behavior)
