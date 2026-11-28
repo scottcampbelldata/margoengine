@@ -17142,6 +17142,13 @@ The collider uses the same visible road and bank geometry. A dynamic deck contri
   The regression independently sums the column's no-slip/free-shear eigenmodes.
   [Liu and Orfila, 2004](https://doi.org/10.1017/S0022112004001806) ·
   [Tanaka, Tinh and Sana, 2022](https://doi.org/10.3390/jmse10101433)
+- The existing LeVeque–George–Berger regular-grid stencil reads a fixed Runge–Kutta stage.
+  Splitting the X sweep by Z rows and the Z sweep by X columns gives each worker disjoint
+  output cells in each sweep. JavaScript atomics publish the stage and join its ranges before
+  the next sweep. The boundary ledger retains individual face contributions and sums them in
+  the same order as the serial sweep. A browser window uses the serial path because its agent
+  cannot block. [HTML Standard, agents](https://html.spec.whatwg.org/multipage/webappapis.html#agents) ·
+  [WebAssembly Threads specification, memory model](https://webassembly.github.io/threads/core/exec/relaxed.html)
 - Kinjiro Kajiura, “The Leading Wave of a Tsunami” (1963). The rapid bottom-to-surface
   transfer at depth h is `sech(kh)`. The implementation uses its long-wave Padé approximation
   `1/(1 + (kh)²/2)`. The equivalent wet-cell Helmholtz system is symmetric and solved by

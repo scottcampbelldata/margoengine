@@ -8187,6 +8187,28 @@ bed stress. Omit it for the default frictionless bed, or use positive `manning` 
 model. Positive Manning and laminar attenuation are mutually exclusive. To restore or replay a world,
 use the same registered solver configuration, including its period and viscosity.
 
+One thread is the default. In Node or a cross-origin-isolated browser worker, pass
+`threads` to split the two-dimensional flux sweeps across a shared-memory world.
+The count is a whole number from one to 64 and includes the caller. The browser window uses
+the default single-thread path. Choose a count that fits the patch dimensions and available
+cores. The count may change between runs without changing the physical snapshot or hash.
+Remove the solver from the world before disposing it to release the workers.
+
+```ts
+import { PhysicsWorld, worldMemory } from '@margoengine/physics/world';
+import { TsunamiSolver } from '@margoengine/physics/tsunami';
+
+using pulse = await TsunamiSolver.load({ threads: 4 });
+const world = new PhysicsWorld({ memory: worldMemory(true) }).add(pulse, {
+  cells: [21, 13],
+  spacing: 0.5,
+  bathymetry: -1,
+});
+world.advance(1);
+console.log(pulse.workCounts());
+world.remove('tsunami');
+```
+
 Pass a live `TerrainBed` geometry or an aligned layout-1 `bottomField` to supply natural seabed
 motion. An optional `bottomFilterDepth` redistributes the rapid bottom response over nearby wet
 cells and preserves water volume. For a calving or slide pulse, pass its 60 Hz `SeaSource` descriptor

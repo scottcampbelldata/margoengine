@@ -24,6 +24,7 @@
     "access": "public"
   },
   "scripts": {
+    "test:gpu:tsunami-threads": "cd ../.. && node packages/physics/tests/tsunami-threads.browser.mjs",
     "test:browser:terramechanics": "cd ../.. && node packages/physics/tests/terramechanics.browser.mjs",
     "test:browser:granular-flow": "cd ../.. && node packages/physics/tests/granular-flow.browser.mjs",
     "test:browser:lava": "cd ../.. && node packages/physics/tests/lava.browser.mjs",

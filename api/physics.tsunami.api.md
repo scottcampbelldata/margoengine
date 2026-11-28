@@ -49,6 +49,7 @@ export interface TsunamiLoadOptions {
     readonly bottomField?: FieldDescriptor;
     readonly terrain?: BedShape;
     readonly sources?: readonly FieldDescriptor[];
+    readonly threads?: number;
     readonly signal?: AbortSignal;
 }
 
@@ -84,7 +85,8 @@ export interface TsunamiSample {
 export class TsunamiSolver implements Solver<TsunamiOptions> {
     readonly inundationField: FieldDescriptor;
     private constructor();
-    static load({ id, bottomField, terrain, sources, signal }?: TsunamiLoadOptions): Promise<TsunamiSolver>;
+    static load({ id, bottomField, terrain, sources, threads, signal }?: TsunamiLoadOptions): Promise<TsunamiSolver>;
+    [Symbol.dispose](): void;
     describe(): {
         id: string;
         fields: readonly FieldUse[];
@@ -100,6 +102,7 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
     sample(x: number, z: number): TsunamiSample;
     surfaceSource(): TsunamiSurfaceSource;
     travelTimes(source: Pair, out?: Float64Array<ArrayBuffer>): Float64Array;
+    workCounts(): TsunamiWorkCounts;
     get budget(): TsunamiBudget;
 }
 
@@ -118,6 +121,14 @@ export interface TsunamiSurfaceSource {
         readonly centre: Pair;
     };
     sample(x: number, z: number, out: TsunamiSurfaceSample): TsunamiSurfaceSample;
+}
+
+export interface TsunamiWorkCounts {
+    readonly cells: number;
+    readonly substeps: number;
+    readonly faceFluxes: number;
+    readonly threads: number;
+    readonly threadFaceFluxes: readonly number[];
 }
 
 export function landslideImpulse(options: LandslideImpulseOptions): {

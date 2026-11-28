@@ -25,6 +25,10 @@ export interface TsunamiKernel {
     kinematicViscosity: number,
     angularFrequency: number,
   ): number;
+  tsunami_thread_plan(job: number): number;
+  tsunami_thread_phase(job: number, stage: number, part: number, parts: number): number;
+  tsunami_thread_accept(job: number): number;
+  tsunami_thread_finish(job: number): number;
   tsunami_sources(
     water: number,
     pressure: number,

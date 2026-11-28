@@ -47,6 +47,7 @@ await build({
         'kernel-thread': resolve(root, 'src/kernel-thread.ts'),
         'explosive-thread': resolve(root, 'src/explosive/thread.ts'),
         'cloth-thread': resolve(root, 'src/cloth/thread.ts'),
+        'tsunami-thread': resolve(root, 'src/tsunami/thread.ts'),
         decomposition: resolve(root, 'src/decomposition.ts'),
         soft: resolve(root, 'src/soft.ts'),
         tissue: resolve(root, 'src/tissue.ts'),

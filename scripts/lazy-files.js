@@ -159,6 +159,14 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/tsunami-thread.js',
+    label: 'tsunami-thread.js',
+    kind: 'Worker for Rust SIMD coastal flux sweeps',
+    measure: 'file',
+    when: 'TsunamiSolver.load({ threads }) with more than one thread',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/terramechanics-kernel.wasm',
     label: 'terramechanics-kernel.wasm',
     kind: 'Rust SIMD soil footprint and conservative redistribution',

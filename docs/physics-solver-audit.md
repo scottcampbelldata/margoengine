@@ -55,6 +55,12 @@ them; the rest is a record of what a stronger solver would need.
 - Point 5. `63770ed64b` and `tsunami-extremes.test.js` verify finite Coriolis and travel-time calculations,
   rejected over-budget CFL ticks and overflowing volumes, no energy increase over 12 seconds of wetting and drying,
   mass conservation to 2.22e−15 m³, and exact replay. `tsunami.test.js` checks malformed grids and coded corrections.
+- Point 6. `tsunami-threads.test.js` checks identical accepted bytes on plain Wasm and shared Wasm
+  with one, two and four threads. A live source crosses an origin-cell boundary during repeated
+  wetting and drying, and a snapshot restores the same bytes and flux counts. A single CFL substep
+  evaluates 50,504 faces on 129 × 97 cells and 199,304 on 257 × 193 cells, partitioned across four
+  workers by whole rows and columns. `tsunami-threads.browser.mjs` checks exact replay and snapshot
+  equality with three actual helpers in a Chromium worker.
 - Point 7. `63770ed64b` and Water's `tsunami-surface.browser.mjs` verify the accepted dry-to-wet surface on both
   renderers. The incoming characteristic can be authored or supplied from an independent gauge. `tsunami.test.js`
   checks its propagation from all four sides, signed volume closure and exact seek.

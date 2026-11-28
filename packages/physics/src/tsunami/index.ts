@@ -3,15 +3,19 @@ import type { BedSample } from '@margoengine/math/fields';
 import { cos, pow } from '@margoengine/math/pinned';
 import { BED_FIELD, BED_LAYOUT, type BedShape, bedSurface, bedVertexCount } from '../earth/bed.js';
 import { WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS } from '../sea/wake.js';
-import { regionWords } from '../world/memory.js';
+import { regionWords, STACK_BYTES } from '../world/memory.js';
 import type { FieldDescriptor, FieldUse, Port, Region, Solver, SolverHost, StepContext } from '../world/solver.js';
 import { bindTsunamiKernel, loadTsunamiBuilds, type TsunamiBuilds, type TsunamiKernel } from './kernel.js';
+import type { TsunamiThreads } from './threads.js';
 
 /** Layout of the cell-centred f64 inundation records. */
 export const TSUNAMI_LAYOUT = 1;
 /** Cell row: bed altitude, surface altitude, depth, X and Z discharge, peak depth and first wet time. */
 export const TSUNAMI_WORDS = 7;
 const F64 = 8;
+const MAX_THREADS = 64;
+const THREAD_JOB_BYTES = 112;
+const THREAD_JOB_POINTER_WORDS = 12;
 type Pair = readonly [number, number];
 type Series = number | ArrayLike<number>;
 
@@ -25,6 +29,8 @@ export interface TsunamiLoadOptions {
   readonly terrain?: BedShape;
   /** Layout-1 f64 SeaSource rows from natural-slide, calving or other local pressure and displacement sources. */
   readonly sources?: readonly FieldDescriptor[];
+  /** Total CPU threads, including the calling thread. Defaults to one. */
+  readonly threads?: number;
   readonly signal?: AbortSignal;
 }
 
@@ -177,6 +183,20 @@ export interface TsunamiBudget {
   readonly substeps: number;
 }
 
+/** Deterministic finite-volume work in the last accepted tsunami tick. */
+export interface TsunamiWorkCounts {
+  /** Cells in the modeled patch. */
+  readonly cells: number;
+  /** Completed CFL substeps in the last tick. */
+  readonly substeps: number;
+  /** Riemann flux evaluations across both Runge–Kutta stages. */
+  readonly faceFluxes: number;
+  /** Logical execution threads, including the calling thread. */
+  readonly threads: number;
+  /** Face flux evaluations performed by each thread, ordered by its index. */
+  readonly threadFaceFluxes: readonly number[];
+}
+
 interface State {
   readonly host: SolverHost;
   readonly kernel: TsunamiKernel;
@@ -207,6 +227,7 @@ interface State {
   readonly sourceTimes: Region;
   readonly output: Region;
   readonly travel: Region;
+  readonly threadJob?: Region;
   readonly filter?: Region;
   readonly incoming?: { readonly region: Region; readonly waves: NonNullable<TsunamiOptions['incoming']> };
   readonly regions: readonly Region[];
@@ -263,6 +284,8 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
   private readonly sources: readonly FieldDescriptor[];
   private readonly terrain?: BedShape;
   private state?: State;
+  private threads?: TsunamiThreads;
+  private disposed = false;
 
   private constructor(
     private readonly builds: TsunamiBuilds,
@@ -309,9 +332,26 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
     bottomField,
     terrain,
     sources,
+    threads = 1,
     signal,
   }: TsunamiLoadOptions = {}): Promise<TsunamiSolver> {
-    return new TsunamiSolver(await loadTsunamiBuilds(signal), id, bottomField, terrain, sources);
+    if (!Number.isInteger(threads) || threads < 1 || threads > MAX_THREADS)
+      throw new MargoError('state', `Choose a whole number of tsunami threads from 1 to ${MAX_THREADS}.`);
+    const builds = await loadTsunamiBuilds(signal);
+    const solver = new TsunamiSolver(builds, id, bottomField, terrain, sources);
+    if (threads > 1) {
+      if (!builds.shared)
+        throw new MargoError('unsupported', 'Use a shared-memory runtime for tsunami threads or load with threads: 1.');
+      const { createTsunamiThreads } = await import('./threads.js');
+      solver.threads = await createTsunamiThreads(threads, signal);
+    }
+    return solver;
+  }
+
+  /** Stop optional workers. Remove the solver from its world before disposal. */
+  [Symbol.dispose](): void {
+    this.disposed = true;
+    this.threads?.close();
   }
 
   describe() {
@@ -319,7 +359,11 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
   }
 
   init(host: SolverHost, options: TsunamiOptions): void {
+    if (this.disposed) throw new MargoError('state', 'This tsunami solver was disposed. Load a new solver.');
     if (this.state) throw new MargoError('state', 'TsunamiSolver already belongs to a world. Load another solver.');
+    const threads = this.threads;
+    if (threads && !(host.memory.buffer instanceof SharedArrayBuffer))
+      throw new MargoError('unsupported', 'Give the tsunami threads a shared-memory world or load with threads: 1.');
     if (options?.cells?.length !== 2)
       throw new MargoError('state', 'Give the tsunami grid two positive whole cell counts in X and Z.');
     const nx = integer('X cells', options.cells[0]);
@@ -405,6 +449,8 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
     const incoming = waves?.some(Boolean)
       ? { region: allocate('incoming-boundary-wave', 12), waves: waves.slice() as typeof waves }
       : undefined;
+    const threadJob = threads && host.allocate('tsunami-thread-job', THREAD_JOB_BYTES, 'u32', TSUNAMI_LAYOUT);
+    const threadLedger = threads && allocate('tsunami-thread-boundary-ledger', 4 * (nx + nz));
     const kernel = bindTsunamiKernel(host, this.builds);
     const s: State = {
       host,
@@ -436,6 +482,7 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
       sourceTimes,
       output,
       travel,
+      threadJob,
       filter,
       incoming,
       regions: [state, bed, model, log, budget, sourceTimes, output],
@@ -474,10 +521,39 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
     checked('initial run-up above sea level', runup - sea, 0);
     words(s, budget).set([volume, volume, 0, 0, 0, initialArea, runup, maximum, 0]);
     this.writeRecords(s);
+    if (threadJob && threadLedger && threads) {
+      const control = host.allocate('tsunami-thread-control', 4 * threads.controlWords, 'i32', TSUNAMI_LAYOUT);
+      const stackTops = Array.from({ length: threads.count - 1 }, (_, lane) => {
+        const stack = host.allocate(`tsunami-worker-stack-${lane + 1}`, STACK_BYTES, 'u8', TSUNAMI_LAYOUT);
+        return stack.byteOffset + stack.byteLength;
+      });
+      new Uint32Array(host.memory.buffer, threadJob.byteOffset, THREAD_JOB_POINTER_WORDS).set([
+        candidate.byteOffset,
+        rk.byteOffset,
+        trial.byteOffset,
+        trialBed.byteOffset,
+        pressure.byteOffset,
+        model.byteOffset,
+        nx,
+        nz,
+        trialLog.byteOffset,
+        results.byteOffset,
+        incoming?.region.byteOffset ?? 0,
+        threadLedger.byteOffset,
+      ]);
+      threads.init({
+        module: this.builds.shared!,
+        memory: host.memory,
+        control: control.byteOffset,
+        job: threadJob.byteOffset,
+        stackTops,
+      });
+    }
     this.state = s;
   }
 
   private live(): State {
+    if (this.disposed) throw new MargoError('state', 'This tsunami solver was disposed. Load a new solver.');
     if (!this.state) throw new MargoError('state', 'TsunamiSolver is not initialized. Add it to a PhysicsWorld.');
     return this.state;
   }
@@ -554,6 +630,33 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
     return ticks;
   }
 
+  private stepThreaded(s: State, job: Region, dt: number, time: number): number {
+    const threads = this.threads!;
+    const at = job.byteOffset;
+    new Float64Array(s.host.memory.buffer, at + 4 * THREAD_JOB_POINTER_WORDS, 8).set([
+      dt,
+      time,
+      s.kinematicViscosity,
+      s.angularFrequency,
+      dt,
+      0,
+      0,
+      0,
+    ]);
+    const kernel = s.kernel;
+    let plan = kernel.tsunami_thread_plan(at);
+    while (plan === 0) {
+      for (let stage = 0; stage < 6; stage++) {
+        const phase = threads.phase(stage, () => kernel.tsunami_thread_phase(at, stage, 0, threads.count));
+        if (phase !== 0) return phase;
+      }
+      const accepted = kernel.tsunami_thread_accept(at);
+      if (accepted !== 0) return accepted;
+      plan = kernel.tsunami_thread_plan(at);
+    }
+    return plan === 3 ? kernel.tsunami_thread_finish(at) : plan;
+  }
+
   step(context: StepContext, dt: number): void {
     const s = this.live();
     if (s.incoming) {
@@ -599,23 +702,26 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
         );
     }
     const ticks = this.applySources(s, context);
-    const status = s.kernel.tsunami_step(
-      s.candidate.byteOffset,
-      s.rk.byteOffset,
-      s.trial.byteOffset,
-      s.trialBed.byteOffset,
-      s.pressure.byteOffset,
-      s.model.byteOffset,
-      s.nx,
-      s.nz,
-      s.trialLog.byteOffset,
-      s.results.byteOffset,
-      dt,
-      (context.tick + 1) * dt,
-      s.incoming?.region.byteOffset ?? 0,
-      s.kinematicViscosity,
-      s.angularFrequency,
-    );
+    const time = (context.tick + 1) * dt;
+    const status = s.threadJob
+      ? this.stepThreaded(s, s.threadJob, dt, time)
+      : s.kernel.tsunami_step(
+          s.candidate.byteOffset,
+          s.rk.byteOffset,
+          s.trial.byteOffset,
+          s.trialBed.byteOffset,
+          s.pressure.byteOffset,
+          s.model.byteOffset,
+          s.nx,
+          s.nz,
+          s.trialLog.byteOffset,
+          s.results.byteOffset,
+          dt,
+          time,
+          s.incoming?.region.byteOffset ?? 0,
+          s.kinematicViscosity,
+          s.angularFrequency,
+        );
     if (status === 2)
       throw new MargoError(
         'state',
@@ -739,6 +845,26 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
       );
     out.set(words(s, s.travel));
     return out;
+  }
+
+  /** Count face work from the last accepted tick and the fixed partitions used by the two sweeps. */
+  workCounts(): TsunamiWorkCounts {
+    const s = this.live();
+    const threads = this.threads?.count ?? 1;
+    const substeps = words(s, s.budget)[8]!;
+    const portion = (lines: number, part: number) =>
+      Math.floor(((part + 1) * lines) / threads) - Math.floor((part * lines) / threads);
+    const threadFaceFluxes = Array.from(
+      { length: threads },
+      (_, part) => 2 * substeps * ((s.nx + 1) * portion(s.nz, part) + (s.nz + 1) * portion(s.nx, part)),
+    );
+    return {
+      cells: s.count,
+      substeps,
+      faceFluxes: 2 * substeps * (2 * s.count + s.nx + s.nz),
+      threads,
+      threadFaceFluxes,
+    };
   }
 
   /** Current storage, signed source and boundary volumes, and shoreline history. */

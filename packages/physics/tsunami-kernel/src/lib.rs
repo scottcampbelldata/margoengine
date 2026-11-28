@@ -339,6 +339,18 @@ impl LaminarBed {
     }
 }
 
+struct Sweep {
+    axis: usize,
+    width: usize,
+    lines: usize,
+    stride: usize,
+    between: usize,
+    low_open: bool,
+    high_open: bool,
+    low_wave: Option<BoundaryWave>,
+    high_wave: Option<BoundaryWave>,
+}
+
 struct Basin<'a> {
     grid: Grid,
     model: &'a Model,
@@ -400,72 +412,119 @@ impl Basin<'_> {
         }
     }
 
+    fn sweep(&self, axis: usize) -> Sweep {
+        let (width, lines, stride, between) = self.grid.strides(axis);
+        let flags = self.model.open as u32;
+        Sweep {
+            axis,
+            width,
+            lines,
+            stride,
+            between,
+            low_open: flags & (1 << (2 * axis)) != 0,
+            high_open: flags & (2 << (2 * axis)) != 0,
+            low_wave: self.wave(2 * axis),
+            high_wave: self.wave(2 * axis + 1),
+        }
+    }
+
+    unsafe fn line_update(
+        &self,
+        base: *const Water,
+        target: *mut Water,
+        ratio: f64,
+        sweep: &Sweep,
+        row: usize,
+    ) -> (f64, f64) {
+        let Sweep {
+            axis,
+            width,
+            stride,
+            between,
+            low_open,
+            high_open,
+            low_wave,
+            high_wave,
+            ..
+        } = *sweep;
+        let start = row * between;
+        let mut inside = self.primitive(base, start, axis);
+        let outside = ghost(inside, -1.0, low_open, self.model, low_wave);
+        let (_, b) = reconstruct(outside, inside, self.model);
+        let low = b.h;
+        *target.add(start) =
+            (*target.add(start)).add(if axis == 0 { b } else { b.swap() }.scale(ratio));
+        for j in 0..width - 1 {
+            let first = start + j * stride;
+            let second = first + stride;
+            let left = self.face_state(base, first, j, width, axis, stride, 1.0);
+            let right = self.face_state(base, second, j + 1, width, axis, stride, -1.0);
+            let (a, b) = reconstruct(left, right, self.model);
+            *target.add(first) =
+                (*target.add(first)).sub(if axis == 0 { a } else { a.swap() }.scale(ratio));
+            *target.add(second) =
+                (*target.add(second)).add(if axis == 0 { b } else { b.swap() }.scale(ratio));
+        }
+        let end = start + (width - 1) * stride;
+        inside = self.primitive(base, end, axis);
+        let outside = ghost(inside, 1.0, high_open, self.model, high_wave);
+        let (a, _) = reconstruct(inside, outside, self.model);
+        *target.add(end) =
+            (*target.add(end)).sub(if axis == 0 { a } else { a.swap() }.scale(ratio));
+        (low, a.h)
+    }
+
+    unsafe fn pressure_cell(
+        &self,
+        base: *const Water,
+        target: *mut Water,
+        ratio: f64,
+        x: usize,
+        z: usize,
+    ) -> usize {
+        let at = self.grid.index(x, z);
+        let p = *self.pressure.add(at);
+        let left = if x == 0 {
+            p
+        } else {
+            *self.pressure.add(at - 1)
+        };
+        let right = if x + 1 == self.grid.width {
+            p
+        } else {
+            *self.pressure.add(at + 1)
+        };
+        let low = if z == 0 {
+            p
+        } else {
+            *self.pressure.add(at - self.grid.width)
+        };
+        let high = if z + 1 == self.grid.rows {
+            p
+        } else {
+            *self.pressure.add(at + self.grid.width)
+        };
+        let accel = -0.5 * ratio * (*base.add(at)).h / self.model.density;
+        (*target.add(at)).x += (right - left) * accel;
+        (*target.add(at)).z += (high - low) * accel;
+        at
+    }
+
     unsafe fn flux_update(&self, base: *const Water, target: *mut Water, dt: f64) -> f64 {
         target.copy_from_nonoverlapping(base, self.grid.size);
         let ratio = dt / self.model.spacing;
         let mut outgoing = 0.0;
-        let flags = self.model.open as u32;
         for axis in 0..2 {
-            let (width, lines, step, between) = self.grid.strides(axis);
-            let low_open = flags & (1 << (2 * axis)) != 0;
-            let high_open = flags & (2 << (2 * axis)) != 0;
-            let low_wave = self.wave(2 * axis);
-            let high_wave = self.wave(2 * axis + 1);
-            for row in 0..lines {
-                let start = row * between;
-                let mut inside = self.primitive(base, start, axis);
-                let outside = ghost(inside, -1.0, low_open, self.model, low_wave);
-                let (_, b) = reconstruct(outside, inside, self.model);
-                outgoing -= b.h;
-                *target.add(start) =
-                    (*target.add(start)).add(if axis == 0 { b } else { b.swap() }.scale(ratio));
-                for j in 0..width - 1 {
-                    let first = start + j * step;
-                    let second = first + step;
-                    let left = self.face_state(base, first, j, width, axis, step, 1.0);
-                    let right = self.face_state(base, second, j + 1, width, axis, step, -1.0);
-                    let (a, b) = reconstruct(left, right, self.model);
-                    *target.add(first) =
-                        (*target.add(first)).sub(if axis == 0 { a } else { a.swap() }.scale(ratio));
-                    *target.add(second) = (*target.add(second))
-                        .add(if axis == 0 { b } else { b.swap() }.scale(ratio));
-                }
-                let end = start + (width - 1) * step;
-                inside = self.primitive(base, end, axis);
-                let outside = ghost(inside, 1.0, high_open, self.model, high_wave);
-                let (a, _) = reconstruct(inside, outside, self.model);
-                outgoing += a.h;
-                *target.add(end) =
-                    (*target.add(end)).sub(if axis == 0 { a } else { a.swap() }.scale(ratio));
+            let sweep = self.sweep(axis);
+            for row in 0..sweep.lines {
+                let (low, high) = self.line_update(base, target, ratio, &sweep, row);
+                outgoing -= low;
+                outgoing += high;
             }
         }
         for z in 0..self.grid.rows {
             for x in 0..self.grid.width {
-                let at = self.grid.index(x, z);
-                let p = *self.pressure.add(at);
-                let left = if x == 0 {
-                    p
-                } else {
-                    *self.pressure.add(at - 1)
-                };
-                let right = if x + 1 == self.grid.width {
-                    p
-                } else {
-                    *self.pressure.add(at + 1)
-                };
-                let low = if z == 0 {
-                    p
-                } else {
-                    *self.pressure.add(at - self.grid.width)
-                };
-                let high = if z + 1 == self.grid.rows {
-                    p
-                } else {
-                    *self.pressure.add(at + self.grid.width)
-                };
-                let accel = -0.5 * ratio * (*base.add(at)).h / self.model.density;
-                (*target.add(at)).x += (right - left) * accel;
-                (*target.add(at)).z += (high - low) * accel;
+                self.pressure_cell(base, target, ratio, x, z);
             }
         }
         outgoing * self.model.spacing * dt
@@ -548,24 +607,60 @@ impl Basin<'_> {
         }
     }
 
-    unsafe fn sanitize(&self, state: *mut Water, old: *const Water) -> bool {
-        for i in 0..self.grid.size {
-            let q = &mut *state.add(i);
-            if !q.is_finite() {
+    fn sanitize_cell(&self, q: &mut Water, old_depth: f64) -> bool {
+        if !q.is_finite() {
+            return false;
+        }
+        if q.h < 0.0 {
+            if q.h < -64.0 * f64::EPSILON * old_depth {
                 return false;
             }
-            if q.h < 0.0 {
-                if q.h < -64.0 * f64::EPSILON * (*old.add(i)).h {
-                    return false;
-                }
-                q.h = 0.0;
-            }
-            if q.h <= self.model.dry {
-                q.x = 0.0;
-                q.z = 0.0;
+            q.h = 0.0;
+        }
+        if q.h <= self.model.dry {
+            q.x = 0.0;
+            q.z = 0.0;
+        }
+        true
+    }
+
+    unsafe fn sanitize(&self, state: *mut Water, old: *const Water) -> bool {
+        for i in 0..self.grid.size {
+            if !self.sanitize_cell(&mut *state.add(i), (*old.add(i)).h) {
+                return false;
             }
         }
         true
+    }
+
+    unsafe fn combine(&self, state: *mut Water, trial: *const Water, i: usize, dt: f64) {
+        let mut q = (*state.add(i)).add(*trial.add(i)).scale(0.5);
+        self.dissipate(&mut q, dt);
+        state.add(i).write(q);
+    }
+
+    unsafe fn next_step(
+        &self,
+        state: *const Water,
+        remaining: f64,
+        dt: f64,
+        substeps: u32,
+    ) -> Result<f64, StepFailure> {
+        if substeps == MAX_CFL_SUBSTEPS {
+            return Err(StepFailure::Work);
+        }
+        let speed = self.bound(state).ok_or(StepFailure::Numeric)?;
+        let step = remaining.min(if speed == 0.0 {
+            remaining
+        } else {
+            0.42 * self.model.spacing / speed
+        });
+        if !(remaining - step < remaining)
+            || (substeps == 0 && step < dt / f64::from(MAX_CFL_SUBSTEPS))
+        {
+            return Err(StepFailure::Work);
+        }
+        Ok(step)
     }
 
     unsafe fn integrate(
@@ -578,21 +673,8 @@ impl Basin<'_> {
         let mut remaining = dt;
         let mut out = 0.0;
         let mut substeps = 0_u32;
-        let minimum_initial_step = dt / f64::from(MAX_CFL_SUBSTEPS);
         while remaining > 0.0 {
-            if substeps == MAX_CFL_SUBSTEPS {
-                return Err(StepFailure::Work);
-            }
-            let speed = self.bound(state).ok_or(StepFailure::Numeric)?;
-            let step = remaining.min(if speed == 0.0 {
-                remaining
-            } else {
-                0.42 * self.model.spacing / speed
-            });
-            let next = remaining - step;
-            if !(next < remaining) || (substeps == 0 && step < minimum_initial_step) {
-                return Err(StepFailure::Work);
-            }
+            let step = self.next_step(state, remaining, dt, substeps)?;
             let first = self.flux_update(state, rk, step);
             if !self.sanitize(rk, state) {
                 return Err(StepFailure::Numeric);
@@ -602,12 +684,10 @@ impl Basin<'_> {
                 return Err(StepFailure::Numeric);
             }
             for i in 0..self.grid.size {
-                let mut q = (*state.add(i)).add(*trial.add(i)).scale(0.5);
-                self.dissipate(&mut q, step);
-                state.add(i).write(q);
+                self.combine(state, trial, i, step);
             }
             out += 0.5 * (first + second);
-            remaining = next;
+            remaining -= step;
             substeps += 1;
         }
         Ok((out, substeps))
@@ -736,6 +816,33 @@ fn inject_water(point: &mut Water, depth: f64) -> f64 {
     change
 }
 
+fn laminar_bed(
+    model: &Model,
+    viscosity: f64,
+    frequency: f64,
+) -> Result<Option<LaminarBed>, StepFailure> {
+    if viscosity == 0.0 {
+        Ok(None)
+    } else if viscosity > 0.0
+        && viscosity.is_finite()
+        && frequency > 0.0
+        && frequency.is_finite()
+        && model.roughness == 0.0
+    {
+        Ok(Some(LaminarBed {
+            viscosity_root: sqrt(viscosity),
+            frequency,
+            stokes_root: sqrt(frequency) * core::f64::consts::FRAC_1_SQRT_2,
+        }))
+    } else {
+        Err(StepFailure::Numeric)
+    }
+}
+
+fn valid_tick(dt: f64, time: f64) -> bool {
+    dt.is_finite() && dt > 0.0 && time.is_finite() && time >= 0.0
+}
+
 #[unsafe(no_mangle)]
 unsafe extern "C" fn tsunami_step(
     state: *mut Water,
@@ -760,21 +867,9 @@ unsafe extern "C" fn tsunami_step(
         size: nx as usize * nz as usize,
     };
     let model = &*parameters;
-    let laminar = if kinematic_viscosity == 0.0 {
-        None
-    } else if kinematic_viscosity > 0.0
-        && kinematic_viscosity.is_finite()
-        && angular_frequency > 0.0
-        && angular_frequency.is_finite()
-        && model.roughness == 0.0
-    {
-        Some(LaminarBed {
-            viscosity_root: sqrt(kinematic_viscosity),
-            frequency: angular_frequency,
-            stokes_root: sqrt(angular_frequency) * core::f64::consts::FRAC_1_SQRT_2,
-        })
-    } else {
-        return StepFailure::Numeric as u32;
+    let laminar = match laminar_bed(model, kinematic_viscosity, angular_frequency) {
+        Ok(laminar) => laminar,
+        Err(reason) => return reason as u32,
     };
     let basin = Basin {
         grid,
@@ -784,20 +879,34 @@ unsafe extern "C" fn tsunami_step(
         incoming: incoming.as_ref(),
         laminar,
     };
-    if !(dt.is_finite() && dt > 0.0 && time.is_finite() && time >= 0.0) {
+    if !valid_tick(dt, time) {
         return StepFailure::Numeric as u32;
     }
     let (out, iterations) = match basin.integrate(state, rk, trial, dt) {
         Ok(receipt) => receipt,
         Err(reason) => return reason as u32,
     };
+    write_receipt(&basin, state, log, metrics, time, out, iterations)
+}
+
+unsafe fn write_receipt(
+    basin: &Basin<'_>,
+    state: *const Water,
+    log: *mut f64,
+    metrics: *mut f64,
+    time: f64,
+    out: f64,
+    iterations: u32,
+) -> u32 {
+    let grid = basin.grid;
+    let model = basin.model;
     let mut volume = 0.0;
     let mut area = 0.0;
     let mut runup = model.sea;
     let mut peak: f64 = 0.0;
     for i in 0..grid.size {
         let q = &*state.add(i);
-        let elevation = *bed.add(i);
+        let elevation = *basin.bed.add(i);
         let surface = elevation + q.h;
         let (u, v) = q.velocity(model.dry);
         if !(q.is_finite() && surface.is_finite() && u.is_finite() && v.is_finite()) {
@@ -831,6 +940,215 @@ unsafe extern "C" fn tsunami_step(
     }
     metrics.copy_from_nonoverlapping(receipt.as_ptr(), receipt.len());
     0
+}
+
+// The host publishes this scratch job before its workers read it and waits
+// for every worker before changing it. Pointers are arena byte offsets.
+#[repr(C)]
+struct ThreadJob {
+    state: u32,
+    rk: u32,
+    trial: u32,
+    bed: u32,
+    pressure: u32,
+    model: u32,
+    nx: u32,
+    nz: u32,
+    log: u32,
+    metrics: u32,
+    incoming: u32,
+    ledger: u32,
+    dt: f64,
+    time: f64,
+    viscosity: f64,
+    frequency: f64,
+    remaining: f64,
+    step: f64,
+    out: f64,
+    iterations: f64,
+}
+
+const _: () = assert!(core::mem::size_of::<ThreadJob>() == 112);
+const THREAD_FINISHED: u32 = 3;
+
+impl ThreadJob {
+    unsafe fn basin(&self) -> Result<Basin<'_>, StepFailure> {
+        let width = self.nx as usize;
+        let rows = self.nz as usize;
+        let size = width.checked_mul(rows).ok_or(StepFailure::Numeric)?;
+        if size == 0 {
+            return Err(StepFailure::Numeric);
+        }
+        let model = &*(self.model as *const Model);
+        Ok(Basin {
+            grid: Grid { width, rows, size },
+            model,
+            bed: self.bed as *const f64,
+            pressure: self.pressure as *const f64,
+            incoming: (self.incoming as *const [BoundaryWave; 4]).as_ref(),
+            laminar: laminar_bed(model, self.viscosity, self.frequency)?,
+        })
+    }
+
+    fn valid(&self) -> bool {
+        valid_tick(self.dt, self.time)
+            && (0.0..=self.dt).contains(&self.remaining)
+            && (0.0..=f64::from(MAX_CFL_SUBSTEPS)).contains(&self.iterations)
+    }
+}
+
+fn partition(len: usize, part: u32, parts: u32) -> core::ops::Range<usize> {
+    let len = len as u64;
+    let parts = u64::from(parts);
+    let part = u64::from(part);
+    ((part * len) / parts) as usize..(((part + 1) * len) / parts) as usize
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn tsunami_thread_plan(job: *mut ThreadJob) -> u32 {
+    let Some(job) = job.as_mut() else {
+        return StepFailure::Numeric as u32;
+    };
+    if !job.valid() || job.step != 0.0 {
+        return StepFailure::Numeric as u32;
+    }
+    if job.remaining == 0.0 {
+        return THREAD_FINISHED;
+    }
+    let basin = match job.basin() {
+        Ok(basin) => basin,
+        Err(reason) => return reason as u32,
+    };
+    let next = basin.next_step(
+        job.state as *const Water,
+        job.remaining,
+        job.dt,
+        job.iterations as u32,
+    );
+    match next {
+        Ok(step) => {
+            job.step = step;
+            0
+        }
+        Err(reason) => reason as u32,
+    }
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn tsunami_thread_phase(
+    job: *const ThreadJob,
+    stage: u32,
+    part: u32,
+    parts: u32,
+) -> u32 {
+    let Some(job) = job.as_ref() else {
+        return StepFailure::Numeric as u32;
+    };
+    if !(job.step > 0.0 && job.step <= job.remaining && stage < 6 && part < parts) {
+        return StepFailure::Numeric as u32;
+    }
+    let basin = match job.basin() {
+        Ok(basin) => basin,
+        Err(reason) => return reason as u32,
+    };
+    let state = job.state as *mut Water;
+    let rk = job.rk as *mut Water;
+    let trial = job.trial as *mut Water;
+    let second = stage >= 3;
+    let (base, target) = if second {
+        (rk.cast_const(), trial)
+    } else {
+        (state.cast_const(), rk)
+    };
+    let ratio = job.step / basin.model.spacing;
+    let phase = (stage % 3) as usize;
+    if phase < 2 {
+        let sweep = basin.sweep(phase);
+        let mut offset = 0;
+        if second {
+            offset += 2 * (basin.grid.width + basin.grid.rows);
+        }
+        if phase == 1 {
+            offset += 2 * basin.grid.rows;
+        }
+        let ledger = (job.ledger as *mut f64).add(offset);
+        for row in partition(sweep.lines, part, parts) {
+            if phase == 0 {
+                let start = row * sweep.width;
+                target
+                    .add(start)
+                    .copy_from_nonoverlapping(base.add(start), sweep.width);
+            }
+            let (low, high) = basin.line_update(base, target, ratio, &sweep, row);
+            ledger.add(2 * row).write(low);
+            ledger.add(2 * row + 1).write(high);
+        }
+    } else {
+        let cells = partition(basin.grid.size, part, parts);
+        let width = basin.grid.width;
+        for z in cells.start / width..cells.end.div_ceil(width) {
+            let row = z * width;
+            for x in cells.start.saturating_sub(row)..(cells.end - row).min(width) {
+                let i = basin.pressure_cell(base, target, ratio, x, z);
+                if !basin.sanitize_cell(&mut *target.add(i), (*base.add(i)).h) {
+                    return StepFailure::Numeric as u32;
+                }
+                if second {
+                    basin.combine(state, trial, i, job.step);
+                }
+            }
+        }
+    }
+    0
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn tsunami_thread_accept(job: *mut ThreadJob) -> u32 {
+    let Some(job) = job.as_mut() else {
+        return StepFailure::Numeric as u32;
+    };
+    if !job.valid() || !(job.step > 0.0 && job.step <= job.remaining) {
+        return StepFailure::Numeric as u32;
+    }
+    let model = &*(job.model as *const Model);
+    let ledger = job.ledger as *const f64;
+    let lines = job.nx as usize + job.nz as usize;
+    let fold = |start: usize| {
+        let mut outgoing = 0.0;
+        for line in start..start + lines {
+            outgoing -= *ledger.add(2 * line);
+            outgoing += *ledger.add(2 * line + 1);
+        }
+        outgoing * model.spacing * job.step
+    };
+    job.out += 0.5 * (fold(0) + fold(lines));
+    job.remaining -= job.step;
+    job.step = 0.0;
+    job.iterations += 1.0;
+    0
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn tsunami_thread_finish(job: *const ThreadJob) -> u32 {
+    let Some(job) = job.as_ref() else {
+        return StepFailure::Numeric as u32;
+    };
+    if !job.valid() || job.remaining != 0.0 || job.step != 0.0 {
+        return StepFailure::Numeric as u32;
+    }
+    let basin = match job.basin() {
+        Ok(basin) => basin,
+        Err(reason) => return reason as u32,
+    };
+    write_receipt(
+        &basin,
+        job.state as *const Water,
+        job.log as *mut f64,
+        job.metrics as *mut f64,
+        job.time,
+        job.out,
+        job.iterations as u32,
+    )
 }
 
 // The eikonal update uses the smaller neighbour along each horizontal axis.

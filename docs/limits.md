@@ -10480,8 +10480,8 @@ It displays the moving wet/dry boundary and depth-averaged surface, without an o
 A world tick accepts only finite depth, discharge, volume and inundation records. If the explicit solver
 would need more than 4,096 CFL substeps, use a coarser grid or smaller forcing. No partial step is published.
 
-The optional tsunami entry is 6,641 B gzip with a 6,711 B ceiling. The plain and shared Wasm assets are
-each 19,409 B raw and 8,220 B gzip. Extreme finite Coriolis rates retain the midpoint rotation's bounded
+The optional tsunami entry is 8,743 B gzip with a 9,006 B ceiling. The plain and shared Wasm assets are
+each 23,068 B raw and 9,530 B gzip. The optional worker asset is 750 B gzip. Extreme finite Coriolis rates retain the midpoint rotation's bounded
 half-turn limit. Resolve the rotation in time when phase accuracy matters.
 
 An incoming wave is uniform along its configured open side and is sampled once per tick. Give its
@@ -10490,6 +10490,14 @@ a single incident period and solves only the dissipative part of the harmonic st
 positive viscosity and period, and disables the use of positive Manning roughness. It omits
 unsteady shear history and phase lag, transitions to turbulent flow, and surface tension. Both
 friction models leave plane-beach run-up mismatches in [SEA-06 laboratory evidence](../packages/physics/scripts/sea06-measured.md).
+
+One CPU thread is the default. Shared-memory execution can split flux lines and pressure updates among
+1–64 threads in Node or a cross-origin-isolated browser worker. The browser window uses the serial
+path. Each native phase joins before the following stage begins. Binding or joining a worker
+that fails or stalls returns a coded error before exposing incomplete state. The solver uses one
+rectangular resolution and has no tiled or adaptively refined grid. `workCounts()` reports the face
+evaluations in the two sweeps of both RK stages, exactly `2 * substeps * (2 * nx * nz + nx + nz)`.
+It separates the same work by each worker's assigned whole rows and columns.
 
 ### Accretion and compact-object trajectories (SPACE-03)
 

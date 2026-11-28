@@ -2931,6 +2931,10 @@ dry-to-wet transition tested on WebGPU and WebGL2.
 The optional single-period bed model damps the depth-integrated discharge. A separate column
 eigenmode solution checks the thin, intermediate and deep cases and exact replay. With the
 laboratory inputs fixed, the laminar term improves T20 run-up and leaves other camera bands open.
+Shared-memory worker lanes split the native flux sweeps into disjoint lines, and the coordinator
+folds boundary fluxes in serial face order. The physical state begins publishing only after each
+phase completes. Plain, shared serial and threaded snapshots use the same state layouts. The
+ordered sweep count is exposed as a deterministic work receipt.
 
 
 Rigid axis locks project the angular impulse and held torque before applying the rotated inverse inertia and

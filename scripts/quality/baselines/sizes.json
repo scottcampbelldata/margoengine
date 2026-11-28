@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21613087,
+  "total": 21615382,
   "history": [
     {
       "date": "2026-10-24",
@@ -15257,6 +15257,12 @@
       "date": "2026-11-27",
       "commit": "sea-06-incoming-characteristics",
       "reason": "Physics/tsunami grows from 6193 to 6455 B gzip and cap 6449 to 6711 B. Both optional kernels move from 6807 to 7303 B gzip. The driven edge and existing outgoing wave share one flux and mass ledger. A separate solver would duplicate boundary state and require inter-solver flux iteration. Core and Stage are unchanged."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "sea-06-threaded-flux",
+      "reason": "Physics/tsunami moves from 6641 to 8743 B gzip and its ceiling from 6711 to 9006 B for optional worker lifecycle, deterministic phase barriers and recorded work. Each Wasm moves from 8220 to 9530 B gzip. The worker asset adds 750 B gzip only when requested. A separate public threaded solver would duplicate the grid binding, native stages and acceptance contract. Core and Stage are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16168,7 +16174,7 @@
     "@margoengine/physics/thin-film": 15631,
     "@margoengine/physics/tissue": 3218,
     "@margoengine/physics/tracers": 17877,
-    "@margoengine/physics/tsunami": 6711,
+    "@margoengine/physics/tsunami": 9006,
     "@margoengine/physics/underwater": 4221,
     "@margoengine/physics/vegetation": 9958,
     "@margoengine/physics/viscoplastic": 5154,
