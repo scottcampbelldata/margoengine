@@ -17,7 +17,8 @@ test('each bundle closure stays inside its allowed packages', () => {
 test('the shared base is the same 23 packages in every bundle', () => {
   const base = KIT_MEMBERS.cad.filter((name) => name !== 'brep' && name !== 'cad-import');
   assert.equal(base.length, 23);
-  for (const bundle of BUNDLES) for (const name of base) assert.ok(KIT_MEMBERS[bundle].includes(name), `${bundle} ${name}`);
+  for (const bundle of BUNDLES)
+    for (const name of base) assert.ok(KIT_MEMBERS[bundle].includes(name), `${bundle} ${name}`);
 });
 
 test('compute is in games and science, and the add-ons are in none', () => {

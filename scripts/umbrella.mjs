@@ -402,10 +402,7 @@ export function umbrellaFiles(root = repository) {
     exports['./importmap'] = { types: './dist/importmap.d.ts', import: './dist/importmap.js' };
   };
   for (const { subpath, file, source } of entries) {
-    if (
-      !cadAliasListed &&
-      (source === '@margoengine/cad-import' || source.startsWith('@margoengine/cad-import/'))
-    )
+    if (!cadAliasListed && (source === '@margoengine/cad-import' || source.startsWith('@margoengine/cad-import/')))
       listCadAlias();
     if (!importMapListed && subpath.split('/')[1] > 'importmap') listImportMap();
     const all = aliasSources(entries, source);

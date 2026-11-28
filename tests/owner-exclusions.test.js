@@ -153,30 +153,30 @@ for (const name of ['kit-react', 'kit-viz', 'kit-web'])
 // whole file (comments stripped) must be re-exports and nothing else.
 for (const name of ['game', 'games', 'web', 'science', 'cad'])
   test(`${name} only re-exports other packages and holds nothing of its own`, () => {
-  assert.ok(OWNER_EXCLUSIONS[name], `${name} is in OWNER_EXCLUSIONS with its reason`);
-  assert.equal(OWNER_FIXTURES[name], undefined, `${name} has a fixture, so it leaves OWNER_EXCLUSIONS`);
-  assert.deepEqual(selectOwnerPackages([name]), { selected: [], pending: [] });
-  const reexports = /^\s*(?:export\s+(?:type\s+)?(?:\*|\{[^}]*\})\s+from\s+'@margoengine\/[^']+';\s*)*$/;
-  const files = sources(`${root}packages/${name}/src`);
-  assert.ok(files.length > 10, `${name} has its entries`);
-  assert.deepEqual(
-    files.filter((file) => !reexports.test(strip(readFileSync(file, 'utf8')))).map((file) => file.slice(root.length)),
-    [],
-    `${name} now holds code of its own: write packages/${name}/tests/owner-lifetime.fixture.js and drop the exclusion`,
-  );
-  for (const bad of [
-    "import { engine } from '@margoengine/core';\nexport * from '@margoengine/animation';",
-    'export const x = 1;',
-    "export * from './local.js';",
-    "export * from '@margoengine/core'; engine.use(plugin);",
-  ])
-    assert.ok(!reexports.test(strip(bad)), bad);
-  for (const ok of [
-    "export * from '@margoengine/animation';",
-    "// x\nexport {\n  a,\n  b,\n} from '@margoengine/geometry/primitives';\nexport type { T } from '@margoengine/core';",
-  ])
-    assert.ok(reexports.test(strip(ok)), ok);
-});
+    assert.ok(OWNER_EXCLUSIONS[name], `${name} is in OWNER_EXCLUSIONS with its reason`);
+    assert.equal(OWNER_FIXTURES[name], undefined, `${name} has a fixture, so it leaves OWNER_EXCLUSIONS`);
+    assert.deepEqual(selectOwnerPackages([name]), { selected: [], pending: [] });
+    const reexports = /^\s*(?:export\s+(?:type\s+)?(?:\*|\{[^}]*\})\s+from\s+'@margoengine\/[^']+';\s*)*$/;
+    const files = sources(`${root}packages/${name}/src`);
+    assert.ok(files.length > 10, `${name} has its entries`);
+    assert.deepEqual(
+      files.filter((file) => !reexports.test(strip(readFileSync(file, 'utf8')))).map((file) => file.slice(root.length)),
+      [],
+      `${name} now holds code of its own: write packages/${name}/tests/owner-lifetime.fixture.js and drop the exclusion`,
+    );
+    for (const bad of [
+      "import { engine } from '@margoengine/core';\nexport * from '@margoengine/animation';",
+      'export const x = 1;',
+      "export * from './local.js';",
+      "export * from '@margoengine/core'; engine.use(plugin);",
+    ])
+      assert.ok(!reexports.test(strip(bad)), bad);
+    for (const ok of [
+      "export * from '@margoengine/animation';",
+      "// x\nexport {\n  a,\n  b,\n} from '@margoengine/geometry/primitives';\nexport type { T } from '@margoengine/core';",
+    ])
+      assert.ok(reexports.test(strip(ok)), ok);
+  });
 
 test('every exclusion has a reason and a package behind it', () => {
   for (const [name, reason] of Object.entries(OWNER_EXCLUSIONS)) {

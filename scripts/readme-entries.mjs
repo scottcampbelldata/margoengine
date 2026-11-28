@@ -11,17 +11,7 @@ import { pathToFileURL } from 'node:url';
 const root = join(import.meta.dirname, '..');
 const knownFile = join(root, 'scripts/support/readme-entries-known.json');
 // The umbrella and the kit packages only forward the member packages' entries, which those READMEs document.
-const FACADES = new Set([
-  'margoengine',
-  'game',
-  'games',
-  'kit-viz',
-  'kit-react',
-  'kit-web',
-  'web',
-  'science',
-  'cad',
-]);
+const FACADES = new Set(['margoengine', 'game', 'games', 'kit-viz', 'kit-react', 'kit-web', 'web', 'science', 'cad']);
 
 /** Every undocumented subpath: { folder: ['./sub', ...] }. The root entry, wildcards and package.json are skipped. */
 export function undocumented() {

@@ -42,10 +42,7 @@ export function closureOf(name, packages, seen = new Set()) {
   if (seen.has(name) || !packages.has(name)) return seen;
   seen.add(name);
   const manifest = packages.get(name);
-  const next = [
-    ...Object.keys(manifest.dependencies ?? {}),
-    ...Object.keys(manifest.optionalDependencies ?? {}),
-  ];
+  const next = [...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.optionalDependencies ?? {})];
   for (const peer of Object.keys(manifest.peerDependencies ?? {}))
     if (manifest.peerDependenciesMeta?.[peer]?.optional !== true) next.push(peer);
   for (const dep of next) if (dep.startsWith('@margoengine/')) closureOf(dep, packages, seen);

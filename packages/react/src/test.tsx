@@ -14,8 +14,11 @@ import { attachPointerEvents } from './events.js';
 import { fault, rangeError } from '../../shared/errors.js';
 import { optionalPeer } from './optional.js';
 
-/** React act, with the React DOM fallback for React 18 component tests. */
-export const act: typeof legacyAct = React.act ?? legacyAct;
+/**
+ * React act, with the React DOM fallback for React 18 component tests. React 19 exports act and React 18 does not.
+ * Webpack reads the named export list and rejects `React.act` on React 18, so the lookup is a string.
+ */
+export const act: typeof legacyAct = React['act'] ?? legacyAct;
 /** Browser or caller-installed DOM (for example jsdom); no globals are installed by this entry. */
 export interface TestRendererOptions extends NullStageOptions {
   /** Existing DOM element. Default a newly appended div in document.body. */

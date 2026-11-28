@@ -18,9 +18,13 @@
 // Everything here is pure (files and a package graph in, a decision out) except the readers at the bottom.
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import { KIT_SHIMS } from '../umbrella.mjs';
 import { baselineDemo, CLASSES, classify, FULL_DIRS, CHECK_CODE, RUNNER, workspaceOf } from './file-classes.mjs';
 import { stripComments } from './strip-comments.mjs';
 import { demos } from './visual-demos.js';
+
+/** Packages that only re-export another install bundle (scripts/umbrella.mjs KIT_SHIMS). */
+const FORWARDING_SHIMS = new Set(Object.keys(KIT_SHIMS).map((name) => `@margoengine/${name}`));
 
 export { FULL_DIRS, workspaceOf };
 
@@ -63,14 +67,25 @@ export function loadWorkspaces(root) {
   return found.map((w) => ({ ...w, deps: [...new Set(w.deps.filter((d) => names.has(d)))] }));
 }
 
-/** The seeds plus every workspace that depends on one of them, directly or through others. Returns a Set of names. */
+/**
+ * The seeds plus every workspace that depends on one of them, directly or through others. Returns a Set of names.
+ * A forwarding shim is walked through, so anything that depends on the shim still counts, but the shim itself is not
+ * a package: it only re-exports the bundle, which is already in the set. Counting both pushed a one-package change
+ * over MAX_AFFECTED.
+ */
 export function dependents(workspaces, seeds) {
   const reverse = new Map();
   for (const w of workspaces) for (const d of w.deps) reverse.set(d, [...(reverse.get(d) ?? []), w.name]);
   const out = new Set(seeds),
+    seen = new Set(seeds),
     queue = [...seeds];
   while (queue.length)
-    for (const name of reverse.get(queue.pop()) ?? []) if (!out.has(name)) out.add(name), queue.push(name);
+    for (const name of reverse.get(queue.pop()) ?? []) {
+      if (seen.has(name)) continue;
+      seen.add(name);
+      queue.push(name);
+      if (!FORWARDING_SHIMS.has(name)) out.add(name);
+    }
   return out;
 }
 

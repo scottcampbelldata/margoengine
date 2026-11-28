@@ -31,8 +31,7 @@ function sampleInto(
   normalize: boolean,
   out: Float32Array,
 ): Float32Array {
-  if (!sampleTrackInto)
-    throw new Error('Install @margoengine/animation before writing an animated USDZ file.');
+  if (!sampleTrackInto) throw new Error('Install @margoengine/animation before writing an animated USDZ file.');
   return sampleTrackInto(times, values, width, time, interpolation, normalize, out);
 }
 import { composeMatrix, invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
