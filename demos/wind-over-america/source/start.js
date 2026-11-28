@@ -1,4 +1,4 @@
-import { Engine } from '@margoengine/core';
+import { startEngine } from '@margoengine/webgl2-compat/auto';
 import { applyQualityTier } from '@margoengine/quality';
 import { demoStatus } from 'margo-demo-status';
 import { loadAtlas, loadWind, openingDay } from './wind-data.js';
@@ -14,7 +14,7 @@ const help = document.querySelector('#help');
 const controller = new AbortController();
 const { signal } = controller;
 const controls = [document.querySelector('#day'), document.querySelector('#play')];
-let engine, atlas;
+let engine, renderer, atlas;
 
 function fit() {
   const width = Math.max(1, Math.round(canvas.clientWidth * 1.5));
@@ -51,21 +51,13 @@ const field = loadWind(signal).then((archive) => {
   return { archive, frames: prepareFrames(archive, openingDay, signal) };
 });
 const scene = import('./scene.js');
-const options = { backend: 'webgpu', exactSize: true, antialias: true, capacity: 48,
+const options = { exactSize: true, antialias: true, capacity: 48, forceCompat: forced,
+  loadCompat: () => import('@margoengine/webgl2-compat'),
   startupTimeout: 2500, camera: { near: .02, far: 15, fov: 35 }, signal };
 
-async function openEngine() {
-  if (!forced && navigator.gpu) {
-    try { return await Engine.create(canvas, options); }
-    catch (reason) {
-      if (reason?.code !== 'unsupported' && reason?.code !== 'timeout') throw reason;
-    }
-  }
-  const { install } = await import('@margoengine/webgl2-compat');
-  await install({ force: true, signal });
-  return Engine.create(canvas, options);
-}
-const opening = openEngine().then((target) => {
+const opening = startEngine(canvas, options).then((started) => {
+  const target = started.engine;
+  renderer = started.renderer;
   if (signal.aborted) {
     target.dispose();
     signal.throwIfAborted();
@@ -75,5 +67,5 @@ const opening = openEngine().then((target) => {
   return target;
 });
 Promise.all([opening, image, field, scene]).then(([engine, atlas, field, exhibit]) =>
-  exhibit.open({ engine, atlas, ...field, fit, fail, status, signal, label })).catch(fail);
+  exhibit.open({ engine, renderer, atlas, ...field, fit, fail, status, signal, label })).catch(fail);
 

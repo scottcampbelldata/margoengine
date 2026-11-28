@@ -2,7 +2,7 @@ import { Timeline } from '@margoengine/sciviz';
 import { LabelRenderer } from '@margoengine/labels';
 import { chartPoint, chartHeight, chartWidth, dates, openingDay } from './wind-data.js';
 import { buildChart } from './chart.js';
-import { windPaint } from './paint.js';
+import { flowInk } from '@margoengine/sciviz/flow-ink';
 
 const initial = openingDay;
 const calendar = new Intl.DateTimeFormat('en-US', { dateStyle: 'long', timeZone: 'UTC' });
@@ -28,7 +28,7 @@ function placeLabels(engine) {
   }
 }
 
-export async function open({ engine, atlas, archive, frames, fit, fail, status, signal, label }) {
+export async function open({ engine, renderer, atlas, archive, frames, fit, fail, status, signal, label }) {
   const { canvas } = engine;
   const slider = document.querySelector('#day');
   const date = document.querySelector('#date');
@@ -43,7 +43,7 @@ export async function open({ engine, atlas, archive, frames, fit, fail, status, 
   engine.lighting.direction.set([-.75, 1.95, .48, 2.42]);
   engine.lighting.radiance.set([.96, .86, .68, .47]);
   engine.lighting.ambient.set([.60, .83, .95]);
-  buildChart(engine);
+  buildChart(engine, atlas);
   placeLabels(engine);
 
   function camera() {
@@ -58,15 +58,24 @@ export async function open({ engine, atlas, archive, frames, fit, fail, status, 
   }
   camera();
 
-  const paint = windPaint(atlas, canvas);
-  engine.scene.use(paint);
+  // Chart x, y onto the table: x east, y north to -z, just above the sheet.
+  const matrix = [1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, .011, 0, 1];
+  const ramp = ['#4a9c9c', '#78c2b0', '#bfccb0', '#e8b87d', '#f78a57'];
+  const winds = await flowInk(engine, {
+    matrix, colors: ramp, range: [0, 20], width: 1.5, opacity: .42, signal,
+    pulse: { length: .035, gap: .098, speed: .064, speedPerValue: .00227, opacity: .75, highlight: '#fff0c2', amount: .4 },
+  });
+  const arrows = await flowInk(engine, {
+    matrix, colors: ramp, range: [0, 20], width: 1.6, opacity: .85, tint: '#faf5d9', tintAmount: .38, signal,
+  });
+  signal.addEventListener('abort', () => { winds.dispose(); arrows.dispose(); }, { once: true });
   function draw() {
     if (!signal.aborted) engine.render({ delta: 0 });
   }
   function loop(now) {
     if (signal.aborted) return;
     if (origin === undefined) origin = now;
-    paint.setTime((now - origin) * .001);
+    winds.seek((now - origin) * .001);
     draw();
     animate = requestAnimationFrame(loop);
   }
@@ -80,7 +89,8 @@ export async function open({ engine, atlas, archive, frames, fit, fail, status, 
     const frame = await frames[index];
     signal.throwIfAborted();
     const stamp = calendar.format(timestamp);
-    paint.setFrame(frame);
+    winds.set(frame.strokes);
+    arrows.set(frame.arrows);
     draw();
     slider.value = String(index);
     slider.setAttribute('aria-valuetext', stamp);
@@ -88,14 +98,11 @@ export async function open({ engine, atlas, archive, frames, fit, fail, status, 
     peak.value = oneDecimal.format(archive[index].maxSpeed) + ' m/s';
     Object.assign(canvas.dataset, {
       day: String(index), date: new Date(timestamp).toISOString().slice(0, 10),
-      vectors: String(frame.arrows), segments: String(frame.segments),
+      vectors: String(frame.vectors), segments: String(frame.segments),
     });
     if (!firstChange && index !== initial) {
-      await engine.gpu.queue.onSubmittedWorkDone();
-      if (!signal.aborted) {
-        firstChange = true;
-        performance.mark('wind-day-applied');
-      }
+      firstChange = true;
+      performance.mark('wind-day-applied');
     }
   }, { controls: false });
 
@@ -144,9 +151,8 @@ export async function open({ engine, atlas, archive, frames, fit, fail, status, 
   }, { once: true });
 
   await timeline.seek(initial);
-  await engine.gpu.queue.onSubmittedWorkDone();
   if (signal.aborted) return;
-  canvas.dataset.renderer = engine.gpu.adapterInfo?.vendor === 'margo-webgl2' ? 'compatibility' : 'webgpu';
+  canvas.dataset.renderer = renderer;
   slider.disabled = false;
   play.disabled = false;
   if (status.ready()) label.hidden = true;

@@ -1,0 +1,52 @@
+{
+  "dates": [
+    "2024-01-01",
+    "2024-01-02",
+    "2024-01-03",
+    "2024-01-04",
+    "2024-01-05",
+    "2024-01-06",
+    "2024-01-07",
+    "2024-01-08"
+  ],
+  "dims": [
+    30,
+    16
+  ],
+  "extentDegrees": [
+    -132.5,
+    -60,
+    20,
+    57.5
+  ],
+  "velocityUnits": "m/s",
+  "encodingStep": 0.025,
+  "sigma": 0.995,
+  "order": "per day U then V; longitude fastest; south to north; little-endian signed int16",
+  "sources": {
+    "u.uwnd": {
+      "url": "https://psl.noaa.gov/thredds/dodsC/Datasets/ncep.reanalysis.dailyavgs/surface/uwnd.sig995.2024.nc",
+      "sha256": "55660ce85d203052cc8b7cdf6c7cbec0f75bdf061f114c9cdbefc4591770ea4a"
+    },
+    "v.vwnd": {
+      "url": "https://psl.noaa.gov/thredds/dodsC/Datasets/ncep.reanalysis.dailyavgs/surface/vwnd.sig995.2024.nc",
+      "sha256": "6ced60bf7eeb55fd3737d623e8cca0a7ec9a6ae581dacca72dbd50c860764cc9"
+    },
+    "land.zip": {
+      "url": "https://naturalearth.s3.amazonaws.com/50m_physical/ne_50m_land.zip",
+      "sha256": "0b8e670cf80dce9cbebe2a193bc44ba5602758c22e1fa603980553646d7ff162"
+    },
+    "lakes.zip": {
+      "url": "https://naturalearth.s3.amazonaws.com/50m_physical/ne_50m_lakes.zip",
+      "sha256": "f28d42c286d96b57a17aac2cbeb432f8c65532c20063495711fbc64e24666df3"
+    },
+    "map.zip": {
+      "url": "https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_us_state_20m.zip",
+      "sha256": "7bc773d83c01b6df69b8aada9c2b5983d97f22f4551947cc5c00b87c663223ef"
+    }
+  },
+  "derived": {
+    "atlas.png": "019e3af3e75fd882f195a1b6819de37b36f63496d4d4fb1c96e313bce936eafb",
+    "wind.bin": "69295e55a10b510435ad239257fbb0b3186e4b1d5d3304b2872680ef7fbc67f9"
+  }
+}
