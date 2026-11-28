@@ -156,3 +156,112 @@ fn a_chain_of_implicit_springs_bends_as_its_beam_at_any_length_and_substeps() {
         }
     }
 }
+
+#[test]
+fn a_torque_held_on_a_tree_link_turns_it_at_the_torque_over_its_inertia_and_rotor() {
+    // A bob of 1 kg and 0.004 kg m^2 a metre below a fixed pivot, hinged about x as a tree, with no gravity and a torque of 2 N m
+    // on it: it turns at 2 t / (I + a), I = 1.004 about the pivot and a its rotor's inertia. The midpoint move of the poses turns
+    // the bob back by h^2 / 2 of the torque's whole turn about its own centre, 500 rad/s^2, and leaves the lock projection to
+    // close the pivot that opens; the tree's forward kinematics ran between the two, read the bob's turned rotation as the
+    // hinge's angle, put its centre where that angle places it and kept the move as speed. The bob then turned the other way at
+    // about 250 rad/s^2: -88.8 rad/s after a second, and -87.5 with a rotor of 0.5.
+    const HINGE_X: u32 = JOINT_LOCK * 7 | JOINT_LOCK * (6 << 3);
+    for armature in [0.0f32, 0.5] {
+        let mut w = World::new(16, 16).unwrap();
+        w.header_mut().gravity = [0.0, 0.0, 0.0];
+        let pivot = w.add_body(FIXED).unwrap();
+        let bob = w.add_body(DYNAMIC).unwrap();
+        let row = bob as usize;
+        w.set_s(INVERSE_MASS, row, 1.0);
+        w.set_v(INERTIA_X, row, v3(0.004, 0.004, 0.004));
+        w.set_v(INVERSE_INERTIA_X, row, v3(250.0, 250.0, 250.0));
+        w.set_pose(bob, v3(0.0, -1.0, 0.0), Q::IDENTITY, false);
+        w.set_u(FLAGS, row, w.flags(row) & !CAN_SLEEP);
+        let j = w.add_joint(pivot, bob, HINGE_X).unwrap() as usize;
+        w.set_v(JOINT_ANCHOR_B_X, j, v3(0.0, 1.0, 0.0));
+        w.set_s(JOINT_ARMATURE_3, j, armature);
+        for (column, value) in [(MB_ROLE, 2), (MB_ROOT, pivot), (MB_NEXT, NONE), (MB_JOINT, j as u32), (MB_PARENT, pivot)] {
+            w.set_u(column, row, value);
+        }
+        for (column, value) in [(MB_ROLE, 1), (MB_ROOT, pivot), (MB_NEXT, bob), (MB_JOINT, NONE), (MB_PARENT, NONE), (MB_NO_SELF, 1)] {
+            w.set_u(column, pivot as usize, value);
+        }
+        w.touch_body(bob);
+        for _ in 0..60 {
+            w.set_v(TORQUE_X, row, v3(2.0, 0.0, 0.0));
+            w.step(1.0 / 60.0);
+        }
+        let (spun, expected) = (w.v(ANGULAR_X, row).x, 2.0 / (1.004 + armature));
+        // The rotor's case to the JS suite's bar; without one, the bob's own small inertia leaves the midpoint move's turn
+        // larger against its free motion, and the projection at the turned pose keeps 1.4e-4 of it (docs/known-bugs.md,
+        // KB-PHYS-LOCKTURN1).
+        let bar = if armature > 0.0 { 1e-4 } else { 1e-3 };
+        assert!((spun / expected - 1.0).abs() < bar, "rotor {armature}: {spun} rad/s against {expected}");
+    }
+}
+
+/// A chain of `n` bobs of 0.5 kg and radius 2 cm hung 0.1 m apart from a fixed pivot on hinges about x, its coordinates
+/// alternating `zig` and -`zig`, as one multibody. Returns the bobs' rows.
+fn hinge_chain(w: &mut World, n: usize, zig: f64) -> Vec<u32> {
+    const HINGE_X: u32 = JOINT_LOCK * 7 | JOINT_LOCK * (6 << 3);
+    w.header_mut().gravity = [0.0, -G, 0.0];
+    let pivot = w.add_body(FIXED).unwrap();
+    let (mut parent, mut at, mut theta) = (pivot, v3(0.0, 0.0, 0.0), 0.0f64);
+    let mut rows = Vec::new();
+    for i in 0..n {
+        theta += if i % 2 == 1 { zig } else { -zig };
+        let turn = Q { x: (theta / 2.0).sin() as f32, y: 0.0, z: 0.0, w: (theta / 2.0).cos() as f32 };
+        let place = at.add(turn.rotate(v3(0.0, -0.1, 0.0)));
+        let b = w.add_body(DYNAMIC).unwrap();
+        let row = b as usize;
+        // A solid sphere: 2/5 m r^2.
+        w.set_s(INVERSE_MASS, row, 2.0);
+        w.set_v(INERTIA_X, row, v3(8e-5, 8e-5, 8e-5));
+        w.set_v(INVERSE_INERTIA_X, row, v3(12500.0, 12500.0, 12500.0));
+        w.set_pose(b, place, turn, false);
+        let j = w.add_joint(parent, b, HINGE_X).unwrap() as usize;
+        w.set_v(JOINT_ANCHOR_B_X, j, v3(0.0, 0.1, 0.0));
+        for (column, value) in [(MB_ROLE, 2), (MB_ROOT, pivot), (MB_NEXT, NONE), (MB_JOINT, j as u32), (MB_PARENT, parent)] {
+            w.set_u(column, row, value);
+        }
+        w.set_u(MB_NEXT, parent as usize, b);
+        rows.push(b);
+        (parent, at) = (b, place);
+    }
+    for (column, value) in [(MB_ROLE, 1), (MB_ROOT, pivot), (MB_JOINT, NONE), (MB_PARENT, NONE), (MB_NO_SELF, 1)] {
+        w.set_u(column, pivot as usize, value);
+    }
+    for &b in &rows {
+        w.touch_body(b);
+    }
+    rows
+}
+
+#[test]
+fn a_long_path_s_banded_step_is_the_whole_matrix_s() {
+    // A path of 64 lock rows or more solves its Newton step on the band of its matrix, O(n w^2), where the QR of the whole matrix
+    // is O(n^3): a chain of 200 hinges, a path of 1,000 rows, took 1,607 s for two seconds in the JS suite. Run both ways on
+    // shorter paths, every pose comes out the same at f32: the two solves differ only in the rounding of doubles. A hanging
+    // chain of hinges comes out the same to the bit for two seconds; a chain of balls released level tumbles, and its rounding
+    // grows as a tumble's does (3e-17 m at 8 balls, 0.14 m at 24 after two seconds), so it is compared over its first sixth of a second (5.7e-6 m apart at 24 balls after half a second).
+    use margoengine_physics_kernel::joints::BANDED_FROM;
+    let run = |banded: bool, hinges: bool, n: usize| -> (Vec<V3>, u32) {
+        let steps = if hinges { 120 } else { 10 };
+        BANDED_FROM.with(|b| b.set(if banded { 0 } else { usize::MAX }));
+        let mut w = World::new(256, 256).unwrap();
+        let rows = if hinges { hinge_chain(&mut w, n, 0.02) } else { chain(&mut w, n).0 };
+        for _ in 0..steps {
+            w.step(1.0 / 60.0);
+        }
+        BANDED_FROM.with(|b| b.set(margoengine_physics_kernel::joints::BANDED_ROWS));
+        (rows.iter().map(|&b| w.v(CENTER_X, b as usize)).collect(), w.hash())
+    };
+    for (hinges, n) in [(true, 3usize), (true, 12), (true, 40), (false, 8), (false, 24)] {
+        let (dense, dense_hash) = run(false, hinges, n);
+        let (band, band_hash) = run(true, hinges, n);
+        let apart = dense.iter().zip(&band).map(|(a, b)| a.sub(*b)).map(|d| d.dot(d).sqrt()).fold(0.0f32, f32::max);
+        assert!(apart < 1e-6, "{n} {}: the banded step moved a link {apart} m from the dense one", if hinges { "hinges" } else { "balls" });
+        println!("{n} {}: apart {apart:.1e} m, hashes {dense_hash:x} {band_hash:x}", if hinges { "hinges" } else { "balls" });
+    }
+}
+

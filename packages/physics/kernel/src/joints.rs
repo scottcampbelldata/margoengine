@@ -136,6 +136,27 @@ const TAUT: f64 = 0.0;
 const THRESHOLD_SHARE: f64 = 0.1;
 /// The margin alpha of a lock's geometric stiffness damping: where h^2 k passes 4 alpha m (`taut_d`).
 const STIFF_MARGIN: f64 = 1.0;
+/// A path of this many lock rows or more solves its Newton step on the matrix's band (`newton_banded`); a shorter one on the
+/// whole matrix by QR with column pivoting, which also finds the rows that depend.
+pub const BANDED_ROWS: usize = 64;
+
+#[cfg(not(target_arch = "wasm32"))]
+std::thread_local! {
+    /// The fewest lock rows a path solves on its band, BANDED_ROWS unless a test sets another to compare the two solves; native
+    /// only, for the tests. The Wasm build reads BANDED_ROWS.
+    pub static BANDED_FROM: core::cell::Cell<usize> = const { core::cell::Cell::new(BANDED_ROWS) };
+}
+#[inline(always)]
+fn banded_from() -> usize {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        BANDED_FROM.with(|b| b.get())
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        BANDED_ROWS
+    }
+}
 
 /// The most bodies the probe of a strike on a held body follows through its locks (`held_response`).
 pub const HELD_BODIES: usize = 32;
@@ -2439,7 +2460,7 @@ impl World {
     }
 
     /// True when the body is dynamic and awake, so a lock may move it.
-    fn lock_moves(&self, at: usize) -> bool {
+    pub(crate) fn lock_moves(&self, at: usize) -> bool {
         let flags = self.flags(at);
         flags & KIND == DYNAMIC && flags & SLEEPING == 0
     }
@@ -2675,6 +2696,9 @@ impl World {
         }
         // Each end as (body, sign, its part of the row, its Moving).
         let ends = |e: &Entry, row: &Row| [(e.a, -1.0f64, row.d, row.ta, e.ma), (e.b, 1.0f64, row.d, row.tb, e.mb)];
+        if n >= banded_from() && self.newton_banded(list, nm, rhs, own, order) {
+            return;
+        }
         for p in 0..n {
             for q in 0..n {
                 let mut sum = 0.0f64;
@@ -2834,6 +2858,142 @@ impl World {
             let doubles = self.doubles(e.at as usize);
             unsafe { *doubles.add(RIGHT + e.r as usize) = l };
         }
+    }
+
+    /// RIGHT for a long path, on the band of its Newton matrix N = J W G^T. Two lock rows meet in N only through a body that both
+    /// hold and that can move, and a path walks from body to body through bodies that hold two locking joints each (`linked`),
+    /// so a joint's rows meet only its neighbours' and N is block tridiagonal: a band of half width w, a few rows, on a chain
+    /// (a ring's closing joint meets the first and makes the band the whole matrix, which is left to the dense solve). On it,
+    /// Gaussian elimination without row exchanges keeps L and U inside the band, O(n w^2) where the QR of the whole matrix is
+    /// O(n^3) (Golub and Van Loan 2013, section 4.3, Algorithm 4.3.1, band Gaussian elimination, and 4.3.2's band back
+    /// substitution). Its pivots are taken in the path's order and each is held to the tests the dense solve's order LU holds
+    /// its own to: clear of rounding against its row's own diagonal (Higham 1990's stop at n u, as `newton_right`) and at
+    /// least THRESHOLD_SHARE of its column (the threshold test of sparse LU, Duff, Erisman and Reid 2017, section 7.8). With
+    /// every pivot passing, the elimination is the one the order LU makes on the whole matrix, whose entries outside the band
+    /// are zeros and stay zeros; the step solves the same system the QR does, to rounding
+    /// (`a_long_path_s_banded_step_is_the_whole_matrix_s`). A pivot that fails, a row that may depend on the others, hands
+    /// the path back to the dense solve, which finds and drops such rows. False then, and for a band too wide to pay.
+    fn newton_banded(&mut self, list: &[Entry], nm: &mut [f64], rhs: &mut [f64], diag: &mut [f64], starts: &mut [u32]) -> bool {
+        let n = list.len();
+        // A body meets a row only when it can move: a fixed or a kinematic end has no mass or inertia here, and two joints on
+        // the same ground meet nowhere.
+        let weighs = |m: &Moving| m.mass.x != 0.0 || m.mass.y != 0.0 || m.mass.z != 0.0 || m.inertia.xx != 0.0 || m.inertia.yy != 0.0 || m.inertia.zz != 0.0;
+        // The joints' runs of entries, in the path's order.
+        let mut joints = 0;
+        for p in 0..n {
+            if p == 0 || list[p].at != list[p - 1].at {
+                starts[joints] = p as u32;
+                joints += 1;
+            }
+        }
+        let run = |i: usize| -> (usize, usize) { (starts[i] as usize, if i + 1 < joints { starts[i + 1] as usize } else { n }) };
+        // The half width: the farthest apart two entries stand whose joints share a body that moves.
+        let mut w = 0;
+        for i in 0..joints {
+            let (from, to) = run(i);
+            w = w.max(to - 1 - from);
+            let e = &list[from];
+            for k in (i + 1..joints).rev() {
+                let (other_from, other_to) = run(k);
+                if other_to - 1 - from <= w {
+                    break;
+                }
+                let o = &list[other_from];
+                let meets = (e.a == o.a && weighs(&e.ma)) || (e.a == o.b && weighs(&e.ma)) || (e.b == o.a && weighs(&e.mb)) || (e.b == o.b && weighs(&e.mb));
+                if meets {
+                    w = other_to - 1 - from;
+                    break;
+                }
+            }
+        }
+        if 3 * w >= n {
+            return false;
+        }
+        let ends = |e: &Entry, row: &Row| [(e.a, -1.0f64, row.d, row.ta, e.ma), (e.b, 1.0f64, row.d, row.tb, e.mb)];
+        // Row exchanges inside the band widen U's band to 2 w (Golub and Van Loan 2013, section 4.3.5): each row keeps its
+        // entries from w left of the diagonal to 2 w right of it, those past w zeros until a row exchange brings some there.
+        let wide = 2 * w;
+        for p in 0..n {
+            for q in p.saturating_sub(w)..(p + wide + 1).min(n) {
+                let mut sum = 0.0f64;
+                if q <= p + w {
+                    for (xa, sa, da, ta, wa) in ends(&list[p], &list[p].j) {
+                        for (xb, sb, db, tb, _) in ends(&list[q], &list[q].g) {
+                            if xa != xb {
+                                continue;
+                            }
+                            sum += sa * sb * (scaled(da, db, wa.mass) + wa.inertia.between(ta, tb));
+                        }
+                    }
+                }
+                nm[p * n + q] = sum;
+            }
+            diag[p] = nm[p * n + p];
+            rhs[p] = -list[p].ask;
+        }
+        // G is not J where a link turns within the substep, so N is not symmetric and a diagonal may stand below zero (a chain's
+        // whipping tail): the scale is its size. A row with none meets nothing and goes to the dense solve.
+        if diag.iter().any(|d| !(d.abs() > 0.0)) {
+            return false;
+        }
+        // Rounding in a band LU grows with the band and not the path: each entry is an inner product of at most w + 1 terms, so
+        // the stop is at (w + 1) u where the whole matrix's is at n u (Higham 2002, Accuracy and Stability of Numerical
+        // Algorithms, theorem 9.3, with the band's inner products). Held to n u, a light bob's row on a chain of 200 hinges
+        // (n = 1,000) at 3.8e-5 of its diagonal was taken for one that depends: the dense solve dropped it and the joint opened.
+        let tolerance = DEPENDENT * (w + 1) as f64;
+        for c in 0..n {
+            let (below, right) = ((c + w + 1).min(n), (c + wide + 1).min(n));
+            // Pivots in the path's order while each holds THRESHOLD_SHARE of its column (the threshold test of sparse LU, Duff,
+            // Erisman and Reid 2017, section 7.8), on the matrix scaled to a unit diagonal, D^-1/2 N D^-1/2, as a linear and a
+            // turning row do not share a unit; past that the row of the band's largest scaled entry is brought up (partial
+            // pivoting). A light bob's turning row on a chain of 200 left a pivot of 5e-4 of its diagonal in order: a row
+            // nearly, not wholly, held by the ones before, which the QR keeps too.
+            let size = |r: usize| nm[r * n + c].abs() / sqrt64(diag[r].abs());
+            let mut best = c;
+            for r in c + 1..below {
+                if size(r) > size(best) {
+                    best = r;
+                }
+            }
+            if best != c && size(c) >= THRESHOLD_SHARE * size(best) {
+                best = c;
+            }
+            if best != c {
+                for k in c..right {
+                    nm.swap(c * n + k, best * n + k);
+                }
+                rhs.swap(c, best);
+                diag.swap(c, best);
+            }
+            let pivot = nm[c * n + c];
+            // Clear of rounding against its own row's diagonal: a row that may depend on the others goes back to the dense solve,
+            // which finds and drops it.
+            if !(pivot.abs() > tolerance * diag[c].abs()) {
+                return false;
+            }
+            for r in c + 1..below {
+                let f = nm[r * n + c] / pivot;
+                if f == 0.0 {
+                    continue;
+                }
+                for k in c..right {
+                    nm[r * n + k] -= f * nm[c * n + k];
+                }
+                rhs[r] -= f * rhs[c];
+            }
+        }
+        for c in (0..n).rev() {
+            let mut sum = rhs[c];
+            for k in c + 1..(c + wide + 1).min(n) {
+                sum -= nm[c * n + k] * rhs[k];
+            }
+            rhs[c] = sum / nm[c * n + c];
+        }
+        for (e, &l) in list.iter().zip(rhs.iter()) {
+            let doubles = self.doubles(e.at as usize);
+            unsafe { *doubles.add(RIGHT + e.r as usize) = l };
+        }
+        true
     }
 
     /// After the projection: its shift over h^2 beta (1 - alpha_f) / (1 - alpha_m) is the locks' acceleration x, the step's

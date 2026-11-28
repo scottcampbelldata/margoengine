@@ -794,9 +794,11 @@ impl World {
         held
     }
 
-    /// Puts every awake multibody's links back where their joints place them.
-    pub fn fk_multibodies(&mut self, h: f32) {
-        self.mb_roots(|w, root| w.fk_tree(root, h));
+    /// Puts every awake multibody's links back where their joints place them; true when it moved any.
+    pub fn fk_multibodies(&mut self, h: f32) -> bool {
+        let mut moved = false;
+        self.mb_roots(|w, root| moved |= w.fk_tree(root, h));
+        moved
     }
 
     /// Reads the speed of every rotor of an awake multibody from its links, before the step lands the impulses given since the
@@ -1180,10 +1182,11 @@ impl World {
         }
     }
 
-    fn fk_tree(&mut self, root: usize, h: f32) {
+    fn fk_tree(&mut self, root: usize, h: f32) -> bool {
         if self.mb_check(root).is_none() {
-            return;
+            return false;
         }
+        let mut moved_any = false;
         let mut at = self.uu(MB_NEXT, root);
         while at != NONE {
             let body = at as usize;
@@ -1270,7 +1273,9 @@ impl World {
             self.set_q(ROTATION_X, body, turned);
             self.set_v(POSITION_X, body, position);
             self.set_v(CENTER_X, body, center);
+            moved_any = true;
         }
+        moved_any
     }
 }
 

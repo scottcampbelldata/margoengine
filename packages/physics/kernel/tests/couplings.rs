@@ -370,3 +370,38 @@ fn paths_grown_together_and_removed_keep_their_points_when_the_store_packs_and_g
         assert!(v.x.abs() + v.y.abs() > 0.5, "and it is moving");
     }
 }
+
+/// The angle a body hinged about z has turned from where it started, from its rotation.
+fn turned_about_z(w: &World, body: u32) -> f32 {
+    let q = w.q(ROTATION_X, body as usize);
+    2.0 * atan2(q.z, q.w)
+}
+
+#[test]
+fn a_coupling_started_broken_holds_its_coordinates_from_the_first_substep() {
+    // Two wheels hinged about z, one started at 1 rad/s and the other still, which breaks their 1 : 2 row. The row's impulse takes
+    // the broken speed back at once: a jump, which the midpoint move of the poses read as a force over the substep, so the poses
+    // kept h/2 of the broken speed and the angles stood h/2 rad off the row for good, where the speeds held it exactly
+    // (1.05e-3 rad at 8 substeps of a 60 Hz step). A gear started broken did the same.
+    for kind in [COORDS, GEAR] {
+        let mut w = World::new(8, 8).unwrap();
+        w.header_mut().gravity = [0.0; 3];
+        let a = wheel(&mut w, v3(0.0, 0.0, 0.0), 1.0, 0.05);
+        let b = wheel(&mut w, v3(3.0, 0.0, 0.0), 1.0, 0.05);
+        // `wheel` adds each wheel's post just before it.
+        let (post_a, post_b) = (a - 1, b - 1);
+        let k = w.add_coupling(kind, a, b).unwrap();
+        w.set_coupling(k, 0, [0.0, 0.0, 1.0]);
+        w.set_coupling(k, 1, [0.0, 0.0, 1.0]);
+        w.set_coupling(k, 6, [2.0, 0.0, 0.0]);
+        w.set_coupling(k, 8, [0.0, 1.0, 0.2]);
+        if kind == COORDS {
+            w.set_coupling(k, 12, [post_a as f32, post_b as f32, 0.0]);
+        }
+        w.set_v(ANGULAR_X, a as usize, v3(0.0, 0.0, 1.0));
+        run(&mut w, 90);
+        let (qa, qb) = (turned_about_z(&w, a), turned_about_z(&w, b));
+        assert!(qa > 0.1 && qb < -0.05, "kind {kind}: both turn, {qa} and {qb}");
+        assert!((qa + 2.0 * qb).abs() < 1e-4, "kind {kind}: q_a + 2 q_b stays 0: {}", qa + 2.0 * qb);
+    }
+}

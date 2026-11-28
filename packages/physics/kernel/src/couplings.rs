@@ -863,6 +863,78 @@ impl World {
         }
     }
 
+    /// After `note_mid_start`: the start speeds a body a lock holds noted (MID_START) are made the ones each rigid gear, rack and
+    /// pair of coordinates holds, an impulse along its row against the speed the row stands at. A start speed that breaks a rigid
+    /// row (one given between steps, or left by the relaxing passes, which leave the couplings out) is taken back by the row's
+    /// impulse at once, a jump and not a force, so `shed_locks`, which reads the substep's free change of speed from MID_START as
+    /// an acceleration and moves the pose back h^2 a / 2 by it, must not see that jump: read as a force, it moved the pose back
+    /// by h/2 of the broken speed, and the row's error, which follows from the speeds it ends with (`track_couplings`), never saw
+    /// the move. Two hinges coupled 1 : 2 with one started at 1 rad/s then stood h/2 rad apart for good
+    /// (`a_coupling_started_broken_holds_its_coordinates_from_the_first_substep`). A soft row is a spring and its push a force;
+    /// a rope and a distance range push one way only and a path's row is its own; they keep the whole change.
+    pub fn hold_start_couplings(&mut self) {
+        let start = |w: &World, id: usize| -> Moving {
+            let mut m = w.moving(id);
+            if w.lock_moves(id) {
+                (m.linear, m.angular) = (w.v(MID_START_X, id), w.v(MID_START_SPIN_X, id));
+            }
+            m
+        };
+        let put = |w: &mut World, id: usize, m: &Moving| {
+            if w.lock_moves(id) {
+                w.set_v(MID_START_X, id, m.linear);
+                w.set_v(MID_START_SPIN_X, id, m.angular);
+            }
+        };
+        for place in self.window.couplings.0..self.window.couplings.1 {
+            let k = self.uu(COUPLING_ORDER, place) as usize;
+            let c = self.coupling(k);
+            if !self.coupling_live(&c) || c.hertz > 0.0 {
+                continue;
+            }
+            if c.kind == GEAR || c.kind == RACK_AND_PINION {
+                let (row, _) = self.coupling_row(&c);
+                let (mut a, mut b) = (start(self, c.a as usize), start(self, c.b as usize));
+                let (speed, inverse) = Self::coupling_speed(&c, &row, &a, &b);
+                if !(inverse > 0.0) || speed == 0.0 {
+                    continue;
+                }
+                Self::coupling_push(&c, &row, &mut a, &mut b, -speed / inverse);
+                put(self, c.a as usize, &a);
+                put(self, c.b as usize, &b);
+            } else if c.kind == COORDS {
+                let sides = self.coords_sides(&c);
+                let inverse = self.coords_inverse(&sides);
+                let mut speed = 0.0;
+                for s in &sides {
+                    let (child, parent) = (start(self, s.child), start(self, s.parent));
+                    speed += if s.slides { s.axis.dot(child.at(s.arm_child).sub(parent.at(s.arm_parent))) } else { s.axis.dot(child.angular.sub(parent.angular)) };
+                }
+                if !(inverse > 0.0) || speed == 0.0 {
+                    continue;
+                }
+                let p = -speed / inverse;
+                // One body at a time, as `coords_push`, so a parent two sides share takes both pushes.
+                for s in &sides {
+                    let mut child = start(self, s.child);
+                    if s.slides {
+                        child.push(s.axis.scale(p), s.arm_child);
+                    } else {
+                        child.angular = child.angular.add(child.inertia.mul(s.axis).scale(p));
+                    }
+                    put(self, s.child, &child);
+                    let mut parent = start(self, s.parent);
+                    if s.slides {
+                        parent.push(s.axis.scale(-p), s.arm_parent);
+                    } else {
+                        parent.angular = parent.angular.sub(parent.inertia.mul(s.axis).scale(p));
+                    }
+                    put(self, s.parent, &parent);
+                }
+            }
+        }
+    }
+
     /// After a substep's poses: a gear's and a rack's error read from them, and a coordinates row's from the speed it ended with.
     pub fn track_couplings(&mut self, h: f32) {
         for place in self.window.couplings.0..self.window.couplings.1 {

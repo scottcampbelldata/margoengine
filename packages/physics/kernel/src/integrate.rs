@@ -364,6 +364,7 @@ impl World {
             self.window.kin = Some(substep);
         }
         self.note_mid_start();
+        self.hold_start_couplings();
         self.integrate_velocities(h);
         tick(self, 10, inner);
         self.hold_multibodies();
@@ -415,11 +416,18 @@ impl World {
         }
         self.refresh_turned_contacts();
         self.track_couplings(h);
-        self.fk_multibodies(h);
         self.tally_drift(h);
         self.refresh_joints(h, false);
         self.project_locks(h);
         self.lock_speeds(h);
+        // A tree's links are put back where their joints place them after the locks close, not before: the midpoint move of
+        // `shed_locks` turns a link back by h^2 / 2 of its loads' whole turn, its locked part included, and leaves the
+        // projection to close the joint that opens. Placed by that turned rotation, a bob under a torque of 2 N m was thrown
+        // the other way each substep, -88.8 rad/s after a second where 2 / 1.004 was due
+        // (`a_torque_held_on_a_tree_link_turns_it_at_the_torque_over_its_inertia_and_rotor`). What it moves, the rows read again.
+        if self.fk_multibodies(h) {
+            self.refresh_joints(h, false);
+        }
         tick(self, 10, inner);
         // As many relaxing passes as pushing ones: one pass does not take the anchors' push back out of a deep pile, and
         // what it leaves is speed no force gave (a pyramid of 14 rows or more rocks for good). An island with e extra
