@@ -50,6 +50,32 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### EARTH-07 four-point pass
+
+- Point 5 (`5348518fdc`). `packages/physics/tests/coupling/aeolian.test.js` checks signed wind sampling with
+  a different cell size, rejection of a malformed last wind sample, overflowing shear and an unrepresentable
+  CFL count. All accepted regions and diagnostics survive the failures. `aeolian-workers.test.js` verifies that
+  a physically empty hill-fetch suffix is skipped and that an unrepresentable sample still intersecting the bed
+  is refused before scanning it.
+- Point 6 (`5348518fdc`). `packages/physics/tests/coupling/aeolian-workers.test.js` compares one plain and
+  one, two and four shared-memory participants for rough sand with ripples and rough snow, including signed
+  rebasing, exported ports, bed changes, budgets and exact snapshot replay. The 33 × 27 sand run uses six
+  CFL intervals, 5,346 exchange rows, 444 f64x2 forcing pairs and 2,664 f64x2 exchange pairs in the four-way
+  case. `packages/physics/tests/aeolian-workers.browser.mjs` starts three helpers from production bundle URLs
+  and checks both emitted Wasm assets.
+- Point 7 (`5348518fdc`). `packages/vfx/test/blown-sand-check.mjs` feeds the production renderer from
+  accepted `TerrainBed` changes and actual transport through the travelling-gust ridge fixture. The gust
+  carries 2.207 kg, erodes the crest by 0.244 mm and deposits 0.154 mm in the lee. Both renderers reproduce
+  their held and replayed RGBA exactly. The original TREE-5 shot awaits integration.
+- Point 8 (`5348518fdc`). `docs/limits.md` records the fixed grain speed, exposure, one-grain restart, absence
+  of suspension, numeric domain and shared-worker requirements. `aeolian.test.js` checks the snow equilibrium
+  against the model formula and conservative settling, ripple, repose and closed/open edge behavior.
+- Point 2 stays open. `packages/physics/scripts/earth07-creyssels-measured.mjs` holds out all six independent
+  collector measurements in Creyssels et al. (2009), Table 1. Predictions are 13.4–32.1% low, and four runs
+  miss the published flux bands after propagating the separate 5% error on the measured wind input. No
+  parameter was fitted to the fluxes. The grain momentum model, suspension and two-way wind response also
+  remain open.
+
 ### ATMO-08 four-point pass
 
 - Point 5 (e2dee8854c). `physics/tests/coupling/drainage-fog.test.js` checks finite wind at a distinct signed origin, rejection of

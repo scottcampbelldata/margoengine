@@ -473,7 +473,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | EARTH-03 | Particle-laden gravity currents | partial | Claude | CLAIMED (Fauld film) |
 | EARTH-05 | Terramechanics | physics/terramechanics with native soil, live rigid and legged contacts, and mineral dust | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), upgrade parts c99bb12d2a and 0fa769d6dc |
 | EARTH-06 | Impact and explosion cratering | stand-in | Claude | CLAIMED (Fauld film) |
-| EARTH-07 | Aeolian transport | physics/aeolian | Codex | BUILDING (codex/physics-earth-07-four-point; four-point pass; [audit](physics-solver-audit.md)), prior landing d2fa3cb303 |
+| EARTH-07 | Aeolian transport | physics/aeolian | Codex | REOPENED (4/8 at 5348518fdc, points 5–8, [evidence](physics-solver-audit.md#earth-07-four-point-pass)), prior landing d2fa3cb303 |
 | EARTH-08 | Seismic waves and ground shaking | physics/seismic | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 32c933e9d0 |
 | EARTH-09 | Volcanic eruption column | partial | Open | OPEN |
 | EARTH-10 | Lava flow | partial | Codex | REOPENED (4/8 at 99d66dbc47, points 5–8, [evidence](physics-solver-audit.md#earth-10-four-point-pass)), prior landing 3a35fac405 |
