@@ -1347,7 +1347,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,444 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,446 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -16231,6 +16231,10 @@ and no shader output draws with that draw buffer off (`packages/webgl2-compat/te
 GL_INVALID_OPERATION "Active draw buffers with missing fragment shader outputs" on ANGLE, KB-COMPAT-SILENTTARGET1); such
 a pipeline sets its draw buffers before and after each draw, two `drawBuffers` calls. No speed figure.
 
+## Stepping: animator/stepping (2026-11-27, KB-STEP-CROUCH1)
+
+`createStepper({legs, start, routes, footfall?, foot?, settle = 0.58 s, kneeFlexion = 8 deg, liftRate = 0.64 m/s})` walks two legs over planned footfalls, left first, and `upperBodyMotion(motion)` returns pelvis, chest, head and arm angles. Kinematic only: no ground forces, no balance recovery, no running. The pelvis plan is sampled every 18 ms over every route given, rate limited to `liftRate`, smoothed by a 21-tap raised cosine and lowered by the filtered window maximum of its excess; between samples the live ceiling clamps it, so a planted leg is never asked past its length. Measured on a 0.88 m leg: level 0.62 m strides give standing knees 8 to 14 degrees, a single-support median of 17, a swing peak of 66 and 4.7 cm of pelvis travel (Perry and Burnfield 2010: about 5, 15 to 20 and 60 degrees; Gard, Miff and Kuo 2004: 4 to 5 cm). The stepping-stones route gives a single-support median of 19 and a peak of 79 (stair ascent swings near 90, Riener, Rabuffetti and Frigo 2002). Standing pelvic list is capped at 0.12 rad, so feet more than about 3 cm apart in height still bend the higher knee. Routes must all have the first route's length. No core or stage bytes.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -16280,6 +16284,25 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   takes friction 0.
 - **Regression:** `packages/physics/tests/rigid-validation.test.js`, the three "hung" cradle tests at both tiers (all six
   fail without the fix).
+
+### Fixed 2026-11-27: the stepping-stones walker crouched, knees near 50 degrees standing and past 100 walking (KB-STEP-CROUCH1, animator)
+
+- **Repro:** the-stepping-stones before this fix: knees 49 to 56 degrees standing, a single-support median of 50,
+  peaks of 101 (stance) and 106 (swing), and about 12 cm of pelvis travel on a level 0.62 m stride; Scott saw a deep
+  lunge. The planning lived in the demo (`source/gait.js`, `walker.js`).
+- **Cause:** the pelvis plan held the root 4.2 cm below standing, modelled each leg 3.1 cm shorter than it is, took a
+  rounded minimum that dropped another 9 mm where limits met and subtracted the smoothing filter's worst-case rise
+  (about 4 cm) at every sample. Near straight the knee is very sensitive: 3 mm of slack bends it 10 degrees, 3 cm
+  bends it 30. The swing foot also held the pelvis down, the trailing heel stayed flat until the other foot had landed,
+  and the hips stood over the footfall middle instead of the ankles, so staggered feet left one knee bent.
+- **Fix:** `@margoengine/animator/stepping` (`createStepper`, `upperBodyMotion`): the ceiling is the reach of each
+  planted leg at an 8 degree loaded knee, the smoothing is lowered only by the filtered window maximum of its own
+  excess, the swing leg never limits the body, the trailing heel rises in terminal stance and the foot leaves at a
+  steep toe-off pitch, standing hips sit over the ankles and the pelvis lists up to 0.12 rad on uneven ground. The
+  demo keeps only wiring; its full-body IK plans for the whole leg (`reach: 1`).
+- **Regression:** `tests/modern-animator-stepping.test.js` (level walk: standing knees under 15 degrees, single-support
+  median 5 to 22, swing peak 45 to 72, pelvis travel 2.5 to 6 cm; stones: standing under 20, median under 25, peak
+  under 85; planted legs never over-extended).
 
 ### Fixed 2026-11-27: IK elbows folded sideways or backward when the pole swung the bend plane (KB-RIG-IKHINGE1, rigging)
 
