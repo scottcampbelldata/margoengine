@@ -2480,15 +2480,29 @@ impl World {
     }
 
     /// The largest gap any lock from list place `first` to `last` stands open by, from the views of the last `refresh_joints`.
+    /// A sliding lock's gap is measured in units of what its anchors' f32 coordinates can resolve, where that is coarser than
+    /// LOCK_CLOSED, so the widest reads closed at LOCK_CLOSED when the gap is rounding: past 8 m from the origin an f32 is 1e-6 m
+    /// coarse or more and a gap of 1e-6 m cannot be read, so a path there never read closed and took every iterate of the
+    /// projection and every cut of its line search each substep; a grid of 30 by 30 balls hung 29 m wide ran 280 times slower
+    /// (`a_bigger_grid_stays_together_too`). A turning lock's gap, an angle from unit quaternions, resolves to 1e-7 anywhere.
     fn widest_lock(&self, first: usize, last: usize, to: usize) -> f32 {
         let mut widest = 0.0f32;
         for i in first..=last {
             let row = self.uu(SOLVE_JOINTS, i) as usize;
             let (m, axes) = lock_rows(self.uu(JOINT_FLAGS, row));
             let view = self.view(row);
+            // Two units in the last place of the largest coordinate of the joint's two bodies, at most: an anchor sits within the
+            // body's own reach of its centre, which a factor of two covers for any body a joint holds at its surface.
+            let far = [self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize].iter().fold(0.0f32, |most, &b| {
+                let c = self.v(CENTER_X, b);
+                most.max(c.x.abs()).max(c.y.abs()).max(c.z.abs())
+            });
+            let coarse = 4.0 * f32::EPSILON * far;
+            let slide = if coarse > LOCK_CLOSED { LOCK_CLOSED / coarse } else { 1.0 };
             for r in 0..m {
                 let at = view.at[axes[r]] - self.s(to + axes[r], row);
                 let at = if at < 0.0 { -at } else { at };
+                let at = if axes[r] < 3 { at * slide } else { at };
                 if at > widest {
                     widest = at;
                 }
