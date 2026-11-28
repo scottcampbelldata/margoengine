@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Biome view ground wiring check</title><style>body{margin:0}canvas{display:block;width:384px;height:384px}</style></head><body><canvas width="384" height="384"></canvas>
+<script type="module">
+// Real-GPU proof of BiomeView's defaults at the ground (ground-check.mjs drives it): a small world of grass, firs and
+// stones with a ridge along its east side, seen from above under a low sun from the east.
+import {Engine} from '/packages/core/dist/index.js';
+import {BiomeWorld,defineBiome} from '/packages/biomes/dist/index.js';
+import {BiomeView} from '/packages/biomes/dist/view.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,46,0.01],target:[0,10,0],near:1,far:1500}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const fell=defineBiome({id:'fell',climate:{},ground:[{material:'grass'}],
+  plants:[{id:'fir',mesh:'procedural:conifer',density:60,radius:2}],
+  rocks:[{id:'stone',mesh:'procedural:rock',density:160,radius:0.8}],
+  details:[{id:'tuft',mesh:'procedural:grass',density:14}]});
+// Flat at 10 m, a 60 m ridge 150 m east: with the sun 15 degrees up its shadow reaches 224 m west, over the middle.
+const world=await BiomeWorld.create({size:[512,512],biomes:[fell],height:{field:x=>10+60*Math.max(0,1-Math.abs(x-150)/40)}});
+const pen=new OffscreenCanvas(384,384).getContext('2d',{willReadFrequently:true});
+const frame=async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();};
+const shot=async()=>{await waitForPipelines(frame);engine.render({delta:0});pen.clearRect(0,0,384,384);pen.drawImage(canvas,0,0);await device.queue.onSubmittedWorkDone();return pen.getImageData(0,0,384,384).data;};
+const differing=(a,b)=>{let n=0;for(let k=0;k<a.length;k+=4)if(Math.abs(a[k]-b[k])+Math.abs(a[k+1]-b[k+1])+Math.abs(a[k+2]-b[k+2])>12)n++;return n/(a.length/4);};
+const sun=[Math.cos(Math.PI/12),Math.sin(Math.PI/12),0];
+// The pixels that differ between two frames (the ground the effect reaches): how much of the frame, and the second
+// frame's light over the first's on them. Grass and crowns in front keep their own light.
+const reached=(a,b)=>{let n=0,x=0,y=0;for(let k=0;k<a.length;k+=4){const p=0.2126*a[k]+0.7152*a[k+1]+0.0722*a[k+2],q=0.2126*b[k]+0.7152*b[k+1]+0.0722*b[k+2];if(Math.abs(q-p)>4){n++;x+=p;y+=q;}}return {share:n/(a.length/4),ratio:n?y/x:1};};
+async function attach(options){
+  engine.lighting.direction.set([...sun,3]);engine.lighting.radiance.set([1,1,1,0.5]);
+  const view=await BiomeView.attach(engine,world,{radius:200,detailRadius:60,water:false,...options});
+  await view.ready;await view.whenIdle();await shot();await view.whenIdle();
+  return view;
+}
+window.check={
+  async run(){
+    device.pushErrorScope('validation');
+    const view=await attach({}),
+      wired={contact:view.groundContact?.count??0,mask:!!view.groundContact?.mask(),cover:view.objects?.groundCover?.look,relief:!!view.relief,objects:view.objects?.count??0};
+    const full=await shot(),again=await shot();
+    view.objects.groundCover.set({thin:0,shorten:0});
+    const uncleared=await shot();
+    view.objects.groundCover.set({thin:8,shorten:1,reach:1});
+    const cleared=await shot();
+    view.objects.groundCover.set({thin:1.4,shorten:0.6,reach:0.25});
+    const back=await shot();
+    view.relief.dispose();
+    const unshaded=await shot();
+    view.dispose();
+    const off=await attach({contact:false,relief:false}),
+      left={contact:off.groundContact??null,cover:off.objects?.groundCover??null,relief:off.relief??null,objects:off.objects?.count??0};
+    off.dispose();
+    const kept=await attach({groundCover:false}),only={contact:!!kept.groundContact,cover:kept.objects?.groundCover??null};
+    kept.dispose();
+    const validation=await device.popErrorScope();
+    return {errors,validation:validation?.message??null,wired,left,only,
+      steady:differing(full,again),opened:differing(uncleared,cleared),partly:differing(uncleared,full),back:differing(full,back),
+      shadow:reached(full,unshaded)};
+  },
+};
+window.ready=true;
+</script></body></html>

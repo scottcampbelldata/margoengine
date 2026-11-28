@@ -30,6 +30,26 @@ test('a mesh patch that writes i.color still writes a variable beside the contac
   assert.match(code, /@location\(5\) contact:vec4f,@location\(6\) @interpolate\(flat\) contactTint:vec4f/);
 });
 
+test('a crown adds one material vector, one varying and its own sky factor', () => {
+  const code = contactStages(lit(''), 5, true);
+  assert.match(code, /material:array<vec4f,10>/);
+  assert.match(code, /@location\(7\) contactCrown:vec4f/);
+  assert.match(code, /o\.contactCrown=vec4f\(crownOut\.xz/);
+  assert.match(code, /\(frame\.ambient\.rgb\*contactKept\)\+margoAmbient\*contactKept/);
+  assert.ok(!contactStages(lit(''), 5).includes('contactCrown'), 'without a crown the shader has none');
+  const sky = { depth: 1, height: 4, crown: { depth: 1.5, radius: 2, top: 8 } };
+  assert.deepEqual([...contactValues(undefined, sky)].slice(8), [1.5, 2, 8, 0]);
+  for (const crown of [
+    { depth: -1, radius: 1, top: 1 },
+    { depth: 21, radius: 1, top: 1 },
+    { depth: 1, radius: 0, top: 1 },
+    { depth: 1, radius: 1, top: 0 },
+    { depth: 1, radius: 1 },
+    null,
+  ])
+    assert.throws(() => contactValues(undefined, { ...sky, crown }), RangeError, JSON.stringify(crown));
+});
+
 test('contactValues is undefined without either option and rejects values out of range', () => {
   assert.equal(contactValues(undefined, undefined), undefined);
   const values = [...contactValues({ height: 0.25, tint: [0.1, 0.2, 0.3] }, { depth: 1, height: 8 })];

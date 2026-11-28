@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Scatter clearing map check</title><style>body{margin:0}canvas{display:block;width:256px;height:256px}</style></head><body><canvas width="256" height="256"></canvas>
+<script type="module">
+// Real-GPU proof of `@margoengine/scatter/clearing-map` (clearing-map.browser.mjs reads the canvas): one upright card
+// 2 m wide and 4 m tall rooted at the origin, as a one-instance `Scatter` or a one-clump `GrassScatter`, under an 8 by
+// 8 map of 1 m texels around it whose columns are given.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine,Geometry,PbrMaterial} from '/packages/core/dist/index.js';
+import {Scatter} from '/packages/scatter/dist/index.js';
+import {GrassScatter} from '/packages/scatter/dist/grass.js';
+import {clearingMap} from '/packages/scatter/dist/clearing-map.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{camera:{position:[0,2,6.5],target:[0,2,0],near:0.5,far:200}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const card=new Geometry([-1,0,0, 1,0,0, 1,4,0, -1,4,0],[0,0,1, 0,0,1, 0,0,1, 0,0,1],[0,1,2, 0,2,3]);
+const textures=new Map();
+const texture=columns=>{
+  const key=columns.join();let t=textures.get(key);if(t)return t;
+  t=device.createTexture({size:[8,8],format:'r8unorm',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
+  const data=new Uint8Array(64);for(let k=0;k<64;k++)data[k]=columns[k%8];
+  device.queue.writeTexture({texture:t},data,{bytesPerRow:8},[8,8]);textures.set(key,t);return t;
+};
+let scatter,kept,map,source,bounds;
+window.check={
+  // A new scatter when `kind` or `thinned` changes; otherwise the map and the look change under the live one.
+  async show({kind='scatter',thinned=true,columns=null,look={},rect=[-4,-4,4,4]}){
+    device.pushErrorScope('validation');
+    const key=kind+thinned;
+    if(key!==kept){
+      scatter?.dispose();source?.dispose();kept=key;
+      source=thinned?clearingMap(()=>map&&{texture:map,bounds}):undefined;
+      const options={count:1,area:[0.001,0.001],scale:[1,1],lodFade:0,material:new PbrMaterial({color:[0.8,0.8,0.8],roughness:1,doubleSided:true}),...(source?{thinning:source}:{})};
+      scatter=kind==='grass'
+        ?GrassScatter.attach(engine,{...options,grass:{height:3,width:0.5,blades:16,radius:0.2,heightVariance:0}})
+        :Scatter.attach(engine,card,options);
+      await scatter.ready;
+    }
+    map=columns?texture(columns):undefined;bounds=rect;source?.set({thin:1.4,shorten:0.6,reach:0.25,...look});
+    engine.lighting.direction.set([0,0.35,1,0]);engine.lighting.radiance.set([1,1,1,0.9]);
+    await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+    engine.render({delta:0});await device.queue.onSubmittedWorkDone();
+    const e=await device.popErrorScope();if(e)errors.push(e.message);
+    return errors.splice(0);
+  },
+};
+window.ready=true;
+</script></body></html>

@@ -1,6 +1,11 @@
 // The ground-contact mask: footprint profiles and the CPU bake (`@margoengine/terrain/ground-contact`).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import {
+  GROUND_CONTACT_SETTINGS,
+  applyGroundContactSettings,
+  groundContactSettingDefaults,
+} from '../dist/ground-contact-settings.js';
 
 const near = (got, want, within, what) => assert.ok(Math.abs(got - want) <= within, `${what}: ${got}, want ${want}`);
 
@@ -79,4 +84,24 @@ test('TerrainGroundContact checks its options and footprints and patches the ter
   assert.throws(() => contact.shader('fn other(){}', 1), { code: 'unsupported' });
   contact.dispose();
   assert.throws(() => contact.set('a', [0, 0, 1, 0]), { code: 'disposed' });
+});
+
+test('the settings table writes the live look and refuses unknown names and values', () => {
+  assert.deepEqual(
+    GROUND_CONTACT_SETTINGS.map((row) => [row.name, row.live]),
+    [
+      ['contact.color', true],
+      ['contact.soil', true],
+      ['contact.occlusion', true],
+    ],
+  );
+  const contact = new TerrainGroundContact({ addLighting: () => () => {} });
+  assert.deepEqual(
+    groundContactSettingDefaults(),
+    Object.fromEntries(Object.entries(contact.look).map(([k, v]) => ['contact.' + k, v])),
+  );
+  applyGroundContactSettings(contact, { 'contact.soil': 0.5, 'contact.color': [0.2, 0.1, 0] });
+  assert.deepEqual(contact.look, { color: [0.2, 0.1, 0], soil: 0.5, occlusion: 1 });
+  assert.throws(() => applyGroundContactSettings(contact, { nope: 1 }), TypeError);
+  assert.throws(() => applyGroundContactSettings(contact, { 'contact.soil': 2 }), RangeError);
 });

@@ -32,7 +32,7 @@ import {
 export type { ScatterImage, ScatterTextures } from './maps.js';
 import { translucencyShader } from './translucency.js';
 import { contactStages, contactValues, type ScatterBase, type ScatterSkyOcclusion } from './contact.js';
-export type { ScatterBase, ScatterSkyOcclusion } from './contact.js';
+export type { ScatterBase, ScatterCrown, ScatterSkyOcclusion } from './contact.js';
 import { fadeCode, pixelFootprint, poseShader } from './pose.js';
 import { outsideLod } from './lod.js';
 import { sameBindings, snapshotBindings } from './bindings.js';
@@ -215,6 +215,13 @@ export interface ScatterOptions {
    */
   clearings?: readonly ScatterClearing[];
   /**
+   * One more test in the distribute pass, which may drop or shorten an instance by where it stands, read again every
+   * frame: `clearingMap()` of `@margoengine/scatter/clearing-map` thins and shortens instances where a world map is
+   * high, such as the ground contact around trunks and stones. Fixed for the scatter's life. Default none: the shader as
+   * it was.
+   */
+  thinning?: ScatterThinningSource;
+  /**
    * Gathers the instances into patches with soft, ragged edges (see {@link ScatterClumps}). Fixed for the scatter's
    * life; the patches follow `seed`, so scatters that share a seed share their patches. Default none: even cover.
    */
@@ -348,6 +355,19 @@ export interface ScatterStateSource {
   poseCode(code: string, group: number, binding: number): string;
   entries(device: GPUDevice): { buffer: GPUBuffer }[];
   update(context: { device: GPUDevice; encoder: GPUCommandEncoder }): void;
+}
+/** What `ScatterOptions.thinning` takes. Made by `clearingMap()` of `@margoengine/scatter/clearing-map`. */
+export interface ScatterThinningSource {
+  /**
+   * The distribute shader with the source's declarations (bindings 12 and up) and test; `key` is the variable that
+   * keys an instance's random numbers.
+   */
+  cullCode(code: string, key: 'i' | 'key'): string;
+  /**
+   * The entries of those bindings, written for this frame. The same array while its resources are the same ones, so the
+   * bind group is made again only when they change.
+   */
+  entries(device: GPUDevice): GPUBindGroupEntry[];
 }
 const frame = `
 struct Frame {camera:mat4x4f,eye:vec4f,area:vec4f,rules:vec4f,scale:vec4f,lod:vec4f,ids:vec4u,color:vec4f,planes:array<vec4f,6>,wind:vec4f,ground:vec4f,blade:vec4f,pixel:vec4f,sway:vec4f}
@@ -554,8 +574,9 @@ function validateWorld(o: ScatterOptions): void {
  */
 export function scatterCullShader(o: ScatterOptions): string {
   const code = optionShader(o),
-    extra = (o.paths?.length ? PATHS : '') + clearingCode(o) + clumpCode(o);
-  return extra ? code.replace(PLANES, extra + PLANES) : code;
+    extra = (o.paths?.length ? PATHS : '') + clearingCode(o) + clumpCode(o),
+    placed = extra ? code.replace(PLANES, extra + PLANES) : code;
+  return o.thinning ? o.thinning.cullCode(placed, o.follow ? 'key' : 'i') : placed;
 }
 
 const wgslNumber = (v: number) => (Number.isInteger(v) ? `${v}.0` : `${v}`);
@@ -718,7 +739,7 @@ export class Scatter implements EnginePlugin {
   readonly count: number;
   /** The meshes' highest vertex in mesh units: the plant top `sway.height` defaults to. */
   protected meshTop = 0;
-  /** The lit material uniform's values: 7 vectors, 9 with `base` or `skyOcclusion`. */
+  /** The lit material uniform's values: 7 vectors, 9 with `base` or `skyOcclusion` (10 with its `crown`). */
   private materialValues = new Float32Array(28);
   /** `base` and `skyOcclusion` as material[7] and [8]; undefined keeps the lit shader as it was. */
   private readonly contact?: Float32Array;
@@ -987,7 +1008,7 @@ export class Scatter implements EnginePlugin {
     this.values[73] = sink;
     this.values[74] = Math.min(edgeShrink, lod[2]);
     this.contact = contactValues(options.base, options.skyOcclusion);
-    if (this.contact) this.materialValues = new Float32Array(36);
+    if (this.contact) this.materialValues = new Float32Array(28 + this.contact.length);
     const { blades } = options;
     if (blades !== undefined) {
       if (typeof blades !== 'object' || blades === null)
@@ -1436,8 +1457,9 @@ export class Scatter implements EnginePlugin {
    * its own index, then the rings compacted and their draw counts set (the tiles entry shares it).
    */
   protected cull(c: ScatterPassContext, terrain: GPUTexture): void {
-    const density = this.options.densityMap ? (this.options.densityMap() ?? this.fallback!) : undefined;
-    if (this.route) return this.route.cull(c.encoder, terrain, density);
+    const density = this.options.densityMap ? (this.options.densityMap() ?? this.fallback!) : undefined,
+      thinned = this.options.thinning?.entries(c.device);
+    if (this.route) return this.route.cull(c.encoder, terrain, density, thinned);
     const n = this.dispatched();
     if (this.ordered?.n !== n) {
       this.ordered?.destroy();
@@ -1445,7 +1467,13 @@ export class Scatter implements EnginePlugin {
       this.computeGroup = undefined;
     }
     const o = this.ordered;
-    if (this.terrain !== terrain || this.densityTexture !== density || this.extraChanged || !this.computeGroup) {
+    if (
+      this.terrain !== terrain ||
+      this.densityTexture !== density ||
+      this.thinned !== thinned ||
+      this.extraChanged ||
+      !this.computeGroup
+    ) {
       const resources: (GPUBufferBinding | GPUTextureView)[] = [
         { buffer: this.exclusionBuffer! },
         ...(density ? [density.createView()] : []),
@@ -1459,10 +1487,12 @@ export class Scatter implements EnginePlugin {
           { binding: 2, resource: { buffer: o.candidates } },
           { binding: 3, resource: { buffer: o.flags } },
           ...resources.map((resource, k) => ({ binding: 6 + k, resource })),
+          ...(thinned ?? []),
         ],
       });
       this.terrain = terrain;
       this.densityTexture = density;
+      this.thinned = thinned;
       this.extraChanged = false;
     }
     const pass = c.encoder.beginComputePass();
@@ -1496,6 +1526,7 @@ export class Scatter implements EnginePlugin {
   /** Set when `extraEntries` changed and the compute bind group must be made again. */
   protected extraChanged = false;
   private densityTexture?: GPUTexture;
+  private thinned?: GPUBindGroupEntry[];
 
   /** Threads of the distribute pass. */
   protected dispatched(): number {
@@ -1702,7 +1733,11 @@ export class Scatter implements EnginePlugin {
       }
       if (lit && this.uvs) code = texturedFragment(code, this.cut, coreNormal);
       if (lit && this.contact)
-        code = contactStages(code, freeLocation(/struct Output \{[^}]+\}/.exec(code)?.[0] ?? ''));
+        code = contactStages(
+          code,
+          freeLocation(/struct Output \{[^}]+\}/.exec(code)?.[0] ?? ''),
+          this.contact.length > 8,
+        );
       if (cover) {
         const covered = coverCode(
           code,

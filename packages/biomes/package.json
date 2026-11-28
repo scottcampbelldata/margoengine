@@ -223,7 +223,7 @@
     "build": "node ../../scripts/build-optional.js biomes && node scripts/copy-erosion.mjs",
     "test": "npm run build && node --test tests/*.test.js tests/coupling/growth.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/biomes/tests/browser-check.mjs && node packages/biomes/tests/water-check.mjs",
+    "test:gpu": "cd ../.. && node packages/biomes/tests/browser-check.mjs && node packages/biomes/tests/water-check.mjs && node packages/biomes/tests/ground-check.mjs && node packages/biomes/tests/ground-check.mjs --compat",
     "test:gpu:objects": "cd ../.. && node packages/biomes/tests/objects-check.mjs",
     "test:gpu:conifers": "cd ../.. && node packages/biomes/tests/conifers-check.mjs",
     "test:gpu:disturbance": "cd ../.. && node packages/biomes/tests/disturbance-check.mjs",

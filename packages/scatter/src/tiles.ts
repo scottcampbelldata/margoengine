@@ -22,7 +22,7 @@ type TilesPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 export interface ScatterTilesOptions
   extends Omit<
     ScatterOptions,
-    'count' | 'area' | 'center' | 'density' | 'densityMap' | 'follow' | 'exclusions' | 'paths' | 'scale'
+    'count' | 'area' | 'center' | 'density' | 'densityMap' | 'follow' | 'exclusions' | 'paths' | 'scale' | 'thinning'
   > {
   /** World rectangle `[minX, minZ, maxX, maxZ]` the heightmap covers (and the tiles lie in). */
   readonly bounds: readonly [number, number, number, number];

@@ -185,10 +185,15 @@ export interface BiomeViewOptions {
   /**
    * Stored objects meet the ground: darker and (on damp ground) mossy stone feet, soil on trunk feet, less sky light low
    * in tree crowns (`BiomeObjectsOptions.contact`), and on the terrain a soil and litter apron with contact shade around
-   * every trunk and stone (`TerrainGroundContact` of `@margoengine/terrain/ground-contact`, `view.groundContact`).
-   * Default true.
+   * every trunk and stone (`TerrainGroundContact` of `@margoengine/terrain/ground-contact`, `view.groundContact`),
+   * with the grass and ferns opened around those feet (`groundCover`). Default true.
    */
   readonly contact?: boolean;
+  /**
+   * How grass and ferns open around those feet (`BiomeObjectsOptions.groundCover`; live as
+   * `view.objects?.groundCover?.set(...)`). `false` leaves them as they are. Default on with `contact`.
+   */
+  readonly groundCover?: import('./objects.js').BiomeObjectsOptions['groundCover'];
   /**
    * The ground's own relief shades it at every distance (`TerrainReliefLighting` of
    * `@margoengine/terrain/relief-lighting`, `view.relief`): ridges cast on the ground behind them and gullies keep less
@@ -1458,6 +1463,7 @@ export class BiomeView implements Disposable {
             ...(options.meshes ? { meshes: options.meshes } : {}),
             ...(options.contact !== undefined ? { contact: options.contact } : {}),
             ...(view.#groundContact ? { ground: view.#groundContact } : {}),
+            ...(options.groundCover !== undefined ? { groundCover: options.groundCover } : {}),
             ...(view.#statesOf ? { states: view.#statesOf } : options.states ? { states: options.states } : {}),
             ...(view.#farEnabled && options.far !== false
               ? {

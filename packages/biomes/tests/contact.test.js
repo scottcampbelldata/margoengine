@@ -1,6 +1,7 @@
 // Objects meet the ground: a species' `sink` and `alignToGround` reach its scatters (until 2026-11-28 both were
 // declared and ignored, so biome stones stood on the surface and floated downhill, KB-BIOMES-SINK1), and by default
-// stones and trunks get a foot and trees less sky light low in the crown.
+// stones and trunks get a foot and trees less sky light low in the crown, a tree's litter apron follows its crown and
+// the grass opens around every foot (it hid the ground's soil ring).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
@@ -12,6 +13,7 @@ const attach = async (options = {}) => {
       id: 'fell',
       climate: {},
       ground: [{ material: 'grass' }],
+      details: [{ id: 'tuft', mesh: 'procedural:grass', density: 4 }],
       plants: [
         {
           id: 'fir',
@@ -19,6 +21,7 @@ const attach = async (options = {}) => {
           density: 100,
           radius: 2,
           sink: 0.27,
+          color: { hue: 0.7, value: 0.3 },
           stands: { scale: 60, cover: 0.8 },
         },
       ],
@@ -70,6 +73,18 @@ test('a species sink and alignToGround reach its scatters', async () => {
   done();
 });
 
+test("a species' colour jitter reaches its leaves and stone, never its bark (KB-BIOMES-SPECIESCOLOR1)", async () => {
+  const { species, parts, done } = await attach(),
+    [trunk, crown] = parts['fell/fir'],
+    [stone] = parts['fell/stone'];
+  assert.deepEqual(species['fell/fir'].variation, { hue: 0.5, value: 0.3 }, 'a hue past half a turn is half a turn');
+  assert.equal(species['fell/stone'].variation, undefined);
+  assert.deepEqual(crown.variation, { hue: 0.5, value: 0.3 });
+  assert.deepEqual(trunk.variation, { hue: 0.02, value: 0.1 });
+  assert.deepEqual(stone.variation, { hue: 0.02, value: 0.1 }, "a rule without a colour keeps the kind's");
+  done();
+});
+
 test('stones and trunks get a foot and trees keep less sky light low down; contact: false leaves them out', async () => {
   const { parts, done } = await attach(),
     [stone] = parts['fell/stone'],
@@ -82,9 +97,12 @@ test('stones and trunks get a foot and trees keep less sky light low down; conta
   assert.ok(trunk.base.height > 0 && trunk.base.height <= 0.35);
   assert.deepEqual(trunk.base.tint, [0.1, 0.08, 0.055]);
   assert.equal(crown.base, undefined);
-  assert.ok(Math.abs(trunk.skyOcclusion.depth - 0.7 * 0.8) < 1e-12);
-  assert.deepEqual(trunk.skyOcclusion, crown.skyOcclusion, 'one tree, one height');
+  assert.ok(Math.abs(trunk.skyOcclusion.depth - 0.5 * 0.8) < 1e-12);
+  const { crown: inside, ...canopy } = crown.skyOcclusion;
+  assert.deepEqual(trunk.skyOcclusion, canopy, 'one tree, one height; wood has no crown of its own to shade it');
   assert.ok(crown.skyOcclusion.height > 2);
+  assert.equal(inside.depth, 1.2, 'the foliage shades itself');
+  assert.ok(inside.radius > 0.5 && Math.abs(inside.top - 2 * canopy.height) < 1e-9, JSON.stringify(inside));
   done();
   const off = await attach({ contact: false });
   for (const list of Object.values(off.parts))
@@ -124,4 +142,65 @@ test('a tile presses its stones and trunks into the ground it is given, and take
   objects.remove('0,0');
   assert.equal(held.size, 0);
   done();
+});
+
+/** A form of two triangles: wood reaching `trunk` metres at its foot and a crown reaching `crown` metres at 3 m. */
+const form = (trunk, crown) =>
+  [
+    ['bark', trunk, 0],
+    ['foliage', crown, 3],
+  ].map(([kind, reach, y]) => ({
+    kind,
+    color: [0.1, 0.1, 0.1],
+    geometry: {
+      positions: [reach, y, 0, 0, y, 0, 0, y + 0.1, 0],
+      normals: [0, 0, 1, 0, 0, 1, 0, 0, 1],
+      indices: [0, 1, 2],
+    },
+  }));
+
+test("a tree's footprint is 0.3 of its crown's reach, or its trunk's where that is wider", async () => {
+  for (const [trunk, crown, want] of [
+    [0.1, 2, 0.6],
+    [0.5, 1, 0.5],
+  ]) {
+    const held = new Map(),
+      ground = { set: (key, list) => held.set(key, [...list]), remove: (key) => held.delete(key) },
+      { done, objects, placement } = await attach({ ground, meshes: { 'procedural:conifer': form(trunk, crown) } }),
+      fir = placement.species.findIndex((s) => s.key === 'fell/fir');
+    objects.add({
+      x: 0,
+      z: 0,
+      origin: [0, 0],
+      size: 256,
+      count: 1,
+      species: placement.species.map((s) => s.key),
+      instances: new Uint8Array([0, 128, 0, 128, fir, 128, 0, 0]),
+      density: [],
+    });
+    const [, , radius, kind] = held.get('0,0');
+    assert.ok(Math.abs(radius - want) < 1e-6, `trunk ${trunk}, crown ${crown}: ${radius}, ${want}`);
+    assert.equal(kind, 0);
+    done();
+  }
+});
+
+test("the detail opens around the ground's feet by default; groundCover and a ground without a mask leave it", async () => {
+  const ground = { set() {}, remove() {}, mask: () => undefined },
+    detail = (objects) => objects.swaying.filter((s) => s.options.densityMap);
+  const on = await attach({ ground });
+  assert.equal(detail(on.objects).length, 2, 'the grass field and its near layer');
+  for (const grass of detail(on.objects)) assert.equal(grass.options.thinning, on.objects.groundCover);
+  assert.deepEqual(on.objects.groundCover.look, { thin: 1.4, shorten: 0.6, reach: 0.25 });
+  for (const part of on.objects.casters) assert.equal(part.options.thinning, undefined, 'objects are not thinned');
+  on.done();
+  const look = await attach({ ground, groundCover: { thin: 3 } });
+  assert.equal(look.objects.groundCover.look.thin, 3);
+  look.done();
+  for (const options of [{ ground, groundCover: false }, { ground: { set() {}, remove() {} } }, {}]) {
+    const off = await attach(options);
+    assert.equal(off.objects.groundCover, undefined);
+    for (const grass of detail(off.objects)) assert.equal(grass.options.thinning, undefined);
+    off.done();
+  }
 });

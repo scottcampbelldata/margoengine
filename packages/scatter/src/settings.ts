@@ -3,8 +3,9 @@
 // the rooted wind, the blade root shade and width, and the variation, clusters and translucency stages. Scatter reads the
 // first rows from its frame uniform every frame (live). Translucency, variation and clusters are read from the material
 // uniform every frame too, but turning one on from 0 (or off to 0) changes the lit shader, so Scatter picks another
-// pipeline (built once on the next frame): those four rows are `live: false`. Not rows: everything placed at
-// construction (count, area, lod, rules, paths, heightmap).
+// pipeline (built once on the next frame): those four rows are `live: false`. The three clearing rows write the look of
+// a `thinning` source (`@margoengine/scatter/clearing-map`), live. Not rows: everything placed at construction (count,
+// area, lod, rules, paths, heightmap) and the `base` and `skyOcclusion` looks.
 import {
   checkSettings,
   colorSetting,
@@ -22,7 +23,7 @@ export type ScatterSettingValue = number | ScatterSettingColor;
 /** Values by setting name; a name left out takes its default. */
 export type ScatterSettingValues = Readonly<Record<string, ScatterSettingValue>>;
 /** The panel a setting sits in. */
-export type ScatterSettingGroup = 'scatter' | 'wind' | 'blades' | 'variation';
+export type ScatterSettingGroup = 'scatter' | 'wind' | 'blades' | 'variation' | 'clearing';
 /** One control: the shared row shape with the scatter groups. */
 export interface ScatterSetting extends SettingRow {
   readonly group: ScatterSettingGroup;
@@ -43,7 +44,12 @@ export interface ScatterSettingTarget {
   variationHue: number;
   variationValue: number;
   clusters: number;
-  readonly options: { readonly blades?: object; readonly material?: object };
+  readonly options: {
+    readonly blades?: object;
+    readonly material?: object;
+    /** Needed by the clearing rows: a source with `set`, as `clearingMap()` makes. */
+    readonly thinning?: object;
+  };
 }
 const n = (
   name: string,
@@ -182,7 +188,38 @@ export const SCATTER_SETTINGS: readonly ScatterSetting[] = [
     'Leaf-cluster cell size: the mesh shades as clumps (0 is off). Turning it on from 0 builds another lit pipeline once. Needs a Scatter built with a `material`.',
     false,
   ),
+  n(
+    'clearing.thin',
+    'clearing',
+    1.4,
+    0,
+    8,
+    0.05,
+    '',
+    'Chance of dropping an instance per unit of the clearing map (the chance stops at 1). Needs a Scatter built with `thinning: clearingMap(...)`.',
+  ),
+  n(
+    'clearing.shorten',
+    'clearing',
+    0.6,
+    0,
+    1,
+    0.01,
+    '',
+    'Share of its height an instance loses per unit of the clearing map. Needs a Scatter built with `thinning: clearingMap(...)`.',
+  ),
+  n(
+    'clearing.reach',
+    'clearing',
+    0.25,
+    0,
+    10,
+    0.05,
+    'm',
+    'How far around its root an instance also reads the clearing map, so a leaning clump is cleared with it. Needs a Scatter built with `thinning: clearingMap(...)`.',
+  ),
 ];
+const CLEARING = ['thin', 'shorten', 'reach'] as const;
 /** The rows that can change every frame without building anything. */
 export const SCATTER_LIVE_SETTINGS: readonly ScatterSetting[] = liveSettings(SCATTER_SETTINGS) as ScatterSetting[];
 const BY_NAME = settingIndex(SCATTER_SETTINGS) as Map<string, ScatterSetting>;
@@ -245,6 +282,13 @@ export function applyScatterSettings(scatter: ScatterSettingTarget, values: Scat
       if (name in values && look[i] !== BY_NAME.get(name)!.default)
         throw new TypeError(`Setting ${name} needs a Scatter built with the material option`);
     });
+  const source = scatter.options.thinning as { set?(look: Record<string, number>): void } | undefined;
+  if (typeof source?.set !== 'function')
+    for (const key of CLEARING) {
+      const name = 'clearing.' + key;
+      if (name in values && values[name] !== BY_NAME.get(name)!.default)
+        throw new TypeError(`Setting ${name} needs a Scatter built with the thinning option`);
+    }
   scatter.density = v('scatter.density') as number;
   scatter.color = v('scatter.color') as ScatterSettingColor;
   scatter.wind = strength > 0 ? (speed > 0 ? [x, z, strength, speed] : [x, z, strength]) : undefined;
@@ -254,6 +298,7 @@ export function applyScatterSettings(scatter: ScatterSettingTarget, values: Scat
     scatter.widen = widen;
     scatter.translucencyAmount = translucency;
   }
+  source?.set?.(Object.fromEntries(CLEARING.map((key) => [key, v('clearing.' + key) as number])));
   if (scatter.options.material !== undefined) {
     scatter.variationHue = look[0];
     scatter.variationValue = look[1];

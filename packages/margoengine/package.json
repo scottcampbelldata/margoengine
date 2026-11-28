@@ -4643,6 +4643,10 @@
       "types": "./dist/scatter/simplify.d.ts",
       "import": "./dist/scatter/simplify.js"
     },
+    "./scatter/clearing-map": {
+      "types": "./dist/scatter/clearing-map.d.ts",
+      "import": "./dist/scatter/clearing-map.js"
+    },
     "./scatter/grass": {
       "types": "./dist/scatter/grass.d.ts",
       "import": "./dist/scatter/grass.js"
@@ -5750,6 +5754,10 @@
     "./terrain/ground-contact": {
       "types": "./dist/terrain/ground-contact.d.ts",
       "import": "./dist/terrain/ground-contact.js"
+    },
+    "./terrain/ground-contact-settings": {
+      "types": "./dist/terrain/ground-contact-settings.d.ts",
+      "import": "./dist/terrain/ground-contact-settings.js"
     },
     "./terrain/rocks": {
       "types": "./dist/terrain/rocks.d.ts",

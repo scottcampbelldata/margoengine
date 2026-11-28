@@ -132,6 +132,7 @@ export class ScatterRoute {
   private readonly placing: GPUComputePipeline;
   private placeGroup?: GPUBindGroup;
   private placedFrom: (GPUTexture | undefined)[] = [];
+  private thinnedBy?: GPUBindGroupEntry[];
   private readonly finish: Kernel[];
   /** 3 ring counts, then one per cascade and ring, each bound alone. */
   private readonly counts: GPUBuffer;
@@ -189,9 +190,19 @@ export class ScatterRoute {
     pass.dispatchWorkgroups(x, y);
   }
   /** The frame's distribute pass: the rings and their counts, as `Scatter`'s cull leaves them. */
-  cull(encoder: GPUCommandEncoder, terrain: GPUTexture, density: GPUTexture | undefined): void {
+  cull(
+    encoder: GPUCommandEncoder,
+    terrain: GPUTexture,
+    density: GPUTexture | undefined,
+    thinned?: GPUBindGroupEntry[],
+  ): void {
     const h = this.host;
-    if (!this.placeGroup || this.placedFrom[0] !== terrain || this.placedFrom[1] !== density) {
+    if (
+      !this.placeGroup ||
+      this.placedFrom[0] !== terrain ||
+      this.placedFrom[1] !== density ||
+      this.thinnedBy !== thinned
+    ) {
       this.placeGroup = this.device.createBindGroup({
         layout: this.placing.getBindGroupLayout(0),
         entries: [
@@ -201,8 +212,10 @@ export class ScatterRoute {
           { binding: 3, resource: { buffer: this.slots.flags } },
           { binding: 6, resource: { buffer: h.exclusions } },
           ...(density ? [{ binding: 7, resource: density.createView() }] : []),
+          ...(thinned ?? []),
         ],
       });
+      this.thinnedBy = thinned;
       this.placedFrom = [terrain, density];
     }
     const pass = encoder.beginComputePass();

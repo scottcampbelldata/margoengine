@@ -132,6 +132,10 @@
       "types": "./dist/ground-contact.d.ts",
       "import": "./dist/ground-contact.js"
     },
+    "./ground-contact-settings": {
+      "types": "./dist/ground-contact-settings.d.ts",
+      "import": "./dist/ground-contact-settings.js"
+    },
     "./rocks": {
       "types": "./dist/rocks.d.ts",
       "import": "./dist/rocks.js"

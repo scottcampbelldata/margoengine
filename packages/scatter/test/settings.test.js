@@ -172,3 +172,15 @@ test('Beaufort thrash: a wind speed runs the sway clock speed / 5.4 times as fas
   applyScatterSettings(s, { 'wind.strength': 0.8 });
   assert.deepEqual(s.wind, [1, 0, 0.8], 'speed 0 writes the three-number wind');
 });
+
+test('the clearing rows write a thinning source, and need one to move off their defaults', () => {
+  const looks = [],
+    target = { options: { thinning: { set: (look) => looks.push(look) } } };
+  applyScatterSettings(target, { 'clearing.thin': 3 });
+  assert.deepEqual(looks, [{ thin: 3, shorten: 0.6, reach: 0.25 }]);
+  assert.throws(() => applyScatterSettings({ options: {} }, { 'clearing.reach': 1 }), {
+    name: 'TypeError',
+    message: /thinning/,
+  });
+  applyScatterSettings({ options: {} }, { 'clearing.reach': 0.25 });
+});

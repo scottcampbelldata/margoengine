@@ -42,6 +42,13 @@ export interface GroundContactOptions extends GroundContactLook {
   /** The first of the three lighting-group bindings the effect declares. Default 124. */
   binding?: number;
 }
+/** The baked mask: red the soil weight and green the sky lost, over a world rectangle with row 0 at `minZ`. */
+export interface GroundContactMask {
+  /** rg8unorm. Borrowed: `dispose()` frees it. */
+  readonly texture: GPUTexture;
+  /** `[minX, minZ, maxX, maxZ]`, world metres. */
+  readonly bounds: readonly [number, number, number, number];
+}
 /** A footprint's kind: 0 a trunk (soil that thins outward), 1 a stone (a narrow ring). */
 export type FootprintKind = 0 | 1;
 
@@ -143,6 +150,7 @@ export class TerrainGroundContact implements EnginePlugin, TerrainLighting, Disp
   #mask?: GPUTexture;
   #sampler?: GPUSampler;
   #entries: GPUBindGroupEntry[] = [];
+  #current?: GroundContactMask;
   #data = new Float32Array(8);
   #texels?: Uint8Array;
   /** The mask's first corner, undefined until its first bake. */
@@ -283,10 +291,25 @@ export class TerrainGroundContact implements EnginePlugin, TerrainLighting, Disp
     this.#dirty = this.#looked = true;
   }
 
+  /**
+   * The mask as it stands for this frame, re-centred and rebaked first when the camera or the footprints moved; undefined
+   * before the effect is attached. Ground cover reads it to open around the feet:
+   * `clearingMap(() => contact.mask())` of `@margoengine/scatter/clearing-map`.
+   */
+  mask(): GroundContactMask | undefined {
+    if (!this.#bake()) return undefined;
+    return this.#current;
+  }
+
   /** The lighting group entries, after re-centring and rebaking the mask when the camera or the footprints moved. */
   bindings(): GPUBindGroupEntry[] {
+    return this.#bake() ? this.#entries : [];
+  }
+
+  /** Brings the mask and the look's uniform up to date; false without a device. */
+  #bake(): boolean {
     const device = this.#engine?.gpu;
-    if (!device || !this.#mask || !this.#buffer) return [];
+    if (!device || !this.#mask || !this.#buffer) return false;
     const span = this.texel * this.resolution,
       eye = this.#engine!.camera.position,
       // The mask moves in steps of an eighth of its span, whole texels, so a re-bake shifts nothing on the ground.
@@ -299,6 +322,9 @@ export class TerrainGroundContact implements EnginePlugin, TerrainLighting, Disp
       this.#dirty = this.#looked = true;
     }
     const origin = this.#origin!;
+    const kept = this.#current;
+    if (!kept || kept.texture !== this.#mask || kept.bounds[0] !== origin[0] || kept.bounds[1] !== origin[1])
+      this.#current = { texture: this.#mask, bounds: [origin[0], origin[1], origin[0] + span, origin[1] + span] };
     if (this.#dirty) {
       const lists: Float32Array[] = [];
       for (const held of this.#held.values()) if (this.#covers(held.box)) lists.push(held.list);
@@ -319,7 +345,7 @@ export class TerrainGroundContact implements EnginePlugin, TerrainLighting, Disp
       device.queue.writeBuffer(this.#buffer, 0, this.#data);
       this.#looked = false;
     }
-    return this.#entries;
+    return true;
   }
 
   /** The terrain's lit shader with soil on `terrainColor` and the sky light lost taken from the ambient term. */
@@ -379,6 +405,7 @@ ${fragmentColor}
     this.#buffer?.destroy();
     this.#mask?.destroy();
     this.#buffer = this.#mask = undefined;
+    this.#current = undefined;
     this.#entries = [];
     this.#held.clear();
     this.#shaders.clear();

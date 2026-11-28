@@ -21,20 +21,40 @@ export interface ScatterSkyOcclusion {
   depth: number;
   /** Height above the ground at which the whole sky shows, above 0 and up to 1,000 metres at scale 1. */
   height: number;
+  /**
+   * The sky light a crown keeps from its own leaves, so its inner needles are darker than its outer tips and one crown
+   * stands out from the one behind it. The crown is a cone about the instance's up axis: `radius` at the ground,
+   * narrowing to a tenth of it from 0.9 of `top` up. A point d of the way from the axis to that surface keeps
+   * exp(-depth x (1 - d)): ambient light on a tree falls with depth inside it (Reeves and Blau, "Approximate and
+   * probabilistic algorithms for shading and rendering structured particle systems", SIGGRAPH 1985,
+   * https://doi.org/10.1145/325165.325250), by Beer-Lambert's law through the leaves. The sun's beam is untouched.
+   * Default none.
+   */
+  crown?: ScatterCrown;
+}
+/** The cone of `ScatterSkyOcclusion.crown`; metres are at instance scale 1 and grow with the instance. */
+export interface ScatterCrown {
+  /** Optical depth from the crown's surface to its axis, 0-20. */
+  depth: number;
+  /** The crown's radius at the ground line, above 0 and up to 1,000. */
+  radius: number;
+  /** The height of the crown's tip above the ground, above 0 and up to 1,000. */
+  top: number;
 }
 
 const within = (v: number, low: number, high: number): boolean => Number.isFinite(v) && v >= low && v <= high;
 
 /**
- * The two material vectors the contact stages read (tint and amount; band height, shade, depth, canopy height), or
- * undefined when both options are unset and the shader stays as it was.
+ * The material vectors the contact stages read (tint and amount; band height, shade, depth, canopy height; and with a
+ * crown its depth, radius and top), or undefined when both options are unset and the shader stays as it was.
  */
 export function contactValues(
   base: ScatterBase | undefined,
   sky: ScatterSkyOcclusion | undefined,
 ): Float32Array | undefined {
   if (base === undefined && sky === undefined) return undefined;
-  const out = new Float32Array(8);
+  const crown = sky?.crown;
+  const out = new Float32Array(crown === undefined ? 8 : 12);
   if (base !== undefined) {
     if (typeof base !== 'object' || base === null) throw new TypeError('Scatter base must be an options object');
     const { height, shade = 0.5, tint, amount = tint ? 0.7 : 0 } = base;
@@ -58,6 +78,19 @@ export function contactValues(
       throw new RangeError('Scatter skyOcclusion needs a depth of 0-20 and a height above 0 and up to 1000');
     out[6] = sky.depth;
     out[7] = sky.height;
+    if (crown !== undefined) {
+      if (
+        typeof crown !== 'object' ||
+        crown === null ||
+        !within(crown.depth, 0, 20) ||
+        !(within(crown.radius, 0, 1000) && crown.radius > 0) ||
+        !(within(crown.top, 0, 1000) && crown.top > 0)
+      )
+        throw new RangeError(
+          'Scatter skyOcclusion crown needs a depth of 0-20 and a radius and a top above 0 and up to 1000',
+        );
+      out.set([crown.depth, crown.radius, crown.top], 8);
+    }
   }
   return out;
 }
@@ -72,6 +105,10 @@ const vertexLines =
   'let footHeight=dot(pose.world-footRoot,footUp)/max(footUp.y,0.2)/footSize;' +
   'o.contact=vec4f(footHeight/max(material[8].x,0.001),footHeight/max(material[8].w,0.001),material[8].y,material[8].z);' +
   'o.contactTint=material[7];';
+/** And with a crown: the vertex across the up axis in crown radii, its height over the crown's top, and the depth. */
+const crownLines =
+  'let crownOut=pose.world-footRoot-footUp*dot(pose.world-footRoot,footUp);' +
+  'o.contactCrown=vec4f(crownOut.xz/(max(material[9].y,0.001)*footSize),footHeight/max(material[9].z,0.001),material[9].x);';
 
 /** Smoothed value noise on a lattice of hashed corners, so the foot band's upper edge is no ruled line. */
 const noise = `
@@ -85,9 +122,10 @@ fn contactNoise(p:vec3f)->f32 {
 
 /**
  * Edits a lit scatter shader (core's, already carrying Scatter's other edits and maps) to read the contact values:
- * the foot's tint on the albedo and the sky light kept on every ambient term. `location` is the first free varying.
+ * the foot's tint on the albedo and the sky light kept on every ambient term. `location` is the first free varying; two
+ * are used, and a third with `crown`.
  */
-export function contactStages(code: string, location: number): string {
+export function contactStages(code: string, location: number, crown = false): string {
   const output = '@location(3) material:vec4f',
     end = /return o;\s*\}/;
   const start = code.indexOf('@vertex fn vertex'),
@@ -100,8 +138,8 @@ export function contactStages(code: string, location: number): string {
     !end.test(code.slice(start, at))
   )
     throw new TypeError('Scatter base and skyOcclusion need the lit shader they were written for');
-  const head = code.slice(0, start).replace('material:array<vec4f,7>', 'material:array<vec4f,9>'),
-    vertex = code.slice(start, at).replace(end, vertexLines + 'return o;\n}'),
+  const head = code.slice(0, start).replace('material:array<vec4f,7>', `material:array<vec4f,${crown ? 10 : 9}>`),
+    vertex = code.slice(start, at).replace(end, vertexLines + (crown ? crownLines : '') + 'return o;\n}'),
     stage = code.slice(at),
     mapped = stage.includes(sampled),
     // Without maps the albedo is the input's colour, which a mesh patch may write (a rock's surface does): the stage
@@ -115,17 +153,22 @@ export function contactStages(code: string, location: number): string {
   const lines =
     '\n let contactFoot=1.0-smoothstep(0.0,1.0,i.contact.x*(0.6+0.8*contactNoise(i.position*9.0)));' +
     'let contactSky=(1.0-i.contact.z*contactFoot)*exp(-i.contact.w*(1.0-clamp(i.contact.y,0.0,1.0)));' +
-    `${albedo}=mix(${albedo},i.contactTint.rgb,contactFoot*i.contactTint.a);\n`;
+    `${albedo}=mix(${albedo},i.contactTint.rgb,contactFoot*i.contactTint.a);\n` +
+    (crown
+      ? ' let contactInside=1.0-min(length(i.contactCrown.xy)/max(1.0-i.contactCrown.z,0.1),1.0);\n' +
+        ' let contactKept=contactSky*exp(-i.contactCrown.w*contactInside);\n'
+      : '');
   return (
     noise +
     head.replace(
       output,
-      `${output},@location(${location}) contact:vec4f,@location(${location + 1}) @interpolate(flat) contactTint:vec4f`,
+      `${output},@location(${location}) contact:vec4f,@location(${location + 1}) @interpolate(flat) contactTint:vec4f` +
+        (crown ? `,@location(${location + 2}) contactCrown:vec4f` : ''),
     ) +
     vertex +
     body.slice(0, cut) +
     lines +
-    occludeAmbient(body.slice(cut), 'contactSky')
+    occludeAmbient(body.slice(cut), crown ? 'contactKept' : 'contactSky')
   );
 }
 

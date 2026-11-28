@@ -5,6 +5,8 @@
 //   within 5 percent, also when `sink` puts a metre of the card underground (the ground line, not the mesh's foot);
 // - `base: { height: 1, shade: 0.6 }` keeps 0.4 at the ground line and everything above 1.67 m, a red `tint` turns the
 //   foot red, and the sun's beam alone draws the same bytes with them as without;
+// - `skyOcclusion.crown: { depth: 1.5, radius: 1, top: 8 }` keeps exp(-1.5 (1 - x / R)) of the sky's light x metres
+//   across the card from its axis, R = 1 - h / 8 at h metres, and all of it past R;
 // - a textured part's occlusion map dims the light of a Sky too. Before the fix it dimmed only core's flat ambient,
 //   which a Sky replaces, so an occlusion of 128/255 left a Sky-lit part as bright as 255 (KB-SCATTER-SKYAO1).
 import assert from 'node:assert/strict';
@@ -86,11 +88,38 @@ await runSuite(
         [r, g] = linear(red.image, c.x, c.rowAt(0.03)),
         [r2, g2] = linear(red.image, c.x, c.rowAt(2.5));
       assert.ok(r > 4 * g && Math.abs(r2 / g2 - 1) < 0.02, `${kind}: the foot turns to the tint (${(r / g).toFixed(1)})`);
+      const crowned = await draw({
+          kind,
+          look: { skyOcclusion: { depth: 0, height: 1, crown: { depth: 1.5, radius: 1, top: 8 } } },
+        }),
+        metre = (c.bottom - c.top) / 4; // float division: pixels per metre, square pixels
+      // A Scatter turns its instance to a random heading, so only its axis is at a known distance; a record's is 0.
+      const places = [
+        [2, 0],
+        [2, 0.375],
+        [2, 0.9],
+        [1, 0.45],
+      ];
+      for (const [h, across] of kind === 'tiles' ? places : places.slice(0, 1)) {
+        const x = Math.round(crowned.image.width / 2 - 0.5 + across * metre),
+          y = c.rowAt(h),
+          out = (x + 0.5 - crowned.image.width / 2) / metre, // float division: view only
+          radius = 1 - c.heightAt(y) / 8,
+          want = Math.exp(-1.5 * (1 - Math.min(Math.abs(out) / radius, 1))),
+          got = linear(crowned.image, x, y)[1] / linear(plain.image, x, y)[1];
+        assert.ok(
+          Math.abs(got / want - 1) < 0.06,
+          `${kind}: crown at ${h} m, ${across} m out keeps ${got.toFixed(3)}, ${want.toFixed(3)}`,
+        );
+      }
       const lit = await draw({ kind, light: 'sun' }),
         under = await draw({
           kind,
           light: 'sun',
-          look: { base: { height: 1, shade: 0.6 }, skyOcclusion: { depth: 1.5, height: 3 } },
+          look: {
+            base: { height: 1, shade: 0.6 },
+            skyOcclusion: { depth: 1.5, height: 3, crown: { depth: 2, radius: 1, top: 5 } },
+          },
         });
       assert.ok(lit.png.equals(under.png), `${kind}: the sun's beam is untouched`);
       // Every lit route compiles with the contact stages: maps, clusters, the two together and translucent blades.
@@ -100,7 +129,12 @@ await runSuite(
         { occlusion: 255, look: { variation: { value: 0.2 }, clusters: 0.5 } },
         { look: { blades: { translucency: 0.5 } } },
       ])
-        await draw({ kind, ...settings, look: { ...settings.look, base: { height: 1 } } });
+        for (const sky of [undefined, { depth: 1, height: 2, crown: { depth: 1, radius: 1, top: 4 } }])
+          await draw({
+            kind,
+            ...settings,
+            look: { ...settings.look, base: { height: 1 }, ...(sky ? { skyOcclusion: sky } : {}) },
+          });
     }
     // The ground line follows sink: with a metre under, the card's row h above its foot stands h - 1 above the ground.
     const sunk = await draw({ kind: 'tiles', look: { sink: 1 } }),

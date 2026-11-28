@@ -106,6 +106,8 @@ export interface PlacedSpecies {
   readonly alignToGround?: number;
   /** The share of a stand the species' `stands` rule closes, 0-1; undefined without one. */
   readonly cover?: number;
+  /** The hue and value jitter of the rule's `color`, those it gives; undefined when it gives neither. */
+  readonly variation?: { readonly hue?: number; readonly value?: number };
 }
 
 /** A detail species' density over a tile: `value / 255 * density` instances per square metre. */
@@ -206,6 +208,16 @@ let serial = 0;
 type Rect = readonly [number, number, number, number];
 
 /** A species prepared for placement: everything as integers. */
+/** The hue and value jitter a rule's `color` gives (a hue past half a turn either way covers the circle already). */
+function jitterOf(color: { readonly hue?: number; readonly value?: number } | undefined): PlacedSpecies['variation'] {
+  const { hue, value } = color ?? {};
+  if (hue === undefined && value === undefined) return undefined;
+  return Object.freeze({
+    ...(hue === undefined ? {} : { hue: Math.min(0.5, hue) }),
+    ...(value === undefined ? {} : { value }),
+  });
+}
+
 interface Spec extends PlacedSpecies {
   readonly index: number;
   readonly code: number; // u32 hash of the key
@@ -447,6 +459,7 @@ function planOf(biomes: readonly BiomeDefinition[], options: PlacementOptions): 
           sink: rule.sink,
           alignToGround: rule.alignToGround,
           cover: rule.stands?.cover,
+          variation: jitterOf(rule.color),
           index,
           code,
           biomeIndex,
@@ -1478,6 +1491,7 @@ export class BiomePlacement implements Disposable {
           sink: s.sink,
           alignToGround: s.alignToGround,
           cover: s.cover,
+          variation: s.variation,
         }),
       ),
     );

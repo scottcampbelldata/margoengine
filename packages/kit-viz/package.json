@@ -2471,6 +2471,10 @@
       "types": "./dist/terrain/ground-contact.d.ts",
       "import": "./dist/terrain/ground-contact.js"
     },
+    "./terrain/ground-contact-settings": {
+      "types": "./dist/terrain/ground-contact-settings.d.ts",
+      "import": "./dist/terrain/ground-contact-settings.js"
+    },
     "./terrain/rocks": {
       "types": "./dist/terrain/rocks.d.ts",
       "import": "./dist/terrain/rocks.js"

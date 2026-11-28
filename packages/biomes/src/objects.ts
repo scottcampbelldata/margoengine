@@ -15,6 +15,7 @@ import { drawCapture, shareCapture } from '../../shared/capture.js';
 import type { ScatterCapture } from '@margoengine/scatter';
 import type { PassContext } from '@margoengine/core/extension';
 import type { BiomeSeasons } from './seasons.js';
+import type { ClearingMap, ClearingMapLook, ScatterClearingMap } from '@margoengine/scatter/clearing-map';
 import type { BiomeWorld } from './world.js';
 
 /** Settings of {@link BiomeObjects.attach}. */
@@ -77,8 +78,9 @@ export interface BiomeObjectsOptions {
   readonly states?: (key: string, kind: 'bark' | 'foliage' | 'stone') => ScatterStateSource | undefined;
   /**
    * Objects meet the ground they stand on: stones darken and, on damp ground, mossen at the foot, trunks take soil on
-   * theirs (`ScatterOptions.base`), and trees keep exp(-0.7 x stand cover) of the sky's light at the ground line, all
-   * of it from half their height up (`ScatterOptions.skyOcclusion`). Default true. A species' `sink` and `alignToGround` apply either
+   * theirs (`ScatterOptions.base`), trees keep exp(-0.5 x stand cover) of the sky's light at the ground line, all
+   * of it from half their height up (`ScatterOptions.skyOcclusion`), and their foliage keeps exp(-1.2) of it at the
+   * crown's axis, all of it at the outer tips (`skyOcclusion.crown`). Default true. A species' `sink` and `alignToGround` apply either
    * way.
    */
   readonly contact?: boolean;
@@ -87,7 +89,18 @@ export interface BiomeObjectsOptions {
    * ...])`, world metres, kind 0 a trunk and 1 a stone, and `remove(key)`. A `TerrainGroundContact` of
    * `@margoengine/terrain/ground-contact` takes them and draws the soil and contact shade there. Default none.
    */
-  readonly ground?: { set(key: string, footprints: ArrayLike<number>): void; remove(key: string): void };
+  readonly ground?: {
+    set(key: string, footprints: ArrayLike<number>): void;
+    remove(key: string): void;
+    /** The baked contact mask, when the ground has one: detail opens around the feet it holds (`groundCover`). */
+    mask?(): ClearingMap | undefined;
+  };
+  /**
+   * How detail (grass, ferns) answers `ground`'s mask: it thins out and stands shorter in the soil ring around every
+   * trunk and stone, so the ring shows (`clearingMap` of `@margoengine/scatter/clearing-map`, whose defaults it takes).
+   * False leaves the detail as it is. Needs a `ground` with a `mask()`. Default on.
+   */
+  readonly groundCover?: false | ClearingMapLook;
 }
 
 /** Vertex data of a registry mesh: positions and normals (xyz per vertex, metres, y up, the base at y = 0) and triangles. */
@@ -230,9 +243,12 @@ const OBJECT_LOOKS = {
 // How objects meet the ground (`contact`). Sky light falls off with the leaves above, exponentially (Monsi and Saeki
 // 1953; English translation 2005, Annals of Botany 95:549, https://doi.org/10.1093/aob/mci052). A crown's outer
 // needles also see the sky from the side, so only a tree's lower half is shaded, to an optical depth of 0.7 at the
-// ground, scaled by the share of its stand the species closes. Both numbers are chosen on rendered stands: the depth
-// of 2 of a closed canopy seen from straight above, over whole trees, turned the crowns black and merged them.
-const CANOPY_DEPTH = 0.7,
+// ground, scaled by the share of its stand the species closes. Inside the crown the foliage shades itself
+// (`skyOcclusion.crown`): that darkens each crown's middle against its tips, so overlapping crowns stand apart. All
+// three numbers are chosen on rendered stands: the depth of 2 of a closed canopy seen from straight above, over whole
+// trees, turned the crowns black and merged them.
+const CANOPY_DEPTH = 0.5,
+  CROWN_DEPTH = 1.2,
   // A species without a `stands` rule counts as half closed (chosen).
   OPEN_COVER = 0.5,
   // Linear albedo: forest soil and litter splashed on a trunk's foot (inside CLM5's dry soil range 0.08 to 0.36 in the
@@ -249,6 +265,7 @@ function standingLooks(
   height: number,
   cover: number | undefined,
   damp: boolean,
+  crown: number,
 ): { base?: ScatterBase; skyOcclusion?: ScatterSkyOcclusion } {
   if (!(height > 0)) return {};
   if (kind === 'stone')
@@ -257,27 +274,52 @@ function standingLooks(
     };
   return {
     ...(kind === 'bark' ? { base: { height: Math.min(0.35, height / 4), shade: 0.4, tint: SOIL, amount: 0.6 } } : {}),
-    ...(tree ? { skyOcclusion: { depth: CANOPY_DEPTH * (cover ?? OPEN_COVER), height: height / 2 } } : {}),
+    ...(tree
+      ? {
+          skyOcclusion: {
+            depth: CANOPY_DEPTH * (cover ?? OPEN_COVER),
+            height: height / 2,
+            ...(kind === 'foliage' && crown > 0 ? { crown: { depth: CROWN_DEPTH, radius: crown, top: height } } : {}),
+          },
+        }
+      : {}),
   };
 }
 
+/** The widest reach across the ground of a part's near mesh, over the vertices below `under` metres. */
+function reachOf(geometry: Part['geometry'], under = Infinity): number {
+  const near = (Array.isArray(geometry) ? geometry[0] : geometry) as { readonly vertices?: ArrayLike<number> };
+  let reach = 0;
+  for (let i = 0; i < (near.vertices?.length ?? 0); i += 6)
+    if (near.vertices![i + 1] < under) reach = Math.max(reach, Math.hypot(near.vertices![i], near.vertices![i + 2]));
+  return reach;
+}
+
+// The share of a crown's radius that a tree's litter apron takes as its footprint radius: with TerrainGroundContact's
+// trunk profile (soil exp(-s / 1.1 r) to 3 r past it) the soil then fades out about at the crown's edge. Litter and duff
+// under pines and western mixed conifers are greater inside the crown than outside it (Prichard et al. 2025, "Forest
+// floor properties in pine forests of the southeastern and western United States", Fire Ecology 21:85,
+// https://doi.org/10.1186/s42408-025-00429-5).
+// The share is chosen on rendered stands.
+const LITTER_REACH = 0.3;
+
+/** The widest reach across the ground of a form's foliage, 0 for a form without any. */
+const crownOf = (form: readonly Part[]): number =>
+  Math.max(0, ...form.map((part) => (part.kind === 'foliage' ? reachOf(part.geometry) : 0)));
+
 /**
- * A form's footprint at scale 1: a stone's from its widest reach across the ground, a tree's from its bark's widest
- * reach below 0.3 m. Plants of other layers leave none.
+ * A form's footprint at scale 1: a stone's from its widest reach across the ground; a tree's from its bark's widest
+ * reach below 0.3 m, or `LITTER_REACH` of its crown's reach where that is wider. Plants of other layers leave none.
  */
 function footOf(form: readonly Part[], tree: boolean): Foot | undefined {
   for (const part of form) {
     const stone = part.kind === 'stone';
     if (!stone && !(tree && part.kind === 'bark')) continue;
-    const near = (Array.isArray(part.geometry) ? part.geometry[0] : part.geometry) as {
-        readonly vertices?: ArrayLike<number>;
-      },
-      v = near.vertices ?? [];
-    let reach = 0;
-    for (let i = 0; i < v.length; i += 6)
-      if (stone || v[i + 1] < 0.3) reach = Math.max(reach, Math.hypot(v[i], v[i + 2]));
+    const reach = reachOf(part.geometry, stone ? Infinity : 0.3);
+    if (!(reach > 0)) continue;
     // A stone's widest corner reaches past its mean outline.
-    if (reach > 0) return { radius: stone ? reach * 0.8 : reach, kind: stone ? 1 : 0 };
+    if (stone) return { radius: reach * 0.8, kind: 1 };
+    return { radius: Math.max(reach, LITTER_REACH * crownOf(form)), kind: 0 };
   }
   return undefined;
 }
@@ -301,7 +343,16 @@ type Trees = { conifers?: Conifers; broadleaves?: Broadleaves };
 type Data = { positions: ArrayLike<number>; normals: ArrayLike<number>; indices: ArrayLike<number> };
 type Kind = keyof typeof OBJECT_LOOKS;
 /** The options with no default value. */
-type Optional = 'heightmap' | 'bounds' | 'far' | 'seasons' | 'meshes' | 'states' | 'contact' | 'ground';
+type Optional =
+  | 'heightmap'
+  | 'bounds'
+  | 'far'
+  | 'seasons'
+  | 'meshes'
+  | 'states'
+  | 'contact'
+  | 'ground'
+  | 'groundCover';
 /** What one form of a species presses into the ground: its radius at scale 1, and 0 a trunk or 1 a stone. */
 type Foot = { readonly radius: number; readonly kind: 0 | 1 };
 /** A mesh part: one geometry, or one per LOD ring (near, middle, far) for meshes with detail levels. */
@@ -328,6 +379,8 @@ type Modules = {
   conifers?: Conifers;
   /** Loaded only when a species or detail key names a broadleaf of `@margoengine/procedural/broadleaves`. */
   broadleaves?: Broadleaves;
+  /** Loaded only when the placement has detail and `ground` has a mask for it to open around. */
+  clearing?: typeof import('@margoengine/scatter/clearing-map');
 };
 
 /** Whether a detail key draws as GrassScatter blades: `procedural:grass` that the `meshes` registry leaves alone. */
@@ -593,6 +646,8 @@ export class BiomeObjects implements Disposable {
   readonly #species = new Map<string, SpeciesEntry>();
   #snags?: SpeciesEntry;
   readonly #details: Detail[] = [];
+  /** What opens the detail around the ground's feet (`groundCover`). */
+  #cover?: ScatterClearingMap;
   /** Held tiles and their object counts. */
   readonly #held = new Map<string, number>();
   #far?: import('@margoengine/biomes/far').FarForest;
@@ -678,7 +733,11 @@ export class BiomeObjects implements Disposable {
         : undefined,
       grass = placement.details.some((d) => isBladeGrass(d.mesh, own))
         ? await import('@margoengine/scatter/grass')
-        : undefined;
+        : undefined,
+      clearing =
+        placement.details.length && options.groundCover !== false && typeof options.ground?.mask === 'function'
+          ? await import('@margoengine/scatter/clearing-map')
+          : undefined;
     const objects = new BiomeObjects(engine, placement, options, {
       tiles,
       scatter,
@@ -687,6 +746,7 @@ export class BiomeObjects implements Disposable {
       ...(conifers ? { conifers } : {}),
       ...(broadleaves ? { broadleaves } : {}),
       ...(grass ? { grass } : {}),
+      ...(clearing ? { clearing } : {}),
     });
     held.run(() => objects.#build());
     if (objects.#seasonal.length) {
@@ -778,6 +838,7 @@ export class BiomeObjects implements Disposable {
           const list: ScatterTiles[] = [],
             // The form's height at scale 1, over all its parts, so a trunk and its crown shade as one tree.
             height = Math.max(0, ...form.map((part) => meshTop(part.geometry))),
+            crown = crownOf(form),
             // Canopy and understory trees (layers 1 and 2) stand under their stand's crowns.
             tree = species?.layer === 1 || species?.layer === 2,
             damp = !!this.#placement.world?.biomes
@@ -801,7 +862,11 @@ export class BiomeObjects implements Disposable {
                 ...(species?.sink !== undefined ? { sink: species.sink } : {}),
                 ...(species?.alignToGround !== undefined ? { alignToGround: species.alignToGround } : {}),
                 // A contact foot (soil or moss, less sky) and the sky light a crown loses lower down.
-                ...(contact ? standingLooks(part.kind, tree, height, species?.cover, damp) : {}),
+                ...(contact ? standingLooks(part.kind, tree, height, species?.cover, damp, crown) : {}),
+                // The species' own colour jitter where its rule gives one: leaves and stone, never bark.
+                ...(part.kind !== 'bark' && species?.variation
+                  ? { variation: { ...OBJECT_LOOKS[part.kind].variation, ...species.variation } }
+                  : {}),
                 // Plants sway with a light breeze; stone does not.
                 ...(part.kind === 'stone' ? {} : { wind: [1, 0, 0.25] as const }),
                 // A scanned part draws its own maps (base colour with a cut-out, normal, occlusion-roughness-metal).
@@ -820,6 +885,8 @@ export class BiomeObjects implements Disposable {
     for (const s of this.#placement.species)
       this.#species.set(s.key, tiles(s.mesh, s.layer !== 1, !!seasons?.isSeasonal(s.biome, s.id), s));
     this.#snags = tiles('procedural:snag', false);
+    const { ground, groundCover } = this.#options;
+    this.#cover = this.#modules.clearing?.clearingMap(() => ground!.mask!(), groundCover || {});
     const [x0, z0, x1, z1] = bounds,
       width = Math.ceil((x1 - x0) / detailResolution), // float division: view only
       depth = Math.ceil((z1 - z0) / detailResolution); // float division
@@ -844,6 +911,8 @@ export class BiomeObjects implements Disposable {
           bounds,
           heightmap,
           densityMap: () => this.#detail(entry, width, depth),
+          // Grass and ferns open around the feet of trunks and stones, so the ground's soil ring shows.
+          ...(this.#cover ? { thinning: this.#cover } : {}),
           lod: [detailRadius * 0.3, detailRadius * 0.6, detailRadius] as [number, number, number],
           lodFade: 0,
           edgeShrink: detailRadius * 0.2,
@@ -916,6 +985,14 @@ export class BiomeObjects implements Disposable {
     const ratio = tinted.map((c, i) => (mean[i] > 0 ? c / mean[i] : 1)), // float division: a colour, mean[i] > 0
       fit = Math.max(1, ...ratio.map((r, i) => r * base[i]));
     return base.map((c, i) => (c * ratio[i]) / fit) as [number, number, number]; // float division: fit >= 1
+  }
+
+  /**
+   * What thins and shortens the detail around the ground's feet (`groundCover`; change it with `set`); undefined
+   * without it.
+   */
+  get groundCover(): ScatterClearingMap | undefined {
+    return this.#cover;
   }
 
   /** Foliage materials that follow the seasons (with `seasons` set): one per seasonal species part and detail. */
@@ -1256,6 +1333,7 @@ export class BiomeObjects implements Disposable {
       d.near?.dispose();
       d.texture?.destroy();
     }
+    this.#cover?.dispose();
     const listeners = [...this.#disposers];
     this.#disposers.clear();
     for (const listener of listeners) listener();
