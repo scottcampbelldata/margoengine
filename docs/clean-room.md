@@ -17125,6 +17125,13 @@ The collider uses the same visible road and bank geometry. A dynamic deck contri
   tick is too expensive. The Coriolis implicit-midpoint rotation evaluates the same Cayley map in
   reciprocal coordinates when its squared half-angle overflows. The eikonal diagonal retains Zhao's
   two-neighbour quadratic by factoring its local transit time before squaring at extreme scales.
+- An open side takes the outgoing shallow-water invariant `u_n + 2 sqrt(gh)` from the interior.
+  A prescribed wave supplies the incoming invariant `u_n − 2 sqrt(gh)` from measured or authored
+  exterior depth and normal speed. Both states meet within the same HLL flux and volume ledger.
+  The flat-bed fixture compares the inward simple wave against its nonlinear characteristics from
+  all four sides. Drähne's laboratory gauge and camera records provide separate forcing and holdouts.
+  [Kristina, Bokhove and van Groesen, 2014, §3.2](https://doi.org/10.5194/npg-21-987-2014) ·
+  [Drähne et al., 2016, §§2.2–2.4 and supplementary data](https://doi.org/10.3390/jmse4010001)
 - Kinjiro Kajiura, “The Leading Wave of a Tsunami” (1963). The rapid bottom-to-surface
   transfer at depth h is `sech(kh)`. The implementation uses its long-wave Padé approximation
   `1/(1 + (kh)²/2)`. The equivalent wet-cell Helmholtz system is symmetric and solved by

@@ -237,6 +237,73 @@ test('TsunamiSolver: characteristic boundaries record the long-wave export', asy
   balance(tsunami, 270);
 });
 
+test('TsunamiSolver carries a prescribed simple wave inward from any open side and accounts for its volume', async () => {
+  const spacing = 0.025;
+  const columns = 120;
+  const height = 0.002;
+  const period = 0.4;
+  const frames = 36;
+  const g = 9.81;
+  const c = Math.sqrt(g);
+  const pulse = (t) => (t >= 0 && t < period ? height * Math.sin((Math.PI * t) / period) ** 2 : 0);
+  const wave = (t) => ({ surface: pulse(t), outwardVelocity: 2 * (c - Math.sqrt(g * (1 + pulse(t)))) });
+  // The outgoing Riemann invariant stays constant. Along each incoming characteristic,
+  // u + c = 3 sqrt(g(h0 + eta)) - 2 sqrt(g h0), so its departure time determines eta.
+  const expected = (distance) => {
+    const arrival = frames / rate.num;
+    let low = -1;
+    let high = arrival;
+    for (let i = 0; i < 50; i++) {
+      const time = (low + high) / 2;
+      const speed = 3 * Math.sqrt(g * (1 + pulse(time))) - 2 * c;
+      if (time + distance / speed < arrival) low = time;
+      else high = time;
+    }
+    return pulse((low + high) / 2);
+  };
+  // Two cell widths and one input step, converted to height by the launch slope.
+  // The transit map has derivative at least 1 − x max|c'| / c², with c' bounded
+  // by 1.5 times the still-water speed times the maximum elevation slope per metre of depth.
+  const slope = (Math.PI * height) / period;
+  const stretch = 1 / (1 - (columns * spacing * 1.5 * slope) / c);
+  const bound = stretch * slope * ((2 * spacing) / c + 1 / rate.num);
+  for (let side = 0; side < 4; side++) {
+    const cells = side < 2 ? [columns, 1] : [1, columns];
+    const open = Array.from({ length: 4 }, (_, i) => i === side);
+    const incoming = open.map((enabled) => (enabled ? wave : undefined));
+    const { world, tsunami } = await make({ cells, spacing, bathymetry: -1, open, incoming }, [0, -g, 0]);
+    const start = world.takeSnapshot();
+    world.advance(frames);
+    for (let i = 0; i < columns; i++) {
+      const cell = side % 2 ? columns - 1 - i : i;
+      const observed = side < 2 ? tsunami.sample(cell, 0).height : tsunami.sample(0, cell).height;
+      close(observed, expected((i + 0.5) * spacing), bound);
+    }
+    assert.ok(tsunami.budget.boundaryExportVolume < 0);
+    balance(tsunami, frames);
+    const hash = world.hash();
+    world.restoreSnapshot(start.bytes);
+    world.advance(frames);
+    assert.equal(world.hash(), hash);
+  }
+});
+
+test('TsunamiSolver refuses a misplaced or nonfinite incoming boundary before publishing state', async () => {
+  const tsunami = await TsunamiSolver.load();
+  const world = new PhysicsWorld({ rate });
+  const base = { cells: [4, 1], spacing: 0.25, bathymetry: -1 };
+  const incoming = [() => ({ surface: Infinity, outwardVelocity: -1 })];
+  assert.throws(() => world.add(tsunami, { ...base, incoming }), { code: 'state', message: /callbacks on open sides/ });
+  world.add(tsunami, { ...base, open: [true, false, false, false], incoming });
+  const previous = tsunami.sample(0, 0);
+  assert.throws(() => world.advance(1), {
+    code: 'state',
+    message: /Return finite surface altitude and outward velocity/,
+  });
+  assert.equal(world.tick, 0);
+  assert.deepEqual(tsunami.sample(0, 0), previous);
+});
+
 test('landslideImpulse: Heller–Hager impulse product and crest height use the paper’s nondimensional groups', () => {
   const depth = 10;
   const g = 9.80665;

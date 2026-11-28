@@ -50,6 +50,20 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### SEA-06 four-point pass
+
+- Point 5. `63770ed64b` and `tsunami-extremes.test.js` verify finite Coriolis and travel-time calculations,
+  rejected over-budget CFL ticks and overflowing volumes, no energy increase over 12 seconds of wetting and drying,
+  mass conservation to 2.22e−15 m³, and exact replay. `tsunami.test.js` checks malformed grids and coded corrections.
+- Point 7. `63770ed64b` and Water's `tsunami-surface.browser.mjs` verify the accepted dry-to-wet surface on both
+  renderers. The incoming characteristic can be authored or supplied from an independent gauge. `tsunami.test.js`
+  checks its propagation from all four sides, signed volume closure and exact seek.
+- Point 8. `63770ed64b` corrects the fault-source documentation and records the renderer and numeric limits.
+  [Laboratory evidence](../packages/physics/scripts/sea06-measured.md) preserves the measured model gaps and reproduction.
+- Point 2 remains open. On the 20 mm grid, the Drähne T30 case meets two of six paired camera bounds and T20 meets
+  none. Both preserve the inlet and gauge records separately. The NOAA canonical beach misses persist across
+  three grids, with the larger crest arriving too early and a weaker case missing the observed rundown.
+
 ## Film set first: the underwater and boat films
 
 The solvers behind the Edmund Fitzgerald, First Wake, Below the Swell and Below the Blue Line films (problem rows EF,

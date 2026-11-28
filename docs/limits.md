@@ -10480,9 +10480,14 @@ It displays the moving wet/dry boundary and depth-averaged surface, without an o
 A world tick accepts only finite depth, discharge, volume and inundation records. If the explicit solver
 would need more than 4,096 CFL substeps, use a coarser grid or smaller forcing. No partial step is published.
 
-The optional tsunami entry is 6,193 B gzip with a 6,449 B ceiling. The plain and shared Wasm assets are
-each 15,307 B raw and 6,807 B gzip. Extreme finite Coriolis rates retain the midpoint rotation's bounded
+The optional tsunami entry is 6,455 B gzip with a 6,711 B ceiling. The plain and shared Wasm assets are
+each 16,569 B raw and 7,303 B gzip. Extreme finite Coriolis rates retain the midpoint rotation's bounded
 half-turn limit. Resolve the rotation in time when phase accuracy matters.
+
+An incoming wave is uniform along its configured open side and is sampled once per tick. Give its
+surface and velocity in the same local datum and axes as the bed. The inviscid Drähne plane-beach
+comparisons still overpredict the maximum run-up in several repeats. See the independent tests and
+limits in [SEA-06 laboratory evidence](../packages/physics/scripts/sea06-measured.md).
 
 ### Accretion and compact-object trajectories (SPACE-03)
 

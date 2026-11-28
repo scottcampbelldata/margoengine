@@ -21,6 +21,7 @@ export interface TsunamiKernel {
     budget: number,
     dt: number,
     time: number,
+    incoming: number,
   ): number;
   tsunami_sources(
     water: number,

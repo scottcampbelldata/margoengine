@@ -20,6 +20,13 @@ export const TSUNAMI_LAYOUT = 1;
 
 export const TSUNAMI_WORDS = 7;
 
+export interface TsunamiBoundarySample {
+    readonly surface: number;
+    readonly outwardVelocity: number;
+}
+
+export type TsunamiBoundaryWave = (time: number) => TsunamiBoundarySample;
+
 export interface TsunamiBudget {
     readonly initialVolume: number;
     readonly storedVolume: number;
@@ -53,6 +60,7 @@ export interface TsunamiOptions {
     readonly manning?: number;
     readonly dryDepth?: number;
     readonly open?: readonly [boolean, boolean, boolean, boolean];
+    readonly incoming?: readonly [TsunamiBoundaryWave?, TsunamiBoundaryWave?, TsunamiBoundaryWave?, TsunamiBoundaryWave?];
     readonly coriolis?: number;
     readonly bottomFilterDepth?: number;
     readonly originCellSize?: number;

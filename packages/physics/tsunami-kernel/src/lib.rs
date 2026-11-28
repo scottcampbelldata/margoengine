@@ -218,30 +218,52 @@ fn reconstruct(left: Rep, right: Rep, model: &Model) -> (Water, Water) {
     (fa, fb)
 }
 
-fn ghost(inside: Rep, outward: f64, open: bool, model: &Model) -> Rep {
+#[derive(Clone, Copy)]
+#[repr(C)]
+struct BoundaryWave {
+    active: f64,
+    surface: f64,
+    outward_velocity: f64,
+}
+
+fn ghost(inside: Rep, outward: f64, open: bool, model: &Model, wave: Option<BoundaryWave>) -> Rep {
     if !open {
         return Rep {
             u: -inside.u,
             ..inside
         };
     }
-    let undisturbed = (model.sea - inside.bed).max(0.0);
-    let c0 = sqrt(model.gravity * undisturbed);
+    let exterior_surface = wave.map_or(model.sea, |wave| wave.surface);
+    let exterior_depth = (exterior_surface - inside.bed).max(0.0);
+    let exterior_normal = if exterior_depth > model.dry {
+        wave.map_or(0.0, |wave| wave.outward_velocity)
+    } else {
+        0.0
+    };
+    let c0 = sqrt(model.gravity * exterior_depth);
     let c = sqrt(model.gravity * inside.h);
     let normal = inside.u * outward;
     if normal >= c && c > 0.0 {
         return inside;
     }
-    if normal <= -c && c > 0.0 {
+    if (normal <= -c && c > 0.0) || (exterior_normal < 0.0 && exterior_normal <= -c0) {
         return Rep {
-            h: undisturbed,
-            u: 0.0,
+            h: exterior_depth,
+            u: if wave.is_some() {
+                exterior_normal * outward
+            } else {
+                0.0
+            },
             v: 0.0,
             bed: inside.bed,
         };
     }
     let outgoing = normal + 2.0 * c;
-    let incoming = -2.0 * c0;
+    let incoming = if wave.is_some() {
+        exterior_normal - 2.0 * c0
+    } else {
+        -2.0 * c0
+    };
     let characteristic = (0.25 * (outgoing - incoming)).max(0.0);
     Rep {
         h: characteristic * characteristic / model.gravity,
@@ -255,9 +277,16 @@ struct Basin<'a> {
     model: &'a Model,
     bed: *const f64,
     pressure: *const f64,
+    incoming: Option<&'a [BoundaryWave; 4]>,
 }
 
 impl Basin<'_> {
+    fn wave(&self, side: usize) -> Option<BoundaryWave> {
+        self.incoming
+            .map(|waves| waves[side])
+            .filter(|wave| wave.active != 0.0)
+    }
+
     unsafe fn primitive(&self, water: *const Water, i: usize, axis: usize) -> Rep {
         let q = if axis == 0 {
             *water.add(i)
@@ -312,10 +341,12 @@ impl Basin<'_> {
             let (width, lines, step, between) = self.grid.strides(axis);
             let low_open = flags & (1 << (2 * axis)) != 0;
             let high_open = flags & (2 << (2 * axis)) != 0;
+            let low_wave = self.wave(2 * axis);
+            let high_wave = self.wave(2 * axis + 1);
             for row in 0..lines {
                 let start = row * between;
                 let mut inside = self.primitive(base, start, axis);
-                let outside = ghost(inside, -1.0, low_open, self.model);
+                let outside = ghost(inside, -1.0, low_open, self.model, low_wave);
                 let (_, b) = reconstruct(outside, inside, self.model);
                 outgoing -= b.h;
                 *target.add(start) =
@@ -333,7 +364,7 @@ impl Basin<'_> {
                 }
                 let end = start + (width - 1) * step;
                 inside = self.primitive(base, end, axis);
-                let outside = ghost(inside, 1.0, high_open, self.model);
+                let outside = ghost(inside, 1.0, high_open, self.model, high_wave);
                 let (a, _) = reconstruct(inside, outside, self.model);
                 outgoing += a.h;
                 *target.add(end) =
@@ -384,6 +415,29 @@ impl Basin<'_> {
                 return None;
             }
             speed = speed.max(local);
+        }
+        if self.incoming.is_some() {
+            for side in 0..4 {
+                let Some(wave) = self.wave(side) else {
+                    continue;
+                };
+                let axis = side / 2;
+                let high = side % 2 == 1;
+                let (width, lines, step, between) = self.grid.strides(axis);
+                let edge = if high { (width - 1) * step } else { 0 };
+                let outward = if high { 1.0 } else { -1.0 };
+                for row in 0..lines {
+                    let inside = self.primitive(field, row * between + edge, axis);
+                    let outside = ghost(inside, outward, true, self.model, Some(wave));
+                    let local = outside.u.abs()
+                        + outside.v.abs()
+                        + 4.0 * sqrt(self.model.gravity * outside.h);
+                    if !local.is_finite() {
+                        return None;
+                    }
+                    speed = speed.max(local);
+                }
+            }
         }
         Some(speed)
     }
@@ -623,6 +677,7 @@ unsafe extern "C" fn tsunami_step(
     metrics: *mut f64,
     dt: f64,
     time: f64,
+    incoming: *const [BoundaryWave; 4],
 ) -> u32 {
     let grid = Grid {
         width: nx as usize,
@@ -635,6 +690,7 @@ unsafe extern "C" fn tsunami_step(
         model,
         bed,
         pressure,
+        incoming: incoming.as_ref(),
     };
     if !(dt.is_finite() && dt > 0.0 && time.is_finite() && time >= 0.0) {
         return StepFailure::Numeric as u32;

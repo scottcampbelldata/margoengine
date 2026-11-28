@@ -28,6 +28,17 @@ export interface TsunamiLoadOptions {
   readonly signal?: AbortSignal;
 }
 
+/** Exterior surface altitude (m) and velocity across an open side (m/s, positive outward). */
+export interface TsunamiBoundarySample {
+  /** Free-surface altitude in the same datum as bathymetry. */
+  readonly surface: number;
+  /** Velocity along the outward normal, so a negative value flows into the grid. */
+  readonly outwardVelocity: number;
+}
+
+/** Deterministic wave input sampled at the midpoint of each world tick, in seconds. */
+export type TsunamiBoundaryWave = (time: number) => TsunamiBoundarySample;
+
 /** A regular XZ patch including offshore water and dry land. Coordinates are metres from the world cell. */
 export interface TsunamiOptions {
   /** X and Z grid dimensions, fastest axis X. */
@@ -54,6 +65,8 @@ export interface TsunamiOptions {
   readonly dryDepth?: number;
   /** Open characteristic boundaries at X low, X high, Z low and Z high. Defaults to all closed. */
   readonly open?: readonly [boolean, boolean, boolean, boolean];
+  /** Optional exterior wave on an open side, in the same order as open. Omit a side for still exterior water. */
+  readonly incoming?: readonly [TsunamiBoundaryWave?, TsunamiBoundaryWave?, TsunamiBoundaryWave?, TsunamiBoundaryWave?];
   /** Coriolis frequency in rad/s, signed on the XZ plane. Defaults to zero. */
   readonly coriolis?: number;
   /** Optional wet-patch reference depth for a rapid bottom deformation filter. Zero uses the shallow limit. */
@@ -183,6 +196,7 @@ interface State {
   readonly output: Region;
   readonly travel: Region;
   readonly filter?: Region;
+  readonly incoming?: { readonly region: Region; readonly waves: NonNullable<TsunamiOptions['incoming']> };
   readonly regions: readonly Region[];
 }
 
@@ -321,6 +335,14 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
     if (!Array.isArray(open) || open.length !== 4 || open.some((side) => typeof side !== 'boolean'))
       throw new MargoError('state', 'Invalid tsunami boundaries. Use four booleans in low/high X and Z order.');
     const mask = open.reduce((bits, side, i) => bits | (side ? 1 << i : 0), 0);
+    const waves = options.incoming;
+    if (
+      waves !== undefined &&
+      (!Array.isArray(waves) ||
+        waves.length > 4 ||
+        waves.some((wave, i) => wave !== undefined && (!open[i] || typeof wave !== 'function')))
+    )
+      throw new MargoError('state', 'Give incoming waves as callbacks on open sides in low/high X and Z order.');
     const parameters = [
       spacing,
       positive('downward gravity', -host.gravity[1]),
@@ -355,6 +377,9 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
     const output = allocate('inundation', TSUNAMI_WORDS * count);
     const travel = allocate('arrival-query', count);
     const filter = filterDepth > 0 ? allocate('bottom-response-work', 5 * count) : undefined;
+    const incoming = waves?.some(Boolean)
+      ? { region: allocate('incoming-boundary-wave', 12), waves: waves.slice() as typeof waves }
+      : undefined;
     const kernel = bindTsunamiKernel(host, this.builds);
     const s: State = {
       host,
@@ -385,6 +410,7 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
       output,
       travel,
       filter,
+      incoming,
       regions: [state, bed, model, log, budget, sourceTimes, output],
     };
     words(s, model).set(parameters);
@@ -503,6 +529,21 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
 
   step(context: StepContext, dt: number): void {
     const s = this.live();
+    if (s.incoming) {
+      const samples = s.incoming.waves.map((wave) => wave?.((context.tick + 0.5) * dt));
+      const boundary = words(s, s.incoming.region);
+      boundary.fill(0);
+      for (const [side, wave] of s.incoming.waves.entries()) {
+        if (!wave) continue;
+        const sample = samples[side];
+        if (!Number.isFinite(sample?.surface) || !Number.isFinite(sample?.outwardVelocity))
+          throw new MargoError('state', 'Return finite surface altitude and outward velocity from each incoming wave.');
+        const at = 3 * side;
+        boundary[at] = 1;
+        boundary[at + 1] = sample!.surface;
+        boundary[at + 2] = sample!.outwardVelocity;
+      }
+    }
     const current = words(s, s.state);
     const candidate = words(s, s.candidate);
     candidate.set(current);
@@ -544,6 +585,7 @@ export class TsunamiSolver implements Solver<TsunamiOptions> {
       s.results.byteOffset,
       dt,
       (context.tick + 1) * dt,
+      s.incoming?.region.byteOffset ?? 0,
     );
     if (status === 2)
       throw new MargoError(

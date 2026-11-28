@@ -8154,6 +8154,31 @@ Advance the physics world before drawing. The mirror reads the accepted depth an
 dry cells until the wave inundates them. Its reusable sample gives distance in local metres and surface
 altitude above the same datum as the terrain. Floating-origin placement stays with the scene that owns both.
 
+Use `incoming` to launch a long wave through an open edge. In low/high X, low/high Z order, pass a
+callback for each driven side. The callback receives the world tick midpoint and supplies an exterior
+surface altitude and outward-normal speed. A negative speed enters the grid. Omit callbacks for still
+exterior water. The budget's signed `boundaryExportVolume` subtracts incoming water and adds outgoing water.
+
+```ts
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { TsunamiSolver } from '@margoengine/physics/tsunami';
+
+const pulse = await TsunamiSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(pulse, {
+  cells: [64, 4],
+  spacing: 0.5,
+  bathymetry: -2,
+  open: [true, false, false, false],
+  incoming: [(time) => {
+    const phase = Math.max(0, 1 - Math.abs(time - 1));
+    const surface = 0.025 * phase * phase;
+    return { surface, outwardVelocity: 2 * (Math.sqrt(9.80665 * 2) - Math.sqrt(9.80665 * (2 + surface))) };
+  }],
+});
+world.advance(60);
+console.log(pulse.budget.boundaryExportVolume);
+```
+
 Pass a live `TerrainBed` geometry or an aligned layout-1 `bottomField` to supply natural seabed
 motion. An optional `bottomFilterDepth` redistributes the rapid bottom response over nearby wet
 cells and preserves water volume. For a calving or slide pulse, pass its 60 Hz `SeaSource` descriptor

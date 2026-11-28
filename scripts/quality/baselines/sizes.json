@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21612825,
+  "total": 21613087,
   "history": [
     {
       "date": "2026-10-24",
@@ -15252,6 +15252,11 @@
       "commit": "lane-a-raw-capture",
       "reason": "LightBounce draws raw meshes with captureEntry from their MargoMaterial (three.js parity row 15): clustered/bounce 15818 to 15839 B; the 21 B are one WGSL branch that a split could not hold",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "sea-06-incoming-characteristics",
+      "reason": "Physics/tsunami grows from 6193 to 6455 B gzip and cap 6449 to 6711 B. Both optional kernels move from 6807 to 7303 B gzip. The driven edge and existing outgoing wave share one flux and mass ledger. A separate solver would duplicate boundary state and require inter-solver flux iteration. Core and Stage are unchanged."
     }
   ],
   "items": {
@@ -16163,7 +16168,7 @@
     "@margoengine/physics/thin-film": 15631,
     "@margoengine/physics/tissue": 3218,
     "@margoengine/physics/tracers": 17877,
-    "@margoengine/physics/tsunami": 6449,
+    "@margoengine/physics/tsunami": 6711,
     "@margoengine/physics/underwater": 4221,
     "@margoengine/physics/vegetation": 9958,
     "@margoengine/physics/viscoplastic": 5154,
