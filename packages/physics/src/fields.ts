@@ -474,8 +474,16 @@ function windDensity(value: number, label: string): number {
   return value;
 }
 
+// The rigid solver holds loads in float32: a load is in its range when it stays finite stored as one. The store rounds as
+// `Math.fround` does, without `Math` on the step path (tests/step-path.test.js).
+const single = new Float32Array(1);
+function inSingleRange(value: number): boolean {
+  single[0] = value;
+  return Number.isFinite(single[0]);
+}
+
 function checkedWrench(result: ReturnType<Wrench>): ReturnType<Wrench> {
-  if (result.some((vector) => vector.some((value) => !Number.isFinite(Math.fround(value)))))
+  if (result.some((vector) => vector.some((value) => !inSingleRange(value))))
     throw fieldInput(
       "A wind force or torque exceeds the rigid solver's numeric range. Reduce wind speed, density or collider scale.",
     );
