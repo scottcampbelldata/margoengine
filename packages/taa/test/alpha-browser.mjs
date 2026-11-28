@@ -1,4 +1,4 @@
-// Real-GPU check that TAA's history keeps premultiplied alpha under motion (threejs-parity row 6), built packages, on
+// Real-GPU check that TAA's history keeps premultiplied alpha under motion (parity row 6), built packages, on
 // WebGPU and (MARGO_COMPAT=1) the WebGL2 layer:
 //   node scripts/run-with-timeout.mjs -- node packages/taa/test/alpha-browser.mjs
 // A flat plate slides across a TransparentCanvas for 20 frames. The canvas is shot over a black page and over a white

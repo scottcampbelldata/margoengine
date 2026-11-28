@@ -1704,7 +1704,7 @@ export class SoftBodyDesc {
   }
 
   /**
-   * A soft volume from any closed triangle mesh (three.js `physics_ammo_volume`, Ammo's `CreateFromTriMesh`): a
+   * A soft volume from any closed triangle mesh: a
    * `@margoengine/geometry` primitive (`sphereGeometry(0.5)`), a core `Geometry`, a loaded glTF primitive
    * (`model.primitives[i]` of `@margoengine/gltf/pbr`, in its node's own space) or flat positions with indices. Vertices within
    * `weld` metres become one particle, so a mesh split at its normal or UV seams is one closed surface; its edges are

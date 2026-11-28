@@ -1,4 +1,4 @@
-// contactcontinue (DYN-01, Babylon's COLLISION_CONTINUED): once a step for each solid pair that touched before the step
+// contactcontinue (DYN-01): once a step for each solid pair that touched before the step
 // and still touches after it, never in the step a pair starts or ends, and never for sensors.
 import assert from 'node:assert/strict';
 import test from 'node:test';

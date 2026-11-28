@@ -395,7 +395,7 @@ export interface PhysicsEventMap {
   contactstart: CollisionEvent;
   /**
    * After each step that has a listener, once for each pair of solid colliders that touched before the step and still
-   * touch after it (Babylon's `COLLISION_CONTINUED`), in the order of the pair rows; a pair that began this step has
+   * touch after it, in the order of the pair rows; a pair that began this step has
    * `contactstart` instead. Either collider must have collision events on (the default).
    */
   contactcontinue: CollisionEvent;

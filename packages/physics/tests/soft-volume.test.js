@@ -1,4 +1,4 @@
-// Soft volumes (P8, SOFT-04 and SOFT-06; three.js `physics_ammo_volume`): SoftBodyDesc.volume welds any closed mesh into a
+// Soft volumes (P8, SOFT-04 and SOFT-06): SoftBodyDesc.volume welds any closed mesh into a
 // deformable body that holds its volume or a gas, bounces on the ground, trades momentum with rigid bodies, takes impulses
 // and forces as a body of its mass, feels the air on its windward side, hangs from an anchor, replays after a snapshot,
 // draws in the shared debug view, and refuses a mesh it cannot use with a coded error.

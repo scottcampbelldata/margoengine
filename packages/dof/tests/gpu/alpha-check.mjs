@@ -1,4 +1,4 @@
-// Real-GPU check that DOF keeps valid premultiplied alpha on a transparent canvas (threejs-parity row 6), built
+// Real-GPU check that DOF keeps valid premultiplied alpha on a transparent canvas (parity row 6), built
 // packages, on WebGPU and (MARGO_COMPAT=1) the WebGL2 layer:
 //   node scripts/run-with-timeout.mjs -- node packages/dof/tests/gpu/alpha-check.mjs
 // Two boxes over a transparent canvas, one or both out of focus, read from DOF's linear outputTexture for the full and

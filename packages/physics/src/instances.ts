@@ -1,6 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// One rigid body per instance of an instanced mesh, the instance index naming the body (three.js's InstancedMesh physics
-// examples, Babylon's thin instances). The bodies are ordinary bodies of the world; after each sync their interpolated
+// One rigid body per instance of an instanced mesh, the instance index naming the body. The bodies are ordinary bodies of the world; after each sync their interpolated
 // poses go to the instance matrices in one write, so thousands of bodies are one draw call. Off the step path: `Math` is
 // allowed, as in sync.ts (a render frame may differ between machines, the simulation never does).
 import { MargoError } from '@margoengine/math/errors';

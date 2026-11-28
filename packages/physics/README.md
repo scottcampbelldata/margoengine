@@ -77,26 +77,7 @@ joints swings one in, one out at either tier. Give its balls friction 0: a hung 
 Coulomb friction at the strike keeps only `1 - mu r / l` of the speed at each pair (`docs/limits.md`, "Touching
 Newton's cradle").
 
-### From three.js and Rapier
-
-The three.js Rapier examples (`physics_rapier_basic`, `physics_rapier_instancing`, `physics_rapier_terrain`) load
-Rapier, make a world with a gravity, describe each body and collider with `RigidBodyDesc` and `ColliderDesc`, call
-`world.step()` each frame, and copy every body's translation and rotation into its mesh (or into
-`InstancedMesh.setMatrixAt`) themselves. In Margo:
-
-| three.js + Rapier | Margo |
-| --- | --- |
-| `await RAPIER.init(); new RAPIER.World({x: 0, y: -9.81, z: 0})` | `await Physics.load(); new Physics(engine)` (gravity -9.81 m/s² by default; `physics.gravity`) |
-| `world.createRigidBody(RigidBodyDesc.dynamic().setTranslation(x, y, z))` then `world.createCollider(ColliderDesc.ball(r), body)` | `physics.addBody(mesh, { position, colliders: { shape: 'sphere', radius: r } })`; `type: 'fixed'`, `'kinematicPosition'` or `'kinematicVelocity'` for the others |
-| `world.step()` and `mesh.position.copy(body.translation())` every frame | nothing: the engine steps at a fixed rate and moves each body's mesh, interpolated |
-| one body per instance, copied into `setMatrixAt` each frame | `new InstancedBodies(physics, instancedMesh, { colliders })` |
-| `ColliderDesc.heightfield(rows, cols, heights, scale)` | `{ shape: 'heightfield', rows, columns, heights, scale }`, the same column-major layout |
-| `world.castRay(new Ray(o, d), maxToi, true)` | `physics.raycast(o, d, { maxDistance })`, which returns the body, collider, point, normal and mesh |
-| `body.applyImpulse({x, y, z}, true)` | `body.applyImpulse([x, y, z])` (arrays, and bodies wake by default) |
-
-Rapier's own names (`setNextKinematicTranslation` is `setNextPosition`, `lockRotations`, `enableCcd` is `ccd`,
-`collisionGroups`, `activeEvents` as `physics.on('contactstart')`) are listed row by row in
-[docs/physics-collision-parity.md](../../docs/physics-collision-parity.md).
+Examples that drive other physics libraries by hand map onto Margo in [docs/physics-migration.md](../../docs/physics-migration.md).
 
 ## Character controller quick start
 
@@ -132,41 +113,6 @@ console.log(controller.grounded, controller.jump(5), body.position);
   the contacts of the last move.
 
 Bad input is a `MargoError` linked to [its help entry](https://margoengine.com/errors#characters).
-
-### From three.js and Rapier
-
-The three.js example `physics_rapier_character_controller` drives Rapier's `KinematicCharacterController` by hand:
-
-```javascript
-const controller = world.createCharacterController(0.01);
-controller.enableAutostep(0.3, 0.2, false);
-controller.enableSnapToGround(0.2);
-controller.setApplyImpulsesToDynamicBodies(true);
-// every frame: gravity and the jump are yours to integrate, and the mesh is yours to move
-velocityY = grounded ? (jump ? 5 : 0) : velocityY - 9.81 * dt;
-controller.computeColliderMovement(collider, { x: vx * dt, y: velocityY * dt, z: vz * dt });
-const m = controller.computedMovement(), p = body.translation();
-body.setNextKinematicTranslation({ x: p.x + m.x, y: p.y + m.y, z: p.z + m.z });
-grounded = controller.computedGrounded();
-mesh.position.copy(body.translation());
-```
-
-In Margo the same options are one object, the step is one call, and a body made with a mesh moves it (the quick start above is the whole program):
-
-```typescript
-const controller = physics.createCharacterController(body, { offset: 0.01, autostep: { maxHeight: 0.3, minWidth: 0.2 }, snapToGround: 0.2, applyImpulsesToDynamicBodies: true });
-physics.on('beforestep', () => {
-  if (jumpPressed) controller.jump(5);
-  controller.walk([vx, 0, vz]);
-});
-```
-
-`move(desired)` and Rapier's read-backs (`computedMovement()`, `computedGrounded()`, `numComputedCollisions()`,
-`computedCollision(i)`) are there under the same names for code that keeps its own integration. Babylon's
-`PhysicsCharacterController` is velocity-driven like `walk`: its `setVelocity` and `integrate(dt, support, gravity)` are
-`walk(velocity)`, and its `checkSupport` is `grounded`, `groundNormal` and `platform`. A character that is a dynamic body,
-pushed by the world, is `createDynamicCharacter`; a ragdoll that
-takes over from either on a hit is `@margoengine/ragdoll/character`. A live page: `examples/character-controller.html`.
 
 ## Debug view (`@margoengine/physics/debug-view`)
 
@@ -454,22 +400,6 @@ engine.start();
 ```
 
 The arcade layout, from the body's half sizes along its forward, left and up axes (`L`, `W`, `H`): wheel radius `r = 0.35 min(W, L)`, suspension rest length `0.85 r`, wheel centres on the body's sides (`W` either side, half of each tyre outside the body) and `0.7 L` ahead and behind the body's centre, the front pair steering and all four driving and braking. The springs rest a third of the way in (`suspensionStiffness = g / (4 sag)` per kilogram of chassis with `sag = rest / 3`), damped at 0.3 of critical on compression and 0.5 on extension, each carrying up to six times its share of the weight, and each hub rests `0.2 r` above the bottom of the body, so the body rides about `0.8 r` off the ground. Grip, engine force (the chassis mass in newtons a wheel, 0.4 g in all), brakes (1.2 g) and steering (0.5 rad at full lock) keep the `Vehicle` defaults. Every option of `new Vehicle` but `wheels` passes through (`maxEngineForce`, `tyre`, `drivetrain`, `antiRollBars`, `forward` and the rest), `wheel` overrides any wheel setting for all four (`{radius: 0.4, frictionSlip: 2}`), `halfExtents` gives the size of a chassis without a box collider, and `wheelMeshes` are drawn front left, front right, rear left, rear right. `car.debugRender({suspension, contacts, slip, wheels, style})` switches each part off and recolours it; it reads the last step and changes nothing. A snapshot of a world with a vehicle is `physics.takeSnapshot()` plus `car.writeMotionState(buffer)` (controls and wheel spin), restored with `restoreSnapshot` and `readMotionState`, and replays bit for bit. A vehicle, `Vehicle.car`, tyre model, drivetrain or motorcycle given input it cannot use throws a `MargoError` (code `unsupported`, or `state` for a chassis of another world, `disposed` after `dispose()`) whose message names the input and the fix and links [margoengine.com/errors#vehicles](https://margoengine.com/errors#vehicles).
-
-### Coming from the three.js Rapier vehicle example
-
-three.js's `physics_rapier_vehicle_controller` example builds a Rapier `DynamicRayCastVehicleController` on the chassis's rigid body, adds each wheel with its chassis-local position, suspension direction, axle and suspension rest length and radius, sets each wheel's suspension stiffness, friction slip and steering, then every frame sets the engine force on the driven wheels, the brake on all and the steering on the front pair, calls the controller's update with the time step, and copies each wheel's translation, suspension length, steering and rotation into the wheel meshes itself. In Margo the same car is:
-
-| three.js + Rapier example | Margo |
-| --- | --- |
-| `world.createVehicleController(chassis)`, then `addWheel(position, direction, axle, restLength, radius)` per wheel | `new Vehicle(physics, chassis, {wheels: [{position, direction, axle, suspensionRestLength, radius}]})`, or `Vehicle.car(physics, chassis)` for the four laid out and tuned |
-| `setWheelSuspensionStiffness`, `setWheelFrictionSlip`, `setWheelSideFrictionStiffness`, `setWheelMaxSuspensionTravel`, `setWheelSuspensionCompression` and `Relaxation`, `setWheelMaxSuspensionForce` per wheel | the same names as wheel options: `suspensionStiffness`, `frictionSlip`, `sideFrictionStiffness`, `maxSuspensionTravel`, `suspensionCompression`, `suspensionRelaxation`, `maxSuspensionForce`, `rollInfluence` |
-| `setWheelEngineForce`, `setWheelBrake`, `setWheelSteering` on chosen wheels each frame | `car.setInput({throttle, steer, brake})` from -1 to 1 (or `engineForce`, `brake`, `steering`), on the wheels marked `drive`, `brake` and `steer` |
-| `vehicle.updateVehicle(dt)` before `world.step()` | nothing: the vehicle steps with the world at its fixed rate |
-| `wheelChassisConnectionPointCs`, `wheelSuspensionLength`, `wheelSteering`, `wheelRotation` read back into each wheel mesh | `wheelMeshes` (or each wheel's `mesh`) are posed for you after every step; `car.wheelLocalPose(i)` gives the pose |
-| `currentVehicleSpeed()`, `wheelIsInContact(i)`, `wheelContactPoint(i)` | `car.speed`, `car.wheel(i).inContact`, `car.wheel(i).contactPoint` (and `contactNormal`, `suspensionForce`, `forwardImpulse`, `sideImpulse`, `ground`) |
-| `world.debugRender()` | `physics.debugRender()` for the colliders, plus `car.debugRender()` for the suspension rays, contacts, tyre slip and wheels |
-
-The suspension and grip numbers mean what they mean in Rapier (stiffness and damping per kilogram of chassis, friction slip as a friction coefficient), so values tuned for the three.js example carry over; `next-vehicle.test.js` drives Margo's vehicle and Rapier's side by side on the same car.
 
 ## Ropes, vehicles and compound shapes
 
@@ -875,7 +805,7 @@ console.log(panel.linearVelocity[0] > 0, wind.workCounts()?.probes); // true 13
 
 ### Gravity fields, updrafts and vortices
 
-Babylon's `PhysicsHelper` fields, as attachments that push every step until removed. Each takes `center`, `radius`,
+Radial and cylindrical force fields, as attachments that push every step until removed. Each takes `center`, `radius`,
 `falloff` (`'linear'` by default, `'inverse-square'` or `'none'`, from the centre or the axis out to the radius) and a
 query `filter`, holds no state of its own (a snapshot and restore replays it bit for bit), and has `enabled` (default
 true) and `remove()` (`using` calls it). A body is pushed at its centre of mass, so it is thrown, not spun, and wakes.
@@ -901,17 +831,9 @@ lift.enabled = false;
 console.log(crate.position);
 ```
 
-Coming from Babylon: `helper.gravitationalField(origin, radius, strength, falloff)` is `new GravityField(physics,
-{center, radius, acceleration})` (an acceleration, so a crate and a pebble fall in alike); `helper.updraft(origin,
-radius, strength, height, mode)` and `helper.vortex(origin, radius, strength, height)` are `Updraft` and `Vortex` with
-`strength` in newtons; the event's `enable()` and `disable()` are `enabled = true` and `false`, and its `dispose()` is
-`remove()`. `applyRadialExplosionImpulse` is `explosion` above; a radial explosion force over one step is `explosion`
-with `impulse` set to the force times `physics.fixedTimestep`. Bad input is a `MargoError` linked to
-[its help entry](https://margoengine.com/errors#physics-fields).
-
 ## Instanced bodies: thousands of bodies in one draw
 
-`new InstancedBodies(physics, mesh, options)` gives every instance of an instanced mesh (`createInstancedMesh` of `@margoengine/materials`) a body of its own, `bodies[i]` (or `body(i)`) moving instance `i`, as three.js's `physics_rapier_instancing` and Babylon's thin-instance physics do. Each body starts at its instance's matrix (position and rotation; the instance's scale stays in the drawing and is never given to the collider), and after every `sync` the bodies' poses, interpolated as a mesh body's are, go to the instance matrices in one `setMatrices` write, which is skipped once every body sleeps, so thousands of bodies stay one draw call. `options` are those of `addBody` without the pose: `colliders` (required: an instanced mesh has no geometry the physics reads), `type`, damping, CCD and the rest, plus `count` (default the mesh's `instances.count`). Instance matrices are world poses, so keep `mesh.root` at the identity. `remove()` (or `using`) removes the bodies and stops the writes; the bodies are ordinary bodies of the world, so queries, events, snapshots and fields see them as any other.
+`new InstancedBodies(physics, mesh, options)` gives every instance of an instanced mesh (`createInstancedMesh` of `@margoengine/materials`) a body of its own, `bodies[i]` (or `body(i)`) moving instance `i`. Each body starts at its instance's matrix (position and rotation; the instance's scale stays in the drawing and is never given to the collider), and after every `sync` the bodies' poses, interpolated as a mesh body's are, go to the instance matrices in one `setMatrices` write, which is skipped once every body sleeps, so thousands of bodies stay one draw call. `options` are those of `addBody` without the pose: `colliders` (required: an instanced mesh has no geometry the physics reads), `type`, damping, CCD and the rest, plus `count` (default the mesh's `instances.count`). Instance matrices are world poses, so keep `mesh.root` at the identity. `remove()` (or `using`) removes the bodies and stops the writes; the bodies are ordinary bodies of the world, so queries, events, snapshots and fields see them as any other.
 
 ```ts
 import {Physics, InstancedBodies} from 'margoengine/physics';
@@ -927,8 +849,6 @@ for (let i = 0; i < 30; i++) physics.step();
 physics.sync(1);
 console.log(crates.body(42).position, data.subarray(42 * 24 + 12, 42 * 24 + 15));
 ```
-
-Coming from three.js: the `physics_rapier_instancing` example makes a Rapier body per instance and copies each body's translation and rotation into `InstancedMesh.setMatrixAt` every frame; here that loop is `InstancedBodies`, and `physics.raycast(...)?.body` with `crates.bodies.indexOf(body)` gives the instance index a pointer hit. Bad input is a `MargoError` linked to [its help entry](https://margoengine.com/errors#physics-instances).
 
 ## Universal joint and wheel joint
 
@@ -1348,26 +1268,6 @@ engine.start();
 | `thickness` (the particle radius) | Metres kept from colliders. |
 | `timestep` (1/60), `substeps` (30) | A frame runs at most 256 substeps; a longer frame drops the rest. |
 | `paused` (false) | Frames stop stepping; `step(n)` still steps. |
-
-#### Coming from three.js and Ammo cloth
-
-three.js's `webgpu_compute_cloth` example builds the cloth by hand: storage buffers of vertices and of springs, compute functions for the Verlet step, the spring forces, a sphere collider and the wind, a render geometry that reads the vertex buffer, and the pointer moving the sphere. Its `physics_ammo_cloth` example makes a patch with `btSoftBodyHelpers.CreatePatch(corners, segments, fixed)`, tunes `get_m_cfg()` (iterations, damping, friction), sets its total mass, ties nodes to a rigid body with `appendAnchor(node, body, disableCollision, influence)`, adds it to the soft world, and every frame copies the nodes' positions and normals into a `BufferGeometry`. In Margo:
-
-| three.js example | Margo |
-| --- | --- |
-| Vertex and spring storage buffers, built per cloth | `SoftBodyDesc.cloth(origin, du, dv, nu, nv)` (or `trimesh`), then `GPUCloth.attach(engine, desc)` |
-| Verlet, spring and collision compute functions | built in: integrate, edge colours, tethers and colliders a substep |
-| Spring stiffness | `stretchCompliance`, `shearCompliance`, `bendCompliance` (m/N) |
-| A sphere uniform the pointer moves | `const ball = cloth.addCollider({shape: 'sphere', radius})`, then `ball.position = point` each frame; capsules, boxes, planes and SDF meshes too |
-| Wind strength uniform | `wind` and `turbulence` |
-| A render geometry over the vertex buffer | `drawGPUCloth(engine, cloth, {material})` |
-| `CreatePatch(..., fixed)` | `SoftBodyDesc.cloth(...).setPinnedParticles([...])` |
-| `setTotalMass`, `kDP`, `kDF` | `setMass`, `setLinearDamping`, `friction` |
-| `appendAnchor(node, body)` | `cloth.attach(i, body)` on the GPU (one way), or `soft.create(desc).attachParticle(i, body)` on the CPU (two way) |
-| Copy `m_nodes` into a `BufferGeometry` each frame | nothing: `drawGPUCloth` (GPU) or `drawSoftBody` (CPU) |
-| Soft-world debug drawer | `PhysicsDebugView.add(cloth)`, or `view.add(() => soft.debugRender())` for the CPU cloth |
-
-Self-contacts, tearing, two-way coupling with rigid bodies and water are the CPU cloth's (`soft.create`).
 
 ### Solid bodies: tetrahedral cells, plasticity, tearing and clusters
 
@@ -1943,8 +1843,7 @@ constant temperature. Each independently filled region is a separate soft body.
 
 ### Soft volumes from any mesh (`SoftBodyDesc.volume`)
 
-A soft ball, a jelly or a balloon straight from a mesh, as three.js's `physics_ammo_volume` makes one with Ammo's
-`CreateFromTriMesh`. It squashes and bounces on the ground, trades momentum with rigid bodies both ways, keeps its
+A soft ball, a jelly or a balloon straight from a mesh. It squashes and bounces on the ground, trades momentum with rigid bodies both ways, keeps its
 volume (or a sealed gas), and takes `applyImpulse`, `applyImpulseAtPoint`, `applyRadialImpulse`, `addForce` and
 `addParticleForce` as a body of its mass would.
 
@@ -2086,12 +1985,6 @@ console.log(ball.centerOfMass(), ball.surfaceVolume());
   the same lines.
 - **Errors.** A mesh that is missing, open, wound inward, not triangles or not finite, or an option out of range, throws
   `MargoError` code `unsupported` with the fix and a link to [soft-volumes](https://margoengine.com/errors#soft-volumes).
-- **From three.js.** `physics_ammo_volume` builds an `Ammo.btSoftBody` from a `BufferGeometry` after merging its
-  vertices by hand, sets `kPR` (pressure) or `kVC` (volume conservation) and the spring `kLST` on its config, adds it
-  with `addSoftBody`, and copies `m_nodes` back into the geometry with its normals every frame. In Margo the same is
-  `soft.create(SoftBodyDesc.volume(geometry, {stiffness, pressure}))` and `drawSoftBody(engine, body)`: the welding,
-  the volume or gas, the mass from density and the drawing with normals are done for you, and the pressure is a real
-  absolute pressure in Pa against the air outside, not a unitless coefficient.
 - **Limits.** The soft kernel keeps positions in float32: damped springs lose up to about 1e-3 of the body's momentum
   over a few seconds near the origin, and more far from it (KB-SOFT-F32MOMENTUM1, `docs/known-bugs.md`). A gas shell is
   isothermal: a vent's flow is isentropic through the hole but the gas left inside keeps its temperature (`docs/limits.md`).
@@ -2669,7 +2562,7 @@ console.log(can.position[1].toFixed(2), cone.position[1].toFixed(2)); // 0.55 0.
 physics.dispose();
 ```
 
-After each step a pair that began or stopped touching fires `contactstart` or `contactend`, or `intersectionstart` or `intersectionend` when either collider is a sensor, with both bodies, meshes and colliders. With a `contactcontinue` listener, every solid pair that touched before the step and still touches after it fires `contactcontinue` once that step (Babylon's `COLLISION_CONTINUED`; never in the step it starts or ends, never for sensors, in the order of the pair rows); with no listener it costs nothing. A sensor sees overlaps and pushes nothing, and it sees kinematic and fixed bodies too. Two fixed bodies never meet, sensor or not. A collider stays quiet with `events: false` when the other side has it too. A pair of sleepers says nothing. A fast body with `ccd: true` that passes through a sensor inside one step fires `intersectionstart` and `intersectionend` for it, though it is in it at neither end of the step. A collider or body removed while it touches ends the contact at once, and the end event, `removed: true` (Rapier's `CollisionEventFlags::REMOVED`), is delivered at the end of the next step, still naming both colliders. `collisionGroups` keeps a pair apart; `solverGroups` lets it be seen and fire events without being solved. Both take a packed `collisionGroups(memberships, filter)` number (16 + 16 bits, as Rapier's JavaScript build packs them) or `interactionGroups(memberships, filter, testMode)`, 32 bits wide as Rapier's Rust `InteractionGroups` is: masks or lists of group indices 0 to 31, tested by `'and'` (each side's memberships share a bit with the other's filter, the default) or `'or'` (either way; used only when both colliders ask for it, and a mixed pair tests by `and`). A collider left at its default is in every group. `collider.interactionGroups()` and `solverInteractionGroups()` read them back, and scene queries take either form as `groups`. `contactFilter(a, b)` runs inside the step for each candidate pair of bodies: it may read the world and must not change it, so a step run from it throws, and false lets the pair pass and keeps its sensor events quiet. A body of higher `dominance` is a wall to a dynamic body of lower dominance, in contacts only, and floors still hold it. `body.enabled = false` takes a body out of the world: it keeps its pose and speed, nothing wakes it, its touches end and what rested on it falls, and its joints rest until it comes back, awake. `collider.setEnabled(false)` does the same for one collider, which keeps its mass.
+After each step a pair that began or stopped touching fires `contactstart` or `contactend`, or `intersectionstart` or `intersectionend` when either collider is a sensor, with both bodies, meshes and colliders. With a `contactcontinue` listener, every solid pair that touched before the step and still touches after it fires `contactcontinue` once that step (never in the step it starts or ends, never for sensors, in the order of the pair rows); with no listener it costs nothing. A sensor sees overlaps and pushes nothing, and it sees kinematic and fixed bodies too. Two fixed bodies never meet, sensor or not. A collider stays quiet with `events: false` when the other side has it too. A pair of sleepers says nothing. A fast body with `ccd: true` that passes through a sensor inside one step fires `intersectionstart` and `intersectionend` for it, though it is in it at neither end of the step. A collider or body removed while it touches ends the contact at once, and the end event, `removed: true` (Rapier's `CollisionEventFlags::REMOVED`), is delivered at the end of the next step, still naming both colliders. `collisionGroups` keeps a pair apart; `solverGroups` lets it be seen and fire events without being solved. Both take a packed `collisionGroups(memberships, filter)` number (16 + 16 bits, as Rapier's JavaScript build packs them) or `interactionGroups(memberships, filter, testMode)`, 32 bits wide as Rapier's Rust `InteractionGroups` is: masks or lists of group indices 0 to 31, tested by `'and'` (each side's memberships share a bit with the other's filter, the default) or `'or'` (either way; used only when both colliders ask for it, and a mixed pair tests by `and`). A collider left at its default is in every group. `collider.interactionGroups()` and `solverInteractionGroups()` read them back, and scene queries take either form as `groups`. `contactFilter(a, b)` runs inside the step for each candidate pair of bodies: it may read the world and must not change it, so a step run from it throws, and false lets the pair pass and keeps its sensor events quiet. A body of higher `dominance` is a wall to a dynamic body of lower dominance, in contacts only, and floors still hold it. `body.enabled = false` takes a body out of the world: it keeps its pose and speed, nothing wakes it, its touches end and what rested on it falls, and its joints rest until it comes back, awake. `collider.setEnabled(false)` does the same for one collider, which keeps its mass.
 
 ```ts
 import {Physics, collisionGroups} from 'margoengine/physics';
@@ -9856,25 +9749,6 @@ pieces live when it was taken, so take it after the last break. The fracture hel
 `voronoiFractureGeometry`, `voronoiFracturePolyhedron` and `computePolyhedronMassProperties` give the cells and their
 mass properties without a world.
 
-Coming from three.js `physics_ammo_break`. That example does the breaking by hand around Ammo.js: it calls
-`ConvexObjectBreaker.prepareBreakableObject(mesh, mass, velocity, angularVelocity, true)` on each object, walks Ammo's
-dispatcher manifolds every frame, compares each contact point's `getAppliedImpulse()` with a fracture impulse, calls
-`subdivideByImpact(mesh, point, normal, ...)` for the broken one, and then, for every piece it returns, builds a
-`btConvexHullShape` from the piece's vertices, a `btRigidBody` with the piece's `userData.mass` and velocities, adds both
-to the scene and the world, and removes the original. In Margo the same scene is the quick start above: `add()` once per
-object, and the contact watch, the threshold (`bondStrength`, N s like the applied impulse), the convex hulls, the masses
-(from the pieces' own volume and `density`) and the velocities are built in. What maps across:
-
-| three.js + Ammo (`physics_ammo_break`) | Margo |
-| --- | --- |
-| `prepareBreakableObject(mesh, mass, v, w, true)` | `breakable.add(mesh, { density })`; then `body.body.setLinearVelocity(v)` |
-| fracture impulse checked against `getAppliedImpulse()` per contact | `bondStrength` per bond, from every contact automatically (`minImpactImpulse` filters taps) |
-| `subdivideByImpact(mesh, point, normal, ...)` | `fractureMode: 'impact'` (cells cluster around the hit), or `'prefractured'` |
-| `btConvexHullShape` and `btRigidBody` per piece, by hand | made for you: `event.fragments[i].body` and `.mesh` in `onBreak` |
-| `userData.mass` from the piece's volume | `fragment.mass`, exact polyhedral mass, inertia and centre of mass |
-| pieces never break again unless marked breakable | `secondaryFracture: true` (default); `anchors` keep a base standing |
-| removing debris yourself | `maxDebris`, `debrisLifetime` and debris sleep |
-
 What it does not do (`docs/limits.md`): a concave mesh breaks as its convex hull (split it with `convexDecomposition`
 first); damage is an impulse budget per bond, not a stress or energy model; cut faces are flat. See
 [`examples/physics-breakable.html`](../../examples/physics-breakable.html) for a stone pillar, a brick wall and a framed
@@ -9932,26 +9806,6 @@ Debug view: `physics.debugRender({ jointFrames: true })` adds, for each joint, f
 blue z, `style.jointFrameLength` metres, default 0.25) and frame B's at anchor B, and in gold (`style.jointLimit`) an arc
 from min to max for each limited turn, a bar for each limited slide, a cone's swing rim, and a cross at each distance stop.
 Draw the lines with `@margoengine/lines`, as the other debug lines.
-
-Coming from three.js and Rapier. The three.js Rapier examples make a joint from a description and a world call, then copy
-each body's pose into its mesh every frame: `world.createImpulseJoint(RAPIER.JointData.revolute(anchor1, anchor2, axis),
-body1, body2, true)`, then `joint.setLimits(min, max)` and `joint.configureMotorVelocity(speed, factor)`, and in the loop
-`mesh.position.copy(body.translation())` and `mesh.quaternion.copy(body.rotation())`. In Margo the joint is one call with
-its limits and motor as options, and a body made with a mesh (`physics.addBody(mesh, options)`) moves it for you. What
-maps across:
-
-| Rapier through three.js | Margo |
-| --- | --- |
-| `JointData.fixed`, `.spherical`, `.revolute`, `.prismatic`, `.rope`, `.spring`, `.generic` | `type: 'fixed'`, `'spherical'`, `'revolute'`, `'prismatic'`, `'rope'`, `'spring'`, `'generic'` |
-| `world.createImpulseJoint(data, body1, body2, true)` | `physics.addJoint(body1, body2, options)` |
-| `world.createMultibodyJoint(...)`, one per link | `physics.addMultibody(root, links)`, the tree at once |
-| `joint.setLimits(min, max)` | `limits: [min, max]` or `joint.setLimits(min, max)`; any axis: `setAxisLimits(dof, min, max)` |
-| `configureMotorVelocity(speed, factor)` | `motor: { targetVelocity: speed, damping: factor }` |
-| `configureMotorPosition(target, stiffness, damping)` | `motor: { targetPosition: target, stiffness, damping }` |
-| a motor's force cap | `maxForce` on the motor |
-| `joint.setContactsEnabled(true)` | `contactsEnabled: true`, or `joint.contactsEnabled = true` |
-| copying `translation()` and `rotation()` into each mesh | `physics.addBody(mesh, options)` moves the mesh |
-| `world.debugRender()` | `physics.debugRender({ jointFrames: true })`, the same `{ vertices, colors }` |
 
 What it does not do (`docs/limits.md`): limits on a ball joint's three turns are on the parts of its rotation vector, which
 match angles about each axis only while one turn is large at a time (a cone holds a swing as one angle); a spring's

@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // GPU cloth (`@margoengine/physics/gpu-cloth`): a cloth of `@margoengine/physics/soft`'s description stepped in compute on
-// WebGPU, as three.js's `webgpu_compute_cloth` does with Verlet in compute, and drawn straight from the GPU buffer it writes
+// WebGPU, with Verlet in compute, and drawn straight from the GPU buffer it writes
 // (`drawGPUCloth` of `@margoengine/gltf/soft-mesh`), so the drawing costs no readback or upload. Pinned to points and to
 // rigid bodies; meets spheres, capsules, boxes, planes and meshes (as signed distance fields) on or off bodies; wind, gravity,
 // stretch, shear and bend compliance. On the WebGL2 compatibility layer, and with no engine at all, its CPU twin

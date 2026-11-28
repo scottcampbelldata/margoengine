@@ -1807,11 +1807,7 @@ engine.start();
 | `setFlow(curve, flow)` | Replaces one curve from the next frame |
 | `dispose()` | Frees the frame texture and instance rows once no material uses the plugin |
 
-Coming from three.js `InstancedFlow`: its offsets are fractions of a curve, so `moveAlongCurve(d)` is
-`plugin.uniforms.progress += d`, `moveIndividualAlongCurve(i, d)` adds `d` to row `i` of
-`instanceAttributes.array('progress')` (then `update('progress', i, 1)`), `setCurve(i, c)` keeps its name and
-`updateCurve(c, curve)` is `setFlow(c, new CurveFlow(curve))`. It wraps on open curves too, which is `wrap: true`
-here. Differences: edits upload by themselves (no `writeChanges`), and every instance keeps its own matrix.
+The comparison with the flow API of other libraries is in [docs/physics-migration.md](../../docs/physics-migration.md).
 
 Limits: 1 to 2,048 curves (four rows of one float texture each, as wide as the longest curve's frames: 64 bytes per
 frame per curve) and the instance count of `instanceAttributes()`. The other limits of `curveFlow()` apply. The frames

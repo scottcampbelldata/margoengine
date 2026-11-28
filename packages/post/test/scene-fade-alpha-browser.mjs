@@ -1,4 +1,4 @@
-// Real-GPU check that SceneFade dissolves a transparent canvas (threejs-parity row 6), built packages, on WebGPU and
+// Real-GPU check that SceneFade dissolves a transparent canvas (parity row 6), built packages, on WebGPU and
 // (MARGO_COMPAT=1) the WebGL2 layer:
 //   node scripts/run-with-timeout.mjs -- node packages/post/test/scene-fade-alpha-browser.mjs
 // A captured frame with a box on the left fades into one with the box on the right. Half way through, every pixel's
