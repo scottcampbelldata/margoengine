@@ -6,6 +6,20 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: liquid and underwater fog over the empty part of a transparent canvas were see-through (KB-WATER-LIQUIDALPHA1, water)
+
+- **Repro:** `packages/post/test/alpha-rim-browser.mjs` on a `TransparentCanvas`: through the middle of a dense 0.8 m
+  `ParticleLiquid` ball over nothing the page showed with coverage 0.004, 1,397 pixels added light while covering
+  nothing, and 3 m under a sea 34,426 of 76,800 pixels did the same under `Underwater`.
+- **Cause:** both composites wrote the scene's alpha, which is 0 where the scene holds nothing, whatever the liquid or
+  the water put in the pixel. Whitewater over empty pixels added its colour and no coverage the same way.
+- **Fix:** each writes the coverage its medium makes: the liquid 1 - (1 - Fresnel) T (1 - a) with a the scene alpha
+  where the refracted ray ends and T the Beer-Lambert transmittance's Rec. 709 luminance; whitewater composites its
+  alpha with its colour; underwater 1 - (1 - a) T of the view path, over the submerged share (Porter and Duff 1984,
+  https://graphics.pixar.com/library/Compositing/paper.pdf). An opaque scene keeps alpha 1. Dense ball 0.91, clear
+  liquid 0.020 (its reflection), under water every pixel covered, the same on WebGPU and the WebGL2 layer (RTX A6000).
+- **Regression:** the same GPU test, the "liquid over nothing" and "under water" cases.
+
 ### Fixed 2026-11-28: rebase:main left docs/api-surface.md with a wrong Unexported figure and a short total (KB-REBASE-SURFACE1, scripts)
 
 - **Repro:** `npm run api:check` on main 66546e10a1: `webgl2-compat` read 313 unexported (the reports hold 307) and the
@@ -1706,8 +1720,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   canvas mark; an opaque canvas keeps its shaders byte for byte. All five read 0.7 of 255 on WebGPU and the WebGL2
   layer (RTX A6000). Entry sizes: water/caustics 6,395 to 6,703 B, water/underwater 9,071 to 9,366 B, weather/lens
   4,075 to 4,398 B gzip.
-- **Left:** where the liquid covers a pixel with nothing behind it on a transparent canvas, the composite keeps the
-  scene's alpha of 0 (read in the shader, not run).
+- **Left then, fixed since:** liquid and underwater fog over empty pixels (KB-WATER-LIQUIDALPHA1).
 - **Regression:** the GPU test above and `packages/post/test/straight-display.test.js` "every display shader that keeps
   a sampled alpha is built through displayFor, in every package".
 ### Fixed 2026-11-27: the aftermath shot shimmered 0.61 percent at mid, all of it the crest conifers' parallax against the sky (KB-LOOK-TV-SHIMMER3, look check; fixed by TAA, KB-SCENES-TVTAA1)

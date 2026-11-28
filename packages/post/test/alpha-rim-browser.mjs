@@ -134,6 +134,76 @@ await postBrowser(
         dispose() {
           this.engine.dispose();
         },
+        // The camera 3 m under a sea with only the box in the water (KB-WATER-LIQUIDALPHA1): every pixel looks through water.
+        async under() {
+          const engine = await Engine.create(document.querySelector('canvas'), {
+            backend: 'webgpu',
+            camera: { position: [0, 0, 3.2], target: [0, 0, 0] },
+          });
+          engine.stop();
+          TransparentCanvas.attach(engine);
+          engine
+            .createMesh()
+            .setGeometry(box(1.2, 1.2, 1.2))
+            .setMaterial(new PbrMaterial({ color: '#e0a050' }));
+          const surface = Water.attach(engine, {
+            size: [20, 20],
+            segments: 4,
+            height: 3,
+            waves: [{ direction: [1, 0], amplitude: 0.01, wavelength: 1 }],
+          });
+          Underwater.attach(engine, { surface });
+          for (let i = 0; i < 3; i++) {
+            engine.render({ delta: 1 / 60 });
+            await engine.gpu.queue.onSubmittedWorkDone();
+          }
+          this.engine = engine;
+        },
+        // A liquid over nothing (KB-WATER-LIQUIDALPHA1): one ball of liquid before the empty canvas, or two blobs of
+        // particles meeting head on so that whitewater flies clear of them.
+        async liquid(absorption, spray) {
+          const engine = await Engine.create(document.querySelector('canvas'), {
+            backend: 'webgpu',
+            camera: { position: [0, 0, 3.2], target: [0, 0, 0] },
+          });
+          engine.stop();
+          TransparentCanvas.attach(engine);
+          const positions = [],
+            velocities = [];
+          if (spray)
+            for (const side of [-1, 1])
+              for (let i = 0; i < 6; i++)
+                for (let j = 0; j < 6; j++)
+                  for (let k = 0; k < 6; k++) {
+                    positions.push(side * 0.3 + (i - 2.5) * 0.1, (j - 2.5) * 0.1, (k - 2.5) * 0.1);
+                    velocities.push(-side * 4, 0, 0);
+                  }
+          else positions.push(0, 0, 0);
+          const liquid = ParticleLiquid.attach(engine, {
+            particles: {
+              positions: new Float32Array(positions),
+              velocities: spray ? new Float32Array(velocities) : undefined,
+            },
+            radius: spray ? 0.05 : 0.4,
+            absorption,
+            whitewater: spray ? { maxParticles: 65536, trappedAirRate: 3000, waveCrestRate: 3000 } : undefined,
+          });
+          engine.render({ delta: 0 });
+          let foam = 0;
+          if (spray) {
+            await liquid.readWhitewater().catch(() => undefined);
+            for (let step = 0; step < 30; step++) {
+              liquid.update();
+              engine.render({ delta: 0 });
+              const counts = await liquid.readWhitewater();
+              foam = counts.spray + counts.foam + counts.bubbles;
+            }
+          }
+          engine.render({ delta: 0 });
+          await engine.gpu.queue.onSubmittedWorkDone();
+          this.engine = engine;
+          return foam;
+        },
       };
     });
     const measure = async (name) => {
@@ -190,6 +260,47 @@ await postBrowser(
         `ok ${name}: ${r.edge} edge pixels within ${r.rim.toFixed(1)} of 255 (no effect ${base.rim.toFixed(1)})`,
       );
     }
+    // The liquid itself over empty pixels covers them by what it reflects and absorbs (it kept the scene's alpha of 0,
+    // so the page showed through it whole), and no pixel adds light where it covers nothing.
+    const read = async () => {
+      await page.evaluate(() => window.t.page('#000'));
+      const black = await shot();
+      await page.evaluate(() => window.t.page('#fff'));
+      const white = await shot();
+      await page.evaluate(() => window.t.dispose());
+      const alpha = (i) => 1 - (white.data[i] - black.data[i]) / 255;
+      let covered = 0,
+        bare = 0;
+      for (let i = 0; i < black.data.length; i += 4) {
+        if (alpha(i) > 0.02) covered++;
+        else if (Math.max(black.data[i], black.data[i + 1], black.data[i + 2]) > 8) bare++;
+      }
+      const centre = (black.height / 2) * black.width + black.width / 2;
+      return { covered, bare, pixels: black.data.length / 4, alpha: alpha(centre * 4) };
+    };
+    const over = async (absorption, spray) => {
+      const foam = await page.evaluate(([a, s]) => window.t.liquid(a, s), [absorption, spray]);
+      return { foam, ...(await read()) };
+    };
+    const dense = await over([3, 3, 3], false),
+      clear = await over([0, 0, 0], false),
+      spray = await over([0.38, 0.1, 0.045], true);
+    console.log(`liquid over nothing: ${JSON.stringify({ dense, clear, spray })}`);
+    // Through the middle of the 0.8 m ball: 1 - 0.98 exp(-3 t) covered, 0.9 for any chord t of 0.75 m or more.
+    assert.ok(dense.alpha > 0.75 && dense.covered > 500, `dense liquid: ${JSON.stringify(dense)}`);
+    // Clear liquid seen face on covers only by its 2 percent reflection.
+    assert.ok(clear.alpha < 0.1, `clear liquid: ${JSON.stringify(clear)}`);
+    assert.ok(spray.foam > 50 && spray.covered > 500, `whitewater: ${JSON.stringify(spray)}`);
+    for (const [name, result] of Object.entries({ dense, clear, spray }))
+      assert.equal(result.bare, 0, `${name}: ${result.bare} pixels add light and cover nothing`);
+    console.log('ok ParticleLiquid over empty pixels covers by what it reflects and absorbs');
+    // Under water the view ends in the water itself, so the water covers the canvas where the scene holds nothing.
+    await page.evaluate(() => window.t.under());
+    const under = await read();
+    console.log(`under water: ${JSON.stringify(under)}`);
+    assert.equal(under.covered, under.pixels, `under water: ${JSON.stringify(under)}`);
+    assert.equal(under.bare, 0, `under water: ${under.bare} pixels add light and cover nothing`);
+    console.log('ok Underwater covers the empty canvas by what the water absorbs and scatters');
   },
   { seconds: 240 },
 );

@@ -101,7 +101,7 @@ fn hg(c:f32)->f32 {let g=u[17].w;let d=1.0+g*g-2.0*g*c;return (1.0-g*g)/(12.5663
  let side=dot(near-level,select(vec3f(0,1,0),normalize(probed.xyz),found));
  let px=max(fwidth(side),1e-9);
  if(u[20].y<0.5||!found){return vec4f(${encode ? 'toDisplay(now.rgb)' : 'now.rgb'},now.a);}
- var rgb=now.rgb;
+ var rgb=now.rgb;var cover=now.a;
  // Antialias the wet and dry coverage across the camera's near plane before tinting the optical interface.
  let submerged=1.0-smoothstep(-px*0.5,px*0.5,side);
  if(submerged>0.0){
@@ -140,10 +140,13 @@ fn hg(c:f32)->f32 {let g=u[17].w;let d=1.0+g*g-2.0*g*c;return (1.0-g*g)/(12.5663
   let z=max(0.0,probed.w-(near+ray*march).y);
   let tail=b*(u[20].x*fresnel*phase*sun*exp(-k*z/max(-down.y,0.05))+ambient*exp(-k*z))*(exp(-k*march)-view)/max(k,vec3f(1e-6));
   rgb=mix(now.rgb,rgb*view+light+tail,submerged);
+  // On a transparent canvas the water covers what it takes of the view past the scene: the page shows through by the
+  // view transmittance only (Porter and Duff 1984; one alpha channel holds it as Rec. 709 luminance).
+  cover=mix(now.a,1.0-(1.0-now.a)*dot(view,vec3f(0.2126,0.7152,0.0722)),submerged);
  }
  let band=select(0.0,1.0-smoothstep(0.0,u[19].x,abs(side)/px),u[19].x>0.0);
  rgb=mix(rgb,rgb*vec3f(0.35,0.5,0.55),band);
- return vec4f(${encode ? 'toDisplay(rgb)' : 'rgb'},now.a);
+ return vec4f(${encode ? 'toDisplay(rgb)' : 'rgb'},cover);
 }`;
 
 /** Fog, colour absorption, a waterline across the camera and light shafts while the camera is below the surface. */

@@ -887,6 +887,10 @@ same index. Method and sources: [caustics record](../../docs/water-caustics.md).
 last HDR effect when the scene has one (for example SSAO's), or make a stack for it when it has none; disposing the
 effect takes it out, and a stack made for it goes with it (`PostStack.join` in `@margoengine/post`).
 
+On a transparent canvas (`TransparentCanvas` of `@margoengine/environment`) the underwater fog and the particle liquid
+cover the page by what they reflect and absorb. A canvas has one alpha channel, so water's coloured transmittance lets
+the page through by its brightness, without tinting it.
+
 ## Particle liquid
 
 `@margoengine/water/liquid` draws any set of particles as a liquid surface: your own solver's output, a recorded

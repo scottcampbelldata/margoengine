@@ -11841,8 +11841,8 @@ the lens and half-resolution patches. SceneFade lerps with a blend constant. Pip
 `dof/tests/gpu/alpha-check.mjs`, `post/test/scene-fade-alpha-browser.mjs` and `alpha-rim-browser.mjs` on WebGPU and the
 WebGL2 layer, RTX A6000, TAAUpscale included. Engine views (`post/test/alpha-views-browser.mjs`, both backends): TAA
 and DOF in two views and SceneFade over overlapping views keep the alpha; it found variance clipping moving colour and
-alpha apart, now clipped as one 4D point (KB-TAA-ALPHACLIP1; Salvi 2016; Karis 2014). Missing: water's composites
-(KB-WATER-ALPHARIM1) and XR on a transparent canvas.
+alpha apart, now clipped as one 4D point (KB-TAA-ALPHACLIP1; Salvi 2016; Karis 2014). Missing: XR on a transparent
+canvas (water's composites followed, KB-WATER-ALPHARIM1).
 
 TAA silhouettes (2026-11-27, KB-TAA-EDGE1): the default resolve takes the motion and expected depth of the nearest
 surface in the 3x3 neighbourhood (closest-depth motion, Karis 2014; FSR2's dilation) and keeps history when that depth
@@ -11982,5 +11982,7 @@ Evidence still missing:
 
 Water's liquid, underwater and caustics composites, post's SurfaceCaustics and weather's LensDrops encode straight colour
 on a premultiplied canvas. Evidence: `packages/post/test/alpha-rim-browser.mjs` on WebGPU and the WebGL2 layer (RTX
-A6000); `packages/post/test/straight-display.test.js` scans every package for the pattern. Missing: other GPUs, XR on a
-transparent canvas, and liquid drawn over empty pixels.
+A6000); `packages/post/test/straight-display.test.js` scans every package for the pattern. `ParticleLiquid` and
+`Underwater` also write the coverage their medium makes, so empty pixels they fill are not see-through
+(KB-WATER-LIQUIDALPHA1): the same test's liquid and underwater cases. Missing: other GPUs and XR on a transparent
+canvas.

@@ -161,17 +161,17 @@ fn fresnel(c:f32,n:f32)->f32 {
  let s=max(0.0,1.0-c*c)/(n*n);if(s>=1.0){return 1.0;}
  let t=sqrt(1.0-s);let a=(c-n*t)/(c+n*t);let b=(n*c-t)/(n*c+t);return 0.5*(a*a+b*b);
 }
-// The premultiplied whitewater layer over the liquid (ambient.w 1 when whitewater is drawn).
-fn foamOver(rgb:vec3f,p:vec2i)->vec3f {
- if(u.ambient.w<0.5){return rgb;}let l=textureLoad(whitewater,p,0);return rgb*(1.0-l.a)+l.rgb;
+// The premultiplied whitewater layer over a premultiplied colour (ambient.w 1 when whitewater is drawn).
+fn foamOver(c:vec4f,p:vec2i)->vec4f {
+ if(u.ambient.w<0.5){return c;}let l=textureLoad(whitewater,p,0);return c*(1.0-l.a)+l;
 }
-fn sceneAt(px:vec2f)->vec3f {
+fn sceneAt(px:vec2f)->vec4f {
  let low=u.viewport.xy;let high=low+u.viewport.zw-vec2f(1);
- return textureLoad(scene,vec2i(clamp(px,low,high)),0).rgb;
+ return textureLoad(scene,vec2i(clamp(px,low,high)),0);
 }
 @fragment fn fragment(@builtin(position) at:vec4f)->@location(0) vec4f {
  let p=vec2i(at.xy);let now=textureLoad(scene,p,0);let d=eyeDepth(p);
- if(u.tint.w<0.5||d<=0.0){let bare=foamOver(now.rgb,p);return vec4f(${encode ? 'toDisplay(bare)' : 'bare'},now.a);}
+ if(u.tint.w<0.5||d<=0.0){let bare=foamOver(now,p);return vec4f(${encode ? 'toDisplay(bare.rgb)' : 'bare.rgb'},bare.a);}
  let c=surface(p,d);let view=normalize(u.eye.xyz-c);
  var n=cross(side(p,d,c,vec2i(1,0)),side(p,d,c,vec2i(0,1)));
  n=select(view,normalize(n),dot(n,n)>0.0);n=select(n,-n,dot(n,view)<0.0);
@@ -182,12 +182,17 @@ fn sceneAt(px:vec2f)->vec3f {
  let ior=u.absorption.w;let cosine=clamp(dot(n,view),0.0,1.0);let f=fresnel(cosine,ior);
  // Refraction: follow the refracted ray for the thickness and read the scene where it leaves the liquid.
  let bent=refract(-view,n,1.0/ior);let exit=c+bent*t;let q=u.viewProj*vec4f(exit,1);
- let behind=select(now.rgb,sceneAt(u.viewport.xy+(q.xy/q.w*vec2f(0.5,-0.5)+0.5)*u.viewport.zw),q.w>0.0);
- let transmitted=behind*exp(-u.absorption.rgb*t)*u.tint.rgb*mean;
+ let behind=select(now,sceneAt(u.viewport.xy+(q.xy/q.w*vec2f(0.5,-0.5)+0.5)*u.viewport.zw),q.w>0.0);
+ let passed=exp(-u.absorption.rgb*t)*u.tint.rgb*mean;
+ let transmitted=behind.rgb*passed;
  let reflected=sky(reflect(-view,n));
  let h=normalize(u.light.xyz+view);
  let highlight=u.radiance.rgb*f*pow(max(dot(n,h),0.0),u.light.w)*(u.light.w+8.0)/25.13274123*max(dot(n,u.light.xyz),0.0);
- let rgb=foamOver(mix(transmitted,reflected,f)+highlight,p);
- return vec4f(${encode ? 'toDisplay(rgb)' : 'rgb'},now.a);
+ // Coverage on a transparent canvas: where the refracted ray ends on nothing, the page behind shows through by what
+ // the surface does not reflect and the liquid does not absorb (Porter and Duff 1984). One alpha channel holds a
+ // coloured transmittance as its Rec. 709 luminance. Over an opaque scene the coverage stays 1.
+ let through=(1.0-f)*min(dot(passed,vec3f(0.2126,0.7152,0.0722)),1.0);
+ let lit=foamOver(vec4f(mix(transmitted,reflected,f)+highlight,1.0-through*(1.0-behind.a)),p);
+ return vec4f(${encode ? 'toDisplay(lit.rgb)' : 'lit.rgb'},lit.a);
 }
 `;
