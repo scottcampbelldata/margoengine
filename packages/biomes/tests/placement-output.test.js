@@ -3,6 +3,8 @@
 // two R16 tiles beside the G1 bench tiles. The hashes were recorded from 14e4d813d, before placement stopped making
 // whole neighbour tiles (biomes J2); a change to how placement reads its neighbours must leave every one of them.
 // MARGO_RECORD=1 prints the hashes.
+// 2026-11-28: the 12 tiles of the preset worlds were recorded again for KB-TUNDRA-GRASS1, whose tundra sedge and lichen
+// name their own meshes; with those two names written as before, every tile gave its earlier hash.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';

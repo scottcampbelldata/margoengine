@@ -573,6 +573,11 @@ test('tundra stores dwarf birch and boulders only: under 60,000 objects per km2 
     p.details.some((d) => d.id === 'lichen'),
     'lichen is a detail species',
   );
+  // KB-TUNDRA-GRASS1: both drew as the half-metre green grass mesh.
+  assert.deepEqual(
+    p.details.filter((d) => d.id === 'sedge' || d.id === 'lichen').map((d) => d.mesh),
+    ['procedural:sedge', 'procedural:lichen'],
+  );
 });
 
 /** Temperate and boreal records of a placement tile, with the desert biome weight (0..255) of each record's cell. */

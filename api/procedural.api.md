@@ -178,6 +178,8 @@ export function generateGrassMesh(blades?: number): GeometryData;
 
 export function generateJettyMesh(options?: JettyOptions): GeometryData;
 
+export function generateLichenMesh(): GeometryData;
+
 export function generateLogWall(options: LogWallOptions): GeometryData;
 
 export function generatePalmMesh(options?: MeshDetailOptions): TreeMesh;
@@ -185,6 +187,8 @@ export function generatePalmMesh(options?: MeshDetailOptions): TreeMesh;
 export function generateReedMesh(stems?: number): GeometryData;
 
 export function generateRockMesh(seed?: number, form?: RockForm): GeometryData;
+
+export function generateSedgeMesh(): GeometryData;
 
 export function generateShrubMesh(options?: MeshDetailOptions): GeometryData;
 

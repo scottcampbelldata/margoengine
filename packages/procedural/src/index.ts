@@ -7,6 +7,8 @@ export {
   generateRockMesh,
   generateFernMesh,
   generateGrassMesh,
+  generateSedgeMesh,
+  generateLichenMesh,
   contactAO,
   radialAO,
   type MeshDetail,

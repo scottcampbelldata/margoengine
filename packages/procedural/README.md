@@ -157,6 +157,17 @@ and [A. Paris, A. Peytavie, E. Guérin, J.-M. Dischler and E. Galin, *Modeling R
 
 `generateFernMesh()` produces seven curved, tapered ribbon fronds; use a
 double-sided material. Both return `GeometryData` and are deterministic.
+`generateSedgeMesh()` is a tundra sedge tuft (seven 4 mm leaves, arching to 10 to 19 cm, 21 triangles) and
+`generateLichenMesh()` a reindeer lichen cushion (14 small branches, under 5 cm tall); draw both double sided. The
+sedge's size follows Carex bigelowii, 10 to 50 cm tall with blades 1.5 to 4 mm
+(https://gobotany.nativeplanttrust.org/species/carex/bigelowii/).
+
+```ts
+import {generateSedgeMesh, generateLichenMesh} from 'margoengine/procedural';
+const sedge = generateSedgeMesh(), lichen = generateLichenMesh();
+console.log(sedge.indices.length / 3, lichen.indices.length / 3);
+```
+
 For the biome presets there are more plants: `generatePalmMesh()`, `generateBirchMesh()`, `generateAcaciaMesh()` and
 `generateSnagMesh()` (a dead standing tree, empty canopy) return `{ trunk, canopy }` like `generateTreeMesh`, and
 `generateCactusMesh()`, `generateReedMesh(stems = 9)` (double sided) and `generateTundraShrubMesh()` return one

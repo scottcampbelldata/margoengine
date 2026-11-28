@@ -1129,6 +1129,84 @@ export function generateGrassMesh(blades = 3): GeometryData {
 }
 
 /**
+ * A sedge tussock, rooted at the origin, +Y up, in metres: seven narrow leaves, 4 mm wide at the base and 14 to 24 cm
+ * long, rising from a 4 cm crown and arching out to pointed tips 10 to 19 cm up (render with a double-sided material;
+ * 21 triangles). Bigelow's sedge (Carex bigelowii) of the tundra stands 10 to 50 cm with blades 1.5 to 4 mm wide
+ * (Native Plant Trust, Go Botany, https://gobotany.nativeplanttrust.org/species/carex/bigelowii/).
+ */
+export function generateSedgeMesh(): GeometryData {
+  const positions: number[] = [],
+    uvs: number[] = [],
+    indices: number[] = [];
+  for (let leaf = 0; leaf < 7; leaf++) {
+    const turn = leaf * 2.399963229728653,
+      dx = Math.cos(turn),
+      dz = Math.sin(turn),
+      step = (leaf * 0.6180339887498949) % 1,
+      length = 0.14 + 0.1 * step,
+      lean = 0.2 + 0.5 * ((leaf * 0.7548776662466927) % 1),
+      root = 0.02 * ((leaf % 3) / 2), // float division: mesh size
+      start = positions.length / 3;
+    let out = root,
+      up = 0;
+    // Two straight pieces, the upper one bent 50 degrees further out: base, bend (0.8 of the width) and tip.
+    for (const [part, bend, half] of [
+      [0, 0, 0.002],
+      [0.6, 0, 0.0016],
+      [0.4, 0.87, 0],
+    ]) {
+      out += part * length * Math.sin(lean + bend);
+      up += part * length * Math.cos(lean + bend);
+      for (const side of half ? [-1, 1] : [0]) {
+        positions.push(out * dx - side * half * dz, up, out * dz + side * half * dx);
+        uvs.push((side + 1) / 2, up / length); // float division: texture coordinate
+      }
+    }
+    indices.push(start, start + 1, start + 2, start + 1, start + 3, start + 2, start + 2, start + 3, start + 4);
+  }
+  return computeTangents(
+    computeVertexNormals(geometryData(positions, new Float32Array(positions.length), uvs, indices)),
+  );
+}
+
+/**
+ * A cushion of reindeer lichen, rooted at the origin, +Y up, in metres: fourteen small upright branches over a 16 cm
+ * round, 2 to 4.5 cm tall (render with a double-sided material; 14 triangles). A low ground cover, not blades: it does
+ * not take the grass's bending.
+ */
+export function generateLichenMesh(): GeometryData {
+  const positions: number[] = [],
+    uvs: number[] = [],
+    indices: number[] = [];
+  for (let branch = 0; branch < 14; branch++) {
+    const turn = branch * 2.399963229728653,
+      dx = Math.cos(turn),
+      dz = Math.sin(turn),
+      // Even cover of the disc: radius from the square root of the branch's rank.
+      r = 0.065 * Math.sqrt((branch + 0.5) / 14), // float division: mesh size
+      tall = 0.045 - 0.025 * (r / 0.065), // float division: mesh size
+      half = 0.012,
+      start = positions.length / 3;
+    positions.push(
+      r * dx - half * dz,
+      0,
+      r * dz + half * dx,
+      r * dx + half * dz,
+      0,
+      r * dz - half * dx,
+      (r + 0.015) * dx,
+      tall,
+      (r + 0.015) * dz,
+    );
+    uvs.push(0, 0, 1, 0, 0.5, 1);
+    indices.push(start, start + 1, start + 2);
+  }
+  return computeTangents(
+    computeVertexNormals(geometryData(positions, new Float32Array(positions.length), uvs, indices)),
+  );
+}
+
+/**
  * Ground-contact occlusion factor for a vertex at height `y`: 0.2 at or below `groundY`, rising linearly
  * to 1 at 0.6 world units above it.
  * @throws RangeError when either height is not finite.

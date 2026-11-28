@@ -47,6 +47,27 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   violation without the fix; with it the pile falls onto the floor, the middle box at y 0.5 and the top one at 1.5 within
   0.02 m).
 
+### Fixed 2026-11-28: the tundra's sedge and lichen drew as half-metre bright green grass (KB-TUNDRA-GRASS1; procedural, biomes)
+
+- **Repro:** a `BiomeView` of the tundra world from 1.1 m: wide green blades about half a metre tall everywhere.
+- **Cause:** the tundra preset's `sedge` and `lichen` details both named `procedural:grass`, the meadow grass mesh and
+  its green.
+- **Fix:** `generateSedgeMesh` (seven 4 mm leaves arching to 10 to 19 cm; Carex bigelowii stands 10 to 50 cm with blades
+  1.5 to 4 mm, Native Plant Trust, Go Botany) and `generateLichenMesh` (a cushion under 5 cm) in
+  `@margoengine/procedural`; `procedural:sedge` is drawn in the cured-grass colour of the ground table (ECOSTRESS wild
+  oat litter) and bends with the wind, `procedural:lichen` in a chosen pale grey-olive (lichens lack green vegetation's
+  peak at 0.55 um: Petzold and Goward 1988, Remote Sensing of Environment 24(3)). A sedge draws 21 triangles and a
+  lichen 14 where each drew the grass's 6.
+- **Left:** the tufts read thin from above; the ground between them carries the cover.
+- **Regression:** `packages/procedural/test/foliage.test.js` "the sedge is a short tuft of narrow leaves and the lichen
+  a low cushion (KB-TUNDRA-GRASS1)" and `packages/biomes/tests/placement.test.js` (the tundra preset's detail meshes).
+
+### Open 2026-11-28: a plain BiomeView page showed a black sky with `scene.background` set (KB-BIOMES-BLACKSKY1; biomes or the page)
+
+- **Repro:** a page that sets `engine.scene.background = [0.42, 0.55, 0.75]`, then `BiomeView.attach` on the tundra preset
+  world with `radius: 600`, camera 2 m over the ground looking at the horizon: the sky draws near black.
+- **Cause:** not traced (the page or the engine is not yet known).
+
 ### Fixed 2026-11-28: terrain ground with `bump` drew as black and white speckle near the camera (KB-TUNDRA-GROUNDNOISE1; terrain)
 
 - **Repro:** a `BiomeView` of the tundra world, camera 1.1 m over the ground: the snow and tundra ground drew as black and

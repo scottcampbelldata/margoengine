@@ -170,8 +170,8 @@ export const presets: Readonly<Record<PresetId, BiomeDefinition>> = Object.freez
     rocks: [rock(25)],
     // Lichen is low ground cover drawn per frame, not 2,000 stored shrubs per hectare.
     details: [
-      { id: 'sedge', mesh: 'procedural:grass', density: 15 },
-      { id: 'lichen', mesh: 'procedural:grass', density: 10 },
+      { id: 'sedge', mesh: 'procedural:sedge', density: 15 },
+      { id: 'lichen', mesh: 'procedural:lichen', density: 10 },
     ],
   }),
   desert: freeze<BiomeDefinition>({

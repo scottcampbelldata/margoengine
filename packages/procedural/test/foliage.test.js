@@ -188,3 +188,33 @@ test('broadleaf trunk top is enclosed by at least one foliage lobe', () => {
     }
   assert.ok(checked >= 8, 'Checks the full cap perimeter and its center');
 });
+
+// KB-TUNDRA-GRASS1: the tundra's sedge and lichen drew as the half-metre green grass.
+test('the sedge is a short tuft of narrow leaves and the lichen a low cushion (KB-TUNDRA-GRASS1)', async () => {
+  const { generateSedgeMesh, generateLichenMesh } = await import('../dist/index.js'),
+    sedge = generateSedgeMesh(),
+    lichen = generateLichenMesh(),
+    box = (data) => {
+      let top = 0,
+        reach = 0;
+      for (let i = 0; i < data.positions.length; i += 3) {
+        assert.ok(data.positions[i + 1] >= 0, 'rooted on the ground');
+        top = Math.max(top, data.positions[i + 1]);
+        reach = Math.max(reach, Math.hypot(data.positions[i], data.positions[i + 2]));
+      }
+      return { top, reach };
+    };
+  assert.deepEqual(sedge, generateSedgeMesh());
+  assert.equal(sedge.indices.length, 7 * 3 * 3);
+  const tuft = box(sedge);
+  assert.ok(tuft.top >= 0.1 && tuft.top <= 0.2 && tuft.reach <= 0.25, JSON.stringify(tuft));
+  // Each leaf's base is 4 mm wide: the first two of its five vertices.
+  for (let leaf = 0; leaf < 7; leaf++) {
+    const a = leaf * 15,
+      p = sedge.positions;
+    assert.ok(Math.abs(Math.hypot(p[a + 3] - p[a], p[a + 5] - p[a + 2]) - 0.004) < 1e-6, `leaf ${leaf}`);
+  }
+  const cushion = box(lichen);
+  assert.equal(lichen.indices.length, 14 * 3);
+  assert.ok(cushion.top <= 0.05 && cushion.reach <= 0.09, JSON.stringify(cushion));
+});

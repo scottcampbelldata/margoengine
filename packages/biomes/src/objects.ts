@@ -351,6 +351,14 @@ function partsOf(
       return [{ geometry: make(p.generateGrassMesh(3)), color: [0.2, 0.4, 0.06], kind: 'foliage', blades: true }];
     case 'fern':
       return [{ geometry: make(p.generateFernMesh()), color: [0.08, 0.28, 0.07], kind: 'foliage' }];
+    case 'sedge':
+      // Cured grass leaves: wild oat litter, ECOSTRESS Spectral Library 1.0 samples VH354 and VH355 (looks.ts).
+      return [{ geometry: make(p.generateSedgeMesh()), color: [0.35, 0.24, 0.1], kind: 'foliage', blades: true }];
+    case 'lichen':
+      // Pale and without green vegetation's peak at 0.55 um (Petzold and Goward, "Reflectance spectra of subarctic
+      // lichens", Remote Sensing of Environment 24(3), 1988, https://doi.org/10.1016/0034-4257(88)90020-X); the value
+      // itself is chosen.
+      return [{ geometry: make(p.generateLichenMesh()), color: [0.27, 0.26, 0.19], kind: 'foliage' }];
     case 'reeds':
       return [{ geometry: make(p.generateReedMesh()), color: [0.36, 0.34, 0.11], kind: 'foliage', blades: true }];
     default:
