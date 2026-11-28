@@ -364,7 +364,6 @@ impl World {
             self.window.kin = Some(substep);
         }
         self.note_mid_start();
-        self.hold_start_couplings();
         self.integrate_velocities(h);
         tick(self, 10, inner);
         self.hold_multibodies();
@@ -407,6 +406,7 @@ impl World {
         self.note_springs(false, h);
         self.clamp_speeds();
         tick(self, 9, inner);
+        self.shed_couplings();
         self.shed_locks(h);
         self.integrate_poses(h, substep, substeps);
         self.shift_poses(&shifts);
@@ -415,7 +415,7 @@ impl World {
             self.window.kin = Some(substep + 1);
         }
         self.refresh_turned_contacts();
-        self.track_couplings(h);
+        self.track_couplings();
         self.tally_drift(h);
         self.refresh_joints(h, false);
         self.project_locks(h);
@@ -425,7 +425,10 @@ impl World {
         // projection to close the joint that opens. Placed by that turned rotation, a bob under a torque of 2 N m was thrown
         // the other way each substep, -88.8 rad/s after a second where 2 / 1.004 was due
         // (`a_torque_held_on_a_tree_link_turns_it_at_the_torque_over_its_inertia_and_rotor`). What it moves, the rows read again.
-        if self.fk_multibodies(h) {
+        // A coordinates row is put back on its row after the links are placed, by turning a coupled link with what hangs from it
+        // about its joint (couplings.rs, `project_coords`), so no joint opens.
+        let placed = self.fk_multibodies(h);
+        if self.project_coords() || placed {
             self.refresh_joints(h, false);
         }
         tick(self, 10, inner);

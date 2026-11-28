@@ -467,8 +467,8 @@ impl World {
             }
             _ => {}
         }
-        // A gear or a rack given new axes or a ratio holds from where its bodies stand now.
-        if (c.kind == GEAR || c.kind == RACK_AND_PINION) && field <= 7 {
+        // A gear, a rack or a coordinates row given new axes, a ratio or (coordinates) new parents holds from where its bodies stand now.
+        if ((c.kind == GEAR || c.kind == RACK_AND_PINION) && field <= 7) || (c.kind == COORDS && (field <= 7 || field == 12)) {
             c.indexed = 0;
             c.error = 0.0;
         }
@@ -508,20 +508,7 @@ impl World {
     fn read_error(&mut self, slot: usize) {
         let mut c = self.coupling(slot);
         let (a, b) = (c.a as usize, c.b as usize);
-        let turned = |start: Q, now: Q, axis: [f32; 3], last: &mut f32, turns: &mut u32| -> f64 {
-            let raw = twist(start, now, axis);
-            let step = raw - *last as f64;
-            let mut whole = *turns as i32;
-            if step > core::f64::consts::PI {
-                whole -= 1;
-            } else if step < -core::f64::consts::PI {
-                whole += 1;
-            }
-            *last = raw as f32;
-            *turns = whole as u32;
-            let length = sqrt64(axis[0] as f64 * axis[0] as f64 + axis[1] as f64 * axis[1] as f64 + axis[2] as f64 * axis[2] as f64);
-            (raw + whole as f64 * core::f64::consts::TAU) * length
-        };
+        let turned = turned_since;
         let (mut last_a, mut last_b) = (c.ground_b[0], c.ground_b[1]);
         let (mut turns_a, mut turns_b) = (c.closed, c.last_span);
         let angle_a = turned(c.start_a(), self.pose_rotation(a), c.axis_a, &mut last_a, &mut turns_a);
@@ -536,6 +523,196 @@ impl World {
         (c.closed, c.last_span) = (turns_a, turns_b);
         c.error = error as f32;
         self.put_coupling(slot, c);
+    }
+
+    /// Where a coordinates row's two sides stand, the start its error is measured from: a turning side's child turned into its
+    /// parent's frame, a sliding side's child centre in its parent's frame.
+    fn begin_coords(&mut self, slot: usize) {
+        let mut c = self.coupling(slot);
+        let sides = [(c.a, c.coords_parent_a(), c.coords_slides_a()), (c.b, c.coords_parent_b(), c.coords_slides_b())];
+        for (i, &(child, parent, slides)) in sides.iter().enumerate() {
+            let (child, parent) = (child as usize, parent as usize);
+            let qp = self.pose_rotation(parent);
+            let start = if slides {
+                let o = qp.unrotate(self.pose_center(child).sub(self.pose_center(parent)));
+                Q { x: o.x, y: o.y, z: o.z, w: 0.0 }
+            } else {
+                qp.conjugate().mul(self.pose_rotation(child))
+            };
+            if i == 0 {
+                c.anchor_a = [start.x, start.y, start.z];
+            } else {
+                c.anchor_b = [start.x, start.y, start.z];
+            }
+            c.ground_a[i] = start.w;
+        }
+        c.ground_b = [0.0; 3];
+        c.closed = 0;
+        c.last_span = 0;
+        c.error = 0.0;
+        c.indexed = 1;
+        self.put_coupling(slot, c);
+    }
+
+    /// A coordinates row's error from the poses: the first side's coordinate since the start plus `ratio` times the second's, a
+    /// turning side's the twist of its child in its parent's frame about the hinge axis (whole turns counted as a gear's are), a
+    /// sliding side's the travel of its child's centre in its parent's frame along the slide. Integrated from the row's speed
+    /// instead, it missed every move of the poses no speed made: the midpoint move of `shed_locks` and the end-pose projection
+    /// of `project_locks` turn a link about its free axis, and two hinges coupled 1 : 2 three levels down a turning arm stood
+    /// 0.024 rad off the row after 90 steps (`a_coupling_three_levels_down_a_turning_arm_holds_its_coordinates`).
+    fn read_coords_error(&mut self, slot: usize) {
+        let mut c = self.coupling(slot);
+        let sides = [(c.a, c.coords_parent_a(), c.coords_slides_a(), c.axis_a, c.start_a(), 1.0f64), (c.b, c.coords_parent_b(), c.coords_slides_b(), c.axis_b, c.start_b(), c.ratio as f64)];
+        let (mut last, mut turns) = ([c.ground_b[0], c.ground_b[1]], [c.closed, c.last_span]);
+        let mut error = 0.0f64;
+        for (i, &(child, parent, slides, axis, start, weight)) in sides.iter().enumerate() {
+            let (child, parent) = (child as usize, parent as usize);
+            let qp = self.pose_rotation(parent);
+            let qc = self.pose_rotation(child);
+            let coordinate = if slides {
+                let o = qp.unrotate(self.pose_center(child).sub(self.pose_center(parent)));
+                // The slide in the parent's frame: a slider's child does not turn in it, so the child's axis read there is fixed.
+                let along = qp.unrotate(qc.rotate(vec(axis)));
+                (o.x - start.x) as f64 * along.x as f64 + (o.y - start.y) as f64 * along.y as f64 + (o.z - start.z) as f64 * along.z as f64
+            } else {
+                turned_since(start, qp.conjugate().mul(qc), axis, &mut last[i], &mut turns[i])
+            };
+            error += weight * coordinate;
+        }
+        c.ground_b = [last[0], last[1], 0.0];
+        (c.closed, c.last_span) = (turns[0], turns[1]);
+        c.error = error as f32;
+        self.put_coupling(slot, c);
+    }
+
+    /// After the locks close at the substep's pose (`project_locks`): each rigid coordinates row whose sides are links of a tree
+    /// that holds is put back on its row at the pose, as the locks are on theirs (post-stabilization, Cline and Pai 2003). A side's
+    /// coordinate moves by its share, the row's error over the sum of w^2 / I of its sides (w the side's weight in the row, I the
+    /// side's subtree inertia about its hinge axis through the joint's anchor, or its mass along a slide), and the side's link
+    /// turns (slides) about its joint with everything that hangs from it, so no joint opens and no other coordinate moves. The
+    /// lock projection closes a gap in the mass metric, which turns links about their free axes too, and the row's bias took
+    /// those moves back only at its share a substep: two hinges coupled 1 : 2 three levels down a turning arm stood 4.9e-3 rad
+    /// off the row (`a_coupling_three_levels_down_a_turning_arm_holds_its_coordinates`). True when it moved any body.
+    pub fn project_coords(&mut self) -> bool {
+        let mut moved = false;
+        for place in self.window.couplings.0..self.window.couplings.1 {
+            let k = self.uu(COUPLING_ORDER, place) as usize;
+            let c = self.coupling(k);
+            if c.kind != COORDS || c.hertz > 0.0 || !c.begun() || !self.coupling_live(&c) {
+                continue;
+            }
+            let sides = [(c.a as usize, c.coords_parent_a() as usize, c.coords_slides_a(), c.axis_a, 1.0f64), (c.b as usize, c.coords_parent_b() as usize, c.coords_slides_b(), c.axis_b, c.ratio as f64)];
+            // Each side's axis in the world (unit), its point, and the give of its coordinate (1 / I or 1 / m of what it moves).
+            let mut move_of = [None; 2];
+            let mut sum = 0.0f64;
+            for (i, &(child, parent, slides, axis, weight)) in sides.iter().enumerate() {
+                if let Some((unit, point, give, length)) = self.coords_side_move(child, parent, slides, axis) {
+                    move_of[i] = Some((unit, point, give, length));
+                    sum += weight * weight * length * length * give;
+                }
+            }
+            if !(sum > 0.0) {
+                continue;
+            }
+            self.read_coords_error(k);
+            let error = self.coupling(k).error as f64;
+            if error == 0.0 {
+                continue;
+            }
+            for (i, &(child, _, slides, _, weight)) in sides.iter().enumerate() {
+                let Some((unit, point, give, length)) = move_of[i] else { continue };
+                // The side's coordinate, at its axis's length as the row reads it, moves by -error w length give / sum.
+                let amount = (-error * weight * length * give / sum) as f32;
+                if amount != 0.0 {
+                    self.move_subtree(child, unit, point, amount, slides);
+                    moved = true;
+                }
+            }
+            self.read_coords_error(k);
+        }
+        moved
+    }
+
+    /// What a coordinates side can move at the pose: when `child` is a link of a tree that holds, hung from `parent` by its
+    /// joint, the unit axis in the world, the joint's anchor on the parent, the give of the coordinate (1 / I of the subtree about
+    /// the axis through the anchor, or 1 / m along a slide), and the axis's length. None when it is not, or the subtree cannot move.
+    fn coords_side_move(&self, child: usize, parent: usize, slides: bool, axis: [f32; 3]) -> Option<(V3, V3, f64, f64)> {
+        if self.uu(MB_ROLE, child) == 0 || self.uu(MB_PARENT, child) as usize != parent || self.uu(MB_HELD, self.uu(MB_ROOT, child) as usize) == 0 {
+            return None;
+        }
+        let joint = self.uu(MB_JOINT, child);
+        if joint == NONE || self.uu(JOINT_A, joint as usize) as usize != parent || !self.lock_moves(child) {
+            return None;
+        }
+        let length = sqrt64(axis[0] as f64 * axis[0] as f64 + axis[1] as f64 * axis[1] as f64 + axis[2] as f64 * axis[2] as f64);
+        if !(length > 0.0) {
+            return None;
+        }
+        let world = self.pose_rotation(child).rotate(vec(axis)).scale((1.0 / length) as f32);
+        let point = self.pose_position(parent).add(self.pose_rotation(parent).rotate(self.v(JOINT_ANCHOR_A_X, joint as usize)));
+        let mut resist = 0.0f64;
+        let mut fixed = false;
+        self.each_in_subtree(child, |w, body| {
+            let inverse_mass = w.s(INVERSE_MASS, body);
+            if !(inverse_mass > 0.0) || !w.lock_moves(body) {
+                fixed = true;
+                return;
+            }
+            let mass = 1.0 / inverse_mass as f64;
+            if slides {
+                resist += mass;
+            } else {
+                let frame = w.pose_rotation(body).mul(w.q(INERTIA_FRAME_X, body));
+                let local = frame.unrotate(world);
+                let inertia = w.v(INERTIA_X, body);
+                let r = w.pose_center(body).sub(point);
+                let off = r.sub(world.scale(r.dot(world)));
+                resist += (inertia.x * local.x * local.x + inertia.y * local.y * local.y + inertia.z * local.z * local.z) as f64 + mass * off.dot(off) as f64;
+            }
+        });
+        if fixed || !(resist > 0.0) {
+            return None;
+        }
+        Some((world, point, 1.0 / resist, length))
+    }
+
+    /// Calls `each` on `top` and every link of its tree that hangs from it, parents before children.
+    fn each_in_subtree(&self, top: usize, mut each: impl FnMut(&World, usize)) {
+        let mut at = top as u32;
+        while at != NONE {
+            let body = at as usize;
+            if self.hangs_from(body, top) {
+                each(self, body);
+            }
+            at = self.uu(MB_NEXT, body);
+        }
+    }
+
+    /// Turns `top` and everything that hangs from it by `amount` rad about `unit` through `point`, or slides them `amount` along it.
+    fn move_subtree(&mut self, top: usize, unit: V3, point: V3, amount: f32, slides: bool) {
+        let turn = Q::from_rotation_vector(unit.scale(amount));
+        let mut at = top as u32;
+        while at != NONE {
+            let body = at as usize;
+            at = self.uu(MB_NEXT, body);
+            if !self.hangs_from(body, top) {
+                continue;
+            }
+            let centre = self.pose_center(body);
+            let linear = if slides { unit.scale(amount) } else { point.add(turn.rotate(centre.sub(point))).sub(centre) };
+            let angular = if slides { v3(0.0, 0.0, 0.0) } else { unit.scale(amount) };
+            self.nudge(body, linear, angular, false);
+        }
+    }
+
+    /// Whether `body` is `top` or a link of its tree below it.
+    fn hangs_from(&self, body: usize, top: usize) -> bool {
+        let (mut up, mut guard) = (body, 0u32);
+        while up != top && self.uu(MB_ROLE, up) != 0 && up != self.uu(MB_ROOT, up) as usize && guard < 1 << 20 {
+            up = self.uu(MB_PARENT, up) as usize;
+            guard += 1;
+        }
+        up == top
     }
 
     pub fn remove_coupling(&mut self, slot: usize) -> bool {
@@ -781,6 +958,9 @@ impl World {
             if (c.kind == GEAR || c.kind == RACK_AND_PINION) && !c.begun() && self.coupling_live(&c) {
                 self.begin_reading(k);
             }
+            if c.kind == COORDS && !c.begun() && self.coupling_live(&c) {
+                self.begin_coords(k);
+            }
             if c.kind == COORDS {
                 if self.coupling_live(&c) && c.impulse != 0.0 {
                     let side = self.coords_sides(&c);
@@ -863,27 +1043,27 @@ impl World {
         }
     }
 
-    /// After `note_mid_start`: the start speeds a body a lock holds noted (MID_START) are made the ones each rigid gear, rack and
-    /// pair of coordinates holds, an impulse along its row against the speed the row stands at. A start speed that breaks a rigid
-    /// row (one given between steps, or left by the relaxing passes, which leave the couplings out) is taken back by the row's
-    /// impulse at once, a jump and not a force, so `shed_locks`, which reads the substep's free change of speed from MID_START as
-    /// an acceleration and moves the pose back h^2 a / 2 by it, must not see that jump: read as a force, it moved the pose back
-    /// by h/2 of the broken speed, and the row's error, which follows from the speeds it ends with (`track_couplings`), never saw
-    /// the move. Two hinges coupled 1 : 2 with one started at 1 rad/s then stood h/2 rad apart for good
-    /// (`a_coupling_started_broken_holds_its_coordinates_from_the_first_substep`). A soft row is a spring and its push a force;
-    /// a rope and a distance range push one way only and a path's row is its own; they keep the whole change.
-    pub fn hold_start_couplings(&mut self) {
-        let start = |w: &World, id: usize| -> Moving {
+    /// Before `shed_locks`: the change of speed each rigid coupling's impulse gave its bodies over the substep is added to the
+    /// start speeds a body a lock holds noted (MID_START), so the midpoint move of the poses, which reads the substep's free
+    /// change of speed from MID_START as an acceleration and moves the pose back h^2 a / 2 by it, leaves it out. A rigid row's
+    /// impulse holds a constraint and is no load: read as one, it moved the pose back by h/2 of the speed the row gave, which
+    /// the row then had to close again. Two hinges coupled 1 : 2 with one started at 1 rad/s stood h/2 rad apart for good
+    /// (`a_coupling_started_broken_holds_its_coordinates_from_the_first_substep`); a cam follower lagged its groove by
+    /// a h^2 / c, twice the lag of a row that reads its speeds at the substep's start
+    /// (`a_follower_on_a_turning_cam_tracks_the_exact_cam_follower_kinematics_for_fifty_turns`); a screw's follower 1 m out
+    /// stood 2.3e-5 m off its helix (`a_screw_on_a_turning_shaft_carries_its_follower_a_pitch_a_turn_with_the_point_a_metre_out`).
+    /// Gears, racks, coordinates rows and a path's two rows across the curve count when rigid; a soft row is a spring and a path's
+    /// motor a drive, so their pushes are forces, and a rope and a distance range push one way only; they keep the whole change.
+    pub fn shed_couplings(&mut self) {
+        let still = |w: &World, id: usize| -> Moving {
             let mut m = w.moving(id);
-            if w.lock_moves(id) {
-                (m.linear, m.angular) = (w.v(MID_START_X, id), w.v(MID_START_SPIN_X, id));
-            }
+            (m.linear, m.angular) = (v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0));
             m
         };
-        let put = |w: &mut World, id: usize, m: &Moving| {
+        let add = |w: &mut World, id: usize, m: &Moving| {
             if w.lock_moves(id) {
-                w.set_v(MID_START_X, id, m.linear);
-                w.set_v(MID_START_SPIN_X, id, m.angular);
+                w.set_v(MID_START_X, id, w.v(MID_START_X, id).add(m.linear));
+                w.set_v(MID_START_SPIN_X, id, w.v(MID_START_SPIN_X, id).add(m.angular));
             }
         };
         for place in self.window.couplings.0..self.window.couplings.1 {
@@ -893,66 +1073,61 @@ impl World {
                 continue;
             }
             if c.kind == GEAR || c.kind == RACK_AND_PINION {
+                if c.impulse == 0.0 {
+                    continue;
+                }
                 let (row, _) = self.coupling_row(&c);
-                let (mut a, mut b) = (start(self, c.a as usize), start(self, c.b as usize));
-                let (speed, inverse) = Self::coupling_speed(&c, &row, &a, &b);
-                if !(inverse > 0.0) || speed == 0.0 {
-                    continue;
-                }
-                Self::coupling_push(&c, &row, &mut a, &mut b, -speed / inverse);
-                put(self, c.a as usize, &a);
-                put(self, c.b as usize, &b);
+                let (mut a, mut b) = (still(self, c.a as usize), still(self, c.b as usize));
+                Self::coupling_push(&c, &row, &mut a, &mut b, c.impulse);
+                add(self, c.a as usize, &a);
+                add(self, c.b as usize, &b);
             } else if c.kind == COORDS {
-                let sides = self.coords_sides(&c);
-                let inverse = self.coords_inverse(&sides);
-                let mut speed = 0.0;
-                for s in &sides {
-                    let (child, parent) = (start(self, s.child), start(self, s.parent));
-                    speed += if s.slides { s.axis.dot(child.at(s.arm_child).sub(parent.at(s.arm_parent))) } else { s.axis.dot(child.angular.sub(parent.angular)) };
-                }
-                if !(inverse > 0.0) || speed == 0.0 {
+                if c.impulse == 0.0 {
                     continue;
                 }
-                let p = -speed / inverse;
                 // One body at a time, as `coords_push`, so a parent two sides share takes both pushes.
-                for s in &sides {
-                    let mut child = start(self, s.child);
+                for s in &self.coords_sides(&c) {
+                    let (mut child, mut parent) = (still(self, s.child), still(self, s.parent));
                     if s.slides {
-                        child.push(s.axis.scale(p), s.arm_child);
+                        child.push(s.axis.scale(c.impulse), s.arm_child);
+                        parent.push(s.axis.scale(-c.impulse), s.arm_parent);
                     } else {
-                        child.angular = child.angular.add(child.inertia.mul(s.axis).scale(p));
+                        child.angular = child.inertia.mul(s.axis).scale(c.impulse);
+                        parent.angular = parent.inertia.mul(s.axis).scale(-c.impulse);
                     }
-                    put(self, s.child, &child);
-                    let mut parent = start(self, s.parent);
-                    if s.slides {
-                        parent.push(s.axis.scale(-p), s.arm_parent);
-                    } else {
-                        parent.angular = parent.angular.sub(parent.inertia.mul(s.axis).scale(p));
-                    }
-                    put(self, s.parent, &parent);
+                    add(self, s.child, &child);
+                    add(self, s.parent, &parent);
                 }
+            } else if c.kind == PATH {
+                if c.impulse_n1 == 0.0 && c.impulse_n2 == 0.0 {
+                    continue;
+                }
+                let Some(s) = self.path_state(&c) else { continue };
+                let (mut a, mut b) = (still(self, c.a as usize), still(self, c.b as usize));
+                for (d, p) in [(s.n1, c.impulse_n1), (s.n2, c.impulse_n2)] {
+                    a.push(d.scale(-p), s.ra);
+                    b.push(d.scale(p), s.rb);
+                }
+                add(self, c.a as usize, &a);
+                add(self, c.b as usize, &b);
             }
         }
     }
 
-    /// After a substep's poses: a gear's and a rack's error read from them, and a coordinates row's from the speed it ended with.
-    pub fn track_couplings(&mut self, h: f32) {
+    /// After a substep's poses: a gear's, a rack's and a coordinates row's error read from them.
+    pub fn track_couplings(&mut self) {
         for place in self.window.couplings.0..self.window.couplings.1 {
             let k = self.uu(COUPLING_ORDER, place) as usize;
             let c = self.coupling(k);
             if !self.coupling_live(&c) || c.kind == PULLEY || c.kind == DISTANCE || c.kind == PATH {
                 continue;
             }
-            if c.kind == COORDS {
-                let side = self.coords_sides(&c);
-                let speed = self.coords_speed(&c, &side);
-                let mut kept = self.coupling(k);
-                kept.error = c.error + speed * h;
-                self.put_coupling(k, kept);
-                continue;
-            }
             if c.begun() {
-                self.read_error(k);
+                if c.kind == COORDS {
+                    self.read_coords_error(k);
+                } else {
+                    self.read_error(k);
+                }
             }
         }
     }
@@ -980,6 +1155,23 @@ fn half_atan2(y: f64, x: f64) -> f64 {
     }
     let angle = if size_y <= x { arc_tangent64(size_y / x) } else { core::f64::consts::FRAC_PI_2 - arc_tangent64(x / size_y) };
     if y < 0.0 { -angle } else { angle }
+}
+
+/// The turn from `start` to `now` about `axis` (in the body's frame) at the axis's length, the whole turns counted from `last`, the
+/// angle read the substep before, into `turns` (an i32): a substep must turn less than half a turn.
+fn turned_since(start: Q, now: Q, axis: [f32; 3], last: &mut f32, turns: &mut u32) -> f64 {
+    let raw = twist(start, now, axis);
+    let step = raw - *last as f64;
+    let mut whole = *turns as i32;
+    if step > core::f64::consts::PI {
+        whole -= 1;
+    } else if step < -core::f64::consts::PI {
+        whole += 1;
+    }
+    *last = raw as f32;
+    *turns = whole as u32;
+    let length = sqrt64(axis[0] as f64 * axis[0] as f64 + axis[1] as f64 * axis[1] as f64 + axis[2] as f64 * axis[2] as f64);
+    (raw + whole as f64 * core::f64::consts::TAU) * length
 }
 
 /// The turn from `start` to `now` about `axis` (in the body's frame), from -pi to pi: the twist of start^-1 now, 2 atan2(v . u, w)

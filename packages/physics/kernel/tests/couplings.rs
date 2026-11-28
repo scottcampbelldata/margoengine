@@ -405,3 +405,68 @@ fn a_coupling_started_broken_holds_its_coordinates_from_the_first_substep() {
         assert!((qa + 2.0 * qb).abs() < 1e-4, "kind {kind}: q_a + 2 q_b stays 0: {}", qa + 2.0 * qb);
     }
 }
+
+/// The angle `child` has turned about z in `parent`'s frame, from their rotations.
+fn relative_turn_about_z(w: &World, parent: u32, child: u32) -> f32 {
+    let q = w.q(ROTATION_X, parent as usize).conjugate().mul(w.q(ROTATION_X, child as usize));
+    2.0 * atan2(q.z, q.w)
+}
+
+#[test]
+fn a_coupling_three_levels_down_a_turning_arm_holds_its_coordinates() {
+    // An arm of three links hinged about z, held as one tree, with the second and third links' hinges coupled 1 : 2, kicked so the
+    // whole arm turns and the second link turns against the first. The locks close at the substep's pose by a move in the mass
+    // metric, which also turns the links about their free axes; with its error integrated from its speed the row never saw those
+    // moves (0.024 rad off after 90 steps), and with the error read from the poses but only its bias to take it back it stood
+    // 4.9e-3 rad off. With no gravity and no loads the arm keeps its angular momentum about the pivot, 6.5 N m s.
+    let mut w = World::new(8, 8).unwrap();
+    w.header_mut().gravity = [0.0; 3];
+    let inertia = (0.8 * 0.8 + 0.2 * 0.2) / 12.0;
+    let root = w.add_body(FIXED).unwrap();
+    w.set_pose(root, v3(0.0, 0.0, 0.0), Q::IDENTITY, false);
+    let links: Vec<u32> = (1..=3).map(|i| point(&mut w, v3(i as f32, 0.0, 0.0), 1.0, inertia)).collect();
+    let mut parent = root;
+    for &b in &links {
+        let j = w.add_joint(parent, b, LOCK_LINEAR_ROWS | JOINT_LOCK * (6 << 3)).unwrap() as usize;
+        w.set_joint_axis(j as u32, v3(0.0, 0.0, 1.0));
+        w.set_s(JOINT_ANCHOR_B_X, j, -1.0);
+        for (column, value) in [(MB_ROLE, 2), (MB_ROOT, root), (MB_NEXT, margoengine_physics_kernel::world::NONE), (MB_JOINT, j as u32), (MB_PARENT, parent)] {
+            w.set_u(column, b as usize, value);
+        }
+        w.set_u(MB_NEXT, parent as usize, b);
+        parent = b;
+    }
+    for (column, value) in [(MB_ROLE, 1), (MB_ROOT, root), (MB_JOINT, margoengine_physics_kernel::world::NONE), (MB_PARENT, margoengine_physics_kernel::world::NONE), (MB_NO_SELF, 1)] {
+        w.set_u(column, root as usize, value);
+    }
+    for &b in &links {
+        w.touch_body(b);
+    }
+    let [l1, l2, l3] = [links[0], links[1], links[2]];
+    let k = w.add_coupling(COORDS, l2, l3).unwrap();
+    w.set_coupling(k, 0, [0.0, 0.0, 1.0]);
+    w.set_coupling(k, 1, [0.0, 0.0, 1.0]);
+    w.set_coupling(k, 6, [2.0, 0.0, 0.0]);
+    w.set_coupling(k, 8, [0.0, 1.0, 0.2]);
+    w.set_coupling(k, 12, [l1 as f32, l2 as f32, 0.0]);
+    w.set_v(ANGULAR_X, l1 as usize, v3(0.0, 0.0, 6.0 / inertia));
+    w.set_v(ANGULAR_X, l2 as usize, v3(0.0, 0.0, 0.5 / inertia));
+    let momentum = |w: &World| -> f32 {
+        links.iter().map(|&b| {
+            let (c, v, s) = (w.v(CENTER_X, b as usize), w.v(LINEAR_X, b as usize), w.v(ANGULAR_X, b as usize));
+            c.x * v.y - c.y * v.x + inertia * s.z
+        }).sum()
+    };
+    let (mut worst, mut turned, mut drift) = (0.0f32, 0.0f32, 0.0f32);
+    for _ in 0..90 {
+        w.step(DT);
+        let (q2, q3) = (relative_turn_about_z(&w, l1, l2), relative_turn_about_z(&w, l2, l3));
+        worst = worst.max((q2 + 2.0 * q3).abs());
+        turned = turned.max(relative_turn_about_z(&w, root, l1).abs());
+        drift = drift.max((momentum(&w) - 6.5).abs());
+    }
+    println!("three levels down: q2 + 2 q3 worst {worst:e} rad, arm turned {turned} rad, momentum off by {drift} N m s");
+    assert!(turned > 0.3, "the arm turned as a whole: {turned} rad");
+    assert!(worst < 1e-5, "q2 + 2 q3 holds while the arm turns: {worst} rad");
+    assert!(drift < 0.065, "the arm keeps its angular momentum about the pivot to 1 %: off by {drift} N m s");
+}

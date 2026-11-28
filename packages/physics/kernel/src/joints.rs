@@ -2446,7 +2446,7 @@ impl World {
     }
 
     /// Moves a body's pose by `linear` at its centre and `angular` as a rotation vector, and counts it in its shift.
-    fn nudge(&mut self, at: usize, linear: V3, angular: V3, counted: bool) {
+    pub(crate) fn nudge(&mut self, at: usize, linear: V3, angular: V3, counted: bool) {
         let center = self.v(CENTER_X, at).add(linear);
         let rotation = Q::from_rotation_vector(angular).mul(self.q(ROTATION_X, at)).normalized();
         self.set_v(CENTER_X, at, center);
