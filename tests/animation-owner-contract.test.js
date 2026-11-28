@@ -10,5 +10,6 @@ test('every explicit Animation plugin disposes by registered identity', () => {
     assert.deepEqual(result.problems, [], name);
     count += result.checked;
   }
-  assert.equal(count, 9);
+  // Ten since f8c292a91d added DeformedPoints (deformed-points.ts), which disposes by its registered identity too.
+  assert.equal(count, 10);
 });
