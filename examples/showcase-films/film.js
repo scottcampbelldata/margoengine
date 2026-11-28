@@ -1,5 +1,6 @@
 import { Clustered } from '@margoengine/clustered';
 import { EnvironmentLighting } from '@margoengine/environment';
+import { panorama } from './panorama.js';
 import { applyMatrix4, boxGeometry, cylinderGeometry, mergeGeometries, planeGeometry } from '@margoengine/geometry';
 import { roundedBoxGeometry } from '@margoengine/geometry/extras';
 import { Material, Texture, createMesh } from '@margoengine/materials';
@@ -181,38 +182,6 @@ export function finishTexture(seed, { r = 130, grain = 16, streak = false, mottl
   return new Texture(canvas, { colorSpace: 'linear', wrapS: 'repeat', wrapT: 'repeat' });
 }
 
-function panorama(night) {
-  const width = 512,
-    height = 256;
-  const data = new Float32Array(width * height * 4);
-  const panels = night
-    ? [
-        [-0.48, 0.16, 0.26, 0.07, [1.9, 1.13, 0.62]],
-        [1.5, 0.32, 0.47, 0.21, [0.27, 0.49, 0.84]],
-        [-2.2, 0.18, 0.18, 0.15, [0.9, 0.62, 0.28]],
-      ]
-    : [
-        [-0.86, 0.78, 0.62, 0.22, [5.8, 5.13, 4.34]],
-        [1.16, 0.66, 0.44, 0.16, [3.0, 4, 5]],
-        [-2.4, 0.34, 0.41, 0.13, [1.3, 1.57, 1.92]],
-      ];
-  for (let y = 0; y < height; y++) {
-    const el = Math.PI * (0.5 - (y + 0.5) / height);
-    for (let x = 0; x < width; x++) {
-      const az = 2 * Math.PI * ((x + 0.5) / width - 0.5);
-      const base = night ? 0.035 + 0.08 * Math.exp(-Math.abs(el) * 3) : 0.175 + 0.15 * Math.max(0, Math.sin(el));
-      const value = night ? [base * 0.55, base * 0.75, base * 1.2] : [base * 0.94, base, base * 1.06];
-      for (const [pa, pe, w, h, rgb] of panels) {
-        const d = Math.atan2(Math.sin(pa - az), Math.cos(pa - az));
-        const brightness = Math.exp(-2 * ((d / w) ** 4 + ((pe - el) / h) ** 4));
-        for (let i = 0; i < 3; i++) value[i] += brightness * rgb[i];
-      }
-      data.set([...value, 1], (y * width + x) * 4);
-    }
-  }
-  return { width, height, data };
-}
-
 class FadePanel extends Panel {
   alpha = 1;
   get opacity() {
@@ -269,7 +238,7 @@ export async function openFilm({ title, build, night = false, far = 75, camera, 
     });
     const { engine } = stage;
     const workshopScene = workshop(engine);
-    const light = await EnvironmentLighting.load(engine, panorama(night), {
+    const light = await EnvironmentLighting.load(engine, panorama(night, look.sky), {
       size: 128,
       specularSize: 128,
       intensity: look.environment ?? (night ? 1.17 : 0.81),

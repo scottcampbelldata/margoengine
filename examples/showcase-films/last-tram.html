@@ -19,6 +19,8 @@
     import { buildDepot } from './last-tram.js';
     await openFilm({ title: 'Last Tram', build: buildDepot, night: true, far: 180, look: {
       environment: 0.45,
+      // What wet tops and glass reflect: the overcast lit orange from below by the city, a dark yard under it.
+      sky: { zenith: [0.11, 0.065, 0.04], horizon: [0.2, 0.115, 0.065], ground: [0.018, 0.016, 0.016] },
       // Night grade: a third of a stop up, the dark yard lifted locally so it reads, black kept black and cool,
       // the sodium highlights warm, and a gentle S so wet speculars pop.
       exposure: 0.8,
