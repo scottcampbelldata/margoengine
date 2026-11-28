@@ -1,6 +1,6 @@
 import { EngineKernel } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
-import { createIntegrator, diskTurnsPerSecond, transmission } from './kinematics.js';
+import { createIntegrator, diskTurnsPerSecond, transmission } from './mechanism.js';
 import { prepareIntegrator } from './model.js';
 
 const canvas = document.querySelector('#scene');

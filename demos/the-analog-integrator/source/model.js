@@ -1,7 +1,7 @@
 import { applyMatrix4, latheGeometry, mergeGeometries } from '@margoengine/geometry';
 import { roundedBoxGeometry } from '@margoengine/geometry/extras';
 import { Material, createMesh } from '@margoengine/materials';
-import { carriageLimit, diskRadius, wheelRadius } from './kinematics.js';
+import { carriageLimit, diskRadius, wheelRadius } from './mechanism.js';
 
 const up = [0,1,0], right = [1,0,0], front = [0,0,1];
 const tau = Math.PI * 2;

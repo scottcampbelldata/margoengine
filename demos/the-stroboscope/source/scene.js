@@ -2,7 +2,7 @@ import { Engine } from '@margoengine/core';
 import { EnvironmentLighting } from '@margoengine/environment';
 import { Shadows } from '@margoengine/shadows';
 import { buildInstrument } from './rig.js';
-import { apparentSpeed, defaultSpeed, rotorPose } from './model.js';
+import { apparentSpeed, defaultSpeed, rotorPose } from './mechanism.js';
 
 const canvas=document.querySelector('#scene'),loading=document.querySelector('#loading');
 const sampling=document.querySelector('#sampling'),rate=document.querySelector('#rate');

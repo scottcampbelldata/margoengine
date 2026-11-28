@@ -301,7 +301,7 @@
   "the-analog-integrator": {
    "R3": 4,
    "R4": 2,
-   "R5": 417
+   "R5": 407
   },
   "the-ar-card": {
    "R3": 11,
@@ -310,7 +310,7 @@
   "the-archimedes-screw": {
    "R3": 3,
    "R4": 1,
-   "R5": 593
+   "R5": 571
   },
   "the-astigmatism-bench": {
    "R1": 3,
@@ -485,7 +485,7 @@
   "the-differential": {
    "R2": 1,
    "R3": 4,
-   "R5": 450
+   "R5": 414
   },
   "the-diffraction-ruler": {
    "R1": 3,
@@ -531,7 +531,7 @@
   "the-epicyclic-drive": {
    "R3": 4,
    "R4": 2,
-   "R5": 484
+   "R5": 476
   },
   "the-exploded-assembly": {
    "R3": 3,
@@ -576,11 +576,11 @@
   },
   "the-geneva-drive": {
    "R4": 1,
-   "R5": 386
+   "R5": 382
   },
   "the-gimbal": {
-   "R4": 3,
-   "R5": 430
+   "R4": 2,
+   "R5": 413
   },
   "the-glass-stack": {
    "R1": 9,
@@ -607,7 +607,7 @@
   "the-harmonic-drive": {
    "R3": 3,
    "R4": 3,
-   "R5": 442
+   "R5": 436
   },
   "the-heat-haze": {
    "R3": 4,
@@ -768,7 +768,7 @@
   "the-oldham-coupling": {
    "R3": 1,
    "R4": 2,
-   "R5": 418
+   "R5": 409
   },
   "the-orrery": {
    "R3": 11,
@@ -848,8 +848,8 @@
   },
   "the-reuleaux-drive": {
    "R3": 4,
-   "R4": 3,
-   "R5": 436
+   "R4": 2,
+   "R5": 403
   },
   "the-rewind-button": {
    "R5": 430
@@ -870,7 +870,7 @@
   "the-rose-engine": {
    "R3": 8,
    "R4": 2,
-   "R5": 492
+   "R5": 486
   },
   "the-salt-wedge": {
    "R2": 2,
@@ -887,7 +887,7 @@
   "the-sarrus-linkage": {
    "R3": 4,
    "R4": 2,
-   "R5": 439
+   "R5": 437
   },
   "the-schlieren-bench": {
    "R1": 5,
@@ -1015,7 +1015,7 @@
   "the-toggle-press": {
    "R3": 4,
    "R4": 2,
-   "R5": 443
+   "R5": 441
   },
   "the-ui-layout-editor": {
    "R5": 604
@@ -1041,10 +1041,9 @@
    "R5": 612
   },
   "the-watt-governor": {
-   "R2": 1,
    "R3": 7,
    "R4": 2,
-   "R5": 486
+   "R5": 479
   },
   "the-weather-radar": {
    "R3": 4,

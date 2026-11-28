@@ -1,6 +1,6 @@
 import { EngineKernel } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
-import { governorPose } from './equilibrium.js';
+import { governorPose } from './mechanism.js';
 import { prepareGovernor } from './model.js';
 
 const canvas=document.querySelector('#scene');

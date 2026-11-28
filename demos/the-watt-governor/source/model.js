@@ -1,7 +1,7 @@
 import { applyMatrix4, cylinderGeometry, latheGeometry, mergeGeometries, sphereGeometry, torusGeometry } from '@margoengine/geometry';
 import { roundedBoxGeometry } from '@margoengine/geometry/extras';
 import { Material, createMesh } from '@margoengine/materials';
-import { ballArm, linkLength, lowSleeve, pivotHeight, rackPitchRadius } from './equilibrium.js';
+import { ballArm, linkLength, lowSleeve, pivotHeight, rackPitchRadius } from './mechanism.js';
 
 const tau=Math.PI*2;
 const up=[0,1,0],front=[0,0,1],across=[1,0,0];

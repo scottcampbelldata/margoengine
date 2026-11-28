@@ -3,7 +3,7 @@ import { cylinderGeometry, latheGeometry } from '@margoengine/geometry/primitive
 import { roundedBoxGeometry } from '@margoengine/geometry/extras';
 import { toGeometry } from '@margoengine/geometry/utils';
 import { axisAngleToQuaternion } from '@margoengine/math/quat';
-import { repeatedSectors } from './model.js';
+import { repeatedSectors } from './mechanism.js';
 
 const front = [0,0,1], lateral = [1,0,0], tau = 2*Math.PI;
 

@@ -1,25 +1,21 @@
-const gravity=9.80665;
+// This demo's mechanism: its dimensions, and its pose from @margoengine/machinery/mechanisms.
+import { wattGovernorEquilibrium } from '@margoengine/machinery/mechanisms';
+
 export const minRpm=58,maxRpm=112;
 export const ballArm=.292;
 export const pickoff=.198;
 export const linkLength=.232;
 export const pivotHeight=.705;
-const tau=2*Math.PI;
 
 function geometry(rpm) {
-  const omega=rpm*tau/60;
-  const height=gravity/(omega*omega);
-  const theta=Math.acos(Math.min(1,height/ballArm));
-  const radial=Math.sin(theta);
-  const vertical=Math.cos(theta);
-  const jointRadius=pickoff*radial;
-  const jointY=pivotHeight-pickoff*vertical;
-  const sleeveY=jointY-Math.sqrt(linkLength*linkLength-jointRadius*jointRadius);
-  return {theta,ballX:ballArm*radial,ballY:pivotHeight-ballArm*vertical,jointRadius,jointY,sleeveY};
+  const e=wattGovernorEquilibrium(rpm*2*Math.PI/60,{arm:ballArm,pickoff,link:linkLength});
+  return {theta:e.angle,ballX:e.radius,ballY:pivotHeight-e.drop,jointRadius:e.joint[0],jointY:pivotHeight-e.joint[1],
+    sleeveY:pivotHeight-e.sleeve};
 }
 
 export const lowSleeve=geometry(minRpm).sleeveY;
 export const highSleeve=geometry(maxRpm).sleeveY;
+/** The sleeve's rack turns the throttle a quarter turn over the speed range. */
 export const rackPitchRadius=(highSleeve-lowSleeve)/(Math.PI*.5);
 
 export function governorPose(rpm) {
