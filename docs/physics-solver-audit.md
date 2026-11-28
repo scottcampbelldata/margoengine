@@ -50,6 +50,32 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### SOUND-02 four-point pass
+
+- Point 5 (`1956fb9218`). `packages/physics/tests/room-sound.test.js` checks finite geometric range
+  and coded geometry and PCM errors, and forces an unrepresentable native source sum. Both pressure
+  regions, trace, sample clock and accepted work survive the failure.
+  `packages/physics/tests/coupling/room-wave-native-range.test.js` proves the native plain and shared
+  variants retain a finite extreme field and reject a true overflow.
+- Point 6 (`1956fb9218`). `packages/physics/tests/coupling/room-wave-workers.test.js` compares one
+  plain participant with one, two and four shared participants. The 25 × 11 × 17 case crosses four
+  samples and visits 12,376 f64x2 pairs per tick, with unchanged receiver and pressure bytes through
+  signed-cell shift and replay. `packages/physics/tests/room-wave-workers.browser.mjs` verifies bundled
+  Wasm files and starts three real helpers.
+- Point 7 (`1956fb9218`). `packages/physics/tests/concert-hall.browser.mjs` uses the actual finite
+  surfaces, image paths and Web Audio impulse. The direct and double-reflection arrivals are 22.875 ms
+  and 40.725 ms. Both wall impacts occur on their computed frames. WebGPU and WebGL2 reproduce their
+  held and replayed frames and PCM exactly. The original showcase source is available on main and
+  the installed reflection cue and original soundtrack remain open.
+- Point 8 (`1956fb9218`). `docs/limits.md` records the reflecting-edge and single-band grid,
+  specular geometry, pressure bounds, memory and helper requirements, and the omitted room responses.
+  The tests in `room-sound.test.js` and `coupling/room-sound.test.js` check the baseline path geometry,
+  discrete mode, diffraction and dissipative boundary.
+- Point 2 stays open. `packages/physics/scripts/sound02-bras-measured.mjs` holds out ten recorded
+  excess reflection delays from the BRAS RS1 rigid-floor scene. All are inside the engineering
+  allowance of roughly 0.16–0.18 ms. Predictions are consistently 0.042–0.133 ms early. The one
+  scene validates early reflection timing. Independent amplitude, late decay and further rooms remain open.
+
 ### DYN-05 four-point pass
 
 - Point 5 (`59abbb0f64`). `packages/physics/tests/coupling/rail.test.js` verifies equal projected

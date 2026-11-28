@@ -487,7 +487,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | FIRE-06 | Heat conduction and phase change | heat, phase change and thermoelasticity | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e497def90e |
 | FIRE-07 | Burning of structures, ships and solids | stand-in | Open | OPEN |
 | SOUND-01 | Outdoor propagation | physics/outdoor-sound and audio/outdoor | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 976796766b |
-| SOUND-02 | Enclosed and urban acoustics | physics/room-sound | Codex | BUILDING (codex/physics-sound-02-four-point; four-point pass; [audit](physics-solver-audit.md)), prior landing bb16680105 |
+| SOUND-02 | Enclosed and urban acoustics | physics/room-sound | Codex | REOPENED (4/8 at 1956fb9218, points 5–8, [evidence](physics-solver-audit.md#sound-02-four-point-pass)), prior landing bb16680105 |
 | SOUND-03 | Underwater acoustics | physics/underwater | Codex | REOPENED (4/8 at 85765e0ef8, points 5–8, [evidence](physics-solver-audit.md#sound-03-four-point-pass)), prior landing 9f850999d0 |
 | SOUND-04 | Contact and modal sound | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e0b1f274ab |
 | SOUND-05 | Physics-driven fluid, fire, wind and machine sound | none | Open | OPEN |
