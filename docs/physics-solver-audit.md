@@ -3139,3 +3139,14 @@ What holds:
 - Point 8 (50e4e322ce). `packages/physics/scripts/ice04-pack-resistance-measured.mjs` scores the change in two tow-force pairs from Xue et al. Table 3, held out from the model and its material parameters. Going from 60 to 80 percent ice gives modeled versus measured increases of 0.542 versus 0.774 N and 1.590 versus 1.231 N. Both are inside the published repeat envelopes with hull-to-floe friction. Using measured floe-to-floe friction globally takes the higher-speed condition outside its repeat-only envelope. [Evidence and limits](limits.md#ice-04-shared-native-drift-and-independent-tow-resistance)
 
 Bonded fracture, polygons, wave interaction, ICE-05 thermodynamics, separate contact friction, absolute tow resistance and original shots remain open. The row stays REOPENED at four points.
+
+### ICE-01 Snowpack
+
+#### ICE-01 four-point pass
+
+- Point 5 (316b7367c1). `packages/physics/tests/coupling/snowpack.test.js` checks fix-linked errors, foreign-bank heat with memory growth, unchanged cover, heat, runoff and version after a late native overflow, and the live signed origin after restore. Corrected forcing repeats the same accepted bytes.
+- Point 6 (316b7367c1). `packages/physics/tests/coupling/snowpack-workers.test.js` verifies exact 1-, 2- and 4-participant signed replay across both grid sizes. Ordered snowfall and drift precede independent column updates. `packages/physics/tests/snowpack-workers.browser.mjs` starts three real helpers. The 221-column case records 714 conduction links and 38,556 bisection iterations, with 694 links solved in f64x2 pairs. Both grids also repeat the previous scalar Wasm exactly.
+- Point 7 (316b7367c1). `packages/weather/tests/snowmelt-film.browser.mjs` links accepted ATMO-09 heat to snowpack discharge and real shallow water. Snow area goes from 300 to 128 m² in 15.67 simulated hours and 10.965 m³ reaches the pond. The unheated control stays dry and snow-covered. Accepted height and the renderer gauge agree within 20 µm. Both renderers repeat exact full RGBA and accepted snapshots.
+- Point 8 (316b7367c1). `packages/physics/scripts/ice01-col-de-porte-measured.mjs` checks later snow depth and water equivalent from two independent six-day weather windows. The model's depth RMSE is 0.011 and 0.018 m. On the last warm day it retains 232.89 kg/m² against 189 kg/m² measured. Even the instantaneous residual of 31.70 kg/m² exceeds the 25 kg/m² spatial RMS scale. The 300-to-150 s refinement and one-hour forcing label shift leave the warm miss intact. [Evidence and limits](limits.md#ice-01-snowpack-acceptance-and-independent-field-measurements)
+
+Warm-period water equivalent, storm-by-storm layers, microstructure and weak layers, suspension and vapor mass exchange, and original avalanche shots remain open. The row stays REOPENED at four points.

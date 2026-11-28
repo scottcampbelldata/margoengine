@@ -497,7 +497,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | EARTH-08 | Seismic waves and ground shaking | physics/seismic | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 32c933e9d0 |
 | EARTH-09 | Volcanic eruption column | partial | Open | OPEN |
 | EARTH-10 | Lava flow | partial | Codex | REOPENED (4/8 at 99d66dbc47, points 5–8, [evidence](physics-solver-audit.md#earth-10-four-point-pass)), prior landing 3a35fac405 |
-| ICE-01 | Snowpack | physics/snowpack and weather/avalanche | Codex | BUILDING (codex/physics-ice-01-four-point; four-point pass; [audit](physics-solver-audit.md)), landed 7f5ad4a8d2 |
+| ICE-01 | Snowpack | physics/snowpack, Weather Snow and live basin runoff | Codex | REOPENED (4/8 at 316b7367c1, points 5–8, [evidence](physics-solver-audit.md#ice-01-four-point-pass)), prior landing 7f5ad4a8d2 |
 | ICE-02 | Glacier and ice-sheet flow | physics/glacier | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 096242cb21 |
 | ICE-03 | Iceberg rigid-body dynamics and calving | physics/iceberg | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 7dbf9e06ee |
 | ICE-04 | Pack ice and floes | physics/pack-ice and live vessel contacts | Codex | REOPENED (4/8 at 50e4e322ce, points 5–8, [evidence](physics-solver-audit.md#ice-04-four-point-pass)), prior landing dbc7a0efd9 |
