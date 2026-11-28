@@ -50,6 +50,33 @@ them; the rest is a record of what a stronger solver would need.
 - **No threads or work counts.** Rust and Wasm SIMD kernels are common; threading, floating origin and recorded work
   counts are rare (point 6).
 
+### SEA-13 four-point pass
+
+- Point 5 (96d21889b9). `packages/physics/tests/coupling/foam.test.js` verifies that a late invalid face and
+  excessive current preserve the previously accepted coverage and clock. A corrected step matches a clean run.
+  All three source fields receive signed cells across rebases and exact snapshot replay.
+  `packages/physics/tests/coupling/foam-transport-workers.test.js` checks rollback of the native work receipt.
+- Point 6 (96d21889b9). `packages/physics/tests/coupling/foam-transport-workers.test.js` compares 39×31 and
+  71×37 grids byte for byte on scalar and native 1/2/4 participants and checks an independent dyadic flux case.
+  `packages/physics/tests/foam-transport-workers.browser.mjs` joins three real nested helpers from packaged
+  assets. Three CFL substeps on 71×37 cells dispatch 7,770 X and 7,668 Z face pairs, with accepted hash
+  8d724e518f48857a.
+- Point 7 (96d21889b9). `packages/water/test/sea-foam-surface.browser.mjs` draws the accepted grid from live
+  wave breaking on both renderers against an identical sea with the producer detached. Coverage grows
+  from 3.43 to 20.37 m² and its centroid travels 8.41 m. Both renderers replay the accepted state and full
+  camera pixels exactly. The resize and detach checks also compare complete frames.
+- Point 8 (96d21889b9). `docs/limits.md` records outflow, decay and saturation of the surface coverage
+  field, geometric wakes, scalar field queries, the still-water plume closure and the separate optical
+  histories. `packages/physics/tests/coupling/foam.test.js` checks coverage replay and
+  `packages/physics/tests/bubble-plume.test.js` checks the analytic pure-plume limit. The technical cutaway
+  leaves OO-1 and RITS-2 open and the adapter does not phase-lock individual patches to a separate sea.
+- Point 2 stays open. `packages/physics/scripts/sea13-whitecaps-measured.mjs` compares nine independent
+  North Atlantic camera measurements without fitting any outcome. All nine miss the published
+  image-threshold sensitivity intervals. Mature-sea predictions were 0.90%, 1.52% and 1.71%, against
+  1.36%, 2.93% and 7.06% observed, with RMSE 3.21 percentage points. The interval describes image
+  threshold sensitivity. The archive supplies ECMWF covariates and grouped wave age; time-resolved
+  directional spectra and coincident local wind measurements are unavailable in this comparison.
+
 ### SOUND-01 four-point pass
 
 - Point 5 (3a2e5a1029). `packages/physics/tests/coupling/outdoor-sound.test.js` rejects a late invalid
