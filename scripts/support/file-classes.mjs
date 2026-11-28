@@ -75,6 +75,7 @@ export const CLASSES = {
   proof: 'none',
   'quality-baseline': 'none',
   python: 'none',
+  'web-demo': 'none',
   asset: 'full',
   script: 'none',
   inert: 'none',
@@ -129,6 +130,8 @@ export function classify(raw, { workspaces = [], checkCode = CHECK_CODE } = {}) 
     return { cls: 'build-config', reason: 'build configuration changed' };
   if (machine.has(file)) return { cls: 'check-code', reason: 'check code or the package build changed' };
   if (RUNNER.includes(file)) return { cls: 'runner' };
+  // The web demo exhibits (built pages, their sources and download zips): root unit tests check them, no GPU step.
+  if (file.startsWith('demos/')) return { cls: 'web-demo' };
   if (file.endsWith('.wgsl')) return { cls: 'wgsl-loose', reason: 'WGSL outside a package changed' };
   if (INERT.some((re) => re.test(file))) return { cls: 'inert' };
   if (/^tests\/[\w.-]+\.test\.js$/.test(file)) return { cls: 'unit' };

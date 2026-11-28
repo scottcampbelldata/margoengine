@@ -37,6 +37,7 @@ test('each class places the files it is meant for, checked in order', () => {
     'quality-baseline': ['scripts/quality/baselines/sizes.json'],
     python: ['python/margoengine/_figure.py', 'python/frontend/figure.ts'],
     asset: ['examples/assets/boulder-robot.glb'],
+    'web-demo': ['demos/newtons-cradle/assets/index-a1.js', 'demos/newtons-cradle.zip'],
     script: [
       'scripts/quiet-gate.mjs',
       'scripts/support/msaa-blend-repeat.html',
