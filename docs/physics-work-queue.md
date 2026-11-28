@@ -527,7 +527,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | AERO-03 | Flight dynamics (wings, rotors, bodies) | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed f9161cc7e |
 | ATMO-01 | Boundary-layer wind field | physics/boundary-layer and weather/boundary-layer | Codex | REOPENED (4/8 at 9d7dd26bc5, points 5–8, [evidence](physics-solver-audit.md#atmo-01-four-point-pass)), prior landing c38c25d3d |
 | ATMO-02 | Atmospheric turbulence and gusts | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c38c25d3d |
-| ATMO-03 | Moist convection and cloud dynamics | none | Codex | BUILDING (codex/physics-atmo-03-four-point; four-point pass; [audit](physics-solver-audit.md)), prior landing 8833dbf0c |
+| ATMO-03 | Moist convection and cloud dynamics | physics/clouds and environment/density-volume | Codex | REOPENED (4/8 at 9622992eda, points 5–8, [evidence](physics-solver-audit.md#atmo-03-four-point-pass)), prior landing 8833dbf0c |
 
 ## Taken
 

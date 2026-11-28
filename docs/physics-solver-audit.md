@@ -52,24 +52,24 @@ them; the rest is a record of what a stronger solver would need.
 
 ### ATMO-03 four-point pass
 
-- Point 5. `atmo03-projection.test.js` independently derives all twelve MAC face velocities for a warmed cell at
+- Point 5. `9622992eda`. `atmo03-projection.test.js` independently derives all twelve MAC face velocities for a warmed cell at
   80 m and 160 m spacing. Removing an extra division by cell width brings the flux balance in every cell within
   the analytical bound. Further tests check immediate mean-wind rewind, a coded impossible atmosphere and exact
   retention of the accepted state and registry receipt after a failure in the second attempted internal step.
-- Point 6. `cloud-projection-threads.test.js` and `cloud-projection-threads.browser.mjs` compare the scalar and native
+- Point 6. `9622992eda`. `cloud-projection-threads.test.js` and `cloud-projection-threads.browser.mjs` compare the scalar and native
   accepted fields, projection diagnostics and exact seek through signed far-origin shifts. Four partitions on the
   49 × 17 × 23 grid perform 171 products covering 3,276,189 cells, with 3,075,606 SIMD-paired visits. Isolated
   Chromium starts three actual helper workers and repeats the same snapshot hash as the scalar projection.
-- Point 7. `cloud-surface.browser.mjs` reproduces the fixed-camera cloud-motion requirement of OO-4. The real
+- Point 7. `9622992eda`. `cloud-surface.browser.mjs` reproduces the fixed-camera cloud-motion requirement of OO-4. The real
   native boundary-layer Wind moves the accepted condensate and the Environment density volume renders that
   changing field on WebGPU and WebGL2. The accepted cloud moves 807.4 m east and rises 72.7 m. Its visible
   centroid moves 203.1 pixels, with exact replay after renderer readiness. `environment/tests/density-volume.test.js`
   checks physical optical scaling
   and validates field replacements. Original film installation and other shot conditions remain open.
-- Point 8. The Physics and Environment READMEs and `docs/limits.md` record the Boussinesq and warm-rain domain,
+- Point 8. `9622992eda`. The Physics and Environment READMEs and `docs/limits.md` record the Boussinesq and warm-rain domain,
   relative pressure residual and resource bounds, scalar transport limits, constant cloud optics defaults, scope of
   SIMD work and the older snapshot layout limitation.
-- Point 2 remains open. The closed MAC cube tests numerical accuracy. Bryan and Fritsch (2002) is an idealised
+- Point 2 remains open. `9622992eda`. The closed MAC cube tests numerical accuracy. Bryan and Fritsch (2002) is an idealised
   simulation benchmark requiring an initial saturated sounding and reversible moist thermodynamics. BOMEX
   intercomparison cloud statistics are simulated, and RICO forcing uses the campaign radar precipitation to close
   the budget. A defensible field test can use independent RICO aircraft liquid-water profiles or ARM LASSO liquid
