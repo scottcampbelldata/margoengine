@@ -10503,7 +10503,7 @@ Blending uses premultiplied colour in the target's blend space. Add sums colour 
 
 Measured gzip after the upstream core-version guard: blend 8208 B (new ceiling 8464 B), sprites root 7480 to 7613 B, slice 8614 to 8760 B; existing root/slice ceilings hold. The blend entry retains the shared renderer rather than copying it or splitting a cohesive operator API. Skeletal is 7436 B after the upstream guard; pick remains 1933 B. Core plus stage is 24209 B, including the guard already on main. This job does not change their source.
 
-Batch 245 job 4 scope is resolved: skeletal JSON import is shipped as `@margoengine/sprites/spine`. Physics constraints are parsed, validated, retained and round-tripped. Each one emits `spine-physics-deferred` with its name when the document loads. Posing never simulates them; evaluation waits for Scott's physics phase.
+Batch 245 job 4 scope is resolved: skeletal JSON import is shipped as `@margoengine/sprites/spine`. Physics constraints are parsed, validated, retained and round-tripped. Each one emits `spine-physics-deferred` with its name when the document loads. Posing never simulates them yet. The physics phase resumed on 2026-11-24, so this is a missing feature, not a hold: docs/known-bugs.md, KB-SPRITES-SPINEPHYS1.
 Batch 213 fresh-build integration with main core version guard: water root 20106 -> 20210 B gzip, ceiling 20185 -> 20289 B (exact growth, no extra headroom); caustics 8961 -> 9004 B under its existing 9230 B ceiling. Required package-registration validation stays with its owner, avoiding duplicated attachment contracts. Core plus stage is 24209 B; no core/stage source change in this job.
 
 SNORM compute storage uses the existing CPU route and native signed-byte textures for r8snorm, rg8snorm and rgba8snorm. Channel bytes remain 1, 2 and 4 per texel. Stores clamp to [-1, 1] and encode at scale 127; only written spans upload, with existing mip/layer synchronization. This does not add framebuffer renderability or change core/stage size. Exact signed-byte regression covers 9 format/dimension combinations. No speed claim.
@@ -16579,11 +16579,16 @@ Core and stage are unchanged.
 - Calibration reads the roll of the shoulders and hips only from the clips (`hingeRolls`), and trusts a roll only up to
   30 degrees: a clip that bends an elbow the wrong way would otherwise teach a roll that flips the hinge. Elbow, knee
   and finger rolls come from the fit alone.
+- Calibration also reads how far the collarbones drop from the rest where the clips hang the arms (`rhythmDrops`, the
+  median over the frames within 30 degrees of the side) and takes their zero back by it, never past Ludewig et al.
+  2009's rhythm for the rest arm's lift. A model with no clip that hangs the arms keeps the rest as the collarbone's
+  zero unless its rest bone already reads raised (KB-RIG-CLAVICLE1).
 - A rig with no naming `fitHuman` knows (the UAL mannequins' Unreal names among them) gets no body unless
   `anatomy: {map}` names its joints (KB-HUM-UALNAMES1).
 - Measured on the Fauld cast's Character Creator old man, three clips: hands and forearms no longer change; the ring
   fingers rest 12.8 degrees past their supination stop (KB-RIG-RINGROLL1), the thumbs are held up to 22 degrees off
-  the walk (KB-RIG-THUMB1), the left collarbone up to 11 (KB-RIG-CLAVICLE1), the calf 4.7 and the toes 2.
+  the walk (KB-RIG-THUMB1), the calf 4.7 and the toes 2. The walk's left collarbone reads 4.2 past its depression stop
+  raw: the clip drops it about 34 degrees below its rest while the right rises 3.
 - `person.check('structural')` reads the Animator's 32-bit pose, so a joint held at its stop can read a hair past it;
   the pose frames count only what passes by 0.01 degrees.
 - `addBody` writes each bone's rest as translation, rotation and scale; a bind matrix with shear loses the shear. A
@@ -16760,6 +16765,47 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-28: a Character Creator collarbone read 13 to 15 degrees depressed on a walk, as its A pose rest was taken as its zero (KB-RIG-CLAVICLE1, rigging)
+
+- **Repro:** `addPerson` on the Fauld cast's Character Creator old man (`civ_old_man.glb`), the pose sheet
+  (`packages/humans/test/pose-sheet.browser.mjs --model=<file>`): idle read `l_sternoclavicular` depression -13.5 and
+  `r_` -13.0, talk -12.1 and -10.5, the walk -15 on both sides, against clinical ranges of about -9
+  (`private/handoffs/rigging-frames/g6` in the rigging lane worktree).
+- **Cause:** the sternoclavicular zero is the rest pose unless the rest holds the collarbone raised, which the fit read
+  from the rest bone's direction in the thorax against Ludewig et al. 2009's direction with the arm at the side. A
+  Character Creator clavicle bone does not lie along the collarbone: its head sits 6 cm off the midline and it aims at
+  the shoulder joint's centre (12.4 cm long, read in Blender 5.3 with its own importer), so its A pose rest read 2.3
+  degrees up, below the 5.9 of an arm at the side, and the raised rest was kept as zero. The bone's direction alone
+  cannot tell where the collarbone is: the rig's body mesh is cut away under the clothes between 4 and 9 cm from the
+  sternal end, so the collarbone's own line cannot be read from the skin either, and one fixed offset is not borne out
+  by the clips (where they hang the arm the bone sits from 29 degrees below level to 7.5 above, by clip and side).
+- **Fix:** the drop is read from the motion. `rhythmDrops` (`packages/rigging/src/anatomy.ts`) takes, over the frames
+  that hang the arm within 30 degrees of the side, the median elevation and retraction the collarbone loses from its
+  rest, less what the rhythm still gives for that lift; the fit's new `drop` option takes the zero back by it, never
+  past the rhythm between the rest arm's lift and the side (7.1 up and 9.1 back for the old man's 60 degree A pose).
+  `addPerson` calibrates it from a model's clips with the hinge rolls. Old man sheet (`rigging-frames/g7`): the idle
+  and talk depression warnings are gone, the walk's right one is gone, and the raised arm rows read 0 warnings.
+- **Still read, and true:** the walk's left collarbone, depression -15 held and -19.1 raw (4.2 past its stop). The clip
+  drops the left collarbone about 34 degrees below its rest while the right rises 3 (Blender, the bone's line against
+  level), so it is the clip's own asymmetry, not the zero.
+- **Regression:** `packages/rigging/tests/clavicle-rhythm.test.js` (an A pose rest with no drop keeps its rest as zero;
+  with the clips' drop it reads the drop, capped by the rhythm; `rhythmDrops` reads a hanging frame's drop less the
+  rhythm for its lift; neither existed before the fix).
+
+### Fixed 2026-11-28: an arm raised past 120 degrees drew the collarbone back past a recalled retraction range (KB-RIG-GIRDLEELLIPSE1, rigging)
+
+- **Repro:** `packages/humans/test/pose-sheet.browser.mjs`, the rows "arms raised" and "arms raised forward overhead",
+  on the code-built body and the Fauld old man: `sternoclavicular retraction -19.8 deg, 1.1 past its clinical range of
+  -18.7 (kapandji)`.
+- **Cause:** the clavicle's retraction range was Kapandji's 20 degrees, recalled, not read. The coupling drives the
+  collarbone by Ludewig et al. 2009's bone pins, 19.8 back from the side at 120 degrees of elevation, and a measured
+  study puts the whole motion further: Sahara et al. 2007 (vertically open MRI, 7 subjects, 14 shoulders,
+  https://europepmc.org/article/MED/17474135) measure 30.6 degrees of clavicle retraction against the thorax over arm
+  abduction.
+- **Fix:** the human table's sternoclavicular retraction takes Sahara 2007's 30.6 as its measured row, with the recalled
+  Kapandji row kept after it (`packages/rigging/src/anatomy-human.ts`); the raised arm rows read 0 warnings on both
+  bodies (`rigging-frames/g7`).
+- **Regression:** `packages/rigging/tests/anatomy-human.test.js` (the table's rows by source and their provenance count).
 ### Fixed 2026-11-28: a biome species' `color` hue and value did nothing (KB-BIOMES-SPECIESCOLOR1, biomes)
 
 - **Repro:** a `SpeciesRule` with `color: { hue: 0.2, value: 0.3 }`: its objects jitter like every other species'.
@@ -16773,6 +16819,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** the check divides the light out against a flat-colour frame, which holds for one light colour. With
   BiomeView's relief lighting on by default, shadowed rock keeps only the sky's blue light and luma over red rises.
 - **Fix:** the check's material shots set `relief: false` (0.086, limits unchanged); relief has its own GPU checks.
+
 
 ### Fixed 2026-11-28: a subtree reference could not be a child of selector, sequence or any builder (KB-BEHAVIOR-SUBTREEBUILD1, behavior)
 
@@ -17832,6 +17879,11 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   gives ulnar deviation and pronation with flexion, but for the thumb only; the finger convergence on the scaphoid
   tubercle (Kapandji, vol. 1) is described, not measured. An MRI hand model (Stillfried et al. 2014, DLR,
   https://elib.dlr.de/85039/) fits per-finger joint axes and is the next source to read for the angle.
+- **Searched again 2026-11-28:** Stillfried et al. 2014 (https://elib.dlr.de/85039/1/StilHilSetSma14_MRI.pdf, read in
+  full) fit hinge axes to the ring and little finger interphalangeal joints from MRI of one hand, but print no axis
+  angles against the phalanges (only fit errors, 0.9 mm and 2.6 degrees at PIP4, and ranges); a search for a measured
+  obliquity of the finger flexion axes found only the finite helical axis spread of the PIP (4.9 degrees). No angle to
+  build from.
 - **Repro:** `addPerson` on the Fauld cast's Character Creator old man (`civ_old_man.glb`), then
   `jointAngles(person.body, person.body.rest)`: `l_metacarpophalangeal_4` and `r_` read flexion 2.6, abduction 9.7,
   rotation -12.8 degrees, past the -10 supination stop. `packages/humans/test/pose-frames.browser.mjs --model=<file>`
@@ -17857,6 +17909,13 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   two fixed axes, flexion in the trapezium and abduction in the metacarpal, neither square to the bones nor to each
   other (about 124 degrees apart in vivo, Chang and Pollard). Neither gives the joint's angles at a relaxed, opposed
   rest against a thumb beside the index, which this row needs, so the zero stays as fitted.
+- **Searched again 2026-11-28:** Stillfried et al. 2014 (MRI-based skeletal hand movement model, DLR,
+  https://elib.dlr.de/85039/, read in full) fit the thumb's CMC as two or three non-intersecting axes on one hand and
+  give its errors (2.6 mm, up to 17.2 degrees in one posture) but no angles of the joint at a relaxed rest; the axes
+  themselves are only in their OpenSim model file. Crisco et al. 2015 (the envelope of physiological motion of the
+  first carpometacarpal joint, J Biomech Eng, 44 subjects by CT) and Halilaj et al. 2015 (76 patients and 44 controls,
+  CT with the hand relaxed) measure motion from a braced or relaxed posture but report no angles of that posture
+  against the trapezium's axes in their abstracts. No relaxed, opposed rest angle was found; the zero stays as fitted.
 - **Repro:** the same old man, walk clip at 0.3 s with `anatomy: {limits: false}`: `r_carpometacarpal_1` reads
   pronation 54.4 and `l_` 47.6 against a 40 degree stop, and the rest pose already reads abduction 39.1 and rotation
   28.6. On the fitted body the thumbs are held at the stop, up to 22 degrees from the clip.
@@ -17870,53 +17929,13 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** no measured ratio of finger flexion to wrist extension for a relaxed hand was found in an open source
   (two searches, 2026-11-28: the tenodesis literature found describes the effect and its surgical use, not a joint
   curve). Building it from a guessed ratio would break the table's rule that every number has a source row.
+- **Searched again 2026-11-28:** Latz et al. 2019 (31 subjects, biaxial electrogoniometers) measure the active MCP range
+  of each finger at five wrist positions (index flexion and extension 84.7 at neutral down to 25.9 at 80 degrees of
+  wrist extension), which is the active range, not where a relaxed finger rests; Akasaka et al. 2020 measure a
+  surgical tenodesis in cadavers. No relaxed-hand curve of finger flexion against wrist extension was found.
 - **Next:** a measured source (a motion capture study of the relaxed hand through wrist range, or a cadaver study of
   passive finger excursion), then a `tenodesis` coupling in `human.couplings` and a rule in
   `packages/rigging/src/coupling.ts` with the same fill semantics as `finger-curl`.
-
-### Open 2026-11-28: an arm raised past 120 degrees draws the collarbone back past its clinical retraction (KB-RIG-GIRDLEELLIPSE1, rigging)
-- **Repro:** `test/pose-sheet.browser.mjs` in `packages/humans`, the rows "arms raised" and "arms raised forward
-  overhead", on the code-built body and the Fauld old man: `sternoclavicular retraction -19.8 deg, 1.1 past its
-  clinical range of -18.7 (kapandji)`, a warning. The pose looks right from the front, three-quarter and side
-  (`private/handoffs/rigging-frames/g6`).
-- **Cause:** the coupling drives the collarbone by Ludewig et al. 2009's bone-pin means (11.1 up and 19.8 back from an
-  arm at the side at 120 degrees of elevation), while the clinical range is Kapandji's recalled retraction, read on an
-  ellipse with elevation. The measured motion of a real collarbone sits just outside the recalled range, so one of the
-  two numbers is wrong for a raised arm.
-- **Next:** take the sternoclavicular retraction range from a measured source (Ludewig 2009's ranges, or a range of
-  motion study of the sternoclavicular joint), with its source row, instead of the recalled one.
-
-### Open 2026-11-28: a Character Creator collarbone is held up to 11 degrees off the walk clip (KB-RIG-CLAVICLE1, rigging)
-- **Learned 2026-11-28:** on the old man's raw walk the collarbone reads depression -13.0 to -13.5, protraction up to
-  9.1 and anterior rotation -5.1 to -5.8 from its A pose rest, all three what a rest collarbone raised and drawn back
-  with a 60 degree arm gives. Ludewig et al. 2009 (bone pins, https://pmc.ncbi.nlm.nih.gov/articles/PMC2657311/): from
-  30 to 120 degrees of humeral elevation the clavicle rises 11 to 17 degrees and retracts 23 to 39, and rests at 5.9
-  elevation and 19.2 retraction (Table I); its posterior rotation (31) comes mostly late, as Inman 1944 says. A trial
-  that turned the rest frame by those rates times the rest arm's elevation from the body's down read 3.0 elevation and
-  -8.0 protraction at 45 degrees on the code-built body as meant, but failed `anatomy.test.js` ("one posture gives one
-  skeleton whatever the rest") and the Animator hook test: that body's collarbone does not rise with its arm, so a rig
-  may or may not model the rhythm. Next: take the correction from the rig itself (the rest collarbone's direction in
-  the thorax against Ludewig's resting values), capped by the rhythm, and compose it as one swing so the twist reads 0
-  (two turns in a row read -0.8 anterior rotation at 90 degrees).
-
-- **Learned 2026-11-28 (part 3):** the fit now takes a collarbone's zero from the rig's own rest direction against
-  Ludewig's arm-at-side direction, capped by the rhythm for the rest arm's lift, as one swing
-  (`packages/rigging/tests/clavicle-rhythm.test.js`). On the old man it changes nothing: with his arm 60 degrees out,
-  his rest collarbone bone reads 2.3 degrees up and 17.8 back in the thorax frame, below the 5.9 and 19.2 of an arm at
-  the side, where the rhythm puts a real collarbone at 13 up and 28 back. A Character Creator clavicle bone aims at
-  the shoulder joint's centre, which sits below the collarbone's own axis, so the bone reads about 11 degrees lower
-  than the bone it stands for. Next: the angle between the sternoclavicular-to-glenohumeral line and the clavicle's
-  axis from a measured source (or read from the rig's clips where an arm hangs at the side), then the same cap.
-
-- **Repro:** the same old man, walk clip at 0.3 s with `anatomy: {limits: false}`: `l_sternoclavicular` depression
-  -25.9 degrees and `r_` -15.3, against stops of 15 and 13.3. On the fitted body the left collarbone is held at -15,
-  11 degrees above the clip. Both read 0 in the rest pose.
-- **Cause:** the sternoclavicular zero is the rest pose (`neutral: 'rest'` in `packages/rigging/src/anatomy-human.ts`).
-  A Character Creator body rests in an A pose, arms raised about 45 degrees, and a raised arm lifts the collarbone with
-  it, about 4 degrees for every 10 of arm elevation (Inman, Saunders and Abbott 1944). Lowering the arms to walk drops
-  the collarbone that far below the rest before any real depression, so the clip reads past the stop.
-- **Fix needed:** the collarbone's zero corrected by the rest pose's arm elevation, or read from the thorax as a body
-  direction. It moves the shoulder's reference frame too, so the shoulder's calibration and the IK tests are rerun.
 
 ### Open 2026-11-28: the UAL mannequins have no naming `fitHuman` knows, so they get no body (KB-HUM-UALNAMES1, rigging)
 
@@ -34774,6 +34793,24 @@ voxel path tracer is excluded on this hardware (hardware check).
   docs/limits.md, "Web template bundle".
 
 ## Open defects
+
+### Open 2026-11-28: skeletal JSON physics constraints are kept but never simulated (KB-SPRITES-SPINEPHYS1, sprites, missing feature)
+
+- **What:** `@margoengine/sprites/spine` parses, validates and round-trips physics constraints (inertia, strength,
+  damping, mass, wind, gravity, their mix and reset timelines), but posing never runs them. A bone a physics
+  constraint drives stays exactly where its animation puts it: hair, cloth and tails do not lag, swing or settle.
+  The current runtime reference of the format includes physics constraint simulation, so this is a gap against the
+  rivals' Spine runtimes (No partial packages), not a choice.
+- **Repro:** load a skeleton with a root bone, a child bone `tail` and `"physics": [{ "name": "tail", "bone": "tail",
+  "rotate": 1, "inertia": 0.5, "strength": 100, "damping": 0.85 }]`, and an animation that moves the root 100 units
+  along x in 0.2 s and holds. `parseSpineJSON` lists one `warnings` entry, code `'spine-physics-deferred'`. Pose
+  the skeleton every 1/60 s: the tail's world rotation is the same on every frame, where a simulated constraint
+  swings it against the motion and settles it over the hold.
+- **Cause:** never built. The reader landed during the physics hold (batch 245 job 4, docs/limits.md), which kept
+  the data and deferred evaluation; the hold ended on 2026-11-24 and the evaluation was not scheduled.
+- **To build:** a per-skeleton physics step in posing (time-stepped, with the constraint's reset and the skeleton's
+  own world position and wind and gravity), clean room from the public format documentation, with a test against
+  measured swing and settle on a fixed step. Then the `'spine-physics-deferred'` warning goes.
 
 ### Closed 2026-11-28: bug 45's native half, trace compile time and CPU/GPU camera rounding (KB5185a, voxel-pathtracer)
 
