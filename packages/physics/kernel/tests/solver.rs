@@ -867,3 +867,201 @@ fn a_plate_held_near_its_friction_rides_a_deck_pitching_far_from_it() {
     assert!(worst < 1e-4, "the plate slid {worst} m on the deck at 1.3 times its friction demand");
     println!("the plate stayed within {worst:e} m of its place at 1.3 times its friction demand");
 }
+
+/// The storm deck of `packages/physics/tests/deck-props.test.js`, in doubles: a laker making way at 7.5 m/s, rolling 20 degrees
+/// at 12 s, pitching 4 degrees at 9 s (phase 1) and heaving 2 m at 9 s (phase 0.4) about the crossing of its roll and pitch
+/// axes, the props 60 m aft on the deck 4 m above the roll axis.
+mod storm {
+    pub const SPEED: f64 = 7.5;
+    pub const SPOT: [f64; 3] = [-60.0, 4.0, 0.0];
+    fn wave(amplitude: f64, period: f64, phase: f64, t: f64) -> f64 {
+        amplitude * (2.0 * std::f64::consts::PI * t / period + phase).sin()
+    }
+    /// Roll about x after pitch about z: q_roll q_pitch, as [x, y, z, w].
+    pub fn rotation(t: f64) -> [f64; 4] {
+        let (roll, pitch) = (wave(20f64.to_radians(), 12.0, 0.0, t), wave(4f64.to_radians(), 9.0, 1.0, t));
+        let (sx, cx, sz, cz) = ((roll / 2.0).sin(), (roll / 2.0).cos(), (pitch / 2.0).sin(), (pitch / 2.0).cos());
+        [sx * cz, -sx * sz, cx * sz, cx * cz]
+    }
+    pub fn origin(t: f64) -> [f64; 3] {
+        [SPEED * t, wave(2.0, 9.0, 0.4, t), 0.0]
+    }
+    pub fn rotate(q: [f64; 4], v: [f64; 3]) -> [f64; 3] {
+        let [x, y, z, w] = q;
+        let t = [2.0 * (y * v[2] - z * v[1]), 2.0 * (z * v[0] - x * v[2]), 2.0 * (x * v[1] - y * v[0])];
+        [v[0] + w * t[0] + y * t[2] - z * t[1], v[1] + w * t[1] + z * t[0] - x * t[2], v[2] + w * t[2] + x * t[1] - y * t[0]]
+    }
+    pub fn conjugate(q: [f64; 4]) -> [f64; 4] {
+        [-q[0], -q[1], -q[2], q[3]]
+    }
+    /// A point fixed in the deck's frame, in the world.
+    pub fn world_of(t: f64, p: [f64; 3]) -> [f64; 3] {
+        let (r, o) = (rotate(rotation(t), p), origin(t));
+        [o[0] + r[0], o[1] + r[1], o[2] + r[2]]
+    }
+    /// The velocity of a point fixed in the deck's frame, by a centred difference.
+    pub fn velocity_of(t: f64, p: [f64; 3]) -> [f64; 3] {
+        let (a, b, h) = (world_of(t + 1e-4, p), world_of(t - 1e-4, p), 2e-4);
+        [(a[0] - b[0]) / h, (a[1] - b[1]) / h, (a[2] - b[2]) / h]
+    }
+    /// The deck's spin: the rotation vector of q(t + h) q(t - h)^-1 over 2 h.
+    pub fn spin(t: f64) -> [f64; 3] {
+        let h = 1e-4;
+        let (a, b) = (rotation(t + h), conjugate(rotation(t - h)));
+        let x = a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1];
+        let y = a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0];
+        let z = a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3];
+        let w = a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2];
+        let n = (x * x + y * y + z * z).sqrt();
+        let angle = 2.0 * n.atan2(w);
+        let s = if n > 0.0 { angle / (2.0 * h) / n } else { 0.0 };
+        [x * s, y * s, z * s]
+    }
+    /// The most friction the spot asks over [0, seconds]: max |f across| / f into the deck, f = R^T (a - g).
+    pub fn demand(seconds: f64) -> f64 {
+        let (h, mut most, mut t) = (1e-3, 0.0f64, 0.0);
+        while t <= seconds {
+            let (a, b, c) = (world_of(t - h, SPOT), world_of(t, SPOT), world_of(t + h, SPOT));
+            let acc: Vec<f64> = (0..3).map(|k| (a[k] - 2.0 * b[k] + c[k]) / (h * h)).collect();
+            let f = rotate(conjugate(rotation(t)), [acc[0], acc[1] + 9.81, acc[2]]);
+            most = most.max(f[0].hypot(f[2]) / f[1]);
+            t += 0.01;
+        }
+        most
+    }
+}
+
+/// Rides one prop on the storm deck for `seconds` at the world's substeps: `parts` are its box colliders (half extents and
+/// offset from the body), the body's centre `lift` above the deck, all at friction `mu`. Returns the most the prop moved
+/// across the deck and the most its up axis turned from the deck's.
+fn ride_storm(parts: &[([f32; 3], [f32; 3])], lift: f64, mu: f32, seconds: u32) -> (f64, f64) {
+    use storm::*;
+    let f = |v: [f64; 3]| v3(v[0] as f32, v[1] as f32, v[2] as f32);
+    let q32 = |q: [f64; 4]| Q { x: q[0] as f32, y: q[1] as f32, z: q[2] as f32, w: q[3] as f32 };
+    let mut w = World::new(4, 8).unwrap();
+    let centre = [0.0, SPOT[1] - 0.5, 0.0];
+    let deck = w.add_body(KINEMATIC_POSITION).unwrap();
+    let floor = w.add_collider(deck, SHAPE_BOX, [70.0, 0.5, 8.0], [0.0; 3], IDENTITY, 0.0).unwrap();
+    w.set_s(COLLIDER_FRICTION, floor as usize, mu);
+    w.set_u(FLAGS, deck as usize, w.flags(deck as usize) | SMOOTH_PATH);
+    w.set_v(POSITION_X, deck as usize, f(world_of(0.0, centre)));
+    w.set_q(ROTATION_X, deck as usize, q32(rotation(0.0)));
+    for (velocity, turning) in [(LINEAR_X, ANGULAR_X), (START_LINEAR_X, START_ANGULAR_X)] {
+        w.set_v(velocity, deck as usize, f(velocity_of(0.0, centre)));
+        w.set_v(turning, deck as usize, f(spin(0.0)));
+    }
+    let prop = w.add_body(DYNAMIC).unwrap();
+    for (half, offset) in parts {
+        let c = w.add_collider(prop, SHAPE_BOX, *half, *offset, IDENTITY, 600.0).unwrap();
+        w.set_s(COLLIDER_FRICTION, c as usize, mu);
+    }
+    no_sleep(&mut w, prop);
+    let at = [SPOT[0], SPOT[1] + lift, SPOT[2]];
+    w.set_v(POSITION_X, prop as usize, f(world_of(0.0, at)));
+    w.set_q(ROTATION_X, prop as usize, q32(rotation(0.0)));
+    w.set_v(LINEAR_X, prop as usize, f(velocity_of(0.0, at)));
+    w.set_v(ANGULAR_X, prop as usize, f(spin(0.0)));
+    let local = |w: &World, t: f64| {
+        let p = w.v(POSITION_X, prop as usize);
+        let o = origin(t);
+        rotate(conjugate(rotation(t)), [p.x as f64 - o[0], p.y as f64 - o[1], p.z as f64 - o[2]])
+    };
+    let placed = local(&w, 0.0);
+    let (mut moved, mut turned) = (0.0f64, 0.0f64);
+    for i in 1..=(seconds * 60) {
+        let t = i as f64 / 60.0;
+        w.set_v(TARGET_X, deck as usize, f(world_of(t, centre)));
+        w.set_q(TARGET_ROTATION_X, deck as usize, q32(rotation(t)));
+        w.set_v(TARGET_LINEAR_X, deck as usize, f(velocity_of(t, centre)));
+        w.set_v(TARGET_ANGULAR_X, deck as usize, f(spin(t)));
+        w.step(DT);
+        let p = local(&w, t);
+        moved = moved.max((p[0] - placed[0]).hypot(p[2] - placed[2]));
+        let up = w.q(ROTATION_X, prop as usize).rotate(v3(0.0, 1.0, 0.0));
+        let deck_up = rotate(rotation(t), [0.0, 1.0, 0.0]);
+        let cos = up.x as f64 * deck_up[0] + up.y as f64 * deck_up[1] + up.z as f64 * deck_up[2];
+        turned = turned.max(cos.min(1.0).acos());
+    }
+    (moved, turned)
+}
+
+#[test]
+fn a_plate_cut_into_four_colliders_rides_the_storm_deck_as_one_collider_does() {
+    // The plate of `deck-props.test.js` (0.24 m square, 2 cm thick) at 1.3 times the storm deck's friction demand, made of
+    // one, two and four box colliders on one body, for 36 s at the world's 8 substeps. Each pair's friction was solved with a
+    // cone of its own points: when the load swung, the pair solved first took the change, met its share of the cone while
+    // the body's other pairs still held, and the relaxing pass cut its anchors, so the plate of two crept 7.2 mm and the
+    // plate of four 10.5 mm where the plate of one held within 0.9 mm (KB-PHYS-MULTIPAIRCREEP1). The pairs between two
+    // bodies now solve their friction as one patch, so a plate rides the same whatever it is cut into.
+    let mu = (1.3 * storm::demand(36.0)) as f32;
+    let one = [([0.12, 0.01, 0.12], [0.0; 3])];
+    let two = [([0.06, 0.01, 0.12], [0.06, 0.0, 0.0]), ([0.06, 0.01, 0.12], [-0.06, 0.0, 0.0])];
+    let four = [
+        ([0.06, 0.01, 0.06], [0.06, 0.0, 0.06]),
+        ([0.06, 0.01, 0.06], [-0.06, 0.0, 0.06]),
+        ([0.06, 0.01, 0.06], [0.06, 0.0, -0.06]),
+        ([0.06, 0.01, 0.06], [-0.06, 0.0, -0.06]),
+    ];
+    let moved: Vec<f64> = [&one[..], &two[..], &four[..]].iter().map(|parts| ride_storm(parts, 0.01, mu, 36).0).collect();
+    println!("friction {mu}: the plate of one, two and four colliders moved {:e}, {:e} and {:e} m", moved[0], moved[1], moved[2]);
+    for (k, m) in moved.iter().enumerate() {
+        assert!(*m < 1e-3, "the plate of {} colliders moved {m} m on the storm deck", [1, 2, 4][k]);
+    }
+    for k in [1, 2] {
+        assert!(moved[k] <= moved[0] + 1e-4, "the plate of {} colliders moved {} m, one collider {} m", [1, 2, 4][k], moved[k], moved[0]);
+    }
+}
+
+/// A chair: a seat 0.44 m square on four legs 0.45 m tall, one body of five boxes, at friction `mu`.
+fn chair_parts() -> Vec<([f32; 3], [f32; 3])> {
+    let mut parts = vec![([0.22, 0.02, 0.22], [0.0; 3])];
+    for (x, z) in [(0.2f32, 0.2f32), (-0.2, 0.2), (0.2, -0.2), (-0.2, -0.2)] {
+        parts.push(([0.02, 0.225, 0.02], [x, -0.225, z]));
+    }
+    parts
+}
+
+#[test]
+fn a_chair_rests_on_a_floor_tilted_near_its_friction() {
+    // The chair on a floor tilted to tan 0.47 against friction 0.72, for 36 s: the load is constant, so it must neither creep
+    // nor rock. Gates on single anchors that held the chair better on the storm deck made it rock on its light legs here and
+    // creep 5 to 23 cm (KB-PHYS-MULTIPAIRCREEP1), so this guards the patch.
+    let mut w = World::new(4, 8).unwrap();
+    floor(&mut w);
+    // The floor's one collider is row 0.
+    w.set_s(COLLIDER_FRICTION, 0, 0.72);
+    slope(&mut w, 0.47);
+    let chair = w.add_body(DYNAMIC).unwrap();
+    for (half, offset) in chair_parts() {
+        let c = w.add_collider(chair, SHAPE_BOX, half, offset, IDENTITY, 600.0).unwrap();
+        w.set_s(COLLIDER_FRICTION, c as usize, 0.72);
+    }
+    no_sleep(&mut w, chair);
+    w.set_v(POSITION_X, chair as usize, v3(0.0, 0.45, 0.0));
+    // Set down onto its legs, then watched.
+    for _ in 0..60 {
+        w.step(DT);
+    }
+    let start = w.v(POSITION_X, chair as usize);
+    let (mut moved, mut turned) = (0.0f32, 0.0f32);
+    for _ in 0..(36 * 60) {
+        w.step(DT);
+        let d = w.v(POSITION_X, chair as usize).sub(start);
+        moved = moved.max((d.x * d.x + d.z * d.z).sqrt());
+        let up = w.q(ROTATION_X, chair as usize).rotate(v3(0.0, 1.0, 0.0));
+        turned = turned.max(up.y.min(1.0).acos());
+    }
+    println!("the chair moved {moved:e} m and its up axis turned {turned:e} rad on the tilted floor");
+    assert!(moved < 5e-4, "the chair crept {moved} m on a floor tilted inside its friction");
+    assert!(turned < 1e-3, "the chair rocked {turned} rad on a floor tilted inside its friction");
+}
+
+#[test]
+fn a_chair_rides_the_storm_deck_as_a_plate_does() {
+    // The chair of `deck-props.test.js` at 1.3 times the storm deck's demand crept 2.0 cm in 36 s, its five colliders' pairs
+    // each cut alone (KB-PHYS-MULTIPAIRCREEP1). Its legs' pairs with the deck now share one patch.
+    let mu = (1.3 * storm::demand(36.0)) as f32;
+    let (moved, turned) = ride_storm(&chair_parts(), 0.45, mu, 36);
+    println!("friction {mu}: the chair moved {moved:e} m and turned {turned:e} rad on the storm deck");
+    assert!(moved < 2e-3, "the chair moved {moved} m on the storm deck at 1.3 times its friction demand");
+}

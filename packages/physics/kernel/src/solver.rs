@@ -122,6 +122,12 @@ impl Sym {
     }
 }
 
+/// `v` with its part along the unit `normal` taken out.
+#[inline(always)]
+fn flat(v: V3, normal: V3) -> V3 {
+    v.sub(normal.scale(v.dot(normal)))
+}
+
 /// What the solver needs of a body, held while it works on a pair.
 #[derive(Clone, Copy)]
 pub struct Moving {
@@ -354,13 +360,104 @@ impl World {
                 self.set_s(CONTACT_OTHER_MASS, at, mass(other));
             }
             self.set_s(PAIR_FORCE, row, 0.0);
+            self.set_u(PAIR_PATCH_NEXT, row, row as u32);
+            self.set_u(PAIR_PATCH_TAIL, row, 1);
             self.set_u(SOLVE_PAIRS, solving, row as u32);
             solving += 1;
         }
         self.header_mut().solving = solving as u32;
         self.order_pairs_by_island(solving);
+        if self.header().friction_model == 0 {
+            self.group_patches();
+        }
         // What a solve called on its own (a test of the warm start, say) works on: the pairs just listed. A step sets its own.
         self.window = self.whole_window();
+    }
+
+    /// Whether body `at` has more than one collider.
+    #[inline]
+    fn many_colliders(&self, at: usize) -> bool {
+        let first = self.uu(FIRST_COLLIDER, at);
+        first != crate::world::NONE && self.uu(COLLIDER_NEXT, first as usize) != crate::world::NONE
+    }
+
+    /// A listed pair's bodies, the lower row first.
+    #[inline]
+    fn body_key(&self, row: u32) -> (usize, usize) {
+        let (a, b) = self.pair_bodies(row);
+        if a < b { (a, b) } else { (b, a) }
+    }
+
+    /// Whether pair `row` joins the patch of pair `lead`, which has the same two bodies: its normal agrees with the lead's and its
+    /// surface moves as the lead's, each turned to the lead's order of the bodies.
+    fn joins_patch(&self, lead: usize, row: usize) -> bool {
+        let sign = if self.pair_bodies(row as u32).0 == self.pair_bodies(lead as u32).0 { 1.0 } else { -1.0 };
+        let (n, m) = (self.v(PAIR_NORMAL_X, lead), self.v(PAIR_NORMAL_X, row).scale(sign));
+        let (u, w) = (self.v(PAIR_SURFACE_X, lead), self.v(PAIR_SURFACE_X, row).scale(sign));
+        n.dot(m) > 1.0 - 1e-6 && u.x == w.x && u.y == w.y && u.z == w.z
+    }
+
+    /// Puts the listed pairs between the same two bodies whose normals agree in friction patches (KB-PHYS-MULTIPAIRCREEP1): a
+    /// body touching another through several colliders, or through several parts of a mesh, holds by the friction of all its
+    /// points together, so the relaxing pass solves them as one (`patch_friction`). Each patch is a ring through
+    /// `PAIR_PATCH_NEXT` in solve order, its last pair marked in `PAIR_PATCH_TAIL`. Islands whose bodies each have one
+    /// collider and that hold no part pairs have nothing to group and are passed by. The grouping reads only the step's
+    /// canonical lists, so it is the same at any thread count, and a patch lies inside one island.
+    fn group_patches(&mut self) {
+        for island in 0..self.header().islands as usize {
+            let (start, count) = (self.uu(ISLAND_PAIR_START, island) as usize, self.uu(ISLAND_PAIR_COUNT, island) as usize);
+            if count < 2 {
+                continue;
+            }
+            let shared = (start..start + count).any(|i| {
+                let row = self.uu(SOLVE_PAIRS, i);
+                let (a, b) = self.pair_bodies(row);
+                self.uu(PAIR_FLAGS, row as usize) & PAIR_IS_PART != 0 || self.many_colliders(a) || self.many_colliders(b)
+            });
+            if !shared {
+                continue;
+            }
+            for k in 0..count {
+                self.set_u(PATCH_LIST, k, self.uu(SOLVE_PAIRS, start + k));
+            }
+            // Stable, so each run of one body pair stays in solve order. The sort writes places into the tail column, which is
+            // put back below.
+            self.sort_list(PATCH_LIST, PAIR_PATCH_TAIL, PATCH_TEMP, count, |w, x, y| w.body_key(x) < w.body_key(y));
+            for k in 0..count {
+                self.set_u(PAIR_PATCH_TAIL, self.uu(PATCH_LIST, k) as usize, 1);
+                self.set_u(PATCH_TEMP, k, 0);
+            }
+            let mut first = 0;
+            while first < count {
+                let bodies = self.body_key(self.uu(PATCH_LIST, first));
+                let mut end = first + 1;
+                while end < count && self.body_key(self.uu(PATCH_LIST, end)) == bodies {
+                    end += 1;
+                }
+                // Each pair not yet in a patch leads one, and the later pairs that agree with it join it.
+                for k in first..end {
+                    if end - first < 2 || self.uu(PATCH_TEMP, k) != 0 {
+                        continue;
+                    }
+                    let lead = self.uu(PATCH_LIST, k) as usize;
+                    let mut last = lead;
+                    for j in k + 1..end {
+                        let row = self.uu(PATCH_LIST, j) as usize;
+                        if self.uu(PATCH_TEMP, j) == 0 && self.joins_patch(lead, row) {
+                            self.set_u(PATCH_TEMP, j, 1);
+                            self.set_u(PAIR_PATCH_NEXT, last, row as u32);
+                            self.set_u(PAIR_PATCH_TAIL, last, 0);
+                            last = row;
+                        }
+                    }
+                    self.set_u(PAIR_PATCH_NEXT, last, lead as u32);
+                    if last != lead {
+                        self.fit_patch_anchors(lead, last);
+                    }
+                }
+                first = end;
+            }
+        }
     }
 
     /// The island a listed pair belongs to: that of its dynamic body, which is the same for both when both are dynamic. None for a
@@ -882,7 +979,13 @@ impl World {
                 self.normal_rows(row, a, b, h, step, true, turn, &mut impacts, &mut body_a, &mut body_b)
             } else {
                 let given = self.normal_rows(row, a, b, h, step, false, turn, &mut impacts, &mut body_a, &mut body_b);
-                self.friction_rows(row, step, false, turn, &mut body_a, &mut body_b);
+                // A pair in a patch leaves its friction to the patch's last pair, which solves the patch's points together
+                // once every pair of it has its normal impulses.
+                if self.uu(PAIR_PATCH_NEXT, row) as usize == row {
+                    self.friction_rows(row, step, false, turn, &mut body_a, &mut body_b);
+                } else if self.uu(PAIR_PATCH_TAIL, row) != 0 {
+                    self.patch_friction(row, turn, &mut body_a, &mut body_b);
+                }
                 given
             };
             // What a point holds after the last relaxing pass is all it gave in this substep, its warm start included.
@@ -958,50 +1061,11 @@ impl World {
         if self.header().friction_model == 1 && self.uu(PAIR_CONTACTS, row) > 1 {
             return self.simplified_friction(row, step, biased, body_a, body_b);
         }
-        let normal = self.v(PAIR_NORMAL_X, row);
-        let tangent = self.v(PAIR_TANGENT_X, row);
-        let other = normal.cross(tangent);
-        let friction = self.s(PAIR_FRICTION, row);
-        let surface = self.v(PAIR_SURFACE_X, row);
         let count = self.uu(PAIR_CONTACTS, row) as usize;
         let mut cuts = [1.0f32; MANIFOLD];
         let mut sweeps = 0;
         loop {
-            let (mut moved, mut largest) = (0.0f32, 0.0f32);
-            for k in 0..count {
-                let at = row * MANIFOLD + (k + turn) % count;
-                let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
-                let pressed = self.s(CONTACT_NORMAL_IMPULSE, at);
-                let held = self.v(CONTACT_TANGENT_X, at);
-                let drift = self.v(CONTACT_DRIFT_X, at);
-                // A surface that moves (a conveyor) is a relative velocity that sliding is brought to, not to zero.
-                let relative = body_b.at(arm_b).sub(body_a.at(arm_a)).sub(surface);
-                let slide = relative.sub(normal.scale(relative.dot(normal)));
-                let (mass_scale, impulse_scale, target) = if biased {
-                    (step.mass_scale, step.impulse_scale, slide.add(drift.scale(step.bias_rate)))
-                } else {
-                    (1.0, 0.0, slide)
-                };
-                let along = -self.s(CONTACT_TANGENT_MASS, at) * mass_scale * target.dot(tangent) - impulse_scale * held.dot(tangent);
-                let across = -self.s(CONTACT_OTHER_MASS, at) * mass_scale * target.dot(other) - impulse_scale * held.dot(other);
-                let mut next = held.add(tangent.scale(along)).add(other.scale(across));
-                let most = friction * pressed;
-                let squared = next.dot(next);
-                cuts[(k + turn) % count] = 1.0;
-                if squared > most * most {
-                    let cut = most / sqrt(squared);
-                    next = next.scale(cut);
-                    cuts[(k + turn) % count] = cut;
-                }
-                let applied = next.sub(held);
-                body_a.push(applied.scale(-1.0), arm_a);
-                body_b.push(applied, arm_b);
-                self.set_v(CONTACT_TANGENT_X, at, next);
-                let size = sqrt(applied.dot(applied));
-                moved = if size > moved { size } else { moved };
-                let total = sqrt(next.dot(next));
-                largest = if total > largest { total } else { largest };
-            }
+            let (moved, largest) = self.friction_sweep(row, step, biased, turn, body_a, body_b, &mut cuts);
             sweeps += 1;
             // One sweep when pushing (see above); the relaxing pass sweeps until the shares settle.
             if biased || count == 1 || moved <= f32::EPSILON * largest || sweeps == SWEEPS {
@@ -1017,6 +1081,160 @@ impl World {
                     self.set_v(CONTACT_DRIFT_X, at, self.v(CONTACT_DRIFT_X, at).scale(*cut));
                 }
             }
+        }
+    }
+
+    /// One sweep of pair `row`'s friction rows over its points, each in its circular cone of mu times its normal impulse so far:
+    /// writes each point's cut (1 where its cone held it) into `cuts` and returns the largest change of a point's impulse and
+    /// the largest impulse a point holds.
+    #[allow(clippy::too_many_arguments)]
+    #[inline(always)]
+    fn friction_sweep(&mut self, row: usize, step: Soft, biased: bool, turn: usize, body_a: &mut Moving, body_b: &mut Moving, cuts: &mut [f32; MANIFOLD]) -> (f32, f32) {
+        let normal = self.v(PAIR_NORMAL_X, row);
+        let tangent = self.v(PAIR_TANGENT_X, row);
+        let other = normal.cross(tangent);
+        let friction = self.s(PAIR_FRICTION, row);
+        let surface = self.v(PAIR_SURFACE_X, row);
+        let count = self.uu(PAIR_CONTACTS, row) as usize;
+        let (mut moved, mut largest) = (0.0f32, 0.0f32);
+        for k in 0..count {
+            let at = row * MANIFOLD + (k + turn) % count;
+            let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
+            let pressed = self.s(CONTACT_NORMAL_IMPULSE, at);
+            let held = self.v(CONTACT_TANGENT_X, at);
+            let drift = self.v(CONTACT_DRIFT_X, at);
+            // A surface that moves (a conveyor) is a relative velocity that sliding is brought to, not to zero.
+            let relative = body_b.at(arm_b).sub(body_a.at(arm_a)).sub(surface);
+            let slide = relative.sub(normal.scale(relative.dot(normal)));
+            let (mass_scale, impulse_scale, target) = if biased {
+                (step.mass_scale, step.impulse_scale, slide.add(drift.scale(step.bias_rate)))
+            } else {
+                (1.0, 0.0, slide)
+            };
+            let along = -self.s(CONTACT_TANGENT_MASS, at) * mass_scale * target.dot(tangent) - impulse_scale * held.dot(tangent);
+            let across = -self.s(CONTACT_OTHER_MASS, at) * mass_scale * target.dot(other) - impulse_scale * held.dot(other);
+            let mut next = held.add(tangent.scale(along)).add(other.scale(across));
+            let most = friction * pressed;
+            let squared = next.dot(next);
+            cuts[(k + turn) % count] = 1.0;
+            if squared > most * most {
+                let cut = most / sqrt(squared);
+                next = next.scale(cut);
+                cuts[(k + turn) % count] = cut;
+            }
+            let applied = next.sub(held);
+            body_a.push(applied.scale(-1.0), arm_a);
+            body_b.push(applied, arm_b);
+            self.set_v(CONTACT_TANGENT_X, at, next);
+            let size = sqrt(applied.dot(applied));
+            moved = if size > moved { size } else { moved };
+            let total = sqrt(next.dot(next));
+            largest = if total > largest { total } else { largest };
+        }
+        (moved, largest)
+    }
+
+    /// The relaxing pass's friction of a patch (`group_patches`), at its last pair `tail`, with `body_a` and `body_b` the tail's
+    /// bodies: every point of every pair of the patch is swept, pair by pair in solve order, until no point's impulse moves by
+    /// more than f32 rounding of the largest a point holds, and each anchor is cut from the last sweep's answer, the one its
+    /// point holds. Solved pair by pair, the pair solved first took a change of load, met its own share of the cone while the
+    /// body's other pairs still held, and was cut; the other pairs took that share up only once the body had slipped onto
+    /// their anchors, so each swing of the load ratcheted a chair of five colliders along a rolling deck, 2.9 cm in 36 s, where
+    /// a plate of one collider held within 0.9 mm (KB-PHYS-MULTIPAIRCREEP1). Together, a pair's cone fills only as the patch's
+    /// load does, the limit surface of a patch (Goyal, Ruina and Papadopoulos 1991) across its colliders met point by point,
+    /// so a cut still takes the energy out of a saturated anchor's pull; the cut anchors then take the patch's shift
+    /// (`fit_patch_anchors`).
+    fn patch_friction(&mut self, tail: usize, turn: usize, body_a: &mut Moving, body_b: &mut Moving) {
+        let first_body = self.pair_bodies(tail as u32).0;
+        let head = self.uu(PAIR_PATCH_NEXT, tail) as usize;
+        let plain = Soft { bias_rate: 0.0, mass_scale: 1.0, impulse_scale: 0.0 };
+        let mut sweeps = 0;
+        loop {
+            let (mut moved, mut largest) = (0.0f32, 0.0f32);
+            let mut row = head;
+            loop {
+                let mut cuts = [1.0f32; MANIFOLD];
+                // A pair whose bodies come the other way round from the tail's sees them so.
+                let (x, y) = if self.pair_bodies(row as u32).0 == first_body { (&mut *body_a, &mut *body_b) } else { (&mut *body_b, &mut *body_a) };
+                let (m, l) = self.friction_sweep(row, plain, false, turn, x, y, &mut cuts);
+                moved = if m > moved { m } else { moved };
+                largest = if l > largest { l } else { largest };
+                for (k, cut) in cuts.iter().enumerate().take(self.uu(PAIR_CONTACTS, row) as usize) {
+                    self.set_s(CONTACT_CUT, row * MANIFOLD + k, *cut);
+                }
+                if row == tail {
+                    break;
+                }
+                row = self.uu(PAIR_PATCH_NEXT, row) as usize;
+            }
+            sweeps += 1;
+            if moved <= f32::EPSILON * largest || sweeps == SWEEPS {
+                break;
+            }
+        }
+        // The anchors are cut point by point, from the last sweep, and then all take the patch's shift.
+        let mut any = false;
+        self.for_patch_points(head, tail, first_body, |w, at, _| {
+            let cut = w.s(CONTACT_CUT, at);
+            if cut < 1.0 {
+                any = true;
+                w.set_v(CONTACT_DRIFT_X, at, w.v(CONTACT_DRIFT_X, at).scale(cut));
+            }
+        });
+        if any {
+            self.fit_patch_anchors(head, tail);
+        }
+    }
+
+    /// Sets every anchor of the patch from `head` round to `tail` to the shift of the patch that best fits them across the
+    /// normal, the mean of the anchors weighted by each point's normal impulse. Anchors cut one point at a time agree with no
+    /// move of the body, so the points pushed against each other at their cones; a point that holds little load (a leg the
+    /// chair has rocked off) moves the mean little; and a point new this step holds no load and takes the patch's anchor,
+    /// where it began from none: a leg that lifted and came down again let go of where the chair stood, and the chair crept
+    /// along the rolling deck with each rock (KB-PHYS-MULTIPAIRCREEP1). A mean never reaches past the anchors it is taken
+    /// of. A shift and a turn fitted by least squares did: its turn, read from a few loaded points close together, reached
+    /// lightly loaded points far off, which took load the next step, and in a stack of three bodies of two boxes each the
+    /// anchors grew to hundreds of metres in two seconds, the middle body's friction stayed at its cone and the top two slid
+    /// off at 7 cm/s (`compound_boxes_stack`). So the turn is left to the points' own friction.
+    fn fit_patch_anchors(&mut self, head: usize, tail: usize) {
+        let first_body = self.pair_bodies(tail as u32).0;
+        let normal = self.v(PAIR_NORMAL_X, tail);
+        let (mut load, mut shift) = (0.0f32, v3(0.0, 0.0, 0.0));
+        self.for_patch_points(head, tail, first_body, |w, at, _| {
+            let n = w.s(CONTACT_NORMAL_IMPULSE, at);
+            load += n;
+            shift = shift.add(flat(w.v(CONTACT_DRIFT_X, at).scale(w.patch_sign(at)), normal).scale(n));
+        });
+        if load <= 0.0 {
+            return;
+        }
+        let shift = shift.scale(1.0 / load);
+        self.for_patch_points(head, tail, first_body, |w, at, _| {
+            w.set_v(CONTACT_DRIFT_X, at, shift.scale(w.patch_sign(at)));
+        });
+    }
+
+    /// 1 where the pair of point `at` has the patch's first body first, -1 where it has it second: set by `for_patch_points`.
+    #[inline(always)]
+    fn patch_sign(&self, at: usize) -> f32 {
+        self.s(PATCH_SIGN, at / MANIFOLD)
+    }
+
+    /// Calls `each` with every point of the patch from `head` round to `tail` and its arm from the patch's first body.
+    fn for_patch_points(&mut self, head: usize, tail: usize, first_body: usize, mut each: impl FnMut(&mut World, usize, V3)) {
+        let mut row = head;
+        loop {
+            let sign = if self.pair_bodies(row as u32).0 == first_body { 1.0 } else { -1.0 };
+            self.set_s(PATCH_SIGN, row, sign);
+            for k in 0..self.uu(PAIR_CONTACTS, row) as usize {
+                let at = row * MANIFOLD + k;
+                let r = if sign > 0.0 { self.v(CONTACT_ARM_A_X, at) } else { self.v(CONTACT_ARM_B_X, at) };
+                each(self, at, r);
+            }
+            if row == tail {
+                break;
+            }
+            row = self.uu(PAIR_PATCH_NEXT, row) as usize;
         }
     }
 

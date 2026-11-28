@@ -81,7 +81,7 @@ impl World {
 
     /// Sorts the first `count` entries of list column `list` by `less`, stably (a bottom-up merge sort through the scratch column
     /// `temp`, which must hold `count` entries), and writes each entry's new place into its row of `slot`.
-    fn sort_list(&mut self, list: usize, slot: usize, temp: usize, count: usize, less: impl Fn(&World, u32, u32) -> bool) {
+    pub(crate) fn sort_list(&mut self, list: usize, slot: usize, temp: usize, count: usize, less: impl Fn(&World, u32, u32) -> bool) {
         let (mut from, mut to) = (list, temp);
         let mut width = 1;
         while width < count {

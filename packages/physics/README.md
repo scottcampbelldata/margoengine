@@ -721,9 +721,9 @@ nothing more.
   out at 17 m/s loses its props 0.4 m a minute (`docs/known-bugs.md`, KB-PHYS-POSEROUND1).
 - Up to 16 substeps a prop holds where friction holds it; from 32 it still slips slowly (`docs/known-bugs.md`,
   KB-PHYS-FINECONE1).
-- Give a prop that must hold one collider where it touches: a body touching through several (a chair on four legs)
-  creeps about 2 cm in 36 s under a storm deck's changing load where one box holds within 2 mm (`docs/known-bugs.md`,
-  KB-PHYS-MULTIPAIRCREEP1).
+- A prop may touch through several colliders (a chair on four legs): the pairs between two bodies whose normals agree
+  solve their friction as one patch, so it holds where one box would, within 2 mm on the storm deck of
+  `tests/deck-props.test.js` (KB-PHYS-MULTIPAIRCREEP1, fixed 2026-11-28).
 
 ```ts
 import {Physics} from 'margoengine/physics';

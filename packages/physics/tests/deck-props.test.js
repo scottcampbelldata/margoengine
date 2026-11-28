@@ -200,11 +200,11 @@ test('a plate sticks where its friction exceeds the deck’s demand, and a plate
   );
   // Held: a part of a millimetre to two over three roll periods (the contacts' softness, not slip that adds up).
   assert.ok(moved[0] < 2e-3, `a held plate moved ${moved[0]} m across the deck`);
+  // The chair of five colliders is held to the plate's bound: its legs' pairs with the deck solve their friction as one
+  // patch, where one pair at a time it crept about 2 cm in the same 36 s (KB-PHYS-MULTIPAIRCREEP1).
+  assert.ok(moved[1] < 2e-3, `a held chair moved ${moved[1]} m across the deck`);
   // Sliding, and still on the 16 m deck.
   for (const k of [2, 3]) assert.ok(moved[k] > 0.05 && moved[k] < 8, `a prop past its friction moved ${moved[k]} m`);
-  // The chair of five colliders at the plate's friction still creeps about 2 cm in the same 36 s, so it is not held to the
-  // plate's bound: a body that touches through several colliders loses its anchors where one pair saturates while the
-  // others hold (KB-PHYS-MULTIPAIRCREEP1).
 });
 
 test('a tall cup tips where its half width over its height is below the demand, and a squat one stands', (t) => {

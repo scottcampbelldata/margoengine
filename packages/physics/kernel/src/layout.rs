@@ -379,6 +379,16 @@ columns! {
     // The supporting pairs of this step, lowest first, and the sort's spare.
     TILT_PAIRS u32 Pair,
     TILT_TEMP u32 Pair,
+    // The friction patches of this step (`group_patches`, solver.rs): the pairs between two bodies whose normals agree solve
+    // their friction as one. A pair's next pair in its patch, in solve order and round from the last to the first (the pair
+    // itself when it is alone); not zero on a patch's last pair; the sort's list and its spare; and each point's cut in the
+    // patch's last sweep.
+    PAIR_PATCH_NEXT u32 Pair,
+    PAIR_PATCH_TAIL u32 Pair,
+    PATCH_LIST u32 Pair,
+    PATCH_TEMP u32 Pair,
+    PATCH_SIGN f32 Pair,
+    CONTACT_CUT f32 Contact,
     // Open addressing: a pair's row plus one, zero when empty.
     PAIR_TABLE u32 Table,
     // Awake bodies, densely.
@@ -1047,11 +1057,12 @@ pub const JOINT_IDLE: u32 = JOINT_OFF | JOINT_BROKEN | JOINT_DISABLED;
 /// The columns that hold the order a step solves in, rebuilt every step from the world's state: the pairs and joints it
 /// solves, the impacts it found, the islands it numbered, the solving joints' scratch, which is indexed by place in
 /// their list, and the rotor speeds read at each substep's start. `World::hash` leaves them out; `World::arena_hash` does not.
-pub const SCRATCH: [usize; 47] = [
+pub const SCRATCH: [usize; 53] = [
     ISLAND_LEVEL, ISLAND_STAMP, MB_HELD, ISLAND_SUBSTEPS,
     SOLVE_PAIRS, IMPACTS, ISLAND_BODIES, ISLAND_LEAD, ISLAND_START, ISLAND_COUNT, ISLAND_READY, ISLAND_PASSES, SOLVE_JOINTS,
     SOLVE_LEAD, SOLVE_VIA, SOLVE_SHARE, ISLAND_PAIR_START, ISLAND_PAIR_COUNT, ISLAND_PAIR_CURSOR, JOINT_ORDER, JOINT_TEMP, ISLAND_JOINT_START,
     ISLAND_JOINT_COUNT, ISLAND_JOINT_CURSOR, COUPLING_ORDER, ISLAND_COUPLING_START, ISLAND_COUPLING_COUNT, ISLAND_COUPLING_CURSOR, MB_STAMP,
     TILT_MASS, TILT_SUPPORTS, TILT_Y, TILT_G, TILT_A, TILT_BASE, TILT_TOP, TILT_TOPS, PAIR_TILT_GAIN, PAIR_TILT_UNHELD, TILT_PAIRS, TILT_TEMP,
-    JOINT_ROTOR_0, JOINT_ROTOR_1, JOINT_ROTOR_2, JOINT_ROTOR_3, JOINT_ROTOR_4, JOINT_ROTOR_5,
+    JOINT_ROTOR_0, JOINT_ROTOR_1, JOINT_ROTOR_2, JOINT_ROTOR_3, JOINT_ROTOR_4, JOINT_ROTOR_5, PAIR_PATCH_NEXT, PAIR_PATCH_TAIL,
+    PATCH_LIST, PATCH_TEMP, PATCH_SIGN, CONTACT_CUT,
 ];

@@ -156,6 +156,21 @@ fn scene(w: &mut World) {
         let spinner = dynamic(w, SHAPE_BOX, [0.3, 0.2, 0.4], v3(-10.0 + i as f32 * 1.5, 2.0, 0.0));
         w.set_v(ANGULAR_X, spinner as usize, v3(3.0 * i as f32, 20.0, 1.0));
     }
+    // A chair (a seat on four legs) and a plate of four boxes, one body each: the pairs between a body and the floor solve
+    // their friction as one patch (KB-PHYS-MULTIPAIRCREEP1), grouped from the step's lists alone.
+    let chair = w.add_body(DYNAMIC).unwrap();
+    w.add_collider(chair, SHAPE_BOX, [0.22, 0.02, 0.22], [0.0; 3], IDENTITY, 600.0).unwrap();
+    for (x, z) in [(0.2f32, 0.2f32), (-0.2, 0.2), (0.2, -0.2), (-0.2, -0.2)] {
+        w.add_collider(chair, SHAPE_BOX, [0.02, 0.225, 0.02], [x, -0.225, z], IDENTITY, 600.0).unwrap();
+    }
+    w.set_v(POSITION_X, chair as usize, v3(4.0, 0.46, -2.0));
+    w.set_v(LINEAR_X, chair as usize, v3(0.8, 0.0, 0.3));
+    let plate = w.add_body(DYNAMIC).unwrap();
+    for (x, z) in [(0.06f32, 0.06f32), (-0.06, 0.06), (0.06, -0.06), (-0.06, -0.06)] {
+        w.add_collider(plate, SHAPE_BOX, [0.06, 0.01, 0.06], [x, 0.0, z], IDENTITY, 600.0).unwrap();
+    }
+    w.set_v(POSITION_X, plate as usize, v3(6.0, 0.011, -2.0));
+    w.set_v(ANGULAR_X, plate as usize, v3(0.0, 2.0, 0.0));
 }
 
 #[test]
