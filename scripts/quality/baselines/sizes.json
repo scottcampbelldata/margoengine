@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21683706,
+  "total": 21687835,
   "history": [
     {
       "date": "2026-10-24",
@@ -15351,6 +15351,12 @@
       "commit": "lane-e-lightning-glow",
       "reason": "sky/lightning-glow: new entry, the lightning channel's light scattered in fog and rain",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "hydro-02-robust-and-visible",
+      "reason": "HYDRO-02 physics/runoff grows from 3869 to 4601 B gzip (cap 4125 to 4857) for numeric and geometry validation and transactional water and budget publication. The native lazy plain and shared assets grow from 3112/3177 to 5135/5194 B gzip for overflow-safe soil and routing bounds. A separate entry would duplicate grid and port validation. Water's shallow surface grows from 1706 to 1716 B gzip under its existing 1962 B cap, to disable ocean-edge blending on the inland mirror. Core and Stage gain zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16254,7 +16260,7 @@
     "@margoengine/physics/rod": 4755,
     "@margoengine/physics/rogue": 7642,
     "@margoengine/physics/room-sound": 5606,
-    "@margoengine/physics/runoff": 4125,
+    "@margoengine/physics/runoff": 4857,
     "@margoengine/physics/schooling": 5102,
     "@margoengine/physics/sea": 14609,
     "@margoengine/physics/seakeeping": 43883,

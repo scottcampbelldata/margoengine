@@ -14398,8 +14398,15 @@ by the current routing step. Climate-only BiomeView flows use a quantized local 
 contributing area. Event hydrographs use the live field. Calibrated flood return periods must come from separate
 hydraulic runs or from measurements.
 
-The optional runoff entry is 3,906 B min+gzip. Its lazy SIMD Wasm images are 7,311 B for plain memory and 7,402 B
-for shared memory before HTTP compression. Both preserve the existing world arena outside their reserved section.
+Green-Ampt uses one wetting front per cell. Interstorm drying attenuates remembered wetting-front
+depth in proportion to remaining soil storage. Layered soil profiles and physically resolved
+redistribution remain open. The topographic index reduces local available soil storage and a linear
+reservoir supplies deep drainage. The receiving shallow-water solver takes the outlet hydrograph.
+Backwater feedback to upslope storage remains open. A nonfinite candidate does not publish.
+
+The optional runoff entry is 4,601 B min+gzip under a 4,857 B ceiling. Lazy SIMD Wasm images are
+20,293 B plain and 20,381 B shared raw, or 5,135 and 5,194 B gzip. Water's inland surface is
+1,716 B gzip under its 1,962 B ceiling. Core and Stage gain zero bytes.
 
 ### Aquatic locomotion (`@margoengine/physics/life`, LIFE-03)
 

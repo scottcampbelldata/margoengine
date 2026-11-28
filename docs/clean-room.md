@@ -15751,6 +15751,9 @@ The work memory and prognostic quantities belong to the world arena. Tests exerc
 wetness-index saturation, volume closure, flood spread, and deterministic replay. The implementation uses the
 publications and this repository's field contracts.
 
+- Roger E. Smith, [Comment on Modeling Infiltration During a Steady Rain by Mein and Larson](https://www.tucson.ars.ag.gov/unit/publications/PDFfiles/170.pdf), 1973, equations 6 and 8. The native step retains the preponding and ponded balance and uses overflow-safe equivalents for extreme ratios. The monotone numerical roots and ordered water sums must give finite candidate state before publication.
+- Reed M. Maxwell et al., [Surface-subsurface model intercomparison](https://doi.org/10.1002/2013WR013725), 2014. Its tilted V catchment motivates the staged test geometry and rain/recession sequence. The camera test is for routing and renderer direction with authored inputs.
+
 ### Aquatic locomotion (LIFE-03, `@margoengine/physics/life`)
 
 - M. J. Lighthill, [Note on the swimming of slender fish](https://doi.org/10.1017/S0022112060001110) (1960),

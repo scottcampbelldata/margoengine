@@ -10996,6 +10996,11 @@ wake into `TracerSolver` and checks threshold, mass, current advection, settling
 `packages/environment/tests/swim-sediment.browser.mjs` fixture uses the active tracer mass for local
 extinction on both graphics backends. The tail-wake render and articulated contacts still need integration.
 
+Runoff stages the next seven grid planes and six cumulative ledger words before native acceptance.
+The native soil and graph solves reject invalid numeric candidates. The timed rain and receiving
+shallow-water regression routes the accepted outlet into Water on WebGPU and WebGL2 and checks
+exact state and image replay.
+
 ### Section 5 evidence for light-bodies aerodynamics (AERO-05)
 
 The falling-body Wasm module integrates fixed-axis plates, fixed-axis blade strips and rounded grains in

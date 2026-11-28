@@ -157,8 +157,8 @@
 <tr><th scope="row"><code>sediment-kernel-shared.wasm</code></th><td>Rust SIMD sediment transport, shared world memory</td><td class="num">12,571</td><td class="num">5,279</td><td class="num">4,747</td><td>SedimentTransport.load() on a host with shared memory support</td></tr>
 <tr><th scope="row"><code>orbit-kernel.wasm</code></th><td>Rust SIMD N-body gravity and orbital drag</td><td class="num">4,444</td><td class="num">2,380</td><td class="num">2,191</td><td>OrbitSolver.load(), only from the optional /orbit entry</td></tr>
 <tr><th scope="row"><code>orbit-kernel-shared.wasm</code></th><td>Rust SIMD N-body gravity, shared world memory</td><td class="num">4,532</td><td class="num">2,435</td><td class="num">2,248</td><td>OrbitSolver.load() on a host with shared memory support</td></tr>
-<tr><th scope="row"><code>runoff-kernel.wasm</code></th><td>Rust SIMD catchment runoff</td><td class="num">7,311</td><td class="num">3,112</td><td class="num">2,831</td><td>RainfallRunoff.load(), only from the optional /runoff entry</td></tr>
-<tr><th scope="row"><code>runoff-kernel-shared.wasm</code></th><td>Rust SIMD catchment runoff, shared world memory</td><td class="num">7,402</td><td class="num">3,177</td><td class="num">2,847</td><td>RainfallRunoff.load() on a host with shared memory support</td></tr>
+<tr><th scope="row"><code>runoff-kernel.wasm</code></th><td>Rust SIMD catchment runoff</td><td class="num">20,293</td><td class="num">5,135</td><td class="num">4,444</td><td>RainfallRunoff.load(), only from the optional /runoff entry</td></tr>
+<tr><th scope="row"><code>runoff-kernel-shared.wasm</code></th><td>Rust SIMD catchment runoff, shared world memory</td><td class="num">20,381</td><td class="num">5,194</td><td class="num">4,565</td><td>RainfallRunoff.load() on a host with shared memory support</td></tr>
 <tr><th scope="row"><code>thermal-kernel.wasm</code></th><td>Rust SIMD heat conduction</td><td class="num">12,160</td><td class="num">5,120</td><td class="num">4,460</td><td>HeatConduction.load() or Thermoelasticity.load() from the optional /thermal entry</td></tr>
 <tr><th scope="row"><code>thermal-kernel-shared.wasm</code></th><td>Rust SIMD heat conduction, shared world memory</td><td class="num">12,160</td><td class="num">5,120</td><td class="num">4,458</td><td>The optional /thermal entry loads a kernel on a host with shared memory support</td></tr>
 <tr><th scope="row"><code>vegetation-kernel.wasm</code></th><td>Rust SIMD structural plant response</td><td class="num">6,456</td><td class="num">2,226</td><td class="num">1,955</td><td>PlantSway.load(), only from the optional /vegetation entry</td></tr>
@@ -4442,7 +4442,7 @@
 <tr><td><code>./underwater</code></td><td class="num">24,702</td><td class="num">9,071</td></tr>
 <tr><td><code>./rivers</code></td><td class="num">11,240</td><td class="num">4,214</td></tr>
 <tr><td><code>./flood</code></td><td class="num">48,913</td><td class="num">17,117</td></tr>
-<tr><td><code>./shallow-surface</code></td><td class="num">3,500</td><td class="num">1,706</td></tr>
+<tr><td><code>./shallow-surface</code></td><td class="num">3,516</td><td class="num">1,716</td></tr>
 <tr><td><code>./flood-bake</code></td><td class="num">10,165</td><td class="num">4,359</td></tr>
 <tr><td><code>./breaking</code></td><td class="num">7,579</td><td class="num">3,537</td></tr>
 <tr><td><code>./sea-state</code></td><td class="num">3,285</td><td class="num">1,694</td></tr>
@@ -4954,7 +4954,7 @@
 <tr><td><code>./viscoplastic</code></td><td class="num">22,683</td><td class="num">8,570</td></tr>
 <tr><td><code>./tsunami</code></td><td class="num">23,301</td><td class="num">8,915</td></tr>
 <tr><td><code>./pack-ice</code></td><td class="num">11,423</td><td class="num">4,715</td></tr>
-<tr><td><code>./runoff</code></td><td class="num">9,524</td><td class="num">3,869</td></tr>
+<tr><td><code>./runoff</code></td><td class="num">11,398</td><td class="num">4,601</td></tr>
 <tr><td><code>./drainage-fog</code></td><td class="num">10,045</td><td class="num">4,267</td></tr>
 <tr><td><code>./vortices</code></td><td class="num">13,162</td><td class="num">5,197</td></tr>
 <tr><td><code>./snowpack</code></td><td class="num">11,964</td><td class="num">4,916</td></tr>

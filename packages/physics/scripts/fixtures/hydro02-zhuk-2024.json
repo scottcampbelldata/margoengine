@@ -1,0 +1,57 @@
+{
+  "source": {
+    "authors": "Volodymyr Zhuk, Lesya Vovk, Ihor Popadiuk and Ivan Matlai",
+    "paper": "Experimental surface runoff hydrographs from linear impervious subcatchments for rainfalls of extremely high intensity",
+    "doi": "https://doi.org/10.1016/j.heliyon.2024.e24734",
+    "year": 2024,
+    "inputsLocation": "Section 2.2 and Figure 2 caption",
+    "observationsLocation": "Figure 2, black cumulative runoff volume trace only",
+    "figure": "https://ars.els-cdn.com/content/image/1-s2.0-S2405844024007655-gr2_lrg.jpg",
+    "figureSha256": "d3df7052791b4efdba19eb9b83b38648f20b4bf379622011f7021bf768d0e002",
+    "figureArticleLicence": "https://creativecommons.org/licenses/by-nc-nd/4.0/",
+    "observationNotes": "Numerical facts transcribed from the published plot. The article's underlying digital mass series is available on request. The 30 s observation is obscured by the orange curve and is omitted. No plot asset is redistributed.",
+    "manningProvenance": "Section 2.2 reports a mean measured Manning coefficient of 0.009 ± 0.0003 for the flume. The measurement procedure and any overlap with Figure 2 runoff are unspecified. The diagnostic uses the published coefficient as given, without fitting it, and cannot establish that it was measured independently of the scored runoff.",
+    "initialDepthProvenance": "The model starts with zero free water, consistent with the Figure 2 retention curve at the start of rainfall. The article does not report a separate prewetting or residual film measurement."
+  },
+  "inputs": {
+    "lengthM": 6,
+    "widthM": 0.305,
+    "slope": 0.01,
+    "slopeRelativeError": 0.01,
+    "manning": 0.009,
+    "manningAbsoluteError": 0.0003,
+    "rainMmPerHour": 1426,
+    "rainRelativeError": 0.032,
+    "rainDurationS": 40,
+    "initialDepthM": 0,
+    "conductivityMPerS": 0
+  },
+  "observations": {
+    "scaleResolutionL": 0.03,
+    "samplingIntervalS": 0.125,
+    "plotPixels": {
+      "xAt0S": 181,
+      "xAt80S": 1339,
+      "yAt0L": 737,
+      "yAt35L": 18,
+      "strokeHalfWidth": 8
+    },
+    "timeSAndCurveYPixels": [
+      [5, 736],
+      [10, 728.5],
+      [15, 699.5],
+      [20, 650],
+      [25, 586],
+      [35, 435.5],
+      [40, 358],
+      [45, 281],
+      [50, 222.5],
+      [55, 191],
+      [60, 177.5],
+      [65, 171],
+      [70, 164.5],
+      [75, 160],
+      [78, 159]
+    ]
+  }
+}

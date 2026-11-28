@@ -507,6 +507,10 @@ first: each names its scope, its evidence file and how to reproduce it.
   packages/physics/tests/coupling/runoff.test.js` after building Physics, Weather and Biomes. The live WebGPU
   discharge fixture added 60.002 m³ when the source delivered 60 m³. Run
   `node packages/biomes/tests/water-check.mjs --flow-only`.
+  A separate fixed-camera storm sends 1.92375 m³ through the combined rain and flood ledger. The inland mirror
+  preserves accepted near-edge depths within 2 µm on WebGPU and WebGL2. Both paths reproduce their exact images
+  after seek in `packages/physics/tests/runoff-surface.browser.mjs`. The lab comparison in the solver audit
+  records the early cumulative-volume miss.
 
 - Pedestrian crowd motion (LIFE-05). A 20 kg and an 80 kg pressed walker receive equal and opposite
   impulses and displace in inverse mass ratio. A future encounter slows two separated walkers before

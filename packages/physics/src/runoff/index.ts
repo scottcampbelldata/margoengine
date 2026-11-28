@@ -1,7 +1,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { Precipitation } from '@margoengine/math/fields';
+import { DYNAMIC_BASE, MAX_MEMORY_PAGES, STACK_BYTES } from '../world/memory.js';
 import type {
-  Cell,
   FieldDescriptor,
   FieldUse,
   Port,
@@ -135,6 +135,7 @@ interface State {
   readonly kernel: RunoffKernel;
   readonly shape: Shape;
   readonly storage: Region;
+  readonly candidate: Region;
   readonly coefficients: Region;
   readonly topology: Region;
   readonly elevations: Region;
@@ -142,6 +143,7 @@ interface State {
   readonly forcing: Region;
   readonly scratch: Region;
   readonly budget: Region;
+  readonly candidateBudget: Region;
   readonly cell: Region;
   readonly topographicScale: number;
   readonly precipitation?: Precipitation;
@@ -149,20 +151,23 @@ interface State {
 
 function numberIn(option: string, value: number, minimum = 0, maximum = Infinity): number {
   if (!Number.isFinite(value) || value < minimum || value > maximum)
-    throw new RangeError(`Invalid runoff ${option}; pass a finite number in [${minimum}, ${maximum}] in its SI units.`);
+    throw new MargoError('state', `Invalid runoff ${option}. Pass a finite SI value in [${minimum}, ${maximum}].`);
   return value;
 }
 
 function positive(option: string, value: number): number {
   if (!Number.isFinite(value) || value <= 0)
-    throw new RangeError(`Invalid runoff ${option}; pass a positive finite number in its SI units.`);
+    throw new MargoError('state', `Invalid runoff ${option}. Pass a positive finite SI value.`);
   return value;
 }
 
 function scalarGrid(option: string, value: GridNumber, count: number) {
   if (typeof value === 'number') return () => value;
-  if (value.length !== count)
-    throw new RangeError(`Invalid runoff ${option} length; supply one number or exactly ${count} cell values.`);
+  if (value?.length !== count)
+    throw new MargoError(
+      'state',
+      `Invalid runoff ${option} length. Supply one number or exactly ${count} cell values.`,
+    );
   return (index: number) => value[index]!;
 }
 
@@ -170,12 +175,21 @@ function gridShape(options: RunoffGrid): Shape {
   const { nx, nz } = options;
   const count = nx * nz;
   if (!Number.isSafeInteger(nx) || !Number.isSafeInteger(nz) || nx < 1 || nz < 1 || count > 0x7fffffff)
-    throw new RangeError(
-      'Invalid runoff dimensions; pass positive integers whose cell indices fit a signed 32-bit grid.',
+    throw new MargoError(
+      'state',
+      'Invalid runoff dimensions. Pass positive integers whose cell indices fit a signed 32-bit grid.',
     );
+  // State, candidate, forcing and geometry plus the six accepted and pending port mirrors.
+  const required = (40 * count + 15) * F64 + DYNAMIC_BASE + STACK_BYTES + 16;
+  if (required >= MAX_MEMORY_PAGES * 65536)
+    throw new MargoError('state', 'Runoff grid exceeds the wasm32 arena. Use fewer cells.');
   const dx = positive('dx', options.dx);
   const dz = positive('dz', options.dz ?? dx);
-  const [x, z] = options.origin ?? [0, 0];
+  const origin = options.origin ?? [0, 0];
+  if (origin.length !== 2)
+    throw new MargoError('state', 'Invalid runoff origin. Give two finite local XZ coordinates.');
+  const x = gridOrigin('X', origin[0], nx, dx);
+  const z = gridOrigin('Z', origin[1], nz, dz);
   return {
     nx,
     nz,
@@ -183,20 +197,34 @@ function gridShape(options: RunoffGrid): Shape {
     dz,
     count,
     area: positive('cell area', dx * dz),
-    x: numberIn('origin x', x, -Infinity),
-    z: numberIn('origin z', z, -Infinity),
+    x,
+    z,
   };
+}
+
+function gridOrigin(axis: string, value: number, count: number, spacing: number): number {
+  const start = numberIn(`origin ${axis}`, value, -Infinity);
+  const extent = numberIn(`grid ${axis} end`, start + count * spacing, -Infinity);
+  if (!(start + 0.5 * spacing > start && extent - 0.5 * spacing < extent))
+    throw new MargoError(
+      'state',
+      `Runoff ${axis} cell centres exceed coordinate resolution. Use a nearer local origin.`,
+    );
+  return start;
 }
 
 function drainageOrder(downstream: ArrayLike<number>, count: number): Int32Array {
   if (downstream.length !== count)
-    throw new RangeError(`Invalid runoff downstream length; give one index per cell (${count} indices).`);
+    throw new MargoError('state', `Invalid runoff downstream length. Give one index per cell (${count} indices).`);
   const topology = new Int32Array(2 * count);
   const incoming = new Int32Array(count);
   for (let i = 0; i < count; i++) {
     const next = downstream[i]!;
     if (!Number.isInteger(next) || next < -1 || next >= count)
-      throw new RangeError(`Invalid runoff downstream[${i}]; use -1 for an outlet or a cell index below ${count}.`);
+      throw new MargoError(
+        'state',
+        `Invalid runoff downstream[${i}]. Use -1 for an outlet or a cell index below ${count}.`,
+      );
     topology[i] = next;
     if (next >= 0) incoming[next]!++;
   }
@@ -207,7 +235,10 @@ function drainageOrder(downstream: ArrayLike<number>, count: number): Int32Array
     if (next >= 0 && --incoming[next]! === 0) topology[end++] = next;
   }
   if (end !== topology.length)
-    throw new RangeError('Runoff downstream links contain a cycle; pass an acyclic drainage graph with outlets.');
+    throw new MargoError(
+      'state',
+      'Runoff downstream links contain a cycle. Pass an acyclic drainage graph with outlets.',
+    );
   return topology;
 }
 
@@ -230,8 +261,9 @@ function inputWords(memory: WebAssembly.Memory, port: Port) {
     return new Float64Array(buffer, region.byteOffset, region.byteLength / F64);
   if (region.layout === LAYOUT && region.type === 'f32')
     return new Float32Array(buffer, region.byteOffset, region.byteLength / Float32Array.BYTES_PER_ELEMENT);
-  throw new RangeError(
-    `Invalid runoff input ${port.field}; publish layout-1 f32 or f64 words in the documented units.`,
+  throw new MargoError(
+    'state',
+    `Invalid runoff input ${port.field}. Publish layout-1 f32 or f64 words in the documented units.`,
   );
 }
 
@@ -254,15 +286,23 @@ export class RainfallRunoff implements Solver<RunoffParams> {
     options: RunoffLoadOptions,
   ) {
     this.id = options.id ?? 'runoff';
+    if (typeof this.id !== 'string' || !this.id.trim() || this.id !== this.id.trim())
+      throw new MargoError('state', 'Invalid runoff solver ID. Use a nonempty name without outer whitespace.');
     if (options.rain) {
       const { field, word } = options.rain;
-      if (field.unit !== 'm/s' || (word !== undefined && (!Number.isSafeInteger(word) || word < 0)))
-        throw new RangeError('Invalid runoff rain binding; use m/s and an optional nonnegative word index.');
+      if (!field?.name || field.unit !== 'm/s' || (word !== undefined && (!Number.isSafeInteger(word) || word < 0)))
+        throw new MargoError(
+          'state',
+          'Invalid runoff rain binding. Give a named field in m/s and a nonnegative word index.',
+        );
       this.rainInput = { field: { ...field }, word };
     }
     if (options.surfaceEnergy) {
-      if (options.surfaceEnergy.unit !== 'kg/(m^2 s)')
-        throw new RangeError('Invalid runoff surface energy binding; bind the ATMO-09 water-flux field in kg/(m^2 s).');
+      if (!options.surfaceEnergy.name || options.surfaceEnergy.unit !== 'kg/(m^2 s)')
+        throw new MargoError(
+          'state',
+          'Invalid runoff surface energy binding. Use the named ATMO-09 water-flux field in kg/(m^2 s).',
+        );
       this.energyInput = { ...options.surfaceEnergy };
     }
     this.depthField = output(`${this.id}:depth`, 'height', 'm');
@@ -283,6 +323,8 @@ export class RainfallRunoff implements Solver<RunoffParams> {
 
   /** Loads the optional runoff kernel, then returns a solver ready to add to a PhysicsWorld. */
   static async load(options: RunoffLoadOptions = {}): Promise<RainfallRunoff> {
+    if (options === null || typeof options !== 'object')
+      throw new MargoError('state', 'Invalid runoff load options. Pass an options object or omit it.');
     return new RainfallRunoff(await loadRunoffBuilds(options.signal), options);
   }
 
@@ -294,10 +336,16 @@ export class RainfallRunoff implements Solver<RunoffParams> {
   }
 
   init(host: SolverHost, options: RunoffParams): void {
+    if (this.state) throw new MargoError('state', 'Runoff is already attached. Load a new solver for another world.');
     if (!options?.downstream)
-      throw new RangeError('Runoff needs a drainage grid; supply dimensions, spacing and downstream cell indices.');
+      throw new MargoError(
+        'state',
+        'Runoff needs a drainage grid. Supply dimensions, spacing and downstream cell indices.',
+      );
+    if (options.precipitation !== undefined && typeof options.precipitation?.sample !== 'function')
+      throw new MargoError('state', 'Invalid runoff precipitation. Give a source with a sample method.');
     const shape = gridShape(options);
-    const { count, dx, dz, nx } = shape;
+    const { count, dx, dz, nx, area } = shape;
     const topology = drainageOrder(options.downstream, count);
     const topographicScale = numberIn(
       'topographicScale',
@@ -322,15 +370,20 @@ export class RainfallRunoff implements Solver<RunoffParams> {
     const configuration = new Float64Array(6 * count);
     const initial = new Float64Array(2 * count);
     for (let i = 0; i < count; i++) heights[i] = numberIn('elevation', elevation(i), -Infinity);
+    let stored = 0;
     for (let i = 0; i < count; i++) {
       const next = topology[i]!;
       const east = ((i % nx) - (next % nx)) * dx;
       const north = (Math.floor(i / nx) - Math.floor(next / nx)) * dz;
-      const reachSlope = slope
-        ? numberIn('slope', slope(i))
-        : next < 0 || !options.elevation
-          ? 0.01
-          : Math.max(0, heights[i]! - heights[next]!) / Math.sqrt(east * east + north * north);
+      let reachSlope = 0.01;
+      if (slope) reachSlope = numberIn('slope', slope(i));
+      else if (next >= 0 && options.elevation) {
+        const squared = east * east + north * north;
+        const distance = squared > 0 && Number.isFinite(squared) ? Math.sqrt(squared) : Math.hypot(east, north);
+        const rise = heights[i]! - heights[next]!;
+        const gradient = Number.isFinite(rise) ? rise / distance : heights[i]! / distance - heights[next]! / distance;
+        reachSlope = numberIn('derived slope', Math.max(0, gradient));
+      }
       const soilCapacity = numberIn('soilCapacity', capacity(i));
       configuration[i] = numberIn('conductivity', conductivity(i));
       configuration[count + i] =
@@ -345,6 +398,7 @@ export class RainfallRunoff implements Solver<RunoffParams> {
       rainRates[i] = numberIn('rainRate', rain(i));
       initial[i] = numberIn('initialDepth', depth(i));
       initial[count + i] = soilCapacity * numberIn('initialSaturation', saturation(i), 0, 1);
+      stored = numberIn('initial stored volume', stored + initial[i]! * area + initial[count + i]! * area);
     }
 
     const allocate = (name: string, words: number) => host.allocate(name, words * F64, 'f64', LAYOUT);
@@ -355,6 +409,7 @@ export class RainfallRunoff implements Solver<RunoffParams> {
       kernel: instantiateRunoff(host, this.builds),
       precipitation: options.precipitation,
       storage: allocate('hydrology-state', COLUMNS * count),
+      candidate: allocate('hydrology-candidate', COLUMNS * count),
       coefficients: allocate('hydrology-coefficients', 6 * count),
       elevations: allocate('hydrology-bed', count),
       topology: host.allocate('hydrology-topology', topology.byteLength, 'i32', LAYOUT),
@@ -362,12 +417,14 @@ export class RainfallRunoff implements Solver<RunoffParams> {
       forcing: allocate('hydrology-forcing', 3 * count),
       scratch: allocate('hydrology-scratch', 2 * count),
       budget: allocate('hydrology-budget', 6),
+      candidateBudget: allocate('hydrology-candidate-budget', 6),
       cell: allocate('hydrology-origin-cell', 3),
     };
     floats(state, state.elevations).set(heights);
     floats(state, state.coefficients).set(configuration);
     floats(state, state.storage).set(initial);
     floats(state, state.rain).set(rainRates);
+    floats(state, state.cell).set(host.cell);
     new Int32Array(host.memory.buffer, state.topology.byteOffset, 2 * count).set(topology);
     this.state = state;
   }
@@ -378,6 +435,7 @@ export class RainfallRunoff implements Solver<RunoffParams> {
 
   step(context: StepContext, dt: number): void {
     const state = this.requireState();
+    const interval = positive('step duration', dt);
     const { host, shape } = state;
     const { count, nx, dx, dz, x, z, area } = shape;
     const forcing = floats(state, state.forcing);
@@ -388,13 +446,16 @@ export class RainfallRunoff implements Solver<RunoffParams> {
       const word = this.rainInput?.word;
       if (word !== undefined || values.length === 1) rain.fill(numberIn('rain field', values[word ?? 0]!));
       else {
-        if (values.length !== count)
-          throw new RangeError(`Invalid runoff rain grid; publish one scalar or ${count} grid words.`);
+        if (values.length !== count || !context.cell.every((cell, axis) => cell === boundRain.cell[axis]))
+          throw new MargoError(
+            'state',
+            `Invalid runoff rain grid. Publish one scalar or ${count} grid words in the same world cell.`,
+          );
         for (let i = 0; i < count; i++) rain[i] = numberIn('rain field', values[i]!);
       }
     } else if (state.precipitation) {
       const heights = floats(state, state.elevations);
-      const time = context.tick * dt;
+      const time = numberIn('precipitation time', context.tick * interval);
       for (let i = 0; i < count; i++) {
         const weather = state.precipitation.sample(
           x + ((i % nx) + 0.5) * dx,
@@ -402,7 +463,7 @@ export class RainfallRunoff implements Solver<RunoffParams> {
           z + (Math.floor(i / nx) + 0.5) * dz,
           time,
         );
-        rain[i] = numberIn('precipitation rain rate', weather.rain.rate) * METRES_PER_MMH;
+        rain[i] = numberIn('precipitation rain rate', weather?.rain?.rate) * METRES_PER_MMH;
       }
     } else rain.set(floats(state, state.rain));
 
@@ -412,33 +473,46 @@ export class RainfallRunoff implements Solver<RunoffParams> {
     if (energy) {
       const values = inputWords(host.memory, energy);
       if (values.length !== 3)
-        throw new RangeError(
-          'Invalid runoff surface energy port; publish ATMO-09 evaporation, melt and runoff as three words.',
+        throw new MargoError(
+          'state',
+          'Invalid runoff surface energy port. Publish ATMO-09 evaporation, melt and runoff as three words.',
         );
       evaporation = numberIn('surface evaporation', values[0]!, -Infinity) / 1000;
       melt = numberIn('snowmelt', values[1]!) / 1000;
     }
     forcing.fill(melt, count, 2 * count);
     forcing.fill(evaporation, 2 * count);
-    state.kernel.runoff_step(
-      state.storage.byteOffset,
+    const accepted = floats(state, state.storage);
+    const budget = floats(state, state.budget);
+    const candidate = floats(state, state.candidate);
+    const nextBudget = floats(state, state.candidateBudget);
+    candidate.set(accepted);
+    nextBudget.set(budget);
+    const status = state.kernel.runoff_step(
+      state.candidate.byteOffset,
       state.coefficients.byteOffset,
       state.topology.byteOffset,
       state.forcing.byteOffset,
       state.scratch.byteOffset,
-      state.budget.byteOffset,
+      state.candidateBudget.byteOffset,
       count,
       area,
       state.topographicScale,
-      dt,
+      interval,
     );
+    if (status !== 0)
+      throw new MargoError(
+        'state',
+        'Runoff update exceeds the finite water or flow range. Use compatible grid, soil and forcing scales.',
+      );
+    accepted.set(candidate);
+    budget.set(nextBudget);
     floats(state, state.cell).set(context.cell);
   }
 
   exportPorts(tick: number): readonly Port[] {
     const state = this.requireState();
-    const [x, y, z] = floats(state, state.cell);
-    const cell: Cell = [x!, y!, z!];
+    const cell = state.host.cell;
     return this.outputPlanes.map(([field, index]) => ({
       field: field.name,
       tick,
@@ -461,7 +535,7 @@ export class RainfallRunoff implements Solver<RunoffParams> {
     const state = this.requireState();
     const { count, nx, nz } = state.shape;
     if (!Number.isInteger(i) || !Number.isInteger(j) || i < 0 || i >= nx || j < 0 || j >= nz)
-      throw new RangeError('Invalid runoff cell; supply a column and row inside the configured grid.');
+      throw new MargoError('state', 'Invalid runoff cell. Supply a column and row in the configured grid.');
     const index = i + nx * j;
     const values = floats(state, state.storage);
     return {
@@ -500,7 +574,7 @@ export class RainfallRunoff implements Solver<RunoffParams> {
 
   private requireState(): State {
     if (!this.state)
-      throw new MargoError('state', 'Runoff has no drainage grid; add the solver to a PhysicsWorld first.');
+      throw new MargoError('state', 'Runoff has no drainage grid. Add the solver to a PhysicsWorld first.');
     return this.state;
   }
 }

@@ -121,7 +121,7 @@ export class ShallowWaterSurface implements EnginePlugin {
         mappedAtCreation: true,
       });
       resources.push(connected);
-      // Keep offshore blending, surf forcing and wall spray inactive across the inland grid.
+      // The inland grid is disconnected from the ocean's surf forcing and wall spray.
       new Uint32Array(connected.getMappedRange()).fill(1);
       connected.unmap();
       const dx = width / columns;
@@ -134,6 +134,8 @@ export class ShallowWaterSurface implements EnginePlugin {
         fluxes: [fluxTexture, fluxTexture],
         connected,
         current: 0,
+        // Keep the solver's free surface all the way to the grid edges.
+        seaBlendEdges: 0,
         step() {
           let at = 0;
           for (let j = 0; j < rows; j++) {

@@ -1589,6 +1589,7 @@ remains caller-owned. Use this path for the framework's rigid-body pressure or d
 ShallowWaterSolver supplied to the mirror.
 
 The mirror supports WebGPU and the full WebGL2 compatibility layer. It uses the live depth and bed height.
+Its inland grid edges retain the accepted flood depth, including where they meet a dry bed.
 Water's existing coastal interpolation, shoreline threshold and velocity reconstruction also apply. The
 mirror does not publish simulated foam, breakers or GPU flood diagnostics.
 

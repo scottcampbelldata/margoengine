@@ -19,7 +19,7 @@ export interface RunoffKernel extends WebAssembly.Exports {
     area: number,
     topographicScale: number,
     dt: number,
-  ): void;
+  ): number;
 }
 
 async function readAsset(url: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {
@@ -32,30 +32,41 @@ async function readAsset(url: URL, signal?: AbortSignal): Promise<WebAssembly.Mo
   }
   const response = await fetch(url, { signal });
   if (!response.ok)
-    throw new MargoError('failed', `Runoff kernel returned HTTP ${response.status}; serve the runoff Wasm asset.`);
+    throw new MargoError('failed', `Runoff kernel returned HTTP ${response.status}. Serve the runoff Wasm asset.`);
   return WebAssembly.compile(await response.arrayBuffer());
 }
 
 export async function loadRunoffBuilds(signal?: AbortSignal): Promise<RunoffBuilds> {
-  const [plain, shared] = await Promise.all([
-    readAsset(new URL(/* @vite-ignore */ './runoff-kernel.wasm?no-inline', import.meta.url), signal),
-    canShareMemory()
-      ? readAsset(new URL(/* @vite-ignore */ './runoff-kernel-shared.wasm?no-inline', import.meta.url), signal)
-      : undefined,
-  ]);
-  signal?.throwIfAborted();
-  return { plain, shared };
+  try {
+    const [plain, shared] = await Promise.all([
+      readAsset(new URL(/* @vite-ignore */ './runoff-kernel.wasm?no-inline', import.meta.url), signal),
+      canShareMemory()
+        ? readAsset(new URL(/* @vite-ignore */ './runoff-kernel-shared.wasm?no-inline', import.meta.url), signal)
+        : undefined,
+    ]);
+    signal?.throwIfAborted();
+    return { plain, shared };
+  } catch (cause) {
+    signal?.throwIfAborted();
+    if (cause instanceof MargoError) throw cause;
+    throw Object.assign(
+      new MargoError('failed', 'Runoff Wasm failed to load. Use a SIMD runtime and serve the runoff kernel.'),
+      {
+        cause,
+      },
+    );
+  }
 }
 
 export function instantiateRunoff(host: SolverHost, builds: RunoffBuilds): RunoffKernel {
   const module = isShared(host.memory) ? builds.shared : builds.plain;
   if (!module)
-    throw new MargoError('unsupported', 'Runoff has no shared Wasm build on this host; create a plain-memory world.');
+    throw new MargoError('unsupported', 'Runoff has no shared Wasm build on this host. Create a plain-memory world.');
   const stack = host.allocate('runoff-stack', STACK_BYTES + 8, 'u8', 1);
   const exports = new WebAssembly.Instance(module, { env: { memory: host.memory } }).exports as RunoffKernel;
   const pointer = exports.__stack_pointer;
   if (!(pointer instanceof WebAssembly.Global))
-    throw new MargoError('failed', 'Runoff Wasm has no instance stack pointer; rebuild the runoff kernel assets.');
+    throw new MargoError('failed', 'Runoff Wasm has no instance stack pointer. Rebuild the runoff kernel assets.');
   pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
   return exports;
 }

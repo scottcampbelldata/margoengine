@@ -154,6 +154,28 @@ them; the rest is a record of what a stronger solver would need.
   [Huang and Garcia (1998), experiment and rheology](https://doi.org/10.1017/S0022112098002845) and
   [Parvin et al. (2024), Figure 3 measured markers](https://doi.org/10.1016/j.apor.2024.104296)
 
+### HYDRO-02 four-point pass
+
+- Point 5. `runoff-extremes.test.js` checks coded corrections for invalid dimensions, cell precision and
+  spatial rain. A cumulative overflow in a real runoff tick preserves the accepted state and budget in
+  plain and shared memory. A rebased spatial rain producer and accepted output retain their cell.
+  `runoff-native-ranges.test.js` exercises formerly invalid Manning depths, early capillary infiltration
+  with a subnormal conductivity-time product, cancellation of the stored depth near full routing, and cumulative native budget overflow.
+- Point 7. `runoff-surface.browser.mjs` drives upstream outlet flow and downstream flood depth from a
+  timed storm on the world clock. It tests dry, rising, recession and snapshot replay on WebGPU and WebGL2.
+  The inland surface renders the accepted near-edge depth with ocean blending disabled.
+- Point 8. The package README and `docs/limits.md` document fixed routing, a single soil layer,
+  the drying approximation, runoff and flood receiver units, and the remaining backwater feedback.
+- Point 2 remains open. The published-parameter Zhuk et al. 6 m flume comparison conserves applied
+  water and matches 8 of 15 reported scale observations within the combined bounds. At 25 s the
+  recorded and 48-cell volumes are 7.350 and 10.820 L, respectively. At 96 cells the largest
+  deviation is 3.528 L. The procedure behind the reported Manning coefficient is unspecified.
+  The independent analytic Woolhiser-Liggett rising limb agrees with the 96-cell simulation
+  to 0.059 L over the rain interval. Reproduce both with `node packages/physics/scripts/hydro02-runoff-measured.mjs`
+  and pass `48 96` for the finer grid comparison.
+  [Zhuk et al. (2024), flume and scale observations](https://doi.org/10.1016/j.heliyon.2024.e24734) and
+  [Woolhiser and Liggett (1967), analytic rising limb](https://doi.org/10.1029/WR003i003p00753)
+
 ## Film set first: the underwater and boat films
 
 The solvers behind the Edmund Fitzgerald, First Wake, Below the Swell and Below the Blue Line films (problem rows EF,

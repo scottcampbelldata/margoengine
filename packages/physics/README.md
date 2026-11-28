@@ -273,10 +273,16 @@ console.log(runoff.read(2, 0).outflow, runoff.budget, flood.budget.inflow);
 The X index varies fastest. A downstream entry of `-1` is an outlet. Supply elevations or explicit
 hydraulic slopes, and use `wetnessIndex` for the natural-log index (the Biomes Q8 values divided by 256).
 Rain may come from the physical `Precipitation` contract or a layout-1 scalar or grid port in m/s.
+For a grid port, put the sender in the same world cell and match the cell dimensions and order. A single
+value is spatially uniform. Sample a time-varying rain source at the physics clock to author a storm.
 An ATMO-09 water-flux port supplies snowmelt and evaporation. All published regions are layout-1
 f64 grids. Depth and soil water use metres, infiltration and recharge use m/s, and channel and outlet
 discharge use m³/s. The runoff budget measures every external gain and loss in m³. Match the area
 upstream of a mapped outlet to the flood grid it feeds so direct flood rain and routed basin rain are each counted once.
+
+To show the accepted water from the output above, give `flood` to `ShallowWaterSurface.attach`
+from `@margoengine/water/shallow-surface` with a Water surface configured for the same bed.
+Advance or seek the world before drawing. A refused runoff step keeps the previous accepted water and ledger.
 
 ## Rooted plants in wind and water
 
