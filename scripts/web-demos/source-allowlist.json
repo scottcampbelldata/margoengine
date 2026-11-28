@@ -565,7 +565,7 @@
    "R1": 3,
    "R3": 11,
    "R4": 1,
-   "R5": 453
+   "R5": 409
   },
   "the-game-menu": {
    "R5": 678
@@ -800,7 +800,7 @@
   "the-pinhole-array": {
    "R1": 5,
    "R4": 1,
-   "R5": 421
+   "R5": 366
   },
   "the-pixel-platformer": {
    "R4": 3,
@@ -844,7 +844,7 @@
   "the-retroreflector": {
    "R1": 4,
    "R4": 2,
-   "R5": 462
+   "R5": 447
   },
   "the-reuleaux-drive": {
    "R3": 4,
@@ -932,7 +932,7 @@
   },
   "the-simplifier": {
    "R3": 16,
-   "R5": 524
+   "R5": 523
   },
   "the-siphon": {
    "R2": 2,

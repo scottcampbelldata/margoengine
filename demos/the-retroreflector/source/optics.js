@@ -1,3 +1,5 @@
+import { cornerCubeReflect } from '@margoengine/optics/imaging';
+
 export const aperture=.144;
 export const arcRadius=.89;
 export const rise=.094;
@@ -18,7 +20,6 @@ export const add=(a,b)=>a.map((part,i)=>part+b[i]);
 export const scale=(a,b)=>a.map((part)=>part*b);
 export const unit=(a)=>scale(a,1/Math.hypot(...a));
 export const addScaled=(a,b,t)=>a.map((part,i)=>part+b[i]*t);
-const sum=(a)=>a[0]+a[1]+a[2];
 
 export function directionToWorld(local){
   return axes.map((axis)=>dot(axis,local));
@@ -35,26 +36,11 @@ export function traceRetroreflector(degrees){
   const relative=[arcRadius*Math.sin(azimuth),rise,arcRadius*Math.cos(azimuth)];
   const lamp=add(pointToWorld(entry),relative);
   const incoming=scale(unit(directionToLocal(relative)),-1);
-  let position=entry;
-  const direction=[...incoming],hits=[];
-  for(let step=0;step<=3;step++){
-    const along=sum(direction);
-    const apertureTime=along>0?(aperture-sum(position))/along:Infinity;
-    const times=direction.map((part,axis)=>part<0?-position[axis]/part:Infinity);
-    const time=Math.min(...times);
-    if(apertureTime<time){
-      const exit=addScaled(position,direction,apertureTime);
-      const outgoing=directionToWorld(direction);
-      const exitWorld=pointToWorld(exit);
-      const receiver=addScaled(exitWorld,outgoing,dot(subtract(lamp,exitWorld),outgoing));
-      return {lamp,incoming,hits,exit,direction,outgoing,receiver,offset:Math.hypot(...subtract(receiver,lamp))};
-    }
-    if(!Number.isFinite(time))break;
-    const axis=times.indexOf(time);
-    position=addScaled(position,direction,time);
-    position[axis]=0;
-    direction[axis]=-direction[axis];
-    hits.push({axis,position,direction:[...direction]});
-  }
-  throw new Error('Ray did not reach the entrance plane');
+  const trace=cornerCubeReflect(entry,incoming,aperture);
+  if(!trace)throw new Error('Ray did not reach the entrance plane');
+  const {hits,exit}=trace,direction=[...trace.direction];
+  const outgoing=directionToWorld(direction);
+  const exitWorld=pointToWorld(exit);
+  const receiver=addScaled(exitWorld,outgoing,dot(subtract(lamp,exitWorld),outgoing));
+  return {lamp,incoming,hits,exit,direction,outgoing,receiver,offset:Math.hypot(...subtract(receiver,lamp))};
 }
