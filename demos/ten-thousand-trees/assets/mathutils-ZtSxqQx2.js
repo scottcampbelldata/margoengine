@@ -1,0 +1,1 @@
+var e=e=>{let t=Math.imul(e^e>>>15,e|1);return t^=t+Math.imul(t^t>>>7,t|61),((t^t>>>14)>>>0)/4294967296},t=1831565813;function n(n=0){let r=n|0;return()=>e(r=r+t|0)}var r=e=>{let t=e>>>0;return()=>(t=Math.imul(1664525,t)+1013904223>>>0)/4294967296};export{n,r as t};

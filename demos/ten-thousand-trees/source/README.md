@@ -1,29 +1,54 @@
 # Ten Thousand Trees
 
-Scrub the flight path or let it run. The camera follows a headwater creek through the forest and banks into the moraine saddle. The wind control changes the motion of the spruce and fir crowns. In reduced-motion mode the scene stays still until you use a control or start the flight.
+Scrub the flight path or let it run. The camera follows the creek up a northern Rockies valley, about 30 m over the
+crowns, from the valley mouth to its head. The wind control changes how hard the firs, pines and cedars sway and how
+fast. In reduced-motion mode the flight waits until you start it or move the slider.
 
-The landscape is original and measured in metres. The tree forms and cold upper basin draw on Engelmann spruce and subalpine fir. The two stands have 6,200 and 3,800 deterministic tree positions. Margo’s public scatter readback captured all 10,000 seeded roots with a top-down native WebGPU camera. The opening renders those roots with the authored terrain, creek, wind direction and flight path. The two stand counts are encoded in draw order. The gzip placement file stores translation to 1/32 m horizontally and 1/64 m vertically, scale to 1/150, and yaw to 360/256 degrees. Its SHA-256 is 5024c1030fd139bd0841fe15ab782ef35dd528e2576adc945eb3e15a9f21e7b4.
+## What draws it
 
-The complete forest streams in a separate renderer worker. GPU scatter samples a height texture for the roots and performs view and distance tests. Across the west bank, distant spruce switch to octahedral imposters baked by Margo from the same tree geometry. Near and middle crowns use Margo’s procedural rooted wind and sway. Native WebGPU also uses the ground as a conservative Hi-Z occluder in the east stand. The WebGL2 compatibility layer keeps the same geometry, materials, wind, seed and flight and relies on view culling and ordinary depth. The sky, valley haze, detailed ground, imposter atlas and native Hi-Z appear together at the current view. The far imposter crowns are still. A browser without OffscreenCanvas initializes the full forest on the page thread.
+Everything on screen comes from Margo Engine packages; the page only wires them to the controls.
 
-The speed readout configures the visual wind input. It does not simulate the valley's weather. The sky, fog, flight and scene details were authored for this location. The source and browser load use public Margo Engine main at `0efd9cff8230507a32deb49907ecd499d46925f5`, with scatter, lod, culling, terrain and sky. Append `?backend=webgl2` to force the supported compatibility tier.
+- **The land and the forest**: `@margoengine/biomes`. `rockiesValleyWorld` is a mountain valley round Wallace, Idaho:
+  a level floor with a creek falling west to the outlet, walls of about 30 degrees cut into side gulches, ridges up to
+  1,000 m above the floor. Its three northern Rockies biomes (moist forest, dry forest and south-facing openings) place
+  western white pine, western red cedar, grand fir, Douglas-fir and western larch, shrubs, rocks and grass.
+  `coniferAge(biomes, 'mature')` draws the conifers at a hundred years, old timber, in place of the presets' pole stands.
+  `BiomeView` streams the tiles round the camera onto a clipmap terrain with the biomes' ground materials (the needle
+  litter darkened to a duff brown here), and carries the relief past the world's edge. The trees are
+  `@margoengine/procedural/conifers` meshes in three rings, octahedral imposters far off, through `@margoengine/scatter`.
+- **Sky, air and sun**: `@margoengine/sky` (Preetham sky lighting the scene, a late afternoon sun 26 degrees up in the
+  west-southwest) and `@margoengine/sky/aerial` (aerial perspective, so far ridges turn blue).
+- **Shadows**: `@margoengine/shadows`, four soft cascades to 1.6 km; every tree, shrub and rock casts.
+- **Grade**: `@margoengine/post` bloom and `@margoengine/tonemap` AgX.
+- **Flight**: `PathControls` of `@margoengine/controls/presentation` on a `@margoengine/splines` curve through the
+  creek line, 72 m over the ground. The whole corridor is made before the flight starts, so a jump along the slider
+  lands on finished ground.
+- **Wind**: each swaying scatter's `wind` takes the slider's speed (km/h to m/s) as its mean speed and a bend strength
+  up to full at 43 km/h. Past a gentle breeze the sway quickens with the Beaufort force, as `@margoengine/scatter`
+  documents.
 
-## Verification
+The readout counts every stored tree, shrub and rock the view holds on the GPU, which changes as tiles stream in.
+Append `?backend=webgl2` to force the WebGL2 compatibility layer.
 
-| Browser profile | First rendered flight input | Complete forest |
-| --- | ---: | ---: |
-| 390 px phone, native WebGPU | 1.125 s | 3.149 s |
-| 390 px phone, automatic WebGL2 | 1.097 s | 4.819 s |
-| 390 px phone, forced WebGL2 | 1.087 s | 4.074 s |
-| 1440 px desktop, native WebGPU | 0.321 s | 1.287 s |
+## Weak spots
 
-Phone checks used cold Chrome emulation with 150 ms latency, 1.6 Mbps downstream and fourfold CPU slowdown. Actual touch moved the flight path during the opening. Browser checks verified the same camera selection after full detail arrived, then tested wind, flight, pause and reduced motion.
+- The creek runs dry: still water on an 8 m creek breaks into patches on the view's 8 m water grid (KB-BIOMES-RIVERSTEP1
+  in docs/known-bugs.md), so the page leaves the water off until that is fixed.
+- The valley floor is open ground: the presets keep woody plants 50 m from the creek, where a view can stand river water.
+- Far ridges past the streamed radius carry the regional cover only and read smoother than the near slopes.
 
 ## References
 
-- U.S. Forest Service, *Silvics of North America*, Engelmann spruce and subalpine fir, 1990. [Engelmann spruce](https://research.fs.usda.gov/silvics/engelmann-spruce), [Subalpine fir](https://research.fs.usda.gov/silvics/subalpine-fir).
-- National Park Service, *Subalpine Ecosystem*, Rocky Mountain National Park. [Timberline and subalpine forest](https://www.nps.gov/romo/learn/nature/subalpine_ecosystem.htm).
-- Ned Greene, Michael Kass and Gavin Miller, *Hierarchical Z-Buffer Visibility*, SIGGRAPH, 1993. [Paper](https://www.cs.princeton.edu/courses/archive/spr01/cs598b/papers/greene93.pdf).
-- Zina Cigolle et al., *A Survey of Efficient Representations for Independent Unit Vectors*, JCGT, 2014. [Paper](https://jcgt.org/published/0003/02/01/).
-- Renaldas Zioma, *GPU-Generated Procedural Wind Animations for Trees*, GPU Gems 3, 2007. [Chapter](https://developer.nvidia.com/gpugems/gpugems3/part-i-geometry/chapter-6-gpu-generated-procedural-wind-animations-trees).
-- A. J. Preetham, Peter Shirley and Brian Smits, *A Practical Analytic Model for Daylight*, SIGGRAPH, 1999. [Paper](https://doi.org/10.1145/311535.311545).
+- Pfister, Kovalchik, Arno and Presby, *Forest habitat types of Montana*, USDA Forest Service INT-34, 1977; Cooper,
+  Neiman and Roberts, *Forest habitat types of northern Idaho: a second approximation*, INT-GTR-236, 1991 (which
+  species stand where; cited by the biomes presets).
+- Dixon, *Essential FVS: A User's Guide to the Forest Vegetation Simulator*, USDA Forest Service, 2002 (the Inland
+  Empire variant's height, diameter and crown width equations behind the conifer ages).
+- A. J. Preetham, Peter Shirley and Brian Smits, *A Practical Analytic Model for Daylight*, SIGGRAPH, 1999.
+  [Paper](https://doi.org/10.1145/311535.311545).
+- Sebastien Hillaire, *A Scalable and Production Ready Sky and Atmosphere Rendering Technique*, EGSR, 2020
+  (aerial perspective). [Paper](https://doi.org/10.1111/cgf.14050).
+- Renaldas Zioma, *GPU-Generated Procedural Wind Animations for Trees*, GPU Gems 3, 2007.
+  [Chapter](https://developer.nvidia.com/gpugems/gpugems3/part-i-geometry/chapter-6-gpu-generated-procedural-wind-animations-trees).
+- National Park Service, *Subalpine Ecosystem*, Rocky Mountain National Park.
+  [Timberline and subalpine forest](https://www.nps.gov/romo/learn/nature/subalpine_ecosystem.htm).
