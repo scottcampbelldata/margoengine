@@ -2,6 +2,7 @@ import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { createPress } from './model.js';
 import { bandSpacing } from './grating.js';
+import { lerp as mix } from '@margoengine/math/mathutils';
 
 const canvas = document.querySelector('#glass');
 const loading = document.querySelector('#loading');
@@ -15,7 +16,6 @@ const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const lifetime = new AbortController();
 const pressView = { target: [-.014, .049, .053], offset: [.39, 1.00, .86], fitAspect: 1.09 };
 const openView = { target: [-.01, .161, -.044], offset: [.45, .83, 1.02], fitAspect: 1.07 };
-const mix = (from, to, amount) => from + (to - from) * amount;
 let engine, press, observer, frame, last = 0;
 let degrees = Number(angle.value), liftTarget = 0, opening = 0, pending = false;
 

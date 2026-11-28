@@ -3,6 +3,7 @@ import { Clustered } from '@margoengine/clustered';
 import { Shadows } from '@margoengine/shadows';
 import { createInstrument } from './model.js';
 import { malus } from '@margoengine/optics/polarization';
+import { lerp as mix } from '@margoengine/math/mathutils';
 
 const transmissionAt = (degrees) => malus(degrees * Math.PI / 180);
 
@@ -20,7 +21,6 @@ const lifetime = new AbortController();
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const overview = { target: [0, .150, .039], offset: [.492, .392, .929], fitAspect: 1.10 };
 const detail = { target: [.008, .241, .030], offset: [.448, .300, .585], fitAspect: 1.02 };
-const mix = (a, b, t) => a + (b - a) * t;
 const studio = [
   { position: [-.48, .61, -.57], range: 1.6, color: [.34, .66, 1], intensity: 1.8, radius: .12 },
   { position: [.29, .53, .42], range: 1.0, color: [1, .82, .63], intensity: .41, radius: .09 },

@@ -2,6 +2,7 @@ import { Engine } from '@margoengine/core';
 import { Shadows } from '@margoengine/shadows';
 import { sampleArray } from './optics.js';
 import { createArray } from './model.js';
+import { lerp as mix } from '@margoengine/math/mathutils';
 
 const canvas=document.querySelector('#scene');
 const loading=document.querySelector('#loading');
@@ -15,7 +16,6 @@ const motion=matchMedia('(prefers-reduced-motion: reduce)');
 const controls=[input,view];
 const wide={aim:[0,.105,-.016],position:[-.43,.92,1.34],fit:1.32,fov:41};
 const detail={aim:[0,.288,-.185],position:[-.020,.451,1.09],fit:1.24,fov:42};
-const mix=(a,b,t)=>a+(b-a)*t;
 let engine,array,observer,frame,last=0,zoom=0;
 let scale=Number(input.value),samples,close=false,dirty=true,applied=false;
 

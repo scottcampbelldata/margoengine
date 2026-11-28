@@ -3,6 +3,7 @@ import { Clustered } from '@margoengine/clustered';
 import { Shadows } from '@margoengine/shadows';
 import { createRoad } from './model.js';
 import { mirrorCenter, traceRetroreflector } from './optics.js';
+import { lerp as mix } from '@margoengine/math/mathutils';
 
 const canvas=document.querySelector('#scene');
 const loading=document.querySelector('#loading');
@@ -16,7 +17,6 @@ const lifetime=new AbortController();
 const motion=matchMedia('(prefers-reduced-motion: reduce)');
 const wide={aim:[0,.080,.044],offset:[1.05,1.31,1.96],fit:1.45,fov:45};
 const detail={aim:[mirrorCenter[0],mirrorCenter[1],mirrorCenter[2]-.025],offset:[.065,.214,.475],fit:1.08,fov:40};
-const mix=(a,b,t)=>a+(b-a)*t;
 let engine,road,observer,frame,last=0,zoom=0;
 let angle=Number(range.value),ray=traceRetroreflector(angle),close=false,dirty=true,applied=false;
 

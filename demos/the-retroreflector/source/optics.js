@@ -1,4 +1,5 @@
 import { cornerCubeReflect } from '@margoengine/optics/imaging';
+import { add, dot, normalize as unit, scale, sub as subtract } from '@margoengine/math/vec3';
 
 export const aperture=.144;
 export const arcRadius=.89;
@@ -14,12 +15,8 @@ export const axes=Object.freeze([
   Object.freeze([1/root6,1/root6,-2/root6]),
   Object.freeze([1/root3,1/root3,1/root3]),
 ]);
-export const dot=(a,b)=>a.reduce((sum,part,i)=>sum+part*b[i],0);
-export const subtract=(a,b)=>a.map((part,i)=>part-b[i]);
-export const add=(a,b)=>a.map((part,i)=>part+b[i]);
-export const scale=(a,b)=>a.map((part)=>part*b);
-export const unit=(a)=>scale(a,1/Math.hypot(...a));
-export const addScaled=(a,b,t)=>a.map((part,i)=>part+b[i]*t);
+export { add, dot, scale, subtract, unit };
+export const addScaled=(a,b,t)=>add(a,scale(b,t));
 
 export function directionToWorld(local){
   return axes.map((axis)=>dot(axis,local));

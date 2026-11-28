@@ -315,7 +315,6 @@
   "the-astigmatism-bench": {
    "R1": 3,
    "R3": 3,
-   "R4": 1,
    "R5": 412
   },
   "the-baked-room": {
@@ -345,7 +344,6 @@
   "the-birefringence-viewer": {
    "R1": 4,
    "R3": 1,
-   "R4": 1,
    "R5": 341
   },
   "the-block-tower": {
@@ -384,7 +382,6 @@
    "R5": 795
   },
   "the-camera-obscura": {
-   "R4": 1,
    "R5": 365
   },
   "the-canal-lock": {
@@ -475,12 +472,11 @@
   },
   "the-desert-mirage": {
    "R1": 14,
-   "R5": 406
+   "R5": 362
   },
   "the-dichroic-splitter": {
    "R1": 3,
-   "R4": 1,
-   "R5": 384
+   "R5": 338
   },
   "the-differential": {
    "R2": 1,
@@ -490,7 +486,6 @@
   "the-diffraction-ruler": {
    "R1": 3,
    "R3": 1,
-   "R4": 1,
    "R5": 338
   },
   "the-domino-cascade": {
@@ -564,7 +559,6 @@
   "the-fresnel-lens": {
    "R1": 3,
    "R3": 11,
-   "R4": 1,
    "R5": 409
   },
   "the-game-menu": {
@@ -601,7 +595,6 @@
   "the-halo-prism": {
    "R1": 4,
    "R3": 10,
-   "R4": 1,
    "R5": 480
   },
   "the-harmonic-drive": {
@@ -647,7 +640,6 @@
    "R5": 412
   },
   "the-iridescence-bench": {
-   "R4": 2,
    "R5": 310
   },
   "the-jewelry-counter": {
@@ -722,7 +714,6 @@
   },
   "the-michelson-interferometer": {
    "R1": 3,
-   "R4": 1,
    "R5": 365
   },
   "the-mirror-hall": {
@@ -733,9 +724,6 @@
   "the-mocap-theatre": {
    "R3": 13,
    "R5": 509
-  },
-  "the-moire-press": {
-   "R4": 1
   },
   "the-molecule": {
    "R3": 7,
@@ -788,8 +776,8 @@
   },
   "the-path-traced-glasshouse": {
    "R3": 5,
-   "R4": 3,
-   "R5": 710
+   "R4": 1,
+   "R5": 685
   },
   "the-pelton-wheel": {
    "R2": 2,
@@ -799,7 +787,6 @@
   },
   "the-pinhole-array": {
    "R1": 5,
-   "R4": 1,
    "R5": 366
   },
   "the-pixel-platformer": {
@@ -813,7 +800,6 @@
    "R5": 945
   },
   "the-polarizer": {
-   "R4": 1,
    "R5": 332
   },
   "the-print-shop": {
@@ -843,8 +829,7 @@
   },
   "the-retroreflector": {
    "R1": 4,
-   "R4": 2,
-   "R5": 447
+   "R5": 444
   },
   "the-reuleaux-drive": {
    "R3": 4,
@@ -892,8 +877,7 @@
   "the-schlieren-bench": {
    "R1": 5,
    "R3": 5,
-   "R4": 1,
-   "R5": 415
+   "R5": 401
   },
   "the-scotch-yoke": {
    "R4": 2,
