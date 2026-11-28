@@ -366,8 +366,14 @@ test('active GPU deformation rejects synchronous bind-pose queries and selection
     });
     engine.gpu.queue.submit = () => {};
     try {
-      assert.throws(() => raycaster.intersectMeshes(engine, [mesh]), /Deformed.*intersectModel/);
-      assert.throws(() => raycaster.intersectEngine(engine), /Deformed.*intersectModel/);
+      assert.throws(() => raycaster.intersectMeshes(engine, [mesh]), {
+        code: 'unsupported',
+        message: /deformed on the GPU.*intersectModel/,
+      });
+      assert.throws(() => raycaster.intersectEngine(engine), {
+        code: 'unsupported',
+        message: /deformed on the GPU.*intersectModel/,
+      });
       const posedRay = triangleRay(
           worldPositions(primitivePositions({ vertices: posed }), mesh.matrix),
           primitive.indices,
