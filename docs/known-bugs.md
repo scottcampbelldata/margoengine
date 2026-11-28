@@ -6951,6 +6951,14 @@ test.
 - **Regression:** `packages/physics/tests/coupling/seismic.test.js` checks the analytic wave branches, a
   free surface and layered site, live body recoil, and replay in both memory modes.
 
+### Fixed: rejected seismic work could change the accepted section (EARTH-08)
+
+Elastic, surface and building fields previously advanced in place, and a later invalid support
+could leave the rigid force buffer partly written. These stages now publish only after checking
+the whole candidate. Initial material callbacks can safely grow plain world memory before the
+initialized bank is copied. `packages/physics/tests/coupling/seismic.test.js` checks numeric failure,
+late force rejection, separate owning memories and signed-origin replay.
+
 ### Fixed 2026-11-26: outdoor sounds played before the pressure wave arrived (PA-64)
 
 - **Repro:** Send a brief sound from 3 km away. Its old positional path pans and attenuates the sound as soon as it plays.

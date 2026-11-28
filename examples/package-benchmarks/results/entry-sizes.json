@@ -15610,8 +15610,8 @@
         "gzip": 12267
       },
       "./seismic": {
-        "raw": 12828,
-        "gzip": 5010
+        "raw": 22213,
+        "gzip": 8300
       },
       "./lightning": {
         "raw": 24693,
@@ -19625,14 +19625,14 @@
       "brotli": 6729
     },
     "packages/physics/dist/seismic-kernel.wasm": {
-      "raw": 2474,
-      "gzip": 1121,
-      "brotli": 985
+      "raw": 4031,
+      "gzip": 1895,
+      "brotli": 1629
     },
     "packages/physics/dist/seismic-kernel-shared.wasm": {
-      "raw": 2474,
-      "gzip": 1122,
-      "brotli": 1000
+      "raw": 4031,
+      "gzip": 1895,
+      "brotli": 1629
     },
     "packages/physics/dist/landscape-kernel.wasm": {
       "raw": 42179,

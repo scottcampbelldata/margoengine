@@ -4788,7 +4788,12 @@ notes one change's size or behaviour and its evidence. Every number has a row in
   chooses a dyadic rate that keeps the elastic Courant number at or below 0.95. The damped outer strip
   approximates an open side and bottom, and oblique waves can return a weak reflection. Cyclic stress
   screening uses configured soil resistance, with no pore-water pressure evolution. A building receiver
-  is one horizontal mode. The optional solver is 5,646 bytes gzip and each lazy SIMD asset is 2,474 bytes raw.
+  is one horizontal mode. One, two or four native participants advance the staggered stencil with
+  a join between velocity and stress and ordered traction-free surface handling. The solver retains an
+  88-byte trial bank per section cell including its coefficient copies, plus the surface and site trials.
+  The optional solver is 8,300 B gzip with an 8,556 B ceiling. Each lazy SIMD asset is 4,031 B raw,
+  1,895 B gzip and 1,629 B Brotli. Core and Stage gain zero bytes.
+  [Measured limits](#earth-08-elastic-site-response-at-mashiki).
 
 - Outdoor sound (SOUND-01). The solver uses a local midpoint sound-speed gradient, one weakly refracted direct
   trajectory or one dominant edge and one coherent horizontal-plane reflection. Both specular legs must reach
@@ -16846,6 +16851,25 @@ For 27.31, 32.97, 40.92 and 50.80 m/s 10 m wind, the revised closure gives drag 
 A prescribed drag plateau cannot resolve the observed high-wind decline or wave-age dependence.
 [Powell et al. (2003)](https://doi.org/10.1038/nature01481).
 
+### EARTH-08 elastic site response at Mashiki
+
+The KMMH16 test at Mashiki initializes its production elastic section from NIED's original
+borehole P–S velocity log as reproduced by NILIM and PWRI. Densities come from Fukutake et al.'s
+independent velocity-based estimate. A generic 0.001 m/s horizontal initial packet propagates
+upward and downward in the modeled bedrock. Both the surface and 252 m borehole signals are
+model outputs. The observations are held out from the section, excitation and damping.
+
+Across 0.75 and 1.5 m depth grids and two packet widths, the modeled surface-to-borehole transit
+is 0.33187–0.33609 s. The reference weak-motion impulse-response time from 107 observations is
+0.377 s. The model arrives 40.9–45.1 ms early. The logged shear travel integral is 0.33125 s.
+The paper's 6% background variability is descriptive and does not give a confidence interval.
+For the same logged section, the independent continuum layer calculation has a local
+spectral-ratio maximum at 4.025 Hz with and without the illustrative damping. The observed
+weak-motion feature is at 3.4 Hz. The comparison does not use the absolute gains from the
+recorded borehole, and the model keeps strain-independent elastic properties.
+[Esfahani, Cotton and Bonilla](https://doi.org/10.1093/gji/ggae222).
+[Reproducible comparison](../packages/physics/scripts/earth08-mashiki-measured.mjs).
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -23800,6 +23824,14 @@ test.
   and soil cyclic demand. `SeismicInertialLoad` moves coupled rigid bodies in their support reference frame.
 - **Regression:** `packages/physics/tests/coupling/seismic.test.js` checks the analytic wave branches, a
   free surface and layered site, live body recoil, and replay in both memory modes.
+
+### Fixed: rejected seismic work could change the accepted section (EARTH-08)
+
+Elastic, surface and building fields previously advanced in place, and a later invalid support
+could leave the rigid force buffer partly written. These stages now publish only after checking
+the whole candidate. Initial material callbacks can safely grow plain world memory before the
+initialized bank is copied. `packages/physics/tests/coupling/seismic.test.js` checks numeric failure,
+late force rejection, separate owning memories and signed-origin replay.
 
 ### Fixed 2026-11-26: outdoor sounds played before the pressure wave arrived (PA-64)
 

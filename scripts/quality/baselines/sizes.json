@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 22128382,
+  "total": 22131672,
   "history": [
     {
       "date": "2026-10-24",
@@ -16013,6 +16013,12 @@
       "commit": "earth-05-native-strip-workers",
       "reason": "EARTH-05 @margoengine/physics/terramechanics 16106 to 19702 B gzip, ceiling 16590 to 20294 B. The optional soil entry keeps accepted banks stable across rejected loads. Native helpers evaluate independent strip sample pairs. Splitting would duplicate the existing soil Wasm ABI, optional loading and the signed field contract. Core and stage receive zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "earth-08-native-stencil-workers",
+      "reason": "EARTH-08 @margoengine/physics/seismic 5010 to 8300 B gzip, ceiling 5266 to 8556 B. The optional seismic entry stages accepted wave, surface and site results. Native helpers own disjoint velocity and stress rows with a join between them. Splitting would duplicate native ABI and accepted-world coupling. Core and stage receive zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16932,7 +16938,7 @@
     "@margoengine/physics/sea": 14609,
     "@margoengine/physics/seakeeping": 54745,
     "@margoengine/physics/sediment": 8037,
-    "@margoengine/physics/seismic": 5266,
+    "@margoengine/physics/seismic": 8556,
     "@margoengine/physics/ship": 36541,
     "@margoengine/physics/snowpack": 8474,
     "@margoengine/physics/soft": 193804,

@@ -723,3 +723,11 @@ models and raw records are not included.
 [Rashidi and Gholami (2011), Fig. 7](https://www.arpnjournals.com/jabs/research_papers/rp_2011/jabs_0311_255.pdf).
 The cited papers retain their copyrights. The script contains factual readouts and a separate
 circular material calibration. It includes no original plots or experimental files.
+
+### EARTH-08 Mashiki measurements
+
+`packages/physics/scripts/earth08-mashiki-measured.mjs` uses the original P–S logging layer
+values from [NIED KiK-net KMMH16](https://doi.org/10.17598/NIED.0004) as reproduced in
+[NILIM and PWRI (2023), Fig. 4.34](https://www.nilim.go.jp/lab/bcg/siryou/tnn/tnn1247pdf/ks1247.pdf),
+and separate weak-motion readouts from [Esfahani et al. (2024), Fig. 2 and §3.1](https://doi.org/10.1093/gji/ggae222).
+No waveform archives, original plots or implementation code are included.

@@ -8,7 +8,15 @@ import {
   momentFraction,
   seismicCyclicStress,
 } from '../../dist/seismic.js';
-import { PhysicsWorld, RigidSolver, worldMemory } from '../../dist/world.js';
+import {
+  BODIES_FIELD,
+  BODY_WORDS,
+  FORCE_WORDS,
+  PhysicsWorld,
+  regionWords,
+  RigidSolver,
+  worldMemory,
+} from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 const fps = { num: 60, den: 1 };
@@ -128,6 +136,124 @@ test('the two public fields hold exact ground and building rows for world reader
   assert.equal(sites.region.layout, SEISMIC_LAYOUT);
   assert.equal(payload(motion)[32 * 8 + 5], ground.motion(32).acceleration[0]);
   assert.equal(payload(sites)[3], ground.reading().absoluteAcceleration);
+});
+
+test('seismic initialization tolerates plain-memory growth and a rejected native pulse preserves accepted state', async () => {
+  using ground = await SeismicGround.load();
+  const memory = worldMemory(false);
+  const cell = [-8, 6, -4];
+  const step = 1 / 120;
+  let sampled = 0;
+  const world = new PhysicsWorld({ rate: fps, memory }).add(
+    ground,
+    {
+      ...basic,
+      spacing: [0.5, 0.5],
+      material: () => {
+        if (++sampled === 10) memory.grow(1);
+        return rock;
+      },
+      initialVelocity: () => [0.1, 0],
+      sites: [{ x: 3, frequency: 2 }],
+      sources: [{ position: [3.25, 4.25], timescale: 0.001, start: step, moment: [Number.MAX_VALUE, 0, 0] }],
+    },
+    cell,
+  );
+  assert.equal(sampled, (basic.width + 2) * (basic.depth + 2));
+  assert.equal(ground.velocity(12, 12)[0], 0.1);
+  const context = { tick: 0, level: 1, seed: 7, cell, inputs: new Map() };
+  const initial = world.takeSnapshot();
+  ground.step(context, step);
+  const accepted = world.takeSnapshot();
+  const receipt = ground.readNativeWork();
+  assert.ok(receipt.velocityCells > 0);
+  assert.throws(
+    () => ground.step({ ...context, tick: 1 }, step),
+    (error) => error.code === 'state' && /Nonfinite seismic wave trial.*errors#seismic/.test(error.message),
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  assert.deepEqual(ground.readNativeWork(), receipt);
+
+  world.shiftOrigin([2, -3, 1]);
+  assert.deepEqual(
+    ground.exportPorts(1).map((port) => port.cell),
+    Array(2).fill([-10, 9, -5]),
+  );
+  world.restoreSnapshot(initial.bytes);
+  ground.step(context, step);
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+});
+
+test('seismic rigid forces use both owning memories and reject a later invalid load atomically', async () => {
+  const field = {
+    name: 'seismic-test:ground',
+    kind: 'particleSet',
+    quantity: 'ground motion',
+    unit: 'm, m/s, m/s^2',
+    centring: 'particle',
+  };
+  const driver = new SeismicInertialLoad(field);
+  const cell = [-3, 2, -7];
+  const world = new PhysicsWorld({ rate: fps }).add(
+    driver,
+    {
+      bodyCapacity: 2,
+      supports: [
+        { body: 0, column: 0 },
+        { body: 1, column: 1 },
+      ],
+    },
+    cell,
+  );
+  const motionMemory = new WebAssembly.Memory({ initial: 1 });
+  const bodiesMemory = new WebAssembly.Memory({ initial: 1 });
+  const motionRegion = {
+    name: 'foreign ground',
+    memory: motionMemory,
+    type: 'f64',
+    layout: 1,
+    byteOffset: 128,
+    byteLength: 128,
+  };
+  const bodiesRegion = {
+    name: 'foreign bodies',
+    memory: bodiesMemory,
+    type: 'f32',
+    layout: 2,
+    byteOffset: 256,
+    byteLength: 2 * BODY_WORDS * 4,
+  };
+  const motion = new Float64Array(motionMemory.buffer, 128, 16);
+  const bodies = new Float32Array(bodiesMemory.buffer, 256, 2 * BODY_WORDS);
+  motion.set([5, -4], 5);
+  motion.set([20, 5], 13);
+  bodies[16] = 0.5;
+  bodies[BODY_WORDS + 16] = 0.25;
+  const step = (region = bodiesRegion) =>
+    driver.step({
+      tick: 0,
+      level: 0,
+      seed: 4,
+      cell,
+      inputs: new Map([
+        [field.name, { field: field.name, region: motionRegion, tick: 0, cell }],
+        [BODIES_FIELD.name, { field: BODIES_FIELD.name, region, tick: 0, cell }],
+      ]),
+    });
+  step();
+  const accepted = world.takeSnapshot();
+  const port = driver.exportPorts(0)[0];
+  const words = regionWords(world.memory, port.region);
+  assert.deepEqual([words[0], words[1], words[FORCE_WORDS], words[FORCE_WORDS + 1]], [-10, 8, -80, -20]);
+  motion[5] = -10;
+  motion[13] = NaN;
+  assert.throws(
+    () => step(),
+    (error) => error.code === 'state' && /finite acceleration.*errors#seismic/.test(error.message),
+  );
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
+  assert.throws(() => step({ ...bodiesRegion, byteOffset: 257 }), /unaligned.*errors#seismic/);
+  assert.deepEqual(world.takeSnapshot().bytes, accepted.bytes);
 });
 
 test('ground acceleration moves an actual rigid body in its shaking support frame', async () => {

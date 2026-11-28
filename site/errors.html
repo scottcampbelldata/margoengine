@@ -146,6 +146,11 @@
       <p><strong>Cause.</strong> A rigid body, collider, shape, scene query or world setting got an input it cannot use (code unsupported): a position, velocity, force, direction or box that is not three finite numbers (or a zero direction), a rotation that is not a quaternion of finite numbers, a mass, density, damping, size, radius, speed or time that is negative or not finite, a shape name or body type that does not exist, a body, collider or row that was removed or belongs to another world, a body of the wrong type for the call (a next velocity on a body that is not kinematicPosition), a mesh from another engine, a solver option outside its range, or a hierarchy deeper than 64 nodes.</p>
       <p><strong>Fix.</strong> Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (<code>dynamic</code>, <code>fixed</code>, <code>kinematicPosition</code>, <code>kinematicVelocity</code>), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.</p>
     </section>
+    <section id="seismic">
+      <h2><a href="#seismic">@margoengine/physics/seismic elastic waves and shaking supports</a></h2>
+      <p><strong>Cause.</strong> A material, natural source, site response or coupled field is invalid or exceeds numeric range.</p>
+      <p><strong>Fix.</strong> Use finite SI wave and material parameters, an aligned registered field in its owning memory, and a sample inside the grid. Increase grid spacing or reduce excessive source strength if needed. Select a shared-memory world when using native helpers.</p>
+    </section>
     <section id="soil">
       <h2><a href="#soil">@margoengine/physics/terramechanics soil contact and terrain fields</a></h2>
       <p><strong>Cause.</strong> A soil property, contact record, related terrain or an accepted deformation exceeds the supported range.</p>

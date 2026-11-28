@@ -6950,10 +6950,10 @@ Moment sources take x and depth in metres from the section's top-left corner. Th
 motion is positive up. World tick rate follows the spatial Courant bound.
 
 ```ts
-import { SeismicGround } from 'margoengine/physics/seismic';
-import { PhysicsWorld } from 'margoengine/physics/world';
+import { SeismicGround } from '@margoengine/physics/seismic';
+import { PhysicsWorld } from '@margoengine/physics/world';
 
-const ground = await SeismicGround.load();
+using ground = await SeismicGround.load({ threads: 1 });
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(ground, {
   width: 25,
   depth: 20,
@@ -6970,6 +6970,7 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(ground, {
 });
 world.advance(60);
 console.log(ground.motion(11).peakHorizontalAcceleration > 0, ground.reading().cyclicStress > 0);
+console.log(ground.readNativeWork()?.velocityCells);
 ```
 
 The ground-motion field supplies acceleration for cameras and structural consumers. `SeismicInertialLoad`
@@ -6978,6 +6979,12 @@ single-mode building receiver defaults to a 0.05 damping ratio. Its soil receive
 cyclic demand with the supplied resistance. The default boundary attenuation targets an outgoing amplitude
 of 0.001 through at most 12 cells, reduced automatically for small grids. Set `absorbingCells: 0` to study
 boundary reflections. A `signal` can cancel kernel loading.
+
+One native participant is the default. Choose two or four with shared world memory in Node or a
+cross-origin-isolated browser worker. The traction-free surface update stays on the caller. Helpers
+finish disjoint velocity rows before any stress row advances. `readNativeWork()` reports accepted
+cell and SIMD-pair counts. Dispose the solver when its world stops. Invalid native or site results
+preserve the accepted wave section, surface output, building response and work receipt.
 
 ## Outdoor sound
 

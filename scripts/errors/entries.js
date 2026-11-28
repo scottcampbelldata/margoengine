@@ -150,6 +150,14 @@ export const entries = [
     fix: 'Pass what the message names: [x, y, z] of finite numbers, [x, y, z, w] rotations, SI units (metres, kilograms, seconds, newtons) of 0 or more, one of the listed shape names and body types (`dynamic`, `fixed`, `kinematicPosition`, `kinematicVelocity`), bodies and colliders this world holds, and meshes of the engine this Physics is attached to. The message names the input and the change to make.',
   },
   {
+    id: 'seismic',
+    title: '@margoengine/physics/seismic elastic waves and shaking supports',
+    kind: 'family',
+    messages: [],
+    cause: 'A material, natural source, site response or coupled field is invalid or exceeds numeric range.',
+    fix: 'Use finite SI wave and material parameters, an aligned registered field in its owning memory, and a sample inside the grid. Increase grid spacing or reduce excessive source strength if needed. Select a shared-memory world when using native helpers.',
+  },
+  {
     id: 'soil',
     title: '@margoengine/physics/terramechanics soil contact and terrain fields',
     kind: 'family',

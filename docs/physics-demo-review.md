@@ -602,3 +602,15 @@ Not in the catalog: staged construction (placement of pieces, stacking, scaffold
   snapshot restore, re-advance and rewind. The laboratory setup draws on NASA Glenn's soil-bin
   concept and uses selected test inputs. The original horse, courier and making-of takes remain
   open. [NASA Glenn SLOPE Laboratory](https://www.nasa.gov/glenn/virtual-tours/slope360/).
+
+### EARTH-08 automated natural wave and civil monitoring station
+
+- `packages/physics/tests/seismic-film.browser.mjs` shows a natural P–SV pulse propagating into a
+  layered site and moving a visible monitoring station. The sampled station reaches 1.816 m/s².
+  At frame 68 its Newmark mode has moved 3.461 mm and the real 2 kg witness in the moving support
+  frame has moved 6.584 mm. The silent control remains still.
+- Each renderer independently matches the complete accepted state and RGBA through hold, immediate
+  restore, re-advance and rewind. The test includes a fixed camera, a recorded seed and a separate
+  instrument-motion pixel check. It is a technical scene about a prescribed earthquake and a
+  single monitoring mode. The measured field comparison is documented in
+  [limits](limits.md#earth-08-elastic-site-response-at-mashiki).

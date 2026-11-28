@@ -1,9 +1,7 @@
-import { MargoError } from '@margoengine/math/errors';
 import { gravityMagnitude } from '@margoengine/math/gravity';
 import { hypot, ln } from '@margoengine/math/pinned';
-import { canShareMemory, isShared, regionWords, STACK_BYTES } from '../world/memory.js';
+import { regionWords } from '../world/memory.js';
 import {
-  type Cell,
   type FieldDescriptor,
   type Port,
   type RateLevel,
@@ -13,14 +11,23 @@ import {
   type StepContext,
   rateOf,
 } from '../world/solver.js';
+import { seismicError } from './errors.js';
+import {
+  bindSeismicKernel,
+  loadSeismicBuilds,
+  type SeismicBuilds,
+  type SeismicKernel,
+  type SeismicWorkCounts,
+} from './kernel.js';
 import { momentFraction, seismicCyclicStress } from './model.js';
 import { SEISMIC_LAYOUT, SEISMIC_SURFACE_WORDS as SURFACE_WORDS } from './ports.js';
 
+export type { SeismicWorkCounts, SeismicWorkerWork } from './kernel.js';
 export { momentFraction, seismicCyclicStress } from './model.js';
 export { SEISMIC_LAYOUT } from './ports.js';
 export { SeismicInertialLoad, type SeismicInertialParams } from './rigid.js';
 
-const ZERO: Cell = [0, 0, 0];
+const ZERO = [0, 0, 0] as const;
 const KERNEL_FIELDS = 11;
 const VX = 0;
 const VZ = 1;
@@ -108,10 +115,16 @@ export interface SeismicSiteReading {
   readonly liquefactionPotential: boolean;
 }
 
-type Native = {
-  __stack_pointer: WebAssembly.Global;
-  seismic_step(ptr: number, width: number, depth: number, dx: number, dz: number, dt: number): void;
-};
+/** Optional native seismic solver settings. */
+export interface SeismicLoadOptions {
+  /** World registration ID. Defaults to seismic. */
+  readonly id?: string;
+  /** Total native participants, including the caller. Defaults to 1. */
+  readonly threads?: 1 | 2 | 4;
+  /** Cancel Wasm compilation and tear down this solver's native helpers. */
+  readonly signal?: AbortSignal;
+}
+
 type Weights = readonly (readonly [index: number, weight: number])[];
 type Source = {
   readonly normal: Weights;
@@ -128,32 +141,19 @@ type Site = {
 };
 
 function finite(value: number, label: string): number {
-  if (!Number.isFinite(value)) throw new RangeError(`Seismic ${label} must be finite. Pass a finite SI value.`);
+  if (!Number.isFinite(value)) throw seismicError(`Seismic ${label} must be finite. Pass a finite SI value.`);
   return value;
 }
 
 function positive(value: number, label: string): number {
-  if (!(finite(value, label) > 0)) throw new RangeError(`Seismic ${label} must be positive. Pass a value above zero.`);
+  if (!(finite(value, label) > 0)) throw seismicError(`Seismic ${label} must be positive. Pass a value above zero.`);
   return value;
 }
 
 function extent(value: number, label: string): number {
   if (!Number.isSafeInteger(value) || value < 2)
-    throw new RangeError(`Seismic ${label} needs at least two complete cells. Pass a whole number.`);
+    throw seismicError(`Seismic ${label} needs at least two complete cells. Pass a whole number.`);
   return value;
-}
-
-async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {
-  signal?.throwIfAborted();
-  if (url.protocol === 'file:') {
-    const module = 'node:fs/promises';
-    const { readFile } = await import(/* @vite-ignore */ module);
-    return WebAssembly.compile(await readFile(url, { signal }));
-  }
-  const response = await fetch(url, { signal });
-  if (!response.ok)
-    throw new MargoError('failed', 'Seismic kernel is unavailable. You must serve both optional Wasm assets.');
-  return WebAssembly.compile(await response.arrayBuffer());
 }
 
 /** Elastodynamic P/SV waves, surface ground motion, building acceleration and liquefaction screening. */
@@ -165,23 +165,27 @@ export class SeismicGround implements Solver<SeismicParams> {
   private elastic!: Region;
   private surface!: Region;
   private responses!: Region;
-  private kernel!: Native;
-  private cell: Cell = ZERO;
+  private kernel!: SeismicKernel;
+  private work?: SeismicWorkCounts;
+  private disposed = false;
+  private threadedAttached = false;
+  private waveTrial!: Region;
+  private motionTrial!: Region;
+  private siteTrial!: Region;
   private width = 0;
   private depth = 0;
   private pitch = 0;
   private count = 0;
   private dx = 10;
   private dz = 10;
-  private origin: Cell = ZERO;
+  private origin: readonly [number, number, number] = ZERO;
   private level: RateLevel = 0;
   private gravity = 0;
   private sources: readonly Source[] = [];
   private sites: readonly Site[] = [];
 
   private constructor(
-    private readonly plain: WebAssembly.Module,
-    private readonly shared: WebAssembly.Module | undefined,
+    private readonly builds: SeismicBuilds,
     readonly id: string,
   ) {
     this.groundField = {
@@ -200,17 +204,25 @@ export class SeismicGround implements Solver<SeismicParams> {
     };
   }
 
-  /** Compiles the optional SIMD kernel for both memory modes supported by the host. */
-  static async load(options: { id?: string; signal?: AbortSignal } = {}): Promise<SeismicGround> {
-    const { signal } = options;
-    const [plain, shared] = await Promise.all([
-      compile(new URL(/* @vite-ignore */ './seismic-kernel.wasm?no-inline', import.meta.url), signal),
-      canShareMemory()
-        ? compile(new URL(/* @vite-ignore */ './seismic-kernel-shared.wasm?no-inline', import.meta.url), signal)
-        : undefined,
-    ]);
-    signal?.throwIfAborted();
-    return new SeismicGround(plain, shared, options.id ?? 'seismic');
+  /** Loads the optional SIMD kernel and requested native helpers. */
+  static async load(options: SeismicLoadOptions = {}): Promise<SeismicGround> {
+    return new SeismicGround(await loadSeismicBuilds(options.signal, options.threads), options.id ?? 'seismic');
+  }
+
+  /** Releases this solver's native helpers. Create a new solver to resume stepping. */
+  [Symbol.dispose](): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.builds[Symbol.dispose]();
+  }
+
+  /** Native stencil work from the most recent accepted step, or undefined before the first. */
+  readNativeWork(): SeismicWorkCounts | undefined {
+    return this.work && structuredClone(this.work);
+  }
+
+  private requireActive(): void {
+    if (this.disposed) throw seismicError('Load a new seismic solver after disposal.', 'disposed');
   }
 
   describe() {
@@ -226,15 +238,21 @@ export class SeismicGround implements Solver<SeismicParams> {
   }
 
   init(host: SolverHost, params: SeismicParams): void {
-    if (!params?.material)
-      throw new RangeError('Seismic ground needs a material. Provide density and P/S wave speeds.');
+    this.requireActive();
+    if (this.threadedAttached)
+      throw seismicError('Load a separate threaded seismic solver for each world.', 'attached');
+    this.work = undefined;
+    if (!params?.material) throw seismicError('Seismic ground needs a material. Provide density and P/S wave speeds.');
     this.host = host;
     this.width = extent(params.width, 'width');
     this.depth = extent(params.depth, 'depth');
     this.pitch = this.width + 2;
-    this.count = this.pitch * (this.depth + 2);
+    this.count = extent(this.pitch * (this.depth + 2), 'buffer cell count');
     this.dx = positive(params.spacing?.[0] ?? 10, 'horizontal spacing');
     this.dz = positive(params.spacing?.[1] ?? 10, 'depth spacing');
+    positive(this.width * this.dx, 'section width');
+    positive(this.depth * this.dz, 'section depth');
+    positive(this.dx * this.dz, 'element area');
     this.origin = [
       finite(params.origin?.[0] ?? 0, 'origin x'),
       finite(params.origin?.[1] ?? 0, 'origin y'),
@@ -246,31 +264,27 @@ export class SeismicGround implements Solver<SeismicParams> {
     const layers = params.absorbingCells ?? Math.min(12, Math.floor(this.width / 3), Math.floor(this.depth / 3));
     const residual = params.boundaryAttenuation ?? 0.001;
     if (!Number.isInteger(layers) || layers < 0 || layers * 2 >= this.width || layers >= this.depth)
-      throw new RangeError('Seismic absorbing cells must leave an interior and a free surface. Use fewer cells.');
+      throw seismicError('Seismic absorbing cells must leave an interior and a free surface. Use fewer cells.');
     if (!(residual > 0 && residual <= 1))
-      throw new RangeError('Invalid seismic boundary amplitude. Pass a fraction above zero and at most 1.');
-    const module =
-      isShared(host.memory) || Object.prototype.toString.call(host.memory.buffer) === '[object SharedArrayBuffer]'
-        ? this.shared
-        : this.plain;
-    if (!module)
-      throw new MargoError('failed', 'Shared seismic kernel is unavailable. Create the world with plain memory.');
-    const stack = host.allocate('seismic-stack', STACK_BYTES, 'u8', SEISMIC_LAYOUT);
-    this.kernel = new WebAssembly.Instance(module, { env: { memory: host.memory } }).exports as Native;
-    if (!(this.kernel.__stack_pointer instanceof WebAssembly.Global) || typeof this.kernel.seismic_step !== 'function')
-      throw new MargoError('failed', 'Unexpected seismic kernel ABI. You must rebuild both optional Wasm assets.');
-    this.kernel.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
+      throw seismicError('Invalid seismic boundary amplitude. Pass a fraction above zero and at most 1.');
     this.elastic = host.allocate('seismic-wave', KERNEL_FIELDS * this.count * 8, 'f64', SEISMIC_LAYOUT);
     this.surface = host.allocate('seismic-ground-motion', this.width * SURFACE_WORDS * 8, 'f64', SEISMIC_LAYOUT);
     this.responses = host.allocate('seismic-building-soil', this.sites.length * SITE_WORDS * 8, 'f64', SEISMIC_LAYOUT);
+    this.waveTrial = host.allocate('seismic-wave-trial', this.elastic.byteLength, 'f64', SEISMIC_LAYOUT);
+    this.motionTrial = host.allocate('seismic-motion-trial', this.surface.byteLength, 'f64', SEISMIC_LAYOUT);
+    this.siteTrial = host.allocate('seismic-site-trial', this.responses.byteLength, 'f64', SEISMIC_LAYOUT);
     this.fillMaterials(params, layers, residual);
-    this.publishMotion(0);
+    const motion = this.words(this.surface);
+    this.publishMotion(0, this.words(this.elastic), motion);
+    this.checkFinite(motion, 'initial surface motion');
+    this.kernel = bindSeismicKernel(host, this.builds);
+    this.threadedAttached = Boolean(this.builds.pool);
   }
 
   private source(source: SeismicSource): Source {
     const [x, z] = source.position;
     if (!(x >= 0 && x <= this.width * this.dx && z >= 0 && z <= this.depth * this.dz))
-      throw new RangeError('Seismic source lies outside the section. You must move it into the grid.');
+      throw seismicError('Seismic source lies outside the section. You must move it into the grid.');
     return {
       normal: this.weights(x / this.dx - 0.5, z / this.dz - 0.5),
       shear: this.weights(x / this.dx - 1, z / this.dz - 1),
@@ -300,16 +314,17 @@ export class SeismicGround implements Solver<SeismicParams> {
 
   private site(site: SeismicSite): Site {
     if (!(site.x >= 0 && site.x <= this.width * this.dx))
-      throw new RangeError('Seismic receiver lies outside the section. You must place it over the grid.');
+      throw seismicError('Seismic receiver lies outside the section. You must place it over the grid.');
     const omega = site.frequency === undefined ? 0 : 2 * Math.PI * positive(site.frequency, 'building frequency');
+    finite(omega * omega, 'building stiffness per unit mass');
     const ratio = finite(site.dampingRatio ?? 0.05, 'building damping ratio');
-    if (ratio < 0) throw new RangeError('Seismic building damping cannot be negative. Pass a nonnegative ratio.');
+    if (ratio < 0) throw seismicError('Seismic building damping cannot be negative. Pass a nonnegative ratio.');
     const soil = site.saturatedSoil && { ...site.saturatedSoil };
     if (soil) {
       seismicCyclicStress(0, this.gravity, soil.overburdenRatio, soil.depthReduction);
       positive(soil.cyclicResistance, 'soil cyclic resistance');
     }
-    return { x: site.x, omega, damping: 2 * ratio * omega, soil };
+    return { x: site.x, omega, damping: finite(2 * ratio * omega, 'building damping per unit mass'), soil };
   }
 
   private words(region: Region): Float64Array {
@@ -317,8 +332,8 @@ export class SeismicGround implements Solver<SeismicParams> {
   }
 
   private fillMaterials(params: SeismicParams, layers: number, residual: number): void {
-    const words = this.words(this.elastic),
-      { dx, dz, count, pitch, width, depth } = this;
+    const { dx, dz, count, pitch, width, depth } = this;
+    const words = new Float64Array(KERNEL_FIELDS * count);
     const densities = new Float64Array(count);
     let fastest = 0;
     for (let z = 0; z < depth + 2; z++) {
@@ -328,23 +343,27 @@ export class SeismicGround implements Solver<SeismicParams> {
         const cx = (realX - 0.5) * dx,
           cz = (realZ - 0.5) * dz;
         const mat = typeof params.material === 'function' ? params.material(cx, cz) : params.material;
+        if (!mat)
+          throw seismicError(
+            'An elastic cell has no material. Supply density and P/S wave speeds for the whole section.',
+          );
         const p = positive(mat.compressionalSpeed, 'P-wave speed'),
           s = finite(mat.shearSpeed, 'S-wave speed');
         const density = positive(mat.density, 'density'),
           loss = finite(mat.damping ?? 0, 'material damping');
         if (s < 0 || loss < 0 || p * p <= (4 / 3) * s * s)
-          throw new RangeError(
+          throw seismicError(
             'Seismic material needs nonnegative shear speed and damping, with positive bulk modulus. Adjust its wave speeds.',
           );
         const index = z * pitch + x;
         densities[index] = density;
-        const shear = density * s * s;
-        words[7 * count + index] = density * p * p - 2 * shear;
+        const shear = finite(density * s * s, 'shear modulus');
+        words[7 * count + index] = finite(density * p * p - 2 * shear, 'Lamé stiffness');
         words[8 * count + index] = shear;
         const edge =
           layers === 0 ? 0 : Math.max(0, layers - Math.min(realX - 1, width - realX, depth - realZ)) / layers;
         const damping = layers === 0 ? 0 : (-3 * p * ln(residual) * edge * edge) / (layers * Math.min(dx, dz));
-        words[10 * count + index] = loss + damping;
+        words[10 * count + index] = finite(loss + damping, 'cell attenuation');
         fastest = Math.max(fastest, p);
         if (params.initialVelocity && realX === x && realZ === z) {
           const horizontal = params.initialVelocity(x * dx, cz)[0];
@@ -373,17 +392,20 @@ export class SeismicGround implements Solver<SeismicParams> {
     for (let level = 0; level <= 7; level++) {
       if (rateOf(level as RateLevel) >= required) {
         this.level = level as RateLevel;
+        this.checkFinite(words, 'initialized wave bank');
+        this.words(this.elastic).set(words);
         return;
       }
     }
-    throw new RangeError(
-      'Seismic Courant rate exceeds the world clock. Increase cell spacing or lower the wave speeds.',
-    );
+    throw seismicError('Seismic Courant rate exceeds the world clock. Increase cell spacing or lower the wave speeds.');
   }
 
-  private publishMotion(dt: number): void {
-    const motion = this.words(this.surface),
-      field = this.words(this.elastic);
+  private checkFinite(data: Float64Array, label: string): void {
+    if (data.some((word) => !Number.isFinite(word)))
+      throw seismicError(`Nonfinite seismic ${label}. Reduce the source or use finite, smaller physical values.`);
+  }
+
+  private publishMotion(dt: number, field: Float64Array, motion: Float64Array): void {
     for (let x = 0; x < this.width; x++) {
       const at = x * SURFACE_WORDS,
         cell = this.pitch + x + 1;
@@ -402,9 +424,7 @@ export class SeismicGround implements Solver<SeismicParams> {
     }
   }
 
-  private respond(dt: number): void {
-    const waves = this.words(this.surface),
-      sites = this.words(this.responses);
+  private respond(dt: number, waves: Float64Array, sites: Float64Array): void {
     for (let i = 0; i < this.sites.length; i++) {
       const site = this.sites[i]!,
         at = SITE_WORDS * i;
@@ -437,10 +457,14 @@ export class SeismicGround implements Solver<SeismicParams> {
   }
 
   step(context: StepContext, dt: number): void {
-    this.cell = context.cell;
-    const waves = this.words(this.elastic),
-      n = this.count;
-    const now = context.tick * dt;
+    this.requireActive();
+    positive(dt, 'time step');
+    if (dt > 1 / rateOf(this.level))
+      throw seismicError('The seismic step exceeds the Courant limit. Advance the world at its requested rate.');
+    const waves = this.words(this.waveTrial);
+    const n = this.count;
+    const now = finite(context.tick * dt, 'clock time');
+    waves.set(this.words(this.elastic));
     for (const { normal, shear, moment, timescale, start } of this.sources) {
       const time = now - start;
       const amount = (momentFraction(time + dt, timescale) - momentFraction(time, timescale)) / (this.dx * this.dz);
@@ -450,15 +474,30 @@ export class SeismicGround implements Solver<SeismicParams> {
       }
       for (const [at, weight] of shear) waves[SXZ * n + at]! -= moment[2] * weight * amount;
     }
-    this.kernel.seismic_step(this.elastic.byteOffset, this.width, this.depth, this.dx, this.dz, dt);
-    this.publishMotion(dt);
-    this.respond(dt);
+    this.kernel.seismic_step(this.waveTrial.byteOffset, this.width, this.depth, this.dx, this.dz, dt);
+    const accepted = this.words(this.elastic);
+    const dynamic = this.words(this.waveTrial).subarray(0, 5 * n);
+    this.checkFinite(dynamic, 'wave trial');
+    const motion = this.words(this.motionTrial);
+    const sites = this.words(this.siteTrial);
+    motion.set(this.words(this.surface));
+    sites.set(this.words(this.responses));
+    this.publishMotion(dt, dynamic, motion);
+    this.respond(dt, motion, sites);
+    this.checkFinite(motion, 'surface motion');
+    this.checkFinite(sites, 'site response');
+    const work = this.kernel.workCounts();
+    accepted.set(dynamic);
+    this.words(this.surface).set(motion);
+    this.words(this.responses).set(sites);
+    this.work = work;
   }
 
   exportPorts(tick: number): readonly Port[] {
+    const cell = this.host.cell;
     return [
-      { field: this.groundField.name, region: this.surface, tick, cell: this.cell },
-      { field: this.siteField.name, region: this.responses, tick, cell: this.cell },
+      { field: this.groundField.name, region: this.surface, tick, cell },
+      { field: this.siteField.name, region: this.responses, tick, cell },
     ];
   }
 
@@ -475,7 +514,7 @@ export class SeismicGround implements Solver<SeismicParams> {
   /** Read the nearest surface column by index. */
   motion(column: number): SeismicMotion {
     if (!Number.isInteger(column) || column < 0 || column >= this.width)
-      throw new RangeError('Seismic surface column is outside the grid. Pass a configured column index.');
+      throw seismicError('Seismic surface column is outside the grid. Pass a configured column index.');
     const at = column * SURFACE_WORDS,
       w = this.words(this.surface);
     return {
@@ -496,7 +535,7 @@ export class SeismicGround implements Solver<SeismicParams> {
       column >= this.width ||
       row >= this.depth
     )
-      throw new RangeError('Seismic cell is outside the section. Pass a configured column and row.');
+      throw seismicError('Seismic cell is outside the section. Pass a configured column and row.');
     const at = (row + 1) * this.pitch + column + 1,
       w = this.words(this.elastic);
     return [w[VX * this.count + at]!, -w[VZ * this.count + at]!];
@@ -505,7 +544,7 @@ export class SeismicGround implements Solver<SeismicParams> {
   /** Read a configured building or soil receiver by index. */
   reading(index = 0): SeismicSiteReading {
     if (!Number.isInteger(index) || index < 0 || index >= this.sites.length)
-      throw new RangeError('Seismic site is outside the list. Pass a configured site index.');
+      throw seismicError('Seismic site is outside the list. Pass a configured site index.');
     const at = index * SITE_WORDS,
       w = this.words(this.responses);
     return {

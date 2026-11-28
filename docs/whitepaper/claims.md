@@ -7170,3 +7170,12 @@ ordered wrench sum. A fixed-camera soil-bin test draws the accepted wheel pose, 
 grains and repeats complete state and RGBA across immediate restore on WebGPU and WebGL2. Independent
 Apfelbeck slender plates and repeated Rashidi–Gholami loads expose the shape and loading-history limits.
 [Observed values and limits](../limits.md#independent-plate-shape-and-repeated-pressure).
+
+### EARTH-08 accepted seismic fields and technical station replay
+
+Rejected sources and invalid support samples leave the accepted wave, site and rigid force
+banks intact. The native interior stencil is equivalent across 1, 2 and 4 participants and
+separately joins the traction-free, velocity and stress work. The civil station's complete
+accepted state and raw RGBA replay independently on WebGPU and WebGL2. In Mashiki the
+independent borehole comparison exposes the limits of the fixed elastic logging profile.
+[Measured limits](../limits.md#earth-08-elastic-site-response-at-mashiki).

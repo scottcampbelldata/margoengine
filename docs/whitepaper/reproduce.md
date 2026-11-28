@@ -5436,3 +5436,13 @@ Burton et al. provide the original lab geometry and an orientation trace. The tr
   deliberately retains the discrepancies.
 - Run `npm run test:gpu:terramechanics-film -w @margoengine/physics` for the real TerrainBed, driven
   wheel and airborne grain cue with separate state and pixel checks on WebGPU and WebGL2.
+
+### EARTH-08 native seismic layers, monitoring station and Mashiki profile
+
+- Build Physics with `node packages/physics/scripts/build.js`. Run
+  `node --test packages/physics/tests/coupling/seismic.test.js packages/physics/tests/coupling/seismic-workers.test.js`.
+- Run `npm run test:gpu:seismic-workers -w @margoengine/physics` to observe the Chromium helpers.
+  Run `npm run test:gpu:seismic-film -w @margoengine/physics` to reproduce the fixed camera,
+  Newmark response and rigid witness in both renderers.
+- Run `node packages/physics/scripts/earth08-mashiki-measured.mjs` to compare modeled elastic
+  motion with the independent weak-motion spectral and travel-time observations.

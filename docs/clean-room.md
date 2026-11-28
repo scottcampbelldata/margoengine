@@ -20667,3 +20667,31 @@ Native resistive-force workers partition complete midpoint pairs from Li, Zhang 
 Eqs. 1–2 and S8–S9. Each pair produces independent forces and the corresponding moment arms.
 The caller joins the pairs and adds their wrench terms in body, strip and sample order to retain
 the scalar result. [Li, Zhang and Goldman](https://doi.org/10.1126/science.1229163).
+
+### EARTH-08 phased elastic waves and recorded site response
+
+Jean Virieux's second-order staggered P–SV stencil keeps the stress and velocity arrays separate.
+The ground solver updates its traction-free boundary, advances disjoint velocity rows and joins
+them before advancing the stress rows. Each native lane applies the same arithmetic before and
+after the split. The stress phase reads the updated neighboring velocity rows across its halo.
+[Virieux (1986)](https://doi.org/10.1190/1.1442147)
+
+The Mashiki profile uses the original NIED KiK-net KMMH16 P–S log as reproduced in Fig. 4.34
+of the Japanese National Institute for Land and Infrastructure Management and Public Works Research
+Institute, *Study on a Method for Verifying Seismic Performance of Large Box Culverts* (2023).
+Later velocity profiles inverted from measured spectral ratios are excluded.
+[NIED](https://doi.org/10.17598/NIED.0004) · [NILIM and PWRI, Fig. 4.34](https://www.nilim.go.jp/lab/bcg/siryou/tnn/tnn1247pdf/ks1247.pdf)
+
+The independent density estimate uses Kiyoshi Fukutake et al., *Quantitative strong motion
+simulations at three locations in downtown Mashiki during the 2016 Kumamoto Earthquake (Mw 7.0)
+based on the nonlinear ground response analyses with soil liquefaction* (2023), Eq. (1).
+Dividing the estimated unit weight by reference gravity gives
+`1,000 × (1.4 + 0.67 × sqrt(Vs / 1,000))` kg/m³ for Vs in m/s. Weak-motion targets do not
+enter this estimate. [Fukutake et al.](https://doi.org/10.1186/s40623-023-01821-8)
+
+Reza Esfahani, Fabrice Cotton and Luis Fabian Bonilla, *Temporal variations of the ‘in-situ’
+nonlinear behaviour of shallow sediments during the 2016 Kumamoto Earthquake sequence* (2024),
+give independent weak-motion observations in Fig. 2 and §3.1. The diagnostic compares two
+synthetic records from a generic incident packet with these observations. Both surface and
+downhole motions are simulated. The field reference is excluded from the input and calibration.
+[Esfahani et al.](https://doi.org/10.1093/gji/ggae222)

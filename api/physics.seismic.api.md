@@ -10,10 +10,9 @@ export class SeismicGround implements Solver<SeismicParams> {
     readonly groundField: FieldDescriptor;
     readonly siteField: FieldDescriptor;
     private constructor();
-    static load(options?: {
-        id?: string;
-        signal?: AbortSignal;
-    }): Promise<SeismicGround>;
+    static load(options?: SeismicLoadOptions): Promise<SeismicGround>;
+    [Symbol.dispose](): void;
+    readNativeWork(): SeismicWorkCounts | undefined;
     describe(): {
         id: string;
         rate: 0;
@@ -63,6 +62,12 @@ export interface SeismicInertialParams {
         body: number;
         column: number;
     }[];
+}
+
+export interface SeismicLoadOptions {
+    readonly id?: string;
+    readonly threads?: 1 | 2 | 4;
+    readonly signal?: AbortSignal;
 }
 
 export interface SeismicMaterial {
@@ -117,6 +122,19 @@ export interface SeismicSource {
     moment: readonly [number, number, number];
     timescale: number;
     start?: number;
+}
+
+export interface SeismicWorkCounts extends SeismicWorkerWork {
+    readonly threads: number;
+    readonly surfacePoints: number;
+    readonly workers: readonly SeismicWorkerWork[];
+}
+
+export interface SeismicWorkerWork {
+    readonly velocityCells: number;
+    readonly stressCells: number;
+    readonly pairedVelocityCells: number;
+    readonly pairedStressCells: number;
 }
 
 export function momentFraction(seconds: number, tau: number): number;

@@ -12406,3 +12406,7 @@ The vortex solver stages field probes, rigid loads and water forcing together. I
 ### EARTH-05 accepted terrain trials, wheel poses and strip work
 
 Soil contact stages accepted deposition, column history, wheel reactions and optical dust in the optional entry. The footprint solver copies foreign terrain only when native code needs the grid in its own memory. The rigid attachment can publish an accepted local wheel pose for immediate renderer restore. The granular strip workers evaluate independent midpoint pairs and join before the ordered force and moment sum. Actual Chromium helpers, exact state and GPU pixel replay, and the slender-plate and cyclic-load misses cover the current operating limits.
+
+### EARTH-08 accepted elastic waves and ground attachments
+
+The optional section allocates separate elastic, surface and site trial regions. Its traction-free surface remains on the caller. The native velocity and stress row phases join separately before publishing accepted results. The support adapter reads registered fields from their owning banks and stages all rigid forces. Exact Chromium worker replays and dual-renderer station playback cover this path. The Mashiki weak-motion diagnostic quantifies limits of the elastic section.

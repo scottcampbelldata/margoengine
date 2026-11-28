@@ -150,6 +150,11 @@ type NativePhaseSolver =
       readonly subject: 'Resistive soil';
       readonly phaseExport: 'resistive_soil_thread_phase';
       readonly phase: 'granular strip forces';
+    }
+  | {
+      readonly subject: 'Seismic';
+      readonly phaseExport: 'seismic_thread_phase';
+      readonly phase: 'velocity and stress stencil';
     };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };
