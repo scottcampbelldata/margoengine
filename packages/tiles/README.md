@@ -192,6 +192,137 @@ console.log(terrainFrame(86.925, 27.988).length); // 16
 
 `parseQuantizedMesh(bytes)` decodes a tile (header, vertices, triangles, edges, oct normals, water mask, metadata); a cut tile throws a `RangeError`. Imagery is `EPSG:3857` with `xyz` rows by default (`projection`, `scheme`, `maximumLevel`, `mimeType` change it); each terrain tile takes the deepest imagery tile that holds it whole, at most one level deeper than the terrain. Without `imagery` the terrain draws lit, in grey, with the tile's normals or ones made from its triangles. Pass `fetch` to `terrain` for headers such as an access token.
 
+## Styling: `@margoengine/tiles/style`
+
+`TilesStyle` compiles an OGC 3D Tiles style (`color`, `show`, `pointSize`, `defines` and `meta`) once and applies it to
+every tile as it loads. Expressions are interpreted, never run as JavaScript: `${name}` reads a feature property,
+`color()`, `rgb()`, `vec2` to `vec4`, math, strings and `regExp` work as the Styling specification says, and a
+`{conditions}` list takes the first condition that holds.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { TilesRenderer } from 'margoengine/tiles';
+import { TilesStyle } from 'margoengine/tiles/style';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: { position: [0, 400, 600], target: [0, 0, 0], far: 50_000 },
+});
+const style = new TilesStyle({
+  defines: { tall: '${Height} > 10' }, // a define reads like a property in the other expressions
+  color: { conditions: [['${tall}', 'color("#d86f45")'], ['true', 'color("white", 0.8)']] },
+  show: '${id} !== 3',
+  meta: { label: '"Building " + ${id}' },
+});
+console.log(style.evaluate({ id: 4, Height: 12 })); // color [0.847, 0.435, 0.271, 1], show true, meta.label 'Building 4'
+// The sample city's b3dm batch tables hold id, Longitude, Latitude and Height for every building.
+const tiles = await TilesRenderer.load(engine, '3d-tiles/TilesetWithRequestVolume/city/tileset.json', {
+  decorate: style.decorate,
+});
+engine.start();
+```
+
+- `decorate` reads b3dm batch properties, pnts `BATCH_ID` and the point semantics (`POSITION`, `POSITION_ABSOLUTE`,
+  `COLOR`, `NORMAL`), i3dm `BATCH_ID` and structural metadata (feature ID attributes and implicit sets). Its saved
+  arrays count against the tile's memory budget and go with the tile on eviction.
+- Colours are sRGB in expressions and multiply each vertex's authored colour in linear light; `show: false` discards
+  the vertex in every surface pass (points get size 0, instances a degenerate transform that keeps their picking id).
+- `evaluate(properties)` takes an object or a lookup `(name) => value`; with no properties it styles the single
+  implicit feature. An expression that yields the wrong type throws a `MargoError` `invalid`; a `conditions` list
+  where nothing matches leaves `color` undefined (white).
+- Your own content binds without the renderer: `bindModel(model, properties)` (a glTF PBR model, per vertex; bind
+  before any deformation), `bindPoints(cloud, properties)` and `bindInstances(instances, properties)` each return a
+  binding whose `update(style)` restyles live and whose `dispose()` (or `using`) puts back the authored data. A
+  disposed binding refuses `update`.
+
+## Map imagery: `@margoengine/tiles/imagery`
+
+`terrainImagery(layerUrl, {imagery})` loads quantized-mesh terrain like `terrain()` and drapes it with any number of
+ordered map layers: Web Map Service (`wms`), Web Map Tile Service (`wmts`) and XYZ or TMS tiles (`xyz`). Each terrain
+tile's drape is composited from every layer, reprojected scanline by scanline between geographic (`EPSG:4326`) and Web
+Mercator (`EPSG:3857`), then laid over the layers below by its `opacity`.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { TilesRenderer } from 'margoengine/tiles';
+import { terrainImagery, terrainRectangle, wms, wmsURL, wmts, wmtsURL, xyz } from 'margoengine/tiles/imagery';
+
+const roads = { url: 'https://maps.example.com/wms', layers: 'roads', version: '1.3.0' as const, crs: 'EPSG:4326' as const };
+const ortho = { url: 'https://maps.example.com/wmts', layer: 'ortho', matrixSet: 'WebMercatorQuad' };
+// The URLs a terrain tile asks for (west, south, east, north in radians):
+const tile = terrainRectangle(1, 0, 0, 'EPSG:4326');
+console.log(wmsURL(roads, tile)); // ...REQUEST=GetMap&LAYERS=roads&CRS=EPSG%3A4326&BBOX=-90%2C-180%2C0%2C-90...
+console.log(wmtsURL(ortho, '3', 2, 5)); // ...REQUEST=GetTile&...&TILEMATRIX=3&TILEROW=5&TILECOL=2
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: { position: [0, 8_000_000, 22_000_000], target: [0, 0, 0], near: 100_000, far: 100_000_000 },
+});
+using source = await terrainImagery('terrain/QuantizedMeshWithOctVertexNormals/layer.json', {
+  imagery: [
+    xyz({ url: 'imagery/{z}/{x}/{y}.png', scheme: 'xyz', maximumLevel: 2 }),
+    { ...wms({ ...roads, size: 256 }), opacity: 0.6, show: false }, // a layer you can switch on later
+    { ...wmts(ortho), show: false },
+  ],
+  imagerySize: 256,
+  maximumCachedBytes: 32 * 1024 * 1024,
+});
+console.log(source.projection, source.maximumLevel); // the layer's projection and deepest level
+const tiles = await TilesRenderer.load(engine, source.url, { fetch: source.fetch, frame: 'local' });
+engine.start();
+```
+
+- `wms` speaks 1.1.1 and 1.3.0 with the version's own CRS key and axis order (`CRS:84`, `EPSG:4326` or `EPSG:3857`);
+  `parameters` adds or replaces query keys, case-insensitively, and the rest of the service URL is kept.
+- `wmts` uses key-value requests, or a ResourceURL template when `url` holds `{TileMatrix}`, `{TileCol}` or `{TileRow}`
+  (other `{Dimension}`s come from `parameters`). Without `matrices` it assumes the global pyramid of the projection at
+  256 pixels a tile, level z having 2^z tiles a side (twice that wide for `EPSG:4326`); give `matrices` (`id`, `width`,
+  `height`, `tileWidth`, `tileHeight`, `resolution`, `topLeft`) or `matrixLabels` for a service that differs, and a
+  level with neither throws a `RangeError`.
+- `xyz` fills `{z}`, `{x}` and `{y}`; `scheme: 'tms'` counts rows from the south. `tileSize` defaults to 256 and
+  `maximumLevel` to 19.
+- The terrain may be geographic or Mercator, with `available` ranges or `metadataAvailability` (tile availability read
+  from the tiles themselves); Mercator branches expand lazily so latitude bounds stay exact at every level. Every
+  request goes through `fetch` (add access headers there) and `signal`; `dispose()`, or `using`, cancels them and frees
+  the decoded staging cache.
+
+## Per-vertex and per-texel properties: `@margoengine/tiles/properties`
+
+`readPropertyMetadata(asset)` reads `EXT_structural_metadata` property attributes (values per vertex) and property
+textures (values per texel) from a loaded glTF asset, without creating engine objects; `loadPropertyMetadata(asset)`
+also fetches an external schema and the property images, keeping the PNG channels exactly as stored.
+
+```ts
+import { GLTFAsset } from 'margoengine/gltf/pbr';
+import { loadPropertyMetadata } from 'margoengine/tiles/properties';
+
+// A CC0 sample: a box whose texture holds two temperatures and an insulation value per texel.
+const url = '3d-tiles/EXT_structural_metadata/SimplePropertyTexture/SimplePropertyTexture.gltf';
+const doc = await (await fetch(url)).json();
+const asset = new GLTFAsset(doc, []);
+const controller = new AbortController();
+const metadata = await loadPropertyMetadata(asset, {
+  baseURL: new URL(url, location.href).href,
+  signal: controller.signal,
+  maximumBytes: 16 * 1024 * 1024,
+});
+const texture = metadata.primitives[0][0].textures[0];
+console.log(texture.class, texture.row([0.25, 0.25])); // 'buildingComponents', {insideTemperature: 20, ...}
+// What a ray hit on triangle 0 of mesh 0, primitive 0, reads at its barycentric coordinates:
+console.log(metadata.sample(0, 0, 0, [1 / 3, 1 / 3, 1 / 3]));
+```
+
+- `PropertyAttributes.get(vertex, name)` and `row(vertex)` return a value after `noData`, `default`, normalization,
+  `offset` and `scale`; a row out of range gives undefined. `PropertyTextures.get(uv, name)` and `row(uv)` read the
+  nearest stored texel (encoded integers and floats are never interpolated) with glTF wrapping, the property's UV set
+  and `KHR_texture_transform`.
+- `sample(mesh, primitive, triangle, barycoord)` interpolates each texture's own coordinate set at a triangle hit and
+  returns one record per property texture.
+- Images come from `image(texture)` in `readPropertyMetadata` (RGBA8 pixels per glTF texture); for an asset decoded by a
+  codec whose float cache loses raw sentinel bits, `accessor(index)` returns the original packed bytes.
+- Limits: fixed-size numeric, enum and boolean properties only (strings and variable arrays go in property tables);
+  decoded attribute bytes up to `maximumDecodedBytes` (default four times the asset's byte limit) and each schema or
+  image resource up to `maximumBytes` (default 64 MiB). Loading honours `signal`; relative resources need `baseURL` in
+  Node.
+
 ## Height under a place: `@margoengine/tiles/height`
 
 `tilesHeightQuery(engine, tiles)` returns `(longitude, latitude) => height`: radians in, metres above the WGS84
