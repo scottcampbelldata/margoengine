@@ -8906,6 +8906,8 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -9.81, 
   .couple(['blast', 'rigid'], 'staggered');
 world.advance(30);
 console.log(shed.linearVelocity, blast.counts, blast.pressureAt([0, 1.5, 30], 0.15));
+```
+
 ## Craters (`@margoengine/physics/crater`)
 
 The crater a buried charge digs, its rim and its ejecta blanket, on the terrain bed (EARTH-06). `craterSize(energy, depth, ground, gravity)` is the apparent crater of a charge of `energy` J with its centre `depth` m down:
@@ -8930,7 +8932,7 @@ Checked against craters it was not fitted to, the radius is within 26 percent, t
 The bed's volume balances to rounding. `ledgerTotals()` gives the volume dug, lifted, compacted, thrown, landed and carried past the bed's edge. `crater(i)` gives each crater's size, how far it has formed and its ejecta curtain's extent. The `crater:craters` field publishes the same for renderers and the base surge. `size` and `pace` scale a crater and its formation time for film.
 
 ```ts
-import {CRATER_GROUNDS, craterSize} from 'margoengine/physics/crater';
+import { CRATER_GROUNDS, craterSize } from '@margoengine/physics/crater';
 
 // Scooter (1960): a million pounds of TNT 38 m down in Nevada alluvium dug a crater 47 m in radius.
 const crater = craterSize(453600 * 4.184e6, 38.1, CRATER_GROUNDS.drySoil, 9.81);
