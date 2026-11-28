@@ -114,8 +114,9 @@ test('no shader normalizes a uniform-only light direction and every writer uploa
     offenders = [],
     // A shader normalizing a light uniform as is: the light or sun of a frame, or a light record's direction.
     normalized = /(?:normalize|length)\(\s*[A-Za-z_]\w*\.(?:light|sun|direction)\.xyz\s*\)/g,
-    // A frame write of the engine light as given, not through unitLight (core's renderer normalizes its own copy).
-    raw = /\.set\([^,()]*lighting\.direction\s*,/g;
+    // A frame write of the engine light as given, not through unitLight (core's renderer normalizes its own copy),
+    // also through a local alias such as `const light = engine.lighting` (LavaSurface wrote `light.direction`).
+    raw = /\.set\([^,()]*\blight(?:ing)?\.direction\s*,/g;
   const scan = (path) => {
     const text = readFileSync(path, 'utf8');
     for (const m of text.matchAll(normalized)) offenders.push(`${path}: ${m[0]}`);

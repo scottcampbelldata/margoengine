@@ -65,6 +65,7 @@ import {
 import { MargoError } from '@margoengine/math/errors';
 import { displayShader } from '../../shared/display.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
+import { unitLight } from '../../shared/unit-light.js';
 import { linearHdr } from '../../shared/hdr-format.js';
 import { applyView } from '../../shared/view-rect.js';
 
@@ -2493,7 +2494,9 @@ fn elevation(cell: vec2i) -> f32 {
   let crossed = cross(dpdx(i.world), dpdy(i.world));
   let upward = crossed * select(-1.0, 1.0, crossed.y >= 0.0);
   let n = upward / max(length(upward), 1e-15);
-  let sun = lava.sun.xyz / max(length(lava.sun.xyz), 1e-15);
+  // The writer uploads the unit direction (unitLight): a normalize of a uniform-only value can differ by an ulp
+  // between frames on some drivers.
+  let sun = lava.sun.xyz;
   let light = lava.ambient.xyz * lava.radiance.w +
     (max(dot(n, sun), 0.0) * lava.sun.w / 3.14159265) * lava.radiance.rgb;
   // Visual diffuse reflectance of exposed and crusted basalt; emission comes only from the accepted skin.
@@ -2705,7 +2708,7 @@ export class LavaSurface implements EnginePlugin {
 
     const light = this.engine.sceneOf(this)?.lighting ?? this.engine.lighting;
     this.values.set(context.camera.matrix, 0);
-    this.values.set(light.direction, 24);
+    unitLight(this.values, 24, light.direction);
     this.values.set(light.radiance, 28);
     this.values.set(light.ambient, 32);
     device.queue.writeBuffer(this.uniform, 0, this.values);
