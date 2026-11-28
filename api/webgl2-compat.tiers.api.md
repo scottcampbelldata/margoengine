@@ -339,6 +339,11 @@ class CompatDevice extends EventTarget {
     computeRuntime: ComputeRuntime | null;
     readback: typeof import('./readback.js') | null;
     constructor(gl: WebGL2RenderingContext, adapter: CompatAdapter, features: ReadonlySet<string>, descriptor?: GPUDeviceDescriptor);
+    held: {
+        render: CompatRenderPipeline[];
+        compute: CompatComputePipeline[];
+    } | null;
+    linksUsable(held: NonNullable<CompatDevice['held']>): Promise<void>;
     enum(name: string): number;
     compare(f: GPUCompareFunction): number;
     unsupported(what: string, anchor?: string): Error;
@@ -1196,11 +1201,18 @@ type Readback = {
     discard?(): void;
 };
 
+interface ReplayCursor {
+    i: number;
+    n: number;
+    o: number;
+}
+
 class Replayer {
     readonly device: CompatDevice;
     readonly gl: WebGL2RenderingContext;
     constructor(device: CompatDevice);
     run(tape: Tape): void;
+    resume(tape: Tape, at: ReplayCursor, until: number): boolean;
     putBlocks(s: TextureStorage, write: BlockWrite): void;
     zero(texture: WebGLTexture, target: number, info: FormatInfo, levels: number, w: number, h: number, d: number): void;
     attachable(info: FormatInfo): boolean;

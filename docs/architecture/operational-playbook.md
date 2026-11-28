@@ -1245,6 +1245,30 @@ layer's browser checks (compat, first draw, compute, lost context, device churn,
 materials and post-processing `--compat` pass. Missing: other GPUs, drivers and browsers (the gain needs a driver
 that links on its own threads), quiet-machine seconds.
 
+### Section 5 evidence: warm frames held for their links and replayed in slices on the WebGL2 layer (KB-QUALITY-WARMSERIAL1, KB-COMPAT-FBSTATUS1, 2026-11-28)
+
+With `KHR_parallel_shader_compile` the layer's queue carries a link hold (`Symbol.for('margoengine.queue.holdsLinks')`,
+`packages/shared/queue-hold.js`). While it is on, a submit that may use a program still linking waits in the queue,
+with every write and submit after it in order, until those programs have linked; nothing reads `LINK_STATUS` before
+the driver reports the link done. `warmUp` of `@margoengine/quality` renders whole frames with the hold on when the
+mark is there, so every link of a frame runs side by side, and ends after `frames` frames in a row made no new
+pipeline; browser WebGPU and the layer without the extension keep the stopped-frame route. The queue replays held work
+in tasks of about 50 ms: a command buffer resumes between commands outside a render pass (`Replayer.run` with a
+cursor), and each task after the first starts once a fence shows the GPU has run the one before. The layer reads
+`checkFramebufferStatus` once per attachment signature (GL ES 3.0.6 section 4.4.4: completeness follows the kinds of
+image attached, never which texture), and an incomplete signature is still reported for every framebuffer that has it.
+Evidence: `packages/webgl2-compat/test/link-hold.test.js` and `framebuffer-status.test.js` (CPU stand-ins that count
+link reads, framebuffer reads, fences and the replay order), `packages/quality/test/warm.test.js`,
+`packages/water/test/warm-up.browser.mjs` (WebGPU and the layer, no early link read); `demos/ten-thousand-trees` on the
+layer, Chrome over ANGLE Direct3D 11 on an RTX A6000 (loaded workstation, main 4469d88656 and the new build taking
+turns, 4 rounds, per-round minimums): ready 28.2 to 17.7 s, longest task 1,012 to 1,011 ms, long tasks in total 11.7
+to 5.6 s, framebuffer status reads 2,862 to 3,018 against 111 to 113; WebGPU 11.6 against 11.4 s, longest 447 against
+410 ms (one round); a frame with the clock stopped byte for byte the same on both backends once the sky fix
+KB-SKY-TABLESKEY1 is in both builds. A probe build placed the old 4.3 s task: one command buffer of 5,611 commands,
+2,473 framebuffer status reads (1.7 s) and 150 `getBufferSubData` read-backs of CPU compute passes (0.9 s); the trace
+showed no Direct3D compile at a draw. Missing: other GPUs, drivers and browsers, quiet-machine seconds; the longest
+task left (about 1 s) is one CPU compute pass's read-back, which slicing between commands cannot split.
+
 ### Section 5 evidence: the staged programs' draw-time compile on Direct3D 11 (KB-COMPAT-LOSTWHY1, 2026-11-28)
 
 ANGLE's Direct3D 11 back end links a program with more than one colour output against a one-output layout and

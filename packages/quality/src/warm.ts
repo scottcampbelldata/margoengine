@@ -1,12 +1,16 @@
 import type { EngineKernel } from '@margoengine/core';
+import { HOLDS_LINKS } from '../../shared/queue-hold.js';
 
 /** What {@link warmUp} did. */
 export interface WarmUpReport {
-  /** Render and compute pipelines created with the async API ahead of their first visible frame. */
+  /**
+   * Render and compute pipelines created with the async API ahead of their first visible frame; on the WebGL2 layer's
+   * frame route (see {@link warmUp}), the distinct pipelines the warm frames made, whose links the layer held them for.
+   */
   pipelines: number;
   /** Pipelines that had to be created synchronously after all (the retried call did not match its warmed descriptor). */
   fallbacks: number;
-  /** Warm render calls, including the stopped ones that discovered a pipeline. */
+  /** Warm render calls, including the stopped ones that discovered a pipeline (on the frame route every one is whole). */
   rounds: number;
   /** A feature failed after a stopped warm frame, so the device was restored (`engine.rebootDevice()`) and the
    * remaining warm frames created their pipelines synchronously. */
@@ -60,6 +64,15 @@ function override<T extends object>(object: T, name: string, value: unknown): ()
  * attach have compiled by then too. Without WebGPU it resolves at once. A feature that stores state before creating its pipeline (so the
  * retry skips the creation) fails on the retry; then every feature is reset through device restoration and the warm
  * frames finish with synchronous creation (`report.rebooted`).
+ * On the WebGL2 compatibility layer with KHR_parallel_shader_compile (its queue carries the link hold,
+ * `Symbol.for('margoengine.queue.holdsLinks')`) no frame is stopped: each warm frame runs whole with the hold on, so the
+ * layer keeps that frame's submits, and the writes after them in order, in its queue until every program the frame made
+ * has linked and drawn once, and all of a frame's links run side by side on the driver's threads instead of one per
+ * round (KB-QUALITY-WARMSERIAL1). It ends after `frames` frames in a row that made no new pipeline.
+ * The layer then replays a held frame in tasks of about 50 ms, each after the GPU has run the one before, so the page
+ * stays responsive while it plays back.
+ * Limit: call it before `engine.start()`. On the layer's frame route the frames a running loop renders meanwhile wait
+ * in the queue behind the held frame (their tapes and write copies kept) and replay after it.
  * ponytail: a feature that is off (`enabled = false`) or attached later is not warmed; call warmUp again after
  * attaching it.
  */
@@ -73,6 +86,7 @@ export async function warmUp(
   const device = gpu() as (GPUDevice & Record<Method, Call>) | null | undefined;
   const context = engine.canvas.getContext('webgpu') as GPUCanvasContext | null;
   if (!device || !context || engine.backend !== 'webgpu') return report;
+  const hold = (device.queue as unknown as Partial<Record<symbol, (on: boolean) => void>>)[HOLDS_LINKS];
   const original = Object.fromEntries(methods.map((name) => [name, device[name]])) as Record<Method, Call>;
   // Shader modules are often recreated on every call, so descriptors are keyed by their code; other GPU objects by identity.
   const sources = new Map<string, number>(),
@@ -84,6 +98,9 @@ export async function warmUp(
     ready = new Map<string, object>();
   // This round's command encoders, each with its open pass (if any), in creation order.
   const encoders: Array<{ encoder: GPUCommandEncoder; pass?: Pass; finished?: boolean }> = [];
+  // The frame route (hold): the loose keys of the pipelines warm frames made, and whether this round made a new one.
+  const seen = new Set<string>();
+  let made = false;
   let warming = false,
     lastMiss = '',
     next = 0,
@@ -110,6 +127,15 @@ export async function warmUp(
   const create = (kind: Kind): Call =>
     function (descriptor) {
       if (!warming) return original[kind].call(this, descriptor);
+      if (hold) {
+        const loose = key(kind, descriptor!, true);
+        if (!seen.has(loose)) {
+          seen.add(loose);
+          report.pipelines++;
+          made = true;
+        }
+        return original[kind].call(this, descriptor);
+      }
       const strict = key(kind, descriptor!, false),
         done = ready.get(strict);
       if (done) return done;
@@ -152,7 +178,7 @@ export async function warmUp(
     }),
     override(device, 'createCommandEncoder', function (this: GPUDevice, descriptor?: GPUCommandEncoderDescriptor) {
       const encoder = original.createCommandEncoder.call(this, descriptor) as GPUCommandEncoder;
-      if (!warming) return encoder;
+      if (!warming || hold) return encoder;
       const record: (typeof encoders)[number] = { encoder };
       encoders.push(record);
       for (const name of ['beginRenderPass', 'beginComputePass'] as const) {
@@ -190,7 +216,23 @@ export async function warmUp(
     for (const step of undo.splice(0)) step();
   };
   try {
-    for (let complete = 0; complete < frames && report.rounds < maxRounds && !engine.disposed; ) {
+    // The layer's frame route: whole frames, each held in the layer's queue until its programs can draw.
+    for (let complete = 0; hold && complete < frames && report.rounds < maxRounds && !engine.disposed; ) {
+      signal?.throwIfAborted();
+      report.rounds++;
+      made = false;
+      warming = gpu() === device;
+      hold(true);
+      try {
+        engine.render({ delta: 0 });
+      } finally {
+        warming = false;
+        hold(false);
+      }
+      await device.queue.onSubmittedWorkDone();
+      complete = made ? 0 : complete + 1;
+    }
+    for (let complete = 0; !hold && complete < frames && report.rounds < maxRounds && !engine.disposed; ) {
       signal?.throwIfAborted();
       report.rounds++;
       pending = undefined;

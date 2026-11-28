@@ -1,5 +1,20 @@
 # Performance history: losses, causes and fixes
 
+## WebGL2 layer: warmUp linked one pipeline per round (2026-11-28, fixed)
+
+- **Loss:** with `warmUp` (`@margoengine/quality/warm`) `demos/ten-thousand-trees` took 28 to 41 s to start on the
+  WebGL2 layer (Chrome, ANGLE Direct3D 11, RTX A6000, loaded workstation) against 18 s without it, with long tasks of
+  12 to 16 s in total.
+- **Cause:** warmUp stopped each frame at the first pipeline still compiling and waited for that one, so 45 rounds
+  linked one program each and repeated the frame's CPU compute passes; a first fix that held whole frames replayed the
+  held frame in one 4.3 s task, 1.7 s of it in 2,473 `checkFramebufferStatus` round trips.
+- **Fix:** whole warm frames held in the layer's queue until their programs link, replayed in tasks of about 50 ms with
+  a fence between them, and one framebuffer status read per attachment signature; the same pixels (byte for byte with
+  the clock stopped, both backends). Paired A/B, 4 rounds, per-round minimums: ready 28.2 to 17.7 s, longest task 1,012
+  to 1,011 ms, long tasks 11.7 to 5.6 s. WebGPU unchanged (11.6 against 11.4 s, one round). Known bugs
+  KB-QUALITY-WARMSERIAL1 and KB-COMPAT-FBSTATUS1; method in
+  [reproduce.md](reproduce.md#webgl2-layer-warm-frames-2026-11-28).
+
 ## WebGL2 layer: synchronous pipelines linked one at a time (2026-11-28, fixed)
 
 - **Loss:** `demos/ten-thousand-trees` took 31 to 33 s to start on the WebGL2 layer (Chrome, ANGLE Direct3D 11, RTX

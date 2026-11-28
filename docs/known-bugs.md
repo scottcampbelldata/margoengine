@@ -371,6 +371,37 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `packages/headless/tests/look-clean.test.js` (a bar moving 2 px under a 12 px camera sweep, drawn sharp,
   fails by the camera's motion and passes by its velocity; the same bar really moving 12 px still fails).
 
+### Fixed 2026-11-28: warmUp made ten-thousand-trees take 33 s instead of 18 s to start on the WebGL2 layer (KB-QUALITY-WARMSERIAL1, quality, webgl2-compat)
+
+- **Repro:** a paired A/B of `scripts/web-demos/startup-profile.mjs ten-thousand-trees --backend=webgl2`, the build of
+  7bcf8d002b^ (no warmUp) and of 7bcf8d002b (warmUp) taking turns, 4 rounds each on the loaded workstation: time to
+  ready 17.7, 17.7, 17.9, 19.3 s before and 33.2, 34.7, 39.7, 51.9 s after (minimum 17.7 against 33.2 s, far past the
+  round-to-round spread). The pictures are the same; long tasks total about 10 s before (one of 9.3 s) and 9 to 29 s
+  after (none over 0.7 s).
+- **Cause:** warmUp (`packages/quality/src/warm.ts`) stopped each warm frame at the first pipeline that did not exist,
+  waited for that one pipeline's async compile, then rendered the frame again: 45 rounds, one link at a time, each
+  repeating the frame's CPU compute passes. The first route built here (whole warm frames held in the layer's queue
+  until their programs linked) started in 21 s but replayed the held frame in one task of 3.3 to 5.4 s. A probe build
+  timed it: one command buffer of 5,611 commands, 4.2 s of a 4.3 s task, with 2,473 `checkFramebufferStatus` calls
+  (1.7 s, KB-COMPAT-FBSTATUS1) and 150 `getBufferSubData` read-backs of CPU compute passes (0.9 s), each waiting for all
+  the GPU work queued before it. No shader compiled at a draw in that task (the trace's Direct3D compile events: none).
+- **Fix:** with KHR_parallel_shader_compile the layer's queue carries a link hold
+  (`Symbol.for('margoengine.queue.holdsLinks')`, `packages/shared/queue-hold.js`): while it is on, a submit that may use
+  a program still linking waits in the queue, with the writes and submits after it in order, until each of those
+  programs has linked and drawn once. warmUp takes that frame route when the mark is there: whole frames with the hold
+  on, ending after `frames` frames in a row that made no new pipeline (browser WebGPU and the layer without the
+  extension keep the stopped-frame route). The queue replays held work in tasks of about 50 ms, a command buffer
+  resuming between commands outside a render pass, each task after the first once a fence shows the GPU has run the one
+  before; and framebuffer status is read once per attachment signature. Paired A/B against main 4469d88656, taking
+  turns, 4 rounds, per-round minimums: ready 28.2 to 17.7 s, longest task 1,012 to 1,011 ms, long tasks in total 11.7
+  to 5.6 s, 2,862 to 3,018 framebuffer status reads to 111 to 113; WebGPU 11.6 against 11.4 s (one round). A frame with
+  the clock stopped is byte for byte the same on both backends once both builds have the sky fix KB-SKY-TABLESKEY1
+  (main's stopped route left aerial perspective's tables empty, so its frame lacked the far haze).
+- **Regression:** `packages/webgl2-compat/test/link-hold.test.js` (links side by side, no early `LINK_STATUS` read,
+  order kept, the replay sliced between passes with a fence between slices), `packages/quality/test/warm.test.js` (the
+  frame route: 4 rounds where the stopped route takes 8, peak 5 links pending), `packages/water/test/warm-up.browser.mjs`
+  (both backends; the layer reads no link status early).
+
 ### Fixed 2026-11-28: the WebGL2 layer read checkFramebufferStatus for every new framebuffer and every new texture (KB-COMPAT-FBSTATUS1, webgl2-compat)
 
 - **Repro:** `scripts/web-demos/startup-profile.mjs ten-thousand-trees --backend=webgl2` on main 4469d88656: 2,878 to
@@ -388,25 +419,6 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   2,878 to 2,954 reads before, 109 to 113 after.
 - **Regression:** `packages/webgl2-compat/test/framebuffer-status.test.js` (6 framebuffers of one signature: 12 reads
   before, 2 after); `packages/webgl2-compat/test/passes.test.js` gives its second stand-in format a signature of its own.
-
-### Open 2026-11-28: warmUp makes ten-thousand-trees take 33 s instead of 18 s to start on the WebGL2 layer (KB-QUALITY-WARMSERIAL1, quality, webgl2-compat)
-
-- **Repro:** a paired A/B of `scripts/web-demos/startup-profile.mjs ten-thousand-trees --backend=webgl2`, the build of
-  7bcf8d002b^ (no warmUp) and of 7bcf8d002b (warmUp) taking turns, 4 rounds each on the loaded workstation: time to
-  ready 17.7, 17.7, 17.9, 19.3 s before and 33.2, 34.7, 39.7, 51.9 s after (minimum 17.7 against 33.2 s, far past the
-  round-to-round spread). The pictures are the same; long tasks total about 10 s before (one of 9.3 s) and 9 to 29 s
-  after (none over 0.7 s).
-- **Cause:** warmUp (`packages/quality/src/warm.ts`) stops each warm frame at the first pipeline that does not exist,
-  waits for that one pipeline's async compile, then renders the frame again: 45 rounds, one pipeline at a time. On the
-  layer each async pipeline also waits for a warm draw and a fence before it resolves, and every round runs the frame's
-  CPU compute passes again. A CPU profile of the after build: 18 s of the 28 s start is the main thread idle, waiting
-  on single links; the synchronous path it replaced linked all of them side by side (KB-COMPAT-SYNCLINK1) in one
-  9.3 s task.
-- **Fix needed:** keep the page responsive and link side by side, with the same pipelines and pictures. Two routes to
-  plan: the layer's queue holds a command buffer whose programs have not linked (as it already holds compute work
-  until the compute runtime loads) and runs it once they have, so the synchronous first frame no longer blocks and
-  warmUp is not needed on the layer; or warmUp discovers every pipeline of a frame per round on a device whose
-  synchronous creation does not block (the layer links in the background) and waits for them together.
 
 ### Fixed 2026-11-28: nine entries of animator, rigging, scatter and biomes were over their size ceilings (KB-SIZE-SPLINEANATOMY1, sizes)
 

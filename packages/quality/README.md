@@ -241,6 +241,13 @@ redrawAfterRestore(engine, () => engine.render({delta: 0})); // only for apps th
   creation) fails on the retry; warmUp then restores the device (`engine.rebootDevice()`, every feature's restore hook)
   and finishes with synchronous creation (`report.rebooted`). A feature attached later or switched off is not warmed:
   call `warmUp` again after attaching it. Zero cost unless imported: no package reads it.
+- On the WebGL2 compatibility layer with `KHR_parallel_shader_compile` no frame is stopped: each warm frame runs whole
+  with the layer's link hold on (`Symbol.for('margoengine.queue.holdsLinks')` on the queue), so the layer keeps the
+  frame's submits, and the writes after them in order, until every program the frame made has linked and drawn once,
+  then replays them in tasks of about 50 ms. All of a frame's links run side by side, so `report.rounds` is a few
+  whole frames (ten-thousand-trees: ready in 17.7 s where the stopped route took 28.2 s, KB-QUALITY-WARMSERIAL1) and
+  `report.pipelines` counts the distinct pipelines the warm frames made. Call it before `engine.start()`: frames a
+  running loop renders meanwhile wait in the queue behind the held frame.
 - `redrawAfterRestore(engine, render)`: core restores a lost GPU device by itself and the engine's loop draws the next
   frame, but an app that renders on demand (paused, loop stopped) shows an empty canvas until it renders again. This
   runs `render` on the two frames after every restoration (effects that read the previous frame, such as water

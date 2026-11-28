@@ -132,7 +132,8 @@ async function start() {
   });
   // Compile every pipeline with the async API before the first visible frame. On the WebGL2 layer the first frame
   // otherwise linked the water surface and the post stack and compiled them again for their targets in one task of
-  // 9 s, and a loaded machine took it past 15 s (KB-WATER-WARMUP1).
+  // 9 s, and a loaded machine took it past 15 s (KB-WATER-WARMUP1). On the layer the warm frames run whole and its
+  // queue holds each one until its programs have linked side by side (KB-QUALITY-WARMSERIAL1), so call it before start().
   await warmUp(engine, { signal: lifetime.signal });
   engine.start();
   await engine.gpu.queue.onSubmittedWorkDone();

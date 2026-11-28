@@ -201,7 +201,11 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   bindings, synchronous calls that would hold the page's thread until the GPU thread finished that compile; a
   synchronous `createRenderPipeline` or `createComputePipeline` with that extension reads no link status in the call,
   so pipelines made together link side by side, and is checked at its first draw or dispatch, by the pop of the
-  validation scope it was made in, or once the driver reports the link done), render passes with clears,
+  validation scope it was made in, or once the driver reports the link done; with the queue's link hold on,
+  `queue[Symbol.for('margoengine.queue.holdsLinks')](true)`, which `warmUp` of `@margoengine/quality/warm` uses, a
+  submit that may use a program still linking waits in the queue with everything after it until those programs can
+  draw, and held work replays in tasks of about 50 ms, each after a fence shows the GPU ran the one before), render
+  passes with clears,
   resolves and discards, indirect draws, copies, `writeBuffer`, `writeTexture`, `copyExternalImageToTexture`,
   `mapAsync` with fenced readbacks, `onSubmittedWorkDone` (a fence that signals on the next poll, also when no frame
   is shown; each poll yields a port task and a 1 ms timer, about 2 ms in Chrome), error scopes, `uncapturederror` and `device.lost`. A buffer, texture or

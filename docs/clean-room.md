@@ -20302,3 +20302,21 @@ sines over the surface point; far-ring sizes chosen so the area seen from above 
 ### SEA-07 native Sun, Moon and atmospheric potential
 
 Pugh and Woodworth (2014), [Sea-Level Science](https://doi.org/10.1017/CBO9781139235778), Chapter 3, and Stewart, [Introduction to Physical Oceanography](https://geo.libretexts.org/Bookshelves/Oceanography/Introduction_to_Physical_Oceanography_%28Stewart%29/17%3A_Coastal_Processes_and_Tides/17.4%3A_Theory_of_Ocean_Tides), §17.4, give the tide-generating potential with constant and uniform-acceleration terms removed. Native cells evaluate the existing rationalized Newton expression for the Sun and Moon using the published Earth-fixed vectors. The wet pressure and tide sums use the original row order. The next phase forms the same pressure head and relative equilibrium tide. Luettich and Westerink (2004), [Formulation and numerical implementation of ADCIRC](https://adcirc.org/wp-content/uploads/sites/2255/2013/07/adcirc_theory_2004_12_08.pdf), Eq. 1.13, gives the separate atmospheric and equilibrium-potential gradients in depth-integrated momentum.
+
+### WebGL2 layer: warm frames held for their links, replayed in slices, framebuffer status per signature (KB-QUALITY-WARMSERIAL1, KB-COMPAT-FBSTATUS1)
+
+Jie Chen, Geoff Lang and the Khronos WebGL Working Group, *KHR_parallel_shader_compile* (WebGL extension 37,
+revision 6, 2020), https://registry.khronos.org/webgl/extensions/KHR_parallel_shader_compile/ : `COMPLETION_STATUS_KHR`
+answers without blocking, so compile and link every program first and poll; it reads true on a lost context. Mozilla
+contributors, *WebGL best practices* (MDN), https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/WebGL_best_practices :
+`checkFramebufferStatus`, `getBufferSubData`, `getError` and the status gets each force a round trip to the GPU process;
+a fence polled with `clientWaitSync(sync, flags, 0)` from a later task waits without blocking. Khronos, *OpenGL ES
+Version 3.0.6* (2019), section 4.4.4, https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf : attachment and
+whole framebuffer completeness follow from each attached image's object type, internal format, renderbuffer samples,
+non-zero size and (for a mutable texture) level, never from which object it is; FRAMEBUFFER_UNSUPPORTED follows from
+the combination of formats. Khronos, *WebGL 2.0 Specification*, https://registry.khronos.org/webgl/specs/latest/2.0/ ,
+"checkFramebufferStatus may return FRAMEBUFFER_INCOMPLETE_DIMENSIONS" (equal widths and heights) and "Framebuffer color
+attachments" (one image at one colour point). Derived here: the queue's link hold, its replay in tasks of about 50 ms
+resumed between commands outside a render pass with a fence between tasks, and the status cache keyed by kind, format,
+size and point. Search results naming Firefox, WebKit and public_webgl threads were not opened and are not cited. No
+browser, ANGLE or other engine source was read.

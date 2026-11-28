@@ -4,6 +4,7 @@
 // WebGPU; what the layer cannot do throws MargoError code `unsupported`.
 import type { CompatXR, CompatXROptions } from '../xr.js';
 import { fault } from '../../../shared/errors.js';
+import { HOLDS_LINKS } from '../../../shared/queue-hold.js';
 import { webgl2Capabilities, type WebGL2Capabilities, type CompatTier } from '../index.js';
 import type { TierFormats } from '../tiers.js';
 import { extensions, type Extensions, GLObjects, GLState } from './gl.js';
@@ -42,6 +43,7 @@ import {
   programUnits,
   translatePipeline,
   type PipelineUnits,
+  type ReplayCursor,
 } from './render.js';
 
 /** The vendor string compatibility adapters report, so apps and stats can show "compatibility mode". */
@@ -496,6 +498,35 @@ export class CompatDevice extends EventTarget {
     gl.samplerParameteri(this.loadSampler, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     this.queue = new CompatQueue(this);
     this.replayer = new Replayer(this);
+    // The link hold (see held) needs links that run without blocking: without the extension a link is known when made.
+    if (this.ext.parallel)
+      Object.defineProperty(this.queue, HOLDS_LINKS, {
+        value: (on: boolean) => {
+          this.held = on ? (this.held ?? { render: [], compute: [] }) : null;
+        },
+      });
+  }
+
+  /**
+   * @internal While the queue's link hold is on (`queue[Symbol.for('margoengine.queue.holdsLinks')](true)`, present
+   * with KHR_parallel_shader_compile; KB-QUALITY-WARMSERIAL1): the render pipelines made since the last submit, and
+   * the compute pipelines made before the compute runtime could build them. The next submit waits in the queue, with
+   * everything after it in order, until each of them can run without a wait (see linksUsable), so a frame's programs
+   * link side by side and none of its draws reads a link status that is not known yet. Null while the hold is off.
+   */
+  held: { render: CompatRenderPipeline[]; compute: CompatComputePipeline[] } | null = null;
+  /**
+   * @internal Resolves once every pipeline `held` noted can run without waiting: a render pipeline's program has linked,
+   * its binding table is read and its first draw compiles nothing more (whenLinked, as createRenderPipelineAsync
+   * resolves), and a compute pipeline is built with its programs linked (readyAsync). Forgets them.
+   */
+  linksUsable(held: NonNullable<CompatDevice['held']>): Promise<void> {
+    const render = held.render.splice(0),
+      compute = held.compute.splice(0);
+    return Promise.all([
+      ...render.map((p) => p.whenLinked()),
+      ...compute.map((p) => this.loadCompute().then(() => p.readyAsync())),
+    ]).then(() => undefined);
   }
 
   /** Enums looked up so far, by name (the replay asks for the same few every frame). */
@@ -784,24 +815,7 @@ export class CompatDevice extends EventTarget {
     if (this.destroyed) return nextGPUTask();
     const waiting = this.queue.waiting;
     if (waiting) return waiting.then(() => this.idle());
-    const gl = this.gl,
-      sync = fence(gl);
-    if (!sync) return nextGPUTask();
-    return new Promise((resolve) => {
-      const poll = () => {
-        if (this.destroyed || gl.isContextLost()) {
-          resolve();
-          return;
-        }
-        if (!fenceDone(gl, sync)) {
-          void nextGPUTask().then(poll);
-          return;
-        }
-        gl.deleteSync(sync);
-        resolve();
-      };
-      void nextGPUTask().then(poll);
-    });
+    return gpuDone(this);
   }
 
   /** Marks a canvas whose texture a replayed pass drew into; the submit shows it when it ends. */
@@ -984,7 +998,11 @@ export class CompatDevice extends EventTarget {
   createComputePipeline(descriptor: GPUComputePipelineDescriptor): CompatComputePipeline {
     const pipeline = new CompatComputePipeline(this, descriptor);
     if (this.computeRuntime) pipeline.ready();
-    else void this.loadCompute().catch(() => undefined);
+    else {
+      // Built with its links left to the driver before the submit that uses it replays (see held).
+      this.held?.compute.push(pipeline);
+      void this.loadCompute().catch(() => undefined);
+    }
     return pipeline;
   }
   createComputePipelineAsync(descriptor: GPUComputePipelineDescriptor): Promise<CompatComputePipeline> {
@@ -1030,11 +1048,52 @@ export class CompatDevice extends EventTarget {
   }
 }
 
+/**
+ * Resolves, in a later task, once the GPU has run every GL command `device` made so far: a fence polled without
+ * blocking. idle() waits for the queue's held work first; the held replay itself waits with this alone.
+ */
+function gpuDone(device: Pick<CompatDevice, 'destroyed' | 'gl'>): Promise<void> {
+  if (device.destroyed) return nextGPUTask();
+  const gl = device.gl,
+    sync = fence(gl);
+  if (!sync) return nextGPUTask();
+  return new Promise((resolve) => {
+    const poll = () => {
+      if (device.destroyed || gl.isContextLost()) {
+        resolve();
+        return;
+      }
+      if (!fenceDone(gl, sync)) {
+        void nextGPUTask().then(poll);
+        return;
+      }
+      gl.deleteSync(sync);
+      resolve();
+    };
+    void nextGPUTask().then(poll);
+  });
+}
+
+/** How long one task of the queue's held work runs before the page gets a turn and the GPU catches up (see drain). */
+const SLICE_MS = 50;
+
+/** A held submit: its command buffers, the one replaying, where its tape stopped, and whether its replay began. */
+interface HeldReplay {
+  readonly list: SubmitList;
+  cb: number;
+  readonly at: ReplayCursor;
+  started: boolean;
+}
+/** A queue operation waiting its turn: a write, destroy or copy, or a held submit (replayed in slices). */
+type Held = (() => void) | HeldReplay;
+/** What a run operation's backlog slot holds (the operation is let go). */
+const NOTHING: Held = () => undefined;
+
 /** The GPUQueue: buffer and texture writes run at once; command buffers replay on submit. */
 export class CompatQueue {
   label = '';
-  /** Queue operations waiting for a lazy chunk, in submission order; null when nothing waits. */
-  private backlog: (() => void)[] | null = null;
+  /** Queue operations waiting for a lazy chunk or a link, in submission order; null when nothing waits. */
+  private backlog: Held[] | null = null;
   private readonly loads: Promise<unknown>[] = [];
   /** Resolves when the waiting operations have run. */
   waiting: Promise<void> | null = null;
@@ -1061,14 +1120,84 @@ export class CompatQueue {
     this.waiting ??= this.drain();
   }
 
-  /** Runs the waiting operations once every load has finished; a failed load has lost the device, so they are dropped. */
+  /**
+   * Runs the waiting operations, in order, once every load has finished; a failed load has lost the device, so they
+   * are dropped. They run in tasks of about SLICE_MS each, a held submit resuming between commands outside a render
+   * pass, and each task after the first starts once the GPU has run the one before (a fence polled without blocking).
+   * Run in one task, a warm frame's held replay was ten-thousand-trees' longest task on ANGLE Direct3D 11 (3.5 s):
+   * each read that waits for the GPU process in it (a CPU compute pass reading back, a framebuffer status) paid for all
+   * the frame's GPU work queued before it (KB-QUALITY-WARMSERIAL1). The backlog stays in place until the last
+   * operation has run, so whatever the queue gets meanwhile still runs after it.
+   */
   private async drain(): Promise<void> {
-    const backlog = this.backlog as (() => void)[];
-    let loaded = true;
-    while (this.loads.length) await (this.loads.shift() as Promise<unknown>).catch(() => (loaded = false));
-    this.backlog = null;
-    this.waiting = null;
-    if (loaded) for (const op of backlog) op();
+    const backlog = this.backlog as Held[],
+      d = this.device;
+    let loaded = true,
+      next = 0,
+      current: HeldReplay | null = null;
+    try {
+      for (;;) {
+        while (this.loads.length) await (this.loads.shift() as Promise<unknown>).catch(() => (loaded = false));
+        if (!loaded || next >= backlog.length) break;
+        const until = performance.now() + SLICE_MS;
+        while (next < backlog.length && !this.loads.length) {
+          const op = backlog[next];
+          // An operation runs as on a queue with nothing waiting: what it asks the queue for runs at once.
+          this.backlog = null;
+          let done = true;
+          try {
+            if (typeof op === 'function') op();
+            else done = this.replaySlice((current = op), until);
+          } finally {
+            const added = this.backlog as Held[] | null;
+            this.backlog = backlog;
+            if (added) for (const a of added) backlog.push(a);
+          }
+          if (!done) break;
+          current = null;
+          backlog[next++] = NOTHING;
+          if (performance.now() >= until) break;
+        }
+        if (next < backlog.length && !this.loads.length) await gpuDone(d);
+      }
+    } finally {
+      // A held submit stopped by a lost device gives its command buffers back and ends its replay.
+      if (current) this.endReplay(current, false);
+      this.backlog = null;
+      this.waiting = null;
+    }
+  }
+
+  /** Replays a held submit until `until`; true once all of it has replayed (then as replay() ends). */
+  private replaySlice(h: HeldReplay, until: number): boolean {
+    const d = this.device,
+      list = h.list;
+    if (!h.started) {
+      h.started = true;
+      d.objects.replaying++;
+    }
+    // A replay that throws is ended by drain() (its command buffers go back, nothing is shown), as replay() ends one.
+    while (h.cb < list.length && !d.destroyed) {
+      if (!d.replayer.resume(list[h.cb].ops, h.at, until)) return false;
+      h.cb++;
+      h.at.i = h.at.n = h.at.o = 0;
+      if (h.cb < list.length && performance.now() >= until) return false;
+    }
+    this.endReplay(h, true);
+    return true;
+  }
+
+  /** The end of a held submit's replay, as in replay(): the tapes go back, then (`shown`) presents and a flush. */
+  private endReplay(h: HeldReplay, shown: boolean): void {
+    if (!h.started) return;
+    h.started = false;
+    const d = this.device;
+    for (const cb of h.list) cb.release?.();
+    d.objects.replaying--;
+    if (!shown) return;
+    d.collect();
+    d.flushPresents();
+    if (!d.destroyed) d.gl.flush();
   }
 
   /**
@@ -1130,6 +1259,8 @@ export class CompatQueue {
       readback ||= !!cb.readback;
     }
     // What the commands need loads first; everything the queue gets meanwhile runs after, in order.
+    const held = d.held;
+    if (held && (held.render.length || held.compute.length)) this.hold(d.linksUsable(held));
     if (!d.computeRuntime && compute) this.hold(d.loadCompute());
     if (!d.readback && readback) this.hold(d.loadReadback());
     if (this.backlog) this.replayLater(list.slice(0, count));
@@ -1155,7 +1286,7 @@ export class CompatQueue {
 
   /** submit() while waiting for a lazy chunk (a method: its closure would cost every submit a context). */
   private replayLater(list: SubmitList): void {
-    this.backlog?.push(() => this.replay(list, list.length));
+    this.backlog?.push({ list, cb: 0, at: { i: 0, n: 0, o: 0 }, started: false });
   }
 
   /** Replays the first `count` submitted command buffers in order, then shows the canvases they drew and flushes. */

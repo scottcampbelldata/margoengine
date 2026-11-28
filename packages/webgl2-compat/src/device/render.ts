@@ -692,6 +692,8 @@ export class CompatRenderPipeline {
       textures: e.textures,
       storage: e.storage,
     });
+    // The link hold (CompatDevice.held) makes the next submit wait until this pipeline can draw without a wait.
+    device.held?.render.push(this);
     if (deferLink) return;
     // A program already checked (a pipeline made again) costs no wait; any other link runs on the driver's threads
     // while the page goes on, and is checked when the pipeline is first used (CompatDevice.deferLink, KB-COMPAT-SYNCLINK1).
@@ -1482,6 +1484,16 @@ interface Sub {
   fbs?: Attachments[];
 }
 
+/** Where a held replay stopped in a tape (Replayer.resume): the next command and its first number and object. */
+export interface ReplayCursor {
+  i: number;
+  n: number;
+  o: number;
+}
+
+/** A tape's start; a replay with no time limit never writes its cursor, so one shared start allocates nothing. */
+const START: ReplayCursor = { i: 0, n: 0, o: 0 };
+
 /** A framebuffer's attachments, as Replayer.framebuffer matches them, and the device's record of it. */
 interface Attachments {
   readonly colors: readonly (Sub | null)[];
@@ -1594,14 +1606,31 @@ export class Replayer {
 
   /** Replays a tape: each command's numbers and objects come off the tape in the order the recorder wrote them. */
   run(tape: Tape): void {
+    this.resume(tape, START, Infinity);
+  }
+
+  /**
+   * Replays a tape from where `at` says. Once `performance.now()` reaches `until` it stops after a command outside a
+   * render pass (a pass's GL state is not left half set for other work to run between), writes where it stopped into
+   * `at` and answers false; the queue's held replay resumes it there (KB-QUALITY-WARMSERIAL1). True once the tape is
+   * done.
+   */
+  resume(tape: Tape, at: ReplayCursor, until: number): boolean {
     const codes = tape.codes,
       nums = tape.nums,
       objs = tape.objs,
-      count = tape.length;
-    let n = 0,
-      o = 0;
-    for (let i = 0; i < count; i++) {
-      if (this.device.destroyed) return;
+      count = tape.length,
+      first = at.i;
+    let n = at.n,
+      o = at.o;
+    for (let i = first; i < count; i++) {
+      if (this.device.destroyed) return true;
+      if (i > first && until < Infinity && this.pass === null && performance.now() >= until) {
+        at.i = i;
+        at.n = n;
+        at.o = o;
+        return false;
+      }
       switch (codes[i]) {
         case OP.CLOSURE:
           (objs[o++] as (r: Replayer) => void)(this);
@@ -1722,6 +1751,7 @@ export class Replayer {
         }
       }
     }
+    return true;
   }
 
   /** The compute pass running: its pipeline, bind groups (reused slots, so a pass allocates none) and workgroup counts. */

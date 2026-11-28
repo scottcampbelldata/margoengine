@@ -866,6 +866,16 @@ Only synthetic geometric inputs are proven; authored mesh placement and spectral
 Every public number should come from one of the commands below. Run them from the repository root on the commit you
 want to check. Status of each claim and which command backs it: [claims.md](claims.md).
 
+## WebGL2 layer warm frames (2026-11-28)
+
+Build `demos/ten-thousand-trees` twice as in the next section, once from main and once with the change, and run
+`startup-profile.mjs ten-thousand-trees --backend=webgl2 --root=<folder>` for each in turn, 4 rounds, under
+`scripts/run-with-timeout.mjs`; compare per-round minimums of the seconds to `data-ready`, the longest task, the long
+tasks' total and the `checkFramebufferStatus` count it prints. `still-frame.mjs` on `webgl2` and `webgpu` gives the
+same hash for both builds. The counts with no GPU are `node --test packages/webgl2-compat/test/link-hold.test.js
+packages/webgl2-compat/test/framebuffer-status.test.js packages/quality/test/warm.test.js`; the early link reads,
+`node packages/water/test/warm-up.browser.mjs` with and without `MARGO_COMPAT=1` (`"early":0`).
+
 ## WebGL2 layer synchronous links (2026-11-28)
 
 Build a demo twice, with the layer before and after the change, into two folders that each hold `<demo>/`

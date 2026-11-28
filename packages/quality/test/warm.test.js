@@ -269,3 +269,110 @@ test('a feature that makes its layouts again on every call still gets its warmed
     ['async', 'async'],
   );
 });
+
+// KB-QUALITY-WARMSERIAL1: on the WebGL2 layer warmUp stopped each warm frame at its first missing pipeline and waited
+// for that one link: ten-thousand-trees took 45 rounds, one link at a time, and started in 33 s instead of 18 s. A
+// queue that carries the layer's link hold (programs link on the driver's threads) gets whole warm frames instead: the
+// hold keeps each frame's submits in the queue until every program it made can draw, so a frame's links run together.
+const HOLDS = Symbol.for('margoengine.queue.holdsLinks');
+class HoldingDevice extends Device {
+  /** Pipelines made whose links have not finished; the GPU finishes them when the held work is done. */
+  pending = new Set();
+  /** The most links pending at a held submit, the hold's state and every change to it. */
+  peak = 0;
+  holding = false;
+  holds = [];
+  constructor() {
+    super();
+    const submit = this.queue.submit;
+    this.queue.submit = (buffers) => {
+      if (this.holding) this.peak = Math.max(this.peak, this.pending.size);
+      submit(buffers);
+    };
+    this.queue.onSubmittedWorkDone = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      this.pending.clear();
+      this.idle = true;
+    };
+    this.queue[HOLDS] = (on) => {
+      this.holding = on;
+      this.holds.push(on);
+    };
+  }
+  createRenderPipeline(descriptor) {
+    const pipeline = super.createRenderPipeline(descriptor);
+    this.pending.add(pipeline);
+    return pipeline;
+  }
+  createComputePipeline(descriptor) {
+    const pipeline = super.createComputePipeline(descriptor);
+    this.pending.add(pipeline);
+    return pipeline;
+  }
+}
+
+test('on a queue with the link hold, warm frames run whole and their links are pending together', async () => {
+  const runs = [];
+  const counted = (feature, i) => (d, encoder) => {
+    runs[i] = (runs[i] ?? 0) + 1;
+    feature(d, encoder);
+  };
+  const render = (code) =>
+    lazy((d) =>
+      d.createRenderPipeline({ layout: 'auto', vertex: { module: d.createShaderModule({ code }), entryPoint: 'v' } }),
+    );
+  let frame = 0;
+  const lateSlot = {};
+  const features = [
+    render('a'),
+    render('b'),
+    render('c'),
+    lazy((d) => d.createComputePipeline({ layout: 'auto', compute: { module: { code: 'k' }, entryPoint: 'main' } })),
+    render('d'),
+    // A variant that first appears in the second frame (history-dependent, like a temporal pass).
+    (d) => {
+      if (++frame >= 2)
+        lateSlot.pipeline ??= d.createRenderPipeline({
+          layout: 'auto',
+          vertex: { module: d.createShaderModule({ code: 'late' }), entryPoint: 'v' },
+        });
+    },
+  ];
+  const e = engine(features.map(counted));
+  e.gpu = new HoldingDevice();
+  const report = await warmUp(e);
+  assert.deepEqual(
+    report,
+    { pipelines: 6, fallbacks: 0, rounds: 4, rebooted: false },
+    'two frames that made pipelines, then two complete',
+  );
+  assert.equal(e.gpu.peak, 5, "the first frame's five links were pending together");
+  assert.deepEqual(e.gpu.calls, { sync: 6, async: 0 }, 'made with the synchronous API, whose links the layer holds');
+  assert.deepEqual(runs, [4, 4, 4, 4, 4, 4], 'every feature ran in every round: no frame was stopped');
+  assert.deepEqual(
+    e.gpu.holds,
+    [true, false, true, false, true, false, true, false],
+    'the hold is on for each warm frame only',
+  );
+  assert.ok(
+    e.frames.every((f) => f.color.offscreen),
+    'warm frames draw offscreen',
+  );
+  assert.equal(Object.hasOwn(e.gpu, 'createRenderPipeline'), false, 'patches removed');
+
+  // A frame that throws and an abort mid-way leave the hold off.
+  const failing = engine([
+    () => {
+      throw new RangeError('scene error');
+    },
+  ]);
+  failing.gpu = new HoldingDevice();
+  await assert.rejects(warmUp(failing), RangeError);
+  assert.equal(failing.gpu.holding, false, 'off after a throwing frame');
+  assert.equal(Object.hasOwn(failing.gpu, 'createRenderPipeline'), false);
+  const mid = new AbortController(),
+    during = engine([render('x'), () => mid.abort(new Error('stopped mid-way'))]);
+  during.gpu = new HoldingDevice();
+  await assert.rejects(warmUp(during, { signal: mid.signal }), /stopped mid-way/);
+  assert.equal(during.gpu.holding, false, 'off after an abort');
+});
