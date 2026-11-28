@@ -2568,6 +2568,15 @@ against published floating model tests.
 4. Cite or replace the rogue rate and derive the event window. Add finite-depth statistics (Janssen 2018).
 5. Throw `MargoError` with codes, add a hull-on-rogue coupling test with conserved quantities, add Wasm SIMD or threaded pair sums, record work counts, and add film seed or placement tests on the dynamic tier.
 
+#### SEA-03 four-point pass
+
+- Point 5 and audit item 11 (0f282397e6). `packages/physics/tests/rogue.test.js` rejects nonfinite queries, dry spectra, misaligned currents and malformed grids with fix-linked codes, preserves caller samples exactly after a rejected flow, differentiates the full placed-wave envelope in both axes and checks that pressure stops below the bed.
+- Point 6 and audit item 8 (0f282397e6). `packages/physics/tests/coupling/rogue-pair-workers.test.js` exercises one, two and four participants on ordinary and finite-depth placed spectra at signed coordinates, with an exact scalar comparison and rewind. `packages/physics/tests/rogue-pair-workers.browser.mjs` starts and releases three actual Chromium helpers. The two-tile case evaluates 263,175 pairs, 263,174 in f64x2 lanes.
+- Point 7 and audit item 10 coupling evidence (0f282397e6). `packages/water/test/rogue-film.browser.mjs` draws the same prescribed crest that drives the live launch. The crest is 1.350 m versus 0.06239 m in the plain sea, with 19.73° versus 0.045° of roll. Both renderers check exact accepted bytes and direct resolved images through hold, restore, re-advance and rewind. The proof covers prescribed placement and one-way surface-to-hull loading.
+- Point 8 and audit item 5 measured comparison (0f282397e6). `packages/physics/scripts/sea03-flume-crests-measured.mjs` uses the separately specified Dematteis et al. wavemaker inputs. At 96 components and 40 Hz the second-order model gives 19, 1 and 3 extreme maxima against the independently observed 78, 99 and 88 for the three regimes. The most favorable tested threshold rounding gives 24, 7 and 6. [Limits](limits.md#placed-second-order-waves-and-flume-crest-counts-sea-03)
+
+High-order phase evolution, breaking, wider measured accuracy, full two-way coupling and the original production shot remain open. The row stays REOPENED at four points.
+
 ### SEA-01 Wave spectrum and wave-field evolution (`@margoengine/physics/waves`, commits 62fa8c303, 526cc95c9, bb9be393e, 8035cee71), owner Codex: REOPENED
 
 **Checked.** Read `packages/physics/src/waves/spectral.ts` (928 lines), `st4.ts` (372), `packages/physics/tests/waves.test.js`, the SEA-01 rows in `docs/physics-solvers.md`, `docs/physics-solver-audit.md` (lines 60, 188, 344) and `docs/known-bugs.md` (KB-PHYS-AUDIT2). No commit touches the waves source or tests since the audit (2026-11-25 onward, only the four above, all before it). Ran `node scripts/run-with-timeout.mjs --max=15 -- node --test packages/physics/tests/waves.test.js`: 11 tests, 11 pass, 0 fail (about 65 s). Not run: no GPU or browser test exists for waves, and `foam.test.js` (coupling) was not re-run.

@@ -16829,18 +16829,23 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `@margoengine/procedural/trees` already grows, then clustered leaf cards), near, middle and imposter levels as the
   conifers have, judged on whole-scene frames. A planner-sized job across procedural and biomes.
 
-### Open 2026-11-28: a meadow seen from a few metres up shows the edge of the dense near grass as a band (KB-BIOMES-GRASSRING1, biomes, scatter)
+### Fixed 2026-11-28: a meadow seen from a few metres up showed the edge of the dense near grass as a band (KB-BIOMES-GRASSRING1, biomes, scatter)
 
-- **Repro:** the FG-16 wide shot (camera 6 m up): the ground within 20 m is a dense sward and beyond it the grass
-  thins at once, a visible line across the frame about 17 degrees below the horizon. From 0.9 m it sits 3 degrees down
-  and hardly shows.
-- **Cause:** KB-BIOMES-SPARSEGRASS1's near layer holds 3 clumps a square metre per unit of density (120 for the
-  temperate preset) and the field across `detailRadius` about 15 (its million candidates); the near layer only shrinks
-  its clumps over its last 4 m (`edgeShrink`) while the field fades in over the same 4 m (`inner`, `innerFade`), so the
-  density falls about eight times within 4 m (`packages/biomes/src/objects.ts`, `NEAR_GRASS`).
-- **Fix needed:** thin the near layer with distance and widen the clumps that stay so the covered share of the ground
-  holds (the aggregate-detail rule of Cook, Halstead, Planck and Ryu 2007), meeting the field's density at its edge,
-  in `@margoengine/scatter` as an option with a test, then used by biomes.
+- **Repro (before):** the FG-16 wide shot (camera 6 m up): the ground within 20 m was a dense sward and beyond it the
+  grass thinned at once, a line across the frame. `packages/biomes/tests/meadow-grass-check.mjs`, 6 m up looking 20
+  degrees down: the share of ground the grass covers fell from 97.6 to 31.9 percent between 14 and 18 m (RTX A6000).
+- **Cause:** the near layer held 3 clumps a square metre per unit of density (120 for the temperate preset) and the
+  field about 10; the near layer shrank over its last 4 m (`edgeShrink`) as the field faded in (`inner`, `innerFade`),
+  so the density fell about twelve times within 4 m (`packages/biomes/src/objects.ts`, `NEAR_GRASS`).
+- **Fix:** scatter gains `edgeThin`: instances drop out one by one, each at its own hashed distance, over a band before
+  the last LOD, so the count falls linearly to none while survivors keep their size and place (the thinning of Cook,
+  Halstead, Planck and Ryu, "Stochastic Simplification of Aggregate Detail", SIGGRAPH 2007). Biomes' near layer now
+  reaches 40 m and thins over its outer 32 m, and the field runs under it to the camera at 0.45 candidates a square
+  metre per unit of density (1,000,000 at most, was 0.25). The same check now covers 92 to 100 percent from 10 to 60
+  m with no fall over 4 points between 2 m bins, on WebGPU and the WebGL2 layer; the wide frame shows no band. Cost:
+  the field places up to 74 percent more clumps.
+- **Regression:** `packages/biomes/tests/meadow-grass-check.mjs` (real GPU; `MARGO_COMPAT=1` for the WebGL2 layer),
+  `packages/scatter/test/inner.browser.mjs` (`edges` cases, `--compat` too) and `packages/scatter/test/tiles.test.js`.
 
 ### Fixed 2026-11-28: the lens drops' glint added light over empty pixels without covering them (KB-WEATHER-LENSGLINT1, weather)
 
@@ -21225,6 +21230,22 @@ checks the retained stations of a sheer hull and exact agreement of the native a
 - **Regression:** "a surge and a tide refuse what they cannot be made from, naming the fix" in
   `packages/physics/tests/surge.test.js` (a wind with no scale, a wind at 60, and a sky at 1, each refused by a water at
   600; a wind at 600 accepted).
+
+### Fixed 2026-11-28: a tensile seam in a cell with no volume reported its points outside the cell (KB-SOFT-SEAMFLAT1, physics/soft)
+
+- **Repro:** `tetrahedron().setTensileSeam({...})` (the volumetric-cut test's cell), then `desc.positions[11] = 0` so the cell is
+  flat after `setCells` checked it, then `soft.create(desc)`: the refusal read "A tensile seam point is outside its cell".
+- **Cause:** `bindTensileSeam` divided by the cell's determinant without checking it, so every cell coordinate was not
+  finite and `locate` blamed the points; its orientation was `Math.sign(determinant)`, 0 for such a cell (the class
+  `tests/modern-zero-determinant-normals.test.js` checks).
+- **Fix:** the seam refuses a cell whose determinant is within `MIN_TET_DETERMINANT` (the bound `setCells` uses) with a coded
+  `unsupported` error naming the cell, and the orientation is `determinant < 0 ? -1 : 1`. SOFT-04 file, changed by lane P
+  with the manager's go.
+- **Regression:** "a tensile seam rejects points outside its material cell and purely face-aligned triangles" in
+  `packages/physics/tests/coupling/volumetric-cut.test.js`.
+- **Open for the SOFT-04 owner (KB-SOFT-FLATCELLMSG1):** `SoftBodyDesc.setCells` (`packages/physics/src/soft.ts`, the flat-cell
+  check) says "Cell N must be flat: its four particles lie in one plane." when it refuses a flat cell; it should say the
+  cell must not be flat. Not changed here: soft.ts is the laptop session's file.
 
 ### Fixed 2026-11-28: a tracked vehicle facing along its up axis ignored every steer (KB-PHYS-TRACKEDUP1, physics)
 
@@ -30379,14 +30400,43 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
   all, the layer's `getBufferSubData` reads hashed too); only the order the layer's reads finish in differs. Entry
   sizes stay under their ceilings (the staged route is in the lazy compat chunk). Regression:
   `packages/voxel-pathtracer/tests/compat-staged.test.js` "mesh PBR evaluates its shading normal and material in
-  programs of their own before surface (KB5451)". Still open: 120 s. The cold first-draw waits left are `sample`
-  (mesh emitter radiance, 83 s), `hit` (45 s) and `shadow` (28 s); `sample`'s `pbrEmitterRadiance` (11,200 inlined
-  statements) is the next candidate for the same treatment.
+  programs of their own before surface (KB5451)". The cold first-draw waits left were `sample` (mesh emitter
+  radiance, 83 s), `post` (labelled `hit` before; 45 s) and `shadow` (28 s).
+- **Fix (2026-11-28, emit and the texel loop):** the staged route evaluates a mesh emitter's radiance in a program
+  of its own, `emit`, drawn between `sample` and `shadow` for the light kind that samples mesh emitters only (kind 5;
+  `StagedTrace.emits`). sampleMeshEmitter draws its three random numbers first and everything after them depends on
+  those draws, the shading point and private words alone, so on this route it returns the face's record offset (bit
+  30 set, so the word stays a normal f32) and its two draws through the light kind's own `radiance` words, and `emit`
+  runs the same code after the draws (`z_meshEmitted`) for the radiance. The stager refuses a shader where `sample`
+  reads that radiance again, changes a private word the emitter code reads, or reaches the call by more than the
+  light kind. A first version kept the record in 4 new state words: mesh PBR's state went from 280 words (10 pages)
+  to 11 pages and every program's state load and store grew with it, slower cold; a whole Hit (35 words) took 12
+  pages, 17 texture units with finish's 5 sums, and the layer refused it. `pbrTexture` on this route also fetches
+  its nearest tap and its four bilinear taps in one loop bounded by the texture's filter word, the same taps in the
+  same order, decoded and mixed in the same expressions: Direct3D's compiler had inlined five `pbrPixel` copies
+  (ten `pbrAddress`) into every texture fetch. WebGPU's shader is not touched. Paired offline fxc over all ten
+  (now eleven) staged programs, 2 rounds, per-program minimum: 89.6 s to 68.0 s (sample 29.7 s to 4.1 s plus emit
+  8.1 s, shadow 17.7 to 15.9 s, post 20.1 to 17.9 s). Cold first image of
+  `MARGO_COMPAT=1 node packages/voxel-pathtracer/tests/mesh-pbr-lobes-browser.mjs` (Edge, ANGLE Direct3D 11, fresh
+  profile, old and new alternating, the workstation quiet): old 94 and 91 s, new 80 and 77 s, under the 120 s bar.
+  Same output: the four mesh GPU tests and the resampled, guiding, media, spectral, mesh and compose
+  (`--backend=compat`) checks give the same sets of readback hashes before and after on WebGPU and the layer (1,576).
+  The lazy compat chunk grows from 13,503 to 14,856 B gzip; the root entry by 1 B (the chunk's name). Regressions:
+  `packages/voxel-pathtracer/tests/compat-staged.test.js` "mesh emitters evaluate their radiance in a program of
+  its own between sample and shadow (KB5451)" and `packages/voxel-pathtracer/tests/mesh-pbr.test.js` "the WebGL2
+  route's texel loop gives pbrTexture's values bit for bit (KB5451)" (CPU WGSL interpreter, nearest and bilinear,
+  sRGB and not). Still open: the busy-machine first image (167 to 205 s while other lanes ran); the largest cold
+  programs left are `post` and `shadow` (about 16 to 18 s each offline).
 - **Sources (the split):** S. Laine, T. Karras, T. Aila, "Megakernels Considered Harmful: Wavefront Path Tracing on
   GPUs", HPG 2013, https://research.nvidia.com/publication/2013-07_megakernels-considered-harmful-wavefront-path-tracing-gpus
   (a path's work cut into small kernels that pass the path state through memory, which keeps each kernel small for
   the compiler and the register file); D. van Antwerpen, "Improving SIMD Efficiency for Parallel Monte Carlo Light
-  Transport on the GPU", HPG 2011, https://doi.org/10.1145/2018323.2018330 (stream compaction between path stages).
+  Transport on the GPU", HPG 2011, https://doi.org/10.1145/2018323.2018330 (stream compaction between path stages);
+  P. S. Heckbert, "Fundamentals of Texture Mapping and Image Warping", MS thesis, UC Berkeley, 1989,
+  https://www2.eecs.berkeley.edu/Pubs/TechRpts/1989/CSD-89-516.pdf (bilinear reconstruction as two linear
+  interpolations of four taps, the order the loop keeps); R. W. Scheifler, "An Analysis of Inline Substitution for a
+  Structured Programming Language", CACM 20(9), 1977, https://doi.org/10.1145/359810.359830 (code growth from
+  inlining every call site, which the single tap avoids).
 - **Sources:** Microsoft, "Function Declaration Syntax" (HLSL `inline` is the default; one copy of the body per call),
   https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-function-syntax ; Microsoft,
   "for Statement" (`loop` keeps flow control, `unroll` copies the body; without an attribute the compiler unrolls
