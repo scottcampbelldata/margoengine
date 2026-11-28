@@ -2,7 +2,7 @@
 
 Import `margoengine/fsm` from the `margoengine` package, or `@margoengine/fsm` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Hierarchical states preserve common ancestors during transitions, bubble events from leaf to root, and expose previous/state/blend for cross-fades. On top of that: [history states](#history-states), [delayed transitions](#delayed-transitions), [parallel regions](#parallel-regions-margoenginefsmparallel), [machines as data](#machines-as-data-margoenginefsmdocument), and [snapshots and traces](#snapshots-and-trace-margoenginefsmtrace).
+Hierarchical states preserve common ancestors during transitions, bubble events from leaf to root, and expose previous/state/blend for cross-fades. On top of that: [history states](#history-states), [delayed transitions](#delayed-transitions), [parallel regions](#parallel-regions-margoenginefsmparallel), [machines as data](#machines-as-data-margoenginefsmdocument), [snapshots and traces](#snapshots-and-trace-margoenginefsmtrace), [event payloads](#event-payloads-margoenginefsmevents), [final states](#final-states-and-eventless-transitions-margoenginefsmfinal) and [invoked tasks](#invoked-tasks-margoenginefsminvoke).
 
 ```ts
 import {StateMachine} from 'margoengine/fsm';
@@ -226,6 +226,129 @@ console.log(trace.records); // [{machine: '', clock: 0, from: 'idle', to: 'windu
 - A snapshot that does not fit the machine throws a `TypeError` and leaves the machine untouched. Both functions throw a `MargoError` with code `state` from a hook in the middle of a change.
 - `MachineTrace` keeps the newest `capacity` changes, default 256, oldest first in `records`, for every machine down through parallel regions. `machine` says which, such as `alive/weapon`; `event` and `after` say what caused the change, both null for `goto`. `from` is null when regions start and `to` when they stop. `dispose()`, or `using`, stops it.
 - A machine has one `listener`, the hook a trace uses; set it yourself for your own debug overlay. A second trace on the same machine throws a `MargoError` with code `attached`.
+
+## Event payloads (`margoengine/fsm/events`)
+
+`EventMachine` is a `StateMachine` whose `send(event, data)` and `plan(event, data)` carry a payload to the guards and
+hooks of that one delivery: a transition's `guard(context, data)`, and the `exit(context, data)` and
+`enter(context, data)` of the states it leaves and enters. A nested machine's `plan(event, data)` hook sees it too.
+
+```ts
+import {EventMachine, EventTrace} from 'margoengine/fsm/events';
+
+type Hit = {damage: number};
+const context = {health: 30, log: [] as string[]};
+const machine = new EventMachine<typeof context, Hit>({
+  alive: {exit: (c, hit) => c.log.push(`last hit ${hit?.damage}`)},
+  dead: {enter: (c, hit) => c.log.push(`killed by ${hit?.damage}`)}
+}, 'alive', context, [
+  {from: 'alive', to: 'dead', event: 'hit', guard: (c, hit) => (c.health -= hit!.damage) <= 0}
+]);
+using trace = new EventTrace(machine, {capacity: 16});
+const big = {damage: 25};
+console.log(machine.send('hit', {damage: 10})); // false: the guard declined, health is 20
+console.log(machine.send('hit', big)); // true
+console.log(machine.state, context.log); // 'dead', ['last hit 25', 'killed by 25']
+console.log(trace.records[0].data === big); // true: the payload itself, not a copy
+```
+
+- Payloads are passed by reference, never cloned or merged into the context; keep or copy what you need.
+- `machine.data` is the payload of the delivery running now and undefined outside one. Initial entry, `goto` and timed
+  (`after`) transitions deliver undefined.
+- `plan(event, data)` keeps its payload in the action it returns, even when other events are sent before it runs.
+- `EventTrace` is a `MachineTrace` (the same `capacity`, default 256, and `dispose()` or `using`) whose records also
+  hold each accepted transition's `data`.
+
+## Final states and eventless transitions (`margoengine/fsm/final`)
+
+`FinalMachine` adds the run-to-completion steps of SCXML (W3C, State Chart XML, 2015) to `EventMachine`: final states,
+`done.state.<parent>` completion events and `always` transitions that fire without an event while their guard holds.
+
+```ts
+import {FinalMachine} from 'margoengine/fsm/final';
+
+const context = {coins: 0};
+const level = new FinalMachine({
+  playing: {initial: 'collect'},
+  collect: {parent: 'playing'},
+  cleared: {parent: 'playing', final: true},
+  results: {},
+  over: {final: true}
+}, 'playing', context, [
+  {from: 'collect', to: 'cleared', always: true, guard: (c) => c.coins >= 3},
+  {from: 'playing', to: 'results', event: 'done.state.playing'},
+  {from: 'results', to: 'over', event: 'continue'}
+]);
+for (let i = 0; i < 3; i++) {
+  context.coins++;
+  level.send('coin'); // no transition takes 'coin', but send asks the always guards again
+}
+// The third coin: collect -> cleared (always), then done.state.playing -> results, in one macrostep.
+console.log(level.state, level.done); // 'results', false
+level.send('continue');
+console.log(level.done, level.send('continue')); // true, false: a stopped machine accepts nothing
+level.goto('playing'); // restarts it
+console.log(level.done, level.state); // false, 'results': coins is still 3, so the level clears at once
+```
+
+- A final state is a leaf with no outgoing transitions or regions (anything else throws a `TypeError`). Entering one
+  queues `done.state.<parent>`; entering a top-level final sets `done` and the machine takes no more events or updates
+  until `goto` restarts it.
+- Each transition gives exactly one trigger: `event`, a positive `after`, or `always: true`. Event names starting with
+  NUL are reserved.
+- One `send`, `update` or `goto` settles a whole macrostep: `always` transitions and completion events run until none is
+  enabled. `send` asks the `always` guards again even when no transition accepted the event. A chain that does not
+  settle in 10,000 microsteps throws a `MargoError` with code `state`.
+- `transitionDefinitions` lists the authored transitions in order, with their `event`, `after` and `always` triggers.
+
+## Invoked tasks (`margoengine/fsm/invoke`)
+
+`InvokeMachine` is a `FinalMachine` whose states own asynchronous tasks: a state's `invoke` (one task or a list) starts
+when the machine settles in it and is cancelled when the machine leaves it. A task's result comes back as the event
+`done.invoke.<id>` with `{output}`, a rejection as `error.invoke.<id>` with `{error}`.
+
+```ts
+import {InvokeMachine} from 'margoengine/fsm/invoke';
+
+const context = {level: ''};
+const stop = new AbortController();
+using loader = new InvokeMachine({
+  loading: {
+    invoke: {
+      id: 'level',
+      run: async (_c, signal, data) => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        signal.throwIfAborted();
+        return `level ${(data as {n: number} | undefined)?.n ?? 1}`;
+      }
+    }
+  },
+  ready: {enter: (c, data) => (c.level = (data as {output: string}).output)},
+  failed: {}
+}, 'loading', context, [
+  {from: 'loading', to: 'ready', event: 'done.invoke.level'},
+  {from: 'loading', to: 'failed', event: 'error.invoke.level'},
+  {from: 'ready', to: 'loading', event: 'next'}
+], {signal: stop.signal});
+
+await loader.invocations.get('level')!.settled;
+console.log(loader.state, context.level); // 'ready', 'level 1'
+loader.send('next', {n: 2}); // run receives the entering payload
+const second = loader.invocations.get('level')!;
+await second.settled;
+console.log(second.status, second.output, context.level); // 'done', 'level 2', 'level 2'
+stop.abort(); // or loader.dispose(): cancels every running task
+```
+
+- `run(context, signal, data)` receives the payload of the event that entered the state (undefined on the first
+  entry) and an `AbortSignal` aborted when the state exits, a top-level final is reached or the machine is disposed;
+  pass it to `fetch` and other cancellable calls. A cancelled task's result is dropped.
+- Task ids are unique and non-empty, and final states own no tasks (a `TypeError` otherwise). A task on a parent keeps
+  running while the machine moves between its children.
+- `invocations` maps each id to its latest record: `state`, `signal`, `status` (`running`, `done`, `error` or
+  `cancelled`), `output` or `error`, and `settled`, a promise that resolves once the done or error event is delivered
+  or the task is cancelled (and rejects if a hook handling the event throws). A re-entry makes a fresh record.
+- `options.signal` aborts the whole runtime; `dispose()`, or `using`, does the same. A disposed machine accepts no events.
 
 ## Live inspection (`margoengine/fsm/inspect`)
 
