@@ -3346,3 +3346,14 @@ A relativistic disk heat and stress closure, emission and light transfer, the or
 - Point 8 (5123bed666). `packages/physics/scripts/life01-legged-measured.mjs` compares measured walk and trot from 62 instrumented horses. Using cohort mass and mean speed only, the default representative bodies cycle 7.6–12.7 strides/min faster and put 13.1–15.6 percentage points less vertical impulse on the forelimbs. The gap persists over speed and leg-length sensitivity. [Measured limits](limits.md#life-01-measured-treadmill-gait-and-forelimb-loading)
 
 Articulated gait, measured conformations and fore-hind load distribution, original films, rider and water exchanges remain open. The row stays REOPENED at four points.
+
+### LIFE-05 Pedestrian dynamics
+
+#### LIFE-05 four-point pass
+
+- Point 5 (8bdf2ce5cf). `packages/physics/tests/coupling/pedestrians.test.js` checks signed borrowed input, an invalid late ground sample, reentrant target refusal, and exact replay after plain memory growth. Invalid candidates preserve accepted contacts, poses, route and native work.
+- Point 6 (8bdf2ce5cf). `packages/physics/tests/coupling/pedestrian-workers.test.js` and `packages/physics/tests/pedestrian-workers.browser.mjs` exercise the exact native drive and wall integration at 1, 2 and 4 participants. The 79-walker example does 158 wall checks and 1,461 SIMD dots. Neighbour reductions and pair impulses retain their order. Complete snapshots repeat across memory modes and three concurrent Chromium helpers.
+- Point 7 (8bdf2ce5cf). `packages/physics/tests/pedestrian-film.browser.mjs` drives articulated walkers from signed accepted NavMesh poses and walking distance. In the matched day-to-day crossing, the approach check gives its analytic 1.765 s to contact and 0.4838 N equal and opposite force. Both renderers replay accepted state and raw RGBA exactly.
+- Point 8 (8bdf2ce5cf). `packages/physics/scripts/life05-pedestrian-measured.mjs` compares independent single-file timings from Seyfried et al. The solver holds 1.318 m/s in both 15- and 20-person cases. Their measured speeds fall to 0.90 and 0.56 m/s. The station count and reconstructed-bend sensitivity are recorded. [Measured limits](limits.md#life-05-measured-single-file-walking)
+
+Steady headway-speed response, original film bindings and the remaining audit items stay open. The row stays REOPENED at four points.
