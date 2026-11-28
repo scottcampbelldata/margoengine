@@ -433,7 +433,11 @@ export function poolFrames(file) {
       const end = (k) => at + k * pool.step;
       if (end(first) < 0) first = Math.min(0, -Math.floor(at / pool.step));
       else if (end(first + pool.frames - 1) > last)
-        first = Math.max(first - Math.ceil((end(first + pool.frames - 1) - last) / pool.step), -Math.floor(at / pool.step), 1 - pool.frames);
+        first = Math.max(
+          first - Math.ceil((end(first + pool.frames - 1) - last) / pool.step),
+          -Math.floor(at / pool.step),
+          1 - pool.frames,
+        );
       const frames = [];
       for (let k = first; k < first + pool.frames; k++) {
         const index = at + k * pool.step;

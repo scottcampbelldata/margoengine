@@ -237,13 +237,34 @@ test('resolveFrame gives the precise frame before its dither, and probePool name
   // One pixel of linear 0.2, 0.5 and 0.03: its 8-bit codes are dithered, the precise frame keeps the sRGB values.
   const sum = new Float32Array([0.2, 0.5, 0.03]),
     precise = new Float32Array(3),
-    rgba = resolveFrame({ sum, width: 1, height: 1, count: 1, outWidth: 1, outHeight: 1, noise, noiseSize: 64, precise });
+    rgba = resolveFrame({
+      sum,
+      width: 1,
+      height: 1,
+      count: 1,
+      outWidth: 1,
+      outHeight: 1,
+      noise,
+      noiseSize: 64,
+      precise,
+    });
   for (let c = 0; c < 3; c++) {
     assert.ok(Math.abs(precise[c] - linearToSrgb(sum[c])) < 1e-6, `channel ${c}: ${precise[c]}`);
     assert.ok(Math.abs(rgba[c] - precise[c] * 255) <= 1, 'the 8-bit code is within a level of it');
   }
   assert.throws(
-    () => resolveFrame({ sum, width: 1, height: 1, count: 1, outWidth: 1, outHeight: 1, noise, noiseSize: 64, precise: new Float32Array(4) }),
+    () =>
+      resolveFrame({
+        sum,
+        width: 1,
+        height: 1,
+        count: 1,
+        outWidth: 1,
+        outHeight: 1,
+        noise,
+        noiseSize: 64,
+        precise: new Float32Array(4),
+      }),
     RangeError,
   );
   // probePool: frames centred on each probe, step apart, inside the shot (2 s at 60 fps: frames 0 to 119).
@@ -251,7 +272,9 @@ test('resolveFrame gives the precise frame before its dither, and probePool name
   assert.equal(file.shot.probePool.frames, 5);
   assert.deepEqual(poolFrames(file), { a: [24, 27, 33, 36], b: [105, 108, 111, 114] });
   // Near the start the window slides after the probe; a pool longer than the shot keeps every frame.
-  assert.deepEqual(poolFrames(parseShot(shot({ probes: { a: 0 }, probePool: { frames: 4, step: 2 } }))), { a: [2, 4, 6] });
+  assert.deepEqual(poolFrames(parseShot(shot({ probes: { a: 0 }, probePool: { frames: 4, step: 2 } }))), {
+    a: [2, 4, 6],
+  });
   assert.equal(poolFrames(parseShot(shot({ probes: { a: 1 }, probePool: { frames: 400, step: 1 } }))).a.length, 119);
   assert.deepEqual(poolFrames(parseShot(shot({ probes: { a: 0.5 } }))), { a: [] });
   for (const probePool of [{ frames: 1, step: 1 }, { frames: 4, step: 0 }, { frames: 2.5, step: 1 }, 7])
