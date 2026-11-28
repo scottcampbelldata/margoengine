@@ -12012,3 +12012,16 @@ the wind sample to its signed field cell. Accepted work reports actual matrix, w
 The 51- and 95-panel coupling cases reproduce scalar forces, circulation and rigid replay at 1, 2 and 4 participants.
 A fixed-camera Aviary regression checks full-frame replay on both renderers. Dense wing storage is quadratic.
 Rotor annuli, full aircraft wake feedback and the original flight timeline remain outside this proof.
+
+## Source-size gate and WGSL redeclaration check (quality gates, section 5 evidence, 2026-11-28)
+
+Two gates aimed at where fixes cluster, not at file size for its own sake. `npm run quality` gains `source-size`
+(`scripts/quality/source-size.js`): no hand-written package source passes 100 KiB, and the 24 over it on 2026-11-28
+(`scripts/quality/baselines/source-size.json`, soft.ts 358 KB down to probes.ts 103 KB) may grow 4 KiB each before
+they must be split along a seam; generated Wasm blueprints and tables are left out. The shared CPU test harnesses now
+reject a shader module that declares a module-scope WGSL name twice (`tests/support/wgsl-redeclared.js`), the class of
+KB-WATER-RIPPLEDUP1, which twice reached main because only the GPU saw it. Evidence: `tests/quality-gate.test.js` (the
+gate on a fixture tree) and `tests/wgsl-redeclared.test.js` (the water clash, every declaration kind, no false hits on
+locals, members or comments); every test file reaching those harnesses ran with the check on. Missing: package tests
+with their own mock device (about 340 files) do not call the check unless they import it, and the gate measures bytes,
+not how many concerns a file holds.

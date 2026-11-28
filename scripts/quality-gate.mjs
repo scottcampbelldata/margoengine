@@ -1,4 +1,4 @@
-// Quality gate (`npm run quality`, part of `npm run verify` and CI): six ratchets over packages/, each against a
+// Quality gate (`npm run quality`, part of `npm run verify` and CI): seven ratchets over packages/, each against a
 // checked-in baseline in scripts/quality/baselines/<gate>.json. A gate passes on what the baseline records and fails on
 // anything new or worse, with the fix in the message. See docs/conventions.md, "Quality gate".
 //   sizes        gzip budget per package entry and worker; static imports of another package's heavy entry (leaks)
@@ -7,6 +7,7 @@
 //   api          TSDoc on public exports; throws follow docs/conventions.md (via npm run hygiene)
 //   clean-room   no three.js / Babylon / other engines in packages/**; no unlisted third-party dependency
 //   shader-comments  comment text inside the shader strings of any package dist (scripts/shader-comments.mjs)
+//   source-size  hand-written package source files over 100 KiB; the ones baselined grow at most 4 KiB
 // and strict steps with no baseline:
 //   readme-types  every README and guide example of every package type-checks (scripts/check-readme-types.mjs). It runs
 //                 here, in every fast gate, because a change to one package can break another package's example, and
@@ -37,6 +38,7 @@ import {
 } from './quality/ratchet.js';
 import { shaderCommentsGate } from './quality/shader-comments.js';
 import { sizesGate } from './quality/sizes.js';
+import { sourceSizeGate } from './quality/source-size.js';
 import { testsGate } from './quality/tests-floor.js';
 import { treeChanges, treeState } from './quality/tree-watch.js';
 
@@ -78,6 +80,12 @@ const GATES = {
     about:
       'comments left inside shader strings of a package dist; each literal the build strip leaves whole counts one',
     fix: 'rebuild (npm run build:packages strips them); a literal left whole has a comment running into an interpolation or the end of the string, so move that comment into the JavaScript beside the string',
+  },
+  'source-size': {
+    run: sourceSizeGate,
+    about:
+      'hand-written package source files over 100 KiB (UTF-8, LF bytes); each baselined at its size + 4 KiB, generated files left out',
+    fix: 'move code out of the file along a seam (a feature chunk, a pass, a solver) into its own file in the same package, exports unchanged; a deliberate growth needs --update --reason',
   },
 };
 

@@ -1,0 +1,39 @@
+{
+  "gate": "source-size",
+  "about": "hand-written package source files over 100 KiB (UTF-8, LF bytes); each baselined at its size + 4 KiB, generated files left out",
+  "total": 3508261,
+  "history": [
+    {
+      "date": "2026-11-28",
+      "commit": "80933edaf",
+      "reason": "Initial baseline: the hand-written package source files over 100 KiB on main when the source-size gate landed (2026-11-28); each may grow 4 KiB, then must be split",
+      "grew": 24
+    }
+  ],
+  "items": {
+    "packages/biomes/src/view.ts": 118918,
+    "packages/environment/src/probes.ts": 107430,
+    "packages/exporters/src/scene.ts": 116603,
+    "packages/exporters/src/threemf.ts": 121704,
+    "packages/gltf/src/model.ts": 291647,
+    "packages/headless/src/look.ts": 146318,
+    "packages/humans/src/fit.ts": 165971,
+    "packages/materials/src/built-material.ts": 172913,
+    "packages/physics/src/kernel.ts": 165732,
+    "packages/physics/src/physics.ts": 124849,
+    "packages/physics/src/seakeeping/solver.ts": 127351,
+    "packages/physics/src/soft.ts": 361734,
+    "packages/scatter/src/index.ts": 109324,
+    "packages/shader/src/raw.ts": 127582,
+    "packages/shadows/src/index.ts": 109063,
+    "packages/vfx/src/fire-front.ts": 111404,
+    "packages/voxel-net/src/server.ts": 108748,
+    "packages/voxel-pathtracer/src/shaders.ts": 126032,
+    "packages/voxel-pathtracer/src/tracer.ts": 108820,
+    "packages/voxel/src/render.ts": 114887,
+    "packages/water/src/index.ts": 158108,
+    "packages/weather/src/lava.ts": 122621,
+    "packages/webgl2-compat/src/device/render.ts": 166972,
+    "packages/webgl2-compat/src/glsl/emit.ts": 123530
+  }
+}
