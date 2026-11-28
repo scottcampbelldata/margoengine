@@ -23,6 +23,7 @@ export interface ArchimedesScrewSpec {
     innerRadius: number;
     incline: number;
     length?: number;
+    freeboard?: number;
 }
 
 export interface BallDiskIntegrator {
