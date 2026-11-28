@@ -57,16 +57,17 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   match still wins, and `HUMAN_NAMINGS` lists them.
 - **Regression:** `packages/rigging/tests/anatomy-human-bundled.test.js` (both bundled rigs fit; the five-bone spine).
 
-### Open 2026-11-28: every `procedural:rock` of a biome is the same stone (KB-BIOMES-ROCKSEED1, biomes)
+### Fixed 2026-11-28: every `procedural:rock` of a biome is the same stone (KB-BIOMES-ROCKSEED1, biomes)
 
 - **Repro:** Above the Treeline before 2026-11-28 (talus of `procedural:rock` over the upper meadow and scree): every
   stone has one silhouette, only turned and scaled, which reads as copies from 2 to 30 m.
-- **Cause:** `partsOf` in `packages/biomes/src/objects.ts` builds the `rock` key from `generateRockMesh(1, ...)`, seed
-  1 for every species and instance, and a species draws one mesh through its `ScatterTiles`, so the seeded forms of
-  `@margoengine/procedural` (block, slab, wedge, shard, pebble) never appear.
-- **Fix needed:** draw a `procedural:rock` species as several seeded forms (records split among a few `ScatterTiles`
-  by a hash of each record, density unchanged), with a test that a talus field holds at least four distinct meshes.
-  The film now draws eight scanned stones instead (`treeline-rocks/talus` in the asset library).
+- **Cause:** `partsOf` in `packages/biomes/src/objects.ts` built the `rock` key from `generateRockMesh(1, ...)`, seed
+  1 for every species and instance, and a species drew one mesh through its `ScatterTiles`, so the seeded forms of
+  `@margoengine/procedural` (block, slab, wedge, shard, pebble) never appeared.
+- **Fix:** a `procedural:rock` species draws eight seeded forms (seeds 1 to 8, each with its three LOD rings), and
+  `add` and `steps` split each tile's records among them by the record's variant nibble, so density is unchanged and
+  neighbouring stones differ. Test: `packages/biomes/tests/objects.test.js` ("a procedural:rock species draws eight
+  seeded stones and splits its records among them").
 
 ### Fixed 2026-11-28: the lens drops' glint added light over empty pixels without covering them (KB-WEATHER-LENSGLINT1, weather)
 

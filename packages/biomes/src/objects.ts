@@ -258,6 +258,7 @@ function partsOf(
   make: (data: Data) => Geometry,
   meshes?: Readonly<Record<string, readonly BiomeMeshPart[]>>,
   conifers?: Conifers,
+  seed = 1,
 ): Part[] {
   const own = meshes && Object.hasOwn(meshes, key) ? meshes[key] : undefined;
   if (own)
@@ -349,7 +350,7 @@ function partsOf(
       // Subdivided finer up close (2,880, 720 and 180 triangles), so a stone a metre or two from the lens shows no facets.
       return [
         {
-          geometry: rings(chain((detail) => p.generateRockMesh(1, undefined, { detail }))),
+          geometry: rings(chain((detail) => p.generateRockMesh(seed, undefined, { detail }))),
           color: STONE,
           kind: 'stone',
         },
@@ -389,6 +390,51 @@ function partsOf(
   }
 }
 
+/**
+ * Seeded stones a `procedural:rock` species draws (KB-BIOMES-ROCKSEED1): seeds 1 to 8 cycle the five forms of
+ * `generateRockMesh` (block, slab, wedge, shard, pebble) with their own proportions and joint planes, and each record
+ * draws the form its variant nibble picks, so a talus field holds eight silhouettes and no stone is a turned copy of
+ * its neighbour. Before 2026-11-28 every stone of every species was seed 1.
+ */
+const ROCK_FORM_COUNT = 8;
+
+/**
+ * The forms a species key draws, each a list of parts: eight seeded stones for `procedural:rock` (unless `meshes`
+ * replaces it), one form for every other key.
+ */
+function formsOf(
+  key: string,
+  p: Procedural,
+  make: (data: Data) => Geometry,
+  meshes?: Readonly<Record<string, readonly BiomeMeshPart[]>>,
+  conifers?: Conifers,
+): Part[][] {
+  if (key !== 'procedural:rock' || (meshes && Object.hasOwn(meshes, key)))
+    return [partsOf(key, p, make, meshes, conifers)];
+  return Array.from({ length: ROCK_FORM_COUNT }, (_, i) => partsOf(key, p, make, meshes, conifers, i + 1));
+}
+
+/**
+ * One species' 8-byte records split among its forms (a power of two up to 16) by each record's variant (the low four
+ * bits of byte 7, a hash drawn at placement), each list in stored order.
+ */
+function splitForms(records: Uint8Array, forms: number): Uint8Array[] {
+  if (forms === 1) return [records];
+  const n = records.length >> 3,
+    counts = new Int32Array(forms);
+  for (let k = 0; k < n; k++) counts[records[k * 8 + 7] & (forms - 1)]++;
+  const out = Array.from(counts, (c) => new Uint8Array(c * 8)),
+    at = new Int32Array(forms);
+  for (let k = 0; k < n; k++) {
+    const f = records[k * 8 + 7] & (forms - 1);
+    out[f].set(records.subarray(k * 8, k * 8 + 8), at[f]++ * 8);
+  }
+  return out;
+}
+
+/** A species' scatters: every part of every form (`tiles`) and the first part of each form, which holds its records. */
+type SpeciesEntry = { tiles: ScatterTiles[]; heads: ScatterTiles[]; radius: number };
+
 type ObjectsPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 /**
  * One detail kind: its scatter (and, for blade grass, the dense layer near the camera), its density map's CPU copy and
@@ -417,9 +463,9 @@ export class BiomeObjects implements Disposable {
   readonly #seasonal: { material: PbrMaterial; base: readonly [number, number, number] }[] = [];
   #offSeasons?: () => void;
   readonly #modules: Modules;
-  /** Per species key: its ScatterTiles (one per mesh part) and the distance it is drawn within. */
-  readonly #species = new Map<string, { tiles: ScatterTiles[]; radius: number }>();
-  #snags?: { tiles: ScatterTiles[]; radius: number };
+  /** Per species key: its ScatterTiles (one per mesh part of each form) and the distance it is drawn within. */
+  readonly #species = new Map<string, SpeciesEntry>();
+  #snags?: SpeciesEntry;
   readonly #details: Detail[] = [];
   /** Held tiles and their object counts. */
   readonly #held = new Map<string, number>();
@@ -585,22 +631,25 @@ export class BiomeObjects implements Disposable {
       side = this.#placement.tileSize,
       // Canopy trees are drawn within the full radius, smaller plants, rocks and props within `nearRadius`.
       seasons = this.#options.seasons,
-      tiles = (key: string, near: boolean, seasonal = false) => {
+      tiles = (key: string, near: boolean, seasonal = false): SpeciesEntry => {
         const r = near ? Math.min(radius, nearRadius) : radius,
           // Room for every tile within the draw distance plus a tile: a view keeps a tile's objects until it is a whole
           // tile beyond (sized for the distance alone, a view with tiles queued ran out of slots in a frame).
           slots = (Math.ceil((2 * (r + side)) / side) + 2) ** 2, // float division: view only
           // Memory follows the held records, so a tile may hold up to scatter's per-tile limit (no stand is dropped).
           slotSize = Math.min(65536, Math.floor(16777216 / slots)), // float division: view only
-          list: ScatterTiles[] = [];
-        for (const part of partsOf(
+          all: ScatterTiles[] = [],
+          heads: ScatterTiles[] = [];
+        for (const form of formsOf(
           key,
           this.#modules.procedural,
           this.#make,
           this.#options.meshes,
           this.#modules.conifers,
-        ))
-          list.push(
+        )) {
+          const list: ScatterTiles[] = [];
+          for (const part of form)
+            list.push(
             this.#modules.tiles.ScatterTiles.attach(this.#engine, part.geometry, {
               bounds,
               heightmap,
@@ -622,7 +671,10 @@ export class BiomeObjects implements Disposable {
               ...(list.length ? { share: list[0] } : {}),
             }),
           );
-        return { radius: r, tiles: list };
+          heads.push(list[0]);
+          all.push(...list);
+        }
+        return { radius: r, tiles: all, heads };
       };
     for (const s of this.#placement.species)
       this.#species.set(s.key, tiles(s.mesh, s.layer !== 1, !!seasons?.isSeasonal(s.biome, s.id)));
@@ -876,27 +928,30 @@ export class BiomeObjects implements Disposable {
         list.push(k);
       }
     }
-    const pick = (list: number[], cap: number) => {
-      // A tile denser than its slot keeps the first records (recorded in `dropped`).
-      if (list.length > cap) {
-        this.dropped += list.length - cap;
-        list = list.slice(0, cap);
-      }
+    const gather = (list: number[]) => {
       const out = new Uint8Array(list.length * 8);
       list.forEach((k, i) => out.set(tile.instances.subarray(k * 8, k * 8 + 8), i * 8));
       return out;
     };
     this.remove(key);
-    for (const [s, list] of bySpecies) {
-      const entry = this.#species.get(tile.species[s]);
-      // The first part holds the records; the others share them.
-      if (entry && distance <= entry.radius)
-        entry.tiles[0].setTile(key, tile.origin, tile.size, pick(list, entry.tiles[0].slotSize));
-    }
-    if (this.#snags && distance <= this.#snags.radius)
-      this.#snags.tiles[0].setTile(key, tile.origin, tile.size, pick(dead, this.#snags.tiles[0].slotSize));
+    const put = (entry: SpeciesEntry | undefined, list: number[]) => {
+      if (!entry || distance > entry.radius) return;
+      // The first part of each form holds its records; the others share them.
+      for (const [f, records] of splitForms(gather(list), entry.heads.length).entries())
+        entry.heads[f].setTile(key, tile.origin, tile.size, this.#cap(records, entry.heads[f].slotSize));
+    };
+    for (const [s, list] of bySpecies) put(this.#species.get(tile.species[s]), list);
+    put(this.#snags, dead);
     this.#held.set(key, tile.count);
     if (distance <= this.#detailReach) for (const d of tile.density) this.#density(tile, d);
+  }
+
+  /** A tile denser than its slot keeps the first records (recorded in `dropped`). */
+  #cap(records: Uint8Array, slotSize: number): Uint8Array {
+    const n = records.length >> 3;
+    if (n <= slotSize) return records;
+    this.dropped += n - slotSize;
+    return records.subarray(0, slotSize * 8);
   }
 
   /** Tiles within this distance of the camera write their detail densities (detail is drawn much closer). */
@@ -918,18 +973,16 @@ export class BiomeObjects implements Disposable {
     for (const g of tile.groups) {
       const entry = g.dead ? this.#snags : this.#species.get(tile.species[g.species]);
       if (!entry || distance > entry.radius) continue;
-      const t = entry.tiles[0],
-        n = g.records.length >> 3;
-      if (n > t.slotSize) this.dropped += n - t.slotSize;
-      records.set(t, n > t.slotSize ? g.records.subarray(0, t.slotSize * 8) : g.records);
+      for (const [f, list] of splitForms(g.records, entry.heads.length).entries())
+        records.set(entry.heads[f], this.#cap(list, entry.heads[f].slotSize));
     }
     const held = this.#held.has(key);
-    for (const entry of [...this.#species.values(), ...(this.#snags ? [this.#snags] : [])]) {
-      const t = entry.tiles[0],
-        r = records.get(t);
-      if (r) out.push(() => t.setTile(key, tile.origin, tile.size, r));
-      else if (held) out.push(() => t.removeTile(key));
-    }
+    for (const entry of [...this.#species.values(), ...(this.#snags ? [this.#snags] : [])])
+      for (const t of entry.heads) {
+        const r = records.get(t);
+        if (r) out.push(() => t.setTile(key, tile.origin, tile.size, r));
+        else if (held) out.push(() => t.removeTile(key));
+      }
     out.push(() => this.#held.set(key, tile.count));
     if (distance <= this.#detailReach) for (const d of tile.density) out.push(() => this.#density(tile, d));
     return out;
@@ -1006,7 +1059,7 @@ export class BiomeObjects implements Disposable {
   remove(key: string): void {
     this.#held.delete(key);
     for (const entry of [...this.#species.values(), ...(this.#snags ? [this.#snags] : [])])
-      entry.tiles[0].removeTile(key);
+      for (const t of entry.heads) t.removeTile(key);
   }
 
   /** Frees every scatter and texture. */

@@ -599,3 +599,55 @@ test('grass details take measured leaf green', async () => {
   const grass = attached.at(-1);
   assert.deepEqual([...grass.options.material.data.slice(0, 3)].map((v) => +v.toFixed(4)), [0.1617, 0.2024, 0.0917]);
 });
+
+// KB-BIOMES-ROCKSEED1: every procedural:rock of a biome was one stone (seed 1 for every species and record), so a talus
+// field read as turned copies of a single block from 2 to 30 m. A rock species now draws eight seeded forms, each record
+// the form its variant nibble picks, and the records of a tile are only split among them (none dropped or doubled).
+test('a procedural:rock species draws eight seeded stones and splits its records among them', async () => {
+  const procedural = await import('@margoengine/procedural'),
+    { Geometry } = await import('@margoengine/core'),
+    engine = { camera: { position: [0, 0, 0] }, use() {} },
+    species = [{ key: 'talus', mesh: 'procedural:rock', layer: 0 }],
+    placement = { tile() {}, species, details: [], tileSize: 256 },
+    objects = await BiomeObjects.attach(engine, placement, {
+      heightmap: () => undefined,
+      bounds: [-2048, -2048, 2048, 2048],
+    }),
+    stones = objects.casters.slice(0, 8),
+    outline = (scatter) => Array.from(scatter.geometries[0].vertices.slice(0, 60), (v) => v.toFixed(4)).join();
+  assert.equal(objects.casters.length, 9, 'eight stone forms, then the snags');
+  assert.equal(new Set(stones.map(outline)).size, 8, 'eight distinct stone meshes');
+  for (const [i, stone] of stones.entries())
+    for (const [ring, detail] of [2, 1, 0].entries()) {
+      const d = procedural.generateRockMesh(i + 1, undefined, { detail });
+      assert.deepEqual(
+        stone.geometries[ring].vertices,
+        new Geometry(d.positions, d.normals, d.indices).vertices,
+        `form ${i} is seed ${i + 1}`,
+      );
+    }
+  // 64 live stones in one tile with every variant 0 to 15 four times: each form holds eight, no record lost.
+  const instances = new Uint8Array(64 * 8);
+  for (let k = 0; k < 64; k++) {
+    instances[k * 8] = k;
+    instances[k * 8 + 7] = k & 15;
+  }
+  const tile = { x: 0, z: 0, origin: [0, 0], size: 256, count: 64, instances, species: ['talus'], density: [] },
+    held = new Map(),
+    sizes = () => stones.map((s) => held.get(s) ?? 0);
+  for (const stone of stones) {
+    const setTile = stone.setTile.bind(stone),
+      removeTile = stone.removeTile.bind(stone);
+    // After the call: setTile removes the tile it replaces first.
+    stone.setTile = (key, origin, side, records) => (setTile(key, origin, side, records), held.set(stone, records.length / 8));
+    stone.removeTile = (key) => (held.delete(stone), removeTile(key));
+  }
+  objects.add(tile, 10);
+  assert.deepEqual(sizes(), [8, 8, 8, 8, 8, 8, 8, 8]);
+  // The stepped path (records grouped by species, as the worker sends them) splits the same way.
+  for (const step of objects.steps({ ...tile, groups: [{ species: 0, dead: false, records: instances }] }, 10)) step();
+  assert.deepEqual(sizes(), [8, 8, 8, 8, 8, 8, 8, 8]);
+  objects.remove('0,0');
+  assert.deepEqual(sizes(), [0, 0, 0, 0, 0, 0, 0, 0]);
+  objects.dispose();
+});
