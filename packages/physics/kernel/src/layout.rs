@@ -684,6 +684,9 @@ columns! {
     SOLVE_VIA u32 JointList,
     // The share of its error each listed joint closes in a biased pass.
     SOLVE_SHARE f32 JointList,
+    // 1 for a joint of a path solved exactly (SOLVE_SHARE is joint_share), 0 for a loose one: the locks' projection steps an
+    // exact path the whole way to the gap its share leaves, and a loose one its share an iterate (joints.rs, `project_to`).
+    SOLVE_EXACT u32 JointList,
     // At the first place of each path: where its slice of NEWTON starts, in words, or NONE when memory could not hold it.
     SOLVE_NEWTON u32 JointList,
     // Where each listed joint goes when the list is put in runs by island, and a place to move the lists through.
@@ -1124,13 +1127,13 @@ pub const JOINT_IDLE: u32 = JOINT_OFF | JOINT_BROKEN | JOINT_DISABLED;
 /// solves, the impacts it found, the islands it numbered, the solving joints' scratch, which is indexed by place in
 /// their list, the rotor speeds read at each substep's start, the locks' Newton solves and what each body's speeds were and
 /// what the springs changed of them in the substep. `World::hash` leaves them out; `World::arena_hash` does not.
-pub const SCRATCH: [usize; 67] = [
+pub const SCRATCH: [usize; 68] = [
     ISLAND_LEVEL, ISLAND_STAMP, MB_HELD, ISLAND_SUBSTEPS,
     SOLVE_PAIRS, IMPACTS, ISLAND_BODIES, ISLAND_LEAD, ISLAND_START, ISLAND_COUNT, ISLAND_READY, ISLAND_PASSES, SOLVE_JOINTS,
     SOLVE_LEAD, SOLVE_VIA, SOLVE_SHARE, ISLAND_PAIR_START, ISLAND_PAIR_COUNT, ISLAND_PAIR_CURSOR, JOINT_ORDER, JOINT_TEMP, ISLAND_JOINT_START,
     ISLAND_JOINT_COUNT, ISLAND_JOINT_CURSOR, COUPLING_ORDER, ISLAND_COUPLING_START, ISLAND_COUPLING_COUNT, ISLAND_COUPLING_CURSOR, MB_STAMP,
     TILT_MASS, TILT_SUPPORTS, TILT_Y, TILT_G, TILT_A, TILT_BASE, TILT_TOP, TILT_TOPS, PAIR_TILT_GAIN, PAIR_TILT_UNHELD, TILT_PAIRS, TILT_TEMP,
-    JOINT_ROTOR_0, JOINT_ROTOR_1, JOINT_ROTOR_2, JOINT_ROTOR_3, JOINT_ROTOR_4, JOINT_ROTOR_5, SOLVE_NEWTON, NEWTON,
+    JOINT_ROTOR_0, JOINT_ROTOR_1, JOINT_ROTOR_2, JOINT_ROTOR_3, JOINT_ROTOR_4, JOINT_ROTOR_5, SOLVE_NEWTON, NEWTON, SOLVE_EXACT,
     MID_START_X, MID_START_Y, MID_START_Z, MID_START_SPIN_X, MID_START_SPIN_Y, MID_START_SPIN_Z,
     SPRING_CHANGE_X, SPRING_CHANGE_Y, SPRING_CHANGE_Z, SPRING_CHANGE_SPIN_X, SPRING_CHANGE_SPIN_Y, SPRING_CHANGE_SPIN_Z,
     PAIR_PATCH_NEXT, PAIR_PATCH_TAIL, PATCH_LIST, PATCH_TEMP, PATCH_SIGN, CONTACT_CUT,

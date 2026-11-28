@@ -1259,3 +1259,27 @@ fn a_spring_settles_at_its_rest_length_plus_the_static_stretch() {
     println!("spring stretch {stretch:.5} of {want:.5}");
     assert!((stretch - want).abs() < 1e-3, "{stretch}");
 }
+
+#[test]
+fn an_exact_path_closes_its_share_of_a_gap_each_substep() {
+    // A body 1 m off a fixed anchor, joined at their centres, no gravity: each substep closes joint_share of what is left, so
+    // after 6 steps of 8 substeps a share of 0.05 leaves 0.95^48 of the metre. The locks' projection stepped an exact path by its
+    // share toward a gap that already left the share's rest, so it closed the share of the share: 0.177 m was left (KB2161).
+    for (share, substeps) in [(0.05f32, 8u32), (0.3, 4), (1.0, 8)] {
+        let mut w = world(4);
+        w.header_mut().gravity = [0.0, 0.0, 0.0];
+        w.header_mut().substeps = substeps;
+        w.header_mut().joint_share = share;
+        w.header_mut().joint_max_push = 1000.0;
+        let fixed = anchor(&mut w);
+        let body = point(&mut w, v3(1.0, 0.0, 0.0), 1.0, 0.004);
+        spherical(&mut w, fixed, body, v3(0.0, 0.0, 0.0), v3(0.0, 0.0, 0.0));
+        for _ in 0..6 {
+            w.step(DT);
+        }
+        let at = w.v(CENTER_X, body as usize);
+        let left = sqrt(at.dot(at)) as f64;
+        let expected = (1.0 - share as f64).powi(6 * substeps as i32);
+        assert!((left - expected).abs() < 0.01, "a share of {share} at {substeps} substeps leaves {left} m, not {expected}");
+    }
+}

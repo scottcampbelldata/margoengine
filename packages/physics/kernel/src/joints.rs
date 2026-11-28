@@ -688,6 +688,7 @@ impl World {
         let share = if exact { self.header().joint_share } else { self.header().joint_loose_share };
         for i in from..*solving {
             self.set_s(SOLVE_SHARE, i, share);
+            self.set_u(SOLVE_EXACT, i, exact as u32);
         }
     }
 
@@ -782,6 +783,7 @@ impl World {
                     self.walk_path(row as u32, self.uu(JOINT_B, row) as usize, &mut solving, stamp);
                 } else {
                     self.set_s(SOLVE_SHARE, solving, self.header().joint_loose_share);
+                    self.set_u(SOLVE_EXACT, solving, 0);
                     self.list_joint(row as u32, NONE, &mut solving, stamp);
                 }
             }
@@ -920,7 +922,7 @@ impl World {
             i = end;
         }
         debug_assert_eq!(loose_at as usize, solving);
-        for column in [SOLVE_JOINTS, SOLVE_VIA, SOLVE_SHARE, SOLVE_LEAD] {
+        for column in [SOLVE_JOINTS, SOLVE_VIA, SOLVE_SHARE, SOLVE_LEAD, SOLVE_EXACT] {
             for k in 0..solving {
                 self.set_u(JOINT_TEMP, self.uu(JOINT_ORDER, k) as usize, self.uu(column, k));
             }
@@ -2518,12 +2520,16 @@ impl World {
                     continue;
                 }
                 open = true;
-                // RIGHT = K^-1 (-share (gap - leave) / h): the speed whose move over the substep, h M^-1 J^T p, closes that share
-                // of each lock toward what it may leave open; a loose joint of a loop takes its share an iterate, as it did a
-                // pass. Near a pose where the rows turn dependent the step is a Gauss-Newton step past its first order model, so
-                // it is cut by `push_share` as the pushing pass's bias was (Buss and Kim 2005; see the head of this file).
-                let asked = self.path_right_to(first, last, self.s(SOLVE_SHARE, first) / h, to);
-                self.newton_right(first, last, self.s(SOLVE_SHARE, first) / h, to, counted);
+                // RIGHT = K^-1 (-(gap - leave) / h): the speed whose move over the substep, h M^-1 J^T p, closes each lock to
+                // what it may leave open, which already leaves the share's rest (`shed_locks`); a loose joint of a loop takes its
+                // share an iterate, as it did a pass, as the paths of a loop step together and a whole step would fight its
+                // neighbours'. Stepping an exact path by its share as well applied it twice: a share of 0.05 closed 3.5 % a
+                // substep (`an_exact_path_closes_its_share_of_a_gap_each_substep`). Near a pose where the rows turn dependent the
+                // step is a Gauss-Newton step past its first order model, so it is cut by `push_share` as the pushing pass's bias
+                // was (Buss and Kim 2005; see the head of this file).
+                let share = if self.uu(SOLVE_EXACT, first) != 0 { 1.0 } else { self.s(SOLVE_SHARE, first) };
+                let asked = self.path_right_to(first, last, share / h, to);
+                self.newton_right(first, last, share / h, to, counted);
                 let by = h * self.push_share(first, last, asked, h);
                 let before = self.widest_lock(first, last, to);
                 for i in first..=last {
