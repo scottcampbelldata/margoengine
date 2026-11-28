@@ -2348,6 +2348,49 @@ pixels.fill(128);
 frame.update(); // uploads on the next frame
 ```
 
+## Saving materials (`@margoengine/materials/serialization`)
+
+`captureMaterialLibrary(materials, options)` turns named materials into a `MaterialLibrary`, a plain JSON value
+(`{ version: 1, materials, objects }`) holding each material's class, factors, maps with their samplers and UV sets,
+render state, features and shader parameters. A texture or buffer used by several materials is stored once and shared
+again on restore. `restoreMaterialLibrary(library, options)` builds new materials and textures from it and never
+changes the originals. `@margoengine/save/materials` wraps these two as `captureMaterials` and `restoreMaterials`.
+
+```ts
+import { PbrMaterial, Texture } from 'margoengine/materials';
+import { captureMaterialLibrary, restoreMaterialLibrary } from 'margoengine/materials/serialization';
+
+const pixels = new Texture({ width: 2, height: 2, data: new Uint8Array(16).fill(200) });
+const red = new PbrMaterial({ color: [1, 0, 0, 1], roughness: 0.4, map: pixels });
+const blue = new PbrMaterial({ color: [0, 0, 1, 1], map: pixels });
+
+const text = JSON.stringify(await captureMaterialLibrary({ red, blue }));
+
+const restored = await restoreMaterialLibrary(JSON.parse(text), {
+  expect: { red: PbrMaterial, blue: PbrMaterial },
+});
+console.log(restored.red instanceof PbrMaterial, restored.red.roughness); // true 0.4
+console.log(restored.red.map === restored.blue.map, restored.red.map !== pixels); // true true: one new texture
+```
+
+- `expect` (default none) names the class each material must be, such as `{ red: PbrMaterial }`. The result is typed
+  by it, so `restored.red` is a `PbrMaterial` with no cast, and the restore checks it at run time: a name that is
+  missing or of another class throws a `MargoError` with code `'state'` and disposes everything the restore made.
+  Without `expect` the result is `Record<string, object>`, one entry per saved name.
+- Texture pixels are embedded by default. `textureURL(texture)` on capture returns a URL (or six for a cube) to store
+  instead; restore downloads it with `fetch` (default the global one) within `limits` (`maxBytes`, `maxPixels`),
+  caps that only the restore's caller sets, never the file.
+- A value no codec knows, such as a callback or an app resource, throws a `MargoError` `'state'` on capture.
+  `externalKey(value)` names it instead, and `resolveExternal(key, { signal })` on restore hands your object back.
+- `codecs` adds `MaterialValueCodec`s (`type`, `test`, `capture`, `restore`) for your own types; `loadCodecs` loads
+  a type owner's codecs only when the library reaches a type it does not know (shader materials use this, so a
+  library without them never downloads `@margoengine/shader`).
+- `signal` stops a capture or restore. A restore that fails or is aborted disposes every material and texture it made.
+- Non-finite numbers, `-0`, typed arrays sharing one buffer and float texels keep their exact bits.
+- `materialParameters(material)` and `restoreMaterialParameters(material, parameters)` read and apply one base
+  material's full parameter set (feature states included) for codec authors; `materialValueCodecs` lists the built-in
+  codecs.
+
 ## After a device restore
 
 A plain GPU object belongs to the device that made it. `envMap` (a six-layer GPUTexture, a `{texture, view}` target or an
