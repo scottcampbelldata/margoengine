@@ -46,6 +46,10 @@
     "./upscale-velocity": {
       "types": "./dist/upscale-velocity.d.ts",
       "import": "./dist/upscale-velocity.js"
+    },
+    "./jitter": {
+      "types": "./dist/jitter.d.ts",
+      "import": "./dist/jitter.js"
     }
   },
   "files": [

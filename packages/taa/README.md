@@ -354,6 +354,20 @@ clipping such as Ikkala et al., "k-DOP Clipping: Robust Ghosting Mitigation in T
 https://webpages.tuni.fi/vga/publications/k_DOP_Clipping.html) narrows ghosts but does not touch the depth test, so it
 was not the fix here.
 
+## Jitter maths alone: `@margoengine/taa/jitter`
+
+`halton(index, base)` and `jitterProjection(out, matrix, frame, width, height)` live in their own entry with no GPU
+code, so a game or a custom renderer that wants TAA's sample pattern without TAA pays only for the maths. The package
+root re-exports both, and a bundle that imports only them from `@margoengine/taa` drops every shader too
+(`tests/modern-extension-isolation.test.js`).
+
+```ts
+import {halton, jitterProjection} from 'margoengine/taa/jitter';
+const projection = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0]);
+const jittered = jitterProjection(new Float32Array(16), projection, 3, 1920, 1080);
+console.log(halton(1, 2), jittered[8], jittered[9]);
+```
+
 ## Film time: seeking the jitter to a cut
 
 `TAA` and `TAAUpscale` have `advanceTime(delta)`, the CPU part of their frame update, and a `time` getter; with frame
