@@ -90,6 +90,7 @@ export interface BiomeViewOptions {
         readonly anchor?: TerrainOptions['clipmapAnchor'];
     };
     readonly patches?: TerrainOptions['patches'];
+    readonly rock?: BiomeViewRock;
     readonly canopy?: number;
     readonly far?: false | {
         readonly radius?: number;
@@ -116,6 +117,11 @@ export interface BiomeViewOptions {
     readonly disturbance?: import('./disturbance.js').Disturbance | BiomeDisturbanceSettings;
     readonly wetness?: BiomeWetness;
 }
+
+export type BiomeViewRock = Omit<NonNullable<TerrainOptions['rock']>, 'debris'> & {
+    readonly debris?: string;
+    readonly drainage?: boolean | import('./hydrology.js').DrainageStructureOptions;
+};
 
 export type BiomeWaterSettings = Omit<WaterOptions, 'size' | 'height' | 'horizon' | 'terrain' | 'spray' | 'fill' | 'still'> & {
     readonly rivers?: 'auto' | 'hydrology' | readonly Int32Array[];

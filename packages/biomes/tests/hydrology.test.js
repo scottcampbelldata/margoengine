@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { hydrology, hydrologyOf, hydrologyTile, riversOf } from '../dist/hydrology.js';
+import { drainageStructure, hydrology, hydrologyOf, hydrologyTile, riversOf } from '../dist/hydrology.js';
 import { BiomeWorld } from '../dist/index.js';
 
 const step = 16000;
@@ -183,4 +183,31 @@ test('a world: rivers fall to their mouths, tile rasters read the grid, and the 
     digest.update(Buffer.from(h[key].buffer, h[key].byteOffset, h[key].byteLength));
   assert.equal(digest.digest('hex'), 'a3678542891456f9e79e0bfc94b7bf8d53d2b222adf3c88c6ad6ae5c9b426ed8');
   world.dispose();
+});
+
+// Above the Treeline look round 4: steep faces drew as smooth grey felt. drainageStructure gives the terrain's rock its
+// gullies (R, catchment) and talus fans (G, rock wall debris settling under the angle of repose).
+test('drainageStructure: gullies where catchment gathers, talus on the apron below a wall and none on the wall', () => {
+  const nx = 64,
+    nz = 64,
+    height = new Int32Array(nx * nz),
+    // A 60 degree wall (z < 20), a 15 degree apron (z 20 to 40), then a 3 degree floor; a shallow V along x = 32.
+    profile = (z) => (z < 20 ? (20 - z) * 27713 + 20 * 4287 : z < 40 ? (40 - z) * 4287 : 0) + (64 - z) * 838;
+  for (let z = 0; z < nz; z++) for (let x = 0; x < nx; x++) height[z * nx + x] = profile(z) + Math.abs(x - 32) * 600;
+  const h = hydrology({ height, nx, nz, step }, { multiple: true }),
+    { width, depth, texels } = drainageStructure(h),
+    at = (x, z, k) => texels[(z * nx + x) * 4 + k];
+  assert.equal(width, nx);
+  assert.equal(depth, nz);
+  assert.ok(at(32, 50, 0) > 200, `the valley line drains a large catchment (${at(32, 50, 0)})`);
+  assert.ok(at(32, 50, 0) > at(32, 2, 0) + 100, 'drainage grows downslope');
+  assert.ok(at(10, 2, 0) < 40, `a wall top drains little (${at(10, 2, 0)})`);
+  for (let z = 0; z < 18; z++) assert.equal(at(12, z, 1), 0, `no debris settles on the wall (row ${z})`);
+  assert.ok(at(12, 24, 1) > 120, `debris settles on the apron below the wall (${at(12, 24, 1)})`);
+  assert.ok(at(12, 24, 1) > at(12, 60, 1), 'the fan thins out downslope');
+  assert.equal(at(5, 5, 3), 255);
+  // The same grid gives the same bytes.
+  assert.deepEqual(drainageStructure(h).texels, texels);
+  for (const options of [{ area: [0, 10] }, { area: [100, 50] }, { wall: 95 }, { repose: 0 }, { travel: 0 }])
+    assert.throws(() => drainageStructure(h, options), RangeError, JSON.stringify(options));
 });

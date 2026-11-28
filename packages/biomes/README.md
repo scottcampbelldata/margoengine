@@ -328,6 +328,41 @@ const view = await BiomeView.attach(engine, world, { patches: { size: 18, contra
 await view.ready;
 ```
 
+`rock` draws bare rock with structure at 10 to 100 m (the terrain's `rock`, on the world and the horizon ring): ledges,
+jointed blocks and buttresses, and over the world gullies carved along the drainage with talus fans and streams below
+the walls. At attach the view routes the world's region grid with multiple flow (`hydrologyOf(world, { multiple: true
+})`, about 0.2 s for a 513 x 513 grid) and `drainageStructure` turns it into the terrain's structure texture: R the log
+of each cell's catchment between 800 and 60,000 square metres, G the rock that walls steeper than 40 degrees shed down
+their D8 paths and that settles under 34 degrees, half of it every 90 m (Statham 1976, "A scree slope rockfall model").
+`debris` names the material that benches, gully floors and fans take; `drainage: false` leaves gullies and fans out, or
+`drainage` sets `drainageStructure`'s `area`, `wall`, `repose` and `travel`. `patches` takes `warp` and `terraces` too.
+
+```js
+import { BiomeWorld } from '@margoengine/biomes';
+import { BiomeView } from '@margoengine/biomes/view';
+import { Engine } from '@margoengine/core';
+
+const engine = await Engine.create(document.querySelector('canvas'));
+const world = await BiomeWorld.create({ seed: 7, size: [1024, 1024], workers: false });
+const view = await BiomeView.attach(engine, world, {
+  patches: { size: 18, contrast: 0.6, warp: 0.6 },
+  rock: { strata: 10, facets: 18, gullies: 6 },
+});
+await view.ready;
+```
+
+`drainageStructure(hydrology, options)` (entry `@margoengine/biomes/hydrology`) returns those `rgba8unorm` texels for
+any height grid, the same bytes for the same grid:
+
+```js
+import { BiomeWorld } from '@margoengine/biomes';
+import { drainageStructure, hydrologyOf } from '@margoengine/biomes/hydrology';
+
+const world = await BiomeWorld.create({ seed: 7, size: [1024, 1024], workers: false });
+const { width, depth, texels } = drainageStructure(hydrologyOf(world, { multiple: true }), { repose: 33 });
+console.log(width, depth, texels.length === width * depth * 4); // 65 65 true
+```
+
 The view's water is the sea of `SEA` where an edge of the world stands at or below sea level: two ocean swell trains,
 out to the horizon. On a landlocked world, or when `water` gives a `wind`, it raises the waves of a wind instead (a
 light air of 2 m/s over 100 m by default) and stops at the world's edge, so `applyWaterSettings(view.water, ...)` and a

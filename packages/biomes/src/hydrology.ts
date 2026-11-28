@@ -585,3 +585,93 @@ flowBridge.drain = (state) => {
     drainFlats(state.filled, state.direction, state.flat, state.grid.nx, state.grid.nz, state.mask);
 };
 flowBridge.finish = finishFlow;
+
+/** Settings of {@link drainageStructure}. Every option has a default. */
+export interface DrainageStructureOptions {
+  /** Catchment in square metres where a gully starts showing and where it is full, [start, full]. Default [800, 60000]. */
+  readonly area?: readonly [number, number];
+  /** Slope in degrees from which a cell is rock wall that sheds debris. Default 40. */
+  readonly wall?: number;
+  /** Slope in degrees below which falling debris settles (talus lies at 32 to 38). Default 34. */
+  readonly repose?: number;
+  /** Metres debris runs on settling ground before half of it has stopped. Default 90. */
+  readonly travel?: number;
+}
+
+/** What {@link drainageStructure} returns: `rgba8unorm` texels over a height grid's `nx` x `nz` corners. */
+export interface DrainageStructure {
+  readonly width: number;
+  readonly depth: number;
+  /** Rows of increasing z: R drainage 0 to 255 (gullies), G settled debris 0 to 255 (talus fans and streams), A 255. */
+  readonly texels: Uint8Array;
+}
+
+/**
+ * The rock structure a terrain draws (`@margoengine/terrain` `TerrainTextures.structure` with `TerrainOptions.rock`),
+ * from a hydrology with `multiple` shares (or its D8 `flow` without).
+ * R is drainage: the log of each cell's catchment between `area[0]` and `area[1]` square metres, where gullies and
+ * couloirs are cut (stream power grows with catchment area: Howard 1994; Whipple and Tucker 1999; multiple flow,
+ * Freeman 1991, spreads it over a slope's hollows). G is debris: every cell steeper than `wall` sheds its area of rock
+ * down its D8 path, steepest first, and on cells under `repose` the load settles, half of it every `travel` metres
+ * (rockfall talus builds below the walls it falls from and runs out where the slope drops under the angle of repose:
+ * Statham 1976, "A scree slope rockfall model", Earth Surface Processes 1(1)); the settled share per cell, log scaled,
+ * spread over its 8 neighbours, makes the fans and the talus streams down the gullies.
+ * @example
+ * const h = hydrologyOf(world, { multiple: true });
+ * const { width, depth, texels } = drainageStructure(h);
+ */
+export function drainageStructure(h: Hydrology, options: DrainageStructureOptions = {}): DrainageStructure {
+  const { nx, nz, step, height, filled, direction, flow, shares } = h;
+  const [start, full] = options.area ?? [800, 60000],
+    wall = options.wall ?? 40,
+    repose = options.repose ?? 34,
+    travel = options.travel ?? 90;
+  if (!(start > 0 && start < full && Number.isFinite(full)))
+    throw rangeError('drainageStructure area must be [start, full] square metres with 0 < start < full', 'biomes');
+  if (!(wall > 0 && wall < 90 && repose > 0 && repose < 90 && travel > 0 && Number.isFinite(travel)))
+    throw rangeError('drainageStructure wall and repose must be 0 to 90 degrees and travel above 0 metres', 'biomes');
+  const n = nx * nz,
+    metres = step / 1000, // float division: mm to m, raster only
+    cell = metres * metres,
+    texels = new Uint8Array(n * 4),
+    slope = new Float32Array(n),
+    span = Math.log(full / start); // float division: raster only
+  for (let z = 0; z < nz; z++)
+    for (let x = 0; x < nx; x++) {
+      const c = z * nx + x,
+        dx = (height[z * nx + Math.min(nx - 1, x + 1)] - height[z * nx + Math.max(0, x - 1)]) / (2000 * metres), // float division: raster only
+        dz = (height[Math.min(nz - 1, z + 1) * nx + x] - height[Math.max(0, z - 1) * nx + x]) / (2000 * metres); // float division: raster only
+      slope[c] = (Math.atan(Math.hypot(dx, dz)) * 180) / Math.PI; // float division: raster only
+      const area = (shares ? shares[c] / 65536 : flow[c]) * cell; // float division: raster only
+      texels[c * 4] = Math.round(255 * Math.min(1, Math.max(0, Math.log(area / start) / span))); // float division: raster only
+      texels[c * 4 + 3] = 255;
+    }
+  // Debris down the D8 paths, from the highest filled cell to the lowest, so every cell has its whole load in.
+  const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => filled[b] - filled[a] || a - b),
+    load = new Float64Array(n),
+    settled = new Float64Array(n),
+    keep = 1 - Math.pow(0.5, metres / travel); // float division: raster only
+  for (const c of order) {
+    let carried = load[c] + (slope[c] >= wall ? cell : 0);
+    if (slope[c] < repose) {
+      const share = carried * keep * Math.min(1, (repose - slope[c]) / 4); // float division: raster only
+      settled[c] = share;
+      carried -= share;
+    }
+    const d = direction[c];
+    if (d < 0) continue;
+    const x = (c % nx) + DX[d],
+      z = Math.floor(c / nx) + DZ[d];
+    if (x >= 0 && x < nx && z >= 0 && z < nz) load[z * nx + x] += carried;
+  }
+  for (let z = 0; z < nz; z++)
+    for (let x = 0; x < nx; x++) {
+      let sum = 0;
+      for (let j = -1; j <= 1; j++)
+        for (let i = -1; i <= 1; i++)
+          sum += settled[Math.min(nz - 1, Math.max(0, z + j)) * nx + Math.min(nx - 1, Math.max(0, x + i))];
+      const c = z * nx + x;
+      texels[c * 4 + 1] = Math.round(255 * Math.min(1, Math.log2(1 + sum / 9 / cell) / 3)); // float division: raster only
+    }
+  return { width: nx, depth: nz, texels };
+}

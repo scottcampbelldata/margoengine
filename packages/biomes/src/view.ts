@@ -74,6 +74,16 @@ export interface BiomeViewOptions {
    */
   readonly patches?: TerrainOptions['patches'];
   /**
+   * Bare rock drawn with structure at 10 to 100 m (the terrain's `rock`, on the world and the horizon ring): ledges,
+   * jointed facets and, over the world, gullies carved along the drainage with talus fans and streams below the walls
+   * (`drainageStructure` of `@margoengine/biomes/hydrology`, multiple flow over the world's region grid, made once at
+   * attach). `debris` names the ground material that benches, gully floors and fans take (one of `materials`, such as
+   * `'gravel'`); `drainage: false` leaves the gullies and fans out, or sets `drainageStructure`'s options. Default: none.
+   * @example
+   * await BiomeView.attach(engine, world, { rock: { debris: 'gravel', strata: 10, facets: 22 } });
+   */
+  readonly rock?: BiomeViewRock;
+  /**
    * How far tree crowns darken the ground, 0 to 1: a material `'canopy'` (its look in `MATERIALS`) takes this share of
    * the ground weight times `canopyCover`, on far hills and on the forest floor, and `materials` lists it last. Nothing
    * is added for worlds without trees or with 16 ground materials already. Default 0.6 with `objects`, 0 without.
@@ -287,6 +297,14 @@ export const SEA: Readonly<Required<Pick<WaterOptions, 'segments' | 'waves' | 'f
 // The wind over a landlocked world's rivers and lakes: a light air (Beaufort 2) over the 100 m a pool of a creek
 // stretches, small ripples.
 const INLAND_WIND = Object.freeze({ speed: 2, fetch: 100 });
+
+/** `BiomeViewOptions.rock`: the terrain's `rock` with the debris layer by material name, and the drainage settings. */
+export type BiomeViewRock = Omit<NonNullable<TerrainOptions['rock']>, 'debris'> & {
+  /** Ground material that benches, gully floors and talus fans take; one of the view's `materials`. Default: none. */
+  readonly debris?: string;
+  /** `false` for no gullies or fans, or `drainageStructure` options. Default `{}` (its defaults). */
+  readonly drainage?: boolean | import('./hydrology.js').DrainageStructureOptions;
+};
 
 /** `Water` settings a view passes on (`@margoengine/water`); the view sets the size, the height and the horizon. */
 export type BiomeWaterSettings = Omit<
@@ -912,6 +930,8 @@ export class BiomeView implements Disposable {
   readonly #weights: Uint8Array[];
   readonly #radius: number;
   readonly #farEnabled: boolean;
+  /** Option `rock`, for the horizon ring too. */
+  readonly #rock?: BiomeViewRock;
   /** Share of the ground the canopy material takes under full crowns (0: no canopy material). */
   readonly #canopy: number;
   readonly #cover?: typeof import('@margoengine/biomes/cover');
@@ -1009,9 +1029,11 @@ export class BiomeView implements Disposable {
     limit: number,
     cover?: typeof import('@margoengine/biomes/cover'),
     canopy = 0,
+    structure?: import('./hydrology.js').DrainageStructure,
   ) {
     this.#engine = engine;
     this.#world = world;
+    this.#rock = options.rock;
     this.#signal = combineSignals(this.#lifetime.signal, options.signal);
     this.#radius = options.radius ?? 1000;
     this.#farEnabled = (options.objects ?? true) && options.far !== false && (!!options.far || this.#radius < 2500);
@@ -1123,6 +1145,7 @@ export class BiomeView implements Disposable {
       clipmapAnchor: anchor,
       captureSurfaceHeight: this.#farEnabled,
       ...(options.patches ? { patches: options.patches } : {}),
+      ...(options.rock ? { rock: terrainRock(options.rock, layerKeys) } : {}),
       // Weights replace the rules; the rules only set each material's texture repeat (4 m), relief and macro tone.
       layers: layerKeys.map((_, i) => {
         const { bump = 0, macro = 0, repeat = 4 } = looks[Math.min(i, looks.length - 1)];
@@ -1167,7 +1190,15 @@ export class BiomeView implements Disposable {
           ]);
         view.#textures = { device, height, weights, tint };
         view.#upload(0, 0, view.#width, view.#depth);
-        return { heightmap: height, layers, weights, ...(tint ? { tint } : {}) };
+        // The rock structure (option `rock`), made once at attach over the world's region grid.
+        const rock =
+          structure && device.createTexture({ size: [structure.width, structure.depth], format: 'rgba8unorm', usage });
+        if (structure && rock)
+          device.queue.writeTexture({ texture: rock }, structure.texels as Uint8Array<ArrayBuffer>, { bytesPerRow: structure.width * 4 }, [
+            structure.width,
+            structure.depth,
+          ]);
+        return { heightmap: height, layers, weights, ...(tint ? { tint } : {}), ...(rock ? { structure: rock } : {}) };
       },
     });
     const horizon = options.horizon ?? 'auto';
@@ -1300,8 +1331,16 @@ export class BiomeView implements Disposable {
     const limit = (engine as unknown as { gpu?: GPUDevice }).gpu?.limits.maxTextureDimension2D ?? 8192;
     const canopy = options.canopy ?? ((options.objects ?? true) ? 0.6 : 0),
       cover = canopy === 0 ? undefined : await import('@margoengine/biomes/cover'),
+      drainage = options.rock?.drainage ?? {},
+      structure =
+        options.rock && drainage !== false
+          ? await import('@margoengine/biomes/hydrology').then((h) =>
+              h.drainageStructure(h.hydrologyOf(world, { multiple: true }), drainage === true ? {} : drainage),
+            )
+          : undefined,
       view = held.run(
-        () => new BiomeView(engine, world, options, terrainModule, limit, cover, cover?.canopyShare(world, canopy)),
+        () =>
+          new BiomeView(engine, world, options, terrainModule, limit, cover, cover?.canopyShare(world, canopy), structure),
       ),
       // The overview runs while the objects load: on the workers off this thread, or here when there are none.
       overview = view.#overview(options.signal);
@@ -2133,6 +2172,7 @@ export class BiomeView implements Disposable {
       resolution: 64,
       levels,
       clipmapAnchor: anchor,
+      ...(this.#rock ? { rock: terrainRock({ ...this.#rock, drainage: false }, layerKeys) } : {}),
       layers: layerKeys.map((_, i) => {
         const { bump = 0, macro = 0 } = looks[Math.min(i, looks.length - 1)];
         const scale = 1 / far.texel; // float division: one repeat per ring texel
@@ -2344,4 +2384,14 @@ export class BiomeView implements Disposable {
   [Symbol.dispose](): void {
     this.dispose();
   }
+}
+
+/** A view's `rock` as the terrain's: the debris material's layer index, the drainage settings left out. */
+function terrainRock(rock: BiomeViewRock, layers: readonly string[]): NonNullable<TerrainOptions['rock']> {
+  if (typeof rock !== 'object' || rock === null) throw typeError('BiomeView rock must be an object', 'biomes');
+  const { debris, drainage: _, ...rest } = rock,
+    index = debris === undefined ? undefined : layers.indexOf(debris);
+  if (index === -1)
+    throw rangeError(`BiomeView rock debris '${String(debris)}' is not one of the view's materials`, 'biomes');
+  return { ...rest, ...(index === undefined ? {} : { debris: index }) };
 }
