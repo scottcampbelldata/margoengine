@@ -1,6 +1,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { Precipitation } from '@margoengine/math/fields';
-import { DYNAMIC_BASE, MAX_MEMORY_PAGES, STACK_BYTES } from '../world/memory.js';
+import type { NativePhasePool } from '../native-phase-pool.js';
+import { DYNAMIC_BASE, isShared, MAX_MEMORY_PAGES, STACK_BYTES } from '../world/memory.js';
 import type {
   FieldDescriptor,
   FieldUse,
@@ -23,6 +24,10 @@ const RECHARGE = 4;
 const DISCHARGE = 5;
 const OUTLETS = 6;
 const METRES_PER_MMH = 1 / 3.6e6;
+const MAX_THREADS = 64;
+const THREAD_HEADER_WORDS = 8;
+const THREAD_HEADER_BYTES = THREAD_HEADER_WORDS * Uint32Array.BYTES_PER_ELEMENT;
+const THREAD_JOB_BYTES = THREAD_HEADER_BYTES + 5 * F64;
 
 type GridNumber = number | ArrayLike<number>;
 
@@ -89,6 +94,8 @@ export interface RunoffLoadOptions {
   readonly rain?: RunoffRainInput;
   /** ATMO-09 layout-1 f64 water-flux field. Its evaporation and melt words drive this patch if bound. */
   readonly surfaceEnergy?: FieldDescriptor;
+  /** Native threads including the caller. Defaults to one. More threads need a shared-memory world. */
+  readonly threads?: number;
   /** Cancels loading with the signal's reason. */
   readonly signal?: AbortSignal;
 }
@@ -119,6 +126,19 @@ export interface RunoffSample {
   readonly outflow: number;
 }
 
+/** Independent native rain and soil work assigned to one worker for the last accepted runtime tick. */
+export interface RunoffWorkerWork {
+  readonly soilCells: number;
+  readonly rainMeltCells: number;
+}
+
+/** Actual native visits, including the caller's ordered routing work. */
+export interface RunoffWorkCounts extends RunoffWorkerWork {
+  readonly threads: number;
+  readonly routedCells: number;
+  readonly workers: readonly RunoffWorkerWork[];
+}
+
 interface Shape {
   readonly nx: number;
   readonly nz: number;
@@ -147,6 +167,8 @@ interface State {
   readonly cell: Region;
   readonly topographicScale: number;
   readonly precipitation?: Precipitation;
+  readonly threadJob?: Region;
+  acceptedTick: boolean;
 }
 
 function numberIn(option: string, value: number, minimum = 0, maximum = Infinity): number {
@@ -171,7 +193,7 @@ function scalarGrid(option: string, value: GridNumber, count: number) {
   return (index: number) => value[index]!;
 }
 
-function gridShape(options: RunoffGrid): Shape {
+function gridShape(options: RunoffGrid, threads?: NativePhasePool): Shape {
   const { nx, nz } = options;
   const count = nx * nz;
   if (!Number.isSafeInteger(nx) || !Number.isSafeInteger(nz) || nx < 1 || nz < 1 || count > 0x7fffffff)
@@ -180,9 +202,12 @@ function gridShape(options: RunoffGrid): Shape {
       'Invalid runoff dimensions. Pass positive integers whose cell indices fit a signed 32-bit grid.',
     );
   // State, candidate, forcing and geometry plus the six accepted and pending port mirrors.
-  const required = (40 * count + 15) * F64 + DYNAMIC_BASE + STACK_BYTES + 16;
+  const workerBytes = threads
+    ? 5 * F64 * count + THREAD_JOB_BYTES + 4 * threads.controlWords + (threads.count - 1) * (STACK_BYTES + 16)
+    : 0;
+  const required = (40 * count + 15) * F64 + DYNAMIC_BASE + STACK_BYTES + 16 + workerBytes;
   if (required >= MAX_MEMORY_PAGES * 65536)
-    throw new MargoError('state', 'Runoff grid exceeds the wasm32 arena. Use fewer cells.');
+    throw new MargoError('state', 'Runoff grid exceeds the wasm32 arena. Use fewer cells or worker threads.');
   const dx = positive('dx', options.dx);
   const dz = positive('dz', options.dz ?? dx);
   const origin = options.origin ?? [0, 0];
@@ -280,6 +305,8 @@ export class RainfallRunoff implements Solver<RunoffParams> {
   private readonly energyInput?: FieldDescriptor;
   private readonly outputPlanes: ReadonlyArray<readonly [FieldDescriptor, number]>;
   private state?: State;
+  private threads?: NativePhasePool;
+  private disposed = false;
 
   private constructor(
     private readonly builds: RunoffBuilds,
@@ -321,11 +348,32 @@ export class RainfallRunoff implements Solver<RunoffParams> {
     ];
   }
 
-  /** Loads the optional runoff kernel, then returns a solver ready to add to a PhysicsWorld. */
+  /** Loads the optional native runoff kernel and any requested shared workers. */
   static async load(options: RunoffLoadOptions = {}): Promise<RainfallRunoff> {
     if (options === null || typeof options !== 'object')
       throw new MargoError('state', 'Invalid runoff load options. Pass an options object or omit it.');
-    return new RainfallRunoff(await loadRunoffBuilds(options.signal), options);
+    const threads = options.threads === undefined ? 1 : options.threads;
+    if (!Number.isSafeInteger(threads) || threads < 1 || threads > MAX_THREADS)
+      throw new MargoError('state', `Choose a whole number of runoff threads from 1 to ${MAX_THREADS}.`);
+    const builds = await loadRunoffBuilds(options.signal);
+    const solver = new RainfallRunoff(builds, options);
+    if (threads > 1) {
+      if (!builds.shared)
+        throw new MargoError('unsupported', 'Use a shared-memory runtime for runoff threads or use threads: 1.');
+      const { createNativePhasePool } = await import('../native-phase-pool.js');
+      solver.threads = await createNativePhasePool(threads, {
+        subject: 'Runoff',
+        phaseExport: 'runoff_thread_phase',
+        signal: options.signal,
+      });
+    }
+    return solver;
+  }
+
+  /** Close the optional workers. Remove the solver from the world before disposal. */
+  [Symbol.dispose](): void {
+    this.disposed = true;
+    this.threads?.close();
   }
 
   describe(): SolverDescription {
@@ -336,6 +384,7 @@ export class RainfallRunoff implements Solver<RunoffParams> {
   }
 
   init(host: SolverHost, options: RunoffParams): void {
+    this.assertActive();
     if (this.state) throw new MargoError('state', 'Runoff is already attached. Load a new solver for another world.');
     if (!options?.downstream)
       throw new MargoError(
@@ -344,7 +393,10 @@ export class RainfallRunoff implements Solver<RunoffParams> {
       );
     if (options.precipitation !== undefined && typeof options.precipitation?.sample !== 'function')
       throw new MargoError('state', 'Invalid runoff precipitation. Give a source with a sample method.');
-    const shape = gridShape(options);
+    const threads = this.threads;
+    if (threads && !isShared(host.memory))
+      throw new MargoError('unsupported', 'Use worldMemory(true) for runoff threads or load with threads: 1.');
+    const shape = gridShape(options, threads);
     const { count, dx, dz, nx, area } = shape;
     const topology = drainageOrder(options.downstream, count);
     const topographicScale = numberIn(
@@ -419,6 +471,8 @@ export class RainfallRunoff implements Solver<RunoffParams> {
       budget: allocate('hydrology-budget', 6),
       candidateBudget: allocate('hydrology-candidate-budget', 6),
       cell: allocate('hydrology-origin-cell', 3),
+      threadJob: threads && host.allocate('hydrology-thread-job', THREAD_JOB_BYTES, 'u32', LAYOUT),
+      acceptedTick: false,
     };
     floats(state, state.elevations).set(heights);
     floats(state, state.coefficients).set(configuration);
@@ -426,7 +480,36 @@ export class RainfallRunoff implements Solver<RunoffParams> {
     floats(state, state.rain).set(rainRates);
     floats(state, state.cell).set(host.cell);
     new Int32Array(host.memory.buffer, state.topology.byteOffset, 2 * count).set(topology);
+    if (threads && state.threadJob) this.bindWorkers(state, threads, state.threadJob);
     this.state = state;
+  }
+
+  private bindWorkers(s: State, threads: NativePhasePool, job: Region): void {
+    const { host, shape } = s;
+    const ledger = host.allocate('hydrology-thread-ledger', 5 * F64 * shape.count, 'f64', LAYOUT);
+    const control = host.allocate('hydrology-thread-control', 4 * threads.controlWords, 'i32', LAYOUT);
+    const stackTops = Array.from({ length: threads.count - 1 }, (_, part) => {
+      const stack = host.allocate(`hydrology-worker-stack-${part + 1}`, STACK_BYTES + 8, 'u8', LAYOUT);
+      return Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
+    });
+    new Uint32Array(host.memory.buffer, job.byteOffset, THREAD_HEADER_WORDS).set([
+      s.candidate.byteOffset,
+      s.coefficients.byteOffset,
+      s.topology.byteOffset,
+      s.forcing.byteOffset,
+      s.scratch.byteOffset,
+      s.candidateBudget.byteOffset,
+      ledger.byteOffset,
+      shape.count,
+    ]);
+    new Float64Array(host.memory.buffer, job.byteOffset + THREAD_HEADER_BYTES, 2).set([shape.area, s.topographicScale]);
+    threads.init({
+      module: this.builds.shared!,
+      memory: host.memory,
+      job: job.byteOffset,
+      control: control.byteOffset,
+      stackTops,
+    });
   }
 
   importPorts(): void {
@@ -488,18 +571,20 @@ export class RainfallRunoff implements Solver<RunoffParams> {
     const nextBudget = floats(state, state.candidateBudget);
     candidate.set(accepted);
     nextBudget.set(budget);
-    const status = state.kernel.runoff_step(
-      state.candidate.byteOffset,
-      state.coefficients.byteOffset,
-      state.topology.byteOffset,
-      state.forcing.byteOffset,
-      state.scratch.byteOffset,
-      state.candidateBudget.byteOffset,
-      count,
-      area,
-      state.topographicScale,
-      interval,
-    );
+    const status = state.threadJob
+      ? this.stepThreaded(state, state.threadJob, interval)
+      : state.kernel.runoff_step(
+          state.candidate.byteOffset,
+          state.coefficients.byteOffset,
+          state.topology.byteOffset,
+          state.forcing.byteOffset,
+          state.scratch.byteOffset,
+          state.candidateBudget.byteOffset,
+          count,
+          area,
+          state.topographicScale,
+          interval,
+        );
     if (status !== 0)
       throw new MargoError(
         'state',
@@ -508,6 +593,19 @@ export class RainfallRunoff implements Solver<RunoffParams> {
     accepted.set(candidate);
     budget.set(nextBudget);
     floats(state, state.cell).set(context.cell);
+    state.acceptedTick = true;
+  }
+
+  private stepThreaded(s: State, job: Region, interval: number): number {
+    const { kernel, host } = s;
+    const threads = this.threads!;
+    const ptr = job.byteOffset;
+    new Float64Array(host.memory.buffer, ptr + THREAD_HEADER_BYTES, 5)[2] = interval;
+    return (
+      kernel.runoff_thread_begin(ptr) ||
+      threads.phase(0, () => kernel.runoff_thread_phase(ptr, 0, 0, threads.count)) ||
+      kernel.runoff_thread_finish(ptr)
+    );
   }
 
   exportPorts(tick: number): readonly Port[] {
@@ -562,6 +660,19 @@ export class RainfallRunoff implements Solver<RunoffParams> {
     };
   }
 
+  /** Count the last successful runtime tick. Replay recomputes these visits outside the snapshot. */
+  workCounts(): RunoffWorkCounts {
+    const state = this.requireState();
+    const threads = this.threads?.count ?? 1;
+    const count = state.acceptedTick ? state.shape.count : 0;
+    const boundary = (part: number) => Math.floor((part * count) / threads);
+    const workers = Array.from({ length: threads }, (_, part) => {
+      const cells = boundary(part + 1) - boundary(part);
+      return { soilCells: cells, rainMeltCells: cells };
+    });
+    return { threads, soilCells: count, rainMeltCells: count, routedCells: count, workers };
+  }
+
   /** Current channel discharge at a point in the grid's coordinates, in m³/s. Outside the grid returns zero. */
   dischargeAt(x: number, z: number): number {
     const state = this.requireState();
@@ -573,8 +684,14 @@ export class RainfallRunoff implements Solver<RunoffParams> {
   }
 
   private requireState(): State {
+    this.assertActive();
     if (!this.state)
       throw new MargoError('state', 'Runoff has no drainage grid. Add the solver to a PhysicsWorld first.');
     return this.state;
+  }
+
+  private assertActive(): void {
+    if (this.disposed)
+      throw new MargoError('state', 'RainfallRunoff was disposed. Load a new solver before adding or stepping it.');
   }
 }

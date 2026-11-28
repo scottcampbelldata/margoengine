@@ -15752,6 +15752,7 @@ wetness-index saturation, volume closure, flood spread, and deterministic replay
 publications and this repository's field contracts.
 
 - Roger E. Smith, [Comment on Modeling Infiltration During a Steady Rain by Mein and Larson](https://www.tucson.ars.ag.gov/unit/publications/PDFfiles/170.pdf), 1973, equations 6 and 8. The native step retains the preponding and ponded balance and uses overflow-safe equivalents for extreme ratios. The monotone numerical roots and ordered water sums must give finite candidate state before publication.
+- W. Ahrens, James Demmel and Hong Diep Nguyen, [Algorithms for Efficient Reproducible Floating Point Summation](https://doi.org/10.1145/3389360), 2020. Floating-point addition depends on evaluation order. The runoff worker partitions write per-cell receipts, then the caller folds the volumes in the original cell order. The ordered topographic means and kinematic drainage graph keep their existing operations.
 - Reed M. Maxwell et al., [Surface-subsurface model intercomparison](https://doi.org/10.1002/2013WR013725), 2014. Its tilted V catchment motivates the staged test geometry and rain/recession sequence. The camera test is for routing and renderer direction with authored inputs.
 
 ### Aquatic locomotion (LIFE-03, `@margoengine/physics/life`)

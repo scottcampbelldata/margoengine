@@ -357,45 +357,39 @@ fn finite_mean(sum: f64, count: usize, value: impl Fn(usize) -> f64) -> f64 {
     (scaled_sum / count as f64) * scale
 }
 
-/// Advances grid storage and routes the resulting water through a topologically sorted drainage graph.
-/// Each pointer describes an allocated world region and is validated by the TypeScript bridge.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn runoff_step(
-    state: *mut f64,
-    coefficients: *const f64,
-    topology: *const i32,
-    forcing: *const f64,
-    scratch: *mut f64,
-    budget: *mut f64,
-    count: usize,
-    area: f64,
-    topographic_scale: f64,
-    dt: f64,
-) -> u32 {
-    if !(count > 0
+fn valid_grid(count: usize, area: f64, topographic_scale: f64, dt: f64) -> bool {
+    count > 0
         && count <= isize::MAX as usize / (PLANES * core::mem::size_of::<f64>())
         && area > 0.0
         && area.is_finite()
         && dt > 0.0
         && dt.is_finite()
         && topographic_scale >= 0.0
-        && topographic_scale.is_finite())
-    {
-        return 1;
-    }
-    let state = unsafe { slice::from_raw_parts_mut(state, PLANES * count) };
-    let coefficients = unsafe { slice::from_raw_parts(coefficients, COEFFICIENTS * count) };
-    let topology = unsafe { slice::from_raw_parts(topology, 2 * count) };
-    let forcing = unsafe { slice::from_raw_parts(forcing, 3 * count) };
-    let scratch = unsafe { slice::from_raw_parts_mut(scratch, 2 * count) };
-    let budget = unsafe { slice::from_raw_parts_mut(budget, 6) };
-    let (supply, incoming) = scratch.split_at_mut(count);
-    rain_and_melt(&forcing[..count], &forcing[count..2 * count], supply);
-    incoming.fill(0.0);
+        && topographic_scale.is_finite()
+}
 
-    let mut mean_deficit = 0.0;
-    let mut mean_index = 0.0;
-    if topographic_scale > 0.0 {
+struct Grid<'a> {
+    coefficients: &'a [f64],
+    forcing: &'a [f64],
+    count: usize,
+    area: f64,
+    topographic_scale: f64,
+    dt: f64,
+}
+
+impl Grid<'_> {
+    fn means(&self, state: &[f64]) -> Option<[f64; 2]> {
+        let Self {
+            coefficients,
+            count,
+            topographic_scale,
+            ..
+        } = *self;
+        if topographic_scale == 0.0 {
+            return Some([0.0, 0.0]);
+        }
+        let mut mean_deficit = 0.0;
+        let mut mean_index = 0.0;
         for i in 0..count {
             mean_deficit += coefficients[SOIL_CAPACITY * count + i] - state[SOIL * count + i];
             mean_index += coefficients[TOPOGRAPHY * count + i];
@@ -404,17 +398,42 @@ pub unsafe extern "C" fn runoff_step(
             coefficients[SOIL_CAPACITY * count + i] - state[SOIL * count + i]
         });
         mean_index = finite_mean(mean_index, count, |i| coefficients[TOPOGRAPHY * count + i]);
-        if !(mean_deficit.is_finite() && mean_index.is_finite()) {
-            return 1;
-        }
+        (mean_deficit.is_finite() && mean_index.is_finite()).then_some([mean_deficit, mean_index])
     }
 
-    for i in 0..count {
+    fn add_water(&self, start: usize, supply: &mut [f64]) {
+        let end = start + supply.len();
+        let count = self.count;
+        rain_and_melt(
+            &self.forcing[start..end],
+            &self.forcing[count + start..count + end],
+            supply,
+        );
+    }
+
+    // A worker owns index i in every plane. A full-grid mutable borrow would
+    // overlap the borrows of the other simultaneously running workers.
+    #[inline(never)]
+    unsafe fn wet_cell(
+        &self,
+        state: *mut f64,
+        i: usize,
+        supply: f64,
+        [mean_deficit, mean_index]: [f64; 2],
+    ) -> Option<[f64; 5]> {
+        let Self {
+            coefficients,
+            forcing,
+            count,
+            area,
+            topographic_scale,
+            dt,
+        } = *self;
         let evaporation = forcing[2 * count + i] * dt;
         let condensation = (-evaporation).max(0.0);
-        let mut surface = state[SURFACE * count + i];
-        let mut soil = state[SOIL * count + i];
-        let mut front = state[FRONT * count + i];
+        let mut surface = unsafe { state.add(SURFACE * count + i).read() };
+        let mut soil = unsafe { state.add(SOIL * count + i).read() };
+        let mut front = unsafe { state.add(FRONT * count + i).read() };
         let capacity = coefficients[SOIL_CAPACITY * count + i];
         let suction = coefficients[SUCTION_DEFICIT * count + i];
         let conductivity = coefficients[CONDUCTIVITY * count + i];
@@ -434,17 +453,17 @@ pub unsafe extern "C" fn runoff_step(
             .iter()
             .all(|word| *word >= 0.0 && word.is_finite())
         {
-            return 1;
+            return None;
         }
         let surface_loss = evaporation.max(0.0).min(surface);
         surface -= surface_loss;
         let soil_loss = (evaporation - surface_loss).max(0.0).min(soil);
         soil -= soil_loss;
 
-        let offered = supply[i] + condensation / dt;
+        let offered = supply + condensation / dt;
         let available = surface + offered * dt;
         if !(offered.is_finite() && available.is_finite()) {
-            return 1;
+            return None;
         }
         let local_deficit = (capacity - soil).max(0.0);
         let deficit = if topographic_scale > 0.0 {
@@ -457,13 +476,13 @@ pub unsafe extern "C" fn runoff_step(
             };
             let adjusted = mean_deficit + correction;
             if adjusted.is_nan() {
-                return 1;
+                return None;
             }
             local_deficit.min(adjusted.max(0.0))
         } else {
             local_deficit
         };
-        let Some(infiltrated) = infiltration(
+        let infiltrated = infiltration(
             front,
             suction,
             conductivity,
@@ -471,10 +490,8 @@ pub unsafe extern "C" fn runoff_step(
             offered,
             available,
             dt,
-        ) else {
-            return 1;
-        };
-        let infiltrated = infiltrated.min(deficit);
+        )?
+        .min(deficit);
         soil += infiltrated;
         front += infiltrated;
         let drainage = soil * (1.0 - exp(-coefficient * dt));
@@ -483,7 +500,7 @@ pub unsafe extern "C" fn runoff_step(
         let stored_before_dry = soil + soil_loss;
         if available == 0.0 && stored_before_dry > 0.0 {
             if !stored_before_dry.is_finite() {
-                return 1;
+                return None;
             }
             front *= remaining_soil / stored_before_dry;
         }
@@ -506,56 +523,244 @@ pub unsafe extern "C" fn runoff_step(
             .chain(ledger.iter())
             .all(|word| *word >= 0.0 && word.is_finite())
         {
-            return 1;
+            return None;
         }
         let [surface, soil, front, infiltration_rate, recharge_rate] = next;
-        state[SURFACE * count + i] = surface;
-        state[SOIL * count + i] = soil;
-        state[FRONT * count + i] = front;
-        state[INFILTRATION * count + i] = infiltration_rate;
-        state[RECHARGE * count + i] = recharge_rate;
-        for (total, delta) in budget.iter_mut().zip(ledger) {
-            *total += delta;
-            if !total.is_finite() {
-                return 1;
-            }
+        unsafe {
+            state.add(SURFACE * count + i).write(surface);
+            state.add(SOIL * count + i).write(soil);
+            state.add(FRONT * count + i).write(front);
+            state.add(INFILTRATION * count + i).write(infiltration_rate);
+            state.add(RECHARGE * count + i).write(recharge_rate);
         }
+        Some(ledger)
     }
 
-    for &cell in &topology[count..] {
-        let i = cell as usize;
-        if i >= count {
-            return 1;
+    #[inline(never)]
+    fn route(
+        &self,
+        state: &mut [f64],
+        topology: &[i32],
+        incoming: &mut [f64],
+        budget: &mut [f64],
+    ) -> u32 {
+        let Self {
+            count,
+            coefficients,
+            area,
+            dt,
+            ..
+        } = *self;
+        for &cell in &topology[count..] {
+            let i = cell as usize;
+            if i >= count {
+                return 1;
+            }
+            let volume = state[SURFACE * count + i] * area + incoming[i];
+            let Some((routed, depth)) =
+                routed_volume(volume, area, coefficients[MANNING * count + i], dt)
+            else {
+                return 1;
+            };
+            let discharge = routed / dt;
+            if !(depth >= 0.0 && depth.is_finite() && discharge >= 0.0 && discharge.is_finite()) {
+                return 1;
+            }
+            state[SURFACE * count + i] = depth;
+            state[DISCHARGE * count + i] = discharge;
+            let next = topology[i];
+            if next < 0 {
+                budget[5] += routed;
+                if !budget[5].is_finite() {
+                    return 1;
+                }
+                state[OUTLET * count + i] = discharge;
+            } else {
+                if next as usize >= count {
+                    return 1;
+                }
+                incoming[next as usize] += routed;
+                if !incoming[next as usize].is_finite() {
+                    return 1;
+                }
+                state[OUTLET * count + i] = 0.0;
+            }
         }
-        let volume = state[SURFACE * count + i] * area + incoming[i];
-        let Some((routed, depth)) =
-            routed_volume(volume, area, coefficients[MANNING * count + i], dt)
-        else {
-            return 1;
-        };
-        let discharge = routed / dt;
-        if !(depth >= 0.0 && depth.is_finite() && discharge >= 0.0 && discharge.is_finite()) {
-            return 1;
-        }
-        state[SURFACE * count + i] = depth;
-        state[DISCHARGE * count + i] = discharge;
-        let next = topology[i];
-        if next < 0 {
-            budget[5] += routed;
-            if !budget[5].is_finite() {
-                return 1;
-            }
-            state[OUTLET * count + i] = discharge;
-        } else {
-            if next as usize >= count {
-                return 1;
-            }
-            incoming[next as usize] += routed;
-            if !incoming[next as usize].is_finite() {
-                return 1;
-            }
-            state[OUTLET * count + i] = 0.0;
+        0
+    }
+}
+
+fn add_ledger(budget: &mut [f64], ledger: [f64; 5]) -> bool {
+    for (total, delta) in budget.iter_mut().zip(ledger) {
+        *total += delta;
+        if !total.is_finite() {
+            return false;
         }
     }
-    0
+    true
+}
+
+/// Advances grid storage and routes water through a topologically sorted drainage graph.
+/// Each pointer describes an allocated world region and is validated by the TypeScript bridge.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn runoff_step(
+    state: *mut f64,
+    coefficients: *const f64,
+    topology: *const i32,
+    forcing: *const f64,
+    scratch: *mut f64,
+    budget: *mut f64,
+    count: usize,
+    area: f64,
+    topographic_scale: f64,
+    dt: f64,
+) -> u32 {
+    if !valid_grid(count, area, topographic_scale, dt) {
+        return 1;
+    }
+    unsafe {
+        let grid = Grid {
+            coefficients: slice::from_raw_parts(coefficients, COEFFICIENTS * count),
+            forcing: slice::from_raw_parts(forcing, 3 * count),
+            count,
+            area,
+            topographic_scale,
+            dt,
+        };
+        let scratch = slice::from_raw_parts_mut(scratch, 2 * count);
+        let budget = slice::from_raw_parts_mut(budget, 6);
+        let (supply, incoming) = scratch.split_at_mut(count);
+        grid.add_water(0, supply);
+        incoming.fill(0.0);
+        let Some(means) = grid.means(slice::from_raw_parts(state, PLANES * count)) else {
+            return 1;
+        };
+        for (i, &offered) in supply.iter().enumerate() {
+            let Some(ledger) = grid.wet_cell(state, i, offered, means) else {
+                return 1;
+            };
+            if !add_ledger(budget, ledger) {
+                return 1;
+            }
+        }
+        grid.route(
+            slice::from_raw_parts_mut(state, PLANES * count),
+            slice::from_raw_parts(topology, 2 * count),
+            incoming,
+            budget,
+        )
+    }
+}
+
+#[repr(C)]
+struct ThreadJob {
+    state: u32,
+    coefficients: u32,
+    topology: u32,
+    forcing: u32,
+    scratch: u32,
+    budget: u32,
+    ledger: u32,
+    count: u32,
+    area: f64,
+    topographic_scale: f64,
+    dt: f64,
+    mean_deficit: f64,
+    mean_index: f64,
+}
+
+const _: () = assert!(core::mem::size_of::<ThreadJob>() == 72);
+
+impl ThreadJob {
+    unsafe fn grid(&self) -> Option<Grid<'_>> {
+        let count = self.count as usize;
+        if !valid_grid(count, self.area, self.topographic_scale, self.dt) {
+            return None;
+        }
+        Some(Grid {
+            coefficients: unsafe {
+                slice::from_raw_parts(self.coefficients as *const f64, COEFFICIENTS * count)
+            },
+            forcing: unsafe { slice::from_raw_parts(self.forcing as *const f64, 3 * count) },
+            count,
+            area: self.area,
+            topographic_scale: self.topographic_scale,
+            dt: self.dt,
+        })
+    }
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn runoff_thread_begin(job: *mut ThreadJob) -> u32 {
+    unsafe {
+        let Some(job) = job.as_mut() else { return 1 };
+        let Some(grid) = job.grid() else { return 1 };
+        let count = grid.count;
+        let Some([mean_deficit, mean_index]) = grid.means(slice::from_raw_parts(
+            job.state as *const f64,
+            PLANES * count,
+        )) else {
+            return 1;
+        };
+        (job.scratch as *mut f64).add(count).write_bytes(0, count);
+        job.mean_deficit = mean_deficit;
+        job.mean_index = mean_index;
+        0
+    }
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn runoff_thread_phase(
+    job: *const ThreadJob,
+    stage: u32,
+    part: u32,
+    parts: u32,
+) -> u32 {
+    if stage != 0 || part >= parts {
+        return 1;
+    }
+    unsafe {
+        let Some(job) = job.as_ref() else { return 1 };
+        let Some(grid) = job.grid() else { return 1 };
+        let part = u64::from(part);
+        let parts = u64::from(parts);
+        let count = u64::from(job.count);
+        let start = (part * count / parts) as usize;
+        let end = ((part + 1) * count / parts) as usize;
+        let supply = slice::from_raw_parts_mut((job.scratch as *mut f64).add(start), end - start);
+        grid.add_water(start, supply);
+        let means = [job.mean_deficit, job.mean_index];
+        let ledger = job.ledger as *mut [f64; 5];
+        for (offset, &offered) in supply.iter().enumerate() {
+            let i = start + offset;
+            let Some(row) = grid.wet_cell(job.state as *mut f64, i, offered, means) else {
+                return 1;
+            };
+            ledger.add(i).write(row);
+        }
+        0
+    }
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn runoff_thread_finish(job: *const ThreadJob) -> u32 {
+    unsafe {
+        let Some(job) = job.as_ref() else { return 1 };
+        let Some(grid) = job.grid() else { return 1 };
+        let count = grid.count;
+        let budget = slice::from_raw_parts_mut(job.budget as *mut f64, 6);
+        let ledger = slice::from_raw_parts(job.ledger as *const [f64; 5], count);
+        // Fix the sum order independently of worker count and finish order.
+        for &row in ledger {
+            if !add_ledger(budget, row) {
+                return 1;
+            }
+        }
+        grid.route(
+            slice::from_raw_parts_mut(job.state as *mut f64, PLANES * count),
+            slice::from_raw_parts(job.topology as *const i32, 2 * count),
+            slice::from_raw_parts_mut((job.scratch as *mut f64).add(count), count),
+            budget,
+        )
+    }
 }

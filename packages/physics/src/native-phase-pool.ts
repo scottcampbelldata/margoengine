@@ -8,7 +8,8 @@ type NativePhaseSolver =
   | { readonly subject: 'Tsunami'; readonly phaseExport: 'tsunami_thread_phase' }
   | { readonly subject: 'Lightning'; readonly phaseExport: 'lightning_thread_phase' }
   | { readonly subject: 'Lava'; readonly phaseExport: 'lava_thread_phase' }
-  | { readonly subject: 'Viscoplastic'; readonly phaseExport: 'viscoplastic_thread_phase' };
+  | { readonly subject: 'Viscoplastic'; readonly phaseExport: 'viscoplastic_thread_phase' }
+  | { readonly subject: 'Runoff'; readonly phaseExport: 'runoff_thread_phase' };
 
 export type NativePhasePoolOptions = NativePhaseSolver & { readonly signal?: AbortSignal };
 
@@ -41,7 +42,13 @@ interface ThreadWorker {
 // Deadlines bound transport failures. Once a phase joins, its numerical result has no wall-clock input.
 const DEADLINE_MS = 10_000;
 const slots = NATIVE_PHASE_CONTROL;
-const phaseLabel = { Tsunami: 'flux', Lightning: 'relaxation', Lava: 'native', Viscoplastic: 'transfer' } as const;
+const phaseLabel = {
+  Tsunami: 'flux',
+  Lightning: 'relaxation',
+  Lava: 'native',
+  Viscoplastic: 'transfer',
+  Runoff: 'soil',
+} as const;
 
 function failedThreads(subject: NativePhaseSolver['subject'], reason: string, cause?: unknown): MargoError {
   return Object.assign(

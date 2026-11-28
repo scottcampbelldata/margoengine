@@ -14,6 +14,7 @@ export class RainfallRunoff implements Solver<RunoffParams> {
     readonly outletField: FieldDescriptor;
     private constructor();
     static load(options?: RunoffLoadOptions): Promise<RainfallRunoff>;
+    [Symbol.dispose](): void;
     describe(): SolverDescription;
     init(host: SolverHost, options: RunoffParams): void;
     importPorts(): void;
@@ -23,6 +24,7 @@ export class RainfallRunoff implements Solver<RunoffParams> {
     extraState(): readonly Region[];
     read(i: number, j: number): RunoffSample;
     get budget(): RunoffBudget;
+    workCounts(): RunoffWorkCounts;
     dischargeAt(x: number, z: number): number;
 }
 
@@ -51,6 +53,7 @@ export interface RunoffLoadOptions {
     readonly id?: string;
     readonly rain?: RunoffRainInput;
     readonly surfaceEnergy?: FieldDescriptor;
+    readonly threads?: number;
     readonly signal?: AbortSignal;
 }
 
@@ -81,6 +84,17 @@ export interface RunoffSample {
     readonly recharge: number;
     readonly discharge: number;
     readonly outflow: number;
+}
+
+export interface RunoffWorkCounts extends RunoffWorkerWork {
+    readonly threads: number;
+    readonly routedCells: number;
+    readonly workers: readonly RunoffWorkerWork[];
+}
+
+export interface RunoffWorkerWork {
+    readonly soilCells: number;
+    readonly rainMeltCells: number;
 }
 
 // Not exported from this entry, but used by the exports above:

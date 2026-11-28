@@ -20,6 +20,9 @@ export interface RunoffKernel extends WebAssembly.Exports {
     topographicScale: number,
     dt: number,
   ): number;
+  runoff_thread_begin(job: number): number;
+  runoff_thread_phase(job: number, stage: number, part: number, parts: number): number;
+  runoff_thread_finish(job: number): number;
 }
 
 async function readAsset(url: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {

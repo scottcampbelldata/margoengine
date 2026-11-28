@@ -32,6 +32,7 @@
     "test:gpu:viscoplastic-surface": "cd ../.. && node packages/physics/tests/viscoplastic-surface.browser.mjs && node packages/physics/tests/viscoplastic-surface.browser.mjs --compat",
     "test:gpu:viscoplastic-threads": "cd ../.. && node packages/physics/tests/viscoplastic-threads.browser.mjs",
     "test:gpu:runoff-surface": "cd ../.. && node packages/physics/tests/runoff-surface.browser.mjs && node packages/physics/tests/runoff-surface.browser.mjs --compat",
+    "test:gpu:runoff-threads": "cd ../.. && node packages/physics/tests/runoff-threads.browser.mjs",
     "test:browser:lightning": "cd ../.. && node packages/physics/tests/lightning.browser.mjs && node packages/physics/tests/lightning.browser.mjs --compat",
     "test:browser:gpu-cloth": "cd ../.. && node packages/physics/tests/gpu-cloth-check.mjs && node packages/physics/tests/gpu-cloth-check.mjs --compat",
     "test:browser:floating": "cd ../.. && node packages/physics/tests/floating-example.browser.mjs && node packages/physics/tests/floating-example.browser.mjs --compat",

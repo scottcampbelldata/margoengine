@@ -11000,6 +11000,8 @@ Runoff stages the next seven grid planes and six cumulative ledger words before 
 The native soil and graph solves reject invalid numeric candidates. The timed rain and receiving
 shallow-water regression routes the accepted outlet into Water on WebGPU and WebGL2 and checks
 exact state and image replay.
+Shared Wasm workers split independent cell work and join before the ordered water receipts
+and drainage graph. The receipt data is runtime-only. Replay reconstructs it by running the same grid visits.
 
 ### Section 5 evidence for light-bodies aerodynamics (AERO-05)
 

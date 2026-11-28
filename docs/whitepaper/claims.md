@@ -511,6 +511,9 @@ first: each names its scope, its evidence file and how to reproduce it.
   preserves accepted near-edge depths within 2 µm on WebGPU and WebGL2. Both paths reproduce their exact images
   after seek in `packages/physics/tests/runoff-surface.browser.mjs`. The lab comparison in the solver audit
   records the early cumulative-volume miss.
+  Four native partitions maintain exact accepted replay on Node and Chromium. The larger proof visits 49,601
+  cells in each independent stage and keeps drainage graph routing in order. See
+  `packages/physics/tests/coupling/runoff-threads.test.js`.
 
 - Pedestrian crowd motion (LIFE-05). A 20 kg and an 80 kg pressed walker receive equal and opposite
   impulses and displace in inverse mass ratio. A future encounter slows two separated walkers before

@@ -34,9 +34,14 @@ test('runoff setup and sampling errors give coded corrections', async () => {
   assert.throws(() => runoff.read(0, 1), error(/column and row in the configured grid/));
 });
 
-test('a cumulative runoff overflow rejects the whole native candidate in either memory mode', async () => {
-  for (const shared of [false, true]) {
-    const runoff = await RainfallRunoff.load();
+test('a cumulative runoff overflow rejects the whole native candidate in either memory mode', async (t) => {
+  for (const [shared, threads] of [
+    [false, 1],
+    [true, 1],
+    [true, 4],
+  ]) {
+    const runoff = await RainfallRunoff.load({ threads });
+    t.after(() => runoff[Symbol.dispose]());
     const world = new PhysicsWorld({ rate, memory: worldMemory(shared) }).add(runoff, {
       ...cell,
       dx: 100,
@@ -46,11 +51,13 @@ test('a cumulative runoff overflow rejects the whole native candidate in either 
     assert.ok(runoff.budget.rain > 1.6e308);
     const tick = world.tick;
     const before = stateBytes(world, runoff);
+    const work = runoff.workCounts();
     const saved = world.takeSnapshot();
     for (let replay = 0; replay < 2; replay++) {
       assert.throws(() => world.advance(11), error(/finite water or flow range.*Use compatible grid/));
       assert.equal(world.tick, tick);
       assert.deepEqual(stateBytes(world, runoff), before);
+      assert.deepEqual(runoff.workCounts(), work);
       world.restoreSnapshot(saved.bytes);
     }
   }

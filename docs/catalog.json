@@ -3465,10 +3465,10 @@
     "package": "@margoengine/optics",
     "version": "1.0.0",
     "published": false,
-    "description": "Physical optics as plain functions: refraction and dispersion, polarisation, thin films and multilayers, diffraction, image formation and spectral colour.",
-    "requirements": "See the package guide for requirements",
+    "description": "Physical optics as plain functions: refraction and dispersion, polarisation, thin films and multilayers, diffraction, image formation and spectral colour; plus the GPU screens of an optics bench.",
+    "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "optics",
-    "install": "npm install @margoengine/optics@1.0.0",
+    "install": "npm install @margoengine/core@1.0.0 @margoengine/optics@1.0.0",
     "imports": "import { AIRY_FIRST_ZERO } from '@margoengine/optics';",
     "exports": [
       "AIRY_FIRST_ZERO",

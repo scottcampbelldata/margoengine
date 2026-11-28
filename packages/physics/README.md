@@ -280,6 +280,13 @@ f64 grids. Depth and soil water use metres, infiltration and recharge use m/s, a
 discharge use m³/s. The runoff budget measures every external gain and loss in m³. Match the area
 upstream of a mapped outlet to the flood grid it feeds so direct flood rain and routed basin rain are each counted once.
 
+For larger catchments, choose `RainfallRunoff.load({ threads: 4 })` and use
+`new PhysicsWorld({ memory: worldMemory(true), rate: { num: 60, den: 1 } })`. Import `worldMemory` from `@margoengine/physics/world`.
+Choose any whole thread count from 1 to 64. The default is one. Run the shared path in Node
+or a cross-origin-isolated browser worker. `workCounts()` returns the last accepted tick's
+native soil, rainfall and graph visits. Dispose the removed solver with `[Symbol.dispose]()`
+or a `using` declaration.
+
 To show the accepted water from the output above, give `flood` to `ShallowWaterSurface.attach`
 from `@margoengine/water/shallow-surface` with a Water surface configured for the same bed.
 Advance or seek the world before drawing. A refused runoff step keeps the previous accepted water and ledger.

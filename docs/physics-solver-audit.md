@@ -156,15 +156,20 @@ them; the rest is a record of what a stronger solver would need.
 
 ### HYDRO-02 four-point pass
 
-- Point 5. `runoff-extremes.test.js` checks coded corrections for invalid dimensions, cell precision and
+- Point 5. `b9f194f409`. `runoff-extremes.test.js` checks coded corrections for invalid dimensions, cell precision and
   spatial rain. A cumulative overflow in a real runoff tick preserves the accepted state and budget in
   plain and shared memory. A rebased spatial rain producer and accepted output retain their cell.
   `runoff-native-ranges.test.js` exercises formerly invalid Manning depths, early capillary infiltration
   with a subnormal conductivity-time product, cancellation of the stored depth near full routing, and cumulative native budget overflow.
-- Point 7. `runoff-surface.browser.mjs` drives upstream outlet flow and downstream flood depth from a
+- Point 6. `runoff-threads.test.js` checks exact worker partition counts, mass and accepted snapshot state
+  in both Wasm memory kinds, with soil, rain and melt forcing and a far world-cell shift.
+  `runoff-threads.browser.mjs` exercises the same coupled replay with three Chromium helpers.
+  Four workers split 12,513 cells across 3,128/3,128/3,128/3,129 visits and 49,601 cells across
+  12,400/12,400/12,400/12,401. The downstream routing and cumulative sums retain their original serial order.
+- Point 7. `b9f194f409`. `runoff-surface.browser.mjs` drives upstream outlet flow and downstream flood depth from a
   timed storm on the world clock. It tests dry, rising, recession and snapshot replay on WebGPU and WebGL2.
   The inland surface renders the accepted near-edge depth with ocean blending disabled.
-- Point 8. The package README and `docs/limits.md` document fixed routing, a single soil layer,
+- Point 8. `b9f194f409`. The package README and `docs/limits.md` document fixed routing, a single soil layer,
   the drying approximation, runoff and flood receiver units, and the remaining backwater feedback.
 - Point 2 remains open. The published-parameter Zhuk et al. 6 m flume comparison conserves applied
   water and matches 8 of 15 reported scale observations within the combined bounds. At 25 s the

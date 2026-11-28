@@ -15442,8 +15442,8 @@
         "gzip": 5010
       },
       "./lightning": {
-        "raw": 24210,
-        "gzip": 8839
+        "raw": 24224,
+        "gzip": 8850
       },
       "./explosive": {
         "raw": 41750,
@@ -15598,20 +15598,20 @@
         "gzip": 15190
       },
       "./viscoplastic": {
-        "raw": 22683,
-        "gzip": 8570
+        "raw": 22697,
+        "gzip": 8580
       },
       "./tsunami": {
-        "raw": 23301,
-        "gzip": 8915
+        "raw": 23315,
+        "gzip": 8925
       },
       "./pack-ice": {
         "raw": 11423,
         "gzip": 4715
       },
       "./runoff": {
-        "raw": 11398,
-        "gzip": 4601
+        "raw": 18056,
+        "gzip": 6936
       },
       "./drainage-fog": {
         "raw": 10045,
@@ -15658,8 +15658,8 @@
         "gzip": 5574
       },
       "./lava": {
-        "raw": 25194,
-        "gzip": 9594
+        "raw": 25208,
+        "gzip": 9605
       },
       "./dfsph": {
         "raw": 19974,
@@ -19288,8 +19288,8 @@
     },
     "packages/physics/dist/solver-phase-thread.js": {
       "raw": 1592,
-      "gzip": 765,
-      "brotli": 674
+      "gzip": 764,
+      "brotli": 670
     },
     "packages/physics/dist/cloth-kernel.wasm": {
       "raw": 11606,
@@ -19422,14 +19422,14 @@
       "brotli": 2248
     },
     "packages/physics/dist/runoff-kernel.wasm": {
-      "raw": 20293,
-      "gzip": 5135,
-      "brotli": 4444
+      "raw": 23699,
+      "gzip": 6427,
+      "brotli": 5537
     },
     "packages/physics/dist/runoff-kernel-shared.wasm": {
-      "raw": 20381,
-      "gzip": 5194,
-      "brotli": 4565
+      "raw": 23787,
+      "gzip": 6489,
+      "brotli": 5604
     },
     "packages/physics/dist/thermal-kernel.wasm": {
       "raw": 12160,
