@@ -1,0 +1,59 @@
+*{box-sizing:border-box}
+:root{--lightningcss-light:initial;--lightningcss-dark: ;color-scheme:light;font-synthesis:none;color:#292d32;background:#f0e9dd;font-family:system-ui,sans-serif}
+body{margin:0}
+main{max-width:1400px;margin:auto;padding:28px clamp(17px,4vw,60px) 22px}
+nav{color:#757269;align-items:center;gap:12px;margin:0 0 clamp(20px,4.6vh,44px);font-size:.72rem;font-weight:650;display:flex}
+nav a{color:#494c4c;text-decoration:none}
+nav a:hover,footer a:hover{color:#973922}
+header{margin:0 0 clamp(16px,3vh,28px)}
+h1{letter-spacing:-.062em;margin:0 0 .17em;font:400 clamp(2.55rem,6.9vw,6rem)/.98 Georgia,Times New Roman,serif}
+header p{color:#565552;margin:0;font-size:clamp(.86rem,1.4vw,1.07rem);line-height:1.48}
+.exhibit{border:1px solid #bfb6a7;grid-template-columns:minmax(0,1fr) clamp(260px,24.4vw,325px);display:grid}
+figure{isolation:isolate;background:#3a3633;min-width:0;min-height:clamp(440px,64vh,700px);margin:0;position:relative;overflow:hidden}
+canvas{width:100%;height:100%;display:block;position:absolute;inset:0}
+figcaption{letter-spacing:.035em;pointer-events:none;color:#eff1f4;justify-content:space-between;gap:8px;font-size:.67rem;display:flex;position:absolute;bottom:15px;left:20px;right:20px}
+figcaption span{background:#223645db;border:1px solid #8b9bae66;padding:5px 8px}
+#loading,#error{z-index:2;color:#fff;text-align:center;background:#294052;border:1px solid #728a9e;width:min(88%,360px);margin:0;padding:14px;font-size:.9rem;line-height:1.5;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)}
+#error{color:#ffded7;background:#4f2a26}
+aside{background:#f8f3ea;border-left:1px solid #bfb6a7;align-content:center;padding:26px clamp(19px,2.6vw,36px);display:grid}
+fieldset{border:0;min-width:0;margin:0;padding:0}
+button{width:100%;min-height:44px;font:inherit;text-align:left;cursor:pointer;border:1px solid #b6ab9a;border-radius:2px;justify-content:space-between;align-items:center;gap:6px;padding:9px 12px;font-size:.86rem;font-weight:690;display:flex}
+button:disabled{opacity:.58;cursor:default}
+.primary{color:#fffaf4;background:#963c2b;border-color:#833324;font-size:.93rem}
+.primary:hover:enabled{background:#7f301f}
+button span{font-size:1.07rem}
+.secondary{color:#343939;background:#f6eee0;margin-top:13px}
+.secondary:hover:enabled{background:#eee1cc}
+#angle-group{margin-top:18px}
+#angle-group legend{color:#4e524e;margin:0 0 7px;font-size:.73rem;font-weight:720}
+.angles{grid-template-columns:repeat(3,1fr);gap:6px;display:grid}
+.angles label{cursor:pointer;position:relative}
+.angles label span{color:#494f4d;background:#faf5eb;border:1px solid #bdb39f;border-radius:2px;place-items:center;min-height:42px;font-size:.83rem;font-weight:660;display:grid}
+.angles input{opacity:0;width:1px;height:1px;position:absolute}
+.angles input:checked+span{color:#7b3529;background:#ead6c5;border-color:#ae715b}
+.angles input:disabled+span{opacity:.68;cursor:default}
+.angles input:focus-visible+span,button:focus-visible{outline-offset:3px;outline:2px solid #405979}
+dl{border-top:1px solid #d0c6b6;gap:18px;margin:24px 0 0;padding-top:18px;display:grid}
+dl div{justify-content:space-between;align-items:baseline;gap:8px;display:flex}
+dt{color:#4b514e;font-size:.76rem;font-weight:650}
+dd{white-space:nowrap;align-items:baseline;gap:5px;margin:0;display:flex}
+dd output{font-variant-numeric:tabular-nums;letter-spacing:-.035em;font:400 1.62rem/1 Georgia,serif}
+dd small{color:#6f685e;font-size:.65rem}
+#trial{color:#625c52;min-height:2.5em;margin:17px 0 0;font-size:.73rem;line-height:1.45}
+footer{color:#756d60;flex-wrap:wrap;align-items:baseline;gap:7px 16px;margin-top:14px;font-size:.69rem;display:flex}
+footer a{color:#54534a;text-underline-offset:3px}
+.sr-only{clip-path:inset(50%);white-space:nowrap;width:1px;height:1px;margin:0;padding:0;position:absolute;overflow:hidden}
+@media (max-width:800px){main{padding:16px 13px 18px}
+nav,header{margin-bottom:15px}
+.exhibit{display:block}
+figure{height:clamp(248px,41svh,500px);min-height:0}
+figcaption{bottom:10px;left:10px;right:10px}
+aside{border-top:1px solid #bfb6a7;border-left:0;padding:13px 14px 16px}
+dl{gap:12px;margin-top:17px;padding-top:14px}
+#angle-group{margin-top:13px}
+#trial{min-height:1.45em;margin-top:12px}
+}
+@media (max-width:350px){main{padding-left:11px;padding-right:11px}
+h1{font-size:2.26rem}
+}
+
