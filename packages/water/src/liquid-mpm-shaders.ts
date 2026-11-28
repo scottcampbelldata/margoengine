@@ -14,7 +14,7 @@
 // (docs/conventions.md, "Shader comments").
 
 /** Floats of the simulation uniform: thirteen vec4 of parameters, four of the liquids, eight of the drains, then six vec4 per collider. */
-export const LIQUID_SIM_FLOATS = (25 + 6 * 8) * 4;
+export const LIQUID_SIM_FLOATS = (26 + 6 * 8) * 4;
 /** Floats of the emit pass's uniform: two vec4 of the frame, then six vec4 per emitter. */
 export const LIQUID_EMIT_FLOATS = (2 + 6 * 4) * 4;
 /** Floats of the debug view uniform. */
@@ -80,6 +80,8 @@ struct Sim {
   // per drain: centre and kind (0 box, 1 sphere, -1 off), half size or radius; cells.w drains
   drains: array<vec4f, 8>,
   colliders: array<Collider, 8>,
+  // per axis 1 when its two walls are smooth (the wall function), 0 when free slip; kinematic viscosity
+  walls: vec4f,
 }
 @group(0) @binding(0) var<uniform> sim: Sim;
 
@@ -457,12 +459,29 @@ fn addImpulse(k: u32, r: vec3f, j: vec3f) {
 `;
 
 /** Grid update: velocity, gravity, the pointer, the speed limit, the colliders (and their impulses), the walls. */
-export const LIQUID_GRID_WGSL = /* wgsl */ `${HEADER}${collideWGSL(3)}
+export const LIQUID_GRID_WGSL = /* wgsl */ `${HEADER}${collideWGSL(3)}${SPLINE_COVER}
 @group(0) @binding(1) var<storage, read_write> grid: array<vec4i>;
 @group(0) @binding(2) var<storage, read_write> forces: array<atomic<i32>>;
 // The normals pass's grad c and |grad c| per node.
 @group(0) @binding(4) var<storage, read> surf: array<vec4f>;
 ${ADD_IMPULSE}
+// Launder and Spalding's (1974) wall function: the friction velocity of a smooth wall under liquid whose node on the
+// wall slides at u, for cells h across it: the larger of the viscous sublayer's (at 13/32 h, the B-spline weights' mean
+// distance) and the log law's u / u* = ln(E y u* / nu) / kappa (at 0.2751 h, their geometric mean), the log law's y+
+// by Newton's method from the crossover y+ = 11.225 (the CPU twin's wallFrictionVelocity).
+fn wallFrictionVelocity(u: f32, h: f32, nu: f32) -> f32 {
+  let yl = ${13 / 32} * h;
+  let yg = ${Math.exp((9 / 8) * Math.log(3) - Math.log(2) - 11 / 6)} * h;
+  let laminar = sqrt(u * nu / yl);
+  let re = u * yg / nu;
+  if (re <= ${11.225 * 11.225}) { return laminar; }
+  var yp = 11.225;
+  for (var k = 0u; k < 10u; k++) {
+    let l = log(9.793 * yp);
+    yp -= (yp * l - 0.4187 * re) / (l + 1.0);
+  }
+  return max(laminar, yp * nu / yg);
+}
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let node = id.x;
@@ -549,6 +568,31 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   let lo = i <= vec3u(PAD);
   let hi = i >= vec3u(PAD) + sim.cells.xyz;
   v = select(v, vec3f(0.0), (lo & (v < vec3f(0.0))) | (hi & (v > vec3f(0.0))));
+  // Smooth walls: a node in a wall's three layers (outside it, on it, inside it) takes that wall's share 1/8, 3/4, 1/8
+  // of the wall function's shear over the B-spline's integral of the wall inside the container, over its own mass (the
+  // MPM traction boundary condition), never reversing its motion along the wall.
+  let volume = weight / sim.invCell.w * sim.cell.x * sim.cell.y * sim.cell.z;
+  for (var a = 0u; a < 3u; a++) {
+    if (sim.walls[a] == 0.0 || volume <= 0.0) { continue; }
+    let below = i32(i[a]) - i32(PAD) + 1;
+    let above = i32(PAD + sim.cells[a]) + 1 - i32(i[a]);
+    var layer = -1;
+    if (below >= 0 && below <= 2) { layer = below; } else if (above >= 0 && above <= 2) { layer = above; }
+    if (layer < 0) { continue; }
+    let b = (a + 1u) % 3u;
+    let c = (a + 2u) % 3u;
+    let ut = length(vec2f(v[b], v[c]));
+    if (ut <= 0.0) { continue; }
+    let us = wallFrictionVelocity(ut, sim.cell[a], sim.walls.w);
+    var area = select(0.125, 0.75, layer == 1);
+    for (var k = 0u; k < 2u; k++) {
+      let e = select(c, b, k == 0u);
+      area *= sim.cell[e] * (splineCover(f32(i32(PAD + sim.cells[e]) - i32(i[e]))) - splineCover(f32(i32(PAD) - i32(i[e]))));
+    }
+    let slow = min(ut, us * us * area * dt / volume);
+    v[b] *= 1.0 - slow / ut;
+    v[c] *= 1.0 - slow / ut;
+  }
   grid[2u * node] = bitcast<vec4i>(vec4f(v, m));
   grid[2u * node + 1u] = vec4i(bitcast<i32>(weight), more.yzw);
 }

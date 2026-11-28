@@ -8434,8 +8434,8 @@ each) on a grid of at most 4,194,304 nodes (32 B each, and 16 B more with surfac
   `pressureIterations` (128) to a residual of `pressureTolerance` (1e-4) of the first; a solve that hits the cap leaves
   the rest of its divergence (`stats.pressureResidual`). The Jacobi preconditioner converges slowly on the grid's
   long-wave and checkerboard-like modes: still water converges within the cap, but a column falling round a sphere in a
-  0.8 m tank (32,768 particles, about 26 cells a side) reaches the cap with 4.5e-4 of its divergence left on the GPU and
-  on the twin alike; a multigrid preconditioner would converge in far fewer iterations and is not built. A cell is liquid at half its rest density or more (the free surface lies within a cell of
+  0.8 m tank (32,768 particles, about 26 cells a side) reaches the cap with 6.4e-4 of its divergence left on the GPU
+  (4.5e-4 with free-slip walls); a multigrid preconditioner would converge in far fewer iterations and is not built. A cell is liquid at half its rest density or more (the free surface lies within a cell of
   the particles' edge, first order) and solid when all its corners lie inside colliders, so a collider's surface is
   placed to the grid's nodes. Measured on the CPU twin (`gpu-liquid.test.js`): a 0.2 m layer on a floor collider holds
   its centroid within a quarter particle spacing over 1.5 s, its cell pressure is rho g d within rho g h, and the floor
@@ -8446,19 +8446,33 @@ each) on a grid of at most 4,194,304 nodes (32 B each, and 16 B more with surfac
   divergence of each cell's 8; the cells' density correction (half a cell's excess a substep) keeps the volume across
   that gap. Each substep costs 7 + 5 * pressureIterations dispatches (the ones past convergence have no workgroups);
   speed is measured in the speed phase.
-- Dam breaks against measurements (`gpu-liquid-dambreak.test.js`, the CPU twin, both profiles, nothing fitted): Martin
-  and Moyce's (1952) two-dimensional collapses, each station's T inside the spread of their own runs at that Z widened by
-  the timing errors of both sides (about 0.2 to 0.3 in T), in table 2 (n^2 = 2) to Z = 9 and, held out, table 1 (n^2 =
-  1) to Z = 9 and table 3 (n^2 = 4) to Z = 7.67, at a / 8 cells; and Lobovsky et al.'s (2014) three-dimensional tank,
-  the front's mean speed along the bed after t* = 1 inside the 1.14 to 1.74 sqrt(g H) their Table 1 gathers from the
-  measured dam breaks: the accurate profile reads 1.668 at H = 300 mm (3 cm cells; theirs 1.56) and, held out, 1.533 at
-  600 mm (4 cm; theirs 1.34); the fast profile reads 1.758 and 1.613, its 300 mm front just over that range, so that
-  check holds the accurate profile only. Both run ahead of the measured fronts late in the run-out: the walls are free
-  slip, with no bed or side-wall friction, and the thinning tongue of the experiments slows under it. At Z = 14 in table
-  2 the accurate profile reaches T = 8.88 (a / 12) and 8.79 (a / 16) where the runs read 9.26 to 9.36, and at Z = 13 in
-  table 1 7.57 (a / 12) against 9.21 to 9.72; the gap does not close as the cells shrink (it is the missing friction,
-  not the grid). The impact pressures Lobovsky et al. measured on the far wall (sensors 3 to 80 mm above the bed, 4.2 mm
-  across) are not checked: a sensor is a tenth of an interactive grid's cell.
+- Walls (`walls`, default `'smooth'`): a smooth wall is no-slip under the liquid's own `viscosity`, by Launder and
+  Spalding's (1974) wall function (the viscous sublayer below y+ = 11.2, the smooth-wall log law, kappa = 0.4187 and
+  E = 9.793, above it) read from the speed of the grid's node on the wall at the B-spline weights' mean (13/32 cell,
+  sublayer) or geometric mean (0.2751 cell, log law) distance from it, and pushed back as the MPM traction condition on
+  the three node layers at the wall (shares 1/8, 3/4, 1/8, over the part of the wall inside the container). It is an
+  equilibrium boundary layer: no roughness (a rough bed slows liquid more), no developing layer at a front, no
+  separation; the wetted area is resolved to the grid, so the edge of a sheet wets up to 1.5 cells too much wall (a slab
+  32 cells long slid 6.5 to 7.8% more than the closed form dU/dt = -u*^2 / d, under the 3 h / L = 9.4% bound,
+  `gpu-liquid.test.js`). Each node's friction is explicit, at most its own speed along the wall a substep. `'slip'`
+  holds only the motion into a wall. The walls take no force back (they are fixed); the colliders keep their Coulomb
+  `friction`.
+- Dam breaks against measurements (`gpu-liquid-dambreak.test.js`, the CPU twin, both profiles, nothing fitted, smooth
+  walls): Martin and Moyce's (1952) two-dimensional collapses on a smooth bed between free-slip side walls, each
+  station's T inside the spread of their own runs at that Z widened by the timing errors of both sides (about 0.2 to
+  0.3 in T), in table 2 (n^2 = 2) to Z = 12 and, held out, table 1 (n^2 = 1) to Z = 13 and table 3 (n^2 = 4) to
+  Z = 7.67, at a / 8 cells; and Lobovsky et al.'s (2014) three-dimensional tank, the front's mean speed along the bed
+  after t* = 1 inside the 1.14 to 1.74 sqrt(g H) their Table 1 gathers from the measured dam breaks: the accurate
+  profile reads 1.632 at H = 300 mm (3 cm cells; theirs 1.56) and, held out, 1.502 at 600 mm (4 cm; theirs 1.34), the
+  fast profile 1.672 and 1.528 (with free-slip walls both ran faster, 1.668 and 1.758 at 300 mm, the fast one past the
+  measured range). With free-slip walls the late run-out ran ahead of the runs (table 1, Z = 13: T = 7.80 against 9.21
+  to 9.72; the gap did not close as the cells shrank); the bed's friction closes it: table 1 reads T = 9.56 (accurate)
+  and 9.58 (fast) at Z = 13 and 10.60 at Z = 14 (where only the 4 1/2 in column has runs, 10.5 and 11.0), the same at
+  a / 12 within 0.3. Past Z = 12 in table 2 the simulated front lags the runs by a little more than the bound: T = 8.94
+  at Z = 13 against 8.60 to 8.73 (bound 8.97, inside) and 9.62 to 9.64 at Z = 14 against 9.26 to 9.36 (bound 9.60), the
+  same at a / 12; the friction there is from the equilibrium log law, which does not know the layer is still developing
+  behind the front. The impact pressures Lobovsky et al. measured on the far wall (sensors 3 to 80 mm above the bed,
+  4.2 mm across) are not checked: a sensor is a tenth of an interactive grid's cell.
 - The fast profile is weakly compressible: the Tait equation lets the liquid compress by about g d / c^2 at depth d. With
   the default speed of sound 2 sqrt(g H) a 0.6 m column in a 1 m tank reads 1.04 to 1.13 times rest density from its
   surface layer to its floor (CPU twin, 6,000 particles, 2.5 s), within 0.02 of the closed form (1 + 6 g d / c^2)^(1/6)
@@ -8501,11 +8515,12 @@ each) on a grid of at most 4,194,304 nodes (32 B each, and 16 B more with surfac
   most 2^30 pairs (simplify the mesh past that). The liquid's force on them is exact in total (a floor collider's impulse
   matches the column's weight and momentum change within the fixed-point rounding, `gpu-liquid.test.js`), but on a
   small submerged body the grid's cells blur the surface: held in a 0.4 m layer (WebGPU, 65,536 particles, cell
-  0.037 m, averaged over 1 to 3 s) a sphere of radius 0.1 m took 35.7 N of lift against Archimedes' 41.1 N (0.87), a
-  capsule of radius 0.07 m and length 0.2 m 35.1 N against 44.3 N (0.79), and a baked mesh cube of half size 0.08 m
-  31.8 N against 40.2 N (0.79): each between rho g V of the shape a quarter cell smaller and larger, the bound
-  `gpu-liquid-check.mjs` holds. A linked box of 500 kg/m³ and half size 0.1 m floated with a mean draft of 0.090 m against
-  Archimedes' 0.100 m (bob 0.014 m over the last 2 of 4 s). On WebGPU the linked body takes its impulse when the force
+  0.037 m, averaged over 1 to 3 s, smooth walls) a sphere of radius 0.1 m took 36.5 N of lift against Archimedes' 41.1 N
+  (0.89), a capsule of radius 0.07 m and length 0.2 m 35.9 N against 44.3 N (0.81), and a baked mesh cube of half size
+  0.08 m 33.0 N against 40.2 N (0.82): each between rho g V of the shape a quarter cell smaller and larger, the bound
+  `gpu-liquid-check.mjs` holds. A linked box of 500 kg/m³ and half size 0.1 m floated with a mean draft of 0.077 m against
+  Archimedes' 0.100 m (bob 0.014 m over the last 2 of 4 s; 0.090 m with free-slip walls; the free level is read
+  from the corner columns beside the walls), inside the check's bound of 0.025 m. On WebGPU the linked body takes its impulse when the force
   sums are read back, usually the next frame: every impulse arrives exactly once, but a frame late, and when the read
   lands depends on the GPU, so a run with linked bodies repeats bit for bit only on the CPU twin. The coupling is
   explicit (the body's motion this frame, the liquid's push a frame later), so a body much lighter than the liquid it

@@ -1,8 +1,9 @@
 // GPULiquid's dam break against J. C. Martin and W. J. Moyce, "An experimental study of the collapse of liquid columns
 // on a rigid horizontal plane", Phil. Trans. R. Soc. A 244 (1952), 312-324, read from the scanned paper's tables (each
 // run's T at each Z, not only the means). Their columns collapse in a channel two-dimensionally; here a column a wide
-// and n^2 a high stands against the container's wall in a tank four cells deep (free-slip side walls, so the flow is
-// two-dimensional), stepped on the CPU twin in both profiles.
+// and n^2 a high stands against the container's wall in a tank four cells deep, stepped on the CPU twin in both profiles,
+// on a smooth bed (the default walls: no-slip under Launder and Spalding's wall function, water's viscosity) between
+// free-slip side walls (symmetry planes, so the flow is two-dimensional as in their channel's middle).
 //
 // Z = front / a against T = n t sqrt(g / a). Martin and Moyce could not time the release, so they set every run's T at
 // Z = 1.44 to one value (table 1: 0.80, table 2: 1.19, table 3: 2.00); the simulation is set the same way. Nothing is
@@ -15,9 +16,10 @@
 // at each crossing, read at the slowest front speed in these windows (dZ / dT >= 0.7, from the tables' means), their two
 // film readings within half a frame of their 300 frames per second (section 3), and their two-decimal rounding.
 //
-// The windows end where the tables' runs end (table 3) or where the tongue has thinned to a few millimetres (Z = 9 in
-// tables 1 and 2): past that the experiments' fronts slow under bed and side-wall friction, which the free-slip walls
-// here leave out, and the simulated fronts run ahead (docs/limits.md gives the numbers).
+// The late run-out, where the tongue thins to a few millimetres and the bed's friction slows it, is checked to Z = 13 in
+// table 1 (the last station with runs of the 2 1/4 in column simulated here; Z = 14 has only the 4 1/2 in column's) and
+// to Z = 12 in table 2; table 3's runs end at Z = 7.67. Past Z = 12 in table 2 the simulated front lags the runs by a
+// little more than the bound (docs/limits.md gives the numbers).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { LIQUID_PARTICLE_FLOATS as F, createLiquidState, resolveLiquidParams, stepLiquidCPU } from '../dist/liquid.js';
@@ -39,6 +41,9 @@ const cases = [
       5.0: [4.09, 4.06, 3.9, 3.89, 3.95, 3.92],
       7.0: [5.16, 5.11, 5.01],
       9.0: [6.31, 6.25, 6.34],
+      10.0: [6.9, 6.82, 6.77],
+      11.0: [7.51, 7.47, 7.34],
+      12.0: [8.12, 8.08, 8.02],
     },
   },
   {
@@ -56,6 +61,10 @@ const cases = [
       7.0: [4.45, 4.45, 4.5, 4.57, 4.19, 4.27, 4.4],
       8.0: [5.11, 5.11, 5.24, 5.24, 4.79, 4.95, 4.98],
       9.0: [5.83, 5.78, 6.03, 6.02, 5.44, 5.82, 5.56],
+      10.0: [6.81, 6.55, 6.86, 6.82, 6.13, 6.68, 6.24],
+      11.0: [7.54, 7.92, 7.7, 7.72, 7.04, 7.61, 7.55],
+      12.0: [8.52, 8.34, 8.71, 8.67, 8.15, 8.45, 8.57],
+      13.0: [9.36, 9.7, 9.21, 9.72, 9.59],
     },
   },
   {
@@ -91,6 +100,7 @@ function collapse({ a, n2, norm, runs }, profile) {
     fill: { min: [0, 0, 0], max: [a, n2 * a, depth] },
     resolution: Math.round(length / h),
     viscosity: 1e-6,
+    walls: ['smooth', 'smooth', 'slip'],
     profile,
   });
   const s = createLiquidState(p);
@@ -107,7 +117,8 @@ function collapse({ a, n2, norm, runs }, profile) {
     for (let i = 0; i < s.live; i++) front = Math.max(front, s.particles[i * F]);
     const Z = front / a;
     for (const m of marks)
-      if (!crossed.has(m) && Z >= m) crossed.set(m, k * (t - dt + (dt * (m - previous)) / Math.max(Z - previous, 1e-12)));
+      if (!crossed.has(m) && Z >= m)
+        crossed.set(m, k * (t - dt + (dt * (m - previous)) / Math.max(Z - previous, 1e-12)));
     previous = Z;
   }
   assert.equal(crossed.size, marks.length, `${profile}: the front reaches Z = ${far - 1}`);
@@ -118,12 +129,17 @@ function collapse({ a, n2, norm, runs }, profile) {
 
 for (const profile of ['accurate', 'fast'])
   for (const c of cases)
-    test(`${profile} profile: Martin and Moyce's ${c.table}, every station inside their runs' spread`, { timeout: 600000 }, () => {
+    test(`${profile} profile: Martin and Moyce's ${c.table}, every station inside their runs' spread`, {
+      timeout: 600000,
+    }, () => {
       const { T, stations, timing } = collapse(c, profile);
       stations.forEach((Z, i) => {
         const lo = Math.min(...c.runs[Z]) - timing,
           hi = Math.max(...c.runs[Z]) + timing;
-        assert.ok(T[i] >= lo && T[i] <= hi, `Z = ${Z}: T ${T[i].toFixed(3)} outside ${lo.toFixed(3)} to ${hi.toFixed(3)}`);
+        assert.ok(
+          T[i] >= lo && T[i] <= hi,
+          `Z = ${Z}: T ${T[i].toFixed(3)} outside ${lo.toFixed(3)} to ${hi.toFixed(3)}`,
+        );
       });
     });
 
@@ -134,38 +150,43 @@ for (const profile of ['accurate', 'fast'])
 // farthest particle within 5 cm of the bed until it nears the far wall, in units of sqrt(g H). Their Table 1 gathers
 // it from the measured dam breaks: 1.56 and 1.34 at their own H = 300 and 600 mm, 1.14 to 1.74 across all of them
 // (Martin and Moyce, Dressler, Hu, Koshizuka), whose spread with gate, bed and scale is the bound. H = 600 mm is held
-// out (its coarser cells, 4 cm, keep the run short).
-for (const [H, cell] of [
-  [0.3, 0.03],
-  [0.6, 0.04],
-])
-  test(`accurate profile: Lobovsky et al.'s ${H * 1000} mm dam break, the front's speed inside the measured ones`, { timeout: 600000 }, () => {
-    const length = 1.61,
-      width = 0.15,
-      top = H > 0.4 ? 1.2 : 0.6;
-    const blocks = [Math.round(0.6 / cell), Math.round(H / cell), Math.round(width / cell)];
-    const p = resolveLiquidParams({
-      count: blocks[0] * blocks[1] * blocks[2] * 8,
-      box: { min: [0, 0, 0], max: [length, top, width] },
-      fill: { min: [0, 0, 0], max: [0.6, H, width] },
-      resolution: Math.round(Math.max(length, top) / cell),
-      viscosity: 1e-6,
-      profile: 'accurate',
+// out (its coarser cells, 4 cm, keep the run short). Both profiles, the tank's walls smooth (the default).
+for (const profile of ['accurate', 'fast'])
+  for (const [H, cell] of [
+    [0.3, 0.03],
+    [0.6, 0.04],
+  ])
+    test(`${profile} profile: Lobovsky et al.'s ${H * 1000} mm dam break, the front's speed inside the measured ones`, {
+      timeout: 600000,
+    }, () => {
+      const length = 1.61,
+        width = 0.15,
+        top = H > 0.4 ? 1.2 : 0.6;
+      const blocks = [Math.round(0.6 / cell), Math.round(H / cell), Math.round(width / cell)];
+      const p = resolveLiquidParams({
+        count: blocks[0] * blocks[1] * blocks[2] * 8,
+        box: { min: [0, 0, 0], max: [length, top, width] },
+        fill: { min: [0, 0, 0], max: [0.6, H, width] },
+        resolution: Math.round(Math.max(length, top) / cell),
+        viscosity: 1e-6,
+        profile,
+      });
+      const s = createLiquidState(p);
+      const run = [];
+      for (let t = 1 / 240; t < 3 * Math.sqrt(H / G); t += 1 / 240) {
+        stepLiquidCPU(s, p, 1 / 240);
+        let x = 0;
+        for (let i = 0; i < s.live; i++) if (s.particles[i * F + 1] < 0.05) x = Math.max(x, s.particles[i * F]);
+        if (t * Math.sqrt(G / H) >= 1 && x < length - 0.05) run.push([t, x]);
+      }
+      const n = run.length,
+        mt = run.reduce((a, r) => a + r[0], 0) / n,
+        mx = run.reduce((a, r) => a + r[1], 0) / n;
+      const speed =
+        run.reduce((a, r) => a + (r[0] - mt) * (r[1] - mx), 0) /
+        run.reduce((a, r) => a + (r[0] - mt) ** 2, 0) /
+        Math.sqrt(G * H);
+      assert.ok(n > 10, 'the front crosses the bed');
+      assert.ok(speed >= 1.14 && speed <= 1.74, `front ${speed.toFixed(3)} sqrt(g H) against 1.14 to 1.74`);
+      assert.equal(s.live, p.count, 'the water is all kept');
     });
-    const s = createLiquidState(p);
-    const run = [];
-    for (let t = 1 / 240; t < 3 * Math.sqrt(H / G); t += 1 / 240) {
-      stepLiquidCPU(s, p, 1 / 240);
-      let x = 0;
-      for (let i = 0; i < s.live; i++) if (s.particles[i * F + 1] < 0.05) x = Math.max(x, s.particles[i * F]);
-      if (t * Math.sqrt(G / H) >= 1 && x < length - 0.05) run.push([t, x]);
-    }
-    const n = run.length,
-      mt = run.reduce((a, r) => a + r[0], 0) / n,
-      mx = run.reduce((a, r) => a + r[1], 0) / n;
-    const speed =
-      run.reduce((a, r) => a + (r[0] - mt) * (r[1] - mx), 0) / run.reduce((a, r) => a + (r[0] - mt) ** 2, 0) / Math.sqrt(G * H);
-    assert.ok(n > 10, 'the front crosses the bed');
-    assert.ok(speed >= 1.14 && speed <= 1.74, `front ${speed.toFixed(3)} sqrt(g H) against 1.14 to 1.74`);
-    assert.equal(s.live, p.count, 'the water is all kept');
-  });

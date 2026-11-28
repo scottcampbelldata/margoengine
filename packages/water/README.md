@@ -994,7 +994,7 @@ Options (all but `count`, `box`, `fill`, `resolution`, `seed` and `surface` can 
 debug view through `setPointer`, `setColliders` and `setDebug`):
 
 - `count` 65,536 particles (1 to 1,048,576). `box` the container, default 1 m wide, deep and tall from
-  [-0.5, 0, -0.5]; its six walls hold the liquid with free slip. `fill` where the particles start, a box inside the
+  [-0.5, 0, -0.5]; its six walls hold the liquid (see `walls`). `fill` where the particles start, a box inside the
   container filled on a jittered lattice from the floor up (`seed`, default 0, jitters it); default the left 40% of the
   container, 60% of its height, its full depth. The packing there is the rest density.
 - `resolution` grid cells along the container's longest side (8 to 256), default two particle spacings a cell (about
@@ -1002,6 +1002,14 @@ debug view through `setPointer`, `setColliders` and `setDebug`):
   least four cells.
 - `gravity` [0, -9.81, 0] m/s², `density` 1000 kg/m³ (it sets the particle mass and so `forces`), `viscosity`
   0.0005 m²/s (kinematic; up to cell² / (8 * substep)).
+- `walls` `'smooth'`: the container's walls are smooth solid walls, no-slip under the liquid's own `viscosity`. A grid
+  cell is far thicker than the boundary layer, so the shear the wall takes is Launder and Spalding's (1974) wall
+  function (the viscous sublayer below y+ = 11.2, the log law above it) read from the speed of the grid's node on the
+  wall, and the wall pushes it back on the liquid as the MPM traction condition: liquid running along the floor slows as
+  on glass or acrylic, and a dam break's thinning front slows with it (`gpu-liquid-dambreak.test.js`). `'slip'` holds
+  only the liquid's motion into a wall (free slip, a symmetry plane: a slice of a wider channel). One value, or one per
+  axis `[x, y, z]` for both walls across it, as `['smooth', 'smooth', 'slip']` for a two-dimensional channel four cells
+  deep.
 - `surfaceTension` 0 N/m (water is 0.072; up to density * cell³ / (2 pi substep²)): pulls the free surface tight, so
   drops round up, jets bead and a drop of radius R holds 2 sigma / R more pressure inside. At a tank's grid scale water's
   own value is below what a cell resolves; raise it (10 N/m rounds a 0.2 m cube into a ball in under a second). It adds

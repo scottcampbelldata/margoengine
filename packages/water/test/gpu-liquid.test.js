@@ -13,10 +13,102 @@ import {
   liquidStateHash,
   resolveLiquidParams,
   stepLiquidCPU,
+  wallFrictionVelocity,
 } from '../dist/liquid.js';
 
 const FIXED = 65536;
 const FORCE_FIXED = 1024;
+
+test('smooth walls: the wall function solves the sublayer and the log law, and a sliding layer slows by its shear', () => {
+  // Launder and Spalding's (1974) laws, u = u*^2 y / nu below y+ = 11.225 and u / u* = ln(9.793 y u* / nu) / 0.4187 above
+  // it, at the node's sampling depths 13/32 and 0.2751 of a cell; the larger u* holds.
+  const kappa = 0.4187,
+    E = 9.793,
+    yl = 13 / 32,
+    yg = Math.exp((9 / 8) * Math.log(3) - Math.log(2) - 11 / 6);
+  for (const [u, h, nu] of [
+    [1e-4, 0.01, 1e-6],
+    [0.05, 0.02, 1e-6],
+    [1, 0.02, 1e-6],
+    [30, 0.1, 1e-6],
+    [1e3, 1, 1e-6],
+    [1, 0.02, 5e-4],
+  ]) {
+    const us = wallFrictionVelocity(u, h, nu);
+    const lam = Math.sqrt((u * nu) / (yl * h));
+    const ypl = (yg * h * us) / nu;
+    const logResidual = Math.abs(u / us - Math.log(E * ypl) / kappa) / (u / us);
+    assert.ok(us >= lam * (1 - 1e-12), `u* ${us} under the sublayer's ${lam}`);
+    assert.ok(us === lam || logResidual < 1e-9, `u = ${u}: log law residual ${logResidual}`);
+    assert.ok(us > 0 && Number.isFinite(us));
+  }
+  assert.equal(wallFrictionVelocity(0, 0.02, 1e-6), 0);
+  // A layer d deep sliding at U along a smooth floor, no gravity, free-slip ends: its mean speed obeys dU/dt = -u*(U)^2 / d
+  // (the shear over the floor's area, over the layer's mass per area). The grid wets the floor up to 1.5 cells past each
+  // free end of the slab (L = 32 cells), so its friction is at most (1 + 3 h / L) of the closed form; over 12 substeps
+  // the layer stays a plug, so the node on the floor reads U within the slowing itself, which moves u*^2 by under
+  // 2 dU / U. The fast profile carries the balance exactly; the accurate profile's projection moves momentum where a free
+  // surface's cells have massless corners, so its slab is not a clean balance (both run the same wall function).
+  const h = 0.02;
+  for (const [profile, cells] of [
+    ['fast', 1],
+    ['fast', 4],
+  ]) {
+    const d = cells * h;
+    const p = resolveLiquidParams({
+      count: 8 * 32 * cells * 4,
+      box: { min: [0, 0, 0], max: [64 * h, 16 * h, 4 * h] },
+      fill: { min: [8 * h, 0, 0], max: [40 * h, d, 4 * h] },
+      resolution: 64,
+      viscosity: 1e-6,
+      gravity: [0, 0, 0],
+      walls: ['slip', 'smooth', 'slip'],
+      profile,
+    });
+    const s = createLiquidState(p);
+    for (let i = 0; i < s.live; i++) s.particles[i * F + 4] = 1;
+    for (let k = 0; k < 12; k++) stepLiquidCPU(s, p, 1 / 240);
+    let mean = 0;
+    for (let i = 0; i < s.live; i++) mean += s.particles[i * F + 4] / s.live;
+    let U = 1;
+    const n = 20000,
+      dt = 0.05 / n;
+    const f = (u) => -(wallFrictionVelocity(u, h, 1e-6) ** 2) / d;
+    for (let k = 0; k < n; k++) {
+      const a = f(U),
+        b = f(U + (dt * a) / 2),
+        c = f(U + (dt * b) / 2),
+        e = f(U + dt * c);
+      U += (dt * (a + 2 * b + 2 * c + e)) / 6;
+    }
+    const lost = 1 - mean,
+      closed = 1 - U;
+    assert.ok(
+      lost >= closed * (1 - 2 * closed) && lost <= closed * (1 + 3 / 32),
+      `${profile}, ${cells} cells deep: slowed by ${lost.toFixed(5)} m/s against ${closed.toFixed(5)} closed form`,
+    );
+  }
+  // Free slip keeps the layer's speed; bad walls are refused with a coded error.
+  const p = resolveLiquidParams({
+    count: 1024,
+    box: { min: [0, 0, 0], max: [1.28, 0.32, 0.08] },
+    fill: { min: [0.16, 0, 0], max: [0.8, 0.04, 0.08] },
+    resolution: 64,
+    viscosity: 1e-6,
+    gravity: [0, 0, 0],
+    walls: 'slip',
+  });
+  const s = createLiquidState(p);
+  for (let i = 0; i < s.live; i++) s.particles[i * F + 4] = 1;
+  for (let k = 0; k < 12; k++) stepLiquidCPU(s, p, 1 / 240);
+  let mean = 0;
+  for (let i = 0; i < s.live; i++) mean += s.particles[i * F + 4] / s.live;
+  assert.ok(Math.abs(mean - 1) < 1e-3, `free slip: ${mean} m/s`);
+  assert.deepEqual(resolveLiquidParams({}).walls, [true, true, true]);
+  assert.deepEqual(resolveLiquidParams({ walls: ['slip', 'smooth', 'slip'] }).walls, [false, true, false]);
+  for (const walls of ['rough', ['smooth'], 1])
+    assert.throws(() => resolveLiquidParams({ walls }), { code: 'unsupported' });
+});
 
 test('a lone particle falls in the closed form of its substeps: v_n = n g h, y_n = y_0 + g h^2 n (n + 1) / 2', () => {
   // One particle has less than rest density, so no pressure, and APIC carries a uniform velocity exactly; only the
@@ -169,7 +261,10 @@ test('surface tension rounds a cube of liquid into a drop with the Laplace press
     frames++;
   }
   pressure /= frames;
-  assert.ok(pressure >= (2 * sigma) / (R + h) && pressure <= (2 * sigma) / (R - h), `pressure ${pressure} Pa against 2 sigma / R = ${(2 * sigma) / R} Pa`);
+  assert.ok(
+    pressure >= (2 * sigma) / (R + h) && pressure <= (2 * sigma) / (R - h),
+    `pressure ${pressure} Pa against 2 sigma / R = ${(2 * sigma) / R} Pa`,
+  );
   // The cube's corners (0.173 m out) are pulled in to the ball's radius within a cell.
   assert.ok(corner < R + h, `farthest particle ${corner} m against R ${R} m`);
 });
@@ -211,9 +306,16 @@ test('two liquids: the floor carries both weights, the heavier sinks through the
       { fill: { min: [-0.15, 0.3, -0.15], max: [0.15, 0.5, 0.15] }, density: 3000, color: [1, 0, 0] },
     ],
     colliders: [{ shape: 'box', position: [0, 0.05, 0], halfExtents: [0.3, 0.05, 0.3] }],
+    walls: 'slip',
   };
   const p = resolveLiquidParams(options);
-  assert.deepEqual(p.kinds.map((k) => [k.count, k.massRatio]), [[800, 1], [800, 3]]);
+  assert.deepEqual(
+    p.kinds.map((k) => [k.count, k.massRatio]),
+    [
+      [800, 1],
+      [800, 3],
+    ],
+  );
   const s = createLiquidState(p);
   const mass = (i) => p.kinds[s.particles[i * F + 7]].massRatio;
   const momentum = () => {
@@ -234,7 +336,11 @@ test('two liquids: the floor carries both weights, the heavier sinks through the
   const M = 800 + 3 * 800;
   const expected = -(momentum() - p0) + M * -9.81 * time;
   // As in the one-liquid test, six standard deviations of the rounding, the heavy particles' terms three times larger.
-  const bound = 6 * 0.29 * (3 * Math.sqrt(substeps * 3 * 27 * 2 * p.count) / FIXED + Math.sqrt(substeps * (p.nodes + p.count)) / FORCE_FIXED);
+  const bound =
+    6 *
+    0.29 *
+    ((3 * Math.sqrt(substeps * 3 * 27 * 2 * p.count)) / FIXED +
+      Math.sqrt(substeps * (p.nodes + p.count)) / FORCE_FIXED);
   assert.ok(Math.abs(impulse - expected) <= bound, `impulse ${impulse} vs ${expected} (bound ${bound})`);
   // The heavy layer has sunk below the light one by 1.5 s (Rayleigh-Taylor).
   for (let k = 0; k < 60; k++) stepLiquidCPU(s, p, 1 / 60);
@@ -269,12 +375,21 @@ test('two liquids: the floor carries both weights, the heavier sinks through the
     { liquids: [] },
     { liquids: Array.from({ length: 5 }, () => ({})) },
     { liquids: [{}, {}] },
-    { liquids: [{ fill: { min: [-0.5, 0, -0.5], max: [0, 0.5, 0.5] } }, { fill: { min: [-0.1, 0, -0.5], max: [0.5, 0.5, 0.5] } }] },
+    {
+      liquids: [
+        { fill: { min: [-0.5, 0, -0.5], max: [0, 0.5, 0.5] } },
+        { fill: { min: [-0.1, 0, -0.5], max: [0.5, 0.5, 0.5] } },
+      ],
+    },
     { liquids: [{ color: [2, 0, 0] }] },
     { liquids: [{ density: 0 }] },
     { mixing: -1 },
   ])
-    assert.throws(() => resolveLiquidParams(bad), (e) => e.code === 'unsupported' && /errors#gpu-liquid/.test(e.message), JSON.stringify(bad));
+    assert.throws(
+      () => resolveLiquidParams(bad),
+      (e) => e.code === 'unsupported' && /errors#gpu-liquid/.test(e.message),
+      JSON.stringify(bad),
+    );
 });
 
 test('emitters add exactly rate * time particles at rest density, drains remove what enters them in order', () => {
@@ -294,17 +409,26 @@ test('emitters add exactly rate * time particles at rest density, drains remove 
   assert.ok(Math.abs(rate - (Math.PI * 0.05 ** 2 * 1) / V0) < 1e-9 * rate);
   const s = createLiquidState(p);
   for (let k = 0; k < 30; k++) stepLiquidCPU(s, p, 1 / 60);
-  assert.equal(s.live - p.count, Math.floor(rate * 0.5 + 1e-6), `added ${s.live - p.count} against rate * T = ${rate * 0.5}`);
+  assert.equal(
+    s.live - p.count,
+    Math.floor(rate * 0.5 + 1e-6),
+    `added ${s.live - p.count} against rate * T = ${rate * 0.5}`,
+  );
   assert.equal(s.emission[0], s.live - p.count);
   for (let i = 0; i < s.live; i++) assert.ok(Number.isFinite(s.particles[i * F + 1]) && s.particles[i * F + 3] >= 0);
-  for (let i = s.live; i < p.capacity; i++) assert.ok(Number.isNaN(s.particles[i * F]), 'slots past the live count are empty');
+  for (let i = s.live; i < p.capacity; i++)
+    assert.ok(Number.isNaN(s.particles[i * F]), 'slots past the live count are empty');
   // At capacity the emitter stops adding.
   const full = resolveLiquidParams({ ...base, capacity: 600 });
   const sf = createLiquidState(full);
   for (let k = 0; k < 30; k++) stepLiquidCPU(sf, full, 1 / 60);
   assert.equal(sf.live, 600);
   // A drain on the floor takes every particle that enters it and keeps the rest in their order.
-  const pd = resolveLiquidParams({ ...base, emitters: [], drains: [{ shape: 'box', position: [0, 0, 0], halfExtents: [0.1, 0.2, 0.1] }] });
+  const pd = resolveLiquidParams({
+    ...base,
+    emitters: [],
+    drains: [{ shape: 'box', position: [0, 0, 0], halfExtents: [0.1, 0.2, 0.1] }],
+  });
   const sd = createLiquidState(pd);
   // Tag each particle with its index in its colour (colours ride along unchanged without mixing).
   for (let i = 0; i < sd.live; i++) sd.particles[i * F + 17] = i / sd.live;
@@ -312,7 +436,10 @@ test('emitters add exactly rate * time particles at rest density, drains remove 
   assert.ok(sd.live < pd.count, `the drain took ${pd.count - sd.live} particles`);
   for (let i = 0; i < sd.live; i++) {
     const b = i * F;
-    assert.ok(!(Math.abs(sd.particles[b]) < 0.1 && sd.particles[b + 1] < 0.2 && Math.abs(sd.particles[b + 2]) < 0.1), 'no live particle in the drain');
+    assert.ok(
+      !(Math.abs(sd.particles[b]) < 0.1 && sd.particles[b + 1] < 0.2 && Math.abs(sd.particles[b + 2]) < 0.1),
+      'no live particle in the drain',
+    );
     if (i) assert.ok(sd.particles[b + 17] > sd.particles[b + 17 - F], 'the survivors keep their order');
   }
   // Emitters and drains together repeat bit for bit, also from a copied state.
@@ -336,7 +463,11 @@ test('emitters add exactly rate * time particles at rest density, drains remove 
     { drains: [{ shape: 'cone', position: [0, 0, 0] }] },
     { drains: [{ shape: 'sphere', position: [0, 0, 0], radius: 0 }] },
   ])
-    assert.throws(() => resolveLiquidParams(bad), (e) => e.code === 'unsupported' && /errors#gpu-liquid/.test(e.message), JSON.stringify(bad));
+    assert.throws(
+      () => resolveLiquidParams(bad),
+      (e) => e.code === 'unsupported' && /errors#gpu-liquid/.test(e.message),
+      JSON.stringify(bad),
+    );
 });
 
 test('the same options give the same state, and a copied state repeats the same steps', () => {
@@ -354,13 +485,23 @@ test('the same options give the same state, and a copied state repeats the same 
   const copy = { ...createLiquidState(half.p), particles: half.s.particles.slice() };
   for (let k = 0; k < 10; k++) stepLiquidCPU(copy, half.p, 1 / 60);
   assert.equal(liquidStateHash(copy.particles), liquidStateHash(a.s.particles));
-  assert.notEqual(liquidStateHash(createLiquidState(resolveLiquidParams({ ...options, seed: 10 })).particles), liquidStateHash(createLiquidState(half.p).particles));
+  assert.notEqual(
+    liquidStateHash(createLiquidState(resolveLiquidParams({ ...options, seed: 10 })).particles),
+    liquidStateHash(createLiquidState(half.p).particles),
+  );
 });
 
 test('GPULiquid.restore checks the whole snapshot before it changes anything', () => {
   const liquid = new GPULiquid({ count: 8 });
   const good = createLiquidState(resolveLiquidParams({ count: 8 })).particles;
-  const bad = (particles, extra = {}) => ({ count: 8, live: 8, steps: 0, emission: new Float64Array(8), particles, ...extra });
+  const bad = (particles, extra = {}) => ({
+    count: 8,
+    live: 8,
+    steps: 0,
+    emission: new Float64Array(8),
+    particles,
+    ...extra,
+  });
   assert.throws(() => liquid.restore(bad(good, { count: 9 })), { code: 'unsupported' });
   assert.throws(() => liquid.restore(bad(good.subarray(0, 8 * F - 1))), { code: 'unsupported' });
   assert.throws(() => liquid.restore(bad(good, { steps: -1 })), { code: 'unsupported' });
@@ -392,7 +533,10 @@ test('collider distances: a sphere and a turned box in closed form', () => {
   assert.ok(Math.abs(colliderDistance(box, [0, 0, 1.5], n) - 0.5) < 1e-12);
   assert.ok(Math.abs(n[2] - 1) < 1e-12);
   assert.ok(Math.abs(colliderDistance(box, [0.75, 0, 0], n) - 0.25) < 1e-12);
-  assert.ok(Math.abs(colliderDistance(box, [0, 0.1, 0], n) + 0.15) < 1e-12, 'inside: minus the distance to the nearest face');
+  assert.ok(
+    Math.abs(colliderDistance(box, [0, 0.1, 0], n) + 0.15) < 1e-12,
+    'inside: minus the distance to the nearest face',
+  );
   assert.ok(Math.abs(n[1] - 1) < 1e-12);
 });
 
@@ -414,7 +558,14 @@ test('capsule, plane and mesh distances in closed form', () => {
   const v = [];
   for (let i = 0; i < 8; i++) v.push(i & 1 ? 0.5 : -0.5, i & 2 ? 0.5 : -0.5, i & 4 ? 0.5 : -0.5);
   // The cube's faces, two triangles each, wound inward (either winding bakes the same field).
-  const faces = [[0, 2, 6, 4], [1, 5, 7, 3], [0, 4, 5, 1], [2, 3, 7, 6], [0, 1, 3, 2], [4, 6, 7, 5]];
+  const faces = [
+    [0, 2, 6, 4],
+    [1, 5, 7, 3],
+    [0, 4, 5, 1],
+    [2, 3, 7, 6],
+    [0, 1, 3, 2],
+    [4, 6, 7, 5],
+  ];
   const indices = faces.flatMap(([a, b, c, d]) => [a, b, c, a, c, d]);
   const mesh = bakeLiquidMesh(v, indices, { resolution: 33, margin: 0.25 });
   const spacing = (2 * mesh.half[0]) / 32;
@@ -426,17 +577,29 @@ test('capsule, plane and mesh distances in closed form', () => {
   assert.ok(Math.abs(colliderDistance(cube, [2, 2, 0], n) - 1.5) < 1e-6, 'outside the field: field plus box distance');
   // A soup of the same triangles without indices bakes the same field.
   const soup = indices.flatMap((i) => v.slice(i * 3, i * 3 + 3));
-  assert.deepEqual(bakeLiquidMesh(soup, null, { resolution: 9 }).distances, bakeLiquidMesh(v, indices, { resolution: 9 }).distances);
+  assert.deepEqual(
+    bakeLiquidMesh(soup, null, { resolution: 9 }).distances,
+    bakeLiquidMesh(v, indices, { resolution: 9 }).distances,
+  );
   const outward = faces.flatMap(([a, b, c, d]) => [a, c, b, a, d, c]);
-  assert.deepEqual(bakeLiquidMesh(v, outward, { resolution: 9 }).distances, bakeLiquidMesh(v, indices, { resolution: 9 }).distances);
+  assert.deepEqual(
+    bakeLiquidMesh(v, outward, { resolution: 9 }).distances,
+    bakeLiquidMesh(v, indices, { resolution: 9 }).distances,
+  );
   for (const bad of [
     () => bakeLiquidMesh([0, 0, 0, 1, 0], null),
     () => bakeLiquidMesh(v, [0, 1, 99]),
     () => bakeLiquidMesh(v, indices, { resolution: 65 }),
     () => bakeLiquidMesh([0, 0, 0, 0, 0, 0, 0, 0, 0], null),
-    () => bakeLiquidMesh(v, Array.from({ length: 3 * 40000 }, (_, i) => i % 8), { resolution: 64 }),
+    () =>
+      bakeLiquidMesh(
+        v,
+        Array.from({ length: 3 * 40000 }, (_, i) => i % 8),
+        { resolution: 64 },
+      ),
     () => resolveLiquidParams({ colliders: [{ shape: 'mesh', position: [0, 0, 0] }] }),
-    () => resolveLiquidParams({ colliders: [{ shape: 'mesh', position: [0, 0, 0], mesh: { ...mesh, resolution: 5 } }] }),
+    () =>
+      resolveLiquidParams({ colliders: [{ shape: 'mesh', position: [0, 0, 0], mesh: { ...mesh, resolution: 5 } }] }),
     () => resolveLiquidParams({ colliders: [{ shape: 'plane', position: [0, 0, 0], normal: [0, 0, 0] }] }),
     () => resolveLiquidParams({ colliders: [{ shape: 'capsule', position: [0, 0, 0], halfHeight: -1 }] }),
   ])
@@ -452,19 +615,25 @@ test('GPULiquid.link takes a body with a pose and impulses, counts toward the 8 
     applyImpulse() {},
     applyTorqueImpulse() {},
   });
-  const liquid = new GPULiquid({ count: 8, colliders: Array.from({ length: 7 }, () => ({ shape: 'sphere', position: [0, 0, 0] })) });
+  const liquid = new GPULiquid({
+    count: 8,
+    colliders: Array.from({ length: 7 }, () => ({ shape: 'sphere', position: [0, 0, 0] })),
+  });
   const a = body();
   const link = liquid.link(a, { shape: 'box', halfExtents: [0.1, 0.1, 0.1] });
   assert.equal(link.body, a);
   assert.throws(() => liquid.link(body(), { shape: 'sphere' }), /at most 8/);
   assert.throws(() => liquid.link(a, { shape: 'sphere' }), /linked already/);
-  assert.throws(() => liquid.link({ ...body(), applyImpulse: undefined }, { shape: 'sphere' }), { code: 'unsupported' });
+  assert.throws(() => liquid.link({ ...body(), applyImpulse: undefined }, { shape: 'sphere' }), {
+    code: 'unsupported',
+  });
   assert.throws(() => liquid.link({ ...body(), rotation: undefined }, { shape: 'sphere' }), { code: 'unsupported' });
   link.unlink();
   liquid.link(body(), { shape: 'capsule', radius: 0.05 });
   // The debug view draws every shape: a capsule's two cap rings (3 x 32 lines each) and 4 side lines, a plane's square
   // and normal (5 lines), a box's 12 edges.
-  const lines = (colliders) => new GPULiquid({ count: 8, colliders, debug: { grid: false, container: false } }).debugLines().length / 8;
+  const lines = (colliders) =>
+    new GPULiquid({ count: 8, colliders, debug: { grid: false, container: false } }).debugLines().length / 8;
   assert.equal(lines([{ shape: 'capsule', position: [0, 0.5, 0] }]), 2 * 96 + 4);
   assert.equal(lines([{ shape: 'plane', position: [0, 0.1, 0] }]), 5);
   assert.equal(lines([{ shape: 'box', position: [0, 0.5, 0] }]), 12);
@@ -512,9 +681,12 @@ test('every bad option is a coded error naming the value, with the help link', (
   const liquid = new GPULiquid({ count: 8 });
   assert.throws(() => liquid.step(1 / 60), { code: 'state' }, 'step needs the liquid attached');
   assert.throws(() => liquid.setPointer({ position: [0, 0, 0], strength: -1 }), { code: 'unsupported' });
-  assert.throws(() => stepLiquidCPU(createLiquidState(resolveLiquidParams({ count: 8 })), resolveLiquidParams({ count: 8 }), 2), {
-    code: 'unsupported',
-  });
+  assert.throws(
+    () => stepLiquidCPU(createLiquidState(resolveLiquidParams({ count: 8 })), resolveLiquidParams({ count: 8 }), 2),
+    {
+      code: 'unsupported',
+    },
+  );
 });
 
 test('the defaults: 65,536 particles, two spacings a cell, every wall on a node, a stable substep', () => {
@@ -544,7 +716,8 @@ test('a floating origin: the liquid lives in a world cell, and a shift of the or
     applyImpulse() {},
     applyTorqueImpulse() {},
   });
-  const make = (cell) => new GPULiquid({ count: 512, seed: 4, originCell: cell, originCellSize: S, debug: { grid: false } });
+  const make = (cell) =>
+    new GPULiquid({ count: 512, seed: 4, originCell: cell, originCellSize: S, debug: { grid: false } });
   const near = make([0, 0, 0]);
   const far = make([1000, 0, 0]);
   assert.deepEqual(far.origin, [1000 * S, 0, 0]);
@@ -574,7 +747,12 @@ test('a floating origin: the liquid lives in a world cell, and a shift of the or
   assert.throws(() => far.shiftOrigin([0.5, 0, 0]), { code: 'unsupported' });
   assert.throws(() => far.shiftOrigin([-(2 ** 31), 0, 0]), { code: 'unsupported' });
   assert.deepEqual(far.options.originCell, [3, -2, 0], 'a refused shift changes nothing');
-  for (const options of [{ originCell: [0, 0] }, { originCell: [0.5, 0, 0] }, { originCellSize: 1000 }, { originCellSize: 2 ** 21 }])
+  for (const options of [
+    { originCell: [0, 0] },
+    { originCell: [0.5, 0, 0] },
+    { originCellSize: 1000 },
+    { originCellSize: 2 ** 21 },
+  ])
     assert.throws(() => resolveLiquidParams(options), { code: 'unsupported' }, JSON.stringify(options));
   near.dispose();
   far.dispose();
@@ -594,7 +772,10 @@ test('accurate profile: still water stays still at rest density with the hydrost
     colliders: [{ shape: 'box', position: [0.2, 0.05, 0.2], halfExtents: [0.3, 0.05, 0.3] }],
   });
   assert.equal(p.profile, 'accurate');
-  assert.ok(Math.abs(p.maxSubstep - (0.5 * p.cellSize) / Math.sqrt(2 * 9.81 * 0.4)) < 1e-15, 'half a cell over the fall speed');
+  assert.ok(
+    Math.abs(p.maxSubstep - (0.5 * p.cellSize) / Math.sqrt(2 * 9.81 * 0.4)) < 1e-15,
+    'half a cell over the fall speed',
+  );
   const s = createLiquidState(p);
   const centroid = () => {
     let y = 0;
@@ -615,7 +796,8 @@ test('accurate profile: still water stays still at rest density with the hydrost
     impulse += s.impulses[1] / FORCE_FIXED;
   }
   let fastest = 0;
-  for (let i = 0; i < s.live; i++) fastest = Math.max(fastest, Math.hypot(s.particles[i * F + 4], s.particles[i * F + 5], s.particles[i * F + 6]));
+  for (let i = 0; i < s.live; i++)
+    fastest = Math.max(fastest, Math.hypot(s.particles[i * F + 4], s.particles[i * F + 5], s.particles[i * F + 6]));
   // From rest, its start jitter (a quarter spacing) settles: no particle moves faster than the speed of falling that far.
   const jitterFall = Math.sqrt(2 * 9.81 * 0.25 * p.lattice[1]);
   assert.ok(fastest < jitterFall, `fastest particle ${fastest} m/s after 1.5 s, against ${jitterFall}`);
@@ -636,7 +818,10 @@ test('accurate profile: still water stays still at rest density with the hydrost
     const y = p.origin[1] + (j + 0.5) * p.cell[1];
     if (y < 0.15 || y > 0.25) continue;
     const exact = 1000 * 9.81 * (0.3 - y);
-    assert.ok(Math.abs(pressure - exact) <= 1000 * 9.81 * p.cellSize, `pressure ${pressure} Pa at ${y} m against ${exact}`);
+    assert.ok(
+      Math.abs(pressure - exact) <= 1000 * 9.81 * p.cellSize,
+      `pressure ${pressure} Pa at ${y} m against ${exact}`,
+    );
     checked++;
   }
   assert.ok(checked >= 2, 'liquid cells down the column');

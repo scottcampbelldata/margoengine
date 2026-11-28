@@ -5,7 +5,13 @@
 // compatibility layer the CPU twin (liquid-mpm-sim.ts) steps it and the same surface draws it. Sources: docs/clean-room.md,
 // "GPU particle liquid".
 import type { EngineKernel } from '@margoengine/core';
-import { engineRuntime, type Engine, type EnginePlugin, type FrameGraph, type PassContext } from '@margoengine/core/extension';
+import {
+  engineRuntime,
+  type Engine,
+  type EnginePlugin,
+  type FrameGraph,
+  type PassContext,
+} from '@margoengine/core/extension';
 import { compatTier } from '../../shared/compat.js';
 import { fault } from '../../shared/errors.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
@@ -94,6 +100,7 @@ export {
   MAX_LIQUID_MESH_WORK,
   resolveLiquidParams,
   stepLiquidCPU,
+  wallFrictionVelocity,
 } from './liquid-mpm-sim.js';
 export type {
   GPULiquidOptions,
@@ -111,6 +118,7 @@ export type {
   LiquidState,
   LiquidStats,
   LiquidVec3,
+  LiquidWall,
   ResolvedCollider,
   ResolvedDrain,
   ResolvedEmitter,
@@ -121,7 +129,14 @@ export type {
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 type Pass = [GPUComputePipeline, GPUBindGroup];
 
-declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; COPY_SRC: number; MAP_READ: number; INDIRECT: number };
+declare const GPUBufferUsage: {
+  UNIFORM: number;
+  STORAGE: number;
+  COPY_DST: number;
+  COPY_SRC: number;
+  MAP_READ: number;
+  INDIRECT: number;
+};
 declare const GPUMapMode: { READ: number };
 
 /** Longest frame delta one frame advances the liquid by, in seconds. */
@@ -272,7 +287,21 @@ export class GPULiquid implements EnginePlugin {
     solve: GPUBuffer;
     args: GPUBuffer;
     uniform: GPUBuffer;
-    passes?: Record<'nodes' | 'cells' | 'volume' | 'start' | 'apply' | 'matvec' | 'alpha' | 'update' | 'beta' | 'final' | 'extend0' | 'extend1', Pass>;
+    passes?: Record<
+      | 'nodes'
+      | 'cells'
+      | 'volume'
+      | 'start'
+      | 'apply'
+      | 'matvec'
+      | 'alpha'
+      | 'update'
+      | 'beta'
+      | 'final'
+      | 'extend0'
+      | 'extend1',
+      Pass
+    >;
   };
   private debugPipelines = new Map<string, [GPURenderPipeline, GPUBindGroup, GPURenderPipeline]>();
   private lineGroups = new Map<GPURenderPipeline, GPUBindGroup>();
@@ -281,7 +310,11 @@ export class GPULiquid implements EnginePlugin {
   private readonly simU32 = new Uint32Array(this.simData);
   private readonly simF32 = new Float32Array(this.simData);
   private readonly debugData = new Float32Array(LIQUID_DEBUG_FLOATS);
-  private readonly colorAttachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'load', storeOp: 'store' };
+  private readonly colorAttachment: GPURenderPassColorAttachment = {
+    view: undefined!,
+    loadOp: 'load',
+    storeOp: 'store',
+  };
   private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {
     view: undefined!,
     depthLoadOp: 'load',
@@ -431,9 +464,13 @@ export class GPULiquid implements EnginePlugin {
         );
     if (typeof body.applyImpulse !== 'function' || typeof body.applyTorqueImpulse !== 'function')
       throw liquidError('GPULiquid.link body needs applyImpulse(impulse, point) and applyTorqueImpulse(torque)');
-    if (this.links.some((l) => l.body === body)) throw liquidError('GPULiquid.link: this body is linked already; unlink it first');
+    if (this.links.some((l) => l.body === body))
+      throw liquidError('GPULiquid.link: this body is linked already; unlink it first');
     const entry: LinkEntry = { body, collider, center: [0, 0, 0], unlink: () => this.unlink(entry) };
-    resolveLiquidParams({ ...this.options, colliders: this.allColliders([linkedCollider(entry, this.origin)]) }, this.count);
+    resolveLiquidParams(
+      { ...this.options, colliders: this.allColliders([linkedCollider(entry, this.origin)]) },
+      this.count,
+    );
     this.flushForces();
     this.links.push(entry);
     return entry;
@@ -468,7 +505,10 @@ export class GPULiquid implements EnginePlugin {
   setColliders(colliders: readonly LiquidCollider[]): void {
     this.assertAlive('setColliders');
     const at = this.origin;
-    resolveLiquidParams({ ...this.options, colliders: [...colliders, ...this.links.map((l) => linkedCollider(l, at))] }, this.count);
+    resolveLiquidParams(
+      { ...this.options, colliders: [...colliders, ...this.links.map((l) => linkedCollider(l, at))] },
+      this.count,
+    );
     this.flushForces();
     this.options.colliders = colliders;
     const n = colliders.length + this.links.length;
@@ -478,7 +518,8 @@ export class GPULiquid implements EnginePlugin {
   /** Merges debug view settings. */
   setDebug(debug: LiquidDebugOptions): void {
     this.assertAlive('setDebug');
-    if (!debug || typeof debug !== 'object') throw liquidError('GPULiquid.setDebug takes an object, for example { enabled: true }');
+    if (!debug || typeof debug !== 'object')
+      throw liquidError('GPULiquid.setDebug takes an object, for example { enabled: true }');
     const merged = { ...this.options.debug, ...debug };
     resolveLiquidParams({ ...this.options, debug: merged }, this.count);
     this.options.debug = merged;
@@ -527,13 +568,20 @@ export class GPULiquid implements EnginePlugin {
     this.assertAlive('snapshot');
     signal?.throwIfAborted();
     const device = this.device;
-    if (!device) throw fault('state', 'GPULiquid.snapshot needs the liquid attached; call GPULiquid.attach(engine) first');
+    if (!device)
+      throw fault('state', 'GPULiquid.snapshot needs the liquid attached; call GPULiquid.attach(engine) first');
     this.ensureResources(device);
     const steps = this.stats.steps;
     const emission = this.emission.slice();
     if (this.compat) {
       const s = this.cpuState!;
-      return { count: this.capacity, live: s.live, steps, emission: s.emission.slice(), particles: s.particles.slice() };
+      return {
+        count: this.capacity,
+        live: s.live,
+        steps,
+        emission: s.emission.slice(),
+        particles: s.particles.slice(),
+      };
     }
     const bytes = this.capacity * LIQUID_PARTICLE_FLOATS * 4;
     const staging = device.createBuffer({ size: bytes + 48, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
@@ -583,7 +631,9 @@ export class GPULiquid implements EnginePlugin {
       snapshot.emission.length !== 2 * MAX_LIQUID_EMITTERS ||
       snapshot.emission.some((v) => !Number.isFinite(v) || v < 0)
     )
-      throw liquidError(`GPULiquid.restore takes a snapshot of a liquid of ${this.capacity} particle slots, from liquid.snapshot()`);
+      throw liquidError(
+        `GPULiquid.restore takes a snapshot of a liquid of ${this.capacity} particle slots, from liquid.snapshot()`,
+      );
     const { boxMin, boxMax } = this.params;
     const data = snapshot.particles;
     for (let i = 0; i < snapshot.live * F; i++)
@@ -596,7 +646,9 @@ export class GPULiquid implements EnginePlugin {
       }
       const kind = data[i * F + 7]!;
       if (!Number.isInteger(kind) || kind < 0 || kind >= this.params.kinds.length)
-        throw liquidError(`GPULiquid.restore: particle ${i} names liquid ${kind}; this liquid has ${this.params.kinds.length}`);
+        throw liquidError(
+          `GPULiquid.restore: particle ${i} names liquid ${kind}; this liquid has ${this.params.kinds.length}`,
+        );
     }
     this.pending = { ...snapshot, particles: data.slice(), emission: snapshot.emission.slice() };
     this.needsInit = true;
@@ -612,7 +664,8 @@ export class GPULiquid implements EnginePlugin {
     this.assertAlive('readForces');
     signal?.throwIfAborted();
     const device = this.device;
-    if (!device) throw fault('state', 'GPULiquid.readForces needs the liquid attached; call GPULiquid.attach(engine) first');
+    if (!device)
+      throw fault('state', 'GPULiquid.readForces needs the liquid attached; call GPULiquid.attach(engine) first');
     this.ensureResources(device);
     if (this.compat) return this.forces.slice(0, this.params.colliders.length);
     const forces = await this.pull();
@@ -630,7 +683,10 @@ export class GPULiquid implements EnginePlugin {
     const k = this.params.colliders.length;
     const links = this.links.slice();
     const centers = links.map((l) => l.center.slice() as [number, number, number]);
-    const staging = device.createBuffer({ size: FORCE_BYTES, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+    const staging = device.createBuffer({
+      size: FORCE_BYTES,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    });
     const encoder = device.createCommandEncoder();
     encoder.copyBufferToBuffer(this.forceBuf!, 0, staging, 0, FORCE_BYTES);
     encoder.clearBuffer(this.forceBuf!);
@@ -693,7 +749,11 @@ export class GPULiquid implements EnginePlugin {
     requireWebGPU(engine, 'GPULiquid');
     const device = engine.gpu!;
     const limit = Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize);
-    const need = Math.max(this.capacity * LIQUID_PARTICLE_FLOATS * 4, this.params.nodes * LIQUID_GRID_STRIDE * 4, MAX_LIQUID_MESH_SAMPLES * 4);
+    const need = Math.max(
+      this.capacity * LIQUID_PARTICLE_FLOATS * 4,
+      this.params.nodes * LIQUID_GRID_STRIDE * 4,
+      MAX_LIQUID_MESH_SAMPLES * 4,
+    );
     if (need > limit)
       throw fault(
         'unsupported',
@@ -709,7 +769,11 @@ export class GPULiquid implements EnginePlugin {
   /** Registers the step, the debug particles and the debug lines on the frame graph. */
   registerPasses(graph: FrameGraph): void {
     graph.add({ name: this.name + ':simulate', order: -8, execute: (c) => c.backend === 'webgpu' && this.simulate(c) });
-    graph.add({ name: this.name + ':debug', order: 2, execute: (c) => c.backend === 'webgpu' && this.drawParticles(c) });
+    graph.add({
+      name: this.name + ':debug',
+      order: 2,
+      execute: (c) => c.backend === 'webgpu' && this.drawParticles(c),
+    });
     graph.add({ name: this.name + ':lines', order: 8, execute: (c) => c.backend === 'webgpu' && this.drawLines(c) });
   }
 
@@ -719,7 +783,15 @@ export class GPULiquid implements EnginePlugin {
     this.pendingDelta = delta;
     this.clocked = true;
     this.ticked = true;
-    if (this.compat || this.pulling || !this.device || !this.forceBuf || !this.params.colliders.length || !(this.forceTime > 0)) return;
+    if (
+      this.compat ||
+      this.pulling ||
+      !this.device ||
+      !this.forceBuf ||
+      !this.params.colliders.length ||
+      !(this.forceTime > 0)
+    )
+      return;
     const device = this.device;
     this.pull().catch((error: unknown) => {
       // A read cut short by dispose() or a device loss has nothing to report.
@@ -751,9 +823,17 @@ export class GPULiquid implements EnginePlugin {
         this.capacity * LIQUID_PARTICLE_FLOATS * 4,
         STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
       );
-      this.debugUniform = this.buffer(device, LIQUID_DEBUG_FLOATS * 4, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+      this.debugUniform = this.buffer(
+        device,
+        LIQUID_DEBUG_FLOATS * 4,
+        GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      );
       if (!this.compat) {
-        this.simUniform = this.buffer(device, this.simData.byteLength, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+        this.simUniform = this.buffer(
+          device,
+          this.simData.byteLength,
+          GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        );
         this.gridBuf = this.buffer(device, p.nodes * LIQUID_GRID_STRIDE * 4, STORAGE);
         this.forceBuf = this.buffer(device, FORCE_BYTES, STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
         this.sdfBuf = undefined;
@@ -761,7 +841,11 @@ export class GPULiquid implements EnginePlugin {
         this.meshFields(device);
         this.surfBuf = this.buffer(device, 16, STORAGE);
         this.tallyBuf = this.buffer(device, 16, STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST);
-        this.emitUniform = this.buffer(device, this.emitData.byteLength, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+        this.emitUniform = this.buffer(
+          device,
+          this.emitData.byteLength,
+          GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        );
         const blocks = Math.ceil(this.capacity / 256);
         this.blockBuf = this.buffer(device, (blocks + 1) * 4, STORAGE);
         this.spanBuf = this.buffer(device, 16, STORAGE | GPUBufferUsage.COPY_DST);
@@ -900,7 +984,15 @@ export class GPULiquid implements EnginePlugin {
     f.set([...p.gravity, 0], 36);
     const ptr = p.pointer;
     f.set(ptr ? [...ptr.position, ptr.radius, ...ptr.velocity, ptr.strength] : [0, 0, 0, 1, 0, 0, 0, 0], 40);
-    f.set([(h * p.surfaceTension) / p.density, p.adhesion, LIQUID_ADHESION_REACH * p.cellSize, p.mixing ? 1 - Math.exp(-p.mixing * h) : 0], 48);
+    f.set(
+      [
+        (h * p.surfaceTension) / p.density,
+        p.adhesion,
+        LIQUID_ADHESION_REACH * p.cellSize,
+        p.mixing ? 1 - Math.exp(-p.mixing * h) : 0,
+      ],
+      48,
+    );
     for (let k = 0; k < 4; k++) {
       const kind = p.kinds[Math.min(k, p.kinds.length - 1)]!;
       f.set([kind.massRatio, h * kind.viscosity * kind.massRatio, 0, 0], 52 + k * 4);
@@ -924,11 +1016,18 @@ export class GPULiquid implements EnginePlugin {
         100 + i * 24,
       );
     });
+    f.set([p.walls[0] ? 1 : 0, p.walls[1] ? 1 : 0, p.walls[2] ? 1 : 0, p.viscosity], 100 + 8 * 24);
     device.queue.writeBuffer(this.simUniform!, 0, this.simData);
   }
 
   /** Encodes `n` substeps of `h` seconds in one compute pass. */
-  private encodeSteps(encoder: GPUCommandEncoder, device: GPUDevice, p: ResolvedLiquidParams, n: number, h: number): void {
+  private encodeSteps(
+    encoder: GPUCommandEncoder,
+    device: GPUDevice,
+    p: ResolvedLiquidParams,
+    n: number,
+    h: number,
+  ): void {
     this.meshFields(device);
     const tension = p.surfaceTension > 0;
     if (!this.surfBuf || (tension && this.surfBuf.size < p.nodes * 16)) {
@@ -943,7 +1042,11 @@ export class GPULiquid implements EnginePlugin {
     if (drains && this.scratchBuf!.size < this.capacity * LIQUID_PARTICLE_FLOATS * 4) {
       this.scratchBuf!.destroy();
       this.owned.splice(this.owned.indexOf(this.scratchBuf!), 1);
-      this.scratchBuf = this.buffer(device, this.capacity * LIQUID_PARTICLE_FLOATS * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+      this.scratchBuf = this.buffer(
+        device,
+        this.capacity * LIQUID_PARTICLE_FLOATS * 4,
+        GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+      );
       this.compute = undefined;
     }
     if (!this.compute) {
@@ -1010,7 +1113,8 @@ export class GPULiquid implements EnginePlugin {
       extra += 4;
     }
     pass.end();
-    if (drains) encoder.copyBufferToBuffer(this.scratchBuf!, 0, this.particleBuf!, 0, this.capacity * LIQUID_PARTICLE_FLOATS * 4);
+    if (drains)
+      encoder.copyBufferToBuffer(this.scratchBuf!, 0, this.particleBuf!, 0, this.capacity * LIQUID_PARTICLE_FLOATS * 4);
     this.stats.steps += n;
     this.stats.dispatches = ((tension ? 6 : 5) + (proj ? 7 + 5 * p.pressureIterations : 0)) * n + extra;
     this.forceTime += n * h;
@@ -1056,28 +1160,85 @@ export class GPULiquid implements EnginePlugin {
         });
         return [pipeline, group];
       };
-      const extend = bound(LIQUID_PROJECT_EXTEND_WGSL, [[0, sim], [1, grid], [2, nodes], [6, uniform, 256]]);
+      const extend = bound(LIQUID_PROJECT_EXTEND_WGSL, [
+        [0, sim],
+        [1, grid],
+        [2, nodes],
+        [6, uniform, 256],
+      ]);
       pr.passes = {
-        nodes: bound(LIQUID_PROJECT_NODES_WGSL, [[0, sim], [1, grid], [2, nodes], [3, sdf]]),
-        cells: bound(LIQUID_PROJECT_CELLS_WGSL, [[0, sim], [1, grid], [2, nodes], [3, cellBuf], [7, uniform, 0]]),
-        volume: bound(LIQUID_PROJECT_VOLUME_WGSL, [[0, sim], [1, cellBuf], [2, solve], [7, uniform, 0]]),
-        start: bound(LIQUID_PROJECT_START_WGSL, [[0, sim], [1, solve], [2, args], [7, uniform, 0]]),
-        apply: bound(LIQUID_PROJECT_APPLY_WGSL, [[0, sim], [1, nodes], [2, cellBuf], [3, solve]]),
-        matvec: bound(LIQUID_PROJECT_MATVEC_WGSL, [[0, sim], [1, nodes], [2, cellBuf], [3, solve]]),
-        alpha: bound(LIQUID_PROJECT_ALPHA_WGSL, [[0, sim], [1, solve]]),
-        update: bound(LIQUID_PROJECT_UPDATE_WGSL, [[0, sim], [1, cellBuf], [2, solve]]),
-        beta: bound(LIQUID_PROJECT_BETA_WGSL, [[0, sim], [1, solve], [2, args], [7, uniform, 0]]),
-        final: bound(LIQUID_PROJECT_FINAL_WGSL, [[0, sim], [1, grid], [2, nodes], [3, cellBuf], [4, forces]]),
+        nodes: bound(LIQUID_PROJECT_NODES_WGSL, [
+          [0, sim],
+          [1, grid],
+          [2, nodes],
+          [3, sdf],
+        ]),
+        cells: bound(LIQUID_PROJECT_CELLS_WGSL, [
+          [0, sim],
+          [1, grid],
+          [2, nodes],
+          [3, cellBuf],
+          [7, uniform, 0],
+        ]),
+        volume: bound(LIQUID_PROJECT_VOLUME_WGSL, [
+          [0, sim],
+          [1, cellBuf],
+          [2, solve],
+          [7, uniform, 0],
+        ]),
+        start: bound(LIQUID_PROJECT_START_WGSL, [
+          [0, sim],
+          [1, solve],
+          [2, args],
+          [7, uniform, 0],
+        ]),
+        apply: bound(LIQUID_PROJECT_APPLY_WGSL, [
+          [0, sim],
+          [1, nodes],
+          [2, cellBuf],
+          [3, solve],
+        ]),
+        matvec: bound(LIQUID_PROJECT_MATVEC_WGSL, [
+          [0, sim],
+          [1, nodes],
+          [2, cellBuf],
+          [3, solve],
+        ]),
+        alpha: bound(LIQUID_PROJECT_ALPHA_WGSL, [
+          [0, sim],
+          [1, solve],
+        ]),
+        update: bound(LIQUID_PROJECT_UPDATE_WGSL, [
+          [0, sim],
+          [1, cellBuf],
+          [2, solve],
+        ]),
+        beta: bound(LIQUID_PROJECT_BETA_WGSL, [
+          [0, sim],
+          [1, solve],
+          [2, args],
+          [7, uniform, 0],
+        ]),
+        final: bound(LIQUID_PROJECT_FINAL_WGSL, [
+          [0, sim],
+          [1, grid],
+          [2, nodes],
+          [3, cellBuf],
+          [4, forces],
+        ]),
         extend0: extend,
-        extend1: [extend[0], device.createBindGroup({
-          layout: extend[0].getBindGroupLayout(0),
-          entries: [
-            { binding: 0, resource: { buffer: sim } },
-            { binding: 1, resource: { buffer: grid } },
-            { binding: 2, resource: { buffer: nodes } },
-            { binding: 6, resource: { buffer: uniform, offset: 512, size: 16 } },
-          ],
-        })],
+        extend1: [
+          extend[0],
+          device.createBindGroup({
+            layout: extend[0].getBindGroupLayout(0),
+            entries: [
+              { binding: 0, resource: { buffer: sim } },
+              { binding: 1, resource: { buffer: grid } },
+              { binding: 2, resource: { buffer: nodes } },
+              { binding: 6, resource: { buffer: uniform, offset: 512, size: 16 } },
+            ],
+          }),
+        ],
       };
     }
     device.queue.writeBuffer(
@@ -1123,7 +1284,13 @@ export class GPULiquid implements EnginePlugin {
     this.stats.pressureIterations = state.iterations;
     this.stats.pressureResidual = state.residual;
     this.forces = this.decodeForces((i) => state.impulses[i]!, 6, p.colliders.length, n * h);
-    this.deliver((i) => state.impulses[i]!, 6, p.colliders.length, this.links, this.links.map((l) => l.center));
+    this.deliver(
+      (i) => state.impulses[i]!,
+      6,
+      p.colliders.length,
+      this.links,
+      this.links.map((l) => l.center),
+    );
     device.queue.writeBuffer(this.particleBuf!, 0, state.particles as Float32Array<ArrayBuffer>);
   }
 
@@ -1215,7 +1382,11 @@ export class GPULiquid implements EnginePlugin {
           fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format }] },
           primitive: { topology, cullMode: 'none' },
           multisample: c.descriptor.multisample,
-          depthStencil: { format: depthFormat, depthWriteEnabled: write, depthCompare: write ? 'greater' : 'greater-equal' },
+          depthStencil: {
+            format: depthFormat,
+            depthWriteEnabled: write,
+            depthCompare: write ? 'greater' : 'greater-equal',
+          },
         });
       };
       const sprites = make(LIQUID_DEBUG_PARTICLES_WGSL, 'triangle-list', true);
@@ -1260,7 +1431,8 @@ export class GPULiquid implements EnginePlugin {
     const p = this.resolve();
     const d = p.debug;
     const out: number[] = [];
-    const line = (a: readonly number[], b: readonly number[], color: number) => out.push(a[0]!, a[1]!, a[2]!, color, b[0]!, b[1]!, b[2]!, color);
+    const line = (a: readonly number[], b: readonly number[], color: number) =>
+      out.push(a[0]!, a[1]!, a[2]!, color, b[0]!, b[1]!, b[2]!, color);
     const [x0, y0, z0] = p.boxMin;
     const [x1, y1, z1] = p.boxMax;
     if (d.container) {
@@ -1274,7 +1446,10 @@ export class GPULiquid implements EnginePlugin {
     if (d.grid) {
       // Every wall lies on a node, so the cells divide each side exactly.
       const ticks = (a: number) =>
-        Array.from({ length: p.cells[a]! + 1 }, (_, i) => p.boxMin[a]! + (i * (p.boxMax[a]! - p.boxMin[a]!)) / p.cells[a]!);
+        Array.from(
+          { length: p.cells[a]! + 1 },
+          (_, i) => p.boxMin[a]! + (i * (p.boxMax[a]! - p.boxMin[a]!)) / p.cells[a]!,
+        );
       for (const z of ticks(2)) line([x0, y0, z], [x1, y0, z], 1);
       for (const x of ticks(0)) line([x, y0, z0], [x, y0, z1], 1);
       for (const y of ticks(1)) line([x0, y, z0], [x1, y, z0], 1);
@@ -1308,7 +1483,13 @@ export class GPULiquid implements EnginePlugin {
           const [r, hh] = c.half;
           const ends = [turn([0, -hh, 0]), turn([0, hh, 0])] as unknown as LiquidVec3[];
           for (const e of ends) circles(e, r, 2);
-          for (const [x, z] of [[r, 0], [-r, 0], [0, r], [0, -r]]) line(turn([x!, -hh, z!]), turn([x!, hh, z!]), 2);
+          for (const [x, z] of [
+            [r, 0],
+            [-r, 0],
+            [0, r],
+            [0, -r],
+          ])
+            line(turn([x!, -hh, z!]), turn([x!, hh, z!]), 2);
           continue;
         }
         if (c.kind === 3) {
@@ -1322,7 +1503,11 @@ export class GPULiquid implements EnginePlugin {
           const at = (a: number, b: number) => c.position.map((v, i) => v + (a * u[i]! + b * w[i]!) * size);
           const quad = [at(-1, -1), at(1, -1), at(1, 1), at(-1, 1)];
           for (let i = 0; i < 4; i++) line(quad[i]!, quad[(i + 1) % 4]!, 2);
-          line(c.position, c.position.map((v, i) => v + n[i]! * size * 0.2), 2);
+          line(
+            c.position,
+            c.position.map((v, i) => v + n[i]! * size * 0.2),
+            2,
+          );
           continue;
         }
         // A box, or a mesh's field box round its centre.
@@ -1366,7 +1551,11 @@ export class GPULiquid implements EnginePlugin {
         this.lineBuf.destroy();
         this.owned.splice(this.owned.indexOf(this.lineBuf), 1);
       }
-      this.lineBuf = this.buffer(c.device, Math.max(4096, points.byteLength * 2), GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
+      this.lineBuf = this.buffer(
+        c.device,
+        Math.max(4096, points.byteLength * 2),
+        GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      );
       this.lineGroups.clear();
     }
     c.device.queue.writeBuffer(this.lineBuf, 0, points as Float32Array<ArrayBuffer>);
@@ -1400,7 +1589,15 @@ export class GPULiquid implements EnginePlugin {
   private release(): void {
     for (const resource of this.owned) resource.destroy();
     this.owned = [];
-    this.particleBuf = this.simUniform = this.gridBuf = this.forceBuf = this.debugUniform = this.lineBuf = this.sdfBuf = this.surfBuf = undefined;
+    this.particleBuf =
+      this.simUniform =
+      this.gridBuf =
+      this.forceBuf =
+      this.debugUniform =
+      this.lineBuf =
+      this.sdfBuf =
+      this.surfBuf =
+        undefined;
     this.tallyBuf = this.emitUniform = this.blockBuf = this.spanBuf = this.scratchBuf = undefined;
     this.project = undefined;
     this.sdfKey = [];
@@ -1460,7 +1657,11 @@ function linkedCollider(l: LinkEntry, origin: readonly [number, number, number])
     v = [at[0]!, at[1]!, at[2]!];
   } else {
     const lv = b.linearVelocity;
-    v = [lv[0]! + w[1] * off[2] - w[2] * off[1], lv[1]! + w[2] * off[0] - w[0] * off[2], lv[2]! + w[0] * off[1] - w[1] * off[0]];
+    v = [
+      lv[0]! + w[1] * off[2] - w[2] * off[1],
+      lv[1]! + w[2] * off[0] - w[0] * off[2],
+      lv[2]! + w[0] * off[1] - w[1] * off[0],
+    ];
   }
   // The body's turn after the shape's own: q_body * q_shape.
   const [ax, ay, az, aw] = bq as [number, number, number, number];

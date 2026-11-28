@@ -15482,6 +15482,18 @@ compute shaders), and no companion code of any paper was opened.
   2013): adhesion as a pull of the liquid towards the boundary with a kernel of the distance. Theirs is zero next to the
   boundary so SPH particles are not drawn into the boundary's particles; here the boundary is a constraint on the grid,
   so the pull is full within a cell and fades to zero at two (a cubic Hermite step).
+- The smooth walls (2026-11-28, `walls`). B. E. Launder and D. B. Spalding, [The numerical computation of turbulent
+  flows](https://doi.org/10.1016/0045-7825(74)90029-2) (Comput. Methods Appl. Mech. Eng. 3, 1974): the wall function,
+  the log law u / u* = ln(E y u* / nu) / kappa with kappa = 0.4187 and E = 9.793 for a smooth wall, the viscous sublayer
+  u+ = y+ below it, met at y+ = 11.225, the wall's shear rho u*^2 taken from the speed at the first grid point because a
+  grid cell is far thicker than the boundary layer. S. B. Pope, Turbulent Flows (Cambridge, 2000), chapter 7: the
+  sublayer and log-law regions and why the larger u* of the two holds. D. Sulsky, Z. Chen and H. L. Schreyer,
+  [A particle method for history-dependent materials](https://doi.org/10.1016/0045-7825(94)90112-0) (Comput. Methods
+  Appl. Mech. Eng. 118, 1994): a traction t on the boundary enters MPM as the nodal force f_i = integral of N_i t dA,
+  here with the quadratic B-spline's values at the wall (1/8, 3/4, 1/8) and its integral over the container's extent.
+  Margo's own: the speed the node on the wall reads lies at the B-spline weights' mean distance from the wall (13/32 of
+  a cell) in the linear sublayer and at their geometric mean (exp(9/8 ln 3 - ln 2 - 11/6) = 0.2751) under the log law;
+  each node's friction never reverses its motion along the wall.
 - Hu et al. 2018 (above), section 6: two-way rigid coupling by giving the body the opposite of the momentum the grid
   takes at its boundary. `link` does this between frames: the collider follows the body's pose and velocity, and the
   summed impulse and moment (about the collider's centre) go to the body through its own `applyImpulse` and

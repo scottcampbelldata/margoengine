@@ -332,9 +332,13 @@ the scatter of Cross's five measured bounces (2002), and a solid ball rolls down
   Babylon, PlayCanvas, LiquidFun and the WebGPU MPM and SPH liquid libraries): speed against the rivals' demos,
   measured in the speed phase (the like-for-like scene is recorded in docs/limits.md, "GPU particle liquid"). Since 2026-11-27 both profiles are checked against Martin and Moyce's (1952) dam-break
   tables (each station inside the spread of their runs, table 2 and held-out tables 1 and 3) and the accurate profile
-  against Lobovsky et al.'s (2014) front speed at 300 mm and, held out, 600 mm (`gpu-liquid-dambreak.test.js`). Open on
-  point 2: the far-wall impact pressures (a sensor is a tenth of a cell) and the late run-out, where the free-slip walls
-  let the front run ahead of the experiments' (no bed friction).
+  against Lobovsky et al.'s (2014) front speed at 300 mm and, held out, 600 mm (`gpu-liquid-dambreak.test.js`). Since
+  2026-11-28 the walls are smooth by default (`walls`: no-slip by Launder and Spalding's wall function, as the MPM
+  traction condition; `'slip'` per axis for symmetry planes), which slows the late run-out to the runs (table 1 to
+  Z = 13, table 2 to Z = 12; past that table 2's front lags by a little more than the bound, docs/limits.md) and brings
+  both profiles inside Lobovsky's measured front speeds (the fast one read 1.758 at 300 mm with free-slip walls, 1.672
+  now). Open on point 2: the far-wall impact pressures (a sensor is a tenth of a cell); on point 6: a multigrid
+  preconditioner for the accurate profile's pressure solve.
 
 ### P14. LIFE-04 Flocking
 

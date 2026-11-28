@@ -50,6 +50,7 @@ export interface GPULiquidOptions {
     emitters?: readonly LiquidEmitter[];
     drains?: readonly LiquidDrain[];
     box?: LiquidBox;
+    walls?: LiquidWall | readonly [LiquidWall, LiquidWall, LiquidWall];
     fill?: LiquidBox;
     resolution?: number;
     gravity?: LiquidVec3;
@@ -224,6 +225,8 @@ export interface LiquidStats {
 
 export type LiquidVec3 = readonly [number, number, number];
 
+export type LiquidWall = 'smooth' | 'slip';
+
 export const MAX_GPU_LIQUID_NODES = 4194304;
 
 export const MAX_GPU_LIQUID_PARTICLES = 1048576;
@@ -376,6 +379,7 @@ export interface ResolvedLiquidParams {
     viscosity: number;
     surfaceTension: number;
     adhesion: number;
+    walls: readonly [boolean, boolean, boolean];
     kinds: ResolvedLiquidKind[];
     mixing: number;
     maxSubstep: number;
@@ -443,4 +447,6 @@ export function liquidSurfaceNormals(p: ResolvedLiquidParams, grid: Float64Array
 export function resolveLiquidParams(options?: GPULiquidOptions, fixedCount?: number): ResolvedLiquidParams;
 
 export function stepLiquidCPU(state: LiquidState, params: ResolvedLiquidParams, dt: number, cap?: number): number;
+
+export function wallFrictionVelocity(u: number, cell: number, nu: number): number;
 ```

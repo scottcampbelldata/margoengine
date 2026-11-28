@@ -214,8 +214,16 @@ export interface GPULiquidOptions {
   emitters?: readonly LiquidEmitter[];
   /** Up to 4 regions that remove the particles that enter them. Default none. */
   drains?: readonly LiquidDrain[];
-  /** The container: its walls hold the liquid (free slip). Default { min: [-0.5, 0, -0.5], max: [0.5, 1, 0.5] }. */
+  /** The container: its walls hold the liquid (see `walls`). Default { min: [-0.5, 0, -0.5], max: [0.5, 1, 0.5] }. */
   box?: LiquidBox;
+  /**
+   * The container's walls: `'smooth'` walls are no-slip, a smooth solid wall under the liquid's own `viscosity`, resolved
+   * by a wall function (the viscous sublayer and the log law of Launder and Spalding 1974) since a grid cell is far
+   * thicker than the boundary layer, so liquid running along a wall or floor slows as it does on glass or acrylic;
+   * `'slip'` walls hold only the liquid's motion into them (free slip: a symmetry plane, for a slice of a wider channel).
+   * One value for every wall, or one per axis `[x, y, z]` for both walls across it. Default `'smooth'`.
+   */
+  walls?: LiquidWall | readonly [LiquidWall, LiquidWall, LiquidWall];
   /**
    * Where the particles start, a box inside the container filled on a jittered lattice from the floor up; the particles'
    * packing there is the rest density. Default the left 40% of the container, 60% of its height, its full depth.
@@ -294,6 +302,9 @@ export interface GPULiquidOptions {
   originCellSize?: number;
 }
 
+/** A container wall of {@link GPULiquidOptions.walls}: no-slip under the wall function, or free slip. */
+export type LiquidWall = 'smooth' | 'slip';
+
 /** One liquid of {@link GPULiquidOptions.liquids}. */
 export interface LiquidKindOptions {
   /** Its start box inside the container; boxes of different liquids must not overlap. Default `fill` (first liquid only). */
@@ -356,6 +367,8 @@ export interface ResolvedLiquidParams {
   viscosity: number;
   surfaceTension: number;
   adhesion: number;
+  /** Per axis: its two walls are smooth (no-slip under the wall function) rather than free slip. */
+  walls: readonly [boolean, boolean, boolean];
   /** The liquids; the first's fill and lattice are also `fillMin`, `fillMax` and `lattice`. */
   kinds: ResolvedLiquidKind[];
   mixing: number;
@@ -481,14 +494,15 @@ export function liquidError(message: string): Error {
 const num = (v: unknown, fallback: number, name: string, min: number, max: number, integer = false): number => {
   const n = v === undefined ? fallback : v;
   if (typeof n !== 'number' || !Number.isFinite(n) || n < min || n > max || (integer && !Number.isInteger(n)))
-    throw liquidError(`GPULiquid ${name} is ${String(n)}; pass ${integer ? 'an integer' : 'a finite number'} from ${min} to ${max}`);
+    throw liquidError(
+      `GPULiquid ${name} is ${String(n)}; pass ${integer ? 'an integer' : 'a finite number'} from ${min} to ${max}`,
+    );
   return n;
 };
 
 const vec = (v: unknown, fallback: LiquidVec3, name: string, min = -1e9, max = 1e9): LiquidVec3 => {
   const a = v === undefined ? fallback : v;
-  if (!Array.isArray(a) && !ArrayBuffer.isView(a))
-    throw liquidError(`GPULiquid ${name} must be [x, y, z]`);
+  if (!Array.isArray(a) && !ArrayBuffer.isView(a)) throw liquidError(`GPULiquid ${name} must be [x, y, z]`);
   const t = a as ArrayLike<number>;
   if (t.length !== 3) throw liquidError(`GPULiquid ${name} must be [x, y, z]`);
   for (let i = 0; i < 3; i++)
@@ -527,17 +541,22 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
     throw liquidError(`GPULiquid liquids must be an array of 1 to ${MAX_LIQUIDS} liquids`);
   const fills = liquidList.map((k, i) => {
     if (!k || typeof k !== 'object') throw liquidError(`GPULiquid liquids[${i}] must be an object`);
-    if (i > 0 && k.fill === undefined) throw liquidError(`GPULiquid liquids[${i}].fill is required; give each liquid after the first its own box`);
+    if (i > 0 && k.fill === undefined)
+      throw liquidError(`GPULiquid liquids[${i}].fill is required; give each liquid after the first its own box`);
     const f = i === 0 && k.fill === undefined ? fill : box(k.fill, fill, `liquids[${i}].fill`);
     for (let a = 0; a < 3; a++)
       if (f.min[a]! < container.min[a]! || f.max[a]! > container.max[a]!)
-        throw liquidError(i ? `GPULiquid liquids[${i}].fill must lie inside box` : 'GPULiquid fill must lie inside box');
+        throw liquidError(
+          i ? `GPULiquid liquids[${i}].fill must lie inside box` : 'GPULiquid fill must lie inside box',
+        );
     return f;
   });
   for (let i = 0; i < fills.length; i++)
     for (let j = 0; j < i; j++)
       if ([0, 1, 2].every((a) => fills[i]!.min[a]! < fills[j]!.max[a]! && fills[j]!.min[a]! < fills[i]!.max[a]!))
-        throw liquidError(`GPULiquid liquids[${j}] and liquids[${i}] start in overlapping boxes; move one so they only touch`);
+        throw liquidError(
+          `GPULiquid liquids[${j}] and liquids[${i}] start in overlapping boxes; move one so they only touch`,
+        );
   // The start lattice: one spacing s for every liquid, rounded to whole columns in x and z per box, filled from its
   // floor; count is split by volume.
   const volumes = fills.map((f) => (f.max[0] - f.min[0]) * (f.max[1] - f.min[1]) * (f.max[2] - f.min[2]));
@@ -546,7 +565,8 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
   let given = 0;
   const blocks = fills.map((f, i) => {
     const n = i === fills.length - 1 ? count - given : Math.round((count * volumes[i]!) / total);
-    if (n < 1) throw liquidError(`GPULiquid liquids[${i}].fill gets no particles of ${count}; enlarge it or raise count`);
+    if (n < 1)
+      throw liquidError(`GPULiquid liquids[${i}].fill gets no particles of ${count}; enlarge it or raise count`);
     const start = given;
     given += n;
     const nx = Math.max(1, Math.round((f.max[0] - f.min[0]) / s)),
@@ -554,7 +574,8 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
     const lattice: LiquidVec3 = [(f.max[0] - f.min[0]) / nx, s, (f.max[2] - f.min[2]) / nz];
     return { fillMin: f.min, fillMax: f.max, lattice, start, count: n };
   });
-  if (given !== count) throw liquidError(`GPULiquid liquids split ${count} particles into ${given}; enlarge the smaller boxes`);
+  if (given !== count)
+    throw liquidError(`GPULiquid liquids split ${count} particles into ${given}; enlarge the smaller boxes`);
   const lattice = blocks[0]!.lattice;
   const longest = Math.max(size[0]!, size[1]!, size[2]!);
   // The mean volume a particle starts with, the rest density's.
@@ -566,7 +587,9 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
   const cells = [0, 1, 2].map((a) => Math.round(size[a]! / h0)) as [number, number, number];
   for (let a = 0; a < 3; a++)
     if (cells[a]! < 4)
-      throw liquidError(`GPULiquid box is ${cells[a]} cells across on axis ${'xyz'[a]}; it needs 4, so raise resolution`);
+      throw liquidError(
+        `GPULiquid box is ${cells[a]} cells across on axis ${'xyz'[a]}; it needs 4, so raise resolution`,
+      );
   const cell: LiquidVec3 = [size[0]! / cells[0], size[1]! / cells[1], size[2]! / cells[2]];
   const h = Math.min(cell[0], cell[1], cell[2]);
   const dims = cells.map((n) => n + 2 * LIQUID_PAD + 1) as [number, number, number];
@@ -582,12 +605,21 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
   if (profile !== 'fast' && profile !== 'accurate')
     throw liquidError(`GPULiquid profile must be 'fast' or 'accurate', not ${String(profile)}`);
   // The accurate profile's substep: half a cell over the speed of a fall through the container's height along gravity.
-  const fall = g > 0 ? (Math.abs(gravity[0]) * size[0]! + Math.abs(gravity[1]) * size[1]! + Math.abs(gravity[2]) * size[2]!) / g : 0;
+  const fall =
+    g > 0
+      ? (Math.abs(gravity[0]) * size[0]! + Math.abs(gravity[1]) * size[1]! + Math.abs(gravity[2]) * size[2]!) / g
+      : 0;
   const flowSpeed = Math.max(0.25, Math.sqrt(2 * g * fall));
   const maxSubstep = profile === 'fast' ? (LIQUID_CFL * h) / speedOfSound : (LIQUID_FLOW_CFL * h) / flowSpeed;
   const pressureIterations = num(options.pressureIterations, 128, 'pressureIterations', 1, 4096, true);
   const pressureTolerance = num(options.pressureTolerance, 1e-4, 'pressureTolerance', 1e-8, 0.1);
-  const viscosity = num(options.viscosity, Math.min(5e-4, (h * h) / (8 * maxSubstep)), 'viscosity', 0, (h * h) / (8 * maxSubstep));
+  const viscosity = num(
+    options.viscosity,
+    Math.min(5e-4, (h * h) / (8 * maxSubstep)),
+    'viscosity',
+    0,
+    (h * h) / (8 * maxSubstep),
+  );
   const maxSubsteps = num(options.maxSubsteps, 32, 'maxSubsteps', 1, 256, true);
   // Brackbill et al. (1992): an explicit capillary step needs dt < sqrt(rho h^3 / (2 pi sigma)).
   const density0 = num(options.density, 1000, 'density', 1e-3, 1e6);
@@ -595,6 +627,13 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
   const surfaceTension = num(options.surfaceTension, 0, 'surfaceTension', 0, tensionMax);
   const adhesion = num(options.adhesion, 0, 'adhesion', 0, 1000);
   const mixing = num(options.mixing, 0, 'mixing', 0, 1000);
+  const wallList = options.walls ?? 'smooth';
+  const wallKinds = typeof wallList === 'string' ? [wallList, wallList, wallList] : wallList;
+  if (!Array.isArray(wallKinds) || wallKinds.length !== 3 || wallKinds.some((w) => w !== 'smooth' && w !== 'slip'))
+    throw liquidError(
+      `GPULiquid walls must be 'smooth', 'slip' or one of them per axis [x, y, z], not ${String(wallList)}`,
+    );
+  const walls = wallKinds.map((w) => w === 'smooth') as [boolean, boolean, boolean];
   const kinds = blocks.map((b, i): ResolvedLiquidKind => {
     const k = liquidList[i]!;
     const kd = num(k.density, density0, `liquids[${i}].density`, 1e-3, 1e6);
@@ -612,7 +651,8 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
   let pointer: ResolvedLiquidParams['pointer'] = null;
   const p = options.pointer;
   if (p !== undefined && p !== null) {
-    if (typeof p !== 'object') throw liquidError('GPULiquid pointer must be { position, velocity?, radius?, strength? } or null');
+    if (typeof p !== 'object')
+      throw liquidError('GPULiquid pointer must be { position, velocity?, radius?, strength? } or null');
     pointer = {
       position: vec(p.position, [0, 0, 0], 'pointer.position'),
       velocity: vec(p.velocity, [0, 0, 0], 'pointer.velocity', -1e4, 1e4),
@@ -627,7 +667,8 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
   let meshSamples = 0;
   const colliders = list.map((c, i): ResolvedCollider => {
     const name = `colliders[${i}]`;
-    const kind = c && typeof c === 'object' ? LIQUID_COLLIDER_KINDS[c.shape as keyof typeof LIQUID_COLLIDER_KINDS] : undefined;
+    const kind =
+      c && typeof c === 'object' ? LIQUID_COLLIDER_KINDS[c.shape as keyof typeof LIQUID_COLLIDER_KINDS] : undefined;
     if (kind === undefined || !Object.hasOwn(LIQUID_COLLIDER_KINDS, c.shape))
       throw liquidError(`GPULiquid ${name}.shape must be 'sphere', 'box', 'capsule', 'plane' or 'mesh'`);
     const r = c.rotation ?? [0, 0, 0, 1];
@@ -665,11 +706,14 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
     };
   });
   if (meshSamples > MAX_LIQUID_MESH_SAMPLES)
-    throw liquidError(`GPULiquid mesh colliders hold ${meshSamples} distance samples, over ${MAX_LIQUID_MESH_SAMPLES}; bake them at a lower resolution`);
+    throw liquidError(
+      `GPULiquid mesh colliders hold ${meshSamples} distance samples, over ${MAX_LIQUID_MESH_SAMPLES}; bake them at a lower resolution`,
+    );
   const d = options.debug ?? {};
   if (!d || typeof d !== 'object') throw liquidError('GPULiquid debug must be an object');
   for (const key of ['enabled', 'grid', 'container', 'colliders'] as const)
-    if (d[key] !== undefined && typeof d[key] !== 'boolean') throw liquidError(`GPULiquid debug.${key} must be true or false`);
+    if (d[key] !== undefined && typeof d[key] !== 'boolean')
+      throw liquidError(`GPULiquid debug.${key} must be true or false`);
   const mode = d.particles ?? 'speed';
   if (mode !== 'speed' && mode !== 'density' && mode !== 'color' && mode !== 'off')
     throw liquidError(`GPULiquid debug.particles must be 'speed', 'density', 'color' or 'off', not ${String(mode)}`);
@@ -687,17 +731,20 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
     throw liquidError(`GPULiquid emitters must be an array of at most ${MAX_LIQUID_EMITTERS}`);
   const inside = (x: LiquidVec3, name: string) => {
     for (let a = 0; a < 3; a++)
-      if (x[a]! < container.min[a]! || x[a]! > container.max[a]!) throw liquidError(`GPULiquid ${name} must lie inside box`);
+      if (x[a]! < container.min[a]! || x[a]! > container.max[a]!)
+        throw liquidError(`GPULiquid ${name} must lie inside box`);
     return x;
   };
   const emitters = emitterList.map((e, i): ResolvedEmitter => {
     const name = `emitters[${i}]`;
-    if (!e || typeof e !== 'object') throw liquidError(`GPULiquid ${name} must be { position, velocity?, radius?, rate?, liquid? }`);
+    if (!e || typeof e !== 'object')
+      throw liquidError(`GPULiquid ${name} must be { position, velocity?, radius?, rate?, liquid? }`);
     const position = inside(vec(e.position, [0, 0, 0], `${name}.position`), `${name}.position`);
     const velocity = vec(e.velocity, [0, -1, 0], `${name}.velocity`, -1e4, 1e4);
     const radius = num(e.radius, 2 * spacing, `${name}.radius`, 1e-6, 1e6);
     const liquid = num(e.liquid, 0, `${name}.liquid`, 0, kinds.length - 1, true);
-    if (e.enabled !== undefined && typeof e.enabled !== 'boolean') throw liquidError(`GPULiquid ${name}.enabled must be true or false`);
+    if (e.enabled !== undefined && typeof e.enabled !== 'boolean')
+      throw liquidError(`GPULiquid ${name}.enabled must be true or false`);
     const speed = Math.hypot(velocity[0], velocity[1], velocity[2]);
     const rate = num(e.rate, (speed * Math.PI * radius * radius) / volume, `${name}.rate`, 0, 1e7);
     // The nozzle's plane: two unit vectors across the jet's direction (any pair when it has no speed).
@@ -719,19 +766,27 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
     const name = `drains[${i}]`;
     if (!d || typeof d !== 'object' || (d.shape !== 'box' && d.shape !== 'sphere'))
       throw liquidError(`GPULiquid ${name}.shape must be 'box' or 'sphere'`);
-    if (d.enabled !== undefined && typeof d.enabled !== 'boolean') throw liquidError(`GPULiquid ${name}.enabled must be true or false`);
+    if (d.enabled !== undefined && typeof d.enabled !== 'boolean')
+      throw liquidError(`GPULiquid ${name}.enabled must be true or false`);
     const half =
       d.shape === 'box'
         ? vec(d.halfExtents, [0.05, 0.05, 0.05], `${name}.halfExtents`, 1e-6, 1e6)
         : ((r: number): LiquidVec3 => [r, r, r])(num(d.radius, 0.05, `${name}.radius`, 1e-6, 1e6));
-    return { kind: d.shape === 'box' ? 0 : 1, position: vec(d.position, [0, 0, 0], `${name}.position`), half, enabled: d.enabled ?? true };
+    return {
+      kind: d.shape === 'box' ? 0 : 1,
+      position: vec(d.position, [0, 0, 0], `${name}.position`),
+      half,
+      enabled: d.enabled ?? true,
+    };
   });
   const oc = options.originCell ?? [0, 0, 0];
   if (!Array.isArray(oc) || oc.length !== 3 || oc.some((v) => !Number.isInteger(v) || v < -(2 ** 31) || v >= 2 ** 31))
     throw liquidError(`GPULiquid originCell must be three integers within +-2^31, not ${String(oc)}`);
   const originCellSize = num(options.originCellSize, 4096, 'originCellSize', 1, 2 ** 20);
   if (!Number.isInteger(Math.log2(originCellSize)))
-    throw liquidError(`GPULiquid originCellSize is ${originCellSize}; pass a power of two of metres from 1 to 2^20, as PhysicsWorld's cellSize`);
+    throw liquidError(
+      `GPULiquid originCellSize is ${originCellSize}; pass a power of two of metres from 1 to 2^20, as PhysicsWorld's cellSize`,
+    );
   return {
     originCell: [oc[0]!, oc[1]!, oc[2]!],
     originCellSize,
@@ -749,7 +804,11 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
     cells,
     dims,
     nodes,
-    origin: [container.min[0] - LIQUID_PAD * cell[0], container.min[1] - LIQUID_PAD * cell[1], container.min[2] - LIQUID_PAD * cell[2]],
+    origin: [
+      container.min[0] - LIQUID_PAD * cell[0],
+      container.min[1] - LIQUID_PAD * cell[1],
+      container.min[2] - LIQUID_PAD * cell[2],
+    ],
     restDensity: (cell[0] * cell[1] * cell[2]) / volume,
     gravity,
     density,
@@ -758,6 +817,7 @@ export function resolveLiquidParams(options: GPULiquidOptions = {}, fixedCount?:
     viscosity,
     surfaceTension,
     adhesion,
+    walls,
     kinds,
     mixing,
     maxSubstep,
@@ -852,7 +912,9 @@ export function emitterPoint(e: ResolvedEmitter, slot: number, k: number, n: num
 
 /** Particles each emitter adds over dt: from its owed fraction plus rate * dt, the whole part. */
 export function emitterCounts(p: ResolvedLiquidParams, emission: Float64Array, dt: number): number[] {
-  return p.emitters.map((e, k) => (e.enabled ? Math.floor(emission[MAX_LIQUID_EMITTERS + k]! + e.rate * dt + 1e-9) : 0));
+  return p.emitters.map((e, k) =>
+    e.enabled ? Math.floor(emission[MAX_LIQUID_EMITTERS + k]! + e.rate * dt + 1e-9) : 0,
+  );
 }
 
 /** Advances the emitters' counts and owed fractions by a frame that added `counts`. */
@@ -907,17 +969,29 @@ function checkMeshShape(m: unknown, name: string): LiquidMeshShape {
 
 /** Closest point to p on the triangle abc (Ericson 2005, Real-Time Collision Detection, 5.1.5), as its squared distance. */
 function triangleDistance2(p: number[], t: ArrayLike<number>, o: number): number {
-  const ax = t[o]!, ay = t[o + 1]!, az = t[o + 2]!;
-  const abx = t[o + 3]! - ax, aby = t[o + 4]! - ay, abz = t[o + 5]! - az;
-  const acx = t[o + 6]! - ax, acy = t[o + 7]! - ay, acz = t[o + 8]! - az;
-  const apx = p[0]! - ax, apy = p[1]! - ay, apz = p[2]! - az;
+  const ax = t[o]!,
+    ay = t[o + 1]!,
+    az = t[o + 2]!;
+  const abx = t[o + 3]! - ax,
+    aby = t[o + 4]! - ay,
+    abz = t[o + 5]! - az;
+  const acx = t[o + 6]! - ax,
+    acy = t[o + 7]! - ay,
+    acz = t[o + 8]! - az;
+  const apx = p[0]! - ax,
+    apy = p[1]! - ay,
+    apz = p[2]! - az;
   const d1 = abx * apx + aby * apy + abz * apz,
     d2 = acx * apx + acy * apy + acz * apz;
   let u: number, v: number;
-  const bpx = apx - abx, bpy = apy - aby, bpz = apz - abz;
+  const bpx = apx - abx,
+    bpy = apy - aby,
+    bpz = apz - abz;
   const d3 = abx * bpx + aby * bpy + abz * bpz,
     d4 = acx * bpx + acy * bpy + acz * bpz;
-  const cpx = apx - acx, cpy = apy - acy, cpz = apz - acz;
+  const cpx = apx - acx,
+    cpy = apy - acy,
+    cpz = apz - acz;
   const d5 = abx * cpx + aby * cpy + abz * cpz,
     d6 = acx * cpx + acy * cpy + acz * cpz;
   const va = d3 * d6 - d5 * d4,
@@ -947,12 +1021,24 @@ function triangleDistance2(p: number[], t: ArrayLike<number>, o: number): number
  * same for a mesh with small holes.
  */
 function solidAngle(p: number[], t: ArrayLike<number>, o: number): number {
-  const ax = t[o]! - p[0]!, ay = t[o + 1]! - p[1]!, az = t[o + 2]! - p[2]!;
-  const bx = t[o + 3]! - p[0]!, by = t[o + 4]! - p[1]!, bz = t[o + 5]! - p[2]!;
-  const cx = t[o + 6]! - p[0]!, cy = t[o + 7]! - p[1]!, cz = t[o + 8]! - p[2]!;
-  const la = Math.hypot(ax, ay, az), lb = Math.hypot(bx, by, bz), lc = Math.hypot(cx, cy, cz);
+  const ax = t[o]! - p[0]!,
+    ay = t[o + 1]! - p[1]!,
+    az = t[o + 2]! - p[2]!;
+  const bx = t[o + 3]! - p[0]!,
+    by = t[o + 4]! - p[1]!,
+    bz = t[o + 5]! - p[2]!;
+  const cx = t[o + 6]! - p[0]!,
+    cy = t[o + 7]! - p[1]!,
+    cz = t[o + 8]! - p[2]!;
+  const la = Math.hypot(ax, ay, az),
+    lb = Math.hypot(bx, by, bz),
+    lc = Math.hypot(cx, cy, cz);
   const det = ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx);
-  const div = la * lb * lc + (ax * bx + ay * by + az * bz) * lc + (ax * cx + ay * cy + az * cz) * lb + (bx * cx + by * cy + bz * cz) * la;
+  const div =
+    la * lb * lc +
+    (ax * bx + ay * by + az * bz) * lc +
+    (ax * cx + ay * cy + az * cz) * lb +
+    (bx * cx + by * cy + bz * cz) * la;
   return 2 * Math.atan2(det, div);
 }
 
@@ -1009,7 +1095,9 @@ export function bakeLiquidMesh(
       `bakeLiquidMesh would test ${n ** 3 * tris} triangle-sample pairs, over ${MAX_LIQUID_MESH_WORK}; simplify the mesh to ${Math.floor(MAX_LIQUID_MESH_WORK / n ** 3)} triangles or lower the resolution`,
     );
   const center: LiquidVec3 = [(lo[0]! + hi[0]!) / 2, (lo[1]! + hi[1]!) / 2, (lo[2]! + hi[2]!) / 2];
-  const half: LiquidVec3 = [0, 1, 2].map((a) => Math.max((hi[a]! - lo[a]!) / 2 + margin, 1e-6)) as unknown as LiquidVec3;
+  const half: LiquidVec3 = [0, 1, 2].map((a) =>
+    Math.max((hi[a]! - lo[a]!) / 2 + margin, 1e-6),
+  ) as unknown as LiquidVec3;
   const distances = new Float32Array(n ** 3);
   const p = [0, 0, 0];
   for (let k = 0, i = 0; k < n; k++)
@@ -1125,13 +1213,20 @@ export function colliderDistance(c: ResolvedCollider, x: LiquidVec3, normal: num
 }
 
 /** Rotates v by the unit quaternion q: v + 2 q.xyz x (q.xyz x v + w v). */
-function rotate(qx: number, qy: number, qz: number, qw: number, vx: number, vy: number, vz: number): [number, number, number] {
+function rotate(
+  qx: number,
+  qy: number,
+  qz: number,
+  qw: number,
+  vx: number,
+  vy: number,
+  vz: number,
+): [number, number, number] {
   const tx = qy * vz - qz * vy + qw * vx,
     ty = qz * vx - qx * vz + qw * vy,
     tz = qx * vy - qy * vx + qw * vz;
   return [vx + 2 * (qy * tz - qz * ty), vy + 2 * (qz * tx - qx * tz), vz + 2 * (qx * ty - qy * tx)];
 }
-
 
 /** The quadratic B-spline weights and the base node of one particle, per axis (f in w[o + 3]). */
 function stencil(p: ResolvedLiquidParams, x: number, a: number, w: Float64Array, o: number): number {
@@ -1148,7 +1243,14 @@ function stencil(p: ResolvedLiquidParams, x: number, a: number, w: Float64Array,
 /** A particle within this many cells of a collider reads the collider as liquid at rest in its density. */
 const GHOST_REACH = 3;
 /** c at node (ix, iy, iz): its mass with the wall mirrors, plus the colliders' cover, over the rest density. */
-function surfaceColor(p: ResolvedLiquidParams, grid: Float64Array, ix: number, iy: number, iz: number, scratch: number[][]): number {
+function surfaceColor(
+  p: ResolvedLiquidParams,
+  grid: Float64Array,
+  ix: number,
+  iy: number,
+  iz: number,
+  scratch: number[][],
+): number {
   const [mx, my, mz, x, normal] = scratch as [number[], number[], number[], [number, number, number], number[]];
   const [nx, ny] = p.dims;
   const kx = wallMirrors(p, 0, ix, mx),
@@ -1156,7 +1258,8 @@ function surfaceColor(p: ResolvedLiquidParams, grid: Float64Array, ix: number, i
     kz = wallMirrors(p, 2, iz, mz);
   let m = 0;
   for (let z = 0; z < kz; z++)
-    for (let y = 0; y < ky; y++) for (let k = 0; k < kx; k++) m += grid[(mx[k]! + nx * (my[y]! + ny * mz[z]!)) * LIQUID_GRID_STRIDE]!;
+    for (let y = 0; y < ky; y++)
+      for (let k = 0; k < kx; k++) m += grid[(mx[k]! + nx * (my[y]! + ny * mz[z]!)) * LIQUID_GRID_STRIDE]!;
   let ghost = 0;
   if (p.colliders.length) {
     x[0] = p.origin[0] + ix * p.cell[0];
@@ -1175,10 +1278,17 @@ function surfaceColor(p: ResolvedLiquidParams, grid: Float64Array, ix: number, i
  */
 export function liquidSurfaceNormals(p: ResolvedLiquidParams, grid: Float64Array): Float64Array {
   const [nx, ny, nz] = p.dims;
-  const scratch = [[0, 0], [0, 0], [0, 0], [0, 0, 0], [0, 0, 0]];
+  const scratch = [
+    [0, 0],
+    [0, 0],
+    [0, 0],
+    [0, 0, 0],
+    [0, 0, 0],
+  ];
   const color = new Float64Array(p.nodes);
   for (let iz = 0, n = 0; iz < nz; iz++)
-    for (let iy = 0; iy < ny; iy++) for (let ix = 0; ix < nx; ix++, n++) color[n] = surfaceColor(p, grid, ix, iy, iz, scratch);
+    for (let iy = 0; iy < ny; iy++)
+      for (let ix = 0; ix < nx; ix++, n++) color[n] = surfaceColor(p, grid, ix, iy, iz, scratch);
   const out = new Float64Array(p.nodes * 4);
   for (let iz = 0, n = 0; iz < nz; iz++)
     for (let iy = 0; iy < ny; iy++)
@@ -1205,7 +1315,14 @@ export function liquidSurfaceNormals(p: ResolvedLiquidParams, grid: Float64Array
  * div T / sigma at node (ix, iy, iz) into `out`, by central differences (one-sided at the grid's edge) of column j of
  * T / sigma = |g| I - g g^T / |g| at the neighbours along j.
  */
-function surfaceForce(p: ResolvedLiquidParams, surf: Float64Array, ix: number, iy: number, iz: number, out: number[]): void {
+function surfaceForce(
+  p: ResolvedLiquidParams,
+  surf: Float64Array,
+  ix: number,
+  iy: number,
+  iz: number,
+  out: number[],
+): void {
   const [nx, ny] = p.dims;
   const i = [ix, iy, iz];
   out[0] = out[1] = out[2] = 0;
@@ -1230,6 +1347,93 @@ function surfaceForce(p: ResolvedLiquidParams, surf: Float64Array, ix: number, i
 
 /** A node under this share of rest density takes the surface force as one at it. */
 export const LIQUID_TENSION_FLOOR = 0.25;
+
+/** Von Karman's constant of the log law, as Launder and Spalding (1974) give it. */
+export const LIQUID_WALL_KAPPA = 0.4187;
+/** The smooth wall's roughness constant E of the log law u+ = ln(E y+) / kappa (Launder and Spalding 1974). */
+export const LIQUID_WALL_E = 9.793;
+/** y+ where the viscous sublayer u+ = y+ and the log law meet: the root of y+ = ln(E y+) / kappa. */
+export const LIQUID_WALL_CROSSOVER = 11.225;
+/** Newton iterations of the log law's y+, enough for every wall Reynolds number below 1e12 at f32. */
+export const LIQUID_WALL_ITERATIONS = 10;
+
+/**
+ * The wall's share of a traction at the node layers outside a wall, on it and inside it: the quadratic B-spline at the
+ * wall, 1/8, 3/4 and 1/8 (the MPM traction boundary condition f_i = N_i(wall) t A).
+ */
+export const LIQUID_WALL_SHARES = [0.125, 0.75, 0.125] as const;
+
+/**
+ * Where the grid samples the liquid's speed along a wall, in cells from it. The node on the wall carries the liquid
+ * within a cell and a half with the quadratic B-spline's weights, so its speed is their weighted mean: in the viscous
+ * sublayer (u linear in y) the speed at the weights' mean distance, 13/32, and under the log law (u linear in ln y) the
+ * speed at their geometric mean distance, exp(9/8 ln 3 - ln 2 - 11/6) = 0.2751.
+ */
+export const LIQUID_WALL_DEPTH = {
+  linear: 13 / 32,
+  log: Math.exp((9 / 8) * Math.log(3) - Math.log(2) - 11 / 6),
+} as const;
+
+/**
+ * The friction velocity u* = sqrt(tau / rho) of a smooth wall under liquid whose grid node on the wall slides at `u`,
+ * for cells `cell` across it and kinematic viscosity `nu` (Launder and Spalding 1974's wall function): the larger of the
+ * viscous sublayer's, u = u*^2 y / nu, and the log law's, u / u* = ln(E y u* / nu) / kappa, each at its own
+ * {@link LIQUID_WALL_DEPTH} (the sublayer's holds below y+ = {@link LIQUID_WALL_CROSSOVER}, the log law's above it, and
+ * the larger one is the one that holds). The log branch solves y+ ln(E y+) / kappa = u y / nu for y+ by Newton's method
+ * from the crossover, where the function is increasing and convex, so the iterates approach the root from above after
+ * the first step.
+ */
+export function wallFrictionVelocity(u: number, cell: number, nu: number): number {
+  if (!(u > 0) || !(nu > 0) || !(cell > 0)) return 0;
+  const yl = LIQUID_WALL_DEPTH.linear * cell,
+    yg = LIQUID_WALL_DEPTH.log * cell;
+  const laminar = Math.sqrt((u * nu) / yl);
+  const re = (u * yg) / nu;
+  if (re <= LIQUID_WALL_CROSSOVER * LIQUID_WALL_CROSSOVER) return laminar;
+  let yp = LIQUID_WALL_CROSSOVER;
+  for (let k = 0; k < LIQUID_WALL_ITERATIONS; k++) {
+    const l = Math.log(LIQUID_WALL_E * yp);
+    yp -= (yp * l - LIQUID_WALL_KAPPA * re) / (l + 1);
+  }
+  return Math.max(laminar, (yp * nu) / yg);
+}
+
+/**
+ * The smooth walls' friction on one grid node (in place on v): a node in a wall's layers takes that wall's share of the
+ * shear stress rho u*^2 the wall function gives for its own speed along the wall (the MPM traction boundary condition,
+ * f_i = t times the integral of N_i over the wall), divided by the node's mass; it never reverses the node's motion along
+ * the wall. The integral is the wall-normal share {@link LIQUID_WALL_SHARES} times, along each of the wall's two axes,
+ * the cell times the B-spline's integral over the container's extent ({@link splineCover}), so a node at or past a side
+ * wall takes only the part of the wall inside the container. `volume` is the node's liquid volume (its weight times a
+ * particle's volume), so the density drops out.
+ */
+export function wallFriction(
+  p: ResolvedLiquidParams,
+  i: readonly number[],
+  v: number[],
+  volume: number,
+  dt: number,
+): void {
+  if (!(volume > 0)) return;
+  for (let a = 0; a < 3; a++) {
+    if (!p.walls[a]) continue;
+    const lo = i[a]! - LIQUID_PAD + 1,
+      hi = LIQUID_PAD + p.cells[a]! + 1 - i[a]!;
+    const layer = lo >= 0 && lo <= 2 ? lo : hi >= 0 && hi <= 2 ? hi : -1;
+    if (layer < 0) continue;
+    const b = (a + 1) % 3,
+      c = (a + 2) % 3;
+    const ut = Math.hypot(v[b]!, v[c]!);
+    if (!(ut > 0)) continue;
+    const us = wallFrictionVelocity(ut, p.cell[a]!, p.viscosity);
+    let area = LIQUID_WALL_SHARES[layer]!;
+    for (const e of [b, c])
+      area *= p.cell[e]! * (splineCover(LIQUID_PAD + p.cells[e]! - i[e]!) - splineCover(LIQUID_PAD - i[e]!));
+    const slow = Math.min(ut, (us * us * area * dt) / volume);
+    v[b] = v[b]! * (1 - slow / ut);
+    v[c] = v[c]! * (1 - slow / ut);
+  }
+}
 
 /** Cells from a wall or collider that adhesion reaches. */
 export const LIQUID_ADHESION_REACH = 2;
@@ -1438,7 +1642,8 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
             // (C + C^T) kd, row r: C[r] . kd plus column r of C . kd.
             const row = b + 8 + r * 3;
             const cd = particles[row]! * kd[0]! + particles[row + 1]! * kd[1]! + particles[row + 2]! * kd[2]!;
-            const ctd = particles[b + 8 + r]! * kd[0]! + particles[b + 11 + r]! * kd[1]! + particles[b + 14 + r]! * kd[2]!;
+            const ctd =
+              particles[b + 8 + r]! * kd[0]! + particles[b + 11 + r]! * kd[1]! + particles[b + 14 + r]! * kd[2]!;
             grid[node + 2 + r] += fixed(weight * (pc * kd[r]! - kv * (cd + ctd)), S);
           }
         }
@@ -1452,6 +1657,8 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
 
   // Grid update: velocity, gravity, surface tension, the pointer, adhesion, the speed limit, the colliders, the walls.
   const vmax = p.cellSize / dt;
+  const wv = [0, 0, 0],
+    wi = [0, 0, 0];
   const pointer = p.pointer;
   const lo = LIQUID_PAD;
   for (let iz = 0, node = 0; iz < p.dims[2]; iz++)
@@ -1498,7 +1705,10 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
         if (p.adhesion) {
           const reach = LIQUID_ADHESION_REACH * p.cellSize;
           for (let a = 0; a < 3; a++) {
-            const pull = p.adhesion * dt * (adhesionKernel(x[a]! - p.boxMin[a]!, reach) - adhesionKernel(p.boxMax[a]! - x[a]!, reach));
+            const pull =
+              p.adhesion *
+              dt *
+              (adhesionKernel(x[a]! - p.boxMin[a]!, reach) - adhesionKernel(p.boxMax[a]! - x[a]!, reach));
             if (a === 0) vx -= pull;
             else if (a === 1) vy -= pull;
             else vz -= pull;
@@ -1573,10 +1783,22 @@ function substep(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
           vy = nvy;
           vz = nvz;
         }
-        // Walls, free slip: no node on or past a wall moves further out.
+        // Walls: no node on or past a wall moves further out, and the smooth walls' friction slows the liquid along them.
         if ((ix <= lo && vx < 0) || (ix >= lo + p.cells[0] && vx > 0)) vx = 0;
         if ((iy <= lo && vy < 0) || (iy >= lo + p.cells[1] && vy > 0)) vy = 0;
         if ((iz <= lo && vz < 0) || (iz >= lo + p.cells[2] && vz > 0)) vz = 0;
+        if (p.walls[0] || p.walls[1] || p.walls[2]) {
+          wv[0] = vx;
+          wv[1] = vy;
+          wv[2] = vz;
+          wi[0] = ix;
+          wi[1] = iy;
+          wi[2] = iz;
+          wallFriction(p, wi, wv, (count * cell[0] * cell[1] * cell[2]) / p.restDensity, dt);
+          vx = wv[0]!;
+          vy = wv[1]!;
+          vz = wv[2]!;
+        }
         grid[node] = Math.fround(vx);
         grid[node + 1] = Math.fround(vy);
         grid[node + 2] = Math.fround(vz);
@@ -1733,7 +1955,8 @@ function project(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
           kz = wallMirrors(p, 2, iz, mz);
         let w = 0;
         for (let c = 0; c < kz; c++)
-          for (let b = 0; b < ky; b++) for (let a = 0; a < kx; a++) w += grid[(mx[a]! + nx * (my[b]! + ny * mz[c]!)) * G + 4]!;
+          for (let b = 0; b < ky; b++)
+            for (let a = 0; a < kx; a++) w += grid[(mx[a]! + nx * (my[b]! + ny * mz[c]!)) * G + 4]!;
         let cover = 0;
         x3[0] = p.origin[0] + ix * p.cell[0];
         x3[1] = p.origin[1] + iy * p.cell[1];
@@ -1834,8 +2057,7 @@ function project(state: LiquidState, p: ResolvedLiquidParams, dt: number): void 
   for (let c = 0; c < cells; c++) {
     if (!fluid[c]) continue;
     let enclosed = true;
-    for (const step of [1, cx, cx * cy])
-      if (air[c - step] || air[c + step]) enclosed = false;
+    for (const step of [1, cx, cx * cy]) if (air[c - step] || air[c + step]) enclosed = false;
     const excess = enclosed ? density[c]! - 1 : Math.max(density[c]! - 1, 0);
     rhs[c] = rhs[c]! + (LIQUID_VOLUME_RATE * excess) / dt;
   }

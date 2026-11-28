@@ -6,6 +6,18 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open: GPULiquid's accurate profile moves momentum at a free surface (KB-LIQUID-SURFMOM1, water)
+
+- **Repro:** `GPULiquid` CPU twin, `profile: 'accurate'`, no gravity, free-slip walls (`walls: 'slip'`), a layer 4
+  cells deep and 32 long sliding at 1 m/s in a tank of 2 cm cells (as the slab of `gpu-liquid.test.js`, "smooth
+  walls"): over 12 substeps (0.05 s) its mean speed drops by 6.2e-4 m/s with nothing to take it; the fast profile keeps
+  it to 4e-9.
+- **Cause:** the projection adds W (P D^T x) to each node's velocity, which moves the node's momentum by rest density
+  times (D^T x) whatever its mass, so each cell's pressure pushes its eight corners with forces that sum to zero. A
+  liquid cell at the free surface has corners with no mass (W = 0) that take no push, so the pushes on its other
+  corners no longer cancel: the surface cells' pressure is a net force on the liquid. A first-order free surface (the
+  pressure is zero in the air cells, not at the surface itself); a ghost-fluid surface (Gibou et al. 2002) would place
+  the zero pressure at the surface and shrink it.
 ### Open 2026-11-28: a rung under its own weight no longer cracks in the remeshing test (KB-SOFT-LADDERCRACKS1, physics soft tests)
 
 - **Repro:** `node --test packages/physics/tests/coupling/volumetric-solids.test.js`, "automatic cracks remain finite when
