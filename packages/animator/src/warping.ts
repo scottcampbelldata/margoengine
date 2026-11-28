@@ -11,7 +11,7 @@ import { sampleTrackInto } from '@margoengine/animation/sampling';
 import { finiteVector } from '@margoengine/math/validate';
 import { treeWeights } from './blend.js';
 import type { Animator } from './index.js';
-import { position, poseTools } from './pose-tools.js';
+import { limbTools, position, poseTools } from './pose-tools.js';
 
 /** One leg of {@link Warping}: a direct hip, knee, ankle chain. */
 export interface WarpLeg {
@@ -96,8 +96,7 @@ export interface DistanceWarpHandle {
   [Symbol.dispose](): void;
 }
 
-const UP = [0, 1, 0],
-  yaw = (angle: number) => [0, Math.sin(angle / 2), 0, Math.cos(angle / 2)];
+const yaw = (angle: number) => [0, Math.sin(angle / 2), 0, Math.cos(angle / 2)];
 const wrap = (angle: number) => angle - 2 * Math.PI * Math.round(angle / (2 * Math.PI));
 
 type Clip = Animator['animation']['clips'][number];
@@ -152,7 +151,8 @@ export function addWarping(animator: Animator, warp: Warping): WarpingHandle {
   const model = animator.animation.model,
     nodes = model.nodes,
     parents = model.root.engine.store.parents,
-    tools = poseTools(animator, 'Warping');
+    tools = poseTools(animator, 'Warping'),
+    limbs = limbTools(animator, tools);
   const node = (index: unknown, label: string): Mesh => {
     if (!Number.isInteger(index) || (index as number) < 0 || (index as number) >= nodes.length)
       throw new RangeError(`Warping ${label} ${index} is not one of the model's ${nodes.length} glTF nodes`);
@@ -298,7 +298,7 @@ export function addWarping(animator: Animator, warp: Warping): WarpingHandle {
       const pole = warp.legs[i].pole,
         k = position(knee),
         ahead = Math.hypot(k[0] - position(hip)[0], k[1] - position(hip)[1], k[2] - position(hip)[2]);
-      tools.placeLimb(
+      limbs.placeLimb(
         hip,
         knee,
         ankle,

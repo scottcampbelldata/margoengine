@@ -38,7 +38,7 @@ import {
   jointTurn,
   turnRotation,
 } from './ik.js';
-import { position, poseTools, subtract } from './pose-tools.js';
+import { limbTools, position, poseTools, subtract } from './pose-tools.js';
 
 /** One arm or leg of {@link FullBodyIK}: a direct chain of three joints. Everything but the joints is read every frame. */
 export interface FullBodyLimb {
@@ -253,7 +253,8 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
   const model = animator.animation.model,
     nodes = model.nodes,
     parents = model.root.engine.store.parents,
-    tools = poseTools(animator, 'Full-body IK');
+    tools = poseTools(animator, 'Full-body IK'),
+    anatomyLimbs = limbTools(animator, tools);
   const node = (index: unknown, label: string): Mesh => {
     if (!Number.isInteger(index) || (index as number) < 0 || (index as number) >= nodes.length)
       throw new RangeError(`Full-body IK ${label} ${index} is not one of the model's ${nodes.length} glTF nodes`);
@@ -674,7 +675,7 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
         if (wish) {
           const turned = rotateByQuaternion(bend as number[], turns[link]),
             knee = position(lower);
-          tools.placeLimb(
+          anatomyLimbs.placeLimb(
             upper,
             lower,
             end,
@@ -690,7 +691,7 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
         if (wanted) {
           const influence = limb.rotation ? (limb.weight ?? 1) * weight : 1;
           tools.setWorldRotation(end, influence < 1 ? quaternionBlend(rest, wanted, influence) : wanted);
-          if (body) tools.limitBone(end);
+          if (body) anatomyLimbs.limitBone(end);
         }
         if (limb.avoidance) {
           const root = position(upper),
@@ -708,13 +709,13 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
             Math.abs(distance(next, tip) - distance(knee, tip)) > tolerance
           )
             throw new RangeError('Full-body IK avoidance must preserve both bone lengths; return a legal knee or null');
-          tools.placeLimb(upper, lower, end, tip, next, { limits: rig.limits });
+          anatomyLimbs.placeLimb(upper, lower, end, tip, next, { limits: rig.limits });
           if (wanted) {
             tools.setWorldRotation(
               end,
               limb.rotation ? quaternionBlend(rest, wanted, (limb.weight ?? 1) * weight) : wanted,
             );
-            if (body) tools.limitBone(end);
+            if (body) anatomyLimbs.limitBone(end);
           }
         }
       }
@@ -724,7 +725,7 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
             headBone,
             quaternionBlend(tools.rotationOf(headBone.matrix), rig.head!.rotation, (rig.head!.weight ?? 1) * weight),
           );
-        if (body) tools.limitBone(headBone);
+        if (body) anatomyLimbs.limitBone(headBone);
         if (headAim) {
           const left = distance(position(headBone), headAim);
           result.distance = Math.max(result.distance, left);

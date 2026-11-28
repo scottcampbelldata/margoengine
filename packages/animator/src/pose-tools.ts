@@ -83,6 +83,15 @@ export function poseTools(animator: Animator, label: string) {
   /** The world rotation of the bone a joint is measured against. */
   const referenceOf = (reference: number): number[] =>
     reference < 0 ? [0, 0, 0, 1] : rotationOf(animator.animation.model.nodes[reference].matrix);
+  return { rotationOf, setWorldRotation, turn, moveBy, indexOf, referenceOf };
+}
+
+/**
+ * The limb tools on top of {@link poseTools}, kept apart from it so a solver that moves no limb (spline IK) carries
+ * none of the anatomical limb code in its bundle (KB-SIZE-SPLINEANATOMY1).
+ */
+export function limbTools(animator: Animator, tools: ReturnType<typeof poseTools>) {
+  const { rotationOf, setWorldRotation, turn, indexOf, referenceOf } = tools;
   /**
    * Holds `bone` inside its joint's range when the Animator has a body (`setAnatomy`) with limits on; true when it
    * turned the bone back.
@@ -139,5 +148,5 @@ export function poseTools(animator: Animator, label: string) {
     turn(hip, rotationBetween(subtract(position(knee), root), subtract(solved.knee, root)));
     turn(knee, rotationBetween(subtract(position(ankle), position(knee)), subtract(solved.ankle, position(knee))));
   };
-  return { rotationOf, setWorldRotation, turn, moveBy, placeLimb, limitBone, indexOf, referenceOf };
+  return { placeLimb, limitBone };
 }

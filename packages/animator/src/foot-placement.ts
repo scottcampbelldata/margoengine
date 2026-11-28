@@ -10,7 +10,7 @@ import { finiteVector } from '@margoengine/math/validate';
 import { quaternionBlend } from './blend.js';
 import { rotationBetween } from './ik.js';
 import type { Animator, GroundHit } from './index.js';
-import { poseTools } from './pose-tools.js';
+import { limbTools, poseTools } from './pose-tools.js';
 
 /** One leg of {@link FootPlacement}: a direct hip, knee, ankle chain. */
 export interface PlacedLeg {
@@ -78,7 +78,9 @@ export function addFootPlacement(animator: Animator, placement: FootPlacement): 
   const model = animator.animation.model,
     nodes = model.nodes,
     parents = model.root.engine.store.parents,
-    { rotationOf, setWorldRotation, moveBy, placeLimb, limitBone } = poseTools(animator, 'Foot placement');
+    tools = poseTools(animator, 'Foot placement'),
+    { rotationOf, setWorldRotation, moveBy } = tools,
+    { placeLimb, limitBone } = limbTools(animator, tools);
   const node = (index: unknown, label: string): Mesh => {
     if (!Number.isInteger(index) || (index as number) < 0 || (index as number) >= nodes.length)
       throw new RangeError(`Foot placement ${label} ${index} is not one of the model's ${nodes.length} glTF nodes`);
