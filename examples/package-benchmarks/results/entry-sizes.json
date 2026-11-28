@@ -1,5 +1,5 @@
 {
-  "commit": "f204a4135a",
+  "commit": "c3591f3be3",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -6238,8 +6238,8 @@
     },
     "@margoengine/geometry": {
       ".": {
-        "raw": 65361,
-        "gzip": 24141
+        "raw": 65370,
+        "gzip": 24145
       },
       "./shapes": {
         "raw": 10104,
@@ -6258,8 +6258,8 @@
         "gzip": 3891
       },
       "./utils": {
-        "raw": 22342,
-        "gzip": 8464
+        "raw": 22351,
+        "gzip": 8475
       },
       "./node-graph": {
         "raw": 31486,
@@ -14392,8 +14392,8 @@
         "gzip": 2808
       },
       ".": {
-        "raw": 240771,
-        "gzip": 84114
+        "raw": 242047,
+        "gzip": 84604
       },
       "./worker": {
         "raw": 23961,
@@ -14428,8 +14428,8 @@
         "gzip": 10492
       },
       "./render": {
-        "raw": 8243,
-        "gzip": 3480
+        "raw": 9772,
+        "gzip": 4093
       },
       "./mocap": {
         "raw": 11208,
@@ -14556,8 +14556,8 @@
         "gzip": 2796
       },
       "./threemf-evaluate": {
-        "raw": 86564,
-        "gzip": 31356
+        "raw": 88643,
+        "gzip": 32027
       },
       "./threemf-boolean": {
         "raw": 38959,
@@ -14572,8 +14572,8 @@
         "gzip": 8677
       },
       "./threemf-volumetric": {
-        "raw": 64230,
-        "gzip": 23730
+        "raw": 66313,
+        "gzip": 24361
       },
       "./threemf-lattice": {
         "raw": 56178,
@@ -15332,8 +15332,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 1449799,
-        "gzip": 934715
+        "raw": 1461111,
+        "gzip": 943280
       },
       "./decomposition": {
         "raw": 26988,
@@ -16574,8 +16574,8 @@
         "gzip": 2627
       },
       "./velocity": {
-        "raw": 8996,
-        "gzip": 3675
+        "raw": 9199,
+        "gzip": 3768
       },
       "./read": {
         "raw": 6393,
@@ -19577,9 +19577,9 @@
       "brotli": 13443
     },
     "packages/physics/dist/index.js": {
-      "raw": 1454700,
-      "gzip": 936871,
-      "brotli": 908895
+      "raw": 1466012,
+      "gzip": 945432,
+      "brotli": 917509
     },
     "packages/save/dist/index.js": {
       "raw": 21229,
@@ -19969,12 +19969,12 @@
       "entry": ".",
       "base": {
         "raw": 320144,
-        "gzip": 102160
+        "gzip": 102162
       },
       "lazy": {
         "name": "physics kernel (deflated Wasm blueprint and its column table)",
-        "raw": 1129654,
-        "gzip": 831917,
+        "raw": 1140966,
+        "gzip": 840561,
         "loadedBy": "`await Physics.load()`, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },

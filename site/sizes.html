@@ -25,7 +25,7 @@
   <main id="main" class="sizes">
     <section class="sizes-intro">
       <h1>Package sizes</h1>
-      <p class="section-lede">Every number on this page was measured from the build of commit <code>f204a4135a</code>, when this page was generated. Raw is minified ES2022 code; min+gzip is the same code gzipped. Each entry is bundled on its own with other packages left external, because your app shares them. Workers and Wasm that load later are <a href="#loaded-later">listed with the call that loads each</a>.</p>
+      <p class="section-lede">Every number on this page was measured from the build of commit <code>c3591f3be3</code>, when this page was generated. Raw is minified ES2022 code; min+gzip is the same code gzipped. Each entry is bundled on its own with other packages left external, because your app shares them. Workers and Wasm that load later are <a href="#loaded-later">listed with the call that loads each</a>.</p>
       <div class="budget">
         <h2 id="core-stage">Core + stage</h2>
         <p class="budget-figure"><strong>25,149 B</strong> min+gzip, limit 25,150 B</p>
@@ -225,7 +225,7 @@
 <tr><th scope="row"><code>@margoengine/gltf/pbr</code></th><td>Chunk</td><td class="num">1,675,955</td><td class="num">660,586</td><td class="num">534,940</td><td><code>addViewer(stage, url)</code> (<code>margoengine/stage/viewer</code>), first call</td></tr>
 <tr><th scope="row"><code>@margoengine/studio</code></th><td>Chunk</td><td class="num">26,640</td><td class="num">9,722</td><td class="num">8,758</td><td><code>addViewer(stage, url)</code> (<code>margoengine/stage/viewer</code>), first call with contact shadows</td></tr>
 <tr><th scope="row"><code>@margoengine/tonemap</code></th><td>Chunk</td><td class="num">43,060</td><td class="num">15,059</td><td class="num">13,443</td><td><code>addViewer(stage, url)</code> (<code>margoengine/stage/viewer</code>), first call with tone mapping</td></tr>
-<tr><th scope="row"><code>@margoengine/physics</code></th><td>Chunk</td><td class="num">1,454,700</td><td class="num">936,871</td><td class="num">908,895</td><td><code>addPhysics(stage)</code> or <code>addBody(stage, mesh)</code> (<code>margoengine/stage/physics</code>), first call</td></tr>
+<tr><th scope="row"><code>@margoengine/physics</code></th><td>Chunk</td><td class="num">1,466,012</td><td class="num">945,432</td><td class="num">917,509</td><td><code>addPhysics(stage)</code> or <code>addBody(stage, mesh)</code> (<code>margoengine/stage/physics</code>), first call</td></tr>
 <tr><th scope="row"><code>@margoengine/save</code></th><td>Chunk</td><td class="num">21,229</td><td class="num">7,207</td><td class="num">6,499</td><td><code>addScene(stage, source)</code> (<code>margoengine/stage/scene</code>), first call</td></tr>
 </tbody>
 <tbody data-lazy-package="@margoengine/decoders">
@@ -349,8 +349,8 @@
 <tr><th scope="row"><code>@margoengine/sky/compat-clouds</code></th><td>Lazy: hurricane storm field</td><td class="num">10,591</td><td class="num">4,395</td><td>the first layer that draws a storm (<code>hurricane</code> option or the type hurricane; import() in volumetric-clouds.ts); its WGSL and maths load once, and every entry above reads the same copy</td></tr>
 <tr><th scope="row"><code>@margoengine/sky/tornado</code></th><td>Base: everything a page reading a Tornado's wind and rain loads, without the lazy part</td><td class="num">19,037</td><td class="num">7,788</td><td></td></tr>
 <tr><th scope="row"><code>@margoengine/sky/tornado</code></th><td>Lazy: tornado shader</td><td class="num">5,724</td><td class="num">2,485</td><td>the first frame of a TornadoCloud (import() in tornado.ts)</td></tr>
-<tr><th scope="row"><code>@margoengine/physics</code></th><td>Base: everything the entry loads before <code>Physics.load()</code>, without the lazy part</td><td class="num">320,144</td><td class="num">102,160</td><td></td></tr>
-<tr><th scope="row"><code>@margoengine/physics</code></th><td>Lazy: physics kernel (deflated Wasm blueprint and its column table)</td><td class="num">1,129,654</td><td class="num">831,917</td><td><code>await Physics.load()</code>, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own</td></tr>
+<tr><th scope="row"><code>@margoengine/physics</code></th><td>Base: everything the entry loads before <code>Physics.load()</code>, without the lazy part</td><td class="num">320,144</td><td class="num">102,162</td><td></td></tr>
+<tr><th scope="row"><code>@margoengine/physics</code></th><td>Lazy: physics kernel (deflated Wasm blueprint and its column table)</td><td class="num">1,140,966</td><td class="num">840,561</td><td><code>await Physics.load()</code>, once per app (import() in kernel.ts); the Wasm is inflated and compiled from it, with no file of its own</td></tr>
 <tr><th scope="row"><code>@margoengine/physics/soft</code></th><td>Base: everything the entry loads before <code>SoftBodies.attach()</code>, without the lazy part</td><td class="num">177,734</td><td class="num">58,797</td><td></td></tr>
 <tr><th scope="row"><code>@margoengine/physics/soft</code></th><td>Lazy: soft body kernel (deflated Wasm blueprint and its column table)</td><td class="num">146,323</td><td class="num">109,941</td><td><code>await SoftBodies.attach(physics)</code>, once per app (import() in soft.ts); the Wasm is inflated and compiled from it, with no file of its own</td></tr>
 <tr><th scope="row"><code>@margoengine/physics2d</code></th><td>Base: everything the entry loads before <code>Physics2D.load()</code>, without the lazy part</td><td class="num">66,511</td><td class="num">21,631</td><td></td></tr>
@@ -3528,7 +3528,7 @@
 <tbody data-package="@margoengine/loaders">
 <tr><th scope="rowgroup" rowspan="53"><a href="./catalog/#loaders">@margoengine/loaders</a></th><td><code>./ply</code></td><td class="num">10,707</td><td class="num">4,230</td><td rowspan="53"><code>@margoengine/bvh</code> (optional), <code>@margoengine/core</code>, <code>@margoengine/decoders</code> (optional), <code>@margoengine/gltf</code> (optional), <code>@margoengine/materials</code> (optional), <code>@margoengine/mesh-edit</code> (optional), <code>@margoengine/procedural</code> (optional)<br>Installs <code>@margoengine/geometry</code>, <code>@margoengine/math</code>, <code>@margoengine/points</code></td></tr>
 <tr><td><code>./off</code></td><td class="num">6,934</td><td class="num">2,808</td></tr>
-<tr><td><code>root</code></td><td class="num">240,771</td><td class="num">84,114</td></tr>
+<tr><td><code>root</code></td><td class="num">242,047</td><td class="num">84,604</td></tr>
 <tr><td><code>./worker</code></td><td class="num">23,961</td><td class="num">9,653</td></tr>
 <tr><td><code>./common</code></td><td class="num">11,527</td><td class="num">4,945</td></tr>
 <tr><td><code>./usd</code></td><td class="num">22,000</td><td class="num">8,881</td></tr>
@@ -3537,7 +3537,7 @@
 <tr><td><code>./font-woff</code></td><td class="num">57,608</td><td class="num">21,543</td></tr>
 <tr><td><code>./svg</code></td><td class="num">35,659</td><td class="num">14,958</td></tr>
 <tr><td><code>./mtl</code></td><td class="num">27,645</td><td class="num">10,492</td></tr>
-<tr><td><code>./render</code></td><td class="num">8,243</td><td class="num">3,480</td></tr>
+<tr><td><code>./render</code></td><td class="num">9,772</td><td class="num">4,093</td></tr>
 <tr><td><code>./mocap</code></td><td class="num">11,208</td><td class="num">4,189</td></tr>
 <tr><td><code>./vrml</code></td><td class="num">22,188</td><td class="num">8,667</td></tr>
 <tr><td><code>./mmd</code></td><td class="num">18,553</td><td class="num">6,827</td></tr>
@@ -3569,11 +3569,11 @@
 <tr><td><code>./vtk-legacy</code></td><td class="num">19,327</td><td class="num">6,939</td></tr>
 <tr><td><code>./geo</code></td><td class="num">35,046</td><td class="num">12,012</td></tr>
 <tr><td><code>./threemf-beams</code></td><td class="num">6,027</td><td class="num">2,796</td></tr>
-<tr><td><code>./threemf-evaluate</code></td><td class="num">86,564</td><td class="num">31,356</td></tr>
+<tr><td><code>./threemf-evaluate</code></td><td class="num">88,643</td><td class="num">32,027</td></tr>
 <tr><td><code>./threemf-boolean</code></td><td class="num">38,959</td><td class="num">14,791</td></tr>
 <tr><td><code>./threemf-displacement</code></td><td class="num">42,154</td><td class="num">16,051</td></tr>
 <tr><td><code>./threemf-secure</code></td><td class="num">21,531</td><td class="num">8,677</td></tr>
-<tr><td><code>./threemf-volumetric</code></td><td class="num">64,230</td><td class="num">23,730</td></tr>
+<tr><td><code>./threemf-volumetric</code></td><td class="num">66,313</td><td class="num">24,361</td></tr>
 <tr><td><code>./threemf-lattice</code></td><td class="num">56,178</td><td class="num">19,369</td></tr>
 <tr><td><code>./mmcif</code></td><td class="num">7,204</td><td class="num">3,259</td></tr>
 <tr><td><code>./dae-kinematics</code></td><td class="num">54,048</td><td class="num">18,959</td></tr>
@@ -4461,7 +4461,7 @@
 <tr><td><code>./attributes</code></td><td class="num">4,927</td><td class="num">2,063</td></tr>
 <tr><td><code>./simplify</code></td><td class="num">2,687</td><td class="num">1,402</td></tr>
 <tr><td><code>./grass</code></td><td class="num">5,810</td><td class="num">2,627</td></tr>
-<tr><td><code>./velocity</code></td><td class="num">8,996</td><td class="num">3,675</td></tr>
+<tr><td><code>./velocity</code></td><td class="num">9,199</td><td class="num">3,768</td></tr>
 <tr><td><code>./read</code></td><td class="num">6,393</td><td class="num">2,956</td></tr>
 </tbody>
 <tbody data-package="@margoengine/scenes">
@@ -4890,7 +4890,7 @@
   <caption class="sr-only">Simulation and games: bytes per package entry</caption>
   <thead><tr><th scope="col">Package</th><th scope="col">Entry</th><th scope="col" class="num">Raw (B)</th><th scope="col" class="num">Min+gzip (B)</th><th scope="col">Peers on</th></tr></thead>
 <tbody data-package="@margoengine/physics">
-<tr><th scope="rowgroup" rowspan="75"><a href="./catalog/#physics">@margoengine/physics</a></th><td><code>root</code></td><td class="num">1,449,799</td><td class="num">934,715</td><td rowspan="75"><code>@margoengine/core</code>, <code>@margoengine/lines</code> (optional)<br>Installs <code>@margoengine/math</code></td></tr>
+<tr><th scope="rowgroup" rowspan="75"><a href="./catalog/#physics">@margoengine/physics</a></th><td><code>root</code></td><td class="num">1,461,111</td><td class="num">943,280</td><td rowspan="75"><code>@margoengine/core</code>, <code>@margoengine/lines</code> (optional)<br>Installs <code>@margoengine/math</code></td></tr>
 <tr><td><code>./decomposition</code></td><td class="num">26,988</td><td class="num">11,152</td></tr>
 <tr><td><code>./soft</code></td><td class="num">324,058</td><td class="num">169,565</td></tr>
 <tr><td><code>./tissue</code></td><td class="num">7,410</td><td class="num">3,154</td></tr>
@@ -5143,12 +5143,12 @@
 <tr><td><code>./parallel</code></td><td class="num">28,924</td><td class="num">11,398</td></tr>
 </tbody>
 <tbody data-package="@margoengine/geometry">
-<tr><th scope="rowgroup" rowspan="20"><a href="./catalog/#geometry">@margoengine/geometry</a></th><td><code>root</code></td><td class="num">65,361</td><td class="num">24,141</td><td rowspan="20"><code>@margoengine/core</code><br>Installs <code>@margoengine/math</code></td></tr>
+<tr><th scope="rowgroup" rowspan="20"><a href="./catalog/#geometry">@margoengine/geometry</a></th><td><code>root</code></td><td class="num">65,370</td><td class="num">24,145</td><td rowspan="20"><code>@margoengine/core</code><br>Installs <code>@margoengine/math</code></td></tr>
 <tr><td><code>./shapes</code></td><td class="num">10,104</td><td class="num">3,632</td></tr>
 <tr><td><code>./triangulate</code></td><td class="num">17,012</td><td class="num">6,762</td></tr>
 <tr><td><code>./extrude</code></td><td class="num">21,673</td><td class="num">8,672</td></tr>
 <tr><td><code>./primitives</code></td><td class="num">9,199</td><td class="num">3,891</td></tr>
-<tr><td><code>./utils</code></td><td class="num">22,342</td><td class="num">8,464</td></tr>
+<tr><td><code>./utils</code></td><td class="num">22,351</td><td class="num">8,475</td></tr>
 <tr><td><code>./node-graph</code></td><td class="num">31,486</td><td class="num">10,469</td></tr>
 <tr><td><code>./extras</code></td><td class="num">42,189</td><td class="num">16,392</td></tr>
 <tr><td><code>./nurbs</code></td><td class="num">13,296</td><td class="num">5,051</td></tr>
