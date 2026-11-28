@@ -474,7 +474,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | LIFE-02 | Limbless, insect and small-animal locomotion | physics/locomotion and signed live terrain scene | Codex | REOPENED (4/8 at b20d78c528, points 5–8, [evidence](physics-solver-audit.md#life-02-four-point-pass)), prior landing 6712e2b2a4 |
 | LIFE-07 | Machine dynamics with actuators | stand-in | Open | OPEN |
 | AERO-04 | Turbomachines in flow | none | Open | OPEN |
-| AERO-05 | Falling and tumbling light bodies | falling plates, winged seeds and swept hail | Codex | BUILDING (codex/physics-aero-05-four-point; four-point pass; [audit](physics-solver-audit.md)), landed c82d68bf98 |
+| AERO-05 | Falling and tumbling light bodies | falling plates, winged seeds, swept hail and live samara scene | Codex | REOPENED (4/8 at c33e207d1b, points 5–8, [evidence](physics-solver-audit.md#aero-05-four-point-pass)), prior landing c82d68bf98 |
 | SEA-03 | Nonlinear waves, rogue waves | physics/rogue and live launch cutaway | Codex | REOPENED (4/8 at 0f282397e6, points 5–8, [evidence](physics-solver-audit.md#sea-03-four-point-pass)), prior landing 47be5f699 |
 | SEA-06 | Tsunami and impulse waves | none | Codex | REOPENED (4/8 at a437d9db30, points 5–8, [evidence](physics-solver-audit.md#sea-06-four-point-pass)), prior landing 1905b1c216 |
 | SEA-07 | Tides, storm surge and currents | physics/surge and live Sun–Moon cutaway | Codex | REOPENED (4/8 at 7e2a01c13d, points 5–8, [evidence](physics-solver-audit.md#sea-07-four-point-pass)), prior landing e5462e9cc |

@@ -3183,3 +3183,14 @@ Basal sliding, longitudinal and transverse stress, temperature and floating shel
 - Point 8 (b20d78c528). `packages/physics/scripts/life02-slithering-measured.mjs` uses separate friction and gait inputs and holds out tracked flat and uphill speed. The default model reverses between 0° and 1.9°, versus 5°–9° measured, and at +5° predicts −0.241 body lengths per cycle against +0.13 measured. Doubling link resolution does not resolve the sign. [Measurement and limits](limits.md#ground-animal-locomotion-life-02)
 
 The planar snake still needs independent speed accuracy, contact-load redistribution and additional gaits. Legged force validation, overhang and articulated contact, reciprocal terrain wear and full rig bindings remain open. The row stays REOPENED at four points.
+
+### AERO-05 Falling and tumbling light bodies
+
+#### AERO-05 four-point pass
+
+- Point 5 (c33e207d1b). `packages/physics/tests/coupling/falling.test.js` rejects late invalid wind, drag, sweep and reentrant callbacks with coded fixes. It grows plain Wasm memory, shifts the published cell and restores bit-exact accepted poses and work. A late f32 overflow leaves the full caller buffer intact. The existing PA-32 rounded-body wall and platform cases remain covered.
+- Point 6 (c33e207d1b). `packages/physics/tests/coupling/falling-workers.test.js` compares all accepted bytes on 303 and 457 mixed APW plate, samara and swept-sphere rows across 1, 2 and 4 participants. `packages/physics/tests/falling-workers.browser.mjs` starts three actual Chromium helpers. In the 303-row case it records 9,012 RK4 evaluations and 252,336 paired SIMD state updates. The Wasm assets match the existing public K23 builds exactly.
+- Point 7 (c33e207d1b). `packages/environment/tests/samara-film.browser.mjs` draws two identically released 36.8 mm samaras in calibrated lanes. At 64/240 s the still-air take spins at 25.45 rad/s and sits 12.82 cm above the analytic vacuum control. Both backends independently reproduce full accepted state and RGBA after hold, restore, re-advance and rewind.
+- Point 8 (c33e207d1b). `packages/physics/scripts/aero05-samara-measured.mjs` retains published morphology and existing polar parameters for two independent natural maple still-air cohorts. The two predicted descent speeds, 0.776 and 0.723 m/s, lie below observed 1.00 ± 0.10 and 1.10 ± 0.24 m/s. Blade and time refinement change the results negligibly. One observed 12 ± 5° cone exceeds the fixed-axis model. [Comparisons and limits](limits.md#falling-plates-winged-seeds-and-hail-aero-05)
+
+Free-axis coning, full 3D plate tumble, natural shape presets, extended Reynolds drag and multi-regime validation remain open. The row stays REOPENED at four points.
