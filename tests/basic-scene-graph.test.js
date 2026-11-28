@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkBuilt, checkFetched, sceneGraph, staticFiles } from '../scripts/support/basic-scene-graph.mjs';
+import {
+  checkBuilt,
+  checkFetched,
+  sceneGraph,
+  staticFiles,
+  unrelatedFiles,
+} from '../scripts/support/basic-scene-graph.mjs';
 
 // The basic scene's build as margoengine/stage/gltf routes it (8f4f4db72): the entry imports the basic loader, gltf/pbr
 // and animation dynamically; gltf/pbr's codecs are dynamic imports of their own with Wasm and worker assets.
@@ -86,4 +92,46 @@ test('a missing basic loader, a missing dependency or a statically imported feat
   const eager = routed();
   eager['index.html'].imports.push(pro);
   assert.throws(() => sceneGraph(eager), /pbr\.js, a deferred glTF feature loader, is a static import/);
+});
+
+test('an optional pack or a stray worker is read from the manifest source, never from a hashed emitted name', () => {
+  // Regression (2026-11-27): Vite's hash of gltf's model chunk was CN0rSkyN, and the emitted-name test read it as sky.
+  const model = '../../../packages/gltf/dist/model-B16_Idts.js',
+    manifest = {
+      ...routed(),
+      [model]: { file: 'assets/model-B16_Idts-CN0rSkyN.js', src: model },
+      '_accessor-Skyy1234-Post5678.js': { file: 'assets/accessor-Skyy1234-Post5678.js', name: 'accessor-Skyy1234' },
+    },
+    graph = sceneGraph(manifest),
+    built = [
+      'index.html',
+      'model.glb',
+      'app.js',
+      'codec.wasm',
+      'codec.worker.js',
+      'assets/model-B16_Idts-CN0rSkyN.js',
+      'assets/accessor-Skyy1234-Post5678.js',
+    ];
+  assert.deepEqual(unrelatedFiles(manifest, built, graph), []);
+  const sky = '../../../packages/sky/dist/index.js',
+    stage = '../../../packages/stage/dist/shadows.js',
+    packs = {
+      ...manifest,
+      [sky]: { file: 'assets/dist-AbCdEfGh.js', src: sky },
+      [stage]: { file: 'assets/shadows-AbCdEfGh.js', src: stage },
+    };
+  assert.deepEqual(
+    unrelatedFiles(
+      packs,
+      [
+        ...built,
+        'assets/dist-AbCdEfGh.js',
+        'assets/shadows-AbCdEfGh.js',
+        'unrelated.worker.js',
+        'assets/stray-AbCdEfGh.wasm',
+      ],
+      sceneGraph(packs),
+    ),
+    ['assets/dist-AbCdEfGh.js', 'assets/shadows-AbCdEfGh.js', 'unrelated.worker.js', 'assets/stray-AbCdEfGh.wasm'],
+  );
 });

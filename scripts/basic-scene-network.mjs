@@ -17,7 +17,7 @@ import { build, preview } from 'vite';
 import { listenWhenFree } from './browser.js';
 import { launchBrowser, browserLabel } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
-import { checkBuilt, checkFetched, sceneGraph } from './support/basic-scene-graph.mjs';
+import { checkBuilt, checkFetched, sceneGraph, unrelatedFiles } from './support/basic-scene-graph.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
   fixture = resolve(root, 'tests/fixtures/basic-scene');
@@ -128,11 +128,7 @@ const built = readdirSync(out, { recursive: true })
 checkBuilt(built, expected, graph);
 // Regression (2026-10-27): the stage's class methods put every optional pack into every stage app's build.
 assert.deepEqual(
-  built.filter(
-    (file) =>
-      /sky|particles|post|environment|shadows/i.test(file) ||
-      (/\.wasm$|worker/i.test(file) && !graph.deferredAssets.has(file)),
-  ),
+  unrelatedFiles(manifest, built, graph),
   [],
   "the build emits no unrelated optional pack or worker/Wasm outside the glTF loaders' asset graphs",
 );

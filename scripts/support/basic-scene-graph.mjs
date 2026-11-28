@@ -74,6 +74,39 @@ export function sceneGraph(manifest) {
   };
 }
 
+// An optional pack is a chunk whose source is in one of these packages or is one of the stage's feature entries.
+const PACK =
+  /(?:^|\/)packages\/(?:(?:sky|particles|post|environment|shadows)\/|stage\/dist\/(?:sky|particles|effects|environment|shadows)\.js$)/;
+const WORKER = /\.wasm$|worker/i;
+
+/**
+ * The emitted files (`built`) that are an optional pack, or a worker or Wasm file outside the glTF loaders' asset
+ * graphs. Read from each file's manifest source, never from its emitted name: emitted names carry content hashes, and
+ * one of them made gltf's model chunk `assets/model-B16_Idts-CN0rSkyN.js` read as a sky pack (2026-11-27). A shared
+ * chunk with no source (a `_name` key) is code of the chunks that import it, which are checked themselves; a file with
+ * no manifest record (the page, the model, an asset listed only under `assets`) is read by its name without Vite's
+ * `-[hash]` (8 characters).
+ */
+export function unrelatedFiles(manifest, built, graph) {
+  const source = new Map(),
+    shared = new Set();
+  for (const [key, chunk] of Object.entries(manifest)) {
+    const path = chunk.src ?? (key.includes('/') ? key : undefined);
+    if (path) source.set(chunk.file, path);
+    else shared.add(chunk.file);
+  }
+  return built.filter((file) => {
+    if (shared.has(file)) return false;
+    const path = source.get(file) ?? file.replace(/-[\w-]{8}(?=\.\w+$)/, ''),
+      name = path.slice(path.lastIndexOf('/') + 1);
+    return (
+      PACK.test(path) ||
+      (!source.has(file) && /sky|particles|post|environment|shadows/i.test(name)) ||
+      (WORKER.test(name) && !graph.deferredAssets.has(file))
+    );
+  });
+}
+
 /**
  * The build check: the files the build emitted (`built`, outDir paths without .vite) must be exactly the page's
  * requests (`expected`) plus the emitted graph of the basic loader and the named deferred loaders. Any other file fails.
