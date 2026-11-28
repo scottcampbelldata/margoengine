@@ -1,5 +1,5 @@
 {
-  "about": "Controls that change nothing to see when operated alone, by design. controls.mjs reports each under 'Could not tell' with its reason, so none is hidden and none counts as dead. A label matches when it starts with `control`; `backend` limits a row to webgpu or webgl2. Add a row only with the next action that shows the control working.",
+  "about": "Controls that change nothing to see when operated alone, by design. controls.mjs reports each under 'Could not tell' with its reason, so none is hidden and none counts as dead. A label matches when it starts with `control`; `backend` limits a row to webgpu or webgl2. `reason` is for a control that changes nothing; `stops` is for stops of a slider or select that draw the same picture by design (a value the picture does not show). Add a row only with the next action that shows the control working.",
   "controls": [
     {
       "demo": "night-storm-sky",
@@ -25,6 +25,36 @@
       "demo": "the-meshlet-statue",
       "control": "Use wall for Hi-Z",
       "reason": "the wall culls the statue's clusters only while the wall slider puts it in front of the statue; at the starting position it hides nothing, so the drawn count stays the same"
+    },
+    {
+      "demo": "edit-and-save-bim",
+      "control": "Acoustic rating",
+      "stops": "the rating is an IFC property value with no geometry: any value other than the file's marks the door's frame amber as an edit queued for export, so 24, 36 and 48 dB draw the same frame; the readout shows the value and Prepare file writes it"
+    },
+    {
+      "demo": "the-harmonic-drive",
+      "control": "Wave generator",
+      "stops": "0 and 30 input turns draw the same drive: the flexspline turns back exactly once in 30 input turns (ratio -1/30), so every part is where it started; the turn readout tells them apart"
+    },
+    {
+      "demo": "parallel-coordinates",
+      "control": "Measurement",
+      "stops": "it chooses the axis the range form edits; press Apply range to select rows on that axis"
+    },
+    {
+      "demo": "parallel-coordinates",
+      "control": "Lower limit",
+      "stops": "it fills the range form; press Apply range to select rows (a value outside the axis gets a message instead)"
+    },
+    {
+      "demo": "parallel-coordinates",
+      "control": "Upper limit",
+      "stops": "it fills the range form; press Apply range to select rows (a value outside the axis gets a message instead)"
+    },
+    {
+      "demo": "volumetric-fog",
+      "control": "Local fog",
+      "stops": "fog hides what lies behind it as exp(-density times distance), so by 40 percent the far trees are mostly hidden and 50 adds little to see (at most 8 of 255); 0 and 100 differ by up to 92 of 255"
     }
   ]
 }

@@ -179,13 +179,30 @@ export function stalled(start, end) {
  * Stops of one control (slider ends and middle, select options) that give the same picture: a "partly dead"
  * control looks dead to a visitor between those stops even when its readout moves. Each stop is { name, value,
  * frames: [frame per picture], noise: [noiseFloor per picture] } with frames taken once the picture settled. Only
- * steady stops (no motion of their own) with different values are compared. Returns the pairs of stop names.
+ * steady stops (no motion of their own) with different values are compared: values equal as numbers (1.7 and a
+ * computed 1.7000000000000002, which the input holds as 1.7) are one value, and so are values one `step` apart or
+ * less (neighbouring settings; on a `period` such as a day of minutes, 0 and 1439 are neighbours). Returns the pairs
+ * of stop names.
  */
-export function identicalStops(stops, { period = 0 } = {}) {
+export function identicalStops(stops, { period = 0, step = 0 } = {}) {
   const wraps = (a, b) => {
     if (!period) return false;
     const turns = Math.abs(Number(a) - Number(b)) / period;
     return Number.isFinite(turns) && turns > 0.5 && Math.abs(turns - Math.round(turns)) < 1e-6;
+  };
+  // The distance between two numeric values, around the period when there is one; NaN when either is not a number.
+  const apart = (a, b) => {
+    if (String(a).trim() === '' || String(b).trim() === '') return NaN;
+    let d = Math.abs(Number(a) - Number(b));
+    if (period > 0) {
+      d %= period;
+      d = Math.min(d, period - d);
+    }
+    return d;
+  };
+  const same = (a, b) => {
+    const d = apart(a, b);
+    return d <= 1e-9 * Math.max(1, Math.abs(Number(a)), Math.abs(Number(b))) || (step > 0 && d <= step * (1 + 1e-9));
   };
   const steady = stops.filter((s) => s.frames.length && s.noise.every((n) => n.count < MIN_PIXELS));
   const pairs = [];
@@ -193,11 +210,64 @@ export function identicalStops(stops, { period = 0 } = {}) {
     for (let j = i + 1; j < steady.length; j++) {
       const a = steady[i],
         b = steady[j];
-      if (a.value === b.value || wraps(a.value, b.value) || a.frames.length !== b.frames.length) continue;
+      if (a.value === b.value || same(a.value, b.value) || wraps(a.value, b.value) || a.frames.length !== b.frames.length)
+        continue;
       if (a.frames.some((f, k) => f.width !== b.frames[k].width || f.height !== b.frames[k].height)) continue;
       if (a.frames.every((f, k) => !compareRegion(f, b.frames[k], b.noise[k]).changed)) pairs.push([a.name, b.name]);
     }
   return pairs;
+}
+
+/**
+ * The period of a slider whose ends meet: whole turns (-180 and 180 degrees draw the same picture by design) or a day
+ * of minutes or hours. 0 when its ends do not meet.
+ */
+export function periodOf(c) {
+  // A live control carries min and max; a saved record keeps them only in its step names ("to max (360)").
+  const end = (which) => c[which] ?? /\(([-+\d.e]+)\)/.exec((c.steps ?? []).find((s) => s.action?.startsWith(`to ${which} `))?.action ?? '')?.[1];
+  const span = Number(end('max')) - Number(end('min'));
+  if (Math.abs(span - 2 * Math.PI) < 1e-3) return 2 * Math.PI;
+  // A clock: minutes or hours of a day, where the last stop is one step before the first again (1439 then 0).
+  const step = Number(c.step ?? 1) || 1;
+  if (/\b(time|clock|hour|minute|o'?clock)\b/i.test(c.label ?? '') && [1440, 24].includes(span + step)) return span + step;
+  return span >= 360 &&
+    /°|\b(deg|degrees|turn|rotat\w*|angle|heading|yaw|bearing|azimuth|spin|hue|longitude)\b/i.test(c.label ?? '')
+    ? 360
+    : 0;
+}
+
+/** Pixels that differ by at least this much (of 255, any channel) at full size can be seen. */
+export const VISIBLE_DELTA = 32;
+/** A full-size picture with at least this many such pixels (beyond its noise) is visibly different. */
+export const VISIBLE_PIXELS = 50;
+
+/**
+ * Pixels of two full-size raw RGB pictures ({ width, height, data }, 3 bytes a pixel) that differ by at least
+ * VISIBLE_DELTA; -1 when the sizes differ.
+ */
+export function visiblePixels(a, b) {
+  if (a.width !== b.width || a.height !== b.height) return -1;
+  let n = 0;
+  for (let i = 0; i < a.data.length; i += 3)
+    if (
+      Math.max(
+        Math.abs(a.data[i] - b.data[i]),
+        Math.abs(a.data[i + 1] - b.data[i + 1]),
+        Math.abs(a.data[i + 2] - b.data[i + 2]),
+      ) >= VISIBLE_DELTA
+    )
+      n++;
+  return n;
+}
+
+/**
+ * Whether two stops that look the same at the working size still differ visibly at full size: a thin part that moves
+ * a few pixels (a bimetal strip's tip) is lost when the picture shrinks, not to a visitor. `noise` is the larger
+ * count of visible pixels each stop's picture changed by on its own.
+ */
+export function visiblyApart(a, b, noise = 0) {
+  const n = visiblePixels(a, b);
+  return n >= VISIBLE_PIXELS && n >= 4 * noise;
 }
 
 function round(v) {

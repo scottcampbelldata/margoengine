@@ -14,8 +14,12 @@ import {
   motionChanged,
   noiseFloor,
   noisyKeys,
+  periodOf,
   stalled,
   textChanges,
+  VISIBLE_DELTA,
+  visiblePixels,
+  visiblyApart,
 } from '../scripts/web-demos/controls-compare.mjs';
 
 const W = 64,
@@ -204,6 +208,57 @@ test('identicalStops finds two stops of one control that give the same picture (
     [['a', 'b']],
     'half a turn apart still counts',
   );
+  // the-chain-fountain: the middle of 1 to 2.4 in steps of 0.1 is 1.7000000000000002, which the input holds as 1.7.
+  assert.deepEqual(
+    identicalStops([stop('start', '1.7', fringesA), stop('max', '2.4', fringesB), stop('middle', '1.7000000000000002', fringesA)]),
+    [],
+    'one value written two ways is not a dead stop',
+  );
+  // the-road-builder: the start (8) and the middle (9) of a 0 to 17 slider are one step apart.
+  const bank = [stop('start', '8', fringesA), stop('max', '17', fringesB), stop('middle', '9', fringesA)];
+  assert.deepEqual(identicalStops(bank), [['start', 'middle']], 'without a step the neighbours look partly dead');
+  assert.deepEqual(identicalStops(bank, { step: 1 }), [], 'neighbouring settings may draw the same picture');
+  assert.deepEqual(
+    identicalStops([stop('start', '6', fringesA), stop('middle', '9', fringesA)], { step: 1 }),
+    [['start', 'middle']],
+    'three steps apart still counts',
+  );
+  // the-sky-clock: 0 and 1439 minutes are one minute apart across midnight.
+  const day = [stop('max', '1439', fringesA), stop('min', '0', fringesA), stop('middle', '720', fringesB)];
+  assert.deepEqual(identicalStops(day, { step: 1 }), [['max', 'min']], 'without the period the ends are 1439 apart');
+  assert.deepEqual(identicalStops(day, { period: 1440, step: 1 }), [], 'around a day they are neighbours');
+});
+
+test('periodOf: whole turns and a day of minutes or hours', () => {
+  assert.equal(periodOf({ label: 'Heading', min: '-180', max: '180' }), 360);
+  // the-sky-clock: 0 to 1439 minutes in steps of 1 is one day.
+  assert.equal(periodOf({ label: 'Time of day (UTC)', min: '0', max: '1439', step: '1' }), 1440);
+  assert.equal(periodOf({ label: 'Hour (UTC)', min: '0', max: '23', step: '1' }), 24);
+  assert.equal(periodOf({ label: 'Discharge', min: '0', max: '1439', step: '1' }), 0, 'not without a clock in its name');
+  assert.equal(periodOf({ label: 'Time of day', min: '0', max: '1440', step: '1' }), 0, 'not when both ends are held');
+  // A saved record keeps its ends only in its step names.
+  assert.equal(periodOf({ label: 'Time of day', steps: [{ action: 'to max (1439)' }, { action: 'to min (0)' }] }), 1440);
+});
+
+test('visiblyApart: a thin part that moves a few pixels at full size is a visible difference', () => {
+  const big = (boxes) => {
+    const width = 200,
+      height = 100,
+      data = new Uint8Array(width * height * 3).fill(40);
+    for (const [x0, y0, w, h, v] of boxes)
+      for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) data.fill(v, (y * width + x) * 3, (y * width + x) * 3 + 3);
+    return { width, height, data };
+  };
+  // A bimetal strip 2 px thick and 120 px long whose tip rises 3 px (the-bimetal-switch, 20 and 24 degrees).
+  const cold = big([[40, 50, 120, 2, 200]]),
+    warm = big([[40, 50, 80, 2, 200], [120, 47, 40, 2, 200]]);
+  assert.equal(visiblePixels(cold, cold), 0);
+  assert.equal(visiblePixels(cold, warm), 160);
+  assert.equal(visiblyApart(cold, warm), true);
+  assert.equal(visiblyApart(cold, warm, 100), false, 'not when the picture changes as much on its own');
+  const faint = big([[40, 50, 120, 2, 40 + VISIBLE_DELTA - 1]]);
+  assert.equal(visiblyApart(big([]), faint), false, 'a change under the visible delta is not seen');
+  assert.equal(visiblyApart(cold, { ...cold, width: 100 }), false, 'pictures of different sizes are not compared');
 });
 
 test('stalled: drawing at the start and nothing at the end; an on-demand page is not stalled', () => {

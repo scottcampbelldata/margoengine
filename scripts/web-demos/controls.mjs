@@ -37,6 +37,9 @@ import {
   noisyKeys,
   stalled,
   textChanges,
+  periodOf,
+  visiblePixels,
+  visiblyApart,
 } from './controls-compare.mjs';
 import { killTree } from '../run-with-timeout.mjs';
 
@@ -851,6 +854,28 @@ class Session {
 }
 
 /** Full-size count of pixels that moved by 4 or more levels, against the same count with no input. */
+/** Keeps the pairs of stops that also look the same at full size (see visiblyApart). */
+async function fullSize(stops, pairs) {
+  const raw = async (png) => {
+    if (!png) return null;
+    const { data, info } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    return { width: info.width, height: info.height, data };
+  };
+  const cache = new Map();
+  const load = (png) => (cache.has(png) ? cache.get(png) : cache.set(png, raw(png)).get(png));
+  const kept = [];
+  for (const pair of pairs) {
+    const [a, b] = pair.map((name) => stops.find((s) => s.name === name));
+    const [A, B, qa, qb] = await Promise.all([a.shot, b.shot, a.quiet, b.quiet].map(load));
+    if (!A || !B) {
+      kept.push(pair);
+      continue;
+    }
+    const noise = Math.max(qa ? visiblePixels(qa, A) : 0, qb ? visiblePixels(qb, B) : 0);
+    if (!visiblyApart(A, B, noise)) kept.push(pair);
+  }
+  return kept;
+}
 async function faintChange(a, b, c) {
   const raw = (png) => sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const [A, B, C] = await Promise.all([raw(a), raw(b), raw(c)]);
@@ -968,7 +993,8 @@ function sliderValues(c) {
     step = c.step === 'any' || c.step === '' ? 0 : Number(c.step);
   if (!(max > min)) return [];
   let mid = (min + max) / 2;
-  if (step > 0) mid = min + Math.round((mid - min) / step) * step;
+  // Snapped to the step as the input snaps it, without float noise (1 + 7 x 0.1 is 1.7000000000000002, the input 1.7).
+  if (step > 0) mid = Number((min + Math.round((mid - min) / step) * step).toPrecision(12));
   const cur = Number(c.value);
   const out = [];
   for (const [name, v] of [
@@ -1016,10 +1042,15 @@ async function testControl(s, c, group, plan = {}) {
     value: String(value),
     frames: pair.b.frames,
     noise: pair.b.frames.map((f, i) => noiseFloor(pair.a.frames[i], f)),
+    shot: pair.b.shot,
+    quiet: pair.a.shot,
   });
   const run = async (control, name, act, value) => {
-    if (value !== undefined && !stops.length)
-      stops.push(stopOf('start', control.kind === 'select' ? control.selectedIndex : (control.value ?? 'start'), pre));
+    if (value !== undefined && !stops.length) {
+      // The value it holds now: controls tried before it (a preset, a play button) may have moved it since the list.
+      const now = (await s.eval((p) => window.__ctl.list().find((x) => x.path === p), control.path)) ?? control;
+      stops.push(stopOf('start', now.kind === 'select' ? now.selectedIndex : (now.value ?? 'start'), pre));
+    }
     const { result, post } = await s.step(control, pre, name, act);
     if (result.verdict === 'dead' && /could not reach/.test(result.how)) result.verdict = 'unreachable';
     rec(control).steps.push(result);
@@ -1063,7 +1094,8 @@ async function testControl(s, c, group, plan = {}) {
       () => pre,
       (v) => (pre = v),
     );
-    const same = stops.length > 2 ? identicalStops(stops, { period: periodOf(c) }) : [];
+    const step = c.kind === 'select' ? 0 : Number(c.step) || 0;
+    const same = stops.length > 2 ? await fullSize(stops, identicalStops(stops, { period: periodOf(c), step })) : [];
     const r = records.find((x) => x.path === c.path);
     if (same.length && r) r.sameStops = same;
     return out;
@@ -1088,11 +1120,18 @@ function refine(c, d) {
     });
     if (!c.sameStops.length) delete c.sameStops;
   }
-  if (c.verdict !== 'dead') return c;
   const slug = d?.slug ?? d?.demo?.replace(/@.*$/, ''),
-    designed = byDesign.find(
+    rows = byDesign.filter(
       (x) => x.demo === slug && c.label?.startsWith(x.control) && (!x.backend || x.backend === (d?.backend ?? 'webgpu')),
     );
+  // Stops that draw the same picture by design (a value the picture does not show): reported with the reason.
+  const alike = rows.find((x) => x.stops);
+  if (c.sameStops?.length && alike) {
+    c.stopsByDesign = `${c.sameStops.map(([a, b]) => `${a} and ${b}`).join(', ')} give the same picture by design: ${alike.stops}`;
+    delete c.sameStops;
+  }
+  if (c.verdict !== 'dead') return c;
+  const designed = rows.find((x) => x.reason);
   if (designed) return Object.assign(c, { verdict: 'unsure', note: `by design: ${designed.reason}` });
   const hint =
     d?.dragHint ??
@@ -1162,17 +1201,6 @@ function pageText(slug) {
   return pageTexts.get(slug);
 }
 const HANDLE = /^(drag|grab|move|reorder|resize)\b/i;
-/** A slider that turns something through whole turns: -180 and 180 degrees draw the same picture by design. */
-function periodOf(c) {
-  // A live control carries min and max; a saved record keeps them only in its step names ("to max (360)").
-  const end = (which) => c[which] ?? /\(([-+\d.e]+)\)/.exec((c.steps ?? []).find((s) => s.action?.startsWith(`to ${which} `))?.action ?? '')?.[1];
-  const span = Number(end('max')) - Number(end('min'));
-  if (Math.abs(span - 2 * Math.PI) < 1e-3) return 2 * Math.PI;
-  return span >= 360 &&
-    /°|\b(deg|degrees|turn|rotat\w*|angle|heading|yaw|bearing|azimuth|spin|hue|longitude)\b/i.test(c.label ?? '')
-    ? 360
-    : 0;
-}
 /**
  * A grid of cells named "Row 2, column 4, Saffron": a click paints the cell with the current colour, so a cell that
  * already holds it changes nothing. When every dead cell holds one value and live cells of the same grid hold others,
@@ -1619,6 +1647,7 @@ function writeMarkdown() {
     for (const c of all(d)) {
       if (c.verdict === 'live' && /acts only while/.test(c.note ?? ''))
         whileRunning.push(`- ${slugOf(d)} (${backendOf(d)}): ${c.label} (${c.note})`);
+      if (c.stopsByDesign) unclear.push({ where: `${slugOf(d)} (${backendOf(d)})`, label: c.label, note: c.stopsByDesign });
       if (c.verdict === 'unsure')
         unclear.push({
           where: `${slugOf(d)} (${backendOf(d)})`,
@@ -1651,7 +1680,7 @@ function writeMarkdown() {
     '',
     `Made by \`node scripts/web-demos/controls.mjs --all\` (WebGPU and \`?backend=webgl2\`) on ${report.generated?.slice(0, 10) ?? 'unknown'}; the full record is \`demos/.reports/controls.json\`. ${ds.length} demo runs, ${controls} controls operated, ${dead} dead, ${unsure} unsure, ${ranked.length} demos with at least one problem.`,
     '',
-    "A control is dead when neither the canvas (beyond its own motion) nor any readout outside its own label changed: on the first pass with reduced motion, again on a fresh page with normal motion and a longer wait, and a third time after pressing the page's start button when it has one. Partly dead: two stops of the same slider or select draw the same picture.",
+    "A control is dead when neither the canvas (beyond its own motion) nor any readout outside its own label changed: on the first pass with reduced motion, again on a fresh page with normal motion and a longer wait, and a third time after pressing the page's start button when it has one. Partly dead: two stops of the same slider or select, more than one step apart, draw the same picture at the working size and at full size.",
     '',
     '## Worst first',
     '',
