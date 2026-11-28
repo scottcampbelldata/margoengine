@@ -125,6 +125,8 @@ export interface USDImage {
   path?: string;
   /** Optional scalar-channel conversion for independently sampled opacity; writes green and alpha. */
   opacity?: { channel: number; scale: number; bias: number; srgb: boolean };
+  /** Scalar-channel conversion for a coat map: writes the value to red and green, alpha 1. */
+  scalar?: { channel: number; scale: number; bias: number; srgb: boolean };
   /** The file's colours are linear, where a base colour texture is read as sRGB. */
   linearColor?: boolean;
   roughness?: { path: string; channel: number };

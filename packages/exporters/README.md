@@ -1228,6 +1228,32 @@ Material textures are the same `TextureData` (encoded PNG or JPEG bytes) the glT
 - `metallicRoughnessTexture` drives `roughness` from green and `metallic` from blue, scaled by the factors.
 - `normalTexture` (scale 2, bias -1, with `normalScale` on x and y), `occlusionTexture` red (`occlusionStrength`) and `emissiveTexture` (times `emissive` and `emissiveStrength`) are read as raw, raw and sRGB.
 
+### Clearcoat and index of refraction
+
+A data scene or GLB material's `KHR_materials_clearcoat` and `KHR_materials_ior` are written to the `UsdPreviewSurface` inputs of the same meaning ([Pixar's specification](https://openusd.org/release/spec_usdpreviewsurface.html)): `clearcoatFactor` as `clearcoat`, `clearcoatRoughnessFactor` as `clearcoatRoughness` (always written with a coat, as USD's fallback is 0.01 and glTF's is 0) and `ior` as `ior` (when it is not 1.5; `extensions.KHR_materials_ior` replaces the material's `ior` field). `clearcoatTexture` drives the coat from red and `clearcoatRoughnessTexture` its roughness from green, each times its factor, with its own `texCoord` and `KHR_texture_transform`. A coat factor of 0 writes nothing. `UsdPreviewSurface` has no coat normal and gives the coat the surface's `ior`, so `clearcoatNormalTexture` is left out (reported to `onWarning`, default `console.warn`), the coat follows the surface normal, and with an `ior` other than 1.5 a USD viewer's coat reflects differently from glTF's, which is fixed at 1.5. `@margoengine/usdz` reads all three inputs and both maps back.
+
+```ts
+import { exportUSDZ } from 'margoengine/exporters/usdz';
+import { parseUSDZ } from 'margoengine/usdz';
+
+const paint = {
+  color: [0.4, 0.02, 0.02],
+  roughness: 0.6,
+  metalness: 0.4,
+  extensions: {
+    KHR_materials_clearcoat: { clearcoatFactor: 1, clearcoatRoughnessFactor: 0.05 },
+    KHR_materials_ior: { ior: 1.6 },
+  },
+};
+const panel = {
+  positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
+  normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+  indices: [0, 1, 2, 0, 2, 3],
+};
+const usdz = exportUSDZ({ nodes: [{ geometry: panel, material: paint }] });
+console.log((await parseUSDZ(usdz)).document.materials?.[0].extensions);
+```
+
 The image bytes are stored unchanged under `texturePrefix` (default `textures/`), each once, with every file's data 64-byte aligned. Vertex colors cannot be combined with a base color texture (UsdPreviewSurface has no multiply), a texture whose UV set is missing is refused, and sampler filters and mipmaps have no USD equivalent and are dropped.
 
 ```ts

@@ -160,7 +160,7 @@ export function exportUSDZ(source: ExportSource | Uint8Array, options: USDZOptio
   if (!items.length) throw new RangeError('USDZ requires at least one mesh');
   const placement =
       options.height === undefined && !options.ground ? { scale: 1, lift: 0 } : placementOf(worldBox(items), options),
-    materials = new USDMaterials(options.texturePrefix),
+    materials = new USDMaterials(options.texturePrefix, options.onWarning),
     fallback = normalizeMaterial({}),
     shapes = localShapes(items, fallback, materials);
   const lines = [

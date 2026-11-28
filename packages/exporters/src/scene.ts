@@ -539,6 +539,8 @@ export interface Mat {
   emissiveStrength: number;
   transmission: number;
   ior: number;
+  /** A data material's `KHR_materials_*` payloads (`ExtendedMaterialData`), which the USD writers read. */
+  extensions?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
   /** Copied by the glTF writers, which alone write extras. */
   extras?: Extras;
   /**
@@ -1324,7 +1326,8 @@ export const samplerOf = (
 const PHONG_SPECULAR = [0, 0, 0].map(() => ((17 / 255 + 0.055) / 1.055) ** 2.4);
 
 /** A texture slot's KHR_texture_transform, validated; it needs the slot's texture. */
-function checkTransform(
+/** @internal A slot's KHR_texture_transform, checked and held as Float32 values. */
+export function checkTransform(
   transform: TextureTransform | undefined,
   texture: TextureData | undefined,
   slot: string,
@@ -1427,6 +1430,7 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
     emissiveStrength: factor(m.emissiveStrength, 'emissiveStrength', 1, (v) => v >= 0),
     transmission: unit(m.transmission, 'transmission', 0),
     ior: factor(m.ior, 'ior', 1.5, (v) => v === 0 || v >= 1),
+    extensions: (m as { extensions?: Mat['extensions'] }).extensions,
     extras: m.extras,
   };
 }

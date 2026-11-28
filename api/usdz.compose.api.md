@@ -333,6 +333,12 @@ interface USDImage {
         bias: number;
         srgb: boolean;
     };
+    scalar?: {
+        channel: number;
+        scale: number;
+        bias: number;
+        srgb: boolean;
+    };
     linearColor?: boolean;
     roughness?: {
         path: string;

@@ -2,6 +2,7 @@ import { LoaderError } from '@margoengine/loaders/common';
 import type { ExtensionHooks, SurfaceRead, USDExtension, USDImagePlacement, USDSurface } from './extension.js';
 import { flat } from './clip.js';
 import { attachPreviewOpacity } from './preview-opacity.js';
+import { physicalExtensions, type PhysicalInput } from './preview-physical.js';
 import { primvarStream } from './primvar-stream.js';
 import { uvSets } from './uv-sets.js';
 import type { PreviewOpacity } from './preview-opacity.js';
@@ -129,16 +130,6 @@ function surface(read: SurfaceRead): USDSurface | undefined {
     usdPreviewReaders: readers,
     ...(readers.length ? { usdPreviewCoordinates: { texCoord: 2 } } : {}),
   };
-  if (readers.some((r) => ['clearcoat', 'clearcoatRoughness', 'ior', 'specularColor'].includes(r.input))) {
-    material.extras = { ...(material.extras as object), usdPreviewPhysical: { clearcoat: scalar('clearcoat', 0) } };
-    material.extensions = {
-      KHR_materials_clearcoat: {
-        clearcoatFactor: 1,
-        clearcoatRoughnessFactor: scalar('clearcoatRoughness', 0.01),
-      },
-      KHR_materials_ior: { ior: 1.5 },
-    };
-  }
   if (threshold > 0) material.alphaCutoff = threshold;
   // TEXCOORD_2 and 3 hold the primvar readers' coordinates, so with readers the maps have the first two sets.
   const sets = uvSets(read.soft, readers.length ? 2 : 4),
@@ -146,7 +137,7 @@ function surface(read: SurfaceRead): USDSurface | undefined {
   if (first) sets.names.push(first.uv ?? 'st');
   // The separate opacity map is sampled from TEXCOORD_1.
   if (alpha) sets.names.push(alpha.uv ?? 'st');
-  const mapped = (source: Parameters<SurfaceRead['image']>[0], from: NonNullable<ReturnType<typeof texture>>) => {
+  const mapped = (source: Parameters<SurfaceRead['image']>[0], from: { where: USDImagePlacement; uv?: string }) => {
     const info = read.image(source, from.where);
     sets.bind(info, from.uv);
     return info;
@@ -171,6 +162,37 @@ function surface(read: SurfaceRead): USDSurface | undefined {
   if (emit) {
     material.emissiveTexture = mapped({ path: emit.path }, emit);
     material.emissiveFactor = [1, 1, 1];
+  }
+  const driven = (name: string): boolean => readers.some((r) => r.input === name);
+  const physicalInput = (name: string): PhysicalInput => {
+    if (driven(name)) return { value: undefined };
+    const map = texture(name);
+    return map ? { value: undefined, map } : { value: input(shader, 'inputs:' + name) };
+  };
+  const coat = physicalInput('clearcoat'),
+    physical = physicalExtensions(
+      coat,
+      physicalInput('clearcoatRoughness'),
+      driven('ior') ? undefined : input(shader, 'inputs:ior'),
+      mapped,
+      () => bad('invalid shader value'),
+    );
+  if (physical) material.extensions = physical;
+  if (['clearcoat', 'clearcoatRoughness', 'ior', 'specularColor'].some(driven)) {
+    // The shader sets a constant or primvar coat; a textured coat stays the extension's own.
+    if (!coat.map)
+      material.extras = { ...(material.extras as object), usdPreviewPhysical: { clearcoat: scalar('clearcoat', 0) } };
+    const held = (physical?.KHR_materials_clearcoat ?? {
+      clearcoatRoughnessFactor: scalar('clearcoatRoughness', 0.01),
+    }) as Record<string, unknown>;
+    material.extensions = {
+      KHR_materials_clearcoat: { ...held, ...(coat.map ? {} : { clearcoatFactor: 1 }) },
+      KHR_materials_ior: physical?.KHR_materials_ior ?? { ior: 1.5 },
+    };
+  }
+  for (const name of Object.keys(material.extensions ?? {})) {
+    const used = (read.document.extensionsUsed ??= []);
+    if (!used.includes(name)) used.push(name);
   }
   if (alpha) {
     const info = read.image(

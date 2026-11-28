@@ -24,6 +24,7 @@ import type { GLTFDocument, GLTFMaterial, GLTFNode } from '../../shared/gltf.js'
 import { captureScene } from '../../shared/scene-scope.js';
 import { LinearToSRGB, SRGBToLinear } from '@margoengine/math/color';
 import { multiplyMatrices } from '@margoengine/math/mat4';
+import { physicalExtensions, type PhysicalInput } from './preview-physical.js';
 
 /** Parse limits and loading hooks for the USD readers. Every limit is checked while parsing; a breach throws a `LoaderError` with code `limit`. */
 export interface USDOptions {
@@ -407,6 +408,12 @@ export class USDAsset {
           (this.extensions as readonly ExtensionHooks[]).map((extension) => extension.decoders?.() ?? {}),
         )),
       );
+      // The coat and ior a UsdPreviewSurface states need the extended materials, loaded only for such a file.
+      if (
+        !decoders.materials &&
+        this.document.materials?.some((m) => m.extensions?.KHR_materials_clearcoat || m.extensions?.KHR_materials_ior)
+      )
+        decoders.materials = (await import('@margoengine/gltf/extended-materials')).extendedMaterials;
       const model = scope.run(() => parseGLTF(engine, this.document, this.buffers, images, decoders));
       try {
         for (const extension of this.extensions as readonly ExtensionHooks[])
@@ -436,19 +443,19 @@ export class USDAsset {
         signal?.throwIfAborted();
         if (source.path) {
           let bitmap = await decode(source.path);
-          if (source.opacity) {
+          const convert = source.opacity ?? source.scalar;
+          if (convert) {
             try {
               const canvas = new OffscreenCanvas(bitmap.width, bitmap.height),
                 context = canvas.getContext('2d')!;
               context.drawImage(bitmap, 0, 0);
               const pixels = context.getImageData(0, 0, bitmap.width, bitmap.height);
               for (let i = 0; i < pixels.data.length; i += 4) {
-                let value = pixels.data[i + source.opacity.channel] / 255;
-                if (source.opacity.srgb && source.opacity.channel !== 3) value = SRGBToLinear(value);
-                const alpha = Math.round(
-                  255 * Math.max(0, Math.min(1, value * source.opacity.scale + source.opacity.bias)),
-                );
-                pixels.data.set([255, alpha, 255, alpha], i);
+                let value = pixels.data[i + convert.channel] / 255;
+                if (convert.srgb && convert.channel !== 3) value = SRGBToLinear(value);
+                const out = Math.round(255 * Math.max(0, Math.min(1, value * convert.scale + convert.bias)));
+                // A coat map stays opaque: a canvas premultiplies, so a low alpha would round its colours away.
+                pixels.data.set(source.opacity ? [255, out, 255, out] : [out, out, 0, 255], i);
               }
               context.putImageData(pixels, 0, 0);
               bitmap.close();
@@ -809,6 +816,51 @@ function asset(
         sets.bind(p.metallicRoughnessTexture, (rough ?? metal)!.uv);
         p.roughnessFactor = 1;
         p.metallicFactor = 1;
+      }
+      const coat = (name: string): PhysicalInput => {
+        const node = connection(shader!, name)?.split('.outputs:')[0];
+        if (!node) return { value: input(shader!, name) };
+        // A primvar-driven input is previewSurface()'s; only a texture or an interface value is read here.
+        if (attrs(node, 'info:id') !== 'UsdUVTexture') {
+          if (/^UsdPrimvarReader/.test(String(attrs(node, 'info:id')))) {
+            if (composed) soft('unsupported primvar reader on ' + name);
+            return { value: undefined };
+          }
+          return { value: input(shader!, name) };
+        }
+        const map = texture(shader!, name);
+        if (!map) return { value: undefined };
+        const [scale, bias] = ['inputs:scale', 'inputs:bias'].map((key, at) =>
+          Array.from(numeric(attrs(node, key) ?? new Array(4).fill(1 - at), 4)),
+        );
+        return {
+          value: undefined,
+          map: {
+            path: map.path,
+            channel: map.channel,
+            scale,
+            bias,
+            srgb: attrs(node, 'inputs:sourceColorSpace') === 'sRGB',
+            where: map.placement,
+            uv: map.uv,
+          },
+        };
+      };
+      const physical = physicalExtensions(
+        coat('inputs:clearcoat'),
+        coat('inputs:clearcoatRoughness'),
+        input(shader, 'inputs:ior'),
+        (source, map) => {
+          const info: { index: number; texCoord?: number } = image(source, map.where);
+          sets.bind(info, map.uv);
+          return info;
+        },
+        () => fail('invalid material factor'),
+      );
+      if (physical) {
+        definition.extensions = physical;
+        doc.extensionsUsed ??= [];
+        for (const name of Object.keys(physical)) if (!doc.extensionsUsed.includes(name)) doc.extensionsUsed.push(name);
       }
     }
     const id = doc.materials.length;

@@ -87,19 +87,28 @@ export function sceneOfParts(parts: GLBParts): { scene: ExportScene; skipped: GL
         KHR_materials_transmission: transmission,
         KHR_materials_ior: ior,
         KHR_materials_specular: specular,
+        KHR_materials_clearcoat: clearcoat,
         KHR_materials_volume: volume,
         KHR_materials_dispersion: dispersion,
       } = m.extensions ?? {},
       out: Record<string, Record<string, unknown>> = {};
-    if (specular) {
-      const { specularTexture, specularColorTexture, ...factors } = specular;
-      out.KHR_materials_specular = factors;
-      for (const [field, info] of Object.entries({ specularTexture, specularColorTexture })) {
-        const read = texture(info as JSONObject | undefined, index);
-        if (!read) continue;
-        const { index: _, ...rest } = info as JSONObject;
-        out.KHR_materials_specular[field] = { ...rest, texture: read } satisfies MaterialTextureInfo;
+    // A payload's `...Texture` fields index the file's textures; the data scene holds the images themselves.
+    for (const [name, payload] of Object.entries({
+      KHR_materials_specular: specular,
+      KHR_materials_clearcoat: clearcoat,
+    })) {
+      if (!payload) continue;
+      const held: Record<string, unknown> = {};
+      for (const [field, value] of Object.entries(payload as JSONObject)) {
+        if (!field.endsWith('Texture')) held[field] = value;
+        else {
+          const read = texture(value as JSONObject, index);
+          if (!read) continue;
+          const { index: _, ...rest } = value as JSONObject;
+          held[field] = { ...rest, texture: read } satisfies MaterialTextureInfo;
+        }
       }
+      out[name] = held;
     }
     // A thickness texture indexes the file's textures, which the data scene does not keep.
     if (volume) {

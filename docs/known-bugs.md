@@ -6,6 +6,18 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-28: the USD importers drop texture factors, and the default one emission and occlusion (KB-USDZ-FACTORS1, usdz)
+
+- **What:** a textured file written by `exportUSDZ` reads back through `@margoengine/usdz` with a white base colour
+  factor, roughness 1 and metalness 1, whatever the file's `inputs:scale` says; the default importer also leaves out
+  `emissiveColor`, its texture and `occlusion`.
+- **Repro:** `exportUSDZ` of a material with `color: [0.5, 0.25, 1]`, `roughness: 0.4`, `metalness: 0.6`, `emissive:
+  [0.5, 0, 0]` and base colour, metal-rough and emissive textures, then `parseUSDZ(file).document.materials[0]`:
+  `baseColorFactor` [1, 1, 1, 1], `roughnessFactor` 1, `metallicFactor` 1, no emission.
+- **Cause:** `material()` in `packages/usdz/src/index.ts` and `surface()` in `preview-surface.ts` set the factors to 1
+  for a textured input and never read the `UsdUVTexture`'s `inputs:scale`; the default `material()` never reads
+  `inputs:emissiveColor` or `inputs:occlusion`. The coat inputs do read their scale (`preview-physical.ts`).
+
 ### Open 2026-11-28: a ball on a spinning hinge settles off its balance in proportion to its inertia (KB-PHYS-SPINBIAS1, physics solver)
 
 - **Repro:** a position-driven spindle turned about z at 68 rpm (`setNextRotation` each 60 Hz step), gravity -9.80665 z, a

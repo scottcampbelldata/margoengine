@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21723115,
+  "total": 21726381,
   "history": [
     {
       "date": "2026-10-24",
@@ -15444,6 +15444,18 @@
       "commit": "kb-biomes-riverstep1",
       "reason": "KB-BIOMES-RIVERSTEP1: new optional entry water/banks (2,725 B budget: WaterBanks, still water passes a clipmap terrain's coarse-ring error and ends where the terrain heights rise through it); biomes/view loads it with import() only for river and lake water and stays within its budget",
       "grew": 1
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "lane-e-usdz-coat",
+      "reason": "USDZ writes and reads UsdPreviewSurface clearcoat, clearcoatRoughness and ior (KHR_materials_clearcoat and _ior; before, the file lost both). Measured gzip before to after: exporters/usdz 23398 to 23976, usdz-anim 28967 to 29507, usdz 12753 to 13316, worker 13753 to 14360, compose 23754 to 24292, preview-surface 4787 to 5259, clips 27424 to 27985. It is the material writer and reader every USD file passes through; a split would add an entry callers must know to keep their coat.",
+      "grew": 6
+    },
+    {
+      "date": "2026-11-28",
+      "commit": "lane-e-usdz-coat",
+      "reason": "USDZ keeps UsdPreviewSurface clearcoat, clearcoatRoughness and ior (before, the file and the importers lost them). Measured gzip, parent to this change: exporters/usdz 23398 to 23976, usdz-anim 28967 to 29507, usdz 13168 to 13740, worker 14169 to 14792, compose 24132 to 24714, preview-surface 5013 to 5479. It is the material writer and reader every USD file passes through; a split would add an entry callers must know to keep their coat.",
+      "grew": 2
     }
   ],
   "items": {
@@ -15854,7 +15866,7 @@
     "@margoengine/exporters/unreal-pixel-art": 1126,
     "@margoengine/exporters/unreal-precision": 28787,
     "@margoengine/exporters/unreal-precision-importer": 17145,
-    "@margoengine/exporters/usdz": 23929,
+    "@margoengine/exporters/usdz": 24696,
     "@margoengine/exporters/usdz-anim": 29678,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 24025,
@@ -16984,20 +16996,20 @@
     "@margoengine/ui/react": 34010,
     "@margoengine/ui/world": 10170,
     "@margoengine/ui/world-gl": 7816,
-    "@margoengine/usdz": 13564,
+    "@margoengine/usdz": 14153,
     "@margoengine/usdz dist/workers/usdz.js": 163144,
     "@margoengine/usdz/anim": 2987,
-    "@margoengine/usdz/clips": 27967,
-    "@margoengine/usdz/compose": 24856,
+    "@margoengine/usdz/clips": 28825,
+    "@margoengine/usdz/compose": 25021,
     "@margoengine/usdz/curves": 3405,
     "@margoengine/usdz/instancer": 2451,
     "@margoengine/usdz/lux": 2221,
     "@margoengine/usdz/materialx": 7561,
-    "@margoengine/usdz/preview-surface": 5269,
+    "@margoengine/usdz/preview-surface": 5515,
     "@margoengine/usdz/shapes": 1457,
     "@margoengine/usdz/skel": 4372,
     "@margoengine/usdz/subdiv": 4929,
-    "@margoengine/usdz/worker": 14595,
+    "@margoengine/usdz/worker": 15236,
     "@margoengine/vfx": 40343,
     "@margoengine/vfx/base": 14674,
     "@margoengine/vfx/blown-sand": 11393,

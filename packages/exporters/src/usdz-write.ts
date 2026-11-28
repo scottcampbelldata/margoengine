@@ -1,7 +1,8 @@
 // What the USDZ writers share: numbers as USD text, the stored archive, materials and mesh prims. `exportUSDZ` and
 // `exportAnimatedUSDZ` write the same materials and shapes and differ in how they place them.
-import { num, samplerOf, textureFiles } from './scene.js';
-import type { Geo, Mat, SceneOptions, TextureData } from './scene.js';
+import { checkTexture, checkTransform, num, samplerOf, textureFiles } from './scene.js';
+import type { Geo, Mat, SceneOptions, TextureData, TextureTransform } from './scene.js';
+import type { MaterialTextureInfo } from './materials.js';
 import { crc32 } from '../../shared/crc32.js';
 import type { USDZBehavior } from './usdz-behaviors.js';
 
@@ -202,10 +203,71 @@ const TEXTURES = [
   'normalTexture',
   'occlusionTexture',
   'emissiveTexture',
+  'clearcoatTexture',
+  'clearcoatRoughnessTexture',
 ] as const;
 
+/** A material with its `KHR_materials_clearcoat` and `KHR_materials_ior` payloads read into surface fields. */
+interface SurfaceMat extends Mat {
+  /** The coat's factor and roughness factor; absent without a coat. */
+  clearcoat?: [number, number];
+  clearcoatTexture?: TextureData;
+  clearcoatTextureTransform?: TextureTransform;
+  clearcoatRoughnessTexture?: TextureData;
+  clearcoatRoughnessTextureTransform?: TextureTransform;
+}
+
+/** A factor of a payload: `fallback` when absent, else a number `valid` accepts. */
+function payloadFactor(value: unknown, label: string, fallback: number, valid: (v: number) => boolean): number {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'number' || !Number.isFinite(value) || !valid(value))
+    throw new RangeError(`USDZ material ${label} is ${String(value)}; use a value inside the glTF range`);
+  return value;
+}
+
+/**
+ * `material` with what UsdPreviewSurface holds of its extension payloads: an `ior` payload replaces the material's own,
+ * and a coat with a factor above 0 sets `clearcoat` and its two maps (a factor of 0 turns the whole layer off,
+ * KHR_materials_clearcoat). A map's `texCoord` and `KHR_texture_transform` are the ones its payload gives.
+ */
+function surfaceMaterial(material: Mat): SurfaceMat {
+  const { KHR_materials_clearcoat: coat, KHR_materials_ior: refraction } = material.extensions ?? {};
+  if (!coat && !refraction) return material;
+  const out: SurfaceMat = { ...material };
+  if (refraction) out.ior = payloadFactor(refraction.ior, 'ior', 1.5, (v) => v === 0 || v >= 1);
+  if (!coat) return out;
+  const inUnit = (v: number): boolean => v >= 0 && v <= 1,
+    factor = payloadFactor(coat.clearcoatFactor, 'clearcoatFactor', 0, inUnit),
+    roughness = payloadFactor(coat.clearcoatRoughnessFactor, 'clearcoatRoughnessFactor', 0, inUnit);
+  if (!factor) return out;
+  out.clearcoat = [factor, roughness];
+  for (const slot of ['clearcoatTexture', 'clearcoatRoughnessTexture'] as const) {
+    const info = coat[slot] as MaterialTextureInfo | undefined;
+    if (info === undefined) continue;
+    const image = checkTexture(info?.texture, slot);
+    if (!image) throw new TypeError(`USDZ material ${slot} needs { texture: TextureData }`);
+    const transform = info.extensions?.KHR_texture_transform as (TextureTransform & { texCoord?: number }) | undefined;
+    const texture = checkTexture(
+      { ...image, texCoord: transform?.texCoord ?? info.texCoord ?? image.texCoord ?? 0 },
+      slot,
+    )!;
+    out[slot] = texture;
+    if (transform)
+      out[`${slot}Transform`] = checkTransform(
+        {
+          offset: transform.offset ?? [0, 0],
+          scale: transform.scale ?? [1, 1],
+          rotation: transform.rotation ?? 0,
+        },
+        texture,
+        slot,
+      );
+  }
+  return out;
+}
+
 /** Whether a material samples UV set `set`. */
-export const samples = (material: Mat, set: number): boolean =>
+const samples = (material: SurfaceMat, set: number): boolean =>
   TEXTURES.some((slot) => material[slot] && (material[slot].texCoord ?? 0) === set);
 
 /** One geometry in its own space: the class prim of the nodes that share it, its local bounds and the UV sets they read. */
@@ -256,7 +318,10 @@ export class USDMaterials {
   private readonly textures: ReturnType<typeof textureFiles>;
   private readonly written = new Map<string, { path: string; sets: boolean[] }>();
   private readonly keys = new Map<Mat, number>();
-  constructor(prefix: string = 'textures/') {
+  private readonly surfaces = new Map<Mat, SurfaceMat>();
+  private readonly onWarning: SceneOptions['onWarning'];
+  constructor(prefix: string = 'textures/', onWarning?: SceneOptions['onWarning']) {
+    this.onWarning = onWarning;
     if (typeof prefix === 'string' && /^\/|(^|\/)\.\.(\/|$)/.test(prefix))
       throw new TypeError(
         `USDZ texturePrefix "${prefix}" leaves the archive; use a relative folder such as 'textures/'`,
@@ -267,13 +332,28 @@ export class USDMaterials {
   get files(): typeof this.textures.files {
     return this.textures.files;
   }
+  /** `material`'s surface fields, read once; a coat normal map, which has no input to go in, is reported then. */
+  private surfaceOf(material: Mat): SurfaceMat {
+    let read = this.surfaces.get(material);
+    if (!read) {
+      this.surfaces.set(material, (read = surfaceMaterial(material)));
+      if (read.clearcoat && material.extensions?.KHR_materials_clearcoat?.clearcoatNormalTexture) {
+        const message = `USDZ material ${material.name ?? '(unnamed)'}: clearcoatNormalTexture is left out, as UsdPreviewSurface has no coat normal; the coat takes the surface normal`;
+        if (this.onWarning) this.onWarning({ code: 'unsupported', message, node: null });
+        else console.warn(message);
+      }
+    }
+    return read;
+  }
   /** Records the UV sets `material` reads from `shape`, before the shape is written. */
   note(shape: Shape, material: Mat): void {
-    shape.sets[0] ||= samples(material, 0);
-    shape.sets[1] ||= samples(material, 1);
+    const read = this.surfaceOf(material);
+    shape.sets[0] ||= samples(read, 0);
+    shape.sets[1] ||= samples(read, 1);
   }
   /** Mesh `i`'s material: builds its prim the first time, and the colour lines for this geometry. */
-  bind(i: number, geometry: Geo, material: Mat): BoundMaterial {
+  bind(i: number, geometry: Geo, source: Mat): BoundMaterial {
+    const material = this.surfaceOf(source);
     for (const slot of TEXTURES) {
       const texture = material[slot];
       if (texture && !(texture.texCoord === 1 ? geometry.uvs1 : geometry.uvs))
@@ -316,12 +396,14 @@ export class USDMaterials {
       material.metalness === 0 &&
       material.roughness === 1 &&
       material.emissive.every((v) => v * material.emissiveStrength === 0) &&
+      material.ior === 1.5 &&
+      !material.clearcoat &&
       TEXTURES.every((slot) => !material[slot])
     )
       return { path: '', lines: [], appearance: appearance() };
     // One material per object and colour stream; its prim takes the first user's number.
-    if (!this.keys.has(material)) this.keys.set(material, this.keys.size);
-    const key = `${this.keys.get(material)}:${colors ? 1 : 0}:${displayOpacity ? 1 : 0}`,
+    if (!this.keys.has(source)) this.keys.set(source, this.keys.size);
+    const key = `${this.keys.get(source)}:${colors ? 1 : 0}:${displayOpacity ? 1 : 0}`,
       known = this.written.get(key),
       path = known?.path ?? `/Margo/Material_${i}`;
     // Texture shaders, built first so the surface can name their outputs.
@@ -413,7 +495,14 @@ export class USDMaterials {
           ),
         emissive = material.emissive.map((v) => v * material.emissiveStrength),
         emission =
-          material.emissiveTexture && sample('emissiveTexture', material.emissiveTexture, true, [...emissive, 1]);
+          material.emissiveTexture && sample('emissiveTexture', material.emissiveTexture, true, [...emissive, 1]),
+        // KHR_materials_clearcoat reads the coat from red and its roughness from green, each times its factor.
+        [coat = 0, coatRoughness = 0] = material.clearcoat ?? [],
+        coatOut =
+          material.clearcoatTexture && sample('clearcoatTexture', material.clearcoatTexture, false, [coat, 1, 1, 1]),
+        coatRoughnessOut =
+          material.clearcoatRoughnessTexture &&
+          sample('clearcoatRoughnessTexture', material.clearcoatRoughnessTexture, false, [1, coatRoughness, 1, 1]);
       return [
         `def Material "Material_${i}" {`,
         `    token outputs:surface.connect = <${path}/Surface.outputs:surface>`,
@@ -439,6 +528,18 @@ export class USDMaterials {
             ? `        float inputs:opacity.connect = <${path}/Opacity.outputs:result>`
             : `        float inputs:opacity = ${num(opacity)}`,
         ...(material.alphaMode === 'MASK' && !opaque ? [`        float inputs:opacityThreshold = ${num(cutoff)}`] : []),
+        ...(material.ior === 1.5 ? [] : [`        float inputs:ior = ${num(material.ior)}`]),
+        // USD's fallback roughness of a coat is 0.01 and glTF's is 0, so a coat always states its own.
+        ...(material.clearcoat
+          ? [
+              coatOut
+                ? `        float inputs:clearcoat.connect = <${coatOut}r>`
+                : `        float inputs:clearcoat = ${num(coat)}`,
+              coatRoughnessOut
+                ? `        float inputs:clearcoatRoughness.connect = <${coatRoughnessOut}g>`
+                : `        float inputs:clearcoatRoughness = ${num(coatRoughness)}`,
+            ]
+          : []),
         ...(normal ? [`        normal3f inputs:normal.connect = <${normal}rgb>`] : []),
         ...(occlusion ? [`        float inputs:occlusion.connect = <${occlusion}r>`] : []),
         '        token outputs:surface',

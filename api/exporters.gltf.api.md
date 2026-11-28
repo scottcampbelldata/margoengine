@@ -502,6 +502,7 @@ interface Mat {
     emissiveStrength: number;
     transmission: number;
     ior: number;
+    extensions?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
     extras?: Extras;
     width?: {
         value: number;

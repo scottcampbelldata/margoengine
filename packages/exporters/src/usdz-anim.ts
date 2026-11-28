@@ -761,7 +761,7 @@ export async function exportAnimatedUSDZ(
     rest = new Poses(new Map(), parents, () => 0),
     ids = new Map(order.map((node, id) => [node, id]));
 
-  const materials = new USDMaterials(options.texturePrefix),
+  const materials = new USDMaterials(options.texturePrefix, options.onWarning),
     fallback = normalizeMaterial({}),
     tail: string[] = [],
     plain = new Map<Geo, Shape>(),
