@@ -35,6 +35,7 @@ import type {
 } from './building-rules.js';
 import { type MeshBuilder, add, scale, type V3 } from './mesh-builder.js';
 import type { BayPlan } from './building-bays.js';
+import { ROOF_HOUSE } from './building-roof-access.js';
 import { type BuildingEscape, twoStairs, unmetBy, walkLimit, walks } from './building-escape.js';
 
 /** One side of the footprint: its start corner, run direction, outward normal and length. */
@@ -88,6 +89,8 @@ export interface StairAvoid {
   readonly hidden?: StairAvoid['rects'];
   /** Where given, the stair's feet and heads stand in here: a tower's side that opens into the main block. */
   readonly from?: { x0: number; x1: number; z0: number; z1: number };
+  /** What a stair that reaches the roof also keeps out of: the other blocks of a joined plan. */
+  readonly roof?: readonly { x0: number; x1: number; z0: number; z1: number }[];
 }
 /**
  * On a built building: how many of the `interior` part's first triangles are the outer walls' inside faces, which
@@ -118,11 +121,16 @@ export interface Interior {
   doorways: BuildingDoorway[];
   stairs: BuildingStair[];
   escapes: BuildingEscape[];
+  /**
+   * Where a stair reaches the roof: its well in the roof, its footprint with the approach, the point its top flight
+   * arrives at and the axis it runs along.
+   */
+  roofStair?: { well: Rect; whole: Rect; head: [number, number]; along: 'x' | 'z' };
 }
 
 type Parts = Record<BuildingPart, MeshBuilder>;
 /** A floor rectangle in local metres. */
-interface Rect {
+export interface Rect {
   x0: number;
   x1: number;
   z0: number;
@@ -132,7 +140,7 @@ const overlaps = (a: Rect, b: Rect) => a.x0 < b.x1 && a.x1 > b.x0 && a.z0 < b.z1
 const within = (a: Rect, b: Rect, eps = 1e-9) =>
   a.x0 >= b.x0 - eps && a.x1 <= b.x1 + eps && a.z0 >= b.z0 - eps && a.z1 <= b.z1 + eps;
 /** `all` less the hole: up to four rectangles. */
-function without(all: Rect, hole?: Rect): Rect[] {
+export function without(all: Rect, hole?: Rect): Rect[] {
   if (!hole || !overlaps(all, hole)) return [all];
   const x0 = Math.max(all.x0, hole.x0),
     x1 = Math.min(all.x1, hole.x1);
@@ -564,6 +572,8 @@ function placeStair(
   plan: (hall?: Hall) => Floor[],
   keepOut: KeepOut,
   winderFirst: boolean,
+  /** Only the stairs a person walks upright: a framed or a winder one. */
+  framedOnly = false,
 ): { stair: StairPlan; hall?: Hall } | undefined {
   const base = plan(),
     order = roomOrder(base),
@@ -571,11 +581,8 @@ function placeStair(
       [framedShapes(rule, floors), CLEAR],
       [winderShapes(style, rule, floors), CLEAR],
     ];
-  const sets: [StairShape[], Clearance[]][] = [
-    ...(winderFirst ? framed.reverse() : framed),
-    [spiralShapes(style, rule, floors), CLEAR],
-    [ladderShapes(rule, floors), TIGHT],
-  ];
+  const sets: [StairShape[], Clearance[]][] = [...(winderFirst ? framed.reverse() : framed)];
+  if (!framedOnly) sets.push([spiralShapes(style, rule, floors), CLEAR], [ladderShapes(rule, floors), TIGHT]);
   for (const [shapes, clearances] of sets) {
     const stair = planStair(shapes, order, base, clearances, keepOut);
     if (stair) return { stair };
@@ -1072,6 +1079,8 @@ export function buildInterior(
   pitched: boolean,
   avoid?: StairAvoid,
   clear?: KeepClear,
+  /** The walking level of a flat roof the stair is to reach. */
+  roofWalk?: number,
 ): Interior {
   const out: Interior = { curtains: [], rooms: [], furniture: [], doorways: [], stairs: [], escapes: [] };
   const W = o.width,
@@ -1298,23 +1307,45 @@ export function buildInterior(
           );
         });
   const rule = stairRule(o.style, (x1 - x0) * (z1 - z0));
-  let chosen: ReturnType<typeof placeStair>;
-  if (o.interior === 'rooms' && o.stairs && floors.length > 1) {
-    const find = (keepOut: KeepOut) =>
+  // The roof as a floor the stair arrives on: one room inside the walls, with room for the stair house round it.
+  const edge = ROOF_HOUSE.wall + 0.02,
+    roofFloor: Floor = {
+      rooms: [{ x0: x0 + edge, x1: x1 - edge, z0: z0 + edge, z1: z1 - edge }],
+      at: [{ column: 0, row: 0 }],
+      doors: [],
+      openings: [],
+      ways: [],
+      uses: [],
+      keep: [],
+    };
+  let chosen: ReturnType<typeof placeStair>,
+    onRoof = false;
+  if (o.interior === 'rooms' && o.stairs) {
+    const find = (keepOut: KeepOut, roof?: number) =>
       placeStair(
         o.style,
         rule,
-        floors,
+        roof === undefined ? floors : [...floors, roof],
         columns,
         rowLines.length - 1,
-        (hall) => planFloors([], hall),
+        (hall) => (roof === undefined ? planFloors([], hall) : [...planFloors([], hall), roofFloor]),
         keepOut,
         o.stairShape === 'winder',
+        roof !== undefined,
       );
-    chosen =
-      (avoid?.soft?.length ? find({ ...avoid, rects: [...avoid.rects, ...avoid.soft] }) : undefined) ??
-      find(avoid ?? { rects: [] }) ??
-      (avoid?.required ? (find({ rects: [], hidden: avoid.hidden }) ?? find({ rects: [] })) : undefined);
+    const preferred = (roof?: number) =>
+      avoid?.soft?.length ? find({ ...avoid, rects: [...avoid.rects, ...avoid.soft] }, roof) : undefined;
+    if (roofWalk !== undefined) {
+      // Never under another block's walls or roof, even where the plan must have a stair.
+      const keepOut = avoid ?? { rects: [] };
+      chosen = preferred(roofWalk) ?? find({ ...keepOut, rects: [...keepOut.rects, ...(avoid?.roof ?? [])] }, roofWalk);
+      onRoof = !!chosen;
+    }
+    if (!chosen && floors.length > 1)
+      chosen =
+        preferred() ??
+        find(avoid ?? { rects: [] }) ??
+        (avoid?.required ? (find({ rects: [], hidden: avoid.hidden }) ?? find({ rects: [] })) : undefined);
   }
   const walls: Wall[] = [],
     plan = chosen?.stair;
@@ -1337,6 +1368,15 @@ export function buildInterior(
   }
   if (second) assignUses(o, layout, use, plans);
   if (plan) out.escapes = escapesOf(o.style, layout, plans, all, o.escapeStair);
+  if (plan && onRoof) {
+    const top = floors.length - 1;
+    out.roofStair = {
+      well: flightRect(plan, top),
+      whole: planRect(plan.place, -plan.before, plan.length + plan.after, 0, plan.breadth),
+      head: flightEnds(plan, top)[1],
+      along: plan.place.u[0] ? 'x' : 'z',
+    };
+  }
   /** The openings in floor `k`, over the flights that arrive there. */
   const wells = (k: number) => plans.filter((p) => k > 0 && k <= p.flights.length).map((p) => flightRect(p, k - 1));
   // The floors above the first are open over the stairs.
@@ -1372,8 +1412,9 @@ export function buildInterior(
   for (const r of clear ?? []) layout[r.floor]?.keep.push(r);
   for (const plan of plans) {
     // A second stair stops at the highest storey that asks for it.
-    const reached = plan.flights.length + 1;
-    buildStair(parts, plan, floors.slice(0, reached), layout, o.detail);
+    const reached = plan.flights.length + 1,
+      levelsUp = onRoof ? [...floors, roofWalk!] : floors;
+    buildStair(parts, plan, levelsUp.slice(0, reached), onRoof ? [...layout, roofFloor] : layout, o.detail);
     const whole = planRect(plan.place, -plan.before, plan.length + plan.after, 0, plan.breadth);
     for (const f of layout.slice(0, reached)) f.keep.push(whole);
     plan.flights.forEach((flight, k) => {
@@ -1393,6 +1434,7 @@ export function buildInterior(
         guard: plan.rule.guard,
         ...(plan.turn && { winders: { count: plan.turn.count, walk: plan.turn.walk, narrow: plan.turn.narrow } }),
         ...(plan === second && { escape: true }),
+        ...(k === floors.length - 1 && { roof: true }),
       });
     });
   }

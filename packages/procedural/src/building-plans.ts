@@ -32,6 +32,7 @@ import {
   type BuildingRoom,
   type BuildingRuleOptions,
   type BuildingStair,
+  type BuildingRoofAccess,
   type BuildingStyle,
   generateBuilding,
   resolveBuildingOptions,
@@ -129,6 +130,8 @@ export interface PlannedBuilding {
   readonly furniture: readonly BuildingFurniture[];
   readonly doorways: readonly BuildingDoorway[];
   readonly stairs: readonly BuildingStair[];
+  /** The way onto each block's roof that has one to report, in plan-local metres. */
+  readonly roofAccess: readonly BuildingRoofAccess[];
   /** Steps through the joins of blocks whose floors differ, in plan-local metres (`doorways` has their openings). */
   readonly joinSteps: readonly BuildingJoinStep[];
   /** Roof covering height of the whole at plan-local `[x, z]` (NaN off every roof): the upper envelope of the blocks. */
@@ -198,28 +201,32 @@ function planStairs(specs: BlockSpec[], given: readonly BuildingWing[]) {
       ),
     ),
     REACH = 1.8;
-  const keepOut = (j: number, others: number[], required: boolean, enter?: number, near: number[] = []) => {
+  /** Block `i`'s plan, drawn in by `inset`, in block `j`'s own terms. */
+  function local(j: number, i: number, inset: number) {
     const sp = specs[j],
       yaw = (sp.turn * Math.PI) / 2,
       c = Math.round(Math.cos(yaw)),
       s = Math.round(Math.sin(yaw)),
-      local = (x: number, z: number) => {
+      turn = (x: number, z: number) => {
         const dx = x - sp.at[0],
           dz = z - sp.at[2];
         return [dx * c - dz * s, dx * s + dz * c];
       },
-      turned = (i: number, inset: number) => {
-        const r = all[i].rect,
-          a = local(r.x0 + inset, r.z0 + inset),
-          b = local(r.x1 - inset, r.z1 - inset);
-        return {
-          x0: Math.min(a[0], b[0]),
-          x1: Math.max(a[0], b[0]),
-          z0: Math.min(a[1], b[1]),
-          z1: Math.max(a[1], b[1]),
-        };
-      };
+      r = all[i].rect,
+      a = turn(r.x0 + inset, r.z0 + inset),
+      b = turn(r.x1 - inset, r.z1 - inset);
+    return {
+      x0: Math.min(a[0], b[0]),
+      x1: Math.max(a[0], b[0]),
+      z0: Math.min(a[1], b[1]),
+      z1: Math.max(a[1], b[1]),
+    };
+  }
+  const keepOut = (j: number, others: number[], required: boolean, enter?: number, near: number[] = []) => {
+    const sp = specs[j],
+      turned = (i: number, inset: number) => local(j, i, inset);
     const avoid: StairAvoid = {
+      roof: beside(j),
       rects: others.map((i) => turned(i, 0)),
       soft: near.map((i) => turned(i, -REACH)),
       hidden: j > 0 ? near.map((i) => turned(i, 0)) : [],
@@ -229,6 +236,10 @@ function planStairs(specs: BlockSpec[], given: readonly BuildingWing[]) {
     };
     specs[j] = { ...sp, opts: Object.assign({}, sp.opts, { [STAIR_AVOID]: avoid }) };
   };
+  // A stair to the roof stands under no other block it joins: neither under its walls nor against its roof.
+  function beside(j: number) {
+    return [...joined].filter((i) => i !== j).map((i) => local(j, i, 0));
+  }
   if (towers.length || uneven.size) keepOut(0, towers, !towers.length, undefined, [...uneven]);
   // A tower is entered from the main block, so its stair starts on that side.
   for (const j of towers) keepOut(j, [], true, 0, uneven.has(j) ? [0] : []);
@@ -242,6 +253,9 @@ function planStairs(specs: BlockSpec[], given: readonly BuildingWing[]) {
         undefined,
         uneven.has(j) ? [0] : [],
       );
+  // The blocks no rule above gave anything to keep out of still keep a roof stair clear of the others.
+  for (const j of joined)
+    if (joined.size > 1 && !(specs[j].opts as { [STAIR_AVOID]?: StairAvoid })[STAIR_AVOID]) keepOut(j, [], false);
   return { first, joined };
 }
 
@@ -1306,7 +1320,8 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
   const rooms: BuildingRoom[] = [],
     furniture: BuildingFurniture[] = [],
     doorways: BuildingDoorway[] = [],
-    stairs: BuildingStair[] = [];
+    stairs: BuildingStair[] = [],
+    roofAccess: BuildingRoofAccess[] = [];
   blocks.forEach((blk, j) => {
     const b = blk.building;
     if (!b) return;
@@ -1346,15 +1361,29 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
         max: [number, number] = [Math.max(a[0], e[0]), Math.max(a[1], e[1])];
       stairs.push({ ...t, min, max, foot: plan2(t.foot[0], t.foot[1]), head: plan2(t.head[0], t.head[1]) });
     }
-    for (const d of b.doorways) {
+    const turnedDoor = (d: BuildingDoorway): BuildingDoorway => {
       const [x, z] = plan2(d.centre[0], d.centre[2]);
-      if (earlier(j, [x, d.centre[1], z])) continue;
-      doorways.push({
-        ...d,
-        centre: [x, d.centre[1], z],
-        normal: sp.turn % 2 ? (d.normal === 'x' ? 'z' : 'x') : d.normal,
-      });
+      return { ...d, centre: [x, d.centre[1], z], normal: sp.turn % 2 ? (d.normal === 'x' ? 'z' : 'x') : d.normal };
+    };
+    for (const d of b.doorways) {
+      const door = turnedDoor(d);
+      if (!earlier(j, door.centre)) doorways.push(door);
     }
+    const way = b.roofAccess;
+    if (way?.house) {
+      const { min, max, door } = way.house,
+        a = plan2(min[0], min[1]),
+        e = plan2(max[0], max[1]);
+      roofAccess.push({
+        ...way,
+        house: {
+          ...way.house,
+          min: [Math.min(a[0], e[0]), Math.min(a[1], e[1])],
+          max: [Math.max(a[0], e[0]), Math.max(a[1], e[1])],
+          door: turnedDoor(door),
+        },
+      });
+    } else if (way) roofAccess.push(way);
   });
   const infos = blocks.map((blk) => ({
     ...blk.info,
@@ -1376,6 +1405,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
     furniture,
     doorways,
     stairs,
+    roofAccess,
     joinSteps: joins.joinSteps,
     roofHeight(x: number, z: number) {
       let best = -Infinity;

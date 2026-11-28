@@ -128,6 +128,7 @@ export const BUILDING_SETTINGS: readonly BuildingSetting[] = [
   c('stairs', 'detail', onOff, 'Stairs between the storeys of furnished rooms.'),
   c('stairShape', 'detail', ['auto', 'winder'], 'Which stair is tried first: a dog-leg (auto) or a winder stair.'),
   c('escapeStair', 'detail', onOff, 'A second stair where the code asks a storey for two.'),
+  c('roofStair', 'detail', ['auto', 'on', 'off'], 'A stair to a flat roof; auto where the code asks for it.'),
   c('ramps', 'frontage', offOn, 'Ramps at the front doors, and between joined floors where one fits.'),
   c('fixtures', 'detail', onOff, 'Kitchen, bathroom and toilet rooms with their fixtures.'),
   c('softFurnishings', 'detail', onOff, 'Tatami, rugs, curtains, bedding and cushions in homes.'),
@@ -148,6 +149,7 @@ const FLAGS = [
   'brackets',
   'stairs',
   'escapeStair',
+  'roofStair',
   'ramps',
   'fixtures',
   'softFurnishings',
@@ -168,6 +170,7 @@ export function buildingOptionsFromSettings(values: BuildingSettingValues): Buil
     v = values as Record<string, BuildingSettingValue>;
   for (const [name, value] of Object.entries(v)) {
     if ([...PAIRED, 'bayWindow', 'bayWindowSides', 'bayWindowFloors'].includes(name)) continue;
+    if (name === 'roofStair' && value === 'auto') continue;
     out[name] = FLAGS.includes(name) ? value === 'on' : value;
   }
   const set = BUILDING_STYLE_SETS[(v.style as BuildingStyle | undefined) ?? 'japan-2011-house'];

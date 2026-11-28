@@ -41,6 +41,7 @@ export interface Building {
     readonly furniture: readonly BuildingFurniture[];
     readonly stairs: readonly BuildingStair[];
     readonly escapes: readonly BuildingEscape[];
+    readonly roofAccess?: BuildingRoofAccess;
     readonly doorways: readonly BuildingDoorway[];
 }
 
@@ -129,6 +130,18 @@ export type BuildingRidge = 'auto' | 'x' | 'z';
 
 export type BuildingRoof = 'flat' | 'gable' | 'hip' | 'hip-gable' | 'shed';
 
+export interface BuildingRoofAccess {
+    readonly required: boolean;
+    readonly level: number;
+    readonly house?: {
+        readonly min: readonly [number, number];
+        readonly max: readonly [number, number];
+        readonly height: number;
+        readonly door: BuildingDoorway;
+    };
+    readonly unmet?: 'stair-off' | 'pitched' | 'no-room';
+}
+
 export type BuildingRoofing = 'tile' | 'shingle' | 'metal' | 'membrane';
 
 export interface BuildingRoom {
@@ -194,6 +207,7 @@ export interface BuildingRuleOptions {
     readonly stairs?: boolean;
     readonly stairShape?: 'auto' | 'winder';
     readonly escapeStair?: boolean;
+    readonly roofStair?: boolean;
     readonly ramps?: boolean;
     readonly fixtures?: boolean;
     readonly softFurnishings?: boolean;
@@ -205,6 +219,7 @@ export interface BuildingRuleOptions {
 export interface BuildingStair {
     readonly floor: number;
     readonly escape?: boolean;
+    readonly roof?: boolean;
     readonly kind: 'dog-leg' | 'straight' | 'winder' | 'spiral' | 'ladder';
     readonly winders?: {
         readonly count: number;
@@ -246,5 +261,5 @@ type Resolved = Required<Omit<BuildingRuleOptions, 'origin'>> & {
     origin: readonly [number, number, number];
 };
 
-type StyleSet = Omit<Resolved, 'style' | 'origin' | 'yaw' | 'seed' | 'detail' | 'interior' | 'stairs' | 'stairShape' | 'escapeStair' | 'ramps' | 'fixtures' | 'softFurnishings'>;
+type StyleSet = Omit<Resolved, 'style' | 'origin' | 'yaw' | 'seed' | 'detail' | 'interior' | 'stairs' | 'stairShape' | 'escapeStair' | 'roofStair' | 'ramps' | 'fixtures' | 'softFurnishings'>;
 ```

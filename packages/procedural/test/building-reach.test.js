@@ -182,8 +182,8 @@ const STAIR_CODE = {
 
 function check(b, o, label, wrong, kinds) {
   const style = o.style;
-  assert.equal(b.stairs.filter((s) => !s.escape).length, b.floors.length - 1, label);
-  for (const s of b.stairs) {
+  assert.equal(b.stairs.filter((s) => !s.escape && !s.roof).length, b.floors.length - 1, label);
+  for (const s of b.stairs.filter((s) => !s.roof)) {
     kinds[s.kind] = (kinds[s.kind] ?? 0) + 1;
     const storey = b.floors[s.floor + 1] - b.floors[s.floor];
     if (Math.abs(s.risers * s.rise - storey) > 1e-6) wrong.push(`${label}: risers do not climb the storey`);
@@ -359,7 +359,9 @@ test('shallow plans get a second stair hall, and what cannot be given has a code
       if (e.stairs !== 2) wrong.push(`${label}: floor ${e.floor} has one stair (${e.required})`);
     }
     if (second.length)
-      wrong.push(...unreached({ ...b, stairs: [...second, ...b.stairs.filter((s) => !s.escape)] }, `${label} by escape`));
+      wrong.push(
+        ...unreached({ ...b, stairs: [...second, ...b.stairs.filter((s) => !s.escape)] }, `${label} by escape`),
+      );
   }
   assert.deepEqual(wrong.slice(0, 20), [], `${wrong.length} failures`);
   assert.ok(asked > 300, `${asked} storeys asked`);

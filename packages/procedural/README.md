@@ -1054,6 +1054,23 @@ const narrow = generateBuilding({style: 'western-1910-brick', width: 4, depth: 5
 console.log(narrow.escapes[1].stairs, narrow.escapes[1].unmet); // 1 no-room
 ```
 
+A flat roof gets a stair with `roofStair`: one more flight from the top storey, open through the ceiling and the
+covering, a stair house over it with a door onto the roof, and a rail where the parapet is lower than 1.1 m (Japan,
+Enforcement Order art. 126, https://laws.e-gov.go.jp/api/1/articles;lawId=325CO0000000338;article=126). It is on by
+default where the style's code asks for it: a flat-roofed western commercial block of four storeys or more (IBC 1011.12,
+as quoted at https://www.lapeyrestair.com/blog/unoccupied-roof-egress-requirements/). `roofAccess` reports the walking
+level, the house and its doorway, and in `unmet` why there is no stair: `stair-off`, `pitched` or `no-room`. The stair's
+last entry in `stairs` has `roof: true`; a joined plan gives `roofAccess` as a list.
+
+```ts
+import {generateBuilding} from 'margoengine/procedural/building-rules';
+const tall = generateBuilding({style: 'western-1910-brick', storeys: [4.1, 3.5, 3.5, 3.5]});
+console.log(tall.roofAccess!.required, tall.stairs.filter((s) => s.roof).length); // true 1
+console.log(tall.roofAccess!.house!.door.width); // 0.9
+const office = generateBuilding({style: 'japan-2011-concrete', roofStair: true});
+console.log(office.roofAccess!.required, !!office.roofAccess!.house); // false true
+```
+
 `townBuildings(lots, {styles, margin, detail, seed, override})` turns the lots of a settlement layout (the `houses` of
 `layoutSettlements` from `@margoengine/biomes/settlements`, `pattern: 'grid'`) into one building's options each: a style
 drawn by weight, the lot less the margin, the front to its street, the floor on the pad, and seeded variety in storeys,

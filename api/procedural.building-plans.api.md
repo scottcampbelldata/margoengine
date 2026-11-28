@@ -74,6 +74,7 @@ export interface PlannedBuilding {
     readonly furniture: readonly BuildingFurniture[];
     readonly doorways: readonly BuildingDoorway[];
     readonly stairs: readonly BuildingStair[];
+    readonly roofAccess: readonly BuildingRoofAccess[];
     readonly joinSteps: readonly BuildingJoinStep[];
     roofHeight(x: number, z: number): number;
     insideBlock(index: number, x: number, y: number, z: number): boolean;
@@ -148,6 +149,18 @@ type BuildingRidge = 'auto' | 'x' | 'z';
 
 type BuildingRoof = 'flat' | 'gable' | 'hip' | 'hip-gable' | 'shed';
 
+interface BuildingRoofAccess {
+    readonly required: boolean;
+    readonly level: number;
+    readonly house?: {
+        readonly min: readonly [number, number];
+        readonly max: readonly [number, number];
+        readonly height: number;
+        readonly door: BuildingDoorway;
+    };
+    readonly unmet?: 'stair-off' | 'pitched' | 'no-room';
+}
+
 type BuildingRoofing = 'tile' | 'shingle' | 'metal' | 'membrane';
 
 interface BuildingRoom {
@@ -213,6 +226,7 @@ interface BuildingRuleOptions {
     readonly stairs?: boolean;
     readonly stairShape?: 'auto' | 'winder';
     readonly escapeStair?: boolean;
+    readonly roofStair?: boolean;
     readonly ramps?: boolean;
     readonly fixtures?: boolean;
     readonly softFurnishings?: boolean;
@@ -224,6 +238,7 @@ interface BuildingRuleOptions {
 interface BuildingStair {
     readonly floor: number;
     readonly escape?: boolean;
+    readonly roof?: boolean;
     readonly kind: 'dog-leg' | 'straight' | 'winder' | 'spiral' | 'ladder';
     readonly winders?: {
         readonly count: number;

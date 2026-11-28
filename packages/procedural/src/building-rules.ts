@@ -34,6 +34,9 @@ import { MeshBuilder, add, clip, cross, dot, lerp, random, scale, sub, unit, typ
 import {
   RAMP,
   buildInterior,
+  without,
+  type Rect,
+  railing,
   type Hole,
   type Side,
   STAIR_AVOID,
@@ -48,6 +51,8 @@ import { WINDOW_FIT, type WindowFit } from './building-windows.js';
 import { buildBay, placeBays, type BuildingBayFrom, type BuildingBayShape } from './building-bays.js';
 export type { BuildingBayFrom, BuildingBayShape } from './building-bays.js';
 import type { BuildingEscape } from './building-escape.js';
+import { type BuildingRoofAccess, buildStairHouse, roofGuard, roofStairRequired } from './building-roof-access.js';
+export type { BuildingRoofAccess } from './building-roof-access.js';
 export type { BuildingEscape } from './building-escape.js';
 
 /** The style sets. Each is a full set of defaults; any option given overrides it. */
@@ -200,6 +205,12 @@ export interface BuildingRuleOptions {
    */
   readonly escapeStair?: boolean;
   /**
+   * A stair on from the top storey to a flat roof, with a stair house on it and a guard 1.1 m high round the edge.
+   * Default where the style's code asks for it: a flat-roofed western commercial block of four storeys or more
+   * (IBC 1011.12).
+   */
+  readonly roofStair?: boolean;
+  /**
    * Ramps where the rules allow them: at each front door in place of its steps (1 in 12, at most 30 in of rise a run
    * with a 60 in landing between runs, handrails and kerbs), and in a joined plan between floors at most 30 in apart,
    * where a run fits. Default false.
@@ -300,6 +311,8 @@ export interface Building {
   readonly stairs: readonly BuildingStair[];
   /** What each storey over the ground floor asks of its way out and has (furnished buildings with stairs). */
   readonly escapes: readonly BuildingEscape[];
+  /** The way onto the roof: present where the code asks for a stair to it or `roofStair` is set. */
+  readonly roofAccess?: BuildingRoofAccess;
   /** Doorways through partition walls, local metres. */
   readonly doorways: readonly BuildingDoorway[];
 }
@@ -350,6 +363,8 @@ export interface BuildingStair {
   readonly floor: number;
   /** True for the flights of a second, escape stair. */
   readonly escape?: boolean;
+  /** True for the flight that arrives on the roof, from the top storey. */
+  readonly roof?: boolean;
   readonly kind: 'dog-leg' | 'straight' | 'winder' | 'spiral' | 'ladder';
   /** A winder stair's turn: its treads, and their depth on the walking line and at the well. */
   readonly winders?: { readonly count: number; readonly walk: number; readonly narrow: number };
@@ -398,6 +413,7 @@ type StyleSet = Omit<
   | 'stairs'
   | 'stairShape'
   | 'escapeStair'
+  | 'roofStair'
   | 'ramps'
   | 'fixtures'
   | 'softFurnishings'
@@ -828,6 +844,12 @@ export function resolveBuildingOptions(options: BuildingRuleOptions = {}): Resol
     stairs: bool(o, 'stairs', true),
     stairShape: pick(o, 'stairShape', ['auto', 'winder'], 'auto'),
     escapeStair: bool(o, 'escapeStair', true),
+    roofStair: bool(
+      o,
+      'roofStair',
+      pick(o, 'roof', ['flat', 'gable', 'hip', 'hip-gable', 'shed'], s.roof) === 'flat' &&
+        roofStairRequired(style, storeys.length, true, 0),
+    ),
     ramps: bool(o, 'ramps', false),
     fixtures: bool(o, 'fixtures', true),
     softFurnishings: bool(o, 'softFurnishings', true),
@@ -1180,8 +1202,9 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
 
   // Only the walls have put faces in the interior part so far.
   const lining = parts.interior.triangles;
-  if (flat) parts.roof.box([0, eaves - 0.1, 0], [W / 2 - th, 0.1, D / 2 - th]);
-  const { curtains, ...inside } = buildInterior(
+  // The walking surface of a flat roof, over the covering.
+  const roofLevel = eaves + (o.parapet > 0 ? 0.04 : ROOFING[o.roofing].thickness);
+  const { curtains, roofStair, ...inside } = buildInterior(
     parts,
     o,
     sides,
@@ -1191,7 +1214,10 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
     !flat,
     (options as { [STAIR_AVOID]?: StairAvoid })[STAIR_AVOID],
     (options as { [KEEP_CLEAR]?: KeepClear })[KEEP_CLEAR],
+    flat && o.roofStair ? roofLevel : undefined,
   );
+  // The ceiling under a flat roof, open over a stair that reaches it.
+  if (flat) slabs(parts.roof, W / 2 - th, D / 2 - th, eaves - 0.2, eaves, roofStair?.well);
   // Base: the foundation from below the ground to the floor, slightly proud of the walls: a ring under the walls and,
   // inside it, a fill that stops under the ground floor's slab, so no face of it shares the floor's plane.
   const ix = W / 2 - th,
@@ -1205,7 +1231,7 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
   foot(-ix, ix, -iz, iz, o.plinth - 0.2);
 
   // Roof.
-  const roof = buildRoof(parts, o, eaves, near, far, ([x, y, z]) =>
+  const roof = buildRoof(parts, o, eaves, near, far, roofStair?.well, ([x, y, z]) =>
     holes.some((h) => {
       if (!h.bay || h.bay.top + 0.12 <= y) return false;
       const s = sides[h.side],
@@ -1292,6 +1318,43 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
         s.out,
       );
 
+  // The stair house over the roof stair, and the guard round the roof it makes walkable.
+  const required = roofStairRequired(o.style, floors.length, flat, o.pitch);
+  let roofAccess: BuildingRoofAccess | undefined;
+  if (roofStair) {
+    const house = buildStairHouse(
+      parts.walls,
+      parts.roof,
+      parts.doors,
+      roofStair.whole,
+      roofStair.head,
+      roofStair.along,
+      roofLevel,
+      floors.length,
+    );
+    top = Math.max(top, roofLevel + house.height);
+    roofGuard(
+      // A low rail over a parapet takes posts alone; a tall one is filled.
+      (a, b, height) => railing(parts.metalwork, a, b, height, !far && height > 0.3),
+      [W / 2 - th / 2, D / 2 - th / 2],
+      o.parapet > 0 ? wallTop + (far ? 0 : 0.08) : roofLevel,
+      roofLevel,
+    );
+    roofAccess = { required, level: roofLevel, house };
+  } else if (required || o.roofStair)
+    roofAccess = {
+      required,
+      level: roofLevel,
+      unmet:
+        !o.roofStair && flat
+          ? 'stair-off'
+          : !flat
+            ? 'pitched'
+            : !o.stairs || o.interior !== 'rooms'
+              ? 'stair-off'
+              : 'no-room',
+    };
+
   // Porch, stoops, balcony, awning.
   const steps: { rise: number; tread: number; count: number }[] = [],
     railings: number[] = [],
@@ -1348,6 +1411,7 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
       }),
     })),
     roofHeight: roof.height,
+    ...(roofAccess && { roofAccess }),
     chimney,
     steps,
     railings,
@@ -1531,12 +1595,22 @@ interface RoofResult {
   frontFill(): void;
   otherFills(): void;
 }
+/** A level slab `x` and `z` to either side of the middle, from `y0` to `y1`, open over `well`. */
+function slabs(b: MeshBuilder, x: number, z: number, y0: number, y1: number, well?: Rect): void {
+  const half = (y1 - y0) / 2;
+  if (!well) return b.box([0, y0 + half, 0], [x, half, z]);
+  for (const r of without({ x0: -x, x1: x, z0: -z, z1: z }, well))
+    b.box([(r.x0 + r.x1) / 2, y0 + half, (r.z0 + r.z1) / 2], [(r.x1 - r.x0) / 2, half, (r.z1 - r.z0) / 2]);
+}
+
 function buildRoof(
   parts: Record<BuildingPart, MeshBuilder>,
   o: Resolved,
   eaves: number,
   near: boolean,
   far: boolean,
+  /** The opening of a roof stair in a flat roof. */
+  well: Rect | undefined,
   /** Whether a bay window stands where a knee brace would foot. */
   taken: (p: V3) => boolean,
 ): RoofResult {
@@ -1548,8 +1622,8 @@ function buildRoof(
     // The slab sits at the eaves; with no parapet it overhangs as a canopy.
     const ov = o.parapet > 0 ? 0 : o.overhang,
       tt = spec.thickness;
-    if (o.parapet === 0) parts.roof.box([0, eaves + tt / 2, 0], [W / 2 + ov, tt / 2, D / 2 + ov]);
-    else parts.roof.box([0, eaves + 0.02, 0], [W / 2 - th, 0.02, D / 2 - th]);
+    if (o.parapet === 0) slabs(parts.roof, W / 2 + ov, D / 2 + ov, eaves, eaves + tt, well);
+    else slabs(parts.roof, W / 2 - th, D / 2 - th, eaves, eaves + 0.04, well);
     const h = eaves + (o.parapet === 0 ? tt : 0.04);
     return {
       top: h,
