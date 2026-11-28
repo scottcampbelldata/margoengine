@@ -11,18 +11,17 @@ const describe=(side,index)=>{
   return side.contacts>0?'At divider':'Approaching';
 };
 
-export async function show({engine,physics,canvas,notice,status,signal,size,fail}){
+export async function show({bench,physics,canvas,notice,status,signal,fail,onResize}){
   const qs=id=>document.querySelector('#'+id);
   const run=qs('run'),replay=qs('replay'),steps=qs('samples');
   const state=canvas.dataset;
-  const compat=engine.backend==='webgl2';
-  const stage=buildStation(engine);
-  engine.scene.background='#25333b';
-  engine.lighting.direction.set([-2.6,7.6,4.1,3.2]);
-  engine.lighting.radiance.set([1.0,.93,.81,.46]);
-  engine.lighting.ambient.set([.78,.91,1.0]);
+  const engine=bench.engine,compat=bench.renderer==='compatibility';
+  const stage=buildStation(engine,mesh=>bench.add(mesh));
   qs('route').textContent=compat?'Margo WebGL2':'Margo WebGPU';
-  state.renderer=compat?'compatibility':'webgpu';
+  const draw=async()=>{
+    await bench.render(0);
+    if(engine.gpu)await engine.gpu.queue.onSubmittedWorkDone();
+  };
   let trace={discrete:opening,continuous:opening},busy=false,first=true;
   let timer,requestId=0,runCount=0;
 
@@ -59,8 +58,7 @@ export async function show({engine,physics,canvas,notice,status,signal,size,fail
   async function present(i,mark){
     const id=++requestId;
     stage.set(trace,i);
-    engine.render(0);
-    if(engine.gpu)await engine.gpu.queue.onSubmittedWorkDone();
+    await draw();
     await afterFrame();
     if(id!==requestId||signal.aborted)return;
     record(i);
@@ -71,8 +69,7 @@ export async function show({engine,physics,canvas,notice,status,signal,size,fail
   }
 
   fit();
-  engine.render(0);
-  if(engine.gpu)await engine.gpu.queue.onSubmittedWorkDone();
+  await draw();
   signal.throwIfAborted();
   record(0);
   status.ready(engine);
@@ -123,10 +120,6 @@ export async function show({engine,physics,canvas,notice,status,signal,size,fail
     stopReplay();
     present(Number(steps.value),event.isTrusted).catch(fail);
   },{signal});
-  const observer=new ResizeObserver(()=>{
-    if(signal.aborted||!size())return;
-    fit();engine.render(0);
-  });
-  observer.observe(canvas);
-  signal.addEventListener('abort',()=>{observer.disconnect();clearTimeout(timer);},{once:true});
+  onResize(()=>{if(!signal.aborted){fit();bench.request();}});
+  signal.addEventListener('abort',()=>clearTimeout(timer),{once:true});
 }

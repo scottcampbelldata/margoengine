@@ -3,7 +3,6 @@ import {toGeometry} from '@margoengine/geometry';
 import {roundedBoxGeometry} from '@margoengine/geometry/extras';
 import {cylinderGeometry} from '@margoengine/geometry/primitives';
 import {divider,laneGap,openingPose,sampleLimit,testBlock} from './experiment.js';
-import {caster} from './cast-shadows.js';
 
 const material=(color,roughness=.58,metalness=0)=>new PbrMaterial({color,roughness,metalness,doubleSided:false});
 const M={
@@ -21,11 +20,13 @@ const basePort=toGeometry(roundedBoxGeometry(7.09,.032,3.19,3,.014));
 const ceramic=box(...testBlock.map(x=>x*2));
 const flag=box(divider[0]*2,divider[1]*2,divider[2]*2);
 
-function mesh(engine,geometry,finish,at,scale=[1,1,1],parent){
-  return engine.createMesh(parent).setGeometry(geometry).setMaterial(finish).setPosition(at).setScale(scale);
-}
-export function buildStation(engine){
-  const put=(shape,finish,at,scale,parent)=>mesh(engine,shape,finish,at,scale,parent);
+// Every part goes to the bench, which casts its shadow from the sun.
+export function buildStation(engine,add){
+  const put=(shape,finish,at,scale=[1,1,1],parent)=>{
+    const part=engine.createMesh(parent).setGeometry(shape).setMaterial(finish).setPosition(at).setScale(scale);
+    add(part);
+    return part;
+  };
   const bar=(finish,at,scale,parent)=>put(block,finish,at,scale,parent);
   const rod=(finish,at,scale,parent)=>put(dowel,finish,at,scale,parent);
 
@@ -34,7 +35,6 @@ export function buildStation(engine){
     put(rim,M.shadow,[x,-.386,z],[.101,1,.153]);
     rod(M.tungsten,[x,-.323,z],[.154,.132,.154]);
   }
-  caster(engine,[3.61,.192,1.68],'26323a',-.431,undefined,true)([0,-.139,0]);
   put(tray,M.lower,[0,-.184,0]);
   put(rim,M.anodised,[0,-.056,0]);
   put(basePort,M.panel,[0,.002,0]);
@@ -66,10 +66,6 @@ export function buildStation(engine){
       bar(M.anodised,[x,.048,lane],[.018,.010,1.15]);
     }
     put(flag,M.ivory,[0,.44,lane]);
-    const limit=[lane-.707,lane+.707];
-    const shade=sign>0?'335c66':'664c31';
-    caster(engine,divider,shade,.039,limit)([0,.44,lane]);
-    const blockShadow=caster(engine,testBlock,shade,.0414,limit);
     for(const side of [-1,1]){
       const z=lane+side*.558;
       bar(M.charcoal,[0,.075,z],[.214,.085,.169]);
@@ -85,14 +81,13 @@ export function buildStation(engine){
     const dots=Array.from({length:sampleLimit},()=>rod(tint,[0,.059,lane],[.065,.017,.065]));
     const segments=Array.from({length:sampleLimit},()=>bar(tint,[0,.049,lane],[.12,.006,.013]));
     const step=rod(M.ivory,[0,.060,lane],[.102,.017,.102]);
-    lanes.push({lane,body,dots,segments,step,blockShadow});
+    lanes.push({lane,body,dots,segments,step});
   }
 
   function pose(lane,samples,index){
     const sample=samples[index];
     const [x,y,z]=sample.position;
     lane.body.setPosition([x,y,z+lane.lane]).setQuaternion(sample.rotation);
-    lane.blockShadow([x,y,z+lane.lane],sample.rotation);
     lane.step.setPosition([x,.059,z+lane.lane]);
     for(let i=0;i<sampleLimit;i++){
       const seen=i<index;
