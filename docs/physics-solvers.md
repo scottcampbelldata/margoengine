@@ -127,7 +127,7 @@ The first column is the ID. Paths are relative to `packages/`. The last column l
 | FLUID-06 | Viscoplastic fluids at small scale | Mud, honey, paint, wet concrete: Bingham and Herschel-Bulkley | `@margoengine/physics/viscoplastic` | Finite-strain 3D APIC, implicit shear return and solvent diffusion, live terrain and replayable inlet. Scene binding and entrainment remain in PA-60. | Ram et al., "A material point method for viscoelastic fluids, foams and sponges" (2015). Huang and Garcia (1998). | K12 K15 K24 |
 | FLUID-07 | Thin films and droplets on surfaces | Rain on glass, wet surfaces, drips, puddle filling | `@margoengine/physics/thin-film` | Conservative lubrication, advancing and receding wetting angles, moving receivers, rain impulses and WakeSolver pressure coupling, timed sill release, transient drop flight and render-ready surface geometry | Oron, Davis and Bankoff, "Long-scale evolution of thin liquid films" (1997). Wang, Mucha and Turk, "Water drops on surfaces" (2005). Mori (1990). Beard (1976), Wang and Pruppacher (1977). | K12 K13 |
 
-### Family HYDRO: rivers, floods and hydrology (6)
+### Family HYDRO: rivers, floods and hydrology (7)
 
 | ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
 |---|---|---|---|---|---|---|
@@ -137,6 +137,7 @@ The first column is the ID. Paths are relative to `packages/`. The last column l
 | HYDRO-04 | Landscape evolution | Multidirectional runoff, implicit stream-power incision, uplift, hillslope diffusion and thermal transport | @margoengine/physics/landscape; @margoengine/biomes/landscape | Physical time, sediment classes, shear thresholds and shared TerrainBed changes (PA-39) | Braun and Willett (2013). Cordonnier et al. (2016, 2017). Schott et al. (2023). | K12 K21 |
 | HYDRO-05 | Dam and levee breach | Overtopping and piping, breach hydrograph, embankment erosion | scenes/src/fauld-blast.ts (constant-discharge source) | stand-in: PA-19, 60 | Froehlich (1995). Visser (1998). | K14 K21 |
 | HYDRO-06 | Groundwater and springs | Unconfined Darcy flow, water table, spring drainage and surface seepage | @margoengine/physics/groundwater | Conservative aquifer storage and registry coupling to recharge and shallow water | Richards (1931). Harbaugh, MODFLOW-2005 (2005). Rupp and Selker (2006). | K12 |
+| HYDRO-07 | Pipe flow, hydraulic structures and hydraulic machines | Closed-conduit flow with Darcy-Weisbach losses (Colebrook, Haaland or Churchill friction), orifices and tank equalisation, Venturi meters, siphons and their vapour limit, steady pipe networks with reservoirs, valves and pumps, lumped water hammer and the hydraulic ram, Pelton jet impulse, hinged bellows displacement, open-channel jumps, critical and normal depth; confined Darcy and Hele-Shaw cells | `@margoengine/physics/hydraulics`; the confined cell solve in `@margoengine/physics/groundwater` | BUILDING (2026-11-27): eight web demos carried hand-written models | Colebrook (1939). Haaland (1983). Churchill (1977). Todini and Pilati (1988). Joukowsky (1898), Wylie and Streeter (1993). Belanger (1828), Hager, Bremen and Kawagoshi (1990). ISO 5167-4 (2003). Hele-Shaw (1898). | K12 K18 |
 
 ### Family ATMO: atmosphere and weather (10)
 
@@ -230,7 +231,7 @@ The first column is the ID. Paths are relative to `packages/`. The last column l
 | AERO | Aerodynamics and flight | 5 |
 | SEA | Ocean, ships and marine | 15 |
 | FLUID | General fluid solvers | 7 |
-| HYDRO | Rivers, floods and hydrology | 6 |
+| HYDRO | Rivers, floods and hydrology | 7 |
 | ATMO | Atmosphere and weather | 10 |
 | EARTH | Granular, terrain and solid earth | 10 |
 | ICE | Cryosphere | 5 |
@@ -238,7 +239,7 @@ The first column is the ID. Paths are relative to `packages/`. The last column l
 | SOUND | Acoustics | 5 |
 | BIO | Vegetation and ecosystems | 4 |
 | SPACE | Orbital and celestial | 3 |
-| **Total** | | **103** |
+| **Total** | | **104** |
 
 ### 2b. Kernel list
 
@@ -425,7 +426,7 @@ In the "Direction" column, "one-way" is written A→B. Everything not listed is 
 
 ## 4. State, order and owners
 
-**State across the 103.**
+**State across the 104.**
 - Sound: DYN-01, DYN-02, DYN-04 (road vehicles), HYDRO-01 (the flood core) and the SGP4 part of SPACE-01.
 - Partial: about 25. The deterministic analytic models in weather, vfx and sky count here: avalanche, eruption,
   lava, thermal, fire front, hurricane and tornado, snow drift and fuel moisture.

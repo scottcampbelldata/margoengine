@@ -1,6 +1,6 @@
 # Physics work queue
 
-Who builds which of the 103 solvers in [physics-solvers.md](physics-solvers.md), so that two agents never build the
+Who builds which of the 104 solvers in [physics-solvers.md](physics-solvers.md), so that two agents never build the
 same one. Every solver is built on the framework in [physics-framework.md](physics-framework.md) and is judged
 against the problems in [physics-demo-review.md](physics-demo-review.md). Read all three, and
 [AGENTS.md](../AGENTS.md), before starting.
@@ -380,7 +380,7 @@ lane B.
 
 The physics engine is the whole job. It is built in two stages:
 
-1. **Now:** the 103 physics solvers in `docs/physics-solvers.md`, each to its row in `docs/physics-parity-bar.md` (see "The standard" above).
+1. **Now:** the 104 physics solvers in `docs/physics-solvers.md`, each to its row in `docs/physics-parity-bar.md` (see "The standard" above).
 2. **After the solvers are done:** the rest of the physics engine. That means parity rows that are not solver
    capabilities, physics tooling (replay debugger, profiler, shape cache), rollback and snapshot sync, and the
    internal refactors.
@@ -550,4 +550,5 @@ KB2161 (docs/known-bugs.md, "A chain laid out level under a 1000:1 end mass stre
 | SEA-15 | Tracers and slicks in water | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 336a4413c4 |
 | FLUID-03 | FLIP and APIC grid-particle liquids | `physics/flip`: APIC liquid box on the world, held to the sea at its open sides (waves in, water out to the wake), solid slip, aeration and spray for SEA-13, 2-D and 3-D dam breaks | Claude (laptop), on Scott's order, 2026-11-27 | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), built 290aba7e2, 2232ca7c4, 4e2e6f26d, 4ec0717e8, 0dddec890, dbe79b009, efd218e88, e998f2989, 815e0fc77; short of the standard on the Wasm port, two-way wave passage, KB-FLIP-CREST1 and the MARIN validation; P13 GPU path (`GPULiquid`, `@margoengine/water/liquid`) landed 2026-11-27 |
 | HYDRO-01 | Conservative shallow water | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 9a189c4eb |
+| HYDRO-07 | Pipe flow, hydraulic structures and hydraulic machines | none: eight web demos carried their own models | Claude (hydraulics lane), on Scott's order, 2026-11-27 | BUILDING (worktree-agent-a99fc1f5ec2ec867c) |
 | ATMO-04 | Precipitation microphysics | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed acbc53c7e |

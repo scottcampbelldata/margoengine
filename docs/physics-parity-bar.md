@@ -460,6 +460,7 @@ forces (both), spatial audio (Babylon), N-body gravity (three.js protoplanet).
 | HYDRO-04 | Landscape evolution | none | Base | REOPENED | MEETS |
 | HYDRO-05 | Dam and levee breach | none | Base | CLAIMED (Fauld film) | MEETS |
 | HYDRO-06 | Groundwater | none | Base | REOPENED | MEETS |
+| HYDRO-07 | Pipe flow and hydraulic machines | none | Base | BUILDING | MEETS |
 
 ### Weather and air
 
