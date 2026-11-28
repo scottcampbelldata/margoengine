@@ -140,6 +140,21 @@ solveFABRIK(points, [1, 1, 0], { pole: [2, 0, 0], iterations: 32, tolerance: 1e-
 
 Unreachable targets straighten the chain toward them (`reached` false, `distance` the gap). A straight chain starts bending toward the pole (or, with none, a fixed side).
 
+`keepBend` (default `true`) keeps an elbow or knee that is already bent more than 2 degrees on the side it is bent to, so a pole on the far side cannot fold it backward: the joint goes to the nearest place on its own side instead, with both bone lengths kept. Pass `keepBend: false` to let the pole fold a joint either way:
+
+```ts
+import { solvePoseIK } from 'margoengine/rigging/ik';
+
+const parents = [-1, 0, 1];
+const local = new Float64Array([
+  0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
+  0, -0.3, 0, -0.0998, 0, 0, 0.995, 1, 1, 1, // the forearm starts bent forward
+  0, -0.28, 0, 0, 0, 0, 1, 1, 1, 1,
+]);
+const result = solvePoseIK({ parents, local }, { joints: [0, 1, 2], target: [0, -0.5, 0], pole: [0, -0.3, 1] });
+console.log(result.reached); // the elbow stays behind although the pole is in front
+```
+
 **With `@margoengine/kinematics-constraints`.** `elbowEvaluator(upperLength, lowerLength, pole)` is the `ElbowEvaluator` an `AvoidanceSolver` needs: the elbow of a two-bone arm reaching from the shoulder to the target, turned `poleAngle` about the shoulder-target line from the pole's side. The solver then searches that angle for an elbow that clears the body's capsules and spheres:
 
 ```ts

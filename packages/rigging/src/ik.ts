@@ -257,6 +257,12 @@ export interface IKChain extends FABRIKOptions {
   target: Vec3;
   /** Blend from the current pose (0) to the solved chain (1); default 1. */
   weight?: number;
+  /**
+   * Keep each bent inner joint (an elbow or knee bent more than 2 degrees in the pose being solved) on its own side:
+   * when the pole would fold it the other way, it goes to the nearest allowed side instead, square to its bend
+   * (default true). A straight inner joint follows the pole as before. False lets the pole fold any joint either way.
+   */
+  keepBend?: boolean;
 }
 
 /**
@@ -324,8 +330,10 @@ export function solvePoseIK(pose: IKPose, chain: IKChain): FABRIKResult {
     points = new Float64Array(joints.length * 3);
   frames.forEach((frame, i) => points.set(frame.position, i * 3));
   const before = points.slice(),
-    result = solveFABRIK(points, chain.target, chain),
-    rotations = chainRotations(
+    bends = chain.keepBend === false ? null : bendSides(before, joints.length),
+    result = solveFABRIK(points, chain.target, chain);
+  if (bends) keepBendSides(points, bends);
+  const rotations = chainRotations(
       before,
       points,
       frames.map((f) => f.rotation),
@@ -368,6 +376,91 @@ function checkChain(
   const weight = chain.weight ?? 1;
   if (!(weight >= 0 && weight <= 1)) throw new RangeError('IK weight must be from 0 to 1');
   return joints;
+}
+
+/** Smallest bend (sine of the angle between a joint's two bones' line and its first bone) that sets a bend side. */
+const BEND_SIDE_MIN = Math.sin((2 * Math.PI) / 180);
+
+/**
+ * The bend side of each inner joint of the chain as posed (`points`, xyz per joint): the unit offset of the joint from
+ * the line through its two neighbours, or null where the joint is near straight. These are world directions; the
+ * chain's parent does not move during a solve, so they hold for the solved chain too.
+ */
+function bendSides(points: Float64Array, n: number): (number[] | null)[] {
+  const sides: (number[] | null)[] = [];
+  for (let i = 1; i < n - 1; i++) {
+    const a = (i - 1) * 3,
+      j = i * 3,
+      b = (i + 1) * 3,
+      u = [points[b] - points[a], points[b + 1] - points[a + 1], points[b + 2] - points[a + 2]],
+      v = [points[j] - points[a], points[j + 1] - points[a + 1], points[j + 2] - points[a + 2]],
+      ul = Math.hypot(u[0], u[1], u[2]),
+      vl = Math.hypot(v[0], v[1], v[2]);
+    if (!(ul > 0 && vl > 0)) {
+      sides.push(null);
+      continue;
+    }
+    const along = (v[0] * u[0] + v[1] * u[1] + v[2] * u[2]) / (ul * ul),
+      off = [v[0] - u[0] * along, v[1] - u[1] * along, v[2] - u[2] * along],
+      ol = Math.hypot(off[0], off[1], off[2]);
+    sides.push(ol > BEND_SIDE_MIN * vl ? [off[0] / ol, off[1] / ol, off[2] / ol] : null);
+  }
+  return sides;
+}
+
+/**
+ * Moves each inner joint that the solve folded to the far side of its posed bend (`sides`, from {@link bendSides})
+ * to the nearest allowed place: its offset from the line through its neighbours loses the part that points away from
+ * the posed side, keeping its distance from the line, so both bone lengths and both neighbours stay put. A hinge
+ * turned a quarter turn about its limb is the most a shoulder or hip allows (shoulder internal rotation about 70 and
+ * external about 90 degrees, hip about 45 each way; Greene and Heckman, The Clinical Measurement of Joint Motion,
+ * AAOS 1994), and FABRIK keeps a joint inside its allowed region by moving it to the closest allowed position
+ * (Aristidou and Lasenby 2011, section 4; Aristidou, Chrysanthou and Lasenby, Extending FABRIK with model
+ * constraints, Computer Animation and Virtual Worlds 27(1), 2016).
+ */
+function keepBendSides(points: Float64Array, sides: readonly (number[] | null)[]): void {
+  for (let i = 1; i <= sides.length; i++) {
+    const side = sides[i - 1];
+    if (!side) continue;
+    const a = (i - 1) * 3,
+      j = i * 3,
+      b = (i + 1) * 3,
+      ax = points[b] - points[a],
+      ay = points[b + 1] - points[a + 1],
+      az = points[b + 2] - points[a + 2],
+      length = Math.hypot(ax, ay, az);
+    if (!(length > 0)) continue;
+    const ux = ax / length,
+      uy = ay / length,
+      uz = az / length,
+      jx = points[j] - points[a],
+      jy = points[j + 1] - points[a + 1],
+      jz = points[j + 2] - points[a + 2],
+      along = jx * ux + jy * uy + jz * uz,
+      px = jx - ux * along,
+      py = jy - uy * along,
+      pz = jz - uz * along,
+      radius = Math.hypot(px, py, pz);
+    // The posed side, square to the solved line.
+    const sAlong = side[0] * ux + side[1] * uy + side[2] * uz;
+    let sx = side[0] - ux * sAlong,
+      sy = side[1] - uy * sAlong,
+      sz = side[2] - uz * sAlong;
+    const sl = Math.hypot(sx, sy, sz);
+    if (!(sl > 1e-9) || !(radius > 0)) continue;
+    (sx /= sl), (sy /= sl), (sz /= sl);
+    const toward = px * sx + py * sy + pz * sz;
+    if (toward >= 0) continue;
+    let qx = px - sx * toward,
+      qy = py - sy * toward,
+      qz = pz - sz * toward;
+    const ql = Math.hypot(qx, qy, qz);
+    if (ql > radius * 1e-6) (qx *= radius / ql), (qy *= radius / ql), (qz *= radius / ql);
+    else (qx = sx * radius), (qy = sy * radius), (qz = sz * radius); // folded straight back: take the posed side
+    points[j] = points[a] + ux * along + qx;
+    points[j + 1] = points[a + 1] + uy * along + qy;
+    points[j + 2] = points[a + 2] + uz * along + qz;
+  }
 }
 
 /**

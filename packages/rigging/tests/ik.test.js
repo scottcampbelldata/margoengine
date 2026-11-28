@@ -210,3 +210,60 @@ test('solvePoseIK takes a scale a little off uniform, as exported rigs have, and
   local[17] = -1;
   assert.throws(() => solvePoseIK({ parents, local }, { joints: [1, 2, 3], target }), /positive scales/);
 });
+
+test('a bent elbow stays on its own side when the pole points the other way (planner idle arm)', () => {
+  // Shoulder at the origin, upper arm down -y, forearm bent 40 degrees forward (+z) at rest: the elbow sits behind the
+  // shoulder-hand line. The pole is out and forward, which used to fold the elbow forward and the forearm backward.
+  const half = (-40 * Math.PI) / 360,
+    bones = () => [
+      { name: 'chest', parent: -1 },
+      { name: 'arm', parent: 0, translation: [0.18, 1.3, 0] },
+      { name: 'forearm', parent: 1, translation: [0, -0.25, 0], rotation: [Math.sin(half), 0, 0, Math.cos(half)] },
+      { name: 'hand', parent: 2, translation: [0, -0.24, 0] },
+    ],
+    at = (skeleton, i) => Array.from(skeleton.matrices.subarray(i * 16 + 12, i * 16 + 15)),
+    chain = { joints: ['arm', 'forearm', 'hand'], target: [0.18, 0.95, -0.05], pole: [0.4, 1.0, 0.6] };
+  /** The elbow's offset from the shoulder-hand line, unit length. */
+  const offset = (s, e, w) => {
+    const u = w.map((v, k) => v - s[k]),
+      j = e.map((v, k) => v - s[k]),
+      t = (j[0] * u[0] + j[1] * u[1] + j[2] * u[2]) / (u[0] ** 2 + u[1] ** 2 + u[2] ** 2),
+      o = j.map((v, k) => v - u[k] * t);
+    return { o, u };
+  };
+  const rest = new Skeleton(bones()),
+    restSide = offset(at(rest, 1), at(rest, 2), at(rest, 3)).o;
+  /** How far the elbow sits toward its rest side (square to the solved line): negative is a backward-bent elbow. */
+  const flexion = (skeleton) => {
+    const s = at(skeleton, 1),
+      e = at(skeleton, 2),
+      w = at(skeleton, 3),
+      { o, u } = offset(s, e, w),
+      k = (restSide[0] * u[0] + restSide[1] * u[1] + restSide[2] * u[2]) / (u[0] ** 2 + u[1] ** 2 + u[2] ** 2),
+      side = restSide.map((v, c) => v - u[c] * k),
+      n = Math.hypot(...side);
+    return {
+      forward: (o[0] * side[0] + o[1] * side[1] + o[2] * side[2]) / n,
+      upper: distance(s, e),
+      lower: distance(e, w),
+      hand: w,
+    };
+  };
+  const free = new Skeleton(bones());
+  solveSkeletonIK(free, { ...chain, keepBend: false });
+  assert.ok(flexion(free).forward < -0.05, 'without keepBend the pole folds the forearm backward');
+  const kept = new Skeleton(bones()),
+    result = solveSkeletonIK(kept, chain),
+    f = flexion(kept);
+  assert.ok(result.reached, `stopped ${result.distance} away`);
+  assert.ok(distance(f.hand, chain.target) <= 1e-4);
+  assert.ok(f.forward >= -1e-9, `the forearm flexes forward or square, not backward: ${f.forward}`);
+  assert.ok(Math.abs(f.upper - 0.25) < 1e-9 && Math.abs(f.lower - 0.24) < 1e-9, 'bone lengths kept');
+  // A pole on the elbow's own side changes nothing.
+  const own = new Skeleton(bones()),
+    same = new Skeleton(bones()),
+    behind = { ...chain, pole: [0.5, 1.0, -0.6] };
+  solveSkeletonIK(own, behind);
+  solveSkeletonIK(same, { ...behind, keepBend: false });
+  for (let b = 0; b < 4; b++) assert.ok(distance(at(own, b), at(same, b)) < 1e-12);
+});

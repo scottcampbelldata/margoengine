@@ -30,6 +30,7 @@ export interface IKChain extends FABRIKOptions {
     joints: readonly number[];
     target: Vec3;
     weight?: number;
+    keepBend?: boolean;
 }
 
 export interface IKPose {
